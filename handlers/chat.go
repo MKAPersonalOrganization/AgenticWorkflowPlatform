@@ -9,6 +9,7 @@ import (
 
 	"school-with-ai/internal/agui"
 	"school-with-ai/internal/session"
+	"school-with-ai/internal/tools"
 	openaiservice "school-with-ai/services/openai"
 )
 
@@ -89,9 +90,12 @@ func HandleSendMessage(store *session.Store, aiClient *openaiservice.Client) htt
 		// Create streaming handler
 		streamHandler := openaiservice.NewStreamHandler(aiClient, store, w, flusher)
 
+		// Get available tools
+		availableTools := tools.GetAllTools()
+
 		// Handle OpenAI streaming
 		ctx := context.Background()
-		if err := streamHandler.HandleStream(ctx, threadID, messageID, messages); err != nil {
+		if err := streamHandler.HandleStream(ctx, threadID, messageID, messages, availableTools); err != nil {
 			// Emit RUN_ERROR event on failure
 			errorEvent := &agui.RunErrorEvent{
 				Type:      "RUN_ERROR",
@@ -103,6 +107,36 @@ func HandleSendMessage(store *session.Store, aiClient *openaiservice.Client) htt
 			agui.WriteSSEEvent(w, errorEvent)
 			flusher.Flush()
 			return
+		}
+
+		// Check if tool calls were made and continue conversation
+		updatedMessages := store.GetMessages(threadID)
+		hasToolCalls := false
+		for _, msg := range updatedMessages {
+			if msg.Role == "assistant" && len(msg.ToolCalls) > 0 {
+				hasToolCalls = true
+				break
+			}
+		}
+
+		// If tool calls were made, continue conversation with results
+		if hasToolCalls {
+			// Generate new message ID for final response
+			finalMessageID := agui.GenerateMessageID()
+
+			// Call OpenAI again with tool results in conversation
+			if err := streamHandler.HandleStream(ctx, threadID, finalMessageID, updatedMessages, availableTools); err != nil {
+				errorEvent := &agui.RunErrorEvent{
+					Type:      "RUN_ERROR",
+					RunID:     runID,
+					Code:      "OPENAI_ERROR",
+					Message:   err.Error(),
+					Timestamp: time.Now().UnixMilli(),
+				}
+				agui.WriteSSEEvent(w, errorEvent)
+				flusher.Flush()
+				return
+			}
 		}
 
 		// Auto-generate thread title if still "New Chat"

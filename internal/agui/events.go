@@ -54,6 +54,40 @@ type RunErrorEvent struct {
 	Timestamp int64  `json:"timestamp,omitempty"`
 }
 
+// ToolCallStartEvent signals the start of a tool call
+type ToolCallStartEvent struct {
+	Type            string `json:"type"`
+	ToolCallID      string `json:"toolCallId"`
+	ToolCallName    string `json:"toolCallName"`
+	ParentMessageID string `json:"parentMessageId,omitempty"`
+	Timestamp       int64  `json:"timestamp,omitempty"`
+}
+
+// ToolCallArgsEvent represents a chunk of tool call arguments
+type ToolCallArgsEvent struct {
+	Type       string `json:"type"`
+	ToolCallID string `json:"toolCallId"`
+	Delta      string `json:"delta"`
+	Timestamp  int64  `json:"timestamp,omitempty"`
+}
+
+// ToolCallEndEvent signals the end of a tool call
+type ToolCallEndEvent struct {
+	Type       string `json:"type"`
+	ToolCallID string `json:"toolCallId"`
+	Timestamp  int64  `json:"timestamp,omitempty"`
+}
+
+// ToolCallResultEvent provides the result of a tool call execution
+type ToolCallResultEvent struct {
+	Type       string `json:"type"`
+	MessageID  string `json:"messageId"`
+	ToolCallID string `json:"toolCallId"`
+	Content    string `json:"content"`
+	Role       string `json:"role,omitempty"`
+	Timestamp  int64  `json:"timestamp,omitempty"`
+}
+
 // GenerateMessageID generates a unique message ID
 func GenerateMessageID() string {
 	return fmt.Sprintf("msg_%d", time.Now().UnixNano())
@@ -62,4 +96,9 @@ func GenerateMessageID() string {
 // GenerateRunID generates a unique run ID
 func GenerateRunID() string {
 	return fmt.Sprintf("run_%d", time.Now().UnixNano())
+}
+
+// GenerateToolCallID generates a unique tool call ID
+func GenerateToolCallID() string {
+	return fmt.Sprintf("tool_%d", time.Now().UnixNano())
 }

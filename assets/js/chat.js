@@ -16,6 +16,7 @@ document.addEventListener('alpine:init', () => {
         sidebarOpen: true,
         hideLifecycleEvents: false,
         currentInteractionId: null,
+        toolCalls: {}, // Track active tool calls by ID
 
         init() {
             // Load sessions from backend
@@ -326,19 +327,70 @@ document.addEventListener('alpine:init', () => {
                     break;
 
                 case 'TOOL_CALL_START':
-                    // Tool call started
+                    // Tool call started - create a new tool call message
+                    this.toolCalls[event.toolCallId] = {
+                        id: event.toolCallId,
+                        name: event.toolCallName,
+                        args: '',
+                        status: 'streaming',
+                        timestamp: new Date(event.timestamp).toISOString()
+                    };
+
+                    this.messages.push({
+                        id: event.toolCallId,
+                        type: 'tool_call',
+                        name: event.toolCallName,
+                        args: '',
+                        status: 'streaming',
+                        timestamp: new Date(event.timestamp).toISOString()
+                    });
+
+                    this.$nextTick(() => this.scrollToBottom());
                     break;
 
                 case 'TOOL_CALL_ARGS':
-                    // Tool call arguments received
+                    // Tool call arguments received - accumulate them
+                    if (this.toolCalls[event.toolCallId]) {
+                        this.toolCalls[event.toolCallId].args += event.delta;
+
+                        // Update the message
+                        const toolMsgIndex = this.messages.findIndex(m => m.id === event.toolCallId);
+                        if (toolMsgIndex !== -1) {
+                            this.messages[toolMsgIndex].args = this.toolCalls[event.toolCallId].args;
+                        }
+                    }
                     break;
 
                 case 'TOOL_CALL_END':
-                    // Tool call ended
+                    // Tool call ended - mark as complete
+                    if (this.toolCalls[event.toolCallId]) {
+                        this.toolCalls[event.toolCallId].status = 'completed';
+
+                        const toolMsgIndex = this.messages.findIndex(m => m.id === event.toolCallId);
+                        if (toolMsgIndex !== -1) {
+                            this.messages[toolMsgIndex].status = 'completed';
+
+                            // Try to parse args as JSON for display
+                            try {
+                                this.messages[toolMsgIndex].parsedArgs = JSON.parse(this.messages[toolMsgIndex].args);
+                            } catch (e) {
+                                this.messages[toolMsgIndex].parsedArgs = { raw: this.messages[toolMsgIndex].args };
+                            }
+                        }
+                    }
                     break;
 
                 case 'TOOL_CALL_RESULT':
-                    // Tool call result received
+                    // Tool call result received - add result message
+                    this.messages.push({
+                        id: event.messageId,
+                        type: 'tool_result',
+                        toolCallId: event.toolCallId,
+                        content: event.content,
+                        timestamp: new Date(event.timestamp).toISOString()
+                    });
+
+                    this.$nextTick(() => this.scrollToBottom());
                     break;
 
                 case 'TEXT_MESSAGE_START':
@@ -560,6 +612,15 @@ document.addEventListener('alpine:init', () => {
                 hour: 'numeric',
                 minute: '2-digit'
             });
+        },
+
+        isValidJSON(str) {
+            try {
+                JSON.parse(str);
+                return true;
+            } catch (e) {
+                return false;
+            }
         },
 
         // Debounce helper for auto-scroll optimization

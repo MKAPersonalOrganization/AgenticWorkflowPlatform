@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/openai/openai-go"
-	"github.com/openai/openai-go/option"
-	"github.com/openai/openai-go/packages/ssestream"
+	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/option"
+	"github.com/openai/openai-go/v3/packages/ssestream"
 	"school-with-ai/internal/session"
 )
 
@@ -57,7 +57,39 @@ func BuildMessages(messages []session.Message) []openai.ChatCompletionMessagePar
 		case "user":
 			params = append(params, openai.UserMessage(msg.Content))
 		case "assistant":
-			params = append(params, openai.AssistantMessage(msg.Content))
+			// Check if assistant message has tool calls
+			if len(msg.ToolCalls) > 0 {
+				// Convert tool calls to OpenAI format
+				toolCalls := make([]openai.ChatCompletionMessageToolCallUnionParam, 0, len(msg.ToolCalls))
+				for _, tc := range msg.ToolCalls {
+					toolCalls = append(toolCalls, openai.ChatCompletionMessageToolCallUnionParam{
+						OfFunction: &openai.ChatCompletionMessageFunctionToolCallParam{
+							ID: tc.ID,
+							Function: openai.ChatCompletionMessageFunctionToolCallFunctionParam{
+								Arguments: tc.Function.Arguments,
+								Name:      tc.Function.Name,
+							},
+						},
+					})
+				}
+
+				// Build assistant message with tool calls
+				var asst openai.ChatCompletionAssistantMessageParam
+				if msg.Content != "" {
+					asst.Content.OfString = openai.String(msg.Content)
+				}
+				asst.Role = "assistant"
+				asst.ToolCalls = toolCalls
+
+				params = append(params, openai.ChatCompletionMessageParamUnion{
+					OfAssistant: &asst,
+				})
+			} else {
+				params = append(params, openai.AssistantMessage(msg.Content))
+			}
+		case "tool":
+			// Tool result message (content first, then toolCallID)
+			params = append(params, openai.ToolMessage(msg.Content, msg.ToolCallID))
 		case "system":
 			params = append(params, openai.SystemMessage(msg.Content))
 		}
@@ -66,14 +98,25 @@ func BuildMessages(messages []session.Message) []openai.ChatCompletionMessagePar
 	return params
 }
 
-// CreateStreamingCompletion creates a streaming chat completion
-func (c *Client) CreateStreamingCompletion(ctx context.Context, messages []session.Message) *ssestream.Stream[openai.ChatCompletionChunk] {
+// CreateStreamingCompletion creates a streaming chat completion with optional tools
+func (c *Client) CreateStreamingCompletion(
+	ctx context.Context,
+	messages []session.Message,
+	tools []openai.ChatCompletionToolUnionParam,
+) *ssestream.Stream[openai.ChatCompletionChunk] {
 	params := BuildMessages(messages)
 
-	stream := c.client.Chat.Completions.NewStreaming(ctx, openai.ChatCompletionNewParams{
+	streamParams := openai.ChatCompletionNewParams{
 		Messages: params,
 		Model:    openai.ChatModel(c.model),
-	})
+	}
+
+	// Add tools if provided
+	if len(tools) > 0 {
+		streamParams.Tools = tools
+	}
+
+	stream := c.client.Chat.Completions.NewStreaming(ctx, streamParams)
 
 	return stream
 }
