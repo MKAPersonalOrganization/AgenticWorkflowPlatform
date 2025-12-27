@@ -1,5 +1,8 @@
 package messagelist
 
+import "school-with-ai/components/message"
+import "school-with-ai/components/errormessage"
+
 templ MessageList() {
 	<div class="space-y-4">
 		<template x-for="message in messages" :key="message.id">
@@ -40,21 +43,9 @@ templ MessageList() {
 					</div>
 				</div>
 				<!-- User Message -->
-				<div x-show="message.role === 'user'" class="flex items-center gap-2 justify-end">
-					<div class="flex flex-col gap-2">
-						<p class="bg-muted ml-auto w-fit rounded-3xl px-4 py-2 text-right whitespace-pre-wrap text-sm" x-text="message.content"></p>
-					</div>
-				</div>
+				@message.UserMessage()
 				<!-- Assistant Message -->
-				<div x-show="message.role === 'assistant'" class="flex flex-col gap-2">
-					<div class="prose prose-sm max-w-none text-sm leading-relaxed whitespace-pre-wrap" x-text="message.content"></div>
-					<!-- Streaming Indicator -->
-					<div x-show="message.streaming" class="flex items-center gap-1 text-muted-foreground">
-						<span class="w-1 h-1 bg-current rounded-full animate-pulse"></span>
-						<span class="w-1 h-1 bg-current rounded-full animate-pulse" style="animation-delay: 150ms;"></span>
-						<span class="w-1 h-1 bg-current rounded-full animate-pulse" style="animation-delay: 300ms;"></span>
-					</div>
-				</div>
+				@message.AssistantMessage()
 			</div>
 		</template>
 		<!-- Typing Indicator -->
@@ -66,18 +57,6 @@ templ MessageList() {
 			</div>
 		</div>
 		<!-- Error Message -->
-		<div x-show="errorMessage" class="rounded-lg bg-destructive/10 border border-destructive/20 p-4">
-			<div class="flex gap-3">
-				<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-destructive shrink-0 mt-0.5">
-					<circle cx="12" cy="12" r="10"></circle>
-					<line x1="12" x2="12" y1="8" y2="12"></line>
-					<line x1="12" x2="12.01" y1="16" y2="16"></line>
-				</svg>
-				<div class="flex-1">
-					<div class="font-semibold text-sm text-destructive mb-1">Error</div>
-					<div class="text-sm text-destructive/90" x-text="errorMessage"></div>
-				</div>
-			</div>
-		</div>
+		@errormessage.ErrorMessage()
 	</div>
 }

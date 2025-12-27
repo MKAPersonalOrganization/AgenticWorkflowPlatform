@@ -1,0 +1,21 @@
+package message
+
+templ UserMessage() {
+	<div x-show="message.role === 'user'" class="flex items-center gap-2 justify-end">
+		<div class="flex flex-col gap-2">
+			<p class="bg-muted ml-auto w-fit rounded-3xl px-4 py-2 text-right whitespace-pre-wrap text-sm" x-text="message.content"></p>
+		</div>
+	</div>
+}
+
+templ AssistantMessage() {
+	<div x-show="message.role === 'assistant'" class="flex flex-col gap-2">
+		<div class="prose prose-sm max-w-none text-sm leading-relaxed whitespace-pre-wrap" x-text="message.content"></div>
+		<!-- Streaming Indicator -->
+		<div x-show="message.streaming" class="flex items-center gap-1 text-muted-foreground">
+			<span class="w-1 h-1 bg-current rounded-full animate-pulse"></span>
+			<span class="w-1 h-1 bg-current rounded-full animate-pulse" style="animation-delay: 150ms;"></span>
+			<span class="w-1 h-1 bg-current rounded-full animate-pulse" style="animation-delay: 300ms;"></span>
+		</div>
+	</div>
+}
