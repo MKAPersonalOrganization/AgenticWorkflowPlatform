@@ -111,6 +111,32 @@ func HandleSendMessage(store *session.Store, aiClient *openaiservice.Client) htt
 			}
 		}
 
+		// Auto-generate thread title if still "New Chat" and aiClient is available
+		if aiClient != nil {
+			thread, exists := store.GetThread(threadID)
+			if exists && thread.Title == "New Chat" && len(thread.Messages) >= 2 {
+				// Generate title synchronously before finishing the run
+				ctx := context.Background()
+				messages := store.GetMessages(threadID)
+				if title, err := aiClient.GenerateThreadTitle(ctx, messages); err == nil && title != "" {
+					store.UpdateThreadTitle(threadID, title)
+
+					// Send CUSTOM event to notify frontend of title update
+					customEvent := map[string]any{
+						"type":      "CUSTOM",
+						"name":      "THREAD_TITLE_UPDATED",
+						"value": map[string]string{
+							"threadId": threadID,
+							"title":    title,
+						},
+						"timestamp": time.Now().UnixMilli(),
+					}
+					agui.WriteSSEEvent(w, customEvent)
+					flusher.Flush()
+				}
+			}
+		}
+
 		// Send RUN_FINISHED event
 		runFinishedEvent := &agui.RunFinishedEvent{
 			Type:      "RUN_FINISHED",
@@ -197,33 +223,6 @@ func HandleGetThreads(store *session.Store) http.HandlerFunc {
 			http.Error(w, "Failed to encode threads", http.StatusInternalServerError)
 			return
 		}
-	}
-}
-
-// UpdateThreadTitleRequest represents the request body for updating thread title
-type UpdateThreadTitleRequest struct {
-	Title string `json:"title"`
-}
-
-// HandleUpdateThreadTitle updates a thread's title
-func HandleUpdateThreadTitle(store *session.Store) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		threadID := r.PathValue("threadId")
-		if threadID == "" {
-			http.Error(w, "threadId is required", http.StatusBadRequest)
-			return
-		}
-
-		var req UpdateThreadTitleRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
-			return
-		}
-
-		store.UpdateThreadTitle(threadID, req.Title)
-
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 	}
 }
 

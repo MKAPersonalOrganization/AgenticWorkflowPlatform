@@ -77,3 +77,44 @@ func (c *Client) CreateStreamingCompletion(ctx context.Context, messages []sessi
 
 	return stream
 }
+
+// GenerateThreadTitle generates a concise title for a conversation thread
+// based on the first few messages exchanged
+func (c *Client) GenerateThreadTitle(ctx context.Context, messages []session.Message) (string, error) {
+	// Create a system prompt for title generation
+	titlePrompt := []openai.ChatCompletionMessageParamUnion{
+		openai.SystemMessage("You are a helpful assistant that generates concise, descriptive titles for conversations. Generate a title that captures the main topic or question. Keep it under 50 characters. Return ONLY the title text, nothing else."),
+	}
+
+	// Add the conversation messages (limited to first 2-3 exchanges for context)
+	maxMessages := 4
+	if len(messages) > maxMessages {
+		messages = messages[:maxMessages]
+	}
+	titlePrompt = append(titlePrompt, BuildMessages(messages)...)
+
+	// Make a non-streaming completion request
+	completion, err := c.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+		Messages:    titlePrompt,
+		Model:       openai.ChatModel(c.model),
+		MaxTokens:   openai.Int(20), // Short title
+		Temperature: openai.Float(0.7),
+	})
+
+	if err != nil {
+		return "", fmt.Errorf("failed to generate title: %w", err)
+	}
+
+	if len(completion.Choices) == 0 {
+		return "", fmt.Errorf("no title generated")
+	}
+
+	title := completion.Choices[0].Message.Content
+
+	// Trim quotes if present
+	if len(title) > 0 && title[0] == '"' && title[len(title)-1] == '"' {
+		title = title[1 : len(title)-1]
+	}
+
+	return title, nil
+}

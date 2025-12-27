@@ -47,7 +47,6 @@ func main() {
 	mux.HandleFunc("/send", handlers.HandleSendMessage(store, aiClient))
 	mux.HandleFunc("GET /api/threads", handlers.HandleGetThreads(store))
 	mux.HandleFunc("GET /api/threads/{threadId}/messages", handlers.HandleGetMessages(store))
-	mux.HandleFunc("PATCH /api/threads/{threadId}/title", handlers.HandleUpdateThreadTitle(store))
 	mux.HandleFunc("DELETE /api/threads/{threadId}", handlers.HandleDeleteThread(store))
 	mux.HandleFunc("/", HandleViewChatInputScreen)
 	err = http.ListenAndServe(addr, mux)
