@@ -381,14 +381,28 @@ document.addEventListener('alpine:init', () => {
                     break;
 
                 case 'TOOL_CALL_RESULT':
-                    // Tool call result received - add result message
-                    this.messages.push({
-                        id: event.messageId,
-                        type: 'tool_result',
-                        toolCallId: event.toolCallId,
-                        content: event.content,
-                        timestamp: new Date(event.timestamp).toISOString()
-                    });
+                    // Tool call result received - insert result message right after the tool call
+                    const toolCallIndex = this.messages.findIndex(m => m.id === event.toolCallId);
+
+                    if (toolCallIndex !== -1) {
+                        // Insert the result right after the tool call message
+                        this.messages.splice(toolCallIndex + 1, 0, {
+                            id: event.messageId,
+                            type: 'tool_result',
+                            toolCallId: event.toolCallId,
+                            content: event.content,
+                            timestamp: new Date(event.timestamp).toISOString()
+                        });
+                    } else {
+                        // Fallback: if tool call not found, append to end
+                        this.messages.push({
+                            id: event.messageId,
+                            type: 'tool_result',
+                            toolCallId: event.toolCallId,
+                            content: event.content,
+                            timestamp: new Date(event.timestamp).toISOString()
+                        });
+                    }
 
                     this.$nextTick(() => this.scrollToBottom());
                     break;
@@ -467,7 +481,12 @@ document.addEventListener('alpine:init', () => {
                 if (!this.messages[userMessageIndex].lifecycleEvents) {
                     this.messages[userMessageIndex].lifecycleEvents = [];
                 }
-                this.messages[userMessageIndex].lifecycleEvents.push(lifecycleEvent);
+
+                // Create a new array reference to ensure Alpine detects the change
+                this.messages[userMessageIndex].lifecycleEvents = [
+                    ...this.messages[userMessageIndex].lifecycleEvents,
+                    lifecycleEvent
+                ];
             }
         },
 

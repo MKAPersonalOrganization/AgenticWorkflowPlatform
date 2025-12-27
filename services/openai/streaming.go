@@ -6,10 +6,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/openai/openai-go/v3"
 	"school-with-ai/internal/agui"
 	"school-with-ai/internal/session"
 	"school-with-ai/internal/tools"
+
+	"github.com/openai/openai-go/v3"
 )
 
 // StreamHandler handles streaming OpenAI responses and emits AG-UI events
@@ -155,19 +156,6 @@ func (h *StreamHandler) HandleStream(
 		return fmt.Errorf("stream error: %w", err)
 	}
 
-	// Emit TOOL_CALL_END for all active tool calls
-	for toolCallID := range activeToolCalls {
-		endEvent := &agui.ToolCallEndEvent{
-			Type:       "TOOL_CALL_END",
-			ToolCallID: toolCallID,
-			Timestamp:  time.Now().UnixMilli(),
-		}
-		if err := agui.WriteSSEEvent(h.writer, endEvent); err != nil {
-			return err
-		}
-		h.flusher.Flush()
-	}
-
 	// Store assistant message and handle tool calls
 	if len(activeToolCalls) > 0 {
 		// Build tool calls list from active tool calls
@@ -192,8 +180,20 @@ func (h *StreamHandler) HandleStream(
 			Timestamp: time.Now(),
 		})
 
-		// Execute each tool call and emit results
+		// For each tool call: emit END, execute, emit RESULT immediately
 		for _, toolCall := range toolCallsList {
+			// Emit TOOL_CALL_END
+			endEvent := &agui.ToolCallEndEvent{
+				Type:       "TOOL_CALL_END",
+				ToolCallID: toolCall.ID,
+				Timestamp:  time.Now().UnixMilli(),
+			}
+			if err := agui.WriteSSEEvent(h.writer, endEvent); err != nil {
+				return err
+			}
+			h.flusher.Flush()
+
+			// Execute the tool call immediately
 			result, err := h.executeToolCall(toolCall)
 			if err != nil {
 				result = fmt.Sprintf(`{"error": "%v"}`, err)
@@ -209,7 +209,7 @@ func (h *StreamHandler) HandleStream(
 				Timestamp:  time.Now(),
 			})
 
-			// Emit TOOL_CALL_RESULT event
+			// Emit TOOL_CALL_RESULT event immediately after execution
 			resultEvent := &agui.ToolCallResultEvent{
 				Type:       "TOOL_CALL_RESULT",
 				MessageID:  toolResultID,
@@ -252,6 +252,8 @@ func (h *StreamHandler) executeToolCall(toolCall session.ToolCall) (string, erro
 	switch toolCall.Function.Name {
 	case "get_weather":
 		return tools.ExecuteWeatherTool(toolCall.Function.Arguments)
+	case "calculate":
+		return tools.ExecuteCalculatorTool(toolCall.Function.Arguments)
 	default:
 		return "", fmt.Errorf("unknown tool: %s", toolCall.Function.Name)
 	}
