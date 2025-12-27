@@ -13,10 +13,17 @@ document.addEventListener('alpine:init', () => {
         events: [],
         sessions: [],
         showDebugPanel: false,
+        sidebarOpen: true,
+        hideLifecycleEvents: false,
+        currentInteractionId: null,
 
         init() {
             // Load sessions from backend
             this.loadSessions();
+        },
+
+        toggleSidebar() {
+            this.sidebarOpen = !this.sidebarOpen;
         },
 
         async loadSessions() {
@@ -193,14 +200,20 @@ document.addEventListener('alpine:init', () => {
             if (!this.currentMessage.trim() || this.isStreaming) return;
 
             const userMessage = this.currentMessage.trim();
+            const interactionId = `interaction_${Date.now()}`;
 
-            // Add user message to UI
+            // Add user message to UI with interaction ID
             this.messages.push({
                 id: `msg_${Date.now()}`,
                 role: 'user',
                 content: userMessage,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                interactionId: interactionId,
+                lifecycleEvents: []
             });
+
+            // Store current interaction ID for this request
+            this.currentInteractionId = interactionId;
 
             // Update session title with first message
             this.updateSessionTitle();
@@ -241,10 +254,105 @@ document.addEventListener('alpine:init', () => {
             // Add event to log (keep only last 10)
             this.addEvent(event);
 
-            switch(event.type) {
+            // Add lifecycle event as a message if not hidden
+            // Track all AG UI Protocol event types except TEXT_MESSAGE_CONTENT (too frequent)
+            const lifecycleEventTypes = [
+                // Lifecycle Events
+                'RUN_STARTED', 'RUN_FINISHED', 'RUN_ERROR', 'STEP_STARTED', 'STEP_FINISHED',
+                // Text Message Events
+                'TEXT_MESSAGE_START', 'TEXT_MESSAGE_END',
+                // Tool Call Events
+                'TOOL_CALL_START', 'TOOL_CALL_ARGS', 'TOOL_CALL_END', 'TOOL_CALL_RESULT',
+                // State Management Events
+                'STATE_SNAPSHOT', 'STATE_DELTA', 'MESSAGES_SNAPSHOT',
+                // Activity Events
+                'ACTIVITY_SNAPSHOT', 'ACTIVITY_DELTA',
+                // Special Events
+                'RAW', 'CUSTOM',
+                // Draft Events (Reasoning)
+                'REASONING_START', 'REASONING_MESSAGE_START', 'REASONING_MESSAGE_END', 'REASONING_END',
+                // Draft Events (Meta)
+                'META_EVENT'
+            ];
+            if (!this.hideLifecycleEvents && lifecycleEventTypes.includes(event.type)) {
+                this.addLifecycleMessage(event);
+            }
+
+            switch (event.type) {
                 case 'RUN_STARTED':
                     // Run started - we can show a loading indicator if needed
-                    console.log('Run started:', event.runId);
+                    break;
+
+                case 'STEP_STARTED':
+                    // Step started within agent run
+                    break;
+
+                case 'STEP_FINISHED':
+                    // Step finished within agent run
+                    break;
+
+                case 'STATE_SNAPSHOT':
+                    // Complete state snapshot received
+                    break;
+
+                case 'STATE_DELTA':
+                    // Incremental state update received
+                    break;
+
+                case 'MESSAGES_SNAPSHOT':
+                    // Messages snapshot received
+                    break;
+
+                case 'ACTIVITY_SNAPSHOT':
+                    // Activity snapshot received
+                    break;
+
+                case 'ACTIVITY_DELTA':
+                    // Activity delta received
+                    break;
+
+                case 'REASONING_START':
+                    // Reasoning started
+                    break;
+
+                case 'REASONING_MESSAGE_START':
+                    // Reasoning message started
+                    break;
+
+                case 'REASONING_MESSAGE_END':
+                    // Reasoning message ended
+                    break;
+
+                case 'REASONING_END':
+                    // Reasoning ended
+                    break;
+
+                case 'META_EVENT':
+                    // Meta event received (e.g., user feedback)
+                    break;
+
+                case 'RAW':
+                    // Raw event from external system
+                    break;
+
+                case 'CUSTOM':
+                    // Custom application-specific event
+                    break;
+
+                case 'TOOL_CALL_START':
+                    // Tool call started
+                    break;
+
+                case 'TOOL_CALL_ARGS':
+                    // Tool call arguments received
+                    break;
+
+                case 'TOOL_CALL_END':
+                    // Tool call ended
+                    break;
+
+                case 'TOOL_CALL_RESULT':
+                    // Tool call result received
                     break;
 
                 case 'TEXT_MESSAGE_START':
@@ -288,7 +396,6 @@ document.addEventListener('alpine:init', () => {
 
                 case 'RUN_FINISHED':
                     // Run completed successfully
-                    console.log('Run finished:', event.runId);
                     this.isStreaming = false;
                     eventSource.close();
                     break;
@@ -301,6 +408,89 @@ document.addEventListener('alpine:init', () => {
                     this.showError(event.message || 'An error occurred');
                     eventSource.close();
                     break;
+            }
+        },
+
+        addLifecycleMessage(event) {
+            // Find the last user message with the current interaction ID
+            const userMessageIndex = this.messages.findIndex(m =>
+                m.role === 'user' && m.interactionId === this.currentInteractionId
+            );
+
+            if (userMessageIndex !== -1) {
+                const lifecycleEvent = {
+                    id: `lifecycle_${Date.now()}_${Math.random()}`,
+                    type: event.type,
+                    content: this.getLifecycleContent(event),
+                    timestamp: new Date().toISOString()
+                };
+
+                // Add to the user message's lifecycle events array
+                if (!this.messages[userMessageIndex].lifecycleEvents) {
+                    this.messages[userMessageIndex].lifecycleEvents = [];
+                }
+                this.messages[userMessageIndex].lifecycleEvents.push(lifecycleEvent);
+            }
+        },
+
+        getLifecycleContent(event) {
+            switch (event.type) {
+                // Lifecycle Events
+                case 'RUN_STARTED':
+                    return 'Started';
+                case 'RUN_FINISHED':
+                    return event.outcome === 'interrupt' ? 'Paused' : 'Completed';
+                case 'RUN_ERROR':
+                    return `Error: ${event.message || 'Unknown'}`;
+                case 'STEP_STARTED':
+                    return `Step: ${event.stepName || 'Unknown'}`;
+                case 'STEP_FINISHED':
+                    return `${event.stepName || 'Step'} Done`;
+                // Text Message Events
+                case 'TEXT_MESSAGE_START':
+                    return 'Responding';
+                case 'TEXT_MESSAGE_END':
+                    return 'Response Done';
+                // Tool Call Events
+                case 'TOOL_CALL_START':
+                    return `Tool: ${event.toolCallName || 'Unknown'}`;
+                case 'TOOL_CALL_ARGS':
+                    return 'Args';
+                case 'TOOL_CALL_END':
+                    return 'Tool Done';
+                case 'TOOL_CALL_RESULT':
+                    return 'Result';
+                // State Management Events
+                case 'STATE_SNAPSHOT':
+                    return 'State Snapshot';
+                case 'STATE_DELTA':
+                    return 'State Update';
+                case 'MESSAGES_SNAPSHOT':
+                    return 'Messages Sync';
+                // Activity Events
+                case 'ACTIVITY_SNAPSHOT':
+                    return `Activity: ${event.activityType || 'Unknown'}`;
+                case 'ACTIVITY_DELTA':
+                    return 'Activity Update';
+                // Reasoning Events (Draft)
+                case 'REASONING_START':
+                    return 'Thinking';
+                case 'REASONING_MESSAGE_START':
+                    return 'Reasoning';
+                case 'REASONING_MESSAGE_END':
+                    return 'Thought Complete';
+                case 'REASONING_END':
+                    return 'Thinking Done';
+                // Meta Events (Draft)
+                case 'META_EVENT':
+                    return event.metaType || 'Meta';
+                // Special Events
+                case 'RAW':
+                    return `Raw: ${event.source || 'External'}`;
+                case 'CUSTOM':
+                    return event.name || 'Custom';
+                default:
+                    return event.type;
             }
         },
 
@@ -340,7 +530,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         getEventDetails(event) {
-            switch(event.type) {
+            switch (event.type) {
                 case 'RUN_STARTED':
                     return `Run ${event.runId?.slice(-8)}`;
                 case 'TEXT_MESSAGE_START':
@@ -360,6 +550,8 @@ document.addEventListener('alpine:init', () => {
 
         showError(message) {
             this.errorMessage = message;
+            // Scroll to show the error
+            this.$nextTick(() => this.scrollToBottom());
             // Auto-hide error after 5 seconds
             setTimeout(() => {
                 this.errorMessage = null;
@@ -369,7 +561,11 @@ document.addEventListener('alpine:init', () => {
         scrollToBottom() {
             const container = this.$refs.messageList;
             if (container) {
-                container.scrollTop = container.scrollHeight;
+                // Smooth scroll to bottom
+                container.scrollTo({
+                    top: container.scrollHeight,
+                    behavior: 'smooth'
+                });
             }
         },
 
@@ -378,6 +574,19 @@ document.addEventListener('alpine:init', () => {
                 hour: 'numeric',
                 minute: '2-digit'
             });
+        },
+
+        // Debounce helper for auto-scroll optimization
+        debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
         }
     }));
 });

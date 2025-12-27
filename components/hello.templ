@@ -1,10 +1,6 @@
 package components
 
-import (
-	"school-with-ai/components/button"
-	"school-with-ai/components/card"
-	"school-with-ai/components/input"
-)
+import "school-with-ai/components/input"
 
 templ ChatInputScreen() {
 	<!DOCTYPE html>
@@ -18,38 +14,31 @@ templ ChatInputScreen() {
 			<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 			@input.Script()
 		</head>
-		<body class="flex min-h-screen bg-background">
-			<div class="flex w-full" x-data="chat">
-				<!-- Sidebar for Session Management -->
-				<div class="w-64 border-r border-border bg-card flex flex-col">
-					<div class="p-4 border-b border-border">
-						<h2 class="text-lg font-semibold mb-3">Sessions</h2>
-						@button.Button(button.Props{
-							Class: "w-full",
-							Attributes: templ.Attributes{
-								"@click": "createNewSession()",
-							},
-						}) {
-							+ New Session
-						}
-					</div>
-					<div class="flex-1 overflow-y-auto p-2">
+		<body class="flex min-h-screen bg-background text-foreground antialiased">
+			<div class="flex w-full h-screen overflow-hidden" x-data="chat">
+				<!-- Left Sidebar - Chat History -->
+				<aside
+					class="hidden lg:flex h-screen flex-col bg-white border-r border-slate-300 shadow-inner-right transition-all duration-300 ease-in-out overflow-hidden"
+					:class="sidebarOpen ? 'w-[300px]' : 'w-0'"
+				>
+					<!-- Sidebar Header -->
+					<div class="flex items-center justify-center px-4 pt-1.5 pb-3 border-b border-slate-200" x-show="sidebarOpen">
+						<h1 class="text-xl font-semibold tracking-tight">Thread History</h1>
+					</div> <!-- Thread List -->
+					<div class="flex h-full w-full flex-col gap-2 overflow-y-scroll pt-3 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-track]:bg-transparent" x-show="sidebarOpen">
 						<template x-for="session in sessions" :key="session.id">
-							<div class="group relative mb-1">
+							<div class="w-full px-1 group relative">
 								<button
-									class="w-full text-left px-3 py-2 rounded transition-colors text-sm"
-									:class="session.id === threadId ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'"
+									class="w-[280px] items-start justify-start text-left font-normal px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors relative"
 									@click="switchSession(session.id)"
 								>
-									<div class="font-medium truncate pr-6" x-text="session.title"></div>
-									<div class="text-xs opacity-70" x-text="formatSessionTime(session.lastMessage)"></div>
+									<p class="truncate text-ellipsis pr-8" x-text="session.title"></p>
 								</button>
 								<button
 									@click.stop="deleteSession(session.id)"
-									class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-destructive/10"
-									:class="session.id === threadId ? 'text-primary-foreground hover:text-destructive' : 'text-muted-foreground hover:text-destructive'"
+									class="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-md hover:bg-red-100"
 								>
-									<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+									<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-600">
 										<path d="M3 6h18"></path>
 										<path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
 										<path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
@@ -57,150 +46,271 @@ templ ChatInputScreen() {
 								</button>
 							</div>
 						</template>
-						<div x-show="sessions.length === 0" class="text-center text-muted-foreground text-sm py-8">
-							No sessions yet
-						</div>
 					</div>
-				</div>
-				<!-- Main Chat Area -->
-				<div class="flex-1 flex justify-center items-center p-5" :class="showDebugPanel ? 'mr-64' : ''">
-					<div class="w-full max-w-4xl h-[90vh]">
-						@card.Card(card.Props{
-							Class: "flex flex-col h-full",
-						}) {
-							@card.Header(card.HeaderProps{}) {
-								<div class="flex items-center justify-between">
-									<div>
-										@card.Title(card.TitleProps{}) {
-											Chat with AI Assistant
-										}
-										@card.Description(card.DescriptionProps{}) {
-											Powered by AG-UI Protocol
-										}
-									</div>
-									<button
-										@click="showDebugPanel = !showDebugPanel"
-										class="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded hover:bg-muted"
-									>
-										<span x-show="!showDebugPanel">Show Events</span>
-										<span x-show="showDebugPanel">Hide Events</span>
-									</button>
-								</div>
-							}
-							@card.Content(card.ContentProps{
-								Class: "flex-1 overflow-y-auto",
-							}) {
-						<div x-ref="messageList" class="space-y-4">
-							<template x-for="message in messages" :key="message.id">
-								<div class="flex gap-3 mb-4" :class="message.role === 'user' ? 'justify-end' : 'justify-start'">
-									<div
-										class="max-w-[80%] rounded-lg p-4"
-										:class="message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'"
-									>
-										<div class="text-xs font-medium mb-1" :class="message.role === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'">
-											<span x-text="message.role === 'user' ? 'You' : 'Assistant'"></span>
-											<span x-text="formatTime(message.timestamp)" class="ml-2"></span>
-										</div>
-										<div class="text-sm whitespace-pre-wrap" x-text="message.content"></div>
-										<div x-show="message.streaming" class="text-xs mt-1 animate-pulse">●</div>
-									</div>
-								</div>
-							</template>
-							<!-- Typing Indicator -->
-							<div x-show="showTypingIndicator" class="flex gap-3 mb-4 justify-start">
-								<div class="max-w-[80%] rounded-lg p-4 bg-muted">
-									<div class="text-xs font-medium mb-1 text-muted-foreground">
-										Assistant
-									</div>
-									<div class="flex gap-1">
-										<span class="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style="animation-delay: 0ms"></span>
-										<span class="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style="animation-delay: 150ms"></span>
-										<span class="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style="animation-delay: 300ms"></span>
-									</div>
-								</div>
-							</div>
-							<!-- Error Message -->
-							<div x-show="errorMessage" class="flex gap-3 mb-4 p-4 rounded-lg bg-destructive/10 border border-destructive/20">
-								<div class="flex-1">
-									<div class="text-sm font-medium text-destructive mb-1">Error</div>
-									<div class="text-sm text-destructive/90" x-text="errorMessage"></div>
-								</div>
-							</div>
-							<div x-show="isStreaming && messages.length === 0 && !showTypingIndicator" class="text-center text-muted-foreground">
-								Waiting for response...
-							</div>
-						</div>
-					}
-					@card.Footer(card.FooterProps{}) {
-						<!-- Input Form -->
-						<form @submit.prevent="sendMessage" class="flex gap-3 w-full">
-							@input.Input(input.Props{
-								Placeholder: "Type your message...",
-								Attributes: templ.Attributes{
-									"x-model":   "currentMessage",
-									":disabled": "isStreaming",
-								},
-							})
-							@button.Button(button.Props{
-								Type: button.TypeSubmit,
-								Attributes: templ.Attributes{
-									":disabled": "isStreaming || !currentMessage.trim()",
-								},
-							}) {
-								<span x-show="!isStreaming">Send</span>
-								<span x-show="isStreaming">Sending...</span>
-							}
-						</form>
-					}
-						}
-					</div>
-				</div>
-				<!-- Debug Sidebar (Right) -->
-				<div
-					x-show="showDebugPanel"
-					x-transition:enter="transition ease-out duration-200"
-					x-transition:enter-start="translate-x-full"
-					x-transition:enter-end="translate-x-0"
-					x-transition:leave="transition ease-in duration-150"
-					x-transition:leave-start="translate-x-0"
-					x-transition:leave-end="translate-x-full"
-					class="fixed right-0 top-0 w-64 h-full border-l border-border bg-card flex flex-col"
-				>
-					<div class="p-4 border-b border-border">
-						<div class="flex items-center justify-between mb-2">
-							<h2 class="text-sm font-semibold">Debug Events</h2>
+				</aside>
+				<!-- Main Content Area -->
+				<main class="flex-1 flex flex-col relative">
+					<!-- Top Header Bar -->
+					<header class="flex items-center justify-between px-6 py-3 border-b border-slate-200 bg-white/80 backdrop-blur-sm">
+						<!-- Sidebar Toggle -->
+						<button
+							@click="toggleSidebar()"
+							class="p-2 rounded-lg hover:bg-gray-100 transition-colors hidden lg:block"
+						>
+							<svg x-show="sidebarOpen" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+								<rect width="18" height="18" x="3" y="3" rx="2"></rect>
+								<path d="M15 3v18"></path>
+								<path d="m8 9 3 3-3 3"></path>
+							</svg>
+							<svg x-show="!sidebarOpen" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+								<rect width="18" height="18" x="3" y="3" rx="2"></rect>
+								<path d="M9 3v18"></path>
+								<path d="m16 15-3-3 3-3"></path>
+							</svg>
+						</button>
+						<div class="flex items-center gap-3">
+							<!-- New Chat Button -->
 							<button
-								@click="showDebugPanel = false"
-								class="text-xs text-muted-foreground hover:text-foreground"
+								@click="createNewSession()"
+								class="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all font-medium text-sm shadow-sm"
 							>
-								✕
+								<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+									<path d="M12 5v14m-7-7h14"></path>
+								</svg>
+								<span>New chat</span>
+							</button>
+							<!-- Debug Toggle -->
+							<button
+								@click="showDebugPanel = !showDebugPanel"
+								class="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+								:class="showDebugPanel ? 'bg-gray-100' : ''"
+							>
+								<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-700">
+									<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+									<circle cx="12" cy="12" r="3"></circle>
+								</svg>
 							</button>
 						</div>
-						<p class="text-xs text-muted-foreground/70">AG-UI Protocol events</p>
-					</div>
-					<div class="flex-1 overflow-y-auto p-3">
-						<div class="space-y-1 text-xs font-mono">
-							<template x-for="event in events.slice().reverse()" :key="event.id">
-								<div class="flex flex-col gap-1 p-2 rounded bg-muted/30 border border-muted-foreground/10">
-									<div class="flex items-center justify-between">
-										<span class="font-medium text-muted-foreground/90" x-text="event.type"></span>
-										<span class="text-muted-foreground/50 text-[10px]" x-text="event.time"></span>
+					</header>
+					<!-- Messages Container -->
+					<div class="flex-1 overflow-y-auto scrollbar-thin" x-ref="messageList">
+						<!-- When no messages: centered welcome screen with input -->
+						<div x-show="messages.length === 0 && !isStreaming" class="h-full flex flex-col items-center justify-center">
+							<div class="flex flex-col items-center gap-8 w-full max-w-3xl mx-auto px-4">
+								<div class="flex flex-col items-center gap-4">
+									<img src="/assets/images/logo.png" alt="Logo" class="w-40 h-40 object-contain"/>
+								</div> <!-- Centered Input Area -->
+								<div class="w-full">
+									<div class="relative z-10 mx-auto w-full rounded-2xl border border-border bg-muted shadow-sm transition-all">
+										<form @submit.prevent="sendMessage" class="mx-auto grid grid-rows-[1fr_auto] gap-2">
+											<textarea
+												x-model="currentMessage"
+												:disabled="isStreaming"
+												@keydown.enter.prevent="if (!$event.shiftKey && currentMessage.trim()) sendMessage()"
+												placeholder="Type your message..."
+												rows="1"
+												class="resize-none border-none bg-transparent p-3.5 pb-0 shadow-none outline-none focus:ring-0 focus:outline-none text-sm"
+												style="field-sizing: content;"
+											></textarea>
+											<div class="flex items-center justify-end p-2 pt-4">
+												<button
+													type="submit"
+													:disabled="isStreaming || !currentMessage.trim()"
+													class="shrink-0 rounded-full p-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+													:class="currentMessage.trim() && !isStreaming ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-muted-foreground/20 text-muted-foreground'"
+												>
+													<svg x-show="!isStreaming" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+														<path d="m22 2-7 20-4-9-9-4Z"></path>
+														<path d="M22 2 11 13"></path>
+													</svg>
+													<svg x-show="isStreaming" class="animate-spin" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+														<path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+													</svg>
+												</button>
+											</div>
+										</form>
 									</div>
-									<div class="text-muted-foreground/70" x-text="event.details"></div>
 								</div>
-							</template>
-							<div x-show="events.length === 0" class="text-center text-muted-foreground/50 py-8">
-								No events yet
+							</div>
+						</div>
+						<!-- When messages exist: regular message list -->
+						<div x-show="messages.length > 0 || isStreaming" class="max-w-3xl mx-auto px-4 py-6">
+							<!-- Messages -->
+							<div class="space-y-4">
+								<template x-for="message in messages" :key="message.id">
+									<div class="group">
+										<!-- Lifecycle Events Timeline (scoped to this interaction) -->
+										<div x-show="message.role === 'user' && !hideLifecycleEvents && message.lifecycleEvents && message.lifecycleEvents.length > 0" class="mb-2 overflow-x-auto">
+											<div class="flex items-center gap-1.5 min-w-max">
+												<template x-for="(event, index) in message.lifecycleEvents" :key="event.id">
+													<div class="flex items-center gap-1.5">
+														<!-- Event Badge -->
+														<div
+															class="px-2 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide"
+															:class="{
+														'bg-green-100 text-green-700': event.type === 'RUN_FINISHED' || event.type === 'TOOL_CALL_END' || event.type === 'TEXT_MESSAGE_END' || event.type === 'STEP_FINISHED' || event.type === 'REASONING_END',
+														'bg-blue-100 text-blue-700': event.type === 'RUN_STARTED' || event.type === 'TEXT_MESSAGE_START' || event.type === 'STEP_STARTED' || event.type === 'REASONING_START',
+														'bg-red-100 text-red-700': event.type === 'RUN_ERROR',
+														'bg-purple-100 text-purple-700': event.type === 'TOOL_CALL_START',
+														'bg-purple-50 text-purple-600': event.type === 'TOOL_CALL_ARGS',
+														'bg-amber-100 text-amber-700': event.type === 'TOOL_CALL_RESULT',
+														'bg-cyan-100 text-cyan-700': event.type === 'STATE_SNAPSHOT' || event.type === 'MESSAGES_SNAPSHOT',
+														'bg-cyan-50 text-cyan-600': event.type === 'STATE_DELTA',
+														'bg-indigo-100 text-indigo-700': event.type === 'ACTIVITY_SNAPSHOT',
+														'bg-indigo-50 text-indigo-600': event.type === 'ACTIVITY_DELTA',
+														'bg-pink-100 text-pink-700': event.type === 'REASONING_MESSAGE_START' || event.type === 'REASONING_MESSAGE_END',
+														'bg-slate-100 text-slate-600': event.type === 'RAW' || event.type === 'CUSTOM' || event.type === 'META_EVENT',
+														'bg-yellow-100 text-yellow-700': event.type === 'RUN_FINISHED' && event.outcome === 'interrupt'
+													}"
+														>
+															<span x-text="event.content"></span>
+														</div>
+														<!-- Arrow -->
+														<svg x-show="index < message.lifecycleEvents.length - 1" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-300">
+															<path d="M5 12h14"></path>
+															<path d="m12 5 7 7-7 7"></path>
+														</svg>
+													</div>
+												</template>
+											</div>
+										</div> <!-- User Message -->
+										<div x-show="message.role === 'user'" class="flex items-center gap-2 justify-end">
+											<div class="flex flex-col gap-2">
+												<p class="bg-muted ml-auto w-fit rounded-3xl px-4 py-2 text-right whitespace-pre-wrap text-sm" x-text="message.content"></p>
+											</div>
+										</div>
+										<!-- Assistant Message -->
+										<div x-show="message.role === 'assistant'" class="flex flex-col gap-2">
+											<div class="prose prose-sm max-w-none text-sm leading-relaxed whitespace-pre-wrap" x-text="message.content"></div>
+											<!-- Streaming Indicator -->
+											<div x-show="message.streaming" class="flex items-center gap-1 text-muted-foreground">
+												<span class="w-1 h-1 bg-current rounded-full animate-pulse"></span>
+												<span class="w-1 h-1 bg-current rounded-full animate-pulse" style="animation-delay: 150ms;"></span>
+												<span class="w-1 h-1 bg-current rounded-full animate-pulse" style="animation-delay: 300ms;"></span>
+											</div>
+										</div>
+									</div>
+								</template>
+								<!-- Typing Indicator -->
+								<div x-show="showTypingIndicator" class="flex flex-col gap-2">
+									<div class="flex items-center gap-1.5">
+										<span class="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style="animation-duration: 1s; animation-delay: 0ms;"></span>
+										<span class="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style="animation-duration: 1s; animation-delay: 150ms;"></span>
+										<span class="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style="animation-duration: 1s; animation-delay: 300ms;"></span>
+									</div>
+								</div>
+								<!-- Error Message -->
+								<div x-show="errorMessage" class="rounded-lg bg-destructive/10 border border-destructive/20 p-4">
+									<div class="flex gap-3">
+										<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-destructive shrink-0 mt-0.5">
+											<circle cx="12" cy="12" r="10"></circle>
+											<line x1="12" x2="12" y1="8" y2="12"></line>
+											<line x1="12" x2="12.01" y1="16" y2="16"></line>
+										</svg>
+										<div class="flex-1">
+											<div class="font-semibold text-sm text-destructive mb-1">Error</div>
+											<div class="text-sm text-destructive/90" x-text="errorMessage"></div>
+										</div>
+									</div>
+								</div>
 							</div>
 						</div>
 					</div>
-					<div class="p-3 border-t border-border text-xs text-muted-foreground/60">
-						<div class="flex items-center justify-between">
-							<span>Total events:</span>
-							<span x-text="events.length"></span>
+					<!-- Input Area - Agent Chat UI Style (only show when messages exist) -->
+					<div x-show="messages.length > 0 || isStreaming" class="sticky bottom-0 flex flex-col items-center gap-8 bg-background">
+						<div class="relative z-10 mx-auto mb-8 w-full max-w-3xl rounded-2xl border border-border bg-muted shadow-sm transition-all">
+							<form @submit.prevent="sendMessage" class="mx-auto grid max-w-3xl grid-rows-[1fr_auto] gap-2">
+								<textarea
+									x-model="currentMessage"
+									:disabled="isStreaming"
+									@keydown.enter.prevent="if (!$event.shiftKey && currentMessage.trim()) sendMessage()"
+									placeholder="Type your message..."
+									rows="1"
+									class="resize-none border-none bg-transparent p-3.5 pb-0 shadow-none outline-none focus:ring-0 focus:outline-none text-sm"
+									style="field-sizing: content;"
+								></textarea>
+								<div class="flex items-center justify-between p-2 pt-4">
+									<!-- Lifecycle Events Toggle -->
+									<div class="flex items-center gap-2">
+										<label class="relative inline-flex items-center cursor-pointer">
+											<input type="checkbox" x-model="hideLifecycleEvents" class="sr-only peer"/>
+											<div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/50 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+										</label>
+										<span class="text-xs text-muted-foreground">Hide Events</span>
+									</div>
+									<!-- Send Button -->
+									<button
+										type="submit"
+										:disabled="isStreaming || !currentMessage.trim()"
+										class="shrink-0 rounded-full p-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+										:class="currentMessage.trim() && !isStreaming ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-muted-foreground/20 text-muted-foreground'"
+									>
+										<svg x-show="!isStreaming" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+											<path d="m22 2-7 20-4-9-9-4Z"></path>
+											<path d="M22 2 11 13"></path>
+										</svg>
+										<svg x-show="isStreaming" class="animate-spin" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+											<path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+										</svg>
+									</button>
+								</div>
+							</form>
 						</div>
 					</div>
-				</div>
+				</main>
+				<!-- Right Debug Panel -->
+				<aside
+					x-show="showDebugPanel"
+					x-transition:enter="transition ease-out duration-200"
+					x-transition:enter-start="translate-x-full opacity-0"
+					x-transition:enter-end="translate-x-0 opacity-100"
+					x-transition:leave="transition ease-in duration-150"
+					x-transition:leave-start="translate-x-0 opacity-100"
+					x-transition:leave-end="translate-x-full opacity-0"
+					class="w-[280px] border-l border-border bg-card flex flex-col"
+				>
+					<!-- Debug Header -->
+					<div class="flex items-center justify-between p-4 border-b border-border shadow-sm">
+						<h2 class="text-sm font-semibold tracking-tight">Debug Events</h2>
+						<button
+							@click="showDebugPanel = false"
+							class="p-1.5 rounded-lg hover:bg-muted transition-all duration-200"
+						>
+							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+								<path d="M18 6 6 18"></path>
+								<path d="m6 6 12 12"></path>
+							</svg>
+						</button>
+					</div>
+					<!-- Events List -->
+					<div class="flex-1 overflow-y-auto p-3 scrollbar-thin">
+						<div class="space-y-2">
+							<template x-for="event in events.slice().reverse()" :key="event.id">
+								<div class="rounded-lg bg-muted/40 border border-border/50 p-3 space-y-1.5 hover:bg-muted/60 transition-colors">
+									<div class="flex items-center justify-between">
+										<span class="text-xs font-semibold font-mono" x-text="event.type"></span>
+										<span class="text-[10px] text-muted-foreground" x-text="event.time"></span>
+									</div>
+									<div class="text-xs text-muted-foreground leading-relaxed" x-text="event.details"></div>
+								</div>
+							</template>
+							<div x-show="events.length === 0" class="flex flex-col items-center justify-center py-16 text-muted-foreground">
+								<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="mb-2 opacity-20">
+									<circle cx="12" cy="12" r="10"></circle>
+									<path d="M12 6v6l4 2"></path>
+								</svg>
+								<p class="text-xs">No events yet</p>
+							</div>
+						</div>
+					</div>
+					<!-- Debug Footer -->
+					<div class="p-3 border-t border-border">
+						<div class="flex items-center justify-between text-xs text-muted-foreground">
+							<span>Total events</span>
+							<span class="font-mono font-semibold" x-text="events.length"></span>
+						</div>
+					</div>
+				</aside>
 			</div>
 		</body>
 	</html>

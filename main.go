@@ -41,6 +41,7 @@ func main() {
 	// Serve static assets
 	mux.Handle("/assets/css/", http.StripPrefix("/assets/css/", http.FileServer(http.Dir("./assets/css"))))
 	mux.Handle("/assets/js/", http.StripPrefix("/assets/js/", http.FileServer(http.Dir("./assets/js"))))
+	mux.Handle("/assets/images/", http.StripPrefix("/assets/images/", http.FileServer(http.Dir("./assets/images"))))
 
 	// Chat routes
 	mux.HandleFunc("/send", handlers.HandleSendMessage(store, aiClient))
@@ -59,6 +60,8 @@ func HandleViewChatInputScreen(w http.ResponseWriter, r *http.Request) {
 	component := components.ChatInputScreen()
 	err := component.Render(r.Context(), w)
 	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		slog.Error("Failed to render chat screen", "error", err)
+		// Don't call http.Error after Render has already written headers
+		// Just log the error - the partial response will be sent
 	}
 }
