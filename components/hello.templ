@@ -25,7 +25,7 @@ templ ChatInputScreen() {
 					<!-- Sidebar Toggle -->
 					<button
 						@click="toggleSidebar()"
-						class="absolute top-4 left-4 z-10 p-2 rounded-lg hover:bg-gray-100 transition-colors hidden lg:block bg-white/80 backdrop-blur-sm shadow-sm"
+						class="absolute top-4 left-4 z-10 p-2 rounded-lg hover:bg-muted transition-colors hidden lg:block bg-card/80 backdrop-blur-sm shadow-sm"
 					>
 						<svg x-show="sidebarOpen" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 							<rect width="18" height="18" x="3" y="3" rx="2"></rect>
@@ -77,25 +77,25 @@ templ ChatInputScreen() {
 														<div
 															class="px-2 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide"
 															:class="{
-														'bg-green-100 text-green-700': event.type === 'RUN_FINISHED' || event.type === 'TOOL_CALL_END' || event.type === 'TEXT_MESSAGE_END' || event.type === 'STEP_FINISHED' || event.type === 'REASONING_END',
-														'bg-blue-100 text-blue-700': event.type === 'RUN_STARTED' || event.type === 'TEXT_MESSAGE_START' || event.type === 'STEP_STARTED' || event.type === 'REASONING_START',
-														'bg-red-100 text-red-700': event.type === 'RUN_ERROR',
-														'bg-purple-100 text-purple-700': event.type === 'TOOL_CALL_START',
-														'bg-purple-50 text-purple-600': event.type === 'TOOL_CALL_ARGS',
-														'bg-amber-100 text-amber-700': event.type === 'TOOL_CALL_RESULT',
-														'bg-cyan-100 text-cyan-700': event.type === 'STATE_SNAPSHOT' || event.type === 'MESSAGES_SNAPSHOT',
-														'bg-cyan-50 text-cyan-600': event.type === 'STATE_DELTA',
-														'bg-indigo-100 text-indigo-700': event.type === 'ACTIVITY_SNAPSHOT',
-														'bg-indigo-50 text-indigo-600': event.type === 'ACTIVITY_DELTA',
-														'bg-pink-100 text-pink-700': event.type === 'REASONING_MESSAGE_START' || event.type === 'REASONING_MESSAGE_END',
-														'bg-slate-100 text-slate-600': event.type === 'RAW' || event.type === 'CUSTOM' || event.type === 'META_EVENT',
-														'bg-yellow-100 text-yellow-700': event.type === 'RUN_FINISHED' && event.outcome === 'interrupt'
+														'bg-primary/10 text-primary': event.type === 'RUN_FINISHED' || event.type === 'TOOL_CALL_END' || event.type === 'TEXT_MESSAGE_END' || event.type === 'STEP_FINISHED' || event.type === 'REASONING_END',
+														'bg-accent/10 text-accent-foreground': event.type === 'RUN_STARTED' || event.type === 'TEXT_MESSAGE_START' || event.type === 'STEP_STARTED' || event.type === 'REASONING_START',
+														'bg-destructive/10 text-destructive': event.type === 'RUN_ERROR',
+														'bg-primary/20 text-primary': event.type === 'TOOL_CALL_START',
+														'bg-muted text-muted-foreground': event.type === 'TOOL_CALL_ARGS',
+														'bg-accent/20 text-accent-foreground': event.type === 'TOOL_CALL_RESULT',
+														'bg-secondary text-secondary-foreground': event.type === 'STATE_SNAPSHOT' || event.type === 'MESSAGES_SNAPSHOT',
+														'bg-secondary/50 text-secondary-foreground': event.type === 'STATE_DELTA',
+														'bg-muted/80 text-foreground': event.type === 'ACTIVITY_SNAPSHOT',
+														'bg-muted/50 text-muted-foreground': event.type === 'ACTIVITY_DELTA',
+														'bg-primary/15 text-primary': event.type === 'REASONING_MESSAGE_START' || event.type === 'REASONING_MESSAGE_END',
+														'bg-muted text-muted-foreground': event.type === 'RAW' || event.type === 'CUSTOM' || event.type === 'META_EVENT',
+														'bg-accent/15 text-accent-foreground': event.type === 'RUN_FINISHED' && event.outcome === 'interrupt'
 													}"
 														>
 															<span x-text="event.content"></span>
 														</div>
 														<!-- Arrow -->
-														<svg x-show="index < message.lifecycleEvents.length - 1" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-300">
+														<svg x-show="index < message.lifecycleEvents.length - 1" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-border">
 															<path d="M5 12h14"></path>
 															<path d="m12 5 7 7-7 7"></path>
 														</svg>
