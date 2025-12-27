@@ -1,0 +1,8 @@
+version: 3
+
+tasks:
+  setup-ubuntu:
+    cmds:
+      - go install github.com/a-h/templ/cmd/templ@latest
+
+  run: "wgo -file=.go -file=.templ -xfile=_templ.go  go tool templ generate :: go run main.go"
