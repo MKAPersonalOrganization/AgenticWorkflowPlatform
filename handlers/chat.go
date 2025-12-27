@@ -83,57 +83,48 @@ func HandleSendMessage(store *session.Store, aiClient *openaiservice.Client) htt
 		// Generate unique message ID for assistant response
 		messageID := agui.GenerateMessageID()
 
-		// Check if OpenAI client is available
-		if aiClient == nil {
-			// Fallback to echo response if no API key
-			sendEchoResponse(w, flusher, threadID, messageID, message, store)
-		} else {
-			// Get conversation history
-			messages := store.GetMessages(threadID)
+		// Get conversation history
+		messages := store.GetMessages(threadID)
 
-			// Create streaming handler
-			streamHandler := openaiservice.NewStreamHandler(aiClient, store, w, flusher)
+		// Create streaming handler
+		streamHandler := openaiservice.NewStreamHandler(aiClient, store, w, flusher)
 
-			// Handle OpenAI streaming
-			ctx := context.Background()
-			if err := streamHandler.HandleStream(ctx, threadID, messageID, messages); err != nil {
-				// Emit RUN_ERROR event on failure
-				errorEvent := &agui.RunErrorEvent{
-					Type:      "RUN_ERROR",
-					RunID:     runID,
-					Code:      "OPENAI_ERROR",
-					Message:   err.Error(),
-					Timestamp: time.Now().UnixMilli(),
-				}
-				agui.WriteSSEEvent(w, errorEvent)
-				flusher.Flush()
-				return
+		// Handle OpenAI streaming
+		ctx := context.Background()
+		if err := streamHandler.HandleStream(ctx, threadID, messageID, messages); err != nil {
+			// Emit RUN_ERROR event on failure
+			errorEvent := &agui.RunErrorEvent{
+				Type:      "RUN_ERROR",
+				RunID:     runID,
+				Code:      "OPENAI_ERROR",
+				Message:   err.Error(),
+				Timestamp: time.Now().UnixMilli(),
 			}
+			agui.WriteSSEEvent(w, errorEvent)
+			flusher.Flush()
+			return
 		}
 
-		// Auto-generate thread title if still "New Chat" and aiClient is available
-		if aiClient != nil {
-			thread, exists := store.GetThread(threadID)
-			if exists && thread.Title == "New Chat" && len(thread.Messages) >= 2 {
-				// Generate title synchronously before finishing the run
-				ctx := context.Background()
-				messages := store.GetMessages(threadID)
-				if title, err := aiClient.GenerateThreadTitle(ctx, messages); err == nil && title != "" {
-					store.UpdateThreadTitle(threadID, title)
+		// Auto-generate thread title if still "New Chat"
+		thread, exists := store.GetThread(threadID)
+		if exists && thread.Title == "New Chat" && len(thread.Messages) >= 2 {
+			// Generate title synchronously before finishing the run
+			messages := store.GetMessages(threadID)
+			if title, err := aiClient.GenerateThreadTitle(ctx, messages); err == nil && title != "" {
+				store.UpdateThreadTitle(threadID, title)
 
-					// Send CUSTOM event to notify frontend of title update
-					customEvent := map[string]any{
-						"type":      "CUSTOM",
-						"name":      "THREAD_TITLE_UPDATED",
-						"value": map[string]string{
-							"threadId": threadID,
-							"title":    title,
-						},
-						"timestamp": time.Now().UnixMilli(),
-					}
-					agui.WriteSSEEvent(w, customEvent)
-					flusher.Flush()
+				// Send CUSTOM event to notify frontend of title update
+				customEvent := map[string]any{
+					"type":      "CUSTOM",
+					"name":      "THREAD_TITLE_UPDATED",
+					"value": map[string]string{
+						"threadId": threadID,
+						"title":    title,
+					},
+					"timestamp": time.Now().UnixMilli(),
 				}
+				agui.WriteSSEEvent(w, customEvent)
+				flusher.Flush()
 			}
 		}
 
@@ -168,49 +159,6 @@ func HandleGetMessages(store *session.Store) http.HandlerFunc {
 			return
 		}
 	}
-}
-
-// sendEchoResponse sends a simple echo response (fallback when OpenAI is not available)
-func sendEchoResponse(w http.ResponseWriter, flusher http.Flusher, threadID, messageID, message string, store *session.Store) {
-	// Send TEXT_MESSAGE_START event
-	startEvent := &agui.TextMessageStartEvent{
-		Type:      "TEXT_MESSAGE_START",
-		MessageID: messageID,
-		Role:      "assistant",
-		Timestamp: time.Now().UnixMilli(),
-	}
-	agui.WriteSSEEvent(w, startEvent)
-	flusher.Flush()
-
-	// Generate echo response
-	response := "Echo (OpenAI not configured): " + message
-
-	// Send content as a single chunk
-	contentEvent := &agui.TextMessageContentEvent{
-		Type:      "TEXT_MESSAGE_CONTENT",
-		MessageID: messageID,
-		Delta:     response,
-		Timestamp: time.Now().UnixMilli(),
-	}
-	agui.WriteSSEEvent(w, contentEvent)
-	flusher.Flush()
-
-	// Store assistant message
-	store.AddMessage(threadID, session.Message{
-		ID:        messageID,
-		Role:      "assistant",
-		Content:   response,
-		Timestamp: time.Now(),
-	})
-
-	// Send TEXT_MESSAGE_END event
-	endEvent := &agui.TextMessageEndEvent{
-		Type:      "TEXT_MESSAGE_END",
-		MessageID: messageID,
-		Timestamp: time.Now().UnixMilli(),
-	}
-	agui.WriteSSEEvent(w, endEvent)
-	flusher.Flush()
 }
 
 // HandleGetThreads retrieves all threads

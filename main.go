@@ -32,8 +32,7 @@ func main() {
 	// Initialize OpenAI client
 	aiClient, err := openaiservice.NewClient()
 	if err != nil {
-		slog.Warn("Failed to initialize OpenAI client, will use fallback", "error", err)
-		// Continue without OpenAI - the handler will need to handle nil client
+		panic(fmt.Sprintf("Failed to initialize OpenAI client: %v", err))
 	}
 
 	mux := http.NewServeMux()
