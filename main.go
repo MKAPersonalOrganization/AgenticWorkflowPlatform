@@ -8,15 +8,12 @@ import (
 	"os"
 
 	"school-with-ai/components"
-
-	"github.com/a-h/templ"
+	"school-with-ai/handlers"
+	"school-with-ai/internal/session"
+	openaiservice "school-with-ai/services/openai"
 )
 
 func main() {
-	component := components.Hello("John")
-
-	http.Handle("/", templ.Handler(component))
-
 	addr := os.Getenv("SERVER_ADDR")
 	if addr == "" {
 		panic("SERVER_ADDR environment variable is not set")
@@ -28,8 +25,40 @@ func main() {
 	}
 
 	slog.Info("Starting server", "host", host, "port", port)
-	err = http.ListenAndServe(addr, nil)
+
+	// Initialize session store
+	store := session.NewStore()
+
+	// Initialize OpenAI client
+	aiClient, err := openaiservice.NewClient()
+	if err != nil {
+		slog.Warn("Failed to initialize OpenAI client, will use fallback", "error", err)
+		// Continue without OpenAI - the handler will need to handle nil client
+	}
+
+	mux := http.NewServeMux()
+
+	// Serve static assets
+	mux.Handle("/assets/css/", http.StripPrefix("/assets/css/", http.FileServer(http.Dir("./assets/css"))))
+	mux.Handle("/assets/js/", http.StripPrefix("/assets/js/", http.FileServer(http.Dir("./assets/js"))))
+
+	// Chat routes
+	mux.HandleFunc("/send", handlers.HandleSendMessage(store, aiClient))
+	mux.HandleFunc("GET /api/threads", handlers.HandleGetThreads(store))
+	mux.HandleFunc("GET /api/threads/{threadId}/messages", handlers.HandleGetMessages(store))
+	mux.HandleFunc("PATCH /api/threads/{threadId}/title", handlers.HandleUpdateThreadTitle(store))
+	mux.HandleFunc("DELETE /api/threads/{threadId}", handlers.HandleDeleteThread(store))
+	mux.HandleFunc("/", HandleViewChatInputScreen)
+	err = http.ListenAndServe(addr, mux)
 	if err != nil {
 		panic(err)
+	}
+}
+
+func HandleViewChatInputScreen(w http.ResponseWriter, r *http.Request) {
+	component := components.ChatInputScreen()
+	err := component.Render(r.Context(), w)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 	}
 }

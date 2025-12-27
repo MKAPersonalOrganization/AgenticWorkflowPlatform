@@ -1,3 +1,9 @@
 # Templ generated files
 *_templ.go
 .env
+
+# Tailwind CSS output
+assets/css/output.css
+
+# templui config (optional - you may want to commit this)
+# .templui.json
