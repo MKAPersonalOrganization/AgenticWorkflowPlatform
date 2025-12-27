@@ -166,7 +166,7 @@ Any changes to `.templ`, `.css`, or `.go` files will automatically rebuild and r
 ├── internal/
 │   └── agui/          # AG-UI protocol implementation
 ├── services/
-│   └── mock/          # Mock AI responses
+│   └── openai/        # OpenAI integration
 ├── assets/
 │   ├── css/           # Tailwind CSS files
 │   └── js/            # Alpine.js components
