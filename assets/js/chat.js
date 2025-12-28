@@ -1847,7 +1847,102 @@ document.addEventListener('alpine:init', () => {
     }));
 });
 
-// Production: Global helper for debugging (Alpine pattern: expose utilities)
+// ═══════════════════════════════════════════════════════════════════════════
+// ALPINE.JS CUSTOM MAGICS (Alpine extending.md pattern)
+// ═══════════════════════════════════════════════════════════════════════════
+
+document.addEventListener('alpine:init', () => {
+    // Custom magic: $chatMetrics - Easy access to performance metrics
+    Alpine.magic('chatMetrics', () => {
+        return () => {
+            const chatComponent = Alpine.$data(document.querySelector('[x-data*="chat"]'));
+            return chatComponent?.getMetrics?.() || null;
+        };
+    });
+
+    // Custom magic: $chatHealth - Check connection health
+    Alpine.magic('chatHealth', () => {
+        return () => {
+            const chatComponent = Alpine.$data(document.querySelector('[x-data*="chat"]'));
+            return chatComponent?.getConnectionHealth?.() || null;
+        };
+    });
+
+    // Custom magic: $chatDiagnostics - Export full diagnostics
+    Alpine.magic('chatDiagnostics', () => {
+        return () => {
+            const chatComponent = Alpine.$data(document.querySelector('[x-data*="chat"]'));
+            return chatComponent?.exportDiagnostics?.() || null;
+        };
+    });
+
+    // Custom magic: $formatTime - Utility for time formatting
+    Alpine.magic('formatTime', () => {
+        return (timestamp) => {
+            if (!timestamp) return '';
+            return new Date(timestamp).toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit'
+            });
+        };
+    });
+
+    // Custom magic: $copyToClipboard - Easy clipboard access
+    Alpine.magic('copyToClipboard', () => {
+        return async (text) => {
+            try {
+                await navigator.clipboard.writeText(text);
+                return true;
+            } catch (error) {
+                console.error('Failed to copy to clipboard:', error);
+                return false;
+            }
+        };
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ALPINE.JS GLOBAL STORE (Alpine store.md pattern)
+// ═══════════════════════════════════════════════════════════════════════════
+
+document.addEventListener('alpine:init', () => {
+    // Global chat settings store
+    Alpine.store('chatSettings', {
+        // Initialize with sensible defaults
+        init() {
+            this.theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        },
+
+        // Settings
+        theme: 'light',
+        soundEnabled: true,
+        notificationsEnabled: true,
+        showTimestamps: true,
+        compactMode: false,
+
+        // Actions
+        toggleSound() {
+            this.soundEnabled = !this.soundEnabled;
+        },
+
+        toggleNotifications() {
+            this.notificationsEnabled = !this.notificationsEnabled;
+        },
+
+        toggleTheme() {
+            this.theme = this.theme === 'light' ? 'dark' : 'light';
+        },
+
+        toggleCompactMode() {
+            this.compactMode = !this.compactMode;
+        }
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PRODUCTION DEBUG UTILITIES (Alpine pattern: expose utilities)
+// ═══════════════════════════════════════════════════════════════════════════
+
 if (typeof window !== 'undefined') {
     window.__chatDebug = {
         getMetrics: () => {
@@ -1865,8 +1960,22 @@ if (typeof window !== 'undefined') {
         resetMetrics: () => {
             const chatComponent = Alpine.$data(document.querySelector('[x-data*="chat"]'));
             return chatComponent?.resetMetrics?.();
+        },
+        // Access Alpine store
+        getSettings: () => Alpine.store('chatSettings'),
+        // Quick health check
+        isHealthy: () => {
+            const chatComponent = Alpine.$data(document.querySelector('[x-data*="chat"]'));
+            return chatComponent?.isHealthy?.() || false;
         }
     };
 
-    console.log('[Chat] Debug utilities available at window.__chatDebug');
+    console.log('[Chat] Debug utilities available:');
+    console.log('  - window.__chatDebug (legacy)');
+    console.log('  - $chatMetrics() in templates');
+    console.log('  - $chatHealth() in templates');
+    console.log('  - $chatDiagnostics() in templates');
+    console.log('  - $formatTime(timestamp) in templates');
+    console.log('  - $copyToClipboard(text) in templates');
+    console.log('  - $store.chatSettings (global settings)');
 }
