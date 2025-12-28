@@ -4,6 +4,8 @@ import "school-with-ai/components/message"
 import "school-with-ai/components/errormessage"
 import "school-with-ai/components/alert"
 import "school-with-ai/components/badge"
+import "school-with-ai/components/skeleton"
+import "school-with-ai/components/collapsible"
 
 templ MessageList() {
 	<div class="space-y-4">
@@ -24,12 +26,31 @@ templ MessageList() {
 								@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "font-mono text-xs"}) {
 									<span x-text="message.name"></span>
 								}
-								<span x-show="message.status === 'streaming'" class="text-xs text-muted-foreground">⏳ streaming...</span>
+								<span x-show="message.status === 'streaming'">
+									@badge.Badge(badge.Props{Variant: badge.VariantOutline, Class: "text-xs"}) {
+										⏳ streaming...
+									}
+								</span>
 							</span>
 						}
 						@alert.Description() {
-							<div x-show="message.status === 'completed'" class="text-sm font-mono bg-muted p-2 rounded border border-border overflow-x-auto">
-								<pre x-text="JSON.stringify(message.parsedArgs, null, 2)" class="text-xs"></pre>
+							<div x-show="message.status === 'streaming'">
+								@skeleton.Skeleton(skeleton.Props{Class: "h-20 w-full"})
+							</div>
+							<div x-show="message.status === 'completed'">
+								@collapsible.Collapsible(collapsible.Props{Open: false}) {
+									@collapsible.Trigger(collapsible.TriggerProps{Class: "flex items-center gap-2 cursor-pointer hover:text-primary"}) {
+										<svg class="w-4 h-4 transition-transform [[data-tui-collapsible-state=open]_&]:rotate-90" fill="currentColor" viewBox="0 0 20 20">
+											<path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
+										</svg>
+										<span class="text-sm font-medium">View arguments</span>
+									}
+									@collapsible.Content() {
+										<div class="mt-2 text-sm font-mono bg-muted p-2 rounded border border-border overflow-x-auto">
+											<pre x-text="JSON.stringify(message.parsedArgs, null, 2)" class="text-xs"></pre>
+										</div>
+									}
+								}
 							</div>
 						}
 					}
