@@ -10,7 +10,11 @@ import "school-with-ai/components/collapsible"
 templ MessageList() {
 	<div class="space-y-4">
 		<template x-for="message in messages" :key="message.id">
-			<div class="group">
+			<div
+				class="group"
+				role="article"
+				:aria-label="`Message from ${message.role || 'system'}`"
+			>
 				<!-- User Message -->
 				@message.UserMessage()
 				<!-- Tool Call Message -->
@@ -82,7 +86,13 @@ templ MessageList() {
 			</div>
 		</template>
 		<!-- Typing Indicator -->
-		<div x-show="showTypingIndicator" class="flex flex-col gap-2">
+		<div
+			x-show="showTypingIndicator"
+			class="flex flex-col gap-2"
+			role="status"
+			aria-live="polite"
+			aria-label="Assistant is typing"
+		>
 			<div class="flex items-center gap-1.5">
 				<span class="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style="animation-duration: 1s; animation-delay: 0ms;"></span>
 				<span class="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style="animation-duration: 1s; animation-delay: 150ms;"></span>

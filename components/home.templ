@@ -41,7 +41,14 @@ templ ChatInputScreen() {
 							@sidebar.Trigger()
 						</div>
 						<!-- Messages Container -->
-						<div class="flex-1 overflow-y-auto scrollbar-thin" x-ref="messageList">
+						<div
+							class="flex-1 overflow-y-auto scrollbar-thin"
+							x-ref="messageList"
+							role="log"
+							aria-live="polite"
+							aria-relevant="additions"
+							aria-label="Chat conversation"
+						>
 							<div x-show="!hasMessages && !isStreaming" class="h-full flex flex-col items-center justify-center">
 								<div class="flex flex-col items-center gap-8 w-full max-w-3xl mx-auto px-4">
 									<div class="flex flex-col items-center gap-4">

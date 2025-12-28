@@ -78,6 +78,7 @@ document.addEventListener('alpine:init', () => {
         __cleanupTasks: new Set(),
         __updateQueue: [],
         __updatePending: false,
+        __srAnnouncer: null,
 
         // ============================================
         // Computed Properties (Simple Getters)
@@ -126,6 +127,9 @@ document.addEventListener('alpine:init', () => {
             queueMicrotask(() => {
                 this.__loadSessions()
             })
+
+            // Initialize screen reader announcer
+            this.__initScreenReaderAnnouncer()
 
             // Initialize throttled scroll (Alpine pattern)
             this.__scrollToBottomThrottled = this.__throttle(
@@ -320,6 +324,9 @@ document.addEventListener('alpine:init', () => {
             this.__currentThreadId = newSessionId;
             this.__currentState = newState;
             localStorage.setItem('currentThreadId', newSessionId);
+
+            // Announce to screen readers
+            this.__announce('New chat session created');
         },
 
         switchSession(sessionId) {
@@ -531,6 +538,52 @@ document.addEventListener('alpine:init', () => {
         },
 
         // ============================================
+        // Accessibility (Alpine UI pattern)
+        // ============================================
+
+        /**
+         * Initialize screen reader announcer element
+         */
+        __initScreenReaderAnnouncer() {
+            // Create hidden live region for screen reader announcements
+            this.__srAnnouncer = document.createElement('div')
+            this.__srAnnouncer.setAttribute('role', 'status')
+            this.__srAnnouncer.setAttribute('aria-live', 'polite')
+            this.__srAnnouncer.setAttribute('aria-atomic', 'true')
+            this.__srAnnouncer.className = 'sr-only'
+            document.body.appendChild(this.__srAnnouncer)
+
+            // Register cleanup
+            this.__cleanupTasks.add(() => {
+                if (this.__srAnnouncer) {
+                    this.__srAnnouncer.remove()
+                }
+            })
+        },
+
+        /**
+         * Announce message to screen readers
+         * @param {string} message - Message to announce
+         * @param {string} priority - 'polite' (default) or 'assertive'
+         */
+        __announce(message, priority = 'polite') {
+            if (!this.__srAnnouncer) return
+
+            // Update aria-live if priority changed
+            if (this.__srAnnouncer.getAttribute('aria-live') !== priority) {
+                this.__srAnnouncer.setAttribute('aria-live', priority)
+            }
+
+            // Clear previous announcement
+            this.__srAnnouncer.textContent = ''
+
+            // Announce new message (timeout ensures screen readers detect the change)
+            setTimeout(() => {
+                this.__srAnnouncer.textContent = message
+            }, 100)
+        },
+
+        // ============================================
         // Keyboard Shortcuts (Alpine UI pattern)
         // ============================================
 
@@ -600,12 +653,15 @@ document.addEventListener('alpine:init', () => {
                     clearInterval(state.heartbeatInterval)
                     state.heartbeatInterval = null
                 }
-                // Show info message instead of error
+                // Announce to screen readers
+                this.__announce('Streaming cancelled')
                 console.log('Streaming cancelled by user')
             }
         },
 
         __notifyNewMessage(message) {
+            // Announce new message to screen readers
+            this.__announce('New message received from assistant')
             // Could be enhanced with browser notifications
             console.log('New message received:', message.id)
         },
@@ -617,6 +673,12 @@ document.addEventListener('alpine:init', () => {
                 if (oldState?.eventSource) {
                     oldState.isBackground = true
                 }
+            }
+
+            // Announce thread switch to screen readers
+            const session = this.sessions.find(s => s.id === newThreadId)
+            if (session) {
+                this.__announce(`Switched to ${session.title}`)
             }
 
             // Focus message input
@@ -999,6 +1061,11 @@ document.addEventListener('alpine:init', () => {
                     state.currentStreamingId = event.messageId;
                     state.currentStreamingContent = '';
 
+                    // Announce to screen readers (only for current thread)
+                    if (threadId === this.__currentThreadId) {
+                        this.__announce('Assistant is responding');
+                    }
+
                     // Add empty assistant message
                     state.messages.push({
                         id: event.messageId,
@@ -1031,6 +1098,11 @@ document.addEventListener('alpine:init', () => {
                         state.messages[endMsgIndex].streaming = false;
                     }
 
+                    // Announce completion to screen readers (only for current thread)
+                    if (threadId === this.__currentThreadId) {
+                        this.__announce('Response complete');
+                    }
+
                     state.currentStreamingId = null;
                     state.currentStreamingContent = '';
                     break;
@@ -1052,6 +1124,8 @@ document.addEventListener('alpine:init', () => {
                     // Only show error if this is the current thread
                     if (threadId === this.__currentThreadId) {
                         this.__showError(event.message || 'An error occurred', threadId);
+                        // Announce error with high priority
+                        this.__announce(`Error: ${event.message || 'An error occurred'}`, 'assertive');
                     }
                     eventSource.close();
                     break;
