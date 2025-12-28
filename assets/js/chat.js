@@ -8,10 +8,44 @@
 // - Modular helper functions with clear separation
 // - Event-driven architecture with SSE streaming
 // - Lazy state initialization for thread isolation
+
+// AG-UI Protocol Lifecycle Event Types
+const LIFECYCLE_EVENT_TYPES = [
+    'RUN_STARTED', 'RUN_FINISHED', 'RUN_ERROR', 'STEP_STARTED', 'STEP_FINISHED',
+    'TEXT_MESSAGE_START', 'TEXT_MESSAGE_END',
+    'TOOL_CALL_START', 'TOOL_CALL_ARGS', 'TOOL_CALL_END', 'TOOL_CALL_RESULT',
+    'STATE_SNAPSHOT', 'STATE_DELTA', 'MESSAGES_SNAPSHOT',
+    'ACTIVITY_SNAPSHOT', 'ACTIVITY_DELTA',
+    'RAW', 'CUSTOM',
+    'REASONING_START', 'REASONING_MESSAGE_START', 'REASONING_MESSAGE_END', 'REASONING_END',
+    'META_EVENT'
+];
+
+/**
+ * Chat Component
+ * 
+ * Multi-threaded chat interface with SSE streaming support.
+ * Manages independent conversation threads with real-time updates.
+ * 
+ * Features:
+ * - Thread isolation: Each thread has independent state
+ * - Real-time streaming: SSE-based message streaming
+ * - Event logging: Debug panel for AG-UI Protocol events
+ * - Auto-scroll: Reactive scroll on new messages
+ * 
+ * State Management:
+ * - Uses __ prefix for internal state (Alpine convention)
+ * - Lazy thread state initialization
+ * - Direct state references for optimal reactivity
+ */
 document.addEventListener('alpine:init', () => {
     Alpine.data('chat', () => ({
-        // Internal state (Alpine convention: __ prefix for internal properties)
-        __threadStates: {}, // Map of threadId -> state object
+        // ============================================
+        // State Properties
+        // ============================================
+
+        // Thread management (internal)
+        __threadStates: {},
         __currentThreadId: null,
         __currentState: {
             messages: [],
@@ -26,13 +60,15 @@ document.addEventListener('alpine:init', () => {
             currentStreamingContent: ''
         },
 
-        // Public UI state
+        // User input
         currentMessage: '',
+
+        // UI state
         sessions: [],
+        sidebarOpen: true,
         showDebugPanel: false,
         showEventLog: false,
         eventLogCopied: false,
-        sidebarOpen: true,
         hideLifecycleEvents: false,
 
         // ============================================
@@ -114,7 +150,11 @@ document.addEventListener('alpine:init', () => {
         // Thread State Management
         // ============================================
 
-        // Internal: Get or create state for a specific thread
+        /**
+         * Get or lazily create thread state
+         * @param {string|null} threadId - Thread ID or null for current
+         * @returns {Object} Thread state object
+         */
         __getThreadState(threadId = null) {
             const id = threadId || this.__currentThreadId
             if (!id) return this.__currentState
@@ -127,7 +167,10 @@ document.addEventListener('alpine:init', () => {
             return this.__threadStates[id]
         },
 
-        // Internal: Factory for creating empty thread state
+        /**
+         * Factory method for creating empty thread state
+         * @returns {Object} New thread state object
+         */
         __createEmptyState() {
             return {
                 messages: [],
@@ -144,12 +187,32 @@ document.addEventListener('alpine:init', () => {
         },
 
         // ============================================
-        // Public API Methods
+        // UI Actions (Alpine pattern: simple action verbs)
         // ============================================
 
-        toggleSidebar() {
+        toggle() {
             this.sidebarOpen = !this.sidebarOpen
         },
+
+        toggleDebugPanel() {
+            this.showDebugPanel = !this.showDebugPanel
+        },
+
+        toggleEventLog() {
+            this.showEventLog = !this.showEventLog
+            if (this.showEventLog) {
+                this.$nextTick(() => {
+                    const logContainer = this.$refs.eventLogContainer
+                    if (logContainer) {
+                        logContainer.scrollTop = logContainer.scrollHeight
+                    }
+                })
+            }
+        },
+
+        // ============================================
+        // Session Management
+        // ============================================
 
         async __loadSessions() {
             try {
@@ -534,30 +597,11 @@ document.addEventListener('alpine:init', () => {
         __handleEvent(event, eventSource, threadId) {
             const state = this.__getThreadState(threadId);
 
-            // Add event to log (keep only last 10)
+            // Log all events for debugging
             this.__addEvent(event, threadId);
 
             // Add lifecycle event as a message if not hidden
-            // Track all AG UI Protocol event types except TEXT_MESSAGE_CONTENT (too frequent)
-            const lifecycleEventTypes = [
-                // Lifecycle Events
-                'RUN_STARTED', 'RUN_FINISHED', 'RUN_ERROR', 'STEP_STARTED', 'STEP_FINISHED',
-                // Text Message Events
-                'TEXT_MESSAGE_START', 'TEXT_MESSAGE_END',
-                // Tool Call Events
-                'TOOL_CALL_START', 'TOOL_CALL_ARGS', 'TOOL_CALL_END', 'TOOL_CALL_RESULT',
-                // State Management Events
-                'STATE_SNAPSHOT', 'STATE_DELTA', 'MESSAGES_SNAPSHOT',
-                // Activity Events
-                'ACTIVITY_SNAPSHOT', 'ACTIVITY_DELTA',
-                // Special Events
-                'RAW', 'CUSTOM',
-                // Draft Events (Reasoning)
-                'REASONING_START', 'REASONING_MESSAGE_START', 'REASONING_MESSAGE_END', 'REASONING_END',
-                // Draft Events (Meta)
-                'META_EVENT'
-            ];
-            if (!this.hideLifecycleEvents && lifecycleEventTypes.includes(event.type)) {
+            if (!this.hideLifecycleEvents && LIFECYCLE_EVENT_TYPES.includes(event.type)) {
                 this.__addLifecycleMessage(event, threadId);
             }
 
@@ -959,12 +1003,12 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
-        clearEventLog() {
-            const state = this.__getThreadState();
-            state.events = [];
+        clear() {
+            const state = this.__getThreadState()
+            state.events = []
         },
 
-        async copyEventLog() {
+        async copy() {
             const state = this.__getThreadState();
 
             try {
