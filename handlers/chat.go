@@ -10,8 +10,8 @@ import (
 	"school-with-ai/internal/agui"
 	"school-with-ai/internal/session"
 	"school-with-ai/internal/tools"
+	"school-with-ai/services/agent"
 	"school-with-ai/services/llm"
-	"school-with-ai/services/streaming"
 )
 
 // HandleSendMessage handles the /send endpoint with SSE streaming
@@ -94,15 +94,21 @@ func HandleSendMessage(store *session.Store, provider llm.Provider) http.Handler
 		// Get conversation history
 		messages := store.GetMessages(threadID)
 
-		// Create user message handler
-		messageHandler := streaming.NewUserMessageHandler(provider, store, w, flusher)
-
 		// Get available tools
 		availableTools := tools.GetAllTools()
 
+		// Create user message handler with tools
+		messageHandler := agent.NewUserMessageHandler(
+			provider,
+			store,
+			w,
+			flusher,
+			agent.WithTools(availableTools),
+		)
+
 		// Process user message and stream response
 		ctx := context.Background()
-		if err := messageHandler.HandleStream(ctx, threadID, messageID, messages, availableTools); err != nil {
+		if err := messageHandler.HandleStream(ctx, threadID, messageID, messages); err != nil {
 			// Emit RUN_ERROR event on failure
 			errorTimestamp := time.Now().UnixMilli()
 			errorCode := "LLM_ERROR"
@@ -140,7 +146,7 @@ func HandleSendMessage(store *session.Store, provider llm.Provider) http.Handler
 			finalMessageID := agui.GenerateMessageID()
 
 			// Process again with tool results in conversation
-			if err := messageHandler.HandleStream(ctx, threadID, finalMessageID, updatedMessages, availableTools); err != nil {
+			if err := messageHandler.HandleStream(ctx, threadID, finalMessageID, updatedMessages); err != nil {
 				errorTimestamp := time.Now().UnixMilli()
 				errorCode := "LLM_ERROR"
 				errorEvent := &agui.RunErrorEvent{

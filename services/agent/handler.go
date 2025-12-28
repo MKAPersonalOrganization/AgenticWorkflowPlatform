@@ -1,4 +1,4 @@
-package streaming
+package agent
 
 import (
 	"context"
@@ -18,16 +18,34 @@ type UserMessageHandler struct {
 	store    *session.Store
 	flusher  http.Flusher
 	writer   http.ResponseWriter
+	tools    []llm.Tool
+}
+
+// Option is a functional option for configuring UserMessageHandler
+type Option func(*UserMessageHandler)
+
+// WithTools configures the handler with available tools
+func WithTools(tools []llm.Tool) Option {
+	return func(h *UserMessageHandler) {
+		h.tools = tools
+	}
 }
 
 // NewUserMessageHandler creates a new user message handler
-func NewUserMessageHandler(provider llm.Provider, store *session.Store, w http.ResponseWriter, f http.Flusher) *UserMessageHandler {
-	return &UserMessageHandler{
+func NewUserMessageHandler(provider llm.Provider, store *session.Store, w http.ResponseWriter, f http.Flusher, opts ...Option) *UserMessageHandler {
+	h := &UserMessageHandler{
 		provider: provider,
 		store:    store,
 		flusher:  f,
 		writer:   w,
 	}
+
+	// Apply options
+	for _, opt := range opts {
+		opt(h)
+	}
+
+	return h
 }
 
 // HandleStream processes the LLM streaming response and emits AG-UI events
@@ -36,12 +54,11 @@ func (h *UserMessageHandler) HandleStream(
 	threadID string,
 	messageID string,
 	messages []session.Message,
-	tools []llm.Tool,
 ) error {
 	// Create streaming completion
 	config := llm.CompletionConfig{
 		Messages: messages,
-		Tools:    tools,
+		Tools:    h.tools,
 	}
 
 	streamIter := h.provider.CreateStreamingCompletion(ctx, config)
