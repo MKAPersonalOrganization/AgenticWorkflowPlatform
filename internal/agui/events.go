@@ -32,6 +32,28 @@ type TextMessageEndEvent struct {
 	MessageID string `json:"messageId"`
 }
 
+// Lifecycle Events
+//
+// These events represent the lifecycle of an agent run. A typical agent run
+// follows a predictable pattern: it begins with a RunStarted event, may contain
+// multiple optional StepStarted/StepFinished pairs, and concludes with either
+// a RunFinished event (success) or a RunError event (failure).
+//
+// Lifecycle events provide crucial structure to agent runs, enabling frontends to
+// track progress, manage UI states appropriately, and handle errors gracefully.
+// They create a consistent framework for understanding when operations begin and
+// end, making it possible to implement features like loading indicators, progress
+// tracking, and error recovery mechanisms.
+//
+// Event Flow:
+//   1. RunStarted (mandatory) - Signals the start of an agent run
+//   2. StepStarted/StepFinished (optional, can occur multiple times) - Granular progress tracking
+//   3. RunFinished OR RunError (mandatory) - Signals completion or failure
+//
+// The RunStarted and either RunFinished or RunError events are mandatory,
+// forming the boundaries of an agent run. Step events are optional and may occur
+// multiple times within a run, allowing for structured, observable progress tracking.
+
 // RunStartedEvent indicates that a run has started.
 type RunStartedEvent struct {
 	BaseEvent
