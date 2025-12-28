@@ -20,14 +20,6 @@ type UserMessageHandler struct {
 	writer   http.ResponseWriter
 }
 
-// ToolCallState tracks streaming tool call data
-type ToolCallState struct {
-	ID        string
-	Index     int
-	Name      string
-	Arguments string
-}
-
 // NewUserMessageHandler creates a new user message handler
 func NewUserMessageHandler(provider llm.Provider, store *session.Store, w http.ResponseWriter, f http.Flusher) *UserMessageHandler {
 	return &UserMessageHandler{
@@ -73,8 +65,14 @@ func (h *UserMessageHandler) HandleStream(
 	var completeContent string
 
 	// Track active tool calls
-	activeToolCalls := make(map[string]*ToolCallState)
-	toolCallsByIndex := make(map[int]*ToolCallState)
+	type toolCallState struct {
+		ID        string
+		Index     int
+		Name      string
+		Arguments string
+	}
+	activeToolCalls := make(map[string]*toolCallState)
+	toolCallsByIndex := make(map[int]*toolCallState)
 
 	// Process stream chunks using iterator
 	for chunk, err := range streamIter {
@@ -107,7 +105,7 @@ func (h *UserMessageHandler) HandleStream(
 		if len(chunk.ToolCalls) > 0 {
 			for _, toolCallDelta := range chunk.ToolCalls {
 				index := toolCallDelta.Index
-				var state *ToolCallState
+				var state *toolCallState
 
 				// Check if this is a new tool call (has ID and function name)
 				if toolCallDelta.ID != "" && toolCallDelta.Name != "" {
@@ -128,7 +126,7 @@ func (h *UserMessageHandler) HandleStream(
 					h.flusher.Flush()
 
 					// Track this tool call
-					state = &ToolCallState{
+					state = &toolCallState{
 						ID:        toolCallDelta.ID,
 						Index:     index,
 						Name:      toolCallDelta.Name,
