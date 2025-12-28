@@ -41,7 +41,18 @@ type RunStartedEvent struct {
 	Input       interface{} `json:"input,omitempty"`
 }
 
-// RunFinishedEvent represents the successful completion of an agent run
+// RunFinishedEvent signals the successful completion of an agent run.
+//
+// The RunFinished event indicates that an agent has successfully completed all its work
+// for the current run. Upon receiving this event, frontends should finalize any UI states
+// that were waiting on the agent's completion. This event marks a clean termination point
+// and indicates that no further processing will occur in this run unless explicitly requested.
+// The optional result field can contain any output data produced by the agent run.
+//
+// Properties:
+//   - threadId: ID of the conversation thread
+//   - runId: ID of the agent run
+//   - result: Optional result data from run
 type RunFinishedEvent struct {
 	BaseEvent
 	ThreadID string      `json:"threadId"`
@@ -49,12 +60,20 @@ type RunFinishedEvent struct {
 	Result   interface{} `json:"result,omitempty"`
 }
 
-// RunErrorEvent represents an error during an agent run
+// RunErrorEvent signals an error during an agent run.
+//
+// The RunError event indicates that the agent encountered an error it could not recover from,
+// causing the run to terminate prematurely. This event provides information about what went wrong,
+// allowing frontends to display appropriate error messages and potentially offer recovery options.
+// After a RunError event, no further processing will occur in this run.
+//
+// Properties:
+//   - message: Error message
+//   - code: Optional error code
 type RunErrorEvent struct {
 	BaseEvent
-	RunID   string  `json:"runId,omitempty"`
-	Code    *string `json:"code,omitempty"`
 	Message string  `json:"message"`
+	Code    *string `json:"code,omitempty"`
 }
 
 // ToolCallStartEvent signals the start of a tool call

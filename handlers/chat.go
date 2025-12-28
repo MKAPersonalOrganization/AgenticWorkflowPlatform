@@ -64,9 +64,8 @@ func HandleSendMessage(store *session.Store, aiClient *openaiservice.Client) htt
 						Type:      "RUN_ERROR",
 						Timestamp: &errorTimestamp,
 					},
-					RunID:   runID,
-					Code:    &errorCode,
 					Message: fmt.Sprintf("%v", r),
+					Code:    &errorCode,
 				}
 				agui.WriteSSEEvent(w, errorEvent)
 				flusher.Flush()
@@ -111,9 +110,8 @@ func HandleSendMessage(store *session.Store, aiClient *openaiservice.Client) htt
 					Type:      "RUN_ERROR",
 					Timestamp: &errorTimestamp,
 				},
-				RunID:   runID,
-				Code:    &errorCode,
 				Message: err.Error(),
+				Code:    &errorCode,
 			}
 			agui.WriteSSEEvent(w, errorEvent)
 			flusher.Flush()
@@ -144,9 +142,8 @@ func HandleSendMessage(store *session.Store, aiClient *openaiservice.Client) htt
 						Type:      "RUN_ERROR",
 						Timestamp: &errorTimestamp,
 					},
-					RunID:   runID,
-					Code:    &errorCode,
 					Message: err.Error(),
+					Code:    &errorCode,
 				}
 				agui.WriteSSEEvent(w, errorEvent)
 				flusher.Flush()
