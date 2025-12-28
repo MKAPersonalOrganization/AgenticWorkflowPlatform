@@ -97,12 +97,14 @@ func HandleSendMessage(store *session.Store, provider llm.Provider) http.Handler
 		// Get available tools
 		availableTools := tools.GetAllTools()
 
+		// Create SSE event emitter
+		emitter := NewSSEEventEmitter(w, flusher)
+
 		// Create user message handler with tools
 		messageHandler := agent.NewUserMessageHandler(
 			provider,
 			store,
-			w,
-			flusher,
+			emitter,
 			agent.WithTools(availableTools),
 		)
 

@@ -3,7 +3,6 @@ package agent
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"time"
 
 	"school-with-ai/internal/agui"
@@ -12,12 +11,11 @@ import (
 	"school-with-ai/services/llm"
 )
 
-// UserMessageHandler handles processing of user messages and emits AG-UI events
+// UserMessageHandler handles processing of user messages and emits domain events
 type UserMessageHandler struct {
 	provider llm.Provider
 	store    *session.Store
-	flusher  http.Flusher
-	writer   http.ResponseWriter
+	emitter  EventEmitter
 	tools    []llm.Tool
 }
 
@@ -32,12 +30,11 @@ func WithTools(tools []llm.Tool) Option {
 }
 
 // NewUserMessageHandler creates a new user message handler
-func NewUserMessageHandler(provider llm.Provider, store *session.Store, w http.ResponseWriter, f http.Flusher, opts ...Option) *UserMessageHandler {
+func NewUserMessageHandler(provider llm.Provider, store *session.Store, emitter EventEmitter, opts ...Option) *UserMessageHandler {
 	h := &UserMessageHandler{
 		provider: provider,
 		store:    store,
-		flusher:  f,
-		writer:   w,
+		emitter:  emitter,
 	}
 
 	// Apply options
@@ -73,10 +70,9 @@ func (h *UserMessageHandler) HandleStream(
 		MessageID: messageID,
 		Role:      "assistant",
 	}
-	if err := agui.WriteSSEEvent(h.writer, startEvent); err != nil {
+	if err := h.emitter.Emit(startEvent); err != nil {
 		return err
 	}
-	h.flusher.Flush()
 
 	// Track complete content for storage
 	var completeContent string
@@ -112,10 +108,9 @@ func (h *UserMessageHandler) HandleStream(
 				MessageID: messageID,
 				Delta:     chunk.Content,
 			}
-			if err := agui.WriteSSEEvent(h.writer, contentEvent); err != nil {
+			if err := h.emitter.Emit(contentEvent); err != nil {
 				return err
 			}
-			h.flusher.Flush()
 		}
 
 		// Handle tool calls
@@ -137,10 +132,9 @@ func (h *UserMessageHandler) HandleStream(
 						ToolCallName:    toolCallDelta.Name,
 						ParentMessageID: &messageID,
 					}
-					if err := agui.WriteSSEEvent(h.writer, toolStartEvent); err != nil {
+					if err := h.emitter.Emit(toolStartEvent); err != nil {
 						return err
 					}
-					h.flusher.Flush()
 
 					// Track this tool call
 					state = &toolCallState{
@@ -171,10 +165,9 @@ func (h *UserMessageHandler) HandleStream(
 						ToolCallID: state.ID,
 						Delta:      toolCallDelta.Arguments,
 					}
-					if err := agui.WriteSSEEvent(h.writer, argsEvent); err != nil {
+					if err := h.emitter.Emit(argsEvent); err != nil {
 						return err
 					}
-					h.flusher.Flush()
 
 					// Accumulate arguments
 					state.Arguments += toolCallDelta.Arguments
@@ -222,10 +215,9 @@ func (h *UserMessageHandler) HandleStream(
 				},
 				ToolCallID: toolCall.ID,
 			}
-			if err := agui.WriteSSEEvent(h.writer, endEvent); err != nil {
+			if err := h.emitter.Emit(endEvent); err != nil {
 				return err
 			}
-			h.flusher.Flush()
 
 			// Debug: log tool call details
 			fmt.Printf("DEBUG: Executing tool call %s - Name: %s, Args length: %d, Args: %s\n",
@@ -260,10 +252,9 @@ func (h *UserMessageHandler) HandleStream(
 				Content:    result,
 				Role:       &role,
 			}
-			if err := agui.WriteSSEEvent(h.writer, resultEvent); err != nil {
+			if err := h.emitter.Emit(resultEvent); err != nil {
 				return err
 			}
-			h.flusher.Flush()
 		}
 	} else {
 		// No tool calls, just store the text message
@@ -284,10 +275,9 @@ func (h *UserMessageHandler) HandleStream(
 		},
 		MessageID: messageID,
 	}
-	if err := agui.WriteSSEEvent(h.writer, endEvent); err != nil {
+	if err := h.emitter.Emit(endEvent); err != nil {
 		return err
 	}
-	h.flusher.Flush()
 
 	return nil
 }
