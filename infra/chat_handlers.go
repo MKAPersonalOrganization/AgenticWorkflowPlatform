@@ -14,9 +14,22 @@ import (
 	"school-with-ai/services/tools"
 )
 
-// HandleSendMessage handles the /send endpoint with SSE streaming
-func HandleSendMessage(store agent.Repository, provider llm.Provider) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+// Handler encapsulates dependencies for HTTP handlers
+type Handler struct {
+	store    agent.Repository
+	provider llm.Provider
+}
+
+// NewHandler creates a new HTTP handler with the given dependencies
+func NewHandler(store agent.Repository, provider llm.Provider) *Handler {
+	return &Handler{
+		store:    store,
+		provider: provider,
+	}
+}
+
+// SendMessage handles the /send endpoint with SSE streaming
+func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		// Setup SSE headers
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")
@@ -41,11 +54,11 @@ func HandleSendMessage(store agent.Repository, provider llm.Provider) http.Handl
 		}
 
 		// Ensure thread exists
-		store.GetOrCreateThread(threadID)
+		h.store.GetOrCreateThread(threadID)
 
 		// Store user message
 		userMsgID := agui.GenerateMessageID()
-		store.AddMessage(threadID, domain.Message{
+		h.store.AddMessage(threadID, domain.Message{
 			ID:        userMsgID,
 			Role:      "user",
 			Content:   message,
@@ -92,7 +105,7 @@ func HandleSendMessage(store agent.Repository, provider llm.Provider) http.Handl
 		messageID := agui.GenerateMessageID()
 
 		// Get conversation history
-		messages := store.GetMessages(threadID)
+		messages := h.store.GetMessages(threadID)
 
 		// Get available tools
 		availableTools := tools.GetAllTools()
@@ -102,8 +115,8 @@ func HandleSendMessage(store agent.Repository, provider llm.Provider) http.Handl
 
 		// Create agent with tools
 		messageHandler := agent.NewAgent(
-			provider,
-			store,
+			h.provider,
+			h.store,
 			emitter,
 			agent.WithTools(availableTools),
 		)
@@ -128,7 +141,7 @@ func HandleSendMessage(store agent.Repository, provider llm.Provider) http.Handl
 		}
 
 		// Check if tool calls were made and continue conversation
-		updatedMessages := store.GetMessages(threadID)
+		updatedMessages := h.store.GetMessages(threadID)
 		hasToolCalls := false
 		for _, msg := range updatedMessages {
 			if msg.Role == "assistant" && len(msg.ToolCalls) > 0 {
@@ -140,7 +153,7 @@ func HandleSendMessage(store agent.Repository, provider llm.Provider) http.Handl
 		// If tool calls were made, continue conversation with results
 		if hasToolCalls {
 			// Emit MESSAGES_SNAPSHOT after tool results
-			if err := emitMessagesSnapshot(w, flusher, threadID, store); err != nil {
+			if err := h.emitMessagesSnapshot(w, flusher, threadID); err != nil {
 				return
 			}
 
@@ -166,22 +179,22 @@ func HandleSendMessage(store agent.Repository, provider llm.Provider) http.Handl
 		}
 
 		// Emit final MESSAGES_SNAPSHOT with complete conversation
-		if err := emitMessagesSnapshot(w, flusher, threadID, store); err != nil {
+		if err := h.emitMessagesSnapshot(w, flusher, threadID); err != nil {
 			return
 		}
 
 		// Auto-generate thread title if still "New Chat"
-		thread, exists := store.GetThread(threadID)
+		thread, exists := h.store.GetThread(threadID)
 		if exists && thread.Title == "New Chat" && len(thread.Messages) >= 2 {
 			// Generate simple title from first user message
-			messages := store.GetMessages(threadID)
+			messages := h.store.GetMessages(threadID)
 			if len(messages) > 0 {
 				// Take first 50 characters of first user message as title
 				title := messages[0].Content
 				if len(title) > 50 {
 					title = title[:50] + "..."
 				}
-				store.UpdateThreadTitle(threadID, title)
+				h.store.UpdateThreadTitle(threadID, title)
 
 				// Send CUSTOM event to notify frontend of title update
 				customTimestamp := time.Now().UnixMilli()
@@ -215,51 +228,45 @@ func HandleSendMessage(store agent.Repository, provider llm.Provider) http.Handl
 			return
 		}
 		flusher.Flush()
-	}
 }
 
-// HandleGetMessages retrieves all messages for a thread
-func HandleGetMessages(store agent.Repository) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+// GetMessages retrieves all messages for a thread
+func (h *Handler) GetMessages(w http.ResponseWriter, r *http.Request) {
 		threadID := r.PathValue("threadId")
 		if threadID == "" {
 			http.Error(w, "threadId is required", http.StatusBadRequest)
 			return
 		}
 
-		messages := store.GetMessages(threadID)
+		messages := h.store.GetMessages(threadID)
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(messages); err != nil {
 			http.Error(w, "Failed to encode messages", http.StatusInternalServerError)
 			return
 		}
-	}
 }
 
-// HandleGetThreads retrieves all threads
-func HandleGetThreads(store agent.Repository) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		threads := store.GetAllThreads()
+// GetThreads retrieves all threads
+func (h *Handler) GetThreads(w http.ResponseWriter, r *http.Request) {
+		threads := h.store.GetAllThreads()
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(threads); err != nil {
 			http.Error(w, "Failed to encode threads", http.StatusInternalServerError)
 			return
 		}
-	}
 }
 
-// HandleDeleteThread deletes a thread
-func HandleDeleteThread(store agent.Repository) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+// DeleteThread deletes a thread
+func (h *Handler) DeleteThread(w http.ResponseWriter, r *http.Request) {
 		threadID := r.PathValue("threadId")
 		if threadID == "" {
 			http.Error(w, "threadId is required", http.StatusBadRequest)
 			return
 		}
 
-		deleted := store.DeleteThread(threadID)
+		deleted := h.store.DeleteThread(threadID)
 		if !deleted {
 			http.Error(w, "Thread not found", http.StatusNotFound)
 			return
@@ -268,12 +275,11 @@ func HandleDeleteThread(store agent.Repository) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]string{"status": "success"})
-	}
 }
 
 // emitMessagesSnapshot converts session messages to AG-UI messages and emits MESSAGES_SNAPSHOT event
-func emitMessagesSnapshot(w http.ResponseWriter, flusher http.Flusher, threadID string, store agent.Repository) error {
-	sessionMessages := store.GetMessages(threadID)
+func (h *Handler) emitMessagesSnapshot(w http.ResponseWriter, flusher http.Flusher, threadID string) error {
+	sessionMessages := h.store.GetMessages(threadID)
 
 	// Convert session.Message to agui.Message
 	aguiMessages := make([]agui.Message, 0, len(sessionMessages))

@@ -41,11 +41,14 @@ func main() {
 	mux.Handle("/assets/js/", http.StripPrefix("/assets/js/", http.FileServer(http.Dir("./assets/js"))))
 	mux.Handle("/assets/images/", http.StripPrefix("/assets/images/", http.FileServer(http.Dir("./assets/images"))))
 
+	// Create handler with dependencies
+	handler := infra.NewHandler(store, provider)
+
 	// Chat routes
-	mux.HandleFunc("/send", infra.HandleSendMessage(store, provider))
-	mux.HandleFunc("GET /api/threads", infra.HandleGetThreads(store))
-	mux.HandleFunc("GET /api/threads/{threadId}/messages", infra.HandleGetMessages(store))
-	mux.HandleFunc("DELETE /api/threads/{threadId}", infra.HandleDeleteThread(store))
+	mux.HandleFunc("/send", handler.SendMessage)
+	mux.HandleFunc("GET /api/threads", handler.GetThreads)
+	mux.HandleFunc("GET /api/threads/{threadId}/messages", handler.GetMessages)
+	mux.HandleFunc("DELETE /api/threads/{threadId}", handler.DeleteThread)
 	mux.HandleFunc("/", HandleViewChatInputScreen)
 	err = http.ListenAndServe(addr, mux)
 	if err != nil {

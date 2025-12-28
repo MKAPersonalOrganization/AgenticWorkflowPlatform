@@ -156,9 +156,6 @@ func (h *Agent) Run(
 				} else {
 					// This is a continuation - find by index
 					state = toolCallsByIndex[index]
-					if state == nil {
-						fmt.Printf("DEBUG: WARNING - No state found for tool call index %d\n", index)
-					}
 				}
 
 				// Stream function arguments if present
@@ -174,10 +171,6 @@ func (h *Agent) Run(
 
 					// Accumulate arguments
 					state.Arguments += toolCallDelta.Arguments
-					fmt.Printf("DEBUG: Accumulated args for %s (index %d): delta='%s', total='%s'\n",
-						state.ID, state.Index, toolCallDelta.Arguments, state.Arguments)
-				} else if state != nil {
-					fmt.Printf("DEBUG: Skipping empty delta for tool call %s (index %d)\n", state.ID, state.Index)
 				}
 			}
 		}
@@ -216,10 +209,6 @@ func (h *Agent) Run(
 			if err := h.emitter.Emit(endEvent); err != nil {
 				return err
 			}
-
-			// Debug: log tool call details
-			fmt.Printf("DEBUG: Executing tool call %s - Name: %s, Args length: %d, Args: %s\n",
-				toolCall.ID, toolCall.Function.Name, len(toolCall.Function.Arguments), toolCall.Function.Arguments)
 
 			// Execute the tool call immediately
 			result, err := h.executeToolCall(toolCall)
