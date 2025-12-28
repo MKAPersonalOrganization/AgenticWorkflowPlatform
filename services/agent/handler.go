@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	"school-with-ai/services/tools"
 	"school-with-ai/services/llm"
+	"school-with-ai/services/tools"
 )
 
 // Repository defines the interface for thread and message storage operations
@@ -69,7 +69,18 @@ func NewAgent(provider llm.Provider, store Repository, emitter EventEmitter, opt
 }
 
 // Run processes the LLM streaming response and emits AG-UI events
+// It automatically handles tool execution loops internally
 func (h *Agent) Run(
+	ctx context.Context,
+	threadID string,
+	messageID string,
+	messages []domain.Message,
+) error {
+	return h.runIteration(ctx, threadID, messageID, messages)
+}
+
+// runIteration processes a single LLM iteration and recursively continues if tools are called
+func (h *Agent) runIteration(
 	ctx context.Context,
 	threadID string,
 	messageID string,
@@ -237,15 +248,33 @@ func (h *Agent) Run(
 				return err
 			}
 		}
-	} else {
-		// No tool calls, just store the text message
-		h.store.AddMessage(threadID, domain.Message{
-			ID:        messageID,
-			Role:      "assistant",
-			Content:   completeContent,
-			Timestamp: time.Now(),
-		})
+
+		// Send TEXT_MESSAGE_END event for this iteration
+		endEvent := &TextMessageEndEvent{
+			MessageID: messageID,
+		}
+		if err := h.emitter.Emit(endEvent); err != nil {
+			return err
+		}
+
+		// Automatically continue conversation with tool results
+		// Get updated messages including tool results
+		updatedMessages := h.store.GetMessages(threadID)
+
+		// Generate new message ID for the continuation
+		continuationMessageID := GenerateID()
+
+		// Recursively call to process the LLM response with tool results
+		return h.runIteration(ctx, threadID, continuationMessageID, updatedMessages)
 	}
+
+	// No tool calls, just store the text message
+	h.store.AddMessage(threadID, domain.Message{
+		ID:        messageID,
+		Role:      "assistant",
+		Content:   completeContent,
+		Timestamp: time.Now(),
+	})
 
 	// Send TEXT_MESSAGE_END event
 	endEvent := &TextMessageEndEvent{
