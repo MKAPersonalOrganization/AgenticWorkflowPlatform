@@ -100,8 +100,8 @@ func HandleSendMessage(store *session.Store, provider llm.Provider) http.Handler
 		// Create SSE event emitter
 		emitter := NewSSEEventEmitter(w, flusher)
 
-		// Create user message handler with tools
-		messageHandler := agent.NewUserMessageHandler(
+		// Create agent with tools
+		messageHandler := agent.NewAgent(
 			provider,
 			store,
 			emitter,
@@ -110,7 +110,7 @@ func HandleSendMessage(store *session.Store, provider llm.Provider) http.Handler
 
 		// Process user message and stream response
 		ctx := context.Background()
-		if err := messageHandler.HandleStream(ctx, threadID, messageID, messages); err != nil {
+		if err := messageHandler.Run(ctx, threadID, messageID, messages); err != nil {
 			// Emit RUN_ERROR event on failure
 			errorTimestamp := time.Now().UnixMilli()
 			errorCode := "LLM_ERROR"
@@ -148,7 +148,7 @@ func HandleSendMessage(store *session.Store, provider llm.Provider) http.Handler
 			finalMessageID := agui.GenerateMessageID()
 
 			// Process again with tool results in conversation
-			if err := messageHandler.HandleStream(ctx, threadID, finalMessageID, updatedMessages); err != nil {
+			if err := messageHandler.Run(ctx, threadID, finalMessageID, updatedMessages); err != nil {
 				errorTimestamp := time.Now().UnixMilli()
 				errorCode := "LLM_ERROR"
 				errorEvent := &agui.RunErrorEvent{

@@ -5,33 +5,32 @@ import (
 	"fmt"
 	"time"
 
-	"school-with-ai/internal/agui"
 	"school-with-ai/internal/session"
 	"school-with-ai/internal/tools"
 	"school-with-ai/services/llm"
 )
 
-// UserMessageHandler handles processing of user messages and emits domain events
-type UserMessageHandler struct {
+// Agent handles processing of user messages and emits domain events
+type Agent struct {
 	provider llm.Provider
 	store    *session.Store
 	emitter  EventEmitter
 	tools    []llm.Tool
 }
 
-// Option is a functional option for configuring UserMessageHandler
-type Option func(*UserMessageHandler)
+// Option is a functional option for configuring Agent
+type Option func(*Agent)
 
 // WithTools configures the handler with available tools
 func WithTools(tools []llm.Tool) Option {
-	return func(h *UserMessageHandler) {
+	return func(h *Agent) {
 		h.tools = tools
 	}
 }
 
-// NewUserMessageHandler creates a new user message handler
-func NewUserMessageHandler(provider llm.Provider, store *session.Store, emitter EventEmitter, opts ...Option) *UserMessageHandler {
-	h := &UserMessageHandler{
+// NewAgent creates a new agent
+func NewAgent(provider llm.Provider, store *session.Store, emitter EventEmitter, opts ...Option) *Agent {
+	h := &Agent{
 		provider: provider,
 		store:    store,
 		emitter:  emitter,
@@ -45,8 +44,8 @@ func NewUserMessageHandler(provider llm.Provider, store *session.Store, emitter 
 	return h
 }
 
-// HandleStream processes the LLM streaming response and emits AG-UI events
-func (h *UserMessageHandler) HandleStream(
+// Run processes the LLM streaming response and emits AG-UI events
+func (h *Agent) Run(
 	ctx context.Context,
 	threadID string,
 	messageID string,
@@ -61,12 +60,7 @@ func (h *UserMessageHandler) HandleStream(
 	streamIter := h.provider.CreateStreamingCompletion(ctx, config)
 
 	// Send TEXT_MESSAGE_START event
-	timestamp := time.Now().UnixMilli()
-	startEvent := &agui.TextMessageStartEvent{
-		BaseEvent: agui.BaseEvent{
-			Type:      "TEXT_MESSAGE_START",
-			Timestamp: &timestamp,
-		},
+	startEvent := &TextMessageStartEvent{
 		MessageID: messageID,
 		Role:      "assistant",
 	}
@@ -99,12 +93,7 @@ func (h *UserMessageHandler) HandleStream(
 			completeContent += chunk.Content
 
 			// Send TEXT_MESSAGE_CONTENT event
-			contentTimestamp := time.Now().UnixMilli()
-			contentEvent := &agui.TextMessageContentEvent{
-				BaseEvent: agui.BaseEvent{
-					Type:      "TEXT_MESSAGE_CONTENT",
-					Timestamp: &contentTimestamp,
-				},
+			contentEvent := &TextMessageContentEvent{
 				MessageID: messageID,
 				Delta:     chunk.Content,
 			}
@@ -122,15 +111,10 @@ func (h *UserMessageHandler) HandleStream(
 				// Check if this is a new tool call (has ID and function name)
 				if toolCallDelta.ID != "" && toolCallDelta.Name != "" {
 					// Emit TOOL_CALL_START
-					toolStartTimestamp := time.Now().UnixMilli()
-					toolStartEvent := &agui.ToolCallStartEvent{
-						BaseEvent: agui.BaseEvent{
-							Type:      "TOOL_CALL_START",
-							Timestamp: &toolStartTimestamp,
-						},
+					toolStartEvent := &ToolCallStartEvent{
 						ToolCallID:      toolCallDelta.ID,
 						ToolCallName:    toolCallDelta.Name,
-						ParentMessageID: &messageID,
+						ParentMessageID: messageID,
 					}
 					if err := h.emitter.Emit(toolStartEvent); err != nil {
 						return err
@@ -156,12 +140,7 @@ func (h *UserMessageHandler) HandleStream(
 				// Stream function arguments if present
 				if state != nil && toolCallDelta.Arguments != "" {
 					// Emit TOOL_CALL_ARGS event
-					argsTimestamp := time.Now().UnixMilli()
-					argsEvent := &agui.ToolCallArgsEvent{
-						BaseEvent: agui.BaseEvent{
-							Type:      "TOOL_CALL_ARGS",
-							Timestamp: &argsTimestamp,
-						},
+					argsEvent := &ToolCallArgsEvent{
 						ToolCallID: state.ID,
 						Delta:      toolCallDelta.Arguments,
 					}
@@ -207,12 +186,7 @@ func (h *UserMessageHandler) HandleStream(
 		// For each tool call: emit END, execute, emit RESULT immediately
 		for _, toolCall := range toolCallsList {
 			// Emit TOOL_CALL_END
-			toolEndTimestamp := time.Now().UnixMilli()
-			endEvent := &agui.ToolCallEndEvent{
-				BaseEvent: agui.BaseEvent{
-					Type:      "TOOL_CALL_END",
-					Timestamp: &toolEndTimestamp,
-				},
+			endEvent := &ToolCallEndEvent{
 				ToolCallID: toolCall.ID,
 			}
 			if err := h.emitter.Emit(endEvent); err != nil {
@@ -230,7 +204,7 @@ func (h *UserMessageHandler) HandleStream(
 			}
 
 			// Store tool result message
-			toolResultID := agui.GenerateMessageID()
+			toolResultID := GenerateID()
 			h.store.AddMessage(threadID, session.Message{
 				ID:         toolResultID,
 				Role:       "tool",
@@ -240,17 +214,11 @@ func (h *UserMessageHandler) HandleStream(
 			})
 
 			// Emit TOOL_CALL_RESULT event immediately after execution
-			resultTimestamp := time.Now().UnixMilli()
-			role := "tool"
-			resultEvent := &agui.ToolCallResultEvent{
-				BaseEvent: agui.BaseEvent{
-					Type:      "TOOL_CALL_RESULT",
-					Timestamp: &resultTimestamp,
-				},
+			resultEvent := &ToolCallResultEvent{
 				MessageID:  toolResultID,
 				ToolCallID: toolCall.ID,
 				Content:    result,
-				Role:       &role,
+				Role:       "tool",
 			}
 			if err := h.emitter.Emit(resultEvent); err != nil {
 				return err
@@ -267,12 +235,7 @@ func (h *UserMessageHandler) HandleStream(
 	}
 
 	// Send TEXT_MESSAGE_END event
-	endTimestamp := time.Now().UnixMilli()
-	endEvent := &agui.TextMessageEndEvent{
-		BaseEvent: agui.BaseEvent{
-			Type:      "TEXT_MESSAGE_END",
-			Timestamp: &endTimestamp,
-		},
+	endEvent := &TextMessageEndEvent{
 		MessageID: messageID,
 	}
 	if err := h.emitter.Emit(endEvent); err != nil {
@@ -283,7 +246,7 @@ func (h *UserMessageHandler) HandleStream(
 }
 
 // executeToolCall executes a tool call and returns the result
-func (h *UserMessageHandler) executeToolCall(toolCall session.ToolCall) (string, error) {
+func (h *Agent) executeToolCall(toolCall session.ToolCall) (string, error) {
 	switch toolCall.Function.Name {
 	case "get_weather":
 		return tools.ExecuteWeatherTool(toolCall.Function.Arguments)
