@@ -449,6 +449,16 @@ document.addEventListener('alpine:init', () => {
             });
         },
 
+        isValidJSON(str) {
+            if (!str) return false;
+            try {
+                JSON.parse(str);
+                return true;
+            } catch (e) {
+                return false;
+            }
+        },
+
         debounce(func, wait) {
             let timeout;
             return function executedFunction(...args) {
@@ -905,6 +915,7 @@ document.addEventListener('alpine:init', () => {
                         type: 'tool_call',
                         name: event.toolCallName,
                         args: '',
+                        parsedArgs: {},
                         status: 'streaming',
                         timestamp: new Date(event.timestamp).toISOString()
                     });
@@ -923,6 +934,14 @@ document.addEventListener('alpine:init', () => {
                         const toolMsgIndex = state.messages.findIndex(m => m.id === event.toolCallId);
                         if (toolMsgIndex !== -1) {
                             state.messages[toolMsgIndex].args = state.toolCalls[event.toolCallId].args;
+
+                            // Try to parse incrementally for live preview (silently fail on incomplete JSON)
+                            try {
+                                const parsed = JSON.parse(state.messages[toolMsgIndex].args);
+                                state.messages[toolMsgIndex].parsedArgs = parsed;
+                            } catch (e) {
+                                // Ignore - JSON is incomplete while streaming
+                            }
                         }
                     }
                     break;
@@ -936,11 +955,12 @@ document.addEventListener('alpine:init', () => {
                         if (toolMsgIndex !== -1) {
                             state.messages[toolMsgIndex].status = 'completed';
 
-                            // Try to parse args as JSON for display
-                            const parsed = this.__tryCatch('parse tool args', { toolCallId: event.toolCallId }, () => {
-                                return JSON.parse(state.messages[toolMsgIndex].args);
+                            // Parse args for display
+                            const argsString = state.messages[toolMsgIndex].args || '{}';
+                            const parsed = this.__tryCatch('parse tool args', { toolCallId: event.toolCallId, args: argsString.substring(0, 100) }, () => {
+                                return JSON.parse(argsString);
                             });
-                            state.messages[toolMsgIndex].parsedArgs = parsed || { raw: state.messages[toolMsgIndex].args };
+                            state.messages[toolMsgIndex].parsedArgs = parsed || { raw: argsString };
                         }
                     }
                     break;

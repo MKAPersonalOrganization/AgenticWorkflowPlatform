@@ -9,6 +9,7 @@ import "school-with-ai/components/collapsible"
 import "school-with-ai/components/popover"
 import "school-with-ai/components/textarea"
 import "school-with-ai/components/sidebar"
+import "school-with-ai/components/code"
 
 templ ChatInputScreen() {
 	<!DOCTYPE html>
@@ -26,6 +27,7 @@ templ ChatInputScreen() {
 			@popover.Script()
 			@textarea.Script()
 			@sidebar.Script()
+			@code.Script()
 		</head>
 		<body class="flex min-h-screen bg-background text-foreground antialiased">
 			<div class="w-full h-screen" x-data="chat">
