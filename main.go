@@ -8,7 +8,6 @@ import (
 	"os"
 
 	"school-with-ai/components"
-	"school-with-ai/handlers"
 	"school-with-ai/infra"
 	"school-with-ai/services/llm"
 
@@ -43,10 +42,10 @@ func main() {
 	mux.Handle("/assets/images/", http.StripPrefix("/assets/images/", http.FileServer(http.Dir("./assets/images"))))
 
 	// Chat routes
-	mux.HandleFunc("/send", handlers.HandleSendMessage(store, provider))
-	mux.HandleFunc("GET /api/threads", handlers.HandleGetThreads(store))
-	mux.HandleFunc("GET /api/threads/{threadId}/messages", handlers.HandleGetMessages(store))
-	mux.HandleFunc("DELETE /api/threads/{threadId}", handlers.HandleDeleteThread(store))
+	mux.HandleFunc("/send", infra.HandleSendMessage(store, provider))
+	mux.HandleFunc("GET /api/threads", infra.HandleGetThreads(store))
+	mux.HandleFunc("GET /api/threads/{threadId}/messages", infra.HandleGetMessages(store))
+	mux.HandleFunc("DELETE /api/threads/{threadId}", infra.HandleDeleteThread(store))
 	mux.HandleFunc("/", HandleViewChatInputScreen)
 	err = http.ListenAndServe(addr, mux)
 	if err != nil {

@@ -1,4 +1,4 @@
-package handlers
+package infra
 
 import (
 	"context"
@@ -8,11 +8,10 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	"school-with-ai/infra"
-	"school-with-ai/pkg/agui"
-	"school-with-ai/pkg/tools"
+	"school-with-ai/infra/agui"
 	"school-with-ai/services/agent"
 	"school-with-ai/services/llm"
+	"school-with-ai/services/tools"
 )
 
 // HandleSendMessage handles the /send endpoint with SSE streaming
@@ -99,7 +98,7 @@ func HandleSendMessage(store agent.Repository, provider llm.Provider) http.Handl
 		availableTools := tools.GetAllTools()
 
 		// Create SSE event emitter
-		emitter := infra.NewSSEEventEmitter(w, flusher)
+		emitter := NewSSEEventEmitter(w, flusher)
 
 		// Create agent with tools
 		messageHandler := agent.NewAgent(
