@@ -1,34 +1,45 @@
 package threadhistory
 
+import "school-with-ai/components/button"
+import "school-with-ai/components/separator"
+
 templ ThreadHistory() {
 	<aside
 		class="hidden lg:flex h-screen flex-col bg-card border-r border-border shadow-inner-right transition-all duration-300 ease-in-out overflow-hidden"
 		:class="sidebarOpen ? 'w-[300px]' : 'w-0'"
 	>
 		<!-- Sidebar Header -->
-		<div class="flex items-center justify-center px-4 pt-1.5 pb-3 border-b border-border" x-show="sidebarOpen">
+		<div class="px-4 pt-1.5 pb-3" x-show="sidebarOpen">
 			<h1 class="text-xl font-semibold tracking-tight">Thread History</h1>
+			@separator.Separator(separator.Props{Class: "mt-3"})
 		</div>
 		<!-- Thread List -->
 		<div class="flex h-full w-full flex-col gap-2 overflow-y-scroll pt-3 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted [&::-webkit-scrollbar-track]:bg-transparent" x-show="sidebarOpen">
 			<template x-for="session in sessions" :key="session.id">
-				<div class="w-full px-1 group relative">
-					<button
-						class="w-[280px] items-start justify-start text-left font-normal px-3 py-2 rounded-lg hover:bg-muted transition-colors relative"
-						@click="switchSession(session.id)"
-					>
-						<p class="truncate text-ellipsis pr-8" x-text="session.title"></p>
-					</button>
-					<button
-						@click.stop="deleteSession(session.id)"
-						class="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-md hover:bg-destructive/10"
-					>
-						<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-destructive">
+				<div class="w-full px-2 group relative">
+					@button.Button(button.Props{
+						Variant: button.VariantGhost,
+						Class:   "w-full justify-start font-normal pr-10",
+						Attributes: templ.Attributes{
+							"@click": "switchSession(session.id)",
+						},
+					}) {
+						<p class="truncate text-ellipsis" x-text="session.title"></p>
+					}
+					@button.Button(button.Props{
+						Variant: button.VariantGhost,
+						Size:    button.SizeIcon,
+						Class:   "absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 text-destructive hover:bg-destructive/10",
+						Attributes: templ.Attributes{
+							"@click.stop": "deleteSession(session.id)",
+						},
+					}) {
+						<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 							<path d="M3 6h18"></path>
 							<path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
 							<path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
 						</svg>
-					</button>
+					}
 				</div>
 			</template>
 		</div>

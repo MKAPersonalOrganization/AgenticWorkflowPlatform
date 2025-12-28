@@ -6,6 +6,10 @@ import "school-with-ai/components/threadhistory"
 import "school-with-ai/components/messagelist"
 import "school-with-ai/components/eventlog"
 import "school-with-ai/components/collapsible"
+import "school-with-ai/components/button"
+import "school-with-ai/components/tooltip"
+import "school-with-ai/components/popover"
+import "school-with-ai/components/textarea"
 
 templ ChatInputScreen() {
 	<!DOCTYPE html>
@@ -16,9 +20,11 @@ templ ChatInputScreen() {
 			<title>Chat</title>
 			<link rel="stylesheet" href="/assets/css/output.css"/>
 			<script src="/assets/js/chat.js"></script>
-			<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-			@input.Script()
-			@collapsible.Script()
+		<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+		@input.Script()
+		@collapsible.Script()
+		@popover.Script()
+		@textarea.Script()
 		</head>
 		<body class="flex min-h-screen bg-background text-foreground antialiased">
 			<div class="flex w-full h-screen overflow-hidden" x-data="chat">
@@ -27,21 +33,30 @@ templ ChatInputScreen() {
 				<!-- Main Content Area -->
 				<main class="flex-1 flex flex-col relative">
 					<!-- Sidebar Toggle -->
-					<button
-						@click="toggleSidebar()"
-						class="absolute top-4 left-4 z-10 p-2 rounded-lg hover:bg-muted transition-colors hidden lg:block bg-card/80 backdrop-blur-sm shadow-sm"
-					>
-						<svg x-show="sidebarOpen" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-							<rect width="18" height="18" x="3" y="3" rx="2"></rect>
-							<path d="M15 3v18"></path>
-							<path d="m8 9 3 3-3 3"></path>
-						</svg>
-						<svg x-show="!sidebarOpen" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-							<rect width="18" height="18" x="3" y="3" rx="2"></rect>
-							<path d="M9 3v18"></path>
-							<path d="m16 15-3-3 3-3"></path>
-						</svg>
-					</button>
+					@tooltip.Tooltip() {
+						@tooltip.Trigger() {
+							@button.Button(button.Props{
+								Variant:    button.VariantGhost,
+								Size:       button.SizeIcon,
+								Class:      "absolute top-4 left-4 z-10 hidden lg:flex bg-card/80 backdrop-blur-sm shadow-sm",
+								Attributes: templ.Attributes{"@click": "toggleSidebar()"},
+							}) {
+								<svg x-show="sidebarOpen" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+									<rect width="18" height="18" x="3" y="3" rx="2"></rect>
+									<path d="M15 3v18"></path>
+									<path d="m8 9 3 3-3 3"></path>
+								</svg>
+								<svg x-show="!sidebarOpen" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+									<rect width="18" height="18" x="3" y="3" rx="2"></rect>
+									<path d="M9 3v18"></path>
+									<path d="m16 15-3-3 3-3"></path>
+								</svg>
+							}
+						}
+						@tooltip.Content() {
+							<span x-text="sidebarOpen ? 'Hide sidebar' : 'Show sidebar'"></span>
+						}
+					}
 					<!-- Messages Container -->
 					<div class="flex-1 overflow-y-auto scrollbar-thin" x-ref="messageList">
 						<div x-show="messages.length === 0 && !isStreaming" class="h-full flex flex-col items-center justify-center">
@@ -58,15 +73,17 @@ templ ChatInputScreen() {
 						<div x-show="messages.length > 0 || isStreaming" class="max-w-3xl mx-auto px-4 py-6">
 							<!-- New Chat Button -->
 							<div class="flex justify-end mb-4">
-								<button
-									@click="createNewSession()"
-									class="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all font-medium text-sm shadow-sm"
-								>
+								@button.Button(button.Props{
+									Variant:    button.VariantDefault,
+									Size:       button.SizeSm,
+									Class:      "shadow-sm",
+									Attributes: templ.Attributes{"@click": "createNewSession()"},
+								}) {
 									<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 										<path d="M12 5v14m-7-7h14"></path>
 									</svg>
 									<span>New chat</span>
-								</button>
+								}
 							</div>
 							<!-- Messages -->
 							@messagelist.MessageList()
