@@ -177,21 +177,13 @@ document.addEventListener('alpine:init', () => {
         destroy() {
             // Clean up all watchers (Alpine pattern)
             this.__watchers?.forEach(unwatch => {
-                try {
-                    unwatch()
-                } catch (e) {
-                    console.error('Watcher cleanup error:', e)
-                }
+                this.__tryCatch('cleanup watcher', {}, () => unwatch());
             })
             this.__watchers = []
 
             // Execute all registered cleanup tasks
             this.__cleanupTasks?.forEach(task => {
-                try {
-                    task()
-                } catch (e) {
-                    console.error('Cleanup task error:', e)
-                }
+                this.__tryCatch('cleanup task', {}, () => task());
             })
             this.__cleanupTasks.clear()
 
@@ -455,15 +447,6 @@ document.addEventListener('alpine:init', () => {
                 hour: 'numeric',
                 minute: '2-digit'
             });
-        },
-
-        isValidJSON(str) {
-            try {
-                JSON.parse(str);
-                return true;
-            } catch (e) {
-                return false;
-            }
         },
 
         debounce(func, wait) {
@@ -954,11 +937,10 @@ document.addEventListener('alpine:init', () => {
                             state.messages[toolMsgIndex].status = 'completed';
 
                             // Try to parse args as JSON for display
-                            try {
-                                state.messages[toolMsgIndex].parsedArgs = JSON.parse(state.messages[toolMsgIndex].args);
-                            } catch (e) {
-                                state.messages[toolMsgIndex].parsedArgs = { raw: state.messages[toolMsgIndex].args };
-                            }
+                            const parsed = this.__tryCatch('parse tool args', { toolCallId: event.toolCallId }, () => {
+                                return JSON.parse(state.messages[toolMsgIndex].args);
+                            });
+                            state.messages[toolMsgIndex].parsedArgs = parsed || { raw: state.messages[toolMsgIndex].args };
                         }
                     }
                     break;
@@ -1168,11 +1150,9 @@ document.addEventListener('alpine:init', () => {
 
         safeParseJSON(jsonString) {
             if (!jsonString) return {};
-            try {
+            return this.__tryCatch('parse JSON', { jsonString: jsonString?.substring(0, 100) }, () => {
                 return JSON.parse(jsonString);
-            } catch (e) {
-                return { raw: jsonString };
-            }
+            }) || { raw: jsonString };
         },
 
         // ============================================
@@ -1244,7 +1224,7 @@ document.addEventListener('alpine:init', () => {
         async copy() {
             const state = this.__getThreadState();
 
-            try {
+            return await this.__tryCatchAsync('copy event log', { eventCount: state.events.length }, async () => {
                 const logText = state.events.map(event => {
                     let details = `[${event.time}] ${event.type} (ID: ${event.id})`;
 
@@ -1271,10 +1251,7 @@ document.addEventListener('alpine:init', () => {
                 setTimeout(() => {
                     this.eventLogCopied = false;
                 }, 2000);
-            } catch (err) {
-                console.error('Failed to copy event log:', err);
-                alert('Failed to copy: ' + err.message);
-            }
+            });
         },
 
         __showError(message, threadId = null) {
