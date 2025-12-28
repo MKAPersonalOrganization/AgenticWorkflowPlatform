@@ -4,7 +4,7 @@ import (
 	"context"
 	"iter"
 
-	"school-with-ai/internal/session"
+	"school-with-ai/domain"
 
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
@@ -119,9 +119,9 @@ func (p *OpenAIProvider) CreateStreamingCompletion(
 						// Add to chunk (only include fields from the delta, not accumulated state)
 						streamChunk.ToolCalls = append(streamChunk.ToolCalls, ToolCallDelta{
 							Index:     index,
-							ID:        tc.ID,                   // From delta, not accumulated
-							Name:      tc.Function.Name,        // From delta, not accumulated
-							Arguments: tc.Function.Arguments,   // From delta, not accumulated
+							ID:        tc.ID,                 // From delta, not accumulated
+							Name:      tc.Function.Name,      // From delta, not accumulated
+							Arguments: tc.Function.Arguments, // From delta, not accumulated
 						})
 					}
 				}
@@ -141,7 +141,7 @@ func (p *OpenAIProvider) CreateStreamingCompletion(
 }
 
 // buildOpenAIMessages converts session messages to OpenAI message format
-func buildOpenAIMessages(messages []session.Message) []openai.ChatCompletionMessageParamUnion {
+func buildOpenAIMessages(messages []domain.Message) []openai.ChatCompletionMessageParamUnion {
 	params := make([]openai.ChatCompletionMessageParamUnion, 0, len(messages))
 
 	for _, msg := range messages {

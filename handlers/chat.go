@@ -7,16 +7,16 @@ import (
 	"net/http"
 	"time"
 
+	"school-with-ai/domain"
 	"school-with-ai/infra"
 	"school-with-ai/internal/agui"
-	"school-with-ai/internal/session"
 	"school-with-ai/internal/tools"
 	"school-with-ai/services/agent"
 	"school-with-ai/services/llm"
 )
 
 // HandleSendMessage handles the /send endpoint with SSE streaming
-func HandleSendMessage(store session.Repository, provider llm.Provider) http.HandlerFunc {
+func HandleSendMessage(store agent.Repository, provider llm.Provider) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Setup SSE headers
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -46,7 +46,7 @@ func HandleSendMessage(store session.Repository, provider llm.Provider) http.Han
 
 		// Store user message
 		userMsgID := agui.GenerateMessageID()
-		store.AddMessage(threadID, session.Message{
+		store.AddMessage(threadID, domain.Message{
 			ID:        userMsgID,
 			Role:      "user",
 			Content:   message,
@@ -220,7 +220,7 @@ func HandleSendMessage(store session.Repository, provider llm.Provider) http.Han
 }
 
 // HandleGetMessages retrieves all messages for a thread
-func HandleGetMessages(store session.Repository) http.HandlerFunc {
+func HandleGetMessages(store agent.Repository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		threadID := r.PathValue("threadId")
 		if threadID == "" {
@@ -239,7 +239,7 @@ func HandleGetMessages(store session.Repository) http.HandlerFunc {
 }
 
 // HandleGetThreads retrieves all threads
-func HandleGetThreads(store session.Repository) http.HandlerFunc {
+func HandleGetThreads(store agent.Repository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		threads := store.GetAllThreads()
 
@@ -252,7 +252,7 @@ func HandleGetThreads(store session.Repository) http.HandlerFunc {
 }
 
 // HandleDeleteThread deletes a thread
-func HandleDeleteThread(store session.Repository) http.HandlerFunc {
+func HandleDeleteThread(store agent.Repository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		threadID := r.PathValue("threadId")
 		if threadID == "" {
@@ -273,7 +273,7 @@ func HandleDeleteThread(store session.Repository) http.HandlerFunc {
 }
 
 // emitMessagesSnapshot converts session messages to AG-UI messages and emits MESSAGES_SNAPSHOT event
-func emitMessagesSnapshot(w http.ResponseWriter, flusher http.Flusher, threadID string, store session.Repository) error {
+func emitMessagesSnapshot(w http.ResponseWriter, flusher http.Flusher, threadID string, store agent.Repository) error {
 	sessionMessages := store.GetMessages(threadID)
 
 	// Convert session.Message to agui.Message
@@ -301,7 +301,7 @@ func emitMessagesSnapshot(w http.ResponseWriter, flusher http.Flusher, threadID 
 }
 
 // convertSessionMessageToAGUI converts a session.Message to agui.Message (discriminated union)
-func convertSessionMessageToAGUI(msg session.Message) agui.Message {
+func convertSessionMessageToAGUI(msg domain.Message) agui.Message {
 	switch msg.Role {
 	case "user":
 		return agui.UserMessage{

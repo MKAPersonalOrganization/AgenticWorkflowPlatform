@@ -5,15 +5,39 @@ import (
 	"fmt"
 	"time"
 
-	"school-with-ai/internal/session"
+	"school-with-ai/domain"
 	"school-with-ai/internal/tools"
 	"school-with-ai/services/llm"
 )
 
+// Repository defines the interface for thread and message storage operations
+type Repository interface {
+	// GetOrCreateThread retrieves an existing thread or creates a new one
+	GetOrCreateThread(threadID string) *domain.Thread
+
+	// AddMessage adds a message to a thread
+	AddMessage(threadID string, msg domain.Message)
+
+	// GetMessages retrieves all messages from a thread
+	GetMessages(threadID string) []domain.Message
+
+	// GetThread retrieves a thread by ID
+	GetThread(threadID string) (*domain.Thread, bool)
+
+	// GetAllThreads retrieves all threads sorted by UpdatedAt (newest first)
+	GetAllThreads() []domain.Thread
+
+	// UpdateThreadTitle updates the title of a thread
+	UpdateThreadTitle(threadID string, title string)
+
+	// DeleteThread removes a thread from the store
+	DeleteThread(threadID string) bool
+}
+
 // Agent handles processing of user messages and emits domain events
 type Agent struct {
 	provider llm.Provider
-	store    session.Repository
+	store    Repository
 	emitter  EventEmitter
 	tools    []llm.Tool
 }
@@ -29,7 +53,7 @@ func WithTools(tools []llm.Tool) Option {
 }
 
 // NewAgent creates a new agent
-func NewAgent(provider llm.Provider, store session.Repository, emitter EventEmitter, opts ...Option) *Agent {
+func NewAgent(provider llm.Provider, store Repository, emitter EventEmitter, opts ...Option) *Agent {
 	h := &Agent{
 		provider: provider,
 		store:    store,
@@ -49,7 +73,7 @@ func (h *Agent) Run(
 	ctx context.Context,
 	threadID string,
 	messageID string,
-	messages []session.Message,
+	messages []domain.Message,
 ) error {
 	// Create streaming completion
 	config := llm.CompletionConfig{
@@ -162,12 +186,12 @@ func (h *Agent) Run(
 	// Store assistant message and handle tool calls
 	if len(activeToolCalls) > 0 {
 		// Build tool calls list from active tool calls
-		toolCallsList := make([]session.ToolCall, 0, len(activeToolCalls))
+		toolCallsList := make([]domain.ToolCall, 0, len(activeToolCalls))
 		for _, state := range activeToolCalls {
-			toolCallsList = append(toolCallsList, session.ToolCall{
+			toolCallsList = append(toolCallsList, domain.ToolCall{
 				ID:   state.ID,
 				Type: "function",
-				Function: session.ToolFunction{
+				Function: domain.ToolFunction{
 					Name:      state.Name,
 					Arguments: state.Arguments,
 				},
@@ -175,7 +199,7 @@ func (h *Agent) Run(
 		}
 
 		// Store assistant message with tool calls
-		h.store.AddMessage(threadID, session.Message{
+		h.store.AddMessage(threadID, domain.Message{
 			ID:        messageID,
 			Role:      "assistant",
 			Content:   completeContent,
@@ -205,7 +229,7 @@ func (h *Agent) Run(
 
 			// Store tool result message
 			toolResultID := GenerateID()
-			h.store.AddMessage(threadID, session.Message{
+			h.store.AddMessage(threadID, domain.Message{
 				ID:         toolResultID,
 				Role:       "tool",
 				Content:    result,
@@ -226,7 +250,7 @@ func (h *Agent) Run(
 		}
 	} else {
 		// No tool calls, just store the text message
-		h.store.AddMessage(threadID, session.Message{
+		h.store.AddMessage(threadID, domain.Message{
 			ID:        messageID,
 			Role:      "assistant",
 			Content:   completeContent,
@@ -246,7 +270,7 @@ func (h *Agent) Run(
 }
 
 // executeToolCall executes a tool call and returns the result
-func (h *Agent) executeToolCall(toolCall session.ToolCall) (string, error) {
+func (h *Agent) executeToolCall(toolCall domain.ToolCall) (string, error) {
 	switch toolCall.Function.Name {
 	case "get_weather":
 		return tools.ExecuteWeatherTool(toolCall.Function.Arguments)

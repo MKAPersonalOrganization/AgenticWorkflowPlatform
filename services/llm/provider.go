@@ -4,7 +4,7 @@ import (
 	"context"
 	"iter"
 
-	"school-with-ai/internal/session"
+	"school-with-ai/domain"
 )
 
 // Provider defines the interface for LLM providers (OpenAI, Anthropic, etc.)
@@ -19,7 +19,7 @@ type Provider interface {
 
 // CompletionConfig contains configuration for a completion request
 type CompletionConfig struct {
-	Messages []session.Message
+	Messages []domain.Message
 	Tools    []Tool
 }
 
@@ -31,9 +31,9 @@ type StreamChunk struct {
 
 // ToolCallDelta represents a streaming tool call delta
 type ToolCallDelta struct {
-	Index    int
-	ID       string
-	Name     string
+	Index     int
+	ID        string
+	Name      string
 	Arguments string
 }
 
