@@ -40,7 +40,7 @@ templ ChatInputScreen() {
 						</div>
 						<!-- Messages Container -->
 						<div class="flex-1 overflow-y-auto scrollbar-thin" x-ref="messageList">
-							<div x-show="messages.length === 0 && !isStreaming" class="h-full flex flex-col items-center justify-center">
+							<div x-show="!hasMessages && !isStreaming" class="h-full flex flex-col items-center justify-center">
 								<div class="flex flex-col items-center gap-8 w-full max-w-3xl mx-auto px-4">
 									<div class="flex flex-col items-center gap-4">
 										<img src="/assets/images/logo.svg" alt="Logo" class="w-64 h-64 object-contain"/>
@@ -51,13 +51,13 @@ templ ChatInputScreen() {
 								</div>
 							</div>
 							<!-- When messages exist: regular message list -->
-							<div x-show="messages.length > 0 || isStreaming" class="max-w-3xl mx-auto px-4 py-6">
+							<div x-show="hasMessages || isStreaming" class="max-w-3xl mx-auto px-4 py-6">
 								<!-- Messages -->
 								@messagelist.MessageList()
 							</div>
 						</div>
 						<!-- Input Area - Agent Chat UI Style (only show when messages exist) -->
-						<div x-show="messages.length > 0 || isStreaming" class="sticky bottom-0 flex flex-col items-center gap-8 bg-background">
+						<div x-show="hasMessages || isStreaming" class="sticky bottom-0 flex flex-col items-center gap-8 bg-background">
 							<div class="mb-8 w-full">
 								@chatinput.ChatInput()
 							</div>

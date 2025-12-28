@@ -2,11 +2,12 @@
 // Following Alpine.js UI library patterns:
 // - __ prefix for internal state and methods (Alpine convention)
 // - queueMicrotask() for async initialization
-// - Simple getters for computed properties
-// - x-effect for reactive side effects
+// - Simple getters for computed properties (reactive data exposure)
+// - $watch for reactive side effects (auto-scroll, state sync)
 // - Direct state references for optimal reactivity
-// - Modular helper functions
-// - Event-driven architecture
+// - Modular helper functions with clear separation
+// - Event-driven architecture with SSE streaming
+// - Lazy state initialization for thread isolation
 document.addEventListener('alpine:init', () => {
     Alpine.data('chat', () => ({
         // Internal state (Alpine convention: __ prefix for internal properties)
@@ -57,6 +58,22 @@ document.addEventListener('alpine:init', () => {
             return this.__currentThreadId
         },
 
+        get showTypingIndicator() {
+            return this.__currentState.showTypingIndicator
+        },
+
+        get hasMessages() {
+            return this.__currentState.messages.length > 0
+        },
+
+        get hasEvents() {
+            return this.__currentState.events.length > 0
+        },
+
+        get canSendMessage() {
+            return this.currentMessage.trim() !== '' && !this.isStreaming
+        },
+
         // ============================================
         // Lifecycle Methods
         // ============================================
@@ -64,6 +81,23 @@ document.addEventListener('alpine:init', () => {
             // Alpine pattern: use queueMicrotask for async initialization
             queueMicrotask(() => {
                 this.__loadSessions()
+            })
+
+            // Alpine UI pattern: Use $watch for declarative reactive side effects
+            // This is preferred over manual tracking in methods
+
+            // Watch for message changes to auto-scroll (Alpine UI pattern)
+            this.$watch('messages', () => {
+                if (this.isStreaming) {
+                    this.$nextTick(() => this.__scrollToBottom())
+                }
+            })
+
+            // Watch for thread changes to ensure state consistency
+            this.$watch('__currentThreadId', (newThreadId) => {
+                if (newThreadId) {
+                    this.__currentState = this.__getThreadState(newThreadId)
+                }
             })
         },
 
@@ -85,6 +119,7 @@ document.addEventListener('alpine:init', () => {
             const id = threadId || this.__currentThreadId
             if (!id) return this.__currentState
 
+            // Lazy initialization pattern (Alpine UI convention)
             if (!this.__threadStates[id]) {
                 this.__threadStates[id] = this.__createEmptyState()
             }
@@ -170,11 +205,11 @@ document.addEventListener('alpine:init', () => {
             this.__currentThreadId = sessionId;
             localStorage.setItem('currentThreadId', sessionId);
 
-            // Switch currentState reference
-            this.__currentState = this.__getThreadState(sessionId);
+            // Note: __currentState is updated automatically via $watch on __currentThreadId
+            const state = this.__getThreadState(sessionId);
 
             // Load messages if not already loaded
-            if (this.__currentState.messages.length === 0) {
+            if (state.messages.length === 0) {
                 this.__loadMessages(sessionId);
             }
 
@@ -257,6 +292,17 @@ document.addEventListener('alpine:init', () => {
 
         __generateInteractionId() {
             return `interaction_${Date.now()}`;
+        },
+
+        __createUserMessage(content, interactionId) {
+            return {
+                id: this.__generateMessageId(),
+                role: 'user',
+                content: content,
+                timestamp: new Date().toISOString(),
+                interactionId: interactionId,
+                lifecycleEvents: []
+            };
         },
 
         formatSessionTime(timestamp) {
@@ -416,20 +462,16 @@ document.addEventListener('alpine:init', () => {
 
         sendMessage() {
             const state = this.__getThreadState();
-            if (!this.currentMessage.trim() || state.isStreaming) return;
+
+            // Validation (can also use canSendMessage getter)
+            if (!this.canSendMessage) return;
 
             const userMessage = this.currentMessage.trim();
             const interactionId = this.__generateInteractionId();
 
-            // Add user message to UI with interaction ID
-            state.messages.push({
-                id: this.__generateMessageId(),
-                role: 'user',
-                content: userMessage,
-                timestamp: new Date().toISOString(),
-                interactionId: interactionId,
-                lifecycleEvents: []
-            });
+            // Create and add user message using factory method
+            const userMsg = this.__createUserMessage(userMessage, interactionId);
+            state.messages.push(userMsg);
 
             // Store current interaction ID for this thread
             state.currentInteractionId = interactionId;
@@ -437,14 +479,21 @@ document.addEventListener('alpine:init', () => {
             // Update session title with first message
             this.__updateSessionTitle();
 
-            // Clear input
+            // Clear input immediately for better UX
             this.currentMessage = '';
 
-            // Scroll to bottom
-            this.$nextTick(() => this.__scrollToBottom());
-
+            // Note: Auto-scroll is handled by $watch on messages
             // Start SSE connection for this thread
             this.__streamResponse(userMessage, this.__currentThreadId);
+        },
+
+        handleKeydown(event) {
+            // Alpine UI pattern: Extract keyboard handling to dedicated method
+            // Send on Enter (without Shift), allow Shift+Enter for newlines
+            if (event.key === 'Enter' && !event.shiftKey && this.canSendMessage) {
+                event.preventDefault();
+                this.sendMessage();
+            }
         },
 
         // ============================================
