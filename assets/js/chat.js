@@ -1,15 +1,43 @@
 import { tryCatch, tryCatchAsync } from './error-handler.js';
 
 // Alpine.js chat component
-// Following Alpine.js UI library patterns:
+// Following Alpine.js UI library patterns and modern resilient practices:
+//
+// NAMING & STRUCTURE:
 // - __ prefix for internal state and methods (Alpine convention)
-// - queueMicrotask() for async initialization
 // - Simple getters for computed properties (reactive data exposure)
+// - Modular helper functions with clear separation
+//
+// INITIALIZATION & LIFECYCLE:
+// - queueMicrotask() for async initialization (Alpine scheduler pattern)
+// - Initialization guards to prevent double-init (Alpine lifecycle pattern)
+// - Lazy state initialization for thread isolation
+//
+// REACTIVITY & STATE:
 // - $watch for reactive side effects (auto-scroll, state sync)
 // - Direct state references for optimal reactivity
-// - Modular helper functions with clear separation
-// - Event-driven architecture with SSE streaming
-// - Lazy state initialization for thread isolation
+// - State validation guards before operations
+//
+// CLEANUP & MEMORY:
+// - Defensive cleanup with while loops (Alpine mutation pattern)
+// - Array nullification for GC (Alpine memory management)
+// - Proper resource disposal (EventSource, intervals, watchers)
+//
+// RESILIENCE & SAFETY:
+// - Duplicate prevention in queues (Alpine scheduler pattern)
+// - Defensive DOM reference checks (isConnected, optional chaining)
+// - Comprehensive error boundaries with tryCatch
+// - Event structure validation before processing
+//
+// PERFORMANCE:
+// - Batch updates with queueMicrotask (Alpine batching pattern)
+// - Throttled scroll for smooth UX
+// - Lazy initialization of thread states
+//
+// ARCHITECTURE:
+// - Event-driven with SSE streaming
+// - Multi-threaded chat with isolated state
+// - AG-UI Protocol integration
 
 // AG-UI Protocol Lifecycle Event Types
 const LIFECYCLE_EVENT_TYPES = [
@@ -79,6 +107,7 @@ document.addEventListener('alpine:init', () => {
         __updateQueue: [],
         __updatePending: false,
         __srAnnouncer: null,
+        __initialized: false,
 
         // ============================================
         // Computed Properties (Simple Getters)
@@ -123,6 +152,13 @@ document.addEventListener('alpine:init', () => {
         // Lifecycle Methods
         // ============================================
         init() {
+            // Guard: Prevent double initialization (Alpine defensive pattern)
+            if (this.__initialized) {
+                console.warn('Chat component already initialized');
+                return;
+            }
+            this.__initialized = true;
+
             // Alpine pattern: use queueMicrotask for async initialization
             queueMicrotask(() => {
                 this.__loadSessions()
@@ -179,32 +215,39 @@ document.addEventListener('alpine:init', () => {
         },
 
         destroy() {
-            // Clean up all watchers (Alpine pattern)
-            this.__watchers?.forEach(unwatch => {
-                this.__tryCatch('cleanup watcher', {}, () => unwatch());
-            })
-            this.__watchers = []
+            // Clean up all watchers (Alpine defensive cleanup pattern)
+            // Use while loop instead of forEach - more resilient, empties array as it processes
+            while (this.__watchers?.length) {
+                const unwatch = this.__watchers.pop()
+                this.__tryCatch('cleanup watcher', {}, () => unwatch?.())
+            }
 
-            // Execute all registered cleanup tasks
-            this.__cleanupTasks?.forEach(task => {
-                this.__tryCatch('cleanup task', {}, () => task());
-            })
-            this.__cleanupTasks.clear()
+            // Execute all registered cleanup tasks (Alpine pattern)
+            while (this.__cleanupTasks?.size > 0) {
+                const tasks = Array.from(this.__cleanupTasks)
+                this.__cleanupTasks.clear()
+                tasks.forEach(task => {
+                    this.__tryCatch('cleanup task', {}, () => task?.())
+                })
+            }
 
             // Cleanup: close all EventSource connections and heartbeats
-            Object.values(this.__threadStates).forEach(state => {
-                if (state.heartbeatInterval) {
+            const threadStates = Object.values(this.__threadStates)
+            for (const state of threadStates) {
+                if (state?.heartbeatInterval) {
                     clearInterval(state.heartbeatInterval)
+                    state.heartbeatInterval = null
                 }
-                if (state.eventSource) {
+                if (state?.eventSource) {
                     state.eventSource.close()
                     state.eventSource = null
                 }
-            })
+            }
 
-            // Clear state
-            this.__threadStates = {}
+            // Clear state and nullify for GC (Alpine memory management pattern)
+            this.__threadStates = null
             this.__currentState = null
+            this.__updateQueue = null
         },
 
         // ============================================
@@ -362,8 +405,19 @@ document.addEventListener('alpine:init', () => {
                 if (response.ok) {
                     // Close EventSource if this thread is streaming
                     const state = this.__threadStates[sessionId];
-                    if (state && state.eventSource) {
+                    if (state?.eventSource) {
                         state.eventSource.close();
+                        state.eventSource = null;
+                    }
+                    if (state?.heartbeatInterval) {
+                        clearInterval(state.heartbeatInterval);
+                        state.heartbeatInterval = null;
+                    }
+
+                    // Clear large arrays for GC (Alpine memory management pattern)
+                    if (state) {
+                        state.messages?.splice(0);
+                        state.events?.splice(0);
                     }
 
                     // Remove thread state
@@ -526,12 +580,22 @@ document.addEventListener('alpine:init', () => {
         },
 
         __batchUpdate(callback) {
-            this.__updateQueue.push(callback)
+            // Prevent duplicate callbacks (Alpine scheduler pattern)
+            if (!this.__updateQueue.includes(callback)) {
+                this.__updateQueue.push(callback)
+            }
+
             if (!this.__updatePending) {
                 this.__updatePending = true
+                const queueLengthWhenTriggered = this.__updateQueue.length
+
                 queueMicrotask(() => {
-                    this.__updateQueue.forEach(fn => fn())
-                    this.__updateQueue = []
+                    // Alpine pattern: detect last flush in event loop
+                    // Process all batched updates in one go
+                    while (this.__updateQueue.length > 0) {
+                        const fn = this.__updateQueue.shift()
+                        this.__tryCatch('batch update', {}, () => fn?.())
+                    }
                     this.__updatePending = false
                 })
             }
@@ -681,9 +745,12 @@ document.addEventListener('alpine:init', () => {
                 this.__announce(`Switched to ${session.title}`)
             }
 
-            // Focus message input
+            // Focus message input (Alpine defensive pattern)
             this.$nextTick(() => {
-                this.$refs.messageInput?.focus({ preventScroll: true })
+                const input = this.$refs?.messageInput;
+                if (input?.isConnected && typeof input.focus === 'function') {
+                    input.focus({ preventScroll: true });
+                }
             })
         },
 
@@ -715,9 +782,21 @@ document.addEventListener('alpine:init', () => {
         __convertBackendMessagesToUI(backendMessages) {
             // Convert backend/AG-UI messages to UI format
             // Handles: user, assistant (with tool calls), tool, system, developer messages
+
+            // Guard: Validate input (Alpine defensive pattern)
+            if (!Array.isArray(backendMessages)) {
+                console.warn('Invalid messages array:', backendMessages);
+                return [];
+            }
+
             const uiMessages = [];
 
             for (const msg of backendMessages) {
+                // Guard: Skip invalid messages
+                if (!msg || !msg.role) {
+                    console.warn('Skipping invalid message:', msg);
+                    continue;
+                }
                 switch (msg.role) {
                     case 'user':
                         uiMessages.push({
@@ -798,6 +877,12 @@ document.addEventListener('alpine:init', () => {
 
         sendMessage() {
             return this.__tryCatch('send message', { messageLength: this.currentMessage.length }, () => {
+                // Guard: Check initialization (Alpine defensive pattern)
+                if (!this.__initialized) {
+                    console.warn('Component not initialized');
+                    return;
+                }
+
                 const state = this.__getThreadState();
 
                 // Validation (can also use canSendMessage getter)
@@ -827,9 +912,12 @@ document.addEventListener('alpine:init', () => {
                 // Clear input immediately for better UX
                 this.currentMessage = '';
 
-                // Focus management
+                // Focus management (Alpine defensive pattern)
                 this.$nextTick(() => {
-                    this.$refs.messageInput?.focus({ preventScroll: true });
+                    const input = this.$refs?.messageInput;
+                    if (input?.isConnected && typeof input.focus === 'function') {
+                        input.focus({ preventScroll: true });
+                    }
                 });
 
                 // Note: Auto-scroll is handled by $watch on messages
@@ -853,6 +941,14 @@ document.addEventListener('alpine:init', () => {
 
         __streamResponse(message, threadId) {
             const state = this.__getThreadState(threadId);
+
+            // Guard: Prevent duplicate connections (Alpine defensive pattern)
+            if (state.eventSource) {
+                console.warn('Stream already active for thread:', threadId);
+                state.eventSource.close();
+                state.eventSource = null;
+            }
+
             state.isStreaming = true;
             state.showTypingIndicator = true;
             state.errorMessage = null;
@@ -864,8 +960,14 @@ document.addEventListener('alpine:init', () => {
             state.eventSource = eventSource;
 
             eventSource.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                this.__handleEvent(data, eventSource, threadId);
+                // Defensive parsing (Alpine pattern)
+                const data = this.__tryCatch('parse SSE event', { threadId }, () => {
+                    return JSON.parse(event.data);
+                });
+
+                if (data) {
+                    this.__handleEvent(data, eventSource, threadId);
+                }
             };
 
             eventSource.onerror = (error) => {
@@ -883,7 +985,17 @@ document.addEventListener('alpine:init', () => {
         },
 
         __handleEvent(event, eventSource, threadId) {
+            // Guard: Validate event structure (Alpine defensive pattern)
+            if (!event || !event.type) {
+                console.warn('Invalid event received:', event);
+                return;
+            }
+
             const state = this.__getThreadState(threadId);
+            if (!state) {
+                console.warn('No state found for thread:', threadId);
+                return;
+            }
 
             // Log all events for debugging
             this.__addEvent(event, threadId);
@@ -1226,12 +1338,23 @@ document.addEventListener('alpine:init', () => {
             // Per AG-UI Protocol spec: MESSAGES_SNAPSHOT replaces entire message array
             // This ensures UI stays synchronized with backend state
 
-            if (!event.messages || !Array.isArray(event.messages)) {
+            // Guard: Validate event structure (Alpine defensive pattern)
+            if (!event?.messages || !Array.isArray(event.messages)) {
                 console.warn('Invalid MESSAGES_SNAPSHOT: missing or invalid messages array');
                 return;
             }
 
             const state = this.__getThreadState(threadId);
+            if (!state) {
+                console.warn('No state found for MESSAGES_SNAPSHOT:', threadId);
+                return;
+            }
+
+            // Clear old messages for GC (Alpine memory management)
+            const oldMessages = state.messages;
+            if (oldMessages?.length > 0) {
+                oldMessages.splice(0);
+            }
 
             // Use shared conversion method
             state.messages = this.__convertBackendMessagesToUI(event.messages);
@@ -1302,8 +1425,9 @@ document.addEventListener('alpine:init', () => {
             this.showEventLog = !this.showEventLog;
             if (this.showEventLog) {
                 this.$nextTick(() => {
-                    const logContainer = this.$refs.eventLogContainer;
-                    if (logContainer) {
+                    // Defensive DOM reference (Alpine pattern)
+                    const logContainer = this.$refs?.eventLogContainer;
+                    if (logContainer?.isConnected) {
                         logContainer.scrollTop = logContainer.scrollHeight;
                     }
                 });
@@ -1312,7 +1436,11 @@ document.addEventListener('alpine:init', () => {
 
         clear() {
             const state = this.__getThreadState()
+            // Clear and nullify for GC (Alpine memory management pattern)
+            const oldEvents = state.events
             state.events = []
+            // Help GC by nullifying large arrays
+            oldEvents.length = 0
         },
 
         async copy() {
@@ -1364,14 +1492,25 @@ document.addEventListener('alpine:init', () => {
         },
 
         __scrollToBottom() {
-            const container = this.$refs.messageList;
-            if (container) {
-                // Smooth scroll to bottom
+            // Defensive DOM reference handling (Alpine pattern)
+            const container = this.$refs?.messageList;
+            if (!container || !container.isConnected) {
+                return;
+            }
+
+            // Additional safety check for scroll capability
+            if (typeof container.scrollTo !== 'function') {
+                console.warn('Container does not support scrollTo');
+                return;
+            }
+
+            // Smooth scroll to bottom
+            this.__tryCatch('scroll to bottom', {}, () => {
                 container.scrollTo({
                     top: container.scrollHeight,
                     behavior: 'smooth'
                 });
-            }
+            });
         }
     }));
 });
