@@ -1,3 +1,5 @@
+import { tryCatch, tryCatchAsync } from './error-handler.js';
+
 // Alpine.js chat component
 // Following Alpine.js UI library patterns:
 // - __ prefix for internal state and methods (Alpine convention)
@@ -71,6 +73,12 @@ document.addEventListener('alpine:init', () => {
         eventLogCopied: false,
         hideLifecycleEvents: false,
 
+        // Internal tracking (Alpine pattern)
+        __watchers: [],
+        __cleanupTasks: new Set(),
+        __updateQueue: [],
+        __updatePending: false,
+
         // ============================================
         // Computed Properties (Simple Getters)
         // ============================================
@@ -119,31 +127,88 @@ document.addEventListener('alpine:init', () => {
                 this.__loadSessions()
             })
 
-            // Alpine UI pattern: Use $watch for declarative reactive side effects
-            // This is preferred over manual tracking in methods
+            // Initialize throttled scroll (Alpine pattern)
+            this.__scrollToBottomThrottled = this.__throttle(
+                () => this.__scrollToBottom(),
+                100
+            )
 
-            // Watch for message changes to auto-scroll (Alpine UI pattern)
-            this.$watch('messages', () => {
+            // Alpine UI pattern: Use $watch for declarative reactive side effects
+            // Store watchers for cleanup
+            const unwatchMessages = this.$watch('messages', (newMessages, oldMessages) => {
                 if (this.isStreaming) {
-                    this.$nextTick(() => this.__scrollToBottom())
+                    this.__scrollToBottomThrottled()
+                }
+                // Notify on new messages when window not focused
+                if (newMessages.length > oldMessages.length) {
+                    const lastMsg = newMessages[newMessages.length - 1]
+                    if (lastMsg.role === 'assistant' && !document.hasFocus()) {
+                        this.__notifyNewMessage(lastMsg)
+                    }
                 }
             })
+            this.__watchers.push(unwatchMessages)
 
             // Watch for thread changes to ensure state consistency
-            this.$watch('__currentThreadId', (newThreadId) => {
+            const unwatchThread = this.$watch('__currentThreadId', (newThreadId, oldThreadId) => {
                 if (newThreadId) {
                     this.__currentState = this.__getThreadState(newThreadId)
+                    this.__onThreadSwitch(newThreadId, oldThreadId)
                 }
             })
+            this.__watchers.push(unwatchThread)
+
+            // Watch for errors to auto-clear
+            const unwatchError = this.$watch('errorMessage', (error) => {
+                if (error) {
+                    setTimeout(() => {
+                        if (this.errorMessage === error) {
+                            this.__currentState.errorMessage = null
+                        }
+                    }, 5000)
+                }
+            })
+            this.__watchers.push(unwatchError)
+
+            // Register keyboard shortcuts (Alpine UI pattern)
+            this.__registerKeyboardShortcuts()
         },
 
         destroy() {
-            // Cleanup: close all EventSource connections
-            Object.values(this.__threadStates).forEach(state => {
-                if (state.eventSource) {
-                    state.eventSource.close()
+            // Clean up all watchers (Alpine pattern)
+            this.__watchers?.forEach(unwatch => {
+                try {
+                    unwatch()
+                } catch (e) {
+                    console.error('Watcher cleanup error:', e)
                 }
             })
+            this.__watchers = []
+
+            // Execute all registered cleanup tasks
+            this.__cleanupTasks?.forEach(task => {
+                try {
+                    task()
+                } catch (e) {
+                    console.error('Cleanup task error:', e)
+                }
+            })
+            this.__cleanupTasks.clear()
+
+            // Cleanup: close all EventSource connections and heartbeats
+            Object.values(this.__threadStates).forEach(state => {
+                if (state.heartbeatInterval) {
+                    clearInterval(state.heartbeatInterval)
+                }
+                if (state.eventSource) {
+                    state.eventSource.close()
+                    state.eventSource = null
+                }
+            })
+
+            // Clear state
+            this.__threadStates = {}
+            this.__currentState = null
         },
 
         // ============================================
@@ -182,7 +247,11 @@ document.addEventListener('alpine:init', () => {
                 errorMessage: null,
                 showTypingIndicator: false,
                 currentStreamingId: null,
-                currentStreamingContent: ''
+                currentStreamingContent: '',
+                // Connection tracking (Alpine pattern)
+                connectionState: null,
+                heartbeatInterval: null,
+                retryCount: 0
             }
         },
 
@@ -215,7 +284,7 @@ document.addEventListener('alpine:init', () => {
         // ============================================
 
         async __loadSessions() {
-            try {
+            return await this.__tryCatchAsync('load sessions', {}, async () => {
                 const response = await fetch('/api/threads');
                 if (response.ok) {
                     const threads = await response.json();
@@ -245,12 +314,10 @@ document.addEventListener('alpine:init', () => {
                         this.__currentState = this.__getThreadState(savedThreadId);
                         this.__loadMessages(savedThreadId);
                     }
+                } else {
+                    throw new Error(`Failed to fetch threads: ${response.status}`);
                 }
-            } catch (error) {
-                console.error('Failed to load sessions:', error);
-                // Fallback: create new session
-                this.createNewSession();
-            }
+            }) || this.createNewSession();
         },
 
         createNewSession() {
@@ -288,7 +355,7 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
-            try {
+            return await this.__tryCatchAsync('delete session', { sessionId }, async () => {
                 const response = await fetch(`/api/threads/${sessionId}`, {
                     method: 'DELETE'
                 });
@@ -315,12 +382,9 @@ document.addEventListener('alpine:init', () => {
                         }
                     }
                 } else {
-                    this.__showError('Failed to delete session');
+                    throw new Error(`Failed to delete session: ${response.status}`);
                 }
-            } catch (error) {
-                console.error('Failed to delete session:', error);
-                this.__showError('Failed to delete session');
-            }
+            });
         },
 
         async __updateSessionTitle() {
@@ -415,6 +479,160 @@ document.addEventListener('alpine:init', () => {
         },
 
         // ============================================
+        // Error Handling (Alpine pattern)
+        // ============================================
+
+        /**
+         * Centralized error handler with context (Alpine pattern)
+         * @param {string} operation - Operation being performed
+         * @param {Object} context - Additional context
+         * @param {Function} callback - Function to execute
+         * @returns {*} Result of callback or null on error
+         */
+        __tryCatch(operation, context, callback) {
+            return tryCatch(operation, context, callback, {
+                threadId: this.__currentThreadId,
+                component: this
+            });
+        },
+
+        /**
+         * Async error handler with context
+         * @param {string} operation - Operation being performed
+         * @param {Object} context - Additional context
+         * @param {Function} callback - Async function to execute
+         * @returns {Promise<*>} Result of callback or null on error
+         */
+        async __tryCatchAsync(operation, context, callback) {
+            return await tryCatchAsync(operation, context, callback, {
+                threadId: this.__currentThreadId,
+                component: this
+            });
+        },
+
+        // ============================================
+        // Performance Utilities (Alpine pattern)
+        // ============================================
+
+        __throttle(func, limit) {
+            let inThrottle
+            return function (...args) {
+                if (!inThrottle) {
+                    func.apply(this, args)
+                    inThrottle = true
+                    setTimeout(() => inThrottle = false, limit)
+                }
+            }
+        },
+
+        __batchUpdate(callback) {
+            this.__updateQueue.push(callback)
+            if (!this.__updatePending) {
+                this.__updatePending = true
+                queueMicrotask(() => {
+                    this.__updateQueue.forEach(fn => fn())
+                    this.__updateQueue = []
+                    this.__updatePending = false
+                })
+            }
+        },
+
+        // ============================================
+        // Keyboard Shortcuts (Alpine UI pattern)
+        // ============================================
+
+        __registerKeyboardShortcuts() {
+            const handler = (e) => {
+                // Don't trigger shortcuts when typing in input fields
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                    // Allow Escape even in input fields
+                    if (e.key !== 'Escape') return;
+                }
+
+                // Ctrl/Cmd + Shift + N - New chat (avoid browser Ctrl+N)
+                if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'N') {
+                    e.preventDefault()
+                    this.createNewSession()
+                }
+
+                // Ctrl/Cmd + B - Toggle sidebar (common pattern)
+                if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+                    e.preventDefault()
+                    this.toggle()
+                }
+
+                // Ctrl/Cmd + Shift + D - Toggle debug panel
+                if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'D') {
+                    e.preventDefault()
+                    this.toggleDebugPanel()
+                }
+
+                // Escape - Cancel streaming
+                if (e.key === 'Escape' && this.isStreaming) {
+                    e.preventDefault()
+                    this.__stopStreaming()
+                }
+
+                // Ctrl/Cmd + Up/Down - Navigate sessions (more intuitive than Alt)
+                if ((e.ctrlKey || e.metaKey) && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+                    e.preventDefault()
+                    this.__navigateSessions(e.key === 'ArrowUp' ? -1 : 1)
+                }
+            }
+
+            document.addEventListener('keydown', handler)
+
+            // Register cleanup
+            this.__cleanupTasks.add(() => {
+                document.removeEventListener('keydown', handler)
+            })
+        },
+
+        __navigateSessions(direction) {
+            if (!this.sessions.length) return
+
+            const currentIndex = this.sessions.findIndex(s => s.id === this.__currentThreadId)
+            const nextIndex = (currentIndex + direction + this.sessions.length) % this.sessions.length
+
+            this.switchSession(this.sessions[nextIndex].id)
+        },
+
+        __stopStreaming() {
+            const state = this.__currentState
+            if (state.eventSource) {
+                state.eventSource.close()
+                state.eventSource = null
+                state.isStreaming = false
+                if (state.heartbeatInterval) {
+                    clearInterval(state.heartbeatInterval)
+                    state.heartbeatInterval = null
+                }
+                // Show info message instead of error
+                console.log('Streaming cancelled by user')
+            }
+        },
+
+        __notifyNewMessage(message) {
+            // Could be enhanced with browser notifications
+            console.log('New message received:', message.id)
+        },
+
+        __onThreadSwitch(newThreadId, oldThreadId) {
+            // Pause/background old thread if streaming
+            if (oldThreadId) {
+                const oldState = this.__threadStates[oldThreadId]
+                if (oldState?.eventSource) {
+                    oldState.isBackground = true
+                }
+            }
+
+            // Focus message input
+            this.$nextTick(() => {
+                this.$refs.messageInput?.focus({ preventScroll: true })
+            })
+        },
+
+        // ============================================
         // Message Loading & Conversion
         // ============================================
 
@@ -422,7 +640,7 @@ document.addEventListener('alpine:init', () => {
             const id = threadId || this.__currentThreadId;
             if (!id) return;
 
-            try {
+            return await this.__tryCatchAsync('load messages', { threadId: id }, async () => {
                 const response = await fetch(`/api/threads/${id}/messages`);
                 if (response.ok) {
                     const messages = await response.json();
@@ -433,10 +651,10 @@ document.addEventListener('alpine:init', () => {
                     if (id === this.__currentThreadId) {
                         this.$nextTick(() => this.__scrollToBottom());
                     }
+                } else {
+                    throw new Error(`Failed to fetch messages: ${response.status}`);
                 }
-            } catch (error) {
-                console.error('Failed to load messages:', error);
-            }
+            });
         },
 
         __convertBackendMessagesToUI(backendMessages) {
@@ -524,30 +742,45 @@ document.addEventListener('alpine:init', () => {
         },
 
         sendMessage() {
-            const state = this.__getThreadState();
+            return this.__tryCatch('send message', { messageLength: this.currentMessage.length }, () => {
+                const state = this.__getThreadState();
 
-            // Validation (can also use canSendMessage getter)
-            if (!this.canSendMessage) return;
+                // Validation (can also use canSendMessage getter)
+                if (!this.canSendMessage) {
+                    console.warn('Cannot send message: invalid state');
+                    return;
+                }
 
-            const userMessage = this.currentMessage.trim();
-            const interactionId = this.__generateInteractionId();
+                if (!this.__currentThreadId) {
+                    this.__showError('Please select or create a chat session');
+                    return;
+                }
 
-            // Create and add user message using factory method
-            const userMsg = this.__createUserMessage(userMessage, interactionId);
-            state.messages.push(userMsg);
+                const userMessage = this.currentMessage.trim();
+                const interactionId = this.__generateInteractionId();
 
-            // Store current interaction ID for this thread
-            state.currentInteractionId = interactionId;
+                // Create and add user message using factory method
+                const userMsg = this.__createUserMessage(userMessage, interactionId);
+                state.messages.push(userMsg);
 
-            // Update session title with first message
-            this.__updateSessionTitle();
+                // Store current interaction ID for this thread
+                state.currentInteractionId = interactionId;
 
-            // Clear input immediately for better UX
-            this.currentMessage = '';
+                // Update session title with first message
+                this.__updateSessionTitle();
 
-            // Note: Auto-scroll is handled by $watch on messages
-            // Start SSE connection for this thread
-            this.__streamResponse(userMessage, this.__currentThreadId);
+                // Clear input immediately for better UX
+                this.currentMessage = '';
+
+                // Focus management
+                this.$nextTick(() => {
+                    this.$refs.messageInput?.focus({ preventScroll: true });
+                });
+
+                // Note: Auto-scroll is handled by $watch on messages
+                // Start SSE connection for this thread
+                this.__streamResponse(userMessage, this.__currentThreadId);
+            });
         },
 
         handleKeydown(event) {
