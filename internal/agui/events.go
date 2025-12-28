@@ -339,6 +339,48 @@ type ToolCallChunkEvent struct {
 	Delta           *string `json:"delta,omitempty"`
 }
 
+// Activity Events
+//
+// Activity Events expose structured, in-progress activity updates that occur
+// between chat messages. They follow the same snapshot/delta pattern as the state
+// system so that UIs can render a complete activity view immediately and then
+// incrementally update it as new information arrives.
+
+// ActivitySnapshotEvent delivers a complete snapshot of an activity message.
+//
+// Frontends should either create a new ActivityMessage or replace the existing
+// one with the payload supplied by the snapshot.
+//
+// Properties:
+//   - messageId: Identifier for the ActivityMessage this event updates
+//   - activityType: Activity discriminator (for example "PLAN", "SEARCH")
+//   - content: Structured JSON payload representing the full activity state
+//   - replace: Per spec, defaults to true. In Go, must be set explicitly as the zero value is false
+type ActivitySnapshotEvent struct {
+	BaseEvent
+	MessageID    string      `json:"messageId"`
+	ActivityType string      `json:"activityType"`
+	Content      interface{} `json:"content"`
+	Replace      bool        `json:"replace"`
+}
+
+// ActivityDeltaEvent applies incremental updates to an existing activity using JSON Patch operations.
+//
+// Activity deltas should be applied in order to the previously synchronized
+// activity content. If an application detects divergence, it can request or emit a
+// fresh ActivitySnapshot to resynchronize.
+//
+// Properties:
+//   - messageId: Identifier for the target activity message
+//   - activityType: Activity discriminator (mirrors the value from the most recent snapshot)
+//   - patch: Array of RFC 6902 JSON Patch operations to apply to the activity data
+type ActivityDeltaEvent struct {
+	BaseEvent
+	MessageID    string        `json:"messageId"`
+	ActivityType string        `json:"activityType"`
+	Patch        []interface{} `json:"patch"`
+}
+
 // Special Events
 //
 // Special events provide flexibility in the protocol by allowing for
