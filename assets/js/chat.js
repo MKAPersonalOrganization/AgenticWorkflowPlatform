@@ -1,35 +1,122 @@
 // Alpine.js chat component
-// Register component before Alpine initializes
+// Following Alpine.js UI library patterns:
+// - __ prefix for internal state and methods (Alpine convention)
+// - queueMicrotask() for async initialization
+// - Simple getters for computed properties
+// - x-effect for reactive side effects
+// - Direct state references for optimal reactivity
+// - Modular helper functions
+// - Event-driven architecture
 document.addEventListener('alpine:init', () => {
     Alpine.data('chat', () => ({
-        messages: [],
+        // Internal state (Alpine convention: __ prefix for internal properties)
+        __threadStates: {}, // Map of threadId -> state object
+        __currentThreadId: null,
+        __currentState: {
+            messages: [],
+            isStreaming: false,
+            eventSource: null,
+            events: [],
+            toolCalls: {},
+            currentInteractionId: null,
+            errorMessage: null,
+            showTypingIndicator: false,
+            currentStreamingId: null,
+            currentStreamingContent: ''
+        },
+
+        // Public UI state
         currentMessage: '',
-        isStreaming: false,
-        showTypingIndicator: false,
-        currentStreamingId: null,
-        currentStreamingContent: '',
-        threadId: null,
-        errorMessage: null,
-        events: [],
         sessions: [],
         showDebugPanel: false,
         showEventLog: false,
         eventLogCopied: false,
         sidebarOpen: true,
         hideLifecycleEvents: false,
-        currentInteractionId: null,
-        toolCalls: {}, // Track active tool calls by ID
 
-        init() {
-            // Load sessions from backend
-            this.loadSessions();
+        // ============================================
+        // Computed Properties (Simple Getters)
+        // ============================================
+        get messages() {
+            return this.__currentState.messages
         },
+
+        get isStreaming() {
+            return this.__currentState.isStreaming
+        },
+
+        get events() {
+            return this.__currentState.events
+        },
+
+        get errorMessage() {
+            return this.__currentState.errorMessage
+        },
+
+        get threadId() {
+            return this.__currentThreadId
+        },
+
+        // ============================================
+        // Lifecycle Methods
+        // ============================================
+        init() {
+            // Alpine pattern: use queueMicrotask for async initialization
+            queueMicrotask(() => {
+                this.__loadSessions()
+            })
+        },
+
+        destroy() {
+            // Cleanup: close all EventSource connections
+            Object.values(this.__threadStates).forEach(state => {
+                if (state.eventSource) {
+                    state.eventSource.close()
+                }
+            })
+        },
+
+        // ============================================
+        // Thread State Management
+        // ============================================
+
+        // Internal: Get or create state for a specific thread
+        __getThreadState(threadId = null) {
+            const id = threadId || this.__currentThreadId
+            if (!id) return this.__currentState
+
+            if (!this.__threadStates[id]) {
+                this.__threadStates[id] = this.__createEmptyState()
+            }
+
+            return this.__threadStates[id]
+        },
+
+        // Internal: Factory for creating empty thread state
+        __createEmptyState() {
+            return {
+                messages: [],
+                isStreaming: false,
+                eventSource: null,
+                events: [],
+                toolCalls: {},
+                currentInteractionId: null,
+                errorMessage: null,
+                showTypingIndicator: false,
+                currentStreamingId: null,
+                currentStreamingContent: ''
+            }
+        },
+
+        // ============================================
+        // Public API Methods
+        // ============================================
 
         toggleSidebar() {
-            this.sidebarOpen = !this.sidebarOpen;
+            this.sidebarOpen = !this.sidebarOpen
         },
 
-        async loadSessions() {
+        async __loadSessions() {
             try {
                 const response = await fetch('/api/threads');
                 if (response.ok) {
@@ -45,8 +132,8 @@ document.addEventListener('alpine:init', () => {
                         }));
 
                     // Get or create current thread ID
-                    this.threadId = localStorage.getItem('currentThreadId');
-                    if (!this.threadId || !this.sessions.find(s => s.id === this.threadId)) {
+                    const savedThreadId = localStorage.getItem('currentThreadId');
+                    if (!savedThreadId || !this.sessions.find(s => s.id === savedThreadId)) {
                         if (this.sessions.length > 0) {
                             // Use the most recent session
                             this.switchSession(this.sessions[0].id);
@@ -56,7 +143,9 @@ document.addEventListener('alpine:init', () => {
                         }
                     } else {
                         // Load existing messages for this thread
-                        this.loadMessages();
+                        this.__currentThreadId = savedThreadId;
+                        this.__currentState = this.__getThreadState(savedThreadId);
+                        this.__loadMessages(savedThreadId);
                     }
                 }
             } catch (error) {
@@ -67,30 +156,34 @@ document.addEventListener('alpine:init', () => {
         },
 
         createNewSession() {
-            const newSessionId = `thread_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+            const newSessionId = this.__generateThreadId();
+            const newState = this.__createEmptyState();
 
-            // Just switch to the new session without adding it to the list yet
-            // It will be added when the first message is sent
-            this.threadId = newSessionId;
+            this.__threadStates[newSessionId] = newState;
+            this.__currentThreadId = newSessionId;
+            this.__currentState = newState;
             localStorage.setItem('currentThreadId', newSessionId);
-            this.messages = [];
-            this.events = [];
-            this.errorMessage = null;
         },
 
         switchSession(sessionId) {
-            if (this.isStreaming) return;
-
-            this.threadId = sessionId;
+            // Allow switching even if current or other threads are streaming - threads are independent
+            this.__currentThreadId = sessionId;
             localStorage.setItem('currentThreadId', sessionId);
-            this.messages = [];
-            this.events = [];
-            this.errorMessage = null;
-            this.loadMessages();
+
+            // Switch currentState reference
+            this.__currentState = this.__getThreadState(sessionId);
+
+            // Load messages if not already loaded
+            if (this.__currentState.messages.length === 0) {
+                this.__loadMessages(sessionId);
+            }
+
+            // Scroll to bottom after switching
+            this.$nextTick(() => this.__scrollToBottom());
         },
 
         async deleteSession(sessionId) {
-            if (this.isStreaming) return;
+            // Allow deletion even if streaming - threads are independent
 
             // Confirm deletion
             if (!confirm('Are you sure you want to delete this session?')) {
@@ -103,11 +196,20 @@ document.addEventListener('alpine:init', () => {
                 });
 
                 if (response.ok) {
+                    // Close EventSource if this thread is streaming
+                    const state = this.__threadStates[sessionId];
+                    if (state && state.eventSource) {
+                        state.eventSource.close();
+                    }
+
+                    // Remove thread state
+                    delete this.__threadStates[sessionId];
+
                     // Remove session from list
                     this.sessions = this.sessions.filter(s => s.id !== sessionId);
 
                     // If we deleted the current session, switch to another or create new
-                    if (this.threadId === sessionId) {
+                    if (this.__currentThreadId === sessionId) {
                         if (this.sessions.length > 0) {
                             this.switchSession(this.sessions[0].id);
                         } else {
@@ -115,22 +217,23 @@ document.addEventListener('alpine:init', () => {
                         }
                     }
                 } else {
-                    this.showError('Failed to delete session');
+                    this.__showError('Failed to delete session');
                 }
             } catch (error) {
                 console.error('Failed to delete session:', error);
-                this.showError('Failed to delete session');
+                this.__showError('Failed to delete session');
             }
         },
 
-        async updateSessionTitle() {
-            let session = this.sessions.find(s => s.id === this.threadId);
+        async __updateSessionTitle() {
+            let session = this.sessions.find(s => s.id === this.__currentThreadId);
 
             // If session doesn't exist in the list yet, create it
-            if (!session && this.messages.length > 0) {
+            const state = this.__getThreadState();
+            if (!session && state.messages.length > 0) {
                 const now = new Date().toISOString();
                 session = {
-                    id: this.threadId,
+                    id: this.__currentThreadId,
                     title: 'New Chat',
                     created: now,
                     lastMessage: now
@@ -138,6 +241,22 @@ document.addEventListener('alpine:init', () => {
                 this.sessions.unshift(session);
                 // Title will be auto-generated by backend AI and updated via CUSTOM event
             }
+        },
+
+        // ============================================
+        // Utility / Helper Methods
+        // ============================================
+
+        __generateThreadId() {
+            return `thread_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+        },
+
+        __generateMessageId() {
+            return `msg_${Date.now()}`;
+        },
+
+        __generateInteractionId() {
+            return `interaction_${Date.now()}`;
         },
 
         formatSessionTime(timestamp) {
@@ -158,22 +277,60 @@ document.addEventListener('alpine:init', () => {
             return date.toLocaleDateString();
         },
 
-        async loadMessages() {
+        formatTime(timestamp) {
+            return new Date(timestamp).toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit'
+            });
+        },
+
+        isValidJSON(str) {
             try {
-                const response = await fetch(`/api/threads/${this.threadId}/messages`);
+                JSON.parse(str);
+                return true;
+            } catch (e) {
+                return false;
+            }
+        },
+
+        debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        },
+
+        // ============================================
+        // Message Loading & Conversion
+        // ============================================
+
+        async __loadMessages(threadId = null) {
+            const id = threadId || this.__currentThreadId;
+            if (!id) return;
+
+            try {
+                const response = await fetch(`/api/threads/${id}/messages`);
                 if (response.ok) {
                     const messages = await response.json();
-                    this.messages = this.convertBackendMessagesToUI(messages);
+                    const state = this.__getThreadState(id);
+                    state.messages = this.__convertBackendMessagesToUI(messages);
 
-                    // Scroll to bottom after loading
-                    this.$nextTick(() => this.scrollToBottom());
+                    // Scroll to bottom after loading (only if this is the current thread)
+                    if (id === this.__currentThreadId) {
+                        this.$nextTick(() => this.__scrollToBottom());
+                    }
                 }
             } catch (error) {
                 console.error('Failed to load messages:', error);
             }
         },
 
-        convertBackendMessagesToUI(backendMessages) {
+        __convertBackendMessagesToUI(backendMessages) {
             // Convert backend/AG-UI messages to UI format
             // Handles: user, assistant (with tool calls), tool, system, developer messages
             const uiMessages = [];
@@ -258,14 +415,15 @@ document.addEventListener('alpine:init', () => {
         },
 
         sendMessage() {
-            if (!this.currentMessage.trim() || this.isStreaming) return;
+            const state = this.__getThreadState();
+            if (!this.currentMessage.trim() || state.isStreaming) return;
 
             const userMessage = this.currentMessage.trim();
-            const interactionId = `interaction_${Date.now()}`;
+            const interactionId = this.__generateInteractionId();
 
             // Add user message to UI with interaction ID
-            this.messages.push({
-                id: `msg_${Date.now()}`,
+            state.messages.push({
+                id: this.__generateMessageId(),
                 role: 'user',
                 content: userMessage,
                 timestamp: new Date().toISOString(),
@@ -273,47 +431,62 @@ document.addEventListener('alpine:init', () => {
                 lifecycleEvents: []
             });
 
-            // Store current interaction ID for this request
-            this.currentInteractionId = interactionId;
+            // Store current interaction ID for this thread
+            state.currentInteractionId = interactionId;
 
             // Update session title with first message
-            this.updateSessionTitle();
+            this.__updateSessionTitle();
 
             // Clear input
             this.currentMessage = '';
 
             // Scroll to bottom
-            this.$nextTick(() => this.scrollToBottom());
+            this.$nextTick(() => this.__scrollToBottom());
 
-            // Start SSE connection
-            this.streamResponse(userMessage);
+            // Start SSE connection for this thread
+            this.__streamResponse(userMessage, this.__currentThreadId);
         },
 
-        streamResponse(message) {
-            this.isStreaming = true;
-            this.showTypingIndicator = true;
-            this.errorMessage = null;
+        // ============================================
+        // SSE Streaming & Event Handling
+        // ============================================
 
-            const url = `/send?threadId=${encodeURIComponent(this.threadId)}&message=${encodeURIComponent(message)}`;
+        __streamResponse(message, threadId) {
+            const state = this.__getThreadState(threadId);
+            state.isStreaming = true;
+            state.showTypingIndicator = true;
+            state.errorMessage = null;
+
+            const url = `/send?threadId=${encodeURIComponent(threadId)}&message=${encodeURIComponent(message)}`;
             const eventSource = new EventSource(url);
+
+            // Store EventSource in thread state so we can close it later
+            state.eventSource = eventSource;
 
             eventSource.onmessage = (event) => {
                 const data = JSON.parse(event.data);
-                this.handleEvent(data, eventSource);
+                this.__handleEvent(data, eventSource, threadId);
             };
 
             eventSource.onerror = (error) => {
                 console.error('SSE error:', error);
                 eventSource.close();
-                this.isStreaming = false;
-                this.showTypingIndicator = false;
-                this.showError('Connection error. Please try again.');
+                state.eventSource = null;
+                state.isStreaming = false;
+                state.showTypingIndicator = false;
+
+                // Only show error if this is the current thread
+                if (threadId === this.__currentThreadId) {
+                    this.__showError('Connection error. Please try again.', threadId);
+                }
             };
         },
 
-        handleEvent(event, eventSource) {
+        __handleEvent(event, eventSource, threadId) {
+            const state = this.__getThreadState(threadId);
+
             // Add event to log (keep only last 10)
-            this.addEvent(event);
+            this.__addEvent(event, threadId);
 
             // Add lifecycle event as a message if not hidden
             // Track all AG UI Protocol event types except TEXT_MESSAGE_CONTENT (too frequent)
@@ -336,7 +509,7 @@ document.addEventListener('alpine:init', () => {
                 'META_EVENT'
             ];
             if (!this.hideLifecycleEvents && lifecycleEventTypes.includes(event.type)) {
-                this.addLifecycleMessage(event);
+                this.__addLifecycleMessage(event, threadId);
             }
 
             switch (event.type) {
@@ -362,7 +535,7 @@ document.addEventListener('alpine:init', () => {
 
                 case 'MESSAGES_SNAPSHOT':
                     // Messages snapshot received - replace entire conversation with snapshot
-                    this.handleMessagesSnapshot(event);
+                    this.__handleMessagesSnapshot(event, threadId);
                     break;
 
                 case 'ACTIVITY_SNAPSHOT':
@@ -410,7 +583,7 @@ document.addEventListener('alpine:init', () => {
 
                 case 'TOOL_CALL_START':
                     // Tool call started - create a new tool call message
-                    this.toolCalls[event.toolCallId] = {
+                    state.toolCalls[event.toolCallId] = {
                         id: event.toolCallId,
                         name: event.toolCallName,
                         args: '',
@@ -418,7 +591,7 @@ document.addEventListener('alpine:init', () => {
                         timestamp: new Date(event.timestamp).toISOString()
                     };
 
-                    this.messages.push({
+                    state.messages.push({
                         id: event.toolCallId,
                         type: 'tool_call',
                         name: event.toolCallName,
@@ -427,36 +600,38 @@ document.addEventListener('alpine:init', () => {
                         timestamp: new Date(event.timestamp).toISOString()
                     });
 
-                    this.$nextTick(() => this.scrollToBottom());
+                    if (threadId === this.__currentThreadId) {
+                        this.$nextTick(() => this.__scrollToBottom());
+                    }
                     break;
 
                 case 'TOOL_CALL_ARGS':
                     // Tool call arguments received - accumulate them
-                    if (this.toolCalls[event.toolCallId]) {
-                        this.toolCalls[event.toolCallId].args += event.delta;
+                    if (state.toolCalls[event.toolCallId]) {
+                        state.toolCalls[event.toolCallId].args += event.delta;
 
                         // Update the message
-                        const toolMsgIndex = this.messages.findIndex(m => m.id === event.toolCallId);
+                        const toolMsgIndex = state.messages.findIndex(m => m.id === event.toolCallId);
                         if (toolMsgIndex !== -1) {
-                            this.messages[toolMsgIndex].args = this.toolCalls[event.toolCallId].args;
+                            state.messages[toolMsgIndex].args = state.toolCalls[event.toolCallId].args;
                         }
                     }
                     break;
 
                 case 'TOOL_CALL_END':
                     // Tool call ended - mark as complete
-                    if (this.toolCalls[event.toolCallId]) {
-                        this.toolCalls[event.toolCallId].status = 'completed';
+                    if (state.toolCalls[event.toolCallId]) {
+                        state.toolCalls[event.toolCallId].status = 'completed';
 
-                        const toolMsgIndex = this.messages.findIndex(m => m.id === event.toolCallId);
+                        const toolMsgIndex = state.messages.findIndex(m => m.id === event.toolCallId);
                         if (toolMsgIndex !== -1) {
-                            this.messages[toolMsgIndex].status = 'completed';
+                            state.messages[toolMsgIndex].status = 'completed';
 
                             // Try to parse args as JSON for display
                             try {
-                                this.messages[toolMsgIndex].parsedArgs = JSON.parse(this.messages[toolMsgIndex].args);
+                                state.messages[toolMsgIndex].parsedArgs = JSON.parse(state.messages[toolMsgIndex].args);
                             } catch (e) {
-                                this.messages[toolMsgIndex].parsedArgs = { raw: this.messages[toolMsgIndex].args };
+                                state.messages[toolMsgIndex].parsedArgs = { raw: state.messages[toolMsgIndex].args };
                             }
                         }
                     }
@@ -464,11 +639,11 @@ document.addEventListener('alpine:init', () => {
 
                 case 'TOOL_CALL_RESULT':
                     // Tool call result received - insert result message right after the tool call
-                    const toolCallIndex = this.messages.findIndex(m => m.id === event.toolCallId);
+                    const toolCallIndex = state.messages.findIndex(m => m.id === event.toolCallId);
 
                     if (toolCallIndex !== -1) {
                         // Insert the result right after the tool call message
-                        this.messages.splice(toolCallIndex + 1, 0, {
+                        state.messages.splice(toolCallIndex + 1, 0, {
                             id: event.messageId,
                             type: 'tool_result',
                             toolCallId: event.toolCallId,
@@ -477,7 +652,7 @@ document.addEventListener('alpine:init', () => {
                         });
                     } else {
                         // Fallback: if tool call not found, append to end
-                        this.messages.push({
+                        state.messages.push({
                             id: event.messageId,
                             type: 'tool_result',
                             toolCallId: event.toolCallId,
@@ -486,16 +661,18 @@ document.addEventListener('alpine:init', () => {
                         });
                     }
 
-                    this.$nextTick(() => this.scrollToBottom());
+                    if (threadId === this.__currentThreadId) {
+                        this.$nextTick(() => this.__scrollToBottom());
+                    }
                     break;
 
                 case 'TEXT_MESSAGE_START':
-                    this.showTypingIndicator = false;
-                    this.currentStreamingId = event.messageId;
-                    this.currentStreamingContent = '';
+                    state.showTypingIndicator = false;
+                    state.currentStreamingId = event.messageId;
+                    state.currentStreamingContent = '';
 
                     // Add empty assistant message
-                    this.messages.push({
+                    state.messages.push({
                         id: event.messageId,
                         role: 'assistant',
                         content: '',
@@ -505,74 +682,84 @@ document.addEventListener('alpine:init', () => {
                     break;
 
                 case 'TEXT_MESSAGE_CONTENT':
-                    this.currentStreamingContent += event.delta;
+                    state.currentStreamingContent += event.delta;
 
                     // Update the streaming message
-                    const msgIndex = this.messages.findIndex(m => m.id === event.messageId);
+                    const msgIndex = state.messages.findIndex(m => m.id === event.messageId);
                     if (msgIndex !== -1) {
-                        this.messages[msgIndex].content = this.currentStreamingContent;
+                        state.messages[msgIndex].content = state.currentStreamingContent;
                     }
 
-                    // Auto-scroll
-                    this.$nextTick(() => this.scrollToBottom());
+                    // Auto-scroll only if this is the current thread
+                    if (threadId === this.__currentThreadId) {
+                        this.$nextTick(() => this.__scrollToBottom());
+                    }
                     break;
 
                 case 'TEXT_MESSAGE_END':
                     // Mark as not streaming
-                    const endMsgIndex = this.messages.findIndex(m => m.id === event.messageId);
+                    const endMsgIndex = state.messages.findIndex(m => m.id === event.messageId);
                     if (endMsgIndex !== -1) {
-                        this.messages[endMsgIndex].streaming = false;
+                        state.messages[endMsgIndex].streaming = false;
                     }
 
-                    this.currentStreamingId = null;
-                    this.currentStreamingContent = '';
+                    state.currentStreamingId = null;
+                    state.currentStreamingContent = '';
                     break;
 
                 case 'RUN_FINISHED':
                     // Run completed successfully
-                    this.isStreaming = false;
+                    state.isStreaming = false;
+                    state.eventSource = null;
                     eventSource.close();
                     break;
 
                 case 'RUN_ERROR':
                     // Handle error
                     console.error('Run error:', event.message);
-                    this.showTypingIndicator = false;
-                    this.isStreaming = false;
-                    this.showError(event.message || 'An error occurred');
+                    state.showTypingIndicator = false;
+                    state.isStreaming = false;
+                    state.eventSource = null;
+
+                    // Only show error if this is the current thread
+                    if (threadId === this.__currentThreadId) {
+                        this.__showError(event.message || 'An error occurred', threadId);
+                    }
                     eventSource.close();
                     break;
             }
         },
 
-        addLifecycleMessage(event) {
+        __addLifecycleMessage(event, threadId) {
+            const state = this.__getThreadState(threadId);
+
             // Find the last user message with the current interaction ID
-            const userMessageIndex = this.messages.findIndex(m =>
-                m.role === 'user' && m.interactionId === this.currentInteractionId
+            const userMessageIndex = state.messages.findIndex(m =>
+                m.role === 'user' && m.interactionId === state.currentInteractionId
             );
 
             if (userMessageIndex !== -1) {
                 const lifecycleEvent = {
                     id: `lifecycle_${Date.now()}_${Math.random()}`,
                     type: event.type,
-                    content: this.getLifecycleContent(event),
+                    content: this.__getLifecycleContent(event),
                     timestamp: new Date().toISOString()
                 };
 
                 // Add to the user message's lifecycle events array
-                if (!this.messages[userMessageIndex].lifecycleEvents) {
-                    this.messages[userMessageIndex].lifecycleEvents = [];
+                if (!state.messages[userMessageIndex].lifecycleEvents) {
+                    state.messages[userMessageIndex].lifecycleEvents = [];
                 }
 
                 // Create a new array reference to ensure Alpine detects the change
-                this.messages[userMessageIndex].lifecycleEvents = [
-                    ...this.messages[userMessageIndex].lifecycleEvents,
+                state.messages[userMessageIndex].lifecycleEvents = [
+                    ...state.messages[userMessageIndex].lifecycleEvents,
                     lifecycleEvent
                 ];
             }
         },
 
-        getLifecycleContent(event) {
+        __getLifecycleContent(event) {
             switch (event.type) {
                 // Lifecycle Events
                 case 'RUN_STARTED':
@@ -633,7 +820,7 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
-        handleMessagesSnapshot(event) {
+        __handleMessagesSnapshot(event, threadId) {
             // Per AG-UI Protocol spec: MESSAGES_SNAPSHOT replaces entire message array
             // This ensures UI stays synchronized with backend state
 
@@ -642,11 +829,15 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
-            // Use shared conversion method
-            this.messages = this.convertBackendMessagesToUI(event.messages);
+            const state = this.__getThreadState(threadId);
 
-            // Scroll to bottom after snapshot
-            this.$nextTick(() => this.scrollToBottom());
+            // Use shared conversion method
+            state.messages = this.__convertBackendMessagesToUI(event.messages);
+
+            // Scroll to bottom after snapshot (only if this is the current thread)
+            if (threadId === this.__currentThreadId) {
+                this.$nextTick(() => this.__scrollToBottom());
+            }
         },
 
         safeParseJSON(jsonString) {
@@ -658,9 +849,15 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
-        addEvent(event) {
+        // ============================================
+        // Event Logging & Debugging
+        // ============================================
+
+        __addEvent(event, threadId) {
+            const state = this.__getThreadState(threadId);
+
             // Add all events to the log (append-only)
-            this.events.push({
+            state.events.push({
                 id: `event_${Date.now()}_${Math.random()}`,
                 type: event.type,
                 time: new Date().toLocaleTimeString('en-US', {
@@ -714,12 +911,15 @@ document.addEventListener('alpine:init', () => {
         },
 
         clearEventLog() {
-            this.events = [];
+            const state = this.__getThreadState();
+            state.events = [];
         },
 
         async copyEventLog() {
+            const state = this.__getThreadState();
+
             try {
-                const logText = this.events.map(event => {
+                const logText = state.events.map(event => {
                     let details = `[${event.time}] ${event.type} (ID: ${event.id})`;
 
                     // Add all event data fields
@@ -751,17 +951,22 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
-        showError(message) {
-            this.errorMessage = message;
-            // Scroll to show the error
-            this.$nextTick(() => this.scrollToBottom());
+        __showError(message, threadId = null) {
+            const state = this.__getThreadState(threadId);
+            state.errorMessage = message;
+
+            // Scroll to show the error (only if this is the current thread)
+            if (!threadId || threadId === this.__currentThreadId) {
+                this.$nextTick(() => this.__scrollToBottom());
+            }
+
             // Auto-hide error after 5 seconds
             setTimeout(() => {
-                this.errorMessage = null;
+                state.errorMessage = null;
             }, 5000);
         },
 
-        scrollToBottom() {
+        __scrollToBottom() {
             const container = this.$refs.messageList;
             if (container) {
                 // Smooth scroll to bottom
@@ -770,35 +975,6 @@ document.addEventListener('alpine:init', () => {
                     behavior: 'smooth'
                 });
             }
-        },
-
-        formatTime(timestamp) {
-            return new Date(timestamp).toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit'
-            });
-        },
-
-        isValidJSON(str) {
-            try {
-                JSON.parse(str);
-                return true;
-            } catch (e) {
-                return false;
-            }
-        },
-
-        // Debounce helper for auto-scroll optimization
-        debounce(func, wait) {
-            let timeout;
-            return function executedFunction(...args) {
-                const later = () => {
-                    clearTimeout(timeout);
-                    func(...args);
-                };
-                clearTimeout(timeout);
-                timeout = setTimeout(later, wait);
-            };
         }
     }));
 });

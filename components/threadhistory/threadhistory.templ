@@ -38,10 +38,19 @@ templ ThreadHistory() {
 							@sidebar.MenuButton(sidebar.MenuButtonProps{
 								Class: "flex-1",
 								Attributes: templ.Attributes{
-									"@click": "switchSession(session.id)",
+									"@click":             "switchSession(session.id)",
+									":class":             "threadId === session.id ? 'bg-sidebar-accent' : ''",
+									"x-bind:data-active": "threadId === session.id",
 								},
 							}) {
-								<span class="truncate" x-text="session.title"></span>
+								<div class="flex items-center gap-2 w-full">
+									<!-- Streaming indicator -->
+									<span x-show="threadStates[session.id]?.isStreaming" class="flex h-2 w-2 relative">
+										<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+										<span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+									</span>
+									<span class="truncate flex-1" x-text="session.title"></span>
+								</div>
 							}
 							<button
 								type="button"

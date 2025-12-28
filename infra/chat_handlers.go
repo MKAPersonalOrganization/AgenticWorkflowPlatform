@@ -101,6 +101,33 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	flusher.Flush()
 
+	// Auto-generate thread title immediately if this is the first message
+	thread, exists := h.store.GetThread(threadID)
+	if exists && thread.Title == "New Chat" && len(thread.Messages) == 1 {
+		// Take first 50 characters of first user message as title
+		title := message
+		if len(title) > 50 {
+			title = title[:50] + "..."
+		}
+		h.store.UpdateThreadTitle(threadID, title)
+
+		// Send CUSTOM event to notify frontend of title update immediately
+		customTimestamp := time.Now().UnixMilli()
+		customEvent := &agui.CustomEvent{
+			BaseEvent: agui.BaseEvent{
+				Type:      "CUSTOM",
+				Timestamp: &customTimestamp,
+			},
+			Name: "THREAD_TITLE_UPDATED",
+			Value: map[string]string{
+				"threadId": threadID,
+				"title":    title,
+			},
+		}
+		agui.WriteSSEEvent(w, customEvent)
+		flusher.Flush()
+	}
+
 	// Generate unique message ID for assistant response
 	messageID := agui.GenerateMessageID()
 
@@ -144,35 +171,6 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	// Emit final MESSAGES_SNAPSHOT with complete conversation
 	if err := h.emitMessagesSnapshot(w, flusher, threadID); err != nil {
 		return
-	} // Auto-generate thread title if still "New Chat"
-	thread, exists := h.store.GetThread(threadID)
-	if exists && thread.Title == "New Chat" && len(thread.Messages) >= 2 {
-		// Generate simple title from first user message
-		messages := h.store.GetMessages(threadID)
-		if len(messages) > 0 {
-			// Take first 50 characters of first user message as title
-			title := messages[0].Content
-			if len(title) > 50 {
-				title = title[:50] + "..."
-			}
-			h.store.UpdateThreadTitle(threadID, title)
-
-			// Send CUSTOM event to notify frontend of title update
-			customTimestamp := time.Now().UnixMilli()
-			customEvent := &agui.CustomEvent{
-				BaseEvent: agui.BaseEvent{
-					Type:      "CUSTOM",
-					Timestamp: &customTimestamp,
-				},
-				Name: "THREAD_TITLE_UPDATED",
-				Value: map[string]string{
-					"threadId": threadID,
-					"title":    title,
-				},
-			}
-			agui.WriteSSEEvent(w, customEvent)
-			flusher.Flush()
-		}
 	}
 
 	// Send RUN_FINISHED event
