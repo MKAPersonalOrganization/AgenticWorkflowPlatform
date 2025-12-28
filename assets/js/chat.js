@@ -163,19 +163,98 @@ document.addEventListener('alpine:init', () => {
                 const response = await fetch(`/api/threads/${this.threadId}/messages`);
                 if (response.ok) {
                     const messages = await response.json();
-                    this.messages = messages.map(msg => ({
-                        id: msg.id,
-                        role: msg.role,
-                        content: msg.content,
-                        timestamp: msg.timestamp,
-                        streaming: false
-                    }));
+                    this.messages = this.convertBackendMessagesToUI(messages);
+
                     // Scroll to bottom after loading
                     this.$nextTick(() => this.scrollToBottom());
                 }
             } catch (error) {
                 console.error('Failed to load messages:', error);
             }
+        },
+
+        convertBackendMessagesToUI(backendMessages) {
+            // Convert backend/AG-UI messages to UI format
+            // Handles: user, assistant (with tool calls), tool, system, developer messages
+            const uiMessages = [];
+
+            for (const msg of backendMessages) {
+                switch (msg.role) {
+                    case 'user':
+                        uiMessages.push({
+                            id: msg.id,
+                            role: 'user',
+                            content: msg.content || '',
+                            timestamp: msg.timestamp || new Date().toISOString(),
+                            streaming: false
+                        });
+                        break;
+
+                    case 'assistant':
+                        // Check for tool calls first
+                        if (msg.toolCalls && msg.toolCalls.length > 0) {
+                            // Add tool call messages
+                            for (const toolCall of msg.toolCalls) {
+                                uiMessages.push({
+                                    id: toolCall.id,
+                                    type: 'tool_call',
+                                    name: toolCall.function?.name || 'unknown',
+                                    args: toolCall.function?.arguments || '{}',
+                                    status: 'completed',
+                                    timestamp: msg.timestamp || new Date().toISOString(),
+                                    parsedArgs: this.safeParseJSON(toolCall.function?.arguments)
+                                });
+                            }
+                        }
+
+                        // Add assistant text message if content exists
+                        if (msg.content) {
+                            uiMessages.push({
+                                id: msg.id,
+                                role: 'assistant',
+                                content: msg.content,
+                                timestamp: msg.timestamp || new Date().toISOString(),
+                                streaming: false
+                            });
+                        }
+                        break;
+
+                    case 'tool':
+                        // Tool result message
+                        uiMessages.push({
+                            id: msg.id,
+                            type: 'tool_result',
+                            toolCallId: msg.toolCallId,
+                            content: msg.content || '',
+                            timestamp: msg.timestamp || new Date().toISOString()
+                        });
+                        break;
+
+                    case 'system':
+                    case 'developer':
+                        uiMessages.push({
+                            id: msg.id,
+                            role: msg.role,
+                            content: msg.content || '',
+                            timestamp: msg.timestamp || new Date().toISOString(),
+                            streaming: false
+                        });
+                        break;
+
+                    default:
+                        // Fallback for unknown roles
+                        console.warn('Unknown message role:', msg.role);
+                        uiMessages.push({
+                            id: msg.id,
+                            role: msg.role,
+                            content: msg.content || '',
+                            timestamp: msg.timestamp || new Date().toISOString(),
+                            streaming: false
+                        });
+                }
+            }
+
+            return uiMessages;
         },
 
         sendMessage() {
@@ -282,7 +361,8 @@ document.addEventListener('alpine:init', () => {
                     break;
 
                 case 'MESSAGES_SNAPSHOT':
-                    // Messages snapshot received
+                    // Messages snapshot received - replace entire conversation with snapshot
+                    this.handleMessagesSnapshot(event);
                     break;
 
                 case 'ACTIVITY_SNAPSHOT':
@@ -550,6 +630,31 @@ document.addEventListener('alpine:init', () => {
                     return event.name || 'Custom';
                 default:
                     return event.type;
+            }
+        },
+
+        handleMessagesSnapshot(event) {
+            // Per AG-UI Protocol spec: MESSAGES_SNAPSHOT replaces entire message array
+            // This ensures UI stays synchronized with backend state
+
+            if (!event.messages || !Array.isArray(event.messages)) {
+                console.warn('Invalid MESSAGES_SNAPSHOT: missing or invalid messages array');
+                return;
+            }
+
+            // Use shared conversion method
+            this.messages = this.convertBackendMessagesToUI(event.messages);
+
+            // Scroll to bottom after snapshot
+            this.$nextTick(() => this.scrollToBottom());
+        },
+
+        safeParseJSON(jsonString) {
+            if (!jsonString) return {};
+            try {
+                return JSON.parse(jsonString);
+            } catch (e) {
+                return { raw: jsonString };
             }
         },
 

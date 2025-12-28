@@ -130,6 +130,11 @@ func HandleSendMessage(store *session.Store, aiClient *openaiservice.Client) htt
 
 		// If tool calls were made, continue conversation with results
 		if hasToolCalls {
+			// Emit MESSAGES_SNAPSHOT after tool results
+			if err := emitMessagesSnapshot(w, flusher, threadID, store); err != nil {
+				return
+			}
+
 			// Generate new message ID for final response
 			finalMessageID := agui.GenerateMessageID()
 
@@ -149,6 +154,11 @@ func HandleSendMessage(store *session.Store, aiClient *openaiservice.Client) htt
 				flusher.Flush()
 				return
 			}
+		}
+
+		// Emit final MESSAGES_SNAPSHOT with complete conversation
+		if err := emitMessagesSnapshot(w, flusher, threadID, store); err != nil {
+			return
 		}
 
 		// Auto-generate thread title if still "New Chat"
@@ -244,5 +254,109 @@ func HandleDeleteThread(store *session.Store) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+	}
+}
+
+// emitMessagesSnapshot converts session messages to AG-UI messages and emits MESSAGES_SNAPSHOT event
+func emitMessagesSnapshot(w http.ResponseWriter, flusher http.Flusher, threadID string, store *session.Store) error {
+	sessionMessages := store.GetMessages(threadID)
+
+	// Convert session.Message to agui.Message
+	aguiMessages := make([]agui.Message, 0, len(sessionMessages))
+	for _, msg := range sessionMessages {
+		aguiMsg := convertSessionMessageToAGUI(msg)
+		aguiMessages = append(aguiMessages, aguiMsg)
+	}
+
+	// Emit MESSAGES_SNAPSHOT event
+	timestamp := time.Now().UnixMilli()
+	messagesSnapshotEvent := &agui.MessagesSnapshotEvent{
+		BaseEvent: agui.BaseEvent{
+			Type:      "MESSAGES_SNAPSHOT",
+			Timestamp: &timestamp,
+		},
+		Messages: aguiMessages,
+	}
+
+	if err := agui.WriteSSEEvent(w, messagesSnapshotEvent); err != nil {
+		return err
+	}
+	flusher.Flush()
+	return nil
+}
+
+// convertSessionMessageToAGUI converts a session.Message to agui.Message (discriminated union)
+func convertSessionMessageToAGUI(msg session.Message) agui.Message {
+	switch msg.Role {
+	case "user":
+		return agui.UserMessage{
+			BaseMessage: agui.BaseMessage{
+				ID:      msg.ID,
+				Role:    msg.Role,
+				Content: &msg.Content,
+			},
+			Content: msg.Content,
+		}
+	case "assistant":
+		assistantMsg := agui.AssistantMessage{
+			BaseMessage: agui.BaseMessage{
+				ID:      msg.ID,
+				Role:    msg.Role,
+				Content: &msg.Content,
+			},
+		}
+
+		// Convert tool calls if present
+		if len(msg.ToolCalls) > 0 {
+			toolCalls := make([]agui.ToolCall, 0, len(msg.ToolCalls))
+			for _, tc := range msg.ToolCalls {
+				toolCalls = append(toolCalls, agui.ToolCall{
+					ID:   tc.ID,
+					Type: tc.Type,
+					Function: agui.FunctionCall{
+						Name:      tc.Function.Name,
+						Arguments: tc.Function.Arguments,
+					},
+				})
+			}
+			assistantMsg.ToolCalls = toolCalls
+		}
+
+		return assistantMsg
+	case "tool":
+		return agui.ToolMessage{
+			ID:         msg.ID,
+			Role:       msg.Role,
+			Content:    msg.Content,
+			ToolCallID: msg.ToolCallID,
+		}
+	case "system":
+		return agui.SystemMessage{
+			BaseMessage: agui.BaseMessage{
+				ID:      msg.ID,
+				Role:    msg.Role,
+				Content: &msg.Content,
+			},
+			Content: msg.Content,
+		}
+	case "developer":
+		return agui.DeveloperMessage{
+			BaseMessage: agui.BaseMessage{
+				ID:      msg.ID,
+				Role:    msg.Role,
+				Content: &msg.Content,
+			},
+			Content: msg.Content,
+		}
+	default:
+		// Default to user message for unknown roles
+		return agui.UserMessage{
+			BaseMessage: agui.BaseMessage{
+				ID:      msg.ID,
+				Role:    msg.Role,
+				Content: &msg.Content,
+			},
+			Content: msg.Content,
+		}
 	}
 }
