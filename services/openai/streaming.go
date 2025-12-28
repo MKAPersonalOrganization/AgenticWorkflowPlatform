@@ -51,11 +51,14 @@ func (h *StreamHandler) HandleStream(
 	stream := h.client.CreateStreamingCompletion(ctx, messages, tools)
 
 	// Send TEXT_MESSAGE_START event
+	timestamp := time.Now().UnixMilli()
 	startEvent := &agui.TextMessageStartEvent{
-		Type:      "TEXT_MESSAGE_START",
+		BaseEvent: agui.BaseEvent{
+			Type:      "TEXT_MESSAGE_START",
+			Timestamp: &timestamp,
+		},
 		MessageID: messageID,
 		Role:      "assistant",
-		Timestamp: time.Now().UnixMilli(),
 	}
 	if err := agui.WriteSSEEvent(h.writer, startEvent); err != nil {
 		return err
@@ -82,11 +85,14 @@ func (h *StreamHandler) HandleStream(
 				completeContent += delta.Content
 
 				// Send TEXT_MESSAGE_CONTENT event
+				contentTimestamp := time.Now().UnixMilli()
 				contentEvent := &agui.TextMessageContentEvent{
-					Type:      "TEXT_MESSAGE_CONTENT",
+					BaseEvent: agui.BaseEvent{
+						Type:      "TEXT_MESSAGE_CONTENT",
+						Timestamp: &contentTimestamp,
+					},
 					MessageID: messageID,
 					Delta:     delta.Content,
-					Timestamp: time.Now().UnixMilli(),
 				}
 				if err := agui.WriteSSEEvent(h.writer, contentEvent); err != nil {
 					return err
@@ -103,12 +109,15 @@ func (h *StreamHandler) HandleStream(
 					// Check if this is a new tool call (has ID and function name)
 					if toolCallDelta.ID != "" && toolCallDelta.Function.Name != "" {
 						// Emit TOOL_CALL_START
+						toolStartTimestamp := time.Now().UnixMilli()
 						toolStartEvent := &agui.ToolCallStartEvent{
-							Type:            "TOOL_CALL_START",
+							BaseEvent: agui.BaseEvent{
+								Type:      "TOOL_CALL_START",
+								Timestamp: &toolStartTimestamp,
+							},
 							ToolCallID:      toolCallDelta.ID,
 							ToolCallName:    toolCallDelta.Function.Name,
-							ParentMessageID: messageID,
-							Timestamp:       time.Now().UnixMilli(),
+							ParentMessageID: &messageID,
 						}
 						if err := agui.WriteSSEEvent(h.writer, toolStartEvent); err != nil {
 							return err
@@ -132,11 +141,14 @@ func (h *StreamHandler) HandleStream(
 					// Stream function arguments if present
 					if state != nil && toolCallDelta.Function.Arguments != "" {
 						// Emit TOOL_CALL_ARGS event
+						argsTimestamp := time.Now().UnixMilli()
 						argsEvent := &agui.ToolCallArgsEvent{
-							Type:       "TOOL_CALL_ARGS",
+							BaseEvent: agui.BaseEvent{
+								Type:      "TOOL_CALL_ARGS",
+								Timestamp: &argsTimestamp,
+							},
 							ToolCallID: state.ID,
 							Delta:      toolCallDelta.Function.Arguments,
-							Timestamp:  time.Now().UnixMilli(),
 						}
 						if err := agui.WriteSSEEvent(h.writer, argsEvent); err != nil {
 							return err
@@ -183,10 +195,13 @@ func (h *StreamHandler) HandleStream(
 		// For each tool call: emit END, execute, emit RESULT immediately
 		for _, toolCall := range toolCallsList {
 			// Emit TOOL_CALL_END
+			toolEndTimestamp := time.Now().UnixMilli()
 			endEvent := &agui.ToolCallEndEvent{
-				Type:       "TOOL_CALL_END",
+				BaseEvent: agui.BaseEvent{
+					Type:      "TOOL_CALL_END",
+					Timestamp: &toolEndTimestamp,
+				},
 				ToolCallID: toolCall.ID,
-				Timestamp:  time.Now().UnixMilli(),
 			}
 			if err := agui.WriteSSEEvent(h.writer, endEvent); err != nil {
 				return err
@@ -210,13 +225,17 @@ func (h *StreamHandler) HandleStream(
 			})
 
 			// Emit TOOL_CALL_RESULT event immediately after execution
+			resultTimestamp := time.Now().UnixMilli()
+			role := "tool"
 			resultEvent := &agui.ToolCallResultEvent{
-				Type:       "TOOL_CALL_RESULT",
+				BaseEvent: agui.BaseEvent{
+					Type:      "TOOL_CALL_RESULT",
+					Timestamp: &resultTimestamp,
+				},
 				MessageID:  toolResultID,
 				ToolCallID: toolCall.ID,
 				Content:    result,
-				Role:       "tool",
-				Timestamp:  time.Now().UnixMilli(),
+				Role:       &role,
 			}
 			if err := agui.WriteSSEEvent(h.writer, resultEvent); err != nil {
 				return err
@@ -234,10 +253,13 @@ func (h *StreamHandler) HandleStream(
 	}
 
 	// Send TEXT_MESSAGE_END event
+	endTimestamp := time.Now().UnixMilli()
 	endEvent := &agui.TextMessageEndEvent{
-		Type:      "TEXT_MESSAGE_END",
+		BaseEvent: agui.BaseEvent{
+			Type:      "TEXT_MESSAGE_END",
+			Timestamp: &endTimestamp,
+		},
 		MessageID: messageID,
-		Timestamp: time.Now().UnixMilli(),
 	}
 	if err := agui.WriteSSEEvent(h.writer, endEvent); err != nil {
 		return err

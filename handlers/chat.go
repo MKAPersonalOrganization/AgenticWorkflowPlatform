@@ -57,12 +57,16 @@ func HandleSendMessage(store *session.Store, aiClient *openaiservice.Client) htt
 		// Error handling with defer to catch panics
 		defer func() {
 			if r := recover(); r != nil {
+				errorTimestamp := time.Now().UnixMilli()
+				errorCode := "INTERNAL_ERROR"
 				errorEvent := &agui.RunErrorEvent{
-					Type:      "RUN_ERROR",
-					RunID:     runID,
-					Code:      "INTERNAL_ERROR",
-					Message:   fmt.Sprintf("%v", r),
-					Timestamp: time.Now().UnixMilli(),
+					BaseEvent: agui.BaseEvent{
+						Type:      "RUN_ERROR",
+						Timestamp: &errorTimestamp,
+					},
+					RunID:   runID,
+					Code:    &errorCode,
+					Message: fmt.Sprintf("%v", r),
 				}
 				agui.WriteSSEEvent(w, errorEvent)
 				flusher.Flush()
@@ -70,11 +74,14 @@ func HandleSendMessage(store *session.Store, aiClient *openaiservice.Client) htt
 		}()
 
 		// Send RUN_STARTED event
+		runStartedTimestamp := time.Now().UnixMilli()
 		runStartedEvent := &agui.RunStartedEvent{
-			Type:      "RUN_STARTED",
-			ThreadID:  threadID,
-			RunID:     runID,
-			Timestamp: time.Now().UnixMilli(),
+			BaseEvent: agui.BaseEvent{
+				Type:      "RUN_STARTED",
+				Timestamp: &runStartedTimestamp,
+			},
+			ThreadID: threadID,
+			RunID:    runID,
 		}
 		if err := agui.WriteSSEEvent(w, runStartedEvent); err != nil {
 			return
@@ -97,12 +104,16 @@ func HandleSendMessage(store *session.Store, aiClient *openaiservice.Client) htt
 		ctx := context.Background()
 		if err := streamHandler.HandleStream(ctx, threadID, messageID, messages, availableTools); err != nil {
 			// Emit RUN_ERROR event on failure
+			errorTimestamp := time.Now().UnixMilli()
+			errorCode := "OPENAI_ERROR"
 			errorEvent := &agui.RunErrorEvent{
-				Type:      "RUN_ERROR",
-				RunID:     runID,
-				Code:      "OPENAI_ERROR",
-				Message:   err.Error(),
-				Timestamp: time.Now().UnixMilli(),
+				BaseEvent: agui.BaseEvent{
+					Type:      "RUN_ERROR",
+					Timestamp: &errorTimestamp,
+				},
+				RunID:   runID,
+				Code:    &errorCode,
+				Message: err.Error(),
 			}
 			agui.WriteSSEEvent(w, errorEvent)
 			flusher.Flush()
@@ -126,12 +137,16 @@ func HandleSendMessage(store *session.Store, aiClient *openaiservice.Client) htt
 
 			// Call OpenAI again with tool results in conversation
 			if err := streamHandler.HandleStream(ctx, threadID, finalMessageID, updatedMessages, availableTools); err != nil {
+				errorTimestamp := time.Now().UnixMilli()
+				errorCode := "OPENAI_ERROR"
 				errorEvent := &agui.RunErrorEvent{
-					Type:      "RUN_ERROR",
-					RunID:     runID,
-					Code:      "OPENAI_ERROR",
-					Message:   err.Error(),
-					Timestamp: time.Now().UnixMilli(),
+					BaseEvent: agui.BaseEvent{
+						Type:      "RUN_ERROR",
+						Timestamp: &errorTimestamp,
+					},
+					RunID:   runID,
+					Code:    &errorCode,
+					Message: err.Error(),
 				}
 				agui.WriteSSEEvent(w, errorEvent)
 				flusher.Flush()
@@ -149,8 +164,8 @@ func HandleSendMessage(store *session.Store, aiClient *openaiservice.Client) htt
 
 				// Send CUSTOM event to notify frontend of title update
 				customEvent := map[string]any{
-					"type":      "CUSTOM",
-					"name":      "THREAD_TITLE_UPDATED",
+					"type": "CUSTOM",
+					"name": "THREAD_TITLE_UPDATED",
 					"value": map[string]string{
 						"threadId": threadID,
 						"title":    title,
@@ -163,11 +178,14 @@ func HandleSendMessage(store *session.Store, aiClient *openaiservice.Client) htt
 		}
 
 		// Send RUN_FINISHED event
+		runFinishedTimestamp := time.Now().UnixMilli()
 		runFinishedEvent := &agui.RunFinishedEvent{
-			Type:      "RUN_FINISHED",
-			ThreadID:  threadID,
-			RunID:     runID,
-			Timestamp: time.Now().UnixMilli(),
+			BaseEvent: agui.BaseEvent{
+				Type:      "RUN_FINISHED",
+				Timestamp: &runFinishedTimestamp,
+			},
+			ThreadID: threadID,
+			RunID:    runID,
 		}
 		if err := agui.WriteSSEEvent(w, runFinishedEvent); err != nil {
 			return

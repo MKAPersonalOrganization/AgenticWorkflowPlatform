@@ -5,87 +5,86 @@ import (
 	"time"
 )
 
+// BaseEvent is the base event for all events in the Agent User Interaction Protocol.
+type BaseEvent struct {
+	Type      string      `json:"type"`
+	Timestamp *int64      `json:"timestamp,omitempty"`
+	RawEvent  interface{} `json:"rawEvent,omitempty"`
+}
+
 // TextMessageStartEvent represents the start of a text message
 type TextMessageStartEvent struct {
-	Type      string `json:"type"`
+	BaseEvent
 	MessageID string `json:"messageId"`
 	Role      string `json:"role,omitempty"`
-	Timestamp int64  `json:"timestamp,omitempty"`
 }
 
 // TextMessageContentEvent represents a chunk of message content
 type TextMessageContentEvent struct {
-	Type      string `json:"type"`
+	BaseEvent
 	MessageID string `json:"messageId"`
 	Delta     string `json:"delta"`
-	Timestamp int64  `json:"timestamp,omitempty"`
 }
 
 // TextMessageEndEvent represents the end of a text message
 type TextMessageEndEvent struct {
-	Type      string `json:"type"`
+	BaseEvent
 	MessageID string `json:"messageId"`
-	Timestamp int64  `json:"timestamp,omitempty"`
 }
 
-// RunStartedEvent represents the start of an agent run
+// RunStartedEvent indicates that a run has started.
 type RunStartedEvent struct {
-	Type      string `json:"type"`
-	ThreadID  string `json:"threadId"`
-	RunID     string `json:"runId"`
-	Timestamp int64  `json:"timestamp,omitempty"`
+	BaseEvent
+	ThreadID    string      `json:"threadId"`
+	RunID       string      `json:"runId"`
+	ParentRunID *string     `json:"parentRunId,omitempty"`
+	Input       interface{} `json:"input,omitempty"`
 }
 
 // RunFinishedEvent represents the successful completion of an agent run
 type RunFinishedEvent struct {
-	Type      string      `json:"type"`
-	ThreadID  string      `json:"threadId"`
-	RunID     string      `json:"runId"`
-	Result    interface{} `json:"result,omitempty"`
-	Timestamp int64       `json:"timestamp,omitempty"`
+	BaseEvent
+	ThreadID string      `json:"threadId"`
+	RunID    string      `json:"runId"`
+	Result   interface{} `json:"result,omitempty"`
 }
 
 // RunErrorEvent represents an error during an agent run
 type RunErrorEvent struct {
-	Type      string `json:"type"`
-	RunID     string `json:"runId,omitempty"`
-	Code      string `json:"code,omitempty"`
-	Message   string `json:"message"`
-	Timestamp int64  `json:"timestamp,omitempty"`
+	BaseEvent
+	RunID   string  `json:"runId,omitempty"`
+	Code    *string `json:"code,omitempty"`
+	Message string  `json:"message"`
 }
 
 // ToolCallStartEvent signals the start of a tool call
 type ToolCallStartEvent struct {
-	Type            string `json:"type"`
-	ToolCallID      string `json:"toolCallId"`
-	ToolCallName    string `json:"toolCallName"`
-	ParentMessageID string `json:"parentMessageId,omitempty"`
-	Timestamp       int64  `json:"timestamp,omitempty"`
+	BaseEvent
+	ToolCallID      string  `json:"toolCallId"`
+	ToolCallName    string  `json:"toolCallName"`
+	ParentMessageID *string `json:"parentMessageId,omitempty"`
 }
 
 // ToolCallArgsEvent represents a chunk of tool call arguments
 type ToolCallArgsEvent struct {
-	Type       string `json:"type"`
+	BaseEvent
 	ToolCallID string `json:"toolCallId"`
 	Delta      string `json:"delta"`
-	Timestamp  int64  `json:"timestamp,omitempty"`
 }
 
 // ToolCallEndEvent signals the end of a tool call
 type ToolCallEndEvent struct {
-	Type       string `json:"type"`
+	BaseEvent
 	ToolCallID string `json:"toolCallId"`
-	Timestamp  int64  `json:"timestamp,omitempty"`
 }
 
 // ToolCallResultEvent provides the result of a tool call execution
 type ToolCallResultEvent struct {
-	Type       string `json:"type"`
-	MessageID  string `json:"messageId"`
-	ToolCallID string `json:"toolCallId"`
-	Content    string `json:"content"`
-	Role       string `json:"role,omitempty"`
-	Timestamp  int64  `json:"timestamp,omitempty"`
+	BaseEvent
+	MessageID  string  `json:"messageId"`
+	ToolCallID string  `json:"toolCallId"`
+	Content    string  `json:"content"`
+	Role       *string `json:"role,omitempty"`
 }
 
 // GenerateMessageID generates a unique message ID
