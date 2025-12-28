@@ -14,6 +14,7 @@ document.addEventListener('alpine:init', () => {
         sessions: [],
         showDebugPanel: false,
         showEventLog: false,
+        eventLogCopied: false,
         sidebarOpen: true,
         hideLifecycleEvents: false,
         currentInteractionId: null,
@@ -609,6 +610,40 @@ document.addEventListener('alpine:init', () => {
 
         clearEventLog() {
             this.events = [];
+        },
+
+        async copyEventLog() {
+            try {
+                const logText = this.events.map(event => {
+                    let details = `[${event.time}] ${event.type} (ID: ${event.id})`;
+
+                    // Add all event data fields
+                    if (Object.keys(event.data).length > 0) {
+                        details += '\n';
+                        for (const [key, value] of Object.entries(event.data)) {
+                            if (typeof value === 'object') {
+                                details += `  ${key}: ${JSON.stringify(value, null, 2).split('\n').join('\n  ')}\n`;
+                            } else {
+                                details += `  ${key}: ${value}\n`;
+                            }
+                        }
+                    }
+
+                    return details;
+                }).join('\n---\n');
+
+                await navigator.clipboard.writeText(logText);
+                console.log('Event log copied to clipboard!');
+
+                // Show success feedback
+                this.eventLogCopied = true;
+                setTimeout(() => {
+                    this.eventLogCopied = false;
+                }, 2000);
+            } catch (err) {
+                console.error('Failed to copy event log:', err);
+                alert('Failed to copy: ' + err.message);
+            }
         },
 
         showError(message) {

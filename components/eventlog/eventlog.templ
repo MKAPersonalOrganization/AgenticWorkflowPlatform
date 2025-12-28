@@ -35,6 +35,20 @@ templ EventLog() {
 			</div>
 			<div class="flex items-center gap-2">
 				<button
+					@click="copyEventLog()"
+					class="p-1 hover:bg-muted rounded text-xs transition-all"
+					:class="eventLogCopied ? 'text-green-600' : 'text-muted-foreground hover:text-foreground'"
+					title="Copy log"
+				>
+					<svg x-show="!eventLogCopied" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect>
+						<path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>
+					</svg>
+					<svg x-show="eventLogCopied" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<path d="M20 6 9 17l-5-5"></path>
+					</svg>
+				</button>
+				<button
 					@click="clearEventLog()"
 					class="p-1 hover:bg-muted rounded text-xs text-muted-foreground hover:text-foreground transition-colors"
 					title="Clear log"
@@ -57,28 +71,40 @@ templ EventLog() {
 			</div>
 		</div>
 		<!-- Event List -->
-		<div class="flex-1 overflow-y-auto p-3 space-y-1 font-mono text-xs" x-ref="eventLogContainer">
+		<div class="flex-1 overflow-y-auto p-3 space-y-2 font-mono text-xs" x-ref="eventLogContainer">
 			<template x-for="event in events" :key="event.id">
-				<div class="p-2 hover:bg-muted/50 rounded border border-transparent hover:border-border transition-colors">
-					<div class="flex items-start gap-2">
-						<span class="text-muted-foreground whitespace-nowrap" x-text="event.time"></span>
-						<span class="font-semibold" :class="getEventTypeColor(event.type)" x-text="event.type"></span>
+				<div class="p-3 bg-muted/30 hover:bg-muted/50 rounded-lg border border-border/50 hover:border-border transition-all">
+					<div class="flex items-start justify-between gap-2 mb-2">
+						<div class="flex items-center gap-2">
+							<span class="text-muted-foreground/80 whitespace-nowrap text-[10px]" x-text="event.time"></span>
+							<span class="font-bold px-2 py-0.5 rounded" :class="getEventTypeColor(event.type)" x-text="event.type"></span>
+						</div>
+						<span class="text-[10px] text-muted-foreground/60" x-text="`ID: ${event.id.slice(-6)}`"></span>
 					</div>
-					<div class="mt-1 pl-20 text-muted-foreground">
-						<template x-if="event.data.messageId">
-							<div><span class="text-xs opacity-70">msgId:</span> <span x-text="event.data.messageId.slice(-8)"></span></div>
-						</template>
-						<template x-if="event.data.toolCallId">
-							<div><span class="text-xs opacity-70">toolId:</span> <span x-text="event.data.toolCallId.slice(-8)"></span></div>
-						</template>
-						<template x-if="event.data.toolCallName">
-							<div><span class="text-xs opacity-70">tool:</span> <span x-text="event.data.toolCallName"></span></div>
-						</template>
-						<template x-if="event.data.delta">
-							<div><span class="text-xs opacity-70">delta:</span> <span x-text="`${event.data.delta.length} chars`"></span></div>
-						</template>
-						<template x-if="event.data.content && event.type === 'TOOL_CALL_RESULT'">
-							<div class="text-xs opacity-70 truncate" x-text="`result: ${event.data.content.substring(0, 50)}...`"></div>
+					<div class="space-y-1.5 text-[11px]" x-show="Object.keys(event.data).length > 0">
+						<template x-for="(value, key) in event.data" :key="key">
+							<div class="flex gap-2 items-start">
+								<span class="text-primary/80 font-semibold min-w-[80px]" x-text="key + ':'"></span>
+								<template x-if="typeof value === 'string' && value.length > 100">
+									<div class="flex-1">
+										<div class="text-muted-foreground break-all" x-text="value.substring(0, 100) + '...'"></div>
+										<button
+											@click="navigator.clipboard.writeText(value); alert('Copied to clipboard!')"
+											class="text-primary/60 hover:text-primary text-[10px] mt-1 underline"
+										>
+											Copy full value
+										</button>
+									</div>
+								</template>
+								<template x-if="typeof value === 'object'">
+									<div class="flex-1">
+										<pre class="text-muted-foreground bg-background/50 p-1.5 rounded text-[10px] overflow-x-auto" x-text="JSON.stringify(value, null, 2)"></pre>
+									</div>
+								</template>
+								<template x-if="typeof value !== 'object' && (typeof value !== 'string' || value.length <= 100)">
+									<span class="text-muted-foreground break-all flex-1" x-text="value"></span>
+								</template>
+							</div>
 						</template>
 					</div>
 				</div>
