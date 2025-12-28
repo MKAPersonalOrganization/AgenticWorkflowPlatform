@@ -106,6 +106,36 @@ type ToolCallResultEvent struct {
 	Role       *string `json:"role,omitempty"`
 }
 
+// StepStartedEvent signals the start of a step within an agent run.
+//
+// The StepStarted event indicates that the agent is beginning a specific subtask or phase
+// of its processing. Steps provide granular visibility into the agent's progress, enabling
+// more precise tracking and feedback in the UI. Steps are optional but highly recommended
+// for complex operations that benefit from being broken down into observable stages.
+// The stepName could be the name of a node or function that is currently executing.
+//
+// Properties:
+//   - stepName: Name of the step
+type StepStartedEvent struct {
+	BaseEvent
+	StepName string `json:"stepName"`
+}
+
+// StepFinishedEvent signals the completion of a step within an agent run.
+//
+// The StepFinished event indicates that the agent has completed a specific subtask or phase.
+// When paired with a corresponding StepStarted event, it creates a bounded context for a
+// discrete unit of work. Frontends can use these events to update progress indicators, show
+// completion animations, or reveal results specific to that step. The stepName must match
+// the corresponding StepStarted event to properly pair the beginning and end of the step.
+//
+// Properties:
+//   - stepName: Name of the step
+type StepFinishedEvent struct {
+	BaseEvent
+	StepName string `json:"stepName"`
+}
+
 // GenerateMessageID generates a unique message ID
 func GenerateMessageID() string {
 	return fmt.Sprintf("msg_%d", time.Now().UnixNano())
