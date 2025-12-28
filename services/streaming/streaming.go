@@ -1,4 +1,4 @@
-package openai
+package streaming
 
 import (
 	"context"
@@ -9,16 +9,15 @@ import (
 	"school-with-ai/internal/agui"
 	"school-with-ai/internal/session"
 	"school-with-ai/internal/tools"
-
-	"github.com/openai/openai-go/v3"
+	"school-with-ai/services/llm"
 )
 
-// StreamHandler handles streaming OpenAI responses and emits AG-UI events
+// StreamHandler handles streaming LLM responses and emits AG-UI events
 type StreamHandler struct {
-	client  *Client
-	store   *session.Store
-	flusher http.Flusher
-	writer  http.ResponseWriter
+	provider llm.Provider
+	store    *session.Store
+	flusher  http.Flusher
+	writer   http.ResponseWriter
 }
 
 // ToolCallState tracks streaming tool call data
@@ -30,25 +29,30 @@ type ToolCallState struct {
 }
 
 // NewStreamHandler creates a new stream handler
-func NewStreamHandler(client *Client, store *session.Store, w http.ResponseWriter, f http.Flusher) *StreamHandler {
+func NewStreamHandler(provider llm.Provider, store *session.Store, w http.ResponseWriter, f http.Flusher) *StreamHandler {
 	return &StreamHandler{
-		client:  client,
-		store:   store,
-		flusher: f,
-		writer:  w,
+		provider: provider,
+		store:    store,
+		flusher:  f,
+		writer:   w,
 	}
 }
 
-// HandleStream processes the OpenAI streaming response and emits AG-UI events
+// HandleStream processes the LLM streaming response and emits AG-UI events
 func (h *StreamHandler) HandleStream(
 	ctx context.Context,
 	threadID string,
 	messageID string,
 	messages []session.Message,
-	tools []openai.ChatCompletionToolUnionParam,
+	tools []llm.Tool,
 ) error {
-	// Create streaming completion with tools
-	stream := h.client.CreateStreamingCompletion(ctx, messages, tools)
+	// Create streaming completion
+	config := llm.CompletionConfig{
+		Messages: messages,
+		Tools:    tools,
+	}
+
+	streamIter := h.provider.CreateStreamingCompletion(ctx, config)
 
 	// Send TEXT_MESSAGE_START event
 	timestamp := time.Now().UnixMilli()
@@ -72,100 +76,100 @@ func (h *StreamHandler) HandleStream(
 	activeToolCalls := make(map[string]*ToolCallState)
 	toolCallsByIndex := make(map[int]*ToolCallState)
 
-	// Process stream chunks
-	for stream.Next() {
-		chunk := stream.Current()
+	// Process stream chunks using iterator
+	for chunk, err := range streamIter {
+		// Check for errors
+		if err != nil {
+			return fmt.Errorf("stream error: %w", err)
+		}
 
-		// Extract content from the first choice
-		if len(chunk.Choices) > 0 {
-			delta := chunk.Choices[0].Delta
+		// Handle text content
+		if chunk.Content != "" {
+			completeContent += chunk.Content
 
-			// Handle text content
-			if delta.Content != "" {
-				completeContent += delta.Content
-
-				// Send TEXT_MESSAGE_CONTENT event
-				contentTimestamp := time.Now().UnixMilli()
-				contentEvent := &agui.TextMessageContentEvent{
-					BaseEvent: agui.BaseEvent{
-						Type:      "TEXT_MESSAGE_CONTENT",
-						Timestamp: &contentTimestamp,
-					},
-					MessageID: messageID,
-					Delta:     delta.Content,
-				}
-				if err := agui.WriteSSEEvent(h.writer, contentEvent); err != nil {
-					return err
-				}
-				h.flusher.Flush()
+			// Send TEXT_MESSAGE_CONTENT event
+			contentTimestamp := time.Now().UnixMilli()
+			contentEvent := &agui.TextMessageContentEvent{
+				BaseEvent: agui.BaseEvent{
+					Type:      "TEXT_MESSAGE_CONTENT",
+					Timestamp: &contentTimestamp,
+				},
+				MessageID: messageID,
+				Delta:     chunk.Content,
 			}
+			if err := agui.WriteSSEEvent(h.writer, contentEvent); err != nil {
+				return err
+			}
+			h.flusher.Flush()
+		}
 
-			// Handle tool calls
-			if len(delta.ToolCalls) > 0 {
-				for _, toolCallDelta := range delta.ToolCalls {
-					index := int(toolCallDelta.Index)
-					var state *ToolCallState
+		// Handle tool calls
+		if len(chunk.ToolCalls) > 0 {
+			for _, toolCallDelta := range chunk.ToolCalls {
+				index := toolCallDelta.Index
+				var state *ToolCallState
 
-					// Check if this is a new tool call (has ID and function name)
-					if toolCallDelta.ID != "" && toolCallDelta.Function.Name != "" {
-						// Emit TOOL_CALL_START
-						toolStartTimestamp := time.Now().UnixMilli()
-						toolStartEvent := &agui.ToolCallStartEvent{
-							BaseEvent: agui.BaseEvent{
-								Type:      "TOOL_CALL_START",
-								Timestamp: &toolStartTimestamp,
-							},
-							ToolCallID:      toolCallDelta.ID,
-							ToolCallName:    toolCallDelta.Function.Name,
-							ParentMessageID: &messageID,
-						}
-						if err := agui.WriteSSEEvent(h.writer, toolStartEvent); err != nil {
-							return err
-						}
-						h.flusher.Flush()
-
-						// Track this tool call
-						state = &ToolCallState{
-							ID:        toolCallDelta.ID,
-							Index:     index,
-							Name:      toolCallDelta.Function.Name,
-							Arguments: "",
-						}
-						activeToolCalls[toolCallDelta.ID] = state
-						toolCallsByIndex[index] = state
-					} else {
-						// This is a continuation - find by index
-						state = toolCallsByIndex[index]
+				// Check if this is a new tool call (has ID and function name)
+				if toolCallDelta.ID != "" && toolCallDelta.Name != "" {
+					// Emit TOOL_CALL_START
+					toolStartTimestamp := time.Now().UnixMilli()
+					toolStartEvent := &agui.ToolCallStartEvent{
+						BaseEvent: agui.BaseEvent{
+							Type:      "TOOL_CALL_START",
+							Timestamp: &toolStartTimestamp,
+						},
+						ToolCallID:      toolCallDelta.ID,
+						ToolCallName:    toolCallDelta.Name,
+						ParentMessageID: &messageID,
 					}
-
-					// Stream function arguments if present
-					if state != nil && toolCallDelta.Function.Arguments != "" {
-						// Emit TOOL_CALL_ARGS event
-						argsTimestamp := time.Now().UnixMilli()
-						argsEvent := &agui.ToolCallArgsEvent{
-							BaseEvent: agui.BaseEvent{
-								Type:      "TOOL_CALL_ARGS",
-								Timestamp: &argsTimestamp,
-							},
-							ToolCallID: state.ID,
-							Delta:      toolCallDelta.Function.Arguments,
-						}
-						if err := agui.WriteSSEEvent(h.writer, argsEvent); err != nil {
-							return err
-						}
-						h.flusher.Flush()
-
-						// Accumulate arguments
-						state.Arguments += toolCallDelta.Function.Arguments
+					if err := agui.WriteSSEEvent(h.writer, toolStartEvent); err != nil {
+						return err
 					}
+					h.flusher.Flush()
+
+					// Track this tool call
+					state = &ToolCallState{
+						ID:        toolCallDelta.ID,
+						Index:     index,
+						Name:      toolCallDelta.Name,
+						Arguments: "",
+					}
+					activeToolCalls[toolCallDelta.ID] = state
+					toolCallsByIndex[index] = state
+				} else {
+					// This is a continuation - find by index
+					state = toolCallsByIndex[index]
+					if state == nil {
+						fmt.Printf("DEBUG: WARNING - No state found for tool call index %d\n", index)
+					}
+				}
+
+				// Stream function arguments if present
+				if state != nil && toolCallDelta.Arguments != "" {
+					// Emit TOOL_CALL_ARGS event
+					argsTimestamp := time.Now().UnixMilli()
+					argsEvent := &agui.ToolCallArgsEvent{
+						BaseEvent: agui.BaseEvent{
+							Type:      "TOOL_CALL_ARGS",
+							Timestamp: &argsTimestamp,
+						},
+						ToolCallID: state.ID,
+						Delta:      toolCallDelta.Arguments,
+					}
+					if err := agui.WriteSSEEvent(h.writer, argsEvent); err != nil {
+						return err
+					}
+					h.flusher.Flush()
+
+					// Accumulate arguments
+					state.Arguments += toolCallDelta.Arguments
+					fmt.Printf("DEBUG: Accumulated args for %s (index %d): delta='%s', total='%s'\n",
+						state.ID, state.Index, toolCallDelta.Arguments, state.Arguments)
+				} else if state != nil {
+					fmt.Printf("DEBUG: Skipping empty delta for tool call %s (index %d)\n", state.ID, state.Index)
 				}
 			}
 		}
-	}
-
-	// Check for stream errors
-	if err := stream.Err(); err != nil {
-		return fmt.Errorf("stream error: %w", err)
 	}
 
 	// Store assistant message and handle tool calls
@@ -207,6 +211,10 @@ func (h *StreamHandler) HandleStream(
 				return err
 			}
 			h.flusher.Flush()
+
+			// Debug: log tool call details
+			fmt.Printf("DEBUG: Executing tool call %s - Name: %s, Args length: %d, Args: %s\n",
+				toolCall.ID, toolCall.Function.Name, len(toolCall.Function.Arguments), toolCall.Function.Arguments)
 
 			// Execute the tool call immediately
 			result, err := h.executeToolCall(toolCall)

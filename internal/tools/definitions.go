@@ -1,15 +1,16 @@
 package tools
 
 import (
-	"github.com/openai/openai-go/v3"
+	"school-with-ai/services/llm"
 )
 
-// GetWeatherTool returns the OpenAI tool definition for weather lookup
-func GetWeatherTool() openai.ChatCompletionToolUnionParam {
-	return openai.ChatCompletionFunctionTool(openai.FunctionDefinitionParam{
+// GetWeatherTool returns the tool definition for weather lookup
+func GetWeatherTool() llm.Tool {
+	return llm.Tool{
+		Type:        "function",
 		Name:        "get_weather",
-		Description: openai.String("Get the current weather for a location"),
-		Parameters: openai.FunctionParameters{
+		Description: "Get the current weather for a location",
+		Parameters: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
 				"location": map[string]string{
@@ -24,15 +25,16 @@ func GetWeatherTool() openai.ChatCompletionToolUnionParam {
 			},
 			"required": []string{"location"},
 		},
-	})
+	}
 }
 
-// GetCalculatorTool returns the OpenAI tool definition for calculator
-func GetCalculatorTool() openai.ChatCompletionToolUnionParam {
-	return openai.ChatCompletionFunctionTool(openai.FunctionDefinitionParam{
+// GetCalculatorTool returns the tool definition for calculator
+func GetCalculatorTool() llm.Tool {
+	return llm.Tool{
+		Type:        "function",
 		Name:        "calculate",
-		Description: openai.String("Perform mathematical calculations. Supports basic arithmetic (+, -, *, /), exponentiation (^), square root (sqrt), and parentheses."),
-		Parameters: openai.FunctionParameters{
+		Description: "Perform mathematical calculations. Supports basic arithmetic (+, -, *, /), exponentiation (^), square root (sqrt), and parentheses.",
+		Parameters: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
 				"expression": map[string]string{
@@ -42,12 +44,12 @@ func GetCalculatorTool() openai.ChatCompletionToolUnionParam {
 			},
 			"required": []string{"expression"},
 		},
-	})
+	}
 }
 
 // GetAllTools returns all available tools
-func GetAllTools() []openai.ChatCompletionToolUnionParam {
-	return []openai.ChatCompletionToolUnionParam{
+func GetAllTools() []llm.Tool {
+	return []llm.Tool{
 		GetWeatherTool(),
 		GetCalculatorTool(),
 	}

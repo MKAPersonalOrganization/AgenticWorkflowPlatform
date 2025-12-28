@@ -1,53 +1,37 @@
 package tools
 
 import (
-	"encoding/json"
 	"testing"
-
-	"github.com/openai/openai-go/v3"
 )
 
 // TestGetWeatherTool verifies the weather tool definition structure
 func TestGetWeatherTool(t *testing.T) {
 	tool := GetWeatherTool()
 
-	// Verify tool can be marshaled to JSON
-	toolJSON, err := json.Marshal(tool)
-	if err != nil {
-		t.Fatalf("Failed to marshal tool: %v", err)
-	}
-
-	// Verify JSON structure
-	var toolMap map[string]any
-	if err := json.Unmarshal(toolJSON, &toolMap); err != nil {
-		t.Fatalf("Failed to unmarshal tool JSON: %v", err)
-	}
-
 	// Check tool type
-	if toolMap["type"] != "function" {
-		t.Errorf("Expected type 'function', got %v", toolMap["type"])
+	if tool.Type != "function" {
+		t.Errorf("Expected type 'function', got %v", tool.Type)
 	}
 
-	// Check function definition exists
-	function, ok := toolMap["function"].(map[string]any)
+	// Check tool name
+	if tool.Name != "get_weather" {
+		t.Errorf("Expected name 'get_weather', got %v", tool.Name)
+	}
+
+	// Check tool has description
+	if tool.Description == "" {
+		t.Error("Tool missing description")
+	}
+
+	// Check tool has parameters
+	if tool.Parameters == nil {
+		t.Fatal("Tool missing parameters")
+	}
+
+	// Check parameters structure
+	params, ok := tool.Parameters.(map[string]any)
 	if !ok {
-		t.Fatalf("Expected function definition, got %T", toolMap["function"])
-	}
-
-	// Check function name
-	if function["name"] != "get_weather" {
-		t.Errorf("Expected name 'get_weather', got %v", function["name"])
-	}
-
-	// Check function has description
-	if _, hasDesc := function["description"]; !hasDesc {
-		t.Error("Function missing description")
-	}
-
-	// Check function has parameters
-	params, ok := function["parameters"].(map[string]any)
-	if !ok {
-		t.Fatalf("Expected parameters object, got %T", function["parameters"])
+		t.Fatalf("Expected parameters to be map[string]any, got %T", tool.Parameters)
 	}
 
 	// Check parameters type
@@ -72,7 +56,7 @@ func TestGetWeatherTool(t *testing.T) {
 	}
 
 	// Check required fields
-	required, ok := params["required"].([]any)
+	required, ok := params["required"].([]string)
 	if !ok {
 		t.Fatalf("Expected required array, got %T", params["required"])
 	}
@@ -82,59 +66,56 @@ func TestGetWeatherTool(t *testing.T) {
 	}
 }
 
+// TestGetCalculatorTool verifies the calculator tool definition structure
+func TestGetCalculatorTool(t *testing.T) {
+	tool := GetCalculatorTool()
+
+	// Check tool type
+	if tool.Type != "function" {
+		t.Errorf("Expected type 'function', got %v", tool.Type)
+	}
+
+	// Check tool name
+	if tool.Name != "calculate" {
+		t.Errorf("Expected name 'calculate', got %v", tool.Name)
+	}
+
+	// Check tool has description
+	if tool.Description == "" {
+		t.Error("Tool missing description")
+	}
+
+	// Check tool has parameters
+	if tool.Parameters == nil {
+		t.Fatal("Tool missing parameters")
+	}
+}
+
 // TestGetAllTools verifies all tools are returned
 func TestGetAllTools(t *testing.T) {
 	tools := GetAllTools()
 
-	if len(tools) == 0 {
-		t.Fatal("Expected at least one tool, got none")
+	if len(tools) < 2 {
+		t.Fatalf("Expected at least 2 tools, got %d", len(tools))
 	}
 
 	// Verify we have the weather tool
 	foundWeather := false
+	foundCalculator := false
 	for _, tool := range tools {
-		toolJSON, err := json.Marshal(tool)
-		if err != nil {
-			t.Errorf("Failed to marshal tool: %v", err)
-			continue
+		if tool.Name == "get_weather" {
+			foundWeather = true
 		}
-
-		var toolMap map[string]any
-		if err := json.Unmarshal(toolJSON, &toolMap); err != nil {
-			t.Errorf("Failed to unmarshal tool JSON: %v", err)
-			continue
-		}
-
-		if function, ok := toolMap["function"].(map[string]any); ok {
-			if function["name"] == "get_weather" {
-				foundWeather = true
-				break
-			}
+		if tool.Name == "calculate" {
+			foundCalculator = true
 		}
 	}
 
 	if !foundWeather {
 		t.Error("Weather tool not found in GetAllTools()")
 	}
-}
-
-// TestToolDefinitionCanBeUsedWithOpenAI verifies tool can be used in OpenAI params
-func TestToolDefinitionCanBeUsedWithOpenAI(t *testing.T) {
-	tools := GetAllTools()
-
-	// Verify tools can be used in ChatCompletionNewParams
-	params := openai.ChatCompletionNewParams{
-		Messages: []openai.ChatCompletionMessageParamUnion{
-			openai.UserMessage("What's the weather?"),
-		},
-		Tools: tools, // Should compile without errors
-		Model: openai.ChatModelGPT4oMini,
-	}
-
-	// Verify params can be marshaled
-	_, err := json.Marshal(params)
-	if err != nil {
-		t.Errorf("Failed to marshal params with tools: %v", err)
+	if !foundCalculator {
+		t.Error("Calculator tool not found in GetAllTools()")
 	}
 }
 
@@ -142,22 +123,14 @@ func TestToolDefinitionCanBeUsedWithOpenAI(t *testing.T) {
 func TestWeatherToolParametersSchema(t *testing.T) {
 	tool := GetWeatherTool()
 
-	toolJSON, err := json.Marshal(tool)
-	if err != nil {
-		t.Fatalf("Failed to marshal tool: %v", err)
-	}
-
-	var toolMap map[string]any
-	if err := json.Unmarshal(toolJSON, &toolMap); err != nil {
-		t.Fatalf("Failed to unmarshal tool JSON: %v", err)
-	}
-
-	function := toolMap["function"].(map[string]any)
-	params := function["parameters"].(map[string]any)
+	params := tool.Parameters.(map[string]any)
 	properties := params["properties"].(map[string]any)
 
-	// Check location property schema
-	location := properties["location"].(map[string]any)
+	// Check location property schema (it's map[string]string)
+	location, ok := properties["location"].(map[string]string)
+	if !ok {
+		t.Fatalf("Expected location to be map[string]string, got %T", properties["location"])
+	}
 	if location["type"] != "string" {
 		t.Errorf("Expected location type 'string', got %v", location["type"])
 	}
@@ -165,24 +138,25 @@ func TestWeatherToolParametersSchema(t *testing.T) {
 		t.Error("Location property missing description")
 	}
 
-	// Check unit property schema
-	unit := properties["unit"].(map[string]any)
+	// Check unit property schema (it's map[string]any because it has enum)
+	unit, ok := properties["unit"].(map[string]any)
+	if !ok {
+		t.Fatalf("Expected unit to be map[string]any, got %T", properties["unit"])
+	}
 	if unit["type"] != "string" {
 		t.Errorf("Expected unit type 'string', got %v", unit["type"])
 	}
 
 	// Check unit has enum values
-	enum, ok := unit["enum"].([]any)
+	enum, ok := unit["enum"].([]string)
 	if !ok {
-		t.Fatal("Unit property missing enum values")
+		t.Fatalf("Unit property missing or invalid enum values, got %T", unit["enum"])
 	}
 
 	expectedEnums := map[string]bool{"celsius": false, "fahrenheit": false}
 	for _, e := range enum {
-		if str, ok := e.(string); ok {
-			if _, exists := expectedEnums[str]; exists {
-				expectedEnums[str] = true
-			}
+		if _, exists := expectedEnums[e]; exists {
+			expectedEnums[e] = true
 		}
 	}
 

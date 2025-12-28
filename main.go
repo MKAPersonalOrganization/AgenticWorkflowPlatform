@@ -10,7 +10,9 @@ import (
 	"school-with-ai/components"
 	"school-with-ai/handlers"
 	"school-with-ai/internal/session"
-	openaiservice "school-with-ai/services/openai"
+	"school-with-ai/services/llm"
+
+	"github.com/openai/openai-go/v3"
 )
 
 func main() {
@@ -29,11 +31,9 @@ func main() {
 	// Initialize session store
 	store := session.NewStore()
 
-	// Initialize OpenAI client
-	aiClient, err := openaiservice.NewClient()
-	if err != nil {
-		panic(fmt.Sprintf("Failed to initialize OpenAI client: %v", err))
-	}
+	// Initialize OpenAI provider with model
+	model := string(openai.ChatModelGPT4oMini) // Use GPT-4o-mini for cost efficiency
+	provider := llm.NewOpenAIProvider(model)
 
 	mux := http.NewServeMux()
 
@@ -43,7 +43,7 @@ func main() {
 	mux.Handle("/assets/images/", http.StripPrefix("/assets/images/", http.FileServer(http.Dir("./assets/images"))))
 
 	// Chat routes
-	mux.HandleFunc("/send", handlers.HandleSendMessage(store, aiClient))
+	mux.HandleFunc("/send", handlers.HandleSendMessage(store, provider))
 	mux.HandleFunc("GET /api/threads", handlers.HandleGetThreads(store))
 	mux.HandleFunc("GET /api/threads/{threadId}/messages", handlers.HandleGetMessages(store))
 	mux.HandleFunc("DELETE /api/threads/{threadId}", handlers.HandleDeleteThread(store))

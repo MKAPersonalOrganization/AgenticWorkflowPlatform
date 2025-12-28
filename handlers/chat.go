@@ -10,11 +10,12 @@ import (
 	"school-with-ai/internal/agui"
 	"school-with-ai/internal/session"
 	"school-with-ai/internal/tools"
-	openaiservice "school-with-ai/services/openai"
+	"school-with-ai/services/llm"
+	"school-with-ai/services/streaming"
 )
 
 // HandleSendMessage handles the /send endpoint with SSE streaming
-func HandleSendMessage(store *session.Store, aiClient *openaiservice.Client) http.HandlerFunc {
+func HandleSendMessage(store *session.Store, provider llm.Provider) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Setup SSE headers
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -94,7 +95,7 @@ func HandleSendMessage(store *session.Store, aiClient *openaiservice.Client) htt
 		messages := store.GetMessages(threadID)
 
 		// Create streaming handler
-		streamHandler := openaiservice.NewStreamHandler(aiClient, store, w, flusher)
+		streamHandler := streaming.NewStreamHandler(provider, store, w, flusher)
 
 		// Get available tools
 		availableTools := tools.GetAllTools()
@@ -164,9 +165,14 @@ func HandleSendMessage(store *session.Store, aiClient *openaiservice.Client) htt
 		// Auto-generate thread title if still "New Chat"
 		thread, exists := store.GetThread(threadID)
 		if exists && thread.Title == "New Chat" && len(thread.Messages) >= 2 {
-			// Generate title synchronously before finishing the run
+			// Generate simple title from first user message
 			messages := store.GetMessages(threadID)
-			if title, err := aiClient.GenerateThreadTitle(ctx, messages); err == nil && title != "" {
+			if len(messages) > 0 {
+				// Take first 50 characters of first user message as title
+				title := messages[0].Content
+				if len(title) > 50 {
+					title = title[:50] + "..."
+				}
 				store.UpdateThreadTitle(threadID, title)
 
 				// Send CUSTOM event to notify frontend of title update
