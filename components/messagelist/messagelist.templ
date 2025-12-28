@@ -7,41 +7,6 @@ templ MessageList() {
 	<div class="space-y-4">
 		<template x-for="message in messages" :key="message.id">
 			<div class="group">
-				<!-- Lifecycle Events Timeline (scoped to this interaction) -->
-				<div x-show="message.role === 'user' && !hideLifecycleEvents && message.lifecycleEvents && message.lifecycleEvents.length > 0" class="mb-2 overflow-x-auto">
-					<div class="flex items-center gap-1.5 min-w-max">
-						<template x-for="(event, index) in message.lifecycleEvents" :key="event.id">
-							<div class="flex items-center gap-1.5">
-								<!-- Event Badge -->
-								<div
-									class="px-2 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide"
-									:class="{
-									'bg-primary/10 text-primary': event.type === 'RUN_FINISHED' || event.type === 'TOOL_CALL_END' || event.type === 'TEXT_MESSAGE_END' || event.type === 'STEP_FINISHED' || event.type === 'REASONING_END',
-									'bg-accent/10 text-accent-foreground': event.type === 'RUN_STARTED' || event.type === 'TEXT_MESSAGE_START' || event.type === 'STEP_STARTED' || event.type === 'REASONING_START',
-									'bg-destructive/10 text-destructive': event.type === 'RUN_ERROR',
-									'bg-primary/20 text-primary': event.type === 'TOOL_CALL_START',
-									'bg-muted text-muted-foreground': event.type === 'TOOL_CALL_ARGS',
-									'bg-accent/20 text-accent-foreground': event.type === 'TOOL_CALL_RESULT',
-									'bg-secondary text-secondary-foreground': event.type === 'STATE_SNAPSHOT' || event.type === 'MESSAGES_SNAPSHOT',
-									'bg-secondary/50 text-secondary-foreground': event.type === 'STATE_DELTA',
-									'bg-muted/80 text-foreground': event.type === 'ACTIVITY_SNAPSHOT',
-									'bg-muted/50 text-muted-foreground': event.type === 'ACTIVITY_DELTA',
-									'bg-primary/15 text-primary': event.type === 'REASONING_MESSAGE_START' || event.type === 'REASONING_MESSAGE_END',
-									'bg-muted text-muted-foreground': event.type === 'RAW' || event.type === 'CUSTOM' || event.type === 'META_EVENT',
-									'bg-accent/15 text-accent-foreground': event.type === 'RUN_FINISHED' && event.outcome === 'interrupt'
-								}"
-								>
-									<span x-text="event.content"></span>
-								</div>
-								<!-- Arrow -->
-								<svg x-show="index < message.lifecycleEvents.length - 1" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-border">
-									<path d="M5 12h14"></path>
-									<path d="m12 5 7 7-7 7"></path>
-								</svg>
-							</div>
-						</template>
-					</div>
-				</div>
 				<!-- User Message -->
 				@message.UserMessage()
 				<!-- Tool Call Message -->

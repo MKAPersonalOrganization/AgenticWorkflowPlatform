@@ -4,6 +4,7 @@ import "school-with-ai/components/input"
 import "school-with-ai/components/chatinput"
 import "school-with-ai/components/threadhistory"
 import "school-with-ai/components/messagelist"
+import "school-with-ai/components/eventlog"
 
 templ ChatInputScreen() {
 	<!DOCTYPE html>
@@ -75,6 +76,7 @@ templ ChatInputScreen() {
 							@chatinput.ChatInput()
 						</div>
 					</div>
+					@eventlog.EventLog()
 				</main>
 			</div>
 		</body>

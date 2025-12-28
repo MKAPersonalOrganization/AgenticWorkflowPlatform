@@ -13,6 +13,7 @@ document.addEventListener('alpine:init', () => {
         events: [],
         sessions: [],
         showDebugPanel: false,
+        showEventLog: false,
         sidebarOpen: true,
         hideLifecycleEvents: false,
         currentInteractionId: null,
@@ -552,38 +553,18 @@ document.addEventListener('alpine:init', () => {
         },
 
         addEvent(event) {
-            // For TEXT_MESSAGE_CONTENT, update the last event if it's also content
-            if (event.type === 'TEXT_MESSAGE_CONTENT') {
-                const lastEvent = this.events[this.events.length - 1];
-                if (lastEvent && lastEvent.type === 'TEXT_MESSAGE_CONTENT') {
-                    // Update the existing content event with cumulative count
-                    const currentChars = parseInt(lastEvent.details.split(' ')[0]) || 0;
-                    const newChars = event.delta?.length || 0;
-                    lastEvent.details = `${currentChars + newChars} chars`;
-                    lastEvent.time = new Date().toLocaleTimeString('en-US', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit'
-                    });
-                    return;
-                }
-            }
-
+            // Add all events to the log (append-only)
             this.events.push({
                 id: `event_${Date.now()}_${Math.random()}`,
                 type: event.type,
                 time: new Date().toLocaleTimeString('en-US', {
                     hour: '2-digit',
                     minute: '2-digit',
-                    second: '2-digit'
+                    second: '2-digit',
+                    fractionalSecondDigits: 3
                 }),
-                details: this.getEventDetails(event)
+                data: event
             });
-
-            // Keep only last 20 events
-            if (this.events.length > 20) {
-                this.events.shift();
-            }
         },
 
         getEventDetails(event) {
@@ -603,6 +584,31 @@ document.addEventListener('alpine:init', () => {
                 default:
                     return '';
             }
+        },
+
+        getEventTypeColor(type) {
+            if (type.startsWith('RUN_')) return 'text-purple-600 dark:text-purple-400';
+            if (type.startsWith('TEXT_MESSAGE_')) return 'text-blue-600 dark:text-blue-400';
+            if (type.startsWith('TOOL_CALL_')) return 'text-green-600 dark:text-green-400';
+            if (type.startsWith('STATE_')) return 'text-orange-600 dark:text-orange-400';
+            if (type.startsWith('STEP_')) return 'text-yellow-600 dark:text-yellow-400';
+            return 'text-gray-600 dark:text-gray-400';
+        },
+
+        toggleEventLog() {
+            this.showEventLog = !this.showEventLog;
+            if (this.showEventLog) {
+                this.$nextTick(() => {
+                    const logContainer = this.$refs.eventLogContainer;
+                    if (logContainer) {
+                        logContainer.scrollTop = logContainer.scrollHeight;
+                    }
+                });
+            }
+        },
+
+        clearEventLog() {
+            this.events = [];
         },
 
         showError(message) {
