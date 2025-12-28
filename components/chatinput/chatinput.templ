@@ -9,12 +9,12 @@ templ ChatInput() {
 		<form @submit.prevent="sendMessage" class="mx-auto grid max-w-3xl grid-rows-[1fr_auto] gap-2 p-2">
 			@textarea.Textarea(textarea.Props{
 				Attributes: templ.Attributes{
-					"x-model":                       "currentMessage",
-					":disabled":                     "isStreaming",
-					"@keydown.enter.prevent":        "if (!$event.shiftKey && currentMessage.trim()) sendMessage()",
-					"placeholder":                   "Type your message...",
-					"rows":                          "1",
-					"style":                         "field-sizing: content;",
+					"x-model":                "currentMessage",
+					":disabled":              "isStreaming",
+					"@keydown.enter.prevent": "if (!$event.shiftKey && currentMessage.trim()) sendMessage()",
+					"placeholder":            "Type your message...",
+					"rows":                   "1",
+					"style":                  "field-sizing: content;",
 				},
 				Class: "resize-none border-none bg-transparent shadow-none text-sm min-h-[40px]",
 			})
