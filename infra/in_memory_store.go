@@ -1,25 +1,27 @@
-package session
+package infra
 
 import (
 	"sync"
 	"time"
+
+	"school-with-ai/internal/session"
 )
 
-// Store manages in-memory thread storage with thread-safe operations
-type Store struct {
+// InMemoryStore manages in-memory thread storage with thread-safe operations
+type InMemoryStore struct {
 	mu      sync.RWMutex
-	threads map[string]*Thread
+	threads map[string]*session.Thread
 }
 
-// NewStore creates a new in-memory session store
-func NewStore() *Store {
-	return &Store{
-		threads: make(map[string]*Thread),
+// NewInMemoryStore creates a new in-memory session store
+func NewInMemoryStore() *InMemoryStore {
+	return &InMemoryStore{
+		threads: make(map[string]*session.Thread),
 	}
 }
 
 // GetOrCreateThread retrieves an existing thread or creates a new one
-func (s *Store) GetOrCreateThread(threadID string) *Thread {
+func (s *InMemoryStore) GetOrCreateThread(threadID string) *session.Thread {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -27,10 +29,10 @@ func (s *Store) GetOrCreateThread(threadID string) *Thread {
 		return thread
 	}
 
-	thread := &Thread{
+	thread := &session.Thread{
 		ID:        threadID,
 		Title:     "New Chat",
-		Messages:  []Message{},
+		Messages:  []session.Message{},
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -39,7 +41,7 @@ func (s *Store) GetOrCreateThread(threadID string) *Thread {
 }
 
 // AddMessage adds a message to a thread
-func (s *Store) AddMessage(threadID string, msg Message) {
+func (s *InMemoryStore) AddMessage(threadID string, msg session.Message) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -50,18 +52,18 @@ func (s *Store) AddMessage(threadID string, msg Message) {
 }
 
 // GetMessages retrieves all messages from a thread
-func (s *Store) GetMessages(threadID string) []Message {
+func (s *InMemoryStore) GetMessages(threadID string) []session.Message {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	if thread, exists := s.threads[threadID]; exists {
 		return thread.Messages
 	}
-	return []Message{}
+	return []session.Message{}
 }
 
 // GetThread retrieves a thread by ID
-func (s *Store) GetThread(threadID string) (*Thread, bool) {
+func (s *InMemoryStore) GetThread(threadID string) (*session.Thread, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -70,11 +72,11 @@ func (s *Store) GetThread(threadID string) (*Thread, bool) {
 }
 
 // GetAllThreads retrieves all threads sorted by UpdatedAt (newest first)
-func (s *Store) GetAllThreads() []Thread {
+func (s *InMemoryStore) GetAllThreads() []session.Thread {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	threads := make([]Thread, 0, len(s.threads))
+	threads := make([]session.Thread, 0, len(s.threads))
 	for _, thread := range s.threads {
 		threads = append(threads, *thread)
 	}
@@ -92,7 +94,7 @@ func (s *Store) GetAllThreads() []Thread {
 }
 
 // UpdateThreadTitle updates the title of a thread
-func (s *Store) UpdateThreadTitle(threadID string, title string) {
+func (s *InMemoryStore) UpdateThreadTitle(threadID string, title string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -103,7 +105,7 @@ func (s *Store) UpdateThreadTitle(threadID string, title string) {
 }
 
 // DeleteThread removes a thread from the store
-func (s *Store) DeleteThread(threadID string) bool {
+func (s *InMemoryStore) DeleteThread(threadID string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

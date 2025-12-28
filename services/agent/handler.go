@@ -13,7 +13,7 @@ import (
 // Agent handles processing of user messages and emits domain events
 type Agent struct {
 	provider llm.Provider
-	store    *session.Store
+	store    session.Repository
 	emitter  EventEmitter
 	tools    []llm.Tool
 }
@@ -29,7 +29,7 @@ func WithTools(tools []llm.Tool) Option {
 }
 
 // NewAgent creates a new agent
-func NewAgent(provider llm.Provider, store *session.Store, emitter EventEmitter, opts ...Option) *Agent {
+func NewAgent(provider llm.Provider, store session.Repository, emitter EventEmitter, opts ...Option) *Agent {
 	h := &Agent{
 		provider: provider,
 		store:    store,

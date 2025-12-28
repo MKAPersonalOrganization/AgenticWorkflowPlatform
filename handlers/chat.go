@@ -16,7 +16,7 @@ import (
 )
 
 // HandleSendMessage handles the /send endpoint with SSE streaming
-func HandleSendMessage(store *session.Store, provider llm.Provider) http.HandlerFunc {
+func HandleSendMessage(store session.Repository, provider llm.Provider) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Setup SSE headers
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -220,7 +220,7 @@ func HandleSendMessage(store *session.Store, provider llm.Provider) http.Handler
 }
 
 // HandleGetMessages retrieves all messages for a thread
-func HandleGetMessages(store *session.Store) http.HandlerFunc {
+func HandleGetMessages(store session.Repository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		threadID := r.PathValue("threadId")
 		if threadID == "" {
@@ -239,7 +239,7 @@ func HandleGetMessages(store *session.Store) http.HandlerFunc {
 }
 
 // HandleGetThreads retrieves all threads
-func HandleGetThreads(store *session.Store) http.HandlerFunc {
+func HandleGetThreads(store session.Repository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		threads := store.GetAllThreads()
 
@@ -252,7 +252,7 @@ func HandleGetThreads(store *session.Store) http.HandlerFunc {
 }
 
 // HandleDeleteThread deletes a thread
-func HandleDeleteThread(store *session.Store) http.HandlerFunc {
+func HandleDeleteThread(store session.Repository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		threadID := r.PathValue("threadId")
 		if threadID == "" {
@@ -273,7 +273,7 @@ func HandleDeleteThread(store *session.Store) http.HandlerFunc {
 }
 
 // emitMessagesSnapshot converts session messages to AG-UI messages and emits MESSAGES_SNAPSHOT event
-func emitMessagesSnapshot(w http.ResponseWriter, flusher http.Flusher, threadID string, store *session.Store) error {
+func emitMessagesSnapshot(w http.ResponseWriter, flusher http.Flusher, threadID string, store session.Repository) error {
 	sessionMessages := store.GetMessages(threadID)
 
 	// Convert session.Message to agui.Message

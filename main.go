@@ -9,7 +9,7 @@ import (
 
 	"school-with-ai/components"
 	"school-with-ai/handlers"
-	"school-with-ai/internal/session"
+	"school-with-ai/infra"
 	"school-with-ai/services/llm"
 
 	"github.com/openai/openai-go/v3"
@@ -29,7 +29,7 @@ func main() {
 	slog.Info("Starting server", "host", host, "port", port)
 
 	// Initialize session store
-	store := session.NewStore()
+	store := infra.NewInMemoryStore()
 
 	// Initialize OpenAI provider with model
 	model := string(openai.ChatModelGPT4oMini) // Use GPT-4o-mini for cost efficiency
