@@ -339,6 +339,53 @@ type StepFinishedEvent struct {
 	StepName string `json:"stepName"`
 }
 
+// Special Events
+//
+// Special events provide flexibility in the protocol by allowing for
+// system-specific functionality and integration with external systems. These
+// events don't follow the standard lifecycle or streaming patterns of other event
+// types but instead serve specialized purposes.
+
+// RawEvent is used to pass through events from external systems.
+//
+// The Raw event acts as a container for events originating from external systems
+// or sources that don't natively follow the Agent UI Protocol. This event type
+// enables interoperability with other event-based systems by wrapping their events
+// in a standardized format. The enclosed event data is preserved in its original
+// form inside the event property, while the optional source property identifies
+// the system it came from. Frontends can use this information to handle external
+// events appropriately, either by processing them directly or by delegating them
+// to system-specific handlers.
+//
+// Properties:
+//   - event: Original event data
+//   - source: Optional source identifier
+type RawEvent struct {
+	BaseEvent
+	Event  interface{} `json:"event"`
+	Source *string     `json:"source,omitempty"`
+}
+
+// CustomEvent is used for application-specific custom events.
+//
+// The Custom event provides an extension mechanism for implementing features not
+// covered by the standard event types. Unlike Raw events which act as
+// passthrough containers, Custom events are explicitly part of the protocol but
+// with application-defined semantics. The name property identifies the specific
+// custom event type, while the value property contains the associated data. This
+// mechanism allows for protocol extensions without requiring formal specification
+// changes. Teams should document their custom events to ensure consistent
+// implementation across frontends and agents.
+//
+// Properties:
+//   - name: Name of the custom event
+//   - value: Value associated with the event
+type CustomEvent struct {
+	BaseEvent
+	Name  string      `json:"name"`
+	Value interface{} `json:"value"`
+}
+
 // GenerateMessageID generates a unique message ID
 func GenerateMessageID() string {
 	return fmt.Sprintf("msg_%d", time.Now().UnixNano())

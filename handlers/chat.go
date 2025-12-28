@@ -160,14 +160,17 @@ func HandleSendMessage(store *session.Store, aiClient *openaiservice.Client) htt
 				store.UpdateThreadTitle(threadID, title)
 
 				// Send CUSTOM event to notify frontend of title update
-				customEvent := map[string]any{
-					"type": "CUSTOM",
-					"name": "THREAD_TITLE_UPDATED",
-					"value": map[string]string{
+				customTimestamp := time.Now().UnixMilli()
+				customEvent := &agui.CustomEvent{
+					BaseEvent: agui.BaseEvent{
+						Type:      "CUSTOM",
+						Timestamp: &customTimestamp,
+					},
+					Name: "THREAD_TITLE_UPDATED",
+					Value: map[string]string{
 						"threadId": threadID,
 						"title":    title,
 					},
-					"timestamp": time.Now().UnixMilli(),
 				}
 				agui.WriteSSEEvent(w, customEvent)
 				flusher.Flush()
