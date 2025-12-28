@@ -86,6 +86,13 @@ func (h *Agent) runIteration(
 	messageID string,
 	messages []domain.Message,
 ) error {
+	// Check if client disconnected before starting LLM call
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("client disconnected: %w", ctx.Err())
+	default:
+	}
+
 	// Create streaming completion
 	config := llm.CompletionConfig{
 		Messages: messages,
@@ -118,6 +125,13 @@ func (h *Agent) runIteration(
 
 	// Process stream chunks using iterator
 	for chunk, err := range streamIter {
+		// Check if client disconnected during streaming
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("client disconnected during streaming: %w", ctx.Err())
+		default:
+		}
+
 		// Check for errors
 		if err != nil {
 			return fmt.Errorf("stream error: %w", err)

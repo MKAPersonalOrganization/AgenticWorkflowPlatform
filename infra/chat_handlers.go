@@ -150,9 +150,17 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 
 	// Process user message and stream response
 	// The agent will automatically handle tool execution loops internally
-	ctx := context.Background()
+	// Use request context to detect when client disconnects (e.g., browser refresh)
+	ctx := r.Context()
 	if err := messageHandler.Run(ctx, threadID, messageID, messages); err != nil {
-		// Emit RUN_ERROR event on failure
+		// Check if error is due to context cancellation (client disconnected)
+		if ctx.Err() == context.Canceled || ctx.Err() == context.DeadlineExceeded {
+			// Client disconnected - don't send error event, just log and return
+			fmt.Printf("Stream cancelled for thread %s (client disconnected): %v\n", threadID, err)
+			return
+		}
+
+		// Emit RUN_ERROR event on failure (only if client is still connected)
 		errorTimestamp := time.Now().UnixMilli()
 		errorCode := "LLM_ERROR"
 		errorEvent := &agui.RunErrorEvent{
