@@ -45,7 +45,7 @@ templ ThreadHistory() {
 							}) {
 								<div class="flex items-center gap-2 w-full">
 									<!-- Streaming indicator -->
-									<span x-show="threadStates[session.id]?.isStreaming" class="flex h-2 w-2 relative">
+									<span x-show="isThreadStreaming(session.id)" class="flex h-2 w-2 relative">
 										<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
 										<span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
 									</span>

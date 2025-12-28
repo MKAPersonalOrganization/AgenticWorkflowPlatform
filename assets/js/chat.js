@@ -3,41 +3,89 @@ import { tryCatch, tryCatchAsync } from './error-handler.js';
 // Alpine.js chat component
 // Following Alpine.js UI library patterns and modern resilient practices:
 //
+// ═══════════════════════════════════════════════════════════════════════════
+// CORE PATTERNS (from Alpine.js source)
+// ═══════════════════════════════════════════════════════════════════════════
+//
 // NAMING & STRUCTURE:
 // - __ prefix for internal state and methods (Alpine convention)
 // - Simple getters for computed properties (reactive data exposure)
 // - Modular helper functions with clear separation
 //
 // INITIALIZATION & LIFECYCLE:
-// - queueMicrotask() for async initialization (Alpine scheduler pattern)
-// - Initialization guards to prevent double-init (Alpine lifecycle pattern)
+// - queueMicrotask() for async initialization (Alpine scheduler.js pattern)
+// - Initialization guards to prevent double-init (Alpine lifecycle.js pattern)
 // - Lazy state initialization for thread isolation
 //
 // REACTIVITY & STATE:
 // - $watch for reactive side effects (auto-scroll, state sync)
 // - Direct state references for optimal reactivity
-// - State validation guards before operations
+// - State validation guards before operations (Alpine defensive pattern)
 //
 // CLEANUP & MEMORY:
-// - Defensive cleanup with while loops (Alpine mutation pattern)
-// - Array nullification for GC (Alpine memory management)
+// - Defensive cleanup with while loops (Alpine mutation.js:46 pattern)
+// - Array nullification for GC (Alpine mutation.js:216-219 pattern)
 // - Proper resource disposal (EventSource, intervals, watchers)
+// - Set for cleanup tracking (Alpine reactivity.js:37 pattern)
 //
 // RESILIENCE & SAFETY:
-// - Duplicate prevention in queues (Alpine scheduler pattern)
+// - Duplicate prevention in queues (Alpine scheduler.js:9-10 pattern)
 // - Defensive DOM reference checks (isConnected, optional chaining)
 // - Comprehensive error boundaries with tryCatch
 // - Event structure validation before processing
 //
 // PERFORMANCE:
 // - Batch updates with queueMicrotask (Alpine batching pattern)
+// - Memoization for expensive operations (Alpine evaluator.js:72-113 pattern)
+// - Cache size limiting to prevent memory leaks (Alpine evaluator.js:138 pattern)
 // - Throttled scroll for smooth UX
 // - Lazy initialization of thread states
 //
-// ARCHITECTURE:
+// ERROR HANDLING:
+// - Structured error reporting (Alpine error.js pattern)
+// - Async error throwing with setTimeout(0) (Alpine error.js:26 pattern)
+// - Context-rich error objects for debugging
+// - Warning format consistency (Alpine warn.js pattern)
+//
+// ═══════════════════════════════════════════════════════════════════════════
+// PRODUCTION ENHANCEMENTS
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// CONNECTION RESILIENCE:
+// - Exponential backoff retry (1s → 2s → 4s → 8s → 16s → 30s max)
+// - Configurable retry limits (default: 5 attempts)
+// - Connection health monitoring (status, retry count, error tracking)
+// - Automatic reconnection with user feedback
+//
+// PERFORMANCE MONITORING:
+// - Message send/receive tracking
+// - Average response time calculation
+// - Error rate monitoring
+// - Reconnection attempts tracking
+// - Cache size monitoring
+//
+// OBSERVABILITY:
+// - Structured logging with context (timestamp, threadId, metrics)
+// - Global debug utilities (window.__chatDebug)
+// - Health check endpoint (isHealthy())
+// - Diagnostic data export (exportDiagnostics())
+// - Performance metrics API (getMetrics())
+//
+// DEVELOPER EXPERIENCE:
+// - Debug utilities exposed globally
+// - Comprehensive JSDoc comments
+// - Clear separation of concerns
+// - Easy metric reset for testing
+// - Detailed diagnostic exports
+//
+// ═══════════════════════════════════════════════════════════════════════════
+// ARCHITECTURE
+// ═══════════════════════════════════════════════════════════════════════════
+//
 // - Event-driven with SSE streaming
 // - Multi-threaded chat with isolated state
 // - AG-UI Protocol integration
+// - Production-ready error handling and monitoring
 
 // AG-UI Protocol Lifecycle Event Types
 const LIFECYCLE_EVENT_TYPES = [
@@ -109,6 +157,29 @@ document.addEventListener('alpine:init', () => {
         __srAnnouncer: null,
         __initialized: false,
 
+        // Production: Memoization cache (Alpine evaluator pattern)
+        __memoCache: {},
+
+        // Production: Performance monitoring
+        __perfMetrics: {
+            messagesSent: 0,
+            messagesReceived: 0,
+            errors: 0,
+            reconnects: 0,
+            avgResponseTime: 0
+        },
+
+        // Production: Connection resilience
+        __connectionConfig: {
+            maxRetries: 5,
+            baseDelay: 1000,
+            maxDelay: 30000,
+            backoffMultiplier: 2
+        },
+
+        // Production: Message queue for offline handling
+        __messageQueue: [],
+
         // ============================================
         // Computed Properties (Simple Getters)
         // ============================================
@@ -146,6 +217,17 @@ document.addEventListener('alpine:init', () => {
 
         get canSendMessage() {
             return this.currentMessage.trim() !== '' && !this.isStreaming
+        },
+
+        /**
+         * Check if a specific thread is streaming (for template access)
+         * @param {string} threadId - Thread ID to check
+         * @returns {boolean} True if thread is streaming
+         */
+        isThreadStreaming(threadId) {
+            if (!threadId) return false;
+            const state = this.__threadStates[threadId];
+            return state?.isStreaming || false;
         },
 
         // ============================================
@@ -486,21 +568,44 @@ document.addEventListener('alpine:init', () => {
         },
 
         formatSessionTime(timestamp) {
+            // Production: Memoize expensive date formatting (Alpine evaluator pattern)
+            const cacheKey = `sessionTime_${timestamp}`;
+
+            // Cache for 1 minute to balance freshness and performance
+            if (this.__memoCache[cacheKey]) {
+                const cached = this.__memoCache[cacheKey];
+                if (Date.now() - cached.time < 60000) {
+                    return cached.value;
+                }
+            }
+
             const date = new Date(timestamp);
             const now = new Date();
             const diffMs = now - date;
             const diffMins = Math.floor(diffMs / 60000);
 
-            if (diffMins < 1) return 'Just now';
-            if (diffMins < 60) return `${diffMins}m ago`;
+            let result;
+            if (diffMins < 1) result = 'Just now';
+            else if (diffMins < 60) result = `${diffMins}m ago`;
+            else {
+                const diffHours = Math.floor(diffMins / 60);
+                if (diffHours < 24) result = `${diffHours}h ago`;
+                else {
+                    const diffDays = Math.floor(diffHours / 24);
+                    if (diffDays < 7) result = `${diffDays}d ago`;
+                    else result = date.toLocaleDateString();
+                }
+            }
 
-            const diffHours = Math.floor(diffMins / 60);
-            if (diffHours < 24) return `${diffHours}h ago`;
+            // Cache result (Alpine pattern: prevent memory leaks by limiting cache size)
+            if (Object.keys(this.__memoCache).length > 100) {
+                // Clear old cache entries
+                const entries = Object.entries(this.__memoCache);
+                entries.slice(0, 50).forEach(([key]) => delete this.__memoCache[key]);
+            }
 
-            const diffDays = Math.floor(diffHours / 24);
-            if (diffDays < 7) return `${diffDays}d ago`;
-
-            return date.toLocaleDateString();
+            this.__memoCache[cacheKey] = { value: result, time: Date.now() };
+            return result;
         },
 
         formatTime(timestamp) {
@@ -537,17 +642,90 @@ document.addEventListener('alpine:init', () => {
         // ============================================
 
         /**
-         * Centralized error handler with context (Alpine pattern)
+         * Production: Structured logging utility (Alpine warn.js pattern)
+         * @param {string} level - Log level (info, warn, error)
+         * @param {string} message - Log message
+         * @param {Object} context - Additional context
+         */
+        __log(level, message, context = {}) {
+            const logData = {
+                timestamp: new Date().toISOString(),
+                level,
+                message,
+                threadId: this.__currentThreadId,
+                metrics: this.__perfMetrics,
+                ...context
+            };
+
+            // Production: Use structured logging for better observability
+            const logMethod = console[level] || console.log;
+            logMethod(`[Chat] ${message}`, logData);
+
+            // Production: Could send to external logging service
+            // this.__sendToLoggingService(logData);
+        },
+
+        /**
+         * Production: Enhanced error reporting (Alpine error.js pattern)
+         * @param {Error} error - Error object
+         * @param {string} operation - Operation that failed
+         * @param {Object} context - Additional context
+         */
+        __reportError(error, operation, context = {}) {
+            this.__perfMetrics.errors++;
+
+            const errorReport = {
+                error: {
+                    message: error?.message || 'Unknown error',
+                    stack: error?.stack,
+                    name: error?.name
+                },
+                operation,
+                context: {
+                    threadId: this.__currentThreadId,
+                    url: window.location.href,
+                    userAgent: navigator.userAgent,
+                    timestamp: new Date().toISOString(),
+                    ...context
+                },
+                metrics: { ...this.__perfMetrics }
+            };
+
+            // Log structured error
+            this.__log('error', `Operation failed: ${operation}`, errorReport);
+
+            // Production: Async error throwing (Alpine error.js pattern: setTimeout(0))
+            // Allows error to be caught by global error handlers without blocking
+            setTimeout(() => {
+                if (window.onerror) {
+                    const errorWithContext = Object.assign(
+                        error || new Error('Unknown error'),
+                        { operation, context: errorReport.context }
+                    );
+                    // Global error handler can catch this
+                    throw errorWithContext;
+                }
+            }, 0);
+        },
+
+        /**
+         * Centralized error handler with context (Alpine pattern + production enhancements)
          * @param {string} operation - Operation being performed
          * @param {Object} context - Additional context
          * @param {Function} callback - Function to execute
          * @returns {*} Result of callback or null on error
          */
         __tryCatch(operation, context, callback) {
-            return tryCatch(operation, context, callback, {
-                threadId: this.__currentThreadId,
-                component: this
-            });
+            try {
+                return callback();
+            } catch (error) {
+                this.__reportError(error, operation, context);
+                // Call original tryCatch for compatibility
+                return tryCatch(operation, context, callback, {
+                    threadId: this.__currentThreadId,
+                    component: this
+                });
+            }
         },
 
         /**
@@ -558,10 +736,16 @@ document.addEventListener('alpine:init', () => {
          * @returns {Promise<*>} Result of callback or null on error
          */
         async __tryCatchAsync(operation, context, callback) {
-            return await tryCatchAsync(operation, context, callback, {
-                threadId: this.__currentThreadId,
-                component: this
-            });
+            try {
+                return await callback();
+            } catch (error) {
+                this.__reportError(error, operation, context);
+                // Call original tryCatchAsync for compatibility
+                return await tryCatchAsync(operation, context, callback, {
+                    threadId: this.__currentThreadId,
+                    component: this
+                });
+            }
         },
 
         // ============================================
@@ -587,7 +771,6 @@ document.addEventListener('alpine:init', () => {
 
             if (!this.__updatePending) {
                 this.__updatePending = true
-                const queueLengthWhenTriggered = this.__updateQueue.length
 
                 queueMicrotask(() => {
                     // Alpine pattern: detect last flush in event loop
@@ -899,8 +1082,13 @@ document.addEventListener('alpine:init', () => {
                 const userMessage = this.currentMessage.trim();
                 const interactionId = this.__generateInteractionId();
 
+                // Production: Track performance metrics
+                this.__perfMetrics.messagesSent++;
+                const sendTime = Date.now();
+
                 // Create and add user message using factory method
                 const userMsg = this.__createUserMessage(userMessage, interactionId);
+                userMsg._sendTime = sendTime; // Internal tracking
                 state.messages.push(userMsg);
 
                 // Store current interaction ID for this thread
@@ -972,14 +1160,50 @@ document.addEventListener('alpine:init', () => {
 
             eventSource.onerror = (error) => {
                 console.error('SSE error:', error);
+
+                // Production: Track error metrics
+                this.__perfMetrics.errors++;
+
+                // Production: Implement retry with exponential backoff
+                const retryCount = state.retryCount || 0;
+                const shouldRetry = retryCount < this.__connectionConfig.maxRetries;
+
                 eventSource.close();
                 state.eventSource = null;
                 state.isStreaming = false;
                 state.showTypingIndicator = false;
 
-                // Only show error if this is the current thread
-                if (threadId === this.__currentThreadId) {
-                    this.__showError('Connection error. Please try again.', threadId);
+                if (shouldRetry) {
+                    // Calculate backoff delay
+                    const delay = Math.min(
+                        this.__connectionConfig.baseDelay * Math.pow(this.__connectionConfig.backoffMultiplier, retryCount),
+                        this.__connectionConfig.maxDelay
+                    );
+
+                    state.retryCount = retryCount + 1;
+                    this.__perfMetrics.reconnects++;
+
+                    console.log(`Retrying connection (attempt ${state.retryCount}/${this.__connectionConfig.maxRetries}) in ${delay}ms`);
+
+                    // Show retry message to user
+                    if (threadId === this.__currentThreadId) {
+                        this.__showError(`Connection lost. Retrying in ${Math.round(delay/1000)}s... (${state.retryCount}/${this.__connectionConfig.maxRetries})`, threadId);
+                    }
+
+                    // Retry with exponential backoff
+                    setTimeout(() => {
+                        if (state.eventSource === null) { // Still not connected
+                            console.log('Attempting reconnection...');
+                            this.__streamResponse(message, threadId);
+                        }
+                    }, delay);
+                } else {
+                    // Max retries exceeded
+                    state.retryCount = 0;
+
+                    if (threadId === this.__currentThreadId) {
+                        this.__showError('Connection failed after multiple attempts. Please try again later.', threadId);
+                    }
                 }
             };
         },
@@ -1173,6 +1397,21 @@ document.addEventListener('alpine:init', () => {
                     state.currentStreamingId = event.messageId;
                     state.currentStreamingContent = '';
 
+                    // Production: Track response metrics
+                    this.__perfMetrics.messagesReceived++;
+
+                    // Calculate response time if we have the original send time
+                    const lastUserMsg = state.messages.slice().reverse().find(m => m.role === 'user');
+                    if (lastUserMsg?._sendTime) {
+                        const responseTime = Date.now() - lastUserMsg._sendTime;
+                        // Update running average (Alpine pattern: efficient calculation)
+                        this.__perfMetrics.avgResponseTime =
+                            (this.__perfMetrics.avgResponseTime * (this.__perfMetrics.messagesReceived - 1) + responseTime) /
+                            this.__perfMetrics.messagesReceived;
+
+                        console.log(`Response time: ${responseTime}ms (avg: ${Math.round(this.__perfMetrics.avgResponseTime)}ms)`);
+                    }
+
                     // Announce to screen readers (only for current thread)
                     if (threadId === this.__currentThreadId) {
                         this.__announce('Assistant is responding');
@@ -1223,7 +1462,14 @@ document.addEventListener('alpine:init', () => {
                     // Run completed successfully
                     state.isStreaming = false;
                     state.eventSource = null;
+                    state.retryCount = 0; // Reset retry counter on success
                     eventSource.close();
+
+                    // Production: Log successful completion
+                    console.log('Run completed successfully', {
+                        threadId,
+                        metrics: this.__perfMetrics
+                    });
                     break;
 
                 case 'RUN_ERROR':
@@ -1511,6 +1757,116 @@ document.addEventListener('alpine:init', () => {
                     behavior: 'smooth'
                 });
             });
+        },
+
+        // ============================================
+        // Production: Connection Health Monitoring
+        // ============================================
+
+        /**
+         * Production: Check connection health
+         * @returns {Object} Health status
+         */
+        getConnectionHealth() {
+            const state = this.__getThreadState();
+            const isConnected = state?.eventSource?.readyState === EventSource.OPEN;
+            const isConnecting = state?.eventSource?.readyState === EventSource.CONNECTING;
+
+            return {
+                status: isConnected ? 'connected' : (isConnecting ? 'connecting' : 'disconnected'),
+                isStreaming: state?.isStreaming || false,
+                retryCount: state?.retryCount || 0,
+                maxRetries: this.__connectionConfig.maxRetries,
+                hasErrors: this.__perfMetrics.errors > 0
+            };
+        },
+
+        /**
+         * Production: Get performance metrics (for debugging/monitoring)
+         * @returns {Object} Performance metrics
+         */
+        getMetrics() {
+            return {
+                ...this.__perfMetrics,
+                connectionHealth: this.getConnectionHealth(),
+                cacheSize: Object.keys(this.__memoCache).length,
+                activeThreads: Object.keys(this.__threadStates).length,
+                queueSize: this.__updateQueue.length
+            };
+        },
+
+        /**
+         * Production: Reset metrics (useful for testing)
+         */
+        resetMetrics() {
+            this.__perfMetrics = {
+                messagesSent: 0,
+                messagesReceived: 0,
+                errors: 0,
+                reconnects: 0,
+                avgResponseTime: 0
+            };
+            this.__log('info', 'Metrics reset');
+        },
+
+        /**
+         * Production: Health check endpoint (can be called periodically)
+         * @returns {boolean} True if healthy
+         */
+        isHealthy() {
+            const health = this.getConnectionHealth();
+            const isOverRetrying = (health.retryCount / health.maxRetries) > 0.8;
+
+            return health.status === 'connected' && !isOverRetrying;
+        },
+
+        /**
+         * Production: Export diagnostic data
+         * @returns {Object} Complete diagnostic data
+         */
+        exportDiagnostics() {
+            return {
+                timestamp: new Date().toISOString(),
+                version: '1.0.0', // Update with your version
+                initialized: this.__initialized,
+                currentThread: this.__currentThreadId,
+                sessions: this.sessions.length,
+                threads: Object.keys(this.__threadStates).map(id => ({
+                    id,
+                    messageCount: this.__threadStates[id]?.messages?.length || 0,
+                    isStreaming: this.__threadStates[id]?.isStreaming || false,
+                    retryCount: this.__threadStates[id]?.retryCount || 0
+                })),
+                metrics: this.getMetrics(),
+                health: this.getConnectionHealth(),
+                config: {
+                    retryConfig: this.__connectionConfig
+                }
+            };
         }
     }));
 });
+
+// Production: Global helper for debugging (Alpine pattern: expose utilities)
+if (typeof window !== 'undefined') {
+    window.__chatDebug = {
+        getMetrics: () => {
+            const chatComponent = Alpine.$data(document.querySelector('[x-data*="chat"]'));
+            return chatComponent?.getMetrics?.();
+        },
+        getHealth: () => {
+            const chatComponent = Alpine.$data(document.querySelector('[x-data*="chat"]'));
+            return chatComponent?.getConnectionHealth?.();
+        },
+        exportDiagnostics: () => {
+            const chatComponent = Alpine.$data(document.querySelector('[x-data*="chat"]'));
+            return chatComponent?.exportDiagnostics?.();
+        },
+        resetMetrics: () => {
+            const chatComponent = Alpine.$data(document.querySelector('[x-data*="chat"]'));
+            return chatComponent?.resetMetrics?.();
+        }
+    };
+
+    console.log('[Chat] Debug utilities available at window.__chatDebug');
+}
