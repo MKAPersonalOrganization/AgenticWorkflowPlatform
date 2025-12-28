@@ -94,18 +94,18 @@ func HandleSendMessage(store *session.Store, provider llm.Provider) http.Handler
 		// Get conversation history
 		messages := store.GetMessages(threadID)
 
-		// Create streaming handler
-		streamHandler := streaming.NewStreamHandler(provider, store, w, flusher)
+		// Create user message handler
+		messageHandler := streaming.NewUserMessageHandler(provider, store, w, flusher)
 
 		// Get available tools
 		availableTools := tools.GetAllTools()
 
-		// Handle OpenAI streaming
+		// Process user message and stream response
 		ctx := context.Background()
-		if err := streamHandler.HandleStream(ctx, threadID, messageID, messages, availableTools); err != nil {
+		if err := messageHandler.HandleStream(ctx, threadID, messageID, messages, availableTools); err != nil {
 			// Emit RUN_ERROR event on failure
 			errorTimestamp := time.Now().UnixMilli()
-			errorCode := "OPENAI_ERROR"
+			errorCode := "LLM_ERROR"
 			errorEvent := &agui.RunErrorEvent{
 				BaseEvent: agui.BaseEvent{
 					Type:      "RUN_ERROR",
@@ -139,10 +139,10 @@ func HandleSendMessage(store *session.Store, provider llm.Provider) http.Handler
 			// Generate new message ID for final response
 			finalMessageID := agui.GenerateMessageID()
 
-			// Call OpenAI again with tool results in conversation
-			if err := streamHandler.HandleStream(ctx, threadID, finalMessageID, updatedMessages, availableTools); err != nil {
+			// Process again with tool results in conversation
+			if err := messageHandler.HandleStream(ctx, threadID, finalMessageID, updatedMessages, availableTools); err != nil {
 				errorTimestamp := time.Now().UnixMilli()
-				errorCode := "OPENAI_ERROR"
+				errorCode := "LLM_ERROR"
 				errorEvent := &agui.RunErrorEvent{
 					BaseEvent: agui.BaseEvent{
 						Type:      "RUN_ERROR",

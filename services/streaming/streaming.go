@@ -12,8 +12,8 @@ import (
 	"school-with-ai/services/llm"
 )
 
-// StreamHandler handles streaming LLM responses and emits AG-UI events
-type StreamHandler struct {
+// UserMessageHandler handles processing of user messages and emits AG-UI events
+type UserMessageHandler struct {
 	provider llm.Provider
 	store    *session.Store
 	flusher  http.Flusher
@@ -28,9 +28,9 @@ type ToolCallState struct {
 	Arguments string
 }
 
-// NewStreamHandler creates a new stream handler
-func NewStreamHandler(provider llm.Provider, store *session.Store, w http.ResponseWriter, f http.Flusher) *StreamHandler {
-	return &StreamHandler{
+// NewUserMessageHandler creates a new user message handler
+func NewUserMessageHandler(provider llm.Provider, store *session.Store, w http.ResponseWriter, f http.Flusher) *UserMessageHandler {
+	return &UserMessageHandler{
 		provider: provider,
 		store:    store,
 		flusher:  f,
@@ -39,7 +39,7 @@ func NewStreamHandler(provider llm.Provider, store *session.Store, w http.Respon
 }
 
 // HandleStream processes the LLM streaming response and emits AG-UI events
-func (h *StreamHandler) HandleStream(
+func (h *UserMessageHandler) HandleStream(
 	ctx context.Context,
 	threadID string,
 	messageID string,
@@ -278,7 +278,7 @@ func (h *StreamHandler) HandleStream(
 }
 
 // executeToolCall executes a tool call and returns the result
-func (h *StreamHandler) executeToolCall(toolCall session.ToolCall) (string, error) {
+func (h *UserMessageHandler) executeToolCall(toolCall session.ToolCall) (string, error) {
 	switch toolCall.Function.Name {
 	case "get_weather":
 		return tools.ExecuteWeatherTool(toolCall.Function.Arguments)
