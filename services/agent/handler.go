@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	"school-with-ai/internal/tools"
+	"school-with-ai/pkg/tools"
 	"school-with-ai/services/llm"
 )
 

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"school-with-ai/internal/agui"
+	"school-with-ai/pkg/agui"
 	"school-with-ai/services/agent"
 )
 

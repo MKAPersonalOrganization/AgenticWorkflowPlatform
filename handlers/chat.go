@@ -9,8 +9,8 @@ import (
 
 	"school-with-ai/domain"
 	"school-with-ai/infra"
-	"school-with-ai/internal/agui"
-	"school-with-ai/internal/tools"
+	"school-with-ai/pkg/agui"
+	"school-with-ai/pkg/tools"
 	"school-with-ai/services/agent"
 	"school-with-ai/services/llm"
 )
