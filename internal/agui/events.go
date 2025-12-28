@@ -12,24 +12,104 @@ type BaseEvent struct {
 	RawEvent  interface{} `json:"rawEvent,omitempty"`
 }
 
-// TextMessageStartEvent represents the start of a text message
+// Text Message Events
+//
+// These events represent the lifecycle of text messages in a conversation. Text
+// message events follow a streaming pattern, where content is delivered
+// incrementally. A message begins with a TextMessageStart event, followed by one
+// or more TextMessageContent events that deliver chunks of text as they become
+// available, and concludes with a TextMessageEnd event.
+//
+// This streaming approach enables real-time display of message content as it's
+// generated, creating a more responsive user experience compared to waiting for
+// the entire message to be complete before showing anything.
+//
+// Event Flow:
+//   1. TextMessageStart - Initializes a new text message with a unique messageId
+//   2. TextMessageContent (one or more) - Delivers chunks of text incrementally
+//   3. TextMessageEnd - Marks the completion of the message
+//
+// The TextMessageContent events each contain a delta field with a chunk of
+// text. Frontends should concatenate these deltas in the order received to
+// construct the complete message. The messageId property links all related
+// events, allowing the frontend to associate content chunks with the correct
+// message.
+
+// TextMessageStartEvent signals the start of a text message.
+//
+// The TextMessageStart event initializes a new text message in the conversation.
+// It establishes a unique messageId that will be referenced by subsequent
+// content chunks and the end event. This event allows frontends to prepare the UI
+// for an incoming message, such as creating a new message bubble with a loading
+// indicator. The role property identifies whether the message is coming from the
+// assistant or potentially another participant in the conversation.
+//
+// Properties:
+//   - messageId: Unique identifier for the message
+//   - role: Role of the message sender ("developer", "system", "assistant", "user", "tool")
 type TextMessageStartEvent struct {
 	BaseEvent
 	MessageID string `json:"messageId"`
 	Role      string `json:"role,omitempty"`
 }
 
-// TextMessageContentEvent represents a chunk of message content
+// TextMessageContentEvent represents a chunk of content in a streaming text message.
+//
+// The TextMessageContent event delivers incremental parts of the message text as
+// they become available. Each event contains a small chunk of text in the delta
+// property that should be appended to previously received chunks. The streaming
+// nature of these events enables real-time display of content, creating a more
+// responsive and engaging user experience. Implementations should handle these
+// events efficiently to ensure smooth text rendering without visible delays or
+// flickering.
+//
+// Properties:
+//   - messageId: Matches the ID from TextMessageStart
+//   - delta: Text content chunk (non-empty)
 type TextMessageContentEvent struct {
 	BaseEvent
 	MessageID string `json:"messageId"`
 	Delta     string `json:"delta"`
 }
 
-// TextMessageEndEvent represents the end of a text message
+// TextMessageEndEvent signals the end of a text message.
+//
+// The TextMessageEnd event marks the completion of a streaming text message.
+// After receiving this event, the frontend knows that the message is complete and
+// no further content will be added. This allows the UI to finalize rendering,
+// remove any loading indicators, and potentially trigger actions that should occur
+// after message completion, such as enabling reply controls or performing
+// automatic scrolling to ensure the full message is visible.
+//
+// Properties:
+//   - messageId: Matches the ID from TextMessageStart
 type TextMessageEndEvent struct {
 	BaseEvent
 	MessageID string `json:"messageId"`
+}
+
+// TextMessageChunkEvent is a convenience event that expands to Start → Content → End automatically.
+//
+// The TextMessageChunk event lets you omit explicit TextMessageStart and
+// TextMessageEnd events. The client stream transformer expands chunks into the
+// standard triad:
+//
+//  1. First chunk for a message must include messageId and will emit
+//     TextMessageStart (role defaults to assistant when not provided).
+//  2. Each chunk with a delta emits a TextMessageContent for the current
+//     messageId.
+//  3. TextMessageEnd is emitted automatically when the stream switches to a new
+//     message ID or when the stream completes.
+//
+// Properties:
+//   - messageId: Optional unique identifier for the message; required on the first chunk of a message
+//   - role: Optional role of the sender ("developer", "system", "assistant", "user")
+//   - delta: Optional text content of the message
+type TextMessageChunkEvent struct {
+	BaseEvent
+	MessageID *string `json:"messageId,omitempty"`
+	Role      *string `json:"role,omitempty"`
+	Delta     *string `json:"delta,omitempty"`
 }
 
 // Lifecycle Events
