@@ -339,6 +339,87 @@ type ToolCallChunkEvent struct {
 	Delta           *string `json:"delta,omitempty"`
 }
 
+// State Management Events
+//
+// These events are used to manage and synchronize the agent's state with the
+// frontend. State management in the protocol follows an efficient snapshot-delta
+// pattern where complete state snapshots are sent initially or infrequently, while
+// incremental updates (deltas) are used for ongoing changes.
+//
+// This approach optimizes for both completeness and efficiency: snapshots ensure
+// the frontend has the full state context, while deltas minimize data transfer for
+// frequent updates. Together, they enable frontends to maintain an accurate
+// representation of agent state without unnecessary data transmission.
+//
+// Event Flow:
+//   1. StateSnapshot - Delivers a comprehensive representation of the agent's current state
+//   2. StateDelta (multiple) - Provides incremental updates using JSON Patch operations
+//   3. StateSnapshot (occasional) - Occasional full refresh to resynchronize
+//   4. MessagesSnapshot - Delivers complete message history
+//
+// The combination of snapshots and deltas allows frontends to efficiently track
+// changes to agent state while ensuring consistency. Snapshots serve as
+// synchronization points that reset the state to a known baseline, while deltas
+// provide lightweight updates between snapshots.
+
+// StateSnapshotEvent provides a complete snapshot of an agent's state.
+//
+// The StateSnapshot event delivers a comprehensive representation of the agent's
+// current state. This event is typically sent at the beginning of an interaction
+// or when synchronization is needed. It contains all state variables relevant to
+// the frontend, allowing it to completely rebuild its internal representation.
+// Frontends should replace their existing state model with the contents of this
+// snapshot rather than trying to merge it with previous state.
+//
+// Properties:
+//   - snapshot: Complete state snapshot
+type StateSnapshotEvent struct {
+	BaseEvent
+	Snapshot interface{} `json:"snapshot"`
+}
+
+// StateDeltaEvent provides a partial update to an agent's state using JSON Patch.
+//
+// The StateDelta event contains incremental updates to the agent's state in the
+// form of JSON Patch operations (as defined in RFC 6902). Each delta represents
+// specific changes to apply to the current state model. This approach is
+// bandwidth-efficient, sending only what has changed rather than the entire state.
+// Frontends should apply these patches in sequence to maintain an accurate state
+// representation. If a frontend detects inconsistencies after applying patches, it
+// may request a fresh StateSnapshot.
+//
+// Properties:
+//   - delta: Array of JSON Patch operations (RFC 6902)
+type StateDeltaEvent struct {
+	BaseEvent
+	Delta []interface{} `json:"delta"`
+}
+
+// MessagesSnapshotEvent provides a snapshot of all messages in a conversation.
+//
+// The MessagesSnapshot event delivers a complete history of messages in the
+// current conversation. Unlike the general state snapshot, this focuses
+// specifically on the conversation transcript. This event is useful for
+// initializing the chat history, synchronizing after connection interruptions, or
+// providing a comprehensive view when a user joins an ongoing conversation.
+// Frontends should use this to establish or refresh the conversational context
+// displayed to users.
+//
+// Messages is a discriminated union based on the "role" field and can contain:
+//   - DeveloperMessage (role: "developer")
+//   - SystemMessage (role: "system")
+//   - AssistantMessage (role: "assistant")
+//   - UserMessage (role: "user")
+//   - ToolMessage (role: "tool")
+//   - ActivityMessage (role: "activity")
+//
+// Properties:
+//   - messages: Array of Message objects (discriminated by "role" field)
+type MessagesSnapshotEvent struct {
+	BaseEvent
+	Messages []Message `json:"messages"`
+}
+
 // Activity Events
 //
 // Activity Events expose structured, in-progress activity updates that occur

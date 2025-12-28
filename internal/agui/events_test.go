@@ -3,17 +3,31 @@ package agui
 import (
 	"encoding/json"
 	"testing"
-	"time"
 )
+
+// Helper function to create pointer to string
+func stringPtr(s string) *string {
+	return &s
+}
+
+// Helper function to create pointer to int64
+func int64Ptr(i int64) *int64 {
+	return &i
+}
 
 // TestToolCallStartEvent verifies TOOL_CALL_START event structure
 func TestToolCallStartEvent(t *testing.T) {
+	parentMsgID := "msg_456"
+	timestamp := int64(1234567890)
+
 	event := ToolCallStartEvent{
-		Type:            "TOOL_CALL_START",
+		BaseEvent: BaseEvent{
+			Type:      "TOOL_CALL_START",
+			Timestamp: &timestamp,
+		},
 		ToolCallID:      "tool_123",
 		ToolCallName:    "get_weather",
-		ParentMessageID: "msg_456",
-		Timestamp:       time.Now().UnixMilli(),
+		ParentMessageID: &parentMsgID,
 	}
 
 	// Verify it serializes to JSON correctly
@@ -45,11 +59,15 @@ func TestToolCallStartEvent(t *testing.T) {
 
 // TestToolCallArgsEvent verifies TOOL_CALL_ARGS event structure
 func TestToolCallArgsEvent(t *testing.T) {
+	timestamp := int64(1234567890)
+
 	event := ToolCallArgsEvent{
-		Type:       "TOOL_CALL_ARGS",
+		BaseEvent: BaseEvent{
+			Type:      "TOOL_CALL_ARGS",
+			Timestamp: &timestamp,
+		},
 		ToolCallID: "tool_123",
 		Delta:      `{"location":"`,
-		Timestamp:  time.Now().UnixMilli(),
 	}
 
 	jsonData, err := json.Marshal(event)
@@ -75,10 +93,14 @@ func TestToolCallArgsEvent(t *testing.T) {
 
 // TestToolCallEndEvent verifies TOOL_CALL_END event structure
 func TestToolCallEndEvent(t *testing.T) {
+	timestamp := int64(1234567890)
+
 	event := ToolCallEndEvent{
-		Type:       "TOOL_CALL_END",
+		BaseEvent: BaseEvent{
+			Type:      "TOOL_CALL_END",
+			Timestamp: &timestamp,
+		},
 		ToolCallID: "tool_123",
-		Timestamp:  time.Now().UnixMilli(),
 	}
 
 	jsonData, err := json.Marshal(event)
@@ -101,13 +123,18 @@ func TestToolCallEndEvent(t *testing.T) {
 
 // TestToolCallResultEvent verifies TOOL_CALL_RESULT event structure
 func TestToolCallResultEvent(t *testing.T) {
+	role := "tool"
+	timestamp := int64(1234567890)
+
 	event := ToolCallResultEvent{
-		Type:       "TOOL_CALL_RESULT",
+		BaseEvent: BaseEvent{
+			Type:      "TOOL_CALL_RESULT",
+			Timestamp: &timestamp,
+		},
 		MessageID:  "msg_789",
 		ToolCallID: "tool_123",
 		Content:    `{"temperature":72,"condition":"sunny"}`,
-		Role:       "tool",
-		Timestamp:  time.Now().UnixMilli(),
+		Role:       &role,
 	}
 
 	jsonData, err := json.Marshal(event)
@@ -136,13 +163,17 @@ func TestToolCallResultEvent(t *testing.T) {
 
 // TestToolCallResultEventOmitsEmptyRole verifies role is omitted when empty
 func TestToolCallResultEventOmitsEmptyRole(t *testing.T) {
+	timestamp := int64(1234567890)
+
 	event := ToolCallResultEvent{
-		Type:       "TOOL_CALL_RESULT",
+		BaseEvent: BaseEvent{
+			Type:      "TOOL_CALL_RESULT",
+			Timestamp: &timestamp,
+		},
 		MessageID:  "msg_789",
 		ToolCallID: "tool_123",
 		Content:    `{"result":"success"}`,
 		// Role omitted - should use default "tool" or be omitted
-		Timestamp: time.Now().UnixMilli(),
 	}
 
 	jsonData, err := json.Marshal(event)
@@ -182,47 +213,59 @@ func TestGenerateToolCallID(t *testing.T) {
 func TestToolCallEventSequence(t *testing.T) {
 	toolCallID := GenerateToolCallID()
 	messageID := GenerateMessageID()
-	timestamp := time.Now().UnixMilli()
+	parentMsgID := messageID
+	timestamp := int64(1234567890)
 
 	// Start event
 	startEvent := ToolCallStartEvent{
-		Type:            "TOOL_CALL_START",
+		BaseEvent: BaseEvent{
+			Type:      "TOOL_CALL_START",
+			Timestamp: int64Ptr(timestamp),
+		},
 		ToolCallID:      toolCallID,
 		ToolCallName:    "get_weather",
-		ParentMessageID: messageID,
-		Timestamp:       timestamp,
+		ParentMessageID: &parentMsgID,
 	}
 
 	// Args events (streaming)
 	argsEvent1 := ToolCallArgsEvent{
-		Type:       "TOOL_CALL_ARGS",
+		BaseEvent: BaseEvent{
+			Type:      "TOOL_CALL_ARGS",
+			Timestamp: int64Ptr(timestamp + 1),
+		},
 		ToolCallID: toolCallID,
 		Delta:      `{"location":"`,
-		Timestamp:  timestamp + 1,
 	}
 
 	argsEvent2 := ToolCallArgsEvent{
-		Type:       "TOOL_CALL_ARGS",
+		BaseEvent: BaseEvent{
+			Type:      "TOOL_CALL_ARGS",
+			Timestamp: int64Ptr(timestamp + 2),
+		},
 		ToolCallID: toolCallID,
 		Delta:      `San Francisco"}`,
-		Timestamp:  timestamp + 2,
 	}
 
 	// End event
 	endEvent := ToolCallEndEvent{
-		Type:       "TOOL_CALL_END",
+		BaseEvent: BaseEvent{
+			Type:      "TOOL_CALL_END",
+			Timestamp: int64Ptr(timestamp + 3),
+		},
 		ToolCallID: toolCallID,
-		Timestamp:  timestamp + 3,
 	}
 
 	// Result event
+	role := "tool"
 	resultEvent := ToolCallResultEvent{
-		Type:       "TOOL_CALL_RESULT",
+		BaseEvent: BaseEvent{
+			Type:      "TOOL_CALL_RESULT",
+			Timestamp: int64Ptr(timestamp + 4),
+		},
 		MessageID:  GenerateMessageID(),
 		ToolCallID: toolCallID,
 		Content:    `{"temperature":72,"condition":"sunny"}`,
-		Role:       "tool",
-		Timestamp:  timestamp + 4,
+		Role:       &role,
 	}
 
 	// Verify all events can be marshaled
