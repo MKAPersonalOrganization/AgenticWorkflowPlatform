@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"school-with-ai/infra"
 	"school-with-ai/internal/agui"
 	"school-with-ai/internal/session"
 	"school-with-ai/internal/tools"
@@ -98,7 +99,7 @@ func HandleSendMessage(store *session.Store, provider llm.Provider) http.Handler
 		availableTools := tools.GetAllTools()
 
 		// Create SSE event emitter
-		emitter := NewSSEEventEmitter(w, flusher)
+		emitter := infra.NewSSEEventEmitter(w, flusher)
 
 		// Create agent with tools
 		messageHandler := agent.NewAgent(
