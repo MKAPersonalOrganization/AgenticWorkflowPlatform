@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"time"
 
 	"school-with-ai/components"
 	"school-with-ai/infra"
@@ -34,6 +35,17 @@ func main() {
 	model := string(openai.ChatModelGPT4oMini) // Use GPT-4o-mini for cost efficiency
 	provider := llm.NewOpenAIProvider(model)
 
+	// Initialize job queue
+	queue := infra.NewInMemoryJobQueue()
+
+	// Initialize and start worker pool
+	workerPool := infra.NewWorkerPool(queue, store, provider, infra.WorkerPoolConfig{
+		NumWorkers:   5,
+		PollInterval: 100 * time.Millisecond,
+	})
+	workerPool.Start()
+	defer workerPool.Stop()
+
 	mux := http.NewServeMux()
 
 	// Serve static assets
@@ -42,10 +54,13 @@ func main() {
 	mux.Handle("/assets/images/", http.StripPrefix("/assets/images/", http.FileServer(http.Dir("./assets/images"))))
 
 	// Create handler with dependencies
-	handler := infra.NewHandler(store, provider)
+	handler := infra.NewHandler(store, provider, queue, workerPool)
 
 	// Chat routes
 	mux.HandleFunc("/send", handler.SendMessage)
+	mux.HandleFunc("GET /api/jobs/active", handler.GetActiveJobs)
+	mux.HandleFunc("GET /api/jobs/{jobId}/stream", handler.StreamJobEvents)
+	mux.HandleFunc("DELETE /api/jobs/{jobId}", handler.CancelJob)
 	mux.HandleFunc("GET /api/threads", handler.GetThreads)
 	mux.HandleFunc("GET /api/threads/{threadId}/messages", handler.GetMessages)
 	mux.HandleFunc("DELETE /api/threads/{threadId}", handler.DeleteThread)

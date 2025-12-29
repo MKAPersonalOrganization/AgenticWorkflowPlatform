@@ -128,6 +128,15 @@ func (h *Agent) runIteration(
 		// Check if client disconnected during streaming
 		select {
 		case <-ctx.Done():
+			// Save partial content before returning
+			if completeContent != "" {
+				h.store.AddMessage(threadID, domain.Message{
+					ID:        messageID,
+					Role:      "assistant",
+					Content:   completeContent,
+					Timestamp: time.Now(),
+				})
+			}
 			return fmt.Errorf("client disconnected during streaming: %w", ctx.Err())
 		default:
 		}

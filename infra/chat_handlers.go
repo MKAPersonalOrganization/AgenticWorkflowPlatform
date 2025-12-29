@@ -1,7 +1,6 @@
 package infra
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -11,25 +10,78 @@ import (
 	"school-with-ai/infra/agui"
 	"school-with-ai/services/agent"
 	"school-with-ai/services/llm"
-	"school-with-ai/services/tools"
 )
 
 // Handler encapsulates dependencies for HTTP handlers
 type Handler struct {
-	store    agent.Repository
-	provider llm.Provider
+	store      agent.Repository
+	provider   llm.Provider
+	queue      domain.JobQueue
+	workerPool *WorkerPool
 }
 
 // NewHandler creates a new HTTP handler with the given dependencies
-func NewHandler(store agent.Repository, provider llm.Provider) *Handler {
+func NewHandler(store agent.Repository, provider llm.Provider, queue domain.JobQueue, workerPool *WorkerPool) *Handler {
 	return &Handler{
-		store:    store,
-		provider: provider,
+		store:      store,
+		provider:   provider,
+		queue:      queue,
+		workerPool: workerPool,
 	}
 }
 
-// SendMessage handles the /send endpoint with SSE streaming
+// SendMessage handles the /send endpoint by enqueuing a job
 func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
+	// Get thread ID and message from query parameters
+	threadID := r.URL.Query().Get("threadId")
+	if threadID == "" {
+		threadID = fmt.Sprintf("thread_%d", time.Now().UnixNano())
+	}
+	message := r.URL.Query().Get("message")
+	if message == "" {
+		message = "Hello"
+	}
+
+	// Create job
+	jobID := agent.GenerateID()
+	messageID := agui.GenerateMessageID()
+
+	job := &domain.Job{
+		ID:        jobID,
+		ThreadID:  threadID,
+		MessageID: messageID,
+		Message:   message,
+		Status:    domain.JobStatusPending,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	// Enqueue job
+	if err := h.queue.Enqueue(job); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to enqueue job: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Return job ID to client
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]string{
+		"jobId":    jobID,
+		"threadId": threadID,
+		"status":   string(domain.JobStatusPending),
+	}); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
+}
+
+// StreamJobEvents streams SSE events for a specific job
+func (h *Handler) StreamJobEvents(w http.ResponseWriter, r *http.Request) {
+	jobID := r.PathValue("jobId")
+	if jobID == "" {
+		http.Error(w, "jobId is required", http.StatusBadRequest)
+		return
+	}
+
 	// Setup SSE headers
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -43,158 +95,203 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get thread ID and message from query parameters
+	// Wait for job to be picked up by a worker
+	ctx := r.Context()
+	var eventBuffer *EventBuffer
+
+	// Poll for event buffer until worker picks up job (or client disconnects)
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			// Client disconnected while waiting
+			return
+		case <-ticker.C:
+			var exists bool
+			eventBuffer, exists = h.workerPool.GetEventBuffer(jobID)
+			if exists {
+				goto streamEvents
+			}
+		}
+	}
+
+streamEvents:
+	// Stream events from buffer
+	eventIndex := 0
+	eventTicker := time.NewTicker(50 * time.Millisecond)
+	defer eventTicker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			// Client disconnected
+			return
+
+		case <-eventTicker.C:
+			// Get new events since last index
+			newEvents := eventBuffer.GetEvents(eventIndex)
+
+			for _, event := range newEvents {
+				// Translate and write event
+				if err := h.translateAndWriteEvent(w, flusher, event); err != nil {
+					return
+				}
+				eventIndex++
+			}
+
+			// Check if job is complete
+			if eventBuffer.IsClosed() && eventIndex >= eventBuffer.Len() {
+				return
+			}
+		}
+	}
+}
+
+func (h *Handler) translateAndWriteEvent(w http.ResponseWriter, flusher http.Flusher, event any) error {
+	var aguiEvent any
+
+	// Translate domain events to agui events
+	switch ev := event.(type) {
+	case *agent.TextMessageStartEvent:
+		timestamp := time.Now().UnixMilli()
+		aguiEvent = &agui.TextMessageStartEvent{
+			BaseEvent: agui.BaseEvent{
+				Type:      "TEXT_MESSAGE_START",
+				Timestamp: &timestamp,
+			},
+			MessageID: ev.MessageID,
+			Role:      ev.Role,
+		}
+
+	case *agent.TextMessageContentEvent:
+		timestamp := time.Now().UnixMilli()
+		aguiEvent = &agui.TextMessageContentEvent{
+			BaseEvent: agui.BaseEvent{
+				Type:      "TEXT_MESSAGE_CONTENT",
+				Timestamp: &timestamp,
+			},
+			MessageID: ev.MessageID,
+			Delta:     ev.Delta,
+		}
+
+	case *agent.TextMessageEndEvent:
+		timestamp := time.Now().UnixMilli()
+		aguiEvent = &agui.TextMessageEndEvent{
+			BaseEvent: agui.BaseEvent{
+				Type:      "TEXT_MESSAGE_END",
+				Timestamp: &timestamp,
+			},
+			MessageID: ev.MessageID,
+		}
+
+	case *agent.ToolCallStartEvent:
+		timestamp := time.Now().UnixMilli()
+		parentMessageID := ev.ParentMessageID
+		aguiEvent = &agui.ToolCallStartEvent{
+			BaseEvent: agui.BaseEvent{
+				Type:      "TOOL_CALL_START",
+				Timestamp: &timestamp,
+			},
+			ToolCallID:      ev.ToolCallID,
+			ToolCallName:    ev.ToolCallName,
+			ParentMessageID: &parentMessageID,
+		}
+
+	case *agent.ToolCallArgsEvent:
+		timestamp := time.Now().UnixMilli()
+		aguiEvent = &agui.ToolCallArgsEvent{
+			BaseEvent: agui.BaseEvent{
+				Type:      "TOOL_CALL_ARGS",
+				Timestamp: &timestamp,
+			},
+			ToolCallID: ev.ToolCallID,
+			Delta:      ev.Delta,
+		}
+
+	case *agent.ToolCallEndEvent:
+		timestamp := time.Now().UnixMilli()
+		aguiEvent = &agui.ToolCallEndEvent{
+			BaseEvent: agui.BaseEvent{
+				Type:      "TOOL_CALL_END",
+				Timestamp: &timestamp,
+			},
+			ToolCallID: ev.ToolCallID,
+		}
+
+	case *agent.ToolCallResultEvent:
+		timestamp := time.Now().UnixMilli()
+		role := ev.Role
+		aguiEvent = &agui.ToolCallResultEvent{
+			BaseEvent: agui.BaseEvent{
+				Type:      "TOOL_CALL_RESULT",
+				Timestamp: &timestamp,
+			},
+			MessageID:  ev.MessageID,
+			ToolCallID: ev.ToolCallID,
+			Content:    ev.Content,
+			Role:       &role,
+		}
+
+	default:
+		// If it's already an agui event, pass through
+		aguiEvent = event
+	}
+
+	if err := agui.WriteSSEEvent(w, aguiEvent); err != nil {
+		return err
+	}
+	flusher.Flush()
+	return nil
+}
+
+// GetActiveJobs retrieves all active jobs for a thread
+func (h *Handler) GetActiveJobs(w http.ResponseWriter, r *http.Request) {
 	threadID := r.URL.Query().Get("threadId")
 	if threadID == "" {
-		threadID = fmt.Sprintf("thread_%d", time.Now().UnixNano())
-	}
-	message := r.URL.Query().Get("message")
-	if message == "" {
-		message = "Hello"
-	}
-
-	// Ensure thread exists
-	h.store.GetOrCreateThread(threadID)
-
-	// Store user message
-	userMsgID := agui.GenerateMessageID()
-	h.store.AddMessage(threadID, domain.Message{
-		ID:        userMsgID,
-		Role:      "user",
-		Content:   message,
-		Timestamp: time.Now(),
-	})
-
-	// Generate unique run ID for this execution
-	runID := agui.GenerateRunID()
-
-	// Error handling with defer to catch panics
-	defer func() {
-		if r := recover(); r != nil {
-			errorTimestamp := time.Now().UnixMilli()
-			errorCode := "INTERNAL_ERROR"
-			errorEvent := &agui.RunErrorEvent{
-				BaseEvent: agui.BaseEvent{
-					Type:      "RUN_ERROR",
-					Timestamp: &errorTimestamp,
-				},
-				Message: fmt.Sprintf("%v", r),
-				Code:    &errorCode,
-			}
-			agui.WriteSSEEvent(w, errorEvent)
-			flusher.Flush()
-		}
-	}()
-
-	// Send RUN_STARTED event
-	runStartedTimestamp := time.Now().UnixMilli()
-	runStartedEvent := &agui.RunStartedEvent{
-		BaseEvent: agui.BaseEvent{
-			Type:      "RUN_STARTED",
-			Timestamp: &runStartedTimestamp,
-		},
-		ThreadID: threadID,
-		RunID:    runID,
-	}
-	if err := agui.WriteSSEEvent(w, runStartedEvent); err != nil {
+		http.Error(w, "threadId is required", http.StatusBadRequest)
 		return
 	}
-	flusher.Flush()
 
-	// Auto-generate thread title immediately if this is the first message
-	thread, exists := h.store.GetThread(threadID)
-	if exists && thread.Title == "New Chat" && len(thread.Messages) == 1 {
-		// Take first 50 characters of first user message as title
-		title := message
-		if len(title) > 50 {
-			title = title[:50] + "..."
-		}
-		h.store.UpdateThreadTitle(threadID, title)
+	activeJobs := h.queue.GetActiveJobsByThread(threadID)
 
-		// Send CUSTOM event to notify frontend of title update immediately
-		customTimestamp := time.Now().UnixMilli()
-		customEvent := &agui.CustomEvent{
-			BaseEvent: agui.BaseEvent{
-				Type:      "CUSTOM",
-				Timestamp: &customTimestamp,
-			},
-			Name: "THREAD_TITLE_UPDATED",
-			Value: map[string]string{
-				"threadId": threadID,
-				"title":    title,
-			},
-		}
-		agui.WriteSSEEvent(w, customEvent)
-		flusher.Flush()
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(activeJobs); err != nil {
+		http.Error(w, "Failed to encode jobs", http.StatusInternalServerError)
+		return
+	}
+}
+
+// CancelJob cancels a pending or active job
+func (h *Handler) CancelJob(w http.ResponseWriter, r *http.Request) {
+	jobID := r.PathValue("jobId")
+	if jobID == "" {
+		http.Error(w, "jobId is required", http.StatusBadRequest)
+		return
 	}
 
-	// Generate unique message ID for assistant response
-	messageID := agui.GenerateMessageID()
-
-	// Get conversation history
-	messages := h.store.GetMessages(threadID)
-
-	// Get available tools
-	availableTools := tools.GetAllTools()
-
-	// Create SSE event emitter
-	emitter := NewSSEEventEmitter(w, flusher)
-
-	// Create agent with tools
-	messageHandler := agent.NewAgent(
-		h.provider,
-		h.store,
-		emitter,
-		agent.WithTools(availableTools),
-	)
-
-	// Process user message and stream response
-	// The agent will automatically handle tool execution loops internally
-	// Use request context to detect when client disconnects (e.g., browser refresh)
-	ctx := r.Context()
-	if err := messageHandler.Run(ctx, threadID, messageID, messages); err != nil {
-		// Check if error is due to context cancellation (client disconnected)
-		if ctx.Err() == context.Canceled || ctx.Err() == context.DeadlineExceeded {
-			// Client disconnected - don't send error event, just log and return
-			fmt.Printf("Stream cancelled for thread %s (client disconnected): %v\n", threadID, err)
+	// Attempt to cancel the job in queue (if pending)
+	if err := h.queue.CancelJob(jobID); err != nil {
+		if err == ErrJobNotFound {
+			http.Error(w, "Job not found", http.StatusNotFound)
 			return
 		}
-
-		// Emit RUN_ERROR event on failure (only if client is still connected)
-		errorTimestamp := time.Now().UnixMilli()
-		errorCode := "LLM_ERROR"
-		errorEvent := &agui.RunErrorEvent{
-			BaseEvent: agui.BaseEvent{
-				Type:      "RUN_ERROR",
-				Timestamp: &errorTimestamp,
-			},
-			Message: err.Error(),
-			Code:    &errorCode,
+		// If not pending, might be processing - try worker pool
+		if !h.workerPool.CancelJob(jobID) {
+			http.Error(w, fmt.Sprintf("Failed to cancel job: %v", err), http.StatusBadRequest)
+			return
 		}
-		agui.WriteSSEEvent(w, errorEvent)
-		flusher.Flush()
-		return
 	}
 
-	// Emit final MESSAGES_SNAPSHOT with complete conversation
-	if err := h.emitMessagesSnapshot(w, flusher, threadID); err != nil {
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]string{
+		"jobId":  jobID,
+		"status": "cancelled",
+	}); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		return
 	}
-
-	// Send RUN_FINISHED event
-	runFinishedTimestamp := time.Now().UnixMilli()
-	runFinishedEvent := &agui.RunFinishedEvent{
-		BaseEvent: agui.BaseEvent{
-			Type:      "RUN_FINISHED",
-			Timestamp: &runFinishedTimestamp,
-		},
-		ThreadID: threadID,
-		RunID:    runID,
-	}
-	if err := agui.WriteSSEEvent(w, runFinishedEvent); err != nil {
-		return
-	}
-	flusher.Flush()
 }
 
 // GetMessages retrieves all messages for a thread

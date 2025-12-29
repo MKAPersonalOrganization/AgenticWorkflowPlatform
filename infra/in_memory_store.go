@@ -51,13 +51,16 @@ func (s *InMemoryStore) AddMessage(threadID string, msg domain.Message) {
 	}
 }
 
-// GetMessages retrieves all messages from a thread
+// GetMessages retrieves all messages from a thread (returns a copy for thread safety)
 func (s *InMemoryStore) GetMessages(threadID string) []domain.Message {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	if thread, exists := s.threads[threadID]; exists {
-		return thread.Messages
+		// Return a copy to prevent external mutation
+		messages := make([]domain.Message, len(thread.Messages))
+		copy(messages, thread.Messages)
+		return messages
 	}
 	return []domain.Message{}
 }

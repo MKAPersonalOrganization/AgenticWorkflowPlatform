@@ -372,7 +372,10 @@ document.addEventListener('alpine:init', () => {
                 // Connection tracking (Alpine pattern)
                 connectionState: null,
                 heartbeatInterval: null,
-                retryCount: 0
+                retryCount: 0,
+                activeJobStreams: new Set(), // Track active job streams to prevent duplicates
+                jobRetryMap: new Map(), // Track retry attempts per job (jobId -> retryCount)
+                currentJobId: null // Track current job for cancellation
             }
         },
 
@@ -433,8 +436,11 @@ document.addEventListener('alpine:init', () => {
                         // Load existing messages for this thread
                         this.__currentThreadId = savedThreadId;
                         this.__currentState = this.__getThreadState(savedThreadId);
-                        this.__loadMessages(savedThreadId);
+                        await this.__loadMessages(savedThreadId);
                     }
+
+                    // Reconnect to active jobs for ALL threads (not just current)
+                    await this.__reconnectToAllActiveJobs();
                 } else {
                     throw new Error(`Failed to fetch threads: ${response.status}`);
                 }
@@ -1058,6 +1064,90 @@ document.addEventListener('alpine:init', () => {
             return uiMessages;
         },
 
+        async cancelJob() {
+            return this.__tryCatchAsync('cancel job', {}, async () => {
+                const state = this.__getThreadState();
+
+                if (!state.currentJobId) {
+                    console.warn('No active job to cancel');
+                    return;
+                }
+
+                const jobId = state.currentJobId;
+                console.log('Cancelling job:', jobId);
+
+                try {
+                    const response = await fetch(`/api/jobs/${jobId}`, {
+                        method: 'DELETE',
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Failed to cancel job: ${response.statusText}`);
+                    }
+
+                    // Close event source
+                    if (state.eventSource) {
+                        state.eventSource.close();
+                        state.eventSource = null;
+                    }
+
+                    // Clean up state
+                    state.activeJobStreams.clear();
+                    state.jobRetryMap.clear();
+                    state.currentJobId = null;
+                    state.isStreaming = false;
+                    state.showTypingIndicator = false;
+
+                    console.log('Job cancelled successfully');
+                } catch (error) {
+                    console.error('Failed to cancel job:', error);
+                    this.__showError('Failed to cancel job', this.__currentThreadId);
+                }
+            });
+        },
+
+        async cancelJob() {
+            return this.__tryCatchAsync('cancel job', {}, async () => {
+                const state = this.__getThreadState();
+
+                if (!state.currentJobId) {
+                    console.warn('No active job to cancel');
+                    return;
+                }
+
+                const jobId = state.currentJobId;
+                console.log('Cancelling job:', jobId);
+
+                try {
+                    const response = await fetch(`/api/jobs/${jobId}`, {
+                        method: 'DELETE',
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Failed to cancel job: ${response.statusText}`);
+                    }
+
+                    // Close event source
+                    if (state.eventSource) {
+                        state.eventSource.close();
+                        state.eventSource = null;
+                    }
+
+                    // Clean up state
+                    state.activeJobStreams.clear();
+                    state.jobRetryMap.clear();
+                    state.currentJobId = null;
+                    state.isStreaming = false;
+                    state.showTypingIndicator = false;
+
+                    console.log('Job cancelled successfully');
+                } catch (error) {
+                    console.error('Failed to cancel job:', error);
+                    this.__showError('Failed to cancel job', this.__currentThreadId);
+                }
+            });
+        },
+
         sendMessage() {
             return this.__tryCatch('send message', { messageLength: this.currentMessage.length }, () => {
                 // Guard: Check initialization (Alpine defensive pattern)
@@ -1127,7 +1217,7 @@ document.addEventListener('alpine:init', () => {
         // SSE Streaming & Event Handling
         // ============================================
 
-        __streamResponse(message, threadId) {
+        async __streamResponse(message, threadId) {
             const state = this.__getThreadState(threadId);
 
             // Guard: Prevent duplicate connections (Alpine defensive pattern)
@@ -1141,15 +1231,63 @@ document.addEventListener('alpine:init', () => {
             state.showTypingIndicator = true;
             state.errorMessage = null;
 
-            const url = `/send?threadId=${encodeURIComponent(threadId)}&message=${encodeURIComponent(message)}`;
-            const eventSource = new EventSource(url);
+            try {
+                // Step 1: Enqueue the job
+                const response = await fetch(`/send?threadId=${encodeURIComponent(threadId)}&message=${encodeURIComponent(message)}`, {
+                    method: 'GET',
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Failed to enqueue job: ${response.statusText}`);
+                }
+
+                const jobData = await response.json();
+                const jobId = jobData.jobId;
+
+                console.log('Job enqueued:', jobId);
+
+                // Store current job ID for cancellation
+                state.currentJobId = jobId;
+
+                // Step 2: Connect to SSE stream for job events
+                this.__connectToJobStream(jobId, threadId);
+
+            } catch (error) {
+                console.error('Failed to start stream:', error);
+                this.__perfMetrics.errors++;
+
+                state.isStreaming = false;
+                state.showTypingIndicator = false;
+
+                if (threadId === this.__currentThreadId) {
+                    this.__showError(`Failed to send message: ${error.message}`, threadId);
+                }
+            }
+        },
+
+        __connectToJobStream(jobId, threadId) {
+            const state = this.__getThreadState(threadId);
+
+            // Prevent duplicate connections to the same job
+            if (state.activeJobStreams.has(jobId)) {
+                console.log('Already streaming job:', jobId);
+                return;
+            }
+
+            state.activeJobStreams.add(jobId);
+
+            const streamUrl = `/api/jobs/${jobId}/stream`;
+            const eventSource = new EventSource(streamUrl);
 
             // Store EventSource in thread state so we can close it later
             state.eventSource = eventSource;
 
             eventSource.onmessage = (event) => {
+                // Reset retry count on successful message
+                state.jobRetryMap.delete(jobId);
+
                 // Defensive parsing (Alpine pattern)
-                const data = this.__tryCatch('parse SSE event', { threadId }, () => {
+                const data = this.__tryCatch('parse SSE event', { threadId, jobId }, () => {
                     return JSON.parse(event.data);
                 });
 
@@ -1159,53 +1297,85 @@ document.addEventListener('alpine:init', () => {
             };
 
             eventSource.onerror = (error) => {
-                console.error('SSE error:', error);
+                console.error('SSE error for job:', jobId, error);
 
-                // Production: Track error metrics
                 this.__perfMetrics.errors++;
 
-                // Production: Implement retry with exponential backoff
-                const retryCount = state.retryCount || 0;
-                const shouldRetry = retryCount < this.__connectionConfig.maxRetries;
-
+                const wasConnected = eventSource.readyState === EventSource.OPEN;
                 eventSource.close();
                 state.eventSource = null;
-                state.isStreaming = false;
-                state.showTypingIndicator = false;
+                state.activeJobStreams.delete(jobId);
 
-                if (shouldRetry) {
-                    // Calculate backoff delay
-                    const delay = Math.min(
-                        this.__connectionConfig.baseDelay * Math.pow(this.__connectionConfig.backoffMultiplier, retryCount),
-                        this.__connectionConfig.maxDelay
-                    );
+                // Update streaming state based on active jobs
+                state.isStreaming = state.activeJobStreams.size > 0;
+                state.showTypingIndicator = state.isStreaming;
 
-                    state.retryCount = retryCount + 1;
-                    this.__perfMetrics.reconnects++;
+                // Only retry if connection was established (not a 404/500)
+                if (wasConnected || eventSource.readyState === EventSource.CONNECTING) {
+                    const currentRetry = state.jobRetryMap.get(jobId) || 0;
+                    state.jobRetryMap.set(jobId, currentRetry + 1);
 
-                    console.log(`Retrying connection (attempt ${state.retryCount}/${this.__connectionConfig.maxRetries}) in ${delay}ms`);
+                    // Exponential backoff: 1s, 2s, 4s, 8s, 16s
+                    const backoffDelay = Math.min(1000 * Math.pow(2, currentRetry), 16000);
 
-                    // Show retry message to user
-                    if (threadId === this.__currentThreadId) {
-                        this.__showError(`Connection lost. Retrying in ${Math.round(delay/1000)}s... (${state.retryCount}/${this.__connectionConfig.maxRetries})`, threadId);
-                    }
+                    console.log(`Retrying job ${jobId} in ${backoffDelay}ms (attempt ${currentRetry + 1}/5)`);
 
-                    // Retry with exponential backoff
                     setTimeout(() => {
-                        if (state.eventSource === null) { // Still not connected
-                            console.log('Attempting reconnection...');
-                            this.__streamResponse(message, threadId);
+                        // Only retry if not manually stopped
+                        if (!state.activeJobStreams.has(jobId)) {
+                            this.__connectToJobStream(jobId, threadId);
                         }
-                    }, delay);
+                    }, backoffDelay);
                 } else {
-                    // Max retries exceeded
-                    state.retryCount = 0;
-
-                    if (threadId === this.__currentThreadId) {
-                        this.__showError('Connection failed after multiple attempts. Please try again later.', threadId);
-                    }
+                    // Job not found or server error - don't retry
+                    console.warn('Job stream not available:', jobId);
+                    state.jobRetryMap.delete(jobId);
                 }
             };
+        }, async __reconnectToAllActiveJobs() {
+            try {
+                // Check active jobs for all sessions
+                for (const session of this.sessions) {
+                    await this.__reconnectToActiveJobs(session.id);
+                }
+            } catch (error) {
+                console.error('Error reconnecting to all active jobs:', error);
+            }
+        },
+
+        async __reconnectToActiveJobs(threadId) {
+            try {
+                const response = await fetch(`/api/jobs/active?threadId=${encodeURIComponent(threadId)}`);
+
+                if (!response.ok) {
+                    console.warn('Failed to fetch active jobs:', response.statusText);
+                    return;
+                }
+
+                const activeJobs = await response.json();
+
+                if (activeJobs && activeJobs.length > 0) {
+                    console.log(`Reconnecting to ${activeJobs.length} active job(s)`, activeJobs);
+
+                    const state = this.__getThreadState(threadId);
+                    state.isStreaming = true;
+                    state.showTypingIndicator = true;
+
+                    // Connect to all active jobs (they will all stream to the same thread)
+                    // The most recent job's ID is stored, but all will contribute events
+                    for (const job of activeJobs) {
+                        console.log('Connecting to job:', job.id, job.status);
+                        this.__connectToJobStream(job.id, threadId);
+                    }
+
+                    // Store the most recent job ID
+                    if (activeJobs.length > 0) {
+                        state.currentJobId = activeJobs[activeJobs.length - 1].id;
+                    }
+                }
+            } catch (error) {
+                console.error('Error reconnecting to active jobs:', error);
+            }
         },
 
         __handleEvent(event, eventSource, threadId) {
@@ -1459,31 +1629,26 @@ document.addEventListener('alpine:init', () => {
                     break;
 
                 case 'RUN_FINISHED':
-                    // Run completed successfully
+                    // Run completed
+                    state.activeJobStreams.clear();
+                    state.jobRetryMap.clear();
+                    state.currentJobId = null;
                     state.isStreaming = false;
-                    state.eventSource = null;
-                    state.retryCount = 0; // Reset retry counter on success
-                    eventSource.close();
-
-                    // Production: Log successful completion
-                    console.log('Run completed successfully', {
-                        threadId,
-                        metrics: this.__perfMetrics
-                    });
-                    break;
-
-                case 'RUN_ERROR':
-                    // Handle error
-                    console.error('Run error:', event.message);
                     state.showTypingIndicator = false;
+                    state.eventSource = null;
+                    state.retryCount = 0;
+
+                    eventSource.close();
+                    break; case 'RUN_ERROR':
+                    console.error('Run error:', event.message);
+
+                    state.activeJobStreams.clear();
                     state.isStreaming = false;
+                    state.showTypingIndicator = false;
                     state.eventSource = null;
 
-                    // Only show error if this is the current thread
                     if (threadId === this.__currentThreadId) {
                         this.__showError(event.message || 'An error occurred', threadId);
-                        // Announce error with high priority
-                        this.__announce(`Error: ${event.message || 'An error occurred'}`, 'assertive');
                     }
                     eventSource.close();
                     break;
