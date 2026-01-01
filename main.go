@@ -51,6 +51,7 @@ func main() {
 	periodicTableTool := tools.NewPeriodicTableTool()
 	equationSolverTool := tools.NewEquationSolverTool()
 	plotTool := tools.NewPlotTool()
+	animateTool := tools.NewAnimateTool()
 
 	// Initialize instructor registry with tools
 	instructorRegistry := agent.NewInstructorRegistry(
@@ -63,6 +64,7 @@ func main() {
 		periodicTableTool,
 		equationSolverTool,
 		plotTool,
+		animateTool,
 	)
 
 	// Initialize and start worker pool with instructor registry

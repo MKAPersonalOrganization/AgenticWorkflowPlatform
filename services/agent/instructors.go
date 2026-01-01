@@ -228,8 +228,8 @@ If question requires multiple subjects, identify which should go FIRST:
 }
 
 // CreateMathInstructor creates the math instructor agent configuration
-func CreateMathInstructor(callAgentTool, whiteboardTool, calculatorTool, graphingTool, equationSolverTool, plotTool Tool) AgentConfig {
-	tools := []Tool{calculatorTool, graphingTool, equationSolverTool, plotTool, callAgentTool, whiteboardTool}
+func CreateMathInstructor(callAgentTool, whiteboardTool, calculatorTool, graphingTool, equationSolverTool, plotTool, animateTool Tool) AgentConfig {
+	tools := []Tool{calculatorTool, graphingTool, equationSolverTool, plotTool, animateTool, callAgentTool, whiteboardTool}
 
 	return AgentConfig{
 		Name:           "math-instructor",
@@ -1123,12 +1123,13 @@ type InstructorRegistry struct {
 	periodicTableTool  Tool
 	equationSolverTool Tool
 	plotTool           Tool
+	animateTool        Tool
 }
 
 // NewInstructorRegistry creates a new instructor registry with all tools
 func NewInstructorRegistry(
 	callAgentTool, whiteboardTool, calculatorTool, weatherTool,
-	graphingTool, unitConversionTool, periodicTableTool, equationSolverTool, plotTool Tool,
+	graphingTool, unitConversionTool, periodicTableTool, equationSolverTool, plotTool, animateTool Tool,
 ) *InstructorRegistry {
 	return &InstructorRegistry{
 		callAgentTool:      callAgentTool,
@@ -1140,6 +1141,7 @@ func NewInstructorRegistry(
 		periodicTableTool:  periodicTableTool,
 		equationSolverTool: equationSolverTool,
 		plotTool:           plotTool,
+		animateTool:        animateTool,
 	}
 }
 
@@ -1149,7 +1151,7 @@ func (r *InstructorRegistry) GetByName(name string) (AgentConfig, bool) {
 	case "student-facing-agent":
 		return CreateStudentFacingAgent(r.callAgentTool, r.whiteboardTool), true
 	case "math-instructor":
-		return CreateMathInstructor(r.callAgentTool, r.whiteboardTool, r.calculatorTool, r.graphingTool, r.equationSolverTool, r.plotTool), true
+		return CreateMathInstructor(r.callAgentTool, r.whiteboardTool, r.calculatorTool, r.graphingTool, r.equationSolverTool, r.plotTool, r.animateTool), true
 	case "physics-instructor":
 		return CreatePhysicsInstructor(r.callAgentTool, r.whiteboardTool, r.calculatorTool, r.weatherTool, r.unitConversionTool), true
 	case "chemistry-instructor":
@@ -1162,7 +1164,7 @@ func (r *InstructorRegistry) GetByName(name string) (AgentConfig, bool) {
 // GetAllInstructors returns all available instructor configurations
 func (r *InstructorRegistry) GetAllInstructors() []AgentConfig {
 	return []AgentConfig{
-		CreateMathInstructor(r.callAgentTool, r.whiteboardTool, r.calculatorTool, r.graphingTool, r.equationSolverTool, r.plotTool),
+		CreateMathInstructor(r.callAgentTool, r.whiteboardTool, r.calculatorTool, r.graphingTool, r.equationSolverTool, r.plotTool, r.animateTool),
 		CreatePhysicsInstructor(r.callAgentTool, r.whiteboardTool, r.calculatorTool, r.weatherTool, r.unitConversionTool),
 		CreateChemistryInstructor(r.callAgentTool, r.whiteboardTool, r.calculatorTool, r.periodicTableTool, r.unitConversionTool),
 	}
