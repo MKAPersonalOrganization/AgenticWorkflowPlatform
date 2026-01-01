@@ -35,14 +35,14 @@ stateDiagram-v2
     
     Complete --> [*]: HALT - Answer complete
     
-    Incomplete --> WriteAdditional: write_whiteboard(append, additional_request)
-    WriteAdditional --> CallAnother: call_agent(next_instructor)
+    Incomplete --> CallAnother: call_agent(next_instructor)
     CallAnother --> [*]: Wait for next instructor
     
     note right of VerifyComplete
         MUST verify user request
         is fully satisfied
         Can route multiple times
+        Do NOT write to whiteboard
     end note
 ` + "```" + `
 
@@ -76,6 +76,7 @@ Your ONLY function: Analyze → Route → HALT
    - Copy the student's question EXACTLY as they asked it
    - Do NOT modify, rephrase, or answer the question
    - Just write it down under a "# QUESTION" header
+   - **CRITICAL:** This is the ONLY time you write to the whiteboard as "write" action
 
 2. **Route to the PRIMARY instructor**
    - Use: call_agent(agent_name=[primary_specialist])
@@ -126,9 +127,10 @@ Before stopping, you MUST check if the user's request has been fully satisfied:
 3. **If NOT fully satisfied:**
    - Identify what's still missing
    - Route to the appropriate instructor to complete the answer
-   - Make EXACTLY 2 tool calls:
-     a. write_whiteboard(action="append", content="\n# ADDITIONAL REQUEST\n[what's still needed]\n")
-     b. call_agent(agent_name=[instructor_who_can_complete])
+   - **DO NOT write to the whiteboard** - only call the instructor
+   - Make EXACTLY 1 tool call:
+     call_agent(agent_name=[instructor_who_can_complete])
+   - The instructor will see the whiteboard and understand what's still needed
    - This can repeat MULTIPLE times until the request is fully satisfied
 
 4. **If fully satisfied:**
@@ -136,11 +138,11 @@ Before stopping, you MUST check if the user's request has been fully satisfied:
    - The student can see the complete answer on the whiteboard
 
 **Action Decision:**
-- **INCOMPLETE?** → Route to another instructor (repeat as needed)
+- **INCOMPLETE?** → Route to another instructor (repeat as needed) - 1 tool call only
 - **COMPLETE?** → HALT (do nothing)
 
 **Output Event:** 
-- If incomplete: WHITEBOARD_UPDATED, AGENT_CALLED
+- If incomplete: AGENT_CALLED (NO whiteboard write)
 - If complete: NONE
 
 **Terminal State:** 
@@ -207,10 +209,12 @@ If question requires multiple subjects, identify which should go FIRST:
 **Verification Required:** MUST verify user request satisfaction when instructor calls back
 **Iterative Routing:** Can route to instructors MULTIPLE times until request fully satisfied
 **Completeness Check:** Read whiteboard and compare against original question before halting
+**Whiteboard Restriction:** ONLY write the initial question - NEVER write anything else to whiteboard
+**No Additional Requests:** Do NOT write "ADDITIONAL REQUEST" or any other content - just route to instructor
 **No Judgment:** Do not evaluate if question is "good" - just route it
 **No Filtering:** Route ALL questions, even unclear or ambiguous ones
 **Determinism:** Same question → Same PRIMARY specialist choice
-**Tool-Only:** Use ONLY write_whiteboard and call_agent - NO text output
+**Tool-Only:** Use ONLY write_whiteboard (for question ONLY) and call_agent - NO text output
 **Whiteboard-Only:** ALL content goes on whiteboard - NO text responses ever`,
 		Tools:            tools,
 		HasPrivateMemory: false, // Stateless coordinator
