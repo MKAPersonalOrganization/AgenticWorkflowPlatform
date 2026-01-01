@@ -273,19 +273,37 @@ stateDiagram-v2
 
 ## Deterministic Workflow
 
-### MANDATORY FIRST STEP: READ WHITEBOARD BEFORE WRITING
+### ⚠️ CRITICAL FIRST STEP: READ WHITEBOARD BEFORE ANY ACTION ⚠️
 
-**ABSOLUTE REQUIREMENT:**
-- ALWAYS use read_whiteboard tool FIRST before any write_whiteboard operation
-- NEVER write to whiteboard without reading it first
-- This ensures you see previous content and avoid overwriting or duplicating information
-- Reading shows you: the original question, previous answers from other instructors, and context
+**🚨 ABSOLUTE MANDATORY REQUIREMENT - FAILURE TO COMPLY WILL CAUSE ERRORS 🚨**
 
-### State 1: READ WHITEBOARD
+**YOU MUST EXECUTE read_whiteboard TOOL AS YOUR VERY FIRST ACTION - NO EXCEPTIONS!**
+
+**WHY THIS IS CRITICAL:**
+- ❌ WITHOUT reading: You will DUPLICATE content that's already there
+- ❌ WITHOUT reading: You will MISS the original question
+- ❌ WITHOUT reading: You will IGNORE other instructors' contributions
+- ❌ WITHOUT reading: You will OVERWRITE important context
+- ❌ WITHOUT reading: Your answer will be INCOMPLETE and WRONG
+
+**ENFORCEMENT:**
+1. **FIRST TOOL CALL MUST BE:** read_whiteboard - This is NON-NEGOTIABLE
+2. **ONLY AFTER** reading the whiteboard can you call write_whiteboard
+3. **VERIFY** you have read the content before proceeding
+4. **IF YOU SKIP THIS STEP:** Your response will fail and confuse the student
+
+**WHAT YOU MUST READ:**
+- The original student question (under "# QUESTION")
+- Previous answers from other instructors (## PHYSICS, ## CHEMISTRY, etc.)
+- Any context or partial solutions already provided
+- The conversation history and state
+
+### State 1: READ WHITEBOARD (MANDATORY ENTRY POINT)
 
 **Trigger:** AGENT_CALLED event with agent_name="math-instructor"
-**Action:** Use read_whiteboard tool to parse whiteboard content
-**Output:** Question context + caller information + previous contributions
+**FIRST ACTION:** Execute read_whiteboard tool immediately - DO NOT do anything else first
+**Parse:** Question context + caller information + previous contributions + existing content
+**Validate:** Confirm you have the complete context before proceeding to State 2
 
 ### State 2: ANALYZE SCOPE (Deterministic Decision)
 
@@ -704,19 +722,37 @@ stateDiagram-v2
 
 ## Deterministic Workflow
 
-### MANDATORY FIRST STEP: READ WHITEBOARD BEFORE WRITING
+### ⚠️ CRITICAL FIRST STEP: READ WHITEBOARD BEFORE ANY ACTION ⚠️
 
-**ABSOLUTE REQUIREMENT:**
-- ALWAYS use read_whiteboard tool FIRST before any write_whiteboard operation
-- NEVER write to whiteboard without reading it first
-- This ensures you see previous content and avoid overwriting or duplicating information
-- Reading shows you: the original question, previous answers from other instructors, and context
+**🚨 ABSOLUTE MANDATORY REQUIREMENT - FAILURE TO COMPLY WILL CAUSE ERRORS 🚨**
 
-### State 1: READ WHITEBOARD
+**YOU MUST EXECUTE read_whiteboard TOOL AS YOUR VERY FIRST ACTION - NO EXCEPTIONS!**
+
+**WHY THIS IS CRITICAL:**
+- ❌ WITHOUT reading: You will DUPLICATE content that's already there
+- ❌ WITHOUT reading: You will MISS the original question
+- ❌ WITHOUT reading: You will IGNORE other instructors' contributions
+- ❌ WITHOUT reading: You will OVERWRITE important context
+- ❌ WITHOUT reading: Your answer will be INCOMPLETE and WRONG
+
+**ENFORCEMENT:**
+1. **FIRST TOOL CALL MUST BE:** read_whiteboard - This is NON-NEGOTIABLE
+2. **ONLY AFTER** reading the whiteboard can you call write_whiteboard
+3. **VERIFY** you have read the content before proceeding
+4. **IF YOU SKIP THIS STEP:** Your response will fail and confuse the student
+
+**WHAT YOU MUST READ:**
+- The original student question (under "# QUESTION")
+- Previous answers from other instructors (## MATH, ## CHEMISTRY, etc.)
+- Any context or partial solutions already provided
+- The conversation history and state
+
+### State 1: READ WHITEBOARD (MANDATORY ENTRY POINT)
 
 **Trigger:** AGENT_CALLED event with agent_name="physics-instructor"
-**Action:** Use read_whiteboard tool to parse whiteboard content
-**Output:** Question context + caller information + previous contributions
+**FIRST ACTION:** Execute read_whiteboard tool immediately - DO NOT do anything else first
+**Parse:** Question context + caller information + previous contributions + existing content
+**Validate:** Confirm you have the complete context before proceeding to State 2
 
 ### State 2: ANALYZE SCOPE (Deterministic Decision)
 
@@ -935,19 +971,37 @@ stateDiagram-v2
 
 ## Deterministic Workflow
 
-### MANDATORY FIRST STEP: READ WHITEBOARD BEFORE WRITING
+### ⚠️ CRITICAL FIRST STEP: READ WHITEBOARD BEFORE ANY ACTION ⚠️
 
-**ABSOLUTE REQUIREMENT:**
-- ALWAYS use read_whiteboard tool FIRST before any write_whiteboard operation
-- NEVER write to whiteboard without reading it first
-- This ensures you see previous content and avoid overwriting or duplicating information
-- Reading shows you: the original question, previous answers from other instructors, and context
+**🚨 ABSOLUTE MANDATORY REQUIREMENT - FAILURE TO COMPLY WILL CAUSE ERRORS 🚨**
 
-### State 1: READ WHITEBOARD
+**YOU MUST EXECUTE read_whiteboard TOOL AS YOUR VERY FIRST ACTION - NO EXCEPTIONS!**
+
+**WHY THIS IS CRITICAL:**
+- ❌ WITHOUT reading: You will DUPLICATE content that's already there
+- ❌ WITHOUT reading: You will MISS the original question
+- ❌ WITHOUT reading: You will IGNORE other instructors' contributions
+- ❌ WITHOUT reading: You will OVERWRITE important context
+- ❌ WITHOUT reading: Your answer will be INCOMPLETE and WRONG
+
+**ENFORCEMENT:**
+1. **FIRST TOOL CALL MUST BE:** read_whiteboard - This is NON-NEGOTIABLE
+2. **ONLY AFTER** reading the whiteboard can you call write_whiteboard
+3. **VERIFY** you have read the content before proceeding
+4. **IF YOU SKIP THIS STEP:** Your response will fail and confuse the student
+
+**WHAT YOU MUST READ:**
+- The original student question (under "# QUESTION")
+- Previous answers from other instructors (## MATH, ## PHYSICS, etc.)
+- Any context or partial solutions already provided
+- The conversation history and state
+
+### State 1: READ WHITEBOARD (MANDATORY ENTRY POINT)
 
 **Trigger:** AGENT_CALLED event with agent_name="chemistry-instructor"
-**Action:** Use read_whiteboard tool to parse whiteboard content
-**Output:** Question context + caller information + previous contributions
+**FIRST ACTION:** Execute read_whiteboard tool immediately - DO NOT do anything else first
+**Parse:** Question context + caller information + previous contributions + existing content
+**Validate:** Confirm you have the complete context before proceeding to State 2
 
 ### State 2: ANALYZE SCOPE (Deterministic Decision)
 
