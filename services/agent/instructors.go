@@ -200,6 +200,7 @@ stateDiagram-v2
 - Explain reasoning for each step
 - Use mathematical notation clearly
 - **ALWAYS use markdown format**
+- **For math equations use dollar signs NOT brackets**: Write equations between dollar signs (one dollar for inline, two dollars for display). Example: The equation followed by two dollar signs on new lines for display mode
 
 ## Invariants (Enforced)
 
@@ -319,6 +320,7 @@ stateDiagram-v2
 - Physical intuition before formulas
 - Connect theory to phenomena
 - **ALWAYS use markdown format**
+- **For math equations use dollar signs NOT brackets**: Write equations between dollar signs (one dollar for inline, two dollars for display). Example: The equation followed by two dollar signs on new lines for display mode
 
 ## Invariants (Enforced)
 
@@ -438,6 +440,50 @@ stateDiagram-v2
 - Real-world chemical examples
 - Explain reaction mechanisms step-by-step
 - **ALWAYS use markdown format**
+- **For math equations use dollar signs NOT brackets**: Write equations between dollar signs (one dollar for inline, two dollars for display). Example: The equation followed by two dollar signs on new lines for display mode
+- **For chemistry structures use SMILES notation**: Use SMILES (Simplified Molecular Input Line Entry System) to render molecular structures
+
+### Chemistry Rendering Examples
+
+**Inline SMILES notation:**
+Use <smiles>SMILES_STRING</smiles> tags for inline chemistry structures.
+
+Example: Water is <smiles>O</smiles>, Ethanol is <smiles>CCO</smiles>
+
+**Block SMILES notation:**
+Use code blocks with smiles language for larger structures (use three backticks with smiles):
+
+` + "```" + `smiles
+CC(C)CC1=CC=C(C=C1)C(C)C
+` + "```" + `
+
+**Common SMILES Examples:**
+- Water: <smiles>O</smiles>
+- Methane: <smiles>C</smiles>
+- Ethanol: <smiles>CCO</smiles>
+- Acetic acid: <smiles>CC(=O)O</smiles>
+- Benzene: <smiles>c1ccccc1</smiles>
+- Glucose: <smiles>OC[CH]1OC(O)[CH](O)[CH](O)[CH]1O</smiles>
+- Aspirin: <smiles>CC(=O)Oc1ccccc1C(=O)O</smiles>
+- Caffeine: <smiles>CN1C=NC2=C1C(=O)N(C(=O)N2C)C</smiles>
+- DNA base Adenine: <smiles>c1nc(c2c(n1)ncn2)N</smiles>
+
+**When to use SMILES:**
+- Showing molecular structures in organic chemistry
+- Illustrating reaction mechanisms
+- Comparing isomers or conformers
+- Teaching functional groups
+- Demonstrating chemical bonding
+
+**SMILES Notation Rules:**
+- Atoms: C (carbon), N (nitrogen), O (oxygen), etc.
+- Single bonds: implicit (CC is ethane)
+- Double bonds: = (C=C is ethene)
+- Triple bonds: # (C#C is ethyne)
+- Aromatic: lowercase (c1ccccc1 is benzene)
+- Branches: parentheses (CC(C)C is isobutane)
+- Rings: numbers for closure (C1CCCCC1 is cyclohexane)
+- Stereochemistry: Use [CH] notation instead of @ for chiral centers
 
 ## Invariants (Enforced)
 

@@ -21,8 +21,22 @@ templ ChatInputScreen() {
 			<title>Chat</title>
 			<link rel="icon" type="image/svg+xml" href="/assets/images/logo.svg"/>
 			<link rel="stylesheet" href="/assets/css/output.css"/>
-			<script type="module" src="/assets/js/chat.js"></script>
 			<script src="https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js"></script>
+			<script>
+			let script = document.createElement('script');
+			script.src = "https://cdn.jsdelivr.net/npm/mathpix-markdown-it@1.3.6/es5/bundle.js";
+			document.head.append(script);
+
+			script.onload = function() {
+				const isLoaded = window.loadMathJax();
+				if (isLoaded) {
+					console.log('Mathpix styles loaded successfully');
+				} else {
+					console.error('Failed to load Mathpix styles');
+				}
+			}
+		</script>
+			<script type="module" src="/assets/js/chat.js"></script>
 			<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 			@input.Script()
 			@collapsible.Script()
