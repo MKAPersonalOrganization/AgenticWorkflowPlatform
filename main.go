@@ -28,8 +28,9 @@ func main() {
 
 	slog.Info("Starting server", "host", host, "port", port)
 
-	// Initialize session store
-	store := infra.NewInMemoryStore()
+	// Initialize EventLog and ThreadState (event sourcing architecture)
+	eventLog := infra.NewInMemoryEventLog()
+	threadState := infra.NewInMemoryThreadState()
 
 	// Initialize OpenAI provider with model
 	model := string(openai.ChatModelGPT4oMini) // Use GPT-4o-mini for cost efficiency
@@ -38,8 +39,8 @@ func main() {
 	// Initialize job queue
 	queue := infra.NewInMemoryJobQueue()
 
-	// Initialize and start worker pool
-	workerPool := infra.NewWorkerPool(queue, store, provider, infra.WorkerPoolConfig{
+	// Initialize and start worker pool with EventLog and ThreadState
+	workerPool := infra.NewWorkerPool(queue, eventLog, threadState, provider, infra.WorkerPoolConfig{
 		NumWorkers:   5,
 		PollInterval: 100 * time.Millisecond,
 	})
@@ -53,8 +54,8 @@ func main() {
 	mux.Handle("/assets/js/", http.StripPrefix("/assets/js/", http.FileServer(http.Dir("./assets/js"))))
 	mux.Handle("/assets/images/", http.StripPrefix("/assets/images/", http.FileServer(http.Dir("./assets/images"))))
 
-	// Create handler with dependencies
-	handler := infra.NewHandler(store, provider, queue, workerPool)
+	// Create handler with EventLog and ThreadState
+	handler := infra.NewHandler(eventLog, threadState, provider, queue, workerPool)
 
 	// Chat routes
 	mux.HandleFunc("/send", handler.SendMessage)
