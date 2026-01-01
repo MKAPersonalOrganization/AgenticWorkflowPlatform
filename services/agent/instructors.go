@@ -199,8 +199,86 @@ stateDiagram-v2
 - Show all algebraic manipulations
 - Explain reasoning for each step
 - Use mathematical notation clearly
-- **ALWAYS use markdown format**
-- **For math equations use dollar signs NOT brackets**: Write equations between dollar signs (one dollar for inline, two dollars for display). Example: The equation followed by two dollar signs on new lines for display mode
+- **ALWAYS use markdown format with proper LaTeX syntax**
+
+### Mathematical Equation Rendering
+
+**Inline Math (within text):**
+- Use single dollar signs: $x^2 + y^2 = z^2$
+- Or use backslash parentheses: \\(E = mc^2\\)
+
+**Display Math (centered, separate line):**
+- Use double dollar signs on separate lines:
+
+$$
+x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}
+$$
+
+- Or use backslash brackets:
+
+\\[
+F = ma
+\\]
+
+**Numbered Equations (for reference):**
+Use the equation environment:
+
+\\begin{equation}
+E = mc^2
+\\label{eq:einstein}
+\\end{equation}
+
+Reference with: See equation \\ref{eq:einstein} or \\eqref{eq:einstein}
+
+**Unnumbered Equations:**
+
+\\begin{equation*}
+a^2 + b^2 = c^2
+\\end{equation*}
+
+**Multiple Aligned Equations:**
+Use align for multi-line equations with alignment:
+
+\\begin{align}
+x &= a + b \\\\
+y &= c + d \\\\
+z &= e + f
+\\end{align}
+
+Use align* for unnumbered:
+
+\\begin{align*}
+F_x &= ma_x \\\\
+F_y &= ma_y
+\\end{align*}
+
+**Split Long Equations:**
+
+\\begin{split}
+a &= b + c - d \\\\
+  &\\quad + e - f \\\\
+  &= g + h
+\\end{split}
+
+**Multiple Equations (ungrouped):**
+
+\\begin{gather}
+a_1 = b_1 + c_1 \\\\
+a_2 = b_2 + c_2
+\\end{gather}
+
+**Custom Equation Tags:**
+
+$$
+\\frac{x(x^{2n} - x^{-2n})}{x^{2n} + x^{-2n}}
+\\tag{A.1}
+$$
+
+### Text Formatting
+- Bold: **text** or \\textbf{text}
+- Italic: *text* or \\textit{text}
+- Sections: Use ## for headings or \\section{Title}
+- Subsections: ### or \\subsection{Title}
 
 ## Invariants (Enforced)
 
@@ -319,8 +397,69 @@ stateDiagram-v2
 - Analogies for abstract concepts
 - Physical intuition before formulas
 - Connect theory to phenomena
-- **ALWAYS use markdown format**
-- **For math equations use dollar signs NOT brackets**: Write equations between dollar signs (one dollar for inline, two dollars for display). Example: The equation followed by two dollar signs on new lines for display mode
+- **ALWAYS use markdown format with proper LaTeX syntax**
+
+### Physics Equation Rendering
+
+**Inline Math (within explanations):**
+- Use single dollar signs: The force $F = ma$ acts on the object
+- Or backslash parentheses: Newton's law \\(F = ma\\) states...
+
+**Display Math (key equations):**
+Use double dollar signs on separate lines:
+
+$$
+F = G\\frac{m_1 m_2}{r^2}
+$$
+
+Or backslash brackets:
+
+\\[
+E_k = \\frac{1}{2}mv^2
+\\]
+
+**Numbered Physics Laws:**
+Use equation environment for important laws:
+
+\\begin{equation}
+F = ma
+\\label{eq:newton2}
+\\end{equation}
+
+As shown in Newton's second law \\eqref{eq:newton2}...
+
+**Vector Notation:**
+- Use \\vec for vectors: $\\vec{F}$, $\\vec{v}$, $\\vec{a}$
+- Or bold: $\\mathbf{F}$, $\\mathbf{v}$
+
+**Multiple Related Equations:**
+Use align for conservation laws or related formulas:
+
+\\begin{align}
+E_{kinetic} &= \\frac{1}{2}mv^2 \\\\
+E_{potential} &= mgh \\\\
+E_{total} &= E_{kinetic} + E_{potential}
+\\end{align}
+
+**Maxwell's Equations Example:**
+
+\\begin{align}
+\\nabla \\cdot \\mathbf{E} &= \\frac{\\rho}{\\epsilon_0} \\\\
+\\nabla \\cdot \\mathbf{B} &= 0 \\\\
+\\nabla \\times \\mathbf{E} &= -\\frac{\\partial \\mathbf{B}}{\\partial t} \\\\
+\\nabla \\times \\mathbf{B} &= \\mu_0\\mathbf{J} + \\mu_0\\epsilon_0\\frac{\\partial \\mathbf{E}}{\\partial t}
+\\end{align}
+
+**Units and Dimensions:**
+- Always include units: The velocity is $v = 10$ m/s
+- Use \\text for units in equations: $E = 50$ \\text{ J}
+
+### Physics-Specific Formatting
+- Use subscripts for indices: $v_x$, $F_g$, $E_k$
+- Use superscripts for powers: $r^2$, $t^3$
+- Greek letters: $\\theta$, $\\omega$, $\\lambda$, $\\rho$
+- Derivatives: $\\frac{dx}{dt}$ or $\\frac{d^2x}{dt^2}$
+- Partial derivatives: $\\frac{\\partial f}{\\partial x}$
 
 ## Invariants (Enforced)
 
@@ -439,9 +578,45 @@ stateDiagram-v2
 - Micro to macro connections
 - Real-world chemical examples
 - Explain reaction mechanisms step-by-step
-- **ALWAYS use markdown format**
-- **For math equations use dollar signs NOT brackets**: Write equations between dollar signs (one dollar for inline, two dollars for display). Example: The equation followed by two dollar signs on new lines for display mode
-- **For chemistry structures use SMILES notation**: Use SMILES (Simplified Molecular Input Line Entry System) to render molecular structures
+- **ALWAYS use markdown format with proper LaTeX and SMILES syntax**
+
+### Chemistry Equation Rendering
+
+**Chemical Equations (use LaTeX):**
+For balanced chemical equations, use normal math mode:
+
+$$
+2H_2 + O_2 \\rightarrow 2H_2O
+$$
+
+Or with reaction arrows:
+
+$$
+CH_4 + 2O_2 \\xrightarrow{\\text{combustion}} CO_2 + 2H_2O
+$$
+
+**Equilibrium Reactions:**
+
+$$
+N_2 + 3H_2 \\rightleftharpoons 2NH_3
+$$
+
+**Chemical Formulas in Text:**
+- Inline: The formula for water is $H_2O$
+- Subscripts: $CO_2$, $H_2SO_4$, $Ca(OH)_2$
+- Charges: $Na^+$, $SO_4^{2-}$, $Fe^{3+}$
+
+**Concentration and Chemistry Math:**
+
+$$
+K_{eq} = \\frac{[C]^c[D]^d}{[A]^a[B]^b}
+$$
+
+$$
+pH = -\\log[H^+]
+$$
+
+**For chemistry structures use SMILES notation**: Use SMILES (Simplified Molecular Input Line Entry System) to render molecular structures
 
 ### Chemistry Rendering Examples
 
