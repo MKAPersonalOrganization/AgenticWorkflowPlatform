@@ -1743,9 +1743,10 @@ document.addEventListener('alpine:init', () => {
                         state.messages[msgIndex].content = state.currentStreamingContent;
                     }
 
-                    // Auto-scroll only if this is the current thread
+                    // Throttled auto-scroll only if this is the current thread
+                    // This prevents excessive scroll adjustments during rapid streaming
                     if (threadId === this.__currentThreadId) {
-                        this.$nextTick(() => this.__scrollToBottom());
+                        this.__scrollToBottomThrottled();
                     }
                     break;
 
