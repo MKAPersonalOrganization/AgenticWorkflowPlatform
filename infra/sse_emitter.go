@@ -15,7 +15,7 @@ type SSEEventEmitter struct {
 }
 
 // NewSSEEventEmitter creates a new SSE event emitter
-func NewSSEEventEmitter(w http.ResponseWriter, f http.Flusher) agent.EventEmitter {
+func NewSSEEventEmitter(w http.ResponseWriter, f http.Flusher) EventEmitter {
 	return &SSEEventEmitter{
 		writer:  w,
 		flusher: f,

@@ -1,4 +1,4 @@
-package agent
+package infra
 
 // EventEmitter is an interface for emitting domain events
 type EventEmitter interface {

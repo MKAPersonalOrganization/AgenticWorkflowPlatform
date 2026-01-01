@@ -10,11 +10,11 @@ import (
 // UINotifier listens to domain events and notifies the UI
 // This separates business logic (domain events) from presentation logic (UI events)
 type UINotifier struct {
-	emitter agent.EventEmitter
+	emitter EventEmitter
 }
 
 // NewUINotifier creates a new UI notifier
-func NewUINotifier(emitter agent.EventEmitter) *UINotifier {
+func NewUINotifier(emitter EventEmitter) *UINotifier {
 	return &UINotifier{
 		emitter: emitter,
 	}

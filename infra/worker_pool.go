@@ -10,7 +10,6 @@ import (
 	"school-with-ai/domain"
 	"school-with-ai/infra/agui"
 	"school-with-ai/services/agent"
-	"school-with-ai/services/llm"
 )
 
 // WorkerPool manages a pool of workers that process jobs from the queue
@@ -18,7 +17,7 @@ type WorkerPool struct {
 	queue              domain.JobQueue
 	log                agent.EventLog
 	state              agent.ThreadState
-	provider           llm.Provider
+	provider           agent.Provider
 	instructorRegistry *agent.InstructorRegistry
 	numWorkers         int
 	pollInterval       time.Duration
@@ -44,7 +43,7 @@ type WorkerPoolConfig struct {
 }
 
 // NewWorkerPool creates a new worker pool
-func NewWorkerPool(queue domain.JobQueue, log agent.EventLog, state agent.ThreadState, provider llm.Provider, instructorRegistry *agent.InstructorRegistry, config WorkerPoolConfig) *WorkerPool {
+func NewWorkerPool(queue domain.JobQueue, log agent.EventLog, state agent.ThreadState, provider agent.Provider, instructorRegistry *agent.InstructorRegistry, config WorkerPoolConfig) *WorkerPool {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	if config.NumWorkers <= 0 {
@@ -394,7 +393,7 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 }
 
 // createChannelEmitter creates an event emitter that stores events in a buffer
-func (wp *WorkerPool) createChannelEmitter(jobID string) agent.EventEmitter {
+func (wp *WorkerPool) createChannelEmitter(jobID string) EventEmitter {
 	wp.mu.Lock()
 	defer wp.mu.Unlock()
 
@@ -443,7 +442,7 @@ func (wp *WorkerPool) CancelJob(jobID string) bool {
 }
 
 // emitMessagesSnapshot emits a MESSAGES_SNAPSHOT event
-func (wp *WorkerPool) emitMessagesSnapshot(emitter agent.EventEmitter, threadID string) {
+func (wp *WorkerPool) emitMessagesSnapshot(emitter EventEmitter, threadID string) {
 	sessionMessages := wp.state.Messages(threadID)
 
 	// Convert session messages to agui messages
@@ -467,7 +466,7 @@ func (wp *WorkerPool) emitMessagesSnapshot(emitter agent.EventEmitter, threadID 
 }
 
 // continueWithAgent runs the specified agent on the thread
-func (wp *WorkerPool) continueWithAgent(ctx context.Context, threadID, agentName string, emitter agent.EventEmitter, runID string) {
+func (wp *WorkerPool) continueWithAgent(ctx context.Context, threadID, agentName string, emitter EventEmitter, runID string) {
 	slog.Info("Continuing with agent", "threadID", threadID, "agent", agentName)
 
 	// Get agent config
