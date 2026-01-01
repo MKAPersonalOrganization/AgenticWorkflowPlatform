@@ -99,8 +99,9 @@ const LIFECYCLE_EVENT_TYPES = [
     'META_EVENT'
 ];
 
-// Initialize markdown-it with highlight.js integration
+// Initialize markdown-it with highlight.js and Mathpix integration
 let md = null;
+
 if (window.markdownit) {
     md = window.markdownit({
         html: true,
@@ -125,8 +126,28 @@ if (window.markdownit) {
  */
 function renderMarkdown(content) {
     if (!content) return '';
-    if (!md) return content; // fallback to plain text if markdown-it not loaded
-    return md.render(content);
+
+    // Use Mathpix renderer if available (supports LaTeX math with $$, \[\], etc.)
+    if (typeof window.markdownToHTML === 'function') {
+        try {
+            return window.markdownToHTML(content, {
+                htmlTags: true
+            });
+        } catch (e) {
+            console.error('Error rendering with Mathpix:', e);
+            // Fallback to regular markdown-it
+            if (md) {
+                return md.render(content);
+            }
+        }
+    }
+
+    // Fallback to regular markdown-it
+    if (md) {
+        return md.render(content);
+    }
+
+    return content;
 }
 
 /**
