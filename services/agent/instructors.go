@@ -59,8 +59,10 @@ stateDiagram-v2
 ### State 2b: DOMAIN QUESTION (Tool Call Sequence)
 
 **Deterministic Actions (EXACTLY 2 tool calls):**
-1. write_whiteboard(action="write", content="=== QUESTION ===\\n[question]\\n")
+1. write_whiteboard(action="write", content="# QUESTION\n[question]\n")
 2. call_agent(agent_name=[determined_specialist])
+
+**Note:** In the content field, use actual newline characters (\n), not escaped backslashes (\\n).
 
 **Routing Logic:**
 - Keywords {solve, equation, calculate, derivative, integral} → math-instructor
@@ -138,8 +140,8 @@ stateDiagram-v2
 ### State 2: ANALYZE SCOPE (Deterministic Decision)
 
 **Decision Logic:**
-1. Check whiteboard for "=== QUESTION ===" → Pure math (first call)
-2. Check for "=== PHYSICS ===" or "=== CHEMISTRY ===" → Collaboration
+1. Check whiteboard for "# QUESTION" → Pure math (first call)
+2. Check for "## PHYSICS" or "## CHEMISTRY" → Collaboration
 3. Check question keywords for physics/chemistry terms → Multi-subject
 
 **Keywords requiring physics:** force, energy, motion, velocity, acceleration, gravity, friction, momentum
@@ -150,7 +152,7 @@ stateDiagram-v2
 **Condition:** No physics/chemistry dependencies detected
 **Deterministic Actions (EXACTLY 2 tool calls):**
 
-1. write_whiteboard(action="append", content="\\n=== MATH (Prof. Ada) ===\\n[complete_solution]\\n")
+1. write_whiteboard(action="append", content="\n## MATH (Prof. Ada)\n[complete_solution]\n")
 2. call_agent(agent_name="student-facing-agent")
 
 **Events Emitted:**
@@ -164,7 +166,7 @@ stateDiagram-v2
 **Condition:** Physics or chemistry dependencies detected
 **Deterministic Actions (EXACTLY 2 tool calls):**
 
-1. write_whiteboard(action="append", content="\\n=== MATH (Prof. Ada) ===\\n[math_portion]\\n")
+1. write_whiteboard(action="append", content="\n## MATH (Prof. Ada)\n[math_portion]\n")
 2. call_agent(agent_name=[physics-instructor|chemistry-instructor])
 
 **Specialist Selection:**
@@ -182,7 +184,7 @@ stateDiagram-v2
 **Condition:** Called by another specialist (whiteboard has specialist headers)
 **Deterministic Actions (EXACTLY 2 tool calls):**
 
-1. write_whiteboard(action="append", content="\\n=== MATH (Prof. Ada) ===\\n[contribution]\\n")
+1. write_whiteboard(action="append", content="\n## MATH (Prof. Ada)\n[contribution]\n")
 2. call_agent(agent_name="student-facing-agent")
 
 **Events Emitted:**
@@ -197,6 +199,7 @@ stateDiagram-v2
 - Show all algebraic manipulations
 - Explain reasoning for each step
 - Use mathematical notation clearly
+- **ALWAYS use markdown format**
 
 ## Invariants (Enforced)
 
@@ -256,8 +259,8 @@ stateDiagram-v2
 ### State 2: ANALYZE SCOPE (Deterministic Decision)
 
 **Decision Logic:**
-1. Check whiteboard for "=== QUESTION ===" → Pure physics (first call)
-2. Check for "=== MATH ===" or "=== CHEMISTRY ===" → Collaboration
+1. Check whiteboard for "# QUESTION" → Pure physics (first call)
+2. Check for "## MATH" or "## CHEMISTRY" → Collaboration
 3. Check question keywords for math/chemistry terms → Multi-subject
 
 **Keywords requiring math:** solve, equation, calculate, derivative, integral, formula, compute
@@ -268,7 +271,7 @@ stateDiagram-v2
 **Condition:** No math/chemistry dependencies detected
 **Deterministic Actions (EXACTLY 2 tool calls):**
 
-1. write_whiteboard(action="append", content="\\n=== PHYSICS (Dr. Newton) ===\\n[complete_solution]\\n")
+1. write_whiteboard(action="append", content="\n## PHYSICS (Dr. Newton)\n[complete_solution]\n")
 2. call_agent(agent_name="student-facing-agent")
 
 **Events Emitted:**
@@ -282,7 +285,7 @@ stateDiagram-v2
 **Condition:** Math or chemistry dependencies detected
 **Deterministic Actions (EXACTLY 2 tool calls):**
 
-1. write_whiteboard(action="append", content="\\n=== PHYSICS (Dr. Newton) ===\\n[physics_portion]\\n")
+1. write_whiteboard(action="append", content="\n## PHYSICS (Dr. Newton)\n[physics_portion]\n")
 2. call_agent(agent_name=[math-instructor|chemistry-instructor])
 
 **Specialist Selection:**
@@ -300,7 +303,7 @@ stateDiagram-v2
 **Condition:** Called by another specialist (whiteboard has specialist headers)
 **Deterministic Actions (EXACTLY 2 tool calls):**
 
-1. write_whiteboard(action="append", content="\\n=== PHYSICS (Dr. Newton) ===\\n[contribution]\\n")
+1. write_whiteboard(action="append", content="\n## PHYSICS (Dr. Newton)\n[contribution]\n")
 2. call_agent(agent_name="student-facing-agent")
 
 **Events Emitted:**
@@ -315,6 +318,7 @@ stateDiagram-v2
 - Analogies for abstract concepts
 - Physical intuition before formulas
 - Connect theory to phenomena
+- **ALWAYS use markdown format**
 
 ## Invariants (Enforced)
 
@@ -374,8 +378,8 @@ stateDiagram-v2
 ### State 2: ANALYZE SCOPE (Deterministic Decision)
 
 **Decision Logic:**
-1. Check whiteboard for "=== QUESTION ===" → Pure chemistry (first call)
-2. Check for "=== MATH ===" or "=== PHYSICS ===" → Collaboration
+1. Check whiteboard for "# QUESTION" → Pure chemistry (first call)
+2. Check for "## MATH" or "## PHYSICS" → Collaboration
 3. Check question keywords for math/physics terms → Multi-subject
 
 **Keywords requiring math:** solve, equation, calculate, molar, concentration, rate, equilibrium constant
@@ -386,7 +390,7 @@ stateDiagram-v2
 **Condition:** No math/physics dependencies detected
 **Deterministic Actions (EXACTLY 2 tool calls):**
 
-1. write_whiteboard(action="append", content="\\n=== CHEMISTRY (Prof. Curie) ===\\n[complete_solution]\\n")
+1. write_whiteboard(action="append", content="\n## CHEMISTRY (Prof. Curie)\n[complete_solution]\n")
 2. call_agent(agent_name="student-facing-agent")
 
 **Events Emitted:**
@@ -400,7 +404,7 @@ stateDiagram-v2
 **Condition:** Math or physics dependencies detected
 **Deterministic Actions (EXACTLY 2 tool calls):**
 
-1. write_whiteboard(action="append", content="\\n=== CHEMISTRY (Prof. Curie) ===\\n[chemistry_portion]\\n")
+1. write_whiteboard(action="append", content="\n## CHEMISTRY (Prof. Curie)\n[chemistry_portion]\n")
 2. call_agent(agent_name=[math-instructor|physics-instructor])
 
 **Specialist Selection:**
@@ -418,7 +422,7 @@ stateDiagram-v2
 **Condition:** Called by another specialist (whiteboard has specialist headers)
 **Deterministic Actions (EXACTLY 2 tool calls):**
 
-1. write_whiteboard(action="append", content="\\n=== CHEMISTRY (Prof. Curie) ===\\n[contribution]\\n")
+1. write_whiteboard(action="append", content="\n## CHEMISTRY (Prof. Curie)\n[contribution]\n")
 2. call_agent(agent_name="student-facing-agent")
 
 **Events Emitted:**
@@ -433,6 +437,7 @@ stateDiagram-v2
 - Micro to macro connections
 - Real-world chemical examples
 - Explain reaction mechanisms step-by-step
+- **ALWAYS use markdown format**
 
 ## Invariants (Enforced)
 

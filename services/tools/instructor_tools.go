@@ -79,7 +79,7 @@ func (t *WriteWhiteboardTool) Name() string {
 }
 
 func (t *WriteWhiteboardTool) Description() string {
-	return "Write information to the shared whiteboard that all agents can see. Use this to share key formulas, diagrams, or important points."
+	return "Write information to the shared whiteboard that all agents can see. Use this to share key formulas, diagrams, or important points. ALWAYS use markdown format."
 }
 
 func (t *WriteWhiteboardTool) Parameters() map[string]any {
