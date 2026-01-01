@@ -99,6 +99,36 @@ const LIFECYCLE_EVENT_TYPES = [
     'META_EVENT'
 ];
 
+// Initialize markdown-it with highlight.js integration
+let md = null;
+if (window.markdownit) {
+    md = window.markdownit({
+        html: true,
+        linkify: true,
+        typographer: true,
+        breaks: true,
+        highlight: function (str, lang) {
+            if (window.hljs && lang && window.hljs.getLanguage(lang)) {
+                try {
+                    return window.hljs.highlight(str, { language: lang }).value;
+                } catch (__) { }
+            }
+            return ''; // use external default escaping
+        }
+    });
+}
+
+/**
+ * Render markdown content safely
+ * @param {string} content - The markdown content to render
+ * @returns {string} - Rendered HTML
+ */
+function renderMarkdown(content) {
+    if (!content) return '';
+    if (!md) return content; // fallback to plain text if markdown-it not loaded
+    return md.render(content);
+}
+
 /**
  * Chat Component
  * 
@@ -2094,6 +2124,19 @@ document.addEventListener('alpine:init', () => {
                     retryConfig: this.__connectionConfig
                 }
             };
+        },
+
+        // ============================================
+        // Markdown Rendering
+        // ============================================
+
+        /**
+         * Render markdown content to HTML
+         * @param {string} content - The markdown content to render
+         * @returns {string} - Rendered HTML
+         */
+        renderMarkdown(content) {
+            return renderMarkdown(content);
         }
     }));
 });
