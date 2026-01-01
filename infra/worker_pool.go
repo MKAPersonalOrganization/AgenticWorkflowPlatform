@@ -231,7 +231,7 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 		ThreadID: job.ThreadID,
 		RunID:    runID,
 	}
-	_ = emitter.Emit(runStartedEvent)	// Auto-generate thread title immediately if this is the first message
+	_ = emitter.Emit(runStartedEvent) // Auto-generate thread title immediately if this is the first message
 	thread, threadExists := wp.state.Get(job.ThreadID)
 	if threadExists && thread.Title == "New Chat" && len(thread.Messages) == 1 {
 		// Take first 50 characters of first user message as title
@@ -262,7 +262,7 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 			Name: "THREAD_TITLE_UPDATED",
 			Value: map[string]string{
 				"threadId": job.ThreadID,
-				"title": title,
+				"title":    title,
 			},
 		}
 		_ = emitter.Emit(customEvent)
@@ -464,7 +464,7 @@ func (wp *WorkerPool) emitMessagesSnapshot(emitter EventEmitter, threadID string
 		Messages: aguiMessages,
 	}
 
-	emitter.Emit(messagesSnapshotEvent)
+	_ = emitter.Emit(messagesSnapshotEvent)
 }
 
 // continueWithAgent runs the specified agent on the thread
@@ -557,7 +557,7 @@ Follow your state machine workflow:
 			Message: fmt.Sprintf("Agent %s failed: %v", agentName, err),
 			Code:    &errorCode,
 		}
-		emitter.Emit(errorEvent)
+		_ = emitter.Emit(errorEvent)
 		return
 	}
 

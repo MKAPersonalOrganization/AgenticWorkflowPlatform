@@ -146,13 +146,13 @@ func (h *Agent) runIteration(
 					},
 					MessageID: messageID,
 					Content:   completeContent,
-				AgentName: h.config.Name,
+					AgentName: h.config.Name,
+				}
+				_ = h.emitDomainEvent(evt, eventHandler)
 			}
-			_ = h.emitDomainEvent(evt, eventHandler)
-		}
-		return fmt.Errorf("client disconnected during streaming: %w", ctx.Err())
-	default:
-	}		// Check for errors
+			return fmt.Errorf("client disconnected during streaming: %w", ctx.Err())
+		default:
+		} // Check for errors
 		if err != nil {
 			return fmt.Errorf("stream error: %w", err)
 		}
