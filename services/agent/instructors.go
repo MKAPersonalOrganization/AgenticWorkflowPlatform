@@ -228,8 +228,8 @@ If question requires multiple subjects, identify which should go FIRST:
 }
 
 // CreateMathInstructor creates the math instructor agent configuration
-func CreateMathInstructor(callAgentTool, whiteboardTool, calculatorTool, graphingTool, equationSolverTool, plotTool, animateTool Tool) AgentConfig {
-	tools := []Tool{calculatorTool, graphingTool, equationSolverTool, plotTool, animateTool, callAgentTool, whiteboardTool}
+func CreateMathInstructor(callAgentTool, whiteboardTool, readWhiteboardTool, calculatorTool, graphingTool, equationSolverTool, plotTool, animateTool Tool) AgentConfig {
+	tools := []Tool{calculatorTool, graphingTool, equationSolverTool, plotTool, animateTool, readWhiteboardTool, callAgentTool, whiteboardTool}
 
 	return AgentConfig{
 		Name:           "math-instructor",
@@ -273,11 +273,19 @@ stateDiagram-v2
 
 ## Deterministic Workflow
 
+### MANDATORY FIRST STEP: READ WHITEBOARD BEFORE WRITING
+
+**ABSOLUTE REQUIREMENT:**
+- ALWAYS use read_whiteboard tool FIRST before any write_whiteboard operation
+- NEVER write to whiteboard without reading it first
+- This ensures you see previous content and avoid overwriting or duplicating information
+- Reading shows you: the original question, previous answers from other instructors, and context
+
 ### State 1: READ WHITEBOARD
 
 **Trigger:** AGENT_CALLED event with agent_name="math-instructor"
-**Action:** Parse whiteboard content
-**Output:** Question context + caller information
+**Action:** Use read_whiteboard tool to parse whiteboard content
+**Output:** Question context + caller information + previous contributions
 
 ### State 2: ANALYZE SCOPE (Deterministic Decision)
 
@@ -696,11 +704,19 @@ stateDiagram-v2
 
 ## Deterministic Workflow
 
+### MANDATORY FIRST STEP: READ WHITEBOARD BEFORE WRITING
+
+**ABSOLUTE REQUIREMENT:**
+- ALWAYS use read_whiteboard tool FIRST before any write_whiteboard operation
+- NEVER write to whiteboard without reading it first
+- This ensures you see previous content and avoid overwriting or duplicating information
+- Reading shows you: the original question, previous answers from other instructors, and context
+
 ### State 1: READ WHITEBOARD
 
 **Trigger:** AGENT_CALLED event with agent_name="physics-instructor"
-**Action:** Parse whiteboard content
-**Output:** Question context + caller information
+**Action:** Use read_whiteboard tool to parse whiteboard content
+**Output:** Question context + caller information + previous contributions
 
 ### State 2: ANALYZE SCOPE (Deterministic Decision)
 
@@ -919,11 +935,19 @@ stateDiagram-v2
 
 ## Deterministic Workflow
 
+### MANDATORY FIRST STEP: READ WHITEBOARD BEFORE WRITING
+
+**ABSOLUTE REQUIREMENT:**
+- ALWAYS use read_whiteboard tool FIRST before any write_whiteboard operation
+- NEVER write to whiteboard without reading it first
+- This ensures you see previous content and avoid overwriting or duplicating information
+- Reading shows you: the original question, previous answers from other instructors, and context
+
 ### State 1: READ WHITEBOARD
 
 **Trigger:** AGENT_CALLED event with agent_name="chemistry-instructor"
-**Action:** Parse whiteboard content
-**Output:** Question context + caller information
+**Action:** Use read_whiteboard tool to parse whiteboard content
+**Output:** Question context + caller information + previous contributions
 
 ### State 2: ANALYZE SCOPE (Deterministic Decision)
 
@@ -1116,6 +1140,7 @@ CC(C)CC1=CC=C(C=C1)C(C)C
 type InstructorRegistry struct {
 	callAgentTool      Tool
 	whiteboardTool     Tool
+	readWhiteboardTool Tool
 	calculatorTool     Tool
 	weatherTool        Tool
 	graphingTool       Tool
@@ -1128,12 +1153,13 @@ type InstructorRegistry struct {
 
 // NewInstructorRegistry creates a new instructor registry with all tools
 func NewInstructorRegistry(
-	callAgentTool, whiteboardTool, calculatorTool, weatherTool,
+	callAgentTool, whiteboardTool, readWhiteboardTool, calculatorTool, weatherTool,
 	graphingTool, unitConversionTool, periodicTableTool, equationSolverTool, plotTool, animateTool Tool,
 ) *InstructorRegistry {
 	return &InstructorRegistry{
 		callAgentTool:      callAgentTool,
 		whiteboardTool:     whiteboardTool,
+		readWhiteboardTool: readWhiteboardTool,
 		calculatorTool:     calculatorTool,
 		weatherTool:        weatherTool,
 		graphingTool:       graphingTool,
@@ -1151,7 +1177,7 @@ func (r *InstructorRegistry) GetByName(name string) (AgentConfig, bool) {
 	case "student-facing-agent":
 		return CreateStudentFacingAgent(r.callAgentTool, r.whiteboardTool), true
 	case "math-instructor":
-		return CreateMathInstructor(r.callAgentTool, r.whiteboardTool, r.calculatorTool, r.graphingTool, r.equationSolverTool, r.plotTool, r.animateTool), true
+		return CreateMathInstructor(r.callAgentTool, r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.graphingTool, r.equationSolverTool, r.plotTool, r.animateTool), true
 	case "physics-instructor":
 		return CreatePhysicsInstructor(r.callAgentTool, r.whiteboardTool, r.calculatorTool, r.weatherTool, r.unitConversionTool), true
 	case "chemistry-instructor":
@@ -1164,7 +1190,7 @@ func (r *InstructorRegistry) GetByName(name string) (AgentConfig, bool) {
 // GetAllInstructors returns all available instructor configurations
 func (r *InstructorRegistry) GetAllInstructors() []AgentConfig {
 	return []AgentConfig{
-		CreateMathInstructor(r.callAgentTool, r.whiteboardTool, r.calculatorTool, r.graphingTool, r.equationSolverTool, r.plotTool, r.animateTool),
+		CreateMathInstructor(r.callAgentTool, r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.graphingTool, r.equationSolverTool, r.plotTool, r.animateTool),
 		CreatePhysicsInstructor(r.callAgentTool, r.whiteboardTool, r.calculatorTool, r.weatherTool, r.unitConversionTool),
 		CreateChemistryInstructor(r.callAgentTool, r.whiteboardTool, r.calculatorTool, r.periodicTableTool, r.unitConversionTool),
 	}
