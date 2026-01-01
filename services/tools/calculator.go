@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -11,6 +12,39 @@ import (
 // CalculatorArgs represents the arguments for calculate tool
 type CalculatorArgs struct {
 	Expression string `json:"expression"`
+}
+
+// CalculatorTool implements the Tool interface for mathematical calculations
+type CalculatorTool struct{}
+
+// NewCalculatorTool creates a new calculator tool
+func NewCalculatorTool() *CalculatorTool {
+	return &CalculatorTool{}
+}
+
+func (c *CalculatorTool) Name() string {
+	return "calculate"
+}
+
+func (c *CalculatorTool) Description() string {
+	return "Perform mathematical calculations. Supports basic arithmetic (+, -, *, /), exponentiation (^), square root (sqrt), and parentheses."
+}
+
+func (c *CalculatorTool) Parameters() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"expression": map[string]any{
+				"type":        "string",
+				"description": "Mathematical expression to evaluate (e.g., '2 + 2', '15 * 3', 'sqrt(16)', '2^8')",
+			},
+		},
+		"required": []string{"expression"},
+	}
+}
+
+func (c *CalculatorTool) Invoke(ctx context.Context, arguments string) (string, error) {
+	return ExecuteCalculatorTool(arguments)
 }
 
 // ExecuteCalculatorTool evaluates a mathematical expression

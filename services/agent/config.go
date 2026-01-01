@@ -10,8 +10,8 @@ type AgentConfig struct {
 	Specialization string // Domain expertise (e.g., "math", "physics")
 
 	// Behavior
-	SystemPrompt string     // Instructions for how the agent should behave
-	Tools        []llm.Tool // Available tools for this agent
+	SystemPrompt string // Instructions for how the agent should behave
+	Tools        []Tool // Available tools for this agent (implements Tool interface)
 
 	// Collaboration (for multi-agent scenarios)
 	HasPrivateMemory bool // Whether agent maintains private memory (isolated)
@@ -24,7 +24,21 @@ func DefaultConfig(name string) AgentConfig {
 		Role:             "instructor",
 		Specialization:   "",
 		SystemPrompt:     "You are a helpful assistant.",
-		Tools:            []llm.Tool{},
+		Tools:            []Tool{},
 		HasPrivateMemory: false,
 	}
+}
+
+// ToLLMTools converts agent.Tool slice to llm.Tool slice for LLM providers
+func ToLLMTools(tools []Tool) []llm.Tool {
+	result := make([]llm.Tool, len(tools))
+	for i, t := range tools {
+		result[i] = llm.Tool{
+			Type:        "function",
+			Name:        t.Name(),
+			Description: t.Description(),
+			Parameters:  t.Parameters(),
+		}
+	}
+	return result
 }

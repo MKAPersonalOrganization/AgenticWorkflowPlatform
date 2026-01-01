@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 )
@@ -9,6 +10,44 @@ import (
 type WeatherArgs struct {
 	Location string `json:"location"`
 	Unit     string `json:"unit,omitempty"`
+}
+
+// WeatherTool implements the Tool interface for weather lookups
+type WeatherTool struct{}
+
+// NewWeatherTool creates a new weather tool
+func NewWeatherTool() *WeatherTool {
+	return &WeatherTool{}
+}
+
+func (w *WeatherTool) Name() string {
+	return "get_weather"
+}
+
+func (w *WeatherTool) Description() string {
+	return "Get current weather information for a location"
+}
+
+func (w *WeatherTool) Parameters() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"location": map[string]any{
+				"type":        "string",
+				"description": "The city and state, e.g. San Francisco, CA",
+			},
+			"unit": map[string]any{
+				"type":        "string",
+				"description": "Temperature unit (fahrenheit or celsius)",
+				"enum":        []string{"fahrenheit", "celsius"},
+			},
+		},
+		"required": []string{"location"},
+	}
+}
+
+func (w *WeatherTool) Invoke(ctx context.Context, arguments string) (string, error) {
+	return ExecuteWeatherTool(arguments)
 }
 
 // ExecuteWeatherTool simulates weather lookup

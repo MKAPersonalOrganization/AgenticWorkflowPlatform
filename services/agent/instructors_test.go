@@ -1,37 +1,54 @@
 package agent_test
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
 	"school-with-ai/services/agent"
-	"school-with-ai/services/llm"
 )
 
-func createMockTools() (handoffTool, whiteboardTool, calculatorTool llm.Tool) {
-	handoffTool = llm.Tool{Type: "function", Name: "call_agent", Description: "Call another agent", Parameters: map[string]interface{}{}}
-	whiteboardTool = llm.Tool{Type: "function", Name: "write_whiteboard", Description: "Write to whiteboard", Parameters: map[string]interface{}{}}
-	calculatorTool = llm.Tool{Type: "function", Name: "calculate", Description: "Calculate", Parameters: map[string]interface{}{}}
+// mockTool is a simple mock implementation of agent.Tool for testing
+type mockTool struct {
+	name        string
+	description string
+	parameters  map[string]any
+}
+
+func (m *mockTool) Name() string                                            { return m.name }
+func (m *mockTool) Description() string                                     { return m.description }
+func (m *mockTool) Parameters() map[string]any                              { return m.parameters }
+func (m *mockTool) Invoke(ctx context.Context, args string) (string, error) { return "{}", nil }
+
+func createMockTools() (handoffTool, whiteboardTool, calculatorTool, weatherTool, graphingTool, unitConversionTool, periodicTableTool, equationSolverTool agent.Tool) {
+	handoffTool = &mockTool{name: "call_agent", description: "Call another agent", parameters: map[string]any{}}
+	whiteboardTool = &mockTool{name: "write_whiteboard", description: "Write to whiteboard", parameters: map[string]any{}}
+	calculatorTool = &mockTool{name: "calculate", description: "Calculate", parameters: map[string]any{}}
+	weatherTool = &mockTool{name: "get_weather", description: "Get weather", parameters: map[string]any{}}
+	graphingTool = &mockTool{name: "plot_function", description: "Plot function", parameters: map[string]any{}}
+	unitConversionTool = &mockTool{name: "convert_units", description: "Convert units", parameters: map[string]any{}}
+	periodicTableTool = &mockTool{name: "lookup_element", description: "Lookup element", parameters: map[string]any{}}
+	equationSolverTool = &mockTool{name: "solve_equation", description: "Solve equation", parameters: map[string]any{}}
 	return
 }
 
 func TestInstructorConfigurations(t *testing.T) {
-	handoffTool, whiteboardTool, calculatorTool := createMockTools()
+	handoffTool, whiteboardTool, calculatorTool, _, graphingTool, _, _, equationSolverTool := createMockTools()
 
 	studentAgent := agent.CreateStudentFacingAgent(handoffTool, whiteboardTool)
 	if studentAgent.Name != "student-facing-agent" {
 		t.Errorf("Expected student agent name 'student-facing-agent', got '%s'", studentAgent.Name)
 	}
 
-	math := agent.CreateMathInstructor(handoffTool, whiteboardTool, calculatorTool)
+	math := agent.CreateMathInstructor(handoffTool, whiteboardTool, calculatorTool, graphingTool, equationSolverTool)
 	if math.Name != "math-instructor" {
 		t.Errorf("Expected math name 'math-instructor', got '%s'", math.Name)
 	}
 }
 
 func TestInstructorRegistry(t *testing.T) {
-	handoffTool, whiteboardTool, calculatorTool := createMockTools()
-	registry := agent.NewInstructorRegistry(handoffTool, whiteboardTool, calculatorTool)
+	handoffTool, whiteboardTool, calculatorTool, weatherTool, graphingTool, unitConversionTool, periodicTableTool, equationSolverTool := createMockTools()
+	registry := agent.NewInstructorRegistry(handoffTool, whiteboardTool, calculatorTool, weatherTool, graphingTool, unitConversionTool, periodicTableTool, equationSolverTool)
 
 	_, exists := registry.GetByName("math-instructor")
 	if !exists {
@@ -40,7 +57,7 @@ func TestInstructorRegistry(t *testing.T) {
 }
 
 func ExampleCreateMathInstructor() {
-	handoffTool, whiteboardTool, calculatorTool := createMockTools()
-	config := agent.CreateMathInstructor(handoffTool, whiteboardTool, calculatorTool)
+	handoffTool, whiteboardTool, calculatorTool, _, graphingTool, _, _, equationSolverTool := createMockTools()
+	config := agent.CreateMathInstructor(handoffTool, whiteboardTool, calculatorTool, graphingTool, equationSolverTool)
 	fmt.Printf("Name: %s\n", config.Name)
 }

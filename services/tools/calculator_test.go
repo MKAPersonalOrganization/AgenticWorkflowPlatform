@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 )
@@ -174,6 +175,97 @@ func TestEvaluateExpression(t *testing.T) {
 			}
 			if !tt.wantErr && got != tt.want {
 				t.Errorf("evaluateExpression() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCalculatorTool_Interface(t *testing.T) {
+	calc := NewCalculatorTool()
+
+	// Test Name
+	if calc.Name() != "calculate" {
+		t.Errorf("Name() = %s, want 'calculate'", calc.Name())
+	}
+
+	// Test Description
+	if calc.Description() == "" {
+		t.Error("Description() should not be empty")
+	}
+
+	// Test Parameters schema
+	params := calc.Parameters()
+	if params["type"] != "object" {
+		t.Errorf("Parameters type = %v, want 'object'", params["type"])
+	}
+
+	props, ok := params["properties"].(map[string]any)
+	if !ok {
+		t.Fatal("Parameters should have properties")
+	}
+	if _, ok := props["expression"]; !ok {
+		t.Error("Parameters should have 'expression' property")
+	}
+
+	required, ok := params["required"].([]string)
+	if !ok || len(required) != 1 || required[0] != "expression" {
+		t.Errorf("Parameters required = %v, want ['expression']", params["required"])
+	}
+}
+
+func TestCalculatorTool_Invoke(t *testing.T) {
+	calc := NewCalculatorTool()
+	ctx := context.Background()
+
+	// Test successful invocation
+	result, err := calc.Invoke(ctx, `{"expression": "2 + 2"}`)
+	if err != nil {
+		t.Fatalf("Invoke() unexpected error: %v", err)
+	}
+
+	var response struct {
+		Expression string  `json:"expression"`
+		Result     float64 `json:"result"`
+	}
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("Failed to parse result: %v", err)
+	}
+
+	if response.Result != 4 {
+		t.Errorf("Invoke() result = %v, want 4", response.Result)
+	}
+}
+
+func TestCalculatorTool_InvokeComplex(t *testing.T) {
+	calc := NewCalculatorTool()
+	ctx := context.Background()
+
+	tests := []struct {
+		name       string
+		expression string
+		want       float64
+	}{
+		{"sqrt", `{"expression": "sqrt(16)"}`, 4},
+		{"power", `{"expression": "2^10"}`, 1024},
+		{"complex", `{"expression": "(10 + 5) * 2"}`, 30},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := calc.Invoke(ctx, tt.expression)
+			if err != nil {
+				t.Fatalf("Invoke() error: %v", err)
+			}
+
+			var response struct {
+				Result float64 `json:"result"`
+			}
+			if err := json.Unmarshal([]byte(result), &response); err != nil {
+				t.Fatalf("Failed to parse result: %v", err)
+			}
+
+			if response.Result != tt.want {
+				t.Errorf("Invoke() result = %v, want %v", response.Result, tt.want)
 			}
 		})
 	}
