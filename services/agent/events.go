@@ -24,6 +24,7 @@ type ToolCallStartEvent struct {
 	ToolCallID      string
 	ToolCallName    string
 	ParentMessageID string
+	AgentName       string
 }
 
 // ToolCallArgsEvent contains a delta of tool call arguments

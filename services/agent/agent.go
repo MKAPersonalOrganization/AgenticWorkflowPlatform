@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -13,10 +14,10 @@ import (
 // Agent handles processing of user messages using pure event sourcing
 // It ONLY emits domain events - no UI concerns
 type Agent struct {
+	config   AgentConfig
 	provider llm.Provider
 	log      EventLog
 	state    ThreadState
-	tools    []llm.Tool
 }
 
 // Option is a functional option for configuring Agent
@@ -25,7 +26,14 @@ type Option func(*Agent)
 // WithTools configures the agent with available tools
 func WithTools(tools []llm.Tool) Option {
 	return func(h *Agent) {
-		h.tools = tools
+		h.config.Tools = tools
+	}
+}
+
+// WithConfig configures the agent with a complete configuration
+func WithConfig(config AgentConfig) Option {
+	return func(h *Agent) {
+		h.config = config
 	}
 }
 
@@ -35,6 +43,7 @@ func NewAgent(provider llm.Provider, log EventLog, state ThreadState, opts ...Op
 		provider: provider,
 		log:      log,
 		state:    state,
+		config:   DefaultConfig("agent"), // Default config
 	}
 
 	// Apply options
@@ -89,10 +98,11 @@ func (h *Agent) runIteration(
 		return err
 	}
 
-	// Create streaming completion
+	// Create streaming completion with agent's system prompt
 	config := llm.CompletionConfig{
-		Messages: messages,
-		Tools:    h.tools,
+		Messages:     messages,
+		Tools:        h.config.Tools,
+		SystemPrompt: h.config.SystemPrompt,
 	}
 
 	streamIter := h.provider.CreateStreamingCompletion(ctx, config)
@@ -125,6 +135,7 @@ func (h *Agent) runIteration(
 					},
 					MessageID: messageID,
 					Content:   completeContent,
+					AgentName: h.config.Name,
 				}
 				h.emitDomainEvent(evt, eventHandler)
 			}
@@ -174,6 +185,7 @@ func (h *Agent) runIteration(
 						ToolCallID:      toolCallDelta.ID,
 						ToolCallName:    toolCallDelta.Name,
 						ParentMessageID: messageID,
+						AgentName:       h.config.Name,
 					}
 					if err := h.emitDomainEvent(toolStartEvent, eventHandler); err != nil {
 						return err
@@ -254,6 +266,7 @@ func (h *Agent) runIteration(
 			MessageID: messageID,
 			Content:   completeContent,
 			ToolCalls: toolCallsList,
+			AgentName: h.config.Name,
 		}
 		if err := h.emitDomainEvent(assistantEvent, eventHandler); err != nil {
 			return err
@@ -262,7 +275,7 @@ func (h *Agent) runIteration(
 		// For each tool call: execute and emit result
 		for _, toolCall := range toolCallsList {
 			// Execute the tool call
-			result, err := h.executeToolCall(toolCall)
+			result, err := h.executeToolCall(threadID, toolCall, eventHandler)
 			if err != nil {
 				result = fmt.Sprintf(`{"error": "%v"}`, err)
 			}
@@ -271,7 +284,7 @@ func (h *Agent) runIteration(
 			toolResultID := GenerateID()
 			toolEvent := &ToolCallExecutedEvent{
 				BaseEvent: BaseEvent{
-					Type:      "ToolCallExecuted",
+					Type:      "ToolCallStarted",
 					Timestamp: time.Now(),
 					ThreadID:  threadID,
 				},
@@ -281,6 +294,7 @@ func (h *Agent) runIteration(
 				ToolArguments:   toolCall.Function.Arguments,
 				ToolResult:      result,
 				ParentMessageID: messageID,
+				AgentName:       h.config.Name,
 			}
 			if err := h.emitDomainEvent(toolEvent, eventHandler); err != nil {
 				return err
@@ -288,6 +302,15 @@ func (h *Agent) runIteration(
 		}
 
 		// Automatically continue conversation with tool results
+		// Exception: If agent called another agent, stop iteration
+		// The worker pool will handle switching to the called agent
+		for _, toolCall := range toolCallsList {
+			if toolCall.Function.Name == "call_agent" {
+				// Agent's job is done - don't continue iteration
+				return nil
+			}
+		}
+
 		// Get updated messages including tool results from state
 		updatedMessages := h.state.Messages(threadID)
 
@@ -307,6 +330,7 @@ func (h *Agent) runIteration(
 		},
 		MessageID: messageID,
 		Content:   completeContent,
+		AgentName: h.config.Name,
 	}
 	if err := h.emitDomainEvent(assistantEvent, eventHandler); err != nil {
 		return err
@@ -338,13 +362,89 @@ func (h *Agent) emitDomainEvent(event Event, eventHandler DomainEventHandler) er
 }
 
 // executeToolCall executes a tool call and returns the result
-func (h *Agent) executeToolCall(toolCall domain.ToolCall) (string, error) {
-	switch toolCall.Function.Name {
+// For instructor tools, it also emits domain events
+func (h *Agent) executeToolCall(threadID string, toolCall domain.ToolCall, eventHandler DomainEventHandler) (string, error) {
+	toolName := toolCall.Function.Name
+
+	// Handle agent collaboration tools - they emit domain events
+	switch toolName {
+	case "call_agent":
+		// Parse the arguments to extract agent call info
+		var input struct {
+			AgentName string `json:"agent_name"`
+			Reason    string `json:"reason"`
+			Context   string `json:"context"`
+		}
+		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
+			return "", fmt.Errorf("failed to parse call_agent arguments: %w", err)
+		}
+
+		// Get current whiteboard state from thread
+		thread, exists := h.state.Get(threadID)
+		whiteboardState := ""
+		if exists {
+			whiteboardState = thread.WhiteboardContent
+		}
+
+		// Emit AgentCalledEvent
+		agentCalledEvent := NewAgentCalled(
+			threadID,
+			h.config.Name,
+			input.AgentName,
+			input.Reason,
+			input.Context,
+			whiteboardState,
+		)
+		if err := h.emitDomainEvent(agentCalledEvent, eventHandler); err != nil {
+			return "", err
+		}
+
+		return tools.ExecuteInstructorTool(toolName, toolCall.Function.Arguments)
+
+	case "write_whiteboard":
+		// Parse the arguments to extract whiteboard info
+		var input struct {
+			Content string `json:"content"`
+			Action  string `json:"action"`
+		}
+		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
+			return "", fmt.Errorf("failed to parse write_whiteboard arguments: %w", err)
+		}
+
+		// Emit WhiteboardUpdatedEvent
+		whiteboardEvent := NewWhiteboardUpdated(threadID, h.config.Name, input.Content, input.Action)
+		if err := h.emitDomainEvent(whiteboardEvent, eventHandler); err != nil {
+			return "", err
+		}
+
+		return tools.ExecuteInstructorTool(toolName, toolCall.Function.Arguments)
+
+	case "emit_event":
+		// Parse the arguments to extract event info
+		var input struct {
+			EventName   string                 `json:"event_name"`
+			Payload     map[string]interface{} `json:"payload"`
+			Description string                 `json:"description"`
+		}
+		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
+			return "", fmt.Errorf("failed to parse emit_event arguments: %w", err)
+		}
+
+		// Emit CustomEventEmittedEvent
+		customEvent := NewCustomEventEmitted(threadID, input.EventName, h.config.Name, input.Description, input.Payload)
+		if err := h.emitDomainEvent(customEvent, eventHandler); err != nil {
+			return "", err
+		}
+
+		return tools.ExecuteInstructorTool(toolName, toolCall.Function.Arguments)
+
+	// Regular tools
 	case "get_weather":
 		return tools.ExecuteWeatherTool(toolCall.Function.Arguments)
 	case "calculate":
 		return tools.ExecuteCalculatorTool(toolCall.Function.Arguments)
 	default:
-		return "", fmt.Errorf("unknown tool: %s", toolCall.Function.Name)
+		// Try instructor tools as fallback
+		return tools.ExecuteInstructorTool(toolName, toolCall.Function.Arguments)
 	}
 }

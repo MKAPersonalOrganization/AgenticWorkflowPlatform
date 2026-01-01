@@ -2,6 +2,7 @@ package infra
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -10,20 +11,20 @@ import (
 	"school-with-ai/infra/agui"
 	"school-with-ai/services/agent"
 	"school-with-ai/services/llm"
-	"school-with-ai/services/tools"
 )
 
 // WorkerPool manages a pool of workers that process jobs from the queue
 type WorkerPool struct {
-	queue        domain.JobQueue
-	log          agent.EventLog
-	state        agent.ThreadState
-	provider     llm.Provider
-	numWorkers   int
-	pollInterval time.Duration
-	ctx          context.Context
-	cancel       context.CancelFunc
-	wg           sync.WaitGroup
+	queue              domain.JobQueue
+	log                agent.EventLog
+	state              agent.ThreadState
+	provider           llm.Provider
+	instructorRegistry *agent.InstructorRegistry
+	numWorkers         int
+	pollInterval       time.Duration
+	ctx                context.Context
+	cancel             context.CancelFunc
+	wg                 sync.WaitGroup
 
 	// Event storage for jobs (jobID -> buffered events)
 	mu           sync.RWMutex
@@ -43,7 +44,7 @@ type WorkerPoolConfig struct {
 }
 
 // NewWorkerPool creates a new worker pool
-func NewWorkerPool(queue domain.JobQueue, log agent.EventLog, state agent.ThreadState, provider llm.Provider, config WorkerPoolConfig) *WorkerPool {
+func NewWorkerPool(queue domain.JobQueue, log agent.EventLog, state agent.ThreadState, provider llm.Provider, instructorRegistry *agent.InstructorRegistry, config WorkerPoolConfig) *WorkerPool {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	if config.NumWorkers <= 0 {
@@ -54,18 +55,19 @@ func NewWorkerPool(queue domain.JobQueue, log agent.EventLog, state agent.Thread
 	}
 
 	return &WorkerPool{
-		queue:            queue,
-		log:              log,
-		state:            state,
-		provider:         provider,
-		numWorkers:       config.NumWorkers,
-		pollInterval:     config.PollInterval,
-		ctx:              ctx,
-		cancel:           cancel,
-		eventBuffers:     make(map[string]*EventBuffer),
-		threadJobs:       make(map[string]string),
-		jobCancels:       make(map[string]context.CancelFunc),
-		threadRateLimits: make(map[string]*time.Ticker),
+		queue:              queue,
+		log:                log,
+		state:              state,
+		provider:           provider,
+		instructorRegistry: instructorRegistry,
+		numWorkers:         config.NumWorkers,
+		pollInterval:       config.PollInterval,
+		ctx:                ctx,
+		cancel:             cancel,
+		eventBuffers:       make(map[string]*EventBuffer),
+		threadJobs:         make(map[string]string),
+		jobCancels:         make(map[string]context.CancelFunc),
+		threadRateLimits:   make(map[string]*time.Ticker),
 	}
 }
 
@@ -275,23 +277,49 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 	// Get conversation history from state
 	messages := wp.state.Messages(job.ThreadID)
 
-	// Get available tools
-	availableTools := tools.GetAllTools()
+	// Determine which agent to use
+	var agentConfig agent.AgentConfig
+	thread, threadExists = wp.state.Get(job.ThreadID)
 
-	// Create agent (pure domain logic)
+	if !threadExists || thread.CurrentInstructor == "" {
+		// New thread - start with student-facing agent (coordinator)
+		agentConfig = wp.instructorRegistry.GetStudentFacingAgent()
+	} else {
+		// Use current agent
+		agentConfig, _ = wp.instructorRegistry.GetByName(thread.CurrentInstructor)
+	}
+
+	// Create agent with the determined config
 	agentInstance := agent.NewAgent(
 		wp.provider,
 		wp.log,
 		wp.state,
-		agent.WithTools(availableTools),
+		agent.WithConfig(agentConfig),
 	)
 
 	// Create UI notifier
 	notifier := NewUINotifier(emitter)
 
-	// Domain event handler: translates domain events to UI events
+	// Track agent events during the run
+	var nextAgent string
+	var agentEventOccurred bool
+
+	// Domain event handler: translates domain events to UI events AND tracks agent events
 	domainEventHandler := func(event agent.Event) error {
-		return notifier.HandleDomainEvent(event)
+		// First, handle UI translation
+		if err := notifier.HandleDomainEvent(event); err != nil {
+			return err
+		}
+
+		// Track agent call events (but don't act on them yet - wait for agent to finish)
+		switch e := event.(type) {
+		case *agent.AgentCalledEvent:
+			// Current agent called another agent - we'll continue after this run completes
+			nextAgent = e.CalledAgent
+			agentEventOccurred = true
+		}
+
+		return nil
 	}
 
 	// Process with agent - it emits domain events, handler translates to UI
@@ -340,6 +368,12 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 
 	// Emit final MESSAGES_SNAPSHOT with complete conversation
 	wp.emitMessagesSnapshot(emitter, job.ThreadID)
+
+	// Check if we need to continue with another agent
+	if agentEventOccurred && nextAgent != "" {
+		slog.Info("Continuing with called agent", "jobID", job.ID, "agent", nextAgent)
+		wp.continueWithAgent(ctx, job.ThreadID, nextAgent, emitter, runID)
+	}
 
 	// Send RUN_FINISHED event
 	runFinishedTimestamp := time.Now().UnixMilli()
@@ -430,6 +464,110 @@ func (wp *WorkerPool) emitMessagesSnapshot(emitter agent.EventEmitter, threadID 
 	}
 
 	emitter.Emit(messagesSnapshotEvent)
+}
+
+// continueWithAgent runs the specified agent on the thread
+func (wp *WorkerPool) continueWithAgent(ctx context.Context, threadID, agentName string, emitter agent.EventEmitter, runID string) {
+	slog.Info("Continuing with agent", "threadID", threadID, "agent", agentName)
+
+	// Get agent config
+	agentConfig, exists := wp.instructorRegistry.GetByName(agentName)
+	if !exists {
+		slog.Error("Agent not found", "agent", agentName)
+		return
+	}
+
+	// Create agent instance
+	agentInstance := agent.NewAgent(
+		wp.provider,
+		wp.log,
+		wp.state,
+		agent.WithConfig(agentConfig),
+	)
+
+	// Get updated messages
+	messages := wp.state.Messages(threadID)
+
+	// For specialist instructors, add a trigger message to prompt them to act
+	// The student-facing-agent doesn't need this since it's just coordinating
+	if agentName != "student-facing-agent" {
+		// Get whiteboard content
+		thread, exists := wp.state.Get(threadID)
+		if exists && thread.WhiteboardContent != "" {
+			// Add trigger message
+			triggerMsg := domain.Message{
+				ID:        agui.GenerateMessageID(),
+				Role:      "user",
+				Timestamp: time.Now(),
+				Content: fmt.Sprintf(`The whiteboard has been updated for you to review. Please read it and provide your expert answer.
+
+WHITEBOARD CONTENT:
+%s
+
+Follow your state machine workflow:
+1. Read and understand the content on the whiteboard
+2. Write your contribution to the whiteboard using write_whiteboard with action="append"
+3. Decide next action:
+   - IF your answer is complete AND no other specialist needed: call_agent(agent_name="student-facing-agent")
+   - IF you need another specialist's expertise: call_agent(agent_name=<specialist>)`, thread.WhiteboardContent),
+			}
+			messages = append(messages, triggerMsg)
+		}
+	}
+
+	// Generate message ID for agent's response
+	messageID := agui.GenerateMessageID()
+
+	// Create UI notifier
+	notifier := NewUINotifier(emitter)
+
+	// Track agent call events during the run
+	var nextAgent string
+	var agentCallOccurred bool
+
+	// Domain event handler for the agent
+	agentEventHandler := func(event agent.Event) error {
+		// Translate domain events to UI events
+		if err := notifier.HandleDomainEvent(event); err != nil {
+			return err
+		}
+
+		// Track agent call events (but don't act on them yet - wait for agent to finish)
+		if callEvent, ok := event.(*agent.AgentCalledEvent); ok {
+			nextAgent = callEvent.CalledAgent
+			agentCallOccurred = true
+		}
+
+		return nil
+	}
+
+	// Run the agent
+	if err := agentInstance.Run(ctx, threadID, messageID, messages, agentEventHandler); err != nil {
+		slog.Error("Agent failed", "agent", agentName, "error", err)
+
+		// Emit error event
+		errorTimestamp := time.Now().UnixMilli()
+		errorCode := "AGENT_ERROR"
+		errorEvent := &agui.RunErrorEvent{
+			BaseEvent: agui.BaseEvent{
+				Type:      "RUN_ERROR",
+				Timestamp: &errorTimestamp,
+			},
+			Message: fmt.Sprintf("Agent %s failed: %v", agentName, err),
+			Code:    &errorCode,
+		}
+		emitter.Emit(errorEvent)
+		return
+	}
+
+	// Emit updated messages snapshot
+	wp.emitMessagesSnapshot(emitter, threadID)
+
+	// Check if we need to continue with another agent (chained call)
+	if agentCallOccurred && nextAgent != "" {
+		slog.Info("Chained call to next agent", "from", agentName, "to", nextAgent)
+		wp.continueWithAgent(ctx, threadID, nextAgent, emitter, runID)
+	}
 }
 
 // EventBuffer stores events for a job and allows multiple consumers

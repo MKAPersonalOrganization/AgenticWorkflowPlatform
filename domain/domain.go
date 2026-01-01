@@ -10,6 +10,7 @@ type Message struct {
 	Timestamp  time.Time  `json:"timestamp"`
 	ToolCalls  []ToolCall `json:"toolCalls,omitempty"`  // For assistant messages with tool calls
 	ToolCallID string     `json:"toolCallId,omitempty"` // For tool result messages
+	AgentName  string     `json:"agentName,omitempty"`  // Name of the agent that created this message
 }
 
 // ToolCall represents a tool/function call made by the assistant
@@ -32,4 +33,18 @@ type Thread struct {
 	Messages  []Message `json:"messages"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
+
+	// Multi-agent instructor fields
+	CurrentInstructor string              `json:"currentInstructor,omitempty"`
+	InstructorHistory []InstructorSession `json:"instructorHistory,omitempty"`
+	WhiteboardContent string              `json:"whiteboardContent,omitempty"`
+}
+
+// InstructorSession tracks when an instructor was active
+type InstructorSession struct {
+	InstructorName string     `json:"instructorName"`
+	Specialization string     `json:"specialization,omitempty"`
+	StartedAt      time.Time  `json:"startedAt"`
+	EndedAt        *time.Time `json:"endedAt,omitempty"`
+	HandoffReason  string     `json:"handoffReason,omitempty"`
 }

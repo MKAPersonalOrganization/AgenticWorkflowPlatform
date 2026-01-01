@@ -246,11 +246,13 @@ type StepFinishedEvent struct {
 //   - toolCallId: Unique identifier for the tool call
 //   - toolCallName: Name of the tool being called
 //   - parentMessageId: Optional ID of the parent message
+//   - agentName: Name of the agent executing the tool call
 type ToolCallStartEvent struct {
 	BaseEvent
 	ToolCallID      string  `json:"toolCallId"`
 	ToolCallName    string  `json:"toolCallName"`
 	ParentMessageID *string `json:"parentMessageId,omitempty"`
+	AgentName       string  `json:"agentName"`
 }
 
 // ToolCallArgsEvent represents a chunk of argument data for a tool call.

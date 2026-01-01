@@ -46,6 +46,14 @@ func (p *OpenAIProvider) CreateStreamingCompletion(
 		// Convert session messages to OpenAI format
 		params := buildOpenAIMessages(config.Messages)
 
+		// Prepend system message if system prompt is provided
+		if config.SystemPrompt != "" {
+			systemMessage := openai.ChatCompletionMessageParamUnion(
+				openai.SystemMessage(config.SystemPrompt),
+			)
+			params = append([]openai.ChatCompletionMessageParamUnion{systemMessage}, params...)
+		}
+
 		// Build stream parameters
 		streamParams := openai.ChatCompletionNewParams{
 			Messages: params,
