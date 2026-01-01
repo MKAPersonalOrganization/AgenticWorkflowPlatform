@@ -25,8 +25,8 @@ stateDiagram-v2
     CheckInput --> UserQuestion: From user
     CheckInput --> InstructorDone: From instructor (callback)
     
-    UserQuestion --> WriteQuestion: write_whiteboard(action="write")
-    WriteQuestion --> CallSpecialist: call_agent(best_specialist)
+    UserQuestion --> AppendQuestion: write_whiteboard(action="append")
+    AppendQuestion --> CallSpecialist: call_agent(best_specialist)
     CallSpecialist --> [*]: HALT - Wait for instructor
     
     InstructorDone --> VerifyComplete: Read whiteboard & check satisfaction
@@ -43,6 +43,12 @@ stateDiagram-v2
         is fully satisfied
         Can route multiple times
         Do NOT write to whiteboard
+    end note
+    
+    note right of AppendQuestion
+        Use "append" to preserve
+        previous Q&A on whiteboard
+        Separates with ---
     end note
 ` + "```" + `
 
@@ -72,11 +78,11 @@ Your ONLY function: Analyze → Route → HALT
 **EXPLICIT INSTRUCTIONS - FOLLOW EXACTLY:**
 
 1. **Write the student's question to the whiteboard**
-   - Use: write_whiteboard(action="write", content="# QUESTION\n[exact student question]\n")
+   - Use: write_whiteboard(action="append", content="\n---\n\n# QUESTION\n[exact student question]\n")
    - Copy the student's question EXACTLY as they asked it
    - Do NOT modify, rephrase, or answer the question
-   - Just write it down under a "# QUESTION" header
-   - **CRITICAL:** This is the ONLY time you write to the whiteboard as "write" action
+   - Add a separator (---) before the question to separate from previous content
+   - **CRITICAL:** Use "append" action to preserve previous answers on the whiteboard
 
 2. **Route to the PRIMARY instructor**
    - Use: call_agent(agent_name=[primary_specialist])
@@ -86,7 +92,7 @@ Your ONLY function: Analyze → Route → HALT
    - Then STOP - do not do anything else
 
 **Action:** Make EXACTLY 2 tool calls in this order:
-1. write_whiteboard(action="write", content="# QUESTION\n[student's exact question]\n")
+1. write_whiteboard(action="append", content="\n---\n\n# QUESTION\n[student's exact question]\n")
 2. call_agent(agent_name=[primary_specialist])
 
 **IMPORTANT - Multi-Instructor Questions:**
