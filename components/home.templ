@@ -10,6 +10,7 @@ import "school-with-ai/components/popover"
 import "school-with-ai/components/textarea"
 import "school-with-ai/components/sidebar"
 import "school-with-ai/components/code"
+import "school-with-ai/components/whiteboard"
 
 templ ChatInputScreen() {
 	<!DOCTYPE html>
@@ -34,45 +35,52 @@ templ ChatInputScreen() {
 				@sidebar.Layout() {
 					<!-- Left Sidebar - Chat History -->
 					@threadhistory.ThreadHistory()
-					<!-- Main Content Area -->
-					<main class="flex-1 flex flex-col relative h-screen overflow-hidden">
-						<!-- Sidebar Toggle -->
-						<div class="absolute top-4 left-4 z-10">
-							@sidebar.Trigger()
-						</div>
-						<!-- Messages Container -->
-						<div
-							class="flex-1 overflow-y-auto scrollbar-thin"
-							x-ref="messageList"
-							role="log"
-							aria-live="polite"
-							aria-relevant="additions"
-							aria-label="Chat conversation"
-						>
-							<div x-show="!hasMessages && !isStreaming" class="h-full flex flex-col items-center justify-center">
-								<div class="flex flex-col items-center gap-8 w-full max-w-3xl mx-auto px-4">
-									<div class="flex flex-col items-center gap-4">
-										<img src="/assets/images/logo.svg" alt="Logo" class="w-64 h-64 object-contain"/>
-									</div> <!-- Centered Input Area -->
-									<div class="w-full">
-										@chatinput.ChatInput()
+					<!-- Main Content Area - Split Layout -->
+					<div class="flex-1 flex h-screen overflow-hidden">
+						<!-- Left Half - Chat -->
+						<main class="flex-1 flex flex-col relative overflow-hidden">
+							<!-- Sidebar Toggle -->
+							<div class="absolute top-4 left-4 z-10">
+								@sidebar.Trigger()
+							</div>
+							<!-- Messages Container -->
+							<div
+								class="flex-1 overflow-y-auto scrollbar-thin"
+								x-ref="messageList"
+								role="log"
+								aria-live="polite"
+								aria-relevant="additions"
+								aria-label="Chat conversation"
+							>
+								<div x-show="!hasMessages && !isStreaming" class="h-full flex flex-col items-center justify-center">
+									<div class="flex flex-col items-center gap-8 w-full max-w-3xl mx-auto px-4">
+										<div class="flex flex-col items-center gap-4">
+											<img src="/assets/images/logo.svg" alt="Logo" class="w-64 h-64 object-contain"/>
+										</div> <!-- Centered Input Area -->
+										<div class="w-full">
+											@chatinput.ChatInput()
+										</div>
 									</div>
 								</div>
+								<!-- When messages exist: regular message list -->
+								<div x-show="hasMessages || isStreaming" class="max-w-3xl mx-auto px-4 py-6">
+									<!-- Messages -->
+									@messagelist.MessageList()
+								</div>
 							</div>
-							<!-- When messages exist: regular message list -->
-							<div x-show="hasMessages || isStreaming" class="max-w-3xl mx-auto px-4 py-6">
-								<!-- Messages -->
-								@messagelist.MessageList()
+							<!-- Input Area - Agent Chat UI Style (only show when messages exist) -->
+							<div x-show="hasMessages || isStreaming" class="sticky bottom-0 flex flex-col items-center gap-8 bg-background">
+								<div class="mb-8 w-full">
+									@chatinput.ChatInput()
+								</div>
 							</div>
-						</div>
-						<!-- Input Area - Agent Chat UI Style (only show when messages exist) -->
-						<div x-show="hasMessages || isStreaming" class="sticky bottom-0 flex flex-col items-center gap-8 bg-background">
-							<div class="mb-8 w-full">
-								@chatinput.ChatInput()
-							</div>
-						</div>
-						@eventlog.EventLog()
-					</main>
+							@eventlog.EventLog()
+						</main>
+						<!-- Right Half - Whiteboard -->
+						<aside class="w-1/2 h-full border-l border-border" x-show="hasMessages || isStreaming" x-transition>
+							@whiteboard.Whiteboard()
+						</aside>
+					</div>
 				}
 			</div>
 		</body>

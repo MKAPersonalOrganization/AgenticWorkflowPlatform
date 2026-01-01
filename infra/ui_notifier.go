@@ -44,6 +44,13 @@ func (n *UINotifier) HandleDomainEvent(event agent.Event) error {
 	case *agent.ToolCallExecutedEvent:
 		return n.emitToolCallResult(evt)
 
+	// Agent collaboration events
+	case *agent.AgentCalledEvent:
+		return n.emitAgentCalled(evt)
+
+	case *agent.WhiteboardUpdatedEvent:
+		return n.emitWhiteboardUpdated(evt)
+
 	// Other domain events don't need UI events
 	default:
 		return nil
@@ -87,6 +94,7 @@ func (n *UINotifier) emitToolCallStart(evt *agent.ToolCallStartedEvent) error {
 		ToolCallID:      evt.ToolCallID,
 		ToolCallName:    evt.ToolCallName,
 		ParentMessageID: &parentMessageID,
+		AgentName:       evt.AgentName,
 	}
 	return n.emitter.Emit(uiEvent)
 }
@@ -140,6 +148,46 @@ func (n *UINotifier) emitToolCallResult(evt *agent.ToolCallExecutedEvent) error 
 		ToolCallID: evt.ToolCallID,
 		Content:    evt.ToolResult,
 		Role:       &role,
+	}
+	return n.emitter.Emit(uiEvent)
+}
+
+// Agent collaboration event emitters
+
+func (n *UINotifier) emitAgentCalled(evt *agent.AgentCalledEvent) error {
+	timestamp := time.Now().UnixMilli()
+	uiEvent := &agui.CustomEvent{
+		BaseEvent: agui.BaseEvent{
+			Type:      "CUSTOM",
+			Timestamp: &timestamp,
+		},
+		Name: "AGENT_CALLED",
+		Value: map[string]interface{}{
+			"callerAgent":     evt.CallerAgent,
+			"calledAgent":     evt.CalledAgent,
+			"reason":          evt.Reason,
+			"context":         evt.Context,
+			"whiteboardState": evt.WhiteboardState,
+			"timestamp":       evt.Timestamp.UnixMilli(),
+		},
+	}
+	return n.emitter.Emit(uiEvent)
+}
+
+func (n *UINotifier) emitWhiteboardUpdated(evt *agent.WhiteboardUpdatedEvent) error {
+	timestamp := time.Now().UnixMilli()
+	uiEvent := &agui.CustomEvent{
+		BaseEvent: agui.BaseEvent{
+			Type:      "CUSTOM",
+			Timestamp: &timestamp,
+		},
+		Name: "WHITEBOARD_UPDATED",
+		Value: map[string]interface{}{
+			"agentName": evt.AgentName,
+			"content":   evt.Content,
+			"action":    evt.Action,
+			"timestamp": evt.Timestamp.UnixMilli(),
+		},
 	}
 	return n.emitter.Emit(uiEvent)
 }

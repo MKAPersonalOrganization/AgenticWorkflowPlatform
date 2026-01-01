@@ -17,8 +17,37 @@ templ MessageList() {
 			>
 				<!-- User Message -->
 				@message.UserMessage()
-				<!-- Tool Call Message -->
-				<div x-show="message.type === 'tool_call'" class="my-2">
+				<!-- Agent-to-Agent Call (special styling) -->
+				<div x-show="message.type === 'tool_call' && message.name === 'call_agent'" class="my-2">
+					@alert.Alert(alert.Props{Class: "border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-950"}) {
+						<!-- Agent collaboration icon -->
+						<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+							<path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"></path>
+						</svg>
+						@alert.Title() {
+							<span class="flex items-center gap-2">
+								@badge.Badge(badge.Props{Variant: badge.VariantDefault, Class: "text-xs"}) {
+									<span x-text="message.agentName"></span>
+								}
+								<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+									<path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+								</svg>
+								@badge.Badge(badge.Props{Variant: badge.VariantDefault, Class: "text-xs"}) {
+									<span x-text="message.parsedArgs?.agent_name"></span>
+								}
+							</span>
+						}
+						@alert.Description() {
+							<div class="text-sm" x-text="message.parsedArgs?.reason || 'Agent collaboration'"></div>
+							<!-- Result -->
+							<div x-show="message.result !== null && message.result !== undefined" class="border-t pt-2 mt-2 text-xs text-muted-foreground">
+								<span x-text="message.result"></span>
+							</div>
+						}
+					}
+				</div>
+				<!-- Regular Tool Call Message (with result if available) -->
+				<div x-show="message.type === 'tool_call' && message.name !== 'call_agent'" class="my-2">
 					@alert.Alert(alert.Props{Class: "border-l-4 border-primary"}) {
 						<!-- Tool Icon -->
 						<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -26,7 +55,8 @@ templ MessageList() {
 						</svg>
 						@alert.Title() {
 							<span class="flex items-center gap-2">
-								<span>Calling tool:</span>
+								<span class="text-xs text-muted-foreground" x-text="message.agentName"></span>
+								<span>→</span>
 								@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "font-mono text-xs"}) {
 									<span x-text="message.name"></span>
 								}
@@ -38,36 +68,55 @@ templ MessageList() {
 							</span>
 						}
 						@alert.Description() {
-							<div x-show="message.status === 'streaming'">
+							<!-- Tool Arguments -->
+							<div x-show="message.status === 'streaming'" class="mb-3">
 								@skeleton.Skeleton(skeleton.Props{Class: "h-20 w-full"})
 							</div>
-							<div x-show="message.status === 'completed'">
+							<div x-show="message.status === 'completed'" class="mb-3">
 								@collapsible.Collapsible(collapsible.Props{Open: false}) {
 									@collapsible.Trigger(collapsible.TriggerProps{Class: "flex items-center gap-2 cursor-pointer hover:text-primary"}) {
 										<svg class="w-4 h-4 transition-transform [[data-tui-collapsible-state=open]_&]:rotate-90" fill="currentColor" viewBox="0 0 20 20">
 											<path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
 										</svg>
-										<span class="text-sm font-medium">View arguments</span>
+										<span class="text-sm font-medium">Arguments</span>
 									}
 									@collapsible.Content() {
-										<div class="mt-3">
+										<div class="mt-2">
 											<div x-html="`<pre><code class='language-json'>${JSON.stringify(message.parsedArgs, null, 2)}</code></pre>`"></div>
 										</div>
 									}
 								}
 							</div>
+							<!-- Tool Result (if available) -->
+							<div x-show="message.result !== null && message.result !== undefined" class="border-t pt-3 mt-3">
+								<div class="flex items-center gap-2 mb-2">
+									<svg class="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+										<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+									</svg>
+									<span class="text-sm font-semibold">Result</span>
+								</div>
+								<div class="relative">
+									<template x-if="isValidJSON(message.result)">
+										<div x-html="`<pre><code class='language-json'>${JSON.stringify(JSON.parse(message.result), null, 2)}</code></pre>`"></div>
+									</template>
+									<template x-if="!isValidJSON(message.result)">
+										<div x-html="`<pre><code class='language-text'>${message.result}</code></pre>`"></div>
+									</template>
+								</div>
+							</div>
 						}
 					}
 				</div>
-				<!-- Tool Result Message -->
+				<!-- Tool Result Message (orphaned - no matching tool call) -->
 				<div x-show="message.type === 'tool_result'" class="my-2">
 					@alert.Alert(alert.Props{Class: "border-l-4 border-primary"}) {
-						<!-- Success Icon -->
-						<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-							<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+						<!-- Processing Icon -->
+						<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+							<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+							<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
 						</svg>
 						@alert.Title() {
-							Tool result
+							Processing...
 						}
 						@alert.Description() {
 							<div class="relative mt-2">

@@ -56,6 +56,7 @@ type ToolCallStartedEvent struct {
 	ToolCallID      string `json:"toolCallId"`
 	ToolCallName    string `json:"toolCallName"`
 	ParentMessageID string `json:"parentMessageId"`
+	AgentName       string `json:"agentName"`
 }
 
 // ToolCallArgumentsStreamedEvent is emitted for each argument delta during streaming
@@ -77,6 +78,7 @@ type AssistantMessageCompletedEvent struct {
 	MessageID string            `json:"messageId"`
 	Content   string            `json:"content"`
 	ToolCalls []domain.ToolCall `json:"toolCalls,omitempty"`
+	AgentName string            `json:"agentName"`
 }
 
 // ToolCallExecutedEvent is emitted when a tool call is executed
@@ -88,12 +90,36 @@ type ToolCallExecutedEvent struct {
 	ToolArguments   string `json:"toolArguments"`
 	ToolResult      string `json:"toolResult"`
 	ParentMessageID string `json:"parentMessageId"` // ID of the assistant message that initiated the tool call
+	AgentName       string `json:"agentName"`
 }
 
 // ThreadTitleUpdatedEvent is emitted when a thread's title is updated
 type ThreadTitleUpdatedEvent struct {
 	BaseEvent
 	NewTitle string `json:"newTitle"`
+}
+
+// CustomEventEmittedEvent is emitted when an agent emits a custom event
+type CustomEventEmittedEvent struct {
+	BaseEvent
+	EventName   string                 `json:"eventName"`
+	Payload     map[string]interface{} `json:"payload"`
+	EmittedBy   string                 `json:"emittedBy"`   // Agent name that emitted the event
+	Description string                 `json:"description"` // Human-readable description
+}
+
+func NewCustomEventEmitted(threadID, eventName, emittedBy, description string, payload map[string]interface{}) *CustomEventEmittedEvent {
+	return &CustomEventEmittedEvent{
+		BaseEvent: BaseEvent{
+			Type:      "CustomEventEmitted",
+			Timestamp: time.Now(),
+			ThreadID:  threadID,
+		},
+		EventName:   eventName,
+		Payload:     payload,
+		EmittedBy:   emittedBy,
+		Description: description,
+	}
 }
 
 // ThreadDeletedEvent is emitted when a thread is deleted

@@ -124,6 +124,7 @@ func (p *InMemoryThreadState) applyEventUnsafe(thread *domain.Thread, event agen
 			Content:   evt.Content,
 			ToolCalls: evt.ToolCalls,
 			Timestamp: evt.Timestamp,
+			AgentName: evt.AgentName,
 		}
 		thread.Messages = append(thread.Messages, msg)
 		thread.UpdatedAt = evt.Timestamp
@@ -135,6 +136,7 @@ func (p *InMemoryThreadState) applyEventUnsafe(thread *domain.Thread, event agen
 			Content:    evt.ToolResult,
 			ToolCallID: evt.ToolCallID,
 			Timestamp:  evt.Timestamp,
+			AgentName:  evt.AgentName,
 		}
 		thread.Messages = append(thread.Messages, msg)
 		thread.UpdatedAt = evt.Timestamp
@@ -145,6 +147,43 @@ func (p *InMemoryThreadState) applyEventUnsafe(thread *domain.Thread, event agen
 
 	case *agent.ThreadDeletedEvent:
 		delete(p.threads, thread.ID)
+
+	// Agent collaboration events
+	case *agent.AgentCalledEvent:
+		// Update current agent
+		thread.CurrentInstructor = evt.CalledAgent
+		thread.UpdatedAt = evt.Timestamp
+
+		// End the previous agent's session if there is one
+		if len(thread.InstructorHistory) > 0 {
+			lastIdx := len(thread.InstructorHistory) - 1
+			if thread.InstructorHistory[lastIdx].EndedAt == nil {
+				thread.InstructorHistory[lastIdx].EndedAt = &evt.Timestamp
+				thread.InstructorHistory[lastIdx].HandoffReason = evt.Reason
+			}
+		}
+
+		// Add new agent session
+		session := domain.InstructorSession{
+			InstructorName: evt.CalledAgent,
+			Specialization: "", // Will be populated from config if needed
+			StartedAt:      evt.Timestamp,
+		}
+		thread.InstructorHistory = append(thread.InstructorHistory, session)
+
+	case *agent.WhiteboardUpdatedEvent:
+		switch evt.Action {
+		case "write":
+			thread.WhiteboardContent = evt.Content
+		case "append":
+			thread.WhiteboardContent += "\n" + evt.Content
+		case "clear":
+			thread.WhiteboardContent = ""
+		}
+		thread.UpdatedAt = evt.Timestamp
+
+	case *agent.CustomEventEmittedEvent:
+		thread.UpdatedAt = evt.Timestamp
 	}
 
 	return nil

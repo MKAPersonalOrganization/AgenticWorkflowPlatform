@@ -75,6 +75,7 @@ type SystemMessage struct {
 type AssistantMessage struct {
 	BaseMessage
 	ToolCalls []ToolCall `json:"toolCalls,omitempty"`
+	AgentName *string    `json:"agentName,omitempty"` // Name of the agent that created this message
 }
 
 // TextInputContent represents a text fragment in a multimodal user message.

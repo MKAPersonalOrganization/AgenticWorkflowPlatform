@@ -19,8 +19,9 @@ type Provider interface {
 
 // CompletionConfig contains configuration for a completion request
 type CompletionConfig struct {
-	Messages []domain.Message
-	Tools    []Tool
+	Messages     []domain.Message
+	Tools        []Tool
+	SystemPrompt string // Optional system-level instructions
 }
 
 // StreamChunk represents a single chunk from the streaming response

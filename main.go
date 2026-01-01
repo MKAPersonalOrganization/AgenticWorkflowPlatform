@@ -10,7 +10,9 @@ import (
 
 	"school-with-ai/components"
 	"school-with-ai/infra"
+	"school-with-ai/services/agent"
 	"school-with-ai/services/llm"
+	"school-with-ai/services/tools"
 
 	"github.com/openai/openai-go/v3"
 )
@@ -39,8 +41,33 @@ func main() {
 	// Initialize job queue
 	queue := infra.NewInMemoryJobQueue()
 
-	// Initialize and start worker pool with EventLog and ThreadState
-	workerPool := infra.NewWorkerPool(queue, eventLog, threadState, provider, infra.WorkerPoolConfig{
+	// Get instructor tools
+	instructorTools := tools.GetInstructorTools()
+	var callAgentTool, whiteboardTool llm.Tool
+	for _, tool := range instructorTools {
+		switch tool.Name {
+		case "call_agent":
+			callAgentTool = tool
+		case "write_whiteboard":
+			whiteboardTool = tool
+		}
+	}
+
+	// Get calculator tool
+	allTools := tools.GetAllTools()
+	var calculatorTool llm.Tool
+	for _, tool := range allTools {
+		if tool.Name == "calculate" {
+			calculatorTool = tool
+			break
+		}
+	}
+
+	// Initialize instructor registry
+	instructorRegistry := agent.NewInstructorRegistry(callAgentTool, whiteboardTool, calculatorTool)
+
+	// Initialize and start worker pool with instructor registry
+	workerPool := infra.NewWorkerPool(queue, eventLog, threadState, provider, instructorRegistry, infra.WorkerPoolConfig{
 		NumWorkers:   5,
 		PollInterval: 100 * time.Millisecond,
 	})

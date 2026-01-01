@@ -135,11 +135,17 @@ document.addEventListener('alpine:init', () => {
             errorMessage: null,
             showTypingIndicator: false,
             currentStreamingId: null,
-            currentStreamingContent: ''
+            currentStreamingContent: '',
+            whiteboardContent: '',
+            whiteboardLastAgent: null
         },
 
         // User input
         currentMessage: '',
+
+        // Whiteboard state
+        whiteboardTyping: null, // Shows "agent is writing..." message
+        whiteboardLastAgent: null, // Last agent who updated whiteboard
 
         // UI state
         sessions: [],
@@ -217,6 +223,10 @@ document.addEventListener('alpine:init', () => {
 
         get canSendMessage() {
             return this.currentMessage.trim() !== '' && !this.isStreaming
+        },
+
+        get currentThread() {
+            return this.sessions.find(s => s.id === this.__currentThreadId) || null
         },
 
         /**
@@ -419,7 +429,9 @@ document.addEventListener('alpine:init', () => {
                             id: thread.id,
                             title: thread.title,
                             created: thread.createdAt,
-                            lastMessage: thread.updatedAt
+                            lastMessage: thread.updatedAt,
+                            whiteboardContent: thread.whiteboardContent || '',
+                            currentInstructor: thread.currentInstructor || null
                         }));
 
                     // Get or create current thread ID
@@ -1000,8 +1012,22 @@ document.addEventListener('alpine:init', () => {
                     case 'assistant':
                         // Check for tool calls first
                         if (msg.toolCalls && msg.toolCalls.length > 0) {
-                            // Add tool call messages
+                            // Add tool call messages - results will be paired later
                             for (const toolCall of msg.toolCalls) {
+                                // Infer agent name from context if not provided (for backwards compatibility)
+                                let agentName = msg.agentName;
+                                if (!agentName) {
+                                    // Try to infer from tool call arguments (for old messages)
+                                    const args = this.safeParseJSON(toolCall.function?.arguments);
+                                    if (args.agent_name) {
+                                        // This is a call_agent tool - the caller is the previous agent
+                                        // Look backwards in messages to find who called this agent
+                                        agentName = 'student-facing-agent'; // Default assumption
+                                    } else {
+                                        agentName = 'agent'; // Generic fallback
+                                    }
+                                }
+
                                 uiMessages.push({
                                     id: toolCall.id,
                                     type: 'tool_call',
@@ -1009,7 +1035,9 @@ document.addEventListener('alpine:init', () => {
                                     args: toolCall.function?.arguments || '{}',
                                     status: 'completed',
                                     timestamp: msg.timestamp || new Date().toISOString(),
-                                    parsedArgs: this.safeParseJSON(toolCall.function?.arguments)
+                                    parsedArgs: this.safeParseJSON(toolCall.function?.arguments),
+                                    result: null, // Will be filled by pairing logic
+                                    agentName: agentName
                                 });
                             }
                         }
@@ -1027,7 +1055,7 @@ document.addEventListener('alpine:init', () => {
                         break;
 
                     case 'tool':
-                        // Tool result message
+                        // Tool result - will be paired with tool call
                         uiMessages.push({
                             id: msg.id,
                             type: 'tool_result',
@@ -1061,7 +1089,30 @@ document.addEventListener('alpine:init', () => {
                 }
             }
 
-            return uiMessages;
+            // Pair tool calls with their results
+            const toolCallMap = new Map();
+            const pairedMessages = [];
+
+            for (const msg of uiMessages) {
+                if (msg.type === 'tool_call') {
+                    toolCallMap.set(msg.id, msg);
+                    pairedMessages.push(msg);
+                } else if (msg.type === 'tool_result') {
+                    const toolCall = toolCallMap.get(msg.toolCallId);
+                    if (toolCall) {
+                        // Attach result to the tool call
+                        toolCall.result = msg.content;
+                        // Don't add the tool_result as a separate message
+                    } else {
+                        // Orphaned result - add it anyway
+                        pairedMessages.push(msg);
+                    }
+                } else {
+                    pairedMessages.push(msg);
+                }
+            }
+
+            return pairedMessages;
         },
 
         async cancelJob() {
@@ -1465,6 +1516,34 @@ document.addEventListener('alpine:init', () => {
                         if (session) {
                             session.title = event.value.title;
                         }
+                    } else if (event.name === 'WHITEBOARD_UPDATED') {
+                        // Update whiteboard content in real-time
+                        const { agentName, content, action } = event.value;
+
+                        // Show typing indicator
+                        this.whiteboardTyping = `${agentName} is writing...`;
+                        setTimeout(() => { this.whiteboardTyping = null; }, 500);
+
+                        // Update whiteboard content based on action
+                        const session = this.sessions.find(s => s.id === threadId);
+                        if (session) {
+                            switch (action) {
+                                case 'write':
+                                    session.whiteboardContent = content;
+                                    break;
+                                case 'append':
+                                    session.whiteboardContent = (session.whiteboardContent || '') + '\n' + content;
+                                    break;
+                                case 'clear':
+                                    session.whiteboardContent = '';
+                                    break;
+                            }
+                            this.whiteboardLastAgent = agentName;
+                        }
+                    } else if (event.name === 'AGENT_CALLED') {
+                        // Agent collaboration event
+                        const { callerAgent, calledAgent, reason } = event.value;
+                        console.log(`Agent collaboration: ${callerAgent} → ${calledAgent} (${reason})`);
                     }
                     break;
 
@@ -1475,7 +1554,8 @@ document.addEventListener('alpine:init', () => {
                         name: event.toolCallName,
                         args: '',
                         status: 'streaming',
-                        timestamp: new Date(event.timestamp).toISOString()
+                        timestamp: new Date(event.timestamp).toISOString(),
+                        agentName: event.agentName || 'unknown'
                     };
 
                     state.messages.push({
@@ -1485,7 +1565,8 @@ document.addEventListener('alpine:init', () => {
                         args: '',
                         parsedArgs: {},
                         status: 'streaming',
-                        timestamp: new Date(event.timestamp).toISOString()
+                        timestamp: new Date(event.timestamp).toISOString(),
+                        agentName: event.agentName || 'unknown'
                     });
 
                     if (threadId === this.__currentThreadId) {

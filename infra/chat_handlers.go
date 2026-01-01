@@ -199,6 +199,7 @@ func (h *Handler) translateAndWriteEvent(w http.ResponseWriter, flusher http.Flu
 			ToolCallID:      ev.ToolCallID,
 			ToolCallName:    ev.ToolCallName,
 			ParentMessageID: &parentMessageID,
+			AgentName:       ev.AgentName,
 		}
 
 	case *agent.ToolCallArgsEvent:
@@ -402,6 +403,11 @@ func convertSessionMessageToAGUI(msg domain.Message) agui.Message {
 				Role:    msg.Role,
 				Content: &msg.Content,
 			},
+		}
+
+		// Add agent name if present
+		if msg.AgentName != "" {
+			assistantMsg.AgentName = &msg.AgentName
 		}
 
 		// Convert tool calls if present
