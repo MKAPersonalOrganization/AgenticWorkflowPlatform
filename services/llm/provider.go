@@ -1,21 +1,8 @@
 package llm
 
 import (
-	"context"
-	"iter"
-
 	"school-with-ai/domain"
 )
-
-// Provider defines the interface for LLM providers (OpenAI, Anthropic, etc.)
-type Provider interface {
-	// CreateStreamingCompletion creates a streaming chat completion
-	// Returns an iterator that yields chunks and errors
-	CreateStreamingCompletion(
-		ctx context.Context,
-		config CompletionConfig,
-	) iter.Seq2[StreamChunk, error]
-}
 
 // CompletionConfig contains configuration for a completion request
 type CompletionConfig struct {

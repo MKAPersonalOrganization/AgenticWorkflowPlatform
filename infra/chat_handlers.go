@@ -9,20 +9,19 @@ import (
 	"school-with-ai/domain"
 	"school-with-ai/infra/agui"
 	"school-with-ai/services/agent"
-	"school-with-ai/services/llm"
 )
 
 // Handler encapsulates dependencies for HTTP handlers
 type Handler struct {
 	state      agent.ThreadState
 	log        agent.EventLog
-	provider   llm.Provider
+	provider   agent.Provider
 	queue      domain.JobQueue
 	workerPool *WorkerPool
 }
 
 // NewHandler creates a new HTTP handler with the given dependencies
-func NewHandler(log agent.EventLog, state agent.ThreadState, provider llm.Provider, queue domain.JobQueue, workerPool *WorkerPool) *Handler {
+func NewHandler(log agent.EventLog, state agent.ThreadState, provider agent.Provider, queue domain.JobQueue, workerPool *WorkerPool) *Handler {
 	return &Handler{
 		state:      state,
 		log:        log,

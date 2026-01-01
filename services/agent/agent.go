@@ -15,7 +15,7 @@ import (
 // It ONLY emits domain events - no UI concerns
 type Agent struct {
 	config   AgentConfig
-	provider llm.Provider
+	provider Provider
 	log      EventLog
 	state    ThreadState
 }
@@ -38,7 +38,7 @@ func WithConfig(config AgentConfig) Option {
 }
 
 // NewAgent creates a new agent with event sourcing (no UI dependencies)
-func NewAgent(provider llm.Provider, log EventLog, state ThreadState, opts ...Option) *Agent {
+func NewAgent(provider Provider, log EventLog, state ThreadState, opts ...Option) *Agent {
 	h := &Agent{
 		provider: provider,
 		log:      log,
