@@ -4,13 +4,28 @@ templ Whiteboard() {
 	<div class="h-full flex flex-col bg-muted/30 border-l border-border">
 		<!-- Header -->
 		<div class="p-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-			<div class="flex items-center gap-2">
-				<svg class="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-				</svg>
-				<h2 class="font-semibold text-sm">Whiteboard</h2>
+			<div class="flex items-center justify-between">
+				<div class="flex items-center gap-2">
+					<svg class="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+					</svg>
+					<div>
+						<h2 class="font-semibold text-sm">Whiteboard</h2>
+						<p class="text-xs text-muted-foreground">Agent collaboration space</p>
+					</div>
+				</div>
+				<!-- Toggle Button -->
+				<button
+					@click="toggleWhiteboard()"
+					class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 w-9"
+					type="button"
+					aria-label="Hide whiteboard"
+				>
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 9 6 6m0-6-6 6m12-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"></path>
+					</svg>
+				</button>
 			</div>
-			<p class="text-xs text-muted-foreground mt-1">Agent collaboration space</p>
 		</div>
 		<!-- Content -->
 		<div class="flex-1 overflow-y-auto p-4">

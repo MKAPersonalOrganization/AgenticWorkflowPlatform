@@ -146,6 +146,7 @@ document.addEventListener('alpine:init', () => {
         // Whiteboard state
         whiteboardTyping: null, // Shows "agent is writing..." message
         whiteboardLastAgent: null, // Last agent who updated whiteboard
+        showWhiteboard: true, // Controls whiteboard visibility
 
         // UI state
         sessions: [],
@@ -411,6 +412,10 @@ document.addEventListener('alpine:init', () => {
                     }
                 })
             }
+        },
+
+        toggleWhiteboard() {
+            this.showWhiteboard = !this.showWhiteboard
         },
 
         // ============================================
