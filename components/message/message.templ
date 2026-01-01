@@ -3,7 +3,7 @@ package message
 templ UserMessage() {
 	<div x-show="message.role === 'user'" class="flex items-center gap-2 justify-end">
 		<div class="flex flex-col gap-2">
-			<p class="bg-muted ml-auto w-fit rounded-3xl px-4 py-2 text-right whitespace-pre-wrap text-sm" x-text="message.content"></p>
+			<div class="bg-muted ml-auto w-fit rounded-3xl px-4 py-2 text-right prose prose-sm text-sm" x-html="renderMarkdown(message.content)"></div>
 		</div>
 	</div>
 }
