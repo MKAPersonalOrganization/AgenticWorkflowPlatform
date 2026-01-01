@@ -274,9 +274,57 @@ $$
 \\tag{A.1}
 $$
 
+**Matrices:**
+Use matrix environments for linear algebra:
+
+\\begin{pmatrix}
+a & b \\\\
+c & d
+\\end{pmatrix}
+
+Other matrix types: bmatrix (brackets), vmatrix (determinant), Vmatrix (double bars)
+
+**Cases (Piecewise Functions):**
+
+$$
+f(x) = \\begin{cases}
+x^2 & \\text{if } x \\geq 0 \\\\
+-x & \\text{if } x < 0
+\\end{cases}
+$$
+
+**Tables (Tabular):**
+For complex tables use LaTeX tabular:
+
+\\begin{tabular}{l c r}
+Left & Center & Right \\\\
+1 & 2 & 3 \\\\
+4 & 5 & 6
+\\end{tabular}
+
+**Theorems and Proofs:**
+Define and use theorem environments:
+
+\\newtheorem{theorem}{Theorem}
+\\newtheorem{lemma}{Lemma}
+
+\\begin{theorem}
+Let $f$ be continuous, then...
+\\end{theorem}
+
+\\begin{proof}
+The proof follows by...
+\\end{proof}
+
+**Footnotes:**
+- Add footnotes: Text\\footnote{Explanation here}
+- Or: Text\\footnotemark{} then \\footnotetext{Explanation}
+
 ### Text Formatting
 - Bold: **text** or \\textbf{text}
 - Italic: *text* or \\textit{text}
+- Underline: \\underline{text}
+- Strikethrough: \\sout{text}
 - Sections: Use ## for headings or \\section{Title}
 - Subsections: ### or \\subsection{Title}
 
@@ -461,6 +509,33 @@ E_{total} &= E_{kinetic} + E_{potential}
 - Derivatives: $\\frac{dx}{dt}$ or $\\frac{d^2x}{dt^2}$
 - Partial derivatives: $\\frac{\\partial f}{\\partial x}$
 
+**Matrices for Physics:**
+For rotation matrices, tensors, etc:
+
+\\begin{pmatrix}
+\\cos\\theta & -\\sin\\theta \\\\
+\\sin\\theta & \\cos\\theta
+\\end{pmatrix}
+
+**Tables for Data:**
+Use tabular for experimental data:
+
+\\begin{tabular}{|c|c|c|}
+\\hline
+Time (s) & Position (m) & Velocity (m/s) \\\\
+\\hline
+0 & 0 & 0 \\\\
+1 & 5 & 10 \\\\
+\\hline
+\\end{tabular}
+
+**Code with Math (for computational physics):**
+
+\\begin{lstlisting}[language=Python, mathescape]
+# Calculate kinetic energy: $E_k = \\frac{1}{2}mv^2$
+energy = 0.5 * mass * velocity**2
+\\end{lstlisting}
+
 ## Invariants (Enforced)
 
 **Event Guarantee:** Every execution emits exactly 2 events (WHITEBOARD_UPDATED + AGENT_CALLED)
@@ -615,6 +690,31 @@ $$
 $$
 pH = -\\log[H^+]
 $$
+
+**Reaction Tables:**
+For ICE tables or stoichiometry:
+
+\\begin{tabular}{|c|c|c|c|}
+\\hline
+ & $N_2$ & $H_2$ & $NH_3$ \\\\
+\\hline
+Initial & 1.0 & 3.0 & 0 \\\\
+Change & -x & -3x & +2x \\\\
+Equil & 1-x & 3-3x & 2x \\\\
+\\hline
+\\end{tabular}
+
+**Multi-step Reactions:**
+Use align for reaction mechanisms:
+
+\\begin{align}
+\\text{Step 1: } & A + B \\rightarrow AB \\\\
+\\text{Step 2: } & AB + C \\rightarrow ABC \\\\
+\\text{Overall: } & A + B + C \\rightarrow ABC
+\\end{align}
+
+**Footnotes for Explanations:**
+Add detailed notes: The reaction\\footnote{Under standard conditions}
 
 **For chemistry structures use SMILES notation**: Use SMILES (Simplified Molecular Input Line Entry System) to render molecular structures
 
