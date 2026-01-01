@@ -5,11 +5,6 @@ import (
 	"testing"
 )
 
-// Helper function to create pointer to string
-func stringPtr(s string) *string {
-	return &s
-}
-
 // Helper function to create pointer to int64
 func int64Ptr(i int64) *int64 {
 	return &i

@@ -347,15 +347,16 @@ func (h *Handler) DeleteThread(w http.ResponseWriter, r *http.Request) {
 			ThreadID:  threadID,
 		},
 	}
-	h.log.Append(threadID, event)
-	h.state.Update(event)
+	_ = h.log.Append(threadID, event)
+	_ = h.state.Update(event)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 }
 
 // emitMessagesSnapshot converts session messages to AG-UI messages and emits MESSAGES_SNAPSHOT event
+// nolint:unused // May be used for future debugging/monitoring
 func (h *Handler) emitMessagesSnapshot(w http.ResponseWriter, flusher http.Flusher, threadID string) error {
 	sessionMessages := h.state.Messages(threadID)
 

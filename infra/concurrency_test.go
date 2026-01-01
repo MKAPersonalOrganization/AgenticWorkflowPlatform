@@ -186,7 +186,7 @@ func TestGetActiveJobsByThread(t *testing.T) {
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		}
-		queue.Enqueue(job)
+		_ = queue.Enqueue(job)
 	}
 
 	// Enqueue jobs for thread 2
@@ -200,7 +200,7 @@ func TestGetActiveJobsByThread(t *testing.T) {
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		}
-		queue.Enqueue(job)
+		_ = queue.Enqueue(job)
 	}
 
 	// Get active jobs for thread 1
@@ -216,7 +216,7 @@ func TestGetActiveJobsByThread(t *testing.T) {
 	}
 
 	// Dequeue one job from thread 1 (changes to processing)
-	queue.Dequeue()
+	_, _ = queue.Dequeue()
 
 	// Verify still counted as active
 	activeJobs1AfterDequeue := queue.GetActiveJobsByThread(thread1)
@@ -225,7 +225,7 @@ func TestGetActiveJobsByThread(t *testing.T) {
 	}
 
 	// Complete one job
-	queue.UpdateJobStatus(activeJobs1AfterDequeue[0].ID, domain.JobStatusCompleted, "")
+	_ = queue.UpdateJobStatus(activeJobs1AfterDequeue[0].ID, domain.JobStatusCompleted, "")
 
 	// Verify active count decreased
 	activeJobs1AfterComplete := queue.GetActiveJobsByThread(thread1)

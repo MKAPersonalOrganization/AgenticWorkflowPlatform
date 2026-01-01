@@ -50,7 +50,7 @@ do for [i=0:40] {
 	if _, err := os.Stat(animationPath); os.IsNotExist(err) {
 		t.Errorf("expected animation file to exist at %s", animationPath)
 	} else {
-		defer os.Remove(animationPath)
+		defer func() { _ = os.Remove(animationPath) }()
 		t.Logf("Wave animation created successfully: %s", response["animation_url"])
 	}
 }
@@ -82,10 +82,12 @@ do for [ang=0:360:10] {
 	}
 
 	var response map[string]interface{}
-	json.Unmarshal([]byte(result), &response)
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
 
 	animationPath := response["animation_path"].(string)
-	defer os.Remove(animationPath)
+	defer func() { _ = os.Remove(animationPath) }()
 	t.Logf("3D rotation animation created: %s", response["animation_url"])
 }
 
@@ -114,13 +116,15 @@ do for [i=1:30] {
 	}
 
 	var response map[string]interface{}
-	json.Unmarshal([]byte(result), &response)
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
 
 	animationPath := response["animation_path"].(string)
 	if !strings.HasSuffix(animationPath, ".webp") {
 		t.Errorf("expected .webp extension, got: %s", animationPath)
 	}
-	defer os.Remove(animationPath)
+	defer func() { _ = os.Remove(animationPath) }()
 	t.Logf("WebP animation created: %s", response["animation_url"])
 }
 
@@ -195,7 +199,9 @@ func TestAnimateTool_DefaultValues(t *testing.T) {
 	}
 
 	var response map[string]interface{}
-	json.Unmarshal([]byte(result), &response)
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
 
 	if response["format"].(string) != "gif" {
 		t.Errorf("expected default format 'gif', got: %s", response["format"])
@@ -206,5 +212,5 @@ func TestAnimateTool_DefaultValues(t *testing.T) {
 	}
 
 	animationPath := response["animation_path"].(string)
-	defer os.Remove(animationPath)
+	defer func() { _ = os.Remove(animationPath) }()
 }

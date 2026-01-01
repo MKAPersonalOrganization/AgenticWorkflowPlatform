@@ -151,7 +151,7 @@ func (wp *WorkerPool) worker(id int) {
 
 				// Requeue the job and continue
 				job.Status = domain.JobStatusPending
-				wp.queue.Enqueue(job)
+				_ = wp.queue.Enqueue(job)
 				wp.threadMu.Unlock()
 				continue
 			}
@@ -182,7 +182,7 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 	select {
 	case <-ctx.Done():
 		slog.Info("Job cancelled before processing", "jobID", job.ID)
-		wp.queue.UpdateJobStatus(job.ID, domain.JobStatusFailed, "cancelled")
+		_ = wp.queue.UpdateJobStatus(job.ID, domain.JobStatusFailed, "cancelled")
 		return
 	default:
 	}
@@ -198,8 +198,8 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 			},
 			Title: "New Chat",
 		}
-		wp.log.Append(job.ThreadID, createEvent)
-		wp.state.Update(createEvent)
+		_ = wp.log.Append(job.ThreadID, createEvent)
+		_ = wp.state.Update(createEvent)
 	}
 
 	// Emit UserMessageAddedEvent
@@ -212,8 +212,8 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 		MessageID: job.MessageID,
 		Content:   job.Message,
 	}
-	wp.log.Append(job.ThreadID, userMsgEvent)
-	wp.state.Update(userMsgEvent)
+	_ = wp.log.Append(job.ThreadID, userMsgEvent)
+	_ = wp.state.Update(userMsgEvent)
 
 	// Generate unique run ID for this execution
 	runID := agui.GenerateRunID()
@@ -231,9 +231,7 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 		ThreadID: job.ThreadID,
 		RunID:    runID,
 	}
-	emitter.Emit(runStartedEvent)
-
-	// Auto-generate thread title immediately if this is the first message
+	_ = emitter.Emit(runStartedEvent)	// Auto-generate thread title immediately if this is the first message
 	thread, threadExists := wp.state.Get(job.ThreadID)
 	if threadExists && thread.Title == "New Chat" && len(thread.Messages) == 1 {
 		// Take first 50 characters of first user message as title
@@ -251,8 +249,8 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 			},
 			NewTitle: title,
 		}
-		wp.log.Append(job.ThreadID, titleEvent)
-		wp.state.Update(titleEvent)
+		_ = wp.log.Append(job.ThreadID, titleEvent)
+		_ = wp.state.Update(titleEvent)
 
 		// Send CUSTOM event to notify frontend of title update immediately
 		customTimestamp := time.Now().UnixMilli()
@@ -264,10 +262,10 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 			Name: "THREAD_TITLE_UPDATED",
 			Value: map[string]string{
 				"threadId": job.ThreadID,
-				"title":    title,
+				"title": title,
 			},
 		}
-		emitter.Emit(customEvent)
+		_ = emitter.Emit(customEvent)
 	}
 
 	// Generate unique message ID for assistant response
@@ -330,7 +328,7 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 		// Check if error was due to cancellation
 		if ctx.Err() == context.Canceled {
 			slog.Info("Job cancelled during processing", "jobID", job.ID)
-			wp.queue.UpdateJobStatus(job.ID, domain.JobStatusFailed, "cancelled")
+			_ = wp.queue.UpdateJobStatus(job.ID, domain.JobStatusFailed, "cancelled")
 
 			// Save partial response before emitting error
 			wp.emitMessagesSnapshot(emitter, job.ThreadID)
@@ -346,13 +344,13 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 				Message: "Job was cancelled",
 				Code:    &errorCode,
 			}
-			emitter.Emit(errorEvent)
+			_ = emitter.Emit(errorEvent)
 			return
 		}
 		slog.Error("Failed to process job", "jobID", job.ID, "error", err)
 
 		// Update job status to failed
-		wp.queue.UpdateJobStatus(job.ID, domain.JobStatusFailed, err.Error())
+		_ = wp.queue.UpdateJobStatus(job.ID, domain.JobStatusFailed, err.Error())
 
 		// Emit RUN_ERROR event
 		errorTimestamp := time.Now().UnixMilli()
@@ -365,7 +363,7 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 			Message: err.Error(),
 			Code:    &errorCode,
 		}
-		emitter.Emit(errorEvent)
+		_ = emitter.Emit(errorEvent)
 		return
 	}
 
@@ -388,10 +386,10 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 		ThreadID: job.ThreadID,
 		RunID:    runID,
 	}
-	emitter.Emit(runFinishedEvent)
+	_ = emitter.Emit(runFinishedEvent)
 
 	// Update job status to completed
-	wp.queue.UpdateJobStatus(job.ID, domain.JobStatusCompleted, "")
+	_ = wp.queue.UpdateJobStatus(job.ID, domain.JobStatusCompleted, "")
 
 	slog.Info("Job completed", "jobID", job.ID, "threadID", job.ThreadID)
 }

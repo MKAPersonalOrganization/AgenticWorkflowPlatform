@@ -186,7 +186,7 @@ func executeGnuplotScript(userScript, title string) (string, error) {
 	if err := os.WriteFile(scriptPath, []byte(script.String()), 0o644); err != nil {
 		return "", fmt.Errorf("failed to write gnuplot script: %w", err)
 	}
-	defer os.Remove(scriptPath) // Clean up script file
+	defer func() { _ = os.Remove(scriptPath) }() // Clean up script file
 
 	// Execute gnuplot
 	cmd := exec.Command("gnuplot", scriptPath)
