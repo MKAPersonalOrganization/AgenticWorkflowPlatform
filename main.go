@@ -44,6 +44,7 @@ func main() {
 	// Create tools using the Tool interface
 	callAgentTool := tools.NewCallAgentTool()
 	whiteboardTool := tools.NewWriteWhiteboardTool()
+	readWhiteboardTool := tools.NewReadWhiteboardTool()
 	calculatorTool := tools.NewCalculatorTool()
 	weatherTool := tools.NewWeatherTool()
 	graphingTool := tools.NewGraphingTool()
@@ -57,6 +58,7 @@ func main() {
 	instructorRegistry := agent.NewInstructorRegistry(
 		callAgentTool,
 		whiteboardTool,
+		readWhiteboardTool,
 		calculatorTool,
 		weatherTool,
 		graphingTool,

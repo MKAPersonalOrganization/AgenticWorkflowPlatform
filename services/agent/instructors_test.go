@@ -20,9 +20,10 @@ func (m *mockTool) Description() string                                     { re
 func (m *mockTool) Parameters() map[string]any                              { return m.parameters }
 func (m *mockTool) Invoke(ctx context.Context, args string) (string, error) { return "{}", nil }
 
-func createMockTools() (handoffTool, whiteboardTool, calculatorTool, weatherTool, graphingTool, unitConversionTool, periodicTableTool, equationSolverTool, plotTool agent.Tool) {
+func createMockTools() (handoffTool, whiteboardTool, readWhiteboardTool, calculatorTool, weatherTool, graphingTool, unitConversionTool, periodicTableTool, equationSolverTool, plotTool, animateTool agent.Tool) {
 	handoffTool = &mockTool{name: "call_agent", description: "Call another agent", parameters: map[string]any{}}
 	whiteboardTool = &mockTool{name: "write_whiteboard", description: "Write to whiteboard", parameters: map[string]any{}}
+	readWhiteboardTool = &mockTool{name: "read_whiteboard", description: "Read whiteboard", parameters: map[string]any{}}
 	calculatorTool = &mockTool{name: "calculate", description: "Calculate", parameters: map[string]any{}}
 	weatherTool = &mockTool{name: "get_weather", description: "Get weather", parameters: map[string]any{}}
 	graphingTool = &mockTool{name: "plot_function", description: "Plot function", parameters: map[string]any{}}
@@ -30,26 +31,27 @@ func createMockTools() (handoffTool, whiteboardTool, calculatorTool, weatherTool
 	periodicTableTool = &mockTool{name: "lookup_element", description: "Lookup element", parameters: map[string]any{}}
 	equationSolverTool = &mockTool{name: "solve_equation", description: "Solve equation", parameters: map[string]any{}}
 	plotTool = &mockTool{name: "plot", description: "Generate plots", parameters: map[string]any{}}
+	animateTool = &mockTool{name: "animate", description: "Generate animations", parameters: map[string]any{}}
 	return
 }
 
 func TestInstructorConfigurations(t *testing.T) {
-	handoffTool, whiteboardTool, calculatorTool, _, graphingTool, _, _, equationSolverTool, plotTool := createMockTools()
+	handoffTool, whiteboardTool, readWhiteboardTool, calculatorTool, _, graphingTool, _, _, equationSolverTool, plotTool, animateTool := createMockTools()
 
 	studentAgent := agent.CreateStudentFacingAgent(handoffTool, whiteboardTool)
 	if studentAgent.Name != "student-facing-agent" {
 		t.Errorf("Expected student agent name 'student-facing-agent', got '%s'", studentAgent.Name)
 	}
 
-	math := agent.CreateMathInstructor(handoffTool, whiteboardTool, calculatorTool, graphingTool, equationSolverTool, plotTool)
+	math := agent.CreateMathInstructor(handoffTool, whiteboardTool, readWhiteboardTool, calculatorTool, graphingTool, equationSolverTool, plotTool, animateTool)
 	if math.Name != "math-instructor" {
 		t.Errorf("Expected math name 'math-instructor', got '%s'", math.Name)
 	}
 }
 
 func TestInstructorRegistry(t *testing.T) {
-	handoffTool, whiteboardTool, calculatorTool, weatherTool, graphingTool, unitConversionTool, periodicTableTool, equationSolverTool, plotTool := createMockTools()
-	registry := agent.NewInstructorRegistry(handoffTool, whiteboardTool, calculatorTool, weatherTool, graphingTool, unitConversionTool, periodicTableTool, equationSolverTool, plotTool)
+	handoffTool, whiteboardTool, readWhiteboardTool, calculatorTool, weatherTool, graphingTool, unitConversionTool, periodicTableTool, equationSolverTool, plotTool, animateTool := createMockTools()
+	registry := agent.NewInstructorRegistry(handoffTool, whiteboardTool, readWhiteboardTool, calculatorTool, weatherTool, graphingTool, unitConversionTool, periodicTableTool, equationSolverTool, plotTool, animateTool)
 
 	_, exists := registry.GetByName("math-instructor")
 	if !exists {
@@ -58,7 +60,7 @@ func TestInstructorRegistry(t *testing.T) {
 }
 
 func ExampleCreateMathInstructor() {
-	handoffTool, whiteboardTool, calculatorTool, _, graphingTool, _, _, equationSolverTool, plotTool := createMockTools()
-	config := agent.CreateMathInstructor(handoffTool, whiteboardTool, calculatorTool, graphingTool, equationSolverTool, plotTool)
+	handoffTool, whiteboardTool, readWhiteboardTool, calculatorTool, _, graphingTool, _, _, equationSolverTool, plotTool, animateTool := createMockTools()
+	config := agent.CreateMathInstructor(handoffTool, whiteboardTool, readWhiteboardTool, calculatorTool, graphingTool, equationSolverTool, plotTool, animateTool)
 	fmt.Printf("Name: %s\n", config.Name)
 }
