@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"school-with-ai/internal/agui"
+	"school-with-ai/infra/agui"
 )
 
 // Example demonstrates how to create and use tool call events
