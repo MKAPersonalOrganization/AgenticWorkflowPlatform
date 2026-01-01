@@ -63,8 +63,8 @@ templ Whiteboard() {
 					</div>
 					<!-- Whiteboard text -->
 					<div
-						class="whitespace-pre-wrap font-mono text-sm bg-background rounded-lg p-4 border border-border shadow-sm min-h-[200px]"
-						x-text="currentThread?.whiteboardContent"
+						class="prose prose-sm max-w-none bg-background rounded-lg p-4 border border-border shadow-sm min-h-[200px]"
+						x-html="renderMarkdown(currentThread?.whiteboardContent || '')"
 					></div>
 				</div>
 			</div>
