@@ -10,7 +10,7 @@ templ UserMessage() {
 
 templ AssistantMessage() {
 	<div x-show="message.role === 'assistant'" class="flex flex-col gap-2">
-		<div class="prose prose-sm max-w-none text-sm leading-relaxed whitespace-pre-wrap" x-text="message.content"></div>
+		<div class="prose prose-sm max-w-none text-sm leading-relaxed" x-html="renderMarkdown(message.content)"></div>
 		<!-- Streaming Indicator -->
 		<div x-show="message.streaming" class="flex items-center gap-1 text-muted-foreground">
 			<span class="w-1 h-1 bg-current rounded-full animate-pulse"></span>
