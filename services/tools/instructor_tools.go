@@ -1,10 +1,9 @@
 package tools
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-
-	"school-with-ai/services/llm"
 )
 
 // CallAgentInput is the unified input for calling any agent
@@ -25,6 +24,124 @@ type EmitEventInput struct {
 	EventName   string                 `json:"event_name"`
 	Payload     map[string]interface{} `json:"payload"`
 	Description string                 `json:"description"`
+}
+
+// CallAgentTool implements the Tool interface for calling other agents
+type CallAgentTool struct{}
+
+func NewCallAgentTool() *CallAgentTool {
+	return &CallAgentTool{}
+}
+
+func (t *CallAgentTool) Name() string {
+	return "call_agent"
+}
+
+func (t *CallAgentTool) Description() string {
+	return "Call another agent to help with the task. This is the primary way agents collaborate in this event-driven system. Instructors call student-facing-agent after answering to return control."
+}
+
+func (t *CallAgentTool) Parameters() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"agent_name": map[string]any{
+				"type":        "string",
+				"description": "The name of the agent to call",
+				"enum":        []string{"student-facing-agent", "math-instructor", "physics-instructor", "chemistry-instructor"},
+			},
+			"reason": map[string]any{
+				"type":        "string",
+				"description": "Why you're calling this agent and what you need help with",
+			},
+			"context": map[string]any{
+				"type":        "string",
+				"description": "Optional: Summary of conversation so far and what the other agent should know",
+			},
+		},
+		"required": []string{"agent_name", "reason"},
+	}
+}
+
+func (t *CallAgentTool) Invoke(ctx context.Context, arguments string) (string, error) {
+	return CallAgent(arguments)
+}
+
+// WriteWhiteboardTool implements the Tool interface for writing to the whiteboard
+type WriteWhiteboardTool struct{}
+
+func NewWriteWhiteboardTool() *WriteWhiteboardTool {
+	return &WriteWhiteboardTool{}
+}
+
+func (t *WriteWhiteboardTool) Name() string {
+	return "write_whiteboard"
+}
+
+func (t *WriteWhiteboardTool) Description() string {
+	return "Write information to the shared whiteboard that all agents can see. Use this to share key formulas, diagrams, or important points."
+}
+
+func (t *WriteWhiteboardTool) Parameters() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"content": map[string]any{
+				"type":        "string",
+				"description": "The content to write to the whiteboard",
+			},
+			"action": map[string]any{
+				"type":        "string",
+				"description": "How to update the whiteboard",
+				"enum":        []string{"write", "append", "clear"},
+			},
+		},
+		"required": []string{"content", "action"},
+	}
+}
+
+func (t *WriteWhiteboardTool) Invoke(ctx context.Context, arguments string) (string, error) {
+	return WriteWhiteboard(arguments)
+}
+
+// EmitEventTool implements the Tool interface for emitting custom events
+type EmitEventTool struct{}
+
+func NewEmitEventTool() *EmitEventTool {
+	return &EmitEventTool{}
+}
+
+func (t *EmitEventTool) Name() string {
+	return "emit_event"
+}
+
+func (t *EmitEventTool) Description() string {
+	return "Emit a custom event to the event store. This allows you to trigger other agents or workflows in a purely event-driven manner."
+}
+
+func (t *EmitEventTool) Parameters() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"event_name": map[string]any{
+				"type":        "string",
+				"description": "Name of the event (e.g., 'task_completed', 'help_needed', 'data_ready')",
+			},
+			"payload": map[string]any{
+				"type":        "object",
+				"description": "Event payload with arbitrary data (JSON object)",
+			},
+			"description": map[string]any{
+				"type":        "string",
+				"description": "Human-readable description of what this event represents",
+			},
+		},
+		"required": []string{"event_name", "description"},
+	}
+}
+
+func (t *EmitEventTool) Invoke(ctx context.Context, arguments string) (string, error) {
+	return EmitEvent(arguments)
 }
 
 // CallAgent allows any agent to call any other agent (purely event-driven)
@@ -94,79 +211,6 @@ func EmitEvent(input string) (string, error) {
 
 	// Return confirmation - the actual event will be emitted by the agent
 	return fmt.Sprintf("Event '%s' emitted: %s", params.EventName, params.Description), nil
-}
-
-// GetInstructorTools returns all instructor-related tools
-func GetInstructorTools() []llm.Tool {
-	return []llm.Tool{
-		{
-			Type:        "function",
-			Name:        "call_agent",
-			Description: "Call another agent to help with the task. This is the primary way agents collaborate in this event-driven system. Instructors call student-facing-agent after answering to return control.",
-			Parameters: map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"agent_name": map[string]interface{}{
-						"type":        "string",
-						"description": "The name of the agent to call",
-						"enum":        []string{"student-facing-agent", "math-instructor", "physics-instructor", "chemistry-instructor"},
-					},
-					"reason": map[string]interface{}{
-						"type":        "string",
-						"description": "Why you're calling this agent and what you need help with",
-					},
-					"context": map[string]interface{}{
-						"type":        "string",
-						"description": "Optional: Summary of conversation so far and what the other agent should know",
-					},
-				},
-				"required": []string{"agent_name", "reason"},
-			},
-		},
-		{
-			Type:        "function",
-			Name:        "write_whiteboard",
-			Description: "Write information to the shared whiteboard that all agents can see. Use this to share key formulas, diagrams, or important points.",
-			Parameters: map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"content": map[string]interface{}{
-						"type":        "string",
-						"description": "The content to write to the whiteboard",
-					},
-					"action": map[string]interface{}{
-						"type":        "string",
-						"description": "How to update the whiteboard",
-						"enum":        []string{"write", "append", "clear"},
-					},
-				},
-				"required": []string{"content", "action"},
-			},
-		},
-		{
-			Type:        "function",
-			Name:        "emit_event",
-			Description: "Emit a custom event to the event store. This allows you to trigger other agents or workflows in a purely event-driven manner.",
-			Parameters: map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"event_name": map[string]interface{}{
-						"type":        "string",
-						"description": "Name of the event (e.g., 'task_completed', 'help_needed', 'data_ready')",
-					},
-					"payload": map[string]interface{}{
-						"type":        "object",
-						"description": "Event payload with arbitrary data (JSON object)",
-					},
-					"description": map[string]interface{}{
-						"type":        "string",
-						"description": "Human-readable description of what this event represents",
-					},
-				},
-				"required": []string{"event_name", "description"},
-			},
-		},
-	}
 }
 
 // ExecuteInstructorTool executes an instructor tool by name

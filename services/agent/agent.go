@@ -8,23 +8,24 @@ import (
 
 	"school-with-ai/domain"
 	"school-with-ai/services/llm"
-	"school-with-ai/services/tools"
 )
 
 // Agent handles processing of user messages using pure event sourcing
 // It ONLY emits domain events - no UI concerns
 type Agent struct {
-	config   AgentConfig
-	provider Provider
-	log      EventLog
-	state    ThreadState
+	config       AgentConfig
+	provider     Provider
+	log          EventLog
+	state        ThreadState
+	toolRegistry *ToolRegistry
+	toolExecutor ToolExecutor
 }
 
 // Option is a functional option for configuring Agent
 type Option func(*Agent)
 
 // WithTools configures the agent with available tools
-func WithTools(tools []llm.Tool) Option {
+func WithTools(tools []Tool) Option {
 	return func(h *Agent) {
 		h.config.Tools = tools
 	}
@@ -37,18 +38,35 @@ func WithConfig(config AgentConfig) Option {
 	}
 }
 
+// WithToolExecutor configures the agent with a custom tool executor
+func WithToolExecutor(executor ToolExecutor) Option {
+	return func(h *Agent) {
+		h.toolExecutor = executor
+	}
+}
+
 // NewAgent creates a new agent with event sourcing (no UI dependencies)
 func NewAgent(provider Provider, log EventLog, state ThreadState, opts ...Option) *Agent {
+	// Create tool registry
+	toolRegistry := NewToolRegistry()
+
 	h := &Agent{
-		provider: provider,
-		log:      log,
-		state:    state,
-		config:   DefaultConfig("agent"), // Default config
+		provider:     provider,
+		log:          log,
+		state:        state,
+		config:       DefaultConfig("agent"),             // Default config
+		toolRegistry: toolRegistry,                       // Tool registry
+		toolExecutor: NewBasicToolExecutor(toolRegistry), // Default tool executor
 	}
 
 	// Apply options
 	for _, opt := range opts {
 		opt(h)
+	}
+
+	// Register configured tools in the registry
+	for _, tool := range h.config.Tools {
+		toolRegistry.Register(tool)
 	}
 
 	return h
@@ -101,7 +119,7 @@ func (h *Agent) runIteration(
 	// Create streaming completion with agent's system prompt
 	config := llm.CompletionConfig{
 		Messages:     messages,
-		Tools:        h.config.Tools,
+		Tools:        ToLLMTools(h.config.Tools),
 		SystemPrompt: h.config.SystemPrompt,
 	}
 
@@ -110,15 +128,8 @@ func (h *Agent) runIteration(
 	// Track complete content for storage
 	var completeContent string
 
-	// Track active tool calls
-	type toolCallState struct {
-		ID        string
-		Index     int
-		Name      string
-		Arguments string
-	}
-	activeToolCalls := make(map[string]*toolCallState)
-	toolCallsByIndex := make(map[int]*toolCallState)
+	// Use accumulator to track streaming tool calls
+	toolCalls := NewToolCallAccumulator()
 
 	// Process stream chunks using iterator
 	for chunk, err := range streamIter {
@@ -152,7 +163,6 @@ func (h *Agent) runIteration(
 		if chunk.Content != "" {
 			completeContent += chunk.Content
 
-			// Emit AssistantContentStreamedEvent for each delta
 			contentEvent := &AssistantContentStreamedEvent{
 				BaseEvent: BaseEvent{
 					Type:      "AssistantContentStreamed",
@@ -167,74 +177,61 @@ func (h *Agent) runIteration(
 			}
 		}
 
-		// Handle tool calls
-		if len(chunk.ToolCalls) > 0 {
-			for _, toolCallDelta := range chunk.ToolCalls {
-				index := toolCallDelta.Index
-				var state *toolCallState
+		// Handle tool calls using accumulator
+		for _, delta := range chunk.ToolCalls {
+			update, ok := toolCalls.ProcessDelta(delta)
+			if !ok {
+				continue
+			}
 
-				// Check if this is a new tool call
-				if toolCallDelta.ID != "" && toolCallDelta.Name != "" {
-					// Emit ToolCallStartedEvent
-					toolStartEvent := &ToolCallStartedEvent{
-						BaseEvent: BaseEvent{
-							Type:      "ToolCallStarted",
-							Timestamp: time.Now(),
-							ThreadID:  threadID,
-						},
-						ToolCallID:      toolCallDelta.ID,
-						ToolCallName:    toolCallDelta.Name,
-						ParentMessageID: messageID,
-						AgentName:       h.config.Name,
-					}
-					if err := h.emitDomainEvent(toolStartEvent, eventHandler); err != nil {
-						return err
-					}
-
-					// Track this tool call
-					state = &toolCallState{
-						ID:        toolCallDelta.ID,
-						Index:     index,
-						Name:      toolCallDelta.Name,
-						Arguments: "",
-					}
-					activeToolCalls[toolCallDelta.ID] = state
-					toolCallsByIndex[index] = state
-				} else {
-					// This is a continuation - find by index
-					state = toolCallsByIndex[index]
+			if update.IsNew {
+				// Emit ToolCallStartedEvent for new tool calls
+				toolStartEvent := &ToolCallStartedEvent{
+					BaseEvent: BaseEvent{
+						Type:      "ToolCallStarted",
+						Timestamp: time.Now(),
+						ThreadID:  threadID,
+					},
+					ToolCallID:      update.ID,
+					ToolCallName:    update.Name,
+					ParentMessageID: messageID,
+					AgentName:       h.config.Name,
 				}
+				if err := h.emitDomainEvent(toolStartEvent, eventHandler); err != nil {
+					return err
+				}
+			}
 
-				// Emit streaming event for arguments
-				if state != nil && toolCallDelta.Arguments != "" {
-					argsEvent := &ToolCallArgumentsStreamedEvent{
-						BaseEvent: BaseEvent{
-							Type:      "ToolCallArgumentsStreamed",
-							Timestamp: time.Now(),
-							ThreadID:  threadID,
-						},
-						ToolCallID: state.ID,
-						Delta:      toolCallDelta.Arguments,
-					}
-					if err := h.emitDomainEvent(argsEvent, eventHandler); err != nil {
-						return err
-					}
-
-					state.Arguments += toolCallDelta.Arguments
+			// Emit streaming event for arguments
+			if update.ArgsDelta != "" {
+				argsEvent := &ToolCallArgumentsStreamedEvent{
+					BaseEvent: BaseEvent{
+						Type:      "ToolCallArgumentsStreamed",
+						Timestamp: time.Now(),
+						ThreadID:  threadID,
+					},
+					ToolCallID: update.ID,
+					Delta:      update.ArgsDelta,
+				}
+				if err := h.emitDomainEvent(argsEvent, eventHandler); err != nil {
+					return err
 				}
 			}
 		}
 	}
 
+	// Get accumulated tool calls
+	toolCallsList := toolCalls.GetAll()
+
 	// Emit ToolCallCompletedEvent for each tool call
-	for _, state := range activeToolCalls {
+	for _, tc := range toolCallsList {
 		completedEvent := &ToolCallCompletedEvent{
 			BaseEvent: BaseEvent{
 				Type:      "ToolCallCompleted",
 				Timestamp: time.Now(),
 				ThreadID:  threadID,
 			},
-			ToolCallID: state.ID,
+			ToolCallID: tc.ID,
 		}
 		if err := h.emitDomainEvent(completedEvent, eventHandler); err != nil {
 			return err
@@ -242,19 +239,7 @@ func (h *Agent) runIteration(
 	}
 
 	// Store assistant message and handle tool calls
-	if len(activeToolCalls) > 0 {
-		// Build tool calls list from active tool calls
-		toolCallsList := make([]domain.ToolCall, 0, len(activeToolCalls))
-		for _, state := range activeToolCalls {
-			toolCallsList = append(toolCallsList, domain.ToolCall{
-				ID:   state.ID,
-				Type: "function",
-				Function: domain.ToolFunction{
-					Name:      state.Name,
-					Arguments: state.Arguments,
-				},
-			})
-		}
+	if toolCalls.HasToolCalls() {
 
 		// Emit AssistantMessageCompletedEvent with tool calls
 		assistantEvent := &AssistantMessageCompletedEvent{
@@ -362,89 +347,72 @@ func (h *Agent) emitDomainEvent(event Event, eventHandler DomainEventHandler) er
 }
 
 // executeToolCall executes a tool call and returns the result
-// For instructor tools, it also emits domain events
+// For collaboration tools, it also emits domain events
 func (h *Agent) executeToolCall(threadID string, toolCall domain.ToolCall, eventHandler DomainEventHandler) (string, error) {
+	// Handle collaboration tools that need to emit domain events
+	if err := h.emitCollaborationEvents(threadID, toolCall, eventHandler); err != nil {
+		return "", err
+	}
+
+	// Execute the tool using the executor
+	return h.toolExecutor.Execute(toolCall)
+}
+
+// emitCollaborationEvents emits domain events for collaboration tools
+func (h *Agent) emitCollaborationEvents(threadID string, toolCall domain.ToolCall, eventHandler DomainEventHandler) error {
 	toolName := toolCall.Function.Name
 
-	// Handle agent collaboration tools - they emit domain events
 	switch toolName {
 	case "call_agent":
-		// Parse the arguments to extract agent call info
 		var input struct {
 			AgentName string `json:"agent_name"`
 			Reason    string `json:"reason"`
 			Context   string `json:"context"`
 		}
 		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
-			return "", fmt.Errorf("failed to parse call_agent arguments: %w", err)
+			return fmt.Errorf("failed to parse call_agent arguments: %w", err)
 		}
 
-		// Get current whiteboard state from thread
 		thread, exists := h.state.Get(threadID)
 		whiteboardState := ""
 		if exists {
 			whiteboardState = thread.WhiteboardContent
 		}
 
-		// Emit AgentCalledEvent
-		agentCalledEvent := NewAgentCalled(
-			threadID,
-			h.config.Name,
-			input.AgentName,
-			input.Reason,
-			input.Context,
-			whiteboardState,
-		)
-		if err := h.emitDomainEvent(agentCalledEvent, eventHandler); err != nil {
-			return "", err
-		}
-
-		return tools.ExecuteInstructorTool(toolName, toolCall.Function.Arguments)
+		return h.emitDomainEvent(NewAgentCalled(
+			threadID, h.config.Name, input.AgentName,
+			input.Reason, input.Context, whiteboardState,
+		), eventHandler)
 
 	case "write_whiteboard":
-		// Parse the arguments to extract whiteboard info
 		var input struct {
 			Content string `json:"content"`
 			Action  string `json:"action"`
 		}
 		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
-			return "", fmt.Errorf("failed to parse write_whiteboard arguments: %w", err)
+			return fmt.Errorf("failed to parse write_whiteboard arguments: %w", err)
 		}
 
-		// Emit WhiteboardUpdatedEvent
-		whiteboardEvent := NewWhiteboardUpdated(threadID, h.config.Name, input.Content, input.Action)
-		if err := h.emitDomainEvent(whiteboardEvent, eventHandler); err != nil {
-			return "", err
-		}
-
-		return tools.ExecuteInstructorTool(toolName, toolCall.Function.Arguments)
+		return h.emitDomainEvent(
+			NewWhiteboardUpdated(threadID, h.config.Name, input.Content, input.Action),
+			eventHandler,
+		)
 
 	case "emit_event":
-		// Parse the arguments to extract event info
 		var input struct {
 			EventName   string                 `json:"event_name"`
 			Payload     map[string]interface{} `json:"payload"`
 			Description string                 `json:"description"`
 		}
 		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
-			return "", fmt.Errorf("failed to parse emit_event arguments: %w", err)
+			return fmt.Errorf("failed to parse emit_event arguments: %w", err)
 		}
 
-		// Emit CustomEventEmittedEvent
-		customEvent := NewCustomEventEmitted(threadID, input.EventName, h.config.Name, input.Description, input.Payload)
-		if err := h.emitDomainEvent(customEvent, eventHandler); err != nil {
-			return "", err
-		}
-
-		return tools.ExecuteInstructorTool(toolName, toolCall.Function.Arguments)
-
-	// Regular tools
-	case "get_weather":
-		return tools.ExecuteWeatherTool(toolCall.Function.Arguments)
-	case "calculate":
-		return tools.ExecuteCalculatorTool(toolCall.Function.Arguments)
-	default:
-		// Try instructor tools as fallback
-		return tools.ExecuteInstructorTool(toolName, toolCall.Function.Arguments)
+		return h.emitDomainEvent(
+			NewCustomEventEmitted(threadID, input.EventName, h.config.Name, input.Description, input.Payload),
+			eventHandler,
+		)
 	}
+
+	return nil
 }

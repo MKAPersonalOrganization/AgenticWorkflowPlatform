@@ -41,30 +41,27 @@ func main() {
 	// Initialize job queue
 	queue := infra.NewInMemoryJobQueue()
 
-	// Get instructor tools
-	instructorTools := tools.GetInstructorTools()
-	var callAgentTool, whiteboardTool llm.Tool
-	for _, tool := range instructorTools {
-		switch tool.Name {
-		case "call_agent":
-			callAgentTool = tool
-		case "write_whiteboard":
-			whiteboardTool = tool
-		}
-	}
+	// Create tools using the Tool interface
+	callAgentTool := tools.NewCallAgentTool()
+	whiteboardTool := tools.NewWriteWhiteboardTool()
+	calculatorTool := tools.NewCalculatorTool()
+	weatherTool := tools.NewWeatherTool()
+	graphingTool := tools.NewGraphingTool()
+	unitConversionTool := tools.NewUnitConversionTool()
+	periodicTableTool := tools.NewPeriodicTableTool()
+	equationSolverTool := tools.NewEquationSolverTool()
 
-	// Get calculator tool
-	allTools := tools.GetAllTools()
-	var calculatorTool llm.Tool
-	for _, tool := range allTools {
-		if tool.Name == "calculate" {
-			calculatorTool = tool
-			break
-		}
-	}
-
-	// Initialize instructor registry
-	instructorRegistry := agent.NewInstructorRegistry(callAgentTool, whiteboardTool, calculatorTool)
+	// Initialize instructor registry with tools
+	instructorRegistry := agent.NewInstructorRegistry(
+		callAgentTool,
+		whiteboardTool,
+		calculatorTool,
+		weatherTool,
+		graphingTool,
+		unitConversionTool,
+		periodicTableTool,
+		equationSolverTool,
+	)
 
 	// Initialize and start worker pool with instructor registry
 	workerPool := infra.NewWorkerPool(queue, eventLog, threadState, provider, instructorRegistry, infra.WorkerPoolConfig{
