@@ -167,7 +167,9 @@ splot x**2 + y**2 with lines`
 	}
 
 	var response map[string]interface{}
-	json.Unmarshal([]byte(result), &response)
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
 
 	imagePath := response["image_path"].(string)
 	defer os.Remove(imagePath)

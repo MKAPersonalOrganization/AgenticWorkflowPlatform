@@ -53,7 +53,7 @@ func TestThreadIsolation(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to dequeue job %d: %v", i, err)
 		}
-		processedJobs = append(processedJobs, job)
+		_ = append(processedJobs, job)
 
 		// Verify status changed to processing
 		if job.Status != domain.JobStatusProcessing {
