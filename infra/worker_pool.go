@@ -280,11 +280,15 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 	var agentConfig agent.AgentConfig
 	thread, threadExists = wp.state.Get(job.ThreadID)
 
-	if !threadExists || thread.CurrentInstructor == "" {
-		// New thread - start with student-facing agent (coordinator)
+	// CRITICAL: New user messages MUST always go through student-facing agent first
+	// This ensures proper routing and prevents instructors from receiving direct questions
+	isNewUserMessage := len(messages) == 0 || messages[len(messages)-1].Role == "user"
+
+	if !threadExists || thread.CurrentInstructor == "" || isNewUserMessage {
+		// New thread OR new user message - ALWAYS start with student-facing agent (coordinator)
 		agentConfig = wp.instructorRegistry.GetStudentFacingAgent()
 	} else {
-		// Use current agent
+		// Continuation from instructor callback - use current agent
 		agentConfig, _ = wp.instructorRegistry.GetByName(thread.CurrentInstructor)
 	}
 
