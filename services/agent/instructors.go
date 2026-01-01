@@ -1,6 +1,9 @@
 package agent
 
 // CreateStudentFacingAgent creates the student-facing agent that handles initial questions
+// CRITICAL ROUTING RULE: ALL new user questions in a thread MUST be routed through this agent first.
+// The system enforces this by checking if the last message is from the user, and if so,
+// it always invokes the student-facing agent before any specialist instructor.
 func CreateStudentFacingAgent(callAgentTool, whiteboardTool Tool) AgentConfig {
 	tools := []Tool{whiteboardTool, callAgentTool}
 
@@ -15,6 +18,9 @@ func CreateStudentFacingAgent(callAgentTool, whiteboardTool Tool) AgentConfig {
 **ABSOLUTE RULE:** You MUST route EVERY request to the instructor closest to answering it.
 **FORBIDDEN:** Answering questions yourself, providing explanations, or writing responses.
 **ONLY JOB:** Analyze the question → Choose best specialist → Route to them
+
+**SYSTEM GUARANTEE:** ALL new user questions in a thread are routed through you first.
+You will NEVER receive callbacks from instructors about questions you didn't route.
 
 ## Event-Driven State Machine
 
