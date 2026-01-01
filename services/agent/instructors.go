@@ -228,8 +228,8 @@ If question requires multiple subjects, identify which should go FIRST:
 }
 
 // CreateMathInstructor creates the math instructor agent configuration
-func CreateMathInstructor(callAgentTool, whiteboardTool, calculatorTool, graphingTool, equationSolverTool Tool) AgentConfig {
-	tools := []Tool{calculatorTool, graphingTool, equationSolverTool, callAgentTool, whiteboardTool}
+func CreateMathInstructor(callAgentTool, whiteboardTool, calculatorTool, graphingTool, equationSolverTool, plotTool Tool) AgentConfig {
+	tools := []Tool{calculatorTool, graphingTool, equationSolverTool, plotTool, callAgentTool, whiteboardTool}
 
 	return AgentConfig{
 		Name:           "math-instructor",
@@ -482,6 +482,159 @@ The proof follows by...
 - Strikethrough: \\sout{text}
 - Sections: Use ## for headings or \\section{Title}
 - Subsections: ### or \\subsection{Title}
+
+## VISUALIZATION TOOLS - USE LIBERALLY
+
+### Plot Tool (CRITICAL - Use for ALL Graphing Needs)
+
+**ABSOLUTE REQUIREMENT:**
+When a student uses ANY of these words: "plot", "graph", "draw", "show", "visualize" combined with a function or equation, you MUST use the plot tool. This is NOT optional.
+
+Examples that REQUIRE plot tool usage:
+- "plot sin x" → MUST use plot tool
+- "graph y = x^2" → MUST use plot tool  
+- "show me cos(x)" → MUST use plot tool
+- "draw the parabola" → MUST use plot tool
+- "visualize the function" → MUST use plot tool
+
+If you fail to use the plot tool when asked to visualize/plot/graph, you are NOT completing the student's request.
+
+**HOW IT WORKS:**
+You write a complete gnuplot script, and the tool executes it to generate a PNG image. The tool automatically adds terminal configuration (set terminal pngcairo) and output path (set output). You focus on the plot content.
+
+**WHEN TO USE THE PLOT TOOL:**
+- MANDATORY when student asks to "graph", "plot", "visualize", "draw", or "show" a function
+- MANDATORY when explaining function behavior (show, don't just tell!)
+- MANDATORY for demonstrating transformations, intersections, or key features
+- MANDATORY for comparing multiple functions visually
+- RECOMMENDED when solving equations graphically
+- RECOMMENDED for showing data points or experimental results
+- RECOMMENDED for illustrating calculus concepts (derivatives, integrals, limits)
+
+**GNUPLOT SCRIPT FORMAT:**
+
+You provide a complete gnuplot script in the gnuplot_script parameter. The script should:
+- ✓ Include all plot commands, settings, labels, etc.
+- ✓ Use valid gnuplot syntax
+- ✗ NOT include 'set terminal' (added automatically)
+- ✗ NOT include 'set output' (added automatically)
+
+**GNUPLOT SYNTAX QUICK REFERENCE:**
+
+Powers: x**2, x**3 (NOT x^2)
+Multiplication: 2*x (must be explicit, NOT 2x)
+Functions: sin(x), cos(x), tan(x), exp(x), log(x), sqrt(x), abs(x)
+Multiple plots: plot sin(x), cos(x), tan(x)
+Ranges: set xrange [-10:10]; set yrange [-5:5]
+Labels: set xlabel 'X'; set ylabel 'Y'; set title 'My Plot'
+Grid: set grid
+Styles: with lines, with points, with linespoints, with boxes
+
+**EXAMPLE USAGE:**
+
+Simple sine wave:
+{
+  "gnuplot_script": "set title 'Sine Wave'\nset xlabel 'x'\nset ylabel 'sin(x)'\nset grid\nset xrange [-6.28:6.28]\nplot sin(x) with lines linewidth 2 title 'y = sin(x)'",
+  "title": "Sine wave visualization"
+}
+
+Multiple trigonometric functions:
+{
+  "gnuplot_script": "set title 'Trigonometric Functions'\nset grid\nset xrange [-6.28:6.28]\nplot sin(x) title 'sin(x)', cos(x) title 'cos(x)'",
+  "title": "Trig functions comparison"
+}
+
+Quadratic with roots:
+{
+  "gnuplot_script": "set title 'Quadratic Function'\nset grid\nset xrange [-2:6]\nplot x**2 - 4*x + 3 with lines title 'y = x² - 4x + 3', 0 with lines dashtype 2 notitle",
+  "title": "Quadratic function"
+}
+
+Data plot with inline data:
+{
+  "gnuplot_script": "set title 'Scatter Plot'\nset grid\nplot '-' with points pointtype 7 pointsize 1.5 title 'Data'\n1 2.3\n2 4.1\n3 5.8\ne",
+  "title": "Experimental data"
+}
+
+**WORKFLOW:**
+1. Write the gnuplot script with all desired settings
+2. Call plot tool with {"gnuplot_script": "...", "title": "..."}
+3. Tool returns image_url like: /assets/charts/plot_abc123.png
+4. Embed in whiteboard with markdown: ![Description](image_url)
+5. Reference the plot in your explanation
+
+**CRITICAL - DO NOT SHOW SCRIPTS TO STUDENTS:**
+- ✗ NEVER include the gnuplot script code in your whiteboard response
+- ✗ NEVER show students the technical implementation details
+- ✓ ONLY show the resulting graph image
+- ✓ Explain what the graph shows mathematically
+- The gnuplot script is an internal implementation detail - students should only see the final visualization
+
+**HOW TO PRESENT PLOTS TO STUDENTS:**
+After calling the plot tool, you will receive a JSON response like:
+{
+  "success": true,
+  "image_url": "/assets/charts/plot_6babebefa8a21dc1_1767303929.png",
+  "message": "Plot generated successfully"
+}
+
+CRITICAL - COPY THE EXACT image_url VALUE:
+You MUST copy the EXACT image_url string from the JSON response. Do NOT make up your own filename. Do NOT simplify it. Do NOT change it in any way.
+
+Step by step:
+1. Call the plot tool
+2. Look at the JSON response
+3. Find the "image_url" field
+4. COPY that EXACT value (including the /assets/charts/ prefix and the full filename with hash and timestamp)
+5. Paste it into your markdown image syntax
+
+CORRECT - Using the exact value from tool response:
+Tool returns: "image_url": "/assets/charts/plot_6babebefa8a21dc1_1767303929.png"
+You write: ![Sine Wave](/assets/charts/plot_6babebefa8a21dc1_1767303929.png)
+
+WRONG - Do NOT do any of these:
+![Sine Wave](/assets/charts/plot_sine_wave.png)  ❌ Making up your own filename
+![Sine Wave](https://assets/charts/plot_abc123.png)  ❌ Adding https://
+![Sine Wave](assets/charts/plot_abc123.png)  ❌ Missing leading /
+![Sine Wave](/assets/charts/sine.png)  ❌ Simplifying the filename
+
+The filename contains a hash and timestamp - you MUST use it exactly as returned.
+
+Example complete workflow:
+1. You call plot tool and get response: {"success": true, "image_url": "/assets/charts/plot_6babebefa8a21dc1_1767303929.png"}
+2. You MUST write to whiteboard using write_whiteboard tool with the EXACT image_url in markdown format:
+
+Here is the graph of the sine function:
+
+![Sine Wave](/assets/charts/plot_6babebefa8a21dc1_1767303929.png)
+
+The graph shows one complete period of the sine wave from -2π to 2π.
+
+CRITICAL REQUIREMENT - WHITEBOARD WRITING:
+After getting the plot tool response, you MUST immediately call write_whiteboard with content that includes:
+- The markdown image syntax with the EXACT image_url value
+- Mathematical explanation
+
+If you don't write the image URL to the whiteboard, the student will NOT see the graph. The plot tool creates the image file, but YOU must write the URL to the whiteboard for it to display.
+
+DO NOT include the gnuplot script or any technical details - just the image and explanation.
+
+**MANDATORY USAGE SCENARIOS (NON-NEGOTIABLE):**
+- ✓ Student says "plot", "graph", "draw", "show", "visualize" + function → MUST use plot tool (NO EXCEPTIONS)
+- ✓ Explaining function behavior → MUST use plot tool
+- ✓ Finding intercepts/roots → MUST show graph
+- ✓ Comparing functions → MUST use plot tool
+- ✓ Showing transformations → MUST use plot tool
+- ✓ Demonstrating limits/continuity → MUST use plot tool
+
+**FAILURE TO USE PLOT TOOL = INCOMPLETE ANSWER**
+If student asks for a plot/graph and you don't use the plot tool, you have failed the task.
+
+### Other Available Tools
+
+**calculator:** For numerical computations
+**equation_solver:** For algebraic equation solving  
+**graphing:** For text-based function analysis (use plot tool instead for visual graphs)
 
 ## Invariants (Enforced)
 
@@ -969,12 +1122,13 @@ type InstructorRegistry struct {
 	unitConversionTool Tool
 	periodicTableTool  Tool
 	equationSolverTool Tool
+	plotTool           Tool
 }
 
 // NewInstructorRegistry creates a new instructor registry with all tools
 func NewInstructorRegistry(
 	callAgentTool, whiteboardTool, calculatorTool, weatherTool,
-	graphingTool, unitConversionTool, periodicTableTool, equationSolverTool Tool,
+	graphingTool, unitConversionTool, periodicTableTool, equationSolverTool, plotTool Tool,
 ) *InstructorRegistry {
 	return &InstructorRegistry{
 		callAgentTool:      callAgentTool,
@@ -985,6 +1139,7 @@ func NewInstructorRegistry(
 		unitConversionTool: unitConversionTool,
 		periodicTableTool:  periodicTableTool,
 		equationSolverTool: equationSolverTool,
+		plotTool:           plotTool,
 	}
 }
 
@@ -994,7 +1149,7 @@ func (r *InstructorRegistry) GetByName(name string) (AgentConfig, bool) {
 	case "student-facing-agent":
 		return CreateStudentFacingAgent(r.callAgentTool, r.whiteboardTool), true
 	case "math-instructor":
-		return CreateMathInstructor(r.callAgentTool, r.whiteboardTool, r.calculatorTool, r.graphingTool, r.equationSolverTool), true
+		return CreateMathInstructor(r.callAgentTool, r.whiteboardTool, r.calculatorTool, r.graphingTool, r.equationSolverTool, r.plotTool), true
 	case "physics-instructor":
 		return CreatePhysicsInstructor(r.callAgentTool, r.whiteboardTool, r.calculatorTool, r.weatherTool, r.unitConversionTool), true
 	case "chemistry-instructor":
@@ -1007,7 +1162,7 @@ func (r *InstructorRegistry) GetByName(name string) (AgentConfig, bool) {
 // GetAllInstructors returns all available instructor configurations
 func (r *InstructorRegistry) GetAllInstructors() []AgentConfig {
 	return []AgentConfig{
-		CreateMathInstructor(r.callAgentTool, r.whiteboardTool, r.calculatorTool, r.graphingTool, r.equationSolverTool),
+		CreateMathInstructor(r.callAgentTool, r.whiteboardTool, r.calculatorTool, r.graphingTool, r.equationSolverTool, r.plotTool),
 		CreatePhysicsInstructor(r.callAgentTool, r.whiteboardTool, r.calculatorTool, r.weatherTool, r.unitConversionTool),
 		CreateChemistryInstructor(r.callAgentTool, r.whiteboardTool, r.calculatorTool, r.periodicTableTool, r.unitConversionTool),
 	}

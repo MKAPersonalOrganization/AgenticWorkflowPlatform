@@ -50,6 +50,7 @@ func main() {
 	unitConversionTool := tools.NewUnitConversionTool()
 	periodicTableTool := tools.NewPeriodicTableTool()
 	equationSolverTool := tools.NewEquationSolverTool()
+	plotTool := tools.NewPlotTool()
 
 	// Initialize instructor registry with tools
 	instructorRegistry := agent.NewInstructorRegistry(
@@ -61,6 +62,7 @@ func main() {
 		unitConversionTool,
 		periodicTableTool,
 		equationSolverTool,
+		plotTool,
 	)
 
 	// Initialize and start worker pool with instructor registry
@@ -77,6 +79,7 @@ func main() {
 	mux.Handle("/assets/css/", http.StripPrefix("/assets/css/", http.FileServer(http.Dir("./assets/css"))))
 	mux.Handle("/assets/js/", http.StripPrefix("/assets/js/", http.FileServer(http.Dir("./assets/js"))))
 	mux.Handle("/assets/images/", http.StripPrefix("/assets/images/", http.FileServer(http.Dir("./assets/images"))))
+	mux.Handle("/assets/charts/", http.StripPrefix("/assets/charts/", http.FileServer(http.Dir("./assets/charts"))))
 
 	// Create handler with EventLog and ThreadState
 	handler := infra.NewHandler(eventLog, threadState, provider, queue, workerPool)
