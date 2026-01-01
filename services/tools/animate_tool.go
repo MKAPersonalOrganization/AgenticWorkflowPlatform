@@ -205,9 +205,10 @@ func executeGnuplotAnimation(userScript, format string, delay int, title string)
 	script.WriteString("# Auto-generated terminal and output settings\n")
 
 	// Set terminal based on format
-	if format == "gif" {
+	switch format {
+	case "gif":
 		script.WriteString(fmt.Sprintf("set terminal gif animate delay %d size 800,600\n", delay))
-	} else if format == "webp" {
+	case "webp":
 		script.WriteString(fmt.Sprintf("set terminal webp animate delay %d size 800,600\n", delay))
 	}
 
@@ -221,7 +222,7 @@ func executeGnuplotAnimation(userScript, format string, delay int, title string)
 	if err := os.WriteFile(scriptPath, []byte(script.String()), 0o644); err != nil {
 		return "", fmt.Errorf("failed to write gnuplot script: %w", err)
 	}
-	defer os.Remove(scriptPath) // Clean up script file
+	defer func() { _ = os.Remove(scriptPath) }() // Clean up script file
 
 	// Execute gnuplot
 	cmd := exec.Command("gnuplot", scriptPath)

@@ -46,7 +46,7 @@ plot sin(x) with lines linewidth 2 title 'y = sin(x)'`
 	if _, err := os.Stat(imagePath); os.IsNotExist(err) {
 		t.Errorf("expected image file to exist at %s", imagePath)
 	} else {
-		defer os.Remove(imagePath)
+		defer func() { _ = os.Remove(imagePath) }()
 		t.Logf("Sine plot created successfully: %s", response["image_url"])
 	}
 }
@@ -71,13 +71,15 @@ plot sin(x) title 'sin(x)', cos(x) title 'cos(x)', tan(x) title 'tan(x)'`
 	}
 
 	var response map[string]interface{}
-	json.Unmarshal([]byte(result), &response)
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
 
 	imagePath := response["image_path"].(string)
 	if _, err := os.Stat(imagePath); os.IsNotExist(err) {
 		t.Errorf("expected image file to exist at %s", imagePath)
 	} else {
-		defer os.Remove(imagePath)
+		defer func() { _ = os.Remove(imagePath) }()
 		t.Logf("Multiple functions plot created: %s", response["image_url"])
 	}
 }
@@ -103,10 +105,12 @@ plot x**2 - 4*x + 3 with lines title 'y = x² - 4x + 3', 0 with lines dashtype 2
 	}
 
 	var response map[string]interface{}
-	json.Unmarshal([]byte(result), &response)
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
 
 	imagePath := response["image_path"].(string)
-	defer os.Remove(imagePath)
+	defer func() { _ = os.Remove(imagePath) }()
 	t.Logf("Quadratic plot created: %s", response["image_url"])
 }
 
@@ -135,10 +139,12 @@ e`
 	}
 
 	var response map[string]interface{}
-	json.Unmarshal([]byte(result), &response)
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
 
 	imagePath := response["image_path"].(string)
-	defer os.Remove(imagePath)
+	defer func() { _ = os.Remove(imagePath) }()
 	t.Logf("Scatter plot created: %s", response["image_url"])
 }
 
