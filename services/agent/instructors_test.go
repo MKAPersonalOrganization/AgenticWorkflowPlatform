@@ -8,20 +8,19 @@ import (
 	"school-with-ai/services/llm"
 )
 
-func createMockTools() (selectTool, handoffTool, whiteboardTool, calculatorTool llm.Tool) {
-	selectTool = llm.Tool{Type: "function", Name: "select_instructor", Description: "Select instructor", Parameters: map[string]interface{}{}}
-	handoffTool = llm.Tool{Type: "function", Name: "handoff_to_instructor", Description: "Handoff to instructor", Parameters: map[string]interface{}{}}
+func createMockTools() (handoffTool, whiteboardTool, calculatorTool llm.Tool) {
+	handoffTool = llm.Tool{Type: "function", Name: "call_agent", Description: "Call another agent", Parameters: map[string]interface{}{}}
 	whiteboardTool = llm.Tool{Type: "function", Name: "write_whiteboard", Description: "Write to whiteboard", Parameters: map[string]interface{}{}}
 	calculatorTool = llm.Tool{Type: "function", Name: "calculate", Description: "Calculate", Parameters: map[string]interface{}{}}
 	return
 }
 
 func TestInstructorConfigurations(t *testing.T) {
-	selectTool, handoffTool, whiteboardTool, calculatorTool := createMockTools()
+	handoffTool, whiteboardTool, calculatorTool := createMockTools()
 
-	router := agent.CreateRouterAgent(selectTool)
-	if router.Name != "instructor-router" {
-		t.Errorf("Expected router name 'instructor-router', got '%s'", router.Name)
+	studentAgent := agent.CreateStudentFacingAgent(handoffTool, whiteboardTool)
+	if studentAgent.Name != "student-facing-agent" {
+		t.Errorf("Expected student agent name 'student-facing-agent', got '%s'", studentAgent.Name)
 	}
 
 	math := agent.CreateMathInstructor(handoffTool, whiteboardTool, calculatorTool)
@@ -31,8 +30,8 @@ func TestInstructorConfigurations(t *testing.T) {
 }
 
 func TestInstructorRegistry(t *testing.T) {
-	selectTool, handoffTool, whiteboardTool, calculatorTool := createMockTools()
-	registry := agent.NewInstructorRegistry(selectTool, handoffTool, whiteboardTool, calculatorTool)
+	handoffTool, whiteboardTool, calculatorTool := createMockTools()
+	registry := agent.NewInstructorRegistry(handoffTool, whiteboardTool, calculatorTool)
 
 	_, exists := registry.GetByName("math-instructor")
 	if !exists {
@@ -41,7 +40,7 @@ func TestInstructorRegistry(t *testing.T) {
 }
 
 func ExampleCreateMathInstructor() {
-	_, handoffTool, whiteboardTool, calculatorTool := createMockTools()
+	handoffTool, whiteboardTool, calculatorTool := createMockTools()
 	config := agent.CreateMathInstructor(handoffTool, whiteboardTool, calculatorTool)
 	fmt.Printf("Name: %s\n", config.Name)
 }
