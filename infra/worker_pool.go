@@ -16,7 +16,8 @@ import (
 // WorkerPool manages a pool of workers that process jobs from the queue
 type WorkerPool struct {
 	queue        domain.JobQueue
-	store        agent.Repository
+	log          agent.EventLog
+	state        agent.ThreadState
 	provider     llm.Provider
 	numWorkers   int
 	pollInterval time.Duration
@@ -42,7 +43,7 @@ type WorkerPoolConfig struct {
 }
 
 // NewWorkerPool creates a new worker pool
-func NewWorkerPool(queue domain.JobQueue, store agent.Repository, provider llm.Provider, config WorkerPoolConfig) *WorkerPool {
+func NewWorkerPool(queue domain.JobQueue, log agent.EventLog, state agent.ThreadState, provider llm.Provider, config WorkerPoolConfig) *WorkerPool {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	if config.NumWorkers <= 0 {
@@ -54,7 +55,8 @@ func NewWorkerPool(queue domain.JobQueue, store agent.Repository, provider llm.P
 
 	return &WorkerPool{
 		queue:            queue,
-		store:            store,
+		log:              log,
+		state:            state,
 		provider:         provider,
 		numWorkers:       config.NumWorkers,
 		pollInterval:     config.PollInterval,
@@ -184,16 +186,33 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 	default:
 	}
 
-	// Ensure thread exists
-	wp.store.GetOrCreateThread(job.ThreadID)
+	// Check if thread exists, if not emit ThreadCreatedEvent
+	_, exists := wp.state.Get(job.ThreadID)
+	if !exists {
+		createEvent := &agent.ThreadCreatedEvent{
+			BaseEvent: agent.BaseEvent{
+				Type:      "ThreadCreated",
+				Timestamp: time.Now(),
+				ThreadID:  job.ThreadID,
+			},
+			Title: "New Chat",
+		}
+		wp.log.Append(job.ThreadID, createEvent)
+		wp.state.Update(createEvent)
+	}
 
-	// Store user message
-	wp.store.AddMessage(job.ThreadID, domain.Message{
-		ID:        job.MessageID,
-		Role:      "user",
+	// Emit UserMessageAddedEvent
+	userMsgEvent := &agent.UserMessageAddedEvent{
+		BaseEvent: agent.BaseEvent{
+			Type:      "UserMessageAdded",
+			Timestamp: time.Now(),
+			ThreadID:  job.ThreadID,
+		},
+		MessageID: job.MessageID,
 		Content:   job.Message,
-		Timestamp: time.Now(),
-	})
+	}
+	wp.log.Append(job.ThreadID, userMsgEvent)
+	wp.state.Update(userMsgEvent)
 
 	// Generate unique run ID for this execution
 	runID := agui.GenerateRunID()
@@ -214,14 +233,25 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 	emitter.Emit(runStartedEvent)
 
 	// Auto-generate thread title immediately if this is the first message
-	thread, exists := wp.store.GetThread(job.ThreadID)
-	if exists && thread.Title == "New Chat" && len(thread.Messages) == 1 {
+	thread, threadExists := wp.state.Get(job.ThreadID)
+	if threadExists && thread.Title == "New Chat" && len(thread.Messages) == 1 {
 		// Take first 50 characters of first user message as title
 		title := job.Message
 		if len(title) > 50 {
 			title = title[:50] + "..."
 		}
-		wp.store.UpdateThreadTitle(job.ThreadID, title)
+
+		// Emit ThreadTitleUpdatedEvent
+		titleEvent := &agent.ThreadTitleUpdatedEvent{
+			BaseEvent: agent.BaseEvent{
+				Type:      "ThreadTitleUpdated",
+				Timestamp: time.Now(),
+				ThreadID:  job.ThreadID,
+			},
+			NewTitle: title,
+		}
+		wp.log.Append(job.ThreadID, titleEvent)
+		wp.state.Update(titleEvent)
 
 		// Send CUSTOM event to notify frontend of title update immediately
 		customTimestamp := time.Now().UnixMilli()
@@ -242,22 +272,30 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 	// Generate unique message ID for assistant response
 	assistantMessageID := agui.GenerateMessageID()
 
-	// Get conversation history
-	messages := wp.store.GetMessages(job.ThreadID)
+	// Get conversation history from state
+	messages := wp.state.Messages(job.ThreadID)
 
 	// Get available tools
 	availableTools := tools.GetAllTools()
 
-	// Create agent with tools
-	messageHandler := agent.NewAgent(
+	// Create agent (pure domain logic)
+	agentInstance := agent.NewAgent(
 		wp.provider,
-		wp.store,
-		emitter,
+		wp.log,
+		wp.state,
 		agent.WithTools(availableTools),
 	)
 
-	// Process user message and stream response with cancellable context
-	if err := messageHandler.Run(ctx, job.ThreadID, assistantMessageID, messages); err != nil {
+	// Create UI notifier
+	notifier := NewUINotifier(emitter)
+
+	// Domain event handler: translates domain events to UI events
+	domainEventHandler := func(event agent.Event) error {
+		return notifier.HandleDomainEvent(event)
+	}
+
+	// Process with agent - it emits domain events, handler translates to UI
+	if err := agentInstance.Run(ctx, job.ThreadID, assistantMessageID, messages, domainEventHandler); err != nil {
 		// Check if error was due to cancellation
 		if ctx.Err() == context.Canceled {
 			slog.Info("Job cancelled during processing", "jobID", job.ID)
@@ -372,7 +410,7 @@ func (wp *WorkerPool) CancelJob(jobID string) bool {
 
 // emitMessagesSnapshot emits a MESSAGES_SNAPSHOT event
 func (wp *WorkerPool) emitMessagesSnapshot(emitter agent.EventEmitter, threadID string) {
-	sessionMessages := wp.store.GetMessages(threadID)
+	sessionMessages := wp.state.Messages(threadID)
 
 	// Convert session messages to agui messages
 	aguiMessages := make([]agui.Message, 0, len(sessionMessages))

@@ -14,16 +14,18 @@ import (
 
 // Handler encapsulates dependencies for HTTP handlers
 type Handler struct {
-	store      agent.Repository
+	state      agent.ThreadState
+	log        agent.EventLog
 	provider   llm.Provider
 	queue      domain.JobQueue
 	workerPool *WorkerPool
 }
 
 // NewHandler creates a new HTTP handler with the given dependencies
-func NewHandler(store agent.Repository, provider llm.Provider, queue domain.JobQueue, workerPool *WorkerPool) *Handler {
+func NewHandler(log agent.EventLog, state agent.ThreadState, provider llm.Provider, queue domain.JobQueue, workerPool *WorkerPool) *Handler {
 	return &Handler{
-		store:      store,
+		state:      state,
+		log:        log,
 		provider:   provider,
 		queue:      queue,
 		workerPool: workerPool,
@@ -302,7 +304,7 @@ func (h *Handler) GetMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	messages := h.store.GetMessages(threadID)
+	messages := h.state.Messages(threadID)
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(messages); err != nil {
@@ -313,7 +315,7 @@ func (h *Handler) GetMessages(w http.ResponseWriter, r *http.Request) {
 
 // GetThreads retrieves all threads
 func (h *Handler) GetThreads(w http.ResponseWriter, r *http.Request) {
-	threads := h.store.GetAllThreads()
+	threads := h.state.All()
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(threads); err != nil {
@@ -330,11 +332,23 @@ func (h *Handler) DeleteThread(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	deleted := h.store.DeleteThread(threadID)
-	if !deleted {
+	// Check if thread exists
+	_, exists := h.state.Get(threadID)
+	if !exists {
 		http.Error(w, "Thread not found", http.StatusNotFound)
 		return
 	}
+
+	// Emit ThreadDeletedEvent
+	event := &agent.ThreadDeletedEvent{
+		BaseEvent: agent.BaseEvent{
+			Type:      "ThreadDeleted",
+			Timestamp: time.Now(),
+			ThreadID:  threadID,
+		},
+	}
+	h.log.Append(threadID, event)
+	h.state.Update(event)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -343,7 +357,7 @@ func (h *Handler) DeleteThread(w http.ResponseWriter, r *http.Request) {
 
 // emitMessagesSnapshot converts session messages to AG-UI messages and emits MESSAGES_SNAPSHOT event
 func (h *Handler) emitMessagesSnapshot(w http.ResponseWriter, flusher http.Flusher, threadID string) error {
-	sessionMessages := h.store.GetMessages(threadID)
+	sessionMessages := h.state.Messages(threadID)
 
 	// Convert session.Message to agui.Message
 	aguiMessages := make([]agui.Message, 0, len(sessionMessages))
