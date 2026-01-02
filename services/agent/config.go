@@ -2,6 +2,11 @@ package agent
 
 import "school-with-ai/services/llm"
 
+// EventNotifier is the interface for handling domain events from agents
+type EventNotifier interface {
+	HandleDomainEvent(event Event) error
+}
+
 // AgentConfig defines the configuration for an agent
 type AgentConfig struct {
 	// Identity
@@ -15,6 +20,9 @@ type AgentConfig struct {
 
 	// Collaboration (for multi-agent scenarios)
 	HasPrivateMemory bool // Whether agent maintains private memory (isolated)
+
+	// Event handling
+	Notifier EventNotifier // UI/Event notifier for this agent
 }
 
 // DefaultConfig returns a basic agent configuration

@@ -275,13 +275,19 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 	messages := wp.state.Messages(job.ThreadID)
 
 	// Determine which agent to use
-	var agentConfig agent.AgentConfig
 	thread, threadExists = wp.state.Get(job.ThreadID)
 
 	// CRITICAL: New user messages MUST always go through student-facing agent first
 	// This ensures proper routing and prevents instructors from receiving direct questions
 	isNewUserMessage := len(messages) == 0 || messages[len(messages)-1].Role == "user"
 
+	// Create UI notifier for this job's event stream
+	notifier := NewUINotifier(emitter)
+
+	// Set the notifier in the registry so all agents created will use it
+	wp.instructorRegistry.SetNotifier(notifier)
+
+	var agentConfig agent.AgentConfig
 	if !threadExists || thread.CurrentInstructor == "" || isNewUserMessage {
 		// New thread OR new user message - ALWAYS start with student-facing agent (coordinator)
 		agentConfig = wp.instructorRegistry.GetStudentFacingAgent()
@@ -298,20 +304,12 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 		agent.WithConfig(agentConfig),
 	)
 
-	// Create UI notifier
-	notifier := NewUINotifier(emitter)
-
 	// Track agent events during the run
 	var nextAgent string
 	var agentEventOccurred bool
 
-	// Domain event handler: translates domain events to UI events AND tracks agent events
+	// Domain event handler: tracks routing events (UI notifications handled by agent's notifier)
 	domainEventHandler := func(event agent.Event) error {
-		// First, handle UI translation
-		if err := notifier.HandleDomainEvent(event); err != nil {
-			return err
-		}
-
 		// Track routing events (but don't act on them yet - wait for agent to finish)
 		switch e := event.(type) {
 		case *agent.DomainEvent:
@@ -495,6 +493,12 @@ func (wp *WorkerPool) emitMessagesSnapshot(emitter EventEmitter, threadID string
 func (wp *WorkerPool) continueWithAgent(ctx context.Context, threadID, agentName string, emitter EventEmitter, runID string) {
 	slog.Info("Continuing with agent", "threadID", threadID, "agent", agentName)
 
+	// Create UI notifier for this continuation's event stream
+	notifier := NewUINotifier(emitter)
+
+	// Set the notifier in the registry so all agents created will use it
+	wp.instructorRegistry.SetNotifier(notifier)
+
 	// Get agent config
 	agentConfig, exists := wp.instructorRegistry.GetByName(agentName)
 	if !exists {
@@ -541,20 +545,12 @@ Follow your state machine workflow:
 	// Generate message ID for agent's response
 	messageID := agui.GenerateMessageID()
 
-	// Create UI notifier
-	notifier := NewUINotifier(emitter)
-
 	// Track routing events during the run
 	var nextAgent string
 	var routingEventOccurred bool
 
-	// Domain event handler for the agent
+	// Domain event handler for the agent (routing only - UI handled by agent's notifier)
 	agentEventHandler := func(event agent.Event) error {
-		// Translate domain events to UI events
-		if err := notifier.HandleDomainEvent(event); err != nil {
-			return err
-		}
-
 		// Track routing events (but don't act on them yet - wait for agent to finish)
 		switch e := event.(type) {
 		case *agent.DomainEvent:
