@@ -4,8 +4,8 @@ package agent
 // CRITICAL ROUTING RULE: ALL new user questions in a thread MUST be routed through this agent first.
 // The system enforces this by checking if the last message is from the user, and if so,
 // it always invokes the student-facing agent before any specialist instructor.
-func CreateStudentFacingAgent(callAgentTool, whiteboardTool Tool) AgentConfig {
-	tools := []Tool{whiteboardTool, callAgentTool}
+func CreateStudentFacingAgent(callAgentTool, whiteboardTool, readWhiteboardTool Tool) AgentConfig {
+	tools := []Tool{readWhiteboardTool, whiteboardTool, callAgentTool}
 
 	return AgentConfig{
 		Name:           "student-facing-agent",
@@ -81,9 +81,28 @@ Your ONLY function: Analyze → Route → HALT
 
 **Input:** User message (any question, any topic)
 
+### ⚠️ CRITICAL FIRST STEP: READ WHITEBOARD TO AVOID DUPLICATES ⚠️
+
+**🚨 MANDATORY REQUIREMENT BEFORE WRITING QUESTION 🚨**
+
+**BEFORE writing the question to the whiteboard, you MUST:**
+
+1. **Execute read_whiteboard tool FIRST** - This is NON-NEGOTIABLE
+2. **Check if this EXACT question is already on the whiteboard:**
+   - Look for "# QUESTION" sections
+   - Compare the student's current question with existing questions
+   - Check if this is a NEW question or already present
+3. **Decision:**
+   - ✓ If question is NOT on whiteboard → Write it (State 1a)
+   - ✗ If question IS already on whiteboard → Skip writing, just route (State 1b)
+
+This prevents duplicate question entries on the whiteboard.
+
+### State 1a: NEW QUESTION - Write & Route
+
 **EXPLICIT INSTRUCTIONS - FOLLOW EXACTLY:**
 
-1. **Write the student's question to the whiteboard**
+1. **Write the student's question to the whiteboard** (ONLY if not already there)
    - Use: write_whiteboard(action="append", content="\n---\n\n# QUESTION\n[exact student question]\n")
    - Copy the student's question EXACTLY as they asked it
    - Do NOT modify, rephrase, or answer the question
@@ -97,9 +116,20 @@ Your ONLY function: Analyze → Route → HALT
    - The instructors will collaborate sequentially (they can call each other)
    - Then STOP - do not do anything else
 
-**Action:** Make EXACTLY 2 tool calls in this order:
-1. write_whiteboard(action="append", content="\n---\n\n# QUESTION\n[student's exact question]\n")
+**Action:** Make EXACTLY 3 tool calls in this order:
+1. read_whiteboard()
+2. write_whiteboard(action="append", content="\n---\n\n# QUESTION\n[student's exact question]\n") - ONLY if question not already present
+3. call_agent(agent_name=[primary_specialist])
+
+### State 1b: EXISTING QUESTION - Route Only
+
+**When question is ALREADY on whiteboard:**
+
+**Action:** Make EXACTLY 2 tool calls:
+1. read_whiteboard()
 2. call_agent(agent_name=[primary_specialist])
+
+**DO NOT write the question again** - it's already there!
 
 **IMPORTANT - Multi-Instructor Questions:**
 - If a question requires multiple subjects (e.g., "calculate the force AND the chemical reaction")
@@ -303,6 +333,7 @@ stateDiagram-v2
 - Previous answers from other instructors (## PHYSICS, ## CHEMISTRY, etc.)
 - Any context or partial solutions already provided
 - The conversation history and state
+- **ALL EXISTING CONTENT** to identify what has already been explained
 
 ### State 1: READ WHITEBOARD (MANDATORY ENTRY POINT)
 
@@ -310,6 +341,45 @@ stateDiagram-v2
 **FIRST ACTION:** Execute read_whiteboard tool immediately - DO NOT do anything else first
 **Parse:** Question context + caller information + previous contributions + existing content
 **Validate:** Confirm you have the complete context before proceeding to State 2
+
+### ⚠️ CRITICAL: NEVER DUPLICATE CONTENT ⚠️
+
+**🚨 ABSOLUTE RULE: ONLY ADD NEW CONCEPTS OR IDEAS 🚨**
+
+**BEFORE WRITING ANYTHING TO THE WHITEBOARD:**
+1. **Read the ENTIRE whiteboard content** using read_whiteboard
+2. **Identify what has ALREADY been explained:**
+   - What concepts have been covered?
+   - What examples have been shown?
+   - What calculations have been performed?
+   - What explanations already exist?
+3. **Determine what is MISSING or NEW:**
+   - What hasn't been addressed yet?
+   - What new perspective can you add?
+   - What additional insight is needed?
+4. **ONLY write content that is:**
+   ✓ NEW - Not already on the whiteboard
+   ✓ DIFFERENT - A new angle or perspective
+   ✓ ADDITIVE - Builds on existing content without repeating it
+   ✗ DUPLICATE - Same concept in different words
+   ✗ REDUNDANT - Already explained by another instructor
+   ✗ REPETITIVE - Restating what's already there
+
+**IF THE CONCEPT IS ALREADY FULLY EXPLAINED:**
+- DO NOT rewrite it
+- DO NOT rephrase it
+- DO NOT add "another way to think about it"
+- ONLY add if you have something genuinely NEW to contribute
+
+**YOUR CONTRIBUTION MUST BE:**
+- A new concept not yet covered
+- A new step in the solution
+- A new example or application
+- A new visualization or perspective
+- Information specifically requested but not yet provided
+
+**FAILURE TO FOLLOW = WASTED STUDENT TIME**
+Duplicating content wastes the student's time and creates confusion. Every word you write must add NEW value.
 
 ### State 2: ANALYZE SCOPE (Deterministic Decision)
 
@@ -683,8 +753,8 @@ If student asks for a plot/graph and you don't use the plot tool, you have faile
 }
 
 // CreatePhysicsInstructor creates the physics instructor agent configuration
-func CreatePhysicsInstructor(callAgentTool, whiteboardTool, calculatorTool, weatherTool, unitConversionTool Tool) AgentConfig {
-	tools := []Tool{calculatorTool, unitConversionTool, weatherTool, callAgentTool, whiteboardTool}
+func CreatePhysicsInstructor(callAgentTool, whiteboardTool, readWhiteboardTool, calculatorTool, weatherTool, unitConversionTool Tool) AgentConfig {
+	tools := []Tool{readWhiteboardTool, calculatorTool, unitConversionTool, weatherTool, callAgentTool, whiteboardTool}
 
 	return AgentConfig{
 		Name:           "physics-instructor",
@@ -752,6 +822,7 @@ stateDiagram-v2
 - Previous answers from other instructors (## MATH, ## CHEMISTRY, etc.)
 - Any context or partial solutions already provided
 - The conversation history and state
+- **ALL EXISTING CONTENT** to identify what has already been explained
 
 ### State 1: READ WHITEBOARD (MANDATORY ENTRY POINT)
 
@@ -759,6 +830,45 @@ stateDiagram-v2
 **FIRST ACTION:** Execute read_whiteboard tool immediately - DO NOT do anything else first
 **Parse:** Question context + caller information + previous contributions + existing content
 **Validate:** Confirm you have the complete context before proceeding to State 2
+
+### ⚠️ CRITICAL: NEVER DUPLICATE CONTENT ⚠️
+
+**🚨 ABSOLUTE RULE: ONLY ADD NEW CONCEPTS OR IDEAS 🚨**
+
+**BEFORE WRITING ANYTHING TO THE WHITEBOARD:**
+1. **Read the ENTIRE whiteboard content** using read_whiteboard
+2. **Identify what has ALREADY been explained:**
+   - What concepts have been covered?
+   - What examples have been shown?
+   - What calculations have been performed?
+   - What explanations already exist?
+3. **Determine what is MISSING or NEW:**
+   - What hasn't been addressed yet?
+   - What new perspective can you add?
+   - What additional insight is needed?
+4. **ONLY write content that is:**
+   ✓ NEW - Not already on the whiteboard
+   ✓ DIFFERENT - A new angle or perspective
+   ✓ ADDITIVE - Builds on existing content without repeating it
+   ✗ DUPLICATE - Same concept in different words
+   ✗ REDUNDANT - Already explained by another instructor
+   ✗ REPETITIVE - Restating what's already there
+
+**IF THE CONCEPT IS ALREADY FULLY EXPLAINED:**
+- DO NOT rewrite it
+- DO NOT rephrase it
+- DO NOT add "another way to think about it"
+- ONLY add if you have something genuinely NEW to contribute
+
+**YOUR CONTRIBUTION MUST BE:**
+- A new concept not yet covered
+- A new step in the solution
+- A new example or application
+- A new visualization or perspective
+- Information specifically requested but not yet provided
+
+**FAILURE TO FOLLOW = WASTED STUDENT TIME**
+Duplicating content wastes the student's time and creates confusion. Every word you write must add NEW value.
 
 ### State 2: ANALYZE SCOPE (Deterministic Decision)
 
@@ -932,8 +1042,8 @@ energy = 0.5 * mass * velocity**2
 }
 
 // CreateChemistryInstructor creates the chemistry instructor agent configuration
-func CreateChemistryInstructor(callAgentTool, whiteboardTool, calculatorTool, periodicTableTool, unitConversionTool Tool) AgentConfig {
-	tools := []Tool{calculatorTool, periodicTableTool, unitConversionTool, callAgentTool, whiteboardTool}
+func CreateChemistryInstructor(callAgentTool, whiteboardTool, readWhiteboardTool, calculatorTool, periodicTableTool, unitConversionTool Tool) AgentConfig {
+	tools := []Tool{readWhiteboardTool, calculatorTool, periodicTableTool, unitConversionTool, callAgentTool, whiteboardTool}
 
 	return AgentConfig{
 		Name:           "chemistry-instructor",
@@ -1001,6 +1111,7 @@ stateDiagram-v2
 - Previous answers from other instructors (## MATH, ## PHYSICS, etc.)
 - Any context or partial solutions already provided
 - The conversation history and state
+- **ALL EXISTING CONTENT** to identify what has already been explained
 
 ### State 1: READ WHITEBOARD (MANDATORY ENTRY POINT)
 
@@ -1008,6 +1119,45 @@ stateDiagram-v2
 **FIRST ACTION:** Execute read_whiteboard tool immediately - DO NOT do anything else first
 **Parse:** Question context + caller information + previous contributions + existing content
 **Validate:** Confirm you have the complete context before proceeding to State 2
+
+### ⚠️ CRITICAL: NEVER DUPLICATE CONTENT ⚠️
+
+**🚨 ABSOLUTE RULE: ONLY ADD NEW CONCEPTS OR IDEAS 🚨**
+
+**BEFORE WRITING ANYTHING TO THE WHITEBOARD:**
+1. **Read the ENTIRE whiteboard content** using read_whiteboard
+2. **Identify what has ALREADY been explained:**
+   - What concepts have been covered?
+   - What examples have been shown?
+   - What calculations have been performed?
+   - What explanations already exist?
+3. **Determine what is MISSING or NEW:**
+   - What hasn't been addressed yet?
+   - What new perspective can you add?
+   - What additional insight is needed?
+4. **ONLY write content that is:**
+   ✓ NEW - Not already on the whiteboard
+   ✓ DIFFERENT - A new angle or perspective
+   ✓ ADDITIVE - Builds on existing content without repeating it
+   ✗ DUPLICATE - Same concept in different words
+   ✗ REDUNDANT - Already explained by another instructor
+   ✗ REPETITIVE - Restating what's already there
+
+**IF THE CONCEPT IS ALREADY FULLY EXPLAINED:**
+- DO NOT rewrite it
+- DO NOT rephrase it
+- DO NOT add "another way to think about it"
+- ONLY add if you have something genuinely NEW to contribute
+
+**YOUR CONTRIBUTION MUST BE:**
+- A new concept not yet covered
+- A new step in the solution
+- A new example or application
+- A new visualization or perspective
+- Information specifically requested but not yet provided
+
+**FAILURE TO FOLLOW = WASTED STUDENT TIME**
+Duplicating content wastes the student's time and creates confusion. Every word you write must add NEW value.
 
 ### State 2: ANALYZE SCOPE (Deterministic Decision)
 
@@ -1235,13 +1385,13 @@ func NewInstructorRegistry(
 func (r *InstructorRegistry) GetByName(name string) (AgentConfig, bool) {
 	switch name {
 	case "student-facing-agent":
-		return CreateStudentFacingAgent(r.callAgentTool, r.whiteboardTool), true
+		return CreateStudentFacingAgent(r.callAgentTool, r.whiteboardTool, r.readWhiteboardTool), true
 	case "math-instructor":
 		return CreateMathInstructor(r.callAgentTool, r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.graphingTool, r.equationSolverTool, r.plotTool, r.animateTool), true
 	case "physics-instructor":
-		return CreatePhysicsInstructor(r.callAgentTool, r.whiteboardTool, r.calculatorTool, r.weatherTool, r.unitConversionTool), true
+		return CreatePhysicsInstructor(r.callAgentTool, r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.weatherTool, r.unitConversionTool), true
 	case "chemistry-instructor":
-		return CreateChemistryInstructor(r.callAgentTool, r.whiteboardTool, r.calculatorTool, r.periodicTableTool, r.unitConversionTool), true
+		return CreateChemistryInstructor(r.callAgentTool, r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.periodicTableTool, r.unitConversionTool), true
 	default:
 		return AgentConfig{}, false
 	}
@@ -1251,12 +1401,12 @@ func (r *InstructorRegistry) GetByName(name string) (AgentConfig, bool) {
 func (r *InstructorRegistry) GetAllInstructors() []AgentConfig {
 	return []AgentConfig{
 		CreateMathInstructor(r.callAgentTool, r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.graphingTool, r.equationSolverTool, r.plotTool, r.animateTool),
-		CreatePhysicsInstructor(r.callAgentTool, r.whiteboardTool, r.calculatorTool, r.weatherTool, r.unitConversionTool),
-		CreateChemistryInstructor(r.callAgentTool, r.whiteboardTool, r.calculatorTool, r.periodicTableTool, r.unitConversionTool),
+		CreatePhysicsInstructor(r.callAgentTool, r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.weatherTool, r.unitConversionTool),
+		CreateChemistryInstructor(r.callAgentTool, r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.periodicTableTool, r.unitConversionTool),
 	}
 }
 
 // GetStudentFacingAgent returns the student-facing agent (entry point for all conversations)
 func (r *InstructorRegistry) GetStudentFacingAgent() AgentConfig {
-	return CreateStudentFacingAgent(r.callAgentTool, r.whiteboardTool)
+	return CreateStudentFacingAgent(r.callAgentTool, r.whiteboardTool, r.readWhiteboardTool)
 }
