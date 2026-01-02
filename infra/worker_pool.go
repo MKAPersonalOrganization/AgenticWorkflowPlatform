@@ -312,11 +312,31 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 			return err
 		}
 
-		// Track agent call events (but don't act on them yet - wait for agent to finish)
+		// Track routing events (but don't act on them yet - wait for agent to finish)
 		switch e := event.(type) {
 		case *agent.AgentCalledEvent:
-			// Current agent called another agent - we'll continue after this run completes
+			// Legacy support - Current agent called another agent
 			nextAgent = e.CalledAgent
+			agentEventOccurred = true
+
+		case *agent.MathQuestionEvent:
+			// Math question emitted - activate math instructor
+			nextAgent = "math-instructor"
+			agentEventOccurred = true
+
+		case *agent.PhysicsQuestionEvent:
+			// Physics question emitted - activate physics instructor
+			nextAgent = "physics-instructor"
+			agentEventOccurred = true
+
+		case *agent.ChemistryQuestionEvent:
+			// Chemistry question emitted - activate chemistry instructor
+			nextAgent = "chemistry-instructor"
+			agentEventOccurred = true
+
+		case *agent.QuestionAnsweredEvent:
+			// Question answered - activate student-facing agent to review and respond
+			nextAgent = "student-facing-agent"
 			agentEventOccurred = true
 		}
 
@@ -508,9 +528,7 @@ WHITEBOARD CONTENT:
 Follow your state machine workflow:
 1. Read and understand the content on the whiteboard
 2. Write your contribution to the whiteboard using write_whiteboard with action="append"
-3. Decide next action:
-   - IF your answer is complete AND no other specialist needed: call_agent(agent_name="student-facing-agent")
-   - IF you need another specialist's expertise: call_agent(agent_name=<specialist>)`, thread.WhiteboardContent),
+3. Signal completion: emit_question_answered(subject="your_subject", is_complete=true/false)`, thread.WhiteboardContent),
 			}
 			messages = append(messages, triggerMsg)
 		}
@@ -522,9 +540,9 @@ Follow your state machine workflow:
 	// Create UI notifier
 	notifier := NewUINotifier(emitter)
 
-	// Track agent call events during the run
+	// Track routing events during the run
 	var nextAgent string
-	var agentCallOccurred bool
+	var routingEventOccurred bool
 
 	// Domain event handler for the agent
 	agentEventHandler := func(event agent.Event) error {
@@ -533,10 +551,28 @@ Follow your state machine workflow:
 			return err
 		}
 
-		// Track agent call events (but don't act on them yet - wait for agent to finish)
-		if callEvent, ok := event.(*agent.AgentCalledEvent); ok {
-			nextAgent = callEvent.CalledAgent
-			agentCallOccurred = true
+		// Track routing events (but don't act on them yet - wait for agent to finish)
+		switch e := event.(type) {
+		case *agent.AgentCalledEvent:
+			// Legacy support
+			nextAgent = e.CalledAgent
+			routingEventOccurred = true
+
+		case *agent.MathQuestionEvent:
+			nextAgent = "math-instructor"
+			routingEventOccurred = true
+
+		case *agent.PhysicsQuestionEvent:
+			nextAgent = "physics-instructor"
+			routingEventOccurred = true
+
+		case *agent.ChemistryQuestionEvent:
+			nextAgent = "chemistry-instructor"
+			routingEventOccurred = true
+
+		case *agent.QuestionAnsweredEvent:
+			nextAgent = "student-facing-agent"
+			routingEventOccurred = true
 		}
 
 		return nil
@@ -564,9 +600,9 @@ Follow your state machine workflow:
 	// Emit updated messages snapshot
 	wp.emitMessagesSnapshot(emitter, threadID)
 
-	// Check if we need to continue with another agent (chained call)
-	if agentCallOccurred && nextAgent != "" {
-		slog.Info("Chained call to next agent", "from", agentName, "to", nextAgent)
+	// Check if we need to continue with another agent (chained routing)
+	if routingEventOccurred && nextAgent != "" {
+		slog.Info("Routing to next agent", "from", agentName, "to", nextAgent)
 		wp.continueWithAgent(ctx, threadID, nextAgent, emitter, runID)
 	}
 }

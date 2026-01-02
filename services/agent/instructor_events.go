@@ -90,3 +90,95 @@ func NewInstructorStrategyChanged(threadID, instructorName, oldStrategy, newStra
 		Reason:         reason,
 	}
 }
+
+// Subject-specific question events for agent activation
+
+type MathQuestionEvent struct {
+	BaseEvent
+	Question        string
+	EmittedBy       string
+	Context         string
+	WhiteboardState string
+}
+
+func NewMathQuestion(threadID, question, emittedBy, context, whiteboardState string) *MathQuestionEvent {
+	return &MathQuestionEvent{
+		BaseEvent: BaseEvent{
+			Type:      "MathQuestion",
+			Timestamp: time.Now(),
+			ThreadID:  threadID,
+		},
+		Question:        question,
+		EmittedBy:       emittedBy,
+		Context:         context,
+		WhiteboardState: whiteboardState,
+	}
+}
+
+type PhysicsQuestionEvent struct {
+	BaseEvent
+	Question        string
+	EmittedBy       string
+	Context         string
+	WhiteboardState string
+}
+
+func NewPhysicsQuestion(threadID, question, emittedBy, context, whiteboardState string) *PhysicsQuestionEvent {
+	return &PhysicsQuestionEvent{
+		BaseEvent: BaseEvent{
+			Type:      "PhysicsQuestion",
+			Timestamp: time.Now(),
+			ThreadID:  threadID,
+		},
+		Question:        question,
+		EmittedBy:       emittedBy,
+		Context:         context,
+		WhiteboardState: whiteboardState,
+	}
+}
+
+type ChemistryQuestionEvent struct {
+	BaseEvent
+	Question        string
+	EmittedBy       string
+	Context         string
+	WhiteboardState string
+}
+
+func NewChemistryQuestion(threadID, question, emittedBy, context, whiteboardState string) *ChemistryQuestionEvent {
+	return &ChemistryQuestionEvent{
+		BaseEvent: BaseEvent{
+			Type:      "ChemistryQuestion",
+			Timestamp: time.Now(),
+			ThreadID:  threadID,
+		},
+		Question:        question,
+		EmittedBy:       emittedBy,
+		Context:         context,
+		WhiteboardState: whiteboardState,
+	}
+}
+
+type QuestionAnsweredEvent struct {
+	BaseEvent
+	Subject         string // "math", "physics", "chemistry"
+	Answer          string
+	AnsweredBy      string
+	IsComplete      bool
+	WhiteboardState string
+}
+
+func NewQuestionAnswered(threadID, subject, answer, answeredBy string, isComplete bool, whiteboardState string) *QuestionAnsweredEvent {
+	return &QuestionAnsweredEvent{
+		BaseEvent: BaseEvent{
+			Type:      "QuestionAnswered",
+			Timestamp: time.Now(),
+			ThreadID:  threadID,
+		},
+		Subject:         subject,
+		Answer:          answer,
+		AnsweredBy:      answeredBy,
+		IsComplete:      isComplete,
+		WhiteboardState: whiteboardState,
+	}
+}

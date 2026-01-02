@@ -42,7 +42,6 @@ func main() {
 	queue := infra.NewInMemoryJobQueue()
 
 	// Create tools using the Tool interface
-	callAgentTool := tools.NewCallAgentTool()
 	whiteboardTool := tools.NewWriteWhiteboardTool()
 	readWhiteboardTool := tools.NewReadWhiteboardTool()
 	calculatorTool := tools.NewCalculatorTool()
@@ -54,9 +53,14 @@ func main() {
 	plotTool := tools.NewPlotTool()
 	animateTool := tools.NewAnimateTool()
 
+	// Event emission tools for agent communication
+	emitMathQuestionTool := tools.NewEmitMathQuestionTool()
+	emitPhysicsQuestionTool := tools.NewEmitPhysicsQuestionTool()
+	emitChemistryQuestionTool := tools.NewEmitChemistryQuestionTool()
+	emitQuestionAnsweredTool := tools.NewEmitQuestionAnsweredTool()
+
 	// Initialize instructor registry with tools
 	instructorRegistry := agent.NewInstructorRegistry(
-		callAgentTool,
 		whiteboardTool,
 		readWhiteboardTool,
 		calculatorTool,
@@ -67,6 +71,10 @@ func main() {
 		equationSolverTool,
 		plotTool,
 		animateTool,
+		emitMathQuestionTool,
+		emitPhysicsQuestionTool,
+		emitChemistryQuestionTool,
+		emitQuestionAnsweredTool,
 	)
 
 	// Initialize and start worker pool with instructor registry

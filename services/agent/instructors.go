@@ -4,8 +4,8 @@ package agent
 // CRITICAL ROUTING RULE: ALL new user questions in a thread MUST be routed through this agent first.
 // The system enforces this by checking if the last message is from the user, and if so,
 // it always invokes the student-facing agent before any specialist instructor.
-func CreateStudentFacingAgent(callAgentTool, whiteboardTool, readWhiteboardTool Tool) AgentConfig {
-	tools := []Tool{readWhiteboardTool, whiteboardTool, callAgentTool}
+func CreateStudentFacingAgent(whiteboardTool, readWhiteboardTool, emitMathQuestionTool, emitPhysicsQuestionTool, emitChemistryQuestionTool Tool) AgentConfig {
+	tools := []Tool{readWhiteboardTool, whiteboardTool, emitMathQuestionTool, emitPhysicsQuestionTool, emitChemistryQuestionTool}
 
 	return AgentConfig{
 		Name:           "student-facing-agent",
@@ -396,8 +396,8 @@ If question requires multiple subjects, identify which should go FIRST:
 }
 
 // CreateMathInstructor creates the math instructor agent configuration
-func CreateMathInstructor(callAgentTool, whiteboardTool, readWhiteboardTool, calculatorTool, graphingTool, equationSolverTool, plotTool, animateTool Tool) AgentConfig {
-	tools := []Tool{calculatorTool, graphingTool, equationSolverTool, plotTool, animateTool, readWhiteboardTool, callAgentTool, whiteboardTool}
+func CreateMathInstructor(whiteboardTool, readWhiteboardTool, calculatorTool, graphingTool, equationSolverTool, plotTool, animateTool, emitQuestionAnsweredTool Tool) AgentConfig {
+	tools := []Tool{calculatorTool, graphingTool, equationSolverTool, plotTool, animateTool, readWhiteboardTool, emitQuestionAnsweredTool, whiteboardTool}
 
 	return AgentConfig{
 		Name:           "math-instructor",
@@ -885,8 +885,8 @@ If student asks for a plot/graph and you don't use the plot tool, you have faile
 }
 
 // CreatePhysicsInstructor creates the physics instructor agent configuration
-func CreatePhysicsInstructor(callAgentTool, whiteboardTool, readWhiteboardTool, calculatorTool, weatherTool, unitConversionTool Tool) AgentConfig {
-	tools := []Tool{readWhiteboardTool, calculatorTool, unitConversionTool, weatherTool, callAgentTool, whiteboardTool}
+func CreatePhysicsInstructor(whiteboardTool, readWhiteboardTool, calculatorTool, weatherTool, unitConversionTool, emitQuestionAnsweredTool Tool) AgentConfig {
+	tools := []Tool{readWhiteboardTool, calculatorTool, unitConversionTool, weatherTool, emitQuestionAnsweredTool, whiteboardTool}
 
 	return AgentConfig{
 		Name:           "physics-instructor",
@@ -1174,8 +1174,8 @@ energy = 0.5 * mass * velocity**2
 }
 
 // CreateChemistryInstructor creates the chemistry instructor agent configuration
-func CreateChemistryInstructor(callAgentTool, whiteboardTool, readWhiteboardTool, calculatorTool, periodicTableTool, unitConversionTool Tool) AgentConfig {
-	tools := []Tool{readWhiteboardTool, calculatorTool, periodicTableTool, unitConversionTool, callAgentTool, whiteboardTool}
+func CreateChemistryInstructor(whiteboardTool, readWhiteboardTool, calculatorTool, periodicTableTool, unitConversionTool, emitQuestionAnsweredTool Tool) AgentConfig {
+	tools := []Tool{readWhiteboardTool, calculatorTool, periodicTableTool, unitConversionTool, emitQuestionAnsweredTool, whiteboardTool}
 
 	return AgentConfig{
 		Name:           "chemistry-instructor",
@@ -1480,36 +1480,43 @@ CC(C)CC1=CC=C(C=C1)C(C)C
 
 // InstructorRegistry holds factory functions for creating instructors with tools
 type InstructorRegistry struct {
-	callAgentTool      Tool
-	whiteboardTool     Tool
-	readWhiteboardTool Tool
-	calculatorTool     Tool
-	weatherTool        Tool
-	graphingTool       Tool
-	unitConversionTool Tool
-	periodicTableTool  Tool
-	equationSolverTool Tool
-	plotTool           Tool
-	animateTool        Tool
+	whiteboardTool            Tool
+	readWhiteboardTool        Tool
+	calculatorTool            Tool
+	weatherTool               Tool
+	graphingTool              Tool
+	unitConversionTool        Tool
+	periodicTableTool         Tool
+	equationSolverTool        Tool
+	plotTool                  Tool
+	animateTool               Tool
+	emitMathQuestionTool      Tool
+	emitPhysicsQuestionTool   Tool
+	emitChemistryQuestionTool Tool
+	emitQuestionAnsweredTool  Tool
 }
 
 // NewInstructorRegistry creates a new instructor registry with all tools
 func NewInstructorRegistry(
-	callAgentTool, whiteboardTool, readWhiteboardTool, calculatorTool, weatherTool,
-	graphingTool, unitConversionTool, periodicTableTool, equationSolverTool, plotTool, animateTool Tool,
+	whiteboardTool, readWhiteboardTool, calculatorTool, weatherTool,
+	graphingTool, unitConversionTool, periodicTableTool, equationSolverTool, plotTool, animateTool,
+	emitMathQuestionTool, emitPhysicsQuestionTool, emitChemistryQuestionTool, emitQuestionAnsweredTool Tool,
 ) *InstructorRegistry {
 	return &InstructorRegistry{
-		callAgentTool:      callAgentTool,
-		whiteboardTool:     whiteboardTool,
-		readWhiteboardTool: readWhiteboardTool,
-		calculatorTool:     calculatorTool,
-		weatherTool:        weatherTool,
-		graphingTool:       graphingTool,
-		unitConversionTool: unitConversionTool,
-		periodicTableTool:  periodicTableTool,
-		equationSolverTool: equationSolverTool,
-		plotTool:           plotTool,
-		animateTool:        animateTool,
+		whiteboardTool:            whiteboardTool,
+		readWhiteboardTool:        readWhiteboardTool,
+		calculatorTool:            calculatorTool,
+		weatherTool:               weatherTool,
+		graphingTool:              graphingTool,
+		unitConversionTool:        unitConversionTool,
+		periodicTableTool:         periodicTableTool,
+		equationSolverTool:        equationSolverTool,
+		plotTool:                  plotTool,
+		animateTool:               animateTool,
+		emitMathQuestionTool:      emitMathQuestionTool,
+		emitPhysicsQuestionTool:   emitPhysicsQuestionTool,
+		emitChemistryQuestionTool: emitChemistryQuestionTool,
+		emitQuestionAnsweredTool:  emitQuestionAnsweredTool,
 	}
 }
 
@@ -1517,13 +1524,13 @@ func NewInstructorRegistry(
 func (r *InstructorRegistry) GetByName(name string) (AgentConfig, bool) {
 	switch name {
 	case "student-facing-agent":
-		return CreateStudentFacingAgent(r.callAgentTool, r.whiteboardTool, r.readWhiteboardTool), true
+		return CreateStudentFacingAgent(r.whiteboardTool, r.readWhiteboardTool, r.emitMathQuestionTool, r.emitPhysicsQuestionTool, r.emitChemistryQuestionTool), true
 	case "math-instructor":
-		return CreateMathInstructor(r.callAgentTool, r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.graphingTool, r.equationSolverTool, r.plotTool, r.animateTool), true
+		return CreateMathInstructor(r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.graphingTool, r.equationSolverTool, r.plotTool, r.animateTool, r.emitQuestionAnsweredTool), true
 	case "physics-instructor":
-		return CreatePhysicsInstructor(r.callAgentTool, r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.weatherTool, r.unitConversionTool), true
+		return CreatePhysicsInstructor(r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.weatherTool, r.unitConversionTool, r.emitQuestionAnsweredTool), true
 	case "chemistry-instructor":
-		return CreateChemistryInstructor(r.callAgentTool, r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.periodicTableTool, r.unitConversionTool), true
+		return CreateChemistryInstructor(r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.periodicTableTool, r.unitConversionTool, r.emitQuestionAnsweredTool), true
 	default:
 		return AgentConfig{}, false
 	}
@@ -1532,13 +1539,13 @@ func (r *InstructorRegistry) GetByName(name string) (AgentConfig, bool) {
 // GetAllInstructors returns all available instructor configurations
 func (r *InstructorRegistry) GetAllInstructors() []AgentConfig {
 	return []AgentConfig{
-		CreateMathInstructor(r.callAgentTool, r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.graphingTool, r.equationSolverTool, r.plotTool, r.animateTool),
-		CreatePhysicsInstructor(r.callAgentTool, r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.weatherTool, r.unitConversionTool),
-		CreateChemistryInstructor(r.callAgentTool, r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.periodicTableTool, r.unitConversionTool),
+		CreateMathInstructor(r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.graphingTool, r.equationSolverTool, r.plotTool, r.animateTool, r.emitQuestionAnsweredTool),
+		CreatePhysicsInstructor(r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.weatherTool, r.unitConversionTool, r.emitQuestionAnsweredTool),
+		CreateChemistryInstructor(r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.periodicTableTool, r.unitConversionTool, r.emitQuestionAnsweredTool),
 	}
 }
 
 // GetStudentFacingAgent returns the student-facing agent (entry point for all conversations)
 func (r *InstructorRegistry) GetStudentFacingAgent() AgentConfig {
-	return CreateStudentFacingAgent(r.callAgentTool, r.whiteboardTool, r.readWhiteboardTool)
+	return CreateStudentFacingAgent(r.whiteboardTool, r.readWhiteboardTool, r.emitMathQuestionTool, r.emitPhysicsQuestionTool, r.emitChemistryQuestionTool)
 }
