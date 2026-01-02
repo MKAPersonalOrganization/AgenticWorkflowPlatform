@@ -56,6 +56,8 @@ func (n *UINotifier) HandleDomainEvent(event agent.Event) error {
 			return n.emitPhysicsQuestion(evt)
 		case agent.EventTypeChemistryQuestion:
 			return n.emitChemistryQuestion(evt)
+		case agent.EventTypeStatisticsQuestion:
+			return n.emitStatisticsQuestion(evt)
 		case agent.EventTypeQuestionAnswered:
 			return n.emitQuestionAnswered(evt)
 		default:
@@ -227,6 +229,24 @@ func (n *UINotifier) emitChemistryQuestion(evt *agent.DomainEvent) error {
 			Timestamp: &timestamp,
 		},
 		Name: "CHEMISTRY_QUESTION",
+		Value: map[string]interface{}{
+			"question":  evt.GetString("question"),
+			"emittedBy": evt.GetString("emitted_by"),
+			"context":   evt.GetString("context"),
+			"timestamp": evt.Timestamp.UnixMilli(),
+		},
+	}
+	return n.emitter.Emit(uiEvent)
+}
+
+func (n *UINotifier) emitStatisticsQuestion(evt *agent.DomainEvent) error {
+	timestamp := time.Now().UnixMilli()
+	uiEvent := &agui.CustomEvent{
+		BaseEvent: agui.BaseEvent{
+			Type:      "CUSTOM",
+			Timestamp: &timestamp,
+		},
+		Name: "STATISTICS_QUESTION",
 		Value: map[string]interface{}{
 			"question":  evt.GetString("question"),
 			"emittedBy": evt.GetString("emitted_by"),

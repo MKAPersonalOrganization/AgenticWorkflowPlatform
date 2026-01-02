@@ -53,10 +53,21 @@ func main() {
 	plotTool := tools.NewPlotTool()
 	animateTool := tools.NewAnimateTool()
 
+	// Statistics tools (grouped by functionality)
+	descriptiveStatsTool := tools.NewDescriptiveStatsTool()
+	correlationTool := tools.NewCorrelationTool()
+	distanceMetricsTool := tools.NewDistanceMetricsTool()
+	samplingTool := tools.NewSamplingTool()
+	dataTransformTool := tools.NewDataTransformTool()
+	normalDistributionTool := tools.NewNormalDistributionTool()
+	geometricDistributionTool := tools.NewGeometricDistributionTool()
+	regressionTool := tools.NewRegressionTool()
+
 	// Event emission tools for agent communication
 	emitMathQuestionTool := tools.NewEmitMathQuestionTool()
 	emitPhysicsQuestionTool := tools.NewEmitPhysicsQuestionTool()
 	emitChemistryQuestionTool := tools.NewEmitChemistryQuestionTool()
+	emitStatisticsQuestionTool := tools.NewEmitStatisticsQuestionTool()
 	emitQuestionAnsweredTool := tools.NewEmitQuestionAnsweredTool()
 
 	// Initialize instructor registry with tools
@@ -71,9 +82,18 @@ func main() {
 		equationSolverTool,
 		plotTool,
 		animateTool,
+		descriptiveStatsTool,
+		correlationTool,
+		distanceMetricsTool,
+		samplingTool,
+		dataTransformTool,
+		normalDistributionTool,
+		geometricDistributionTool,
+		regressionTool,
 		emitMathQuestionTool,
 		emitPhysicsQuestionTool,
 		emitChemistryQuestionTool,
+		emitStatisticsQuestionTool,
 		emitQuestionAnsweredTool,
 	)
 
