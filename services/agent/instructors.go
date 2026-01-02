@@ -4,6 +4,18 @@ package agent
 // CRITICAL ROUTING RULE: ALL new user questions in a thread MUST be routed through this agent first.
 // The system enforces this by checking if the last message is from the user, and if so,
 // it always invokes the student-facing agent before any specialist instructor.
+//
+// EVENT CONTRACT:
+//
+//	Responds To (Triggers):
+//	  - User message (system routes new user messages to this agent)
+//	  - question.answered: Emitted by instructors when they complete their work
+//
+//	Emits:
+//	  - question.math: Activates math-instructor to answer a math question
+//	  - question.physics: Activates physics-instructor to answer a physics question
+//	  - question.chemistry: Activates chemistry-instructor to answer a chemistry question
+//	  - whiteboard.updated: Updates shared whiteboard content (only for initial question)
 func CreateStudentFacingAgent(whiteboardTool, readWhiteboardTool, emitMathQuestionTool, emitPhysicsQuestionTool, emitChemistryQuestionTool Tool) AgentConfig {
 	tools := []Tool{readWhiteboardTool, whiteboardTool, emitMathQuestionTool, emitPhysicsQuestionTool, emitChemistryQuestionTool}
 
@@ -394,8 +406,19 @@ If question requires multiple subjects, identify which should go FIRST:
 }
 
 // CreateMathInstructor creates the math instructor agent configuration
-func CreateMathInstructor(whiteboardTool, readWhiteboardTool, calculatorTool, graphingTool, equationSolverTool, plotTool, animateTool, emitQuestionAnsweredTool Tool) AgentConfig {
-	tools := []Tool{calculatorTool, graphingTool, equationSolverTool, plotTool, animateTool, readWhiteboardTool, emitQuestionAnsweredTool, whiteboardTool}
+//
+// EVENT CONTRACT:
+//
+//	Responds To (Triggers):
+//	  - question.math: Emitted by student-facing-agent or other instructors when math expertise is needed
+//
+//	Emits:
+//	  - question.answered: Signals completion of work (activates student-facing-agent)
+//	  - question.physics: Activates physics-instructor for multi-subject questions
+//	  - question.chemistry: Activates chemistry-instructor for multi-subject questions
+//	  - whiteboard.updated: Updates shared whiteboard with math solution
+func CreateMathInstructor(whiteboardTool, readWhiteboardTool, calculatorTool, graphingTool, equationSolverTool, plotTool, animateTool, emitQuestionAnsweredTool, emitPhysicsQuestionTool, emitChemistryQuestionTool Tool) AgentConfig {
+	tools := []Tool{calculatorTool, graphingTool, equationSolverTool, plotTool, animateTool, readWhiteboardTool, emitQuestionAnsweredTool, emitPhysicsQuestionTool, emitChemistryQuestionTool, whiteboardTool}
 
 	return AgentConfig{
 		Name:           "math-instructor",
@@ -870,21 +893,32 @@ If student asks for a plot/graph and you don't use the plot tool, you have faile
 
 ## Invariants (Enforced)
 
-**Event Guarantee:** Every execution emits exactly 2 events (WHITEBOARD_UPDATED + AGENT_CALLED)
+**Event Guarantee:** Every execution emits WHITEBOARD_UPDATED + routing event (question.answered or question.[subject])
 **Determinism:** Same whiteboard content → Same tool call sequence
-**No Loops:** No agent calls itself
-**Terminal:** Always ends with call_agent (NEVER with text response)
+**No Loops:** No agent calls itself via events
+**Terminal:** Always ends with event emission (emit_question_answered or emit_[subject]_question)
 **Idempotency:** Can be replayed with same result
 **Whiteboard-Only:** ALL content goes on whiteboard - NO text responses ever
-**Tool-Only:** Use ONLY write_whiteboard and call_agent - NO text output`,
+**Event-Only Communication:** Use event emission tools to coordinate with other agents`,
 		Tools:            tools,
 		HasPrivateMemory: true,
 	}
 }
 
 // CreatePhysicsInstructor creates the physics instructor agent configuration
-func CreatePhysicsInstructor(whiteboardTool, readWhiteboardTool, calculatorTool, weatherTool, unitConversionTool, emitQuestionAnsweredTool Tool) AgentConfig {
-	tools := []Tool{readWhiteboardTool, calculatorTool, unitConversionTool, weatherTool, emitQuestionAnsweredTool, whiteboardTool}
+//
+// EVENT CONTRACT:
+//
+//	Responds To (Triggers):
+//	  - question.physics: Emitted by student-facing-agent or other instructors when physics expertise is needed
+//
+//	Emits:
+//	  - question.answered: Signals completion of work (activates student-facing-agent)
+//	  - question.math: Activates math-instructor for multi-subject questions
+//	  - question.chemistry: Activates chemistry-instructor for multi-subject questions
+//	  - whiteboard.updated: Updates shared whiteboard with physics solution
+func CreatePhysicsInstructor(whiteboardTool, readWhiteboardTool, calculatorTool, weatherTool, unitConversionTool, emitQuestionAnsweredTool, emitMathQuestionTool, emitChemistryQuestionTool Tool) AgentConfig {
+	tools := []Tool{readWhiteboardTool, calculatorTool, unitConversionTool, weatherTool, emitQuestionAnsweredTool, emitMathQuestionTool, emitChemistryQuestionTool, whiteboardTool}
 
 	return AgentConfig{
 		Name:           "physics-instructor",
@@ -1159,21 +1193,32 @@ energy = 0.5 * mass * velocity**2
 
 ## Invariants (Enforced)
 
-**Event Guarantee:** Every execution emits exactly 2 events (WHITEBOARD_UPDATED + AGENT_CALLED)
+**Event Guarantee:** Every execution emits WHITEBOARD_UPDATED + routing event (question.answered or question.[subject])
 **Determinism:** Same whiteboard content → Same tool call sequence
-**No Loops:** No agent calls itself
-**Terminal:** Always ends with call_agent (NEVER with text response)
+**No Loops:** No agent calls itself via events
+**Terminal:** Always ends with event emission (emit_question_answered or emit_[subject]_question)
 **Idempotency:** Can be replayed with same result
 **Whiteboard-Only:** ALL content goes on whiteboard - NO text responses ever
-**Tool-Only:** Use ONLY write_whiteboard and call_agent - NO text output`,
+**Event-Only Communication:** Use event emission tools to coordinate with other agents`,
 		Tools:            tools,
 		HasPrivateMemory: true,
 	}
 }
 
 // CreateChemistryInstructor creates the chemistry instructor agent configuration
-func CreateChemistryInstructor(whiteboardTool, readWhiteboardTool, calculatorTool, periodicTableTool, unitConversionTool, emitQuestionAnsweredTool Tool) AgentConfig {
-	tools := []Tool{readWhiteboardTool, calculatorTool, periodicTableTool, unitConversionTool, emitQuestionAnsweredTool, whiteboardTool}
+//
+// EVENT CONTRACT:
+//
+//	Responds To (Triggers):
+//	  - question.chemistry: Emitted by student-facing-agent or other instructors when chemistry expertise is needed
+//
+//	Emits:
+//	  - question.answered: Signals completion of work (activates student-facing-agent)
+//	  - question.math: Activates math-instructor for multi-subject questions
+//	  - question.physics: Activates physics-instructor for multi-subject questions
+//	  - whiteboard.updated: Updates shared whiteboard with chemistry solution
+func CreateChemistryInstructor(whiteboardTool, readWhiteboardTool, calculatorTool, periodicTableTool, unitConversionTool, emitQuestionAnsweredTool, emitMathQuestionTool, emitPhysicsQuestionTool Tool) AgentConfig {
+	tools := []Tool{readWhiteboardTool, calculatorTool, periodicTableTool, unitConversionTool, emitQuestionAnsweredTool, emitMathQuestionTool, emitPhysicsQuestionTool, whiteboardTool}
 
 	return AgentConfig{
 		Name:           "chemistry-instructor",
@@ -1464,13 +1509,13 @@ CC(C)CC1=CC=C(C=C1)C(C)C
 
 ## Invariants (Enforced)
 
-**Event Guarantee:** Every execution emits exactly 2 events (WHITEBOARD_UPDATED + AGENT_CALLED)
+**Event Guarantee:** Every execution emits WHITEBOARD_UPDATED + routing event (question.answered or question.[subject])
 **Determinism:** Same whiteboard content → Same tool call sequence
-**No Loops:** No agent calls itself
-**Terminal:** Always ends with call_agent (NEVER with text response)
+**No Loops:** No agent calls itself via events
+**Terminal:** Always ends with event emission (emit_question_answered or emit_[subject]_question)
 **Idempotency:** Can be replayed with same result
 **Whiteboard-Only:** ALL content goes on whiteboard - NO text responses ever
-**Tool-Only:** Use ONLY write_whiteboard and call_agent - NO text output`,
+**Event-Only Communication:** Use event emission tools to coordinate with other agents`,
 		Tools:            tools,
 		HasPrivateMemory: true,
 	}
@@ -1524,11 +1569,11 @@ func (r *InstructorRegistry) GetByName(name string) (AgentConfig, bool) {
 	case "student-facing-agent":
 		return CreateStudentFacingAgent(r.whiteboardTool, r.readWhiteboardTool, r.emitMathQuestionTool, r.emitPhysicsQuestionTool, r.emitChemistryQuestionTool), true
 	case "math-instructor":
-		return CreateMathInstructor(r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.graphingTool, r.equationSolverTool, r.plotTool, r.animateTool, r.emitQuestionAnsweredTool), true
+		return CreateMathInstructor(r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.graphingTool, r.equationSolverTool, r.plotTool, r.animateTool, r.emitQuestionAnsweredTool, r.emitPhysicsQuestionTool, r.emitChemistryQuestionTool), true
 	case "physics-instructor":
-		return CreatePhysicsInstructor(r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.weatherTool, r.unitConversionTool, r.emitQuestionAnsweredTool), true
+		return CreatePhysicsInstructor(r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.weatherTool, r.unitConversionTool, r.emitQuestionAnsweredTool, r.emitMathQuestionTool, r.emitChemistryQuestionTool), true
 	case "chemistry-instructor":
-		return CreateChemistryInstructor(r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.periodicTableTool, r.unitConversionTool, r.emitQuestionAnsweredTool), true
+		return CreateChemistryInstructor(r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.periodicTableTool, r.unitConversionTool, r.emitQuestionAnsweredTool, r.emitMathQuestionTool, r.emitPhysicsQuestionTool), true
 	default:
 		return AgentConfig{}, false
 	}
@@ -1537,9 +1582,9 @@ func (r *InstructorRegistry) GetByName(name string) (AgentConfig, bool) {
 // GetAllInstructors returns all available instructor configurations
 func (r *InstructorRegistry) GetAllInstructors() []AgentConfig {
 	return []AgentConfig{
-		CreateMathInstructor(r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.graphingTool, r.equationSolverTool, r.plotTool, r.animateTool, r.emitQuestionAnsweredTool),
-		CreatePhysicsInstructor(r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.weatherTool, r.unitConversionTool, r.emitQuestionAnsweredTool),
-		CreateChemistryInstructor(r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.periodicTableTool, r.unitConversionTool, r.emitQuestionAnsweredTool),
+		CreateMathInstructor(r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.graphingTool, r.equationSolverTool, r.plotTool, r.animateTool, r.emitQuestionAnsweredTool, r.emitPhysicsQuestionTool, r.emitChemistryQuestionTool),
+		CreatePhysicsInstructor(r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.weatherTool, r.unitConversionTool, r.emitQuestionAnsweredTool, r.emitMathQuestionTool, r.emitChemistryQuestionTool),
+		CreateChemistryInstructor(r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.periodicTableTool, r.unitConversionTool, r.emitQuestionAnsweredTool, r.emitMathQuestionTool, r.emitPhysicsQuestionTool),
 	}
 }
 
