@@ -197,10 +197,10 @@ window.copyCodeBlock = async function (event) {
         // Visual feedback
         const originalHTML = button.innerHTML;
         button.innerHTML = `
-            <svg class="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-3 h-3 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
             </svg>
-            <span class="text-green-500">Copied!</span>
+            <span class="text-primary">Copied!</span>
         `;
 
         setTimeout(() => {
@@ -638,13 +638,13 @@ document.addEventListener('alpine:init', () => {
         getToastIcon(type) {
             switch (type) {
                 case 'success':
-                    return '<svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>'
+                    return '<svg class="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>'
                 case 'error':
-                    return '<svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>'
+                    return '<svg class="w-5 h-5 text-destructive" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>'
                 case 'warning':
-                    return '<svg class="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>'
+                    return '<svg class="w-5 h-5 text-accent-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>'
                 default:
-                    return '<svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>'
+                    return '<svg class="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>'
             }
         },
 
@@ -1290,7 +1290,7 @@ document.addEventListener('alpine:init', () => {
          * Toggle theme: light -> dark -> system -> light
          */
         toggleTheme() {
-            const currentTheme = this.getCurrentTheme()
+            const currentTheme = this.theme
             let nextTheme
 
             if (currentTheme === 'light') {
@@ -1305,18 +1305,11 @@ document.addEventListener('alpine:init', () => {
         },
 
         /**
-         * Get current theme preference
-         * @returns {'light'|'dark'|'system'}
-         */
-        getCurrentTheme() {
-            return localStorage.getItem('theme') || 'system'
-        },
-
-        /**
          * Set theme preference
          * @param {'light'|'dark'|'system'} theme
          */
         setTheme(theme) {
+            this.theme = theme
             localStorage.setItem('theme', theme)
             this.__applyTheme(theme)
 
@@ -1360,13 +1353,14 @@ document.addEventListener('alpine:init', () => {
          * Initialize theme from localStorage or system preference
          */
         __initTheme() {
-            const savedTheme = this.getCurrentTheme()
+            const savedTheme = localStorage.getItem('theme') || 'system'
+            this.theme = savedTheme
             this.__applyTheme(savedTheme)
 
             // Listen for system theme changes when in system mode
             const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
             mediaQuery.addEventListener('change', (e) => {
-                if (this.getCurrentTheme() === 'system') {
+                if (this.theme === 'system') {
                     this.__applyTheme('system')
                 }
             })
@@ -2379,12 +2373,12 @@ document.addEventListener('alpine:init', () => {
         },
 
         getEventTypeColor(type) {
-            if (type.startsWith('RUN_')) return 'text-purple-600 dark:text-purple-400';
-            if (type.startsWith('TEXT_MESSAGE_')) return 'text-blue-600 dark:text-blue-400';
-            if (type.startsWith('TOOL_CALL_')) return 'text-green-600 dark:text-green-400';
-            if (type.startsWith('STATE_')) return 'text-orange-600 dark:text-orange-400';
-            if (type.startsWith('STEP_')) return 'text-yellow-600 dark:text-yellow-400';
-            return 'text-gray-600 dark:text-gray-400';
+            if (type.startsWith('RUN_')) return 'text-primary';
+            if (type.startsWith('TEXT_MESSAGE_')) return 'text-primary';
+            if (type.startsWith('TOOL_CALL_')) return 'text-accent-foreground';
+            if (type.startsWith('STATE_')) return 'text-accent-foreground';
+            if (type.startsWith('STEP_')) return 'text-accent-foreground';
+            return 'text-muted-foreground';
         },
 
         toggleEventLog() {
