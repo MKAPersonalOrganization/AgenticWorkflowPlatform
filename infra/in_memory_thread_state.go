@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"school-with-ai/domain"
+	"school-with-ai/services/agents"
 	"school-with-ai/services/sdk"
 )
 
@@ -149,9 +150,9 @@ func (p *InMemoryThreadState) applyEventUnsafe(thread *domain.Thread, event sdk.
 		delete(p.threads, thread.ID)
 
 	// Agent collaboration events
-	case *sdk.DomainEvent:
+	case *agents.DomainEvent:
 		switch evt.Type {
-		case sdk.EventTypeWhiteboardUpdated:
+		case agents.EventTypeWhiteboardUpdated:
 			action := evt.GetString("action")
 			content := evt.GetString("content")
 			switch action {
