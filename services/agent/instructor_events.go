@@ -15,6 +15,7 @@ const (
 	EventTypeMathQuestion              EventType = "question.math"
 	EventTypePhysicsQuestion           EventType = "question.physics"
 	EventTypeChemistryQuestion         EventType = "question.chemistry"
+	EventTypeStatisticsQuestion        EventType = "question.statistics"
 	EventTypeQuestionAnswered          EventType = "question.answered"
 )
 
@@ -156,6 +157,22 @@ func NewChemistryQuestionEvent(threadID, question, emittedBy, context, whiteboar
 	return &DomainEvent{
 		ID:        generateEventID(),
 		Type:      EventTypeChemistryQuestion,
+		Timestamp: time.Now(),
+		ThreadID:  threadID,
+		Version:   1,
+		Data: map[string]interface{}{
+			"question":         question,
+			"emitted_by":       emittedBy,
+			"context":          context,
+			"whiteboard_state": whiteboardState,
+		},
+	}
+}
+
+func NewStatisticsQuestionEvent(threadID, question, emittedBy, context, whiteboardState string) *DomainEvent {
+	return &DomainEvent{
+		ID:        generateEventID(),
+		Type:      EventTypeStatisticsQuestion,
 		Timestamp: time.Now(),
 		ThreadID:  threadID,
 		Version:   1,

@@ -416,6 +416,20 @@ func (h *Agent) emitCollaborationEvents(threadID string, toolCall domain.ToolCal
 			eventHandler,
 		)
 
+	case "emit_statistics_question":
+		var input struct {
+			Question string `json:"question"`
+			Context  string `json:"context"`
+		}
+		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
+			return fmt.Errorf("failed to parse emit_statistics_question arguments: %w", err)
+		}
+
+		return h.emitDomainEvent(
+			NewStatisticsQuestionEvent(threadID, input.Question, h.config.Name, input.Context, getWhiteboardState()),
+			eventHandler,
+		)
+
 	case "emit_question_answered":
 		var input struct {
 			Subject    string `json:"subject"`

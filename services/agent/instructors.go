@@ -15,9 +15,10 @@ package agent
 //	  - question.math: Activates math-instructor to answer a math question
 //	  - question.physics: Activates physics-instructor to answer a physics question
 //	  - question.chemistry: Activates chemistry-instructor to answer a chemistry question
+//	  - question.statistics: Activates statistics-instructor to answer a statistics question
 //	  - whiteboard.updated: Updates shared whiteboard content (only for initial question)
-func CreateStudentFacingAgent(whiteboardTool, readWhiteboardTool, emitMathQuestionTool, emitPhysicsQuestionTool, emitChemistryQuestionTool Tool) AgentConfig {
-	tools := []Tool{readWhiteboardTool, whiteboardTool, emitMathQuestionTool, emitPhysicsQuestionTool, emitChemistryQuestionTool}
+func CreateStudentFacingAgent(whiteboardTool, readWhiteboardTool, emitMathQuestionTool, emitPhysicsQuestionTool, emitChemistryQuestionTool, emitStatisticsQuestionTool Tool) AgentConfig {
+	tools := []Tool{readWhiteboardTool, whiteboardTool, emitMathQuestionTool, emitPhysicsQuestionTool, emitChemistryQuestionTool, emitStatisticsQuestionTool}
 
 	return AgentConfig{
 		Name:           "student-facing-agent",
@@ -200,7 +201,7 @@ This prevents duplicate question entries on the whiteboard.
    - **CRITICAL:** Use "append" action to preserve previous answers on the whiteboard
 
 2. **Emit event to activate the PRIMARY instructor**
-   - Use: emit_math_question, emit_physics_question, or emit_chemistry_question
+   - Use: emit_math_question, emit_physics_question, emit_chemistry_question, or emit_statistics_question
    - Choose the event for the instructor best equipped to START answering (see selection guide below)
    - If the question needs multiple instructors, emit event for the FIRST one
    - The instructors will collaborate sequentially via events
@@ -374,15 +375,25 @@ If question requires multiple subjects, identify which should go FIRST:
 - Laboratory concepts, solutions
 - **Choose as first when:** Chemical concepts are the foundation
 
+**Statistics Instructor (emit_statistics_question):**
+- Data analysis, descriptive statistics
+- Mean, median, mode, variance, standard deviation
+- Correlation, regression, distributions
+- Probability calculations
+- Statistical tests, sampling
+- Data transformation and analysis
+- **Choose as first when:** Question involves analyzing numerical data or probability
+
 **Event Emission Decision Tree:**
 1. Does question have MULTIPLE subjects? → Choose the PRIMARY one (most fundamental or dominant)
-2. Does question mention chemistry terms primarily? → emit_chemistry_question
-3. Does question mention physics terms primarily? → emit_physics_question  
-4. Otherwise → emit_math_question (default)
+2. Does question mention statistics/data analysis terms primarily? → emit_statistics_question
+3. Does question mention chemistry terms primarily? → emit_chemistry_question
+4. Does question mention physics terms primarily? → emit_physics_question  
+5. Otherwise → emit_math_question (default)
 
 **Remember:** You only emit event for ONE instructor (the primary one). They will handle collaboration with other instructors sequentially via events if needed.
 
-**Output Event:** WHITEBOARD_UPDATED, then MATH_QUESTION or PHYSICS_QUESTION or CHEMISTRY_QUESTION
+**Output Event:** WHITEBOARD_UPDATED, then MATH_QUESTION or PHYSICS_QUESTION or CHEMISTRY_QUESTION or STATISTICS_QUESTION
 **Terminal State:** HALT (specialist will be automatically activated by the system)
 
 ## Invariants (Enforced)
@@ -1521,45 +1532,200 @@ CC(C)CC1=CC=C(C=C1)C(C)C
 	}
 }
 
+// CreateStatisticsInstructor creates the statistics instructor agent with comprehensive statistical tools
+func CreateStatisticsInstructor(whiteboardTool, readWhiteboardTool, descriptiveStatsTool, correlationTool, distanceMetricsTool, samplingTool, dataTransformTool, normalDistributionTool, geometricDistributionTool, regressionTool, emitQuestionAnsweredTool Tool) AgentConfig {
+	tools := []Tool{
+		whiteboardTool,
+		readWhiteboardTool,
+		descriptiveStatsTool,
+		correlationTool,
+		distanceMetricsTool,
+		samplingTool,
+		dataTransformTool,
+		normalDistributionTool,
+		geometricDistributionTool,
+		regressionTool,
+		emitQuestionAnsweredTool,
+	}
+
+	return AgentConfig{
+		Name: "statistics-instructor",
+		SystemPrompt: `# Statistics Instructor Agent
+
+You are a statistics instructor specializing in data analysis, probability, and statistical inference.
+
+## Behavioral Rules
+
+**CRITICAL:** Every execution MUST emit TWO events:
+1. WHITEBOARD_UPDATED (via write_whiteboard tool)
+2. QUESTION_ANSWERED (via emit_question_answered tool)
+
+**Event-Driven State Machine:**
+- **State 1:** Read whiteboard → Analyze question
+- **State 2:** Execute statistical operations
+- **State 3:** Write formatted results → Emit QUESTION_ANSWERED
+- **NEVER:** Respond with text - ALL output via whiteboard + events
+
+## Workflow
+
+1. **Read** whiteboard: Check student's question and data
+2. **Analyze** what statistical operations are needed
+3. **Execute** using appropriate statistical tools
+4. **Write** results to whiteboard with clear interpretation
+5. **Emit** question.answered event to signal completion
+
+## Available Tools
+
+### Descriptive Statistics (descriptive_statistics)
+Calculate summary statistics: mean, median, mode, min, max, sum, variance (population/sample), standard deviation (population/sample), quartiles, percentiles, geometric mean, harmonic mean, midhinge, trimean, IQR, MAD, describe
+
+### Correlation & Covariance (correlation_analysis)
+Measure relationships: correlation, pearson, covariance, covariance_population, autocorrelation
+
+### Distance Metrics (distance_metrics)
+Calculate distances: euclidean_distance, manhattan_distance, chebyshev_distance, minkowski_distance
+
+### Sampling & Outliers (sampling_and_outliers)
+Data sampling and outlier detection: sample, stable_sample, quartile_outliers
+
+### Data Transformation (data_transformation)
+Transform data: sigmoid, softmax, cumulative_sum, entropy, round
+
+### Normal Distribution (normal_distribution)
+Normal distribution functions: norm_pdf, norm_cdf, norm_ppf, norm_sf, norm_isf, log variants, norm_mean, norm_median, norm_std, norm_var, norm_entropy, norm_moment, norm_stats, norm_interval, norm_fit, norm_box_muller_rvs, norm_ppf_rvs
+
+### Geometric Distribution (geometric_distribution)
+Geometric distribution: prob_geom, exp_geom, var_geom
+
+### Regression Analysis (regression_analysis)
+Perform regression: linear, exponential, logarithmic
+
+## Teaching Style
+
+- **Interpret Results:** Explain what the numbers mean in context
+- **Check Assumptions:** Verify data meets requirements (e.g., positive for geometric mean)
+- **Visual Clarity:** Use tables and formatted output on whiteboard
+- **Statistical Significance:** When relevant, discuss confidence and variation
+- **Real-World Context:** Connect statistics to the original question
+
+## Whiteboard Formatting
+
+Use LaTeX for mathematical notation:
+
+**Descriptive Statistics:**
+$$
+\\bar{x} = \\frac{1}{n}\\sum_{i=1}^{n} x_i = [RESULT]
+$$
+
+**Standard Deviation:**
+$$
+s = \\sqrt{\\frac{1}{n-1}\\sum_{i=1}^{n}(x_i - \\bar{x})^2} = [RESULT]
+$$
+
+**Correlation:**
+$$
+r = \\frac{\\sum(x_i - \\bar{x})(y_i - \\bar{y})}{\\sqrt{\\sum(x_i - \\bar{x})^2\\sum(y_i - \\bar{y})^2}} = [RESULT]
+$$
+
+**Distribution Results:**
+Present in tables:
+
+| Statistic | Value |
+|-----------|-------|
+| Mean | [value] |
+| Std Dev | [value] |
+| Q1 | [value] |
+| Median | [value] |
+| Q3 | [value] |
+
+**Regression:**
+For y = mx + b:
+$$
+y = [m]x + [b]
+$$
+R² = [value]
+
+## Error Handling
+
+- Check for empty datasets
+- Verify data types (all numbers)
+- Handle division by zero
+- Check for sufficient sample size
+- Validate probability parameters (0 < p ≤ 1)
+
+## Invariants (Enforced)
+
+**Event Guarantee:** Every execution emits WHITEBOARD_UPDATED + emit_question_answered
+**Determinism:** Same data → Same statistical results
+**No Loops:** No agent calls itself via events
+**Terminal:** Always ends with emit_question_answered
+**Whiteboard-Only:** ALL content goes on whiteboard - NO text responses ever
+**Precision:** Use appropriate decimal places for statistical output`,
+		Tools:            tools,
+		HasPrivateMemory: true,
+	}
+}
+
 // InstructorRegistry holds factory functions for creating instructors with tools
 type InstructorRegistry struct {
-	whiteboardTool            Tool
-	readWhiteboardTool        Tool
-	calculatorTool            Tool
-	weatherTool               Tool
-	graphingTool              Tool
-	unitConversionTool        Tool
-	periodicTableTool         Tool
-	equationSolverTool        Tool
-	plotTool                  Tool
-	animateTool               Tool
-	emitMathQuestionTool      Tool
-	emitPhysicsQuestionTool   Tool
-	emitChemistryQuestionTool Tool
-	emitQuestionAnsweredTool  Tool
+	whiteboardTool             Tool
+	readWhiteboardTool         Tool
+	calculatorTool             Tool
+	weatherTool                Tool
+	graphingTool               Tool
+	unitConversionTool         Tool
+	periodicTableTool          Tool
+	equationSolverTool         Tool
+	plotTool                   Tool
+	animateTool                Tool
+	descriptiveStatsTool       Tool
+	correlationTool            Tool
+	distanceMetricsTool        Tool
+	samplingTool               Tool
+	dataTransformTool          Tool
+	normalDistributionTool     Tool
+	geometricDistributionTool  Tool
+	regressionTool             Tool
+	emitMathQuestionTool       Tool
+	emitPhysicsQuestionTool    Tool
+	emitChemistryQuestionTool  Tool
+	emitStatisticsQuestionTool Tool
+	emitQuestionAnsweredTool   Tool
 }
 
 // NewInstructorRegistry creates a new instructor registry with all tools
 func NewInstructorRegistry(
 	whiteboardTool, readWhiteboardTool, calculatorTool, weatherTool,
 	graphingTool, unitConversionTool, periodicTableTool, equationSolverTool, plotTool, animateTool,
-	emitMathQuestionTool, emitPhysicsQuestionTool, emitChemistryQuestionTool, emitQuestionAnsweredTool Tool,
+	descriptiveStatsTool, correlationTool, distanceMetricsTool, samplingTool,
+	dataTransformTool, normalDistributionTool, geometricDistributionTool, regressionTool,
+	emitMathQuestionTool, emitPhysicsQuestionTool, emitChemistryQuestionTool,
+	emitStatisticsQuestionTool, emitQuestionAnsweredTool Tool,
 ) *InstructorRegistry {
 	return &InstructorRegistry{
-		whiteboardTool:            whiteboardTool,
-		readWhiteboardTool:        readWhiteboardTool,
-		calculatorTool:            calculatorTool,
-		weatherTool:               weatherTool,
-		graphingTool:              graphingTool,
-		unitConversionTool:        unitConversionTool,
-		periodicTableTool:         periodicTableTool,
-		equationSolverTool:        equationSolverTool,
-		plotTool:                  plotTool,
-		animateTool:               animateTool,
-		emitMathQuestionTool:      emitMathQuestionTool,
-		emitPhysicsQuestionTool:   emitPhysicsQuestionTool,
-		emitChemistryQuestionTool: emitChemistryQuestionTool,
-		emitQuestionAnsweredTool:  emitQuestionAnsweredTool,
+		whiteboardTool:             whiteboardTool,
+		readWhiteboardTool:         readWhiteboardTool,
+		calculatorTool:             calculatorTool,
+		weatherTool:                weatherTool,
+		graphingTool:               graphingTool,
+		unitConversionTool:         unitConversionTool,
+		periodicTableTool:          periodicTableTool,
+		equationSolverTool:         equationSolverTool,
+		plotTool:                   plotTool,
+		animateTool:                animateTool,
+		descriptiveStatsTool:       descriptiveStatsTool,
+		correlationTool:            correlationTool,
+		distanceMetricsTool:        distanceMetricsTool,
+		samplingTool:               samplingTool,
+		dataTransformTool:          dataTransformTool,
+		normalDistributionTool:     normalDistributionTool,
+		geometricDistributionTool:  geometricDistributionTool,
+		regressionTool:             regressionTool,
+		emitMathQuestionTool:       emitMathQuestionTool,
+		emitPhysicsQuestionTool:    emitPhysicsQuestionTool,
+		emitChemistryQuestionTool:  emitChemistryQuestionTool,
+		emitStatisticsQuestionTool: emitStatisticsQuestionTool,
+		emitQuestionAnsweredTool:   emitQuestionAnsweredTool,
 	}
 }
 
@@ -1567,13 +1733,15 @@ func NewInstructorRegistry(
 func (r *InstructorRegistry) GetByName(name string) (AgentConfig, bool) {
 	switch name {
 	case "student-facing-agent":
-		return CreateStudentFacingAgent(r.whiteboardTool, r.readWhiteboardTool, r.emitMathQuestionTool, r.emitPhysicsQuestionTool, r.emitChemistryQuestionTool), true
+		return CreateStudentFacingAgent(r.whiteboardTool, r.readWhiteboardTool, r.emitMathQuestionTool, r.emitPhysicsQuestionTool, r.emitChemistryQuestionTool, r.emitStatisticsQuestionTool), true
 	case "math-instructor":
 		return CreateMathInstructor(r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.graphingTool, r.equationSolverTool, r.plotTool, r.animateTool, r.emitQuestionAnsweredTool, r.emitPhysicsQuestionTool, r.emitChemistryQuestionTool), true
 	case "physics-instructor":
 		return CreatePhysicsInstructor(r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.weatherTool, r.unitConversionTool, r.emitQuestionAnsweredTool, r.emitMathQuestionTool, r.emitChemistryQuestionTool), true
 	case "chemistry-instructor":
 		return CreateChemistryInstructor(r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.periodicTableTool, r.unitConversionTool, r.emitQuestionAnsweredTool, r.emitMathQuestionTool, r.emitPhysicsQuestionTool), true
+	case "statistics-instructor":
+		return CreateStatisticsInstructor(r.whiteboardTool, r.readWhiteboardTool, r.descriptiveStatsTool, r.correlationTool, r.distanceMetricsTool, r.samplingTool, r.dataTransformTool, r.normalDistributionTool, r.geometricDistributionTool, r.regressionTool, r.emitQuestionAnsweredTool), true
 	default:
 		return AgentConfig{}, false
 	}
@@ -1585,10 +1753,11 @@ func (r *InstructorRegistry) GetAllInstructors() []AgentConfig {
 		CreateMathInstructor(r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.graphingTool, r.equationSolverTool, r.plotTool, r.animateTool, r.emitQuestionAnsweredTool, r.emitPhysicsQuestionTool, r.emitChemistryQuestionTool),
 		CreatePhysicsInstructor(r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.weatherTool, r.unitConversionTool, r.emitQuestionAnsweredTool, r.emitMathQuestionTool, r.emitChemistryQuestionTool),
 		CreateChemistryInstructor(r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.periodicTableTool, r.unitConversionTool, r.emitQuestionAnsweredTool, r.emitMathQuestionTool, r.emitPhysicsQuestionTool),
+		CreateStatisticsInstructor(r.whiteboardTool, r.readWhiteboardTool, r.descriptiveStatsTool, r.correlationTool, r.distanceMetricsTool, r.samplingTool, r.dataTransformTool, r.normalDistributionTool, r.geometricDistributionTool, r.regressionTool, r.emitQuestionAnsweredTool),
 	}
 }
 
 // GetStudentFacingAgent returns the student-facing agent (entry point for all conversations)
 func (r *InstructorRegistry) GetStudentFacingAgent() AgentConfig {
-	return CreateStudentFacingAgent(r.whiteboardTool, r.readWhiteboardTool, r.emitMathQuestionTool, r.emitPhysicsQuestionTool, r.emitChemistryQuestionTool)
+	return CreateStudentFacingAgent(r.whiteboardTool, r.readWhiteboardTool, r.emitMathQuestionTool, r.emitPhysicsQuestionTool, r.emitChemistryQuestionTool, r.emitStatisticsQuestionTool)
 }

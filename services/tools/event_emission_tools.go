@@ -140,6 +140,50 @@ func (t *EmitChemistryQuestionTool) Invoke(ctx context.Context, arguments string
 	return fmt.Sprintf("ChemistryQuestion event emitted. Question: %s", params.Question), nil
 }
 
+// EmitStatisticsQuestionTool emits statistics question events
+type EmitStatisticsQuestionTool struct{}
+
+func NewEmitStatisticsQuestionTool() *EmitStatisticsQuestionTool {
+	return &EmitStatisticsQuestionTool{}
+}
+
+func (t *EmitStatisticsQuestionTool) Name() string {
+	return "emit_statistics_question"
+}
+
+func (t *EmitStatisticsQuestionTool) Description() string {
+	return "Emit a statistics question event to activate the statistics instructor. The statistics instructor subscribes to these events and will be automatically invoked to analyze data and answer the question."
+}
+
+func (t *EmitStatisticsQuestionTool) Parameters() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"question": map[string]any{
+				"type":        "string",
+				"description": "The statistics/data analysis question that needs to be answered",
+			},
+			"context": map[string]any{
+				"type":        "string",
+				"description": "Optional context or additional information about the question",
+			},
+		},
+		"required": []string{"question"},
+	}
+}
+
+func (t *EmitStatisticsQuestionTool) Invoke(ctx context.Context, arguments string) (string, error) {
+	var params struct {
+		Question string `json:"question"`
+		Context  string `json:"context"`
+	}
+	if err := json.Unmarshal([]byte(arguments), &params); err != nil {
+		return "", fmt.Errorf("failed to parse arguments: %w", err)
+	}
+
+	return fmt.Sprintf("StatisticsQuestion event emitted. Question: %s", params.Question), nil
+}
+
 // EmitQuestionAnsweredTool allows instructors to signal they've answered a question
 type EmitQuestionAnsweredTool struct{}
 

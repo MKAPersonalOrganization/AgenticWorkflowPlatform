@@ -332,6 +332,11 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 				nextAgent = "chemistry-instructor"
 				agentEventOccurred = true
 
+			case agent.EventTypeStatisticsQuestion:
+				// Statistics question emitted - activate statistics instructor
+				nextAgent = "statistics-instructor"
+				agentEventOccurred = true
+
 			case agent.EventTypeQuestionAnswered:
 				// Question answered - activate student-facing agent to review and respond
 				nextAgent = "student-facing-agent"
@@ -565,6 +570,10 @@ Follow your state machine workflow:
 
 			case agent.EventTypeChemistryQuestion:
 				nextAgent = "chemistry-instructor"
+				routingEventOccurred = true
+
+			case agent.EventTypeStatisticsQuestion:
+				nextAgent = "statistics-instructor"
 				routingEventOccurred = true
 
 			case agent.EventTypeQuestionAnswered:
