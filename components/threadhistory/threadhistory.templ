@@ -7,30 +7,64 @@ import "school-with-ai/components/icon"
 
 templ ThreadHistory() {
 	@sidebar.Sidebar(sidebar.Props{
+		ID:          "thread-history-sidebar",
 		Side:        sidebar.SideLeft,
 		Variant:     sidebar.VariantSidebar,
 		Collapsible: sidebar.CollapsibleOffcanvas,
-		Collapsed:   false,
+		Collapsed:   true,
+		Class:       "z-30 !left-0 !border-r-0",
 	}) {
 		@sidebar.Header() {
 			<div class="flex items-center justify-between">
 				<h1 class="text-xl font-semibold tracking-tight">Thread History</h1>
+				<!-- Close Sidebar Button -->
 				@button.Button(button.Props{
-					Variant: button.VariantDefault,
-					Size:    button.SizeSm,
-					Class:   "shadow-sm",
+					Size:    button.SizeIcon,
+					Variant: button.VariantGhost,
+					Class:   "size-7 md:hidden",
 					Attributes: templ.Attributes{
-						"@click": "createNewSession()",
+						"data-tui-sheet-close": "thread-history-sidebar-mobile",
 					},
 				}) {
-					<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-						<path d="M12 5v14m-7-7h14"></path>
-					</svg>
+					@icon.X(icon.Props{Class: "size-4"})
+					<span class="sr-only">Close Thread History</span>
 				}
+				<div class="hidden md:block">
+					@button.Button(button.Props{
+						Size:    button.SizeIcon,
+						Variant: button.VariantGhost,
+						Class:   "size-7",
+						Attributes: templ.Attributes{
+							"data-tui-sidebar-trigger": true,
+							"data-tui-sidebar-target":  "thread-history-sidebar",
+						},
+					}) {
+						@icon.PanelLeftClose(icon.Props{Class: "size-4"})
+						<span class="sr-only">Close Thread History</span>
+					}
+				</div>
 			</div>
 			@separator.Separator(separator.Props{Class: "mt-3"})
 		}
 		@sidebar.Content() {
+			<!-- Action Buttons Stack -->
+			<div class="px-3 py-2 space-y-2">
+				<!-- New Chat Button -->
+				@button.Button(button.Props{
+					Variant: button.VariantDefault,
+					Size:    button.SizeSm,
+					Class:   "w-full justify-start gap-2 shadow-sm",
+					Attributes: templ.Attributes{
+						"@click": "createNewSession()",
+					},
+				}) {
+					@icon.Plus(icon.Props{Class: "size-4"})
+					<span>New Chat</span>
+				}
+				<!-- Future buttons can be added here -->
+			</div>
+			@separator.Separator()
+			<!-- Thread List -->
 			@sidebar.Menu() {
 				<template x-for="session in sessions" :key="session.id">
 					@sidebar.MenuItem() {
