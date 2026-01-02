@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	"school-with-ai/services/agents"
+	"school-with-ai/services/agents/shared/tools"
 	"school-with-ai/services/llm"
 )
 
@@ -293,7 +293,7 @@ func (h *Agent) runIteration(
 		// Exception: If agent emitted routing events, stop iteration
 		// The worker pool will handle activating the appropriate agent
 		for _, toolCall := range toolCallsList {
-			if agents.IsCollaborationTool(toolCall.Function.Name) {
+			if tools.IsCollaborationTool(toolCall.Function.Name) {
 				// Agent's job is done - don't continue iteration
 				return nil
 			}
@@ -360,7 +360,7 @@ func (h *Agent) emitDomainEvent(event Event, eventHandler DomainEventHandler) er
 // For collaboration tools, it also emits domain events
 func (h *Agent) executeToolCall(threadID string, toolCall domain.ToolCall, eventHandler DomainEventHandler) (string, error) {
 	// Handle collaboration tools that need to emit domain events
-	if agents.IsCollaborationTool(toolCall.Function.Name) || toolCall.Function.Name == "write_whiteboard" {
+	if tools.IsCollaborationTool(toolCall.Function.Name) || toolCall.Function.Name == "write_whiteboard" {
 		// Create whiteboard state getter
 		getWhiteboardState := func(tid string) string {
 			thread, exists := h.state.Get(tid)
@@ -370,7 +370,7 @@ func (h *Agent) executeToolCall(threadID string, toolCall domain.ToolCall, event
 			return ""
 		}
 
-		event, err := agents.HandleCollaborationToolCall(threadID, h.config.Name, toolCall, getWhiteboardState)
+		event, err := tools.HandleCollaborationToolCall(threadID, h.config.Name, toolCall, getWhiteboardState)
 		if err != nil {
 			return "", err
 		}

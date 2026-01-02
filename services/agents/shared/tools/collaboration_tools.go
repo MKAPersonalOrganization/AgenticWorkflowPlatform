@@ -1,10 +1,11 @@
-package agents
+package tools
 
 import (
 	"encoding/json"
 	"fmt"
 
 	"school-with-ai/domain"
+	"school-with-ai/services/agents"
 )
 
 // WhiteboardStateGetter is a function that retrieves the whiteboard state for a thread
@@ -20,7 +21,7 @@ func IsCollaborationTool(toolName string) bool {
 }
 
 // HandleCollaborationToolCall processes a collaboration tool call and returns the domain event
-func HandleCollaborationToolCall(threadID string, agentName string, toolCall domain.ToolCall, getWhiteboardState WhiteboardStateGetter) (*DomainEvent, error) {
+func HandleCollaborationToolCall(threadID string, agentName string, toolCall domain.ToolCall, getWhiteboardState WhiteboardStateGetter) (*agents.DomainEvent, error) {
 	toolName := toolCall.Function.Name
 
 	switch toolName {
@@ -32,7 +33,7 @@ func HandleCollaborationToolCall(threadID string, agentName string, toolCall dom
 		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
 			return nil, fmt.Errorf("failed to parse emit_math_question arguments: %w", err)
 		}
-		return NewMathQuestionEvent(threadID, input.Question, agentName, input.Context, getWhiteboardState(threadID)), nil
+		return agents.NewMathQuestionEvent(threadID, input.Question, agentName, input.Context, getWhiteboardState(threadID)), nil
 
 	case "emit_physics_question":
 		var input struct {
@@ -42,7 +43,7 @@ func HandleCollaborationToolCall(threadID string, agentName string, toolCall dom
 		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
 			return nil, fmt.Errorf("failed to parse emit_physics_question arguments: %w", err)
 		}
-		return NewPhysicsQuestionEvent(threadID, input.Question, agentName, input.Context, getWhiteboardState(threadID)), nil
+		return agents.NewPhysicsQuestionEvent(threadID, input.Question, agentName, input.Context, getWhiteboardState(threadID)), nil
 
 	case "emit_chemistry_question":
 		var input struct {
@@ -52,7 +53,7 @@ func HandleCollaborationToolCall(threadID string, agentName string, toolCall dom
 		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
 			return nil, fmt.Errorf("failed to parse emit_chemistry_question arguments: %w", err)
 		}
-		return NewChemistryQuestionEvent(threadID, input.Question, agentName, input.Context, getWhiteboardState(threadID)), nil
+		return agents.NewChemistryQuestionEvent(threadID, input.Question, agentName, input.Context, getWhiteboardState(threadID)), nil
 
 	case "emit_statistics_question":
 		var input struct {
@@ -62,7 +63,7 @@ func HandleCollaborationToolCall(threadID string, agentName string, toolCall dom
 		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
 			return nil, fmt.Errorf("failed to parse emit_statistics_question arguments: %w", err)
 		}
-		return NewStatisticsQuestionEvent(threadID, input.Question, agentName, input.Context, getWhiteboardState(threadID)), nil
+		return agents.NewStatisticsQuestionEvent(threadID, input.Question, agentName, input.Context, getWhiteboardState(threadID)), nil
 
 	case "emit_question_answered":
 		var input struct {
@@ -73,7 +74,7 @@ func HandleCollaborationToolCall(threadID string, agentName string, toolCall dom
 		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
 			return nil, fmt.Errorf("failed to parse emit_question_answered arguments: %w", err)
 		}
-		return NewQuestionAnsweredEvent(threadID, input.Subject, input.Summary, agentName, input.IsComplete, getWhiteboardState(threadID)), nil
+		return agents.NewQuestionAnsweredEvent(threadID, input.Subject, input.Summary, agentName, input.IsComplete, getWhiteboardState(threadID)), nil
 
 	case "write_whiteboard":
 		var input struct {
@@ -83,7 +84,7 @@ func HandleCollaborationToolCall(threadID string, agentName string, toolCall dom
 		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
 			return nil, fmt.Errorf("failed to parse write_whiteboard arguments: %w", err)
 		}
-		return NewWhiteboardUpdatedEvent(threadID, agentName, input.Content, input.Action), nil
+		return agents.NewWhiteboardUpdatedEvent(threadID, agentName, input.Content, input.Action), nil
 
 	default:
 		return nil, fmt.Errorf("unknown collaboration tool: %s", toolName)

@@ -1,8 +1,8 @@
 package studentfacing
 
 import (
+	"school-with-ai/services/agents/shared/tools"
 	"school-with-ai/services/sdk"
-	"school-with-ai/services/tools"
 )
 
 // CreateStudentFacingAgent creates the student-facing agent that handles initial questions
