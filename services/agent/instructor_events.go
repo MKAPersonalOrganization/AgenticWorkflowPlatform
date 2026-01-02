@@ -8,14 +8,11 @@ import (
 // EventType represents the type of domain event
 type EventType string
 
+// Common instructor event types
 const (
 	EventTypeWhiteboardUpdated         EventType = "whiteboard.updated"
 	EventTypeInstructorThought         EventType = "instructor.thought"
 	EventTypeInstructorStrategyChanged EventType = "instructor.strategy_changed"
-	EventTypeMathQuestion              EventType = "question.math"
-	EventTypePhysicsQuestion           EventType = "question.physics"
-	EventTypeChemistryQuestion         EventType = "question.chemistry"
-	EventTypeStatisticsQuestion        EventType = "question.statistics"
 	EventTypeQuestionAnswered          EventType = "question.answered"
 )
 
@@ -71,7 +68,7 @@ func (e *DomainEvent) MarshalPayload() ([]byte, error) {
 	return json.Marshal(e.Data)
 }
 
-// Event constructors
+// Common instructor event constructors
 
 func NewWhiteboardUpdatedEvent(threadID, agentName, content, action string) *DomainEvent {
 	return &DomainEvent{
@@ -115,72 +112,6 @@ func NewInstructorStrategyChangedEvent(threadID, instructorName, oldStrategy, ne
 			"old_strategy":    oldStrategy,
 			"new_strategy":    newStrategy,
 			"reason":          reason,
-		},
-	}
-}
-
-// Subject-specific question events for agent activation
-
-func NewMathQuestionEvent(threadID, question, emittedBy, context, whiteboardState string) *DomainEvent {
-	return &DomainEvent{
-		ID:        generateEventID(),
-		Type:      EventTypeMathQuestion,
-		Timestamp: time.Now(),
-		ThreadID:  threadID,
-		Version:   1,
-		Data: map[string]interface{}{
-			"question":         question,
-			"emitted_by":       emittedBy,
-			"context":          context,
-			"whiteboard_state": whiteboardState,
-		},
-	}
-}
-
-func NewPhysicsQuestionEvent(threadID, question, emittedBy, context, whiteboardState string) *DomainEvent {
-	return &DomainEvent{
-		ID:        generateEventID(),
-		Type:      EventTypePhysicsQuestion,
-		Timestamp: time.Now(),
-		ThreadID:  threadID,
-		Version:   1,
-		Data: map[string]interface{}{
-			"question":         question,
-			"emitted_by":       emittedBy,
-			"context":          context,
-			"whiteboard_state": whiteboardState,
-		},
-	}
-}
-
-func NewChemistryQuestionEvent(threadID, question, emittedBy, context, whiteboardState string) *DomainEvent {
-	return &DomainEvent{
-		ID:        generateEventID(),
-		Type:      EventTypeChemistryQuestion,
-		Timestamp: time.Now(),
-		ThreadID:  threadID,
-		Version:   1,
-		Data: map[string]interface{}{
-			"question":         question,
-			"emitted_by":       emittedBy,
-			"context":          context,
-			"whiteboard_state": whiteboardState,
-		},
-	}
-}
-
-func NewStatisticsQuestionEvent(threadID, question, emittedBy, context, whiteboardState string) *DomainEvent {
-	return &DomainEvent{
-		ID:        generateEventID(),
-		Type:      EventTypeStatisticsQuestion,
-		Timestamp: time.Now(),
-		ThreadID:  threadID,
-		Version:   1,
-		Data: map[string]interface{}{
-			"question":         question,
-			"emitted_by":       emittedBy,
-			"context":          context,
-			"whiteboard_state": whiteboardState,
 		},
 	}
 }
