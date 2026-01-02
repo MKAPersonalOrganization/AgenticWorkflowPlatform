@@ -1,8 +1,7 @@
-package agent
+package chemistry
 
 import (
-	"time"
-
+	"school-with-ai/services/agent"
 	"school-with-ai/services/tools"
 )
 
@@ -18,9 +17,9 @@ import (
 //	  - question.math: Activates math-instructor for multi-subject questions
 //	  - question.physics: Activates physics-instructor for multi-subject questions
 //	  - whiteboard.updated: Updates shared whiteboard with chemistry solution
-func CreateChemistryInstructor(notifier EventNotifier) AgentConfig {
+func CreateChemistryInstructor(notifier agent.EventNotifier) agent.AgentConfig {
 	// Create a dedicated tool registry for this agent
-	registry := NewToolRegistry()
+	registry := agent.NewToolRegistry()
 
 	// Create only the tools this agent needs
 	registry.Register(tools.NewReadWhiteboardTool())
@@ -32,7 +31,7 @@ func CreateChemistryInstructor(notifier EventNotifier) AgentConfig {
 	registry.Register(tools.NewEmitPhysicsQuestionTool())
 	registry.Register(tools.NewWriteWhiteboardTool())
 
-	return AgentConfig{
+	return agent.AgentConfig{
 		Name:           "chemistry-instructor",
 		Role:           "instructor",
 		Specialization: "chemistry",
@@ -331,28 +330,5 @@ CC(C)CC1=CC=C(C=C1)C(C)C
 		Tools:            registry.All(),
 		HasPrivateMemory: true,
 		Notifier:         notifier,
-	}
-}
-
-// Chemistry-specific events
-
-const (
-	EventTypeChemistryQuestion EventType = "question.chemistry"
-)
-
-// NewChemistryQuestionEvent creates a chemistry question event
-func NewChemistryQuestionEvent(threadID, question, emittedBy, context, whiteboardState string) *DomainEvent {
-	return &DomainEvent{
-		ID:        generateEventID(),
-		Type:      EventTypeChemistryQuestion,
-		Timestamp: time.Now(),
-		ThreadID:  threadID,
-		Version:   1,
-		Data: map[string]interface{}{
-			"question":         question,
-			"emitted_by":       emittedBy,
-			"context":          context,
-			"whiteboard_state": whiteboardState,
-		},
 	}
 }

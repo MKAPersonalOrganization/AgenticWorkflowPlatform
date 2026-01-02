@@ -14,6 +14,10 @@ const (
 	EventTypeInstructorThought         EventType = "instructor.thought"
 	EventTypeInstructorStrategyChanged EventType = "instructor.strategy_changed"
 	EventTypeQuestionAnswered          EventType = "question.answered"
+	EventTypeMathQuestion              EventType = "question.math"
+	EventTypePhysicsQuestion           EventType = "question.physics"
+	EventTypeChemistryQuestion         EventType = "question.chemistry"
+	EventTypeStatisticsQuestion        EventType = "question.statistics"
 )
 
 // DomainEvent is the unified event structure for all system events
@@ -72,7 +76,7 @@ func (e *DomainEvent) MarshalPayload() ([]byte, error) {
 
 func NewWhiteboardUpdatedEvent(threadID, agentName, content, action string) *DomainEvent {
 	return &DomainEvent{
-		ID:        generateEventID(),
+		ID:        GenerateEventID(),
 		Type:      EventTypeWhiteboardUpdated,
 		Timestamp: time.Now(),
 		ThreadID:  threadID,
@@ -87,7 +91,7 @@ func NewWhiteboardUpdatedEvent(threadID, agentName, content, action string) *Dom
 
 func NewInstructorThoughtEvent(threadID, instructorName, thought string, isPrivate bool) *DomainEvent {
 	return &DomainEvent{
-		ID:        generateEventID(),
+		ID:        GenerateEventID(),
 		Type:      EventTypeInstructorThought,
 		Timestamp: time.Now(),
 		ThreadID:  threadID,
@@ -102,7 +106,7 @@ func NewInstructorThoughtEvent(threadID, instructorName, thought string, isPriva
 
 func NewInstructorStrategyChangedEvent(threadID, instructorName, oldStrategy, newStrategy, reason string) *DomainEvent {
 	return &DomainEvent{
-		ID:        generateEventID(),
+		ID:        GenerateEventID(),
 		Type:      EventTypeInstructorStrategyChanged,
 		Timestamp: time.Now(),
 		ThreadID:  threadID,
@@ -118,7 +122,7 @@ func NewInstructorStrategyChangedEvent(threadID, instructorName, oldStrategy, ne
 
 func NewQuestionAnsweredEvent(threadID, subject, answer, answeredBy string, isComplete bool, whiteboardState string) *DomainEvent {
 	return &DomainEvent{
-		ID:        generateEventID(),
+		ID:        GenerateEventID(),
 		Type:      EventTypeQuestionAnswered,
 		Timestamp: time.Now(),
 		ThreadID:  threadID,
@@ -133,7 +137,75 @@ func NewQuestionAnsweredEvent(threadID, subject, answer, answeredBy string, isCo
 	}
 }
 
-// Helper function to generate unique event IDs
-func generateEventID() string {
+// NewMathQuestionEvent creates a math question event
+func NewMathQuestionEvent(threadID, question, emittedBy, context, whiteboardState string) *DomainEvent {
+	return &DomainEvent{
+		ID:        GenerateEventID(),
+		Type:      EventTypeMathQuestion,
+		Timestamp: time.Now(),
+		ThreadID:  threadID,
+		Version:   1,
+		Data: map[string]interface{}{
+			"question":         question,
+			"emitted_by":       emittedBy,
+			"context":          context,
+			"whiteboard_state": whiteboardState,
+		},
+	}
+}
+
+// NewPhysicsQuestionEvent creates a physics question event
+func NewPhysicsQuestionEvent(threadID, question, emittedBy, context, whiteboardState string) *DomainEvent {
+	return &DomainEvent{
+		ID:        GenerateEventID(),
+		Type:      EventTypePhysicsQuestion,
+		Timestamp: time.Now(),
+		ThreadID:  threadID,
+		Version:   1,
+		Data: map[string]interface{}{
+			"question":         question,
+			"emitted_by":       emittedBy,
+			"context":          context,
+			"whiteboard_state": whiteboardState,
+		},
+	}
+}
+
+// NewChemistryQuestionEvent creates a chemistry question event
+func NewChemistryQuestionEvent(threadID, question, emittedBy, context, whiteboardState string) *DomainEvent {
+	return &DomainEvent{
+		ID:        GenerateEventID(),
+		Type:      EventTypeChemistryQuestion,
+		Timestamp: time.Now(),
+		ThreadID:  threadID,
+		Version:   1,
+		Data: map[string]interface{}{
+			"question":         question,
+			"emitted_by":       emittedBy,
+			"context":          context,
+			"whiteboard_state": whiteboardState,
+		},
+	}
+}
+
+// NewStatisticsQuestionEvent creates a statistics question event
+func NewStatisticsQuestionEvent(threadID, question, emittedBy, context, whiteboardState string) *DomainEvent {
+	return &DomainEvent{
+		ID:        GenerateEventID(),
+		Type:      EventTypeStatisticsQuestion,
+		Timestamp: time.Now(),
+		ThreadID:  threadID,
+		Version:   1,
+		Data: map[string]interface{}{
+			"question":         question,
+			"emitted_by":       emittedBy,
+			"context":          context,
+			"whiteboard_state": whiteboardState,
+		},
+	}
+}
+
+// GenerateEventID generates unique event IDs (exported for use by agent packages)
+func GenerateEventID() string {
 	return time.Now().Format("20060102150405.000000")
 }

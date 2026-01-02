@@ -1,15 +1,14 @@
-package agent
+package statistics
 
 import (
-	"time"
-
+	"school-with-ai/services/agent"
 	"school-with-ai/services/tools"
 )
 
 // CreateStatisticsInstructor creates the statistics instructor agent with comprehensive statistical tools
-func CreateStatisticsInstructor(notifier EventNotifier) AgentConfig {
+func CreateStatisticsInstructor(notifier agent.EventNotifier) agent.AgentConfig {
 	// Create a dedicated tool registry for this agent
-	registry := NewToolRegistry()
+	registry := agent.NewToolRegistry()
 
 	// Create only the tools this agent needs
 	registry.Register(tools.NewWriteWhiteboardTool())
@@ -24,7 +23,7 @@ func CreateStatisticsInstructor(notifier EventNotifier) AgentConfig {
 	registry.Register(tools.NewRegressionTool())
 	registry.Register(tools.NewEmitQuestionAnsweredTool())
 
-	return AgentConfig{
+	return agent.AgentConfig{
 		Name: "statistics-instructor",
 		SystemPrompt: `# Statistics Instructor Agent
 
@@ -140,28 +139,5 @@ R² = [value]
 		Tools:            registry.All(),
 		HasPrivateMemory: true,
 		Notifier:         notifier,
-	}
-}
-
-// Statistics-specific events
-
-const (
-	EventTypeStatisticsQuestion EventType = "question.statistics"
-)
-
-// NewStatisticsQuestionEvent creates a statistics question event
-func NewStatisticsQuestionEvent(threadID, question, emittedBy, context, whiteboardState string) *DomainEvent {
-	return &DomainEvent{
-		ID:        generateEventID(),
-		Type:      EventTypeStatisticsQuestion,
-		Timestamp: time.Now(),
-		ThreadID:  threadID,
-		Version:   1,
-		Data: map[string]interface{}{
-			"question":         question,
-			"emitted_by":       emittedBy,
-			"context":          context,
-			"whiteboard_state": whiteboardState,
-		},
 	}
 }

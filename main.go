@@ -10,7 +10,11 @@ import (
 
 	"school-with-ai/components"
 	"school-with-ai/infra"
-	"school-with-ai/services/agent"
+	"school-with-ai/services/agents/chemistry"
+	"school-with-ai/services/agents/math"
+	"school-with-ai/services/agents/physics"
+	"school-with-ai/services/agents/statistics"
+	"school-with-ai/services/agents/studentfacing"
 	"school-with-ai/services/llm"
 
 	"github.com/openai/openai-go/v3"
@@ -44,11 +48,11 @@ func main() {
 	agentRegistry := infra.NewAgentRegistry(nil)
 
 	// Register all agents
-	agentRegistry.Register("student-facing-agent", agent.CreateStudentFacingAgent)
-	agentRegistry.Register("math-instructor", agent.CreateMathInstructor)
-	agentRegistry.Register("physics-instructor", agent.CreatePhysicsInstructor)
-	agentRegistry.Register("chemistry-instructor", agent.CreateChemistryInstructor)
-	agentRegistry.Register("statistics-instructor", agent.CreateStatisticsInstructor)
+	agentRegistry.Register("student-facing-agent", studentfacing.CreateStudentFacingAgent)
+	agentRegistry.Register("math-instructor", math.CreateMathInstructor)
+	agentRegistry.Register("physics-instructor", physics.CreatePhysicsInstructor)
+	agentRegistry.Register("chemistry-instructor", chemistry.CreateChemistryInstructor)
+	agentRegistry.Register("statistics-instructor", statistics.CreateStatisticsInstructor)
 
 	// Initialize and start worker pool with agent registry
 	workerPool := infra.NewWorkerPool(queue, eventLog, threadState, provider, agentRegistry, infra.WorkerPoolConfig{

@@ -1,8 +1,7 @@
-package agent
+package math
 
 import (
-	"time"
-
+	"school-with-ai/services/agent"
 	"school-with-ai/services/tools"
 )
 
@@ -18,9 +17,9 @@ import (
 //	  - question.physics: Activates physics-instructor for multi-subject questions
 //	  - question.chemistry: Activates chemistry-instructor for multi-subject questions
 //	  - whiteboard.updated: Updates shared whiteboard with math solution
-func CreateMathInstructor(notifier EventNotifier) AgentConfig {
+func CreateMathInstructor(notifier agent.EventNotifier) agent.AgentConfig {
 	// Create a dedicated tool registry for this agent
-	registry := NewToolRegistry()
+	registry := agent.NewToolRegistry()
 
 	// Create only the tools this agent needs
 	registry.Register(tools.NewCalculatorTool())
@@ -34,7 +33,7 @@ func CreateMathInstructor(notifier EventNotifier) AgentConfig {
 	registry.Register(tools.NewEmitChemistryQuestionTool())
 	registry.Register(tools.NewWriteWhiteboardTool())
 
-	return AgentConfig{
+	return agent.AgentConfig{
 		Name:           "math-instructor",
 		Role:           "instructor",
 		Specialization: "mathematics",
@@ -517,28 +516,5 @@ If student asks for a plot/graph and you don't use the plot tool, you have faile
 		Tools:            registry.All(),
 		HasPrivateMemory: true,
 		Notifier:         notifier,
-	}
-}
-
-// Math-specific events
-
-const (
-	EventTypeMathQuestion EventType = "question.math"
-)
-
-// NewMathQuestionEvent creates a math question event
-func NewMathQuestionEvent(threadID, question, emittedBy, context, whiteboardState string) *DomainEvent {
-	return &DomainEvent{
-		ID:        generateEventID(),
-		Type:      EventTypeMathQuestion,
-		Timestamp: time.Now(),
-		ThreadID:  threadID,
-		Version:   1,
-		Data: map[string]interface{}{
-			"question":         question,
-			"emitted_by":       emittedBy,
-			"context":          context,
-			"whiteboard_state": whiteboardState,
-		},
 	}
 }
