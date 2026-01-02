@@ -18,7 +18,14 @@ package agent
 //	  - question.statistics: Activates statistics-instructor to answer a statistics question
 //	  - whiteboard.updated: Updates shared whiteboard content (only for initial question)
 func CreateStudentFacingAgent(whiteboardTool, readWhiteboardTool, emitMathQuestionTool, emitPhysicsQuestionTool, emitChemistryQuestionTool, emitStatisticsQuestionTool Tool) AgentConfig {
-	tools := []Tool{readWhiteboardTool, whiteboardTool, emitMathQuestionTool, emitPhysicsQuestionTool, emitChemistryQuestionTool, emitStatisticsQuestionTool}
+	// Create a dedicated tool registry for this agent
+	registry := NewToolRegistry()
+	registry.Register(readWhiteboardTool)
+	registry.Register(whiteboardTool)
+	registry.Register(emitMathQuestionTool)
+	registry.Register(emitPhysicsQuestionTool)
+	registry.Register(emitChemistryQuestionTool)
+	registry.Register(emitStatisticsQuestionTool)
 
 	return AgentConfig{
 		Name:           "student-facing-agent",
@@ -411,7 +418,7 @@ If question requires multiple subjects, identify which should go FIRST:
 **Determinism:** Same question → Same PRIMARY specialist event
 **Tool-Only:** Use ONLY write_whiteboard (for question) and emit_[subject]_question tools - NO text output
 **Whiteboard-Only:** ALL content goes on whiteboard - NO text responses ever`,
-		Tools:            tools,
+		Tools:            registry.All(),
 		HasPrivateMemory: false, // Stateless coordinator
 	}
 }
@@ -429,7 +436,18 @@ If question requires multiple subjects, identify which should go FIRST:
 //	  - question.chemistry: Activates chemistry-instructor for multi-subject questions
 //	  - whiteboard.updated: Updates shared whiteboard with math solution
 func CreateMathInstructor(whiteboardTool, readWhiteboardTool, calculatorTool, graphingTool, equationSolverTool, plotTool, animateTool, emitQuestionAnsweredTool, emitPhysicsQuestionTool, emitChemistryQuestionTool Tool) AgentConfig {
-	tools := []Tool{calculatorTool, graphingTool, equationSolverTool, plotTool, animateTool, readWhiteboardTool, emitQuestionAnsweredTool, emitPhysicsQuestionTool, emitChemistryQuestionTool, whiteboardTool}
+	// Create a dedicated tool registry for this agent
+	registry := NewToolRegistry()
+	registry.Register(calculatorTool)
+	registry.Register(graphingTool)
+	registry.Register(equationSolverTool)
+	registry.Register(plotTool)
+	registry.Register(animateTool)
+	registry.Register(readWhiteboardTool)
+	registry.Register(emitQuestionAnsweredTool)
+	registry.Register(emitPhysicsQuestionTool)
+	registry.Register(emitChemistryQuestionTool)
+	registry.Register(whiteboardTool)
 
 	return AgentConfig{
 		Name:           "math-instructor",
@@ -911,7 +929,7 @@ If student asks for a plot/graph and you don't use the plot tool, you have faile
 **Idempotency:** Can be replayed with same result
 **Whiteboard-Only:** ALL content goes on whiteboard - NO text responses ever
 **Event-Only Communication:** Use event emission tools to coordinate with other agents`,
-		Tools:            tools,
+		Tools:            registry.All(),
 		HasPrivateMemory: true,
 	}
 }
@@ -929,7 +947,16 @@ If student asks for a plot/graph and you don't use the plot tool, you have faile
 //	  - question.chemistry: Activates chemistry-instructor for multi-subject questions
 //	  - whiteboard.updated: Updates shared whiteboard with physics solution
 func CreatePhysicsInstructor(whiteboardTool, readWhiteboardTool, calculatorTool, weatherTool, unitConversionTool, emitQuestionAnsweredTool, emitMathQuestionTool, emitChemistryQuestionTool Tool) AgentConfig {
-	tools := []Tool{readWhiteboardTool, calculatorTool, unitConversionTool, weatherTool, emitQuestionAnsweredTool, emitMathQuestionTool, emitChemistryQuestionTool, whiteboardTool}
+	// Create a dedicated tool registry for this agent
+	registry := NewToolRegistry()
+	registry.Register(readWhiteboardTool)
+	registry.Register(calculatorTool)
+	registry.Register(unitConversionTool)
+	registry.Register(weatherTool)
+	registry.Register(emitQuestionAnsweredTool)
+	registry.Register(emitMathQuestionTool)
+	registry.Register(emitChemistryQuestionTool)
+	registry.Register(whiteboardTool)
 
 	return AgentConfig{
 		Name:           "physics-instructor",
@@ -1211,7 +1238,7 @@ energy = 0.5 * mass * velocity**2
 **Idempotency:** Can be replayed with same result
 **Whiteboard-Only:** ALL content goes on whiteboard - NO text responses ever
 **Event-Only Communication:** Use event emission tools to coordinate with other agents`,
-		Tools:            tools,
+		Tools:            registry.All(),
 		HasPrivateMemory: true,
 	}
 }
@@ -1229,7 +1256,16 @@ energy = 0.5 * mass * velocity**2
 //	  - question.physics: Activates physics-instructor for multi-subject questions
 //	  - whiteboard.updated: Updates shared whiteboard with chemistry solution
 func CreateChemistryInstructor(whiteboardTool, readWhiteboardTool, calculatorTool, periodicTableTool, unitConversionTool, emitQuestionAnsweredTool, emitMathQuestionTool, emitPhysicsQuestionTool Tool) AgentConfig {
-	tools := []Tool{readWhiteboardTool, calculatorTool, periodicTableTool, unitConversionTool, emitQuestionAnsweredTool, emitMathQuestionTool, emitPhysicsQuestionTool, whiteboardTool}
+	// Create a dedicated tool registry for this agent
+	registry := NewToolRegistry()
+	registry.Register(readWhiteboardTool)
+	registry.Register(calculatorTool)
+	registry.Register(periodicTableTool)
+	registry.Register(unitConversionTool)
+	registry.Register(emitQuestionAnsweredTool)
+	registry.Register(emitMathQuestionTool)
+	registry.Register(emitPhysicsQuestionTool)
+	registry.Register(whiteboardTool)
 
 	return AgentConfig{
 		Name:           "chemistry-instructor",
@@ -1527,26 +1563,26 @@ CC(C)CC1=CC=C(C=C1)C(C)C
 **Idempotency:** Can be replayed with same result
 **Whiteboard-Only:** ALL content goes on whiteboard - NO text responses ever
 **Event-Only Communication:** Use event emission tools to coordinate with other agents`,
-		Tools:            tools,
+		Tools:            registry.All(),
 		HasPrivateMemory: true,
 	}
 }
 
 // CreateStatisticsInstructor creates the statistics instructor agent with comprehensive statistical tools
 func CreateStatisticsInstructor(whiteboardTool, readWhiteboardTool, descriptiveStatsTool, correlationTool, distanceMetricsTool, samplingTool, dataTransformTool, normalDistributionTool, geometricDistributionTool, regressionTool, emitQuestionAnsweredTool Tool) AgentConfig {
-	tools := []Tool{
-		whiteboardTool,
-		readWhiteboardTool,
-		descriptiveStatsTool,
-		correlationTool,
-		distanceMetricsTool,
-		samplingTool,
-		dataTransformTool,
-		normalDistributionTool,
-		geometricDistributionTool,
-		regressionTool,
-		emitQuestionAnsweredTool,
-	}
+	// Create a dedicated tool registry for this agent
+	registry := NewToolRegistry()
+	registry.Register(whiteboardTool)
+	registry.Register(readWhiteboardTool)
+	registry.Register(descriptiveStatsTool)
+	registry.Register(correlationTool)
+	registry.Register(distanceMetricsTool)
+	registry.Register(samplingTool)
+	registry.Register(dataTransformTool)
+	registry.Register(normalDistributionTool)
+	registry.Register(geometricDistributionTool)
+	registry.Register(regressionTool)
+	registry.Register(emitQuestionAnsweredTool)
 
 	return AgentConfig{
 		Name: "statistics-instructor",
@@ -1661,7 +1697,7 @@ R² = [value]
 **Terminal:** Always ends with emit_question_answered
 **Whiteboard-Only:** ALL content goes on whiteboard - NO text responses ever
 **Precision:** Use appropriate decimal places for statistical output`,
-		Tools:            tools,
+		Tools:            registry.All(),
 		HasPrivateMemory: true,
 	}
 }
