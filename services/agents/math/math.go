@@ -2,7 +2,8 @@ package math
 
 import (
 	"school-with-ai/services/agent"
-	"school-with-ai/services/tools"
+	"school-with-ai/services/agents/math/tools"
+	sharedtools "school-with-ai/services/tools"
 )
 
 // CreateMathInstructor creates the math instructor agent configuration
@@ -22,16 +23,16 @@ func CreateMathInstructor(notifier agent.EventNotifier) agent.AgentConfig {
 	registry := agent.NewToolRegistry()
 
 	// Create only the tools this agent needs
-	registry.Register(tools.NewCalculatorTool())
+	registry.Register(sharedtools.NewCalculatorTool())
 	registry.Register(tools.NewGraphingTool())
 	registry.Register(tools.NewEquationSolverTool())
 	registry.Register(tools.NewPlotTool())
 	registry.Register(tools.NewAnimateTool())
-	registry.Register(tools.NewReadWhiteboardTool())
-	registry.Register(tools.NewEmitQuestionAnsweredTool())
-	registry.Register(tools.NewEmitPhysicsQuestionTool())
-	registry.Register(tools.NewEmitChemistryQuestionTool())
-	registry.Register(tools.NewWriteWhiteboardTool())
+	registry.Register(sharedtools.NewReadWhiteboardTool())
+	registry.Register(sharedtools.NewEmitQuestionAnsweredTool())
+	registry.Register(sharedtools.NewEmitPhysicsQuestionTool())
+	registry.Register(sharedtools.NewEmitChemistryQuestionTool())
+	registry.Register(sharedtools.NewWriteWhiteboardTool())
 
 	return agent.AgentConfig{
 		Name:           "math-instructor",
