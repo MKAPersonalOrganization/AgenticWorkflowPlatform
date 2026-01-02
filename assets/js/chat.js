@@ -130,24 +130,97 @@ function renderMarkdown(content) {
     // Use Mathpix renderer if available (supports LaTeX math with $$, \[\], etc.)
     if (typeof window.markdownToHTML === 'function') {
         try {
-            return window.markdownToHTML(content, {
+            const rendered = window.markdownToHTML(content, {
                 htmlTags: true
             });
+            return enhanceCodeBlocks(rendered);
         } catch (e) {
             console.error('Error rendering with Mathpix:', e);
             // Fallback to regular markdown-it
             if (md) {
-                return md.render(content);
+                return enhanceCodeBlocks(md.render(content));
             }
         }
     }
 
     // Fallback to regular markdown-it
     if (md) {
-        return md.render(content);
+        return enhanceCodeBlocks(md.render(content));
     }
 
     return content;
+}
+
+/**
+ * Enhance code blocks with copy buttons
+ * @param {string} html - Rendered HTML
+ * @returns {string} - Enhanced HTML with copy buttons
+ */
+function enhanceCodeBlocks(html) {
+    if (!html) return html;
+
+    // Wrap code blocks in a relative container and add copy button
+    return html.replace(
+        /<pre><code([^>]*)>([\s\S]*?)<\/code><\/pre>/g,
+        (match, attrs, code) => {
+            return `<div class="relative group/codeblock">
+                <button
+                    onclick="copyCodeBlock(event)"
+                    class="absolute top-2 right-2 opacity-0 group-hover/codeblock:opacity-100 transition-opacity inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-xs font-medium ring-offset-background bg-muted hover:bg-accent hover:text-accent-foreground border border-border h-7 px-2 shadow-sm touch-target"
+                    type="button"
+                    aria-label="Copy code"
+                    title="Copy code"
+                >
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                    </svg>
+                    <span>Copy</span>
+                </button>
+                <pre><code${attrs}>${code}</code></pre>
+            </div>`;
+        }
+    );
+}
+
+/**
+ * Global function to copy code blocks (called from onclick)
+ * @param {Event} event - Click event
+ */
+window.copyCodeBlock = async function (event) {
+    const button = event.currentTarget;
+    const codeBlock = button.closest('.group\\/codeblock')?.querySelector('code');
+    if (!codeBlock) return;
+
+    try {
+        await navigator.clipboard.writeText(codeBlock.textContent);
+
+        // Visual feedback
+        const originalHTML = button.innerHTML;
+        button.innerHTML = `
+            <svg class="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+            <span class="text-green-500">Copied!</span>
+        `;
+
+        setTimeout(() => {
+            button.innerHTML = originalHTML;
+        }, 2000);
+
+        // Show toast if available
+        const chatComponent = Alpine.$data(document.querySelector('[x-data*="chat"]'));
+        if (chatComponent?.showToast) {
+            chatComponent.showToast('Code copied to clipboard', 'success', 2000);
+        }
+    } catch (error) {
+        console.error('Failed to copy code:', error);
+
+        // Show error toast if available
+        const chatComponent = Alpine.$data(document.querySelector('[x-data*="chat"]'));
+        if (chatComponent?.showToast) {
+            chatComponent.showToast('Failed to copy code', 'error');
+        }
+    }
 }
 
 /**
@@ -198,6 +271,13 @@ document.addEventListener('alpine:init', () => {
         whiteboardTyping: null, // Shows "agent is writing..." message
         whiteboardLastAgent: null, // Last agent who updated whiteboard
         showWhiteboard: true, // Controls whiteboard visibility
+        showThread: true, // Controls thread/chat visibility
+
+        // Split panel state
+        splitPosition: 50, // Percentage of width for left panel (thread)
+        __isResizing: false, // Internal: tracking resize drag state
+        __resizeStartX: 0, // Internal: starting X position of resize
+        __resizeStartSplit: 50, // Internal: starting split position
 
         // UI state
         sessions: [],
@@ -206,6 +286,15 @@ document.addEventListener('alpine:init', () => {
         showEventLog: false,
         eventLogCopied: false,
         hideLifecycleEvents: false,
+        showKeyboardShortcuts: false, // Keyboard shortcuts help modal
+        toasts: [], // Toast notifications queue
+        __toastIdCounter: 0, // Internal toast ID counter
+
+        // Theme management: 'light', 'dark', or 'system'
+        theme: 'system',
+
+        // Accessibility: Check for reduced motion preference
+        prefersReducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
 
         // Internal tracking (Alpine pattern)
         __watchers: [],
@@ -303,6 +392,9 @@ document.addEventListener('alpine:init', () => {
             }
             this.__initialized = true;
 
+            // Initialize theme from saved preference
+            this.__initTheme()
+
             // Alpine pattern: use queueMicrotask for async initialization
             queueMicrotask(() => {
                 this.__loadSessions()
@@ -316,6 +408,10 @@ document.addEventListener('alpine:init', () => {
                 () => this.__scrollToBottom(),
                 100
             )
+
+            // Bind resize handlers to maintain correct 'this' context
+            this.__handleResize = this.__handleResize.bind(this)
+            this.__stopResize = this.__stopResize.bind(this)
 
             // Alpine UI pattern: Use $watch for declarative reactive side effects
             // Store watchers for cleanup
@@ -467,6 +563,211 @@ document.addEventListener('alpine:init', () => {
 
         toggleWhiteboard() {
             this.showWhiteboard = !this.showWhiteboard
+            // Reset split position when toggling
+            if (this.showWhiteboard && this.showThread) {
+                this.splitPosition = 50
+            }
+        },
+
+        toggleThread() {
+            this.showThread = !this.showThread
+            // Reset split position when toggling
+            if (this.showWhiteboard && this.showThread) {
+                this.splitPosition = 50
+            }
+        },
+
+        toggleKeyboardShortcuts() {
+            this.showKeyboardShortcuts = !this.showKeyboardShortcuts
+        },
+
+        // ============================================
+        // Toast Notification System
+        // ============================================
+
+        /**
+         * Show a toast notification
+         * @param {string} message - The message to display
+         * @param {string} type - Type: 'success', 'error', 'info', 'warning'
+         * @param {number} duration - Duration in ms (default: 4000, 0 = persistent)
+         * @returns {number} Toast ID for manual dismissal
+         */
+        showToast(message, type = 'info', duration = 4000) {
+            const id = ++this.__toastIdCounter
+            const toast = {
+                id,
+                message,
+                type,
+                visible: true,
+                leaving: false
+            }
+
+            this.toasts.push(toast)
+
+            // Auto-dismiss after duration (unless duration is 0)
+            if (duration > 0) {
+                setTimeout(() => {
+                    this.dismissToast(id)
+                }, duration)
+            }
+
+            // Announce to screen readers
+            this.__announce(message, type === 'error' ? 'assertive' : 'polite')
+
+            return id
+        },
+
+        /**
+         * Dismiss a toast notification
+         * @param {number} id - Toast ID to dismiss
+         */
+        dismissToast(id) {
+            const toast = this.toasts.find(t => t.id === id)
+            if (toast && !toast.leaving) {
+                toast.leaving = true
+                // Wait for animation to complete before removing
+                setTimeout(() => {
+                    this.toasts = this.toasts.filter(t => t.id !== id)
+                }, 200)
+            }
+        },
+
+        /**
+         * Get toast icon based on type
+         */
+        getToastIcon(type) {
+            switch (type) {
+                case 'success':
+                    return '<svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>'
+                case 'error':
+                    return '<svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>'
+                case 'warning':
+                    return '<svg class="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>'
+                default:
+                    return '<svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>'
+            }
+        },
+
+        // ============================================
+        // Copy to Clipboard Utilities
+        // ============================================
+
+        /**
+         * Copy text to clipboard with toast feedback
+         * @param {string} text - Text to copy
+         * @param {string} successMessage - Message to show on success
+         */
+        async copyToClipboard(text, successMessage = 'Copied to clipboard') {
+            try {
+                await navigator.clipboard.writeText(text)
+                this.showToast(successMessage, 'success', 2000)
+                return true
+            } catch (error) {
+                console.error('Failed to copy:', error)
+                this.showToast('Failed to copy to clipboard', 'error')
+                return false
+            }
+        },
+
+        /**
+         * Copy message content to clipboard
+         * @param {string} messageId - ID of the message to copy
+         */
+        async copyMessage(messageId) {
+            const state = this.__getThreadState()
+            const message = state.messages.find(m => m.id === messageId)
+            if (message) {
+                const content = message.content || message.args || ''
+                await this.copyToClipboard(content, 'Message copied')
+            }
+        },
+
+        /**
+         * Copy code block content
+         * @param {Event} event - Click event from code block
+         */
+        async copyCodeBlock(event) {
+            const button = event.currentTarget
+            const codeBlock = button.closest('pre')?.querySelector('code')
+            if (codeBlock) {
+                await this.copyToClipboard(codeBlock.textContent, 'Code copied')
+            }
+        },
+
+        // ============================================
+        // Resizable Split Panel Methods
+        // ============================================
+
+        startResize(event) {
+            // Handle both mouse and touch events
+            const isTouch = event.type === 'touchstart'
+
+            // Only handle left mouse button for mouse events
+            if (!isTouch && event.button !== 0) return
+
+            // Prevent default to avoid scrolling on touch devices
+            if (isTouch) {
+                event.preventDefault()
+            }
+
+            this.__isResizing = true
+            this.__resizeStartX = isTouch ? event.touches[0].clientX : event.clientX
+            this.__resizeStartSplit = this.splitPosition
+
+            // Prevent text selection during resize
+            document.body.style.userSelect = 'none'
+            document.body.style.cursor = 'col-resize'
+
+            // Add global event listeners for both mouse and touch
+            document.addEventListener('mousemove', this.__handleResize)
+            document.addEventListener('mouseup', this.__stopResize)
+            document.addEventListener('touchmove', this.__handleResize, { passive: false })
+            document.addEventListener('touchend', this.__stopResize)
+            document.addEventListener('touchcancel', this.__stopResize)
+        },
+
+        __handleResize(event) {
+            if (!this.__isResizing) return
+
+            // Prevent scrolling during touch resize
+            if (event.type === 'touchmove') {
+                event.preventDefault()
+            }
+
+            const container = document.querySelector('[x-ref="splitContainer"]') ||
+                document.querySelector('.flex-1.flex.h-screen.overflow-hidden')
+            if (!container) return
+
+            const containerRect = container.getBoundingClientRect()
+            const clientX = event.type === 'touchmove' ? event.touches[0].clientX : event.clientX
+            const deltaX = clientX - this.__resizeStartX
+            const deltaPercent = (deltaX / containerRect.width) * 100
+
+            // Calculate new split position with constraints (20% - 80%)
+            let newSplit = this.__resizeStartSplit + deltaPercent
+            newSplit = Math.max(20, Math.min(80, newSplit))
+
+            this.splitPosition = newSplit
+        },
+
+        __stopResize() {
+            if (!this.__isResizing) return
+
+            this.__isResizing = false
+            document.body.style.userSelect = ''
+            document.body.style.cursor = ''
+
+            // Remove all global event listeners
+            document.removeEventListener('mousemove', this.__handleResize)
+            document.removeEventListener('mouseup', this.__stopResize)
+            document.removeEventListener('touchmove', this.__handleResize)
+            document.removeEventListener('touchend', this.__stopResize)
+            document.removeEventListener('touchcancel', this.__stopResize)
+        },
+
+        // Double-click to reset split position to 50%
+        resetSplitPosition() {
+            this.splitPosition = 50
         },
 
         // ============================================
@@ -910,10 +1211,27 @@ document.addEventListener('alpine:init', () => {
 
         __registerKeyboardShortcuts() {
             const handler = (e) => {
-                // Don't trigger shortcuts when typing in input fields
+                // ? or Ctrl+/ - Show keyboard shortcuts (works even in inputs)
+                if (e.key === '?' || ((e.ctrlKey || e.metaKey) && e.key === '/')) {
+                    e.preventDefault()
+                    this.toggleKeyboardShortcuts()
+                    return
+                }
+
+                // Escape - Close modals or cancel streaming
+                if (e.key === 'Escape') {
+                    e.preventDefault()
+                    if (this.showKeyboardShortcuts) {
+                        this.showKeyboardShortcuts = false
+                    } else if (this.isStreaming) {
+                        this.__stopStreaming()
+                    }
+                    return
+                }
+
+                // Don't trigger other shortcuts when typing in input fields
                 if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-                    // Allow Escape even in input fields
-                    if (e.key !== 'Escape') return;
+                    return
                 }
 
                 // Ctrl/Cmd + Shift + N - New chat (avoid browser Ctrl+N)
@@ -934,10 +1252,19 @@ document.addEventListener('alpine:init', () => {
                     this.toggleDebugPanel()
                 }
 
-                // Escape - Cancel streaming
-                if (e.key === 'Escape' && this.isStreaming) {
+                // Ctrl/Cmd + Shift + T - Toggle theme
+                if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'T') {
                     e.preventDefault()
-                    this.__stopStreaming()
+                    this.toggleTheme()
+                }
+
+                // Ctrl/Cmd + W - Toggle whiteboard
+                if ((e.ctrlKey || e.metaKey) && e.key === 'w') {
+                    // Only if we have messages (otherwise let browser handle it)
+                    if (this.hasMessages || this.isStreaming) {
+                        e.preventDefault()
+                        this.toggleWhiteboard()
+                    }
                 }
 
                 // Ctrl/Cmd + Up/Down - Navigate sessions (more intuitive than Alt)
@@ -952,6 +1279,96 @@ document.addEventListener('alpine:init', () => {
             // Register cleanup
             this.__cleanupTasks.add(() => {
                 document.removeEventListener('keydown', handler)
+            })
+        },
+
+        // ============================================
+        // Theme Management
+        // ============================================
+
+        /**
+         * Toggle theme: light -> dark -> system -> light
+         */
+        toggleTheme() {
+            const currentTheme = this.getCurrentTheme()
+            let nextTheme
+
+            if (currentTheme === 'light') {
+                nextTheme = 'dark'
+            } else if (currentTheme === 'dark') {
+                nextTheme = 'system'
+            } else {
+                nextTheme = 'light'
+            }
+
+            this.setTheme(nextTheme)
+        },
+
+        /**
+         * Get current theme preference
+         * @returns {'light'|'dark'|'system'}
+         */
+        getCurrentTheme() {
+            return localStorage.getItem('theme') || 'system'
+        },
+
+        /**
+         * Set theme preference
+         * @param {'light'|'dark'|'system'} theme
+         */
+        setTheme(theme) {
+            localStorage.setItem('theme', theme)
+            this.__applyTheme(theme)
+
+            // Update Alpine store if available
+            if (Alpine.store('chatSettings')) {
+                Alpine.store('chatSettings').theme = theme
+            }
+
+            // Show toast notification
+            const themeLabels = {
+                light: 'Light mode',
+                dark: 'Dark mode',
+                system: 'System theme'
+            }
+            this.showToast(`${themeLabels[theme]} enabled`, 'info', 2000)
+        },
+
+        /**
+         * Apply theme to document
+         * @param {'light'|'dark'|'system'} theme
+         */
+        __applyTheme(theme) {
+            const root = document.documentElement
+
+            if (theme === 'system') {
+                // Remove explicit class, let system preference apply
+                const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+                if (systemPrefersDark) {
+                    root.classList.add('dark')
+                } else {
+                    root.classList.remove('dark')
+                }
+            } else if (theme === 'dark') {
+                root.classList.add('dark')
+            } else {
+                root.classList.remove('dark')
+            }
+        },
+
+        /**
+         * Initialize theme from localStorage or system preference
+         */
+        __initTheme() {
+            const savedTheme = this.getCurrentTheme()
+            this.__applyTheme(savedTheme)
+
+            // Listen for system theme changes when in system mode
+            const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+            mediaQuery.addEventListener('change', (e) => {
+                if (this.getCurrentTheme() === 'system') {
+                    this.__applyTheme('system')
+                }
             })
         },
 
