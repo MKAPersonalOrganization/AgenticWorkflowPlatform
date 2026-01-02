@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"school-with-ai/infra/agui"
-	"school-with-ai/services/agent"
+	"school-with-ai/services/sdk"
 )
 
 // UINotifier listens to domain events and notifies the UI
@@ -21,44 +21,44 @@ func NewUINotifier(emitter EventEmitter) *UINotifier {
 }
 
 // HandleDomainEvent processes a domain event and emits corresponding UI events
-func (n *UINotifier) HandleDomainEvent(event agent.Event) error {
+func (n *UINotifier) HandleDomainEvent(event sdk.Event) error {
 	switch evt := event.(type) {
-	case *agent.AssistantMessageStartedEvent:
+	case *sdk.AssistantMessageStartedEvent:
 		return n.emitTextMessageStart(evt)
 
-	case *agent.AssistantContentStreamedEvent:
+	case *sdk.AssistantContentStreamedEvent:
 		return n.emitTextMessageContent(evt)
 
-	case *agent.ToolCallStartedEvent:
+	case *sdk.ToolCallStartedEvent:
 		return n.emitToolCallStart(evt)
 
-	case *agent.ToolCallArgumentsStreamedEvent:
+	case *sdk.ToolCallArgumentsStreamedEvent:
 		return n.emitToolCallArgs(evt)
 
-	case *agent.ToolCallCompletedEvent:
+	case *sdk.ToolCallCompletedEvent:
 		return n.emitToolCallEnd(evt)
 
-	case *agent.AssistantMessageCompletedEvent:
+	case *sdk.AssistantMessageCompletedEvent:
 		return n.emitTextMessageEnd(evt)
 
-	case *agent.ToolCallExecutedEvent:
+	case *sdk.ToolCallExecutedEvent:
 		return n.emitToolCallResult(evt)
 
 	// Agent collaboration events
-	case *agent.DomainEvent:
+	case *sdk.DomainEvent:
 		// Handle unified domain events
 		switch evt.Type {
-		case agent.EventTypeWhiteboardUpdated:
+		case sdk.EventTypeWhiteboardUpdated:
 			return n.emitWhiteboardUpdated(evt)
-		case agent.EventTypeMathQuestion:
+		case sdk.EventTypeMathQuestion:
 			return n.emitMathQuestion(evt)
-		case agent.EventTypePhysicsQuestion:
+		case sdk.EventTypePhysicsQuestion:
 			return n.emitPhysicsQuestion(evt)
-		case agent.EventTypeChemistryQuestion:
+		case sdk.EventTypeChemistryQuestion:
 			return n.emitChemistryQuestion(evt)
-		case agent.EventTypeStatisticsQuestion:
+		case sdk.EventTypeStatisticsQuestion:
 			return n.emitStatisticsQuestion(evt)
-		case agent.EventTypeQuestionAnswered:
+		case sdk.EventTypeQuestionAnswered:
 			return n.emitQuestionAnswered(evt)
 		default:
 			return nil
@@ -70,7 +70,7 @@ func (n *UINotifier) HandleDomainEvent(event agent.Event) error {
 	}
 }
 
-func (n *UINotifier) emitTextMessageStart(evt *agent.AssistantMessageStartedEvent) error {
+func (n *UINotifier) emitTextMessageStart(evt *sdk.AssistantMessageStartedEvent) error {
 	timestamp := time.Now().UnixMilli()
 	uiEvent := &agui.TextMessageStartEvent{
 		BaseEvent: agui.BaseEvent{
@@ -83,7 +83,7 @@ func (n *UINotifier) emitTextMessageStart(evt *agent.AssistantMessageStartedEven
 	return n.emitter.Emit(uiEvent)
 }
 
-func (n *UINotifier) emitTextMessageContent(evt *agent.AssistantContentStreamedEvent) error {
+func (n *UINotifier) emitTextMessageContent(evt *sdk.AssistantContentStreamedEvent) error {
 	timestamp := time.Now().UnixMilli()
 	uiEvent := &agui.TextMessageContentEvent{
 		BaseEvent: agui.BaseEvent{
@@ -96,7 +96,7 @@ func (n *UINotifier) emitTextMessageContent(evt *agent.AssistantContentStreamedE
 	return n.emitter.Emit(uiEvent)
 }
 
-func (n *UINotifier) emitToolCallStart(evt *agent.ToolCallStartedEvent) error {
+func (n *UINotifier) emitToolCallStart(evt *sdk.ToolCallStartedEvent) error {
 	timestamp := time.Now().UnixMilli()
 	parentMessageID := evt.ParentMessageID
 	uiEvent := &agui.ToolCallStartEvent{
@@ -112,7 +112,7 @@ func (n *UINotifier) emitToolCallStart(evt *agent.ToolCallStartedEvent) error {
 	return n.emitter.Emit(uiEvent)
 }
 
-func (n *UINotifier) emitToolCallArgs(evt *agent.ToolCallArgumentsStreamedEvent) error {
+func (n *UINotifier) emitToolCallArgs(evt *sdk.ToolCallArgumentsStreamedEvent) error {
 	timestamp := time.Now().UnixMilli()
 	uiEvent := &agui.ToolCallArgsEvent{
 		BaseEvent: agui.BaseEvent{
@@ -125,7 +125,7 @@ func (n *UINotifier) emitToolCallArgs(evt *agent.ToolCallArgumentsStreamedEvent)
 	return n.emitter.Emit(uiEvent)
 }
 
-func (n *UINotifier) emitToolCallEnd(evt *agent.ToolCallCompletedEvent) error {
+func (n *UINotifier) emitToolCallEnd(evt *sdk.ToolCallCompletedEvent) error {
 	timestamp := time.Now().UnixMilli()
 	uiEvent := &agui.ToolCallEndEvent{
 		BaseEvent: agui.BaseEvent{
@@ -137,7 +137,7 @@ func (n *UINotifier) emitToolCallEnd(evt *agent.ToolCallCompletedEvent) error {
 	return n.emitter.Emit(uiEvent)
 }
 
-func (n *UINotifier) emitTextMessageEnd(evt *agent.AssistantMessageCompletedEvent) error {
+func (n *UINotifier) emitTextMessageEnd(evt *sdk.AssistantMessageCompletedEvent) error {
 	timestamp := time.Now().UnixMilli()
 	uiEvent := &agui.TextMessageEndEvent{
 		BaseEvent: agui.BaseEvent{
@@ -149,7 +149,7 @@ func (n *UINotifier) emitTextMessageEnd(evt *agent.AssistantMessageCompletedEven
 	return n.emitter.Emit(uiEvent)
 }
 
-func (n *UINotifier) emitToolCallResult(evt *agent.ToolCallExecutedEvent) error {
+func (n *UINotifier) emitToolCallResult(evt *sdk.ToolCallExecutedEvent) error {
 	timestamp := time.Now().UnixMilli()
 	role := "tool"
 	uiEvent := &agui.ToolCallResultEvent{
@@ -167,7 +167,7 @@ func (n *UINotifier) emitToolCallResult(evt *agent.ToolCallExecutedEvent) error 
 
 // Agent collaboration event emitters
 
-func (n *UINotifier) emitWhiteboardUpdated(evt *agent.DomainEvent) error {
+func (n *UINotifier) emitWhiteboardUpdated(evt *sdk.DomainEvent) error {
 	timestamp := time.Now().UnixMilli()
 	uiEvent := &agui.CustomEvent{
 		BaseEvent: agui.BaseEvent{
@@ -185,7 +185,7 @@ func (n *UINotifier) emitWhiteboardUpdated(evt *agent.DomainEvent) error {
 	return n.emitter.Emit(uiEvent)
 }
 
-func (n *UINotifier) emitMathQuestion(evt *agent.DomainEvent) error {
+func (n *UINotifier) emitMathQuestion(evt *sdk.DomainEvent) error {
 	timestamp := time.Now().UnixMilli()
 	uiEvent := &agui.CustomEvent{
 		BaseEvent: agui.BaseEvent{
@@ -203,7 +203,7 @@ func (n *UINotifier) emitMathQuestion(evt *agent.DomainEvent) error {
 	return n.emitter.Emit(uiEvent)
 }
 
-func (n *UINotifier) emitPhysicsQuestion(evt *agent.DomainEvent) error {
+func (n *UINotifier) emitPhysicsQuestion(evt *sdk.DomainEvent) error {
 	timestamp := time.Now().UnixMilli()
 	uiEvent := &agui.CustomEvent{
 		BaseEvent: agui.BaseEvent{
@@ -221,7 +221,7 @@ func (n *UINotifier) emitPhysicsQuestion(evt *agent.DomainEvent) error {
 	return n.emitter.Emit(uiEvent)
 }
 
-func (n *UINotifier) emitChemistryQuestion(evt *agent.DomainEvent) error {
+func (n *UINotifier) emitChemistryQuestion(evt *sdk.DomainEvent) error {
 	timestamp := time.Now().UnixMilli()
 	uiEvent := &agui.CustomEvent{
 		BaseEvent: agui.BaseEvent{
@@ -239,7 +239,7 @@ func (n *UINotifier) emitChemistryQuestion(evt *agent.DomainEvent) error {
 	return n.emitter.Emit(uiEvent)
 }
 
-func (n *UINotifier) emitStatisticsQuestion(evt *agent.DomainEvent) error {
+func (n *UINotifier) emitStatisticsQuestion(evt *sdk.DomainEvent) error {
 	timestamp := time.Now().UnixMilli()
 	uiEvent := &agui.CustomEvent{
 		BaseEvent: agui.BaseEvent{
@@ -257,7 +257,7 @@ func (n *UINotifier) emitStatisticsQuestion(evt *agent.DomainEvent) error {
 	return n.emitter.Emit(uiEvent)
 }
 
-func (n *UINotifier) emitQuestionAnswered(evt *agent.DomainEvent) error {
+func (n *UINotifier) emitQuestionAnswered(evt *sdk.DomainEvent) error {
 	timestamp := time.Now().UnixMilli()
 	uiEvent := &agui.CustomEvent{
 		BaseEvent: agui.BaseEvent{

@@ -1,10 +1,10 @@
-package agent_test
+package sdk_test
 
 import (
 	"testing"
 
 	"school-with-ai/infra"
-	"school-with-ai/services/agent"
+	"school-with-ai/services/sdk"
 	"school-with-ai/services/agents/math"
 	"school-with-ai/services/agents/physics"
 	"school-with-ai/services/agents/studentfacing"
@@ -12,7 +12,7 @@ import (
 
 func TestInstructorConfigurations(t *testing.T) {
 	// Mock notifier
-	var mockNotifier agent.EventNotifier = nil
+	var mockNotifier sdk.EventNotifier = nil
 
 	studentAgent := studentfacing.CreateStudentFacingAgent(mockNotifier)
 	if studentAgent.Name != "student-facing-agent" {
@@ -27,7 +27,7 @@ func TestInstructorConfigurations(t *testing.T) {
 
 func TestAgentRegistry(t *testing.T) {
 	// Mock notifier
-	var mockNotifier agent.EventNotifier = nil
+	var mockNotifier sdk.EventNotifier = nil
 
 	registry := infra.NewAgentRegistry(mockNotifier)
 

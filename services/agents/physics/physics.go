@@ -1,7 +1,7 @@
 package physics
 
 import (
-	"school-with-ai/services/agent"
+	"school-with-ai/services/sdk"
 	"school-with-ai/services/agents/physics/tools"
 	sharedtools "school-with-ai/services/tools"
 )
@@ -18,9 +18,9 @@ import (
 //	  - question.math: Activates math-instructor for multi-subject questions
 //	  - question.chemistry: Activates chemistry-instructor for multi-subject questions
 //	  - whiteboard.updated: Updates shared whiteboard with physics solution
-func CreatePhysicsInstructor(notifier agent.EventNotifier) agent.AgentConfig {
+func CreatePhysicsInstructor(notifier sdk.EventNotifier) sdk.AgentConfig {
 	// Create a dedicated tool registry for this agent
-	registry := agent.NewToolRegistry()
+	registry := sdk.NewToolRegistry()
 
 	// Create only the tools this agent needs
 	registry.Register(sharedtools.NewReadWhiteboardTool())
@@ -32,7 +32,7 @@ func CreatePhysicsInstructor(notifier agent.EventNotifier) agent.AgentConfig {
 	registry.Register(sharedtools.NewEmitChemistryQuestionTool())
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
 
-	return agent.AgentConfig{
+	return sdk.AgentConfig{
 		Name:           "physics-instructor",
 		Role:           "instructor",
 		Specialization: "physics",

@@ -9,22 +9,22 @@ import (
 
 	"school-with-ai/domain"
 	"school-with-ai/infra/agui"
-	"school-with-ai/services/agent"
+	"school-with-ai/services/sdk"
 )
 
 // AgentFactory is a function that creates an agent configuration with a given notifier
-type AgentFactory func(notifier agent.EventNotifier) agent.AgentConfig
+type AgentFactory func(notifier sdk.EventNotifier) sdk.AgentConfig
 
 // AgentRegistry manages agent factories
 // Agents register themselves with the registry
 type AgentRegistry struct {
 	mu        sync.RWMutex
 	factories map[string]AgentFactory
-	notifier  agent.EventNotifier
+	notifier  sdk.EventNotifier
 }
 
 // NewAgentRegistry creates a new agent registry
-func NewAgentRegistry(notifier agent.EventNotifier) *AgentRegistry {
+func NewAgentRegistry(notifier sdk.EventNotifier) *AgentRegistry {
 	return &AgentRegistry{
 		factories: make(map[string]AgentFactory),
 		notifier:  notifier,
@@ -39,20 +39,20 @@ func (r *AgentRegistry) Register(name string, factory AgentFactory) {
 }
 
 // GetByName returns the agent configuration for a specific agent by name
-func (r *AgentRegistry) GetByName(name string) (agent.AgentConfig, bool) {
+func (r *AgentRegistry) GetByName(name string) (sdk.AgentConfig, bool) {
 	r.mu.RLock()
 	factory, exists := r.factories[name]
 	r.mu.RUnlock()
 
 	if !exists {
-		return agent.AgentConfig{}, false
+		return sdk.AgentConfig{}, false
 	}
 
 	return factory(r.notifier), true
 }
 
 // SetNotifier updates the notifier for all agents created by this registry
-func (r *AgentRegistry) SetNotifier(notifier agent.EventNotifier) {
+func (r *AgentRegistry) SetNotifier(notifier sdk.EventNotifier) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.notifier = notifier
@@ -61,9 +61,9 @@ func (r *AgentRegistry) SetNotifier(notifier agent.EventNotifier) {
 // WorkerPool manages a pool of workers that process jobs from the queue
 type WorkerPool struct {
 	queue         domain.JobQueue
-	log           agent.EventLog
-	state         agent.ThreadState
-	provider      agent.Provider
+	log           sdk.EventLog
+	state         sdk.ThreadState
+	provider      sdk.Provider
 	agentRegistry *AgentRegistry
 	numWorkers    int
 	pollInterval  time.Duration
@@ -89,7 +89,7 @@ type WorkerPoolConfig struct {
 }
 
 // NewWorkerPool creates a new worker pool
-func NewWorkerPool(queue domain.JobQueue, log agent.EventLog, state agent.ThreadState, provider agent.Provider, agentRegistry *AgentRegistry, config WorkerPoolConfig) *WorkerPool {
+func NewWorkerPool(queue domain.JobQueue, log sdk.EventLog, state sdk.ThreadState, provider sdk.Provider, agentRegistry *AgentRegistry, config WorkerPoolConfig) *WorkerPool {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	if config.NumWorkers <= 0 {
@@ -236,8 +236,8 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 	// Check if thread exists, if not emit ThreadCreatedEvent
 	_, exists := wp.state.Get(job.ThreadID)
 	if !exists {
-		createEvent := &agent.ThreadCreatedEvent{
-			BaseEvent: agent.BaseEvent{
+		createEvent := &sdk.ThreadCreatedEvent{
+			BaseEvent: sdk.BaseEvent{
 				Type:      "ThreadCreated",
 				Timestamp: time.Now(),
 				ThreadID:  job.ThreadID,
@@ -249,8 +249,8 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 	}
 
 	// Emit UserMessageAddedEvent
-	userMsgEvent := &agent.UserMessageAddedEvent{
-		BaseEvent: agent.BaseEvent{
+	userMsgEvent := &sdk.UserMessageAddedEvent{
+		BaseEvent: sdk.BaseEvent{
 			Type:      "UserMessageAdded",
 			Timestamp: time.Now(),
 			ThreadID:  job.ThreadID,
@@ -287,8 +287,8 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 		}
 
 		// Emit ThreadTitleUpdatedEvent
-		titleEvent := &agent.ThreadTitleUpdatedEvent{
-			BaseEvent: agent.BaseEvent{
+		titleEvent := &sdk.ThreadTitleUpdatedEvent{
+			BaseEvent: sdk.BaseEvent{
 				Type:      "ThreadTitleUpdated",
 				Timestamp: time.Now(),
 				ThreadID:  job.ThreadID,
@@ -333,7 +333,7 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 	// Set the notifier in the registry so all agents created will use it
 	wp.agentRegistry.SetNotifier(notifier)
 
-	var agentConfig agent.AgentConfig
+	var agentConfig sdk.AgentConfig
 	var agentName string
 
 	if !threadExists || thread.CurrentInstructor == "" || isNewUserMessage {
@@ -352,11 +352,11 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 	}
 
 	// Create agent with the determined config
-	agentInstance := agent.NewAgent(
+	agentInstance := sdk.NewAgent(
 		wp.provider,
 		wp.log,
 		wp.state,
-		agent.WithConfig(agentConfig),
+		sdk.WithConfig(agentConfig),
 	)
 
 	// Track agent events during the run
@@ -364,33 +364,33 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 	var agentEventOccurred bool
 
 	// Domain event handler: tracks routing events (UI notifications handled by agent's notifier)
-	domainEventHandler := func(event agent.Event) error {
+	domainEventHandler := func(event sdk.Event) error {
 		// Track routing events (but don't act on them yet - wait for agent to finish)
 		switch e := event.(type) {
-		case *agent.DomainEvent:
+		case *sdk.DomainEvent:
 			// Handle unified domain events
 			switch e.Type {
-			case agent.EventTypeMathQuestion:
+			case sdk.EventTypeMathQuestion:
 				// Math question emitted - activate math instructor
 				nextAgent = "math-instructor"
 				agentEventOccurred = true
 
-			case agent.EventTypePhysicsQuestion:
+			case sdk.EventTypePhysicsQuestion:
 				// Physics question emitted - activate physics instructor
 				nextAgent = "physics-instructor"
 				agentEventOccurred = true
 
-			case agent.EventTypeChemistryQuestion:
+			case sdk.EventTypeChemistryQuestion:
 				// Chemistry question emitted - activate chemistry instructor
 				nextAgent = "chemistry-instructor"
 				agentEventOccurred = true
 
-			case agent.EventTypeStatisticsQuestion:
+			case sdk.EventTypeStatisticsQuestion:
 				// Statistics question emitted - activate statistics instructor
 				nextAgent = "statistics-instructor"
 				agentEventOccurred = true
 
-			case agent.EventTypeQuestionAnswered:
+			case sdk.EventTypeQuestionAnswered:
 				// Question answered - activate student-facing agent to review and respond
 				nextAgent = "student-facing-agent"
 				agentEventOccurred = true
@@ -562,11 +562,11 @@ func (wp *WorkerPool) continueWithAgent(ctx context.Context, threadID, agentName
 	}
 
 	// Create agent instance
-	agentInstance := agent.NewAgent(
+	agentInstance := sdk.NewAgent(
 		wp.provider,
 		wp.log,
 		wp.state,
-		agent.WithConfig(agentConfig),
+		sdk.WithConfig(agentConfig),
 	)
 
 	// Get updated messages
@@ -605,29 +605,29 @@ Follow your state machine workflow:
 	var routingEventOccurred bool
 
 	// Domain event handler for the agent (routing only - UI handled by agent's notifier)
-	agentEventHandler := func(event agent.Event) error {
+	agentEventHandler := func(event sdk.Event) error {
 		// Track routing events (but don't act on them yet - wait for agent to finish)
 		switch e := event.(type) {
-		case *agent.DomainEvent:
+		case *sdk.DomainEvent:
 			// Handle unified domain events
 			switch e.Type {
-			case agent.EventTypeMathQuestion:
+			case sdk.EventTypeMathQuestion:
 				nextAgent = "math-instructor"
 				routingEventOccurred = true
 
-			case agent.EventTypePhysicsQuestion:
+			case sdk.EventTypePhysicsQuestion:
 				nextAgent = "physics-instructor"
 				routingEventOccurred = true
 
-			case agent.EventTypeChemistryQuestion:
+			case sdk.EventTypeChemistryQuestion:
 				nextAgent = "chemistry-instructor"
 				routingEventOccurred = true
 
-			case agent.EventTypeStatisticsQuestion:
+			case sdk.EventTypeStatisticsQuestion:
 				nextAgent = "statistics-instructor"
 				routingEventOccurred = true
 
-			case agent.EventTypeQuestionAnswered:
+			case sdk.EventTypeQuestionAnswered:
 				nextAgent = "student-facing-agent"
 				routingEventOccurred = true
 			}
@@ -731,7 +731,7 @@ func (eb *EventBuffer) IsClosed() bool {
 	return eb.closed
 }
 
-// BufferedEventEmitter implements agent.EventEmitter using EventBuffer
+// BufferedEventEmitter implements sdk.EventEmitter using EventBuffer
 type BufferedEventEmitter struct {
 	jobID  string
 	buffer *EventBuffer

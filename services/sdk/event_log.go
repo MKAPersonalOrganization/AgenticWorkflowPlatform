@@ -1,4 +1,4 @@
-package agent
+package sdk
 
 // EventLog is the append-only log of everything that happened in a thread
 type EventLog interface {
