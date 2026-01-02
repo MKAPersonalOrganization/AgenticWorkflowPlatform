@@ -20,8 +20,7 @@ func (m *mockTool) Description() string                                     { re
 func (m *mockTool) Parameters() map[string]any                              { return m.parameters }
 func (m *mockTool) Invoke(ctx context.Context, args string) (string, error) { return "{}", nil }
 
-func createMockTools() (handoffTool, whiteboardTool, readWhiteboardTool, calculatorTool, weatherTool, graphingTool, unitConversionTool, periodicTableTool, equationSolverTool, plotTool, animateTool agent.Tool) {
-	handoffTool = &mockTool{name: "call_agent", description: "Call another agent", parameters: map[string]any{}}
+func createMockTools() (whiteboardTool, readWhiteboardTool, calculatorTool, weatherTool, graphingTool, unitConversionTool, periodicTableTool, equationSolverTool, plotTool, animateTool, emitMathQuestionTool, emitPhysicsQuestionTool, emitChemistryQuestionTool, emitQuestionAnsweredTool agent.Tool) {
 	whiteboardTool = &mockTool{name: "write_whiteboard", description: "Write to whiteboard", parameters: map[string]any{}}
 	readWhiteboardTool = &mockTool{name: "read_whiteboard", description: "Read whiteboard", parameters: map[string]any{}}
 	calculatorTool = &mockTool{name: "calculate", description: "Calculate", parameters: map[string]any{}}
@@ -32,26 +31,30 @@ func createMockTools() (handoffTool, whiteboardTool, readWhiteboardTool, calcula
 	equationSolverTool = &mockTool{name: "solve_equation", description: "Solve equation", parameters: map[string]any{}}
 	plotTool = &mockTool{name: "plot", description: "Generate plots", parameters: map[string]any{}}
 	animateTool = &mockTool{name: "animate", description: "Generate animations", parameters: map[string]any{}}
+	emitMathQuestionTool = &mockTool{name: "emit_math_question", description: "Emit math question event", parameters: map[string]any{}}
+	emitPhysicsQuestionTool = &mockTool{name: "emit_physics_question", description: "Emit physics question event", parameters: map[string]any{}}
+	emitChemistryQuestionTool = &mockTool{name: "emit_chemistry_question", description: "Emit chemistry question event", parameters: map[string]any{}}
+	emitQuestionAnsweredTool = &mockTool{name: "emit_question_answered", description: "Emit question answered event", parameters: map[string]any{}}
 	return
 }
 
 func TestInstructorConfigurations(t *testing.T) {
-	handoffTool, whiteboardTool, readWhiteboardTool, calculatorTool, _, graphingTool, _, _, equationSolverTool, plotTool, animateTool := createMockTools()
+	whiteboardTool, readWhiteboardTool, calculatorTool, _, graphingTool, _, _, equationSolverTool, plotTool, animateTool, emitMathQuestionTool, emitPhysicsQuestionTool, emitChemistryQuestionTool, emitQuestionAnsweredTool := createMockTools()
 
-	studentAgent := agent.CreateStudentFacingAgent(handoffTool, whiteboardTool)
+	studentAgent := agent.CreateStudentFacingAgent(whiteboardTool, readWhiteboardTool, emitMathQuestionTool, emitPhysicsQuestionTool, emitChemistryQuestionTool)
 	if studentAgent.Name != "student-facing-agent" {
 		t.Errorf("Expected student agent name 'student-facing-agent', got '%s'", studentAgent.Name)
 	}
 
-	math := agent.CreateMathInstructor(handoffTool, whiteboardTool, readWhiteboardTool, calculatorTool, graphingTool, equationSolverTool, plotTool, animateTool)
+	math := agent.CreateMathInstructor(whiteboardTool, readWhiteboardTool, calculatorTool, graphingTool, equationSolverTool, plotTool, animateTool, emitQuestionAnsweredTool, emitPhysicsQuestionTool, emitChemistryQuestionTool)
 	if math.Name != "math-instructor" {
 		t.Errorf("Expected math name 'math-instructor', got '%s'", math.Name)
 	}
 }
 
 func TestInstructorRegistry(t *testing.T) {
-	handoffTool, whiteboardTool, readWhiteboardTool, calculatorTool, weatherTool, graphingTool, unitConversionTool, periodicTableTool, equationSolverTool, plotTool, animateTool := createMockTools()
-	registry := agent.NewInstructorRegistry(handoffTool, whiteboardTool, readWhiteboardTool, calculatorTool, weatherTool, graphingTool, unitConversionTool, periodicTableTool, equationSolverTool, plotTool, animateTool)
+	whiteboardTool, readWhiteboardTool, calculatorTool, weatherTool, graphingTool, unitConversionTool, periodicTableTool, equationSolverTool, plotTool, animateTool, emitMathQuestionTool, emitPhysicsQuestionTool, emitChemistryQuestionTool, emitQuestionAnsweredTool := createMockTools()
+	registry := agent.NewInstructorRegistry(whiteboardTool, readWhiteboardTool, calculatorTool, weatherTool, graphingTool, unitConversionTool, periodicTableTool, equationSolverTool, plotTool, animateTool, emitMathQuestionTool, emitPhysicsQuestionTool, emitChemistryQuestionTool, emitQuestionAnsweredTool)
 
 	_, exists := registry.GetByName("math-instructor")
 	if !exists {
@@ -60,7 +63,7 @@ func TestInstructorRegistry(t *testing.T) {
 }
 
 func ExampleCreateMathInstructor() {
-	handoffTool, whiteboardTool, readWhiteboardTool, calculatorTool, _, graphingTool, _, _, equationSolverTool, plotTool, animateTool := createMockTools()
-	config := agent.CreateMathInstructor(handoffTool, whiteboardTool, readWhiteboardTool, calculatorTool, graphingTool, equationSolverTool, plotTool, animateTool)
+	whiteboardTool, readWhiteboardTool, calculatorTool, _, graphingTool, _, _, equationSolverTool, plotTool, animateTool, _, emitPhysicsQuestionTool, emitChemistryQuestionTool, emitQuestionAnsweredTool := createMockTools()
+	config := agent.CreateMathInstructor(whiteboardTool, readWhiteboardTool, calculatorTool, graphingTool, equationSolverTool, plotTool, animateTool, emitQuestionAnsweredTool, emitPhysicsQuestionTool, emitChemistryQuestionTool)
 	fmt.Printf("Name: %s\n", config.Name)
 }
