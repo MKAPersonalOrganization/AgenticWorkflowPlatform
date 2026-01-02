@@ -20,7 +20,9 @@ func TestDescriptiveStatsTool_Mean(t *testing.T) {
 	}
 
 	var response map[string]any
-	json.Unmarshal([]byte(result), &response)
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("Failed to unmarshal response: %v", err)
+	}
 	if response["result"] != 3.0 {
 		t.Errorf("Expected mean 3.0, got %v", response["result"])
 	}
@@ -40,7 +42,9 @@ func TestDescriptiveStatsTool_Describe(t *testing.T) {
 	}
 
 	var response map[string]any
-	json.Unmarshal([]byte(result), &response)
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("Failed to unmarshal response: %v", err)
+	}
 	resultMap := response["result"].(map[string]any)
 
 	if resultMap["count"] != float64(10) {
@@ -66,7 +70,9 @@ func TestCorrelationTool_Pearson(t *testing.T) {
 	}
 
 	var response map[string]any
-	json.Unmarshal([]byte(result), &response)
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("Failed to unmarshal response: %v", err)
+	}
 	correlation := response["result"].(float64)
 
 	if correlation < 0.99 || correlation > 1.01 {
@@ -89,7 +95,9 @@ func TestDistanceMetricsTool_Euclidean(t *testing.T) {
 	}
 
 	var response map[string]any
-	json.Unmarshal([]byte(result), &response)
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("Failed to unmarshal response: %v", err)
+	}
 	distance := response["distance"].(float64)
 
 	if distance != 5.0 {
@@ -111,7 +119,9 @@ func TestSamplingTool_QuartileOutliers(t *testing.T) {
 	}
 
 	var response map[string]any
-	json.Unmarshal([]byte(result), &response)
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("Failed to unmarshal response: %v", err)
+	}
 	resultMap := response["result"].(map[string]any)
 
 	if resultMap["extreme"] == nil {
@@ -133,7 +143,9 @@ func TestDataTransformTool_Sigmoid(t *testing.T) {
 	}
 
 	var response map[string]any
-	json.Unmarshal([]byte(result), &response)
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("Failed to unmarshal response: %v", err)
+	}
 
 	if response["result"] == nil {
 		t.Error("Expected sigmoid transformation result")
@@ -155,7 +167,9 @@ func TestDataTransformTool_Round(t *testing.T) {
 	}
 
 	var response map[string]any
-	json.Unmarshal([]byte(result), &response)
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("Failed to unmarshal response: %v", err)
+	}
 
 	if response["result"] != 3.14 {
 		t.Errorf("Expected 3.14, got %v", response["result"])
@@ -178,7 +192,9 @@ func TestNormalDistributionTool_Pdf(t *testing.T) {
 	}
 
 	var response map[string]any
-	json.Unmarshal([]byte(result), &response)
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("Failed to unmarshal response: %v", err)
+	}
 
 	pdf := response["result"].(float64)
 	expected := 0.3989422804014327 // 1/sqrt(2*pi)
@@ -202,7 +218,9 @@ func TestNormalDistributionTool_Fit(t *testing.T) {
 	}
 
 	var response map[string]any
-	json.Unmarshal([]byte(result), &response)
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("Failed to unmarshal response: %v", err)
+	}
 	resultMap := response["result"].(map[string]any)
 
 	if resultMap["loc"] != 3.0 {
@@ -224,7 +242,9 @@ func TestGeometricDistributionTool_ExpGeom(t *testing.T) {
 	}
 
 	var response map[string]any
-	json.Unmarshal([]byte(result), &response)
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("Failed to unmarshal response: %v", err)
+	}
 
 	if response["result"] != 2.0 {
 		t.Errorf("Expected expectation 2.0, got %v", response["result"])
@@ -246,7 +266,9 @@ func TestRegressionTool_Linear(t *testing.T) {
 	}
 
 	var response map[string]any
-	json.Unmarshal([]byte(result), &response)
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("Failed to unmarshal response: %v", err)
+	}
 
 	if response["type"] != "linear" {
 		t.Errorf("Expected linear regression type, got %v", response["type"])
