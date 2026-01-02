@@ -1,9 +1,9 @@
 package math
 
 import (
-	"school-with-ai/services/sdk"
 	"school-with-ai/services/agents/math/tools"
-	sharedtools "school-with-ai/services/tools"
+	sharedtools "school-with-ai/services/agents/shared/tools"
+	"school-with-ai/services/sdk"
 )
 
 // CreateMathInstructor creates the math instructor agent configuration

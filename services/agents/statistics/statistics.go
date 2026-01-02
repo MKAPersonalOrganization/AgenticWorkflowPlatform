@@ -1,9 +1,9 @@
 package statistics
 
 import (
-	"school-with-ai/services/sdk"
+	sharedtools "school-with-ai/services/agents/shared/tools"
 	"school-with-ai/services/agents/statistics/tools"
-	sharedtools "school-with-ai/services/tools"
+	"school-with-ai/services/sdk"
 )
 
 // CreateStatisticsInstructor creates the statistics instructor agent with comprehensive statistical tools
