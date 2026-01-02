@@ -12,7 +12,6 @@ import (
 	"school-with-ai/infra"
 	"school-with-ai/services/agent"
 	"school-with-ai/services/llm"
-	"school-with-ai/services/tools"
 
 	"github.com/openai/openai-go/v3"
 )
@@ -41,61 +40,8 @@ func main() {
 	// Initialize job queue
 	queue := infra.NewInMemoryJobQueue()
 
-	// Create tools using the Tool interface
-	whiteboardTool := tools.NewWriteWhiteboardTool()
-	readWhiteboardTool := tools.NewReadWhiteboardTool()
-	calculatorTool := tools.NewCalculatorTool()
-	weatherTool := tools.NewWeatherTool()
-	graphingTool := tools.NewGraphingTool()
-	unitConversionTool := tools.NewUnitConversionTool()
-	periodicTableTool := tools.NewPeriodicTableTool()
-	equationSolverTool := tools.NewEquationSolverTool()
-	plotTool := tools.NewPlotTool()
-	animateTool := tools.NewAnimateTool()
-
-	// Statistics tools (grouped by functionality)
-	descriptiveStatsTool := tools.NewDescriptiveStatsTool()
-	correlationTool := tools.NewCorrelationTool()
-	distanceMetricsTool := tools.NewDistanceMetricsTool()
-	samplingTool := tools.NewSamplingTool()
-	dataTransformTool := tools.NewDataTransformTool()
-	normalDistributionTool := tools.NewNormalDistributionTool()
-	geometricDistributionTool := tools.NewGeometricDistributionTool()
-	regressionTool := tools.NewRegressionTool()
-
-	// Event emission tools for agent communication
-	emitMathQuestionTool := tools.NewEmitMathQuestionTool()
-	emitPhysicsQuestionTool := tools.NewEmitPhysicsQuestionTool()
-	emitChemistryQuestionTool := tools.NewEmitChemistryQuestionTool()
-	emitStatisticsQuestionTool := tools.NewEmitStatisticsQuestionTool()
-	emitQuestionAnsweredTool := tools.NewEmitQuestionAnsweredTool()
-
-	// Initialize instructor registry with tools
-	instructorRegistry := agent.NewInstructorRegistry(
-		whiteboardTool,
-		readWhiteboardTool,
-		calculatorTool,
-		weatherTool,
-		graphingTool,
-		unitConversionTool,
-		periodicTableTool,
-		equationSolverTool,
-		plotTool,
-		animateTool,
-		descriptiveStatsTool,
-		correlationTool,
-		distanceMetricsTool,
-		samplingTool,
-		dataTransformTool,
-		normalDistributionTool,
-		geometricDistributionTool,
-		regressionTool,
-		emitMathQuestionTool,
-		emitPhysicsQuestionTool,
-		emitChemistryQuestionTool,
-		emitStatisticsQuestionTool,
-		emitQuestionAnsweredTool,
-	)
+	// Initialize instructor registry (notifier will be set per-job dynamically)
+	instructorRegistry := agent.NewInstructorRegistry(nil)
 
 	// Initialize and start worker pool with instructor registry
 	workerPool := infra.NewWorkerPool(queue, eventLog, threadState, provider, instructorRegistry, infra.WorkerPoolConfig{

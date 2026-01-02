@@ -11,7 +11,7 @@ import (
 )
 
 // Agent handles processing of user messages using pure event sourcing
-// It ONLY emits domain events - no UI concerns
+// Each agent is responsible for registering its own event notifications
 type Agent struct {
 	config       AgentConfig
 	provider     Provider
@@ -19,6 +19,7 @@ type Agent struct {
 	state        ThreadState
 	toolRegistry *ToolRegistry
 	toolExecutor ToolExecutor
+	notifier     EventNotifier // Agent's own notifier
 }
 
 // Option is a functional option for configuring Agent
@@ -68,6 +69,9 @@ func NewAgent(provider Provider, log EventLog, state ThreadState, opts ...Option
 	for _, tool := range h.config.Tools {
 		toolRegistry.Register(tool)
 	}
+
+	// Set notifier from config
+	h.notifier = h.config.Notifier
 
 	return h
 }
@@ -338,7 +342,14 @@ func (h *Agent) emitDomainEvent(event Event, eventHandler DomainEventHandler) er
 		return err
 	}
 
-	// Notify external handler (e.g., UI projection)
+	// Notify via agent's own notifier first (if configured)
+	if h.notifier != nil {
+		if err := h.notifier.HandleDomainEvent(event); err != nil {
+			return err
+		}
+	}
+
+	// Notify external handler (e.g., for routing decisions)
 	if eventHandler != nil {
 		if err := eventHandler(event); err != nil {
 			return err

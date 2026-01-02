@@ -1,5 +1,7 @@
 package agent
 
+import "school-with-ai/services/tools"
+
 // CreateStudentFacingAgent creates the student-facing agent that handles initial questions
 // CRITICAL ROUTING RULE: ALL new user questions in a thread MUST be routed through this agent first.
 // The system enforces this by checking if the last message is from the user, and if so,
@@ -17,15 +19,17 @@ package agent
 //	  - question.chemistry: Activates chemistry-instructor to answer a chemistry question
 //	  - question.statistics: Activates statistics-instructor to answer a statistics question
 //	  - whiteboard.updated: Updates shared whiteboard content (only for initial question)
-func CreateStudentFacingAgent(whiteboardTool, readWhiteboardTool, emitMathQuestionTool, emitPhysicsQuestionTool, emitChemistryQuestionTool, emitStatisticsQuestionTool Tool) AgentConfig {
+func CreateStudentFacingAgent(notifier EventNotifier) AgentConfig {
 	// Create a dedicated tool registry for this agent
 	registry := NewToolRegistry()
-	registry.Register(readWhiteboardTool)
-	registry.Register(whiteboardTool)
-	registry.Register(emitMathQuestionTool)
-	registry.Register(emitPhysicsQuestionTool)
-	registry.Register(emitChemistryQuestionTool)
-	registry.Register(emitStatisticsQuestionTool)
+
+	// Create only the tools this agent needs
+	registry.Register(tools.NewReadWhiteboardTool())
+	registry.Register(tools.NewWriteWhiteboardTool())
+	registry.Register(tools.NewEmitMathQuestionTool())
+	registry.Register(tools.NewEmitPhysicsQuestionTool())
+	registry.Register(tools.NewEmitChemistryQuestionTool())
+	registry.Register(tools.NewEmitStatisticsQuestionTool())
 
 	return AgentConfig{
 		Name:           "student-facing-agent",
@@ -420,6 +424,7 @@ If question requires multiple subjects, identify which should go FIRST:
 **Whiteboard-Only:** ALL content goes on whiteboard - NO text responses ever`,
 		Tools:            registry.All(),
 		HasPrivateMemory: false, // Stateless coordinator
+		Notifier:         notifier,
 	}
 }
 
@@ -435,19 +440,21 @@ If question requires multiple subjects, identify which should go FIRST:
 //	  - question.physics: Activates physics-instructor for multi-subject questions
 //	  - question.chemistry: Activates chemistry-instructor for multi-subject questions
 //	  - whiteboard.updated: Updates shared whiteboard with math solution
-func CreateMathInstructor(whiteboardTool, readWhiteboardTool, calculatorTool, graphingTool, equationSolverTool, plotTool, animateTool, emitQuestionAnsweredTool, emitPhysicsQuestionTool, emitChemistryQuestionTool Tool) AgentConfig {
+func CreateMathInstructor(notifier EventNotifier) AgentConfig {
 	// Create a dedicated tool registry for this agent
 	registry := NewToolRegistry()
-	registry.Register(calculatorTool)
-	registry.Register(graphingTool)
-	registry.Register(equationSolverTool)
-	registry.Register(plotTool)
-	registry.Register(animateTool)
-	registry.Register(readWhiteboardTool)
-	registry.Register(emitQuestionAnsweredTool)
-	registry.Register(emitPhysicsQuestionTool)
-	registry.Register(emitChemistryQuestionTool)
-	registry.Register(whiteboardTool)
+
+	// Create only the tools this agent needs
+	registry.Register(tools.NewCalculatorTool())
+	registry.Register(tools.NewGraphingTool())
+	registry.Register(tools.NewEquationSolverTool())
+	registry.Register(tools.NewPlotTool())
+	registry.Register(tools.NewAnimateTool())
+	registry.Register(tools.NewReadWhiteboardTool())
+	registry.Register(tools.NewEmitQuestionAnsweredTool())
+	registry.Register(tools.NewEmitPhysicsQuestionTool())
+	registry.Register(tools.NewEmitChemistryQuestionTool())
+	registry.Register(tools.NewWriteWhiteboardTool())
 
 	return AgentConfig{
 		Name:           "math-instructor",
@@ -931,6 +938,7 @@ If student asks for a plot/graph and you don't use the plot tool, you have faile
 **Event-Only Communication:** Use event emission tools to coordinate with other agents`,
 		Tools:            registry.All(),
 		HasPrivateMemory: true,
+		Notifier:         notifier,
 	}
 }
 
@@ -946,17 +954,19 @@ If student asks for a plot/graph and you don't use the plot tool, you have faile
 //	  - question.math: Activates math-instructor for multi-subject questions
 //	  - question.chemistry: Activates chemistry-instructor for multi-subject questions
 //	  - whiteboard.updated: Updates shared whiteboard with physics solution
-func CreatePhysicsInstructor(whiteboardTool, readWhiteboardTool, calculatorTool, weatherTool, unitConversionTool, emitQuestionAnsweredTool, emitMathQuestionTool, emitChemistryQuestionTool Tool) AgentConfig {
+func CreatePhysicsInstructor(notifier EventNotifier) AgentConfig {
 	// Create a dedicated tool registry for this agent
 	registry := NewToolRegistry()
-	registry.Register(readWhiteboardTool)
-	registry.Register(calculatorTool)
-	registry.Register(unitConversionTool)
-	registry.Register(weatherTool)
-	registry.Register(emitQuestionAnsweredTool)
-	registry.Register(emitMathQuestionTool)
-	registry.Register(emitChemistryQuestionTool)
-	registry.Register(whiteboardTool)
+
+	// Create only the tools this agent needs
+	registry.Register(tools.NewReadWhiteboardTool())
+	registry.Register(tools.NewCalculatorTool())
+	registry.Register(tools.NewUnitConversionTool())
+	registry.Register(tools.NewWeatherTool())
+	registry.Register(tools.NewEmitQuestionAnsweredTool())
+	registry.Register(tools.NewEmitMathQuestionTool())
+	registry.Register(tools.NewEmitChemistryQuestionTool())
+	registry.Register(tools.NewWriteWhiteboardTool())
 
 	return AgentConfig{
 		Name:           "physics-instructor",
@@ -1240,6 +1250,7 @@ energy = 0.5 * mass * velocity**2
 **Event-Only Communication:** Use event emission tools to coordinate with other agents`,
 		Tools:            registry.All(),
 		HasPrivateMemory: true,
+		Notifier:         notifier,
 	}
 }
 
@@ -1255,17 +1266,19 @@ energy = 0.5 * mass * velocity**2
 //	  - question.math: Activates math-instructor for multi-subject questions
 //	  - question.physics: Activates physics-instructor for multi-subject questions
 //	  - whiteboard.updated: Updates shared whiteboard with chemistry solution
-func CreateChemistryInstructor(whiteboardTool, readWhiteboardTool, calculatorTool, periodicTableTool, unitConversionTool, emitQuestionAnsweredTool, emitMathQuestionTool, emitPhysicsQuestionTool Tool) AgentConfig {
+func CreateChemistryInstructor(notifier EventNotifier) AgentConfig {
 	// Create a dedicated tool registry for this agent
 	registry := NewToolRegistry()
-	registry.Register(readWhiteboardTool)
-	registry.Register(calculatorTool)
-	registry.Register(periodicTableTool)
-	registry.Register(unitConversionTool)
-	registry.Register(emitQuestionAnsweredTool)
-	registry.Register(emitMathQuestionTool)
-	registry.Register(emitPhysicsQuestionTool)
-	registry.Register(whiteboardTool)
+
+	// Create only the tools this agent needs
+	registry.Register(tools.NewReadWhiteboardTool())
+	registry.Register(tools.NewCalculatorTool())
+	registry.Register(tools.NewPeriodicTableTool())
+	registry.Register(tools.NewUnitConversionTool())
+	registry.Register(tools.NewEmitQuestionAnsweredTool())
+	registry.Register(tools.NewEmitMathQuestionTool())
+	registry.Register(tools.NewEmitPhysicsQuestionTool())
+	registry.Register(tools.NewWriteWhiteboardTool())
 
 	return AgentConfig{
 		Name:           "chemistry-instructor",
@@ -1565,24 +1578,27 @@ CC(C)CC1=CC=C(C=C1)C(C)C
 **Event-Only Communication:** Use event emission tools to coordinate with other agents`,
 		Tools:            registry.All(),
 		HasPrivateMemory: true,
+		Notifier:         notifier,
 	}
 }
 
 // CreateStatisticsInstructor creates the statistics instructor agent with comprehensive statistical tools
-func CreateStatisticsInstructor(whiteboardTool, readWhiteboardTool, descriptiveStatsTool, correlationTool, distanceMetricsTool, samplingTool, dataTransformTool, normalDistributionTool, geometricDistributionTool, regressionTool, emitQuestionAnsweredTool Tool) AgentConfig {
+func CreateStatisticsInstructor(notifier EventNotifier) AgentConfig {
 	// Create a dedicated tool registry for this agent
 	registry := NewToolRegistry()
-	registry.Register(whiteboardTool)
-	registry.Register(readWhiteboardTool)
-	registry.Register(descriptiveStatsTool)
-	registry.Register(correlationTool)
-	registry.Register(distanceMetricsTool)
-	registry.Register(samplingTool)
-	registry.Register(dataTransformTool)
-	registry.Register(normalDistributionTool)
-	registry.Register(geometricDistributionTool)
-	registry.Register(regressionTool)
-	registry.Register(emitQuestionAnsweredTool)
+
+	// Create only the tools this agent needs
+	registry.Register(tools.NewWriteWhiteboardTool())
+	registry.Register(tools.NewReadWhiteboardTool())
+	registry.Register(tools.NewDescriptiveStatsTool())
+	registry.Register(tools.NewCorrelationTool())
+	registry.Register(tools.NewDistanceMetricsTool())
+	registry.Register(tools.NewSamplingTool())
+	registry.Register(tools.NewDataTransformTool())
+	registry.Register(tools.NewNormalDistributionTool())
+	registry.Register(tools.NewGeometricDistributionTool())
+	registry.Register(tools.NewRegressionTool())
+	registry.Register(tools.NewEmitQuestionAnsweredTool())
 
 	return AgentConfig{
 		Name: "statistics-instructor",
@@ -1699,69 +1715,20 @@ R² = [value]
 **Precision:** Use appropriate decimal places for statistical output`,
 		Tools:            registry.All(),
 		HasPrivateMemory: true,
+		Notifier:         notifier,
 	}
 }
 
-// InstructorRegistry holds factory functions for creating instructors with tools
+// InstructorRegistry manages creation of instructor agents
+// Each instructor creates its own tools internally for complete self-containment
 type InstructorRegistry struct {
-	whiteboardTool             Tool
-	readWhiteboardTool         Tool
-	calculatorTool             Tool
-	weatherTool                Tool
-	graphingTool               Tool
-	unitConversionTool         Tool
-	periodicTableTool          Tool
-	equationSolverTool         Tool
-	plotTool                   Tool
-	animateTool                Tool
-	descriptiveStatsTool       Tool
-	correlationTool            Tool
-	distanceMetricsTool        Tool
-	samplingTool               Tool
-	dataTransformTool          Tool
-	normalDistributionTool     Tool
-	geometricDistributionTool  Tool
-	regressionTool             Tool
-	emitMathQuestionTool       Tool
-	emitPhysicsQuestionTool    Tool
-	emitChemistryQuestionTool  Tool
-	emitStatisticsQuestionTool Tool
-	emitQuestionAnsweredTool   Tool
+	notifier EventNotifier // Shared UI notifier for all instructors
 }
 
-// NewInstructorRegistry creates a new instructor registry with all tools
-func NewInstructorRegistry(
-	whiteboardTool, readWhiteboardTool, calculatorTool, weatherTool,
-	graphingTool, unitConversionTool, periodicTableTool, equationSolverTool, plotTool, animateTool,
-	descriptiveStatsTool, correlationTool, distanceMetricsTool, samplingTool,
-	dataTransformTool, normalDistributionTool, geometricDistributionTool, regressionTool,
-	emitMathQuestionTool, emitPhysicsQuestionTool, emitChemistryQuestionTool,
-	emitStatisticsQuestionTool, emitQuestionAnsweredTool Tool,
-) *InstructorRegistry {
+// NewInstructorRegistry creates a new instructor registry
+func NewInstructorRegistry(notifier EventNotifier) *InstructorRegistry {
 	return &InstructorRegistry{
-		whiteboardTool:             whiteboardTool,
-		readWhiteboardTool:         readWhiteboardTool,
-		calculatorTool:             calculatorTool,
-		weatherTool:                weatherTool,
-		graphingTool:               graphingTool,
-		unitConversionTool:         unitConversionTool,
-		periodicTableTool:          periodicTableTool,
-		equationSolverTool:         equationSolverTool,
-		plotTool:                   plotTool,
-		animateTool:                animateTool,
-		descriptiveStatsTool:       descriptiveStatsTool,
-		correlationTool:            correlationTool,
-		distanceMetricsTool:        distanceMetricsTool,
-		samplingTool:               samplingTool,
-		dataTransformTool:          dataTransformTool,
-		normalDistributionTool:     normalDistributionTool,
-		geometricDistributionTool:  geometricDistributionTool,
-		regressionTool:             regressionTool,
-		emitMathQuestionTool:       emitMathQuestionTool,
-		emitPhysicsQuestionTool:    emitPhysicsQuestionTool,
-		emitChemistryQuestionTool:  emitChemistryQuestionTool,
-		emitStatisticsQuestionTool: emitStatisticsQuestionTool,
-		emitQuestionAnsweredTool:   emitQuestionAnsweredTool,
+		notifier: notifier,
 	}
 }
 
@@ -1769,15 +1736,15 @@ func NewInstructorRegistry(
 func (r *InstructorRegistry) GetByName(name string) (AgentConfig, bool) {
 	switch name {
 	case "student-facing-agent":
-		return CreateStudentFacingAgent(r.whiteboardTool, r.readWhiteboardTool, r.emitMathQuestionTool, r.emitPhysicsQuestionTool, r.emitChemistryQuestionTool, r.emitStatisticsQuestionTool), true
+		return CreateStudentFacingAgent(r.notifier), true
 	case "math-instructor":
-		return CreateMathInstructor(r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.graphingTool, r.equationSolverTool, r.plotTool, r.animateTool, r.emitQuestionAnsweredTool, r.emitPhysicsQuestionTool, r.emitChemistryQuestionTool), true
+		return CreateMathInstructor(r.notifier), true
 	case "physics-instructor":
-		return CreatePhysicsInstructor(r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.weatherTool, r.unitConversionTool, r.emitQuestionAnsweredTool, r.emitMathQuestionTool, r.emitChemistryQuestionTool), true
+		return CreatePhysicsInstructor(r.notifier), true
 	case "chemistry-instructor":
-		return CreateChemistryInstructor(r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.periodicTableTool, r.unitConversionTool, r.emitQuestionAnsweredTool, r.emitMathQuestionTool, r.emitPhysicsQuestionTool), true
+		return CreateChemistryInstructor(r.notifier), true
 	case "statistics-instructor":
-		return CreateStatisticsInstructor(r.whiteboardTool, r.readWhiteboardTool, r.descriptiveStatsTool, r.correlationTool, r.distanceMetricsTool, r.samplingTool, r.dataTransformTool, r.normalDistributionTool, r.geometricDistributionTool, r.regressionTool, r.emitQuestionAnsweredTool), true
+		return CreateStatisticsInstructor(r.notifier), true
 	default:
 		return AgentConfig{}, false
 	}
@@ -1786,14 +1753,20 @@ func (r *InstructorRegistry) GetByName(name string) (AgentConfig, bool) {
 // GetAllInstructors returns all available instructor configurations
 func (r *InstructorRegistry) GetAllInstructors() []AgentConfig {
 	return []AgentConfig{
-		CreateMathInstructor(r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.graphingTool, r.equationSolverTool, r.plotTool, r.animateTool, r.emitQuestionAnsweredTool, r.emitPhysicsQuestionTool, r.emitChemistryQuestionTool),
-		CreatePhysicsInstructor(r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.weatherTool, r.unitConversionTool, r.emitQuestionAnsweredTool, r.emitMathQuestionTool, r.emitChemistryQuestionTool),
-		CreateChemistryInstructor(r.whiteboardTool, r.readWhiteboardTool, r.calculatorTool, r.periodicTableTool, r.unitConversionTool, r.emitQuestionAnsweredTool, r.emitMathQuestionTool, r.emitPhysicsQuestionTool),
-		CreateStatisticsInstructor(r.whiteboardTool, r.readWhiteboardTool, r.descriptiveStatsTool, r.correlationTool, r.distanceMetricsTool, r.samplingTool, r.dataTransformTool, r.normalDistributionTool, r.geometricDistributionTool, r.regressionTool, r.emitQuestionAnsweredTool),
+		CreateMathInstructor(r.notifier),
+		CreatePhysicsInstructor(r.notifier),
+		CreateChemistryInstructor(r.notifier),
+		CreateStatisticsInstructor(r.notifier),
 	}
 }
 
 // GetStudentFacingAgent returns the student-facing agent (entry point for all conversations)
 func (r *InstructorRegistry) GetStudentFacingAgent() AgentConfig {
-	return CreateStudentFacingAgent(r.whiteboardTool, r.readWhiteboardTool, r.emitMathQuestionTool, r.emitPhysicsQuestionTool, r.emitChemistryQuestionTool, r.emitStatisticsQuestionTool)
+	return CreateStudentFacingAgent(r.notifier)
+}
+
+// SetNotifier updates the notifier for all agents created by this registry
+// This allows dynamically setting a per-request notifier (e.g., for SSE streams)
+func (r *InstructorRegistry) SetNotifier(notifier EventNotifier) {
+	r.notifier = notifier
 }
