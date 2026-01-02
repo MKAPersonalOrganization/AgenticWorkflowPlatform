@@ -9,7 +9,6 @@ import (
 type EventType string
 
 const (
-	EventTypeAgentCalled               EventType = "agent.called"
 	EventTypeWhiteboardUpdated         EventType = "whiteboard.updated"
 	EventTypeInstructorThought         EventType = "instructor.thought"
 	EventTypeInstructorStrategyChanged EventType = "instructor.strategy_changed"
@@ -72,23 +71,6 @@ func (e *DomainEvent) MarshalPayload() ([]byte, error) {
 }
 
 // Event constructors
-
-func NewAgentCalledEvent(threadID, caller, called, reason, context, whiteboardState string) *DomainEvent {
-	return &DomainEvent{
-		ID:        generateEventID(),
-		Type:      EventTypeAgentCalled,
-		Timestamp: time.Now(),
-		ThreadID:  threadID,
-		Version:   1,
-		Data: map[string]interface{}{
-			"caller_agent":     caller,
-			"called_agent":     called,
-			"reason":           reason,
-			"context":          context,
-			"whiteboard_state": whiteboardState,
-		},
-	}
-}
 
 func NewWhiteboardUpdatedEvent(threadID, agentName, content, action string) *DomainEvent {
 	return &DomainEvent{

@@ -42,7 +42,6 @@ type DomainEvent struct {
 
 ```go
 const (
-    EventTypeAgentCalled               = "agent.called"
     EventTypeWhiteboardUpdated         = "whiteboard.updated"
     EventTypeInstructorThought         = "instructor.thought"
     EventTypeInstructorStrategyChanged = "instructor.strategy_changed"
@@ -53,21 +52,16 @@ const (
 )
 ```
 
-## Event Data Schemas
+### Pure Event-Driven Communication
 
-### Agent Called Event
-```json
-{
-  "type": "agent.called",
-  "data": {
-    "caller_agent": "student-facing-agent",
-    "called_agent": "math-instructor",
-    "reason": "Student asked a calculus question",
-    "context": "derivative problem",
-    "whiteboard_state": "# QUESTION\n..."
-  }
-}
-```
+Agents **only** communicate through domain events - there is no direct agent-to-agent calling:
+
+- **Question Events**: Activate specialist instructors (`question.math`, `question.physics`, `question.chemistry`)
+- **Answer Events**: Signal completion and activate coordinator (`question.answered`)
+- **Whiteboard Events**: Track content changes (`whiteboard.updated`)
+- **Internal Events**: Private thoughts and strategy changes (not visible to other agents)
+
+## Event Data Schemas
 
 ### Question Events (Math/Physics/Chemistry)
 ```json
@@ -180,15 +174,14 @@ event.Metadata = map[string]string{
 
 ## Legacy Compatibility
 
-Old event structures are maintained for backward compatibility:
+~~Old event structures are maintained for backward compatibility~~
 
-```go
-// New way (preferred)
-event := NewMathQuestionEvent(threadID, question, emittedBy, context, whiteboard)
-
-// Old way (deprecated, but still works)
-event := NewMathQuestion(threadID, question, emittedBy, context, whiteboard)
-```
+**As of January 2026**, the system is **purely event-driven**:
+- ❌ No `agent.called` events (removed)
+- ❌ No `call_agent` tool (removed)
+- ✅ Only domain-specific question events (`question.math`, `question.physics`, `question.chemistry`, `question.answered`)
+- ✅ Agents subscribe to specific event types
+- ✅ Worker pool dispatches agents based on emitted events
 
 ## Best Practices
 

@@ -317,11 +317,6 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 		case *agent.DomainEvent:
 			// Handle unified domain events
 			switch e.Type {
-			case agent.EventTypeAgentCalled:
-				// Legacy support - Current agent called another agent
-				nextAgent = e.GetString("called_agent")
-				agentEventOccurred = true
-
 			case agent.EventTypeMathQuestion:
 				// Math question emitted - activate math instructor
 				nextAgent = "math-instructor"
@@ -560,11 +555,6 @@ Follow your state machine workflow:
 		case *agent.DomainEvent:
 			// Handle unified domain events
 			switch e.Type {
-			case agent.EventTypeAgentCalled:
-				// Legacy support
-				nextAgent = e.GetString("called_agent")
-				routingEventOccurred = true
-
 			case agent.EventTypeMathQuestion:
 				nextAgent = "math-instructor"
 				routingEventOccurred = true
