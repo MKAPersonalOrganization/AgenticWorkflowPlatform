@@ -9,31 +9,31 @@ import (
 type EventType string
 
 const (
-	EventTypeAgentCalled            EventType = "agent.called"
-	EventTypeWhiteboardUpdated      EventType = "whiteboard.updated"
-	EventTypeInstructorThought      EventType = "instructor.thought"
+	EventTypeAgentCalled               EventType = "agent.called"
+	EventTypeWhiteboardUpdated         EventType = "whiteboard.updated"
+	EventTypeInstructorThought         EventType = "instructor.thought"
 	EventTypeInstructorStrategyChanged EventType = "instructor.strategy_changed"
-	EventTypeMathQuestion           EventType = "question.math"
-	EventTypePhysicsQuestion        EventType = "question.physics"
-	EventTypeChemistryQuestion      EventType = "question.chemistry"
-	EventTypeQuestionAnswered       EventType = "question.answered"
+	EventTypeMathQuestion              EventType = "question.math"
+	EventTypePhysicsQuestion           EventType = "question.physics"
+	EventTypeChemistryQuestion         EventType = "question.chemistry"
+	EventTypeQuestionAnswered          EventType = "question.answered"
 )
 
 // DomainEvent is the unified event structure for all system events
 type DomainEvent struct {
 	// Core event metadata
-	ID        string                 `json:"id"`
-	Type      EventType              `json:"type"`
-	Timestamp time.Time              `json:"timestamp"`
-	ThreadID  string                 `json:"thread_id"`
-	Version   int                    `json:"version"` // For event versioning/schema evolution
-	
+	ID        string    `json:"id"`
+	Type      EventType `json:"type"`
+	Timestamp time.Time `json:"timestamp"`
+	ThreadID  string    `json:"thread_id"`
+	Version   int       `json:"version"` // For event versioning/schema evolution
+
 	// Event payload - flexible structure for different event types
 	Data map[string]interface{} `json:"data"`
-	
+
 	// Additional metadata
 	Metadata map[string]string `json:"metadata,omitempty"`
-	
+
 	// Correlation for event chains
 	CorrelationID string `json:"correlation_id,omitempty"`
 	CausationID   string `json:"causation_id,omitempty"` // ID of event that caused this one
