@@ -12,18 +12,64 @@ import (
 	"school-with-ai/services/agent"
 )
 
+// AgentFactory is a function that creates an agent configuration with a given notifier
+type AgentFactory func(notifier agent.EventNotifier) agent.AgentConfig
+
+// AgentRegistry manages agent factories
+// Agents register themselves with the registry
+type AgentRegistry struct {
+	mu        sync.RWMutex
+	factories map[string]AgentFactory
+	notifier  agent.EventNotifier
+}
+
+// NewAgentRegistry creates a new agent registry
+func NewAgentRegistry(notifier agent.EventNotifier) *AgentRegistry {
+	return &AgentRegistry{
+		factories: make(map[string]AgentFactory),
+		notifier:  notifier,
+	}
+}
+
+// Register adds an agent factory to the registry
+func (r *AgentRegistry) Register(name string, factory AgentFactory) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.factories[name] = factory
+}
+
+// GetByName returns the agent configuration for a specific agent by name
+func (r *AgentRegistry) GetByName(name string) (agent.AgentConfig, bool) {
+	r.mu.RLock()
+	factory, exists := r.factories[name]
+	r.mu.RUnlock()
+
+	if !exists {
+		return agent.AgentConfig{}, false
+	}
+
+	return factory(r.notifier), true
+}
+
+// SetNotifier updates the notifier for all agents created by this registry
+func (r *AgentRegistry) SetNotifier(notifier agent.EventNotifier) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.notifier = notifier
+}
+
 // WorkerPool manages a pool of workers that process jobs from the queue
 type WorkerPool struct {
-	queue              domain.JobQueue
-	log                agent.EventLog
-	state              agent.ThreadState
-	provider           agent.Provider
-	instructorRegistry *agent.InstructorRegistry
-	numWorkers         int
-	pollInterval       time.Duration
-	ctx                context.Context
-	cancel             context.CancelFunc
-	wg                 sync.WaitGroup
+	queue         domain.JobQueue
+	log           agent.EventLog
+	state         agent.ThreadState
+	provider      agent.Provider
+	agentRegistry *AgentRegistry
+	numWorkers    int
+	pollInterval  time.Duration
+	ctx           context.Context
+	cancel        context.CancelFunc
+	wg            sync.WaitGroup
 
 	// Event storage for jobs (jobID -> buffered events)
 	mu           sync.RWMutex
@@ -43,7 +89,7 @@ type WorkerPoolConfig struct {
 }
 
 // NewWorkerPool creates a new worker pool
-func NewWorkerPool(queue domain.JobQueue, log agent.EventLog, state agent.ThreadState, provider agent.Provider, instructorRegistry *agent.InstructorRegistry, config WorkerPoolConfig) *WorkerPool {
+func NewWorkerPool(queue domain.JobQueue, log agent.EventLog, state agent.ThreadState, provider agent.Provider, agentRegistry *AgentRegistry, config WorkerPoolConfig) *WorkerPool {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	if config.NumWorkers <= 0 {
@@ -54,19 +100,19 @@ func NewWorkerPool(queue domain.JobQueue, log agent.EventLog, state agent.Thread
 	}
 
 	return &WorkerPool{
-		queue:              queue,
-		log:                log,
-		state:              state,
-		provider:           provider,
-		instructorRegistry: instructorRegistry,
-		numWorkers:         config.NumWorkers,
-		pollInterval:       config.PollInterval,
-		ctx:                ctx,
-		cancel:             cancel,
-		eventBuffers:       make(map[string]*EventBuffer),
-		threadJobs:         make(map[string]string),
-		jobCancels:         make(map[string]context.CancelFunc),
-		threadRateLimits:   make(map[string]*time.Ticker),
+		queue:            queue,
+		log:              log,
+		state:            state,
+		provider:         provider,
+		agentRegistry:    agentRegistry,
+		numWorkers:       config.NumWorkers,
+		pollInterval:     config.PollInterval,
+		ctx:              ctx,
+		cancel:           cancel,
+		eventBuffers:     make(map[string]*EventBuffer),
+		threadJobs:       make(map[string]string),
+		jobCancels:       make(map[string]context.CancelFunc),
+		threadRateLimits: make(map[string]*time.Ticker),
 	}
 }
 
@@ -285,15 +331,24 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 	notifier := NewUINotifier(emitter)
 
 	// Set the notifier in the registry so all agents created will use it
-	wp.instructorRegistry.SetNotifier(notifier)
+	wp.agentRegistry.SetNotifier(notifier)
 
 	var agentConfig agent.AgentConfig
+	var agentName string
+
 	if !threadExists || thread.CurrentInstructor == "" || isNewUserMessage {
 		// New thread OR new user message - ALWAYS start with student-facing agent (coordinator)
-		agentConfig = wp.instructorRegistry.GetStudentFacingAgent()
+		agentName = "student-facing-agent"
 	} else {
 		// Continuation from instructor callback - use current agent
-		agentConfig, _ = wp.instructorRegistry.GetByName(thread.CurrentInstructor)
+		agentName = thread.CurrentInstructor
+	}
+
+	var found bool
+	agentConfig, found = wp.agentRegistry.GetByName(agentName)
+	if !found {
+		slog.Error("Agent not found in registry", "agent", agentName)
+		return
 	}
 
 	// Create agent with the determined config
@@ -497,10 +552,10 @@ func (wp *WorkerPool) continueWithAgent(ctx context.Context, threadID, agentName
 	notifier := NewUINotifier(emitter)
 
 	// Set the notifier in the registry so all agents created will use it
-	wp.instructorRegistry.SetNotifier(notifier)
+	wp.agentRegistry.SetNotifier(notifier)
 
 	// Get agent config
-	agentConfig, exists := wp.instructorRegistry.GetByName(agentName)
+	agentConfig, exists := wp.agentRegistry.GetByName(agentName)
 	if !exists {
 		slog.Error("Agent not found", "agent", agentName)
 		return
