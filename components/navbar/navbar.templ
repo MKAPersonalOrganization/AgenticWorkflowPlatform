@@ -1,0 +1,106 @@
+package navbar
+
+import "school-with-ai/components/button"
+import "school-with-ai/components/icon"
+import "school-with-ai/components/sheet"
+import "school-with-ai/components/popover"
+
+type Props struct {
+	SidebarID string
+	Class     string
+}
+
+templ Navbar(props ...Props) {
+	{{ var p Props }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	if p.SidebarID == "" {
+		{{ p.SidebarID = "thread-history-sidebar" }}
+	}
+	<!-- Left Navigation Bar -->
+	<nav
+		class={ "fixed left-0 top-0 h-screen w-16 bg-sidebar z-10 flex flex-col items-center py-4 gap-4 transition-opacity duration-200", p.Class }
+		id="main-navbar"
+		data-navbar-for={ p.SidebarID }
+	>
+		<!-- Sidebar Toggle Button (Mobile) -->
+		<div class="md:hidden">
+			@sheet.Trigger(sheet.TriggerProps{
+				For: p.SidebarID + "-mobile",
+			}) {
+				@button.Button(button.Props{
+					Size:    button.SizeIcon,
+					Variant: button.VariantGhost,
+					Class:   "size-9",
+				}) {
+					@icon.PanelLeft(icon.Props{Class: "size-5"})
+					<span class="sr-only">Open Thread History</span>
+				}
+			}
+		</div>
+		<!-- Sidebar Toggle Button (Desktop) -->
+		<div class="hidden md:block">
+			@button.Button(button.Props{
+				Size:    button.SizeIcon,
+				Variant: button.VariantGhost,
+				Class:   "size-9",
+				Attributes: templ.Attributes{
+					"data-tui-sidebar-trigger": true,
+					"data-tui-sidebar-target":  p.SidebarID,
+				},
+			}) {
+				@icon.PanelLeft(icon.Props{Class: "size-5"})
+				<span class="sr-only">Open Thread History</span>
+			}
+		</div>
+		<!-- Settings Menu (at bottom) -->
+		<div class="mt-auto">
+			@popover.Trigger(popover.TriggerProps{
+				For: "navbar-settings-popover",
+			}) {
+				@button.Button(button.Props{
+					Size:    button.SizeIcon,
+					Variant: button.VariantGhost,
+					Class:   "size-9",
+				}) {
+					@icon.Settings(icon.Props{Class: "size-5"})
+					<span class="sr-only">Settings</span>
+				}
+			}
+			@popover.Content(popover.ContentProps{
+				ID:        "navbar-settings-popover",
+				Class:     "w-56",
+				Placement: popover.PlacementRight,
+			}) {
+				<div class="space-y-1">
+					<div class="px-2 py-1.5 text-sm font-semibold">Settings</div>
+					<div class="border-t border-border my-1"></div>
+					<!-- Theme Toggle -->
+					<button
+						@click="toggleTheme()"
+						class="flex items-center gap-3 w-full px-2 py-2 text-sm rounded-md hover:bg-accent transition-colors"
+						type="button"
+					>
+						<!-- Theme icons -->
+						<div class="flex items-center justify-center size-5">
+							<!-- Sun icon (light mode) -->
+							<svg x-show="theme === 'light'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+							</svg>
+							<!-- Moon icon (dark mode) -->
+							<svg x-show="theme === 'dark'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+							</svg>
+							<!-- System icon (auto mode) -->
+							<svg x-show="theme === 'system'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+							</svg>
+						</div>
+						<span class="flex-1 text-left">Theme: <span x-text="theme.charAt(0).toUpperCase() + theme.slice(1)"></span></span>
+					</button>
+				</div>
+			}
+		</div>
+	</nav>
+}
