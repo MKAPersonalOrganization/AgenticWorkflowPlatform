@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"school-with-ai/domain"
+	"school-with-ai/services/agents"
 	"school-with-ai/services/llm"
 )
 
@@ -292,11 +293,7 @@ func (h *Agent) runIteration(
 		// Exception: If agent emitted routing events, stop iteration
 		// The worker pool will handle activating the appropriate agent
 		for _, toolCall := range toolCallsList {
-			toolName := toolCall.Function.Name
-			if toolName == "emit_math_question" ||
-				toolName == "emit_physics_question" ||
-				toolName == "emit_chemistry_question" ||
-				toolName == "emit_question_answered" {
+			if agents.IsCollaborationTool(toolCall.Function.Name) {
 				// Agent's job is done - don't continue iteration
 				return nil
 			}
@@ -363,128 +360,43 @@ func (h *Agent) emitDomainEvent(event Event, eventHandler DomainEventHandler) er
 // For collaboration tools, it also emits domain events
 func (h *Agent) executeToolCall(threadID string, toolCall domain.ToolCall, eventHandler DomainEventHandler) (string, error) {
 	// Handle collaboration tools that need to emit domain events
-	if err := h.emitCollaborationEvents(threadID, toolCall, eventHandler); err != nil {
-		return "", err
+	if agents.IsCollaborationTool(toolCall.Function.Name) || toolCall.Function.Name == "write_whiteboard" {
+		// Create whiteboard state getter
+		getWhiteboardState := func(tid string) string {
+			thread, exists := h.state.Get(tid)
+			if exists {
+				return thread.WhiteboardContent
+			}
+			return ""
+		}
+
+		event, err := agents.HandleCollaborationToolCall(threadID, h.config.Name, toolCall, getWhiteboardState)
+		if err != nil {
+			return "", err
+		}
+		if err := h.emitDomainEvent(event, eventHandler); err != nil {
+			return "", err
+		}
+		return "{\"status\": \"event_emitted\"}", nil
 	}
 
-	// Execute the tool using the executor
-	return h.toolExecutor.Execute(toolCall)
-}
-
-// emitCollaborationEvents emits domain events for collaboration tools
-func (h *Agent) emitCollaborationEvents(threadID string, toolCall domain.ToolCall, eventHandler DomainEventHandler) error {
-	toolName := toolCall.Function.Name
-
-	// Get whiteboard state for events
-	getWhiteboardState := func() string {
-		thread, exists := h.state.Get(threadID)
-		if exists {
-			return thread.WhiteboardContent
-		}
-		return ""
-	}
-
-	switch toolName {
-	case "emit_math_question":
-		var input struct {
-			Question string `json:"question"`
-			Context  string `json:"context"`
-		}
-		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
-			return fmt.Errorf("failed to parse emit_math_question arguments: %w", err)
-		}
-
-		return h.emitDomainEvent(
-			NewMathQuestionEvent(threadID, input.Question, h.config.Name, input.Context, getWhiteboardState()),
-			eventHandler,
-		)
-
-	case "emit_physics_question":
-		var input struct {
-			Question string `json:"question"`
-			Context  string `json:"context"`
-		}
-		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
-			return fmt.Errorf("failed to parse emit_physics_question arguments: %w", err)
-		}
-
-		return h.emitDomainEvent(
-			NewPhysicsQuestionEvent(threadID, input.Question, h.config.Name, input.Context, getWhiteboardState()),
-			eventHandler,
-		)
-
-	case "emit_chemistry_question":
-		var input struct {
-			Question string `json:"question"`
-			Context  string `json:"context"`
-		}
-		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
-			return fmt.Errorf("failed to parse emit_chemistry_question arguments: %w", err)
-		}
-
-		return h.emitDomainEvent(
-			NewChemistryQuestionEvent(threadID, input.Question, h.config.Name, input.Context, getWhiteboardState()),
-			eventHandler,
-		)
-
-	case "emit_statistics_question":
-		var input struct {
-			Question string `json:"question"`
-			Context  string `json:"context"`
-		}
-		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
-			return fmt.Errorf("failed to parse emit_statistics_question arguments: %w", err)
-		}
-
-		return h.emitDomainEvent(
-			NewStatisticsQuestionEvent(threadID, input.Question, h.config.Name, input.Context, getWhiteboardState()),
-			eventHandler,
-		)
-
-	case "emit_question_answered":
-		var input struct {
-			Subject    string `json:"subject"`
-			IsComplete bool   `json:"is_complete"`
-			Summary    string `json:"summary"`
-		}
-		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
-			return fmt.Errorf("failed to parse emit_question_answered arguments: %w", err)
-		}
-
-		return h.emitDomainEvent(
-			NewQuestionAnsweredEvent(threadID, input.Subject, input.Summary, h.config.Name, input.IsComplete, getWhiteboardState()),
-			eventHandler,
-		)
-
-	case "write_whiteboard":
-		var input struct {
-			Content string `json:"content"`
-			Action  string `json:"action"`
-		}
-		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
-			return fmt.Errorf("failed to parse write_whiteboard arguments: %w", err)
-		}
-
-		return h.emitDomainEvent(
-			NewWhiteboardUpdatedEvent(threadID, h.config.Name, input.Content, input.Action),
-			eventHandler,
-		)
-
-	case "emit_event":
+	// Handle custom event emission
+	if toolCall.Function.Name == "emit_event" {
 		var input struct {
 			EventName   string                 `json:"event_name"`
 			Payload     map[string]interface{} `json:"payload"`
 			Description string                 `json:"description"`
 		}
 		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
-			return fmt.Errorf("failed to parse emit_event arguments: %w", err)
+			return "", fmt.Errorf("failed to parse emit_event arguments: %w", err)
 		}
-
-		return h.emitDomainEvent(
-			NewCustomEventEmitted(threadID, input.EventName, h.config.Name, input.Description, input.Payload),
-			eventHandler,
-		)
+		event := NewCustomEventEmitted(threadID, input.EventName, h.config.Name, input.Description, input.Payload)
+		if err := h.emitDomainEvent(event, eventHandler); err != nil {
+			return "", err
+		}
+		return "{\"status\": \"event_emitted\"}", nil
 	}
 
-	return nil
+	// Execute the tool using the executor
+	return h.toolExecutor.Execute(toolCall)
 }

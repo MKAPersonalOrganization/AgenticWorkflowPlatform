@@ -1,13 +1,13 @@
-package sdk_test
+package infra_test
 
 import (
 	"testing"
 
 	"school-with-ai/infra"
-	"school-with-ai/services/sdk"
 	"school-with-ai/services/agents/math"
 	"school-with-ai/services/agents/physics"
 	"school-with-ai/services/agents/studentfacing"
+	"school-with-ai/services/sdk"
 )
 
 func TestInstructorConfigurations(t *testing.T) {

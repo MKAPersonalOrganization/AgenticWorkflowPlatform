@@ -9,6 +9,7 @@ import (
 
 	"school-with-ai/domain"
 	"school-with-ai/infra/agui"
+	"school-with-ai/services/agents"
 	"school-with-ai/services/sdk"
 )
 
@@ -367,30 +368,30 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 	domainEventHandler := func(event sdk.Event) error {
 		// Track routing events (but don't act on them yet - wait for agent to finish)
 		switch e := event.(type) {
-		case *sdk.DomainEvent:
+		case *agents.DomainEvent:
 			// Handle unified domain events
 			switch e.Type {
-			case sdk.EventTypeMathQuestion:
+			case agents.EventTypeMathQuestion:
 				// Math question emitted - activate math instructor
 				nextAgent = "math-instructor"
 				agentEventOccurred = true
 
-			case sdk.EventTypePhysicsQuestion:
+			case agents.EventTypePhysicsQuestion:
 				// Physics question emitted - activate physics instructor
 				nextAgent = "physics-instructor"
 				agentEventOccurred = true
 
-			case sdk.EventTypeChemistryQuestion:
+			case agents.EventTypeChemistryQuestion:
 				// Chemistry question emitted - activate chemistry instructor
 				nextAgent = "chemistry-instructor"
 				agentEventOccurred = true
 
-			case sdk.EventTypeStatisticsQuestion:
+			case agents.EventTypeStatisticsQuestion:
 				// Statistics question emitted - activate statistics instructor
 				nextAgent = "statistics-instructor"
 				agentEventOccurred = true
 
-			case sdk.EventTypeQuestionAnswered:
+			case agents.EventTypeQuestionAnswered:
 				// Question answered - activate student-facing agent to review and respond
 				nextAgent = "student-facing-agent"
 				agentEventOccurred = true
@@ -608,26 +609,26 @@ Follow your state machine workflow:
 	agentEventHandler := func(event sdk.Event) error {
 		// Track routing events (but don't act on them yet - wait for agent to finish)
 		switch e := event.(type) {
-		case *sdk.DomainEvent:
+		case *agents.DomainEvent:
 			// Handle unified domain events
 			switch e.Type {
-			case sdk.EventTypeMathQuestion:
+			case agents.EventTypeMathQuestion:
 				nextAgent = "math-instructor"
 				routingEventOccurred = true
 
-			case sdk.EventTypePhysicsQuestion:
+			case agents.EventTypePhysicsQuestion:
 				nextAgent = "physics-instructor"
 				routingEventOccurred = true
 
-			case sdk.EventTypeChemistryQuestion:
+			case agents.EventTypeChemistryQuestion:
 				nextAgent = "chemistry-instructor"
 				routingEventOccurred = true
 
-			case sdk.EventTypeStatisticsQuestion:
+			case agents.EventTypeStatisticsQuestion:
 				nextAgent = "statistics-instructor"
 				routingEventOccurred = true
 
-			case sdk.EventTypeQuestionAnswered:
+			case agents.EventTypeQuestionAnswered:
 				nextAgent = "student-facing-agent"
 				routingEventOccurred = true
 			}

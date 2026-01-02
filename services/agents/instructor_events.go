@@ -1,4 +1,4 @@
-package sdk
+package agents
 
 import (
 	"encoding/json"

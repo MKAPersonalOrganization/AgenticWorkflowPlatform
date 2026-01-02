@@ -11,8 +11,8 @@ type EventNotifier interface {
 type AgentConfig struct {
 	// Identity
 	Name           string // Unique identifier for the agent
-	Role           string // "router" | "instructor" | "specialist" (for backward compatibility)
-	Specialization string // Domain expertise (e.g., "math", "physics")
+	Role           string // Agent role (e.g., "assistant", "specialist")
+	Specialization string // Domain expertise or specialization
 
 	// Behavior
 	SystemPrompt string // Instructions for how the agent should behave
@@ -29,7 +29,7 @@ type AgentConfig struct {
 func DefaultConfig(name string) AgentConfig {
 	return AgentConfig{
 		Name:             name,
-		Role:             "instructor",
+		Role:             "assistant",
 		Specialization:   "",
 		SystemPrompt:     "You are a helpful assistant.",
 		Tools:            []Tool{},

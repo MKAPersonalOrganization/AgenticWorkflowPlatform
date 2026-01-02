@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"school-with-ai/infra/agui"
+	"school-with-ai/services/agents"
 	"school-with-ai/services/sdk"
 )
 
@@ -45,20 +46,20 @@ func (n *UINotifier) HandleDomainEvent(event sdk.Event) error {
 		return n.emitToolCallResult(evt)
 
 	// Agent collaboration events
-	case *sdk.DomainEvent:
+	case *agents.DomainEvent:
 		// Handle unified domain events
 		switch evt.Type {
-		case sdk.EventTypeWhiteboardUpdated:
+		case agents.EventTypeWhiteboardUpdated:
 			return n.emitWhiteboardUpdated(evt)
-		case sdk.EventTypeMathQuestion:
+		case agents.EventTypeMathQuestion:
 			return n.emitMathQuestion(evt)
-		case sdk.EventTypePhysicsQuestion:
+		case agents.EventTypePhysicsQuestion:
 			return n.emitPhysicsQuestion(evt)
-		case sdk.EventTypeChemistryQuestion:
+		case agents.EventTypeChemistryQuestion:
 			return n.emitChemistryQuestion(evt)
-		case sdk.EventTypeStatisticsQuestion:
+		case agents.EventTypeStatisticsQuestion:
 			return n.emitStatisticsQuestion(evt)
-		case sdk.EventTypeQuestionAnswered:
+		case agents.EventTypeQuestionAnswered:
 			return n.emitQuestionAnswered(evt)
 		default:
 			return nil
@@ -167,7 +168,7 @@ func (n *UINotifier) emitToolCallResult(evt *sdk.ToolCallExecutedEvent) error {
 
 // Agent collaboration event emitters
 
-func (n *UINotifier) emitWhiteboardUpdated(evt *sdk.DomainEvent) error {
+func (n *UINotifier) emitWhiteboardUpdated(evt *agents.DomainEvent) error {
 	timestamp := time.Now().UnixMilli()
 	uiEvent := &agui.CustomEvent{
 		BaseEvent: agui.BaseEvent{
@@ -185,7 +186,7 @@ func (n *UINotifier) emitWhiteboardUpdated(evt *sdk.DomainEvent) error {
 	return n.emitter.Emit(uiEvent)
 }
 
-func (n *UINotifier) emitMathQuestion(evt *sdk.DomainEvent) error {
+func (n *UINotifier) emitMathQuestion(evt *agents.DomainEvent) error {
 	timestamp := time.Now().UnixMilli()
 	uiEvent := &agui.CustomEvent{
 		BaseEvent: agui.BaseEvent{
@@ -203,7 +204,7 @@ func (n *UINotifier) emitMathQuestion(evt *sdk.DomainEvent) error {
 	return n.emitter.Emit(uiEvent)
 }
 
-func (n *UINotifier) emitPhysicsQuestion(evt *sdk.DomainEvent) error {
+func (n *UINotifier) emitPhysicsQuestion(evt *agents.DomainEvent) error {
 	timestamp := time.Now().UnixMilli()
 	uiEvent := &agui.CustomEvent{
 		BaseEvent: agui.BaseEvent{
@@ -221,7 +222,7 @@ func (n *UINotifier) emitPhysicsQuestion(evt *sdk.DomainEvent) error {
 	return n.emitter.Emit(uiEvent)
 }
 
-func (n *UINotifier) emitChemistryQuestion(evt *sdk.DomainEvent) error {
+func (n *UINotifier) emitChemistryQuestion(evt *agents.DomainEvent) error {
 	timestamp := time.Now().UnixMilli()
 	uiEvent := &agui.CustomEvent{
 		BaseEvent: agui.BaseEvent{
@@ -239,7 +240,7 @@ func (n *UINotifier) emitChemistryQuestion(evt *sdk.DomainEvent) error {
 	return n.emitter.Emit(uiEvent)
 }
 
-func (n *UINotifier) emitStatisticsQuestion(evt *sdk.DomainEvent) error {
+func (n *UINotifier) emitStatisticsQuestion(evt *agents.DomainEvent) error {
 	timestamp := time.Now().UnixMilli()
 	uiEvent := &agui.CustomEvent{
 		BaseEvent: agui.BaseEvent{
@@ -257,7 +258,7 @@ func (n *UINotifier) emitStatisticsQuestion(evt *sdk.DomainEvent) error {
 	return n.emitter.Emit(uiEvent)
 }
 
-func (n *UINotifier) emitQuestionAnswered(evt *sdk.DomainEvent) error {
+func (n *UINotifier) emitQuestionAnswered(evt *agents.DomainEvent) error {
 	timestamp := time.Now().UnixMilli()
 	uiEvent := &agui.CustomEvent{
 		BaseEvent: agui.BaseEvent{
