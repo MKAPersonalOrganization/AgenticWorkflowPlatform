@@ -114,6 +114,96 @@ Agents **only** communicate through domain events - there is no direct agent-to-
 }
 ```
 
+## Agent Communication Matrix
+
+The following diagram shows which events each agent can emit and respond to:
+
+```mermaid
+flowchart TB
+    subgraph Events["Domain Events"]
+        MQ[question.math]
+        PQ[question.physics]
+        CQ[question.chemistry]
+        QA[question.answered]
+        WB[whiteboard.updated]
+    end
+
+    subgraph Agents["Agents"]
+        SFA[Student-Facing Agent]
+        MATH[Math Instructor]
+        PHYS[Physics Instructor]
+        CHEM[Chemistry Instructor]
+    end
+
+    %% Student-Facing Agent
+    SFA -->|emits| MQ
+    SFA -->|emits| PQ
+    SFA -->|emits| CQ
+    SFA -->|emits| WB
+    QA -->|triggers| SFA
+
+    %% Math Instructor
+    MQ -->|triggers| MATH
+    MATH -->|emits| QA
+    MATH -->|emits| PQ
+    MATH -->|emits| CQ
+    MATH -->|emits| WB
+
+    %% Physics Instructor
+    PQ -->|triggers| PHYS
+    PHYS -->|emits| QA
+    PHYS -->|emits| MQ
+    PHYS -->|emits| CQ
+    PHYS -->|emits| WB
+
+    %% Chemistry Instructor
+    CQ -->|triggers| CHEM
+    CHEM -->|emits| QA
+    CHEM -->|emits| MQ
+    CHEM -->|emits| PQ
+    CHEM -->|emits| WB
+
+    style SFA fill:#e1f5fe
+    style MATH fill:#fff3e0
+    style PHYS fill:#f3e5f5
+    style CHEM fill:#e8f5e9
+    style MQ fill:#fff3e0
+    style PQ fill:#f3e5f5
+    style CQ fill:#e8f5e9
+    style QA fill:#ffebee
+    style WB fill:#fafafa
+```
+
+### Agent Event Contracts
+
+| Agent | Responds To (Triggers) | Emits |
+|-------|------------------------|-------|
+| **student-facing-agent** | User messages, `question.answered` | `question.math`, `question.physics`, `question.chemistry`, `whiteboard.updated` |
+| **math-instructor** | `question.math` | `question.answered`, `question.physics`, `question.chemistry`, `whiteboard.updated` |
+| **physics-instructor** | `question.physics` | `question.answered`, `question.math`, `question.chemistry`, `whiteboard.updated` |
+| **chemistry-instructor** | `question.chemistry` | `question.answered`, `question.math`, `question.physics`, `whiteboard.updated` |
+
+### Communication Patterns
+
+```mermaid
+flowchart LR
+    subgraph "Single-Subject Question"
+        U1[User] --> SFA1[Student-Facing Agent]
+        SFA1 -->|question.math| M1[Math Instructor]
+        M1 -->|question.answered| SFA1
+    end
+```
+
+```mermaid
+flowchart LR
+    subgraph "Multi-Subject Collaboration"
+        U2[User] --> SFA2[Student-Facing Agent]
+        SFA2 -->|question.physics| P2[Physics Instructor]
+        P2 -->|question.math| M2[Math Instructor]
+        M2 -->|question.answered| SFA2
+    end
+```
+
 ## Event Flow Example
 
 ```mermaid
@@ -122,7 +212,7 @@ sequenceDiagram
     participant SFA as Student-Facing Agent
     participant EventLog
     participant Math as Math Instructor
-    
+
     Student->>SFA: "What is d/dx(x²)?"
     SFA->>EventLog: emit question.math
     EventLog-->>Math: dispatch event
