@@ -285,10 +285,14 @@ func (h *Agent) runIteration(
 		}
 
 		// Automatically continue conversation with tool results
-		// Exception: If agent called another agent, stop iteration
-		// The worker pool will handle switching to the called agent
+		// Exception: If agent emitted routing events, stop iteration
+		// The worker pool will handle activating the appropriate agent
 		for _, toolCall := range toolCallsList {
-			if toolCall.Function.Name == "call_agent" {
+			toolName := toolCall.Function.Name
+			if toolName == "emit_math_question" ||
+				toolName == "emit_physics_question" ||
+				toolName == "emit_chemistry_question" ||
+				toolName == "emit_question_answered" {
 				// Agent's job is done - don't continue iteration
 				return nil
 			}
@@ -360,27 +364,72 @@ func (h *Agent) executeToolCall(threadID string, toolCall domain.ToolCall, event
 func (h *Agent) emitCollaborationEvents(threadID string, toolCall domain.ToolCall, eventHandler DomainEventHandler) error {
 	toolName := toolCall.Function.Name
 
+	// Get whiteboard state for events
+	getWhiteboardState := func() string {
+		thread, exists := h.state.Get(threadID)
+		if exists {
+			return thread.WhiteboardContent
+		}
+		return ""
+	}
+
 	switch toolName {
-	case "call_agent":
+	case "emit_math_question":
 		var input struct {
-			AgentName string `json:"agent_name"`
-			Reason    string `json:"reason"`
-			Context   string `json:"context"`
+			Question string `json:"question"`
+			Context  string `json:"context"`
 		}
 		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
-			return fmt.Errorf("failed to parse call_agent arguments: %w", err)
+			return fmt.Errorf("failed to parse emit_math_question arguments: %w", err)
 		}
 
-		thread, exists := h.state.Get(threadID)
-		whiteboardState := ""
-		if exists {
-			whiteboardState = thread.WhiteboardContent
+		return h.emitDomainEvent(
+			NewMathQuestion(threadID, input.Question, h.config.Name, input.Context, getWhiteboardState()),
+			eventHandler,
+		)
+
+	case "emit_physics_question":
+		var input struct {
+			Question string `json:"question"`
+			Context  string `json:"context"`
+		}
+		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
+			return fmt.Errorf("failed to parse emit_physics_question arguments: %w", err)
 		}
 
-		return h.emitDomainEvent(NewAgentCalled(
-			threadID, h.config.Name, input.AgentName,
-			input.Reason, input.Context, whiteboardState,
-		), eventHandler)
+		return h.emitDomainEvent(
+			NewPhysicsQuestion(threadID, input.Question, h.config.Name, input.Context, getWhiteboardState()),
+			eventHandler,
+		)
+
+	case "emit_chemistry_question":
+		var input struct {
+			Question string `json:"question"`
+			Context  string `json:"context"`
+		}
+		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
+			return fmt.Errorf("failed to parse emit_chemistry_question arguments: %w", err)
+		}
+
+		return h.emitDomainEvent(
+			NewChemistryQuestion(threadID, input.Question, h.config.Name, input.Context, getWhiteboardState()),
+			eventHandler,
+		)
+
+	case "emit_question_answered":
+		var input struct {
+			Subject    string `json:"subject"`
+			IsComplete bool   `json:"is_complete"`
+			Summary    string `json:"summary"`
+		}
+		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
+			return fmt.Errorf("failed to parse emit_question_answered arguments: %w", err)
+		}
+
+		return h.emitDomainEvent(
+			NewQuestionAnswered(threadID, input.Subject, input.Summary, h.config.Name, input.IsComplete, getWhiteboardState()),
+			eventHandler,
+		)
 
 	case "write_whiteboard":
 		var input struct {

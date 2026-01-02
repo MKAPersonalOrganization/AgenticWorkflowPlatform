@@ -51,6 +51,18 @@ func (n *UINotifier) HandleDomainEvent(event agent.Event) error {
 	case *agent.WhiteboardUpdatedEvent:
 		return n.emitWhiteboardUpdated(evt)
 
+	case *agent.MathQuestionEvent:
+		return n.emitMathQuestion(evt)
+
+	case *agent.PhysicsQuestionEvent:
+		return n.emitPhysicsQuestion(evt)
+
+	case *agent.ChemistryQuestionEvent:
+		return n.emitChemistryQuestion(evt)
+
+	case *agent.QuestionAnsweredEvent:
+		return n.emitQuestionAnswered(evt)
+
 	// Other domain events don't need UI events
 	default:
 		return nil
@@ -187,6 +199,79 @@ func (n *UINotifier) emitWhiteboardUpdated(evt *agent.WhiteboardUpdatedEvent) er
 			"content":   evt.Content,
 			"action":    evt.Action,
 			"timestamp": evt.Timestamp.UnixMilli(),
+		},
+	}
+	return n.emitter.Emit(uiEvent)
+}
+
+func (n *UINotifier) emitMathQuestion(evt *agent.MathQuestionEvent) error {
+	timestamp := time.Now().UnixMilli()
+	uiEvent := &agui.CustomEvent{
+		BaseEvent: agui.BaseEvent{
+			Type:      "CUSTOM",
+			Timestamp: &timestamp,
+		},
+		Name: "MATH_QUESTION",
+		Value: map[string]interface{}{
+			"question":  evt.Question,
+			"emittedBy": evt.EmittedBy,
+			"context":   evt.Context,
+			"timestamp": evt.Timestamp.UnixMilli(),
+		},
+	}
+	return n.emitter.Emit(uiEvent)
+}
+
+func (n *UINotifier) emitPhysicsQuestion(evt *agent.PhysicsQuestionEvent) error {
+	timestamp := time.Now().UnixMilli()
+	uiEvent := &agui.CustomEvent{
+		BaseEvent: agui.BaseEvent{
+			Type:      "CUSTOM",
+			Timestamp: &timestamp,
+		},
+		Name: "PHYSICS_QUESTION",
+		Value: map[string]interface{}{
+			"question":  evt.Question,
+			"emittedBy": evt.EmittedBy,
+			"context":   evt.Context,
+			"timestamp": evt.Timestamp.UnixMilli(),
+		},
+	}
+	return n.emitter.Emit(uiEvent)
+}
+
+func (n *UINotifier) emitChemistryQuestion(evt *agent.ChemistryQuestionEvent) error {
+	timestamp := time.Now().UnixMilli()
+	uiEvent := &agui.CustomEvent{
+		BaseEvent: agui.BaseEvent{
+			Type:      "CUSTOM",
+			Timestamp: &timestamp,
+		},
+		Name: "CHEMISTRY_QUESTION",
+		Value: map[string]interface{}{
+			"question":  evt.Question,
+			"emittedBy": evt.EmittedBy,
+			"context":   evt.Context,
+			"timestamp": evt.Timestamp.UnixMilli(),
+		},
+	}
+	return n.emitter.Emit(uiEvent)
+}
+
+func (n *UINotifier) emitQuestionAnswered(evt *agent.QuestionAnsweredEvent) error {
+	timestamp := time.Now().UnixMilli()
+	uiEvent := &agui.CustomEvent{
+		BaseEvent: agui.BaseEvent{
+			Type:      "CUSTOM",
+			Timestamp: &timestamp,
+		},
+		Name: "QUESTION_ANSWERED",
+		Value: map[string]interface{}{
+			"subject":    evt.Subject,
+			"answer":     evt.Answer,
+			"answeredBy": evt.AnsweredBy,
+			"isComplete": evt.IsComplete,
+			"timestamp":  evt.Timestamp.UnixMilli(),
 		},
 	}
 	return n.emitter.Emit(uiEvent)

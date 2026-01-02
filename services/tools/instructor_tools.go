@@ -6,13 +6,6 @@ import (
 	"fmt"
 )
 
-// CallAgentInput is the unified input for calling any agent
-type CallAgentInput struct {
-	AgentName string `json:"agent_name"`
-	Reason    string `json:"reason"`
-	Context   string `json:"context"` // Optional: context to share with the agent
-}
-
 // WriteWhiteboardInput is the input for writing to the shared whiteboard
 type WriteWhiteboardInput struct {
 	Content string `json:"content"`
@@ -24,47 +17,6 @@ type EmitEventInput struct {
 	EventName   string                 `json:"event_name"`
 	Payload     map[string]interface{} `json:"payload"`
 	Description string                 `json:"description"`
-}
-
-// CallAgentTool implements the Tool interface for calling other agents
-type CallAgentTool struct{}
-
-func NewCallAgentTool() *CallAgentTool {
-	return &CallAgentTool{}
-}
-
-func (t *CallAgentTool) Name() string {
-	return "call_agent"
-}
-
-func (t *CallAgentTool) Description() string {
-	return "Call another agent to help with the task. This is the primary way agents collaborate in this event-driven system. Instructors call student-facing-agent after answering to return control."
-}
-
-func (t *CallAgentTool) Parameters() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"agent_name": map[string]any{
-				"type":        "string",
-				"description": "The name of the agent to call",
-				"enum":        []string{"student-facing-agent", "math-instructor", "physics-instructor", "chemistry-instructor"},
-			},
-			"reason": map[string]any{
-				"type":        "string",
-				"description": "Why you're calling this agent and what you need help with",
-			},
-			"context": map[string]any{
-				"type":        "string",
-				"description": "Optional: Summary of conversation so far and what the other agent should know",
-			},
-		},
-		"required": []string{"agent_name", "reason"},
-	}
-}
-
-func (t *CallAgentTool) Invoke(ctx context.Context, arguments string) (string, error) {
-	return CallAgent(arguments)
 }
 
 // WriteWhiteboardTool implements the Tool interface for writing to the whiteboard
@@ -144,33 +96,6 @@ func (t *EmitEventTool) Invoke(ctx context.Context, arguments string) (string, e
 	return EmitEvent(arguments)
 }
 
-// CallAgent allows any agent to call any other agent (purely event-driven)
-func CallAgent(input string) (string, error) {
-	var params CallAgentInput
-	if err := json.Unmarshal([]byte(input), &params); err != nil {
-		return "", fmt.Errorf("failed to parse input: %w", err)
-	}
-
-	// Validation
-	validAgents := map[string]bool{
-		"student-facing-agent": true,
-		"math-instructor":      true,
-		"physics-instructor":   true,
-		"chemistry-instructor": true,
-	}
-
-	if !validAgents[params.AgentName] {
-		return "", fmt.Errorf("invalid agent: %s", params.AgentName)
-	}
-
-	// Return a signal that will be processed by the event handler
-	// The actual agent switch happens via domain events
-	if params.Context != "" {
-		return fmt.Sprintf("Calling %s. Reason: %s. Context: %s", params.AgentName, params.Reason, params.Context), nil
-	}
-	return fmt.Sprintf("Calling %s. Reason: %s", params.AgentName, params.Reason), nil
-}
-
 // WriteWhiteboard allows instructors to write to the shared whiteboard
 func WriteWhiteboard(input string) (string, error) {
 	var params WriteWhiteboardInput
@@ -216,8 +141,6 @@ func EmitEvent(input string) (string, error) {
 // ExecuteInstructorTool executes an instructor tool by name
 func ExecuteInstructorTool(name string, arguments string) (string, error) {
 	switch name {
-	case "call_agent":
-		return CallAgent(arguments)
 	case "write_whiteboard":
 		return WriteWhiteboard(arguments)
 	case "emit_event":
