@@ -2,7 +2,8 @@ package chemistry
 
 import (
 	"school-with-ai/services/agent"
-	"school-with-ai/services/tools"
+	"school-with-ai/services/agents/chemistry/tools"
+	sharedtools "school-with-ai/services/tools"
 )
 
 // CreateChemistryInstructor creates the chemistry instructor agent configuration
@@ -22,14 +23,14 @@ func CreateChemistryInstructor(notifier agent.EventNotifier) agent.AgentConfig {
 	registry := agent.NewToolRegistry()
 
 	// Create only the tools this agent needs
-	registry.Register(tools.NewReadWhiteboardTool())
-	registry.Register(tools.NewCalculatorTool())
+	registry.Register(sharedtools.NewReadWhiteboardTool())
+	registry.Register(sharedtools.NewCalculatorTool())
 	registry.Register(tools.NewPeriodicTableTool())
-	registry.Register(tools.NewUnitConversionTool())
-	registry.Register(tools.NewEmitQuestionAnsweredTool())
-	registry.Register(tools.NewEmitMathQuestionTool())
-	registry.Register(tools.NewEmitPhysicsQuestionTool())
-	registry.Register(tools.NewWriteWhiteboardTool())
+	registry.Register(sharedtools.NewUnitConversionTool())
+	registry.Register(sharedtools.NewEmitQuestionAnsweredTool())
+	registry.Register(sharedtools.NewEmitMathQuestionTool())
+	registry.Register(sharedtools.NewEmitPhysicsQuestionTool())
+	registry.Register(sharedtools.NewWriteWhiteboardTool())
 
 	return agent.AgentConfig{
 		Name:           "chemistry-instructor",
