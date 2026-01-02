@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"school-with-ai/infra"
 	"school-with-ai/services/agent"
 )
 
@@ -22,15 +23,29 @@ func TestInstructorConfigurations(t *testing.T) {
 	}
 }
 
-func TestInstructorRegistry(t *testing.T) {
+func TestAgentRegistry(t *testing.T) {
 	// Mock notifier
 	var mockNotifier agent.EventNotifier = nil
 
-	registry := agent.NewInstructorRegistry(mockNotifier)
+	registry := infra.NewAgentRegistry(mockNotifier)
+
+	// Register agents
+	registry.Register("math-instructor", agent.CreateMathInstructor)
+	registry.Register("physics-instructor", agent.CreatePhysicsInstructor)
 
 	_, exists := registry.GetByName("math-instructor")
 	if !exists {
 		t.Error("Expected to find math-instructor")
+	}
+
+	_, exists = registry.GetByName("physics-instructor")
+	if !exists {
+		t.Error("Expected to find physics-instructor")
+	}
+
+	_, exists = registry.GetByName("nonexistent")
+	if exists {
+		t.Error("Expected not to find nonexistent agent")
 	}
 }
 

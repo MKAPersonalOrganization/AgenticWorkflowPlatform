@@ -40,11 +40,18 @@ func main() {
 	// Initialize job queue
 	queue := infra.NewInMemoryJobQueue()
 
-	// Initialize instructor registry (notifier will be set per-job dynamically)
-	instructorRegistry := agent.NewInstructorRegistry(nil)
+	// Initialize agent registry (notifier will be set per-job dynamically)
+	agentRegistry := infra.NewAgentRegistry(nil)
 
-	// Initialize and start worker pool with instructor registry
-	workerPool := infra.NewWorkerPool(queue, eventLog, threadState, provider, instructorRegistry, infra.WorkerPoolConfig{
+	// Register all agents
+	agentRegistry.Register("student-facing-agent", agent.CreateStudentFacingAgent)
+	agentRegistry.Register("math-instructor", agent.CreateMathInstructor)
+	agentRegistry.Register("physics-instructor", agent.CreatePhysicsInstructor)
+	agentRegistry.Register("chemistry-instructor", agent.CreateChemistryInstructor)
+	agentRegistry.Register("statistics-instructor", agent.CreateStatisticsInstructor)
+
+	// Initialize and start worker pool with agent registry
+	workerPool := infra.NewWorkerPool(queue, eventLog, threadState, provider, agentRegistry, infra.WorkerPoolConfig{
 		NumWorkers:   5,
 		PollInterval: 100 * time.Millisecond,
 	})

@@ -1,20 +1,20 @@
 package agent
 
-// InstructorRegistry manages creation of instructor agents
-// Each instructor creates its own tools internally for complete self-containment
-type InstructorRegistry struct {
-	notifier EventNotifier // Shared UI notifier for all instructors
+// AgentRegistry manages creation of all agents (student-facing and instructors)
+// Each agent creates its own tools internally for complete self-containment
+type AgentRegistry struct {
+	notifier EventNotifier // Shared UI notifier for all agents
 }
 
-// NewInstructorRegistry creates a new instructor registry
-func NewInstructorRegistry(notifier EventNotifier) *InstructorRegistry {
-	return &InstructorRegistry{
+// NewAgentRegistry creates a new agent registry
+func NewAgentRegistry(notifier EventNotifier) *AgentRegistry {
+	return &AgentRegistry{
 		notifier: notifier,
 	}
 }
 
-// GetByName returns the agent configuration for a specific instructor
-func (r *InstructorRegistry) GetByName(name string) (AgentConfig, bool) {
+// GetByName returns the agent configuration for a specific agent by name
+func (r *AgentRegistry) GetByName(name string) (AgentConfig, bool) {
 	switch name {
 	case "student-facing-agent":
 		return CreateStudentFacingAgent(r.notifier), true
@@ -32,7 +32,7 @@ func (r *InstructorRegistry) GetByName(name string) (AgentConfig, bool) {
 }
 
 // GetAllInstructors returns all available instructor configurations
-func (r *InstructorRegistry) GetAllInstructors() []AgentConfig {
+func (r *AgentRegistry) GetAllInstructors() []AgentConfig {
 	return []AgentConfig{
 		CreateMathInstructor(r.notifier),
 		CreatePhysicsInstructor(r.notifier),
@@ -42,12 +42,12 @@ func (r *InstructorRegistry) GetAllInstructors() []AgentConfig {
 }
 
 // GetStudentFacingAgent returns the student-facing agent (entry point for all conversations)
-func (r *InstructorRegistry) GetStudentFacingAgent() AgentConfig {
+func (r *AgentRegistry) GetStudentFacingAgent() AgentConfig {
 	return CreateStudentFacingAgent(r.notifier)
 }
 
 // SetNotifier updates the notifier for all agents created by this registry
 // This allows dynamically setting a per-request notifier (e.g., for SSE streams)
-func (r *InstructorRegistry) SetNotifier(notifier EventNotifier) {
+func (r *AgentRegistry) SetNotifier(notifier EventNotifier) {
 	r.notifier = notifier
 }
