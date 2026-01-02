@@ -2,7 +2,8 @@ package statistics
 
 import (
 	"school-with-ai/services/agent"
-	"school-with-ai/services/tools"
+	"school-with-ai/services/agents/statistics/tools"
+	sharedtools "school-with-ai/services/tools"
 )
 
 // CreateStatisticsInstructor creates the statistics instructor agent with comprehensive statistical tools
@@ -11,8 +12,8 @@ func CreateStatisticsInstructor(notifier agent.EventNotifier) agent.AgentConfig 
 	registry := agent.NewToolRegistry()
 
 	// Create only the tools this agent needs
-	registry.Register(tools.NewWriteWhiteboardTool())
-	registry.Register(tools.NewReadWhiteboardTool())
+	registry.Register(sharedtools.NewWriteWhiteboardTool())
+	registry.Register(sharedtools.NewReadWhiteboardTool())
 	registry.Register(tools.NewDescriptiveStatsTool())
 	registry.Register(tools.NewCorrelationTool())
 	registry.Register(tools.NewDistanceMetricsTool())
@@ -21,7 +22,7 @@ func CreateStatisticsInstructor(notifier agent.EventNotifier) agent.AgentConfig 
 	registry.Register(tools.NewNormalDistributionTool())
 	registry.Register(tools.NewGeometricDistributionTool())
 	registry.Register(tools.NewRegressionTool())
-	registry.Register(tools.NewEmitQuestionAnsweredTool())
+	registry.Register(sharedtools.NewEmitQuestionAnsweredTool())
 
 	return agent.AgentConfig{
 		Name: "statistics-instructor",

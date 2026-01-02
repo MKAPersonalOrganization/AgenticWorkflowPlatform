@@ -2,7 +2,8 @@ package physics
 
 import (
 	"school-with-ai/services/agent"
-	"school-with-ai/services/tools"
+	"school-with-ai/services/agents/physics/tools"
+	sharedtools "school-with-ai/services/tools"
 )
 
 // CreatePhysicsInstructor creates the physics instructor agent configuration
@@ -22,14 +23,14 @@ func CreatePhysicsInstructor(notifier agent.EventNotifier) agent.AgentConfig {
 	registry := agent.NewToolRegistry()
 
 	// Create only the tools this agent needs
-	registry.Register(tools.NewReadWhiteboardTool())
-	registry.Register(tools.NewCalculatorTool())
-	registry.Register(tools.NewUnitConversionTool())
+	registry.Register(sharedtools.NewReadWhiteboardTool())
+	registry.Register(sharedtools.NewCalculatorTool())
+	registry.Register(sharedtools.NewUnitConversionTool())
 	registry.Register(tools.NewWeatherTool())
-	registry.Register(tools.NewEmitQuestionAnsweredTool())
-	registry.Register(tools.NewEmitMathQuestionTool())
-	registry.Register(tools.NewEmitChemistryQuestionTool())
-	registry.Register(tools.NewWriteWhiteboardTool())
+	registry.Register(sharedtools.NewEmitQuestionAnsweredTool())
+	registry.Register(sharedtools.NewEmitMathQuestionTool())
+	registry.Register(sharedtools.NewEmitChemistryQuestionTool())
+	registry.Register(sharedtools.NewWriteWhiteboardTool())
 
 	return agent.AgentConfig{
 		Name:           "physics-instructor",
