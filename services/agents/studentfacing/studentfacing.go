@@ -1,6 +1,9 @@
-package agent
+package studentfacing
 
-import "school-with-ai/services/tools"
+import (
+	"school-with-ai/services/agent"
+	"school-with-ai/services/tools"
+)
 
 // CreateStudentFacingAgent creates the student-facing agent that handles initial questions
 // CRITICAL ROUTING RULE: ALL new user questions in a thread MUST be routed through this agent first.
@@ -19,9 +22,9 @@ import "school-with-ai/services/tools"
 //	  - question.chemistry: Activates chemistry-instructor to answer a chemistry question
 //	  - question.statistics: Activates statistics-instructor to answer a statistics question
 //	  - whiteboard.updated: Updates shared whiteboard content (only for initial question)
-func CreateStudentFacingAgent(notifier EventNotifier) AgentConfig {
+func CreateStudentFacingAgent(notifier agent.EventNotifier) agent.AgentConfig {
 	// Create a dedicated tool registry for this agent
-	registry := NewToolRegistry()
+	registry := agent.NewToolRegistry()
 
 	// Create only the tools this agent needs
 	registry.Register(tools.NewReadWhiteboardTool())
@@ -31,7 +34,7 @@ func CreateStudentFacingAgent(notifier EventNotifier) AgentConfig {
 	registry.Register(tools.NewEmitChemistryQuestionTool())
 	registry.Register(tools.NewEmitStatisticsQuestionTool())
 
-	return AgentConfig{
+	return agent.AgentConfig{
 		Name:           "student-facing-agent",
 		Role:           "coordinator",
 		Specialization: "routing",

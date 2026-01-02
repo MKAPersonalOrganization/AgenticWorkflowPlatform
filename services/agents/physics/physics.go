@@ -1,8 +1,7 @@
-package agent
+package physics
 
 import (
-	"time"
-
+	"school-with-ai/services/agent"
 	"school-with-ai/services/tools"
 )
 
@@ -18,9 +17,9 @@ import (
 //	  - question.math: Activates math-instructor for multi-subject questions
 //	  - question.chemistry: Activates chemistry-instructor for multi-subject questions
 //	  - whiteboard.updated: Updates shared whiteboard with physics solution
-func CreatePhysicsInstructor(notifier EventNotifier) AgentConfig {
+func CreatePhysicsInstructor(notifier agent.EventNotifier) agent.AgentConfig {
 	// Create a dedicated tool registry for this agent
-	registry := NewToolRegistry()
+	registry := agent.NewToolRegistry()
 
 	// Create only the tools this agent needs
 	registry.Register(tools.NewReadWhiteboardTool())
@@ -32,7 +31,7 @@ func CreatePhysicsInstructor(notifier EventNotifier) AgentConfig {
 	registry.Register(tools.NewEmitChemistryQuestionTool())
 	registry.Register(tools.NewWriteWhiteboardTool())
 
-	return AgentConfig{
+	return agent.AgentConfig{
 		Name:           "physics-instructor",
 		Role:           "instructor",
 		Specialization: "physics",
@@ -315,28 +314,5 @@ energy = 0.5 * mass * velocity**2
 		Tools:            registry.All(),
 		HasPrivateMemory: true,
 		Notifier:         notifier,
-	}
-}
-
-// Physics-specific events
-
-const (
-	EventTypePhysicsQuestion EventType = "question.physics"
-)
-
-// NewPhysicsQuestionEvent creates a physics question event
-func NewPhysicsQuestionEvent(threadID, question, emittedBy, context, whiteboardState string) *DomainEvent {
-	return &DomainEvent{
-		ID:        generateEventID(),
-		Type:      EventTypePhysicsQuestion,
-		Timestamp: time.Now(),
-		ThreadID:  threadID,
-		Version:   1,
-		Data: map[string]interface{}{
-			"question":         question,
-			"emitted_by":       emittedBy,
-			"context":          context,
-			"whiteboard_state": whiteboardState,
-		},
 	}
 }
