@@ -149,38 +149,43 @@ func (p *InMemoryThreadState) applyEventUnsafe(thread *domain.Thread, event agen
 		delete(p.threads, thread.ID)
 
 	// Agent collaboration events
-	case *agent.AgentCalledEvent:
-		// Update current agent
-		thread.CurrentInstructor = evt.CalledAgent
-		thread.UpdatedAt = evt.Timestamp
+	case *agent.DomainEvent:
+		switch evt.Type {
+		case agent.EventTypeAgentCalled:
+			// Update current agent
+			thread.CurrentInstructor = evt.GetString("called_agent")
+			thread.UpdatedAt = evt.Timestamp
 
-		// End the previous agent's session if there is one
-		if len(thread.InstructorHistory) > 0 {
-			lastIdx := len(thread.InstructorHistory) - 1
-			if thread.InstructorHistory[lastIdx].EndedAt == nil {
-				thread.InstructorHistory[lastIdx].EndedAt = &evt.Timestamp
-				thread.InstructorHistory[lastIdx].HandoffReason = evt.Reason
+			// End the previous agent's session if there is one
+			if len(thread.InstructorHistory) > 0 {
+				lastIdx := len(thread.InstructorHistory) - 1
+				if thread.InstructorHistory[lastIdx].EndedAt == nil {
+					thread.InstructorHistory[lastIdx].EndedAt = &evt.Timestamp
+					thread.InstructorHistory[lastIdx].HandoffReason = evt.GetString("reason")
+				}
 			}
-		}
 
-		// Add new agent session
-		session := domain.InstructorSession{
-			InstructorName: evt.CalledAgent,
-			Specialization: "", // Will be populated from config if needed
-			StartedAt:      evt.Timestamp,
-		}
-		thread.InstructorHistory = append(thread.InstructorHistory, session)
+			// Add new agent session
+			session := domain.InstructorSession{
+				InstructorName: evt.GetString("called_agent"),
+				Specialization: "", // Will be populated from config if needed
+				StartedAt:      evt.Timestamp,
+			}
+			thread.InstructorHistory = append(thread.InstructorHistory, session)
 
-	case *agent.WhiteboardUpdatedEvent:
-		switch evt.Action {
-		case "write":
-			thread.WhiteboardContent = evt.Content
-		case "append":
-			thread.WhiteboardContent += "\n" + evt.Content
-		case "clear":
-			thread.WhiteboardContent = ""
+		case agent.EventTypeWhiteboardUpdated:
+			action := evt.GetString("action")
+			content := evt.GetString("content")
+			switch action {
+			case "write":
+				thread.WhiteboardContent = content
+			case "append":
+				thread.WhiteboardContent += "\n" + content
+			case "clear":
+				thread.WhiteboardContent = ""
+			}
+			thread.UpdatedAt = evt.Timestamp
 		}
-		thread.UpdatedAt = evt.Timestamp
 
 	case *agent.CustomEventEmittedEvent:
 		thread.UpdatedAt = evt.Timestamp
