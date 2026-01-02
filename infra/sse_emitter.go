@@ -5,10 +5,10 @@ import (
 	"time"
 
 	"school-with-ai/infra/agui"
-	"school-with-ai/services/agent"
+	"school-with-ai/services/sdk"
 )
 
-// SSEEventEmitter implements agent.EventEmitter for Server-Sent Events
+// SSEEventEmitter implements sdk.EventEmitter for Server-Sent Events
 type SSEEventEmitter struct {
 	writer  http.ResponseWriter
 	flusher http.Flusher
@@ -28,7 +28,7 @@ func (e *SSEEventEmitter) Emit(event any) error {
 
 	// Translate domain events to agui events
 	switch ev := event.(type) {
-	case *agent.TextMessageStartEvent:
+	case *sdk.TextMessageStartEvent:
 		timestamp := time.Now().UnixMilli()
 		aguiEvent = &agui.TextMessageStartEvent{
 			BaseEvent: agui.BaseEvent{
@@ -39,7 +39,7 @@ func (e *SSEEventEmitter) Emit(event any) error {
 			Role:      ev.Role,
 		}
 
-	case *agent.TextMessageContentEvent:
+	case *sdk.TextMessageContentEvent:
 		timestamp := time.Now().UnixMilli()
 		aguiEvent = &agui.TextMessageContentEvent{
 			BaseEvent: agui.BaseEvent{
@@ -50,7 +50,7 @@ func (e *SSEEventEmitter) Emit(event any) error {
 			Delta:     ev.Delta,
 		}
 
-	case *agent.TextMessageEndEvent:
+	case *sdk.TextMessageEndEvent:
 		timestamp := time.Now().UnixMilli()
 		aguiEvent = &agui.TextMessageEndEvent{
 			BaseEvent: agui.BaseEvent{
@@ -60,7 +60,7 @@ func (e *SSEEventEmitter) Emit(event any) error {
 			MessageID: ev.MessageID,
 		}
 
-	case *agent.ToolCallStartEvent:
+	case *sdk.ToolCallStartEvent:
 		timestamp := time.Now().UnixMilli()
 		parentMessageID := ev.ParentMessageID
 		aguiEvent = &agui.ToolCallStartEvent{
@@ -73,7 +73,7 @@ func (e *SSEEventEmitter) Emit(event any) error {
 			ParentMessageID: &parentMessageID,
 		}
 
-	case *agent.ToolCallArgsEvent:
+	case *sdk.ToolCallArgsEvent:
 		timestamp := time.Now().UnixMilli()
 		aguiEvent = &agui.ToolCallArgsEvent{
 			BaseEvent: agui.BaseEvent{
@@ -84,7 +84,7 @@ func (e *SSEEventEmitter) Emit(event any) error {
 			Delta:      ev.Delta,
 		}
 
-	case *agent.ToolCallEndEvent:
+	case *sdk.ToolCallEndEvent:
 		timestamp := time.Now().UnixMilli()
 		aguiEvent = &agui.ToolCallEndEvent{
 			BaseEvent: agui.BaseEvent{
@@ -94,7 +94,7 @@ func (e *SSEEventEmitter) Emit(event any) error {
 			ToolCallID: ev.ToolCallID,
 		}
 
-	case *agent.ToolCallResultEvent:
+	case *sdk.ToolCallResultEvent:
 		timestamp := time.Now().UnixMilli()
 		role := ev.Role
 		aguiEvent = &agui.ToolCallResultEvent{

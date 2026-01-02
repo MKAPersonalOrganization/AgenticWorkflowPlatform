@@ -1,21 +1,21 @@
-package agent_test
+package sdk_test
 
 import (
 	"context"
 	"encoding/json"
 	"testing"
 
-	"school-with-ai/services/agent"
+	"school-with-ai/services/sdk"
 )
 
 func TestFunctionTool(t *testing.T) {
-	tool := agent.NewFunctionTool(
+	tool := sdk.NewFunctionTool(
 		"get_weather",
 		"Get the current weather for a location",
-		agent.ObjectSchema(
+		sdk.ObjectSchema(
 			map[string]any{
-				"location": agent.StringProperty("The city name"),
-				"unit":     agent.EnumProperty("Temperature unit", []string{"celsius", "fahrenheit"}),
+				"location": sdk.StringProperty("The city name"),
+				"unit":     sdk.EnumProperty("Temperature unit", []string{"celsius", "fahrenheit"}),
 			},
 			[]string{"location"},
 		),
@@ -71,20 +71,20 @@ func TestFunctionTool(t *testing.T) {
 }
 
 func TestToolRegistry(t *testing.T) {
-	registry := agent.NewToolRegistry()
+	registry := sdk.NewToolRegistry()
 
 	// Register some tools
-	weatherTool := agent.NewFunctionTool(
+	weatherTool := sdk.NewFunctionTool(
 		"get_weather",
 		"Get weather",
-		agent.ObjectSchema(map[string]any{"location": agent.StringProperty("City")}, []string{"location"}),
+		sdk.ObjectSchema(map[string]any{"location": sdk.StringProperty("City")}, []string{"location"}),
 		func(ctx context.Context, args string) (string, error) { return `{"temp": 20}`, nil },
 	)
 
-	calcTool := agent.NewFunctionTool(
+	calcTool := sdk.NewFunctionTool(
 		"calculate",
 		"Calculate expression",
-		agent.ObjectSchema(map[string]any{"expression": agent.StringProperty("Math expression")}, []string{"expression"}),
+		sdk.ObjectSchema(map[string]any{"expression": sdk.StringProperty("Math expression")}, []string{"expression"}),
 		func(ctx context.Context, args string) (string, error) { return `{"result": 42}`, nil },
 	)
 
@@ -125,20 +125,20 @@ func TestToolRegistry(t *testing.T) {
 }
 
 func TestToToolSpec(t *testing.T) {
-	tool := agent.NewFunctionTool(
+	tool := sdk.NewFunctionTool(
 		"test_tool",
 		"A test tool",
-		agent.ObjectSchema(
+		sdk.ObjectSchema(
 			map[string]any{
-				"param1": agent.StringProperty("First parameter"),
-				"param2": agent.IntegerProperty("Second parameter"),
+				"param1": sdk.StringProperty("First parameter"),
+				"param2": sdk.IntegerProperty("Second parameter"),
 			},
 			[]string{"param1"},
 		),
 		func(ctx context.Context, args string) (string, error) { return "{}", nil },
 	)
 
-	spec := agent.ToToolSpec(tool)
+	spec := sdk.ToToolSpec(tool)
 
 	if spec.Type != "function" {
 		t.Errorf("expected type 'function', got '%s'", spec.Type)
@@ -167,7 +167,7 @@ func TestParseArguments(t *testing.T) {
 		Unit     string `json:"unit"`
 	}
 
-	args, err := agent.ParseArguments[Args](`{"location": "Paris", "unit": "celsius"}`)
+	args, err := sdk.ParseArguments[Args](`{"location": "Paris", "unit": "celsius"}`)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -182,9 +182,9 @@ func TestParseArguments(t *testing.T) {
 
 func TestSchemaHelpers(t *testing.T) {
 	// Test ObjectSchema
-	objSchema := agent.ObjectSchema(
+	objSchema := sdk.ObjectSchema(
 		map[string]any{
-			"name": agent.StringProperty("The name"),
+			"name": sdk.StringProperty("The name"),
 		},
 		[]string{"name"},
 	)
@@ -193,7 +193,7 @@ func TestSchemaHelpers(t *testing.T) {
 	}
 
 	// Test StringProperty
-	strProp := agent.StringProperty("A string")
+	strProp := sdk.StringProperty("A string")
 	if strProp["type"] != "string" {
 		t.Errorf("expected type 'string'")
 	}
@@ -202,25 +202,25 @@ func TestSchemaHelpers(t *testing.T) {
 	}
 
 	// Test IntegerProperty
-	intProp := agent.IntegerProperty("A number")
+	intProp := sdk.IntegerProperty("A number")
 	if intProp["type"] != "integer" {
 		t.Errorf("expected type 'integer'")
 	}
 
 	// Test NumberProperty
-	numProp := agent.NumberProperty("A decimal")
+	numProp := sdk.NumberProperty("A decimal")
 	if numProp["type"] != "number" {
 		t.Errorf("expected type 'number'")
 	}
 
 	// Test BooleanProperty
-	boolProp := agent.BooleanProperty("A flag")
+	boolProp := sdk.BooleanProperty("A flag")
 	if boolProp["type"] != "boolean" {
 		t.Errorf("expected type 'boolean'")
 	}
 
 	// Test EnumProperty
-	enumProp := agent.EnumProperty("A choice", []string{"a", "b", "c"})
+	enumProp := sdk.EnumProperty("A choice", []string{"a", "b", "c"})
 	if enumProp["type"] != "string" {
 		t.Errorf("expected type 'string'")
 	}

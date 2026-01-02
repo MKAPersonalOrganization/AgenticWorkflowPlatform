@@ -3,24 +3,24 @@ package infra
 import (
 	"sync"
 
-	"school-with-ai/services/agent"
+	"school-with-ai/services/sdk"
 )
 
 // InMemoryEventLog is an in-memory implementation of EventLog
 type InMemoryEventLog struct {
 	mu     sync.RWMutex
-	events map[string][]agent.Event
+	events map[string][]sdk.Event
 }
 
 // NewInMemoryEventLog creates a new in-memory event log
 func NewInMemoryEventLog() *InMemoryEventLog {
 	return &InMemoryEventLog{
-		events: make(map[string][]agent.Event),
+		events: make(map[string][]sdk.Event),
 	}
 }
 
 // Append adds one or more events to a thread's history
-func (s *InMemoryEventLog) Append(threadID string, events ...agent.Event) error {
+func (s *InMemoryEventLog) Append(threadID string, events ...sdk.Event) error {
 	if len(events) == 0 {
 		return nil
 	}
@@ -33,7 +33,7 @@ func (s *InMemoryEventLog) Append(threadID string, events ...agent.Event) error 
 }
 
 // History retrieves all events for a thread in order
-func (s *InMemoryEventLog) History(threadID string) ([]agent.Event, error) {
+func (s *InMemoryEventLog) History(threadID string) ([]sdk.Event, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 

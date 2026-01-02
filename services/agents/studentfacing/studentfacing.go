@@ -1,7 +1,7 @@
 package studentfacing
 
 import (
-	"school-with-ai/services/agent"
+	"school-with-ai/services/sdk"
 	"school-with-ai/services/tools"
 )
 
@@ -22,9 +22,9 @@ import (
 //	  - question.chemistry: Activates chemistry-instructor to answer a chemistry question
 //	  - question.statistics: Activates statistics-instructor to answer a statistics question
 //	  - whiteboard.updated: Updates shared whiteboard content (only for initial question)
-func CreateStudentFacingAgent(notifier agent.EventNotifier) agent.AgentConfig {
+func CreateStudentFacingAgent(notifier sdk.EventNotifier) sdk.AgentConfig {
 	// Create a dedicated tool registry for this agent
-	registry := agent.NewToolRegistry()
+	registry := sdk.NewToolRegistry()
 
 	// Create only the tools this agent needs
 	registry.Register(tools.NewReadWhiteboardTool())
@@ -34,7 +34,7 @@ func CreateStudentFacingAgent(notifier agent.EventNotifier) agent.AgentConfig {
 	registry.Register(tools.NewEmitChemistryQuestionTool())
 	registry.Register(tools.NewEmitStatisticsQuestionTool())
 
-	return agent.AgentConfig{
+	return sdk.AgentConfig{
 		Name:           "student-facing-agent",
 		Role:           "coordinator",
 		Specialization: "routing",

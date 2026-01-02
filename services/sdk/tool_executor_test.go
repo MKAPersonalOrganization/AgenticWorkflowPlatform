@@ -1,4 +1,4 @@
-package agent_test
+package sdk_test
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"school-with-ai/domain"
-	"school-with-ai/services/agent"
+	"school-with-ai/services/sdk"
 	"school-with-ai/services/tools"
 )
 
@@ -60,7 +60,7 @@ func (m *MockToolExecutor) LastCall() domain.ToolCall {
 }
 
 // Verify MockToolExecutor implements ToolExecutor
-var _ agent.ToolExecutor = (*MockToolExecutor)(nil)
+var _ sdk.ToolExecutor = (*MockToolExecutor)(nil)
 
 func TestMockToolExecutor_Execute(t *testing.T) {
 	executor := NewMockToolExecutor()
@@ -137,10 +137,10 @@ func TestMockToolExecutor_DefaultResult(t *testing.T) {
 
 func TestBasicToolExecutor_Calculate(t *testing.T) {
 	// Create tool registry and register the calculator tool
-	toolRegistry := agent.NewToolRegistry()
+	toolRegistry := sdk.NewToolRegistry()
 	toolRegistry.Register(tools.NewCalculatorTool())
 
-	executor := agent.NewBasicToolExecutor(toolRegistry)
+	executor := sdk.NewBasicToolExecutor(toolRegistry)
 
 	toolCall := domain.ToolCall{
 		ID:   "call_calc",
@@ -163,11 +163,11 @@ func TestBasicToolExecutor_Calculate(t *testing.T) {
 
 func TestBasicToolExecutor_WriteWhiteboard(t *testing.T) {
 	// Create tool registry and register instructor tools
-	toolRegistry := agent.NewToolRegistry()
+	toolRegistry := sdk.NewToolRegistry()
 	// Register whiteboard tool
 	toolRegistry.Register(tools.NewWriteWhiteboardTool())
 
-	executor := agent.NewBasicToolExecutor(toolRegistry)
+	executor := sdk.NewBasicToolExecutor(toolRegistry)
 
 	toolCall := domain.ToolCall{
 		ID:   "call_whiteboard",
@@ -196,11 +196,11 @@ func TestAgentWithCustomToolExecutor(t *testing.T) {
 
 	// Verify agent can be created with custom executor
 	// This is the key benefit - the agent is now decoupled from tool implementations
-	agentInstance := agent.NewAgent(
+	agentInstance := sdk.NewAgent(
 		nil, // provider not needed for this test
 		nil, // log not needed for this test
 		nil, // state not needed for this test
-		agent.WithToolExecutor(mockExecutor),
+		sdk.WithToolExecutor(mockExecutor),
 	)
 
 	// Verify the agent was created (basic sanity check)
@@ -211,14 +211,14 @@ func TestAgentWithCustomToolExecutor(t *testing.T) {
 
 func TestRegistryToolExecutor(t *testing.T) {
 	ctx := context.Background()
-	registry := agent.NewToolRegistry()
+	registry := sdk.NewToolRegistry()
 
 	// Register a test tool
-	registry.Register(agent.NewFunctionTool(
+	registry.Register(sdk.NewFunctionTool(
 		"greet",
 		"Greet someone",
-		agent.ObjectSchema(
-			map[string]any{"name": agent.StringProperty("The name")},
+		sdk.ObjectSchema(
+			map[string]any{"name": sdk.StringProperty("The name")},
 			[]string{"name"},
 		),
 		func(ctx context.Context, arguments string) (string, error) {
@@ -232,7 +232,7 @@ func TestRegistryToolExecutor(t *testing.T) {
 		},
 	))
 
-	executor := agent.NewRegistryToolExecutor(ctx, registry)
+	executor := sdk.NewRegistryToolExecutor(ctx, registry)
 
 	// Test successful execution
 	result, err := executor.Execute(domain.ToolCall{
@@ -254,8 +254,8 @@ func TestRegistryToolExecutor(t *testing.T) {
 
 func TestRegistryToolExecutor_ToolNotFound(t *testing.T) {
 	ctx := context.Background()
-	registry := agent.NewToolRegistry()
-	executor := agent.NewRegistryToolExecutor(ctx, registry)
+	registry := sdk.NewToolRegistry()
+	executor := sdk.NewRegistryToolExecutor(ctx, registry)
 
 	_, err := executor.Execute(domain.ToolCall{
 		ID:   "call_1",

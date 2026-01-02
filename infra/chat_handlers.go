@@ -8,20 +8,20 @@ import (
 
 	"school-with-ai/domain"
 	"school-with-ai/infra/agui"
-	"school-with-ai/services/agent"
+	"school-with-ai/services/sdk"
 )
 
 // Handler encapsulates dependencies for HTTP handlers
 type Handler struct {
-	state      agent.ThreadState
-	log        agent.EventLog
-	provider   agent.Provider
+	state      sdk.ThreadState
+	log        sdk.EventLog
+	provider   sdk.Provider
 	queue      domain.JobQueue
 	workerPool *WorkerPool
 }
 
 // NewHandler creates a new HTTP handler with the given dependencies
-func NewHandler(log agent.EventLog, state agent.ThreadState, provider agent.Provider, queue domain.JobQueue, workerPool *WorkerPool) *Handler {
+func NewHandler(log sdk.EventLog, state sdk.ThreadState, provider sdk.Provider, queue domain.JobQueue, workerPool *WorkerPool) *Handler {
 	return &Handler{
 		state:      state,
 		log:        log,
@@ -44,7 +44,7 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create job
-	jobID := agent.GenerateID()
+	jobID := sdk.GenerateID()
 	messageID := agui.GenerateMessageID()
 
 	job := &domain.Job{
@@ -155,7 +155,7 @@ func (h *Handler) translateAndWriteEvent(w http.ResponseWriter, flusher http.Flu
 
 	// Translate domain events to agui events
 	switch ev := event.(type) {
-	case *agent.TextMessageStartEvent:
+	case *sdk.TextMessageStartEvent:
 		timestamp := time.Now().UnixMilli()
 		aguiEvent = &agui.TextMessageStartEvent{
 			BaseEvent: agui.BaseEvent{
@@ -166,7 +166,7 @@ func (h *Handler) translateAndWriteEvent(w http.ResponseWriter, flusher http.Flu
 			Role:      ev.Role,
 		}
 
-	case *agent.TextMessageContentEvent:
+	case *sdk.TextMessageContentEvent:
 		timestamp := time.Now().UnixMilli()
 		aguiEvent = &agui.TextMessageContentEvent{
 			BaseEvent: agui.BaseEvent{
@@ -177,7 +177,7 @@ func (h *Handler) translateAndWriteEvent(w http.ResponseWriter, flusher http.Flu
 			Delta:     ev.Delta,
 		}
 
-	case *agent.TextMessageEndEvent:
+	case *sdk.TextMessageEndEvent:
 		timestamp := time.Now().UnixMilli()
 		aguiEvent = &agui.TextMessageEndEvent{
 			BaseEvent: agui.BaseEvent{
@@ -187,7 +187,7 @@ func (h *Handler) translateAndWriteEvent(w http.ResponseWriter, flusher http.Flu
 			MessageID: ev.MessageID,
 		}
 
-	case *agent.ToolCallStartEvent:
+	case *sdk.ToolCallStartEvent:
 		timestamp := time.Now().UnixMilli()
 		parentMessageID := ev.ParentMessageID
 		aguiEvent = &agui.ToolCallStartEvent{
@@ -201,7 +201,7 @@ func (h *Handler) translateAndWriteEvent(w http.ResponseWriter, flusher http.Flu
 			AgentName:       ev.AgentName,
 		}
 
-	case *agent.ToolCallArgsEvent:
+	case *sdk.ToolCallArgsEvent:
 		timestamp := time.Now().UnixMilli()
 		aguiEvent = &agui.ToolCallArgsEvent{
 			BaseEvent: agui.BaseEvent{
@@ -212,7 +212,7 @@ func (h *Handler) translateAndWriteEvent(w http.ResponseWriter, flusher http.Flu
 			Delta:      ev.Delta,
 		}
 
-	case *agent.ToolCallEndEvent:
+	case *sdk.ToolCallEndEvent:
 		timestamp := time.Now().UnixMilli()
 		aguiEvent = &agui.ToolCallEndEvent{
 			BaseEvent: agui.BaseEvent{
@@ -222,7 +222,7 @@ func (h *Handler) translateAndWriteEvent(w http.ResponseWriter, flusher http.Flu
 			ToolCallID: ev.ToolCallID,
 		}
 
-	case *agent.ToolCallResultEvent:
+	case *sdk.ToolCallResultEvent:
 		timestamp := time.Now().UnixMilli()
 		role := ev.Role
 		aguiEvent = &agui.ToolCallResultEvent{
@@ -340,8 +340,8 @@ func (h *Handler) DeleteThread(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Emit ThreadDeletedEvent
-	event := &agent.ThreadDeletedEvent{
-		BaseEvent: agent.BaseEvent{
+	event := &sdk.ThreadDeletedEvent{
+		BaseEvent: sdk.BaseEvent{
 			Type:      "ThreadDeleted",
 			Timestamp: time.Now(),
 			ThreadID:  threadID,

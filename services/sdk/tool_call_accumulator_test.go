@@ -1,14 +1,14 @@
-package agent_test
+package sdk_test
 
 import (
 	"testing"
 
-	"school-with-ai/services/agent"
+	"school-with-ai/services/sdk"
 	"school-with-ai/services/llm"
 )
 
 func TestToolCallAccumulator_NewToolCall(t *testing.T) {
-	acc := agent.NewToolCallAccumulator()
+	acc := sdk.NewToolCallAccumulator()
 
 	// First delta starts a new tool call
 	delta := llm.ToolCallDelta{
@@ -37,7 +37,7 @@ func TestToolCallAccumulator_NewToolCall(t *testing.T) {
 }
 
 func TestToolCallAccumulator_ArgumentStreaming(t *testing.T) {
-	acc := agent.NewToolCallAccumulator()
+	acc := sdk.NewToolCallAccumulator()
 
 	// Start tool call
 	acc.ProcessDelta(llm.ToolCallDelta{
@@ -80,7 +80,7 @@ func TestToolCallAccumulator_ArgumentStreaming(t *testing.T) {
 }
 
 func TestToolCallAccumulator_MultipleToolCalls(t *testing.T) {
-	acc := agent.NewToolCallAccumulator()
+	acc := sdk.NewToolCallAccumulator()
 
 	// First tool call
 	acc.ProcessDelta(llm.ToolCallDelta{
@@ -115,7 +115,7 @@ func TestToolCallAccumulator_MultipleToolCalls(t *testing.T) {
 }
 
 func TestToolCallAccumulator_HasToolCalls(t *testing.T) {
-	acc := agent.NewToolCallAccumulator()
+	acc := sdk.NewToolCallAccumulator()
 
 	if acc.HasToolCalls() {
 		t.Error("expected HasToolCalls to be false initially")
@@ -133,7 +133,7 @@ func TestToolCallAccumulator_HasToolCalls(t *testing.T) {
 }
 
 func TestToolCallAccumulator_UnknownIndex(t *testing.T) {
-	acc := agent.NewToolCallAccumulator()
+	acc := sdk.NewToolCallAccumulator()
 
 	// Delta for unknown index should not be processed
 	_, ok := acc.ProcessDelta(llm.ToolCallDelta{

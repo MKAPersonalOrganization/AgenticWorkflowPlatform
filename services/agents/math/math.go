@@ -1,7 +1,7 @@
 package math
 
 import (
-	"school-with-ai/services/agent"
+	"school-with-ai/services/sdk"
 	"school-with-ai/services/agents/math/tools"
 	sharedtools "school-with-ai/services/tools"
 )
@@ -18,9 +18,9 @@ import (
 //	  - question.physics: Activates physics-instructor for multi-subject questions
 //	  - question.chemistry: Activates chemistry-instructor for multi-subject questions
 //	  - whiteboard.updated: Updates shared whiteboard with math solution
-func CreateMathInstructor(notifier agent.EventNotifier) agent.AgentConfig {
+func CreateMathInstructor(notifier sdk.EventNotifier) sdk.AgentConfig {
 	// Create a dedicated tool registry for this agent
-	registry := agent.NewToolRegistry()
+	registry := sdk.NewToolRegistry()
 
 	// Create only the tools this agent needs
 	registry.Register(sharedtools.NewCalculatorTool())
@@ -34,7 +34,7 @@ func CreateMathInstructor(notifier agent.EventNotifier) agent.AgentConfig {
 	registry.Register(sharedtools.NewEmitChemistryQuestionTool())
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
 
-	return agent.AgentConfig{
+	return sdk.AgentConfig{
 		Name:           "math-instructor",
 		Role:           "instructor",
 		Specialization: "mathematics",

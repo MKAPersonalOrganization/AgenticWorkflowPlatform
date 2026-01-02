@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	"school-with-ai/domain"
-	"school-with-ai/services/agent"
+	"school-with-ai/services/sdk"
 )
 
 // InMemoryThreadState is an in-memory implementation of ThreadState
@@ -63,7 +63,7 @@ func (p *InMemoryThreadState) All() []domain.Thread {
 }
 
 // Update applies a single event to update the state
-func (p *InMemoryThreadState) Update(event agent.Event) error {
+func (p *InMemoryThreadState) Update(event sdk.Event) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -83,14 +83,14 @@ func (p *InMemoryThreadState) Update(event agent.Event) error {
 }
 
 // applyEventUnsafe applies an event to a thread (caller must hold lock)
-func (p *InMemoryThreadState) applyEventUnsafe(thread *domain.Thread, event agent.Event) error {
+func (p *InMemoryThreadState) applyEventUnsafe(thread *domain.Thread, event sdk.Event) error {
 	switch evt := event.(type) {
-	case *agent.ThreadCreatedEvent:
+	case *sdk.ThreadCreatedEvent:
 		thread.Title = evt.Title
 		thread.CreatedAt = evt.Timestamp
 		thread.UpdatedAt = evt.Timestamp
 
-	case *agent.UserMessageAddedEvent:
+	case *sdk.UserMessageAddedEvent:
 		msg := domain.Message{
 			ID:        evt.MessageID,
 			Role:      "user",
@@ -100,24 +100,24 @@ func (p *InMemoryThreadState) applyEventUnsafe(thread *domain.Thread, event agen
 		thread.Messages = append(thread.Messages, msg)
 		thread.UpdatedAt = evt.Timestamp
 
-	case *agent.AssistantMessageStartedEvent:
+	case *sdk.AssistantMessageStartedEvent:
 		// Marker event for traceability - no state change
 		thread.UpdatedAt = evt.Timestamp
 
-	case *agent.AssistantContentStreamedEvent:
+	case *sdk.AssistantContentStreamedEvent:
 		// Ephemeral streaming event - ignore in projection
 		// Only used for real-time UI updates
 
-	case *agent.ToolCallStartedEvent:
+	case *sdk.ToolCallStartedEvent:
 		// Ephemeral streaming event - ignore in projection
 
-	case *agent.ToolCallArgumentsStreamedEvent:
+	case *sdk.ToolCallArgumentsStreamedEvent:
 		// Ephemeral streaming event - ignore in projection
 
-	case *agent.ToolCallCompletedEvent:
+	case *sdk.ToolCallCompletedEvent:
 		// Ephemeral streaming event - ignore in projection
 
-	case *agent.AssistantMessageCompletedEvent:
+	case *sdk.AssistantMessageCompletedEvent:
 		msg := domain.Message{
 			ID:        evt.MessageID,
 			Role:      "assistant",
@@ -129,7 +129,7 @@ func (p *InMemoryThreadState) applyEventUnsafe(thread *domain.Thread, event agen
 		thread.Messages = append(thread.Messages, msg)
 		thread.UpdatedAt = evt.Timestamp
 
-	case *agent.ToolCallExecutedEvent:
+	case *sdk.ToolCallExecutedEvent:
 		msg := domain.Message{
 			ID:         evt.MessageID,
 			Role:       "tool",
@@ -141,17 +141,17 @@ func (p *InMemoryThreadState) applyEventUnsafe(thread *domain.Thread, event agen
 		thread.Messages = append(thread.Messages, msg)
 		thread.UpdatedAt = evt.Timestamp
 
-	case *agent.ThreadTitleUpdatedEvent:
+	case *sdk.ThreadTitleUpdatedEvent:
 		thread.Title = evt.NewTitle
 		thread.UpdatedAt = evt.Timestamp
 
-	case *agent.ThreadDeletedEvent:
+	case *sdk.ThreadDeletedEvent:
 		delete(p.threads, thread.ID)
 
 	// Agent collaboration events
-	case *agent.DomainEvent:
+	case *sdk.DomainEvent:
 		switch evt.Type {
-		case agent.EventTypeWhiteboardUpdated:
+		case sdk.EventTypeWhiteboardUpdated:
 			action := evt.GetString("action")
 			content := evt.GetString("content")
 			switch action {
@@ -165,7 +165,7 @@ func (p *InMemoryThreadState) applyEventUnsafe(thread *domain.Thread, event agen
 			thread.UpdatedAt = evt.Timestamp
 		}
 
-	case *agent.CustomEventEmittedEvent:
+	case *sdk.CustomEventEmittedEvent:
 		thread.UpdatedAt = evt.Timestamp
 	}
 
