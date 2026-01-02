@@ -44,7 +44,10 @@ templ Whiteboard() {
 			</div>
 		</div>
 		<!-- Content -->
-		<div class="flex-1 overflow-y-auto p-4">
+		<div
+			class="flex-1 overflow-y-auto p-4"
+			x-ref="whiteboardContent"
+		>
 			<!-- Empty state -->
 			<div x-show="!currentThread?.whiteboardContent" class="h-full flex items-center justify-center text-center px-4">
 				<div class="space-y-2">
@@ -83,6 +86,23 @@ templ Whiteboard() {
 						x-html="renderMarkdown(currentThread?.whiteboardContent || '')"
 					></div>
 				</div>
+				<!-- Scroll anchor element -->
+				<div
+					x-ref="whiteboardBottom"
+					x-init="
+						$watch('currentThread?.whiteboardContent', () => {
+							if (currentThread?.whiteboardContent) {
+								$nextTick(() => {
+									requestAnimationFrame(() => {
+										requestAnimationFrame(() => {
+											$refs.whiteboardBottom?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+										});
+									});
+								});
+							}
+						});
+					"
+				></div>
 			</div>
 		</div>
 	</div>
