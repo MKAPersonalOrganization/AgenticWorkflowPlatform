@@ -314,30 +314,34 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 
 		// Track routing events (but don't act on them yet - wait for agent to finish)
 		switch e := event.(type) {
-		case *agent.AgentCalledEvent:
-			// Legacy support - Current agent called another agent
-			nextAgent = e.CalledAgent
-			agentEventOccurred = true
+		case *agent.DomainEvent:
+			// Handle unified domain events
+			switch e.Type {
+			case agent.EventTypeAgentCalled:
+				// Legacy support - Current agent called another agent
+				nextAgent = e.GetString("called_agent")
+				agentEventOccurred = true
 
-		case *agent.MathQuestionEvent:
-			// Math question emitted - activate math instructor
-			nextAgent = "math-instructor"
-			agentEventOccurred = true
+			case agent.EventTypeMathQuestion:
+				// Math question emitted - activate math instructor
+				nextAgent = "math-instructor"
+				agentEventOccurred = true
 
-		case *agent.PhysicsQuestionEvent:
-			// Physics question emitted - activate physics instructor
-			nextAgent = "physics-instructor"
-			agentEventOccurred = true
+			case agent.EventTypePhysicsQuestion:
+				// Physics question emitted - activate physics instructor
+				nextAgent = "physics-instructor"
+				agentEventOccurred = true
 
-		case *agent.ChemistryQuestionEvent:
-			// Chemistry question emitted - activate chemistry instructor
-			nextAgent = "chemistry-instructor"
-			agentEventOccurred = true
+			case agent.EventTypeChemistryQuestion:
+				// Chemistry question emitted - activate chemistry instructor
+				nextAgent = "chemistry-instructor"
+				agentEventOccurred = true
 
-		case *agent.QuestionAnsweredEvent:
-			// Question answered - activate student-facing agent to review and respond
-			nextAgent = "student-facing-agent"
-			agentEventOccurred = true
+			case agent.EventTypeQuestionAnswered:
+				// Question answered - activate student-facing agent to review and respond
+				nextAgent = "student-facing-agent"
+				agentEventOccurred = true
+			}
 		}
 
 		return nil
@@ -553,26 +557,30 @@ Follow your state machine workflow:
 
 		// Track routing events (but don't act on them yet - wait for agent to finish)
 		switch e := event.(type) {
-		case *agent.AgentCalledEvent:
-			// Legacy support
-			nextAgent = e.CalledAgent
-			routingEventOccurred = true
+		case *agent.DomainEvent:
+			// Handle unified domain events
+			switch e.Type {
+			case agent.EventTypeAgentCalled:
+				// Legacy support
+				nextAgent = e.GetString("called_agent")
+				routingEventOccurred = true
 
-		case *agent.MathQuestionEvent:
-			nextAgent = "math-instructor"
-			routingEventOccurred = true
+			case agent.EventTypeMathQuestion:
+				nextAgent = "math-instructor"
+				routingEventOccurred = true
 
-		case *agent.PhysicsQuestionEvent:
-			nextAgent = "physics-instructor"
-			routingEventOccurred = true
+			case agent.EventTypePhysicsQuestion:
+				nextAgent = "physics-instructor"
+				routingEventOccurred = true
 
-		case *agent.ChemistryQuestionEvent:
-			nextAgent = "chemistry-instructor"
-			routingEventOccurred = true
+			case agent.EventTypeChemistryQuestion:
+				nextAgent = "chemistry-instructor"
+				routingEventOccurred = true
 
-		case *agent.QuestionAnsweredEvent:
-			nextAgent = "student-facing-agent"
-			routingEventOccurred = true
+			case agent.EventTypeQuestionAnswered:
+				nextAgent = "student-facing-agent"
+				routingEventOccurred = true
+			}
 		}
 
 		return nil

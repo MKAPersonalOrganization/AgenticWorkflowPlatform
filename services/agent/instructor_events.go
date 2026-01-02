@@ -1,184 +1,209 @@
 package agent
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
-// AgentCalledEvent is emitted when any agent calls another agent (unified event-driven approach)
-type AgentCalledEvent struct {
-	BaseEvent
-	CallerAgent     string
-	CalledAgent     string
-	Reason          string
-	Context         string
-	WhiteboardState string
+// EventType represents the type of domain event
+type EventType string
+
+const (
+	EventTypeAgentCalled            EventType = "agent.called"
+	EventTypeWhiteboardUpdated      EventType = "whiteboard.updated"
+	EventTypeInstructorThought      EventType = "instructor.thought"
+	EventTypeInstructorStrategyChanged EventType = "instructor.strategy_changed"
+	EventTypeMathQuestion           EventType = "question.math"
+	EventTypePhysicsQuestion        EventType = "question.physics"
+	EventTypeChemistryQuestion      EventType = "question.chemistry"
+	EventTypeQuestionAnswered       EventType = "question.answered"
+)
+
+// DomainEvent is the unified event structure for all system events
+type DomainEvent struct {
+	// Core event metadata
+	ID        string                 `json:"id"`
+	Type      EventType              `json:"type"`
+	Timestamp time.Time              `json:"timestamp"`
+	ThreadID  string                 `json:"thread_id"`
+	Version   int                    `json:"version"` // For event versioning/schema evolution
+	
+	// Event payload - flexible structure for different event types
+	Data map[string]interface{} `json:"data"`
+	
+	// Additional metadata
+	Metadata map[string]string `json:"metadata,omitempty"`
+	
+	// Correlation for event chains
+	CorrelationID string `json:"correlation_id,omitempty"`
+	CausationID   string `json:"causation_id,omitempty"` // ID of event that caused this one
 }
 
-func NewAgentCalled(threadID, caller, called, reason, context, whiteboardState string) *AgentCalledEvent {
-	return &AgentCalledEvent{
-		BaseEvent: BaseEvent{
-			Type:      "AgentCalled",
-			Timestamp: time.Now(),
-			ThreadID:  threadID,
+// Implement Event interface
+func (e *DomainEvent) EventType() string         { return string(e.Type) }
+func (e *DomainEvent) EventTimestamp() time.Time { return e.Timestamp }
+func (e *DomainEvent) AggregateID() string       { return e.ThreadID }
+
+// Helper methods to extract typed data from the event
+
+func (e *DomainEvent) GetString(key string) string {
+	if val, ok := e.Data[key].(string); ok {
+		return val
+	}
+	return ""
+}
+
+func (e *DomainEvent) GetBool(key string) bool {
+	if val, ok := e.Data[key].(bool); ok {
+		return val
+	}
+	return false
+}
+
+func (e *DomainEvent) GetInt(key string) int {
+	if val, ok := e.Data[key].(float64); ok { // JSON numbers are float64
+		return int(val)
+	}
+	return 0
+}
+
+func (e *DomainEvent) MarshalPayload() ([]byte, error) {
+	return json.Marshal(e.Data)
+}
+
+// Event constructors
+
+func NewAgentCalledEvent(threadID, caller, called, reason, context, whiteboardState string) *DomainEvent {
+	return &DomainEvent{
+		ID:        generateEventID(),
+		Type:      EventTypeAgentCalled,
+		Timestamp: time.Now(),
+		ThreadID:  threadID,
+		Version:   1,
+		Data: map[string]interface{}{
+			"caller_agent":     caller,
+			"called_agent":     called,
+			"reason":           reason,
+			"context":          context,
+			"whiteboard_state": whiteboardState,
 		},
-		CallerAgent:     caller,
-		CalledAgent:     called,
-		Reason:          reason,
-		Context:         context,
-		WhiteboardState: whiteboardState,
 	}
 }
 
-type WhiteboardUpdatedEvent struct {
-	BaseEvent
-	AgentName string
-	Content   string
-	Action    string // "write" | "append" | "clear"
-}
-
-func NewWhiteboardUpdated(threadID, agentName, content, action string) *WhiteboardUpdatedEvent {
-	return &WhiteboardUpdatedEvent{
-		BaseEvent: BaseEvent{
-			Type:      "WhiteboardUpdated",
-			Timestamp: time.Now(),
-			ThreadID:  threadID,
+func NewWhiteboardUpdatedEvent(threadID, agentName, content, action string) *DomainEvent {
+	return &DomainEvent{
+		ID:        generateEventID(),
+		Type:      EventTypeWhiteboardUpdated,
+		Timestamp: time.Now(),
+		ThreadID:  threadID,
+		Version:   1,
+		Data: map[string]interface{}{
+			"agent_name": agentName,
+			"content":    content,
+			"action":     action,
 		},
-		AgentName: agentName,
-		Content:   content,
-		Action:    action,
 	}
 }
 
-// Private instructor events
-
-type InstructorThoughtRecordedEvent struct {
-	BaseEvent
-	InstructorName string
-	Thought        string
-	IsPrivate      bool
-}
-
-func NewInstructorThoughtRecorded(threadID, instructorName, thought string, isPrivate bool) *InstructorThoughtRecordedEvent {
-	return &InstructorThoughtRecordedEvent{
-		BaseEvent: BaseEvent{
-			Type:      "InstructorThoughtRecorded",
-			Timestamp: time.Now(),
-			ThreadID:  threadID,
+func NewInstructorThoughtEvent(threadID, instructorName, thought string, isPrivate bool) *DomainEvent {
+	return &DomainEvent{
+		ID:        generateEventID(),
+		Type:      EventTypeInstructorThought,
+		Timestamp: time.Now(),
+		ThreadID:  threadID,
+		Version:   1,
+		Data: map[string]interface{}{
+			"instructor_name": instructorName,
+			"thought":         thought,
+			"is_private":      isPrivate,
 		},
-		InstructorName: instructorName,
-		Thought:        thought,
-		IsPrivate:      isPrivate,
 	}
 }
 
-type InstructorStrategyChangedEvent struct {
-	BaseEvent
-	InstructorName string
-	OldStrategy    string
-	NewStrategy    string
-	Reason         string
-}
-
-func NewInstructorStrategyChanged(threadID, instructorName, oldStrategy, newStrategy, reason string) *InstructorStrategyChangedEvent {
-	return &InstructorStrategyChangedEvent{
-		BaseEvent: BaseEvent{
-			Type:      "InstructorStrategyChanged",
-			Timestamp: time.Now(),
-			ThreadID:  threadID,
+func NewInstructorStrategyChangedEvent(threadID, instructorName, oldStrategy, newStrategy, reason string) *DomainEvent {
+	return &DomainEvent{
+		ID:        generateEventID(),
+		Type:      EventTypeInstructorStrategyChanged,
+		Timestamp: time.Now(),
+		ThreadID:  threadID,
+		Version:   1,
+		Data: map[string]interface{}{
+			"instructor_name": instructorName,
+			"old_strategy":    oldStrategy,
+			"new_strategy":    newStrategy,
+			"reason":          reason,
 		},
-		InstructorName: instructorName,
-		OldStrategy:    oldStrategy,
-		NewStrategy:    newStrategy,
-		Reason:         reason,
 	}
 }
 
 // Subject-specific question events for agent activation
 
-type MathQuestionEvent struct {
-	BaseEvent
-	Question        string
-	EmittedBy       string
-	Context         string
-	WhiteboardState string
-}
-
-func NewMathQuestion(threadID, question, emittedBy, context, whiteboardState string) *MathQuestionEvent {
-	return &MathQuestionEvent{
-		BaseEvent: BaseEvent{
-			Type:      "MathQuestion",
-			Timestamp: time.Now(),
-			ThreadID:  threadID,
+func NewMathQuestionEvent(threadID, question, emittedBy, context, whiteboardState string) *DomainEvent {
+	return &DomainEvent{
+		ID:        generateEventID(),
+		Type:      EventTypeMathQuestion,
+		Timestamp: time.Now(),
+		ThreadID:  threadID,
+		Version:   1,
+		Data: map[string]interface{}{
+			"question":         question,
+			"emitted_by":       emittedBy,
+			"context":          context,
+			"whiteboard_state": whiteboardState,
 		},
-		Question:        question,
-		EmittedBy:       emittedBy,
-		Context:         context,
-		WhiteboardState: whiteboardState,
 	}
 }
 
-type PhysicsQuestionEvent struct {
-	BaseEvent
-	Question        string
-	EmittedBy       string
-	Context         string
-	WhiteboardState string
-}
-
-func NewPhysicsQuestion(threadID, question, emittedBy, context, whiteboardState string) *PhysicsQuestionEvent {
-	return &PhysicsQuestionEvent{
-		BaseEvent: BaseEvent{
-			Type:      "PhysicsQuestion",
-			Timestamp: time.Now(),
-			ThreadID:  threadID,
+func NewPhysicsQuestionEvent(threadID, question, emittedBy, context, whiteboardState string) *DomainEvent {
+	return &DomainEvent{
+		ID:        generateEventID(),
+		Type:      EventTypePhysicsQuestion,
+		Timestamp: time.Now(),
+		ThreadID:  threadID,
+		Version:   1,
+		Data: map[string]interface{}{
+			"question":         question,
+			"emitted_by":       emittedBy,
+			"context":          context,
+			"whiteboard_state": whiteboardState,
 		},
-		Question:        question,
-		EmittedBy:       emittedBy,
-		Context:         context,
-		WhiteboardState: whiteboardState,
 	}
 }
 
-type ChemistryQuestionEvent struct {
-	BaseEvent
-	Question        string
-	EmittedBy       string
-	Context         string
-	WhiteboardState string
-}
-
-func NewChemistryQuestion(threadID, question, emittedBy, context, whiteboardState string) *ChemistryQuestionEvent {
-	return &ChemistryQuestionEvent{
-		BaseEvent: BaseEvent{
-			Type:      "ChemistryQuestion",
-			Timestamp: time.Now(),
-			ThreadID:  threadID,
+func NewChemistryQuestionEvent(threadID, question, emittedBy, context, whiteboardState string) *DomainEvent {
+	return &DomainEvent{
+		ID:        generateEventID(),
+		Type:      EventTypeChemistryQuestion,
+		Timestamp: time.Now(),
+		ThreadID:  threadID,
+		Version:   1,
+		Data: map[string]interface{}{
+			"question":         question,
+			"emitted_by":       emittedBy,
+			"context":          context,
+			"whiteboard_state": whiteboardState,
 		},
-		Question:        question,
-		EmittedBy:       emittedBy,
-		Context:         context,
-		WhiteboardState: whiteboardState,
 	}
 }
 
-type QuestionAnsweredEvent struct {
-	BaseEvent
-	Subject         string // "math", "physics", "chemistry"
-	Answer          string
-	AnsweredBy      string
-	IsComplete      bool
-	WhiteboardState string
+func NewQuestionAnsweredEvent(threadID, subject, answer, answeredBy string, isComplete bool, whiteboardState string) *DomainEvent {
+	return &DomainEvent{
+		ID:        generateEventID(),
+		Type:      EventTypeQuestionAnswered,
+		Timestamp: time.Now(),
+		ThreadID:  threadID,
+		Version:   1,
+		Data: map[string]interface{}{
+			"subject":          subject,
+			"answer":           answer,
+			"answered_by":      answeredBy,
+			"is_complete":      isComplete,
+			"whiteboard_state": whiteboardState,
+		},
+	}
 }
 
-func NewQuestionAnswered(threadID, subject, answer, answeredBy string, isComplete bool, whiteboardState string) *QuestionAnsweredEvent {
-	return &QuestionAnsweredEvent{
-		BaseEvent: BaseEvent{
-			Type:      "QuestionAnswered",
-			Timestamp: time.Now(),
-			ThreadID:  threadID,
-		},
-		Subject:         subject,
-		Answer:          answer,
-		AnsweredBy:      answeredBy,
-		IsComplete:      isComplete,
-		WhiteboardState: whiteboardState,
-	}
+// Helper function to generate unique event IDs
+func generateEventID() string {
+	return time.Now().Format("20060102150405.000000")
 }

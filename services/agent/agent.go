@@ -384,7 +384,7 @@ func (h *Agent) emitCollaborationEvents(threadID string, toolCall domain.ToolCal
 		}
 
 		return h.emitDomainEvent(
-			NewMathQuestion(threadID, input.Question, h.config.Name, input.Context, getWhiteboardState()),
+			NewMathQuestionEvent(threadID, input.Question, h.config.Name, input.Context, getWhiteboardState()),
 			eventHandler,
 		)
 
@@ -398,7 +398,7 @@ func (h *Agent) emitCollaborationEvents(threadID string, toolCall domain.ToolCal
 		}
 
 		return h.emitDomainEvent(
-			NewPhysicsQuestion(threadID, input.Question, h.config.Name, input.Context, getWhiteboardState()),
+			NewPhysicsQuestionEvent(threadID, input.Question, h.config.Name, input.Context, getWhiteboardState()),
 			eventHandler,
 		)
 
@@ -412,7 +412,7 @@ func (h *Agent) emitCollaborationEvents(threadID string, toolCall domain.ToolCal
 		}
 
 		return h.emitDomainEvent(
-			NewChemistryQuestion(threadID, input.Question, h.config.Name, input.Context, getWhiteboardState()),
+			NewChemistryQuestionEvent(threadID, input.Question, h.config.Name, input.Context, getWhiteboardState()),
 			eventHandler,
 		)
 
@@ -427,7 +427,7 @@ func (h *Agent) emitCollaborationEvents(threadID string, toolCall domain.ToolCal
 		}
 
 		return h.emitDomainEvent(
-			NewQuestionAnswered(threadID, input.Subject, input.Summary, h.config.Name, input.IsComplete, getWhiteboardState()),
+			NewQuestionAnsweredEvent(threadID, input.Subject, input.Summary, h.config.Name, input.IsComplete, getWhiteboardState()),
 			eventHandler,
 		)
 
@@ -441,7 +441,7 @@ func (h *Agent) emitCollaborationEvents(threadID string, toolCall domain.ToolCal
 		}
 
 		return h.emitDomainEvent(
-			NewWhiteboardUpdated(threadID, h.config.Name, input.Content, input.Action),
+			NewWhiteboardUpdatedEvent(threadID, h.config.Name, input.Content, input.Action),
 			eventHandler,
 		)
 
