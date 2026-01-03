@@ -91,12 +91,25 @@ func (n *UINotifier) emitTextMessageContent(evt *sdk.AssistantContentStreamedEve
 }
 
 func (n *UINotifier) emitToolCallStart(evt *sdk.ToolCallStartedEvent) error {
+	// Emit standard TOOL_CALL_START event
 	uiEvent := aguievents.NewToolCallStartEvent(
 		evt.ToolCallID,
 		evt.ToolCallName,
 		aguievents.WithParentMessageID(evt.ParentMessageID),
 	)
-	return n.emitter.Emit(uiEvent)
+	if err := n.emitter.Emit(uiEvent); err != nil {
+		return err
+	}
+
+	// Emit custom TOOL_CALL_AGENT event to pair tool call with agent
+	agentEvent := aguievents.NewCustomEvent(
+		"TOOL_CALL_AGENT",
+		aguievents.WithValue(map[string]interface{}{
+			"toolCallId": evt.ToolCallID,
+			"agentName":  evt.AgentName,
+		}),
+	)
+	return n.emitter.Emit(agentEvent)
 }
 
 func (n *UINotifier) emitToolCallArgs(evt *sdk.ToolCallArgumentsStreamedEvent) error {
