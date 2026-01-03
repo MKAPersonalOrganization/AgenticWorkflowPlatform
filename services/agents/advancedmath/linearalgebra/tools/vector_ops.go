@@ -4,7 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
+
+	"github.com/cpmech/gosl/la"
 )
 
 // VectorOperationsTool provides vector operations
@@ -96,7 +97,9 @@ func (t *VectorOperationsTool) Invoke(ctx context.Context, arguments string) (st
 		if len(args.Vector1) != len(args.Vector2) {
 			return "", fmt.Errorf("vectors must have same length")
 		}
-		result = vecAdd(args.Vector1, args.Vector2, args.Alpha, args.Beta)
+		res := la.NewVector(len(args.Vector1))
+		la.VecAdd(res, args.Alpha, la.Vector(args.Vector1), args.Beta, la.Vector(args.Vector2))
+		result = []float64(res)
 
 	case "subtract":
 		if len(args.Vector2) == 0 {
@@ -105,10 +108,15 @@ func (t *VectorOperationsTool) Invoke(ctx context.Context, arguments string) (st
 		if len(args.Vector1) != len(args.Vector2) {
 			return "", fmt.Errorf("vectors must have same length")
 		}
-		result = vecAdd(args.Vector1, args.Vector2, 1.0, -1.0)
+		res := la.NewVector(len(args.Vector1))
+		la.VecAdd(res, 1.0, la.Vector(args.Vector1), -1.0, la.Vector(args.Vector2))
+		result = []float64(res)
 
 	case "scale":
-		result = vecScale(args.Vector1, args.Scalar)
+		v := la.Vector(args.Vector1)
+		res := la.NewVector(len(v))
+		res.Apply(args.Scalar, v)
+		result = []float64(res)
 
 	case "dot":
 		if len(args.Vector2) == 0 {
@@ -117,7 +125,7 @@ func (t *VectorOperationsTool) Invoke(ctx context.Context, arguments string) (st
 		if len(args.Vector1) != len(args.Vector2) {
 			return "", fmt.Errorf("vectors must have same length")
 		}
-		result = vecDot(args.Vector1, args.Vector2)
+		result = la.VecDot(la.Vector(args.Vector1), la.Vector(args.Vector2))
 
 	case "cross":
 		if len(args.Vector2) == 0 {
@@ -126,25 +134,32 @@ func (t *VectorOperationsTool) Invoke(ctx context.Context, arguments string) (st
 		if len(args.Vector1) != 3 || len(args.Vector2) != 3 {
 			return "", fmt.Errorf("cross product requires 3D vectors")
 		}
-		result = vecCross(args.Vector1, args.Vector2)
+		// gosl doesn't have cross product, use standard formula
+		u, v := args.Vector1, args.Vector2
+		result = []float64{
+			u[1]*v[2] - u[2]*v[1],
+			u[2]*v[0] - u[0]*v[2],
+			u[0]*v[1] - u[1]*v[0],
+		}
 
 	case "norm":
-		result = vecNorm(args.Vector1)
+		result = la.Vector(args.Vector1).Norm()
 
 	case "unit":
-		result = vecUnit(args.Vector1)
+		v := la.Vector(args.Vector1)
+		result = []float64(v.GetUnit())
 
 	case "max":
-		result = vecMax(args.Vector1)
+		result = la.Vector(args.Vector1).Max()
 
 	case "min":
-		result = vecMin(args.Vector1)
+		result = la.Vector(args.Vector1).Min()
 
 	case "accum":
-		result = vecAccum(args.Vector1)
+		result = la.Vector(args.Vector1).Accum()
 
 	case "rms":
-		result = vecRms(args.Vector1)
+		result = la.Vector(args.Vector1).Rms()
 
 	case "norm_diff":
 		if len(args.Vector2) == 0 {
@@ -153,7 +168,7 @@ func (t *VectorOperationsTool) Invoke(ctx context.Context, arguments string) (st
 		if len(args.Vector1) != len(args.Vector2) {
 			return "", fmt.Errorf("vectors must have same length")
 		}
-		result = vecNormDiff(args.Vector1, args.Vector2)
+		result = la.Vector(args.Vector1).NormDiff(la.Vector(args.Vector2))
 
 	default:
 		return "", fmt.Errorf("unknown operation: %s", args.Operation)
@@ -173,95 +188,4 @@ func (t *VectorOperationsTool) Invoke(ctx context.Context, arguments string) (st
 		return "", fmt.Errorf("failed to marshal response: %w", err)
 	}
 	return string(data), nil
-}
-
-// Vector operation implementations (based on gosl/la)
-
-func vecAdd(u, v []float64, alpha, beta float64) []float64 {
-	res := make([]float64, len(u))
-	for i := 0; i < len(u); i++ {
-		res[i] = alpha*u[i] + beta*v[i]
-	}
-	return res
-}
-
-func vecScale(v []float64, scalar float64) []float64 {
-	res := make([]float64, len(v))
-	for i := 0; i < len(v); i++ {
-		res[i] = scalar * v[i]
-	}
-	return res
-}
-
-func vecDot(u, v []float64) float64 {
-	var res float64
-	for i := 0; i < len(u); i++ {
-		res += u[i] * v[i]
-	}
-	return res
-}
-
-func vecCross(u, v []float64) []float64 {
-	return []float64{
-		u[1]*v[2] - u[2]*v[1],
-		u[2]*v[0] - u[0]*v[2],
-		u[0]*v[1] - u[1]*v[0],
-	}
-}
-
-func vecNorm(v []float64) float64 {
-	return math.Sqrt(vecDot(v, v))
-}
-
-func vecUnit(v []float64) []float64 {
-	norm := vecNorm(v)
-	if norm == 0 {
-		return v
-	}
-	return vecScale(v, 1.0/norm)
-}
-
-func vecMax(v []float64) float64 {
-	max := v[0]
-	for i := 1; i < len(v); i++ {
-		if v[i] > max {
-			max = v[i]
-		}
-	}
-	return max
-}
-
-func vecMin(v []float64) float64 {
-	min := v[0]
-	for i := 1; i < len(v); i++ {
-		if v[i] < min {
-			min = v[i]
-		}
-	}
-	return min
-}
-
-func vecAccum(v []float64) float64 {
-	var sum float64
-	for i := 0; i < len(v); i++ {
-		sum += v[i]
-	}
-	return sum
-}
-
-func vecRms(v []float64) float64 {
-	var rms float64
-	for i := 0; i < len(v); i++ {
-		rms += v[i] * v[i]
-	}
-	return math.Sqrt(rms / float64(len(v)))
-}
-
-func vecNormDiff(u, v []float64) float64 {
-	var diff float64
-	for i := 0; i < len(u); i++ {
-		d := u[i] - v[i]
-		diff += d * d
-	}
-	return math.Sqrt(diff)
 }

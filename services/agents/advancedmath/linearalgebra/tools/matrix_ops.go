@@ -4,7 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
+
+	"github.com/cpmech/gosl/la"
 )
 
 // MatrixOperationsTool provides matrix operations
@@ -100,49 +101,114 @@ func (t *MatrixOperationsTool) Invoke(ctx context.Context, arguments string) (st
 		if len(args.Matrix2) == 0 {
 			return "", fmt.Errorf("matrix2 required for multiply operation")
 		}
-		result, err = matMul(args.Matrix, args.Matrix2, args.Alpha)
+		a := la.NewMatrixDeep2(args.Matrix)
+		b := la.NewMatrixDeep2(args.Matrix2)
+		c := la.NewMatrix(a.M, b.N)
+		la.MatMatMul(c, args.Alpha, a, b)
+		result = c.GetDeep2()
 
 	case "add":
 		if len(args.Matrix2) == 0 {
 			return "", fmt.Errorf("matrix2 required for add operation")
 		}
-		result, err = matAdd(args.Matrix, args.Matrix2, args.Alpha, args.Beta)
+		// gosl doesn't have direct matrix add, so we'll use manual implementation
+		a, b := args.Matrix, args.Matrix2
+		if len(a) != len(b) || len(a[0]) != len(b[0]) {
+			return "", fmt.Errorf("matrices must have same dimensions")
+		}
+		m, n := len(a), len(a[0])
+		c := make([][]float64, m)
+		for i := 0; i < m; i++ {
+			c[i] = make([]float64, n)
+			for j := 0; j < n; j++ {
+				c[i][j] = args.Alpha*a[i][j] + args.Beta*b[i][j]
+			}
+		}
+		result = c
 
 	case "subtract":
 		if len(args.Matrix2) == 0 {
 			return "", fmt.Errorf("matrix2 required for subtract operation")
 		}
-		result, err = matAdd(args.Matrix, args.Matrix2, 1.0, -1.0)
+		a, b := args.Matrix, args.Matrix2
+		if len(a) != len(b) || len(a[0]) != len(b[0]) {
+			return "", fmt.Errorf("matrices must have same dimensions")
+		}
+		m, n := len(a), len(a[0])
+		c := make([][]float64, m)
+		for i := 0; i < m; i++ {
+			c[i] = make([]float64, n)
+			for j := 0; j < n; j++ {
+				c[i][j] = a[i][j] - b[i][j]
+			}
+		}
+		result = c
 
 	case "transpose":
-		result = matTranspose(args.Matrix)
+		a := la.NewMatrixDeep2(args.Matrix)
+		result = a.GetTranspose().GetDeep2()
 
 	case "inverse":
-		result, err = matInverse(args.Matrix)
+		a := la.NewMatrixDeep2(args.Matrix)
+		if a.M != a.N {
+			return "", fmt.Errorf("inverse requires square matrix")
+		}
+		ai := la.NewMatrix(a.N, a.M)
+		la.MatInv(ai, a, false)
+		result = ai.GetDeep2()
 
 	case "determinant":
-		result, err = matDeterminant(args.Matrix)
+		a := la.NewMatrixDeep2(args.Matrix)
+		if a.M != a.N {
+			return "", fmt.Errorf("determinant requires square matrix")
+		}
+		result = a.Det()
 
 	case "trace":
-		result, err = matTrace(args.Matrix)
+		if len(args.Matrix) != len(args.Matrix[0]) {
+			return "", fmt.Errorf("trace requires square matrix")
+		}
+		var trace float64
+		for i := 0; i < len(args.Matrix); i++ {
+			trace += args.Matrix[i][i]
+		}
+		result = trace
 
 	case "norm_frobenius":
-		result = matNormFrobenius(args.Matrix)
+		a := la.NewMatrixDeep2(args.Matrix)
+		result = a.NormFrob()
 
 	case "scale":
-		result = matScale(args.Matrix, args.Scalar)
+		a := la.NewMatrixDeep2(args.Matrix)
+		scaled := la.NewMatrix(a.M, a.N)
+		scaled.Apply(args.Scalar, a)
+		result = scaled.GetDeep2()
 
 	case "matrix_vector_multiply":
 		if len(args.Vector) == 0 {
 			return "", fmt.Errorf("vector required for matrix_vector_multiply")
 		}
-		result, err = matVecMul(args.Matrix, args.Vector, args.Alpha)
+		a := la.NewMatrixDeep2(args.Matrix)
+		u := la.Vector(args.Vector)
+		if a.N != len(u) {
+			return "", fmt.Errorf("incompatible dimensions: matrix columns (%d) != vector length (%d)", a.N, len(u))
+		}
+		v := la.NewVector(a.M)
+		la.MatVecMul(v, args.Alpha, a, u)
+		result = []float64(v)
 
 	case "vector_matrix_multiply":
 		if len(args.Vector) == 0 {
 			return "", fmt.Errorf("vector required for vector_matrix_multiply")
 		}
-		result, err = vecMatMul(args.Vector, args.Matrix, args.Alpha)
+		a := la.NewMatrixDeep2(args.Matrix)
+		u := la.Vector(args.Vector)
+		if len(u) != a.M {
+			return "", fmt.Errorf("incompatible dimensions: vector length (%d) != matrix rows (%d)", len(u), a.M)
+		}
+		v := la.NewVector(a.N)
+		la.MatTrVecMul(v, args.Alpha, a, u)
+		result = []float64(v)
 
 	default:
 		return "", fmt.Errorf("unknown operation: %s", args.Operation)
@@ -162,219 +228,4 @@ func (t *MatrixOperationsTool) Invoke(ctx context.Context, arguments string) (st
 		return "", fmt.Errorf("failed to marshal response: %w", err)
 	}
 	return string(data), nil
-}
-
-// Matrix operation implementations
-
-func matMul(a, b [][]float64, alpha float64) ([][]float64, error) {
-	m, n, p := len(a), len(a[0]), len(b[0])
-	if len(b) != n {
-		return nil, fmt.Errorf("incompatible dimensions for multiplication: (%dx%d) x (%dx%d)", m, n, len(b), p)
-	}
-
-	c := make([][]float64, m)
-	for i := 0; i < m; i++ {
-		c[i] = make([]float64, p)
-		for j := 0; j < p; j++ {
-			for k := 0; k < n; k++ {
-				c[i][j] += alpha * a[i][k] * b[k][j]
-			}
-		}
-	}
-	return c, nil
-}
-
-func matAdd(a, b [][]float64, alpha, beta float64) ([][]float64, error) {
-	if len(a) != len(b) || len(a[0]) != len(b[0]) {
-		return nil, fmt.Errorf("matrices must have same dimensions")
-	}
-
-	m, n := len(a), len(a[0])
-	c := make([][]float64, m)
-	for i := 0; i < m; i++ {
-		c[i] = make([]float64, n)
-		for j := 0; j < n; j++ {
-			c[i][j] = alpha*a[i][j] + beta*b[i][j]
-		}
-	}
-	return c, nil
-}
-
-func matTranspose(a [][]float64) [][]float64 {
-	m, n := len(a), len(a[0])
-	t := make([][]float64, n)
-	for i := 0; i < n; i++ {
-		t[i] = make([]float64, m)
-		for j := 0; j < m; j++ {
-			t[i][j] = a[j][i]
-		}
-	}
-	return t
-}
-
-func matScale(a [][]float64, scalar float64) [][]float64 {
-	m, n := len(a), len(a[0])
-	c := make([][]float64, m)
-	for i := 0; i < m; i++ {
-		c[i] = make([]float64, n)
-		for j := 0; j < n; j++ {
-			c[i][j] = scalar * a[i][j]
-		}
-	}
-	return c
-}
-
-func matTrace(a [][]float64) (float64, error) {
-	if len(a) != len(a[0]) {
-		return 0, fmt.Errorf("trace requires square matrix")
-	}
-	var trace float64
-	for i := 0; i < len(a); i++ {
-		trace += a[i][i]
-	}
-	return trace, nil
-}
-
-func matNormFrobenius(a [][]float64) float64 {
-	var sum float64
-	for i := 0; i < len(a); i++ {
-		for j := 0; j < len(a[0]); j++ {
-			sum += a[i][j] * a[i][j]
-		}
-	}
-	return math.Sqrt(sum)
-}
-
-func matVecMul(a [][]float64, v []float64, alpha float64) ([]float64, error) {
-	if len(a[0]) != len(v) {
-		return nil, fmt.Errorf("incompatible dimensions: matrix columns (%d) != vector length (%d)", len(a[0]), len(v))
-	}
-
-	result := make([]float64, len(a))
-	for i := 0; i < len(a); i++ {
-		for j := 0; j < len(v); j++ {
-			result[i] += alpha * a[i][j] * v[j]
-		}
-	}
-	return result, nil
-}
-
-func vecMatMul(v []float64, a [][]float64, alpha float64) ([]float64, error) {
-	if len(v) != len(a) {
-		return nil, fmt.Errorf("incompatible dimensions: vector length (%d) != matrix rows (%d)", len(v), len(a))
-	}
-
-	result := make([]float64, len(a[0]))
-	for j := 0; j < len(a[0]); j++ {
-		for i := 0; i < len(v); i++ {
-			result[j] += alpha * v[i] * a[i][j]
-		}
-	}
-	return result, nil
-}
-
-func matInverse(a [][]float64) ([][]float64, error) {
-	n := len(a)
-	if n != len(a[0]) {
-		return nil, fmt.Errorf("inverse requires square matrix")
-	}
-
-	// Create augmented matrix [A|I]
-	aug := make([][]float64, n)
-	for i := 0; i < n; i++ {
-		aug[i] = make([]float64, 2*n)
-		for j := 0; j < n; j++ {
-			aug[i][j] = a[i][j]
-		}
-		aug[i][n+i] = 1.0
-	}
-
-	// Gauss-Jordan elimination
-	for i := 0; i < n; i++ {
-		// Find pivot
-		maxRow := i
-		for k := i + 1; k < n; k++ {
-			if math.Abs(aug[k][i]) > math.Abs(aug[maxRow][i]) {
-				maxRow = k
-			}
-		}
-
-		// Swap rows
-		aug[i], aug[maxRow] = aug[maxRow], aug[i]
-
-		// Check for singular matrix
-		if math.Abs(aug[i][i]) < 1e-10 {
-			return nil, fmt.Errorf("matrix is singular or nearly singular")
-		}
-
-		// Scale pivot row
-		pivot := aug[i][i]
-		for j := 0; j < 2*n; j++ {
-			aug[i][j] /= pivot
-		}
-
-		// Eliminate column
-		for k := 0; k < n; k++ {
-			if k != i {
-				factor := aug[k][i]
-				for j := 0; j < 2*n; j++ {
-					aug[k][j] -= factor * aug[i][j]
-				}
-			}
-		}
-	}
-
-	// Extract inverse from augmented matrix
-	inv := make([][]float64, n)
-	for i := 0; i < n; i++ {
-		inv[i] = aug[i][n:]
-	}
-
-	return inv, nil
-}
-
-func matDeterminant(a [][]float64) (float64, error) {
-	n := len(a)
-	if n != len(a[0]) {
-		return 0, fmt.Errorf("determinant requires square matrix")
-	}
-
-	// Make a copy
-	m := make([][]float64, n)
-	for i := 0; i < n; i++ {
-		m[i] = make([]float64, n)
-		copy(m[i], a[i])
-	}
-
-	det := 1.0
-	for i := 0; i < n; i++ {
-		// Find pivot
-		maxRow := i
-		for k := i + 1; k < n; k++ {
-			if math.Abs(m[k][i]) > math.Abs(m[maxRow][i]) {
-				maxRow = k
-			}
-		}
-
-		if maxRow != i {
-			m[i], m[maxRow] = m[maxRow], m[i]
-			det = -det
-		}
-
-		if math.Abs(m[i][i]) < 1e-10 {
-			return 0, nil
-		}
-
-		det *= m[i][i]
-
-		// Eliminate column
-		for k := i + 1; k < n; k++ {
-			factor := m[k][i] / m[i][i]
-			for j := i; j < n; j++ {
-				m[k][j] -= factor * m[i][j]
-			}
-		}
-	}
-
-	return det, nil
 }
