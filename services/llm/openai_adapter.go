@@ -261,11 +261,11 @@ func (c *OpenAIClient) applyOptions(params *openai.ChatCompletionNewParams, opti
 		openaiTools := make([]openai.ChatCompletionToolUnionParam, 0, len(options.Tools))
 		for _, tool := range options.Tools {
 			funcDef := openai.FunctionDefinitionParam{
-				Name:        tool.GetName(),
-				Description: openai.String(tool.GetDescription()),
+				Name:        tool.Name(),
+				Description: openai.String(tool.Description()),
 			}
 
-			if params := tool.GetParameters(); params != nil {
+			if params := tool.Parameters(); params != nil {
 				funcDef.Parameters = openai.FunctionParameters(params)
 			}
 

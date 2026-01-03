@@ -247,9 +247,9 @@ func (c *OllamaClient) buildTools(tools []AITool) []api.Tool {
 		ollamaTools = append(ollamaTools, api.Tool{
 			Type: "function",
 			Function: api.ToolFunction{
-				Name:        tool.GetName(),
-				Description: tool.GetDescription(),
-				Parameters:  convertToToolParameters(tool.GetParameters()),
+				Name:        tool.Name(),
+				Description: tool.Description(),
+				Parameters:  convertToToolParameters(tool.Parameters()),
 			},
 		})
 	}
