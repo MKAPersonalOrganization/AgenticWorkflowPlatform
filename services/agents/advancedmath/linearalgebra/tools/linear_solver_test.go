@@ -45,7 +45,9 @@ func TestLinearSolverTool_GaussianElimination(t *testing.T) {
 			}
 
 			var response map[string]any
-			json.Unmarshal([]byte(result), &response)
+			if err := json.Unmarshal([]byte(result), &response); err != nil {
+				t.Fatalf("failed to unmarshal response: %v", err)
+			}
 
 			resultVec := response["solution"].([]interface{})
 			for i, exp := range tt.expected {
@@ -74,7 +76,9 @@ func TestLinearSolverTool_LU(t *testing.T) {
 	}
 
 	var response map[string]any
-	json.Unmarshal([]byte(result), &response)
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
 
 	expected := []float64{1, 2}
 	resultVec := response["solution"].([]interface{})
@@ -102,7 +106,9 @@ func TestLinearSolverTool_Cholesky(t *testing.T) {
 	}
 
 	var response map[string]any
-	json.Unmarshal([]byte(result), &response)
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
 
 	expected := []float64{2, 1}
 	resultVec := response["solution"].([]interface{})

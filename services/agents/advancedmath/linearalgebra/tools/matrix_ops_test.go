@@ -26,7 +26,9 @@ func TestMatrixOperationsTool_Multiply(t *testing.T) {
 	}
 
 	var response map[string]any
-	json.Unmarshal([]byte(result), &response)
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
 
 	expected := [][]float64{{19, 22}, {43, 50}}
 	resultMatrix := response["result"].([]interface{})
@@ -56,7 +58,9 @@ func TestMatrixOperationsTool_Transpose(t *testing.T) {
 	}
 
 	var response map[string]any
-	json.Unmarshal([]byte(result), &response)
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
 
 	expected := [][]float64{{1, 4}, {2, 5}, {3, 6}}
 	resultMatrix := response["result"].([]interface{})
@@ -105,7 +109,9 @@ func TestMatrixOperationsTool_Determinant(t *testing.T) {
 			}
 
 			var response map[string]any
-			json.Unmarshal([]byte(result), &response)
+			if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
 
 			actual := response["result"].(float64)
 			if math.Abs(actual-tt.expected) > 1e-9 {
@@ -130,7 +136,9 @@ func TestMatrixOperationsTool_Inverse(t *testing.T) {
 	}
 
 	var response map[string]any
-	json.Unmarshal([]byte(result), &response)
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
 
 	expected := [][]float64{{0.6, -0.7}, {-0.2, 0.4}}
 	resultMatrix := response["result"].([]interface{})

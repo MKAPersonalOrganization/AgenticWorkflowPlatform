@@ -26,7 +26,9 @@ func TestEigenvalueTool_Basic(t *testing.T) {
 	}
 
 	var response map[string]any
-	json.Unmarshal([]byte(result), &response)
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
 
 	eigvals := response["eigenvalues"].([]interface{})
 	if len(eigvals) != 3 {
@@ -82,7 +84,9 @@ func TestEigenvalueTool_Symmetric2x2(t *testing.T) {
 	}
 
 	var response map[string]any
-	json.Unmarshal([]byte(result), &response)
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
 
 	// Check that it's recognized as symmetric
 	if !response["is_symmetric"].(bool) {
@@ -138,7 +142,9 @@ func TestEigenvalueTool_Identity(t *testing.T) {
 	}
 
 	var response map[string]any
-	json.Unmarshal([]byte(result), &response)
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
 
 	eigvals := response["eigenvalues"].([]interface{})
 	for i, v := range eigvals {
