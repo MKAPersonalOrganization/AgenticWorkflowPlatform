@@ -5,9 +5,8 @@ import (
 )
 
 // GetWeatherTool returns the tool definition for weather lookup
-func GetWeatherTool() llm.Tool {
-	return llm.Tool{
-		Type:        "function",
+func GetWeatherTool() llm.AITool {
+	return llm.AITool{
 		Name:        "get_weather",
 		Description: "Get the current weather for a location",
 		Parameters: map[string]any{
@@ -29,9 +28,8 @@ func GetWeatherTool() llm.Tool {
 }
 
 // GetCalculatorTool returns the tool definition for calculator
-func GetCalculatorTool() llm.Tool {
-	return llm.Tool{
-		Type:        "function",
+func GetCalculatorTool() llm.AITool {
+	return llm.AITool{
 		Name:        "calculate",
 		Description: "Perform mathematical calculations. Supports basic arithmetic (+, -, *, /), exponentiation (^), square root (sqrt), and parentheses.",
 		Parameters: map[string]any{
@@ -48,8 +46,8 @@ func GetCalculatorTool() llm.Tool {
 }
 
 // GetAllTools returns all available tools
-func GetAllTools() []llm.Tool {
-	return []llm.Tool{
+func GetAllTools() []llm.AITool {
+	return []llm.AITool{
 		GetWeatherTool(),
 		GetCalculatorTool(),
 	}

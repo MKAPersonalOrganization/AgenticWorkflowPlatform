@@ -15,17 +15,17 @@ import (
 type Handler struct {
 	state      sdk.ThreadState
 	log        sdk.EventLog
-	provider   sdk.Provider
+	chatClient sdk.ChatClient
 	queue      domain.JobQueue
 	workerPool *WorkerPool
 }
 
 // NewHandler creates a new HTTP handler with the given dependencies
-func NewHandler(log sdk.EventLog, state sdk.ThreadState, provider sdk.Provider, queue domain.JobQueue, workerPool *WorkerPool) *Handler {
+func NewHandler(log sdk.EventLog, state sdk.ThreadState, chatClient sdk.ChatClient, queue domain.JobQueue, workerPool *WorkerPool) *Handler {
 	return &Handler{
 		state:      state,
 		log:        log,
-		provider:   provider,
+		chatClient: chatClient,
 		queue:      queue,
 		workerPool: workerPool,
 	}

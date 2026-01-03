@@ -64,7 +64,7 @@ type WorkerPool struct {
 	queue         domain.JobQueue
 	log           sdk.EventLog
 	state         sdk.ThreadState
-	provider      sdk.Provider
+	chatClient    sdk.ChatClient
 	agentRegistry *AgentRegistry
 	numWorkers    int
 	pollInterval  time.Duration
@@ -90,7 +90,7 @@ type WorkerPoolConfig struct {
 }
 
 // NewWorkerPool creates a new worker pool
-func NewWorkerPool(queue domain.JobQueue, log sdk.EventLog, state sdk.ThreadState, provider sdk.Provider, agentRegistry *AgentRegistry, config WorkerPoolConfig) *WorkerPool {
+func NewWorkerPool(queue domain.JobQueue, log sdk.EventLog, state sdk.ThreadState, chatClient sdk.ChatClient, agentRegistry *AgentRegistry, config WorkerPoolConfig) *WorkerPool {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	if config.NumWorkers <= 0 {
@@ -104,7 +104,7 @@ func NewWorkerPool(queue domain.JobQueue, log sdk.EventLog, state sdk.ThreadStat
 		queue:            queue,
 		log:              log,
 		state:            state,
-		provider:         provider,
+		chatClient:       chatClient,
 		agentRegistry:    agentRegistry,
 		numWorkers:       config.NumWorkers,
 		pollInterval:     config.PollInterval,
@@ -354,7 +354,7 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 
 	// Create agent with the determined config
 	agentInstance := sdk.NewAgent(
-		wp.provider,
+		wp.chatClient,
 		wp.log,
 		wp.state,
 		sdk.WithConfig(agentConfig),
@@ -573,7 +573,7 @@ func (wp *WorkerPool) continueWithAgent(ctx context.Context, threadID, agentName
 
 	// Create agent instance
 	agentInstance := sdk.NewAgent(
-		wp.provider,
+		wp.chatClient,
 		wp.log,
 		wp.state,
 		sdk.WithConfig(agentConfig),

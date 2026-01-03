@@ -37,16 +37,24 @@ func DefaultConfig(name string) AgentConfig {
 	}
 }
 
-// ToLLMTools converts agent.Tool slice to llm.Tool slice for LLM providers
-func ToLLMTools(tools []Tool) []llm.Tool {
-	result := make([]llm.Tool, len(tools))
+// ToAITools converts agent.Tool slice to llm.AITool slice for ChatClient
+func ToAITools(tools []Tool) []llm.AITool {
+	result := make([]llm.AITool, len(tools))
 	for i, t := range tools {
-		result[i] = llm.Tool{
-			Type:        "function",
+		result[i] = llm.AITool{
 			Name:        t.Name(),
 			Description: t.Description(),
 			Parameters:  t.Parameters(),
 		}
 	}
 	return result
+}
+
+// ToChatOptions builds ChatOptions from agent configuration
+func ToChatOptions(config AgentConfig) *llm.ChatOptions {
+	return &llm.ChatOptions{
+		Instructions: config.SystemPrompt,
+		Tools:        ToAITools(config.Tools),
+		ToolMode:     llm.ToolModeAuto,
+	}
 }

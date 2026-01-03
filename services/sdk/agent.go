@@ -15,7 +15,7 @@ import (
 // Each agent is responsible for registering its own event notifications
 type Agent struct {
 	config       AgentConfig
-	provider     Provider
+	chatClient   ChatClient
 	log          EventLog
 	state        ThreadState
 	toolRegistry *ToolRegistry
@@ -48,12 +48,12 @@ func WithToolExecutor(executor ToolExecutor) Option {
 }
 
 // NewAgent creates a new agent with event sourcing (no UI dependencies)
-func NewAgent(provider Provider, log EventLog, state ThreadState, opts ...Option) *Agent {
+func NewAgent(chatClient ChatClient, log EventLog, state ThreadState, opts ...Option) *Agent {
 	// Create tool registry
 	toolRegistry := NewToolRegistry()
 
 	h := &Agent{
-		provider:     provider,
+		chatClient:   chatClient,
 		log:          log,
 		state:        state,
 		config:       DefaultConfig("agent"),             // Default config
@@ -121,14 +121,14 @@ func (h *Agent) runIteration(
 		return err
 	}
 
-	// Create streaming completion with agent's system prompt
-	config := llm.CompletionConfig{
-		Messages:     messages,
-		Tools:        ToLLMTools(h.config.Tools),
-		SystemPrompt: h.config.SystemPrompt,
-	}
+	// Convert domain messages to ChatMessage format
+	chatMessages := llm.FromDomainMessages(messages)
 
-	streamIter := h.provider.CreateStreamingCompletion(ctx, config)
+	// Build chat options from agent config
+	chatOptions := ToChatOptions(h.config)
+
+	// Get streaming response from ChatClient
+	streamIter := h.chatClient.GetStreamingResponse(ctx, chatMessages, chatOptions)
 
 	// Track complete content for storage
 	var completeContent string
@@ -136,8 +136,8 @@ func (h *Agent) runIteration(
 	// Use accumulator to track streaming tool calls
 	toolCalls := NewToolCallAccumulator()
 
-	// Process stream chunks using iterator
-	for chunk, err := range streamIter {
+	// Process stream updates using iterator
+	for update, err := range streamIter {
 		// Check if client disconnected during streaming
 		select {
 		case <-ctx.Done():
@@ -157,14 +157,17 @@ func (h *Agent) runIteration(
 			}
 			return fmt.Errorf("client disconnected during streaming: %w", ctx.Err())
 		default:
-		} // Check for errors
+		}
+
+		// Check for errors
 		if err != nil {
 			return fmt.Errorf("stream error: %w", err)
 		}
 
 		// Handle text content - emit streaming event for each delta
-		if chunk.Content != "" {
-			completeContent += chunk.Content
+		textDelta := update.Text()
+		if textDelta != "" {
+			completeContent += textDelta
 
 			contentEvent := &AssistantContentStreamedEvent{
 				BaseEvent: BaseEvent{
@@ -173,7 +176,7 @@ func (h *Agent) runIteration(
 					ThreadID:  threadID,
 				},
 				MessageID: messageID,
-				Delta:     chunk.Content,
+				Delta:     textDelta,
 			}
 			if err := h.emitDomainEvent(contentEvent, eventHandler); err != nil {
 				return err
@@ -181,13 +184,9 @@ func (h *Agent) runIteration(
 		}
 
 		// Handle tool calls using accumulator
-		for _, delta := range chunk.ToolCalls {
-			update, ok := toolCalls.ProcessDelta(delta)
-			if !ok {
-				continue
-			}
-
-			if update.IsNew {
+		tcUpdate, hasTool := toolCalls.ProcessUpdate(update)
+		if hasTool {
+			if tcUpdate.IsNew {
 				// Emit ToolCallStartedEvent for new tool calls
 				toolStartEvent := &ToolCallStartedEvent{
 					BaseEvent: BaseEvent{
@@ -195,8 +194,8 @@ func (h *Agent) runIteration(
 						Timestamp: time.Now(),
 						ThreadID:  threadID,
 					},
-					ToolCallID:      update.ID,
-					ToolCallName:    update.Name,
+					ToolCallID:      tcUpdate.ID,
+					ToolCallName:    tcUpdate.Name,
 					ParentMessageID: messageID,
 					AgentName:       h.config.Name,
 				}
@@ -206,15 +205,15 @@ func (h *Agent) runIteration(
 			}
 
 			// Emit streaming event for arguments
-			if update.ArgsDelta != "" {
+			if tcUpdate.ArgsDelta != "" {
 				argsEvent := &ToolCallArgumentsStreamedEvent{
 					BaseEvent: BaseEvent{
 						Type:      "ToolCallArgumentsStreamed",
 						Timestamp: time.Now(),
 						ThreadID:  threadID,
 					},
-					ToolCallID: update.ID,
-					Delta:      update.ArgsDelta,
+					ToolCallID: tcUpdate.ID,
+					Delta:      tcUpdate.ArgsDelta,
 				}
 				if err := h.emitDomainEvent(argsEvent, eventHandler); err != nil {
 					return err

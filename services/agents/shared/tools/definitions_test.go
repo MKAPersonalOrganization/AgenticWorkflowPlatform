@@ -8,11 +8,6 @@ import (
 func TestGetWeatherTool(t *testing.T) {
 	tool := GetWeatherTool()
 
-	// Check tool type
-	if tool.Type != "function" {
-		t.Errorf("Expected type 'function', got %v", tool.Type)
-	}
-
 	// Check tool name
 	if tool.Name != "get_weather" {
 		t.Errorf("Expected name 'get_weather', got %v", tool.Name)
@@ -28,11 +23,8 @@ func TestGetWeatherTool(t *testing.T) {
 		t.Fatal("Tool missing parameters")
 	}
 
-	// Check parameters structure
-	params, ok := tool.Parameters.(map[string]any)
-	if !ok {
-		t.Fatalf("Expected parameters to be map[string]any, got %T", tool.Parameters)
-	}
+	// Parameters are already map[string]any
+	params := tool.Parameters
 
 	// Check parameters type
 	if params["type"] != "object" {
@@ -69,11 +61,6 @@ func TestGetWeatherTool(t *testing.T) {
 // TestGetCalculatorTool verifies the calculator tool definition structure
 func TestGetCalculatorTool(t *testing.T) {
 	tool := GetCalculatorTool()
-
-	// Check tool type
-	if tool.Type != "function" {
-		t.Errorf("Expected type 'function', got %v", tool.Type)
-	}
 
 	// Check tool name
 	if tool.Name != "calculate" {
@@ -123,7 +110,8 @@ func TestGetAllTools(t *testing.T) {
 func TestWeatherToolParametersSchema(t *testing.T) {
 	tool := GetWeatherTool()
 
-	params := tool.Parameters.(map[string]any)
+	// Parameters are already map[string]any
+	params := tool.Parameters
 	properties := params["properties"].(map[string]any)
 
 	// Check location property schema (it's map[string]string)
