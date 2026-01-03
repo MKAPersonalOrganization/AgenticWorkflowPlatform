@@ -181,10 +181,17 @@ func ToDomainMessage(cm ChatMessage) domain.Message {
 }
 
 // FromDomainMessages converts a slice of domain.Message to ChatMessage.
+// Filters out system messages with agent_handoff metadata as they're UI-only.
 func FromDomainMessages(msgs []domain.Message) []ChatMessage {
-	result := make([]ChatMessage, len(msgs))
-	for i, m := range msgs {
-		result[i] = FromDomainMessage(m)
+	result := make([]ChatMessage, 0, len(msgs))
+	for _, m := range msgs {
+		// Skip agent handoff messages - they're for UI display only
+		if m.Metadata != nil {
+			if msgType, ok := m.Metadata["type"].(string); ok && msgType == "agent_handoff" {
+				continue
+			}
+		}
+		result = append(result, FromDomainMessage(m))
 	}
 	return result
 }

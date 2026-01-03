@@ -376,6 +376,14 @@ func (h *Agent) executeToolCall(threadID string, toolCall domain.ToolCall, event
 		if err := h.emitDomainEvent(event, eventHandler); err != nil {
 			return "", err
 		}
+
+		// Emit agent handoff event for question routing tools
+		if handoffEvent := tools.GetHandoffEventForTool(threadID, h.config.Name, toolCall.Function.Name); handoffEvent != nil {
+			if err := h.emitDomainEvent(handoffEvent, eventHandler); err != nil {
+				return "", err
+			}
+		}
+
 		return "{\"status\": \"event_emitted\"}", nil
 	}
 

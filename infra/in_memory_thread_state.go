@@ -1,6 +1,7 @@
 package infra
 
 import (
+	"fmt"
 	"sync"
 
 	"school-with-ai/domain"
@@ -162,6 +163,36 @@ func (p *InMemoryThreadState) applyEventUnsafe(thread *domain.Thread, event sdk.
 				thread.WhiteboardContent += "\n" + content
 			case "clear":
 				thread.WhiteboardContent = ""
+			}
+			thread.UpdatedAt = evt.Timestamp
+		case agents.EventTypeAgentHandoff:
+			// Store agent handoff as a system message
+			// Content format: "AGENT_HANDOFF|from|to|reason" for parsing on frontend
+			msgID := fmt.Sprintf("handoff-%s-%d", evt.ThreadID, evt.Timestamp.UnixNano())
+
+			// Check if this handoff message already exists (deduplication)
+			exists := false
+			for _, msg := range thread.Messages {
+				if msg.ID == msgID {
+					exists = true
+					break
+				}
+			}
+
+			if !exists {
+				msg := domain.Message{
+					ID:        msgID,
+					Role:      "system",
+					Content:   "AGENT_HANDOFF|" + evt.GetString("from_agent") + "|" + evt.GetString("to_agent") + "|" + evt.GetString("reason"),
+					Timestamp: evt.Timestamp,
+					Metadata: map[string]interface{}{
+						"type":       "agent_handoff",
+						"from_agent": evt.GetString("from_agent"),
+						"to_agent":   evt.GetString("to_agent"),
+						"reason":     evt.GetString("reason"),
+					},
+				}
+				thread.Messages = append(thread.Messages, msg)
 			}
 			thread.UpdatedAt = evt.Timestamp
 		}

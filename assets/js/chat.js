@@ -1534,13 +1534,26 @@ document.addEventListener('alpine:init', () => {
 
                     case 'system':
                     case 'developer':
-                        uiMessages.push({
-                            id: msg.id,
-                            role: msg.role,
-                            content: msg.content || '',
-                            timestamp: msg.timestamp || new Date().toISOString(),
-                            streaming: false
-                        });
+                        // Check if this is an agent handoff message (special format)
+                        if (msg.content && msg.content.startsWith('AGENT_HANDOFF|')) {
+                            const parts = msg.content.split('|');
+                            uiMessages.push({
+                                id: msg.id,
+                                type: 'agent_handoff',
+                                fromAgent: parts[1] || '',
+                                toAgent: parts[2] || '',
+                                reason: parts[3] || '',
+                                timestamp: msg.timestamp || new Date().toISOString()
+                            });
+                        } else {
+                            uiMessages.push({
+                                id: msg.id,
+                                role: msg.role,
+                                content: msg.content || '',
+                                timestamp: msg.timestamp || new Date().toISOString(),
+                                streaming: false
+                            });
+                        }
                         break;
 
                     default:
@@ -2316,8 +2329,11 @@ document.addEventListener('alpine:init', () => {
                 oldMessages.splice(0);
             }
 
-            // Use shared conversion method
-            state.messages = this.__convertBackendMessagesToUI(event.messages);
+            // Use shared conversion method (now includes handoffs from backend)
+            const convertedMessages = this.__convertBackendMessagesToUI(event.messages);
+
+            // Set messages from backend (includes handoffs)
+            state.messages = convertedMessages;
 
             // Scroll to bottom after snapshot (only if this is the current thread)
             if (threadId === this.__currentThreadId) {

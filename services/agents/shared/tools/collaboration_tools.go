@@ -101,3 +101,34 @@ func HandleCollaborationToolCall(threadID string, agentName string, toolCall dom
 		return nil, fmt.Errorf("unknown collaboration tool: %s", toolName)
 	}
 }
+
+// GetHandoffEventForTool creates an agent handoff event for collaboration tools
+// Returns nil if the tool doesn't represent an agent handoff
+func GetHandoffEventForTool(threadID string, fromAgent string, toolName string) *agents.DomainEvent {
+	var toAgent, reason string
+
+	switch toolName {
+	case "emit_math_question":
+		toAgent = "math-instructor"
+		reason = "Math question requires specialist"
+	case "emit_physics_question":
+		toAgent = "physics-instructor"
+		reason = "Physics question requires specialist"
+	case "emit_chemistry_question":
+		toAgent = "chemistry-instructor"
+		reason = "Chemistry question requires specialist"
+	case "emit_statistics_question":
+		toAgent = "statistics-instructor"
+		reason = "Statistics question requires specialist"
+	case "emit_linearalgebra_question":
+		toAgent = "linearalgebra-instructor"
+		reason = "Linear algebra question requires specialist"
+	case "emit_question_answered":
+		toAgent = "student-facing-agent"
+		reason = "Question answered, returning to coordinator"
+	default:
+		return nil
+	}
+
+	return agents.NewAgentHandoffEvent(threadID, fromAgent, toAgent, reason)
+}

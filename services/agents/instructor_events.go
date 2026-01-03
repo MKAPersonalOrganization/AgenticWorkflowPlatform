@@ -19,6 +19,7 @@ const (
 	EventTypeChemistryQuestion         EventType = "question.chemistry"
 	EventTypeStatisticsQuestion        EventType = "question.statistics"
 	EventTypeLinearAlgebraQuestion     EventType = "question.linearalgebra"
+	EventTypeAgentHandoff              EventType = "agent.handoff"
 )
 
 // DomainEvent is the unified event structure for all system events
@@ -219,6 +220,22 @@ func NewLinearAlgebraQuestionEvent(threadID, question, emittedBy, context, white
 			"emitted_by":       emittedBy,
 			"context":          context,
 			"whiteboard_state": whiteboardState,
+		},
+	}
+}
+
+// NewAgentHandoffEvent creates an agent handoff event
+func NewAgentHandoffEvent(threadID, fromAgent, toAgent, reason string) *DomainEvent {
+	return &DomainEvent{
+		ID:        GenerateEventID(),
+		Type:      EventTypeAgentHandoff,
+		Timestamp: time.Now(),
+		ThreadID:  threadID,
+		Version:   1,
+		Data: map[string]interface{}{
+			"from_agent": fromAgent,
+			"to_agent":   toAgent,
+			"reason":     reason,
 		},
 	}
 }
