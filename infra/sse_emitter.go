@@ -1,12 +1,29 @@
 package infra
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
-	"time"
 
-	"school-with-ai/infra/agui"
 	"school-with-ai/services/sdk"
+
+	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
+
+// writeSSEEvent writes an event to the response writer in SSE format
+func writeSSEEvent(w http.ResponseWriter, event interface{}) error {
+	data, err := json.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("failed to marshal event: %w", err)
+	}
+
+	_, err = fmt.Fprintf(w, "data: %s\n\n", data)
+	if err != nil {
+		return fmt.Errorf("failed to write event: %w", err)
+	}
+
+	return nil
+}
 
 // SSEEventEmitter implements sdk.EventEmitter for Server-Sent Events
 type SSEEventEmitter struct {
@@ -29,91 +46,54 @@ func (e *SSEEventEmitter) Emit(event any) error {
 	// Translate domain events to agui events
 	switch ev := event.(type) {
 	case *sdk.TextMessageStartEvent:
-		timestamp := time.Now().UnixMilli()
-		aguiEvent = &agui.TextMessageStartEvent{
-			BaseEvent: agui.BaseEvent{
-				Type:      "TEXT_MESSAGE_START",
-				Timestamp: &timestamp,
-			},
-			MessageID: ev.MessageID,
-			Role:      ev.Role,
-		}
+		role := ev.Role
+		aguiEvent = aguievents.NewTextMessageStartEvent(
+			ev.MessageID,
+			aguievents.WithRole(role),
+		)
 
 	case *sdk.TextMessageContentEvent:
-		timestamp := time.Now().UnixMilli()
-		aguiEvent = &agui.TextMessageContentEvent{
-			BaseEvent: agui.BaseEvent{
-				Type:      "TEXT_MESSAGE_CONTENT",
-				Timestamp: &timestamp,
-			},
-			MessageID: ev.MessageID,
-			Delta:     ev.Delta,
-		}
+		aguiEvent = aguievents.NewTextMessageContentEvent(
+			ev.MessageID,
+			ev.Delta,
+		)
 
 	case *sdk.TextMessageEndEvent:
-		timestamp := time.Now().UnixMilli()
-		aguiEvent = &agui.TextMessageEndEvent{
-			BaseEvent: agui.BaseEvent{
-				Type:      "TEXT_MESSAGE_END",
-				Timestamp: &timestamp,
-			},
-			MessageID: ev.MessageID,
-		}
+		aguiEvent = aguievents.NewTextMessageEndEvent(
+			ev.MessageID,
+		)
 
 	case *sdk.ToolCallStartEvent:
-		timestamp := time.Now().UnixMilli()
-		parentMessageID := ev.ParentMessageID
-		aguiEvent = &agui.ToolCallStartEvent{
-			BaseEvent: agui.BaseEvent{
-				Type:      "TOOL_CALL_START",
-				Timestamp: &timestamp,
-			},
-			ToolCallID:      ev.ToolCallID,
-			ToolCallName:    ev.ToolCallName,
-			ParentMessageID: &parentMessageID,
-		}
+		aguiEvent = aguievents.NewToolCallStartEvent(
+			ev.ToolCallID,
+			ev.ToolCallName,
+			aguievents.WithParentMessageID(ev.ParentMessageID),
+		)
 
 	case *sdk.ToolCallArgsEvent:
-		timestamp := time.Now().UnixMilli()
-		aguiEvent = &agui.ToolCallArgsEvent{
-			BaseEvent: agui.BaseEvent{
-				Type:      "TOOL_CALL_ARGS",
-				Timestamp: &timestamp,
-			},
-			ToolCallID: ev.ToolCallID,
-			Delta:      ev.Delta,
-		}
+		aguiEvent = aguievents.NewToolCallArgsEvent(
+			ev.ToolCallID,
+			ev.Delta,
+		)
 
 	case *sdk.ToolCallEndEvent:
-		timestamp := time.Now().UnixMilli()
-		aguiEvent = &agui.ToolCallEndEvent{
-			BaseEvent: agui.BaseEvent{
-				Type:      "TOOL_CALL_END",
-				Timestamp: &timestamp,
-			},
-			ToolCallID: ev.ToolCallID,
-		}
+		aguiEvent = aguievents.NewToolCallEndEvent(
+			ev.ToolCallID,
+		)
 
 	case *sdk.ToolCallResultEvent:
-		timestamp := time.Now().UnixMilli()
-		role := ev.Role
-		aguiEvent = &agui.ToolCallResultEvent{
-			BaseEvent: agui.BaseEvent{
-				Type:      "TOOL_CALL_RESULT",
-				Timestamp: &timestamp,
-			},
-			MessageID:  ev.MessageID,
-			ToolCallID: ev.ToolCallID,
-			Content:    ev.Content,
-			Role:       &role,
-		}
+		aguiEvent = aguievents.NewToolCallResultEvent(
+			ev.MessageID,
+			ev.ToolCallID,
+			ev.Content,
+		)
 
 	default:
 		// If it's already an agui event or unknown type, pass through
 		aguiEvent = event
 	}
 
-	if err := agui.WriteSSEEvent(e.writer, aguiEvent); err != nil {
+	if err := writeSSEEvent(e.writer, aguiEvent); err != nil {
 		return err
 	}
 	e.flusher.Flush()

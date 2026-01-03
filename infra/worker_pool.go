@@ -8,9 +8,10 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	"school-with-ai/infra/agui"
 	"school-with-ai/services/agents"
 	"school-with-ai/services/sdk"
+
+	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
 
 // AgentFactory is a function that creates an agent configuration with a given notifier
@@ -263,21 +264,16 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 	_ = wp.state.Update(userMsgEvent)
 
 	// Generate unique run ID for this execution
-	runID := agui.GenerateRunID()
+	runID := aguievents.GenerateRunID()
 
 	// Create event emitter that sends to SSE channel
 	emitter := wp.createChannelEmitter(job.ID)
 
 	// Send RUN_STARTED event
-	runStartedTimestamp := time.Now().UnixMilli()
-	runStartedEvent := &agui.RunStartedEvent{
-		BaseEvent: agui.BaseEvent{
-			Type:      "RUN_STARTED",
-			Timestamp: &runStartedTimestamp,
-		},
-		ThreadID: job.ThreadID,
-		RunID:    runID,
-	}
+	runStartedEvent := aguievents.NewRunStartedEvent(
+		job.ThreadID,
+		runID,
+	)
 	_ = emitter.Emit(runStartedEvent) // Auto-generate thread title immediately if this is the first message
 	thread, threadExists := wp.state.Get(job.ThreadID)
 	if threadExists && thread.Title == "New Chat" && len(thread.Messages) == 1 {
@@ -300,23 +296,18 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 		_ = wp.state.Update(titleEvent)
 
 		// Send CUSTOM event to notify frontend of title update immediately
-		customTimestamp := time.Now().UnixMilli()
-		customEvent := &agui.CustomEvent{
-			BaseEvent: agui.BaseEvent{
-				Type:      "CUSTOM",
-				Timestamp: &customTimestamp,
-			},
-			Name: "THREAD_TITLE_UPDATED",
-			Value: map[string]string{
+		customEvent := aguievents.NewCustomEvent(
+			"THREAD_TITLE_UPDATED",
+			aguievents.WithValue(map[string]string{
 				"threadId": job.ThreadID,
 				"title":    title,
-			},
-		}
+			}),
+		)
 		_ = emitter.Emit(customEvent)
 	}
 
 	// Generate unique message ID for assistant response
-	assistantMessageID := agui.GenerateMessageID()
+	assistantMessageID := aguievents.GenerateMessageID()
 
 	// Get conversation history from state
 	messages := wp.state.Messages(job.ThreadID)
@@ -418,16 +409,10 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 			wp.emitMessagesSnapshot(emitter, job.ThreadID)
 
 			// Emit RUN_ERROR event for cancellation
-			errorTimestamp := time.Now().UnixMilli()
-			errorCode := "CANCELLED"
-			errorEvent := &agui.RunErrorEvent{
-				BaseEvent: agui.BaseEvent{
-					Type:      "RUN_ERROR",
-					Timestamp: &errorTimestamp,
-				},
-				Message: "Job was cancelled",
-				Code:    &errorCode,
-			}
+			errorEvent := aguievents.NewRunErrorEvent(
+				"Job was cancelled",
+				aguievents.WithErrorCode("CANCELLED"),
+			)
 			_ = emitter.Emit(errorEvent)
 			return
 		}
@@ -437,16 +422,10 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 		_ = wp.queue.UpdateJobStatus(job.ID, domain.JobStatusFailed, err.Error())
 
 		// Emit RUN_ERROR event
-		errorTimestamp := time.Now().UnixMilli()
-		errorCode := "LLM_ERROR"
-		errorEvent := &agui.RunErrorEvent{
-			BaseEvent: agui.BaseEvent{
-				Type:      "RUN_ERROR",
-				Timestamp: &errorTimestamp,
-			},
-			Message: err.Error(),
-			Code:    &errorCode,
-		}
+		errorEvent := aguievents.NewRunErrorEvent(
+			err.Error(),
+			aguievents.WithErrorCode("LLM_ERROR"),
+		)
 		_ = emitter.Emit(errorEvent)
 		return
 	}
@@ -464,15 +443,10 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 	}
 
 	// Send RUN_FINISHED event
-	runFinishedTimestamp := time.Now().UnixMilli()
-	runFinishedEvent := &agui.RunFinishedEvent{
-		BaseEvent: agui.BaseEvent{
-			Type:      "RUN_FINISHED",
-			Timestamp: &runFinishedTimestamp,
-		},
-		ThreadID: job.ThreadID,
-		RunID:    runID,
-	}
+	runFinishedEvent := aguievents.NewRunFinishedEvent(
+		job.ThreadID,
+		runID,
+	)
 	_ = emitter.Emit(runFinishedEvent)
 
 	// Update job status to completed
@@ -535,21 +509,14 @@ func (wp *WorkerPool) emitMessagesSnapshot(emitter EventEmitter, threadID string
 	sessionMessages := wp.state.Messages(threadID)
 
 	// Convert session messages to agui messages
-	aguiMessages := make([]agui.Message, 0, len(sessionMessages))
+	aguiMessages := make([]aguievents.Message, 0, len(sessionMessages))
 	for _, msg := range sessionMessages {
 		aguiMsg := convertSessionMessageToAGUI(msg)
 		aguiMessages = append(aguiMessages, aguiMsg)
 	}
 
 	// Emit MESSAGES_SNAPSHOT event
-	timestamp := time.Now().UnixMilli()
-	messagesSnapshotEvent := &agui.MessagesSnapshotEvent{
-		BaseEvent: agui.BaseEvent{
-			Type:      "MESSAGES_SNAPSHOT",
-			Timestamp: &timestamp,
-		},
-		Messages: aguiMessages,
-	}
+	messagesSnapshotEvent := aguievents.NewMessagesSnapshotEvent(aguiMessages)
 
 	_ = emitter.Emit(messagesSnapshotEvent)
 }
@@ -590,7 +557,7 @@ func (wp *WorkerPool) continueWithAgent(ctx context.Context, threadID, agentName
 		if exists && thread.WhiteboardContent != "" {
 			// Add trigger message
 			triggerMsg := domain.Message{
-				ID:        agui.GenerateMessageID(),
+				ID:        aguievents.GenerateMessageID(),
 				Role:      "user",
 				Timestamp: time.Now(),
 				Content: fmt.Sprintf(`The whiteboard has been updated for you to review. Please read it and provide your expert answer.
@@ -608,7 +575,7 @@ Follow your state machine workflow:
 	}
 
 	// Generate message ID for agent's response
-	messageID := agui.GenerateMessageID()
+	messageID := aguievents.GenerateMessageID()
 
 	// Track routing events during the run
 	var nextAgent string
@@ -655,16 +622,10 @@ Follow your state machine workflow:
 		slog.Error("Agent failed", "agent", agentName, "error", err)
 
 		// Emit error event
-		errorTimestamp := time.Now().UnixMilli()
-		errorCode := "AGENT_ERROR"
-		errorEvent := &agui.RunErrorEvent{
-			BaseEvent: agui.BaseEvent{
-				Type:      "RUN_ERROR",
-				Timestamp: &errorTimestamp,
-			},
-			Message: fmt.Sprintf("Agent %s failed: %v", agentName, err),
-			Code:    &errorCode,
-		}
+		errorEvent := aguievents.NewRunErrorEvent(
+			fmt.Sprintf("Agent %s failed: %v", agentName, err),
+			aguievents.WithErrorCode("AGENT_ERROR"),
+		)
 		_ = emitter.Emit(errorEvent)
 		return
 	}

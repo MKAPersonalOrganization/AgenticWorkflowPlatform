@@ -7,8 +7,9 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	"school-with-ai/infra/agui"
 	"school-with-ai/services/sdk"
+
+	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
 
 // Handler encapsulates dependencies for HTTP handlers
@@ -45,7 +46,7 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 
 	// Create job
 	jobID := sdk.GenerateID()
-	messageID := agui.GenerateMessageID()
+	messageID := aguievents.GenerateMessageID()
 
 	job := &domain.Job{
 		ID:        jobID,
@@ -156,92 +157,43 @@ func (h *Handler) translateAndWriteEvent(w http.ResponseWriter, flusher http.Flu
 	// Translate domain events to agui events
 	switch ev := event.(type) {
 	case *sdk.TextMessageStartEvent:
-		timestamp := time.Now().UnixMilli()
-		aguiEvent = &agui.TextMessageStartEvent{
-			BaseEvent: agui.BaseEvent{
-				Type:      "TEXT_MESSAGE_START",
-				Timestamp: &timestamp,
-			},
-			MessageID: ev.MessageID,
-			Role:      ev.Role,
-		}
+		aguiEvent = aguievents.NewTextMessageStartEvent(
+			ev.MessageID,
+			aguievents.WithRole(ev.Role),
+		)
 
 	case *sdk.TextMessageContentEvent:
-		timestamp := time.Now().UnixMilli()
-		aguiEvent = &agui.TextMessageContentEvent{
-			BaseEvent: agui.BaseEvent{
-				Type:      "TEXT_MESSAGE_CONTENT",
-				Timestamp: &timestamp,
-			},
-			MessageID: ev.MessageID,
-			Delta:     ev.Delta,
-		}
+		aguiEvent = aguievents.NewTextMessageContentEvent(ev.MessageID, ev.Delta)
 
 	case *sdk.TextMessageEndEvent:
-		timestamp := time.Now().UnixMilli()
-		aguiEvent = &agui.TextMessageEndEvent{
-			BaseEvent: agui.BaseEvent{
-				Type:      "TEXT_MESSAGE_END",
-				Timestamp: &timestamp,
-			},
-			MessageID: ev.MessageID,
-		}
+		aguiEvent = aguievents.NewTextMessageEndEvent(ev.MessageID)
 
 	case *sdk.ToolCallStartEvent:
-		timestamp := time.Now().UnixMilli()
-		parentMessageID := ev.ParentMessageID
-		aguiEvent = &agui.ToolCallStartEvent{
-			BaseEvent: agui.BaseEvent{
-				Type:      "TOOL_CALL_START",
-				Timestamp: &timestamp,
-			},
-			ToolCallID:      ev.ToolCallID,
-			ToolCallName:    ev.ToolCallName,
-			ParentMessageID: &parentMessageID,
-			AgentName:       ev.AgentName,
-		}
+		aguiEvent = aguievents.NewToolCallStartEvent(
+			ev.ToolCallID,
+			ev.ToolCallName,
+			aguievents.WithParentMessageID(ev.ParentMessageID),
+		)
 
 	case *sdk.ToolCallArgsEvent:
-		timestamp := time.Now().UnixMilli()
-		aguiEvent = &agui.ToolCallArgsEvent{
-			BaseEvent: agui.BaseEvent{
-				Type:      "TOOL_CALL_ARGS",
-				Timestamp: &timestamp,
-			},
-			ToolCallID: ev.ToolCallID,
-			Delta:      ev.Delta,
-		}
+		aguiEvent = aguievents.NewToolCallArgsEvent(ev.ToolCallID, ev.Delta)
 
 	case *sdk.ToolCallEndEvent:
-		timestamp := time.Now().UnixMilli()
-		aguiEvent = &agui.ToolCallEndEvent{
-			BaseEvent: agui.BaseEvent{
-				Type:      "TOOL_CALL_END",
-				Timestamp: &timestamp,
-			},
-			ToolCallID: ev.ToolCallID,
-		}
+		aguiEvent = aguievents.NewToolCallEndEvent(ev.ToolCallID)
 
 	case *sdk.ToolCallResultEvent:
-		timestamp := time.Now().UnixMilli()
-		role := ev.Role
-		aguiEvent = &agui.ToolCallResultEvent{
-			BaseEvent: agui.BaseEvent{
-				Type:      "TOOL_CALL_RESULT",
-				Timestamp: &timestamp,
-			},
-			MessageID:  ev.MessageID,
-			ToolCallID: ev.ToolCallID,
-			Content:    ev.Content,
-			Role:       &role,
-		}
+		aguiEvent = aguievents.NewToolCallResultEvent(
+			ev.MessageID,
+			ev.ToolCallID,
+			ev.Content,
+		)
 
 	default:
 		// If it's already an agui event, pass through
 		aguiEvent = event
 	}
 
-	if err := agui.WriteSSEEvent(w, aguiEvent); err != nil {
+	if err := writeSSEEvent(w, aguiEvent); err != nil {
 		return err
 	}
 	flusher.Flush()
@@ -360,107 +312,60 @@ func (h *Handler) DeleteThread(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) emitMessagesSnapshot(w http.ResponseWriter, flusher http.Flusher, threadID string) error {
 	sessionMessages := h.state.Messages(threadID)
 
-	// Convert session.Message to agui.Message
-	aguiMessages := make([]agui.Message, 0, len(sessionMessages))
+	// Convert session.Message to aguievents.Message
+	aguiMessages := make([]aguievents.Message, 0, len(sessionMessages))
 	for _, msg := range sessionMessages {
 		aguiMsg := convertSessionMessageToAGUI(msg)
 		aguiMessages = append(aguiMessages, aguiMsg)
 	}
 
 	// Emit MESSAGES_SNAPSHOT event
-	timestamp := time.Now().UnixMilli()
-	messagesSnapshotEvent := &agui.MessagesSnapshotEvent{
-		BaseEvent: agui.BaseEvent{
-			Type:      "MESSAGES_SNAPSHOT",
-			Timestamp: &timestamp,
-		},
-		Messages: aguiMessages,
-	}
+	messagesSnapshotEvent := aguievents.NewMessagesSnapshotEvent(aguiMessages)
 
-	if err := agui.WriteSSEEvent(w, messagesSnapshotEvent); err != nil {
+	if err := writeSSEEvent(w, messagesSnapshotEvent); err != nil {
 		return err
 	}
 	flusher.Flush()
 	return nil
 }
 
-// convertSessionMessageToAGUI converts a session.Message to agui.Message (discriminated union)
-func convertSessionMessageToAGUI(msg domain.Message) agui.Message {
-	switch msg.Role {
-	case "user":
-		return agui.UserMessage{
-			BaseMessage: agui.BaseMessage{
-				ID:      msg.ID,
-				Role:    msg.Role,
-				Content: &msg.Content,
-			},
-			Content: msg.Content,
-		}
-	case "assistant":
-		assistantMsg := agui.AssistantMessage{
-			BaseMessage: agui.BaseMessage{
-				ID:      msg.ID,
-				Role:    msg.Role,
-				Content: &msg.Content,
-			},
-		}
-
-		// Add agent name if present
-		if msg.AgentName != "" {
-			assistantMsg.AgentName = &msg.AgentName
-		}
-
-		// Convert tool calls if present
-		if len(msg.ToolCalls) > 0 {
-			toolCalls := make([]agui.ToolCall, 0, len(msg.ToolCalls))
-			for _, tc := range msg.ToolCalls {
-				toolCalls = append(toolCalls, agui.ToolCall{
-					ID:   tc.ID,
-					Type: tc.Type,
-					Function: agui.FunctionCall{
-						Name:      tc.Function.Name,
-						Arguments: tc.Function.Arguments,
-					},
-				})
-			}
-			assistantMsg.ToolCalls = toolCalls
-		}
-
-		return assistantMsg
-	case "tool":
-		return agui.ToolMessage{
-			ID:         msg.ID,
-			Role:       msg.Role,
-			Content:    msg.Content,
-			ToolCallID: msg.ToolCallID,
-		}
-	case "system":
-		return agui.SystemMessage{
-			BaseMessage: agui.BaseMessage{
-				ID:      msg.ID,
-				Role:    msg.Role,
-				Content: &msg.Content,
-			},
-			Content: msg.Content,
-		}
-	case "developer":
-		return agui.DeveloperMessage{
-			BaseMessage: agui.BaseMessage{
-				ID:      msg.ID,
-				Role:    msg.Role,
-				Content: &msg.Content,
-			},
-			Content: msg.Content,
-		}
-	default:
-		// Default to user message for unknown roles
-		return agui.UserMessage{
-			BaseMessage: agui.BaseMessage{
-				ID:      msg.ID,
-				Role:    msg.Role,
-				Content: &msg.Content,
-			},
-			Content: msg.Content,
-		}
+// convertSessionMessageToAGUI converts a session.Message to aguievents.Message
+func convertSessionMessageToAGUI(msg domain.Message) aguievents.Message {
+	aguiMsg := aguievents.Message{
+		ID:   msg.ID,
+		Role: msg.Role,
 	}
+
+	// Set content (pointer for optional content)
+	if msg.Content != "" {
+		aguiMsg.Content = &msg.Content
+	}
+
+	// Add agent name for assistant messages
+	if msg.Role == "assistant" && msg.AgentName != "" {
+		aguiMsg.Name = &msg.AgentName
+	}
+
+	// Convert tool calls if present
+	if len(msg.ToolCalls) > 0 {
+		toolCalls := make([]aguievents.ToolCall, 0, len(msg.ToolCalls))
+		for _, tc := range msg.ToolCalls {
+			toolCalls = append(toolCalls, aguievents.ToolCall{
+				ID:   tc.ID,
+				Type: tc.Type,
+				Function: aguievents.Function{
+					Name:      tc.Function.Name,
+					Arguments: tc.Function.Arguments,
+				},
+			})
+		}
+		aguiMsg.ToolCalls = toolCalls
+	}
+
+	// Add tool call ID for tool messages
+	if msg.Role == "tool" && msg.ToolCallID != "" {
+		aguiMsg.ToolCallID = &msg.ToolCallID
+	}
+
+	return aguiMsg
 }
