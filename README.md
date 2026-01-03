@@ -9,6 +9,48 @@ A chat application built with Go, Templ, Tailwind CSS, and Alpine.js, implementi
 - **Styling**: Tailwind CSS v4
 - **Components**: templui (shadcn/ui equivalent for Go/Templ)
 - **Protocol**: AG-UI for server-sent events
+- **Linear Algebra**: gosl library (LAPACK/OpenBLAS integration)
+
+## Architecture
+
+### Multi-Agent System
+
+The application uses an event-driven multi-agent architecture with specialized instructors:
+
+- **student-facing-agent**: Routes user questions to specialists
+- **math-instructor**: General mathematics, delegates to linear algebra professor
+- **physics-instructor**: Physics problems
+- **chemistry-instructor**: Chemistry topics
+- **statistics-instructor**: Statistical analysis
+- **linearalgebra-professor**: Advanced linear algebra (vectors, matrices, eigenvalues)
+
+### Access Control: Capability-Based Security
+
+The system enforces **which agents can call other agents** through capability-based access control:
+
+**How it works:**
+1. Agents can only use **tools** registered in their tool registry
+2. `emit_linearalgebra_question` tool is **only** registered in math-instructor's registry
+3. Linear algebra professor **only** responds to `LinearAlgebraQuestion` events
+4. Worker pool routes events to appropriate agents
+5. No direct agent-to-agent invocation possible
+
+**Example - Math Instructor calling Linear Algebra Professor:**
+```go
+// In math-instructor's tool registry:
+registry.Register(sharedtools.NewEmitLinearAlgebraQuestionTool())  // ✅ Has access
+
+// In physics-instructor's tool registry:
+// emit_linearalgebra_question tool NOT registered  // ❌ No access
+```
+
+This creates a **hard architectural constraint**: only math-instructor can delegate to the linear algebra specialist. Other agents physically cannot invoke it because they lack the necessary tool.
+
+**Benefits:**
+- Prevents unauthorized agent interactions
+- Clear separation of concerns
+- Type-safe access control enforced at compile time
+- Optimized library usage only where needed (gosl/LAPACK only loaded for linear algebra)
 
 ## Prerequisites
 

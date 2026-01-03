@@ -391,6 +391,12 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 				nextAgent = "statistics-instructor"
 				agentEventOccurred = true
 
+			case agents.EventTypeLinearAlgebraQuestion:
+				// Linear algebra question emitted - activate linear algebra professor
+				slog.Info("LinearAlgebraQuestion event detected", "nextAgent", "linearalgebra-professor")
+				nextAgent = "linearalgebra-professor"
+				agentEventOccurred = true
+
 			case agents.EventTypeQuestionAnswered:
 				// Question answered - activate student-facing agent to review and respond
 				nextAgent = "student-facing-agent"
@@ -449,9 +455,12 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 	wp.emitMessagesSnapshot(emitter, job.ThreadID)
 
 	// Check if we need to continue with another agent
-	if agentEventOccurred && nextAgent != "" {
-		slog.Info("Continuing with called agent", "jobID", job.ID, "agent", nextAgent)
+	// Important: Don't route to the same agent that just ran (agents shouldn't handle their own events)
+	if agentEventOccurred && nextAgent != "" && nextAgent != agentName {
+		slog.Info("Continuing with called agent", "jobID", job.ID, "currentAgent", agentName, "nextAgent", nextAgent)
 		wp.continueWithAgent(ctx, job.ThreadID, nextAgent, emitter, runID)
+	} else if agentEventOccurred && nextAgent != "" {
+		slog.Warn("Agent tried to route to itself - blocked", "agent", agentName, "nextAgent", nextAgent)
 	}
 
 	// Send RUN_FINISHED event
@@ -628,6 +637,10 @@ Follow your state machine workflow:
 				nextAgent = "statistics-instructor"
 				routingEventOccurred = true
 
+			case agents.EventTypeLinearAlgebraQuestion:
+				nextAgent = "linearalgebra-professor"
+				routingEventOccurred = true
+
 			case agents.EventTypeQuestionAnswered:
 				nextAgent = "student-facing-agent"
 				routingEventOccurred = true
@@ -660,7 +673,8 @@ Follow your state machine workflow:
 	wp.emitMessagesSnapshot(emitter, threadID)
 
 	// Check if we need to continue with another agent (chained routing)
-	if routingEventOccurred && nextAgent != "" {
+	// Important: Don't route to the same agent (agents shouldn't handle their own events)
+	if routingEventOccurred && nextAgent != "" && nextAgent != agentName {
 		slog.Info("Routing to next agent", "from", agentName, "to", nextAgent)
 		wp.continueWithAgent(ctx, threadID, nextAgent, emitter, runID)
 	}
