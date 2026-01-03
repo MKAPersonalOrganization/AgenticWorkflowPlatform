@@ -98,12 +98,72 @@ templ MessageList() {
 								@skeleton.Skeleton(skeleton.Props{Class: "h-20 w-full"})
 							</div>
 							<div x-show="message.status === 'completed'" class="mb-3">
+								<!-- Arguments Summary -->
+								<div class="mb-2 text-sm text-muted-foreground">
+									<template x-if="message.name === 'plot'">
+										<div>
+											<span class="font-medium">Plotting:</span>
+											<span x-text="message.parsedArgs?.title || 'Graph'"></span>
+										</div>
+									</template>
+									<template x-if="message.name === 'write_whiteboard'">
+										<div>
+											<span class="font-medium">Action:</span>
+											<span x-text="message.parsedArgs?.action || 'write'"></span>
+											<template x-if="message.parsedArgs?.content">
+												<span class="text-xs ml-2">(<span x-text="(message.parsedArgs.content || '').length"></span> chars)</span>
+											</template>
+										</div>
+									</template>
+									<template x-if="message.name === 'read_whiteboard'">
+										<div class="text-xs">Reading current whiteboard content</div>
+									</template>
+									<template x-if="message.name === 'emit_math_question'">
+										<div>
+											<span class="font-medium">Question:</span>
+											<span x-text="message.parsedArgs?.question || ''"></span>
+										</div>
+									</template>
+									<template x-if="message.name === 'emit_physics_question'">
+										<div>
+											<span class="font-medium">Question:</span>
+											<span x-text="message.parsedArgs?.question || ''"></span>
+										</div>
+									</template>
+									<template x-if="message.name === 'emit_chemistry_question'">
+										<div>
+											<span class="font-medium">Question:</span>
+											<span x-text="message.parsedArgs?.question || ''"></span>
+										</div>
+									</template>
+									<template x-if="message.name === 'emit_statistics_question'">
+										<div>
+											<span class="font-medium">Question:</span>
+											<span x-text="message.parsedArgs?.question || ''"></span>
+										</div>
+									</template>
+									<template x-if="message.name === 'emit_linear_algebra_question'">
+										<div>
+											<span class="font-medium">Question:</span>
+											<span x-text="message.parsedArgs?.question || ''"></span>
+										</div>
+									</template>
+									<template x-if="message.name === 'emit_question_answered'">
+										<div>
+											<span class="font-medium">Subject:</span>
+											<span x-text="message.parsedArgs?.subject || ''"></span>
+											<template x-if="message.parsedArgs?.is_complete">
+												<span class="ml-2 text-green-600">✓ Complete</span>
+											</template>
+										</div>
+									</template>
+								</div>
 								@collapsible.Collapsible(collapsible.Props{Open: false}) {
 									@collapsible.Trigger(collapsible.TriggerProps{Class: "flex items-center gap-2 cursor-pointer hover:text-primary"}) {
 										<svg class="w-4 h-4 transition-transform [[data-tui-collapsible-state=open]_&]:rotate-90" fill="currentColor" viewBox="0 0 20 20">
 											<path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
 										</svg>
-										<span class="text-sm font-medium">Arguments</span>
+										<span class="text-sm font-medium">Full Arguments</span>
 									}
 									@collapsible.Content() {
 										<div class="mt-2">
@@ -120,13 +180,68 @@ templ MessageList() {
 									</svg>
 									<span class="text-sm font-semibold">Result</span>
 								</div>
+								<!-- Result Summary -->
+								<div class="mb-2 text-sm">
+									<template x-if="message.name === 'plot' && isValidJSON(message.result)">
+										<div class="space-y-1">
+											<template x-if="JSON.parse(message.result).success">
+												<div class="text-green-600 font-medium">✓ Plot generated successfully</div>
+												<div class="text-muted-foreground">
+													<span class="font-medium">Image:</span>
+													<a x-bind:href="JSON.parse(message.result).image_url" target="_blank" class="text-primary hover:underline ml-1" x-text="JSON.parse(message.result).image_url"></a>
+												</div>
+											</template>
+										</div>
+									</template>
+									<template x-if="message.name === 'write_whiteboard' && isValidJSON(message.result)">
+										<div class="space-y-1">
+											<div class="text-green-600 font-medium">✓ Whiteboard updated</div>
+											<div class="text-muted-foreground text-xs">
+												<span class="font-medium">Action:</span>
+												<span x-text="message.parsedArgs?.action || 'write'"></span>
+												<span class="mx-2">•</span>
+												<span class="font-medium">Content:</span>
+												<span x-text="(message.parsedArgs?.content || '').length"></span> characters
+											</div>
+											<template x-if="message.parsedArgs?.content">
+												<div class="mt-1 text-xs text-muted-foreground bg-muted/50 rounded p-2 max-h-20 overflow-y-auto">
+													<div class="whitespace-pre-wrap font-mono" x-text="(message.parsedArgs.content || '').slice(0, 200) + ((message.parsedArgs.content || '').length > 200 ? '...' : '')"></div>
+												</div>
+											</template>
+										</div>
+									</template>
+									<template x-if="message.name === 'read_whiteboard' && isValidJSON(message.result)">
+										<div class="text-muted-foreground">
+											<span class="font-medium">Content length:</span>
+											<span x-text="(JSON.parse(message.result).content || '').length"></span> characters
+										</div>
+									</template>
+									<template x-if="(message.name === 'emit_math_question' || message.name === 'emit_physics_question' || message.name === 'emit_chemistry_question' || message.name === 'emit_statistics_question' || message.name === 'emit_linear_algebra_question') && isValidJSON(message.result)">
+										<div class="text-green-600 font-medium">✓ Question routed to specialist</div>
+									</template>
+									<template x-if="message.name === 'emit_question_answered' && isValidJSON(message.result)">
+										<div class="text-green-600 font-medium">✓ Answer recorded</div>
+									</template>
+								</div>
 								<div class="relative">
-									<template x-if="isValidJSON(message.result)">
-										<div x-html="`<pre><code class='language-json'>${JSON.stringify(JSON.parse(message.result), null, 2)}</code></pre>`"></div>
-									</template>
-									<template x-if="!isValidJSON(message.result)">
-										<div x-html="`<pre><code class='language-text'>${message.result}</code></pre>`"></div>
-									</template>
+									@collapsible.Collapsible(collapsible.Props{Open: false}) {
+										@collapsible.Trigger(collapsible.TriggerProps{Class: "flex items-center gap-2 cursor-pointer hover:text-primary"}) {
+											<svg class="w-4 h-4 transition-transform [[data-tui-collapsible-state=open]_&]:rotate-90" fill="currentColor" viewBox="0 0 20 20">
+												<path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
+											</svg>
+											<span class="text-sm font-medium">Full Result</span>
+										}
+										@collapsible.Content() {
+											<div class="mt-2">
+												<template x-if="isValidJSON(message.result)">
+													<div x-html="`<pre><code class='language-json'>${JSON.stringify(JSON.parse(message.result), null, 2)}</code></pre>`"></div>
+												</template>
+												<template x-if="!isValidJSON(message.result)">
+													<div x-html="`<pre><code class='language-text'>${message.result}</code></pre>`"></div>
+												</template>
+											</div>
+										}
+									}
 								</div>
 							</div>
 						}
