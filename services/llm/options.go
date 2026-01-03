@@ -64,75 +64,23 @@ type ChatOptions struct {
 
 // Clone creates a deep copy of ChatOptions.
 func (o ChatOptions) Clone() ChatOptions {
-	clone := o
-
-	// Deep copy slices
 	if o.StopSequences != nil {
-		clone.StopSequences = make([]string, len(o.StopSequences))
-		copy(clone.StopSequences, o.StopSequences)
+		seq := make([]string, len(o.StopSequences))
+		copy(seq, o.StopSequences)
+		o.StopSequences = seq
 	}
 
 	if o.Tools != nil {
-		clone.Tools = CloneTools(o.Tools)
+		o.Tools = CloneTools(o.Tools)
 	}
 
-	// Deep copy pointers
-	if o.Temperature != nil {
-		v := *o.Temperature
-		clone.Temperature = &v
-	}
-	if o.MaxOutputTokens != nil {
-		v := *o.MaxOutputTokens
-		clone.MaxOutputTokens = &v
-	}
-	if o.TopP != nil {
-		v := *o.TopP
-		clone.TopP = &v
-	}
-	if o.FrequencyPenalty != nil {
-		v := *o.FrequencyPenalty
-		clone.FrequencyPenalty = &v
-	}
-	if o.PresencePenalty != nil {
-		v := *o.PresencePenalty
-		clone.PresencePenalty = &v
-	}
-	if o.Seed != nil {
-		v := *o.Seed
-		clone.Seed = &v
-	}
-
-	// Deep copy map
 	if o.AdditionalProperties != nil {
-		clone.AdditionalProperties = make(map[string]any, len(o.AdditionalProperties))
+		props := make(map[string]any, len(o.AdditionalProperties))
 		for k, v := range o.AdditionalProperties {
-			clone.AdditionalProperties[k] = v
+			props[k] = v
 		}
+		o.AdditionalProperties = props
 	}
 
-	return clone
-}
-
-// WithTemperature sets the temperature and returns the options for chaining.
-func (o ChatOptions) WithTemperature(temp float64) ChatOptions {
-	o.Temperature = &temp
-	return o
-}
-
-// WithMaxTokens sets the max output tokens and returns the options for chaining.
-func (o ChatOptions) WithMaxTokens(tokens int) ChatOptions {
-	o.MaxOutputTokens = &tokens
-	return o
-}
-
-// WithInstructions sets the system instructions and returns the options for chaining.
-func (o ChatOptions) WithInstructions(instructions string) ChatOptions {
-	o.Instructions = instructions
-	return o
-}
-
-// WithTools sets the available tools and returns the options for chaining.
-func (o ChatOptions) WithTools(tools []AITool) ChatOptions {
-	o.Tools = tools
 	return o
 }

@@ -18,10 +18,7 @@ const (
 )
 
 // ChatResponseUpdate represents a streaming response chunk from the model.
-// This mirrors Microsoft.Extensions.AI.ChatResponseUpdate from the .NET agent framework.
-//
-// During streaming, multiple updates are yielded that together form a complete response.
-// Each update may contain partial text, partial tool calls, or metadata.
+// Multiple updates are yielded that together form a complete response.
 type ChatResponseUpdate struct {
 	// Role indicates the role of the message being streamed.
 	// Typically ChatRoleAssistant for model responses.
@@ -85,39 +82,6 @@ func (u ChatResponseUpdate) HasContent() bool {
 // IsComplete returns true if this is the final update (has finish reason).
 func (u ChatResponseUpdate) IsComplete() bool {
 	return u.FinishReason != ""
-}
-
-// NewTextUpdate creates a response update with text content.
-func NewTextUpdate(text string) ChatResponseUpdate {
-	return ChatResponseUpdate{
-		Role:     ChatRoleAssistant,
-		Contents: []AIContent{TextContent{Text: text}},
-	}
-}
-
-// NewFunctionCallUpdate creates a response update with a function call.
-func NewFunctionCallUpdate(callID, name, argsJSON string, index int) ChatResponseUpdate {
-	return ChatResponseUpdate{
-		Role:          ChatRoleAssistant,
-		ToolCallIndex: index,
-		ToolCallID:    callID,
-		Contents: []AIContent{FunctionCallContent{
-			CallID:        callID,
-			Name:          name,
-			ArgumentsJSON: argsJSON,
-		}},
-	}
-}
-
-// NewFunctionCallArgsUpdate creates a response update with function call argument delta.
-func NewFunctionCallArgsUpdate(argsJSON string, index int) ChatResponseUpdate {
-	return ChatResponseUpdate{
-		Role:          ChatRoleAssistant,
-		ToolCallIndex: index,
-		Contents: []AIContent{FunctionCallContent{
-			ArgumentsJSON: argsJSON,
-		}},
-	}
 }
 
 // UsageDetails tracks token usage for a request.

@@ -167,7 +167,7 @@ func (c *OpenAIClient) buildAssistantMessage(msg ChatMessage) openai.ChatComplet
 				OfFunction: &openai.ChatCompletionMessageFunctionToolCallParam{
 					ID: fc.CallID,
 					Function: openai.ChatCompletionMessageFunctionToolCallFunctionParam{
-						Arguments: fc.GetArgumentsJSON(),
+						Arguments: fc.ArgumentsJSON(),
 						Name:      fc.Name,
 					},
 				},
@@ -203,9 +203,9 @@ func (c *OpenAIClient) buildToolCallUpdate(tc openai.ChatCompletionChunkChoiceDe
 	// Add function call content if we have name or arguments
 	if tc.ID != "" || tc.Function.Name != "" || tc.Function.Arguments != "" {
 		fc := FunctionCallContent{
-			CallID:        tc.ID,
-			Name:          tc.Function.Name,
-			ArgumentsJSON: tc.Function.Arguments,
+			CallID:       tc.ID,
+			Name:         tc.Function.Name,
+			RawArguments: tc.Function.Arguments,
 		}
 		update.Contents = []AIContent{fc}
 	}

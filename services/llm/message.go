@@ -7,10 +7,7 @@ import (
 )
 
 // ChatMessage represents a single message in a conversation.
-// This mirrors Microsoft.Extensions.AI.ChatMessage from the .NET agent framework.
-//
-// A message has a role (user, assistant, system, tool) and contains
-// one or more content items that can be of different types.
+// A message has a role and contains one or more content items.
 type ChatMessage struct {
 	// Role indicates who sent this message.
 	Role ChatRole `json:"role"`
@@ -132,9 +129,9 @@ func FromDomainMessage(msg domain.Message) ChatMessage {
 	// Add function calls from tool calls
 	for _, tc := range msg.ToolCalls {
 		cm.Contents = append(cm.Contents, FunctionCallContent{
-			CallID:        tc.ID,
-			Name:          tc.Function.Name,
-			ArgumentsJSON: tc.Function.Arguments,
+			CallID:       tc.ID,
+			Name:         tc.Function.Name,
+			RawArguments: tc.Function.Arguments,
 		})
 	}
 
@@ -165,7 +162,7 @@ func ToDomainMessage(cm ChatMessage) domain.Message {
 			Type: "function",
 			Function: domain.ToolFunction{
 				Name:      fc.Name,
-				Arguments: fc.GetArgumentsJSON(),
+				Arguments: fc.ArgumentsJSON(),
 			},
 		})
 	}

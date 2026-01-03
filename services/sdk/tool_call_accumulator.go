@@ -54,7 +54,7 @@ func (a *ToolCallAccumulator) ProcessUpdate(update llm.ChatResponseUpdate) (Tool
 			ID:        fc.CallID,
 			Index:     index,
 			Name:      fc.Name,
-			Arguments: fc.ArgumentsJSON,
+			Arguments: fc.RawArguments,
 		}
 		a.byID[fc.CallID] = state
 		a.byIndex[index] = state
@@ -63,7 +63,7 @@ func (a *ToolCallAccumulator) ProcessUpdate(update llm.ChatResponseUpdate) (Tool
 			ID:        fc.CallID,
 			Name:      fc.Name,
 			IsNew:     true,
-			ArgsDelta: fc.ArgumentsJSON,
+			ArgsDelta: fc.RawArguments,
 		}, true
 	}
 
@@ -77,15 +77,15 @@ func (a *ToolCallAccumulator) ProcessUpdate(update llm.ChatResponseUpdate) (Tool
 	}
 
 	// Accumulate arguments
-	if fc.ArgumentsJSON != "" {
-		state.Arguments += fc.ArgumentsJSON
+	if fc.RawArguments != "" {
+		state.Arguments += fc.RawArguments
 	}
 
 	return ToolCallUpdate{
 		ID:        state.ID,
 		Name:      state.Name,
 		IsNew:     false,
-		ArgsDelta: fc.ArgumentsJSON,
+		ArgsDelta: fc.RawArguments,
 	}, true
 }
 
