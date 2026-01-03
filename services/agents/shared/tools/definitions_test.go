@@ -9,22 +9,22 @@ func TestGetWeatherTool(t *testing.T) {
 	tool := GetWeatherTool()
 
 	// Check tool name
-	if tool.GetName() != "get_weather" {
-		t.Errorf("Expected name 'get_weather', got %v", tool.GetName())
+	if tool.Name() != "get_weather" {
+		t.Errorf("Expected name 'get_weather', got %v", tool.Name())
 	}
 
 	// Check tool has description
-	if tool.GetDescription() == "" {
+	if tool.Description() == "" {
 		t.Error("Tool missing description")
 	}
 
 	// Check tool has parameters
-	if tool.GetParameters() == nil {
+	if tool.Parameters() == nil {
 		t.Fatal("Tool missing parameters")
 	}
 
 	// Parameters are already map[string]any
-	params := tool.GetParameters()
+	params := tool.Parameters()
 
 	// Check parameters type
 	if params["type"] != "object" {
@@ -63,17 +63,17 @@ func TestGetCalculatorTool(t *testing.T) {
 	tool := GetCalculatorTool()
 
 	// Check tool name
-	if tool.GetName() != "calculate" {
-		t.Errorf("Expected name 'calculate', got %v", tool.GetName())
+	if tool.Name() != "calculate" {
+		t.Errorf("Expected name 'calculate', got %v", tool.Name())
 	}
 
 	// Check tool has description
-	if tool.GetDescription() == "" {
+	if tool.Description() == "" {
 		t.Error("Tool missing description")
 	}
 
 	// Check tool has parameters
-	if tool.GetParameters() == nil {
+	if tool.Parameters() == nil {
 		t.Fatal("Tool missing parameters")
 	}
 }
@@ -90,10 +90,10 @@ func TestGetAllTools(t *testing.T) {
 	foundWeather := false
 	foundCalculator := false
 	for _, tool := range tools {
-		if tool.GetName() == "get_weather" {
+		if tool.Name() == "get_weather" {
 			foundWeather = true
 		}
-		if tool.GetName() == "calculate" {
+		if tool.Name() == "calculate" {
 			foundCalculator = true
 		}
 	}
@@ -111,7 +111,7 @@ func TestWeatherToolParametersSchema(t *testing.T) {
 	tool := GetWeatherTool()
 
 	// Parameters are already map[string]any
-	params := tool.GetParameters()
+	params := tool.Parameters()
 	properties := params["properties"].(map[string]any)
 
 	// Check location property schema (it's map[string]string)
