@@ -9,22 +9,22 @@ func TestGetWeatherTool(t *testing.T) {
 	tool := GetWeatherTool()
 
 	// Check tool name
-	if tool.Name != "get_weather" {
-		t.Errorf("Expected name 'get_weather', got %v", tool.Name)
+	if tool.GetName() != "get_weather" {
+		t.Errorf("Expected name 'get_weather', got %v", tool.GetName())
 	}
 
 	// Check tool has description
-	if tool.Description == "" {
+	if tool.GetDescription() == "" {
 		t.Error("Tool missing description")
 	}
 
 	// Check tool has parameters
-	if tool.Parameters == nil {
+	if tool.GetParameters() == nil {
 		t.Fatal("Tool missing parameters")
 	}
 
 	// Parameters are already map[string]any
-	params := tool.Parameters
+	params := tool.GetParameters()
 
 	// Check parameters type
 	if params["type"] != "object" {
@@ -63,17 +63,17 @@ func TestGetCalculatorTool(t *testing.T) {
 	tool := GetCalculatorTool()
 
 	// Check tool name
-	if tool.Name != "calculate" {
-		t.Errorf("Expected name 'calculate', got %v", tool.Name)
+	if tool.GetName() != "calculate" {
+		t.Errorf("Expected name 'calculate', got %v", tool.GetName())
 	}
 
 	// Check tool has description
-	if tool.Description == "" {
+	if tool.GetDescription() == "" {
 		t.Error("Tool missing description")
 	}
 
 	// Check tool has parameters
-	if tool.Parameters == nil {
+	if tool.GetParameters() == nil {
 		t.Fatal("Tool missing parameters")
 	}
 }
@@ -90,10 +90,10 @@ func TestGetAllTools(t *testing.T) {
 	foundWeather := false
 	foundCalculator := false
 	for _, tool := range tools {
-		if tool.Name == "get_weather" {
+		if tool.GetName() == "get_weather" {
 			foundWeather = true
 		}
-		if tool.Name == "calculate" {
+		if tool.GetName() == "calculate" {
 			foundCalculator = true
 		}
 	}
@@ -111,7 +111,7 @@ func TestWeatherToolParametersSchema(t *testing.T) {
 	tool := GetWeatherTool()
 
 	// Parameters are already map[string]any
-	params := tool.Parameters
+	params := tool.GetParameters()
 	properties := params["properties"].(map[string]any)
 
 	// Check location property schema (it's map[string]string)

@@ -261,12 +261,12 @@ func (c *OpenAIClient) applyOptions(params *openai.ChatCompletionNewParams, opti
 		openaiTools := make([]openai.ChatCompletionToolUnionParam, 0, len(options.Tools))
 		for _, tool := range options.Tools {
 			funcDef := openai.FunctionDefinitionParam{
-				Name:        tool.Name,
-				Description: openai.String(tool.Description),
+				Name:        tool.GetName(),
+				Description: openai.String(tool.GetDescription()),
 			}
 
-			if tool.Parameters != nil {
-				funcDef.Parameters = openai.FunctionParameters(tool.Parameters)
+			if params := tool.GetParameters(); params != nil {
+				funcDef.Parameters = openai.FunctionParameters(params)
 			}
 
 			openaiTools = append(openaiTools, openai.ChatCompletionFunctionTool(funcDef))
@@ -283,7 +283,7 @@ func (c *OpenAIClient) applyOptions(params *openai.ChatCompletionNewParams, opti
 			params.ToolChoice = openai.ChatCompletionToolChoiceOptionUnionParam{
 				OfAuto: openai.String("required"),
 			}
-		// ToolModeAuto is the default, no need to set
+			// ToolModeAuto is the default, no need to set
 		}
 	}
 }

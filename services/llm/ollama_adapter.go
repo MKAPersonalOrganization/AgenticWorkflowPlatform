@@ -119,7 +119,6 @@ func (c *OllamaClient) GetStreamingResponse(
 
 			return nil
 		})
-
 		if err != nil {
 			yield(ChatResponseUpdate{}, err)
 		}
@@ -248,9 +247,9 @@ func (c *OllamaClient) buildTools(tools []AITool) []api.Tool {
 		ollamaTools = append(ollamaTools, api.Tool{
 			Type: "function",
 			Function: api.ToolFunction{
-				Name:        tool.Name,
-				Description: tool.Description,
-				Parameters:  convertToToolParameters(tool.Parameters),
+				Name:        tool.GetName(),
+				Description: tool.GetDescription(),
+				Parameters:  convertToToolParameters(tool.GetParameters()),
 			},
 		})
 	}

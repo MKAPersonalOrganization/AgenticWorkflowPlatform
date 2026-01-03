@@ -15,21 +15,6 @@ const (
 	ToolModeNone ToolMode = "none"
 )
 
-// AITool represents a tool/function that can be called by the model.
-// This mirrors Microsoft.Extensions.AI.AITool from the .NET agent framework.
-type AITool struct {
-	// Name is the unique identifier for this tool.
-	Name string `json:"name"`
-
-	// Description explains what the tool does.
-	// This helps the model decide when to use the tool.
-	Description string `json:"description"`
-
-	// Parameters is the JSON Schema describing the tool's parameters.
-	// Typically includes "type": "object", "properties", and "required".
-	Parameters map[string]any `json:"parameters,omitempty"`
-}
-
 // ChatOptions contains configuration for a chat completion request.
 // This mirrors Microsoft.Extensions.AI.ChatOptions from the .NET agent framework.
 type ChatOptions struct {
@@ -88,10 +73,7 @@ func (o ChatOptions) Clone() ChatOptions {
 	}
 
 	if o.Tools != nil {
-		clone.Tools = make([]AITool, len(o.Tools))
-		for i, t := range o.Tools {
-			clone.Tools[i] = t.Clone()
-		}
+		clone.Tools = CloneTools(o.Tools)
 	}
 
 	// Deep copy pointers
@@ -125,20 +107,6 @@ func (o ChatOptions) Clone() ChatOptions {
 		clone.AdditionalProperties = make(map[string]any, len(o.AdditionalProperties))
 		for k, v := range o.AdditionalProperties {
 			clone.AdditionalProperties[k] = v
-		}
-	}
-
-	return clone
-}
-
-// Clone creates a deep copy of AITool.
-func (t AITool) Clone() AITool {
-	clone := t
-
-	if t.Parameters != nil {
-		clone.Parameters = make(map[string]any, len(t.Parameters))
-		for k, v := range t.Parameters {
-			clone.Parameters[k] = v
 		}
 	}
 

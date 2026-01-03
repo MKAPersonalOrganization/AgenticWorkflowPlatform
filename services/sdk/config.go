@@ -41,11 +41,11 @@ func DefaultConfig(name string) AgentConfig {
 func ToAITools(tools []Tool) []llm.AITool {
 	result := make([]llm.AITool, len(tools))
 	for i, t := range tools {
-		result[i] = llm.AITool{
-			Name:        t.Name(),
-			Description: t.Description(),
-			Parameters:  t.Parameters(),
-		}
+		result[i] = llm.NewAIFunctionTool(
+			t.Name(),
+			t.Description(),
+			t.Parameters(),
+		)
 	}
 	return result
 }
