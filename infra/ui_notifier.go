@@ -1,11 +1,10 @@
 package infra
 
 import (
-	"time"
-
-	"school-with-ai/infra/agui"
 	"school-with-ai/services/agents"
 	"school-with-ai/services/sdk"
+
+	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
 
 // UINotifier listens to domain events and notifies the UI
@@ -74,225 +73,151 @@ func (n *UINotifier) HandleDomainEvent(event sdk.Event) error {
 }
 
 func (n *UINotifier) emitTextMessageStart(evt *sdk.AssistantMessageStartedEvent) error {
-	timestamp := time.Now().UnixMilli()
-	uiEvent := &agui.TextMessageStartEvent{
-		BaseEvent: agui.BaseEvent{
-			Type:      "TEXT_MESSAGE_START",
-			Timestamp: &timestamp,
-		},
-		MessageID: evt.MessageID,
-		Role:      "assistant",
-	}
+	uiEvent := aguievents.NewTextMessageStartEvent(
+		evt.MessageID,
+		aguievents.WithRole("assistant"),
+	)
 	return n.emitter.Emit(uiEvent)
 }
 
 func (n *UINotifier) emitTextMessageContent(evt *sdk.AssistantContentStreamedEvent) error {
-	timestamp := time.Now().UnixMilli()
-	uiEvent := &agui.TextMessageContentEvent{
-		BaseEvent: agui.BaseEvent{
-			Type:      "TEXT_MESSAGE_CONTENT",
-			Timestamp: &timestamp,
-		},
-		MessageID: evt.MessageID,
-		Delta:     evt.Delta,
-	}
+	uiEvent := aguievents.NewTextMessageContentEvent(
+		evt.MessageID,
+		evt.Delta,
+	)
 	return n.emitter.Emit(uiEvent)
 }
 
 func (n *UINotifier) emitToolCallStart(evt *sdk.ToolCallStartedEvent) error {
-	timestamp := time.Now().UnixMilli()
-	parentMessageID := evt.ParentMessageID
-	uiEvent := &agui.ToolCallStartEvent{
-		BaseEvent: agui.BaseEvent{
-			Type:      "TOOL_CALL_START",
-			Timestamp: &timestamp,
-		},
-		ToolCallID:      evt.ToolCallID,
-		ToolCallName:    evt.ToolCallName,
-		ParentMessageID: &parentMessageID,
-		AgentName:       evt.AgentName,
-	}
+	uiEvent := aguievents.NewToolCallStartEvent(
+		evt.ToolCallID,
+		evt.ToolCallName,
+		aguievents.WithParentMessageID(evt.ParentMessageID),
+	)
 	return n.emitter.Emit(uiEvent)
 }
 
 func (n *UINotifier) emitToolCallArgs(evt *sdk.ToolCallArgumentsStreamedEvent) error {
-	timestamp := time.Now().UnixMilli()
-	uiEvent := &agui.ToolCallArgsEvent{
-		BaseEvent: agui.BaseEvent{
-			Type:      "TOOL_CALL_ARGS",
-			Timestamp: &timestamp,
-		},
-		ToolCallID: evt.ToolCallID,
-		Delta:      evt.Delta,
-	}
+	uiEvent := aguievents.NewToolCallArgsEvent(
+		evt.ToolCallID,
+		evt.Delta,
+	)
 	return n.emitter.Emit(uiEvent)
 }
 
 func (n *UINotifier) emitToolCallEnd(evt *sdk.ToolCallCompletedEvent) error {
-	timestamp := time.Now().UnixMilli()
-	uiEvent := &agui.ToolCallEndEvent{
-		BaseEvent: agui.BaseEvent{
-			Type:      "TOOL_CALL_END",
-			Timestamp: &timestamp,
-		},
-		ToolCallID: evt.ToolCallID,
-	}
+	uiEvent := aguievents.NewToolCallEndEvent(
+		evt.ToolCallID,
+	)
 	return n.emitter.Emit(uiEvent)
 }
 
 func (n *UINotifier) emitTextMessageEnd(evt *sdk.AssistantMessageCompletedEvent) error {
-	timestamp := time.Now().UnixMilli()
-	uiEvent := &agui.TextMessageEndEvent{
-		BaseEvent: agui.BaseEvent{
-			Type:      "TEXT_MESSAGE_END",
-			Timestamp: &timestamp,
-		},
-		MessageID: evt.MessageID,
-	}
+	uiEvent := aguievents.NewTextMessageEndEvent(
+		evt.MessageID,
+	)
 	return n.emitter.Emit(uiEvent)
 }
 
 func (n *UINotifier) emitToolCallResult(evt *sdk.ToolCallExecutedEvent) error {
-	timestamp := time.Now().UnixMilli()
-	role := "tool"
-	uiEvent := &agui.ToolCallResultEvent{
-		BaseEvent: agui.BaseEvent{
-			Type:      "TOOL_CALL_RESULT",
-			Timestamp: &timestamp,
-		},
-		MessageID:  evt.MessageID,
-		ToolCallID: evt.ToolCallID,
-		Content:    evt.ToolResult,
-		Role:       &role,
-	}
+	uiEvent := aguievents.NewToolCallResultEvent(
+		evt.MessageID,
+		evt.ToolCallID,
+		evt.ToolResult,
+	)
 	return n.emitter.Emit(uiEvent)
 }
 
 // Agent collaboration event emitters
 
 func (n *UINotifier) emitWhiteboardUpdated(evt *agents.DomainEvent) error {
-	timestamp := time.Now().UnixMilli()
-	uiEvent := &agui.CustomEvent{
-		BaseEvent: agui.BaseEvent{
-			Type:      "CUSTOM",
-			Timestamp: &timestamp,
-		},
-		Name: "WHITEBOARD_UPDATED",
-		Value: map[string]interface{}{
+	uiEvent := aguievents.NewCustomEvent(
+		"WHITEBOARD_UPDATED",
+		aguievents.WithValue(map[string]interface{}{
 			"agentName": evt.GetString("agent_name"),
 			"content":   evt.GetString("content"),
 			"action":    evt.GetString("action"),
 			"timestamp": evt.Timestamp.UnixMilli(),
-		},
-	}
+		}),
+	)
 	return n.emitter.Emit(uiEvent)
 }
 
 func (n *UINotifier) emitMathQuestion(evt *agents.DomainEvent) error {
-	timestamp := time.Now().UnixMilli()
-	uiEvent := &agui.CustomEvent{
-		BaseEvent: agui.BaseEvent{
-			Type:      "CUSTOM",
-			Timestamp: &timestamp,
-		},
-		Name: "MATH_QUESTION",
-		Value: map[string]interface{}{
+	uiEvent := aguievents.NewCustomEvent(
+		"MATH_QUESTION",
+		aguievents.WithValue(map[string]interface{}{
 			"question":  evt.GetString("question"),
 			"emittedBy": evt.GetString("emitted_by"),
 			"context":   evt.GetString("context"),
 			"timestamp": evt.Timestamp.UnixMilli(),
-		},
-	}
+		}),
+	)
 	return n.emitter.Emit(uiEvent)
 }
 
 func (n *UINotifier) emitPhysicsQuestion(evt *agents.DomainEvent) error {
-	timestamp := time.Now().UnixMilli()
-	uiEvent := &agui.CustomEvent{
-		BaseEvent: agui.BaseEvent{
-			Type:      "CUSTOM",
-			Timestamp: &timestamp,
-		},
-		Name: "PHYSICS_QUESTION",
-		Value: map[string]interface{}{
+	uiEvent := aguievents.NewCustomEvent(
+		"PHYSICS_QUESTION",
+		aguievents.WithValue(map[string]interface{}{
 			"question":  evt.GetString("question"),
 			"emittedBy": evt.GetString("emitted_by"),
 			"context":   evt.GetString("context"),
 			"timestamp": evt.Timestamp.UnixMilli(),
-		},
-	}
+		}),
+	)
 	return n.emitter.Emit(uiEvent)
 }
 
 func (n *UINotifier) emitChemistryQuestion(evt *agents.DomainEvent) error {
-	timestamp := time.Now().UnixMilli()
-	uiEvent := &agui.CustomEvent{
-		BaseEvent: agui.BaseEvent{
-			Type:      "CUSTOM",
-			Timestamp: &timestamp,
-		},
-		Name: "CHEMISTRY_QUESTION",
-		Value: map[string]interface{}{
+	uiEvent := aguievents.NewCustomEvent(
+		"CHEMISTRY_QUESTION",
+		aguievents.WithValue(map[string]interface{}{
 			"question":  evt.GetString("question"),
 			"emittedBy": evt.GetString("emitted_by"),
 			"context":   evt.GetString("context"),
 			"timestamp": evt.Timestamp.UnixMilli(),
-		},
-	}
+		}),
+	)
 	return n.emitter.Emit(uiEvent)
 }
 
 func (n *UINotifier) emitStatisticsQuestion(evt *agents.DomainEvent) error {
-	timestamp := time.Now().UnixMilli()
-	uiEvent := &agui.CustomEvent{
-		BaseEvent: agui.BaseEvent{
-			Type:      "CUSTOM",
-			Timestamp: &timestamp,
-		},
-		Name: "STATISTICS_QUESTION",
-		Value: map[string]interface{}{
+	uiEvent := aguievents.NewCustomEvent(
+		"STATISTICS_QUESTION",
+		aguievents.WithValue(map[string]interface{}{
 			"question":  evt.GetString("question"),
 			"emittedBy": evt.GetString("emitted_by"),
 			"context":   evt.GetString("context"),
 			"timestamp": evt.Timestamp.UnixMilli(),
-		},
-	}
+		}),
+	)
 	return n.emitter.Emit(uiEvent)
 }
 
 func (n *UINotifier) emitLinearAlgebraQuestion(evt *agents.DomainEvent) error {
-	timestamp := time.Now().UnixMilli()
-	uiEvent := &agui.CustomEvent{
-		BaseEvent: agui.BaseEvent{
-			Type:      "CUSTOM",
-			Timestamp: &timestamp,
-		},
-		Name: "LINEARALGEBRA_QUESTION",
-		Value: map[string]interface{}{
+	uiEvent := aguievents.NewCustomEvent(
+		"LINEARALGEBRA_QUESTION",
+		aguievents.WithValue(map[string]interface{}{
 			"question":  evt.GetString("question"),
 			"emittedBy": evt.GetString("emitted_by"),
 			"context":   evt.GetString("context"),
 			"timestamp": evt.Timestamp.UnixMilli(),
-		},
-	}
+		}),
+	)
 	return n.emitter.Emit(uiEvent)
 }
 
 func (n *UINotifier) emitQuestionAnswered(evt *agents.DomainEvent) error {
-	timestamp := time.Now().UnixMilli()
-	uiEvent := &agui.CustomEvent{
-		BaseEvent: agui.BaseEvent{
-			Type:      "CUSTOM",
-			Timestamp: &timestamp,
-		},
-		Name: "QUESTION_ANSWERED",
-		Value: map[string]interface{}{
+	uiEvent := aguievents.NewCustomEvent(
+		"QUESTION_ANSWERED",
+		aguievents.WithValue(map[string]interface{}{
 			"subject":    evt.GetString("subject"),
 			"answer":     evt.GetString("answer"),
 			"answeredBy": evt.GetString("answered_by"),
 			"isComplete": evt.GetBool("is_complete"),
 			"timestamp":  evt.Timestamp.UnixMilli(),
-		},
-	}
+		}),
+	)
 	return n.emitter.Emit(uiEvent)
 }
