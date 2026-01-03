@@ -2029,13 +2029,17 @@ document.addEventListener('alpine:init', () => {
 
                 case 'TOOL_CALL_START':
                     // Tool call started - create a new tool call message
+                    // Infer agent from last handoff event
+                    const lastHandoff = [...state.messages].reverse().find(m => m.type === 'agent_handoff');
+                    const currentAgent = lastHandoff?.toAgent || 'agent';
+
                     state.toolCalls[event.toolCallId] = {
                         id: event.toolCallId,
                         name: event.toolCallName,
                         args: '',
                         status: 'streaming',
                         timestamp: new Date(event.timestamp).toISOString(),
-                        agentName: event.agentName || 'unknown'
+                        agentName: currentAgent
                     };
 
                     state.messages.push({
@@ -2046,7 +2050,7 @@ document.addEventListener('alpine:init', () => {
                         parsedArgs: {},
                         status: 'streaming',
                         timestamp: new Date(event.timestamp).toISOString(),
-                        agentName: event.agentName || 'unknown'
+                        agentName: currentAgent
                     });
 
                     if (threadId === this.__currentThreadId) {
