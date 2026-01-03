@@ -56,7 +56,7 @@ func TestToolCallAccumulator_ArgumentStreaming(t *testing.T) {
 	update1, ok := acc.ProcessUpdate(llm.ChatResponseUpdate{
 		ToolCallIndex: 0,
 		Contents: []llm.AIContent{llm.FunctionCallContent{
-			ArgumentsJSON: `{"city":`,
+			RawArguments: `{"city":`,
 		}},
 	})
 	if !ok {
@@ -72,7 +72,7 @@ func TestToolCallAccumulator_ArgumentStreaming(t *testing.T) {
 	update2, _ := acc.ProcessUpdate(llm.ChatResponseUpdate{
 		ToolCallIndex: 0,
 		Contents: []llm.AIContent{llm.FunctionCallContent{
-			ArgumentsJSON: `"London"}`,
+			RawArguments: `"London"}`,
 		}},
 	})
 	if update2.ArgsDelta != `"London"}` {
@@ -104,7 +104,7 @@ func TestToolCallAccumulator_MultipleToolCalls(t *testing.T) {
 	acc.ProcessUpdate(llm.ChatResponseUpdate{
 		ToolCallIndex: 0,
 		Contents: []llm.AIContent{llm.FunctionCallContent{
-			ArgumentsJSON: `{"city":"London"}`,
+			RawArguments: `{"city":"London"}`,
 		}},
 	})
 
@@ -120,7 +120,7 @@ func TestToolCallAccumulator_MultipleToolCalls(t *testing.T) {
 	acc.ProcessUpdate(llm.ChatResponseUpdate{
 		ToolCallIndex: 1,
 		Contents: []llm.AIContent{llm.FunctionCallContent{
-			ArgumentsJSON: `{"expr":"2+2"}`,
+			RawArguments: `{"expr":"2+2"}`,
 		}},
 	})
 
@@ -162,7 +162,7 @@ func TestToolCallAccumulator_UnknownIndex(t *testing.T) {
 	_, ok := acc.ProcessUpdate(llm.ChatResponseUpdate{
 		ToolCallIndex: 5, // No tool call at this index
 		Contents: []llm.AIContent{llm.FunctionCallContent{
-			ArgumentsJSON: `{"foo":"bar"}`,
+			RawArguments: `{"foo":"bar"}`,
 		}},
 	})
 

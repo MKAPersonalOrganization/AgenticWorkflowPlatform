@@ -93,9 +93,9 @@ func (c *OllamaClient) GetStreamingResponse(
 					ToolCallIndex: toolCallIndex,
 					ToolCallID:    callID,
 					Contents: []AIContent{FunctionCallContent{
-						CallID:        callID,
-						Name:          tc.Function.Name,
-						ArgumentsJSON: argsJSON,
+						CallID:       callID,
+						Name:         tc.Function.Name,
+						RawArguments: argsJSON,
 					}},
 				}
 
@@ -161,8 +161,8 @@ func (c *OllamaClient) buildMessages(messages []ChatMessage, options *ChatOption
 					var args map[string]any
 					if fc.Arguments != nil {
 						args = fc.Arguments
-					} else if fc.ArgumentsJSON != "" {
-						json.Unmarshal([]byte(fc.ArgumentsJSON), &args)
+					} else if fc.RawArguments != "" {
+						json.Unmarshal([]byte(fc.RawArguments), &args)
 					}
 
 					toolCalls = append(toolCalls, api.ToolCall{
