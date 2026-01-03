@@ -580,7 +580,7 @@ func (t *NormalDistributionTool) Name() string {
 }
 
 func (t *NormalDistributionTool) Description() string {
-	return "Normal distribution functions: pdf, cdf, ppf, sf, isf, log variants, fit, moments, stats, interval, random sampling"
+	return "Normal distribution functions: pdf, cdf, ppf, sf, isf, log variants, fit, moments, stats, interval, random sampling, ncr (N choose R combinatorics)"
 }
 
 func (t *NormalDistributionTool) Parameters() map[string]any {
@@ -594,7 +594,7 @@ func (t *NormalDistributionTool) Parameters() map[string]any {
 					"norm_log_pdf", "norm_log_cdf", "norm_log_sf",
 					"norm_mean", "norm_median", "norm_std", "norm_var",
 					"norm_entropy", "norm_moment", "norm_stats", "norm_interval",
-					"norm_fit", "norm_box_muller_rvs", "norm_ppf_rvs",
+					"norm_fit", "norm_box_muller_rvs", "norm_ppf_rvs", "ncr",
 				},
 				"description": "Normal distribution operation",
 			},
@@ -616,7 +616,7 @@ func (t *NormalDistributionTool) Parameters() map[string]any {
 			},
 			"n": map[string]any{
 				"type":        "integer",
-				"description": "Moment order (for norm_moment)",
+				"description": "Moment order (for norm_moment) or N value (for ncr N choose R)",
 			},
 			"moments": map[string]any{
 				"type":        "string",
@@ -635,6 +635,10 @@ func (t *NormalDistributionTool) Parameters() map[string]any {
 				"items":       map[string]string{"type": "number"},
 				"description": "Data for norm_fit operation",
 			},
+			"r": map[string]any{
+				"type":        "integer",
+				"description": "R value for ncr (N choose R) operation",
+			},
 		},
 		"required": []string{"operation"},
 	}
@@ -648,6 +652,7 @@ func (t *NormalDistributionTool) Invoke(ctx context.Context, arguments string) (
 		Loc       float64   `json:"loc,omitempty"`
 		Scale     float64   `json:"scale,omitempty"`
 		N         int       `json:"n,omitempty"`
+		R         int       `json:"r,omitempty"`
 		Moments   string    `json:"moments,omitempty"`
 		Alpha     float64   `json:"alpha,omitempty"`
 		Size      int       `json:"size,omitempty"`
@@ -719,6 +724,8 @@ func (t *NormalDistributionTool) Invoke(ctx context.Context, arguments string) (
 			args.Size = 100
 		}
 		result = stats.NormPpfRvs(args.Loc, args.Scale, args.Size)
+	case "ncr":
+		result = stats.Ncr(args.N, args.R)
 	default:
 		return "", fmt.Errorf("unknown operation: %s", args.Operation)
 	}

@@ -68,7 +68,7 @@ Data sampling and outlier detection: sample, stable_sample, quartile_outliers
 Transform data: sigmoid, softmax, cumulative_sum, entropy, round
 
 ### Normal Distribution (normal_distribution)
-Normal distribution functions: norm_pdf, norm_cdf, norm_ppf, norm_sf, norm_isf, log variants, norm_mean, norm_median, norm_std, norm_var, norm_entropy, norm_moment, norm_stats, norm_interval, norm_fit, norm_box_muller_rvs, norm_ppf_rvs
+Normal distribution functions: norm_pdf, norm_cdf, norm_ppf, norm_sf, norm_isf, log variants, norm_mean, norm_median, norm_std, norm_var, norm_entropy, norm_moment, norm_stats, norm_interval, norm_fit, norm_box_muller_rvs, norm_ppf_rvs, ncr (N choose R combinatorics)
 
 ### Geometric Distribution (geometric_distribution)
 Geometric distribution: prob_geom, exp_geom, var_geom
