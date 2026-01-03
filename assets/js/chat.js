@@ -522,6 +522,7 @@ document.addEventListener('alpine:init', () => {
                 eventSource: null,
                 events: [],
                 toolCalls: {},
+                toolCallAgents: {}, // Map toolCallId -> agentName for concurrent agents
                 currentInteractionId: null,
                 errorMessage: null,
                 showTypingIndicator: false,
@@ -1481,20 +1482,6 @@ document.addEventListener('alpine:init', () => {
                         if (msg.toolCalls && msg.toolCalls.length > 0) {
                             // Add tool call messages - results will be paired later
                             for (const toolCall of msg.toolCalls) {
-                                // Infer agent name from context if not provided (for backwards compatibility)
-                                let agentName = msg.agentName;
-                                if (!agentName) {
-                                    // Try to infer from tool call arguments (for old messages)
-                                    const args = this.safeParseJSON(toolCall.function?.arguments);
-                                    if (args.agent_name) {
-                                        // This is a call_agent tool - the caller is the previous agent
-                                        // Look backwards in messages to find who called this agent
-                                        agentName = 'student-facing-agent'; // Default assumption
-                                    } else {
-                                        agentName = 'agent'; // Generic fallback
-                                    }
-                                }
-
                                 uiMessages.push({
                                     id: toolCall.id,
                                     type: 'tool_call',
@@ -1504,7 +1491,7 @@ document.addEventListener('alpine:init', () => {
                                     timestamp: msg.timestamp || new Date().toISOString(),
                                     parsedArgs: this.safeParseJSON(toolCall.function?.arguments),
                                     result: null, // Will be filled by pairing logic
-                                    agentName: agentName
+                                    agentName: msg.agentName || 'agent'
                                 });
                             }
                         }
@@ -2020,6 +2007,19 @@ document.addEventListener('alpine:init', () => {
                             }
                             this.whiteboardLastAgent = agentName;
                         }
+                    } else if (event.name === 'TOOL_CALL_AGENT') {
+                        // Tool call agent pairing - update tool call with agent name
+                        const { toolCallId, agentName } = event.value;
+                        state.toolCallAgents[toolCallId] = agentName;
+
+                        // Update tool call and message with agent name
+                        if (state.toolCalls[toolCallId]) {
+                            state.toolCalls[toolCallId].agentName = agentName;
+                        }
+                        const toolMsgIndex = state.messages.findIndex(m => m.id === toolCallId);
+                        if (toolMsgIndex !== -1) {
+                            state.messages[toolMsgIndex].agentName = agentName;
+                        }
                     } else if (event.name === 'AGENT_CALLED') {
                         // Agent collaboration event
                         const { callerAgent, calledAgent, reason } = event.value;
@@ -2028,18 +2028,15 @@ document.addEventListener('alpine:init', () => {
                     break;
 
                 case 'TOOL_CALL_START':
-                    // Tool call started - create a new tool call message
-                    // Infer agent from last handoff event
-                    const lastHandoff = [...state.messages].reverse().find(m => m.type === 'agent_handoff');
-                    const currentAgent = lastHandoff?.toAgent || 'agent';
-
+                    // Tool call started - create message with placeholder agent
+                    // Agent name updated by TOOL_CALL_AGENT event (supports concurrent agents)
                     state.toolCalls[event.toolCallId] = {
                         id: event.toolCallId,
                         name: event.toolCallName,
                         args: '',
                         status: 'streaming',
                         timestamp: new Date(event.timestamp).toISOString(),
-                        agentName: currentAgent
+                        agentName: state.toolCallAgents[event.toolCallId] || 'agent'
                     };
 
                     state.messages.push({
@@ -2050,7 +2047,7 @@ document.addEventListener('alpine:init', () => {
                         parsedArgs: {},
                         status: 'streaming',
                         timestamp: new Date(event.timestamp).toISOString(),
-                        agentName: currentAgent
+                        agentName: state.toolCallAgents[event.toolCallId] || 'agent'
                     });
 
                     if (threadId === this.__currentThreadId) {
