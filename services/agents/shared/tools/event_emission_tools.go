@@ -184,6 +184,50 @@ func (t *EmitStatisticsQuestionTool) Invoke(ctx context.Context, arguments strin
 	return fmt.Sprintf("StatisticsQuestion event emitted. Question: %s", params.Question), nil
 }
 
+// EmitLinearAlgebraQuestionTool allows agents to emit a linear algebra question event
+type EmitLinearAlgebraQuestionTool struct{}
+
+func NewEmitLinearAlgebraQuestionTool() *EmitLinearAlgebraQuestionTool {
+	return &EmitLinearAlgebraQuestionTool{}
+}
+
+func (t *EmitLinearAlgebraQuestionTool) Name() string {
+	return "emit_linearalgebra_question"
+}
+
+func (t *EmitLinearAlgebraQuestionTool) Description() string {
+	return "Emit a linear algebra question event to activate the linear algebra professor. Use this for vector operations, matrix operations, eigenvalues, linear systems, etc. The professor has access to optimized LAPACK/OpenBLAS routines via gosl library."
+}
+
+func (t *EmitLinearAlgebraQuestionTool) Parameters() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"question": map[string]any{
+				"type":        "string",
+				"description": "The linear algebra question (vectors, matrices, eigenvalues, linear systems, etc.)",
+			},
+			"context": map[string]any{
+				"type":        "string",
+				"description": "Optional context or additional information about the question",
+			},
+		},
+		"required": []string{"question"},
+	}
+}
+
+func (t *EmitLinearAlgebraQuestionTool) Invoke(ctx context.Context, arguments string) (string, error) {
+	var params struct {
+		Question string `json:"question"`
+		Context  string `json:"context"`
+	}
+	if err := json.Unmarshal([]byte(arguments), &params); err != nil {
+		return "", fmt.Errorf("failed to parse arguments: %w", err)
+	}
+
+	return fmt.Sprintf("LinearAlgebraQuestion event emitted. Question: %s", params.Question), nil
+}
+
 // EmitQuestionAnsweredTool allows instructors to signal they've answered a question
 type EmitQuestionAnsweredTool struct{}
 

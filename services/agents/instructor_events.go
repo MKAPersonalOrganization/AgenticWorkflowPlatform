@@ -18,6 +18,7 @@ const (
 	EventTypePhysicsQuestion           EventType = "question.physics"
 	EventTypeChemistryQuestion         EventType = "question.chemistry"
 	EventTypeStatisticsQuestion        EventType = "question.statistics"
+	EventTypeLinearAlgebraQuestion     EventType = "question.linearalgebra"
 )
 
 // DomainEvent is the unified event structure for all system events
@@ -193,6 +194,23 @@ func NewStatisticsQuestionEvent(threadID, question, emittedBy, context, whiteboa
 	return &DomainEvent{
 		ID:        GenerateEventID(),
 		Type:      EventTypeStatisticsQuestion,
+		Timestamp: time.Now(),
+		ThreadID:  threadID,
+		Version:   1,
+		Data: map[string]interface{}{
+			"question":         question,
+			"emitted_by":       emittedBy,
+			"context":          context,
+			"whiteboard_state": whiteboardState,
+		},
+	}
+}
+
+// NewLinearAlgebraQuestionEvent creates a linear algebra question event
+func NewLinearAlgebraQuestionEvent(threadID, question, emittedBy, context, whiteboardState string) *DomainEvent {
+	return &DomainEvent{
+		ID:        GenerateEventID(),
+		Type:      EventTypeLinearAlgebraQuestion,
 		Timestamp: time.Now(),
 		ThreadID:  threadID,
 		Version:   1,

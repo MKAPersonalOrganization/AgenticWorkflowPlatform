@@ -59,6 +59,8 @@ func (n *UINotifier) HandleDomainEvent(event sdk.Event) error {
 			return n.emitChemistryQuestion(evt)
 		case agents.EventTypeStatisticsQuestion:
 			return n.emitStatisticsQuestion(evt)
+		case agents.EventTypeLinearAlgebraQuestion:
+			return n.emitLinearAlgebraQuestion(evt)
 		case agents.EventTypeQuestionAnswered:
 			return n.emitQuestionAnswered(evt)
 		default:
@@ -248,6 +250,24 @@ func (n *UINotifier) emitStatisticsQuestion(evt *agents.DomainEvent) error {
 			Timestamp: &timestamp,
 		},
 		Name: "STATISTICS_QUESTION",
+		Value: map[string]interface{}{
+			"question":  evt.GetString("question"),
+			"emittedBy": evt.GetString("emitted_by"),
+			"context":   evt.GetString("context"),
+			"timestamp": evt.Timestamp.UnixMilli(),
+		},
+	}
+	return n.emitter.Emit(uiEvent)
+}
+
+func (n *UINotifier) emitLinearAlgebraQuestion(evt *agents.DomainEvent) error {
+	timestamp := time.Now().UnixMilli()
+	uiEvent := &agui.CustomEvent{
+		BaseEvent: agui.BaseEvent{
+			Type:      "CUSTOM",
+			Timestamp: &timestamp,
+		},
+		Name: "LINEARALGEBRA_QUESTION",
 		Value: map[string]interface{}{
 			"question":  evt.GetString("question"),
 			"emittedBy": evt.GetString("emitted_by"),

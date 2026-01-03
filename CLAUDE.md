@@ -37,11 +37,24 @@ This is an AI-powered educational chat application implementing a multi-agent sy
 
 **Agent System** (`services/agent/`):
 - **student-facing-agent**: Router/coordinator that routes ALL user questions to specialist instructors. Never answers directly.
-- **math-instructor** (Prof. Ada): Algebra, calculus, equations. Has plot/graphing tools.
+- **math-instructor** (Prof. Ada): Algebra, calculus, equations. Has plot/graphing tools. Can delegate to linear algebra professor.
 - **physics-instructor** (Dr. Newton): Mechanics, thermodynamics, unit conversions.
 - **chemistry-instructor** (Prof. Curie): Elements, reactions, molecular structures.
+- **statistics-instructor**: Statistical analysis, probability distributions, regression.
+- **linearalgebra-professor**: Advanced linear algebra using optimized gosl/LAPACK libraries. **Only callable by math-instructor via events.**
 
-Agents communicate exclusively via a shared **whiteboard** - they write answers there and call each other using `call_agent` tool. The student-facing-agent always receives callbacks when instructors complete their work.
+**Agent Access Control (Capability-Based Security)**:
+
+Agents communicate via **event emission** - they cannot directly call other agents. Access to specialized agents is controlled through **tool registration**:
+
+- `emit_linearalgebra_question` tool is **only registered** in math-instructor's tool registry
+- Other agents (student-facing, physics, chemistry, statistics) cannot invoke linear algebra professor
+- Linear algebra professor only activates on `LinearAlgebraQuestion` events
+- Event routing enforced by worker pool - no workarounds exist
+
+This creates a **hard architectural constraint**: only math-instructor can delegate to linear algebra specialist.
+
+Agents write answers to a shared **whiteboard** and emit events to coordinate work. The student-facing-agent receives callbacks when instructors complete their work.
 
 **Infrastructure** (`infra/`):
 - **WorkerPool**: Manages 5 concurrent workers processing jobs from a queue

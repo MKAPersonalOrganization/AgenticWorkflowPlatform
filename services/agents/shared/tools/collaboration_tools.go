@@ -17,6 +17,7 @@ func IsCollaborationTool(toolName string) bool {
 		toolName == "emit_physics_question" ||
 		toolName == "emit_chemistry_question" ||
 		toolName == "emit_statistics_question" ||
+		toolName == "emit_linearalgebra_question" ||
 		toolName == "emit_question_answered"
 }
 
@@ -64,6 +65,16 @@ func HandleCollaborationToolCall(threadID string, agentName string, toolCall dom
 			return nil, fmt.Errorf("failed to parse emit_statistics_question arguments: %w", err)
 		}
 		return agents.NewStatisticsQuestionEvent(threadID, input.Question, agentName, input.Context, getWhiteboardState(threadID)), nil
+
+	case "emit_linearalgebra_question":
+		var input struct {
+			Question string `json:"question"`
+			Context  string `json:"context"`
+		}
+		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
+			return nil, fmt.Errorf("failed to parse emit_linearalgebra_question arguments: %w", err)
+		}
+		return agents.NewLinearAlgebraQuestionEvent(threadID, input.Question, agentName, input.Context, getWhiteboardState(threadID)), nil
 
 	case "emit_question_answered":
 		var input struct {
