@@ -6,10 +6,10 @@ import (
 
 // GetWeatherTool returns the tool definition for weather lookup
 func GetWeatherTool() llm.AITool {
-	return llm.AITool{
-		Name:        "get_weather",
-		Description: "Get the current weather for a location",
-		Parameters: map[string]any{
+	return llm.NewAIFunctionTool(
+		"get_weather",
+		"Get the current weather for a location",
+		map[string]any{
 			"type": "object",
 			"properties": map[string]any{
 				"location": map[string]string{
@@ -24,15 +24,15 @@ func GetWeatherTool() llm.AITool {
 			},
 			"required": []string{"location"},
 		},
-	}
+	)
 }
 
 // GetCalculatorTool returns the tool definition for calculator
 func GetCalculatorTool() llm.AITool {
-	return llm.AITool{
-		Name:        "calculate",
-		Description: "Perform mathematical calculations. Supports basic arithmetic (+, -, *, /), exponentiation (^), square root (sqrt), and parentheses.",
-		Parameters: map[string]any{
+	return llm.NewAIFunctionTool(
+		"calculate",
+		"Perform mathematical calculations. Supports basic arithmetic (+, -, *, /), exponentiation (^), square root (sqrt), and parentheses.",
+		map[string]any{
 			"type": "object",
 			"properties": map[string]any{
 				"expression": map[string]string{
@@ -42,7 +42,7 @@ func GetCalculatorTool() llm.AITool {
 			},
 			"required": []string{"expression"},
 		},
-	}
+	)
 }
 
 // GetAllTools returns all available tools
