@@ -62,6 +62,8 @@ func (n *UINotifier) HandleDomainEvent(event sdk.Event) error {
 			return n.emitLinearAlgebraQuestion(evt)
 		case agents.EventTypeQuestionAnswered:
 			return n.emitQuestionAnswered(evt)
+		case agents.EventTypeAgentHandoff:
+			return n.emitAgentHandoff(evt)
 		default:
 			return nil
 		}
@@ -202,6 +204,19 @@ func (n *UINotifier) emitLinearAlgebraQuestion(evt *agents.DomainEvent) error {
 			"question":  evt.GetString("question"),
 			"emittedBy": evt.GetString("emitted_by"),
 			"context":   evt.GetString("context"),
+			"timestamp": evt.Timestamp.UnixMilli(),
+		}),
+	)
+	return n.emitter.Emit(uiEvent)
+}
+
+func (n *UINotifier) emitAgentHandoff(evt *agents.DomainEvent) error {
+	uiEvent := aguievents.NewCustomEvent(
+		"AGENT_HANDOFF",
+		aguievents.WithValue(map[string]interface{}{
+			"fromAgent": evt.GetString("from_agent"),
+			"toAgent":   evt.GetString("to_agent"),
+			"reason":    evt.GetString("reason"),
 			"timestamp": evt.Timestamp.UnixMilli(),
 		}),
 	)

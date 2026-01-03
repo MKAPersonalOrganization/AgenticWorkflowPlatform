@@ -6,6 +6,7 @@ import "school-with-ai/components/alert"
 import "school-with-ai/components/badge"
 import "school-with-ai/components/skeleton"
 import "school-with-ai/components/collapsible"
+import "school-with-ai/components/agenthandoff"
 
 templ MessageList() {
 	<div class="space-y-4">
@@ -154,6 +155,8 @@ templ MessageList() {
 						}
 					}
 				</div>
+				<!-- Agent Handoff Message -->
+				@agenthandoff.AgentHandoff()
 				<!-- Assistant Message -->
 				@message.AssistantMessage()
 			</div>
