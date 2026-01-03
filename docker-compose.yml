@@ -1,0 +1,32 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/workspace
+      - go-modules:/go/pkg/mod
+    working_dir: /workspace
+    command: go run main.go
+    environment:
+      - CGO_ENABLED=1
+      - GO111MODULE=on
+
+  # For testing only
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - .:/workspace
+      - go-modules:/go/pkg/mod
+    working_dir: /workspace
+    command: go test ./... -v
+    environment:
+      - CGO_ENABLED=1
+      - GO111MODULE=on
+
+volumes:
+  go-modules:

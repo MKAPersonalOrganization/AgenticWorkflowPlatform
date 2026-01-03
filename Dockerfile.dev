@@ -1,0 +1,58 @@
+# Development Dockerfile with gosl support
+FROM ubuntu:22.04
+
+# Disable tzdata questions
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Use bash
+SHELL ["/bin/bash", "-c"]
+
+# Essential tools
+RUN apt-get update -y && apt-get install -y --no-install-recommends \
+  ca-certificates \
+  netbase \
+  curl \
+  git \
+  && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Required compilers and libraries for gosl
+RUN apt-get update -y && apt-get install -y --no-install-recommends \
+  gcc \
+  gfortran \
+  libfftw3-dev \
+  liblapacke-dev \
+  libmetis-dev \
+  libmumps-seq-dev \
+  libopenblas-dev \
+  libsuitesparse-dev \
+  && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Install Go
+ARG GO_VERSION=1.24.2
+RUN curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar -xzC /usr/local
+
+# Set Go environment
+ENV PATH="/usr/local/go/bin:${PATH}"
+ENV GOPATH="/go"
+ENV PATH="${GOPATH}/bin:${PATH}"
+
+# Set working directory
+WORKDIR /workspace
+
+# Copy go.mod and go.sum first for better caching
+COPY go.mod go.sum* ./
+
+# Download dependencies
+RUN go mod download
+
+# Copy the rest of the application
+COPY . .
+
+# Build the application
+RUN go build -o bin/school-with-ai .
+
+# Expose port
+EXPOSE 8080
+
+# Run the application
+CMD ["./bin/school-with-ai"]
