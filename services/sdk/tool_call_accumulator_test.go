@@ -3,33 +3,36 @@ package sdk_test
 import (
 	"testing"
 
-	"school-with-ai/services/sdk"
 	"school-with-ai/services/llm"
+	"school-with-ai/services/sdk"
 )
 
 func TestToolCallAccumulator_NewToolCall(t *testing.T) {
 	acc := sdk.NewToolCallAccumulator()
 
-	// First delta starts a new tool call
-	delta := llm.ToolCallDelta{
-		Index: 0,
-		ID:    "call_123",
-		Name:  "get_weather",
+	// First update starts a new tool call
+	update := llm.ChatResponseUpdate{
+		ToolCallIndex: 0,
+		ToolCallID:    "call_123",
+		Contents: []llm.AIContent{llm.FunctionCallContent{
+			CallID: "call_123",
+			Name:   "get_weather",
+		}},
 	}
 
-	update, ok := acc.ProcessDelta(delta)
+	result, ok := acc.ProcessUpdate(update)
 	if !ok {
-		t.Fatal("expected delta to be processed")
+		t.Fatal("expected update to be processed")
 	}
 
-	if !update.IsNew {
+	if !result.IsNew {
 		t.Error("expected IsNew to be true")
 	}
-	if update.ID != "call_123" {
-		t.Errorf("expected ID 'call_123', got '%s'", update.ID)
+	if result.ID != "call_123" {
+		t.Errorf("expected ID 'call_123', got '%s'", result.ID)
 	}
-	if update.Name != "get_weather" {
-		t.Errorf("expected Name 'get_weather', got '%s'", update.Name)
+	if result.Name != "get_weather" {
+		t.Errorf("expected Name 'get_weather', got '%s'", result.Name)
 	}
 	if acc.Count() != 1 {
 		t.Errorf("expected count 1, got %d", acc.Count())
@@ -40,19 +43,24 @@ func TestToolCallAccumulator_ArgumentStreaming(t *testing.T) {
 	acc := sdk.NewToolCallAccumulator()
 
 	// Start tool call
-	acc.ProcessDelta(llm.ToolCallDelta{
-		Index: 0,
-		ID:    "call_123",
-		Name:  "get_weather",
+	acc.ProcessUpdate(llm.ChatResponseUpdate{
+		ToolCallIndex: 0,
+		ToolCallID:    "call_123",
+		Contents: []llm.AIContent{llm.FunctionCallContent{
+			CallID: "call_123",
+			Name:   "get_weather",
+		}},
 	})
 
 	// Stream arguments in chunks
-	update1, ok := acc.ProcessDelta(llm.ToolCallDelta{
-		Index:     0,
-		Arguments: `{"city":`,
+	update1, ok := acc.ProcessUpdate(llm.ChatResponseUpdate{
+		ToolCallIndex: 0,
+		Contents: []llm.AIContent{llm.FunctionCallContent{
+			ArgumentsJSON: `{"city":`,
+		}},
 	})
 	if !ok {
-		t.Fatal("expected delta to be processed")
+		t.Fatal("expected update to be processed")
 	}
 	if update1.IsNew {
 		t.Error("expected IsNew to be false for continuation")
@@ -61,9 +69,11 @@ func TestToolCallAccumulator_ArgumentStreaming(t *testing.T) {
 		t.Errorf("unexpected args delta: %s", update1.ArgsDelta)
 	}
 
-	update2, _ := acc.ProcessDelta(llm.ToolCallDelta{
-		Index:     0,
-		Arguments: `"London"}`,
+	update2, _ := acc.ProcessUpdate(llm.ChatResponseUpdate{
+		ToolCallIndex: 0,
+		Contents: []llm.AIContent{llm.FunctionCallContent{
+			ArgumentsJSON: `"London"}`,
+		}},
 	})
 	if update2.ArgsDelta != `"London"}` {
 		t.Errorf("unexpected args delta: %s", update2.ArgsDelta)
@@ -83,25 +93,35 @@ func TestToolCallAccumulator_MultipleToolCalls(t *testing.T) {
 	acc := sdk.NewToolCallAccumulator()
 
 	// First tool call
-	acc.ProcessDelta(llm.ToolCallDelta{
-		Index: 0,
-		ID:    "call_1",
-		Name:  "get_weather",
+	acc.ProcessUpdate(llm.ChatResponseUpdate{
+		ToolCallIndex: 0,
+		ToolCallID:    "call_1",
+		Contents: []llm.AIContent{llm.FunctionCallContent{
+			CallID: "call_1",
+			Name:   "get_weather",
+		}},
 	})
-	acc.ProcessDelta(llm.ToolCallDelta{
-		Index:     0,
-		Arguments: `{"city":"London"}`,
+	acc.ProcessUpdate(llm.ChatResponseUpdate{
+		ToolCallIndex: 0,
+		Contents: []llm.AIContent{llm.FunctionCallContent{
+			ArgumentsJSON: `{"city":"London"}`,
+		}},
 	})
 
 	// Second tool call
-	acc.ProcessDelta(llm.ToolCallDelta{
-		Index: 1,
-		ID:    "call_2",
-		Name:  "calculate",
+	acc.ProcessUpdate(llm.ChatResponseUpdate{
+		ToolCallIndex: 1,
+		ToolCallID:    "call_2",
+		Contents: []llm.AIContent{llm.FunctionCallContent{
+			CallID: "call_2",
+			Name:   "calculate",
+		}},
 	})
-	acc.ProcessDelta(llm.ToolCallDelta{
-		Index:     1,
-		Arguments: `{"expr":"2+2"}`,
+	acc.ProcessUpdate(llm.ChatResponseUpdate{
+		ToolCallIndex: 1,
+		Contents: []llm.AIContent{llm.FunctionCallContent{
+			ArgumentsJSON: `{"expr":"2+2"}`,
+		}},
 	})
 
 	if acc.Count() != 2 {
@@ -121,10 +141,13 @@ func TestToolCallAccumulator_HasToolCalls(t *testing.T) {
 		t.Error("expected HasToolCalls to be false initially")
 	}
 
-	acc.ProcessDelta(llm.ToolCallDelta{
-		Index: 0,
-		ID:    "call_1",
-		Name:  "get_weather",
+	acc.ProcessUpdate(llm.ChatResponseUpdate{
+		ToolCallIndex: 0,
+		ToolCallID:    "call_1",
+		Contents: []llm.AIContent{llm.FunctionCallContent{
+			CallID: "call_1",
+			Name:   "get_weather",
+		}},
 	})
 
 	if !acc.HasToolCalls() {
@@ -135,13 +158,15 @@ func TestToolCallAccumulator_HasToolCalls(t *testing.T) {
 func TestToolCallAccumulator_UnknownIndex(t *testing.T) {
 	acc := sdk.NewToolCallAccumulator()
 
-	// Delta for unknown index should not be processed
-	_, ok := acc.ProcessDelta(llm.ToolCallDelta{
-		Index:     5, // No tool call at this index
-		Arguments: `{"foo":"bar"}`,
+	// Update for unknown index should not be processed
+	_, ok := acc.ProcessUpdate(llm.ChatResponseUpdate{
+		ToolCallIndex: 5, // No tool call at this index
+		Contents: []llm.AIContent{llm.FunctionCallContent{
+			ArgumentsJSON: `{"foo":"bar"}`,
+		}},
 	})
 
 	if ok {
-		t.Error("expected delta for unknown index to not be processed")
+		t.Error("expected update for unknown index to not be processed")
 	}
 }

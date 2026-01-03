@@ -4,196 +4,310 @@ import (
 	"context"
 	"iter"
 
-	"school-with-ai/domain"
-
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
 )
 
-// OpenAIProvider implements the Provider interface for OpenAI
-type OpenAIProvider struct {
+// OpenAIClient implements the ChatClient interface for OpenAI.
+// It provides streaming chat completions using the OpenAI API.
+type OpenAIClient struct {
 	client *openai.Client
 	model  string
 }
 
-// NewOpenAIProvider creates a new OpenAI provider with a model
-// Requires OPENAI_API_KEY environment variable to be set
-func NewOpenAIProvider(model string) *OpenAIProvider {
+// NewOpenAIClient creates a new OpenAI client with the specified model.
+// Requires OPENAI_API_KEY environment variable to be set.
+func NewOpenAIClient(model string) *OpenAIClient {
 	client := openai.NewClient()
-	return &OpenAIProvider{
+	return &OpenAIClient{
 		client: &client,
 		model:  model,
 	}
 }
 
-// NewOpenAIProviderWithAPIKey creates a new OpenAI provider with an explicit API key and model
-func NewOpenAIProviderWithAPIKey(apiKey string, model string) *OpenAIProvider {
+// NewOpenAIClientWithAPIKey creates a new OpenAI client with an explicit API key and model.
+func NewOpenAIClientWithAPIKey(apiKey string, model string) *OpenAIClient {
 	client := openai.NewClient(
 		option.WithAPIKey(apiKey),
 	)
-	return &OpenAIProvider{
+	return &OpenAIClient{
 		client: &client,
 		model:  model,
 	}
 }
 
-// CreateStreamingCompletion implements the Provider interface
-func (p *OpenAIProvider) CreateStreamingCompletion(
+// GetStreamingResponse implements the ChatClient interface.
+// It sends messages to OpenAI and streams back response updates.
+func (c *OpenAIClient) GetStreamingResponse(
 	ctx context.Context,
-	config CompletionConfig,
-) iter.Seq2[StreamChunk, error] {
-	return func(yield func(StreamChunk, error) bool) {
-		// Convert session messages to OpenAI format
-		params := buildOpenAIMessages(config.Messages)
-
-		// Prepend system message if system prompt is provided
-		if config.SystemPrompt != "" {
-			systemMessage := openai.ChatCompletionMessageParamUnion(
-				openai.SystemMessage(config.SystemPrompt),
-			)
-			params = append([]openai.ChatCompletionMessageParamUnion{systemMessage}, params...)
-		}
+	messages []ChatMessage,
+	options *ChatOptions,
+) iter.Seq2[ChatResponseUpdate, error] {
+	return func(yield func(ChatResponseUpdate, error) bool) {
+		// Build OpenAI message parameters
+		params := c.buildMessages(messages, options)
 
 		// Build stream parameters
 		streamParams := openai.ChatCompletionNewParams{
 			Messages: params,
-			Model:    openai.ChatModel(p.model),
+			Model:    c.getModel(options),
 		}
 
-		// Convert and add tools if provided
-		if len(config.Tools) > 0 {
-			openaiTools := make([]openai.ChatCompletionToolUnionParam, 0, len(config.Tools))
-			for _, tool := range config.Tools {
-				funcDef := openai.FunctionDefinitionParam{
-					Name:        tool.Name,
-					Description: openai.String(tool.Description),
-				}
-
-				// Set parameters if provided
-				// tool.Parameters is map[string]any which is compatible with openai.FunctionParameters
-				if tool.Parameters != nil {
-					funcDef.Parameters = openai.FunctionParameters(tool.Parameters.(map[string]any))
-				}
-
-				openaiTools = append(openaiTools, openai.ChatCompletionFunctionTool(funcDef))
-			}
-			streamParams.Tools = openaiTools
-		}
+		// Apply options
+		c.applyOptions(&streamParams, options)
 
 		// Create the stream
-		stream := p.client.Chat.Completions.NewStreaming(ctx, streamParams)
+		stream := c.client.Chat.Completions.NewStreaming(ctx, streamParams)
 
-		// Track active tool calls by index
-		toolCallsByIndex := make(map[int]*ToolCallDelta)
+		var responseID string
+		var finishReason FinishReason
 
 		// Iterate over stream chunks
 		for stream.Next() {
 			chunk := stream.Current()
 
+			// Capture response ID from first chunk
+			if responseID == "" && chunk.ID != "" {
+				responseID = chunk.ID
+			}
+
 			if len(chunk.Choices) > 0 {
-				delta := chunk.Choices[0].Delta
-				streamChunk := StreamChunk{}
+				choice := chunk.Choices[0]
+				delta := choice.Delta
+
+				// Check for finish reason
+				if choice.FinishReason != "" {
+					finishReason = mapFinishReason(string(choice.FinishReason))
+				}
 
 				// Handle text content
 				if delta.Content != "" {
-					streamChunk.Content = delta.Content
-				}
-
-				// Handle tool calls
-				if len(delta.ToolCalls) > 0 {
-					for _, tc := range delta.ToolCalls {
-						index := int(tc.Index)
-
-						// Get or create tool call state
-						toolCall, exists := toolCallsByIndex[index]
-						if !exists {
-							toolCall = &ToolCallDelta{
-								Index: index,
-							}
-							toolCallsByIndex[index] = toolCall
-						}
-
-						// Update fields from delta
-						if tc.ID != "" {
-							toolCall.ID = tc.ID
-						}
-						if tc.Function.Name != "" {
-							toolCall.Name = tc.Function.Name
-						}
-						if tc.Function.Arguments != "" {
-							toolCall.Arguments += tc.Function.Arguments
-						}
-
-						// Add to chunk (only include fields from the delta, not accumulated state)
-						streamChunk.ToolCalls = append(streamChunk.ToolCalls, ToolCallDelta{
-							Index:     index,
-							ID:        tc.ID,                 // From delta, not accumulated
-							Name:      tc.Function.Name,      // From delta, not accumulated
-							Arguments: tc.Function.Arguments, // From delta, not accumulated
-						})
+					update := ChatResponseUpdate{
+						Role:       ChatRoleAssistant,
+						ResponseID: responseID,
+						Contents:   []AIContent{TextContent{Text: delta.Content}},
+					}
+					if !yield(update, nil) {
+						return
 					}
 				}
 
-				// Yield the chunk
-				if !yield(streamChunk, nil) {
-					return
+				// Handle tool calls
+				for _, tc := range delta.ToolCalls {
+					update := c.buildToolCallUpdate(tc, responseID)
+					if !yield(update, nil) {
+						return
+					}
 				}
 			}
 		}
 
 		// Check for stream errors
 		if err := stream.Err(); err != nil {
-			yield(StreamChunk{}, err)
+			yield(ChatResponseUpdate{}, err)
+			return
+		}
+
+		// Yield final update with finish reason
+		if finishReason != "" {
+			finalUpdate := ChatResponseUpdate{
+				Role:         ChatRoleAssistant,
+				ResponseID:   responseID,
+				FinishReason: finishReason,
+			}
+			yield(finalUpdate, nil)
 		}
 	}
 }
 
-// buildOpenAIMessages converts session messages to OpenAI message format
-func buildOpenAIMessages(messages []domain.Message) []openai.ChatCompletionMessageParamUnion {
-	params := make([]openai.ChatCompletionMessageParamUnion, 0, len(messages))
+// buildMessages converts ChatMessage slice to OpenAI message format.
+func (c *OpenAIClient) buildMessages(messages []ChatMessage, options *ChatOptions) []openai.ChatCompletionMessageParamUnion {
+	params := make([]openai.ChatCompletionMessageParamUnion, 0, len(messages)+1)
 
+	// Prepend system message if instructions are provided
+	if options != nil && options.Instructions != "" {
+		params = append(params, openai.SystemMessage(options.Instructions))
+	}
+
+	// Convert each message
 	for _, msg := range messages {
 		switch msg.Role {
-		case "user":
-			params = append(params, openai.UserMessage(msg.Content))
-		case "assistant":
-			// Check if assistant message has tool calls
-			if len(msg.ToolCalls) > 0 {
-				// Convert tool calls to OpenAI format
-				toolCalls := make([]openai.ChatCompletionMessageToolCallUnionParam, 0, len(msg.ToolCalls))
-				for _, tc := range msg.ToolCalls {
-					toolCalls = append(toolCalls, openai.ChatCompletionMessageToolCallUnionParam{
-						OfFunction: &openai.ChatCompletionMessageFunctionToolCallParam{
-							ID: tc.ID,
-							Function: openai.ChatCompletionMessageFunctionToolCallFunctionParam{
-								Arguments: tc.Function.Arguments,
-								Name:      tc.Function.Name,
-							},
-						},
-					})
-				}
+		case ChatRoleUser:
+			params = append(params, openai.UserMessage(msg.Text()))
 
-				// Build assistant message with tool calls
-				var asst openai.ChatCompletionAssistantMessageParam
-				if msg.Content != "" {
-					asst.Content.OfString = openai.String(msg.Content)
-				}
-				asst.Role = "assistant"
-				asst.ToolCalls = toolCalls
+		case ChatRoleAssistant:
+			params = append(params, c.buildAssistantMessage(msg))
 
-				params = append(params, openai.ChatCompletionMessageParamUnion{
-					OfAssistant: &asst,
-				})
-			} else {
-				params = append(params, openai.AssistantMessage(msg.Content))
+		case ChatRoleTool:
+			for _, fr := range msg.FunctionResults() {
+				content := fr.Result
+				if fr.IsError() {
+					content = fr.Error
+				}
+				params = append(params, openai.ToolMessage(content, fr.CallID))
 			}
-		case "tool":
-			// Tool result message (content first, then toolCallID)
-			params = append(params, openai.ToolMessage(msg.Content, msg.ToolCallID))
-		case "system":
-			params = append(params, openai.SystemMessage(msg.Content))
+
+		case ChatRoleSystem:
+			params = append(params, openai.SystemMessage(msg.Text()))
 		}
 	}
 
 	return params
+}
+
+// buildAssistantMessage converts an assistant ChatMessage to OpenAI format.
+func (c *OpenAIClient) buildAssistantMessage(msg ChatMessage) openai.ChatCompletionMessageParamUnion {
+	functionCalls := msg.FunctionCalls()
+
+	if len(functionCalls) > 0 {
+		// Build tool calls
+		toolCalls := make([]openai.ChatCompletionMessageToolCallUnionParam, 0, len(functionCalls))
+		for _, fc := range functionCalls {
+			toolCalls = append(toolCalls, openai.ChatCompletionMessageToolCallUnionParam{
+				OfFunction: &openai.ChatCompletionMessageFunctionToolCallParam{
+					ID: fc.CallID,
+					Function: openai.ChatCompletionMessageFunctionToolCallFunctionParam{
+						Arguments: fc.GetArgumentsJSON(),
+						Name:      fc.Name,
+					},
+				},
+			})
+		}
+
+		// Build assistant message with tool calls
+		var asst openai.ChatCompletionAssistantMessageParam
+		text := msg.Text()
+		if text != "" {
+			asst.Content.OfString = openai.String(text)
+		}
+		asst.Role = "assistant"
+		asst.ToolCalls = toolCalls
+
+		return openai.ChatCompletionMessageParamUnion{
+			OfAssistant: &asst,
+		}
+	}
+
+	return openai.AssistantMessage(msg.Text())
+}
+
+// buildToolCallUpdate creates a ChatResponseUpdate from an OpenAI tool call delta.
+func (c *OpenAIClient) buildToolCallUpdate(tc openai.ChatCompletionChunkChoiceDeltaToolCall, responseID string) ChatResponseUpdate {
+	update := ChatResponseUpdate{
+		Role:          ChatRoleAssistant,
+		ResponseID:    responseID,
+		ToolCallIndex: int(tc.Index),
+		ToolCallID:    tc.ID,
+	}
+
+	// Add function call content if we have name or arguments
+	if tc.ID != "" || tc.Function.Name != "" || tc.Function.Arguments != "" {
+		fc := FunctionCallContent{
+			CallID:        tc.ID,
+			Name:          tc.Function.Name,
+			ArgumentsJSON: tc.Function.Arguments,
+		}
+		update.Contents = []AIContent{fc}
+	}
+
+	return update
+}
+
+// applyOptions applies ChatOptions to OpenAI stream parameters.
+func (c *OpenAIClient) applyOptions(params *openai.ChatCompletionNewParams, options *ChatOptions) {
+	if options == nil {
+		return
+	}
+
+	// Apply temperature
+	if options.Temperature != nil {
+		params.Temperature = openai.Float(*options.Temperature)
+	}
+
+	// Apply max tokens
+	if options.MaxOutputTokens != nil {
+		params.MaxTokens = openai.Int(int64(*options.MaxOutputTokens))
+	}
+
+	// Apply top_p
+	if options.TopP != nil {
+		params.TopP = openai.Float(*options.TopP)
+	}
+
+	// Apply frequency penalty
+	if options.FrequencyPenalty != nil {
+		params.FrequencyPenalty = openai.Float(*options.FrequencyPenalty)
+	}
+
+	// Apply presence penalty
+	if options.PresencePenalty != nil {
+		params.PresencePenalty = openai.Float(*options.PresencePenalty)
+	}
+
+	// Apply stop sequences
+	if len(options.StopSequences) > 0 {
+		params.Stop = openai.ChatCompletionNewParamsStopUnion{
+			OfStringArray: options.StopSequences,
+		}
+	}
+
+	// Apply seed
+	if options.Seed != nil {
+		params.Seed = openai.Int(*options.Seed)
+	}
+
+	// Apply tools
+	if len(options.Tools) > 0 {
+		openaiTools := make([]openai.ChatCompletionToolUnionParam, 0, len(options.Tools))
+		for _, tool := range options.Tools {
+			funcDef := openai.FunctionDefinitionParam{
+				Name:        tool.Name,
+				Description: openai.String(tool.Description),
+			}
+
+			if tool.Parameters != nil {
+				funcDef.Parameters = openai.FunctionParameters(tool.Parameters)
+			}
+
+			openaiTools = append(openaiTools, openai.ChatCompletionFunctionTool(funcDef))
+		}
+		params.Tools = openaiTools
+
+		// Apply tool mode
+		switch options.ToolMode {
+		case ToolModeNone:
+			params.ToolChoice = openai.ChatCompletionToolChoiceOptionUnionParam{
+				OfAuto: openai.String("none"),
+			}
+		case ToolModeRequired:
+			params.ToolChoice = openai.ChatCompletionToolChoiceOptionUnionParam{
+				OfAuto: openai.String("required"),
+			}
+		// ToolModeAuto is the default, no need to set
+		}
+	}
+}
+
+// getModel returns the model to use, preferring options.ModelID if set.
+func (c *OpenAIClient) getModel(options *ChatOptions) openai.ChatModel {
+	if options != nil && options.ModelID != "" {
+		return openai.ChatModel(options.ModelID)
+	}
+	return openai.ChatModel(c.model)
+}
+
+// mapFinishReason converts OpenAI finish reason to our FinishReason type.
+func mapFinishReason(reason string) FinishReason {
+	switch reason {
+	case "stop":
+		return FinishReasonStop
+	case "length":
+		return FinishReasonLength
+	case "tool_calls":
+		return FinishReasonToolCalls
+	case "content_filter":
+		return FinishReasonContentFilter
+	default:
+		return FinishReason(reason)
+	}
 }

@@ -27,54 +27,65 @@ func NewToolCallAccumulator() *ToolCallAccumulator {
 	}
 }
 
-// ToolCallUpdate represents the result of processing a delta
+// ToolCallUpdate represents the result of processing an update
 type ToolCallUpdate struct {
-	ID          string
-	Name        string
-	IsNew       bool   // true if this is a new tool call
-	ArgsDelta   string // the new arguments added in this delta
+	ID        string
+	Name      string
+	IsNew     bool   // true if this is a new tool call
+	ArgsDelta string // the new arguments added in this update
 }
 
-// ProcessDelta processes a streaming tool call delta
-// Returns the update info and whether the delta was processed
-func (a *ToolCallAccumulator) ProcessDelta(delta llm.ToolCallDelta) (ToolCallUpdate, bool) {
-	index := delta.Index
+// ProcessUpdate processes a ChatResponseUpdate and extracts tool call information.
+// Returns the update info and whether any tool call content was found.
+func (a *ToolCallAccumulator) ProcessUpdate(update llm.ChatResponseUpdate) (ToolCallUpdate, bool) {
+	// Get function calls from the update
+	functionCalls := update.FunctionCalls()
+	if len(functionCalls) == 0 {
+		return ToolCallUpdate{}, false
+	}
 
-	// Check if this is a new tool call (has ID and Name)
-	if delta.ID != "" && delta.Name != "" {
+	// Process the first function call in the update
+	fc := functionCalls[0]
+	index := update.ToolCallIndex
+
+	// Check if this is a new tool call (has CallID and Name)
+	if fc.CallID != "" && fc.Name != "" {
 		state := &toolCallState{
-			ID:        delta.ID,
+			ID:        fc.CallID,
 			Index:     index,
-			Name:      delta.Name,
-			Arguments: delta.Arguments,
+			Name:      fc.Name,
+			Arguments: fc.ArgumentsJSON,
 		}
-		a.byID[delta.ID] = state
+		a.byID[fc.CallID] = state
 		a.byIndex[index] = state
 
 		return ToolCallUpdate{
-			ID:        delta.ID,
-			Name:      delta.Name,
+			ID:        fc.CallID,
+			Name:      fc.Name,
 			IsNew:     true,
-			ArgsDelta: delta.Arguments,
+			ArgsDelta: fc.ArgumentsJSON,
 		}, true
 	}
 
-	// This is a continuation - find by index
+	// This is a continuation - find by index or ID
 	state, exists := a.byIndex[index]
+	if !exists && update.ToolCallID != "" {
+		state, exists = a.byID[update.ToolCallID]
+	}
 	if !exists {
 		return ToolCallUpdate{}, false
 	}
 
 	// Accumulate arguments
-	if delta.Arguments != "" {
-		state.Arguments += delta.Arguments
+	if fc.ArgumentsJSON != "" {
+		state.Arguments += fc.ArgumentsJSON
 	}
 
 	return ToolCallUpdate{
 		ID:        state.ID,
 		Name:      state.Name,
 		IsNew:     false,
-		ArgsDelta: delta.Arguments,
+		ArgsDelta: fc.ArgumentsJSON,
 	}, true
 }
 

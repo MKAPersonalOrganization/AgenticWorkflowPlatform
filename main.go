@@ -38,9 +38,9 @@ func main() {
 	eventLog := infra.NewInMemoryEventLog()
 	threadState := infra.NewInMemoryThreadState()
 
-	// Initialize OpenAI provider with model
+	// Initialize OpenAI chat client with model
 	model := string(openai.ChatModelGPT4oMini) // Use GPT-4o-mini for cost efficiency
-	provider := llm.NewOpenAIProvider(model)
+	chatClient := llm.NewOpenAIClient(model)
 
 	// Initialize job queue
 	queue := infra.NewInMemoryJobQueue()
@@ -57,7 +57,7 @@ func main() {
 	agentRegistry.Register("linearalgebra-professor", linearalgebra.CreateLinearAlgebraProfessor)
 
 	// Initialize and start worker pool with agent registry
-	workerPool := infra.NewWorkerPool(queue, eventLog, threadState, provider, agentRegistry, infra.WorkerPoolConfig{
+	workerPool := infra.NewWorkerPool(queue, eventLog, threadState, chatClient, agentRegistry, infra.WorkerPoolConfig{
 		NumWorkers:   5,
 		PollInterval: 100 * time.Millisecond,
 	})
@@ -73,7 +73,7 @@ func main() {
 	mux.Handle("/assets/charts/", http.StripPrefix("/assets/charts/", http.FileServer(http.Dir("./assets/charts"))))
 
 	// Create handler with EventLog and ThreadState
-	handler := infra.NewHandler(eventLog, threadState, provider, queue, workerPool)
+	handler := infra.NewHandler(eventLog, threadState, chatClient, queue, workerPool)
 
 	// Chat routes
 	mux.HandleFunc("/send", handler.SendMessage)

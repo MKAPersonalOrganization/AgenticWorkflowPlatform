@@ -6,176 +6,194 @@ import (
 	"fmt"
 	"iter"
 
-	"school-with-ai/domain"
-
 	"github.com/ollama/ollama/api"
 )
 
-// OllamaProvider implements the Provider interface for Ollama
-type OllamaProvider struct {
+// OllamaClient implements the ChatClient interface for Ollama.
+// It provides streaming chat completions using the Ollama API.
+type OllamaClient struct {
 	client *api.Client
 	model  string
 }
 
-// NewOllamaProvider creates a new Ollama provider with a model
-// Connects to Ollama server at OLLAMA_HOST (defaults to http://localhost:11434)
-func NewOllamaProvider(model string) (*OllamaProvider, error) {
+// NewOllamaClient creates a new Ollama client with the specified model.
+// Connects to Ollama server at OLLAMA_HOST (defaults to http://localhost:11434).
+func NewOllamaClient(model string) (*OllamaClient, error) {
 	client, err := api.ClientFromEnvironment()
 	if err != nil {
 		return nil, fmt.Errorf("ollama client: %w", err)
 	}
 
-	return &OllamaProvider{
+	return &OllamaClient{
 		client: client,
 		model:  model,
 	}, nil
 }
 
-// NewOllamaProviderWithClient creates a new Ollama provider with a custom client
-func NewOllamaProviderWithClient(client *api.Client, model string) *OllamaProvider {
-	return &OllamaProvider{
+// NewOllamaClientWithClient creates a new Ollama client with a custom api.Client.
+func NewOllamaClientWithClient(client *api.Client, model string) *OllamaClient {
+	return &OllamaClient{
 		client: client,
 		model:  model,
 	}
 }
 
-// CreateStreamingCompletion implements the Provider interface
-func (p *OllamaProvider) CreateStreamingCompletion(
+// GetStreamingResponse implements the ChatClient interface.
+// It sends messages to Ollama and streams back response updates.
+func (c *OllamaClient) GetStreamingResponse(
 	ctx context.Context,
-	config CompletionConfig,
-) iter.Seq2[StreamChunk, error] {
-	return func(yield func(StreamChunk, error) bool) {
-		// Convert messages to Ollama format
-		messages := buildOllamaMessages(config.Messages)
+	messages []ChatMessage,
+	options *ChatOptions,
+) iter.Seq2[ChatResponseUpdate, error] {
+	return func(yield func(ChatResponseUpdate, error) bool) {
+		// Build Ollama messages
+		ollamaMessages := c.buildMessages(messages, options)
 
 		// Build chat request
 		req := &api.ChatRequest{
-			Model:    p.model,
-			Messages: messages,
+			Model:    c.getModel(options),
+			Messages: ollamaMessages,
 			Stream:   boolPtr(true),
 		}
 
-		// Add tools if provided
-		if len(config.Tools) > 0 {
-			req.Tools = buildOllamaTools(config.Tools)
-		}
+		// Apply options
+		c.applyOptions(req, options)
 
-		// Track active tool calls by index
-		toolCallsByIndex := make(map[int]*ToolCallDelta)
+		// Track tool calls by index for generating IDs
 		var toolCallIndex int
 
 		// Stream chat responses
-		err := p.client.Chat(ctx, req, func(resp api.ChatResponse) error {
-			streamChunk := StreamChunk{}
-
+		err := c.client.Chat(ctx, req, func(resp api.ChatResponse) error {
 			// Handle text content
 			if resp.Message.Content != "" {
-				streamChunk.Content = resp.Message.Content
-			}
-
-			// Handle tool calls
-			if len(resp.Message.ToolCalls) > 0 {
-				for _, tc := range resp.Message.ToolCalls {
-					// Check if this is a new tool call or continuation
-					toolCall, exists := toolCallsByIndex[toolCallIndex]
-					if !exists {
-						// New tool call
-						toolCall = &ToolCallDelta{
-							Index: toolCallIndex,
-							ID:    fmt.Sprintf("call_%d", toolCallIndex),
-							Name:  tc.Function.Name,
-						}
-						toolCallsByIndex[toolCallIndex] = toolCall
-
-						// Emit tool call start
-						streamChunk.ToolCalls = append(streamChunk.ToolCalls, ToolCallDelta{
-							Index: toolCall.Index,
-							ID:    toolCall.ID,
-							Name:  tc.Function.Name,
-						})
-					}
-
-					// Add arguments
-					if tc.Function.Arguments != nil {
-						argsJSON, err := json.Marshal(tc.Function.Arguments)
-						if err == nil {
-							argsDelta := string(argsJSON)
-							toolCall.Arguments = argsDelta
-
-							// Emit arguments
-							streamChunk.ToolCalls = append(streamChunk.ToolCalls, ToolCallDelta{
-								Index:     toolCall.Index,
-								Arguments: argsDelta,
-							})
-						}
-					}
-
-					toolCallIndex++
+				update := ChatResponseUpdate{
+					Role:     ChatRoleAssistant,
+					Contents: []AIContent{TextContent{Text: resp.Message.Content}},
+				}
+				if !yield(update, nil) {
+					return fmt.Errorf("stream cancelled")
 				}
 			}
 
-			// Yield the chunk
-			if !yield(streamChunk, nil) {
-				return fmt.Errorf("stream cancelled")
+			// Handle tool calls
+			for _, tc := range resp.Message.ToolCalls {
+				callID := fmt.Sprintf("call_%d", toolCallIndex)
+
+				// Marshal arguments to JSON
+				var argsJSON string
+				if tc.Function.Arguments != nil {
+					if data, err := json.Marshal(tc.Function.Arguments); err == nil {
+						argsJSON = string(data)
+					}
+				}
+
+				// Emit tool call update
+				update := ChatResponseUpdate{
+					Role:          ChatRoleAssistant,
+					ToolCallIndex: toolCallIndex,
+					ToolCallID:    callID,
+					Contents: []AIContent{FunctionCallContent{
+						CallID:        callID,
+						Name:          tc.Function.Name,
+						ArgumentsJSON: argsJSON,
+					}},
+				}
+
+				if !yield(update, nil) {
+					return fmt.Errorf("stream cancelled")
+				}
+
+				toolCallIndex++
+			}
+
+			// Check for completion
+			if resp.Done {
+				finalUpdate := ChatResponseUpdate{
+					Role:         ChatRoleAssistant,
+					FinishReason: c.mapFinishReason(resp),
+				}
+				if !yield(finalUpdate, nil) {
+					return fmt.Errorf("stream cancelled")
+				}
 			}
 
 			return nil
 		})
+
 		if err != nil {
-			yield(StreamChunk{}, err)
+			yield(ChatResponseUpdate{}, err)
 		}
 	}
 }
 
-// buildOllamaMessages converts domain messages to Ollama format
-func buildOllamaMessages(messages []domain.Message) []api.Message {
-	ollamaMessages := make([]api.Message, 0, len(messages))
+// buildMessages converts ChatMessage slice to Ollama message format.
+func (c *OllamaClient) buildMessages(messages []ChatMessage, options *ChatOptions) []api.Message {
+	ollamaMessages := make([]api.Message, 0, len(messages)+1)
 
+	// Prepend system message if instructions are provided
+	if options != nil && options.Instructions != "" {
+		ollamaMessages = append(ollamaMessages, api.Message{
+			Role:    "system",
+			Content: options.Instructions,
+		})
+	}
+
+	// Convert each message
 	for _, msg := range messages {
 		switch msg.Role {
-		case "user":
+		case ChatRoleUser:
 			ollamaMessages = append(ollamaMessages, api.Message{
 				Role:    "user",
-				Content: msg.Content,
+				Content: msg.Text(),
 			})
 
-		case "assistant":
+		case ChatRoleAssistant:
 			ollamaMsg := api.Message{
 				Role:    "assistant",
-				Content: msg.Content,
+				Content: msg.Text(),
 			}
 
-			// Check if assistant message has tool calls
-			if len(msg.ToolCalls) > 0 {
-				toolCalls := make([]api.ToolCall, 0, len(msg.ToolCalls))
-				for _, tc := range msg.ToolCalls {
-					// Parse arguments as JSON
+			// Convert function calls to tool calls
+			functionCalls := msg.FunctionCalls()
+			if len(functionCalls) > 0 {
+				toolCalls := make([]api.ToolCall, 0, len(functionCalls))
+				for _, fc := range functionCalls {
+					// Parse arguments
 					var args map[string]any
-					if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err == nil {
-						toolCalls = append(toolCalls, api.ToolCall{
-							Function: api.ToolCallFunction{
-								Name:      tc.Function.Name,
-								Arguments: args,
-							},
-						})
+					if fc.Arguments != nil {
+						args = fc.Arguments
+					} else if fc.ArgumentsJSON != "" {
+						json.Unmarshal([]byte(fc.ArgumentsJSON), &args)
 					}
+
+					toolCalls = append(toolCalls, api.ToolCall{
+						Function: api.ToolCallFunction{
+							Name:      fc.Name,
+							Arguments: args,
+						},
+					})
 				}
 				ollamaMsg.ToolCalls = toolCalls
 			}
 
 			ollamaMessages = append(ollamaMessages, ollamaMsg)
 
-		case "tool":
-			// Tool result message
-			ollamaMessages = append(ollamaMessages, api.Message{
-				Role:    "tool",
-				Content: msg.Content,
-			})
+		case ChatRoleTool:
+			for _, fr := range msg.FunctionResults() {
+				content := fr.Result
+				if fr.IsError() {
+					content = fr.Error
+				}
+				ollamaMessages = append(ollamaMessages, api.Message{
+					Role:    "tool",
+					Content: content,
+				})
+			}
 
-		case "system":
+		case ChatRoleSystem:
 			ollamaMessages = append(ollamaMessages, api.Message{
 				Role:    "system",
-				Content: msg.Content,
+				Content: msg.Text(),
 			})
 		}
 	}
@@ -183,13 +201,52 @@ func buildOllamaMessages(messages []domain.Message) []api.Message {
 	return ollamaMessages
 }
 
-// buildOllamaTools converts domain tools to Ollama format
-func buildOllamaTools(tools []Tool) []api.Tool {
+// applyOptions applies ChatOptions to the Ollama chat request.
+func (c *OllamaClient) applyOptions(req *api.ChatRequest, options *ChatOptions) {
+	if options == nil {
+		return
+	}
+
+	// Apply options as a map
+	opts := make(map[string]any)
+
+	if options.Temperature != nil {
+		opts["temperature"] = *options.Temperature
+	}
+
+	if options.MaxOutputTokens != nil {
+		opts["num_predict"] = *options.MaxOutputTokens
+	}
+
+	if options.TopP != nil {
+		opts["top_p"] = *options.TopP
+	}
+
+	if options.Seed != nil {
+		opts["seed"] = *options.Seed
+	}
+
+	if len(options.StopSequences) > 0 {
+		opts["stop"] = options.StopSequences
+	}
+
+	if len(opts) > 0 {
+		req.Options = opts
+	}
+
+	// Apply tools
+	if len(options.Tools) > 0 {
+		req.Tools = c.buildTools(options.Tools)
+	}
+}
+
+// buildTools converts AITool slice to Ollama tool format.
+func (c *OllamaClient) buildTools(tools []AITool) []api.Tool {
 	ollamaTools := make([]api.Tool, 0, len(tools))
 
 	for _, tool := range tools {
 		ollamaTools = append(ollamaTools, api.Tool{
-			Type: tool.Type,
+			Type: "function",
 			Function: api.ToolFunction{
 				Name:        tool.Name,
 				Description: tool.Description,
@@ -201,26 +258,44 @@ func buildOllamaTools(tools []Tool) []api.Tool {
 	return ollamaTools
 }
 
-// convertToToolParameters converts a generic parameters map to Ollama's ToolFunctionParameters
-func convertToToolParameters(params any) api.ToolFunctionParameters {
-	if params == nil {
-		return api.ToolFunctionParameters{}
+// getModel returns the model to use, preferring options.ModelID if set.
+func (c *OllamaClient) getModel(options *ChatOptions) string {
+	if options != nil && options.ModelID != "" {
+		return options.ModelID
 	}
+	return c.model
+}
 
-	paramsMap, ok := params.(map[string]any)
-	if !ok {
+// mapFinishReason determines the finish reason from Ollama response.
+func (c *OllamaClient) mapFinishReason(resp api.ChatResponse) FinishReason {
+	if resp.DoneReason == "stop" {
+		return FinishReasonStop
+	}
+	if resp.DoneReason == "length" {
+		return FinishReasonLength
+	}
+	// Check if the last response had tool calls
+	if len(resp.Message.ToolCalls) > 0 {
+		return FinishReasonToolCalls
+	}
+	return FinishReasonStop
+}
+
+// convertToToolParameters converts a generic parameters map to Ollama's ToolFunctionParameters.
+func convertToToolParameters(params map[string]any) api.ToolFunctionParameters {
+	if params == nil {
 		return api.ToolFunctionParameters{}
 	}
 
 	result := api.ToolFunctionParameters{}
 
 	// Extract type
-	if typeVal, ok := paramsMap["type"].(string); ok {
+	if typeVal, ok := params["type"].(string); ok {
 		result.Type = typeVal
 	}
 
 	// Extract required fields
-	if requiredVal, ok := paramsMap["required"].([]any); ok {
+	if requiredVal, ok := params["required"].([]any); ok {
 		required := make([]string, 0, len(requiredVal))
 		for _, r := range requiredVal {
 			if s, ok := r.(string); ok {
@@ -231,7 +306,7 @@ func convertToToolParameters(params any) api.ToolFunctionParameters {
 	}
 
 	// Extract properties
-	if propsVal, ok := paramsMap["properties"].(map[string]any); ok {
+	if propsVal, ok := params["properties"].(map[string]any); ok {
 		properties := make(map[string]api.ToolProperty)
 		for key, val := range propsVal {
 			if propMap, ok := val.(map[string]any); ok {
@@ -252,32 +327,32 @@ func convertToToolParameters(params any) api.ToolFunctionParameters {
 	}
 
 	// Extract other optional fields
-	if defsVal, ok := paramsMap["$defs"]; ok {
+	if defsVal, ok := params["$defs"]; ok {
 		result.Defs = defsVal
 	}
-	if itemsVal, ok := paramsMap["items"]; ok {
+	if itemsVal, ok := params["items"]; ok {
 		result.Items = itemsVal
 	}
 
 	return result
 }
 
-// boolPtr returns a pointer to a bool value
+// boolPtr returns a pointer to a bool value.
 func boolPtr(b bool) *bool {
 	return &b
 }
 
-// Heartbeat checks if Ollama server is running
-func (p *OllamaProvider) Heartbeat(ctx context.Context) error {
-	return p.client.Heartbeat(ctx)
+// Heartbeat checks if Ollama server is running.
+func (c *OllamaClient) Heartbeat(ctx context.Context) error {
+	return c.client.Heartbeat(ctx)
 }
 
-// ListModels lists available models on the Ollama server
-func (p *OllamaProvider) ListModels(ctx context.Context) (*api.ListResponse, error) {
-	return p.client.List(ctx)
+// ListModels lists available models on the Ollama server.
+func (c *OllamaClient) ListModels(ctx context.Context) (*api.ListResponse, error) {
+	return c.client.List(ctx)
 }
 
-// Version returns the Ollama server version
-func (p *OllamaProvider) Version(ctx context.Context) (string, error) {
-	return p.client.Version(ctx)
+// Version returns the Ollama server version.
+func (c *OllamaClient) Version(ctx context.Context) (string, error) {
+	return c.client.Version(ctx)
 }
