@@ -13,63 +13,96 @@ A chat application built with Go, Templ, Tailwind CSS, and Alpine.js, implementi
 
 ## Architecture
 
-### Multi-Agent System
+### Declarative Event-Driven Multi-Agent System
 
-The application uses an event-driven multi-agent architecture with specialized instructors:
+The application uses a **declarative agent contract architecture** where agents define their behavior through contracts rather than manual wiring.
 
-- **student-facing-agent**: Routes user questions to specialists
-- **math-instructor**: General mathematics, delegates to linear algebra professor
-- **physics-instructor**: Physics problems
-- **chemistry-instructor**: Chemistry topics
-- **statistics-instructor**: Statistical analysis
-- **linearalgebra-professor**: Advanced linear algebra (vectors, matrices, eigenvalues)
+#### Agent Contracts
 
-### Access Control: Capability-Based Security
+Each agent declares its event-driven contract in a `contract.go` file:
 
-The system enforces **which agents can call other agents** through capability-based access control:
-
-**How it works:**
-1. Agents can only use **tools** registered in their tool registry
-2. `emit_linearalgebra_question` tool is **only** registered in math-instructor's registry
-3. Linear algebra professor **only** responds to `LinearAlgebraQuestion` events
-4. Worker pool routes events to appropriate agents
-5. No direct agent-to-agent invocation possible
-
-**Example - Math Instructor calling Linear Algebra Professor:**
 ```go
-// In math-instructor's tool registry:
-registry.Register(sharedtools.NewEmitLinearAlgebraQuestionTool())  // ✅ Has access
-
-// In physics-instructor's tool registry:
-// emit_linearalgebra_question tool NOT registered  // ❌ No access
+var Contract = &eventbus.AgentContract{
+    Name:      "math-instructor",
+    ListensTo: []agents.EventType{agents.EventTypeMathQuestion},
+    Emits:     []agents.EventType{
+        agents.EventTypeQuestionAnswered,
+        agents.EventTypePhysicsQuestion,
+        agents.EventTypeLinearAlgebraQuestion,
+    },
+    Tools:     domainTools(),  // Specialized tools
+    Factory:   CreateMathInstructor,
+}
 ```
 
-This creates a **hard architectural constraint**: only math-instructor can delegate to the linear algebra specialist. Other agents physically cannot invoke it because they lack the necessary tool.
+**What this provides:**
+- **Automatic Event Routing**: Events are routed to agents based on `ListensTo` declarations
+- **Auto-Generated Tools**: Emission tools (e.g., `emit_physics_question`) are generated from `Emits`
+- **Collaboration Tools**: Whiteboard and communication tools are automatically provided
+- **Zero Manual Wiring**: No need to update routing tables or worker pools when adding agents
 
-**Benefits:**
-- Prevents unauthorized agent interactions
-- Clear separation of concerns
-- Type-safe access control enforced at compile time
-- Optimized library usage only where needed (gosl/LAPACK only loaded for linear algebra)
+#### Specialized Agents
+
+- **student-facing-agent**: Routes user questions to appropriate specialists
+- **math-instructor**: General mathematics, can delegate to linear algebra and other specialists
+- **physics-instructor**: Physics problems and applications
+- **chemistry-instructor**: Chemistry topics and reactions
+- **statistics-instructor**: Statistical analysis and probability
+- **linearalgebra-instructor**: Advanced linear algebra (vectors, matrices, eigenvalues)
+- **diagramming-instructor**: Creates diagrams using Mermaid
+
+#### How It Works
+
+1. **Agent Registration**: Contracts are registered in `main.go`:
+   ```go
+   eventbus.GlobalContracts.Register(math.Contract)
+   eventbus.GlobalContracts.Register(physics.Contract)
+   ```
+
+2. **Automatic Tool Generation**: The system generates emission tools for each agent:
+   ```go
+   // For math-instructor that can emit physics questions:
+   emit_physics_question(question="...")  // Auto-generated
+   ```
+
+3. **Event-Driven Collaboration**: Agents collaborate by emitting events:
+   ```
+   User Question → student-facing-agent
+                → emits math_question event
+                → math-instructor receives event
+                → processes and writes to whiteboard
+                → emits question_answered event
+                → student-facing-agent receives callback
+   ```
+
+4. **Shared Whiteboard**: All agents collaborate through a shared whiteboard:
+   - `read_whiteboard`: Read current content
+   - `write_whiteboard`: Update with new content
+   - `emit_question_answered`: Signal completion
+
+#### Adding a New Agent
+
+See [docs/ADDING_NEW_AGENT.md](docs/ADDING_NEW_AGENT.md) for the complete guide.
+
+**Quick overview:**
+1. Create `services/agents/<name>/contract.go` with the agent contract
+2. Implement the agent factory function
+3. Add event type constant to `instructor_events.go`
+4. Register contract in `main.go`
+
+That's it! The system handles routing, tool generation, and event wiring automatically.
+
+#### Architecture Benefits
+
+- **Declarative**: Agents declare what they do, not how routing works
+- **Decoupled**: Agents don't know about each other, only event types
+- **Scalable**: Adding agents doesn't require updating multiple files
+- **Type-Safe**: Event contracts enforced at compile time
+- **Self-Documenting**: Contracts serve as documentation of agent capabilities
 
 ## Authentication
 
 The application uses [Ory Kratos](https://www.ory.sh/kratos/) for identity and user management with a complete self-service flow implementation.
-
-### Features
-
-| Feature | Status |
-|---------|--------|
-| User Registration | ✅ Implemented |
-| Email Verification | ✅ Implemented |
-| User Login | ✅ Implemented |
-| Password Recovery | ✅ Implemented |
-| User Settings | ✅ Implemented |
-| Logout | ✅ Implemented |
-| Session Management | ✅ Implemented |
-| Protected Routes | ✅ Implemented |
-| User Context in Handlers | ✅ Implemented |
-| User UI Elements | ✅ Implemented |
 
 ### Auth Stack
 
@@ -446,8 +479,44 @@ Any changes to `.templ`, `.css`, or `.go` files will automatically rebuild and r
 
 ```
 .
-├── components/          # Templ components
-│   ├── auth/           # Authentication pages
+├── services/
+│   ├── agents/
+│   │   ├── eventbus/              # Event routing and contract registry
+│   │   │   ├── contract.go        # AgentContract type definition
+│   │   │   ├── eventbus.go        # Event subscription management
+│   │   │   ├── emission.go        # Auto-generates emission tools
+│   │   │   └── registry.go        # GlobalContracts singleton
+│   │   ├── math/                  # Math instructor agent
+│   │   │   ├── contract.go        # Math agent contract
+│   │   │   ├── math.go            # Agent factory and config
+│   │   │   └── tools/             # Math-specific tools
+│   │   ├── physics/               # Physics instructor agent
+│   │   ├── chemistry/             # Chemistry instructor agent
+│   │   ├── statistics/            # Statistics instructor agent
+│   │   ├── studentfacing/         # Router agent
+│   │   ├── diagramming/           # Diagramming agent
+│   │   ├── shared/
+│   │   │   └── tools/             # Shared collaboration tools
+│   │   └── instructor_events.go   # Event type constants
+│   ├── sdk/                       # Agent SDK and core runtime
+│   │   ├── agent.go               # Agent execution engine
+│   │   ├── tool_executor.go       # Tool execution handling
+│   │   └── types.go               # Core types and interfaces
+│   └── llm/                       # LLM client abstraction
+├── infra/
+│   ├── worker_pool.go             # Event routing via contracts
+│   ├── ui_notifier.go             # Domain → UI event translation
+│   ├── auth/                      # Authentication infrastructure
+│   │   ├── kratos_client.go       # Ory Kratos API client
+│   │   ├── middleware.go          # Session validation
+│   │   └── handlers.go            # Auth page handlers
+│   └── chat_handlers.go           # Chat API handlers
+├── domain/
+│   ├── domain.go                  # Core domain types
+│   ├── user.go                    # User model
+│   └── job.go                     # Job processing model
+├── components/                    # Templ components
+│   ├── auth/                      # Authentication pages
 │   │   ├── layout.templ           # Base layout for auth pages
 │   │   ├── ui_nodes.templ         # Kratos UI node renderer
 │   │   ├── login.templ            # Login page
@@ -456,9 +525,9 @@ Any changes to `.templ`, `.css`, or `.go` files will automatically rebuild and r
 │   │   ├── recovery.templ         # Password recovery page
 │   │   ├── settings.templ         # User settings page
 │   │   └── error.templ            # Error page
-│   ├── button/         # Button component (from templui)
-│   ├── card/           # Card component (from templui)
-│   ├── input/          # Input component (from templui)
+│   ├── button/                    # Button component (from templui)
+│   ├── card/                      # Card component (from templui)
+│   ├── input/                     # Input component (from templui)
 │   ├── form/           # Form components (from templui)
 │   └── hello.templ     # Main chat UI
 ├── domain/             # Domain models
@@ -491,11 +560,22 @@ Any changes to `.templ`, `.css`, or `.go` files will automatically rebuild and r
 ├── assets/
 │   ├── css/            # Tailwind CSS files
 │   └── js/             # Alpine.js components
-├── main.go             # Application entry point with auth routes
+├── docs/
+│   ├── ADDING_NEW_AGENT.md        # Guide for adding new agents
+│   ├── EVENT_ARCHITECTURE.md      # Event system architecture
+│   ├── EVENT_FLOWS.md             # Event flow diagrams
+│   └── todos.md                   # Implementation status
+├── main.go             # Application entry point with contract registration
 ├── docker-compose.yml  # Infrastructure (Kratos, PostgreSQL, MailSlurper)
-├── Taskfile.yaml       # Task runner configuration
-└── AUTH_IMPLEMENTATION_TODO.md  # Implementation plan (19/20 steps complete - 95%)
+└── Taskfile.yaml       # Task runner configuration
 ```
+
+## Documentation
+
+- **[ADDING_NEW_AGENT.md](docs/ADDING_NEW_AGENT.md)** - Complete guide for adding new specialized agents
+- **[EVENT_ARCHITECTURE.md](docs/EVENT_ARCHITECTURE.md)** - Detailed event system architecture
+- **[EVENT_FLOWS.md](docs/EVENT_FLOWS.md)** - Event flow diagrams and patterns
+- **[AUTH_IMPLEMENTATION_TODO.md](AUTH_IMPLEMENTATION_TODO.md)** - Authentication implementation status (95% complete)
 
 ## AG-UI Protocol
 
