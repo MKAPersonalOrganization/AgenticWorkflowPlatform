@@ -16,6 +16,10 @@ type AgentContract struct {
 	ListensTo []agents.EventType // Events this agent reacts to (subscriptions)
 	Emits     []agents.EventType // Events this agent can emit (publications)
 
+	// Event Handlers - map event types to handler functions
+	// Handlers are invoked when events are received and can modify the agent's behavior
+	Handlers agents.EventHandlerRegistry
+
 	// Tools - domain-specific tools only (emission tools are auto-generated from Emits)
 	Tools []sdk.Tool
 

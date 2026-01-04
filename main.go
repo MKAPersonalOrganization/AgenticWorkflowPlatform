@@ -57,15 +57,8 @@ func main() {
 	eventbus.GlobalContracts.Register(linearalgebra.Contract)
 	eventbus.GlobalContracts.Register(diagramming.Contract)
 
-	// Initialize agent registry from contracts
-	agentRegistry := infra.NewAgentRegistry(nil)
-	for _, contract := range eventbus.GlobalContracts.All() {
-		// Convert eventbus.AgentFactory to infra.AgentFactory (same signature)
-		agentRegistry.Register(contract.Name, infra.AgentFactory(contract.Factory))
-	}
-
-	// Initialize and start worker pool with agent registry
-	workerPool := infra.NewWorkerPool(queue, eventLog, threadState, chatClient, agentRegistry, infra.WorkerPoolConfig{
+	// Initialize and start worker pool
+	workerPool := infra.NewWorkerPool(queue, eventLog, threadState, chatClient, infra.WorkerPoolConfig{
 		NumWorkers:   5,
 		PollInterval: 100 * time.Millisecond,
 	})

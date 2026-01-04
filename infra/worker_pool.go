@@ -15,64 +15,17 @@ import (
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
 
-// AgentFactory is a function that creates an agent configuration with a given notifier
-type AgentFactory func(notifier sdk.EventNotifier) sdk.AgentConfig
-
-// AgentRegistry manages agent factories
-// Agents register themselves with the registry
-type AgentRegistry struct {
-	mu        sync.RWMutex
-	factories map[string]AgentFactory
-	notifier  sdk.EventNotifier
-}
-
-// NewAgentRegistry creates a new agent registry
-func NewAgentRegistry(notifier sdk.EventNotifier) *AgentRegistry {
-	return &AgentRegistry{
-		factories: make(map[string]AgentFactory),
-		notifier:  notifier,
-	}
-}
-
-// Register adds an agent factory to the registry
-func (r *AgentRegistry) Register(name string, factory AgentFactory) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.factories[name] = factory
-}
-
-// GetByName returns the agent configuration for a specific agent by name
-func (r *AgentRegistry) GetByName(name string) (sdk.AgentConfig, bool) {
-	r.mu.RLock()
-	factory, exists := r.factories[name]
-	r.mu.RUnlock()
-
-	if !exists {
-		return sdk.AgentConfig{}, false
-	}
-
-	return factory(r.notifier), true
-}
-
-// SetNotifier updates the notifier for all agents created by this registry
-func (r *AgentRegistry) SetNotifier(notifier sdk.EventNotifier) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.notifier = notifier
-}
-
 // WorkerPool manages a pool of workers that process jobs from the queue
 type WorkerPool struct {
-	queue         domain.JobQueue
-	log           sdk.EventLog
-	state         sdk.ThreadState
-	chatClient    sdk.ChatClient
-	agentRegistry *AgentRegistry
-	numWorkers    int
-	pollInterval  time.Duration
-	ctx           context.Context
-	cancel        context.CancelFunc
-	wg            sync.WaitGroup
+	queue        domain.JobQueue
+	log          sdk.EventLog
+	state        sdk.ThreadState
+	chatClient   sdk.ChatClient
+	numWorkers   int
+	pollInterval time.Duration
+	ctx          context.Context
+	cancel       context.CancelFunc
+	wg           sync.WaitGroup
 
 	// Event storage for jobs (jobID -> buffered events)
 	mu           sync.RWMutex
@@ -92,7 +45,7 @@ type WorkerPoolConfig struct {
 }
 
 // NewWorkerPool creates a new worker pool
-func NewWorkerPool(queue domain.JobQueue, log sdk.EventLog, state sdk.ThreadState, chatClient sdk.ChatClient, agentRegistry *AgentRegistry, config WorkerPoolConfig) *WorkerPool {
+func NewWorkerPool(queue domain.JobQueue, log sdk.EventLog, state sdk.ThreadState, chatClient sdk.ChatClient, config WorkerPoolConfig) *WorkerPool {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	if config.NumWorkers <= 0 {
@@ -107,7 +60,6 @@ func NewWorkerPool(queue domain.JobQueue, log sdk.EventLog, state sdk.ThreadStat
 		log:              log,
 		state:            state,
 		chatClient:       chatClient,
-		agentRegistry:    agentRegistry,
 		numWorkers:       config.NumWorkers,
 		pollInterval:     config.PollInterval,
 		ctx:              ctx,
@@ -307,116 +259,21 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 		_ = emitter.Emit(customEvent)
 	}
 
-	// Generate unique message ID for assistant response
-	assistantMessageID := aguievents.GenerateMessageID()
-
-	// Get conversation history from state
-	messages := wp.state.Messages(job.ThreadID)
-
-	// Determine which agent to use
-	thread, threadExists = wp.state.Get(job.ThreadID)
-
-	// CRITICAL: New user messages MUST always go through student-facing agent first
-	// This ensures proper routing and prevents instructors from receiving direct questions
-	isNewUserMessage := len(messages) == 0 || messages[len(messages)-1].Role == "user"
-
-	// Create UI notifier for this job's event stream
-	notifier := NewUINotifier(emitter)
-
-	// Set the notifier in the registry so all agents created will use it
-	wp.agentRegistry.SetNotifier(notifier)
-
-	var agentConfig sdk.AgentConfig
-	var agentName string
-
-	if !threadExists || thread.CurrentInstructor == "" || isNewUserMessage {
-		// New thread OR new user message - ALWAYS start with student-facing agent (coordinator)
-		agentName = "student-facing-agent"
-	} else {
-		// Continuation from instructor callback - use current agent
-		agentName = thread.CurrentInstructor
+	// Create UserMessage event to trigger student-facing agent
+	userMessageEvent := &agents.DomainEvent{
+		ID:        agents.GenerateEventID(),
+		Type:      agents.EventTypeUserMessage,
+		Timestamp: time.Now(),
+		ThreadID:  job.ThreadID,
+		Version:   1,
+		Data: map[string]interface{}{
+			"message":    job.Message,
+			"message_id": job.MessageID,
+		},
 	}
 
-	var found bool
-	agentConfig, found = wp.agentRegistry.GetByName(agentName)
-	if !found {
-		slog.Error("Agent not found in registry", "agent", agentName)
-		return
-	}
-
-	// Create agent with the determined config
-	agentInstance := sdk.NewAgent(
-		wp.chatClient,
-		wp.log,
-		wp.state,
-		sdk.WithConfig(agentConfig),
-		sdk.WithToolCallHandler(eventbus.CreateToolCallHandler(eventbus.GlobalContracts, wp.state)),
-		sdk.WithShouldContinueIteration(eventbus.CreateShouldContinueIterationFn(eventbus.GlobalContracts)),
-	)
-
-	// Track agent events during the run
-	var nextAgent string
-	var agentEventOccurred bool
-
-	// Domain event handler: tracks routing events (UI notifications handled by agent's notifier)
-	domainEventHandler := func(event sdk.Event) error {
-		// Track routing events (but don't act on them yet - wait for agent to finish)
-		switch e := event.(type) {
-		case *agents.DomainEvent:
-			// Use EventBus to route events to subscribers
-			if subscriber, ok := eventbus.GlobalContracts.RouteEvent(e.Type); ok {
-				slog.Info("Event routed via EventBus", "eventType", e.Type, "nextAgent", subscriber)
-				nextAgent = subscriber
-				agentEventOccurred = true
-			}
-		}
-
-		return nil
-	}
-
-	// Process with agent - it emits domain events, handler translates to UI
-	if err := agentInstance.Run(ctx, job.ThreadID, assistantMessageID, messages, domainEventHandler); err != nil {
-		// Check if error was due to cancellation
-		if ctx.Err() == context.Canceled {
-			slog.Info("Job cancelled during processing", "jobID", job.ID)
-			_ = wp.queue.UpdateJobStatus(job.ID, domain.JobStatusFailed, "cancelled")
-
-			// Save partial response before emitting error
-			wp.emitMessagesSnapshot(emitter, job.ThreadID)
-
-			// Emit RUN_ERROR event for cancellation
-			errorEvent := aguievents.NewRunErrorEvent(
-				"Job was cancelled",
-				aguievents.WithErrorCode("CANCELLED"),
-			)
-			_ = emitter.Emit(errorEvent)
-			return
-		}
-		slog.Error("Failed to process job", "jobID", job.ID, "error", err)
-
-		// Update job status to failed
-		_ = wp.queue.UpdateJobStatus(job.ID, domain.JobStatusFailed, err.Error())
-
-		// Emit RUN_ERROR event
-		errorEvent := aguievents.NewRunErrorEvent(
-			err.Error(),
-			aguievents.WithErrorCode("LLM_ERROR"),
-		)
-		_ = emitter.Emit(errorEvent)
-		return
-	}
-
-	// Emit final MESSAGES_SNAPSHOT with complete conversation
-	wp.emitMessagesSnapshot(emitter, job.ThreadID)
-
-	// Check if we need to continue with another agent
-	// Important: Don't route to the same agent that just ran (agents shouldn't handle their own events)
-	if agentEventOccurred && nextAgent != "" && nextAgent != agentName {
-		slog.Info("Continuing with called agent", "jobID", job.ID, "currentAgent", agentName, "nextAgent", nextAgent)
-		wp.continueWithAgent(ctx, job.ThreadID, nextAgent, emitter, runID)
-	} else if agentEventOccurred && nextAgent != "" {
-		slog.Warn("Agent tried to route to itself - blocked", "agent", agentName, "nextAgent", nextAgent)
-	}
+	// Route to student-facing agent via handler
+	wp.continueWithAgent(ctx, job.ThreadID, "student-facing-agent", emitter, runID, userMessageEvent)
 
 	// Send RUN_FINISHED event
 	runFinishedEvent := aguievents.NewRunFinishedEvent(
@@ -513,22 +370,28 @@ func (wp *WorkerPool) emitMessagesSnapshot(emitter EventEmitter, threadID string
 	}
 }
 
-// continueWithAgent runs the specified agent on the thread
-func (wp *WorkerPool) continueWithAgent(ctx context.Context, threadID, agentName string, emitter EventEmitter, runID string) {
+// continueWithAgent runs the specified agent on the thread using event handlers
+func (wp *WorkerPool) continueWithAgent(ctx context.Context, threadID, agentName string, emitter EventEmitter, runID string, triggeringEvent *agents.DomainEvent) {
 	slog.Info("Continuing with agent", "threadID", threadID, "agent", agentName)
+
+	// Validate that we have a triggering event
+	if triggeringEvent == nil {
+		slog.Error("No triggering event provided for agent continuation", "agent", agentName)
+		return
+	}
 
 	// Create UI notifier for this continuation's event stream
 	notifier := NewUINotifier(emitter)
 
-	// Set the notifier in the registry so all agents created will use it
-	wp.agentRegistry.SetNotifier(notifier)
-
-	// Get agent config
-	agentConfig, exists := wp.agentRegistry.GetByName(agentName)
-	if !exists {
-		slog.Error("Agent not found", "agent", agentName)
+	// Get the agent's contract
+	contract, ok := eventbus.GlobalContracts.GetContract(agentName)
+	if !ok {
+		slog.Error("No contract found for agent", "agent", agentName)
 		return
 	}
+
+	// Create agent config from contract factory
+	agentConfig := contract.Factory(notifier)
 
 	// Create agent instance
 	agentInstance := sdk.NewAgent(
@@ -540,64 +403,40 @@ func (wp *WorkerPool) continueWithAgent(ctx context.Context, threadID, agentName
 		sdk.WithShouldContinueIteration(eventbus.CreateShouldContinueIterationFn(eventbus.GlobalContracts)),
 	)
 
-	// Get updated messages
-	messages := wp.state.Messages(threadID)
-
-	// For specialist instructors, add a trigger message to prompt them to act
-	// The student-facing-agent doesn't need this since it's just coordinating
-	if agentName != "student-facing-agent" {
-		// Get whiteboard content
-		thread, exists := wp.state.Get(threadID)
-		if exists && thread.WhiteboardContent != "" {
-			// Add trigger message
-			triggerMsg := domain.Message{
-				ID:        aguievents.GenerateMessageID(),
-				Role:      "user",
-				Timestamp: time.Now(),
-				Content: fmt.Sprintf(`The whiteboard has been updated for you to review. Please read it and provide your expert answer.
-
-WHITEBOARD CONTENT:
-%s
-
-Follow your state machine workflow:
-1. Read and understand the content on the whiteboard
-2. Write your contribution to the whiteboard using write_whiteboard with action="append"
-3. Signal completion: emit_question_answered(subject="your_subject", is_complete=true/false)`, thread.WhiteboardContent),
-			}
-			messages = append(messages, triggerMsg)
-		}
+	// Verify the agent has a handler for this event
+	if contract.Handlers == nil {
+		slog.Error("Agent has no handlers defined", "agent", agentName)
+		return
 	}
 
-	// Generate message ID for agent's response
-	messageID := aguievents.GenerateMessageID()
-
-	// Track routing events during the run
-	var nextAgent string
-	var routingEventOccurred bool
-
-	// Domain event handler for the agent (routing only - UI handled by agent's notifier)
-	agentEventHandler := func(event sdk.Event) error {
-		// Track routing events (but don't act on them yet - wait for agent to finish)
-		switch e := event.(type) {
-		case *agents.DomainEvent:
-			// Use EventBus to route events to subscribers
-			if subscriber, ok := eventbus.GlobalContracts.RouteEvent(e.Type); ok {
-				nextAgent = subscriber
-				routingEventOccurred = true
-			}
-		}
-
-		return nil
+	handler, hasHandler := contract.Handlers[triggeringEvent.Type]
+	if !hasHandler {
+		slog.Error("Agent has no handler for event type", "agent", agentName, "eventType", triggeringEvent.Type)
+		return
 	}
 
-	// Run the agent
-	if err := agentInstance.Run(ctx, threadID, messageID, messages, agentEventHandler); err != nil {
-		slog.Error("Agent failed", "agent", agentName, "error", err)
+	slog.Info("Executing event handler", "agent", agentName, "eventType", triggeringEvent.Type)
 
-		// Emit error event
+	// Create handler context
+	handlerCtx := &agents.EventHandlerContext{
+		ThreadID: threadID,
+		Event:    triggeringEvent,
+		Agent:    agentInstance,
+		State:    wp.state,
+		Notifier: notifier,
+	}
+
+	// Track events before handler execution
+	eventsBefore, _ := wp.log.History(threadID)
+	beforeCount := len(eventsBefore)
+
+	// Execute the handler - it owns the complete logic
+	if err := handler(ctx, handlerCtx); err != nil {
+		slog.Error("Handler execution failed", "agent", agentName, "eventType", triggeringEvent.Type, "error", err)
+
 		errorEvent := aguievents.NewRunErrorEvent(
-			fmt.Sprintf("Agent %s failed: %v", agentName, err),
-			aguievents.WithErrorCode("AGENT_ERROR"),
+			fmt.Sprintf("Agent %s handler failed: %v", agentName, err),
+			aguievents.WithErrorCode("HANDLER_ERROR"),
 		)
 		_ = emitter.Emit(errorEvent)
 		return
@@ -606,11 +445,42 @@ Follow your state machine workflow:
 	// Emit updated messages snapshot
 	wp.emitMessagesSnapshot(emitter, threadID)
 
-	// Check if we need to continue with another agent (chained routing)
-	// Important: Don't route to the same agent (agents shouldn't handle their own events)
-	if routingEventOccurred && nextAgent != "" && nextAgent != agentName {
-		slog.Info("Routing to next agent", "from", agentName, "to", nextAgent)
-		wp.continueWithAgent(ctx, threadID, nextAgent, emitter, runID)
+	slog.Info("Handler execution completed", "agent", agentName, "eventType", triggeringEvent.Type)
+
+	// Check for new routing events emitted during handler execution
+	eventsAfter, _ := wp.log.History(threadID)
+	if len(eventsAfter) > beforeCount {
+		// Process new events for routing
+		newEvents := eventsAfter[beforeCount:]
+		wp.processRoutingEvents(ctx, threadID, newEvents, emitter, runID)
+	}
+}
+
+// processRoutingEvents checks new events for routing and triggers appropriate agents
+func (wp *WorkerPool) processRoutingEvents(ctx context.Context, threadID string, newEvents []sdk.Event, emitter EventEmitter, runID string) {
+	for _, event := range newEvents {
+		// Cast to DomainEvent to check type
+		domainEvent, ok := event.(*agents.DomainEvent)
+		if !ok {
+			continue
+		}
+
+		// Get all agents subscribed to this event type
+		subscribers := eventbus.GlobalContracts.EventBus().GetSubscribers(domainEvent.Type)
+
+		if len(subscribers) == 0 {
+			continue
+		}
+
+		slog.Info("Routing event to subscribers",
+			"eventType", domainEvent.Type,
+			"subscribers", subscribers,
+			"subscriberCount", len(subscribers))
+
+		// Trigger all subscribed agents
+		for _, agentName := range subscribers {
+			wp.continueWithAgent(ctx, threadID, agentName, emitter, runID, domainEvent)
+		}
 	}
 }
 
