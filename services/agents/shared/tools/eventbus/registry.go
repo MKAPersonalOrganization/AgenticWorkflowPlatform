@@ -3,12 +3,13 @@ package eventbus
 import (
 	"encoding/json"
 	"fmt"
-	"school-with-ai/domain"
-	"school-with-ai/services/agents"
-	"school-with-ai/services/sdk"
 	"strings"
 	"sync"
 	"time"
+
+	"school-with-ai/domain"
+	"school-with-ai/services/agents"
+	"school-with-ai/services/sdk"
 )
 
 // GlobalContracts is the singleton contract registry

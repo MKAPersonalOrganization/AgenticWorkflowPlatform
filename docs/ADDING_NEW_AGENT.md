@@ -36,7 +36,7 @@ package agentname
 
 import (
 	"school-with-ai/services/agents"
-	"school-with-ai/services/agents/eventbus"
+	"school-with-ai/services/agents/shared/tools/eventbus"
 	"school-with-ai/services/agents/<agent-name>/tools"
 	sharedtools "school-with-ai/services/agents/shared/tools"
 	"school-with-ai/services/sdk"
@@ -280,7 +280,7 @@ package geometry
 
 import (
 	"school-with-ai/services/agents"
-	"school-with-ai/services/agents/eventbus"
+	"school-with-ai/services/agents/shared/tools/eventbus"
 	"school-with-ai/services/agents/geometry/tools"
 	"school-with-ai/services/sdk"
 )
@@ -445,8 +445,8 @@ If you get import cycle errors:
 | `services/agents/<name>/contract.go` | Define agent's event contract |
 | `services/agents/<name>/<name>.go` | Implement agent factory function |
 | `services/agents/instructor_events.go` | Event type constants |
-| `services/agents/eventbus/registry.go` | Global contract registry |
-| `services/agents/eventbus/emission.go` | Auto-generates emission tools |
+| `services/agents/shared/tools/eventbus/registry.go` | Global contract registry |
+| `services/agents/shared/tools/eventbus/emission.go` | Auto-generates emission tools |
 | `main.go` | Register all contracts |
 | `infra/worker_pool.go` | Routes events via contract registry |
 
