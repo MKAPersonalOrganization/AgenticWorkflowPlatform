@@ -92,15 +92,15 @@ func main() {
 	// Protected auth routes
 	mux.HandleFunc("GET /auth/settings", authMiddleware.RequireAuthFunc(authHandlers.SettingsPage))
 
-	// Chat routes
-	mux.HandleFunc("/send", handler.SendMessage)
-	mux.HandleFunc("GET /api/jobs/active", handler.GetActiveJobs)
-	mux.HandleFunc("GET /api/jobs/{jobId}/stream", handler.StreamJobEvents)
-	mux.HandleFunc("DELETE /api/jobs/{jobId}", handler.CancelJob)
-	mux.HandleFunc("GET /api/threads", handler.GetThreads)
-	mux.HandleFunc("GET /api/threads/{threadId}/messages", handler.GetMessages)
-	mux.HandleFunc("DELETE /api/threads/{threadId}", handler.DeleteThread)
-	mux.HandleFunc("/", HandleViewChatInputScreen)
+	// Protected chat routes (require authentication)
+	mux.HandleFunc("/send", authMiddleware.RequireAuthFunc(handler.SendMessage))
+	mux.HandleFunc("GET /api/jobs/active", authMiddleware.RequireAuthFunc(handler.GetActiveJobs))
+	mux.HandleFunc("GET /api/jobs/{jobId}/stream", authMiddleware.RequireAuthFunc(handler.StreamJobEvents))
+	mux.HandleFunc("DELETE /api/jobs/{jobId}", authMiddleware.RequireAuthFunc(handler.CancelJob))
+	mux.HandleFunc("GET /api/threads", authMiddleware.RequireAuthFunc(handler.GetThreads))
+	mux.HandleFunc("GET /api/threads/{threadId}/messages", authMiddleware.RequireAuthFunc(handler.GetMessages))
+	mux.HandleFunc("DELETE /api/threads/{threadId}", authMiddleware.RequireAuthFunc(handler.DeleteThread))
+	mux.HandleFunc("/", authMiddleware.RequireAuthFunc(HandleViewChatInputScreen))
 	err = http.ListenAndServe(addr, mux)
 	if err != nil {
 		panic(err)

@@ -3,10 +3,12 @@ package infra
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
 	"school-with-ai/domain"
+	"school-with-ai/infra/auth"
 	"school-with-ai/services/sdk"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
@@ -34,17 +36,25 @@ func NewHandler(log sdk.EventLog, state sdk.ThreadState, chatClient sdk.ChatClie
 
 // SendMessage handles the /send endpoint by enqueuing a job
 func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
+	// Get authenticated user from context
+	user := auth.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	// Get thread ID and message from query parameters
 	threadID := r.URL.Query().Get("threadId")
 	if threadID == "" {
-		threadID = fmt.Sprintf("thread_%d", time.Now().UnixNano())
+		// Create user-specific thread ID
+		threadID = fmt.Sprintf("thread_%s_%d", user.ID, time.Now().UnixNano())
 	}
 	message := r.URL.Query().Get("message")
 	if message == "" {
 		message = "Hello"
 	}
 
-	// Create job
+	// Create job with user ID
 	jobID := sdk.GenerateID()
 	messageID := aguievents.GenerateMessageID()
 
@@ -53,10 +63,17 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		ThreadID:  threadID,
 		MessageID: messageID,
 		Message:   message,
+		UserID:    user.ID,
 		Status:    domain.JobStatusPending,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
+
+	slog.Info("Creating job for user",
+		"userID", user.ID,
+		"email", user.Email,
+		"threadID", threadID,
+		"jobID", jobID)
 
 	// Enqueue job
 	if err := h.queue.Enqueue(job); err != nil {
@@ -267,6 +284,17 @@ func (h *Handler) GetMessages(w http.ResponseWriter, r *http.Request) {
 
 // GetThreads retrieves all threads
 func (h *Handler) GetThreads(w http.ResponseWriter, r *http.Request) {
+	// Get authenticated user from context
+	user := auth.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	slog.Info("Getting threads for user", "userID", user.ID, "email", user.Email)
+
+	// TODO: Filter threads by user ID
+	// For now, return all threads (will be fixed in a future update)
 	threads := h.state.All()
 
 	w.Header().Set("Content-Type", "application/json")
@@ -278,11 +306,20 @@ func (h *Handler) GetThreads(w http.ResponseWriter, r *http.Request) {
 
 // DeleteThread deletes a thread
 func (h *Handler) DeleteThread(w http.ResponseWriter, r *http.Request) {
+	// Get authenticated user from context
+	user := auth.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	threadID := r.PathValue("threadId")
 	if threadID == "" {
 		http.Error(w, "threadId is required", http.StatusBadRequest)
 		return
 	}
+
+	slog.Info("Deleting thread", "userID", user.ID, "threadID", threadID)
 
 	// Check if thread exists
 	_, exists := h.state.Get(threadID)
@@ -290,6 +327,8 @@ func (h *Handler) DeleteThread(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Thread not found", http.StatusNotFound)
 		return
 	}
+
+	// TODO: Verify user owns this thread before allowing deletion
 
 	// Emit ThreadDeletedEvent
 	event := &sdk.ThreadDeletedEvent{

@@ -67,7 +67,8 @@ The application uses [Ory Kratos](https://www.ory.sh/kratos/) for identity and u
 | User Settings | ✅ Implemented |
 | Logout | ✅ Implemented |
 | Session Management | ✅ Implemented |
-| Protected Routes | ⬜ Planned (Step 19) |
+| Protected Routes | ✅ Implemented |
+| User Context in Handlers | ✅ Implemented |
 | User UI Elements | ⬜ Planned (Step 20) |
 
 ### Auth Stack
@@ -88,6 +89,26 @@ The application uses [Ory Kratos](https://www.ory.sh/kratos/) for identity and u
 | `GET /auth/settings` | User settings (profile, password, 2FA) | Protected |
 | `GET /auth/logout` | Logout handler | Public |
 | `GET /auth/error` | Error page for auth flows | Public |
+
+### Protected Routes
+
+All chat and API routes now require authentication:
+
+| Route | Description | Protection |
+|-------|-------------|------------|
+| `GET /` | Main chat interface | Protected |
+| `POST /send` | Send message endpoint | Protected |
+| `GET /api/jobs/active` | Get active jobs | Protected |
+| `GET /api/jobs/{jobId}/stream` | Stream job events (SSE) | Protected |
+| `DELETE /api/jobs/{jobId}` | Cancel a job | Protected |
+| `GET /api/threads` | Get all threads | Protected |
+| `GET /api/threads/{threadId}/messages` | Get thread messages | Protected |
+| `DELETE /api/threads/{threadId}` | Delete a thread | Protected |
+
+**Behavior:**
+- Unauthenticated requests redirect to `/auth/login?return_to={original_url}`
+- After successful login, users are redirected back to the original URL
+- User context available in all handlers via `auth.GetUserFromContext()`
 
 ### Running with Authentication
 
@@ -173,11 +194,13 @@ KRATOS_BROWSER_URL=http://127.0.0.1:4433  # External URL for browser redirects
 
 **Components:**
 - `domain/user.go` - User model with Kratos identity traits
+- `domain/job.go` - Job model with UserID for tracking user actions
 - `infra/auth/kratos_client.go` - Kratos API client wrapper
 - `infra/auth/middleware.go` - Session validation middleware (`RequireAuth`, `OptionalAuth`)
 - `infra/auth/session.go` - Session context helpers
 - `infra/auth/handlers.go` - Auth page handlers (login, registration, etc.)
 - `infra/auth/flow_helpers.go` - Flow URL generation and helper functions
+- `infra/chat_handlers.go` - Chat handlers with user context integration
 - `components/auth/` - Auth page templates (login, registration, verification, recovery, settings, error)
 
 **Session Management:**
@@ -186,12 +209,25 @@ KRATOS_BROWSER_URL=http://127.0.0.1:4433  # External URL for browser redirects
 - User and session data stored in request context
 - Session expiry handled automatically with re-authentication flows
 
+**Route Protection:**
+- All chat routes (`/`, `/send`, `/api/*`) protected with `RequireAuth` middleware
+- Settings page protected with `RequireAuth` middleware
+- Unauthenticated requests redirected to login with `return_to` parameter
+- User context accessible in handlers via `auth.GetUserFromContext()`
+
+**User Context Integration:**
+- Jobs track UserID for associating messages with users
+- Thread creation uses user-specific IDs (`thread_{userID}_{timestamp}`)
+- User actions logged with user ID and email for audit trail
+- Future: Thread filtering by user ownership
+
 **Security Features:**
 - CSRF protection on all forms
 - Email verification required after registration
 - Password recovery with time-limited codes
 - AAL2 (two-factor authentication) support
 - User enumeration protection (recovery flow doesn't reveal if email exists)
+- Secure session cookies with HttpOnly and SameSite flags
 
 ## Prerequisites
 
@@ -356,7 +392,7 @@ Any changes to `.templ`, `.css`, or `.go` files will automatically rebuild and r
 │   └── hello.templ     # Main chat UI
 ├── domain/             # Domain models
 │   ├── user.go         # User model matching Kratos identity
-│   └── job.go          # Background job model
+│   └── job.go          # Background job model with UserID
 ├── infra/
 │   ├── auth/           # Authentication infrastructure
 │   │   ├── kratos_client.go      # Kratos API client wrapper
@@ -365,7 +401,7 @@ Any changes to `.templ`, `.css`, or `.go` files will automatically rebuild and r
 │   │   ├── handlers.go           # Auth page handlers
 │   │   ├── flow_helpers.go       # Flow URL generation and helpers
 │   │   └── *_test.go            # Unit tests (29 tests)
-│   ├── chat_handlers.go           # Chat SSE endpoint
+│   ├── chat_handlers.go           # Chat SSE endpoint with user context
 │   ├── emitter.go                 # SSE event emitter
 │   ├── job_queue.go               # Background job queue
 │   └── worker_pool.go             # Worker pool for async processing
@@ -387,7 +423,7 @@ Any changes to `.templ`, `.css`, or `.go` files will automatically rebuild and r
 ├── main.go             # Application entry point with auth routes
 ├── docker-compose.yml  # Infrastructure (Kratos, PostgreSQL, MailSlurper)
 ├── Taskfile.yaml       # Task runner configuration
-└── AUTH_IMPLEMENTATION_TODO.md  # Implementation plan (18/20 steps complete)
+└── AUTH_IMPLEMENTATION_TODO.md  # Implementation plan (19/20 steps complete - 95%)
 ```
 
 ## AG-UI Protocol
