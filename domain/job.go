@@ -18,6 +18,7 @@ type Job struct {
 	ThreadID  string    `json:"threadId"`
 	MessageID string    `json:"messageId"`
 	Message   string    `json:"message"`
+	UserID    string    `json:"userId,omitempty"` // User who created the job
 	Status    JobStatus `json:"status"`
 	Error     string    `json:"error,omitempty"`
 	CreatedAt time.Time `json:"createdAt"`
