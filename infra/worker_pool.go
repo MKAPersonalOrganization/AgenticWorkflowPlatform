@@ -350,6 +350,8 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 		wp.log,
 		wp.state,
 		sdk.WithConfig(agentConfig),
+		sdk.WithToolCallHandler(eventbus.CreateToolCallHandler(eventbus.GlobalContracts, wp.state)),
+		sdk.WithShouldContinueIteration(eventbus.CreateShouldContinueIterationFn(eventbus.GlobalContracts)),
 	)
 
 	// Track agent events during the run
@@ -534,6 +536,8 @@ func (wp *WorkerPool) continueWithAgent(ctx context.Context, threadID, agentName
 		wp.log,
 		wp.state,
 		sdk.WithConfig(agentConfig),
+		sdk.WithToolCallHandler(eventbus.CreateToolCallHandler(eventbus.GlobalContracts, wp.state)),
+		sdk.WithShouldContinueIteration(eventbus.CreateShouldContinueIterationFn(eventbus.GlobalContracts)),
 	)
 
 	// Get updated messages
