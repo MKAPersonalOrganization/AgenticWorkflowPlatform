@@ -3,7 +3,7 @@ package diagramming
 import (
 	"school-with-ai/services/agents"
 	"school-with-ai/services/agents/diagramming/tools"
-	"school-with-ai/services/agents/eventbus"
+	"school-with-ai/services/agents/shared/tools/eventbus"
 	"school-with-ai/services/sdk"
 )
 

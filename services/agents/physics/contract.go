@@ -2,9 +2,9 @@ package physics
 
 import (
 	"school-with-ai/services/agents"
-	"school-with-ai/services/agents/eventbus"
 	"school-with-ai/services/agents/physics/tools"
 	sharedtools "school-with-ai/services/agents/shared/tools"
+	"school-with-ai/services/agents/shared/tools/eventbus"
 	"school-with-ai/services/sdk"
 )
 

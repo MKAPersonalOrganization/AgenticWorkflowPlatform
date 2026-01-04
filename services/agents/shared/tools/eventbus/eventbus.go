@@ -1,8 +1,9 @@
 package eventbus
 
 import (
-	"school-with-ai/services/agents"
 	"sync"
+
+	"school-with-ai/services/agents"
 )
 
 // EventBus manages event subscriptions and routing.
