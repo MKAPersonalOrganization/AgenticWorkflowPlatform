@@ -519,6 +519,22 @@ func (wp *WorkerPool) emitMessagesSnapshot(emitter EventEmitter, threadID string
 	messagesSnapshotEvent := aguievents.NewMessagesSnapshotEvent(aguiMessages)
 
 	_ = emitter.Emit(messagesSnapshotEvent)
+
+	// Emit tool call agent mappings from assistant messages
+	for _, msg := range sessionMessages {
+		if msg.Role == "assistant" && len(msg.ToolCalls) > 0 && msg.AgentName != "" {
+			for _, tc := range msg.ToolCalls {
+				agentEvent := aguievents.NewCustomEvent(
+					"TOOL_CALL_AGENT",
+					aguievents.WithValue(map[string]interface{}{
+						"toolCallId": tc.ID,
+						"agentName":  msg.AgentName,
+					}),
+				)
+				_ = emitter.Emit(agentEvent)
+			}
+		}
+	}
 }
 
 // continueWithAgent runs the specified agent on the thread

@@ -522,7 +522,6 @@ document.addEventListener('alpine:init', () => {
                 eventSource: null,
                 events: [],
                 toolCalls: {},
-                toolCallAgents: {}, // Map toolCallId -> agentName for concurrent agents
                 currentInteractionId: null,
                 errorMessage: null,
                 showTypingIndicator: false,
@@ -2008,14 +2007,14 @@ document.addEventListener('alpine:init', () => {
                             this.whiteboardLastAgent = agentName;
                         }
                     } else if (event.name === 'TOOL_CALL_AGENT') {
-                        // Tool call agent pairing - update tool call with agent name
+                        // Tool call agent pairing - update tool call and message with agent name
                         const { toolCallId, agentName } = event.value;
-                        state.toolCallAgents[toolCallId] = agentName;
 
-                        // Update tool call and message with agent name
+                        // Update tool call with agent name
                         if (state.toolCalls[toolCallId]) {
                             state.toolCalls[toolCallId].agentName = agentName;
                         }
+                        // Update message with agent name
                         const toolMsgIndex = state.messages.findIndex(m => m.id === toolCallId);
                         if (toolMsgIndex !== -1) {
                             state.messages[toolMsgIndex].agentName = agentName;
@@ -2029,14 +2028,14 @@ document.addEventListener('alpine:init', () => {
 
                 case 'TOOL_CALL_START':
                     // Tool call started - create message with placeholder agent
-                    // Agent name updated by TOOL_CALL_AGENT event (supports concurrent agents)
+                    // Agent name will be set by preceding TOOL_CALL_AGENT event
                     state.toolCalls[event.toolCallId] = {
                         id: event.toolCallId,
                         name: event.toolCallName,
                         args: '',
                         status: 'streaming',
                         timestamp: new Date(event.timestamp).toISOString(),
-                        agentName: state.toolCallAgents[event.toolCallId] || 'agent'
+                        agentName: 'agent' // Will be updated by TOOL_CALL_AGENT event
                     };
 
                     state.messages.push({
@@ -2047,7 +2046,7 @@ document.addEventListener('alpine:init', () => {
                         parsedArgs: {},
                         status: 'streaming',
                         timestamp: new Date(event.timestamp).toISOString(),
-                        agentName: state.toolCallAgents[event.toolCallId] || 'agent'
+                        agentName: 'agent' // Will be updated by TOOL_CALL_AGENT event
                     });
 
                     if (threadId === this.__currentThreadId) {
