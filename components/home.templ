@@ -14,8 +14,9 @@ import "school-with-ai/components/whiteboard"
 import "school-with-ai/components/dialog"
 import "school-with-ai/components/keyboardshortcuts"
 import "school-with-ai/components/navbar"
+import "school-with-ai/domain"
 
-templ ChatInputScreen() {
+templ ChatInputScreen(user *domain.User) {
 	<!DOCTYPE html>
 	<html lang="en">
 		<head>
@@ -101,7 +102,7 @@ templ ChatInputScreen() {
 		<body class="flex min-h-screen bg-background text-foreground antialiased">
 			<div class="w-full h-screen" x-data="chat">
 				<!-- Left Navigation Bar -->
-				@navbar.Navbar(navbar.Props{SidebarID: "thread-history-sidebar"})
+				@navbar.Navbar(navbar.Props{SidebarID: "thread-history-sidebar", User: user})
 				<!-- Sidebar Layout with left margin for navbar -->
 				<div class="ml-16 flex-1">
 					@sidebar.Layout() {

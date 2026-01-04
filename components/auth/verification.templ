@@ -1,12 +1,14 @@
 package auth
 
 import client "github.com/ory/client-go"
+import "school-with-ai/domain"
 
 type VerificationPageProps struct {
 	FlowAction string
 	FlowMethod string
 	Messages   []UIMessage
 	LoginURL   string
+	User       *domain.User
 }
 
 // VerificationPage renders the email verification page with a slot for form content
@@ -14,6 +16,7 @@ templ VerificationPage(props VerificationPageProps) {
 	@AuthLayout(LayoutProps{
 		Title:       "Verify Your Email",
 		Description: "Enter the verification code sent to your email",
+		User:        props.User,
 	}) {
 		<!-- Flow-level messages -->
 		if len(props.Messages) > 0 {

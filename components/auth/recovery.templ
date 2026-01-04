@@ -1,12 +1,14 @@
 package auth
 
 import client "github.com/ory/client-go"
+import "school-with-ai/domain"
 
 type RecoveryPageProps struct {
 	FlowAction string
 	FlowMethod string
 	Messages   []UIMessage
 	LoginURL   string
+	User       *domain.User
 }
 
 // RecoveryPage renders the password recovery page with a slot for form content

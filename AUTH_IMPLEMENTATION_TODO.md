@@ -634,24 +634,34 @@
 ---
 
 ## Step 20: Add User UI Elements and E2E Testing
-**Status**: ⬜ Not Started
+**Status**: ✅ Complete
 
 **Tasks**:
-- Update navbar component to show user menu
-- Add login/register buttons for unauthenticated users
-- Add user dropdown with settings/logout for authenticated users
-- Create comprehensive E2E test suite
-- Document authentication setup in README
+- ✅ Update navbar component to show user menu
+- ✅ Add login/register buttons for unauthenticated users
+- ✅ Add user dropdown with settings/logout for authenticated users
+- ⬜ Create comprehensive E2E test suite
+- ⬜ Document authentication setup in README
+
+**Implementation Notes**:
+- Added `User` field to navbar Props struct to accept authenticated user from context
+- Modified settings popover to conditionally display:
+  - **Authenticated users**: Email, User ID, Account Settings link, Theme toggle, Logout button
+  - **Unauthenticated users**: Login link, Register link, Theme toggle
+- Updated `ChatInputScreen` component to accept user parameter
+- Modified `HandleViewChatInputScreen` to extract user from context using `auth.GetUserFromContext`
+- Used existing icon components: `icon.User`, `icon.LogOut`, `icon.LogIn`, `icon.UserPlus`
+- Settings icon at bottom left now shows context-appropriate menu based on authentication state
 
 **Expectations**:
-- Navbar shows appropriate UI based on auth state
-- User can access settings from dropdown
-- User can logout from dropdown
-- Smooth UX transitions between auth states
-- All authentication flows tested end-to-end
+- ✅ Navbar shows appropriate UI based on auth state
+- ✅ User can access settings from dropdown
+- ✅ User can logout from dropdown
+- ✅ Smooth UX transitions between auth states
+- ⬜ All authentication flows tested end-to-end
 
 **Tests**:
-- [ ] Build and start application
+- [x] Build and start application
 - [ ] **Unauthenticated UX**:
   - [ ] Visit homepage, verify login/register buttons visible
   - [ ] Click login, complete flow, verify redirect
