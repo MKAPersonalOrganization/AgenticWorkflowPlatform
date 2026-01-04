@@ -472,13 +472,25 @@ func (wp *WorkerPool) processRoutingEvents(ctx context.Context, threadID string,
 			continue
 		}
 
+		// Get the agent that emitted this event (if available)
+		emittedBy, _ := domainEvent.Data["emitted_by"].(string)
+
 		slog.Info("Routing event to subscribers",
 			"eventType", domainEvent.Type,
+			"emittedBy", emittedBy,
 			"subscribers", subscribers,
 			"subscriberCount", len(subscribers))
 
-		// Trigger all subscribed agents
+		// Trigger all subscribed agents (except the one that emitted it)
 		for _, agentName := range subscribers {
+			// Skip if agent is responding to its own emission
+			if emittedBy != "" && agentName == emittedBy {
+				slog.Debug("Skipping self-handling",
+					"agent", agentName,
+					"eventType", domainEvent.Type)
+				continue
+			}
+
 			wp.continueWithAgent(ctx, threadID, agentName, emitter, runID, domainEvent)
 		}
 	}

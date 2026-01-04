@@ -68,12 +68,12 @@ func CreateToolCallHandler(registry *ContractRegistry, state sdk.ThreadState) sd
 // CreateShouldContinueIterationFn creates a function that determines if iteration should continue
 func CreateShouldContinueIterationFn(registry *ContractRegistry) sdk.ShouldContinueIterationFn {
 	return func(toolCalls []domain.ToolCall) bool {
-		// Stop iteration if any collaboration tool was called
+		// Stop iteration if any tool triggers another agent (emission tools)
 		for _, toolCall := range toolCalls {
-			if registry.IsCollaborationTool(toolCall.Function.Name) {
-				return false // Don't continue - let worker pool handle routing
+			if registry.IsEmissionTool(toolCall.Function.Name) || toolCall.Function.Name == "emit_question_answered" {
+				return false
 			}
 		}
-		return true // Continue iteration for normal tools
+		return true
 	}
 }
