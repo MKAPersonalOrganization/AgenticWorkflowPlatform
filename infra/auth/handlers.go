@@ -443,12 +443,108 @@ func (h *AuthHandlers) SettingsPage(w http.ResponseWriter, r *http.Request) {
 
 // LogoutHandler handles GET /auth/logout
 func (h *AuthHandlers) LogoutHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO: Implement in Step 18
-	http.Error(w, "Not implemented", http.StatusNotImplemented)
+	// Get the logout token from query params (if redirected from Kratos)
+	logoutToken := r.URL.Query().Get("token")
+
+	if logoutToken != "" {
+		// We have a logout token, perform the actual logout
+		// This is the final step where we submit the logout token to Kratos
+		// The logout URL is in the Kratos public API
+		logoutURL := h.kratos.PublicURL() + "/self-service/logout?token=" + logoutToken
+		http.Redirect(w, r, logoutURL, http.StatusSeeOther)
+		return
+	}
+
+	// No token - create a new logout flow
+	cookie := r.Header.Get("Cookie")
+	flow, err := h.kratos.CreateBrowserLogoutFlow(r.Context(), cookie)
+	if err != nil {
+		slog.Error("Failed to create logout flow", "error", err)
+		// On error, just redirect to login
+		http.Redirect(w, r, h.appURL+"/auth/login", http.StatusSeeOther)
+		return
+	}
+
+	// Redirect to the logout URL which will complete the logout
+	// Kratos will then redirect back to our app
+	http.Redirect(w, r, flow.LogoutUrl, http.StatusSeeOther)
 }
 
 // ErrorPage handles GET /auth/error
 func (h *AuthHandlers) ErrorPage(w http.ResponseWriter, r *http.Request) {
-	// TODO: Implement in Step 18
-	http.Error(w, "Authentication error", http.StatusBadRequest)
+	errorID := r.URL.Query().Get("id")
+	errorParam := r.URL.Query().Get("error")
+
+	var errorMessage, errorDetails string
+
+	// If we have an error ID, try to fetch the error from Kratos
+	if errorID != "" {
+		flowError, err := h.kratos.GetFlowError(r.Context(), errorID)
+		if err != nil {
+			slog.Error("Failed to get flow error", "errorID", errorID, "error", err)
+			errorMessage = "An unexpected error occurred"
+			errorDetails = "We couldn't retrieve the error details. Please try again."
+		} else if flowError.Error != nil {
+			// Extract message from the error map
+			if msg, ok := flowError.Error["message"].(string); ok {
+				errorMessage = msg
+			}
+			if reason, ok := flowError.Error["reason"].(string); ok {
+				errorDetails = reason
+			}
+			// Also try "error_description" for OAuth2 errors
+			if errorMessage == "" {
+				if desc, ok := flowError.Error["error_description"].(string); ok {
+					errorMessage = desc
+				}
+			}
+		}
+	} else if errorParam != "" {
+		// Use the error parameter to show a generic message
+		errorMessage = getErrorMessage(errorParam)
+	} else {
+		// No error info provided
+		errorMessage = "An unexpected error occurred"
+		errorDetails = "Please try again or contact support if the problem persists."
+	}
+
+	// Build URLs
+	loginURL := h.appURL + "/auth/login"
+	homeURL := h.appURL + "/"
+
+	// Render the error page
+	props := auth.ErrorPageProps{
+		ErrorID:      errorID,
+		ErrorMessage: errorMessage,
+		ErrorDetails: errorDetails,
+		LoginURL:     loginURL,
+		HomeURL:      homeURL,
+	}
+
+	component := auth.ErrorPage(props)
+	err := component.Render(r.Context(), w)
+	if err != nil {
+		slog.Error("Failed to render error page", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+// getErrorMessage returns a user-friendly error message for common error types
+func getErrorMessage(errorType string) string {
+	switch errorType {
+	case "login_flow_error":
+		return "Login Error"
+	case "registration_flow_error":
+		return "Registration Error"
+	case "recovery_flow_error":
+		return "Password Recovery Error"
+	case "verification_flow_error":
+		return "Email Verification Error"
+	case "settings_flow_error":
+		return "Settings Error"
+	case "session_error":
+		return "Session Error"
+	default:
+		return "Authentication Error"
+	}
 }
