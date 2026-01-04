@@ -520,7 +520,7 @@ func (wp *WorkerPool) emitMessagesSnapshot(emitter EventEmitter, threadID string
 
 	_ = emitter.Emit(messagesSnapshotEvent)
 
-	// Emit tool call agent mappings from assistant messages
+	// Emit tool call agent mappings (consistent with streaming flow)
 	for _, msg := range sessionMessages {
 		if msg.Role == "assistant" && len(msg.ToolCalls) > 0 && msg.AgentName != "" {
 			for _, tc := range msg.ToolCalls {
