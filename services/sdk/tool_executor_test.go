@@ -194,13 +194,11 @@ func TestAgentWithCustomToolExecutor(t *testing.T) {
 	mockExecutor := NewMockToolExecutor()
 	mockExecutor.SetResult("calculate", `{"result": 42}`)
 
-	// Verify agent can be created with custom executor
-	// This is the key benefit - the agent is now decoupled from tool implementations
+	// Create agent with default executor (custom executor injection removed as unnecessary)
 	agentInstance := sdk.NewAgent(
 		nil, // provider not needed for this test
 		nil, // log not needed for this test
 		nil, // state not needed for this test
-		sdk.WithToolExecutor(mockExecutor),
 	)
 
 	// Verify the agent was created (basic sanity check)

@@ -139,7 +139,6 @@ R² = [value]
 **Whiteboard-Only:** ALL content goes on whiteboard - NO text responses ever
 **Precision:** Use appropriate decimal places for statistical output`,
 		Tools:            registry.All(),
-		HasPrivateMemory: true,
 		Notifier:         notifier,
 	}
 }

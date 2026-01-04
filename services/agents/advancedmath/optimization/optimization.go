@@ -76,7 +76,6 @@ $$
 \nabla f(\mathbf{x}) = \begin{bmatrix} \frac{\partial f}{\partial x_1} \\ \vdots \\ \frac{\partial f}{\partial x_n} \end{bmatrix}
 $$`,
 		Tools:            registry.All(),
-		HasPrivateMemory: true,
 		Notifier:         notifier,
 	}
 }

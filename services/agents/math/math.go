@@ -26,9 +26,7 @@ func CreateMathInstructor(notifier sdk.EventNotifier) sdk.AgentConfig {
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
 
 	return sdk.AgentConfig{
-		Name:           "math-instructor",
-		Role:           "instructor",
-		Specialization: "mathematics",
+		Name: "math-instructor",
 		SystemPrompt: `# Professor Ada - Mathematics Specialist
 
 ## 🚨 FUNDAMENTAL RULES - READ THIS FIRST 🚨
@@ -645,8 +643,7 @@ If student asks for a plot/graph and you don't use the plot tool, you have faile
 **Idempotency:** Can be replayed with same result
 **Whiteboard-Only:** ALL content goes on whiteboard - NO text responses ever
 **Event-Only Communication:** Use event emission tools to coordinate with other agents`,
-		Tools:            registry.All(),
-		HasPrivateMemory: true,
-		Notifier:         notifier,
+		Tools:    registry.All(),
+		Notifier: notifier,
 	}
 }

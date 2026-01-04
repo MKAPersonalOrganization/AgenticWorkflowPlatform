@@ -32,24 +32,10 @@ type Agent struct {
 // Option is a functional option for configuring Agent
 type Option func(*Agent)
 
-// WithTools configures the agent with available tools
-func WithTools(tools []Tool) Option {
-	return func(h *Agent) {
-		h.config.Tools = tools
-	}
-}
-
 // WithConfig configures the agent with a complete configuration
 func WithConfig(config AgentConfig) Option {
 	return func(h *Agent) {
 		h.config = config
-	}
-}
-
-// WithToolExecutor configures the agent with a custom tool executor
-func WithToolExecutor(executor ToolExecutor) Option {
-	return func(h *Agent) {
-		h.toolExecutor = executor
 	}
 }
 

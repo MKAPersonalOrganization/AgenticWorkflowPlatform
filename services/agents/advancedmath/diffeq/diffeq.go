@@ -72,7 +72,6 @@ $$
 \mathbf{y}(t_0) = \mathbf{y}_0
 $$`,
 		Tools:            registry.All(),
-		HasPrivateMemory: true,
 		Notifier:         notifier,
 	}
 }

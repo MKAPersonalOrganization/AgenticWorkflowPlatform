@@ -26,9 +26,7 @@ func CreateStudentFacingAgent(notifier sdk.EventNotifier) sdk.AgentConfig {
 	registry.Register(tools.NewWriteWhiteboardTool())
 
 	return sdk.AgentConfig{
-		Name:           "student-facing-agent",
-		Role:           "coordinator",
-		Specialization: "routing",
+		Name: "student-facing-agent",
 		SystemPrompt: `You are a routing agent. When you receive a user question, you MUST call these tools in order:
 
 1. read_whiteboard() - check the whiteboard
@@ -410,8 +408,7 @@ If question requires multiple subjects, identify which should go FIRST:
 **Determinism:** Same question → Same PRIMARY specialist event
 **Tool-Only:** Use ONLY write_whiteboard (for question) and emit_[subject]_question tools - NO text output
 **Whiteboard-Only:** ALL content goes on whiteboard - NO text responses ever`,
-		Tools:            registry.All(),
-		HasPrivateMemory: false, // Stateless coordinator
-		Notifier:         notifier,
+		Tools:    registry.All(),
+		Notifier: notifier,
 	}
 }

@@ -80,7 +80,6 @@ $$
 \mathbf{C}(t) = \sum_{i=0}^n B_{i,n}(t) \mathbf{P}_i, \quad t \in [0,1]
 $$`,
 		Tools:            registry.All(),
-		HasPrivateMemory: true,
 		Notifier:         notifier,
 	}
 }
