@@ -1,0 +1,45 @@
+package auth
+
+import client "github.com/ory/client-go"
+
+type SettingsPageProps struct {
+	FlowAction string
+	FlowMethod string
+	Messages   []UIMessage
+	LogoutURL  string
+}
+
+// SettingsPageWithNodes renders the settings page with all Kratos UI nodes
+templ SettingsPageWithNodes(nodes []client.UiNode, props SettingsPageProps) {
+	@AuthLayout(LayoutProps{
+		Title:       "Account Settings",
+		Description: "Manage your profile, password, and security settings",
+	}) {
+		<!-- Flow-level messages -->
+		if len(props.Messages) > 0 {
+			@Messages(MessagesProps{Messages: props.Messages})
+		}
+		<!-- Settings Form -->
+		if props.FlowAction != "" {
+			@Form(FormProps{
+				Action: props.FlowAction,
+				Method: props.FlowMethod,
+			}) {
+				@UINodes(UINodesProps{
+					Nodes:  nodes,
+					Groups: []string{"default", "profile", "password", "totp", "lookup_secret", "webauthn"},
+				})
+			}
+			<!-- Additional Links -->
+			<div class="mt-6 text-center text-sm">
+				if props.LogoutURL != "" {
+					<div>
+						<a href={ templ.SafeURL(props.LogoutURL) } class="text-destructive hover:underline">
+							Sign out
+						</a>
+					</div>
+				}
+			</div>
+		}
+	}
+}

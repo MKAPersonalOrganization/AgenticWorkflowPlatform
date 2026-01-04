@@ -79,15 +79,18 @@ func main() {
 	// Initialize Kratos client and auth handlers
 	kratosClient := auth.NewKratosClient()
 	authHandlers := auth.NewAuthHandlers(kratosClient)
+	authMiddleware := auth.NewMiddleware(kratosClient)
 
-	// Auth routes
+	// Auth routes (public)
 	mux.HandleFunc("GET /auth/login", authHandlers.LoginPage)
 	mux.HandleFunc("GET /auth/registration", authHandlers.RegistrationPage)
 	mux.HandleFunc("GET /auth/recovery", authHandlers.RecoveryPage)
 	mux.HandleFunc("GET /auth/verification", authHandlers.VerificationPage)
-	mux.HandleFunc("GET /auth/settings", authHandlers.SettingsPage)
 	mux.HandleFunc("GET /auth/logout", authHandlers.LogoutHandler)
 	mux.HandleFunc("GET /auth/error", authHandlers.ErrorPage)
+
+	// Protected auth routes
+	mux.HandleFunc("GET /auth/settings", authMiddleware.RequireAuthFunc(authHandlers.SettingsPage))
 
 	// Chat routes
 	mux.HandleFunc("/send", handler.SendMessage)
