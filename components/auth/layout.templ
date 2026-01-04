@@ -1,0 +1,76 @@
+package auth
+
+import "school-with-ai/components/card"
+
+type LayoutProps struct {
+	Title       string
+	Description string
+	LogoURL     string
+}
+
+// AuthLayout provides a centered card layout for authentication pages
+templ AuthLayout(props LayoutProps) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>{ props.Title } - SchoolWithAI</title>
+			<link rel="icon" type="image/svg+xml" href="/assets/images/logo.svg"/>
+			<link rel="stylesheet" href="/assets/css/output.css"/>
+		</head>
+		<body class="min-h-screen bg-gray-50 dark:bg-gray-900">
+			<main class="flex min-h-screen items-center justify-center p-4">
+				<div class="w-full max-w-md space-y-8">
+					<!-- Logo -->
+					<div class="flex justify-center">
+						if props.LogoURL != "" {
+							<img src={ props.LogoURL } alt="SchoolWithAI Logo" class="h-12 w-auto"/>
+						} else {
+							<img src="/assets/images/logo.svg" alt="SchoolWithAI Logo" class="h-12 w-auto"/>
+						}
+					</div>
+					<!-- Main Content Card -->
+					@card.Card(card.Props{
+						Class: "w-full",
+					}) {
+						@card.Header(card.HeaderProps{}) {
+							@card.Title(card.TitleProps{
+								Class: "text-center text-2xl font-bold",
+							}) {
+								{ props.Title }
+							}
+							if props.Description != "" {
+								@card.Description(card.DescriptionProps{
+									Class: "text-center",
+								}) {
+									{ props.Description }
+								}
+							}
+						}
+						@card.Content(card.ContentProps{}) {
+							{ children... }
+						}
+					}
+					<!-- Footer Links -->
+					<div class="text-center text-sm text-gray-600 dark:text-gray-400">
+						<div class="space-x-4">
+							<a href="/privacy" class="hover:text-gray-900 dark:hover:text-gray-100">Privacy</a>
+							<span>•</span>
+							<a href="/terms" class="hover:text-gray-900 dark:hover:text-gray-100">Terms</a>
+							<span>•</span>
+							<a href="/support" class="hover:text-gray-900 dark:hover:text-gray-100">Support</a>
+						</div>
+						<div class="mt-2 text-xs">
+							© { templ.EscapeString(getCurrentYear()) } SchoolWithAI. All rights reserved.
+						</div>
+					</div>
+				</div>
+			</main>
+		</body>
+	</html>
+}
+
+func getCurrentYear() string {
+	return "2026"
+}

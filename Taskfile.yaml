@@ -1,6 +1,12 @@
 version: 3
 dotenv: [".env"]
 
+env:
+  APP_URL: http://127.0.0.1:8090
+  KRATOS_PUBLIC_URL: http://127.0.0.1:4433
+  KRATOS_ADMIN_URL: http://127.0.0.1:4434
+  KRATOS_BROWSER_URL: http://127.0.0.1:4433
+
 vars:
   TAILWIND_CMD:
     sh: command -v tailwindcss >/dev/null 2>&1 && echo "tailwindcss" || echo "npx tailwindcss@latest"
@@ -27,3 +33,18 @@ tasks:
       - task --parallel tailwind templ
 
   run: "wgo -file=.go -file=.templ -xfile=_templ.go  go tool templ generate :: go run main.go"
+
+  up:
+    desc: Start docker compose services (Kratos, Postgres, MailSlurper)
+    cmds:
+      - docker compose up -d postgres mailslurper kratos-migrate kratos
+
+  down:
+    desc: Stop docker compose services
+    cmds:
+      - docker compose down
+
+  logs:
+    desc: Show docker compose logs
+    cmds:
+      - docker compose logs -f kratos

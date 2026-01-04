@@ -1,0 +1,121 @@
+version: v0.13.0
+
+dsn: env://DATABASE_URL
+
+serve:
+  public:
+    base_url: http://127.0.0.1:4433/
+    cors:
+      enabled: true
+      allowed_origins:
+        - http://127.0.0.1:8090
+      allowed_methods:
+        - POST
+        - GET
+        - PUT
+        - PATCH
+        - DELETE
+      allowed_headers:
+        - Authorization
+        - Cookie
+        - Content-Type
+      exposed_headers:
+        - Content-Type
+        - Set-Cookie
+  admin:
+    base_url: http://kratos:4434/
+
+selfservice:
+  default_browser_return_url: http://127.0.0.1:8090/
+  allowed_return_urls:
+    - http://127.0.0.1:8090
+
+  methods:
+    password:
+      enabled: true
+    totp:
+      config:
+        issuer: SchoolWithAI
+      enabled: true
+    lookup_secret:
+      enabled: true
+    link:
+      enabled: true
+    code:
+      enabled: true
+
+  flows:
+    error:
+      ui_url: http://127.0.0.1:8090/auth/error
+
+    settings:
+      ui_url: http://127.0.0.1:8090/auth/settings
+      privileged_session_max_age: 15m
+      required_aal: highest_available
+
+    recovery:
+      enabled: true
+      ui_url: http://127.0.0.1:8090/auth/recovery
+      use: code
+      after:
+        default_browser_return_url: http://127.0.0.1:8090/auth/login
+
+    verification:
+      enabled: true
+      ui_url: http://127.0.0.1:8090/auth/verification
+      use: code
+      after:
+        default_browser_return_url: http://127.0.0.1:8090/
+
+    logout:
+      after:
+        default_browser_return_url: http://127.0.0.1:8090/auth/login
+
+    login:
+      ui_url: http://127.0.0.1:8090/auth/login
+      lifespan: 10m
+      after:
+        default_browser_return_url: http://127.0.0.1:8090/
+
+    registration:
+      lifespan: 10m
+      ui_url: http://127.0.0.1:8090/auth/registration
+      enable_legacy_one_step: true
+      after:
+        password:
+          hooks:
+            - hook: session
+            - hook: show_verification_ui
+
+log:
+  level: info
+  format: json
+  leak_sensitive_values: false
+
+secrets:
+  cookie:
+    - PLEASE-CHANGE-ME-I-AM-VERY-INSECURE
+  cipher:
+    - 32-LONG-SECRET-NOT-SECURE-AT-ALL
+
+ciphers:
+  algorithm: xchacha20-poly1305
+
+hashers:
+  algorithm: bcrypt
+  bcrypt:
+    cost: 12
+
+identity:
+  default_schema_id: default
+  schemas:
+    - id: default
+      url: file:///etc/config/kratos/identity.schema.json
+
+courier:
+  smtp:
+    connection_uri: smtps://test:test@mailslurper:1025/?skip_ssl_verify=true
+    from_address: noreply@schoolwithai.local
+
+feature_flags:
+  use_continue_with_transitions: false

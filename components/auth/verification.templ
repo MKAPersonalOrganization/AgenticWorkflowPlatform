@@ -1,0 +1,54 @@
+package auth
+
+import client "github.com/ory/client-go"
+
+type VerificationPageProps struct {
+	FlowAction string
+	FlowMethod string
+	Messages   []UIMessage
+	LoginURL   string
+}
+
+// VerificationPage renders the email verification page with a slot for form content
+templ VerificationPage(props VerificationPageProps) {
+	@AuthLayout(LayoutProps{
+		Title:       "Verify Your Email",
+		Description: "Enter the verification code sent to your email",
+	}) {
+		<!-- Flow-level messages -->
+		if len(props.Messages) > 0 {
+			@Messages(MessagesProps{Messages: props.Messages})
+		}
+		<!-- Verification Form -->
+		if props.FlowAction != "" {
+			@Form(FormProps{
+				Action: props.FlowAction,
+				Method: props.FlowMethod,
+			}) {
+				{ children... }
+			}
+			<!-- Additional Links -->
+			<div class="mt-4 text-center text-sm">
+				if props.LoginURL != "" {
+					<div class="text-muted-foreground">
+						Already verified?
+						{ " " }
+						<a href={ templ.SafeURL(props.LoginURL) } class="text-primary hover:underline">
+							Sign in
+						</a>
+					</div>
+				}
+			</div>
+		}
+	}
+}
+
+// VerificationPageWithNodes renders the verification page with Kratos UI nodes
+templ VerificationPageWithNodes(nodes []client.UiNode, props VerificationPageProps) {
+	@VerificationPage(props) {
+		@UINodes(UINodesProps{
+			Nodes:  nodes,
+			Groups: []string{"default", "code", "link"},
+		})
+	}
+}
