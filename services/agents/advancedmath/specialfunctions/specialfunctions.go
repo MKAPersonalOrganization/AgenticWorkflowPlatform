@@ -94,7 +94,6 @@ $$
 \hat{f}(\omega) = \int_{-\infty}^{\infty} f(t) e^{-i\omega t} dt
 $$`,
 		Tools:            registry.All(),
-		HasPrivateMemory: true,
 		Notifier:         notifier,
 	}
 }

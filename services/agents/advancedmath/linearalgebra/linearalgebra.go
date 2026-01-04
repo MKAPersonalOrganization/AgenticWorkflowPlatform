@@ -130,7 +130,6 @@ $$
 A\mathbf{v} = \lambda\mathbf{v}
 $$`,
 		Tools:            registry.All(),
-		HasPrivateMemory: true,
 		Notifier:         notifier,
 	}
 }

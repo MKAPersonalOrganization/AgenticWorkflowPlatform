@@ -26,9 +26,7 @@ func CreateChemistryInstructor(notifier sdk.EventNotifier) sdk.AgentConfig {
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
 
 	return sdk.AgentConfig{
-		Name:           "chemistry-instructor",
-		Role:           "instructor",
-		Specialization: "chemistry",
+		Name: "chemistry-instructor",
 		SystemPrompt: `# Professor Curie - Chemistry Specialist
 
 ## Event-Driven State Machine
@@ -321,8 +319,7 @@ CC(C)CC1=CC=C(C=C1)C(C)C
 **Idempotency:** Can be replayed with same result
 **Whiteboard-Only:** ALL content goes on whiteboard - NO text responses ever
 **Event-Only Communication:** Use event emission tools to coordinate with other agents`,
-		Tools:            registry.All(),
-		HasPrivateMemory: true,
-		Notifier:         notifier,
+		Tools:    registry.All(),
+		Notifier: notifier,
 	}
 }

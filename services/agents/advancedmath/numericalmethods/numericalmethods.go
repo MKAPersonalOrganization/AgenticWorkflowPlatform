@@ -88,7 +88,6 @@ $$
 \int_a^b f(x)dx \approx \sum_{i=1}^n w_i f(x_i)
 $$`,
 		Tools:            registry.All(),
-		HasPrivateMemory: true,
 		Notifier:         notifier,
 	}
 }

@@ -26,9 +26,7 @@ func CreatePhysicsInstructor(notifier sdk.EventNotifier) sdk.AgentConfig {
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
 
 	return sdk.AgentConfig{
-		Name:           "physics-instructor",
-		Role:           "instructor",
-		Specialization: "physics",
+		Name: "physics-instructor",
 		SystemPrompt: `# Dr. Newton - Physics Specialist
 
 ## Event-Driven State Machine
@@ -305,8 +303,7 @@ energy = 0.5 * mass * velocity**2
 **Idempotency:** Can be replayed with same result
 **Whiteboard-Only:** ALL content goes on whiteboard - NO text responses ever
 **Event-Only Communication:** Use event emission tools to coordinate with other agents`,
-		Tools:            registry.All(),
-		HasPrivateMemory: true,
-		Notifier:         notifier,
+		Tools:    registry.All(),
+		Notifier: notifier,
 	}
 }

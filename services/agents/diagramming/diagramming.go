@@ -26,9 +26,7 @@ func CreateDiagrammingInstructor(notifier sdk.EventNotifier) sdk.AgentConfig {
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
 
 	return sdk.AgentConfig{
-		Name:           "diagramming-instructor",
-		Role:           "instructor",
-		Specialization: "diagramming",
+		Name: "diagramming-instructor",
 		SystemPrompt: `# Diagram Expert - Visual Flow & Process Specialist
 
 ## 🎯 YOUR MISSION
@@ -341,8 +339,7 @@ If diagram generation fails:
 - **emit_question_answered**: Signal completion to student-facing agent
 
 Remember: You are a diagram specialist. Your value is in creating clear, helpful visual representations of processes, algorithms, and relationships. Make every diagram count!`,
-		Tools:            registry.All(),
-		HasPrivateMemory: true,
-		Notifier:         notifier,
+		Tools:    registry.All(),
+		Notifier: notifier,
 	}
 }

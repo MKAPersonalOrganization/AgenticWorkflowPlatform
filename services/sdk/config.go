@@ -10,16 +10,11 @@ type EventNotifier interface {
 // AgentConfig defines the configuration for an agent
 type AgentConfig struct {
 	// Identity
-	Name           string // Unique identifier for the agent
-	Role           string // Agent role (e.g., "assistant", "specialist")
-	Specialization string // Domain expertise or specialization
+	Name string // Unique identifier for the agent
 
 	// Behavior
 	SystemPrompt string // Instructions for how the agent should behave
 	Tools        []Tool // Available tools for this agent (implements Tool interface)
-
-	// Collaboration (for multi-agent scenarios)
-	HasPrivateMemory bool // Whether agent maintains private memory (isolated)
 
 	// Event handling
 	Notifier EventNotifier // UI/Event notifier for this agent
@@ -28,12 +23,9 @@ type AgentConfig struct {
 // DefaultConfig returns a basic agent configuration
 func DefaultConfig(name string) AgentConfig {
 	return AgentConfig{
-		Name:             name,
-		Role:             "assistant",
-		Specialization:   "",
-		SystemPrompt:     "You are a helpful assistant.",
-		Tools:            []Tool{},
-		HasPrivateMemory: false,
+		Name:         name,
+		SystemPrompt: "You are a helpful assistant.",
+		Tools:        []Tool{},
 	}
 }
 
