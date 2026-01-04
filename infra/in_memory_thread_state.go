@@ -111,7 +111,7 @@ func (p *InMemoryThreadState) applyEventUnsafe(thread *domain.Thread, event sdk.
 		// Only used for real-time UI updates
 
 	case *sdk.ToolCallStartedEvent:
-		// Ephemeral streaming event - ignore in projection
+		// Ephemeral event - agent info preserved in event stream order
 
 	case *sdk.ToolCallArgumentsStreamedEvent:
 		// Ephemeral streaming event - ignore in projection
