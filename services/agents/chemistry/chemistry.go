@@ -1,35 +1,28 @@
 package chemistry
 
 import (
-	"school-with-ai/services/agents/chemistry/tools"
+	"school-with-ai/services/agents/eventbus"
 	sharedtools "school-with-ai/services/agents/shared/tools"
 	"school-with-ai/services/sdk"
 )
 
-// CreateChemistryInstructor creates the chemistry instructor agent configuration
-//
-// EVENT CONTRACT:
-//
-//	Responds To (Triggers):
-//	  - question.chemistry: Emitted by student-facing-agent or other instructors when chemistry expertise is needed
-//
-//	Emits:
-//	  - question.answered: Signals completion of work (activates student-facing-agent)
-//	  - question.math: Activates math-instructor for multi-subject questions
-//	  - question.physics: Activates physics-instructor for multi-subject questions
-//	  - whiteboard.updated: Updates shared whiteboard with chemistry solution
+// CreateChemistryInstructor creates the chemistry instructor agent configuration.
+// Event contract is defined in contract.go
 func CreateChemistryInstructor(notifier sdk.EventNotifier) sdk.AgentConfig {
-	// Create a dedicated tool registry for this agent
 	registry := sdk.NewToolRegistry()
 
-	// Create only the tools this agent needs
+	// Domain-specific tools
+	for _, tool := range domainTools() {
+		registry.Register(tool)
+	}
+
+	// Auto-generated emission tools
+	for _, tool := range eventbus.GenerateEmissionTools(emits()) {
+		registry.Register(tool)
+	}
+
+	// Shared collaboration tools
 	registry.Register(sharedtools.NewReadWhiteboardTool())
-	registry.Register(sharedtools.NewCalculatorTool())
-	registry.Register(tools.NewPeriodicTableTool())
-	registry.Register(sharedtools.NewUnitConversionTool())
-	registry.Register(sharedtools.NewEmitQuestionAnsweredTool())
-	registry.Register(sharedtools.NewEmitMathQuestionTool())
-	registry.Register(sharedtools.NewEmitPhysicsQuestionTool())
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
 
 	return sdk.AgentConfig{

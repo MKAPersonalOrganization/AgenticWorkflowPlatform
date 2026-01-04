@@ -1,30 +1,29 @@
 package diagramming
 
 import (
-	"school-with-ai/services/agents/diagramming/tools"
+	"school-with-ai/services/agents/eventbus"
 	sharedtools "school-with-ai/services/agents/shared/tools"
 	"school-with-ai/services/sdk"
 )
 
-// CreateDiagrammingInstructor creates the diagramming specialist agent configuration
-//
-// EVENT CONTRACT:
-//
-//	Responds To (Triggers):
-//	  - question.diagramming: Emitted by student-facing-agent or other instructors when diagram visualization is needed
-//
-//	Emits:
-//	  - question.answered: Signals completion of work (activates student-facing-agent)
-//	  - whiteboard.updated: Updates shared whiteboard with diagram
+// CreateDiagrammingInstructor creates the diagramming specialist agent configuration.
+// Event contract is defined in contract.go
 func CreateDiagrammingInstructor(notifier sdk.EventNotifier) sdk.AgentConfig {
-	// Create a dedicated tool registry for this agent
 	registry := sdk.NewToolRegistry()
 
-	// Create only the tools this agent needs
-	registry.Register(tools.NewMermaidDiagramTool())
+	// Domain-specific tools
+	for _, tool := range domainTools() {
+		registry.Register(tool)
+	}
+
+	// Auto-generated emission tools
+	for _, tool := range eventbus.GenerateEmissionTools(emits()) {
+		registry.Register(tool)
+	}
+
+	// Shared collaboration tools
 	registry.Register(sharedtools.NewReadWhiteboardTool())
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
-	registry.Register(sharedtools.NewEmitQuestionAnsweredTool())
 
 	return sdk.AgentConfig{
 		Name:           "diagramming-instructor",

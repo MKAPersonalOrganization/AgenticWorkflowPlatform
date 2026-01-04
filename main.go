@@ -14,6 +14,7 @@ import (
 	"school-with-ai/services/agents/advancedmath/linearalgebra"
 	"school-with-ai/services/agents/chemistry"
 	"school-with-ai/services/agents/diagramming"
+	"school-with-ai/services/agents/eventbus"
 	"school-with-ai/services/agents/math"
 	"school-with-ai/services/agents/physics"
 	"school-with-ai/services/agents/statistics"
@@ -47,17 +48,21 @@ func main() {
 	// Initialize job queue
 	queue := infra.NewInMemoryJobQueue()
 
-	// Initialize agent registry (notifier will be set per-job dynamically)
-	agentRegistry := infra.NewAgentRegistry(nil)
+	// Register all agent contracts with the EventBus for routing
+	eventbus.GlobalContracts.Register(studentfacing.Contract)
+	eventbus.GlobalContracts.Register(math.Contract)
+	eventbus.GlobalContracts.Register(physics.Contract)
+	eventbus.GlobalContracts.Register(chemistry.Contract)
+	eventbus.GlobalContracts.Register(statistics.Contract)
+	eventbus.GlobalContracts.Register(linearalgebra.Contract)
+	eventbus.GlobalContracts.Register(diagramming.Contract)
 
-	// Register all agents
-	agentRegistry.Register("student-facing-agent", studentfacing.CreateStudentFacingAgent)
-	agentRegistry.Register("math-instructor", math.CreateMathInstructor)
-	agentRegistry.Register("physics-instructor", physics.CreatePhysicsInstructor)
-	agentRegistry.Register("chemistry-instructor", chemistry.CreateChemistryInstructor)
-	agentRegistry.Register("statistics-instructor", statistics.CreateStatisticsInstructor)
-	agentRegistry.Register("linearalgebra-professor", linearalgebra.CreateLinearAlgebraProfessor)
-	agentRegistry.Register("diagramming-instructor", diagramming.CreateDiagrammingInstructor)
+	// Initialize agent registry from contracts
+	agentRegistry := infra.NewAgentRegistry(nil)
+	for _, contract := range eventbus.GlobalContracts.All() {
+		// Convert eventbus.AgentFactory to infra.AgentFactory (same signature)
+		agentRegistry.Register(contract.Name, infra.AgentFactory(contract.Factory))
+	}
 
 	// Initialize and start worker pool with agent registry
 	workerPool := infra.NewWorkerPool(queue, eventLog, threadState, chatClient, agentRegistry, infra.WorkerPoolConfig{

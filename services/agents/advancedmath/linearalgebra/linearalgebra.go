@@ -1,25 +1,29 @@
 package linearalgebra
 
 import (
-	"school-with-ai/services/agents/advancedmath/linearalgebra/tools"
+	"school-with-ai/services/agents/eventbus"
 	sharedtools "school-with-ai/services/agents/shared/tools"
 	"school-with-ai/services/sdk"
 )
 
-// CreateLinearAlgebraProfessor creates the linear algebra professor agent
+// CreateLinearAlgebraProfessor creates the linear algebra professor agent.
+// Event contract is defined in contract.go
 func CreateLinearAlgebraProfessor(notifier sdk.EventNotifier) sdk.AgentConfig {
 	registry := sdk.NewToolRegistry()
 
-	// Shared tools
-	registry.Register(sharedtools.NewWriteWhiteboardTool())
-	registry.Register(sharedtools.NewReadWhiteboardTool())
-	registry.Register(sharedtools.NewEmitQuestionAnsweredTool())
+	// Domain-specific tools
+	for _, tool := range domainTools() {
+		registry.Register(tool)
+	}
 
-	// Linear algebra specific tools
-	registry.Register(tools.NewVectorOperationsTool())
-	registry.Register(tools.NewMatrixOperationsTool())
-	registry.Register(tools.NewLinearSolverTool())
-	registry.Register(tools.NewEigenvalueTool())
+	// Auto-generated emission tools
+	for _, tool := range eventbus.GenerateEmissionTools(emits()) {
+		registry.Register(tool)
+	}
+
+	// Shared collaboration tools
+	registry.Register(sharedtools.NewReadWhiteboardTool())
+	registry.Register(sharedtools.NewWriteWhiteboardTool())
 
 	return sdk.AgentConfig{
 		Name: "linearalgebra-professor",

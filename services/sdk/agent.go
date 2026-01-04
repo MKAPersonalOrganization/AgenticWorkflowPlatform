@@ -4,12 +4,100 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"school-with-ai/domain"
+	"school-with-ai/services/agents"
 	"school-with-ai/services/agents/shared/tools"
 	"school-with-ai/services/llm"
 )
+
+// isCollaborationTool checks if a tool is a collaboration/routing tool.
+// This uses pattern matching to avoid import cycles with eventbus.
+func isCollaborationTool(toolName string) bool {
+	// Emission tools follow pattern: emit_<subject>_question
+	if strings.HasPrefix(toolName, "emit_") && strings.HasSuffix(toolName, "_question") {
+		return true
+	}
+	// Special collaboration tools
+	return toolName == "emit_question_answered" ||
+		toolName == "write_whiteboard" ||
+		toolName == "read_whiteboard"
+}
+
+// isEmissionTool checks if a tool is an emit_*_question tool
+func isEmissionTool(toolName string) bool {
+	return strings.HasPrefix(toolName, "emit_") && strings.HasSuffix(toolName, "_question")
+}
+
+// eventTypeFromToolName extracts the event type from an emission tool name.
+// e.g., "emit_math_question" -> "question.math"
+func eventTypeFromToolName(toolName string) agents.EventType {
+	if len(toolName) < 14 { // len("emit_") + len("_question")
+		return ""
+	}
+	slug := toolName[5 : len(toolName)-9] // strip "emit_" prefix and "_question" suffix
+	return agents.EventType("question." + slug)
+}
+
+// createEventFromEmissionTool creates a domain event from an emission tool call.
+// This handles dynamic emit_*_question tools using pattern matching.
+func createEventFromEmissionTool(threadID, agentName string, toolCall domain.ToolCall, getWhiteboardState func(string) string) (*agents.DomainEvent, error) {
+	toolName := toolCall.Function.Name
+
+	// Parse the arguments
+	var params struct {
+		Question string `json:"question"`
+		Request  string `json:"request"` // Alternative field name
+		Context  string `json:"context"`
+	}
+	if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &params); err != nil {
+		return nil, fmt.Errorf("failed to parse %s arguments: %w", toolName, err)
+	}
+
+	// Use "question" or "request" field
+	questionValue := params.Question
+	if questionValue == "" {
+		questionValue = params.Request
+	}
+
+	// Derive event type from tool name
+	eventType := eventTypeFromToolName(toolName)
+
+	return &agents.DomainEvent{
+		ID:        agents.GenerateEventID(),
+		Type:      eventType,
+		Timestamp: time.Now(),
+		ThreadID:  threadID,
+		Version:   1,
+		Data: map[string]interface{}{
+			"question":         questionValue,
+			"emitted_by":       agentName,
+			"context":          params.Context,
+			"whiteboard_state": getWhiteboardState(threadID),
+		},
+	}, nil
+}
+
+// createHandoffEventFromTool creates a handoff event for an emission tool.
+func createHandoffEventFromTool(threadID, fromAgent, toolName string) *agents.DomainEvent {
+	if !isEmissionTool(toolName) {
+		return nil
+	}
+
+	// Extract subject from tool name: "emit_math_question" -> "math"
+	slug := toolName[5 : len(toolName)-9]
+	targetAgent := slug + "-instructor"
+	reason := strings.Title(slug) + " question requires specialist"
+
+	// Special case for linearalgebra -> professor
+	if slug == "linearalgebra" {
+		targetAgent = "linearalgebra-professor"
+	}
+
+	return agents.NewAgentHandoffEvent(threadID, fromAgent, targetAgent, reason)
+}
 
 // Agent handles processing of user messages using pure event sourcing
 // Each agent is responsible for registering its own event notifications
@@ -292,7 +380,7 @@ func (h *Agent) runIteration(
 		// Exception: If agent emitted routing events, stop iteration
 		// The worker pool will handle activating the appropriate agent
 		for _, toolCall := range toolCallsList {
-			if tools.IsCollaborationTool(toolCall.Function.Name) {
+			if isCollaborationTool(toolCall.Function.Name) {
 				// Agent's job is done - don't continue iteration
 				return nil
 			}
@@ -358,18 +446,20 @@ func (h *Agent) emitDomainEvent(event Event, eventHandler DomainEventHandler) er
 // executeToolCall executes a tool call and returns the result
 // For collaboration tools, it also emits domain events
 func (h *Agent) executeToolCall(threadID string, toolCall domain.ToolCall, eventHandler DomainEventHandler) (string, error) {
-	// Handle collaboration tools that need to emit domain events
-	if tools.IsCollaborationTool(toolCall.Function.Name) || toolCall.Function.Name == "write_whiteboard" {
-		// Create whiteboard state getter
-		getWhiteboardState := func(tid string) string {
-			thread, exists := h.state.Get(tid)
-			if exists {
-				return thread.WhiteboardContent
-			}
-			return ""
-		}
+	toolName := toolCall.Function.Name
 
-		event, err := tools.HandleCollaborationToolCall(threadID, h.config.Name, toolCall, getWhiteboardState)
+	// Create whiteboard state getter
+	getWhiteboardState := func(tid string) string {
+		thread, exists := h.state.Get(tid)
+		if exists {
+			return thread.WhiteboardContent
+		}
+		return ""
+	}
+
+	// Handle emit_*_question tools (dynamically routed via EventBus)
+	if isEmissionTool(toolName) {
+		event, err := createEventFromEmissionTool(threadID, h.config.Name, toolCall, getWhiteboardState)
 		if err != nil {
 			return "", err
 		}
@@ -377,8 +467,28 @@ func (h *Agent) executeToolCall(threadID string, toolCall domain.ToolCall, event
 			return "", err
 		}
 
-		// Emit agent handoff event for question routing tools
-		if handoffEvent := tools.GetHandoffEventForTool(threadID, h.config.Name, toolCall.Function.Name); handoffEvent != nil {
+		// Emit agent handoff event
+		if handoffEvent := createHandoffEventFromTool(threadID, h.config.Name, toolName); handoffEvent != nil {
+			if err := h.emitDomainEvent(handoffEvent, eventHandler); err != nil {
+				return "", err
+			}
+		}
+
+		return "{\"status\": \"event_emitted\"}", nil
+	}
+
+	// Handle special collaboration tools (emit_question_answered, write_whiteboard)
+	if toolName == "emit_question_answered" || toolName == "write_whiteboard" {
+		event, err := tools.HandleSpecialToolCall(threadID, h.config.Name, toolCall, getWhiteboardState)
+		if err != nil {
+			return "", err
+		}
+		if err := h.emitDomainEvent(event, eventHandler); err != nil {
+			return "", err
+		}
+
+		// Emit agent handoff event for emit_question_answered
+		if handoffEvent := tools.GetSpecialToolHandoffEvent(threadID, h.config.Name, toolName); handoffEvent != nil {
 			if err := h.emitDomainEvent(handoffEvent, eventHandler); err != nil {
 				return "", err
 			}

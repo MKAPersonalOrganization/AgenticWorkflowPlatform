@@ -11,82 +11,22 @@ import (
 // WhiteboardStateGetter is a function that retrieves the whiteboard state for a thread
 type WhiteboardStateGetter func(threadID string) string
 
-// IsCollaborationTool checks if a tool is a collaboration/routing tool
-func IsCollaborationTool(toolName string) bool {
-	return toolName == "emit_math_question" ||
-		toolName == "emit_physics_question" ||
-		toolName == "emit_chemistry_question" ||
-		toolName == "emit_statistics_question" ||
-		toolName == "emit_linearalgebra_question" ||
-		toolName == "emit_diagramming_question" ||
-		toolName == "emit_question_answered"
-}
+// IsCollaborationToolFn is a function type for checking if a tool is a collaboration tool.
+// This allows the caller to inject the check logic to avoid import cycles.
+type IsCollaborationToolFn func(toolName string) bool
 
-// HandleCollaborationToolCall processes a collaboration tool call and returns the domain event
-func HandleCollaborationToolCall(threadID string, agentName string, toolCall domain.ToolCall, getWhiteboardState WhiteboardStateGetter) (*agents.DomainEvent, error) {
+// HandleCollaborationToolFn creates a domain event from a tool call.
+type HandleCollaborationToolFn func(threadID, agentName string, toolCall domain.ToolCall, getWhiteboardState WhiteboardStateGetter) (*agents.DomainEvent, error)
+
+// CreateHandoffEventFn creates a handoff event for a tool.
+type CreateHandoffEventFn func(threadID, fromAgent, toolName string) *agents.DomainEvent
+
+// HandleSpecialToolCall processes special collaboration tools (question_answered, whiteboard).
+// This is called for tools that aren't handled by the eventbus registry.
+func HandleSpecialToolCall(threadID string, agentName string, toolCall domain.ToolCall, getWhiteboardState WhiteboardStateGetter) (*agents.DomainEvent, error) {
 	toolName := toolCall.Function.Name
 
 	switch toolName {
-	case "emit_math_question":
-		var input struct {
-			Question string `json:"question"`
-			Context  string `json:"context"`
-		}
-		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
-			return nil, fmt.Errorf("failed to parse emit_math_question arguments: %w", err)
-		}
-		return agents.NewMathQuestionEvent(threadID, input.Question, agentName, input.Context, getWhiteboardState(threadID)), nil
-
-	case "emit_physics_question":
-		var input struct {
-			Question string `json:"question"`
-			Context  string `json:"context"`
-		}
-		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
-			return nil, fmt.Errorf("failed to parse emit_physics_question arguments: %w", err)
-		}
-		return agents.NewPhysicsQuestionEvent(threadID, input.Question, agentName, input.Context, getWhiteboardState(threadID)), nil
-
-	case "emit_chemistry_question":
-		var input struct {
-			Question string `json:"question"`
-			Context  string `json:"context"`
-		}
-		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
-			return nil, fmt.Errorf("failed to parse emit_chemistry_question arguments: %w", err)
-		}
-		return agents.NewChemistryQuestionEvent(threadID, input.Question, agentName, input.Context, getWhiteboardState(threadID)), nil
-
-	case "emit_statistics_question":
-		var input struct {
-			Question string `json:"question"`
-			Context  string `json:"context"`
-		}
-		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
-			return nil, fmt.Errorf("failed to parse emit_statistics_question arguments: %w", err)
-		}
-		return agents.NewStatisticsQuestionEvent(threadID, input.Question, agentName, input.Context, getWhiteboardState(threadID)), nil
-
-	case "emit_linearalgebra_question":
-		var input struct {
-			Question string `json:"question"`
-			Context  string `json:"context"`
-		}
-		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
-			return nil, fmt.Errorf("failed to parse emit_linearalgebra_question arguments: %w", err)
-		}
-		return agents.NewLinearAlgebraQuestionEvent(threadID, input.Question, agentName, input.Context, getWhiteboardState(threadID)), nil
-
-	case "emit_diagramming_question":
-		var input struct {
-			Request string `json:"request"`
-			Context string `json:"context"`
-		}
-		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
-			return nil, fmt.Errorf("failed to parse emit_diagramming_question arguments: %w", err)
-		}
-		return agents.NewDiagrammingQuestionEvent(threadID, input.Request, agentName, input.Context, getWhiteboardState(threadID)), nil
-
 	case "emit_question_answered":
 		var input struct {
 			Subject    string `json:"subject"`
@@ -109,40 +49,14 @@ func HandleCollaborationToolCall(threadID string, agentName string, toolCall dom
 		return agents.NewWhiteboardUpdatedEvent(threadID, agentName, input.Content, input.Action), nil
 
 	default:
-		return nil, fmt.Errorf("unknown collaboration tool: %s", toolName)
+		return nil, fmt.Errorf("unknown special tool: %s", toolName)
 	}
 }
 
-// GetHandoffEventForTool creates an agent handoff event for collaboration tools
-// Returns nil if the tool doesn't represent an agent handoff
-func GetHandoffEventForTool(threadID string, fromAgent string, toolName string) *agents.DomainEvent {
-	var toAgent, reason string
-
-	switch toolName {
-	case "emit_math_question":
-		toAgent = "math-instructor"
-		reason = "Math question requires specialist"
-	case "emit_physics_question":
-		toAgent = "physics-instructor"
-		reason = "Physics question requires specialist"
-	case "emit_chemistry_question":
-		toAgent = "chemistry-instructor"
-		reason = "Chemistry question requires specialist"
-	case "emit_statistics_question":
-		toAgent = "statistics-instructor"
-		reason = "Statistics question requires specialist"
-	case "emit_linearalgebra_question":
-		toAgent = "linearalgebra-instructor"
-		reason = "Linear algebra question requires specialist"
-	case "emit_diagramming_question":
-		toAgent = "diagramming-instructor"
-		reason = "Diagramming request requires specialist"
-	case "emit_question_answered":
-		toAgent = "student-facing-agent"
-		reason = "Question answered, returning to coordinator"
-	default:
-		return nil
+// GetSpecialToolHandoffEvent creates a handoff event for special tools.
+func GetSpecialToolHandoffEvent(threadID string, fromAgent string, toolName string) *agents.DomainEvent {
+	if toolName == "emit_question_answered" {
+		return agents.NewAgentHandoffEvent(threadID, fromAgent, "student-facing-agent", "Question answered, returning to coordinator")
 	}
-
-	return agents.NewAgentHandoffEvent(threadID, fromAgent, toAgent, reason)
+	return nil
 }
