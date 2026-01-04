@@ -10,6 +10,7 @@ import (
 
 	"school-with-ai/components"
 	"school-with-ai/infra"
+	"school-with-ai/infra/auth"
 	"school-with-ai/services/agents/advancedmath/linearalgebra"
 	"school-with-ai/services/agents/chemistry"
 	"school-with-ai/services/agents/math"
@@ -74,6 +75,19 @@ func main() {
 
 	// Create handler with EventLog and ThreadState
 	handler := infra.NewHandler(eventLog, threadState, chatClient, queue, workerPool)
+
+	// Initialize Kratos client and auth handlers
+	kratosClient := auth.NewKratosClient()
+	authHandlers := auth.NewAuthHandlers(kratosClient)
+
+	// Auth routes
+	mux.HandleFunc("GET /auth/login", authHandlers.LoginPage)
+	mux.HandleFunc("GET /auth/registration", authHandlers.RegistrationPage)
+	mux.HandleFunc("GET /auth/recovery", authHandlers.RecoveryPage)
+	mux.HandleFunc("GET /auth/verification", authHandlers.VerificationPage)
+	mux.HandleFunc("GET /auth/settings", authHandlers.SettingsPage)
+	mux.HandleFunc("GET /auth/logout", authHandlers.LogoutHandler)
+	mux.HandleFunc("GET /auth/error", authHandlers.ErrorPage)
 
 	// Chat routes
 	mux.HandleFunc("/send", handler.SendMessage)

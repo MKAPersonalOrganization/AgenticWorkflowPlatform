@@ -1,0 +1,62 @@
+package auth
+
+import client "github.com/ory/client-go"
+
+type LoginPageProps struct {
+	FlowAction      string
+	FlowMethod      string
+	Messages        []UIMessage
+	RecoveryURL     string
+	RegistrationURL string
+}
+
+// LoginPage renders the login page with a slot for form content
+templ LoginPage(props LoginPageProps) {
+	@AuthLayout(LayoutProps{
+		Title:       "Sign In",
+		Description: "Enter your credentials to access your account",
+	}) {
+		<!-- Flow-level messages -->
+		if len(props.Messages) > 0 {
+			@Messages(MessagesProps{Messages: props.Messages})
+		}
+		<!-- Login Form -->
+		if props.FlowAction != "" {
+			@Form(FormProps{
+				Action: props.FlowAction,
+				Method: props.FlowMethod,
+			}) {
+				{ children... }
+			}
+			<!-- Additional Links -->
+			<div class="mt-4 space-y-2 text-center text-sm">
+				if props.RecoveryURL != "" {
+					<div>
+						<a href={ templ.SafeURL(props.RecoveryURL) } class="text-primary hover:underline">
+							Forgot your password?
+						</a>
+					</div>
+				}
+				if props.RegistrationURL != "" {
+					<div class="text-muted-foreground">
+						Don't have an account?
+						{ " " }
+						<a href={ templ.SafeURL(props.RegistrationURL) } class="text-primary hover:underline">
+							Create one
+						</a>
+					</div>
+				}
+			</div>
+		}
+	}
+}
+
+// LoginPageWithNodes renders the login page with Kratos UI nodes
+templ LoginPageWithNodes(nodes []client.UiNode, props LoginPageProps) {
+	@LoginPage(props) {
+		@UINodes(UINodesProps{
+			Nodes:  nodes,
+			Groups: []string{"default", "password"},
+		})
+	}
+}

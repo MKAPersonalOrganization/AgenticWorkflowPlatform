@@ -1,0 +1,315 @@
+package auth
+
+import (
+	client "github.com/ory/client-go"
+	"school-with-ai/components/alert"
+	"school-with-ai/components/button"
+	"school-with-ai/components/form"
+	"school-with-ai/components/input"
+)
+
+type FormProps struct {
+	Action string
+	Method string
+	Class  string
+}
+
+// Form renders a standard HTML form wrapper
+templ Form(props FormProps) {
+	<form
+		if props.Action != "" {
+			action={ props.Action }
+		}
+		if props.Method != "" {
+			method={ props.Method }
+		} else {
+			method="POST"
+		}
+		if props.Class != "" {
+			class={ props.Class }
+		} else {
+			class="space-y-4"
+		}
+	>
+		{ children... }
+	</form>
+}
+
+type MessagesProps struct {
+	Messages []UIMessage
+}
+
+type UIMessage struct {
+	ID      int64
+	Text    string
+	Type    string
+	Context map[string]interface{}
+}
+
+// Messages renders flow messages (errors, info, success)
+templ Messages(props MessagesProps) {
+	if len(props.Messages) > 0 {
+		<div class="space-y-2">
+			for _, msg := range props.Messages {
+				@alert.Alert(alert.Props{
+					Variant: getAlertVariant(msg.Type),
+					Class:   "text-sm",
+				}) {
+					@alert.Title(alert.TitleProps{}) {
+						{ msg.Text }
+					}
+				}
+			}
+		</div>
+	}
+}
+
+func getAlertVariant(msgType string) alert.Variant {
+	switch msgType {
+	case "error":
+		return alert.VariantDestructive
+	case "success":
+		return alert.VariantDefault
+	case "info":
+		return alert.VariantDefault
+	default:
+		return alert.VariantDefault
+	}
+}
+
+type UINodeProps struct {
+	Node client.UiNode
+}
+
+// UINode renders a single Kratos UI node
+templ UINode(props UINodeProps) {
+	{{ node := props.Node }}
+	if node.Attributes.UiNodeInputAttributes != nil {
+		@renderInputNode(node)
+	} else if node.Attributes.UiNodeTextAttributes != nil {
+		@renderTextNode(node)
+	} else if node.Attributes.UiNodeAnchorAttributes != nil {
+		@renderAnchorNode(node)
+	} else if node.Attributes.UiNodeImageAttributes != nil {
+		@renderImageNode(node)
+	} else if node.Attributes.UiNodeScriptAttributes != nil {
+		@renderScriptNode(node)
+	}
+}
+
+templ renderInputNode(node client.UiNode) {
+	{{ attrs := node.Attributes.UiNodeInputAttributes }}
+	if attrs.Type == "submit" || attrs.Type == "button" {
+		@button.Button(button.Props{
+			Type:     button.TypeSubmit,
+			Class:    "w-full",
+			Variant:  button.VariantDefault,
+			Disabled: boolValue(attrs.Disabled),
+			Attributes: templ.Attributes{
+				"name":  attrs.Name,
+				"value": stringValue(attrs.Value),
+			},
+		}) {
+			{ getNodeLabel(node) }
+		}
+	} else if attrs.Type == "hidden" {
+		<input
+			type="hidden"
+			name={ attrs.Name }
+			value={ stringValue(attrs.Value) }
+		/>
+	} else if attrs.Type == "checkbox" {
+		@form.ItemFlex() {
+			<input
+				type="checkbox"
+				id={ attrs.Name }
+				name={ attrs.Name }
+				value={ stringValue(attrs.Value) }
+				if boolValue(attrs.Required) {
+					required
+				}
+				if boolValue(attrs.Disabled) {
+					disabled
+				}
+				class="h-4 w-4 rounded border-gray-300"
+			/>
+			@form.Label(form.LabelProps{
+				For: attrs.Name,
+			}) {
+				{ getNodeLabel(node) }
+			}
+		}
+	} else {
+		@form.Item() {
+			@form.Label(form.LabelProps{
+				For: attrs.Name,
+			}) {
+				{ getNodeLabel(node) }
+			}
+			@input.Input(input.Props{
+				Type:        getInputType(attrs.Type),
+				Name:        attrs.Name,
+				ID:          attrs.Name,
+				Value:       stringValue(attrs.Value),
+				Placeholder: getNodeLabel(node),
+				Disabled:    boolValue(attrs.Disabled),
+				Attributes: templ.Attributes{
+					"autocomplete": stringValue(attrs.Autocomplete),
+					"required":     boolValue(attrs.Required),
+				},
+			})
+			@renderNodeMessages(node)
+		}
+	}
+}
+
+templ renderTextNode(node client.UiNode) {
+	{{ attrs := node.Attributes.UiNodeTextAttributes }}
+	<div class="text-sm text-muted-foreground">
+		{ attrs.Text.Text }
+	</div>
+}
+
+templ renderAnchorNode(node client.UiNode) {
+	{{ attrs := node.Attributes.UiNodeAnchorAttributes }}
+	<a
+		href={ templ.SafeURL(attrs.Href) }
+		class="text-sm text-primary hover:underline"
+		if attrs.Title.Text != "" {
+			title={ attrs.Title.Text }
+		}
+	>
+		{ attrs.Title.Text }
+	</a>
+}
+
+templ renderImageNode(node client.UiNode) {
+	{{ attrs := node.Attributes.UiNodeImageAttributes }}
+	<img
+		src={ attrs.Src }
+		alt={ getNodeLabel(node) }
+		class="mx-auto h-12 w-auto"
+	/>
+}
+
+templ renderScriptNode(node client.UiNode) {
+	{{ attrs := node.Attributes.UiNodeScriptAttributes }}
+	<script src={ attrs.Src } if attrs.Async {
+	async
+} if attrs.Referrerpolicy != "" {
+	referrerpolicy={ attrs.Referrerpolicy }
+} if attrs.Crossorigin != "" {
+	crossorigin={ attrs.Crossorigin }
+} if attrs.Integrity != "" {
+	integrity={ attrs.Integrity }
+} if attrs.Type != "" {
+	type={ attrs.Type }
+} if attrs.Nonce != "" {
+	nonce={ attrs.Nonce }
+}></script>
+}
+
+templ renderNodeMessages(node client.UiNode) {
+	if len(node.Messages) > 0 {
+		for _, msg := range node.Messages {
+			@form.Message(form.MessageProps{
+				Variant: getFormMessageVariant(string(msg.Type)),
+			}) {
+				{ msg.Text }
+			}
+		}
+	}
+}
+
+func getFormMessageVariant(msgType string) form.MessageVariant {
+	switch msgType {
+	case "error":
+		return form.MessageVariantError
+	case "info":
+		return form.MessageVariantInfo
+	default:
+		return form.MessageVariantInfo
+	}
+}
+
+func getNodeLabel(node client.UiNode) string {
+	if node.Meta.Label != nil && node.Meta.Label.Text != "" {
+		return node.Meta.Label.Text
+	}
+	if node.Attributes.UiNodeInputAttributes != nil {
+		return node.Attributes.UiNodeInputAttributes.Name
+	}
+	return ""
+}
+
+func getInputType(kratosType string) input.Type {
+	switch kratosType {
+	case "email":
+		return input.TypeEmail
+	case "password":
+		return input.TypePassword
+	case "number":
+		return input.TypeNumber
+	case "tel":
+		return input.TypeTel
+	case "url":
+		return input.TypeURL
+	default:
+		return input.TypeText
+	}
+}
+
+func stringValue(v interface{}) string {
+	if v == nil {
+		return ""
+	}
+	if s, ok := v.(string); ok {
+		return s
+	}
+	return ""
+}
+
+func boolValue(v interface{}) bool {
+	if v == nil {
+		return false
+	}
+	if b, ok := v.(bool); ok {
+		return b
+	}
+	return false
+}
+
+type UINodesProps struct {
+	Nodes  []client.UiNode
+	Groups []string
+}
+
+// UINodes renders multiple Kratos UI nodes, optionally filtered by group
+templ UINodes(props UINodesProps) {
+	{{ nodes := filterNodes(props.Nodes, props.Groups) }}
+	<div class="space-y-4">
+		for _, node := range nodes {
+			@UINode(UINodeProps{Node: node})
+		}
+	</div>
+}
+
+func filterNodes(nodes []client.UiNode, groups []string) []client.UiNode {
+	if len(groups) == 0 {
+		return nodes
+	}
+
+	groupSet := make(map[string]bool)
+	for _, g := range groups {
+		groupSet[g] = true
+	}
+
+	filtered := make([]client.UiNode, 0)
+	for _, node := range nodes {
+		if groupSet[node.Group] {
+			filtered = append(filtered, node)
+		}
+	}
+
+	return filtered
+}

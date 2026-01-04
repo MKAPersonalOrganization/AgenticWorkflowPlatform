@@ -52,6 +52,91 @@ This creates a **hard architectural constraint**: only math-instructor can deleg
 - Type-safe access control enforced at compile time
 - Optimized library usage only where needed (gosl/LAPACK only loaded for linear algebra)
 
+## Authentication
+
+The application uses [Ory Kratos](https://www.ory.sh/kratos/) for identity and user management.
+
+### Features (Current State)
+
+| Feature | Status |
+|---------|--------|
+| User Registration | ✅ Implemented |
+| Email Verification | ✅ Implemented |
+| User Login | ✅ Implemented |
+| Password Recovery | 🔄 In Progress |
+| User Settings | ⬜ Not Started |
+| Logout | ⬜ Not Started |
+| Protected Routes | ⬜ Not Started |
+
+### Auth Stack
+
+- **Ory Kratos**: Identity server handling registration, login, verification, recovery
+- **PostgreSQL**: Identity storage
+- **MailSlurper**: Email testing (development only)
+
+### Auth Routes
+
+| Route | Description |
+|-------|-------------|
+| `GET /auth/login` | Login page |
+| `GET /auth/registration` | Registration page |
+| `GET /auth/verification` | Email verification page |
+| `GET /auth/recovery` | Password recovery (not implemented) |
+| `GET /auth/settings` | User settings (not implemented) |
+| `GET /auth/logout` | Logout handler (not implemented) |
+
+### Running with Authentication
+
+1. Start the infrastructure:
+```bash
+docker compose up -d
+```
+
+2. Verify services are running:
+```bash
+# Kratos health check
+curl http://127.0.0.1:4433/health/ready
+
+# MailSlurper UI (for verification emails)
+open http://127.0.0.1:4436
+```
+
+3. Start the application:
+```bash
+task dev
+```
+
+4. Access the auth pages:
+- Registration: http://127.0.0.1:8090/auth/registration
+- Login: http://127.0.0.1:8090/auth/login
+
+### Local Signup Flow
+
+1. **Register**: Go to http://127.0.0.1:8090/auth/registration
+   - Fill in email, password, first name, last name
+   - Click "Sign up"
+
+2. **Get Verification Code**: Open MailSlurper at http://127.0.0.1:4436
+   - Find the verification email sent to your address
+   - Copy the 6-digit verification code
+
+3. **Verify Email**: You'll be redirected to the verification page
+   - Enter the verification code from the email
+   - Click "Submit"
+
+4. **Login**: After verification, go to http://127.0.0.1:8090/auth/login
+   - Enter your email and password
+   - Click "Sign in"
+
+### Environment Variables (Auth)
+
+```bash
+# Required
+APP_URL=http://127.0.0.1:8090
+KRATOS_PUBLIC_URL=http://127.0.0.1:4433
+KRATOS_ADMIN_URL=http://127.0.0.1:4434
+```
+
 ## Prerequisites
 
 - Go 1.21+
@@ -199,21 +284,29 @@ Any changes to `.templ`, `.css`, or `.go` files will automatically rebuild and r
 ```
 .
 ├── components/          # Templ components
+│   ├── auth/           # Authentication pages (login, registration, verification)
 │   ├── button/         # Button component (from templui)
 │   ├── card/           # Card component (from templui)
 │   ├── input/          # Input component (from templui)
 │   └── hello.templ     # Main chat UI
+├── domain/             # Domain models
+│   └── user.go         # User model matching Kratos identity
 ├── handlers/           # HTTP handlers
 │   └── chat.go         # Chat SSE endpoint
-├── internal/
-│   └── agui/          # AG-UI protocol implementation
+├── infra/
+│   ├── auth/           # Kratos client, middleware, handlers
+│   └── agui/           # AG-UI protocol implementation
+├── kratos/             # Ory Kratos configuration
+│   ├── kratos.yml      # Kratos server config
+│   └── identity.schema.json  # User identity schema
 ├── services/
-│   └── openai/        # OpenAI integration
+│   └── openai/         # OpenAI integration
 ├── assets/
-│   ├── css/           # Tailwind CSS files
-│   └── js/            # Alpine.js components
-├── main.go            # Application entry point
-└── Taskfile.yaml      # Task runner configuration
+│   ├── css/            # Tailwind CSS files
+│   └── js/             # Alpine.js components
+├── main.go             # Application entry point
+├── docker-compose.yml  # Infrastructure (Kratos, PostgreSQL, MailSlurper)
+└── Taskfile.yaml       # Task runner configuration
 ```
 
 ## AG-UI Protocol
