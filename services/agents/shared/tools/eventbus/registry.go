@@ -80,17 +80,6 @@ func (r *ContractRegistry) IsEmissionTool(toolName string) bool {
 	return exists
 }
 
-// IsCollaborationTool checks if a tool name is any kind of collaboration tool
-func (r *ContractRegistry) IsCollaborationTool(toolName string) bool {
-	// Built-in collaboration tools
-	if toolName == "write_whiteboard" || toolName == "read_whiteboard" {
-		return true
-	}
-
-	// Check if it's a registered emission tool
-	return r.IsEmissionTool(toolName)
-}
-
 // GetTargetAgentForTool returns the agent that should be activated when
 // an emission tool is called
 func (r *ContractRegistry) GetTargetAgentForTool(toolName string) (string, bool) {
