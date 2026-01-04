@@ -248,6 +248,60 @@ KRATOS_BROWSER_URL=http://127.0.0.1:4433  # External URL for browser redirects
 
 ## Prerequisites
 
+### Docker Setup
+
+The application can be run entirely in Docker containers for a consistent development environment.
+
+**Configure environment variables:**
+
+Before starting the containers, set your OpenAI API key on the host machine:
+```bash
+export OPENAI_API_KEY=your_actual_api_key_here
+```
+
+**Build and start all services:**
+```bash
+docker compose up -d --build
+```
+
+Or build without starting:
+```bash
+docker compose build
+```
+
+This will start:
+- **app**: Main application server (port 8090)
+- **postgres**: PostgreSQL database for Kratos (port 5433)
+- **kratos**: Ory Kratos identity server (ports 4433, 4434)
+- **kratos-migrate**: Database migration service
+- **mailslurper**: Email testing service (ports 4436, 4437)
+
+**Check service status:**
+```bash
+docker compose ps
+```
+
+**View application logs:**
+```bash
+docker compose logs app -f
+```
+
+**Rebuild and restart the app container:**
+```bash
+docker compose up app -d --build
+```
+
+**Stop all services:**
+```bash
+docker compose down
+```
+
+**Environment variables passed to Docker:**
+- `OPENAI_API_KEY`: Captured from host environment for OpenAI API access
+- Other configuration in `docker-compose.yml`
+
+### Local Development
+
 - Go 1.21+
 - Task (task runner)
 - templui CLI
