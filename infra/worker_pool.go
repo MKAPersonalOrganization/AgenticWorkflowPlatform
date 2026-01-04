@@ -388,6 +388,12 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 				nextAgent = "linearalgebra-professor"
 				agentEventOccurred = true
 
+			case agents.EventTypeDiagrammingQuestion:
+				// Diagramming question emitted - activate diagramming instructor
+				slog.Info("DiagrammingQuestion event detected", "nextAgent", "diagramming-instructor")
+				nextAgent = "diagramming-instructor"
+				agentEventOccurred = true
+
 			case agents.EventTypeQuestionAnswered:
 				// Question answered - activate student-facing agent to review and respond
 				nextAgent = "student-facing-agent"
@@ -622,6 +628,10 @@ Follow your state machine workflow:
 
 			case agents.EventTypeLinearAlgebraQuestion:
 				nextAgent = "linearalgebra-professor"
+				routingEventOccurred = true
+
+			case agents.EventTypeDiagrammingQuestion:
+				nextAgent = "diagramming-instructor"
 				routingEventOccurred = true
 
 			case agents.EventTypeQuestionAnswered:

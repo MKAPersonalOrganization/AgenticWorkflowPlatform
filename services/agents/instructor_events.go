@@ -19,6 +19,7 @@ const (
 	EventTypeChemistryQuestion         EventType = "question.chemistry"
 	EventTypeStatisticsQuestion        EventType = "question.statistics"
 	EventTypeLinearAlgebraQuestion     EventType = "question.linearalgebra"
+	EventTypeDiagrammingQuestion       EventType = "question.diagramming"
 	EventTypeAgentHandoff              EventType = "agent.handoff"
 )
 
@@ -217,6 +218,23 @@ func NewLinearAlgebraQuestionEvent(threadID, question, emittedBy, context, white
 		Version:   1,
 		Data: map[string]interface{}{
 			"question":         question,
+			"emitted_by":       emittedBy,
+			"context":          context,
+			"whiteboard_state": whiteboardState,
+		},
+	}
+}
+
+// NewDiagrammingQuestionEvent creates a diagramming question event
+func NewDiagrammingQuestionEvent(threadID, request, emittedBy, context, whiteboardState string) *DomainEvent {
+	return &DomainEvent{
+		ID:        GenerateEventID(),
+		Type:      EventTypeDiagrammingQuestion,
+		Timestamp: time.Now(),
+		ThreadID:  threadID,
+		Version:   1,
+		Data: map[string]interface{}{
+			"request":          request,
 			"emitted_by":       emittedBy,
 			"context":          context,
 			"whiteboard_state": whiteboardState,

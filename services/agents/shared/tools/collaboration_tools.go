@@ -18,6 +18,7 @@ func IsCollaborationTool(toolName string) bool {
 		toolName == "emit_chemistry_question" ||
 		toolName == "emit_statistics_question" ||
 		toolName == "emit_linearalgebra_question" ||
+		toolName == "emit_diagramming_question" ||
 		toolName == "emit_question_answered"
 }
 
@@ -76,6 +77,16 @@ func HandleCollaborationToolCall(threadID string, agentName string, toolCall dom
 		}
 		return agents.NewLinearAlgebraQuestionEvent(threadID, input.Question, agentName, input.Context, getWhiteboardState(threadID)), nil
 
+	case "emit_diagramming_question":
+		var input struct {
+			Request string `json:"request"`
+			Context string `json:"context"`
+		}
+		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
+			return nil, fmt.Errorf("failed to parse emit_diagramming_question arguments: %w", err)
+		}
+		return agents.NewDiagrammingQuestionEvent(threadID, input.Request, agentName, input.Context, getWhiteboardState(threadID)), nil
+
 	case "emit_question_answered":
 		var input struct {
 			Subject    string `json:"subject"`
@@ -123,6 +134,9 @@ func GetHandoffEventForTool(threadID string, fromAgent string, toolName string) 
 	case "emit_linearalgebra_question":
 		toAgent = "linearalgebra-instructor"
 		reason = "Linear algebra question requires specialist"
+	case "emit_diagramming_question":
+		toAgent = "diagramming-instructor"
+		reason = "Diagramming request requires specialist"
 	case "emit_question_answered":
 		toAgent = "student-facing-agent"
 		reason = "Question answered, returning to coordinator"

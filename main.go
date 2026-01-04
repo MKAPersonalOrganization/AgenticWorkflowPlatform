@@ -13,6 +13,7 @@ import (
 	"school-with-ai/infra/auth"
 	"school-with-ai/services/agents/advancedmath/linearalgebra"
 	"school-with-ai/services/agents/chemistry"
+	"school-with-ai/services/agents/diagramming"
 	"school-with-ai/services/agents/math"
 	"school-with-ai/services/agents/physics"
 	"school-with-ai/services/agents/statistics"
@@ -56,6 +57,7 @@ func main() {
 	agentRegistry.Register("chemistry-instructor", chemistry.CreateChemistryInstructor)
 	agentRegistry.Register("statistics-instructor", statistics.CreateStatisticsInstructor)
 	agentRegistry.Register("linearalgebra-professor", linearalgebra.CreateLinearAlgebraProfessor)
+	agentRegistry.Register("diagramming-instructor", diagramming.CreateDiagrammingInstructor)
 
 	// Initialize and start worker pool with agent registry
 	workerPool := infra.NewWorkerPool(queue, eventLog, threadState, chatClient, agentRegistry, infra.WorkerPoolConfig{
