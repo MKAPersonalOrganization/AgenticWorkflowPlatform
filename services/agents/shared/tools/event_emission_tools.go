@@ -228,6 +228,50 @@ func (t *EmitLinearAlgebraQuestionTool) Invoke(ctx context.Context, arguments st
 	return fmt.Sprintf("LinearAlgebraQuestion event emitted. Question: %s", params.Question), nil
 }
 
+// EmitDiagrammingQuestionTool allows agents to request diagram creation from the diagramming specialist
+type EmitDiagrammingQuestionTool struct{}
+
+func NewEmitDiagrammingQuestionTool() *EmitDiagrammingQuestionTool {
+	return &EmitDiagrammingQuestionTool{}
+}
+
+func (t *EmitDiagrammingQuestionTool) Name() string {
+	return "emit_diagramming_question"
+}
+
+func (t *EmitDiagrammingQuestionTool) Description() string {
+	return "Emit a diagramming request event to activate the diagramming specialist. Use this when you need to create flowcharts, sequence diagrams, state diagrams, or other visual representations. The diagramming specialist will create the diagram and add it to the whiteboard."
+}
+
+func (t *EmitDiagrammingQuestionTool) Parameters() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"request": map[string]any{
+				"type":        "string",
+				"description": "Description of the diagram needed (e.g., 'flowchart for GCD algorithm', 'state diagram for problem solving process', 'sequence diagram for agent interaction')",
+			},
+			"context": map[string]any{
+				"type":        "string",
+				"description": "Optional additional context about what the diagram should show",
+			},
+		},
+		"required": []string{"request"},
+	}
+}
+
+func (t *EmitDiagrammingQuestionTool) Invoke(ctx context.Context, arguments string) (string, error) {
+	var params struct {
+		Request string `json:"request"`
+		Context string `json:"context"`
+	}
+	if err := json.Unmarshal([]byte(arguments), &params); err != nil {
+		return "", fmt.Errorf("failed to parse arguments: %w", err)
+	}
+
+	return fmt.Sprintf("DiagrammingQuestion event emitted. Request: %s", params.Request), nil
+}
+
 // EmitQuestionAnsweredTool allows instructors to signal they've answered a question
 type EmitQuestionAnsweredTool struct{}
 
@@ -250,7 +294,7 @@ func (t *EmitQuestionAnsweredTool) Parameters() map[string]any {
 			"subject": map[string]any{
 				"type":        "string",
 				"description": "The subject of the question answered",
-				"enum":        []string{"math", "physics", "chemistry"},
+				"enum":        []string{"math", "physics", "chemistry", "diagramming"},
 			},
 			"is_complete": map[string]any{
 				"type":        "boolean",
@@ -276,9 +320,10 @@ func (t *EmitQuestionAnsweredTool) Invoke(ctx context.Context, arguments string)
 	}
 
 	validSubjects := map[string]bool{
-		"math":      true,
-		"physics":   true,
-		"chemistry": true,
+		"math":        true,
+		"physics":     true,
+		"chemistry":   true,
+		"diagramming": true,
 	}
 
 	if !validSubjects[params.Subject] {
