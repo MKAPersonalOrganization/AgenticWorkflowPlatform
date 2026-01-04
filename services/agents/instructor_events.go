@@ -10,6 +10,7 @@ type EventType string
 
 // Common instructor event types
 const (
+	EventTypeUserMessage               EventType = "user.message"
 	EventTypeWhiteboardUpdated         EventType = "whiteboard.updated"
 	EventTypeInstructorThought         EventType = "instructor.thought"
 	EventTypeInstructorStrategyChanged EventType = "instructor.strategy_changed"
