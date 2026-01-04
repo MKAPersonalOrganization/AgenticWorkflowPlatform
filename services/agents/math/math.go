@@ -33,6 +33,7 @@ func CreateMathInstructor(notifier sdk.EventNotifier) sdk.AgentConfig {
 	registry.Register(sharedtools.NewEmitPhysicsQuestionTool())
 	registry.Register(sharedtools.NewEmitChemistryQuestionTool())
 	registry.Register(sharedtools.NewEmitLinearAlgebraQuestionTool())
+	registry.Register(sharedtools.NewEmitDiagrammingQuestionTool())
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
 
 	return sdk.AgentConfig{
