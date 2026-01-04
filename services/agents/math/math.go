@@ -1,39 +1,28 @@
 package math
 
 import (
-	"school-with-ai/services/agents/math/tools"
+	"school-with-ai/services/agents/eventbus"
 	sharedtools "school-with-ai/services/agents/shared/tools"
 	"school-with-ai/services/sdk"
 )
 
-// CreateMathInstructor creates the math instructor agent configuration
-//
-// EVENT CONTRACT:
-//
-//	Responds To (Triggers):
-//	  - question.math: Emitted by student-facing-agent or other instructors when math expertise is needed
-//
-//	Emits:
-//	  - question.answered: Signals completion of work (activates student-facing-agent)
-//	  - question.physics: Activates physics-instructor for multi-subject questions
-//	  - question.chemistry: Activates chemistry-instructor for multi-subject questions
-//	  - whiteboard.updated: Updates shared whiteboard with math solution
+// CreateMathInstructor creates the math instructor agent configuration.
+// Event contract is defined in contract.go
 func CreateMathInstructor(notifier sdk.EventNotifier) sdk.AgentConfig {
-	// Create a dedicated tool registry for this agent
 	registry := sdk.NewToolRegistry()
 
-	// Create only the tools this agent needs
-	registry.Register(sharedtools.NewCalculatorTool())
-	registry.Register(tools.NewGraphingTool())
-	registry.Register(tools.NewEquationSolverTool())
-	registry.Register(tools.NewPlotTool())
-	registry.Register(tools.NewAnimateTool())
+	// Domain-specific tools
+	for _, tool := range domainTools() {
+		registry.Register(tool)
+	}
+
+	// Auto-generated emission tools from emits()
+	for _, tool := range eventbus.GenerateEmissionTools(emits()) {
+		registry.Register(tool)
+	}
+
+	// Shared collaboration tools
 	registry.Register(sharedtools.NewReadWhiteboardTool())
-	registry.Register(sharedtools.NewEmitQuestionAnsweredTool())
-	registry.Register(sharedtools.NewEmitPhysicsQuestionTool())
-	registry.Register(sharedtools.NewEmitChemistryQuestionTool())
-	registry.Register(sharedtools.NewEmitLinearAlgebraQuestionTool())
-	registry.Register(sharedtools.NewEmitDiagrammingQuestionTool())
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
 
 	return sdk.AgentConfig{

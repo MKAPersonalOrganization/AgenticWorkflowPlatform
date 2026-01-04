@@ -1,28 +1,29 @@
 package statistics
 
 import (
+	"school-with-ai/services/agents/eventbus"
 	sharedtools "school-with-ai/services/agents/shared/tools"
-	"school-with-ai/services/agents/statistics/tools"
 	"school-with-ai/services/sdk"
 )
 
-// CreateStatisticsInstructor creates the statistics instructor agent with comprehensive statistical tools
+// CreateStatisticsInstructor creates the statistics instructor agent.
+// Event contract is defined in contract.go
 func CreateStatisticsInstructor(notifier sdk.EventNotifier) sdk.AgentConfig {
-	// Create a dedicated tool registry for this agent
 	registry := sdk.NewToolRegistry()
 
-	// Create only the tools this agent needs
-	registry.Register(sharedtools.NewWriteWhiteboardTool())
+	// Domain-specific tools
+	for _, tool := range domainTools() {
+		registry.Register(tool)
+	}
+
+	// Auto-generated emission tools
+	for _, tool := range eventbus.GenerateEmissionTools(emits()) {
+		registry.Register(tool)
+	}
+
+	// Shared collaboration tools
 	registry.Register(sharedtools.NewReadWhiteboardTool())
-	registry.Register(tools.NewDescriptiveStatsTool())
-	registry.Register(tools.NewCorrelationTool())
-	registry.Register(tools.NewDistanceMetricsTool())
-	registry.Register(tools.NewSamplingTool())
-	registry.Register(tools.NewDataTransformTool())
-	registry.Register(tools.NewNormalDistributionTool())
-	registry.Register(tools.NewGeometricDistributionTool())
-	registry.Register(tools.NewRegressionTool())
-	registry.Register(sharedtools.NewEmitQuestionAnsweredTool())
+	registry.Register(sharedtools.NewWriteWhiteboardTool())
 
 	return sdk.AgentConfig{
 		Name: "statistics-instructor",

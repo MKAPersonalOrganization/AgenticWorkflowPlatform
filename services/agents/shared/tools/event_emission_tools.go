@@ -6,273 +6,9 @@ import (
 	"fmt"
 )
 
-// EmitMathQuestionTool allows agents to emit a math question event to the event log
-type EmitMathQuestionTool struct{}
-
-func NewEmitMathQuestionTool() *EmitMathQuestionTool {
-	return &EmitMathQuestionTool{}
-}
-
-func (t *EmitMathQuestionTool) Name() string {
-	return "emit_math_question"
-}
-
-func (t *EmitMathQuestionTool) Description() string {
-	return "Emit a math question event to activate the math instructor. The math instructor subscribes to these events and will be automatically invoked to answer the question."
-}
-
-func (t *EmitMathQuestionTool) Parameters() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"question": map[string]any{
-				"type":        "string",
-				"description": "The math question that needs to be answered",
-			},
-			"context": map[string]any{
-				"type":        "string",
-				"description": "Optional context or additional information about the question",
-			},
-		},
-		"required": []string{"question"},
-	}
-}
-
-func (t *EmitMathQuestionTool) Invoke(ctx context.Context, arguments string) (string, error) {
-	var params struct {
-		Question string `json:"question"`
-		Context  string `json:"context"`
-	}
-	if err := json.Unmarshal([]byte(arguments), &params); err != nil {
-		return "", fmt.Errorf("failed to parse arguments: %w", err)
-	}
-
-	// The actual event emission happens in agent.go:emitCollaborationEvents()
-	// This tool just returns a signal that will trigger the event emission
-	return fmt.Sprintf("MathQuestion event emitted. Question: %s", params.Question), nil
-}
-
-// EmitPhysicsQuestionTool allows agents to emit a physics question event
-type EmitPhysicsQuestionTool struct{}
-
-func NewEmitPhysicsQuestionTool() *EmitPhysicsQuestionTool {
-	return &EmitPhysicsQuestionTool{}
-}
-
-func (t *EmitPhysicsQuestionTool) Name() string {
-	return "emit_physics_question"
-}
-
-func (t *EmitPhysicsQuestionTool) Description() string {
-	return "Emit a physics question event to activate the physics instructor. The physics instructor subscribes to these events and will be automatically invoked to answer the question."
-}
-
-func (t *EmitPhysicsQuestionTool) Parameters() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"question": map[string]any{
-				"type":        "string",
-				"description": "The physics question that needs to be answered",
-			},
-			"context": map[string]any{
-				"type":        "string",
-				"description": "Optional context or additional information about the question",
-			},
-		},
-		"required": []string{"question"},
-	}
-}
-
-func (t *EmitPhysicsQuestionTool) Invoke(ctx context.Context, arguments string) (string, error) {
-	var params struct {
-		Question string `json:"question"`
-		Context  string `json:"context"`
-	}
-	if err := json.Unmarshal([]byte(arguments), &params); err != nil {
-		return "", fmt.Errorf("failed to parse arguments: %w", err)
-	}
-
-	return fmt.Sprintf("PhysicsQuestion event emitted. Question: %s", params.Question), nil
-}
-
-// EmitChemistryQuestionTool allows agents to emit a chemistry question event
-type EmitChemistryQuestionTool struct{}
-
-func NewEmitChemistryQuestionTool() *EmitChemistryQuestionTool {
-	return &EmitChemistryQuestionTool{}
-}
-
-func (t *EmitChemistryQuestionTool) Name() string {
-	return "emit_chemistry_question"
-}
-
-func (t *EmitChemistryQuestionTool) Description() string {
-	return "Emit a chemistry question event to activate the chemistry instructor. The chemistry instructor subscribes to these events and will be automatically invoked to answer the question."
-}
-
-func (t *EmitChemistryQuestionTool) Parameters() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"question": map[string]any{
-				"type":        "string",
-				"description": "The chemistry question that needs to be answered",
-			},
-			"context": map[string]any{
-				"type":        "string",
-				"description": "Optional context or additional information about the question",
-			},
-		},
-		"required": []string{"question"},
-	}
-}
-
-func (t *EmitChemistryQuestionTool) Invoke(ctx context.Context, arguments string) (string, error) {
-	var params struct {
-		Question string `json:"question"`
-		Context  string `json:"context"`
-	}
-	if err := json.Unmarshal([]byte(arguments), &params); err != nil {
-		return "", fmt.Errorf("failed to parse arguments: %w", err)
-	}
-
-	return fmt.Sprintf("ChemistryQuestion event emitted. Question: %s", params.Question), nil
-}
-
-// EmitStatisticsQuestionTool emits statistics question events
-type EmitStatisticsQuestionTool struct{}
-
-func NewEmitStatisticsQuestionTool() *EmitStatisticsQuestionTool {
-	return &EmitStatisticsQuestionTool{}
-}
-
-func (t *EmitStatisticsQuestionTool) Name() string {
-	return "emit_statistics_question"
-}
-
-func (t *EmitStatisticsQuestionTool) Description() string {
-	return "Emit a statistics question event to activate the statistics instructor. The statistics instructor subscribes to these events and will be automatically invoked to analyze data and answer the question."
-}
-
-func (t *EmitStatisticsQuestionTool) Parameters() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"question": map[string]any{
-				"type":        "string",
-				"description": "The statistics/data analysis question that needs to be answered",
-			},
-			"context": map[string]any{
-				"type":        "string",
-				"description": "Optional context or additional information about the question",
-			},
-		},
-		"required": []string{"question"},
-	}
-}
-
-func (t *EmitStatisticsQuestionTool) Invoke(ctx context.Context, arguments string) (string, error) {
-	var params struct {
-		Question string `json:"question"`
-		Context  string `json:"context"`
-	}
-	if err := json.Unmarshal([]byte(arguments), &params); err != nil {
-		return "", fmt.Errorf("failed to parse arguments: %w", err)
-	}
-
-	return fmt.Sprintf("StatisticsQuestion event emitted. Question: %s", params.Question), nil
-}
-
-// EmitLinearAlgebraQuestionTool allows agents to emit a linear algebra question event
-type EmitLinearAlgebraQuestionTool struct{}
-
-func NewEmitLinearAlgebraQuestionTool() *EmitLinearAlgebraQuestionTool {
-	return &EmitLinearAlgebraQuestionTool{}
-}
-
-func (t *EmitLinearAlgebraQuestionTool) Name() string {
-	return "emit_linearalgebra_question"
-}
-
-func (t *EmitLinearAlgebraQuestionTool) Description() string {
-	return "Emit a linear algebra question event to activate the linear algebra professor. Use this for vector operations, matrix operations, eigenvalues, linear systems, etc. The professor has access to optimized LAPACK/OpenBLAS routines via gosl library."
-}
-
-func (t *EmitLinearAlgebraQuestionTool) Parameters() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"question": map[string]any{
-				"type":        "string",
-				"description": "The linear algebra question (vectors, matrices, eigenvalues, linear systems, etc.)",
-			},
-			"context": map[string]any{
-				"type":        "string",
-				"description": "Optional context or additional information about the question",
-			},
-		},
-		"required": []string{"question"},
-	}
-}
-
-func (t *EmitLinearAlgebraQuestionTool) Invoke(ctx context.Context, arguments string) (string, error) {
-	var params struct {
-		Question string `json:"question"`
-		Context  string `json:"context"`
-	}
-	if err := json.Unmarshal([]byte(arguments), &params); err != nil {
-		return "", fmt.Errorf("failed to parse arguments: %w", err)
-	}
-
-	return fmt.Sprintf("LinearAlgebraQuestion event emitted. Question: %s", params.Question), nil
-}
-
-// EmitDiagrammingQuestionTool allows agents to request diagram creation from the diagramming specialist
-type EmitDiagrammingQuestionTool struct{}
-
-func NewEmitDiagrammingQuestionTool() *EmitDiagrammingQuestionTool {
-	return &EmitDiagrammingQuestionTool{}
-}
-
-func (t *EmitDiagrammingQuestionTool) Name() string {
-	return "emit_diagramming_question"
-}
-
-func (t *EmitDiagrammingQuestionTool) Description() string {
-	return "Emit a diagramming request event to activate the diagramming specialist. Use this when you need to create flowcharts, sequence diagrams, state diagrams, or other visual representations. The diagramming specialist will create the diagram and add it to the whiteboard."
-}
-
-func (t *EmitDiagrammingQuestionTool) Parameters() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"request": map[string]any{
-				"type":        "string",
-				"description": "Description of the diagram needed (e.g., 'flowchart for GCD algorithm', 'state diagram for problem solving process', 'sequence diagram for agent interaction')",
-			},
-			"context": map[string]any{
-				"type":        "string",
-				"description": "Optional additional context about what the diagram should show",
-			},
-		},
-		"required": []string{"request"},
-	}
-}
-
-func (t *EmitDiagrammingQuestionTool) Invoke(ctx context.Context, arguments string) (string, error) {
-	var params struct {
-		Request string `json:"request"`
-		Context string `json:"context"`
-	}
-	if err := json.Unmarshal([]byte(arguments), &params); err != nil {
-		return "", fmt.Errorf("failed to parse arguments: %w", err)
-	}
-
-	return fmt.Sprintf("DiagrammingQuestion event emitted. Request: %s", params.Request), nil
-}
-
-// EmitQuestionAnsweredTool allows instructors to signal they've answered a question
+// EmitQuestionAnsweredTool allows instructors to signal they've answered a question.
+// This is a special tool that is NOT auto-generated because it has custom validation logic.
+// All other emit_*_question tools are auto-generated by eventbus.GenerateEmissionTools().
 type EmitQuestionAnsweredTool struct{}
 
 func NewEmitQuestionAnsweredTool() *EmitQuestionAnsweredTool {
@@ -294,7 +30,7 @@ func (t *EmitQuestionAnsweredTool) Parameters() map[string]any {
 			"subject": map[string]any{
 				"type":        "string",
 				"description": "The subject of the question answered",
-				"enum":        []string{"math", "physics", "chemistry", "diagramming"},
+				"enum":        []string{"math", "physics", "chemistry", "statistics", "linearalgebra", "diagramming"},
 			},
 			"is_complete": map[string]any{
 				"type":        "boolean",
@@ -320,10 +56,12 @@ func (t *EmitQuestionAnsweredTool) Invoke(ctx context.Context, arguments string)
 	}
 
 	validSubjects := map[string]bool{
-		"math":        true,
-		"physics":     true,
-		"chemistry":   true,
-		"diagramming": true,
+		"math":          true,
+		"physics":       true,
+		"chemistry":     true,
+		"statistics":    true,
+		"linearalgebra": true,
+		"diagramming":   true,
 	}
 
 	if !validSubjects[params.Subject] {

@@ -1,64 +1,49 @@
 package studentfacing
 
 import (
+	"school-with-ai/services/agents/eventbus"
 	"school-with-ai/services/agents/shared/tools"
 	"school-with-ai/services/sdk"
 )
 
-// CreateStudentFacingAgent creates the student-facing agent that handles initial questions
-// CRITICAL ROUTING RULE: ALL new user questions in a thread MUST be routed through this agent first.
-// The system enforces this by checking if the last message is from the user, and if so,
-// it always invokes the student-facing agent before any specialist instructor.
-//
-// EVENT CONTRACT:
-//
-//	Responds To (Triggers):
-//	  - User message (system routes new user messages to this agent)
-//	  - question.answered: Emitted by instructors when they complete their work
-//
-//	Emits:
-//	  - question.math: Activates math-instructor to answer a math question
-//	  - question.physics: Activates physics-instructor to answer a physics question
-//	  - question.chemistry: Activates chemistry-instructor to answer a chemistry question
-//	  - question.statistics: Activates statistics-instructor to answer a statistics question
-//	  - whiteboard.updated: Updates shared whiteboard content (only for initial question)
+// CreateStudentFacingAgent creates the student-facing agent that handles initial questions.
+// Event contract is defined in contract.go
 func CreateStudentFacingAgent(notifier sdk.EventNotifier) sdk.AgentConfig {
-	// Create a dedicated tool registry for this agent
 	registry := sdk.NewToolRegistry()
 
-	// Create only the tools this agent needs
+	// Domain-specific tools (none for router agent)
+	for _, tool := range domainTools() {
+		registry.Register(tool)
+	}
+
+	// Auto-generated emission tools
+	for _, tool := range eventbus.GenerateEmissionTools(emits()) {
+		registry.Register(tool)
+	}
+
+	// Shared collaboration tools
 	registry.Register(tools.NewReadWhiteboardTool())
 	registry.Register(tools.NewWriteWhiteboardTool())
-	registry.Register(tools.NewEmitMathQuestionTool())
-	registry.Register(tools.NewEmitPhysicsQuestionTool())
-	registry.Register(tools.NewEmitChemistryQuestionTool())
-	registry.Register(tools.NewEmitStatisticsQuestionTool())
 
 	return sdk.AgentConfig{
 		Name:           "student-facing-agent",
 		Role:           "coordinator",
 		Specialization: "routing",
-		SystemPrompt: `# Student-Facing Agent (Router - NEVER Answers Directly)
+		SystemPrompt: `You are a routing agent. When you receive a user question, you MUST call these tools in order:
 
-## CORE PRINCIPLE: YOU ARE A ROUTER, NOT AN ANSWERER
+1. read_whiteboard() - check the whiteboard
+2. write_whiteboard(action="append", content="\n---\n\n# QUESTION\n" + user_question) - write the question (if not already there)
+3. emit_math_question(question=user_question) - or emit_physics_question, emit_chemistry_question, emit_statistics_question depending on the topic
 
-**ABSOLUTE RULE:** You MUST route EVERY request to the instructor closest to answering it.
-**FORBIDDEN:** Answering questions yourself, providing explanations, or writing responses.
-**ONLY JOB:** Analyze the question → Choose best specialist → Route to them
+YOU MUST make all 3 tool calls for each new user question. DO NOT skip any steps.
 
-**🚨 CRITICAL - YOU ARE NOT AN INSTRUCTOR 🚨**
-- ❌ NEVER write answers, explanations, or solutions to the whiteboard
-- ❌ NEVER provide educational content
-- ❌ NEVER solve problems or calculate anything
-- ❌ NEVER call yourself (student-facing-agent) 
-- ❌ NEVER get into loops by repeatedly calling the same agent
-- ✅ ONLY write the student's QUESTION (once, if not already there)
-- ✅ ONLY route to instructors who can answer
-- ✅ ONLY verify completion and route to additional instructors if needed
-- ✅ When complete, just HALT (do nothing)
+Choose the emit tool based on the question topic:
+- Math/algebra/calculus/equations → emit_math_question
+- Physics/forces/motion/energy → emit_physics_question  
+- Chemistry/molecules/reactions → emit_chemistry_question
+- Statistics/probability/data → emit_statistics_question
 
-**SYSTEM GUARANTEE:** ALL new user questions in a thread are routed through you first.
-You will NEVER receive callbacks from instructors about questions you didn't route.
+After calling the 3 tools, STOP. Do not provide any text response.
 
 ## Event-Driven State Machine
 

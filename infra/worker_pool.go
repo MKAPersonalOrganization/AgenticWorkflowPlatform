@@ -9,6 +9,7 @@ import (
 
 	"school-with-ai/domain"
 	"school-with-ai/services/agents"
+	"school-with-ai/services/agents/eventbus"
 	"school-with-ai/services/sdk"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
@@ -360,43 +361,10 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 		// Track routing events (but don't act on them yet - wait for agent to finish)
 		switch e := event.(type) {
 		case *agents.DomainEvent:
-			// Handle unified domain events
-			switch e.Type {
-			case agents.EventTypeMathQuestion:
-				// Math question emitted - activate math instructor
-				nextAgent = "math-instructor"
-				agentEventOccurred = true
-
-			case agents.EventTypePhysicsQuestion:
-				// Physics question emitted - activate physics instructor
-				nextAgent = "physics-instructor"
-				agentEventOccurred = true
-
-			case agents.EventTypeChemistryQuestion:
-				// Chemistry question emitted - activate chemistry instructor
-				nextAgent = "chemistry-instructor"
-				agentEventOccurred = true
-
-			case agents.EventTypeStatisticsQuestion:
-				// Statistics question emitted - activate statistics instructor
-				nextAgent = "statistics-instructor"
-				agentEventOccurred = true
-
-			case agents.EventTypeLinearAlgebraQuestion:
-				// Linear algebra question emitted - activate linear algebra professor
-				slog.Info("LinearAlgebraQuestion event detected", "nextAgent", "linearalgebra-professor")
-				nextAgent = "linearalgebra-professor"
-				agentEventOccurred = true
-
-			case agents.EventTypeDiagrammingQuestion:
-				// Diagramming question emitted - activate diagramming instructor
-				slog.Info("DiagrammingQuestion event detected", "nextAgent", "diagramming-instructor")
-				nextAgent = "diagramming-instructor"
-				agentEventOccurred = true
-
-			case agents.EventTypeQuestionAnswered:
-				// Question answered - activate student-facing agent to review and respond
-				nextAgent = "student-facing-agent"
+			// Use EventBus to route events to subscribers
+			if subscriber, ok := eventbus.GlobalContracts.RouteEvent(e.Type); ok {
+				slog.Info("Event routed via EventBus", "eventType", e.Type, "nextAgent", subscriber)
+				nextAgent = subscriber
 				agentEventOccurred = true
 			}
 		}
@@ -608,34 +576,9 @@ Follow your state machine workflow:
 		// Track routing events (but don't act on them yet - wait for agent to finish)
 		switch e := event.(type) {
 		case *agents.DomainEvent:
-			// Handle unified domain events
-			switch e.Type {
-			case agents.EventTypeMathQuestion:
-				nextAgent = "math-instructor"
-				routingEventOccurred = true
-
-			case agents.EventTypePhysicsQuestion:
-				nextAgent = "physics-instructor"
-				routingEventOccurred = true
-
-			case agents.EventTypeChemistryQuestion:
-				nextAgent = "chemistry-instructor"
-				routingEventOccurred = true
-
-			case agents.EventTypeStatisticsQuestion:
-				nextAgent = "statistics-instructor"
-				routingEventOccurred = true
-
-			case agents.EventTypeLinearAlgebraQuestion:
-				nextAgent = "linearalgebra-professor"
-				routingEventOccurred = true
-
-			case agents.EventTypeDiagrammingQuestion:
-				nextAgent = "diagramming-instructor"
-				routingEventOccurred = true
-
-			case agents.EventTypeQuestionAnswered:
-				nextAgent = "student-facing-agent"
+			// Use EventBus to route events to subscribers
+			if subscriber, ok := eventbus.GlobalContracts.RouteEvent(e.Type); ok {
+				nextAgent = subscriber
 				routingEventOccurred = true
 			}
 		}
