@@ -130,6 +130,7 @@ func (h *AuthHandlers) LoginPage(w http.ResponseWriter, r *http.Request) {
 		Messages:        messages,
 		RecoveryURL:     recoveryURL,
 		RegistrationURL: registrationURL,
+		User:            GetUserFromContext(r.Context()), // nil if not authenticated
 	}
 
 	component := auth.LoginPageWithNodes(flow.Ui.Nodes, props)
@@ -208,6 +209,7 @@ func (h *AuthHandlers) RegistrationPage(w http.ResponseWriter, r *http.Request) 
 		FlowMethod: flow.Ui.Method,
 		Messages:   messages,
 		LoginURL:   loginURL,
+		User:       GetUserFromContext(r.Context()), // nil if not authenticated
 	}
 
 	component := auth.RegistrationPageWithNodes(flow.Ui.Nodes, props)
@@ -286,6 +288,7 @@ func (h *AuthHandlers) RecoveryPage(w http.ResponseWriter, r *http.Request) {
 		FlowMethod: flow.Ui.Method,
 		Messages:   messages,
 		LoginURL:   loginURL,
+		User:       GetUserFromContext(r.Context()), // nil if not authenticated
 	}
 
 	component := auth.RecoveryPageWithNodes(flow.Ui.Nodes, props)
@@ -364,6 +367,7 @@ func (h *AuthHandlers) VerificationPage(w http.ResponseWriter, r *http.Request) 
 		FlowMethod: flow.Ui.Method,
 		Messages:   messages,
 		LoginURL:   loginURL,
+		User:       GetUserFromContext(r.Context()), // nil if not authenticated
 	}
 
 	component := auth.VerificationPageWithNodes(flow.Ui.Nodes, props)
@@ -413,6 +417,9 @@ func (h *AuthHandlers) SettingsPage(w http.ResponseWriter, r *http.Request) {
 	// Build logout URL
 	logoutURL := h.appURL + "/auth/logout"
 
+	// Get authenticated user from context
+	user := GetUserFromContext(r.Context())
+
 	// Extract messages from flow
 	var messages []auth.UIMessage
 	if flow.Ui.Messages != nil {
@@ -432,6 +439,7 @@ func (h *AuthHandlers) SettingsPage(w http.ResponseWriter, r *http.Request) {
 		FlowMethod: flow.Ui.Method,
 		Messages:   messages,
 		LogoutURL:  logoutURL,
+		User:       user,
 	}
 
 	component := auth.SettingsPageWithNodes(flow.Ui.Nodes, props)
@@ -519,6 +527,7 @@ func (h *AuthHandlers) ErrorPage(w http.ResponseWriter, r *http.Request) {
 		ErrorDetails: errorDetails,
 		LoginURL:     loginURL,
 		HomeURL:      homeURL,
+		User:         GetUserFromContext(r.Context()), // nil if not authenticated
 	}
 
 	component := auth.ErrorPage(props)

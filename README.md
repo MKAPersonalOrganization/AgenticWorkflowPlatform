@@ -69,7 +69,7 @@ The application uses [Ory Kratos](https://www.ory.sh/kratos/) for identity and u
 | Session Management | ✅ Implemented |
 | Protected Routes | ✅ Implemented |
 | User Context in Handlers | ✅ Implemented |
-| User UI Elements | ⬜ Planned (Step 20) |
+| User UI Elements | ✅ Implemented |
 
 ### Auth Stack
 
@@ -89,6 +89,23 @@ The application uses [Ory Kratos](https://www.ory.sh/kratos/) for identity and u
 | `GET /auth/settings` | User settings (profile, password, 2FA) | Protected |
 | `GET /auth/logout` | Logout handler | Public |
 | `GET /auth/error` | Error page for auth flows | Public |
+
+### User Interface
+
+The application displays user information in the left navigation bar:
+
+**Authenticated Users:**
+- User email and ID displayed in settings popover
+- Quick access to Account Settings (`/auth/settings`)
+- Theme toggle (Light/Dark/System)
+- Logout button
+
+**Unauthenticated Users:**
+- Login button
+- Register button
+- Theme toggle
+
+The settings icon is located at the bottom left of the navbar and shows context-appropriate options based on authentication state.
 
 ### Protected Routes
 

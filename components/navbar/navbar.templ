@@ -4,10 +4,12 @@ import "school-with-ai/components/button"
 import "school-with-ai/components/icon"
 import "school-with-ai/components/sheet"
 import "school-with-ai/components/popover"
+import "school-with-ai/domain"
 
 type Props struct {
 	SidebarID string
 	Class     string
+	User      *domain.User // Authenticated user (nil if not authenticated)
 }
 
 templ Navbar(props ...Props) {
@@ -74,31 +76,107 @@ templ Navbar(props ...Props) {
 				Placement: popover.PlacementRight,
 			}) {
 				<div class="space-y-1">
-					<div class="px-2 py-1.5 text-sm font-semibold">Settings</div>
-					<div class="border-t border-border my-1"></div>
-					<!-- Theme Toggle -->
-					<button
-						@click="toggleTheme()"
-						class="flex items-center gap-3 w-full px-2 py-2 text-sm rounded-md hover:bg-accent transition-colors"
-						type="button"
-					>
-						<!-- Theme icons -->
-						<div class="flex items-center justify-center size-5">
-							<!-- Sun icon (light mode) -->
-							<svg x-show="theme === 'light'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
-							</svg>
-							<!-- Moon icon (dark mode) -->
-							<svg x-show="theme === 'dark'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
-							</svg>
-							<!-- System icon (auto mode) -->
-							<svg x-show="theme === 'system'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-							</svg>
+					if p.User != nil {
+						<!-- Authenticated User Section -->
+						<div class="px-2 py-1.5">
+							<div class="text-sm font-semibold truncate">{ p.User.Email }</div>
+							<div class="text-xs text-muted-foreground">{ p.User.ID }</div>
 						</div>
-						<span class="flex-1 text-left">Theme: <span x-text="theme.charAt(0).toUpperCase() + theme.slice(1)"></span></span>
-					</button>
+						<div class="border-t border-border my-1"></div>
+						<!-- Account Settings Link -->
+						<a
+							href="/auth/settings"
+							class="flex items-center gap-3 w-full px-2 py-2 text-sm rounded-md hover:bg-accent transition-colors"
+						>
+							<div class="flex items-center justify-center size-5">
+								@icon.User(icon.Props{Class: "size-4"})
+							</div>
+							<span class="flex-1 text-left">Account Settings</span>
+						</a>
+						<div class="border-t border-border my-1"></div>
+						<!-- Theme Toggle -->
+						<button
+							@click="toggleTheme()"
+							class="flex items-center gap-3 w-full px-2 py-2 text-sm rounded-md hover:bg-accent transition-colors"
+							type="button"
+						>
+							<!-- Theme icons -->
+							<div class="flex items-center justify-center size-5">
+								<!-- Sun icon (light mode) -->
+								<svg x-show="theme === 'light'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+								</svg>
+								<!-- Moon icon (dark mode) -->
+								<svg x-show="theme === 'dark'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+								</svg>
+								<!-- System icon (auto mode) -->
+								<svg x-show="theme === 'system'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+								</svg>
+							</div>
+							<span class="flex-1 text-left">Theme: <span x-text="theme.charAt(0).toUpperCase() + theme.slice(1)"></span></span>
+						</button>
+						<div class="border-t border-border my-1"></div>
+						<!-- Logout Button -->
+						<a
+							href="/auth/logout"
+							class="flex items-center gap-3 w-full px-2 py-2 text-sm rounded-md hover:bg-accent text-destructive hover:text-destructive transition-colors"
+						>
+							<div class="flex items-center justify-center size-5">
+								@icon.LogOut(icon.Props{Class: "size-4"})
+							</div>
+							<span class="flex-1 text-left">Logout</span>
+						</a>
+					} else {
+						<!-- Unauthenticated User Section -->
+						<div class="px-2 py-1.5 text-sm font-semibold">Welcome</div>
+						<div class="border-t border-border my-1"></div>
+						<!-- Login Link -->
+						<a
+							href="/auth/login"
+							class="flex items-center gap-3 w-full px-2 py-2 text-sm rounded-md hover:bg-accent transition-colors"
+						>
+							<div class="flex items-center justify-center size-5">
+								@icon.LogIn(icon.Props{Class: "size-4"})
+							</div>
+							<span class="flex-1 text-left">Login</span>
+						</a>
+						<!-- Register Link -->
+						<a
+							href="/auth/registration"
+							class="flex items-center gap-3 w-full px-2 py-2 text-sm rounded-md hover:bg-accent transition-colors"
+						>
+							<div class="flex items-center justify-center size-5">
+								@icon.UserPlus(icon.Props{Class: "size-4"})
+							</div>
+							<span class="flex-1 text-left">Register</span>
+						</a>
+						<div class="border-t border-border my-1"></div>
+						<!-- Theme Toggle -->
+						<button
+							@click="toggleTheme()"
+							class="flex items-center gap-3 w-full px-2 py-2 text-sm rounded-md hover:bg-accent transition-colors"
+							type="button"
+						>
+							<!-- Theme icons -->
+							<div class="flex items-center justify-center size-5">
+								<!-- Sun icon (light mode) -->
+								<svg x-show="theme === 'light'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+								</svg>
+								<!-- Moon icon (dark mode) -->
+								<svg x-show="theme === 'dark'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+								</svg>
+								<!-- System icon (auto mode) -->
+								<svg x-show="theme === 'system'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+								</svg>
+							</div>
+							<span class="flex-1 text-left">Theme: <span x-text="theme.charAt(0).toUpperCase() + theme.slice(1)"></span></span>
+						</button>
+					}
 				</div>
 			}
 		</div>

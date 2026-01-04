@@ -1,11 +1,14 @@
 package auth
 
+import "school-with-ai/domain"
+
 type ErrorPageProps struct {
 	ErrorID      string
 	ErrorMessage string
 	ErrorDetails string
 	LoginURL     string
 	HomeURL      string
+	User         *domain.User
 }
 
 // ErrorPage renders the authentication error page
@@ -13,6 +16,7 @@ templ ErrorPage(props ErrorPageProps) {
 	@AuthLayout(LayoutProps{
 		Title:       "An Error Occurred",
 		Description: "We encountered a problem while processing your request",
+		User:        props.User,
 	}) {
 		<div class="space-y-4">
 			<!-- Error Icon -->

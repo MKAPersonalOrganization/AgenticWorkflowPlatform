@@ -108,7 +108,10 @@ func main() {
 }
 
 func HandleViewChatInputScreen(w http.ResponseWriter, r *http.Request) {
-	component := components.ChatInputScreen()
+	// Get authenticated user from context
+	user := auth.GetUserFromContext(r.Context())
+
+	component := components.ChatInputScreen(user)
 	err := component.Render(r.Context(), w)
 	if err != nil {
 		slog.Error("Failed to render chat screen", "error", err)

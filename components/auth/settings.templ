@@ -1,45 +1,190 @@
 package auth
 
 import client "github.com/ory/client-go"
+import "school-with-ai/components/button"
+import "school-with-ai/components/icon"
+import "school-with-ai/components/card"
+import "school-with-ai/components"
+import "school-with-ai/domain"
 
 type SettingsPageProps struct {
 	FlowAction string
 	FlowMethod string
 	Messages   []UIMessage
 	LogoutURL  string
+	User       *domain.User
 }
 
 // SettingsPageWithNodes renders the settings page with all Kratos UI nodes
 templ SettingsPageWithNodes(nodes []client.UiNode, props SettingsPageProps) {
-	@AuthLayout(LayoutProps{
-		Title:       "Account Settings",
-		Description: "Manage your profile, password, and security settings",
+	@components.AppLayout(components.AppLayoutProps{
+		Title: "Account Settings",
+		User:  props.User,
 	}) {
-		<!-- Flow-level messages -->
-		if len(props.Messages) > 0 {
-			@Messages(MessagesProps{Messages: props.Messages})
-		}
-		<!-- Settings Form -->
-		if props.FlowAction != "" {
-			@Form(FormProps{
-				Action: props.FlowAction,
-				Method: props.FlowMethod,
-			}) {
-				@UINodes(UINodesProps{
-					Nodes:  nodes,
-					Groups: []string{"default", "profile", "password", "totp", "lookup_secret", "webauthn"},
-				})
-			}
-			<!-- Additional Links -->
-			<div class="mt-6 text-center text-sm">
-				if props.LogoutURL != "" {
-					<div>
-						<a href={ templ.SafeURL(props.LogoutURL) } class="text-destructive hover:underline">
-							Sign out
-						</a>
+		<div class="container mx-auto max-w-4xl p-6 space-y-6">
+				<!-- Header with Back Button -->
+				<div class="flex items-center gap-4">
+					<a href="/">
+						@button.Button(button.Props{
+							Variant: button.VariantGhost,
+							Size:    button.SizeIcon,
+						}) {
+							@icon.ArrowLeft(icon.Props{Class: "size-5"})
+							<span class="sr-only">Back to Chat</span>
+						}
+					</a>
+					<div class="flex-1">
+						<h1 class="text-3xl font-bold tracking-tight">Account Settings</h1>
+						<p class="text-muted-foreground mt-1">Manage your profile, password, and security settings</p>
 					</div>
+				</div>
+				<!-- Flow-level messages -->
+				if len(props.Messages) > 0 {
+					<div class="rounded-lg border bg-card p-4">
+						@Messages(MessagesProps{Messages: props.Messages})
+					</div>
+				}
+				<!-- Settings Form -->
+				if props.FlowAction != "" {
+					@Form(FormProps{
+						Action: props.FlowAction,
+						Method: props.FlowMethod,
+					}) {
+						<!-- Profile Settings -->
+						{{ profileNodes := filterNodesByGroup(nodes, "profile") }}
+						if len(profileNodes) > 0 {
+							@card.Card(card.Props{}) {
+								@card.Header(card.HeaderProps{}) {
+									@card.Title(card.TitleProps{}) {
+										<div class="flex items-center gap-2">
+											@icon.User(icon.Props{Class: "size-5"})
+											<span>Profile Information</span>
+										</div>
+									}
+									@card.Description(card.DescriptionProps{}) {
+										Update your profile details and personal information
+									}
+								}
+								@card.Content(card.ContentProps{}) {
+									@UINodes(UINodesProps{
+										Nodes:  profileNodes,
+										Groups: []string{"profile"},
+									})
+								}
+							}
+						}
+						<!-- Password Settings -->
+						{{ passwordNodes := filterNodesByGroup(nodes, "password") }}
+						if len(passwordNodes) > 0 {
+							@card.Card(card.Props{}) {
+								@card.Header(card.HeaderProps{}) {
+									@card.Title(card.TitleProps{}) {
+										<div class="flex items-center gap-2">
+											@icon.Lock(icon.Props{Class: "size-5"})
+											<span>Change Password</span>
+										</div>
+									}
+									@card.Description(card.DescriptionProps{}) {
+										Update your password to keep your account secure
+									}
+								}
+								@card.Content(card.ContentProps{}) {
+									@UINodes(UINodesProps{
+										Nodes:  passwordNodes,
+										Groups: []string{"password"},
+									})
+								}
+							}
+						}
+						<!-- Two-Factor Authentication -->
+						{{ totpNodes := filterNodesByGroup(nodes, "totp") }}
+						if len(totpNodes) > 0 {
+							@card.Card(card.Props{}) {
+								@card.Header(card.HeaderProps{}) {
+									@card.Title(card.TitleProps{}) {
+										<div class="flex items-center gap-2">
+											@icon.Shield(icon.Props{Class: "size-5"})
+											<span>Two-Factor Authentication (TOTP)</span>
+										</div>
+									}
+									@card.Description(card.DescriptionProps{}) {
+										Add an extra layer of security with authenticator apps
+									}
+								}
+								@card.Content(card.ContentProps{}) {
+									@UINodes(UINodesProps{
+										Nodes:  totpNodes,
+										Groups: []string{"totp"},
+									})
+								}
+							}
+						}
+						<!-- Backup Codes -->
+						{{ lookupNodes := filterNodesByGroup(nodes, "lookup_secret") }}
+						if len(lookupNodes) > 0 {
+							@card.Card(card.Props{}) {
+								@card.Header(card.HeaderProps{}) {
+									@card.Title(card.TitleProps{}) {
+										<div class="flex items-center gap-2">
+											@icon.Key(icon.Props{Class: "size-5"})
+											<span>Backup Codes</span>
+										</div>
+									}
+									@card.Description(card.DescriptionProps{}) {
+										Generate backup codes for account recovery
+									}
+								}
+								@card.Content(card.ContentProps{}) {
+									@UINodes(UINodesProps{
+										Nodes:  lookupNodes,
+										Groups: []string{"lookup_secret"},
+									})
+								}
+							}
+						}
+						<!-- WebAuthn -->
+						{{ webauthnNodes := filterNodesByGroup(nodes, "webauthn") }}
+						if len(webauthnNodes) > 0 {
+							@card.Card(card.Props{}) {
+								@card.Header(card.HeaderProps{}) {
+									@card.Title(card.TitleProps{}) {
+										<div class="flex items-center gap-2">
+											@icon.Fingerprint(icon.Props{Class: "size-5"})
+											<span>Security Keys</span>
+										</div>
+									}
+									@card.Description(card.DescriptionProps{}) {
+										Manage hardware security keys (WebAuthn)
+									}
+								}
+								@card.Content(card.ContentProps{}) {
+									@UINodes(UINodesProps{
+										Nodes:  webauthnNodes,
+										Groups: []string{"webauthn"},
+									})
+								}
+							}
+						}
+						<!-- Default/Other Settings -->
+						{{ defaultNodes := filterNodesByGroup(nodes, "default") }}
+						if len(defaultNodes) > 0 {
+							@UINodes(UINodesProps{
+								Nodes:  defaultNodes,
+								Groups: []string{"default"},
+							})
+						}
+					}
 				}
 			</div>
 		}
 	}
+
+func filterNodesByGroup(nodes []client.UiNode, group string) []client.UiNode {
+	var filtered []client.UiNode
+	for _, node := range nodes {
+		if node.Group == group {
+			filtered = append(filtered, node)
+		}
+	}
+	return filtered
 }

@@ -1,12 +1,14 @@
 package auth
 
 import client "github.com/ory/client-go"
+import "school-with-ai/domain"
 
 type RegistrationPageProps struct {
 	FlowAction string
 	FlowMethod string
 	Messages   []UIMessage
 	LoginURL   string
+	User       *domain.User
 }
 
 // RegistrationPage renders the registration page with a slot for form content
