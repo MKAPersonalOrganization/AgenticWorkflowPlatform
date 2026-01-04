@@ -219,8 +219,80 @@ func (h *AuthHandlers) RegistrationPage(w http.ResponseWriter, r *http.Request) 
 
 // RecoveryPage handles GET /auth/recovery
 func (h *AuthHandlers) RecoveryPage(w http.ResponseWriter, r *http.Request) {
-	// TODO: Implement in Step 16
-	http.Error(w, "Not implemented", http.StatusNotImplemented)
+	flowID := r.URL.Query().Get("flow")
+	returnTo := r.URL.Query().Get("return_to")
+
+	// If no flow ID, redirect to Kratos to initialize flow
+	if flowID == "" {
+		slog.Debug("No flow ID found, redirecting to Kratos to initialize recovery flow")
+		initURL := h.kratos.InitFlowURL(FlowTypeRecovery, FlowParams{
+			ReturnTo: returnTo,
+		})
+		http.Redirect(w, r, initURL, http.StatusSeeOther)
+		return
+	}
+
+	// Fetch the recovery flow from Kratos
+	cookie := r.Header.Get("Cookie")
+	flow, err := h.kratos.GetRecoveryFlow(r.Context(), flowID, cookie)
+	if err != nil {
+		slog.Error("Failed to get recovery flow", "flowID", flowID, "error", err)
+
+		// If flow expired or not found, redirect to initialize new flow
+		if IsFlowExpired(err) {
+			slog.Debug("Flow expired or not found, redirecting to initialize new flow")
+			initURL := h.kratos.InitFlowURL(FlowTypeRecovery, FlowParams{
+				ReturnTo: returnTo,
+			})
+			http.Redirect(w, r, initURL, http.StatusSeeOther)
+			return
+		}
+
+		// Redirect to error page for other errors
+		errorURL := h.appURL + "/auth/error?error=recovery_flow_error"
+		http.Redirect(w, r, errorURL, http.StatusSeeOther)
+		return
+	}
+
+	// Build login URL
+	loginQuery := url.Values{}
+	if returnTo != "" {
+		loginQuery.Set("return_to", returnTo)
+	} else if flow.GetReturnTo() != "" {
+		loginQuery.Set("return_to", flow.GetReturnTo())
+	}
+
+	loginURL := h.appURL + "/auth/login"
+	if len(loginQuery) > 0 {
+		loginURL += "?" + loginQuery.Encode()
+	}
+
+	// Extract messages from flow
+	var messages []auth.UIMessage
+	if flow.Ui.Messages != nil {
+		for _, msg := range flow.Ui.Messages {
+			messages = append(messages, auth.UIMessage{
+				ID:      msg.Id,
+				Text:    msg.Text,
+				Type:    string(msg.Type),
+				Context: msg.Context,
+			})
+		}
+	}
+
+	// Render the recovery page
+	props := auth.RecoveryPageProps{
+		FlowAction: flow.Ui.Action,
+		FlowMethod: flow.Ui.Method,
+		Messages:   messages,
+		LoginURL:   loginURL,
+	}
+
+	component := auth.RecoveryPageWithNodes(flow.Ui.Nodes, props)
+	err = component.Render(r.Context(), w)
+	if err != nil {
+		slog.Error("Failed to render recovery page", "error", err)
+	}
 }
 
 // VerificationPage handles GET /auth/verification
@@ -303,8 +375,70 @@ func (h *AuthHandlers) VerificationPage(w http.ResponseWriter, r *http.Request) 
 
 // SettingsPage handles GET /auth/settings
 func (h *AuthHandlers) SettingsPage(w http.ResponseWriter, r *http.Request) {
-	// TODO: Implement in Step 17
-	http.Error(w, "Not implemented", http.StatusNotImplemented)
+	flowID := r.URL.Query().Get("flow")
+	returnTo := r.URL.Query().Get("return_to")
+
+	// If no flow ID, redirect to Kratos to initialize flow
+	if flowID == "" {
+		slog.Debug("No flow ID found, redirecting to Kratos to initialize settings flow")
+		initURL := h.kratos.InitFlowURL(FlowTypeSettings, FlowParams{
+			ReturnTo: returnTo,
+		})
+		http.Redirect(w, r, initURL, http.StatusSeeOther)
+		return
+	}
+
+	// Fetch the settings flow from Kratos
+	cookie := r.Header.Get("Cookie")
+	flow, err := h.kratos.GetSettingsFlow(r.Context(), flowID, cookie)
+	if err != nil {
+		slog.Error("Failed to get settings flow", "flowID", flowID, "error", err)
+
+		// If flow expired or not found, redirect to initialize new flow
+		if IsFlowExpired(err) {
+			slog.Debug("Flow expired or not found, redirecting to initialize new flow")
+			initURL := h.kratos.InitFlowURL(FlowTypeSettings, FlowParams{
+				ReturnTo: returnTo,
+			})
+			http.Redirect(w, r, initURL, http.StatusSeeOther)
+			return
+		}
+
+		// Redirect to error page for other errors
+		errorURL := h.appURL + "/auth/error?error=settings_flow_error"
+		http.Redirect(w, r, errorURL, http.StatusSeeOther)
+		return
+	}
+
+	// Build logout URL
+	logoutURL := h.appURL + "/auth/logout"
+
+	// Extract messages from flow
+	var messages []auth.UIMessage
+	if flow.Ui.Messages != nil {
+		for _, msg := range flow.Ui.Messages {
+			messages = append(messages, auth.UIMessage{
+				ID:      msg.Id,
+				Text:    msg.Text,
+				Type:    string(msg.Type),
+				Context: msg.Context,
+			})
+		}
+	}
+
+	// Render the settings page
+	props := auth.SettingsPageProps{
+		FlowAction: flow.Ui.Action,
+		FlowMethod: flow.Ui.Method,
+		Messages:   messages,
+		LogoutURL:  logoutURL,
+	}
+
+	component := auth.SettingsPageWithNodes(flow.Ui.Nodes, props)
+	err = component.Render(r.Context(), w)
+	if err != nil {
+		slog.Error("Failed to render settings page", "error", err)
+	}
 }
 
 // LogoutHandler handles GET /auth/logout
