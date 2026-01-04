@@ -77,23 +77,42 @@ func handleUserMessage(ctx context.Context, handlerCtx *agents.EventHandlerConte
 }
 
 func handleQuestionAnswered(ctx context.Context, handlerCtx *agents.EventHandlerContext) error {
-	slog.Info("Question answered - verifying completeness",
-		"threadID", handlerCtx.ThreadID,
-		"subject", handlerCtx.Event.Data["subject"],
-		"isComplete", handlerCtx.Event.Data["is_complete"],
-	)
-
 	subject, _ := handlerCtx.Event.Data["subject"].(string)
 	isComplete, _ := handlerCtx.Event.Data["is_complete"].(bool)
-	whiteboardState, _ := handlerCtx.Event.Data["whiteboard_state"].(string)
-	answeredBy, _ := handlerCtx.Event.Data["answered_by"].(string)
+	answer, _ := handlerCtx.Event.Data["answer"].(string)
 
-	slog.Info("Processing question answered callback",
+	slog.Info("Question answered",
+		"threadID", handlerCtx.ThreadID,
 		"subject", subject,
 		"isComplete", isComplete,
-		"answeredBy", answeredBy,
 	)
 
+	// If complete, directly emit the answer - no LLM call needed
+	if isComplete {
+		messageID := aguievents.GenerateMessageID()
+		assistantEvent := &sdk.AssistantMessageCompletedEvent{
+			BaseEvent: sdk.BaseEvent{
+				Type:      "AssistantMessageCompleted",
+				Timestamp: time.Now(),
+				ThreadID:  handlerCtx.ThreadID,
+			},
+			MessageID: messageID,
+			Content:   answer,
+			AgentName: "student-facing-agent",
+		}
+
+		if err := handlerCtx.State.Update(assistantEvent); err != nil {
+			return err
+		}
+		if err := handlerCtx.Notifier.HandleDomainEvent(assistantEvent); err != nil {
+			return err
+		}
+
+		slog.Info("Final answer presented to user")
+		return nil
+	}
+
+	// If incomplete, invoke agent to determine what's still needed
 	thread, exists := handlerCtx.State.Get(handlerCtx.ThreadID)
 	if !exists {
 		return fmt.Errorf("thread not found: %s", handlerCtx.ThreadID)
@@ -101,27 +120,19 @@ func handleQuestionAnswered(ctx context.Context, handlerCtx *agents.EventHandler
 
 	messages := thread.Messages
 
-	// The student-facing agent needs to verify if the answer is complete
-	// and potentially route to other specialists if needed
 	triggerMsg := domain.Message{
 		ID:        aguievents.GenerateMessageID(),
 		Role:      "user",
 		Timestamp: time.Now(),
-		Content: fmt.Sprintf(`An instructor (%s) has completed their work on a %s question.
+		Content: fmt.Sprintf(`A %s specialist has completed partial work (marked as incomplete).
 
-WHITEBOARD CONTENT:
-%s
+Current answer: %s
 
-Your task (STATE 2: INSTRUCTOR CALLBACK):
-1. Read the whiteboard to see what has been answered
-2. Verify if the ENTIRE user request has been satisfied
-3. If complete: HALT (do nothing - your work is done)
-4. If incomplete: Determine what's still missing and emit the appropriate question event to activate the needed specialist`, answeredBy, subject, whiteboardState),
+Determine what's still missing from the original question and route to the appropriate specialist.`, subject, answer),
 	}
 	messages = append(messages, triggerMsg)
 
 	messageID := aguievents.GenerateMessageID()
-
 	err := handlerCtx.Agent.Run(ctx, handlerCtx.ThreadID, messageID, messages, func(event sdk.Event) error {
 		return nil
 	})
