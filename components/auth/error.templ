@@ -1,0 +1,61 @@
+package auth
+
+type ErrorPageProps struct {
+	ErrorID      string
+	ErrorMessage string
+	ErrorDetails string
+	LoginURL     string
+	HomeURL      string
+}
+
+// ErrorPage renders the authentication error page
+templ ErrorPage(props ErrorPageProps) {
+	@AuthLayout(LayoutProps{
+		Title:       "An Error Occurred",
+		Description: "We encountered a problem while processing your request",
+	}) {
+		<div class="space-y-4">
+			<!-- Error Icon -->
+			<div class="flex justify-center">
+				<div class="rounded-full bg-destructive/10 p-3">
+					<svg class="h-6 w-6 text-destructive" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+					</svg>
+				</div>
+			</div>
+			<!-- Error Message -->
+			<div class="text-center space-y-2">
+				if props.ErrorMessage != "" {
+					<h2 class="text-lg font-semibold text-destructive">{ props.ErrorMessage }</h2>
+				} else {
+					<h2 class="text-lg font-semibold text-destructive">Authentication Error</h2>
+				}
+				if props.ErrorDetails != "" {
+					<p class="text-sm text-muted-foreground">{ props.ErrorDetails }</p>
+				}
+				if props.ErrorID != "" {
+					<p class="text-xs text-muted-foreground">Error ID: { props.ErrorID }</p>
+				}
+			</div>
+			<!-- Action Buttons -->
+			<div class="flex flex-col gap-2 pt-4">
+				if props.LoginURL != "" {
+					<a
+						href={ templ.SafeURL(props.LoginURL) }
+						class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
+					>
+						Go to Login
+					</a>
+				}
+				if props.HomeURL != "" {
+					<a
+						href={ templ.SafeURL(props.HomeURL) }
+						class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
+					>
+						Go to Home
+					</a>
+				}
+			</div>
+		</div>
+	}
+}

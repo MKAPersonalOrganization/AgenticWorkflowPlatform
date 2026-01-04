@@ -54,36 +54,40 @@ This creates a **hard architectural constraint**: only math-instructor can deleg
 
 ## Authentication
 
-The application uses [Ory Kratos](https://www.ory.sh/kratos/) for identity and user management.
+The application uses [Ory Kratos](https://www.ory.sh/kratos/) for identity and user management with a complete self-service flow implementation.
 
-### Features (Current State)
+### Features
 
 | Feature | Status |
 |---------|--------|
 | User Registration | ✅ Implemented |
 | Email Verification | ✅ Implemented |
 | User Login | ✅ Implemented |
-| Password Recovery | 🔄 In Progress |
-| User Settings | ⬜ Not Started |
-| Logout | ⬜ Not Started |
-| Protected Routes | ⬜ Not Started |
+| Password Recovery | ✅ Implemented |
+| User Settings | ✅ Implemented |
+| Logout | ✅ Implemented |
+| Session Management | ✅ Implemented |
+| Protected Routes | ⬜ Planned (Step 19) |
+| User UI Elements | ⬜ Planned (Step 20) |
 
 ### Auth Stack
 
-- **Ory Kratos**: Identity server handling registration, login, verification, recovery
+- **Ory Kratos**: Identity server handling all self-service flows
 - **PostgreSQL**: Identity storage
 - **MailSlurper**: Email testing (development only)
+- **Go Middleware**: Session validation and route protection
 
 ### Auth Routes
 
-| Route | Description |
-|-------|-------------|
-| `GET /auth/login` | Login page |
-| `GET /auth/registration` | Registration page |
-| `GET /auth/verification` | Email verification page |
-| `GET /auth/recovery` | Password recovery (not implemented) |
-| `GET /auth/settings` | User settings (not implemented) |
-| `GET /auth/logout` | Logout handler (not implemented) |
+| Route | Description | Protection |
+|-------|-------------|------------|
+| `GET /auth/login` | Login page | Public |
+| `GET /auth/registration` | Registration page | Public |
+| `GET /auth/verification` | Email verification page | Public |
+| `GET /auth/recovery` | Password recovery page | Public |
+| `GET /auth/settings` | User settings (profile, password, 2FA) | Protected |
+| `GET /auth/logout` | Logout handler | Public |
+| `GET /auth/error` | Error page for auth flows | Public |
 
 ### Running with Authentication
 
@@ -106,27 +110,52 @@ open http://127.0.0.1:4436
 task dev
 ```
 
-4. Access the auth pages:
+4. Access the application:
+- Home/Chat: http://127.0.0.1:8090/
 - Registration: http://127.0.0.1:8090/auth/registration
 - Login: http://127.0.0.1:8090/auth/login
+- Settings: http://127.0.0.1:8090/auth/settings (requires authentication)
 
-### Local Signup Flow
+### Complete Auth Flow
 
-1. **Register**: Go to http://127.0.0.1:8090/auth/registration
-   - Fill in email, password, first name, last name
-   - Click "Sign up"
+#### 1. Registration
+1. Go to http://127.0.0.1:8090/auth/registration
+2. Fill in email, password, first name, last name
+3. Click "Sign up"
+4. Redirected to verification page
 
-2. **Get Verification Code**: Open MailSlurper at http://127.0.0.1:4436
-   - Find the verification email sent to your address
-   - Copy the 6-digit verification code
+#### 2. Email Verification
+1. Open MailSlurper at http://127.0.0.1:4436
+2. Find the verification email sent to your address
+3. Copy the 6-digit verification code
+4. Enter the code on the verification page
+5. Click "Submit"
+6. Redirected to settings page
 
-3. **Verify Email**: You'll be redirected to the verification page
-   - Enter the verification code from the email
-   - Click "Submit"
+#### 3. Login
+1. Go to http://127.0.0.1:8090/auth/login
+2. Enter your email and password
+3. Click "Sign in"
+4. Access protected routes
 
-4. **Login**: After verification, go to http://127.0.0.1:8090/auth/login
-   - Enter your email and password
-   - Click "Sign in"
+#### 4. Password Recovery
+1. Click "Forgot your password?" on login page
+2. Enter your email address
+3. Check MailSlurper for recovery code
+4. Enter the code and new password
+5. Redirected to settings page
+
+#### 5. Settings Management
+1. Login to your account
+2. Navigate to http://127.0.0.1:8090/auth/settings
+3. Update profile information (first name, last name)
+4. Change password
+5. Enable/disable two-factor authentication (TOTP)
+6. View recovery codes
+
+#### 6. Logout
+1. Click "Sign out" in settings page
+2. Session cleared and redirected to login
 
 ### Environment Variables (Auth)
 
@@ -135,7 +164,34 @@ task dev
 APP_URL=http://127.0.0.1:8090
 KRATOS_PUBLIC_URL=http://127.0.0.1:4433
 KRATOS_ADMIN_URL=http://127.0.0.1:4434
+
+# Optional (for production)
+KRATOS_BROWSER_URL=http://127.0.0.1:4433  # External URL for browser redirects
 ```
+
+### Authentication Architecture
+
+**Components:**
+- `domain/user.go` - User model with Kratos identity traits
+- `infra/auth/kratos_client.go` - Kratos API client wrapper
+- `infra/auth/middleware.go` - Session validation middleware (`RequireAuth`, `OptionalAuth`)
+- `infra/auth/session.go` - Session context helpers
+- `infra/auth/handlers.go` - Auth page handlers (login, registration, etc.)
+- `infra/auth/flow_helpers.go` - Flow URL generation and helper functions
+- `components/auth/` - Auth page templates (login, registration, verification, recovery, settings, error)
+
+**Session Management:**
+- Sessions stored in secure HTTP-only cookies by Kratos
+- Middleware validates sessions on each request via Kratos `toSession` API
+- User and session data stored in request context
+- Session expiry handled automatically with re-authentication flows
+
+**Security Features:**
+- CSRF protection on all forms
+- Email verification required after registration
+- Password recovery with time-limited codes
+- AAL2 (two-factor authentication) support
+- User enumeration protection (recovery flow doesn't reveal if email exists)
 
 ## Prerequisites
 
@@ -284,29 +340,54 @@ Any changes to `.templ`, `.css`, or `.go` files will automatically rebuild and r
 ```
 .
 ├── components/          # Templ components
-│   ├── auth/           # Authentication pages (login, registration, verification)
+│   ├── auth/           # Authentication pages
+│   │   ├── layout.templ           # Base layout for auth pages
+│   │   ├── ui_nodes.templ         # Kratos UI node renderer
+│   │   ├── login.templ            # Login page
+│   │   ├── registration.templ     # Registration page
+│   │   ├── verification.templ     # Email verification page
+│   │   ├── recovery.templ         # Password recovery page
+│   │   ├── settings.templ         # User settings page
+│   │   └── error.templ            # Error page
 │   ├── button/         # Button component (from templui)
 │   ├── card/           # Card component (from templui)
 │   ├── input/          # Input component (from templui)
+│   ├── form/           # Form components (from templui)
 │   └── hello.templ     # Main chat UI
 ├── domain/             # Domain models
-│   └── user.go         # User model matching Kratos identity
-├── handlers/           # HTTP handlers
-│   └── chat.go         # Chat SSE endpoint
+│   ├── user.go         # User model matching Kratos identity
+│   └── job.go          # Background job model
 ├── infra/
-│   ├── auth/           # Kratos client, middleware, handlers
-│   └── agui/           # AG-UI protocol implementation
+│   ├── auth/           # Authentication infrastructure
+│   │   ├── kratos_client.go      # Kratos API client wrapper
+│   │   ├── middleware.go         # Session validation middleware
+│   │   ├── session.go            # Session context helpers
+│   │   ├── handlers.go           # Auth page handlers
+│   │   ├── flow_helpers.go       # Flow URL generation and helpers
+│   │   └── *_test.go            # Unit tests (29 tests)
+│   ├── chat_handlers.go           # Chat SSE endpoint
+│   ├── emitter.go                 # SSE event emitter
+│   ├── job_queue.go               # Background job queue
+│   └── worker_pool.go             # Worker pool for async processing
 ├── kratos/             # Ory Kratos configuration
-│   ├── kratos.yml      # Kratos server config
-│   └── identity.schema.json  # User identity schema
+│   ├── kratos.yml      # Kratos server config (flows, URLs, SMTP)
+│   └── identity.schema.json  # User identity schema (email, name)
 ├── services/
-│   └── openai/         # OpenAI integration
+│   ├── agents/         # Specialized AI agents
+│   │   ├── studentfacing/        # Router agent
+│   │   ├── math/                 # Math instructor
+│   │   ├── physics/              # Physics instructor
+│   │   ├── chemistry/            # Chemistry instructor
+│   │   ├── statistics/           # Statistics instructor
+│   │   └── advancedmath/         # Linear algebra professor
+│   └── llm/            # OpenAI integration
 ├── assets/
 │   ├── css/            # Tailwind CSS files
 │   └── js/             # Alpine.js components
-├── main.go             # Application entry point
+├── main.go             # Application entry point with auth routes
 ├── docker-compose.yml  # Infrastructure (Kratos, PostgreSQL, MailSlurper)
-└── Taskfile.yaml       # Task runner configuration
+├── Taskfile.yaml       # Task runner configuration
+└── AUTH_IMPLEMENTATION_TODO.md  # Implementation plan (18/20 steps complete)
 ```
 
 ## AG-UI Protocol
