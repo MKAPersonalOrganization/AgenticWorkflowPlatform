@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"school-with-ai/domain"
+	"school-with-ai/infra"
 	"school-with-ai/services/agents"
 	"school-with-ai/services/agents/shared/tools/eventbus"
 	"school-with-ai/services/sdk"
@@ -44,27 +45,23 @@ func handleUserMessage(ctx context.Context, handlerCtx *agents.EventHandlerConte
 		"message", handlerCtx.Event.Data["message"],
 	)
 
-	message, _ := handlerCtx.Event.Data["message"].(string)
+	// Get the AgentThread from state
+	state, ok := handlerCtx.State.(*infra.InMemoryThreadState)
+	if !ok {
+		return fmt.Errorf("state is not InMemoryThreadState")
+	}
 
-	thread, exists := handlerCtx.State.Get(handlerCtx.ThreadID)
+	agentThread, exists := state.GetAgentThread(handlerCtx.ThreadID)
 	if !exists {
 		return fmt.Errorf("thread not found: %s", handlerCtx.ThreadID)
 	}
 
-	messages := thread.Messages
-
-	// The student-facing agent analyzes the user message and routes to appropriate specialist
-	triggerMsg := domain.Message{
-		ID:        aguievents.GenerateMessageID(),
-		Role:      "user",
-		Timestamp: time.Now(),
-		Content:   message, // The actual user message becomes the trigger
-	}
-	messages = append(messages, triggerMsg)
+	// Note: The user message has already been added to the thread via UserMessageAddedEvent
+	// No need to add it again - the agent will see it in the thread's message history
 
 	messageID := aguievents.GenerateMessageID()
 
-	err := handlerCtx.Agent.Run(ctx, handlerCtx.ThreadID, messageID, messages, func(event sdk.Event) error {
+	err := handlerCtx.Agent.RunWithThread(ctx, handlerCtx.ThreadID, messageID, agentThread, func(event sdk.Event) error {
 		return nil
 	}, sdk.DefaultRunOptions())
 	if err != nil {
@@ -113,12 +110,15 @@ func handleQuestionAnswered(ctx context.Context, handlerCtx *agents.EventHandler
 	}
 
 	// If incomplete, invoke agent to determine what's still needed
-	thread, exists := handlerCtx.State.Get(handlerCtx.ThreadID)
+	state, ok := handlerCtx.State.(*infra.InMemoryThreadState)
+	if !ok {
+		return fmt.Errorf("state is not InMemoryThreadState")
+	}
+
+	agentThread, exists := state.GetAgentThread(handlerCtx.ThreadID)
 	if !exists {
 		return fmt.Errorf("thread not found: %s", handlerCtx.ThreadID)
 	}
-
-	messages := thread.Messages
 
 	triggerMsg := domain.Message{
 		ID:        aguievents.GenerateMessageID(),
@@ -130,10 +130,10 @@ Current answer: %s
 
 Determine what's still missing from the original question and route to the appropriate specialist.`, subject, answer),
 	}
-	messages = append(messages, triggerMsg)
+	agentThread.AddMessages([]domain.Message{triggerMsg})
 
 	messageID := aguievents.GenerateMessageID()
-	err := handlerCtx.Agent.Run(ctx, handlerCtx.ThreadID, messageID, messages, func(event sdk.Event) error {
+	err := handlerCtx.Agent.RunWithThread(ctx, handlerCtx.ThreadID, messageID, agentThread, func(event sdk.Event) error {
 		return nil
 	}, sdk.DefaultRunOptions())
 	if err != nil {

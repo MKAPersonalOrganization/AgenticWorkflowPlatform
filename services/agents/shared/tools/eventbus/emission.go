@@ -81,6 +81,10 @@ func GenerateEmissionTools(emits []agents.EventType) []sdk.Tool {
 		if eventType == agents.EventTypeWhiteboardUpdated {
 			continue
 		}
+		// Skip question.answered - this has a custom tool with is_complete parameter
+		if eventType == agents.EventTypeQuestionAnswered {
+			continue
+		}
 		tools = append(tools, NewEmissionTool(eventType))
 	}
 	return tools

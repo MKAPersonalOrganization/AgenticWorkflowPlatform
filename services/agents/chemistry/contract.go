@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"school-with-ai/domain"
+	"school-with-ai/infra"
 	"school-with-ai/services/agents"
 	"school-with-ai/services/agents/chemistry/tools"
 	sharedtools "school-with-ai/services/agents/shared/tools"
@@ -56,12 +57,16 @@ func handleChemistryQuestion(ctx context.Context, handlerCtx *agents.EventHandle
 		"emittedBy", emittedBy,
 	)
 
-	thread, exists := handlerCtx.State.Get(handlerCtx.ThreadID)
+	// Get the AgentThread from state
+	state, ok := handlerCtx.State.(*infra.InMemoryThreadState)
+	if !ok {
+		return fmt.Errorf("state is not InMemoryThreadState")
+	}
+
+	agentThread, exists := state.GetAgentThread(handlerCtx.ThreadID)
 	if !exists {
 		return fmt.Errorf("thread not found: %s", handlerCtx.ThreadID)
 	}
-
-	messages := thread.Messages
 
 	triggerMsg := domain.Message{
 		ID:        aguievents.GenerateMessageID(),
@@ -78,11 +83,11 @@ Follow your workflow:
 3. Write your contribution to the whiteboard using write_whiteboard with action="append"
 4. Signal completion: emit_question_answered(subject="chemistry", is_complete=true)`, whiteboardState),
 	}
-	messages = append(messages, triggerMsg)
+	agentThread.AddMessages([]domain.Message{triggerMsg})
 
 	messageID := aguievents.GenerateMessageID()
 
-	err := handlerCtx.Agent.Run(ctx, handlerCtx.ThreadID, messageID, messages, func(event sdk.Event) error {
+	err := handlerCtx.Agent.RunWithThread(ctx, handlerCtx.ThreadID, messageID, agentThread, func(event sdk.Event) error {
 		return nil
 	}, sdk.DefaultRunOptions())
 	if err != nil {

@@ -20,7 +20,8 @@ func CreateLinearAlgebraProfessor(notifier sdk.EventNotifier) sdk.AgentConfig {
 	for _, tool := range eventbus.GenerateEmissionTools(emits()) {
 		registry.Register(tool)
 	}
-
+	// Custom emit_question_answered tool (not auto-generated)
+	registry.Register(sharedtools.NewEmitQuestionAnsweredTool())
 	// Shared collaboration tools
 	registry.Register(sharedtools.NewReadWhiteboardTool())
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
@@ -55,7 +56,7 @@ func CreateLinearAlgebraProfessor(notifier sdk.EventNotifier) sdk.AgentConfig {
 **Vector:** $\mathbf{v} = \begin{bmatrix} v_1 \\ v_2 \end{bmatrix}$
 **Matrix:** $A = \begin{bmatrix} a_{11} & a_{12} \\ a_{21} & a_{22} \end{bmatrix}$
 **Eigenvalue:** $A\mathbf{v} = \lambda\mathbf{v}$`,
-		Tools:            registry.All(),
-		Notifier:         notifier,
+		Tools:    registry.All(),
+		Notifier: notifier,
 	}
 }
