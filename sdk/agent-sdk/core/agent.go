@@ -335,7 +335,7 @@ func (h *Agent) runIteration(
 		if !ok {
 			return fmt.Errorf("state does not implement ThreadStateWithAgentAccess")
 		}
-		
+
 		updatedThread, exists := stateWithAccess.GetAgentThread(threadID)
 		if !exists {
 			return fmt.Errorf("thread %s not found after tool execution", threadID)
