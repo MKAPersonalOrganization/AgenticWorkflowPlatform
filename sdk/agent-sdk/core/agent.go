@@ -330,15 +330,23 @@ func (h *Agent) runIteration(
 			return nil
 		}
 
-		// Get updated messages including tool results from state
-		updatedMessages := h.state.Messages(threadID)
+		// Get updated thread state with tool results
+		stateWithAccess, ok := h.state.(ThreadStateWithAgentAccess)
+		if !ok {
+			return fmt.Errorf("state does not implement ThreadStateWithAgentAccess")
+		}
+		
+		updatedThread, exists := stateWithAccess.GetAgentThread(threadID)
+		if !exists {
+			return fmt.Errorf("thread %s not found after tool execution", threadID)
+		}
 
 		// Generate new message ID for the continuation
 		continuationMessageID := GenerateID()
 
 		// Recursively call to process the LLM response with tool results
 		// Pass the same runOpts to maintain consistency across iterations
-		return h.runIteration(ctx, threadID, continuationMessageID, updatedMessages, thread, eventHandler, runOpts)
+		return h.runIteration(ctx, threadID, continuationMessageID, updatedThread.GetMessages(), thread, eventHandler, runOpts)
 	}
 
 	// No tool calls, just emit the completed message event

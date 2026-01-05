@@ -355,8 +355,8 @@ func (p *InMemoryAguiProjection) ListThreads() []string {
 
 // Rebuild reconstructs the projection from the EventStore for a single stream or all streams.
 // If streamID is empty, it rebuilds all streams.
-func (p *InMemoryAguiProjection) Rebuild(ctx context.Context, store sdk.EventStore, streamID string) error {
-	if streamID == "" {
+func (p *InMemoryAguiProjection) Rebuild(ctx context.Context, store sdk.EventStore, threadID string) error {
+	if threadID == "" {
 		// Rebuild all streams - not supported with minimal interface
 		return fmt.Errorf("RebuildAll not supported with minimal EventStore interface")
 	}
@@ -364,15 +364,15 @@ func (p *InMemoryAguiProjection) Rebuild(ctx context.Context, store sdk.EventSto
 	// Rebuild single stream
 	p.mu.Lock()
 	// Clear state for this stream
-	delete(p.threads, streamID)
-	delete(p.activeRuns, streamID)
-	delete(p.toolCallsByThread, streamID)
+	delete(p.threads, threadID)
+	delete(p.activeRuns, threadID)
+	delete(p.toolCallsByThread, threadID)
 	p.mu.Unlock()
 
-	// Replay all events for each stream
-	events, err := store.ReadStream(ctx, streamID, 0)
+	// Replay all events for the stream
+	events, err := store.ReadStream(ctx, threadID, 0)
 	if err != nil {
-		return fmt.Errorf("failed to read events for stream %s: %w", streamID, err)
+		return fmt.Errorf("failed to read events for stream %s: %w", threadID, err)
 	}
 
 	for _, event := range events {

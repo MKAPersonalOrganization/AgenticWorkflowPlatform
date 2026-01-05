@@ -162,7 +162,7 @@ func (p *InMemoryLLMContextProjection) All() []domain.Thread {
 	return threads
 }
 
-// Apply updates the projection with a single event (implements sdk.Projection).
+// Apply updates the projection with a single event (implements eventstore.Projection).
 // This delegates to Update for backward compatibility.
 func (p *InMemoryLLMContextProjection) Apply(ctx context.Context, event sdk.Event) error {
 	return p.Update(event)

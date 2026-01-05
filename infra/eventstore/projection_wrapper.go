@@ -13,12 +13,12 @@ import (
 // manual projection updates at every append site.
 type ProjectionEventStore struct {
 	wrapped     sdk.EventStore
-	projections []sdk.Projection
+	projections []Projection
 	mu          sync.RWMutex
 }
 
 // NewProjectionEventStore creates an event store that automatically updates projections.
-func NewProjectionEventStore(wrapped sdk.EventStore, projections ...sdk.Projection) *ProjectionEventStore {
+func NewProjectionEventStore(wrapped sdk.EventStore, projections ...Projection) *ProjectionEventStore {
 	return &ProjectionEventStore{
 		wrapped:     wrapped,
 		projections: projections,
@@ -52,7 +52,7 @@ func (p *ProjectionEventStore) Append(ctx context.Context, streamID string, even
 }
 
 // RegisterProjection adds a projection to receive event updates.
-func (p *ProjectionEventStore) RegisterProjection(projection sdk.Projection) {
+func (p *ProjectionEventStore) RegisterProjection(projection Projection) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.projections = append(p.projections, projection)
