@@ -3,8 +3,8 @@ package chatapi_test
 import (
 	"testing"
 
-	"school-with-ai/services/agents/math"
-	"school-with-ai/services/agents/studentfacing"
+	"school-with-ai/services/chatwrite/agents/math"
+	"school-with-ai/services/chatwrite/agents/studentfacing"
 	"school-with-ai/sdk/agent-sdk/core"
 )
 

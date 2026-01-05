@@ -1,7 +1,7 @@
 package chatapi
 
 import (
-	"school-with-ai/services/agents"
+	"school-with-ai/services/chatwrite/agents"
 	"school-with-ai/sdk/agent-sdk/core"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"

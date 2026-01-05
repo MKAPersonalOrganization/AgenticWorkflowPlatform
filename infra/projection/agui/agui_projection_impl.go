@@ -7,7 +7,7 @@ import (
 	"time"
 
 	sdk "school-with-ai/sdk/agent-sdk/core"
-	"school-with-ai/services/agents"
+	"school-with-ai/services/chatwrite/agents"
 )
 
 // InMemoryAguiProjection is an in-memory implementation of the AguiProjection.

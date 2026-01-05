@@ -10,8 +10,8 @@ import (
 	"school-with-ai/domain"
 	"school-with-ai/infra/projection/agui"
 	sdk "school-with-ai/sdk/agent-sdk/core"
-	"school-with-ai/services/agents"
-	"school-with-ai/services/agents/shared/tools/eventbus"
+	"school-with-ai/services/chatwrite/agents"
+	"school-with-ai/services/chatwrite/agents/shared/tools/eventbus"
 	"school-with-ai/services/chatwrite"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
