@@ -11,5 +11,8 @@ type Projection interface {
 	Apply(ctx context.Context, event Event) error
 
 	// Rebuild reconstructs the projection from the EventStore.
-	Rebuild(ctx context.Context, store EventStore, streamID string) error
+	Rebuild(ctx context.Context, store EventStore, threadID string) error
+
+	// GetAgentThread retrieves the conversation state for agent processing.
+	GetAgentThread(threadID string) (AgentThread, bool)
 }
