@@ -98,7 +98,7 @@ func TestReadWhiteboardTool_DifferentThreads(t *testing.T) {
 	tool1.SetWhiteboardStore(mockStore, "thread-123")
 	result1, _ := tool1.Invoke(context.Background(), "{}")
 	var response1 map[string]interface{}
-	json.Unmarshal([]byte(result1), &response1)
+	_ = json.Unmarshal([]byte(result1), &response1)
 
 	if response1["content"].(string) != "Thread 123 content" {
 		t.Errorf("thread-123: expected 'Thread 123 content', got %q", response1["content"])
@@ -109,7 +109,7 @@ func TestReadWhiteboardTool_DifferentThreads(t *testing.T) {
 	tool2.SetWhiteboardStore(mockStore, "thread-456")
 	result2, _ := tool2.Invoke(context.Background(), "{}")
 	var response2 map[string]interface{}
-	json.Unmarshal([]byte(result2), &response2)
+	_ = json.Unmarshal([]byte(result2), &response2)
 
 	if response2["content"].(string) != "Thread 456 content" {
 		t.Errorf("thread-456: expected 'Thread 456 content', got %q", response2["content"])

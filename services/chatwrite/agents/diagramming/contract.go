@@ -81,7 +81,7 @@ func handleDiagrammingQuestion(ctx context.Context, handlerCtx *agents.EventHand
 			"event_type":   "question.diagramming",
 		},
 	}
-	agentThread.AddMessages([]domain.Message{triggerMsg})
+	_ = agentThread.AddMessages([]domain.Message{triggerMsg})
 
 	messageID := aguievents.GenerateMessageID()
 

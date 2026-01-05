@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"school-with-ai/domain"
+	sdk "school-with-ai/sdk/agent-sdk/core"
 	"school-with-ai/services/chatwrite/agents"
-	"school-with-ai/sdk/agent-sdk/core"
 )
 
 // GlobalContracts is the singleton contract registry
@@ -149,7 +149,12 @@ func (r *ContractRegistry) CreateHandoffEvent(
 	}
 
 	slug := EventTypeSlug(EventTypeFromToolName(toolName))
-	reason := fmt.Sprintf("%s question requires specialist", strings.Title(slug))
+	// Capitalize first letter of slug for reason
+	capitalizedSlug := slug
+	if len(slug) > 0 {
+		capitalizedSlug = string(slug[0]-32) + slug[1:]
+	}
+	reason := fmt.Sprintf("%s question requires specialist", capitalizedSlug)
 
 	return agents.NewAgentHandoffEvent(threadID, fromAgent, targetAgent, reason)
 }

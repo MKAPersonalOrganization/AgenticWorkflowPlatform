@@ -83,7 +83,7 @@ func handleChemistryQuestion(ctx context.Context, handlerCtx *agents.EventHandle
 			"event_type":   "question.chemistry",
 		},
 	}
-	agentThread.AddMessages([]domain.Message{triggerMsg})
+	_ = agentThread.AddMessages([]domain.Message{triggerMsg})
 
 	messageID := aguievents.GenerateMessageID()
 

@@ -259,26 +259,3 @@ func TestToChatOptionsAllParameters(t *testing.T) {
 	require.NotNil(t, chatOpts.AdditionalProperties)
 	assert.Equal(t, "value", chatOpts.AdditionalProperties["custom"])
 }
-
-// Mock tool for testing
-type mockTool struct {
-	name        string
-	description string
-	parameters  map[string]interface{}
-}
-
-func (m *mockTool) Name() string {
-	return m.name
-}
-
-func (m *mockTool) Description() string {
-	return m.description
-}
-
-func (m *mockTool) Parameters() map[string]interface{} {
-	return m.parameters
-}
-
-func (m *mockTool) Execute(arguments string) (string, error) {
-	return `{"result": "success"}`, nil
-}

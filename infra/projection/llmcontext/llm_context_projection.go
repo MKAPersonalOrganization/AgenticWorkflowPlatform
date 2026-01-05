@@ -243,7 +243,7 @@ func (p *InMemoryLLMContextProjection) applyEventUnsafe(agentThread sdk.AgentThr
 			Content:   evt.Content,
 			Timestamp: evt.Timestamp,
 		}
-		agentThread.AddMessages([]domain.Message{msg})
+		_ = agentThread.AddMessages([]domain.Message{msg})
 		meta.UpdatedAt = evt.Timestamp
 
 	case *sdk.AssistantMessageStartedEvent:
@@ -270,7 +270,7 @@ func (p *InMemoryLLMContextProjection) applyEventUnsafe(agentThread sdk.AgentThr
 			Timestamp: evt.Timestamp,
 			AgentName: evt.AgentName,
 		}
-		agentThread.AddMessages([]domain.Message{msg})
+		_ = agentThread.AddMessages([]domain.Message{msg})
 		meta.UpdatedAt = evt.Timestamp
 
 	case *sdk.ToolCallExecutedEvent:
@@ -282,7 +282,7 @@ func (p *InMemoryLLMContextProjection) applyEventUnsafe(agentThread sdk.AgentThr
 			Timestamp:  evt.Timestamp,
 			AgentName:  evt.AgentName,
 		}
-		agentThread.AddMessages([]domain.Message{msg})
+		_ = agentThread.AddMessages([]domain.Message{msg})
 		meta.UpdatedAt = evt.Timestamp
 
 	case *sdk.ThreadTitleUpdatedEvent:
@@ -323,7 +323,7 @@ func (p *InMemoryLLMContextProjection) applyEventUnsafe(agentThread sdk.AgentThr
 					"reason":     evt.GetString("reason"),
 				},
 			}
-			agentThread.AddMessages([]domain.Message{msg})
+			_ = agentThread.AddMessages([]domain.Message{msg})
 			meta.UpdatedAt = evt.Timestamp
 		}
 

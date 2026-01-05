@@ -22,18 +22,6 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// Mock Kratos client for testing
-type mockKratosClient struct {
-	toSessionFunc func(ctx context.Context, cookie string) (*client.Session, error)
-}
-
-func (m *mockKratosClient) ToSession(ctx context.Context, cookie string) (*client.Session, error) {
-	if m.toSessionFunc != nil {
-		return m.toSessionFunc(ctx, cookie)
-	}
-	return nil, nil
-}
-
 func TestNewMiddleware(t *testing.T) {
 	kratosClient := NewKratosClient()
 	middleware := NewMiddleware(kratosClient)
