@@ -37,14 +37,14 @@ func main() {
 
 	slog.Info("Starting server", "host", host, "port", port)
 
-	// Initialize EventLog and ThreadState (event sourcing architecture)
+	// Initialize EventStore and LLMContextProjection (event sourcing architecture)
 	baseEventStore := infra.NewInMemoryEventStore()
 	llmContextProjection := infra.NewInMemoryLLMContextProjection()
 
 	// Initialize AGUI projection (reads from event store)
 	aguiProjection := infra.NewInMemoryAguiProjection()
 
-	// Wrap event log to automatically update projections
+	// Wrap event store to automatically update projections
 	eventLog := infra.NewProjectionEventStore(baseEventStore, llmContextProjection, aguiProjection)
 
 	// Initialize OpenAI chat client with model
@@ -79,7 +79,7 @@ func main() {
 	mux.Handle("/assets/images/", http.StripPrefix("/assets/images/", http.FileServer(http.Dir("./assets/images"))))
 	mux.Handle("/assets/charts/", http.StripPrefix("/assets/charts/", http.FileServer(http.Dir("./assets/charts"))))
 
-	// Create handler with EventLog and LLMContextProjection
+	// Create handler with EventStore and LLMContextProjection
 	handler := infra.NewHandler(eventLog, llmContextProjection, chatClient, queue, workerPool)
 
 	// Create AGUI projection handler

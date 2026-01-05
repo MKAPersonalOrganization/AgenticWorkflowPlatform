@@ -1,7 +1,9 @@
-package sdk
+package infra
 
 import (
 	"time"
+
+	"school-with-ai/services/sdk"
 )
 
 // AguiProjection is a read model optimized for the AG-UI protocol.
@@ -19,7 +21,7 @@ import (
 // This projection is rebuilt from the EventStore on startup and updated
 // as new events are appended.
 type AguiProjection interface {
-	Projection
+	sdk.Projection
 
 	// GetThreadState retrieves the UI state for a thread.
 	// Returns nil if thread doesn't exist.

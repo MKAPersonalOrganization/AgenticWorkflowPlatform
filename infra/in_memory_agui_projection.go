@@ -22,25 +22,25 @@ type InMemoryAguiProjection struct {
 	mu sync.RWMutex
 
 	// Thread state indexed by threadID
-	threads map[string]*sdk.AguiThreadState
+	threads map[string]*AguiThreadState
 
 	// Active runs indexed by threadID
-	activeRuns map[string]*sdk.AguiRunState
+	activeRuns map[string]*AguiRunState
 
 	// Active messages being streamed (messageID -> message)
-	streamingMessages map[string]*sdk.AguiMessage
+	streamingMessages map[string]*AguiMessage
 
 	// Tool calls indexed by threadID
-	toolCallsByThread map[string]map[string]*sdk.AguiToolCall
+	toolCallsByThread map[string]map[string]*AguiToolCall
 }
 
 // NewInMemoryAguiProjection creates a new in-memory AGUI projection.
 func NewInMemoryAguiProjection() *InMemoryAguiProjection {
 	return &InMemoryAguiProjection{
-		threads:           make(map[string]*sdk.AguiThreadState),
-		activeRuns:        make(map[string]*sdk.AguiRunState),
-		streamingMessages: make(map[string]*sdk.AguiMessage),
-		toolCallsByThread: make(map[string]map[string]*sdk.AguiToolCall),
+		threads:           make(map[string]*AguiThreadState),
+		activeRuns:        make(map[string]*AguiRunState),
+		streamingMessages: make(map[string]*AguiMessage),
+		toolCallsByThread: make(map[string]map[string]*AguiToolCall),
 	}
 }
 
@@ -56,15 +56,15 @@ func (p *InMemoryAguiProjection) Apply(ctx context.Context, event sdk.Event) err
 
 	// Ensure thread state exists
 	if _, exists := p.threads[threadID]; !exists {
-		p.threads[threadID] = &sdk.AguiThreadState{
+		p.threads[threadID] = &AguiThreadState{
 			ThreadID:      threadID,
-			Messages:      []sdk.AguiMessage{},
-			ToolCalls:     []sdk.AguiToolCall{},
-			AgentActivity: make(map[string]*sdk.AguiAgentActivity),
+			Messages:      []AguiMessage{},
+			ToolCalls:     []AguiToolCall{},
+			AgentActivity: make(map[string]*AguiAgentActivity),
 			CreatedAt:     time.Now(),
 			UpdatedAt:     time.Now(),
 		}
-		p.toolCallsByThread[threadID] = make(map[string]*sdk.AguiToolCall)
+		p.toolCallsByThread[threadID] = make(map[string]*AguiToolCall)
 	}
 
 	thread := p.threads[threadID]
@@ -78,7 +78,7 @@ func (p *InMemoryAguiProjection) Apply(ctx context.Context, event sdk.Event) err
 		thread.CreatedAt = evt.Timestamp
 
 	case *sdk.UserMessageAddedEvent:
-		p.addMessage(thread, sdk.AguiMessage{
+		p.addMessage(thread, AguiMessage{
 			ID:        evt.MessageID,
 			Role:      "user",
 			Content:   evt.Content,
@@ -87,7 +87,7 @@ func (p *InMemoryAguiProjection) Apply(ctx context.Context, event sdk.Event) err
 		})
 
 	case *sdk.AssistantMessageStartedEvent:
-		msg := sdk.AguiMessage{
+		msg := AguiMessage{
 			ID:        evt.MessageID,
 			Role:      "assistant",
 			Content:   "",
@@ -107,9 +107,9 @@ func (p *InMemoryAguiProjection) Apply(ctx context.Context, event sdk.Event) err
 			msg.Status = "complete"
 			msg.Content = evt.Content // Final content
 			if len(evt.ToolCalls) > 0 {
-				msg.ToolCalls = make([]sdk.AguiMessageToolCall, len(evt.ToolCalls))
+				msg.ToolCalls = make([]AguiMessageToolCall, len(evt.ToolCalls))
 				for i, tc := range evt.ToolCalls {
-					msg.ToolCalls[i] = sdk.AguiMessageToolCall{
+					msg.ToolCalls[i] = AguiMessageToolCall{
 						ID:        tc.ID,
 						Name:      tc.Function.Name,
 						Arguments: tc.Function.Arguments,
@@ -121,7 +121,7 @@ func (p *InMemoryAguiProjection) Apply(ctx context.Context, event sdk.Event) err
 		p.updateAgentActivity(thread, evt.AgentName, evt.Timestamp)
 
 	case *sdk.ToolCallStartedEvent:
-		toolCall := &sdk.AguiToolCall{
+		toolCall := &AguiToolCall{
 			ID:              evt.ToolCallID,
 			Name:            evt.ToolCallName,
 			Arguments:       "",
@@ -144,14 +144,14 @@ func (p *InMemoryAguiProjection) Apply(ctx context.Context, event sdk.Event) err
 		}
 
 	case *sdk.ToolCallExecutedEvent:
-		msg := sdk.AguiMessage{
+		msg := AguiMessage{
 			ID:        evt.MessageID,
 			Role:      "tool",
 			Content:   evt.ToolResult,
 			AgentName: evt.AgentName,
 			Timestamp: evt.Timestamp,
 			Status:    "complete",
-			ToolCall: &sdk.AguiMessageToolResult{
+			ToolCall: &AguiMessageToolResult{
 				ID:     evt.ToolCallID,
 				Result: evt.ToolResult,
 			},
@@ -184,7 +184,7 @@ func (p *InMemoryAguiProjection) Apply(ctx context.Context, event sdk.Event) err
 }
 
 // applyDomainEvent handles custom domain events.
-func (p *InMemoryAguiProjection) applyDomainEvent(thread *sdk.AguiThreadState, evt *agents.DomainEvent) {
+func (p *InMemoryAguiProjection) applyDomainEvent(thread *AguiThreadState, evt *agents.DomainEvent) {
 	switch evt.Type {
 	case agents.EventTypeWhiteboardUpdated:
 		action := evt.GetString("action")
@@ -199,7 +199,7 @@ func (p *InMemoryAguiProjection) applyDomainEvent(thread *sdk.AguiThreadState, e
 		}
 
 	case agents.EventTypeAgentHandoff:
-		msg := sdk.AguiMessage{
+		msg := AguiMessage{
 			ID:        fmt.Sprintf("handoff-%s-%d", evt.ThreadID, evt.Timestamp.UnixNano()),
 			Role:      "system",
 			Content:   fmt.Sprintf("Agent handoff: %s → %s", evt.GetString("from_agent"), evt.GetString("to_agent")),
@@ -236,19 +236,19 @@ func (p *InMemoryAguiProjection) applyDomainEvent(thread *sdk.AguiThreadState, e
 }
 
 // addMessage adds a message to the thread state.
-func (p *InMemoryAguiProjection) addMessage(thread *sdk.AguiThreadState, msg sdk.AguiMessage) {
+func (p *InMemoryAguiProjection) addMessage(thread *AguiThreadState, msg AguiMessage) {
 	thread.Messages = append(thread.Messages, msg)
 }
 
 // updateAgentActivity updates the agent activity metrics.
-func (p *InMemoryAguiProjection) updateAgentActivity(thread *sdk.AguiThreadState, agentName string, timestamp time.Time) {
+func (p *InMemoryAguiProjection) updateAgentActivity(thread *AguiThreadState, agentName string, timestamp time.Time) {
 	if agentName == "" {
 		return
 	}
 
 	activity, exists := thread.AgentActivity[agentName]
 	if !exists {
-		activity = &sdk.AguiAgentActivity{
+		activity = &AguiAgentActivity{
 			AgentName:     agentName,
 			FirstActiveAt: timestamp,
 		}
@@ -259,7 +259,7 @@ func (p *InMemoryAguiProjection) updateAgentActivity(thread *sdk.AguiThreadState
 }
 
 // GetThreadState retrieves the UI state for a thread.
-func (p *InMemoryAguiProjection) GetThreadState(threadID string) (*sdk.AguiThreadState, bool) {
+func (p *InMemoryAguiProjection) GetThreadState(threadID string) (*AguiThreadState, bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -270,16 +270,16 @@ func (p *InMemoryAguiProjection) GetThreadState(threadID string) (*sdk.AguiThrea
 
 	// Return a copy to prevent external modifications
 	threadCopy := *thread
-	threadCopy.Messages = make([]sdk.AguiMessage, len(thread.Messages))
+	threadCopy.Messages = make([]AguiMessage, len(thread.Messages))
 	copy(threadCopy.Messages, thread.Messages)
-	threadCopy.ToolCalls = make([]sdk.AguiToolCall, len(thread.ToolCalls))
+	threadCopy.ToolCalls = make([]AguiToolCall, len(thread.ToolCalls))
 	copy(threadCopy.ToolCalls, thread.ToolCalls)
 
 	return &threadCopy, true
 }
 
 // GetActiveRun retrieves information about the currently active run for a thread.
-func (p *InMemoryAguiProjection) GetActiveRun(threadID string) (*sdk.AguiRunState, bool) {
+func (p *InMemoryAguiProjection) GetActiveRun(threadID string) (*AguiRunState, bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -293,47 +293,47 @@ func (p *InMemoryAguiProjection) GetActiveRun(threadID string) (*sdk.AguiRunStat
 }
 
 // GetMessages retrieves all UI-formatted messages for a thread.
-func (p *InMemoryAguiProjection) GetMessages(threadID string) []sdk.AguiMessage {
+func (p *InMemoryAguiProjection) GetMessages(threadID string) []AguiMessage {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
 	thread, exists := p.threads[threadID]
 	if !exists {
-		return []sdk.AguiMessage{}
+		return []AguiMessage{}
 	}
 
-	messages := make([]sdk.AguiMessage, len(thread.Messages))
+	messages := make([]AguiMessage, len(thread.Messages))
 	copy(messages, thread.Messages)
 	return messages
 }
 
 // GetToolCalls retrieves all tool calls for a thread.
-func (p *InMemoryAguiProjection) GetToolCalls(threadID string) []sdk.AguiToolCall {
+func (p *InMemoryAguiProjection) GetToolCalls(threadID string) []AguiToolCall {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
 	thread, exists := p.threads[threadID]
 	if !exists {
-		return []sdk.AguiToolCall{}
+		return []AguiToolCall{}
 	}
 
-	toolCalls := make([]sdk.AguiToolCall, len(thread.ToolCalls))
+	toolCalls := make([]AguiToolCall, len(thread.ToolCalls))
 	copy(toolCalls, thread.ToolCalls)
 	return toolCalls
 }
 
 // GetAgentActivity retrieves agent activity summary for a thread.
-func (p *InMemoryAguiProjection) GetAgentActivity(threadID string) map[string]*sdk.AguiAgentActivity {
+func (p *InMemoryAguiProjection) GetAgentActivity(threadID string) map[string]*AguiAgentActivity {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
 	thread, exists := p.threads[threadID]
 	if !exists {
-		return make(map[string]*sdk.AguiAgentActivity)
+		return make(map[string]*AguiAgentActivity)
 	}
 
 	// Return a copy
-	activity := make(map[string]*sdk.AguiAgentActivity, len(thread.AgentActivity))
+	activity := make(map[string]*AguiAgentActivity, len(thread.AgentActivity))
 	for name, act := range thread.AgentActivity {
 		actCopy := *act
 		activity[name] = &actCopy
@@ -368,10 +368,10 @@ func (p *InMemoryAguiProjection) Rebuild(ctx context.Context, store sdk.EventSto
 
 		p.mu.Lock()
 		// Clear all state
-		p.threads = make(map[string]*sdk.AguiThreadState)
-		p.activeRuns = make(map[string]*sdk.AguiRunState)
-		p.streamingMessages = make(map[string]*sdk.AguiMessage)
-		p.toolCallsByThread = make(map[string]map[string]*sdk.AguiToolCall)
+		p.threads = make(map[string]*AguiThreadState)
+		p.activeRuns = make(map[string]*AguiRunState)
+		p.streamingMessages = make(map[string]*AguiMessage)
+		p.toolCallsByThread = make(map[string]map[string]*AguiToolCall)
 		p.mu.Unlock()
 	} else {
 		// Rebuild single stream
@@ -412,11 +412,11 @@ func (p *InMemoryAguiProjection) Clear() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	p.threads = make(map[string]*sdk.AguiThreadState)
-	p.activeRuns = make(map[string]*sdk.AguiRunState)
-	p.streamingMessages = make(map[string]*sdk.AguiMessage)
-	p.toolCallsByThread = make(map[string]map[string]*sdk.AguiToolCall)
+	p.threads = make(map[string]*AguiThreadState)
+	p.activeRuns = make(map[string]*AguiRunState)
+	p.streamingMessages = make(map[string]*AguiMessage)
+	p.toolCallsByThread = make(map[string]map[string]*AguiToolCall)
 }
 
 // Verify InMemoryAguiProjection implements AguiProjection
-var _ sdk.AguiProjection = (*InMemoryAguiProjection)(nil)
+var _ AguiProjection = (*InMemoryAguiProjection)(nil)
