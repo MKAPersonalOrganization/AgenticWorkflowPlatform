@@ -9,9 +9,9 @@ import (
 
 	"school-with-ai/domain"
 	"school-with-ai/infra/projection/agui"
+	sdk "school-with-ai/sdk/agent-sdk/core"
 	"school-with-ai/services/agents"
 	"school-with-ai/services/agents/shared/tools/eventbus"
-	"school-with-ai/sdk/agent-sdk/core"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
@@ -427,13 +427,12 @@ func (wp *WorkerPool) continueWithAgent(ctx context.Context, threadID, agentName
 	}
 
 	// Track events before handler execution
-	eventsBefore, _ := wp.log.ReadAll(ctx, threadID)
+	eventsBefore, _ := wp.log.ReadStream(ctx, threadID, 0)
 	beforeCount := len(eventsBefore)
 
 	// Execute the handler - it owns the complete logic
 	if err := handler(ctx, handlerCtx); err != nil {
 		slog.Error("Handler execution failed", "agent", agentName, "eventType", triggeringEvent.Type, "error", err)
-
 		errorEvent := aguievents.NewRunErrorEvent(
 			fmt.Sprintf("Agent %s handler failed: %v", agentName, err),
 			aguievents.WithErrorCode("HANDLER_ERROR"),
@@ -448,7 +447,7 @@ func (wp *WorkerPool) continueWithAgent(ctx context.Context, threadID, agentName
 	slog.Info("Handler execution completed", "agent", agentName, "eventType", triggeringEvent.Type)
 
 	// Check for new routing events emitted during handler execution
-	eventsAfter, _ := wp.log.ReadAll(ctx, threadID)
+	eventsAfter, _ := wp.log.ReadStream(ctx, threadID, 0)
 	if len(eventsAfter) > beforeCount {
 		// Process new events for routing
 		newEvents := eventsAfter[beforeCount:]
