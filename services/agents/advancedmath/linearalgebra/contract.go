@@ -52,7 +52,7 @@ func handleLinearAlgebraQuestion(ctx context.Context, handlerCtx *agents.EventHa
 
 	// Get the question from the event
 	question, _ := handlerCtx.Event.Data["question"].(string)
-	whiteboardState, _ := handlerCtx.Event.Data["whiteboard_state"].(string)
+	context, _ := handlerCtx.Event.Data["context"].(string)
 	emittedBy, _ := handlerCtx.Event.Data["emitted_by"].(string)
 
 	slog.Info("Processing linear algebra question",
@@ -71,21 +71,22 @@ func handleLinearAlgebraQuestion(ctx context.Context, handlerCtx *agents.EventHa
 		return fmt.Errorf("thread not found: %s", handlerCtx.ThreadID)
 	}
 
+	// Create a clean handoff message with just the question and optional context
+	handoffContent := question
+	if context != "" {
+		handoffContent = fmt.Sprintf("%s\n\nContext: %s", question, context)
+	}
+
 	// Add a trigger message with the whiteboard content
 	triggerMsg := domain.Message{
 		ID:        aguievents.GenerateMessageID(),
 		Role:      "user",
 		Timestamp: time.Now(),
-		Content: fmt.Sprintf(`You have received a linear algebra question. The whiteboard has the context you need.
-
-WHITEBOARD CONTENT:
-%s
-
-Follow your workflow:
-1. Read and understand the content on the whiteboard
-2. Use your linear algebra tools to compute the solution
-3. Write your contribution to the whiteboard using write_whiteboard with action="append"
-4. Signal completion: emit_question_answered(subject="linearalgebra", is_complete=true)`, whiteboardState),
+		Content:   handoffContent,
+		Metadata: map[string]interface{}{
+			"handoff_from": emittedBy,
+			"event_type":   "question.linearalgebra",
+		},
 	}
 	agentThread.AddMessages([]domain.Message{triggerMsg})
 

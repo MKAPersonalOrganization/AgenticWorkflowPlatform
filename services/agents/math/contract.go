@@ -57,7 +57,7 @@ func handleMathQuestion(ctx context.Context, handlerCtx *agents.EventHandlerCont
 	)
 
 	question, _ := handlerCtx.Event.Data["question"].(string)
-	whiteboardState, _ := handlerCtx.Event.Data["whiteboard_state"].(string)
+	context, _ := handlerCtx.Event.Data["context"].(string)
 	emittedBy, _ := handlerCtx.Event.Data["emitted_by"].(string)
 
 	slog.Info("Processing math question",
@@ -76,20 +76,21 @@ func handleMathQuestion(ctx context.Context, handlerCtx *agents.EventHandlerCont
 		return fmt.Errorf("thread not found: %s", handlerCtx.ThreadID)
 	}
 
+	// Create a clean handoff message with just the question and optional context
+	handoffContent := question
+	if context != "" {
+		handoffContent = fmt.Sprintf("%s\n\nContext: %s", question, context)
+	}
+
 	triggerMsg := domain.Message{
 		ID:        aguievents.GenerateMessageID(),
 		Role:      "user",
 		Timestamp: time.Now(),
-		Content: fmt.Sprintf(`You have received a math question. The whiteboard has the context you need.
-
-WHITEBOARD CONTENT:
-%s
-
-Follow your workflow:
-1. Read and understand the content on the whiteboard
-2. Use your math tools to compute the solution (calculator, graphing, equation solver, etc.)
-3. Write your contribution to the whiteboard using write_whiteboard with action="append"
-4. Signal completion: emit_question_answered(subject="math", is_complete=true)`, whiteboardState),
+		Content:   handoffContent,
+		Metadata: map[string]interface{}{
+			"handoff_from": emittedBy,
+			"event_type":   "question.math",
+		},
 	}
 	agentThread.AddMessages([]domain.Message{triggerMsg})
 
