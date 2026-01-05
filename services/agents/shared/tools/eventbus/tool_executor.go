@@ -2,22 +2,18 @@ package eventbus
 
 import (
 	"school-with-ai/domain"
+	sdk "school-with-ai/sdk/agent-sdk/core"
 	"school-with-ai/services/agents/shared/tools"
-	"school-with-ai/sdk/agent-sdk/core"
 )
 
 // CreateToolCallHandler creates a tool call handler that emits events for collaboration tools
-func CreateToolCallHandler(registry *ContractRegistry, state sdk.ThreadStore) sdk.ToolCallHandler {
+func CreateToolCallHandler(registry *ContractRegistry, state sdk.ThreadStore, whiteboardStore interface{ Get(threadID string) string }) sdk.ToolCallHandler {
 	return func(threadID string, agentName string, toolCall domain.ToolCall, result string, eventEmitter func(sdk.Event) error) error {
 		toolName := toolCall.Function.Name
 
-		// Create whiteboard state getter
+		// Create whiteboard state getter using WhiteboardStore
 		getWhiteboardState := func(tid string) string {
-			thread, exists := state.Get(tid)
-			if exists {
-				return thread.WhiteboardContent
-			}
-			return ""
+			return whiteboardStore.Get(tid)
 		}
 
 		// Handle emit_*_question tools (dynamically routed via EventBus)

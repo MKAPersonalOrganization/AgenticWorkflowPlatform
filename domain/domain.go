@@ -38,7 +38,6 @@ type Thread struct {
 	// Multi-agent instructor fields
 	CurrentInstructor string              `json:"currentInstructor,omitempty"`
 	InstructorHistory []InstructorSession `json:"instructorHistory,omitempty"`
-	WhiteboardContent string              `json:"whiteboardContent,omitempty"`
 }
 
 // InstructorSession tracks when an instructor was active

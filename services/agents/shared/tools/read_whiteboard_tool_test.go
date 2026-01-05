@@ -97,3 +97,73 @@ func TestReadWhiteboardTool_Parameters(t *testing.T) {
 		t.Errorf("expected no required parameters, got: %v", required)
 	}
 }
+
+// mockWhiteboardStore is a simple mock implementation of WhiteboardReader
+type mockWhiteboardStore struct {
+	whiteboards map[string]string
+}
+
+func (m *mockWhiteboardStore) Get(threadID string) string {
+	return m.whiteboards[threadID]
+}
+
+func TestReadWhiteboardTool_WithWhiteboardStore(t *testing.T) {
+	tool := NewReadWhiteboardTool()
+
+	// Set up mock whiteboard store
+	mockStore := &mockWhiteboardStore{
+		whiteboards: map[string]string{
+			"thread-123": "# Math Problem\n\nSolved using calculus.",
+			"thread-456": "# Physics Problem\n\nF = ma",
+		},
+	}
+
+	// Configure tool with store for thread-123
+	tool.SetWhiteboardStore(mockStore, "thread-123")
+
+	result, err := tool.Invoke(context.Background(), "{}")
+	if err != nil {
+		t.Fatalf("failed to invoke read_whiteboard tool: %v", err)
+	}
+
+	var response map[string]interface{}
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+
+	expected := "# Math Problem\n\nSolved using calculus."
+	if response["content"].(string) != expected {
+		t.Errorf("expected content %q, got %q", expected, response["content"])
+	}
+}
+
+func TestReadWhiteboardTool_WithWhiteboardStore_DifferentThreads(t *testing.T) {
+	mockStore := &mockWhiteboardStore{
+		whiteboards: map[string]string{
+			"thread-123": "Thread 123 content",
+			"thread-456": "Thread 456 content",
+		},
+	}
+
+	// Test with thread-123
+	tool1 := NewReadWhiteboardTool()
+	tool1.SetWhiteboardStore(mockStore, "thread-123")
+	result1, _ := tool1.Invoke(context.Background(), "{}")
+	var response1 map[string]interface{}
+	json.Unmarshal([]byte(result1), &response1)
+
+	if response1["content"].(string) != "Thread 123 content" {
+		t.Errorf("thread-123: expected 'Thread 123 content', got %q", response1["content"])
+	}
+
+	// Test with thread-456
+	tool2 := NewReadWhiteboardTool()
+	tool2.SetWhiteboardStore(mockStore, "thread-456")
+	result2, _ := tool2.Invoke(context.Background(), "{}")
+	var response2 map[string]interface{}
+	json.Unmarshal([]byte(result2), &response2)
+
+	if response2["content"].(string) != "Thread 456 content" {
+		t.Errorf("thread-456: expected 'Thread 456 content', got %q", response2["content"])
+	}
+}

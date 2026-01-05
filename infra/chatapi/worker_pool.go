@@ -18,16 +18,17 @@ import (
 
 // WorkerPool manages a pool of workers that process jobs from the queue
 type WorkerPool struct {
-	queue          domain.JobQueue
-	log            sdk.EventStore
-	state          sdk.ThreadStore
-	aguiProjection agui.AguiProjection
-	chatClient     sdk.ChatClient
-	numWorkers     int
-	pollInterval   time.Duration
-	ctx            context.Context
-	cancel         context.CancelFunc
-	wg             sync.WaitGroup
+	queue                domain.JobQueue
+	log                  sdk.EventStore
+	state                sdk.ThreadStore
+	aguiProjection       agui.AguiProjection
+	whiteboardProjection interface{ Get(threadID string) string } // WhiteboardReader interface
+	chatClient           sdk.ChatClient
+	numWorkers           int
+	pollInterval         time.Duration
+	ctx                  context.Context
+	cancel               context.CancelFunc
+	wg                   sync.WaitGroup
 
 	// Event storage for jobs (jobID -> buffered events)
 	mu           sync.RWMutex
@@ -47,7 +48,7 @@ type WorkerPoolConfig struct {
 }
 
 // NewWorkerPool creates a new worker pool
-func NewWorkerPool(queue domain.JobQueue, log sdk.EventStore, state sdk.ThreadStore, aguiProjection agui.AguiProjection, chatClient sdk.ChatClient, config WorkerPoolConfig) *WorkerPool {
+func NewWorkerPool(queue domain.JobQueue, log sdk.EventStore, state sdk.ThreadStore, aguiProjection agui.AguiProjection, whiteboardProjection interface{ Get(threadID string) string }, chatClient sdk.ChatClient, config WorkerPoolConfig) *WorkerPool {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	if config.NumWorkers <= 0 {
@@ -58,19 +59,20 @@ func NewWorkerPool(queue domain.JobQueue, log sdk.EventStore, state sdk.ThreadSt
 	}
 
 	return &WorkerPool{
-		queue:            queue,
-		log:              log,
-		state:            state,
-		aguiProjection:   aguiProjection,
-		chatClient:       chatClient,
-		numWorkers:       config.NumWorkers,
-		pollInterval:     config.PollInterval,
-		ctx:              ctx,
-		cancel:           cancel,
-		eventBuffers:     make(map[string]*EventBuffer),
-		threadJobs:       make(map[string]string),
-		jobCancels:       make(map[string]context.CancelFunc),
-		threadRateLimits: make(map[string]*time.Ticker),
+		queue:                queue,
+		log:                  log,
+		state:                state,
+		aguiProjection:       aguiProjection,
+		whiteboardProjection: whiteboardProjection,
+		chatClient:           chatClient,
+		numWorkers:           config.NumWorkers,
+		pollInterval:         config.PollInterval,
+		ctx:                  ctx,
+		cancel:               cancel,
+		eventBuffers:         make(map[string]*EventBuffer),
+		threadJobs:           make(map[string]string),
+		jobCancels:           make(map[string]context.CancelFunc),
+		threadRateLimits:     make(map[string]*time.Ticker),
 	}
 }
 
@@ -399,7 +401,7 @@ func (wp *WorkerPool) continueWithAgent(ctx context.Context, threadID, agentName
 		wp.log,
 		wp.state,
 		sdk.WithConfig(agentConfig),
-		sdk.WithToolCallHandler(eventbus.CreateToolCallHandler(eventbus.GlobalContracts, wp.state)),
+		sdk.WithToolCallHandler(eventbus.CreateToolCallHandler(eventbus.GlobalContracts, wp.state, wp.whiteboardProjection)),
 		sdk.WithShouldContinueIteration(eventbus.CreateShouldContinueIterationFn(eventbus.GlobalContracts)),
 	)
 

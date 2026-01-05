@@ -187,16 +187,8 @@ func (p *InMemoryAguiProjection) Apply(ctx context.Context, event sdk.Event) err
 func (p *InMemoryAguiProjection) applyDomainEvent(thread *AguiThreadState, evt *agents.DomainEvent) {
 	switch evt.Type {
 	case agents.EventTypeWhiteboardUpdated:
-		action := evt.GetString("action")
-		content := evt.GetString("content")
-		switch action {
-		case "write":
-			thread.WhiteboardContent = content
-		case "append":
-			thread.WhiteboardContent += "\n" + content
-		case "clear":
-			thread.WhiteboardContent = ""
-		}
+		// Whiteboard content is now handled by dedicated WhiteboardStore projection
+		// This event is processed there, not in the AGUI projection
 
 	case agents.EventTypeAgentHandoff:
 		msg := AguiMessage{
