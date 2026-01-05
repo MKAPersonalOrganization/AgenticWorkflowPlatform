@@ -3,7 +3,7 @@ package linearalgebra
 import (
 	sharedtools "school-with-ai/services/agents/shared/tools"
 	"school-with-ai/services/agents/shared/tools/eventbus"
-	"school-with-ai/services/sdk"
+	"school-with-ai/sdk"
 )
 
 // CreateLinearAlgebraProfessor creates the linear algebra professor agent.

@@ -3,7 +3,7 @@ package physics
 import (
 	sharedtools "school-with-ai/services/agents/shared/tools"
 	"school-with-ai/services/agents/shared/tools/eventbus"
-	"school-with-ai/services/sdk"
+	"school-with-ai/sdk"
 )
 
 // CreatePhysicsInstructor creates the physics instructor agent configuration.

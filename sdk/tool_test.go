@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"school-with-ai/services/sdk"
+	"school-with-ai/sdk"
 )
 
 func TestFunctionTool(t *testing.T) {

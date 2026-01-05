@@ -3,7 +3,7 @@ package numericalmethods
 import (
 	"school-with-ai/services/agents/advancedmath/numericalmethods/tools"
 	sharedtools "school-with-ai/services/agents/shared/tools"
-	"school-with-ai/services/sdk"
+	"school-with-ai/sdk"
 )
 
 // CreateNumericalMethodsProfessor creates the numerical methods professor agent
