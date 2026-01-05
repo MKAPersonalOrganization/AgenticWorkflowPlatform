@@ -91,7 +91,7 @@ func handleMathQuestion(ctx context.Context, handlerCtx *agents.EventHandlerCont
 			"event_type":   "question.math",
 		},
 	}
-	agentThread.AddMessages([]domain.Message{triggerMsg})
+	_ = agentThread.AddMessages([]domain.Message{triggerMsg})
 
 	messageID := aguievents.GenerateMessageID()
 

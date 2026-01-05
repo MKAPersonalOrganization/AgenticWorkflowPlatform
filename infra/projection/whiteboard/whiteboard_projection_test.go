@@ -28,10 +28,10 @@ func TestWhiteboardProjection_Append(t *testing.T) {
 	threadID := "thread-123"
 
 	event1 := agents.NewWhiteboardUpdatedEvent(threadID, "test-agent", "First line", "write")
-	store.Update(event1)
+	_ = store.Update(event1)
 
 	event2 := agents.NewWhiteboardUpdatedEvent(threadID, "test-agent", "Second line", "append")
-	store.Update(event2)
+	_ = store.Update(event2)
 
 	content := store.Get(threadID)
 	expected := "First line\nSecond line"
@@ -45,7 +45,7 @@ func TestWhiteboardProjection_AppendToEmpty(t *testing.T) {
 	threadID := "thread-123"
 
 	event := agents.NewWhiteboardUpdatedEvent(threadID, "test-agent", "First line", "append")
-	store.Update(event)
+	_ = store.Update(event)
 
 	content := store.Get(threadID)
 	if content != "First line" {
@@ -58,10 +58,10 @@ func TestWhiteboardProjection_Clear(t *testing.T) {
 	threadID := "thread-123"
 
 	event1 := agents.NewWhiteboardUpdatedEvent(threadID, "test-agent", "Some content", "write")
-	store.Update(event1)
+	_ = store.Update(event1)
 
 	event2 := agents.NewWhiteboardUpdatedEvent(threadID, "test-agent", "", "clear")
-	store.Update(event2)
+	_ = store.Update(event2)
 
 	content := store.Get(threadID)
 	if content != "" {
@@ -73,10 +73,10 @@ func TestWhiteboardProjection_MultipleThreads(t *testing.T) {
 	store := NewInMemoryWhiteboardProjection()
 
 	event1 := agents.NewWhiteboardUpdatedEvent("thread-1", "agent-1", "Thread 1 content", "write")
-	store.Update(event1)
+	_ = store.Update(event1)
 
 	event2 := agents.NewWhiteboardUpdatedEvent("thread-2", "agent-2", "Thread 2 content", "write")
-	store.Update(event2)
+	_ = store.Update(event2)
 
 	content1 := store.Get("thread-1")
 	if content1 != "Thread 1 content" {
@@ -133,7 +133,7 @@ func TestWhiteboardProjection_UnknownAction(t *testing.T) {
 	threadID := "thread-123"
 
 	event1 := agents.NewWhiteboardUpdatedEvent(threadID, "test-agent", "Initial content", "write")
-	store.Update(event1)
+	_ = store.Update(event1)
 
 	event2 := &agents.DomainEvent{
 		ID:        "event-2",
@@ -145,7 +145,7 @@ func TestWhiteboardProjection_UnknownAction(t *testing.T) {
 			"content": "This should be ignored",
 		},
 	}
-	store.Update(event2)
+	_ = store.Update(event2)
 
 	content := store.Get(threadID)
 	if content != "Initial content" {

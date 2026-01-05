@@ -63,7 +63,7 @@ func TestInMemoryEventStore_ReadStream(t *testing.T) {
 	event2 := &sdk.UserMessageAddedEvent{BaseEvent: sdk.BaseEvent{ThreadID: "thread-1"}, Content: "2"}
 	event3 := &sdk.UserMessageAddedEvent{BaseEvent: sdk.BaseEvent{ThreadID: "thread-1"}, Content: "3"}
 
-	store.Append(ctx, "thread-1", event1, event2, event3)
+	_, _ = store.Append(ctx, "thread-1", event1, event2, event3)
 
 	t.Run("reads all events from beginning", func(t *testing.T) {
 		events, err := store.ReadStream(ctx, "thread-1", 0)

@@ -85,7 +85,7 @@ func handleStatisticsQuestion(ctx context.Context, handlerCtx *agents.EventHandl
 			"event_type":   "question.statistics",
 		},
 	}
-	agentThread.AddMessages([]domain.Message{triggerMsg})
+	_ = agentThread.AddMessages([]domain.Message{triggerMsg})
 
 	messageID := aguievents.GenerateMessageID()
 

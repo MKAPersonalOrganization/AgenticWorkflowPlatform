@@ -83,7 +83,7 @@ func handlePhysicsQuestion(ctx context.Context, handlerCtx *agents.EventHandlerC
 			"event_type":   "question.physics",
 		},
 	}
-	agentThread.AddMessages([]domain.Message{triggerMsg})
+	_ = agentThread.AddMessages([]domain.Message{triggerMsg})
 
 	messageID := aguievents.GenerateMessageID()
 

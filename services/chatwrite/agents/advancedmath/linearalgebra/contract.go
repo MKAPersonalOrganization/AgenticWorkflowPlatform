@@ -87,7 +87,7 @@ func handleLinearAlgebraQuestion(ctx context.Context, handlerCtx *agents.EventHa
 			"event_type":   "question.linearalgebra",
 		},
 	}
-	agentThread.AddMessages([]domain.Message{triggerMsg})
+	_ = agentThread.AddMessages([]domain.Message{triggerMsg})
 
 	// Generate message ID for agent's response
 	messageID := aguievents.GenerateMessageID()

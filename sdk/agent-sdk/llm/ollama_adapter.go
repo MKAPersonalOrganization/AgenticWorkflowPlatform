@@ -162,7 +162,7 @@ func (c *OllamaClient) buildMessages(messages []ChatMessage, options *ChatOption
 					if fc.Arguments != nil {
 						args = fc.Arguments
 					} else if fc.RawArguments != "" {
-						json.Unmarshal([]byte(fc.RawArguments), &args)
+						_ = json.Unmarshal([]byte(fc.RawArguments), &args)
 					}
 
 					toolCalls = append(toolCalls, api.ToolCall{
@@ -188,12 +188,6 @@ func (c *OllamaClient) buildMessages(messages []ChatMessage, options *ChatOption
 					Content: content,
 				})
 			}
-
-		case ChatRoleSystem:
-			ollamaMessages = append(ollamaMessages, api.Message{
-				Role:    "system",
-				Content: msg.Text(),
-			})
 		}
 	}
 
