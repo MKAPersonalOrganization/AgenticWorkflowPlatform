@@ -1,4 +1,4 @@
-package infra
+package chatapi
 
 import (
 	"context"
@@ -344,7 +344,7 @@ func (wp *WorkerPool) emitMessagesSnapshot(emitter EventEmitter, threadID string
 	// Convert session messages to agui messages
 	aguiMessages := make([]aguievents.Message, 0, len(sessionMessages))
 	for _, msg := range sessionMessages {
-		aguiMsg := convertSessionMessageToAGUI(msg)
+		aguiMsg := ConvertSessionMessageToAGUI(msg)
 		aguiMessages = append(aguiMessages, aguiMsg)
 	}
 

@@ -1,4 +1,4 @@
-package infra
+package chatapi
 
 // EventEmitter is an interface for emitting domain events
 type EventEmitter interface {
