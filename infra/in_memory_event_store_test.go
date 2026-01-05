@@ -1,4 +1,4 @@
-package sdk
+package infra
 
 import (
 	"context"
@@ -6,6 +6,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"school-with-ai/services/sdk"
 )
 
 func TestInMemoryEventStore_Append(t *testing.T) {
@@ -13,8 +15,8 @@ func TestInMemoryEventStore_Append(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("appends events to stream", func(t *testing.T) {
-		event := &ThreadCreatedEvent{
-			BaseEvent: BaseEvent{
+		event := &sdk.ThreadCreatedEvent{
+			BaseEvent: sdk.BaseEvent{
 				Type:      "ThreadCreated",
 				Timestamp: time.Now(),
 				ThreadID:  "thread-1",
@@ -33,12 +35,12 @@ func TestInMemoryEventStore_Append(t *testing.T) {
 	})
 
 	t.Run("increments version on each append", func(t *testing.T) {
-		event1 := &UserMessageAddedEvent{
-			BaseEvent: BaseEvent{ThreadID: "thread-2"},
+		event1 := &sdk.UserMessageAddedEvent{
+			BaseEvent: sdk.BaseEvent{ThreadID: "thread-2"},
 			Content:   "Hello",
 		}
-		event2 := &UserMessageAddedEvent{
-			BaseEvent: BaseEvent{ThreadID: "thread-2"},
+		event2 := &sdk.UserMessageAddedEvent{
+			BaseEvent: sdk.BaseEvent{ThreadID: "thread-2"},
 			Content:   "World",
 		}
 
@@ -59,9 +61,9 @@ func TestInMemoryEventStore_ReadStream(t *testing.T) {
 	ctx := context.Background()
 
 	// Add some events
-	event1 := &UserMessageAddedEvent{BaseEvent: BaseEvent{ThreadID: "thread-1"}, Content: "1"}
-	event2 := &UserMessageAddedEvent{BaseEvent: BaseEvent{ThreadID: "thread-1"}, Content: "2"}
-	event3 := &UserMessageAddedEvent{BaseEvent: BaseEvent{ThreadID: "thread-1"}, Content: "3"}
+	event1 := &sdk.UserMessageAddedEvent{BaseEvent: sdk.BaseEvent{ThreadID: "thread-1"}, Content: "1"}
+	event2 := &sdk.UserMessageAddedEvent{BaseEvent: sdk.BaseEvent{ThreadID: "thread-1"}, Content: "2"}
+	event3 := &sdk.UserMessageAddedEvent{BaseEvent: sdk.BaseEvent{ThreadID: "thread-1"}, Content: "3"}
 
 	store.Append(ctx, "thread-1", event1, event2, event3)
 
@@ -115,7 +117,7 @@ func TestInMemoryEventStore_StreamVersion(t *testing.T) {
 	})
 
 	t.Run("returns correct version after appends", func(t *testing.T) {
-		event := &UserMessageAddedEvent{BaseEvent: BaseEvent{ThreadID: "thread-1"}}
+		event := &sdk.UserMessageAddedEvent{BaseEvent: sdk.BaseEvent{ThreadID: "thread-1"}}
 		store.Append(ctx, "thread-1", event, event, event)
 
 		version, _ := store.StreamVersion(ctx, "thread-1")
@@ -137,7 +139,7 @@ func TestInMemoryEventStore_StreamExists(t *testing.T) {
 	})
 
 	t.Run("returns true after append", func(t *testing.T) {
-		event := &UserMessageAddedEvent{BaseEvent: BaseEvent{ThreadID: "thread-1"}}
+		event := &sdk.UserMessageAddedEvent{BaseEvent: sdk.BaseEvent{ThreadID: "thread-1"}}
 		store.Append(ctx, "thread-1", event)
 
 		exists, _ := store.StreamExists(ctx, "thread-1")
@@ -151,7 +153,7 @@ func TestInMemoryEventStore_DeleteStream(t *testing.T) {
 	store := NewInMemoryEventStore()
 	ctx := context.Background()
 
-	event := &UserMessageAddedEvent{BaseEvent: BaseEvent{ThreadID: "thread-1"}}
+	event := &sdk.UserMessageAddedEvent{BaseEvent: sdk.BaseEvent{ThreadID: "thread-1"}}
 	store.Append(ctx, "thread-1", event)
 
 	err := store.DeleteStream(ctx, "thread-1")
@@ -177,7 +179,7 @@ func TestInMemoryEventStore_ListStreams(t *testing.T) {
 	})
 
 	t.Run("returns all streams", func(t *testing.T) {
-		event := &UserMessageAddedEvent{BaseEvent: BaseEvent{}}
+		event := &sdk.UserMessageAddedEvent{BaseEvent: sdk.BaseEvent{}}
 		store.Append(ctx, "stream-a", event)
 		store.Append(ctx, "stream-b", event)
 		store.Append(ctx, "stream-c", event)
@@ -194,7 +196,7 @@ func TestInMemoryEventStore_OptimisticLocking(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("succeeds with correct expected version", func(t *testing.T) {
-		event := &UserMessageAddedEvent{BaseEvent: BaseEvent{ThreadID: "thread-1"}}
+		event := &sdk.UserMessageAddedEvent{BaseEvent: sdk.BaseEvent{ThreadID: "thread-1"}}
 
 		// First append with expected version -1 (create new)
 		v1, err := store.AppendWithExpectedVersion(ctx, "thread-1", -1, event)
@@ -216,24 +218,24 @@ func TestInMemoryEventStore_OptimisticLocking(t *testing.T) {
 	})
 
 	t.Run("fails with wrong expected version", func(t *testing.T) {
-		event := &UserMessageAddedEvent{BaseEvent: BaseEvent{ThreadID: "thread-2"}}
+		event := &sdk.UserMessageAddedEvent{BaseEvent: sdk.BaseEvent{ThreadID: "thread-2"}}
 		store.Append(ctx, "thread-2", event)
 
 		// Try to append with wrong expected version
 		_, err := store.AppendWithExpectedVersion(ctx, "thread-2", 0, event)
-		if err != ErrConcurrencyConflict {
-			t.Errorf("expected ErrConcurrencyConflict, got %v", err)
+		if err != sdk.ErrConcurrencyConflict {
+			t.Errorf("expected sdk.ErrConcurrencyConflict, got %v", err)
 		}
 	})
 
 	t.Run("fails creating existing stream with -1", func(t *testing.T) {
-		event := &UserMessageAddedEvent{BaseEvent: BaseEvent{ThreadID: "thread-3"}}
+		event := &sdk.UserMessageAddedEvent{BaseEvent: sdk.BaseEvent{ThreadID: "thread-3"}}
 		store.Append(ctx, "thread-3", event)
 
 		// Try to create with -1 when stream exists
 		_, err := store.AppendWithExpectedVersion(ctx, "thread-3", -1, event)
-		if err != ErrConcurrencyConflict {
-			t.Errorf("expected ErrConcurrencyConflict, got %v", err)
+		if err != sdk.ErrConcurrencyConflict {
+			t.Errorf("expected sdk.ErrConcurrencyConflict, got %v", err)
 		}
 	})
 }
@@ -245,7 +247,7 @@ func TestInMemoryEventStore_Subscribe(t *testing.T) {
 	t.Run("notifies subscriber of new events", func(t *testing.T) {
 		var receivedCount int32
 
-		unsubscribe, err := store.Subscribe(ctx, "thread-1", func(ctx context.Context, streamID string, event Event) error {
+		unsubscribe, err := store.Subscribe(ctx, "thread-1", func(ctx context.Context, streamID string, event sdk.Event) error {
 			atomic.AddInt32(&receivedCount, 1)
 			return nil
 		})
@@ -254,7 +256,7 @@ func TestInMemoryEventStore_Subscribe(t *testing.T) {
 		}
 		defer unsubscribe()
 
-		event := &UserMessageAddedEvent{BaseEvent: BaseEvent{ThreadID: "thread-1"}}
+		event := &sdk.UserMessageAddedEvent{BaseEvent: sdk.BaseEvent{ThreadID: "thread-1"}}
 		store.Append(ctx, "thread-1", event, event, event)
 
 		// Give time for async handlers
@@ -268,12 +270,12 @@ func TestInMemoryEventStore_Subscribe(t *testing.T) {
 	t.Run("unsubscribe stops notifications", func(t *testing.T) {
 		var receivedCount int32
 
-		unsubscribe, _ := store.Subscribe(ctx, "thread-2", func(ctx context.Context, streamID string, event Event) error {
+		unsubscribe, _ := store.Subscribe(ctx, "thread-2", func(ctx context.Context, streamID string, event sdk.Event) error {
 			atomic.AddInt32(&receivedCount, 1)
 			return nil
 		})
 
-		event := &UserMessageAddedEvent{BaseEvent: BaseEvent{ThreadID: "thread-2"}}
+		event := &sdk.UserMessageAddedEvent{BaseEvent: sdk.BaseEvent{ThreadID: "thread-2"}}
 		store.Append(ctx, "thread-2", event)
 
 		unsubscribe()
@@ -295,7 +297,7 @@ func TestInMemoryEventStore_SubscribeAll(t *testing.T) {
 	var receivedStreams []string
 	var mu sync.Mutex
 
-	unsubscribe, _ := store.SubscribeAll(ctx, func(ctx context.Context, streamID string, event Event) error {
+	unsubscribe, _ := store.SubscribeAll(ctx, func(ctx context.Context, streamID string, event sdk.Event) error {
 		mu.Lock()
 		receivedStreams = append(receivedStreams, streamID)
 		mu.Unlock()
@@ -303,7 +305,7 @@ func TestInMemoryEventStore_SubscribeAll(t *testing.T) {
 	})
 	defer unsubscribe()
 
-	event := &UserMessageAddedEvent{BaseEvent: BaseEvent{}}
+	event := &sdk.UserMessageAddedEvent{BaseEvent: sdk.BaseEvent{}}
 	store.Append(ctx, "stream-a", event)
 	store.Append(ctx, "stream-b", event)
 	store.Append(ctx, "stream-c", event)
@@ -328,8 +330,8 @@ func TestInMemoryEventStore_ConcurrentAccess(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			event := &UserMessageAddedEvent{
-				BaseEvent: BaseEvent{ThreadID: "shared"},
+			event := &sdk.UserMessageAddedEvent{
+				BaseEvent: sdk.BaseEvent{ThreadID: "shared"},
 				Content:   "message",
 			}
 			store.Append(ctx, "shared", event)
