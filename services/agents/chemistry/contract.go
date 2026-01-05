@@ -84,7 +84,7 @@ Follow your workflow:
 
 	err := handlerCtx.Agent.Run(ctx, handlerCtx.ThreadID, messageID, messages, func(event sdk.Event) error {
 		return nil
-	})
+	}, sdk.DefaultRunOptions())
 	if err != nil {
 		slog.Error("Chemistry handler failed", "error", err)
 		return err

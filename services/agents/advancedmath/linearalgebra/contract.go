@@ -93,7 +93,7 @@ Follow your workflow:
 	err := handlerCtx.Agent.Run(ctx, handlerCtx.ThreadID, messageID, messages, func(event sdk.Event) error {
 		// Events emitted by the agent are handled by the worker pool's routing
 		return nil
-	})
+	}, sdk.DefaultRunOptions())
 	if err != nil {
 		slog.Error("Linear algebra handler failed", "error", err)
 		return err
