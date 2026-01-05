@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	"school-with-ai/infra"
 	"school-with-ai/services/agents"
 	"school-with-ai/services/agents/shared/tools/eventbus"
 	"school-with-ai/services/sdk"
@@ -45,13 +44,13 @@ func handleUserMessage(ctx context.Context, handlerCtx *agents.EventHandlerConte
 		"message", handlerCtx.Event.Data["message"],
 	)
 
-	// Get the AgentThread from state
-	state, ok := handlerCtx.State.(*infra.InMemoryThreadState)
+	// Get the AgentThread from state using ThreadStateWithStore interface
+	stateWithStore, ok := handlerCtx.State.(sdk.ThreadStateWithStore)
 	if !ok {
-		return fmt.Errorf("state is not InMemoryThreadState")
+		return fmt.Errorf("state does not implement ThreadStateWithStore")
 	}
 
-	agentThread, exists := state.GetAgentThread(handlerCtx.ThreadID)
+	agentThread, exists := stateWithStore.GetAgentThread(handlerCtx.ThreadID)
 	if !exists {
 		return fmt.Errorf("thread not found: %s", handlerCtx.ThreadID)
 	}
@@ -110,12 +109,12 @@ func handleQuestionAnswered(ctx context.Context, handlerCtx *agents.EventHandler
 	}
 
 	// If incomplete, invoke agent to determine what's still needed
-	state, ok := handlerCtx.State.(*infra.InMemoryThreadState)
+	stateWithStore, ok := handlerCtx.State.(sdk.ThreadStateWithStore)
 	if !ok {
-		return fmt.Errorf("state is not InMemoryThreadState")
+		return fmt.Errorf("state does not implement ThreadStateWithStore")
 	}
 
-	agentThread, exists := state.GetAgentThread(handlerCtx.ThreadID)
+	agentThread, exists := stateWithStore.GetAgentThread(handlerCtx.ThreadID)
 	if !exists {
 		return fmt.Errorf("thread not found: %s", handlerCtx.ThreadID)
 	}

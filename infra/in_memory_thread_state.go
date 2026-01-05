@@ -1,6 +1,7 @@
 package infra
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -10,11 +11,27 @@ import (
 	"school-with-ai/services/sdk"
 )
 
-// InMemoryThreadState is an in-memory implementation of ThreadState
+// InMemoryThreadState is an in-memory projection of thread state.
+//
+// IMPORTANT: This is a READ MODEL (projection), not a primary storage.
+// In event sourcing:
+//   - EventStore is the source of truth (append-only events)
+//   - InMemoryThreadState is a projection (derived from events)
+//   - Agents READ from this projection
+//   - Agents WRITE by emitting events to EventStore
+//
+// This projection:
+//   - Is updated by applying events via Update()
+//   - Can be rebuilt from EventStore at any time
+//   - Provides optimized read access for agents
 type InMemoryThreadState struct {
-	mu      sync.RWMutex
+	mu sync.RWMutex
+
+	// Thread conversation state (messages)
 	threads map[string]sdk.AgentThread
-	// Metadata per thread (title, timestamps, etc.)
+
+	// Thread metadata (title, timestamps, etc.)
+	// This is derived from events, not stored separately
 	metadata map[string]*threadMetadata
 }
 
@@ -25,9 +42,10 @@ type threadMetadata struct {
 	CurrentInstructor string
 	InstructorHistory []domain.InstructorSession
 	WhiteboardContent string
+	Version           int64 // Event version this projection is at
 }
 
-// NewInMemoryThreadState creates a new in-memory thread state
+// NewInMemoryThreadState creates a new in-memory thread projection.
 func NewInMemoryThreadState() *InMemoryThreadState {
 	return &InMemoryThreadState{
 		threads:  make(map[string]sdk.AgentThread),
@@ -35,7 +53,7 @@ func NewInMemoryThreadState() *InMemoryThreadState {
 	}
 }
 
-// Get retrieves a thread by ID
+// Get retrieves a thread projection by ID.
 func (p *InMemoryThreadState) Get(threadID string) (*domain.Thread, bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -50,7 +68,7 @@ func (p *InMemoryThreadState) Get(threadID string) (*domain.Thread, bool) {
 		meta = &threadMetadata{}
 	}
 
-	// Convert AgentThread to domain.Thread for the projection
+	// Build the read model from projection state
 	thread := &domain.Thread{
 		ID:                agentThread.GetID(),
 		Title:             meta.Title,
@@ -65,7 +83,7 @@ func (p *InMemoryThreadState) Get(threadID string) (*domain.Thread, bool) {
 	return thread, true
 }
 
-// GetAgentThread retrieves the underlying AgentThread by ID
+// GetAgentThread retrieves the conversation state for agent processing.
 func (p *InMemoryThreadState) GetAgentThread(threadID string) (sdk.AgentThread, bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -74,7 +92,29 @@ func (p *InMemoryThreadState) GetAgentThread(threadID string) (sdk.AgentThread, 
 	return agentThread, exists
 }
 
-// Messages retrieves all messages from a thread
+// GetOrCreateAgentThread ensures a thread exists in the projection.
+// Note: This doesn't write to EventStore - it just ensures the projection
+// is ready to receive events for this thread.
+func (p *InMemoryThreadState) GetOrCreateAgentThread(ctx context.Context, threadID string) (sdk.AgentThread, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if agentThread, exists := p.threads[threadID]; exists {
+		return agentThread, nil
+	}
+
+	// Create empty projection entry (will be populated by events)
+	agentThread := sdk.NewInMemoryThreadWithID(threadID)
+	p.threads[threadID] = agentThread
+	p.metadata[threadID] = &threadMetadata{
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	return agentThread, nil
+}
+
+// Messages retrieves all messages from a thread's projection.
 func (p *InMemoryThreadState) Messages(threadID string) []domain.Message {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -85,7 +125,7 @@ func (p *InMemoryThreadState) Messages(threadID string) []domain.Message {
 	return []domain.Message{}
 }
 
-// All retrieves all threads sorted by UpdatedAt (newest first)
+// All retrieves all thread projections sorted by UpdatedAt (newest first).
 func (p *InMemoryThreadState) All() []domain.Thread {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -110,7 +150,7 @@ func (p *InMemoryThreadState) All() []domain.Thread {
 		threads = append(threads, thread)
 	}
 
-	// Simple bubble sort by UpdatedAt descending
+	// Sort by UpdatedAt descending
 	for i := 0; i < len(threads)-1; i++ {
 		for j := i + 1; j < len(threads); j++ {
 			if threads[i].UpdatedAt.Before(threads[j].UpdatedAt) {
@@ -122,14 +162,15 @@ func (p *InMemoryThreadState) All() []domain.Thread {
 	return threads
 }
 
-// Update applies a single event to update the state
+// Update applies a single event to update the projection.
+// This is called when new events are appended to the EventStore.
 func (p *InMemoryThreadState) Update(event sdk.Event) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	threadID := event.AggregateID()
 
-	// Get or create thread and metadata
+	// Ensure thread exists in projection
 	agentThread, exists := p.threads[threadID]
 	if !exists {
 		agentThread = sdk.NewInMemoryThreadWithID(threadID)
@@ -141,7 +182,67 @@ func (p *InMemoryThreadState) Update(event sdk.Event) error {
 	return p.applyEventUnsafe(agentThread, meta, event)
 }
 
-// applyEventUnsafe applies an event to a thread (caller must hold lock)
+// Rebuild reconstructs the projection from the EventStore for a single thread.
+func (p *InMemoryThreadState) Rebuild(ctx context.Context, store sdk.EventStore, threadID string) error {
+	// Read all events for this thread
+	events, err := store.ReadAll(ctx, threadID)
+	if err != nil {
+		return fmt.Errorf("failed to read events for thread %s: %w", threadID, err)
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	// Clear existing projection for this thread
+	delete(p.threads, threadID)
+	delete(p.metadata, threadID)
+
+	if len(events) == 0 {
+		return nil
+	}
+
+	// Create fresh projection entry
+	agentThread := sdk.NewInMemoryThreadWithID(threadID)
+	p.threads[threadID] = agentThread
+	p.metadata[threadID] = &threadMetadata{}
+	meta := p.metadata[threadID]
+
+	// Replay all events
+	for _, event := range events {
+		if err := p.applyEventUnsafe(agentThread, meta, event); err != nil {
+			return fmt.Errorf("failed to apply event during rebuild: %w", err)
+		}
+	}
+
+	meta.Version = int64(len(events))
+	return nil
+}
+
+// RebuildAll reconstructs all thread projections from the EventStore.
+func (p *InMemoryThreadState) RebuildAll(ctx context.Context, store sdk.EventStore) error {
+	// List all streams
+	streamIDs, err := store.ListStreams(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list streams: %w", err)
+	}
+
+	p.mu.Lock()
+	// Clear all projections
+	p.threads = make(map[string]sdk.AgentThread)
+	p.metadata = make(map[string]*threadMetadata)
+	p.mu.Unlock()
+
+	// Rebuild each thread
+	for _, threadID := range streamIDs {
+		if err := p.Rebuild(ctx, store, threadID); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// applyEventUnsafe applies an event to a thread (caller must hold lock).
 func (p *InMemoryThreadState) applyEventUnsafe(agentThread sdk.AgentThread, meta *threadMetadata, event sdk.Event) error {
 	switch evt := event.(type) {
 	case *sdk.ThreadCreatedEvent:
@@ -160,21 +261,19 @@ func (p *InMemoryThreadState) applyEventUnsafe(agentThread sdk.AgentThread, meta
 		meta.UpdatedAt = evt.Timestamp
 
 	case *sdk.AssistantMessageStartedEvent:
-		// Marker event for traceability - no state change
 		meta.UpdatedAt = evt.Timestamp
 
 	case *sdk.AssistantContentStreamedEvent:
 		// Ephemeral streaming event - ignore in projection
-		// Only used for real-time UI updates
 
 	case *sdk.ToolCallStartedEvent:
-		// Ephemeral event - agent info preserved in event stream order
+		// Ephemeral event
 
 	case *sdk.ToolCallArgumentsStreamedEvent:
-		// Ephemeral streaming event - ignore in projection
+		// Ephemeral streaming event
 
 	case *sdk.ToolCallCompletedEvent:
-		// Ephemeral streaming event - ignore in projection
+		// Ephemeral streaming event
 
 	case *sdk.AssistantMessageCompletedEvent:
 		msg := domain.Message{
@@ -205,10 +304,10 @@ func (p *InMemoryThreadState) applyEventUnsafe(agentThread sdk.AgentThread, meta
 		meta.UpdatedAt = evt.Timestamp
 
 	case *sdk.ThreadDeletedEvent:
-		delete(p.threads, agentThread.GetID())
-		delete(p.metadata, agentThread.GetID())
+		threadID := agentThread.GetID()
+		delete(p.threads, threadID)
+		delete(p.metadata, threadID)
 
-	// Agent collaboration events
 	case *agents.DomainEvent:
 		switch evt.Type {
 		case agents.EventTypeWhiteboardUpdated:
@@ -224,35 +323,29 @@ func (p *InMemoryThreadState) applyEventUnsafe(agentThread sdk.AgentThread, meta
 			}
 			meta.UpdatedAt = evt.Timestamp
 		case agents.EventTypeAgentHandoff:
-			// Store agent handoff as a system message
-			// Content format: "AGENT_HANDOFF|from|to|reason" for parsing on frontend
 			msgID := fmt.Sprintf("handoff-%s-%d", evt.ThreadID, evt.Timestamp.UnixNano())
 
-			// Check if this handoff message already exists (deduplication)
+			// Check for duplicate
 			messages := agentThread.GetMessages()
-			exists := false
 			for _, msg := range messages {
 				if msg.ID == msgID {
-					exists = true
-					break
+					return nil // Already applied
 				}
 			}
 
-			if !exists {
-				msg := domain.Message{
-					ID:        msgID,
-					Role:      "system",
-					Content:   "AGENT_HANDOFF|" + evt.GetString("from_agent") + "|" + evt.GetString("to_agent") + "|" + evt.GetString("reason"),
-					Timestamp: evt.Timestamp,
-					Metadata: map[string]interface{}{
-						"type":       "agent_handoff",
-						"from_agent": evt.GetString("from_agent"),
-						"to_agent":   evt.GetString("to_agent"),
-						"reason":     evt.GetString("reason"),
-					},
-				}
-				agentThread.AddMessages([]domain.Message{msg})
+			msg := domain.Message{
+				ID:        msgID,
+				Role:      "system",
+				Content:   "AGENT_HANDOFF|" + evt.GetString("from_agent") + "|" + evt.GetString("to_agent") + "|" + evt.GetString("reason"),
+				Timestamp: evt.Timestamp,
+				Metadata: map[string]any{
+					"type":       "agent_handoff",
+					"from_agent": evt.GetString("from_agent"),
+					"to_agent":   evt.GetString("to_agent"),
+					"reason":     evt.GetString("reason"),
+				},
 			}
+			agentThread.AddMessages([]domain.Message{msg})
 			meta.UpdatedAt = evt.Timestamp
 		}
 
@@ -260,5 +353,25 @@ func (p *InMemoryThreadState) applyEventUnsafe(agentThread sdk.AgentThread, meta
 		meta.UpdatedAt = evt.Timestamp
 	}
 
+	meta.Version++
 	return nil
 }
+
+// ThreadExists checks if a thread has any events in the projection.
+func (p *InMemoryThreadState) ThreadExists(threadID string) bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	_, exists := p.threads[threadID]
+	return exists
+}
+
+// Clear removes all projections (useful for testing).
+func (p *InMemoryThreadState) Clear() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.threads = make(map[string]sdk.AgentThread)
+	p.metadata = make(map[string]*threadMetadata)
+}
+
+// Verify InMemoryThreadState implements ThreadStateWithAgentAccess
+var _ sdk.ThreadStateWithAgentAccess = (*InMemoryThreadState)(nil)
