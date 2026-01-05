@@ -39,7 +39,7 @@ import (
 	"school-with-ai/services/agents/shared/tools/eventbus"
 	"school-with-ai/services/agents/<agent-name>/tools"
 	sharedtools "school-with-ai/services/agents/shared/tools"
-	"school-with-ai/sdk/agent-sdk"
+	"school-with-ai/sdk/agent-sdk/core"
 )
 
 // domainTools returns the domain-specific tools for this agent.
@@ -126,7 +126,7 @@ Create the factory function that builds your agent configuration.
 package agentname
 
 import (
-	"school-with-ai/sdk/agent-sdk"
+	"school-with-ai/sdk/agent-sdk/core"
 )
 
 // Create<AgentName>Instructor creates the agent configuration.
@@ -282,7 +282,7 @@ import (
 	"school-with-ai/services/agents"
 	"school-with-ai/services/agents/shared/tools/eventbus"
 	"school-with-ai/services/agents/geometry/tools"
-	"school-with-ai/sdk/agent-sdk"
+	"school-with-ai/sdk/agent-sdk/core"
 )
 
 func domainTools() []sdk.Tool {
@@ -315,7 +315,7 @@ var Contract = &eventbus.AgentContract{
 ```go
 package geometry
 
-import "school-with-ai/sdk/agent-sdk"
+import "school-with-ai/sdk/agent-sdk/core"
 
 func CreateGeometryInstructor(notifier sdk.EventNotifier) sdk.AgentConfig {
 	return sdk.AgentConfig{

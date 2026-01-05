@@ -10,7 +10,7 @@ import (
 
 	"school-with-ai/domain"
 	"school-with-ai/infra/auth"
-	"school-with-ai/sdk/agent-sdk"
+	"school-with-ai/sdk/agent-sdk/core"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )

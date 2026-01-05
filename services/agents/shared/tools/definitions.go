@@ -1,7 +1,7 @@
 package tools
 
 import (
-	"school-with-ai/services/llm"
+	"school-with-ai/sdk/agent-sdk/llm"
 )
 
 // GetWeatherTool returns the tool definition for weather lookup

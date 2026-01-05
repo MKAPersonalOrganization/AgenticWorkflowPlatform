@@ -3,7 +3,7 @@ package statistics
 import (
 	sharedtools "school-with-ai/services/agents/shared/tools"
 	"school-with-ai/services/agents/shared/tools/eventbus"
-	"school-with-ai/sdk/agent-sdk"
+	"school-with-ai/sdk/agent-sdk/core"
 )
 
 // CreateStatisticsInstructor creates the statistics instructor agent.

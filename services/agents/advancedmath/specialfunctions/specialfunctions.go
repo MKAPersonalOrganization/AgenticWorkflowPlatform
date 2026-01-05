@@ -3,7 +3,7 @@ package specialfunctions
 import (
 	"school-with-ai/services/agents/advancedmath/specialfunctions/tools"
 	sharedtools "school-with-ai/services/agents/shared/tools"
-	"school-with-ai/sdk/agent-sdk"
+	"school-with-ai/sdk/agent-sdk/core"
 )
 
 // CreateSpecialFunctionsProfessor creates the special functions professor agent

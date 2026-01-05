@@ -1,6 +1,6 @@
 package sdk
 
-import "school-with-ai/services/llm"
+import "school-with-ai/sdk/agent-sdk/llm"
 
 // EventNotifier is the interface for handling domain events from agents
 type EventNotifier interface {
