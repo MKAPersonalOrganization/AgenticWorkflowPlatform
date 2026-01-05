@@ -1,6 +1,14 @@
 package domain
 
-import "time"
+import (
+	"errors"
+	"time"
+)
+
+// Common errors
+var (
+	ErrThreadNotFound = errors.New("thread not found")
+)
 
 // Message represents a single message in a conversation
 type Message struct {
