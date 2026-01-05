@@ -20,8 +20,8 @@ type ShouldContinueIterationFn func(toolCalls []domain.ToolCall) bool
 type Agent struct {
 	config                  AgentConfig
 	chatClient              ChatClient
-	log                     EventStore
-	state                   ThreadStore
+	writeModel              EventStore
+	readModel               ThreadStore
 	toolRegistry            *ToolRegistry
 	toolExecutor            ToolExecutor
 	notifier                EventNotifier // Agent's own notifier
@@ -54,14 +54,14 @@ func WithShouldContinueIteration(fn ShouldContinueIterationFn) Option {
 }
 
 // NewAgent creates a new agent with event sourcing (no UI dependencies)
-func NewAgent(chatClient ChatClient, log EventStore, state ThreadStore, opts ...Option) *Agent {
+func NewAgent(chatClient ChatClient, writeModel EventStore, readModel ThreadStore, opts ...Option) *Agent {
 	// Create tool registry
 	toolRegistry := NewToolRegistry()
 
 	h := &Agent{
 		chatClient:   chatClient,
-		log:          log,
-		state:        state,
+		writeModel:   writeModel,
+		readModel:    readModel,
 		config:       DefaultConfig("agent"),             // Default config
 		toolRegistry: toolRegistry,                       // Tool registry
 		toolExecutor: NewBasicToolExecutor(toolRegistry), // Default tool executor
@@ -331,7 +331,7 @@ func (h *Agent) runIteration(
 		}
 
 		// Get updated thread state with tool results
-		stateWithAccess, ok := h.state.(ThreadStateWithAgentAccess)
+		stateWithAccess, ok := h.readModel.(ThreadStateWithAgentAccess)
 		if !ok {
 			return fmt.Errorf("state does not implement ThreadStateWithAgentAccess")
 		}
@@ -370,7 +370,7 @@ func (h *Agent) runIteration(
 // emitDomainEvent persists the event and notifies handlers
 func (h *Agent) emitDomainEvent(event Event, eventHandler DomainEventHandler) error {
 	// Append to event store (this will automatically update projections via ProjectionEventStore)
-	_, err := h.log.Append(context.Background(), event.AggregateID(), event)
+	_, err := h.writeModel.Append(context.Background(), event.AggregateID(), event)
 	if err != nil {
 		return err
 	}
