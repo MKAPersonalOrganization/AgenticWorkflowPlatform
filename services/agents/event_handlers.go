@@ -4,13 +4,14 @@ import (
 	"context"
 
 	sdk "school-with-ai/sdk/agent-sdk/core"
+	"school-with-ai/services"
 )
 
 // EventHandlerContext provides the context needed for event handlers to execute.
 type EventHandlerContext struct {
 	ThreadID string
 	Event    *DomainEvent
-	Agent    *sdk.AgentService
+	Agent    *services.AgentService
 	State    sdk.ThreadStore
 	Notifier sdk.EventNotifier
 }

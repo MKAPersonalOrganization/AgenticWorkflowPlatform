@@ -308,51 +308,6 @@ func TestThreadIsolation(t *testing.T) {
 	})
 }
 
-// TestAgentThreadFactory verifies Agent thread factory methods
-func TestAgentThreadFactory(t *testing.T) {
-	t.Run("GetNewThread creates new thread", func(t *testing.T) {
-		agent := &AgentService{}
-
-		thread := agent.GetNewThread()
-		require.NotNil(t, thread)
-
-		assert.NotEmpty(t, thread.GetID())
-		assert.Equal(t, ThreadTypeLocal, thread.GetType())
-		assert.Empty(t, thread.GetMessages())
-	})
-
-	t.Run("DeserializeThread restores thread", func(t *testing.T) {
-		agent := &AgentService{}
-
-		// Create and serialize a thread
-		originalThread := NewInMemoryThreadWithID("test-thread")
-		messages := []domain.Message{
-			{ID: "msg1", Role: "user", Content: "Test", Timestamp: time.Now()},
-		}
-		_ = originalThread.AddMessages(messages)
-
-		data, err := originalThread.Serialize()
-		require.NoError(t, err)
-
-		// Deserialize using agent
-		restoredThread, err := agent.DeserializeThread(data)
-		require.NoError(t, err)
-		require.NotNil(t, restoredThread)
-
-		assert.Equal(t, "test-thread", restoredThread.GetID())
-		assert.Len(t, restoredThread.GetMessages(), 1)
-		assert.Equal(t, "Test", restoredThread.GetMessages()[0].Content)
-	})
-
-	t.Run("DeserializeThread with invalid data", func(t *testing.T) {
-		agent := &AgentService{}
-
-		thread, err := agent.DeserializeThread([]byte("invalid"))
-		assert.Error(t, err)
-		assert.Nil(t, thread)
-	})
-}
-
 // TestMessageStoreThreadSafety verifies concurrent access to message store
 func TestMessageStoreThreadSafety(t *testing.T) {
 	t.Run("concurrent writes and reads", func(t *testing.T) {

@@ -189,24 +189,6 @@ func TestBasicToolExecutor_WriteWhiteboard(t *testing.T) {
 	}
 }
 
-func TestAgentWithCustomToolExecutor(t *testing.T) {
-	// Create a mock executor that tracks calls
-	mockExecutor := NewMockToolExecutor()
-	mockExecutor.SetResult("calculate", `{"result": 42}`)
-
-	// Create agent with default executor (custom executor injection removed as unnecessary)
-	agentInstance := sdk.NewAgentService(
-		nil, // provider not needed for this test
-		nil, // log not needed for this test
-		nil, // state not needed for this test
-	)
-
-	// Verify the agent was created (basic sanity check)
-	if agentInstance == nil {
-		t.Fatal("expected agent to be created")
-	}
-}
-
 func TestRegistryToolExecutor(t *testing.T) {
 	ctx := context.Background()
 	registry := sdk.NewToolRegistry()
