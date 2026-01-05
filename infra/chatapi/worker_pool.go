@@ -10,6 +10,7 @@ import (
 	"school-with-ai/domain"
 	"school-with-ai/infra/projection/agui"
 	sdk "school-with-ai/sdk/agent-sdk/core"
+	"school-with-ai/services"
 	"school-with-ai/services/agents"
 	"school-with-ai/services/agents/shared/tools/eventbus"
 
@@ -24,6 +25,7 @@ type WorkerPool struct {
 	aguiProjection       agui.AguiProjection
 	whiteboardProjection interface{ Get(threadID string) string } // WhiteboardReader interface
 	chatClient           sdk.ChatClient
+	chatService          *services.ChatService
 	numWorkers           int
 	pollInterval         time.Duration
 	ctx                  context.Context
@@ -48,7 +50,7 @@ type WorkerPoolConfig struct {
 }
 
 // NewWorkerPool creates a new worker pool
-func NewWorkerPool(queue domain.JobQueue, log sdk.EventStore, state sdk.ThreadStore, aguiProjection agui.AguiProjection, whiteboardProjection interface{ Get(threadID string) string }, chatClient sdk.ChatClient, config WorkerPoolConfig) *WorkerPool {
+func NewWorkerPool(queue domain.JobQueue, log sdk.EventStore, state sdk.ThreadStore, aguiProjection agui.AguiProjection, whiteboardProjection interface{ Get(threadID string) string }, chatClient sdk.ChatClient, chatService *services.ChatService, config WorkerPoolConfig) *WorkerPool {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	if config.NumWorkers <= 0 {
@@ -65,6 +67,7 @@ func NewWorkerPool(queue domain.JobQueue, log sdk.EventStore, state sdk.ThreadSt
 		aguiProjection:       aguiProjection,
 		whiteboardProjection: whiteboardProjection,
 		chatClient:           chatClient,
+		chatService:          chatService,
 		numWorkers:           config.NumWorkers,
 		pollInterval:         config.PollInterval,
 		ctx:                  ctx,
@@ -193,31 +196,14 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 	default:
 	}
 
-	// Check if thread exists, if not emit ThreadCreatedEvent
+	// Check if thread exists, if not create it using chat service
 	_, exists := wp.state.Get(job.ThreadID)
 	if !exists {
-		createEvent := &sdk.ThreadCreatedEvent{
-			BaseEvent: sdk.BaseEvent{
-				Type:      "ThreadCreated",
-				Timestamp: time.Now(),
-				ThreadID:  job.ThreadID,
-			},
-			Title: "New Chat",
-		}
-		_, _ = wp.log.Append(ctx, job.ThreadID, createEvent)
+		_ = wp.chatService.CreateThread(ctx, job.ThreadID, "New Chat")
 	}
 
-	// Emit UserMessageAddedEvent
-	userMsgEvent := &sdk.UserMessageAddedEvent{
-		BaseEvent: sdk.BaseEvent{
-			Type:      "UserMessageAdded",
-			Timestamp: time.Now(),
-			ThreadID:  job.ThreadID,
-		},
-		MessageID: job.MessageID,
-		Content:   job.Message,
-	}
-	_, _ = wp.log.Append(ctx, job.ThreadID, userMsgEvent)
+	// Add user message using chat service
+	_ = wp.chatService.AddUserMessage(ctx, job.ThreadID, job.MessageID, job.Message)
 
 	// Generate unique run ID for this execution
 	runID := aguievents.GenerateRunID()
@@ -239,16 +225,8 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 			title = title[:50] + "..."
 		}
 
-		// Emit ThreadTitleUpdatedEvent
-		titleEvent := &sdk.ThreadTitleUpdatedEvent{
-			BaseEvent: sdk.BaseEvent{
-				Type:      "ThreadTitleUpdated",
-				Timestamp: time.Now(),
-				ThreadID:  job.ThreadID,
-			},
-			NewTitle: title,
-		}
-		_, _ = wp.log.Append(ctx, job.ThreadID, titleEvent)
+		// Update thread title using chat service
+		_ = wp.chatService.UpdateThreadTitle(ctx, job.ThreadID, title)
 
 		// Send CUSTOM event to notify frontend of title update immediately
 		customEvent := aguievents.NewCustomEvent(

@@ -11,6 +11,7 @@ import (
 	"school-with-ai/domain"
 	"school-with-ai/infra/auth"
 	sdk "school-with-ai/sdk/agent-sdk/core"
+	"school-with-ai/services"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
@@ -35,21 +36,23 @@ func writeSSEEvent(w http.ResponseWriter, event interface{}) error {
 
 // Handler encapsulates dependencies for HTTP handlers
 type Handler struct {
-	state      sdk.ThreadStore
-	log        sdk.EventStore
-	chatClient sdk.ChatClient
-	queue      domain.JobQueue
-	workerPool *WorkerPool
+	state       sdk.ThreadStore
+	log         sdk.EventStore
+	chatClient  sdk.ChatClient
+	queue       domain.JobQueue
+	workerPool  *WorkerPool
+	chatService *services.ChatService
 }
 
 // NewHandler creates a new HTTP handler with the given dependencies
-func NewHandler(log sdk.EventStore, state sdk.ThreadStore, chatClient sdk.ChatClient, queue domain.JobQueue, workerPool *WorkerPool) *Handler {
+func NewHandler(log sdk.EventStore, state sdk.ThreadStore, chatClient sdk.ChatClient, queue domain.JobQueue, workerPool *WorkerPool, chatService *services.ChatService) *Handler {
 	return &Handler{
-		state:      state,
-		log:        log,
-		chatClient: chatClient,
-		queue:      queue,
-		workerPool: workerPool,
+		state:       state,
+		log:         log,
+		chatClient:  chatClient,
+		queue:       queue,
+		workerPool:  workerPool,
+		chatService: chatService,
 	}
 }
 
@@ -340,25 +343,17 @@ func (h *Handler) DeleteThread(w http.ResponseWriter, r *http.Request) {
 
 	slog.Info("Deleting thread", "userID", user.ID, "threadID", threadID)
 
-	// Check if thread exists
-	_, exists := h.state.Get(threadID)
-	if !exists {
-		http.Error(w, "Thread not found", http.StatusNotFound)
-		return
-	}
-
 	// TODO: Verify user owns this thread before allowing deletion
 
-	// Emit ThreadDeletedEvent
-	event := &sdk.ThreadDeletedEvent{
-		BaseEvent: sdk.BaseEvent{
-			Type:      "ThreadDeleted",
-			Timestamp: time.Now(),
-			ThreadID:  threadID,
-		},
+	// Delete thread using chat service
+	if err := h.chatService.DeleteThread(r.Context(), threadID); err != nil {
+		if errors.Is(err, domain.ErrThreadNotFound) {
+			http.Error(w, "Thread not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
-	_, _ = h.log.Append(r.Context(), threadID, event)
-	_ = h.state.Update(event)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
