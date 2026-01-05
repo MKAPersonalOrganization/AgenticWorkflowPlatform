@@ -11,20 +11,20 @@ import (
 	"school-with-ai/services/sdk"
 )
 
-// InMemoryThreadState is an in-memory projection of thread state.
+// InMemoryLLMContextProjection is an in-memory projection of thread state for LLM context.
 //
 // IMPORTANT: This is a READ MODEL (projection), not a primary storage.
 // In event sourcing:
 //   - EventStore is the source of truth (append-only events)
-//   - InMemoryThreadState is a projection (derived from events)
-//   - Agents READ from this projection
+//   - InMemoryLLMContextProjection is a projection (derived from events)
+//   - Agents READ from this projection to get conversation context
 //   - Agents WRITE by emitting events to EventStore
 //
 // This projection:
 //   - Is updated by applying events via Update()
 //   - Can be rebuilt from EventStore at any time
-//   - Provides optimized read access for agents
-type InMemoryThreadState struct {
+//   - Provides optimized read access for LLM agents
+type InMemoryLLMContextProjection struct {
 	mu sync.RWMutex
 
 	// Thread conversation state (messages)
@@ -45,16 +45,16 @@ type threadMetadata struct {
 	Version           int64 // Event version this projection is at
 }
 
-// NewInMemoryThreadState creates a new in-memory thread projection.
-func NewInMemoryThreadState() *InMemoryThreadState {
-	return &InMemoryThreadState{
+// NewInMemoryLLMContextProjection creates a new in-memory LLM context projection.
+func NewInMemoryLLMContextProjection() *InMemoryLLMContextProjection {
+	return &InMemoryLLMContextProjection{
 		threads:  make(map[string]sdk.AgentThread),
 		metadata: make(map[string]*threadMetadata),
 	}
 }
 
 // Get retrieves a thread projection by ID.
-func (p *InMemoryThreadState) Get(threadID string) (*domain.Thread, bool) {
+func (p *InMemoryLLMContextProjection) Get(threadID string) (*domain.Thread, bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -84,7 +84,7 @@ func (p *InMemoryThreadState) Get(threadID string) (*domain.Thread, bool) {
 }
 
 // GetAgentThread retrieves the conversation state for agent processing.
-func (p *InMemoryThreadState) GetAgentThread(threadID string) (sdk.AgentThread, bool) {
+func (p *InMemoryLLMContextProjection) GetAgentThread(threadID string) (sdk.AgentThread, bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -95,7 +95,7 @@ func (p *InMemoryThreadState) GetAgentThread(threadID string) (sdk.AgentThread, 
 // GetOrCreateAgentThread ensures a thread exists in the projection.
 // Note: This doesn't write to EventStore - it just ensures the projection
 // is ready to receive events for this thread.
-func (p *InMemoryThreadState) GetOrCreateAgentThread(ctx context.Context, threadID string) (sdk.AgentThread, error) {
+func (p *InMemoryLLMContextProjection) GetOrCreateAgentThread(ctx context.Context, threadID string) (sdk.AgentThread, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -115,7 +115,7 @@ func (p *InMemoryThreadState) GetOrCreateAgentThread(ctx context.Context, thread
 }
 
 // Messages retrieves all messages from a thread's projection.
-func (p *InMemoryThreadState) Messages(threadID string) []domain.Message {
+func (p *InMemoryLLMContextProjection) Messages(threadID string) []domain.Message {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -126,7 +126,7 @@ func (p *InMemoryThreadState) Messages(threadID string) []domain.Message {
 }
 
 // All retrieves all thread projections sorted by UpdatedAt (newest first).
-func (p *InMemoryThreadState) All() []domain.Thread {
+func (p *InMemoryLLMContextProjection) All() []domain.Thread {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -162,9 +162,15 @@ func (p *InMemoryThreadState) All() []domain.Thread {
 	return threads
 }
 
+// Apply updates the projection with a single event (implements sdk.Projection).
+// This delegates to Update for backward compatibility.
+func (p *InMemoryLLMContextProjection) Apply(ctx context.Context, event sdk.Event) error {
+	return p.Update(event)
+}
+
 // Update applies a single event to update the projection.
 // This is called when new events are appended to the EventStore.
-func (p *InMemoryThreadState) Update(event sdk.Event) error {
+func (p *InMemoryLLMContextProjection) Update(event sdk.Event) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -183,7 +189,7 @@ func (p *InMemoryThreadState) Update(event sdk.Event) error {
 }
 
 // Rebuild reconstructs the projection from the EventStore for a single thread.
-func (p *InMemoryThreadState) Rebuild(ctx context.Context, store sdk.EventStore, threadID string) error {
+func (p *InMemoryLLMContextProjection) Rebuild(ctx context.Context, store sdk.EventStore, threadID string) error {
 	// Read all events for this thread
 	events, err := store.ReadAll(ctx, threadID)
 	if err != nil {
@@ -219,7 +225,7 @@ func (p *InMemoryThreadState) Rebuild(ctx context.Context, store sdk.EventStore,
 }
 
 // RebuildAll reconstructs all thread projections from the EventStore.
-func (p *InMemoryThreadState) RebuildAll(ctx context.Context, store sdk.EventStore) error {
+func (p *InMemoryLLMContextProjection) RebuildAll(ctx context.Context, store sdk.EventStore) error {
 	// List all streams
 	streamIDs, err := store.ListStreams(ctx)
 	if err != nil {
@@ -243,7 +249,7 @@ func (p *InMemoryThreadState) RebuildAll(ctx context.Context, store sdk.EventSto
 }
 
 // applyEventUnsafe applies an event to a thread (caller must hold lock).
-func (p *InMemoryThreadState) applyEventUnsafe(agentThread sdk.AgentThread, meta *threadMetadata, event sdk.Event) error {
+func (p *InMemoryLLMContextProjection) applyEventUnsafe(agentThread sdk.AgentThread, meta *threadMetadata, event sdk.Event) error {
 	switch evt := event.(type) {
 	case *sdk.ThreadCreatedEvent:
 		meta.Title = evt.Title
@@ -358,7 +364,7 @@ func (p *InMemoryThreadState) applyEventUnsafe(agentThread sdk.AgentThread, meta
 }
 
 // ThreadExists checks if a thread has any events in the projection.
-func (p *InMemoryThreadState) ThreadExists(threadID string) bool {
+func (p *InMemoryLLMContextProjection) ThreadExists(threadID string) bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	_, exists := p.threads[threadID]
@@ -366,12 +372,12 @@ func (p *InMemoryThreadState) ThreadExists(threadID string) bool {
 }
 
 // Clear removes all projections (useful for testing).
-func (p *InMemoryThreadState) Clear() {
+func (p *InMemoryLLMContextProjection) Clear() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.threads = make(map[string]sdk.AgentThread)
 	p.metadata = make(map[string]*threadMetadata)
 }
 
-// Verify InMemoryThreadState implements ThreadStateWithAgentAccess
-var _ sdk.ThreadStateWithAgentAccess = (*InMemoryThreadState)(nil)
+// Verify InMemoryLLMContextProjection implements ThreadStateWithAgentAccess
+var _ sdk.ThreadStateWithAgentAccess = (*InMemoryLLMContextProjection)(nil)

@@ -361,13 +361,8 @@ func (h *Agent) runIteration(
 
 // emitDomainEvent persists the event and notifies handlers
 func (h *Agent) emitDomainEvent(event Event, eventHandler DomainEventHandler) error {
-	// Append to event log
+	// Append to event log (this will automatically update projections via ProjectionEventStore)
 	if err := h.log.Append(event.AggregateID(), event); err != nil {
-		return err
-	}
-
-	// Update thread state
-	if err := h.state.Update(event); err != nil {
 		return err
 	}
 
