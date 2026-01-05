@@ -396,7 +396,7 @@ func (wp *WorkerPool) continueWithAgent(ctx context.Context, threadID, agentName
 	agentConfig := contract.Factory(notifier)
 
 	// Create agent instance
-	agentInstance := sdk.NewAgent(
+	agentInstance := sdk.NewAgentService(
 		wp.chatClient,
 		wp.log,
 		wp.state,

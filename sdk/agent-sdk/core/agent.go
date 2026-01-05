@@ -15,9 +15,9 @@ type ToolCallHandler func(threadID string, agentName string, toolCall domain.Too
 // ShouldContinueIterationFn determines if the agent should continue iterating after tool calls
 type ShouldContinueIterationFn func(toolCalls []domain.ToolCall) bool
 
-// Agent handles processing of user messages using pure event sourcing
+// AgentService handles processing of user messages using pure event sourcing
 // Each agent is responsible for registering its own event notifications
-type Agent struct {
+type AgentService struct {
 	config                  AgentConfig
 	chatClient              ChatClient
 	writeModel              EventStore
@@ -29,36 +29,36 @@ type Agent struct {
 	shouldContinueIteration ShouldContinueIterationFn
 }
 
-// Option is a functional option for configuring Agent
-type Option func(*Agent)
+// Option is a functional option for configuring AgentService
+type Option func(*AgentService)
 
 // WithConfig configures the agent with a complete configuration
 func WithConfig(config AgentConfig) Option {
-	return func(h *Agent) {
+	return func(h *AgentService) {
 		h.config = config
 	}
 }
 
 // WithToolCallHandler configures the agent with a tool call handler for custom event emission
 func WithToolCallHandler(handler ToolCallHandler) Option {
-	return func(h *Agent) {
+	return func(h *AgentService) {
 		h.toolCallHandler = handler
 	}
 }
 
 // WithShouldContinueIteration configures the agent with a function to determine if iteration should continue
 func WithShouldContinueIteration(fn ShouldContinueIterationFn) Option {
-	return func(h *Agent) {
+	return func(h *AgentService) {
 		h.shouldContinueIteration = fn
 	}
 }
 
-// NewAgent creates a new agent with event sourcing (no UI dependencies)
-func NewAgent(chatClient ChatClient, writeModel EventStore, readModel ThreadStore, opts ...Option) *Agent {
+// NewAgentService creates a new agent with event sourcing (no UI dependencies)
+func NewAgentService(chatClient ChatClient, writeModel EventStore, readModel ThreadStore, opts ...Option) *AgentService {
 	// Create tool registry
 	toolRegistry := NewToolRegistry()
 
-	h := &Agent{
+	h := &AgentService{
 		chatClient:   chatClient,
 		writeModel:   writeModel,
 		readModel:    readModel,
@@ -87,7 +87,7 @@ func NewAgent(chatClient ChatClient, writeModel EventStore, readModel ThreadStor
 // This method creates a fresh conversation thread that can be used to maintain state
 // and context for interactions with this agent. Each thread represents an independent
 // conversation session.
-func (h *Agent) GetNewThread() AgentThread {
+func (h *AgentService) GetNewThread() AgentThread {
 	return NewInMemoryThread()
 }
 
@@ -95,7 +95,7 @@ func (h *Agent) GetNewThread() AgentThread {
 // This method enables restoration of conversation threads from previously saved state,
 // allowing conversations to resume across application restarts or be migrated between
 // different agent instances.
-func (h *Agent) DeserializeThread(data []byte) (AgentThread, error) {
+func (h *AgentService) DeserializeThread(data []byte) (AgentThread, error) {
 	thread, err := NewInMemoryThreadFromState(data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to deserialize thread: %w", err)
@@ -112,7 +112,7 @@ type DomainEventHandler func(event Event) error
 // like message reduction, custom storage, and serialization.
 //
 // The thread parameter can be obtained from GetNewThread() or DeserializeThread().
-func (h *Agent) RunWithThread(
+func (h *AgentService) RunWithThread(
 	ctx context.Context,
 	threadID string,
 	messageID string,
@@ -127,7 +127,7 @@ func (h *Agent) RunWithThread(
 
 // runIteration processes a single LLM iteration and recursively continues if tools are called
 // thread parameter is optional - if provided, it will be used for message management
-func (h *Agent) runIteration(
+func (h *AgentService) runIteration(
 	ctx context.Context,
 	threadID string,
 	messageID string,
@@ -368,7 +368,7 @@ func (h *Agent) runIteration(
 }
 
 // emitDomainEvent persists the event and notifies handlers
-func (h *Agent) emitDomainEvent(event Event, eventHandler DomainEventHandler) error {
+func (h *AgentService) emitDomainEvent(event Event, eventHandler DomainEventHandler) error {
 	// Append to event store (this will automatically update projections via ProjectionEventStore)
 	_, err := h.writeModel.Append(context.Background(), event.AggregateID(), event)
 	if err != nil {
@@ -393,7 +393,7 @@ func (h *Agent) emitDomainEvent(event Event, eventHandler DomainEventHandler) er
 }
 
 // executeToolCall executes a tool call and returns the result
-func (h *Agent) executeToolCall(threadID string, toolCall domain.ToolCall, eventHandler DomainEventHandler) (string, error) {
+func (h *AgentService) executeToolCall(threadID string, toolCall domain.ToolCall, eventHandler DomainEventHandler) (string, error) {
 	// Execute the tool using the executor
 	result, err := h.toolExecutor.Execute(toolCall)
 	if err != nil {
