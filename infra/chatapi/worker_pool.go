@@ -20,7 +20,7 @@ import (
 type WorkerPool struct {
 	queue          domain.JobQueue
 	log            sdk.EventStore
-	state          sdk.ThreadState
+	state          sdk.ThreadStore
 	aguiProjection agui.AguiProjection
 	chatClient     sdk.ChatClient
 	numWorkers     int
@@ -47,7 +47,7 @@ type WorkerPoolConfig struct {
 }
 
 // NewWorkerPool creates a new worker pool
-func NewWorkerPool(queue domain.JobQueue, log sdk.EventStore, state sdk.ThreadState, aguiProjection agui.AguiProjection, chatClient sdk.ChatClient, config WorkerPoolConfig) *WorkerPool {
+func NewWorkerPool(queue domain.JobQueue, log sdk.EventStore, state sdk.ThreadStore, aguiProjection agui.AguiProjection, chatClient sdk.ChatClient, config WorkerPoolConfig) *WorkerPool {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	if config.NumWorkers <= 0 {
