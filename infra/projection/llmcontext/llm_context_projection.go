@@ -41,7 +41,6 @@ type threadMetadata struct {
 	UpdatedAt         time.Time
 	CurrentInstructor string
 	InstructorHistory []domain.InstructorSession
-	WhiteboardContent string
 	Version           int64 // Event version this projection is at
 }
 
@@ -77,7 +76,6 @@ func (p *InMemoryLLMContextProjection) Get(threadID string) (*domain.Thread, boo
 		UpdatedAt:         meta.UpdatedAt,
 		CurrentInstructor: meta.CurrentInstructor,
 		InstructorHistory: meta.InstructorHistory,
-		WhiteboardContent: meta.WhiteboardContent,
 	}
 
 	return thread, true
@@ -145,7 +143,6 @@ func (p *InMemoryLLMContextProjection) All() []domain.Thread {
 			UpdatedAt:         meta.UpdatedAt,
 			CurrentInstructor: meta.CurrentInstructor,
 			InstructorHistory: meta.InstructorHistory,
-			WhiteboardContent: meta.WhiteboardContent,
 		}
 		threads = append(threads, thread)
 	}
@@ -300,16 +297,8 @@ func (p *InMemoryLLMContextProjection) applyEventUnsafe(agentThread sdk.AgentThr
 	case *agents.DomainEvent:
 		switch evt.Type {
 		case agents.EventTypeWhiteboardUpdated:
-			action := evt.GetString("action")
-			content := evt.GetString("content")
-			switch action {
-			case "write":
-				meta.WhiteboardContent = content
-			case "append":
-				meta.WhiteboardContent += "\n" + content
-			case "clear":
-				meta.WhiteboardContent = ""
-			}
+			// Whiteboard content is now handled by dedicated WhiteboardStore projection
+			// This event is processed there, not in the LLMContext projection
 			meta.UpdatedAt = evt.Timestamp
 		case agents.EventTypeAgentHandoff:
 			msgID := fmt.Sprintf("handoff-%s-%d", evt.ThreadID, evt.Timestamp.UnixNano())

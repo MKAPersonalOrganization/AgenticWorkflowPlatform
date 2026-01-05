@@ -5,6 +5,12 @@ import (
 	"encoding/json"
 )
 
+// WhiteboardReader is an interface for reading whiteboard content.
+// This allows decoupling from the concrete WhiteboardStore implementation.
+type WhiteboardReader interface {
+	Get(threadID string) string
+}
+
 // ReadWhiteboardArgs represents the arguments for reading from the whiteboard
 type ReadWhiteboardArgs struct {
 	// No arguments needed - just read current content
@@ -12,7 +18,8 @@ type ReadWhiteboardArgs struct {
 
 // ReadWhiteboardTool implements the Tool interface for reading whiteboard content
 type ReadWhiteboardTool struct {
-	getContentFunc func() string
+	store    WhiteboardReader
+	threadID string
 }
 
 // NewReadWhiteboardTool creates a new read whiteboard tool
@@ -20,9 +27,28 @@ func NewReadWhiteboardTool() *ReadWhiteboardTool {
 	return &ReadWhiteboardTool{}
 }
 
-// SetContentGetter sets the function to retrieve whiteboard content
+// SetWhiteboardStore sets the whiteboard store and thread ID for this tool instance.
+// This should be called before the tool is used.
+func (r *ReadWhiteboardTool) SetWhiteboardStore(store WhiteboardReader, threadID string) {
+	r.store = store
+	r.threadID = threadID
+}
+
+// SetContentGetter is deprecated but kept for backward compatibility.
+// Use SetWhiteboardStore instead.
 func (r *ReadWhiteboardTool) SetContentGetter(fn func() string) {
-	r.getContentFunc = fn
+	// Wrap the function in an adapter
+	r.store = &funcWhiteboardReader{fn: fn}
+	r.threadID = "" // Not needed for function-based reader
+}
+
+// funcWhiteboardReader adapts a function to the WhiteboardReader interface
+type funcWhiteboardReader struct {
+	fn func() string
+}
+
+func (f *funcWhiteboardReader) Get(threadID string) string {
+	return f.fn()
 }
 
 func (r *ReadWhiteboardTool) Name() string {
@@ -42,11 +68,11 @@ func (r *ReadWhiteboardTool) Parameters() map[string]any {
 }
 
 func (r *ReadWhiteboardTool) Invoke(ctx context.Context, arguments string) (string, error) {
-	if r.getContentFunc == nil {
-		return "", nil // Return empty if no getter is set
+	if r.store == nil {
+		return "", nil // Return empty if no store is set
 	}
 
-	content := r.getContentFunc()
+	content := r.store.Get(r.threadID)
 
 	result := map[string]any{
 		"success": true,

@@ -8,13 +8,15 @@ import (
 
 // AguiProjectionHandler provides HTTP endpoints for querying the AGUI projection.
 type AguiProjectionHandler struct {
-	projection AguiProjection
+	projection      AguiProjection
+	whiteboardStore interface{ Get(threadID string) string }
 }
 
 // NewAguiProjectionHandler creates a new handler for AGUI projection queries.
-func NewAguiProjectionHandler(projection AguiProjection) *AguiProjectionHandler {
+func NewAguiProjectionHandler(projection AguiProjection, whiteboardStore interface{ Get(threadID string) string }) *AguiProjectionHandler {
 	return &AguiProjectionHandler{
-		projection: projection,
+		projection:      projection,
+		whiteboardStore: whiteboardStore,
 	}
 }
 
@@ -33,8 +35,23 @@ func (h *AguiProjectionHandler) GetThreadState(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// Add whiteboard content from dedicated projection
+	whiteboardContent := h.whiteboardStore.Get(threadID)
+
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(state); err != nil {
+	response := map[string]interface{}{
+		"threadId":          state.ThreadID,
+		"title":             state.Title,
+		"messages":          state.Messages,
+		"activeRun":         state.ActiveRun,
+		"toolCalls":         state.ToolCalls,
+		"agentActivity":     state.AgentActivity,
+		"whiteboardContent": whiteboardContent,
+		"createdAt":         state.CreatedAt,
+		"updatedAt":         state.UpdatedAt,
+		"version":           state.Version,
+	}
+	if err := json.NewEncoder(w).Encode(response); err != nil {
 		slog.Error("Failed to encode thread state", "error", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 	}

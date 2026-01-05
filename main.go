@@ -14,6 +14,8 @@ import (
 	"school-with-ai/infra/eventstore"
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/infra/projection/llmcontext"
+	"school-with-ai/infra/projection/whiteboard"
+	"school-with-ai/sdk/agent-sdk/llm"
 	"school-with-ai/services/agents/advancedmath/linearalgebra"
 	"school-with-ai/services/agents/chemistry"
 	"school-with-ai/services/agents/diagramming"
@@ -22,7 +24,6 @@ import (
 	"school-with-ai/services/agents/shared/tools/eventbus"
 	"school-with-ai/services/agents/statistics"
 	"school-with-ai/services/agents/studentfacing"
-	"school-with-ai/sdk/agent-sdk/llm"
 
 	"github.com/openai/openai-go/v3"
 )
@@ -47,8 +48,11 @@ func main() {
 	// Initialize AGUI projection (reads from event store)
 	aguiProjection := agui.NewInMemoryAguiProjection()
 
+	// Initialize Whiteboard projection (reads from event store)
+	whiteboardProjection := whiteboard.NewInMemoryWhiteboardProjection()
+
 	// Wrap event store to automatically update projections
-	eventLog := eventstore.NewProjectionEventStore(baseEventStore, llmContextProjection, aguiProjection)
+	eventLog := eventstore.NewProjectionEventStore(baseEventStore, llmContextProjection, aguiProjection, whiteboardProjection)
 
 	// Initialize OpenAI chat client with model
 	model := string(openai.ChatModelGPT4oMini) // Use GPT-4o-mini for cost efficiency
@@ -67,7 +71,7 @@ func main() {
 	eventbus.GlobalContracts.Register(diagramming.Contract)
 
 	// Initialize and start worker pool
-	workerPool := chatapi.NewWorkerPool(queue, eventLog, llmContextProjection, aguiProjection, chatClient, chatapi.WorkerPoolConfig{
+	workerPool := chatapi.NewWorkerPool(queue, eventLog, llmContextProjection, aguiProjection, whiteboardProjection, chatClient, chatapi.WorkerPoolConfig{
 		NumWorkers:   5,
 		PollInterval: 100 * time.Millisecond,
 	})
@@ -86,7 +90,7 @@ func main() {
 	handler := chatapi.NewHandler(eventLog, llmContextProjection, chatClient, queue, workerPool)
 
 	// Create AGUI projection handler
-	aguiHandler := agui.NewAguiProjectionHandler(aguiProjection)
+	aguiHandler := agui.NewAguiProjectionHandler(aguiProjection, whiteboardProjection)
 
 	// Initialize Kratos client and auth handlers
 	kratosClient := auth.NewKratosClient()
