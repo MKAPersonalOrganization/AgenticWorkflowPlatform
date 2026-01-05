@@ -1,4 +1,4 @@
-package infra
+package chatapi
 
 import (
 	"errors"
@@ -8,10 +8,7 @@ import (
 	"school-with-ai/domain"
 )
 
-var (
-	ErrQueueEmpty  = errors.New("queue is empty")
-	ErrJobNotFound = errors.New("job not found")
-)
+var ErrQueueEmpty = errors.New("queue is empty")
 
 // InMemoryJobQueue implements domain.JobQueue using in-memory storage
 type InMemoryJobQueue struct {

@@ -1,4 +1,4 @@
-package infra_test
+package chatapi_test
 
 import (
 	"testing"

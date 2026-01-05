@@ -7,12 +7,12 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	"school-with-ai/infra"
+	"school-with-ai/infra/chatapi"
 )
 
 // TestThreadIsolation verifies that only one job can process per thread at a time
 func TestThreadIsolation(t *testing.T) {
-	queue := infra.NewInMemoryJobQueue()
+	queue := chatapi.NewInMemoryJobQueue()
 
 	// Enqueue multiple jobs for the same thread
 	threadID := "thread-isolation-test"
@@ -70,7 +70,7 @@ func TestThreadIsolation(t *testing.T) {
 
 // TestConcurrentJobEnqueue tests concurrent job enqueuing from multiple goroutines
 func TestConcurrentJobEnqueue(t *testing.T) {
-	queue := infra.NewInMemoryJobQueue()
+	queue := chatapi.NewInMemoryJobQueue()
 
 	const numGoroutines = 10
 	const jobsPerGoroutine = 10
@@ -125,7 +125,7 @@ func TestConcurrentJobEnqueue(t *testing.T) {
 
 // TestJobCancellation tests job cancellation functionality
 func TestJobCancellation(t *testing.T) {
-	queue := infra.NewInMemoryJobQueue()
+	queue := chatapi.NewInMemoryJobQueue()
 
 	// Create and enqueue a job
 	job := &domain.Job{
@@ -170,7 +170,7 @@ func TestJobCancellation(t *testing.T) {
 
 // TestGetActiveJobsByThread tests retrieving active jobs for a thread
 func TestGetActiveJobsByThread(t *testing.T) {
-	queue := infra.NewInMemoryJobQueue()
+	queue := chatapi.NewInMemoryJobQueue()
 
 	thread1 := "thread-1"
 	thread2 := "thread-2"
@@ -236,7 +236,7 @@ func TestGetActiveJobsByThread(t *testing.T) {
 
 // TestEventBuffer tests the event buffer functionality
 func TestEventBuffer(t *testing.T) {
-	buffer := infra.NewEventBuffer(100)
+	buffer := chatapi.NewEventBuffer(100)
 
 	// Append events
 	for i := 0; i < 10; i++ {
@@ -280,7 +280,7 @@ func TestEventBuffer(t *testing.T) {
 
 // TestEventBufferConcurrency tests concurrent access to event buffer
 func TestEventBufferConcurrency(t *testing.T) {
-	buffer := infra.NewEventBuffer(1000)
+	buffer := chatapi.NewEventBuffer(1000)
 
 	var wg sync.WaitGroup
 	const numWriters = 5

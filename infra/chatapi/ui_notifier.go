@@ -1,4 +1,4 @@
-package infra
+package chatapi
 
 import (
 	"school-with-ai/services/agents"

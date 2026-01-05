@@ -1,7 +1,8 @@
-package infra
+package chatapi
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -13,6 +14,24 @@ import (
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
+
+// ErrJobNotFound is returned when a job is not found
+var ErrJobNotFound = errors.New("job not found")
+
+// writeSSEEvent writes an event to the response writer in SSE format
+func writeSSEEvent(w http.ResponseWriter, event interface{}) error {
+	data, err := json.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("failed to marshal event: %w", err)
+	}
+
+	_, err = fmt.Fprintf(w, "data: %s\n\n", data)
+	if err != nil {
+		return fmt.Errorf("failed to write event: %w", err)
+	}
+
+	return nil
+}
 
 // Handler encapsulates dependencies for HTTP handlers
 type Handler struct {
@@ -354,7 +373,7 @@ func (h *Handler) emitMessagesSnapshot(w http.ResponseWriter, flusher http.Flush
 	// Convert session.Message to aguievents.Message
 	aguiMessages := make([]aguievents.Message, 0, len(sessionMessages))
 	for _, msg := range sessionMessages {
-		aguiMsg := convertSessionMessageToAGUI(msg)
+		aguiMsg := ConvertSessionMessageToAGUI(msg)
 		aguiMessages = append(aguiMessages, aguiMsg)
 	}
 
@@ -386,45 +405,4 @@ func (h *Handler) emitMessagesSnapshot(w http.ResponseWriter, flusher http.Flush
 	}
 
 	return nil
-}
-
-// convertSessionMessageToAGUI converts a session.Message to aguievents.Message
-func convertSessionMessageToAGUI(msg domain.Message) aguievents.Message {
-	aguiMsg := aguievents.Message{
-		ID:   msg.ID,
-		Role: msg.Role,
-	}
-
-	// Set content (pointer for optional content)
-	if msg.Content != "" {
-		aguiMsg.Content = &msg.Content
-	}
-
-	// Add agent name for assistant messages
-	if msg.Role == "assistant" && msg.AgentName != "" {
-		aguiMsg.Name = &msg.AgentName
-	}
-
-	// Convert tool calls if present
-	if len(msg.ToolCalls) > 0 {
-		toolCalls := make([]aguievents.ToolCall, 0, len(msg.ToolCalls))
-		for _, tc := range msg.ToolCalls {
-			toolCalls = append(toolCalls, aguievents.ToolCall{
-				ID:   tc.ID,
-				Type: tc.Type,
-				Function: aguievents.Function{
-					Name:      tc.Function.Name,
-					Arguments: tc.Function.Arguments,
-				},
-			})
-		}
-		aguiMsg.ToolCalls = toolCalls
-	}
-
-	// Add tool call ID for tool messages
-	if msg.Role == "tool" && msg.ToolCallID != "" {
-		aguiMsg.ToolCallID = &msg.ToolCallID
-	}
-
-	return aguiMsg
 }
