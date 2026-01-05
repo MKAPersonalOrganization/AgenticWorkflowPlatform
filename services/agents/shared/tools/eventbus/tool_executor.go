@@ -3,11 +3,12 @@ package eventbus
 import (
 	"school-with-ai/domain"
 	sdk "school-with-ai/sdk/agent-sdk/core"
+	"school-with-ai/services"
 	"school-with-ai/services/agents/shared/tools"
 )
 
 // CreateToolCallHandler creates a tool call handler that emits events for collaboration tools
-func CreateToolCallHandler(registry *ContractRegistry, state sdk.ThreadStore, whiteboardStore interface{ Get(threadID string) string }) sdk.ToolCallHandler {
+func CreateToolCallHandler(registry *ContractRegistry, state sdk.ThreadStore, whiteboardStore interface{ Get(threadID string) string }) services.ToolCallHandler {
 	return func(threadID string, agentName string, toolCall domain.ToolCall, result string, eventEmitter func(sdk.Event) error) error {
 		toolName := toolCall.Function.Name
 
@@ -62,7 +63,7 @@ func CreateToolCallHandler(registry *ContractRegistry, state sdk.ThreadStore, wh
 }
 
 // CreateShouldContinueIterationFn creates a function that determines if iteration should continue
-func CreateShouldContinueIterationFn(registry *ContractRegistry) sdk.ShouldContinueIterationFn {
+func CreateShouldContinueIterationFn(registry *ContractRegistry) services.ShouldContinueIterationFn {
 	return func(toolCalls []domain.ToolCall) bool {
 		// Stop iteration if any tool triggers another agent (emission tools)
 		for _, toolCall := range toolCalls {

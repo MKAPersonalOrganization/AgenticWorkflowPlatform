@@ -374,13 +374,13 @@ func (wp *WorkerPool) continueWithAgent(ctx context.Context, threadID, agentName
 	agentConfig := contract.Factory(notifier)
 
 	// Create agent instance
-	agentInstance := sdk.NewAgentService(
+	agentInstance := services.NewAgentService(
 		wp.chatClient,
 		wp.log,
 		wp.state,
-		sdk.WithConfig(agentConfig),
-		sdk.WithToolCallHandler(eventbus.CreateToolCallHandler(eventbus.GlobalContracts, wp.state, wp.whiteboardProjection)),
-		sdk.WithShouldContinueIteration(eventbus.CreateShouldContinueIterationFn(eventbus.GlobalContracts)),
+		services.WithConfig(agentConfig),
+		services.WithToolCallHandler(eventbus.CreateToolCallHandler(eventbus.GlobalContracts, wp.state, wp.whiteboardProjection)),
+		services.WithShouldContinueIteration(eventbus.CreateShouldContinueIterationFn(eventbus.GlobalContracts)),
 	)
 
 	// Verify the agent has a handler for this event
