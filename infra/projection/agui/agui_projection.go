@@ -3,7 +3,7 @@ package agui
 import (
 	"time"
 
-	"school-with-ai/sdk"
+	"school-with-ai/sdk/agent-sdk"
 )
 
 // AguiProjection is a read model optimized for the AG-UI protocol.

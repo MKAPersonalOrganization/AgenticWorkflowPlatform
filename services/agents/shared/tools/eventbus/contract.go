@@ -2,7 +2,7 @@ package eventbus
 
 import (
 	"school-with-ai/services/agents"
-	"school-with-ai/sdk"
+	"school-with-ai/sdk/agent-sdk"
 )
 
 // AgentContract defines the event-driven contract for an agent.

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"school-with-ai/sdk"
+	"school-with-ai/sdk/agent-sdk"
 )
 
 func TestInMemoryEventStore_Append(t *testing.T) {

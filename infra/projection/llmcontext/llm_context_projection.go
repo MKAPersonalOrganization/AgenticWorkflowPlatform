@@ -8,7 +8,7 @@ import (
 
 	"school-with-ai/domain"
 	"school-with-ai/services/agents"
-	"school-with-ai/sdk"
+	"school-with-ai/sdk/agent-sdk"
 )
 
 // InMemoryLLMContextProjection is an in-memory projection of thread state for LLM context.
