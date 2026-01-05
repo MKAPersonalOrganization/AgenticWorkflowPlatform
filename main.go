@@ -16,6 +16,7 @@ import (
 	"school-with-ai/infra/projection/llmcontext"
 	"school-with-ai/infra/projection/whiteboard"
 	"school-with-ai/sdk/agent-sdk/llm"
+	"school-with-ai/services/chatwrite"
 	"school-with-ai/services/chatwrite/agents/advancedmath/linearalgebra"
 	"school-with-ai/services/chatwrite/agents/chemistry"
 	"school-with-ai/services/chatwrite/agents/diagramming"
@@ -24,7 +25,6 @@ import (
 	"school-with-ai/services/chatwrite/agents/shared/tools/eventbus"
 	"school-with-ai/services/chatwrite/agents/statistics"
 	"school-with-ai/services/chatwrite/agents/studentfacing"
-	"school-with-ai/services/chatwrite"
 
 	"github.com/openai/openai-go/v3"
 )
@@ -91,7 +91,7 @@ func main() {
 	mux.Handle("/assets/charts/", http.StripPrefix("/assets/charts/", http.FileServer(http.Dir("./assets/charts"))))
 
 	// Create handler with EventStore and LLMContextProjection
-	handler := chatapi.NewHandler(eventLog, llmContextProjection, chatClient, queue, workerPool, chatWriteService)
+	handler := chatapi.NewHandler(eventLog, llmContextProjection, chatClient, queue, workerPool, chatWriteService, whiteboardProjection)
 
 	// Create AGUI projection handler
 	aguiHandler := agui.NewAguiProjectionHandler(aguiProjection, whiteboardProjection)

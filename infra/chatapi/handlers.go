@@ -10,6 +10,7 @@ import (
 
 	"school-with-ai/domain"
 	"school-with-ai/infra/auth"
+	"school-with-ai/infra/projection/whiteboard"
 	sdk "school-with-ai/sdk/agent-sdk/core"
 	"school-with-ai/services/chatwrite"
 
@@ -18,6 +19,12 @@ import (
 
 // ErrJobNotFound is returned when a job is not found
 var ErrJobNotFound = errors.New("job not found")
+
+// ThreadResponse represents a thread with additional UI-specific fields
+type ThreadResponse struct {
+	domain.Thread
+	WhiteboardContent string `json:"whiteboardContent,omitempty"`
+}
 
 // writeSSEEvent writes an event to the response writer in SSE format
 func writeSSEEvent(w http.ResponseWriter, event interface{}) error {
@@ -36,23 +43,25 @@ func writeSSEEvent(w http.ResponseWriter, event interface{}) error {
 
 // Handler encapsulates dependencies for HTTP handlers
 type Handler struct {
-	state            sdk.ThreadStore
-	log              sdk.EventStore
-	chatClient       sdk.ChatClient
-	queue            domain.JobQueue
-	workerPool       *WorkerPool
-	chatWriteService *chatwrite.ChatWriteService
+	state                sdk.ThreadStore
+	log                  sdk.EventStore
+	chatClient           sdk.ChatClient
+	queue                domain.JobQueue
+	workerPool           *WorkerPool
+	chatWriteService     *chatwrite.ChatWriteService
+	whiteboardProjection whiteboard.WhiteboardStore
 }
 
 // NewHandler creates a new HTTP handler with the given dependencies
-func NewHandler(log sdk.EventStore, state sdk.ThreadStore, chatClient sdk.ChatClient, queue domain.JobQueue, workerPool *WorkerPool, chatWriteService *chatwrite.ChatWriteService) *Handler {
+func NewHandler(log sdk.EventStore, state sdk.ThreadStore, chatClient sdk.ChatClient, queue domain.JobQueue, workerPool *WorkerPool, chatWriteService *chatwrite.ChatWriteService, whiteboardProjection whiteboard.WhiteboardStore) *Handler {
 	return &Handler{
-		state:            state,
-		log:              log,
-		chatClient:       chatClient,
-		queue:            queue,
-		workerPool:       workerPool,
-		chatWriteService: chatWriteService,
+		state:                state,
+		log:                  log,
+		chatClient:           chatClient,
+		queue:                queue,
+		workerPool:           workerPool,
+		chatWriteService:     chatWriteService,
+		whiteboardProjection: whiteboardProjection,
 	}
 }
 
@@ -319,8 +328,17 @@ func (h *Handler) GetThreads(w http.ResponseWriter, r *http.Request) {
 	// For now, return all threads (will be fixed in a future update)
 	threads := h.state.All()
 
+	// Enrich threads with whiteboard content
+	response := make([]ThreadResponse, len(threads))
+	for i, thread := range threads {
+		response[i] = ThreadResponse{
+			Thread:            thread,
+			WhiteboardContent: h.whiteboardProjection.Get(thread.ID),
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(threads); err != nil {
+	if err := json.NewEncoder(w).Encode(response); err != nil {
 		http.Error(w, "Failed to encode threads", http.StatusInternalServerError)
 		return
 	}
