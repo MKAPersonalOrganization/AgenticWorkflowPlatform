@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"school-with-ai/domain"
+	"school-with-ai/infra"
 	"school-with-ai/services/agents"
 	"school-with-ai/services/agents/advancedmath/linearalgebra/tools"
 	"school-with-ai/services/agents/shared/tools/eventbus"
@@ -59,13 +60,16 @@ func handleLinearAlgebraQuestion(ctx context.Context, handlerCtx *agents.EventHa
 		"emittedBy", emittedBy,
 	)
 
-	// Get current thread state to build message history
-	thread, exists := handlerCtx.State.Get(handlerCtx.ThreadID)
+	// Get the AgentThread from state
+	state, ok := handlerCtx.State.(*infra.InMemoryThreadState)
+	if !ok {
+		return fmt.Errorf("state is not InMemoryThreadState")
+	}
+
+	agentThread, exists := state.GetAgentThread(handlerCtx.ThreadID)
 	if !exists {
 		return fmt.Errorf("thread not found: %s", handlerCtx.ThreadID)
 	}
-
-	messages := thread.Messages
 
 	// Add a trigger message with the whiteboard content
 	triggerMsg := domain.Message{
@@ -83,14 +87,14 @@ Follow your workflow:
 3. Write your contribution to the whiteboard using write_whiteboard with action="append"
 4. Signal completion: emit_question_answered(subject="linearalgebra", is_complete=true)`, whiteboardState),
 	}
-	messages = append(messages, triggerMsg)
+	agentThread.AddMessages([]domain.Message{triggerMsg})
 
 	// Generate message ID for agent's response
 	messageID := aguievents.GenerateMessageID()
 
 	// Run the agent to process this event
 	// The agent will use its tools and system prompt to generate the response
-	err := handlerCtx.Agent.Run(ctx, handlerCtx.ThreadID, messageID, messages, func(event sdk.Event) error {
+	err := handlerCtx.Agent.RunWithThread(ctx, handlerCtx.ThreadID, messageID, agentThread, func(event sdk.Event) error {
 		// Events emitted by the agent are handled by the worker pool's routing
 		return nil
 	}, sdk.DefaultRunOptions())

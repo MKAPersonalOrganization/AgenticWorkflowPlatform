@@ -21,6 +21,9 @@ func CreateMathInstructor(notifier sdk.EventNotifier) sdk.AgentConfig {
 		registry.Register(tool)
 	}
 
+	// Custom emit_question_answered tool (not auto-generated)
+	registry.Register(sharedtools.NewEmitQuestionAnsweredTool())
+
 	// Shared collaboration tools
 	registry.Register(sharedtools.NewReadWhiteboardTool())
 	registry.Register(sharedtools.NewWriteWhiteboardTool())

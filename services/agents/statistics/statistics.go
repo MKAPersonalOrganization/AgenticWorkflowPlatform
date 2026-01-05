@@ -20,7 +20,8 @@ func CreateStatisticsInstructor(notifier sdk.EventNotifier) sdk.AgentConfig {
 	for _, tool := range eventbus.GenerateEmissionTools(emits()) {
 		registry.Register(tool)
 	}
-
+	// Custom emit_question_answered tool (not auto-generated)
+	registry.Register(sharedtools.NewEmitQuestionAnsweredTool())
 	// Shared collaboration tools
 	registry.Register(sharedtools.NewReadWhiteboardTool())
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
@@ -66,7 +67,7 @@ func CreateStatisticsInstructor(notifier sdk.EventNotifier) sdk.AgentConfig {
 **Std Dev:** $s = \\sqrt{\\frac{1}{n-1}\\sum_{i=1}^{n}(x_i - \\bar{x})^2}$
 **Correlation:** $r = \\frac{\\sum(x_i - \\bar{x})(y_i - \\bar{y})}{\\sqrt{\\sum(x_i - \\bar{x})^2\\sum(y_i - \\bar{y})^2}}$
 **Regression:** $y = mx + b$ with $R^2$`,
-		Tools:            registry.All(),
-		Notifier:         notifier,
+		Tools:    registry.All(),
+		Notifier: notifier,
 	}
 }

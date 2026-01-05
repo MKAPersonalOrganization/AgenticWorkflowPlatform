@@ -3,6 +3,7 @@ package infra
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"school-with-ai/domain"
 	"school-with-ai/services/agents"
@@ -12,13 +13,25 @@ import (
 // InMemoryThreadState is an in-memory implementation of ThreadState
 type InMemoryThreadState struct {
 	mu      sync.RWMutex
-	threads map[string]*domain.Thread
+	threads map[string]sdk.AgentThread
+	// Metadata per thread (title, timestamps, etc.)
+	metadata map[string]*threadMetadata
+}
+
+type threadMetadata struct {
+	Title             string
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	CurrentInstructor string
+	InstructorHistory []domain.InstructorSession
+	WhiteboardContent string
 }
 
 // NewInMemoryThreadState creates a new in-memory thread state
 func NewInMemoryThreadState() *InMemoryThreadState {
 	return &InMemoryThreadState{
-		threads: make(map[string]*domain.Thread),
+		threads:  make(map[string]sdk.AgentThread),
+		metadata: make(map[string]*threadMetadata),
 	}
 }
 
@@ -27,8 +40,38 @@ func (p *InMemoryThreadState) Get(threadID string) (*domain.Thread, bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	thread, exists := p.threads[threadID]
-	return thread, exists
+	agentThread, exists := p.threads[threadID]
+	if !exists {
+		return nil, false
+	}
+
+	meta := p.metadata[threadID]
+	if meta == nil {
+		meta = &threadMetadata{}
+	}
+
+	// Convert AgentThread to domain.Thread for the projection
+	thread := &domain.Thread{
+		ID:                agentThread.GetID(),
+		Title:             meta.Title,
+		Messages:          agentThread.GetMessages(),
+		CreatedAt:         meta.CreatedAt,
+		UpdatedAt:         meta.UpdatedAt,
+		CurrentInstructor: meta.CurrentInstructor,
+		InstructorHistory: meta.InstructorHistory,
+		WhiteboardContent: meta.WhiteboardContent,
+	}
+
+	return thread, true
+}
+
+// GetAgentThread retrieves the underlying AgentThread by ID
+func (p *InMemoryThreadState) GetAgentThread(threadID string) (sdk.AgentThread, bool) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	agentThread, exists := p.threads[threadID]
+	return agentThread, exists
 }
 
 // Messages retrieves all messages from a thread
@@ -36,8 +79,8 @@ func (p *InMemoryThreadState) Messages(threadID string) []domain.Message {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	if thread, exists := p.threads[threadID]; exists {
-		return thread.Messages
+	if agentThread, exists := p.threads[threadID]; exists {
+		return agentThread.GetMessages()
 	}
 	return []domain.Message{}
 }
@@ -48,8 +91,23 @@ func (p *InMemoryThreadState) All() []domain.Thread {
 	defer p.mu.RUnlock()
 
 	threads := make([]domain.Thread, 0, len(p.threads))
-	for _, thread := range p.threads {
-		threads = append(threads, *thread)
+	for threadID, agentThread := range p.threads {
+		meta := p.metadata[threadID]
+		if meta == nil {
+			meta = &threadMetadata{}
+		}
+
+		thread := domain.Thread{
+			ID:                agentThread.GetID(),
+			Title:             meta.Title,
+			Messages:          agentThread.GetMessages(),
+			CreatedAt:         meta.CreatedAt,
+			UpdatedAt:         meta.UpdatedAt,
+			CurrentInstructor: meta.CurrentInstructor,
+			InstructorHistory: meta.InstructorHistory,
+			WhiteboardContent: meta.WhiteboardContent,
+		}
+		threads = append(threads, thread)
 	}
 
 	// Simple bubble sort by UpdatedAt descending
@@ -71,26 +129,25 @@ func (p *InMemoryThreadState) Update(event sdk.Event) error {
 
 	threadID := event.AggregateID()
 
-	// Get or create thread
-	thread, exists := p.threads[threadID]
+	// Get or create thread and metadata
+	agentThread, exists := p.threads[threadID]
 	if !exists {
-		thread = &domain.Thread{
-			ID:       threadID,
-			Messages: []domain.Message{},
-		}
-		p.threads[threadID] = thread
+		agentThread = sdk.NewInMemoryThreadWithID(threadID)
+		p.threads[threadID] = agentThread
+		p.metadata[threadID] = &threadMetadata{}
 	}
 
-	return p.applyEventUnsafe(thread, event)
+	meta := p.metadata[threadID]
+	return p.applyEventUnsafe(agentThread, meta, event)
 }
 
 // applyEventUnsafe applies an event to a thread (caller must hold lock)
-func (p *InMemoryThreadState) applyEventUnsafe(thread *domain.Thread, event sdk.Event) error {
+func (p *InMemoryThreadState) applyEventUnsafe(agentThread sdk.AgentThread, meta *threadMetadata, event sdk.Event) error {
 	switch evt := event.(type) {
 	case *sdk.ThreadCreatedEvent:
-		thread.Title = evt.Title
-		thread.CreatedAt = evt.Timestamp
-		thread.UpdatedAt = evt.Timestamp
+		meta.Title = evt.Title
+		meta.CreatedAt = evt.Timestamp
+		meta.UpdatedAt = evt.Timestamp
 
 	case *sdk.UserMessageAddedEvent:
 		msg := domain.Message{
@@ -99,12 +156,12 @@ func (p *InMemoryThreadState) applyEventUnsafe(thread *domain.Thread, event sdk.
 			Content:   evt.Content,
 			Timestamp: evt.Timestamp,
 		}
-		thread.Messages = append(thread.Messages, msg)
-		thread.UpdatedAt = evt.Timestamp
+		agentThread.AddMessages([]domain.Message{msg})
+		meta.UpdatedAt = evt.Timestamp
 
 	case *sdk.AssistantMessageStartedEvent:
 		// Marker event for traceability - no state change
-		thread.UpdatedAt = evt.Timestamp
+		meta.UpdatedAt = evt.Timestamp
 
 	case *sdk.AssistantContentStreamedEvent:
 		// Ephemeral streaming event - ignore in projection
@@ -128,8 +185,8 @@ func (p *InMemoryThreadState) applyEventUnsafe(thread *domain.Thread, event sdk.
 			Timestamp: evt.Timestamp,
 			AgentName: evt.AgentName,
 		}
-		thread.Messages = append(thread.Messages, msg)
-		thread.UpdatedAt = evt.Timestamp
+		agentThread.AddMessages([]domain.Message{msg})
+		meta.UpdatedAt = evt.Timestamp
 
 	case *sdk.ToolCallExecutedEvent:
 		msg := domain.Message{
@@ -140,15 +197,16 @@ func (p *InMemoryThreadState) applyEventUnsafe(thread *domain.Thread, event sdk.
 			Timestamp:  evt.Timestamp,
 			AgentName:  evt.AgentName,
 		}
-		thread.Messages = append(thread.Messages, msg)
-		thread.UpdatedAt = evt.Timestamp
+		agentThread.AddMessages([]domain.Message{msg})
+		meta.UpdatedAt = evt.Timestamp
 
 	case *sdk.ThreadTitleUpdatedEvent:
-		thread.Title = evt.NewTitle
-		thread.UpdatedAt = evt.Timestamp
+		meta.Title = evt.NewTitle
+		meta.UpdatedAt = evt.Timestamp
 
 	case *sdk.ThreadDeletedEvent:
-		delete(p.threads, thread.ID)
+		delete(p.threads, agentThread.GetID())
+		delete(p.metadata, agentThread.GetID())
 
 	// Agent collaboration events
 	case *agents.DomainEvent:
@@ -158,21 +216,22 @@ func (p *InMemoryThreadState) applyEventUnsafe(thread *domain.Thread, event sdk.
 			content := evt.GetString("content")
 			switch action {
 			case "write":
-				thread.WhiteboardContent = content
+				meta.WhiteboardContent = content
 			case "append":
-				thread.WhiteboardContent += "\n" + content
+				meta.WhiteboardContent += "\n" + content
 			case "clear":
-				thread.WhiteboardContent = ""
+				meta.WhiteboardContent = ""
 			}
-			thread.UpdatedAt = evt.Timestamp
+			meta.UpdatedAt = evt.Timestamp
 		case agents.EventTypeAgentHandoff:
 			// Store agent handoff as a system message
 			// Content format: "AGENT_HANDOFF|from|to|reason" for parsing on frontend
 			msgID := fmt.Sprintf("handoff-%s-%d", evt.ThreadID, evt.Timestamp.UnixNano())
 
 			// Check if this handoff message already exists (deduplication)
+			messages := agentThread.GetMessages()
 			exists := false
-			for _, msg := range thread.Messages {
+			for _, msg := range messages {
 				if msg.ID == msgID {
 					exists = true
 					break
@@ -192,13 +251,13 @@ func (p *InMemoryThreadState) applyEventUnsafe(thread *domain.Thread, event sdk.
 						"reason":     evt.GetString("reason"),
 					},
 				}
-				thread.Messages = append(thread.Messages, msg)
+				agentThread.AddMessages([]domain.Message{msg})
 			}
-			thread.UpdatedAt = evt.Timestamp
+			meta.UpdatedAt = evt.Timestamp
 		}
 
 	case *sdk.CustomEventEmittedEvent:
-		thread.UpdatedAt = evt.Timestamp
+		meta.UpdatedAt = evt.Timestamp
 	}
 
 	return nil

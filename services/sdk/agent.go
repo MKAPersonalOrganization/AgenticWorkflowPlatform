@@ -83,30 +83,56 @@ func NewAgent(chatClient ChatClient, log EventLog, state ThreadState, opts ...Op
 	return h
 }
 
+// GetNewThread creates a new conversation thread that is compatible with this agent.
+// This method creates a fresh conversation thread that can be used to maintain state
+// and context for interactions with this agent. Each thread represents an independent
+// conversation session.
+func (h *Agent) GetNewThread() AgentThread {
+	return NewInMemoryThread()
+}
+
+// DeserializeThread deserializes an agent thread from its JSON serialized representation.
+// This method enables restoration of conversation threads from previously saved state,
+// allowing conversations to resume across application restarts or be migrated between
+// different agent instances.
+func (h *Agent) DeserializeThread(data []byte) (AgentThread, error) {
+	thread, err := NewInMemoryThreadFromState(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deserialize thread: %w", err)
+	}
+	return thread, nil
+}
+
 // DomainEventHandler is called for each domain event emitted by the agent
 // This allows external systems to react to events (e.g., UI projections, logging, etc.)
 type DomainEventHandler func(event Event) error
 
-// Run processes the LLM streaming response and emits domain events
-// eventHandler is called for each domain event (for UI projections, etc.)
-// runOpts specifies per-run configuration that overrides agent defaults
-func (h *Agent) Run(
+// RunWithThread processes the LLM streaming response using an AgentThread for message management.
+// This is the modern API that provides better separation of concerns and supports advanced features
+// like message reduction, custom storage, and serialization.
+//
+// The thread parameter can be obtained from GetNewThread() or DeserializeThread().
+func (h *Agent) RunWithThread(
 	ctx context.Context,
 	threadID string,
 	messageID string,
-	messages []domain.Message,
+	thread AgentThread,
 	eventHandler DomainEventHandler,
 	runOpts RunOptions,
 ) error {
-	return h.runIteration(ctx, threadID, messageID, messages, eventHandler, runOpts)
+	// Get messages from thread
+	messages := thread.GetMessages()
+	return h.runIteration(ctx, threadID, messageID, messages, thread, eventHandler, runOpts)
 }
 
 // runIteration processes a single LLM iteration and recursively continues if tools are called
+// thread parameter is optional - if provided, it will be used for message management
 func (h *Agent) runIteration(
 	ctx context.Context,
 	threadID string,
 	messageID string,
 	messages []domain.Message,
+	thread AgentThread,
 	eventHandler DomainEventHandler,
 	runOpts RunOptions,
 ) error {
@@ -312,7 +338,7 @@ func (h *Agent) runIteration(
 
 		// Recursively call to process the LLM response with tool results
 		// Pass the same runOpts to maintain consistency across iterations
-		return h.runIteration(ctx, threadID, continuationMessageID, updatedMessages, eventHandler, runOpts)
+		return h.runIteration(ctx, threadID, continuationMessageID, updatedMessages, thread, eventHandler, runOpts)
 	}
 
 	// No tool calls, just emit the completed message event
