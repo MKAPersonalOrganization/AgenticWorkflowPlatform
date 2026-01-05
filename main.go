@@ -11,6 +11,9 @@ import (
 	"school-with-ai/components"
 	"school-with-ai/infra"
 	"school-with-ai/infra/auth"
+	"school-with-ai/infra/eventstore"
+	"school-with-ai/infra/projection/agui"
+	"school-with-ai/infra/projection/llmcontext"
 	"school-with-ai/services/agents/advancedmath/linearalgebra"
 	"school-with-ai/services/agents/chemistry"
 	"school-with-ai/services/agents/diagramming"
@@ -38,14 +41,14 @@ func main() {
 	slog.Info("Starting server", "host", host, "port", port)
 
 	// Initialize EventStore and LLMContextProjection (event sourcing architecture)
-	baseEventStore := infra.NewInMemoryEventStore()
-	llmContextProjection := infra.NewInMemoryLLMContextProjection()
+	baseEventStore := eventstore.NewInMemoryEventStore()
+	llmContextProjection := llmcontext.NewInMemoryLLMContextProjection()
 
 	// Initialize AGUI projection (reads from event store)
-	aguiProjection := infra.NewInMemoryAguiProjection()
+	aguiProjection := agui.NewInMemoryAguiProjection()
 
 	// Wrap event store to automatically update projections
-	eventLog := infra.NewProjectionEventStore(baseEventStore, llmContextProjection, aguiProjection)
+	eventLog := eventstore.NewProjectionEventStore(baseEventStore, llmContextProjection, aguiProjection)
 
 	// Initialize OpenAI chat client with model
 	model := string(openai.ChatModelGPT4oMini) // Use GPT-4o-mini for cost efficiency
@@ -83,7 +86,7 @@ func main() {
 	handler := infra.NewHandler(eventLog, llmContextProjection, chatClient, queue, workerPool)
 
 	// Create AGUI projection handler
-	aguiHandler := infra.NewAguiProjectionHandler(aguiProjection)
+	aguiHandler := agui.NewAguiProjectionHandler(aguiProjection)
 
 	// Initialize Kratos client and auth handlers
 	kratosClient := auth.NewKratosClient()

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"school-with-ai/domain"
+	"school-with-ai/infra/projection/agui"
 	"school-with-ai/services/agents"
 	"school-with-ai/services/agents/shared/tools/eventbus"
 	"school-with-ai/services/sdk"
@@ -20,7 +21,7 @@ type WorkerPool struct {
 	queue          domain.JobQueue
 	log            sdk.EventStore
 	state          sdk.ThreadState
-	aguiProjection AguiProjection
+	aguiProjection agui.AguiProjection
 	chatClient     sdk.ChatClient
 	numWorkers     int
 	pollInterval   time.Duration
@@ -46,7 +47,7 @@ type WorkerPoolConfig struct {
 }
 
 // NewWorkerPool creates a new worker pool
-func NewWorkerPool(queue domain.JobQueue, log sdk.EventStore, state sdk.ThreadState, aguiProjection AguiProjection, chatClient sdk.ChatClient, config WorkerPoolConfig) *WorkerPool {
+func NewWorkerPool(queue domain.JobQueue, log sdk.EventStore, state sdk.ThreadState, aguiProjection agui.AguiProjection, chatClient sdk.ChatClient, config WorkerPoolConfig) *WorkerPool {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	if config.NumWorkers <= 0 {
