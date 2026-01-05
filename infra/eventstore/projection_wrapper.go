@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"school-with-ai/sdk/agent-sdk/core"
+	sdk "school-with-ai/sdk/agent-sdk/core"
 )
 
 // ProjectionEventStore wraps an EventStore and automatically updates projections when events are appended.
@@ -62,26 +62,6 @@ func (p *ProjectionEventStore) RegisterProjection(projection sdk.Projection) {
 var _ sdk.EventStore = (*ProjectionEventStore)(nil)
 
 // Implement EventStore interface methods by delegating to wrapped EventStore
-func (p *ProjectionEventStore) ReadAll(ctx context.Context, streamID string) ([]sdk.Event, error) {
-	return p.wrapped.ReadAll(ctx, streamID)
-}
-
 func (p *ProjectionEventStore) ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]sdk.Event, error) {
 	return p.wrapped.ReadStream(ctx, streamID, fromVersion)
-}
-
-func (p *ProjectionEventStore) StreamVersion(ctx context.Context, streamID string) (int64, error) {
-	return p.wrapped.StreamVersion(ctx, streamID)
-}
-
-func (p *ProjectionEventStore) StreamExists(ctx context.Context, streamID string) (bool, error) {
-	return p.wrapped.StreamExists(ctx, streamID)
-}
-
-func (p *ProjectionEventStore) ListStreams(ctx context.Context) ([]string, error) {
-	return p.wrapped.ListStreams(ctx)
-}
-
-func (p *ProjectionEventStore) DeleteStream(ctx context.Context, streamID string) error {
-	return p.wrapped.DeleteStream(ctx, streamID)
 }

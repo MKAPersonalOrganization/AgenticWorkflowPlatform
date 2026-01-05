@@ -129,10 +129,4 @@ type ProjectionManager interface {
 
 	// RebuildAll rebuilds all registered projections from the EventStore.
 	RebuildAll(ctx context.Context, store EventStore) error
-
-	// Start begins listening for new events and applying them to projections.
-	Start(ctx context.Context, store EventStoreWithSubscription) error
-
-	// Stop stops listening for new events.
-	Stop() error
 }

@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
+	sdk "school-with-ai/sdk/agent-sdk/core"
 	"school-with-ai/services/agents"
-	"school-with-ai/sdk/agent-sdk/core"
 )
 
 // InMemoryAguiProjection is an in-memory implementation of the AguiProjection.
@@ -356,46 +356,28 @@ func (p *InMemoryAguiProjection) ListThreads() []string {
 // Rebuild reconstructs the projection from the EventStore for a single stream or all streams.
 // If streamID is empty, it rebuilds all streams.
 func (p *InMemoryAguiProjection) Rebuild(ctx context.Context, store sdk.EventStore, streamID string) error {
-	var streamIDs []string
-	var err error
-
 	if streamID == "" {
-		// Rebuild all streams
-		streamIDs, err = store.ListStreams(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to list streams: %w", err)
-		}
-
-		p.mu.Lock()
-		// Clear all state
-		p.threads = make(map[string]*AguiThreadState)
-		p.activeRuns = make(map[string]*AguiRunState)
-		p.streamingMessages = make(map[string]*AguiMessage)
-		p.toolCallsByThread = make(map[string]map[string]*AguiToolCall)
-		p.mu.Unlock()
-	} else {
-		// Rebuild single stream
-		streamIDs = []string{streamID}
-
-		p.mu.Lock()
-		// Clear state for this stream
-		delete(p.threads, streamID)
-		delete(p.activeRuns, streamID)
-		delete(p.toolCallsByThread, streamID)
-		p.mu.Unlock()
+		// Rebuild all streams - not supported with minimal interface
+		return fmt.Errorf("RebuildAll not supported with minimal EventStore interface")
 	}
 
-	// Replay all events for each stream
-	for _, sid := range streamIDs {
-		events, err := store.ReadAll(ctx, sid)
-		if err != nil {
-			return fmt.Errorf("failed to read events for stream %s: %w", sid, err)
-		}
+	// Rebuild single stream
+	p.mu.Lock()
+	// Clear state for this stream
+	delete(p.threads, streamID)
+	delete(p.activeRuns, streamID)
+	delete(p.toolCallsByThread, streamID)
+	p.mu.Unlock()
 
-		for _, event := range events {
-			if err := p.Apply(ctx, event); err != nil {
-				return fmt.Errorf("failed to apply event during rebuild: %w", err)
-			}
+	// Replay all events for each stream
+	events, err := store.ReadStream(ctx, streamID, 0)
+	if err != nil {
+		return fmt.Errorf("failed to read events for stream %s: %w", streamID, err)
+	}
+
+	for _, event := range events {
+		if err := p.Apply(ctx, event); err != nil {
+			return fmt.Errorf("failed to apply event during rebuild: %w", err)
 		}
 	}
 

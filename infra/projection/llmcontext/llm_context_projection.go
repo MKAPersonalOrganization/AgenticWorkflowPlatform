@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"school-with-ai/domain"
+	sdk "school-with-ai/sdk/agent-sdk/core"
 	"school-with-ai/services/agents"
-	"school-with-ai/sdk/agent-sdk/core"
 )
 
 // InMemoryLLMContextProjection is an in-memory projection of thread state for LLM context.
@@ -191,7 +191,7 @@ func (p *InMemoryLLMContextProjection) Update(event sdk.Event) error {
 // Rebuild reconstructs the projection from the EventStore for a single thread.
 func (p *InMemoryLLMContextProjection) Rebuild(ctx context.Context, store sdk.EventStore, threadID string) error {
 	// Read all events for this thread
-	events, err := store.ReadAll(ctx, threadID)
+	events, err := store.ReadStream(ctx, threadID, 0)
 	if err != nil {
 		return fmt.Errorf("failed to read events for thread %s: %w", threadID, err)
 	}
@@ -226,26 +226,9 @@ func (p *InMemoryLLMContextProjection) Rebuild(ctx context.Context, store sdk.Ev
 
 // RebuildAll reconstructs all thread projections from the EventStore.
 func (p *InMemoryLLMContextProjection) RebuildAll(ctx context.Context, store sdk.EventStore) error {
-	// List all streams
-	streamIDs, err := store.ListStreams(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to list streams: %w", err)
-	}
-
-	p.mu.Lock()
-	// Clear all projections
-	p.threads = make(map[string]sdk.AgentThread)
-	p.metadata = make(map[string]*threadMetadata)
-	p.mu.Unlock()
-
-	// Rebuild each thread
-	for _, threadID := range streamIDs {
-		if err := p.Rebuild(ctx, store, threadID); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	// Since we don't have ListStreams anymore, we can't rebuild all
+	// This would need to be implemented differently or removed
+	return fmt.Errorf("RebuildAll not supported with minimal EventStore interface")
 }
 
 // applyEventUnsafe applies an event to a thread (caller must hold lock).
