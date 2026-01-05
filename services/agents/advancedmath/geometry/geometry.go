@@ -3,7 +3,7 @@ package geometry
 import (
 	"school-with-ai/services/agents/advancedmath/geometry/tools"
 	sharedtools "school-with-ai/services/agents/shared/tools"
-	"school-with-ai/sdk"
+	"school-with-ai/sdk/agent-sdk"
 )
 
 // CreateGeometryProfessor creates the computational geometry professor agent

@@ -3,7 +3,7 @@ package optimization
 import (
 	"school-with-ai/services/agents/advancedmath/optimization/tools"
 	sharedtools "school-with-ai/services/agents/shared/tools"
-	"school-with-ai/sdk"
+	"school-with-ai/sdk/agent-sdk"
 )
 
 // CreateOptimizationProfessor creates the optimization professor agent

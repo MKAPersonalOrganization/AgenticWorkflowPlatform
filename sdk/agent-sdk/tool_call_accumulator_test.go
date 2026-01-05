@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"school-with-ai/services/llm"
-	"school-with-ai/sdk"
+	"school-with-ai/sdk/agent-sdk"
 )
 
 func TestToolCallAccumulator_NewToolCall(t *testing.T) {

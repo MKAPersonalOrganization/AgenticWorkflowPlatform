@@ -3,7 +3,7 @@ package studentfacing
 import (
 	"school-with-ai/services/agents/shared/tools"
 	"school-with-ai/services/agents/shared/tools/eventbus"
-	"school-with-ai/sdk"
+	"school-with-ai/sdk/agent-sdk"
 )
 
 // CreateStudentFacingAgent creates the student-facing agent that handles initial questions.
