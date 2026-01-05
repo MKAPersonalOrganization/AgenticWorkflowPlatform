@@ -20,7 +20,7 @@ type ShouldContinueIterationFn func(toolCalls []domain.ToolCall) bool
 type Agent struct {
 	config                  AgentConfig
 	chatClient              ChatClient
-	log                     EventLog
+	log                     EventStore
 	state                   ThreadState
 	toolRegistry            *ToolRegistry
 	toolExecutor            ToolExecutor
@@ -54,7 +54,7 @@ func WithShouldContinueIteration(fn ShouldContinueIterationFn) Option {
 }
 
 // NewAgent creates a new agent with event sourcing (no UI dependencies)
-func NewAgent(chatClient ChatClient, log EventLog, state ThreadState, opts ...Option) *Agent {
+func NewAgent(chatClient ChatClient, log EventStore, state ThreadState, opts ...Option) *Agent {
 	// Create tool registry
 	toolRegistry := NewToolRegistry()
 
@@ -361,8 +361,9 @@ func (h *Agent) runIteration(
 
 // emitDomainEvent persists the event and notifies handlers
 func (h *Agent) emitDomainEvent(event Event, eventHandler DomainEventHandler) error {
-	// Append to event log (this will automatically update projections via ProjectionEventStore)
-	if err := h.log.Append(event.AggregateID(), event); err != nil {
+	// Append to event store (this will automatically update projections via ProjectionEventStore)
+	_, err := h.log.Append(context.Background(), event.AggregateID(), event)
+	if err != nil {
 		return err
 	}
 

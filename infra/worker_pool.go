@@ -18,9 +18,9 @@ import (
 // WorkerPool manages a pool of workers that process jobs from the queue
 type WorkerPool struct {
 	queue          domain.JobQueue
-	log            sdk.EventLog
+	log            sdk.EventStore
 	state          sdk.ThreadState
-	aguiProjection sdk.AguiProjection
+	aguiProjection AguiProjection
 	chatClient     sdk.ChatClient
 	numWorkers     int
 	pollInterval   time.Duration
@@ -46,7 +46,7 @@ type WorkerPoolConfig struct {
 }
 
 // NewWorkerPool creates a new worker pool
-func NewWorkerPool(queue domain.JobQueue, log sdk.EventLog, state sdk.ThreadState, aguiProjection sdk.AguiProjection, chatClient sdk.ChatClient, config WorkerPoolConfig) *WorkerPool {
+func NewWorkerPool(queue domain.JobQueue, log sdk.EventStore, state sdk.ThreadState, aguiProjection AguiProjection, chatClient sdk.ChatClient, config WorkerPoolConfig) *WorkerPool {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	if config.NumWorkers <= 0 {
@@ -201,7 +201,7 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 			},
 			Title: "New Chat",
 		}
-		_ = wp.log.Append(job.ThreadID, createEvent)
+		_, _ = wp.log.Append(ctx, job.ThreadID, createEvent)
 	}
 
 	// Emit UserMessageAddedEvent
@@ -214,7 +214,7 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 		MessageID: job.MessageID,
 		Content:   job.Message,
 	}
-	_ = wp.log.Append(job.ThreadID, userMsgEvent)
+	_, _ = wp.log.Append(ctx, job.ThreadID, userMsgEvent)
 
 	// Generate unique run ID for this execution
 	runID := aguievents.GenerateRunID()
@@ -245,7 +245,7 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 			},
 			NewTitle: title,
 		}
-		_ = wp.log.Append(job.ThreadID, titleEvent)
+		_, _ = wp.log.Append(ctx, job.ThreadID, titleEvent)
 
 		// Send CUSTOM event to notify frontend of title update immediately
 		customEvent := aguievents.NewCustomEvent(
@@ -426,7 +426,7 @@ func (wp *WorkerPool) continueWithAgent(ctx context.Context, threadID, agentName
 	}
 
 	// Track events before handler execution
-	eventsBefore, _ := wp.log.History(threadID)
+	eventsBefore, _ := wp.log.ReadAll(ctx, threadID)
 	beforeCount := len(eventsBefore)
 
 	// Execute the handler - it owns the complete logic
@@ -447,7 +447,7 @@ func (wp *WorkerPool) continueWithAgent(ctx context.Context, threadID, agentName
 	slog.Info("Handler execution completed", "agent", agentName, "eventType", triggeringEvent.Type)
 
 	// Check for new routing events emitted during handler execution
-	eventsAfter, _ := wp.log.History(threadID)
+	eventsAfter, _ := wp.log.ReadAll(ctx, threadID)
 	if len(eventsAfter) > beforeCount {
 		// Process new events for routing
 		newEvents := eventsAfter[beforeCount:]

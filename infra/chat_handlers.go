@@ -17,14 +17,14 @@ import (
 // Handler encapsulates dependencies for HTTP handlers
 type Handler struct {
 	state      sdk.ThreadState
-	log        sdk.EventLog
+	log        sdk.EventStore
 	chatClient sdk.ChatClient
 	queue      domain.JobQueue
 	workerPool *WorkerPool
 }
 
 // NewHandler creates a new HTTP handler with the given dependencies
-func NewHandler(log sdk.EventLog, state sdk.ThreadState, chatClient sdk.ChatClient, queue domain.JobQueue, workerPool *WorkerPool) *Handler {
+func NewHandler(log sdk.EventStore, state sdk.ThreadState, chatClient sdk.ChatClient, queue domain.JobQueue, workerPool *WorkerPool) *Handler {
 	return &Handler{
 		state:      state,
 		log:        log,
@@ -338,7 +338,7 @@ func (h *Handler) DeleteThread(w http.ResponseWriter, r *http.Request) {
 			ThreadID:  threadID,
 		},
 	}
-	_ = h.log.Append(threadID, event)
+	_, _ = h.log.Append(r.Context(), threadID, event)
 	_ = h.state.Update(event)
 
 	w.Header().Set("Content-Type", "application/json")

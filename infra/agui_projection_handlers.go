@@ -4,17 +4,15 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-
-	"school-with-ai/services/sdk"
 )
 
 // AguiProjectionHandler provides HTTP endpoints for querying the AGUI projection.
 type AguiProjectionHandler struct {
-	projection sdk.AguiProjection
+	projection AguiProjection
 }
 
 // NewAguiProjectionHandler creates a new handler for AGUI projection queries.
-func NewAguiProjectionHandler(projection sdk.AguiProjection) *AguiProjectionHandler {
+func NewAguiProjectionHandler(projection AguiProjection) *AguiProjectionHandler {
 	return &AguiProjectionHandler{
 		projection: projection,
 	}

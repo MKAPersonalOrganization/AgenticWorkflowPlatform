@@ -7,36 +7,37 @@ import (
 	"school-with-ai/services/sdk"
 )
 
-// ProjectionEventStore wraps an EventLog and automatically updates projections when events are appended.
+// ProjectionEventStore wraps an EventStore and automatically updates projections when events are appended.
 //
-// This ensures that all projections stay in sync with the event log without requiring
+// This ensures that all projections stay in sync with the event store without requiring
 // manual projection updates at every append site.
 type ProjectionEventStore struct {
-	wrapped     sdk.EventLog
+	wrapped     sdk.EventStore
 	projections []sdk.Projection
 	mu          sync.RWMutex
 }
 
 // NewProjectionEventStore creates an event store that automatically updates projections.
-func NewProjectionEventStore(wrapped sdk.EventLog, projections ...sdk.Projection) *ProjectionEventStore {
+func NewProjectionEventStore(wrapped sdk.EventStore, projections ...sdk.Projection) *ProjectionEventStore {
 	return &ProjectionEventStore{
 		wrapped:     wrapped,
 		projections: projections,
 	}
 }
 
-// Append adds one or more events to a thread's history and updates all projections.
-func (p *ProjectionEventStore) Append(threadID string, events ...sdk.Event) error {
-	// Append to underlying log first
-	if err := p.wrapped.Append(threadID, events...); err != nil {
-		return err
+// Append adds one or more events to a stream and updates all projections.
+// Implements EventStore interface.
+func (p *ProjectionEventStore) Append(ctx context.Context, streamID string, events ...sdk.Event) (int64, error) {
+	// Append to underlying store first
+	version, err := p.wrapped.Append(ctx, streamID, events...)
+	if err != nil {
+		return 0, err
 	}
 
 	// Update all projections
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	ctx := context.Background()
 	for _, projection := range p.projections {
 		for _, event := range events {
 			if err := projection.Apply(ctx, event); err != nil {
@@ -47,27 +48,7 @@ func (p *ProjectionEventStore) Append(threadID string, events ...sdk.Event) erro
 		}
 	}
 
-	return nil
-}
-
-// AppendToStream adds events and returns version (for EventStore-like behavior)
-func (p *ProjectionEventStore) AppendToStream(ctx context.Context, streamID string, events ...sdk.Event) (int64, error) {
-	// First append using the EventLog interface
-	if err := p.Append(streamID, events...); err != nil {
-		return 0, err
-	}
-
-	// Count events to get version
-	history, err := p.wrapped.History(streamID)
-	if err != nil {
-		return 0, err
-	}
-	return int64(len(history)), nil
-}
-
-// History retrieves all events for a thread in order.
-func (p *ProjectionEventStore) History(threadID string) ([]sdk.Event, error) {
-	return p.wrapped.History(threadID)
+	return version, nil
 }
 
 // RegisterProjection adds a projection to receive event updates.
@@ -77,68 +58,30 @@ func (p *ProjectionEventStore) RegisterProjection(projection sdk.Projection) {
 	p.projections = append(p.projections, projection)
 }
 
-// Verify ProjectionEventStore implements EventLog
-var _ sdk.EventLog = (*ProjectionEventStore)(nil)
+// Verify ProjectionEventStore implements EventStore
+var _ sdk.EventStore = (*ProjectionEventStore)(nil)
 
-// Implement EventStore interface methods by delegating to wrapped InMemoryEventStore
+// Implement EventStore interface methods by delegating to wrapped EventStore
 func (p *ProjectionEventStore) ReadAll(ctx context.Context, streamID string) ([]sdk.Event, error) {
-	// Directly use the wrapped InMemoryEventStore which implements both interfaces
-	if log, ok := p.wrapped.(*InMemoryEventStore); ok {
-		return log.ReadAll(ctx, streamID)
-	}
-	return p.wrapped.History(streamID)
+	return p.wrapped.ReadAll(ctx, streamID)
 }
 
 func (p *ProjectionEventStore) ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]sdk.Event, error) {
-	if log, ok := p.wrapped.(*InMemoryEventStore); ok {
-		return log.ReadStream(ctx, streamID, fromVersion)
-	}
-	// Fallback
-	events, err := p.wrapped.History(streamID)
-	if err != nil {
-		return nil, err
-	}
-	if fromVersion >= int64(len(events)) {
-		return []sdk.Event{}, nil
-	}
-	return events[fromVersion:], nil
+	return p.wrapped.ReadStream(ctx, streamID, fromVersion)
 }
 
 func (p *ProjectionEventStore) StreamVersion(ctx context.Context, streamID string) (int64, error) {
-	if log, ok := p.wrapped.(*InMemoryEventStore); ok {
-		return log.StreamVersion(ctx, streamID)
-	}
-	// Fallback
-	events, err := p.wrapped.History(streamID)
-	if err != nil {
-		return 0, err
-	}
-	return int64(len(events)), nil
+	return p.wrapped.StreamVersion(ctx, streamID)
 }
 
 func (p *ProjectionEventStore) StreamExists(ctx context.Context, streamID string) (bool, error) {
-	if log, ok := p.wrapped.(*InMemoryEventStore); ok {
-		return log.StreamExists(ctx, streamID)
-	}
-	// Fallback
-	events, err := p.wrapped.History(streamID)
-	if err != nil {
-		return false, err
-	}
-	return len(events) > 0, nil
+	return p.wrapped.StreamExists(ctx, streamID)
 }
 
 func (p *ProjectionEventStore) ListStreams(ctx context.Context) ([]string, error) {
-	if log, ok := p.wrapped.(*InMemoryEventStore); ok {
-		return log.ListStreams(ctx)
-	}
-	return []string{}, nil
+	return p.wrapped.ListStreams(ctx)
 }
 
 func (p *ProjectionEventStore) DeleteStream(ctx context.Context, streamID string) error {
-	if log, ok := p.wrapped.(*InMemoryEventStore); ok {
-		return log.DeleteStream(ctx, streamID)
-	}
-	return nil
+	return p.wrapped.DeleteStream(ctx, streamID)
 }
-
