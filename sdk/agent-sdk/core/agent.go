@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	"school-with-ai/services/llm"
+	"school-with-ai/sdk/agent-sdk/llm"
 )
 
 // ToolCallHandler is called after a tool is executed, allowing custom event emission

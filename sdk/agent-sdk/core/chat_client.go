@@ -4,7 +4,7 @@ import (
 	"context"
 	"iter"
 
-	"school-with-ai/services/llm"
+	"school-with-ai/sdk/agent-sdk/llm"
 )
 
 // ChatClient defines the interface for LLM providers (OpenAI, Anthropic, Ollama, etc.)

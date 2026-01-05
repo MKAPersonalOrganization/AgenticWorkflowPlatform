@@ -22,7 +22,7 @@ import (
 	"school-with-ai/services/agents/shared/tools/eventbus"
 	"school-with-ai/services/agents/statistics"
 	"school-with-ai/services/agents/studentfacing"
-	"school-with-ai/services/llm"
+	"school-with-ai/sdk/agent-sdk/llm"
 
 	"github.com/openai/openai-go/v3"
 )

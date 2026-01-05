@@ -3,7 +3,7 @@ package math
 import (
 	sharedtools "school-with-ai/services/agents/shared/tools"
 	"school-with-ai/services/agents/shared/tools/eventbus"
-	"school-with-ai/sdk/agent-sdk"
+	"school-with-ai/sdk/agent-sdk/core"
 )
 
 // CreateMathInstructor creates the math instructor agent configuration.

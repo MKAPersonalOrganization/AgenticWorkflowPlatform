@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"school-with-ai/sdk/agent-sdk"
+	"school-with-ai/sdk/agent-sdk/core"
 )
 
 // InMemoryEventStore is an in-memory implementation of EventStore.
