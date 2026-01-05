@@ -66,7 +66,7 @@ func handleUserMessage(ctx context.Context, handlerCtx *agents.EventHandlerConte
 
 	err := handlerCtx.Agent.Run(ctx, handlerCtx.ThreadID, messageID, messages, func(event sdk.Event) error {
 		return nil
-	})
+	}, sdk.DefaultRunOptions())
 	if err != nil {
 		slog.Error("User message handler failed", "error", err)
 		return err
@@ -135,7 +135,7 @@ Determine what's still missing from the original question and route to the appro
 	messageID := aguievents.GenerateMessageID()
 	err := handlerCtx.Agent.Run(ctx, handlerCtx.ThreadID, messageID, messages, func(event sdk.Event) error {
 		return nil
-	})
+	}, sdk.DefaultRunOptions())
 	if err != nil {
 		slog.Error("Student-facing handler failed", "error", err)
 		return err

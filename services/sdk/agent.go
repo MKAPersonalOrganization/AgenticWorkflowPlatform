@@ -89,14 +89,16 @@ type DomainEventHandler func(event Event) error
 
 // Run processes the LLM streaming response and emits domain events
 // eventHandler is called for each domain event (for UI projections, etc.)
+// runOpts specifies per-run configuration that overrides agent defaults
 func (h *Agent) Run(
 	ctx context.Context,
 	threadID string,
 	messageID string,
 	messages []domain.Message,
 	eventHandler DomainEventHandler,
+	runOpts RunOptions,
 ) error {
-	return h.runIteration(ctx, threadID, messageID, messages, eventHandler)
+	return h.runIteration(ctx, threadID, messageID, messages, eventHandler, runOpts)
 }
 
 // runIteration processes a single LLM iteration and recursively continues if tools are called
@@ -106,6 +108,7 @@ func (h *Agent) runIteration(
 	messageID string,
 	messages []domain.Message,
 	eventHandler DomainEventHandler,
+	runOpts RunOptions,
 ) error {
 	// Check if client disconnected before starting LLM call
 	select {
@@ -130,8 +133,8 @@ func (h *Agent) runIteration(
 	// Convert domain messages to ChatMessage format
 	chatMessages := llm.FromDomainMessages(messages)
 
-	// Build chat options from agent config
-	chatOptions := ToChatOptions(h.config)
+	// Build chat options from agent config and run options
+	chatOptions := ToChatOptions(h.config, runOpts)
 
 	// Get streaming response from ChatClient
 	streamIter := h.chatClient.GetStreamingResponse(ctx, chatMessages, chatOptions)
@@ -308,7 +311,8 @@ func (h *Agent) runIteration(
 		continuationMessageID := GenerateID()
 
 		// Recursively call to process the LLM response with tool results
-		return h.runIteration(ctx, threadID, continuationMessageID, updatedMessages, eventHandler)
+		// Pass the same runOpts to maintain consistency across iterations
+		return h.runIteration(ctx, threadID, continuationMessageID, updatedMessages, eventHandler, runOpts)
 	}
 
 	// No tool calls, just emit the completed message event
