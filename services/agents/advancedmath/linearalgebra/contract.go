@@ -80,7 +80,7 @@ func handleLinearAlgebraQuestion(ctx context.Context, handlerCtx *agents.EventHa
 	// Add a trigger message with the whiteboard content
 	triggerMsg := domain.Message{
 		ID:        aguievents.GenerateMessageID(),
-		Role:      "user",
+		Role:      emittedBy,
 		Timestamp: time.Now(),
 		Content:   handoffContent,
 		Metadata: map[string]interface{}{

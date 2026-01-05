@@ -74,7 +74,7 @@ func handleDiagrammingQuestion(ctx context.Context, handlerCtx *agents.EventHand
 
 	triggerMsg := domain.Message{
 		ID:        aguievents.GenerateMessageID(),
-		Role:      "user",
+		Role:      emittedBy,
 		Timestamp: time.Now(),
 		Content:   handoffContent,
 		Metadata: map[string]interface{}{

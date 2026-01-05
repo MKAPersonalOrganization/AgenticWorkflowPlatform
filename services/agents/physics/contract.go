@@ -76,7 +76,7 @@ func handlePhysicsQuestion(ctx context.Context, handlerCtx *agents.EventHandlerC
 
 	triggerMsg := domain.Message{
 		ID:        aguievents.GenerateMessageID(),
-		Role:      "user",
+		Role:      emittedBy,
 		Timestamp: time.Now(),
 		Content:   handoffContent,
 		Metadata: map[string]interface{}{
