@@ -11,7 +11,7 @@ import (
 	"school-with-ai/services/agents/chemistry/tools"
 	sharedtools "school-with-ai/services/agents/shared/tools"
 	"school-with-ai/services/agents/shared/tools/eventbus"
-	"school-with-ai/services/sdk"
+	"school-with-ai/sdk"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )

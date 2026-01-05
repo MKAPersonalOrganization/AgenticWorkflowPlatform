@@ -8,7 +8,7 @@ import (
 
 	"school-with-ai/domain"
 	"school-with-ai/services/agents/shared/tools"
-	"school-with-ai/services/sdk"
+	"school-with-ai/sdk"
 )
 
 // MockToolExecutor is a test double for ToolExecutor

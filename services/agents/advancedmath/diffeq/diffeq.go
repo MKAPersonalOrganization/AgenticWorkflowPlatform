@@ -3,7 +3,7 @@ package diffeq
 import (
 	"school-with-ai/services/agents/advancedmath/diffeq/tools"
 	sharedtools "school-with-ai/services/agents/shared/tools"
-	"school-with-ai/services/sdk"
+	"school-with-ai/sdk"
 )
 
 // CreateDifferentialEquationsProfessor creates the differential equations professor agent

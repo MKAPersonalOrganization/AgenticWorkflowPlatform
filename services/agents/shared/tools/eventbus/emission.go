@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"school-with-ai/services/agents"
-	"school-with-ai/services/sdk"
+	"school-with-ai/sdk"
 )
 
 // EmissionTool is a generic tool for emitting agent activation events.

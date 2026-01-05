@@ -5,7 +5,7 @@ import (
 
 	"school-with-ai/services/agents/math"
 	"school-with-ai/services/agents/studentfacing"
-	"school-with-ai/services/sdk"
+	"school-with-ai/sdk"
 )
 
 func TestInstructorConfigurations(t *testing.T) {

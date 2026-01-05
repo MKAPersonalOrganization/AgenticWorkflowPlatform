@@ -9,7 +9,7 @@ import (
 
 	"school-with-ai/domain"
 	"school-with-ai/services/agents"
-	"school-with-ai/services/sdk"
+	"school-with-ai/sdk"
 )
 
 // GlobalContracts is the singleton contract registry

@@ -3,7 +3,7 @@ package agents
 import (
 	"context"
 
-	"school-with-ai/services/sdk"
+	"school-with-ai/sdk"
 )
 
 // EventHandlerContext provides the context needed for event handlers to execute.
