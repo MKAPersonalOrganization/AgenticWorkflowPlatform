@@ -34,23 +34,6 @@ func (r *ReadWhiteboardTool) SetWhiteboardStore(store WhiteboardReader, threadID
 	r.threadID = threadID
 }
 
-// SetContentGetter is deprecated but kept for backward compatibility.
-// Use SetWhiteboardStore instead.
-func (r *ReadWhiteboardTool) SetContentGetter(fn func() string) {
-	// Wrap the function in an adapter
-	r.store = &funcWhiteboardReader{fn: fn}
-	r.threadID = "" // Not needed for function-based reader
-}
-
-// funcWhiteboardReader adapts a function to the WhiteboardReader interface
-type funcWhiteboardReader struct {
-	fn func() string
-}
-
-func (f *funcWhiteboardReader) Get(threadID string) string {
-	return f.fn()
-}
-
 func (r *ReadWhiteboardTool) Name() string {
 	return "read_whiteboard"
 }

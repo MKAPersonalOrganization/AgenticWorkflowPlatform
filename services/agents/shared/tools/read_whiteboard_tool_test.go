@@ -9,11 +9,14 @@ import (
 func TestReadWhiteboardTool_Success(t *testing.T) {
 	tool := NewReadWhiteboardTool()
 
-	// Set up mock content getter
+	// Set up mock whiteboard store
 	mockContent := "# Test Whiteboard\n\nThis is test content on the whiteboard."
-	tool.SetContentGetter(func() string {
-		return mockContent
-	})
+	mockStore := &mockWhiteboardStore{
+		whiteboards: map[string]string{
+			"thread-123": mockContent,
+		},
+	}
+	tool.SetWhiteboardStore(mockStore, "thread-123")
 
 	result, err := tool.Invoke(context.Background(), "{}")
 	if err != nil {
@@ -32,37 +35,12 @@ func TestReadWhiteboardTool_Success(t *testing.T) {
 	if response["content"].(string) != mockContent {
 		t.Errorf("expected content %q, got %q", mockContent, response["content"])
 	}
-
-	t.Logf("Whiteboard content retrieved: %s", response["content"])
 }
 
-func TestReadWhiteboardTool_EmptyContent(t *testing.T) {
+func TestReadWhiteboardTool_NoStoreSet(t *testing.T) {
 	tool := NewReadWhiteboardTool()
 
-	// Set up mock content getter returning empty string
-	tool.SetContentGetter(func() string {
-		return ""
-	})
-
-	result, err := tool.Invoke(context.Background(), "{}")
-	if err != nil {
-		t.Fatalf("failed to invoke read_whiteboard tool: %v", err)
-	}
-
-	var response map[string]interface{}
-	if err := json.Unmarshal([]byte(result), &response); err != nil {
-		t.Fatalf("failed to unmarshal result: %v", err)
-	}
-
-	if response["content"].(string) != "" {
-		t.Errorf("expected empty content, got %q", response["content"])
-	}
-}
-
-func TestReadWhiteboardTool_NoGetterSet(t *testing.T) {
-	tool := NewReadWhiteboardTool()
-
-	// No getter set - should return empty
+	// No store set - should return empty
 	result, err := tool.Invoke(context.Background(), "{}")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -107,37 +85,7 @@ func (m *mockWhiteboardStore) Get(threadID string) string {
 	return m.whiteboards[threadID]
 }
 
-func TestReadWhiteboardTool_WithWhiteboardStore(t *testing.T) {
-	tool := NewReadWhiteboardTool()
-
-	// Set up mock whiteboard store
-	mockStore := &mockWhiteboardStore{
-		whiteboards: map[string]string{
-			"thread-123": "# Math Problem\n\nSolved using calculus.",
-			"thread-456": "# Physics Problem\n\nF = ma",
-		},
-	}
-
-	// Configure tool with store for thread-123
-	tool.SetWhiteboardStore(mockStore, "thread-123")
-
-	result, err := tool.Invoke(context.Background(), "{}")
-	if err != nil {
-		t.Fatalf("failed to invoke read_whiteboard tool: %v", err)
-	}
-
-	var response map[string]interface{}
-	if err := json.Unmarshal([]byte(result), &response); err != nil {
-		t.Fatalf("failed to unmarshal result: %v", err)
-	}
-
-	expected := "# Math Problem\n\nSolved using calculus."
-	if response["content"].(string) != expected {
-		t.Errorf("expected content %q, got %q", expected, response["content"])
-	}
-}
-
-func TestReadWhiteboardTool_WithWhiteboardStore_DifferentThreads(t *testing.T) {
+func TestReadWhiteboardTool_DifferentThreads(t *testing.T) {
 	mockStore := &mockWhiteboardStore{
 		whiteboards: map[string]string{
 			"thread-123": "Thread 123 content",
