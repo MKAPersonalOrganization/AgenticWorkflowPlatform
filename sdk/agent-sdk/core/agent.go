@@ -21,7 +21,7 @@ type Agent struct {
 	config                  AgentConfig
 	chatClient              ChatClient
 	log                     EventStore
-	state                   ThreadState
+	state                   ThreadStore
 	toolRegistry            *ToolRegistry
 	toolExecutor            ToolExecutor
 	notifier                EventNotifier // Agent's own notifier
@@ -54,7 +54,7 @@ func WithShouldContinueIteration(fn ShouldContinueIterationFn) Option {
 }
 
 // NewAgent creates a new agent with event sourcing (no UI dependencies)
-func NewAgent(chatClient ChatClient, log EventStore, state ThreadState, opts ...Option) *Agent {
+func NewAgent(chatClient ChatClient, log EventStore, state ThreadStore, opts ...Option) *Agent {
 	// Create tool registry
 	toolRegistry := NewToolRegistry()
 

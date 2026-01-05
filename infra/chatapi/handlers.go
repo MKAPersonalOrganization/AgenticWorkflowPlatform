@@ -10,7 +10,7 @@ import (
 
 	"school-with-ai/domain"
 	"school-with-ai/infra/auth"
-	"school-with-ai/sdk/agent-sdk/core"
+	sdk "school-with-ai/sdk/agent-sdk/core"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
@@ -35,7 +35,7 @@ func writeSSEEvent(w http.ResponseWriter, event interface{}) error {
 
 // Handler encapsulates dependencies for HTTP handlers
 type Handler struct {
-	state      sdk.ThreadState
+	state      sdk.ThreadStore
 	log        sdk.EventStore
 	chatClient sdk.ChatClient
 	queue      domain.JobQueue
@@ -43,7 +43,7 @@ type Handler struct {
 }
 
 // NewHandler creates a new HTTP handler with the given dependencies
-func NewHandler(log sdk.EventStore, state sdk.ThreadState, chatClient sdk.ChatClient, queue domain.JobQueue, workerPool *WorkerPool) *Handler {
+func NewHandler(log sdk.EventStore, state sdk.ThreadStore, chatClient sdk.ChatClient, queue domain.JobQueue, workerPool *WorkerPool) *Handler {
 	return &Handler{
 		state:      state,
 		log:        log,

@@ -7,7 +7,7 @@ import (
 )
 
 // CreateToolCallHandler creates a tool call handler that emits events for collaboration tools
-func CreateToolCallHandler(registry *ContractRegistry, state sdk.ThreadState) sdk.ToolCallHandler {
+func CreateToolCallHandler(registry *ContractRegistry, state sdk.ThreadStore) sdk.ToolCallHandler {
 	return func(threadID string, agentName string, toolCall domain.ToolCall, result string, eventEmitter func(sdk.Event) error) error {
 		toolName := toolCall.Function.Name
 

@@ -11,7 +11,7 @@ type EventHandlerContext struct {
 	ThreadID string
 	Event    *DomainEvent
 	Agent    *sdk.Agent
-	State    sdk.ThreadState
+	State    sdk.ThreadStore
 	Notifier sdk.EventNotifier
 }
 
