@@ -38,8 +38,14 @@ func main() {
 	slog.Info("Starting server", "host", host, "port", port)
 
 	// Initialize EventLog and ThreadState (event sourcing architecture)
-	eventLog := infra.NewInMemoryEventLog()
-	threadState := infra.NewInMemoryThreadState()
+	baseEventStore := infra.NewInMemoryEventStore()
+	llmContextProjection := infra.NewInMemoryLLMContextProjection()
+
+	// Initialize AGUI projection (reads from event store)
+	aguiProjection := infra.NewInMemoryAguiProjection()
+
+	// Wrap event log to automatically update projections
+	eventLog := infra.NewProjectionEventStore(baseEventStore, llmContextProjection, aguiProjection)
 
 	// Initialize OpenAI chat client with model
 	model := string(openai.ChatModelGPT4oMini) // Use GPT-4o-mini for cost efficiency
@@ -58,7 +64,7 @@ func main() {
 	eventbus.GlobalContracts.Register(diagramming.Contract)
 
 	// Initialize and start worker pool
-	workerPool := infra.NewWorkerPool(queue, eventLog, threadState, chatClient, infra.WorkerPoolConfig{
+	workerPool := infra.NewWorkerPool(queue, eventLog, llmContextProjection, aguiProjection, chatClient, infra.WorkerPoolConfig{
 		NumWorkers:   5,
 		PollInterval: 100 * time.Millisecond,
 	})
@@ -73,8 +79,11 @@ func main() {
 	mux.Handle("/assets/images/", http.StripPrefix("/assets/images/", http.FileServer(http.Dir("./assets/images"))))
 	mux.Handle("/assets/charts/", http.StripPrefix("/assets/charts/", http.FileServer(http.Dir("./assets/charts"))))
 
-	// Create handler with EventLog and ThreadState
-	handler := infra.NewHandler(eventLog, threadState, chatClient, queue, workerPool)
+	// Create handler with EventLog and LLMContextProjection
+	handler := infra.NewHandler(eventLog, llmContextProjection, chatClient, queue, workerPool)
+
+	// Create AGUI projection handler
+	aguiHandler := infra.NewAguiProjectionHandler(aguiProjection)
 
 	// Initialize Kratos client and auth handlers
 	kratosClient := auth.NewKratosClient()
@@ -100,6 +109,15 @@ func main() {
 	mux.HandleFunc("GET /api/threads", authMiddleware.RequireAuthFunc(handler.GetThreads))
 	mux.HandleFunc("GET /api/threads/{threadId}/messages", authMiddleware.RequireAuthFunc(handler.GetMessages))
 	mux.HandleFunc("DELETE /api/threads/{threadId}", authMiddleware.RequireAuthFunc(handler.DeleteThread))
+
+	// AGUI projection query endpoints (protected)
+	mux.HandleFunc("GET /api/agui/threads", authMiddleware.RequireAuthFunc(aguiHandler.ListThreads))
+	mux.HandleFunc("GET /api/agui/threads/{threadId}", authMiddleware.RequireAuthFunc(aguiHandler.GetThreadState))
+	mux.HandleFunc("GET /api/agui/threads/{threadId}/messages", authMiddleware.RequireAuthFunc(aguiHandler.GetMessages))
+	mux.HandleFunc("GET /api/agui/threads/{threadId}/tool-calls", authMiddleware.RequireAuthFunc(aguiHandler.GetToolCalls))
+	mux.HandleFunc("GET /api/agui/threads/{threadId}/agent-activity", authMiddleware.RequireAuthFunc(aguiHandler.GetAgentActivity))
+	mux.HandleFunc("GET /api/agui/threads/{threadId}/active-run", authMiddleware.RequireAuthFunc(aguiHandler.GetActiveRun))
+
 	mux.HandleFunc("/", authMiddleware.RequireAuthFunc(HandleViewChatInputScreen))
 	err = http.ListenAndServe(addr, mux)
 	if err != nil {

@@ -17,15 +17,16 @@ import (
 
 // WorkerPool manages a pool of workers that process jobs from the queue
 type WorkerPool struct {
-	queue        domain.JobQueue
-	log          sdk.EventLog
-	state        sdk.ThreadState
-	chatClient   sdk.ChatClient
-	numWorkers   int
-	pollInterval time.Duration
-	ctx          context.Context
-	cancel       context.CancelFunc
-	wg           sync.WaitGroup
+	queue          domain.JobQueue
+	log            sdk.EventLog
+	state          sdk.ThreadState
+	aguiProjection sdk.AguiProjection
+	chatClient     sdk.ChatClient
+	numWorkers     int
+	pollInterval   time.Duration
+	ctx            context.Context
+	cancel         context.CancelFunc
+	wg             sync.WaitGroup
 
 	// Event storage for jobs (jobID -> buffered events)
 	mu           sync.RWMutex
@@ -45,7 +46,7 @@ type WorkerPoolConfig struct {
 }
 
 // NewWorkerPool creates a new worker pool
-func NewWorkerPool(queue domain.JobQueue, log sdk.EventLog, state sdk.ThreadState, chatClient sdk.ChatClient, config WorkerPoolConfig) *WorkerPool {
+func NewWorkerPool(queue domain.JobQueue, log sdk.EventLog, state sdk.ThreadState, aguiProjection sdk.AguiProjection, chatClient sdk.ChatClient, config WorkerPoolConfig) *WorkerPool {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	if config.NumWorkers <= 0 {
@@ -59,6 +60,7 @@ func NewWorkerPool(queue domain.JobQueue, log sdk.EventLog, state sdk.ThreadStat
 		queue:            queue,
 		log:              log,
 		state:            state,
+		aguiProjection:   aguiProjection,
 		chatClient:       chatClient,
 		numWorkers:       config.NumWorkers,
 		pollInterval:     config.PollInterval,
@@ -200,7 +202,6 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 			Title: "New Chat",
 		}
 		_ = wp.log.Append(job.ThreadID, createEvent)
-		_ = wp.state.Update(createEvent)
 	}
 
 	// Emit UserMessageAddedEvent
@@ -214,7 +215,6 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 		Content:   job.Message,
 	}
 	_ = wp.log.Append(job.ThreadID, userMsgEvent)
-	_ = wp.state.Update(userMsgEvent)
 
 	// Generate unique run ID for this execution
 	runID := aguievents.GenerateRunID()
@@ -246,7 +246,6 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 			NewTitle: title,
 		}
 		_ = wp.log.Append(job.ThreadID, titleEvent)
-		_ = wp.state.Update(titleEvent)
 
 		// Send CUSTOM event to notify frontend of title update immediately
 		customEvent := aguievents.NewCustomEvent(
