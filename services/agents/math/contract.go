@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	"school-with-ai/infra"
 	"school-with-ai/services/agents"
 	"school-with-ai/services/agents/math/tools"
 	sharedtools "school-with-ai/services/agents/shared/tools"
@@ -65,13 +64,13 @@ func handleMathQuestion(ctx context.Context, handlerCtx *agents.EventHandlerCont
 		"emittedBy", emittedBy,
 	)
 
-	// Get the AgentThread from state
-	state, ok := handlerCtx.State.(*infra.InMemoryThreadState)
+	// Get the AgentThread from state using ThreadStateWithStore interface
+	stateWithStore, ok := handlerCtx.State.(sdk.ThreadStateWithStore)
 	if !ok {
-		return fmt.Errorf("state is not InMemoryThreadState")
+		return fmt.Errorf("state does not implement ThreadStateWithStore")
 	}
 
-	agentThread, exists := state.GetAgentThread(handlerCtx.ThreadID)
+	agentThread, exists := stateWithStore.GetAgentThread(handlerCtx.ThreadID)
 	if !exists {
 		return fmt.Errorf("thread not found: %s", handlerCtx.ThreadID)
 	}
@@ -87,7 +86,7 @@ func handleMathQuestion(ctx context.Context, handlerCtx *agents.EventHandlerCont
 		Role:      emittedBy,
 		Timestamp: time.Now(),
 		Content:   handoffContent,
-		Metadata: map[string]interface{}{
+		Metadata: map[string]any{
 			"handoff_from": emittedBy,
 			"event_type":   "question.math",
 		},
