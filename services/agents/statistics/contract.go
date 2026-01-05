@@ -78,7 +78,7 @@ func handleStatisticsQuestion(ctx context.Context, handlerCtx *agents.EventHandl
 
 	triggerMsg := domain.Message{
 		ID:        aguievents.GenerateMessageID(),
-		Role:      "user",
+		Role:      emittedBy,
 		Timestamp: time.Now(),
 		Content:   handoffContent,
 		Metadata: map[string]interface{}{
