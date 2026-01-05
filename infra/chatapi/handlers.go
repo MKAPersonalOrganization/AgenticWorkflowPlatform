@@ -11,7 +11,7 @@ import (
 	"school-with-ai/domain"
 	"school-with-ai/infra/auth"
 	sdk "school-with-ai/sdk/agent-sdk/core"
-	"school-with-ai/services"
+	"school-with-ai/services/chatwrite"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
@@ -36,23 +36,23 @@ func writeSSEEvent(w http.ResponseWriter, event interface{}) error {
 
 // Handler encapsulates dependencies for HTTP handlers
 type Handler struct {
-	state       sdk.ThreadStore
-	log         sdk.EventStore
-	chatClient  sdk.ChatClient
-	queue       domain.JobQueue
-	workerPool  *WorkerPool
-	chatService *services.ChatService
+	state            sdk.ThreadStore
+	log              sdk.EventStore
+	chatClient       sdk.ChatClient
+	queue            domain.JobQueue
+	workerPool       *WorkerPool
+	chatWriteService *chatwrite.ChatWriteService
 }
 
 // NewHandler creates a new HTTP handler with the given dependencies
-func NewHandler(log sdk.EventStore, state sdk.ThreadStore, chatClient sdk.ChatClient, queue domain.JobQueue, workerPool *WorkerPool, chatService *services.ChatService) *Handler {
+func NewHandler(log sdk.EventStore, state sdk.ThreadStore, chatClient sdk.ChatClient, queue domain.JobQueue, workerPool *WorkerPool, chatWriteService *chatwrite.ChatWriteService) *Handler {
 	return &Handler{
-		state:       state,
-		log:         log,
-		chatClient:  chatClient,
-		queue:       queue,
-		workerPool:  workerPool,
-		chatService: chatService,
+		state:            state,
+		log:              log,
+		chatClient:       chatClient,
+		queue:            queue,
+		workerPool:       workerPool,
+		chatWriteService: chatWriteService,
 	}
 }
 
@@ -346,7 +346,7 @@ func (h *Handler) DeleteThread(w http.ResponseWriter, r *http.Request) {
 	// TODO: Verify user owns this thread before allowing deletion
 
 	// Delete thread using chat service
-	if err := h.chatService.DeleteThread(r.Context(), threadID); err != nil {
+	if err := h.chatWriteService.DeleteThread(r.Context(), threadID); err != nil {
 		if errors.Is(err, domain.ErrThreadNotFound) {
 			http.Error(w, "Thread not found", http.StatusNotFound)
 			return

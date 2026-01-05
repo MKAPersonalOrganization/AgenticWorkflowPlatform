@@ -1,4 +1,4 @@
-package services
+package chatwrite
 
 import (
 	"context"
@@ -16,9 +16,9 @@ type ToolCallHandler func(threadID string, agentName string, toolCall domain.Too
 // ShouldContinueIterationFn determines if the agent should continue iterating after tool calls
 type ShouldContinueIterationFn func(toolCalls []domain.ToolCall) bool
 
-// AgentService handles processing of user messages using pure event sourcing
+// ChatWriteService handles processing of user messages using pure event sourcing
 // Each agent is responsible for registering its own event notifications
-type AgentService struct {
+type ChatWriteService struct {
 	config                  sdk.AgentConfig
 	chatClient              sdk.ChatClient
 	writeModel              sdk.EventStore
@@ -30,36 +30,36 @@ type AgentService struct {
 	shouldContinueIteration ShouldContinueIterationFn
 }
 
-// Option is a functional option for configuring AgentService
-type Option func(*AgentService)
+// Option is a functional option for configuring ChatWriteService
+type Option func(*ChatWriteService)
 
 // WithConfig configures the agent with a complete configuration
 func WithConfig(config sdk.AgentConfig) Option {
-	return func(h *AgentService) {
+	return func(h *ChatWriteService) {
 		h.config = config
 	}
 }
 
 // WithToolCallHandler configures the agent with a tool call handler for custom event emission
 func WithToolCallHandler(handler ToolCallHandler) Option {
-	return func(h *AgentService) {
+	return func(h *ChatWriteService) {
 		h.toolCallHandler = handler
 	}
 }
 
 // WithShouldContinueIteration configures the agent with a function to determine if iteration should continue
 func WithShouldContinueIteration(fn ShouldContinueIterationFn) Option {
-	return func(h *AgentService) {
+	return func(h *ChatWriteService) {
 		h.shouldContinueIteration = fn
 	}
 }
 
-// NewAgentService creates a new agent with event sourcing (no UI dependencies)
-func NewAgentService(chatClient sdk.ChatClient, writeModel sdk.EventStore, readModel sdk.ThreadStore, opts ...Option) *AgentService {
+// New creates a new chat write service with event sourcing (no UI dependencies)
+func New(chatClient sdk.ChatClient, writeModel sdk.EventStore, readModel sdk.ThreadStore, opts ...Option) *ChatWriteService {
 	// Create tool registry
 	toolRegistry := sdk.NewToolRegistry()
 
-	h := &AgentService{
+	h := &ChatWriteService{
 		chatClient:   chatClient,
 		writeModel:   writeModel,
 		readModel:    readModel,
@@ -88,7 +88,7 @@ func NewAgentService(chatClient sdk.ChatClient, writeModel sdk.EventStore, readM
 // This method creates a fresh conversation thread that can be used to maintain state
 // and context for interactions with this agent. Each thread represents an independent
 // conversation session.
-func (h *AgentService) GetNewThread() sdk.AgentThread {
+func (h *ChatWriteService) GetNewThread() sdk.AgentThread {
 	return sdk.NewInMemoryThread()
 }
 
@@ -96,7 +96,7 @@ func (h *AgentService) GetNewThread() sdk.AgentThread {
 // This method enables restoration of conversation threads from previously saved state,
 // allowing conversations to resume across application restarts or be migrated between
 // different agent instances.
-func (h *AgentService) DeserializeThread(data []byte) (sdk.AgentThread, error) {
+func (h *ChatWriteService) DeserializeThread(data []byte) (sdk.AgentThread, error) {
 	thread, err := sdk.NewInMemoryThreadFromState(data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to deserialize thread: %w", err)
@@ -113,7 +113,7 @@ type DomainEventHandler func(event sdk.Event) error
 // like message reduction, custom storage, and serialization.
 //
 // The thread parameter can be obtained from GetNewThread() or DeserializeThread().
-func (h *AgentService) RunWithThread(
+func (h *ChatWriteService) RunWithThread(
 	ctx context.Context,
 	threadID string,
 	messageID string,
@@ -128,7 +128,7 @@ func (h *AgentService) RunWithThread(
 
 // runIteration processes a single LLM iteration and recursively continues if tools are called
 // thread parameter is optional - if provided, it will be used for message management
-func (h *AgentService) runIteration(
+func (h *ChatWriteService) runIteration(
 	ctx context.Context,
 	threadID string,
 	messageID string,
@@ -369,7 +369,7 @@ func (h *AgentService) runIteration(
 }
 
 // emitDomainEvent persists the event and notifies handlers
-func (h *AgentService) emitDomainEvent(event sdk.Event, eventHandler DomainEventHandler) error {
+func (h *ChatWriteService) emitDomainEvent(event sdk.Event, eventHandler DomainEventHandler) error {
 	// Append to event store (this will automatically update projections via ProjectionEventStore)
 	_, err := h.writeModel.Append(context.Background(), event.AggregateID(), event)
 	if err != nil {
@@ -394,7 +394,7 @@ func (h *AgentService) emitDomainEvent(event sdk.Event, eventHandler DomainEvent
 }
 
 // executeToolCall executes a tool call and returns the result
-func (h *AgentService) executeToolCall(threadID string, toolCall domain.ToolCall, eventHandler DomainEventHandler) (string, error) {
+func (h *ChatWriteService) executeToolCall(threadID string, toolCall domain.ToolCall, eventHandler DomainEventHandler) (string, error) {
 	// Execute the tool using the executor
 	result, err := h.toolExecutor.Execute(toolCall)
 	if err != nil {
@@ -412,4 +412,74 @@ func (h *AgentService) executeToolCall(threadID string, toolCall domain.ToolCall
 	}
 
 	return result, nil
+}
+
+// CreateThread creates a new chat thread
+func (h *ChatWriteService) CreateThread(ctx context.Context, threadID, title string) error {
+	// Check if thread already exists
+	if _, exists := h.readModel.Get(threadID); exists {
+		return nil // Thread already exists, no-op
+	}
+
+	event := &sdk.ThreadCreatedEvent{
+		BaseEvent: sdk.BaseEvent{
+			Type:      "ThreadCreated",
+			Timestamp: time.Now(),
+			ThreadID:  threadID,
+		},
+		Title: title,
+	}
+
+	_, err := h.writeModel.Append(ctx, threadID, event)
+	return err
+}
+
+// AddUserMessage adds a user message to a thread
+func (h *ChatWriteService) AddUserMessage(ctx context.Context, threadID, messageID, content string) error {
+	event := &sdk.UserMessageAddedEvent{
+		BaseEvent: sdk.BaseEvent{
+			Type:      "UserMessageAdded",
+			Timestamp: time.Now(),
+			ThreadID:  threadID,
+		},
+		MessageID: messageID,
+		Content:   content,
+	}
+
+	_, err := h.writeModel.Append(ctx, threadID, event)
+	return err
+}
+
+// UpdateThreadTitle updates the title of a thread
+func (h *ChatWriteService) UpdateThreadTitle(ctx context.Context, threadID, newTitle string) error {
+	event := &sdk.ThreadTitleUpdatedEvent{
+		BaseEvent: sdk.BaseEvent{
+			Type:      "ThreadTitleUpdated",
+			Timestamp: time.Now(),
+			ThreadID:  threadID,
+		},
+		NewTitle: newTitle,
+	}
+
+	_, err := h.writeModel.Append(ctx, threadID, event)
+	return err
+}
+
+// DeleteThread deletes a thread
+func (h *ChatWriteService) DeleteThread(ctx context.Context, threadID string) error {
+	// Check if thread exists
+	if _, exists := h.readModel.Get(threadID); !exists {
+		return domain.ErrThreadNotFound
+	}
+
+	event := &sdk.ThreadDeletedEvent{
+		BaseEvent: sdk.BaseEvent{
+			Type:      "ThreadDeleted",
+			Timestamp: time.Now(),
+			ThreadID:  threadID,
+		},
+	}
+
+	_, err := h.writeModel.Append(ctx, threadID, event)
+	return err
 }

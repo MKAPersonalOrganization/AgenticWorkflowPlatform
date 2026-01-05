@@ -10,9 +10,9 @@ import (
 	"school-with-ai/domain"
 	"school-with-ai/infra/projection/agui"
 	sdk "school-with-ai/sdk/agent-sdk/core"
-	"school-with-ai/services"
 	"school-with-ai/services/agents"
 	"school-with-ai/services/agents/shared/tools/eventbus"
+	"school-with-ai/services/chatwrite"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
@@ -25,7 +25,7 @@ type WorkerPool struct {
 	aguiProjection       agui.AguiProjection
 	whiteboardProjection interface{ Get(threadID string) string } // WhiteboardReader interface
 	chatClient           sdk.ChatClient
-	chatService          *services.ChatService
+	chatWriteService     *chatwrite.ChatWriteService
 	numWorkers           int
 	pollInterval         time.Duration
 	ctx                  context.Context
@@ -50,7 +50,7 @@ type WorkerPoolConfig struct {
 }
 
 // NewWorkerPool creates a new worker pool
-func NewWorkerPool(queue domain.JobQueue, log sdk.EventStore, state sdk.ThreadStore, aguiProjection agui.AguiProjection, whiteboardProjection interface{ Get(threadID string) string }, chatClient sdk.ChatClient, chatService *services.ChatService, config WorkerPoolConfig) *WorkerPool {
+func NewWorkerPool(queue domain.JobQueue, log sdk.EventStore, state sdk.ThreadStore, aguiProjection agui.AguiProjection, whiteboardProjection interface{ Get(threadID string) string }, chatClient sdk.ChatClient, chatWriteService *chatwrite.ChatWriteService, config WorkerPoolConfig) *WorkerPool {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	if config.NumWorkers <= 0 {
@@ -67,7 +67,7 @@ func NewWorkerPool(queue domain.JobQueue, log sdk.EventStore, state sdk.ThreadSt
 		aguiProjection:       aguiProjection,
 		whiteboardProjection: whiteboardProjection,
 		chatClient:           chatClient,
-		chatService:          chatService,
+		chatWriteService:     chatWriteService,
 		numWorkers:           config.NumWorkers,
 		pollInterval:         config.PollInterval,
 		ctx:                  ctx,
@@ -199,11 +199,11 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 	// Check if thread exists, if not create it using chat service
 	_, exists := wp.state.Get(job.ThreadID)
 	if !exists {
-		_ = wp.chatService.CreateThread(ctx, job.ThreadID, "New Chat")
+		_ = wp.chatWriteService.CreateThread(ctx, job.ThreadID, "New Chat")
 	}
 
 	// Add user message using chat service
-	_ = wp.chatService.AddUserMessage(ctx, job.ThreadID, job.MessageID, job.Message)
+	_ = wp.chatWriteService.AddUserMessage(ctx, job.ThreadID, job.MessageID, job.Message)
 
 	// Generate unique run ID for this execution
 	runID := aguievents.GenerateRunID()
@@ -226,7 +226,7 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 		}
 
 		// Update thread title using chat service
-		_ = wp.chatService.UpdateThreadTitle(ctx, job.ThreadID, title)
+		_ = wp.chatWriteService.UpdateThreadTitle(ctx, job.ThreadID, title)
 
 		// Send CUSTOM event to notify frontend of title update immediately
 		customEvent := aguievents.NewCustomEvent(
@@ -374,13 +374,13 @@ func (wp *WorkerPool) continueWithAgent(ctx context.Context, threadID, agentName
 	agentConfig := contract.Factory(notifier)
 
 	// Create agent instance
-	agentInstance := services.NewAgentService(
+	agentInstance := chatwrite.New(
 		wp.chatClient,
 		wp.log,
 		wp.state,
-		services.WithConfig(agentConfig),
-		services.WithToolCallHandler(eventbus.CreateToolCallHandler(eventbus.GlobalContracts, wp.state, wp.whiteboardProjection)),
-		services.WithShouldContinueIteration(eventbus.CreateShouldContinueIterationFn(eventbus.GlobalContracts)),
+		chatwrite.WithConfig(agentConfig),
+		chatwrite.WithToolCallHandler(eventbus.CreateToolCallHandler(eventbus.GlobalContracts, wp.state, wp.whiteboardProjection)),
+		chatwrite.WithShouldContinueIteration(eventbus.CreateShouldContinueIterationFn(eventbus.GlobalContracts)),
 	)
 
 	// Verify the agent has a handler for this event
