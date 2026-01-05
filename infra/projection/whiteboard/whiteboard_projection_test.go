@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"school-with-ai/services/agents"
+	"school-with-ai/services/chatwrite/agents"
 )
 
 func TestWhiteboardProjection_Write(t *testing.T) {

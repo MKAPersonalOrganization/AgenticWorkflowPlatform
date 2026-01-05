@@ -35,10 +35,10 @@ This file defines your agent's declarative event contract. The contract specifie
 package agentname
 
 import (
-	"school-with-ai/services/agents"
-	"school-with-ai/services/agents/shared/tools/eventbus"
-	"school-with-ai/services/agents/<agent-name>/tools"
-	sharedtools "school-with-ai/services/agents/shared/tools"
+	"school-with-ai/services/chatwrite/agents"
+	"school-with-ai/services/chatwrite/agents/shared/tools/eventbus"
+	"school-with-ai/services/chatwrite/agents/<agent-name>/tools"
+	sharedtools "school-with-ai/services/chatwrite/agents/shared/tools"
 	"school-with-ai/sdk/agent-sdk/core"
 )
 
@@ -218,7 +218,7 @@ Import your agent package and register its contract:
 ```go
 import (
 	// ... existing imports ...
-	"school-with-ai/services/agents/<agent-name>"
+	"school-with-ai/services/chatwrite/agents/<agent-name>"
 )
 
 func main() {
@@ -279,9 +279,9 @@ Here's a complete example of adding a geometry agent.
 package geometry
 
 import (
-	"school-with-ai/services/agents"
-	"school-with-ai/services/agents/shared/tools/eventbus"
-	"school-with-ai/services/agents/geometry/tools"
+	"school-with-ai/services/chatwrite/agents"
+	"school-with-ai/services/chatwrite/agents/shared/tools/eventbus"
+	"school-with-ai/services/chatwrite/agents/geometry/tools"
 	"school-with-ai/sdk/agent-sdk/core"
 )
 
@@ -352,7 +352,7 @@ const (
 ```go
 import (
 	// ... existing ...
-	"school-with-ai/services/agents/geometry"
+	"school-with-ai/services/chatwrite/agents/geometry"
 )
 
 func main() {
