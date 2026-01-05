@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"school-with-ai/domain"
+	sdk "school-with-ai/sdk/agent-sdk/core"
 	"school-with-ai/services/agents/shared/tools"
-	"school-with-ai/sdk/agent-sdk/core"
 )
 
 // MockToolExecutor is a test double for ToolExecutor
@@ -195,7 +195,7 @@ func TestAgentWithCustomToolExecutor(t *testing.T) {
 	mockExecutor.SetResult("calculate", `{"result": 42}`)
 
 	// Create agent with default executor (custom executor injection removed as unnecessary)
-	agentInstance := sdk.NewAgent(
+	agentInstance := sdk.NewAgentService(
 		nil, // provider not needed for this test
 		nil, // log not needed for this test
 		nil, // state not needed for this test

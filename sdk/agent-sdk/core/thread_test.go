@@ -311,7 +311,7 @@ func TestThreadIsolation(t *testing.T) {
 // TestAgentThreadFactory verifies Agent thread factory methods
 func TestAgentThreadFactory(t *testing.T) {
 	t.Run("GetNewThread creates new thread", func(t *testing.T) {
-		agent := &Agent{}
+		agent := &AgentService{}
 
 		thread := agent.GetNewThread()
 		require.NotNil(t, thread)
@@ -322,7 +322,7 @@ func TestAgentThreadFactory(t *testing.T) {
 	})
 
 	t.Run("DeserializeThread restores thread", func(t *testing.T) {
-		agent := &Agent{}
+		agent := &AgentService{}
 
 		// Create and serialize a thread
 		originalThread := NewInMemoryThreadWithID("test-thread")
@@ -345,7 +345,7 @@ func TestAgentThreadFactory(t *testing.T) {
 	})
 
 	t.Run("DeserializeThread with invalid data", func(t *testing.T) {
-		agent := &Agent{}
+		agent := &AgentService{}
 
 		thread, err := agent.DeserializeThread([]byte("invalid"))
 		assert.Error(t, err)
