@@ -26,19 +26,6 @@ func domainTools() []core.Tool {
 	}
 }
 
-// emits returns the events this agent can emit.
-// Defined as a function to avoid initialization cycles.
-func emits() []agents.EventType {
-	return []agents.EventType{
-		agents.EventTypeQuestionAnswered,      // "question.answered"
-		agents.EventTypePhysicsQuestion,       // "question.physics"
-		agents.EventTypeChemistryQuestion,     // "question.chemistry"
-		agents.EventTypeLinearAlgebraQuestion, // "question.linearalgebra"
-		agents.EventTypeDiagrammingQuestion,   // "question.diagramming"
-		agents.EventTypeWhiteboardUpdated,     // "whiteboard.updated"
-	}
-}
-
 func handlers() agents.EventHandlerRegistry {
 	registry := make(agents.EventHandlerRegistry)
 
@@ -117,7 +104,6 @@ var Contract = &eventbus.AgentContract{
 	},
 
 	// Events this agent can emit (emission tools are auto-generated)
-	Emits:    emits(),
 	Handlers: handlers(),
 
 	// Domain-specific tools (emission tools are auto-generated from Emits)
