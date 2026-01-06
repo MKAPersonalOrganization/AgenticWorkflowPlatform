@@ -1,9 +1,9 @@
 package optimization
 
 import (
+	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/services/chatwrite/agents/advancedmath/optimization/tools"
 	sharedtools "school-with-ai/services/chatwrite/agents/shared/tools"
-	"school-with-ai/sdk/agentsdk/core"
 )
 
 // CreateOptimizationProfessor creates the optimization professor agent
@@ -13,7 +13,6 @@ func CreateOptimizationProfessor(notifier core.EventNotifier) core.AgentConfig {
 	// Shared tools
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
 	registry.Register(sharedtools.NewReadWhiteboardTool())
-	registry.Register(sharedtools.NewEmitQuestionAnsweredTool())
 
 	// Optimization specific tools
 	registry.Register(tools.NewUnconstrainedOptimizationTool())
@@ -75,7 +74,7 @@ $$
 $$
 \nabla f(\mathbf{x}) = \begin{bmatrix} \frac{\partial f}{\partial x_1} \\ \vdots \\ \frac{\partial f}{\partial x_n} \end{bmatrix}
 $$`,
-		Tools:            registry.All(),
-		Notifier:         notifier,
+		Tools:    registry.All(),
+		Notifier: notifier,
 	}
 }

@@ -19,12 +19,6 @@ func domainTools() []core.Tool {
 	}
 }
 
-func emits() []agents.EventType {
-	return []agents.EventType{
-		agents.EventTypeQuestionAnswered,  // "question.answered"
-		agents.EventTypeWhiteboardUpdated, // "whiteboard.updated"
-	}
-}
 
 func handlers() agents.EventHandlerRegistry {
 	registry := make(agents.EventHandlerRegistry)
@@ -103,7 +97,6 @@ var Contract = &eventbus.AgentContract{
 		agents.EventTypeDiagrammingQuestion,
 	},
 
-	Emits:    emits(),
 	Handlers: handlers(),
 	Tools:    domainTools(),
 

@@ -1,9 +1,9 @@
 package diffeq
 
 import (
+	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/services/chatwrite/agents/advancedmath/diffeq/tools"
 	sharedtools "school-with-ai/services/chatwrite/agents/shared/tools"
-	"school-with-ai/sdk/agentsdk/core"
 )
 
 // CreateDifferentialEquationsProfessor creates the differential equations professor agent
@@ -13,7 +13,6 @@ func CreateDifferentialEquationsProfessor(notifier core.EventNotifier) core.Agen
 	// Shared tools
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
 	registry.Register(sharedtools.NewReadWhiteboardTool())
-	registry.Register(sharedtools.NewEmitQuestionAnsweredTool())
 
 	// Differential equations specific tools
 	registry.Register(tools.NewODESolverTool())
@@ -71,7 +70,7 @@ $$
 $$
 \mathbf{y}(t_0) = \mathbf{y}_0
 $$`,
-		Tools:            registry.All(),
-		Notifier:         notifier,
+		Tools:    registry.All(),
+		Notifier: notifier,
 	}
 }

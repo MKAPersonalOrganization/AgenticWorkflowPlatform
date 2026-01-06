@@ -92,9 +92,7 @@ func handleAgentHandoff(ctx context.Context, handlerCtx *agents.EventHandlerCont
 }
 
 // Contract defines the event-driven contract for the math instructor.
-// The system uses this to:
-// - Route question.math events to this agent
-// - Auto-generate emission tools for the events this agent can emit
+// The system uses this to route agent.handoff events to this agent.
 var Contract = &eventbus.AgentContract{
 	Name: "math-instructor",
 
@@ -103,10 +101,10 @@ var Contract = &eventbus.AgentContract{
 		agents.EventTypeAgentHandoff, // "agent.handoff"
 	},
 
-	// Events this agent can emit (emission tools are auto-generated)
+	// Event handlers for processing domain events
 	Handlers: handlers(),
 
-	// Domain-specific tools (emission tools are auto-generated from Emits)
+	// Domain-specific tools for this agent
 	Tools: domainTools(),
 
 	Factory: CreateMathInstructor,

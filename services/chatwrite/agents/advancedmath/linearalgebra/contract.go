@@ -22,12 +22,6 @@ func domainTools() []core.Tool {
 	}
 }
 
-func emits() []agents.EventType {
-	return []agents.EventType{
-		agents.EventTypeQuestionAnswered,  // "question.answered"
-		agents.EventTypeWhiteboardUpdated, // "whiteboard.updated"
-	}
-}
 
 // handlers returns the event handlers for this agent
 func handlers() agents.EventHandlerRegistry {
@@ -113,7 +107,6 @@ var Contract = &eventbus.AgentContract{
 		agents.EventTypeLinearAlgebraQuestion,
 	},
 
-	Emits:    emits(),
 	Handlers: handlers(),
 	Tools:    domainTools(),
 

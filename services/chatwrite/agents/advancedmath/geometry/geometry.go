@@ -1,9 +1,9 @@
 package geometry
 
 import (
+	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/services/chatwrite/agents/advancedmath/geometry/tools"
 	sharedtools "school-with-ai/services/chatwrite/agents/shared/tools"
-	"school-with-ai/sdk/agentsdk/core"
 )
 
 // CreateGeometryProfessor creates the computational geometry professor agent
@@ -13,7 +13,6 @@ func CreateGeometryProfessor(notifier core.EventNotifier) core.AgentConfig {
 	// Shared tools
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
 	registry.Register(sharedtools.NewReadWhiteboardTool())
-	registry.Register(sharedtools.NewEmitQuestionAnsweredTool())
 
 	// Geometry specific tools
 	registry.Register(tools.NewGeometricPrimitivesTool())
@@ -79,7 +78,7 @@ $$
 $$
 \mathbf{C}(t) = \sum_{i=0}^n B_{i,n}(t) \mathbf{P}_i, \quad t \in [0,1]
 $$`,
-		Tools:            registry.All(),
-		Notifier:         notifier,
+		Tools:    registry.All(),
+		Notifier: notifier,
 	}
 }
