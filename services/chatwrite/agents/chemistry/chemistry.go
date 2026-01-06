@@ -3,7 +3,6 @@ package chemistry
 import (
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/sdk/agentsdk/core/middleware"
-	sharedtools "school-with-ai/services/chatwrite/agents/shared/tools"
 )
 
 // CreateChemistryInstructor creates the chemistry instructor agent configuration.
@@ -15,9 +14,6 @@ func CreateChemistryInstructor(notifier core.EventNotifier) core.AgentConfig {
 	for _, tool := range domainTools() {
 		registry.Register(tool)
 	}
-
-	// Custom emit_question_answered tool (not auto-generated)
-	registry.Register(sharedtools.NewEmitQuestionAnsweredTool())
 
 	return core.AgentConfig{
 		Name: "chemistry-instructor",
