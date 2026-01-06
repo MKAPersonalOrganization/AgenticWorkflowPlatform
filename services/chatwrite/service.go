@@ -50,7 +50,6 @@ type ChatWriteService struct {
 	writeModel              EventStore
 	readModel               ThreadStore
 	toolRegistry            *core.ToolRegistry
-	toolExecutor            core.ToolExecutor
 	notifier                core.EventNotifier // Agent's own notifier
 	toolCallHandler         ToolCallHandler
 	shouldContinueIteration ShouldContinueIterationFn
@@ -89,9 +88,8 @@ func New(chatClient ChatClient, writeModel EventStore, readModel ThreadStore, op
 		chatClient:   chatClient,
 		writeModel:   writeModel,
 		readModel:    readModel,
-		config:       core.DefaultConfig("agent"),             // Default config
-		toolRegistry: toolRegistry,                           // Tool registry
-		toolExecutor: core.NewBasicToolExecutor(toolRegistry), // Default tool executor
+		config:       core.DefaultConfig("agent"), // Default config
+		toolRegistry: toolRegistry,                // Tool registry
 	}
 
 	// Apply options
@@ -186,8 +184,25 @@ func (h *ChatWriteService) runIteration(
 	// Convert domain messages to ChatMessage format
 	chatMessages := llm.FromDomainMessages(messages)
 
-	// Build chat options from agent config and run options
-	chatOptions := core.ToChatOptions(h.config, runOpts)
+	// Build chat options from agent config and run options, applying middleware
+	chatOptions, reqCtx, err := core.ToChatOptionsWithMiddleware(ctx, h.config, chatMessages, runOpts)
+	if err != nil {
+		return fmt.Errorf("failed to apply middleware: %w", err)
+	}
+
+	// Check if middleware terminated early
+	if reqCtx.Terminate {
+		return nil
+	}
+
+	// Create a dynamic tool registry that includes middleware tools
+	dynamicRegistry := core.NewToolRegistry()
+	for _, tool := range reqCtx.GetEffectiveTools() {
+		dynamicRegistry.Register(tool)
+	}
+
+	// Create a tool executor with the dynamic registry
+	dynamicExecutor := core.NewRegistryToolExecutor(ctx, dynamicRegistry)
 
 	// Get streaming response from ChatClient
 	streamIter := h.chatClient.GetStreamingResponse(ctx, chatMessages, chatOptions)
@@ -323,8 +338,8 @@ func (h *ChatWriteService) runIteration(
 
 		// For each tool call: execute and emit result
 		for _, toolCall := range toolCallsList {
-			// Execute the tool call
-			result, err := h.executeToolCall(threadID, toolCall, eventHandler)
+			// Execute the tool call using dynamic executor with middleware tools
+			result, err := h.executeToolCallWithExecutor(threadID, toolCall, eventHandler, dynamicExecutor)
 			if err != nil {
 				result = fmt.Sprintf(`{"error": "%v"}`, err)
 			}
@@ -419,10 +434,10 @@ func (h *ChatWriteService) emitDomainEvent(event core.Event, eventHandler Domain
 	return nil
 }
 
-// executeToolCall executes a tool call and returns the result
-func (h *ChatWriteService) executeToolCall(threadID string, toolCall domain.ToolCall, eventHandler DomainEventHandler) (string, error) {
-	// Execute the tool using the executor
-	result, err := h.toolExecutor.Execute(toolCall)
+// executeToolCallWithExecutor executes a tool call using a dynamic executor that includes middleware tools
+func (h *ChatWriteService) executeToolCallWithExecutor(threadID string, toolCall domain.ToolCall, eventHandler DomainEventHandler, executor core.ToolExecutor) (string, error) {
+	// Execute the tool using the provided executor
+	result, err := executor.Execute(toolCall)
 	if err != nil {
 		return result, err
 	}

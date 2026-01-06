@@ -72,41 +72,13 @@ func handleUserMessage(ctx context.Context, handlerCtx *agents.EventHandlerConte
 
 func handleQuestionAnswered(ctx context.Context, handlerCtx *agents.EventHandlerContext) error {
 	subject, _ := handlerCtx.Event.Data["subject"].(string)
-	isComplete, _ := handlerCtx.Event.Data["is_complete"].(bool)
-	answer, _ := handlerCtx.Event.Data["answer"].(string)
 
 	slog.Info("Question answered",
 		"threadID", handlerCtx.ThreadID,
 		"subject", subject,
-		"isComplete", isComplete,
 	)
 
-	// If complete, directly emit the answer - no LLM call needed
-	if isComplete {
-		messageID := domain.GenerateMessageID()
-		assistantEvent := &core.AssistantMessageCompletedEvent{
-			BaseEvent: core.BaseEvent{
-				Type:      "AssistantMessageCompleted",
-				Timestamp: time.Now(),
-				ThreadID:  handlerCtx.ThreadID,
-			},
-			MessageID: messageID,
-			Content:   answer,
-			AgentName: "student-facing-agent",
-		}
-
-		if err := handlerCtx.State.Update(assistantEvent); err != nil {
-			return err
-		}
-		if err := handlerCtx.Notifier.HandleDomainEvent(assistantEvent); err != nil {
-			return err
-		}
-
-		slog.Info("Final answer presented to user")
-		return nil
-	}
-
-	// If incomplete, invoke agent to determine what's still needed
+	// Get the AgentThread to let the agent process the answer and update todos
 	stateWithStore, ok := handlerCtx.State.(core.ThreadStateWithStore)
 	if !ok {
 		return fmt.Errorf("state does not implement ThreadStateWithStore")
@@ -117,15 +89,21 @@ func handleQuestionAnswered(ctx context.Context, handlerCtx *agents.EventHandler
 		return fmt.Errorf("thread not found: %s", handlerCtx.ThreadID)
 	}
 
+	// Create a message instructing the agent to update todos and check completion
 	triggerMsg := domain.Message{
 		ID:        domain.GenerateMessageID(),
-		Role:      "user",
+		Role:      "system",
 		Timestamp: time.Now(),
-		Content: fmt.Sprintf(`A %s specialist has completed partial work (marked as incomplete).
+		Content: fmt.Sprintf(`A %s specialist has answered. The answer is on the whiteboard.
 
-Current answer: %s
+Instructions:
+1. Update your todos with write_todos() - mark the completed routing as "completed"
+2. Sync the updated plan with write_whiteboard()
+3. Check if ALL todos are completed:
+   - If YES: Present the final answer to the user based on the whiteboard content
+   - If NO: Continue routing to the next specialist for pending todos
 
-Determine what's still missing from the original question and route to the appropriate specialist.`, subject, answer),
+Remember: You are a routing coordinator. Check the routing plan and continue until everything is done.`, subject),
 	}
 	_ = agentThread.AddMessages([]domain.Message{triggerMsg})
 
@@ -138,7 +116,7 @@ Determine what's still missing from the original question and route to the appro
 		return err
 	}
 
-	slog.Info("Question answered event handled successfully")
+	slog.Info("Question answered event handled - agent processing completion")
 	return nil
 }
 

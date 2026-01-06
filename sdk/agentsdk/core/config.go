@@ -1,6 +1,10 @@
 package core
 
-import "school-with-ai/sdk/agentsdk/llm"
+import (
+	"context"
+
+	"school-with-ai/sdk/agentsdk/llm"
+)
 
 // EventNotifier is the interface for handling domain events from agents
 type EventNotifier interface {
@@ -15,6 +19,9 @@ type AgentConfig struct {
 	// Behavior
 	SystemPrompt string // Instructions for how the agent should behave
 	Tools        []Tool // Available tools for this agent (implements Tool interface)
+
+	// Middleware
+	Middleware []Middleware // Middleware chain for request/response processing
 
 	// LLM Parameters (defaults for all runs)
 	Temperature      *float64 // Default temperature (0.0-2.0)
@@ -36,6 +43,7 @@ func DefaultConfig(name string) AgentConfig {
 		Name:         name,
 		SystemPrompt: "You are a helpful assistant.",
 		Tools:        []Tool{},
+		Middleware:   []Middleware{},
 	}
 }
 
@@ -52,70 +60,54 @@ func ToAITools(tools []Tool) []llm.AITool {
 	return result
 }
 
-// ToChatOptions builds ChatOptions from agent configuration and run options.
-// RunOptions take precedence over AgentConfig values when both are set.
-func ToChatOptions(config AgentConfig, runOpts RunOptions) *llm.ChatOptions {
+// ToChatOptionsWithMiddleware builds ChatOptions from agent configuration and run options,
+// applying middleware transformations. This is the middleware-aware version of ToChatOptions.
+// It executes the middleware chain to collect additional tools and system prompt modifications.
+// Returns the ChatOptions and the RequestContext (which may have Terminate=true if middleware
+// short-circuited).
+func ToChatOptionsWithMiddleware(ctx context.Context, config AgentConfig, messages []llm.ChatMessage, runOpts RunOptions) (*llm.ChatOptions, *RequestContext, error) {
+	// Apply middleware to get the request context
+	reqCtx, err := ApplyMiddleware(ctx, config, messages, runOpts)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Build ChatOptions from the middleware-modified request context
 	opts := &llm.ChatOptions{
-		Instructions: config.SystemPrompt,
-		Tools:        ToAITools(config.Tools),
+		Instructions: reqCtx.GetEffectiveSystemPrompt(),
+		Tools:        ToAITools(reqCtx.GetEffectiveTools()),
 		ToolMode:     llm.ToolModeAuto,
 	}
 
-	// Apply config defaults
-	if config.Temperature != nil {
-		opts.Temperature = config.Temperature
+	// Apply config parameters from request context
+	if reqCtx.Config.Temperature != nil {
+		opts.Temperature = reqCtx.Config.Temperature
 	}
-	if config.MaxTokens != nil {
-		opts.MaxOutputTokens = config.MaxTokens
+	if reqCtx.Config.MaxTokens != nil {
+		opts.MaxOutputTokens = reqCtx.Config.MaxTokens
 	}
-	if config.TopP != nil {
-		opts.TopP = config.TopP
+	if reqCtx.Config.TopP != nil {
+		opts.TopP = reqCtx.Config.TopP
 	}
-	if config.FrequencyPenalty != nil {
-		opts.FrequencyPenalty = config.FrequencyPenalty
+	if reqCtx.Config.FrequencyPenalty != nil {
+		opts.FrequencyPenalty = reqCtx.Config.FrequencyPenalty
 	}
-	if config.PresencePenalty != nil {
-		opts.PresencePenalty = config.PresencePenalty
+	if reqCtx.Config.PresencePenalty != nil {
+		opts.PresencePenalty = reqCtx.Config.PresencePenalty
 	}
-	if config.StopSequences != nil {
-		opts.StopSequences = make([]string, len(config.StopSequences))
-		copy(opts.StopSequences, config.StopSequences)
+	if reqCtx.Config.StopSequences != nil {
+		opts.StopSequences = make([]string, len(reqCtx.Config.StopSequences))
+		copy(opts.StopSequences, reqCtx.Config.StopSequences)
 	}
-	if config.ModelID != "" {
-		opts.ModelID = config.ModelID
+	if reqCtx.Config.ModelID != "" {
+		opts.ModelID = reqCtx.Config.ModelID
 	}
-	if config.Seed != nil {
-		opts.Seed = config.Seed
+	if reqCtx.Config.Seed != nil {
+		opts.Seed = reqCtx.Config.Seed
 	}
 
-	// Apply run options overrides
-	if runOpts.Temperature != nil {
-		opts.Temperature = runOpts.Temperature
-	}
-	if runOpts.MaxTokens != nil {
-		opts.MaxOutputTokens = runOpts.MaxTokens
-	}
-	if runOpts.TopP != nil {
-		opts.TopP = runOpts.TopP
-	}
-	if runOpts.FrequencyPenalty != nil {
-		opts.FrequencyPenalty = runOpts.FrequencyPenalty
-	}
-	if runOpts.PresencePenalty != nil {
-		opts.PresencePenalty = runOpts.PresencePenalty
-	}
-	if runOpts.StopSequences != nil {
-		opts.StopSequences = make([]string, len(runOpts.StopSequences))
-		copy(opts.StopSequences, runOpts.StopSequences)
-	}
-	if runOpts.ModelID != "" {
-		opts.ModelID = runOpts.ModelID
-	}
-	if runOpts.Seed != nil {
-		opts.Seed = runOpts.Seed
-	}
-	// Merge additional properties
-	if runOpts.AdditionalProperties != nil {
+	// Merge additional properties from run options
+	if len(runOpts.AdditionalProperties) > 0 {
 		if opts.AdditionalProperties == nil {
 			opts.AdditionalProperties = make(map[string]any)
 		}
@@ -124,5 +116,91 @@ func ToChatOptions(config AgentConfig, runOpts RunOptions) *llm.ChatOptions {
 		}
 	}
 
-	return opts
+	return opts, reqCtx, nil
+}
+
+// ApplyMiddleware executes the middleware chain on initial request context
+// to collect additional tools and system prompt modifications. This is called
+// before the LLM request to gather middleware contributions.
+func ApplyMiddleware(ctx context.Context, config AgentConfig, messages []llm.ChatMessage, runOpts RunOptions) (*RequestContext, error) {
+	// Build initial request context with minimal config
+	initialConfig := &AgentConfig{}
+	reqCtx := NewRequestContext(messages, config.SystemPrompt, config.Tools, initialConfig)
+
+	// Copy config parameters to request context
+	if config.Temperature != nil {
+		reqCtx.Config.Temperature = config.Temperature
+	}
+	if config.MaxTokens != nil {
+		reqCtx.Config.MaxTokens = config.MaxTokens
+	}
+	if config.TopP != nil {
+		reqCtx.Config.TopP = config.TopP
+	}
+	if config.FrequencyPenalty != nil {
+		reqCtx.Config.FrequencyPenalty = config.FrequencyPenalty
+	}
+	if config.PresencePenalty != nil {
+		reqCtx.Config.PresencePenalty = config.PresencePenalty
+	}
+	if config.StopSequences != nil {
+		reqCtx.Config.StopSequences = make([]string, len(config.StopSequences))
+		copy(reqCtx.Config.StopSequences, config.StopSequences)
+	}
+	if config.ModelID != "" {
+		reqCtx.Config.ModelID = config.ModelID
+	}
+	if config.Seed != nil {
+		reqCtx.Config.Seed = config.Seed
+	}
+
+	// Apply run options overrides
+	if runOpts.Temperature != nil {
+		reqCtx.Config.Temperature = runOpts.Temperature
+	}
+	if runOpts.MaxTokens != nil {
+		reqCtx.Config.MaxTokens = runOpts.MaxTokens
+	}
+	if runOpts.TopP != nil {
+		reqCtx.Config.TopP = runOpts.TopP
+	}
+	if runOpts.FrequencyPenalty != nil {
+		reqCtx.Config.FrequencyPenalty = runOpts.FrequencyPenalty
+	}
+	if runOpts.PresencePenalty != nil {
+		reqCtx.Config.PresencePenalty = runOpts.PresencePenalty
+	}
+	if runOpts.StopSequences != nil {
+		reqCtx.Config.StopSequences = make([]string, len(runOpts.StopSequences))
+		copy(reqCtx.Config.StopSequences, runOpts.StopSequences)
+	}
+	if runOpts.ModelID != "" {
+		reqCtx.Config.ModelID = runOpts.ModelID
+	}
+	if runOpts.Seed != nil {
+		reqCtx.Config.Seed = runOpts.Seed
+	}
+	// Note: AdditionalProperties are handled separately in ChatOptions
+
+	// Execute middleware chain if any middleware is configured
+	if len(config.Middleware) > 0 {
+		// Use a no-op handler - we're only running the "before" phase here
+		// The actual LLM call happens in the service layer
+		noOpHandler := func(ctx context.Context, reqCtx *RequestContext) error {
+			return nil // No-op
+		}
+
+		chain := ChainMiddleware(config.Middleware, noOpHandler)
+
+		if err := chain(ctx, reqCtx); err != nil {
+			return nil, err
+		}
+
+		// Check if middleware terminated early
+		if reqCtx.Terminate {
+			return reqCtx, nil
+		}
+	}
+
+	return reqCtx, nil
 }

@@ -32,24 +32,19 @@ func (t *EmitQuestionAnsweredTool) Parameters() map[string]any {
 				"description": "The subject of the question answered",
 				"enum":        []string{"math", "physics", "chemistry", "statistics", "linearalgebra", "diagramming"},
 			},
-			"is_complete": map[string]any{
-				"type":        "boolean",
-				"description": "Whether the answer is complete or if additional specialists are needed",
-			},
 			"summary": map[string]any{
 				"type":        "string",
 				"description": "Brief summary of what was answered",
 			},
 		},
-		"required": []string{"subject", "is_complete"},
+		"required": []string{"subject"},
 	}
 }
 
 func (t *EmitQuestionAnsweredTool) Invoke(ctx context.Context, arguments string) (string, error) {
 	var params struct {
-		Subject    string `json:"subject"`
-		IsComplete bool   `json:"is_complete"`
-		Summary    string `json:"summary"`
+		Subject string `json:"subject"`
+		Summary string `json:"summary"`
 	}
 	if err := json.Unmarshal([]byte(arguments), &params); err != nil {
 		return "", fmt.Errorf("failed to parse arguments: %w", err)
@@ -68,10 +63,5 @@ func (t *EmitQuestionAnsweredTool) Invoke(ctx context.Context, arguments string)
 		return "", fmt.Errorf("invalid subject: %s", params.Subject)
 	}
 
-	status := "complete"
-	if !params.IsComplete {
-		status = "partial (additional specialists needed)"
-	}
-
-	return fmt.Sprintf("QuestionAnswered event emitted. Subject: %s, Status: %s", params.Subject, status), nil
+	return fmt.Sprintf("QuestionAnswered event emitted. Subject: %s", params.Subject), nil
 }
