@@ -4,16 +4,21 @@ import (
 	"context"
 
 	"school-with-ai/domain"
-	sdk "school-with-ai/sdk/agent-sdk/core"
 )
+
+// ThreadStore provides read access to thread state
+type ThreadStore interface {
+	Get(threadID string) (*domain.Thread, bool)
+	All() []domain.Thread
+}
 
 // ChatReadService provides read operations for chat management
 type ChatReadService struct {
-	threadStore sdk.ThreadStore
+	threadStore ThreadStore
 }
 
 // New creates a new chat read service
-func New(threadStore sdk.ThreadStore) *ChatReadService {
+func New(threadStore ThreadStore) *ChatReadService {
 	return &ChatReadService{
 		threadStore: threadStore,
 	}

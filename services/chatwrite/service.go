@@ -3,12 +3,38 @@ package chatwrite
 import (
 	"context"
 	"fmt"
+	"iter"
 	"time"
 
 	"school-with-ai/domain"
 	sdk "school-with-ai/sdk/agent-sdk/core"
 	"school-with-ai/sdk/agent-sdk/llm"
 )
+
+// ChatClient defines the interface for LLM providers (OpenAI, Anthropic, Ollama, etc.)
+type ChatClient interface {
+	GetStreamingResponse(
+		ctx context.Context,
+		messages []llm.ChatMessage,
+		options *llm.ChatOptions,
+	) iter.Seq2[llm.ChatResponseUpdate, error]
+}
+
+// EventStore is the source of truth in the event sourcing architecture
+type EventStore interface {
+	Append(ctx context.Context, streamID string, events ...sdk.Event) (int64, error)
+	ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]sdk.Event, error)
+}
+
+// ThreadStore provides read access to thread state
+type ThreadStore interface {
+	GetAgentThread(threadID string) (sdk.AgentThread, bool)
+	GetOrCreateAgentThread(ctx context.Context, threadID string) (sdk.AgentThread, error)
+	Get(threadID string) (*domain.Thread, bool)
+	Messages(threadID string) []domain.Message
+	All() []domain.Thread
+	Update(event sdk.Event) error
+}
 
 // ToolCallHandler is called after a tool is executed, allowing custom event emission
 type ToolCallHandler func(threadID string, agentName string, toolCall domain.ToolCall, result string, eventEmitter func(sdk.Event) error) error
@@ -20,9 +46,9 @@ type ShouldContinueIterationFn func(toolCalls []domain.ToolCall) bool
 // Each agent is responsible for registering its own event notifications
 type ChatWriteService struct {
 	config                  sdk.AgentConfig
-	chatClient              sdk.ChatClient
-	writeModel              sdk.EventStore
-	readModel               sdk.ThreadStore
+	chatClient              ChatClient
+	writeModel              EventStore
+	readModel               ThreadStore
 	toolRegistry            *sdk.ToolRegistry
 	toolExecutor            sdk.ToolExecutor
 	notifier                sdk.EventNotifier // Agent's own notifier
@@ -55,7 +81,7 @@ func WithShouldContinueIteration(fn ShouldContinueIterationFn) Option {
 }
 
 // New creates a new chat write service with event sourcing (no UI dependencies)
-func New(chatClient sdk.ChatClient, writeModel sdk.EventStore, readModel sdk.ThreadStore, opts ...Option) *ChatWriteService {
+func New(chatClient ChatClient, writeModel EventStore, readModel ThreadStore, opts ...Option) *ChatWriteService {
 	// Create tool registry
 	toolRegistry := sdk.NewToolRegistry()
 

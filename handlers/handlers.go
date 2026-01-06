@@ -1,21 +1,49 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"iter"
 	"log/slog"
 	"net/http"
 	"time"
 
 	"school-with-ai/domain"
 	sdk "school-with-ai/sdk/agent-sdk/core"
+	"school-with-ai/sdk/agent-sdk/llm"
 	"school-with-ai/services"
 	"school-with-ai/services/chatwrite"
 	"school-with-ai/services/orchestration"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
+
+// ChatClient defines the interface for LLM providers
+type ChatClient interface {
+	GetStreamingResponse(
+		ctx context.Context,
+		messages []llm.ChatMessage,
+		options *llm.ChatOptions,
+	) iter.Seq2[llm.ChatResponseUpdate, error]
+}
+
+// EventStore is the source of truth in the event sourcing architecture
+type EventStore interface {
+	Append(ctx context.Context, streamID string, events ...sdk.Event) (int64, error)
+	ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]sdk.Event, error)
+}
+
+// ThreadStore provides read access to thread state
+type ThreadStore interface {
+	GetAgentThread(threadID string) (sdk.AgentThread, bool)
+	GetOrCreateAgentThread(ctx context.Context, threadID string) (sdk.AgentThread, error)
+	Get(threadID string) (*domain.Thread, bool)
+	Messages(threadID string) []domain.Message
+	All() []domain.Thread
+	Update(event sdk.Event) error
+}
 
 // ErrJobNotFound is returned when a job is not found
 var ErrJobNotFound = errors.New("job not found")
@@ -43,9 +71,9 @@ func writeSSEEvent(w http.ResponseWriter, event interface{}) error {
 
 // Handler encapsulates dependencies for HTTP handlers
 type Handler struct {
-	state             sdk.ThreadStore
-	log               sdk.EventStore
-	chatClient        sdk.ChatClient
+	state             ThreadStore
+	log               EventStore
+	chatClient        ChatClient
 	queue             domain.JobQueue
 	workerPool        *orchestration.WorkerPool
 	chatWriteService  *chatwrite.ChatWriteService
@@ -55,9 +83,9 @@ type Handler struct {
 
 // NewHandler creates a new HTTP handler with the given dependencies
 func NewHandler(
-	log sdk.EventStore,
-	state sdk.ThreadStore,
-	chatClient sdk.ChatClient,
+	log EventStore,
+	state ThreadStore,
+	chatClient ChatClient,
 	queue domain.JobQueue,
 	workerPool *orchestration.WorkerPool,
 	chatWriteService *chatwrite.ChatWriteService,

@@ -7,12 +7,19 @@ import (
 	"school-with-ai/services/chatwrite"
 )
 
+// ThreadStore provides read access to thread state
+type ThreadStore interface {
+	GetAgentThread(threadID string) (sdk.AgentThread, bool)
+	GetOrCreateAgentThread(ctx context.Context, threadID string) (sdk.AgentThread, error)
+	Update(event sdk.Event) error
+}
+
 // EventHandlerContext provides the context needed for event handlers to execute.
 type EventHandlerContext struct {
 	ThreadID string
 	Event    *DomainEvent
 	Agent    *chatwrite.ChatWriteService
-	State    sdk.ThreadStore
+	State    ThreadStore
 	Notifier sdk.EventNotifier
 }
 
