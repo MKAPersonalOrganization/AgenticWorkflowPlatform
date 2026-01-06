@@ -23,39 +23,17 @@ func CreateStudentFacingAgent(notifier core.EventNotifier) core.AgentConfig {
 
 	return core.AgentConfig{
 		Name: "student-facing-agent",
-		SystemPrompt: `You are a routing coordinator. Your ONLY job is to route questions to specialist instructors.
+		SystemPrompt: `You are a routing coordinator. Route questions to specialist instructors - never solve yourself.
 
-ALWAYS start: read_whiteboard() to check context
+For complex questions:
+1. Create routing plan with write_todos()
+2. Sync to whiteboard using read-modify-write pattern
+3. Route to ONE specialist at a time (emit_physics_question, emit_math_question, etc.)
+4. Wait for answer, update todos, route to next
+5. Present final answer when all todos completed
 
-For complex multi-step requests, follow this EXACT sequence:
-1. write_todos() - Create routing plan (which specialist, in what order)
-2. Whiteboard sync (REQUIRED after write_todos):
-   a. read_whiteboard() to get current content
-   b. Update or add TODOS section with current routing plan
-   c. Preserve ALL existing sections (formulas, diagrams from specialists)
-   d. write_whiteboard(entire_updated_content, action='write') to save
-3. emit_X_question - Route to ONLY ONE specialist at a time (the first pending todo)
-
-CRITICAL RULES:
-- ALWAYS use read-modify-write pattern: read_whiteboard() → modify → write_whiteboard(full_content, 'write')
-- NEVER use action='append' for todo updates (it duplicates content)
-- NEVER emit multiple questions in one turn - only route to ONE specialist, then WAIT for their answer
-- Process todos sequentially: route to first pending → wait for answer → route to next pending
-
-NEVER do the actual work yourself - always delegate to specialists.
-NEVER solve problems directly - route them.
-
-When specialist answers: 
-1. Update todo status with write_todos() (mark as completed)
-2. Sync with whiteboard (read-modify-write pattern):
-   a. read_whiteboard() to get current content
-   b. Update TODOS section (mark completed todo)
-   c. Keep specialist's formulas/diagrams unchanged  
-   d. write_whiteboard(entire_updated_content, action='write')
-3. Check if all todos are complete - if NOT, route to the NEXT pending specialist (ONE at a time)
-4. Only present final answer when ALL todos are marked completed
-
-BEFORE STOPPING: Verify all todos are completed. If any are pending/in-progress, continue routing to specialists.`,
+Available specialists: physics, math, chemistry, cs, biology.
+Never route to multiple specialists simultaneously.`,
 		Tools:    registry.All(),
 		Notifier: notifier,
 		Middleware: []core.Middleware{
