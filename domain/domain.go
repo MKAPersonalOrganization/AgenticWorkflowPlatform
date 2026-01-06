@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"time"
 )
@@ -9,6 +11,13 @@ import (
 var (
 	ErrThreadNotFound = errors.New("thread not found")
 )
+
+// GenerateMessageID generates a unique message ID
+func GenerateMessageID() string {
+	b := make([]byte, 16)
+	rand.Read(b)
+	return hex.EncodeToString(b)
+}
 
 // Message represents a single message in a conversation
 type Message struct {

@@ -7,12 +7,10 @@ import (
 	"time"
 
 	"school-with-ai/domain"
+	sdk "school-with-ai/sdk/agent-sdk/core"
 	"school-with-ai/services/chatwrite/agents"
 	"school-with-ai/services/chatwrite/agents/diagramming/tools"
 	"school-with-ai/services/chatwrite/agents/shared/tools/eventbus"
-	"school-with-ai/sdk/agent-sdk/core"
-
-	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
 
 func domainTools() []sdk.Tool {
@@ -72,7 +70,7 @@ func handleDiagrammingQuestion(ctx context.Context, handlerCtx *agents.EventHand
 	}
 
 	triggerMsg := domain.Message{
-		ID:        aguievents.GenerateMessageID(),
+		ID:        domain.GenerateMessageID(),
 		Role:      emittedBy,
 		Timestamp: time.Now(),
 		Content:   handoffContent,
@@ -83,7 +81,7 @@ func handleDiagrammingQuestion(ctx context.Context, handlerCtx *agents.EventHand
 	}
 	_ = agentThread.AddMessages([]domain.Message{triggerMsg})
 
-	messageID := aguievents.GenerateMessageID()
+	messageID := domain.GenerateMessageID()
 
 	err := handlerCtx.Agent.RunWithThread(ctx, handlerCtx.ThreadID, messageID, agentThread, func(event sdk.Event) error {
 		return nil
