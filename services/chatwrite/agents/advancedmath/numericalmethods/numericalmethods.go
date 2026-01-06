@@ -1,9 +1,9 @@
 package numericalmethods
 
 import (
+	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/services/chatwrite/agents/advancedmath/numericalmethods/tools"
 	sharedtools "school-with-ai/services/chatwrite/agents/shared/tools"
-	"school-with-ai/sdk/agentsdk/core"
 )
 
 // CreateNumericalMethodsProfessor creates the numerical methods professor agent
@@ -13,7 +13,6 @@ func CreateNumericalMethodsProfessor(notifier core.EventNotifier) core.AgentConf
 	// Shared tools
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
 	registry.Register(sharedtools.NewReadWhiteboardTool())
-	registry.Register(sharedtools.NewEmitQuestionAnsweredTool())
 
 	// Numerical methods specific tools
 	registry.Register(tools.NewRootFindingTool())
@@ -87,7 +86,7 @@ $$
 $$
 \int_a^b f(x)dx \approx \sum_{i=1}^n w_i f(x_i)
 $$`,
-		Tools:            registry.All(),
-		Notifier:         notifier,
+		Tools:    registry.All(),
+		Notifier: notifier,
 	}
 }

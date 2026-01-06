@@ -148,16 +148,17 @@ func TestTransferToAgentTool_Parameters(t *testing.T) {
 		t.Fatal("Expected required field to be []string")
 	}
 
-	if len(required) != 2 {
-		t.Errorf("Expected 2 required fields, got %d", len(required))
+	if len(required) != 1 {
+		t.Errorf("Expected 1 required field, got %d", len(required))
 	}
 
 	if !containsString(required, "agent_name") {
 		t.Error("Expected agent_name to be required")
 	}
 
-	if !containsString(required, "question") {
-		t.Error("Expected question to be required")
+	// question is optional for return handoffs
+	if containsString(required, "question") {
+		t.Error("Expected question to be optional (not required)")
 	}
 
 	// Check properties
@@ -274,14 +275,29 @@ func TestTransferToAgentTool_Invoke_MissingQuestion(t *testing.T) {
 	}
 
 	argsJSON, _ := json.Marshal(args)
-	_, err := tool.Invoke(context.Background(), string(argsJSON))
+	result, err := tool.Invoke(context.Background(), string(argsJSON))
 
-	if err == nil {
-		t.Error("Expected error for missing question")
+	// question is optional, so this should succeed
+	if err != nil {
+		t.Errorf("Expected no error for missing question (it's optional), got %v", err)
 	}
 
-	if !contains(err.Error(), "question") {
-		t.Errorf("Expected error to mention question, got %v", err)
+	if !contains(result, "Successfully") {
+		t.Errorf("Expected Successfully result, got %s", result)
+	}
+
+	// Verify handoff was stored
+	handoff, ok := GetHandoff(reqCtx)
+	if !ok || handoff == nil {
+		t.Fatal("Expected handoff to be stored")
+	}
+
+	if handoff.TargetAgent != "math" {
+		t.Errorf("Expected ToAgent to be math, got %s", handoff.TargetAgent)
+	}
+
+	if handoff.Question != "" {
+		t.Errorf("Expected Question to be empty, got %s", handoff.Question)
 	}
 }
 

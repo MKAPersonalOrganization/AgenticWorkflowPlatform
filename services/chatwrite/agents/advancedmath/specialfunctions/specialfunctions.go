@@ -1,9 +1,9 @@
 package specialfunctions
 
 import (
+	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/services/chatwrite/agents/advancedmath/specialfunctions/tools"
 	sharedtools "school-with-ai/services/chatwrite/agents/shared/tools"
-	"school-with-ai/sdk/agentsdk/core"
 )
 
 // CreateSpecialFunctionsProfessor creates the special functions professor agent
@@ -13,7 +13,6 @@ func CreateSpecialFunctionsProfessor(notifier core.EventNotifier) core.AgentConf
 	// Shared tools
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
 	registry.Register(sharedtools.NewReadWhiteboardTool())
-	registry.Register(sharedtools.NewEmitQuestionAnsweredTool())
 
 	// Special functions specific tools
 	registry.Register(tools.NewBesselFunctionsTool())
@@ -93,7 +92,7 @@ $$
 $$
 \hat{f}(\omega) = \int_{-\infty}^{\infty} f(t) e^{-i\omega t} dt
 $$`,
-		Tools:            registry.All(),
-		Notifier:         notifier,
+		Tools:    registry.All(),
+		Notifier: notifier,
 	}
 }

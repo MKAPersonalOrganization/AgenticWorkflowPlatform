@@ -1,9 +1,8 @@
 package statistics
 
 import (
-	sharedtools "school-with-ai/services/chatwrite/agents/shared/tools"
-	"school-with-ai/services/chatwrite/agents/shared/tools/eventbus"
 	"school-with-ai/sdk/agentsdk/core"
+	sharedtools "school-with-ai/services/chatwrite/agents/shared/tools"
 )
 
 // CreateStatisticsInstructor creates the statistics instructor agent.
@@ -16,12 +15,6 @@ func CreateStatisticsInstructor(notifier core.EventNotifier) core.AgentConfig {
 		registry.Register(tool)
 	}
 
-	// Auto-generated emission tools
-	for _, tool := range eventbus.GenerateEmissionTools(emits()) {
-		registry.Register(tool)
-	}
-	// Custom emit_question_answered tool (not auto-generated)
-	registry.Register(sharedtools.NewEmitQuestionAnsweredTool())
 	// Shared collaboration tools
 	registry.Register(sharedtools.NewReadWhiteboardTool())
 	registry.Register(sharedtools.NewWriteWhiteboardTool())

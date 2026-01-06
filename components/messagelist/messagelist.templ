@@ -77,42 +77,15 @@ templ MessageList() {
 									<template x-if="message.name === 'read_whiteboard'">
 										<div class="text-xs">Reading current whiteboard content</div>
 									</template>
-									<template x-if="message.name === 'emit_math_question'">
+									<template x-if="message.name === 'transfer_to_agent'">
 										<div>
-											<span class="font-medium">Question:</span>
-											<span x-text="message.parsedArgs?.question || ''"></span>
-										</div>
-									</template>
-									<template x-if="message.name === 'emit_physics_question'">
-										<div>
-											<span class="font-medium">Question:</span>
-											<span x-text="message.parsedArgs?.question || ''"></span>
-										</div>
-									</template>
-									<template x-if="message.name === 'emit_chemistry_question'">
-										<div>
-											<span class="font-medium">Question:</span>
-											<span x-text="message.parsedArgs?.question || ''"></span>
-										</div>
-									</template>
-									<template x-if="message.name === 'emit_statistics_question'">
-										<div>
-											<span class="font-medium">Question:</span>
-											<span x-text="message.parsedArgs?.question || ''"></span>
-										</div>
-									</template>
-									<template x-if="message.name === 'emit_linear_algebra_question'">
-										<div>
-											<span class="font-medium">Question:</span>
-											<span x-text="message.parsedArgs?.question || ''"></span>
-										</div>
-									</template>
-									<template x-if="message.name === 'emit_question_answered'">
-										<div>
-											<span class="font-medium">Subject:</span>
-											<span x-text="message.parsedArgs?.subject || ''"></span>
-											<template x-if="message.parsedArgs?.is_complete">
-												<span class="ml-2 text-green-600">✓ Complete</span>
+											<span class="font-medium">Transferring to:</span>
+											<span x-text="message.parsedArgs?.agent_name || ''"></span>
+											<template x-if="message.parsedArgs?.question">
+												<div class="mt-1 text-xs">
+													<span class="font-medium">Question:</span>
+													<span x-text="message.parsedArgs?.question || ''"></span>
+												</div>
 											</template>
 										</div>
 									</template>
@@ -175,11 +148,8 @@ templ MessageList() {
 											<span x-text="(JSON.parse(message.result).content || '').length"></span> characters
 										</div>
 									</template>
-									<template x-if="(message.name === 'emit_math_question' || message.name === 'emit_physics_question' || message.name === 'emit_chemistry_question' || message.name === 'emit_statistics_question' || message.name === 'emit_linear_algebra_question') && isValidJSON(message.result)">
-										<div class="text-green-600 font-medium">✓ Question routed to specialist</div>
-									</template>
-									<template x-if="message.name === 'emit_question_answered' && isValidJSON(message.result)">
-										<div class="text-green-600 font-medium">✓ Answer recorded</div>
+									<template x-if="message.name === 'transfer_to_agent' && isValidJSON(message.result)">
+										<div class="text-green-600 font-medium">✓ Handoff successful</div>
 									</template>
 								</div>
 								<div class="relative">
