@@ -1,4 +1,4 @@
-package sdk_test
+package core_test
 
 import (
 	"context"
@@ -9,13 +9,13 @@ import (
 )
 
 func TestFunctionTool(t *testing.T) {
-	tool := sdk.NewFunctionTool(
+	tool := core.NewFunctionTool(
 		"get_weather",
 		"Get the current weather for a location",
-		sdk.ObjectSchema(
+		core.ObjectSchema(
 			map[string]any{
-				"location": sdk.StringProperty("The city name"),
-				"unit":     sdk.EnumProperty("Temperature unit", []string{"celsius", "fahrenheit"}),
+				"location": core.StringProperty("The city name"),
+				"unit":     core.EnumProperty("Temperature unit", []string{"celsius", "fahrenheit"}),
 			},
 			[]string{"location"},
 		),
@@ -71,20 +71,20 @@ func TestFunctionTool(t *testing.T) {
 }
 
 func TestToolRegistry(t *testing.T) {
-	registry := sdk.NewToolRegistry()
+	registry := core.NewToolRegistry()
 
 	// Register some tools
-	weatherTool := sdk.NewFunctionTool(
+	weatherTool := core.NewFunctionTool(
 		"get_weather",
 		"Get weather",
-		sdk.ObjectSchema(map[string]any{"location": sdk.StringProperty("City")}, []string{"location"}),
+		core.ObjectSchema(map[string]any{"location": core.StringProperty("City")}, []string{"location"}),
 		func(ctx context.Context, args string) (string, error) { return `{"temp": 20}`, nil },
 	)
 
-	calcTool := sdk.NewFunctionTool(
+	calcTool := core.NewFunctionTool(
 		"calculate",
 		"Calculate expression",
-		sdk.ObjectSchema(map[string]any{"expression": sdk.StringProperty("Math expression")}, []string{"expression"}),
+		core.ObjectSchema(map[string]any{"expression": core.StringProperty("Math expression")}, []string{"expression"}),
 		func(ctx context.Context, args string) (string, error) { return `{"result": 42}`, nil },
 	)
 
@@ -125,20 +125,20 @@ func TestToolRegistry(t *testing.T) {
 }
 
 func TestToToolSpec(t *testing.T) {
-	tool := sdk.NewFunctionTool(
+	tool := core.NewFunctionTool(
 		"test_tool",
 		"A test tool",
-		sdk.ObjectSchema(
+		core.ObjectSchema(
 			map[string]any{
-				"param1": sdk.StringProperty("First parameter"),
-				"param2": sdk.IntegerProperty("Second parameter"),
+				"param1": core.StringProperty("First parameter"),
+				"param2": core.IntegerProperty("Second parameter"),
 			},
 			[]string{"param1"},
 		),
 		func(ctx context.Context, args string) (string, error) { return "{}", nil },
 	)
 
-	spec := sdk.ToToolSpec(tool)
+	spec := core.ToToolSpec(tool)
 
 	if spec.Type != "function" {
 		t.Errorf("expected type 'function', got '%s'", spec.Type)
@@ -167,7 +167,7 @@ func TestParseArguments(t *testing.T) {
 		Unit     string `json:"unit"`
 	}
 
-	args, err := sdk.ParseArguments[Args](`{"location": "Paris", "unit": "celsius"}`)
+	args, err := core.ParseArguments[Args](`{"location": "Paris", "unit": "celsius"}`)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -182,9 +182,9 @@ func TestParseArguments(t *testing.T) {
 
 func TestSchemaHelpers(t *testing.T) {
 	// Test ObjectSchema
-	objSchema := sdk.ObjectSchema(
+	objSchema := core.ObjectSchema(
 		map[string]any{
-			"name": sdk.StringProperty("The name"),
+			"name": core.StringProperty("The name"),
 		},
 		[]string{"name"},
 	)
@@ -193,7 +193,7 @@ func TestSchemaHelpers(t *testing.T) {
 	}
 
 	// Test StringProperty
-	strProp := sdk.StringProperty("A string")
+	strProp := core.StringProperty("A string")
 	if strProp["type"] != "string" {
 		t.Errorf("expected type 'string'")
 	}
@@ -202,25 +202,25 @@ func TestSchemaHelpers(t *testing.T) {
 	}
 
 	// Test IntegerProperty
-	intProp := sdk.IntegerProperty("A number")
+	intProp := core.IntegerProperty("A number")
 	if intProp["type"] != "integer" {
 		t.Errorf("expected type 'integer'")
 	}
 
 	// Test NumberProperty
-	numProp := sdk.NumberProperty("A decimal")
+	numProp := core.NumberProperty("A decimal")
 	if numProp["type"] != "number" {
 		t.Errorf("expected type 'number'")
 	}
 
 	// Test BooleanProperty
-	boolProp := sdk.BooleanProperty("A flag")
+	boolProp := core.BooleanProperty("A flag")
 	if boolProp["type"] != "boolean" {
 		t.Errorf("expected type 'boolean'")
 	}
 
 	// Test EnumProperty
-	enumProp := sdk.EnumProperty("A choice", []string{"a", "b", "c"})
+	enumProp := core.EnumProperty("A choice", []string{"a", "b", "c"})
 	if enumProp["type"] != "string" {
 		t.Errorf("expected type 'string'")
 	}

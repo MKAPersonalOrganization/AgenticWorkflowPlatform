@@ -3,15 +3,15 @@ package agents
 import (
 	"context"
 
-	sdk "school-with-ai/sdk/agent-sdk/core"
+	"school-with-ai/sdk/agent-sdk/core"
 	"school-with-ai/services/chatwrite"
 )
 
 // ThreadStore provides read access to thread state
 type ThreadStore interface {
-	GetAgentThread(threadID string) (sdk.AgentThread, bool)
-	GetOrCreateAgentThread(ctx context.Context, threadID string) (sdk.AgentThread, error)
-	Update(event sdk.Event) error
+	GetAgentThread(threadID string) (core.AgentThread, bool)
+	GetOrCreateAgentThread(ctx context.Context, threadID string) (core.AgentThread, error)
+	Update(event core.Event) error
 }
 
 // EventHandlerContext provides the context needed for event handlers to execute.
@@ -20,7 +20,7 @@ type EventHandlerContext struct {
 	Event    *DomainEvent
 	Agent    *chatwrite.ChatWriteService
 	State    ThreadStore
-	Notifier sdk.EventNotifier
+	Notifier core.EventNotifier
 }
 
 // EventHandler is a function that handles a specific event type for an agent.

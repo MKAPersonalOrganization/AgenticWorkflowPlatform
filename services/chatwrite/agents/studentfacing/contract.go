@@ -7,14 +7,14 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	sdk "school-with-ai/sdk/agent-sdk/core"
+	"school-with-ai/sdk/agent-sdk/core"
 	"school-with-ai/services/chatwrite/agents"
 	"school-with-ai/services/chatwrite/agents/shared/tools/eventbus"
 )
 
-func domainTools() []sdk.Tool {
+func domainTools() []core.Tool {
 	// No domain-specific tools - this agent only routes
-	return []sdk.Tool{}
+	return []core.Tool{}
 }
 
 func emits() []agents.EventType {
@@ -43,7 +43,7 @@ func handleUserMessage(ctx context.Context, handlerCtx *agents.EventHandlerConte
 	)
 
 	// Get the AgentThread from state using ThreadStateWithStore interface
-	stateWithStore, ok := handlerCtx.State.(sdk.ThreadStateWithStore)
+	stateWithStore, ok := handlerCtx.State.(core.ThreadStateWithStore)
 	if !ok {
 		return fmt.Errorf("state does not implement ThreadStateWithStore")
 	}
@@ -58,9 +58,9 @@ func handleUserMessage(ctx context.Context, handlerCtx *agents.EventHandlerConte
 
 	messageID := domain.GenerateMessageID()
 
-	err := handlerCtx.Agent.RunWithThread(ctx, handlerCtx.ThreadID, messageID, agentThread, func(event sdk.Event) error {
+	err := handlerCtx.Agent.RunWithThread(ctx, handlerCtx.ThreadID, messageID, agentThread, func(event core.Event) error {
 		return nil
-	}, sdk.DefaultRunOptions())
+	}, core.DefaultRunOptions())
 	if err != nil {
 		slog.Error("User message handler failed", "error", err)
 		return err
@@ -84,8 +84,8 @@ func handleQuestionAnswered(ctx context.Context, handlerCtx *agents.EventHandler
 	// If complete, directly emit the answer - no LLM call needed
 	if isComplete {
 		messageID := domain.GenerateMessageID()
-		assistantEvent := &sdk.AssistantMessageCompletedEvent{
-			BaseEvent: sdk.BaseEvent{
+		assistantEvent := &core.AssistantMessageCompletedEvent{
+			BaseEvent: core.BaseEvent{
 				Type:      "AssistantMessageCompleted",
 				Timestamp: time.Now(),
 				ThreadID:  handlerCtx.ThreadID,
@@ -107,7 +107,7 @@ func handleQuestionAnswered(ctx context.Context, handlerCtx *agents.EventHandler
 	}
 
 	// If incomplete, invoke agent to determine what's still needed
-	stateWithStore, ok := handlerCtx.State.(sdk.ThreadStateWithStore)
+	stateWithStore, ok := handlerCtx.State.(core.ThreadStateWithStore)
 	if !ok {
 		return fmt.Errorf("state does not implement ThreadStateWithStore")
 	}
@@ -130,9 +130,9 @@ Determine what's still missing from the original question and route to the appro
 	_ = agentThread.AddMessages([]domain.Message{triggerMsg})
 
 	messageID := domain.GenerateMessageID()
-	err := handlerCtx.Agent.RunWithThread(ctx, handlerCtx.ThreadID, messageID, agentThread, func(event sdk.Event) error {
+	err := handlerCtx.Agent.RunWithThread(ctx, handlerCtx.ThreadID, messageID, agentThread, func(event core.Event) error {
 		return nil
-	}, sdk.DefaultRunOptions())
+	}, core.DefaultRunOptions())
 	if err != nil {
 		slog.Error("Student-facing handler failed", "error", err)
 		return err

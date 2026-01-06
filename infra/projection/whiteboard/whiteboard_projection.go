@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"school-with-ai/domain"
-	sdk "school-with-ai/sdk/agent-sdk/core"
+	"school-with-ai/sdk/agent-sdk/core"
 )
 
 // WhiteboardStore is a projection that maintains whiteboard content per thread.
@@ -103,12 +103,12 @@ func (p *InMemoryWhiteboardProjection) Update(event any) error {
 }
 
 // Apply updates the projection with a single event (implements eventstore.Projection).
-func (p *InMemoryWhiteboardProjection) Apply(ctx context.Context, event sdk.Event) error {
+func (p *InMemoryWhiteboardProjection) Apply(ctx context.Context, event core.Event) error {
 	return p.Update(event)
 }
 
 // Rebuild reconstructs the projection from the EventStore (implements eventstore.Projection).
-func (p *InMemoryWhiteboardProjection) Rebuild(ctx context.Context, store sdk.EventStore, streamID string) error {
+func (p *InMemoryWhiteboardProjection) Rebuild(ctx context.Context, store core.EventStore, streamID string) error {
 	// Read all events for the stream
 	events, err := store.ReadStream(ctx, streamID, 0)
 	if err != nil {

@@ -1,4 +1,4 @@
-package sdk_test
+package core_test
 
 import (
 	"testing"
@@ -8,7 +8,7 @@ import (
 )
 
 func TestToolCallAccumulator_NewToolCall(t *testing.T) {
-	acc := sdk.NewToolCallAccumulator()
+	acc := core.NewToolCallAccumulator()
 
 	// First update starts a new tool call
 	update := llm.ChatResponseUpdate{
@@ -40,7 +40,7 @@ func TestToolCallAccumulator_NewToolCall(t *testing.T) {
 }
 
 func TestToolCallAccumulator_ArgumentStreaming(t *testing.T) {
-	acc := sdk.NewToolCallAccumulator()
+	acc := core.NewToolCallAccumulator()
 
 	// Start tool call
 	acc.ProcessUpdate(llm.ChatResponseUpdate{
@@ -90,7 +90,7 @@ func TestToolCallAccumulator_ArgumentStreaming(t *testing.T) {
 }
 
 func TestToolCallAccumulator_MultipleToolCalls(t *testing.T) {
-	acc := sdk.NewToolCallAccumulator()
+	acc := core.NewToolCallAccumulator()
 
 	// First tool call
 	acc.ProcessUpdate(llm.ChatResponseUpdate{
@@ -135,7 +135,7 @@ func TestToolCallAccumulator_MultipleToolCalls(t *testing.T) {
 }
 
 func TestToolCallAccumulator_HasToolCalls(t *testing.T) {
-	acc := sdk.NewToolCallAccumulator()
+	acc := core.NewToolCallAccumulator()
 
 	if acc.HasToolCalls() {
 		t.Error("expected HasToolCalls to be false initially")
@@ -156,7 +156,7 @@ func TestToolCallAccumulator_HasToolCalls(t *testing.T) {
 }
 
 func TestToolCallAccumulator_UnknownIndex(t *testing.T) {
-	acc := sdk.NewToolCallAccumulator()
+	acc := core.NewToolCallAccumulator()
 
 	// Update for unknown index should not be processed
 	_, ok := acc.ProcessUpdate(llm.ChatResponseUpdate{

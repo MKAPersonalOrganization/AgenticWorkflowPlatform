@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	sdk "school-with-ai/sdk/agent-sdk/core"
+	"school-with-ai/sdk/agent-sdk/core"
 )
 
 // InMemoryLLMContextProjection is an in-memory projection of thread state for LLM context.
@@ -27,7 +27,7 @@ type InMemoryLLMContextProjection struct {
 	mu sync.RWMutex
 
 	// Thread conversation state (messages)
-	threads map[string]sdk.AgentThread
+	threads map[string]core.AgentThread
 
 	// Thread metadata (title, timestamps, etc.)
 	// This is derived from events, not stored separately
@@ -46,7 +46,7 @@ type threadMetadata struct {
 // NewInMemoryLLMContextProjection creates a new in-memory LLM context projection.
 func NewInMemoryLLMContextProjection() *InMemoryLLMContextProjection {
 	return &InMemoryLLMContextProjection{
-		threads:  make(map[string]sdk.AgentThread),
+		threads:  make(map[string]core.AgentThread),
 		metadata: make(map[string]*threadMetadata),
 	}
 }
@@ -81,7 +81,7 @@ func (p *InMemoryLLMContextProjection) Get(threadID string) (*domain.Thread, boo
 }
 
 // GetAgentThread retrieves the conversation state for agent processing.
-func (p *InMemoryLLMContextProjection) GetAgentThread(threadID string) (sdk.AgentThread, bool) {
+func (p *InMemoryLLMContextProjection) GetAgentThread(threadID string) (core.AgentThread, bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -92,7 +92,7 @@ func (p *InMemoryLLMContextProjection) GetAgentThread(threadID string) (sdk.Agen
 // GetOrCreateAgentThread ensures a thread exists in the projection.
 // Note: This doesn't write to EventStore - it just ensures the projection
 // is ready to receive events for this thread.
-func (p *InMemoryLLMContextProjection) GetOrCreateAgentThread(ctx context.Context, threadID string) (sdk.AgentThread, error) {
+func (p *InMemoryLLMContextProjection) GetOrCreateAgentThread(ctx context.Context, threadID string) (core.AgentThread, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -101,7 +101,7 @@ func (p *InMemoryLLMContextProjection) GetOrCreateAgentThread(ctx context.Contex
 	}
 
 	// Create empty projection entry (will be populated by events)
-	agentThread := sdk.NewInMemoryThreadWithID(threadID)
+	agentThread := core.NewInMemoryThreadWithID(threadID)
 	p.threads[threadID] = agentThread
 	p.metadata[threadID] = &threadMetadata{
 		CreatedAt: time.Now(),
@@ -160,13 +160,13 @@ func (p *InMemoryLLMContextProjection) All() []domain.Thread {
 
 // Apply updates the projection with a single event (implements eventstore.Projection).
 // This delegates to Update for backward compatibility.
-func (p *InMemoryLLMContextProjection) Apply(ctx context.Context, event sdk.Event) error {
+func (p *InMemoryLLMContextProjection) Apply(ctx context.Context, event core.Event) error {
 	return p.Update(event)
 }
 
 // Update applies a single event to update the projection.
 // This is called when new events are appended to the EventStore.
-func (p *InMemoryLLMContextProjection) Update(event sdk.Event) error {
+func (p *InMemoryLLMContextProjection) Update(event core.Event) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -175,7 +175,7 @@ func (p *InMemoryLLMContextProjection) Update(event sdk.Event) error {
 	// Ensure thread exists in projection
 	agentThread, exists := p.threads[threadID]
 	if !exists {
-		agentThread = sdk.NewInMemoryThreadWithID(threadID)
+		agentThread = core.NewInMemoryThreadWithID(threadID)
 		p.threads[threadID] = agentThread
 		p.metadata[threadID] = &threadMetadata{}
 	}
@@ -185,7 +185,7 @@ func (p *InMemoryLLMContextProjection) Update(event sdk.Event) error {
 }
 
 // Rebuild reconstructs the projection from the EventStore for a single thread.
-func (p *InMemoryLLMContextProjection) Rebuild(ctx context.Context, store sdk.EventStore, threadID string) error {
+func (p *InMemoryLLMContextProjection) Rebuild(ctx context.Context, store core.EventStore, threadID string) error {
 	// Read all events for this thread
 	events, err := store.ReadStream(ctx, threadID, 0)
 	if err != nil {
@@ -204,7 +204,7 @@ func (p *InMemoryLLMContextProjection) Rebuild(ctx context.Context, store sdk.Ev
 	}
 
 	// Create fresh projection entry
-	agentThread := sdk.NewInMemoryThreadWithID(threadID)
+	agentThread := core.NewInMemoryThreadWithID(threadID)
 	p.threads[threadID] = agentThread
 	p.metadata[threadID] = &threadMetadata{}
 	meta := p.metadata[threadID]
@@ -221,21 +221,21 @@ func (p *InMemoryLLMContextProjection) Rebuild(ctx context.Context, store sdk.Ev
 }
 
 // RebuildAll reconstructs all thread projections from the EventStore.
-func (p *InMemoryLLMContextProjection) RebuildAll(ctx context.Context, store sdk.EventStore) error {
+func (p *InMemoryLLMContextProjection) RebuildAll(ctx context.Context, store core.EventStore) error {
 	// Since we don't have ListStreams anymore, we can't rebuild all
 	// This would need to be implemented differently or removed
 	return fmt.Errorf("RebuildAll not supported with minimal EventStore interface")
 }
 
 // applyEventUnsafe applies an event to a thread (caller must hold lock).
-func (p *InMemoryLLMContextProjection) applyEventUnsafe(agentThread sdk.AgentThread, meta *threadMetadata, event sdk.Event) error {
+func (p *InMemoryLLMContextProjection) applyEventUnsafe(agentThread core.AgentThread, meta *threadMetadata, event core.Event) error {
 	switch evt := event.(type) {
-	case *sdk.ThreadCreatedEvent:
+	case *core.ThreadCreatedEvent:
 		meta.Title = evt.Title
 		meta.CreatedAt = evt.Timestamp
 		meta.UpdatedAt = evt.Timestamp
 
-	case *sdk.UserMessageAddedEvent:
+	case *core.UserMessageAddedEvent:
 		msg := domain.Message{
 			ID:        evt.MessageID,
 			Role:      "user",
@@ -245,22 +245,22 @@ func (p *InMemoryLLMContextProjection) applyEventUnsafe(agentThread sdk.AgentThr
 		_ = agentThread.AddMessages([]domain.Message{msg})
 		meta.UpdatedAt = evt.Timestamp
 
-	case *sdk.AssistantMessageStartedEvent:
+	case *core.AssistantMessageStartedEvent:
 		meta.UpdatedAt = evt.Timestamp
 
-	case *sdk.AssistantContentStreamedEvent:
+	case *core.AssistantContentStreamedEvent:
 		// Ephemeral streaming event - ignore in projection
 
-	case *sdk.ToolCallStartedEvent:
+	case *core.ToolCallStartedEvent:
 		// Ephemeral event
 
-	case *sdk.ToolCallArgumentsStreamedEvent:
+	case *core.ToolCallArgumentsStreamedEvent:
 		// Ephemeral streaming event
 
-	case *sdk.ToolCallCompletedEvent:
+	case *core.ToolCallCompletedEvent:
 		// Ephemeral streaming event
 
-	case *sdk.AssistantMessageCompletedEvent:
+	case *core.AssistantMessageCompletedEvent:
 		msg := domain.Message{
 			ID:        evt.MessageID,
 			Role:      "assistant",
@@ -272,7 +272,7 @@ func (p *InMemoryLLMContextProjection) applyEventUnsafe(agentThread sdk.AgentThr
 		_ = agentThread.AddMessages([]domain.Message{msg})
 		meta.UpdatedAt = evt.Timestamp
 
-	case *sdk.ToolCallExecutedEvent:
+	case *core.ToolCallExecutedEvent:
 		msg := domain.Message{
 			ID:         evt.MessageID,
 			Role:       "tool",
@@ -284,11 +284,11 @@ func (p *InMemoryLLMContextProjection) applyEventUnsafe(agentThread sdk.AgentThr
 		_ = agentThread.AddMessages([]domain.Message{msg})
 		meta.UpdatedAt = evt.Timestamp
 
-	case *sdk.ThreadTitleUpdatedEvent:
+	case *core.ThreadTitleUpdatedEvent:
 		meta.Title = evt.NewTitle
 		meta.UpdatedAt = evt.Timestamp
 
-	case *sdk.ThreadDeletedEvent:
+	case *core.ThreadDeletedEvent:
 		threadID := agentThread.GetID()
 		delete(p.threads, threadID)
 		delete(p.metadata, threadID)
@@ -326,7 +326,7 @@ func (p *InMemoryLLMContextProjection) applyEventUnsafe(agentThread sdk.AgentThr
 			meta.UpdatedAt = evt.Timestamp
 		}
 
-	case *sdk.CustomEventEmittedEvent:
+	case *core.CustomEventEmittedEvent:
 		meta.UpdatedAt = evt.Timestamp
 	}
 
@@ -346,9 +346,9 @@ func (p *InMemoryLLMContextProjection) ThreadExists(threadID string) bool {
 func (p *InMemoryLLMContextProjection) Clear() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.threads = make(map[string]sdk.AgentThread)
+	p.threads = make(map[string]core.AgentThread)
 	p.metadata = make(map[string]*threadMetadata)
 }
 
 // Verify InMemoryLLMContextProjection implements ThreadStateWithAgentAccess
-var _ sdk.ThreadStateWithAgentAccess = (*InMemoryLLMContextProjection)(nil)
+var _ core.ThreadStateWithAgentAccess = (*InMemoryLLMContextProjection)(nil)

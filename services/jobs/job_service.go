@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	sdk "school-with-ai/sdk/agent-sdk/core"
+	"school-with-ai/sdk/agent-sdk/core"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
@@ -46,7 +46,7 @@ func (s *jobService) SubmitJob(ctx context.Context, threadID, message string, us
 	}
 
 	// Generate unique IDs
-	jobID := sdk.GenerateID()
+	jobID := core.GenerateID()
 	messageID := aguievents.GenerateMessageID()
 
 	// Create job

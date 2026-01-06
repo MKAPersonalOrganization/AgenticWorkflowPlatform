@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	sdk "school-with-ai/sdk/agent-sdk/core"
+	"school-with-ai/sdk/agent-sdk/core"
 	"school-with-ai/services/chatwrite/agents"
 )
 
@@ -178,7 +178,7 @@ func (r *ContractRegistry) EventBus() *EventBus {
 
 // GetEmissionToolsFor returns all emission tools that an agent is allowed to use.
 // An agent can emit events that have subscribers (other agents listening).
-func (r *ContractRegistry) GetEmissionToolsFor(agentName string) []sdk.Tool {
+func (r *ContractRegistry) GetEmissionToolsFor(agentName string) []core.Tool {
 	r.mu.RLock()
 	contract, ok := r.contracts[agentName]
 	r.mu.RUnlock()

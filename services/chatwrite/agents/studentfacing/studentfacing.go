@@ -8,8 +8,8 @@ import (
 
 // CreateStudentFacingAgent creates the student-facing agent that handles initial questions.
 // Event contract is defined in contract.go
-func CreateStudentFacingAgent(notifier sdk.EventNotifier) sdk.AgentConfig {
-	registry := sdk.NewToolRegistry()
+func CreateStudentFacingAgent(notifier core.EventNotifier) core.AgentConfig {
+	registry := core.NewToolRegistry()
 
 	// Domain-specific tools (none for router agent)
 	for _, tool := range domainTools() {
@@ -25,7 +25,7 @@ func CreateStudentFacingAgent(notifier sdk.EventNotifier) sdk.AgentConfig {
 	registry.Register(tools.NewReadWhiteboardTool())
 	registry.Register(tools.NewWriteWhiteboardTool())
 
-	return sdk.AgentConfig{
+	return core.AgentConfig{
 		Name: "student-facing-agent",
 		SystemPrompt: `Always read_whiteboard() first before any decision.
 

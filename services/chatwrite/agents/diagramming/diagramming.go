@@ -8,8 +8,8 @@ import (
 
 // CreateDiagrammingInstructor creates the diagramming specialist agent configuration.
 // Event contract is defined in contract.go
-func CreateDiagrammingInstructor(notifier sdk.EventNotifier) sdk.AgentConfig {
-	registry := sdk.NewToolRegistry()
+func CreateDiagrammingInstructor(notifier core.EventNotifier) core.AgentConfig {
+	registry := core.NewToolRegistry()
 
 	// Domain-specific tools
 	for _, tool := range domainTools() {
@@ -26,7 +26,7 @@ func CreateDiagrammingInstructor(notifier sdk.EventNotifier) sdk.AgentConfig {
 	registry.Register(sharedtools.NewReadWhiteboardTool())
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
 
-	return sdk.AgentConfig{
+	return core.AgentConfig{
 		Name: "diagramming-instructor",
 		SystemPrompt: `# Diagram Expert
 

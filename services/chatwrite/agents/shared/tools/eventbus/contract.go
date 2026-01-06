@@ -21,14 +21,14 @@ type AgentContract struct {
 	Handlers agents.EventHandlerRegistry
 
 	// Tools - domain-specific tools only (emission tools are auto-generated from Emits)
-	Tools []sdk.Tool
+	Tools []core.Tool
 
 	// Factory function to create the agent
 	Factory AgentFactory
 }
 
 // AgentFactory creates an agent configuration with a given notifier
-type AgentFactory func(notifier sdk.EventNotifier) sdk.AgentConfig
+type AgentFactory func(notifier core.EventNotifier) core.AgentConfig
 
 // EventTypeSlug extracts the slug from an event type.
 // e.g., "question.math" -> "math"

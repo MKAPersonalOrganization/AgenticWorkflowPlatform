@@ -1,4 +1,4 @@
-package sdk
+package core
 
 import "school-with-ai/sdk/agent-sdk/llm"
 

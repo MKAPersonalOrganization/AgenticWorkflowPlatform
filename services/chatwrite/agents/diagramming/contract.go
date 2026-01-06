@@ -7,14 +7,14 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	sdk "school-with-ai/sdk/agent-sdk/core"
+	"school-with-ai/sdk/agent-sdk/core"
 	"school-with-ai/services/chatwrite/agents"
 	"school-with-ai/services/chatwrite/agents/diagramming/tools"
 	"school-with-ai/services/chatwrite/agents/shared/tools/eventbus"
 )
 
-func domainTools() []sdk.Tool {
-	return []sdk.Tool{
+func domainTools() []core.Tool {
+	return []core.Tool{
 		tools.NewMermaidDiagramTool(),
 	}
 }
@@ -53,7 +53,7 @@ func handleDiagrammingQuestion(ctx context.Context, handlerCtx *agents.EventHand
 	)
 
 	// Get the AgentThread from state using ThreadStateWithStore interface
-	stateWithStore, ok := handlerCtx.State.(sdk.ThreadStateWithStore)
+	stateWithStore, ok := handlerCtx.State.(core.ThreadStateWithStore)
 	if !ok {
 		return fmt.Errorf("state does not implement ThreadStateWithStore")
 	}
@@ -83,9 +83,9 @@ func handleDiagrammingQuestion(ctx context.Context, handlerCtx *agents.EventHand
 
 	messageID := domain.GenerateMessageID()
 
-	err := handlerCtx.Agent.RunWithThread(ctx, handlerCtx.ThreadID, messageID, agentThread, func(event sdk.Event) error {
+	err := handlerCtx.Agent.RunWithThread(ctx, handlerCtx.ThreadID, messageID, agentThread, func(event core.Event) error {
 		return nil
-	}, sdk.DefaultRunOptions())
+	}, core.DefaultRunOptions())
 	if err != nil {
 		slog.Error("Diagramming handler failed", "error", err)
 		return err
