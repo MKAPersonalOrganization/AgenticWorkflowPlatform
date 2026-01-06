@@ -456,6 +456,34 @@ func (wp *WorkerPool) continueWithAgent(ctx context.Context, threadID, agentName
 // processRoutingEvents checks new events for routing and triggers appropriate agents
 func (wp *WorkerPool) processRoutingEvents(ctx context.Context, threadID string, newEvents []core.Event, emitter EventEmitter, runID string) {
 	for _, event := range newEvents {
+		// Check for agent handoff events (NEW: handoff system)
+		if handoffEvent, ok := event.(*core.AgentHandoffEvent); ok {
+			slog.Info("Processing agent handoff",
+				"threadID", threadID,
+				"from", handoffEvent.FromAgent,
+				"to", handoffEvent.ToAgent,
+				"question", handoffEvent.Question)
+
+			// Create a domain event for the target agent
+			targetEvent := &agents.DomainEvent{
+				ID:        agents.GenerateEventID(),
+				Type:      agents.EventTypeAgentHandoff,
+				Timestamp: handoffEvent.Timestamp,
+				ThreadID:  threadID,
+				Version:   1,
+				Data: map[string]interface{}{
+					"from_agent": handoffEvent.FromAgent,
+					"to_agent":   handoffEvent.ToAgent,
+					"question":   handoffEvent.Question,
+					"context":    handoffEvent.Context,
+				},
+			}
+
+			// Route to the target agent
+			wp.continueWithAgent(ctx, threadID, handoffEvent.ToAgent, emitter, runID, targetEvent)
+			continue
+		}
+
 		// Cast to DomainEvent to check type
 		domainEvent, ok := event.(*agents.DomainEvent)
 		if !ok {

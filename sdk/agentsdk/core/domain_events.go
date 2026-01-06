@@ -126,3 +126,16 @@ func NewCustomEventEmitted(threadID, eventName, emittedBy, description string, p
 type ThreadDeletedEvent struct {
 	BaseEvent
 }
+
+// AgentHandoffEvent is emitted when one agent transfers control to another
+type AgentHandoffEvent struct {
+	BaseEvent
+	FromAgent   string `json:"fromAgent"`   // Name of the agent transferring control
+	ToAgent     string `json:"toAgent"`     // Name of the agent receiving control
+	Question    string `json:"question"`    // Question or task for the target agent
+	Context     string `json:"context"`     // Relevant context from conversation
+	HandoffType string `json:"handoffType"` // Type of handoff: "transfer", "return", etc.
+}
+
+// Now provides a mockable time function for testing
+var Now = time.Now

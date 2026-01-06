@@ -34,27 +34,27 @@ func emits() []agents.EventType {
 func handlers() agents.EventHandlerRegistry {
 	registry := make(agents.EventHandlerRegistry)
 
-	registry.Register(agents.EventTypePhysicsQuestion, handlePhysicsQuestion)
+	registry.Register(agents.EventTypeAgentHandoff, handleAgentHandoff)
 
 	return registry
 }
 
-func handlePhysicsQuestion(ctx context.Context, handlerCtx *agents.EventHandlerContext) error {
-	slog.Info("Physics question received",
+func handleAgentHandoff(ctx context.Context, handlerCtx *agents.EventHandlerContext) error {
+	slog.Info("Agent handoff received",
 		"threadID", handlerCtx.ThreadID,
-		"question", handlerCtx.Event.Data["question"],
+		"to_agent", handlerCtx.Event.Data["to_agent"],
 	)
 
 	question, _ := handlerCtx.Event.Data["question"].(string)
 	context, _ := handlerCtx.Event.Data["context"].(string)
-	emittedBy, _ := handlerCtx.Event.Data["emitted_by"].(string)
+	fromAgent, _ := handlerCtx.Event.Data["from_agent"].(string)
 
-	slog.Info("Processing physics question",
+	slog.Info("Processing agent handoff",
 		"question", question,
-		"emittedBy", emittedBy,
+		"from", fromAgent,
 	)
 
-	// Get the AgentThread from state using ThreadStateWithStore interface
+	// Get the AgentThread from state
 	stateWithStore, ok := handlerCtx.State.(core.ThreadStateWithStore)
 	if !ok {
 		return fmt.Errorf("state does not implement ThreadStateWithStore")
@@ -65,7 +65,7 @@ func handlePhysicsQuestion(ctx context.Context, handlerCtx *agents.EventHandlerC
 		return fmt.Errorf("thread not found: %s", handlerCtx.ThreadID)
 	}
 
-	// Create a clean handoff message with just the question and optional context
+	// Create handoff message with question and context
 	handoffContent := question
 	if context != "" {
 		handoffContent = fmt.Sprintf("%s\n\nContext: %s", question, context)
@@ -73,12 +73,12 @@ func handlePhysicsQuestion(ctx context.Context, handlerCtx *agents.EventHandlerC
 
 	triggerMsg := domain.Message{
 		ID:        domain.GenerateMessageID(),
-		Role:      emittedBy,
+		Role:      fromAgent,
 		Timestamp: time.Now(),
 		Content:   handoffContent,
 		Metadata: map[string]any{
-			"handoff_from": emittedBy,
-			"event_type":   "question.physics",
+			"handoff_from": fromAgent,
+			"event_type":   "agent.handoff",
 		},
 	}
 	_ = agentThread.AddMessages([]domain.Message{triggerMsg})
@@ -89,11 +89,10 @@ func handlePhysicsQuestion(ctx context.Context, handlerCtx *agents.EventHandlerC
 		return nil
 	}, core.DefaultRunOptions())
 	if err != nil {
-		slog.Error("Physics handler failed", "error", err)
+		slog.Error("Handoff handler failed", "error", err)
 		return err
 	}
 
-	slog.Info("Physics question handled successfully")
 	return nil
 }
 
@@ -102,7 +101,7 @@ var Contract = &eventbus.AgentContract{
 	Name: "physics-instructor",
 
 	ListensTo: []agents.EventType{
-		agents.EventTypePhysicsQuestion,
+		agents.EventTypeAgentHandoff,
 	},
 
 	Emits:    emits(),
