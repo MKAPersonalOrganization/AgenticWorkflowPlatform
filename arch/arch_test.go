@@ -71,9 +71,11 @@ func containsOnlyStdLib(errStr string) bool {
 	}
 
 	// Allow SDK packages as they provide shared types
-	allowedSDKPackages := []string{
+	// Also allow the services package as it contains interfaces that handlers need
+	allowedPackages := []string{
 		"school-with-ai/sdk/agent-sdk/llm",
 		"school-with-ai/sdk/agent-sdk/core",
+		"school-with-ai/services",
 	}
 
 	for _, pkg := range stdLibPackages {
@@ -82,7 +84,7 @@ func containsOnlyStdLib(errStr string) bool {
 		}
 	}
 
-	for _, pkg := range allowedSDKPackages {
+	for _, pkg := range allowedPackages {
 		if contains(errStr, pkg) {
 			return true
 		}
