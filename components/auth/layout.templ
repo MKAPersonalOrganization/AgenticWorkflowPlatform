@@ -19,7 +19,7 @@ templ AuthLayout(props LayoutProps) {
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 			<title>{ props.Title } - SchoolWithAI</title>
-			<link rel="icon" type="image/svg+xml" href="/assets/images/logo.svg"/>
+		<link rel="icon" type="image/svg+xml" href="/assets/images/logo-black.svg"/>
 			<link rel="stylesheet" href="/assets/css/output.css"/>
 		</head>
 		<body class="flex min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -34,7 +34,8 @@ templ AuthLayout(props LayoutProps) {
 						if props.LogoURL != "" {
 							<img src={ props.LogoURL } alt="SchoolWithAI Logo" class="h-12 w-auto"/>
 						} else {
-							<img src="/assets/images/logo.svg" alt="SchoolWithAI Logo" class="h-12 w-auto"/>
+						<img src="/assets/images/logo-black.svg" alt="SchoolWithAI Logo" class="h-12 w-auto dark:hidden"/>
+						<img src="/assets/images/logo-white.svg" alt="SchoolWithAI Logo" class="h-12 w-auto hidden dark:block"/>
 						}
 					</div>
 					<!-- Main Content Card -->
