@@ -19,10 +19,8 @@ import (
 func domainTools() []core.Tool {
 	return []core.Tool{
 		sharedtools.NewCalculatorTool(),
-		tools.NewGraphingTool(),
-		tools.NewEquationSolverTool(),
-		tools.NewPlotTool(),
-		tools.NewAnimateTool(),
+		tools.NewPlotTool(),    // gnuplot-based plotting - the ONLY plotting tool
+		tools.NewAnimateTool(), // gnuplot-based animations
 	}
 }
 

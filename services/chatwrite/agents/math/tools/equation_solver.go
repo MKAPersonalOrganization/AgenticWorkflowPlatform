@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // EquationSolverArgs represents the arguments for equation solver tool
@@ -117,16 +118,16 @@ func solveEquation(equation, variable string) map[string]any {
 }
 
 func detectEquationType(equation string) string {
-	if contains(equation, "^3") {
+	if strings.Contains(equation, "^3") {
 		return "cubic"
 	}
-	if contains(equation, "^2") {
+	if strings.Contains(equation, "^2") {
 		return "quadratic"
 	}
-	if contains(equation, "sin") || contains(equation, "cos") || contains(equation, "tan") {
+	if strings.Contains(equation, "sin") || strings.Contains(equation, "cos") || strings.Contains(equation, "tan") {
 		return "trigonometric"
 	}
-	if contains(equation, "log") || contains(equation, "ln") {
+	if strings.Contains(equation, "log") || strings.Contains(equation, "ln") {
 		return "logarithmic"
 	}
 	return "linear"

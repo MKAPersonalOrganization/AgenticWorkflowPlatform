@@ -31,7 +31,7 @@ func (p *PlotTool) Name() string {
 }
 
 func (p *PlotTool) Description() string {
-	return "Execute gnuplot scripts to generate high-quality mathematical plots and graphs. You provide a complete gnuplot script, and the tool executes it to create a PNG image. Supports all gnuplot features: function plots, data plots, 3D visualizations, multiple plots, custom styling, etc."
+	return "The ONLY plotting/graphing tool available. Generates plots by executing gnuplot scripts via CLI. You write a complete gnuplot script, the tool executes it through the gnuplot command-line interface, and returns a PNG image. This is a script-based tool - you provide the gnuplot commands, and the CLI tool processes them. Supports all gnuplot features: function plots, data plots, 3D visualizations, multiple plots, custom styling, etc."
 }
 
 func (p *PlotTool) Parameters() map[string]any {
