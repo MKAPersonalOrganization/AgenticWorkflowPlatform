@@ -1,9 +1,10 @@
 package physics
 
 import (
+	"school-with-ai/sdk/agentsdk/core"
+	"school-with-ai/sdk/agentsdk/core/middleware"
 	sharedtools "school-with-ai/services/chatwrite/agents/shared/tools"
 	"school-with-ai/services/chatwrite/agents/shared/tools/eventbus"
-	"school-with-ai/sdk/agentsdk/core"
 )
 
 // CreatePhysicsInstructor creates the physics instructor agent configuration.
@@ -22,9 +23,6 @@ func CreatePhysicsInstructor(notifier core.EventNotifier) core.AgentConfig {
 	}
 	// Custom emit_question_answered tool (not auto-generated)
 	registry.Register(sharedtools.NewEmitQuestionAnsweredTool())
-	// Shared collaboration tools
-	registry.Register(sharedtools.NewReadWhiteboardTool())
-	registry.Register(sharedtools.NewWriteWhiteboardTool())
 
 	return core.AgentConfig{
 		Name: "physics-instructor",
@@ -138,7 +136,8 @@ E_{total} &= E_{kinetic} + E_{potential}
 \\cos\\theta & -\\sin\\theta \\\\
 \\sin\\theta & \\cos\\theta
 \\end{pmatrix}`,
-		Tools:    registry.All(),
-		Notifier: notifier,
+		Tools:      registry.All(),
+		Notifier:   notifier,
+		Middleware: []core.Middleware{middleware.NewWhiteboardMiddleware()},
 	}
 }

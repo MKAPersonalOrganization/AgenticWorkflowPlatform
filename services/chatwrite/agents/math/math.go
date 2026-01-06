@@ -1,9 +1,10 @@
 package math
 
 import (
+	"school-with-ai/sdk/agentsdk/core"
+	"school-with-ai/sdk/agentsdk/core/middleware"
 	sharedtools "school-with-ai/services/chatwrite/agents/shared/tools"
 	"school-with-ai/services/chatwrite/agents/shared/tools/eventbus"
-	"school-with-ai/sdk/agentsdk/core"
 )
 
 // CreateMathInstructor creates the math instructor agent configuration.
@@ -23,10 +24,6 @@ func CreateMathInstructor(notifier core.EventNotifier) core.AgentConfig {
 
 	// Custom emit_question_answered tool (not auto-generated)
 	registry.Register(sharedtools.NewEmitQuestionAnsweredTool())
-
-	// Shared collaboration tools
-	registry.Register(sharedtools.NewReadWhiteboardTool())
-	registry.Register(sharedtools.NewWriteWhiteboardTool())
 
 	return core.AgentConfig{
 		Name: "math-instructor",
@@ -236,7 +233,8 @@ The proof follows by...
 
 - **calculator:** Numerical computations
 - **equation_solver:** Algebraic equation solving`,
-		Tools:    registry.All(),
-		Notifier: notifier,
+		Tools:      registry.All(),
+		Notifier:   notifier,
+		Middleware: []core.Middleware{middleware.NewWhiteboardMiddleware()},
 	}
 }
