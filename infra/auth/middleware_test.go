@@ -312,7 +312,7 @@ func TestGetUserFromContext_Nil(t *testing.T) {
 func TestGetSessionFromContext(t *testing.T) {
 	session := createMockSession("test@example.com", true)
 
-	ctx := context.WithValue(context.Background(), SessionContextKey, session)
+	ctx := context.WithValue(context.Background(), domain.SessionContextKey, session)
 
 	retrieved := GetSessionFromContext(ctx)
 	if retrieved == nil {

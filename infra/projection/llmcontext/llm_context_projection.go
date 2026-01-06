@@ -8,7 +8,6 @@ import (
 
 	"school-with-ai/domain"
 	sdk "school-with-ai/sdk/agent-sdk/core"
-	"school-with-ai/services/chatwrite/agents"
 )
 
 // InMemoryLLMContextProjection is an in-memory projection of thread state for LLM context.
@@ -294,13 +293,13 @@ func (p *InMemoryLLMContextProjection) applyEventUnsafe(agentThread sdk.AgentThr
 		delete(p.threads, threadID)
 		delete(p.metadata, threadID)
 
-	case *agents.DomainEvent:
+	case *domain.DomainEvent:
 		switch evt.Type {
-		case agents.EventTypeWhiteboardUpdated:
+		case domain.EventTypeWhiteboardUpdated:
 			// Whiteboard content is now handled by dedicated WhiteboardStore projection
 			// This event is processed there, not in the LLMContext projection
 			meta.UpdatedAt = evt.Timestamp
-		case agents.EventTypeAgentHandoff:
+		case domain.EventTypeAgentHandoff:
 			msgID := fmt.Sprintf("handoff-%s-%d", evt.ThreadID, evt.Timestamp.UnixNano())
 
 			// Check for duplicate
