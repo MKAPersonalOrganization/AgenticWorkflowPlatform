@@ -12,7 +12,7 @@ require (
 	github.com/ag-ui-protocol/ag-ui/sdks/community/go v0.0.0-20251230070606-5ae00423dc91
 	github.com/cpmech/gosl v1.2.13-0.20250408030823-d25acbe85e13
 	github.com/google/uuid v1.6.0
-	github.com/kcmvp/archunit v0.1.2
+	github.com/kcmvp/archunit v0.2.0-alpha1
 	github.com/montanaflynn/stats v0.7.1
 	github.com/ollama/ollama v0.13.5
 	github.com/openai/openai-go/v3 v3.15.0
@@ -28,6 +28,7 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
+	github.com/kr/pretty v0.3.1 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/natefinch/atomic v1.0.1 // indirect
