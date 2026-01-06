@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"school-with-ai/domain"
 	sdk "school-with-ai/sdk/agent-sdk/core"
-	"school-with-ai/services/chatwrite/agents"
 )
 
 // InMemoryAguiProjection is an in-memory implementation of the AguiProjection.
@@ -176,7 +176,7 @@ func (p *InMemoryAguiProjection) Apply(ctx context.Context, event sdk.Event) err
 		delete(p.toolCallsByThread, threadID)
 
 	// Handle custom domain events
-	case *agents.DomainEvent:
+	case *domain.DomainEvent:
 		p.applyDomainEvent(thread, evt)
 	}
 
@@ -184,13 +184,13 @@ func (p *InMemoryAguiProjection) Apply(ctx context.Context, event sdk.Event) err
 }
 
 // applyDomainEvent handles custom domain events.
-func (p *InMemoryAguiProjection) applyDomainEvent(thread *AguiThreadState, evt *agents.DomainEvent) {
+func (p *InMemoryAguiProjection) applyDomainEvent(thread *AguiThreadState, evt *domain.DomainEvent) {
 	switch evt.Type {
-	case agents.EventTypeWhiteboardUpdated:
+	case domain.EventTypeWhiteboardUpdated:
 		// Whiteboard content is now handled by dedicated WhiteboardStore projection
 		// This event is processed there, not in the AGUI projection
 
-	case agents.EventTypeAgentHandoff:
+	case domain.EventTypeAgentHandoff:
 		msg := AguiMessage{
 			ID:        fmt.Sprintf("handoff-%s-%d", evt.ThreadID, evt.Timestamp.UnixNano()),
 			Role:      "system",
@@ -206,19 +206,19 @@ func (p *InMemoryAguiProjection) applyDomainEvent(thread *AguiThreadState, evt *
 		}
 		p.addMessage(thread, msg)
 
-	case agents.EventTypeMathQuestion,
-		agents.EventTypePhysicsQuestion,
-		agents.EventTypeChemistryQuestion,
-		agents.EventTypeStatisticsQuestion,
-		agents.EventTypeLinearAlgebraQuestion,
-		agents.EventTypeDiagrammingQuestion:
+	case domain.EventTypeMathQuestion,
+		domain.EventTypePhysicsQuestion,
+		domain.EventTypeChemistryQuestion,
+		domain.EventTypeStatisticsQuestion,
+		domain.EventTypeLinearAlgebraQuestion,
+		domain.EventTypeDiagrammingQuestion:
 		// Question events - could add to activity log if needed
 		agentName := evt.GetString("emitted_by")
 		if agentName != "" {
 			p.updateAgentActivity(thread, agentName, evt.Timestamp)
 		}
 
-	case agents.EventTypeQuestionAnswered:
+	case domain.EventTypeQuestionAnswered:
 		// Answer events - track activity
 		agentName := evt.GetString("answered_by")
 		if agentName != "" {

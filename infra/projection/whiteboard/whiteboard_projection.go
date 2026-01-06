@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
+	"school-with-ai/domain"
 	sdk "school-with-ai/sdk/agent-sdk/core"
-	"school-with-ai/services/chatwrite/agents"
 )
 
 // WhiteboardStore is a projection that maintains whiteboard content per thread.
@@ -65,8 +65,8 @@ func (p *InMemoryWhiteboardProjection) GetAll() map[string]string {
 // Update applies an event to update the projection.
 func (p *InMemoryWhiteboardProjection) Update(event any) error {
 	// Only process EventTypeWhiteboardUpdated events
-	domainEvent, ok := event.(*agents.DomainEvent)
-	if !ok || domainEvent.Type != agents.EventTypeWhiteboardUpdated {
+	domainEvent, ok := event.(*domain.DomainEvent)
+	if !ok || domainEvent.Type != domain.EventTypeWhiteboardUpdated {
 		return nil // Ignore non-whiteboard events
 	}
 
