@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	"school-with-ai/sdk/agent-sdk/core"
-	"school-with-ai/sdk/agent-sdk/llm"
+	"school-with-ai/sdk/agentsdk/core"
+	"school-with-ai/sdk/agentsdk/llm"
 )
 
 // ChatClient defines the interface for LLM providers (OpenAI, Anthropic, Ollama, etc.)

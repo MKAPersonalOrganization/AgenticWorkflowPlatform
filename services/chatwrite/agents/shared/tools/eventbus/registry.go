@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	"school-with-ai/sdk/agent-sdk/core"
+	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/services/chatwrite/agents"
 )
 

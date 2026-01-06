@@ -70,10 +70,10 @@ func TestLayerDepth(t *testing.T) {
 // TestAgentSDKIsolation ensures agent-sdk is only used by agents
 // This maintains the ability to swap the agent framework in the future
 func TestAgentSDKIsolation(t *testing.T) {
-	agentSDKCore := archunit.Packages("AgentSDKCore", []string{".../core"})
-	agentSDKLLM := archunit.Packages("AgentSDKLLM", []string{".../llm"})
+	agentSDKCore := archunit.Packages("AgentSDKCore", []string{".../sdk/agentsdk/core"})
+	agentSDKLLM := archunit.Packages("AgentSDKLLM", []string{".../sdk/agentsdk/llm"})
 	agentsLayer := archunit.Packages("Agents", []string{".../services/chatwrite/agents/..."})
-
+	
 	// Agent SDK Core should only be referred by the agents layer
 	err := agentSDKCore.ShouldBeOnlyReferredByLayers(agentsLayer)
 	assert.NoError(t, err, "Agent SDK Core should only be used by agents to maintain framework swappability")

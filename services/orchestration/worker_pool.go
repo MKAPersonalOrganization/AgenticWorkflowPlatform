@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	"school-with-ai/sdk/agent-sdk/core"
-	"school-with-ai/sdk/agent-sdk/llm"
+	"school-with-ai/sdk/agentsdk/core"
+	"school-with-ai/sdk/agentsdk/llm"
 	"school-with-ai/services/chatwrite"
 	"school-with-ai/services/chatwrite/agents"
 	"school-with-ai/services/chatwrite/agents/shared/tools/eventbus"

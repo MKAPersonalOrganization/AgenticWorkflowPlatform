@@ -2,7 +2,7 @@ package core
 
 import (
 	"school-with-ai/domain"
-	"school-with-ai/sdk/agent-sdk/llm"
+	"school-with-ai/sdk/agentsdk/llm"
 )
 
 // ToolCallAccumulator tracks streaming tool call deltas and builds complete tool calls

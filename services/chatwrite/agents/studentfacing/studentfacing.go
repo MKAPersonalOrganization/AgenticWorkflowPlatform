@@ -3,7 +3,7 @@ package studentfacing
 import (
 	"school-with-ai/services/chatwrite/agents/shared/tools"
 	"school-with-ai/services/chatwrite/agents/shared/tools/eventbus"
-	"school-with-ai/sdk/agent-sdk/core"
+	"school-with-ai/sdk/agentsdk/core"
 )
 
 // CreateStudentFacingAgent creates the student-facing agent that handles initial questions.
