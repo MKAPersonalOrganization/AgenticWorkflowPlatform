@@ -15,7 +15,7 @@ var (
 // GenerateMessageID generates a unique message ID
 func GenerateMessageID() string {
 	b := make([]byte, 16)
-	rand.Read(b)
+	_, _ = rand.Read(b) // crypto/rand.Read always returns len(b), nil on success
 	return hex.EncodeToString(b)
 }
 
