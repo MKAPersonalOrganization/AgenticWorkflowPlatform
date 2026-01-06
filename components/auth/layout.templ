@@ -19,7 +19,7 @@ templ AuthLayout(props LayoutProps) {
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 			<title>{ props.Title } - SchoolWithAI</title>
-		<link rel="icon" type="image/svg+xml" href="/assets/images/logo-black.svg"/>
+			<link rel="icon" type="image/svg+xml" href="/assets/images/logo-black.svg"/>
 			<link rel="stylesheet" href="/assets/css/output.css"/>
 		</head>
 		<body class="flex min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -29,49 +29,49 @@ templ AuthLayout(props LayoutProps) {
 			<div class="ml-16 flex-1">
 				<main class="flex min-h-screen items-center justify-center p-4">
 					<div class="w-full max-w-md space-y-8">
-					<!-- Logo -->
-					<div class="flex justify-center">
-						if props.LogoURL != "" {
-							<img src={ props.LogoURL } alt="SchoolWithAI Logo" class="h-12 w-auto"/>
-						} else {
-						<img src="/assets/images/logo-black.svg" alt="SchoolWithAI Logo" class="h-12 w-auto dark:hidden"/>
-						<img src="/assets/images/logo-white.svg" alt="SchoolWithAI Logo" class="h-12 w-auto hidden dark:block"/>
-						}
-					</div>
-					<!-- Main Content Card -->
-					@card.Card(card.Props{
-						Class: "w-full",
-					}) {
-						@card.Header(card.HeaderProps{}) {
-							@card.Title(card.TitleProps{
-								Class: "text-center text-2xl font-bold",
-							}) {
-								{ props.Title }
+						<!-- Logo -->
+						<div class="flex justify-center">
+							if props.LogoURL != "" {
+								<img src={ props.LogoURL } alt="SchoolWithAI Logo" class="h-12 w-auto"/>
+							} else {
+								<img src="/assets/images/logo-black.svg" alt="SchoolWithAI Logo" class="h-12 w-auto dark:hidden"/>
+								<img src="/assets/images/logo-white.svg" alt="SchoolWithAI Logo" class="h-12 w-auto hidden dark:block"/>
 							}
-							if props.Description != "" {
-								@card.Description(card.DescriptionProps{
-									Class: "text-center",
+						</div>
+						<!-- Main Content Card -->
+						@card.Card(card.Props{
+							Class: "w-full",
+						}) {
+							@card.Header(card.HeaderProps{}) {
+								@card.Title(card.TitleProps{
+									Class: "text-center text-2xl font-bold",
 								}) {
-									{ props.Description }
+									{ props.Title }
+								}
+								if props.Description != "" {
+									@card.Description(card.DescriptionProps{
+										Class: "text-center",
+									}) {
+										{ props.Description }
+									}
 								}
 							}
+							@card.Content(card.ContentProps{}) {
+								{ children... }
+							}
 						}
-						@card.Content(card.ContentProps{}) {
-							{ children... }
-						}
-					}
-					<!-- Footer Links -->
-					<div class="text-center text-sm text-gray-600 dark:text-gray-400">
-						<div class="space-x-4">
-							<a href="/privacy" class="hover:text-gray-900 dark:hover:text-gray-100">Privacy</a>
-							<span>•</span>
-							<a href="/terms" class="hover:text-gray-900 dark:hover:text-gray-100">Terms</a>
-							<span>•</span>
-							<a href="/support" class="hover:text-gray-900 dark:hover:text-gray-100">Support</a>
-						</div>
-						<div class="mt-2 text-xs">
-							© { templ.EscapeString(getCurrentYear()) } SchoolWithAI. All rights reserved.
-						</div>
+						<!-- Footer Links -->
+						<div class="text-center text-sm text-gray-600 dark:text-gray-400">
+							<div class="space-x-4">
+								<a href="/privacy" class="hover:text-gray-900 dark:hover:text-gray-100">Privacy</a>
+								<span>•</span>
+								<a href="/terms" class="hover:text-gray-900 dark:hover:text-gray-100">Terms</a>
+								<span>•</span>
+								<a href="/support" class="hover:text-gray-900 dark:hover:text-gray-100">Support</a>
+							</div>
+							<div class="mt-2 text-xs">
+								© { templ.EscapeString(getCurrentYear()) } SchoolWithAI. All rights reserved.
+							</div>
 						</div>
 					</div>
 				</main>
