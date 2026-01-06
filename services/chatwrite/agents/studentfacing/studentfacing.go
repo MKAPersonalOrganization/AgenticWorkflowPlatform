@@ -3,7 +3,6 @@ package studentfacing
 import (
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/sdk/agentsdk/core/middleware"
-	"school-with-ai/services/chatwrite/agents/shared/tools/eventbus"
 )
 
 // CreateStudentFacingAgent creates the student-facing agent that handles initial questions.
@@ -13,11 +12,6 @@ func CreateStudentFacingAgent(notifier core.EventNotifier) core.AgentConfig {
 
 	// Domain-specific tools (none for router agent)
 	for _, tool := range domainTools() {
-		registry.Register(tool)
-	}
-
-	// Auto-generated emission tools
-	for _, tool := range eventbus.GenerateEmissionTools(emits()) {
 		registry.Register(tool)
 	}
 
@@ -32,13 +26,14 @@ For complex questions:
 4. Wait for answer, update todos, route to next
 5. Present final answer when all todos completed
 
-Available specialists: physics, math, chemistry, cs, biology.
+Available specialists: physics, math, chemistry, linear algebra.
 Never route to multiple specialists simultaneously.`,
 		Tools:    registry.All(),
 		Notifier: notifier,
 		Middleware: []core.Middleware{
 			middleware.NewTodoListMiddleware(),
 			middleware.NewWhiteboardMiddleware(),
+			middleware.NewEmissionMiddleware(),
 		},
 	}
 }

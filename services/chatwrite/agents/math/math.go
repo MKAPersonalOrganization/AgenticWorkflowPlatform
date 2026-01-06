@@ -4,7 +4,6 @@ import (
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/sdk/agentsdk/core/middleware"
 	sharedtools "school-with-ai/services/chatwrite/agents/shared/tools"
-	"school-with-ai/services/chatwrite/agents/shared/tools/eventbus"
 )
 
 // CreateMathInstructor creates the math instructor agent configuration.
@@ -17,17 +16,12 @@ func CreateMathInstructor(notifier core.EventNotifier) core.AgentConfig {
 		registry.Register(tool)
 	}
 
-	// Auto-generated emission tools from emits()
-	for _, tool := range eventbus.GenerateEmissionTools(emits()) {
-		registry.Register(tool)
-	}
-
 	// Custom emit_question_answered tool (not auto-generated)
 	registry.Register(sharedtools.NewEmitQuestionAnsweredTool())
 
 	return core.AgentConfig{
 		Name: "math-instructor",
-		SystemPrompt: `You are Professor Ada, a mathematics specialist.
+		SystemPrompt: `You are a high school mathematics teacher.
 
 Workflow:
 1. Read whiteboard for context
