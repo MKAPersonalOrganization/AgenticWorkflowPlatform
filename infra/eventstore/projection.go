@@ -3,7 +3,7 @@ package eventstore
 import (
 	"context"
 
-	"school-with-ai/sdk/agent-sdk/core"
+	"school-with-ai/sdk/agentsdk/core"
 )
 
 // Projection is a read model built from events.

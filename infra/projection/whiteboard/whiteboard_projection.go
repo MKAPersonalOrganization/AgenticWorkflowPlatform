@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"school-with-ai/domain"
-	"school-with-ai/sdk/agent-sdk/core"
+	"school-with-ai/sdk/agentsdk/core"
 )
 
 // WhiteboardStore is a projection that maintains whiteboard content per thread.

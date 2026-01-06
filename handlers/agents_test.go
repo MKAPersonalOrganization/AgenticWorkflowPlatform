@@ -5,7 +5,7 @@ import (
 
 	"school-with-ai/services/chatwrite/agents/math"
 	"school-with-ai/services/chatwrite/agents/studentfacing"
-	"school-with-ai/sdk/agent-sdk/core"
+	"school-with-ai/sdk/agentsdk/core"
 )
 
 func TestInstructorConfigurations(t *testing.T) {

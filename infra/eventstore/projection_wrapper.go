@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"school-with-ai/sdk/agent-sdk/core"
+	"school-with-ai/sdk/agentsdk/core"
 )
 
 // ProjectionEventStore wraps an EventStore and automatically updates projections when events are appended.

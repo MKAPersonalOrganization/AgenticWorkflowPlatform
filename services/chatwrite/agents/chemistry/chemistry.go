@@ -3,7 +3,7 @@ package chemistry
 import (
 	sharedtools "school-with-ai/services/chatwrite/agents/shared/tools"
 	"school-with-ai/services/chatwrite/agents/shared/tools/eventbus"
-	"school-with-ai/sdk/agent-sdk/core"
+	"school-with-ai/sdk/agentsdk/core"
 )
 
 // CreateChemistryInstructor creates the chemistry instructor agent configuration.

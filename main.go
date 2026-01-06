@@ -16,7 +16,7 @@ import (
 	"school-with-ai/infra/projection/llmcontext"
 	"school-with-ai/infra/projection/whiteboard"
 	"school-with-ai/infra/queue"
-	"school-with-ai/sdk/agent-sdk/llm"
+	"school-with-ai/sdk/agentsdk/llm"
 	authService "school-with-ai/services/auth"
 	"school-with-ai/services/chatwrite"
 	"school-with-ai/services/chatwrite/agents/advancedmath/linearalgebra"

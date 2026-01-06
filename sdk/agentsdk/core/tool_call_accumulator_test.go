@@ -3,8 +3,8 @@ package core_test
 import (
 	"testing"
 
-	"school-with-ai/sdk/agent-sdk/llm"
-	"school-with-ai/sdk/agent-sdk/core"
+	"school-with-ai/sdk/agentsdk/llm"
+	"school-with-ai/sdk/agentsdk/core"
 )
 
 func TestToolCallAccumulator_NewToolCall(t *testing.T) {

@@ -2,7 +2,7 @@ package eventbus
 
 import (
 	"school-with-ai/services/chatwrite/agents"
-	"school-with-ai/sdk/agent-sdk/core"
+	"school-with-ai/sdk/agentsdk/core"
 )
 
 // AgentContract defines the event-driven contract for an agent.
