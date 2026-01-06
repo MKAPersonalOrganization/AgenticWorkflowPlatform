@@ -1,4 +1,4 @@
-package handlers
+package queue
 
 import (
 	"errors"
@@ -8,7 +8,10 @@ import (
 	"school-with-ai/domain"
 )
 
-var ErrQueueEmpty = errors.New("queue is empty")
+var (
+	ErrQueueEmpty  = errors.New("queue is empty")
+	ErrJobNotFound = errors.New("job not found")
+)
 
 // InMemoryJobQueue implements domain.JobQueue using in-memory storage
 type InMemoryJobQueue struct {

@@ -15,7 +15,9 @@ import (
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/infra/projection/llmcontext"
 	"school-with-ai/infra/projection/whiteboard"
+	"school-with-ai/infra/queue"
 	"school-with-ai/sdk/agent-sdk/llm"
+	authService "school-with-ai/services/auth"
 	"school-with-ai/services/chatwrite"
 	"school-with-ai/services/chatwrite/agents/advancedmath/linearalgebra"
 	"school-with-ai/services/chatwrite/agents/chemistry"
@@ -25,6 +27,8 @@ import (
 	"school-with-ai/services/chatwrite/agents/shared/tools/eventbus"
 	"school-with-ai/services/chatwrite/agents/statistics"
 	"school-with-ai/services/chatwrite/agents/studentfacing"
+	"school-with-ai/services/orchestration"
+	"school-with-ai/services/projections"
 
 	"github.com/openai/openai-go/v3"
 )
@@ -60,7 +64,7 @@ func main() {
 	chatClient := llm.NewOpenAIClient(model)
 
 	// Initialize job queue
-	queue := handlers.NewInMemoryJobQueue()
+	queue := queue.NewInMemoryJobQueue()
 
 	// Register all agent contracts with the EventBus for routing
 	eventbus.GlobalContracts.Register(studentfacing.Contract)
@@ -74,8 +78,12 @@ func main() {
 	// Initialize chat write service
 	chatWriteService := chatwrite.New(chatClient, eventLog, llmContextProjection)
 
+	// Initialize service layer
+	authSvc := authService.NewAuthService()
+	projectionService := projections.NewProjectionService(aguiProjection, whiteboardProjection)
+
 	// Initialize and start worker pool
-	workerPool := handlers.NewWorkerPool(queue, eventLog, llmContextProjection, aguiProjection, whiteboardProjection, chatClient, chatWriteService, handlers.WorkerPoolConfig{
+	workerPool := orchestration.NewWorkerPool(queue, eventLog, llmContextProjection, aguiProjection, whiteboardProjection, chatClient, chatWriteService, orchestration.WorkerPoolConfig{
 		NumWorkers:   5,
 		PollInterval: 100 * time.Millisecond,
 	})
@@ -91,7 +99,7 @@ func main() {
 	mux.Handle("/assets/charts/", http.StripPrefix("/assets/charts/", http.FileServer(http.Dir("./assets/charts"))))
 
 	// Create handler with EventStore and LLMContextProjection
-	handler := handlers.NewHandler(eventLog, llmContextProjection, chatClient, queue, workerPool, chatWriteService, whiteboardProjection)
+	handler := handlers.NewHandler(eventLog, llmContextProjection, chatClient, queue, workerPool, chatWriteService, authSvc, projectionService)
 
 	// Create AGUI projection handler
 	aguiHandler := agui.NewAguiProjectionHandler(aguiProjection, whiteboardProjection)

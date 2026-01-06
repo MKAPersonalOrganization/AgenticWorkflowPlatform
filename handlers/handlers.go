@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	"school-with-ai/infra/auth"
-	"school-with-ai/infra/projection/whiteboard"
 	sdk "school-with-ai/sdk/agent-sdk/core"
+	"school-with-ai/services"
 	"school-with-ai/services/chatwrite"
+	"school-with-ai/services/orchestration"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
@@ -43,32 +43,43 @@ func writeSSEEvent(w http.ResponseWriter, event interface{}) error {
 
 // Handler encapsulates dependencies for HTTP handlers
 type Handler struct {
-	state                sdk.ThreadStore
-	log                  sdk.EventStore
-	chatClient           sdk.ChatClient
-	queue                domain.JobQueue
-	workerPool           *WorkerPool
-	chatWriteService     *chatwrite.ChatWriteService
-	whiteboardProjection whiteboard.WhiteboardStore
+	state             sdk.ThreadStore
+	log               sdk.EventStore
+	chatClient        sdk.ChatClient
+	queue             domain.JobQueue
+	workerPool        *orchestration.WorkerPool
+	chatWriteService  *chatwrite.ChatWriteService
+	authService       services.AuthService
+	projectionService services.ProjectionService
 }
 
 // NewHandler creates a new HTTP handler with the given dependencies
-func NewHandler(log sdk.EventStore, state sdk.ThreadStore, chatClient sdk.ChatClient, queue domain.JobQueue, workerPool *WorkerPool, chatWriteService *chatwrite.ChatWriteService, whiteboardProjection whiteboard.WhiteboardStore) *Handler {
+func NewHandler(
+	log sdk.EventStore,
+	state sdk.ThreadStore,
+	chatClient sdk.ChatClient,
+	queue domain.JobQueue,
+	workerPool *orchestration.WorkerPool,
+	chatWriteService *chatwrite.ChatWriteService,
+	authService services.AuthService,
+	projectionService services.ProjectionService,
+) *Handler {
 	return &Handler{
-		state:                state,
-		log:                  log,
-		chatClient:           chatClient,
-		queue:                queue,
-		workerPool:           workerPool,
-		chatWriteService:     chatWriteService,
-		whiteboardProjection: whiteboardProjection,
+		state:             state,
+		log:               log,
+		chatClient:        chatClient,
+		queue:             queue,
+		workerPool:        workerPool,
+		chatWriteService:  chatWriteService,
+		authService:       authService,
+		projectionService: projectionService,
 	}
 }
 
 // SendMessage handles the /send endpoint by enqueuing a job
 func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	// Get authenticated user from context
-	user := auth.GetUserFromContext(r.Context())
+	user := h.authService.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -147,7 +158,7 @@ func (h *Handler) StreamJobEvents(w http.ResponseWriter, r *http.Request) {
 
 	// Wait for job to be picked up by a worker
 	ctx := r.Context()
-	var eventBuffer *EventBuffer
+	var eventBuffer *orchestration.EventBuffer
 
 	// Poll for event buffer until worker picks up job (or client disconnects)
 	ticker := time.NewTicker(50 * time.Millisecond)
@@ -316,7 +327,7 @@ func (h *Handler) GetMessages(w http.ResponseWriter, r *http.Request) {
 // GetThreads retrieves all threads
 func (h *Handler) GetThreads(w http.ResponseWriter, r *http.Request) {
 	// Get authenticated user from context
-	user := auth.GetUserFromContext(r.Context())
+	user := h.authService.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -333,7 +344,7 @@ func (h *Handler) GetThreads(w http.ResponseWriter, r *http.Request) {
 	for i, thread := range threads {
 		response[i] = ThreadResponse{
 			Thread:            thread,
-			WhiteboardContent: h.whiteboardProjection.Get(thread.ID),
+			WhiteboardContent: h.projectionService.GetWhiteboardContent(thread.ID),
 		}
 	}
 
@@ -347,7 +358,7 @@ func (h *Handler) GetThreads(w http.ResponseWriter, r *http.Request) {
 // DeleteThread deletes a thread
 func (h *Handler) DeleteThread(w http.ResponseWriter, r *http.Request) {
 	// Get authenticated user from context
-	user := auth.GetUserFromContext(r.Context())
+	user := h.authService.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return

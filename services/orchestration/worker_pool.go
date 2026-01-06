@@ -1,4 +1,4 @@
-package handlers
+package orchestration
 
 import (
 	"context"
@@ -9,10 +9,11 @@ import (
 
 	"school-with-ai/domain"
 	"school-with-ai/infra/projection/agui"
+	"school-with-ai/infra/queue"
 	sdk "school-with-ai/sdk/agent-sdk/core"
+	"school-with-ai/services/chatwrite"
 	"school-with-ai/services/chatwrite/agents"
 	"school-with-ai/services/chatwrite/agents/shared/tools/eventbus"
-	"school-with-ai/services/chatwrite"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
@@ -140,7 +141,7 @@ func (wp *WorkerPool) worker(id int) {
 			// Try to dequeue a job
 			job, err := wp.queue.Dequeue()
 			if err != nil {
-				if err != ErrQueueEmpty {
+				if err != queue.ErrQueueEmpty {
 					slog.Error("Failed to dequeue job", "workerID", id, "error", err)
 				}
 				continue
