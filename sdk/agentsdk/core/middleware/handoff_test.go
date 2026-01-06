@@ -8,6 +8,14 @@ import (
 	"school-with-ai/sdk/agentsdk/core"
 )
 
+// Helper to create a test request context with proper agent config
+func newTestRequestContext() *core.RequestContext {
+	config := &core.AgentConfig{
+		Name: "test-agent",
+	}
+	return core.NewRequestContext(nil, "", nil, config)
+}
+
 func TestNewHandoffMiddleware(t *testing.T) {
 	agents := map[string]string{
 		"math":    "Mathematics specialist",
@@ -53,7 +61,7 @@ func TestHandoffMiddleware_Process(t *testing.T) {
 	}
 
 	middleware := NewHandoffMiddleware(agents)
-	reqCtx := core.NewRequestContext(nil, "", nil, nil)
+	reqCtx := newTestRequestContext()
 
 	called := false
 	next := func(ctx context.Context, rc *core.RequestContext) error {
@@ -196,7 +204,10 @@ func TestTransferToAgentTool_Invoke_Success(t *testing.T) {
 		"math": "Mathematics specialist",
 	}
 
-	reqCtx := core.NewRequestContext(nil, "", nil, nil)
+	config := &core.AgentConfig{
+		Name: "test-agent",
+	}
+	reqCtx := core.NewRequestContext(nil, "", nil, config)
 	tool := NewTransferToAgentTool(agents, reqCtx)
 
 	args := map[string]interface{}{
@@ -243,7 +254,7 @@ func TestTransferToAgentTool_Invoke_MissingAgentName(t *testing.T) {
 		"math": "Mathematics specialist",
 	}
 
-	reqCtx := core.NewRequestContext(nil, "", nil, nil)
+	reqCtx := newTestRequestContext()
 	tool := NewTransferToAgentTool(agents, reqCtx)
 
 	args := map[string]interface{}{
@@ -267,7 +278,7 @@ func TestTransferToAgentTool_Invoke_MissingQuestion(t *testing.T) {
 		"math": "Mathematics specialist",
 	}
 
-	reqCtx := core.NewRequestContext(nil, "", nil, nil)
+	reqCtx := newTestRequestContext()
 	tool := NewTransferToAgentTool(agents, reqCtx)
 
 	args := map[string]interface{}{
@@ -276,7 +287,6 @@ func TestTransferToAgentTool_Invoke_MissingQuestion(t *testing.T) {
 
 	argsJSON, _ := json.Marshal(args)
 	result, err := tool.Invoke(context.Background(), string(argsJSON))
-
 	// question is optional, so this should succeed
 	if err != nil {
 		t.Errorf("Expected no error for missing question (it's optional), got %v", err)
@@ -306,7 +316,7 @@ func TestTransferToAgentTool_Invoke_UnknownAgent(t *testing.T) {
 		"math": "Mathematics specialist",
 	}
 
-	reqCtx := core.NewRequestContext(nil, "", nil, nil)
+	reqCtx := newTestRequestContext()
 	tool := NewTransferToAgentTool(agents, reqCtx)
 
 	args := map[string]interface{}{
@@ -335,7 +345,7 @@ func TestTransferToAgentTool_Invoke_WithoutContext(t *testing.T) {
 		"math": "Mathematics specialist",
 	}
 
-	reqCtx := core.NewRequestContext(nil, "", nil, nil)
+	reqCtx := newTestRequestContext()
 	tool := NewTransferToAgentTool(agents, reqCtx)
 
 	// Context is optional, should work without it
@@ -370,7 +380,7 @@ func TestTransferToAgentTool_Invoke_InvalidJSON(t *testing.T) {
 		"math": "Mathematics specialist",
 	}
 
-	reqCtx := core.NewRequestContext(nil, "", nil, nil)
+	reqCtx := newTestRequestContext()
 	tool := NewTransferToAgentTool(agents, reqCtx)
 
 	_, err := tool.Invoke(context.Background(), "invalid json")
@@ -381,7 +391,7 @@ func TestTransferToAgentTool_Invoke_InvalidJSON(t *testing.T) {
 }
 
 func TestGetHandoff_NotSet(t *testing.T) {
-	reqCtx := core.NewRequestContext(nil, "", nil, nil)
+	reqCtx := newTestRequestContext()
 
 	handoff, ok := GetHandoff(reqCtx)
 
@@ -395,7 +405,7 @@ func TestGetHandoff_NotSet(t *testing.T) {
 }
 
 func TestSetHandoff_AndGet(t *testing.T) {
-	reqCtx := core.NewRequestContext(nil, "", nil, nil)
+	reqCtx := newTestRequestContext()
 
 	expectedHandoff := Handoff{
 		TargetAgent: "math",
@@ -429,7 +439,7 @@ func TestSetHandoff_AndGet(t *testing.T) {
 }
 
 func TestClearHandoff(t *testing.T) {
-	reqCtx := core.NewRequestContext(nil, "", nil, nil)
+	reqCtx := newTestRequestContext()
 
 	// Set handoff
 	SetHandoff(reqCtx, Handoff{
@@ -457,7 +467,7 @@ func TestClearHandoff(t *testing.T) {
 }
 
 func TestHasHandoff(t *testing.T) {
-	reqCtx := core.NewRequestContext(nil, "", nil, nil)
+	reqCtx := newTestRequestContext()
 
 	// Initially should not have handoff
 	if HasHandoff(reqCtx) {
@@ -525,7 +535,7 @@ func TestHandoffMiddleware_MultipleAgents(t *testing.T) {
 	}
 
 	middleware := NewHandoffMiddleware(agents)
-	reqCtx := core.NewRequestContext(nil, "", nil, nil)
+	reqCtx := newTestRequestContext()
 
 	next := func(ctx context.Context, rc *core.RequestContext) error {
 		return nil
