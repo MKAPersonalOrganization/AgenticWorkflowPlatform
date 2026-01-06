@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	"school-with-ai/infra/queue"
 	sdk "school-with-ai/sdk/agent-sdk/core"
 	"school-with-ai/sdk/agent-sdk/llm"
 	"school-with-ai/services/chatwrite"
@@ -159,7 +158,7 @@ func (wp *WorkerPool) worker(id int) {
 			// Try to dequeue a job
 			job, err := wp.queue.Dequeue()
 			if err != nil {
-				if err != queue.ErrQueueEmpty {
+				if err != domain.ErrQueueEmpty {
 					slog.Error("Failed to dequeue job", "workerID", id, "error", err)
 				}
 				continue

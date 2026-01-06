@@ -1,6 +1,14 @@
 package domain
 
-import "time"
+import (
+	"errors"
+	"time"
+)
+
+var (
+	ErrQueueEmpty  = errors.New("queue is empty")
+	ErrJobNotFound = errors.New("job not found")
+)
 
 // JobStatus represents the current state of a job
 type JobStatus string

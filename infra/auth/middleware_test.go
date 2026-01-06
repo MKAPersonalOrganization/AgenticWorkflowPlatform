@@ -285,7 +285,7 @@ func TestGetUserFromContext(t *testing.T) {
 		Email: "test@example.com",
 	}
 
-	ctx := context.WithValue(context.Background(), UserContextKey, user)
+	ctx := context.WithValue(context.Background(), domain.UserContextKey, user)
 
 	retrieved := GetUserFromContext(ctx)
 	if retrieved == nil {
@@ -340,7 +340,7 @@ func TestIsAuthenticated(t *testing.T) {
 	}{
 		{
 			name: "authenticated",
-			ctx: context.WithValue(context.Background(), UserContextKey, &domain.User{
+			ctx: context.WithValue(context.Background(), domain.UserContextKey, &domain.User{
 				ID:    "test-123",
 				Email: "test@example.com",
 			}),

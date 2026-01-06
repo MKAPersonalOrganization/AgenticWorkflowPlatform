@@ -64,7 +64,7 @@ func TestThreadIsolation(t *testing.T) {
 
 	// Verify queue is empty
 	_, err := queue.Dequeue()
-	if err != jobqueue.ErrQueueEmpty {
+	if err != domain.ErrQueueEmpty {
 		t.Errorf("Expected ErrQueueEmpty, got %v", err)
 	}
 }
@@ -110,7 +110,7 @@ func TestConcurrentJobEnqueue(t *testing.T) {
 
 	for {
 		_, err := queue.Dequeue()
-		if err == jobqueue.ErrQueueEmpty {
+		if err == domain.ErrQueueEmpty {
 			break
 		}
 		if err != nil {
@@ -164,7 +164,7 @@ func TestJobCancellation(t *testing.T) {
 
 	// Verify job is not in pending queue
 	_, err := queue.Dequeue()
-	if err != jobqueue.ErrQueueEmpty {
+	if err != domain.ErrQueueEmpty {
 		t.Errorf("Expected empty queue after cancellation, got error: %v", err)
 	}
 }

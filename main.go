@@ -80,7 +80,8 @@ func main() {
 
 	// Initialize service layer
 	authSvc := authService.NewAuthService()
-	projectionService := projections.NewProjectionService(aguiProjection, whiteboardProjection)
+	aguiServiceAdapter := agui.NewServiceAdapter(aguiProjection)
+	projectionService := projections.NewProjectionService(aguiServiceAdapter, whiteboardProjection)
 
 	// Initialize and start worker pool
 	workerPool := orchestration.NewWorkerPool(queue, eventLog, llmContextProjection, whiteboardProjection, chatClient, chatWriteService, orchestration.WorkerPoolConfig{

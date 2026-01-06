@@ -8,11 +8,6 @@ import (
 	"school-with-ai/domain"
 )
 
-var (
-	ErrQueueEmpty  = errors.New("queue is empty")
-	ErrJobNotFound = errors.New("job not found")
-)
-
 // InMemoryJobQueue implements domain.JobQueue using in-memory storage
 type InMemoryJobQueue struct {
 	mu      sync.RWMutex
@@ -49,7 +44,7 @@ func (q *InMemoryJobQueue) Dequeue() (*domain.Job, error) {
 
 	// Check if queue is empty
 	if len(q.pending) == 0 {
-		return nil, ErrQueueEmpty
+		return nil, domain.ErrQueueEmpty
 	}
 
 	// Get first job (FIFO)
@@ -79,7 +74,7 @@ func (q *InMemoryJobQueue) UpdateJobStatus(jobID string, status domain.JobStatus
 
 	job, exists := q.jobs[jobID]
 	if !exists {
-		return ErrJobNotFound
+		return domain.ErrJobNotFound
 	}
 
 	job.Status = status
@@ -125,7 +120,7 @@ func (q *InMemoryJobQueue) CancelJob(jobID string) error {
 
 	job, exists := q.jobs[jobID]
 	if !exists {
-		return ErrJobNotFound
+		return domain.ErrJobNotFound
 	}
 
 	// Can only cancel pending jobs

@@ -1,0 +1,17 @@
+package agui
+
+// ServiceAdapter wraps AguiProjection to match the services interface
+// This adapter exists to decouple services from infrastructure types
+type ServiceAdapter struct {
+	projection AguiProjection
+}
+
+// NewServiceAdapter creates a new adapter for services layer
+func NewServiceAdapter(proj AguiProjection) *ServiceAdapter {
+	return &ServiceAdapter{projection: proj}
+}
+
+// GetThreadState returns thread state as interface{} to match services contract
+func (a *ServiceAdapter) GetThreadState(threadID string) (interface{}, bool) {
+	return a.projection.GetThreadState(threadID)
+}
