@@ -3,6 +3,7 @@ package orchestration
 import (
 	"context"
 	"fmt"
+	"iter"
 	"log/slog"
 	"sync"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/infra/queue"
 	sdk "school-with-ai/sdk/agent-sdk/core"
+	"school-with-ai/sdk/agent-sdk/llm"
 	"school-with-ai/services/chatwrite"
 	"school-with-ai/services/chatwrite/agents"
 	"school-with-ai/services/chatwrite/agents/shared/tools/eventbus"
@@ -18,14 +20,33 @@ import (
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
 
+// ChatClient defines the interface for LLM providers
+type ChatClient interface {
+	GetStreamingResponse(
+		ctx context.Context,
+		messages []llm.ChatMessage,
+		options *llm.ChatOptions,
+	) iter.Seq2[llm.ChatResponseUpdate, error]
+}
+
+// ThreadStore provides read access to thread state
+type ThreadStore interface {
+	GetAgentThread(threadID string) (sdk.AgentThread, bool)
+	GetOrCreateAgentThread(ctx context.Context, threadID string) (sdk.AgentThread, error)
+	Get(threadID string) (*domain.Thread, bool)
+	Messages(threadID string) []domain.Message
+	All() []domain.Thread
+	Update(event sdk.Event) error
+}
+
 // WorkerPool manages a pool of workers that process jobs from the queue
 type WorkerPool struct {
 	queue                domain.JobQueue
 	log                  sdk.EventStore
-	state                sdk.ThreadStore
+	state                ThreadStore
 	aguiProjection       agui.AguiProjection
 	whiteboardProjection interface{ Get(threadID string) string } // WhiteboardReader interface
-	chatClient           sdk.ChatClient
+	chatClient           ChatClient
 	chatWriteService     *chatwrite.ChatWriteService
 	numWorkers           int
 	pollInterval         time.Duration
@@ -51,7 +72,7 @@ type WorkerPoolConfig struct {
 }
 
 // NewWorkerPool creates a new worker pool
-func NewWorkerPool(queue domain.JobQueue, log sdk.EventStore, state sdk.ThreadStore, aguiProjection agui.AguiProjection, whiteboardProjection interface{ Get(threadID string) string }, chatClient sdk.ChatClient, chatWriteService *chatwrite.ChatWriteService, config WorkerPoolConfig) *WorkerPool {
+func NewWorkerPool(queue domain.JobQueue, log sdk.EventStore, state ThreadStore, aguiProjection agui.AguiProjection, whiteboardProjection interface{ Get(threadID string) string }, chatClient ChatClient, chatWriteService *chatwrite.ChatWriteService, config WorkerPoolConfig) *WorkerPool {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	if config.NumWorkers <= 0 {
