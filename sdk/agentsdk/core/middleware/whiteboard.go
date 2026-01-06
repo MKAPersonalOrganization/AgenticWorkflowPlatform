@@ -29,18 +29,180 @@ Always read the whiteboard at the start of your work to understand the current c
 
 const WriteWhiteboardToolDescription = `Write information to the shared whiteboard that all agents can see. Use this to share key formulas, diagrams, or important points. ALWAYS use markdown format.
 
-Actions:
+## Actions
 - 'write': REPLACE entire whiteboard content (use read_whiteboard first to preserve existing content)
 - 'append': Add new content to the end
 - 'clear': Erase all content
 
-Best practice: Use read_whiteboard() first, then modify the content, then write_whiteboard() with action='write' to update specific sections while preserving others.
+## Best Practice Workflow
+Use read_whiteboard() first, then modify the content, then write_whiteboard() with action='write' to update specific sections while preserving others.
 
 Example workflow for updating a section:
 1. content = read_whiteboard()
 2. Modify the specific section you need (e.g., update TODOS)
 3. Keep other sections unchanged (e.g., formulas from specialists)
-4. write_whiteboard(updated_content, action='write')`
+4. write_whiteboard(updated_content, action='write')
+
+## LaTeX Math Rendering
+
+### Inline Math
+- Use single dollar signs: $x^2 + y^2 = z^2$
+- Or backslash parentheses: \\(E = mc^2\\)
+- For inline formulas in explanations: The force $F = ma$ acts on the object
+
+### Display Math (Centered Equations)
+Use double dollar signs on separate lines:
+
+$$
+x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}
+$$
+
+Or backslash brackets:
+
+\\[
+E_k = \\frac{1}{2}mv^2
+\\]
+
+### Numbered Equations
+Use equation environment for reference:
+
+\\begin{equation}
+E = mc^2
+\\label{eq:einstein}
+\\end{equation}
+
+Reference with: See equation \\ref{eq:einstein} or \\eqref{eq:einstein}
+
+For unnumbered:
+
+\\begin{equation*}
+a^2 + b^2 = c^2
+\\end{equation*}
+
+### Multiple Aligned Equations
+Use align for multi-line equations with alignment:
+
+\\begin{align}
+E_{kinetic} &= \\frac{1}{2}mv^2 \\\\
+E_{potential} &= mgh \\\\
+E_{total} &= E_{kinetic} + E_{potential}
+\\end{align}
+
+Use align* for unnumbered:
+
+\\begin{align*}
+F_x &= ma_x \\\\
+F_y &= ma_y
+\\end{align*}
+
+### Split Long Equations
+
+\\begin{split}
+a &= b + c - d \\\\
+  &\\quad + e - f \\\\
+  &= g + h
+\\end{split}
+
+### Multiple Equations (Ungrouped)
+
+\\begin{gather}
+a_1 = b_1 + c_1 \\\\
+a_2 = b_2 + c_2
+\\end{gather}
+
+### Custom Tags
+
+$$
+\\frac{x(x^{2n} - x^{-2n})}{x^{2n} + x^{-2n}}
+\\tag{A.1}
+$$
+
+### Matrices
+Use matrix environments:
+
+\\begin{pmatrix}
+a & b \\\\
+c & d
+\\end{pmatrix}
+
+Other types:
+- bmatrix: brackets [a b; c d]
+- vmatrix: determinant |a b; c d|
+- Vmatrix: double bars ||a b; c d||
+
+### Piecewise Functions
+
+$$
+f(x) = \\begin{cases}
+x^2 & \\text{if } x \\geq 0 \\\\
+-x & \\text{if } x < 0
+\\end{cases}
+$$
+
+### Tables
+
+\\begin{tabular}{l c r}
+Left & Center & Right \\\\
+1 & 2 & 3 \\\\
+4 & 5 & 6
+\\end{tabular}
+
+### Common Symbols
+- Subscripts: $v_x$, $F_g$, $E_k$
+- Superscripts: $r^2$, $t^3$, $x^{2n}$
+- Greek letters: $\\alpha$, $\\beta$, $\\theta$, $\\omega$, $\\lambda$, $\\rho$, $\\nabla$
+- Derivatives: $\\frac{dx}{dt}$, $\\frac{d^2x}{dt^2}$
+- Partial derivatives: $\\frac{\\partial f}{\\partial x}$
+- Vectors: $\\vec{F}$, $\\vec{v}$ or bold $\\mathbf{F}$, $\\mathbf{v}$
+- Units in equations: $E = 50$ \\text{ J}, $v = 10$ \\text{ m/s}
+
+## Chemistry-Specific Formatting
+
+### Chemical Equations
+For balanced chemical equations:
+
+$$
+2H_2 + O_2 \\rightarrow 2H_2O
+$$
+
+With reaction conditions:
+
+$$
+CH_4 + 2O_2 \\xrightarrow{\\text{combustion}} CO_2 + 2H_2O
+$$
+
+Equilibrium:
+
+$$
+N_2 + 3H_2 \\rightleftharpoons 2NH_3
+$$
+
+### Chemical Formulas
+- Inline: $H_2O$, $CO_2$, $H_2SO_4$, $Ca(OH)_2$
+- Charges: $Na^+$, $SO_4^{2-}$, $Fe^{3+}$
+- Equilibrium constant: $K_{eq} = \\frac{[C]^c[D]^d}{[A]^a[B]^b}$
+- pH: $pH = -\\log[H^+]$
+
+### SMILES Notation (Molecular Structures)
+Use <smiles>SMILES_STRING</smiles> tags for inline structures:
+
+- Water: <smiles>O</smiles>
+- Methane: <smiles>C</smiles>
+- Ethanol: <smiles>CCO</smiles>
+- Benzene: <smiles>c1ccccc1</smiles>
+- Glucose: <smiles>OC[CH]1OC(O)[CH](O)[CH](O)[CH]1O</smiles>
+
+For larger structures, use code blocks with smiles language (three backticks with smiles).
+
+## Markdown Formatting
+- Headers: # Title, ## Section, ### Subsection
+- Bold: **text** or \\textbf{text}
+- Italic: *text* or \\textit{text}
+- Underline: \\underline{text}
+- Strikethrough: \\sout{text}
+- Lists: use -, *, or numbered
+- Code: backtick for inline code or triple backticks for blocks
+- Footnotes: Text\\footnote{Explanation here}`
 
 const WhiteboardSystemPrompt = `## Whiteboard Tools
 
