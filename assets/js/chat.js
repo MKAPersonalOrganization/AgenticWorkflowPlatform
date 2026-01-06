@@ -2011,60 +2011,21 @@ document.addEventListener('alpine:init', () => {
                             this.whiteboardLastAgent = agentName;
                         }
                     } else if (event.name === 'TOOL_CALL_AGENT') {
-                        // Tool call agent pairing - store agent name for upcoming TOOL_CALL_START
                         const { toolCallId, agentName } = event.value;
-                        console.log(`[TOOL_CALL_AGENT] toolCallId=${toolCallId}, agentName=${agentName}`);
 
-                        // Initialize pending map if needed
-                        if (!state.pendingToolCallAgents) {
-                            state.pendingToolCallAgents = {};
-                        }
+                        state.pendingToolCallAgents = state.pendingToolCallAgents || {};
                         state.pendingToolCallAgents[toolCallId] = agentName;
 
-                        // Check if tool call already exists but wasn't rendered yet (TOOL_CALL_START arrived first)
-                        const existingToolCall = state.toolCalls[toolCallId];
-                        if (existingToolCall && !existingToolCall.hasAgentName) {
-                            // Update the tool call with agent name
-                            existingToolCall.agentName = agentName;
-                            existingToolCall.hasAgentName = true;
-
-                            // Try to parse existing args if available
-                            let parsedArgs = {};
-                            if (existingToolCall.args) {
-                                try {
-                                    parsedArgs = JSON.parse(existingToolCall.args);
-                                } catch (e) {
-                                    // Ignore - JSON is incomplete while streaming
-                                }
-                            }
-
-                            // Now add to messages array for rendering
-                            state.messages.push({
-                                id: existingToolCall.id,
-                                type: 'tool_call',
-                                name: existingToolCall.name,
-                                args: existingToolCall.args,
-                                parsedArgs: parsedArgs,
-                                status: existingToolCall.status,
-                                timestamp: existingToolCall.timestamp,
-                                agentName: agentName
-                            });
-
-                            // Clean up pending agent name
-                            delete state.pendingToolCallAgents[toolCallId];
-
-                            if (threadId === this.__currentThreadId) {
-                                this.$nextTick(() => this.__scrollToBottom());
-                            }
-                        } else if (existingToolCall) {
-                            // Tool call exists and was already rendered, just update the agent name
-                            existingToolCall.agentName = agentName;
-                            const toolMsgIndex = state.messages.findIndex(m => m.id === toolCallId);
-                            if (toolMsgIndex !== -1) {
-                                state.messages[toolMsgIndex].agentName = agentName;
-                            }
+                        // Update agent name in tool call state and message if they exist
+                        if (state.toolCalls[toolCallId]) {
+                            state.toolCalls[toolCallId].agentName = agentName;
                         }
-                        // If tool call doesn't exist yet, the pending map will be used by TOOL_CALL_START
+
+                        const msgIndex = state.messages.findIndex(m => m.id === toolCallId);
+                        if (msgIndex !== -1) {
+                            state.messages[msgIndex].agentName = agentName;
+                            delete state.pendingToolCallAgents[toolCallId];
+                        }
                     } else if (event.name === 'AGENT_CALLED') {
                         // Agent collaboration event
                         const { callerAgent, calledAgent, reason } = event.value;
@@ -2073,61 +2034,47 @@ document.addEventListener('alpine:init', () => {
                     break;
 
                 case 'TOOL_CALL_START':
-                    // Tool call started - check if we have agent name from TOOL_CALL_AGENT event
-                    const agentName = state.pendingToolCallAgents?.[event.toolCallId];
-                    console.log(`[TOOL_CALL_START] toolCallId=${event.toolCallId}, agentName=${agentName}, hasPending=${!!agentName}`);
+                    const agentName = state.pendingToolCallAgents?.[event.toolCallId] || null;
 
-                    // Store tool call in state (internal tracking)
                     state.toolCalls[event.toolCallId] = {
                         id: event.toolCallId,
                         name: event.toolCallName,
                         args: '',
                         status: 'streaming',
                         timestamp: new Date(event.timestamp).toISOString(),
-                        agentName: agentName || 'agent',
-                        hasAgentName: !!agentName // Track if we have the agent name
+                        agentName: agentName
                     };
 
-                    // Only add to messages array (for rendering) if we have the agent name
+                    // Always render immediately for live streaming
+                    state.messages.push({
+                        id: event.toolCallId,
+                        type: 'tool_call',
+                        name: event.toolCallName,
+                        args: '',
+                        parsedArgs: {},
+                        status: 'streaming',
+                        timestamp: new Date(event.timestamp).toISOString(),
+                        agentName: agentName // Will be null initially, updated by TOOL_CALL_AGENT
+                    });
+
                     if (agentName) {
-                        state.messages.push({
-                            id: event.toolCallId,
-                            type: 'tool_call',
-                            name: event.toolCallName,
-                            args: '',
-                            parsedArgs: {},
-                            status: 'streaming',
-                            timestamp: new Date(event.timestamp).toISOString(),
-                            agentName: agentName
-                        });
-
-                        // Clean up pending agent name
                         delete state.pendingToolCallAgents[event.toolCallId];
-
-                        if (threadId === this.__currentThreadId) {
-                            this.$nextTick(() => this.__scrollToBottom());
-                        }
                     }
-                    // If no agent name yet, the TOOL_CALL_AGENT event will add it to messages when it arrives
+
+                    if (threadId === this.__currentThreadId) {
+                        this.$nextTick(() => this.__scrollToBottom());
+                    }
                     break;
 
                 case 'TOOL_CALL_ARGS':
-                    // Tool call arguments received - accumulate them
                     if (state.toolCalls[event.toolCallId]) {
                         state.toolCalls[event.toolCallId].args += event.delta;
 
-                        // Update the message
-                        const toolMsgIndex = state.messages.findIndex(m => m.id === event.toolCallId);
-                        if (toolMsgIndex !== -1) {
-                            state.messages[toolMsgIndex].args = state.toolCalls[event.toolCallId].args;
-
-                            // Try to parse incrementally for live preview (silently fail on incomplete JSON)
-                            try {
-                                const parsed = JSON.parse(state.messages[toolMsgIndex].args);
-                                state.messages[toolMsgIndex].parsedArgs = parsed;
-                            } catch (e) {
-                                // Ignore - JSON is incomplete while streaming
-                            }
+                        const msgIndex = state.messages.findIndex(m => m.id === event.toolCallId);
+                        if (msgIndex !== -1) {
+                            const msg = state.messages[msgIndex];
+                            msg.args = state.toolCalls[event.toolCallId].args;
+                            msg.parsedArgs = this.safeParseJSON(msg.args);
                         }
                     }
                     break;
@@ -2391,9 +2338,12 @@ document.addEventListener('alpine:init', () => {
 
         safeParseJSON(jsonString) {
             if (!jsonString) return {};
-            return this.__tryCatch('parse JSON', { jsonString: jsonString?.substring(0, 100) }, () => {
+            try {
                 return JSON.parse(jsonString);
-            }) || { raw: jsonString };
+            } catch (e) {
+                // Silently fail - expected during streaming when JSON is incomplete
+                return {};
+            }
         },
 
         // ============================================
