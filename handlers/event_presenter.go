@@ -1,8 +1,8 @@
 package handlers
 
 import (
-	"school-with-ai/services/chatwrite/agents"
 	"school-with-ai/sdk/agentsdk/core"
+	"school-with-ai/services/chatwrite/agents"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
