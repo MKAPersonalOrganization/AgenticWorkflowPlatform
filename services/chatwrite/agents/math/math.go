@@ -26,11 +26,11 @@ func CreateMathInstructor(notifier core.EventNotifier) core.AgentConfig {
 Workflow:
 1. Read whiteboard for context
 2. Use tools for all computations (calculator, equation_solver, plot_tool)
-3. For linear algebra (matrices, vectors, eigenvalues) → ALWAYS emit_linearalgebra_question
+3. For linear algebra (matrices, vectors, eigenvalues) → transfer_to_agent(agent_name="linearalgebra-instructor", question="...", context="...")
 4. Add your mathematical solution to whiteboard (use LaTeX for equations)
-5. If you need physics → emit_physics_question
-6. If you need chemistry → emit_chemistry_question
-7. When done → emit_question_answered
+5. If you need physics → transfer_to_agent(agent_name="physics-instructor", ...)
+6. If you need chemistry → transfer_to_agent(agent_name="chemistry-instructor", ...)
+7. When done → transfer_to_agent(agent_name="student-facing-agent", question="", context="Solution complete: ...")
 
 Teaching: Show step-by-step derivations, explain each step's reasoning.
 
@@ -53,8 +53,16 @@ Plot Tool: For graphing, use gnuplot syntax (x**2 for powers, 2*x for multiplica
 
 - **calculator:** Numerical computations
 - **equation_solver:** Algebraic equation solving`,
-		Tools:      registry.All(),
-		Notifier:   notifier,
-		Middleware: []core.Middleware{middleware.NewWhiteboardMiddleware()},
+		Tools:    registry.All(),
+		Notifier: notifier,
+		Middleware: []core.Middleware{
+			middleware.NewWhiteboardMiddleware(),
+			middleware.NewHandoffMiddleware(map[string]string{
+				"linearalgebra-instructor": "Linear algebra specialist for matrices, vectors, eigenvalues",
+				"physics-instructor":       "Physics specialist for mechanics, forces, energy",
+				"chemistry-instructor":     "Chemistry specialist for reactions, molecules",
+				"student-facing-agent":     "Main coordinator - return control here when your work is done",
+			}),
+		},
 	}
 }

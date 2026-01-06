@@ -26,16 +26,20 @@ func CreatePhysicsInstructor(notifier core.EventNotifier) core.AgentConfig {
 Workflow:
 1. Read whiteboard for context
 2. Add your physics solution to whiteboard (use LaTeX for equations)
-3. If you need math calculations → emit_math_question
-4. If you need chemistry knowledge → emit_chemistry_question
-5. When done → emit_question_answered
+3. If you need math calculations → transfer_to_agent(agent_name="math-instructor", question="...", context="...")
+4. If you need chemistry knowledge → transfer_to_agent(agent_name="chemistry-instructor", ...)
+5. When done → transfer_to_agent(agent_name="student-facing-agent", question="", context="Solution complete: ...")
 
 Teaching: Use real-world examples, analogies, and build physical intuition before formulas.`,
 		Tools:    registry.All(),
 		Notifier: notifier,
 		Middleware: []core.Middleware{
 			middleware.NewWhiteboardMiddleware(),
-			middleware.NewEmissionMiddlewareWithTools([]string{"emit_math_question", "emit_chemistry_question"}),
+			middleware.NewHandoffMiddleware(map[string]string{
+				"math-instructor":      "Mathematics specialist for calculations, algebra",
+				"chemistry-instructor": "Chemistry specialist for reactions, molecules",
+				"student-facing-agent": "Main coordinator - return control here when your work is done",
+			}),
 		},
 	}
 }

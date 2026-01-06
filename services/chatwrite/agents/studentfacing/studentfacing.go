@@ -22,18 +22,22 @@ func CreateStudentFacingAgent(notifier core.EventNotifier) core.AgentConfig {
 For complex questions:
 1. Create routing plan with write_todos()
 2. Sync to whiteboard using read-modify-write pattern
-3. Route to ONE specialist at a time (emit_physics_question, emit_math_question, etc.)
-4. Wait for answer, update todos, route to next
+3. Route to ONE specialist at a time using transfer_to_agent(agent_name="...", question="...", context="...")
+4. Wait for specialist to return control with their answer
 5. Present final answer when all todos completed
 
-Available specialists: physics, math, chemistry, linear algebra.
-Never route to multiple specialists simultaneously.`,
+IMPORTANT: After calling transfer_to_agent, STOP and wait. Do NOT call multiple specialists simultaneously.`,
 		Tools:    registry.All(),
 		Notifier: notifier,
 		Middleware: []core.Middleware{
 			middleware.NewTodoListMiddleware(),
 			middleware.NewWhiteboardMiddleware(),
-			middleware.NewEmissionMiddleware(),
+			middleware.NewHandoffMiddleware(map[string]string{
+				"math-instructor":          "Mathematics specialist for calculations, algebra, calculus, equations",
+				"physics-instructor":       "Physics specialist for mechanics, forces, energy, motion",
+				"chemistry-instructor":     "Chemistry specialist for reactions, stoichiometry, molecules",
+				"linearalgebra-instructor": "Linear algebra specialist for matrices, vectors, eigenvalues",
+			}),
 		},
 	}
 }
