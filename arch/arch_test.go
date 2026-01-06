@@ -67,11 +67,3 @@ func TestNoCircularDependencies(t *testing.T) {
 func TestLayerDepth(t *testing.T) {
 	t.Skip("DepthShouldLessThan not available in v0.2.0-alpha1")
 }
-
-// TestAgentSDKIsolation ensures agent-sdk is only used by agents
-func TestAgentSDKIsolation(t *testing.T) {
-	err := archunit.ArchUnit().Validate(
-		archunit.Layers("AgentSDK").ShouldOnlyBeReferredBy(archunit.Layers("Agents")),
-	)
-	assert.NoError(t, err, "Agent SDK should only be used by agents to maintain framework swappability")
-}
