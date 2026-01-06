@@ -7,13 +7,11 @@ import (
 	"time"
 
 	"school-with-ai/domain"
+	sdk "school-with-ai/sdk/agent-sdk/core"
 	"school-with-ai/services/chatwrite/agents"
 	"school-with-ai/services/chatwrite/agents/math/tools"
 	sharedtools "school-with-ai/services/chatwrite/agents/shared/tools"
 	"school-with-ai/services/chatwrite/agents/shared/tools/eventbus"
-	"school-with-ai/sdk/agent-sdk/core"
-
-	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
 
 // domainTools returns the domain-specific tools for the math instructor.
@@ -82,7 +80,7 @@ func handleMathQuestion(ctx context.Context, handlerCtx *agents.EventHandlerCont
 	}
 
 	triggerMsg := domain.Message{
-		ID:        aguievents.GenerateMessageID(),
+		ID:        domain.GenerateMessageID(),
 		Role:      emittedBy,
 		Timestamp: time.Now(),
 		Content:   handoffContent,
@@ -93,7 +91,7 @@ func handleMathQuestion(ctx context.Context, handlerCtx *agents.EventHandlerCont
 	}
 	_ = agentThread.AddMessages([]domain.Message{triggerMsg})
 
-	messageID := aguievents.GenerateMessageID()
+	messageID := domain.GenerateMessageID()
 
 	err := handlerCtx.Agent.RunWithThread(ctx, handlerCtx.ThreadID, messageID, agentThread, func(event sdk.Event) error {
 		return nil

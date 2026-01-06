@@ -7,11 +7,9 @@ import (
 	"time"
 
 	"school-with-ai/domain"
+	sdk "school-with-ai/sdk/agent-sdk/core"
 	"school-with-ai/services/chatwrite/agents"
 	"school-with-ai/services/chatwrite/agents/shared/tools/eventbus"
-	"school-with-ai/sdk/agent-sdk/core"
-
-	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
 
 func domainTools() []sdk.Tool {
@@ -58,7 +56,7 @@ func handleUserMessage(ctx context.Context, handlerCtx *agents.EventHandlerConte
 	// Note: The user message has already been added to the thread via UserMessageAddedEvent
 	// No need to add it again - the agent will see it in the thread's message history
 
-	messageID := aguievents.GenerateMessageID()
+	messageID := domain.GenerateMessageID()
 
 	err := handlerCtx.Agent.RunWithThread(ctx, handlerCtx.ThreadID, messageID, agentThread, func(event sdk.Event) error {
 		return nil
@@ -85,7 +83,7 @@ func handleQuestionAnswered(ctx context.Context, handlerCtx *agents.EventHandler
 
 	// If complete, directly emit the answer - no LLM call needed
 	if isComplete {
-		messageID := aguievents.GenerateMessageID()
+		messageID := domain.GenerateMessageID()
 		assistantEvent := &sdk.AssistantMessageCompletedEvent{
 			BaseEvent: sdk.BaseEvent{
 				Type:      "AssistantMessageCompleted",
@@ -120,7 +118,7 @@ func handleQuestionAnswered(ctx context.Context, handlerCtx *agents.EventHandler
 	}
 
 	triggerMsg := domain.Message{
-		ID:        aguievents.GenerateMessageID(),
+		ID:        domain.GenerateMessageID(),
 		Role:      "user",
 		Timestamp: time.Now(),
 		Content: fmt.Sprintf(`A %s specialist has completed partial work (marked as incomplete).
@@ -131,7 +129,7 @@ Determine what's still missing from the original question and route to the appro
 	}
 	_ = agentThread.AddMessages([]domain.Message{triggerMsg})
 
-	messageID := aguievents.GenerateMessageID()
+	messageID := domain.GenerateMessageID()
 	err := handlerCtx.Agent.RunWithThread(ctx, handlerCtx.ThreadID, messageID, agentThread, func(event sdk.Event) error {
 		return nil
 	}, sdk.DefaultRunOptions())

@@ -7,12 +7,10 @@ import (
 	"time"
 
 	"school-with-ai/domain"
+	sdk "school-with-ai/sdk/agent-sdk/core"
 	"school-with-ai/services/chatwrite/agents"
 	"school-with-ai/services/chatwrite/agents/advancedmath/linearalgebra/tools"
 	"school-with-ai/services/chatwrite/agents/shared/tools/eventbus"
-	"school-with-ai/sdk/agent-sdk/core"
-
-	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
 
 func domainTools() []sdk.Tool {
@@ -78,7 +76,7 @@ func handleLinearAlgebraQuestion(ctx context.Context, handlerCtx *agents.EventHa
 
 	// Add a trigger message with the whiteboard content
 	triggerMsg := domain.Message{
-		ID:        aguievents.GenerateMessageID(),
+		ID:        domain.GenerateMessageID(),
 		Role:      emittedBy,
 		Timestamp: time.Now(),
 		Content:   handoffContent,
@@ -90,7 +88,7 @@ func handleLinearAlgebraQuestion(ctx context.Context, handlerCtx *agents.EventHa
 	_ = agentThread.AddMessages([]domain.Message{triggerMsg})
 
 	// Generate message ID for agent's response
-	messageID := aguievents.GenerateMessageID()
+	messageID := domain.GenerateMessageID()
 
 	// Run the agent to process this event
 	// The agent will use its tools and system prompt to generate the response
