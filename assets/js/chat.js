@@ -2012,18 +2012,14 @@ document.addEventListener('alpine:init', () => {
                         }
                     } else if (event.name === 'TOOL_CALL_AGENT') {
                         const { toolCallId, agentName } = event.value;
-
                         state.pendingToolCallAgents = state.pendingToolCallAgents || {};
                         state.pendingToolCallAgents[toolCallId] = agentName;
 
-                        // Update agent name in tool call state and message if they exist
-                        if (state.toolCalls[toolCallId]) {
-                            state.toolCalls[toolCallId].agentName = agentName;
-                        }
-
-                        const msgIndex = state.messages.findIndex(m => m.id === toolCallId);
-                        if (msgIndex !== -1) {
-                            state.messages[msgIndex].agentName = agentName;
+                        // Update existing entries
+                        if (state.toolCalls[toolCallId]) state.toolCalls[toolCallId].agentName = agentName;
+                        const msg = state.messages.find(m => m.id === toolCallId);
+                        if (msg) {
+                            msg.agentName = agentName;
                             delete state.pendingToolCallAgents[toolCallId];
                         }
                     } else if (event.name === 'AGENT_CALLED') {
