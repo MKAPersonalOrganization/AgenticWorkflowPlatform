@@ -1,7 +1,10 @@
 package core
 
 import (
+	"context"
 	"testing"
+
+	"school-with-ai/sdk/agentsdk/llm"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -77,7 +80,8 @@ func TestToChatOptionsWithDefaultRunOptions(t *testing.T) {
 		Temperature:  &temp,
 	}
 
-	chatOpts := ToChatOptions(config, DefaultRunOptions())
+	chatOpts, _, err := ToChatOptionsWithMiddleware(context.Background(), config, []llm.ChatMessage{}, DefaultRunOptions())
+	require.NoError(t, err)
 
 	require.NotNil(t, chatOpts)
 	assert.Equal(t, "Test prompt", chatOpts.Instructions)
@@ -108,7 +112,8 @@ func TestToChatOptionsRunOptionsOverridesConfig(t *testing.T) {
 		ModelID:     "gpt-4",
 	}
 
-	chatOpts := ToChatOptions(config, runOpts)
+	chatOpts, _, err := ToChatOptionsWithMiddleware(context.Background(), config, []llm.ChatMessage{}, runOpts)
+	require.NoError(t, err)
 
 	require.NotNil(t, chatOpts)
 
@@ -151,7 +156,8 @@ func TestToChatOptionsPartialOverride(t *testing.T) {
 		StopSequences: []string{"run-stop-1", "run-stop-2"},
 	}
 
-	chatOpts := ToChatOptions(config, runOpts)
+	chatOpts, _, err := ToChatOptionsWithMiddleware(context.Background(), config, []llm.ChatMessage{}, runOpts)
+	require.NoError(t, err)
 
 	require.NotNil(t, chatOpts)
 
@@ -186,7 +192,8 @@ func TestToChatOptionsAdditionalProperties(t *testing.T) {
 		},
 	}
 
-	chatOpts := ToChatOptions(config, runOpts)
+	chatOpts, _, err := ToChatOptionsWithMiddleware(context.Background(), config, []llm.ChatMessage{}, runOpts)
+	require.NoError(t, err)
 
 	require.NotNil(t, chatOpts)
 	require.NotNil(t, chatOpts.AdditionalProperties)
@@ -237,7 +244,8 @@ func TestToChatOptionsAllParameters(t *testing.T) {
 		},
 	}
 
-	chatOpts := ToChatOptions(config, runOpts)
+	chatOpts, _, err := ToChatOptionsWithMiddleware(context.Background(), config, []llm.ChatMessage{}, runOpts)
+	require.NoError(t, err)
 
 	require.NotNil(t, chatOpts)
 

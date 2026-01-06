@@ -29,14 +29,13 @@ func HandleSpecialToolCall(threadID string, agentName string, toolCall domain.To
 	switch toolName {
 	case "emit_question_answered":
 		var input struct {
-			Subject    string `json:"subject"`
-			IsComplete bool   `json:"is_complete"`
-			Summary    string `json:"summary"`
+			Subject string `json:"subject"`
+			Summary string `json:"summary"`
 		}
 		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
 			return nil, fmt.Errorf("failed to parse emit_question_answered arguments: %w", err)
 		}
-		return agents.NewQuestionAnsweredEvent(threadID, input.Subject, input.Summary, agentName, input.IsComplete, getWhiteboardState(threadID)), nil
+		return agents.NewQuestionAnsweredEvent(threadID, input.Subject, input.Summary, agentName, getWhiteboardState(threadID)), nil
 
 	case "write_whiteboard":
 		var input struct {

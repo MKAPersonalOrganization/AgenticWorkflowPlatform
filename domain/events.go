@@ -124,7 +124,7 @@ func NewInstructorStrategyChangedEvent(threadID, instructorName, oldStrategy, ne
 	}
 }
 
-func NewQuestionAnsweredEvent(threadID, subject, answer, answeredBy string, isComplete bool, whiteboardState string) *DomainEvent {
+func NewQuestionAnsweredEvent(threadID, subject, answer, answeredBy, whiteboardState string) *DomainEvent {
 	return &DomainEvent{
 		ID:        GenerateEventID(),
 		Type:      EventTypeQuestionAnswered,
@@ -135,7 +135,6 @@ func NewQuestionAnsweredEvent(threadID, subject, answer, answeredBy string, isCo
 			"subject":          subject,
 			"answer":           answer,
 			"answered_by":      answeredBy,
-			"is_complete":      isComplete,
 			"whiteboard_state": whiteboardState,
 		},
 	}
