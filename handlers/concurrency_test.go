@@ -7,12 +7,13 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	"school-with-ai/handlers"
+	jobqueue "school-with-ai/infra/queue"
+	"school-with-ai/services/orchestration"
 )
 
 // TestThreadIsolation verifies that only one job can process per thread at a time
 func TestThreadIsolation(t *testing.T) {
-	queue := handlers.NewInMemoryJobQueue()
+	queue := jobqueue.NewInMemoryJobQueue()
 
 	// Enqueue multiple jobs for the same thread
 	threadID := "thread-isolation-test"
@@ -63,14 +64,14 @@ func TestThreadIsolation(t *testing.T) {
 
 	// Verify queue is empty
 	_, err := queue.Dequeue()
-	if err != handlers.ErrQueueEmpty {
+	if err != jobqueue.ErrQueueEmpty {
 		t.Errorf("Expected ErrQueueEmpty, got %v", err)
 	}
 }
 
 // TestConcurrentJobEnqueue tests concurrent job enqueuing from multiple goroutines
 func TestConcurrentJobEnqueue(t *testing.T) {
-	queue := handlers.NewInMemoryJobQueue()
+	queue := jobqueue.NewInMemoryJobQueue()
 
 	const numGoroutines = 10
 	const jobsPerGoroutine = 10
@@ -109,7 +110,7 @@ func TestConcurrentJobEnqueue(t *testing.T) {
 
 	for {
 		_, err := queue.Dequeue()
-		if err == handlers.ErrQueueEmpty {
+		if err == jobqueue.ErrQueueEmpty {
 			break
 		}
 		if err != nil {
@@ -125,7 +126,7 @@ func TestConcurrentJobEnqueue(t *testing.T) {
 
 // TestJobCancellation tests job cancellation functionality
 func TestJobCancellation(t *testing.T) {
-	queue := handlers.NewInMemoryJobQueue()
+	queue := jobqueue.NewInMemoryJobQueue()
 
 	// Create and enqueue a job
 	job := &domain.Job{
@@ -163,14 +164,14 @@ func TestJobCancellation(t *testing.T) {
 
 	// Verify job is not in pending queue
 	_, err := queue.Dequeue()
-	if err != handlers.ErrQueueEmpty {
+	if err != jobqueue.ErrQueueEmpty {
 		t.Errorf("Expected empty queue after cancellation, got error: %v", err)
 	}
 }
 
 // TestGetActiveJobsByThread tests retrieving active jobs for a thread
 func TestGetActiveJobsByThread(t *testing.T) {
-	queue := handlers.NewInMemoryJobQueue()
+	queue := jobqueue.NewInMemoryJobQueue()
 
 	thread1 := "thread-1"
 	thread2 := "thread-2"
@@ -236,7 +237,7 @@ func TestGetActiveJobsByThread(t *testing.T) {
 
 // TestEventBuffer tests the event buffer functionality
 func TestEventBuffer(t *testing.T) {
-	buffer := handlers.NewEventBuffer(100)
+	buffer := orchestration.NewEventBuffer(100)
 
 	// Append events
 	for i := 0; i < 10; i++ {
@@ -280,7 +281,7 @@ func TestEventBuffer(t *testing.T) {
 
 // TestEventBufferConcurrency tests concurrent access to event buffer
 func TestEventBufferConcurrency(t *testing.T) {
-	buffer := handlers.NewEventBuffer(1000)
+	buffer := orchestration.NewEventBuffer(1000)
 
 	var wg sync.WaitGroup
 	const numWriters = 5
