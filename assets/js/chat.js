@@ -255,6 +255,7 @@ document.addEventListener('alpine:init', () => {
             eventSource: null,
             events: [],
             toolCalls: {},
+            pendingToolCallAgents: {},
             currentInteractionId: null,
             errorMessage: null,
             showTypingIndicator: false,
@@ -522,6 +523,7 @@ document.addEventListener('alpine:init', () => {
                 eventSource: null,
                 events: [],
                 toolCalls: {},
+                pendingToolCallAgents: {},
                 currentInteractionId: null,
                 errorMessage: null,
                 showTypingIndicator: false,
@@ -2007,14 +2009,19 @@ document.addEventListener('alpine:init', () => {
                             this.whiteboardLastAgent = agentName;
                         }
                     } else if (event.name === 'TOOL_CALL_AGENT') {
-                        // Tool call agent pairing - update tool call and message with agent name
+                        // Tool call agent pairing - store agent name for upcoming TOOL_CALL_START
                         const { toolCallId, agentName } = event.value;
 
-                        // Update tool call with agent name
+                        // Initialize pending map if needed
+                        if (!state.pendingToolCallAgents) {
+                            state.pendingToolCallAgents = {};
+                        }
+                        state.pendingToolCallAgents[toolCallId] = agentName;
+
+                        // Also update existing tool call if it already exists (edge case)
                         if (state.toolCalls[toolCallId]) {
                             state.toolCalls[toolCallId].agentName = agentName;
                         }
-                        // Update message with agent name
                         const toolMsgIndex = state.messages.findIndex(m => m.id === toolCallId);
                         if (toolMsgIndex !== -1) {
                             state.messages[toolMsgIndex].agentName = agentName;
@@ -2027,15 +2034,16 @@ document.addEventListener('alpine:init', () => {
                     break;
 
                 case 'TOOL_CALL_START':
-                    // Tool call started - create message with placeholder agent
-                    // Agent name will be set by preceding TOOL_CALL_AGENT event
+                    // Tool call started - use agent name from pending map (set by TOOL_CALL_AGENT event)
+                    const agentName = state.pendingToolCallAgents?.[event.toolCallId] || 'agent';
+
                     state.toolCalls[event.toolCallId] = {
                         id: event.toolCallId,
                         name: event.toolCallName,
                         args: '',
                         status: 'streaming',
                         timestamp: new Date(event.timestamp).toISOString(),
-                        agentName: 'agent' // Will be updated by TOOL_CALL_AGENT event
+                        agentName: agentName
                     };
 
                     state.messages.push({
@@ -2046,8 +2054,13 @@ document.addEventListener('alpine:init', () => {
                         parsedArgs: {},
                         status: 'streaming',
                         timestamp: new Date(event.timestamp).toISOString(),
-                        agentName: 'agent' // Will be updated by TOOL_CALL_AGENT event
+                        agentName: agentName
                     });
+
+                    // Clean up pending agent name
+                    if (state.pendingToolCallAgents?.[event.toolCallId]) {
+                        delete state.pendingToolCallAgents[event.toolCallId];
+                    }
 
                     if (threadId === this.__currentThreadId) {
                         this.$nextTick(() => this.__scrollToBottom());
@@ -2095,27 +2108,18 @@ document.addEventListener('alpine:init', () => {
                     break;
 
                 case 'TOOL_CALL_RESULT':
-                    // Tool call result received - insert result message right after the tool call
-                    const toolCallIndex = state.messages.findIndex(m => m.id === event.toolCallId);
+                    // Tool call result received - update the tool call message with result
+                    const resultToolCallIndex = state.messages.findIndex(m => m.id === event.toolCallId);
 
-                    if (toolCallIndex !== -1) {
-                        // Insert the result right after the tool call message
-                        state.messages.splice(toolCallIndex + 1, 0, {
-                            id: event.messageId,
-                            type: 'tool_result',
-                            toolCallId: event.toolCallId,
-                            content: event.content,
-                            timestamp: new Date(event.timestamp).toISOString()
-                        });
-                    } else {
-                        // Fallback: if tool call not found, append to end
-                        state.messages.push({
-                            id: event.messageId,
-                            type: 'tool_result',
-                            toolCallId: event.toolCallId,
-                            content: event.content,
-                            timestamp: new Date(event.timestamp).toISOString()
-                        });
+                    if (resultToolCallIndex !== -1) {
+                        // Update the existing tool call message with the result
+                        state.messages[resultToolCallIndex].result = event.content;
+                        state.messages[resultToolCallIndex].resultTimestamp = new Date(event.timestamp).toISOString();
+                    }
+
+                    // Also update the tool call in toolCalls map
+                    if (state.toolCalls[event.toolCallId]) {
+                        state.toolCalls[event.toolCallId].result = event.content;
                     }
 
                     if (threadId === this.__currentThreadId) {
