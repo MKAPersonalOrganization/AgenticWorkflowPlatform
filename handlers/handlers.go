@@ -45,9 +45,6 @@ type ThreadStore interface {
 	Update(event sdk.Event) error
 }
 
-// ErrJobNotFound is returned when a job is not found
-var ErrJobNotFound = errors.New("job not found")
-
 // ThreadResponse represents a thread with additional UI-specific fields
 type ThreadResponse struct {
 	domain.Thread
@@ -314,7 +311,7 @@ func (h *Handler) CancelJob(w http.ResponseWriter, r *http.Request) {
 
 	// Attempt to cancel the job in queue (if pending)
 	if err := h.queue.CancelJob(jobID); err != nil {
-		if err == ErrJobNotFound {
+		if err == domain.ErrJobNotFound {
 			http.Error(w, "Job not found", http.StatusNotFound)
 			return
 		}

@@ -1,30 +1,20 @@
 package auth
 
+// This file re-exports session functions from domain for backward compatibility
+// New code should use domain.GetUserFromContext(), domain.GetSessionFromContext(), etc.
+
 import (
-	"context"
-
 	"school-with-ai/domain"
-
-	client "github.com/ory/client-go"
 )
 
 // GetUserFromContext retrieves the authenticated user from the request context
-func GetUserFromContext(ctx context.Context) *domain.User {
-	if user, ok := ctx.Value(UserContextKey).(*domain.User); ok {
-		return user
-	}
-	return nil
-}
+// Deprecated: Use domain.GetUserFromContext instead
+var GetUserFromContext = domain.GetUserFromContext
 
 // GetSessionFromContext retrieves the Kratos session from the request context
-func GetSessionFromContext(ctx context.Context) *client.Session {
-	if session, ok := ctx.Value(SessionContextKey).(*client.Session); ok {
-		return session
-	}
-	return nil
-}
+// Deprecated: Use domain.GetSessionFromContext instead
+var GetSessionFromContext = domain.GetSessionFromContext
 
 // IsAuthenticated checks if the context has an authenticated user
-func IsAuthenticated(ctx context.Context) bool {
-	return GetUserFromContext(ctx) != nil
-}
+// Deprecated: Use domain.IsAuthenticated instead
+var IsAuthenticated = domain.IsAuthenticated

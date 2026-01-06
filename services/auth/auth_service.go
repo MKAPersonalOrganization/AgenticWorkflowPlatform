@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"school-with-ai/domain"
-	infraAuth "school-with-ai/infra/auth"
 )
 
 // authService implements the services.AuthService interface
@@ -17,7 +16,7 @@ func NewAuthService() *authService {
 
 // GetUserFromContext extracts authenticated user from request context
 func (s *authService) GetUserFromContext(ctx context.Context) *domain.User {
-	return infraAuth.GetUserFromContext(ctx)
+	return domain.GetUserFromContext(ctx)
 }
 
 // IsAuthenticated checks if request context has valid authentication

@@ -2,21 +2,29 @@ package projections
 
 import (
 	"fmt"
-
-	"school-with-ai/infra/projection/agui"
-	"school-with-ai/infra/projection/whiteboard"
 )
+
+// WhiteboardReader provides read access to whiteboard content
+type WhiteboardReader interface {
+	Get(threadID string) string
+}
+
+// AguiProjection provides access to AGUI thread state
+// The specific type returned is implementation-dependent
+type AguiProjection interface {
+	GetThreadState(threadID string) (interface{}, bool)
+}
 
 // projectionService implements the services.ProjectionService interface
 type projectionService struct {
-	aguiProjection       agui.AguiProjection
-	whiteboardProjection whiteboard.WhiteboardStore
+	aguiProjection       AguiProjection
+	whiteboardProjection WhiteboardReader
 }
 
 // NewProjectionService creates a new projection service
 func NewProjectionService(
-	aguiProj agui.AguiProjection,
-	whiteboardProj whiteboard.WhiteboardStore,
+	aguiProj AguiProjection,
+	whiteboardProj WhiteboardReader,
 ) *projectionService {
 	return &projectionService{
 		aguiProjection:       aguiProj,
@@ -41,12 +49,12 @@ func (s *projectionService) GetThreadHistory(threadID string) (interface{}, erro
 
 // GetAguiProjection returns the underlying AGUI projection
 // This is used by services that need direct access to projection
-func (s *projectionService) GetAguiProjection() agui.AguiProjection {
+func (s *projectionService) GetAguiProjection() AguiProjection {
 	return s.aguiProjection
 }
 
 // GetWhiteboardProjection returns the underlying whiteboard projection
 // This is used by services that need direct access to projection
-func (s *projectionService) GetWhiteboardProjection() whiteboard.WhiteboardStore {
+func (s *projectionService) GetWhiteboardProjection() WhiteboardReader {
 	return s.whiteboardProjection
 }

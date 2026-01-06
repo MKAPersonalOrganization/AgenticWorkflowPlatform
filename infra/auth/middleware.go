@@ -13,16 +13,6 @@ import (
 	client "github.com/ory/client-go"
 )
 
-// contextKey is a custom type for context keys to avoid collisions
-type contextKey string
-
-const (
-	// UserContextKey is the context key for storing the user
-	UserContextKey contextKey = "user"
-	// SessionContextKey is the context key for storing the session
-	SessionContextKey contextKey = "session"
-)
-
 // Middleware wraps the Kratos client for authentication middleware
 type Middleware struct {
 	kratosClient *KratosClient
@@ -90,8 +80,8 @@ func (m *Middleware) RequireAuth(next http.Handler) http.Handler {
 		}
 
 		// Add user and session to context
-		ctx := context.WithValue(r.Context(), UserContextKey, user)
-		ctx = context.WithValue(ctx, SessionContextKey, session)
+		ctx := context.WithValue(r.Context(), domain.UserContextKey, user)
+		ctx = context.WithValue(ctx, domain.SessionContextKey, session)
 
 		// Call next handler with updated context
 		next.ServeHTTP(w, r.WithContext(ctx))
@@ -119,8 +109,8 @@ func (m *Middleware) OptionalAuth(next http.Handler) http.Handler {
 		}
 
 		// Add user and session to context
-		ctx := context.WithValue(r.Context(), UserContextKey, user)
-		ctx = context.WithValue(ctx, SessionContextKey, session)
+		ctx := context.WithValue(r.Context(), domain.UserContextKey, user)
+		ctx = context.WithValue(ctx, domain.SessionContextKey, session)
 
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})

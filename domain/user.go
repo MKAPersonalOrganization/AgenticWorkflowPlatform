@@ -1,9 +1,20 @@
 package domain
 
 import (
+	"context"
 	"time"
 
 	client "github.com/ory/client-go"
+)
+
+// contextKey is a type for context keys to avoid collisions
+type contextKey string
+
+const (
+	// UserContextKey is the context key for storing the user
+	UserContextKey contextKey = "user"
+	// SessionContextKey is the context key for storing the Kratos session
+	SessionContextKey contextKey = "session"
 )
 
 // IdentityTraits represents the user's identity traits as defined in the Kratos identity schema
@@ -108,6 +119,27 @@ func (u *User) IsEmailVerified() bool {
 	// This will be implemented when we have access to verifiable addresses
 	// For now, return false as a safe default
 	return false
+}
+
+// GetUserFromContext retrieves the authenticated user from the request context
+func GetUserFromContext(ctx context.Context) *User {
+	if user, ok := ctx.Value(UserContextKey).(*User); ok {
+		return user
+	}
+	return nil
+}
+
+// GetSessionFromContext retrieves the Kratos session from the request context
+func GetSessionFromContext(ctx context.Context) *client.Session {
+	if session, ok := ctx.Value(SessionContextKey).(*client.Session); ok {
+		return session
+	}
+	return nil
+}
+
+// IsAuthenticated checks if the context has an authenticated user
+func IsAuthenticated(ctx context.Context) bool {
+	return GetUserFromContext(ctx) != nil
 }
 
 // HasName checks if the user has provided their name
