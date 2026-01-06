@@ -33,10 +33,10 @@ IMPORTANT: After calling transfer_to_agent, STOP and wait. Do NOT call multiple 
 			middleware.NewTodoListMiddleware(),
 			middleware.NewWhiteboardMiddleware(),
 			middleware.NewHandoffMiddleware(map[string]string{
-				"math-instructor":          "Mathematics specialist for calculations, algebra, calculus, equations",
-				"physics-instructor":       "Physics specialist for mechanics, forces, energy, motion",
-				"chemistry-instructor":     "Chemistry specialist for reactions, stoichiometry, molecules",
-				"linearalgebra-instructor": "Linear algebra specialist for matrices, vectors, eigenvalues",
+				"math-instructor":          "ALL mathematics: algebra, calculus, trigonometry, derivatives, integrals, graphing, equations",
+				"physics-instructor":       "Physics concepts: mechanics, forces, energy, motion (delegates math to math-instructor)",
+				"chemistry-instructor":     "Chemistry: reactions, stoichiometry, molecules (delegates math to math-instructor)",
+				"linearalgebra-instructor": "Linear algebra ONLY: matrices, vectors, eigenvalues, matrix operations",
 			}),
 		},
 	}

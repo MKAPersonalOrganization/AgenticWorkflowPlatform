@@ -32,9 +32,9 @@ Teaching: Visualize molecular structures, explain mechanisms step-by-step, conne
 		Middleware: []core.Middleware{
 			middleware.NewWhiteboardMiddleware(),
 			middleware.NewHandoffMiddleware(map[string]string{
-				"math-instructor":      "Mathematics specialist for calculations, algebra",
-				"physics-instructor":   "Physics specialist for mechanics, forces, energy",
-				"student-facing-agent": "Main coordinator - return control here when your work is done",
+				"math-instructor":      "For ALL math: stoichiometry calculations, equations, numerical problems",
+				"physics-instructor":   "Physics concepts ONLY",
+				"student-facing-agent": "Return here when chemistry work is complete",
 			}),
 		},
 	}

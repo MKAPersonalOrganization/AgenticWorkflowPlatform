@@ -32,9 +32,9 @@ Teaching: Use real-world examples, analogies, and build physical intuition befor
 		Middleware: []core.Middleware{
 			middleware.NewWhiteboardMiddleware(),
 			middleware.NewHandoffMiddleware(map[string]string{
-				"math-instructor":      "Mathematics specialist for calculations, algebra",
-				"chemistry-instructor": "Chemistry specialist for reactions, molecules",
-				"student-facing-agent": "Main coordinator - return control here when your work is done",
+				"math-instructor":      "For ALL math: calculus, derivatives, integrals, equations, numerical calculations",
+				"chemistry-instructor": "Chemistry concepts ONLY",
+				"student-facing-agent": "Return here when physics work is complete",
 			}),
 		},
 	}
