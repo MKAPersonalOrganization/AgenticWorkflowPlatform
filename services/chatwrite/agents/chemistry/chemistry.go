@@ -1,9 +1,10 @@
 package chemistry
 
 import (
+	"school-with-ai/sdk/agentsdk/core"
+	"school-with-ai/sdk/agentsdk/core/middleware"
 	sharedtools "school-with-ai/services/chatwrite/agents/shared/tools"
 	"school-with-ai/services/chatwrite/agents/shared/tools/eventbus"
-	"school-with-ai/sdk/agentsdk/core"
 )
 
 // CreateChemistryInstructor creates the chemistry instructor agent configuration.
@@ -22,9 +23,6 @@ func CreateChemistryInstructor(notifier core.EventNotifier) core.AgentConfig {
 	}
 	// Custom emit_question_answered tool (not auto-generated)
 	registry.Register(sharedtools.NewEmitQuestionAnsweredTool())
-	// Shared collaboration tools
-	registry.Register(sharedtools.NewReadWhiteboardTool())
-	registry.Register(sharedtools.NewWriteWhiteboardTool())
 
 	return core.AgentConfig{
 		Name: "chemistry-instructor",
@@ -170,7 +168,8 @@ CC(C)CC1=CC=C(C=C1)C(C)C
 - Atoms: C, N, O, etc. | Bonds: implicit single, = double, # triple
 - Aromatic: lowercase (c1ccccc1 = benzene) | Branches: parentheses
 - Rings: numbers for closure (C1CCCCC1 = cyclohexane)`,
-		Tools:    registry.All(),
-		Notifier: notifier,
+		Tools:      registry.All(),
+		Notifier:   notifier,
+		Middleware: []core.Middleware{middleware.NewWhiteboardMiddleware()},
 	}
 }
