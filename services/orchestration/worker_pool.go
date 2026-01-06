@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	"school-with-ai/infra/projection/agui"
 	"school-with-ai/infra/queue"
 	sdk "school-with-ai/sdk/agent-sdk/core"
 	"school-with-ai/sdk/agent-sdk/llm"
@@ -44,7 +43,6 @@ type WorkerPool struct {
 	queue                domain.JobQueue
 	log                  sdk.EventStore
 	state                ThreadStore
-	aguiProjection       agui.AguiProjection
 	whiteboardProjection interface{ Get(threadID string) string } // WhiteboardReader interface
 	chatClient           ChatClient
 	chatWriteService     *chatwrite.ChatWriteService
@@ -72,7 +70,7 @@ type WorkerPoolConfig struct {
 }
 
 // NewWorkerPool creates a new worker pool
-func NewWorkerPool(queue domain.JobQueue, log sdk.EventStore, state ThreadStore, aguiProjection agui.AguiProjection, whiteboardProjection interface{ Get(threadID string) string }, chatClient ChatClient, chatWriteService *chatwrite.ChatWriteService, config WorkerPoolConfig) *WorkerPool {
+func NewWorkerPool(queue domain.JobQueue, log sdk.EventStore, state ThreadStore, whiteboardProjection interface{ Get(threadID string) string }, chatClient ChatClient, chatWriteService *chatwrite.ChatWriteService, config WorkerPoolConfig) *WorkerPool {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	if config.NumWorkers <= 0 {
@@ -86,7 +84,6 @@ func NewWorkerPool(queue domain.JobQueue, log sdk.EventStore, state ThreadStore,
 		queue:                queue,
 		log:                  log,
 		state:                state,
-		aguiProjection:       aguiProjection,
 		whiteboardProjection: whiteboardProjection,
 		chatClient:           chatClient,
 		chatWriteService:     chatWriteService,

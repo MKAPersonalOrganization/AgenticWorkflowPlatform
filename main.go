@@ -83,7 +83,7 @@ func main() {
 	projectionService := projections.NewProjectionService(aguiProjection, whiteboardProjection)
 
 	// Initialize and start worker pool
-	workerPool := orchestration.NewWorkerPool(queue, eventLog, llmContextProjection, aguiProjection, whiteboardProjection, chatClient, chatWriteService, orchestration.WorkerPoolConfig{
+	workerPool := orchestration.NewWorkerPool(queue, eventLog, llmContextProjection, whiteboardProjection, chatClient, chatWriteService, orchestration.WorkerPoolConfig{
 		NumWorkers:   5,
 		PollInterval: 100 * time.Millisecond,
 	})
