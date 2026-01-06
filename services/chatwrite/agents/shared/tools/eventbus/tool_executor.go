@@ -58,28 +58,7 @@ func CreateToolCallHandler(registry *ContractRegistry, state ThreadStore, whiteb
 			return nil
 		}
 
-		// Handle emit_*_question tools (dynamically routed via EventBus)
-		if registry.IsEmissionTool(toolName) {
-			// Emit the domain event
-			event, err := registry.CreateEventFromToolCall(threadID, agentName, toolCall, getWhiteboardState)
-			if err != nil {
-				return err
-			}
-			if err := eventEmitter(event); err != nil {
-				return err
-			}
-
-			// Emit agent handoff event
-			if handoffEvent := registry.CreateHandoffEvent(threadID, agentName, toolName); handoffEvent != nil {
-				if err := eventEmitter(handoffEvent); err != nil {
-					return err
-				}
-			}
-			return nil
-		}
-
-		// Handle special collaboration tools (emit_question_answered, write_whiteboard)
-		if toolName == "emit_question_answered" || toolName == "write_whiteboard" {
+		if toolName == "write_whiteboard" {
 			// Emit the domain event
 			event, err := tools.HandleSpecialToolCall(threadID, agentName, toolCall, getWhiteboardState)
 			if err != nil {
@@ -89,12 +68,6 @@ func CreateToolCallHandler(registry *ContractRegistry, state ThreadStore, whiteb
 				return err
 			}
 
-			// Emit agent handoff event for emit_question_answered
-			if handoffEvent := tools.GetSpecialToolHandoffEvent(threadID, agentName, toolName); handoffEvent != nil {
-				if err := eventEmitter(handoffEvent); err != nil {
-					return err
-				}
-			}
 			return nil
 		}
 
@@ -109,10 +82,8 @@ func CreateShouldContinueIterationFn(registry *ContractRegistry) chatwrite.Shoul
 		// Stop iteration if any tool triggers another agent
 		for _, toolCall := range toolCalls {
 			toolName := toolCall.Function.Name
-			// Stop for emission tools, handoff tool, or question answered
-			if registry.IsEmissionTool(toolName) ||
-				toolName == "emit_question_answered" ||
-				toolName == "transfer_to_agent" {
+			// Stop for handoff tool
+			if toolName == "transfer_to_agent" {
 				return false
 			}
 		}
