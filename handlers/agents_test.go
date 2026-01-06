@@ -1,4 +1,4 @@
-package chatapi_test
+package handlers_test
 
 import (
 	"testing"

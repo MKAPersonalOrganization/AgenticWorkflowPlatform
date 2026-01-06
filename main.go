@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"school-with-ai/components"
+	"school-with-ai/handlers"
 	"school-with-ai/infra/auth"
-	"school-with-ai/infra/chatapi"
 	"school-with-ai/infra/eventstore"
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/infra/projection/llmcontext"
@@ -60,7 +60,7 @@ func main() {
 	chatClient := llm.NewOpenAIClient(model)
 
 	// Initialize job queue
-	queue := chatapi.NewInMemoryJobQueue()
+	queue := handlers.NewInMemoryJobQueue()
 
 	// Register all agent contracts with the EventBus for routing
 	eventbus.GlobalContracts.Register(studentfacing.Contract)
@@ -75,7 +75,7 @@ func main() {
 	chatWriteService := chatwrite.New(chatClient, eventLog, llmContextProjection)
 
 	// Initialize and start worker pool
-	workerPool := chatapi.NewWorkerPool(queue, eventLog, llmContextProjection, aguiProjection, whiteboardProjection, chatClient, chatWriteService, chatapi.WorkerPoolConfig{
+	workerPool := handlers.NewWorkerPool(queue, eventLog, llmContextProjection, aguiProjection, whiteboardProjection, chatClient, chatWriteService, handlers.WorkerPoolConfig{
 		NumWorkers:   5,
 		PollInterval: 100 * time.Millisecond,
 	})
@@ -91,7 +91,7 @@ func main() {
 	mux.Handle("/assets/charts/", http.StripPrefix("/assets/charts/", http.FileServer(http.Dir("./assets/charts"))))
 
 	// Create handler with EventStore and LLMContextProjection
-	handler := chatapi.NewHandler(eventLog, llmContextProjection, chatClient, queue, workerPool, chatWriteService, whiteboardProjection)
+	handler := handlers.NewHandler(eventLog, llmContextProjection, chatClient, queue, workerPool, chatWriteService, whiteboardProjection)
 
 	// Create AGUI projection handler
 	aguiHandler := agui.NewAguiProjectionHandler(aguiProjection, whiteboardProjection)

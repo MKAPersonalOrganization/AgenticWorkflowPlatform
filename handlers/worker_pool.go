@@ -1,4 +1,4 @@
-package chatapi
+package handlers
 
 import (
 	"context"
