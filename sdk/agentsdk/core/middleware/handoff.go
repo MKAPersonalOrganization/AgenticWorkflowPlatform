@@ -125,6 +125,12 @@ func (t *TransferToAgentTool) Invoke(ctx context.Context, arguments string) (str
 		return "", fmt.Errorf("agent_name is required")
 	}
 
+	// Prevent self-transfer
+	currentAgentName := t.reqCtx.Config.Name
+	if args.AgentName == currentAgentName {
+		return "", fmt.Errorf("cannot transfer to yourself (%s). If you can handle this task, answer directly instead of transferring", currentAgentName)
+	}
+
 	// Validate agent exists
 	if _, exists := t.availableAgents[args.AgentName]; !exists {
 		agentNames := make([]string, 0, len(t.availableAgents))

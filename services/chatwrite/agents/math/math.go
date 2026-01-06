@@ -54,10 +54,10 @@ Plot Tool: For graphing, use gnuplot syntax (x**2 for powers, 2*x for multiplica
 		Middleware: []core.Middleware{
 			middleware.NewWhiteboardMiddleware(),
 			middleware.NewHandoffMiddleware(map[string]string{
-				"linearalgebra-instructor": "Linear algebra specialist for matrices, vectors, eigenvalues",
-				"physics-instructor":       "Physics specialist for mechanics, forces, energy",
-				"chemistry-instructor":     "Chemistry specialist for reactions, molecules",
-				"student-facing-agent":     "Main coordinator - return control here when your work is done",
+				"linearalgebra-instructor": "Linear algebra ONLY: matrices, vectors, eigenvalues, matrix operations. Use ONLY for linear algebra.",
+				"physics-instructor":       "Physics concepts ONLY: forces, motion, energy, momentum. NOT for math calculations.",
+				"chemistry-instructor":     "Chemistry ONLY: chemical reactions, molecules, stoichiometry. NOT for math.",
+				"student-facing-agent":     "Return here when ALL math work is complete",
 			}),
 		},
 	}
