@@ -9,7 +9,6 @@ import (
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/services/chatwrite/agents"
-	"school-with-ai/services/chatwrite/agents/physics/tools"
 	sharedtools "school-with-ai/services/chatwrite/agents/shared/tools"
 	"school-with-ai/services/chatwrite/agents/shared/tools/eventbus"
 )
@@ -17,11 +16,8 @@ import (
 func domainTools() []core.Tool {
 	return []core.Tool{
 		sharedtools.NewCalculatorTool(),
-		sharedtools.NewUnitConversionTool(),
-		tools.NewWeatherTool(),
 	}
 }
-
 
 func handlers() agents.EventHandlerRegistry {
 	registry := make(agents.EventHandlerRegistry)
