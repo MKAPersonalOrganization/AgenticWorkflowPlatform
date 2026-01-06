@@ -1,4 +1,4 @@
-package sdk
+package core
 
 // RunOptions provides optional parameters for controlling agent run behavior.
 // These options can override the agent's default configuration on a per-run basis.

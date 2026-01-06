@@ -7,8 +7,8 @@ import (
 )
 
 // CreateOptimizationProfessor creates the optimization professor agent
-func CreateOptimizationProfessor(notifier sdk.EventNotifier) sdk.AgentConfig {
-	registry := sdk.NewToolRegistry()
+func CreateOptimizationProfessor(notifier core.EventNotifier) core.AgentConfig {
+	registry := core.NewToolRegistry()
 
 	// Shared tools
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
@@ -19,7 +19,7 @@ func CreateOptimizationProfessor(notifier sdk.EventNotifier) sdk.AgentConfig {
 	registry.Register(tools.NewUnconstrainedOptimizationTool())
 	registry.Register(tools.NewConstrainedOptimizationTool())
 
-	return sdk.AgentConfig{
+	return core.AgentConfig{
 		Name: "optimization-professor",
 		SystemPrompt: `# Optimization Professor
 

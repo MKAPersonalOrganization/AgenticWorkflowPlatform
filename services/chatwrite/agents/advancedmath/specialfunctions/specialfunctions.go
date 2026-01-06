@@ -7,8 +7,8 @@ import (
 )
 
 // CreateSpecialFunctionsProfessor creates the special functions professor agent
-func CreateSpecialFunctionsProfessor(notifier sdk.EventNotifier) sdk.AgentConfig {
-	registry := sdk.NewToolRegistry()
+func CreateSpecialFunctionsProfessor(notifier core.EventNotifier) core.AgentConfig {
+	registry := core.NewToolRegistry()
 
 	// Shared tools
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
@@ -22,7 +22,7 @@ func CreateSpecialFunctionsProfessor(notifier sdk.EventNotifier) sdk.AgentConfig
 	registry.Register(tools.NewInterpolationTool())
 	registry.Register(tools.NewFFTTool())
 
-	return sdk.AgentConfig{
+	return core.AgentConfig{
 		Name: "specialfunctions-professor",
 		SystemPrompt: `# Special Functions Professor
 

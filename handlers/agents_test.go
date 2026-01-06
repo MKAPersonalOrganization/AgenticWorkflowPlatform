@@ -10,7 +10,7 @@ import (
 
 func TestInstructorConfigurations(t *testing.T) {
 	// Mock notifier
-	var mockNotifier sdk.EventNotifier = nil
+	var mockNotifier core.EventNotifier = nil
 
 	studentAgent := studentfacing.CreateStudentFacingAgent(mockNotifier)
 	if studentAgent.Name != "student-facing-agent" {

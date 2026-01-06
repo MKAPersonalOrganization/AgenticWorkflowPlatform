@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	sdk "school-with-ai/sdk/agent-sdk/core"
+	"school-with-ai/sdk/agent-sdk/core"
 )
 
 func TestInMemoryEventStore_Append(t *testing.T) {
@@ -13,8 +13,8 @@ func TestInMemoryEventStore_Append(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("appends events to stream", func(t *testing.T) {
-		event := &sdk.ThreadCreatedEvent{
-			BaseEvent: sdk.BaseEvent{
+		event := &core.ThreadCreatedEvent{
+			BaseEvent: core.BaseEvent{
 				Type:      "ThreadCreated",
 				Timestamp: time.Now(),
 				ThreadID:  "thread-1",
@@ -33,12 +33,12 @@ func TestInMemoryEventStore_Append(t *testing.T) {
 	})
 
 	t.Run("increments version on each append", func(t *testing.T) {
-		event1 := &sdk.UserMessageAddedEvent{
-			BaseEvent: sdk.BaseEvent{ThreadID: "thread-2"},
+		event1 := &core.UserMessageAddedEvent{
+			BaseEvent: core.BaseEvent{ThreadID: "thread-2"},
 			Content:   "Hello",
 		}
-		event2 := &sdk.UserMessageAddedEvent{
-			BaseEvent: sdk.BaseEvent{ThreadID: "thread-2"},
+		event2 := &core.UserMessageAddedEvent{
+			BaseEvent: core.BaseEvent{ThreadID: "thread-2"},
 			Content:   "World",
 		}
 
@@ -59,9 +59,9 @@ func TestInMemoryEventStore_ReadStream(t *testing.T) {
 	ctx := context.Background()
 
 	// Add some events
-	event1 := &sdk.UserMessageAddedEvent{BaseEvent: sdk.BaseEvent{ThreadID: "thread-1"}, Content: "1"}
-	event2 := &sdk.UserMessageAddedEvent{BaseEvent: sdk.BaseEvent{ThreadID: "thread-1"}, Content: "2"}
-	event3 := &sdk.UserMessageAddedEvent{BaseEvent: sdk.BaseEvent{ThreadID: "thread-1"}, Content: "3"}
+	event1 := &core.UserMessageAddedEvent{BaseEvent: core.BaseEvent{ThreadID: "thread-1"}, Content: "1"}
+	event2 := &core.UserMessageAddedEvent{BaseEvent: core.BaseEvent{ThreadID: "thread-1"}, Content: "2"}
+	event3 := &core.UserMessageAddedEvent{BaseEvent: core.BaseEvent{ThreadID: "thread-1"}, Content: "3"}
 
 	_, _ = store.Append(ctx, "thread-1", event1, event2, event3)
 

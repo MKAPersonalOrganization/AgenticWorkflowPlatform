@@ -8,8 +8,8 @@ import (
 
 // CreatePhysicsInstructor creates the physics instructor agent configuration.
 // Event contract is defined in contract.go
-func CreatePhysicsInstructor(notifier sdk.EventNotifier) sdk.AgentConfig {
-	registry := sdk.NewToolRegistry()
+func CreatePhysicsInstructor(notifier core.EventNotifier) core.AgentConfig {
+	registry := core.NewToolRegistry()
 
 	// Domain-specific tools
 	for _, tool := range domainTools() {
@@ -26,7 +26,7 @@ func CreatePhysicsInstructor(notifier sdk.EventNotifier) sdk.AgentConfig {
 	registry.Register(sharedtools.NewReadWhiteboardTool())
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
 
-	return sdk.AgentConfig{
+	return core.AgentConfig{
 		Name: "physics-instructor",
 		SystemPrompt: `# Dr. Newton - Physics Specialist
 

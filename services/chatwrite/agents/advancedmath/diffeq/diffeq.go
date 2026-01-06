@@ -7,8 +7,8 @@ import (
 )
 
 // CreateDifferentialEquationsProfessor creates the differential equations professor agent
-func CreateDifferentialEquationsProfessor(notifier sdk.EventNotifier) sdk.AgentConfig {
-	registry := sdk.NewToolRegistry()
+func CreateDifferentialEquationsProfessor(notifier core.EventNotifier) core.AgentConfig {
+	registry := core.NewToolRegistry()
 
 	// Shared tools
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
@@ -19,7 +19,7 @@ func CreateDifferentialEquationsProfessor(notifier sdk.EventNotifier) sdk.AgentC
 	registry.Register(tools.NewODESolverTool())
 	registry.Register(tools.NewStiffODESolverTool())
 
-	return sdk.AgentConfig{
+	return core.AgentConfig{
 		Name: "diffeq-professor",
 		SystemPrompt: `# Differential Equations Professor
 

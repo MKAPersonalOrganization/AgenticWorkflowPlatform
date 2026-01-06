@@ -7,14 +7,14 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	sdk "school-with-ai/sdk/agent-sdk/core"
+	"school-with-ai/sdk/agent-sdk/core"
 	"school-with-ai/services/chatwrite/agents"
 	"school-with-ai/services/chatwrite/agents/advancedmath/linearalgebra/tools"
 	"school-with-ai/services/chatwrite/agents/shared/tools/eventbus"
 )
 
-func domainTools() []sdk.Tool {
-	return []sdk.Tool{
+func domainTools() []core.Tool {
+	return []core.Tool{
 		tools.NewVectorOperationsTool(),
 		tools.NewMatrixOperationsTool(),
 		tools.NewLinearSolverTool(),
@@ -58,7 +58,7 @@ func handleLinearAlgebraQuestion(ctx context.Context, handlerCtx *agents.EventHa
 	)
 
 	// Get the AgentThread from state using ThreadStateWithStore interface
-	stateWithStore, ok := handlerCtx.State.(sdk.ThreadStateWithStore)
+	stateWithStore, ok := handlerCtx.State.(core.ThreadStateWithStore)
 	if !ok {
 		return fmt.Errorf("state does not implement ThreadStateWithStore")
 	}
@@ -92,10 +92,10 @@ func handleLinearAlgebraQuestion(ctx context.Context, handlerCtx *agents.EventHa
 
 	// Run the agent to process this event
 	// The agent will use its tools and system prompt to generate the response
-	err := handlerCtx.Agent.RunWithThread(ctx, handlerCtx.ThreadID, messageID, agentThread, func(event sdk.Event) error {
+	err := handlerCtx.Agent.RunWithThread(ctx, handlerCtx.ThreadID, messageID, agentThread, func(event core.Event) error {
 		// Events emitted by the agent are handled by the worker pool's routing
 		return nil
-	}, sdk.DefaultRunOptions())
+	}, core.DefaultRunOptions())
 	if err != nil {
 		slog.Error("Linear algebra handler failed", "error", err)
 		return err

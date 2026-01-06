@@ -7,8 +7,8 @@ import (
 )
 
 // CreateNumericalMethodsProfessor creates the numerical methods professor agent
-func CreateNumericalMethodsProfessor(notifier sdk.EventNotifier) sdk.AgentConfig {
-	registry := sdk.NewToolRegistry()
+func CreateNumericalMethodsProfessor(notifier core.EventNotifier) core.AgentConfig {
+	registry := core.NewToolRegistry()
 
 	// Shared tools
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
@@ -21,7 +21,7 @@ func CreateNumericalMethodsProfessor(notifier sdk.EventNotifier) sdk.AgentConfig
 	registry.Register(tools.NewNumericalDerivativeTool())
 	registry.Register(tools.NewNumericalIntegrationTool())
 
-	return sdk.AgentConfig{
+	return core.AgentConfig{
 		Name: "numericalmethods-professor",
 		SystemPrompt: `# Numerical Methods Professor
 

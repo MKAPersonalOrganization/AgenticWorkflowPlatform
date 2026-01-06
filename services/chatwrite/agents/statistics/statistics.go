@@ -8,8 +8,8 @@ import (
 
 // CreateStatisticsInstructor creates the statistics instructor agent.
 // Event contract is defined in contract.go
-func CreateStatisticsInstructor(notifier sdk.EventNotifier) sdk.AgentConfig {
-	registry := sdk.NewToolRegistry()
+func CreateStatisticsInstructor(notifier core.EventNotifier) core.AgentConfig {
+	registry := core.NewToolRegistry()
 
 	// Domain-specific tools
 	for _, tool := range domainTools() {
@@ -26,7 +26,7 @@ func CreateStatisticsInstructor(notifier sdk.EventNotifier) sdk.AgentConfig {
 	registry.Register(sharedtools.NewReadWhiteboardTool())
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
 
-	return sdk.AgentConfig{
+	return core.AgentConfig{
 		Name: "statistics-instructor",
 		SystemPrompt: `# Statistics Instructor
 

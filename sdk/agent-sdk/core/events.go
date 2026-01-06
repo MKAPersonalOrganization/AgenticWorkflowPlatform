@@ -1,4 +1,4 @@
-package sdk
+package core
 
 // Domain events emitted by the agent
 

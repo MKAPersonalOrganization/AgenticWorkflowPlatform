@@ -21,27 +21,27 @@ func NewUINotifier(emitter EventEmitter) *UINotifier {
 }
 
 // HandleDomainEvent processes a domain event and emits corresponding UI events
-func (n *UINotifier) HandleDomainEvent(event sdk.Event) error {
+func (n *UINotifier) HandleDomainEvent(event core.Event) error {
 	switch evt := event.(type) {
-	case *sdk.AssistantMessageStartedEvent:
+	case *core.AssistantMessageStartedEvent:
 		return n.emitTextMessageStart(evt)
 
-	case *sdk.AssistantContentStreamedEvent:
+	case *core.AssistantContentStreamedEvent:
 		return n.emitTextMessageContent(evt)
 
-	case *sdk.ToolCallStartedEvent:
+	case *core.ToolCallStartedEvent:
 		return n.emitToolCallStart(evt)
 
-	case *sdk.ToolCallArgumentsStreamedEvent:
+	case *core.ToolCallArgumentsStreamedEvent:
 		return n.emitToolCallArgs(evt)
 
-	case *sdk.ToolCallCompletedEvent:
+	case *core.ToolCallCompletedEvent:
 		return n.emitToolCallEnd(evt)
 
-	case *sdk.AssistantMessageCompletedEvent:
+	case *core.AssistantMessageCompletedEvent:
 		return n.emitTextMessageEnd(evt)
 
-	case *sdk.ToolCallExecutedEvent:
+	case *core.ToolCallExecutedEvent:
 		return n.emitToolCallResult(evt)
 
 	// Agent collaboration events
@@ -76,7 +76,7 @@ func (n *UINotifier) HandleDomainEvent(event sdk.Event) error {
 	}
 }
 
-func (n *UINotifier) emitTextMessageStart(evt *sdk.AssistantMessageStartedEvent) error {
+func (n *UINotifier) emitTextMessageStart(evt *core.AssistantMessageStartedEvent) error {
 	uiEvent := aguievents.NewTextMessageStartEvent(
 		evt.MessageID,
 		aguievents.WithRole("assistant"),
@@ -84,7 +84,7 @@ func (n *UINotifier) emitTextMessageStart(evt *sdk.AssistantMessageStartedEvent)
 	return n.emitter.Emit(uiEvent)
 }
 
-func (n *UINotifier) emitTextMessageContent(evt *sdk.AssistantContentStreamedEvent) error {
+func (n *UINotifier) emitTextMessageContent(evt *core.AssistantContentStreamedEvent) error {
 	uiEvent := aguievents.NewTextMessageContentEvent(
 		evt.MessageID,
 		evt.Delta,
@@ -92,7 +92,7 @@ func (n *UINotifier) emitTextMessageContent(evt *sdk.AssistantContentStreamedEve
 	return n.emitter.Emit(uiEvent)
 }
 
-func (n *UINotifier) emitToolCallStart(evt *sdk.ToolCallStartedEvent) error {
+func (n *UINotifier) emitToolCallStart(evt *core.ToolCallStartedEvent) error {
 	// First emit TOOL_CALL_AGENT to establish agent-tool call association
 	agentEvent := aguievents.NewCustomEvent(
 		"TOOL_CALL_AGENT",
@@ -114,7 +114,7 @@ func (n *UINotifier) emitToolCallStart(evt *sdk.ToolCallStartedEvent) error {
 	return n.emitter.Emit(uiEvent)
 }
 
-func (n *UINotifier) emitToolCallArgs(evt *sdk.ToolCallArgumentsStreamedEvent) error {
+func (n *UINotifier) emitToolCallArgs(evt *core.ToolCallArgumentsStreamedEvent) error {
 	uiEvent := aguievents.NewToolCallArgsEvent(
 		evt.ToolCallID,
 		evt.Delta,
@@ -122,21 +122,21 @@ func (n *UINotifier) emitToolCallArgs(evt *sdk.ToolCallArgumentsStreamedEvent) e
 	return n.emitter.Emit(uiEvent)
 }
 
-func (n *UINotifier) emitToolCallEnd(evt *sdk.ToolCallCompletedEvent) error {
+func (n *UINotifier) emitToolCallEnd(evt *core.ToolCallCompletedEvent) error {
 	uiEvent := aguievents.NewToolCallEndEvent(
 		evt.ToolCallID,
 	)
 	return n.emitter.Emit(uiEvent)
 }
 
-func (n *UINotifier) emitTextMessageEnd(evt *sdk.AssistantMessageCompletedEvent) error {
+func (n *UINotifier) emitTextMessageEnd(evt *core.AssistantMessageCompletedEvent) error {
 	uiEvent := aguievents.NewTextMessageEndEvent(
 		evt.MessageID,
 	)
 	return n.emitter.Emit(uiEvent)
 }
 
-func (n *UINotifier) emitToolCallResult(evt *sdk.ToolCallExecutedEvent) error {
+func (n *UINotifier) emitToolCallResult(evt *core.ToolCallExecutedEvent) error {
 	uiEvent := aguievents.NewToolCallResultEvent(
 		evt.MessageID,
 		evt.ToolCallID,

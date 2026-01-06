@@ -7,8 +7,8 @@ import (
 )
 
 // CreateGeometryProfessor creates the computational geometry professor agent
-func CreateGeometryProfessor(notifier sdk.EventNotifier) sdk.AgentConfig {
-	registry := sdk.NewToolRegistry()
+func CreateGeometryProfessor(notifier core.EventNotifier) core.AgentConfig {
+	registry := core.NewToolRegistry()
 
 	// Shared tools
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
@@ -20,7 +20,7 @@ func CreateGeometryProfessor(notifier sdk.EventNotifier) sdk.AgentConfig {
 	registry.Register(tools.NewCurvesTool())
 	registry.Register(tools.NewMeshingTool())
 
-	return sdk.AgentConfig{
+	return core.AgentConfig{
 		Name: "geometry-professor",
 		SystemPrompt: `# Computational Geometry Professor
 

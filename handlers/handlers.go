@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	sdk "school-with-ai/sdk/agent-sdk/core"
+	"school-with-ai/sdk/agent-sdk/core"
 	"school-with-ai/sdk/agent-sdk/llm"
 	"school-with-ai/services"
 	"school-with-ai/services/chatwrite"
@@ -31,18 +31,18 @@ type ChatClient interface {
 
 // EventStore is the source of truth in the event sourcing architecture
 type EventStore interface {
-	Append(ctx context.Context, streamID string, events ...sdk.Event) (int64, error)
-	ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]sdk.Event, error)
+	Append(ctx context.Context, streamID string, events ...core.Event) (int64, error)
+	ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]core.Event, error)
 }
 
 // ThreadStore provides read access to thread state
 type ThreadStore interface {
-	GetAgentThread(threadID string) (sdk.AgentThread, bool)
-	GetOrCreateAgentThread(ctx context.Context, threadID string) (sdk.AgentThread, error)
+	GetAgentThread(threadID string) (core.AgentThread, bool)
+	GetOrCreateAgentThread(ctx context.Context, threadID string) (core.AgentThread, error)
 	Get(threadID string) (*domain.Thread, bool)
 	Messages(threadID string) []domain.Message
 	All() []domain.Thread
-	Update(event sdk.Event) error
+	Update(event core.Event) error
 }
 
 // ThreadResponse represents a thread with additional UI-specific fields
@@ -122,7 +122,7 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create job with user ID
-	jobID := sdk.GenerateID()
+	jobID := core.GenerateID()
 	messageID := aguievents.GenerateMessageID()
 
 	job := &domain.Job{
@@ -240,32 +240,32 @@ func (h *Handler) translateAndWriteEvent(w http.ResponseWriter, flusher http.Flu
 
 	// Translate domain events to agui events
 	switch ev := event.(type) {
-	case *sdk.TextMessageStartEvent:
+	case *core.TextMessageStartEvent:
 		aguiEvent = aguievents.NewTextMessageStartEvent(
 			ev.MessageID,
 			aguievents.WithRole(ev.Role),
 		)
 
-	case *sdk.TextMessageContentEvent:
+	case *core.TextMessageContentEvent:
 		aguiEvent = aguievents.NewTextMessageContentEvent(ev.MessageID, ev.Delta)
 
-	case *sdk.TextMessageEndEvent:
+	case *core.TextMessageEndEvent:
 		aguiEvent = aguievents.NewTextMessageEndEvent(ev.MessageID)
 
-	case *sdk.ToolCallStartEvent:
+	case *core.ToolCallStartEvent:
 		aguiEvent = aguievents.NewToolCallStartEvent(
 			ev.ToolCallID,
 			ev.ToolCallName,
 			aguievents.WithParentMessageID(ev.ParentMessageID),
 		)
 
-	case *sdk.ToolCallArgsEvent:
+	case *core.ToolCallArgsEvent:
 		aguiEvent = aguievents.NewToolCallArgsEvent(ev.ToolCallID, ev.Delta)
 
-	case *sdk.ToolCallEndEvent:
+	case *core.ToolCallEndEvent:
 		aguiEvent = aguievents.NewToolCallEndEvent(ev.ToolCallID)
 
-	case *sdk.ToolCallResultEvent:
+	case *core.ToolCallResultEvent:
 		aguiEvent = aguievents.NewToolCallResultEvent(
 			ev.MessageID,
 			ev.ToolCallID,

@@ -8,8 +8,8 @@ import (
 
 // CreateMathInstructor creates the math instructor agent configuration.
 // Event contract is defined in contract.go
-func CreateMathInstructor(notifier sdk.EventNotifier) sdk.AgentConfig {
-	registry := sdk.NewToolRegistry()
+func CreateMathInstructor(notifier core.EventNotifier) core.AgentConfig {
+	registry := core.NewToolRegistry()
 
 	// Domain-specific tools
 	for _, tool := range domainTools() {
@@ -28,7 +28,7 @@ func CreateMathInstructor(notifier sdk.EventNotifier) sdk.AgentConfig {
 	registry.Register(sharedtools.NewReadWhiteboardTool())
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
 
-	return sdk.AgentConfig{
+	return core.AgentConfig{
 		Name: "math-instructor",
 		SystemPrompt: `# Professor Ada - Mathematics Specialist
 

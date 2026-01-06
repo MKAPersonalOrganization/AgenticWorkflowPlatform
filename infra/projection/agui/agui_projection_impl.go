@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	sdk "school-with-ai/sdk/agent-sdk/core"
+	"school-with-ai/sdk/agent-sdk/core"
 )
 
 // InMemoryAguiProjection is an in-memory implementation of the AguiProjection.
@@ -45,7 +45,7 @@ func NewInMemoryAguiProjection() *InMemoryAguiProjection {
 }
 
 // Apply updates the projection with a single event.
-func (p *InMemoryAguiProjection) Apply(ctx context.Context, event sdk.Event) error {
+func (p *InMemoryAguiProjection) Apply(ctx context.Context, event core.Event) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -73,11 +73,11 @@ func (p *InMemoryAguiProjection) Apply(ctx context.Context, event sdk.Event) err
 
 	// Apply event-specific logic
 	switch evt := event.(type) {
-	case *sdk.ThreadCreatedEvent:
+	case *core.ThreadCreatedEvent:
 		thread.Title = evt.Title
 		thread.CreatedAt = evt.Timestamp
 
-	case *sdk.UserMessageAddedEvent:
+	case *core.UserMessageAddedEvent:
 		p.addMessage(thread, AguiMessage{
 			ID:        evt.MessageID,
 			Role:      "user",
@@ -86,7 +86,7 @@ func (p *InMemoryAguiProjection) Apply(ctx context.Context, event sdk.Event) err
 			Status:    "complete",
 		})
 
-	case *sdk.AssistantMessageStartedEvent:
+	case *core.AssistantMessageStartedEvent:
 		msg := AguiMessage{
 			ID:        evt.MessageID,
 			Role:      "assistant",
@@ -97,12 +97,12 @@ func (p *InMemoryAguiProjection) Apply(ctx context.Context, event sdk.Event) err
 		p.addMessage(thread, msg)
 		p.streamingMessages[evt.MessageID] = &thread.Messages[len(thread.Messages)-1]
 
-	case *sdk.AssistantContentStreamedEvent:
+	case *core.AssistantContentStreamedEvent:
 		if msg, exists := p.streamingMessages[evt.MessageID]; exists {
 			msg.Content += evt.Delta
 		}
 
-	case *sdk.AssistantMessageCompletedEvent:
+	case *core.AssistantMessageCompletedEvent:
 		if msg, exists := p.streamingMessages[evt.MessageID]; exists {
 			msg.Status = "complete"
 			msg.Content = evt.Content // Final content
@@ -120,7 +120,7 @@ func (p *InMemoryAguiProjection) Apply(ctx context.Context, event sdk.Event) err
 		}
 		p.updateAgentActivity(thread, evt.AgentName, evt.Timestamp)
 
-	case *sdk.ToolCallStartedEvent:
+	case *core.ToolCallStartedEvent:
 		toolCall := &AguiToolCall{
 			ID:              evt.ToolCallID,
 			Name:            evt.ToolCallName,
@@ -133,17 +133,17 @@ func (p *InMemoryAguiProjection) Apply(ctx context.Context, event sdk.Event) err
 		p.toolCallsByThread[threadID][evt.ToolCallID] = toolCall
 		p.updateAgentActivity(thread, evt.AgentName, evt.Timestamp)
 
-	case *sdk.ToolCallArgumentsStreamedEvent:
+	case *core.ToolCallArgumentsStreamedEvent:
 		if tc, exists := p.toolCallsByThread[threadID][evt.ToolCallID]; exists {
 			tc.Arguments += evt.Delta
 		}
 
-	case *sdk.ToolCallCompletedEvent:
+	case *core.ToolCallCompletedEvent:
 		if tc, exists := p.toolCallsByThread[threadID][evt.ToolCallID]; exists {
 			tc.Status = "args_complete"
 		}
 
-	case *sdk.ToolCallExecutedEvent:
+	case *core.ToolCallExecutedEvent:
 		msg := AguiMessage{
 			ID:        evt.MessageID,
 			Role:      "tool",
@@ -167,10 +167,10 @@ func (p *InMemoryAguiProjection) Apply(ctx context.Context, event sdk.Event) err
 		}
 		p.updateAgentActivity(thread, evt.AgentName, evt.Timestamp)
 
-	case *sdk.ThreadTitleUpdatedEvent:
+	case *core.ThreadTitleUpdatedEvent:
 		thread.Title = evt.NewTitle
 
-	case *sdk.ThreadDeletedEvent:
+	case *core.ThreadDeletedEvent:
 		delete(p.threads, threadID)
 		delete(p.activeRuns, threadID)
 		delete(p.toolCallsByThread, threadID)
@@ -347,7 +347,7 @@ func (p *InMemoryAguiProjection) ListThreads() []string {
 
 // Rebuild reconstructs the projection from the EventStore for a single stream or all streams.
 // If streamID is empty, it rebuilds all streams.
-func (p *InMemoryAguiProjection) Rebuild(ctx context.Context, store sdk.EventStore, threadID string) error {
+func (p *InMemoryAguiProjection) Rebuild(ctx context.Context, store core.EventStore, threadID string) error {
 	if threadID == "" {
 		// Rebuild all streams - not supported with minimal interface
 		return fmt.Errorf("RebuildAll not supported with minimal EventStore interface")

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	sdk "school-with-ai/sdk/agent-sdk/core"
+	"school-with-ai/sdk/agent-sdk/core"
 	"school-with-ai/sdk/agent-sdk/llm"
 	"school-with-ai/services/chatwrite"
 	"school-with-ai/services/chatwrite/agents"
@@ -29,18 +29,18 @@ type ChatClient interface {
 
 // ThreadStore provides read access to thread state
 type ThreadStore interface {
-	GetAgentThread(threadID string) (sdk.AgentThread, bool)
-	GetOrCreateAgentThread(ctx context.Context, threadID string) (sdk.AgentThread, error)
+	GetAgentThread(threadID string) (core.AgentThread, bool)
+	GetOrCreateAgentThread(ctx context.Context, threadID string) (core.AgentThread, error)
 	Get(threadID string) (*domain.Thread, bool)
 	Messages(threadID string) []domain.Message
 	All() []domain.Thread
-	Update(event sdk.Event) error
+	Update(event core.Event) error
 }
 
 // WorkerPool manages a pool of workers that process jobs from the queue
 type WorkerPool struct {
 	queue                domain.JobQueue
-	log                  sdk.EventStore
+	log                  core.EventStore
 	state                ThreadStore
 	whiteboardProjection interface{ Get(threadID string) string } // WhiteboardReader interface
 	chatClient           ChatClient
@@ -69,7 +69,7 @@ type WorkerPoolConfig struct {
 }
 
 // NewWorkerPool creates a new worker pool
-func NewWorkerPool(queue domain.JobQueue, log sdk.EventStore, state ThreadStore, whiteboardProjection interface{ Get(threadID string) string }, chatClient ChatClient, chatWriteService *chatwrite.ChatWriteService, config WorkerPoolConfig) *WorkerPool {
+func NewWorkerPool(queue domain.JobQueue, log core.EventStore, state ThreadStore, whiteboardProjection interface{ Get(threadID string) string }, chatClient ChatClient, chatWriteService *chatwrite.ChatWriteService, config WorkerPoolConfig) *WorkerPool {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	if config.NumWorkers <= 0 {
@@ -454,7 +454,7 @@ func (wp *WorkerPool) continueWithAgent(ctx context.Context, threadID, agentName
 }
 
 // processRoutingEvents checks new events for routing and triggers appropriate agents
-func (wp *WorkerPool) processRoutingEvents(ctx context.Context, threadID string, newEvents []sdk.Event, emitter EventEmitter, runID string) {
+func (wp *WorkerPool) processRoutingEvents(ctx context.Context, threadID string, newEvents []core.Event, emitter EventEmitter, runID string) {
 	for _, event := range newEvents {
 		// Cast to DomainEvent to check type
 		domainEvent, ok := event.(*agents.DomainEvent)
@@ -559,7 +559,7 @@ func (eb *EventBuffer) IsClosed() bool {
 	return eb.closed
 }
 
-// BufferedEventEmitter implements sdk.EventEmitter using EventBuffer
+// BufferedEventEmitter implements core.EventEmitter using EventBuffer
 type BufferedEventEmitter struct {
 	jobID  string
 	buffer *EventBuffer

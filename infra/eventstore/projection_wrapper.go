@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	sdk "school-with-ai/sdk/agent-sdk/core"
+	"school-with-ai/sdk/agent-sdk/core"
 )
 
 // ProjectionEventStore wraps an EventStore and automatically updates projections when events are appended.
@@ -12,13 +12,13 @@ import (
 // This ensures that all projections stay in sync with the event store without requiring
 // manual projection updates at every append site.
 type ProjectionEventStore struct {
-	wrapped     sdk.EventStore
+	wrapped     core.EventStore
 	projections []Projection
 	mu          sync.RWMutex
 }
 
 // NewProjectionEventStore creates an event store that automatically updates projections.
-func NewProjectionEventStore(wrapped sdk.EventStore, projections ...Projection) *ProjectionEventStore {
+func NewProjectionEventStore(wrapped core.EventStore, projections ...Projection) *ProjectionEventStore {
 	return &ProjectionEventStore{
 		wrapped:     wrapped,
 		projections: projections,
@@ -27,7 +27,7 @@ func NewProjectionEventStore(wrapped sdk.EventStore, projections ...Projection) 
 
 // Append adds one or more events to a stream and updates all projections.
 // Implements EventStore interface.
-func (p *ProjectionEventStore) Append(ctx context.Context, streamID string, events ...sdk.Event) (int64, error) {
+func (p *ProjectionEventStore) Append(ctx context.Context, streamID string, events ...core.Event) (int64, error) {
 	// Append to underlying store first
 	version, err := p.wrapped.Append(ctx, streamID, events...)
 	if err != nil {
@@ -59,9 +59,9 @@ func (p *ProjectionEventStore) RegisterProjection(projection Projection) {
 }
 
 // Verify ProjectionEventStore implements EventStore
-var _ sdk.EventStore = (*ProjectionEventStore)(nil)
+var _ core.EventStore = (*ProjectionEventStore)(nil)
 
 // Implement EventStore interface methods by delegating to wrapped EventStore
-func (p *ProjectionEventStore) ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]sdk.Event, error) {
+func (p *ProjectionEventStore) ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]core.Event, error) {
 	return p.wrapped.ReadStream(ctx, streamID, fromVersion)
 }

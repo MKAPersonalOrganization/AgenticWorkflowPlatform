@@ -8,8 +8,8 @@ import (
 
 // CreateLinearAlgebraProfessor creates the linear algebra professor agent.
 // Event contract is defined in contract.go
-func CreateLinearAlgebraProfessor(notifier sdk.EventNotifier) sdk.AgentConfig {
-	registry := sdk.NewToolRegistry()
+func CreateLinearAlgebraProfessor(notifier core.EventNotifier) core.AgentConfig {
+	registry := core.NewToolRegistry()
 
 	// Domain-specific tools
 	for _, tool := range domainTools() {
@@ -26,7 +26,7 @@ func CreateLinearAlgebraProfessor(notifier sdk.EventNotifier) sdk.AgentConfig {
 	registry.Register(sharedtools.NewReadWhiteboardTool())
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
 
-	return sdk.AgentConfig{
+	return core.AgentConfig{
 		Name: "linearalgebra-professor",
 		SystemPrompt: `# Linear Algebra Professor
 

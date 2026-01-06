@@ -2,19 +2,19 @@ package eventbus
 
 import (
 	"school-with-ai/domain"
-	sdk "school-with-ai/sdk/agent-sdk/core"
+	"school-with-ai/sdk/agent-sdk/core"
 	"school-with-ai/services/chatwrite"
 	"school-with-ai/services/chatwrite/agents/shared/tools"
 )
 
 // ThreadStore provides read access to thread state
 type ThreadStore interface {
-	GetAgentThread(threadID string) (sdk.AgentThread, bool)
+	GetAgentThread(threadID string) (core.AgentThread, bool)
 }
 
 // CreateToolCallHandler creates a tool call handler that emits events for collaboration tools
 func CreateToolCallHandler(registry *ContractRegistry, state ThreadStore, whiteboardStore interface{ Get(threadID string) string }) chatwrite.ToolCallHandler {
-	return func(threadID string, agentName string, toolCall domain.ToolCall, result string, eventEmitter func(sdk.Event) error) error {
+	return func(threadID string, agentName string, toolCall domain.ToolCall, result string, eventEmitter func(core.Event) error) error {
 		toolName := toolCall.Function.Name
 
 		// Create whiteboard state getter using WhiteboardStore

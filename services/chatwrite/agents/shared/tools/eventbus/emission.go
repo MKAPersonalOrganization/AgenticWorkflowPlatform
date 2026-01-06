@@ -16,7 +16,7 @@ type EmissionTool struct {
 }
 
 // NewEmissionTool creates an emission tool for the given event type
-func NewEmissionTool(eventType agents.EventType) sdk.Tool {
+func NewEmissionTool(eventType agents.EventType) core.Tool {
 	return &EmissionTool{eventType: eventType}
 }
 
@@ -74,8 +74,8 @@ func (t *EmissionTool) Invoke(ctx context.Context, arguments string) (string, er
 
 // GenerateEmissionTools creates emission tools for all event types in the Emits list.
 // This is called during agent setup to auto-generate tools from the contract.
-func GenerateEmissionTools(emits []agents.EventType) []sdk.Tool {
-	tools := make([]sdk.Tool, 0, len(emits))
+func GenerateEmissionTools(emits []agents.EventType) []core.Tool {
+	tools := make([]core.Tool, 0, len(emits))
 	for _, eventType := range emits {
 		// Skip whiteboard.updated - this is handled differently
 		if eventType == agents.EventTypeWhiteboardUpdated {
@@ -90,5 +90,5 @@ func GenerateEmissionTools(emits []agents.EventType) []sdk.Tool {
 	return tools
 }
 
-// Verify EmissionTool implements sdk.Tool
-var _ sdk.Tool = (*EmissionTool)(nil)
+// Verify EmissionTool implements core.Tool
+var _ core.Tool = (*EmissionTool)(nil)
