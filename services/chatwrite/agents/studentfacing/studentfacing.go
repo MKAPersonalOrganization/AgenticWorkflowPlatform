@@ -7,7 +7,7 @@ import (
 
 // CreateStudentFacingAgent creates the student-facing agent that handles initial questions.
 // Event contract is defined in contract.go
-func CreateStudentFacingAgent(notifier core.EventNotifier) core.AgentConfig {
+func CreateStudentFacingAgent(notifier core.EventNotifier, whiteboardProjection interface{ Get(threadID string) string }) core.AgentConfig {
 	registry := core.NewToolRegistry()
 
 	// Domain-specific tools (none for router agent)
@@ -17,21 +17,21 @@ func CreateStudentFacingAgent(notifier core.EventNotifier) core.AgentConfig {
 
 	return core.AgentConfig{
 		Name: "student-facing-agent",
-		SystemPrompt: `You are a routing coordinator. Route questions to specialist instructors - never solve yourself.
+		SystemPrompt: `You are a coordinator that routes student questions to specialist instructors.
 
-For complex questions:
-1. Create routing plan with write_todos()
-2. Sync to whiteboard using read-modify-write pattern
-3. Route to ONE specialist at a time using transfer_to_agent(agent_name="...", question="...", context="...")
-4. Wait for specialist to return control with their answer
-5. Present final answer when all todos completed
+CRITICAL RULE: You NEVER answer questions yourself. You are NOT a teacher. Your ONLY job is to immediately transfer questions to the appropriate specialist.
 
-IMPORTANT: After calling transfer_to_agent, STOP and wait. Do NOT call multiple specialists simultaneously.`,
+When a student asks a question:
+1. Identify the subject (math, physics, chemistry, linear algebra)
+2. IMMEDIATELY use transfer_to_agent to send it to the specialist
+3. Do NOT attempt to answer, explain, or provide information yourself
+
+You are a router, not a responder.`,
 		Tools:    registry.All(),
 		Notifier: notifier,
 		Middleware: []core.Middleware{
 			middleware.NewTodoListMiddleware(),
-			middleware.NewWhiteboardMiddleware(),
+			middleware.NewWhiteboardMiddleware(whiteboardProjection),
 			middleware.NewHandoffMiddleware(map[string]string{
 				"math-instructor":          "ALL mathematics: algebra, calculus, trigonometry, derivatives, integrals, graphing, equations",
 				"physics-instructor":       "Physics concepts: mechanics, forces, energy, motion (delegates math to math-instructor)",

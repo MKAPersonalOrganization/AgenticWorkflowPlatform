@@ -11,32 +11,60 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// mockWhiteboardProjection is a simple in-memory implementation for testing
+type mockWhiteboardProjection struct {
+	data map[string]string
+}
+
+func newMockWhiteboardProjection() *mockWhiteboardProjection {
+	return &mockWhiteboardProjection{
+		data: make(map[string]string),
+	}
+}
+
+func (m *mockWhiteboardProjection) Get(threadID string) string {
+	if m.data == nil {
+		return ""
+	}
+	return m.data[threadID]
+}
+
+func (m *mockWhiteboardProjection) Set(threadID, content string) {
+	if m.data == nil {
+		m.data = make(map[string]string)
+	}
+	m.data[threadID] = content
+}
+
 func TestWhiteboardMiddleware(t *testing.T) {
-	t.Run("adds read and write whiteboard tools", func(t *testing.T) {
-		middleware := NewWhiteboardMiddleware()
+	t.Run("adds write whiteboard tool and injects content in system prompt", func(t *testing.T) {
+		projection := newMockWhiteboardProjection()
+		middleware := NewWhiteboardMiddleware(projection)
 		reqCtx := &core.RequestContext{
-			Tools: []core.Tool{},
-			State: make(map[string]interface{}),
+			ThreadID: "thread-123",
+			Tools:    []core.Tool{},
+			State:    make(map[string]interface{}),
 		}
 
 		called := false
 		next := func(ctx context.Context, rc *core.RequestContext) error {
 			called = true
-			// Check that tools were added
+			// Check that write tool was added
 			tools := rc.GetEffectiveTools()
-			assert.Len(t, tools, 2, "should have 2 tools")
+			assert.Len(t, tools, 1, "should have 1 tool")
 
-			var hasRead, hasWrite bool
+			var hasWrite bool
 			for _, tool := range tools {
-				if tool.Name() == "read_whiteboard" {
-					hasRead = true
-				}
 				if tool.Name() == "write_whiteboard" {
 					hasWrite = true
 				}
 			}
-			assert.True(t, hasRead, "should have read_whiteboard tool")
 			assert.True(t, hasWrite, "should have write_whiteboard tool")
+
+			// Check that whiteboard content is in system prompt
+			prompt := rc.GetEffectiveSystemPrompt()
+			assert.Contains(t, prompt, "Current Whiteboard Content")
+			assert.Contains(t, prompt, "The whiteboard is currently empty")
 			return nil
 		}
 
@@ -45,8 +73,9 @@ func TestWhiteboardMiddleware(t *testing.T) {
 		assert.True(t, called)
 	})
 
-	t.Run("adds system prompt", func(t *testing.T) {
-		middleware := NewWhiteboardMiddleware()
+	t.Run("adds system prompt with whiteboard info", func(t *testing.T) {
+		projection := newMockWhiteboardProjection()
+		middleware := NewWhiteboardMiddleware(projection)
 		reqCtx := &core.RequestContext{
 			SystemPrompt: "",
 			State:        make(map[string]interface{}),
@@ -54,9 +83,9 @@ func TestWhiteboardMiddleware(t *testing.T) {
 
 		next := func(ctx context.Context, rc *core.RequestContext) error {
 			prompt := rc.GetEffectiveSystemPrompt()
-			assert.Contains(t, prompt, "Whiteboard Tools")
-			assert.Contains(t, prompt, "read_whiteboard")
+			assert.Contains(t, prompt, "Shared Whiteboard")
 			assert.Contains(t, prompt, "write_whiteboard")
+			assert.NotContains(t, prompt, "read_whiteboard")
 			return nil
 		}
 
@@ -65,14 +94,40 @@ func TestWhiteboardMiddleware(t *testing.T) {
 	})
 
 	t.Run("initializes whiteboard state", func(t *testing.T) {
-		middleware := NewWhiteboardMiddleware()
+		projection := newMockWhiteboardProjection()
+		middleware := NewWhiteboardMiddleware(projection)
 		reqCtx := &core.RequestContext{
-			State: make(map[string]interface{}),
+			ThreadID: "thread-123",
+			State:    make(map[string]interface{}),
 		}
 
 		next := func(ctx context.Context, rc *core.RequestContext) error {
-			content := GetWhiteboardContent(rc)
-			assert.Equal(t, "", content, "should initialize to empty string")
+			content := projection.Get(rc.ThreadID)
+			assert.Equal(t, "", content, "projection should have empty content initially")
+			return nil
+		}
+
+		err := middleware.Process(context.Background(), reqCtx, next)
+		require.NoError(t, err)
+	})
+
+	t.Run("injects existing whiteboard content into system prompt", func(t *testing.T) {
+		projection := newMockWhiteboardProjection()
+		middleware := NewWhiteboardMiddleware(projection)
+		reqCtx := &core.RequestContext{
+			ThreadID: "thread-123",
+			State:    make(map[string]interface{}),
+		}
+
+		// Pre-populate projection with content
+		projection.Set("thread-123", "# Existing Content\n- Item 1\n- Item 2")
+
+		next := func(ctx context.Context, rc *core.RequestContext) error {
+			prompt := rc.GetEffectiveSystemPrompt()
+			assert.Contains(t, prompt, "Current Whiteboard Content")
+			assert.Contains(t, prompt, "# Existing Content")
+			assert.Contains(t, prompt, "- Item 1")
+			assert.NotContains(t, prompt, "currently empty")
 			return nil
 		}
 
@@ -82,8 +137,10 @@ func TestWhiteboardMiddleware(t *testing.T) {
 
 	t.Run("custom system prompt", func(t *testing.T) {
 		customPrompt := "Custom whiteboard instructions"
-		middleware := NewWhiteboardMiddlewareWithPrompt(customPrompt)
+		projection := newMockWhiteboardProjection()
+		middleware := NewWhiteboardMiddlewareWithPrompt(projection, customPrompt)
 		reqCtx := &core.RequestContext{
+			ThreadID:     "thread-123",
 			SystemPrompt: "",
 			State:        make(map[string]interface{}),
 		}
@@ -96,41 +153,6 @@ func TestWhiteboardMiddleware(t *testing.T) {
 
 		err := middleware.Process(context.Background(), reqCtx, next)
 		require.NoError(t, err)
-	})
-}
-
-func TestReadWhiteboardTool(t *testing.T) {
-	t.Run("tool metadata", func(t *testing.T) {
-		reqCtx := &core.RequestContext{State: make(map[string]interface{})}
-		tool := NewReadWhiteboardTool(reqCtx)
-
-		assert.Equal(t, "read_whiteboard", tool.Name())
-		assert.Contains(t, tool.Description(), "Read the current content")
-		params := tool.Parameters()
-		assert.Equal(t, "object", params["type"])
-	})
-
-	t.Run("returns empty message when whiteboard is empty", func(t *testing.T) {
-		reqCtx := &core.RequestContext{State: make(map[string]interface{})}
-		SetWhiteboardContent(reqCtx, "")
-
-		tool := NewReadWhiteboardTool(reqCtx)
-		result, err := tool.Invoke(context.Background(), "{}")
-
-		require.NoError(t, err)
-		assert.Equal(t, "The whiteboard is currently empty.", result)
-	})
-
-	t.Run("returns whiteboard content", func(t *testing.T) {
-		reqCtx := &core.RequestContext{State: make(map[string]interface{})}
-		content := "# Formula\nF = ma"
-		SetWhiteboardContent(reqCtx, content)
-
-		tool := NewReadWhiteboardTool(reqCtx)
-		result, err := tool.Invoke(context.Background(), "{}")
-
-		require.NoError(t, err)
-		assert.Equal(t, content, result)
 	})
 }
 
@@ -275,8 +297,9 @@ func TestGetSetWhiteboardContent(t *testing.T) {
 }
 
 func TestWhiteboardMiddlewareIntegration(t *testing.T) {
-	t.Run("read-modify-write pattern", func(t *testing.T) {
-		middleware := NewWhiteboardMiddleware()
+	t.Run("write and verify content in system prompt", func(t *testing.T) {
+		projection := newMockWhiteboardProjection()
+		middleware := NewWhiteboardMiddleware(projection)
 		reqCtx := &core.RequestContext{
 			Tools: []core.Tool{},
 			State: make(map[string]interface{}),
@@ -285,18 +308,14 @@ func TestWhiteboardMiddlewareIntegration(t *testing.T) {
 		next := func(ctx context.Context, rc *core.RequestContext) error {
 			tools := rc.GetEffectiveTools()
 
-			// Find tools
-			var readTool, writeTool core.Tool
+			// Find write tool
+			var writeTool core.Tool
 			for _, tool := range tools {
-				if tool.Name() == "read_whiteboard" {
-					readTool = tool
-				}
 				if tool.Name() == "write_whiteboard" {
 					writeTool = tool
 				}
 			}
 
-			require.NotNil(t, readTool)
 			require.NotNil(t, writeTool)
 
 			// Initial write
@@ -307,13 +326,13 @@ func TestWhiteboardMiddlewareIntegration(t *testing.T) {
 			_, err := writeTool.Invoke(ctx, string(writeArgs))
 			require.NoError(t, err)
 
-			// Read
-			readResult, err := readTool.Invoke(ctx, "{}")
-			require.NoError(t, err)
-			assert.Contains(t, readResult, "Initial Content")
+			// Verify content is accessible via GetWhiteboardContent
+			content := GetWhiteboardContent(rc)
+			assert.Contains(t, content, "Initial Content")
+			assert.Contains(t, content, "First section")
 
-			// Modify and write
-			modified := readResult + "\n\n# New Section\nAdded content"
+			// Modify and write (simulating read-modify-write using GetWhiteboardContent)
+			modified := content + "\n\n# New Section\nAdded content"
 			writeArgs2, _ := json.Marshal(map[string]string{
 				"content": modified,
 				"action":  "write",
@@ -321,11 +340,10 @@ func TestWhiteboardMiddlewareIntegration(t *testing.T) {
 			_, err = writeTool.Invoke(ctx, string(writeArgs2))
 			require.NoError(t, err)
 
-			// Verify
-			finalResult, err := readTool.Invoke(ctx, "{}")
-			require.NoError(t, err)
-			assert.Contains(t, finalResult, "Initial Content")
-			assert.Contains(t, finalResult, "New Section")
+			// Verify final content
+			finalContent := GetWhiteboardContent(rc)
+			assert.Contains(t, finalContent, "Initial Content")
+			assert.Contains(t, finalContent, "New Section")
 
 			return nil
 		}

@@ -7,7 +7,7 @@ import (
 
 // CreateDiagrammingInstructor creates the diagramming specialist agent configuration.
 // Event contract is defined in contract.go
-func CreateDiagrammingInstructor(notifier core.EventNotifier) core.AgentConfig {
+func CreateDiagrammingInstructor(notifier core.EventNotifier, whiteboardProjection interface{ Get(threadID string) string }) core.AgentConfig {
 	registry := core.NewToolRegistry()
 
 	// Domain-specific tools
@@ -16,7 +16,6 @@ func CreateDiagrammingInstructor(notifier core.EventNotifier) core.AgentConfig {
 	}
 
 	// Shared collaboration tools
-	registry.Register(sharedtools.NewReadWhiteboardTool())
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
 
 	return core.AgentConfig{
@@ -25,7 +24,7 @@ func CreateDiagrammingInstructor(notifier core.EventNotifier) core.AgentConfig {
 
 ## Core Rules
 
-1. **Read First**: Always call read_whiteboard as your first action
+1. **Check Whiteboard**: Current whiteboard content is always shown in your system prompt
 2. **Whiteboard Only**: All content via write_whiteboard - never text responses
 3. **End with Event**: Always emit question_answered after writing diagram
 4. **Use Exact URLs**: Copy image_url from mermaid_diagram response exactly
@@ -33,7 +32,7 @@ func CreateDiagrammingInstructor(notifier core.EventNotifier) core.AgentConfig {
 
 ## Workflow
 
-1. read_whiteboard() - get context
+1. Review whiteboard content in your system prompt for context
 2. mermaid_diagram({mermaid_code: "...", title: "...", output_type: "png"})
 3. write_whiteboard with ![Description](EXACT_image_url) and explanation
 4. emit_question_answered(subject="diagramming", is_complete=true)

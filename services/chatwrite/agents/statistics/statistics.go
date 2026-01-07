@@ -7,7 +7,7 @@ import (
 
 // CreateStatisticsInstructor creates the statistics instructor agent.
 // Event contract is defined in contract.go
-func CreateStatisticsInstructor(notifier core.EventNotifier) core.AgentConfig {
+func CreateStatisticsInstructor(notifier core.EventNotifier, whiteboardProjection interface{ Get(threadID string) string }) core.AgentConfig {
 	registry := core.NewToolRegistry()
 
 	// Domain-specific tools
@@ -16,7 +16,6 @@ func CreateStatisticsInstructor(notifier core.EventNotifier) core.AgentConfig {
 	}
 
 	// Shared collaboration tools
-	registry.Register(sharedtools.NewReadWhiteboardTool())
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
 
 	return core.AgentConfig{
@@ -25,13 +24,13 @@ func CreateStatisticsInstructor(notifier core.EventNotifier) core.AgentConfig {
 
 ## Core Rules
 
-1. **Read First**: Always call read_whiteboard as your first action
+1. **Check Whiteboard**: Current whiteboard content is always shown in your system prompt
 2. **Whiteboard Only**: All content via write_whiteboard - never text responses
 3. **End with Event**: Always emit question_answered after writing results
 
 ## Workflow
 
-1. read_whiteboard() - get question and data
+1. Review whiteboard content in your system prompt for question and data
 2. Execute statistical tools as needed
 3. write_whiteboard(action="append", content="## STATISTICS\n[results]\n")
 4. emit_question_answered(subject="statistics", is_complete=true)

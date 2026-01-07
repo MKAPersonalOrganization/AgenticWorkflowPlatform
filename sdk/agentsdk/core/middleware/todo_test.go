@@ -202,6 +202,7 @@ func TestTodoListMiddleware_Process_AddsToolAndPrompt(t *testing.T) {
 	middleware := NewTodoListMiddleware()
 
 	reqCtx := core.NewRequestContext(
+		"",
 		nil,
 		"Original prompt",
 		[]core.Tool{},
@@ -247,6 +248,7 @@ func TestTodoListMiddleware_Process_PreservesExistingTools(t *testing.T) {
 	existingTool := &MockTool{name: "existing_tool"}
 
 	reqCtx := core.NewRequestContext(
+		"",
 		nil,
 		"Original prompt",
 		[]core.Tool{existingTool},
@@ -287,7 +289,7 @@ func TestTodoListMiddleware_Process_PreservesExistingTools(t *testing.T) {
 }
 
 func TestGetTodos_EmptyState(t *testing.T) {
-	reqCtx := core.NewRequestContext(nil, "", nil, &core.AgentConfig{})
+	reqCtx := core.NewRequestContext("", nil, "", nil, &core.AgentConfig{})
 
 	todos := GetTodos(reqCtx)
 	if todos != nil {
@@ -296,7 +298,7 @@ func TestGetTodos_EmptyState(t *testing.T) {
 }
 
 func TestSetTodos_AndGetTodos(t *testing.T) {
-	reqCtx := core.NewRequestContext(nil, "", nil, &core.AgentConfig{})
+	reqCtx := core.NewRequestContext("", nil, "", nil, &core.AgentConfig{})
 
 	expectedTodos := []Todo{
 		{Content: "Task 1", Status: TodoStatusPending},
@@ -328,6 +330,7 @@ func TestTodoListMiddleware_Integration(t *testing.T) {
 	middleware := NewTodoListMiddleware()
 
 	reqCtx := core.NewRequestContext(
+		"",
 		nil,
 		"You are a helpful assistant",
 		[]core.Tool{},

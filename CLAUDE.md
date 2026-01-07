@@ -88,7 +88,7 @@ DELETE /api/threads/{threadId}            → Delete thread
 Educational tools available to instructors:
 - `calculator`, `equation_solver`, `graphing`, `plot_tool` (gnuplot), `animate_tool`
 - `periodic_table`, `unit_conversion`
-- `write_whiteboard`, `read_whiteboard` (shared state)
+- `write_whiteboard` (shared state - whiteboard content is always available in system prompt)
 - Event emission tools (auto-generated from agent contracts: `emit_math_question`, `emit_physics_question`, etc.)
 
 ### Frontend Stack

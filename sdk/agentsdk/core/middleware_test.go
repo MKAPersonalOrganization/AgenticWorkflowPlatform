@@ -45,7 +45,7 @@ func TestNewRequestContext(t *testing.T) {
 	tools := []Tool{}
 	config := &AgentConfig{Name: "test-agent"}
 
-	ctx := NewRequestContext(messages, systemPrompt, tools, config)
+	ctx := NewRequestContext("", messages, systemPrompt, tools, config)
 
 	if len(ctx.Messages) != 1 {
 		t.Errorf("Expected 1 message, got %d", len(ctx.Messages))
@@ -65,7 +65,7 @@ func TestNewRequestContext(t *testing.T) {
 }
 
 func TestRequestContext_WithMetadata(t *testing.T) {
-	ctx := NewRequestContext(nil, "", nil, nil)
+	ctx := NewRequestContext("", nil, "", nil, nil)
 
 	ctx.WithMetadata("key1", "value1")
 	ctx.WithMetadata("key2", 42)
@@ -95,7 +95,7 @@ func TestRequestContext_WithMetadata(t *testing.T) {
 }
 
 func TestRequestContext_SetTerminate(t *testing.T) {
-	ctx := NewRequestContext(nil, "", nil, nil)
+	ctx := NewRequestContext("", nil, "", nil, nil)
 
 	if ctx.Terminate {
 		t.Error("Expected Terminate to be false initially")
@@ -109,7 +109,7 @@ func TestRequestContext_SetTerminate(t *testing.T) {
 }
 
 func TestRequestContext_AddTool(t *testing.T) {
-	ctx := NewRequestContext(nil, "", nil, nil)
+	ctx := NewRequestContext("", nil, "", nil, nil)
 
 	tool1 := NewFunctionTool("tool1", "desc1", nil, nil)
 	tool2 := NewFunctionTool("tool2", "desc2", nil, nil)
@@ -128,7 +128,7 @@ func TestRequestContext_AddTool(t *testing.T) {
 }
 
 func TestRequestContext_AddSystemPrompt(t *testing.T) {
-	ctx := NewRequestContext(nil, "Base prompt", nil, nil)
+	ctx := NewRequestContext("", nil, "Base prompt", nil, nil)
 
 	ctx.AddSystemPrompt("Addition 1")
 	ctx.AddSystemPrompt("Addition 2")
@@ -147,7 +147,7 @@ func TestRequestContext_AddSystemPrompt(t *testing.T) {
 }
 
 func TestRequestContext_GetEffectiveSystemPrompt_NoAdditions(t *testing.T) {
-	ctx := NewRequestContext(nil, "Base prompt only", nil, nil)
+	ctx := NewRequestContext("", nil, "Base prompt only", nil, nil)
 
 	effective := ctx.GetEffectiveSystemPrompt()
 	if effective != "Base prompt only" {
@@ -157,7 +157,7 @@ func TestRequestContext_GetEffectiveSystemPrompt_NoAdditions(t *testing.T) {
 
 func TestRequestContext_GetEffectiveTools(t *testing.T) {
 	baseTool := NewFunctionTool("base", "base tool", nil, nil)
-	ctx := NewRequestContext(nil, "", []Tool{baseTool}, nil)
+	ctx := NewRequestContext("", nil, "", []Tool{baseTool}, nil)
 
 	// Initially, only base tool
 	tools := ctx.GetEffectiveTools()
@@ -177,6 +177,7 @@ func TestRequestContext_GetEffectiveTools(t *testing.T) {
 
 func TestRequestContext_Override(t *testing.T) {
 	original := NewRequestContext(
+		"thread-123",
 		[]llm.ChatMessage{{Role: llm.ChatRoleUser, Contents: []llm.AIContent{llm.TextContent{Text: "Original"}}}},
 		"Original prompt",
 		nil,
@@ -226,7 +227,7 @@ func TestMiddlewareFunc(t *testing.T) {
 		return next(ctx, reqCtx)
 	})
 
-	ctx := NewRequestContext(nil, "", nil, nil)
+	ctx := NewRequestContext("", nil, "", nil, nil)
 	err := middlewareFunc.Process(context.Background(), ctx, NoOpHandler)
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
@@ -244,7 +245,7 @@ func TestChainMiddleware_Empty(t *testing.T) {
 	}
 
 	handler := ChainMiddleware([]Middleware{}, baseHandler)
-	ctx := NewRequestContext(nil, "", nil, nil)
+	ctx := NewRequestContext("", nil, "", nil, nil)
 
 	err := handler(context.Background(), ctx)
 	if err != nil {
@@ -264,7 +265,7 @@ func TestChainMiddleware_SingleMiddleware(t *testing.T) {
 	}
 
 	handler := ChainMiddleware([]Middleware{m}, baseHandler)
-	ctx := NewRequestContext(nil, "", nil, nil)
+	ctx := NewRequestContext("", nil, "", nil, nil)
 
 	err := handler(context.Background(), ctx)
 	if err != nil {
@@ -317,7 +318,7 @@ func TestChainMiddleware_MultipleMiddleware_ExecutionOrder(t *testing.T) {
 	}
 
 	handler := ChainMiddleware([]Middleware{m1, m2, m3}, baseHandler)
-	ctx := NewRequestContext(nil, "", nil, nil)
+	ctx := NewRequestContext("", nil, "", nil, nil)
 
 	err := handler(context.Background(), ctx)
 	if err != nil {
@@ -372,7 +373,7 @@ func TestChainMiddleware_MiddlewareCanModifyContext(t *testing.T) {
 	}
 
 	handler := ChainMiddleware([]Middleware{m1, m2}, baseHandler)
-	ctx := NewRequestContext(nil, "", nil, nil)
+	ctx := NewRequestContext("", nil, "", nil, nil)
 
 	err := handler(context.Background(), ctx)
 	if err != nil {
@@ -396,7 +397,7 @@ func TestChainMiddleware_MiddlewareCanShortCircuit(t *testing.T) {
 	}
 
 	handler := ChainMiddleware([]Middleware{m1, m2, m3}, baseHandler)
-	ctx := NewRequestContext(nil, "", nil, nil)
+	ctx := NewRequestContext("", nil, "", nil, nil)
 
 	err := handler(context.Background(), ctx)
 	if err != nil {
@@ -430,7 +431,7 @@ func TestChainMiddleware_ErrorPropagation(t *testing.T) {
 	}
 
 	handler := ChainMiddleware([]Middleware{m1, m2, m3}, baseHandler)
-	ctx := NewRequestContext(nil, "", nil, nil)
+	ctx := NewRequestContext("", nil, "", nil, nil)
 
 	err := handler(context.Background(), ctx)
 	if err == nil {
@@ -461,7 +462,7 @@ func TestChainMiddleware_BaseHandlerError(t *testing.T) {
 	baseHandler := ErrorHandler(baseError)
 
 	handler := ChainMiddleware([]Middleware{m}, baseHandler)
-	ctx := NewRequestContext(nil, "", nil, nil)
+	ctx := NewRequestContext("", nil, "", nil, nil)
 
 	err := handler(context.Background(), ctx)
 	if err != baseError {
@@ -478,7 +479,7 @@ func TestChainMiddleware_BaseHandlerError(t *testing.T) {
 }
 
 func TestNoOpHandler(t *testing.T) {
-	ctx := NewRequestContext(nil, "", nil, nil)
+	ctx := NewRequestContext("", nil, "", nil, nil)
 	err := NoOpHandler(context.Background(), ctx)
 	if err != nil {
 		t.Errorf("NoOpHandler should not return error, got %v", err)
@@ -489,7 +490,7 @@ func TestErrorHandler(t *testing.T) {
 	expectedError := errors.New("test error")
 	handler := ErrorHandler(expectedError)
 
-	ctx := NewRequestContext(nil, "", nil, nil)
+	ctx := NewRequestContext("", nil, "", nil, nil)
 	err := handler(context.Background(), ctx)
 	if err != expectedError {
 		t.Errorf("Expected error %v, got %v", expectedError, err)
@@ -500,7 +501,7 @@ func TestResultHandler(t *testing.T) {
 	expectedResult := "test result"
 	handler := ResultHandler(expectedResult)
 
-	ctx := NewRequestContext(nil, "", nil, nil)
+	ctx := NewRequestContext("", nil, "", nil, nil)
 	err := handler(context.Background(), ctx)
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
@@ -523,7 +524,7 @@ func TestMiddleware_CanAccessResultAfterNext(t *testing.T) {
 	}
 
 	handler := ChainMiddleware([]Middleware{m}, ResultHandler(expectedResult))
-	ctx := NewRequestContext(nil, "", nil, nil)
+	ctx := NewRequestContext("", nil, "", nil, nil)
 
 	err := handler(context.Background(), ctx)
 	if err != nil {
@@ -549,7 +550,7 @@ func TestMiddleware_CanAddToolsDynamically(t *testing.T) {
 	}
 
 	handler := ChainMiddleware([]Middleware{m}, NoOpHandler)
-	ctx := NewRequestContext(nil, "", nil, nil)
+	ctx := NewRequestContext("", nil, "", nil, nil)
 
 	err := handler(context.Background(), ctx)
 	if err != nil {
@@ -570,7 +571,7 @@ func TestMiddleware_CanAddSystemPromptDynamically(t *testing.T) {
 	}
 
 	handler := ChainMiddleware([]Middleware{m}, NoOpHandler)
-	ctx := NewRequestContext(nil, "Base instructions", nil, nil)
+	ctx := NewRequestContext("", nil, "Base instructions", nil, nil)
 
 	err := handler(context.Background(), ctx)
 	if err != nil {
@@ -587,7 +588,7 @@ func TestMiddleware_CanAddSystemPromptDynamically(t *testing.T) {
 // Benchmark middleware chain performance
 func BenchmarkChainMiddleware_NoMiddleware(b *testing.B) {
 	handler := ChainMiddleware([]Middleware{}, NoOpHandler)
-	ctx := NewRequestContext(nil, "", nil, nil)
+	ctx := NewRequestContext("", nil, "", nil, nil)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -598,7 +599,7 @@ func BenchmarkChainMiddleware_NoMiddleware(b *testing.B) {
 func BenchmarkChainMiddleware_SingleMiddleware(b *testing.B) {
 	m := &mockMiddleware{}
 	handler := ChainMiddleware([]Middleware{m}, NoOpHandler)
-	ctx := NewRequestContext(nil, "", nil, nil)
+	ctx := NewRequestContext("", nil, "", nil, nil)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -612,7 +613,7 @@ func BenchmarkChainMiddleware_TenMiddleware(b *testing.B) {
 		middlewares[i] = &mockMiddleware{}
 	}
 	handler := ChainMiddleware(middlewares, NoOpHandler)
-	ctx := NewRequestContext(nil, "", nil, nil)
+	ctx := NewRequestContext("", nil, "", nil, nil)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

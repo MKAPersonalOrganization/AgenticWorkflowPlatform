@@ -19,7 +19,6 @@ func domainTools() []core.Tool {
 	}
 }
 
-
 func handlers() agents.EventHandlerRegistry {
 	registry := make(agents.EventHandlerRegistry)
 
@@ -77,9 +76,11 @@ func handleDiagrammingQuestion(ctx context.Context, handlerCtx *agents.EventHand
 
 	messageID := domain.GenerateMessageID()
 
+	runOpts := core.DefaultRunOptions()
+
 	err := handlerCtx.Agent.RunWithThread(ctx, handlerCtx.ThreadID, messageID, agentThread, func(event core.Event) error {
 		return nil
-	}, core.DefaultRunOptions())
+	}, runOpts)
 	if err != nil {
 		slog.Error("Diagramming handler failed", "error", err)
 		return err

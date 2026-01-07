@@ -48,9 +48,11 @@ func handleUserMessage(ctx context.Context, handlerCtx *agents.EventHandlerConte
 
 	messageID := domain.GenerateMessageID()
 
+	runOpts := core.DefaultRunOptions()
+
 	err := handlerCtx.Agent.RunWithThread(ctx, handlerCtx.ThreadID, messageID, agentThread, func(event core.Event) error {
 		return nil
-	}, core.DefaultRunOptions())
+	}, runOpts)
 	if err != nil {
 		slog.Error("User message handler failed", "error", err)
 		return err
@@ -107,9 +109,11 @@ func handleAgentHandoff(ctx context.Context, handlerCtx *agents.EventHandlerCont
 
 	messageID := domain.GenerateMessageID()
 
+	runOpts := core.DefaultRunOptions()
+
 	err := handlerCtx.Agent.RunWithThread(ctx, handlerCtx.ThreadID, messageID, agentThread, func(event core.Event) error {
 		return nil
-	}, core.DefaultRunOptions())
+	}, runOpts)
 	if err != nil {
 		slog.Error("Coordinator handoff handler failed", "error", err)
 		return err

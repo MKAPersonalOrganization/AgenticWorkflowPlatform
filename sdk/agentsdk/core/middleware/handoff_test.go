@@ -13,7 +13,7 @@ func newTestRequestContext() *core.RequestContext {
 	config := &core.AgentConfig{
 		Name: "test-agent",
 	}
-	return core.NewRequestContext(nil, "", nil, config)
+	return core.NewRequestContext("", nil, "", nil, config)
 }
 
 func TestNewHandoffMiddleware(t *testing.T) {
@@ -207,7 +207,7 @@ func TestTransferToAgentTool_Invoke_Success(t *testing.T) {
 	config := &core.AgentConfig{
 		Name: "test-agent",
 	}
-	reqCtx := core.NewRequestContext(nil, "", nil, config)
+	reqCtx := core.NewRequestContext("", nil, "", nil, config)
 	tool := NewTransferToAgentTool(agents, reqCtx)
 
 	args := map[string]interface{}{

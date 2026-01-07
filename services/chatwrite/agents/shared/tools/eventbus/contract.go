@@ -25,8 +25,8 @@ type AgentContract struct {
 	Factory AgentFactory
 }
 
-// AgentFactory creates an agent configuration with a given notifier
-type AgentFactory func(notifier core.EventNotifier) core.AgentConfig
+// AgentFactory creates an agent configuration with a given notifier and whiteboard projection
+type AgentFactory func(notifier core.EventNotifier, whiteboardProjection interface{ Get(threadID string) string }) core.AgentConfig
 
 // EventTypeSlug extracts the slug from an event type.
 // e.g., "question.math" -> "math"

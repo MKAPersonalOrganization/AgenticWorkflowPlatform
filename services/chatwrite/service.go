@@ -185,7 +185,7 @@ func (h *ChatWriteService) runIteration(
 	chatMessages := llm.FromDomainMessages(messages)
 
 	// Build chat options from agent config and run options, applying middleware
-	chatOptions, reqCtx, err := core.ToChatOptionsWithMiddleware(ctx, h.config, chatMessages, runOpts)
+	chatOptions, reqCtx, err := core.ToChatOptionsWithMiddleware(ctx, h.config, chatMessages, threadID, runOpts)
 	if err != nil {
 		return fmt.Errorf("failed to apply middleware: %w", err)
 	}

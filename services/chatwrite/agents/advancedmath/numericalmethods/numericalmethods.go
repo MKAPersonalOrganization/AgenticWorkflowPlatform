@@ -7,12 +7,11 @@ import (
 )
 
 // CreateNumericalMethodsProfessor creates the numerical methods professor agent
-func CreateNumericalMethodsProfessor(notifier core.EventNotifier) core.AgentConfig {
+func CreateNumericalMethodsProfessor(notifier core.EventNotifier, whiteboardProjection interface{ Get(threadID string) string }) core.AgentConfig {
 	registry := core.NewToolRegistry()
 
 	// Shared tools
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
-	registry.Register(sharedtools.NewReadWhiteboardTool())
 
 	// Numerical methods specific tools
 	registry.Register(tools.NewRootFindingTool())
@@ -34,7 +33,7 @@ You are an advanced mathematics professor specializing in numerical methods and 
 
 ## Workflow
 
-1. **Read** whiteboard: Check student's question
+1. **Check** whiteboard content in your system prompt for student's question
 2. **Analyze** what numerical methods are needed
 3. **Execute** using gosl/num library tools
 4. **Write** results to whiteboard with convergence analysis

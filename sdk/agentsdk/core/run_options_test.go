@@ -80,7 +80,7 @@ func TestToChatOptionsWithDefaultRunOptions(t *testing.T) {
 		Temperature:  &temp,
 	}
 
-	chatOpts, _, err := ToChatOptionsWithMiddleware(context.Background(), config, []llm.ChatMessage{}, DefaultRunOptions())
+	chatOpts, _, err := ToChatOptionsWithMiddleware(context.Background(), config, []llm.ChatMessage{}, "", DefaultRunOptions())
 	require.NoError(t, err)
 
 	require.NotNil(t, chatOpts)
@@ -112,7 +112,7 @@ func TestToChatOptionsRunOptionsOverridesConfig(t *testing.T) {
 		ModelID:     "gpt-4",
 	}
 
-	chatOpts, _, err := ToChatOptionsWithMiddleware(context.Background(), config, []llm.ChatMessage{}, runOpts)
+	chatOpts, _, err := ToChatOptionsWithMiddleware(context.Background(), config, []llm.ChatMessage{}, "", runOpts)
 	require.NoError(t, err)
 
 	require.NotNil(t, chatOpts)
@@ -156,7 +156,7 @@ func TestToChatOptionsPartialOverride(t *testing.T) {
 		StopSequences: []string{"run-stop-1", "run-stop-2"},
 	}
 
-	chatOpts, _, err := ToChatOptionsWithMiddleware(context.Background(), config, []llm.ChatMessage{}, runOpts)
+	chatOpts, _, err := ToChatOptionsWithMiddleware(context.Background(), config, []llm.ChatMessage{}, "", runOpts)
 	require.NoError(t, err)
 
 	require.NotNil(t, chatOpts)
@@ -192,7 +192,7 @@ func TestToChatOptionsAdditionalProperties(t *testing.T) {
 		},
 	}
 
-	chatOpts, _, err := ToChatOptionsWithMiddleware(context.Background(), config, []llm.ChatMessage{}, runOpts)
+	chatOpts, _, err := ToChatOptionsWithMiddleware(context.Background(), config, []llm.ChatMessage{}, "", runOpts)
 	require.NoError(t, err)
 
 	require.NotNil(t, chatOpts)
@@ -244,7 +244,7 @@ func TestToChatOptionsAllParameters(t *testing.T) {
 		},
 	}
 
-	chatOpts, _, err := ToChatOptionsWithMiddleware(context.Background(), config, []llm.ChatMessage{}, runOpts)
+	chatOpts, _, err := ToChatOptionsWithMiddleware(context.Background(), config, []llm.ChatMessage{}, "", runOpts)
 	require.NoError(t, err)
 
 	require.NotNil(t, chatOpts)

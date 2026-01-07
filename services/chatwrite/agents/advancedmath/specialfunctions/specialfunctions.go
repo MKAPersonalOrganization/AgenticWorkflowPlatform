@@ -7,12 +7,11 @@ import (
 )
 
 // CreateSpecialFunctionsProfessor creates the special functions professor agent
-func CreateSpecialFunctionsProfessor(notifier core.EventNotifier) core.AgentConfig {
+func CreateSpecialFunctionsProfessor(notifier core.EventNotifier, whiteboardProjection interface{ Get(threadID string) string }) core.AgentConfig {
 	registry := core.NewToolRegistry()
 
 	// Shared tools
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
-	registry.Register(sharedtools.NewReadWhiteboardTool())
 
 	// Special functions specific tools
 	registry.Register(tools.NewBesselFunctionsTool())
@@ -35,7 +34,7 @@ You are an advanced mathematics professor specializing in special functions, Fou
 
 ## Workflow
 
-1. **Read** whiteboard: Check student's question
+1. **Check** whiteboard content in your system prompt for student's question
 2. **Analyze** which special functions or transforms are needed
 3. **Execute** using gosl/fun library tools
 4. **Write** results to whiteboard with function properties

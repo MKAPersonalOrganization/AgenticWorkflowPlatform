@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -101,11 +100,10 @@ Remember: The script will be executed as-is, so ensure it's complete and valid g
 			},
 			"title": map[string]any{
 				"type":        "string",
-				"description": "Brief description of the plot for logging/reference purposes. Example: 'Sine wave visualization', 'Quadratic function with roots'",
-				"maxLength":   100,
+				"description": "REQUIRED. A descriptive name for the plot that will be used as the image filename. Use lowercase with hyphens, e.g., 'sine-wave', 'quadratic-function', 'velocity-vs-time'. This will be the actual filename.",
 			},
 		},
-		"required": []string{"gnuplot_script"},
+		"required": []string{"gnuplot_script", "title"},
 	}
 }
 
@@ -115,9 +113,12 @@ func (p *PlotTool) Invoke(ctx context.Context, arguments string) (string, error)
 		return "", fmt.Errorf("failed to parse plot args: %w", err)
 	}
 
-	// Validate required gnuplot_script parameter
+	// Validate required parameters
 	if args.GnuplotScript == "" {
 		return "", fmt.Errorf("gnuplot_script parameter is required")
+	}
+	if args.Title == "" {
+		return "", fmt.Errorf("title parameter is required")
 	}
 
 	// Validate script doesn't contain terminal/output commands (we manage these)
@@ -167,10 +168,23 @@ func executeGnuplotScript(userScript, title string) (string, error) {
 		return "", fmt.Errorf("failed to create charts directory: %w", err)
 	}
 
-	// Generate unique filename
-	hash := fmt.Sprintf("%x", md5.Sum([]byte(userScript+title+fmt.Sprintf("%d", time.Now().UnixNano()))))
-	hash = hash[:16] // Use first 16 chars
-	imagePath := filepath.Join(chartsDir, fmt.Sprintf("plot_%s_%d.png", hash, time.Now().Unix()))
+	// Sanitize title for use as filename (lowercase, hyphens only, alphanumeric)
+	sanitizedTitle := strings.ToLower(title)
+	sanitizedTitle = strings.ReplaceAll(sanitizedTitle, " ", "-")
+	// Remove any characters that aren't alphanumeric or hyphens
+	var cleanTitle strings.Builder
+	for _, char := range sanitizedTitle {
+		if (char >= 'a' && char <= 'z') || (char >= '0' && char <= '9') || char == '-' {
+			cleanTitle.WriteRune(char)
+		}
+	}
+	filename := cleanTitle.String()
+	if filename == "" {
+		filename = "plot"
+	}
+
+	// Add timestamp to make it unique
+	imagePath := filepath.Join(chartsDir, fmt.Sprintf("%s_%d.png", filename, time.Now().Unix()))
 
 	// Build complete gnuplot script with terminal and output settings
 	var script strings.Builder
@@ -182,7 +196,7 @@ func executeGnuplotScript(userScript, title string) (string, error) {
 	script.WriteString("\n")
 
 	// Write script to temporary file
-	scriptPath := filepath.Join(chartsDir, fmt.Sprintf("script_%s_%d.gp", hash, time.Now().Unix()))
+	scriptPath := filepath.Join(chartsDir, fmt.Sprintf("script_%s_%d.gp", filename, time.Now().Unix()))
 	if err := os.WriteFile(scriptPath, []byte(script.String()), 0o644); err != nil {
 		return "", fmt.Errorf("failed to write gnuplot script: %w", err)
 	}

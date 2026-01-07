@@ -7,12 +7,11 @@ import (
 )
 
 // CreateGeometryProfessor creates the computational geometry professor agent
-func CreateGeometryProfessor(notifier core.EventNotifier) core.AgentConfig {
+func CreateGeometryProfessor(notifier core.EventNotifier, whiteboardProjection interface{ Get(threadID string) string }) core.AgentConfig {
 	registry := core.NewToolRegistry()
 
 	// Shared tools
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
-	registry.Register(sharedtools.NewReadWhiteboardTool())
 
 	// Geometry specific tools
 	registry.Register(tools.NewGeometricPrimitivesTool())
@@ -33,7 +32,7 @@ You are an advanced mathematics professor specializing in computational geometry
 
 ## Workflow
 
-1. **Read** whiteboard: Check geometric problem
+1. **Check** whiteboard content in your system prompt for geometric problem
 2. **Analyze** what geometric computations are needed
 3. **Execute** using gosl/gm library tools
 4. **Write** results to whiteboard with visualizations
