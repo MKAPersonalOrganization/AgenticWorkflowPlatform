@@ -53,6 +53,7 @@ type ChatWriteService struct {
 	notifier                core.EventNotifier // Agent's own notifier
 	toolCallHandler         ToolCallHandler
 	shouldContinueIteration ShouldContinueIterationFn
+	reqCtxCapture           **core.RequestContext // Captures the request context for handoff detection
 }
 
 // Option is a functional option for configuring ChatWriteService
@@ -76,6 +77,13 @@ func WithToolCallHandler(handler ToolCallHandler) Option {
 func WithShouldContinueIteration(fn ShouldContinueIterationFn) Option {
 	return func(h *ChatWriteService) {
 		h.shouldContinueIteration = fn
+	}
+}
+
+// WithRequestContextCapture configures the agent to capture the request context for handoff detection
+func WithRequestContextCapture(capture **core.RequestContext) Option {
+	return func(h *ChatWriteService) {
+		h.reqCtxCapture = capture
 	}
 }
 
@@ -188,6 +196,11 @@ func (h *ChatWriteService) runIteration(
 	chatOptions, reqCtx, err := core.ToChatOptionsWithMiddleware(ctx, h.config, chatMessages, threadID, runOpts)
 	if err != nil {
 		return fmt.Errorf("failed to apply middleware: %w", err)
+	}
+
+	// Capture request context if configured (for handoff detection)
+	if h.reqCtxCapture != nil {
+		*h.reqCtxCapture = reqCtx
 	}
 
 	// Check if middleware terminated early
