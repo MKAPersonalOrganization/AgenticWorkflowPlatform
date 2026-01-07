@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
@@ -48,8 +49,10 @@ func NewProcessChatTask(job *domain.Job) (*asynq.Task, error) {
 	// Thread isolation is handled by the in-memory job queue
 
 	return asynq.NewTask(TypeProcessChat, payload,
-		asynq.MaxRetry(3),
-		asynq.TaskID(job.ID), // Use job ID as task ID for deduplication
+		asynq.MaxRetry(3),             // Retry up to 3 times on failure
+		asynq.Timeout(5*time.Minute),  // 5 minute timeout for LLM calls
+		asynq.TaskID(job.ID),          // Use job ID as task ID for deduplication
+		asynq.Retention(24*time.Hour), // Keep completed tasks for 24 hours
 	), nil
 }
 

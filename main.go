@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"time"
 
 	"school-with-ai/components"
 	"school-with-ai/handlers"
@@ -93,8 +94,10 @@ func main() {
 	// Initialize Asynq server
 	asynqServer := orchestration.NewAsynqServer(
 		orchestration.AsynqConfig{
-			RedisAddr:   redisAddr,
-			Concurrency: 5,
+			RedisAddr:           redisAddr,
+			Concurrency:         5,
+			ShutdownTimeout:     10 * time.Second, // Wait 10s for workers to finish
+			HealthCheckInterval: 15 * time.Second, // Check Redis every 15s
 		},
 		eventLog,
 		llmContextProjection,
@@ -104,7 +107,11 @@ func main() {
 		jobQueue,
 	)
 	defer asynqServer.Shutdown()
-	slog.Info("Asynq server started", "redis", redisAddr, "concurrency", 5)
+	slog.Info("Asynq server started",
+		"redis", redisAddr,
+		"concurrency", 5,
+		"shutdownTimeout", "10s",
+		"healthCheckInterval", "15s")
 
 	// Create HTTP handler
 	handler := handlers.NewAsynqHandler(eventLog, llmContextProjection, chatClient, jobQueue, asynqServer, chatWriteService, authSvc, projectionService)
@@ -128,13 +135,26 @@ func main() {
 	// Health check endpoint (public)
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
+
+		// Get Asynq metrics
+		metrics, err := asynqServer.GetMetrics()
+		if err != nil {
+			slog.Error("Failed to get Asynq metrics", "error", err)
+			metrics = nil
+		}
+
+		response := map[string]any{
 			"status":   "healthy",
 			"redis":    redisAddr,
-			"workers":  5,
 			"mode":     "asynq",
 			"asynqmon": "http://localhost:8080",
-		})
+		}
+
+		if metrics != nil {
+			response["metrics"] = metrics
+		}
+
+		json.NewEncoder(w).Encode(response)
 	})
 
 	// Auth routes (public)
