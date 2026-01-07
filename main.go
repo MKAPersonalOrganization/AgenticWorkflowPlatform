@@ -88,6 +88,12 @@ func main() {
 		NumWorkers:   5,
 		PollInterval: 100 * time.Millisecond,
 	})
+
+	// Connect AGUI projection to worker pool for real-time event emission
+	// When the projection processes events, it will emit AGUI protocol events
+	// directly to the appropriate job's event buffer for SSE streaming
+	aguiProjection.SetEventEmitter(workerPool.EmitEventForThread)
+
 	workerPool.Start()
 	defer workerPool.Stop()
 

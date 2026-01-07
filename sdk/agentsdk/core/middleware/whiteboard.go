@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 )
 
@@ -317,20 +316,11 @@ func (t *WriteWhiteboardTool) Invoke(ctx context.Context, arguments string) (str
 		SetWhiteboardContent(t.reqCtx, finalContent)
 	}
 
-	// Emit whiteboard.updated event to persist the change
-	// If no notifier is configured, we skip persistence but still update local state
-	if t.reqCtx.Config != nil && t.reqCtx.Config.Notifier != nil {
-		event := domain.NewWhiteboardUpdatedEvent(
-			t.reqCtx.ThreadID,
-			"", // agent name - could be extracted from config if needed
-			finalContent,
-			string(args.Action),
-		)
-		if err := t.reqCtx.EmitEvent(event); err != nil {
-			// Log the error but don't fail - local state is already updated
-			return fmt.Sprintf("Whiteboard updated (%s) - warning: failed to persist", args.Action), nil
-		}
-	}
+	// Emit WhiteboardUpdatedEvent for the projection to capture
+	threadID := t.reqCtx.ThreadID
+	agentName := t.reqCtx.Config.Name
+	event := NewWhiteboardUpdatedEvent(threadID, agentName, finalContent, string(args.Action))
+	t.reqCtx.EmitEvent(event)
 
 	return fmt.Sprintf("Whiteboard updated (%s)", args.Action), nil
 }

@@ -8,7 +8,12 @@ import (
 
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
+
+	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
+
+// EventEmitter is a callback for emitting AGUI events in real-time.
+type EventEmitter func(threadID string, event interface{}) error
 
 // InMemoryAguiProjection is an in-memory implementation of the AguiProjection.
 //
@@ -18,6 +23,9 @@ import (
 //   - Tool call execution tracking
 //   - Agent activity metrics
 //   - Run lifecycle state
+//
+// When an EventEmitter is registered, the projection emits AGUI protocol events
+// in real-time as domain events are processed, enabling live UI updates.
 type InMemoryAguiProjection struct {
 	mu sync.RWMutex
 
@@ -32,6 +40,9 @@ type InMemoryAguiProjection struct {
 
 	// Tool calls indexed by threadID
 	toolCallsByThread map[string]map[string]*AguiToolCall
+
+	// Event emitter for real-time AGUI events (optional)
+	emitter EventEmitter
 }
 
 // NewInMemoryAguiProjection creates a new in-memory AGUI projection.
@@ -42,6 +53,15 @@ func NewInMemoryAguiProjection() *InMemoryAguiProjection {
 		streamingMessages: make(map[string]*AguiMessage),
 		toolCallsByThread: make(map[string]map[string]*AguiToolCall),
 	}
+}
+
+// SetEventEmitter registers a callback for real-time AGUI event emission.
+// The projection will call this emitter whenever it processes domain events,
+// enabling real-time UI updates.
+func (p *InMemoryAguiProjection) SetEventEmitter(emitter EventEmitter) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.emitter = emitter
 }
 
 // Apply updates the projection with a single event.
@@ -166,6 +186,14 @@ func (p *InMemoryAguiProjection) Apply(ctx context.Context, event core.Event) er
 			thread.ToolCalls = append(thread.ToolCalls, *tc)
 		}
 		p.updateAgentActivity(thread, evt.AgentName, evt.Timestamp)
+
+		// Emit TOOL_CALL_RESULT event for real-time UI updates
+		toolResultEvent := aguievents.NewToolCallResultEvent(
+			evt.MessageID,
+			evt.ToolCallID,
+			evt.ToolResult,
+		)
+		p.emit(threadID, toolResultEvent)
 
 	case *core.ThreadTitleUpdatedEvent:
 		thread.Title = evt.NewTitle
@@ -390,6 +418,18 @@ func (p *InMemoryAguiProjection) Clear() {
 	p.activeRuns = make(map[string]*AguiRunState)
 	p.streamingMessages = make(map[string]*AguiMessage)
 	p.toolCallsByThread = make(map[string]map[string]*AguiToolCall)
+}
+
+// emit emits an AGUI event if an emitter is registered.
+// This enables real-time UI updates without needing MESSAGES_SNAPSHOT.
+func (p *InMemoryAguiProjection) emit(threadID string, event interface{}) {
+	if p.emitter != nil {
+		// The emitter is responsible for routing the event to the correct thread/job
+		// We pass the threadID so the WorkerPool can route to the correct buffer
+		go func() {
+			_ = p.emitter(threadID, event)
+		}()
+	}
 }
 
 // Verify InMemoryAguiProjection implements AguiProjection

@@ -107,6 +107,38 @@ func (wp *WorkerPool) Start() {
 	}
 }
 
+// EmitEventForThread emits an AGUI event to all active jobs for the given thread.
+// This is called by the AGUI projection to send real-time events to the UI.
+func (wp *WorkerPool) EmitEventForThread(threadID string, event any) error {
+	wp.mu.RLock()
+	defer wp.mu.RUnlock()
+
+	// Find the active job for this thread
+	wp.threadMu.RLock()
+	jobID, ok := wp.threadJobs[threadID]
+	wp.threadMu.RUnlock()
+
+	if !ok {
+		// No active job for this thread - event will be in MESSAGES_SNAPSHOT later
+		return nil
+	}
+
+	// Emit to the job's event buffer
+	if buffer, exists := wp.eventBuffers[jobID]; exists {
+		buffer.Append(event)
+	}
+
+	return nil
+}
+
+// GetEventRouter returns an EventEmitter that routes AGUI events from the projection
+// to the appropriate job buffers. This enables real-time UI updates from domain events.
+func (wp *WorkerPool) GetEventRouter(threadID string) func(event interface{}) error {
+	return func(event interface{}) error {
+		return wp.EmitEventForThread(threadID, event)
+	}
+}
+
 // Stop gracefully stops the worker pool
 func (wp *WorkerPool) Stop() {
 	slog.Info("Stopping worker pool")
