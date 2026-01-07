@@ -99,29 +99,6 @@ type ThreadTitleUpdatedEvent struct {
 	NewTitle string `json:"newTitle"`
 }
 
-// CustomEventEmittedEvent is emitted when an agent emits a custom event
-type CustomEventEmittedEvent struct {
-	BaseEvent
-	EventName   string                 `json:"eventName"`
-	Payload     map[string]interface{} `json:"payload"`
-	EmittedBy   string                 `json:"emittedBy"`   // Agent name that emitted the event
-	Description string                 `json:"description"` // Human-readable description
-}
-
-func NewCustomEventEmitted(threadID, eventName, emittedBy, description string, payload map[string]interface{}) *CustomEventEmittedEvent {
-	return &CustomEventEmittedEvent{
-		BaseEvent: BaseEvent{
-			Type:      "CustomEventEmitted",
-			Timestamp: time.Now(),
-			ThreadID:  threadID,
-		},
-		EventName:   eventName,
-		Payload:     payload,
-		EmittedBy:   emittedBy,
-		Description: description,
-	}
-}
-
 // ThreadDeletedEvent is emitted when a thread is deleted
 type ThreadDeletedEvent struct {
 	BaseEvent

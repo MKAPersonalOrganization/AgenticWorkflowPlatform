@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
@@ -202,20 +201,9 @@ func (p *InMemoryAguiProjection) Apply(ctx context.Context, event core.Event) er
 		delete(p.threads, threadID)
 		delete(p.activeRuns, threadID)
 		delete(p.toolCallsByThread, threadID)
-
-	// Handle custom domain events
-	case *domain.DomainEvent:
-		p.applyDomainEvent(thread, evt)
 	}
 
 	return nil
-}
-
-// applyDomainEvent handles custom domain events.
-// This function is kept for backward compatibility but no longer handles any events.
-func (p *InMemoryAguiProjection) applyDomainEvent(thread *AguiThreadState, evt *domain.DomainEvent) {
-	// No custom domain events are handled anymore
-	// Handoffs and other interactions are now tool-based
 }
 
 // addMessage adds a message to the thread state.
