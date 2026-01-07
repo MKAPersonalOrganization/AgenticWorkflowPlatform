@@ -13,33 +13,27 @@ A chat application built with Go, Templ, Tailwind CSS, and Alpine.js, implementi
 
 ## Architecture
 
-### Declarative Event-Driven Multi-Agent System
+### Tool-Based Multi-Agent System
 
-The application uses a **declarative agent contract architecture** where agents define their behavior through contracts rather than manual wiring.
+The application uses a **tool-based agent architecture** where agents collaborate through direct tool calls and a shared whiteboard.
 
 #### Agent Contracts
 
-Each agent declares its event-driven contract in a `contract.go` file:
+Each agent declares its capabilities in a `contract.go` file:
 
 ```go
 var Contract = &eventbus.AgentContract{
-    Name:      "math-instructor",
-    ListensTo: []agents.EventType{agents.EventTypeMathQuestion},
-    Emits:     []agents.EventType{
-        agents.EventTypeQuestionAnswered,
-        agents.EventTypePhysicsQuestion,
-        agents.EventTypeLinearAlgebraQuestion,
-    },
-    Tools:     domainTools(),  // Specialized tools
-    Factory:   CreateMathInstructor,
+    Name:    "math-instructor",
+    Tools:   domainTools(),  // Domain-specific tools (plot, animate, calculator)
+    Factory: CreateMathInstructor,
 }
 ```
 
 **What this provides:**
-- **Automatic Event Routing**: Events are routed to agents based on `ListensTo` declarations
-- **Auto-Generated Tools**: Emission tools (e.g., `emit_physics_question`) are generated from `Emits`
-- **Collaboration Tools**: Whiteboard and communication tools are automatically provided
-- **Zero Manual Wiring**: No need to update routing tables or worker pools when adding agents
+- **Tool Registry**: Each agent registers its domain-specific tools
+- **Agent Factory**: Factory function creates agent configuration with system prompt and tools
+- **Simple Registration**: Register agent contracts in main.go
+- **Direct Communication**: Agents use `transfer_to_agent` tool for handoffs
 
 #### Specialized Agents
 
@@ -59,46 +53,45 @@ var Contract = &eventbus.AgentContract{
    eventbus.GlobalContracts.Register(physics.Contract)
    ```
 
-2. **Automatic Tool Generation**: The system generates emission tools for each agent:
+2. **Tool-Based Handoffs**: Agents use `transfer_to_agent` for direct collaboration:
    ```go
-   // For math-instructor that can emit physics questions:
-   emit_physics_question(question="...")  // Auto-generated
+   transfer_to_agent(
+       agent_name="physics-instructor",
+       question="Calculate projectile motion..."
+   )
    ```
 
-3. **Event-Driven Collaboration**: Agents collaborate by emitting events:
+3. **Agent Collaboration Flow**:
    ```
    User Question → student-facing-agent
-                → emits math_question event
-                → math-instructor receives event
+                → calls transfer_to_agent("math-instructor", question)
+                → math-instructor receives request
                 → processes and writes to whiteboard
-                → emits question_answered event
-                → student-facing-agent receives callback
+                → control returns to student-facing-agent
    ```
 
 4. **Shared Whiteboard**: All agents collaborate through a shared whiteboard:
-   - `read_whiteboard`: Read current content
-   - `write_whiteboard`: Update with new content
-   - `emit_question_answered`: Signal completion
+   - `write_whiteboard`: Write, append, or clear whiteboard content
+   - Whiteboard content is injected into each agent's system prompt
+   - Used for sharing formulas, diagrams, and step-by-step work
 
 #### Adding a New Agent
 
-See [docs/ADDING_NEW_AGENT.md](docs/ADDING_NEW_AGENT.md) for the complete guide.
-
 **Quick overview:**
-1. Create `services/agents/<name>/contract.go` with the agent contract
-2. Implement the agent factory function
-3. Add event type constant to `instructor_events.go`
-4. Register contract in `main.go`
+1. Create `services/chatwrite/agents/<name>/contract.go` with the agent contract
+2. Implement the agent factory function in `<name>.go`
+3. Define domain-specific tools in `tools/` subdirectory
+4. Register contract in `main.go` using `eventbus.GlobalContracts.Register()`
 
-That's it! The system handles routing, tool generation, and event wiring automatically.
+That's it! The contract registry makes the agent available for `transfer_to_agent` calls.
 
 #### Architecture Benefits
 
-- **Declarative**: Agents declare what they do, not how routing works
-- **Decoupled**: Agents don't know about each other, only event types
-- **Scalable**: Adding agents doesn't require updating multiple files
-- **Type-Safe**: Event contracts enforced at compile time
-- **Self-Documenting**: Contracts serve as documentation of agent capabilities
+- **Simple**: Direct tool-based communication without complex event routing
+- **Decoupled**: Agents only know about tools, not other agents
+- **Scalable**: Adding agents only requires registration in main.go
+- **Composable**: Middleware adds capabilities (handoffs, whiteboard, todos)
+- **Type-Safe**: Tool schemas enforce parameter validation
 
 ## Authentication
 
