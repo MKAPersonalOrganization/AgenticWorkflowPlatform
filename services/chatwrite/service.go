@@ -125,10 +125,6 @@ func (h *ChatWriteService) DeserializeThread(data []byte) (core.AgentThread, err
 	return thread, nil
 }
 
-// DomainEventHandler is called for each domain event emitted by the agent
-// This allows external systems to react to events (e.g., UI projections, logging, etc.)
-type DomainEventHandler func(event core.Event) error
-
 // RunWithThread processes the LLM streaming response using an AgentThread for message management.
 // This is the modern API that provides better separation of concerns and supports advanced features
 // like message reduction, custom storage, and serialization.
@@ -139,12 +135,11 @@ func (h *ChatWriteService) RunWithThread(
 	threadID string,
 	messageID string,
 	thread core.AgentThread,
-	eventHandler DomainEventHandler,
 	runOpts core.RunOptions,
 ) error {
 	// Get messages from thread
 	messages := thread.GetMessages()
-	return h.runIteration(ctx, threadID, messageID, messages, thread, eventHandler, runOpts)
+	return h.runIteration(ctx, threadID, messageID, messages, thread, runOpts)
 }
 
 // runIteration processes a single LLM iteration and recursively continues if tools are called
@@ -155,7 +150,6 @@ func (h *ChatWriteService) runIteration(
 	messageID string,
 	messages []domain.Message,
 	thread core.AgentThread,
-	eventHandler DomainEventHandler,
 	runOpts core.RunOptions,
 ) error {
 	// Check if client disconnected before starting LLM call
@@ -174,7 +168,7 @@ func (h *ChatWriteService) runIteration(
 		},
 		MessageID: messageID,
 	}
-	if err := h.emitDomainEvent(startEvent, eventHandler); err != nil {
+	if err := h.emitDomainEvent(startEvent); err != nil {
 		return err
 	}
 
@@ -232,7 +226,7 @@ func (h *ChatWriteService) runIteration(
 					Content:   completeContent,
 					AgentName: h.config.Name,
 				}
-				_ = h.emitDomainEvent(evt, eventHandler)
+				_ = h.emitDomainEvent(evt)
 			}
 			return fmt.Errorf("client disconnected during streaming: %w", ctx.Err())
 		default:
@@ -257,7 +251,7 @@ func (h *ChatWriteService) runIteration(
 				MessageID: messageID,
 				Delta:     textDelta,
 			}
-			if err := h.emitDomainEvent(contentEvent, eventHandler); err != nil {
+			if err := h.emitDomainEvent(contentEvent); err != nil {
 				return err
 			}
 		}
@@ -278,7 +272,7 @@ func (h *ChatWriteService) runIteration(
 					ParentMessageID: messageID,
 					AgentName:       h.config.Name,
 				}
-				if err := h.emitDomainEvent(toolStartEvent, eventHandler); err != nil {
+				if err := h.emitDomainEvent(toolStartEvent); err != nil {
 					return err
 				}
 			}
@@ -294,7 +288,7 @@ func (h *ChatWriteService) runIteration(
 					ToolCallID: tcUpdate.ID,
 					Delta:      tcUpdate.ArgsDelta,
 				}
-				if err := h.emitDomainEvent(argsEvent, eventHandler); err != nil {
+				if err := h.emitDomainEvent(argsEvent); err != nil {
 					return err
 				}
 			}
@@ -314,7 +308,7 @@ func (h *ChatWriteService) runIteration(
 			},
 			ToolCallID: tc.ID,
 		}
-		if err := h.emitDomainEvent(completedEvent, eventHandler); err != nil {
+		if err := h.emitDomainEvent(completedEvent); err != nil {
 			return err
 		}
 	}
@@ -334,14 +328,14 @@ func (h *ChatWriteService) runIteration(
 			ToolCalls: toolCallsList,
 			AgentName: h.config.Name,
 		}
-		if err := h.emitDomainEvent(assistantEvent, eventHandler); err != nil {
+		if err := h.emitDomainEvent(assistantEvent); err != nil {
 			return err
 		}
 
 		// For each tool call: execute and emit result
 		for _, toolCall := range toolCallsList {
 			// Execute the tool call using dynamic executor with middleware tools
-			result, err := h.executeToolCallWithExecutor(threadID, toolCall, eventHandler, dynamicExecutor)
+			result, err := h.executeToolCallWithExecutor(threadID, toolCall, dynamicExecutor)
 			if err != nil {
 				result = fmt.Sprintf(`{"error": "%v"}`, err)
 			}
@@ -362,7 +356,7 @@ func (h *ChatWriteService) runIteration(
 				ParentMessageID: messageID,
 				AgentName:       h.config.Name,
 			}
-			if err := h.emitDomainEvent(toolEvent, eventHandler); err != nil {
+			if err := h.emitDomainEvent(toolEvent); err != nil {
 				return err
 			}
 		}
@@ -390,7 +384,7 @@ func (h *ChatWriteService) runIteration(
 
 		// Recursively call to process the LLM response with tool results
 		// Pass the same runOpts to maintain consistency across iterations
-		return h.runIteration(ctx, threadID, continuationMessageID, updatedThread.GetMessages(), thread, eventHandler, runOpts)
+		return h.runIteration(ctx, threadID, continuationMessageID, updatedThread.GetMessages(), thread, runOpts)
 	}
 
 	// No tool calls, just emit the completed message event
@@ -404,31 +398,24 @@ func (h *ChatWriteService) runIteration(
 		Content:   completeContent,
 		AgentName: h.config.Name,
 	}
-	if err := h.emitDomainEvent(assistantEvent, eventHandler); err != nil {
+	if err := h.emitDomainEvent(assistantEvent); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-// emitDomainEvent persists the event and notifies handlers
-func (h *ChatWriteService) emitDomainEvent(event core.Event, eventHandler DomainEventHandler) error {
+// emitDomainEvent persists the event and notifies the UI via the agent's notifier
+func (h *ChatWriteService) emitDomainEvent(event core.Event) error {
 	// Append to event store (this will automatically update projections via ProjectionEventStore)
 	_, err := h.writeModel.Append(context.Background(), event.AggregateID(), event)
 	if err != nil {
 		return err
 	}
 
-	// Notify via agent's own notifier first (if configured)
+	// Notify via agent's notifier (if configured)
 	if h.notifier != nil {
 		if err := h.notifier.HandleDomainEvent(event); err != nil {
-			return err
-		}
-	}
-
-	// Notify external handler (e.g., for routing decisions)
-	if eventHandler != nil {
-		if err := eventHandler(event); err != nil {
 			return err
 		}
 	}
@@ -437,7 +424,7 @@ func (h *ChatWriteService) emitDomainEvent(event core.Event, eventHandler Domain
 }
 
 // executeToolCallWithExecutor executes a tool call using a dynamic executor that includes middleware tools
-func (h *ChatWriteService) executeToolCallWithExecutor(threadID string, toolCall domain.ToolCall, eventHandler DomainEventHandler, executor core.ToolExecutor) (string, error) {
+func (h *ChatWriteService) executeToolCallWithExecutor(threadID string, toolCall domain.ToolCall, executor core.ToolExecutor) (string, error) {
 	// Execute the tool using the provided executor
 	result, err := executor.Execute(toolCall)
 	if err != nil {
