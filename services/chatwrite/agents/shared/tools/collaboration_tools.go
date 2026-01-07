@@ -39,14 +39,9 @@ func HandleSpecialToolCall(threadID string, agentName string, toolCall domain.To
 		return agents.NewQuestionAnsweredEvent(threadID, input.Subject, input.Summary, agentName, getWhiteboardState(threadID)), nil
 
 	case "write_whiteboard":
-		var input struct {
-			Content string `json:"content"`
-			Action  string `json:"action"`
-		}
-		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
-			return nil, fmt.Errorf("failed to parse write_whiteboard arguments: %w", err)
-		}
-		return agents.NewWhiteboardUpdatedEvent(threadID, agentName, input.Content, input.Action), nil
+		// No custom event needed - ToolCallExecutedEvent is automatically emitted
+		// The whiteboard projection listens to ToolCallExecutedEvent and parses the arguments
+		return nil, nil
 
 	default:
 		return nil, fmt.Errorf("unknown special tool: %s", toolName)

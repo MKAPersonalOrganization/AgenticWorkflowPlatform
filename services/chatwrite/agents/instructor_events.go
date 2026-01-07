@@ -5,7 +5,6 @@ package agents
 
 import (
 	"school-with-ai/domain"
-	"school-with-ai/sdk/agentsdk/core/middleware"
 )
 
 // Re-export EventType and constants
@@ -13,7 +12,6 @@ type EventType = domain.EventType
 
 const (
 	EventTypeUserMessage               = domain.EventTypeUserMessage
-	EventTypeWhiteboardUpdated         = "whiteboard.updated" // Now handled by middleware
 	EventTypeInstructorThought         = domain.EventTypeInstructorThought
 	EventTypeInstructorStrategyChanged = domain.EventTypeInstructorStrategyChanged
 	EventTypeQuestionAnswered          = domain.EventTypeQuestionAnswered
@@ -31,7 +29,6 @@ type DomainEvent = domain.DomainEvent
 
 // Re-export event constructors
 var (
-	NewWhiteboardUpdatedEvent         = middleware.NewWhiteboardUpdatedEvent
 	NewInstructorThoughtEvent         = domain.NewInstructorThoughtEvent
 	NewInstructorStrategyChangedEvent = domain.NewInstructorStrategyChangedEvent
 	NewQuestionAnsweredEvent          = domain.NewQuestionAnsweredEvent

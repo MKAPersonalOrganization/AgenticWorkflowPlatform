@@ -2,16 +2,15 @@ package whiteboard
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 
-	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
-	"school-with-ai/sdk/agentsdk/core/middleware"
 )
 
 // WhiteboardStore is a projection that maintains whiteboard content per thread.
 //
-// This projection listens to EventTypeWhiteboardUpdated events and builds
+// This projection listens to ToolCallExecutedEvent (for write_whiteboard tool) and builds
 // a read model of whiteboard state. It's used by tools to read/write whiteboard
 // content without coupling to the Thread domain model.
 //
@@ -68,60 +67,40 @@ func (p *InMemoryWhiteboardProjection) Update(event any) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	// Handle new middleware.WhiteboardUpdatedEvent
-	if whiteboardEvent, ok := event.(*middleware.WhiteboardUpdatedEvent); ok {
-		threadID := whiteboardEvent.ThreadID
-		action := whiteboardEvent.Action
-		content := whiteboardEvent.Content
-
-		switch action {
-		case "write":
-			p.whiteboards[threadID] = content
-		case "append":
-			existing := p.whiteboards[threadID]
-			if existing == "" {
-				p.whiteboards[threadID] = content
-			} else {
-				p.whiteboards[threadID] = existing + "\n" + content
+	// Handle standard ToolCallExecutedEvent for write_whiteboard tool
+	if toolEvent, ok := event.(*core.ToolCallExecutedEvent); ok {
+		if toolEvent.ToolName == "write_whiteboard" {
+			// Parse tool arguments to extract action and content
+			var args struct {
+				Content string `json:"content"`
+				Action  string `json:"action"`
 			}
-		case "clear":
-			p.whiteboards[threadID] = ""
+			if err := json.Unmarshal([]byte(toolEvent.ToolArguments), &args); err != nil {
+				return nil // Skip malformed events
+			}
+
+			threadID := toolEvent.AggregateID()
+			action := args.Action
+			content := args.Content
+
+			switch action {
+			case "write":
+				p.whiteboards[threadID] = content
+			case "append":
+				existing := p.whiteboards[threadID]
+				if existing == "" {
+					p.whiteboards[threadID] = content
+				} else {
+					p.whiteboards[threadID] = existing + "\n" + content
+				}
+			case "clear":
+				p.whiteboards[threadID] = ""
+			}
 		}
 		return nil
 	}
 
-	// Handle legacy domain.DomainEvent (for backward compatibility)
-	domainEvent, ok := event.(*domain.DomainEvent)
-	if !ok || domainEvent.Type != domain.EventTypeWhiteboardUpdated {
-		return nil // Ignore non-whiteboard events
-	}
-
-	threadID := domainEvent.ThreadID
-	action := domainEvent.GetString("action")
-	content := domainEvent.GetString("content")
-
-	switch action {
-	case "write":
-		// Replace entire whiteboard content
-		p.whiteboards[threadID] = content
-
-	case "append":
-		// Append to existing content
-		existing := p.whiteboards[threadID]
-		if existing == "" {
-			p.whiteboards[threadID] = content
-		} else {
-			p.whiteboards[threadID] = existing + "\n" + content
-		}
-
-	case "clear":
-		// Clear whiteboard content
-		p.whiteboards[threadID] = ""
-
-	default:
-		// Unknown action - do nothing
-	}
-
+	// Ignore other events
 	return nil
 }
 

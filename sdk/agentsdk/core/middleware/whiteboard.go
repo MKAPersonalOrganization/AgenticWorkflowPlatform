@@ -316,11 +316,8 @@ func (t *WriteWhiteboardTool) Invoke(ctx context.Context, arguments string) (str
 		SetWhiteboardContent(t.reqCtx, finalContent)
 	}
 
-	// Emit WhiteboardUpdatedEvent for the projection to capture
-	threadID := t.reqCtx.ThreadID
-	agentName := t.reqCtx.Config.Name
-	event := NewWhiteboardUpdatedEvent(threadID, agentName, finalContent, string(args.Action))
-	t.reqCtx.EmitEvent(event)
+	// No need to emit custom event - ToolCallExecutedEvent is emitted automatically
+	// by the service layer and contains all the tool execution details
 
 	return fmt.Sprintf("Whiteboard updated (%s)", args.Action), nil
 }

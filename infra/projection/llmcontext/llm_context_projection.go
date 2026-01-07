@@ -295,10 +295,6 @@ func (p *InMemoryLLMContextProjection) applyEventUnsafe(agentThread core.AgentTh
 
 	case *domain.DomainEvent:
 		switch evt.Type {
-		case domain.EventTypeWhiteboardUpdated:
-			// Whiteboard content is now handled by dedicated WhiteboardStore projection
-			// This event is processed there, not in the LLMContext projection
-			meta.UpdatedAt = evt.Timestamp
 		case domain.EventTypeAgentHandoff:
 			msgID := fmt.Sprintf("handoff-%s-%d", evt.ThreadID, evt.Timestamp.UnixNano())
 
