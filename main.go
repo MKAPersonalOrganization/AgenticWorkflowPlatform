@@ -24,7 +24,7 @@ import (
 	"school-with-ai/services/chatwrite/agents/diagramming"
 	"school-with-ai/services/chatwrite/agents/math"
 	"school-with-ai/services/chatwrite/agents/physics"
-	"school-with-ai/services/chatwrite/agents/shared/tools/eventbus"
+	"school-with-ai/services/chatwrite/agents/shared"
 	"school-with-ai/services/chatwrite/agents/statistics"
 	"school-with-ai/services/chatwrite/agents/studentfacing"
 	"school-with-ai/services/orchestration"
@@ -66,14 +66,14 @@ func main() {
 	// Initialize job queue
 	queue := queue.NewInMemoryJobQueue()
 
-	// Register all agent contracts with the EventBus for routing
-	eventbus.GlobalContracts.Register(studentfacing.Contract)
-	eventbus.GlobalContracts.Register(math.Contract)
-	eventbus.GlobalContracts.Register(physics.Contract)
-	eventbus.GlobalContracts.Register(chemistry.Contract)
-	eventbus.GlobalContracts.Register(statistics.Contract)
-	eventbus.GlobalContracts.Register(linearalgebra.Contract)
-	eventbus.GlobalContracts.Register(diagramming.Contract)
+	// Register all agent factories for routing
+	shared.GlobalAgents.Register("student-facing-agent", studentfacing.CreateStudentFacingAgent)
+	shared.GlobalAgents.Register("math-instructor", math.CreateMathInstructor)
+	shared.GlobalAgents.Register("physics-instructor", physics.CreatePhysicsInstructor)
+	shared.GlobalAgents.Register("chemistry-instructor", chemistry.CreateChemistryInstructor)
+	shared.GlobalAgents.Register("statistics-instructor", statistics.CreateStatisticsInstructor)
+	shared.GlobalAgents.Register("linear-algebra-instructor", linearalgebra.CreateLinearAlgebraProfessor)
+	shared.GlobalAgents.Register("diagramming-instructor", diagramming.CreateDiagrammingInstructor)
 
 	// Initialize chat write service
 	chatWriteService := chatwrite.New(chatClient, eventLog, llmContextProjection)

@@ -13,7 +13,7 @@ import (
 	"school-with-ai/sdk/agentsdk/core/middleware"
 	"school-with-ai/sdk/agentsdk/llm"
 	"school-with-ai/services/chatwrite"
-	"school-with-ai/services/chatwrite/agents/shared/tools/eventbus"
+	"school-with-ai/services/chatwrite/agents/shared"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
@@ -395,15 +395,15 @@ func (wp *WorkerPool) continueWithAgentDirect(ctx context.Context, threadID, age
 	// Create UI notifier for this agent's event stream
 	notifier := NewUINotifier(emitter)
 
-	// Get the agent's contract
-	contract, ok := eventbus.GlobalContracts.GetContract(agentName)
+	// Get the agent's factory
+	factory, ok := shared.GlobalAgents.Get(agentName)
 	if !ok {
-		slog.Error("No contract found for agent", "agent", agentName)
+		slog.Error("No factory found for agent", "agent", agentName)
 		return
 	}
 
-	// Create agent config from contract factory
-	agentConfig := contract.Factory(notifier, wp.whiteboardProjection)
+	// Create agent config from factory
+	agentConfig := factory(notifier, wp.whiteboardProjection)
 
 	// Create agent instance
 	var handoffReqCtx *core.RequestContext // Capture request context to check for handoffs
@@ -412,7 +412,7 @@ func (wp *WorkerPool) continueWithAgentDirect(ctx context.Context, threadID, age
 		wp.log,
 		wp.state,
 		chatwrite.WithConfig(agentConfig),
-		chatwrite.WithShouldContinueIteration(eventbus.CreateShouldContinueIterationFn()),
+		chatwrite.WithShouldContinueIteration(shared.CreateShouldContinueIterationFn()),
 		chatwrite.WithRequestContextCapture(&handoffReqCtx), // Capture context to check handoff
 	)
 

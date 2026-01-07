@@ -2,8 +2,16 @@ package diagramming
 
 import (
 	"school-with-ai/sdk/agentsdk/core"
+	"school-with-ai/services/chatwrite/agents/diagramming/tools"
 	sharedtools "school-with-ai/services/chatwrite/agents/shared/tools"
 )
+
+// domainTools returns the domain-specific tools for the diagramming instructor.
+func domainTools() []core.Tool {
+	return []core.Tool{
+		tools.NewMermaidDiagramTool(),
+	}
+}
 
 // CreateDiagrammingInstructor creates the diagramming specialist agent configuration.
 // Event contract is defined in contract.go

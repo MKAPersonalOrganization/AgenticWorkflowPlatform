@@ -2,8 +2,20 @@ package linearalgebra
 
 import (
 	"school-with-ai/sdk/agentsdk/core"
+	"school-with-ai/services/chatwrite/agents/advancedmath/linearalgebra/tools"
 	sharedtools "school-with-ai/services/chatwrite/agents/shared/tools"
 )
+
+// domainTools returns the domain-specific tools for the linear algebra instructor.
+func domainTools() []core.Tool {
+	return []core.Tool{
+		sharedtools.NewCalculatorTool(),
+		tools.NewVectorOperationsTool(),
+		tools.NewMatrixOperationsTool(),
+		tools.NewLinearSolverTool(),
+		tools.NewEigenvalueTool(),
+	}
+}
 
 // CreateLinearAlgebraProfessor creates the linear algebra professor agent.
 // Event contract is defined in contract.go

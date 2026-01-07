@@ -3,10 +3,20 @@ package math
 import (
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/sdk/agentsdk/core/middleware"
+	"school-with-ai/services/chatwrite/agents/math/tools"
+	sharedtools "school-with-ai/services/chatwrite/agents/shared/tools"
 )
 
+// domainTools returns the domain-specific tools for the math instructor.
+func domainTools() []core.Tool {
+	return []core.Tool{
+		sharedtools.NewCalculatorTool(),
+		tools.NewPlotTool(),    // gnuplot-based plotting
+		tools.NewAnimateTool(), // gnuplot-based animations
+	}
+}
+
 // CreateMathInstructor creates the math instructor agent configuration.
-// Event contract is defined in contract.go
 func CreateMathInstructor(notifier core.EventNotifier, whiteboardProjection interface{ Get(threadID string) string }) core.AgentConfig {
 	registry := core.NewToolRegistry()
 

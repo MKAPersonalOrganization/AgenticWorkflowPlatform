@@ -3,7 +3,23 @@ package statistics
 import (
 	"school-with-ai/sdk/agentsdk/core"
 	sharedtools "school-with-ai/services/chatwrite/agents/shared/tools"
+	"school-with-ai/services/chatwrite/agents/statistics/tools"
 )
+
+// domainTools returns the domain-specific tools for the statistics instructor.
+func domainTools() []core.Tool {
+	return []core.Tool{
+		sharedtools.NewCalculatorTool(),
+		tools.NewDescriptiveStatsTool(),
+		tools.NewCorrelationTool(),
+		tools.NewDistanceMetricsTool(),
+		tools.NewSamplingTool(),
+		tools.NewDataTransformTool(),
+		tools.NewNormalDistributionTool(),
+		tools.NewGeometricDistributionTool(),
+		tools.NewRegressionTool(),
+	}
+}
 
 // CreateStatisticsInstructor creates the statistics instructor agent.
 // Event contract is defined in contract.go
