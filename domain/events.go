@@ -11,7 +11,6 @@ type EventType string
 // Common instructor event types
 const (
 	EventTypeUserMessage               EventType = "user.message"
-	EventTypeWhiteboardUpdated         EventType = "whiteboard.updated"
 	EventTypeInstructorThought         EventType = "instructor.thought"
 	EventTypeInstructorStrategyChanged EventType = "instructor.strategy_changed"
 	EventTypeQuestionAnswered          EventType = "question.answered"
@@ -77,21 +76,6 @@ func (e *DomainEvent) MarshalPayload() ([]byte, error) {
 }
 
 // Common instructor event constructors
-
-func NewWhiteboardUpdatedEvent(threadID, agentName, content, action string) *DomainEvent {
-	return &DomainEvent{
-		ID:        GenerateEventID(),
-		Type:      EventTypeWhiteboardUpdated,
-		Timestamp: time.Now(),
-		ThreadID:  threadID,
-		Version:   1,
-		Data: map[string]interface{}{
-			"agent_name": agentName,
-			"content":    content,
-			"action":     action,
-		},
-	}
-}
 
 func NewInstructorThoughtEvent(threadID, instructorName, thought string, isPrivate bool) *DomainEvent {
 	return &DomainEvent{

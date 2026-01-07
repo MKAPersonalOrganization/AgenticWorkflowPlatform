@@ -214,10 +214,6 @@ func (p *InMemoryAguiProjection) Apply(ctx context.Context, event core.Event) er
 // applyDomainEvent handles custom domain events.
 func (p *InMemoryAguiProjection) applyDomainEvent(thread *AguiThreadState, evt *domain.DomainEvent) {
 	switch evt.Type {
-	case domain.EventTypeWhiteboardUpdated:
-		// Whiteboard content is now handled by dedicated WhiteboardStore projection
-		// This event is processed there, not in the AGUI projection
-
 	case domain.EventTypeAgentHandoff:
 		msg := AguiMessage{
 			ID:        fmt.Sprintf("handoff-%s-%d", evt.ThreadID, evt.Timestamp.UnixNano()),
