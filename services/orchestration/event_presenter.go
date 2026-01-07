@@ -48,20 +48,6 @@ func (n *UINotifier) HandleDomainEvent(event core.Event) error {
 	case *agents.DomainEvent:
 		// Handle unified domain events
 		switch evt.Type {
-		case agents.EventTypeMathQuestion:
-			return n.emitMathQuestion(evt)
-		case agents.EventTypePhysicsQuestion:
-			return n.emitPhysicsQuestion(evt)
-		case agents.EventTypeChemistryQuestion:
-			return n.emitChemistryQuestion(evt)
-		case agents.EventTypeStatisticsQuestion:
-			return n.emitStatisticsQuestion(evt)
-		case agents.EventTypeLinearAlgebraQuestion:
-			return n.emitLinearAlgebraQuestion(evt)
-		case agents.EventTypeDiagrammingQuestion:
-			return n.emitDiagrammingQuestion(evt)
-		case agents.EventTypeQuestionAnswered:
-			return n.emitQuestionAnswered(evt)
 		case agents.EventTypeAgentHandoff:
 			return n.emitAgentHandoff(evt)
 		default:
@@ -145,84 +131,6 @@ func (n *UINotifier) emitToolCallResult(evt *core.ToolCallExecutedEvent) error {
 
 // Agent collaboration event emitters
 
-func (n *UINotifier) emitMathQuestion(evt *agents.DomainEvent) error {
-	uiEvent := aguievents.NewCustomEvent(
-		"MATH_QUESTION",
-		aguievents.WithValue(map[string]interface{}{
-			"question":  evt.GetString("question"),
-			"emittedBy": evt.GetString("emitted_by"),
-			"context":   evt.GetString("context"),
-			"timestamp": evt.Timestamp.UnixMilli(),
-		}),
-	)
-	return n.emitter.Emit(uiEvent)
-}
-
-func (n *UINotifier) emitPhysicsQuestion(evt *agents.DomainEvent) error {
-	uiEvent := aguievents.NewCustomEvent(
-		"PHYSICS_QUESTION",
-		aguievents.WithValue(map[string]interface{}{
-			"question":  evt.GetString("question"),
-			"emittedBy": evt.GetString("emitted_by"),
-			"context":   evt.GetString("context"),
-			"timestamp": evt.Timestamp.UnixMilli(),
-		}),
-	)
-	return n.emitter.Emit(uiEvent)
-}
-
-func (n *UINotifier) emitChemistryQuestion(evt *agents.DomainEvent) error {
-	uiEvent := aguievents.NewCustomEvent(
-		"CHEMISTRY_QUESTION",
-		aguievents.WithValue(map[string]interface{}{
-			"question":  evt.GetString("question"),
-			"emittedBy": evt.GetString("emitted_by"),
-			"context":   evt.GetString("context"),
-			"timestamp": evt.Timestamp.UnixMilli(),
-		}),
-	)
-	return n.emitter.Emit(uiEvent)
-}
-
-func (n *UINotifier) emitStatisticsQuestion(evt *agents.DomainEvent) error {
-	uiEvent := aguievents.NewCustomEvent(
-		"STATISTICS_QUESTION",
-		aguievents.WithValue(map[string]interface{}{
-			"question":  evt.GetString("question"),
-			"emittedBy": evt.GetString("emitted_by"),
-			"context":   evt.GetString("context"),
-			"timestamp": evt.Timestamp.UnixMilli(),
-		}),
-	)
-	return n.emitter.Emit(uiEvent)
-}
-
-func (n *UINotifier) emitLinearAlgebraQuestion(evt *agents.DomainEvent) error {
-	uiEvent := aguievents.NewCustomEvent(
-		"LINEARALGEBRA_QUESTION",
-		aguievents.WithValue(map[string]interface{}{
-			"question":  evt.GetString("question"),
-			"emittedBy": evt.GetString("emitted_by"),
-			"context":   evt.GetString("context"),
-			"timestamp": evt.Timestamp.UnixMilli(),
-		}),
-	)
-	return n.emitter.Emit(uiEvent)
-}
-
-func (n *UINotifier) emitDiagrammingQuestion(evt *agents.DomainEvent) error {
-	uiEvent := aguievents.NewCustomEvent(
-		"DIAGRAMMING_QUESTION",
-		aguievents.WithValue(map[string]interface{}{
-			"request":   evt.GetString("request"),
-			"emittedBy": evt.GetString("emitted_by"),
-			"context":   evt.GetString("context"),
-			"timestamp": evt.Timestamp.UnixMilli(),
-		}),
-	)
-	return n.emitter.Emit(uiEvent)
-}
-
 func (n *UINotifier) emitAgentHandoff(evt *agents.DomainEvent) error {
 	uiEvent := aguievents.NewCustomEvent(
 		"AGENT_HANDOFF",
@@ -231,20 +139,6 @@ func (n *UINotifier) emitAgentHandoff(evt *agents.DomainEvent) error {
 			"toAgent":   evt.GetString("to_agent"),
 			"reason":    evt.GetString("reason"),
 			"timestamp": evt.Timestamp.UnixMilli(),
-		}),
-	)
-	return n.emitter.Emit(uiEvent)
-}
-
-func (n *UINotifier) emitQuestionAnswered(evt *agents.DomainEvent) error {
-	uiEvent := aguievents.NewCustomEvent(
-		"QUESTION_ANSWERED",
-		aguievents.WithValue(map[string]interface{}{
-			"subject":    evt.GetString("subject"),
-			"answer":     evt.GetString("answer"),
-			"answeredBy": evt.GetString("answered_by"),
-			"isComplete": evt.GetBool("is_complete"),
-			"timestamp":  evt.Timestamp.UnixMilli(),
 		}),
 	)
 	return n.emitter.Emit(uiEvent)

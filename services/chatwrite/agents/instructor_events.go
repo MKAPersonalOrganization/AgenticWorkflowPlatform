@@ -14,13 +14,6 @@ const (
 	EventTypeUserMessage               = domain.EventTypeUserMessage
 	EventTypeInstructorThought         = domain.EventTypeInstructorThought
 	EventTypeInstructorStrategyChanged = domain.EventTypeInstructorStrategyChanged
-	EventTypeQuestionAnswered          = domain.EventTypeQuestionAnswered
-	EventTypeMathQuestion              = domain.EventTypeMathQuestion
-	EventTypePhysicsQuestion           = domain.EventTypePhysicsQuestion
-	EventTypeChemistryQuestion         = domain.EventTypeChemistryQuestion
-	EventTypeStatisticsQuestion        = domain.EventTypeStatisticsQuestion
-	EventTypeLinearAlgebraQuestion     = domain.EventTypeLinearAlgebraQuestion
-	EventTypeDiagrammingQuestion       = domain.EventTypeDiagrammingQuestion
 	EventTypeAgentHandoff              = domain.EventTypeAgentHandoff
 )
 
@@ -31,13 +24,6 @@ type DomainEvent = domain.DomainEvent
 var (
 	NewInstructorThoughtEvent         = domain.NewInstructorThoughtEvent
 	NewInstructorStrategyChangedEvent = domain.NewInstructorStrategyChangedEvent
-	NewQuestionAnsweredEvent          = domain.NewQuestionAnsweredEvent
-	NewMathQuestionEvent              = domain.NewMathQuestionEvent
-	NewPhysicsQuestionEvent           = domain.NewPhysicsQuestionEvent
-	NewChemistryQuestionEvent         = domain.NewChemistryQuestionEvent
-	NewStatisticsQuestionEvent        = domain.NewStatisticsQuestionEvent
-	NewLinearAlgebraQuestionEvent     = domain.NewLinearAlgebraQuestionEvent
-	NewDiagrammingQuestionEvent       = domain.NewDiagrammingQuestionEvent
 	NewAgentHandoffEvent              = domain.NewAgentHandoffEvent
 	GenerateEventID                   = domain.GenerateEventID
 )

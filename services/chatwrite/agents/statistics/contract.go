@@ -27,11 +27,7 @@ func domainTools() []core.Tool {
 }
 
 func handlers() agents.EventHandlerRegistry {
-	registry := make(agents.EventHandlerRegistry)
-
-	registry.Register(agents.EventTypeStatisticsQuestion, handleStatisticsQuestion)
-
-	return registry
+	return make(agents.EventHandlerRegistry) // No custom event handlers needed
 }
 
 func handleStatisticsQuestion(ctx context.Context, handlerCtx *agents.EventHandlerContext) error {
@@ -98,9 +94,7 @@ func handleStatisticsQuestion(ctx context.Context, handlerCtx *agents.EventHandl
 var Contract = &eventbus.AgentContract{
 	Name: "statistics-instructor",
 
-	ListensTo: []agents.EventType{
-		agents.EventTypeStatisticsQuestion,
-	},
+	ListensTo: []agents.EventType{}, // Agent activation handled through handoffs
 
 	Handlers: handlers(),
 	Tools:    domainTools(),

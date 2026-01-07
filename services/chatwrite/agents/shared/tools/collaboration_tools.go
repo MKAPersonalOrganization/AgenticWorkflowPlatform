@@ -1,12 +1,10 @@
 package tools
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
-	"school-with-ai/services/chatwrite/agents"
 )
 
 // WhiteboardStateGetter is a function that retrieves the whiteboard state for a thread
@@ -20,23 +18,18 @@ type IsCollaborationToolFn func(toolName string) bool
 type HandleCollaborationToolFn func(threadID, agentName string, toolCall domain.ToolCall, getWhiteboardState WhiteboardStateGetter) (core.Event, error)
 
 // CreateHandoffEventFn creates a handoff event for a tool.
-type CreateHandoffEventFn func(threadID, fromAgent, toolName string) *agents.DomainEvent
+type CreateHandoffEventFn func(threadID, fromAgent, toolName string) *domain.DomainEvent
 
-// HandleSpecialToolCall processes special collaboration tools (question_answered, whiteboard).
+// HandleSpecialToolCall processes special collaboration tools.
 // This is called for tools that aren't handled by the eventbus registry.
 func HandleSpecialToolCall(threadID string, agentName string, toolCall domain.ToolCall, getWhiteboardState WhiteboardStateGetter) (core.Event, error) {
 	toolName := toolCall.Function.Name
 
 	switch toolName {
 	case "emit_question_answered":
-		var input struct {
-			Subject string `json:"subject"`
-			Summary string `json:"summary"`
-		}
-		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
-			return nil, fmt.Errorf("failed to parse emit_question_answered arguments: %w", err)
-		}
-		return agents.NewQuestionAnsweredEvent(threadID, input.Subject, input.Summary, agentName, getWhiteboardState(threadID)), nil
+		// No custom event needed - agent handoffs and completions are tracked through
+		// standard ToolCallExecutedEvent and agent activity
+		return nil, nil
 
 	case "write_whiteboard":
 		// No custom event needed - ToolCallExecutedEvent is automatically emitted
@@ -49,9 +42,9 @@ func HandleSpecialToolCall(threadID string, agentName string, toolCall domain.To
 }
 
 // GetSpecialToolHandoffEvent creates a handoff event for special tools.
-func GetSpecialToolHandoffEvent(threadID string, fromAgent string, toolName string) *agents.DomainEvent {
+func GetSpecialToolHandoffEvent(threadID string, fromAgent string, toolName string) *domain.DomainEvent {
 	if toolName == "emit_question_answered" {
-		return agents.NewAgentHandoffEvent(threadID, fromAgent, "student-facing-agent", "Question answered, returning to coordinator")
+		return domain.NewAgentHandoffEvent(threadID, fromAgent, "student-facing-agent", "Question answered, returning to coordinator")
 	}
 	return nil
 }
