@@ -1617,8 +1617,8 @@ document.addEventListener('alpine:init', () => {
                 console.log('Cancelling job:', jobId);
 
                 try {
-                    const response = await fetch(`/api/jobs/${jobId}`, {
-                        method: 'DELETE',
+                    const response = await fetch(`/v1/tasks/${jobId}:cancel`, {
+                        method: 'POST',
                     });
 
                     if (!response.ok) {
@@ -1659,8 +1659,8 @@ document.addEventListener('alpine:init', () => {
                 console.log('Cancelling job:', jobId);
 
                 try {
-                    const response = await fetch(`/api/jobs/${jobId}`, {
-                        method: 'DELETE',
+                    const response = await fetch(`/v1/tasks/${jobId}:cancel`, {
+                        method: 'POST',
                     });
 
                     if (!response.ok) {
@@ -1773,7 +1773,7 @@ document.addEventListener('alpine:init', () => {
 
             try {
                 // Step 1: Enqueue the task (async POST request - A2A compliant)
-                const response = await fetch('/api/messages', {
+                const response = await fetch('/v1/message:send', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1796,7 +1796,7 @@ document.addEventListener('alpine:init', () => {
                 console.log('[DEBUG] task.metadata:', task.metadata);
 
                 const taskId = task.id;
-                const streamUrl = task.metadata?.streamUrl || `/api/jobs/${taskId}/stream`;
+                const streamUrl = task.metadata?.streamUrl || `/v1/tasks/${taskId}:subscribe`;
 
                 console.log('Task created:', taskId);
                 console.log('State:', task.status.state);
@@ -1832,7 +1832,7 @@ document.addEventListener('alpine:init', () => {
 
             state.activeJobStreams.add(jobId);
 
-            const streamUrl = `/api/jobs/${jobId}/stream`;
+            const streamUrl = `/v1/tasks/${jobId}:subscribe`;
             const eventSource = new EventSource(streamUrl);
 
             // Store EventSource in thread state so we can close it later

@@ -30,6 +30,8 @@ import (
 	"school-with-ai/services/orchestration"
 	"school-with-ai/services/projections"
 
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/openai/openai-go/v3"
 )
 
@@ -111,13 +113,18 @@ func main() {
 	// Create HTTP handler
 	handler := handlers.NewAsynqHandler(eventLog, llmContextProjection, chatClient, asynqServer, chatWriteService, authSvc, projectionService)
 
-	mux := http.NewServeMux()
+	// Create chi router
+	r := chi.NewRouter()
+
+	// Add chi middleware
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
 
 	// Serve static assets
-	mux.Handle("/assets/css/", http.StripPrefix("/assets/css/", http.FileServer(http.Dir("./assets/css"))))
-	mux.Handle("/assets/js/", http.StripPrefix("/assets/js/", http.FileServer(http.Dir("./assets/js"))))
-	mux.Handle("/assets/images/", http.StripPrefix("/assets/images/", http.FileServer(http.Dir("./assets/images"))))
-	mux.Handle("/assets/charts/", http.StripPrefix("/assets/charts/", http.FileServer(http.Dir("./assets/charts"))))
+	r.Handle("/assets/css/*", http.StripPrefix("/assets/css/", http.FileServer(http.Dir("./assets/css"))))
+	r.Handle("/assets/js/*", http.StripPrefix("/assets/js/", http.FileServer(http.Dir("./assets/js"))))
+	r.Handle("/assets/images/*", http.StripPrefix("/assets/images/", http.FileServer(http.Dir("./assets/images"))))
+	r.Handle("/assets/charts/*", http.StripPrefix("/assets/charts/", http.FileServer(http.Dir("./assets/charts"))))
 
 	// Create AGUI projection handler
 	aguiHandler := agui.NewAguiProjectionHandler(aguiProjection, whiteboardProjection)
@@ -128,7 +135,7 @@ func main() {
 	authMiddleware := auth.NewMiddleware(kratosClient)
 
 	// Health check endpoint (public)
-	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
 		// Get Asynq metrics
@@ -156,35 +163,34 @@ func main() {
 	})
 
 	// Auth routes (public)
-	mux.HandleFunc("GET /auth/login", authHandlers.LoginPage)
-	mux.HandleFunc("GET /auth/registration", authHandlers.RegistrationPage)
-	mux.HandleFunc("GET /auth/recovery", authHandlers.RecoveryPage)
-	mux.HandleFunc("GET /auth/verification", authHandlers.VerificationPage)
-	mux.HandleFunc("GET /auth/logout", authHandlers.LogoutHandler)
-	mux.HandleFunc("GET /auth/error", authHandlers.ErrorPage)
+	r.Get("/auth/login", authHandlers.LoginPage)
+	r.Get("/auth/registration", authHandlers.RegistrationPage)
+	r.Get("/auth/recovery", authHandlers.RecoveryPage)
+	r.Get("/auth/verification", authHandlers.VerificationPage)
+	r.Get("/auth/logout", authHandlers.LogoutHandler)
+	r.Get("/auth/error", authHandlers.ErrorPage)
 
 	// Protected auth routes
-	mux.HandleFunc("GET /auth/settings", authMiddleware.RequireAuthFunc(authHandlers.SettingsPage))
+	r.Get("/auth/settings", authMiddleware.RequireAuthFunc(authHandlers.SettingsPage))
 
-	// Protected async API routes (require authentication)
-	mux.HandleFunc("POST /api/messages", authMiddleware.RequireAuthFunc(handler.SendMessage))
-	mux.HandleFunc("GET /api/jobs/{jobId}", authMiddleware.RequireAuthFunc(handler.GetJobStatus))
-	mux.HandleFunc("GET /api/jobs/{jobId}/stream", authMiddleware.RequireAuthFunc(handler.StreamJobEvents))
-	mux.HandleFunc("DELETE /api/jobs/{jobId}", authMiddleware.RequireAuthFunc(handler.CancelJob))
-	mux.HandleFunc("GET /api/threads", authMiddleware.RequireAuthFunc(handler.GetThreads))
-	mux.HandleFunc("GET /api/threads/{threadId}/messages", authMiddleware.RequireAuthFunc(handler.GetMessages))
-	mux.HandleFunc("DELETE /api/threads/{threadId}", authMiddleware.RequireAuthFunc(handler.DeleteThread))
+	// A2A REST API routes (spec-compliant)
+	r.Post("/v1/message:send", authMiddleware.RequireAuthFunc(handler.SendMessage))
+	r.Get("/v1/tasks/{id}", authMiddleware.RequireAuthFunc(handler.GetJobStatus))
+	r.Get("/v1/tasks/{id}:subscribe", authMiddleware.RequireAuthFunc(handler.StreamJobEvents))
+	r.Post("/v1/tasks/{id}:cancel", authMiddleware.RequireAuthFunc(handler.CancelJob))
 
 	// AGUI projection query endpoints (protected)
-	mux.HandleFunc("GET /api/agui/threads", authMiddleware.RequireAuthFunc(aguiHandler.ListThreads))
-	mux.HandleFunc("GET /api/agui/threads/{threadId}", authMiddleware.RequireAuthFunc(aguiHandler.GetThreadState))
-	mux.HandleFunc("GET /api/agui/threads/{threadId}/messages", authMiddleware.RequireAuthFunc(aguiHandler.GetMessages))
-	mux.HandleFunc("GET /api/agui/threads/{threadId}/tool-calls", authMiddleware.RequireAuthFunc(aguiHandler.GetToolCalls))
-	mux.HandleFunc("GET /api/agui/threads/{threadId}/agent-activity", authMiddleware.RequireAuthFunc(aguiHandler.GetAgentActivity))
-	mux.HandleFunc("GET /api/agui/threads/{threadId}/active-run", authMiddleware.RequireAuthFunc(aguiHandler.GetActiveRun))
+	r.Get("/api/agui/threads", authMiddleware.RequireAuthFunc(aguiHandler.ListThreads))
+	r.Get("/api/agui/threads/{threadId}", authMiddleware.RequireAuthFunc(aguiHandler.GetThreadState))
+	r.Get("/api/agui/threads/{threadId}/messages", authMiddleware.RequireAuthFunc(aguiHandler.GetMessages))
+	r.Get("/api/agui/threads/{threadId}/tool-calls", authMiddleware.RequireAuthFunc(aguiHandler.GetToolCalls))
+	r.Get("/api/agui/threads/{threadId}/agent-activity", authMiddleware.RequireAuthFunc(aguiHandler.GetAgentActivity))
+	r.Get("/api/agui/threads/{threadId}/active-run", authMiddleware.RequireAuthFunc(aguiHandler.GetActiveRun))
 
-	mux.HandleFunc("/", authMiddleware.RequireAuthFunc(HandleViewChatInputScreen))
-	err = http.ListenAndServe(addr, mux)
+	// Home route
+	r.Get("/", authMiddleware.RequireAuthFunc(HandleViewChatInputScreen))
+
+	err = http.ListenAndServe(addr, r)
 	if err != nil {
 		panic(err)
 	}

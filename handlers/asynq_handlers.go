@@ -126,7 +126,7 @@ func (h *AsynqHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 
 	// Create A2A Task
 	task := NewTask(jobID, contextID, TaskStateSubmitted)
-	task.Metadata["streamUrl"] = fmt.Sprintf("/api/jobs/%s/stream", jobID)
+	task.Metadata["streamUrl"] = fmt.Sprintf("/v1/tasks/%s:subscribe", jobID)
 
 	slog.Info("[API] Returning task response",
 		"taskID", task.ID,
@@ -142,7 +142,7 @@ func (h *AsynqHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 
 // StreamJobEvents streams SSE events for a specific job
 func (h *AsynqHandler) StreamJobEvents(w http.ResponseWriter, r *http.Request) {
-	jobID := r.PathValue("jobId")
+	jobID := r.PathValue("id")
 	if jobID == "" {
 		http.Error(w, "jobId is required", http.StatusBadRequest)
 		return
@@ -267,7 +267,7 @@ func (h *AsynqHandler) translateAndWriteEvent(w http.ResponseWriter, flusher htt
 
 // GetJobStatus retrieves the status of a task (A2A compliant)
 func (h *AsynqHandler) GetJobStatus(w http.ResponseWriter, r *http.Request) {
-	taskID := r.PathValue("jobId")
+	taskID := r.PathValue("id")
 	if taskID == "" {
 		http.Error(w, "taskId is required", http.StatusBadRequest)
 		return
@@ -286,7 +286,7 @@ func (h *AsynqHandler) GetJobStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Add stream URL to metadata (not part of core A2A spec)
-	task.Metadata["streamUrl"] = fmt.Sprintf("/api/jobs/%s/stream", taskID)
+	task.Metadata["streamUrl"] = fmt.Sprintf("/v1/tasks/%s:subscribe", taskID)
 
 	if err != nil {
 		// Task not found in queue - check if completed via event buffer
@@ -337,7 +337,7 @@ func (h *AsynqHandler) GetJobStatus(w http.ResponseWriter, r *http.Request) {
 
 // CancelJob cancels a pending or active job
 func (h *AsynqHandler) CancelJob(w http.ResponseWriter, r *http.Request) {
-	jobID := r.PathValue("jobId")
+	jobID := r.PathValue("id")
 	if jobID == "" {
 		http.Error(w, "jobId is required", http.StatusBadRequest)
 		return
