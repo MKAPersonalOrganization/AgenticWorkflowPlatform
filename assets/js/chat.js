@@ -1772,34 +1772,41 @@ document.addEventListener('alpine:init', () => {
             state.errorMessage = null;
 
             try {
-                // Step 1: Enqueue the job (async POST request)
+                // Step 1: Enqueue the task (async POST request - A2A compliant)
                 const response = await fetch('/api/messages', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        threadId: threadId,
+                        contextId: threadId,
                         message: message,
                     }),
                 });
 
                 if (!response.ok) {
-                    throw new Error(`Failed to enqueue job: ${response.statusText}`);
+                    throw new Error(`Failed to enqueue task: ${response.statusText}`);
                 }
 
-                const jobData = await response.json();
-                const jobId = jobData.jobId;
+                // Response is A2A Task object
+                const task = await response.json();
+                console.log('[DEBUG] Full task object:', task);
+                console.log('[DEBUG] task.id:', task.id);
+                console.log('[DEBUG] task.contextId:', task.contextId);
+                console.log('[DEBUG] task.metadata:', task.metadata);
 
-                console.log('Job enqueued:', jobId);
-                console.log('Status:', jobData.status);
-                console.log('Stream URL:', jobData.streamUrl);
+                const taskId = task.id;
+                const streamUrl = task.metadata?.streamUrl || `/api/jobs/${taskId}/stream`;
 
-                // Store current job ID for cancellation
-                state.currentJobId = jobId;
+                console.log('Task created:', taskId);
+                console.log('State:', task.status.state);
+                console.log('Stream URL:', streamUrl);
 
-                // Step 2: Connect to SSE stream for job events
-                this.__connectToJobStream(jobId, threadId);
+                // Store current task ID for cancellation
+                state.currentJobId = taskId;
+
+                // Step 2: Connect to SSE stream for task events
+                this.__connectToJobStream(taskId, threadId);
 
             } catch (error) {
                 console.error('Failed to start stream:', error);
