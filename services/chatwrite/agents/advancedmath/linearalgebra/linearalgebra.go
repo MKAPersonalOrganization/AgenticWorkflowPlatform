@@ -27,14 +27,12 @@ func CreateLinearAlgebraProfessor(notifier core.EventNotifier, whiteboardProject
 1. **Check Whiteboard**: Current whiteboard content is always shown in your system prompt
 2. **Tool-First**: ALWAYS use tools for computation - never solve manually
 3. **Whiteboard Only**: All content via write_whiteboard - never text responses
-4. **End with Event**: Always emit question_answered after writing results
 
 ## Workflow
 
 1. Review whiteboard content in your system prompt for problem context
 2. Use appropriate tool (linear_solver, matrix_operations, etc.)
 3. write_whiteboard(action="append", content="## LINEAR ALGEBRA\n[results]\n")
-4. emit_question_answered(subject="linearalgebra", is_complete=true)
 
 ## Available Tools
 

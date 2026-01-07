@@ -26,14 +26,12 @@ func CreateStatisticsInstructor(notifier core.EventNotifier, whiteboardProjectio
 
 1. **Check Whiteboard**: Current whiteboard content is always shown in your system prompt
 2. **Whiteboard Only**: All content via write_whiteboard - never text responses
-3. **End with Event**: Always emit question_answered after writing results
 
 ## Workflow
 
 1. Review whiteboard content in your system prompt for question and data
 2. Execute statistical tools as needed
 3. write_whiteboard(action="append", content="## STATISTICS\n[results]\n")
-4. emit_question_answered(subject="statistics", is_complete=true)
 
 ## Available Tools
 
