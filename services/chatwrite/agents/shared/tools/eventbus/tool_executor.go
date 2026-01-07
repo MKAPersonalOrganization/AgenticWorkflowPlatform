@@ -6,7 +6,6 @@ import (
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/services/chatwrite"
-	"school-with-ai/services/chatwrite/agents/shared/tools"
 )
 
 // ThreadStore provides read access to thread state
@@ -18,11 +17,6 @@ type ThreadStore interface {
 func CreateToolCallHandler(registry *ContractRegistry, state ThreadStore, whiteboardStore interface{ Get(threadID string) string }) chatwrite.ToolCallHandler {
 	return func(threadID string, agentName string, toolCall domain.ToolCall, result string, eventEmitter func(core.Event) error) error {
 		toolName := toolCall.Function.Name
-
-		// Create whiteboard state getter using WhiteboardStore
-		getWhiteboardState := func(tid string) string {
-			return whiteboardStore.Get(tid)
-		}
 
 		// Handle transfer_to_agent tool (NEW: handoff system)
 		if toolName == "transfer_to_agent" {
@@ -52,19 +46,6 @@ func CreateToolCallHandler(registry *ContractRegistry, state ThreadStore, whiteb
 			}
 
 			if err := eventEmitter(handoffEvent); err != nil {
-				return err
-			}
-
-			return nil
-		}
-
-		if toolName == "write_whiteboard" {
-			// Emit the domain event
-			event, err := tools.HandleSpecialToolCall(threadID, agentName, toolCall, getWhiteboardState)
-			if err != nil {
-				return err
-			}
-			if err := eventEmitter(event); err != nil {
 				return err
 			}
 

@@ -6,6 +6,7 @@ import (
 
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
+	"school-with-ai/sdk/agentsdk/core/middleware"
 )
 
 // WhiteboardStore is a projection that maintains whiteboard content per thread.
@@ -64,14 +65,36 @@ func (p *InMemoryWhiteboardProjection) GetAll() map[string]string {
 
 // Update applies an event to update the projection.
 func (p *InMemoryWhiteboardProjection) Update(event any) error {
-	// Only process EventTypeWhiteboardUpdated events
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	// Handle new middleware.WhiteboardUpdatedEvent
+	if whiteboardEvent, ok := event.(*middleware.WhiteboardUpdatedEvent); ok {
+		threadID := whiteboardEvent.ThreadID
+		action := whiteboardEvent.Action
+		content := whiteboardEvent.Content
+
+		switch action {
+		case "write":
+			p.whiteboards[threadID] = content
+		case "append":
+			existing := p.whiteboards[threadID]
+			if existing == "" {
+				p.whiteboards[threadID] = content
+			} else {
+				p.whiteboards[threadID] = existing + "\n" + content
+			}
+		case "clear":
+			p.whiteboards[threadID] = ""
+		}
+		return nil
+	}
+
+	// Handle legacy domain.DomainEvent (for backward compatibility)
 	domainEvent, ok := event.(*domain.DomainEvent)
 	if !ok || domainEvent.Type != domain.EventTypeWhiteboardUpdated {
 		return nil // Ignore non-whiteboard events
 	}
-
-	p.mu.Lock()
-	defer p.mu.Unlock()
 
 	threadID := domainEvent.ThreadID
 	action := domainEvent.GetString("action")

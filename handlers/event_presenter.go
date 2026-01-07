@@ -48,8 +48,6 @@ func (n *UINotifier) HandleDomainEvent(event core.Event) error {
 	case *agents.DomainEvent:
 		// Handle unified domain events
 		switch evt.Type {
-		case agents.EventTypeWhiteboardUpdated:
-			return n.emitWhiteboardUpdated(evt)
 		case agents.EventTypeMathQuestion:
 			return n.emitMathQuestion(evt)
 		case agents.EventTypePhysicsQuestion:
@@ -146,19 +144,6 @@ func (n *UINotifier) emitToolCallResult(evt *core.ToolCallExecutedEvent) error {
 }
 
 // Agent collaboration event emitters
-
-func (n *UINotifier) emitWhiteboardUpdated(evt *agents.DomainEvent) error {
-	uiEvent := aguievents.NewCustomEvent(
-		"WHITEBOARD_UPDATED",
-		aguievents.WithValue(map[string]interface{}{
-			"agentName": evt.GetString("agent_name"),
-			"content":   evt.GetString("content"),
-			"action":    evt.GetString("action"),
-			"timestamp": evt.Timestamp.UnixMilli(),
-		}),
-	)
-	return n.emitter.Emit(uiEvent)
-}
 
 func (n *UINotifier) emitMathQuestion(evt *agents.DomainEvent) error {
 	uiEvent := aguievents.NewCustomEvent(

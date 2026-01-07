@@ -1439,6 +1439,9 @@ document.addEventListener('alpine:init', () => {
                     const state = this.__getThreadState(id);
                     state.messages = this.__convertBackendMessagesToUI(messages);
 
+                    // Load whiteboard content from AGUI projection
+                    await this.__loadWhiteboardContent(id);
+
                     // Scroll to bottom after loading (only if this is the current thread)
                     if (id === this.__currentThreadId) {
                         this.$nextTick(() => this.__scrollToBottom());
@@ -1447,6 +1450,22 @@ document.addEventListener('alpine:init', () => {
                     throw new Error(`Failed to fetch messages: ${response.status}`);
                 }
             });
+        },
+
+        async __loadWhiteboardContent(threadId) {
+            try {
+                const response = await fetch(`/api/agui/threads/${threadId}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const session = this.sessions.find(s => s.id === threadId);
+                    if (session && data.whiteboardContent !== undefined) {
+                        session.whiteboardContent = data.whiteboardContent;
+                        console.log('[Whiteboard] Loaded content for thread', threadId, '- length:', data.whiteboardContent?.length || 0);
+                    }
+                }
+            } catch (error) {
+                console.warn('[Whiteboard] Failed to load content:', error);
+            }
         },
 
         __convertBackendMessagesToUI(backendMessages) {
@@ -1986,30 +2005,6 @@ document.addEventListener('alpine:init', () => {
                         if (session) {
                             session.title = event.value.title;
                         }
-                    } else if (event.name === 'WHITEBOARD_UPDATED') {
-                        // Update whiteboard content in real-time
-                        const { agentName, content, action } = event.value;
-
-                        // Show typing indicator
-                        this.whiteboardTyping = `${agentName} is writing...`;
-                        setTimeout(() => { this.whiteboardTyping = null; }, 500);
-
-                        // Update whiteboard content based on action
-                        const session = this.sessions.find(s => s.id === threadId);
-                        if (session) {
-                            switch (action) {
-                                case 'write':
-                                    session.whiteboardContent = content;
-                                    break;
-                                case 'append':
-                                    session.whiteboardContent = (session.whiteboardContent || '') + '\n' + content;
-                                    break;
-                                case 'clear':
-                                    session.whiteboardContent = '';
-                                    break;
-                            }
-                            this.whiteboardLastAgent = agentName;
-                        }
                     } else if (event.name === 'TOOL_CALL_AGENT') {
                         const { toolCallId, agentName } = event.value;
                         state.pendingToolCallAgents = state.pendingToolCallAgents || {};
@@ -2096,12 +2091,61 @@ document.addEventListener('alpine:init', () => {
 
                 case 'TOOL_CALL_RESULT':
                     // Tool call result received - update the tool call message with result
+                    console.log('[TOOL_CALL_RESULT] Event received:', {
+                        toolCallId: event.toolCallId,
+                        content: event.content,
+                        totalMessages: state.messages.length,
+                        messageIds: state.messages.map(m => ({ id: m.id, type: m.type, name: m.name }))
+                    });
+
                     const resultToolCallIndex = state.messages.findIndex(m => m.id === event.toolCallId);
+                    console.log('[TOOL_CALL_RESULT] Found message at index:', resultToolCallIndex);
 
                     if (resultToolCallIndex !== -1) {
                         // Update the existing tool call message with the result
                         state.messages[resultToolCallIndex].result = event.content;
                         state.messages[resultToolCallIndex].resultTimestamp = new Date(event.timestamp).toISOString();
+
+                        // DEBUG: Log tool call info
+                        const toolMsg = state.messages[resultToolCallIndex];
+                        console.log('[TOOL_CALL_RESULT] Tool message details:', {
+                            toolCallId: event.toolCallId,
+                            name: toolMsg.name,
+                            parsedArgs: toolMsg.parsedArgs,
+                            args: toolMsg.args,
+                            result: event.content
+                        });
+
+                        // Handle whiteboard tool calls - detect and update whiteboard
+                        if (state.messages[resultToolCallIndex].name === 'write_whiteboard') {
+                            console.log('[WHITEBOARD] Detected write_whiteboard tool call!');
+                            const parsed = state.messages[resultToolCallIndex].parsedArgs;
+                            if (parsed) {
+                                const { content, action } = parsed;
+                                const agentName = state.messages[resultToolCallIndex].agentName || 'Agent';
+
+                                // Show typing indicator
+                                this.whiteboardTyping = `${agentName} is writing...`;
+                                setTimeout(() => { this.whiteboardTyping = null; }, 500);
+
+                                // Update whiteboard content based on action
+                                const session = this.sessions.find(s => s.id === threadId);
+                                if (session && content !== undefined) {
+                                    switch (action) {
+                                        case 'write':
+                                            session.whiteboardContent = content;
+                                            break;
+                                        case 'append':
+                                            session.whiteboardContent = (session.whiteboardContent || '') + '\n' + content;
+                                            break;
+                                        case 'clear':
+                                            session.whiteboardContent = '';
+                                            break;
+                                    }
+                                    this.whiteboardLastAgent = agentName;
+                                }
+                            }
+                        }
                     }
 
                     // Also update the tool call in toolCalls map
@@ -2302,9 +2346,11 @@ document.addEventListener('alpine:init', () => {
             // Per AG-UI Protocol spec: MESSAGES_SNAPSHOT replaces entire message array
             // This ensures UI stays synchronized with backend state
 
+            console.log('[MESSAGES_SNAPSHOT] Received event for thread', threadId, 'with', event?.messages?.length || 0, 'messages');
+
             // Guard: Validate event structure (Alpine defensive pattern)
             if (!event?.messages || !Array.isArray(event.messages)) {
-                console.warn('Invalid MESSAGES_SNAPSHOT: missing or invalid messages array');
+                console.warn('Invalid MESSAGES_SNAPSHOT: missing or invalid messages array', event);
                 return;
             }
 
@@ -2325,6 +2371,56 @@ document.addEventListener('alpine:init', () => {
 
             // Set messages from backend (includes handoffs)
             state.messages = convertedMessages;
+
+            console.log('[MESSAGES_SNAPSHOT] Processing', state.messages.length, 'messages for thread', threadId);
+
+            // Check for whiteboard updates in the snapshot
+            for (const msg of state.messages) {
+                if (msg.type === 'tool_call' && msg.name === 'write_whiteboard') {
+                    console.log('[MESSAGES_SNAPSHOT] Found write_whiteboard tool call:', {
+                        id: msg.id,
+                        name: msg.name,
+                        hasParsedArgs: !!msg.parsedArgs,
+                        parsedArgs: msg.parsedArgs,
+                        agentName: msg.agentName
+                    });
+
+                    if (msg.parsedArgs) {
+                        const { content, action } = msg.parsedArgs;
+                        const agentName = msg.agentName || 'Agent';
+
+                        console.log('[MESSAGES_SNAPSHOT] Applying whiteboard update:', {
+                            action,
+                            contentLength: content?.length,
+                            agentName,
+                            currentWhiteboardLength: this.sessions.find(s => s.id === threadId)?.whiteboardContent?.length || 0
+                        });
+
+                        // Update whiteboard content based on action
+                        const session = this.sessions.find(s => s.id === threadId);
+                        if (session && content !== undefined) {
+                            switch (action) {
+                                case 'write':
+                                    session.whiteboardContent = content;
+                                    break;
+                                case 'append':
+                                    session.whiteboardContent = (session.whiteboardContent || '') + '\n' + content;
+                                    break;
+                                case 'clear':
+                                    session.whiteboardContent = '';
+                                    break;
+                            }
+                            this.whiteboardLastAgent = agentName;
+                            console.log('[MESSAGES_SNAPSHOT] Whiteboard updated, new length:', session.whiteboardContent?.length);
+                        } else {
+                            console.warn('[MESSAGES_SNAPSHOT] Could not update whiteboard:', {
+                                hasSession: !!session,
+                                hasContent: content !== undefined
+                            });
+                        }
+                    }
+                }
+            }
 
             // Scroll to bottom after snapshot (only if this is the current thread)
             if (threadId === this.__currentThreadId) {

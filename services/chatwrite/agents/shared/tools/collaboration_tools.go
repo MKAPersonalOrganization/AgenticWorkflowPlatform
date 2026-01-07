@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"school-with-ai/domain"
+	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/services/chatwrite/agents"
 )
 
@@ -16,14 +17,14 @@ type WhiteboardStateGetter func(threadID string) string
 type IsCollaborationToolFn func(toolName string) bool
 
 // HandleCollaborationToolFn creates a domain event from a tool call.
-type HandleCollaborationToolFn func(threadID, agentName string, toolCall domain.ToolCall, getWhiteboardState WhiteboardStateGetter) (*agents.DomainEvent, error)
+type HandleCollaborationToolFn func(threadID, agentName string, toolCall domain.ToolCall, getWhiteboardState WhiteboardStateGetter) (core.Event, error)
 
 // CreateHandoffEventFn creates a handoff event for a tool.
 type CreateHandoffEventFn func(threadID, fromAgent, toolName string) *agents.DomainEvent
 
 // HandleSpecialToolCall processes special collaboration tools (question_answered, whiteboard).
 // This is called for tools that aren't handled by the eventbus registry.
-func HandleSpecialToolCall(threadID string, agentName string, toolCall domain.ToolCall, getWhiteboardState WhiteboardStateGetter) (*agents.DomainEvent, error) {
+func HandleSpecialToolCall(threadID string, agentName string, toolCall domain.ToolCall, getWhiteboardState WhiteboardStateGetter) (core.Event, error) {
 	toolName := toolCall.Function.Name
 
 	switch toolName {

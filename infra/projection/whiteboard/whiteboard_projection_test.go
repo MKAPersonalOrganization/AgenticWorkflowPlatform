@@ -5,13 +5,14 @@ import (
 	"time"
 
 	"school-with-ai/domain"
+	"school-with-ai/sdk/agentsdk/core/middleware"
 )
 
 func TestWhiteboardProjection_Write(t *testing.T) {
 	store := NewInMemoryWhiteboardProjection()
 	threadID := "thread-123"
 
-	event := domain.NewWhiteboardUpdatedEvent(threadID, "test-agent", "Hello, World!", "write")
+	event := middleware.NewWhiteboardUpdatedEvent(threadID, "test-agent", "Hello, World!", "write")
 	err := store.Update(event)
 	if err != nil {
 		t.Fatalf("Update failed: %v", err)
@@ -27,10 +28,10 @@ func TestWhiteboardProjection_Append(t *testing.T) {
 	store := NewInMemoryWhiteboardProjection()
 	threadID := "thread-123"
 
-	event1 := domain.NewWhiteboardUpdatedEvent(threadID, "test-agent", "First line", "write")
+	event1 := middleware.NewWhiteboardUpdatedEvent(threadID, "test-agent", "First line", "write")
 	_ = store.Update(event1)
 
-	event2 := domain.NewWhiteboardUpdatedEvent(threadID, "test-agent", "Second line", "append")
+	event2 := middleware.NewWhiteboardUpdatedEvent(threadID, "test-agent", "Second line", "append")
 	_ = store.Update(event2)
 
 	content := store.Get(threadID)
@@ -44,7 +45,7 @@ func TestWhiteboardProjection_AppendToEmpty(t *testing.T) {
 	store := NewInMemoryWhiteboardProjection()
 	threadID := "thread-123"
 
-	event := domain.NewWhiteboardUpdatedEvent(threadID, "test-agent", "First line", "append")
+	event := middleware.NewWhiteboardUpdatedEvent(threadID, "test-agent", "First line", "append")
 	_ = store.Update(event)
 
 	content := store.Get(threadID)
@@ -57,10 +58,10 @@ func TestWhiteboardProjection_Clear(t *testing.T) {
 	store := NewInMemoryWhiteboardProjection()
 	threadID := "thread-123"
 
-	event1 := domain.NewWhiteboardUpdatedEvent(threadID, "test-agent", "Some content", "write")
+	event1 := middleware.NewWhiteboardUpdatedEvent(threadID, "test-agent", "Some content", "write")
 	_ = store.Update(event1)
 
-	event2 := domain.NewWhiteboardUpdatedEvent(threadID, "test-agent", "", "clear")
+	event2 := middleware.NewWhiteboardUpdatedEvent(threadID, "test-agent", "", "clear")
 	_ = store.Update(event2)
 
 	content := store.Get(threadID)
@@ -72,10 +73,10 @@ func TestWhiteboardProjection_Clear(t *testing.T) {
 func TestWhiteboardProjection_MultipleThreads(t *testing.T) {
 	store := NewInMemoryWhiteboardProjection()
 
-	event1 := domain.NewWhiteboardUpdatedEvent("thread-1", "agent-1", "Thread 1 content", "write")
+	event1 := middleware.NewWhiteboardUpdatedEvent("thread-1", "agent-1", "Thread 1 content", "write")
 	_ = store.Update(event1)
 
-	event2 := domain.NewWhiteboardUpdatedEvent("thread-2", "agent-2", "Thread 2 content", "write")
+	event2 := middleware.NewWhiteboardUpdatedEvent("thread-2", "agent-2", "Thread 2 content", "write")
 	_ = store.Update(event2)
 
 	content1 := store.Get("thread-1")
@@ -132,7 +133,7 @@ func TestWhiteboardProjection_UnknownAction(t *testing.T) {
 	store := NewInMemoryWhiteboardProjection()
 	threadID := "thread-123"
 
-	event1 := domain.NewWhiteboardUpdatedEvent(threadID, "test-agent", "Initial content", "write")
+	event1 := middleware.NewWhiteboardUpdatedEvent(threadID, "test-agent", "Initial content", "write")
 	_ = store.Update(event1)
 
 	event2 := &domain.DomainEvent{
