@@ -18,7 +18,6 @@ type AsynqServer struct {
 	server             *asynq.Server
 	client             *asynq.Client
 	eventBufferManager *EventBufferManager
-	queue              domain.JobQueue
 	redisAddr          string // Store for metrics
 }
 
@@ -40,7 +39,6 @@ func NewAsynqServer(
 	whiteboardProjection interface{ Get(threadID string) string },
 	chatClient chatwrite.ChatClient,
 	chatWriteService *chatwrite.ChatWriteService,
-	queue domain.JobQueue,
 ) *AsynqServer {
 	// Default Redis options if not provided
 	if config.RedisOptions.Addr == "" && config.RedisAddr == "" {
@@ -77,7 +75,6 @@ func NewAsynqServer(
 		whiteboardProjection,
 		chatClient,
 		chatWriteService,
-		queue,
 		eventBufferManager,
 	)
 
@@ -139,8 +136,8 @@ func NewAsynqServer(
 		server:             srv,
 		client:             client,
 		eventBufferManager: eventBufferManager,
-		queue:              queue,
-		redisAddr:          config.RedisAddr,
+
+		redisAddr: config.RedisAddr,
 	}
 }
 
@@ -163,6 +160,32 @@ func (s *AsynqServer) EnqueueJob(job *domain.Job) error {
 // GetEventBuffer gets the event buffer for a job (for SSE streaming)
 func (s *AsynqServer) GetEventBuffer(jobID string) (*EventBuffer, bool) {
 	return s.eventBufferManager.GetEventBuffer(jobID)
+}
+
+// CancelTask attempts to cancel a task by job ID
+func (s *AsynqServer) CancelTask(jobID string) error {
+	inspector := asynq.NewInspector(asynq.RedisClientOpt{Addr: s.redisAddr})
+	defer inspector.Close()
+
+	// Try to delete the task from the default queue first (for pending/scheduled/retry tasks)
+	err := inspector.DeleteTask("default", jobID)
+	if err == nil {
+		slog.Info("Deleted pending task", "jobID", jobID)
+		return nil
+	}
+
+	// If delete failed, the task might be actively processing
+	// Try to send cancellation signal instead
+	if err := inspector.CancelProcessing(jobID); err != nil {
+		slog.Warn("Failed to send cancellation signal",
+			"jobID", jobID,
+			"error", err,
+			"note", "Task may have already completed or doesn't exist")
+		return fmt.Errorf("failed to cancel task: task not found or already completed")
+	}
+
+	slog.Info("Sent cancellation signal to active task", "jobID", jobID)
+	return nil
 }
 
 // Shutdown gracefully shuts down the Asynq server

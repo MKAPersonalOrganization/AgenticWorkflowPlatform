@@ -25,7 +25,6 @@ type AsynqHandler struct {
 	state             *llmcontext.InMemoryLLMContextProjection
 	log               *eventstore.ProjectionEventStore
 	chatClient        *llm.OpenAIClient
-	queue             domain.JobQueue
 	asynqServer       *orchestration.AsynqServer
 	chatWriteService  *chatwrite.ChatWriteService
 	authService       services.AuthService
@@ -37,7 +36,6 @@ func NewAsynqHandler(
 	log *eventstore.ProjectionEventStore,
 	state *llmcontext.InMemoryLLMContextProjection,
 	chatClient *llm.OpenAIClient,
-	queue domain.JobQueue,
 	asynqServer *orchestration.AsynqServer,
 	chatWriteService *chatwrite.ChatWriteService,
 	authService services.AuthService,
@@ -47,7 +45,6 @@ func NewAsynqHandler(
 		state:             state,
 		log:               log,
 		chatClient:        chatClient,
-		queue:             queue,
 		asynqServer:       asynqServer,
 		chatWriteService:  chatWriteService,
 		authService:       authService,
@@ -96,12 +93,6 @@ func (h *AsynqHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		"threadID", threadID,
 		"jobID", jobID,
 		"message", message)
-
-	// Enqueue job to in-memory queue for tracking
-	if err := h.queue.Enqueue(job); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to enqueue job: %v", err), http.StatusInternalServerError)
-		return
-	}
 
 	// Enqueue to Asynq for async processing by workers
 	if err := h.asynqServer.EnqueueJob(job); err != nil {
@@ -259,10 +250,11 @@ func (h *AsynqHandler) GetActiveJobs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	activeJobs := h.queue.GetActiveJobsByThread(threadID)
-
+	// Note: Asynq doesn't support filtering by thread ID directly
+	// This would require custom metadata querying or maintaining a separate index
+	// For now, return empty array or implement custom tracking if needed
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(activeJobs); err != nil {
+	if err := json.NewEncoder(w).Encode([]domain.Job{}); err != nil {
 		http.Error(w, "Failed to encode jobs", http.StatusInternalServerError)
 		return
 	}
@@ -276,12 +268,8 @@ func (h *AsynqHandler) CancelJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Attempt to cancel the job in queue (if pending)
-	if err := h.queue.CancelJob(jobID); err != nil {
-		if err == domain.ErrJobNotFound {
-			http.Error(w, "Job not found", http.StatusNotFound)
-			return
-		}
+	// Use Asynq Inspector to cancel task
+	if err := h.asynqServer.CancelTask(jobID); err != nil {
 		http.Error(w, fmt.Sprintf("Failed to cancel job: %v", err), http.StatusBadRequest)
 		return
 	}

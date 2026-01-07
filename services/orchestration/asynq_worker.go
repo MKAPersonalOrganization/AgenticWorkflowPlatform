@@ -63,7 +63,6 @@ type ChatWorker struct {
 	whiteboardProjection interface{ Get(threadID string) string }
 	chatClient           chatwrite.ChatClient
 	chatWriteService     *chatwrite.ChatWriteService
-	queue                domain.JobQueue
 	eventBufferManager   *EventBufferManager
 }
 
@@ -74,7 +73,6 @@ func NewChatWorker(
 	whiteboardProjection interface{ Get(threadID string) string },
 	chatClient chatwrite.ChatClient,
 	chatWriteService *chatwrite.ChatWriteService,
-	queue domain.JobQueue,
 	eventBufferManager *EventBufferManager,
 ) *ChatWorker {
 	return &ChatWorker{
@@ -83,7 +81,6 @@ func NewChatWorker(
 		whiteboardProjection: whiteboardProjection,
 		chatClient:           chatClient,
 		chatWriteService:     chatWriteService,
-		queue:                queue,
 		eventBufferManager:   eventBufferManager,
 	}
 }
@@ -100,23 +97,9 @@ func (w *ChatWorker) ProcessTask(ctx context.Context, t *asynq.Task) error {
 		"threadID", payload.ThreadID,
 		"message", payload.Message)
 
-	// Update job status
-	if err := w.queue.UpdateJobStatus(payload.JobID, domain.JobStatusProcessing, ""); err != nil {
-		slog.Error("Failed to update job status", "jobID", payload.JobID, "error", err)
-	}
-
 	// Process the chat message
 	if err := w.processChat(ctx, payload); err != nil {
-		// Update job status to failed
-		if updateErr := w.queue.UpdateJobStatus(payload.JobID, domain.JobStatusFailed, err.Error()); updateErr != nil {
-			slog.Error("Failed to update job status", "jobID", payload.JobID, "error", updateErr)
-		}
 		return err
-	}
-
-	// Update job status to completed
-	if err := w.queue.UpdateJobStatus(payload.JobID, domain.JobStatusCompleted, ""); err != nil {
-		slog.Error("Failed to update job status", "jobID", payload.JobID, "error", err)
 	}
 
 	slog.Info("[WORKER] Job completed successfully",
@@ -128,6 +111,11 @@ func (w *ChatWorker) ProcessTask(ctx context.Context, t *asynq.Task) error {
 
 // processChat processes a single chat message (similar to processJob from worker_pool.go)
 func (w *ChatWorker) processChat(ctx context.Context, payload ProcessChatPayload) error {
+	// Check if context was cancelled
+	if ctx.Err() != nil {
+		return fmt.Errorf("task cancelled: %w", ctx.Err())
+	}
+
 	// Check if thread exists, if not create it
 	_, exists := w.state.Get(payload.ThreadID)
 	if !exists {
@@ -194,6 +182,12 @@ func (w *ChatWorker) processChat(ctx context.Context, payload ProcessChatPayload
 
 // continueWithAgentDirect runs an agent directly
 func (w *ChatWorker) continueWithAgentDirect(ctx context.Context, threadID, agentName string, emitter EventEmitter, runID string) {
+	// Check if context was cancelled before starting agent
+	if ctx.Err() != nil {
+		slog.Warn("Agent execution cancelled", "threadID", threadID, "agent", agentName)
+		return
+	}
+
 	slog.Info("Continuing with agent (direct)", "threadID", threadID, "agent", agentName)
 
 	// Create UI notifier for this agent's event stream
