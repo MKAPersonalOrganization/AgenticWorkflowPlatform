@@ -1,18 +1,29 @@
 package whiteboard
 
 import (
+	"encoding/json"
 	"testing"
-	"time"
 
-	"school-with-ai/domain"
-	"school-with-ai/sdk/agentsdk/core/middleware"
+	"school-with-ai/sdk/agentsdk/core"
 )
 
 func TestWhiteboardProjection_Write(t *testing.T) {
 	store := NewInMemoryWhiteboardProjection()
 	threadID := "thread-123"
 
-	event := middleware.NewWhiteboardUpdatedEvent(threadID, "test-agent", "Hello, World!", "write")
+	args, _ := json.Marshal(map[string]interface{}{
+		"action":  "write",
+		"content": "Hello, World!",
+	})
+	event := &core.ToolCallExecutedEvent{
+		BaseEvent: core.BaseEvent{
+			Type:     "ToolCallExecuted",
+			ThreadID: threadID,
+		},
+		ToolName:      "write_whiteboard",
+		ToolArguments: string(args),
+		AgentName:     "test-agent",
+	}
 	err := store.Update(event)
 	if err != nil {
 		t.Fatalf("Update failed: %v", err)
@@ -28,10 +39,22 @@ func TestWhiteboardProjection_Append(t *testing.T) {
 	store := NewInMemoryWhiteboardProjection()
 	threadID := "thread-123"
 
-	event1 := middleware.NewWhiteboardUpdatedEvent(threadID, "test-agent", "First line", "write")
+	args1, _ := json.Marshal(map[string]interface{}{"action": "write", "content": "First line"})
+	event1 := &core.ToolCallExecutedEvent{
+		BaseEvent:     core.BaseEvent{Type: "ToolCallExecuted", ThreadID: threadID},
+		ToolName:      "write_whiteboard",
+		ToolArguments: string(args1),
+		AgentName:     "test-agent",
+	}
 	_ = store.Update(event1)
 
-	event2 := middleware.NewWhiteboardUpdatedEvent(threadID, "test-agent", "Second line", "append")
+	args2, _ := json.Marshal(map[string]interface{}{"action": "append", "content": "Second line"})
+	event2 := &core.ToolCallExecutedEvent{
+		BaseEvent:     core.BaseEvent{Type: "ToolCallExecuted", ThreadID: threadID},
+		ToolName:      "write_whiteboard",
+		ToolArguments: string(args2),
+		AgentName:     "test-agent",
+	}
 	_ = store.Update(event2)
 
 	content := store.Get(threadID)
@@ -45,7 +68,13 @@ func TestWhiteboardProjection_AppendToEmpty(t *testing.T) {
 	store := NewInMemoryWhiteboardProjection()
 	threadID := "thread-123"
 
-	event := middleware.NewWhiteboardUpdatedEvent(threadID, "test-agent", "First line", "append")
+	args, _ := json.Marshal(map[string]interface{}{"action": "append", "content": "First line"})
+	event := &core.ToolCallExecutedEvent{
+		BaseEvent:     core.BaseEvent{Type: "ToolCallExecuted", ThreadID: threadID},
+		ToolName:      "write_whiteboard",
+		ToolArguments: string(args),
+		AgentName:     "test-agent",
+	}
 	_ = store.Update(event)
 
 	content := store.Get(threadID)
@@ -58,10 +87,22 @@ func TestWhiteboardProjection_Clear(t *testing.T) {
 	store := NewInMemoryWhiteboardProjection()
 	threadID := "thread-123"
 
-	event1 := middleware.NewWhiteboardUpdatedEvent(threadID, "test-agent", "Some content", "write")
+	args1, _ := json.Marshal(map[string]interface{}{"action": "write", "content": "Some content"})
+	event1 := &core.ToolCallExecutedEvent{
+		BaseEvent:     core.BaseEvent{Type: "ToolCallExecuted", ThreadID: threadID},
+		ToolName:      "write_whiteboard",
+		ToolArguments: string(args1),
+		AgentName:     "test-agent",
+	}
 	_ = store.Update(event1)
 
-	event2 := middleware.NewWhiteboardUpdatedEvent(threadID, "test-agent", "", "clear")
+	args2, _ := json.Marshal(map[string]interface{}{"action": "clear", "content": ""})
+	event2 := &core.ToolCallExecutedEvent{
+		BaseEvent:     core.BaseEvent{Type: "ToolCallExecuted", ThreadID: threadID},
+		ToolName:      "write_whiteboard",
+		ToolArguments: string(args2),
+		AgentName:     "test-agent",
+	}
 	_ = store.Update(event2)
 
 	content := store.Get(threadID)
@@ -73,10 +114,22 @@ func TestWhiteboardProjection_Clear(t *testing.T) {
 func TestWhiteboardProjection_MultipleThreads(t *testing.T) {
 	store := NewInMemoryWhiteboardProjection()
 
-	event1 := middleware.NewWhiteboardUpdatedEvent("thread-1", "agent-1", "Thread 1 content", "write")
+	args1, _ := json.Marshal(map[string]interface{}{"action": "write", "content": "Thread 1 content"})
+	event1 := &core.ToolCallExecutedEvent{
+		BaseEvent:     core.BaseEvent{Type: "ToolCallExecuted", ThreadID: "thread-1"},
+		ToolName:      "write_whiteboard",
+		ToolArguments: string(args1),
+		AgentName:     "agent-1",
+	}
 	_ = store.Update(event1)
 
-	event2 := middleware.NewWhiteboardUpdatedEvent("thread-2", "agent-2", "Thread 2 content", "write")
+	args2, _ := json.Marshal(map[string]interface{}{"action": "write", "content": "Thread 2 content"})
+	event2 := &core.ToolCallExecutedEvent{
+		BaseEvent:     core.BaseEvent{Type: "ToolCallExecuted", ThreadID: "thread-2"},
+		ToolName:      "write_whiteboard",
+		ToolArguments: string(args2),
+		AgentName:     "agent-2",
+	}
 	_ = store.Update(event2)
 
 	content1 := store.Get("thread-1")
@@ -108,14 +161,12 @@ func TestWhiteboardProjection_IgnoreNonWhiteboardEvents(t *testing.T) {
 	store := NewInMemoryWhiteboardProjection()
 	threadID := "thread-123"
 
-	nonWhiteboardEvent := &domain.DomainEvent{
-		ID:        "event-1",
-		Type:      domain.EventTypeUserMessage,
-		Timestamp: time.Now(),
-		ThreadID:  threadID,
-		Data: map[string]interface{}{
-			"content": "This should be ignored",
-		},
+	// Non-whiteboard tool event
+	nonWhiteboardEvent := &core.ToolCallExecutedEvent{
+		BaseEvent:     core.BaseEvent{Type: "ToolCallExecuted", ThreadID: threadID},
+		ToolName:      "some_other_tool",
+		ToolArguments: `{"content": "This should be ignored"}`,
+		AgentName:     "test-agent",
 	}
 
 	err := store.Update(nonWhiteboardEvent)
@@ -133,18 +184,21 @@ func TestWhiteboardProjection_UnknownAction(t *testing.T) {
 	store := NewInMemoryWhiteboardProjection()
 	threadID := "thread-123"
 
-	event1 := middleware.NewWhiteboardUpdatedEvent(threadID, "test-agent", "Initial content", "write")
+	args1, _ := json.Marshal(map[string]interface{}{"action": "write", "content": "Initial content"})
+	event1 := &core.ToolCallExecutedEvent{
+		BaseEvent:     core.BaseEvent{Type: "ToolCallExecuted", ThreadID: threadID},
+		ToolName:      "write_whiteboard",
+		ToolArguments: string(args1),
+		AgentName:     "test-agent",
+	}
 	_ = store.Update(event1)
 
-	event2 := &domain.DomainEvent{
-		ID:        "event-2",
-		Type:      domain.EventTypeWhiteboardUpdated,
-		Timestamp: time.Now(),
-		ThreadID:  threadID,
-		Data: map[string]interface{}{
-			"action":  "unknown_action",
-			"content": "This should be ignored",
-		},
+	args2, _ := json.Marshal(map[string]interface{}{"action": "unknown_action", "content": "This should be ignored"})
+	event2 := &core.ToolCallExecutedEvent{
+		BaseEvent:     core.BaseEvent{Type: "ToolCallExecuted", ThreadID: threadID},
+		ToolName:      "write_whiteboard",
+		ToolArguments: string(args2),
+		AgentName:     "test-agent",
 	}
 	_ = store.Update(event2)
 
