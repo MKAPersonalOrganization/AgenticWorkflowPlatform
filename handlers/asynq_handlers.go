@@ -18,6 +18,7 @@ import (
 	"school-with-ai/services/orchestration"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
+	"github.com/hibiken/asynq"
 )
 
 // AsynqHandler encapsulates dependencies for HTTP handlers using Asynq
@@ -52,7 +53,23 @@ func NewAsynqHandler(
 	}
 }
 
-// SendMessage handles the /send endpoint by enqueuing a job with Asynq
+// SendMessageRequest represents the async chat request
+type SendMessageRequest struct {
+	ThreadID string `json:"threadId,omitempty"`
+	Message  string `json:"message"`
+}
+
+// SendMessageResponse represents the async job response
+type SendMessageResponse struct {
+	JobID     string `json:"jobId"`
+	ThreadID  string `json:"threadId"`
+	Status    string `json:"status"`
+	Queue     string `json:"queue"`
+	StreamURL string `json:"streamUrl"`
+	CreatedAt string `json:"createdAt"`
+}
+
+// SendMessage handles POST /api/messages - async chat message processing
 func (h *AsynqHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	// Get authenticated user from context
 	user := h.authService.GetUserFromContext(r.Context())
@@ -61,58 +78,73 @@ func (h *AsynqHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get thread ID and message from query parameters
-	threadID := r.URL.Query().Get("threadId")
-	if threadID == "" {
-		// Create user-specific thread ID
-		threadID = fmt.Sprintf("thread_%s_%d", user.ID, time.Now().UnixNano())
-	}
-	message := r.URL.Query().Get("message")
-	if message == "" {
-		message = "Hello"
+	// Parse JSON request body
+	var req SendMessageRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
 	}
 
-	// Create job with user ID
+	if req.Message == "" {
+		http.Error(w, "Message is required", http.StatusBadRequest)
+		return
+	}
+
+	// Generate thread ID if not provided
+	threadID := req.ThreadID
+	if threadID == "" {
+		threadID = fmt.Sprintf("thread_%s_%d", user.ID, time.Now().UnixNano())
+	}
+
+	// Generate IDs for async task
 	jobID := core.GenerateID()
 	messageID := aguievents.GenerateMessageID()
 
-	job := &domain.Job{
-		ID:        jobID,
+	// Create payload for async processing
+	payload := orchestration.ProcessChatPayload{
+		JobID:     jobID,
 		ThreadID:  threadID,
 		MessageID: messageID,
-		Message:   message,
+		Message:   req.Message,
 		UserID:    user.ID,
-		Status:    domain.JobStatusPending,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
 	}
 
-	slog.Info("[API] Received chat request",
+	slog.Info("[API] Async chat request received",
 		"userID", user.ID,
 		"email", user.Email,
 		"threadID", threadID,
 		"jobID", jobID,
-		"message", message)
+		"messageLength", len(req.Message))
 
-	// Enqueue to Asynq for async processing by workers
-	if err := h.asynqServer.EnqueueJob(job); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to enqueue to Asynq: %v", err), http.StatusInternalServerError)
+	// Enqueue to Asynq for async processing
+	taskInfo, err := h.asynqServer.EnqueueJob(payload)
+	if err != nil {
+		slog.Error("[API] Failed to enqueue task", "error", err)
+		http.Error(w, "Failed to enqueue task", http.StatusInternalServerError)
 		return
 	}
 
-	slog.Info("[API] Job enqueued to Redis, returning immediately",
+	slog.Info("[API] Task enqueued successfully",
 		"jobID", jobID,
-		"status", "pending",
-		"note", "Worker will pick up job asynchronously")
+		"taskID", taskInfo.ID,
+		"queue", taskInfo.Queue,
+		"state", taskInfo.State)
 
-	// Return job ID to client
+	// Return async job response
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]string{
-		"jobId":    jobID,
-		"threadId": threadID,
-		"status":   string(domain.JobStatusPending),
-	}); err != nil {
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	w.WriteHeader(http.StatusAccepted) // 202 Accepted for async operations
+
+	response := SendMessageResponse{
+		JobID:     jobID,
+		ThreadID:  threadID,
+		Status:    "queued",
+		Queue:     taskInfo.Queue,
+		StreamURL: fmt.Sprintf("/api/jobs/%s/stream", jobID),
+		CreatedAt: time.Now().Format(time.RFC3339),
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		slog.Error("[API] Failed to encode response", "error", err)
 		return
 	}
 }
@@ -242,20 +274,76 @@ func (h *AsynqHandler) translateAndWriteEvent(w http.ResponseWriter, flusher htt
 	return nil
 }
 
-// GetActiveJobs retrieves all active jobs for a thread
-func (h *AsynqHandler) GetActiveJobs(w http.ResponseWriter, r *http.Request) {
-	threadID := r.URL.Query().Get("threadId")
-	if threadID == "" {
-		http.Error(w, "threadId is required", http.StatusBadRequest)
+// JobStatusResponse represents async job status
+type JobStatusResponse struct {
+	JobID       string `json:"jobId"`
+	Status      string `json:"status"`
+	Queue       string `json:"queue,omitempty"`
+	Retried     int    `json:"retried,omitempty"`
+	MaxRetry    int    `json:"maxRetry,omitempty"`
+	LastError   string `json:"lastError,omitempty"`
+	StreamURL   string `json:"streamUrl"`
+	CompletedAt string `json:"completedAt,omitempty"`
+}
+
+// GetJobStatus retrieves the status of an async task
+func (h *AsynqHandler) GetJobStatus(w http.ResponseWriter, r *http.Request) {
+	jobID := r.PathValue("jobId")
+	if jobID == "" {
+		http.Error(w, "jobId is required", http.StatusBadRequest)
 		return
 	}
 
-	// Note: Asynq doesn't support filtering by thread ID directly
-	// This would require custom metadata querying or maintaining a separate index
-	// For now, return empty array or implement custom tracking if needed
+	// Try to get task info from Asynq
+	taskInfo, err := h.asynqServer.GetTaskInfo("default", jobID)
+
+	response := JobStatusResponse{
+		JobID:     jobID,
+		StreamURL: fmt.Sprintf("/api/jobs/%s/stream", jobID),
+	}
+
+	if err != nil {
+		// Task not found in queue - might be completed or never existed
+		// Check if event buffer exists (means task was processed)
+		_, exists := h.asynqServer.GetEventBuffer(jobID)
+		if exists {
+			response.Status = "completed"
+		} else {
+			response.Status = "not_found"
+		}
+	} else {
+		// Map Asynq state to our status
+		switch taskInfo.State {
+		case asynq.TaskStatePending:
+			response.Status = "pending"
+		case asynq.TaskStateActive:
+			response.Status = "processing"
+		case asynq.TaskStateScheduled:
+			response.Status = "scheduled"
+		case asynq.TaskStateRetry:
+			response.Status = "retrying"
+		case asynq.TaskStateArchived:
+			response.Status = "failed"
+		case asynq.TaskStateCompleted:
+			response.Status = "completed"
+			if !taskInfo.CompletedAt.IsZero() {
+				response.CompletedAt = taskInfo.CompletedAt.Format(time.RFC3339)
+			}
+		default:
+			response.Status = "unknown"
+		}
+
+		response.Queue = taskInfo.Queue
+		response.Retried = taskInfo.Retried
+		response.MaxRetry = taskInfo.MaxRetry
+		if taskInfo.LastErr != "" {
+			response.LastError = taskInfo.LastErr
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode([]domain.Job{}); err != nil {
-		http.Error(w, "Failed to encode jobs", http.StatusInternalServerError)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		return
 	}
 }

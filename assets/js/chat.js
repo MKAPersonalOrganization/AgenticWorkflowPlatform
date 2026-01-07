@@ -1772,9 +1772,16 @@ document.addEventListener('alpine:init', () => {
             state.errorMessage = null;
 
             try {
-                // Step 1: Enqueue the job
-                const response = await fetch(`/send?threadId=${encodeURIComponent(threadId)}&message=${encodeURIComponent(message)}`, {
-                    method: 'GET',
+                // Step 1: Enqueue the job (async POST request)
+                const response = await fetch('/api/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        threadId: threadId,
+                        message: message,
+                    }),
                 });
 
                 if (!response.ok) {
@@ -1785,6 +1792,8 @@ document.addEventListener('alpine:init', () => {
                 const jobId = jobData.jobId;
 
                 console.log('Job enqueued:', jobId);
+                console.log('Status:', jobData.status);
+                console.log('Stream URL:', jobData.streamUrl);
 
                 // Store current job ID for cancellation
                 state.currentJobId = jobId;

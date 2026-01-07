@@ -166,9 +166,9 @@ func main() {
 	// Protected auth routes
 	mux.HandleFunc("GET /auth/settings", authMiddleware.RequireAuthFunc(authHandlers.SettingsPage))
 
-	// Protected chat routes (require authentication)
-	mux.HandleFunc("/send", authMiddleware.RequireAuthFunc(handler.SendMessage))
-	mux.HandleFunc("GET /api/jobs/active", authMiddleware.RequireAuthFunc(handler.GetActiveJobs))
+	// Protected async API routes (require authentication)
+	mux.HandleFunc("POST /api/messages", authMiddleware.RequireAuthFunc(handler.SendMessage))
+	mux.HandleFunc("GET /api/jobs/{jobId}", authMiddleware.RequireAuthFunc(handler.GetJobStatus))
 	mux.HandleFunc("GET /api/jobs/{jobId}/stream", authMiddleware.RequireAuthFunc(handler.StreamJobEvents))
 	mux.HandleFunc("DELETE /api/jobs/{jobId}", authMiddleware.RequireAuthFunc(handler.CancelJob))
 	mux.HandleFunc("GET /api/threads", authMiddleware.RequireAuthFunc(handler.GetThreads))
