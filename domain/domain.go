@@ -63,5 +63,4 @@ type InstructorSession struct {
 	Specialization string     `json:"specialization,omitempty"`
 	StartedAt      time.Time  `json:"startedAt"`
 	EndedAt        *time.Time `json:"endedAt,omitempty"`
-	HandoffReason  string     `json:"handoffReason,omitempty"`
 }

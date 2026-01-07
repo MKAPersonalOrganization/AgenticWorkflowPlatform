@@ -2,7 +2,6 @@ package orchestration
 
 import (
 	"school-with-ai/sdk/agentsdk/core"
-	"school-with-ai/services/chatwrite/agents"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
@@ -43,11 +42,6 @@ func (n *UINotifier) HandleDomainEvent(event core.Event) error {
 
 	case *core.ToolCallExecutedEvent:
 		return n.emitToolCallResult(evt)
-
-	// Agent collaboration events
-	case *agents.DomainEvent:
-		// No custom domain events are handled anymore
-		return nil
 
 	// Other domain events don't need UI events
 	default:

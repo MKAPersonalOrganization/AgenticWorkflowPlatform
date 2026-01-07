@@ -292,13 +292,6 @@ func (p *InMemoryLLMContextProjection) applyEventUnsafe(agentThread core.AgentTh
 		threadID := agentThread.GetID()
 		delete(p.threads, threadID)
 		delete(p.metadata, threadID)
-
-	case *domain.DomainEvent:
-		// No custom domain events are handled anymore
-		// Handoffs and other interactions are now tool-based
-
-	case *core.CustomEventEmittedEvent:
-		meta.UpdatedAt = evt.Timestamp
 	}
 
 	meta.Version++

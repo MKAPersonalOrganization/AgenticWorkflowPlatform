@@ -118,17 +118,3 @@ type AguiAgentActivity struct {
 	TotalRunTime    int64     `json:"totalRunTime"` // milliseconds
 	CurrentlyActive bool      `json:"currentlyActive"`
 }
-
-// Custom event types for AG-UI protocol
-const (
-	AguiEventTypeWhiteboardUpdated     = "WHITEBOARD_UPDATED"
-	AguiEventTypeMathQuestion          = "MATH_QUESTION"
-	AguiEventTypePhysicsQuestion       = "PHYSICS_QUESTION"
-	AguiEventTypeChemistryQuestion     = "CHEMISTRY_QUESTION"
-	AguiEventTypeStatisticsQuestion    = "STATISTICS_QUESTION"
-	AguiEventTypeLinearAlgebraQuestion = "LINEARALGEBRA_QUESTION"
-	AguiEventTypeDiagrammingQuestion   = "DIAGRAMMING_QUESTION"
-	AguiEventTypeQuestionAnswered      = "QUESTION_ANSWERED"
-	AguiEventTypeAgentHandoff          = "AGENT_HANDOFF"
-	AguiEventTypeToolCallAgent         = "TOOL_CALL_AGENT"
-)
