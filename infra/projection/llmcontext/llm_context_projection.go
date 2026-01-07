@@ -35,12 +35,10 @@ type InMemoryLLMContextProjection struct {
 }
 
 type threadMetadata struct {
-	Title             string
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
-	CurrentInstructor string
-	InstructorHistory []domain.InstructorSession
-	Version           int64 // Event version this projection is at
+	Title     string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	Version   int64 // Event version this projection is at
 }
 
 // NewInMemoryLLMContextProjection creates a new in-memory LLM context projection.
@@ -68,13 +66,11 @@ func (p *InMemoryLLMContextProjection) Get(threadID string) (*domain.Thread, boo
 
 	// Build the read model from projection state
 	thread := &domain.Thread{
-		ID:                agentThread.GetID(),
-		Title:             meta.Title,
-		Messages:          agentThread.GetMessages(),
-		CreatedAt:         meta.CreatedAt,
-		UpdatedAt:         meta.UpdatedAt,
-		CurrentInstructor: meta.CurrentInstructor,
-		InstructorHistory: meta.InstructorHistory,
+		ID:        agentThread.GetID(),
+		Title:     meta.Title,
+		Messages:  agentThread.GetMessages(),
+		CreatedAt: meta.CreatedAt,
+		UpdatedAt: meta.UpdatedAt,
 	}
 
 	return thread, true
@@ -135,13 +131,11 @@ func (p *InMemoryLLMContextProjection) All() []domain.Thread {
 		}
 
 		thread := domain.Thread{
-			ID:                agentThread.GetID(),
-			Title:             meta.Title,
-			Messages:          agentThread.GetMessages(),
-			CreatedAt:         meta.CreatedAt,
-			UpdatedAt:         meta.UpdatedAt,
-			CurrentInstructor: meta.CurrentInstructor,
-			InstructorHistory: meta.InstructorHistory,
+			ID:        agentThread.GetID(),
+			Title:     meta.Title,
+			Messages:  agentThread.GetMessages(),
+			CreatedAt: meta.CreatedAt,
+			UpdatedAt: meta.UpdatedAt,
 		}
 		threads = append(threads, thread)
 	}

@@ -51,16 +51,4 @@ type Thread struct {
 	Messages  []Message `json:"messages"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
-
-	// Multi-agent instructor fields
-	CurrentInstructor string              `json:"currentInstructor,omitempty"`
-	InstructorHistory []InstructorSession `json:"instructorHistory,omitempty"`
-}
-
-// InstructorSession tracks when an instructor was active
-type InstructorSession struct {
-	InstructorName string     `json:"instructorName"`
-	Specialization string     `json:"specialization,omitempty"`
-	StartedAt      time.Time  `json:"startedAt"`
-	EndedAt        *time.Time `json:"endedAt,omitempty"`
 }
