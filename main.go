@@ -16,7 +16,6 @@ import (
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/infra/projection/llmcontext"
 	"school-with-ai/infra/projection/whiteboard"
-	"school-with-ai/infra/queue"
 	"school-with-ai/sdk/agentsdk/llm"
 	authService "school-with-ai/services/auth"
 	"school-with-ai/services/chatwrite"
@@ -81,9 +80,6 @@ func main() {
 	aguiServiceAdapter := agui.NewServiceAdapter(aguiProjection)
 	projectionService := projections.NewProjectionService(aguiServiceAdapter, whiteboardProjection)
 
-	// Initialize job queue
-	jobQueue := queue.NewInMemoryJobQueue()
-
 	// Get Redis address from environment
 	redisAddr := os.Getenv("REDIS_ADDR")
 	if redisAddr == "" {
@@ -104,7 +100,6 @@ func main() {
 		whiteboardProjection,
 		chatClient,
 		chatWriteService,
-		jobQueue,
 	)
 	defer asynqServer.Shutdown()
 	slog.Info("Asynq server started",
@@ -114,7 +109,7 @@ func main() {
 		"healthCheckInterval", "15s")
 
 	// Create HTTP handler
-	handler := handlers.NewAsynqHandler(eventLog, llmContextProjection, chatClient, jobQueue, asynqServer, chatWriteService, authSvc, projectionService)
+	handler := handlers.NewAsynqHandler(eventLog, llmContextProjection, chatClient, asynqServer, chatWriteService, authSvc, projectionService)
 
 	mux := http.NewServeMux()
 
@@ -154,7 +149,10 @@ func main() {
 			response["metrics"] = metrics
 		}
 
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			slog.Error("Failed to encode health response", "error", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
 	})
 
 	// Auth routes (public)
