@@ -53,20 +53,10 @@ func NewAsynqHandler(
 	}
 }
 
-// SendMessageRequest represents the async chat request
+// SendMessageRequest represents the async chat request (A2A compatible)
 type SendMessageRequest struct {
-	ThreadID string `json:"threadId,omitempty"`
-	Message  string `json:"message"`
-}
-
-// SendMessageResponse represents the async job response
-type SendMessageResponse struct {
-	JobID     string `json:"jobId"`
-	ThreadID  string `json:"threadId"`
-	Status    string `json:"status"`
-	Queue     string `json:"queue"`
-	StreamURL string `json:"streamUrl"`
-	CreatedAt string `json:"createdAt"`
+	ContextID string `json:"contextId,omitempty"` // Optional: existing context (threadID)
+	Message   string `json:"message"`             // The message/input for the task
 }
 
 // SendMessage handles POST /api/messages - async chat message processing
@@ -90,10 +80,10 @@ func (h *AsynqHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate thread ID if not provided
-	threadID := req.ThreadID
-	if threadID == "" {
-		threadID = fmt.Sprintf("thread_%s_%d", user.ID, time.Now().UnixNano())
+	// Generate context ID (thread ID) if not provided
+	contextID := req.ContextID
+	if contextID == "" {
+		contextID = fmt.Sprintf("thread_%s_%d", user.ID, time.Now().UnixNano())
 	}
 
 	// Generate IDs for async task
@@ -103,7 +93,7 @@ func (h *AsynqHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	// Create payload for async processing
 	payload := orchestration.ProcessChatPayload{
 		JobID:     jobID,
-		ThreadID:  threadID,
+		ThreadID:  contextID,
 		MessageID: messageID,
 		Message:   req.Message,
 		UserID:    user.ID,
@@ -112,8 +102,8 @@ func (h *AsynqHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	slog.Info("[API] Async chat request received",
 		"userID", user.ID,
 		"email", user.Email,
-		"threadID", threadID,
-		"jobID", jobID,
+		"contextID", contextID,
+		"taskID", jobID,
 		"messageLength", len(req.Message))
 
 	// Enqueue to Asynq for async processing
@@ -130,20 +120,21 @@ func (h *AsynqHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		"queue", taskInfo.Queue,
 		"state", taskInfo.State)
 
-	// Return async job response
+	// Return A2A-compliant task response
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted) // 202 Accepted for async operations
 
-	response := SendMessageResponse{
-		JobID:     jobID,
-		ThreadID:  threadID,
-		Status:    "queued",
-		Queue:     taskInfo.Queue,
-		StreamURL: fmt.Sprintf("/api/jobs/%s/stream", jobID),
-		CreatedAt: time.Now().Format(time.RFC3339),
-	}
+	// Create A2A Task
+	task := NewTask(jobID, contextID, TaskStateSubmitted)
+	task.Metadata["streamUrl"] = fmt.Sprintf("/api/jobs/%s/stream", jobID)
 
-	if err := json.NewEncoder(w).Encode(response); err != nil {
+	slog.Info("[API] Returning task response",
+		"taskID", task.ID,
+		"contextID", task.ContextID,
+		"status", task.Status.State,
+		"streamUrl", task.Metadata["streamUrl"])
+
+	if err := json.NewEncoder(w).Encode(task); err != nil {
 		slog.Error("[API] Failed to encode response", "error", err)
 		return
 	}
@@ -274,75 +265,71 @@ func (h *AsynqHandler) translateAndWriteEvent(w http.ResponseWriter, flusher htt
 	return nil
 }
 
-// JobStatusResponse represents async job status
-type JobStatusResponse struct {
-	JobID       string `json:"jobId"`
-	Status      string `json:"status"`
-	Queue       string `json:"queue,omitempty"`
-	Retried     int    `json:"retried,omitempty"`
-	MaxRetry    int    `json:"maxRetry,omitempty"`
-	LastError   string `json:"lastError,omitempty"`
-	StreamURL   string `json:"streamUrl"`
-	CompletedAt string `json:"completedAt,omitempty"`
-}
-
-// GetJobStatus retrieves the status of an async task
+// GetJobStatus retrieves the status of a task (A2A compliant)
 func (h *AsynqHandler) GetJobStatus(w http.ResponseWriter, r *http.Request) {
-	jobID := r.PathValue("jobId")
-	if jobID == "" {
-		http.Error(w, "jobId is required", http.StatusBadRequest)
+	taskID := r.PathValue("jobId")
+	if taskID == "" {
+		http.Error(w, "taskId is required", http.StatusBadRequest)
 		return
 	}
 
 	// Try to get task info from Asynq
-	taskInfo, err := h.asynqServer.GetTaskInfo("default", jobID)
+	taskInfo, err := h.asynqServer.GetTaskInfo("default", taskID)
 
-	response := JobStatusResponse{
-		JobID:     jobID,
-		StreamURL: fmt.Sprintf("/api/jobs/%s/stream", jobID),
+	// Create A2A Task response
+	task := Task{
+		ID:        taskID,
+		ContextID: "", // Would need to be stored/retrieved separately
+		Artifacts: []Artifact{},
+		History:   []interface{}{},
+		Metadata:  make(map[string]interface{}),
 	}
 
+	// Add stream URL to metadata (not part of core A2A spec)
+	task.Metadata["streamUrl"] = fmt.Sprintf("/api/jobs/%s/stream", taskID)
+
 	if err != nil {
-		// Task not found in queue - might be completed or never existed
-		// Check if event buffer exists (means task was processed)
-		_, exists := h.asynqServer.GetEventBuffer(jobID)
+		// Task not found in queue - check if completed via event buffer
+		_, exists := h.asynqServer.GetEventBuffer(taskID)
 		if exists {
-			response.Status = "completed"
+			task.Status = NewTaskStatus(TaskStateCompleted, nil)
 		} else {
-			response.Status = "not_found"
+			task.Status = NewTaskStatus(TaskStateUnknown, nil)
 		}
 	} else {
-		// Map Asynq state to our status
+		// Map Asynq state to A2A TaskState
+		var state TaskState
 		switch taskInfo.State {
 		case asynq.TaskStatePending:
-			response.Status = "pending"
+			state = TaskStateSubmitted
 		case asynq.TaskStateActive:
-			response.Status = "processing"
+			state = TaskStateWorking
 		case asynq.TaskStateScheduled:
-			response.Status = "scheduled"
+			state = TaskStateSubmitted
 		case asynq.TaskStateRetry:
-			response.Status = "retrying"
+			state = TaskStateWorking
 		case asynq.TaskStateArchived:
-			response.Status = "failed"
+			state = TaskStateFailed
 		case asynq.TaskStateCompleted:
-			response.Status = "completed"
-			if !taskInfo.CompletedAt.IsZero() {
-				response.CompletedAt = taskInfo.CompletedAt.Format(time.RFC3339)
-			}
+			state = TaskStateCompleted
 		default:
-			response.Status = "unknown"
+			state = TaskStateUnknown
 		}
 
-		response.Queue = taskInfo.Queue
-		response.Retried = taskInfo.Retried
-		response.MaxRetry = taskInfo.MaxRetry
+		task.Status = NewTaskStatus(state, nil)
+
+		// Add retry information to metadata (implementation detail, not A2A core)
+		if taskInfo.Retried > 0 {
+			task.Metadata["retried"] = taskInfo.Retried
+			task.Metadata["maxRetry"] = taskInfo.MaxRetry
+		}
 		if taskInfo.LastErr != "" {
-			response.LastError = taskInfo.LastErr
+			task.Metadata["lastError"] = taskInfo.LastErr
 		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(response); err != nil {
+	if err := json.NewEncoder(w).Encode(task); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		return
 	}
