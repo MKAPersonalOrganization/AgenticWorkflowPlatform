@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
@@ -18,13 +19,17 @@ type AsynqServer struct {
 	client             *asynq.Client
 	eventBufferManager *EventBufferManager
 	queue              domain.JobQueue
+	redisAddr          string // Store for metrics
 }
 
 // AsynqConfig contains configuration for the Asynq server
 type AsynqConfig struct {
-	RedisAddr    string
-	Concurrency  int
-	RedisOptions asynq.RedisClientOpt
+	RedisAddr           string
+	Concurrency         int
+	RedisOptions        asynq.RedisClientOpt
+	ShutdownTimeout     time.Duration // Time to wait for workers to finish
+	HealthCheckInterval time.Duration // Interval for Redis health checks
+	RetryDelayFunc      asynq.RetryDelayFunc
 }
 
 // NewAsynqServer creates a new Asynq-based task processing server
@@ -50,6 +55,16 @@ func NewAsynqServer(
 	// Default concurrency
 	if config.Concurrency <= 0 {
 		config.Concurrency = 5
+	}
+
+	// Default shutdown timeout
+	if config.ShutdownTimeout <= 0 {
+		config.ShutdownTimeout = 8 * time.Second
+	}
+
+	// Default health check interval
+	if config.HealthCheckInterval <= 0 {
+		config.HealthCheckInterval = 15 * time.Second
 	}
 
 	// Create event buffer manager
@@ -81,12 +96,27 @@ func NewAsynqServer(
 			LogLevel: asynq.InfoLevel,
 			// Enable strict priority to ensure thread isolation
 			StrictPriority: false,
+			// Shutdown timeout
+			ShutdownTimeout: config.ShutdownTimeout,
+			// Health check
+			HealthCheckFunc: func(err error) {
+				if err != nil {
+					slog.Error("[ASYNQ] Redis health check failed", "error", err)
+				} else {
+					slog.Debug("[ASYNQ] Redis health check passed")
+				}
+			},
+			HealthCheckInterval: config.HealthCheckInterval,
 			// Error handler
 			ErrorHandler: asynq.ErrorHandlerFunc(func(ctx context.Context, task *asynq.Task, err error) {
-				slog.Error("Task processing failed",
+				retried, _ := asynq.GetRetryCount(ctx)
+				maxRetry, _ := asynq.GetMaxRetry(ctx)
+				slog.Error("[ASYNQ] Task processing failed",
 					"type", task.Type(),
-					"payload", string(task.Payload()),
-					"error", err)
+					"error", err,
+					"retried", retried,
+					"maxRetry", maxRetry,
+					"exhausted", retried >= maxRetry)
 			}),
 		},
 	)
@@ -110,6 +140,7 @@ func NewAsynqServer(
 		client:             client,
 		eventBufferManager: eventBufferManager,
 		queue:              queue,
+		redisAddr:          config.RedisAddr,
 	}
 }
 
