@@ -32,6 +32,7 @@ type TaskStatus struct {
 type Message struct {
 	ID        string                 `json:"messageId"`           // Unique identifier for the message
 	ContextID string                 `json:"contextId,omitempty"` // Context identifier
+	TaskID    string                 `json:"taskId,omitempty"`    // Optional task reference
 	Role      string                 `json:"role"`                // "user" or "agent"
 	Parts     []interface{}          `json:"parts"`               // Content parts
 	Metadata  map[string]interface{} `json:"metadata,omitempty"`  // Optional metadata
@@ -52,7 +53,7 @@ type Task struct {
 	ContextID string                 `json:"contextId"`           // Unique identifier for the contextual collection (threadID)
 	Status    TaskStatus             `json:"status"`              // Current status of the task
 	Artifacts []Artifact             `json:"artifacts,omitempty"` // Output artifacts
-	History   []interface{}          `json:"history,omitempty"`   // History of interactions (messages)
+	History   []*Message             `json:"history,omitempty"`   // History of interactions (messages)
 	Metadata  map[string]interface{} `json:"metadata,omitempty"`  // Custom metadata
 }
 
@@ -90,7 +91,7 @@ func NewTask(id, contextID string, state TaskState) Task {
 		ContextID: contextID,
 		Status:    NewTaskStatus(state, nil),
 		Artifacts: []Artifact{},
-		History:   []interface{}{},
+		History:   []*Message{},
 		Metadata:  make(map[string]interface{}),
 	}
 }

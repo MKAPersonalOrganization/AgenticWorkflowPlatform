@@ -281,7 +281,7 @@ func (h *AsynqHandler) GetJobStatus(w http.ResponseWriter, r *http.Request) {
 		ID:        taskID,
 		ContextID: "", // Would need to be stored/retrieved separately
 		Artifacts: []Artifact{},
-		History:   []interface{}{},
+		History:   []*Message{},
 		Metadata:  make(map[string]interface{}),
 	}
 
