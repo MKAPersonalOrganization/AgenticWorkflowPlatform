@@ -1,16 +1,16 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"iter"
 	"log/slog"
 	"net/http"
 	"time"
 
 	"school-with-ai/domain"
+	"school-with-ai/infra/eventstore"
+	"school-with-ai/infra/projection/llmcontext"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/sdk/agentsdk/llm"
 	"school-with-ai/services"
@@ -20,89 +20,43 @@ import (
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
 
-// ChatClient defines the interface for LLM providers
-type ChatClient interface {
-	GetStreamingResponse(
-		ctx context.Context,
-		messages []llm.ChatMessage,
-		options *llm.ChatOptions,
-	) iter.Seq2[llm.ChatResponseUpdate, error]
-}
-
-// EventStore is the source of truth in the event sourcing architecture
-type EventStore interface {
-	Append(ctx context.Context, streamID string, events ...core.Event) (int64, error)
-	ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]core.Event, error)
-}
-
-// ThreadStore provides read access to thread state
-type ThreadStore interface {
-	GetAgentThread(threadID string) (core.AgentThread, bool)
-	GetOrCreateAgentThread(ctx context.Context, threadID string) (core.AgentThread, error)
-	Get(threadID string) (*domain.Thread, bool)
-	Messages(threadID string) []domain.Message
-	All() []domain.Thread
-	Update(event core.Event) error
-}
-
-// ThreadResponse represents a thread with additional UI-specific fields
-type ThreadResponse struct {
-	domain.Thread
-	WhiteboardContent string `json:"whiteboardContent,omitempty"`
-}
-
-// writeSSEEvent writes an event to the response writer in SSE format
-func writeSSEEvent(w http.ResponseWriter, event interface{}) error {
-	data, err := json.Marshal(event)
-	if err != nil {
-		return fmt.Errorf("failed to marshal event: %w", err)
-	}
-
-	_, err = fmt.Fprintf(w, "data: %s\n\n", data)
-	if err != nil {
-		return fmt.Errorf("failed to write event: %w", err)
-	}
-
-	return nil
-}
-
-// Handler encapsulates dependencies for HTTP handlers
-type Handler struct {
-	state             ThreadStore
-	log               EventStore
-	chatClient        ChatClient
+// AsynqHandler encapsulates dependencies for HTTP handlers using Asynq
+type AsynqHandler struct {
+	state             *llmcontext.InMemoryLLMContextProjection
+	log               *eventstore.ProjectionEventStore
+	chatClient        *llm.OpenAIClient
 	queue             domain.JobQueue
-	workerPool        *orchestration.WorkerPool
+	asynqServer       *orchestration.AsynqServer
 	chatWriteService  *chatwrite.ChatWriteService
 	authService       services.AuthService
 	projectionService services.ProjectionService
 }
 
-// NewHandler creates a new HTTP handler with the given dependencies
-func NewHandler(
-	log EventStore,
-	state ThreadStore,
-	chatClient ChatClient,
+// NewAsynqHandler creates a new HTTP handler with Asynq dependencies
+func NewAsynqHandler(
+	log *eventstore.ProjectionEventStore,
+	state *llmcontext.InMemoryLLMContextProjection,
+	chatClient *llm.OpenAIClient,
 	queue domain.JobQueue,
-	workerPool *orchestration.WorkerPool,
+	asynqServer *orchestration.AsynqServer,
 	chatWriteService *chatwrite.ChatWriteService,
 	authService services.AuthService,
 	projectionService services.ProjectionService,
-) *Handler {
-	return &Handler{
+) *AsynqHandler {
+	return &AsynqHandler{
 		state:             state,
 		log:               log,
 		chatClient:        chatClient,
 		queue:             queue,
-		workerPool:        workerPool,
+		asynqServer:       asynqServer,
 		chatWriteService:  chatWriteService,
 		authService:       authService,
 		projectionService: projectionService,
 	}
 }
 
-// SendMessage handles the /send endpoint by enqueuing a job
-func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
+// SendMessage handles the /send endpoint by enqueuing a job with Asynq
+func (h *AsynqHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	// Get authenticated user from context
 	user := h.authService.GetUserFromContext(r.Context())
 	if user == nil {
@@ -136,15 +90,21 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt: time.Now(),
 	}
 
-	slog.Info("Creating job for user",
+	slog.Info("Creating job for user with Asynq",
 		"userID", user.ID,
 		"email", user.Email,
 		"threadID", threadID,
 		"jobID", jobID)
 
-	// Enqueue job
+	// Enqueue job to in-memory queue for tracking
 	if err := h.queue.Enqueue(job); err != nil {
 		http.Error(w, fmt.Sprintf("Failed to enqueue job: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Enqueue to Asynq for processing
+	if err := h.asynqServer.EnqueueJob(job); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to enqueue to Asynq: %v", err), http.StatusInternalServerError)
 		return
 	}
 
@@ -161,7 +121,7 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 }
 
 // StreamJobEvents streams SSE events for a specific job
-func (h *Handler) StreamJobEvents(w http.ResponseWriter, r *http.Request) {
+func (h *AsynqHandler) StreamJobEvents(w http.ResponseWriter, r *http.Request) {
 	jobID := r.PathValue("jobId")
 	if jobID == "" {
 		http.Error(w, "jobId is required", http.StatusBadRequest)
@@ -181,7 +141,7 @@ func (h *Handler) StreamJobEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Wait for job to be picked up by a worker
+	// Wait for job to be picked up by Asynq worker
 	ctx := r.Context()
 	var eventBuffer *orchestration.EventBuffer
 
@@ -196,7 +156,7 @@ func (h *Handler) StreamJobEvents(w http.ResponseWriter, r *http.Request) {
 			return
 		case <-ticker.C:
 			var exists bool
-			eventBuffer, exists = h.workerPool.GetEventBuffer(jobID)
+			eventBuffer, exists = h.asynqServer.GetEventBuffer(jobID)
 			if exists {
 				goto streamEvents
 			}
@@ -235,7 +195,8 @@ streamEvents:
 	}
 }
 
-func (h *Handler) translateAndWriteEvent(w http.ResponseWriter, flusher http.Flusher, event any) error {
+// translateAndWriteEvent translates domain events to AGUI events and writes them
+func (h *AsynqHandler) translateAndWriteEvent(w http.ResponseWriter, flusher http.Flusher, event any) error {
 	var aguiEvent any
 
 	// Translate domain events to agui events
@@ -285,7 +246,7 @@ func (h *Handler) translateAndWriteEvent(w http.ResponseWriter, flusher http.Flu
 }
 
 // GetActiveJobs retrieves all active jobs for a thread
-func (h *Handler) GetActiveJobs(w http.ResponseWriter, r *http.Request) {
+func (h *AsynqHandler) GetActiveJobs(w http.ResponseWriter, r *http.Request) {
 	threadID := r.URL.Query().Get("threadId")
 	if threadID == "" {
 		http.Error(w, "threadId is required", http.StatusBadRequest)
@@ -302,7 +263,7 @@ func (h *Handler) GetActiveJobs(w http.ResponseWriter, r *http.Request) {
 }
 
 // CancelJob cancels a pending or active job
-func (h *Handler) CancelJob(w http.ResponseWriter, r *http.Request) {
+func (h *AsynqHandler) CancelJob(w http.ResponseWriter, r *http.Request) {
 	jobID := r.PathValue("jobId")
 	if jobID == "" {
 		http.Error(w, "jobId is required", http.StatusBadRequest)
@@ -315,11 +276,8 @@ func (h *Handler) CancelJob(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Job not found", http.StatusNotFound)
 			return
 		}
-		// If not pending, might be processing - try worker pool
-		if !h.workerPool.CancelJob(jobID) {
-			http.Error(w, fmt.Sprintf("Failed to cancel job: %v", err), http.StatusBadRequest)
-			return
-		}
+		http.Error(w, fmt.Sprintf("Failed to cancel job: %v", err), http.StatusBadRequest)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -333,24 +291,28 @@ func (h *Handler) CancelJob(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetMessages retrieves all messages for a thread
-func (h *Handler) GetMessages(w http.ResponseWriter, r *http.Request) {
+func (h *AsynqHandler) GetMessages(w http.ResponseWriter, r *http.Request) {
 	threadID := r.PathValue("threadId")
 	if threadID == "" {
 		http.Error(w, "threadId is required", http.StatusBadRequest)
 		return
 	}
 
-	messages := h.state.Messages(threadID)
+	thread, exists := h.state.Get(threadID)
+	if !exists {
+		http.Error(w, "Thread not found", http.StatusNotFound)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(messages); err != nil {
+	if err := json.NewEncoder(w).Encode(thread.Messages); err != nil {
 		http.Error(w, "Failed to encode messages", http.StatusInternalServerError)
 		return
 	}
 }
 
 // GetThreads retrieves all threads
-func (h *Handler) GetThreads(w http.ResponseWriter, r *http.Request) {
+func (h *AsynqHandler) GetThreads(w http.ResponseWriter, r *http.Request) {
 	// Get authenticated user from context
 	user := h.authService.GetUserFromContext(r.Context())
 	if user == nil {
@@ -360,15 +322,13 @@ func (h *Handler) GetThreads(w http.ResponseWriter, r *http.Request) {
 
 	slog.Info("Getting threads for user", "userID", user.ID, "email", user.Email)
 
-	// TODO: Filter threads by user ID
-	// For now, return all threads (will be fixed in a future update)
 	threads := h.state.All()
 
 	// Enrich threads with whiteboard content
 	response := make([]ThreadResponse, len(threads))
 	for i, thread := range threads {
 		response[i] = ThreadResponse{
-			Thread:            thread,
+			Thread:            &thread,
 			WhiteboardContent: h.projectionService.GetWhiteboardContent(thread.ID),
 		}
 	}
@@ -381,7 +341,7 @@ func (h *Handler) GetThreads(w http.ResponseWriter, r *http.Request) {
 }
 
 // DeleteThread deletes a thread
-func (h *Handler) DeleteThread(w http.ResponseWriter, r *http.Request) {
+func (h *AsynqHandler) DeleteThread(w http.ResponseWriter, r *http.Request) {
 	// Get authenticated user from context
 	user := h.authService.GetUserFromContext(r.Context())
 	if user == nil {
@@ -397,8 +357,6 @@ func (h *Handler) DeleteThread(w http.ResponseWriter, r *http.Request) {
 
 	slog.Info("Deleting thread", "userID", user.ID, "threadID", threadID)
 
-	// TODO: Verify user owns this thread before allowing deletion
-
 	// Delete thread using chat service
 	if err := h.chatWriteService.DeleteThread(r.Context(), threadID); err != nil {
 		if errors.Is(err, domain.ErrThreadNotFound) {
@@ -412,46 +370,4 @@ func (h *Handler) DeleteThread(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success"})
-}
-
-// emitMessagesSnapshot converts session messages to AG-UI messages and emits MESSAGES_SNAPSHOT event
-// nolint:unused // May be used for future debugging/monitoring
-func (h *Handler) emitMessagesSnapshot(w http.ResponseWriter, flusher http.Flusher, threadID string) error {
-	sessionMessages := h.state.Messages(threadID)
-
-	// Convert session.Message to aguievents.Message
-	aguiMessages := make([]aguievents.Message, 0, len(sessionMessages))
-	for _, msg := range sessionMessages {
-		aguiMsg := ConvertSessionMessageToAGUI(msg)
-		aguiMessages = append(aguiMessages, aguiMsg)
-	}
-
-	// Emit MESSAGES_SNAPSHOT event
-	messagesSnapshotEvent := aguievents.NewMessagesSnapshotEvent(aguiMessages)
-
-	if err := writeSSEEvent(w, messagesSnapshotEvent); err != nil {
-		return err
-	}
-	flusher.Flush()
-
-	// Emit tool call agent mappings (consistent with streaming flow)
-	for _, msg := range sessionMessages {
-		if msg.Role == "assistant" && len(msg.ToolCalls) > 0 && msg.AgentName != "" {
-			for _, tc := range msg.ToolCalls {
-				agentEvent := aguievents.NewCustomEvent(
-					"TOOL_CALL_AGENT",
-					aguievents.WithValue(map[string]interface{}{
-						"toolCallId": tc.ID,
-						"agentName":  msg.AgentName,
-					}),
-				)
-				if err := writeSSEEvent(w, agentEvent); err != nil {
-					return err
-				}
-				flusher.Flush()
-			}
-		}
-	}
-
-	return nil
 }

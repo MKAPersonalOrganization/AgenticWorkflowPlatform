@@ -1,42 +1,31 @@
 services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
+  # Redis for Asynq task queue
+  redis:
+    image: redis:7-alpine
     ports:
-      - "8090:8090"
+      - "6379:6379"
     volumes:
-      - .:/workspace
-      - go-modules:/go/pkg/mod
-    working_dir: /workspace
-    command: go run main.go
-    environment:
-      - CGO_ENABLED=1
-      - GO111MODULE=on
-      - SERVER_ADDR=0.0.0.0:8090
-      - APP_URL=http://127.0.0.1:8090
-      - KRATOS_PUBLIC_URL=http://kratos:4433
-      - KRATOS_ADMIN_URL=http://kratos:4434
-      - KRATOS_BROWSER_URL=http://127.0.0.1:4433
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - redis-data:/data
     networks:
       - intranet
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
-  # For testing only
-  test:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
-    volumes:
-      - .:/workspace
-      - go-modules:/go/pkg/mod
-    working_dir: /workspace
-    command: go test ./... -v
+  # Asynqmon - monitoring UI for Asynq
+  asynqmon:
+    image: hibiken/asynqmon:latest
+    ports:
+      - "8080:8080"
     environment:
-      - CGO_ENABLED=1
-      - GO111MODULE=on
+      - REDIS_ADDR=redis:6379
     networks:
       - intranet
+    depends_on:
+      redis:
+        condition: service_healthy
 
   # PostgreSQL database for Kratos
   postgres:
@@ -104,3 +93,4 @@ networks:
 volumes:
   go-modules:
   kratos-postgres:
+  redis-data:

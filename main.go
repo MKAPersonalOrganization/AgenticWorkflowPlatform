@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"time"
 
 	"school-with-ai/components"
 	"school-with-ai/handlers"
@@ -44,7 +43,7 @@ func main() {
 		panic(fmt.Sprintf("invalid SERVER_ADDR: %v", err))
 	}
 
-	slog.Info("Starting server", "host", host, "port", port)
+	slog.Info("Starting server with Asynq", "host", host, "port", port)
 
 	// Initialize EventStore and LLMContextProjection (event sourcing architecture)
 	baseEventStore := eventstore.NewInMemoryEventStore()
@@ -63,9 +62,6 @@ func main() {
 	model := string(openai.ChatModelGPT4oMini) // Use GPT-4o-mini for cost efficiency
 	chatClient := llm.NewOpenAIClient(model)
 
-	// Initialize job queue
-	queue := queue.NewInMemoryJobQueue()
-
 	// Register all agent factories for routing
 	shared.GlobalAgents.Register("student-facing-agent", studentfacing.CreateStudentFacingAgent)
 	shared.GlobalAgents.Register("math-instructor", math.CreateMathInstructor)
@@ -83,19 +79,34 @@ func main() {
 	aguiServiceAdapter := agui.NewServiceAdapter(aguiProjection)
 	projectionService := projections.NewProjectionService(aguiServiceAdapter, whiteboardProjection)
 
-	// Initialize and start worker pool
-	workerPool := orchestration.NewWorkerPool(queue, eventLog, llmContextProjection, whiteboardProjection, chatClient, chatWriteService, orchestration.WorkerPoolConfig{
-		NumWorkers:   5,
-		PollInterval: 100 * time.Millisecond,
-	})
+	// Initialize job queue
+	jobQueue := queue.NewInMemoryJobQueue()
 
-	// Connect AGUI projection to worker pool for real-time event emission
-	// When the projection processes events, it will emit AGUI protocol events
-	// directly to the appropriate job's event buffer for SSE streaming
-	aguiProjection.SetEventEmitter(workerPool.EmitEventForThread)
+	// Get Redis address from environment
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = "localhost:6379"
+		slog.Info("Using default Redis address", "addr", redisAddr)
+	}
 
-	workerPool.Start()
-	defer workerPool.Stop()
+	// Initialize Asynq server
+	asynqServer := orchestration.NewAsynqServer(
+		orchestration.AsynqConfig{
+			RedisAddr:   redisAddr,
+			Concurrency: 5,
+		},
+		eventLog,
+		llmContextProjection,
+		whiteboardProjection,
+		chatClient,
+		chatWriteService,
+		jobQueue,
+	)
+	defer asynqServer.Shutdown()
+	slog.Info("Asynq server started", "redis", redisAddr, "concurrency", 5)
+
+	// Create HTTP handler
+	handler := handlers.NewAsynqHandler(eventLog, llmContextProjection, chatClient, jobQueue, asynqServer, chatWriteService, authSvc, projectionService)
 
 	mux := http.NewServeMux()
 
@@ -104,9 +115,6 @@ func main() {
 	mux.Handle("/assets/js/", http.StripPrefix("/assets/js/", http.FileServer(http.Dir("./assets/js"))))
 	mux.Handle("/assets/images/", http.StripPrefix("/assets/images/", http.FileServer(http.Dir("./assets/images"))))
 	mux.Handle("/assets/charts/", http.StripPrefix("/assets/charts/", http.FileServer(http.Dir("./assets/charts"))))
-
-	// Create handler with EventStore and LLMContextProjection
-	handler := handlers.NewHandler(eventLog, llmContextProjection, chatClient, queue, workerPool, chatWriteService, authSvc, projectionService)
 
 	// Create AGUI projection handler
 	aguiHandler := agui.NewAguiProjectionHandler(aguiProjection, whiteboardProjection)
