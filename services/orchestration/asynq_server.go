@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"time"
 
-	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/services/chatwrite"
 
@@ -141,25 +140,78 @@ func NewAsynqServer(
 	}
 }
 
-// EnqueueJob enqueues a chat processing job
-func (s *AsynqServer) EnqueueJob(job *domain.Job) error {
-	task, err := NewProcessChatTask(job)
+// EnqueueJob enqueues a chat processing job and returns task info
+func (s *AsynqServer) EnqueueJob(payload ProcessChatPayload) (*asynq.TaskInfo, error) {
+	task, err := NewProcessChatTask(payload)
 	if err != nil {
-		return fmt.Errorf("failed to create task: %w", err)
+		return nil, fmt.Errorf("failed to create task: %w", err)
 	}
 
 	info, err := s.client.Enqueue(task)
 	if err != nil {
-		return fmt.Errorf("failed to enqueue task: %w", err)
+		return nil, fmt.Errorf("failed to enqueue task: %w", err)
 	}
 
-	slog.Info("Enqueued chat task", "jobID", job.ID, "taskID", info.ID, "queue", info.Queue)
-	return nil
+	slog.Info("Enqueued chat task", "jobID", payload.JobID, "taskID", info.ID, "queue", info.Queue)
+	return info, nil
 }
 
 // GetEventBuffer gets the event buffer for a job (for SSE streaming)
 func (s *AsynqServer) GetEventBuffer(jobID string) (*EventBuffer, bool) {
 	return s.eventBufferManager.GetEventBuffer(jobID)
+}
+
+// GetTaskInfo retrieves task information from Asynq
+func (s *AsynqServer) GetTaskInfo(queue, taskID string) (*asynq.TaskInfo, error) {
+	inspector := asynq.NewInspector(asynq.RedisClientOpt{Addr: s.redisAddr})
+	defer inspector.Close()
+
+	tasks, err := inspector.ListPendingTasks(queue)
+	if err == nil {
+		for _, task := range tasks {
+			if task.ID == taskID {
+				return task, nil
+			}
+		}
+	}
+
+	tasks, err = inspector.ListActiveTasks(queue)
+	if err == nil {
+		for _, task := range tasks {
+			if task.ID == taskID {
+				return task, nil
+			}
+		}
+	}
+
+	tasks, err = inspector.ListScheduledTasks(queue)
+	if err == nil {
+		for _, task := range tasks {
+			if task.ID == taskID {
+				return task, nil
+			}
+		}
+	}
+
+	tasks, err = inspector.ListRetryTasks(queue)
+	if err == nil {
+		for _, task := range tasks {
+			if task.ID == taskID {
+				return task, nil
+			}
+		}
+	}
+
+	tasks, err = inspector.ListArchivedTasks(queue)
+	if err == nil {
+		for _, task := range tasks {
+			if task.ID == taskID {
+				return task, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("task not found: %s", taskID)
 }
 
 // CancelTask attempts to cancel a task by job ID

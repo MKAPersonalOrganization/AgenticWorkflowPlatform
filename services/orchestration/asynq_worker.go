@@ -32,26 +32,16 @@ type ProcessChatPayload struct {
 }
 
 // NewProcessChatTask creates a new task for processing a chat message
-func NewProcessChatTask(job *domain.Job) (*asynq.Task, error) {
-	payload, err := json.Marshal(ProcessChatPayload{
-		JobID:     job.ID,
-		ThreadID:  job.ThreadID,
-		MessageID: job.MessageID,
-		Message:   job.Message,
-		UserID:    job.UserID,
-	})
+func NewProcessChatTask(payload ProcessChatPayload) (*asynq.Task, error) {
+	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	// Use Queue option to ensure thread isolation
-	// For now, use default queue since dynamic queue registration is complex
-	// Thread isolation is handled by the in-memory job queue
-
-	return asynq.NewTask(TypeProcessChat, payload,
+	return asynq.NewTask(TypeProcessChat, payloadBytes,
 		asynq.MaxRetry(3),             // Retry up to 3 times on failure
 		asynq.Timeout(5*time.Minute),  // 5 minute timeout for LLM calls
-		asynq.TaskID(job.ID),          // Use job ID as task ID for deduplication
+		asynq.TaskID(payload.JobID),   // Use job ID as task ID for deduplication
 		asynq.Retention(24*time.Hour), // Keep completed tasks for 24 hours
 	), nil
 }
