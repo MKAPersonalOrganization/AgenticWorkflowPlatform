@@ -10,6 +10,7 @@ import (
 
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
+	"school-with-ai/sdk/agentsdk/core/middleware"
 	"school-with-ai/sdk/agentsdk/llm"
 	"school-with-ai/services/chatwrite"
 	"school-with-ai/services/chatwrite/agents/shared/tools/eventbus"
@@ -405,6 +406,7 @@ func (wp *WorkerPool) continueWithAgentDirect(ctx context.Context, threadID, age
 	agentConfig := contract.Factory(notifier, wp.whiteboardProjection)
 
 	// Create agent instance
+	var handoffReqCtx *core.RequestContext // Capture request context to check for handoffs
 	agentInstance := chatwrite.New(
 		wp.chatClient,
 		wp.log,
@@ -412,6 +414,7 @@ func (wp *WorkerPool) continueWithAgentDirect(ctx context.Context, threadID, age
 		chatwrite.WithConfig(agentConfig),
 		chatwrite.WithToolCallHandler(eventbus.CreateToolCallHandler(eventbus.GlobalContracts, wp.state, wp.whiteboardProjection)),
 		chatwrite.WithShouldContinueIteration(eventbus.CreateShouldContinueIterationFn(eventbus.GlobalContracts)),
+		chatwrite.WithRequestContextCapture(&handoffReqCtx), // Capture context to check handoff
 	)
 
 	// Get the thread
@@ -420,10 +423,6 @@ func (wp *WorkerPool) continueWithAgentDirect(ctx context.Context, threadID, age
 		slog.Error("Thread not found", "threadID", threadID)
 		return
 	}
-
-	// Track events before agent execution
-	eventsBefore, _ := wp.log.ReadStream(ctx, threadID, 0)
-	beforeCount := len(eventsBefore)
 
 	// Generate message ID for this run
 	messageID := domain.GenerateMessageID()
@@ -448,28 +447,17 @@ func (wp *WorkerPool) continueWithAgentDirect(ctx context.Context, threadID, age
 
 	slog.Info("Agent run completed (direct)", "agent", agentName)
 
-	// Check for new handoff events emitted during agent execution
-	eventsAfter, _ := wp.log.ReadStream(ctx, threadID, 0)
-	if len(eventsAfter) > beforeCount {
-		// Process new handoff events (e.g., nested handoffs)
-		newEvents := eventsAfter[beforeCount:]
-		wp.processHandoffEvents(ctx, threadID, newEvents, emitter, runID)
-	}
-}
-
-// processHandoffEvents checks for agent handoff events and continues execution
-func (wp *WorkerPool) processHandoffEvents(ctx context.Context, threadID string, newEvents []core.Event, emitter EventEmitter, runID string) {
-	for _, event := range newEvents {
-		// Check for agent handoff events (tool-based handoff system)
-		if handoffEvent, ok := event.(*core.AgentHandoffEvent); ok {
-			slog.Info("Processing tool-based agent handoff",
+	// Check if agent requested a handoff via transfer_to_agent tool
+	if handoffReqCtx != nil {
+		if handoff, ok := middleware.GetHandoff(handoffReqCtx); ok {
+			slog.Info("Processing agent handoff",
 				"threadID", threadID,
-				"from", handoffEvent.FromAgent,
-				"to", handoffEvent.ToAgent,
-				"question", handoffEvent.Question)
+				"from", agentName,
+				"to", handoff.TargetAgent,
+				"question", handoff.Question)
 
-			// Continue directly with the target agent
-			wp.continueWithAgentDirect(ctx, threadID, handoffEvent.ToAgent, emitter, runID)
+			// Continue with target agent (recursive)
+			wp.continueWithAgentDirect(ctx, threadID, handoff.TargetAgent, emitter, runID)
 		}
 	}
 }

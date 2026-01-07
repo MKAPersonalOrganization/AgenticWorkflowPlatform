@@ -1,8 +1,6 @@
 package eventbus
 
 import (
-	"encoding/json"
-
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/services/chatwrite"
@@ -16,43 +14,7 @@ type ThreadStore interface {
 // CreateToolCallHandler creates a tool call handler that emits events for collaboration tools
 func CreateToolCallHandler(registry *ContractRegistry, state ThreadStore, whiteboardStore interface{ Get(threadID string) string }) chatwrite.ToolCallHandler {
 	return func(threadID string, agentName string, toolCall domain.ToolCall, result string, eventEmitter func(core.Event) error) error {
-		toolName := toolCall.Function.Name
-
-		// Handle transfer_to_agent tool (NEW: handoff system)
-		if toolName == "transfer_to_agent" {
-			// Parse the tool arguments to get handoff details
-			var args struct {
-				AgentName string `json:"agent_name"`
-				Question  string `json:"question"`
-				Context   string `json:"context"`
-			}
-
-			if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
-				return err
-			}
-
-			// Create agent handoff event
-			handoffEvent := &core.AgentHandoffEvent{
-				BaseEvent: core.BaseEvent{
-					Type:      "AgentHandoff",
-					Timestamp: core.Now(),
-					ThreadID:  threadID,
-				},
-				FromAgent:   agentName,
-				ToAgent:     args.AgentName,
-				Question:    args.Question,
-				Context:     args.Context,
-				HandoffType: "transfer",
-			}
-
-			if err := eventEmitter(handoffEvent); err != nil {
-				return err
-			}
-
-			return nil
-		}
-
-		// For all other tools, no special handling needed
+		// No special handling needed - handoffs are detected from request context
 		return nil
 	}
 }
