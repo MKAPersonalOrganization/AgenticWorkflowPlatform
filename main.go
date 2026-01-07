@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net"
@@ -123,6 +124,18 @@ func main() {
 	kratosClient := auth.NewKratosClient()
 	authHandlers := auth.NewAuthHandlers(kratosClient)
 	authMiddleware := auth.NewMiddleware(kratosClient)
+
+	// Health check endpoint (public)
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"status":   "healthy",
+			"redis":    redisAddr,
+			"workers":  5,
+			"mode":     "asynq",
+			"asynqmon": "http://localhost:8080",
+		})
+	})
 
 	// Auth routes (public)
 	mux.HandleFunc("GET /auth/login", authHandlers.LoginPage)
