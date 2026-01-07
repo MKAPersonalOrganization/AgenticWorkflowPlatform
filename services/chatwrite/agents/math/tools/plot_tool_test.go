@@ -274,7 +274,10 @@ func TestPlotTool_ParametersSchema(t *testing.T) {
 		t.Fatal("expected required to be a string array")
 	}
 
-	if len(required) != 1 || required[0] != "gnuplot_script" {
-		t.Errorf("expected required to contain only 'gnuplot_script', got: %v", required)
+	if len(required) != 2 {
+		t.Errorf("expected required to contain 2 fields, got: %v", required)
+	}
+	if required[0] != "gnuplot_script" || required[1] != "title" {
+		t.Errorf("expected required to contain 'gnuplot_script' and 'title', got: %v", required)
 	}
 }

@@ -7,7 +7,7 @@ import (
 
 // CreateChemistryInstructor creates the chemistry instructor agent configuration.
 // Event contract is defined in contract.go
-func CreateChemistryInstructor(notifier core.EventNotifier) core.AgentConfig {
+func CreateChemistryInstructor(notifier core.EventNotifier, whiteboardProjection interface{ Get(threadID string) string }) core.AgentConfig {
 	registry := core.NewToolRegistry()
 
 	// Domain-specific tools
@@ -17,20 +17,27 @@ func CreateChemistryInstructor(notifier core.EventNotifier) core.AgentConfig {
 
 	return core.AgentConfig{
 		Name: "chemistry-instructor",
-		SystemPrompt: `You are a high school chemistry teacher.
+		SystemPrompt: `You are a high school chemistry teacher who LOVES the whiteboard. You believe chemistry comes alive through molecular structures, reaction mechanisms, and balanced equations written out step-by-step.
 
-Workflow:
-1. Read whiteboard for context
-2. Add your chemistry solution to whiteboard (use LaTeX for equations, SMILES for molecules)
-3. If you need math calculations → transfer_to_agent(agent_name="math-instructor", question="...", context="...")
-4. If you need physics knowledge → transfer_to_agent(agent_name="physics-instructor", ...)
-5. When done → transfer_to_agent(agent_name="student-facing-agent", question="", context="Solution complete: ...")
+⚠️ CRITICAL SYSTEM CONSTRAINT ⚠️
+You are PHYSICALLY UNABLE to send chat messages. Your vocal cords don't work. You have NO MOUTH.
+The ONLY way you can communicate is through tools:
+- write_whiteboard (your only voice)
+- transfer_to_agent (to hand off work)
 
-Teaching: Visualize molecular structures, explain mechanisms step-by-step, connect micro to macro.`,
+IF YOU SEND A CHAT MESSAGE, IT WILL BE IGNORED. Students CANNOT hear you speak.
+EVERYTHING must go on the whiteboard using write_whiteboard tool.
+
+Your teaching style:
+- Let your whiteboard structures and equations do ALL the talking (it's your only communication method)
+- Draw Lewis structures, reaction arrows, and electron flow mechanisms
+- Use LaTeX for chemical equations and SMILES notation for molecules
+- Show concepts visually, then hand calculations to math-instructor when needed
+- When done, use transfer_to_agent to return to student-facing-agent`,
 		Tools:    registry.All(),
 		Notifier: notifier,
 		Middleware: []core.Middleware{
-			middleware.NewWhiteboardMiddleware(),
+			middleware.NewWhiteboardMiddleware(whiteboardProjection),
 			middleware.NewHandoffMiddleware(map[string]string{
 				"math-instructor":      "For ALL math: stoichiometry calculations, equations, numerical problems",
 				"physics-instructor":   "Physics concepts ONLY",

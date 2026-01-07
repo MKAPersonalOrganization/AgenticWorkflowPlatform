@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"fmt"
 
 	"school-with-ai/sdk/agentsdk/llm"
 )
@@ -39,6 +40,9 @@ type NextHandler func(ctx context.Context, reqCtx *RequestContext) error
 // RequestContext carries all state through the middleware chain.
 // It contains the request data, agent configuration, and execution state.
 type RequestContext struct {
+	// ThreadID is the identifier for the conversation thread
+	ThreadID string
+
 	// Messages are the conversation messages being sent to the LLM
 	Messages []llm.ChatMessage
 
@@ -73,8 +77,9 @@ type RequestContext struct {
 }
 
 // NewRequestContext creates a new RequestContext with the given parameters.
-func NewRequestContext(messages []llm.ChatMessage, systemPrompt string, tools []Tool, config *AgentConfig) *RequestContext {
+func NewRequestContext(threadID string, messages []llm.ChatMessage, systemPrompt string, tools []Tool, config *AgentConfig) *RequestContext {
 	return &RequestContext{
+		ThreadID:              threadID,
 		Messages:              messages,
 		SystemPrompt:          systemPrompt,
 		Tools:                 tools,
@@ -118,6 +123,16 @@ func (rc *RequestContext) AddSystemPrompt(text string) {
 	if text != "" {
 		rc.SystemPromptAdditions = append(rc.SystemPromptAdditions, text)
 	}
+}
+
+// EmitEvent emits a domain event using the configured notifier.
+// This is a convenience method for tools and middleware to emit events.
+// Returns an error if no notifier is configured or if the event emission fails.
+func (rc *RequestContext) EmitEvent(event Event) error {
+	if rc.Config == nil || rc.Config.Notifier == nil {
+		return fmt.Errorf("no event notifier configured")
+	}
+	return rc.Config.Notifier.HandleDomainEvent(event)
 }
 
 // GetEffectiveSystemPrompt returns the combined system prompt including
@@ -185,6 +200,7 @@ func WithResult(result interface{}) ContextOption {
 func (rc *RequestContext) Override(opts ...ContextOption) *RequestContext {
 	// Create a shallow copy
 	newCtx := &RequestContext{
+		ThreadID:              rc.ThreadID,
 		Messages:              rc.Messages,
 		SystemPrompt:          rc.SystemPrompt,
 		Tools:                 rc.Tools,

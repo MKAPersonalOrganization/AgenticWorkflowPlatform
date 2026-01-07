@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 )
 
@@ -17,31 +18,47 @@ const (
 	WhiteboardActionClear  WhiteboardAction = "clear"  // Clear all content
 )
 
-const ReadWhiteboardToolDescription = `Read the current content of the shared whiteboard. 
-
-The whiteboard is a shared space where all agents can view and contribute information. It typically contains:
-- Routing plans and task progress (TODOS section)
-- Key formulas and equations from specialists
-- Diagrams and visualizations
-- Important notes and context
-
-Always read the whiteboard at the start of your work to understand the current context and avoid duplicating effort.`
-
 const WriteWhiteboardToolDescription = `Write information to the shared whiteboard that all agents can see. Use this to share key formulas, diagrams, or important points. ALWAYS use markdown format.
 
 ## Actions
-- 'write': REPLACE entire whiteboard content (use read_whiteboard first to preserve existing content)
+- 'write': REPLACE entire whiteboard content (check current content in system prompt to preserve existing sections)
 - 'append': Add new content to the end
 - 'clear': Erase all content
 
 ## Best Practice Workflow
-Use read_whiteboard() first, then modify the content, then write_whiteboard() with action='write' to update specific sections while preserving others.
+The current whiteboard content is always shown in your system prompt. Review it first, then modify the content you need, and write back the entire updated content using action='write'.
 
 Example workflow for updating a section:
-1. content = read_whiteboard()
+1. Review current whiteboard content in your system prompt
 2. Modify the specific section you need (e.g., update TODOS)
 3. Keep other sections unchanged (e.g., formulas from specialists)
 4. write_whiteboard(updated_content, action='write')
+
+## Adding Images (Charts, Plots, Diagrams)
+
+⚠️ CRITICAL: You CANNOT add images by hallucinating URLs. You MUST use the plot tool first!
+
+Workflow:
+1. Call the plot tool with gnuplot_script and title parameters
+2. The tool returns JSON with image_url field
+3. COPY THE EXACT image_url VALUE from the JSON response (it starts with /assets/)
+4. Use markdown syntax: ![Description](PASTE_EXACT_IMAGE_URL_HERE)
+
+EXACT COPY-PASTE REQUIRED:
+When plot tool returns: {"image_url": "/assets/charts/sine-wave_1234567890.png", "success": true}
+You write to whiteboard: ![Sine Wave Graph](/assets/charts/sine-wave_1234567890.png)
+                                          ↑ EXACT COPY of image_url value ↑
+
+CRITICAL RULES:
+1. The path MUST start with /assets/ (with leading slash, no https://)
+2. NEVER add "https://" or any protocol prefix
+3. COPY the image_url value EXACTLY as returned by the plot tool
+4. Do NOT modify, shorten, or change the path in any way
+
+WRONG ❌: ![Plot](https://assets/charts/file.png)  ← Don't add https://
+WRONG ❌: ![Plot](assets/charts/file.png)  ← Missing leading slash /
+WRONG ❌: ![Plot](/charts/file.png)  ← Don't skip the /assets/ part
+CORRECT ✓: ![Plot](/assets/charts/sine-wave_1234567890.png)  ← Exact copy from image_url!
 
 ## LaTeX Math Rendering
 
@@ -204,57 +221,22 @@ For larger structures, use code blocks with smiles language (three backticks wit
 - Code: backtick for inline code or triple backticks for blocks
 - Footnotes: Text\\footnote{Explanation here}`
 
-const WhiteboardSystemPrompt = `## Whiteboard Tools
+const WhiteboardSystemPrompt = `## Shared Whiteboard
 
-You have access to read_whiteboard and write_whiteboard tools for collaborative information sharing.
+The whiteboard is a shared markdown document visible to all agents. The current whiteboard content is always included below in your system prompt.
 
-The whiteboard is a shared markdown document visible to all agents. Use it to:
+You can update the whiteboard using the write_whiteboard tool to:
 - Share routing plans and task progress
 - Display formulas, equations, and calculations
 - Show diagrams and visualizations
 - Communicate important context between agents
 
 Best practices:
-- ALWAYS read_whiteboard() first to check existing content
-- Use read-modify-write pattern: read → update specific sections → write entire content
+- Check the current whiteboard content in your system prompt before making updates
+- Use read-modify-write pattern: review current content → update specific sections → write entire content
 - Structure content with markdown headers (# Section Name)
 - Preserve content from other agents when updating
 - Use action='write' (not 'append') when updating existing sections to avoid duplication`
-
-// ReadWhiteboardTool is the tool for reading the whiteboard
-type ReadWhiteboardTool struct {
-	reqCtx *core.RequestContext
-}
-
-// NewReadWhiteboardTool creates a new ReadWhiteboardTool
-func NewReadWhiteboardTool(reqCtx *core.RequestContext) *ReadWhiteboardTool {
-	return &ReadWhiteboardTool{
-		reqCtx: reqCtx,
-	}
-}
-
-func (t *ReadWhiteboardTool) Name() string {
-	return "read_whiteboard"
-}
-
-func (t *ReadWhiteboardTool) Description() string {
-	return ReadWhiteboardToolDescription
-}
-
-func (t *ReadWhiteboardTool) Parameters() map[string]interface{} {
-	return map[string]interface{}{
-		"type":       "object",
-		"properties": map[string]interface{}{},
-	}
-}
-
-func (t *ReadWhiteboardTool) Invoke(ctx context.Context, arguments string) (string, error) {
-	content := GetWhiteboardContent(t.reqCtx)
-	if content == "" {
-		return "The whiteboard is currently empty.", nil
-	}
-	return content, nil
-}
 
 // WriteWhiteboardTool is the tool for writing to the whiteboard
 type WriteWhiteboardTool struct {
@@ -315,53 +297,90 @@ func (t *WriteWhiteboardTool) Invoke(ctx context.Context, arguments string) (str
 		return "", fmt.Errorf("invalid action: %s (must be write, append, or clear)", args.Action)
 	}
 
+	var finalContent string
+
 	// Update whiteboard based on action
 	switch args.Action {
 	case WhiteboardActionWrite:
-		SetWhiteboardContent(t.reqCtx, args.Content)
+		finalContent = args.Content
+		SetWhiteboardContent(t.reqCtx, finalContent)
 	case WhiteboardActionAppend:
 		current := GetWhiteboardContent(t.reqCtx)
 		if current == "" {
-			SetWhiteboardContent(t.reqCtx, args.Content)
+			finalContent = args.Content
 		} else {
-			SetWhiteboardContent(t.reqCtx, current+"\n"+args.Content)
+			finalContent = current + "\n" + args.Content
 		}
+		SetWhiteboardContent(t.reqCtx, finalContent)
 	case WhiteboardActionClear:
-		SetWhiteboardContent(t.reqCtx, "")
+		finalContent = ""
+		SetWhiteboardContent(t.reqCtx, finalContent)
 	}
 
-	return fmt.Sprintf("Whiteboard updated (%s): %s", args.Action, args.Content), nil
+	// Emit whiteboard.updated event to persist the change
+	// If no notifier is configured, we skip persistence but still update local state
+	if t.reqCtx.Config != nil && t.reqCtx.Config.Notifier != nil {
+		event := domain.NewWhiteboardUpdatedEvent(
+			t.reqCtx.ThreadID,
+			"", // agent name - could be extracted from config if needed
+			finalContent,
+			string(args.Action),
+		)
+		if err := t.reqCtx.EmitEvent(event); err != nil {
+			// Log the error but don't fail - local state is already updated
+			return fmt.Sprintf("Whiteboard updated (%s) - warning: failed to persist", args.Action), nil
+		}
+	}
+
+	return fmt.Sprintf("Whiteboard updated (%s)", args.Action), nil
+}
+
+// WhiteboardProjection provides read access to whiteboard content
+type WhiteboardProjection interface {
+	Get(threadID string) string
 }
 
 // WhiteboardMiddleware provides whiteboard management capabilities to agents
 type WhiteboardMiddleware struct {
 	systemPrompt string
+	projection   WhiteboardProjection
 }
 
 // NewWhiteboardMiddleware creates a new WhiteboardMiddleware with default prompts
-func NewWhiteboardMiddleware() *WhiteboardMiddleware {
+func NewWhiteboardMiddleware(projection WhiteboardProjection) *WhiteboardMiddleware {
 	return &WhiteboardMiddleware{
 		systemPrompt: WhiteboardSystemPrompt,
+		projection:   projection,
 	}
 }
 
 // NewWhiteboardMiddlewareWithPrompt creates a new WhiteboardMiddleware with custom prompt
-func NewWhiteboardMiddlewareWithPrompt(systemPrompt string) *WhiteboardMiddleware {
+func NewWhiteboardMiddlewareWithPrompt(projection WhiteboardProjection, systemPrompt string) *WhiteboardMiddleware {
 	return &WhiteboardMiddleware{
 		systemPrompt: systemPrompt,
+		projection:   projection,
 	}
 }
 
 // Process implements the Middleware interface
 func (m *WhiteboardMiddleware) Process(ctx context.Context, reqCtx *core.RequestContext, next core.NextHandler) error {
-	// Add whiteboard tools to the request context
-	reqCtx.AddTool(NewReadWhiteboardTool(reqCtx))
+	// Add write_whiteboard tool to the request context
 	reqCtx.AddTool(NewWriteWhiteboardTool(reqCtx))
+
+	// Add whiteboard instructions to system prompt
 	reqCtx.AddSystemPrompt(m.systemPrompt)
 
-	// Initialize whiteboard state if not present
-	if _, exists := reqCtx.State["whiteboard_content"]; !exists {
-		reqCtx.State["whiteboard_content"] = ""
+	// Inject current whiteboard content from projection into system prompt
+	var whiteboardContent string
+	if m.projection != nil && reqCtx.ThreadID != "" {
+		whiteboardContent = m.projection.Get(reqCtx.ThreadID)
+	}
+
+	if whiteboardContent != "" {
+		whiteboardSection := fmt.Sprintf("\n\n---\n\n## Current Whiteboard Content\n\n%s\n\n---\n", whiteboardContent)
+		reqCtx.AddSystemPrompt(whiteboardSection)
+	} else {
+		reqCtx.AddSystemPrompt("\n\n---\n\n## Current Whiteboard Content\n\nThe whiteboard is currently empty.\n\n---\n")
 	}
 
 	return next(ctx, reqCtx)

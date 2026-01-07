@@ -389,7 +389,7 @@ func (wp *WorkerPool) continueWithAgent(ctx context.Context, threadID, agentName
 	}
 
 	// Create agent config from contract factory
-	agentConfig := contract.Factory(notifier)
+	agentConfig := contract.Factory(notifier, wp.whiteboardProjection)
 
 	// Create agent instance
 	agentInstance := chatwrite.New(

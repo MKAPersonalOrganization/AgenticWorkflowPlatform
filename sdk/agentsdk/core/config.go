@@ -65,9 +65,9 @@ func ToAITools(tools []Tool) []llm.AITool {
 // It executes the middleware chain to collect additional tools and system prompt modifications.
 // Returns the ChatOptions and the RequestContext (which may have Terminate=true if middleware
 // short-circuited).
-func ToChatOptionsWithMiddleware(ctx context.Context, config AgentConfig, messages []llm.ChatMessage, runOpts RunOptions) (*llm.ChatOptions, *RequestContext, error) {
+func ToChatOptionsWithMiddleware(ctx context.Context, config AgentConfig, messages []llm.ChatMessage, threadID string, runOpts RunOptions) (*llm.ChatOptions, *RequestContext, error) {
 	// Apply middleware to get the request context
-	reqCtx, err := ApplyMiddleware(ctx, config, messages, runOpts)
+	reqCtx, err := ApplyMiddleware(ctx, config, messages, threadID, runOpts)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -122,10 +122,10 @@ func ToChatOptionsWithMiddleware(ctx context.Context, config AgentConfig, messag
 // ApplyMiddleware executes the middleware chain on initial request context
 // to collect additional tools and system prompt modifications. This is called
 // before the LLM request to gather middleware contributions.
-func ApplyMiddleware(ctx context.Context, config AgentConfig, messages []llm.ChatMessage, runOpts RunOptions) (*RequestContext, error) {
+func ApplyMiddleware(ctx context.Context, config AgentConfig, messages []llm.ChatMessage, threadID string, runOpts RunOptions) (*RequestContext, error) {
 	// Build initial request context with minimal config
 	initialConfig := &AgentConfig{}
-	reqCtx := NewRequestContext(messages, config.SystemPrompt, config.Tools, initialConfig)
+	reqCtx := NewRequestContext(threadID, messages, config.SystemPrompt, config.Tools, initialConfig)
 
 	// Copy config parameters to request context
 	if config.Temperature != nil {

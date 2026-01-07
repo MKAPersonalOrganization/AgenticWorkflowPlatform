@@ -7,12 +7,11 @@ import (
 )
 
 // CreateOptimizationProfessor creates the optimization professor agent
-func CreateOptimizationProfessor(notifier core.EventNotifier) core.AgentConfig {
+func CreateOptimizationProfessor(notifier core.EventNotifier, whiteboardProjection interface{ Get(threadID string) string }) core.AgentConfig {
 	registry := core.NewToolRegistry()
 
 	// Shared tools
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
-	registry.Register(sharedtools.NewReadWhiteboardTool())
 
 	// Optimization specific tools
 	registry.Register(tools.NewUnconstrainedOptimizationTool())
@@ -32,7 +31,7 @@ You are an advanced mathematics professor specializing in numerical optimization
 
 ## Workflow
 
-1. **Read** whiteboard: Check optimization problem formulation
+1. **Check** whiteboard content in your system prompt for optimization problem formulation
 2. **Analyze** problem type (convex/nonconvex, constrained/unconstrained)
 3. **Execute** using gosl/opt library optimizers
 4. **Write** optimal solution and convergence history to whiteboard

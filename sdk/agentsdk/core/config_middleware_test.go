@@ -55,7 +55,7 @@ func TestToChatOptionsWithMiddleware_WithoutMiddleware(t *testing.T) {
 
 	runOpts := RunOptions{}
 
-	opts, _, err := ToChatOptionsWithMiddleware(context.Background(), config, []llm.ChatMessage{}, runOpts)
+	opts, _, err := ToChatOptionsWithMiddleware(context.Background(), config, []llm.ChatMessage{}, "", runOpts)
 	if err != nil {
 		t.Fatalf("ToChatOptionsWithMiddleware failed: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestApplyMiddleware_NoMiddleware(t *testing.T) {
 		llm.NewUserMessage("Hello"),
 	}
 
-	reqCtx, err := ApplyMiddleware(context.Background(), config, messages, RunOptions{})
+	reqCtx, err := ApplyMiddleware(context.Background(), config, messages, "", RunOptions{})
 	if err != nil {
 		t.Fatalf("ApplyMiddleware failed: %v", err)
 	}
@@ -119,7 +119,7 @@ func TestApplyMiddleware_WithToolInjection(t *testing.T) {
 		llm.NewUserMessage("Hello"),
 	}
 
-	reqCtx, err := ApplyMiddleware(context.Background(), config, messages, RunOptions{})
+	reqCtx, err := ApplyMiddleware(context.Background(), config, messages, "", RunOptions{})
 	if err != nil {
 		t.Fatalf("ApplyMiddleware failed: %v", err)
 	}
@@ -163,7 +163,7 @@ func TestApplyMiddleware_WithSystemPromptAddition(t *testing.T) {
 		llm.NewUserMessage("Hello"),
 	}
 
-	reqCtx, err := ApplyMiddleware(context.Background(), config, messages, RunOptions{})
+	reqCtx, err := ApplyMiddleware(context.Background(), config, messages, "", RunOptions{})
 	if err != nil {
 		t.Fatalf("ApplyMiddleware failed: %v", err)
 	}
@@ -195,7 +195,7 @@ func TestApplyMiddleware_Termination(t *testing.T) {
 		llm.NewUserMessage("Hello"),
 	}
 
-	reqCtx, err := ApplyMiddleware(context.Background(), config, messages, RunOptions{})
+	reqCtx, err := ApplyMiddleware(context.Background(), config, messages, "", RunOptions{})
 	if err != nil {
 		t.Fatalf("ApplyMiddleware failed: %v", err)
 	}
@@ -229,7 +229,7 @@ func TestToChatOptionsWithMiddleware(t *testing.T) {
 		llm.NewUserMessage("Test message"),
 	}
 
-	opts, reqCtx, err := ToChatOptionsWithMiddleware(context.Background(), config, messages, RunOptions{})
+	opts, reqCtx, err := ToChatOptionsWithMiddleware(context.Background(), config, messages, "", RunOptions{})
 	if err != nil {
 		t.Fatalf("ToChatOptionsWithMiddleware failed: %v", err)
 	}
@@ -272,7 +272,7 @@ func TestToChatOptionsWithMiddleware_Termination(t *testing.T) {
 		llm.NewUserMessage("Test"),
 	}
 
-	opts, reqCtx, err := ToChatOptionsWithMiddleware(context.Background(), config, messages, RunOptions{})
+	opts, reqCtx, err := ToChatOptionsWithMiddleware(context.Background(), config, messages, "", RunOptions{})
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -307,7 +307,7 @@ func TestApplyMiddleware_ConfigParameters(t *testing.T) {
 		llm.NewUserMessage("Test"),
 	}
 
-	reqCtx, err := ApplyMiddleware(context.Background(), config, messages, RunOptions{})
+	reqCtx, err := ApplyMiddleware(context.Background(), config, messages, "", RunOptions{})
 	if err != nil {
 		t.Fatalf("ApplyMiddleware failed: %v", err)
 	}
@@ -353,7 +353,7 @@ func TestApplyMiddleware_RunOptionsOverride(t *testing.T) {
 		llm.NewUserMessage("Test"),
 	}
 
-	reqCtx, err := ApplyMiddleware(context.Background(), config, messages, runOpts)
+	reqCtx, err := ApplyMiddleware(context.Background(), config, messages, "", runOpts)
 	if err != nil {
 		t.Fatalf("ApplyMiddleware failed: %v", err)
 	}
@@ -396,7 +396,7 @@ func TestApplyMiddleware_MultipleMiddleware(t *testing.T) {
 		llm.NewUserMessage("Test"),
 	}
 
-	reqCtx, err := ApplyMiddleware(context.Background(), config, messages, RunOptions{})
+	reqCtx, err := ApplyMiddleware(context.Background(), config, messages, "", RunOptions{})
 	if err != nil {
 		t.Fatalf("ApplyMiddleware failed: %v", err)
 	}

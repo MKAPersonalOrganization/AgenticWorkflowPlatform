@@ -22,7 +22,6 @@ func domainTools() []core.Tool {
 	}
 }
 
-
 // handlers returns the event handlers for this agent
 func handlers() agents.EventHandlerRegistry {
 	registry := make(agents.EventHandlerRegistry)
@@ -84,12 +83,14 @@ func handleLinearAlgebraQuestion(ctx context.Context, handlerCtx *agents.EventHa
 	// Generate message ID for agent's response
 	messageID := domain.GenerateMessageID()
 
+	runOpts := core.DefaultRunOptions()
+
 	// Run the agent to process this event
 	// The agent will use its tools and system prompt to generate the response
 	err := handlerCtx.Agent.RunWithThread(ctx, handlerCtx.ThreadID, messageID, agentThread, func(event core.Event) error {
 		// Events emitted by the agent are handled by the worker pool's routing
 		return nil
-	}, core.DefaultRunOptions())
+	}, runOpts)
 	if err != nil {
 		slog.Error("Linear algebra handler failed", "error", err)
 		return err

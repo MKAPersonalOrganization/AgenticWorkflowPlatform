@@ -7,7 +7,7 @@ import (
 
 // CreateLinearAlgebraProfessor creates the linear algebra professor agent.
 // Event contract is defined in contract.go
-func CreateLinearAlgebraProfessor(notifier core.EventNotifier) core.AgentConfig {
+func CreateLinearAlgebraProfessor(notifier core.EventNotifier, whiteboardProjection interface{ Get(threadID string) string }) core.AgentConfig {
 	registry := core.NewToolRegistry()
 
 	// Domain-specific tools
@@ -16,7 +16,6 @@ func CreateLinearAlgebraProfessor(notifier core.EventNotifier) core.AgentConfig 
 	}
 
 	// Shared collaboration tools
-	registry.Register(sharedtools.NewReadWhiteboardTool())
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
 
 	return core.AgentConfig{
@@ -25,14 +24,14 @@ func CreateLinearAlgebraProfessor(notifier core.EventNotifier) core.AgentConfig 
 
 ## Core Rules
 
-1. **Read First**: Always call read_whiteboard as your first action
+1. **Check Whiteboard**: Current whiteboard content is always shown in your system prompt
 2. **Tool-First**: ALWAYS use tools for computation - never solve manually
 3. **Whiteboard Only**: All content via write_whiteboard - never text responses
 4. **End with Event**: Always emit question_answered after writing results
 
 ## Workflow
 
-1. read_whiteboard() - get problem context
+1. Review whiteboard content in your system prompt for problem context
 2. Use appropriate tool (linear_solver, matrix_operations, etc.)
 3. write_whiteboard(action="append", content="## LINEAR ALGEBRA\n[results]\n")
 4. emit_question_answered(subject="linearalgebra", is_complete=true)

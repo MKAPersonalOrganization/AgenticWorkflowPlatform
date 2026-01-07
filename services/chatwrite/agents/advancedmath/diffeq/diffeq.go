@@ -7,12 +7,11 @@ import (
 )
 
 // CreateDifferentialEquationsProfessor creates the differential equations professor agent
-func CreateDifferentialEquationsProfessor(notifier core.EventNotifier) core.AgentConfig {
+func CreateDifferentialEquationsProfessor(notifier core.EventNotifier, whiteboardProjection interface{ Get(threadID string) string }) core.AgentConfig {
 	registry := core.NewToolRegistry()
 
 	// Shared tools
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
-	registry.Register(sharedtools.NewReadWhiteboardTool())
 
 	// Differential equations specific tools
 	registry.Register(tools.NewODESolverTool())
@@ -32,7 +31,7 @@ You are an advanced mathematics professor specializing in ordinary and partial d
 
 ## Workflow
 
-1. **Read** whiteboard: Check student's question and ODE system
+1. **Check** whiteboard content in your system prompt for student's question and ODE system
 2. **Analyze** problem type (stiff/non-stiff, initial value/boundary value)
 3. **Execute** using gosl/ode library solvers
 4. **Write** solution trajectories and analysis to whiteboard
