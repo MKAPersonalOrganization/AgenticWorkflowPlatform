@@ -140,7 +140,7 @@ func TestBasicToolExecutor_Calculate(t *testing.T) {
 	toolRegistry := core.NewToolRegistry()
 	toolRegistry.Register(tools.NewCalculatorTool())
 
-	executor := core.NewBasicToolExecutor(toolRegistry)
+	executor := core.NewRegistryToolExecutor(context.Background(), toolRegistry)
 
 	toolCall := domain.ToolCall{
 		ID:   "call_calc",
@@ -167,7 +167,7 @@ func TestBasicToolExecutor_WriteWhiteboard(t *testing.T) {
 	// Register whiteboard tool
 	toolRegistry.Register(tools.NewWriteWhiteboardTool())
 
-	executor := core.NewBasicToolExecutor(toolRegistry)
+	executor := core.NewRegistryToolExecutor(context.Background(), toolRegistry)
 
 	toolCall := domain.ToolCall{
 		ID:   "call_whiteboard",
