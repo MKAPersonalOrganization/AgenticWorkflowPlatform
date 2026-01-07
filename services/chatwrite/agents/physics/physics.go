@@ -3,10 +3,17 @@ package physics
 import (
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/sdk/agentsdk/core/middleware"
+	sharedtools "school-with-ai/services/chatwrite/agents/shared/tools"
 )
 
+// domainTools returns the domain-specific tools for the physics instructor.
+func domainTools() []core.Tool {
+	return []core.Tool{
+		sharedtools.NewCalculatorTool(),
+	}
+}
+
 // CreatePhysicsInstructor creates the physics instructor agent configuration.
-// Event contract is defined in contract.go
 func CreatePhysicsInstructor(notifier core.EventNotifier, whiteboardProjection interface{ Get(threadID string) string }) core.AgentConfig {
 	registry := core.NewToolRegistry()
 

@@ -1,4 +1,4 @@
-package eventbus
+package shared
 
 import (
 	"school-with-ai/domain"

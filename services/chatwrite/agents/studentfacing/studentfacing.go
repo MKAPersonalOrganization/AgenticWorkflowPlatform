@@ -5,8 +5,13 @@ import (
 	"school-with-ai/sdk/agentsdk/core/middleware"
 )
 
-// CreateStudentFacingAgent creates the student-facing agent that handles initial questions.
-// Event contract is defined in contract.go
+// domainTools returns the domain-specific tools for the student-facing agent.
+func domainTools() []core.Tool {
+	// No domain-specific tools - this agent only routes
+	return []core.Tool{}
+}
+
+// CreateStudentFacingAgent creates the student-facing agent configuration.
 func CreateStudentFacingAgent(notifier core.EventNotifier, whiteboardProjection interface{ Get(threadID string) string }) core.AgentConfig {
 	registry := core.NewToolRegistry()
 

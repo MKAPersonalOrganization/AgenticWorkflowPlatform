@@ -3,10 +3,17 @@ package chemistry
 import (
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/sdk/agentsdk/core/middleware"
+	sharedtools "school-with-ai/services/chatwrite/agents/shared/tools"
 )
 
+// domainTools returns the domain-specific tools for the chemistry instructor.
+func domainTools() []core.Tool {
+	return []core.Tool{
+		sharedtools.NewCalculatorTool(),
+	}
+}
+
 // CreateChemistryInstructor creates the chemistry instructor agent configuration.
-// Event contract is defined in contract.go
 func CreateChemistryInstructor(notifier core.EventNotifier, whiteboardProjection interface{ Get(threadID string) string }) core.AgentConfig {
 	registry := core.NewToolRegistry()
 
