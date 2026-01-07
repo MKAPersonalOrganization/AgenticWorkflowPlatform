@@ -46,13 +46,8 @@ func (n *UINotifier) HandleDomainEvent(event core.Event) error {
 
 	// Agent collaboration events
 	case *agents.DomainEvent:
-		// Handle unified domain events
-		switch evt.Type {
-		case agents.EventTypeAgentHandoff:
-			return n.emitAgentHandoff(evt)
-		default:
-			return nil
-		}
+		// No custom domain events are handled anymore
+		return nil
 
 	// Other domain events don't need UI events
 	default:
@@ -125,21 +120,6 @@ func (n *UINotifier) emitToolCallResult(evt *core.ToolCallExecutedEvent) error {
 		evt.MessageID,
 		evt.ToolCallID,
 		evt.ToolResult,
-	)
-	return n.emitter.Emit(uiEvent)
-}
-
-// Agent collaboration event emitters
-
-func (n *UINotifier) emitAgentHandoff(evt *agents.DomainEvent) error {
-	uiEvent := aguievents.NewCustomEvent(
-		"AGENT_HANDOFF",
-		aguievents.WithValue(map[string]interface{}{
-			"fromAgent": evt.GetString("from_agent"),
-			"toAgent":   evt.GetString("to_agent"),
-			"reason":    evt.GetString("reason"),
-			"timestamp": evt.Timestamp.UnixMilli(),
-		}),
 	)
 	return n.emitter.Emit(uiEvent)
 }

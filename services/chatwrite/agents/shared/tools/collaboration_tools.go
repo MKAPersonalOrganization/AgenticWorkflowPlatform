@@ -42,9 +42,7 @@ func HandleSpecialToolCall(threadID string, agentName string, toolCall domain.To
 }
 
 // GetSpecialToolHandoffEvent creates a handoff event for special tools.
+// This function is no longer used as handoffs are now tool-based.
 func GetSpecialToolHandoffEvent(threadID string, fromAgent string, toolName string) *domain.DomainEvent {
-	if toolName == "emit_question_answered" {
-		return domain.NewAgentHandoffEvent(threadID, fromAgent, "student-facing-agent", "Question answered, returning to coordinator")
-	}
 	return nil
 }

@@ -294,33 +294,8 @@ func (p *InMemoryLLMContextProjection) applyEventUnsafe(agentThread core.AgentTh
 		delete(p.metadata, threadID)
 
 	case *domain.DomainEvent:
-		switch evt.Type {
-		case domain.EventTypeAgentHandoff:
-			msgID := fmt.Sprintf("handoff-%s-%d", evt.ThreadID, evt.Timestamp.UnixNano())
-
-			// Check for duplicate
-			messages := agentThread.GetMessages()
-			for _, msg := range messages {
-				if msg.ID == msgID {
-					return nil // Already applied
-				}
-			}
-
-			msg := domain.Message{
-				ID:        msgID,
-				Role:      "system",
-				Content:   "AGENT_HANDOFF|" + evt.GetString("from_agent") + "|" + evt.GetString("to_agent") + "|" + evt.GetString("reason"),
-				Timestamp: evt.Timestamp,
-				Metadata: map[string]any{
-					"type":       "agent_handoff",
-					"from_agent": evt.GetString("from_agent"),
-					"to_agent":   evt.GetString("to_agent"),
-					"reason":     evt.GetString("reason"),
-				},
-			}
-			_ = agentThread.AddMessages([]domain.Message{msg})
-			meta.UpdatedAt = evt.Timestamp
-		}
+		// No custom domain events are handled anymore
+		// Handoffs and other interactions are now tool-based
 
 	case *core.CustomEventEmittedEvent:
 		meta.UpdatedAt = evt.Timestamp

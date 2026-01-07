@@ -10,10 +10,7 @@ type EventType string
 
 // Common instructor event types
 const (
-	EventTypeUserMessage               EventType = "user.message"
-	EventTypeInstructorThought         EventType = "instructor.thought"
-	EventTypeInstructorStrategyChanged EventType = "instructor.strategy_changed"
-	EventTypeAgentHandoff              EventType = "agent.handoff"
+	EventTypeUserMessage EventType = "user.message"
 )
 
 // DomainEvent is the unified event structure for all system events
@@ -69,53 +66,6 @@ func (e *DomainEvent) MarshalPayload() ([]byte, error) {
 }
 
 // Common instructor event constructors
-
-func NewInstructorThoughtEvent(threadID, instructorName, thought string, isPrivate bool) *DomainEvent {
-	return &DomainEvent{
-		ID:        GenerateEventID(),
-		Type:      EventTypeInstructorThought,
-		Timestamp: time.Now(),
-		ThreadID:  threadID,
-		Version:   1,
-		Data: map[string]interface{}{
-			"instructor_name": instructorName,
-			"thought":         thought,
-			"is_private":      isPrivate,
-		},
-	}
-}
-
-func NewInstructorStrategyChangedEvent(threadID, instructorName, oldStrategy, newStrategy, reason string) *DomainEvent {
-	return &DomainEvent{
-		ID:        GenerateEventID(),
-		Type:      EventTypeInstructorStrategyChanged,
-		Timestamp: time.Now(),
-		ThreadID:  threadID,
-		Version:   1,
-		Data: map[string]interface{}{
-			"instructor_name": instructorName,
-			"old_strategy":    oldStrategy,
-			"new_strategy":    newStrategy,
-			"reason":          reason,
-		},
-	}
-}
-
-// NewAgentHandoffEvent creates an agent handoff event
-func NewAgentHandoffEvent(threadID, fromAgent, toAgent, reason string) *DomainEvent {
-	return &DomainEvent{
-		ID:        GenerateEventID(),
-		Type:      EventTypeAgentHandoff,
-		Timestamp: time.Now(),
-		ThreadID:  threadID,
-		Version:   1,
-		Data: map[string]interface{}{
-			"from_agent": fromAgent,
-			"to_agent":   toAgent,
-			"reason":     reason,
-		},
-	}
-}
 
 // GenerateEventID generates unique event IDs (exported for use by agent packages)
 func GenerateEventID() string {

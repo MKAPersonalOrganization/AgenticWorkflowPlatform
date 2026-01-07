@@ -12,7 +12,6 @@ import (
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/sdk/agentsdk/llm"
 	"school-with-ai/services/chatwrite"
-	"school-with-ai/services/chatwrite/agents"
 	"school-with-ai/services/chatwrite/agents/shared/tools/eventbus"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
@@ -289,21 +288,8 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 		_ = emitter.Emit(customEvent)
 	}
 
-	// Create UserMessage event to trigger student-facing agent
-	userMessageEvent := &agents.DomainEvent{
-		ID:        agents.GenerateEventID(),
-		Type:      agents.EventTypeUserMessage,
-		Timestamp: time.Now(),
-		ThreadID:  job.ThreadID,
-		Version:   1,
-		Data: map[string]interface{}{
-			"message":    job.Message,
-			"message_id": job.MessageID,
-		},
-	}
-
-	// Route to student-facing agent via handler
-	wp.continueWithAgent(ctx, job.ThreadID, "student-facing-agent", emitter, runID, userMessageEvent)
+	// Execute student-facing agent directly (tool-based routing)
+	wp.continueWithAgentDirect(ctx, job.ThreadID, "student-facing-agent", emitter, runID)
 
 	// Send RUN_FINISHED event
 	runFinishedEvent := aguievents.NewRunFinishedEvent(
@@ -400,17 +386,12 @@ func (wp *WorkerPool) emitMessagesSnapshot(emitter EventEmitter, threadID string
 	}
 }
 
-// continueWithAgent runs the specified agent on the thread using event handlers
-func (wp *WorkerPool) continueWithAgent(ctx context.Context, threadID, agentName string, emitter EventEmitter, runID string, triggeringEvent *agents.DomainEvent) {
-	slog.Info("Continuing with agent", "threadID", threadID, "agent", agentName)
+// continueWithAgentDirect runs an agent directly without requiring a domain event handler
+// This is used for tool-based handoffs where agents don't have event handlers
+func (wp *WorkerPool) continueWithAgentDirect(ctx context.Context, threadID, agentName string, emitter EventEmitter, runID string) {
+	slog.Info("Continuing with agent (direct)", "threadID", threadID, "agent", agentName)
 
-	// Validate that we have a triggering event
-	if triggeringEvent == nil {
-		slog.Error("No triggering event provided for agent continuation", "agent", agentName)
-		return
-	}
-
-	// Create UI notifier for this continuation's event stream
+	// Create UI notifier for this agent's event stream
 	notifier := NewUINotifier(emitter)
 
 	// Get the agent's contract
@@ -433,39 +414,30 @@ func (wp *WorkerPool) continueWithAgent(ctx context.Context, threadID, agentName
 		chatwrite.WithShouldContinueIteration(eventbus.CreateShouldContinueIterationFn(eventbus.GlobalContracts)),
 	)
 
-	// Verify the agent has a handler for this event
-	if contract.Handlers == nil {
-		slog.Error("Agent has no handlers defined", "agent", agentName)
+	// Get the thread
+	agentThread, exists := wp.state.GetAgentThread(threadID)
+	if !exists {
+		slog.Error("Thread not found", "threadID", threadID)
 		return
 	}
 
-	handler, hasHandler := contract.Handlers[triggeringEvent.Type]
-	if !hasHandler {
-		slog.Error("Agent has no handler for event type", "agent", agentName, "eventType", triggeringEvent.Type)
-		return
-	}
-
-	slog.Info("Executing event handler", "agent", agentName, "eventType", triggeringEvent.Type)
-
-	// Create handler context
-	handlerCtx := &agents.EventHandlerContext{
-		ThreadID: threadID,
-		Event:    triggeringEvent,
-		Agent:    agentInstance,
-		State:    wp.state,
-		Notifier: notifier,
-	}
-
-	// Track events before handler execution
+	// Track events before agent execution
 	eventsBefore, _ := wp.log.ReadStream(ctx, threadID, 0)
 	beforeCount := len(eventsBefore)
 
-	// Execute the handler - it owns the complete logic
-	if err := handler(ctx, handlerCtx); err != nil {
-		slog.Error("Handler execution failed", "agent", agentName, "eventType", triggeringEvent.Type, "error", err)
+	// Generate message ID for this run
+	messageID := domain.GenerateMessageID()
+
+	// Run the agent with the current thread state
+	runOpts := core.DefaultRunOptions()
+	err := agentInstance.RunWithThread(ctx, threadID, messageID, agentThread, func(event core.Event) error {
+		return nil
+	}, runOpts)
+	if err != nil {
+		slog.Error("Agent run failed", "agent", agentName, "error", err)
 		errorEvent := aguievents.NewRunErrorEvent(
-			fmt.Sprintf("Agent %s handler failed: %v", agentName, err),
-			aguievents.WithErrorCode("HANDLER_ERROR"),
+			fmt.Sprintf("Agent %s failed: %v", agentName, err),
+			aguievents.WithErrorCode("AGENT_RUN_ERROR"),
 		)
 		_ = emitter.Emit(errorEvent)
 		return
@@ -474,81 +446,30 @@ func (wp *WorkerPool) continueWithAgent(ctx context.Context, threadID, agentName
 	// Emit updated messages snapshot
 	wp.emitMessagesSnapshot(emitter, threadID)
 
-	slog.Info("Handler execution completed", "agent", agentName, "eventType", triggeringEvent.Type)
+	slog.Info("Agent run completed (direct)", "agent", agentName)
 
-	// Check for new routing events emitted during handler execution
+	// Check for new handoff events emitted during agent execution
 	eventsAfter, _ := wp.log.ReadStream(ctx, threadID, 0)
 	if len(eventsAfter) > beforeCount {
-		// Process new events for routing
+		// Process new handoff events (e.g., nested handoffs)
 		newEvents := eventsAfter[beforeCount:]
-		wp.processRoutingEvents(ctx, threadID, newEvents, emitter, runID)
+		wp.processHandoffEvents(ctx, threadID, newEvents, emitter, runID)
 	}
 }
 
-// processRoutingEvents checks new events for routing and triggers appropriate agents
-func (wp *WorkerPool) processRoutingEvents(ctx context.Context, threadID string, newEvents []core.Event, emitter EventEmitter, runID string) {
+// processHandoffEvents checks for agent handoff events and continues execution
+func (wp *WorkerPool) processHandoffEvents(ctx context.Context, threadID string, newEvents []core.Event, emitter EventEmitter, runID string) {
 	for _, event := range newEvents {
-		// Check for agent handoff events (NEW: handoff system)
+		// Check for agent handoff events (tool-based handoff system)
 		if handoffEvent, ok := event.(*core.AgentHandoffEvent); ok {
-			slog.Info("Processing agent handoff",
+			slog.Info("Processing tool-based agent handoff",
 				"threadID", threadID,
 				"from", handoffEvent.FromAgent,
 				"to", handoffEvent.ToAgent,
 				"question", handoffEvent.Question)
 
-			// Create a domain event for the target agent
-			targetEvent := &agents.DomainEvent{
-				ID:        agents.GenerateEventID(),
-				Type:      agents.EventTypeAgentHandoff,
-				Timestamp: handoffEvent.Timestamp,
-				ThreadID:  threadID,
-				Version:   1,
-				Data: map[string]interface{}{
-					"from_agent": handoffEvent.FromAgent,
-					"to_agent":   handoffEvent.ToAgent,
-					"question":   handoffEvent.Question,
-					"context":    handoffEvent.Context,
-				},
-			}
-
-			// Route to the target agent
-			wp.continueWithAgent(ctx, threadID, handoffEvent.ToAgent, emitter, runID, targetEvent)
-			continue
-		}
-
-		// Cast to DomainEvent to check type
-		domainEvent, ok := event.(*agents.DomainEvent)
-		if !ok {
-			continue
-		}
-
-		// Get all agents subscribed to this event type
-		subscribers := eventbus.GlobalContracts.EventBus().GetSubscribers(domainEvent.Type)
-
-		if len(subscribers) == 0 {
-			continue
-		}
-
-		// Get the agent that emitted this event (if available)
-		emittedBy, _ := domainEvent.Data["emitted_by"].(string)
-
-		slog.Info("Routing event to subscribers",
-			"eventType", domainEvent.Type,
-			"emittedBy", emittedBy,
-			"subscribers", subscribers,
-			"subscriberCount", len(subscribers))
-
-		// Trigger all subscribed agents (except the one that emitted it)
-		for _, agentName := range subscribers {
-			// Skip if agent is responding to its own emission
-			if emittedBy != "" && agentName == emittedBy {
-				slog.Debug("Skipping self-handling",
-					"agent", agentName,
-					"eventType", domainEvent.Type)
-				continue
-			}
-
-			wp.continueWithAgent(ctx, threadID, agentName, emitter, runID, domainEvent)
+			// Continue directly with the target agent
+			wp.continueWithAgentDirect(ctx, threadID, handoffEvent.ToAgent, emitter, runID)
 		}
 	}
 }
