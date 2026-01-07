@@ -90,11 +90,12 @@ func (h *AsynqHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt: time.Now(),
 	}
 
-	slog.Info("Creating job for user with Asynq",
+	slog.Info("[API] Received chat request",
 		"userID", user.ID,
 		"email", user.Email,
 		"threadID", threadID,
-		"jobID", jobID)
+		"jobID", jobID,
+		"message", message)
 
 	// Enqueue job to in-memory queue for tracking
 	if err := h.queue.Enqueue(job); err != nil {
@@ -102,11 +103,16 @@ func (h *AsynqHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Enqueue to Asynq for processing
+	// Enqueue to Asynq for async processing by workers
 	if err := h.asynqServer.EnqueueJob(job); err != nil {
 		http.Error(w, fmt.Sprintf("Failed to enqueue to Asynq: %v", err), http.StatusInternalServerError)
 		return
 	}
+
+	slog.Info("[API] Job enqueued to Redis, returning immediately",
+		"jobID", jobID,
+		"status", "pending",
+		"note", "Worker will pick up job asynchronously")
 
 	// Return job ID to client
 	w.Header().Set("Content-Type", "application/json")

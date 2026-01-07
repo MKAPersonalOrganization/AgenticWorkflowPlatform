@@ -92,7 +92,10 @@ func (w *ChatWorker) ProcessTask(ctx context.Context, t *asynq.Task) error {
 		return fmt.Errorf("json.Unmarshal failed: %v: %w", err, asynq.SkipRetry)
 	}
 
-	slog.Info("Processing chat task", "jobID", payload.JobID, "threadID", payload.ThreadID)
+	slog.Info("[WORKER] Picked up job from Redis queue",
+		"jobID", payload.JobID,
+		"threadID", payload.ThreadID,
+		"message", payload.Message)
 
 	// Update job status
 	if err := w.queue.UpdateJobStatus(payload.JobID, domain.JobStatusProcessing, ""); err != nil {
@@ -113,7 +116,10 @@ func (w *ChatWorker) ProcessTask(ctx context.Context, t *asynq.Task) error {
 		slog.Error("Failed to update job status", "jobID", payload.JobID, "error", err)
 	}
 
-	slog.Info("Chat task completed", "jobID", payload.JobID, "threadID", payload.ThreadID)
+	slog.Info("[WORKER] Job completed successfully",
+		"jobID", payload.JobID,
+		"threadID", payload.ThreadID,
+		"note", "Events streamed to client via SSE")
 	return nil
 }
 
