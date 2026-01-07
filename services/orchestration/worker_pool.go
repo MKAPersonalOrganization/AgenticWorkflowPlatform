@@ -46,7 +46,7 @@ type WorkerPool struct {
 	chatClient           ChatClient
 	chatWriteService     *chatwrite.ChatWriteService
 	numWorkers           int
-	pollInterval         time.Duration
+	jobChan              chan *domain.Job // Channel for job delivery (replaces polling)
 	ctx                  context.Context
 	cancel               context.CancelFunc
 	wg                   sync.WaitGroup
@@ -64,8 +64,7 @@ type WorkerPool struct {
 
 // WorkerPoolConfig configures the worker pool
 type WorkerPoolConfig struct {
-	NumWorkers   int
-	PollInterval time.Duration
+	NumWorkers int
 }
 
 // NewWorkerPool creates a new worker pool
@@ -74,9 +73,6 @@ func NewWorkerPool(queue domain.JobQueue, log core.EventStore, state ThreadStore
 
 	if config.NumWorkers <= 0 {
 		config.NumWorkers = 5 // Default to 5 workers
-	}
-	if config.PollInterval == 0 {
-		config.PollInterval = 100 * time.Millisecond // Default poll interval
 	}
 
 	return &WorkerPool{
@@ -87,7 +83,7 @@ func NewWorkerPool(queue domain.JobQueue, log core.EventStore, state ThreadStore
 		chatClient:           chatClient,
 		chatWriteService:     chatWriteService,
 		numWorkers:           config.NumWorkers,
-		pollInterval:         config.PollInterval,
+		jobChan:              make(chan *domain.Job, config.NumWorkers*2), // Buffered channel
 		ctx:                  ctx,
 		cancel:               cancel,
 		eventBuffers:         make(map[string]*EventBuffer),
@@ -101,6 +97,11 @@ func NewWorkerPool(queue domain.JobQueue, log core.EventStore, state ThreadStore
 func (wp *WorkerPool) Start() {
 	slog.Info("Starting worker pool", "numWorkers", wp.numWorkers)
 
+	// Start job dispatcher (dequeues from queue, pushes to channel)
+	wp.wg.Add(1)
+	go wp.dispatcher()
+
+	// Start workers (process from channel)
 	for i := 0; i < wp.numWorkers; i++ {
 		wp.wg.Add(1)
 		go wp.worker(i)
@@ -139,6 +140,48 @@ func (wp *WorkerPool) GetEventRouter(threadID string) func(event interface{}) er
 	}
 }
 
+// dispatcher continuously dequeues jobs from the queue and sends them to the job channel
+func (wp *WorkerPool) dispatcher() {
+	defer wp.wg.Done()
+
+	slog.Info("Job dispatcher started")
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-wp.ctx.Done():
+			slog.Info("Job dispatcher stopping")
+			close(wp.jobChan) // Close channel to signal workers
+			return
+
+		case <-ticker.C:
+			// Try to dequeue a job
+			job, err := wp.queue.Dequeue()
+			if err != nil {
+				if err != domain.ErrQueueEmpty {
+					slog.Error("Failed to dequeue job", "error", err)
+				}
+				continue
+			}
+
+			// Send to job channel (non-blocking with timeout)
+			select {
+			case wp.jobChan <- job:
+				slog.Debug("Job dispatched", "jobID", job.ID)
+			case <-time.After(5 * time.Second):
+				slog.Warn("Job channel full, requeueing", "jobID", job.ID)
+				job.Status = domain.JobStatusPending
+				if err := wp.queue.Enqueue(job); err != nil {
+					slog.Error("Failed to requeue job", "jobID", job.ID, "error", err)
+				}
+			case <-wp.ctx.Done():
+				return
+			}
+		}
+	}
+}
+
 // Stop gracefully stops the worker pool
 func (wp *WorkerPool) Stop() {
 	slog.Info("Stopping worker pool")
@@ -171,14 +214,11 @@ func (wp *WorkerPool) Stop() {
 	slog.Info("Worker pool stopped")
 }
 
-// worker is a single worker that polls the queue and processes jobs
+// worker processes jobs from the job channel
 func (wp *WorkerPool) worker(id int) {
 	defer wp.wg.Done()
 
 	slog.Info("Worker started", "workerID", id)
-
-	ticker := time.NewTicker(wp.pollInterval)
-	defer ticker.Stop()
 
 	for {
 		select {
@@ -186,14 +226,10 @@ func (wp *WorkerPool) worker(id int) {
 			slog.Info("Worker stopping", "workerID", id)
 			return
 
-		case <-ticker.C:
-			// Try to dequeue a job
-			job, err := wp.queue.Dequeue()
-			if err != nil {
-				if err != domain.ErrQueueEmpty {
-					slog.Error("Failed to dequeue job", "workerID", id, "error", err)
-				}
-				continue
+		case job, ok := <-wp.jobChan:
+			if !ok {
+				slog.Info("Worker stopping - job channel closed", "workerID", id)
+				return
 			}
 
 			slog.Info("Worker processing job", "workerID", id, "jobID", job.ID, "threadID", job.ThreadID)
@@ -249,11 +285,19 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 	// Check if thread exists, if not create it using chat service
 	_, exists := wp.state.Get(job.ThreadID)
 	if !exists {
-		_ = wp.chatWriteService.CreateThread(ctx, job.ThreadID, "New Chat")
+		if err := wp.chatWriteService.CreateThread(ctx, job.ThreadID, "New Chat"); err != nil {
+			slog.Error("Failed to create thread", "jobID", job.ID, "threadID", job.ThreadID, "error", err)
+			_ = wp.queue.UpdateJobStatus(job.ID, domain.JobStatusFailed, err.Error())
+			return
+		}
 	}
 
 	// Add user message using chat service
-	_ = wp.chatWriteService.AddUserMessage(ctx, job.ThreadID, job.MessageID, job.Message)
+	if err := wp.chatWriteService.AddUserMessage(ctx, job.ThreadID, job.MessageID, job.Message); err != nil {
+		slog.Error("Failed to add user message", "jobID", job.ID, "error", err)
+		_ = wp.queue.UpdateJobStatus(job.ID, domain.JobStatusFailed, err.Error())
+		return
+	}
 
 	// Generate unique run ID for this execution
 	runID := aguievents.GenerateRunID()
@@ -266,7 +310,11 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 		job.ThreadID,
 		runID,
 	)
-	_ = emitter.Emit(runStartedEvent) // Auto-generate thread title immediately if this is the first message
+	if err := emitter.Emit(runStartedEvent); err != nil {
+		slog.Error("Failed to emit run started event", "jobID", job.ID, "error", err)
+	}
+
+	// Auto-generate thread title immediately if this is the first message
 	thread, threadExists := wp.state.Get(job.ThreadID)
 	if threadExists && thread.Title == "New Chat" && len(thread.Messages) == 1 {
 		// Take first 50 characters of first user message as title
@@ -276,7 +324,9 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 		}
 
 		// Update thread title using chat service
-		_ = wp.chatWriteService.UpdateThreadTitle(ctx, job.ThreadID, title)
+		if err := wp.chatWriteService.UpdateThreadTitle(ctx, job.ThreadID, title); err != nil {
+			slog.Error("Failed to update thread title", "jobID", job.ID, "error", err)
+		}
 
 		// Send CUSTOM event to notify frontend of title update immediately
 		customEvent := aguievents.NewCustomEvent(
@@ -286,7 +336,9 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 				"title":    title,
 			}),
 		)
-		_ = emitter.Emit(customEvent)
+		if err := emitter.Emit(customEvent); err != nil {
+			slog.Error("Failed to emit thread title updated event", "jobID", job.ID, "error", err)
+		}
 	}
 
 	// Execute student-facing agent directly (tool-based routing)
@@ -297,10 +349,14 @@ func (wp *WorkerPool) processJob(ctx context.Context, job *domain.Job) {
 		job.ThreadID,
 		runID,
 	)
-	_ = emitter.Emit(runFinishedEvent)
+	if err := emitter.Emit(runFinishedEvent); err != nil {
+		slog.Error("Failed to emit run finished event", "jobID", job.ID, "error", err)
+	}
 
 	// Update job status to completed
-	_ = wp.queue.UpdateJobStatus(job.ID, domain.JobStatusCompleted, "")
+	if err := wp.queue.UpdateJobStatus(job.ID, domain.JobStatusCompleted, ""); err != nil {
+		slog.Error("Failed to update job status", "jobID", job.ID, "error", err)
+	}
 
 	slog.Info("Job completed", "jobID", job.ID, "threadID", job.ThreadID)
 }
@@ -457,82 +513,4 @@ func (wp *WorkerPool) continueWithAgentDirect(ctx context.Context, threadID, age
 			wp.continueWithAgentDirect(ctx, threadID, handoff.TargetAgent, emitter, runID)
 		}
 	}
-}
-
-// EventBuffer stores events for a job and allows multiple consumers
-type EventBuffer struct {
-	mu      sync.RWMutex
-	events  []any
-	closed  bool
-	maxSize int
-}
-
-// NewEventBuffer creates a new event buffer
-func NewEventBuffer(maxSize int) *EventBuffer {
-	return &EventBuffer{
-		events:  make([]any, 0, maxSize),
-		maxSize: maxSize,
-	}
-}
-
-// Append adds an event to the buffer
-func (eb *EventBuffer) Append(event any) {
-	eb.mu.Lock()
-	defer eb.mu.Unlock()
-
-	if eb.closed {
-		return
-	}
-
-	eb.events = append(eb.events, event)
-
-	// Trim if exceeds max size (keep most recent events)
-	if len(eb.events) > eb.maxSize {
-		eb.events = eb.events[len(eb.events)-eb.maxSize:]
-	}
-}
-
-// GetEvents returns all events since the given index
-func (eb *EventBuffer) GetEvents(fromIndex int) []any {
-	eb.mu.RLock()
-	defer eb.mu.RUnlock()
-
-	if fromIndex >= len(eb.events) {
-		return nil
-	}
-
-	return eb.events[fromIndex:]
-}
-
-// Len returns the number of events
-func (eb *EventBuffer) Len() int {
-	eb.mu.RLock()
-	defer eb.mu.RUnlock()
-	return len(eb.events)
-}
-
-// Close marks the buffer as closed
-func (eb *EventBuffer) Close() {
-	eb.mu.Lock()
-	defer eb.mu.Unlock()
-	eb.closed = true
-}
-
-// IsClosed returns whether the buffer is closed
-func (eb *EventBuffer) IsClosed() bool {
-	eb.mu.RLock()
-	defer eb.mu.RUnlock()
-	return eb.closed
-}
-
-// BufferedEventEmitter implements core.EventEmitter using EventBuffer
-type BufferedEventEmitter struct {
-	jobID  string
-	buffer *EventBuffer
-}
-
-// Emit appends an event to the buffer
-func (e *BufferedEventEmitter) Emit(event any) error {
-	e.buffer.Append(event)
-	return nil
 }
