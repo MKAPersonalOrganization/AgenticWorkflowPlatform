@@ -212,24 +212,10 @@ func (p *InMemoryAguiProjection) Apply(ctx context.Context, event core.Event) er
 }
 
 // applyDomainEvent handles custom domain events.
+// This function is kept for backward compatibility but no longer handles any events.
 func (p *InMemoryAguiProjection) applyDomainEvent(thread *AguiThreadState, evt *domain.DomainEvent) {
-	switch evt.Type {
-	case domain.EventTypeAgentHandoff:
-		msg := AguiMessage{
-			ID:        fmt.Sprintf("handoff-%s-%d", evt.ThreadID, evt.Timestamp.UnixNano()),
-			Role:      "system",
-			Content:   fmt.Sprintf("Agent handoff: %s → %s", evt.GetString("from_agent"), evt.GetString("to_agent")),
-			Timestamp: evt.Timestamp,
-			Status:    "complete",
-			Metadata: map[string]any{
-				"type":       "agent_handoff",
-				"from_agent": evt.GetString("from_agent"),
-				"to_agent":   evt.GetString("to_agent"),
-				"reason":     evt.GetString("reason"),
-			},
-		}
-		p.addMessage(thread, msg)
-	}
+	// No custom domain events are handled anymore
+	// Handoffs and other interactions are now tool-based
 }
 
 // addMessage adds a message to the thread state.

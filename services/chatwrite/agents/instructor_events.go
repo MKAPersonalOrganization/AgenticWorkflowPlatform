@@ -1,29 +1,24 @@
 package agents
 
-// This file re-exports domain events from the domain package for backward compatibility
+// This file re-exports domain helpers for backward compatibility
 // New code should import from domain directly
 
 import (
 	"school-with-ai/domain"
 )
 
-// Re-export EventType and constants
-type EventType = domain.EventType
-
-const (
-	EventTypeUserMessage               = domain.EventTypeUserMessage
-	EventTypeInstructorThought         = domain.EventTypeInstructorThought
-	EventTypeInstructorStrategyChanged = domain.EventTypeInstructorStrategyChanged
-	EventTypeAgentHandoff              = domain.EventTypeAgentHandoff
-)
-
 // Re-export DomainEvent type
 type DomainEvent = domain.DomainEvent
 
-// Re-export event constructors
+// Re-export EventType
+type EventType = domain.EventType
+
+// Re-export event type constants
+const (
+	EventTypeUserMessage = domain.EventTypeUserMessage
+)
+
+// Re-export helpers
 var (
-	NewInstructorThoughtEvent         = domain.NewInstructorThoughtEvent
-	NewInstructorStrategyChangedEvent = domain.NewInstructorStrategyChangedEvent
-	NewAgentHandoffEvent              = domain.NewAgentHandoffEvent
-	GenerateEventID                   = domain.GenerateEventID
+	GenerateEventID = domain.GenerateEventID
 )

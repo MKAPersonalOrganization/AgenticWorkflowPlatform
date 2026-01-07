@@ -1,14 +1,7 @@
 package statistics
 
 import (
-	"context"
-	"fmt"
-	"log/slog"
-	"time"
-
-	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
-	"school-with-ai/services/chatwrite/agents"
 	"school-with-ai/services/chatwrite/agents/shared/tools/eventbus"
 	"school-with-ai/services/chatwrite/agents/statistics/tools"
 )
@@ -26,78 +19,10 @@ func domainTools() []core.Tool {
 	}
 }
 
-func handlers() agents.EventHandlerRegistry {
-	return make(agents.EventHandlerRegistry) // No custom event handlers needed
-}
-
-func handleStatisticsQuestion(ctx context.Context, handlerCtx *agents.EventHandlerContext) error {
-	slog.Info("Statistics question received",
-		"threadID", handlerCtx.ThreadID,
-		"question", handlerCtx.Event.Data["question"],
-	)
-
-	question, _ := handlerCtx.Event.Data["question"].(string)
-	context, _ := handlerCtx.Event.Data["context"].(string)
-	emittedBy, _ := handlerCtx.Event.Data["emitted_by"].(string)
-
-	slog.Info("Processing statistics question",
-		"question", question,
-		"emittedBy", emittedBy,
-	)
-
-	// Get the AgentThread from state using ThreadStateWithStore interface
-	stateWithStore, ok := handlerCtx.State.(core.ThreadStateWithStore)
-	if !ok {
-		return fmt.Errorf("state does not implement ThreadStateWithStore")
-	}
-
-	agentThread, exists := stateWithStore.GetAgentThread(handlerCtx.ThreadID)
-	if !exists {
-		return fmt.Errorf("thread not found: %s", handlerCtx.ThreadID)
-	}
-
-	// Create a clean handoff message with just the question and optional context
-	handoffContent := question
-	if context != "" {
-		handoffContent = fmt.Sprintf("%s\n\nContext: %s", question, context)
-	}
-
-	triggerMsg := domain.Message{
-		ID:        domain.GenerateMessageID(),
-		Role:      emittedBy,
-		Timestamp: time.Now(),
-		Content:   handoffContent,
-		Metadata: map[string]any{
-			"handoff_from": emittedBy,
-			"event_type":   "question.statistics",
-		},
-	}
-	_ = agentThread.AddMessages([]domain.Message{triggerMsg})
-
-	messageID := domain.GenerateMessageID()
-
-	runOpts := core.DefaultRunOptions()
-
-	err := handlerCtx.Agent.RunWithThread(ctx, handlerCtx.ThreadID, messageID, agentThread, func(event core.Event) error {
-		return nil
-	}, runOpts)
-	if err != nil {
-		slog.Error("Statistics handler failed", "error", err)
-		return err
-	}
-
-	slog.Info("Statistics question handled successfully")
-	return nil
-}
-
-// Contract defines the event-driven contract for the statistics instructor.
+// Contract defines the contract for the statistics instructor.
 var Contract = &eventbus.AgentContract{
 	Name: "statistics-instructor",
 
-	ListensTo: []agents.EventType{}, // Agent activation handled through handoffs
-
-	Handlers: handlers(),
-	Tools:    domainTools(),
-
+	Tools:   domainTools(),
 	Factory: CreateStatisticsInstructor,
 }
