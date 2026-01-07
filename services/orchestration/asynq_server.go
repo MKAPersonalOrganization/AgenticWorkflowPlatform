@@ -166,52 +166,8 @@ func (s *AsynqServer) GetTaskInfo(queue, taskID string) (*asynq.TaskInfo, error)
 	inspector := asynq.NewInspector(asynq.RedisClientOpt{Addr: s.redisAddr})
 	defer inspector.Close()
 
-	tasks, err := inspector.ListPendingTasks(queue)
-	if err == nil {
-		for _, task := range tasks {
-			if task.ID == taskID {
-				return task, nil
-			}
-		}
-	}
-
-	tasks, err = inspector.ListActiveTasks(queue)
-	if err == nil {
-		for _, task := range tasks {
-			if task.ID == taskID {
-				return task, nil
-			}
-		}
-	}
-
-	tasks, err = inspector.ListScheduledTasks(queue)
-	if err == nil {
-		for _, task := range tasks {
-			if task.ID == taskID {
-				return task, nil
-			}
-		}
-	}
-
-	tasks, err = inspector.ListRetryTasks(queue)
-	if err == nil {
-		for _, task := range tasks {
-			if task.ID == taskID {
-				return task, nil
-			}
-		}
-	}
-
-	tasks, err = inspector.ListArchivedTasks(queue)
-	if err == nil {
-		for _, task := range tasks {
-			if task.ID == taskID {
-				return task, nil
-			}
-		}
-	}
-
-	return nil, fmt.Errorf("task not found: %s", taskID)
+	// Use Inspector's GetTaskInfo which efficiently looks up the task
+	return inspector.GetTaskInfo(queue, taskID)
 }
 
 // CancelTask attempts to cancel a task by job ID
