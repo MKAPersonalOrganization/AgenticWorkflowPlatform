@@ -412,8 +412,7 @@ func (wp *WorkerPool) continueWithAgentDirect(ctx context.Context, threadID, age
 		wp.log,
 		wp.state,
 		chatwrite.WithConfig(agentConfig),
-		chatwrite.WithToolCallHandler(eventbus.CreateToolCallHandler(eventbus.GlobalContracts, wp.state, wp.whiteboardProjection)),
-		chatwrite.WithShouldContinueIteration(eventbus.CreateShouldContinueIterationFn(eventbus.GlobalContracts)),
+		chatwrite.WithShouldContinueIteration(eventbus.CreateShouldContinueIterationFn()),
 		chatwrite.WithRequestContextCapture(&handoffReqCtx), // Capture context to check handoff
 	)
 

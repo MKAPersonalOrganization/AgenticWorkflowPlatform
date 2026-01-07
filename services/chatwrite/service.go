@@ -36,9 +36,6 @@ type ThreadStore interface {
 	Update(event core.Event) error
 }
 
-// ToolCallHandler is called after a tool is executed, allowing custom event emission
-type ToolCallHandler func(threadID string, agentName string, toolCall domain.ToolCall, result string, eventEmitter func(core.Event) error) error
-
 // ShouldContinueIterationFn determines if the agent should continue iterating after tool calls
 type ShouldContinueIterationFn func(toolCalls []domain.ToolCall) bool
 
@@ -51,7 +48,6 @@ type ChatWriteService struct {
 	readModel               ThreadStore
 	toolRegistry            *core.ToolRegistry
 	notifier                core.EventNotifier // Agent's own notifier
-	toolCallHandler         ToolCallHandler
 	shouldContinueIteration ShouldContinueIterationFn
 	reqCtxCapture           **core.RequestContext // Captures the request context for handoff detection
 }
@@ -63,13 +59,6 @@ type Option func(*ChatWriteService)
 func WithConfig(config core.AgentConfig) Option {
 	return func(h *ChatWriteService) {
 		h.config = config
-	}
-}
-
-// WithToolCallHandler configures the agent with a tool call handler for custom event emission
-func WithToolCallHandler(handler ToolCallHandler) Option {
-	return func(h *ChatWriteService) {
-		h.toolCallHandler = handler
 	}
 }
 
@@ -453,16 +442,6 @@ func (h *ChatWriteService) executeToolCallWithExecutor(threadID string, toolCall
 	result, err := executor.Execute(toolCall)
 	if err != nil {
 		return result, err
-	}
-
-	// If a tool call handler is configured, call it for custom event emission
-	if h.toolCallHandler != nil {
-		emitFn := func(event core.Event) error {
-			return h.emitDomainEvent(event, eventHandler)
-		}
-		if err := h.toolCallHandler(threadID, h.config.Name, toolCall, result, emitFn); err != nil {
-			return result, err
-		}
 	}
 
 	return result, nil
