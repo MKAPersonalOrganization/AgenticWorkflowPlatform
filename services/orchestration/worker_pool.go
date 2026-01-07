@@ -428,9 +428,7 @@ func (wp *WorkerPool) continueWithAgentDirect(ctx context.Context, threadID, age
 
 	// Run the agent with the current thread state
 	runOpts := core.DefaultRunOptions()
-	err := agentInstance.RunWithThread(ctx, threadID, messageID, agentThread, func(event core.Event) error {
-		return nil
-	}, runOpts)
+	err := agentInstance.RunWithThread(ctx, threadID, messageID, agentThread, runOpts)
 	if err != nil {
 		slog.Error("Agent run failed", "agent", agentName, "error", err)
 		errorEvent := aguievents.NewRunErrorEvent(
