@@ -13,13 +13,6 @@ const (
 	EventTypeUserMessage               EventType = "user.message"
 	EventTypeInstructorThought         EventType = "instructor.thought"
 	EventTypeInstructorStrategyChanged EventType = "instructor.strategy_changed"
-	EventTypeQuestionAnswered          EventType = "question.answered"
-	EventTypeMathQuestion              EventType = "question.math"
-	EventTypePhysicsQuestion           EventType = "question.physics"
-	EventTypeChemistryQuestion         EventType = "question.chemistry"
-	EventTypeStatisticsQuestion        EventType = "question.statistics"
-	EventTypeLinearAlgebraQuestion     EventType = "question.linearalgebra"
-	EventTypeDiagrammingQuestion       EventType = "question.diagramming"
 	EventTypeAgentHandoff              EventType = "agent.handoff"
 )
 
@@ -104,124 +97,6 @@ func NewInstructorStrategyChangedEvent(threadID, instructorName, oldStrategy, ne
 			"old_strategy":    oldStrategy,
 			"new_strategy":    newStrategy,
 			"reason":          reason,
-		},
-	}
-}
-
-func NewQuestionAnsweredEvent(threadID, subject, answer, answeredBy, whiteboardState string) *DomainEvent {
-	return &DomainEvent{
-		ID:        GenerateEventID(),
-		Type:      EventTypeQuestionAnswered,
-		Timestamp: time.Now(),
-		ThreadID:  threadID,
-		Version:   1,
-		Data: map[string]interface{}{
-			"subject":          subject,
-			"answer":           answer,
-			"answered_by":      answeredBy,
-			"whiteboard_state": whiteboardState,
-		},
-	}
-}
-
-// NewMathQuestionEvent creates a math question event
-func NewMathQuestionEvent(threadID, question, emittedBy, context, whiteboardState string) *DomainEvent {
-	return &DomainEvent{
-		ID:        GenerateEventID(),
-		Type:      EventTypeMathQuestion,
-		Timestamp: time.Now(),
-		ThreadID:  threadID,
-		Version:   1,
-		Data: map[string]interface{}{
-			"question":         question,
-			"emitted_by":       emittedBy,
-			"context":          context,
-			"whiteboard_state": whiteboardState,
-		},
-	}
-}
-
-// NewPhysicsQuestionEvent creates a physics question event
-func NewPhysicsQuestionEvent(threadID, question, emittedBy, context, whiteboardState string) *DomainEvent {
-	return &DomainEvent{
-		ID:        GenerateEventID(),
-		Type:      EventTypePhysicsQuestion,
-		Timestamp: time.Now(),
-		ThreadID:  threadID,
-		Version:   1,
-		Data: map[string]interface{}{
-			"question":         question,
-			"emitted_by":       emittedBy,
-			"context":          context,
-			"whiteboard_state": whiteboardState,
-		},
-	}
-}
-
-// NewChemistryQuestionEvent creates a chemistry question event
-func NewChemistryQuestionEvent(threadID, question, emittedBy, context, whiteboardState string) *DomainEvent {
-	return &DomainEvent{
-		ID:        GenerateEventID(),
-		Type:      EventTypeChemistryQuestion,
-		Timestamp: time.Now(),
-		ThreadID:  threadID,
-		Version:   1,
-		Data: map[string]interface{}{
-			"question":         question,
-			"emitted_by":       emittedBy,
-			"context":          context,
-			"whiteboard_state": whiteboardState,
-		},
-	}
-}
-
-// NewStatisticsQuestionEvent creates a statistics question event
-func NewStatisticsQuestionEvent(threadID, question, emittedBy, context, whiteboardState string) *DomainEvent {
-	return &DomainEvent{
-		ID:        GenerateEventID(),
-		Type:      EventTypeStatisticsQuestion,
-		Timestamp: time.Now(),
-		ThreadID:  threadID,
-		Version:   1,
-		Data: map[string]interface{}{
-			"question":         question,
-			"emitted_by":       emittedBy,
-			"context":          context,
-			"whiteboard_state": whiteboardState,
-		},
-	}
-}
-
-// NewLinearAlgebraQuestionEvent creates a linear algebra question event
-func NewLinearAlgebraQuestionEvent(threadID, question, emittedBy, context, whiteboardState string) *DomainEvent {
-	return &DomainEvent{
-		ID:        GenerateEventID(),
-		Type:      EventTypeLinearAlgebraQuestion,
-		Timestamp: time.Now(),
-		ThreadID:  threadID,
-		Version:   1,
-		Data: map[string]interface{}{
-			"question":         question,
-			"emitted_by":       emittedBy,
-			"context":          context,
-			"whiteboard_state": whiteboardState,
-		},
-	}
-}
-
-// NewDiagrammingQuestionEvent creates a diagramming question event
-func NewDiagrammingQuestionEvent(threadID, request, emittedBy, context, whiteboardState string) *DomainEvent {
-	return &DomainEvent{
-		ID:        GenerateEventID(),
-		Type:      EventTypeDiagrammingQuestion,
-		Timestamp: time.Now(),
-		ThreadID:  threadID,
-		Version:   1,
-		Data: map[string]interface{}{
-			"request":          request,
-			"emitted_by":       emittedBy,
-			"context":          context,
-			"whiteboard_state": whiteboardState,
 		},
 	}
 }

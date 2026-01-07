@@ -24,12 +24,7 @@ func domainTools() []core.Tool {
 
 // handlers returns the event handlers for this agent
 func handlers() agents.EventHandlerRegistry {
-	registry := make(agents.EventHandlerRegistry)
-
-	// Handler for linear algebra questions
-	registry.Register(agents.EventTypeLinearAlgebraQuestion, handleLinearAlgebraQuestion)
-
-	return registry
+	return make(agents.EventHandlerRegistry) // No custom event handlers needed
 }
 
 // handleLinearAlgebraQuestion handles incoming linear algebra questions.
@@ -104,9 +99,7 @@ func handleLinearAlgebraQuestion(ctx context.Context, handlerCtx *agents.EventHa
 var Contract = &eventbus.AgentContract{
 	Name: "linearalgebra-professor",
 
-	ListensTo: []agents.EventType{
-		agents.EventTypeLinearAlgebraQuestion,
-	},
+	ListensTo: []agents.EventType{}, // Agent activation handled through handoffs
 
 	Handlers: handlers(),
 	Tools:    domainTools(),

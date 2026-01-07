@@ -20,11 +20,7 @@ func domainTools() []core.Tool {
 }
 
 func handlers() agents.EventHandlerRegistry {
-	registry := make(agents.EventHandlerRegistry)
-
-	registry.Register(agents.EventTypeDiagrammingQuestion, handleDiagrammingQuestion)
-
-	return registry
+	return make(agents.EventHandlerRegistry) // No custom event handlers needed
 }
 
 func handleDiagrammingQuestion(ctx context.Context, handlerCtx *agents.EventHandlerContext) error {
@@ -94,9 +90,7 @@ func handleDiagrammingQuestion(ctx context.Context, handlerCtx *agents.EventHand
 var Contract = &eventbus.AgentContract{
 	Name: "diagramming-instructor",
 
-	ListensTo: []agents.EventType{
-		agents.EventTypeDiagrammingQuestion,
-	},
+	ListensTo: []agents.EventType{}, // Agent activation handled through handoffs
 
 	Handlers: handlers(),
 	Tools:    domainTools(),

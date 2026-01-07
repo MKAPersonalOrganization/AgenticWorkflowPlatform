@@ -229,25 +229,6 @@ func (p *InMemoryAguiProjection) applyDomainEvent(thread *AguiThreadState, evt *
 			},
 		}
 		p.addMessage(thread, msg)
-
-	case domain.EventTypeMathQuestion,
-		domain.EventTypePhysicsQuestion,
-		domain.EventTypeChemistryQuestion,
-		domain.EventTypeStatisticsQuestion,
-		domain.EventTypeLinearAlgebraQuestion,
-		domain.EventTypeDiagrammingQuestion:
-		// Question events - could add to activity log if needed
-		agentName := evt.GetString("emitted_by")
-		if agentName != "" {
-			p.updateAgentActivity(thread, agentName, evt.Timestamp)
-		}
-
-	case domain.EventTypeQuestionAnswered:
-		// Answer events - track activity
-		agentName := evt.GetString("answered_by")
-		if agentName != "" {
-			p.updateAgentActivity(thread, agentName, evt.Timestamp)
-		}
 	}
 }
 
