@@ -5,25 +5,30 @@ import (
 
 	"school-with-ai/domain"
 	"school-with-ai/infra/projection/agui"
-	"school-with-ai/infra/projection/llmcontext"
 	"school-with-ai/infra/projection/whiteboard"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
+
+// LLMContextProjection defines the interface for LLM context projections
+type LLMContextProjection interface {
+	Get(threadID string) (*domain.Thread, bool)
+	All() []domain.Thread
+}
 
 // ProjectionService implements the services.ProjectionService interface
 // This is in the infra layer and can use concrete projection types
 type ProjectionService struct {
 	aguiProjection       agui.AguiProjection
 	whiteboardProjection whiteboard.WhiteboardStore
-	llmContextProjection *llmcontext.InMemoryLLMContextProjection
+	llmContextProjection LLMContextProjection
 }
 
 // NewProjectionService creates a new projection service
 func NewProjectionService(
 	aguiProj agui.AguiProjection,
 	whiteboardProj whiteboard.WhiteboardStore,
-	llmContextProj *llmcontext.InMemoryLLMContextProjection,
+	llmContextProj LLMContextProjection,
 ) *ProjectionService {
 	return &ProjectionService{
 		aguiProjection:       aguiProj,

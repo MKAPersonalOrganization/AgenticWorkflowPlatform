@@ -65,3 +65,7 @@ var _ core.EventStore = (*ProjectionEventStore)(nil)
 func (p *ProjectionEventStore) ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]core.Event, error) {
 	return p.wrapped.ReadStream(ctx, streamID, fromVersion)
 }
+
+func (p *ProjectionEventStore) DeleteStream(ctx context.Context, streamID string) error {
+	return p.wrapped.DeleteStream(ctx, streamID)
+}

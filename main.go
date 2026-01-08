@@ -15,7 +15,7 @@ import (
 	"school-with-ai/infra/eventstore"
 	"school-with-ai/infra/eventstore/kurrentdb"
 	"school-with-ai/infra/projection/agui"
-	"school-with-ai/infra/projection/llmcontext"
+	"school-with-ai/infra/projection/querytime"
 	"school-with-ai/infra/projection/whiteboard"
 	"school-with-ai/infra/projections"
 	"school-with-ai/sdk/agentsdk/llm"
@@ -62,16 +62,20 @@ func main() {
 	}
 	defer baseEventStore.Close()
 
-	llmContextProjection := llmcontext.NewInMemoryLLMContextProjection()
-
-	// Initialize AGUI projection (reads from event store)
-	aguiProjection := agui.NewInMemoryAguiProjection()
+	// Initialize query-time AGUI projection (reads directly from event store on each query)
+	aguiProjection := agui.NewQueryTimeAguiProjection(baseEventStore)
 
 	// Initialize Whiteboard projection (reads from event store)
 	whiteboardProjection := whiteboard.NewInMemoryWhiteboardProjection()
 
-	// Wrap event store to automatically update projections
-	eventLog := eventstore.NewProjectionEventStore(baseEventStore, llmContextProjection, aguiProjection, whiteboardProjection)
+	// Wrap event store to automatically update projections (only Whiteboard now)
+	// Both LLM context and AGUI are now query-time, so they don't need projection updates
+	eventLog := eventstore.NewProjectionEventStore(baseEventStore, whiteboardProjection)
+
+	// Initialize query-time LLM context projection (reads directly from event store)
+	// Uses AGUI projection to get list of all threads for the All() method
+	// Use baseEventStore directly since we don't need wrapper for query-time projections
+	llmContextProjection := querytime.NewQueryTimeLLMContextProjection(baseEventStore, aguiProjection)
 
 	// Initialize OpenAI chat client with model
 	model := string(openai.ChatModelGPT4oMini) // Use GPT-4o-mini for cost efficiency
