@@ -161,7 +161,10 @@ func (t *WriteTodosTool) Invoke(ctx context.Context, arguments string) (string, 
 		return "", fmt.Errorf("failed to parse todo arguments: %w", err)
 	}
 
-	todosJSON, _ := json.Marshal(args.Todos)
+	todosJSON, err := json.Marshal(args.Todos)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal todos: %w", err)
+	}
 
 	return "Updated todo list to " + string(todosJSON), nil
 }

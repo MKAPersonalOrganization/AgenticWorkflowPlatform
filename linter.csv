@@ -1,2 +1,5 @@
-bodyclose,containedctx,contextcheck,cyclop,depguard,dupl,err113,errchkjson,exhaustive,exhaustruct,forbidigo,forcetypeassert,funcorder,funlen,gochecknoglobals,gochecknoinits,gocognit,goconst,gocritic,gocyclo,godox,gosec,ireturn,lll,mnd,nestif,noctx,noinlineerr,paralleltest,revive,tagliatelle,testifylint,testpackage,unconvert,unparam,usetesting,varnamelen,wrapcheck
-8,2,10,21,180,3,116,53,3,319,13,75,14,16,1645,1,8,10,5,1,1,6,16,503,47,9,2,90,259,348,17,21,26,11,1,15,59,33
+bodyclose,containedctx,contextcheck,cyclop,depguard,dupl,err113,errcheck,errchkjson,exhaustive,exhaustruct,forbidigo,forcetypeassert,funcorder,funlen,gochecknoglobals,gochecknoinits,gocognit,goconst,gocritic,gocyclo,godox,gosec,ireturn,lll,mnd,modernize,nestif,noctx,noinlineerr,paralleltest,revive,staticcheck,tagliatelle,testifylint,testpackage,unconvert,unparam,usetesting,varnamelen,wrapcheck
+8,2,10,21,180,3,116,0,53,3,319,13,75,14,16,1645,1,8,10,5,1,1,6,16,503,47,0,9,2,90,259,348,0,17,21,26,11,1,15,59,33
+0,2,10,22,180,3,116,8,52,3,319,13,75,14,16,1645,1,8,11,5,1,1,6,17,503,47,6,8,2,90,259,349,1,17,21,26,11,1,15,59,33
+0,2,10,21,180,3,117,14,52,3,319,17,75,14,16,1646,1,8,11,5,1,1,11,18,503,49,8,8,4,96,259,350,1,17,21,26,11,1,15,59,33
+0,2,10,22,180,3,117,14,52,3,319,17,75,14,16,1646,1,8,11,5,1,1,11,17,503,49,8,8,4,96,259,350,1,17,21,26,11,1,15,59,33
