@@ -124,7 +124,8 @@ func (p *InMemoryAguiProjection) Apply(ctx context.Context, event core.Event) er
 	case *core.AssistantMessageCompletedEvent:
 		if msg, exists := p.streamingMessages[evt.MessageID]; exists {
 			msg.Status = "complete"
-			msg.Content = evt.Content // Final content
+			msg.Content = evt.Content     // Final content
+			msg.AgentName = evt.AgentName // Store agent name for tool calls
 			if len(evt.ToolCalls) > 0 {
 				msg.ToolCalls = make([]AguiMessageToolCall, len(evt.ToolCalls))
 				for i, tc := range evt.ToolCalls {

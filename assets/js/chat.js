@@ -1470,8 +1470,23 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
+        /**
+         * Convert backend AGUI messages to UI display format
+         * 
+         * UNIFIED DATA SOURCE: Both SSE and REST API read from AGUI projection and convert to AG-UI SDK format.
+         * - REST API: GET /api/agui/threads/{id}/messages → converts AguiMessage to aguievents.Message
+         * - SSE: GET /v1/tasks/{id}/events → sends MESSAGES_SNAPSHOT in aguievents.Message format
+         * 
+         * Format: AG-UI SDK standard (nested structure)
+         * - toolCalls: [{id, type: "function", function: {name, arguments}}]
+         * - toolCallID: pointer to string for tool result messages
+         * - name: pointer to string for agent name
+         * 
+         * @param {Array<aguievents.Message>} backendMessages - Messages in AG-UI SDK format
+         * @returns {Array<UIMessage>} - Converted messages for UI display
+         */
         __convertBackendMessagesToUI(backendMessages) {
-            // Convert backend/AG-UI messages to UI format
+            // Convert AG-UI SDK messages to UI format
             // Handles: user, assistant (with tool calls), tool, system, developer messages
 
             // Guard: Validate input (Alpine defensive pattern)
@@ -1503,17 +1518,22 @@ document.addEventListener('alpine:init', () => {
                         // Check for tool calls first
                         if (msg.toolCalls && msg.toolCalls.length > 0) {
                             // Add tool call messages - results will be paired later
-                            // Per AG-UI protocol: msg.name contains the agent name for assistant messages
-                            const agentName = msg.name || msg.agentName || 'agent';
+                            // AG-UI SDK format: msg.name is a pointer to agent name string
+                            const agentName = msg.name || 'agent';
+
                             for (const toolCall of msg.toolCalls) {
+                                // AG-UI SDK format: nested structure {id, type, function: {name, arguments}}
+                                const toolName = toolCall.function?.name || 'unknown';
+                                const toolArgs = toolCall.function?.arguments || '{}';
+
                                 uiMessages.push({
                                     id: toolCall.id,
                                     type: 'tool_call',
-                                    name: toolCall.function?.name || 'unknown',
-                                    args: toolCall.function?.arguments || '{}',
+                                    name: toolName,
+                                    args: toolArgs,
                                     status: 'completed',
                                     timestamp: msg.timestamp || new Date().toISOString(),
-                                    parsedArgs: this.safeParseJSON(toolCall.function?.arguments),
+                                    parsedArgs: this.safeParseJSON(toolArgs),
                                     result: null, // Will be filled by pairing logic
                                     agentName: agentName
                                 });
@@ -1534,10 +1554,12 @@ document.addEventListener('alpine:init', () => {
 
                     case 'tool':
                         // Tool result - will be paired with tool call
+                        // AG-UI SDK format: toolCallID is a pointer to string
+                        const toolCallId = msg.toolCallID || null;
                         uiMessages.push({
                             id: msg.id,
                             type: 'tool_result',
-                            toolCallId: msg.toolCallId,
+                            toolCallId: toolCallId,
                             content: msg.content || '',
                             timestamp: msg.timestamp || new Date().toISOString()
                         });

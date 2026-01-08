@@ -5,7 +5,48 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
+
+	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
+
+// convertToAGUISDKFormat converts AguiMessage to aguievents.Message (AG-UI SDK format)
+// This ensures all REST API endpoints return the same format as SSE (unified data format)
+func convertToAGUISDKFormat(projectionMessages []AguiMessage) []aguievents.Message {
+	aguiMessages := make([]aguievents.Message, 0, len(projectionMessages))
+	for _, msg := range projectionMessages {
+		aguiMsg := aguievents.Message{
+			ID:   msg.ID,
+			Role: msg.Role,
+		}
+		if msg.Content != "" {
+			aguiMsg.Content = &msg.Content
+		}
+		if msg.AgentName != "" {
+			aguiMsg.Name = &msg.AgentName
+		}
+		// Convert tool calls from flat to nested format
+		if len(msg.ToolCalls) > 0 {
+			toolCalls := make([]aguievents.ToolCall, len(msg.ToolCalls))
+			for i, tc := range msg.ToolCalls {
+				toolCalls[i] = aguievents.ToolCall{
+					ID:   tc.ID,
+					Type: "function",
+					Function: aguievents.Function{
+						Name:      tc.Name,
+						Arguments: tc.Arguments,
+					},
+				}
+			}
+			aguiMsg.ToolCalls = toolCalls
+		}
+		// Convert tool call result
+		if msg.ToolCall != nil {
+			aguiMsg.ToolCallID = &msg.ToolCall.ID
+		}
+		aguiMessages = append(aguiMessages, aguiMsg)
+	}
+	return aguiMessages
+}
 
 // AguiProjectionHandler provides HTTP endpoints for querying the AGUI projection.
 type AguiProjectionHandler struct {
@@ -67,11 +108,12 @@ func (h *AguiProjectionHandler) GetMessages(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	messages := h.projection.GetMessages(threadID)
+	projectionMessages := h.projection.GetMessages(threadID)
+	aguiMessages := convertToAGUISDKFormat(projectionMessages)
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(map[string]interface{}{
-		"messages": messages,
+		"messages": aguiMessages,
 	}); err != nil {
 		slog.Error("Failed to encode messages", "error", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
@@ -147,10 +189,13 @@ func (h *AguiProjectionHandler) ListThreads(w http.ResponseWriter, r *http.Reque
 			}
 		}
 
+		// Convert messages to AG-UI SDK format for consistency
+		aguiMessages := convertToAGUISDKFormat(state.Messages)
+
 		threads = append(threads, map[string]interface{}{
 			"id":                threadID,
 			"title":             state.Title,
-			"messages":          state.Messages,
+			"messages":          aguiMessages,
 			"createdAt":         state.CreatedAt,
 			"updatedAt":         state.UpdatedAt,
 			"whiteboardContent": whiteboardContent,

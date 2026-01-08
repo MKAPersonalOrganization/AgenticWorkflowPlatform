@@ -125,7 +125,7 @@ func (w *ChatWorker) processChat(ctx context.Context, payload ProcessChatPayload
 	runID := aguievents.GenerateRunID()
 
 	// Create event emitter for SSE streaming
-	emitter := w.eventBufferManager.CreateEmitter(payload.JobID)
+	emitter := w.eventBufferManager.CreateEmitter(payload.JobID, payload.ThreadID)
 	defer w.eventBufferManager.CloseEmitter(payload.JobID)
 
 	// Send RUN_STARTED event
@@ -227,9 +227,6 @@ func (w *ChatWorker) continueWithAgentDirect(ctx context.Context, threadID, agen
 		return
 	}
 
-	// Emit updated messages snapshot
-	w.emitMessagesSnapshot(emitter, threadID)
-
 	slog.Info("Agent run completed (direct)", "agent", agentName)
 
 	// Check for agent handoff
@@ -243,38 +240,6 @@ func (w *ChatWorker) continueWithAgentDirect(ctx context.Context, threadID, agen
 
 			// Continue with target agent (recursive)
 			w.continueWithAgentDirect(ctx, threadID, handoff.TargetAgent, emitter, runID)
-		}
-	}
-}
-
-// emitMessagesSnapshot emits a MESSAGES_SNAPSHOT event
-func (w *ChatWorker) emitMessagesSnapshot(emitter EventEmitter, threadID string) {
-	sessionMessages := w.state.Messages(threadID)
-
-	// Convert session messages to agui messages
-	aguiMessages := make([]aguievents.Message, 0, len(sessionMessages))
-	for _, msg := range sessionMessages {
-		aguiMsg := ConvertSessionMessageToAGUI(msg)
-		aguiMessages = append(aguiMessages, aguiMsg)
-	}
-
-	// Emit MESSAGES_SNAPSHOT event
-	messagesSnapshotEvent := aguievents.NewMessagesSnapshotEvent(aguiMessages)
-	_ = emitter.Emit(messagesSnapshotEvent)
-
-	// Emit tool call agent mappings
-	for _, msg := range sessionMessages {
-		if msg.Role == "assistant" && len(msg.ToolCalls) > 0 && msg.AgentName != "" {
-			for _, tc := range msg.ToolCalls {
-				agentEvent := aguievents.NewCustomEvent(
-					"TOOL_CALL_AGENT",
-					aguievents.WithValue(map[string]interface{}{
-						"toolCallId": tc.ID,
-						"agentName":  msg.AgentName,
-					}),
-				)
-				_ = emitter.Emit(agentEvent)
-			}
 		}
 	}
 }
