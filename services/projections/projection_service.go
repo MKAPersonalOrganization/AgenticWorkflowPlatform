@@ -4,26 +4,39 @@ import (
 	"fmt"
 
 	"school-with-ai/domain"
-	"school-with-ai/infra/projection/agui"
-	"school-with-ai/infra/projection/llmcontext"
-	"school-with-ai/infra/projection/whiteboard"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
 
+// WhiteboardReader provides read access to whiteboard content
+type WhiteboardReader interface {
+	Get(threadID string) string
+}
+
+// AguiProjection provides access to AGUI thread state
+type AguiProjection interface {
+	GetThreadState(threadID string) (interface{}, bool)
+	GetMessages(threadID string) []aguievents.Message
+}
+
+// LLMContextReader provides read access to LLM context projections
+type LLMContextReader interface {
+	Get(threadID string) (*domain.Thread, bool)
+	All() []domain.Thread
+}
+
 // projectionService implements the services.ProjectionService interface
-// Services can depend on infra - this maintains clean architecture boundaries
 type projectionService struct {
-	aguiProjection       agui.AguiProjection
-	whiteboardProjection whiteboard.WhiteboardStore
-	llmContextProjection *llmcontext.InMemoryLLMContextProjection
+	aguiProjection       AguiProjection
+	whiteboardProjection WhiteboardReader
+	llmContextProjection LLMContextReader
 }
 
 // NewProjectionService creates a new projection service
 func NewProjectionService(
-	aguiProj agui.AguiProjection,
-	whiteboardProj whiteboard.WhiteboardStore,
-	llmContextProj *llmcontext.InMemoryLLMContextProjection,
+	aguiProj AguiProjection,
+	whiteboardProj WhiteboardReader,
+	llmContextProj LLMContextReader,
 ) *projectionService {
 	return &projectionService{
 		aguiProjection:       aguiProj,
