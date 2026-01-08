@@ -133,7 +133,7 @@ func TestMermaidDiagramTool_ClassDiagram(t *testing.T) {
 func TestMermaidDiagramTool_StateDiagram(t *testing.T) {
 	tool := NewMermaidDiagramTool()
 
-	mermaidCode := "stateDiagram-v2\n    [*] --> Idle\n    --> Processing: Start Task\n    Processing --> Success: Complete\n    Processing --> Error: Fail\n    Success --> [*]\n    Error --> Idle: Retry\n    Error --> [*]: Give Up"
+	mermaidCode := "stateDiagram-v2\n    [*] --> Idle\n    Idle --> Processing: Start Task\n    Processing --> Success: Complete\n    Processing --> Error: Fail\n    Success --> [*]\n    Error --> Idle: Retry\n    Error --> [*]: Give Up"
 
 	args := MermaidDiagramArgs{
 		MermaidCode: mermaidCode,
