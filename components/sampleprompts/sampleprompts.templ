@@ -5,7 +5,7 @@ templ SamplePrompts() {
 	<div class="w-full space-y-3" x-data="{ selectedCategory: null }">
 		<p class="text-sm font-medium text-muted-foreground">Explore subjects:</p>
 		<!-- Category Buttons -->
-		<div class="grid gap-2 md:grid-cols-2">
+		<div class="grid gap-2 grid-cols-2 md:grid-cols-4">
 			<!-- Math Category -->
 			<button
 				@click="selectedCategory = selectedCategory === 'math' ? null : 'math'"
@@ -83,6 +83,87 @@ templ SamplePrompts() {
 						<p class="text-sm font-medium">Biology</p>
 					</div>
 					<svg class="w-4 h-4 transition-transform" :class="selectedCategory === 'biology' ? 'rotate-180' : ''" fill="currentColor" viewBox="0 0 20 20">
+						<path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+					</svg>
+				</div>
+			</button>
+			<!-- History Category -->
+			<button
+				@click="selectedCategory = selectedCategory === 'history' ? null : 'history'"
+				class="text-left p-4 rounded-lg border border-border bg-card hover:bg-accent transition-all"
+				:class="selectedCategory === 'history' ? 'border-primary bg-accent' : ''"
+			>
+				<div class="flex items-center justify-between">
+					<div class="flex items-center gap-3">
+						<div class="shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+							<svg class="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
+								<path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"></path>
+							</svg>
+						</div>
+						<p class="text-sm font-medium">History</p>
+					</div>
+					<svg class="w-4 h-4 transition-transform" :class="selectedCategory === 'history' ? 'rotate-180' : ''" fill="currentColor" viewBox="0 0 20 20">
+						<path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+					</svg>
+				</div>
+			</button>
+			<!-- Literature Category -->
+			<button
+				@click="selectedCategory = selectedCategory === 'literature' ? null : 'literature'"
+				class="text-left p-4 rounded-lg border border-border bg-card hover:bg-accent transition-all"
+				:class="selectedCategory === 'literature' ? 'border-primary bg-accent' : ''"
+			>
+				<div class="flex items-center justify-between">
+					<div class="flex items-center gap-3">
+						<div class="shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+							<svg class="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
+								<path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"></path>
+							</svg>
+						</div>
+						<p class="text-sm font-medium">Literature</p>
+					</div>
+					<svg class="w-4 h-4 transition-transform" :class="selectedCategory === 'literature' ? 'rotate-180' : ''" fill="currentColor" viewBox="0 0 20 20">
+						<path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+					</svg>
+				</div>
+			</button>
+			<!-- Computer Science Category -->
+			<button
+				@click="selectedCategory = selectedCategory === 'cs' ? null : 'cs'"
+				class="text-left p-4 rounded-lg border border-border bg-card hover:bg-accent transition-all"
+				:class="selectedCategory === 'cs' ? 'border-primary bg-accent' : ''"
+			>
+				<div class="flex items-center justify-between">
+					<div class="flex items-center gap-3">
+						<div class="shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+							<svg class="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
+								<path fill-rule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+							</svg>
+						</div>
+						<p class="text-sm font-medium">Computer Science</p>
+					</div>
+					<svg class="w-4 h-4 transition-transform" :class="selectedCategory === 'cs' ? 'rotate-180' : ''" fill="currentColor" viewBox="0 0 20 20">
+						<path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+					</svg>
+				</div>
+			</button>
+			<!-- Economics Category -->
+			<button
+				@click="selectedCategory = selectedCategory === 'economics' ? null : 'economics'"
+				class="text-left p-4 rounded-lg border border-border bg-card hover:bg-accent transition-all"
+				:class="selectedCategory === 'economics' ? 'border-primary bg-accent' : ''"
+			>
+				<div class="flex items-center justify-between">
+					<div class="flex items-center gap-3">
+						<div class="shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+							<svg class="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
+								<path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"></path>
+								<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clip-rule="evenodd"></path>
+							</svg>
+						</div>
+						<p class="text-sm font-medium">Economics</p>
+					</div>
+					<svg class="w-4 h-4 transition-transform" :class="selectedCategory === 'economics' ? 'rotate-180' : ''" fill="currentColor" viewBox="0 0 20 20">
 						<path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path>
 					</svg>
 				</div>
@@ -176,6 +257,90 @@ templ SamplePrompts() {
 				class="w-full text-left p-3 rounded-lg border border-border bg-card/50 hover:bg-accent hover:border-primary transition-all text-sm"
 			>
 				Describe the structure of DNA
+			</button>
+		</div>
+		<!-- History Examples -->
+		<div x-show="selectedCategory === 'history'" x-collapse class="space-y-2">
+			<button
+				@click="currentMessage = 'Explain the causes of World War I'; sendMessage()"
+				class="w-full text-left p-3 rounded-lg border border-border bg-card/50 hover:bg-accent hover:border-primary transition-all text-sm"
+			>
+				Explain the causes of World War I
+			</button>
+			<button
+				@click="currentMessage = 'What were the key events of the French Revolution?'; sendMessage()"
+				class="w-full text-left p-3 rounded-lg border border-border bg-card/50 hover:bg-accent hover:border-primary transition-all text-sm"
+			>
+				What were the key events of the French Revolution?
+			</button>
+			<button
+				@click="currentMessage = 'Describe the impact of the Industrial Revolution on society'; sendMessage()"
+				class="w-full text-left p-3 rounded-lg border border-border bg-card/50 hover:bg-accent hover:border-primary transition-all text-sm"
+			>
+				Describe the impact of the Industrial Revolution on society
+			</button>
+		</div>
+		<!-- Literature Examples -->
+		<div x-show="selectedCategory === 'literature'" x-collapse class="space-y-2">
+			<button
+				@click="currentMessage = 'Analyze the theme of revenge in Hamlet'; sendMessage()"
+				class="w-full text-left p-3 rounded-lg border border-border bg-card/50 hover:bg-accent hover:border-primary transition-all text-sm"
+			>
+				Analyze the theme of revenge in Hamlet
+			</button>
+			<button
+				@click="currentMessage = 'What are the main literary devices in To Kill a Mockingbird?'; sendMessage()"
+				class="w-full text-left p-3 rounded-lg border border-border bg-card/50 hover:bg-accent hover:border-primary transition-all text-sm"
+			>
+				What are the main literary devices in To Kill a Mockingbird?
+			</button>
+			<button
+				@click="currentMessage = 'Compare and contrast a sonnet and a haiku'; sendMessage()"
+				class="w-full text-left p-3 rounded-lg border border-border bg-card/50 hover:bg-accent hover:border-primary transition-all text-sm"
+			>
+				Compare and contrast a sonnet and a haiku
+			</button>
+		</div>
+		<!-- Computer Science Examples -->
+		<div x-show="selectedCategory === 'cs'" x-collapse class="space-y-2">
+			<button
+				@click="currentMessage = 'Explain what an algorithm is with examples'; sendMessage()"
+				class="w-full text-left p-3 rounded-lg border border-border bg-card/50 hover:bg-accent hover:border-primary transition-all text-sm"
+			>
+				Explain what an algorithm is with examples
+			</button>
+			<button
+				@click="currentMessage = 'What is the difference between a stack and a queue?'; sendMessage()"
+				class="w-full text-left p-3 rounded-lg border border-border bg-card/50 hover:bg-accent hover:border-primary transition-all text-sm"
+			>
+				What is the difference between a stack and a queue?
+			</button>
+			<button
+				@click="currentMessage = 'Write a simple Python program to find prime numbers'; sendMessage()"
+				class="w-full text-left p-3 rounded-lg border border-border bg-card/50 hover:bg-accent hover:border-primary transition-all text-sm"
+			>
+				Write a simple Python program to find prime numbers
+			</button>
+		</div>
+		<!-- Economics Examples -->
+		<div x-show="selectedCategory === 'economics'" x-collapse class="space-y-2">
+			<button
+				@click="currentMessage = 'Explain the law of supply and demand'; sendMessage()"
+				class="w-full text-left p-3 rounded-lg border border-border bg-card/50 hover:bg-accent hover:border-primary transition-all text-sm"
+			>
+				Explain the law of supply and demand
+			</button>
+			<button
+				@click="currentMessage = 'What is the difference between GDP and GNP?'; sendMessage()"
+				class="w-full text-left p-3 rounded-lg border border-border bg-card/50 hover:bg-accent hover:border-primary transition-all text-sm"
+			>
+				What is the difference between GDP and GNP?
+			</button>
+			<button
+				@click="currentMessage = 'How does inflation affect the economy?'; sendMessage()"
+				class="w-full text-left p-3 rounded-lg border border-border bg-card/50 hover:bg-accent hover:border-primary transition-all text-sm"
+			>
+				How does inflation affect the economy?
 			</button>
 		</div>
 	</div>
