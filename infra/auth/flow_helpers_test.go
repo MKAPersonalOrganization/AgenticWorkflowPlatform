@@ -157,7 +157,7 @@ func TestExtractMessages(t *testing.T) {
 			Id:   4000006,
 			Text: "Invalid credentials",
 			Type: "error",
-			Context: map[string]interface{}{
+			Context: map[string]any{
 				"reason": "wrong password",
 			},
 		},
@@ -455,7 +455,7 @@ func TestFilterNodesByGroup(t *testing.T) {
 	}
 }
 
-// Integration tests (these will only run with -short=false and require running Kratos)
+// Integration tests (these will only run with -short=false and require running Kratos).
 func TestKratosClient_GetLoginFlow_Integration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test")
@@ -486,7 +486,7 @@ func TestKratosClient_GetFlowError_Integration(t *testing.T) {
 	}
 }
 
-// Helper function
+// Helper function.
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && containsSubstring(s, substr))
 }
@@ -497,5 +497,6 @@ func containsSubstring(s, substr string) bool {
 			return true
 		}
 	}
+
 	return false
 }

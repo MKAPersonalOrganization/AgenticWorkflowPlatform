@@ -3,16 +3,17 @@ package middleware
 import (
 	"context"
 	"encoding/json"
-	"testing"
-
 	"school-with-ai/sdk/agentsdk/core"
+	"slices"
+	"testing"
 )
 
-// Helper to create a test request context with proper agent config
+// Helper to create a test request context with proper agent config.
 func newTestRequestContext() *core.RequestContext {
 	config := &core.AgentConfig{
 		Name: "test-agent",
 	}
+
 	return core.NewRequestContext("", nil, "", nil, config)
 }
 
@@ -66,6 +67,7 @@ func TestHandoffMiddleware_Process(t *testing.T) {
 	called := false
 	next := func(ctx context.Context, rc *core.RequestContext) error {
 		called = true
+
 		return nil
 	}
 
@@ -84,6 +86,7 @@ func TestHandoffMiddleware_Process(t *testing.T) {
 	for _, tool := range tools {
 		if tool.Name() == "transfer_to_agent" {
 			found = true
+
 			break
 		}
 	}
@@ -170,7 +173,7 @@ func TestTransferToAgentTool_Parameters(t *testing.T) {
 	}
 
 	// Check properties
-	props, ok := params["properties"].(map[string]interface{})
+	props, ok := params["properties"].(map[string]any)
 	if !ok {
 		t.Fatal("Expected properties to be map")
 	}
@@ -188,7 +191,7 @@ func TestTransferToAgentTool_Parameters(t *testing.T) {
 	}
 
 	// Check agent_name has enum
-	agentNameProp := props["agent_name"].(map[string]interface{})
+	agentNameProp := props["agent_name"].(map[string]any)
 	enum, ok := agentNameProp["enum"].([]string)
 	if !ok {
 		t.Fatal("Expected agent_name to have enum")
@@ -210,7 +213,7 @@ func TestTransferToAgentTool_Invoke_Success(t *testing.T) {
 	reqCtx := core.NewRequestContext("", nil, "", nil, config)
 	tool := NewTransferToAgentTool(agents, reqCtx)
 
-	args := map[string]interface{}{
+	args := map[string]any{
 		"agent_name": "math",
 		"question":   "What is 2 + 2?",
 		"context":    "Basic arithmetic question",
@@ -257,7 +260,7 @@ func TestTransferToAgentTool_Invoke_MissingAgentName(t *testing.T) {
 	reqCtx := newTestRequestContext()
 	tool := NewTransferToAgentTool(agents, reqCtx)
 
-	args := map[string]interface{}{
+	args := map[string]any{
 		"question": "What is 2 + 2?",
 	}
 
@@ -281,7 +284,7 @@ func TestTransferToAgentTool_Invoke_MissingQuestion(t *testing.T) {
 	reqCtx := newTestRequestContext()
 	tool := NewTransferToAgentTool(agents, reqCtx)
 
-	args := map[string]interface{}{
+	args := map[string]any{
 		"agent_name": "math",
 	}
 
@@ -319,7 +322,7 @@ func TestTransferToAgentTool_Invoke_UnknownAgent(t *testing.T) {
 	reqCtx := newTestRequestContext()
 	tool := NewTransferToAgentTool(agents, reqCtx)
 
-	args := map[string]interface{}{
+	args := map[string]any{
 		"agent_name": "biology", // Not in available agents
 		"question":   "What is photosynthesis?",
 	}
@@ -349,7 +352,7 @@ func TestTransferToAgentTool_Invoke_WithoutContext(t *testing.T) {
 	tool := NewTransferToAgentTool(agents, reqCtx)
 
 	// Context is optional, should work without it
-	args := map[string]interface{}{
+	args := map[string]any{
 		"agent_name": "math",
 		"question":   "What is 2 + 2?",
 	}
@@ -552,6 +555,7 @@ func TestHandoffMiddleware_MultipleAgents(t *testing.T) {
 	for _, tool := range tools {
 		if tool.Name() == "transfer_to_agent" {
 			transferTool = tool
+
 			break
 		}
 	}
@@ -561,8 +565,8 @@ func TestHandoffMiddleware_MultipleAgents(t *testing.T) {
 	}
 
 	params := transferTool.Parameters()
-	props := params["properties"].(map[string]interface{})
-	agentNameProp := props["agent_name"].(map[string]interface{})
+	props := params["properties"].(map[string]any)
+	agentNameProp := props["agent_name"].(map[string]any)
 	enum := agentNameProp["enum"].([]string)
 
 	if len(enum) != 4 {
@@ -589,14 +593,10 @@ func containsSubstring(s, substr string) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
 func containsString(slice []string, s string) bool {
-	for _, item := range slice {
-		if item == s {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(slice, s)
 }

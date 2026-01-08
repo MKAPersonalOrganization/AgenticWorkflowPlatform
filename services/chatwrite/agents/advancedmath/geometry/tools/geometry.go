@@ -2,7 +2,7 @@ package tools
 
 import "context"
 
-// GeometricPrimitivesTool performs operations with geometric primitives
+// GeometricPrimitivesTool performs operations with geometric primitives.
 type GeometricPrimitivesTool struct{}
 
 func NewGeometricPrimitivesTool() *GeometricPrimitivesTool {
@@ -25,7 +25,7 @@ func (t *GeometricPrimitivesTool) Invoke(ctx context.Context, arguments string) 
 	return `{"result": "Implementation pending"}`, nil
 }
 
-// CurvesTool works with curves and surfaces
+// CurvesTool works with curves and surfaces.
 type CurvesTool struct{}
 
 func NewCurvesTool() *CurvesTool {
@@ -48,7 +48,7 @@ func (t *CurvesTool) Invoke(ctx context.Context, arguments string) (string, erro
 	return `{"result": "Implementation pending"}`, nil
 }
 
-// MeshingTool performs mesh generation
+// MeshingTool performs mesh generation.
 type MeshingTool struct{}
 
 func NewMeshingTool() *MeshingTool {

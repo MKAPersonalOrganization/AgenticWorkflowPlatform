@@ -49,7 +49,7 @@ func TestLinearSolverTool_GaussianElimination(t *testing.T) {
 				t.Fatalf("failed to unmarshal response: %v", err)
 			}
 
-			resultVec := response["solution"].([]interface{})
+			resultVec := response["solution"].([]any)
 			for i, exp := range tt.expected {
 				actual := resultVec[i].(float64)
 				if math.Abs(actual-exp) > 1e-9 {
@@ -81,7 +81,7 @@ func TestLinearSolverTool_LU(t *testing.T) {
 	}
 
 	expected := []float64{1, 2}
-	resultVec := response["solution"].([]interface{})
+	resultVec := response["solution"].([]any)
 	for i, exp := range expected {
 		actual := resultVec[i].(float64)
 		if math.Abs(actual-exp) > 1e-9 {
@@ -111,7 +111,7 @@ func TestLinearSolverTool_Cholesky(t *testing.T) {
 	}
 
 	expected := []float64{2, 1}
-	resultVec := response["solution"].([]interface{})
+	resultVec := response["solution"].([]any)
 	for i, exp := range expected {
 		actual := resultVec[i].(float64)
 		if math.Abs(actual-exp) > 1e-9 {

@@ -3,21 +3,22 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
 	"strings"
 )
 
-// CalculatorArgs represents the arguments for calculate tool
+// CalculatorArgs represents the arguments for calculate tool.
 type CalculatorArgs struct {
 	Expression string `json:"expression"`
 }
 
-// CalculatorTool implements the Tool interface for mathematical calculations
+// CalculatorTool implements the Tool interface for mathematical calculations.
 type CalculatorTool struct{}
 
-// NewCalculatorTool creates a new calculator tool
+// NewCalculatorTool creates a new calculator tool.
 func NewCalculatorTool() *CalculatorTool {
 	return &CalculatorTool{}
 }
@@ -47,7 +48,7 @@ func (c *CalculatorTool) Invoke(ctx context.Context, arguments string) (string, 
 	return ExecuteCalculatorTool(arguments)
 }
 
-// ExecuteCalculatorTool evaluates a mathematical expression
+// ExecuteCalculatorTool evaluates a mathematical expression.
 func ExecuteCalculatorTool(argsJSON string) (string, error) {
 	var args CalculatorArgs
 	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
@@ -75,21 +76,22 @@ func ExecuteCalculatorTool(argsJSON string) (string, error) {
 }
 
 // evaluateExpression evaluates a simple mathematical expression
-// Supports: +, -, *, /, ^, sqrt, and parentheses
+// Supports: +, -, *, /, ^, sqrt, and parentheses.
 func evaluateExpression(expr string) (float64, error) {
 	// Remove whitespace
 	expr = strings.ReplaceAll(expr, " ", "")
 
 	if expr == "" {
-		return 0, fmt.Errorf("empty expression")
+		return 0, errors.New("empty expression")
 	}
 
 	// Parse and evaluate
 	result, _, err := parseExpression(expr, 0)
+
 	return result, err
 }
 
-// parseExpression parses an expression with operator precedence
+// parseExpression parses an expression with operator precedence.
 func parseExpression(expr string, pos int) (float64, int, error) {
 	left, newPos, err := parseTerm(expr, pos)
 	if err != nil {
@@ -119,7 +121,7 @@ func parseExpression(expr string, pos int) (float64, int, error) {
 	return left, newPos, nil
 }
 
-// parseTerm handles multiplication and division
+// parseTerm handles multiplication and division.
 func parseTerm(expr string, pos int) (float64, int, error) {
 	left, newPos, err := parseFactor(expr, pos)
 	if err != nil {
@@ -142,7 +144,7 @@ func parseTerm(expr string, pos int) (float64, int, error) {
 			left *= right
 		} else {
 			if right == 0 {
-				return 0, nextPos, fmt.Errorf("division by zero")
+				return 0, nextPos, errors.New("division by zero")
 			}
 			left /= right
 		}
@@ -152,15 +154,16 @@ func parseTerm(expr string, pos int) (float64, int, error) {
 	return left, newPos, nil
 }
 
-// parseFactor handles numbers, parentheses, and functions
+// parseFactor handles numbers, parentheses, and functions.
 func parseFactor(expr string, pos int) (float64, int, error) {
 	if pos >= len(expr) {
-		return 0, pos, fmt.Errorf("unexpected end of expression")
+		return 0, pos, errors.New("unexpected end of expression")
 	}
 
 	// Handle negative numbers
 	if expr[pos] == '-' {
 		val, newPos, err := parseFactor(expr, pos+1)
+
 		return -val, newPos, err
 	}
 
@@ -176,8 +179,9 @@ func parseFactor(expr string, pos int) (float64, int, error) {
 			return 0, newPos, err
 		}
 		if newPos >= len(expr) || expr[newPos] != ')' {
-			return 0, newPos, fmt.Errorf("mismatched parentheses")
+			return 0, newPos, errors.New("mismatched parentheses")
 		}
+
 		return val, newPos + 1, nil
 	}
 
@@ -188,21 +192,24 @@ func parseFactor(expr string, pos int) (float64, int, error) {
 			return 0, newPos, err
 		}
 		if newPos >= len(expr) || expr[newPos] != ')' {
-			return 0, newPos, fmt.Errorf("mismatched parentheses in sqrt")
+			return 0, newPos, errors.New("mismatched parentheses in sqrt")
 		}
 		if val < 0 {
-			return 0, newPos, fmt.Errorf("square root of negative number")
+			return 0, newPos, errors.New("square root of negative number")
 		}
+
 		return math.Sqrt(val), newPos + 1, nil
 	}
 
 	// Handle power operator (^)
 	numStr := ""
 	startPos := pos
+	var numStrSb202 strings.Builder
 	for pos < len(expr) && (isDigit(expr[pos]) || expr[pos] == '.') {
-		numStr += string(expr[pos])
+		numStrSb202.WriteString(string(expr[pos]))
 		pos++
 	}
+	numStr += numStrSb202.String()
 
 	if numStr == "" {
 		return 0, pos, fmt.Errorf("expected number at position %d", startPos)
@@ -219,13 +226,14 @@ func parseFactor(expr string, pos int) (float64, int, error) {
 		if err != nil {
 			return 0, newPos, err
 		}
+
 		return math.Pow(num, exponent), newPos, nil
 	}
 
 	return num, pos, nil
 }
 
-// isDigit checks if a character is a digit
+// isDigit checks if a character is a digit.
 func isDigit(c byte) bool {
 	return c >= '0' && c <= '9'
 }

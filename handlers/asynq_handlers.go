@@ -6,20 +6,19 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"time"
-
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/sdk/agentsdk/llm"
 	"school-with-ai/services"
 	"school-with-ai/services/chatwrite"
 	"school-with-ai/services/orchestration"
+	"time"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 	"github.com/hibiken/asynq"
 )
 
-// AsynqHandler encapsulates dependencies for HTTP handlers using Asynq
+// AsynqHandler encapsulates dependencies for HTTP handlers using Asynq.
 type AsynqHandler struct {
 	chatClient        *llm.OpenAIClient
 	asynqServer       *orchestration.AsynqServer
@@ -28,7 +27,7 @@ type AsynqHandler struct {
 	projectionService services.ProjectionService
 }
 
-// NewAsynqHandler creates a new HTTP handler with Asynq dependencies
+// NewAsynqHandler creates a new HTTP handler with Asynq dependencies.
 func NewAsynqHandler(
 	chatClient *llm.OpenAIClient,
 	asynqServer *orchestration.AsynqServer,
@@ -45,18 +44,19 @@ func NewAsynqHandler(
 	}
 }
 
-// SendMessageRequest represents the async chat request (A2A compatible)
+// SendMessageRequest represents the async chat request (A2A compatible).
 type SendMessageRequest struct {
 	ContextID string `json:"contextId,omitempty"` // Optional: existing context (threadID)
 	Message   string `json:"message"`             // The message/input for the task
 }
 
-// SendMessage handles POST /api/messages - async chat message processing
+// SendMessage handles POST /api/messages - async chat message processing.
 func (h *AsynqHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	// Get authenticated user from context
 	user := h.authService.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+
 		return
 	}
 
@@ -64,11 +64,13 @@ func (h *AsynqHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	var req SendMessageRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
+
 		return
 	}
 
 	if req.Message == "" {
 		http.Error(w, "Message is required", http.StatusBadRequest)
+
 		return
 	}
 
@@ -103,6 +105,7 @@ func (h *AsynqHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Error("[API] Failed to enqueue task", "error", err)
 		http.Error(w, "Failed to enqueue task", http.StatusInternalServerError)
+
 		return
 	}
 
@@ -128,15 +131,17 @@ func (h *AsynqHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewEncoder(w).Encode(task); err != nil {
 		slog.Error("[API] Failed to encode response", "error", err)
+
 		return
 	}
 }
 
-// StreamJobEvents streams SSE events for a specific job
+// StreamJobEvents streams SSE events for a specific job.
 func (h *AsynqHandler) StreamJobEvents(w http.ResponseWriter, r *http.Request) {
 	jobID := r.PathValue("id")
 	if jobID == "" {
 		http.Error(w, "jobId is required", http.StatusBadRequest)
+
 		return
 	}
 
@@ -150,6 +155,7 @@ func (h *AsynqHandler) StreamJobEvents(w http.ResponseWriter, r *http.Request) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
+
 		return
 	}
 
@@ -180,8 +186,10 @@ streamEvents:
 	messages := h.projectionService.GetThreadMessages(eventBuffer.ThreadID)
 	if len(messages) > 0 {
 		messagesSnapshotEvent := aguievents.NewMessagesSnapshotEvent(messages)
-		if err := writeSSEEvent(w, messagesSnapshotEvent); err != nil {
+		err := writeSSEEvent(w, messagesSnapshotEvent)
+		if err != nil {
 			slog.Error("[API] Failed to write messages snapshot event", "error", err, "jobID", jobID)
+
 			return
 		}
 		flusher.Flush()
@@ -204,7 +212,8 @@ streamEvents:
 
 			for _, event := range newEvents {
 				// Translate and write event
-				if err := h.translateAndWriteEvent(w, flusher, event); err != nil {
+				err := h.translateAndWriteEvent(w, flusher, event)
+				if err != nil {
 					return
 				}
 				eventIndex++
@@ -218,7 +227,7 @@ streamEvents:
 	}
 }
 
-// translateAndWriteEvent translates domain events to AGUI events and writes them
+// translateAndWriteEvent translates domain events to AGUI events and writes them.
 func (h *AsynqHandler) translateAndWriteEvent(w http.ResponseWriter, flusher http.Flusher, event any) error {
 	var aguiEvent any
 
@@ -261,18 +270,21 @@ func (h *AsynqHandler) translateAndWriteEvent(w http.ResponseWriter, flusher htt
 		aguiEvent = event
 	}
 
-	if err := writeSSEEvent(w, aguiEvent); err != nil {
+	err := writeSSEEvent(w, aguiEvent)
+	if err != nil {
 		return err
 	}
 	flusher.Flush()
+
 	return nil
 }
 
-// GetJobStatus retrieves the status of a task (A2A compliant)
+// GetJobStatus retrieves the status of a task (A2A compliant).
 func (h *AsynqHandler) GetJobStatus(w http.ResponseWriter, r *http.Request) {
 	taskID := r.PathValue("id")
 	if taskID == "" {
 		http.Error(w, "taskId is required", http.StatusBadRequest)
+
 		return
 	}
 
@@ -285,7 +297,7 @@ func (h *AsynqHandler) GetJobStatus(w http.ResponseWriter, r *http.Request) {
 		ContextID: "", // Would need to be stored/retrieved separately
 		Artifacts: []Artifact{},
 		History:   []*Message{},
-		Metadata:  make(map[string]interface{}),
+		Metadata:  make(map[string]any),
 	}
 
 	// Add stream URL to metadata (not part of core A2A spec)
@@ -334,61 +346,72 @@ func (h *AsynqHandler) GetJobStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(task); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+
 		return
 	}
 }
 
-// CancelJob cancels a pending or active job
+// CancelJob cancels a pending or active job.
 func (h *AsynqHandler) CancelJob(w http.ResponseWriter, r *http.Request) {
 	jobID := r.PathValue("id")
 	if jobID == "" {
 		http.Error(w, "jobId is required", http.StatusBadRequest)
+
 		return
 	}
 
 	// Use Asynq Inspector to cancel task
-	if err := h.asynqServer.CancelTask(jobID); err != nil {
+	err := h.asynqServer.CancelTask(jobID)
+	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to cancel job: %v", err), http.StatusBadRequest)
+
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]string{
+	err := json.NewEncoder(w).Encode(map[string]string{
 		"jobId":  jobID,
 		"status": "cancelled",
-	}); err != nil {
+	})
+	if err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+
 		return
 	}
 }
 
-// GetMessages retrieves all messages for a thread
+// GetMessages retrieves all messages for a thread.
 func (h *AsynqHandler) GetMessages(w http.ResponseWriter, r *http.Request) {
 	threadID := r.PathValue("threadId")
 	if threadID == "" {
 		http.Error(w, "threadId is required", http.StatusBadRequest)
+
 		return
 	}
 
 	thread, exists := h.projectionService.GetThread(threadID)
 	if !exists {
 		http.Error(w, "Thread not found", http.StatusNotFound)
+
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(thread.Messages); err != nil {
+	err := json.NewEncoder(w).Encode(thread.Messages)
+	if err != nil {
 		http.Error(w, "Failed to encode messages", http.StatusInternalServerError)
+
 		return
 	}
 }
 
-// GetThreads retrieves all threads
+// GetThreads retrieves all threads.
 func (h *AsynqHandler) GetThreads(w http.ResponseWriter, r *http.Request) {
 	// Get authenticated user from context
 	user := h.authService.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+
 		return
 	}
 
@@ -406,42 +429,50 @@ func (h *AsynqHandler) GetThreads(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(response); err != nil {
+	err := json.NewEncoder(w).Encode(response)
+	if err != nil {
 		http.Error(w, "Failed to encode threads", http.StatusInternalServerError)
+
 		return
 	}
 }
 
-// DeleteThread deletes a thread
+// DeleteThread deletes a thread.
 func (h *AsynqHandler) DeleteThread(w http.ResponseWriter, r *http.Request) {
 	// Get authenticated user from context
 	user := h.authService.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+
 		return
 	}
 
 	threadID := r.PathValue("threadId")
 	if threadID == "" {
 		http.Error(w, "threadId is required", http.StatusBadRequest)
+
 		return
 	}
 
 	slog.Info("Deleting thread", "userID", user.ID, "threadID", threadID)
 
 	// Delete thread using chat service
-	if err := h.chatWriteService.DeleteThread(r.Context(), threadID); err != nil {
+	err := h.chatWriteService.DeleteThread(r.Context(), threadID)
+	if err != nil {
 		if errors.Is(err, domain.ErrThreadNotFound) {
 			http.Error(w, "Thread not found", http.StatusNotFound)
+
 			return
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(map[string]string{"status": "success"}); err != nil {
+	err := json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+	if err != nil {
 		slog.Error("[API] Failed to encode delete response", "error", err)
 	}
 }

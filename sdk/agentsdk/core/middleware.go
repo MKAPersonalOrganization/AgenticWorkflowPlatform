@@ -2,9 +2,9 @@ package core
 
 import (
 	"context"
-	"fmt"
-
+	"errors"
 	"school-with-ai/sdk/agentsdk/llm"
+	"strings"
 )
 
 // Middleware provides a way to intercept and modify agent execution.
@@ -95,6 +95,7 @@ func NewRequestContext(threadID string, messages []llm.ChatMessage, systemPrompt
 // This is useful for middleware to share information.
 func (rc *RequestContext) WithMetadata(key string, value interface{}) *RequestContext {
 	rc.State[key] = value
+
 	return rc
 }
 
@@ -102,6 +103,7 @@ func (rc *RequestContext) WithMetadata(key string, value interface{}) *RequestCo
 // Returns the value and a boolean indicating if the key exists.
 func (rc *RequestContext) GetMetadata(key string) (interface{}, bool) {
 	val, ok := rc.State[key]
+
 	return val, ok
 }
 
@@ -130,8 +132,9 @@ func (rc *RequestContext) AddSystemPrompt(text string) {
 // Returns an error if no notifier is configured or if the event emission fails.
 func (rc *RequestContext) EmitEvent(event Event) error {
 	if rc.Config == nil || rc.Config.Notifier == nil {
-		return fmt.Errorf("no event notifier configured")
+		return errors.New("no event notifier configured")
 	}
+
 	return rc.Config.Notifier.HandleDomainEvent(event)
 }
 
@@ -143,11 +146,14 @@ func (rc *RequestContext) GetEffectiveSystemPrompt() string {
 	}
 
 	result := rc.SystemPrompt
+	var resultSb146 strings.Builder
 	for _, addition := range rc.SystemPromptAdditions {
 		if addition != "" {
-			result += "\n\n" + addition
+			resultSb146.WriteString("\n\n" + addition)
 		}
 	}
+	result += resultSb146.String()
+
 	return result
 }
 
@@ -160,6 +166,7 @@ func (rc *RequestContext) GetEffectiveTools() []Tool {
 	allTools := make([]Tool, 0, len(rc.Tools)+len(rc.AdditionalTools))
 	allTools = append(allTools, rc.Tools...)
 	allTools = append(allTools, rc.AdditionalTools...)
+
 	return allTools
 }
 
@@ -308,9 +315,10 @@ func ErrorHandler(err error) NextHandler {
 func ResultHandler(result interface{}) NextHandler {
 	return func(ctx context.Context, reqCtx *RequestContext) error {
 		reqCtx.Result = result
+
 		return nil
 	}
 }
 
-// Verify MiddlewareFunc implements Middleware
+// Verify MiddlewareFunc implements Middleware.
 var _ Middleware = (*MiddlewareFunc)(nil)

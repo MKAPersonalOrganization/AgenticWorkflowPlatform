@@ -55,6 +55,7 @@ func TestVectorOperationsTool_Add(t *testing.T) {
 				if err == nil {
 					t.Errorf("expected error but got none")
 				}
+
 				return
 			}
 
@@ -67,7 +68,7 @@ func TestVectorOperationsTool_Add(t *testing.T) {
 				t.Fatalf("failed to unmarshal response: %v", err)
 			}
 
-			resultVec := response["result"].([]interface{})
+			resultVec := response["result"].([]any)
 			for i, expected := range tt.expected {
 				actual := resultVec[i].(float64)
 				if math.Abs(actual-expected) > 1e-10 {
@@ -170,7 +171,7 @@ func TestVectorOperationsTool_Cross(t *testing.T) {
 				t.Fatalf("failed to unmarshal response: %v", err)
 			}
 
-			resultVec := response["result"].([]interface{})
+			resultVec := response["result"].([]any)
 			for i, exp := range tt.expected {
 				actual := resultVec[i].(float64)
 				if math.Abs(actual-exp) > 1e-10 {
@@ -252,7 +253,7 @@ func TestVectorOperationsTool_Unit(t *testing.T) {
 	}
 
 	expected := []float64{0.6, 0.8}
-	resultVec := response["result"].([]interface{})
+	resultVec := response["result"].([]any)
 	for i, exp := range expected {
 		actual := resultVec[i].(float64)
 		if math.Abs(actual-exp) > 1e-10 {

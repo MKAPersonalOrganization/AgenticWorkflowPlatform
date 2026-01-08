@@ -6,7 +6,7 @@ import (
 	sharedtools "school-with-ai/services/chatwrite/agents/shared/tools"
 )
 
-// CreateOptimizationProfessor creates the optimization professor agent
+// CreateOptimizationProfessor creates the optimization professor agent.
 func CreateOptimizationProfessor(notifier core.EventNotifier, whiteboardProjection interface{ Get(threadID string) string }) core.AgentConfig {
 	registry := core.NewToolRegistry()
 

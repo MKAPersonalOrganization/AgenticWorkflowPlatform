@@ -5,29 +5,29 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-
 	"school-with-ai/components/auth"
 )
 
-// AuthHandlers contains handlers for authentication routes
+// AuthHandlers contains handlers for authentication routes.
 type AuthHandlers struct {
 	kratos *KratosClient
 	appURL string
 }
 
-// NewAuthHandlers creates new authentication handlers
+// NewAuthHandlers creates new authentication handlers.
 func NewAuthHandlers(kratos *KratosClient) *AuthHandlers {
 	appURL := os.Getenv("APP_URL")
 	if appURL == "" {
 		panic("required environment variable APP_URL is not set")
 	}
+
 	return &AuthHandlers{
 		kratos: kratos,
 		appURL: appURL,
 	}
 }
 
-// LoginPage handles GET /auth/login
+// LoginPage handles GET /auth/login.
 func (h *AuthHandlers) LoginPage(w http.ResponseWriter, r *http.Request) {
 	flowID := r.URL.Query().Get("flow")
 	returnTo := r.URL.Query().Get("return_to")
@@ -43,6 +43,7 @@ func (h *AuthHandlers) LoginPage(w http.ResponseWriter, r *http.Request) {
 			Refresh:  refresh,
 		})
 		http.Redirect(w, r, initURL, http.StatusSeeOther)
+
 		return
 	}
 
@@ -61,12 +62,14 @@ func (h *AuthHandlers) LoginPage(w http.ResponseWriter, r *http.Request) {
 				Refresh:  refresh,
 			})
 			http.Redirect(w, r, initURL, http.StatusSeeOther)
+
 			return
 		}
 
 		// Redirect to error page for other errors
 		errorURL := h.appURL + "/auth/error?error=login_flow_error"
 		http.Redirect(w, r, errorURL, http.StatusSeeOther)
+
 		return
 	}
 
@@ -77,6 +80,7 @@ func (h *AuthHandlers) LoginPage(w http.ResponseWriter, r *http.Request) {
 			ReturnTo: flow.GetReturnTo(),
 		})
 		http.Redirect(w, r, verificationURL, http.StatusSeeOther)
+
 		return
 	}
 
@@ -140,7 +144,7 @@ func (h *AuthHandlers) LoginPage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// RegistrationPage handles GET /auth/registration
+// RegistrationPage handles GET /auth/registration.
 func (h *AuthHandlers) RegistrationPage(w http.ResponseWriter, r *http.Request) {
 	flowID := r.URL.Query().Get("flow")
 	returnTo := r.URL.Query().Get("return_to")
@@ -152,6 +156,7 @@ func (h *AuthHandlers) RegistrationPage(w http.ResponseWriter, r *http.Request) 
 			ReturnTo: returnTo,
 		})
 		http.Redirect(w, r, initURL, http.StatusSeeOther)
+
 		return
 	}
 
@@ -168,12 +173,14 @@ func (h *AuthHandlers) RegistrationPage(w http.ResponseWriter, r *http.Request) 
 				ReturnTo: returnTo,
 			})
 			http.Redirect(w, r, initURL, http.StatusSeeOther)
+
 			return
 		}
 
 		// Redirect to error page for other errors
 		errorURL := h.appURL + "/auth/error?error=registration_flow_error"
 		http.Redirect(w, r, errorURL, http.StatusSeeOther)
+
 		return
 	}
 
@@ -219,7 +226,7 @@ func (h *AuthHandlers) RegistrationPage(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-// RecoveryPage handles GET /auth/recovery
+// RecoveryPage handles GET /auth/recovery.
 func (h *AuthHandlers) RecoveryPage(w http.ResponseWriter, r *http.Request) {
 	flowID := r.URL.Query().Get("flow")
 	returnTo := r.URL.Query().Get("return_to")
@@ -231,6 +238,7 @@ func (h *AuthHandlers) RecoveryPage(w http.ResponseWriter, r *http.Request) {
 			ReturnTo: returnTo,
 		})
 		http.Redirect(w, r, initURL, http.StatusSeeOther)
+
 		return
 	}
 
@@ -247,12 +255,14 @@ func (h *AuthHandlers) RecoveryPage(w http.ResponseWriter, r *http.Request) {
 				ReturnTo: returnTo,
 			})
 			http.Redirect(w, r, initURL, http.StatusSeeOther)
+
 			return
 		}
 
 		// Redirect to error page for other errors
 		errorURL := h.appURL + "/auth/error?error=recovery_flow_error"
 		http.Redirect(w, r, errorURL, http.StatusSeeOther)
+
 		return
 	}
 
@@ -298,7 +308,7 @@ func (h *AuthHandlers) RecoveryPage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// VerificationPage handles GET /auth/verification
+// VerificationPage handles GET /auth/verification.
 func (h *AuthHandlers) VerificationPage(w http.ResponseWriter, r *http.Request) {
 	flowID := r.URL.Query().Get("flow")
 	returnTo := r.URL.Query().Get("return_to")
@@ -310,6 +320,7 @@ func (h *AuthHandlers) VerificationPage(w http.ResponseWriter, r *http.Request) 
 			ReturnTo: returnTo,
 		})
 		http.Redirect(w, r, initURL, http.StatusSeeOther)
+
 		return
 	}
 
@@ -326,12 +337,14 @@ func (h *AuthHandlers) VerificationPage(w http.ResponseWriter, r *http.Request) 
 				ReturnTo: returnTo,
 			})
 			http.Redirect(w, r, initURL, http.StatusSeeOther)
+
 			return
 		}
 
 		// Redirect to error page for other errors
 		errorURL := h.appURL + "/auth/error?error=verification_flow_error"
 		http.Redirect(w, r, errorURL, http.StatusSeeOther)
+
 		return
 	}
 
@@ -377,7 +390,7 @@ func (h *AuthHandlers) VerificationPage(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-// SettingsPage handles GET /auth/settings
+// SettingsPage handles GET /auth/settings.
 func (h *AuthHandlers) SettingsPage(w http.ResponseWriter, r *http.Request) {
 	flowID := r.URL.Query().Get("flow")
 	returnTo := r.URL.Query().Get("return_to")
@@ -389,6 +402,7 @@ func (h *AuthHandlers) SettingsPage(w http.ResponseWriter, r *http.Request) {
 			ReturnTo: returnTo,
 		})
 		http.Redirect(w, r, initURL, http.StatusSeeOther)
+
 		return
 	}
 
@@ -405,12 +419,14 @@ func (h *AuthHandlers) SettingsPage(w http.ResponseWriter, r *http.Request) {
 				ReturnTo: returnTo,
 			})
 			http.Redirect(w, r, initURL, http.StatusSeeOther)
+
 			return
 		}
 
 		// Redirect to error page for other errors
 		errorURL := h.appURL + "/auth/error?error=settings_flow_error"
 		http.Redirect(w, r, errorURL, http.StatusSeeOther)
+
 		return
 	}
 
@@ -449,7 +465,7 @@ func (h *AuthHandlers) SettingsPage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// LogoutHandler handles GET /auth/logout
+// LogoutHandler handles GET /auth/logout.
 func (h *AuthHandlers) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	// Get the logout token from query params (if redirected from Kratos)
 	logoutToken := r.URL.Query().Get("token")
@@ -460,6 +476,7 @@ func (h *AuthHandlers) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 		// The logout URL is in the Kratos public API
 		logoutURL := h.kratos.PublicURL() + "/self-service/logout?token=" + logoutToken
 		http.Redirect(w, r, logoutURL, http.StatusSeeOther)
+
 		return
 	}
 
@@ -470,6 +487,7 @@ func (h *AuthHandlers) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 		slog.Error("Failed to create logout flow", "error", err)
 		// On error, just redirect to login
 		http.Redirect(w, r, h.appURL+"/auth/login", http.StatusSeeOther)
+
 		return
 	}
 
@@ -478,7 +496,7 @@ func (h *AuthHandlers) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, flow.LogoutUrl, http.StatusSeeOther)
 }
 
-// ErrorPage handles GET /auth/error
+// ErrorPage handles GET /auth/error.
 func (h *AuthHandlers) ErrorPage(w http.ResponseWriter, r *http.Request) {
 	errorID := r.URL.Query().Get("id")
 	errorParam := r.URL.Query().Get("error")
@@ -538,7 +556,7 @@ func (h *AuthHandlers) ErrorPage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// getErrorMessage returns a user-friendly error message for common error types
+// getErrorMessage returns a user-friendly error message for common error types.
 func getErrorMessage(errorType string) string {
 	switch errorType {
 	case "login_flow_error":

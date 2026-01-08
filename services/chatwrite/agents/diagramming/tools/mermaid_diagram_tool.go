@@ -4,24 +4,26 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"time"
 )
 
-// MermaidDiagramArgs represents the arguments for the mermaid diagram tool
+// MermaidDiagramArgs represents the arguments for the mermaid diagram tool.
 type MermaidDiagramArgs struct {
 	MermaidCode string `json:"mermaid_code"` // Complete mermaid diagram definition
 	Title       string `json:"title"`        // Diagram title (for reference/logging)
 	OutputType  string `json:"output_type"`  // Output format: "svg" or "png" (default: "png")
 }
 
-// MermaidDiagramTool implements the Tool interface for generating diagrams with mermaid-cli
+// MermaidDiagramTool implements the Tool interface for generating diagrams with mermaid-cli.
 type MermaidDiagramTool struct{}
 
-// NewMermaidDiagramTool creates a new mermaid diagram tool
+// NewMermaidDiagramTool creates a new mermaid diagram tool.
 func NewMermaidDiagramTool() *MermaidDiagramTool {
 	return &MermaidDiagramTool{}
 }
@@ -39,82 +41,8 @@ func (m *MermaidDiagramTool) Parameters() map[string]any {
 		"type": "object",
 		"properties": map[string]any{
 			"mermaid_code": map[string]any{
-				"type": "string",
-				"description": `Complete mermaid diagram definition. REQUIRED. The code should be valid mermaid syntax.
-
-SUPPORTED DIAGRAM TYPES:
-1. Flowchart - Process flows and decision trees
-2. Sequence Diagram - Interaction between entities over time
-3. Class Diagram - Object-oriented class relationships
-4. State Diagram - State transitions and lifecycle
-5. ER Diagram - Entity relationships in databases
-6. Gantt Chart - Project timelines
-7. Pie Chart - Proportional data
-8. Git Graph - Version control branching
-
-MERMAID SYNTAX EXAMPLES:
-
-Flowchart:
-graph TD
-    A[Start] --> B{Is it working?}
-    B -->|Yes| C[Great!]
-    B -->|No| D[Debug]
-    D --> B
-
-Sequence Diagram:
-sequenceDiagram
-    participant A as Alice
-    participant B as Bob
-    A->>B: Hello Bob!
-    B->>A: Hi Alice!
-    A->>B: How are you?
-    B->>A: I'm good, thanks!
-
-Class Diagram:
-classDiagram
-    class Animal {
-        +String name
-        +int age
-        +makeSound()
-    }
-    class Dog {
-        +String breed
-        +bark()
-    }
-    Animal <|-- Dog
-
-State Diagram:
-stateDiagram-v2
-    [*] --> Idle
-    Idle --> Processing: Start
-    Processing --> Success: Complete
-    Processing --> Error: Fail
-    Success --> [*]
-    Error --> Idle: Retry
-
-ER Diagram:
-erDiagram
-    CUSTOMER ||--o{ ORDER : places
-    ORDER ||--|{ LINE-ITEM : contains
-    CUSTOMER }|..|{ DELIVERY-ADDRESS : uses
-
-Pie Chart:
-pie title Pets Distribution
-    "Dogs" : 386
-    "Cats" : 85
-    "Rabbits" : 15
-
-Git Graph:
-gitGraph
-    commit
-    branch develop
-    checkout develop
-    commit
-    checkout main
-    merge develop
-    commit
-
-Remember: Ensure your mermaid syntax is valid. The diagram will be rendered exactly as specified.`,
+				"type":        "string",
+				"description": "Complete mermaid diagram definition. REQUIRED. The code should be valid mermaid syntax.\n\nSUPPORTED DIAGRAM TYPES:\n1. Flowchart - Process flows and decision trees\n2. Sequence Diagram - Interaction between entities over time\n3. Class Diagram - Object-oriented class relationships\n4. State Diagram - State transitions and lifecycle\n5. ER Diagram - Entity relationships in databases\n6. Gantt Chart - Project timelines\n7. Pie Chart - Proportional data\n8. Git Graph - Version control branching\n\nMERMAID SYNTAX EXAMPLES:\n\nFlowchart:\ngraph TD\n    A[Start] --> B{Is it working?}\n    B -->|Yes| C[Great!]\n    B -->|No| D[Debug]\n    D --> B\n\nSequence Diagram:\nsequenceDiagram\n    participant A as Alice\n    participant B as Bob\n    A->>B: Hello Bob!\n    B->>A: Hi Alice!\n    A->>B: How are you?\n    B->>A: I'm good, thanks!\n\nClass Diagram:\nclassDiagram\n    class Animal {\n        +String name\n        +int age\n        +makeSound()\n    }\n    class Dog {\n        +String breed\n        +bark()\n    }\n    Animal <|-- Dog\n\nState Diagram:\nstateDiagram-v2\n    [*] --> Idle\n    --> Processing: Start\n    Processing --> Success: Complete\n    Processing --> Error: Fail\n    Success --> [*]\n    Error --> Idle: Retry\n\nER Diagram:\nerDiagram\n    CUSTOMER ||--o{ ORDER : places\n    ORDER ||--|{ LINE-ITEM : contains\n    CUSTOMER }|..|{ DELIVERY-ADDRESS : uses\n\nPie Chart:\npie title Pets Distribution\n    \"Dogs\" : 386\n    \"Cats\" : 85\n    \"Rabbits\" : 15\n\nGit Graph:\ngitGraph\n    commit\n    branch develop\n    checkout develop\n    commit\n    checkout main\n    merge develop\n    commit\n\nRemember: Ensure your mermaid syntax is valid. The diagram will be rendered exactly as specified.",
 			},
 			"title": map[string]any{
 				"type":        "string",
@@ -139,7 +67,7 @@ func (m *MermaidDiagramTool) Invoke(ctx context.Context, arguments string) (stri
 
 	// Validate required mermaid_code parameter
 	if args.MermaidCode == "" {
-		return "", fmt.Errorf("mermaid_code parameter is required")
+		return "", errors.New("mermaid_code parameter is required")
 	}
 
 	// Set default output type
@@ -154,7 +82,7 @@ func (m *MermaidDiagramTool) Invoke(ctx context.Context, arguments string) (stri
 
 	// Validate title length
 	if len(args.Title) > 100 {
-		return "", fmt.Errorf("title exceeds maximum length of 100 characters")
+		return "", errors.New("title exceeds maximum length of 100 characters")
 	}
 
 	// Generate the diagram
@@ -183,7 +111,7 @@ func (m *MermaidDiagramTool) Invoke(ctx context.Context, arguments string) (stri
 	return string(resultJSON), nil
 }
 
-// executeMermaidDiagram executes mermaid-cli via Docker to generate the diagram
+// executeMermaidDiagram executes mermaid-cli via Docker to generate the diagram.
 func executeMermaidDiagram(mermaidCode, title, outputType string) (string, error) {
 	// Ensure charts directory exists
 	chartsDir := "assets/charts"
@@ -192,7 +120,7 @@ func executeMermaidDiagram(mermaidCode, title, outputType string) (string, error
 	}
 
 	// Generate unique filename
-	hash := fmt.Sprintf("%x", md5.Sum([]byte(mermaidCode+title+fmt.Sprintf("%d", time.Now().UnixNano()))))
+	hash := fmt.Sprintf("%x", md5.Sum([]byte(mermaidCode+title+strconv.FormatInt(time.Now().UnixNano(), 10))))
 	hash = hash[:16] // Use first 16 chars
 
 	// Define file paths
@@ -215,14 +143,14 @@ func executeMermaidDiagram(mermaidCode, title, outputType string) (string, error
 	}
 
 	// Execute mermaid-cli via Docker
-	// Docker command: docker run --rm -v /path/to/charts:/data minlag/mermaid-cli -i input.mmd -o output.png
+	// command: docker run --rm -v /path/to/charts:/data minlag/mermaid-cli -i input.mmd -o output.png
 	cmd := exec.Command(
 		"docker", "run", "--rm",
 		"-u", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
-		"-v", fmt.Sprintf("%s:/data", absChartsDir),
+		"-v", absChartsDir+":/data",
 		"minlag/mermaid-cli",
-		"-i", fmt.Sprintf("/data/%s", inputFileName),
-		"-o", fmt.Sprintf("/data/%s", outputFileName),
+		"-i", "/data/"+inputFileName,
+		"-o", "/data/"+outputFileName,
 	)
 
 	output, err := cmd.CombinedOutput()

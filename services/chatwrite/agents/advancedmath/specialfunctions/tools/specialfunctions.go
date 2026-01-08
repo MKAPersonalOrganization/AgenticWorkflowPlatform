@@ -2,7 +2,7 @@ package tools
 
 import "context"
 
-// BesselFunctionsTool computes Bessel functions
+// BesselFunctionsTool computes Bessel functions.
 type BesselFunctionsTool struct{}
 
 func NewBesselFunctionsTool() *BesselFunctionsTool {
@@ -25,7 +25,7 @@ func (t *BesselFunctionsTool) Invoke(ctx context.Context, arguments string) (str
 	return `{"result": "Implementation pending"}`, nil
 }
 
-// OrthogonalPolynomialsTool computes orthogonal polynomials
+// OrthogonalPolynomialsTool computes orthogonal polynomials.
 type OrthogonalPolynomialsTool struct{}
 
 func NewOrthogonalPolynomialsTool() *OrthogonalPolynomialsTool {
@@ -48,7 +48,7 @@ func (t *OrthogonalPolynomialsTool) Invoke(ctx context.Context, arguments string
 	return `{"result": "Implementation pending"}`, nil
 }
 
-// EllipticIntegralsTool computes elliptic integrals
+// EllipticIntegralsTool computes elliptic integrals.
 type EllipticIntegralsTool struct{}
 
 func NewEllipticIntegralsTool() *EllipticIntegralsTool {
@@ -71,7 +71,7 @@ func (t *EllipticIntegralsTool) Invoke(ctx context.Context, arguments string) (s
 	return `{"result": "Implementation pending"}`, nil
 }
 
-// InterpolationTool performs interpolation
+// InterpolationTool performs interpolation.
 type InterpolationTool struct{}
 
 func NewInterpolationTool() *InterpolationTool {
@@ -94,7 +94,7 @@ func (t *InterpolationTool) Invoke(ctx context.Context, arguments string) (strin
 	return `{"result": "Implementation pending"}`, nil
 }
 
-// FFTTool performs Fast Fourier Transform
+// FFTTool performs Fast Fourier Transform.
 type FFTTool struct{}
 
 func NewFFTTool() *FFTTool {

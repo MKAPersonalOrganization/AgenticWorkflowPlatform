@@ -8,6 +8,7 @@ linters:
   # Disable deprecated linters
   disable:
     - wsl # Deprecated, replaced by wsl_v5
+    - wsl_v5 # Too strict for whitespace rules
 
   exclusions:
     rules:

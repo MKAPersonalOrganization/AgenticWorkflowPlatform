@@ -3,12 +3,13 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/cpmech/gosl/la"
 )
 
-// EigenvalueTool computes eigenvalues and eigenvectors
+// EigenvalueTool computes eigenvalues and eigenvectors.
 type EigenvalueTool struct{}
 
 func NewEigenvalueTool() *EigenvalueTool {
@@ -60,7 +61,7 @@ func (t *EigenvalueTool) Invoke(ctx context.Context, arguments string) (string, 
 
 	n := len(args.Matrix)
 	if n == 0 || len(args.Matrix[0]) != n {
-		return "", fmt.Errorf("matrix must be square")
+		return "", errors.New("matrix must be square")
 	}
 
 	A := la.NewMatrixDeep2(args.Matrix)
@@ -97,11 +98,11 @@ func (t *EigenvalueTool) Invoke(ctx context.Context, arguments string) (string, 
 	if args.ComputeVectors {
 		// Convert complex eigenvectors to real/imag pairs for JSON
 		eigenvectorsJSON := make([][][]float64, n)
-		for i := 0; i < n; i++ {
+		for i := range n {
 			eigenvectorsJSON[i] = make([][]float64, 2)
 			eigenvectorsJSON[i][0] = make([]float64, n) // real part
 			eigenvectorsJSON[i][1] = make([]float64, n) // imag part
-			for j := 0; j < n; j++ {
+			for j := range n {
 				val := eigenvectors.Get(j, i) // column i is eigenvector i
 				eigenvectorsJSON[i][0][j] = real(val)
 				eigenvectorsJSON[i][1][j] = imag(val)
@@ -114,5 +115,6 @@ func (t *EigenvalueTool) Invoke(ctx context.Context, arguments string) (string, 
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal response: %w", err)
 	}
+
 	return string(data), nil
 }

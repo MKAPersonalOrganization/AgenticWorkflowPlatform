@@ -18,7 +18,7 @@ func domainTools() []core.Tool {
 }
 
 // CreateLinearAlgebraProfessor creates the linear algebra professor agent.
-// Event contract is defined in contract.go
+// Event contract is defined in contract.go.
 func CreateLinearAlgebraProfessor(notifier core.EventNotifier, whiteboardProjection interface{ Get(threadID string) string }) core.AgentConfig {
 	registry := core.NewToolRegistry()
 

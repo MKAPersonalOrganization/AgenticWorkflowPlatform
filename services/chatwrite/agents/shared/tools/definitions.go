@@ -4,7 +4,7 @@ import (
 	"school-with-ai/sdk/agentsdk/llm"
 )
 
-// GetWeatherTool returns the tool definition for weather lookup
+// GetWeatherTool returns the tool definition for weather lookup.
 func GetWeatherTool() llm.AITool {
 	return llm.NewAIFunctionTool(
 		"get_weather",
@@ -27,7 +27,7 @@ func GetWeatherTool() llm.AITool {
 	)
 }
 
-// GetCalculatorTool returns the tool definition for calculator
+// GetCalculatorTool returns the tool definition for calculator.
 func GetCalculatorTool() llm.AITool {
 	return llm.NewAIFunctionTool(
 		"calculate",
@@ -45,7 +45,7 @@ func GetCalculatorTool() llm.AITool {
 	)
 }
 
-// GetAllTools returns all available tools
+// GetAllTools returns all available tools.
 func GetAllTools() []llm.AITool {
 	return []llm.AITool{
 		GetWeatherTool(),

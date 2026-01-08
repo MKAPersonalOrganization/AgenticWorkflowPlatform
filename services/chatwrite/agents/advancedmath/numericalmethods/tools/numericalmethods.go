@@ -4,7 +4,7 @@ import (
 	"context"
 )
 
-// RootFindingTool finds roots of equations
+// RootFindingTool finds roots of equations.
 type RootFindingTool struct{}
 
 func NewRootFindingTool() *RootFindingTool {
@@ -36,7 +36,7 @@ func (t *RootFindingTool) Invoke(ctx context.Context, arguments string) (string,
 	return `{"result": "Implementation pending"}`, nil
 }
 
-// NonlinearSolverTool solves nonlinear systems
+// NonlinearSolverTool solves nonlinear systems.
 type NonlinearSolverTool struct{}
 
 func NewNonlinearSolverTool() *NonlinearSolverTool {
@@ -59,7 +59,7 @@ func (t *NonlinearSolverTool) Invoke(ctx context.Context, arguments string) (str
 	return `{"result": "Implementation pending"}`, nil
 }
 
-// NumericalDerivativeTool computes numerical derivatives
+// NumericalDerivativeTool computes numerical derivatives.
 type NumericalDerivativeTool struct{}
 
 func NewNumericalDerivativeTool() *NumericalDerivativeTool {
@@ -82,7 +82,7 @@ func (t *NumericalDerivativeTool) Invoke(ctx context.Context, arguments string) 
 	return `{"result": "Implementation pending"}`, nil
 }
 
-// NumericalIntegrationTool performs numerical integration
+// NumericalIntegrationTool performs numerical integration.
 type NumericalIntegrationTool struct{}
 
 func NewNumericalIntegrationTool() *NumericalIntegrationTool {

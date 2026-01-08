@@ -1,5 +1,7 @@
 package core
 
+import "maps"
+
 // RunOptions provides optional parameters for controlling agent run behavior.
 // These options can override the agent's default configuration on a per-run basis.
 // This mirrors the approach in Microsoft.Agents.AI.AgentRunOptions from the .NET agent framework.
@@ -38,7 +40,7 @@ type RunOptions struct {
 	// AdditionalProperties holds custom metadata or provider-specific options.
 	// This can be used to pass implementation-specific details that don't fit
 	// into the standard options schema.
-	AdditionalProperties map[string]interface{}
+	AdditionalProperties map[string]any
 }
 
 // Clone creates a deep copy of RunOptions.
@@ -59,10 +61,8 @@ func (o RunOptions) Clone() RunOptions {
 	}
 
 	if o.AdditionalProperties != nil {
-		clone.AdditionalProperties = make(map[string]interface{}, len(o.AdditionalProperties))
-		for k, v := range o.AdditionalProperties {
-			clone.AdditionalProperties[k] = v
-		}
+		clone.AdditionalProperties = make(map[string]any, len(o.AdditionalProperties))
+		maps.Copy(clone.AdditionalProperties, o.AdditionalProperties)
 	}
 
 	return clone
@@ -72,7 +72,7 @@ func (o RunOptions) Clone() RunOptions {
 // Matches the defaults from Microsoft.Agents.AI.AgentRunOptions:
 // - Temperature: 1.0 (controls randomness)
 // - TopP: 1.0 (nucleus sampling threshold)
-// - Other parameters use zero values (nil) to defer to agent config
+// - Other parameters use zero values (nil) to defer to agent config.
 func DefaultRunOptions() RunOptions {
 	temperature := 1.0
 	topP := 1.0

@@ -3,12 +3,11 @@ package core
 import (
 	"context"
 	"errors"
-	"testing"
-
 	"school-with-ai/sdk/agentsdk/llm"
+	"testing"
 )
 
-// Mock middleware for testing
+// Mock middleware for testing.
 type mockMiddleware struct {
 	beforeCalled bool
 	afterCalled  bool
@@ -224,6 +223,7 @@ func TestMiddlewareFunc(t *testing.T) {
 	called := false
 	middlewareFunc := MiddlewareFunc(func(ctx context.Context, reqCtx *RequestContext, next NextHandler) error {
 		called = true
+
 		return next(ctx, reqCtx)
 	})
 
@@ -241,6 +241,7 @@ func TestChainMiddleware_Empty(t *testing.T) {
 	baseHandlerCalled := false
 	baseHandler := func(ctx context.Context, reqCtx *RequestContext) error {
 		baseHandlerCalled = true
+
 		return nil
 	}
 
@@ -261,6 +262,7 @@ func TestChainMiddleware_SingleMiddleware(t *testing.T) {
 	baseHandlerCalled := false
 	baseHandler := func(ctx context.Context, reqCtx *RequestContext) error {
 		baseHandlerCalled = true
+
 		return nil
 	}
 
@@ -314,6 +316,7 @@ func TestChainMiddleware_MultipleMiddleware_ExecutionOrder(t *testing.T) {
 
 	baseHandler := func(ctx context.Context, reqCtx *RequestContext) error {
 		executionOrder = append(executionOrder, "base")
+
 		return nil
 	}
 
@@ -369,6 +372,7 @@ func TestChainMiddleware_MiddlewareCanModifyContext(t *testing.T) {
 		if !ok2 || val2 != "set by m2" {
 			return errors.New("base handler could not read m2 metadata")
 		}
+
 		return nil
 	}
 
@@ -393,6 +397,7 @@ func TestChainMiddleware_MiddlewareCanShortCircuit(t *testing.T) {
 	baseHandlerCalled := false
 	baseHandler := func(ctx context.Context, reqCtx *RequestContext) error {
 		baseHandlerCalled = true
+
 		return nil
 	}
 
@@ -427,6 +432,7 @@ func TestChainMiddleware_ErrorPropagation(t *testing.T) {
 	baseHandlerCalled := false
 	baseHandler := func(ctx context.Context, reqCtx *RequestContext) error {
 		baseHandlerCalled = true
+
 		return nil
 	}
 
@@ -465,7 +471,7 @@ func TestChainMiddleware_BaseHandlerError(t *testing.T) {
 	ctx := NewRequestContext("", nil, "", nil, nil)
 
 	err := handler(context.Background(), ctx)
-	if err != baseError {
+	if !errors.Is(err, baseError) {
 		t.Errorf("Expected base handler error, got %v", err)
 	}
 
@@ -492,7 +498,7 @@ func TestErrorHandler(t *testing.T) {
 
 	ctx := NewRequestContext("", nil, "", nil, nil)
 	err := handler(context.Background(), ctx)
-	if err != expectedError {
+	if !errors.Is(err, expectedError) {
 		t.Errorf("Expected error %v, got %v", expectedError, err)
 	}
 }
@@ -585,13 +591,12 @@ func TestMiddleware_CanAddSystemPromptDynamically(t *testing.T) {
 	}
 }
 
-// Benchmark middleware chain performance
+// Benchmark middleware chain performance.
 func BenchmarkChainMiddleware_NoMiddleware(b *testing.B) {
 	handler := ChainMiddleware([]Middleware{}, NoOpHandler)
 	ctx := NewRequestContext("", nil, "", nil, nil)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = handler(context.Background(), ctx)
 	}
 }
@@ -601,22 +606,20 @@ func BenchmarkChainMiddleware_SingleMiddleware(b *testing.B) {
 	handler := ChainMiddleware([]Middleware{m}, NoOpHandler)
 	ctx := NewRequestContext("", nil, "", nil, nil)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = handler(context.Background(), ctx)
 	}
 }
 
 func BenchmarkChainMiddleware_TenMiddleware(b *testing.B) {
 	middlewares := make([]Middleware, 10)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		middlewares[i] = &mockMiddleware{}
 	}
 	handler := ChainMiddleware(middlewares, NoOpHandler)
 	ctx := NewRequestContext("", nil, "", nil, nil)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = handler(context.Background(), ctx)
 	}
 }

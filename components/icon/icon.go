@@ -48,6 +48,7 @@ func Icon(name string) func(...Props) templ.Component {
 
 			if cached {
 				_, err = w.Write([]byte(svg))
+
 				return err
 			}
 
@@ -64,6 +65,7 @@ func Icon(name string) func(...Props) templ.Component {
 			iconMutex.Unlock()
 
 			_, err = w.Write([]byte(generatedSvg))
+
 			return err
 		})
 	}
@@ -114,5 +116,6 @@ func getIconContent(name string) (string, error) {
 	if !exists {
 		return "", fmt.Errorf("icon '%s' not found in internalSvgData map", name)
 	}
+
 	return content, nil
 }

@@ -37,7 +37,7 @@ do for [i=0:40] {
 		t.Fatalf("failed to invoke animate tool: %v", err)
 	}
 
-	var response map[string]interface{}
+	var response map[string]any
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}
@@ -81,7 +81,7 @@ do for [ang=0:360:10] {
 		t.Fatalf("failed to create animation: %v", err)
 	}
 
-	var response map[string]interface{}
+	var response map[string]any
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
@@ -115,7 +115,7 @@ do for [i=1:30] {
 		t.Fatalf("failed to create webp animation: %v", err)
 	}
 
-	var response map[string]interface{}
+	var response map[string]any
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
@@ -198,7 +198,7 @@ func TestAnimateTool_DefaultValues(t *testing.T) {
 		t.Fatalf("failed with defaults: %v", err)
 	}
 
-	var response map[string]interface{}
+	var response map[string]any
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}

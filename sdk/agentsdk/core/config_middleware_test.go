@@ -2,12 +2,11 @@ package core
 
 import (
 	"context"
-	"testing"
-
 	"school-with-ai/sdk/agentsdk/llm"
+	"testing"
 )
 
-// MockTool is a simple tool implementation for testing
+// MockTool is a simple tool implementation for testing.
 type MockTool struct {
 	name        string
 	description string
@@ -28,11 +27,11 @@ func (m *MockTool) Description() string {
 	return m.description
 }
 
-func (m *MockTool) Parameters() map[string]interface{} {
-	return map[string]interface{}{
+func (m *MockTool) Parameters() map[string]any {
+	return map[string]any{
 		"type": "object",
-		"properties": map[string]interface{}{
-			"input": map[string]interface{}{
+		"properties": map[string]any{
+			"input": map[string]any{
 				"type":        "string",
 				"description": "Input parameter",
 			},
@@ -44,7 +43,7 @@ func (m *MockTool) Invoke(ctx context.Context, arguments string) (string, error)
 	return "mock result", nil
 }
 
-// TestToChatOptionsWithMiddleware_WithoutMiddleware ensures backward compatibility
+// TestToChatOptionsWithMiddleware_WithoutMiddleware ensures backward compatibility.
 func TestToChatOptionsWithMiddleware_WithoutMiddleware(t *testing.T) {
 	config := AgentConfig{
 		Name:         "test-agent",
@@ -69,7 +68,7 @@ func TestToChatOptionsWithMiddleware_WithoutMiddleware(t *testing.T) {
 	}
 }
 
-// TestApplyMiddleware_NoMiddleware ensures ApplyMiddleware works without middleware
+// TestApplyMiddleware_NoMiddleware ensures ApplyMiddleware works without middleware.
 func TestApplyMiddleware_NoMiddleware(t *testing.T) {
 	config := AgentConfig{
 		Name:         "test-agent",
@@ -100,11 +99,12 @@ func TestApplyMiddleware_NoMiddleware(t *testing.T) {
 	}
 }
 
-// TestApplyMiddleware_WithToolInjection tests middleware adding tools
+// TestApplyMiddleware_WithToolInjection tests middleware adding tools.
 func TestApplyMiddleware_WithToolInjection(t *testing.T) {
 	// Create middleware that adds a tool
 	toolAdderMiddleware := MiddlewareFunc(func(ctx context.Context, reqCtx *RequestContext, next NextHandler) error {
 		reqCtx.AddTool(NewMockTool("injected_tool", "Middleware-injected tool"))
+
 		return next(ctx, reqCtx)
 	})
 
@@ -144,11 +144,12 @@ func TestApplyMiddleware_WithToolInjection(t *testing.T) {
 	}
 }
 
-// TestApplyMiddleware_WithSystemPromptAddition tests middleware adding to system prompt
+// TestApplyMiddleware_WithSystemPromptAddition tests middleware adding to system prompt.
 func TestApplyMiddleware_WithSystemPromptAddition(t *testing.T) {
 	// Create middleware that adds to system prompt
 	promptAdderMiddleware := MiddlewareFunc(func(ctx context.Context, reqCtx *RequestContext, next NextHandler) error {
 		reqCtx.AddSystemPrompt("IMPORTANT: Always be concise.")
+
 		return next(ctx, reqCtx)
 	})
 
@@ -176,7 +177,7 @@ func TestApplyMiddleware_WithSystemPromptAddition(t *testing.T) {
 	}
 }
 
-// TestApplyMiddleware_Termination tests middleware terminating early
+// TestApplyMiddleware_Termination tests middleware terminating early.
 func TestApplyMiddleware_Termination(t *testing.T) {
 	// Create middleware that terminates
 	terminatorMiddleware := MiddlewareFunc(func(ctx context.Context, reqCtx *RequestContext, next NextHandler) error {
@@ -209,12 +210,13 @@ func TestApplyMiddleware_Termination(t *testing.T) {
 	}
 }
 
-// TestToChatOptionsWithMiddleware tests the integrated middleware flow
+// TestToChatOptionsWithMiddleware tests the integrated middleware flow.
 func TestToChatOptionsWithMiddleware(t *testing.T) {
 	// Create middleware that adds tool and system prompt
 	enrichmentMiddleware := MiddlewareFunc(func(ctx context.Context, reqCtx *RequestContext, next NextHandler) error {
 		reqCtx.AddTool(NewMockTool("middleware_tool", "Added by middleware"))
 		reqCtx.AddSystemPrompt("\n\nNote: Middleware is active.")
+
 		return next(ctx, reqCtx)
 	})
 
@@ -256,10 +258,11 @@ func TestToChatOptionsWithMiddleware(t *testing.T) {
 	}
 }
 
-// TestToChatOptionsWithMiddleware_Termination tests early termination
+// TestToChatOptionsWithMiddleware_Termination tests early termination.
 func TestToChatOptionsWithMiddleware_Termination(t *testing.T) {
 	terminatorMiddleware := MiddlewareFunc(func(ctx context.Context, reqCtx *RequestContext, next NextHandler) error {
 		reqCtx.SetTerminate()
+
 		return nil
 	})
 
@@ -286,7 +289,7 @@ func TestToChatOptionsWithMiddleware_Termination(t *testing.T) {
 	}
 }
 
-// TestApplyMiddleware_ConfigParameters tests that config parameters are copied to reqCtx
+// TestApplyMiddleware_ConfigParameters tests that config parameters are copied to reqCtx.
 func TestApplyMiddleware_ConfigParameters(t *testing.T) {
 	temp := 0.7
 	maxTokens := 1000
@@ -330,7 +333,7 @@ func TestApplyMiddleware_ConfigParameters(t *testing.T) {
 	}
 }
 
-// TestApplyMiddleware_RunOptionsOverride tests that run options override config
+// TestApplyMiddleware_RunOptionsOverride tests that run options override config.
 func TestApplyMiddleware_RunOptionsOverride(t *testing.T) {
 	configTemp := 0.5
 	runTemp := 0.9
@@ -367,7 +370,7 @@ func TestApplyMiddleware_RunOptionsOverride(t *testing.T) {
 	}
 }
 
-// TestApplyMiddleware_MultipleMiddleware tests middleware chain execution order
+// TestApplyMiddleware_MultipleMiddleware tests middleware chain execution order.
 func TestApplyMiddleware_MultipleMiddleware(t *testing.T) {
 	var executionOrder []string
 
@@ -376,6 +379,7 @@ func TestApplyMiddleware_MultipleMiddleware(t *testing.T) {
 		reqCtx.AddTool(NewMockTool("tool1", "From middleware 1"))
 		err := next(ctx, reqCtx)
 		executionOrder = append(executionOrder, "m1-after")
+
 		return err
 	})
 
@@ -384,6 +388,7 @@ func TestApplyMiddleware_MultipleMiddleware(t *testing.T) {
 		reqCtx.AddTool(NewMockTool("tool2", "From middleware 2"))
 		err := next(ctx, reqCtx)
 		executionOrder = append(executionOrder, "m2-after")
+
 		return err
 	})
 

@@ -4,14 +4,14 @@ import (
 	"school-with-ai/domain"
 )
 
-// ThreadType represents the type of agent thread
+// ThreadType represents the type of agent thread.
 type ThreadType string
 
 const (
-	// ThreadTypeLocal represents a thread with all conversation state stored locally
+	// ThreadTypeLocal represents a thread with all conversation state stored locally.
 	ThreadTypeLocal ThreadType = "local"
 
-	// ThreadTypeRemote represents a thread where conversation state is managed server-side
+	// ThreadTypeRemote represents a thread where conversation state is managed server-side.
 	ThreadTypeRemote ThreadType = "remote"
 )
 
@@ -55,5 +55,5 @@ type AgentThread interface {
 	// This allows for retrieval of strongly-typed services that might be provided by the thread,
 	// including the thread itself or any services it might be wrapping.
 	// Returns nil if the service is not available.
-	GetService(serviceType interface{}) interface{}
+	GetService(serviceType any) any
 }

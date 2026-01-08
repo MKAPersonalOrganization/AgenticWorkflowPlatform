@@ -33,7 +33,7 @@ plot sin(x) with lines linewidth 2 title 'y = sin(x)'`
 		t.Fatalf("failed to invoke plot tool: %v", err)
 	}
 
-	var response map[string]interface{}
+	var response map[string]any
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}
@@ -70,7 +70,7 @@ plot sin(x) title 'sin(x)', cos(x) title 'cos(x)', tan(x) title 'tan(x)'`
 		t.Fatalf("failed to create plot: %v", err)
 	}
 
-	var response map[string]interface{}
+	var response map[string]any
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
@@ -104,7 +104,7 @@ plot x**2 - 4*x + 3 with lines title 'y = x² - 4x + 3', 0 with lines dashtype 2
 		t.Fatalf("failed to create plot: %v", err)
 	}
 
-	var response map[string]interface{}
+	var response map[string]any
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
@@ -138,7 +138,7 @@ e`
 		t.Fatalf("failed to create plot: %v", err)
 	}
 
-	var response map[string]interface{}
+	var response map[string]any
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
@@ -166,14 +166,15 @@ splot x**2 + y**2 with lines`
 		t.Fatalf("failed to create plot: %v", err)
 	}
 
-	var response map[string]interface{}
+	var response map[string]any
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
 
 	imagePath := response["image_path"].(string)
 	defer func() {
-		if err := os.Remove(imagePath); err != nil {
+		err := os.Remove(imagePath)
+		if err != nil {
 			t.Logf("Failed to remove test image: %v", err)
 		}
 	}()

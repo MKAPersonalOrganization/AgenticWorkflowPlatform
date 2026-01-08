@@ -3,9 +3,8 @@ package agui
 import (
 	"context"
 	"fmt"
-	"time"
-
 	"school-with-ai/sdk/agentsdk/core"
+	"time"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
@@ -63,6 +62,7 @@ func (p *QueryTimeAguiProjection) GetThreadState(threadID string) (*AguiThreadSt
 	}
 
 	state.ActiveRun = activeRun
+
 	return state, true
 }
 
@@ -72,6 +72,7 @@ func (p *QueryTimeAguiProjection) GetActiveRun(threadID string) (*AguiRunState, 
 	if !exists || state.ActiveRun == nil {
 		return nil, false
 	}
+
 	return state.ActiveRun, true
 }
 
@@ -81,6 +82,7 @@ func (p *QueryTimeAguiProjection) GetMessages(threadID string) []aguievents.Mess
 	if !exists {
 		return []aguievents.Message{}
 	}
+
 	return state.Messages
 }
 
@@ -90,6 +92,7 @@ func (p *QueryTimeAguiProjection) GetToolCalls(threadID string) []AguiToolCall {
 	if !exists {
 		return []AguiToolCall{}
 	}
+
 	return state.ToolCalls
 }
 
@@ -99,6 +102,7 @@ func (p *QueryTimeAguiProjection) GetAgentActivity(threadID string) map[string]*
 	if !exists {
 		return make(map[string]*AguiAgentActivity)
 	}
+
 	return state.AgentActivity
 }
 
@@ -107,6 +111,7 @@ func (p *QueryTimeAguiProjection) GetAgentActivity(threadID string) map[string]*
 func (p *QueryTimeAguiProjection) ListThreads() []string {
 	if p.threadIDLister == nil {
 		fmt.Println("[AGUI QueryTime] threadIDLister is nil")
+
 		return []string{}
 	}
 
@@ -114,9 +119,11 @@ func (p *QueryTimeAguiProjection) ListThreads() []string {
 	threadIDs, err := p.threadIDLister.ReadAllThreadIDs(ctx)
 	if err != nil {
 		fmt.Printf("[AGUI QueryTime] Error reading thread IDs: %v\n", err)
+
 		return []string{}
 	}
 	fmt.Printf("[AGUI QueryTime] ListThreads returning %d threads\n", len(threadIDs))
+
 	return threadIDs
 }
 
@@ -134,6 +141,7 @@ func (p *QueryTimeAguiProjection) Update(ctx context.Context, events []core.Even
 // ThreadExists checks if a thread exists by attempting to read its events.
 func (p *QueryTimeAguiProjection) ThreadExists(threadID string) bool {
 	_, exists := p.GetThreadState(threadID)
+
 	return exists
 }
 
@@ -408,5 +416,5 @@ func (p *QueryTimeAguiProjection) SetEventEmitter(emitter EventEmitter) {
 	// No-op: query-time projections don't emit real-time events
 }
 
-// Verify QueryTimeAguiProjection implements AguiProjection
+// Verify QueryTimeAguiProjection implements AguiProjection.
 var _ AguiProjection = (*QueryTimeAguiProjection)(nil)

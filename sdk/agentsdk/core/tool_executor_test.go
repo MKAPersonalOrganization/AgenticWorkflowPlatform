@@ -4,14 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"testing"
-
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/services/chatwrite/agents/shared/tools"
+	"testing"
 )
 
-// MockToolExecutor is a test double for ToolExecutor
+// MockToolExecutor is a test double for ToolExecutor.
 type MockToolExecutor struct {
 	results map[string]string
 	errors  map[string]error
@@ -56,10 +55,11 @@ func (m *MockToolExecutor) LastCall() domain.ToolCall {
 	if len(m.calls) == 0 {
 		return domain.ToolCall{}
 	}
+
 	return m.calls[len(m.calls)-1]
 }
 
-// Verify MockToolExecutor implements ToolExecutor
+// Verify MockToolExecutor implements ToolExecutor.
 var _ core.ToolExecutor = (*MockToolExecutor)(nil)
 
 func TestMockToolExecutor_Execute(t *testing.T) {
@@ -205,9 +205,11 @@ func TestRegistryToolExecutor(t *testing.T) {
 			var args struct {
 				Name string `json:"name"`
 			}
-			if err := json.Unmarshal([]byte(arguments), &args); err != nil {
+			err := json.Unmarshal([]byte(arguments), &args)
+			if err != nil {
 				return "", err
 			}
+
 			return `{"message": "Hello, ` + args.Name + `!"}`, nil
 		},
 	))

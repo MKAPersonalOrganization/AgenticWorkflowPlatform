@@ -31,9 +31,9 @@ func TestMatrixOperationsTool_Multiply(t *testing.T) {
 	}
 
 	expected := [][]float64{{19, 22}, {43, 50}}
-	resultMatrix := response["result"].([]interface{})
+	resultMatrix := response["result"].([]any)
 	for i := range expected {
-		row := resultMatrix[i].([]interface{})
+		row := resultMatrix[i].([]any)
 		for j, exp := range expected[i] {
 			actual := row[j].(float64)
 			if math.Abs(actual-exp) > 1e-10 {
@@ -63,9 +63,9 @@ func TestMatrixOperationsTool_Transpose(t *testing.T) {
 	}
 
 	expected := [][]float64{{1, 4}, {2, 5}, {3, 6}}
-	resultMatrix := response["result"].([]interface{})
+	resultMatrix := response["result"].([]any)
 	for i := range expected {
-		row := resultMatrix[i].([]interface{})
+		row := resultMatrix[i].([]any)
 		for j, exp := range expected[i] {
 			actual := row[j].(float64)
 			if math.Abs(actual-exp) > 1e-10 {
@@ -141,9 +141,9 @@ func TestMatrixOperationsTool_Inverse(t *testing.T) {
 	}
 
 	expected := [][]float64{{0.6, -0.7}, {-0.2, 0.4}}
-	resultMatrix := response["result"].([]interface{})
+	resultMatrix := response["result"].([]any)
 	for i := range expected {
-		row := resultMatrix[i].([]interface{})
+		row := resultMatrix[i].([]any)
 		for j, exp := range expected[i] {
 			actual := row[j].(float64)
 			if math.Abs(actual-exp) > 1e-9 {

@@ -2,16 +2,16 @@ package core
 
 import (
 	"context"
-
+	"maps"
 	"school-with-ai/sdk/agentsdk/llm"
 )
 
-// EventNotifier is the interface for handling domain events from agents
+// EventNotifier is the interface for handling domain events from agents.
 type EventNotifier interface {
 	HandleDomainEvent(event Event) error
 }
 
-// AgentConfig defines the configuration for an agent
+// AgentConfig defines the configuration for an agent.
 type AgentConfig struct {
 	// Identity
 	Name string // Unique identifier for the agent
@@ -37,7 +37,7 @@ type AgentConfig struct {
 	Notifier EventNotifier // UI/Event notifier for this agent
 }
 
-// DefaultConfig returns a basic agent configuration
+// DefaultConfig returns a basic agent configuration.
 func DefaultConfig(name string) AgentConfig {
 	return AgentConfig{
 		Name:         name,
@@ -47,7 +47,7 @@ func DefaultConfig(name string) AgentConfig {
 	}
 }
 
-// ToAITools converts agent.Tool slice to llm.AITool slice for ChatClient
+// ToAITools converts agent.Tool slice to llm.AITool slice for ChatClient.
 func ToAITools(tools []Tool) []llm.AITool {
 	result := make([]llm.AITool, len(tools))
 	for i, t := range tools {
@@ -57,6 +57,7 @@ func ToAITools(tools []Tool) []llm.AITool {
 			t.Parameters(),
 		)
 	}
+
 	return result
 }
 
@@ -111,9 +112,7 @@ func ToChatOptionsWithMiddleware(ctx context.Context, config AgentConfig, messag
 		if opts.AdditionalProperties == nil {
 			opts.AdditionalProperties = make(map[string]any)
 		}
-		for k, v := range runOpts.AdditionalProperties {
-			opts.AdditionalProperties[k] = v
-		}
+		maps.Copy(opts.AdditionalProperties, runOpts.AdditionalProperties)
 	}
 
 	return opts, reqCtx, nil
@@ -192,7 +191,8 @@ func ApplyMiddleware(ctx context.Context, config AgentConfig, messages []llm.Cha
 
 		chain := ChainMiddleware(config.Middleware, noOpHandler)
 
-		if err := chain(ctx, reqCtx); err != nil {
+		err := chain(ctx, reqCtx)
+		if err != nil {
 			return nil, err
 		}
 

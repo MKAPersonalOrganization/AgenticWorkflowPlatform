@@ -5,7 +5,7 @@ import (
 	"school-with-ai/services/chatwrite"
 )
 
-// CreateShouldContinueIterationFn creates a function that determines if iteration should continue
+// CreateShouldContinueIterationFn creates a function that determines if iteration should continue.
 func CreateShouldContinueIterationFn() chatwrite.ShouldContinueIterationFn {
 	return func(toolCalls []domain.ToolCall) bool {
 		// Stop iteration if any tool triggers another agent
@@ -16,6 +16,7 @@ func CreateShouldContinueIterationFn() chatwrite.ShouldContinueIterationFn {
 				return false
 			}
 		}
+
 		return true
 	}
 }

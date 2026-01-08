@@ -5,10 +5,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"school-with-ai/domain"
 	"testing"
 	"time"
-
-	"school-with-ai/domain"
 
 	client "github.com/ory/client-go"
 )
@@ -50,7 +49,7 @@ func TestMiddleware_RequireAuth_NoSession(t *testing.T) {
 	})
 
 	// Create request without cookie
-	req := httptest.NewRequest("GET", "/protected", nil)
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
 	rec := httptest.NewRecorder()
 
 	// Wrap handler with RequireAuth
@@ -104,7 +103,7 @@ func TestMiddleware_RequireAuth_ValidSession(t *testing.T) {
 
 	// Note: This test requires a valid session cookie from Kratos
 	// In a real integration test, you would create a session first
-	req := httptest.NewRequest("GET", "/protected", nil)
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
 	req.Header.Set("Cookie", "invalid-session-cookie")
 	rec := httptest.NewRecorder()
 
@@ -130,7 +129,7 @@ func TestMiddleware_OptionalAuth_NoSession(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	req := httptest.NewRequest("GET", "/public", nil)
+	req := httptest.NewRequest(http.MethodGet, "/public", nil)
 	rec := httptest.NewRecorder()
 
 	middleware.OptionalAuth(handler).ServeHTTP(rec, req)
@@ -169,7 +168,7 @@ func TestMiddleware_validateSession(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest("GET", "/", nil)
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
 			if tt.cookie != "" {
 				req.Header.Set("Cookie", tt.cookie)
 			}
@@ -202,7 +201,7 @@ func TestMiddleware_RequireAuthFunc(t *testing.T) {
 
 	wrappedHandler := middleware.RequireAuthFunc(handler)
 
-	req := httptest.NewRequest("GET", "/protected", nil)
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
 	rec := httptest.NewRecorder()
 
 	wrappedHandler(rec, req)
@@ -230,7 +229,7 @@ func TestMiddleware_OptionalAuthFunc(t *testing.T) {
 
 	wrappedHandler := middleware.OptionalAuthFunc(handler)
 
-	req := httptest.NewRequest("GET", "/public", nil)
+	req := httptest.NewRequest(http.MethodGet, "/public", nil)
 	rec := httptest.NewRecorder()
 
 	wrappedHandler(rec, req)
@@ -258,7 +257,7 @@ func TestMiddleware_AAL2Redirect(t *testing.T) {
 	}
 }
 
-// Helper function to create a mock session for testing
+// Helper function to create a mock session for testing.
 func createMockSession(email string, active bool) *client.Session {
 	now := time.Now()
 	aal := client.AUTHENTICATORASSURANCELEVEL_AAL1
@@ -272,7 +271,7 @@ func createMockSession(email string, active bool) *client.Session {
 			Id:        "identity-123",
 			CreatedAt: &now,
 			UpdatedAt: &now,
-			Traits: map[string]interface{}{
+			Traits: map[string]any{
 				"email": email,
 			},
 		},

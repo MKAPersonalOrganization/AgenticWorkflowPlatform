@@ -1,9 +1,8 @@
 package llm
 
 import (
-	"strings"
-
 	"school-with-ai/domain"
+	"strings"
 )
 
 // ChatMessage represents a single message in a conversation.
@@ -30,6 +29,7 @@ func (m ChatMessage) Text() string {
 			sb.WriteString(tc.Text)
 		}
 	}
+
 	return sb.String()
 }
 
@@ -41,6 +41,7 @@ func (m ChatMessage) FunctionCalls() []FunctionCallContent {
 			calls = append(calls, fc)
 		}
 	}
+
 	return calls
 }
 
@@ -52,6 +53,7 @@ func (m ChatMessage) FunctionResults() []FunctionResultContent {
 			results = append(results, fr)
 		}
 	}
+
 	return results
 }
 
@@ -62,6 +64,7 @@ func (m ChatMessage) HasFunctionCalls() bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -193,6 +196,7 @@ func FromDomainMessages(msgs []domain.Message) []ChatMessage {
 		}
 		result = append(result, FromDomainMessage(m))
 	}
+
 	return result
 }
 
@@ -202,5 +206,6 @@ func ToDomainMessages(msgs []ChatMessage) []domain.Message {
 	for i, m := range msgs {
 		result[i] = ToDomainMessage(m)
 	}
+
 	return result
 }

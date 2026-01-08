@@ -2,7 +2,7 @@ package tools
 
 import "context"
 
-// ODESolverTool solves ordinary differential equations
+// ODESolverTool solves ordinary differential equations.
 type ODESolverTool struct{}
 
 func NewODESolverTool() *ODESolverTool {
@@ -25,7 +25,7 @@ func (t *ODESolverTool) Invoke(ctx context.Context, arguments string) (string, e
 	return `{"result": "Implementation pending"}`, nil
 }
 
-// StiffODESolverTool solves stiff ODEs
+// StiffODESolverTool solves stiff ODEs.
 type StiffODESolverTool struct{}
 
 func NewStiffODESolverTool() *StiffODESolverTool {

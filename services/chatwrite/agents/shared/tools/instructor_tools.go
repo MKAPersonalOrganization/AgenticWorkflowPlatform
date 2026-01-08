@@ -6,13 +6,13 @@ import (
 	"fmt"
 )
 
-// WriteWhiteboardInput is the input for writing to the shared whiteboard
+// WriteWhiteboardInput is the input for writing to the shared whiteboard.
 type WriteWhiteboardInput struct {
 	Content string `json:"content"`
 	Action  string `json:"action"` // "write", "append", or "clear"
 }
 
-// WriteWhiteboardTool implements the Tool interface for writing to the whiteboard
+// WriteWhiteboardTool implements the Tool interface for writing to the whiteboard.
 type WriteWhiteboardTool struct{}
 
 func NewWriteWhiteboardTool() *WriteWhiteboardTool {
@@ -49,10 +49,11 @@ func (t *WriteWhiteboardTool) Invoke(ctx context.Context, arguments string) (str
 	return WriteWhiteboard(arguments)
 }
 
-// WriteWhiteboard allows instructors to write to the shared whiteboard
+// WriteWhiteboard allows instructors to write to the shared whiteboard.
 func WriteWhiteboard(input string) (string, error) {
 	var params WriteWhiteboardInput
-	if err := json.Unmarshal([]byte(input), &params); err != nil {
+	err := json.Unmarshal([]byte(input), &params)
+	if err != nil {
 		return "", fmt.Errorf("failed to parse input: %w", err)
 	}
 
@@ -71,7 +72,7 @@ func WriteWhiteboard(input string) (string, error) {
 	return fmt.Sprintf("Whiteboard updated (%s): %s", params.Action, params.Content), nil
 }
 
-// ExecuteInstructorTool executes an instructor tool by name
+// ExecuteInstructorTool executes an instructor tool by name.
 func ExecuteInstructorTool(name string, arguments string) (string, error) {
 	switch name {
 	case "write_whiteboard":

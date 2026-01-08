@@ -1,5 +1,7 @@
 package llm
 
+import "maps"
+
 // AITool is the base interface for all AI tools.
 // This mirrors Microsoft.Extensions.AI.AITool from the .NET agent framework.
 //
@@ -43,9 +45,7 @@ func (t AIFunctionTool) Clone() AIFunctionTool {
 	var params map[string]any
 	if t.parameters != nil {
 		params = make(map[string]any, len(t.parameters))
-		for k, v := range t.parameters {
-			params[k] = v
-		}
+		maps.Copy(params, t.parameters)
 	}
 
 	return AIFunctionTool{
@@ -55,7 +55,7 @@ func (t AIFunctionTool) Clone() AIFunctionTool {
 	}
 }
 
-// Verify AIFunctionTool implements AITool
+// Verify AIFunctionTool implements AITool.
 var _ AITool = AIFunctionTool{}
 
 // NewAIFunctionTool creates a new function tool with the given metadata.

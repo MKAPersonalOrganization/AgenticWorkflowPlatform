@@ -22,7 +22,7 @@ func domainTools() []core.Tool {
 }
 
 // CreateStatisticsInstructor creates the statistics instructor agent.
-// Event contract is defined in contract.go
+// Event contract is defined in contract.go.
 func CreateStatisticsInstructor(notifier core.EventNotifier, whiteboardProjection interface{ Get(threadID string) string }) core.AgentConfig {
 	registry := core.NewToolRegistry()
 

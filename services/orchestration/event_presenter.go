@@ -7,19 +7,19 @@ import (
 )
 
 // UINotifier listens to domain events and notifies the UI
-// This separates business logic (domain events) from presentation logic (UI events)
+// This separates business logic (domain events) from presentation logic (UI events).
 type UINotifier struct {
 	emitter EventEmitter
 }
 
-// NewUINotifier creates a new UI notifier
+// NewUINotifier creates a new UI notifier.
 func NewUINotifier(emitter EventEmitter) *UINotifier {
 	return &UINotifier{
 		emitter: emitter,
 	}
 }
 
-// HandleDomainEvent processes a domain event and emits corresponding UI events
+// HandleDomainEvent processes a domain event and emits corresponding UI events.
 func (n *UINotifier) HandleDomainEvent(event core.Event) error {
 	switch evt := event.(type) {
 	case *core.AssistantMessageStartedEvent:
@@ -54,6 +54,7 @@ func (n *UINotifier) emitTextMessageStart(evt *core.AssistantMessageStartedEvent
 		evt.MessageID,
 		aguievents.WithRole("assistant"),
 	)
+
 	return n.emitter.Emit(uiEvent)
 }
 
@@ -62,6 +63,7 @@ func (n *UINotifier) emitTextMessageContent(evt *core.AssistantContentStreamedEv
 		evt.MessageID,
 		evt.Delta,
 	)
+
 	return n.emitter.Emit(uiEvent)
 }
 
@@ -69,12 +71,13 @@ func (n *UINotifier) emitToolCallStart(evt *core.ToolCallStartedEvent) error {
 	// First emit TOOL_CALL_AGENT to establish agent-tool call association
 	agentEvent := aguievents.NewCustomEvent(
 		"TOOL_CALL_AGENT",
-		aguievents.WithValue(map[string]interface{}{
+		aguievents.WithValue(map[string]any{
 			"toolCallId": evt.ToolCallID,
 			"agentName":  evt.AgentName,
 		}),
 	)
-	if err := n.emitter.Emit(agentEvent); err != nil {
+	err := n.emitter.Emit(agentEvent)
+	if err != nil {
 		return err
 	}
 
@@ -84,6 +87,7 @@ func (n *UINotifier) emitToolCallStart(evt *core.ToolCallStartedEvent) error {
 		evt.ToolCallName,
 		aguievents.WithParentMessageID(evt.ParentMessageID),
 	)
+
 	return n.emitter.Emit(uiEvent)
 }
 
@@ -92,6 +96,7 @@ func (n *UINotifier) emitToolCallArgs(evt *core.ToolCallArgumentsStreamedEvent) 
 		evt.ToolCallID,
 		evt.Delta,
 	)
+
 	return n.emitter.Emit(uiEvent)
 }
 
@@ -99,6 +104,7 @@ func (n *UINotifier) emitToolCallEnd(evt *core.ToolCallCompletedEvent) error {
 	uiEvent := aguievents.NewToolCallEndEvent(
 		evt.ToolCallID,
 	)
+
 	return n.emitter.Emit(uiEvent)
 }
 
@@ -106,6 +112,7 @@ func (n *UINotifier) emitTextMessageEnd(evt *core.AssistantMessageCompletedEvent
 	uiEvent := aguievents.NewTextMessageEndEvent(
 		evt.MessageID,
 	)
+
 	return n.emitter.Emit(uiEvent)
 }
 
@@ -115,5 +122,6 @@ func (n *UINotifier) emitToolCallResult(evt *core.ToolCallExecutedEvent) error {
 		evt.ToolCallID,
 		evt.ToolResult,
 	)
+
 	return n.emitter.Emit(uiEvent)
 }

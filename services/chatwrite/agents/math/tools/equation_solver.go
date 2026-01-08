@@ -7,16 +7,16 @@ import (
 	"strings"
 )
 
-// EquationSolverArgs represents the arguments for equation solver tool
+// EquationSolverArgs represents the arguments for equation solver tool.
 type EquationSolverArgs struct {
 	Equation string `json:"equation"`
 	Variable string `json:"variable,omitempty"`
 }
 
-// EquationSolverTool implements the Tool interface for solving equations
+// EquationSolverTool implements the Tool interface for solving equations.
 type EquationSolverTool struct{}
 
-// NewEquationSolverTool creates a new equation solver tool
+// NewEquationSolverTool creates a new equation solver tool.
 func NewEquationSolverTool() *EquationSolverTool {
 	return &EquationSolverTool{}
 }
@@ -130,5 +130,6 @@ func detectEquationType(equation string) string {
 	if strings.Contains(equation, "log") || strings.Contains(equation, "ln") {
 		return "logarithmic"
 	}
+
 	return "linear"
 }

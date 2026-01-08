@@ -8,13 +8,13 @@ import (
 )
 
 // GetUserFromContext retrieves the authenticated user from the request context
-// Deprecated: Use domain.GetUserFromContext instead
+// Deprecated: Use domain.GetUserFromContext instead.
 var GetUserFromContext = domain.GetUserFromContext
 
 // GetSessionFromContext retrieves the Kratos session from the request context
-// Deprecated: Use domain.GetSessionFromContext instead
+// Deprecated: Use domain.GetSessionFromContext instead.
 var GetSessionFromContext = domain.GetSessionFromContext
 
 // IsAuthenticated checks if the context has an authenticated user
-// Deprecated: Use domain.IsAuthenticated instead
+// Deprecated: Use domain.IsAuthenticated instead.
 var IsAuthenticated = domain.IsAuthenticated

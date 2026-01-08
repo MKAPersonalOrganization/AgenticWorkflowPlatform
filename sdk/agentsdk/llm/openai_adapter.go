@@ -19,6 +19,7 @@ type OpenAIClient struct {
 // Requires OPENAI_API_KEY environment variable to be set.
 func NewOpenAIClient(model string) *OpenAIClient {
 	client := openai.NewClient()
+
 	return &OpenAIClient{
 		client: &client,
 		model:  model,
@@ -30,6 +31,7 @@ func NewOpenAIClientWithAPIKey(apiKey string, model string) *OpenAIClient {
 	client := openai.NewClient(
 		option.WithAPIKey(apiKey),
 	)
+
 	return &OpenAIClient{
 		client: &client,
 		model:  model,
@@ -103,8 +105,10 @@ func (c *OpenAIClient) GetStreamingResponse(
 		}
 
 		// Check for stream errors
-		if err := stream.Err(); err != nil {
+		err := stream.Err()
+		if err != nil {
 			yield(ChatResponseUpdate{}, err)
+
 			return
 		}
 
@@ -293,6 +297,7 @@ func (c *OpenAIClient) getModel(options *ChatOptions) openai.ChatModel {
 	if options != nil && options.ModelID != "" {
 		return openai.ChatModel(options.ModelID)
 	}
+
 	return openai.ChatModel(c.model)
 }
 

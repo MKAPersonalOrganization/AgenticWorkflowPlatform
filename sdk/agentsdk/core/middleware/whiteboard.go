@@ -4,11 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
 	"school-with-ai/sdk/agentsdk/core"
 )
 
-// WhiteboardAction represents the type of whiteboard update
+// WhiteboardAction represents the type of whiteboard update.
 type WhiteboardAction string
 
 const (
@@ -237,12 +236,12 @@ Best practices:
 - Preserve content from other agents when updating
 - Use action='write' (not 'append') when updating existing sections to avoid duplication`
 
-// WriteWhiteboardTool is the tool for writing to the whiteboard
+// WriteWhiteboardTool is the tool for writing to the whiteboard.
 type WriteWhiteboardTool struct {
 	reqCtx *core.RequestContext
 }
 
-// NewWriteWhiteboardTool creates a new WriteWhiteboardTool
+// NewWriteWhiteboardTool creates a new WriteWhiteboardTool.
 func NewWriteWhiteboardTool(reqCtx *core.RequestContext) *WriteWhiteboardTool {
 	return &WriteWhiteboardTool{
 		reqCtx: reqCtx,
@@ -257,15 +256,15 @@ func (t *WriteWhiteboardTool) Description() string {
 	return WriteWhiteboardToolDescription
 }
 
-func (t *WriteWhiteboardTool) Parameters() map[string]interface{} {
-	return map[string]interface{}{
+func (t *WriteWhiteboardTool) Parameters() map[string]any {
+	return map[string]any{
 		"type": "object",
-		"properties": map[string]interface{}{
-			"content": map[string]interface{}{
+		"properties": map[string]any{
+			"content": map[string]any{
 				"type":        "string",
 				"description": "The content to write to the whiteboard (use markdown format)",
 			},
-			"action": map[string]interface{}{
+			"action": map[string]any{
 				"type":        "string",
 				"description": "How to update: 'write' (replace entire content - use read_whiteboard first to preserve sections), 'append' (add to end), 'clear' (erase all)",
 				"enum":        []string{"write", "append", "clear"},
@@ -281,7 +280,8 @@ func (t *WriteWhiteboardTool) Invoke(ctx context.Context, arguments string) (str
 		Action  WhiteboardAction `json:"action"`
 	}
 
-	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
+	err := json.Unmarshal([]byte(arguments), &args)
+	if err != nil {
 		return "", fmt.Errorf("failed to parse whiteboard arguments: %w", err)
 	}
 
@@ -322,18 +322,18 @@ func (t *WriteWhiteboardTool) Invoke(ctx context.Context, arguments string) (str
 	return fmt.Sprintf("Whiteboard updated (%s)", args.Action), nil
 }
 
-// WhiteboardProjection provides read access to whiteboard content
+// WhiteboardProjection provides read access to whiteboard content.
 type WhiteboardProjection interface {
 	Get(threadID string) string
 }
 
-// WhiteboardMiddleware provides whiteboard management capabilities to agents
+// WhiteboardMiddleware provides whiteboard management capabilities to agents.
 type WhiteboardMiddleware struct {
 	systemPrompt string
 	projection   WhiteboardProjection
 }
 
-// NewWhiteboardMiddleware creates a new WhiteboardMiddleware with default prompts
+// NewWhiteboardMiddleware creates a new WhiteboardMiddleware with default prompts.
 func NewWhiteboardMiddleware(projection WhiteboardProjection) *WhiteboardMiddleware {
 	return &WhiteboardMiddleware{
 		systemPrompt: WhiteboardSystemPrompt,
@@ -341,7 +341,7 @@ func NewWhiteboardMiddleware(projection WhiteboardProjection) *WhiteboardMiddlew
 	}
 }
 
-// NewWhiteboardMiddlewareWithPrompt creates a new WhiteboardMiddleware with custom prompt
+// NewWhiteboardMiddlewareWithPrompt creates a new WhiteboardMiddleware with custom prompt.
 func NewWhiteboardMiddlewareWithPrompt(projection WhiteboardProjection, systemPrompt string) *WhiteboardMiddleware {
 	return &WhiteboardMiddleware{
 		systemPrompt: systemPrompt,
@@ -349,7 +349,7 @@ func NewWhiteboardMiddlewareWithPrompt(projection WhiteboardProjection, systemPr
 	}
 }
 
-// Process implements the Middleware interface
+// Process implements the Middleware interface.
 func (m *WhiteboardMiddleware) Process(ctx context.Context, reqCtx *core.RequestContext, next core.NextHandler) error {
 	// Add write_whiteboard tool to the request context
 	reqCtx.AddTool(NewWriteWhiteboardTool(reqCtx))
@@ -373,15 +373,16 @@ func (m *WhiteboardMiddleware) Process(ctx context.Context, reqCtx *core.Request
 	return next(ctx, reqCtx)
 }
 
-// GetWhiteboardContent retrieves the current whiteboard content from the request context
+// GetWhiteboardContent retrieves the current whiteboard content from the request context.
 func GetWhiteboardContent(reqCtx *core.RequestContext) string {
 	if content, ok := reqCtx.State["whiteboard_content"].(string); ok {
 		return content
 	}
+
 	return ""
 }
 
-// SetWhiteboardContent updates the whiteboard content in the request context
+// SetWhiteboardContent updates the whiteboard content in the request context.
 func SetWhiteboardContent(reqCtx *core.RequestContext, content string) {
 	reqCtx.State["whiteboard_content"] = content
 }
