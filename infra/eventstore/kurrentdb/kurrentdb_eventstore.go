@@ -135,7 +135,9 @@ func (s *KurrentDBEventStore) ReadStream(ctx context.Context, streamID string, f
 // Close closes the KurrentDB client connection.
 func (s *KurrentDBEventStore) Close() error {
 	if s.client != nil {
-		return s.client.Close()
+		if err := s.client.Close(); err != nil {
+			return fmt.Errorf("failed to close KurrentDB client: %w", err)
+		}
 	}
 
 	return nil
@@ -295,7 +297,7 @@ func (s *KurrentDBEventStore) readFromStreamsProjection(ctx context.Context) ([]
 			break
 		}
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to receive event from $streams: %w", err)
 		}
 
 		// Parse $streams event data format: "{version}@{stream-name}"

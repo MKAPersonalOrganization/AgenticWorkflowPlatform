@@ -48,8 +48,11 @@ func Icon(name string) func(...Props) templ.Component {
 
 			if cached {
 				_, err = w.Write([]byte(svg))
+				if err != nil {
+					return fmt.Errorf("failed to write cached icon '%s': %w", name, err)
+				}
 
-				return err
+				return nil
 			}
 
 			// Not cached, generate it
@@ -65,8 +68,11 @@ func Icon(name string) func(...Props) templ.Component {
 			iconMutex.Unlock()
 
 			_, err = w.Write([]byte(generatedSvg))
+			if err != nil {
+				return fmt.Errorf("failed to write generated icon '%s': %w", name, err)
+			}
 
-			return err
+			return nil
 		})
 	}
 }

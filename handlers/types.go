@@ -14,8 +14,11 @@ func writeSSEEvent(w io.Writer, event any) error {
 		return fmt.Errorf("failed to marshal event: %w", err)
 	}
 	_, err = fmt.Fprintf(w, "data: %s\n\n", eventBytes)
+	if err != nil {
+		return fmt.Errorf("failed to write SSE event: %w", err)
+	}
 
-	return err
+	return nil
 }
 
 // ThreadResponse represents a thread with its messages.

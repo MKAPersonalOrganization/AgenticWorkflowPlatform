@@ -197,7 +197,11 @@ func getGitStats() ([]Commit, error) {
 		commits = append(commits, *currentCommit)
 	}
 
-	return commits, scanner.Err()
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("scanner error: %w", err)
+	}
+
+	return commits, nil
 }
 
 func createGnuplotScript(numCommits, totalAdded, totalRemoved int, startDate, endDate string) error {

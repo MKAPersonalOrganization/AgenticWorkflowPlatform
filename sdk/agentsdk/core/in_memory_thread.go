@@ -95,7 +95,11 @@ func (t *InMemoryThread) GetMessages() []domain.Message {
 
 // AddMessages adds new messages to the thread.
 func (t *InMemoryThread) AddMessages(messages []domain.Message) error {
-	return t.messageStore.AddMessages(messages)
+	if err := t.messageStore.AddMessages(messages); err != nil {
+		return fmt.Errorf("failed to add messages to thread: %w", err)
+	}
+
+	return nil
 }
 
 // Serialize serializes the thread state to JSON.

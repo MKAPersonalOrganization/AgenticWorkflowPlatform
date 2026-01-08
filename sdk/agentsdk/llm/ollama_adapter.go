@@ -346,15 +346,29 @@ func boolPtr(b bool) *bool {
 
 // Heartbeat checks if Ollama server is running.
 func (c *OllamaClient) Heartbeat(ctx context.Context) error {
-	return c.client.Heartbeat(ctx)
+	if err := c.client.Heartbeat(ctx); err != nil {
+		return fmt.Errorf("ollama heartbeat failed: %w", err)
+	}
+
+	return nil
 }
 
 // ListModels lists available models on the Ollama server.
 func (c *OllamaClient) ListModels(ctx context.Context) (*api.ListResponse, error) {
-	return c.client.List(ctx)
+	resp, err := c.client.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list ollama models: %w", err)
+	}
+
+	return resp, nil
 }
 
 // Version returns the Ollama server version.
 func (c *OllamaClient) Version(ctx context.Context) (string, error) {
-	return c.client.Version(ctx)
+	version, err := c.client.Version(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get ollama version: %w", err)
+	}
+
+	return version, nil
 }

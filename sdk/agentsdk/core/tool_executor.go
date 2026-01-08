@@ -33,7 +33,12 @@ func (e *RegistryToolExecutor) Execute(toolCall domain.ToolCall) (string, error)
 		return "", fmt.Errorf("tool not found: %s", toolCall.Function.Name)
 	}
 
-	return tool.Invoke(e.ctx, toolCall.Function.Arguments)
+	result, err := tool.Invoke(e.ctx, toolCall.Function.Arguments)
+	if err != nil {
+		return result, fmt.Errorf("failed to invoke tool %s: %w", toolCall.Function.Name, err)
+	}
+
+	return result, nil
 }
 
 // Verify RegistryToolExecutor implements ToolExecutor.

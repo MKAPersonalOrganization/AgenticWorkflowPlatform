@@ -423,14 +423,14 @@ func (h *ChatWriteService) emitDomainEvent(event core.Event) error {
 	// Append to event store (this will automatically update projections via ProjectionEventStore)
 	_, err := h.writeModel.Append(context.Background(), event.AggregateID(), event)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to append event to write model: %w", err)
 	}
 
 	// Notify via agent's notifier (if configured)
 	if h.notifier != nil {
 		err := h.notifier.HandleDomainEvent(event)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to notify via agent notifier: %w", err)
 		}
 	}
 
@@ -442,7 +442,7 @@ func (h *ChatWriteService) executeToolCallWithExecutor(threadID string, toolCall
 	// Execute the tool using the provided executor
 	result, err := executor.Execute(toolCall)
 	if err != nil {
-		return result, err
+		return result, fmt.Errorf("failed to execute tool call %s: %w", toolCall.Function.Name, err)
 	}
 
 	return result, nil
@@ -465,8 +465,11 @@ func (h *ChatWriteService) CreateThread(ctx context.Context, threadID, title str
 	}
 
 	_, err := h.writeModel.Append(ctx, threadID, event)
+	if err != nil {
+		return fmt.Errorf("failed to append ThreadCreatedEvent: %w", err)
+	}
 
-	return err
+	return nil
 }
 
 // AddUserMessage adds a user message to a thread.
@@ -482,8 +485,11 @@ func (h *ChatWriteService) AddUserMessage(ctx context.Context, threadID, message
 	}
 
 	_, err := h.writeModel.Append(ctx, threadID, event)
+	if err != nil {
+		return fmt.Errorf("failed to append UserMessageAddedEvent: %w", err)
+	}
 
-	return err
+	return nil
 }
 
 // UpdateThreadTitle updates the title of a thread.
@@ -498,8 +504,11 @@ func (h *ChatWriteService) UpdateThreadTitle(ctx context.Context, threadID, newT
 	}
 
 	_, err := h.writeModel.Append(ctx, threadID, event)
+	if err != nil {
+		return fmt.Errorf("failed to append ThreadTitleUpdatedEvent: %w", err)
+	}
 
-	return err
+	return nil
 }
 
 // DeleteThread deletes a thread by removing its event stream from the event store.
@@ -512,7 +521,7 @@ func (h *ChatWriteService) DeleteThread(ctx context.Context, threadID string) er
 	// Delete the stream from the event store
 	err := h.writeModel.DeleteStream(ctx, threadID)
 	if err != nil {
-		return fmt.Errorf("failed to delete thread stream: %w", err)
+		return fmt.Errorf("failed to delete thread stream %s: %w", threadID, err)
 	}
 
 	return nil

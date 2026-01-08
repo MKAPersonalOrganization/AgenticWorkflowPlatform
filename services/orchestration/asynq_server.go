@@ -174,7 +174,12 @@ func (s *AsynqServer) GetTaskInfo(queue, taskID string) (*asynq.TaskInfo, error)
 	}()
 
 	// Use Inspector's GetTaskInfo which efficiently looks up the task
-	return inspector.GetTaskInfo(queue, taskID)
+	taskInfo, err := inspector.GetTaskInfo(queue, taskID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get task info for queue=%s taskID=%s: %w", queue, taskID, err)
+	}
+
+	return taskInfo, nil
 }
 
 // CancelTask attempts to cancel a task by job ID.
