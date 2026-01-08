@@ -7,6 +7,7 @@ import (
 )
 
 func TestToolCallAccumulator_NewToolCall(t *testing.T) {
+	t.Parallel()
 	acc := core.NewToolCallAccumulator()
 
 	// First update starts a new tool call
@@ -39,6 +40,7 @@ func TestToolCallAccumulator_NewToolCall(t *testing.T) {
 }
 
 func TestToolCallAccumulator_ArgumentStreaming(t *testing.T) {
+	t.Parallel()
 	acc := core.NewToolCallAccumulator()
 
 	// Start tool call
@@ -89,6 +91,7 @@ func TestToolCallAccumulator_ArgumentStreaming(t *testing.T) {
 }
 
 func TestToolCallAccumulator_MultipleToolCalls(t *testing.T) {
+	t.Parallel()
 	acc := core.NewToolCallAccumulator()
 
 	// First tool call
@@ -134,6 +137,7 @@ func TestToolCallAccumulator_MultipleToolCalls(t *testing.T) {
 }
 
 func TestToolCallAccumulator_HasToolCalls(t *testing.T) {
+	t.Parallel()
 	acc := core.NewToolCallAccumulator()
 
 	if acc.HasToolCalls() {
@@ -155,6 +159,7 @@ func TestToolCallAccumulator_HasToolCalls(t *testing.T) {
 }
 
 func TestToolCallAccumulator_UnknownIndex(t *testing.T) {
+	t.Parallel()
 	acc := core.NewToolCallAccumulator()
 
 	// Update for unknown index should not be processed

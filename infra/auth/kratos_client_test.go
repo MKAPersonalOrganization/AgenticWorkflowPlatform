@@ -7,6 +7,7 @@ import (
 )
 
 func TestNewKratosClient(t *testing.T) {
+	t.Parallel()
 	// Save original env vars
 	origPublic := os.Getenv("KRATOS_PUBLIC_URL")
 	origAdmin := os.Getenv("KRATOS_ADMIN_URL")
@@ -50,6 +51,7 @@ func TestNewKratosClient(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			// Set environment variables (all required)
 			_ = os.Setenv("KRATOS_PUBLIC_URL", tt.publicURL)
 			_ = os.Setenv("KRATOS_ADMIN_URL", tt.adminURL)
@@ -90,6 +92,7 @@ func TestNewKratosClient(t *testing.T) {
 }
 
 func TestKratosClient_Integration(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("Skipping integration test")
 	}
@@ -103,6 +106,7 @@ func TestKratosClient_Integration(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("ToSession with invalid cookie", func(t *testing.T) {
+		t.Parallel()
 		_, err := client.ToSession(ctx, "invalid-cookie")
 		if err == nil {
 			t.Error("Expected error for invalid cookie, got nil")
@@ -110,6 +114,7 @@ func TestKratosClient_Integration(t *testing.T) {
 	})
 
 	t.Run("GetLoginFlow with invalid ID", func(t *testing.T) {
+		t.Parallel()
 		_, err := client.GetLoginFlow(ctx, "invalid-flow-id", "")
 		if err == nil {
 			t.Error("Expected error for invalid flow ID, got nil")
@@ -117,6 +122,7 @@ func TestKratosClient_Integration(t *testing.T) {
 	})
 
 	t.Run("GetFlowError with invalid ID", func(t *testing.T) {
+		t.Parallel()
 		_, err := client.GetFlowError(ctx, "invalid-error-id")
 		if err == nil {
 			t.Error("Expected error for invalid error ID, got nil")
@@ -125,6 +131,7 @@ func TestKratosClient_Integration(t *testing.T) {
 }
 
 func TestGetEnv(t *testing.T) {
+	t.Parallel()
 	// Save and restore env var
 	orig := os.Getenv("TEST_VAR")
 	defer func() {
@@ -160,6 +167,7 @@ func TestGetEnv(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if tt.envValue != "" {
 				_ = os.Setenv(tt.key, tt.envValue)
 			} else {

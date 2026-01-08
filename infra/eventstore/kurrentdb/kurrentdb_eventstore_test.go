@@ -15,6 +15,7 @@ import (
 // Run 'task up' to start KurrentDB, then run tests without -short flag.
 
 func TestEventStore_AppendAndRead(t *testing.T) {
+	t.Parallel()
 	// Use mock for unit tests
 	store := NewMockEventStore()
 
@@ -65,6 +66,7 @@ func TestEventStore_AppendAndRead(t *testing.T) {
 }
 
 func TestEventStore_ReadFromVersion(t *testing.T) {
+	t.Parallel()
 	// Use mock for unit tests
 	store := NewMockEventStore()
 
@@ -116,6 +118,7 @@ func TestEventStore_ReadFromVersion(t *testing.T) {
 }
 
 func TestEventStore_ReadNonExistentStream(t *testing.T) {
+	t.Parallel()
 	// Use mock for unit tests
 	store := NewMockEventStore()
 
@@ -129,6 +132,7 @@ func TestEventStore_ReadNonExistentStream(t *testing.T) {
 }
 
 func TestEventStore_DeleteStream(t *testing.T) {
+	t.Parallel()
 	// Use mock for unit tests
 	store := NewMockEventStore()
 

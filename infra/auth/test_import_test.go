@@ -7,6 +7,7 @@ import (
 )
 
 func TestImportOryClient(t *testing.T) {
+	t.Parallel()
 	config := client.NewConfiguration()
 	if config == nil {
 		t.Fatal("Expected configuration to be non-nil")
@@ -14,6 +15,7 @@ func TestImportOryClient(t *testing.T) {
 }
 
 func TestNewConfigurationWithBasePath(t *testing.T) {
+	t.Parallel()
 	config := client.NewConfiguration()
 	config.Servers = client.ServerConfigurations{
 		{

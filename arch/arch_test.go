@@ -25,6 +25,7 @@ func init() {
 // TestCleanArchitecture enforces clean architecture layer boundaries
 // as defined in ADR-001-clean-architecture-layer-boundaries.md.
 func TestCleanArchitecture(t *testing.T) {
+	t.Parallel()
 	// Rule 1: Services can only depend on Domain
 	err := archunit.ArchUnit().Validate(
 		archunit.Layers("Services").ShouldNotRefer(archunit.Layers("Handlers", "Infra")),
@@ -54,6 +55,7 @@ func TestCleanArchitecture(t *testing.T) {
 
 // TestNoCircularDependencies ensures no circular dependencies exist between layers.
 func TestNoCircularDependencies(t *testing.T) {
+	t.Parallel()
 	// Services should only be referred by Handlers
 	err := archunit.ArchUnit().Validate(
 		archunit.Layers("Services").ShouldOnlyBeReferredBy(archunit.Layers("Handlers")),
@@ -65,5 +67,6 @@ func TestNoCircularDependencies(t *testing.T) {
 
 // TestLayerDepth ensures layers don't have excessive package depth.
 func TestLayerDepth(t *testing.T) {
+	t.Parallel()
 	t.Skip("DepthShouldLessThan not available in v0.2.0-alpha1")
 }

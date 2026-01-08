@@ -18,6 +18,7 @@ func newTestRequestContext() *core.RequestContext {
 }
 
 func TestNewHandoffMiddleware(t *testing.T) {
+	t.Parallel()
 	agents := map[string]string{
 		"math":    "Mathematics specialist",
 		"physics": "Physics specialist",
@@ -39,6 +40,7 @@ func TestNewHandoffMiddleware(t *testing.T) {
 }
 
 func TestNewHandoffMiddlewareWithPrompt(t *testing.T) {
+	t.Parallel()
 	agents := map[string]string{
 		"math": "Mathematics specialist",
 	}
@@ -56,6 +58,7 @@ func TestNewHandoffMiddlewareWithPrompt(t *testing.T) {
 }
 
 func TestHandoffMiddleware_Process(t *testing.T) {
+	t.Parallel()
 	agents := map[string]string{
 		"math":    "Mathematics specialist",
 		"physics": "Physics specialist",
@@ -102,6 +105,7 @@ func TestHandoffMiddleware_Process(t *testing.T) {
 }
 
 func TestTransferToAgentTool_Name(t *testing.T) {
+	t.Parallel()
 	tool := NewTransferToAgentTool(map[string]string{}, nil)
 
 	if tool.Name() != "transfer_to_agent" {
@@ -110,6 +114,7 @@ func TestTransferToAgentTool_Name(t *testing.T) {
 }
 
 func TestTransferToAgentTool_Description(t *testing.T) {
+	t.Parallel()
 	agents := map[string]string{
 		"math":    "Mathematics specialist for calculations",
 		"physics": "Physics specialist for mechanics",
@@ -141,6 +146,7 @@ func TestTransferToAgentTool_Description(t *testing.T) {
 }
 
 func TestTransferToAgentTool_Parameters(t *testing.T) {
+	t.Parallel()
 	agents := map[string]string{
 		"math":    "Mathematics specialist",
 		"physics": "Physics specialist",
@@ -203,6 +209,7 @@ func TestTransferToAgentTool_Parameters(t *testing.T) {
 }
 
 func TestTransferToAgentTool_Invoke_Success(t *testing.T) {
+	t.Parallel()
 	agents := map[string]string{
 		"math": "Mathematics specialist",
 	}
@@ -253,6 +260,7 @@ func TestTransferToAgentTool_Invoke_Success(t *testing.T) {
 }
 
 func TestTransferToAgentTool_Invoke_MissingAgentName(t *testing.T) {
+	t.Parallel()
 	agents := map[string]string{
 		"math": "Mathematics specialist",
 	}
@@ -277,6 +285,7 @@ func TestTransferToAgentTool_Invoke_MissingAgentName(t *testing.T) {
 }
 
 func TestTransferToAgentTool_Invoke_MissingQuestion(t *testing.T) {
+	t.Parallel()
 	agents := map[string]string{
 		"math": "Mathematics specialist",
 	}
@@ -315,6 +324,7 @@ func TestTransferToAgentTool_Invoke_MissingQuestion(t *testing.T) {
 }
 
 func TestTransferToAgentTool_Invoke_UnknownAgent(t *testing.T) {
+	t.Parallel()
 	agents := map[string]string{
 		"math": "Mathematics specialist",
 	}
@@ -344,6 +354,7 @@ func TestTransferToAgentTool_Invoke_UnknownAgent(t *testing.T) {
 }
 
 func TestTransferToAgentTool_Invoke_WithoutContext(t *testing.T) {
+	t.Parallel()
 	agents := map[string]string{
 		"math": "Mathematics specialist",
 	}
@@ -379,6 +390,7 @@ func TestTransferToAgentTool_Invoke_WithoutContext(t *testing.T) {
 }
 
 func TestTransferToAgentTool_Invoke_InvalidJSON(t *testing.T) {
+	t.Parallel()
 	agents := map[string]string{
 		"math": "Mathematics specialist",
 	}
@@ -394,6 +406,7 @@ func TestTransferToAgentTool_Invoke_InvalidJSON(t *testing.T) {
 }
 
 func TestGetHandoff_NotSet(t *testing.T) {
+	t.Parallel()
 	reqCtx := newTestRequestContext()
 
 	handoff, ok := GetHandoff(reqCtx)
@@ -408,6 +421,7 @@ func TestGetHandoff_NotSet(t *testing.T) {
 }
 
 func TestSetHandoff_AndGet(t *testing.T) {
+	t.Parallel()
 	reqCtx := newTestRequestContext()
 
 	expectedHandoff := Handoff{
@@ -442,6 +456,7 @@ func TestSetHandoff_AndGet(t *testing.T) {
 }
 
 func TestClearHandoff(t *testing.T) {
+	t.Parallel()
 	reqCtx := newTestRequestContext()
 
 	// Set handoff
@@ -470,6 +485,7 @@ func TestClearHandoff(t *testing.T) {
 }
 
 func TestHasHandoff(t *testing.T) {
+	t.Parallel()
 	reqCtx := newTestRequestContext()
 
 	// Initially should not have handoff
@@ -493,6 +509,7 @@ func TestHasHandoff(t *testing.T) {
 }
 
 func TestBuildSystemPromptWithAgents(t *testing.T) {
+	t.Parallel()
 	agents := map[string]string{
 		"math":    "Mathematics specialist",
 		"physics": "Physics specialist for mechanics",
@@ -530,6 +547,7 @@ func TestBuildSystemPromptWithAgents(t *testing.T) {
 }
 
 func TestHandoffMiddleware_MultipleAgents(t *testing.T) {
+	t.Parallel()
 	agents := map[string]string{
 		"math":          "Mathematics specialist",
 		"physics":       "Physics specialist",

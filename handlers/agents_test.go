@@ -8,6 +8,7 @@ import (
 )
 
 func TestInstructorConfigurations(t *testing.T) {
+	t.Parallel()
 	// Mock notifier
 	var mockNotifier core.EventNotifier = nil
 	// Mock whiteboard projection

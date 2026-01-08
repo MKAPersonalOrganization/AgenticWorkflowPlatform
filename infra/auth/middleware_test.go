@@ -22,6 +22,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestNewMiddleware(t *testing.T) {
+	t.Parallel()
 	kratosClient := NewKratosClient()
 	middleware := NewMiddleware(kratosClient)
 
@@ -39,6 +40,7 @@ func TestNewMiddleware(t *testing.T) {
 }
 
 func TestMiddleware_RequireAuth_NoSession(t *testing.T) {
+	t.Parallel()
 	kratosClient := NewKratosClient()
 	middleware := NewMiddleware(kratosClient)
 
@@ -73,6 +75,7 @@ func TestMiddleware_RequireAuth_NoSession(t *testing.T) {
 }
 
 func TestMiddleware_RequireAuth_ValidSession(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("Skipping integration test")
 	}
@@ -116,6 +119,7 @@ func TestMiddleware_RequireAuth_ValidSession(t *testing.T) {
 }
 
 func TestMiddleware_OptionalAuth_NoSession(t *testing.T) {
+	t.Parallel()
 	kratosClient := NewKratosClient()
 	middleware := NewMiddleware(kratosClient)
 
@@ -146,6 +150,7 @@ func TestMiddleware_OptionalAuth_NoSession(t *testing.T) {
 }
 
 func TestMiddleware_validateSession(t *testing.T) {
+	t.Parallel()
 	kratosClient := NewKratosClient()
 	middleware := NewMiddleware(kratosClient)
 
@@ -168,6 +173,7 @@ func TestMiddleware_validateSession(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
 			if tt.cookie != "" {
 				req.Header.Set("Cookie", tt.cookie)
@@ -191,6 +197,7 @@ func TestMiddleware_validateSession(t *testing.T) {
 }
 
 func TestMiddleware_RequireAuthFunc(t *testing.T) {
+	t.Parallel()
 	kratosClient := NewKratosClient()
 	middleware := NewMiddleware(kratosClient)
 
@@ -218,6 +225,7 @@ func TestMiddleware_RequireAuthFunc(t *testing.T) {
 }
 
 func TestMiddleware_OptionalAuthFunc(t *testing.T) {
+	t.Parallel()
 	kratosClient := NewKratosClient()
 	middleware := NewMiddleware(kratosClient)
 
@@ -246,6 +254,7 @@ func TestMiddleware_OptionalAuthFunc(t *testing.T) {
 }
 
 func TestMiddleware_AAL2Redirect(t *testing.T) {
+	t.Parallel()
 	// Test that if AAL2 is required but not satisfied, we redirect
 	kratosClient := NewKratosClient()
 	middleware := NewMiddleware(kratosClient)
@@ -279,6 +288,7 @@ func createMockSession(email string, active bool) *client.Session {
 }
 
 func TestGetUserFromContext(t *testing.T) {
+	t.Parallel()
 	user := &domain.User{
 		ID:    "test-123",
 		Email: "test@example.com",
@@ -301,6 +311,7 @@ func TestGetUserFromContext(t *testing.T) {
 }
 
 func TestGetUserFromContext_Nil(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	user := GetUserFromContext(ctx)
 	if user != nil {
@@ -309,6 +320,7 @@ func TestGetUserFromContext_Nil(t *testing.T) {
 }
 
 func TestGetSessionFromContext(t *testing.T) {
+	t.Parallel()
 	session := createMockSession("test@example.com", true)
 
 	ctx := context.WithValue(context.Background(), domain.SessionContextKey, session)
@@ -324,6 +336,7 @@ func TestGetSessionFromContext(t *testing.T) {
 }
 
 func TestGetSessionFromContext_Nil(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	session := GetSessionFromContext(ctx)
 	if session != nil {
@@ -332,6 +345,7 @@ func TestGetSessionFromContext_Nil(t *testing.T) {
 }
 
 func TestIsAuthenticated(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		ctx      context.Context
@@ -354,6 +368,7 @@ func TestIsAuthenticated(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := IsAuthenticated(tt.ctx)
 			if got != tt.expected {
 				t.Errorf("IsAuthenticated() = %v, want %v", got, tt.expected)

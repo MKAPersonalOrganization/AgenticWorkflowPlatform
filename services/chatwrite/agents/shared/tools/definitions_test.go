@@ -6,6 +6,7 @@ import (
 
 // TestGetWeatherTool verifies the weather tool definition structure.
 func TestGetWeatherTool(t *testing.T) {
+	t.Parallel()
 	tool := GetWeatherTool()
 
 	// Check tool name
@@ -60,6 +61,7 @@ func TestGetWeatherTool(t *testing.T) {
 
 // TestGetCalculatorTool verifies the calculator tool definition structure.
 func TestGetCalculatorTool(t *testing.T) {
+	t.Parallel()
 	tool := GetCalculatorTool()
 
 	// Check tool name
@@ -80,6 +82,7 @@ func TestGetCalculatorTool(t *testing.T) {
 
 // TestGetAllTools verifies all tools are returned.
 func TestGetAllTools(t *testing.T) {
+	t.Parallel()
 	tools := GetAllTools()
 
 	if len(tools) < 2 {
@@ -108,6 +111,7 @@ func TestGetAllTools(t *testing.T) {
 
 // TestWeatherToolParametersSchema verifies the JSON schema is valid.
 func TestWeatherToolParametersSchema(t *testing.T) {
+	t.Parallel()
 	tool := GetWeatherTool()
 
 	// Parameters are already map[string]any

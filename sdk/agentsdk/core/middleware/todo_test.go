@@ -9,6 +9,7 @@ import (
 )
 
 func TestTodo_JSONMarshaling(t *testing.T) {
+	t.Parallel()
 	todo := Todo{
 		Content: "Complete the implementation",
 		Status:  TodoStatusInProgress,
@@ -34,6 +35,7 @@ func TestTodo_JSONMarshaling(t *testing.T) {
 }
 
 func TestWriteTodosTool_Name(t *testing.T) {
+	t.Parallel()
 	tool := NewWriteTodosTool()
 	if tool.Name() != "write_todos" {
 		t.Errorf("Expected name 'write_todos', got %s", tool.Name())
@@ -41,6 +43,7 @@ func TestWriteTodosTool_Name(t *testing.T) {
 }
 
 func TestWriteTodosTool_Description(t *testing.T) {
+	t.Parallel()
 	tool := NewWriteTodosTool()
 	desc := tool.Description()
 
@@ -61,6 +64,7 @@ func TestWriteTodosTool_Description(t *testing.T) {
 }
 
 func TestWriteTodosTool_CustomDescription(t *testing.T) {
+	t.Parallel()
 	customDesc := "Custom todo tool description"
 	tool := NewWriteTodosToolWithDescription(customDesc)
 
@@ -70,6 +74,7 @@ func TestWriteTodosTool_CustomDescription(t *testing.T) {
 }
 
 func TestWriteTodosTool_Parameters(t *testing.T) {
+	t.Parallel()
 	tool := NewWriteTodosTool()
 	params := tool.Parameters()
 
@@ -122,6 +127,7 @@ func TestWriteTodosTool_Parameters(t *testing.T) {
 }
 
 func TestWriteTodosTool_Invoke(t *testing.T) {
+	t.Parallel()
 	tool := NewWriteTodosTool()
 
 	todos := []Todo{
@@ -154,6 +160,7 @@ func TestWriteTodosTool_Invoke(t *testing.T) {
 }
 
 func TestWriteTodosTool_Invoke_InvalidJSON(t *testing.T) {
+	t.Parallel()
 	tool := NewWriteTodosTool()
 
 	_, err := tool.Invoke(context.Background(), "invalid json")
@@ -163,6 +170,7 @@ func TestWriteTodosTool_Invoke_InvalidJSON(t *testing.T) {
 }
 
 func TestNewTodoListMiddleware(t *testing.T) {
+	t.Parallel()
 	middleware := NewTodoListMiddleware()
 
 	if middleware == nil {
@@ -183,6 +191,7 @@ func TestNewTodoListMiddleware(t *testing.T) {
 }
 
 func TestNewTodoListMiddlewareWithPrompts(t *testing.T) {
+	t.Parallel()
 	customSystemPrompt := "Custom system prompt"
 	customToolDesc := "Custom tool description"
 
@@ -198,6 +207,7 @@ func TestNewTodoListMiddlewareWithPrompts(t *testing.T) {
 }
 
 func TestTodoListMiddleware_Process_AddsToolAndPrompt(t *testing.T) {
+	t.Parallel()
 	middleware := NewTodoListMiddleware()
 
 	reqCtx := core.NewRequestContext(
@@ -244,6 +254,7 @@ func TestTodoListMiddleware_Process_AddsToolAndPrompt(t *testing.T) {
 }
 
 func TestTodoListMiddleware_Process_PreservesExistingTools(t *testing.T) {
+	t.Parallel()
 	middleware := NewTodoListMiddleware()
 
 	existingTool := &MockTool{name: "existing_tool"}
@@ -290,6 +301,7 @@ func TestTodoListMiddleware_Process_PreservesExistingTools(t *testing.T) {
 }
 
 func TestGetTodos_EmptyState(t *testing.T) {
+	t.Parallel()
 	reqCtx := core.NewRequestContext("", nil, "", nil, &core.AgentConfig{})
 
 	todos := GetTodos(reqCtx)
@@ -299,6 +311,7 @@ func TestGetTodos_EmptyState(t *testing.T) {
 }
 
 func TestSetTodos_AndGetTodos(t *testing.T) {
+	t.Parallel()
 	reqCtx := core.NewRequestContext("", nil, "", nil, &core.AgentConfig{})
 
 	expectedTodos := []Todo{
@@ -328,6 +341,7 @@ func TestSetTodos_AndGetTodos(t *testing.T) {
 }
 
 func TestTodoListMiddleware_Integration(t *testing.T) {
+	t.Parallel()
 	middleware := NewTodoListMiddleware()
 
 	reqCtx := core.NewRequestContext(
@@ -377,6 +391,7 @@ func TestTodoListMiddleware_Integration(t *testing.T) {
 }
 
 func TestTodoStatus_AllValidValues(t *testing.T) {
+	t.Parallel()
 	validStatuses := []TodoStatus{
 		TodoStatusPending,
 		TodoStatusInProgress,

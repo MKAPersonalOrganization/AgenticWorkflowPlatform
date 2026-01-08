@@ -7,6 +7,7 @@ import (
 )
 
 func TestExecuteCalculatorTool(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name           string
 		argsJSON       string
@@ -103,6 +104,7 @@ func TestExecuteCalculatorTool(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result, err := ExecuteCalculatorTool(tt.argsJSON)
 
 			if tt.wantErr {
@@ -149,6 +151,7 @@ func TestExecuteCalculatorTool(t *testing.T) {
 }
 
 func TestEvaluateExpression(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		expression string
@@ -171,6 +174,7 @@ func TestEvaluateExpression(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := evaluateExpression(tt.expression)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("evaluateExpression() error = %v, wantErr %v", err, tt.wantErr)
@@ -185,6 +189,7 @@ func TestEvaluateExpression(t *testing.T) {
 }
 
 func TestCalculatorTool_Interface(t *testing.T) {
+	t.Parallel()
 	calc := NewCalculatorTool()
 
 	// Test Name
@@ -218,6 +223,7 @@ func TestCalculatorTool_Interface(t *testing.T) {
 }
 
 func TestCalculatorTool_Invoke(t *testing.T) {
+	t.Parallel()
 	calc := NewCalculatorTool()
 	ctx := context.Background()
 
@@ -241,6 +247,7 @@ func TestCalculatorTool_Invoke(t *testing.T) {
 }
 
 func TestCalculatorTool_InvokeComplex(t *testing.T) {
+	t.Parallel()
 	calc := NewCalculatorTool()
 	ctx := context.Background()
 
@@ -256,6 +263,7 @@ func TestCalculatorTool_InvokeComplex(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result, err := calc.Invoke(ctx, tt.expression)
 			if err != nil {
 				t.Fatalf("Invoke() error: %v", err)

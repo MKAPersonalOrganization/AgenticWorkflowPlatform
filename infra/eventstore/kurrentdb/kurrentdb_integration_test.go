@@ -18,6 +18,7 @@ import (
 // Make sure KurrentDB is running: task up
 
 func TestKurrentDBIntegration_AppendAndRead(t *testing.T) {
+	t.Parallel()
 	connectionString := "esdb://localhost:2113?tls=false"
 	store, err := NewKurrentDBEventStore(connectionString)
 	require.NoError(t, err)
@@ -60,6 +61,7 @@ func TestKurrentDBIntegration_AppendAndRead(t *testing.T) {
 }
 
 func TestKurrentDBIntegration_DeleteStream(t *testing.T) {
+	t.Parallel()
 	connectionString := "esdb://localhost:2113?tls=false"
 	store, err := NewKurrentDBEventStore(connectionString)
 	require.NoError(t, err)
@@ -95,6 +97,7 @@ func TestKurrentDBIntegration_DeleteStream(t *testing.T) {
 }
 
 func TestKurrentDBIntegration_ReadAllThreadIDs(t *testing.T) {
+	t.Parallel()
 	connectionString := "esdb://localhost:2113?tls=false"
 	store, err := NewKurrentDBEventStore(connectionString)
 	require.NoError(t, err)

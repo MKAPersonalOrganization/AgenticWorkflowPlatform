@@ -8,6 +8,7 @@ import (
 )
 
 func TestVectorOperationsTool_Add(t *testing.T) {
+	t.Parallel()
 	tool := NewVectorOperationsTool()
 
 	tests := []struct {
@@ -48,6 +49,7 @@ func TestVectorOperationsTool_Add(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			argsJSON, _ := json.Marshal(tt.args)
 			result, err := tool.Invoke(context.Background(), string(argsJSON))
 
@@ -80,6 +82,7 @@ func TestVectorOperationsTool_Add(t *testing.T) {
 }
 
 func TestVectorOperationsTool_Dot(t *testing.T) {
+	t.Parallel()
 	tool := NewVectorOperationsTool()
 
 	tests := []struct {
@@ -104,6 +107,7 @@ func TestVectorOperationsTool_Dot(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			args := map[string]any{
 				"operation": "dot",
 				"vector1":   tt.vector1,
@@ -130,6 +134,7 @@ func TestVectorOperationsTool_Dot(t *testing.T) {
 }
 
 func TestVectorOperationsTool_Cross(t *testing.T) {
+	t.Parallel()
 	tool := NewVectorOperationsTool()
 
 	tests := []struct {
@@ -154,6 +159,7 @@ func TestVectorOperationsTool_Cross(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			args := map[string]any{
 				"operation": "cross",
 				"vector1":   tt.vector1,
@@ -183,6 +189,7 @@ func TestVectorOperationsTool_Cross(t *testing.T) {
 }
 
 func TestVectorOperationsTool_Norm(t *testing.T) {
+	t.Parallel()
 	tool := NewVectorOperationsTool()
 
 	tests := []struct {
@@ -209,6 +216,7 @@ func TestVectorOperationsTool_Norm(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			args := map[string]any{
 				"operation": "norm",
 				"vector1":   tt.vector,
@@ -234,6 +242,7 @@ func TestVectorOperationsTool_Norm(t *testing.T) {
 }
 
 func TestVectorOperationsTool_Unit(t *testing.T) {
+	t.Parallel()
 	tool := NewVectorOperationsTool()
 
 	args := map[string]any{

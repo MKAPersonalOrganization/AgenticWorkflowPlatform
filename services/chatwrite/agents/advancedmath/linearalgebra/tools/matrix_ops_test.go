@@ -8,6 +8,7 @@ import (
 )
 
 func TestMatrixOperationsTool_Multiply(t *testing.T) {
+	t.Parallel()
 	tool := NewMatrixOperationsTool()
 
 	matrix1 := [][]float64{{1, 2}, {3, 4}}
@@ -44,6 +45,7 @@ func TestMatrixOperationsTool_Multiply(t *testing.T) {
 }
 
 func TestMatrixOperationsTool_Transpose(t *testing.T) {
+	t.Parallel()
 	tool := NewMatrixOperationsTool()
 
 	args := map[string]any{
@@ -76,6 +78,7 @@ func TestMatrixOperationsTool_Transpose(t *testing.T) {
 }
 
 func TestMatrixOperationsTool_Determinant(t *testing.T) {
+	t.Parallel()
 	tool := NewMatrixOperationsTool()
 
 	tests := []struct {
@@ -97,6 +100,7 @@ func TestMatrixOperationsTool_Determinant(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			args := map[string]any{
 				"operation": "determinant",
 				"matrix":    tt.matrix,
@@ -122,6 +126,7 @@ func TestMatrixOperationsTool_Determinant(t *testing.T) {
 }
 
 func TestMatrixOperationsTool_Inverse(t *testing.T) {
+	t.Parallel()
 	tool := NewMatrixOperationsTool()
 
 	args := map[string]any{

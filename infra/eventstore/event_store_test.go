@@ -8,10 +8,12 @@ import (
 )
 
 func TestInMemoryEventStore_Append(t *testing.T) {
+	t.Parallel()
 	store := NewInMemoryEventStore()
 	ctx := context.Background()
 
 	t.Run("appends events to stream", func(t *testing.T) {
+		t.Parallel()
 		event := &core.ThreadCreatedEvent{
 			BaseEvent: core.BaseEvent{
 				Type:      "ThreadCreatedEvent",
@@ -32,6 +34,7 @@ func TestInMemoryEventStore_Append(t *testing.T) {
 	})
 
 	t.Run("increments version on each append", func(t *testing.T) {
+		t.Parallel()
 		event1 := &core.UserMessageAddedEvent{
 			BaseEvent: core.BaseEvent{ThreadID: "thread-2"},
 			Content:   "Hello",
@@ -54,6 +57,7 @@ func TestInMemoryEventStore_Append(t *testing.T) {
 }
 
 func TestInMemoryEventStore_ReadStream(t *testing.T) {
+	t.Parallel()
 	store := NewInMemoryEventStore()
 	ctx := context.Background()
 
@@ -65,6 +69,7 @@ func TestInMemoryEventStore_ReadStream(t *testing.T) {
 	_, _ = store.Append(ctx, "thread-1", event1, event2, event3)
 
 	t.Run("reads all events from beginning", func(t *testing.T) {
+		t.Parallel()
 		events, err := store.ReadStream(ctx, "thread-1", 0)
 		if err != nil {
 			t.Fatalf("ReadStream failed: %v", err)
@@ -76,6 +81,7 @@ func TestInMemoryEventStore_ReadStream(t *testing.T) {
 	})
 
 	t.Run("reads events from specific version", func(t *testing.T) {
+		t.Parallel()
 		events, err := store.ReadStream(ctx, "thread-1", 1)
 		if err != nil {
 			t.Fatalf("ReadStream failed: %v", err)
@@ -87,6 +93,7 @@ func TestInMemoryEventStore_ReadStream(t *testing.T) {
 	})
 
 	t.Run("returns empty for nonexistent stream", func(t *testing.T) {
+		t.Parallel()
 		events, err := store.ReadStream(ctx, "nonexistent", 0)
 		if err != nil {
 			t.Fatalf("ReadStream failed: %v", err)

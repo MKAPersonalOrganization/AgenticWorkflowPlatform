@@ -46,6 +46,7 @@ func (m *mockMiddleware) Process(ctx context.Context, reqCtx *RequestContext, ne
 }
 
 func TestNewRequestContext(t *testing.T) {
+	t.Parallel()
 	messages := []llm.ChatMessage{
 		{Role: llm.ChatRoleUser, Contents: []llm.AIContent{llm.TextContent{Text: "Hello"}}},
 	}
@@ -73,6 +74,7 @@ func TestNewRequestContext(t *testing.T) {
 }
 
 func TestRequestContext_WithMetadata(t *testing.T) {
+	t.Parallel()
 	ctx := NewRequestContext("", nil, "", nil, nil)
 
 	ctx.WithMetadata("key1", "value1")
@@ -103,6 +105,7 @@ func TestRequestContext_WithMetadata(t *testing.T) {
 }
 
 func TestRequestContext_SetTerminate(t *testing.T) {
+	t.Parallel()
 	ctx := NewRequestContext("", nil, "", nil, nil)
 
 	if ctx.Terminate {
@@ -117,6 +120,7 @@ func TestRequestContext_SetTerminate(t *testing.T) {
 }
 
 func TestRequestContext_AddTool(t *testing.T) {
+	t.Parallel()
 	ctx := NewRequestContext("", nil, "", nil, nil)
 
 	tool1 := NewFunctionTool("tool1", "desc1", nil, nil)
@@ -136,6 +140,7 @@ func TestRequestContext_AddTool(t *testing.T) {
 }
 
 func TestRequestContext_AddSystemPrompt(t *testing.T) {
+	t.Parallel()
 	ctx := NewRequestContext("", nil, "Base prompt", nil, nil)
 
 	ctx.AddSystemPrompt("Addition 1")
@@ -155,6 +160,7 @@ func TestRequestContext_AddSystemPrompt(t *testing.T) {
 }
 
 func TestRequestContext_GetEffectiveSystemPrompt_NoAdditions(t *testing.T) {
+	t.Parallel()
 	ctx := NewRequestContext("", nil, "Base prompt only", nil, nil)
 
 	effective := ctx.GetEffectiveSystemPrompt()
@@ -164,6 +170,7 @@ func TestRequestContext_GetEffectiveSystemPrompt_NoAdditions(t *testing.T) {
 }
 
 func TestRequestContext_GetEffectiveTools(t *testing.T) {
+	t.Parallel()
 	baseTool := NewFunctionTool("base", "base tool", nil, nil)
 	ctx := NewRequestContext("", nil, "", []Tool{baseTool}, nil)
 
@@ -184,6 +191,7 @@ func TestRequestContext_GetEffectiveTools(t *testing.T) {
 }
 
 func TestRequestContext_Override(t *testing.T) {
+	t.Parallel()
 	original := NewRequestContext(
 		"thread-123",
 		[]llm.ChatMessage{{Role: llm.ChatRoleUser, Contents: []llm.AIContent{llm.TextContent{Text: "Original"}}}},
@@ -229,6 +237,7 @@ func TestRequestContext_Override(t *testing.T) {
 }
 
 func TestMiddlewareFunc(t *testing.T) {
+	t.Parallel()
 	called := false
 	middlewareFunc := MiddlewareFunc(func(ctx context.Context, reqCtx *RequestContext, next NextHandler) error {
 		called = true
@@ -247,6 +256,7 @@ func TestMiddlewareFunc(t *testing.T) {
 }
 
 func TestChainMiddleware_Empty(t *testing.T) {
+	t.Parallel()
 	baseHandlerCalled := false
 	baseHandler := func(ctx context.Context, reqCtx *RequestContext) error {
 		baseHandlerCalled = true
@@ -267,6 +277,7 @@ func TestChainMiddleware_Empty(t *testing.T) {
 }
 
 func TestChainMiddleware_SingleMiddleware(t *testing.T) {
+	t.Parallel()
 	m := &mockMiddleware{}
 	baseHandlerCalled := false
 	baseHandler := func(ctx context.Context, reqCtx *RequestContext) error {
@@ -294,6 +305,7 @@ func TestChainMiddleware_SingleMiddleware(t *testing.T) {
 }
 
 func TestChainMiddleware_MultipleMiddleware_ExecutionOrder(t *testing.T) {
+	t.Parallel()
 	executionOrder := []string{}
 
 	m1 := &mockMiddleware{
@@ -355,6 +367,7 @@ func TestChainMiddleware_MultipleMiddleware_ExecutionOrder(t *testing.T) {
 }
 
 func TestChainMiddleware_MiddlewareCanModifyContext(t *testing.T) {
+	t.Parallel()
 	m1 := &mockMiddleware{
 		beforeFunc: func(rc *RequestContext) {
 			rc.WithMetadata("m1", "set by m1")
@@ -395,6 +408,7 @@ func TestChainMiddleware_MiddlewareCanModifyContext(t *testing.T) {
 }
 
 func TestChainMiddleware_MiddlewareCanShortCircuit(t *testing.T) {
+	t.Parallel()
 	m1 := &mockMiddleware{}
 	m2 := &mockMiddleware{
 		beforeFunc: func(rc *RequestContext) {
@@ -434,6 +448,7 @@ func TestChainMiddleware_MiddlewareCanShortCircuit(t *testing.T) {
 }
 
 func TestChainMiddleware_ErrorPropagation(t *testing.T) {
+	t.Parallel()
 	m1 := &mockMiddleware{}
 	m2 := &mockMiddleware{shouldError: true}
 	m3 := &mockMiddleware{}
@@ -472,6 +487,7 @@ func TestChainMiddleware_ErrorPropagation(t *testing.T) {
 }
 
 func TestChainMiddleware_BaseHandlerError(t *testing.T) {
+	t.Parallel()
 	m := &mockMiddleware{}
 	baseError := errTestBaseHandler
 	baseHandler := ErrorHandler(baseError)
@@ -494,6 +510,7 @@ func TestChainMiddleware_BaseHandlerError(t *testing.T) {
 }
 
 func TestNoOpHandler(t *testing.T) {
+	t.Parallel()
 	ctx := NewRequestContext("", nil, "", nil, nil)
 	err := NoOpHandler(context.Background(), ctx)
 	if err != nil {
@@ -502,6 +519,7 @@ func TestNoOpHandler(t *testing.T) {
 }
 
 func TestErrorHandler(t *testing.T) {
+	t.Parallel()
 	expectedError := errTestGeneric
 	handler := ErrorHandler(expectedError)
 
@@ -513,6 +531,7 @@ func TestErrorHandler(t *testing.T) {
 }
 
 func TestResultHandler(t *testing.T) {
+	t.Parallel()
 	expectedResult := "test result"
 	handler := ResultHandler(expectedResult)
 
@@ -527,6 +546,7 @@ func TestResultHandler(t *testing.T) {
 }
 
 func TestMiddleware_CanAccessResultAfterNext(t *testing.T) {
+	t.Parallel()
 	expectedResult := "final result"
 	resultSeen := false
 
@@ -554,6 +574,7 @@ func TestMiddleware_CanAccessResultAfterNext(t *testing.T) {
 }
 
 func TestMiddleware_CanAddToolsDynamically(t *testing.T) {
+	t.Parallel()
 	tool1 := NewFunctionTool("tool1", "Tool 1", nil, nil)
 	tool2 := NewFunctionTool("tool2", "Tool 2", nil, nil)
 
@@ -579,6 +600,7 @@ func TestMiddleware_CanAddToolsDynamically(t *testing.T) {
 }
 
 func TestMiddleware_CanAddSystemPromptDynamically(t *testing.T) {
+	t.Parallel()
 	m := &mockMiddleware{
 		beforeFunc: func(rc *RequestContext) {
 			rc.AddSystemPrompt("Additional instructions from middleware")

@@ -37,7 +37,9 @@ func (m *mockWhiteboardProjection) Set(threadID, content string) {
 }
 
 func TestWhiteboardMiddleware(t *testing.T) {
+	t.Parallel()
 	t.Run("adds write whiteboard tool and injects content in system prompt", func(t *testing.T) {
+		t.Parallel()
 		projection := newMockWhiteboardProjection()
 		middleware := NewWhiteboardMiddleware(projection)
 		reqCtx := &core.RequestContext{
@@ -75,6 +77,7 @@ func TestWhiteboardMiddleware(t *testing.T) {
 	})
 
 	t.Run("adds system prompt with whiteboard info", func(t *testing.T) {
+		t.Parallel()
 		projection := newMockWhiteboardProjection()
 		middleware := NewWhiteboardMiddleware(projection)
 		reqCtx := &core.RequestContext{
@@ -96,6 +99,7 @@ func TestWhiteboardMiddleware(t *testing.T) {
 	})
 
 	t.Run("initializes whiteboard state", func(t *testing.T) {
+		t.Parallel()
 		projection := newMockWhiteboardProjection()
 		middleware := NewWhiteboardMiddleware(projection)
 		reqCtx := &core.RequestContext{
@@ -115,6 +119,7 @@ func TestWhiteboardMiddleware(t *testing.T) {
 	})
 
 	t.Run("injects existing whiteboard content into system prompt", func(t *testing.T) {
+		t.Parallel()
 		projection := newMockWhiteboardProjection()
 		middleware := NewWhiteboardMiddleware(projection)
 		reqCtx := &core.RequestContext{
@@ -140,6 +145,7 @@ func TestWhiteboardMiddleware(t *testing.T) {
 	})
 
 	t.Run("custom system prompt", func(t *testing.T) {
+		t.Parallel()
 		customPrompt := "Custom whiteboard instructions"
 		projection := newMockWhiteboardProjection()
 		middleware := NewWhiteboardMiddlewareWithPrompt(projection, customPrompt)
@@ -162,7 +168,9 @@ func TestWhiteboardMiddleware(t *testing.T) {
 }
 
 func TestWriteWhiteboardTool(t *testing.T) {
+	t.Parallel()
 	t.Run("tool metadata", func(t *testing.T) {
+		t.Parallel()
 		reqCtx := &core.RequestContext{State: make(map[string]any)}
 		tool := NewWriteWhiteboardTool(reqCtx)
 
@@ -177,6 +185,7 @@ func TestWriteWhiteboardTool(t *testing.T) {
 	})
 
 	t.Run("write action replaces content", func(t *testing.T) {
+		t.Parallel()
 		reqCtx := &core.RequestContext{State: make(map[string]any)}
 		SetWhiteboardContent(reqCtx, "Old content")
 
@@ -195,6 +204,7 @@ func TestWriteWhiteboardTool(t *testing.T) {
 	})
 
 	t.Run("append action adds to existing content", func(t *testing.T) {
+		t.Parallel()
 		reqCtx := &core.RequestContext{State: make(map[string]any)}
 		SetWhiteboardContent(reqCtx, "First line")
 
@@ -213,6 +223,7 @@ func TestWriteWhiteboardTool(t *testing.T) {
 	})
 
 	t.Run("append to empty whiteboard", func(t *testing.T) {
+		t.Parallel()
 		reqCtx := &core.RequestContext{State: make(map[string]any)}
 		SetWhiteboardContent(reqCtx, "")
 
@@ -230,6 +241,7 @@ func TestWriteWhiteboardTool(t *testing.T) {
 	})
 
 	t.Run("clear action removes all content", func(t *testing.T) {
+		t.Parallel()
 		reqCtx := &core.RequestContext{State: make(map[string]any)}
 		SetWhiteboardContent(reqCtx, "Some content to clear")
 
@@ -248,6 +260,7 @@ func TestWriteWhiteboardTool(t *testing.T) {
 	})
 
 	t.Run("invalid action returns error", func(t *testing.T) {
+		t.Parallel()
 		reqCtx := &core.RequestContext{State: make(map[string]any)}
 		tool := NewWriteWhiteboardTool(reqCtx)
 
@@ -264,6 +277,7 @@ func TestWriteWhiteboardTool(t *testing.T) {
 	})
 
 	t.Run("invalid JSON returns error", func(t *testing.T) {
+		t.Parallel()
 		reqCtx := &core.RequestContext{State: make(map[string]any)}
 		tool := NewWriteWhiteboardTool(reqCtx)
 
@@ -275,7 +289,9 @@ func TestWriteWhiteboardTool(t *testing.T) {
 }
 
 func TestGetSetWhiteboardContent(t *testing.T) {
+	t.Parallel()
 	t.Run("get and set whiteboard content", func(t *testing.T) {
+		t.Parallel()
 		reqCtx := &core.RequestContext{State: make(map[string]any)}
 
 		// Initially empty
@@ -294,6 +310,7 @@ func TestGetSetWhiteboardContent(t *testing.T) {
 	})
 
 	t.Run("get from context without whiteboard_content key", func(t *testing.T) {
+		t.Parallel()
 		reqCtx := &core.RequestContext{State: make(map[string]any)}
 		// Don't set anything
 		content := GetWhiteboardContent(reqCtx)
@@ -302,7 +319,9 @@ func TestGetSetWhiteboardContent(t *testing.T) {
 }
 
 func TestWhiteboardMiddlewareIntegration(t *testing.T) {
+	t.Parallel()
 	t.Run("write and verify content in system prompt", func(t *testing.T) {
+		t.Parallel()
 		projection := newMockWhiteboardProjection()
 		middleware := NewWhiteboardMiddleware(projection)
 		reqCtx := &core.RequestContext{
