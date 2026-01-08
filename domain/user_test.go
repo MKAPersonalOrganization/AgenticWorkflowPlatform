@@ -20,7 +20,7 @@ func TestNewUserFromIdentity(t *testing.T) {
 			name:     "nil identity",
 			identity: nil,
 			wantUser: nil,
-			wantErr:  false,
+			wantErr:  true,
 		},
 		{
 			name: "identity with email only",
@@ -175,16 +175,22 @@ func TestNewUserFromSession(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := NewUserFromSession(tt.session)
-			if err != nil {
-				t.Errorf("NewUserFromSession() error = %v", err)
-
-				return
-			}
-			if tt.wantNil && got != nil {
-				t.Errorf("NewUserFromSession() expected nil, got %+v", got)
-			}
-			if !tt.wantNil && got == nil {
-				t.Errorf("NewUserFromSession() expected user, got nil")
+			if tt.wantNil {
+				if err == nil {
+					t.Errorf("NewUserFromSession() expected error, got nil")
+					return
+				}
+				if got != nil {
+					t.Errorf("NewUserFromSession() expected nil user, got %+v", got)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("NewUserFromSession() unexpected error = %v", err)
+					return
+				}
+				if got == nil {
+					t.Errorf("NewUserFromSession() expected user, got nil")
+				}
 			}
 		})
 	}

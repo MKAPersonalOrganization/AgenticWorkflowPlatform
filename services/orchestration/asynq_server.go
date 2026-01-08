@@ -5,16 +5,17 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
+
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/services/chatwrite"
-	"time"
 
 	"github.com/hibiken/asynq"
 )
 
 var (
 	// ErrRedisHealthCheckFailed is returned when Redis health check fails.
-	ErrRedisHealthCheckFailed = errors.New("Redis health check failed")
+	ErrRedisHealthCheckFailed = errors.New("redis health check failed")
 	// ErrTaskNotFound is returned when trying to cancel a task that is not found or already completed.
 	ErrTaskNotFound = errors.New("failed to cancel task: task not found or already completed")
 )
