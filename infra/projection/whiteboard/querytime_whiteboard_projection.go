@@ -1,0 +1,139 @@
+package whiteboard
+
+import (
+	"context"
+	"encoding/json"
+
+	"school-with-ai/sdk/agentsdk/core"
+)
+
+// QueryTimeWhiteboardProjection is a query-time projection that rebuilds whiteboard state
+// from events on every read. This eliminates the need for in-memory state management.
+//
+// Benefits:
+//   - No memory overhead for storing whiteboard state
+//   - Always consistent with event store (no projection lag)
+//   - Simpler architecture - no need to manage projection updates
+//   - Thread state persists across server restarts
+type QueryTimeWhiteboardProjection struct {
+	eventStore     core.EventStore
+	threadIDLister ThreadIDLister
+}
+
+// ThreadIDLister provides a way to list all thread IDs
+type ThreadIDLister interface {
+	ReadAllThreadIDs(ctx context.Context) ([]string, error)
+}
+
+// NewQueryTimeWhiteboardProjection creates a new query-time whiteboard projection.
+func NewQueryTimeWhiteboardProjection(eventStore core.EventStore, threadIDLister ThreadIDLister) *QueryTimeWhiteboardProjection {
+	return &QueryTimeWhiteboardProjection{
+		eventStore:     eventStore,
+		threadIDLister: threadIDLister,
+	}
+}
+
+// Get retrieves the whiteboard content for a thread by rebuilding from events.
+func (p *QueryTimeWhiteboardProjection) Get(threadID string) string {
+	ctx := context.Background()
+
+	events, err := p.eventStore.ReadStream(ctx, threadID, 0)
+	if err != nil || len(events) == 0 {
+		return ""
+	}
+
+	// Rebuild whiteboard state from events
+	content := ""
+	for _, event := range events {
+		content = applyEventToWhiteboard(content, event)
+	}
+
+	return content
+}
+
+// GetAll retrieves all whiteboards by listing all threads and rebuilding each.
+func (p *QueryTimeWhiteboardProjection) GetAll() map[string]string {
+	if p.threadIDLister == nil {
+		return map[string]string{}
+	}
+
+	ctx := context.Background()
+	threadIDs, err := p.threadIDLister.ReadAllThreadIDs(ctx)
+	if err != nil {
+		return map[string]string{}
+	}
+
+	result := make(map[string]string, len(threadIDs))
+	for _, threadID := range threadIDs {
+		content := p.Get(threadID)
+		if content != "" {
+			result[threadID] = content
+		}
+	}
+
+	return result
+}
+
+// Update is a no-op for query-time projections since we read directly from the event store.
+func (p *QueryTimeWhiteboardProjection) Update(event any) error {
+	// No-op: query-time projections don't maintain state
+	return nil
+}
+
+// Apply is a no-op for query-time projections.
+func (p *QueryTimeWhiteboardProjection) Apply(ctx context.Context, event core.Event) error {
+	// No-op: query-time projections don't maintain state
+	return nil
+}
+
+// Rebuild is a no-op for query-time projections since we always read fresh from the event store.
+func (p *QueryTimeWhiteboardProjection) Rebuild(ctx context.Context, store core.EventStore, streamID string) error {
+	// No-op: query-time projections don't maintain state, so nothing to rebuild
+	return nil
+}
+
+// applyEventToWhiteboard applies an event to rebuild whiteboard state
+func applyEventToWhiteboard(currentContent string, event core.Event) string {
+	// Handle ToolCallExecutedEvent for write_whiteboard tool
+	switch evt := event.(type) {
+	case *core.ToolCallExecutedEvent:
+		if evt.ToolName == "write_whiteboard" {
+			return applyWhiteboardTool(currentContent, evt.ToolArguments)
+		}
+	case core.ToolCallExecutedEvent:
+		if evt.ToolName == "write_whiteboard" {
+			return applyWhiteboardTool(currentContent, evt.ToolArguments)
+		}
+	}
+
+	return currentContent
+}
+
+// applyWhiteboardTool parses whiteboard tool arguments and applies the action
+func applyWhiteboardTool(currentContent string, toolArguments string) string {
+	var args struct {
+		Content string `json:"content"`
+		Action  string `json:"action"`
+	}
+
+	if err := json.Unmarshal([]byte(toolArguments), &args); err != nil {
+		return currentContent // Skip malformed events
+	}
+
+	switch args.Action {
+	case "write":
+		return args.Content
+	case "append":
+		if currentContent == "" {
+			return args.Content
+		}
+		return currentContent + "\n" + args.Content
+	case "clear":
+		return ""
+	default:
+		return currentContent
+	}
+}
+
+// Verify QueryTimeWhiteboardProjection implements WhiteboardStore
+var _ WhiteboardStore = (*QueryTimeWhiteboardProjection)(nil)
