@@ -3,8 +3,14 @@ package middleware
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"school-with-ai/sdk/agentsdk/core"
+)
+
+var (
+	// ErrInvalidWhiteboardAction is returned when an invalid whiteboard action is provided.
+	ErrInvalidWhiteboardAction = errors.New("invalid action (must be write, append, or clear)")
 )
 
 // WhiteboardAction represents the type of whiteboard update.
@@ -293,7 +299,7 @@ func (t *WriteWhiteboardTool) Invoke(ctx context.Context, arguments string) (str
 	}
 
 	if !validActions[args.Action] {
-		return "", fmt.Errorf("invalid action: %s (must be write, append, or clear)", args.Action)
+		return "", fmt.Errorf("%w: %s", ErrInvalidWhiteboardAction, args.Action)
 	}
 
 	var finalContent string

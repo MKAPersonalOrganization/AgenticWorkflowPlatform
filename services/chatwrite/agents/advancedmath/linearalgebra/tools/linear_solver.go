@@ -9,6 +9,17 @@ import (
 	"github.com/cpmech/gosl/la"
 )
 
+var (
+	// ErrLinearSquareMatrix is returned when matrix A must be square.
+	ErrLinearSquareMatrix = errors.New("matrix A must be a square matrix")
+
+	// ErrLinearDimensionMismatch is returned when vector b doesn't match A dimensions.
+	ErrLinearDimensionMismatch = errors.New("vector b must have same length as A rows")
+
+	// ErrUnknownMethod is returned when an unknown solver method is requested.
+	ErrUnknownMethod = errors.New("unknown method")
+)
+
 // LinearSolverTool solves linear systems.
 type LinearSolverTool struct{}
 
@@ -67,14 +78,13 @@ func (t *LinearSolverTool) Invoke(ctx context.Context, arguments string) (string
 	// Validate dimensions
 	n := len(args.A)
 	if n == 0 || len(args.A[0]) != n {
-		return "", errors.New("matrix A must be a square matrix")
+		return "", ErrLinearSquareMatrix
 	}
 	if len(args.B) != n {
-		return "", errors.New("vector b must have same length as A rows")
+		return "", ErrLinearDimensionMismatch
 	}
 
 	var x []float64
-	var err error
 
 	A_mat := la.NewMatrixDeep2(args.A)
 	b_vec := la.Vector(args.B)
@@ -91,11 +101,7 @@ func (t *LinearSolverTool) Invoke(ctx context.Context, arguments string) (string
 		la.SolveRealLinSysSPD(x, A_mat, b_vec)
 
 	default:
-		return "", fmt.Errorf("unknown method: %s", args.Method)
-	}
-
-	if err != nil {
-		return "", fmt.Errorf("solver failed: %w", err)
+		return "", fmt.Errorf("%w: %s", ErrUnknownMethod, args.Method)
 	}
 
 	response := map[string]any{

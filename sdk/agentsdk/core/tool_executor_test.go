@@ -11,6 +11,10 @@ import (
 	"testing"
 )
 
+var (
+	errTestToolNotFound = errors.New("tool not found")
+)
+
 // MockToolExecutor is a test double for ToolExecutor.
 type MockToolExecutor struct {
 	results map[string]string
@@ -92,7 +96,7 @@ func TestMockToolExecutor_Execute(t *testing.T) {
 
 func TestMockToolExecutor_ExecuteWithError(t *testing.T) {
 	executor := NewMockToolExecutor()
-	expectedErr := errors.New("tool not found")
+	expectedErr := errTestToolNotFound
 	executor.SetError("unknown_tool", expectedErr)
 
 	toolCall := domain.ToolCall{

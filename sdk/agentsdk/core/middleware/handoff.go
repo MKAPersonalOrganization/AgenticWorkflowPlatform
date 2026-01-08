@@ -10,6 +10,17 @@ import (
 	"strings"
 )
 
+var (
+	// ErrAgentNameRequired is returned when agent_name is missing from transfer arguments.
+	ErrAgentNameRequired = errors.New("agent_name is required")
+
+	// ErrSelfTransfer is returned when an agent attempts to transfer to itself.
+	ErrSelfTransfer = errors.New("cannot transfer to yourself")
+
+	// ErrUnknownAgent is returned when attempting to transfer to a non-existent agent.
+	ErrUnknownAgent = errors.New("unknown agent")
+)
+
 const TransferToAgentToolDescription = `Transfer control to another specialist agent when they are better suited to handle the question.
 
 Use this tool to delegate tasks to agents with specific expertise. Review the available agents below and choose the most appropriate one based on their description and the nature of the task.
@@ -123,13 +134,13 @@ func (t *TransferToAgentTool) Invoke(ctx context.Context, arguments string) (str
 
 	// Validate agent_name is provided
 	if args.AgentName == "" {
-		return "", errors.New("agent_name is required")
+		return "", ErrAgentNameRequired
 	}
 
 	// Prevent self-transfer
 	currentAgentName := t.reqCtx.Config.Name
 	if args.AgentName == currentAgentName {
-		return "", fmt.Errorf("cannot transfer to yourself (%s). If you can handle this task, answer directly instead of transferring", currentAgentName)
+		return "", fmt.Errorf("%w (%s). If you can handle this task, answer directly instead of transferring", ErrSelfTransfer, currentAgentName)
 	}
 
 	// Validate agent exists
@@ -139,7 +150,7 @@ func (t *TransferToAgentTool) Invoke(ctx context.Context, arguments string) (str
 			agentNames = append(agentNames, name)
 		}
 
-		return "", fmt.Errorf("unknown agent: %s. Available agents: %v", args.AgentName, agentNames)
+		return "", fmt.Errorf("%w: %s. Available agents: %v", ErrUnknownAgent, args.AgentName, agentNames)
 	}
 
 	// Store handoff in request context state

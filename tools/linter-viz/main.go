@@ -282,21 +282,50 @@ func getTopLinters(headers []string, dataRows [][]string) []string {
 
 func generateGnuplotScript(headers []string, dataRows [][]string, topLinters []string) error {
 	script := `
-set terminal pngcairo size 1400,900 enhanced font 'Arial,12'
+set terminal pngcairo size 1600,1000 enhanced font 'Arial,11' background rgb 'white'
 set output '/tmp/linter_stats.png'
 
-set title "Linter Issues Over Time" font 'Arial,16'
-set xlabel "Snapshot"
-set ylabel "Issue Count"
-set grid
+# Professional color scheme
+set style line 1 lc rgb '#E74C3C' lt 1 lw 2.5 pt 7 ps 1.2
+set style line 2 lc rgb '#3498DB' lt 1 lw 2.5 pt 9 ps 1.2
+set style line 3 lc rgb '#2ECC71' lt 1 lw 2.5 pt 5 ps 1.2
+set style line 4 lc rgb '#F39C12' lt 1 lw 2.5 pt 13 ps 1.2
+set style line 5 lc rgb '#9B59B6' lt 1 lw 2.5 pt 11 ps 1.2
+set style line 6 lc rgb '#1ABC9C' lt 1 lw 2.5 pt 6 ps 1.2
+set style line 7 lc rgb '#E67E22' lt 1 lw 2.5 pt 4 ps 1.2
+set style line 8 lc rgb '#34495E' lt 1 lw 2.5 pt 8 ps 1.2
+set style line 9 lc rgb '#95A5A6' lt 1 lw 2.5 pt 10 ps 1.2
+set style line 10 lc rgb '#D35400' lt 1 lw 2.5 pt 12 ps 1.2
 
-set key outside right top
+# Grid styling
+set style line 100 lc rgb '#D0D0D0' lt 1 lw 0.5
+set grid ls 100 xtics ytics
 
-set style data linespoints
-set pointsize 1.5
+# Border and tics styling
+set border lw 1.5
+set tics nomirror
 
-# Use snapshot numbers as x-axis
-set xtics 1
+# Title and labels
+set title "Linter Issues Over Time (Normalized)" font 'Arial,18' tc rgb '#2C3E50'
+set xlabel "Snapshot Number" font 'Arial,13' tc rgb '#2C3E50' offset 0,0.5
+set ylabel "Relative Issue Count (First Snapshot = 100%)" font 'Arial,13' tc rgb '#2C3E50' offset 1.5,0
+
+# Legend styling
+set key outside right top box opaque
+set key spacing 1.2 font 'Arial,10'
+set key width 1
+
+# Axis ranges and formatting
+set xtics 1 font 'Arial,10'
+set ytics font 'Arial,10'
+set yrange [0:120]
+set format y "%.0f%%"
+
+# Margins for better layout
+set lmargin 12
+set rmargin 20
+set tmargin 3
+set bmargin 4
 
 `
 
@@ -313,21 +342,83 @@ set xtics 1
 		}
 
 		if colIdx > 0 {
-			plotLines = append(plotLines, fmt.Sprintf("'-' using 1:%d with linespoints title '%s'", colIdx, linter))
+			plotLines = append(plotLines, fmt.Sprintf("'-' using 1:2 with linespoints title '%s'", linter))
 		}
+	}
+
+	// Pre-calculate normalized data and filter out linters with no change
+	type linterData struct {
+		name   string
+		points []float64
+	}
+	var validLinters []linterData
+
+	for _, linter := range topLinters {
+		// Find column index for this linter
+		colIdx := -1
+		for i, h := range headers {
+			if h == linter {
+				colIdx = i
+				break
+			}
+		}
+
+		if colIdx < 0 {
+			continue
+		}
+
+		// Get first value for normalization (baseline)
+		firstVal := 0.0
+		if colIdx < len(dataRows[0]) {
+			firstVal, _ = strconv.ParseFloat(dataRows[0][colIdx], 64)
+		}
+
+		// If first value is 0, we can't normalize - skip this linter
+		if firstVal == 0 {
+			continue
+		}
+
+		// Calculate normalized data points
+		var points []float64
+		hasChange := false
+		for _, row := range dataRows {
+			currentVal := 0.0
+			if colIdx < len(row) {
+				currentVal, _ = strconv.ParseFloat(row[colIdx], 64)
+			}
+			normalizedVal := (currentVal / firstVal) * 100.0
+			points = append(points, normalizedVal)
+
+			// Check if value differs from 100% (with small tolerance for floating point)
+			if normalizedVal < 99.9 || normalizedVal > 100.1 {
+				hasChange = true
+			}
+		}
+
+		// Only include linters that have changed
+		if hasChange {
+			validLinters = append(validLinters, linterData{name: linter, points: points})
+		}
+	}
+
+	// Build plot command with only valid linters
+	plotLines = nil
+	for i, ld := range validLinters {
+		styleNum := (i % 10) + 1
+		plotLines = append(plotLines, fmt.Sprintf("'-' using 1:2 with linespoints ls %d title '%s'", styleNum, ld.name))
+	}
+
+	if len(plotLines) == 0 {
+		return fmt.Errorf("no linters with changes to plot")
 	}
 
 	script += "plot " + strings.Join(plotLines, ", \\\n     ") + "\n\n"
 
-	// Add data for each linter
-	for range topLinters {
-		for i, row := range dataRows {
+	// Add normalized data for valid linters
+	for _, ld := range validLinters {
+		for i, val := range ld.points {
 			snapshot := i + 1
-			script += fmt.Sprintf("%d", snapshot)
-			for _, val := range row {
-				script += fmt.Sprintf(" %s", val)
-			}
-			script += "\n"
+			script += fmt.Sprintf("%d %.2f\n", snapshot, val)
 		}
 		script += "e\n"
 	}

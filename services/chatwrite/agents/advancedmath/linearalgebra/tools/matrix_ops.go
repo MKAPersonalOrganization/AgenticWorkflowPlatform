@@ -9,6 +9,26 @@ import (
 	"github.com/cpmech/gosl/la"
 )
 
+var (
+	// ErrMatrix2Required is returned when matrix2 is required but not provided.
+	ErrMatrix2Required = errors.New("matrix2 required for operation")
+
+	// ErrMatrixSameDimensions is returned when matrices must have the same dimensions.
+	ErrMatrixSameDimensions = errors.New("matrices must have same dimensions")
+
+	// ErrSquareMatrixRequired is returned when a square matrix is required.
+	ErrSquareMatrixRequired = errors.New("square matrix required")
+
+	// ErrVectorRequired is returned when a vector is required but not provided.
+	ErrVectorRequired = errors.New("vector required for operation")
+
+	// ErrIncompatibleDimensions is returned when matrix/vector dimensions are incompatible.
+	ErrIncompatibleDimensions = errors.New("incompatible dimensions")
+
+	// ErrUnknownMatrixOperation is returned when an unknown operation is requested.
+	ErrUnknownMatrixOperation = errors.New("unknown operation")
+)
+
 // MatrixOperationsTool provides matrix operations.
 type MatrixOperationsTool struct{}
 
@@ -95,12 +115,11 @@ func (t *MatrixOperationsTool) Invoke(ctx context.Context, arguments string) (st
 	}
 
 	var result any
-	var err error
 
 	switch args.Operation {
 	case "multiply":
 		if len(args.Matrix2) == 0 {
-			return "", errors.New("matrix2 required for multiply operation")
+			return "", ErrMatrix2Required
 		}
 		a := la.NewMatrixDeep2(args.Matrix)
 		b := la.NewMatrixDeep2(args.Matrix2)
@@ -110,12 +129,12 @@ func (t *MatrixOperationsTool) Invoke(ctx context.Context, arguments string) (st
 
 	case "add":
 		if len(args.Matrix2) == 0 {
-			return "", errors.New("matrix2 required for add operation")
+			return "", ErrMatrix2Required
 		}
 		// gosl doesn't have direct matrix add, so we'll use manual implementation
 		a, b := args.Matrix, args.Matrix2
 		if len(a) != len(b) || len(a[0]) != len(b[0]) {
-			return "", errors.New("matrices must have same dimensions")
+			return "", ErrMatrixSameDimensions
 		}
 		m, n := len(a), len(a[0])
 		c := make([][]float64, m)
@@ -129,11 +148,11 @@ func (t *MatrixOperationsTool) Invoke(ctx context.Context, arguments string) (st
 
 	case "subtract":
 		if len(args.Matrix2) == 0 {
-			return "", errors.New("matrix2 required for subtract operation")
+			return "", ErrMatrix2Required
 		}
 		a, b := args.Matrix, args.Matrix2
 		if len(a) != len(b) || len(a[0]) != len(b[0]) {
-			return "", errors.New("matrices must have same dimensions")
+			return "", ErrMatrixSameDimensions
 		}
 		m, n := len(a), len(a[0])
 		c := make([][]float64, m)
@@ -152,7 +171,7 @@ func (t *MatrixOperationsTool) Invoke(ctx context.Context, arguments string) (st
 	case "inverse":
 		a := la.NewMatrixDeep2(args.Matrix)
 		if a.M != a.N {
-			return "", errors.New("inverse requires square matrix")
+			return "", ErrSquareMatrixRequired
 		}
 		ai := la.NewMatrix(a.N, a.M)
 		la.MatInv(ai, a, false)
@@ -161,13 +180,13 @@ func (t *MatrixOperationsTool) Invoke(ctx context.Context, arguments string) (st
 	case "determinant":
 		a := la.NewMatrixDeep2(args.Matrix)
 		if a.M != a.N {
-			return "", errors.New("determinant requires square matrix")
+			return "", ErrSquareMatrixRequired
 		}
 		result = a.Det()
 
 	case "trace":
 		if len(args.Matrix) != len(args.Matrix[0]) {
-			return "", errors.New("trace requires square matrix")
+			return "", ErrSquareMatrixRequired
 		}
 		var trace float64
 		for i := range len(args.Matrix) {
@@ -187,12 +206,12 @@ func (t *MatrixOperationsTool) Invoke(ctx context.Context, arguments string) (st
 
 	case "matrix_vector_multiply":
 		if len(args.Vector) == 0 {
-			return "", errors.New("vector required for matrix_vector_multiply")
+			return "", ErrVectorRequired
 		}
 		a := la.NewMatrixDeep2(args.Matrix)
 		u := la.Vector(args.Vector)
 		if a.N != len(u) {
-			return "", fmt.Errorf("incompatible dimensions: matrix columns (%d) != vector length (%d)", a.N, len(u))
+			return "", fmt.Errorf("%w: matrix columns (%d) != vector length (%d)", ErrIncompatibleDimensions, a.N, len(u))
 		}
 		v := la.NewVector(a.M)
 		la.MatVecMul(v, args.Alpha, a, u)
@@ -200,23 +219,19 @@ func (t *MatrixOperationsTool) Invoke(ctx context.Context, arguments string) (st
 
 	case "vector_matrix_multiply":
 		if len(args.Vector) == 0 {
-			return "", errors.New("vector required for vector_matrix_multiply")
+			return "", ErrVectorRequired
 		}
 		a := la.NewMatrixDeep2(args.Matrix)
 		u := la.Vector(args.Vector)
 		if len(u) != a.M {
-			return "", fmt.Errorf("incompatible dimensions: vector length (%d) != matrix rows (%d)", len(u), a.M)
+			return "", fmt.Errorf("%w: vector length (%d) != matrix rows (%d)", ErrIncompatibleDimensions, len(u), a.M)
 		}
 		v := la.NewVector(a.N)
 		la.MatTrVecMul(v, args.Alpha, a, u)
 		result = []float64(v)
 
 	default:
-		return "", fmt.Errorf("unknown operation: %s", args.Operation)
-	}
-
-	if err != nil {
-		return "", fmt.Errorf("operation failed: %w", err)
+		return "", fmt.Errorf("%w: %s", ErrUnknownMatrixOperation, args.Operation)
 	}
 
 	response := map[string]any{
