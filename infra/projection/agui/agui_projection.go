@@ -8,6 +8,9 @@ import (
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
 
+// EventEmitter is a function that emits real-time events to connected clients.
+type EventEmitter func(threadID string, event interface{}) error
+
 // AguiProjection is a read model optimized for the AG-UI protocol.
 //
 // This projection maintains UI-specific state derived from domain events,

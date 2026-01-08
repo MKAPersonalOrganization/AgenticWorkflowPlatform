@@ -288,7 +288,7 @@ func (p *QueryTimeAguiProjection) applyEventToState(
 	case *core.AssistantMessageCompletedEvent:
 		if msg, exists := streamingMessages[evt.MessageID]; exists {
 			msg.Content = &evt.Content
-			if evt.ToolCalls != nil && len(evt.ToolCalls) > 0 {
+			if len(evt.ToolCalls) > 0 {
 				msg.ToolCalls = make([]aguievents.ToolCall, len(evt.ToolCalls))
 				for i, tc := range evt.ToolCalls {
 					msg.ToolCalls[i] = aguievents.ToolCall{
@@ -324,7 +324,7 @@ func (p *QueryTimeAguiProjection) applyEventToState(
 	case core.AssistantMessageCompletedEvent:
 		if msg, exists := streamingMessages[evt.MessageID]; exists {
 			msg.Content = &evt.Content
-			if evt.ToolCalls != nil && len(evt.ToolCalls) > 0 {
+			if len(evt.ToolCalls) > 0 {
 				msg.ToolCalls = make([]aguievents.ToolCall, len(evt.ToolCalls))
 				for i, tc := range evt.ToolCalls {
 					msg.ToolCalls[i] = aguievents.ToolCall{
