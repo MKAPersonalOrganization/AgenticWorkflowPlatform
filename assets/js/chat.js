@@ -778,7 +778,7 @@ document.addEventListener('alpine:init', () => {
 
         async __loadSessions() {
             return await this.__tryCatchAsync('load sessions', {}, async () => {
-                const response = await fetch('/api/threads');
+                const response = await fetch('/api/agui/threads');
                 if (response.ok) {
                     const threads = await response.json();
                     // Only show threads that have messages
@@ -857,7 +857,7 @@ document.addEventListener('alpine:init', () => {
             }
 
             return await this.__tryCatchAsync('delete session', { sessionId }, async () => {
-                const response = await fetch(`/api/threads/${sessionId}`, {
+                const response = await fetch(`/api/agui/threads/${sessionId}`, {
                     method: 'DELETE'
                 });
 
@@ -1433,7 +1433,7 @@ document.addEventListener('alpine:init', () => {
             if (!id) return;
 
             return await this.__tryCatchAsync('load messages', { threadId: id }, async () => {
-                const response = await fetch(`/api/threads/${id}/messages`);
+                const response = await fetch(`/api/agui/threads/${id}/messages`);
                 if (response.ok) {
                     const messages = await response.json();
                     const state = this.__getThreadState(id);
@@ -1901,33 +1901,27 @@ document.addEventListener('alpine:init', () => {
 
         async __reconnectToActiveJobs(threadId) {
             try {
-                const response = await fetch(`/api/jobs/active?threadId=${encodeURIComponent(threadId)}`);
+                const response = await fetch(`/api/agui/threads/${encodeURIComponent(threadId)}/active-run`);
 
                 if (!response.ok) {
-                    console.warn('Failed to fetch active jobs:', response.statusText);
+                    console.warn('Failed to fetch active run:', response.statusText);
                     return;
                 }
 
-                const activeJobs = await response.json();
+                const data = await response.json();
+                const activeRun = data.activeRun;
 
-                if (activeJobs && activeJobs.length > 0) {
-                    console.log(`Reconnecting to ${activeJobs.length} active job(s)`, activeJobs);
+                if (activeRun && activeRun.status === 'running') {
+                    console.log('Reconnecting to active run:', activeRun);
 
                     const state = this.__getThreadState(threadId);
                     state.isStreaming = true;
                     state.showTypingIndicator = true;
 
-                    // Connect to all active jobs (they will all stream to the same thread)
-                    // The most recent job's ID is stored, but all will contribute events
-                    for (const job of activeJobs) {
-                        console.log('Connecting to job:', job.id, job.status);
-                        this.__connectToJobStream(job.id, threadId);
-                    }
-
-                    // Store the most recent job ID
-                    if (activeJobs.length > 0) {
-                        state.currentJobId = activeJobs[activeJobs.length - 1].id;
-                    }
+                    // Note: We don't have the job ID from the active run data
+                    // The reconnection will happen through the SSE connection
+                    // when we get the job status from the stream
+                    console.log('Active run detected:', activeRun.runId, activeRun.status);
                 }
             } catch (error) {
                 console.error('Error reconnecting to active jobs:', error);

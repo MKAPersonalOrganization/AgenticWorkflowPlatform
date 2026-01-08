@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"time"
 )
 
 // AguiProjectionHandler provides HTTP endpoints for querying the AGUI projection.
@@ -122,10 +123,43 @@ func (h *AguiProjectionHandler) GetAgentActivity(w http.ResponseWriter, r *http.
 func (h *AguiProjectionHandler) ListThreads(w http.ResponseWriter, r *http.Request) {
 	threadIDs := h.projection.ListThreads()
 
+	// Build thread summaries with full state
+	threads := make([]map[string]interface{}, 0, len(threadIDs))
+	for _, threadID := range threadIDs {
+		state, exists := h.projection.GetThreadState(threadID)
+		if !exists {
+			continue
+		}
+
+		// Get whiteboard content
+		whiteboardContent := h.whiteboardStore.Get(threadID)
+
+		// Determine current instructor from agent activity
+		var currentInstructor string
+		if len(state.AgentActivity) > 0 {
+			// Get the most recently active agent
+			var latestTime time.Time
+			for agentName, activity := range state.AgentActivity {
+				if activity.LastActiveAt.After(latestTime) {
+					latestTime = activity.LastActiveAt
+					currentInstructor = agentName
+				}
+			}
+		}
+
+		threads = append(threads, map[string]interface{}{
+			"id":                threadID,
+			"title":             state.Title,
+			"messages":          state.Messages,
+			"createdAt":         state.CreatedAt,
+			"updatedAt":         state.UpdatedAt,
+			"whiteboardContent": whiteboardContent,
+			"currentInstructor": currentInstructor,
+		})
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]interface{}{
-		"threads": threadIDs,
-	}); err != nil {
+	if err := json.NewEncoder(w).Encode(threads); err != nil {
 		slog.Error("Failed to encode thread list", "error", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 	}
