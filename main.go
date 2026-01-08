@@ -79,8 +79,7 @@ func main() {
 
 	// Initialize service layer
 	authSvc := authService.NewAuthService()
-	aguiServiceAdapter := agui.NewServiceAdapter(aguiProjection)
-	projectionService := projections.NewProjectionService(aguiServiceAdapter, whiteboardProjection, llmContextProjection)
+	projectionService := projections.NewProjectionService(aguiProjection, whiteboardProjection, llmContextProjection)
 
 	// Get Redis address from environment
 	redisAddr := os.Getenv("REDIS_ADDR")

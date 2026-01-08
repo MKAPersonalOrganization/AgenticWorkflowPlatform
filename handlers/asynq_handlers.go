@@ -10,7 +10,6 @@ import (
 
 	"school-with-ai/domain"
 	"school-with-ai/infra/eventstore"
-	"school-with-ai/infra/projection/agui"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/sdk/agentsdk/llm"
 	"school-with-ai/services"
@@ -182,14 +181,11 @@ func (h *AsynqHandler) StreamJobEvents(w http.ResponseWriter, r *http.Request) {
 
 streamEvents:
 	// FIRST: Send MESSAGES_SNAPSHOT from projection (ensures client has current state)
-	if threadHistory, err := h.projectionService.GetThreadHistory(eventBuffer.ThreadID); err == nil {
-		// Type assert to *agui.AguiThreadState
-		if threadState, ok := threadHistory.(*agui.AguiThreadState); ok {
-			// Messages are already in AG-UI SDK format - use directly
-			messagesSnapshotEvent := aguievents.NewMessagesSnapshotEvent(threadState.Messages)
-			if err := writeSSEEvent(w, messagesSnapshotEvent); err == nil {
-				flusher.Flush()
-			}
+	messages := h.projectionService.GetThreadMessages(eventBuffer.ThreadID)
+	if len(messages) > 0 {
+		messagesSnapshotEvent := aguievents.NewMessagesSnapshotEvent(messages)
+		if err := writeSSEEvent(w, messagesSnapshotEvent); err == nil {
+			flusher.Flush()
 		}
 	}
 
