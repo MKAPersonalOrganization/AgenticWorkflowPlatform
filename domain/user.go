@@ -28,7 +28,7 @@ const (
 // IdentityTraits represents the user's identity traits as defined in the Kratos identity schema.
 type IdentityTraits struct {
 	Email string     `json:"email"`
-	Name  NameTraits `json:"name,omitempty"`
+	Name  NameTraits `json:"name"`
 }
 
 // NameTraits represents the user's name information.
@@ -67,7 +67,7 @@ func NewUserFromIdentity(identity *client.Identity) (*User, error) {
 	}
 
 	// Extract traits
-	if traits, ok := identity.Traits.(map[string]interface{}); ok {
+	if traits, ok := identity.Traits.(map[string]any); ok {
 		// Extract email
 		if email, ok := traits["email"].(string); ok {
 			user.Email = email
@@ -75,7 +75,7 @@ func NewUserFromIdentity(identity *client.Identity) (*User, error) {
 		}
 
 		// Extract name
-		if nameObj, ok := traits["name"].(map[string]interface{}); ok {
+		if nameObj, ok := traits["name"].(map[string]any); ok {
 			if first, ok := nameObj["first"].(string); ok {
 				user.FirstName = first
 				user.Traits.Name.First = first
