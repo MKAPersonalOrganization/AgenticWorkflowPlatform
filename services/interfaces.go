@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"school-with-ai/domain"
+
+	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
 
 // AuthService provides authentication and authorization operations
@@ -24,4 +26,6 @@ type ProjectionService interface {
 	GetThread(threadID string) (*domain.Thread, bool)
 	// GetAllThreads retrieves all threads
 	GetAllThreads() []domain.Thread
+	// GetThreadMessages retrieves AGUI-formatted messages for a thread
+	GetThreadMessages(threadID string) []aguievents.Message
 }

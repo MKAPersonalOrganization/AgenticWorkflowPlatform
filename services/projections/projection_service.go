@@ -4,37 +4,26 @@ import (
 	"fmt"
 
 	"school-with-ai/domain"
+	"school-with-ai/infra/projection/agui"
+	"school-with-ai/infra/projection/llmcontext"
+	"school-with-ai/infra/projection/whiteboard"
+
+	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
 
-// WhiteboardReader provides read access to whiteboard content
-type WhiteboardReader interface {
-	Get(threadID string) string
-}
-
-// AguiProjection provides access to AGUI thread state
-// The specific type returned is implementation-dependent
-type AguiProjection interface {
-	GetThreadState(threadID string) (interface{}, bool)
-}
-
-// LLMContextReader provides read access to LLM context projections
-type LLMContextReader interface {
-	Get(threadID string) (*domain.Thread, bool)
-	All() []domain.Thread
-}
-
 // projectionService implements the services.ProjectionService interface
+// Services can depend on infra - this maintains clean architecture boundaries
 type projectionService struct {
-	aguiProjection       AguiProjection
-	whiteboardProjection WhiteboardReader
-	llmContextProjection LLMContextReader
+	aguiProjection       agui.AguiProjection
+	whiteboardProjection whiteboard.WhiteboardStore
+	llmContextProjection *llmcontext.InMemoryLLMContextProjection
 }
 
 // NewProjectionService creates a new projection service
 func NewProjectionService(
-	aguiProj AguiProjection,
-	whiteboardProj WhiteboardReader,
-	llmContextProj LLMContextReader,
+	aguiProj agui.AguiProjection,
+	whiteboardProj whiteboard.WhiteboardStore,
+	llmContextProj *llmcontext.InMemoryLLMContextProjection,
 ) *projectionService {
 	return &projectionService{
 		aguiProjection:       aguiProj,
@@ -50,7 +39,6 @@ func (s *projectionService) GetWhiteboardContent(threadID string) string {
 
 // GetThreadHistory retrieves formatted AGUI message history
 func (s *projectionService) GetThreadHistory(threadID string) (interface{}, error) {
-	// Return the thread state which includes messages
 	state, exists := s.aguiProjection.GetThreadState(threadID)
 	if !exists {
 		return nil, fmt.Errorf("thread not found: %s", threadID)
@@ -68,14 +56,7 @@ func (s *projectionService) GetAllThreads() []domain.Thread {
 	return s.llmContextProjection.All()
 }
 
-// GetAguiProjection returns the underlying AGUI projection
-// This is used by services that need direct access to projection
-func (s *projectionService) GetAguiProjection() AguiProjection {
-	return s.aguiProjection
-}
-
-// GetWhiteboardProjection returns the underlying whiteboard projection
-// This is used by services that need direct access to projection
-func (s *projectionService) GetWhiteboardProjection() WhiteboardReader {
-	return s.whiteboardProjection
+// GetThreadMessages retrieves AGUI-formatted messages for a thread
+func (s *projectionService) GetThreadMessages(threadID string) []aguievents.Message {
+	return s.aguiProjection.GetMessages(threadID)
 }
