@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"school-with-ai/infra/eventstore"
+
+	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
 
 // AguiProjection is a read model optimized for the AG-UI protocol.
@@ -32,7 +34,7 @@ type AguiProjection interface {
 	GetActiveRun(threadID string) (*AguiRunState, bool)
 
 	// GetMessages retrieves all UI-formatted messages for a thread.
-	GetMessages(threadID string) []AguiMessage
+	GetMessages(threadID string) []aguievents.Message
 
 	// GetToolCalls retrieves all tool calls for a thread.
 	GetToolCalls(threadID string) []AguiToolCall
@@ -48,7 +50,7 @@ type AguiProjection interface {
 type AguiThreadState struct {
 	ThreadID          string                        `json:"threadId"`
 	Title             string                        `json:"title,omitempty"`
-	Messages          []AguiMessage                 `json:"messages"`
+	Messages          []aguievents.Message          `json:"messages"` // AG-UI SDK format
 	ActiveRun         *AguiRunState                 `json:"activeRun,omitempty"`
 	ToolCalls         []AguiToolCall                `json:"toolCalls"`
 	AgentActivity     map[string]*AguiAgentActivity `json:"agentActivity"`
@@ -68,32 +70,8 @@ type AguiRunState struct {
 	Error      string    `json:"error,omitempty"`
 }
 
-// AguiMessage represents a message in the UI format.
-type AguiMessage struct {
-	ID        string                 `json:"id"`
-	Role      string                 `json:"role"` // "user", "assistant", "system", "tool"
-	Content   string                 `json:"content"`
-	AgentName string                 `json:"agentName,omitempty"`
-	ToolCalls []AguiMessageToolCall  `json:"toolCalls,omitempty"`
-	ToolCall  *AguiMessageToolResult `json:"toolCall,omitempty"` // For tool result messages
-	Timestamp time.Time              `json:"timestamp"`
-	Status    string                 `json:"status,omitempty"` // "streaming", "complete"
-	Metadata  map[string]any         `json:"metadata,omitempty"`
-}
-
-// AguiMessageToolCall represents a tool call within a message.
-type AguiMessageToolCall struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Arguments string `json:"arguments"`
-}
-
-// AguiMessageToolResult represents tool call information in a tool result message.
-type AguiMessageToolResult struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Result string `json:"result"`
-}
+// NOTE: Messages are now stored using aguievents.Message (AG-UI SDK format) directly.
+// This eliminates the need for conversion between internal and SDK formats.
 
 // AguiToolCall represents a complete tool call execution.
 type AguiToolCall struct {

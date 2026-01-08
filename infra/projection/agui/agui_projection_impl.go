@@ -35,7 +35,7 @@ type InMemoryAguiProjection struct {
 	activeRuns map[string]*AguiRunState
 
 	// Active messages being streamed (messageID -> message)
-	streamingMessages map[string]*AguiMessage
+	streamingMessages map[string]*aguievents.Message
 
 	// Tool calls indexed by threadID
 	toolCallsByThread map[string]map[string]*AguiToolCall
@@ -49,7 +49,7 @@ func NewInMemoryAguiProjection() *InMemoryAguiProjection {
 	return &InMemoryAguiProjection{
 		threads:           make(map[string]*AguiThreadState),
 		activeRuns:        make(map[string]*AguiRunState),
-		streamingMessages: make(map[string]*AguiMessage),
+		streamingMessages: make(map[string]*aguievents.Message),
 		toolCallsByThread: make(map[string]map[string]*AguiToolCall),
 	}
 }
@@ -77,7 +77,7 @@ func (p *InMemoryAguiProjection) Apply(ctx context.Context, event core.Event) er
 	if _, exists := p.threads[threadID]; !exists {
 		p.threads[threadID] = &AguiThreadState{
 			ThreadID:      threadID,
-			Messages:      []AguiMessage{},
+			Messages:      []aguievents.Message{},
 			ToolCalls:     []AguiToolCall{},
 			AgentActivity: make(map[string]*AguiAgentActivity),
 			CreatedAt:     time.Now(),
@@ -97,42 +97,50 @@ func (p *InMemoryAguiProjection) Apply(ctx context.Context, event core.Event) er
 		thread.CreatedAt = evt.Timestamp
 
 	case *core.UserMessageAddedEvent:
-		p.addMessage(thread, AguiMessage{
-			ID:        evt.MessageID,
-			Role:      "user",
-			Content:   evt.Content,
-			Timestamp: evt.Timestamp,
-			Status:    "complete",
+		content := evt.Content
+		p.addMessage(thread, aguievents.Message{
+			ID:      evt.MessageID,
+			Role:    "user",
+			Content: &content,
 		})
 
 	case *core.AssistantMessageStartedEvent:
-		msg := AguiMessage{
-			ID:        evt.MessageID,
-			Role:      "assistant",
-			Content:   "",
-			Timestamp: evt.Timestamp,
-			Status:    "streaming",
+		emptyContent := ""
+		msg := aguievents.Message{
+			ID:      evt.MessageID,
+			Role:    "assistant",
+			Content: &emptyContent,
 		}
 		p.addMessage(thread, msg)
 		p.streamingMessages[evt.MessageID] = &thread.Messages[len(thread.Messages)-1]
 
 	case *core.AssistantContentStreamedEvent:
 		if msg, exists := p.streamingMessages[evt.MessageID]; exists {
-			msg.Content += evt.Delta
+			if msg.Content != nil {
+				updatedContent := *msg.Content + evt.Delta
+				msg.Content = &updatedContent
+			}
 		}
 
 	case *core.AssistantMessageCompletedEvent:
 		if msg, exists := p.streamingMessages[evt.MessageID]; exists {
-			msg.Status = "complete"
-			msg.Content = evt.Content     // Final content
-			msg.AgentName = evt.AgentName // Store agent name for tool calls
+			// Set final content
+			msg.Content = &evt.Content
+			// Set agent name
+			if evt.AgentName != "" {
+				msg.Name = &evt.AgentName
+			}
+			// Convert tool calls to AG-UI SDK nested format
 			if len(evt.ToolCalls) > 0 {
-				msg.ToolCalls = make([]AguiMessageToolCall, len(evt.ToolCalls))
+				msg.ToolCalls = make([]aguievents.ToolCall, len(evt.ToolCalls))
 				for i, tc := range evt.ToolCalls {
-					msg.ToolCalls[i] = AguiMessageToolCall{
-						ID:        tc.ID,
-						Name:      tc.Function.Name,
-						Arguments: tc.Function.Arguments,
+					msg.ToolCalls[i] = aguievents.ToolCall{
+						ID:   tc.ID,
+						Type: "function",
+						Function: aguievents.Function{
+							Name:      tc.Function.Name,
+							Arguments: tc.Function.Arguments,
+						},
 					}
 				}
 			}
@@ -164,17 +172,12 @@ func (p *InMemoryAguiProjection) Apply(ctx context.Context, event core.Event) er
 		}
 
 	case *core.ToolCallExecutedEvent:
-		msg := AguiMessage{
-			ID:        evt.MessageID,
-			Role:      "tool",
-			Content:   evt.ToolResult,
-			AgentName: evt.AgentName,
-			Timestamp: evt.Timestamp,
-			Status:    "complete",
-			ToolCall: &AguiMessageToolResult{
-				ID:     evt.ToolCallID,
-				Result: evt.ToolResult,
-			},
+		toolResult := evt.ToolResult
+		msg := aguievents.Message{
+			ID:         evt.MessageID,
+			Role:       "tool",
+			Content:    &toolResult,
+			ToolCallID: &evt.ToolCallID,
 		}
 		p.addMessage(thread, msg)
 
@@ -208,7 +211,7 @@ func (p *InMemoryAguiProjection) Apply(ctx context.Context, event core.Event) er
 }
 
 // addMessage adds a message to the thread state.
-func (p *InMemoryAguiProjection) addMessage(thread *AguiThreadState, msg AguiMessage) {
+func (p *InMemoryAguiProjection) addMessage(thread *AguiThreadState, msg aguievents.Message) {
 	thread.Messages = append(thread.Messages, msg)
 }
 
@@ -242,7 +245,7 @@ func (p *InMemoryAguiProjection) GetThreadState(threadID string) (*AguiThreadSta
 
 	// Return a copy to prevent external modifications
 	threadCopy := *thread
-	threadCopy.Messages = make([]AguiMessage, len(thread.Messages))
+	threadCopy.Messages = make([]aguievents.Message, len(thread.Messages))
 	copy(threadCopy.Messages, thread.Messages)
 	threadCopy.ToolCalls = make([]AguiToolCall, len(thread.ToolCalls))
 	copy(threadCopy.ToolCalls, thread.ToolCalls)
@@ -265,16 +268,16 @@ func (p *InMemoryAguiProjection) GetActiveRun(threadID string) (*AguiRunState, b
 }
 
 // GetMessages retrieves all UI-formatted messages for a thread.
-func (p *InMemoryAguiProjection) GetMessages(threadID string) []AguiMessage {
+func (p *InMemoryAguiProjection) GetMessages(threadID string) []aguievents.Message {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
 	thread, exists := p.threads[threadID]
 	if !exists {
-		return []AguiMessage{}
+		return []aguievents.Message{}
 	}
 
-	messages := make([]AguiMessage, len(thread.Messages))
+	messages := make([]aguievents.Message, len(thread.Messages))
 	copy(messages, thread.Messages)
 	return messages
 }
@@ -368,7 +371,7 @@ func (p *InMemoryAguiProjection) Clear() {
 
 	p.threads = make(map[string]*AguiThreadState)
 	p.activeRuns = make(map[string]*AguiRunState)
-	p.streamingMessages = make(map[string]*AguiMessage)
+	p.streamingMessages = make(map[string]*aguievents.Message)
 	p.toolCallsByThread = make(map[string]map[string]*AguiToolCall)
 }
 
