@@ -4,9 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
-
 	"school-with-ai/sdk/agentsdk/llm"
+	"strings"
 )
 
 var (

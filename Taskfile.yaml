@@ -55,23 +55,6 @@ tasks:
       - go run ./tools/repo-statistics 10
       - xdg-open /tmp/repo_graph.png 2>/dev/null || open /tmp/repo_graph.png 2>/dev/null || echo "Graph saved at /tmp/repo_graph.png"
 
-  linter-snapshot:
-    desc: Capture linter snapshot and visualize trends
-    cmds:
-      - go run ./tools/linter-viz -s
-      - xdg-open /tmp/linter_stats.png 2>/dev/null || open /tmp/linter_stats.png 2>/dev/null || echo "Graph saved at /tmp/linter_stats.png"
-
-  linter-viz:
-    desc: Visualize linter trends (without taking new snapshot)
-    cmds:
-      - go run ./tools/linter-viz
-      - xdg-open /tmp/linter_stats.png 2>/dev/null || open /tmp/linter_stats.png 2>/dev/null || echo "Graph saved at /tmp/linter_stats.png"
-
-  linter-analyze:
-    desc: Analyze linter data and show detailed trends
-    cmds:
-      - ./tools/linter-viz/analyze.py
-
   ci:
     desc: Run CI checks (format, lint, test, build)
     cmds:

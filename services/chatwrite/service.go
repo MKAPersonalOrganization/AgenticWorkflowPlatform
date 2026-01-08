@@ -5,11 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"iter"
-	"time"
-
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/sdk/agentsdk/llm"
+	"time"
 )
 
 var (
