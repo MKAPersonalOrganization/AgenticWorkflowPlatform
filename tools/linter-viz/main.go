@@ -15,14 +15,14 @@ import (
 )
 
 const (
-	minDataRows                   = 2
-	regexMatchGroups              = 3
-	topLintersCount               = 10
-	normalizationBase             = 100.0
-	changeToleranceLower          = 99.9
-	changeToleranceUpper          = 100.1
-	maxStyleColors                = 10
-	filePermission                = 0o600
+	minDataRows          = 2
+	regexMatchGroups     = 3
+	topLintersCount      = 10
+	normalizationBase    = 100.0
+	changeToleranceLower = 99.9
+	changeToleranceUpper = 100.1
+	maxStyleColors       = 10
+	filePermission       = 0o600
 )
 
 var (
@@ -33,47 +33,47 @@ var (
 // getTrackedLinters returns the fixed list of linters to track (alphabetically sorted).
 func getTrackedLinters() []string {
 	return []string{
-	"bodyclose",
-	"containedctx",
-	"contextcheck",
-	"cyclop",
-	"depguard",
-	"dupl",
-	"err113",
-	"errcheck",
-	"errchkjson",
-	"exhaustive",
-	"exhaustruct",
-	"forbidigo",
-	"forcetypeassert",
-	"funcorder",
-	"funlen",
-	"gochecknoglobals",
-	"gochecknoinits",
-	"gocognit",
-	"goconst",
-	"gocritic",
-	"gocyclo",
-	"godox",
-	"gosec",
-	"ireturn",
-	"lll",
-	"mnd",
-	"modernize",
-	"nestif",
-	"noctx",
-	"noinlineerr",
-	"paralleltest",
-	"revive",
-	"staticcheck",
-	"tagliatelle",
-	"testifylint",
-	"testpackage",
-	"unconvert",
-	"unparam",
-	"usetesting",
-	"varnamelen",
-	"wrapcheck",
+		"bodyclose",
+		"containedctx",
+		"contextcheck",
+		"cyclop",
+		"depguard",
+		"dupl",
+		"err113",
+		"errcheck",
+		"errchkjson",
+		"exhaustive",
+		"exhaustruct",
+		"forbidigo",
+		"forcetypeassert",
+		"funcorder",
+		"funlen",
+		"gochecknoglobals",
+		"gochecknoinits",
+		"gocognit",
+		"goconst",
+		"gocritic",
+		"gocyclo",
+		"godox",
+		"gosec",
+		"ireturn",
+		"lll",
+		"mnd",
+		"modernize",
+		"nestif",
+		"noctx",
+		"noinlineerr",
+		"paralleltest",
+		"revive",
+		"staticcheck",
+		"tagliatelle",
+		"testifylint",
+		"testpackage",
+		"unconvert",
+		"unparam",
+		"usetesting",
+		"varnamelen",
+		"wrapcheck",
 	}
 }
 

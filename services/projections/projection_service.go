@@ -3,6 +3,7 @@ package projections
 import (
 	"errors"
 	"fmt"
+
 	"school-with-ai/domain"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
