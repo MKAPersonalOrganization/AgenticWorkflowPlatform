@@ -20,4 +20,8 @@ type ProjectionService interface {
 	GetWhiteboardContent(threadID string) string
 	// GetThreadHistory retrieves formatted AGUI message history
 	GetThreadHistory(threadID string) (interface{}, error)
+	// GetThread retrieves a thread by ID
+	GetThread(threadID string) (*domain.Thread, bool)
+	// GetAllThreads retrieves all threads
+	GetAllThreads() []domain.Thread
 }

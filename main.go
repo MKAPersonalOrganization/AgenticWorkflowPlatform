@@ -80,7 +80,7 @@ func main() {
 	// Initialize service layer
 	authSvc := authService.NewAuthService()
 	aguiServiceAdapter := agui.NewServiceAdapter(aguiProjection)
-	projectionService := projections.NewProjectionService(aguiServiceAdapter, whiteboardProjection)
+	projectionService := projections.NewProjectionService(aguiServiceAdapter, whiteboardProjection, llmContextProjection)
 
 	// Get Redis address from environment
 	redisAddr := os.Getenv("REDIS_ADDR")
@@ -111,7 +111,7 @@ func main() {
 		"healthCheckInterval", "15s")
 
 	// Create HTTP handler
-	handler := handlers.NewAsynqHandler(eventLog, llmContextProjection, chatClient, asynqServer, chatWriteService, authSvc, projectionService)
+	handler := handlers.NewAsynqHandler(eventLog, chatClient, asynqServer, chatWriteService, authSvc, projectionService)
 
 	// Create chi router
 	r := chi.NewRouter()

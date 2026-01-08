@@ -11,7 +11,6 @@ import (
 	"school-with-ai/domain"
 	"school-with-ai/infra/eventstore"
 	"school-with-ai/infra/projection/agui"
-	"school-with-ai/infra/projection/llmcontext"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/sdk/agentsdk/llm"
 	"school-with-ai/services"
@@ -24,7 +23,6 @@ import (
 
 // AsynqHandler encapsulates dependencies for HTTP handlers using Asynq
 type AsynqHandler struct {
-	state             *llmcontext.InMemoryLLMContextProjection
 	log               *eventstore.ProjectionEventStore
 	chatClient        *llm.OpenAIClient
 	asynqServer       *orchestration.AsynqServer
@@ -36,7 +34,6 @@ type AsynqHandler struct {
 // NewAsynqHandler creates a new HTTP handler with Asynq dependencies
 func NewAsynqHandler(
 	log *eventstore.ProjectionEventStore,
-	state *llmcontext.InMemoryLLMContextProjection,
 	chatClient *llm.OpenAIClient,
 	asynqServer *orchestration.AsynqServer,
 	chatWriteService *chatwrite.ChatWriteService,
@@ -44,7 +41,6 @@ func NewAsynqHandler(
 	projectionService services.ProjectionService,
 ) *AsynqHandler {
 	return &AsynqHandler{
-		state:             state,
 		log:               log,
 		chatClient:        chatClient,
 		asynqServer:       asynqServer,
@@ -380,7 +376,7 @@ func (h *AsynqHandler) GetMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	thread, exists := h.state.Get(threadID)
+	thread, exists := h.projectionService.GetThread(threadID)
 	if !exists {
 		http.Error(w, "Thread not found", http.StatusNotFound)
 		return
@@ -404,7 +400,7 @@ func (h *AsynqHandler) GetThreads(w http.ResponseWriter, r *http.Request) {
 
 	slog.Info("Getting threads for user", "userID", user.ID, "email", user.Email)
 
-	threads := h.state.All()
+	threads := h.projectionService.GetAllThreads()
 
 	// Enrich threads with whiteboard content
 	response := make([]ThreadResponse, len(threads))
