@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	"school-with-ai/infra/eventstore"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/sdk/agentsdk/llm"
 	"school-with-ai/services"
@@ -22,7 +21,6 @@ import (
 
 // AsynqHandler encapsulates dependencies for HTTP handlers using Asynq
 type AsynqHandler struct {
-	log               *eventstore.ProjectionEventStore
 	chatClient        *llm.OpenAIClient
 	asynqServer       *orchestration.AsynqServer
 	chatWriteService  *chatwrite.ChatWriteService
@@ -32,7 +30,6 @@ type AsynqHandler struct {
 
 // NewAsynqHandler creates a new HTTP handler with Asynq dependencies
 func NewAsynqHandler(
-	log *eventstore.ProjectionEventStore,
 	chatClient *llm.OpenAIClient,
 	asynqServer *orchestration.AsynqServer,
 	chatWriteService *chatwrite.ChatWriteService,
@@ -40,7 +37,6 @@ func NewAsynqHandler(
 	projectionService services.ProjectionService,
 ) *AsynqHandler {
 	return &AsynqHandler{
-		log:               log,
 		chatClient:        chatClient,
 		asynqServer:       asynqServer,
 		chatWriteService:  chatWriteService,

@@ -16,6 +16,7 @@ import (
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/infra/projection/llmcontext"
 	"school-with-ai/infra/projection/whiteboard"
+	"school-with-ai/infra/projections"
 	"school-with-ai/sdk/agentsdk/llm"
 	authService "school-with-ai/services/auth"
 	"school-with-ai/services/chatwrite"
@@ -28,7 +29,6 @@ import (
 	"school-with-ai/services/chatwrite/agents/statistics"
 	"school-with-ai/services/chatwrite/agents/studentfacing"
 	"school-with-ai/services/orchestration"
-	"school-with-ai/services/projections"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -110,7 +110,7 @@ func main() {
 		"healthCheckInterval", "15s")
 
 	// Create HTTP handler
-	handler := handlers.NewAsynqHandler(eventLog, chatClient, asynqServer, chatWriteService, authSvc, projectionService)
+	handler := handlers.NewAsynqHandler(chatClient, asynqServer, chatWriteService, authSvc, projectionService)
 
 	// Create chi router
 	r := chi.NewRouter()
