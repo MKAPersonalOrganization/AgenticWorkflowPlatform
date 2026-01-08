@@ -5,16 +5,31 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
+
+	"school-with-ai/infra/projection/whiteboard"
+
+	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
+
+// ThreadSummary represents a summary of a thread for list views
+type ThreadSummary struct {
+	ID                string               `json:"id"`
+	Title             string               `json:"title"`
+	Messages          []aguievents.Message `json:"messages"`
+	CreatedAt         time.Time            `json:"createdAt"`
+	UpdatedAt         time.Time            `json:"updatedAt"`
+	WhiteboardContent string               `json:"whiteboardContent"`
+	CurrentInstructor string               `json:"currentInstructor,omitempty"`
+}
 
 // AguiProjectionHandler provides HTTP endpoints for querying the AGUI projection.
 type AguiProjectionHandler struct {
 	projection      AguiProjection
-	whiteboardStore interface{ Get(threadID string) string }
+	whiteboardStore whiteboard.WhiteboardStore
 }
 
 // NewAguiProjectionHandler creates a new handler for AGUI projection queries.
-func NewAguiProjectionHandler(projection AguiProjection, whiteboardStore interface{ Get(threadID string) string }) *AguiProjectionHandler {
+func NewAguiProjectionHandler(projection AguiProjection, whiteboardStore whiteboard.WhiteboardStore) *AguiProjectionHandler {
 	return &AguiProjectionHandler{
 		projection:      projection,
 		whiteboardStore: whiteboardStore,
@@ -37,22 +52,10 @@ func (h *AguiProjectionHandler) GetThreadState(w http.ResponseWriter, r *http.Re
 	}
 
 	// Add whiteboard content from dedicated projection
-	whiteboardContent := h.whiteboardStore.Get(threadID)
+	state.WhiteboardContent = h.whiteboardStore.Get(threadID)
 
 	w.Header().Set("Content-Type", "application/json")
-	response := map[string]interface{}{
-		"threadId":          state.ThreadID,
-		"title":             state.Title,
-		"messages":          state.Messages,
-		"activeRun":         state.ActiveRun,
-		"toolCalls":         state.ToolCalls,
-		"agentActivity":     state.AgentActivity,
-		"whiteboardContent": whiteboardContent,
-		"createdAt":         state.CreatedAt,
-		"updatedAt":         state.UpdatedAt,
-		"version":           state.Version,
-	}
-	if err := json.NewEncoder(w).Encode(response); err != nil {
+	if err := json.NewEncoder(w).Encode(state); err != nil {
 		slog.Error("Failed to encode thread state", "error", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 	}
@@ -67,12 +70,10 @@ func (h *AguiProjectionHandler) GetMessages(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	projectionMessages := h.projection.GetMessages(threadID)
+	messages := h.projection.GetMessages(threadID)
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]interface{}{
-		"messages": projectionMessages,
-	}); err != nil {
+	if err := json.NewEncoder(w).Encode(messages); err != nil {
 		slog.Error("Failed to encode messages", "error", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 	}
@@ -90,9 +91,7 @@ func (h *AguiProjectionHandler) GetToolCalls(w http.ResponseWriter, r *http.Requ
 	toolCalls := h.projection.GetToolCalls(threadID)
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]interface{}{
-		"toolCalls": toolCalls,
-	}); err != nil {
+	if err := json.NewEncoder(w).Encode(toolCalls); err != nil {
 		slog.Error("Failed to encode tool calls", "error", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 	}
@@ -110,9 +109,7 @@ func (h *AguiProjectionHandler) GetAgentActivity(w http.ResponseWriter, r *http.
 	activity := h.projection.GetAgentActivity(threadID)
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]interface{}{
-		"agentActivity": activity,
-	}); err != nil {
+	if err := json.NewEncoder(w).Encode(activity); err != nil {
 		slog.Error("Failed to encode agent activity", "error", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 	}
@@ -123,8 +120,7 @@ func (h *AguiProjectionHandler) GetAgentActivity(w http.ResponseWriter, r *http.
 func (h *AguiProjectionHandler) ListThreads(w http.ResponseWriter, r *http.Request) {
 	threadIDs := h.projection.ListThreads()
 
-	// Build thread summaries with full state
-	threads := make([]map[string]interface{}, 0, len(threadIDs))
+	threads := make([]ThreadSummary, 0, len(threadIDs))
 	for _, threadID := range threadIDs {
 		state, exists := h.projection.GetThreadState(threadID)
 		if !exists {
@@ -147,14 +143,14 @@ func (h *AguiProjectionHandler) ListThreads(w http.ResponseWriter, r *http.Reque
 			}
 		}
 
-		threads = append(threads, map[string]interface{}{
-			"id":                threadID,
-			"title":             state.Title,
-			"messages":          state.Messages,
-			"createdAt":         state.CreatedAt,
-			"updatedAt":         state.UpdatedAt,
-			"whiteboardContent": whiteboardContent,
-			"currentInstructor": currentInstructor,
+		threads = append(threads, ThreadSummary{
+			ID:                threadID,
+			Title:             state.Title,
+			Messages:          state.Messages,
+			CreatedAt:         state.CreatedAt,
+			UpdatedAt:         state.UpdatedAt,
+			WhiteboardContent: whiteboardContent,
+			CurrentInstructor: currentInstructor,
 		})
 	}
 
@@ -175,21 +171,17 @@ func (h *AguiProjectionHandler) GetActiveRun(w http.ResponseWriter, r *http.Requ
 	}
 
 	run, exists := h.projection.GetActiveRun(threadID)
+
+	w.Header().Set("Content-Type", "application/json")
 	if !exists {
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(map[string]interface{}{
-			"activeRun": nil,
-		}); err != nil {
+		if err := json.NewEncoder(w).Encode(nil); err != nil {
 			slog.Error("Failed to encode null active run", "error", err)
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 		}
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]interface{}{
-		"activeRun": run,
-	}); err != nil {
+	if err := json.NewEncoder(w).Encode(run); err != nil {
 		slog.Error("Failed to encode active run", "error", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 	}
