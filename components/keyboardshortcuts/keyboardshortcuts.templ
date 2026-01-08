@@ -4,7 +4,7 @@ import "school-with-ai/components/dialog"
 
 templ KeyboardShortcuts() {
 	<!-- Keyboard Shortcuts Dialog -->
-	@dialog.Content(dialog.ContentProps{Class: "sm:max-w-2xl"}) {
+	@dialog.Content(dialog.ContentProps{Class: "sm:max-w-2xl", HideCloseButton: true}) {
 		@dialog.Header(dialog.HeaderProps{}) {
 			@dialog.Title(dialog.TitleProps{}) {
 				<div class="flex items-center gap-2">
@@ -140,9 +140,13 @@ templ KeyboardShortcuts() {
 		</div>
 		@dialog.Footer(dialog.FooterProps{}) {
 			<div class="flex justify-end">
-				@dialog.Close(dialog.CloseProps{Class: "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"}) {
+				<button
+					@click="showKeyboardShortcuts = false"
+					class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
+					type="button"
+				>
 					Got it!
-				}
+				</button>
 			</div>
 		}
 	}
