@@ -8,6 +8,7 @@ import (
 )
 
 func TestNewUserFromIdentity(t *testing.T) {
+	t.Parallel()
 	now := time.Now()
 
 	tests := []struct {
@@ -106,6 +107,7 @@ func TestNewUserFromIdentity(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := NewUserFromIdentity(tt.identity)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewUserFromIdentity() error = %v, wantErr %v", err, tt.wantErr)
@@ -144,6 +146,7 @@ func TestNewUserFromIdentity(t *testing.T) {
 }
 
 func TestNewUserFromSession(t *testing.T) {
+	t.Parallel()
 	now := time.Now()
 
 	tests := []struct {
@@ -174,6 +177,7 @@ func TestNewUserFromSession(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := NewUserFromSession(tt.session)
 			if tt.wantNil {
 				if err == nil {
@@ -197,6 +201,7 @@ func TestNewUserFromSession(t *testing.T) {
 }
 
 func TestUser_GetFullName(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		user User
@@ -238,6 +243,7 @@ func TestUser_GetFullName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := tt.user.GetFullName(); got != tt.want {
 				t.Errorf("User.GetFullName() = %v, want %v", got, tt.want)
 			}
@@ -246,6 +252,7 @@ func TestUser_GetFullName(t *testing.T) {
 }
 
 func TestUser_GetDisplayName(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		user User
@@ -271,6 +278,7 @@ func TestUser_GetDisplayName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := tt.user.GetDisplayName(); got != tt.want {
 				t.Errorf("User.GetDisplayName() = %v, want %v", got, tt.want)
 			}
@@ -279,6 +287,7 @@ func TestUser_GetDisplayName(t *testing.T) {
 }
 
 func TestUser_HasName(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		user User
@@ -308,6 +317,7 @@ func TestUser_HasName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := tt.user.HasName(); got != tt.want {
 				t.Errorf("User.HasName() = %v, want %v", got, tt.want)
 			}
@@ -316,6 +326,7 @@ func TestUser_HasName(t *testing.T) {
 }
 
 func TestUser_IsComplete(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		user User
@@ -362,6 +373,7 @@ func TestUser_IsComplete(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := tt.user.IsComplete(); got != tt.want {
 				t.Errorf("User.IsComplete() = %v, want %v", got, tt.want)
 			}
@@ -370,6 +382,7 @@ func TestUser_IsComplete(t *testing.T) {
 }
 
 func TestUser_IsEmailVerified(t *testing.T) {
+	t.Parallel()
 	// Test default behavior (returns false for now)
 	user := User{Email: "test@example.com"}
 	if got := user.IsEmailVerified(); got != false {
