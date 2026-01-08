@@ -117,8 +117,8 @@ func TestVectorOperationsTool_Dot(t *testing.T) {
 
 			var response map[string]any
 			if err := json.Unmarshal([]byte(result), &response); err != nil {
-		t.Fatalf("failed to unmarshal response: %v", err)
-	}
+				t.Fatalf("failed to unmarshal response: %v", err)
+			}
 
 			actual := response["result"].(float64)
 			if math.Abs(actual-tt.expected) > 1e-10 {
@@ -167,8 +167,8 @@ func TestVectorOperationsTool_Cross(t *testing.T) {
 
 			var response map[string]any
 			if err := json.Unmarshal([]byte(result), &response); err != nil {
-		t.Fatalf("failed to unmarshal response: %v", err)
-	}
+				t.Fatalf("failed to unmarshal response: %v", err)
+			}
 
 			resultVec := response["result"].([]interface{})
 			for i, exp := range tt.expected {
@@ -221,8 +221,8 @@ func TestVectorOperationsTool_Norm(t *testing.T) {
 
 			var response map[string]any
 			if err := json.Unmarshal([]byte(result), &response); err != nil {
-		t.Fatalf("failed to unmarshal response: %v", err)
-	}
+				t.Fatalf("failed to unmarshal response: %v", err)
+			}
 
 			actual := response["result"].(float64)
 			if math.Abs(actual-tt.expected) > 1e-10 {
