@@ -170,7 +170,7 @@ func (t *MatrixOperationsTool) Invoke(ctx context.Context, arguments string) (st
 			return "", errors.New("trace requires square matrix")
 		}
 		var trace float64
-		for i := 0; i < len(args.Matrix); i++ {
+		for i := range len(args.Matrix) {
 			trace += args.Matrix[i][i]
 		}
 		result = trace
