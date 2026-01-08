@@ -186,6 +186,7 @@ func main() {
 	r.Get("/api/agui/threads/{threadId}/tool-calls", authMiddleware.RequireAuthFunc(aguiHandler.GetToolCalls))
 	r.Get("/api/agui/threads/{threadId}/agent-activity", authMiddleware.RequireAuthFunc(aguiHandler.GetAgentActivity))
 	r.Get("/api/agui/threads/{threadId}/active-run", authMiddleware.RequireAuthFunc(aguiHandler.GetActiveRun))
+	r.Delete("/api/agui/threads/{threadId}", authMiddleware.RequireAuthFunc(handler.DeleteThread))
 
 	// Home route
 	r.Get("/", authMiddleware.RequireAuthFunc(HandleViewChatInputScreen))
