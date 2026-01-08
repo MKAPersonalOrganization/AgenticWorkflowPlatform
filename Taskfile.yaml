@@ -56,8 +56,10 @@ tasks:
       - xdg-open /tmp/repo_graph.png 2>/dev/null || open /tmp/repo_graph.png 2>/dev/null || echo "Graph saved at /tmp/repo_graph.png"
 
   ci:
-    desc: Run CI checks (lint, test, build)
+    desc: Run CI checks (format, lint, test, build)
     cmds:
+      - find . -name "*.go" -not -path "./.READ/*" -not -path "*/testdata/*" -not -path "./bin/*" -not -path "./components/*" -exec gofmt -w {} +
+      - find . -name "*.go" -not -path "./.READ/*" -not -path "*/testdata/*" -not -path "./bin/*" -not -path "./components/*" -exec gofumpt -w {} +
       - golangci-lint run ./...
       - go test -race -v ./...
       - go build -o bin/app ./main.go
