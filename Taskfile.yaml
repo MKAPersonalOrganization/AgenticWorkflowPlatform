@@ -35,7 +35,7 @@ tasks:
   run: "wgo -file=.go -file=.templ -xfile=_templ.go  go tool templ generate :: go run main.go"
 
   up:
-    desc: Start docker compose services (Redis, Asynqmon, Kratos, Postgres, MailSlurper)
+    desc: Start docker compose services (Redis, Asynqmon, Kratos, Postgres, MailSlurper, KurrentDB)
     cmds:
       - docker compose up -d
 

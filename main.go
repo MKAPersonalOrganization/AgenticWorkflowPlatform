@@ -13,6 +13,7 @@ import (
 	"school-with-ai/handlers"
 	"school-with-ai/infra/auth"
 	"school-with-ai/infra/eventstore"
+	"school-with-ai/infra/eventstore/kurrentdb"
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/infra/projection/llmcontext"
 	"school-with-ai/infra/projection/whiteboard"
@@ -48,8 +49,19 @@ func main() {
 
 	slog.Info("Starting server with Asynq", "host", host, "port", port)
 
-	// Initialize EventStore and LLMContextProjection (event sourcing architecture)
-	baseEventStore := eventstore.NewInMemoryEventStore()
+	// Initialize KurrentDB EventStore (production-ready, PostgreSQL-backed)
+	kurrentDBConnectionString := os.Getenv("KURRENTDB_CONNECTION_STRING")
+	if kurrentDBConnectionString == "" {
+		kurrentDBConnectionString = "esdb://localhost:2113?tls=false"
+		slog.Info("Using default KurrentDB connection string", "connectionString", kurrentDBConnectionString)
+	}
+
+	baseEventStore, err := kurrentdb.NewKurrentDBEventStore(kurrentDBConnectionString)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create KurrentDB event store: %v", err))
+	}
+	defer baseEventStore.Close()
+
 	llmContextProjection := llmcontext.NewInMemoryLLMContextProjection()
 
 	// Initialize AGUI projection (reads from event store)
