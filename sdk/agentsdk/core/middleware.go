@@ -57,11 +57,11 @@ type RequestContext struct {
 
 	// State is a key-value store for sharing data between middleware
 	// Middleware can use this to store and retrieve arbitrary data
-	State map[string]interface{}
+	State map[string]any
 
 	// Result contains the execution result after the base handler runs
 	// For LLM calls, this will be the chat response
-	Result interface{}
+	Result any
 
 	// Terminate indicates whether to stop execution after current middleware
 	// When true, the middleware chain will not continue
@@ -84,7 +84,7 @@ func NewRequestContext(threadID string, messages []llm.ChatMessage, systemPrompt
 		SystemPrompt:          systemPrompt,
 		Tools:                 tools,
 		Config:                config,
-		State:                 make(map[string]interface{}),
+		State:                 make(map[string]any),
 		AdditionalTools:       []Tool{},
 		SystemPromptAdditions: []string{},
 		Terminate:             false,
@@ -93,7 +93,7 @@ func NewRequestContext(threadID string, messages []llm.ChatMessage, systemPrompt
 
 // WithMetadata adds a key-value pair to the context state.
 // This is useful for middleware to share information.
-func (rc *RequestContext) WithMetadata(key string, value interface{}) *RequestContext {
+func (rc *RequestContext) WithMetadata(key string, value any) *RequestContext {
 	rc.State[key] = value
 
 	return rc
@@ -101,7 +101,7 @@ func (rc *RequestContext) WithMetadata(key string, value interface{}) *RequestCo
 
 // GetMetadata retrieves a value from the context state.
 // Returns the value and a boolean indicating if the key exists.
-func (rc *RequestContext) GetMetadata(key string) (interface{}, bool) {
+func (rc *RequestContext) GetMetadata(key string) (any, bool) {
 	val, ok := rc.State[key]
 
 	return val, ok
@@ -196,7 +196,7 @@ func WithTools(tools []Tool) ContextOption {
 }
 
 // WithResult sets the result in the context.
-func WithResult(result interface{}) ContextOption {
+func WithResult(result any) ContextOption {
 	return func(rc *RequestContext) {
 		rc.Result = result
 	}
@@ -312,7 +312,7 @@ func ErrorHandler(err error) NextHandler {
 
 // ResultHandler creates a NextHandler that sets a result in the context.
 // Useful for testing middleware that inspects results.
-func ResultHandler(result interface{}) NextHandler {
+func ResultHandler(result any) NextHandler {
 	return func(ctx context.Context, reqCtx *RequestContext) error {
 		reqCtx.Result = result
 
