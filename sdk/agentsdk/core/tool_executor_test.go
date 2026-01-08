@@ -11,9 +11,7 @@ import (
 	"testing"
 )
 
-var (
-	errTestToolNotFound = errors.New("tool not found")
-)
+var errTestToolNotFound = errors.New("tool not found")
 
 // MockToolExecutor is a test double for ToolExecutor.
 type MockToolExecutor struct {

@@ -1,11 +1,14 @@
 package projections
 
 import (
+	"errors"
 	"fmt"
 	"school-with-ai/domain"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
+
+var ErrThreadNotFound = errors.New("thread not found")
 
 // WhiteboardReader provides read access to whiteboard content.
 type WhiteboardReader interface {
@@ -53,7 +56,7 @@ func (s *projectionService) GetWhiteboardContent(threadID string) string {
 func (s *projectionService) GetThreadHistory(threadID string) (any, error) {
 	state, exists := s.aguiProjection.GetThreadState(threadID)
 	if !exists {
-		return nil, fmt.Errorf("thread not found: %s", threadID)
+		return nil, fmt.Errorf("%w: %s", ErrThreadNotFound, threadID)
 	}
 
 	return state, nil

@@ -9,10 +9,8 @@ import (
 	"github.com/google/uuid"
 )
 
-var (
-	// ErrEmptyThreadState is returned when attempting to deserialize empty thread state.
-	ErrEmptyThreadState = errors.New("serialized thread state is empty")
-)
+// ErrEmptyThreadState is returned when attempting to deserialize empty thread state.
+var ErrEmptyThreadState = errors.New("serialized thread state is empty")
 
 // InMemoryThread provides an abstract base for agent threads that maintain
 // all conversation state in local memory.
@@ -100,7 +98,8 @@ func (t *InMemoryThread) GetMessages() []domain.Message {
 
 // AddMessages adds new messages to the thread.
 func (t *InMemoryThread) AddMessages(messages []domain.Message) error {
-	if err := t.messageStore.AddMessages(messages); err != nil {
+	err := t.messageStore.AddMessages(messages)
+	if err != nil {
 		return fmt.Errorf("failed to add messages to thread: %w", err)
 	}
 

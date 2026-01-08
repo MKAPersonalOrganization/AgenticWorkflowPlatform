@@ -8,16 +8,16 @@ import (
 	client "github.com/ory/client-go"
 )
 
-// Test error sentinels for testing error handling
+// Test error sentinels for testing error handling.
 var (
-	errTest410FlowExpired        = errors.New("410 Gone: flow expired")
-	errTest404NotFound           = errors.New("404 Not Found")
-	errTestFlowExpired           = errors.New("flow expired")
-	errTestFlowNotFound          = errors.New("flow not found")
-	errTestNetworkError          = errors.New("network error")
-	errTestSessionAAL2Required   = errors.New("session_aal2_required")
-	errTestAAL2Required          = errors.New("authentication level aal2 required")
-	errTestInvalidCredentials    = errors.New("invalid credentials")
+	errTest410FlowExpired      = errors.New("410 Gone: flow expired")
+	errTest404NotFound         = errors.New("404 Not Found")
+	errTestFlowExpired         = errors.New("flow expired")
+	errTestFlowNotFound        = errors.New("flow not found")
+	errTestNetworkError        = errors.New("network error")
+	errTestSessionAAL2Required = errors.New("session_aal2_required")
+	errTestAAL2Required        = errors.New("authentication level aal2 required")
+	errTestInvalidCredentials  = errors.New("invalid credentials")
 )
 
 func TestInitFlowURL(t *testing.T) {

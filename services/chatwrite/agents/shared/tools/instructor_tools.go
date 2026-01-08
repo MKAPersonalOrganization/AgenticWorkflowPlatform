@@ -3,7 +3,13 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+)
+
+var (
+	ErrInvalidAction         = errors.New("invalid action")
+	ErrUnknownInstructorTool = errors.New("unknown instructor tool")
 )
 
 // WriteWhiteboardInput is the input for writing to the shared whiteboard.
@@ -65,7 +71,7 @@ func WriteWhiteboard(input string) (string, error) {
 	}
 
 	if !validActions[params.Action] {
-		return "", fmt.Errorf("invalid action: %s (must be write, append, or clear)", params.Action)
+		return "", fmt.Errorf("%w: %s (must be write, append, or clear)", ErrInvalidAction, params.Action)
 	}
 
 	// Return confirmation
@@ -78,6 +84,6 @@ func ExecuteInstructorTool(name string, arguments string) (string, error) {
 	case "write_whiteboard":
 		return WriteWhiteboard(arguments)
 	default:
-		return "", fmt.Errorf("unknown instructor tool: %s", name)
+		return "", fmt.Errorf("%w: %s", ErrUnknownInstructorTool, name)
 	}
 }

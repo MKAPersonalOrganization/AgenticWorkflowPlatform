@@ -12,6 +12,13 @@ import (
 	"github.com/hibiken/asynq"
 )
 
+var (
+	// ErrRedisHealthCheckFailed is returned when Redis health check fails.
+	ErrRedisHealthCheckFailed = errors.New("Redis health check failed")
+	// ErrTaskNotFound is returned when trying to cancel a task that is not found or already completed.
+	ErrTaskNotFound = errors.New("failed to cancel task: task not found or already completed")
+)
+
 // AsynqServer wraps Asynq server and client for chat task processing.
 type AsynqServer struct {
 	server             *asynq.Server
@@ -208,7 +215,7 @@ func (s *AsynqServer) CancelTask(jobID string) error {
 			"error", err,
 			"note", "Task may have already completed or doesn't exist")
 
-		return errors.New("failed to cancel task: task not found or already completed")
+		return ErrTaskNotFound
 	}
 
 	slog.Info("Sent cancellation signal to active task", "jobID", jobID)

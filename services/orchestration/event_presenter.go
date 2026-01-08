@@ -56,7 +56,8 @@ func (n *UINotifier) emitTextMessageStart(evt *core.AssistantMessageStartedEvent
 		aguievents.WithRole("assistant"),
 	)
 
-	if err := n.emitter.Emit(uiEvent); err != nil {
+	err := n.emitter.Emit(uiEvent)
+	if err != nil {
 		return fmt.Errorf("failed to emit text message start event: %w", err)
 	}
 
@@ -69,7 +70,8 @@ func (n *UINotifier) emitTextMessageContent(evt *core.AssistantContentStreamedEv
 		evt.Delta,
 	)
 
-	if err := n.emitter.Emit(uiEvent); err != nil {
+	err := n.emitter.Emit(uiEvent)
+	if err != nil {
 		return fmt.Errorf("failed to emit text message content event: %w", err)
 	}
 
@@ -110,7 +112,8 @@ func (n *UINotifier) emitToolCallArgs(evt *core.ToolCallArgumentsStreamedEvent) 
 		evt.Delta,
 	)
 
-	if err := n.emitter.Emit(uiEvent); err != nil {
+	err := n.emitter.Emit(uiEvent)
+	if err != nil {
 		return fmt.Errorf("failed to emit tool call args event: %w", err)
 	}
 
@@ -122,7 +125,8 @@ func (n *UINotifier) emitToolCallEnd(evt *core.ToolCallCompletedEvent) error {
 		evt.ToolCallID,
 	)
 
-	if err := n.emitter.Emit(uiEvent); err != nil {
+	err := n.emitter.Emit(uiEvent)
+	if err != nil {
 		return fmt.Errorf("failed to emit tool call end event: %w", err)
 	}
 
@@ -134,7 +138,8 @@ func (n *UINotifier) emitTextMessageEnd(evt *core.AssistantMessageCompletedEvent
 		evt.MessageID,
 	)
 
-	if err := n.emitter.Emit(uiEvent); err != nil {
+	err := n.emitter.Emit(uiEvent)
+	if err != nil {
 		return fmt.Errorf("failed to emit text message end event: %w", err)
 	}
 
@@ -148,7 +153,8 @@ func (n *UINotifier) emitToolCallResult(evt *core.ToolCallExecutedEvent) error {
 		evt.ToolResult,
 	)
 
-	if err := n.emitter.Emit(uiEvent); err != nil {
+	err := n.emitter.Emit(uiEvent)
+	if err != nil {
 		return fmt.Errorf("failed to emit tool call result event: %w", err)
 	}
 

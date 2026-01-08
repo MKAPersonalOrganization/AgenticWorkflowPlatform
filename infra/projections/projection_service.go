@@ -10,10 +10,8 @@ import (
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
 
-var (
-	// ErrThreadNotFound is returned when a thread is not found in the projection.
-	ErrThreadNotFound = errors.New("thread not found")
-)
+// ErrThreadNotFound is returned when a thread is not found in the projection.
+var ErrThreadNotFound = errors.New("thread not found")
 
 // LLMContextProjection defines the interface for LLM context projections.
 type LLMContextProjection interface {

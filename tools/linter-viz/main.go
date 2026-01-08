@@ -3,8 +3,10 @@ package main
 import (
 	"bufio"
 	"encoding/csv"
+	"errors"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"regexp"
@@ -12,8 +14,25 @@ import (
 	"strings"
 )
 
-// Fixed list of linters to track (alphabetically sorted)
-var trackedLinters = []string{
+const (
+	minDataRows                   = 2
+	regexMatchGroups              = 3
+	topLintersCount               = 10
+	normalizationBase             = 100.0
+	changeToleranceLower          = 99.9
+	changeToleranceUpper          = 100.1
+	maxStyleColors                = 10
+	filePermission                = 0o600
+)
+
+var (
+	ErrNoDataToPlot         = errors.New("need at least header and one data row")
+	ErrNoLintersWithChanges = errors.New("no linters with changes to plot")
+)
+
+// getTrackedLinters returns the fixed list of linters to track (alphabetically sorted).
+func getTrackedLinters() []string {
+	return []string{
 	"bodyclose",
 	"containedctx",
 	"contextcheck",
@@ -55,6 +74,7 @@ var trackedLinters = []string{
 	"usetesting",
 	"varnamelen",
 	"wrapcheck",
+	}
 }
 
 func main() {
@@ -65,22 +85,24 @@ func main() {
 	csvPath := "linter.csv"
 
 	if *snapshot || *snapshotShort {
-		fmt.Println("Running golangci-lint to capture snapshot...")
-		if err := captureSnapshot(csvPath); err != nil {
+		log.Println("Running golangci-lint to capture snapshot...")
+		err := captureSnapshot(csvPath)
+		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error capturing snapshot: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Println("Snapshot added to", csvPath)
+		log.Println("Snapshot added to", csvPath)
 	}
 
 	// Generate visualization
-	fmt.Println("Generating visualization...")
-	if err := visualize(csvPath); err != nil {
+	log.Println("Generating visualization...")
+	err := visualize(csvPath)
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error generating visualization: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Println("Visualization saved to /tmp/linter_stats.png")
+	log.Println("Visualization saved to /tmp/linter_stats.png")
 }
 
 func captureSnapshot(csvPath string) error {
@@ -92,12 +114,12 @@ func captureSnapshot(csvPath string) error {
 	counts := parseLinterOutput(string(output))
 
 	// Read existing CSV
-	file, err := os.Open(csvPath)
+	file, err := os.Open(csvPath) //nolint:gosec // csvPath is controlled by application
 	if err != nil {
 		// If CSV doesn't exist, create it with headers
 		return initializeCSV(csvPath, counts)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	reader := csv.NewReader(file)
 	records, err := reader.ReadAll()
@@ -107,10 +129,12 @@ func captureSnapshot(csvPath string) error {
 
 	if len(records) == 0 {
 		// Empty CSV, initialize it
-		file.Close()
+		_ = file.Close()
+
 		return initializeCSV(csvPath, counts)
 	}
 
+	trackedLinters := getTrackedLinters()
 	// Build new row based on fixed linter list
 	newRow := make([]string, len(trackedLinters))
 	for i, linter := range trackedLinters {
@@ -125,12 +149,12 @@ func captureSnapshot(csvPath string) error {
 	records = append(records, newRow)
 
 	// Write back to CSV
-	file.Close()
-	outFile, err := os.Create(csvPath)
+	_ = file.Close()
+	outFile, err := os.Create(csvPath) //nolint:gosec // csvPath is controlled by application
 	if err != nil {
 		return fmt.Errorf("failed to create CSV: %w", err)
 	}
-	defer outFile.Close()
+	defer func() { _ = outFile.Close() }()
 
 	writer := csv.NewWriter(outFile)
 	if err := writer.WriteAll(records); err != nil {
@@ -142,6 +166,7 @@ func captureSnapshot(csvPath string) error {
 }
 
 func initializeCSV(csvPath string, counts map[string]int) error {
+	trackedLinters := getTrackedLinters()
 	// Create new CSV with headers and first data row
 	records := [][]string{
 		trackedLinters, // Header row
@@ -159,11 +184,11 @@ func initializeCSV(csvPath string, counts map[string]int) error {
 	records = append(records, dataRow)
 
 	// Write to CSV
-	outFile, err := os.Create(csvPath)
+	outFile, err := os.Create(csvPath) //nolint:gosec // csvPath is controlled by application
 	if err != nil {
 		return fmt.Errorf("failed to create CSV: %w", err)
 	}
-	defer outFile.Close()
+	defer func() { _ = outFile.Close() }()
 
 	writer := csv.NewWriter(outFile)
 	if err := writer.WriteAll(records); err != nil {
@@ -185,7 +210,7 @@ func parseLinterOutput(output string) map[string]int {
 	for scanner.Scan() {
 		line := scanner.Text()
 		matches := re.FindStringSubmatch(line)
-		if len(matches) == 3 {
+		if len(matches) == regexMatchGroups {
 			linter := matches[1]
 			count, _ := strconv.Atoi(matches[2])
 			counts[linter] = count
@@ -197,11 +222,11 @@ func parseLinterOutput(output string) map[string]int {
 
 func visualize(csvPath string) error {
 	// Read CSV
-	file, err := os.Open(csvPath)
+	file, err := os.Open(csvPath) //nolint:gosec // csvPath is controlled by application
 	if err != nil {
 		return fmt.Errorf("failed to open CSV: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	reader := csv.NewReader(file)
 	records, err := reader.ReadAll()
@@ -209,8 +234,8 @@ func visualize(csvPath string) error {
 		return fmt.Errorf("failed to read CSV: %w", err)
 	}
 
-	if len(records) < 2 {
-		return fmt.Errorf("need at least header and one data row")
+	if len(records) < minDataRows {
+		return ErrNoDataToPlot
 	}
 
 	headers := records[0]
@@ -258,7 +283,7 @@ func getTopLinters(headers []string, dataRows [][]string) []string {
 	}
 
 	// Sort by count descending
-	for i := 0; i < len(linters)-1; i++ {
+	for i := range len(linters) - 1 {
 		for j := i + 1; j < len(linters); j++ {
 			if linters[j].count > linters[i].count {
 				linters[i], linters[j] = linters[j], linters[i]
@@ -267,21 +292,18 @@ func getTopLinters(headers []string, dataRows [][]string) []string {
 	}
 
 	// Take top 10
-	top := 10
-	if len(linters) < top {
-		top = len(linters)
-	}
+	top := min(len(linters), topLintersCount)
 
 	result := make([]string, top)
-	for i := 0; i < top; i++ {
+	for i := range top {
 		result[i] = linters[i].name
 	}
 
 	return result
 }
 
-func generateGnuplotScript(headers []string, dataRows [][]string, topLinters []string) error {
-	script := `
+func buildGnuplotHeader() string {
+	return `
 set terminal pngcairo size 1600,1000 enhanced font 'Arial,11' background rgb 'white'
 set output '/tmp/linter_stats.png'
 
@@ -328,100 +350,116 @@ set tmargin 3
 set bmargin 4
 
 `
+}
 
-	// Build plot command
-	var plotLines []string
-	for _, linter := range topLinters {
-		// Find column index for this linter
-		colIdx := -1
-		for i, h := range headers {
-			if h == linter {
-				colIdx = i + 1 // gnuplot columns are 1-indexed
-				break
-			}
-		}
+type linterData struct {
+	name   string
+	points []float64
+}
 
-		if colIdx > 0 {
-			plotLines = append(plotLines, fmt.Sprintf("'-' using 1:2 with linespoints title '%s'", linter))
-		}
-	}
-
-	// Pre-calculate normalized data and filter out linters with no change
-	type linterData struct {
-		name   string
-		points []float64
-	}
+func normalizeData(headers []string, dataRows [][]string, topLinters []string) ([]linterData, error) {
 	var validLinters []linterData
 
 	for _, linter := range topLinters {
-		// Find column index for this linter
-		colIdx := -1
-		for i, h := range headers {
-			if h == linter {
-				colIdx = i
-				break
-			}
-		}
-
-		if colIdx < 0 {
+		normalized, err := normalizeLinterData(linter, headers, dataRows)
+		if err != nil {
 			continue
 		}
-
-		// Get first value for normalization (baseline)
-		firstVal := 0.0
-		if colIdx < len(dataRows[0]) {
-			firstVal, _ = strconv.ParseFloat(dataRows[0][colIdx], 64)
-		}
-
-		// If first value is 0, we can't normalize - skip this linter
-		if firstVal == 0 {
-			continue
-		}
-
-		// Calculate normalized data points
-		var points []float64
-		hasChange := false
-		for _, row := range dataRows {
-			currentVal := 0.0
-			if colIdx < len(row) {
-				currentVal, _ = strconv.ParseFloat(row[colIdx], 64)
-			}
-			normalizedVal := (currentVal / firstVal) * 100.0
-			points = append(points, normalizedVal)
-
-			// Check if value differs from 100% (with small tolerance for floating point)
-			if normalizedVal < 99.9 || normalizedVal > 100.1 {
-				hasChange = true
-			}
-		}
-
-		// Only include linters that have changed
-		if hasChange {
-			validLinters = append(validLinters, linterData{name: linter, points: points})
+		if normalized != nil {
+			validLinters = append(validLinters, *normalized)
 		}
 	}
 
-	// Build plot command with only valid linters
-	plotLines = nil
+	if len(validLinters) == 0 {
+		return nil, ErrNoLintersWithChanges
+	}
+
+	return validLinters, nil
+}
+
+func normalizeLinterData(linter string, headers []string, dataRows [][]string) (*linterData, error) {
+	// Find column index for this linter
+	colIdx := -1
+	for i, h := range headers {
+		if h == linter {
+			colIdx = i
+			break
+		}
+	}
+
+	if colIdx < 0 {
+		return nil, fmt.Errorf("linter not found")
+	}
+
+	// Get first value for normalization (baseline)
+	firstVal := 0.0
+	if colIdx < len(dataRows[0]) {
+		firstVal, _ = strconv.ParseFloat(dataRows[0][colIdx], 64)
+	}
+
+	// If first value is 0, we can't normalize - skip this linter
+	if firstVal == 0 {
+		return nil, fmt.Errorf("cannot normalize zero baseline")
+	}
+
+	// Calculate normalized data points
+	var points []float64
+	hasChange := false
+	for _, row := range dataRows {
+		currentVal := 0.0
+		if colIdx < len(row) {
+			currentVal, _ = strconv.ParseFloat(row[colIdx], 64)
+		}
+		normalizedVal := (currentVal / firstVal) * normalizationBase
+		points = append(points, normalizedVal)
+
+		// Check if value differs from 100% (with small tolerance for floating point)
+		if normalizedVal < changeToleranceLower || normalizedVal > changeToleranceUpper {
+			hasChange = true
+		}
+	}
+
+	// Only include linters that have changed
+	if !hasChange {
+		return nil, nil
+	}
+
+	return &linterData{name: linter, points: points}, nil
+}
+
+func buildPlotCommand(validLinters []linterData) string {
+	var plotLines []string
 	for i, ld := range validLinters {
-		styleNum := (i % 10) + 1
+		styleNum := (i % maxStyleColors) + 1
 		plotLines = append(plotLines, fmt.Sprintf("'-' using 1:2 with linespoints ls %d title '%s'", styleNum, ld.name))
 	}
+	return "plot " + strings.Join(plotLines, ", \\\n     ") + "\n\n"
+}
 
-	if len(plotLines) == 0 {
-		return fmt.Errorf("no linters with changes to plot")
-	}
-
-	script += "plot " + strings.Join(plotLines, ", \\\n     ") + "\n\n"
-
-	// Add normalized data for valid linters
+func buildDataSection(validLinters []linterData) string {
+	var builder strings.Builder
 	for _, ld := range validLinters {
 		for i, val := range ld.points {
 			snapshot := i + 1
-			script += fmt.Sprintf("%d %.2f\n", snapshot, val)
+			builder.WriteString(fmt.Sprintf("%d %.2f\n", snapshot, val))
 		}
-		script += "e\n"
+		builder.WriteString("e\n")
+	}
+	return builder.String()
+}
+
+func generateGnuplotScript(headers []string, dataRows [][]string, topLinters []string) error {
+	script := buildGnuplotHeader()
+
+	// Pre-calculate normalized data and filter out linters with no change
+	validLinters, err := normalizeData(headers, dataRows, topLinters)
+	if err != nil {
+		return err
 	}
 
-	return os.WriteFile("/tmp/linter_stats.gnuplot", []byte(script), 0o600)
+	// Build plot command and data sections
+	script += buildPlotCommand(validLinters)
+	script += buildDataSection(validLinters)
+
+	return os.WriteFile("/tmp/linter_stats.gnuplot", []byte(script), filePermission) //nolint:gosec // temp file path is intentional
 }

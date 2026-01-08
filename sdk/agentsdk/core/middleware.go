@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	// ErrNoEventNotifier is returned when attempting to emit an event without a configured notifier.
-	ErrNoEventNotifier = errors.New("no event notifier configured")
+	ErrNoEventNotifier     = errors.New("no event notifier configured")
+	ErrEventEmissionFailed = errors.New("failed to handle domain event")
 )
 
 // Middleware provides a way to intercept and modify agent execution.
@@ -141,8 +141,9 @@ func (rc *RequestContext) EmitEvent(event Event) error {
 		return ErrNoEventNotifier
 	}
 
-	if err := rc.Config.Notifier.HandleDomainEvent(event); err != nil {
-		return fmt.Errorf("failed to handle domain event: %w", err)
+	err := rc.Config.Notifier.HandleDomainEvent(event)
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrEventEmissionFailed, err)
 	}
 
 	return nil

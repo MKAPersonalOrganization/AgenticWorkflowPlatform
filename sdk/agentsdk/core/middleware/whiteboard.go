@@ -8,10 +8,8 @@ import (
 	"school-with-ai/sdk/agentsdk/core"
 )
 
-var (
-	// ErrInvalidWhiteboardAction is returned when an invalid whiteboard action is provided.
-	ErrInvalidWhiteboardAction = errors.New("invalid action (must be write, append, or clear)")
-)
+// ErrInvalidWhiteboardAction is returned when an invalid whiteboard action is provided.
+var ErrInvalidWhiteboardAction = errors.New("invalid action (must be write, append, or clear)")
 
 // WhiteboardAction represents the type of whiteboard update.
 type WhiteboardAction string
