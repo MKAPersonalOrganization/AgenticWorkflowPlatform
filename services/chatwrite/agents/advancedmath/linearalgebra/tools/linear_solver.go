@@ -66,10 +66,10 @@ func (t *LinearSolverTool) Invoke(ctx context.Context, arguments string) (string
 	// Validate dimensions
 	n := len(args.A)
 	if n == 0 || len(args.A[0]) != n {
-		return "", fmt.Errorf("A must be a square matrix")
+		return "", fmt.Errorf("matrix A must be a square matrix")
 	}
 	if len(args.B) != n {
-		return "", fmt.Errorf("b must have same length as A rows")
+		return "", fmt.Errorf("vector b must have same length as A rows")
 	}
 
 	var x []float64

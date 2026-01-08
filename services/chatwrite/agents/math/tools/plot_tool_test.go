@@ -172,7 +172,11 @@ splot x**2 + y**2 with lines`
 	}
 
 	imagePath := response["image_path"].(string)
-	defer os.Remove(imagePath)
+	defer func() {
+		if err := os.Remove(imagePath); err != nil {
+			t.Logf("Failed to remove test image: %v", err)
+		}
+	}()
 	t.Logf("3D surface plot created: %s", response["image_url"])
 }
 

@@ -15,10 +15,10 @@ import (
 
 func TestMain(m *testing.M) {
 	// Set required env vars for all tests
-	os.Setenv("KRATOS_PUBLIC_URL", "http://127.0.0.1:4433")
-	os.Setenv("KRATOS_ADMIN_URL", "http://127.0.0.1:4434")
-	os.Setenv("KRATOS_BROWSER_URL", "http://127.0.0.1:4433")
-	os.Setenv("APP_URL", "http://127.0.0.1:8090")
+	_ = os.Setenv("KRATOS_PUBLIC_URL", "http://127.0.0.1:4433")
+	_ = os.Setenv("KRATOS_ADMIN_URL", "http://127.0.0.1:4434")
+	_ = os.Setenv("KRATOS_BROWSER_URL", "http://127.0.0.1:4433")
+	_ = os.Setenv("APP_URL", "http://127.0.0.1:8090")
 	os.Exit(m.Run())
 }
 
@@ -79,10 +79,10 @@ func TestMiddleware_RequireAuth_ValidSession(t *testing.T) {
 	}
 
 	// Set up environment (all required)
-	os.Setenv("KRATOS_PUBLIC_URL", "http://127.0.0.1:4433")
-	os.Setenv("KRATOS_ADMIN_URL", "http://127.0.0.1:4434")
-	os.Setenv("KRATOS_BROWSER_URL", "http://127.0.0.1:4433")
-	os.Setenv("APP_URL", "http://127.0.0.1:8090")
+	_ = os.Setenv("KRATOS_PUBLIC_URL", "http://127.0.0.1:4433")
+	_ = os.Setenv("KRATOS_ADMIN_URL", "http://127.0.0.1:4434")
+	_ = os.Setenv("KRATOS_BROWSER_URL", "http://127.0.0.1:4433")
+	_ = os.Setenv("APP_URL", "http://127.0.0.1:8090")
 
 	kratosClient := NewKratosClient()
 	middleware := NewMiddleware(kratosClient)

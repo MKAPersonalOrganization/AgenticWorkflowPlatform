@@ -1,6 +1,7 @@
 package orchestration
 
 import (
+	"log/slog"
 	"time"
 
 	"github.com/hibiken/asynq"
@@ -33,7 +34,11 @@ func (s *AsynqServer) GetMetrics() (*ServerMetrics, error) {
 	inspector := asynq.NewInspector(asynq.RedisClientOpt{
 		Addr: s.redisAddr,
 	})
-	defer inspector.Close()
+	defer func() {
+		if err := inspector.Close(); err != nil {
+			slog.Warn("Failed to close inspector", "error", err)
+		}
+	}()
 
 	// Get queue stats
 	stats, err := inspector.GetQueueInfo("default")

@@ -14,9 +14,9 @@ func TestNewKratosClient(t *testing.T) {
 
 	// Clean up
 	defer func() {
-		os.Setenv("KRATOS_PUBLIC_URL", origPublic)
-		os.Setenv("KRATOS_ADMIN_URL", origAdmin)
-		os.Setenv("KRATOS_BROWSER_URL", origBrowser)
+		_ = os.Setenv("KRATOS_PUBLIC_URL", origPublic)
+		_ = os.Setenv("KRATOS_ADMIN_URL", origAdmin)
+		_ = os.Setenv("KRATOS_BROWSER_URL", origBrowser)
 	}()
 
 	tests := []struct {
@@ -51,9 +51,9 @@ func TestNewKratosClient(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set environment variables (all required)
-			os.Setenv("KRATOS_PUBLIC_URL", tt.publicURL)
-			os.Setenv("KRATOS_ADMIN_URL", tt.adminURL)
-			os.Setenv("KRATOS_BROWSER_URL", tt.browserURL)
+			_ = os.Setenv("KRATOS_PUBLIC_URL", tt.publicURL)
+			_ = os.Setenv("KRATOS_ADMIN_URL", tt.adminURL)
+			_ = os.Setenv("KRATOS_BROWSER_URL", tt.browserURL)
 
 			// Create client
 			client := NewKratosClient()
@@ -95,9 +95,9 @@ func TestKratosClient_Integration(t *testing.T) {
 	}
 
 	// Set up environment for integration test
-	os.Setenv("KRATOS_PUBLIC_URL", "http://127.0.0.1:4433")
-	os.Setenv("KRATOS_ADMIN_URL", "http://127.0.0.1:4434")
-	os.Setenv("KRATOS_BROWSER_URL", "http://127.0.0.1:4433")
+	_ = os.Setenv("KRATOS_PUBLIC_URL", "http://127.0.0.1:4433")
+	_ = os.Setenv("KRATOS_ADMIN_URL", "http://127.0.0.1:4434")
+	_ = os.Setenv("KRATOS_BROWSER_URL", "http://127.0.0.1:4433")
 
 	client := NewKratosClient()
 	ctx := context.Background()
@@ -129,9 +129,9 @@ func TestGetEnv(t *testing.T) {
 	orig := os.Getenv("TEST_VAR")
 	defer func() {
 		if orig != "" {
-			os.Setenv("TEST_VAR", orig)
+			_ = os.Setenv("TEST_VAR", orig)
 		} else {
-			os.Unsetenv("TEST_VAR")
+			_ = os.Unsetenv("TEST_VAR")
 		}
 	}()
 
@@ -161,9 +161,9 @@ func TestGetEnv(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.envValue != "" {
-				os.Setenv(tt.key, tt.envValue)
+				_ = os.Setenv(tt.key, tt.envValue)
 			} else {
-				os.Unsetenv(tt.key)
+				_ = os.Unsetenv(tt.key)
 			}
 
 			got := getEnv(tt.key, tt.defaultValue)

@@ -54,3 +54,11 @@ tasks:
     cmds:
       - go run ./tools/repo-statistics 10
       - xdg-open /tmp/repo_graph.png 2>/dev/null || open /tmp/repo_graph.png 2>/dev/null || echo "Graph saved at /tmp/repo_graph.png"
+
+  ci:
+    desc: Run CI checks (lint, test, build)
+    cmds:
+      - golangci-lint run ./...
+      - go test -race -v ./...
+      - go build -o bin/app ./main.go
+      - rm -f bin/app
