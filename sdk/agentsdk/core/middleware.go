@@ -276,24 +276,25 @@ func ChainMiddleware(middlewares []Middleware, baseHandler NextHandler) NextHand
 
 	// Build the chain from right to left (innermost to outermost)
 	// This ensures the first middleware in the slice is the outermost wrapper
+	// Safe: loop bounds validated by len > 0 check above and i >= 0 condition
 	handler := baseHandler
 	for i := len(middlewares) - 1; i >= 0; i-- {
-		// Capture the current middleware and handler in the closure
-		currentMiddleware := middlewares[i]
-		nextHandler := handler
-
-		// Create a new handler that wraps the next handler with current middleware
-		handler = func(ctx context.Context, reqCtx *RequestContext) error {
-			// Check if we should terminate before executing this middleware
-			if reqCtx.Terminate {
-				return nil
-			}
-
-			return currentMiddleware.Process(ctx, reqCtx, nextHandler)
-		}
+		handler = wrapWithMiddleware(middlewares[i], handler)
 	}
 
 	return handler
+}
+
+// wrapWithMiddleware wraps a handler with a middleware, properly capturing variables to avoid closure issues.
+func wrapWithMiddleware(middleware Middleware, next NextHandler) NextHandler {
+	return func(ctx context.Context, reqCtx *RequestContext) error {
+		// Check if we should terminate before executing this middleware
+		if reqCtx.Terminate {
+			return nil
+		}
+
+		return middleware.Process(ctx, reqCtx, next)
+	}
 }
 
 // NoOpHandler is a NextHandler that does nothing.

@@ -2,7 +2,7 @@ package tools
 
 import (
 	"context"
-	"crypto/md5"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -113,14 +113,14 @@ func (m *MermaidDiagramTool) Invoke(ctx context.Context, arguments string) (stri
 
 // executeMermaidDiagram executes mermaid-cli via Docker to generate the diagram.
 func executeMermaidDiagram(mermaidCode, title, outputType string) (string, error) {
-	// Ensure charts directory exists
+	// Ensure charts directory exists with secure permissions
 	chartsDir := "assets/charts"
-	if err := os.MkdirAll(chartsDir, 0o755); err != nil {
+	if err := os.MkdirAll(chartsDir, 0o750); err != nil {
 		return "", fmt.Errorf("failed to create charts directory: %w", err)
 	}
 
-	// Generate unique filename
-	hash := fmt.Sprintf("%x", md5.Sum([]byte(mermaidCode+title+strconv.FormatInt(time.Now().UnixNano(), 10))))
+	// Generate unique filename using SHA256 (secure hash)
+	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(mermaidCode+title+strconv.FormatInt(time.Now().UnixNano(), 10))))
 	hash = hash[:16] // Use first 16 chars
 
 	// Define file paths
@@ -130,8 +130,8 @@ func executeMermaidDiagram(mermaidCode, title, outputType string) (string, error
 	inputPath := filepath.Join(chartsDir, inputFileName)
 	outputPath := filepath.Join(chartsDir, outputFileName)
 
-	// Write mermaid code to input file
-	if err := os.WriteFile(inputPath, []byte(mermaidCode), 0o644); err != nil {
+	// Write mermaid code to input file with secure permissions
+	if err := os.WriteFile(inputPath, []byte(mermaidCode), 0o600); err != nil {
 		return "", fmt.Errorf("failed to write mermaid input file: %w", err)
 	}
 	defer func() { _ = os.Remove(inputPath) }() // Clean up input file
@@ -142,8 +142,14 @@ func executeMermaidDiagram(mermaidCode, title, outputType string) (string, error
 		return "", fmt.Errorf("failed to get absolute path: %w", err)
 	}
 
+	// Validate filenames contain only safe characters (hash-based, so should be alphanumeric + underscore + dot)
+	if !isSafeFilename(inputFileName) || !isSafeFilename(outputFileName) {
+		return "", errors.New("invalid filename detected")
+	}
+
 	// Execute mermaid-cli via Docker
 	// command: docker run --rm -v /path/to/charts:/data minlag/mermaid-cli -i input.mmd -o output.png
+	// Note: inputFileName and outputFileName are hash-based and validated, preventing injection
 	cmd := exec.Command(
 		"docker", "run", "--rm",
 		"-u", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
@@ -164,4 +170,19 @@ func executeMermaidDiagram(mermaidCode, title, outputType string) (string, error
 	}
 
 	return outputPath, nil
+}
+
+// isSafeFilename validates that a filename contains only safe characters.
+// Allows: alphanumeric, underscore, hyphen, dot.
+func isSafeFilename(filename string) bool {
+	for _, char := range filename {
+		if !((char >= 'a' && char <= 'z') ||
+			(char >= 'A' && char <= 'Z') ||
+			(char >= '0' && char <= '9') ||
+			char == '_' || char == '-' || char == '.') {
+			return false
+		}
+	}
+
+	return filename != "" && filename != "." && filename != ".."
 }

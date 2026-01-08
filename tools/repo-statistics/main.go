@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -249,22 +250,36 @@ print sprintf("Net Change: %%d lines", %d)
 print sprintf("Period: %%s to %%s", "%s", "%s")
 `, numCommits, totalAdded, totalRemoved, totalAdded-totalRemoved, startDate, endDate)
 
-	return os.WriteFile("/tmp/repo_stats.gnuplot", []byte(script), 0o644)
+	// Write with secure permissions
+	return os.WriteFile("/tmp/repo_stats.gnuplot", []byte(script), 0o600)
 }
 
 func openImage(path string) {
+	// Validate the path is an absolute path and exists
+	absPath, err := filepath.Abs(path)
+	if err != nil || absPath != path {
+		// Path is not absolute or invalid, don't open
+		return
+	}
+	if _, err := os.Stat(absPath); err != nil {
+		// File doesn't exist, don't open
+		return
+	}
+
 	// Try different commands to open the image
+	// These are well-known, safe system commands for opening files
 	commands := [][]string{
-		{"xdg-open", path},
-		{"open", path},  // macOS
-		{"start", path}, // Windows
-		{"eog", path},   // GNOME
-		{"feh", path},   // Lightweight
+		{"xdg-open", absPath},
+		{"open", absPath},  // macOS
+		{"start", absPath}, // Windows
+		{"eog", absPath},   // GNOME
+		{"feh", absPath},   // Lightweight
 	}
 
 	for _, cmd := range commands {
 		if _, err := exec.LookPath(cmd[0]); err == nil {
 			go func(c []string) {
+				// Intentionally launching system image viewer with validated path
 				_ = exec.Command(c[0], c[1:]...).Start()
 			}(cmd)
 
