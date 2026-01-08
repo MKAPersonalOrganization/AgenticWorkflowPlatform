@@ -8,6 +8,7 @@ import (
 )
 
 func TestLinearSolverTool_GaussianElimination(t *testing.T) {
+	t.Parallel()
 	tool := NewLinearSolverTool()
 
 	tests := []struct {
@@ -32,6 +33,7 @@ func TestLinearSolverTool_GaussianElimination(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			args := map[string]any{
 				"method": "gauss",
 				"A":      tt.matrix,
@@ -61,6 +63,7 @@ func TestLinearSolverTool_GaussianElimination(t *testing.T) {
 }
 
 func TestLinearSolverTool_LU(t *testing.T) {
+	t.Parallel()
 	tool := NewLinearSolverTool()
 
 	args := map[string]any{
@@ -91,6 +94,7 @@ func TestLinearSolverTool_LU(t *testing.T) {
 }
 
 func TestLinearSolverTool_Cholesky(t *testing.T) {
+	t.Parallel()
 	tool := NewLinearSolverTool()
 
 	args := map[string]any{

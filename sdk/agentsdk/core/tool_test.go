@@ -9,6 +9,7 @@ import (
 )
 
 func TestFunctionTool(t *testing.T) {
+	t.Parallel()
 	tool := core.NewFunctionTool(
 		"get_weather",
 		"Get the current weather for a location",
@@ -73,6 +74,7 @@ func TestFunctionTool(t *testing.T) {
 }
 
 func TestToolRegistry(t *testing.T) {
+	t.Parallel()
 	registry := core.NewToolRegistry()
 
 	// Register some tools
@@ -127,6 +129,7 @@ func TestToolRegistry(t *testing.T) {
 }
 
 func TestToToolSpec(t *testing.T) {
+	t.Parallel()
 	tool := core.NewFunctionTool(
 		"test_tool",
 		"A test tool",
@@ -164,6 +167,7 @@ func TestToToolSpec(t *testing.T) {
 }
 
 func TestParseArguments(t *testing.T) {
+	t.Parallel()
 	type Args struct {
 		Location string `json:"location"`
 		Unit     string `json:"unit"`
@@ -183,6 +187,7 @@ func TestParseArguments(t *testing.T) {
 }
 
 func TestSchemaHelpers(t *testing.T) {
+	t.Parallel()
 	// Test ObjectSchema
 	objSchema := core.ObjectSchema(
 		map[string]any{

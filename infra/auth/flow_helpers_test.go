@@ -21,6 +21,7 @@ var (
 )
 
 func TestInitFlowURL(t *testing.T) {
+	t.Parallel()
 	kratosClient := NewKratosClient()
 
 	tests := []struct {
@@ -82,6 +83,7 @@ func TestInitFlowURL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			url := kratosClient.InitFlowURL(tt.flowType, tt.params)
 
 			for _, expected := range tt.contains {
@@ -94,6 +96,7 @@ func TestInitFlowURL(t *testing.T) {
 }
 
 func TestExtractCSRFToken(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		nodes    []client.UiNode
@@ -150,6 +153,7 @@ func TestExtractCSRFToken(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := ExtractCSRFToken(tt.nodes)
 			if result != tt.expected {
 				t.Errorf("ExtractCSRFToken() = %v, want %v", result, tt.expected)
@@ -159,6 +163,7 @@ func TestExtractCSRFToken(t *testing.T) {
 }
 
 func TestExtractMessages(t *testing.T) {
+	t.Parallel()
 	messages := []client.UiText{
 		{
 			Id:   1010001,
@@ -195,6 +200,7 @@ func TestExtractMessages(t *testing.T) {
 }
 
 func TestGetMessageType(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		input    string
 		expected string
@@ -211,6 +217,7 @@ func TestGetMessageType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
+			t.Parallel()
 			result := GetMessageType(tt.input)
 			if result != tt.expected {
 				t.Errorf("GetMessageType(%s) = %s, want %s", tt.input, result, tt.expected)
@@ -220,6 +227,7 @@ func TestGetMessageType(t *testing.T) {
 }
 
 func TestIsFlowExpired(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		err      error
@@ -259,6 +267,7 @@ func TestIsFlowExpired(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := IsFlowExpired(tt.err)
 			if result != tt.expected {
 				t.Errorf("IsFlowExpired() = %v, want %v", result, tt.expected)
@@ -268,6 +277,7 @@ func TestIsFlowExpired(t *testing.T) {
 }
 
 func TestShouldRedirectToVerification(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		messages []client.UiText
@@ -304,6 +314,7 @@ func TestShouldRedirectToVerification(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := ShouldRedirectToVerification(tt.messages)
 			if result != tt.expected {
 				t.Errorf("ShouldRedirectToVerification() = %v, want %v", result, tt.expected)
@@ -313,6 +324,7 @@ func TestShouldRedirectToVerification(t *testing.T) {
 }
 
 func TestIsAAL2Required(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		err      error
@@ -342,6 +354,7 @@ func TestIsAAL2Required(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := IsAAL2Required(tt.err)
 			if result != tt.expected {
 				t.Errorf("IsAAL2Required() = %v, want %v", result, tt.expected)
@@ -351,6 +364,7 @@ func TestIsAAL2Required(t *testing.T) {
 }
 
 func TestGetNodeValue(t *testing.T) {
+	t.Parallel()
 	nodes := []client.UiNode{
 		{
 			Attributes: client.UiNodeAttributes{
@@ -394,6 +408,7 @@ func TestGetNodeValue(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := GetNodeValue(nodes, tt.nodeName)
 			if result != tt.expected {
 				t.Errorf("GetNodeValue() = %v, want %v", result, tt.expected)
@@ -403,6 +418,7 @@ func TestGetNodeValue(t *testing.T) {
 }
 
 func TestFilterNodesByGroup(t *testing.T) {
+	t.Parallel()
 	nodes := []client.UiNode{
 		{
 			Group: "default",
@@ -459,6 +475,7 @@ func TestFilterNodesByGroup(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := FilterNodesByGroup(nodes, tt.groups...)
 			if len(result) != tt.expected {
 				t.Errorf("FilterNodesByGroup() returned %d nodes, want %d", len(result), tt.expected)
@@ -469,6 +486,7 @@ func TestFilterNodesByGroup(t *testing.T) {
 
 // Integration tests (these will only run with -short=false and require running Kratos).
 func TestKratosClient_GetLoginFlow_Integration(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("Skipping integration test")
 	}
@@ -484,6 +502,7 @@ func TestKratosClient_GetLoginFlow_Integration(t *testing.T) {
 }
 
 func TestKratosClient_GetFlowError_Integration(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("Skipping integration test")
 	}

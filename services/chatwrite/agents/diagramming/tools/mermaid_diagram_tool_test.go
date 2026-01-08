@@ -9,6 +9,7 @@ import (
 )
 
 func TestMermaidDiagramTool_SimpleFlowchart(t *testing.T) {
+	t.Parallel()
 	tool := NewMermaidDiagramTool()
 
 	mermaidCode := `graph TD
@@ -53,6 +54,7 @@ func TestMermaidDiagramTool_SimpleFlowchart(t *testing.T) {
 }
 
 func TestMermaidDiagramTool_SequenceDiagram(t *testing.T) {
+	t.Parallel()
 	tool := NewMermaidDiagramTool()
 
 	mermaidCode := `sequenceDiagram
@@ -89,6 +91,7 @@ func TestMermaidDiagramTool_SequenceDiagram(t *testing.T) {
 }
 
 func TestMermaidDiagramTool_ClassDiagram(t *testing.T) {
+	t.Parallel()
 	tool := NewMermaidDiagramTool()
 
 	mermaidCode := `classDiagram
@@ -131,6 +134,7 @@ func TestMermaidDiagramTool_ClassDiagram(t *testing.T) {
 }
 
 func TestMermaidDiagramTool_StateDiagram(t *testing.T) {
+	t.Parallel()
 	tool := NewMermaidDiagramTool()
 
 	mermaidCode := "stateDiagram-v2\n    [*] --> Idle\n    Idle --> Processing: Start Task\n    Processing --> Success: Complete\n    Processing --> Error: Fail\n    Success --> [*]\n    Error --> Idle: Retry\n    Error --> [*]: Give Up"
@@ -158,6 +162,7 @@ func TestMermaidDiagramTool_StateDiagram(t *testing.T) {
 }
 
 func TestMermaidDiagramTool_SVGOutput(t *testing.T) {
+	t.Parallel()
 	tool := NewMermaidDiagramTool()
 
 	mermaidCode := `graph LR
@@ -199,6 +204,7 @@ func TestMermaidDiagramTool_SVGOutput(t *testing.T) {
 }
 
 func TestMermaidDiagramTool_ERDiagram(t *testing.T) {
+	t.Parallel()
 	tool := NewMermaidDiagramTool()
 
 	mermaidCode := `erDiagram
@@ -237,6 +243,7 @@ func TestMermaidDiagramTool_ERDiagram(t *testing.T) {
 }
 
 func TestMermaidDiagramTool_ValidationMissingCode(t *testing.T) {
+	t.Parallel()
 	tool := NewMermaidDiagramTool()
 
 	args := MermaidDiagramArgs{
@@ -256,6 +263,7 @@ func TestMermaidDiagramTool_ValidationMissingCode(t *testing.T) {
 }
 
 func TestMermaidDiagramTool_ValidationInvalidOutputType(t *testing.T) {
+	t.Parallel()
 	tool := NewMermaidDiagramTool()
 
 	args := MermaidDiagramArgs{
@@ -276,6 +284,7 @@ func TestMermaidDiagramTool_ValidationInvalidOutputType(t *testing.T) {
 }
 
 func TestMermaidDiagramTool_ValidationTitleTooLong(t *testing.T) {
+	t.Parallel()
 	tool := NewMermaidDiagramTool()
 
 	longTitle := strings.Repeat("a", 101)
@@ -296,6 +305,7 @@ func TestMermaidDiagramTool_ValidationTitleTooLong(t *testing.T) {
 }
 
 func TestMermaidDiagramTool_ParametersSchema(t *testing.T) {
+	t.Parallel()
 	tool := NewMermaidDiagramTool()
 	params := tool.Parameters()
 
@@ -324,6 +334,7 @@ func TestMermaidDiagramTool_ParametersSchema(t *testing.T) {
 }
 
 func TestMermaidDiagramTool_PieChart(t *testing.T) {
+	t.Parallel()
 	tool := NewMermaidDiagramTool()
 
 	mermaidCode := `pie title Programming Languages Usage
@@ -355,6 +366,7 @@ func TestMermaidDiagramTool_PieChart(t *testing.T) {
 }
 
 func TestMermaidDiagramTool_ComplexFlowchart(t *testing.T) {
+	t.Parallel()
 	tool := NewMermaidDiagramTool()
 
 	mermaidCode := "graph TD\n    Start[Start Problem] --> Read[Read Question]\n    Read --> Identify{Identify Type}\n    Identify -->|Algebra| Alg[Use Algebra Tools]\n    Identify -->|Calculus| Calc[Use Calculus Tools]\n    Identify -->|Geometry| Geo[Use Geometry Tools]\n    Alg --> Solve[Solve Problem]\n    Calc --> Solve\n    Geo --> Solve\n    --> Verify{Verify Solution}\n    Verify -->|Correct| End[Present Answer]\n    Verify -->|Incorrect| Read\n    End --> Finish[Complete]"
@@ -392,6 +404,7 @@ func TestMermaidDiagramTool_ComplexFlowchart(t *testing.T) {
 }
 
 func TestMermaidDiagramTool_DefaultOutputType(t *testing.T) {
+	t.Parallel()
 	tool := NewMermaidDiagramTool()
 
 	mermaidCode := `graph LR
@@ -429,6 +442,7 @@ func TestMermaidDiagramTool_DefaultOutputType(t *testing.T) {
 }
 
 func TestMermaidDiagramTool_JSONResponseFormat(t *testing.T) {
+	t.Parallel()
 	tool := NewMermaidDiagramTool()
 
 	mermaidCode := `graph TD

@@ -7,6 +7,7 @@ import (
 )
 
 func TestDescriptiveStatsTool_Mean(t *testing.T) {
+	t.Parallel()
 	tool := NewDescriptiveStatsTool()
 	args := map[string]any{
 		"operation": "mean",
@@ -29,6 +30,7 @@ func TestDescriptiveStatsTool_Mean(t *testing.T) {
 }
 
 func TestDescriptiveStatsTool_Describe(t *testing.T) {
+	t.Parallel()
 	tool := NewDescriptiveStatsTool()
 	args := map[string]any{
 		"operation": "describe",
@@ -56,6 +58,7 @@ func TestDescriptiveStatsTool_Describe(t *testing.T) {
 }
 
 func TestCorrelationTool_Pearson(t *testing.T) {
+	t.Parallel()
 	tool := NewCorrelationTool()
 	args := map[string]any{
 		"operation": "pearson",
@@ -81,6 +84,7 @@ func TestCorrelationTool_Pearson(t *testing.T) {
 }
 
 func TestDistanceMetricsTool_Euclidean(t *testing.T) {
+	t.Parallel()
 	tool := NewDistanceMetricsTool()
 	args := map[string]any{
 		"operation": "euclidean_distance",
@@ -106,6 +110,7 @@ func TestDistanceMetricsTool_Euclidean(t *testing.T) {
 }
 
 func TestSamplingTool_QuartileOutliers(t *testing.T) {
+	t.Parallel()
 	tool := NewSamplingTool()
 	args := map[string]any{
 		"operation": "quartile_outliers",
@@ -130,6 +135,7 @@ func TestSamplingTool_QuartileOutliers(t *testing.T) {
 }
 
 func TestDataTransformTool_Sigmoid(t *testing.T) {
+	t.Parallel()
 	tool := NewDataTransformTool()
 	args := map[string]any{
 		"operation": "sigmoid",
@@ -153,6 +159,7 @@ func TestDataTransformTool_Sigmoid(t *testing.T) {
 }
 
 func TestDataTransformTool_Round(t *testing.T) {
+	t.Parallel()
 	tool := NewDataTransformTool()
 	args := map[string]any{
 		"operation": "round",
@@ -177,6 +184,7 @@ func TestDataTransformTool_Round(t *testing.T) {
 }
 
 func TestNormalDistributionTool_Pdf(t *testing.T) {
+	t.Parallel()
 	tool := NewNormalDistributionTool()
 	args := map[string]any{
 		"operation": "norm_pdf",
@@ -205,6 +213,7 @@ func TestNormalDistributionTool_Pdf(t *testing.T) {
 }
 
 func TestNormalDistributionTool_Fit(t *testing.T) {
+	t.Parallel()
 	tool := NewNormalDistributionTool()
 	args := map[string]any{
 		"operation": "norm_fit",
@@ -229,6 +238,7 @@ func TestNormalDistributionTool_Fit(t *testing.T) {
 }
 
 func TestGeometricDistributionTool_ExpGeom(t *testing.T) {
+	t.Parallel()
 	tool := NewGeometricDistributionTool()
 	args := map[string]any{
 		"operation": "exp_geom",
@@ -252,6 +262,7 @@ func TestGeometricDistributionTool_ExpGeom(t *testing.T) {
 }
 
 func TestRegressionTool_Linear(t *testing.T) {
+	t.Parallel()
 	tool := NewRegressionTool()
 	args := map[string]any{
 		"type": "linear",

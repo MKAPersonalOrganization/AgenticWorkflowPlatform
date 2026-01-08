@@ -12,7 +12,9 @@ import (
 
 // TestInMemoryThreadCreation verifies that in-memory threads can be created correctly.
 func TestInMemoryThreadCreation(t *testing.T) {
+	t.Parallel()
 	t.Run("create new thread", func(t *testing.T) {
+		t.Parallel()
 		thread := NewInMemoryThread()
 
 		assert.NotEmpty(t, thread.GetID(), "thread should have an ID")
@@ -21,6 +23,7 @@ func TestInMemoryThreadCreation(t *testing.T) {
 	})
 
 	t.Run("create thread with ID", func(t *testing.T) {
+		t.Parallel()
 		expectedID := "test-thread-123"
 		thread := NewInMemoryThreadWithID(expectedID)
 
@@ -30,6 +33,7 @@ func TestInMemoryThreadCreation(t *testing.T) {
 	})
 
 	t.Run("create thread with initial messages", func(t *testing.T) {
+		t.Parallel()
 		messages := []domain.Message{
 			{
 				ID:        "msg1",
@@ -58,7 +62,9 @@ func TestInMemoryThreadCreation(t *testing.T) {
 
 // TestThreadMessageManagement verifies message CRUD operations.
 func TestThreadMessageManagement(t *testing.T) {
+	t.Parallel()
 	t.Run("add and retrieve messages", func(t *testing.T) {
+		t.Parallel()
 		thread := NewInMemoryThread()
 
 		messages := []domain.Message{
@@ -80,6 +86,7 @@ func TestThreadMessageManagement(t *testing.T) {
 	})
 
 	t.Run("add multiple message batches", func(t *testing.T) {
+		t.Parallel()
 		thread := NewInMemoryThread()
 
 		batch1 := []domain.Message{
@@ -104,6 +111,7 @@ func TestThreadMessageManagement(t *testing.T) {
 	})
 
 	t.Run("messages are immutable copies", func(t *testing.T) {
+		t.Parallel()
 		thread := NewInMemoryThread()
 
 		original := []domain.Message{
@@ -126,6 +134,7 @@ func TestThreadMessageManagement(t *testing.T) {
 	})
 
 	t.Run("message store operations", func(t *testing.T) {
+		t.Parallel()
 		thread := NewInMemoryThread()
 		store := thread.GetMessageStore()
 
@@ -157,7 +166,9 @@ func TestThreadMessageManagement(t *testing.T) {
 
 // TestThreadSerialization verifies thread serialization and deserialization.
 func TestThreadSerialization(t *testing.T) {
+	t.Parallel()
 	t.Run("serialize and deserialize thread", func(t *testing.T) {
+		t.Parallel()
 		// Create thread with messages
 		originalThread := NewInMemoryThreadWithID("thread-123")
 		messages := []domain.Message{
@@ -199,6 +210,7 @@ func TestThreadSerialization(t *testing.T) {
 	})
 
 	t.Run("serialize empty thread", func(t *testing.T) {
+		t.Parallel()
 		thread := NewInMemoryThread()
 
 		data, err := thread.Serialize()
@@ -210,6 +222,7 @@ func TestThreadSerialization(t *testing.T) {
 	})
 
 	t.Run("deserialize invalid data", func(t *testing.T) {
+		t.Parallel()
 		invalidData := []byte("not valid json")
 
 		thread, err := NewInMemoryThreadFromState(invalidData)
@@ -218,6 +231,7 @@ func TestThreadSerialization(t *testing.T) {
 	})
 
 	t.Run("deserialize empty data", func(t *testing.T) {
+		t.Parallel()
 		thread, err := NewInMemoryThreadFromState([]byte{})
 		assert.Error(t, err)
 		assert.Nil(t, thread)
@@ -226,7 +240,9 @@ func TestThreadSerialization(t *testing.T) {
 
 // TestThreadIsolation verifies that multiple threads don't interfere with each other.
 func TestThreadIsolation(t *testing.T) {
+	t.Parallel()
 	t.Run("multiple threads are independent", func(t *testing.T) {
+		t.Parallel()
 		thread1 := NewInMemoryThreadWithID("thread-1")
 		thread2 := NewInMemoryThreadWithID("thread-2")
 
@@ -254,6 +270,7 @@ func TestThreadIsolation(t *testing.T) {
 	})
 
 	t.Run("concurrent access to different threads", func(t *testing.T) {
+		t.Parallel()
 		thread1 := NewInMemoryThread()
 		thread2 := NewInMemoryThread()
 
@@ -309,7 +326,9 @@ func TestThreadIsolation(t *testing.T) {
 
 // TestMessageStoreThreadSafety verifies concurrent access to message store.
 func TestMessageStoreThreadSafety(t *testing.T) {
+	t.Parallel()
 	t.Run("concurrent writes and reads", func(t *testing.T) {
+		t.Parallel()
 		store := NewInMemoryMessageStore()
 		done := make(chan bool)
 
@@ -343,7 +362,9 @@ func TestMessageStoreThreadSafety(t *testing.T) {
 
 // TestThreadGetService verifies service retrieval pattern.
 func TestThreadGetService(t *testing.T) {
+	t.Parallel()
 	t.Run("get thread service", func(t *testing.T) {
+		t.Parallel()
 		thread := NewInMemoryThread()
 
 		var agentThread AgentThread
@@ -352,6 +373,7 @@ func TestThreadGetService(t *testing.T) {
 	})
 
 	t.Run("get message store service", func(t *testing.T) {
+		t.Parallel()
 		thread := NewInMemoryThread()
 
 		var messageStore MessageStore
@@ -360,6 +382,7 @@ func TestThreadGetService(t *testing.T) {
 	})
 
 	t.Run("get unknown service returns nil", func(t *testing.T) {
+		t.Parallel()
 		thread := NewInMemoryThread()
 
 		type UnknownService any

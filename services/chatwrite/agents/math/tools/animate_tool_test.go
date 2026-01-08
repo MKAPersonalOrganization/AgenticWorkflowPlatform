@@ -9,6 +9,7 @@ import (
 )
 
 func TestAnimateTool_WavePropagation(t *testing.T) {
+	t.Parallel()
 	tool := NewAnimateTool()
 
 	script := `set xrange [0:10]
@@ -56,6 +57,7 @@ do for [i=0:40] {
 }
 
 func TestAnimateTool_Rotating3D(t *testing.T) {
+	t.Parallel()
 	tool := NewAnimateTool()
 
 	script := `unset border
@@ -92,6 +94,7 @@ do for [ang=0:360:10] {
 }
 
 func TestAnimateTool_WebPFormat(t *testing.T) {
+	t.Parallel()
 	tool := NewAnimateTool()
 
 	script := `set xrange [-10:10]
@@ -129,6 +132,7 @@ do for [i=1:30] {
 }
 
 func TestAnimateTool_ValidationMissingScript(t *testing.T) {
+	t.Parallel()
 	tool := NewAnimateTool()
 	args := AnimateArgs{
 		Format: "gif",
@@ -147,6 +151,7 @@ func TestAnimateTool_ValidationMissingScript(t *testing.T) {
 }
 
 func TestAnimateTool_ValidationInvalidFormat(t *testing.T) {
+	t.Parallel()
 	tool := NewAnimateTool()
 	args := AnimateArgs{
 		GnuplotScript: "plot sin(x)",
@@ -165,6 +170,7 @@ func TestAnimateTool_ValidationInvalidFormat(t *testing.T) {
 }
 
 func TestAnimateTool_ValidationSetTerminal(t *testing.T) {
+	t.Parallel()
 	tool := NewAnimateTool()
 	args := AnimateArgs{
 		GnuplotScript: "set terminal gif\ndo for [i=1:10] { plot sin(x + i) }",
@@ -183,6 +189,7 @@ func TestAnimateTool_ValidationSetTerminal(t *testing.T) {
 }
 
 func TestAnimateTool_DefaultValues(t *testing.T) {
+	t.Parallel()
 	tool := NewAnimateTool()
 
 	script := `do for [i=1:5] { plot sin(x + i) }`

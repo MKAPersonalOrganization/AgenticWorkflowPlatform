@@ -10,6 +10,7 @@ import (
 )
 
 func TestRunOptionsClone(t *testing.T) {
+	t.Parallel()
 	temp := 0.7
 	maxTokens := 100
 	topP := 0.9
@@ -53,6 +54,7 @@ func TestRunOptionsClone(t *testing.T) {
 }
 
 func TestDefaultRunOptions(t *testing.T) {
+	t.Parallel()
 	opts := DefaultRunOptions()
 
 	// Microsoft framework defaults: Temperature=1.0, TopP=1.0
@@ -72,6 +74,7 @@ func TestDefaultRunOptions(t *testing.T) {
 }
 
 func TestToChatOptionsWithDefaultRunOptions(t *testing.T) {
+	t.Parallel()
 	temp := 0.5
 	config := AgentConfig{
 		Name:         "test-agent",
@@ -90,6 +93,7 @@ func TestToChatOptionsWithDefaultRunOptions(t *testing.T) {
 }
 
 func TestToChatOptionsRunOptionsOverridesConfig(t *testing.T) {
+	t.Parallel()
 	configTemp := 0.5
 	configMaxTokens := 100
 	configTopP := 0.8
@@ -131,6 +135,7 @@ func TestToChatOptionsRunOptionsOverridesConfig(t *testing.T) {
 }
 
 func TestToChatOptionsPartialOverride(t *testing.T) {
+	t.Parallel()
 	configTemp := 0.5
 	configMaxTokens := 100
 	configTopP := 0.8
@@ -178,6 +183,7 @@ func TestToChatOptionsPartialOverride(t *testing.T) {
 }
 
 func TestToChatOptionsAdditionalProperties(t *testing.T) {
+	t.Parallel()
 	config := AgentConfig{
 		Name:         "test-agent",
 		SystemPrompt: "Test prompt",
@@ -202,6 +208,7 @@ func TestToChatOptionsAdditionalProperties(t *testing.T) {
 }
 
 func TestToChatOptionsAllParameters(t *testing.T) {
+	t.Parallel()
 	configTemp := 0.5
 	configMaxTokens := 100
 	configTopP := 0.8

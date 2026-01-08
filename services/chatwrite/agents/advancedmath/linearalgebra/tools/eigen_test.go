@@ -8,6 +8,7 @@ import (
 )
 
 func TestEigenvalueTool_Basic(t *testing.T) {
+	t.Parallel()
 	tool := NewEigenvalueTool()
 
 	// Test with a simple diagonal matrix
@@ -63,6 +64,7 @@ func TestEigenvalueTool_Basic(t *testing.T) {
 }
 
 func TestEigenvalueTool_Symmetric2x2(t *testing.T) {
+	t.Parallel()
 	t.Skip("Jacobi implementation needs refinement - eigenvalues not computed correctly")
 
 	tool := NewEigenvalueTool()
@@ -126,6 +128,7 @@ func TestEigenvalueTool_Symmetric2x2(t *testing.T) {
 }
 
 func TestEigenvalueTool_Identity(t *testing.T) {
+	t.Parallel()
 	tool := NewEigenvalueTool()
 
 	args := map[string]any{
@@ -157,6 +160,7 @@ func TestEigenvalueTool_Identity(t *testing.T) {
 }
 
 func TestEigenvalueTool_NonSquareMatrix(t *testing.T) {
+	t.Parallel()
 	tool := NewEigenvalueTool()
 
 	args := map[string]any{

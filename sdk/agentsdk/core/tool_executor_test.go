@@ -66,6 +66,7 @@ func (m *MockToolExecutor) LastCall() domain.ToolCall {
 var _ core.ToolExecutor = (*MockToolExecutor)(nil)
 
 func TestMockToolExecutor_Execute(t *testing.T) {
+	t.Parallel()
 	executor := NewMockToolExecutor()
 	executor.SetResult("get_weather", `{"temperature": 72}`)
 
@@ -93,6 +94,7 @@ func TestMockToolExecutor_Execute(t *testing.T) {
 }
 
 func TestMockToolExecutor_ExecuteWithError(t *testing.T) {
+	t.Parallel()
 	executor := NewMockToolExecutor()
 	expectedErr := errTestToolNotFound
 	executor.SetError("unknown_tool", expectedErr)
@@ -117,6 +119,7 @@ func TestMockToolExecutor_ExecuteWithError(t *testing.T) {
 }
 
 func TestMockToolExecutor_DefaultResult(t *testing.T) {
+	t.Parallel()
 	executor := NewMockToolExecutor()
 
 	toolCall := domain.ToolCall{
@@ -139,6 +142,7 @@ func TestMockToolExecutor_DefaultResult(t *testing.T) {
 }
 
 func TestBasicToolExecutor_Calculate(t *testing.T) {
+	t.Parallel()
 	// Create tool registry and register the calculator tool
 	toolRegistry := core.NewToolRegistry()
 	toolRegistry.Register(tools.NewCalculatorTool())
@@ -165,6 +169,7 @@ func TestBasicToolExecutor_Calculate(t *testing.T) {
 }
 
 func TestBasicToolExecutor_WriteWhiteboard(t *testing.T) {
+	t.Parallel()
 	// Create tool registry and register instructor tools
 	toolRegistry := core.NewToolRegistry()
 	// Register whiteboard tool
@@ -193,6 +198,7 @@ func TestBasicToolExecutor_WriteWhiteboard(t *testing.T) {
 }
 
 func TestRegistryToolExecutor(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	registry := core.NewToolRegistry()
 
@@ -238,6 +244,7 @@ func TestRegistryToolExecutor(t *testing.T) {
 }
 
 func TestRegistryToolExecutor_ToolNotFound(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	registry := core.NewToolRegistry()
 	executor := core.NewRegistryToolExecutor(ctx, registry)

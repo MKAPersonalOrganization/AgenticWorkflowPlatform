@@ -9,6 +9,7 @@ import (
 )
 
 func TestPlotTool_SimpleFunctionPlot(t *testing.T) {
+	t.Parallel()
 	tool := NewPlotTool()
 
 	script := `set title 'Sine Wave'
@@ -52,6 +53,7 @@ plot sin(x) with lines linewidth 2 title 'y = sin(x)'`
 }
 
 func TestPlotTool_MultipleFunctions(t *testing.T) {
+	t.Parallel()
 	tool := NewPlotTool()
 
 	script := `set title 'Trigonometric Functions'
@@ -85,6 +87,7 @@ plot sin(x) title 'sin(x)', cos(x) title 'cos(x)', tan(x) title 'tan(x)'`
 }
 
 func TestPlotTool_QuadraticWithRoots(t *testing.T) {
+	t.Parallel()
 	tool := NewPlotTool()
 
 	script := `set title 'Quadratic Function with Roots'
@@ -115,6 +118,7 @@ plot x**2 - 4*x + 3 with lines title 'y = x² - 4x + 3', 0 with lines dashtype 2
 }
 
 func TestPlotTool_InlineDataPlot(t *testing.T) {
+	t.Parallel()
 	tool := NewPlotTool()
 
 	script := `set title 'Scatter Plot with Data'
@@ -149,6 +153,7 @@ e`
 }
 
 func TestPlotTool_3DSurface(t *testing.T) {
+	t.Parallel()
 	tool := NewPlotTool()
 
 	script := `set title '3D Surface Plot'
@@ -182,6 +187,7 @@ splot x**2 + y**2 with lines`
 }
 
 func TestPlotTool_ValidationMissingScript(t *testing.T) {
+	t.Parallel()
 	tool := NewPlotTool()
 	args := PlotArgs{
 		// Missing gnuplot_script
@@ -200,6 +206,7 @@ func TestPlotTool_ValidationMissingScript(t *testing.T) {
 }
 
 func TestPlotTool_ValidationSetTerminal(t *testing.T) {
+	t.Parallel()
 	tool := NewPlotTool()
 	args := PlotArgs{
 		GnuplotScript: "set terminal png\nplot sin(x)",
@@ -218,6 +225,7 @@ func TestPlotTool_ValidationSetTerminal(t *testing.T) {
 }
 
 func TestPlotTool_ValidationSetOutput(t *testing.T) {
+	t.Parallel()
 	tool := NewPlotTool()
 	args := PlotArgs{
 		GnuplotScript: "set output 'test.png'\nplot sin(x)",
@@ -236,6 +244,7 @@ func TestPlotTool_ValidationSetOutput(t *testing.T) {
 }
 
 func TestPlotTool_ValidationTitleTooLong(t *testing.T) {
+	t.Parallel()
 	tool := NewPlotTool()
 	longTitle := strings.Repeat("a", 101) // 101 characters (exceeds 100 limit)
 	args := PlotArgs{
@@ -255,6 +264,7 @@ func TestPlotTool_ValidationTitleTooLong(t *testing.T) {
 }
 
 func TestPlotTool_ParametersSchema(t *testing.T) {
+	t.Parallel()
 	tool := NewPlotTool()
 	params := tool.Parameters()
 

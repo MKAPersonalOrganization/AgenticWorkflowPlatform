@@ -45,6 +45,7 @@ func (m *MockTool) Invoke(ctx context.Context, arguments string) (string, error)
 
 // TestToChatOptionsWithMiddleware_WithoutMiddleware ensures backward compatibility.
 func TestToChatOptionsWithMiddleware_WithoutMiddleware(t *testing.T) {
+	t.Parallel()
 	config := AgentConfig{
 		Name:         "test-agent",
 		SystemPrompt: "You are a test assistant",
@@ -70,6 +71,7 @@ func TestToChatOptionsWithMiddleware_WithoutMiddleware(t *testing.T) {
 
 // TestApplyMiddleware_NoMiddleware ensures ApplyMiddleware works without middleware.
 func TestApplyMiddleware_NoMiddleware(t *testing.T) {
+	t.Parallel()
 	config := AgentConfig{
 		Name:         "test-agent",
 		SystemPrompt: "Original prompt",
@@ -101,6 +103,7 @@ func TestApplyMiddleware_NoMiddleware(t *testing.T) {
 
 // TestApplyMiddleware_WithToolInjection tests middleware adding tools.
 func TestApplyMiddleware_WithToolInjection(t *testing.T) {
+	t.Parallel()
 	// Create middleware that adds a tool
 	toolAdderMiddleware := MiddlewareFunc(func(ctx context.Context, reqCtx *RequestContext, next NextHandler) error {
 		reqCtx.AddTool(NewMockTool("injected_tool", "Middleware-injected tool"))
@@ -146,6 +149,7 @@ func TestApplyMiddleware_WithToolInjection(t *testing.T) {
 
 // TestApplyMiddleware_WithSystemPromptAddition tests middleware adding to system prompt.
 func TestApplyMiddleware_WithSystemPromptAddition(t *testing.T) {
+	t.Parallel()
 	// Create middleware that adds to system prompt
 	promptAdderMiddleware := MiddlewareFunc(func(ctx context.Context, reqCtx *RequestContext, next NextHandler) error {
 		reqCtx.AddSystemPrompt("IMPORTANT: Always be concise.")
@@ -179,6 +183,7 @@ func TestApplyMiddleware_WithSystemPromptAddition(t *testing.T) {
 
 // TestApplyMiddleware_Termination tests middleware terminating early.
 func TestApplyMiddleware_Termination(t *testing.T) {
+	t.Parallel()
 	// Create middleware that terminates
 	terminatorMiddleware := MiddlewareFunc(func(ctx context.Context, reqCtx *RequestContext, next NextHandler) error {
 		reqCtx.SetTerminate()
@@ -212,6 +217,7 @@ func TestApplyMiddleware_Termination(t *testing.T) {
 
 // TestToChatOptionsWithMiddleware tests the integrated middleware flow.
 func TestToChatOptionsWithMiddleware(t *testing.T) {
+	t.Parallel()
 	// Create middleware that adds tool and system prompt
 	enrichmentMiddleware := MiddlewareFunc(func(ctx context.Context, reqCtx *RequestContext, next NextHandler) error {
 		reqCtx.AddTool(NewMockTool("middleware_tool", "Added by middleware"))
@@ -260,6 +266,7 @@ func TestToChatOptionsWithMiddleware(t *testing.T) {
 
 // TestToChatOptionsWithMiddleware_Termination tests early termination.
 func TestToChatOptionsWithMiddleware_Termination(t *testing.T) {
+	t.Parallel()
 	terminatorMiddleware := MiddlewareFunc(func(ctx context.Context, reqCtx *RequestContext, next NextHandler) error {
 		reqCtx.SetTerminate()
 
@@ -291,6 +298,7 @@ func TestToChatOptionsWithMiddleware_Termination(t *testing.T) {
 
 // TestApplyMiddleware_ConfigParameters tests that config parameters are copied to reqCtx.
 func TestApplyMiddleware_ConfigParameters(t *testing.T) {
+	t.Parallel()
 	temp := 0.7
 	maxTokens := 1000
 	topP := 0.9
@@ -335,6 +343,7 @@ func TestApplyMiddleware_ConfigParameters(t *testing.T) {
 
 // TestApplyMiddleware_RunOptionsOverride tests that run options override config.
 func TestApplyMiddleware_RunOptionsOverride(t *testing.T) {
+	t.Parallel()
 	configTemp := 0.5
 	runTemp := 0.9
 	configModel := "gpt-3.5"
@@ -372,6 +381,7 @@ func TestApplyMiddleware_RunOptionsOverride(t *testing.T) {
 
 // TestApplyMiddleware_MultipleMiddleware tests middleware chain execution order.
 func TestApplyMiddleware_MultipleMiddleware(t *testing.T) {
+	t.Parallel()
 	var executionOrder []string
 
 	middleware1 := MiddlewareFunc(func(ctx context.Context, reqCtx *RequestContext, next NextHandler) error {
