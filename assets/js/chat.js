@@ -1435,8 +1435,10 @@ document.addEventListener('alpine:init', () => {
             return await this.__tryCatchAsync('load messages', { threadId: id }, async () => {
                 const response = await fetch(`/api/agui/threads/${id}/messages`);
                 if (response.ok) {
-                    const messages = await response.json();
+                    const data = await response.json();
                     const state = this.__getThreadState(id);
+                    // Handle both array and object responses
+                    const messages = Array.isArray(data) ? data : (data.messages || []);
                     state.messages = this.__convertBackendMessagesToUI(messages);
 
                     // Load whiteboard content from AGUI projection
