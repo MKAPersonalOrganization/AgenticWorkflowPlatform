@@ -121,6 +121,42 @@ jobs:
       - name: Run architecture tests
         run: go test -v ./arch/...
 
+  statistics:
+    name: Generate Repository Statistics
+    runs-on: ubuntu-latest
+    needs: [test, lint, arch-tests]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.2"
+          cache: true
+
+      - name: Install gnuplot
+        run: sudo apt-get update && sudo apt-get install -y gnuplot
+
+      - name: Generate statistics
+        run: go run ./tools/repo-statistics
+
+      - name: Copy graph to .github/images
+        run: |
+          mkdir -p .github/images
+          cp /tmp/repo_graph.png .github/images/repo_statistics.png
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/images/repo_statistics.png
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update repository statistics [skip ci]" && git push)
+
   build:
     name: Build
     runs-on: ubuntu-latest

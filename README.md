@@ -2,6 +2,10 @@
 
 A chat application built with Go, Templ, Tailwind CSS, and Alpine.js, implementing the AG-UI protocol for AI agent interactions.
 
+## Repository Statistics
+
+![Repository Statistics](.github/images/repo_statistics.png)
+
 ## System Architecture
 
 ```mermaid
