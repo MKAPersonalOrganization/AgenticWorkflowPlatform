@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"time"
+
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/sdk/agentsdk/core/middleware"
 	"school-with-ai/services/chatwrite"
 	"school-with-ai/services/chatwrite/agents/shared"
-	"time"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 	"github.com/hibiken/asynq"
@@ -88,7 +89,7 @@ func (w *ChatWorker) ProcessTask(ctx context.Context, t *asynq.Task) error {
 		"message", payload.Message)
 
 	// Process the chat message
-	err := w.processChat(ctx, payload)
+	err = w.processChat(ctx, payload)
 	if err != nil {
 		return err
 	}
@@ -136,7 +137,7 @@ func (w *ChatWorker) processChat(ctx context.Context, payload ProcessChatPayload
 
 	// Send RUN_STARTED event
 	runStartedEvent := aguievents.NewRunStartedEvent(payload.ThreadID, runID)
-	err := emitter.Emit(runStartedEvent)
+	err = emitter.Emit(runStartedEvent)
 	if err != nil {
 		slog.Error("Failed to emit run started event", "jobID", payload.JobID, "error", err)
 	}
@@ -161,7 +162,7 @@ func (w *ChatWorker) processChat(ctx context.Context, payload ProcessChatPayload
 				"title":    title,
 			}),
 		)
-		err := emitter.Emit(customEvent)
+		err = emitter.Emit(customEvent)
 		if err != nil {
 			slog.Error("Failed to emit thread title updated event", "jobID", payload.JobID, "error", err)
 		}
@@ -172,7 +173,7 @@ func (w *ChatWorker) processChat(ctx context.Context, payload ProcessChatPayload
 
 	// Send RUN_FINISHED event
 	runFinishedEvent := aguievents.NewRunFinishedEvent(payload.ThreadID, runID)
-	err := emitter.Emit(runFinishedEvent)
+	err = emitter.Emit(runFinishedEvent)
 	if err != nil {
 		slog.Error("Failed to emit run finished event", "jobID", payload.JobID, "error", err)
 	}
