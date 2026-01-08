@@ -11,15 +11,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Note: These tests require a running KurrentDB instance.
-// Run 'task up' to start KurrentDB before running tests.
+// Note: Unit tests use MockEventStore and run in all environments.
+// Integration tests require a running KurrentDB instance.
+// Run 'task up' to start KurrentDB, then run tests without -short flag.
 
-func TestKurrentDBEventStore_AppendAndRead(t *testing.T) {
-	// Connect to KurrentDB
-	connectionString := "esdb://localhost:2113?tls=false"
-	store, err := NewKurrentDBEventStore(connectionString)
-	require.NoError(t, err)
-	defer store.Close()
+func TestEventStore_AppendAndRead(t *testing.T) {
+	// Use mock for unit tests
+	store := NewMockEventStore()
 
 	ctx := context.Background()
 	streamID := "test-stream-" + time.Now().Format("20060102150405")
@@ -67,11 +65,9 @@ func TestKurrentDBEventStore_AppendAndRead(t *testing.T) {
 	assert.Equal(t, "Hello, world!", userMessage.Content)
 }
 
-func TestKurrentDBEventStore_ReadFromVersion(t *testing.T) {
-	connectionString := "esdb://localhost:2113?tls=false"
-	store, err := NewKurrentDBEventStore(connectionString)
-	require.NoError(t, err)
-	defer store.Close()
+func TestEventStore_ReadFromVersion(t *testing.T) {
+	// Use mock for unit tests
+	store := NewMockEventStore()
 
 	ctx := context.Background()
 	streamID := "test-stream-versions-" + time.Now().Format("20060102150405")
@@ -107,7 +103,7 @@ func TestKurrentDBEventStore_ReadFromVersion(t *testing.T) {
 		},
 	}
 
-	_, err = store.Append(ctx, streamID, events...)
+	_, err := store.Append(ctx, streamID, events...)
 	require.NoError(t, err)
 
 	// Read from version 1 (should get 2nd and 3rd events)
@@ -120,11 +116,9 @@ func TestKurrentDBEventStore_ReadFromVersion(t *testing.T) {
 	assert.Equal(t, "msg-2", userMessage.MessageID)
 }
 
-func TestKurrentDBEventStore_ReadNonExistentStream(t *testing.T) {
-	connectionString := "esdb://localhost:2113?tls=false"
-	store, err := NewKurrentDBEventStore(connectionString)
-	require.NoError(t, err)
-	defer store.Close()
+func TestEventStore_ReadNonExistentStream(t *testing.T) {
+	// Use mock for unit tests
+	store := NewMockEventStore()
 
 	ctx := context.Background()
 	streamID := "non-existent-stream"
@@ -133,4 +127,42 @@ func TestKurrentDBEventStore_ReadNonExistentStream(t *testing.T) {
 	events, err := store.ReadStream(ctx, streamID, 0)
 	require.NoError(t, err)
 	assert.Empty(t, events)
+}
+
+func TestEventStore_DeleteStream(t *testing.T) {
+	// Use mock for unit tests
+	store := NewMockEventStore()
+
+	ctx := context.Background()
+	streamID := "test-stream-delete-" + time.Now().Format("20060102150405")
+
+	// Append some events
+	events := []core.Event{
+		core.UserMessageAddedEvent{
+			BaseEvent: core.BaseEvent{
+				Type:      "UserMessageAddedEvent",
+				Timestamp: time.Now(),
+				ThreadID:  streamID,
+			},
+			MessageID: "msg-1",
+			Content:   "Test message",
+		},
+	}
+
+	_, err := store.Append(ctx, streamID, events...)
+	require.NoError(t, err)
+
+	// Verify events exist
+	readEvents, err := store.ReadStream(ctx, streamID, 0)
+	require.NoError(t, err)
+	assert.Len(t, readEvents, 1)
+
+	// Delete the stream
+	err = store.DeleteStream(ctx, streamID)
+	require.NoError(t, err)
+
+	// Verify stream is deleted (returns empty)
+	readEvents, err = store.ReadStream(ctx, streamID, 0)
+	require.NoError(t, err)
+	assert.Empty(t, readEvents)
 }
