@@ -70,11 +70,12 @@ templ ThreadHistory() {
 					@sidebar.MenuItem() {
 						<div class="flex items-center gap-2 w-full group/item">
 							@sidebar.MenuButton(sidebar.MenuButtonProps{
-								Class: "flex-1",
+								Class: "flex-1 relative",
 								Attributes: templ.Attributes{
 									"@click":             "switchSession(session.id)",
-									":class":             "threadId === session.id ? 'bg-sidebar-accent' : ''",
+									":class":             "threadId === session.id ? 'bg-sidebar-accent/50 font-medium before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:h-5 before:w-0.5 before:bg-primary before:rounded-r-full' : 'hover:bg-sidebar-accent/30'",
 									"x-bind:data-active": "threadId === session.id",
+									"class":              "transition-all duration-300 ease-out",
 								},
 							}) {
 								<div class="flex items-center gap-2 w-full">
