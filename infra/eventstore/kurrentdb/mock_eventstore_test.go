@@ -2,9 +2,15 @@ package kurrentdb
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"school-with-ai/sdk/agentsdk/core"
 	"sync"
+)
+
+var (
+	// ErrStreamDeleted is returned when attempting to append to a deleted stream.
+	ErrStreamDeleted = errors.New("stream has been deleted")
 )
 
 // MockEventStore is a test double for EventStore that doesn't require KurrentDB.
@@ -26,7 +32,7 @@ func (m *MockEventStore) Append(ctx context.Context, streamID string, events ...
 	defer m.mu.Unlock()
 
 	if m.deleted[streamID] {
-		return 0, fmt.Errorf("stream %s has been deleted", streamID)
+		return 0, fmt.Errorf("stream %s: %w", streamID, ErrStreamDeleted)
 	}
 
 	if m.streams[streamID] == nil {

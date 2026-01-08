@@ -7,6 +7,15 @@ import (
 	"testing"
 )
 
+// Test error sentinels
+var (
+	errTestMiddleware           = errors.New("middleware error")
+	errTestM1MetadataRead       = errors.New("base handler could not read m1 metadata")
+	errTestM2MetadataRead       = errors.New("base handler could not read m2 metadata")
+	errTestBaseHandler          = errors.New("base handler error")
+	errTestGeneric              = errors.New("test error")
+)
+
 // Mock middleware for testing.
 type mockMiddleware struct {
 	beforeCalled bool
@@ -23,7 +32,7 @@ func (m *mockMiddleware) Process(ctx context.Context, reqCtx *RequestContext, ne
 	}
 
 	if m.shouldError {
-		return errors.New("middleware error")
+		return errTestMiddleware
 	}
 
 	err := next(ctx, reqCtx)
@@ -367,10 +376,10 @@ func TestChainMiddleware_MiddlewareCanModifyContext(t *testing.T) {
 		val1, ok1 := reqCtx.GetMetadata("m1")
 		val2, ok2 := reqCtx.GetMetadata("m2")
 		if !ok1 || val1 != "set by m1" {
-			return errors.New("base handler could not read m1 metadata")
+			return errTestM1MetadataRead
 		}
 		if !ok2 || val2 != "set by m2" {
-			return errors.New("base handler could not read m2 metadata")
+			return errTestM2MetadataRead
 		}
 
 		return nil
@@ -464,7 +473,7 @@ func TestChainMiddleware_ErrorPropagation(t *testing.T) {
 
 func TestChainMiddleware_BaseHandlerError(t *testing.T) {
 	m := &mockMiddleware{}
-	baseError := errors.New("base handler error")
+	baseError := errTestBaseHandler
 	baseHandler := ErrorHandler(baseError)
 
 	handler := ChainMiddleware([]Middleware{m}, baseHandler)
@@ -493,7 +502,7 @@ func TestNoOpHandler(t *testing.T) {
 }
 
 func TestErrorHandler(t *testing.T) {
-	expectedError := errors.New("test error")
+	expectedError := errTestGeneric
 	handler := ErrorHandler(expectedError)
 
 	ctx := NewRequestContext("", nil, "", nil, nil)

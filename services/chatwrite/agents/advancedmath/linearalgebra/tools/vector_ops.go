@@ -9,6 +9,20 @@ import (
 	"github.com/cpmech/gosl/la"
 )
 
+var (
+	// ErrVector2Required is returned when vector2 is required but not provided.
+	ErrVector2Required = errors.New("vector2 required for operation")
+
+	// ErrVectorLengthMismatch is returned when vectors have incompatible lengths.
+	ErrVectorLengthMismatch = errors.New("vectors must have same length")
+
+	// ErrCrossProduct3DOnly is returned when cross product is called with non-3D vectors.
+	ErrCrossProduct3DOnly = errors.New("cross product requires 3D vectors")
+
+	// ErrUnknownOperation is returned when an unknown operation is requested.
+	ErrUnknownOperation = errors.New("unknown operation")
+)
+
 // VectorOperationsTool provides vector operations.
 type VectorOperationsTool struct{}
 
@@ -88,15 +102,14 @@ func (t *VectorOperationsTool) Invoke(ctx context.Context, arguments string) (st
 	}
 
 	var result any
-	var err error
 
 	switch args.Operation {
 	case "add":
 		if len(args.Vector2) == 0 {
-			return "", errors.New("vector2 required for add operation")
+			return "", ErrVector2Required
 		}
 		if len(args.Vector1) != len(args.Vector2) {
-			return "", errors.New("vectors must have same length")
+			return "", ErrVectorLengthMismatch
 		}
 		res := la.NewVector(len(args.Vector1))
 		la.VecAdd(res, args.Alpha, la.Vector(args.Vector1), args.Beta, la.Vector(args.Vector2))
@@ -104,10 +117,10 @@ func (t *VectorOperationsTool) Invoke(ctx context.Context, arguments string) (st
 
 	case "subtract":
 		if len(args.Vector2) == 0 {
-			return "", errors.New("vector2 required for subtract operation")
+			return "", ErrVector2Required
 		}
 		if len(args.Vector1) != len(args.Vector2) {
-			return "", errors.New("vectors must have same length")
+			return "", ErrVectorLengthMismatch
 		}
 		res := la.NewVector(len(args.Vector1))
 		la.VecAdd(res, 1.0, la.Vector(args.Vector1), -1.0, la.Vector(args.Vector2))
@@ -121,19 +134,19 @@ func (t *VectorOperationsTool) Invoke(ctx context.Context, arguments string) (st
 
 	case "dot":
 		if len(args.Vector2) == 0 {
-			return "", errors.New("vector2 required for dot product")
+			return "", ErrVector2Required
 		}
 		if len(args.Vector1) != len(args.Vector2) {
-			return "", errors.New("vectors must have same length")
+			return "", ErrVectorLengthMismatch
 		}
 		result = la.VecDot(la.Vector(args.Vector1), la.Vector(args.Vector2))
 
 	case "cross":
 		if len(args.Vector2) == 0 {
-			return "", errors.New("vector2 required for cross product")
+			return "", ErrVector2Required
 		}
 		if len(args.Vector1) != 3 || len(args.Vector2) != 3 {
-			return "", errors.New("cross product requires 3D vectors")
+			return "", ErrCrossProduct3DOnly
 		}
 		// gosl doesn't have cross product, use standard formula
 		u, v := args.Vector1, args.Vector2
@@ -164,19 +177,15 @@ func (t *VectorOperationsTool) Invoke(ctx context.Context, arguments string) (st
 
 	case "norm_diff":
 		if len(args.Vector2) == 0 {
-			return "", errors.New("vector2 required for norm_diff operation")
+			return "", ErrVector2Required
 		}
 		if len(args.Vector1) != len(args.Vector2) {
-			return "", errors.New("vectors must have same length")
+			return "", ErrVectorLengthMismatch
 		}
 		result = la.Vector(args.Vector1).NormDiff(la.Vector(args.Vector2))
 
 	default:
-		return "", fmt.Errorf("unknown operation: %s", args.Operation)
-	}
-
-	if err != nil {
-		return "", fmt.Errorf("operation failed: %w", err)
+		return "", fmt.Errorf("%w: %s", ErrUnknownOperation, args.Operation)
 	}
 
 	response := map[string]any{

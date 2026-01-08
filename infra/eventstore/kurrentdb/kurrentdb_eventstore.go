@@ -13,6 +13,11 @@ import (
 	"github.com/kurrent-io/KurrentDB-Client-Go/kurrentdb"
 )
 
+var (
+	// ErrUnknownEventType is returned when an unknown event type is encountered during deserialization.
+	ErrUnknownEventType = errors.New("unknown event type")
+)
+
 // KurrentDBEventStore is an implementation of EventStore using KurrentDB (PostgreSQL-backed).
 type KurrentDBEventStore struct {
 	client *kurrentdb.Client
@@ -237,7 +242,7 @@ func (s *KurrentDBEventStore) convertFromRecordedEvent(recordedEvent *kurrentdb.
 		event = e
 
 	default:
-		return nil, fmt.Errorf("unknown event type: %s", recordedEvent.EventType)
+		return nil, fmt.Errorf("%w: %s", ErrUnknownEventType, recordedEvent.EventType)
 	}
 
 	return event, nil

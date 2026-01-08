@@ -1,12 +1,18 @@
 package projections
 
 import (
+	"errors"
 	"fmt"
 	"school-with-ai/domain"
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/infra/projection/whiteboard"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
+)
+
+var (
+	// ErrThreadNotFound is returned when a thread is not found in the projection.
+	ErrThreadNotFound = errors.New("thread not found")
 )
 
 // LLMContextProjection defines the interface for LLM context projections.
@@ -45,7 +51,7 @@ func (s *ProjectionService) GetWhiteboardContent(threadID string) string {
 func (s *ProjectionService) GetThreadHistory(threadID string) (any, error) {
 	state, exists := s.aguiProjection.GetThreadState(threadID)
 	if !exists {
-		return nil, fmt.Errorf("thread not found: %s", threadID)
+		return nil, fmt.Errorf("%w: %s", ErrThreadNotFound, threadID)
 	}
 
 	return state, nil

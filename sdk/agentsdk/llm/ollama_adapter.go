@@ -10,6 +10,11 @@ import (
 	"github.com/ollama/ollama/api"
 )
 
+var (
+	// ErrStreamCancelled is returned when the stream is cancelled by the consumer.
+	ErrStreamCancelled = errors.New("stream cancelled")
+)
+
 // OllamaClient implements the ChatClient interface for Ollama.
 // It provides streaming chat completions using the Ollama API.
 type OllamaClient struct {
@@ -72,7 +77,7 @@ func (c *OllamaClient) GetStreamingResponse(
 					Contents: []AIContent{TextContent{Text: resp.Message.Content}},
 				}
 				if !yield(update, nil) {
-					return errors.New("stream cancelled")
+					return ErrStreamCancelled
 				}
 			}
 
@@ -103,7 +108,7 @@ func (c *OllamaClient) GetStreamingResponse(
 				}
 
 				if !yield(update, nil) {
-					return errors.New("stream cancelled")
+					return ErrStreamCancelled
 				}
 
 				toolCallIndex++
@@ -116,7 +121,7 @@ func (c *OllamaClient) GetStreamingResponse(
 					FinishReason: c.mapFinishReason(resp),
 				}
 				if !yield(finalUpdate, nil) {
-					return errors.New("stream cancelled")
+					return ErrStreamCancelled
 				}
 			}
 

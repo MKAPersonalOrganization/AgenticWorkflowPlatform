@@ -9,6 +9,11 @@ import (
 	"github.com/cpmech/gosl/la"
 )
 
+var (
+	// ErrEigenSquareMatrix is returned when a square matrix is required for eigenvalue computation.
+	ErrEigenSquareMatrix = errors.New("matrix must be square")
+)
+
 // EigenvalueTool computes eigenvalues and eigenvectors.
 type EigenvalueTool struct{}
 
@@ -61,7 +66,7 @@ func (t *EigenvalueTool) Invoke(ctx context.Context, arguments string) (string, 
 
 	n := len(args.Matrix)
 	if n == 0 || len(args.Matrix[0]) != n {
-		return "", errors.New("matrix must be square")
+		return "", ErrEigenSquareMatrix
 	}
 
 	A := la.NewMatrixDeep2(args.Matrix)

@@ -13,6 +13,13 @@ import (
 	client "github.com/ory/client-go"
 )
 
+var (
+	// ErrNoCookieHeader is returned when the Cookie header is missing from the request.
+	ErrNoCookieHeader = errors.New("no cookie header")
+	// ErrSessionNotActive is returned when the session is not active.
+	ErrSessionNotActive = errors.New("session is not active")
+)
+
 // Middleware wraps the Kratos client for authentication middleware.
 type Middleware struct {
 	kratosClient *KratosClient
@@ -127,7 +134,7 @@ func (m *Middleware) validateSession(r *http.Request) (*client.Session, error) {
 	// Get session cookie from request
 	cookie := r.Header.Get("Cookie")
 	if cookie == "" {
-		return nil, errors.New("no cookie header")
+		return nil, ErrNoCookieHeader
 	}
 
 	// Validate session with Kratos
@@ -138,7 +145,7 @@ func (m *Middleware) validateSession(r *http.Request) (*client.Session, error) {
 
 	// Check if session is active
 	if session.Active == nil || !*session.Active {
-		return nil, errors.New("session is not active")
+		return nil, ErrSessionNotActive
 	}
 
 	return session, nil

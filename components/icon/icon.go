@@ -4,11 +4,17 @@ package icon
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
 
 	"github.com/a-h/templ"
+)
+
+var (
+	// ErrIconNotFound is returned when an icon is not found in the internal data map.
+	ErrIconNotFound = errors.New("icon not found in internalSvgData map")
 )
 
 // iconContents caches the fully generated SVG strings for icons that have been used,
@@ -120,7 +126,7 @@ func generateSVG(name string, props Props) (string, error) {
 func getIconContent(name string) (string, error) {
 	content, exists := internalSvgData[name]
 	if !exists {
-		return "", fmt.Errorf("icon '%s' not found in internalSvgData map", name)
+		return "", fmt.Errorf("icon '%s': %w", name, ErrIconNotFound)
 	}
 
 	return content, nil

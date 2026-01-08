@@ -10,6 +10,32 @@ import (
 	"strings"
 )
 
+var (
+	// ErrEmptyExpression is returned when the expression is empty.
+	ErrEmptyExpression = errors.New("empty expression")
+
+	// ErrDivisionByZero is returned when dividing by zero.
+	ErrDivisionByZero = errors.New("division by zero")
+
+	// ErrUnexpectedEndOfExpression is returned when the expression ends unexpectedly.
+	ErrUnexpectedEndOfExpression = errors.New("unexpected end of expression")
+
+	// ErrMismatchedParentheses is returned when parentheses don't match.
+	ErrMismatchedParentheses = errors.New("mismatched parentheses")
+
+	// ErrMismatchedParenthesesSqrt is returned when sqrt parentheses don't match.
+	ErrMismatchedParenthesesSqrt = errors.New("mismatched parentheses in sqrt")
+
+	// ErrSqrtNegative is returned when taking square root of negative number.
+	ErrSqrtNegative = errors.New("square root of negative number")
+
+	// ErrExpectedNumber is returned when a number is expected but not found.
+	ErrExpectedNumber = errors.New("expected number")
+
+	// ErrInvalidNumber is returned when a number string is invalid.
+	ErrInvalidNumber = errors.New("invalid number")
+)
+
 // CalculatorArgs represents the arguments for calculate tool.
 type CalculatorArgs struct {
 	Expression string `json:"expression"`
@@ -82,7 +108,7 @@ func evaluateExpression(expr string) (float64, error) {
 	expr = strings.ReplaceAll(expr, " ", "")
 
 	if expr == "" {
-		return 0, errors.New("empty expression")
+		return 0, ErrEmptyExpression
 	}
 
 	// Parse and evaluate
@@ -144,7 +170,7 @@ func parseTerm(expr string, pos int) (float64, int, error) {
 			left *= right
 		} else {
 			if right == 0 {
-				return 0, nextPos, errors.New("division by zero")
+				return 0, nextPos, ErrDivisionByZero
 			}
 			left /= right
 		}
@@ -157,7 +183,7 @@ func parseTerm(expr string, pos int) (float64, int, error) {
 // parseFactor handles numbers, parentheses, and functions.
 func parseFactor(expr string, pos int) (float64, int, error) {
 	if pos >= len(expr) {
-		return 0, pos, errors.New("unexpected end of expression")
+		return 0, pos, ErrUnexpectedEndOfExpression
 	}
 
 	// Handle negative numbers
@@ -179,7 +205,7 @@ func parseFactor(expr string, pos int) (float64, int, error) {
 			return 0, newPos, err
 		}
 		if newPos >= len(expr) || expr[newPos] != ')' {
-			return 0, newPos, errors.New("mismatched parentheses")
+			return 0, newPos, ErrMismatchedParentheses
 		}
 
 		return val, newPos + 1, nil
@@ -192,10 +218,10 @@ func parseFactor(expr string, pos int) (float64, int, error) {
 			return 0, newPos, err
 		}
 		if newPos >= len(expr) || expr[newPos] != ')' {
-			return 0, newPos, errors.New("mismatched parentheses in sqrt")
+			return 0, newPos, ErrMismatchedParenthesesSqrt
 		}
 		if val < 0 {
-			return 0, newPos, errors.New("square root of negative number")
+			return 0, newPos, ErrSqrtNegative
 		}
 
 		return math.Sqrt(val), newPos + 1, nil
@@ -212,12 +238,12 @@ func parseFactor(expr string, pos int) (float64, int, error) {
 	numStr += numStrSb202.String()
 
 	if numStr == "" {
-		return 0, pos, fmt.Errorf("expected number at position %d", startPos)
+		return 0, pos, fmt.Errorf("%w at position %d", ErrExpectedNumber, startPos)
 	}
 
 	num, err := strconv.ParseFloat(numStr, 64)
 	if err != nil {
-		return 0, pos, fmt.Errorf("invalid number: %s", numStr)
+		return 0, pos, fmt.Errorf("%w: %s", ErrInvalidNumber, numStr)
 	}
 
 	// Handle exponentiation

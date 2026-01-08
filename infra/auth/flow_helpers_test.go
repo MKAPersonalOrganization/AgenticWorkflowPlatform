@@ -8,6 +8,18 @@ import (
 	client "github.com/ory/client-go"
 )
 
+// Test error sentinels for testing error handling
+var (
+	errTest410FlowExpired        = errors.New("410 Gone: flow expired")
+	errTest404NotFound           = errors.New("404 Not Found")
+	errTestFlowExpired           = errors.New("flow expired")
+	errTestFlowNotFound          = errors.New("flow not found")
+	errTestNetworkError          = errors.New("network error")
+	errTestSessionAAL2Required   = errors.New("session_aal2_required")
+	errTestAAL2Required          = errors.New("authentication level aal2 required")
+	errTestInvalidCredentials    = errors.New("invalid credentials")
+)
+
 func TestInitFlowURL(t *testing.T) {
 	kratosClient := NewKratosClient()
 
@@ -220,27 +232,27 @@ func TestIsFlowExpired(t *testing.T) {
 		},
 		{
 			name:     "410 error",
-			err:      errors.New("410 Gone: flow expired"),
+			err:      errTest410FlowExpired,
 			expected: true,
 		},
 		{
 			name:     "404 error",
-			err:      errors.New("404 Not Found"),
+			err:      errTest404NotFound,
 			expected: true,
 		},
 		{
 			name:     "explicit flow expired",
-			err:      errors.New("flow expired"),
+			err:      errTestFlowExpired,
 			expected: true,
 		},
 		{
 			name:     "flow not found",
-			err:      errors.New("flow not found"),
+			err:      errTestFlowNotFound,
 			expected: true,
 		},
 		{
 			name:     "other error",
-			err:      errors.New("network error"),
+			err:      errTestNetworkError,
 			expected: false,
 		},
 	}
@@ -313,17 +325,17 @@ func TestIsAAL2Required(t *testing.T) {
 		},
 		{
 			name:     "aal2 required",
-			err:      errors.New("session_aal2_required"),
+			err:      errTestSessionAAL2Required,
 			expected: true,
 		},
 		{
 			name:     "aal2 in message",
-			err:      errors.New("authentication level aal2 required"),
+			err:      errTestAAL2Required,
 			expected: true,
 		},
 		{
 			name:     "other error",
-			err:      errors.New("invalid credentials"),
+			err:      errTestInvalidCredentials,
 			expected: false,
 		},
 	}

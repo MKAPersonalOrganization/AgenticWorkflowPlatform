@@ -2,8 +2,14 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"school-with-ai/domain"
+)
+
+var (
+	// ErrToolNotFound is returned when a tool is not registered.
+	ErrToolNotFound = errors.New("tool not found")
 )
 
 // ToolExecutor executes tool calls and returns results.
@@ -30,7 +36,7 @@ func NewRegistryToolExecutor(ctx context.Context, registry *ToolRegistry) *Regis
 func (e *RegistryToolExecutor) Execute(toolCall domain.ToolCall) (string, error) {
 	tool, ok := e.registry.Get(toolCall.Function.Name)
 	if !ok {
-		return "", fmt.Errorf("tool not found: %s", toolCall.Function.Name)
+		return "", fmt.Errorf("%w: %s", ErrToolNotFound, toolCall.Function.Name)
 	}
 
 	result, err := tool.Invoke(e.ctx, toolCall.Function.Arguments)

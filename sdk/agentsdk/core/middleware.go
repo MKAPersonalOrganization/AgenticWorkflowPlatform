@@ -8,6 +8,11 @@ import (
 	"strings"
 )
 
+var (
+	// ErrNoEventNotifier is returned when attempting to emit an event without a configured notifier.
+	ErrNoEventNotifier = errors.New("no event notifier configured")
+)
+
 // Middleware provides a way to intercept and modify agent execution.
 // Middleware can inspect and modify the request context before and after
 // the next handler executes, enabling cross-cutting concerns like logging,
@@ -133,7 +138,7 @@ func (rc *RequestContext) AddSystemPrompt(text string) {
 // Returns an error if no notifier is configured or if the event emission fails.
 func (rc *RequestContext) EmitEvent(event Event) error {
 	if rc.Config == nil || rc.Config.Notifier == nil {
-		return errors.New("no event notifier configured")
+		return ErrNoEventNotifier
 	}
 
 	if err := rc.Config.Notifier.HandleDomainEvent(event); err != nil {
