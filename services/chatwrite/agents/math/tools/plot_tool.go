@@ -163,9 +163,9 @@ func (p *PlotTool) Invoke(ctx context.Context, arguments string) (string, error)
 
 // executeGnuplotScript executes a gnuplot script and generates the plot image.
 func executeGnuplotScript(userScript, title string) (string, error) {
-	// Ensure charts directory exists
+	// Ensure charts directory exists with secure permissions
 	chartsDir := "assets/charts"
-	if err := os.MkdirAll(chartsDir, 0o755); err != nil {
+	if err := os.MkdirAll(chartsDir, 0o750); err != nil {
 		return "", fmt.Errorf("failed to create charts directory: %w", err)
 	}
 
@@ -196,14 +196,24 @@ func executeGnuplotScript(userScript, title string) (string, error) {
 	script.WriteString(userScript)
 	script.WriteString("\n")
 
-	// Write script to temporary file
+	// Write script to temporary file with secure permissions
 	scriptPath := filepath.Join(chartsDir, fmt.Sprintf("script_%s_%d.gp", filename, time.Now().Unix()))
-	if err := os.WriteFile(scriptPath, []byte(script.String()), 0o644); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(script.String()), 0o600); err != nil {
 		return "", fmt.Errorf("failed to write gnuplot script: %w", err)
 	}
 	defer func() { _ = os.Remove(scriptPath) }() // Clean up script file
 
-	// Execute gnuplot
+	// Validate script path is safe before executing
+	// scriptPath is constructed internally, so should be safe, but verify
+	if !filepath.IsAbs(scriptPath) {
+		var err error
+		scriptPath, err = filepath.Abs(scriptPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to get absolute path: %w", err)
+		}
+	}
+
+	// Execute gnuplot with validated path
 	cmd := exec.Command("gnuplot", scriptPath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {

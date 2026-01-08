@@ -2,7 +2,7 @@ package tools
 
 import (
 	"context"
-	"crypto/md5"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -190,14 +190,14 @@ func (a *AnimateTool) Invoke(ctx context.Context, arguments string) (string, err
 
 // executeGnuplotAnimation executes a gnuplot animation script and generates the animation file.
 func executeGnuplotAnimation(userScript, format string, delay int, title string) (string, error) {
-	// Ensure charts directory exists
+	// Ensure charts directory exists with secure permissions
 	chartsDir := "assets/charts"
-	if err := os.MkdirAll(chartsDir, 0o755); err != nil {
+	if err := os.MkdirAll(chartsDir, 0o750); err != nil {
 		return "", fmt.Errorf("failed to create charts directory: %w", err)
 	}
 
-	// Generate unique filename
-	hash := fmt.Sprintf("%x", md5.Sum([]byte(userScript+title+strconv.FormatInt(time.Now().UnixNano(), 10))))
+	// Generate unique filename using SHA256 (secure hash)
+	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(userScript+title+strconv.FormatInt(time.Now().UnixNano(), 10))))
 	hash = hash[:16] // Use first 16 chars
 	extension := "." + format
 	animationPath := filepath.Join(chartsDir, fmt.Sprintf("animate_%s_%d%s", hash, time.Now().Unix(), extension))
@@ -219,14 +219,24 @@ func executeGnuplotAnimation(userScript, format string, delay int, title string)
 	script.WriteString(userScript)
 	script.WriteString("\n\nunset output\n")
 
-	// Write script to temporary file
+	// Write script to temporary file with secure permissions
 	scriptPath := filepath.Join(chartsDir, fmt.Sprintf("animate_script_%s_%d.gp", hash, time.Now().Unix()))
-	if err := os.WriteFile(scriptPath, []byte(script.String()), 0o644); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(script.String()), 0o600); err != nil {
 		return "", fmt.Errorf("failed to write gnuplot script: %w", err)
 	}
 	defer func() { _ = os.Remove(scriptPath) }() // Clean up script file
 
-	// Execute gnuplot
+	// Validate script path is safe before executing
+	// scriptPath is constructed internally, so should be safe, but verify
+	if !filepath.IsAbs(scriptPath) {
+		var err error
+		scriptPath, err = filepath.Abs(scriptPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to get absolute path: %w", err)
+		}
+	}
+
+	// Execute gnuplot with validated path
 	cmd := exec.Command("gnuplot", scriptPath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {

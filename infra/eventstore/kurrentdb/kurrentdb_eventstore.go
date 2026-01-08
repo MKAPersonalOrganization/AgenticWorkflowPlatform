@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"school-with-ai/sdk/agentsdk/core"
 	"strings"
 
@@ -76,11 +77,21 @@ func (s *KurrentDBEventStore) Append(ctx context.Context, streamID string, event
 		return 0, fmt.Errorf("failed to append to stream: %w", err)
 	}
 
+	// Check for integer overflow before converting uint64 to int64
+	if result.NextExpectedVersion > math.MaxInt64 {
+		return 0, fmt.Errorf("version overflow: %d exceeds max int64", result.NextExpectedVersion)
+	}
+
 	return int64(result.NextExpectedVersion), nil
 }
 
 // ReadStream reads all events for a stream from a specific version.
 func (s *KurrentDBEventStore) ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]core.Event, error) {
+	// Check for negative version before converting int64 to uint64
+	if fromVersion < 0 {
+		return nil, fmt.Errorf("invalid fromVersion: %d (must be non-negative)", fromVersion)
+	}
+
 	readOpts := kurrentdb.ReadStreamOptions{
 		From:      kurrentdb.Revision(uint64(fromVersion)),
 		Direction: kurrentdb.Forwards,
@@ -236,9 +247,14 @@ func (s *KurrentDBEventStore) convertFromRecordedEvent(recordedEvent *kurrentdb.
 func (s *KurrentDBEventStore) ReadAllThreadIDs(ctx context.Context) ([]string, error) {
 	threadIDs, err := s.readFromStreamsProjection(ctx)
 	if err != nil {
-		// If $streams is not available, return empty list
-		// This can happen if the projection is not enabled
-		return []string{}, nil
+		// Check if error is specifically "stream not found" which indicates projection not available
+		// Only ignore that specific error, return other errors (network, permissions, etc.)
+		if strings.Contains(err.Error(), "stream not found") || strings.Contains(err.Error(), "STREAM_NOT_FOUND") {
+			// Projection not enabled - return empty list gracefully
+			return []string{}, nil
+		}
+		// Return actual errors (network, auth, etc.)
+		return nil, fmt.Errorf("failed to read thread IDs: %w", err)
 	}
 
 	return threadIDs, nil

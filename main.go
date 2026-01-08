@@ -209,7 +209,17 @@ func main() {
 	// Home route
 	r.Get("/", authMiddleware.RequireAuthFunc(HandleViewChatInputScreen))
 
-	err = http.ListenAndServe(addr, r)
+	// Create server with proper timeouts to prevent slowloris and similar attacks
+	server := &http.Server{
+		Addr:              addr,
+		Handler:           r,
+		ReadTimeout:       15 * time.Second,
+		ReadHeaderTimeout: 10 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
+	err = server.ListenAndServe()
 	if err != nil {
 		panic(err)
 	}

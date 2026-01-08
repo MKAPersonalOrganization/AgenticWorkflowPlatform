@@ -55,6 +55,7 @@ tasks:
       - go run ./tools/repo-statistics 10
       - xdg-open /tmp/repo_graph.png 2>/dev/null || open /tmp/repo_graph.png 2>/dev/null || echo "Graph saved at /tmp/repo_graph.png"
 
+
   ci:
     desc: Run CI checks (format, lint, test, build)
     cmds:

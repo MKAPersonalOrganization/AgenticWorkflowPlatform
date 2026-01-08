@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	client "github.com/ory/client-go"
@@ -43,7 +44,7 @@ type User struct {
 // NewUserFromIdentity creates a User from a Kratos Identity.
 func NewUserFromIdentity(identity *client.Identity) (*User, error) {
 	if identity == nil {
-		return nil, nil
+		return nil, errors.New("identity cannot be nil")
 	}
 
 	user := &User{
@@ -85,7 +86,7 @@ func NewUserFromIdentity(identity *client.Identity) (*User, error) {
 // NewUserFromSession creates a User from a Kratos Session.
 func NewUserFromSession(session *client.Session) (*User, error) {
 	if session == nil || session.Identity == nil {
-		return nil, nil
+		return nil, errors.New("session or session identity cannot be nil")
 	}
 
 	return NewUserFromIdentity(session.Identity)
