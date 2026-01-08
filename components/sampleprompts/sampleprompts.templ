@@ -1,0 +1,182 @@
+package sampleprompts
+
+templ SamplePrompts() {
+	<!-- Sample Prompts -->
+	<div class="w-full space-y-3" x-data="{ selectedCategory: null }">
+		<p class="text-sm font-medium text-muted-foreground">Explore subjects:</p>
+		<!-- Category Buttons -->
+		<div class="grid gap-2 md:grid-cols-2">
+			<!-- Math Category -->
+			<button
+				@click="selectedCategory = selectedCategory === 'math' ? null : 'math'"
+				class="text-left p-4 rounded-lg border border-border bg-card hover:bg-accent transition-all"
+				:class="selectedCategory === 'math' ? 'border-primary bg-accent' : ''"
+			>
+				<div class="flex items-center justify-between">
+					<div class="flex items-center gap-3">
+						<div class="shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+							<svg class="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
+								<path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z"></path>
+							</svg>
+						</div>
+						<p class="text-sm font-medium">Mathematics</p>
+					</div>
+					<svg class="w-4 h-4 transition-transform" :class="selectedCategory === 'math' ? 'rotate-180' : ''" fill="currentColor" viewBox="0 0 20 20">
+						<path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+					</svg>
+				</div>
+			</button>
+			<!-- Physics Category -->
+			<button
+				@click="selectedCategory = selectedCategory === 'physics' ? null : 'physics'"
+				class="text-left p-4 rounded-lg border border-border bg-card hover:bg-accent transition-all"
+				:class="selectedCategory === 'physics' ? 'border-primary bg-accent' : ''"
+			>
+				<div class="flex items-center justify-between">
+					<div class="flex items-center gap-3">
+						<div class="shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+							<svg class="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
+								<path d="M10 12a2 2 0 100-4 2 2 0 000 4z"></path>
+								<path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"></path>
+							</svg>
+						</div>
+						<p class="text-sm font-medium">Physics</p>
+					</div>
+					<svg class="w-4 h-4 transition-transform" :class="selectedCategory === 'physics' ? 'rotate-180' : ''" fill="currentColor" viewBox="0 0 20 20">
+						<path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+					</svg>
+				</div>
+			</button>
+			<!-- Chemistry Category -->
+			<button
+				@click="selectedCategory = selectedCategory === 'chemistry' ? null : 'chemistry'"
+				class="text-left p-4 rounded-lg border border-border bg-card hover:bg-accent transition-all"
+				:class="selectedCategory === 'chemistry' ? 'border-primary bg-accent' : ''"
+			>
+				<div class="flex items-center justify-between">
+					<div class="flex items-center gap-3">
+						<div class="shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+							<svg class="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
+								<path fill-rule="evenodd" d="M7 2a1 1 0 00-.707 1.707L7 4.414v3.758a1 1 0 01-.293.707l-4 4C.817 14.769 2.156 18 4.828 18h10.343c2.673 0 4.012-3.231 2.122-5.121l-4-4A1 1 0 0113 8.172V4.414l.707-.707A1 1 0 0013 2H7zm2 6.172V4h2v4.172a3 3 0 00.879 2.12l1.027 1.028a4 4 0 00-2.171.102l-.47.156a4 4 0 01-2.53 0l-.563-.187a1.993 1.993 0 00-.114-.035l1.063-1.063A3 3 0 009 8.172z" clip-rule="evenodd"></path>
+							</svg>
+						</div>
+						<p class="text-sm font-medium">Chemistry</p>
+					</div>
+					<svg class="w-4 h-4 transition-transform" :class="selectedCategory === 'chemistry' ? 'rotate-180' : ''" fill="currentColor" viewBox="0 0 20 20">
+						<path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+					</svg>
+				</div>
+			</button>
+			<!-- Biology Category -->
+			<button
+				@click="selectedCategory = selectedCategory === 'biology' ? null : 'biology'"
+				class="text-left p-4 rounded-lg border border-border bg-card hover:bg-accent transition-all"
+				:class="selectedCategory === 'biology' ? 'border-primary bg-accent' : ''"
+			>
+				<div class="flex items-center justify-between">
+					<div class="flex items-center gap-3">
+						<div class="shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+							<svg class="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
+								<path fill-rule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clip-rule="evenodd"></path>
+							</svg>
+						</div>
+						<p class="text-sm font-medium">Biology</p>
+					</div>
+					<svg class="w-4 h-4 transition-transform" :class="selectedCategory === 'biology' ? 'rotate-180' : ''" fill="currentColor" viewBox="0 0 20 20">
+						<path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+					</svg>
+				</div>
+			</button>
+		</div>
+		<!-- Math Examples -->
+		<div x-show="selectedCategory === 'math'" x-collapse class="space-y-2">
+			<button
+				@click="currentMessage = 'Solve the quadratic equation: x² + 5x + 6 = 0'; sendMessage()"
+				class="w-full text-left p-3 rounded-lg border border-border bg-card/50 hover:bg-accent hover:border-primary transition-all text-sm"
+			>
+				Solve the quadratic equation: x² + 5x + 6 = 0
+			</button>
+			<button
+				@click="currentMessage = 'What is the derivative of sin(x) * cos(x)?'; sendMessage()"
+				class="w-full text-left p-3 rounded-lg border border-border bg-card/50 hover:bg-accent hover:border-primary transition-all text-sm"
+			>
+				What is the derivative of sin(x) · cos(x)?
+			</button>
+			<button
+				@click="currentMessage = 'Calculate the area of a circle with radius 5'; sendMessage()"
+				class="w-full text-left p-3 rounded-lg border border-border bg-card/50 hover:bg-accent hover:border-primary transition-all text-sm"
+			>
+				Calculate the area of a circle with radius 5
+			</button>
+			<button
+				@click="currentMessage = 'Calculate mean and standard deviation of: 4, 8, 6, 5, 3, 7'; sendMessage()"
+				class="w-full text-left p-3 rounded-lg border border-border bg-card/50 hover:bg-accent hover:border-primary transition-all text-sm"
+			>
+				Calculate mean and standard deviation of: 4, 8, 6, 5, 3, 7
+			</button>
+		</div>
+		<!-- Physics Examples -->
+		<div x-show="selectedCategory === 'physics'" x-collapse class="space-y-2">
+			<button
+				@click="currentMessage = 'Calculate the force needed to accelerate a 50kg object at 3m/s²'; sendMessage()"
+				class="w-full text-left p-3 rounded-lg border border-border bg-card/50 hover:bg-accent hover:border-primary transition-all text-sm"
+			>
+				Calculate the force needed to accelerate a 50kg object at 3m/s²
+			</button>
+			<button
+				@click="currentMessage = 'What is the kinetic energy of a 2kg object moving at 10m/s?'; sendMessage()"
+				class="w-full text-left p-3 rounded-lg border border-border bg-card/50 hover:bg-accent hover:border-primary transition-all text-sm"
+			>
+				What is the kinetic energy of a 2kg object moving at 10m/s?
+			</button>
+			<button
+				@click="currentMessage = 'Explain Newton\\'s third law of motion with an example'; sendMessage()"
+				class="w-full text-left p-3 rounded-lg border border-border bg-card/50 hover:bg-accent hover:border-primary transition-all text-sm"
+			>
+				Explain Newton's third law of motion with an example
+			</button>
+		</div>
+		<!-- Chemistry Examples -->
+		<div x-show="selectedCategory === 'chemistry'" x-collapse class="space-y-2">
+			<button
+				@click="currentMessage = 'Balance the equation: H₂ + O₂ → H₂O'; sendMessage()"
+				class="w-full text-left p-3 rounded-lg border border-border bg-card/50 hover:bg-accent hover:border-primary transition-all text-sm"
+			>
+				Balance the equation: H₂ + O₂ → H₂O
+			</button>
+			<button
+				@click="currentMessage = 'What is the molar mass of glucose (C₆H₁₂O₆)?'; sendMessage()"
+				class="w-full text-left p-3 rounded-lg border border-border bg-card/50 hover:bg-accent hover:border-primary transition-all text-sm"
+			>
+				What is the molar mass of glucose (C₆H₁₂O₆)?
+			</button>
+			<button
+				@click="currentMessage = 'Explain the difference between ionic and covalent bonds'; sendMessage()"
+				class="w-full text-left p-3 rounded-lg border border-border bg-card/50 hover:bg-accent hover:border-primary transition-all text-sm"
+			>
+				Explain the difference between ionic and covalent bonds
+			</button>
+		</div>
+		<!-- Biology Examples -->
+		<div x-show="selectedCategory === 'biology'" x-collapse class="space-y-2">
+			<button
+				@click="currentMessage = 'Explain the process of photosynthesis'; sendMessage()"
+				class="w-full text-left p-3 rounded-lg border border-border bg-card/50 hover:bg-accent hover:border-primary transition-all text-sm"
+			>
+				Explain the process of photosynthesis
+			</button>
+			<button
+				@click="currentMessage = 'What are the main differences between plant and animal cells?'; sendMessage()"
+				class="w-full text-left p-3 rounded-lg border border-border bg-card/50 hover:bg-accent hover:border-primary transition-all text-sm"
+			>
+				What are the main differences between plant and animal cells?
+			</button>
+			<button
+				@click="currentMessage = 'Describe the structure of DNA'; sendMessage()"
+				class="w-full text-left p-3 rounded-lg border border-border bg-card/50 hover:bg-accent hover:border-primary transition-all text-sm"
+			>
+				Describe the structure of DNA
+			</button>
+		</div>
+	</div>
+}
