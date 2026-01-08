@@ -59,7 +59,11 @@ func main() {
 	if err != nil {
 		panic(fmt.Sprintf("failed to create KurrentDB event store: %v", err))
 	}
-	defer baseEventStore.Close()
+	defer func() {
+		if closeErr := baseEventStore.Close(); closeErr != nil {
+			slog.Error("Failed to close event store", "error", closeErr)
+		}
+	}()
 
 	// Initialize query-time AGUI projection (reads directly from event store on each query)
 	aguiProjection := agui.NewQueryTimeAguiProjection(baseEventStore)

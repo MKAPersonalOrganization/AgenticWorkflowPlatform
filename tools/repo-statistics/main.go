@@ -61,8 +61,9 @@ func main() {
 	fmt.Printf("Found %d commits\n", len(commits))
 
 	// Apply commit range filter
-	start, end := 1, len(commits)
+	var start, end int
 	if commitRange != "" {
+		var err error
 		start, end, err = parseRange(commitRange, len(commits))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error parsing range: %v\n", err)
@@ -84,22 +85,32 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Error creating data file: %v\n", err)
 		os.Exit(1)
 	}
-	defer f.Close()
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil {
+			fmt.Fprintf(os.Stderr, "Error closing data file: %v\n", closeErr)
+		}
+	}()
 
 	for i, commit := range commits {
 		totalAdded += commit.Added
 		totalRemoved += commit.Removed
-		fmt.Fprintf(f, "%d %s %d %d %d %d\n",
-			i+1, commit.Date, commit.Added, commit.Removed, totalAdded, totalRemoved)
+		if _, err := fmt.Fprintf(f, "%d %s %d %d %d %d\n",
+			i+1, commit.Date, commit.Added, commit.Removed, totalAdded, totalRemoved); err != nil {
+			fmt.Fprintf(os.Stderr, "Error writing to data file: %v\n", err)
+			os.Exit(1)
+		}
 	}
 
 	fmt.Printf("Total Lines Added: %d\n", totalAdded)
 	fmt.Printf("Total Lines Removed: %d\n", totalRemoved)
 	fmt.Printf("Net Change: %d lines\n", totalAdded-totalRemoved)
 
+	// Determine date range
+	startDate := commits[0].Date
+	endDate := commits[len(commits)-1].Date
+
 	// Create gnuplot script
-	err = createGnuplotScript(len(commits), totalAdded, totalRemoved,
-		commits[0].Date, commits[len(commits)-1].Date)
+	err = createGnuplotScript(len(commits), totalAdded, totalRemoved, startDate, endDate)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating gnuplot script: %v\n", err)
 		os.Exit(1)
@@ -252,7 +263,9 @@ func openImage(path string) {
 
 	for _, cmd := range commands {
 		if _, err := exec.LookPath(cmd[0]); err == nil {
-			go exec.Command(cmd[0], cmd[1:]...).Start()
+			go func(c []string) {
+				_ = exec.Command(c[0], c[1:]...).Start()
+			}(cmd)
 			return
 		}
 	}

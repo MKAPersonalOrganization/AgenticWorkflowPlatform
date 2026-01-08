@@ -164,7 +164,11 @@ func (s *AsynqServer) GetEventBuffer(jobID string) (*EventBuffer, bool) {
 // GetTaskInfo retrieves task information from Asynq
 func (s *AsynqServer) GetTaskInfo(queue, taskID string) (*asynq.TaskInfo, error) {
 	inspector := asynq.NewInspector(asynq.RedisClientOpt{Addr: s.redisAddr})
-	defer inspector.Close()
+	defer func() {
+		if err := inspector.Close(); err != nil {
+			slog.Warn("Failed to close inspector", "error", err)
+		}
+	}()
 
 	// Use Inspector's GetTaskInfo which efficiently looks up the task
 	return inspector.GetTaskInfo(queue, taskID)
@@ -173,7 +177,11 @@ func (s *AsynqServer) GetTaskInfo(queue, taskID string) (*asynq.TaskInfo, error)
 // CancelTask attempts to cancel a task by job ID
 func (s *AsynqServer) CancelTask(jobID string) error {
 	inspector := asynq.NewInspector(asynq.RedisClientOpt{Addr: s.redisAddr})
-	defer inspector.Close()
+	defer func() {
+		if err := inspector.Close(); err != nil {
+			slog.Warn("Failed to close inspector", "error", err)
+		}
+	}()
 
 	// Try to delete the task from the default queue first (for pending/scheduled/retry tasks)
 	err := inspector.DeleteTask("default", jobID)
@@ -200,6 +208,8 @@ func (s *AsynqServer) CancelTask(jobID string) error {
 func (s *AsynqServer) Shutdown() {
 	slog.Info("Shutting down Asynq server")
 	s.server.Shutdown()
-	s.client.Close()
+	if err := s.client.Close(); err != nil {
+		slog.Error("Failed to close Asynq client", "error", err)
+	}
 	slog.Info("Asynq server shut down")
 }
