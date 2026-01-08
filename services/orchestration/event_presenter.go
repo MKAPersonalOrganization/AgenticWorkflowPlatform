@@ -1,6 +1,7 @@
 package orchestration
 
 import (
+	"fmt"
 	"school-with-ai/sdk/agentsdk/core"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
@@ -55,7 +56,11 @@ func (n *UINotifier) emitTextMessageStart(evt *core.AssistantMessageStartedEvent
 		aguievents.WithRole("assistant"),
 	)
 
-	return n.emitter.Emit(uiEvent)
+	if err := n.emitter.Emit(uiEvent); err != nil {
+		return fmt.Errorf("failed to emit text message start event: %w", err)
+	}
+
+	return nil
 }
 
 func (n *UINotifier) emitTextMessageContent(evt *core.AssistantContentStreamedEvent) error {
@@ -64,7 +69,11 @@ func (n *UINotifier) emitTextMessageContent(evt *core.AssistantContentStreamedEv
 		evt.Delta,
 	)
 
-	return n.emitter.Emit(uiEvent)
+	if err := n.emitter.Emit(uiEvent); err != nil {
+		return fmt.Errorf("failed to emit text message content event: %w", err)
+	}
+
+	return nil
 }
 
 func (n *UINotifier) emitToolCallStart(evt *core.ToolCallStartedEvent) error {
@@ -78,7 +87,7 @@ func (n *UINotifier) emitToolCallStart(evt *core.ToolCallStartedEvent) error {
 	)
 	err := n.emitter.Emit(agentEvent)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to emit tool call agent event: %w", err)
 	}
 
 	// Then emit standard TOOL_CALL_START event
@@ -88,7 +97,11 @@ func (n *UINotifier) emitToolCallStart(evt *core.ToolCallStartedEvent) error {
 		aguievents.WithParentMessageID(evt.ParentMessageID),
 	)
 
-	return n.emitter.Emit(uiEvent)
+	if err := n.emitter.Emit(uiEvent); err != nil {
+		return fmt.Errorf("failed to emit tool call start event: %w", err)
+	}
+
+	return nil
 }
 
 func (n *UINotifier) emitToolCallArgs(evt *core.ToolCallArgumentsStreamedEvent) error {
@@ -97,7 +110,11 @@ func (n *UINotifier) emitToolCallArgs(evt *core.ToolCallArgumentsStreamedEvent) 
 		evt.Delta,
 	)
 
-	return n.emitter.Emit(uiEvent)
+	if err := n.emitter.Emit(uiEvent); err != nil {
+		return fmt.Errorf("failed to emit tool call args event: %w", err)
+	}
+
+	return nil
 }
 
 func (n *UINotifier) emitToolCallEnd(evt *core.ToolCallCompletedEvent) error {
@@ -105,7 +122,11 @@ func (n *UINotifier) emitToolCallEnd(evt *core.ToolCallCompletedEvent) error {
 		evt.ToolCallID,
 	)
 
-	return n.emitter.Emit(uiEvent)
+	if err := n.emitter.Emit(uiEvent); err != nil {
+		return fmt.Errorf("failed to emit tool call end event: %w", err)
+	}
+
+	return nil
 }
 
 func (n *UINotifier) emitTextMessageEnd(evt *core.AssistantMessageCompletedEvent) error {
@@ -113,7 +134,11 @@ func (n *UINotifier) emitTextMessageEnd(evt *core.AssistantMessageCompletedEvent
 		evt.MessageID,
 	)
 
-	return n.emitter.Emit(uiEvent)
+	if err := n.emitter.Emit(uiEvent); err != nil {
+		return fmt.Errorf("failed to emit text message end event: %w", err)
+	}
+
+	return nil
 }
 
 func (n *UINotifier) emitToolCallResult(evt *core.ToolCallExecutedEvent) error {
@@ -123,5 +148,9 @@ func (n *UINotifier) emitToolCallResult(evt *core.ToolCallExecutedEvent) error {
 		evt.ToolResult,
 	)
 
-	return n.emitter.Emit(uiEvent)
+	if err := n.emitter.Emit(uiEvent); err != nil {
+		return fmt.Errorf("failed to emit tool call result event: %w", err)
+	}
+
+	return nil
 }

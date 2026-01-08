@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"errors"
+	"fmt"
 	"school-with-ai/sdk/agentsdk/llm"
 	"strings"
 )
@@ -135,7 +136,11 @@ func (rc *RequestContext) EmitEvent(event Event) error {
 		return errors.New("no event notifier configured")
 	}
 
-	return rc.Config.Notifier.HandleDomainEvent(event)
+	if err := rc.Config.Notifier.HandleDomainEvent(event); err != nil {
+		return fmt.Errorf("failed to handle domain event: %w", err)
+	}
+
+	return nil
 }
 
 // GetEffectiveSystemPrompt returns the combined system prompt including

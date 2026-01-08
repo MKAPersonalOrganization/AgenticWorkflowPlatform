@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/services/chatwrite/agents/shared/tools"
@@ -207,7 +208,7 @@ func TestRegistryToolExecutor(t *testing.T) {
 			}
 			err := json.Unmarshal([]byte(arguments), &args)
 			if err != nil {
-				return "", err
+				return "", fmt.Errorf("failed to unmarshal arguments: %w", err)
 			}
 
 			return `{"message": "Hello, ` + args.Name + `!"}`, nil

@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 )
 
 // Tool represents a tool that can be called by an LLM.
@@ -195,6 +196,9 @@ func EnumProperty(description string, values []string) map[string]any {
 func ParseArguments[T any](arguments string) (T, error) {
 	var result T
 	err := json.Unmarshal([]byte(arguments), &result)
+	if err != nil {
+		return result, fmt.Errorf("failed to parse arguments: %w", err)
+	}
 
-	return result, err
+	return result, nil
 }

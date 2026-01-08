@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/json"
+	"fmt"
 	"school-with-ai/domain"
 	"sync"
 )
@@ -58,7 +59,7 @@ func NewInMemoryMessageStoreFromState(data []byte) (*InMemoryMessageStore, error
 
 	err := json.Unmarshal(data, &state)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal message store state: %w", err)
 	}
 
 	store.messages = state.Messages
@@ -135,5 +136,10 @@ func (s *InMemoryMessageStore) Serialize() ([]byte, error) {
 		Messages: s.messages,
 	}
 
-	return json.Marshal(state)
+	data, err := json.Marshal(state)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal message store state: %w", err)
+	}
+
+	return data, nil
 }

@@ -3,6 +3,7 @@ package core_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"school-with-ai/sdk/agentsdk/core"
 	"testing"
 )
@@ -25,7 +26,7 @@ func TestFunctionTool(t *testing.T) {
 			}
 			err := json.Unmarshal([]byte(arguments), &args)
 			if err != nil {
-				return "", err
+				return "", fmt.Errorf("failed to unmarshal arguments: %w", err)
 			}
 			if args.Unit == "" {
 				args.Unit = "celsius"

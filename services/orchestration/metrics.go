@@ -1,6 +1,7 @@
 package orchestration
 
 import (
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -44,7 +45,7 @@ func (s *AsynqServer) GetMetrics() (*ServerMetrics, error) {
 	// Get queue stats
 	stats, err := inspector.GetQueueInfo("default")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get queue info: %w", err)
 	}
 
 	metrics := &ServerMetrics{
