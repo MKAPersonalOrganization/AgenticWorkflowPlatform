@@ -15,8 +15,7 @@ graph TB
     Kratos[Ory Kratos<br/>Identity & Auth]
     Postgres[(PostgreSQL<br/>Kratos DB)]
     
-    Asynqmon[Asynqmon<br/>Queue Monitor]
-    MailSlurper[MailSlurper<br/>Email Testing]
+    EmailService[Email Service]
     
     Browser -->|HTTP/SSE| GoApp
     GoApp -->|Events| KurrentDB
@@ -25,9 +24,7 @@ graph TB
     GoApp -->|Auth API| Kratos
     
     Kratos -->|SQL| Postgres
-    Kratos -->|SMTP| MailSlurper
-    
-    Asynqmon -.->|Monitor| Redis
+    Kratos -->|SMTP| EmailService
 ```
 
 ### Component Overview
@@ -38,8 +35,7 @@ graph TB
 - **Redis**: Task queue for async job processing (Asynq)
 - **Ory Kratos**: Identity and session management
 - **PostgreSQL**: Database for Kratos user data
-- **Asynqmon**: Web UI for monitoring Redis task queue
-- **MailSlurper**: Email testing in development
+- **Email Service**: Notification service for authentication emails
 
 ### Key Patterns
 
