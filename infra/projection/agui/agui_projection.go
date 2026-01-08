@@ -1,14 +1,15 @@
 package agui
 
 import (
-	"school-with-ai/infra/eventstore"
 	"time"
+
+	"school-with-ai/infra/eventstore"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
 
 // EventEmitter is a function that emits real-time events to connected clients.
-type EventEmitter func(threadID string, event interface{}) error
+type EventEmitter func(threadID string, event any) error
 
 // AguiProjection is a read model optimized for the AG-UI protocol.
 //
@@ -53,7 +54,7 @@ type AguiThreadState struct {
 	ThreadID          string                        `json:"threadId"`
 	Title             string                        `json:"title,omitempty"`
 	Messages          []aguievents.Message          `json:"messages"` // AG-UI SDK format
-	ActiveRun         *AguiRunState                 `json:"activeRun,omitempty"`
+	ActiveRun         *AguiRunState                 `json:"activeRun"`
 	ToolCalls         []AguiToolCall                `json:"toolCalls"`
 	AgentActivity     map[string]*AguiAgentActivity `json:"agentActivity"`
 	WhiteboardContent string                        `json:"whiteboardContent,omitempty"`
@@ -68,7 +69,7 @@ type AguiRunState struct {
 	AgentName  string    `json:"agentName"`
 	Status     string    `json:"status"` // "running", "completed", "error"
 	StartedAt  time.Time `json:"startedAt"`
-	FinishedAt time.Time `json:"finishedAt,omitempty"`
+	FinishedAt time.Time `json:"finishedAt"`
 	Error      string    `json:"error,omitempty"`
 }
 
@@ -85,7 +86,7 @@ type AguiToolCall struct {
 	ParentMessageID string    `json:"parentMessageId"`
 	Status          string    `json:"status"` // "started", "args_complete", "completed"
 	StartedAt       time.Time `json:"startedAt"`
-	CompletedAt     time.Time `json:"completedAt,omitempty"`
+	CompletedAt     time.Time `json:"completedAt"`
 }
 
 // AguiAgentActivity tracks an agent's activity in a thread.
