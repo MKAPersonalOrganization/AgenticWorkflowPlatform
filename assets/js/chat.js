@@ -1473,8 +1473,8 @@ document.addEventListener('alpine:init', () => {
         /**
          * Convert backend AGUI messages to UI display format
          * 
-         * UNIFIED DATA SOURCE: Both SSE and REST API read from AGUI projection and convert to AG-UI SDK format.
-         * - REST API: GET /api/agui/threads/{id}/messages → converts AguiMessage to aguievents.Message
+         * UNIFIED DATA SOURCE: Both SSE and REST API read from AGUI projection (stores AG-UI SDK format natively).
+         * - REST API: GET /api/agui/threads/{id}/messages → returns aguievents.Message directly
          * - SSE: GET /v1/tasks/{id}/events → sends MESSAGES_SNAPSHOT in aguievents.Message format
          * 
          * Format: AG-UI SDK standard (nested structure)
