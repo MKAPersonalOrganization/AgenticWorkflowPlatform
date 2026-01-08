@@ -18,12 +18,12 @@ func NewEventBufferManager() *EventBufferManager {
 }
 
 // CreateEmitter creates a new event emitter for a job
-func (m *EventBufferManager) CreateEmitter(jobID string) EventEmitter {
+func (m *EventBufferManager) CreateEmitter(jobID string, threadID string) EventEmitter {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	// Create a buffered event storage
-	buffer := NewEventBuffer(1000)
+	buffer := NewEventBuffer(1000, threadID)
 	m.eventBuffers[jobID] = buffer
 
 	return &BufferedEventEmitter{
@@ -54,17 +54,19 @@ func (m *EventBufferManager) CloseEmitter(jobID string) {
 
 // EventBuffer stores events for a job and allows multiple consumers
 type EventBuffer struct {
-	mu      sync.RWMutex
-	events  []any
-	closed  bool
-	maxSize int
+	mu       sync.RWMutex
+	events   []any
+	closed   bool
+	maxSize  int
+	ThreadID string // Associated thread ID for this job
 }
 
 // NewEventBuffer creates a new event buffer
-func NewEventBuffer(maxSize int) *EventBuffer {
+func NewEventBuffer(maxSize int, threadID string) *EventBuffer {
 	return &EventBuffer{
-		events:  make([]any, 0, maxSize),
-		maxSize: maxSize,
+		events:   make([]any, 0, maxSize),
+		maxSize:  maxSize,
+		ThreadID: threadID,
 	}
 }
 

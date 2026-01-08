@@ -10,6 +10,7 @@ import (
 
 	"school-with-ai/domain"
 	"school-with-ai/infra/eventstore"
+	"school-with-ai/infra/projection/agui"
 	"school-with-ai/infra/projection/llmcontext"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/sdk/agentsdk/llm"
@@ -184,7 +185,53 @@ func (h *AsynqHandler) StreamJobEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 streamEvents:
-	// Stream events from buffer
+	// FIRST: Send MESSAGES_SNAPSHOT from projection (ensures client has current state)
+	if threadHistory, err := h.projectionService.GetThreadHistory(eventBuffer.ThreadID); err == nil {
+		// Type assert to *agui.AguiThreadState
+		if threadState, ok := threadHistory.(*agui.AguiThreadState); ok {
+			// Convert []AguiMessage to []aguievents.Message for the snapshot event
+			aguiMessages := make([]aguievents.Message, 0, len(threadState.Messages))
+			for _, msg := range threadState.Messages {
+				aguiMsg := aguievents.Message{
+					ID:   msg.ID,
+					Role: msg.Role,
+				}
+				if msg.Content != "" {
+					aguiMsg.Content = &msg.Content
+				}
+				if msg.AgentName != "" {
+					aguiMsg.Name = &msg.AgentName
+				}
+				// Convert tool calls
+				if len(msg.ToolCalls) > 0 {
+					toolCalls := make([]aguievents.ToolCall, len(msg.ToolCalls))
+					for i, tc := range msg.ToolCalls {
+						toolCalls[i] = aguievents.ToolCall{
+							ID:   tc.ID,
+							Type: "function",
+							Function: aguievents.Function{
+								Name:      tc.Name,
+								Arguments: tc.Arguments,
+							},
+						}
+					}
+					aguiMsg.ToolCalls = toolCalls
+				}
+				// Convert tool call result
+				if msg.ToolCall != nil {
+					aguiMsg.ToolCallID = &msg.ToolCall.ID
+				}
+				aguiMessages = append(aguiMessages, aguiMsg)
+			}
+
+			messagesSnapshotEvent := aguievents.NewMessagesSnapshotEvent(aguiMessages)
+			if err := writeSSEEvent(w, messagesSnapshotEvent); err == nil {
+				flusher.Flush()
+			}
+		}
+	}
+
+	// THEN: Stream realtime events from buffer
 	eventIndex := 0
 	eventTicker := time.NewTicker(50 * time.Millisecond)
 	defer eventTicker.Stop()
