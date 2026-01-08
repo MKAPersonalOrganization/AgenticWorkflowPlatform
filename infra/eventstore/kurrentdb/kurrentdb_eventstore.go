@@ -6,19 +6,18 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
-
 	"school-with-ai/sdk/agentsdk/core"
+	"strings"
 
 	"github.com/kurrent-io/KurrentDB-Client-Go/kurrentdb"
 )
 
-// KurrentDBEventStore is an implementation of EventStore using KurrentDB (PostgreSQL-backed)
+// KurrentDBEventStore is an implementation of EventStore using KurrentDB (PostgreSQL-backed).
 type KurrentDBEventStore struct {
 	client *kurrentdb.Client
 }
 
-// NewKurrentDBEventStore creates a new KurrentDB event store
+// NewKurrentDBEventStore creates a new KurrentDB event store.
 func NewKurrentDBEventStore(connectionString string) (*KurrentDBEventStore, error) {
 	settings, err := kurrentdb.ParseConnectionString(connectionString)
 	if err != nil {
@@ -50,7 +49,7 @@ func (s *KurrentDBEventStore) enableSystemProjections() {
 	// No-op: System projections must be enabled externally
 }
 
-// Append adds events to a stream in KurrentDB
+// Append adds events to a stream in KurrentDB.
 func (s *KurrentDBEventStore) Append(ctx context.Context, streamID string, events ...core.Event) (int64, error) {
 	if len(events) == 0 {
 		return 0, nil
@@ -80,7 +79,7 @@ func (s *KurrentDBEventStore) Append(ctx context.Context, streamID string, event
 	return int64(result.NextExpectedVersion), nil
 }
 
-// ReadStream reads all events for a stream from a specific version
+// ReadStream reads all events for a stream from a specific version.
 func (s *KurrentDBEventStore) ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]core.Event, error) {
 	readOpts := kurrentdb.ReadStreamOptions{
 		From:      kurrentdb.Revision(uint64(fromVersion)),
@@ -107,6 +106,7 @@ func (s *KurrentDBEventStore) ReadStream(ctx context.Context, streamID string, f
 				(len(errMsg) > 30 && errMsg[:30] == "[ErrorCodeResourceNotFound] a ")) {
 				return []core.Event{}, nil
 			}
+
 			return nil, fmt.Errorf("failed to receive event: %w", err)
 		}
 
@@ -121,92 +121,104 @@ func (s *KurrentDBEventStore) ReadStream(ctx context.Context, streamID string, f
 	return events, nil
 }
 
-// Close closes the KurrentDB client connection
+// Close closes the KurrentDB client connection.
 func (s *KurrentDBEventStore) Close() error {
 	if s.client != nil {
 		return s.client.Close()
 	}
+
 	return nil
 }
 
-// convertFromRecordedEvent converts a KurrentDB RecordedEvent to a domain event
+// convertFromRecordedEvent converts a KurrentDB RecordedEvent to a domain event.
 func (s *KurrentDBEventStore) convertFromRecordedEvent(recordedEvent *kurrentdb.RecordedEvent) (core.Event, error) {
 	var event core.Event
 
 	switch recordedEvent.EventType {
 	case "ThreadCreatedEvent":
 		var e core.ThreadCreatedEvent
-		if err := json.Unmarshal(recordedEvent.Data, &e); err != nil {
+		err := json.Unmarshal(recordedEvent.Data, &e)
+		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal ThreadCreatedEvent: %w", err)
 		}
 		event = e
 
 	case "UserMessageAddedEvent":
 		var e core.UserMessageAddedEvent
-		if err := json.Unmarshal(recordedEvent.Data, &e); err != nil {
+		err := json.Unmarshal(recordedEvent.Data, &e)
+		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal UserMessageAddedEvent: %w", err)
 		}
 		event = e
 
 	case "AssistantMessageStartedEvent":
 		var e core.AssistantMessageStartedEvent
-		if err := json.Unmarshal(recordedEvent.Data, &e); err != nil {
+		err := json.Unmarshal(recordedEvent.Data, &e)
+		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal AssistantMessageStartedEvent: %w", err)
 		}
 		event = e
 
 	case "AssistantContentStreamedEvent":
 		var e core.AssistantContentStreamedEvent
-		if err := json.Unmarshal(recordedEvent.Data, &e); err != nil {
+		err := json.Unmarshal(recordedEvent.Data, &e)
+		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal AssistantContentStreamedEvent: %w", err)
 		}
 		event = e
 
 	case "ToolCallStartedEvent":
 		var e core.ToolCallStartedEvent
-		if err := json.Unmarshal(recordedEvent.Data, &e); err != nil {
+		err := json.Unmarshal(recordedEvent.Data, &e)
+		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal ToolCallStartedEvent: %w", err)
 		}
 		event = e
 
 	case "ToolCallArgumentsStreamedEvent":
 		var e core.ToolCallArgumentsStreamedEvent
-		if err := json.Unmarshal(recordedEvent.Data, &e); err != nil {
+		err := json.Unmarshal(recordedEvent.Data, &e)
+		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal ToolCallArgumentsStreamedEvent: %w", err)
 		}
 		event = e
 
 	case "ToolCallCompletedEvent":
 		var e core.ToolCallCompletedEvent
-		if err := json.Unmarshal(recordedEvent.Data, &e); err != nil {
+		err := json.Unmarshal(recordedEvent.Data, &e)
+		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal ToolCallCompletedEvent: %w", err)
 		}
 		event = e
 
 	case "AssistantMessageCompletedEvent":
 		var e core.AssistantMessageCompletedEvent
-		if err := json.Unmarshal(recordedEvent.Data, &e); err != nil {
+		err := json.Unmarshal(recordedEvent.Data, &e)
+		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal AssistantMessageCompletedEvent: %w", err)
 		}
 		event = e
 
 	case "ToolCallExecutedEvent":
 		var e core.ToolCallExecutedEvent
-		if err := json.Unmarshal(recordedEvent.Data, &e); err != nil {
+		err := json.Unmarshal(recordedEvent.Data, &e)
+		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal ToolCallExecutedEvent: %w", err)
 		}
 		event = e
 
 	case "ThreadTitleUpdatedEvent":
 		var e core.ThreadTitleUpdatedEvent
-		if err := json.Unmarshal(recordedEvent.Data, &e); err != nil {
+		err := json.Unmarshal(recordedEvent.Data, &e)
+		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal ThreadTitleUpdatedEvent: %w", err)
 		}
 		event = e
 
 	case "ThreadDeletedEvent":
 		var e core.ThreadDeletedEvent
-		if err := json.Unmarshal(recordedEvent.Data, &e); err != nil {
+		err := json.Unmarshal(recordedEvent.Data, &e)
+		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal ThreadDeletedEvent: %w", err)
 		}
 		event = e
@@ -228,6 +240,7 @@ func (s *KurrentDBEventStore) ReadAllThreadIDs(ctx context.Context) ([]string, e
 		// This can happen if the projection is not enabled
 		return []string{}, nil
 	}
+
 	return threadIDs, nil
 }
 
@@ -240,6 +253,7 @@ func (s *KurrentDBEventStore) DeleteStream(ctx context.Context, streamID string)
 		return fmt.Errorf("failed to delete stream %s: %w", streamID, err)
 	}
 	_ = result // DeleteResult contains position info if needed
+
 	return nil
 }
 
@@ -284,8 +298,9 @@ func (s *KurrentDBEventStore) readFromStreamsProjection(ctx context.Context) ([]
 	for threadID := range threadIDs {
 		result = append(result, threadID)
 	}
+
 	return result, nil
 }
 
-// Verify KurrentDBEventStore implements core.EventStore
+// Verify KurrentDBEventStore implements core.EventStore.
 var _ core.EventStore = (*KurrentDBEventStore)(nil)

@@ -2,13 +2,13 @@ package chatwrite
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"iter"
-	"time"
-
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/sdk/agentsdk/llm"
+	"time"
 )
 
 // ChatClient defines the interface for LLM providers (OpenAI, Anthropic, Ollama, etc.)
@@ -20,14 +20,14 @@ type ChatClient interface {
 	) iter.Seq2[llm.ChatResponseUpdate, error]
 }
 
-// EventStore is the source of truth in the event sourcing architecture
+// EventStore is the source of truth in the event sourcing architecture.
 type EventStore interface {
 	Append(ctx context.Context, streamID string, events ...core.Event) (int64, error)
 	ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]core.Event, error)
 	DeleteStream(ctx context.Context, streamID string) error
 }
 
-// ThreadStore provides read access to thread state
+// ThreadStore provides read access to thread state.
 type ThreadStore interface {
 	GetAgentThread(threadID string) (core.AgentThread, bool)
 	GetOrCreateAgentThread(ctx context.Context, threadID string) (core.AgentThread, error)
@@ -37,11 +37,11 @@ type ThreadStore interface {
 	Update(event core.Event) error
 }
 
-// ShouldContinueIterationFn determines if the agent should continue iterating after tool calls
+// ShouldContinueIterationFn determines if the agent should continue iterating after tool calls.
 type ShouldContinueIterationFn func(toolCalls []domain.ToolCall) bool
 
 // ChatWriteService handles processing of user messages using pure event sourcing
-// Each agent is responsible for registering its own event notifications
+// Each agent is responsible for registering its own event notifications.
 type ChatWriteService struct {
 	config                  core.AgentConfig
 	chatClient              ChatClient
@@ -53,31 +53,31 @@ type ChatWriteService struct {
 	reqCtxCapture           **core.RequestContext // Captures the request context for handoff detection
 }
 
-// Option is a functional option for configuring ChatWriteService
+// Option is a functional option for configuring ChatWriteService.
 type Option func(*ChatWriteService)
 
-// WithConfig configures the agent with a complete configuration
+// WithConfig configures the agent with a complete configuration.
 func WithConfig(config core.AgentConfig) Option {
 	return func(h *ChatWriteService) {
 		h.config = config
 	}
 }
 
-// WithShouldContinueIteration configures the agent with a function to determine if iteration should continue
+// WithShouldContinueIteration configures the agent with a function to determine if iteration should continue.
 func WithShouldContinueIteration(fn ShouldContinueIterationFn) Option {
 	return func(h *ChatWriteService) {
 		h.shouldContinueIteration = fn
 	}
 }
 
-// WithRequestContextCapture configures the agent to capture the request context for handoff detection
+// WithRequestContextCapture configures the agent to capture the request context for handoff detection.
 func WithRequestContextCapture(capture **core.RequestContext) Option {
 	return func(h *ChatWriteService) {
 		h.reqCtxCapture = capture
 	}
 }
 
-// New creates a new chat write service with event sourcing (no UI dependencies)
+// New creates a new chat write service with event sourcing (no UI dependencies).
 func New(chatClient ChatClient, writeModel EventStore, readModel ThreadStore, opts ...Option) *ChatWriteService {
 	// Create tool registry
 	toolRegistry := core.NewToolRegistry()
@@ -123,6 +123,7 @@ func (h *ChatWriteService) DeserializeThread(data []byte) (core.AgentThread, err
 	if err != nil {
 		return nil, fmt.Errorf("failed to deserialize thread: %w", err)
 	}
+
 	return thread, nil
 }
 
@@ -140,11 +141,12 @@ func (h *ChatWriteService) RunWithThread(
 ) error {
 	// Get messages from thread
 	messages := thread.GetMessages()
+
 	return h.runIteration(ctx, threadID, messageID, messages, thread, runOpts)
 }
 
 // runIteration processes a single LLM iteration and recursively continues if tools are called
-// thread parameter is optional - if provided, it will be used for message management
+// thread parameter is optional - if provided, it will be used for message management.
 func (h *ChatWriteService) runIteration(
 	ctx context.Context,
 	threadID string,
@@ -229,6 +231,7 @@ func (h *ChatWriteService) runIteration(
 				}
 				_ = h.emitDomainEvent(evt)
 			}
+
 			return fmt.Errorf("client disconnected during streaming: %w", ctx.Err())
 		default:
 		}
@@ -252,7 +255,8 @@ func (h *ChatWriteService) runIteration(
 				MessageID: messageID,
 				Delta:     textDelta,
 			}
-			if err := h.emitDomainEvent(contentEvent); err != nil {
+			err := h.emitDomainEvent(contentEvent)
+			if err != nil {
 				return err
 			}
 		}
@@ -273,7 +277,8 @@ func (h *ChatWriteService) runIteration(
 					ParentMessageID: messageID,
 					AgentName:       h.config.Name,
 				}
-				if err := h.emitDomainEvent(toolStartEvent); err != nil {
+				err := h.emitDomainEvent(toolStartEvent)
+				if err != nil {
 					return err
 				}
 			}
@@ -289,7 +294,8 @@ func (h *ChatWriteService) runIteration(
 					ToolCallID: tcUpdate.ID,
 					Delta:      tcUpdate.ArgsDelta,
 				}
-				if err := h.emitDomainEvent(argsEvent); err != nil {
+				err := h.emitDomainEvent(argsEvent)
+				if err != nil {
 					return err
 				}
 			}
@@ -309,14 +315,14 @@ func (h *ChatWriteService) runIteration(
 			},
 			ToolCallID: tc.ID,
 		}
-		if err := h.emitDomainEvent(completedEvent); err != nil {
+		err := h.emitDomainEvent(completedEvent)
+		if err != nil {
 			return err
 		}
 	}
 
 	// Store assistant message and handle tool calls
 	if toolCalls.HasToolCalls() {
-
 		// Emit AssistantMessageCompletedEvent with tool calls
 		assistantEvent := &core.AssistantMessageCompletedEvent{
 			BaseEvent: core.BaseEvent{
@@ -329,7 +335,8 @@ func (h *ChatWriteService) runIteration(
 			ToolCalls: toolCallsList,
 			AgentName: h.config.Name,
 		}
-		if err := h.emitDomainEvent(assistantEvent); err != nil {
+		err := h.emitDomainEvent(assistantEvent)
+		if err != nil {
 			return err
 		}
 
@@ -372,7 +379,7 @@ func (h *ChatWriteService) runIteration(
 		// Get updated thread state with tool results
 		stateWithAccess, ok := h.readModel.(core.ThreadStateWithAgentAccess)
 		if !ok {
-			return fmt.Errorf("state does not implement ThreadStateWithAgentAccess")
+			return errors.New("state does not implement ThreadStateWithAgentAccess")
 		}
 
 		updatedThread, exists := stateWithAccess.GetAgentThread(threadID)
@@ -411,7 +418,7 @@ func (h *ChatWriteService) runIteration(
 	return nil
 }
 
-// emitDomainEvent persists the event and notifies the UI via the agent's notifier
+// emitDomainEvent persists the event and notifies the UI via the agent's notifier.
 func (h *ChatWriteService) emitDomainEvent(event core.Event) error {
 	// Append to event store (this will automatically update projections via ProjectionEventStore)
 	_, err := h.writeModel.Append(context.Background(), event.AggregateID(), event)
@@ -421,7 +428,8 @@ func (h *ChatWriteService) emitDomainEvent(event core.Event) error {
 
 	// Notify via agent's notifier (if configured)
 	if h.notifier != nil {
-		if err := h.notifier.HandleDomainEvent(event); err != nil {
+		err := h.notifier.HandleDomainEvent(event)
+		if err != nil {
 			return err
 		}
 	}
@@ -429,7 +437,7 @@ func (h *ChatWriteService) emitDomainEvent(event core.Event) error {
 	return nil
 }
 
-// executeToolCallWithExecutor executes a tool call using a dynamic executor that includes middleware tools
+// executeToolCallWithExecutor executes a tool call using a dynamic executor that includes middleware tools.
 func (h *ChatWriteService) executeToolCallWithExecutor(threadID string, toolCall domain.ToolCall, executor core.ToolExecutor) (string, error) {
 	// Execute the tool using the provided executor
 	result, err := executor.Execute(toolCall)
@@ -440,7 +448,7 @@ func (h *ChatWriteService) executeToolCallWithExecutor(threadID string, toolCall
 	return result, nil
 }
 
-// CreateThread creates a new chat thread
+// CreateThread creates a new chat thread.
 func (h *ChatWriteService) CreateThread(ctx context.Context, threadID, title string) error {
 	// Check if thread already exists
 	if _, exists := h.readModel.Get(threadID); exists {
@@ -457,10 +465,11 @@ func (h *ChatWriteService) CreateThread(ctx context.Context, threadID, title str
 	}
 
 	_, err := h.writeModel.Append(ctx, threadID, event)
+
 	return err
 }
 
-// AddUserMessage adds a user message to a thread
+// AddUserMessage adds a user message to a thread.
 func (h *ChatWriteService) AddUserMessage(ctx context.Context, threadID, messageID, content string) error {
 	event := &core.UserMessageAddedEvent{
 		BaseEvent: core.BaseEvent{
@@ -473,10 +482,11 @@ func (h *ChatWriteService) AddUserMessage(ctx context.Context, threadID, message
 	}
 
 	_, err := h.writeModel.Append(ctx, threadID, event)
+
 	return err
 }
 
-// UpdateThreadTitle updates the title of a thread
+// UpdateThreadTitle updates the title of a thread.
 func (h *ChatWriteService) UpdateThreadTitle(ctx context.Context, threadID, newTitle string) error {
 	event := &core.ThreadTitleUpdatedEvent{
 		BaseEvent: core.BaseEvent{
@@ -488,10 +498,11 @@ func (h *ChatWriteService) UpdateThreadTitle(ctx context.Context, threadID, newT
 	}
 
 	_, err := h.writeModel.Append(ctx, threadID, event)
+
 	return err
 }
 
-// DeleteThread deletes a thread by removing its event stream from the event store
+// DeleteThread deletes a thread by removing its event stream from the event store.
 func (h *ChatWriteService) DeleteThread(ctx context.Context, threadID string) error {
 	// Check if thread exists
 	if _, exists := h.readModel.Get(threadID); !exists {

@@ -7,8 +7,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"time"
-
 	"school-with-ai/components"
 	"school-with-ai/handlers"
 	"school-with-ai/infra/auth"
@@ -18,7 +16,6 @@ import (
 	"school-with-ai/infra/projection/whiteboard"
 	"school-with-ai/infra/projections"
 	"school-with-ai/sdk/agentsdk/llm"
-	authService "school-with-ai/services/auth"
 	"school-with-ai/services/chatwrite"
 	"school-with-ai/services/chatwrite/agents/advancedmath/linearalgebra"
 	"school-with-ai/services/chatwrite/agents/chemistry"
@@ -29,6 +26,9 @@ import (
 	"school-with-ai/services/chatwrite/agents/statistics"
 	"school-with-ai/services/chatwrite/agents/studentfacing"
 	"school-with-ai/services/orchestration"
+	"time"
+
+	authService "school-with-ai/services/auth"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -60,7 +60,8 @@ func main() {
 		panic(fmt.Sprintf("failed to create KurrentDB event store: %v", err))
 	}
 	defer func() {
-		if closeErr := baseEventStore.Close(); closeErr != nil {
+		closeErr := baseEventStore.Close()
+		if closeErr != nil {
 			slog.Error("Failed to close event store", "error", closeErr)
 		}
 	}()

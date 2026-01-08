@@ -4,15 +4,17 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
 
-// AnimateArgs represents the arguments for the animate tool
+// AnimateArgs represents the arguments for the animate tool.
 type AnimateArgs struct {
 	GnuplotScript string `json:"gnuplot_script"` // Complete gnuplot animation script
 	Format        string `json:"format"`         // "gif" or "webp"
@@ -20,10 +22,10 @@ type AnimateArgs struct {
 	Title         string `json:"title"`          // Animation title (for reference/logging)
 }
 
-// AnimateTool implements the Tool interface for generating animations with gnuplot
+// AnimateTool implements the Tool interface for generating animations with gnuplot.
 type AnimateTool struct{}
 
-// NewAnimateTool creates a new animate tool
+// NewAnimateTool creates a new animate tool.
 func NewAnimateTool() *AnimateTool {
 	return &AnimateTool{}
 }
@@ -126,16 +128,16 @@ func (a *AnimateTool) Invoke(ctx context.Context, arguments string) (string, err
 
 	// Validate required gnuplot_script parameter
 	if args.GnuplotScript == "" {
-		return "", fmt.Errorf("gnuplot_script parameter is required")
+		return "", errors.New("gnuplot_script parameter is required")
 	}
 
 	// Validate script doesn't contain terminal/output commands
 	scriptLower := strings.ToLower(args.GnuplotScript)
 	if strings.Contains(scriptLower, "set terminal") || strings.Contains(scriptLower, "set term") {
-		return "", fmt.Errorf("gnuplot_script should not contain 'set terminal' command - terminal type is managed automatically")
+		return "", errors.New("gnuplot_script should not contain 'set terminal' command - terminal type is managed automatically")
 	}
 	if strings.Contains(scriptLower, "set output") {
-		return "", fmt.Errorf("gnuplot_script should not contain 'set output' command - output path is managed automatically")
+		return "", errors.New("gnuplot_script should not contain 'set output' command - output path is managed automatically")
 	}
 
 	// Validate format
@@ -156,7 +158,7 @@ func (a *AnimateTool) Invoke(ctx context.Context, arguments string) (string, err
 
 	// Validate title length
 	if len(args.Title) > 100 {
-		return "", fmt.Errorf("title exceeds maximum length of 100 characters")
+		return "", errors.New("title exceeds maximum length of 100 characters")
 	}
 
 	// Generate the animation
@@ -186,7 +188,7 @@ func (a *AnimateTool) Invoke(ctx context.Context, arguments string) (string, err
 	return string(resultJSON), nil
 }
 
-// executeGnuplotAnimation executes a gnuplot animation script and generates the animation file
+// executeGnuplotAnimation executes a gnuplot animation script and generates the animation file.
 func executeGnuplotAnimation(userScript, format string, delay int, title string) (string, error) {
 	// Ensure charts directory exists
 	chartsDir := "assets/charts"
@@ -195,7 +197,7 @@ func executeGnuplotAnimation(userScript, format string, delay int, title string)
 	}
 
 	// Generate unique filename
-	hash := fmt.Sprintf("%x", md5.Sum([]byte(userScript+title+fmt.Sprintf("%d", time.Now().UnixNano()))))
+	hash := fmt.Sprintf("%x", md5.Sum([]byte(userScript+title+strconv.FormatInt(time.Now().UnixNano(), 10))))
 	hash = hash[:16] // Use first 16 chars
 	extension := "." + format
 	animationPath := filepath.Join(chartsDir, fmt.Sprintf("animate_%s_%d%s", hash, time.Now().Unix(), extension))

@@ -109,11 +109,13 @@ func TestExecuteCalculatorTool(t *testing.T) {
 				if err == nil {
 					t.Errorf("ExecuteCalculatorTool() expected error but got none")
 				}
+
 				return
 			}
 
 			if err != nil {
 				t.Errorf("ExecuteCalculatorTool() unexpected error: %v", err)
+
 				return
 			}
 
@@ -121,6 +123,7 @@ func TestExecuteCalculatorTool(t *testing.T) {
 			var resultData map[string]any
 			if err := json.Unmarshal([]byte(result), &resultData); err != nil {
 				t.Errorf("Failed to parse result JSON: %v", err)
+
 				return
 			}
 
@@ -171,6 +174,7 @@ func TestEvaluateExpression(t *testing.T) {
 			got, err := evaluateExpression(tt.expression)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("evaluateExpression() error = %v, wantErr %v", err, tt.wantErr)
+
 				return
 			}
 			if !tt.wantErr && got != tt.want {

@@ -6,7 +6,7 @@ import (
 	sharedtools "school-with-ai/services/chatwrite/agents/shared/tools"
 )
 
-// CreateGeometryProfessor creates the computational geometry professor agent
+// CreateGeometryProfessor creates the computational geometry professor agent.
 func CreateGeometryProfessor(notifier core.EventNotifier, whiteboardProjection interface{ Get(threadID string) string }) core.AgentConfig {
 	registry := core.NewToolRegistry()
 

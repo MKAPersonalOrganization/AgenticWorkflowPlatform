@@ -3,12 +3,13 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/cpmech/gosl/la"
 )
 
-// MatrixOperationsTool provides matrix operations
+// MatrixOperationsTool provides matrix operations.
 type MatrixOperationsTool struct{}
 
 func NewMatrixOperationsTool() *MatrixOperationsTool {
@@ -99,7 +100,7 @@ func (t *MatrixOperationsTool) Invoke(ctx context.Context, arguments string) (st
 	switch args.Operation {
 	case "multiply":
 		if len(args.Matrix2) == 0 {
-			return "", fmt.Errorf("matrix2 required for multiply operation")
+			return "", errors.New("matrix2 required for multiply operation")
 		}
 		a := la.NewMatrixDeep2(args.Matrix)
 		b := la.NewMatrixDeep2(args.Matrix2)
@@ -109,18 +110,18 @@ func (t *MatrixOperationsTool) Invoke(ctx context.Context, arguments string) (st
 
 	case "add":
 		if len(args.Matrix2) == 0 {
-			return "", fmt.Errorf("matrix2 required for add operation")
+			return "", errors.New("matrix2 required for add operation")
 		}
 		// gosl doesn't have direct matrix add, so we'll use manual implementation
 		a, b := args.Matrix, args.Matrix2
 		if len(a) != len(b) || len(a[0]) != len(b[0]) {
-			return "", fmt.Errorf("matrices must have same dimensions")
+			return "", errors.New("matrices must have same dimensions")
 		}
 		m, n := len(a), len(a[0])
 		c := make([][]float64, m)
-		for i := 0; i < m; i++ {
+		for i := range m {
 			c[i] = make([]float64, n)
-			for j := 0; j < n; j++ {
+			for j := range n {
 				c[i][j] = args.Alpha*a[i][j] + args.Beta*b[i][j]
 			}
 		}
@@ -128,17 +129,17 @@ func (t *MatrixOperationsTool) Invoke(ctx context.Context, arguments string) (st
 
 	case "subtract":
 		if len(args.Matrix2) == 0 {
-			return "", fmt.Errorf("matrix2 required for subtract operation")
+			return "", errors.New("matrix2 required for subtract operation")
 		}
 		a, b := args.Matrix, args.Matrix2
 		if len(a) != len(b) || len(a[0]) != len(b[0]) {
-			return "", fmt.Errorf("matrices must have same dimensions")
+			return "", errors.New("matrices must have same dimensions")
 		}
 		m, n := len(a), len(a[0])
 		c := make([][]float64, m)
-		for i := 0; i < m; i++ {
+		for i := range m {
 			c[i] = make([]float64, n)
-			for j := 0; j < n; j++ {
+			for j := range n {
 				c[i][j] = a[i][j] - b[i][j]
 			}
 		}
@@ -151,7 +152,7 @@ func (t *MatrixOperationsTool) Invoke(ctx context.Context, arguments string) (st
 	case "inverse":
 		a := la.NewMatrixDeep2(args.Matrix)
 		if a.M != a.N {
-			return "", fmt.Errorf("inverse requires square matrix")
+			return "", errors.New("inverse requires square matrix")
 		}
 		ai := la.NewMatrix(a.N, a.M)
 		la.MatInv(ai, a, false)
@@ -160,13 +161,13 @@ func (t *MatrixOperationsTool) Invoke(ctx context.Context, arguments string) (st
 	case "determinant":
 		a := la.NewMatrixDeep2(args.Matrix)
 		if a.M != a.N {
-			return "", fmt.Errorf("determinant requires square matrix")
+			return "", errors.New("determinant requires square matrix")
 		}
 		result = a.Det()
 
 	case "trace":
 		if len(args.Matrix) != len(args.Matrix[0]) {
-			return "", fmt.Errorf("trace requires square matrix")
+			return "", errors.New("trace requires square matrix")
 		}
 		var trace float64
 		for i := 0; i < len(args.Matrix); i++ {
@@ -186,7 +187,7 @@ func (t *MatrixOperationsTool) Invoke(ctx context.Context, arguments string) (st
 
 	case "matrix_vector_multiply":
 		if len(args.Vector) == 0 {
-			return "", fmt.Errorf("vector required for matrix_vector_multiply")
+			return "", errors.New("vector required for matrix_vector_multiply")
 		}
 		a := la.NewMatrixDeep2(args.Matrix)
 		u := la.Vector(args.Vector)
@@ -199,7 +200,7 @@ func (t *MatrixOperationsTool) Invoke(ctx context.Context, arguments string) (st
 
 	case "vector_matrix_multiply":
 		if len(args.Vector) == 0 {
-			return "", fmt.Errorf("vector required for vector_matrix_multiply")
+			return "", errors.New("vector required for vector_matrix_multiply")
 		}
 		a := la.NewMatrixDeep2(args.Matrix)
 		u := la.Vector(args.Vector)
@@ -227,5 +228,6 @@ func (t *MatrixOperationsTool) Invoke(ctx context.Context, arguments string) (st
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal response: %w", err)
 	}
+
 	return string(data), nil
 }

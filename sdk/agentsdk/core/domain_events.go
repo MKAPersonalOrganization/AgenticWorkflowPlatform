@@ -1,19 +1,18 @@
 package core
 
 import (
-	"time"
-
 	"school-with-ai/domain"
+	"time"
 )
 
-// Event is the base interface for all domain events
+// Event is the base interface for all domain events.
 type Event interface {
 	EventType() string
 	EventTimestamp() time.Time
 	AggregateID() string // ThreadID
 }
 
-// BaseEvent provides common fields for all events
+// BaseEvent provides common fields for all events.
 type BaseEvent struct {
 	Type      string    `json:"type"`
 	Timestamp time.Time `json:"timestamp"`
@@ -24,66 +23,75 @@ func (e BaseEvent) EventType() string         { return e.Type }
 func (e BaseEvent) EventTimestamp() time.Time { return e.Timestamp }
 func (e BaseEvent) AggregateID() string       { return e.ThreadID }
 
-// ThreadCreatedEvent is emitted when a new thread is created
+// ThreadCreatedEvent is emitted when a new thread is created.
 type ThreadCreatedEvent struct {
 	BaseEvent
+
 	Title string `json:"title"`
 }
 
-// UserMessageAddedEvent is emitted when a user sends a message
+// UserMessageAddedEvent is emitted when a user sends a message.
 type UserMessageAddedEvent struct {
 	BaseEvent
+
 	MessageID string `json:"messageId"`
 	Content   string `json:"content"`
 }
 
-// AssistantMessageStartedEvent is emitted when the assistant begins responding
+// AssistantMessageStartedEvent is emitted when the assistant begins responding.
 type AssistantMessageStartedEvent struct {
 	BaseEvent
+
 	MessageID string `json:"messageId"`
 }
 
-// AssistantContentStreamedEvent is emitted for each content delta during streaming
+// AssistantContentStreamedEvent is emitted for each content delta during streaming.
 type AssistantContentStreamedEvent struct {
 	BaseEvent
+
 	MessageID string `json:"messageId"`
 	Delta     string `json:"delta"`
 }
 
-// ToolCallStartedEvent is emitted when a tool call begins
+// ToolCallStartedEvent is emitted when a tool call begins.
 type ToolCallStartedEvent struct {
 	BaseEvent
+
 	ToolCallID      string `json:"toolCallId"`
 	ToolCallName    string `json:"toolCallName"`
 	ParentMessageID string `json:"parentMessageId"`
 	AgentName       string `json:"agentName"`
 }
 
-// ToolCallArgumentsStreamedEvent is emitted for each argument delta during streaming
+// ToolCallArgumentsStreamedEvent is emitted for each argument delta during streaming.
 type ToolCallArgumentsStreamedEvent struct {
 	BaseEvent
+
 	ToolCallID string `json:"toolCallId"`
 	Delta      string `json:"delta"`
 }
 
-// ToolCallCompletedEvent is emitted when a tool call's arguments are complete
+// ToolCallCompletedEvent is emitted when a tool call's arguments are complete.
 type ToolCallCompletedEvent struct {
 	BaseEvent
+
 	ToolCallID string `json:"toolCallId"`
 }
 
-// AssistantMessageCompletedEvent is emitted when the assistant completes a message
+// AssistantMessageCompletedEvent is emitted when the assistant completes a message.
 type AssistantMessageCompletedEvent struct {
 	BaseEvent
+
 	MessageID string            `json:"messageId"`
 	Content   string            `json:"content"`
 	ToolCalls []domain.ToolCall `json:"toolCalls,omitempty"`
 	AgentName string            `json:"agentName"`
 }
 
-// ToolCallExecutedEvent is emitted when a tool call is executed
+// ToolCallExecutedEvent is emitted when a tool call is executed.
 type ToolCallExecutedEvent struct {
 	BaseEvent
+
 	MessageID       string `json:"messageId"` // ID of the tool result message
 	ToolCallID      string `json:"toolCallId"`
 	ToolName        string `json:"toolName"`
@@ -93,16 +101,17 @@ type ToolCallExecutedEvent struct {
 	AgentName       string `json:"agentName"`
 }
 
-// ThreadTitleUpdatedEvent is emitted when a thread's title is updated
+// ThreadTitleUpdatedEvent is emitted when a thread's title is updated.
 type ThreadTitleUpdatedEvent struct {
 	BaseEvent
+
 	NewTitle string `json:"newTitle"`
 }
 
-// ThreadDeletedEvent is emitted when a thread is deleted
+// ThreadDeletedEvent is emitted when a thread is deleted.
 type ThreadDeletedEvent struct {
 	BaseEvent
 }
 
-// Now provides a mockable time function for testing
+// Now provides a mockable time function for testing.
 var Now = time.Now

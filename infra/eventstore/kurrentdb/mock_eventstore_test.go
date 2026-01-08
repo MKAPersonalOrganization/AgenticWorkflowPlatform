@@ -3,12 +3,11 @@ package kurrentdb
 import (
 	"context"
 	"fmt"
-	"sync"
-
 	"school-with-ai/sdk/agentsdk/core"
+	"sync"
 )
 
-// MockEventStore is a test double for EventStore that doesn't require KurrentDB
+// MockEventStore is a test double for EventStore that doesn't require KurrentDB.
 type MockEventStore struct {
 	mu      sync.RWMutex
 	streams map[string][]core.Event
@@ -35,6 +34,7 @@ func (m *MockEventStore) Append(ctx context.Context, streamID string, events ...
 	}
 
 	m.streams[streamID] = append(m.streams[streamID], events...)
+
 	return int64(len(m.streams[streamID])), nil
 }
 
@@ -68,10 +68,11 @@ func (m *MockEventStore) DeleteStream(ctx context.Context, streamID string) erro
 
 	m.deleted[streamID] = true
 	delete(m.streams, streamID)
+
 	return nil
 }
 
-// ReadAllThreadIDs returns all stream IDs (for testing)
+// ReadAllThreadIDs returns all stream IDs (for testing).
 func (m *MockEventStore) ReadAllThreadIDs(ctx context.Context) ([]string, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -82,8 +83,9 @@ func (m *MockEventStore) ReadAllThreadIDs(ctx context.Context) ([]string, error)
 			ids = append(ids, id)
 		}
 	}
+
 	return ids, nil
 }
 
-// Verify MockEventStore implements EventStore
+// Verify MockEventStore implements EventStore.
 var _ core.EventStore = (*MockEventStore)(nil)

@@ -4,11 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
 	"school-with-ai/sdk/agentsdk/core"
 )
 
-// TodoStatus represents the status of a todo item
+// TodoStatus represents the status of a todo item.
 type TodoStatus string
 
 const (
@@ -17,7 +16,7 @@ const (
 	TodoStatusCompleted  TodoStatus = "completed"
 )
 
-// Todo represents a single todo item with content and status
+// Todo represents a single todo item with content and status.
 type Todo struct {
 	Content string     `json:"content"` // The content/description of the todo item
 	Status  TodoStatus `json:"status"`  // The current status of the todo item
@@ -97,19 +96,19 @@ Writing todos takes time and tokens, use it when it is helpful for managing comp
 - The ` + "`write_todos`" + ` tool should never be called multiple times in parallel.
 - Don't be afraid to revise the To-Do list as you go. New information may reveal new tasks that need to be done, or old tasks that are irrelevant.`
 
-// WriteTodosTool is the tool for managing the todo list
+// WriteTodosTool is the tool for managing the todo list.
 type WriteTodosTool struct {
 	description string
 }
 
-// NewWriteTodosTool creates a new WriteTodosTool with the default description
+// NewWriteTodosTool creates a new WriteTodosTool with the default description.
 func NewWriteTodosTool() *WriteTodosTool {
 	return &WriteTodosTool{
 		description: WriteTodosToolDescription,
 	}
 }
 
-// NewWriteTodosToolWithDescription creates a new WriteTodosTool with a custom description
+// NewWriteTodosToolWithDescription creates a new WriteTodosTool with a custom description.
 func NewWriteTodosToolWithDescription(description string) *WriteTodosTool {
 	return &WriteTodosTool{
 		description: description,
@@ -124,21 +123,21 @@ func (t *WriteTodosTool) Description() string {
 	return t.description
 }
 
-func (t *WriteTodosTool) Parameters() map[string]interface{} {
-	return map[string]interface{}{
+func (t *WriteTodosTool) Parameters() map[string]any {
+	return map[string]any{
 		"type": "object",
-		"properties": map[string]interface{}{
-			"todos": map[string]interface{}{
+		"properties": map[string]any{
+			"todos": map[string]any{
 				"type":        "array",
 				"description": "List of todo items with content and status",
-				"items": map[string]interface{}{
+				"items": map[string]any{
 					"type": "object",
-					"properties": map[string]interface{}{
-						"content": map[string]interface{}{
+					"properties": map[string]any{
+						"content": map[string]any{
 							"type":        "string",
 							"description": "The content/description of the todo item",
 						},
-						"status": map[string]interface{}{
+						"status": map[string]any{
 							"type":        "string",
 							"enum":        []string{"pending", "in_progress", "completed"},
 							"description": "The current status of the todo item",
@@ -157,22 +156,24 @@ func (t *WriteTodosTool) Invoke(ctx context.Context, arguments string) (string, 
 		Todos []Todo `json:"todos"`
 	}
 
-	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
+	err := json.Unmarshal([]byte(arguments), &args)
+	if err != nil {
 		return "", fmt.Errorf("failed to parse todo arguments: %w", err)
 	}
 
 	todosJSON, _ := json.Marshal(args.Todos)
-	return fmt.Sprintf("Updated todo list to %s", string(todosJSON)), nil
+
+	return "Updated todo list to " + string(todosJSON), nil
 }
 
-// TodoListMiddleware provides todo list management capabilities to agents
+// TodoListMiddleware provides todo list management capabilities to agents.
 type TodoListMiddleware struct {
 	systemPrompt    string
 	toolDescription string
 	tool            core.Tool
 }
 
-// NewTodoListMiddleware creates a new TodoListMiddleware with default prompts
+// NewTodoListMiddleware creates a new TodoListMiddleware with default prompts.
 func NewTodoListMiddleware() *TodoListMiddleware {
 	return &TodoListMiddleware{
 		systemPrompt:    WriteTodosSystemPrompt,
@@ -181,7 +182,7 @@ func NewTodoListMiddleware() *TodoListMiddleware {
 	}
 }
 
-// NewTodoListMiddlewareWithPrompts creates a new TodoListMiddleware with custom prompts
+// NewTodoListMiddlewareWithPrompts creates a new TodoListMiddleware with custom prompts.
 func NewTodoListMiddlewareWithPrompts(systemPrompt, toolDescription string) *TodoListMiddleware {
 	return &TodoListMiddleware{
 		systemPrompt:    systemPrompt,
@@ -190,12 +191,13 @@ func NewTodoListMiddlewareWithPrompts(systemPrompt, toolDescription string) *Tod
 	}
 }
 
-// Process implements the Middleware interface
+// Process implements the Middleware interface.
 func (m *TodoListMiddleware) Process(ctx context.Context, reqCtx *core.RequestContext, next core.NextHandler) error {
 	reqCtx.AddTool(m.tool)
 	reqCtx.AddSystemPrompt(m.systemPrompt)
 
-	if err := next(ctx, reqCtx); err != nil {
+	err := next(ctx, reqCtx)
+	if err != nil {
 		return err
 	}
 
@@ -209,15 +211,16 @@ func (m *TodoListMiddleware) Process(ctx context.Context, reqCtx *core.RequestCo
 	return nil
 }
 
-// GetTodos retrieves the current todo list from the request context
+// GetTodos retrieves the current todo list from the request context.
 func GetTodos(reqCtx *core.RequestContext) []Todo {
 	if todos, ok := reqCtx.State["todos"].([]Todo); ok {
 		return todos
 	}
+
 	return nil
 }
 
-// SetTodos updates the todo list in the request context
+// SetTodos updates the todo list in the request context.
 func SetTodos(reqCtx *core.RequestContext, todos []Todo) {
 	reqCtx.State["todos"] = todos
 }

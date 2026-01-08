@@ -6,7 +6,7 @@ import (
 	sharedtools "school-with-ai/services/chatwrite/agents/shared/tools"
 )
 
-// CreateDifferentialEquationsProfessor creates the differential equations professor agent
+// CreateDifferentialEquationsProfessor creates the differential equations professor agent.
 func CreateDifferentialEquationsProfessor(notifier core.EventNotifier, whiteboardProjection interface{ Get(threadID string) string }) core.AgentConfig {
 	registry := core.NewToolRegistry()
 

@@ -2,9 +2,8 @@ package eventstore
 
 import (
 	"context"
-	"sync"
-
 	"school-with-ai/sdk/agentsdk/core"
+	"sync"
 )
 
 // InMemoryEventStore is an in-memory implementation of EventStore.
@@ -26,6 +25,7 @@ func (s *InMemoryEventStore) Append(ctx context.Context, streamID string, events
 	defer s.mu.Unlock()
 
 	s.streams[streamID] = append(s.streams[streamID], events...)
+
 	return int64(len(s.streams[streamID])), nil
 }
 
@@ -48,8 +48,9 @@ func (s *InMemoryEventStore) DeleteStream(ctx context.Context, streamID string) 
 	defer s.mu.Unlock()
 
 	delete(s.streams, streamID)
+
 	return nil
 }
 
-// Verify InMemoryEventStore implements core.EventStore
+// Verify InMemoryEventStore implements core.EventStore.
 var _ core.EventStore = (*InMemoryEventStore)(nil)

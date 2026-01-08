@@ -5,13 +5,13 @@ import (
 	"school-with-ai/sdk/agentsdk/llm"
 )
 
-// ToolCallAccumulator tracks streaming tool call deltas and builds complete tool calls
+// ToolCallAccumulator tracks streaming tool call deltas and builds complete tool calls.
 type ToolCallAccumulator struct {
 	byID    map[string]*toolCallState
 	byIndex map[int]*toolCallState
 }
 
-// toolCallState tracks the state of a single tool call during streaming
+// toolCallState tracks the state of a single tool call during streaming.
 type toolCallState struct {
 	ID        string
 	Index     int
@@ -19,7 +19,7 @@ type toolCallState struct {
 	Arguments string
 }
 
-// NewToolCallAccumulator creates a new accumulator
+// NewToolCallAccumulator creates a new accumulator.
 func NewToolCallAccumulator() *ToolCallAccumulator {
 	return &ToolCallAccumulator{
 		byID:    make(map[string]*toolCallState),
@@ -27,7 +27,7 @@ func NewToolCallAccumulator() *ToolCallAccumulator {
 	}
 }
 
-// ToolCallUpdate represents the result of processing an update
+// ToolCallUpdate represents the result of processing an update.
 type ToolCallUpdate struct {
 	ID        string
 	Name      string
@@ -89,7 +89,7 @@ func (a *ToolCallAccumulator) ProcessUpdate(update llm.ChatResponseUpdate) (Tool
 	}, true
 }
 
-// GetAll returns all accumulated tool calls as domain.ToolCall slices
+// GetAll returns all accumulated tool calls as domain.ToolCall slices.
 func (a *ToolCallAccumulator) GetAll() []domain.ToolCall {
 	result := make([]domain.ToolCall, 0, len(a.byID))
 	for _, state := range a.byID {
@@ -102,15 +102,16 @@ func (a *ToolCallAccumulator) GetAll() []domain.ToolCall {
 			},
 		})
 	}
+
 	return result
 }
 
-// Count returns the number of tool calls being tracked
+// Count returns the number of tool calls being tracked.
 func (a *ToolCallAccumulator) Count() int {
 	return len(a.byID)
 }
 
-// HasToolCalls returns true if any tool calls have been accumulated
+// HasToolCalls returns true if any tool calls have been accumulated.
 func (a *ToolCallAccumulator) HasToolCalls() bool {
 	return len(a.byID) > 0
 }

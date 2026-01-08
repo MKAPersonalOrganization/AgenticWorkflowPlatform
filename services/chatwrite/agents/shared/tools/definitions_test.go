@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-// TestGetWeatherTool verifies the weather tool definition structure
+// TestGetWeatherTool verifies the weather tool definition structure.
 func TestGetWeatherTool(t *testing.T) {
 	tool := GetWeatherTool()
 
@@ -58,7 +58,7 @@ func TestGetWeatherTool(t *testing.T) {
 	}
 }
 
-// TestGetCalculatorTool verifies the calculator tool definition structure
+// TestGetCalculatorTool verifies the calculator tool definition structure.
 func TestGetCalculatorTool(t *testing.T) {
 	tool := GetCalculatorTool()
 
@@ -78,7 +78,7 @@ func TestGetCalculatorTool(t *testing.T) {
 	}
 }
 
-// TestGetAllTools verifies all tools are returned
+// TestGetAllTools verifies all tools are returned.
 func TestGetAllTools(t *testing.T) {
 	tools := GetAllTools()
 
@@ -106,7 +106,7 @@ func TestGetAllTools(t *testing.T) {
 	}
 }
 
-// TestWeatherToolParametersSchema verifies the JSON schema is valid
+// TestWeatherToolParametersSchema verifies the JSON schema is valid.
 func TestWeatherToolParametersSchema(t *testing.T) {
 	tool := GetWeatherTool()
 

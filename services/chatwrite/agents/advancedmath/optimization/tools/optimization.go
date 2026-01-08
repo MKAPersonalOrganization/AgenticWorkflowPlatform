@@ -2,7 +2,7 @@ package tools
 
 import "context"
 
-// UnconstrainedOptimizationTool performs unconstrained optimization
+// UnconstrainedOptimizationTool performs unconstrained optimization.
 type UnconstrainedOptimizationTool struct{}
 
 func NewUnconstrainedOptimizationTool() *UnconstrainedOptimizationTool {
@@ -25,7 +25,7 @@ func (t *UnconstrainedOptimizationTool) Invoke(ctx context.Context, arguments st
 	return `{"result": "Implementation pending"}`, nil
 }
 
-// ConstrainedOptimizationTool performs constrained optimization
+// ConstrainedOptimizationTool performs constrained optimization.
 type ConstrainedOptimizationTool struct{}
 
 func NewConstrainedOptimizationTool() *ConstrainedOptimizationTool {

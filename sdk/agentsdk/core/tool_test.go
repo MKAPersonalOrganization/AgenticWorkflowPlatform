@@ -3,9 +3,8 @@ package core_test
 import (
 	"context"
 	"encoding/json"
-	"testing"
-
 	"school-with-ai/sdk/agentsdk/core"
+	"testing"
 )
 
 func TestFunctionTool(t *testing.T) {
@@ -24,12 +23,14 @@ func TestFunctionTool(t *testing.T) {
 				Location string `json:"location"`
 				Unit     string `json:"unit"`
 			}
-			if err := json.Unmarshal([]byte(arguments), &args); err != nil {
+			err := json.Unmarshal([]byte(arguments), &args)
+			if err != nil {
 				return "", err
 			}
 			if args.Unit == "" {
 				args.Unit = "celsius"
 			}
+
 			return `{"temperature": 22, "unit": "` + args.Unit + `", "location": "` + args.Location + `"}`, nil
 		},
 	)

@@ -60,6 +60,7 @@ func (u ChatResponseUpdate) Text() string {
 			return tc.Text
 		}
 	}
+
 	return ""
 }
 
@@ -71,6 +72,7 @@ func (u ChatResponseUpdate) FunctionCalls() []FunctionCallContent {
 			calls = append(calls, fc)
 		}
 	}
+
 	return calls
 }
 

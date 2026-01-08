@@ -86,7 +86,8 @@ func main() {
 		os.Exit(1)
 	}
 	defer func() {
-		if closeErr := f.Close(); closeErr != nil {
+		closeErr := f.Close()
+		if closeErr != nil {
 			fmt.Fprintf(os.Stderr, "Error closing data file: %v\n", closeErr)
 		}
 	}()
@@ -266,6 +267,7 @@ func openImage(path string) {
 			go func(c []string) {
 				_ = exec.Command(c[0], c[1:]...).Start()
 			}(cmd)
+
 			return
 		}
 	}
@@ -273,6 +275,7 @@ func openImage(path string) {
 
 func isNumber(s string) bool {
 	_, err := strconv.Atoi(s)
+
 	return err == nil
 }
 
@@ -288,6 +291,7 @@ func parseRange(rangeStr string, maxCommits int) (start, end int, err error) {
 		if start < 1 || start > maxCommits {
 			return 0, 0, fmt.Errorf("commit number %d out of range (1-%d)", start, maxCommits)
 		}
+
 		return start, maxCommits, nil
 	}
 

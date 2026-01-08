@@ -3,10 +3,9 @@ package middleware
 import (
 	"context"
 	"encoding/json"
+	"school-with-ai/sdk/agentsdk/core"
 	"strings"
 	"testing"
-
-	"school-with-ai/sdk/agentsdk/core"
 )
 
 func TestTodo_JSONMarshaling(t *testing.T) {
@@ -78,12 +77,12 @@ func TestWriteTodosTool_Parameters(t *testing.T) {
 		t.Error("Expected type to be 'object'")
 	}
 
-	props, ok := params["properties"].(map[string]interface{})
+	props, ok := params["properties"].(map[string]any)
 	if !ok {
 		t.Fatal("Expected properties to be a map")
 	}
 
-	todosParam, ok := props["todos"].(map[string]interface{})
+	todosParam, ok := props["todos"].(map[string]any)
 	if !ok {
 		t.Fatal("Expected todos parameter to exist")
 	}
@@ -92,12 +91,12 @@ func TestWriteTodosTool_Parameters(t *testing.T) {
 		t.Error("Expected todos type to be 'array'")
 	}
 
-	items, ok := todosParam["items"].(map[string]interface{})
+	items, ok := todosParam["items"].(map[string]any)
 	if !ok {
 		t.Fatal("Expected items to be defined")
 	}
 
-	itemProps, ok := items["properties"].(map[string]interface{})
+	itemProps, ok := items["properties"].(map[string]any)
 	if !ok {
 		t.Fatal("Expected item properties to be defined")
 	}
@@ -106,7 +105,7 @@ func TestWriteTodosTool_Parameters(t *testing.T) {
 		t.Error("Expected content property in todo items")
 	}
 
-	statusProp, ok := itemProps["status"].(map[string]interface{})
+	statusProp, ok := itemProps["status"].(map[string]any)
 	if !ok {
 		t.Fatal("Expected status property to be defined")
 	}
@@ -131,7 +130,7 @@ func TestWriteTodosTool_Invoke(t *testing.T) {
 		{Content: "Task 3", Status: TodoStatusCompleted},
 	}
 
-	args := map[string]interface{}{
+	args := map[string]any{
 		"todos": todos,
 	}
 
@@ -212,6 +211,7 @@ func TestTodoListMiddleware_Process_AddsToolAndPrompt(t *testing.T) {
 	nextCalled := false
 	nextHandler := func(ctx context.Context, rc *core.RequestContext) error {
 		nextCalled = true
+
 		return nil
 	}
 
@@ -229,6 +229,7 @@ func TestTodoListMiddleware_Process_AddsToolAndPrompt(t *testing.T) {
 	for _, tool := range tools {
 		if tool.Name() == "write_todos" {
 			foundTool = true
+
 			break
 		}
 	}
@@ -346,6 +347,7 @@ func TestTodoListMiddleware_Integration(t *testing.T) {
 		}
 
 		SetTodos(rc, todos)
+
 		return nil
 	}
 
@@ -390,7 +392,7 @@ func TestTodoStatus_AllValidValues(t *testing.T) {
 	}
 }
 
-// MockTool for testing
+// MockTool for testing.
 type MockTool struct {
 	name string
 }
@@ -403,10 +405,10 @@ func (m *MockTool) Description() string {
 	return "Mock tool for testing"
 }
 
-func (m *MockTool) Parameters() map[string]interface{} {
-	return map[string]interface{}{
+func (m *MockTool) Parameters() map[string]any {
+	return map[string]any{
 		"type":       "object",
-		"properties": map[string]interface{}{},
+		"properties": map[string]any{},
 	}
 }
 

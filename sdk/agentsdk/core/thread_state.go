@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-
 	"school-with-ai/domain"
 )
 

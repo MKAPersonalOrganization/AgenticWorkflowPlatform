@@ -2,7 +2,6 @@ package eventstore
 
 import (
 	"context"
-
 	"school-with-ai/sdk/agentsdk/core"
 )
 

@@ -1,5 +1,7 @@
 package llm
 
+import "maps"
+
 // ToolMode controls how the model uses tools/functions.
 // This mirrors Microsoft.Extensions.AI.ChatToolMode from the .NET agent framework.
 type ToolMode string
@@ -76,9 +78,7 @@ func (o ChatOptions) Clone() ChatOptions {
 
 	if o.AdditionalProperties != nil {
 		props := make(map[string]any, len(o.AdditionalProperties))
-		for k, v := range o.AdditionalProperties {
-			props[k] = v
-		}
+		maps.Copy(props, o.AdditionalProperties)
 		o.AdditionalProperties = props
 	}
 

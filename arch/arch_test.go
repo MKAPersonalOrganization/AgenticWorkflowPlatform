@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Define all layers once at package level
+// Define all layers once at package level.
 var (
 	domainLayer   = archunit.ArchLayer("Domain", "school-with-ai/domain")
 	servicesLayer = archunit.ArchLayer("Services", "school-with-ai/services/...")
@@ -23,7 +23,7 @@ func init() {
 }
 
 // TestCleanArchitecture enforces clean architecture layer boundaries
-// as defined in ADR-001-clean-architecture-layer-boundaries.md
+// as defined in ADR-001-clean-architecture-layer-boundaries.md.
 func TestCleanArchitecture(t *testing.T) {
 	// Rule 1: Services can only depend on Domain
 	err := archunit.ArchUnit().Validate(
@@ -52,7 +52,7 @@ func TestCleanArchitecture(t *testing.T) {
 	}
 }
 
-// TestNoCircularDependencies ensures no circular dependencies exist between layers
+// TestNoCircularDependencies ensures no circular dependencies exist between layers.
 func TestNoCircularDependencies(t *testing.T) {
 	// Services should only be referred by Handlers
 	err := archunit.ArchUnit().Validate(
@@ -63,7 +63,7 @@ func TestNoCircularDependencies(t *testing.T) {
 	}
 }
 
-// TestLayerDepth ensures layers don't have excessive package depth
+// TestLayerDepth ensures layers don't have excessive package depth.
 func TestLayerDepth(t *testing.T) {
 	t.Skip("DepthShouldLessThan not available in v0.2.0-alpha1")
 }

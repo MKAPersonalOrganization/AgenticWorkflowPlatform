@@ -3,12 +3,13 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/cpmech/gosl/la"
 )
 
-// LinearSolverTool solves linear systems
+// LinearSolverTool solves linear systems.
 type LinearSolverTool struct{}
 
 func NewLinearSolverTool() *LinearSolverTool {
@@ -66,10 +67,10 @@ func (t *LinearSolverTool) Invoke(ctx context.Context, arguments string) (string
 	// Validate dimensions
 	n := len(args.A)
 	if n == 0 || len(args.A[0]) != n {
-		return "", fmt.Errorf("matrix A must be a square matrix")
+		return "", errors.New("matrix A must be a square matrix")
 	}
 	if len(args.B) != n {
-		return "", fmt.Errorf("vector b must have same length as A rows")
+		return "", errors.New("vector b must have same length as A rows")
 	}
 
 	var x []float64
@@ -107,5 +108,6 @@ func (t *LinearSolverTool) Invoke(ctx context.Context, arguments string) (string
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal response: %w", err)
 	}
+
 	return string(data), nil
 }

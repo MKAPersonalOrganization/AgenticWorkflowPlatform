@@ -2,8 +2,8 @@ package core
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
-
 	"school-with-ai/domain"
 
 	"github.com/google/uuid"
@@ -23,13 +23,13 @@ type InMemoryThread struct {
 	messageStore MessageStore
 }
 
-// inMemoryThreadState is used for JSON serialization/deserialization
+// inMemoryThreadState is used for JSON serialization/deserialization.
 type inMemoryThreadState struct {
 	ID         string          `json:"id"`
 	StoreState json.RawMessage `json:"storeState,omitempty"`
 }
 
-// NewInMemoryThread creates a new in-memory thread with a generated ID
+// NewInMemoryThread creates a new in-memory thread with a generated ID.
 func NewInMemoryThread() *InMemoryThread {
 	return &InMemoryThread{
 		id:           uuid.New().String(),
@@ -37,7 +37,7 @@ func NewInMemoryThread() *InMemoryThread {
 	}
 }
 
-// NewInMemoryThreadWithID creates a new in-memory thread with a specific ID
+// NewInMemoryThreadWithID creates a new in-memory thread with a specific ID.
 func NewInMemoryThreadWithID(id string) *InMemoryThread {
 	return &InMemoryThread{
 		id:           id,
@@ -45,24 +45,25 @@ func NewInMemoryThreadWithID(id string) *InMemoryThread {
 	}
 }
 
-// NewInMemoryThreadWithMessages creates a new in-memory thread with initial messages
+// NewInMemoryThreadWithMessages creates a new in-memory thread with initial messages.
 func NewInMemoryThreadWithMessages(messages []domain.Message) (*InMemoryThread, error) {
 	thread := &InMemoryThread{
 		id:           uuid.New().String(),
 		messageStore: NewInMemoryMessageStore(),
 	}
 
-	if err := thread.messageStore.AddMessages(messages); err != nil {
+	err := thread.messageStore.AddMessages(messages)
+	if err != nil {
 		return nil, fmt.Errorf("failed to add initial messages: %w", err)
 	}
 
 	return thread, nil
 }
 
-// NewInMemoryThreadFromState creates a new in-memory thread from previously serialized state
+// NewInMemoryThreadFromState creates a new in-memory thread from previously serialized state.
 func NewInMemoryThreadFromState(data []byte) (*InMemoryThread, error) {
 	if len(data) == 0 {
-		return nil, fmt.Errorf("serialized thread state is empty")
+		return nil, errors.New("serialized thread state is empty")
 	}
 
 	var state inMemoryThreadState
@@ -82,22 +83,22 @@ func NewInMemoryThreadFromState(data []byte) (*InMemoryThread, error) {
 	}, nil
 }
 
-// GetID returns the unique identifier for this thread
+// GetID returns the unique identifier for this thread.
 func (t *InMemoryThread) GetID() string {
 	return t.id
 }
 
-// GetMessages returns all messages in the thread
+// GetMessages returns all messages in the thread.
 func (t *InMemoryThread) GetMessages() []domain.Message {
 	return t.messageStore.GetMessages()
 }
 
-// AddMessages adds new messages to the thread
+// AddMessages adds new messages to the thread.
 func (t *InMemoryThread) AddMessages(messages []domain.Message) error {
 	return t.messageStore.AddMessages(messages)
 }
 
-// Serialize serializes the thread state to JSON
+// Serialize serializes the thread state to JSON.
 func (t *InMemoryThread) Serialize() ([]byte, error) {
 	storeData, err := t.messageStore.Serialize()
 	if err != nil {
@@ -117,13 +118,13 @@ func (t *InMemoryThread) Serialize() ([]byte, error) {
 	return data, nil
 }
 
-// GetType returns the thread type (always local for InMemoryThread)
+// GetType returns the thread type (always local for InMemoryThread).
 func (t *InMemoryThread) GetType() ThreadType {
 	return ThreadTypeLocal
 }
 
-// GetService asks the thread for an object of the specified type
-func (t *InMemoryThread) GetService(serviceType interface{}) interface{} {
+// GetService asks the thread for an object of the specified type.
+func (t *InMemoryThread) GetService(serviceType any) any {
 	// Return self if requesting AgentThread type
 	if _, ok := serviceType.(*AgentThread); ok {
 		return t
@@ -137,7 +138,7 @@ func (t *InMemoryThread) GetService(serviceType interface{}) interface{} {
 	return nil
 }
 
-// GetMessageStore returns the underlying message store for advanced operations
+// GetMessageStore returns the underlying message store for advanced operations.
 func (t *InMemoryThread) GetMessageStore() MessageStore {
 	return t.messageStore
 }

@@ -3,15 +3,14 @@ package middleware
 import (
 	"context"
 	"encoding/json"
-	"testing"
-
 	"school-with-ai/sdk/agentsdk/core"
+	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// mockWhiteboardProjection is a simple in-memory implementation for testing
+// mockWhiteboardProjection is a simple in-memory implementation for testing.
 type mockWhiteboardProjection struct {
 	data map[string]string
 }
@@ -26,6 +25,7 @@ func (m *mockWhiteboardProjection) Get(threadID string) string {
 	if m.data == nil {
 		return ""
 	}
+
 	return m.data[threadID]
 }
 
@@ -43,7 +43,7 @@ func TestWhiteboardMiddleware(t *testing.T) {
 		reqCtx := &core.RequestContext{
 			ThreadID: "thread-123",
 			Tools:    []core.Tool{},
-			State:    make(map[string]interface{}),
+			State:    make(map[string]any),
 		}
 
 		called := false
@@ -65,6 +65,7 @@ func TestWhiteboardMiddleware(t *testing.T) {
 			prompt := rc.GetEffectiveSystemPrompt()
 			assert.Contains(t, prompt, "Current Whiteboard Content")
 			assert.Contains(t, prompt, "The whiteboard is currently empty")
+
 			return nil
 		}
 
@@ -78,7 +79,7 @@ func TestWhiteboardMiddleware(t *testing.T) {
 		middleware := NewWhiteboardMiddleware(projection)
 		reqCtx := &core.RequestContext{
 			SystemPrompt: "",
-			State:        make(map[string]interface{}),
+			State:        make(map[string]any),
 		}
 
 		next := func(ctx context.Context, rc *core.RequestContext) error {
@@ -86,6 +87,7 @@ func TestWhiteboardMiddleware(t *testing.T) {
 			assert.Contains(t, prompt, "Shared Whiteboard")
 			assert.Contains(t, prompt, "write_whiteboard")
 			assert.NotContains(t, prompt, "read_whiteboard")
+
 			return nil
 		}
 
@@ -98,12 +100,13 @@ func TestWhiteboardMiddleware(t *testing.T) {
 		middleware := NewWhiteboardMiddleware(projection)
 		reqCtx := &core.RequestContext{
 			ThreadID: "thread-123",
-			State:    make(map[string]interface{}),
+			State:    make(map[string]any),
 		}
 
 		next := func(ctx context.Context, rc *core.RequestContext) error {
 			content := projection.Get(rc.ThreadID)
-			assert.Equal(t, "", content, "projection should have empty content initially")
+			assert.Empty(t, content, "projection should have empty content initially")
+
 			return nil
 		}
 
@@ -116,7 +119,7 @@ func TestWhiteboardMiddleware(t *testing.T) {
 		middleware := NewWhiteboardMiddleware(projection)
 		reqCtx := &core.RequestContext{
 			ThreadID: "thread-123",
-			State:    make(map[string]interface{}),
+			State:    make(map[string]any),
 		}
 
 		// Pre-populate projection with content
@@ -128,6 +131,7 @@ func TestWhiteboardMiddleware(t *testing.T) {
 			assert.Contains(t, prompt, "# Existing Content")
 			assert.Contains(t, prompt, "- Item 1")
 			assert.NotContains(t, prompt, "currently empty")
+
 			return nil
 		}
 
@@ -142,12 +146,13 @@ func TestWhiteboardMiddleware(t *testing.T) {
 		reqCtx := &core.RequestContext{
 			ThreadID:     "thread-123",
 			SystemPrompt: "",
-			State:        make(map[string]interface{}),
+			State:        make(map[string]any),
 		}
 
 		next := func(ctx context.Context, rc *core.RequestContext) error {
 			prompt := rc.GetEffectiveSystemPrompt()
 			assert.Contains(t, prompt, customPrompt)
+
 			return nil
 		}
 
@@ -158,7 +163,7 @@ func TestWhiteboardMiddleware(t *testing.T) {
 
 func TestWriteWhiteboardTool(t *testing.T) {
 	t.Run("tool metadata", func(t *testing.T) {
-		reqCtx := &core.RequestContext{State: make(map[string]interface{})}
+		reqCtx := &core.RequestContext{State: make(map[string]any)}
 		tool := NewWriteWhiteboardTool(reqCtx)
 
 		assert.Equal(t, "write_whiteboard", tool.Name())
@@ -166,13 +171,13 @@ func TestWriteWhiteboardTool(t *testing.T) {
 		params := tool.Parameters()
 		assert.Equal(t, "object", params["type"])
 
-		props := params["properties"].(map[string]interface{})
+		props := params["properties"].(map[string]any)
 		assert.Contains(t, props, "content")
 		assert.Contains(t, props, "action")
 	})
 
 	t.Run("write action replaces content", func(t *testing.T) {
-		reqCtx := &core.RequestContext{State: make(map[string]interface{})}
+		reqCtx := &core.RequestContext{State: make(map[string]any)}
 		SetWhiteboardContent(reqCtx, "Old content")
 
 		tool := NewWriteWhiteboardTool(reqCtx)
@@ -190,7 +195,7 @@ func TestWriteWhiteboardTool(t *testing.T) {
 	})
 
 	t.Run("append action adds to existing content", func(t *testing.T) {
-		reqCtx := &core.RequestContext{State: make(map[string]interface{})}
+		reqCtx := &core.RequestContext{State: make(map[string]any)}
 		SetWhiteboardContent(reqCtx, "First line")
 
 		tool := NewWriteWhiteboardTool(reqCtx)
@@ -208,7 +213,7 @@ func TestWriteWhiteboardTool(t *testing.T) {
 	})
 
 	t.Run("append to empty whiteboard", func(t *testing.T) {
-		reqCtx := &core.RequestContext{State: make(map[string]interface{})}
+		reqCtx := &core.RequestContext{State: make(map[string]any)}
 		SetWhiteboardContent(reqCtx, "")
 
 		tool := NewWriteWhiteboardTool(reqCtx)
@@ -225,7 +230,7 @@ func TestWriteWhiteboardTool(t *testing.T) {
 	})
 
 	t.Run("clear action removes all content", func(t *testing.T) {
-		reqCtx := &core.RequestContext{State: make(map[string]interface{})}
+		reqCtx := &core.RequestContext{State: make(map[string]any)}
 		SetWhiteboardContent(reqCtx, "Some content to clear")
 
 		tool := NewWriteWhiteboardTool(reqCtx)
@@ -239,11 +244,11 @@ func TestWriteWhiteboardTool(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Contains(t, result, "Whiteboard updated")
-		assert.Equal(t, "", GetWhiteboardContent(reqCtx))
+		assert.Empty(t, GetWhiteboardContent(reqCtx))
 	})
 
 	t.Run("invalid action returns error", func(t *testing.T) {
-		reqCtx := &core.RequestContext{State: make(map[string]interface{})}
+		reqCtx := &core.RequestContext{State: make(map[string]any)}
 		tool := NewWriteWhiteboardTool(reqCtx)
 
 		args := map[string]string{
@@ -259,7 +264,7 @@ func TestWriteWhiteboardTool(t *testing.T) {
 	})
 
 	t.Run("invalid JSON returns error", func(t *testing.T) {
-		reqCtx := &core.RequestContext{State: make(map[string]interface{})}
+		reqCtx := &core.RequestContext{State: make(map[string]any)}
 		tool := NewWriteWhiteboardTool(reqCtx)
 
 		_, err := tool.Invoke(context.Background(), "invalid json")
@@ -271,11 +276,11 @@ func TestWriteWhiteboardTool(t *testing.T) {
 
 func TestGetSetWhiteboardContent(t *testing.T) {
 	t.Run("get and set whiteboard content", func(t *testing.T) {
-		reqCtx := &core.RequestContext{State: make(map[string]interface{})}
+		reqCtx := &core.RequestContext{State: make(map[string]any)}
 
 		// Initially empty
 		content := GetWhiteboardContent(reqCtx)
-		assert.Equal(t, "", content)
+		assert.Empty(t, content)
 
 		// Set content
 		SetWhiteboardContent(reqCtx, "Test content")
@@ -289,10 +294,10 @@ func TestGetSetWhiteboardContent(t *testing.T) {
 	})
 
 	t.Run("get from context without whiteboard_content key", func(t *testing.T) {
-		reqCtx := &core.RequestContext{State: make(map[string]interface{})}
+		reqCtx := &core.RequestContext{State: make(map[string]any)}
 		// Don't set anything
 		content := GetWhiteboardContent(reqCtx)
-		assert.Equal(t, "", content)
+		assert.Empty(t, content)
 	})
 }
 
@@ -302,7 +307,7 @@ func TestWhiteboardMiddlewareIntegration(t *testing.T) {
 		middleware := NewWhiteboardMiddleware(projection)
 		reqCtx := &core.RequestContext{
 			Tools: []core.Tool{},
-			State: make(map[string]interface{}),
+			State: make(map[string]any),
 		}
 
 		next := func(ctx context.Context, rc *core.RequestContext) error {

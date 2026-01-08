@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/montanaflynn/stats"
@@ -169,6 +170,7 @@ func (t *DescriptiveStatsTool) formatResponse(operation string, result any) (str
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal response: %w", err)
 	}
+
 	return string(data), nil
 }
 
@@ -236,27 +238,27 @@ func (t *CorrelationTool) Invoke(ctx context.Context, arguments string) (string,
 	switch args.Operation {
 	case "correlation":
 		if len(args.Data1) == 0 || len(args.Data2) == 0 {
-			return "", fmt.Errorf("correlation requires data1 and data2")
+			return "", errors.New("correlation requires data1 and data2")
 		}
 		result, err = stats.Correlation(stats.Float64Data(args.Data1), stats.Float64Data(args.Data2))
 	case "pearson":
 		if len(args.Data1) == 0 || len(args.Data2) == 0 {
-			return "", fmt.Errorf("pearson requires data1 and data2")
+			return "", errors.New("pearson requires data1 and data2")
 		}
 		result, err = stats.Pearson(stats.Float64Data(args.Data1), stats.Float64Data(args.Data2))
 	case "covariance":
 		if len(args.Data1) == 0 || len(args.Data2) == 0 {
-			return "", fmt.Errorf("covariance requires data1 and data2")
+			return "", errors.New("covariance requires data1 and data2")
 		}
 		result, err = stats.Covariance(stats.Float64Data(args.Data1), stats.Float64Data(args.Data2))
 	case "covariance_population":
 		if len(args.Data1) == 0 || len(args.Data2) == 0 {
-			return "", fmt.Errorf("covariance_population requires data1 and data2")
+			return "", errors.New("covariance_population requires data1 and data2")
 		}
 		result, err = stats.CovariancePopulation(stats.Float64Data(args.Data1), stats.Float64Data(args.Data2))
 	case "autocorrelation":
 		if len(args.Data1) == 0 {
-			return "", fmt.Errorf("autocorrelation requires data1")
+			return "", errors.New("autocorrelation requires data1")
 		}
 		result, err = stats.AutoCorrelation(stats.Float64Data(args.Data1), args.Lags)
 	default:
@@ -275,6 +277,7 @@ func (t *CorrelationTool) Invoke(ctx context.Context, arguments string) (string,
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal response: %w", err)
 	}
+
 	return string(data), nil
 }
 
@@ -371,6 +374,7 @@ func (t *DistanceMetricsTool) Invoke(ctx context.Context, arguments string) (str
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal response: %w", err)
 	}
+
 	return string(data), nil
 }
 
@@ -472,6 +476,7 @@ func (t *SamplingTool) Invoke(ctx context.Context, arguments string) (string, er
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal response: %w", err)
 	}
+
 	return string(responseData), nil
 }
 
@@ -562,6 +567,7 @@ func (t *DataTransformTool) Invoke(ctx context.Context, arguments string) (strin
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal response: %w", err)
 	}
+
 	return string(data), nil
 }
 
@@ -707,7 +713,7 @@ func (t *NormalDistributionTool) Invoke(ctx context.Context, arguments string) (
 		}
 	case "norm_fit":
 		if len(args.Data) == 0 {
-			return "", fmt.Errorf("norm_fit requires data")
+			return "", errors.New("norm_fit requires data")
 		}
 		params := stats.NormFit(args.Data)
 		result = map[string]any{
@@ -738,6 +744,7 @@ func (t *NormalDistributionTool) Invoke(ctx context.Context, arguments string) (
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal response: %w", err)
 	}
+
 	return string(data), nil
 }
 
@@ -823,6 +830,7 @@ func (t *GeometricDistributionTool) Invoke(ctx context.Context, arguments string
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal response: %w", err)
 	}
+
 	return string(data), nil
 }
 
@@ -880,7 +888,7 @@ func (r *RegressionTool) Invoke(ctx context.Context, arguments string) (string, 
 	}
 
 	if len(args.X) != len(args.Y) {
-		return "", fmt.Errorf("x and y arrays must have the same length")
+		return "", errors.New("x and y arrays must have the same length")
 	}
 
 	series := make(stats.Series, len(args.X))
@@ -922,5 +930,6 @@ func (r *RegressionTool) Invoke(ctx context.Context, arguments string) (string, 
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal response: %w", err)
 	}
+
 	return string(data), nil
 }

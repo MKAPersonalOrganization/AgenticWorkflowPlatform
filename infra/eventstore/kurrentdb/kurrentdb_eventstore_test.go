@@ -2,10 +2,9 @@ package kurrentdb
 
 import (
 	"context"
+	"school-with-ai/sdk/agentsdk/core"
 	"testing"
 	"time"
-
-	"school-with-ai/sdk/agentsdk/core"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -46,7 +45,7 @@ func TestEventStore_AppendAndRead(t *testing.T) {
 	// Append events
 	version, err := store.Append(ctx, streamID, events...)
 	require.NoError(t, err)
-	assert.Greater(t, version, int64(0))
+	assert.Positive(t, version)
 
 	// Read events back
 	readEvents, err := store.ReadStream(ctx, streamID, 0)

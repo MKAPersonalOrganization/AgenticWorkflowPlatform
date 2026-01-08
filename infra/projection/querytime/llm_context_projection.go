@@ -2,13 +2,12 @@ package querytime
 
 import (
 	"context"
-	"time"
-
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
+	"time"
 )
 
-// ThreadLister provides a way to list all thread IDs
+// ThreadLister provides a way to list all thread IDs.
 type ThreadLister interface {
 	ListThreads() []string
 }
@@ -26,7 +25,7 @@ type QueryTimeLLMContextProjection struct {
 	threadLister ThreadLister // Used to get list of all threads for All() method
 }
 
-// threadMetadata holds non-message thread information
+// threadMetadata holds non-message thread information.
 type threadMetadata struct {
 	Title     string
 	CreatedAt time.Time
@@ -107,6 +106,7 @@ func (p *QueryTimeLLMContextProjection) Messages(threadID string) []domain.Messa
 	if thread, exists := p.Get(threadID); exists {
 		return thread.Messages
 	}
+
 	return []domain.Message{}
 }
 
@@ -126,7 +126,7 @@ func (p *QueryTimeLLMContextProjection) All() []domain.Thread {
 	}
 
 	// Sort by UpdatedAt descending
-	for i := 0; i < len(threads)-1; i++ {
+	for i := range len(threads) - 1 {
 		for j := i + 1; j < len(threads); j++ {
 			if threads[i].UpdatedAt.Before(threads[j].UpdatedAt) {
 				threads[i], threads[j] = threads[j], threads[i]
@@ -153,6 +153,7 @@ func (p *QueryTimeLLMContextProjection) Apply(ctx context.Context, event core.Ev
 func (p *QueryTimeLLMContextProjection) ThreadExists(threadID string) bool {
 	ctx := context.Background()
 	events, err := p.eventStore.ReadStream(ctx, threadID, 0)
+
 	return err == nil && len(events) > 0
 }
 
@@ -168,7 +169,7 @@ func (p *QueryTimeLLMContextProjection) RebuildAll(ctx context.Context, store co
 	return nil
 }
 
-// applyEventToThread applies an event to rebuild thread state
+// applyEventToThread applies an event to rebuild thread state.
 func applyEventToThread(agentThread core.AgentThread, meta *threadMetadata, event core.Event) error {
 	switch evt := event.(type) {
 	case core.ThreadCreatedEvent:
@@ -286,5 +287,5 @@ func applyEventToThread(agentThread core.AgentThread, meta *threadMetadata, even
 	return nil
 }
 
-// Verify QueryTimeLLMContextProjection implements core.ThreadStateWithAgentAccess
+// Verify QueryTimeLLMContextProjection implements core.ThreadStateWithAgentAccess.
 var _ core.ThreadStateWithAgentAccess = (*QueryTimeLLMContextProjection)(nil)

@@ -34,7 +34,7 @@ func TestMermaidDiagramTool_SimpleFlowchart(t *testing.T) {
 		t.Fatalf("failed to invoke mermaid diagram tool: %v", err)
 	}
 
-	var response map[string]interface{}
+	var response map[string]any
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}
@@ -74,7 +74,7 @@ func TestMermaidDiagramTool_SequenceDiagram(t *testing.T) {
 		t.Fatalf("failed to create sequence diagram: %v", err)
 	}
 
-	var response map[string]interface{}
+	var response map[string]any
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
@@ -120,7 +120,7 @@ func TestMermaidDiagramTool_ClassDiagram(t *testing.T) {
 		t.Fatalf("failed to create class diagram: %v", err)
 	}
 
-	var response map[string]interface{}
+	var response map[string]any
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
@@ -133,14 +133,7 @@ func TestMermaidDiagramTool_ClassDiagram(t *testing.T) {
 func TestMermaidDiagramTool_StateDiagram(t *testing.T) {
 	tool := NewMermaidDiagramTool()
 
-	mermaidCode := `stateDiagram-v2
-    [*] --> Idle
-    Idle --> Processing: Start Task
-    Processing --> Success: Complete
-    Processing --> Error: Fail
-    Success --> [*]
-    Error --> Idle: Retry
-    Error --> [*]: Give Up`
+	mermaidCode := "stateDiagram-v2\n    [*] --> Idle\n    --> Processing: Start Task\n    Processing --> Success: Complete\n    Processing --> Error: Fail\n    Success --> [*]\n    Error --> Idle: Retry\n    Error --> [*]: Give Up"
 
 	args := MermaidDiagramArgs{
 		MermaidCode: mermaidCode,
@@ -154,7 +147,7 @@ func TestMermaidDiagramTool_StateDiagram(t *testing.T) {
 		t.Fatalf("failed to create state diagram: %v", err)
 	}
 
-	var response map[string]interface{}
+	var response map[string]any
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
@@ -183,7 +176,7 @@ func TestMermaidDiagramTool_SVGOutput(t *testing.T) {
 		t.Fatalf("failed to create SVG diagram: %v", err)
 	}
 
-	var response map[string]interface{}
+	var response map[string]any
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
@@ -233,7 +226,7 @@ func TestMermaidDiagramTool_ERDiagram(t *testing.T) {
 		t.Fatalf("failed to create ER diagram: %v", err)
 	}
 
-	var response map[string]interface{}
+	var response map[string]any
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
@@ -351,7 +344,7 @@ func TestMermaidDiagramTool_PieChart(t *testing.T) {
 		t.Fatalf("failed to create pie chart: %v", err)
 	}
 
-	var response map[string]interface{}
+	var response map[string]any
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
@@ -364,19 +357,7 @@ func TestMermaidDiagramTool_PieChart(t *testing.T) {
 func TestMermaidDiagramTool_ComplexFlowchart(t *testing.T) {
 	tool := NewMermaidDiagramTool()
 
-	mermaidCode := `graph TD
-    Start[Start Problem] --> Read[Read Question]
-    Read --> Identify{Identify Type}
-    Identify -->|Algebra| Alg[Use Algebra Tools]
-    Identify -->|Calculus| Calc[Use Calculus Tools]
-    Identify -->|Geometry| Geo[Use Geometry Tools]
-    Alg --> Solve[Solve Problem]
-    Calc --> Solve
-    Geo --> Solve
-    Solve --> Verify{Verify Solution}
-    Verify -->|Correct| End[Present Answer]
-    Verify -->|Incorrect| Read
-    End --> Finish[Complete]`
+	mermaidCode := "graph TD\n    Start[Start Problem] --> Read[Read Question]\n    Read --> Identify{Identify Type}\n    Identify -->|Algebra| Alg[Use Algebra Tools]\n    Identify -->|Calculus| Calc[Use Calculus Tools]\n    Identify -->|Geometry| Geo[Use Geometry Tools]\n    Alg --> Solve[Solve Problem]\n    Calc --> Solve\n    Geo --> Solve\n    --> Verify{Verify Solution}\n    Verify -->|Correct| End[Present Answer]\n    Verify -->|Incorrect| Read\n    End --> Finish[Complete]"
 
 	args := MermaidDiagramArgs{
 		MermaidCode: mermaidCode,
@@ -390,7 +371,7 @@ func TestMermaidDiagramTool_ComplexFlowchart(t *testing.T) {
 		t.Fatalf("failed to create complex flowchart: %v", err)
 	}
 
-	var response map[string]interface{}
+	var response map[string]any
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
@@ -429,7 +410,7 @@ func TestMermaidDiagramTool_DefaultOutputType(t *testing.T) {
 		t.Fatalf("failed to create diagram with default output type: %v", err)
 	}
 
-	var response map[string]interface{}
+	var response map[string]any
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
@@ -465,7 +446,7 @@ func TestMermaidDiagramTool_JSONResponseFormat(t *testing.T) {
 		t.Fatalf("failed to invoke tool: %v", err)
 	}
 
-	var response map[string]interface{}
+	var response map[string]any
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}

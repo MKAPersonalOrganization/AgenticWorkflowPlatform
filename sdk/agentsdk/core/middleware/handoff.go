@@ -3,11 +3,11 @@ package middleware
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"school-with-ai/sdk/agentsdk/core"
 	"sort"
 	"strings"
-
-	"school-with-ai/sdk/agentsdk/core"
 )
 
 const TransferToAgentToolDescription = `Transfer control to another specialist agent when they are better suited to handle the question.
@@ -34,20 +34,20 @@ Transfer guidelines:
 5. If you are the best agent for the task, answer directly
 6. When transferring, call the tool without additional commentary`
 
-// Handoff represents a transfer request to another agent
+// Handoff represents a transfer request to another agent.
 type Handoff struct {
 	TargetAgent string `json:"target_agent"` // Name of the agent to transfer to
 	Question    string `json:"question"`     // Question or task for the target agent
 	Context     string `json:"context"`      // Relevant context from the conversation
 }
 
-// TransferToAgentTool is the tool for transferring to another agent
+// TransferToAgentTool is the tool for transferring to another agent.
 type TransferToAgentTool struct {
 	availableAgents map[string]string // agent_name -> description
 	reqCtx          *core.RequestContext
 }
 
-// NewTransferToAgentTool creates a new TransferToAgentTool
+// NewTransferToAgentTool creates a new TransferToAgentTool.
 func NewTransferToAgentTool(availableAgents map[string]string, reqCtx *core.RequestContext) *TransferToAgentTool {
 	return &TransferToAgentTool{
 		availableAgents: availableAgents,
@@ -80,7 +80,7 @@ func (t *TransferToAgentTool) Description() string {
 	return sb.String()
 }
 
-func (t *TransferToAgentTool) Parameters() map[string]interface{} {
+func (t *TransferToAgentTool) Parameters() map[string]any {
 	// Build enum of available agent names
 	agentNames := make([]string, 0, len(t.availableAgents))
 	for name := range t.availableAgents {
@@ -88,19 +88,19 @@ func (t *TransferToAgentTool) Parameters() map[string]interface{} {
 	}
 	sort.Strings(agentNames)
 
-	return map[string]interface{}{
+	return map[string]any{
 		"type": "object",
-		"properties": map[string]interface{}{
-			"agent_name": map[string]interface{}{
+		"properties": map[string]any{
+			"agent_name": map[string]any{
 				"type":        "string",
 				"description": "The name of the agent to transfer to",
 				"enum":        agentNames,
 			},
-			"question": map[string]interface{}{
+			"question": map[string]any{
 				"type":        "string",
 				"description": "The question or task for the specialist agent. Can be empty when returning to coordinator with results.",
 			},
-			"context": map[string]interface{}{
+			"context": map[string]any{
 				"type":        "string",
 				"description": "Relevant context from the conversation. When returning to coordinator, use this to provide your results/answer.",
 			},
@@ -116,13 +116,14 @@ func (t *TransferToAgentTool) Invoke(ctx context.Context, arguments string) (str
 		Context   string `json:"context"`
 	}
 
-	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
+	err := json.Unmarshal([]byte(arguments), &args)
+	if err != nil {
 		return "", fmt.Errorf("failed to parse transfer arguments: %w", err)
 	}
 
 	// Validate agent_name is provided
 	if args.AgentName == "" {
-		return "", fmt.Errorf("agent_name is required")
+		return "", errors.New("agent_name is required")
 	}
 
 	// Prevent self-transfer
@@ -137,6 +138,7 @@ func (t *TransferToAgentTool) Invoke(ctx context.Context, arguments string) (str
 		for name := range t.availableAgents {
 			agentNames = append(agentNames, name)
 		}
+
 		return "", fmt.Errorf("unknown agent: %s. Available agents: %v", args.AgentName, agentNames)
 	}
 
@@ -149,16 +151,16 @@ func (t *TransferToAgentTool) Invoke(ctx context.Context, arguments string) (str
 
 	SetHandoff(t.reqCtx, handoff)
 
-	return fmt.Sprintf("Successfully transferred to %s", args.AgentName), nil
+	return "Successfully transferred to " + args.AgentName, nil
 }
 
-// HandoffMiddleware provides agent handoff/transfer capabilities
+// HandoffMiddleware provides agent handoff/transfer capabilities.
 type HandoffMiddleware struct {
 	availableAgents map[string]string // agent_name -> description
 	systemPrompt    string
 }
 
-// NewHandoffMiddleware creates a new HandoffMiddleware with specified available agents
+// NewHandoffMiddleware creates a new HandoffMiddleware with specified available agents.
 func NewHandoffMiddleware(availableAgents map[string]string) *HandoffMiddleware {
 	return &HandoffMiddleware{
 		availableAgents: availableAgents,
@@ -166,7 +168,7 @@ func NewHandoffMiddleware(availableAgents map[string]string) *HandoffMiddleware 
 	}
 }
 
-// NewHandoffMiddlewareWithPrompt creates a new HandoffMiddleware with custom system prompt
+// NewHandoffMiddlewareWithPrompt creates a new HandoffMiddleware with custom system prompt.
 func NewHandoffMiddlewareWithPrompt(availableAgents map[string]string, systemPrompt string) *HandoffMiddleware {
 	return &HandoffMiddleware{
 		availableAgents: availableAgents,
@@ -174,7 +176,7 @@ func NewHandoffMiddlewareWithPrompt(availableAgents map[string]string, systemPro
 	}
 }
 
-// Process implements the Middleware interface
+// Process implements the Middleware interface.
 func (m *HandoffMiddleware) Process(ctx context.Context, reqCtx *core.RequestContext, next core.NextHandler) error {
 	// Add transfer_to_agent tool
 	reqCtx.AddTool(NewTransferToAgentTool(m.availableAgents, reqCtx))
@@ -187,7 +189,7 @@ func (m *HandoffMiddleware) Process(ctx context.Context, reqCtx *core.RequestCon
 	return next(ctx, reqCtx)
 }
 
-// buildSystemPromptWithAgents creates the system prompt including the list of available agents
+// buildSystemPromptWithAgents creates the system prompt including the list of available agents.
 func (m *HandoffMiddleware) buildSystemPromptWithAgents() string {
 	var sb strings.Builder
 	sb.WriteString(m.systemPrompt)
@@ -210,7 +212,7 @@ func (m *HandoffMiddleware) buildSystemPromptWithAgents() string {
 
 // State helper functions
 
-// GetHandoff retrieves the current handoff from request context state
+// GetHandoff retrieves the current handoff from request context state.
 func GetHandoff(reqCtx *core.RequestContext) (*Handoff, bool) {
 	val, ok := reqCtx.State["handoff"]
 	if !ok {
@@ -220,21 +222,23 @@ func GetHandoff(reqCtx *core.RequestContext) (*Handoff, bool) {
 	if !ok {
 		return nil, false
 	}
+
 	return &h, true
 }
 
-// SetHandoff stores a handoff in the request context state
+// SetHandoff stores a handoff in the request context state.
 func SetHandoff(reqCtx *core.RequestContext, h Handoff) {
 	reqCtx.State["handoff"] = h
 }
 
-// ClearHandoff removes the handoff from request context state
+// ClearHandoff removes the handoff from request context state.
 func ClearHandoff(reqCtx *core.RequestContext) {
 	delete(reqCtx.State, "handoff")
 }
 
-// HasHandoff checks if a handoff is present in the request context
+// HasHandoff checks if a handoff is present in the request context.
 func HasHandoff(reqCtx *core.RequestContext) bool {
 	_, exists := reqCtx.State["handoff"]
+
 	return exists
 }

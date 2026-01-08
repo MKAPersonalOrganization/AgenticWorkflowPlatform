@@ -2,16 +2,15 @@ package core
 
 import (
 	"fmt"
+	"school-with-ai/domain"
 	"testing"
 	"time"
-
-	"school-with-ai/domain"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// TestInMemoryThreadCreation verifies that in-memory threads can be created correctly
+// TestInMemoryThreadCreation verifies that in-memory threads can be created correctly.
 func TestInMemoryThreadCreation(t *testing.T) {
 	t.Run("create new thread", func(t *testing.T) {
 		thread := NewInMemoryThread()
@@ -57,7 +56,7 @@ func TestInMemoryThreadCreation(t *testing.T) {
 	})
 }
 
-// TestThreadMessageManagement verifies message CRUD operations
+// TestThreadMessageManagement verifies message CRUD operations.
 func TestThreadMessageManagement(t *testing.T) {
 	t.Run("add and retrieve messages", func(t *testing.T) {
 		thread := NewInMemoryThread()
@@ -156,7 +155,7 @@ func TestThreadMessageManagement(t *testing.T) {
 	})
 }
 
-// TestThreadSerialization verifies thread serialization and deserialization
+// TestThreadSerialization verifies thread serialization and deserialization.
 func TestThreadSerialization(t *testing.T) {
 	t.Run("serialize and deserialize thread", func(t *testing.T) {
 		// Create thread with messages
@@ -225,7 +224,7 @@ func TestThreadSerialization(t *testing.T) {
 	})
 }
 
-// TestThreadIsolation verifies that multiple threads don't interfere with each other
+// TestThreadIsolation verifies that multiple threads don't interfere with each other.
 func TestThreadIsolation(t *testing.T) {
 	t.Run("multiple threads are independent", func(t *testing.T) {
 		thread1 := NewInMemoryThreadWithID("thread-1")
@@ -262,7 +261,7 @@ func TestThreadIsolation(t *testing.T) {
 
 		// Goroutine 1: writes to thread1
 		go func() {
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				msg := []domain.Message{
 					{
 						ID:        fmt.Sprintf("msg-%d", i),
@@ -278,7 +277,7 @@ func TestThreadIsolation(t *testing.T) {
 
 		// Goroutine 2: writes to thread2
 		go func() {
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				msg := []domain.Message{
 					{
 						ID:        fmt.Sprintf("msg-%d", i),
@@ -308,7 +307,7 @@ func TestThreadIsolation(t *testing.T) {
 	})
 }
 
-// TestMessageStoreThreadSafety verifies concurrent access to message store
+// TestMessageStoreThreadSafety verifies concurrent access to message store.
 func TestMessageStoreThreadSafety(t *testing.T) {
 	t.Run("concurrent writes and reads", func(t *testing.T) {
 		store := NewInMemoryMessageStore()
@@ -316,7 +315,7 @@ func TestMessageStoreThreadSafety(t *testing.T) {
 
 		// Writer goroutine
 		go func() {
-			for i := 0; i < 50; i++ {
+			for i := range 50 {
 				msg := []domain.Message{
 					{ID: fmt.Sprintf("msg-%d", i), Role: "user", Content: "Test", Timestamp: time.Now()},
 				}
@@ -327,7 +326,7 @@ func TestMessageStoreThreadSafety(t *testing.T) {
 
 		// Reader goroutine
 		go func() {
-			for i := 0; i < 50; i++ {
+			for range 50 {
 				_ = store.GetMessages()
 				_ = store.Count()
 			}
@@ -342,7 +341,7 @@ func TestMessageStoreThreadSafety(t *testing.T) {
 	})
 }
 
-// TestThreadGetService verifies service retrieval pattern
+// TestThreadGetService verifies service retrieval pattern.
 func TestThreadGetService(t *testing.T) {
 	t.Run("get thread service", func(t *testing.T) {
 		thread := NewInMemoryThread()
@@ -363,7 +362,7 @@ func TestThreadGetService(t *testing.T) {
 	t.Run("get unknown service returns nil", func(t *testing.T) {
 		thread := NewInMemoryThread()
 
-		type UnknownService interface{}
+		type UnknownService any
 		var unknown UnknownService
 		service := thread.GetService(&unknown)
 		assert.Nil(t, service)

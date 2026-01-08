@@ -47,6 +47,7 @@ func (f FunctionCallContent) ArgumentsJSON() string {
 	if err != nil {
 		return "{}"
 	}
+
 	return string(data)
 }
 

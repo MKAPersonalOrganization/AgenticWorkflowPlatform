@@ -28,7 +28,7 @@ func TestNewUserFromIdentity(t *testing.T) {
 				Id:        "user-123",
 				CreatedAt: &now,
 				UpdatedAt: &now,
-				Traits: map[string]interface{}{
+				Traits: map[string]any{
 					"email": "test@example.com",
 				},
 			},
@@ -49,9 +49,9 @@ func TestNewUserFromIdentity(t *testing.T) {
 				Id:        "user-456",
 				CreatedAt: &now,
 				UpdatedAt: &now,
-				Traits: map[string]interface{}{
+				Traits: map[string]any{
 					"email": "john@example.com",
-					"name": map[string]interface{}{
+					"name": map[string]any{
 						"first": "John",
 						"last":  "Doe",
 					},
@@ -80,9 +80,9 @@ func TestNewUserFromIdentity(t *testing.T) {
 				Id:        "user-789",
 				CreatedAt: &now,
 				UpdatedAt: &now,
-				Traits: map[string]interface{}{
+				Traits: map[string]any{
 					"email": "jane@example.com",
-					"name": map[string]interface{}{
+					"name": map[string]any{
 						"first": "Jane",
 					},
 				},
@@ -109,16 +109,19 @@ func TestNewUserFromIdentity(t *testing.T) {
 			got, err := NewUserFromIdentity(tt.identity)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewUserFromIdentity() error = %v, wantErr %v", err, tt.wantErr)
+
 				return
 			}
 
 			if tt.wantUser == nil && got != nil {
 				t.Errorf("NewUserFromIdentity() expected nil, got %+v", got)
+
 				return
 			}
 
 			if tt.wantUser != nil && got == nil {
 				t.Errorf("NewUserFromIdentity() expected user, got nil")
+
 				return
 			}
 
@@ -160,7 +163,7 @@ func TestNewUserFromSession(t *testing.T) {
 					Id:        "user-123",
 					CreatedAt: &now,
 					UpdatedAt: &now,
-					Traits: map[string]interface{}{
+					Traits: map[string]any{
 						"email": "test@example.com",
 					},
 				},
@@ -174,6 +177,7 @@ func TestNewUserFromSession(t *testing.T) {
 			got, err := NewUserFromSession(tt.session)
 			if err != nil {
 				t.Errorf("NewUserFromSession() error = %v", err)
+
 				return
 			}
 			if tt.wantNil && got != nil {

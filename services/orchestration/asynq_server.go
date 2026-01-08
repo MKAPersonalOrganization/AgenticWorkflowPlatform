@@ -2,17 +2,17 @@ package orchestration
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
-	"time"
-
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/services/chatwrite"
+	"time"
 
 	"github.com/hibiken/asynq"
 )
 
-// AsynqServer wraps Asynq server and client for chat task processing
+// AsynqServer wraps Asynq server and client for chat task processing.
 type AsynqServer struct {
 	server             *asynq.Server
 	client             *asynq.Client
@@ -20,7 +20,7 @@ type AsynqServer struct {
 	redisAddr          string // Store for metrics
 }
 
-// AsynqConfig contains configuration for the Asynq server
+// AsynqConfig contains configuration for the Asynq server.
 type AsynqConfig struct {
 	RedisAddr           string
 	Concurrency         int
@@ -30,7 +30,7 @@ type AsynqConfig struct {
 	RetryDelayFunc      asynq.RetryDelayFunc
 }
 
-// NewAsynqServer creates a new Asynq-based task processing server
+// NewAsynqServer creates a new Asynq-based task processing server.
 func NewAsynqServer(
 	config AsynqConfig,
 	log core.EventStore,
@@ -126,7 +126,8 @@ func NewAsynqServer(
 
 	// Start server in background
 	go func() {
-		if err := srv.Run(mux); err != nil {
+		err := srv.Run(mux)
+		if err != nil {
 			slog.Error("Asynq server error", "error", err)
 		}
 	}()
@@ -140,7 +141,7 @@ func NewAsynqServer(
 	}
 }
 
-// EnqueueJob enqueues a chat processing job and returns task info
+// EnqueueJob enqueues a chat processing job and returns task info.
 func (s *AsynqServer) EnqueueJob(payload ProcessChatPayload) (*asynq.TaskInfo, error) {
 	task, err := NewProcessChatTask(payload)
 	if err != nil {
@@ -153,19 +154,21 @@ func (s *AsynqServer) EnqueueJob(payload ProcessChatPayload) (*asynq.TaskInfo, e
 	}
 
 	slog.Info("Enqueued chat task", "jobID", payload.JobID, "taskID", info.ID, "queue", info.Queue)
+
 	return info, nil
 }
 
-// GetEventBuffer gets the event buffer for a job (for SSE streaming)
+// GetEventBuffer gets the event buffer for a job (for SSE streaming).
 func (s *AsynqServer) GetEventBuffer(jobID string) (*EventBuffer, bool) {
 	return s.eventBufferManager.GetEventBuffer(jobID)
 }
 
-// GetTaskInfo retrieves task information from Asynq
+// GetTaskInfo retrieves task information from Asynq.
 func (s *AsynqServer) GetTaskInfo(queue, taskID string) (*asynq.TaskInfo, error) {
 	inspector := asynq.NewInspector(asynq.RedisClientOpt{Addr: s.redisAddr})
 	defer func() {
-		if err := inspector.Close(); err != nil {
+		err := inspector.Close()
+		if err != nil {
 			slog.Warn("Failed to close inspector", "error", err)
 		}
 	}()
@@ -174,11 +177,12 @@ func (s *AsynqServer) GetTaskInfo(queue, taskID string) (*asynq.TaskInfo, error)
 	return inspector.GetTaskInfo(queue, taskID)
 }
 
-// CancelTask attempts to cancel a task by job ID
+// CancelTask attempts to cancel a task by job ID.
 func (s *AsynqServer) CancelTask(jobID string) error {
 	inspector := asynq.NewInspector(asynq.RedisClientOpt{Addr: s.redisAddr})
 	defer func() {
-		if err := inspector.Close(); err != nil {
+		err := inspector.Close()
+		if err != nil {
 			slog.Warn("Failed to close inspector", "error", err)
 		}
 	}()
@@ -187,6 +191,7 @@ func (s *AsynqServer) CancelTask(jobID string) error {
 	err := inspector.DeleteTask("default", jobID)
 	if err == nil {
 		slog.Info("Deleted pending task", "jobID", jobID)
+
 		return nil
 	}
 
@@ -197,18 +202,21 @@ func (s *AsynqServer) CancelTask(jobID string) error {
 			"jobID", jobID,
 			"error", err,
 			"note", "Task may have already completed or doesn't exist")
-		return fmt.Errorf("failed to cancel task: task not found or already completed")
+
+		return errors.New("failed to cancel task: task not found or already completed")
 	}
 
 	slog.Info("Sent cancellation signal to active task", "jobID", jobID)
+
 	return nil
 }
 
-// Shutdown gracefully shuts down the Asynq server
+// Shutdown gracefully shuts down the Asynq server.
 func (s *AsynqServer) Shutdown() {
 	slog.Info("Shutting down Asynq server")
 	s.server.Shutdown()
-	if err := s.client.Close(); err != nil {
+	err := s.client.Close()
+	if err != nil {
 		slog.Error("Failed to close Asynq client", "error", err)
 	}
 	slog.Info("Asynq server shut down")

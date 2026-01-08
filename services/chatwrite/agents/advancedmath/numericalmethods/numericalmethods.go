@@ -6,7 +6,7 @@ import (
 	sharedtools "school-with-ai/services/chatwrite/agents/shared/tools"
 )
 
-// CreateNumericalMethodsProfessor creates the numerical methods professor agent
+// CreateNumericalMethodsProfessor creates the numerical methods professor agent.
 func CreateNumericalMethodsProfessor(notifier core.EventNotifier, whiteboardProjection interface{ Get(threadID string) string }) core.AgentConfig {
 	registry := core.NewToolRegistry()
 

@@ -7,7 +7,7 @@ import (
 	"github.com/hibiken/asynq"
 )
 
-// ServerMetrics contains metrics about the Asynq server
+// ServerMetrics contains metrics about the Asynq server.
 type ServerMetrics struct {
 	// Queue metrics
 	Pending   int `json:"pending"`
@@ -29,13 +29,14 @@ type ServerMetrics struct {
 	Status       string `json:"status"`
 }
 
-// GetMetrics returns current server and queue metrics
+// GetMetrics returns current server and queue metrics.
 func (s *AsynqServer) GetMetrics() (*ServerMetrics, error) {
 	inspector := asynq.NewInspector(asynq.RedisClientOpt{
 		Addr: s.redisAddr,
 	})
 	defer func() {
-		if err := inspector.Close(); err != nil {
+		err := inspector.Close()
+		if err != nil {
 			slog.Warn("Failed to close inspector", "error", err)
 		}
 	}()

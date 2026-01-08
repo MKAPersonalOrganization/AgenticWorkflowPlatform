@@ -24,20 +24,20 @@ type Tool interface {
 }
 
 // ToolSpec represents the JSON schema specification of a tool
-// This is used to send tool definitions to the LLM
+// This is used to send tool definitions to the LLM.
 type ToolSpec struct {
 	Type     string       `json:"type"`
 	Function FunctionSpec `json:"function"`
 }
 
-// FunctionSpec describes a function tool
+// FunctionSpec describes a function tool.
 type FunctionSpec struct {
 	Name        string         `json:"name"`
 	Description string         `json:"description"`
 	Parameters  map[string]any `json:"parameters"`
 }
 
-// ToToolSpec converts a Tool to a ToolSpec for LLM consumption
+// ToToolSpec converts a Tool to a ToolSpec for LLM consumption.
 func ToToolSpec(t Tool) ToolSpec {
 	return ToolSpec{
 		Type: "function",
@@ -49,7 +49,7 @@ func ToToolSpec(t Tool) ToolSpec {
 	}
 }
 
-// FunctionTool is a Tool implementation that wraps a function
+// FunctionTool is a Tool implementation that wraps a function.
 type FunctionTool struct {
 	name        string
 	description string
@@ -57,7 +57,7 @@ type FunctionTool struct {
 	handler     func(ctx context.Context, arguments string) (string, error)
 }
 
-// NewFunctionTool creates a new function tool
+// NewFunctionTool creates a new function tool.
 func NewFunctionTool(
 	name string,
 	description string,
@@ -88,53 +88,56 @@ func (f *FunctionTool) Invoke(ctx context.Context, arguments string) (string, er
 	return f.handler(ctx, arguments)
 }
 
-// Verify FunctionTool implements Tool
+// Verify FunctionTool implements Tool.
 var _ Tool = (*FunctionTool)(nil)
 
-// ToolRegistry holds a collection of tools by name
+// ToolRegistry holds a collection of tools by name.
 type ToolRegistry struct {
 	tools map[string]Tool
 }
 
-// NewToolRegistry creates a new empty tool registry
+// NewToolRegistry creates a new empty tool registry.
 func NewToolRegistry() *ToolRegistry {
 	return &ToolRegistry{
 		tools: make(map[string]Tool),
 	}
 }
 
-// Register adds a tool to the registry
+// Register adds a tool to the registry.
 func (r *ToolRegistry) Register(tool Tool) {
 	r.tools[tool.Name()] = tool
 }
 
-// Get retrieves a tool by name
+// Get retrieves a tool by name.
 func (r *ToolRegistry) Get(name string) (Tool, bool) {
 	tool, ok := r.tools[name]
+
 	return tool, ok
 }
 
-// All returns all registered tools
+// All returns all registered tools.
 func (r *ToolRegistry) All() []Tool {
 	result := make([]Tool, 0, len(r.tools))
 	for _, tool := range r.tools {
 		result = append(result, tool)
 	}
+
 	return result
 }
 
-// ToToolSpecs converts all tools to ToolSpecs for LLM consumption
+// ToToolSpecs converts all tools to ToolSpecs for LLM consumption.
 func (r *ToolRegistry) ToToolSpecs() []ToolSpec {
 	result := make([]ToolSpec, 0, len(r.tools))
 	for _, tool := range r.tools {
 		result = append(result, ToToolSpec(tool))
 	}
+
 	return result
 }
 
 // JSONSchema helpers for building parameter schemas
 
-// ObjectSchema creates a JSON schema for an object type
+// ObjectSchema creates a JSON schema for an object type.
 func ObjectSchema(properties map[string]any, required []string) map[string]any {
 	schema := map[string]any{
 		"type":       "object",
@@ -143,10 +146,11 @@ func ObjectSchema(properties map[string]any, required []string) map[string]any {
 	if len(required) > 0 {
 		schema["required"] = required
 	}
+
 	return schema
 }
 
-// StringProperty creates a string property schema
+// StringProperty creates a string property schema.
 func StringProperty(description string) map[string]any {
 	return map[string]any{
 		"type":        "string",
@@ -154,7 +158,7 @@ func StringProperty(description string) map[string]any {
 	}
 }
 
-// IntegerProperty creates an integer property schema
+// IntegerProperty creates an integer property schema.
 func IntegerProperty(description string) map[string]any {
 	return map[string]any{
 		"type":        "integer",
@@ -162,7 +166,7 @@ func IntegerProperty(description string) map[string]any {
 	}
 }
 
-// NumberProperty creates a number property schema
+// NumberProperty creates a number property schema.
 func NumberProperty(description string) map[string]any {
 	return map[string]any{
 		"type":        "number",
@@ -170,7 +174,7 @@ func NumberProperty(description string) map[string]any {
 	}
 }
 
-// BooleanProperty creates a boolean property schema
+// BooleanProperty creates a boolean property schema.
 func BooleanProperty(description string) map[string]any {
 	return map[string]any{
 		"type":        "boolean",
@@ -178,7 +182,7 @@ func BooleanProperty(description string) map[string]any {
 	}
 }
 
-// EnumProperty creates a string enum property schema
+// EnumProperty creates a string enum property schema.
 func EnumProperty(description string, values []string) map[string]any {
 	return map[string]any{
 		"type":        "string",
@@ -187,9 +191,10 @@ func EnumProperty(description string, values []string) map[string]any {
 	}
 }
 
-// ParseArguments is a helper to parse JSON arguments into a struct
+// ParseArguments is a helper to parse JSON arguments into a struct.
 func ParseArguments[T any](arguments string) (T, error) {
 	var result T
 	err := json.Unmarshal([]byte(arguments), &result)
+
 	return result, err
 }

@@ -5,24 +5,23 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"time"
-
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/sdk/agentsdk/core/middleware"
 	"school-with-ai/services/chatwrite"
 	"school-with-ai/services/chatwrite/agents/shared"
+	"time"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 	"github.com/hibiken/asynq"
 )
 
-// Task type constants
+// Task type constants.
 const (
 	TypeProcessChat = "chat:process"
 )
 
-// ProcessChatPayload contains the data needed to process a chat message
+// ProcessChatPayload contains the data needed to process a chat message.
 type ProcessChatPayload struct {
 	JobID     string `json:"job_id"`
 	ThreadID  string `json:"thread_id"`
@@ -31,7 +30,7 @@ type ProcessChatPayload struct {
 	UserID    string `json:"user_id"`
 }
 
-// NewProcessChatTask creates a new task for processing a chat message
+// NewProcessChatTask creates a new task for processing a chat message.
 func NewProcessChatTask(payload ProcessChatPayload) (*asynq.Task, error) {
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
@@ -46,7 +45,7 @@ func NewProcessChatTask(payload ProcessChatPayload) (*asynq.Task, error) {
 	), nil
 }
 
-// ChatWorker processes chat messages
+// ChatWorker processes chat messages.
 type ChatWorker struct {
 	log                  core.EventStore
 	state                chatwrite.ThreadStore
@@ -56,7 +55,7 @@ type ChatWorker struct {
 	eventBufferManager   *EventBufferManager
 }
 
-// NewChatWorker creates a new chat worker
+// NewChatWorker creates a new chat worker.
 func NewChatWorker(
 	log core.EventStore,
 	state chatwrite.ThreadStore,
@@ -75,11 +74,12 @@ func NewChatWorker(
 	}
 }
 
-// ProcessTask implements asynq.Handler interface
+// ProcessTask implements asynq.Handler interface.
 func (w *ChatWorker) ProcessTask(ctx context.Context, t *asynq.Task) error {
 	var payload ProcessChatPayload
-	if err := json.Unmarshal(t.Payload(), &payload); err != nil {
-		return fmt.Errorf("json.Unmarshal failed: %v: %w", err, asynq.SkipRetry)
+	err := json.Unmarshal(t.Payload(), &payload)
+	if err != nil {
+		return fmt.Errorf("json.Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
 
 	slog.Info("[WORKER] Picked up job from Redis queue",
@@ -88,7 +88,8 @@ func (w *ChatWorker) ProcessTask(ctx context.Context, t *asynq.Task) error {
 		"message", payload.Message)
 
 	// Process the chat message
-	if err := w.processChat(ctx, payload); err != nil {
+	err := w.processChat(ctx, payload)
+	if err != nil {
 		return err
 	}
 
@@ -96,10 +97,11 @@ func (w *ChatWorker) ProcessTask(ctx context.Context, t *asynq.Task) error {
 		"jobID", payload.JobID,
 		"threadID", payload.ThreadID,
 		"note", "Events streamed to client via SSE")
+
 	return nil
 }
 
-// processChat processes a single chat message (similar to processJob from worker_pool.go)
+// processChat processes a single chat message (similar to processJob from worker_pool.go).
 func (w *ChatWorker) processChat(ctx context.Context, payload ProcessChatPayload) error {
 	// Check if context was cancelled
 	if ctx.Err() != nil {
@@ -109,15 +111,19 @@ func (w *ChatWorker) processChat(ctx context.Context, payload ProcessChatPayload
 	// Check if thread exists, if not create it
 	_, exists := w.state.Get(payload.ThreadID)
 	if !exists {
-		if err := w.chatWriteService.CreateThread(ctx, payload.ThreadID, "New Chat"); err != nil {
+		err := w.chatWriteService.CreateThread(ctx, payload.ThreadID, "New Chat")
+		if err != nil {
 			slog.Error("Failed to create thread", "jobID", payload.JobID, "threadID", payload.ThreadID, "error", err)
+
 			return fmt.Errorf("failed to create thread: %w", err)
 		}
 	}
 
 	// Add user message
-	if err := w.chatWriteService.AddUserMessage(ctx, payload.ThreadID, payload.MessageID, payload.Message); err != nil {
+	err := w.chatWriteService.AddUserMessage(ctx, payload.ThreadID, payload.MessageID, payload.Message)
+	if err != nil {
 		slog.Error("Failed to add user message", "jobID", payload.JobID, "error", err)
+
 		return fmt.Errorf("failed to add user message: %w", err)
 	}
 
@@ -130,7 +136,8 @@ func (w *ChatWorker) processChat(ctx context.Context, payload ProcessChatPayload
 
 	// Send RUN_STARTED event
 	runStartedEvent := aguievents.NewRunStartedEvent(payload.ThreadID, runID)
-	if err := emitter.Emit(runStartedEvent); err != nil {
+	err := emitter.Emit(runStartedEvent)
+	if err != nil {
 		slog.Error("Failed to emit run started event", "jobID", payload.JobID, "error", err)
 	}
 
@@ -142,7 +149,8 @@ func (w *ChatWorker) processChat(ctx context.Context, payload ProcessChatPayload
 			title = title[:50] + "..."
 		}
 
-		if err := w.chatWriteService.UpdateThreadTitle(ctx, payload.ThreadID, title); err != nil {
+		err := w.chatWriteService.UpdateThreadTitle(ctx, payload.ThreadID, title)
+		if err != nil {
 			slog.Error("Failed to update thread title", "jobID", payload.JobID, "error", err)
 		}
 
@@ -153,7 +161,8 @@ func (w *ChatWorker) processChat(ctx context.Context, payload ProcessChatPayload
 				"title":    title,
 			}),
 		)
-		if err := emitter.Emit(customEvent); err != nil {
+		err := emitter.Emit(customEvent)
+		if err != nil {
 			slog.Error("Failed to emit thread title updated event", "jobID", payload.JobID, "error", err)
 		}
 	}
@@ -163,18 +172,20 @@ func (w *ChatWorker) processChat(ctx context.Context, payload ProcessChatPayload
 
 	// Send RUN_FINISHED event
 	runFinishedEvent := aguievents.NewRunFinishedEvent(payload.ThreadID, runID)
-	if err := emitter.Emit(runFinishedEvent); err != nil {
+	err := emitter.Emit(runFinishedEvent)
+	if err != nil {
 		slog.Error("Failed to emit run finished event", "jobID", payload.JobID, "error", err)
 	}
 
 	return nil
 }
 
-// continueWithAgentDirect runs an agent directly
+// continueWithAgentDirect runs an agent directly.
 func (w *ChatWorker) continueWithAgentDirect(ctx context.Context, threadID, agentName string, emitter EventEmitter, runID string) {
 	// Check if context was cancelled before starting agent
 	if ctx.Err() != nil {
 		slog.Warn("Agent execution cancelled", "threadID", threadID, "agent", agentName)
+
 		return
 	}
 
@@ -187,6 +198,7 @@ func (w *ChatWorker) continueWithAgentDirect(ctx context.Context, threadID, agen
 	factory, ok := shared.GlobalAgents.Get(agentName)
 	if !ok {
 		slog.Error("No factory found for agent", "agent", agentName)
+
 		return
 	}
 
@@ -208,6 +220,7 @@ func (w *ChatWorker) continueWithAgentDirect(ctx context.Context, threadID, agen
 	agentThread, err := w.state.GetOrCreateAgentThread(ctx, threadID)
 	if err != nil {
 		slog.Error("Failed to get/create thread", "threadID", threadID, "error", err)
+
 		return
 	}
 
@@ -224,6 +237,7 @@ func (w *ChatWorker) continueWithAgentDirect(ctx context.Context, threadID, agen
 			aguievents.WithErrorCode("AGENT_RUN_ERROR"),
 		)
 		_ = emitter.Emit(errorEvent)
+
 		return
 	}
 

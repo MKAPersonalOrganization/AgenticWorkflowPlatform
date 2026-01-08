@@ -2,24 +2,23 @@ package auth
 
 import (
 	"context"
-
 	"school-with-ai/domain"
 )
 
-// authService implements the services.AuthService interface
+// authService implements the services.AuthService interface.
 type authService struct{}
 
-// NewAuthService creates a new authentication service
+// NewAuthService creates a new authentication service.
 func NewAuthService() *authService {
 	return &authService{}
 }
 
-// GetUserFromContext extracts authenticated user from request context
+// GetUserFromContext extracts authenticated user from request context.
 func (s *authService) GetUserFromContext(ctx context.Context) *domain.User {
 	return domain.GetUserFromContext(ctx)
 }
 
-// IsAuthenticated checks if request context has valid authentication
+// IsAuthenticated checks if request context has valid authentication.
 func (s *authService) IsAuthenticated(ctx context.Context) bool {
 	return s.GetUserFromContext(ctx) != nil
 }

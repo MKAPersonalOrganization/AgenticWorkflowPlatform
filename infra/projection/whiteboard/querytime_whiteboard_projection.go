@@ -3,7 +3,6 @@ package whiteboard
 import (
 	"context"
 	"encoding/json"
-
 	"school-with-ai/sdk/agentsdk/core"
 )
 
@@ -20,7 +19,7 @@ type QueryTimeWhiteboardProjection struct {
 	threadIDLister ThreadIDLister
 }
 
-// ThreadIDLister provides a way to list all thread IDs
+// ThreadIDLister provides a way to list all thread IDs.
 type ThreadIDLister interface {
 	ReadAllThreadIDs(ctx context.Context) ([]string, error)
 }
@@ -92,7 +91,7 @@ func (p *QueryTimeWhiteboardProjection) Rebuild(ctx context.Context, store core.
 	return nil
 }
 
-// applyEventToWhiteboard applies an event to rebuild whiteboard state
+// applyEventToWhiteboard applies an event to rebuild whiteboard state.
 func applyEventToWhiteboard(currentContent string, event core.Event) string {
 	// Handle ToolCallExecutedEvent for write_whiteboard tool
 	switch evt := event.(type) {
@@ -109,14 +108,15 @@ func applyEventToWhiteboard(currentContent string, event core.Event) string {
 	return currentContent
 }
 
-// applyWhiteboardTool parses whiteboard tool arguments and applies the action
+// applyWhiteboardTool parses whiteboard tool arguments and applies the action.
 func applyWhiteboardTool(currentContent string, toolArguments string) string {
 	var args struct {
 		Content string `json:"content"`
 		Action  string `json:"action"`
 	}
 
-	if err := json.Unmarshal([]byte(toolArguments), &args); err != nil {
+	err := json.Unmarshal([]byte(toolArguments), &args)
+	if err != nil {
 		return currentContent // Skip malformed events
 	}
 
@@ -127,6 +127,7 @@ func applyWhiteboardTool(currentContent string, toolArguments string) string {
 		if currentContent == "" {
 			return args.Content
 		}
+
 		return currentContent + "\n" + args.Content
 	case "clear":
 		return ""
@@ -135,5 +136,5 @@ func applyWhiteboardTool(currentContent string, toolArguments string) string {
 	}
 }
 
-// Verify QueryTimeWhiteboardProjection implements WhiteboardStore
+// Verify QueryTimeWhiteboardProjection implements WhiteboardStore.
 var _ WhiteboardStore = (*QueryTimeWhiteboardProjection)(nil)

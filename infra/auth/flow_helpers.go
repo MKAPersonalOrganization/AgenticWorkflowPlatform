@@ -8,7 +8,7 @@ import (
 	client "github.com/ory/client-go"
 )
 
-// FlowType represents the different self-service flow types
+// FlowType represents the different self-service flow types.
 type FlowType string
 
 const (
@@ -19,7 +19,7 @@ const (
 	FlowTypeSettings     FlowType = "settings"
 )
 
-// FlowParams contains parameters for initializing or fetching a flow
+// FlowParams contains parameters for initializing or fetching a flow.
 type FlowParams struct {
 	FlowID         string
 	ReturnTo       string
@@ -31,7 +31,7 @@ type FlowParams struct {
 	Cookie         string
 }
 
-// InitFlowURL generates the URL to initialize a new flow
+// InitFlowURL generates the URL to initialize a new flow.
 func (k *KratosClient) InitFlowURL(flowType FlowType, params FlowParams) string {
 	query := url.Values{}
 
@@ -60,10 +60,11 @@ func (k *KratosClient) InitFlowURL(flowType FlowType, params FlowParams) string 
 	if len(query) > 0 {
 		return fmt.Sprintf("%s%s?%s", baseURL, flowPath, query.Encode())
 	}
+
 	return fmt.Sprintf("%s%s", baseURL, flowPath)
 }
 
-// ExtractCSRFToken extracts the CSRF token from flow UI nodes
+// ExtractCSRFToken extracts the CSRF token from flow UI nodes.
 func ExtractCSRFToken(nodes []client.UiNode) string {
 	for _, node := range nodes {
 		if node.Group == "default" {
@@ -80,18 +81,19 @@ func ExtractCSRFToken(nodes []client.UiNode) string {
 			}
 		}
 	}
+
 	return ""
 }
 
-// UIMessage represents a user-facing message from Kratos
+// UIMessage represents a user-facing message from Kratos.
 type UIMessage struct {
 	ID      int64
 	Text    string
 	Type    string
-	Context map[string]interface{}
+	Context map[string]any
 }
 
-// ExtractMessages extracts and formats UI messages from Kratos flow
+// ExtractMessages extracts and formats UI messages from Kratos flow.
 func ExtractMessages(messages []client.UiText) []UIMessage {
 	result := make([]UIMessage, 0, len(messages))
 
@@ -108,7 +110,7 @@ func ExtractMessages(messages []client.UiText) []UIMessage {
 	return result
 }
 
-// GetMessageType returns a CSS-friendly message type (error, success, info, warning)
+// GetMessageType returns a CSS-friendly message type (error, success, info, warning).
 func GetMessageType(msgType string) string {
 	msgType = strings.ToLower(msgType)
 	switch msgType {
@@ -123,7 +125,7 @@ func GetMessageType(msgType string) string {
 	}
 }
 
-// IsFlowExpired checks if a flow has expired based on common error codes
+// IsFlowExpired checks if a flow has expired based on common error codes.
 func IsFlowExpired(err error) bool {
 	if err == nil {
 		return false
@@ -139,28 +141,30 @@ func IsFlowExpired(err error) bool {
 }
 
 // ShouldRedirectToVerification checks if login flow requires email verification
-// Message ID 4000010 indicates verification is required
+// Message ID 4000010 indicates verification is required.
 func ShouldRedirectToVerification(messages []client.UiText) bool {
 	for _, msg := range messages {
 		if msg.Id == 4000010 {
 			return true
 		}
 	}
+
 	return false
 }
 
-// IsAAL2Required checks if the error indicates AAL2 (2FA) is required
+// IsAAL2Required checks if the error indicates AAL2 (2FA) is required.
 func IsAAL2Required(err error) bool {
 	if err == nil {
 		return false
 	}
 
 	errMsg := err.Error()
+
 	return strings.Contains(errMsg, "session_aal2_required") ||
 		strings.Contains(errMsg, "aal2")
 }
 
-// GetNodeValue extracts the value from a UI node by name
+// GetNodeValue extracts the value from a UI node by name.
 func GetNodeValue(nodes []client.UiNode, name string) string {
 	for _, node := range nodes {
 		if node.Attributes.UiNodeInputAttributes != nil {
@@ -172,10 +176,11 @@ func GetNodeValue(nodes []client.UiNode, name string) string {
 			}
 		}
 	}
+
 	return ""
 }
 
-// FilterNodesByGroup filters UI nodes by group (e.g., "default", "password", "profile")
+// FilterNodesByGroup filters UI nodes by group (e.g., "default", "password", "profile").
 func FilterNodesByGroup(nodes []client.UiNode, groups ...string) []client.UiNode {
 	if len(groups) == 0 {
 		return nodes

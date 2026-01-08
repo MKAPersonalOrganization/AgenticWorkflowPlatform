@@ -1,11 +1,10 @@
 package handlers_test
 
 import (
-	"testing"
-
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/services/chatwrite/agents/math"
 	"school-with-ai/services/chatwrite/agents/studentfacing"
+	"testing"
 )
 
 func TestInstructorConfigurations(t *testing.T) {
@@ -25,7 +24,7 @@ func TestInstructorConfigurations(t *testing.T) {
 	}
 }
 
-// mockWhiteboardProjection implements the whiteboard projection interface for testing
+// mockWhiteboardProjection implements the whiteboard projection interface for testing.
 type mockWhiteboardProjection struct {
 	data map[string]string
 }
@@ -34,5 +33,6 @@ func (m *mockWhiteboardProjection) Get(threadID string) string {
 	if m.data == nil {
 		return ""
 	}
+
 	return m.data[threadID]
 }

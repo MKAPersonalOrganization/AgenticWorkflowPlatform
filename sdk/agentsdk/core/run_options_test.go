@@ -2,9 +2,8 @@ package core
 
 import (
 	"context"
-	"testing"
-
 	"school-with-ai/sdk/agentsdk/llm"
+	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,7 +26,7 @@ func TestRunOptionsClone(t *testing.T) {
 		StopSequences:    []string{"stop1", "stop2"},
 		ModelID:          "gpt-4",
 		Seed:             &seed,
-		AdditionalProperties: map[string]interface{}{
+		AdditionalProperties: map[string]any{
 			"custom": "value",
 		},
 	}
@@ -185,7 +184,7 @@ func TestToChatOptionsAdditionalProperties(t *testing.T) {
 	}
 
 	runOpts := RunOptions{
-		AdditionalProperties: map[string]interface{}{
+		AdditionalProperties: map[string]any{
 			"customKey1": "value1",
 			"customKey2": 42,
 			"customKey3": true,
@@ -239,7 +238,7 @@ func TestToChatOptionsAllParameters(t *testing.T) {
 		StopSequences:    []string{"run-stop-1", "run-stop-2"},
 		ModelID:          "gpt-4",
 		Seed:             &runSeed,
-		AdditionalProperties: map[string]interface{}{
+		AdditionalProperties: map[string]any{
 			"custom": "value",
 		},
 	}

@@ -30,7 +30,7 @@ func TestEigenvalueTool_Basic(t *testing.T) {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
 
-	eigvals := response["eigenvalues"].([]interface{})
+	eigvals := response["eigenvalues"].([]any)
 	if len(eigvals) != 3 {
 		t.Fatalf("expected 3 eigenvalues, got %d", len(eigvals))
 	}
@@ -38,13 +38,13 @@ func TestEigenvalueTool_Basic(t *testing.T) {
 	// Extract real parts and sort
 	actualVals := make([]float64, len(eigvals))
 	for i, v := range eigvals {
-		m := v.(map[string]interface{})
+		m := v.(map[string]any)
 		actualVals[i] = m["real"].(float64)
 	}
 
 	// Sort descending
 	sortDesc := func(vals []float64) {
-		for i := 0; i < len(vals)-1; i++ {
+		for i := range len(vals) - 1 {
 			for j := i + 1; j < len(vals); j++ {
 				if vals[j] > vals[i] {
 					vals[i], vals[j] = vals[j], vals[i]
@@ -93,7 +93,7 @@ func TestEigenvalueTool_Symmetric2x2(t *testing.T) {
 		t.Error("matrix should be recognized as symmetric")
 	}
 
-	eigvals := response["eigenvalues"].([]interface{})
+	eigvals := response["eigenvalues"].([]any)
 	if len(eigvals) != 2 {
 		t.Fatalf("expected 2 eigenvalues, got %d", len(eigvals))
 	}
@@ -101,7 +101,7 @@ func TestEigenvalueTool_Symmetric2x2(t *testing.T) {
 	// Extract real parts
 	actualVals := make([]float64, len(eigvals))
 	for i, v := range eigvals {
-		m := v.(map[string]interface{})
+		m := v.(map[string]any)
 		actualVals[i] = m["real"].(float64)
 		// Eigenvalues should be real for symmetric matrix
 		imag := m["imag"].(float64)
@@ -146,9 +146,9 @@ func TestEigenvalueTool_Identity(t *testing.T) {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
 
-	eigvals := response["eigenvalues"].([]interface{})
+	eigvals := response["eigenvalues"].([]any)
 	for i, v := range eigvals {
-		m := v.(map[string]interface{})
+		m := v.(map[string]any)
 		val := m["real"].(float64)
 		if math.Abs(val-1.0) > 1e-10 {
 			t.Errorf("eigenvalue %d: expected 1.0, got %v", i, val)

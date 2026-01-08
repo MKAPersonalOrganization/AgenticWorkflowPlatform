@@ -6,7 +6,7 @@ import (
 	sharedtools "school-with-ai/services/chatwrite/agents/shared/tools"
 )
 
-// CreateSpecialFunctionsProfessor creates the special functions professor agent
+// CreateSpecialFunctionsProfessor creates the special functions professor agent.
 func CreateSpecialFunctionsProfessor(notifier core.EventNotifier, whiteboardProjection interface{ Get(threadID string) string }) core.AgentConfig {
 	registry := core.NewToolRegistry()
 

@@ -3,6 +3,7 @@ package llm
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"iter"
 
@@ -71,7 +72,7 @@ func (c *OllamaClient) GetStreamingResponse(
 					Contents: []AIContent{TextContent{Text: resp.Message.Content}},
 				}
 				if !yield(update, nil) {
-					return fmt.Errorf("stream cancelled")
+					return errors.New("stream cancelled")
 				}
 			}
 
@@ -102,7 +103,7 @@ func (c *OllamaClient) GetStreamingResponse(
 				}
 
 				if !yield(update, nil) {
-					return fmt.Errorf("stream cancelled")
+					return errors.New("stream cancelled")
 				}
 
 				toolCallIndex++
@@ -115,7 +116,7 @@ func (c *OllamaClient) GetStreamingResponse(
 					FinishReason: c.mapFinishReason(resp),
 				}
 				if !yield(finalUpdate, nil) {
-					return fmt.Errorf("stream cancelled")
+					return errors.New("stream cancelled")
 				}
 			}
 
@@ -164,7 +165,8 @@ func (c *OllamaClient) buildMessages(messages []ChatMessage, options *ChatOption
 					if fc.Arguments != nil {
 						args = fc.Arguments
 					} else if fc.RawArguments != "" {
-						if err := json.Unmarshal([]byte(fc.RawArguments), &args); err != nil {
+						err := json.Unmarshal([]byte(fc.RawArguments), &args)
+						if err != nil {
 							// Log error but continue with empty args
 							args = make(map[string]any)
 						}
@@ -261,6 +263,7 @@ func (c *OllamaClient) getModel(options *ChatOptions) string {
 	if options != nil && options.ModelID != "" {
 		return options.ModelID
 	}
+
 	return c.model
 }
 
@@ -276,6 +279,7 @@ func (c *OllamaClient) mapFinishReason(resp api.ChatResponse) FinishReason {
 	if len(resp.Message.ToolCalls) > 0 {
 		return FinishReasonToolCalls
 	}
+
 	return FinishReasonStop
 }
 

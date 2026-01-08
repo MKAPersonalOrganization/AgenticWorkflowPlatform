@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -11,16 +12,16 @@ import (
 	"time"
 )
 
-// PlotArgs represents the arguments for the plot tool
+// PlotArgs represents the arguments for the plot tool.
 type PlotArgs struct {
 	GnuplotScript string `json:"gnuplot_script"` // Complete gnuplot script to execute
 	Title         string `json:"title"`          // Plot title (for reference/logging)
 }
 
-// PlotTool implements the Tool interface for generating plots with gnuplot
+// PlotTool implements the Tool interface for generating plots with gnuplot.
 type PlotTool struct{}
 
-// NewPlotTool creates a new plot tool
+// NewPlotTool creates a new plot tool.
 func NewPlotTool() *PlotTool {
 	return &PlotTool{}
 }
@@ -115,24 +116,24 @@ func (p *PlotTool) Invoke(ctx context.Context, arguments string) (string, error)
 
 	// Validate required parameters
 	if args.GnuplotScript == "" {
-		return "", fmt.Errorf("gnuplot_script parameter is required")
+		return "", errors.New("gnuplot_script parameter is required")
 	}
 	if args.Title == "" {
-		return "", fmt.Errorf("title parameter is required")
+		return "", errors.New("title parameter is required")
 	}
 
 	// Validate script doesn't contain terminal/output commands (we manage these)
 	scriptLower := strings.ToLower(args.GnuplotScript)
 	if strings.Contains(scriptLower, "set terminal") {
-		return "", fmt.Errorf("gnuplot_script should not contain 'set terminal' command - terminal type is managed automatically")
+		return "", errors.New("gnuplot_script should not contain 'set terminal' command - terminal type is managed automatically")
 	}
 	if strings.Contains(scriptLower, "set output") {
-		return "", fmt.Errorf("gnuplot_script should not contain 'set output' command - output path is managed automatically")
+		return "", errors.New("gnuplot_script should not contain 'set output' command - output path is managed automatically")
 	}
 
 	// Validate title length
 	if len(args.Title) > 100 {
-		return "", fmt.Errorf("title exceeds maximum length of 100 characters")
+		return "", errors.New("title exceeds maximum length of 100 characters")
 	}
 
 	// Generate the plot
@@ -160,7 +161,7 @@ func (p *PlotTool) Invoke(ctx context.Context, arguments string) (string, error)
 	return string(resultJSON), nil
 }
 
-// executeGnuplotScript executes a gnuplot script and generates the plot image
+// executeGnuplotScript executes a gnuplot script and generates the plot image.
 func executeGnuplotScript(userScript, title string) (string, error) {
 	// Ensure charts directory exists
 	chartsDir := "assets/charts"
