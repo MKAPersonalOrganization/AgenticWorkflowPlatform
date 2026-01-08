@@ -48,3 +48,9 @@ tasks:
     desc: Show docker compose logs
     cmds:
       - docker compose logs -f kratos
+
+  statistics:
+    desc: Generate and display git repository statistics
+    cmds:
+      - go run ./tools/repo-statistics 10
+      - xdg-open /tmp/repo_graph.png 2>/dev/null || open /tmp/repo_graph.png 2>/dev/null || echo "Graph saved at /tmp/repo_graph.png"
