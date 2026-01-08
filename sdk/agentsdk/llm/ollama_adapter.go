@@ -82,9 +82,11 @@ func (c *OllamaClient) GetStreamingResponse(
 				// Marshal arguments to JSON
 				var argsJSON string
 				if tc.Function.Arguments != nil {
-					if data, err := json.Marshal(tc.Function.Arguments); err == nil {
-						argsJSON = string(data)
+					data, err := json.Marshal(tc.Function.Arguments)
+					if err != nil {
+						return fmt.Errorf("failed to marshal tool call arguments: %w", err)
 					}
+					argsJSON = string(data)
 				}
 
 				// Emit tool call update
@@ -162,7 +164,10 @@ func (c *OllamaClient) buildMessages(messages []ChatMessage, options *ChatOption
 					if fc.Arguments != nil {
 						args = fc.Arguments
 					} else if fc.RawArguments != "" {
-						_ = json.Unmarshal([]byte(fc.RawArguments), &args)
+						if err := json.Unmarshal([]byte(fc.RawArguments), &args); err != nil {
+							// Log error but continue with empty args
+							args = make(map[string]any)
+						}
 					}
 
 					toolCalls = append(toolCalls, api.ToolCall{

@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -15,7 +16,11 @@ var (
 // GenerateMessageID generates a unique message ID
 func GenerateMessageID() string {
 	b := make([]byte, 16)
-	_, _ = rand.Read(b) // crypto/rand.Read always returns len(b), nil on success
+	if _, err := rand.Read(b); err != nil {
+		// This should never happen, but if it does, panic is appropriate
+		// since we can't generate a secure random ID
+		panic(fmt.Sprintf("failed to generate random ID: %v", err))
+	}
 	return hex.EncodeToString(b)
 }
 
