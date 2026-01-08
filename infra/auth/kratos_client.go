@@ -95,6 +95,9 @@ func (k *KratosClient) ToSession(ctx context.Context, cookie string) (*client.Se
 	req = req.Cookie(cookie)
 
 	session, resp, err := req.Execute()
+	if resp != nil && resp.Body != nil {
+		defer resp.Body.Close()
+	}
 	if err != nil {
 		if resp != nil {
 			slog.Debug("ToSession failed",
@@ -116,6 +119,9 @@ func (k *KratosClient) GetLoginFlow(ctx context.Context, flowID string, cookie s
 	}
 
 	flow, resp, err := req.Execute()
+	if resp != nil && resp.Body != nil {
+		defer resp.Body.Close()
+	}
 	if err != nil {
 		if resp != nil {
 			slog.Debug("GetLoginFlow failed",
@@ -138,6 +144,9 @@ func (k *KratosClient) GetRegistrationFlow(ctx context.Context, flowID string, c
 	}
 
 	flow, resp, err := req.Execute()
+	if resp != nil && resp.Body != nil {
+		defer resp.Body.Close()
+	}
 	if err != nil {
 		if resp != nil {
 			slog.Debug("GetRegistrationFlow failed",
@@ -160,6 +169,9 @@ func (k *KratosClient) GetRecoveryFlow(ctx context.Context, flowID string, cooki
 	}
 
 	flow, resp, err := req.Execute()
+	if resp != nil && resp.Body != nil {
+		defer resp.Body.Close()
+	}
 	if err != nil {
 		if resp != nil {
 			slog.Debug("GetRecoveryFlow failed",
@@ -182,6 +194,9 @@ func (k *KratosClient) GetVerificationFlow(ctx context.Context, flowID string, c
 	}
 
 	flow, resp, err := req.Execute()
+	if resp != nil && resp.Body != nil {
+		defer resp.Body.Close()
+	}
 	if err != nil {
 		if resp != nil {
 			slog.Debug("GetVerificationFlow failed",
@@ -204,6 +219,9 @@ func (k *KratosClient) GetSettingsFlow(ctx context.Context, flowID string, cooki
 	}
 
 	flow, resp, err := req.Execute()
+	if resp != nil && resp.Body != nil {
+		defer resp.Body.Close()
+	}
 	if err != nil {
 		if resp != nil {
 			slog.Debug("GetSettingsFlow failed",
@@ -226,6 +244,9 @@ func (k *KratosClient) CreateBrowserLogoutFlow(ctx context.Context, cookie strin
 	}
 
 	flow, resp, err := req.Execute()
+	if resp != nil && resp.Body != nil {
+		defer resp.Body.Close()
+	}
 	if err != nil {
 		if resp != nil {
 			slog.Debug("CreateBrowserLogoutFlow failed",
@@ -244,6 +265,9 @@ func (k *KratosClient) GetFlowError(ctx context.Context, errorID string) (*clien
 	req := k.frontend.GetFlowError(ctx).Id(errorID)
 
 	flowError, resp, err := req.Execute()
+	if resp != nil && resp.Body != nil {
+		defer resp.Body.Close()
+	}
 	if err != nil {
 		if resp != nil {
 			slog.Debug("GetFlowError failed",
