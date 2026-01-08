@@ -204,10 +204,10 @@ func (w *ChatWorker) continueWithAgentDirect(ctx context.Context, threadID, agen
 		chatwrite.WithRequestContextCapture(&handoffReqCtx),
 	)
 
-	// Get the thread
-	agentThread, exists := w.state.GetAgentThread(threadID)
-	if !exists {
-		slog.Error("Thread not found", "threadID", threadID)
+	// Get or create the thread (for new threads, this creates an empty one)
+	agentThread, err := w.state.GetOrCreateAgentThread(ctx, threadID)
+	if err != nil {
+		slog.Error("Failed to get/create thread", "threadID", threadID, "error", err)
 		return
 	}
 
@@ -216,7 +216,7 @@ func (w *ChatWorker) continueWithAgentDirect(ctx context.Context, threadID, agen
 
 	// Run the agent
 	runOpts := core.DefaultRunOptions()
-	err := agentInstance.RunWithThread(ctx, threadID, messageID, agentThread, runOpts)
+	err = agentInstance.RunWithThread(ctx, threadID, messageID, agentThread, runOpts)
 	if err != nil {
 		slog.Error("Agent run failed", "agent", agentName, "error", err)
 		errorEvent := aguievents.NewRunErrorEvent(

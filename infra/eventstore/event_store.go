@@ -42,5 +42,14 @@ func (s *InMemoryEventStore) ReadStream(ctx context.Context, streamID string, fr
 	return events[fromVersion:], nil
 }
 
+// DeleteStream removes a stream from the in-memory store.
+func (s *InMemoryEventStore) DeleteStream(ctx context.Context, streamID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.streams, streamID)
+	return nil
+}
+
 // Verify InMemoryEventStore implements core.EventStore
 var _ core.EventStore = (*InMemoryEventStore)(nil)

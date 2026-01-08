@@ -15,7 +15,7 @@ func TestInMemoryEventStore_Append(t *testing.T) {
 	t.Run("appends events to stream", func(t *testing.T) {
 		event := &core.ThreadCreatedEvent{
 			BaseEvent: core.BaseEvent{
-				Type:      "ThreadCreated",
+				Type:      "ThreadCreatedEvent",
 				Timestamp: time.Now(),
 				ThreadID:  "thread-1",
 			},

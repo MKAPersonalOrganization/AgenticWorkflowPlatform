@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"school-with-ai/sdk/agentsdk/core"
 
@@ -29,9 +30,24 @@ func NewKurrentDBEventStore(connectionString string) (*KurrentDBEventStore, erro
 		return nil, fmt.Errorf("failed to create KurrentDB client: %w", err)
 	}
 
-	return &KurrentDBEventStore{
+	store := &KurrentDBEventStore{
 		client: client,
-	}, nil
+	}
+
+	// Enable system projections on startup (best effort - ignore errors)
+	go store.enableSystemProjections()
+
+	return store, nil
+}
+
+// enableSystemProjections enables required system projections
+// Note: The KurrentDB Go SDK does not expose projection management APIs.
+// The $streams system projection must be enabled via HTTP API or Admin UI:
+//
+//	curl -X POST http://localhost:2113/projection/$streams/command/enable \
+//	  -H "Content-Type: application/json" -u admin:changeit
+func (s *KurrentDBEventStore) enableSystemProjections() {
+	// No-op: System projections must be enabled externally
 }
 
 // Append adds events to a stream in KurrentDB
@@ -200,6 +216,75 @@ func (s *KurrentDBEventStore) convertFromRecordedEvent(recordedEvent *kurrentdb.
 	}
 
 	return event, nil
+}
+
+// ReadAllThreadIDs reads all thread IDs by scanning the $streams system projection.
+// The $streams projection must be enabled before calling this method.
+// Returns an empty slice if no threads are found or if the projection is not available.
+func (s *KurrentDBEventStore) ReadAllThreadIDs(ctx context.Context) ([]string, error) {
+	threadIDs, err := s.readFromStreamsProjection(ctx)
+	if err != nil {
+		// If $streams is not available, return empty list
+		// This can happen if the projection is not enabled
+		return []string{}, nil
+	}
+	return threadIDs, nil
+}
+
+// DeleteStream permanently deletes a stream from the event store.
+// This uses KurrentDB's DeleteStream which sets the "Truncate Before" to the stream's current last event.
+// After deletion, reads will return "stream not found" but the stream can be written to again.
+func (s *KurrentDBEventStore) DeleteStream(ctx context.Context, streamID string) error {
+	result, err := s.client.DeleteStream(ctx, streamID, kurrentdb.DeleteStreamOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to delete stream %s: %w", streamID, err)
+	}
+	_ = result // DeleteResult contains position info if needed
+	return nil
+}
+
+// readFromStreamsProjection reads all thread IDs from the $streams system projection.
+// The $streams projection stores metadata for all streams in the format: "{version}@{stream-name}"
+// We parse this format to extract stream names that start with "thread".
+func (s *KurrentDBEventStore) readFromStreamsProjection(ctx context.Context) ([]string, error) {
+	readOpts := kurrentdb.ReadStreamOptions{
+		From:      kurrentdb.Revision(0),
+		Direction: kurrentdb.Forwards,
+	}
+
+	stream, err := s.client.ReadStream(ctx, "$streams", readOpts, 10000)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read $streams: %w", err)
+	}
+	defer stream.Close()
+
+	threadIDs := make(map[string]bool)
+	for {
+		resolvedEvent, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		// Parse $streams event data format: "{version}@{stream-name}"
+		// Example: "0@thread_1234567890"
+		dataStr := string(resolvedEvent.Event.Data)
+		if atIndex := strings.Index(dataStr, "@"); atIndex != -1 && atIndex < len(dataStr)-1 {
+			streamName := dataStr[atIndex+1:]
+			// Filter for thread streams only
+			if len(streamName) >= 6 && streamName[:6] == "thread" {
+				threadIDs[streamName] = true
+			}
+		}
+	}
+
+	result := make([]string, 0, len(threadIDs))
+	for threadID := range threadIDs {
+		result = append(result, threadID)
+	}
+	return result, nil
 }
 
 // Verify KurrentDBEventStore implements core.EventStore

@@ -24,6 +24,7 @@ type ChatClient interface {
 type EventStore interface {
 	Append(ctx context.Context, streamID string, events ...core.Event) (int64, error)
 	ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]core.Event, error)
+	DeleteStream(ctx context.Context, streamID string) error
 }
 
 // ThreadStore provides read access to thread state
@@ -162,7 +163,7 @@ func (h *ChatWriteService) runIteration(
 	// Emit AssistantMessageStartedEvent
 	startEvent := &core.AssistantMessageStartedEvent{
 		BaseEvent: core.BaseEvent{
-			Type:      "AssistantMessageStarted",
+			Type:      "AssistantMessageStartedEvent",
 			Timestamp: time.Now(),
 			ThreadID:  threadID,
 		},
@@ -218,7 +219,7 @@ func (h *ChatWriteService) runIteration(
 			if completeContent != "" {
 				evt := &core.AssistantMessageCompletedEvent{
 					BaseEvent: core.BaseEvent{
-						Type:      "AssistantMessageCompleted",
+						Type:      "AssistantMessageCompletedEvent",
 						Timestamp: time.Now(),
 						ThreadID:  threadID,
 					},
@@ -244,7 +245,7 @@ func (h *ChatWriteService) runIteration(
 
 			contentEvent := &core.AssistantContentStreamedEvent{
 				BaseEvent: core.BaseEvent{
-					Type:      "AssistantContentStreamed",
+					Type:      "AssistantContentStreamedEvent",
 					Timestamp: time.Now(),
 					ThreadID:  threadID,
 				},
@@ -263,7 +264,7 @@ func (h *ChatWriteService) runIteration(
 				// Emit ToolCallStartedEvent for new tool calls
 				toolStartEvent := &core.ToolCallStartedEvent{
 					BaseEvent: core.BaseEvent{
-						Type:      "ToolCallStarted",
+						Type:      "ToolCallStartedEvent",
 						Timestamp: time.Now(),
 						ThreadID:  threadID,
 					},
@@ -281,7 +282,7 @@ func (h *ChatWriteService) runIteration(
 			if tcUpdate.ArgsDelta != "" {
 				argsEvent := &core.ToolCallArgumentsStreamedEvent{
 					BaseEvent: core.BaseEvent{
-						Type:      "ToolCallArgumentsStreamed",
+						Type:      "ToolCallArgumentsStreamedEvent",
 						Timestamp: time.Now(),
 						ThreadID:  threadID,
 					},
@@ -302,7 +303,7 @@ func (h *ChatWriteService) runIteration(
 	for _, tc := range toolCallsList {
 		completedEvent := &core.ToolCallCompletedEvent{
 			BaseEvent: core.BaseEvent{
-				Type:      "ToolCallCompleted",
+				Type:      "ToolCallCompletedEvent",
 				Timestamp: time.Now(),
 				ThreadID:  threadID,
 			},
@@ -319,7 +320,7 @@ func (h *ChatWriteService) runIteration(
 		// Emit AssistantMessageCompletedEvent with tool calls
 		assistantEvent := &core.AssistantMessageCompletedEvent{
 			BaseEvent: core.BaseEvent{
-				Type:      "AssistantMessageCompleted",
+				Type:      "AssistantMessageCompletedEvent",
 				Timestamp: time.Now(),
 				ThreadID:  threadID,
 			},
@@ -344,7 +345,7 @@ func (h *ChatWriteService) runIteration(
 			toolResultID := core.GenerateID()
 			toolEvent := &core.ToolCallExecutedEvent{
 				BaseEvent: core.BaseEvent{
-					Type:      "ToolCallStarted",
+					Type:      "ToolCallExecutedEvent",
 					Timestamp: time.Now(),
 					ThreadID:  threadID,
 				},
@@ -376,7 +377,12 @@ func (h *ChatWriteService) runIteration(
 
 		updatedThread, exists := stateWithAccess.GetAgentThread(threadID)
 		if !exists {
-			return fmt.Errorf("thread %s not found after tool execution", threadID)
+			// For query-time projections, try GetOrCreateAgentThread instead
+			var err error
+			updatedThread, err = stateWithAccess.GetOrCreateAgentThread(ctx, threadID)
+			if err != nil {
+				return fmt.Errorf("failed to get/create thread %s after tool execution: %w", threadID, err)
+			}
 		}
 
 		// Generate new message ID for the continuation
@@ -390,7 +396,7 @@ func (h *ChatWriteService) runIteration(
 	// No tool calls, just emit the completed message event
 	assistantEvent := &core.AssistantMessageCompletedEvent{
 		BaseEvent: core.BaseEvent{
-			Type:      "AssistantMessageCompleted",
+			Type:      "AssistantMessageCompletedEvent",
 			Timestamp: time.Now(),
 			ThreadID:  threadID,
 		},
@@ -443,7 +449,7 @@ func (h *ChatWriteService) CreateThread(ctx context.Context, threadID, title str
 
 	event := &core.ThreadCreatedEvent{
 		BaseEvent: core.BaseEvent{
-			Type:      "ThreadCreated",
+			Type:      "ThreadCreatedEvent",
 			Timestamp: time.Now(),
 			ThreadID:  threadID,
 		},
@@ -458,7 +464,7 @@ func (h *ChatWriteService) CreateThread(ctx context.Context, threadID, title str
 func (h *ChatWriteService) AddUserMessage(ctx context.Context, threadID, messageID, content string) error {
 	event := &core.UserMessageAddedEvent{
 		BaseEvent: core.BaseEvent{
-			Type:      "UserMessageAdded",
+			Type:      "UserMessageAddedEvent",
 			Timestamp: time.Now(),
 			ThreadID:  threadID,
 		},
@@ -474,7 +480,7 @@ func (h *ChatWriteService) AddUserMessage(ctx context.Context, threadID, message
 func (h *ChatWriteService) UpdateThreadTitle(ctx context.Context, threadID, newTitle string) error {
 	event := &core.ThreadTitleUpdatedEvent{
 		BaseEvent: core.BaseEvent{
-			Type:      "ThreadTitleUpdated",
+			Type:      "ThreadTitleUpdatedEvent",
 			Timestamp: time.Now(),
 			ThreadID:  threadID,
 		},
@@ -485,21 +491,18 @@ func (h *ChatWriteService) UpdateThreadTitle(ctx context.Context, threadID, newT
 	return err
 }
 
-// DeleteThread deletes a thread
+// DeleteThread deletes a thread by removing its event stream from the event store
 func (h *ChatWriteService) DeleteThread(ctx context.Context, threadID string) error {
 	// Check if thread exists
 	if _, exists := h.readModel.Get(threadID); !exists {
 		return domain.ErrThreadNotFound
 	}
 
-	event := &core.ThreadDeletedEvent{
-		BaseEvent: core.BaseEvent{
-			Type:      "ThreadDeleted",
-			Timestamp: time.Now(),
-			ThreadID:  threadID,
-		},
+	// Delete the stream from the event store
+	err := h.writeModel.DeleteStream(ctx, threadID)
+	if err != nil {
+		return fmt.Errorf("failed to delete thread stream: %w", err)
 	}
 
-	_, err := h.writeModel.Append(ctx, threadID, event)
-	return err
+	return nil
 }
