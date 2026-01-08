@@ -12,10 +12,8 @@ import (
 	"github.com/a-h/templ"
 )
 
-var (
-	// ErrIconNotFound is returned when an icon is not found in the internal data map.
-	ErrIconNotFound = errors.New("icon not found in internalSvgData map")
-)
+// ErrIconNotFound is returned when an icon is not found in the internal data map.
+var ErrIconNotFound = errors.New("icon not found in internalSvgData map")
 
 // iconContents caches the fully generated SVG strings for icons that have been used,
 // keyed by a composite key of name and props to handle different stylings.

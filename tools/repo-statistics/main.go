@@ -2,12 +2,22 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+)
+
+var (
+	ErrInvalidCommitNumber = errors.New("invalid commit number")
+	ErrCommitOutOfRange    = errors.New("commit number out of range")
+	ErrInvalidRangeFormat  = errors.New("invalid range format")
+	ErrInvalidStartCommit  = errors.New("invalid start commit")
+	ErrInvalidEndCommit    = errors.New("invalid end commit")
+	ErrStartGreaterThanEnd = errors.New("start commit is greater than end commit")
 )
 
 type Commit struct {
@@ -305,10 +315,10 @@ func parseRange(rangeStr string, maxCommits int) (start, end int, err error) {
 	if !strings.Contains(rangeStr, "-") {
 		start, err = strconv.Atoi(rangeStr)
 		if err != nil {
-			return 0, 0, fmt.Errorf("invalid commit number: %s", rangeStr)
+			return 0, 0, fmt.Errorf("%w: %s", ErrInvalidCommitNumber, rangeStr)
 		}
 		if start < 1 || start > maxCommits {
-			return 0, 0, fmt.Errorf("commit number %d out of range (1-%d)", start, maxCommits)
+			return 0, 0, fmt.Errorf("%w: %d (1-%d)", ErrCommitOutOfRange, start, maxCommits)
 		}
 
 		return start, maxCommits, nil
@@ -317,7 +327,7 @@ func parseRange(rangeStr string, maxCommits int) (start, end int, err error) {
 	// Handle range (start-end)
 	parts := strings.Split(rangeStr, "-")
 	if len(parts) != 2 {
-		return 0, 0, fmt.Errorf("invalid range format: %s (use start-end)", rangeStr)
+		return 0, 0, fmt.Errorf("%w: %s (use start-end)", ErrInvalidRangeFormat, rangeStr)
 	}
 
 	// Parse start
@@ -326,7 +336,7 @@ func parseRange(rangeStr string, maxCommits int) (start, end int, err error) {
 	} else {
 		start, err = strconv.Atoi(strings.TrimSpace(parts[0]))
 		if err != nil {
-			return 0, 0, fmt.Errorf("invalid start commit: %s", parts[0])
+			return 0, 0, fmt.Errorf("%w: %s", ErrInvalidStartCommit, parts[0])
 		}
 	}
 
@@ -336,19 +346,19 @@ func parseRange(rangeStr string, maxCommits int) (start, end int, err error) {
 	} else {
 		end, err = strconv.Atoi(strings.TrimSpace(parts[1]))
 		if err != nil {
-			return 0, 0, fmt.Errorf("invalid end commit: %s", parts[1])
+			return 0, 0, fmt.Errorf("%w: %s", ErrInvalidEndCommit, parts[1])
 		}
 	}
 
 	// Validate range
 	if start < 1 || start > maxCommits {
-		return 0, 0, fmt.Errorf("start commit %d out of range (1-%d)", start, maxCommits)
+		return 0, 0, fmt.Errorf("%w: start %d (1-%d)", ErrCommitOutOfRange, start, maxCommits)
 	}
 	if end < 1 || end > maxCommits {
-		return 0, 0, fmt.Errorf("end commit %d out of range (1-%d)", end, maxCommits)
+		return 0, 0, fmt.Errorf("%w: end %d (1-%d)", ErrCommitOutOfRange, end, maxCommits)
 	}
 	if start > end {
-		return 0, 0, fmt.Errorf("start commit %d is greater than end commit %d", start, end)
+		return 0, 0, fmt.Errorf("%w: %d > %d", ErrStartGreaterThanEnd, start, end)
 	}
 
 	return start, end, nil

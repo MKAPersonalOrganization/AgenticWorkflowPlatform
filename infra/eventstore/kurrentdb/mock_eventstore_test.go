@@ -8,10 +8,8 @@ import (
 	"sync"
 )
 
-var (
-	// ErrStreamDeleted is returned when attempting to append to a deleted stream.
-	ErrStreamDeleted = errors.New("stream has been deleted")
-)
+// ErrStreamDeleted is returned when attempting to append to a deleted stream.
+var ErrStreamDeleted = errors.New("stream has been deleted")
 
 // MockEventStore is a test double for EventStore that doesn't require KurrentDB.
 type MockEventStore struct {

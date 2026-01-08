@@ -9,10 +9,8 @@ import (
 	"github.com/cpmech/gosl/la"
 )
 
-var (
-	// ErrEigenSquareMatrix is returned when a square matrix is required for eigenvalue computation.
-	ErrEigenSquareMatrix = errors.New("matrix must be square")
-)
+// ErrEigenSquareMatrix is returned when a square matrix is required for eigenvalue computation.
+var ErrEigenSquareMatrix = errors.New("matrix must be square")
 
 // EigenvalueTool computes eigenvalues and eigenvectors.
 type EigenvalueTool struct{}

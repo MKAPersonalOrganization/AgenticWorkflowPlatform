@@ -10,10 +10,8 @@ import (
 	"github.com/ollama/ollama/api"
 )
 
-var (
-	// ErrStreamCancelled is returned when the stream is cancelled by the consumer.
-	ErrStreamCancelled = errors.New("stream cancelled")
-)
+// ErrStreamCancelled is returned when the stream is cancelled by the consumer.
+var ErrStreamCancelled = errors.New("stream cancelled")
 
 // OllamaClient implements the ChatClient interface for Ollama.
 // It provides streaming chat completions using the Ollama API.
@@ -351,7 +349,8 @@ func boolPtr(b bool) *bool {
 
 // Heartbeat checks if Ollama server is running.
 func (c *OllamaClient) Heartbeat(ctx context.Context) error {
-	if err := c.client.Heartbeat(ctx); err != nil {
+	err := c.client.Heartbeat(ctx)
+	if err != nil {
 		return fmt.Errorf("ollama heartbeat failed: %w", err)
 	}
 

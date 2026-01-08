@@ -11,6 +11,13 @@ import (
 	"time"
 )
 
+var (
+	// ErrThreadDeserializationFailed is returned when thread deserialization fails.
+	ErrThreadDeserializationFailed = errors.New("failed to deserialize thread")
+	// ErrStateNotThreadStateWithAgentAccess is returned when state doesn't implement ThreadStateWithAgentAccess.
+	ErrStateNotThreadStateWithAgentAccess = errors.New("state does not implement ThreadStateWithAgentAccess")
+)
+
 // ChatClient defines the interface for LLM providers (OpenAI, Anthropic, Ollama, etc.)
 type ChatClient interface {
 	GetStreamingResponse(
@@ -121,7 +128,7 @@ func (h *ChatWriteService) GetNewThread() core.AgentThread {
 func (h *ChatWriteService) DeserializeThread(data []byte) (core.AgentThread, error) {
 	thread, err := core.NewInMemoryThreadFromState(data)
 	if err != nil {
-		return nil, fmt.Errorf("failed to deserialize thread: %w", err)
+		return nil, fmt.Errorf("%w: %w", ErrThreadDeserializationFailed, err)
 	}
 
 	return thread, nil
@@ -379,7 +386,7 @@ func (h *ChatWriteService) runIteration(
 		// Get updated thread state with tool results
 		stateWithAccess, ok := h.readModel.(core.ThreadStateWithAgentAccess)
 		if !ok {
-			return errors.New("state does not implement ThreadStateWithAgentAccess")
+			return ErrStateNotThreadStateWithAgentAccess
 		}
 
 		updatedThread, exists := stateWithAccess.GetAgentThread(threadID)

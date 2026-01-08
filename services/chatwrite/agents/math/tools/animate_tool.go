@@ -14,6 +14,16 @@ import (
 	"time"
 )
 
+var (
+	ErrGnuplotScriptRequired     = errors.New("gnuplot_script parameter is required")
+	ErrTerminalCommandNotAllowed = errors.New("gnuplot_script should not contain 'set terminal' command - terminal type is managed automatically")
+	ErrOutputCommandNotAllowed   = errors.New("gnuplot_script should not contain 'set output' command - output path is managed automatically")
+	ErrAnimateTitleTooLong       = errors.New("title exceeds maximum length of 100 characters")
+	ErrInvalidAnimationFormat    = errors.New("format must be 'gif' or 'webp'")
+	ErrDelayTooLarge             = errors.New("delay exceeds maximum of 500")
+	ErrAnimationFileNotCreated   = errors.New("gnuplot did not create the expected output file")
+)
+
 // AnimateArgs represents the arguments for the animate tool.
 type AnimateArgs struct {
 	GnuplotScript string `json:"gnuplot_script"` // Complete gnuplot animation script
@@ -128,16 +138,16 @@ func (a *AnimateTool) Invoke(ctx context.Context, arguments string) (string, err
 
 	// Validate required gnuplot_script parameter
 	if args.GnuplotScript == "" {
-		return "", errors.New("gnuplot_script parameter is required")
+		return "", ErrGnuplotScriptRequired
 	}
 
 	// Validate script doesn't contain terminal/output commands
 	scriptLower := strings.ToLower(args.GnuplotScript)
 	if strings.Contains(scriptLower, "set terminal") || strings.Contains(scriptLower, "set term") {
-		return "", errors.New("gnuplot_script should not contain 'set terminal' command - terminal type is managed automatically")
+		return "", ErrTerminalCommandNotAllowed
 	}
 	if strings.Contains(scriptLower, "set output") {
-		return "", errors.New("gnuplot_script should not contain 'set output' command - output path is managed automatically")
+		return "", ErrOutputCommandNotAllowed
 	}
 
 	// Validate format
@@ -145,7 +155,7 @@ func (a *AnimateTool) Invoke(ctx context.Context, arguments string) (string, err
 		args.Format = "gif"
 	}
 	if args.Format != "gif" && args.Format != "webp" {
-		return "", fmt.Errorf("format must be 'gif' or 'webp', got: %s", args.Format)
+		return "", fmt.Errorf("%w, got: %s", ErrInvalidAnimationFormat, args.Format)
 	}
 
 	// Validate delay
@@ -153,12 +163,12 @@ func (a *AnimateTool) Invoke(ctx context.Context, arguments string) (string, err
 		args.Delay = 50 // Default to 20fps
 	}
 	if args.Delay > 500 {
-		return "", fmt.Errorf("delay exceeds maximum of 500 (got: %d)", args.Delay)
+		return "", fmt.Errorf("%w (got: %d)", ErrDelayTooLarge, args.Delay)
 	}
 
 	// Validate title length
 	if len(args.Title) > 100 {
-		return "", errors.New("title exceeds maximum length of 100 characters")
+		return "", ErrAnimateTitleTooLong
 	}
 
 	// Generate the animation
@@ -245,7 +255,7 @@ func executeGnuplotAnimation(userScript, format string, delay int, title string)
 
 	// Verify the animation was created
 	if _, err := os.Stat(animationPath); os.IsNotExist(err) {
-		return "", fmt.Errorf("gnuplot did not create the expected output file at %s", animationPath)
+		return "", fmt.Errorf("%w at %s", ErrAnimationFileNotCreated, animationPath)
 	}
 
 	return animationPath, nil

@@ -13,9 +13,14 @@ import (
 	"github.com/kurrent-io/KurrentDB-Client-Go/kurrentdb"
 )
 
+// ErrUnknownEventType is returned when an unknown event type is encountered during deserialization.
+var ErrUnknownEventType = errors.New("unknown event type")
+
 var (
-	// ErrUnknownEventType is returned when an unknown event type is encountered during deserialization.
-	ErrUnknownEventType = errors.New("unknown event type")
+	// ErrVersionOverflow is returned when a version exceeds max int64.
+	ErrVersionOverflow = errors.New("version overflow")
+	// ErrInvalidFromVersion is returned when fromVersion is negative.
+	ErrInvalidFromVersion = errors.New("invalid fromVersion: must be non-negative")
 )
 
 // KurrentDBEventStore is an implementation of EventStore using KurrentDB (PostgreSQL-backed).
@@ -84,7 +89,7 @@ func (s *KurrentDBEventStore) Append(ctx context.Context, streamID string, event
 
 	// Check for integer overflow before converting uint64 to int64
 	if result.NextExpectedVersion > math.MaxInt64 {
-		return 0, fmt.Errorf("version overflow: %d exceeds max int64", result.NextExpectedVersion)
+		return 0, fmt.Errorf("%w: %d exceeds max int64", ErrVersionOverflow, result.NextExpectedVersion)
 	}
 
 	return int64(result.NextExpectedVersion), nil
@@ -94,7 +99,7 @@ func (s *KurrentDBEventStore) Append(ctx context.Context, streamID string, event
 func (s *KurrentDBEventStore) ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]core.Event, error) {
 	// Check for negative version before converting int64 to uint64
 	if fromVersion < 0 {
-		return nil, fmt.Errorf("invalid fromVersion: %d (must be non-negative)", fromVersion)
+		return nil, fmt.Errorf("%w: %d", ErrInvalidFromVersion, fromVersion)
 	}
 
 	readOpts := kurrentdb.ReadStreamOptions{
@@ -140,7 +145,8 @@ func (s *KurrentDBEventStore) ReadStream(ctx context.Context, streamID string, f
 // Close closes the KurrentDB client connection.
 func (s *KurrentDBEventStore) Close() error {
 	if s.client != nil {
-		if err := s.client.Close(); err != nil {
+		err := s.client.Close()
+		if err != nil {
 			return fmt.Errorf("failed to close KurrentDB client: %w", err)
 		}
 	}

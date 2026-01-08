@@ -8,6 +8,13 @@ import (
 	client "github.com/ory/client-go"
 )
 
+var (
+	// ErrIdentityNil is returned when an identity is nil.
+	ErrIdentityNil = errors.New("identity cannot be nil")
+	// ErrSessionNil is returned when a session or session identity is nil.
+	ErrSessionNil = errors.New("session or session identity cannot be nil")
+)
+
 // contextKey is a type for context keys to avoid collisions.
 type contextKey string
 
@@ -44,7 +51,7 @@ type User struct {
 // NewUserFromIdentity creates a User from a Kratos Identity.
 func NewUserFromIdentity(identity *client.Identity) (*User, error) {
 	if identity == nil {
-		return nil, errors.New("identity cannot be nil")
+		return nil, ErrIdentityNil
 	}
 
 	user := &User{
@@ -86,7 +93,7 @@ func NewUserFromIdentity(identity *client.Identity) (*User, error) {
 // NewUserFromSession creates a User from a Kratos Session.
 func NewUserFromSession(session *client.Session) (*User, error) {
 	if session == nil || session.Identity == nil {
-		return nil, errors.New("session or session identity cannot be nil")
+		return nil, ErrSessionNil
 	}
 
 	return NewUserFromIdentity(session.Identity)

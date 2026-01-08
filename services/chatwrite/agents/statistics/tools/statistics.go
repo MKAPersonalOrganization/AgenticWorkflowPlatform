@@ -9,6 +9,18 @@ import (
 	"github.com/montanaflynn/stats"
 )
 
+var (
+	ErrCorrelationRequiresData          = errors.New("correlation requires data1 and data2")
+	ErrPearsonRequiresData              = errors.New("pearson requires data1 and data2")
+	ErrCovarianceRequiresData           = errors.New("covariance requires data1 and data2")
+	ErrCovariancePopulationRequiresData = errors.New("covariance_population requires data1 and data2")
+	ErrAutocorrelationRequiresData      = errors.New("autocorrelation requires data1")
+	ErrNormFitRequiresData              = errors.New("norm_fit requires data")
+	ErrXYArrayLengthMismatch            = errors.New("x and y arrays must have the same length")
+	ErrUnknownOperation                 = errors.New("unknown operation")
+	ErrUnknownRegressionType            = errors.New("unknown regression type")
+)
+
 // =============================================================================
 // DESCRIPTIVE STATISTICS TOOL
 // =============================================================================
@@ -151,7 +163,7 @@ func (t *DescriptiveStatsTool) Invoke(ctx context.Context, arguments string) (st
 			}
 		}
 	default:
-		return "", fmt.Errorf("unknown operation: %s", args.Operation)
+		return "", fmt.Errorf("%w: %s", ErrUnknownOperation, args.Operation)
 	}
 
 	if err != nil {
@@ -238,31 +250,31 @@ func (t *CorrelationTool) Invoke(ctx context.Context, arguments string) (string,
 	switch args.Operation {
 	case "correlation":
 		if len(args.Data1) == 0 || len(args.Data2) == 0 {
-			return "", errors.New("correlation requires data1 and data2")
+			return "", ErrCorrelationRequiresData
 		}
 		result, err = stats.Correlation(stats.Float64Data(args.Data1), stats.Float64Data(args.Data2))
 	case "pearson":
 		if len(args.Data1) == 0 || len(args.Data2) == 0 {
-			return "", errors.New("pearson requires data1 and data2")
+			return "", ErrPearsonRequiresData
 		}
 		result, err = stats.Pearson(stats.Float64Data(args.Data1), stats.Float64Data(args.Data2))
 	case "covariance":
 		if len(args.Data1) == 0 || len(args.Data2) == 0 {
-			return "", errors.New("covariance requires data1 and data2")
+			return "", ErrCovarianceRequiresData
 		}
 		result, err = stats.Covariance(stats.Float64Data(args.Data1), stats.Float64Data(args.Data2))
 	case "covariance_population":
 		if len(args.Data1) == 0 || len(args.Data2) == 0 {
-			return "", errors.New("covariance_population requires data1 and data2")
+			return "", ErrCovariancePopulationRequiresData
 		}
 		result, err = stats.CovariancePopulation(stats.Float64Data(args.Data1), stats.Float64Data(args.Data2))
 	case "autocorrelation":
 		if len(args.Data1) == 0 {
-			return "", errors.New("autocorrelation requires data1")
+			return "", ErrAutocorrelationRequiresData
 		}
 		result, err = stats.AutoCorrelation(stats.Float64Data(args.Data1), args.Lags)
 	default:
-		return "", fmt.Errorf("unknown operation: %s", args.Operation)
+		return "", fmt.Errorf("%w: %s", ErrUnknownOperation, args.Operation)
 	}
 
 	if err != nil {
@@ -359,7 +371,7 @@ func (t *DistanceMetricsTool) Invoke(ctx context.Context, arguments string) (str
 		}
 		result, err = stats.MinkowskiDistance(p1, p2, lambda)
 	default:
-		return "", fmt.Errorf("unknown operation: %s", args.Operation)
+		return "", fmt.Errorf("%w: %s", ErrUnknownOperation, args.Operation)
 	}
 
 	if err != nil {
@@ -461,7 +473,7 @@ func (t *SamplingTool) Invoke(ctx context.Context, arguments string) (string, er
 			}
 		}
 	default:
-		return "", fmt.Errorf("unknown operation: %s", args.Operation)
+		return "", fmt.Errorf("%w: %s", ErrUnknownOperation, args.Operation)
 	}
 
 	if err != nil {
@@ -552,7 +564,7 @@ func (t *DataTransformTool) Invoke(ctx context.Context, arguments string) (strin
 	case "round":
 		result, err = stats.Round(args.Value, args.Places)
 	default:
-		return "", fmt.Errorf("unknown operation: %s", args.Operation)
+		return "", fmt.Errorf("%w: %s", ErrUnknownOperation, args.Operation)
 	}
 
 	if err != nil {
@@ -713,7 +725,7 @@ func (t *NormalDistributionTool) Invoke(ctx context.Context, arguments string) (
 		}
 	case "norm_fit":
 		if len(args.Data) == 0 {
-			return "", errors.New("norm_fit requires data")
+			return "", ErrNormFitRequiresData
 		}
 		params := stats.NormFit(args.Data)
 		result = map[string]any{
@@ -733,7 +745,7 @@ func (t *NormalDistributionTool) Invoke(ctx context.Context, arguments string) (
 	case "ncr":
 		result = stats.Ncr(args.N, args.R)
 	default:
-		return "", fmt.Errorf("unknown operation: %s", args.Operation)
+		return "", fmt.Errorf("%w: %s", ErrUnknownOperation, args.Operation)
 	}
 
 	response := map[string]any{
@@ -815,7 +827,7 @@ func (t *GeometricDistributionTool) Invoke(ctx context.Context, arguments string
 	case "var_geom":
 		result, err = stats.VarGeom(args.P)
 	default:
-		return "", fmt.Errorf("unknown operation: %s", args.Operation)
+		return "", fmt.Errorf("%w: %s", ErrUnknownOperation, args.Operation)
 	}
 
 	if err != nil {
@@ -888,7 +900,7 @@ func (r *RegressionTool) Invoke(ctx context.Context, arguments string) (string, 
 	}
 
 	if len(args.X) != len(args.Y) {
-		return "", errors.New("x and y arrays must have the same length")
+		return "", ErrXYArrayLengthMismatch
 	}
 
 	series := make(stats.Series, len(args.X))
@@ -907,7 +919,7 @@ func (r *RegressionTool) Invoke(ctx context.Context, arguments string) (string, 
 	case "logarithmic":
 		result, err = stats.LogarithmicRegression(series)
 	default:
-		return "", fmt.Errorf("unknown regression type: %s", args.Type)
+		return "", fmt.Errorf("%w: %s", ErrUnknownRegressionType, args.Type)
 	}
 
 	if err != nil {

@@ -7,10 +7,8 @@ import (
 	"school-with-ai/domain"
 )
 
-var (
-	// ErrToolNotFound is returned when a tool is not registered.
-	ErrToolNotFound = errors.New("tool not found")
-)
+// ErrToolNotFound is returned when a tool is not registered.
+var ErrToolNotFound = errors.New("tool not found")
 
 // ToolExecutor executes tool calls and returns results.
 type ToolExecutor interface {

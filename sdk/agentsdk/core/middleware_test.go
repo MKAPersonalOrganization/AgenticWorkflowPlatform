@@ -7,13 +7,13 @@ import (
 	"testing"
 )
 
-// Test error sentinels
+// Test error sentinels.
 var (
-	errTestMiddleware           = errors.New("middleware error")
-	errTestM1MetadataRead       = errors.New("base handler could not read m1 metadata")
-	errTestM2MetadataRead       = errors.New("base handler could not read m2 metadata")
-	errTestBaseHandler          = errors.New("base handler error")
-	errTestGeneric              = errors.New("test error")
+	errTestMiddleware     = errors.New("middleware error")
+	errTestM1MetadataRead = errors.New("base handler could not read m1 metadata")
+	errTestM2MetadataRead = errors.New("base handler could not read m2 metadata")
+	errTestBaseHandler    = errors.New("base handler error")
+	errTestGeneric        = errors.New("test error")
 )
 
 // Mock middleware for testing.

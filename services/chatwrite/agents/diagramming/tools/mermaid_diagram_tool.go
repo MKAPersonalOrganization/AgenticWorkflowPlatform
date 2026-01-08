@@ -13,6 +13,14 @@ import (
 	"time"
 )
 
+var (
+	ErrMermaidCodeRequired  = errors.New("mermaid_code parameter is required")
+	ErrTitleTooLong         = errors.New("title exceeds maximum length of 100 characters")
+	ErrInvalidFilename      = errors.New("invalid filename detected")
+	ErrInvalidOutputType    = errors.New("output_type must be 'svg' or 'png'")
+	ErrOutputFileNotCreated = errors.New("mermaid-cli did not create the expected output file")
+)
+
 // MermaidDiagramArgs represents the arguments for the mermaid diagram tool.
 type MermaidDiagramArgs struct {
 	MermaidCode string `json:"mermaid_code"` // Complete mermaid diagram definition
@@ -67,7 +75,7 @@ func (m *MermaidDiagramTool) Invoke(ctx context.Context, arguments string) (stri
 
 	// Validate required mermaid_code parameter
 	if args.MermaidCode == "" {
-		return "", errors.New("mermaid_code parameter is required")
+		return "", ErrMermaidCodeRequired
 	}
 
 	// Set default output type
@@ -77,12 +85,12 @@ func (m *MermaidDiagramTool) Invoke(ctx context.Context, arguments string) (stri
 
 	// Validate output type
 	if args.OutputType != "svg" && args.OutputType != "png" {
-		return "", fmt.Errorf("output_type must be 'svg' or 'png', got: %s", args.OutputType)
+		return "", fmt.Errorf("%w, got: %s", ErrInvalidOutputType, args.OutputType)
 	}
 
 	// Validate title length
 	if len(args.Title) > 100 {
-		return "", errors.New("title exceeds maximum length of 100 characters")
+		return "", ErrTitleTooLong
 	}
 
 	// Generate the diagram
@@ -144,7 +152,7 @@ func executeMermaidDiagram(mermaidCode, title, outputType string) (string, error
 
 	// Validate filenames contain only safe characters (hash-based, so should be alphanumeric + underscore + dot)
 	if !isSafeFilename(inputFileName) || !isSafeFilename(outputFileName) {
-		return "", errors.New("invalid filename detected")
+		return "", ErrInvalidFilename
 	}
 
 	// Execute mermaid-cli via Docker
@@ -166,7 +174,7 @@ func executeMermaidDiagram(mermaidCode, title, outputType string) (string, error
 
 	// Verify the image was created
 	if _, err := os.Stat(outputPath); os.IsNotExist(err) {
-		return "", fmt.Errorf("mermaid-cli did not create the expected output file at %s\nOutput: %s", outputPath, string(output))
+		return "", fmt.Errorf("%w at %s\nOutput: %s", ErrOutputFileNotCreated, outputPath, string(output))
 	}
 
 	return outputPath, nil

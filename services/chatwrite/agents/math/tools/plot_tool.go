@@ -12,6 +12,15 @@ import (
 	"time"
 )
 
+var (
+	ErrPlotScriptRequired            = errors.New("gnuplot_script parameter is required")
+	ErrPlotTitleRequired             = errors.New("title parameter is required")
+	ErrPlotTitleTooLong              = errors.New("title exceeds maximum length of 100 characters")
+	ErrPlotTerminalCommandNotAllowed = errors.New("gnuplot_script should not contain 'set terminal' command - terminal type is managed automatically")
+	ErrPlotOutputCommandNotAllowed   = errors.New("gnuplot_script should not contain 'set output' command - output path is managed automatically")
+	ErrPlotFileNotCreated            = errors.New("gnuplot did not create the expected output file")
+)
+
 // PlotArgs represents the arguments for the plot tool.
 type PlotArgs struct {
 	GnuplotScript string `json:"gnuplot_script"` // Complete gnuplot script to execute
@@ -116,24 +125,24 @@ func (p *PlotTool) Invoke(ctx context.Context, arguments string) (string, error)
 
 	// Validate required parameters
 	if args.GnuplotScript == "" {
-		return "", errors.New("gnuplot_script parameter is required")
+		return "", ErrPlotScriptRequired
 	}
 	if args.Title == "" {
-		return "", errors.New("title parameter is required")
+		return "", ErrPlotTitleRequired
 	}
 
 	// Validate script doesn't contain terminal/output commands (we manage these)
 	scriptLower := strings.ToLower(args.GnuplotScript)
 	if strings.Contains(scriptLower, "set terminal") {
-		return "", errors.New("gnuplot_script should not contain 'set terminal' command - terminal type is managed automatically")
+		return "", ErrPlotTerminalCommandNotAllowed
 	}
 	if strings.Contains(scriptLower, "set output") {
-		return "", errors.New("gnuplot_script should not contain 'set output' command - output path is managed automatically")
+		return "", ErrPlotOutputCommandNotAllowed
 	}
 
 	// Validate title length
 	if len(args.Title) > 100 {
-		return "", errors.New("title exceeds maximum length of 100 characters")
+		return "", ErrPlotTitleTooLong
 	}
 
 	// Generate the plot
@@ -222,7 +231,7 @@ func executeGnuplotScript(userScript, title string) (string, error) {
 
 	// Verify the image was created
 	if _, err := os.Stat(imagePath); os.IsNotExist(err) {
-		return "", fmt.Errorf("gnuplot did not create the expected output file at %s", imagePath)
+		return "", fmt.Errorf("%w at %s", ErrPlotFileNotCreated, imagePath)
 	}
 
 	return imagePath, nil
