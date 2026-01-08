@@ -2,19 +2,22 @@ package sampleprompts
 
 templ SamplePrompts() {
 	<!-- Sample Prompts -->
-	<div class="w-full space-y-3" x-data="{ selectedCategory: null }">
-		<p class="text-sm font-medium text-muted-foreground">Explore subjects:</p>
+	<div class="w-full space-y-4" x-data="{ selectedCategory: null }">
+		<p class="text-sm font-semibold text-foreground/80 tracking-wide uppercase">Explore subjects</p>
 		<!-- Category Buttons -->
-		<div class="grid gap-2 grid-cols-2 md:grid-cols-4">
+		<div class="grid gap-3 grid-cols-2 md:grid-cols-4">
 			<!-- Math Category -->
 			<button
 				@click="selectedCategory = selectedCategory === 'math' ? null : 'math'"
-				class="text-left p-4 rounded-lg border border-border bg-card hover:bg-accent transition-all"
-				:class="selectedCategory === 'math' ? 'border-primary bg-accent' : ''"
+				class="text-left p-4 rounded-xl border border-border/50 bg-card hover:bg-accent hover:shadow-md transition-all duration-300 hover:scale-105"
+				:class="selectedCategory === 'math' ? 'border-primary bg-accent shadow-md scale-105' : ''"
 			>
 				<div class="flex items-center justify-between">
 					<div class="flex items-center gap-3">
-						<div class="shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+						<div
+							class="shrink-0 w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center transition-colors duration-300"
+							:class="selectedCategory === 'math' ? 'bg-primary/20' : ''"
+						>
 							<svg class="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
 								<path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z"></path>
 							</svg>
@@ -29,12 +32,15 @@ templ SamplePrompts() {
 			<!-- Physics Category -->
 			<button
 				@click="selectedCategory = selectedCategory === 'physics' ? null : 'physics'"
-				class="text-left p-4 rounded-lg border border-border bg-card hover:bg-accent transition-all"
-				:class="selectedCategory === 'physics' ? 'border-primary bg-accent' : ''"
+				class="text-left p-4 rounded-xl border border-border/50 bg-card hover:bg-accent hover:shadow-md transition-all duration-300 hover:scale-105"
+				:class="selectedCategory === 'physics' ? 'border-primary bg-accent shadow-md scale-105' : ''"
 			>
 				<div class="flex items-center justify-between">
 					<div class="flex items-center gap-3">
-						<div class="shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+						<div
+							class="shrink-0 w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center transition-colors duration-300"
+							:class="selectedCategory === 'physics' ? 'bg-primary/20' : ''"
+						>
 							<svg class="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
 								<path d="M10 12a2 2 0 100-4 2 2 0 000 4z"></path>
 								<path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"></path>
@@ -50,12 +56,15 @@ templ SamplePrompts() {
 			<!-- Chemistry Category -->
 			<button
 				@click="selectedCategory = selectedCategory === 'chemistry' ? null : 'chemistry'"
-				class="text-left p-4 rounded-lg border border-border bg-card hover:bg-accent transition-all"
-				:class="selectedCategory === 'chemistry' ? 'border-primary bg-accent' : ''"
+				class="text-left p-4 rounded-xl border border-border/50 bg-card hover:bg-accent hover:shadow-md transition-all duration-300 hover:scale-105"
+				:class="selectedCategory === 'chemistry' ? 'border-primary bg-accent shadow-md scale-105' : ''"
 			>
 				<div class="flex items-center justify-between">
 					<div class="flex items-center gap-3">
-						<div class="shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+						<div
+							class="shrink-0 w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center transition-colors duration-300"
+							:class="selectedCategory === 'chemistry' ? 'bg-primary/20' : ''"
+						>
 							<svg class="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
 								<path fill-rule="evenodd" d="M7 2a1 1 0 00-.707 1.707L7 4.414v3.758a1 1 0 01-.293.707l-4 4C.817 14.769 2.156 18 4.828 18h10.343c2.673 0 4.012-3.231 2.122-5.121l-4-4A1 1 0 0113 8.172V4.414l.707-.707A1 1 0 0013 2H7zm2 6.172V4h2v4.172a3 3 0 00.879 2.12l1.027 1.028a4 4 0 00-2.171.102l-.47.156a4 4 0 01-2.53 0l-.563-.187a1.993 1.993 0 00-.114-.035l1.063-1.063A3 3 0 009 8.172z" clip-rule="evenodd"></path>
 							</svg>
@@ -70,12 +79,15 @@ templ SamplePrompts() {
 			<!-- Biology Category -->
 			<button
 				@click="selectedCategory = selectedCategory === 'biology' ? null : 'biology'"
-				class="text-left p-4 rounded-lg border border-border bg-card hover:bg-accent transition-all"
-				:class="selectedCategory === 'biology' ? 'border-primary bg-accent' : ''"
+				class="text-left p-4 rounded-xl border border-border/50 bg-card hover:bg-accent hover:shadow-md transition-all duration-300 hover:scale-105"
+				:class="selectedCategory === 'biology' ? 'border-primary bg-accent shadow-md scale-105' : ''"
 			>
 				<div class="flex items-center justify-between">
 					<div class="flex items-center gap-3">
-						<div class="shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+						<div
+							class="shrink-0 w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center transition-colors duration-300"
+							:class="selectedCategory === 'biology' ? 'bg-primary/20' : ''"
+						>
 							<svg class="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
 								<path fill-rule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clip-rule="evenodd"></path>
 							</svg>
@@ -90,12 +102,15 @@ templ SamplePrompts() {
 			<!-- History Category -->
 			<button
 				@click="selectedCategory = selectedCategory === 'history' ? null : 'history'"
-				class="text-left p-4 rounded-lg border border-border bg-card hover:bg-accent transition-all"
-				:class="selectedCategory === 'history' ? 'border-primary bg-accent' : ''"
+				class="text-left p-4 rounded-xl border border-border/50 bg-card hover:bg-accent hover:shadow-md transition-all duration-300 hover:scale-105"
+				:class="selectedCategory === 'history' ? 'border-primary bg-accent shadow-md scale-105' : ''"
 			>
 				<div class="flex items-center justify-between">
 					<div class="flex items-center gap-3">
-						<div class="shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+						<div
+							class="shrink-0 w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center transition-colors duration-300"
+							:class="selectedCategory === 'history' ? 'bg-primary/20' : ''"
+						>
 							<svg class="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
 								<path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"></path>
 							</svg>
@@ -110,12 +125,15 @@ templ SamplePrompts() {
 			<!-- Literature Category -->
 			<button
 				@click="selectedCategory = selectedCategory === 'literature' ? null : 'literature'"
-				class="text-left p-4 rounded-lg border border-border bg-card hover:bg-accent transition-all"
-				:class="selectedCategory === 'literature' ? 'border-primary bg-accent' : ''"
+				class="text-left p-4 rounded-xl border border-border/50 bg-card hover:bg-accent hover:shadow-md transition-all duration-300 hover:scale-105"
+				:class="selectedCategory === 'literature' ? 'border-primary bg-accent shadow-md scale-105' : ''"
 			>
 				<div class="flex items-center justify-between">
 					<div class="flex items-center gap-3">
-						<div class="shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+						<div
+							class="shrink-0 w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center transition-colors duration-300"
+							:class="selectedCategory === 'literature' ? 'bg-primary/20' : ''"
+						>
 							<svg class="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
 								<path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"></path>
 							</svg>
@@ -130,12 +148,15 @@ templ SamplePrompts() {
 			<!-- Computer Science Category -->
 			<button
 				@click="selectedCategory = selectedCategory === 'cs' ? null : 'cs'"
-				class="text-left p-4 rounded-lg border border-border bg-card hover:bg-accent transition-all"
-				:class="selectedCategory === 'cs' ? 'border-primary bg-accent' : ''"
+				class="text-left p-4 rounded-xl border border-border/50 bg-card hover:bg-accent hover:shadow-md transition-all duration-300 hover:scale-105"
+				:class="selectedCategory === 'cs' ? 'border-primary bg-accent shadow-md scale-105' : ''"
 			>
 				<div class="flex items-center justify-between">
 					<div class="flex items-center gap-3">
-						<div class="shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+						<div
+							class="shrink-0 w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center transition-colors duration-300"
+							:class="selectedCategory === 'cs' ? 'bg-primary/20' : ''"
+						>
 							<svg class="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
 								<path fill-rule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"></path>
 							</svg>
@@ -150,12 +171,15 @@ templ SamplePrompts() {
 			<!-- Economics Category -->
 			<button
 				@click="selectedCategory = selectedCategory === 'economics' ? null : 'economics'"
-				class="text-left p-4 rounded-lg border border-border bg-card hover:bg-accent transition-all"
-				:class="selectedCategory === 'economics' ? 'border-primary bg-accent' : ''"
+				class="text-left p-4 rounded-xl border border-border/50 bg-card hover:bg-accent hover:shadow-md transition-all duration-300 hover:scale-105"
+				:class="selectedCategory === 'economics' ? 'border-primary bg-accent shadow-md scale-105' : ''"
 			>
 				<div class="flex items-center justify-between">
 					<div class="flex items-center gap-3">
-						<div class="shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+						<div
+							class="shrink-0 w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center transition-colors duration-300"
+							:class="selectedCategory === 'economics' ? 'bg-primary/20' : ''"
+						>
 							<svg class="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
 								<path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"></path>
 								<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clip-rule="evenodd"></path>
@@ -170,10 +194,10 @@ templ SamplePrompts() {
 			</button>
 		</div>
 		<!-- Math Examples -->
-		<div x-show="selectedCategory === 'math'" x-collapse class="space-y-2">
+		<div x-show="selectedCategory === 'math'" x-collapse class="space-y-2 pt-2">
 			<button
 				@click="currentMessage = 'Solve the quadratic equation: x² + 5x + 6 = 0'; sendMessage()"
-				class="w-full text-left p-3 rounded-lg border border-border bg-card/50 hover:bg-accent hover:border-primary transition-all text-sm"
+				class="w-full text-left p-3.5 rounded-lg border border-border/40 bg-card/50 hover:bg-accent hover:border-primary hover:shadow-sm transition-all duration-200 text-sm hover:translate-x-1"
 			>
 				Solve the quadratic equation: x² + 5x + 6 = 0
 			</button>
