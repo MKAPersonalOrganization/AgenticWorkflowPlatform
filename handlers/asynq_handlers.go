@@ -180,9 +180,11 @@ streamEvents:
 	messages := h.projectionService.GetThreadMessages(eventBuffer.ThreadID)
 	if len(messages) > 0 {
 		messagesSnapshotEvent := aguievents.NewMessagesSnapshotEvent(messages)
-		if err := writeSSEEvent(w, messagesSnapshotEvent); err == nil {
-			flusher.Flush()
+		if err := writeSSEEvent(w, messagesSnapshotEvent); err != nil {
+			slog.Error("[API] Failed to write messages snapshot event", "error", err, "jobID", jobID)
+			return
 		}
+		flusher.Flush()
 	}
 
 	// THEN: Stream realtime events from buffer
@@ -439,5 +441,7 @@ func (h *AsynqHandler) DeleteThread(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+	if err := json.NewEncoder(w).Encode(map[string]string{"status": "success"}); err != nil {
+		slog.Error("[API] Failed to encode delete response", "error", err)
+	}
 }
