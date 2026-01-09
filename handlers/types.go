@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+
 	"school-with-ai/domain"
 )
 
@@ -24,6 +25,4 @@ func writeSSEEvent(w io.Writer, event any) error {
 // ThreadResponse represents a thread with its messages.
 type ThreadResponse struct {
 	*domain.Thread
-
-	WhiteboardContent string `json:"whiteboardContent,omitempty"`
 }

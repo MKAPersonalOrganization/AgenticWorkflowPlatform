@@ -1,11 +1,10 @@
 package handlers_test
 
 import (
-	"testing"
-
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/services/chatwrite/agents/math"
 	"school-with-ai/services/chatwrite/agents/studentfacing"
+	"testing"
 )
 
 func TestInstructorConfigurations(t *testing.T) {
