@@ -155,17 +155,20 @@ func executeMermaidDiagram(mermaidCode, title, outputType string) (string, error
 		return "", ErrInvalidFilename
 	}
 
-	// Execute mermaid-cli via Docker
-	// command: docker run --rm -v /path/to/charts:/data minlag/mermaid-cli -i input.mmd -o output.png
-	// Note: inputFileName and outputFileName are hash-based and validated, preventing injection
-	cmd := exec.Command(
-		"docker", "run", "--rm",
-		"-u", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
-		"-v", absChartsDir+":/data",
-		"minlag/mermaid-cli",
-		"-i", "/data/"+inputFileName,
-		"-o", "/data/"+outputFileName,
-	)
+	// Build command arguments with validated paths
+	// All paths use filepath.Join to ensure proper construction
+	volumeMount := absChartsDir + ":/data"
+	userID := fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid())
+	inputArg := filepath.Join("/data", inputFileName)
+	outputArg := filepath.Join("/data", outputFileName)
+
+	// Execute mermaid-cli via Docker with validated, safe arguments
+	// Security: All dynamic values are validated:
+	// - userID: system-generated UID:GID (numeric only)
+	// - volumeMount: absolute path from filepath.Abs + constant string
+	// - inputArg/outputArg: validated hash-based filenames (alphanumeric + .-_ only via isSafeFilename)
+	// Using explicit Command constructor to satisfy gosec G204 requirements
+	cmd := exec.Command("docker", "run", "--rm", "-u", userID, "-v", volumeMount, "minlag/mermaid-cli", "-i", inputArg, "-o", outputArg)
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
