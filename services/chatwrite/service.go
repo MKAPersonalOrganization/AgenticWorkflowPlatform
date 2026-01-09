@@ -8,6 +8,7 @@ import (
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/sdk/agentsdk/llm"
+	"school-with-ai/services/chatwrite/rag"
 	"time"
 )
 
@@ -58,6 +59,7 @@ type ChatWriteService struct {
 	notifier                core.EventNotifier // Agent's own notifier
 	shouldContinueIteration ShouldContinueIterationFn
 	reqCtxCapture           **core.RequestContext // Captures the request context for handoff detection
+	ragService              rag.RAG               // RAG service for retrieving relevant context
 }
 
 // Option is a functional option for configuring ChatWriteService.
@@ -81,6 +83,13 @@ func WithShouldContinueIteration(fn ShouldContinueIterationFn) Option {
 func WithRequestContextCapture(capture **core.RequestContext) Option {
 	return func(h *ChatWriteService) {
 		h.reqCtxCapture = capture
+	}
+}
+
+// WithRAG configures the agent with a RAG service for context retrieval.
+func WithRAG(ragService rag.RAG) Option {
+	return func(h *ChatWriteService) {
+		h.ragService = ragService
 	}
 }
 

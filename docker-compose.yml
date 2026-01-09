@@ -116,6 +116,22 @@ services:
       retries: 5
       start_period: 30s
 
+  # Typesense - Vector search database for RAG
+  typesense:
+    image: typesense/typesense:26.0
+    container_name: typesense
+    environment:
+      - TYPESENSE_DATA_DIR=/data
+      - TYPESENSE_API_KEY=${TYPESENSE_API_KEY:-dev-typesense-key}
+      - TYPESENSE_ENABLE_CORS=true
+    ports:
+      - "8108:8108" # HTTP API
+    volumes:
+      - typesense-data:/data
+    networks:
+      - intranet
+    command: --data-dir /data --api-key=${TYPESENSE_API_KEY:-dev-typesense-key} --enable-cors
+
 networks:
   intranet:
 
@@ -125,3 +141,4 @@ volumes:
   redis-data:
   kurrentdb-data:
   kurrentdb-logs:
+  typesense-data:
