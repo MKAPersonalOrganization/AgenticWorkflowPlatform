@@ -1,10 +1,11 @@
 package handlers_test
 
 import (
+	"testing"
+
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/services/chatwrite/agents/math"
 	"school-with-ai/services/chatwrite/agents/studentfacing"
-	"testing"
 )
 
 func TestInstructorConfigurations(t *testing.T) {
@@ -36,4 +37,16 @@ func (m *mockWhiteboardProjection) Get(threadID string) string {
 	}
 
 	return m.data[threadID]
+}
+
+func (m *mockWhiteboardProjection) GetAll() map[string]string {
+	if m.data == nil {
+		return make(map[string]string)
+	}
+
+	return m.data
+}
+
+func (m *mockWhiteboardProjection) Update(event any) error {
+	return nil
 }

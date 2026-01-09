@@ -59,11 +59,12 @@ tasks:
       - xdg-open .github/images/repo_statistics.png 2>/dev/null || open .github/images/repo_statistics.png 2>/dev/null || echo "Graph saved at .github/images/repo_statistics.png"
 
   ci:
-    desc: Run CI checks (format, lint, test, build)
+    desc: Run CI checks (format, lint, test, arch tests, build)
     cmds:
       - find . -name "*.go" -not -path "./.READ/*" -not -path "*/testdata/*" -not -path "./bin/*" -not -path "./components/*" -exec gofmt -w {} +
       - find . -name "*.go" -not -path "./.READ/*" -not -path "*/testdata/*" -not -path "./bin/*" -not -path "./components/*" -exec gofumpt -w {} +
       - golangci-lint run --fix ./...
       - go test -race -v ./...
+      - go test -v ./arch/...
       - go build -o bin/app ./main.go
       - rm -f bin/app

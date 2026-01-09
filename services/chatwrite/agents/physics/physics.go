@@ -1,6 +1,7 @@
 package physics
 
 import (
+	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/sdk/agentsdk/core/middleware"
 	sharedtools "school-with-ai/services/chatwrite/agents/shared/tools"
@@ -14,7 +15,7 @@ func domainTools() []core.Tool {
 }
 
 // CreatePhysicsInstructor creates the physics instructor agent configuration.
-func CreatePhysicsInstructor(notifier core.EventNotifier, whiteboardProjection interface{ Get(threadID string) string }) core.AgentConfig {
+func CreatePhysicsInstructor(notifier core.EventNotifier, whiteboardProjection domain.WhiteboardStore) core.AgentConfig {
 	registry := core.NewToolRegistry()
 
 	// Domain-specific tools

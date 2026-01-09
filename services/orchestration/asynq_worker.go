@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"time"
+
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/sdk/agentsdk/core/middleware"
 	"school-with-ai/services/chatwrite"
 	"school-with-ai/services/chatwrite/agents/shared"
-	"time"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 	"github.com/hibiken/asynq"
@@ -49,7 +50,7 @@ func NewProcessChatTask(payload ProcessChatPayload) (*asynq.Task, error) {
 type ChatWorker struct {
 	log                  core.EventStore
 	state                chatwrite.ThreadStore
-	whiteboardProjection interface{ Get(threadID string) string }
+	whiteboardProjection domain.WhiteboardStore
 	chatClient           chatwrite.ChatClient
 	chatWriteService     *chatwrite.ChatWriteService
 	eventBufferManager   *EventBufferManager
@@ -59,7 +60,7 @@ type ChatWorker struct {
 func NewChatWorker(
 	log core.EventStore,
 	state chatwrite.ThreadStore,
-	whiteboardProjection interface{ Get(threadID string) string },
+	whiteboardProjection domain.WhiteboardStore,
 	chatClient chatwrite.ChatClient,
 	chatWriteService *chatwrite.ChatWriteService,
 	eventBufferManager *EventBufferManager,

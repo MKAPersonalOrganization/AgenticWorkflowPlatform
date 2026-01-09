@@ -1,6 +1,7 @@
 package linearalgebra
 
 import (
+	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/services/chatwrite/agents/advancedmath/linearalgebra/tools"
 	sharedtools "school-with-ai/services/chatwrite/agents/shared/tools"
@@ -19,7 +20,7 @@ func domainTools() []core.Tool {
 
 // CreateLinearAlgebraProfessor creates the linear algebra professor agent.
 // Event contract is defined in contract.go.
-func CreateLinearAlgebraProfessor(notifier core.EventNotifier, whiteboardProjection interface{ Get(threadID string) string }) core.AgentConfig {
+func CreateLinearAlgebraProfessor(notifier core.EventNotifier, whiteboardProjection domain.WhiteboardStore) core.AgentConfig {
 	registry := core.NewToolRegistry()
 
 	// Domain-specific tools
