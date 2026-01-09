@@ -1,10 +1,9 @@
 package shared
 
 import (
-	"sync"
-
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
+	"sync"
 )
 
 // AgentFactory creates an agent configuration with a given notifier and whiteboard projection.

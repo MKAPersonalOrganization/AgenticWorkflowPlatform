@@ -789,7 +789,7 @@ document.addEventListener('alpine:init', () => {
                             title: thread.title,
                             created: thread.createdAt,
                             lastMessage: thread.updatedAt,
-                            whiteboardContent: thread.whiteboardContent || '',
+                            whiteboardContent: '', // Will be accumulated from AGUI events
                             currentInstructor: thread.currentInstructor || null
                         }));
 

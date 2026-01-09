@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
+
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/sdk/agentsdk/llm"
 	"school-with-ai/services"
 	"school-with-ai/services/chatwrite"
 	"school-with-ai/services/orchestration"
-	"time"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 	"github.com/hibiken/asynq"
@@ -419,12 +420,11 @@ func (h *AsynqHandler) GetThreads(w http.ResponseWriter, r *http.Request) {
 
 	threads := h.projectionService.GetAllThreads()
 
-	// Enrich threads with whiteboard content
+	// Convert threads to response format
 	response := make([]ThreadResponse, len(threads))
 	for i, thread := range threads {
 		response[i] = ThreadResponse{
-			Thread:            &thread,
-			WhiteboardContent: h.projectionService.GetWhiteboardContent(thread.ID),
+			Thread: &thread,
 		}
 	}
 
