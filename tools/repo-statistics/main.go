@@ -89,18 +89,20 @@ func main() {
 	// Calculate cumulative stats
 	totalAdded := 0
 	totalRemoved := 0
-	dataFile := "/tmp/repo_stats.dat"
 
-	f, err := os.Create(dataFile)
+	// Create secure temporary data file
+	f, err := os.CreateTemp("", "repo_stats_*.dat")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating data file: %v\n", err)
 		os.Exit(1)
 	}
+	dataFile := f.Name()
 	defer func() {
 		closeErr := f.Close()
 		if closeErr != nil {
 			fmt.Fprintf(os.Stderr, "Error closing data file: %v\n", closeErr)
 		}
+		_ = os.Remove(dataFile)
 	}()
 
 	for i, commit := range commits {
@@ -121,16 +123,45 @@ func main() {
 	startDate := commits[0].Date
 	endDate := commits[len(commits)-1].Date
 
+	// Create secure temporary files for gnuplot output
+	outputFile, err := os.CreateTemp("", "repo_graph_*.png")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error creating output file: %v\n", err)
+		os.Exit(1)
+	}
+	outputPath := outputFile.Name()
+	_ = outputFile.Close()
+	defer func() { _ = os.Remove(outputPath) }()
+
+	summaryFile, err := os.CreateTemp("", "repo_stats_summary_*.txt")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error creating summary file: %v\n", err)
+		os.Exit(1)
+	}
+	summaryPath := summaryFile.Name()
+	_ = summaryFile.Close()
+	defer func() { _ = os.Remove(summaryPath) }()
+
 	// Create gnuplot script
-	err = createGnuplotScript(len(commits), totalAdded, totalRemoved, startDate, endDate)
+	scriptPath, err := createGnuplotScript(len(commits), totalAdded, totalRemoved, startDate, endDate, dataFile, outputPath, summaryPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating gnuplot script: %v\n", err)
 		os.Exit(1)
 	}
+	defer func() { _ = os.Remove(scriptPath) }()
 
-	// Run gnuplot
+	// Validate gnuplot executable exists in PATH
+	gnuplotPath, err := exec.LookPath("gnuplot")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: gnuplot not found in PATH: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Run gnuplot with validated paths
+	// gnuplotPath is from LookPath (system executable)
+	// scriptPath is internally generated secure temp file
 	fmt.Println("Generating graph with gnuplot...")
-	cmd := exec.Command("gnuplot", "/tmp/repo_stats.gnuplot")
+	cmd := exec.Command(gnuplotPath, scriptPath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error running gnuplot: %v\n%s\n", err, output)
@@ -138,10 +169,10 @@ func main() {
 	}
 
 	fmt.Println(string(output))
-	fmt.Println("\n✓ Graph saved to /tmp/repo_graph.png")
+	fmt.Printf("\n✓ Graph saved to %s\n", outputPath)
 
 	// Try to open the image
-	openImage("/tmp/repo_graph.png")
+	openImage(outputPath)
 }
 
 func getGitStats() ([]Commit, error) {
@@ -214,9 +245,9 @@ func getGitStats() ([]Commit, error) {
 	return commits, nil
 }
 
-func createGnuplotScript(numCommits, totalAdded, totalRemoved int, startDate, endDate string) error {
+func createGnuplotScript(numCommits, totalAdded, totalRemoved int, startDate, endDate, dataFile, outputPath, summaryPath string) (string, error) {
 	script := fmt.Sprintf(`set terminal pngcairo size 1600,1000 enhanced font 'Arial,11'
-set output '/tmp/repo_graph.png'
+set output '%s'
 
 set multiplot layout 2,1 title "Git Repository Statistics" font ",18"
 
@@ -231,7 +262,7 @@ set style fill transparent solid 0.3
 set style line 1 lc rgb '#00AA00' lt 1 lw 2 pt 7 ps 0.5
 set style line 2 lc rgb '#DD0000' lt 1 lw 2 pt 7 ps 0.5
 
-plot '/tmp/repo_stats.dat' using 1:5 with filledcurves x1 lc rgb '#00AA00' notitle, \
+plot '%s' using 1:5 with filledcurves x1 lc rgb '#00AA00' notitle, \
      '' using 1:5 with linespoints ls 1 title 'Lines Added (Cumulative)', \
      '' using 1:6 with filledcurves x1 lc rgb '#DD0000' notitle, \
      '' using 1:6 with linespoints ls 2 title 'Lines Removed (Cumulative)'
@@ -248,13 +279,13 @@ set boxwidth 0.8
 set style line 3 lc rgb '#00AA00'
 set style line 4 lc rgb '#DD0000'
 
-plot '/tmp/repo_stats.dat' using 1:3 with boxes ls 3 title 'Lines Added', \
+plot '%s' using 1:3 with boxes ls 3 title 'Lines Added', \
      '' using 1:(-$4) with boxes ls 4 title 'Lines Removed'
 
 unset multiplot
 
 # Summary info
-set print "/tmp/repo_stats_summary.txt"
+set print "%s"
 print sprintf("Repository Statistics")
 print sprintf("=====================")
 print sprintf("Total Commits: %%d", %d)
@@ -262,10 +293,28 @@ print sprintf("Total Lines Added: %%d", %d)
 print sprintf("Total Lines Removed: %%d", %d)
 print sprintf("Net Change: %%d lines", %d)
 print sprintf("Period: %%s to %%s", "%s", "%s")
-`, numCommits, totalAdded, totalRemoved, totalAdded-totalRemoved, startDate, endDate)
+`, outputPath, dataFile, dataFile, summaryPath, numCommits, totalAdded, totalRemoved, totalAdded-totalRemoved, startDate, endDate)
 
-	// Write with secure permissions
-	return os.WriteFile("/tmp/repo_stats.gnuplot", []byte(script), 0o600)
+	// Create secure temporary script file
+	scriptFile, err := os.CreateTemp("", "repo_stats_*.gnuplot")
+	if err != nil {
+		return "", fmt.Errorf("failed to create script file: %w", err)
+	}
+	scriptPath := scriptFile.Name()
+
+	// Write script with secure permissions
+	if _, err := scriptFile.WriteString(script); err != nil {
+		_ = scriptFile.Close()
+		_ = os.Remove(scriptPath)
+		return "", fmt.Errorf("failed to write script: %w", err)
+	}
+
+	if err := scriptFile.Close(); err != nil {
+		_ = os.Remove(scriptPath)
+		return "", fmt.Errorf("failed to close script file: %w", err)
+	}
+
+	return scriptPath, nil
 }
 
 func openImage(path string) {
@@ -282,20 +331,16 @@ func openImage(path string) {
 
 	// Try different commands to open the image
 	// These are well-known, safe system commands for opening files
-	commands := [][]string{
-		{"xdg-open", absPath},
-		{"open", absPath},  // macOS
-		{"start", absPath}, // Windows
-		{"eog", absPath},   // GNOME
-		{"feh", absPath},   // Lightweight
-	}
+	// absPath has been validated to be absolute and to exist
+	commands := []string{"xdg-open", "open", "start", "eog", "feh"}
 
-	for _, cmd := range commands {
-		if _, err := exec.LookPath(cmd[0]); err == nil {
-			go func(c []string) {
-				// Intentionally launching system image viewer with validated path
-				_ = exec.Command(c[0], c[1:]...).Start()
-			}(cmd)
+	for _, cmdName := range commands {
+		if _, err := exec.LookPath(cmdName); err == nil {
+			// Launch system image viewer with validated absolute path
+			// cmdName is from our safe list, absPath is validated above
+			go func(name, path string) {
+				_ = exec.Command(name, path).Start()
+			}(cmdName, absPath)
 
 			return
 		}

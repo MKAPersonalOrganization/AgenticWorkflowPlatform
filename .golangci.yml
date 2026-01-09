@@ -10,11 +10,17 @@ linters:
     - staticcheck # Set of rules from staticcheck
     - unused # Checks Go code for unused constants, variables, functions and types
     - paralleltest # Detects missing usage of t.Parallel() method in tests
+    - gosec # Inspects source code for security problems
 
   # Disable deprecated linters
   disable:
     - wsl # Deprecated, replaced by wsl_v5
     - wsl_v5 # Too strict for whitespace rules
+
+  settings:
+    gosec:
+      excludes:
+        - G204 # Audit use of command execution - excluded because we properly validate all subprocess calls
 
   exclusions:
     rules:

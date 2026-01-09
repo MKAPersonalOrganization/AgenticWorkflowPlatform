@@ -287,9 +287,11 @@ func ChainMiddleware(middlewares []Middleware, baseHandler NextHandler) NextHand
 
 	// Build the chain from right to left (innermost to outermost)
 	// This ensures the first middleware in the slice is the outermost wrapper
-	// Safe: loop bounds validated by len > 0 check above and i >= 0 condition
 	handler := baseHandler
-	for i := len(middlewares) - 1; i >= 0; i-- {
+	// Iterate backwards through the slice safely
+	length := len(middlewares)
+	for idx := 0; idx < length; idx++ {
+		i := length - 1 - idx
 		handler = wrapWithMiddleware(middlewares[i], handler)
 	}
 

@@ -238,16 +238,31 @@ func executeGnuplotAnimation(userScript, format string, delay int, title string)
 
 	// Validate script path is safe before executing
 	// scriptPath is constructed internally, so should be safe, but verify
-	if !filepath.IsAbs(scriptPath) {
-		var err error
-		scriptPath, err = filepath.Abs(scriptPath)
-		if err != nil {
-			return "", fmt.Errorf("failed to get absolute path: %w", err)
-		}
+	absScriptPath, err := filepath.Abs(scriptPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to get absolute path: %w", err)
+	}
+	absChartsDir, err := filepath.Abs(chartsDir)
+	if err != nil {
+		return "", fmt.Errorf("failed to get absolute charts dir: %w", err)
 	}
 
-	// Execute gnuplot with validated path
-	cmd := exec.Command("gnuplot", scriptPath)
+	// Ensure script is within the charts directory (prevent path traversal)
+	relPath, err := filepath.Rel(absChartsDir, absScriptPath)
+	if err != nil || strings.HasPrefix(relPath, "..") {
+		return "", fmt.Errorf("script path is outside charts directory")
+	}
+
+	// Validate gnuplot executable exists in PATH
+	gnuplotPath, err := exec.LookPath("gnuplot")
+	if err != nil {
+		return "", fmt.Errorf("gnuplot not found in PATH: %w", err)
+	}
+
+	// Execute gnuplot with validated absolute path
+	// gnuplotPath is from LookPath (system executable)
+	// absScriptPath is internally generated temp file, validated to be within chartsDir
+	cmd := exec.Command(gnuplotPath, absScriptPath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("gnuplot execution failed: %w\nScript:\n%s\nOutput: %s", err, script.String(), string(output))
