@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
+
+	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/services/chatwrite"
-	"time"
 
 	"github.com/hibiken/asynq"
 )
@@ -42,7 +44,7 @@ func NewAsynqServer(
 	config AsynqConfig,
 	log core.EventStore,
 	state chatwrite.ThreadStore,
-	whiteboardProjection interface{ Get(threadID string) string },
+	whiteboardProjection domain.WhiteboardStore,
 	chatClient chatwrite.ChatClient,
 	chatWriteService *chatwrite.ChatWriteService,
 ) *AsynqServer {

@@ -1,13 +1,14 @@
 package optimization
 
 import (
+	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/services/chatwrite/agents/advancedmath/optimization/tools"
 	sharedtools "school-with-ai/services/chatwrite/agents/shared/tools"
 )
 
 // CreateOptimizationProfessor creates the optimization professor agent.
-func CreateOptimizationProfessor(notifier core.EventNotifier, whiteboardProjection interface{ Get(threadID string) string }) core.AgentConfig {
+func CreateOptimizationProfessor(notifier core.EventNotifier, whiteboardProjection domain.WhiteboardStore) core.AgentConfig {
 	registry := core.NewToolRegistry()
 
 	// Shared tools

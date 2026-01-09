@@ -1,6 +1,7 @@
 package studentfacing
 
 import (
+	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/sdk/agentsdk/core/middleware"
 )
@@ -12,7 +13,7 @@ func domainTools() []core.Tool {
 }
 
 // CreateStudentFacingAgent creates the student-facing agent configuration.
-func CreateStudentFacingAgent(notifier core.EventNotifier, whiteboardProjection interface{ Get(threadID string) string }) core.AgentConfig {
+func CreateStudentFacingAgent(notifier core.EventNotifier, whiteboardProjection domain.WhiteboardStore) core.AgentConfig {
 	registry := core.NewToolRegistry()
 
 	// Domain-specific tools (none for router agent)

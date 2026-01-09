@@ -1,12 +1,14 @@
 package shared
 
 import (
-	"school-with-ai/sdk/agentsdk/core"
 	"sync"
+
+	"school-with-ai/domain"
+	"school-with-ai/sdk/agentsdk/core"
 )
 
 // AgentFactory creates an agent configuration with a given notifier and whiteboard projection.
-type AgentFactory func(notifier core.EventNotifier, whiteboardProjection interface{ Get(threadID string) string }) core.AgentConfig
+type AgentFactory func(notifier core.EventNotifier, whiteboardProjection domain.WhiteboardStore) core.AgentConfig
 
 // GlobalAgents is the global agent registry.
 var GlobalAgents = NewAgentRegistry()
