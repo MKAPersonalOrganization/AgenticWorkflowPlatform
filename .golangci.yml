@@ -11,6 +11,7 @@ linters:
     - unused # Checks Go code for unused constants, variables, functions and types
     - paralleltest # Detects missing usage of t.Parallel() method in tests
     - gosec # Inspects source code for security problems
+    - bodyclose # Checks whether HTTP response body is closed successfully
 
   # Disable deprecated linters
   disable:
