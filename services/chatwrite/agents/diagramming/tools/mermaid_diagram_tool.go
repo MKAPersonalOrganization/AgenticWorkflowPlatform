@@ -187,10 +187,10 @@ func executeMermaidDiagram(mermaidCode, title, outputType string) (string, error
 // Allows: alphanumeric, underscore, hyphen, dot.
 func isSafeFilename(filename string) bool {
 	for _, char := range filename {
-		if !((char >= 'a' && char <= 'z') ||
-			(char >= 'A' && char <= 'Z') ||
-			(char >= '0' && char <= '9') ||
-			char == '_' || char == '-' || char == '.') {
+		if (char < 'a' || char > 'z') &&
+			(char < 'A' || char > 'Z') &&
+			(char < '0' || char > '9') &&
+			char != '_' && char != '-' && char != '.' {
 			return false
 		}
 	}
