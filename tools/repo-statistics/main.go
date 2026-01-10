@@ -123,15 +123,15 @@ func main() {
 	startDate := commits[0].Date
 	endDate := commits[len(commits)-1].Date
 
-	// Create secure temporary files for gnuplot output
-	outputFile, err := os.CreateTemp("", "repo_graph_*.png")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating output file: %v\n", err)
+	// Create output directory
+	outputDir := ".github/images"
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+		fmt.Fprintf(os.Stderr, "Error creating output directory: %v\n", err)
 		os.Exit(1)
 	}
-	outputPath := outputFile.Name()
-	_ = outputFile.Close()
-	defer func() { _ = os.Remove(outputPath) }()
+
+	// Output to a fixed path that can be referenced in README
+	outputPath := filepath.Join(outputDir, "repo_statistics.png")
 
 	summaryFile, err := os.CreateTemp("", "repo_stats_summary_*.txt")
 	if err != nil {
