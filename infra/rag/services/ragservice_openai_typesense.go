@@ -3,9 +3,9 @@ package services
 import (
 	"context"
 	"fmt"
+	"school-with-ai/domain"
 	"school-with-ai/infra/rag/embeddingproviders"
 	"school-with-ai/infra/rag/embeddingstore"
-	"school-with-ai/services/chatwrite/rag"
 
 	"github.com/rs/zerolog/log"
 )
@@ -18,7 +18,7 @@ type OpenAITypesenseRAG struct {
 }
 
 // Verify OpenAITypesenseRAG implements RAG interface at compile time
-var _ rag.RAG = (*OpenAITypesenseRAG)(nil)
+var _ domain.RAG = (*OpenAITypesenseRAG)(nil)
 
 // OpenAITypesenseConfig holds configuration for the OpenAI + Typesense RAG implementation
 type OpenAITypesenseConfig struct {
@@ -68,7 +68,7 @@ func NewOpenAITypesenseRAG(cfg *OpenAITypesenseConfig) (*OpenAITypesenseRAG, err
 
 // Index adds or updates embeddings for the given chunks
 // This method generates embeddings using OpenAI and stores them in Typesense
-func (r *OpenAITypesenseRAG) Index(ctx context.Context, chunks ...*rag.SessionRAGIndexChunk) error {
+func (r *OpenAITypesenseRAG) Index(ctx context.Context, chunks ...*domain.SessionRAGIndexChunk) error {
 	if len(chunks) == 0 {
 		return fmt.Errorf("no chunks provided for indexing")
 	}
@@ -114,7 +114,7 @@ func (r *OpenAITypesenseRAG) Index(ctx context.Context, chunks ...*rag.SessionRA
 
 // Query searches for similar chunks based on the query text
 // This method generates an embedding for the query using OpenAI and searches in Typesense
-func (r *OpenAITypesenseRAG) Query(ctx context.Context, q *rag.SessionRAGQuery) ([]*rag.SessionRAGResult, error) {
+func (r *OpenAITypesenseRAG) Query(ctx context.Context, q *domain.SessionRAGQuery) ([]*domain.SessionRAGResult, error) {
 	if q == nil {
 		return nil, fmt.Errorf("query is required")
 	}
@@ -156,7 +156,7 @@ func (r *OpenAITypesenseRAG) Query(ctx context.Context, q *rag.SessionRAGQuery) 
 }
 
 // Delete removes indexed chunks from Typesense
-func (r *OpenAITypesenseRAG) Delete(ctx context.Context, req *rag.DeleteIndexRequest) error {
+func (r *OpenAITypesenseRAG) Delete(ctx context.Context, req *domain.DeleteIndexRequest) error {
 	if req == nil {
 		return fmt.Errorf("delete request is required")
 	}
@@ -181,7 +181,7 @@ func (r *OpenAITypesenseRAG) Delete(ctx context.Context, req *rag.DeleteIndexReq
 
 // GetEmbeddingDimensions returns the dimensionality of the embeddings used
 func (r *OpenAITypesenseRAG) GetEmbeddingDimensions() int {
-	return rag.GetDimensions(r.embeddings.GetModel())
+	return domain.GetEmbeddingDimensions(r.embeddings.GetModel())
 }
 
 // GetEmbeddingModel returns the OpenAI model being used for embeddings

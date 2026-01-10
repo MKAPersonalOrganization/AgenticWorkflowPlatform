@@ -2,7 +2,6 @@ package orchestration
 
 import (
 	"fmt"
-
 	"school-with-ai/sdk/agentsdk/core"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"

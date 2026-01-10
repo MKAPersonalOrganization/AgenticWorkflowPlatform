@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-
 	"school-with-ai/infra/projection/whiteboard"
 	"school-with-ai/services"
 )

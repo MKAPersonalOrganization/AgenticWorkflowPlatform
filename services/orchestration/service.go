@@ -4,13 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"time"
-
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/sdk/agentsdk/core/middleware"
 	"school-with-ai/services/chatwrite"
 	"school-with-ai/services/chatwrite/agents/shared"
+	"time"
 )
 
 // Service provides transport-agnostic message orchestration.
@@ -119,7 +118,7 @@ func (s *Service) HandleUserMessage(
 	}
 
 	// 5. Run agent handoff chain starting with student-facing agent
-	emitter.Emit(&domain.RunStartedEvent{
+	_ = emitter.Emit(&domain.RunStartedEvent{
 		ThreadID:  params.ThreadID,
 		RunID:     runID,
 		Timestamp: time.Now(),
@@ -127,7 +126,7 @@ func (s *Service) HandleUserMessage(
 
 	s.runAgentHandoffChain(ctx, params.ThreadID, "student-facing-agent", emitter, runID)
 
-	emitter.Emit(&domain.RunFinishedEvent{
+	_ = emitter.Emit(&domain.RunFinishedEvent{
 		ThreadID:  params.ThreadID,
 		RunID:     runID,
 		Timestamp: time.Now(),
@@ -147,7 +146,7 @@ func (s *Service) runAgentHandoffChain(ctx context.Context, threadID, startAgent
 
 		nextAgent, err := s.runAgent(ctx, threadID, currentAgent, emitter)
 		if err != nil {
-			emitter.Emit(&domain.RunErrorEvent{
+			_ = emitter.Emit(&domain.RunErrorEvent{
 				ThreadID:  threadID,
 				Message:   fmt.Sprintf("Agent %s failed: %v", currentAgent, err),
 				ErrorCode: "AGENT_RUN_ERROR",

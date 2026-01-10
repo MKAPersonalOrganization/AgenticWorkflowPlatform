@@ -3,7 +3,7 @@ package embeddingproviders
 import (
 	"context"
 	"fmt"
-	"school-with-ai/services/chatwrite/rag"
+	"school-with-ai/domain"
 
 	"github.com/pgvector/pgvector-go"
 	"github.com/rs/zerolog"
@@ -18,7 +18,7 @@ type OpenAIEmbeddingProvider struct {
 }
 
 // Verify OpenAIEmbeddingProvider implements EmbeddingProvider interface at compile time
-var _ rag.EmbeddingProvider = (*OpenAIEmbeddingProvider)(nil)
+var _ domain.EmbeddingProvider = (*OpenAIEmbeddingProvider)(nil)
 
 // OpenAIEmbeddingConfig holds configuration for the OpenAI embedding provider
 type OpenAIEmbeddingConfig struct {
