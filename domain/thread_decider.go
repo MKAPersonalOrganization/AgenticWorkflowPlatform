@@ -2,9 +2,8 @@ package domain
 
 import (
 	"errors"
-	"time"
-
 	"school-with-ai/sdk/agentsdk/core"
+	"time"
 )
 
 // ThreadDecider implements the business logic for Thread aggregate.
