@@ -1,6 +1,8 @@
 package orchestration
 
 import (
+	"school-with-ai/domain"
+
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
 
@@ -24,22 +26,22 @@ func NewAguiEventEmitter(emitter EventEmitter) *AguiEventEmitter {
 func (a *AguiEventEmitter) Emit(event any) error {
 	// Convert domain events to AGUI events
 	switch evt := event.(type) {
-	case *RunStartedEvent:
+	case *domain.RunStartedEvent:
 		aguiEvent := aguievents.NewRunStartedEvent(evt.ThreadID, evt.RunID)
 		return a.underlying.Emit(aguiEvent)
 
-	case *RunFinishedEvent:
+	case *domain.RunFinishedEvent:
 		aguiEvent := aguievents.NewRunFinishedEvent(evt.ThreadID, evt.RunID)
 		return a.underlying.Emit(aguiEvent)
 
-	case *RunErrorEvent:
+	case *domain.RunErrorEvent:
 		aguiEvent := aguievents.NewRunErrorEvent(
 			evt.Message,
 			aguievents.WithErrorCode(evt.ErrorCode),
 		)
 		return a.underlying.Emit(aguiEvent)
 
-	case *ThreadTitleUpdatedEvent:
+	case *domain.ThreadTitleUpdatedEvent:
 		aguiEvent := aguievents.NewCustomEvent(
 			"THREAD_TITLE_UPDATED",
 			aguievents.WithValue(map[string]string{

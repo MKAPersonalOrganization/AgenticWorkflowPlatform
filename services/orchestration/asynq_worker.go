@@ -98,12 +98,12 @@ func (w *ChatWorker) processChat(ctx context.Context, payload ProcessChatPayload
 	aguiEmitter := NewAguiEventEmitter(emitter)
 
 	// Delegate to orchestration service
-	params := ProcessMessageParams{
+	params := UserMessageParams{
 		ThreadID:  payload.ThreadID,
 		MessageID: payload.MessageID,
 		Content:   payload.Message,
 		UserID:    payload.UserID,
 	}
 
-	return w.orchestrationService.ProcessMessage(ctx, params, aguiEmitter)
+	return w.orchestrationService.HandleUserMessage(ctx, params, aguiEmitter)
 }
