@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"school-with-ai/domain"
+
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
 
@@ -82,9 +84,9 @@ func TestEventEmitterInterface(t *testing.T) {
 	}
 }
 
-// TestProcessMessageParamsValidation verifies that ProcessMessageParams is created correctly.
-func TestProcessMessageParamsValidation(t *testing.T) {
-	params := ProcessMessageParams{
+// TestUserMessageParamsValidation verifies that UserMessageParams is created correctly.
+func TestUserMessageParamsValidation(t *testing.T) {
+	params := UserMessageParams{
 		ThreadID:  "thread-123",
 		MessageID: "msg-456",
 		Content:   "Hello, world!",
@@ -100,8 +102,8 @@ func TestProcessMessageParamsValidation(t *testing.T) {
 	}
 }
 
-// TestProcessMessageCancellation verifies that ProcessMessage respects context cancellation.
-func TestProcessMessageCancellation(t *testing.T) {
+// TestHandleUserMessageCancellation verifies that HandleUserMessage respects context cancellation.
+func TestHandleUserMessageCancellation(t *testing.T) {
 	service := NewService(nil, nil, nil, nil, nil)
 	emitter := &mockEventEmitter{}
 
@@ -109,7 +111,7 @@ func TestProcessMessageCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
 
-	params := ProcessMessageParams{
+	params := UserMessageParams{
 		ThreadID:  "thread-123",
 		MessageID: "msg-456",
 		Content:   "test",
@@ -117,7 +119,7 @@ func TestProcessMessageCancellation(t *testing.T) {
 	}
 
 	// Should return error due to cancelled context
-	err := service.ProcessMessage(ctx, params, emitter)
+	err := service.HandleUserMessage(ctx, params, emitter)
 	if err == nil {
 		t.Error("Expected error for cancelled context, got nil")
 	}
@@ -133,7 +135,7 @@ func TestAguiEventAdapter(t *testing.T) {
 	aguiAdapter := NewAguiEventEmitter(mockEmitter)
 
 	// Test RunStartedEvent conversion
-	domainEvent := &RunStartedEvent{
+	domainEvent := &domain.RunStartedEvent{
 		ThreadID: "thread-123",
 		RunID:    "run-456",
 	}
@@ -155,7 +157,7 @@ func TestAguiEventAdapter(t *testing.T) {
 
 	// Test RunFinishedEvent conversion
 	mockEmitter.events = nil // Reset
-	finishedEvent := &RunFinishedEvent{
+	finishedEvent := &domain.RunFinishedEvent{
 		ThreadID: "thread-123",
 		RunID:    "run-456",
 	}
@@ -171,7 +173,7 @@ func TestAguiEventAdapter(t *testing.T) {
 
 	// Test RunErrorEvent conversion
 	mockEmitter.events = nil // Reset
-	errorEvent := &RunErrorEvent{
+	errorEvent := &domain.RunErrorEvent{
 		Message:   "Test error",
 		ErrorCode: "TEST_ERROR",
 	}
@@ -186,7 +188,7 @@ func TestAguiEventAdapter(t *testing.T) {
 
 	// Test ThreadTitleUpdatedEvent conversion
 	mockEmitter.events = nil // Reset
-	titleEvent := &ThreadTitleUpdatedEvent{
+	titleEvent := &domain.ThreadTitleUpdatedEvent{
 		ThreadID: "thread-123",
 		Title:    "New Title",
 	}
