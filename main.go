@@ -7,6 +7,8 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"time"
+
 	"school-with-ai/components"
 	"school-with-ai/handlers"
 	"school-with-ai/infra/auth"
@@ -26,7 +28,6 @@ import (
 	"school-with-ai/services/chatwrite/agents/statistics"
 	"school-with-ai/services/chatwrite/agents/studentfacing"
 	"school-with-ai/services/orchestration"
-	"time"
 
 	authService "school-with-ai/services/auth"
 
@@ -193,7 +194,6 @@ func main() {
 
 	// A2A REST API routes (spec-compliant)
 	r.Post("/v1/message:send", authMiddleware.RequireAuthFunc(handler.SendMessage))
-	r.Get("/v1/tasks/{id}", authMiddleware.RequireAuthFunc(handler.GetJobStatus))
 	r.Get("/v1/tasks/{id}:subscribe", authMiddleware.RequireAuthFunc(handler.StreamJobEvents))
 	r.Post("/v1/tasks/{id}:cancel", authMiddleware.RequireAuthFunc(handler.CancelJob))
 
@@ -201,8 +201,6 @@ func main() {
 	r.Get("/api/agui/threads", authMiddleware.RequireAuthFunc(aguiHandler.ListThreads))
 	r.Get("/api/agui/threads/{threadId}", authMiddleware.RequireAuthFunc(aguiHandler.GetThreadState))
 	r.Get("/api/agui/threads/{threadId}/messages", authMiddleware.RequireAuthFunc(aguiHandler.GetMessages))
-	r.Get("/api/agui/threads/{threadId}/tool-calls", authMiddleware.RequireAuthFunc(aguiHandler.GetToolCalls))
-	r.Get("/api/agui/threads/{threadId}/agent-activity", authMiddleware.RequireAuthFunc(aguiHandler.GetAgentActivity))
 	r.Get("/api/agui/threads/{threadId}/active-run", authMiddleware.RequireAuthFunc(aguiHandler.GetActiveRun))
 	r.Delete("/api/agui/threads/{threadId}", authMiddleware.RequireAuthFunc(handler.DeleteThread))
 
