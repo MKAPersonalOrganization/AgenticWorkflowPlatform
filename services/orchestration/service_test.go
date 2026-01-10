@@ -1,0 +1,202 @@
+package orchestration
+
+import (
+	"context"
+	"testing"
+
+	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
+)
+
+// mockEventEmitter implements EventEmitter for testing
+type mockEventEmitter struct {
+	events []any
+}
+
+func (m *mockEventEmitter) Emit(event any) error {
+	m.events = append(m.events, event)
+	return nil
+}
+
+func (m *mockEventEmitter) GetEvents() []any {
+	return m.events
+}
+
+func (m *mockEventEmitter) GetEventTypes() []string {
+	var types []string
+	for _, event := range m.events {
+		switch e := event.(type) {
+		case *aguievents.RunStartedEvent:
+			types = append(types, "RUN_STARTED")
+		case *aguievents.RunFinishedEvent:
+			types = append(types, "RUN_FINISHED")
+		case *aguievents.CustomEvent:
+			types = append(types, "CUSTOM:"+e.Name)
+		default:
+			types = append(types, "UNKNOWN")
+		}
+	}
+	return types
+}
+
+// TestServiceCreation verifies that the orchestration service can be created.
+func TestServiceCreation(t *testing.T) {
+	// This test ensures the Service struct can be instantiated
+	service := NewService(
+		nil, // chatWriteService
+		nil, // threadStore
+		nil, // whiteboardProjection
+		nil, // eventLog
+		nil, // chatClient
+	)
+
+	if service == nil {
+		t.Fatal("NewService() returned nil")
+	}
+
+	if service.chatWriteService != nil {
+		t.Error("Expected nil chatWriteService")
+	}
+}
+
+// TestEventEmitterInterface verifies the EventEmitter interface works correctly.
+func TestEventEmitterInterface(t *testing.T) {
+	emitter := &mockEventEmitter{}
+
+	// Test emitting a RUN_STARTED event
+	runStartedEvent := aguievents.NewRunStartedEvent("thread-123", "run-456")
+	err := emitter.Emit(runStartedEvent)
+	if err != nil {
+		t.Fatalf("Failed to emit event: %v", err)
+	}
+
+	// Verify event was captured
+	events := emitter.GetEvents()
+	if len(events) != 1 {
+		t.Fatalf("Expected 1 event, got %d", len(events))
+	}
+
+	// Verify event type
+	types := emitter.GetEventTypes()
+	if len(types) != 1 || types[0] != "RUN_STARTED" {
+		t.Errorf("Expected event type RUN_STARTED, got %v", types)
+	}
+}
+
+// TestProcessMessageParamsValidation verifies that ProcessMessageParams is created correctly.
+func TestProcessMessageParamsValidation(t *testing.T) {
+	params := ProcessMessageParams{
+		ThreadID:  "thread-123",
+		MessageID: "msg-456",
+		Content:   "Hello, world!",
+		UserID:    "user-789",
+	}
+
+	if params.ThreadID != "thread-123" {
+		t.Errorf("Expected ThreadID 'thread-123', got '%s'", params.ThreadID)
+	}
+
+	if params.Content != "Hello, world!" {
+		t.Errorf("Expected Content 'Hello, world!', got '%s'", params.Content)
+	}
+}
+
+// TestProcessMessageCancellation verifies that ProcessMessage respects context cancellation.
+func TestProcessMessageCancellation(t *testing.T) {
+	service := NewService(nil, nil, nil, nil, nil)
+	emitter := &mockEventEmitter{}
+
+	// Create cancelled context
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	params := ProcessMessageParams{
+		ThreadID:  "thread-123",
+		MessageID: "msg-456",
+		Content:   "test",
+		UserID:    "user-789",
+	}
+
+	// Should return error due to cancelled context
+	err := service.ProcessMessage(ctx, params, emitter)
+	if err == nil {
+		t.Error("Expected error for cancelled context, got nil")
+	}
+
+	if ctx.Err() == nil {
+		t.Error("Context should be cancelled")
+	}
+}
+
+// TestAguiEventAdapter verifies that the AGUI adapter converts domain events to AGUI events.
+func TestAguiEventAdapter(t *testing.T) {
+	mockEmitter := &mockEventEmitter{}
+	aguiAdapter := NewAguiEventEmitter(mockEmitter)
+
+	// Test RunStartedEvent conversion
+	domainEvent := &RunStartedEvent{
+		ThreadID: "thread-123",
+		RunID:    "run-456",
+	}
+	err := aguiAdapter.Emit(domainEvent)
+	if err != nil {
+		t.Fatalf("Failed to emit domain event: %v", err)
+	}
+
+	// Verify AGUI event was emitted
+	events := mockEmitter.GetEvents()
+	if len(events) != 1 {
+		t.Fatalf("Expected 1 event, got %d", len(events))
+	}
+
+	types := mockEmitter.GetEventTypes()
+	if len(types) != 1 || types[0] != "RUN_STARTED" {
+		t.Errorf("Expected AGUI RUN_STARTED event, got %v", types)
+	}
+
+	// Test RunFinishedEvent conversion
+	mockEmitter.events = nil // Reset
+	finishedEvent := &RunFinishedEvent{
+		ThreadID: "thread-123",
+		RunID:    "run-456",
+	}
+	err = aguiAdapter.Emit(finishedEvent)
+	if err != nil {
+		t.Fatalf("Failed to emit finished event: %v", err)
+	}
+
+	types = mockEmitter.GetEventTypes()
+	if len(types) != 1 || types[0] != "RUN_FINISHED" {
+		t.Errorf("Expected AGUI RUN_FINISHED event, got %v", types)
+	}
+
+	// Test RunErrorEvent conversion
+	mockEmitter.events = nil // Reset
+	errorEvent := &RunErrorEvent{
+		Message:   "Test error",
+		ErrorCode: "TEST_ERROR",
+	}
+	err = aguiAdapter.Emit(errorEvent)
+	if err != nil {
+		t.Fatalf("Failed to emit error event: %v", err)
+	}
+
+	if len(mockEmitter.events) != 1 {
+		t.Errorf("Expected 1 error event, got %d", len(mockEmitter.events))
+	}
+
+	// Test ThreadTitleUpdatedEvent conversion
+	mockEmitter.events = nil // Reset
+	titleEvent := &ThreadTitleUpdatedEvent{
+		ThreadID: "thread-123",
+		Title:    "New Title",
+	}
+	err = aguiAdapter.Emit(titleEvent)
+	if err != nil {
+		t.Fatalf("Failed to emit title event: %v", err)
+	}
+
+	types = mockEmitter.GetEventTypes()
+	if len(types) != 1 || types[0] != "CUSTOM:THREAD_TITLE_UPDATED" {
+		t.Errorf("Expected CUSTOM:THREAD_TITLE_UPDATED event, got %v", types)
+	}
+}
