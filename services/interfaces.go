@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+
 	"school-with-ai/domain"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
@@ -27,4 +28,17 @@ type ProjectionService interface {
 	GetAllThreads() []domain.Thread
 	// GetThreadMessages retrieves AGUI-formatted messages for a thread
 	GetThreadMessages(threadID string) []aguievents.Message
+	// ListThreadSummaries retrieves all threads with summaries, sorted by most recent
+	ListThreadSummaries() []ThreadSummary
+}
+
+// ThreadSummary represents a summary of a thread for list views.
+type ThreadSummary struct {
+	ID                string               `json:"id"`
+	Title             string               `json:"title"`
+	Messages          []aguievents.Message `json:"messages"`
+	CreatedAt         string               `json:"createdAt"`
+	UpdatedAt         string               `json:"updatedAt"`
+	WhiteboardContent string               `json:"whiteboardContent"`
+	CurrentInstructor string               `json:"currentInstructor,omitempty"`
 }

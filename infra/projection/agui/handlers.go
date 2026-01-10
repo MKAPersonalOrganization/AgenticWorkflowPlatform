@@ -4,36 +4,29 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"sort"
-	"time"
 
 	"school-with-ai/infra/projection/whiteboard"
-
-	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
+	"school-with-ai/services"
 )
-
-// ThreadSummary represents a summary of a thread for list views.
-type ThreadSummary struct {
-	ID                string               `json:"id"`
-	Title             string               `json:"title"`
-	Messages          []aguievents.Message `json:"messages"`
-	CreatedAt         time.Time            `json:"createdAt"`
-	UpdatedAt         time.Time            `json:"updatedAt"`
-	WhiteboardContent string               `json:"whiteboardContent"`
-	CurrentInstructor string               `json:"currentInstructor,omitempty"`
-}
 
 // AguiProjectionHandler provides HTTP endpoints for querying the AGUI projection.
 type AguiProjectionHandler struct {
-	projection      AguiProjection
-	whiteboardStore whiteboard.WhiteboardStore
+	projection        AguiProjection
+	whiteboardStore   whiteboard.WhiteboardStore
+	projectionService ProjectionService
+}
+
+// ProjectionService provides business logic for projections.
+type ProjectionService interface {
+	ListThreadSummaries() []services.ThreadSummary
 }
 
 // NewAguiProjectionHandler creates a new handler for AGUI projection queries.
-func NewAguiProjectionHandler(projection AguiProjection, whiteboardStore whiteboard.WhiteboardStore) *AguiProjectionHandler {
+func NewAguiProjectionHandler(projection AguiProjection, whiteboardStore whiteboard.WhiteboardStore, projectionService ProjectionService) *AguiProjectionHandler {
 	return &AguiProjectionHandler{
-		projection:      projection,
-		whiteboardStore: whiteboardStore,
+		projection:        projection,
+		whiteboardStore:   whiteboardStore,
+		projectionService: projectionService,
 	}
 }
 
@@ -85,49 +78,10 @@ func (h *AguiProjectionHandler) GetMessages(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-// ListThreads returns all thread IDs in the projection.
+// ListThreads returns all thread summaries, sorted by most recent.
 // GET /api/agui/threads.
 func (h *AguiProjectionHandler) ListThreads(w http.ResponseWriter, r *http.Request) {
-	threadIDs := h.projection.ListThreads()
-
-	threads := make([]ThreadSummary, 0, len(threadIDs))
-	for _, threadID := range threadIDs {
-		state, exists := h.projection.GetThreadState(threadID)
-		if !exists {
-			continue
-		}
-
-		// Get whiteboard content
-		whiteboardContent := h.whiteboardStore.Get(threadID)
-
-		// Determine current instructor from agent activity
-		var currentInstructor string
-		if len(state.AgentActivity) > 0 {
-			// Get the most recently active agent
-			var latestTime time.Time
-			for agentName, activity := range state.AgentActivity {
-				if activity.LastActiveAt.After(latestTime) {
-					latestTime = activity.LastActiveAt
-					currentInstructor = agentName
-				}
-			}
-		}
-
-		threads = append(threads, ThreadSummary{
-			ID:                threadID,
-			Title:             state.Title,
-			Messages:          state.Messages,
-			CreatedAt:         state.CreatedAt,
-			UpdatedAt:         state.UpdatedAt,
-			WhiteboardContent: whiteboardContent,
-			CurrentInstructor: currentInstructor,
-		})
-	}
-
-	// Sort threads by UpdatedAt descending (most recent first)
-	sort.Slice(threads, func(i, j int) bool {
-		return threads[i].UpdatedAt.After(threads[j].UpdatedAt)
-	})
+	threads := h.projectionService.ListThreadSummaries()
 
 	w.Header().Set("Content-Type", "application/json")
 	err := json.NewEncoder(w).Encode(threads)

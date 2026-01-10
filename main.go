@@ -146,7 +146,7 @@ func main() {
 	r.Handle("/assets/charts/*", http.StripPrefix("/assets/charts/", http.FileServer(http.Dir("./assets/charts"))))
 
 	// Create AGUI projection handler
-	aguiHandler := agui.NewAguiProjectionHandler(aguiProjection, whiteboardProjection)
+	aguiHandler := agui.NewAguiProjectionHandler(aguiProjection, whiteboardProjection, projectionService)
 
 	// Initialize Kratos client and auth handlers
 	kratosClient := auth.NewKratosClient()
