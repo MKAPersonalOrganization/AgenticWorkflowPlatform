@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"school-with-ai/sdk/agentsdk/core"
 	"testing"
 	"time"
 )
@@ -9,20 +8,14 @@ import (
 // TestThreadDeciderCreateThread verifies the create thread command.
 func TestThreadDeciderCreateThread(t *testing.T) {
 	t.Parallel()
-	decider := NewThreadDecider()
-	thread := NewThreadAggregate("thread-1")
 
-	cmd := CreateThread{
-		ThreadID: "thread-1",
-		UserID:   "user-1",
-		Title:    "My First Thread",
-	}
-
-	events, err := decider.Decide(cmd, thread)
+	// Using the new pattern - create thread directly
+	thread, err := OpenThread("thread-1", "user-1", "My First Thread")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
+	events := thread.DequeueUncommittedEvents()
 	if len(events) != 1 {
 		t.Fatalf("expected 1 event, got %d", len(events))
 	}
@@ -48,44 +41,39 @@ func TestThreadDeciderCreateThread(t *testing.T) {
 // TestThreadDeciderCreateThreadValidation verifies validation rules.
 func TestThreadDeciderCreateThreadValidation(t *testing.T) {
 	t.Parallel()
-	decider := NewThreadDecider()
-	thread := NewThreadAggregate("")
 
 	tests := []struct {
-		name    string
-		cmd     CreateThread
-		wantErr bool
+		name     string
+		threadID string
+		userID   string
+		title    string
+		wantErr  bool
 	}{
 		{
-			name: "missing thread ID",
-			cmd: CreateThread{
-				ThreadID: "",
-				UserID:   "user-1",
-			},
-			wantErr: true,
+			name:     "missing thread ID",
+			threadID: "",
+			userID:   "user-1",
+			wantErr:  true,
 		},
 		{
-			name: "missing user ID",
-			cmd: CreateThread{
-				ThreadID: "thread-1",
-				UserID:   "",
-			},
-			wantErr: true,
+			name:     "missing user ID",
+			threadID: "thread-1",
+			userID:   "",
+			wantErr:  true,
 		},
 		{
-			name: "valid command",
-			cmd: CreateThread{
-				ThreadID: "thread-1",
-				UserID:   "user-1",
-			},
-			wantErr: false,
+			name:     "valid command",
+			threadID: "thread-1",
+			userID:   "user-1",
+			title:    "Test",
+			wantErr:  false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			_, err := decider.Decide(tt.cmd, thread)
+			_, err := OpenThread(tt.threadID, tt.userID, tt.title)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("expected error=%v, got error=%v", tt.wantErr, err)
 			}
@@ -96,35 +84,18 @@ func TestThreadDeciderCreateThreadValidation(t *testing.T) {
 // TestThreadDeciderAddMessage verifies adding messages.
 func TestThreadDeciderAddMessage(t *testing.T) {
 	t.Parallel()
-	decider := NewThreadDecider()
 
-	// Create thread first
-	thread := NewThreadAggregate("thread-1")
-	createCmd := CreateThread{
-		ThreadID: "thread-1",
-		UserID:   "user-1",
-		Title:    "Test",
-	}
-
-	events, _ := decider.Decide(createCmd, thread)
-	for _, e := range events {
-		thread.Evolve(e)
-		thread.IncrementVersion()
-	}
+	// Create thread first using the new pattern
+	thread, _ := OpenThread("thread-1", "user-1", "Test")
+	thread.DequeueUncommittedEvents() // Clear creation event
 
 	// Now add a message
-	addCmd := AddMessage{
-		ThreadID:  "thread-1",
-		MessageID: "msg-1",
-		Role:      "user",
-		Content:   "Hello!",
-	}
-
-	events, err := decider.Decide(addCmd, thread)
+	err := thread.AddMessage("msg-1", "user", "Hello!", nil, "", "", nil)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
+	events := thread.DequeueUncommittedEvents()
 	if len(events) != 1 {
 		t.Fatalf("expected 1 event, got %d", len(events))
 	}
@@ -155,7 +126,7 @@ func TestThreadAggregateEvolve(t *testing.T) {
 		Title:     "Test Thread",
 		Timestamp: time.Now(),
 	}
-	thread.Evolve(created)
+	thread.Apply(created)
 
 	if thread.ID != "thread-1" {
 		t.Errorf("expected ID 'thread-1', got '%s'", thread.ID)
@@ -177,7 +148,7 @@ func TestThreadAggregateEvolve(t *testing.T) {
 		Content:   "Hello!",
 		Timestamp: time.Now(),
 	}
-	thread.Evolve(msgAdded)
+	thread.Apply(msgAdded)
 
 	if len(thread.Messages) != 1 {
 		t.Fatalf("expected 1 message, got %d", len(thread.Messages))
@@ -195,52 +166,36 @@ func TestThreadAggregateEvolve(t *testing.T) {
 // TestThreadAggregateValidation verifies business rule validation.
 func TestThreadAggregateValidation(t *testing.T) {
 	t.Parallel()
-	thread := NewThreadAggregate("thread-1")
 
 	// Create and delete thread
-	thread.Evolve(&ThreadCreated{
-		ThreadID:  "thread-1",
-		UserID:    "user-1",
-		Timestamp: time.Now(),
-	})
+	thread, _ := OpenThread("thread-1", "user-1", "Test")
+	thread.DequeueUncommittedEvents()
 
-	thread.Evolve(&ThreadDeleted{
-		ThreadID:  "thread-1",
-		Timestamp: time.Now(),
-	})
+	thread.Delete()
+	thread.DequeueUncommittedEvents()
 
-	// Validation should fail for deleted thread
-	err := thread.Validate()
+	// Try to add message to deleted thread - should fail
+	err := thread.AddMessage("msg-1", "user", "Hello!", nil, "", "", nil)
 	if err == nil {
-		t.Error("expected validation error for deleted thread")
+		t.Error("expected error when adding message to deleted thread")
 	}
 }
 
 // TestThreadTitleChange verifies title changes.
 func TestThreadTitleChange(t *testing.T) {
 	t.Parallel()
-	decider := NewThreadDecider()
-	thread := NewThreadAggregate("thread-1")
 
 	// Create thread
-	thread.Evolve(&ThreadCreated{
-		ThreadID:  "thread-1",
-		UserID:    "user-1",
-		Title:     "Original Title",
-		Timestamp: time.Now(),
-	})
+	thread, _ := OpenThread("thread-1", "user-1", "Original Title")
+	thread.DequeueUncommittedEvents()
 
 	// Change title
-	cmd := ChangeThreadTitle{
-		ThreadID: "thread-1",
-		NewTitle: "New Title",
-	}
-
-	events, err := decider.Decide(cmd, thread)
+	err := thread.ChangeTitle("New Title")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
+	events := thread.DequeueUncommittedEvents()
 	if len(events) != 1 {
 		t.Fatalf("expected 1 event, got %d", len(events))
 	}
@@ -254,8 +209,7 @@ func TestThreadTitleChange(t *testing.T) {
 		t.Errorf("expected NewTitle 'New Title', got '%s'", changed.NewTitle)
 	}
 
-	// Apply event and verify state
-	thread.Evolve(changed)
+	// Verify state was updated
 	if thread.Title != "New Title" {
 		t.Errorf("expected title 'New Title', got '%s'", thread.Title)
 	}
@@ -264,64 +218,68 @@ func TestThreadTitleChange(t *testing.T) {
 // TestThreadTitleChangeIdempotent verifies no event if title unchanged.
 func TestThreadTitleChangeIdempotent(t *testing.T) {
 	t.Parallel()
-	decider := NewThreadDecider()
-	thread := NewThreadAggregate("thread-1")
 
 	// Create thread
-	thread.Evolve(&ThreadCreated{
-		ThreadID:  "thread-1",
-		UserID:    "user-1",
-		Title:     "Same Title",
-		Timestamp: time.Now(),
-	})
+	thread, _ := OpenThread("thread-1", "user-1", "Same Title")
+	thread.DequeueUncommittedEvents()
 
 	// Try to change to same title
-	cmd := ChangeThreadTitle{
-		ThreadID: "thread-1",
-		NewTitle: "Same Title",
-	}
-
-	events, err := decider.Decide(cmd, thread)
+	err := thread.ChangeTitle("Same Title")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
 	// Should return no events (idempotent)
+	events := thread.DequeueUncommittedEvents()
 	if len(events) != 0 {
 		t.Errorf("expected 0 events for unchanged title, got %d", len(events))
 	}
 }
 
-// TestAggregateVersionTracking verifies version increments.
+// TestAggregateVersionTracking verifies version tracking follows EventSourcing.NetCore pattern.
+// Version should only track PERSISTED events, not uncommitted ones.
 func TestAggregateVersionTracking(t *testing.T) {
 	t.Parallel()
-	thread := NewThreadAggregate("thread-1")
 
+	thread, _ := OpenThread("thread-1", "user-1", "Test")
+
+	// Version should be 0 - Enqueue doesn't increment version, only LoadFromHistory does
 	if thread.Version != 0 {
-		t.Errorf("expected initial version 0, got %d", thread.Version)
+		t.Errorf("expected version 0 after creation (uncommitted), got %d", thread.Version)
 	}
 
-	events := []core.Event{
-		&ThreadCreated{
-			ThreadID:  "thread-1",
-			UserID:    "user-1",
-			Timestamp: time.Now(),
-		},
-		&MessageAdded{
-			ThreadID:  "thread-1",
-			MessageID: "msg-1",
-			Role:      "user",
-			Content:   "Test",
-			Timestamp: time.Now(),
-		},
+	// Should have 1 uncommitted event
+	uncommitted := thread.DequeueUncommittedEvents()
+	if len(uncommitted) != 1 {
+		t.Errorf("expected 1 uncommitted event, got %d", len(uncommitted))
 	}
 
-	for _, e := range events {
-		thread.Evolve(e)
-		thread.IncrementVersion()
+	// Simulate persisting and reloading (what repository does)
+	thread.LoadFromHistory(uncommitted, thread.Apply)
+
+	// NOW version should be 1 (1 persisted event)
+	if thread.Version != 1 {
+		t.Errorf("expected version 1 after loading history, got %d", thread.Version)
 	}
 
+	// Add another message
+	thread.AddMessage("msg-1", "user", "Test", nil, "", "", nil)
+
+	// Version still 1 (new event not persisted yet)
+	if thread.Version != 1 {
+		t.Errorf("expected version 1 after adding uncommitted message, got %d", thread.Version)
+	}
+
+	// Simulate persist and reload
+	uncommitted2 := thread.DequeueUncommittedEvents()
+	if len(uncommitted2) != 1 {
+		t.Errorf("expected 1 uncommitted event, got %d", len(uncommitted2))
+	}
+
+	thread.LoadFromHistory(uncommitted2, thread.Apply)
+
+	// NOW version should be 2
 	if thread.Version != 2 {
-		t.Errorf("expected version 2 after 2 events, got %d", thread.Version)
+		t.Errorf("expected version 2 after loading second event, got %d", thread.Version)
 	}
 }

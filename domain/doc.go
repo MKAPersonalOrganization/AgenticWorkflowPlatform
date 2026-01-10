@@ -1,13 +1,12 @@
-// Package domain provides event-sourced domain models using patterns from EventSourcing.NetCore.
+// Package domain provides event-sourced domain models following patterns from EventSourcing.NetCore.
 //
 // # Event Sourcing Architecture
 //
 // This implementation follows these key patterns:
 //
-// 1. **Aggregate Pattern**: ThreadAggregate embeds AggregateState for event sourcing capabilities
-// 2. **Decider Pattern**: Pure functions for command validation and event generation
-// 3. **Repository Pattern**: Handles persistence and optimistic concurrency
-// 4. **Evolve Pattern**: Pure state transitions from events
+// 1. **Aggregate Pattern**: Business logic implemented as methods on the aggregate
+// 2. **Repository Pattern**: Handles persistence and optimistic concurrency
+// 3. **Apply Pattern**: Pure state transitions from events
 //
 // # Quick Start
 //
@@ -16,29 +15,14 @@
 //	// 1. Create repository
 //	repo := domain.NewThreadRepository(eventStore)
 //
-//	// 2. Create aggregate
-//	thread := domain.NewThreadAggregate("thread-123")
-//
-//	// 3. Use decider to process command
-//	decider := domain.NewThreadDecider()
-//	cmd := domain.CreateThread{
-//	    ThreadID: "thread-123",
-//	    UserID:   "user-456",
-//	    Title:    "My Conversation",
-//	}
-//
-//	events, err := decider.Decide(cmd, thread)
+//	// 2. Create thread using static factory method
+//	thread, err := domain.OpenThread("thread-123", "user-456", "My Conversation")
 //	if err != nil {
-//	    // Command validation failed
+//	    // Validation failed
 //	    return err
 //	}
 //
-//	// 4. Enqueue events and save
-//	for _, event := range events {
-//	    thread.Enqueue(event)
-//	    thread.Evolve(event) // Update local state
-//	}
-//
+//	// 3. Save the new thread
 //	err = repo.SaveNew(ctx, thread)
 //	if err != nil {
 //	    // Persistence failed
@@ -53,27 +37,13 @@
 //	    return err
 //	}
 //
-//	// 2. Create command
-//	cmd := domain.AddMessage{
-//	    ThreadID:  "thread-123",
-//	    MessageID: "msg-789",
-//	    Role:      "user",
-//	    Content:   "Hello, world!",
-//	}
-//
-//	// 3. Use decider to validate and generate events
-//	decider := domain.NewThreadDecider()
-//	events, err := decider.Decide(cmd, thread)
+//	// 2. Call business method on aggregate
+//	err = thread.AddMessage("msg-789", "user", "Hello, world!", nil, "", "", nil)
 //	if err != nil {
 //	    return err // Business rule violation
 //	}
 //
-//	// 4. Apply events and save
-//	for _, event := range events {
-//	    thread.Enqueue(event)
-//	    thread.Evolve(event)
-//	}
-//
+//	// 3. Save changes
 //	err = repo.Save(ctx, thread) // Uses optimistic concurrency
 //	if err == core.ErrConcurrencyConflict {
 //	    // Another process modified the thread - reload and retry
@@ -81,27 +51,30 @@
 //
 // # Key Concepts
 //
-// ## Commands vs Events
+// ## Business Logic in Aggregate Methods
 //
-// Commands represent intentions and can fail:
-//   - CreateThread, AddMessage, ChangeThreadTitle
-//   - Validated by Decider
-//   - Can return errors
+// Following EventSourcing.NetCore pattern, business logic lives in aggregate methods:
+//   - OpenThread() - Static factory for creating new threads
+//   - AddMessage() - Adds a message with validation
+//   - ChangeTitle() - Changes title (idempotent if same)
+//   - Delete() - Marks thread as deleted
+//
+// Each method:
+//   - Validates business rules
+//   - Creates appropriate events
+//   - Enqueues and applies events automatically
+//   - Returns error if validation fails
+//
+// ## Events
 //
 // Events represent facts that happened:
 //   - ThreadCreated, MessageAdded, ThreadTitleChanged
 //   - Immutable and persisted in EventStore
-//   - Cannot fail (they already happened)
-//
-// ## Decider Pattern
-//
-// The Decider separates business logic into three pure functions:
-//
-//	type Decider[State, Command, Event] struct {
-//	    Decide     func(Command, State) ([]Event, error)  // Validate and generate events
-//	    Evolve     func(State, Event) State               // Apply event to state
-//	    GetInitial func() State                           // Create zero state
-//	}
+//   - Applied via the Apply() method to update state
+//     Decide     func(Command, State) ([]Event, error)  // Validate and generate events
+//     Evolve     func(State, Event) State               // Apply event to state
+//     GetInitial func() State                           // Create zero state
+//     }
 //
 // Benefits:
 // - Easy to test (pure functions)
@@ -124,18 +97,23 @@
 //
 // AggregateState provides:
 // - Version tracking (number of events applied)
+//
+// ## Aggregate State Management
+//
+// Each aggregate embeds BaseAggregate which provides:
+// - Version tracking for optimistic concurrency
 // - Uncommitted events queue
 // - Event replay (LoadFromHistory)
 //
-// Your aggregate embeds AggregateState and implements Evolve:
+// Your aggregate embeds BaseAggregate and implements Apply:
 //
 //	type ThreadAggregate struct {
-//	    AggregateState      // Embedded state management
+//	    BaseAggregate       // Embedded state management
 //	    Title     string    // Domain state
 //	    Messages  []Message // Domain state
 //	}
 //
-//	func (t *ThreadAggregate) Evolve(event Event) {
+//	func (t *ThreadAggregate) Apply(event Event) {
 //	    switch e := event.(type) {
 //	    case *MessageAdded:
 //	        t.Messages = append(t.Messages, ...)
@@ -147,17 +125,10 @@
 // Event sourcing makes testing easy - just verify events:
 //
 //	func TestCreateThread(t *testing.T) {
-//	    decider := domain.NewThreadDecider()
-//	    thread := domain.NewThreadAggregate("thread-1")
-//
-//	    cmd := domain.CreateThread{
-//	        ThreadID: "thread-1",
-//	        UserID:   "user-1",
-//	        Title:    "Test",
-//	    }
-//
-//	    events, err := decider.Decide(cmd, thread)
+//	    thread, err := domain.OpenThread("thread-1", "user-1", "Test")
 //	    assert.NoError(t, err)
+//
+//	    events := thread.DequeueUncommittedEvents()
 //	    assert.Len(t, events, 1)
 //
 //	    created := events[0].(*domain.ThreadCreated)
