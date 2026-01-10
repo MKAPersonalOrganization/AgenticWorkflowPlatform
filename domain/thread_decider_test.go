@@ -1,10 +1,9 @@
 package domain
 
 import (
+	"school-with-ai/sdk/agentsdk/core"
 	"testing"
 	"time"
-
-	"school-with-ai/sdk/agentsdk/core"
 )
 
 // TestThreadDeciderCreateThread verifies the create thread command.
