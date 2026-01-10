@@ -2,9 +2,10 @@ package kurrentdb
 
 import (
 	"context"
-	"school-with-ai/sdk/agentsdk/core"
 	"testing"
 	"time"
+
+	"school-with-ai/sdk/agentsdk/core"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -44,7 +45,7 @@ func TestEventStore_AppendAndRead(t *testing.T) {
 	}
 
 	// Append events
-	version, err := store.Append(ctx, streamID, events...)
+	version, err := store.AppendWithVersion(ctx, streamID, -1, events...)
 	require.NoError(t, err)
 	assert.Positive(t, version)
 
@@ -104,7 +105,7 @@ func TestEventStore_ReadFromVersion(t *testing.T) {
 		},
 	}
 
-	_, err := store.Append(ctx, streamID, events...)
+	_, err := store.AppendWithVersion(ctx, streamID, -1, events...)
 	require.NoError(t, err)
 
 	// Read from version 1 (should get 2nd and 3rd events)
@@ -152,7 +153,7 @@ func TestEventStore_DeleteStream(t *testing.T) {
 		},
 	}
 
-	_, err := store.Append(ctx, streamID, events...)
+	_, err := store.AppendWithVersion(ctx, streamID, -1, events...)
 	require.NoError(t, err)
 
 	// Verify events exist

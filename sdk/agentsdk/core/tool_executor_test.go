@@ -1,11 +1,11 @@
 package core_test
 
 import (
+
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/services/chatwrite/agents/shared/tools"
 	"testing"
@@ -17,18 +17,18 @@ var errTestToolNotFound = errors.New("tool not found")
 type MockToolExecutor struct {
 	results map[string]string
 	errors  map[string]error
-	calls   []domain.ToolCall
+	calls   []core.ToolCall
 }
 
 func NewMockToolExecutor() *MockToolExecutor {
 	return &MockToolExecutor{
 		results: make(map[string]string),
 		errors:  make(map[string]error),
-		calls:   []domain.ToolCall{},
+		calls:   []core.ToolCall{},
 	}
 }
 
-func (m *MockToolExecutor) Execute(toolCall domain.ToolCall) (string, error) {
+func (m *MockToolExecutor) Execute(toolCall core.ToolCall) (string, error) {
 	m.calls = append(m.calls, toolCall)
 
 	if err, ok := m.errors[toolCall.Function.Name]; ok {
@@ -54,9 +54,9 @@ func (m *MockToolExecutor) CallCount() int {
 	return len(m.calls)
 }
 
-func (m *MockToolExecutor) LastCall() domain.ToolCall {
+func (m *MockToolExecutor) LastCall() core.ToolCall {
 	if len(m.calls) == 0 {
-		return domain.ToolCall{}
+		return core.ToolCall{}
 	}
 
 	return m.calls[len(m.calls)-1]
@@ -70,10 +70,10 @@ func TestMockToolExecutor_Execute(t *testing.T) {
 	executor := NewMockToolExecutor()
 	executor.SetResult("get_weather", `{"temperature": 72}`)
 
-	toolCall := domain.ToolCall{
+	toolCall := core.ToolCall{
 		ID:   "call_123",
 		Type: "function",
-		Function: domain.ToolFunction{
+		Function: core.ToolFunction{
 			Name:      "get_weather",
 			Arguments: `{"city": "London"}`,
 		},
@@ -99,10 +99,10 @@ func TestMockToolExecutor_ExecuteWithError(t *testing.T) {
 	expectedErr := errTestToolNotFound
 	executor.SetError("unknown_tool", expectedErr)
 
-	toolCall := domain.ToolCall{
+	toolCall := core.ToolCall{
 		ID:   "call_456",
 		Type: "function",
-		Function: domain.ToolFunction{
+		Function: core.ToolFunction{
 			Name:      "unknown_tool",
 			Arguments: `{}`,
 		},
@@ -122,10 +122,10 @@ func TestMockToolExecutor_DefaultResult(t *testing.T) {
 	t.Parallel()
 	executor := NewMockToolExecutor()
 
-	toolCall := domain.ToolCall{
+	toolCall := core.ToolCall{
 		ID:   "call_789",
 		Type: "function",
-		Function: domain.ToolFunction{
+		Function: core.ToolFunction{
 			Name:      "any_tool",
 			Arguments: `{}`,
 		},
@@ -149,10 +149,10 @@ func TestBasicToolExecutor_Calculate(t *testing.T) {
 
 	executor := core.NewRegistryToolExecutor(context.Background(), toolRegistry)
 
-	toolCall := domain.ToolCall{
+	toolCall := core.ToolCall{
 		ID:   "call_calc",
 		Type: "function",
-		Function: domain.ToolFunction{
+		Function: core.ToolFunction{
 			Name:      "calculate",
 			Arguments: `{"expression": "2 + 2"}`,
 		},
@@ -177,10 +177,10 @@ func TestBasicToolExecutor_WriteWhiteboard(t *testing.T) {
 
 	executor := core.NewRegistryToolExecutor(context.Background(), toolRegistry)
 
-	toolCall := domain.ToolCall{
+	toolCall := core.ToolCall{
 		ID:   "call_whiteboard",
 		Type: "function",
-		Function: domain.ToolFunction{
+		Function: core.ToolFunction{
 			Name:      "write_whiteboard",
 			Arguments: `{"content": "test content", "action": "write"}`,
 		},
@@ -226,10 +226,10 @@ func TestRegistryToolExecutor(t *testing.T) {
 	executor := core.NewRegistryToolExecutor(ctx, registry)
 
 	// Test successful execution
-	result, err := executor.Execute(domain.ToolCall{
+	result, err := executor.Execute(core.ToolCall{
 		ID:   "call_1",
 		Type: "function",
-		Function: domain.ToolFunction{
+		Function: core.ToolFunction{
 			Name:      "greet",
 			Arguments: `{"name": "World"}`,
 		},
@@ -249,10 +249,10 @@ func TestRegistryToolExecutor_ToolNotFound(t *testing.T) {
 	registry := core.NewToolRegistry()
 	executor := core.NewRegistryToolExecutor(ctx, registry)
 
-	_, err := executor.Execute(domain.ToolCall{
+	_, err := executor.Execute(core.ToolCall{
 		ID:   "call_1",
 		Type: "function",
-		Function: domain.ToolFunction{
+		Function: core.ToolFunction{
 			Name:      "nonexistent",
 			Arguments: `{}`,
 		},

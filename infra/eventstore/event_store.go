@@ -2,8 +2,9 @@ package eventstore
 
 import (
 	"context"
-	"school-with-ai/sdk/agentsdk/core"
 	"sync"
+
+	"school-with-ai/sdk/agentsdk/core"
 )
 
 // InMemoryEventStore is an in-memory implementation of EventStore.
@@ -19,10 +20,17 @@ func NewInMemoryEventStore() *InMemoryEventStore {
 	}
 }
 
-// Append adds events to a stream.
-func (s *InMemoryEventStore) Append(ctx context.Context, streamID string, events ...core.Event) (int64, error) {
+// AppendWithVersion adds events to a stream with optimistic concurrency control.
+func (s *InMemoryEventStore) AppendWithVersion(ctx context.Context, streamID string, expectedVersion int64, events ...core.Event) (int64, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	currentVersion := int64(len(s.streams[streamID]))
+
+	// Check optimistic concurrency
+	if expectedVersion >= 0 && currentVersion != expectedVersion {
+		return 0, core.ErrConcurrencyConflict
+	}
 
 	s.streams[streamID] = append(s.streams[streamID], events...)
 

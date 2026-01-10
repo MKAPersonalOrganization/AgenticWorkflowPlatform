@@ -1,7 +1,6 @@
 package core
 
 import (
-	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/llm"
 )
 
@@ -89,14 +88,14 @@ func (a *ToolCallAccumulator) ProcessUpdate(update llm.ChatResponseUpdate) (Tool
 	}, true
 }
 
-// GetAll returns all accumulated tool calls as domain.ToolCall slices.
-func (a *ToolCallAccumulator) GetAll() []domain.ToolCall {
-	result := make([]domain.ToolCall, 0, len(a.byID))
+// GetAll returns all accumulated tool calls as ToolCall slices.
+func (a *ToolCallAccumulator) GetAll() []ToolCall {
+	result := make([]ToolCall, 0, len(a.byID))
 	for _, state := range a.byID {
-		result = append(result, domain.ToolCall{
+		result = append(result, ToolCall{
 			ID:   state.ID,
 			Type: "function",
-			Function: domain.ToolFunction{
+			Function: ToolFunction{
 				Name:      state.Name,
 				Arguments: state.Arguments,
 			},

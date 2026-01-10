@@ -24,7 +24,6 @@ require (
 	github.com/pgvector/pgvector-go v0.3.0
 	github.com/rs/zerolog v1.34.0
 	github.com/sashabaranov/go-openai v1.41.2
-	github.com/sourcegraph/conc v0.3.0
 	github.com/stretchr/testify v1.11.1
 	github.com/typesense/typesense-go/v2 v2.0.0
 )
@@ -58,8 +57,6 @@ require (
 	github.com/tidwall/sjson v1.2.5 // indirect
 	go.opentelemetry.io/otel v1.38.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.38.0 // indirect
-	go.uber.org/atomic v1.7.0 // indirect
-	go.uber.org/multierr v1.9.0 // indirect
 	golang.org/x/crypto v0.46.0 // indirect
 	golang.org/x/mod v0.31.0 // indirect
 	golang.org/x/net v0.48.0 // indirect

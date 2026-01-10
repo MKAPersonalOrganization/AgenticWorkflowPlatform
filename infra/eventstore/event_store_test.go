@@ -2,12 +2,13 @@ package eventstore
 
 import (
 	"context"
-	"school-with-ai/sdk/agentsdk/core"
 	"testing"
 	"time"
+
+	"school-with-ai/sdk/agentsdk/core"
 )
 
-func TestInMemoryEventStore_Append(t *testing.T) {
+func TestInMemoryEventStore_AppendWithVersion(t *testing.T) {
 	t.Parallel()
 	store := NewInMemoryEventStore()
 	ctx := context.Background()
@@ -23,9 +24,9 @@ func TestInMemoryEventStore_Append(t *testing.T) {
 			Title: "Test Thread",
 		}
 
-		version, err := store.Append(ctx, "thread-1", event)
+		version, err := store.AppendWithVersion(ctx, "thread-1", -1, event)
 		if err != nil {
-			t.Fatalf("Append failed: %v", err)
+			t.Fatalf("AppendWithVersion failed: %v", err)
 		}
 
 		if version != 1 {
@@ -44,14 +45,34 @@ func TestInMemoryEventStore_Append(t *testing.T) {
 			Content:   "World",
 		}
 
-		v1, _ := store.Append(ctx, "thread-2", event1)
-		v2, _ := store.Append(ctx, "thread-2", event2)
+		v1, _ := store.AppendWithVersion(ctx, "thread-2", -1, event1)
+		v2, _ := store.AppendWithVersion(ctx, "thread-2", -1, event2)
 
 		if v1 != 1 {
 			t.Errorf("expected first version 1, got %d", v1)
 		}
 		if v2 != 2 {
 			t.Errorf("expected second version 2, got %d", v2)
+		}
+	})
+
+	t.Run("enforces optimistic concurrency", func(t *testing.T) {
+		t.Parallel()
+		event := &core.ThreadCreatedEvent{
+			BaseEvent: core.BaseEvent{ThreadID: "thread-3"},
+			Title:     "Test",
+		}
+
+		// First append should succeed
+		_, err := store.AppendWithVersion(ctx, "thread-3", 0, event)
+		if err != nil {
+			t.Fatalf("First append failed: %v", err)
+		}
+
+		// Second append with wrong expected version should fail
+		_, err = store.AppendWithVersion(ctx, "thread-3", 0, event)
+		if err != core.ErrConcurrencyConflict {
+			t.Errorf("expected ErrConcurrencyConflict, got %v", err)
 		}
 	})
 }
@@ -66,7 +87,7 @@ func TestInMemoryEventStore_ReadStream(t *testing.T) {
 	event2 := &core.UserMessageAddedEvent{BaseEvent: core.BaseEvent{ThreadID: "thread-1"}, Content: "2"}
 	event3 := &core.UserMessageAddedEvent{BaseEvent: core.BaseEvent{ThreadID: "thread-1"}, Content: "3"}
 
-	_, _ = store.Append(ctx, "thread-1", event1, event2, event3)
+	_, _ = store.AppendWithVersion(ctx, "thread-1", -1, event1, event2, event3)
 
 	t.Run("reads all events from beginning", func(t *testing.T) {
 		t.Parallel()

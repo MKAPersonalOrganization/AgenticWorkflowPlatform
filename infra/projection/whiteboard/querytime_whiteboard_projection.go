@@ -3,6 +3,8 @@ package whiteboard
 import (
 	"context"
 	"encoding/json"
+
+	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 )
 
@@ -24,6 +26,9 @@ type ThreadIDLister interface {
 	ReadAllThreadIDs(ctx context.Context) ([]string, error)
 }
 
+// ToolCallExecuted is an alias to avoid repeated package qualifiers.
+type ToolCallExecuted = domain.ToolCallExecuted
+
 // NewQueryTimeWhiteboardProjection creates a new query-time whiteboard projection.
 func NewQueryTimeWhiteboardProjection(eventStore core.EventStore, threadIDLister ThreadIDLister) *QueryTimeWhiteboardProjection {
 	return &QueryTimeWhiteboardProjection{
@@ -36,7 +41,9 @@ func NewQueryTimeWhiteboardProjection(eventStore core.EventStore, threadIDLister
 func (p *QueryTimeWhiteboardProjection) Get(threadID string) string {
 	ctx := context.Background()
 
-	events, err := p.eventStore.ReadStream(ctx, threadID, 0)
+	// Use same stream naming convention as thread aggregate: "Thread-{threadID}"
+	streamName := "Thread-" + threadID
+	events, err := p.eventStore.ReadStream(ctx, streamName, 0)
 	if err != nil || len(events) == 0 {
 		return ""
 	}
@@ -93,8 +100,16 @@ func (p *QueryTimeWhiteboardProjection) Rebuild(ctx context.Context, store core.
 
 // applyEventToWhiteboard applies an event to rebuild whiteboard state.
 func applyEventToWhiteboard(currentContent string, event core.Event) string {
-	// Handle ToolCallExecutedEvent for write_whiteboard tool
+	// Handle both domain.ToolCallExecuted (persisted) and core.ToolCallExecutedEvent (UI events)
 	switch evt := event.(type) {
+	case *ToolCallExecuted:
+		if evt.ToolName == "write_whiteboard" {
+			return applyWhiteboardTool(currentContent, evt.ToolArguments)
+		}
+	case ToolCallExecuted:
+		if evt.ToolName == "write_whiteboard" {
+			return applyWhiteboardTool(currentContent, evt.ToolArguments)
+		}
 	case *core.ToolCallExecutedEvent:
 		if evt.ToolName == "write_whiteboard" {
 			return applyWhiteboardTool(currentContent, evt.ToolArguments)

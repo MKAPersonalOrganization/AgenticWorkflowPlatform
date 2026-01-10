@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"school-with-ai/domain"
 )
 
 // ThreadState is a projection that provides read access to thread state.
@@ -19,13 +18,13 @@ import (
 type ThreadState interface {
 	// Get retrieves a thread projection by ID.
 	// Returns the derived thread state from events.
-	Get(threadID string) (*domain.Thread, bool)
+	Get(threadID string) (*Thread, bool)
 
 	// Messages retrieves all messages from a thread's projection.
-	Messages(threadID string) []domain.Message
+	Messages(threadID string) []Message
 
 	// All retrieves all thread projections sorted by most recent first.
-	All() []domain.Thread
+	All() []Thread
 
 	// Update applies a single event to update the projection.
 	// This is called when new events are appended to the EventStore.

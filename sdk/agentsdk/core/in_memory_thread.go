@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"school-with-ai/domain"
 
 	"github.com/google/uuid"
 )
@@ -49,7 +48,7 @@ func NewInMemoryThreadWithID(id string) *InMemoryThread {
 }
 
 // NewInMemoryThreadWithMessages creates a new in-memory thread with initial messages.
-func NewInMemoryThreadWithMessages(messages []domain.Message) (*InMemoryThread, error) {
+func NewInMemoryThreadWithMessages(messages []Message) (*InMemoryThread, error) {
 	thread := &InMemoryThread{
 		id:           uuid.New().String(),
 		messageStore: NewInMemoryMessageStore(),
@@ -92,12 +91,12 @@ func (t *InMemoryThread) GetID() string {
 }
 
 // GetMessages returns all messages in the thread.
-func (t *InMemoryThread) GetMessages() []domain.Message {
+func (t *InMemoryThread) GetMessages() []Message {
 	return t.messageStore.GetMessages()
 }
 
 // AddMessages adds new messages to the thread.
-func (t *InMemoryThread) AddMessages(messages []domain.Message) error {
+func (t *InMemoryThread) AddMessages(messages []Message) error {
 	err := t.messageStore.AddMessages(messages)
 	if err != nil {
 		return fmt.Errorf("failed to add messages to thread: %w", err)
