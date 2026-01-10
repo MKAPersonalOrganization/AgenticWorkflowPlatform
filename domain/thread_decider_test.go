@@ -1,14 +1,14 @@
 package domain
 
 import (
+	"school-with-ai/sdk/agentsdk/core"
 	"testing"
 	"time"
-
-	"school-with-ai/sdk/agentsdk/core"
 )
 
 // TestThreadDeciderCreateThread verifies the create thread command.
 func TestThreadDeciderCreateThread(t *testing.T) {
+	t.Parallel()
 	decider := NewThreadDecider()
 	thread := NewThreadAggregate("thread-1")
 
@@ -47,6 +47,7 @@ func TestThreadDeciderCreateThread(t *testing.T) {
 
 // TestThreadDeciderCreateThreadValidation verifies validation rules.
 func TestThreadDeciderCreateThreadValidation(t *testing.T) {
+	t.Parallel()
 	decider := NewThreadDecider()
 	thread := NewThreadAggregate("")
 
@@ -83,6 +84,7 @@ func TestThreadDeciderCreateThreadValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			_, err := decider.Decide(tt.cmd, thread)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("expected error=%v, got error=%v", tt.wantErr, err)
@@ -93,6 +95,7 @@ func TestThreadDeciderCreateThreadValidation(t *testing.T) {
 
 // TestThreadDeciderAddMessage verifies adding messages.
 func TestThreadDeciderAddMessage(t *testing.T) {
+	t.Parallel()
 	decider := NewThreadDecider()
 
 	// Create thread first
@@ -142,6 +145,7 @@ func TestThreadDeciderAddMessage(t *testing.T) {
 
 // TestThreadAggregateEvolve verifies state transitions.
 func TestThreadAggregateEvolve(t *testing.T) {
+	t.Parallel()
 	thread := NewThreadAggregate("thread-1")
 
 	// Apply ThreadCreated event
@@ -190,6 +194,7 @@ func TestThreadAggregateEvolve(t *testing.T) {
 
 // TestThreadAggregateValidation verifies business rule validation.
 func TestThreadAggregateValidation(t *testing.T) {
+	t.Parallel()
 	thread := NewThreadAggregate("thread-1")
 
 	// Create and delete thread
@@ -213,6 +218,7 @@ func TestThreadAggregateValidation(t *testing.T) {
 
 // TestThreadTitleChange verifies title changes.
 func TestThreadTitleChange(t *testing.T) {
+	t.Parallel()
 	decider := NewThreadDecider()
 	thread := NewThreadAggregate("thread-1")
 
@@ -257,6 +263,7 @@ func TestThreadTitleChange(t *testing.T) {
 
 // TestThreadTitleChangeIdempotent verifies no event if title unchanged.
 func TestThreadTitleChangeIdempotent(t *testing.T) {
+	t.Parallel()
 	decider := NewThreadDecider()
 	thread := NewThreadAggregate("thread-1")
 
@@ -287,6 +294,7 @@ func TestThreadTitleChangeIdempotent(t *testing.T) {
 
 // TestAggregateVersionTracking verifies version increments.
 func TestAggregateVersionTracking(t *testing.T) {
+	t.Parallel()
 	thread := NewThreadAggregate("thread-1")
 
 	if thread.Version != 0 {

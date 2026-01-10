@@ -2,9 +2,8 @@ package domain
 
 import (
 	"fmt"
-	"time"
-
 	"school-with-ai/sdk/agentsdk/core"
+	"time"
 )
 
 // Event is an alias for core.Event for convenience.

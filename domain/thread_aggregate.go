@@ -2,9 +2,8 @@ package domain
 
 import (
 	"errors"
-	"time"
-
 	"school-with-ai/sdk/agentsdk/core"
+	"time"
 )
 
 // ThreadAggregate is an event-sourced aggregate representing a conversation thread.

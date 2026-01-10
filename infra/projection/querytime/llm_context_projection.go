@@ -2,10 +2,9 @@ package querytime
 
 import (
 	"context"
-	"time"
-
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
+	"time"
 )
 
 // ThreadLister provides a way to list all thread IDs.

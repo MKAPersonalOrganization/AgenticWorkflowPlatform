@@ -3,7 +3,6 @@ package whiteboard
 import (
 	"context"
 	"encoding/json"
-
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 )

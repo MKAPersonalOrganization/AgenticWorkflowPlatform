@@ -2,10 +2,9 @@ package eventstore
 
 import (
 	"context"
+	"school-with-ai/sdk/agentsdk/core"
 	"testing"
 	"time"
-
-	"school-with-ai/sdk/agentsdk/core"
 )
 
 func TestInMemoryEventStore_AppendWithVersion(t *testing.T) {

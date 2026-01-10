@@ -3,9 +3,8 @@ package kurrentdb
 import (
 	"context"
 	"errors"
-	"sync"
-
 	"school-with-ai/sdk/agentsdk/core"
+	"sync"
 )
 
 // ErrStreamDeleted is returned when attempting to append to a deleted stream.
