@@ -1933,10 +1933,14 @@ document.addEventListener('alpine:init', () => {
                 }
 
                 const data = await response.json();
-                const activeRun = data.activeRun;
 
-                if (activeRun && activeRun.status === 'running') {
-                    console.log('Reconnecting to active run:', activeRun);
+                // Backend returns null when no active run exists
+                if (!data) {
+                    return;
+                }
+
+                if (data.status === 'running') {
+                    console.log('Reconnecting to active run:', data);
 
                     const state = this.__getThreadState(threadId);
                     state.isStreaming = true;
@@ -1945,7 +1949,7 @@ document.addEventListener('alpine:init', () => {
                     // Note: We don't have the job ID from the active run data
                     // The reconnection will happen through the SSE connection
                     // when we get the job status from the stream
-                    console.log('Active run detected:', activeRun.runId, activeRun.status);
+                    console.log('Active run detected:', data.runId, data.status);
                 }
             } catch (error) {
                 console.error('Error reconnecting to active jobs:', error);
