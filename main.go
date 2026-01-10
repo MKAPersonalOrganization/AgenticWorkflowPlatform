@@ -192,7 +192,6 @@ func main() {
 	// Protected auth routes
 	r.Get("/auth/settings", authMiddleware.RequireAuthFunc(authHandlers.SettingsPage))
 
-	// A2A REST API routes (spec-compliant)
 	r.Post("/v1/message:send", authMiddleware.RequireAuthFunc(handler.SendMessage))
 	r.Get("/v1/tasks/{id}:subscribe", authMiddleware.RequireAuthFunc(handler.StreamJobEvents))
 	r.Post("/v1/tasks/{id}:cancel", authMiddleware.RequireAuthFunc(handler.CancelJob))
