@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"school-with-ai/infra/projection/whiteboard"
+	"sort"
 	"time"
+
+	"school-with-ai/infra/projection/whiteboard"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
@@ -121,6 +123,11 @@ func (h *AguiProjectionHandler) ListThreads(w http.ResponseWriter, r *http.Reque
 			CurrentInstructor: currentInstructor,
 		})
 	}
+
+	// Sort threads by UpdatedAt descending (most recent first)
+	sort.Slice(threads, func(i, j int) bool {
+		return threads[i].UpdatedAt.After(threads[j].UpdatedAt)
+	})
 
 	w.Header().Set("Content-Type", "application/json")
 	err := json.NewEncoder(w).Encode(threads)
