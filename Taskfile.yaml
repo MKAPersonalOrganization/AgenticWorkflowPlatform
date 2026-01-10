@@ -53,9 +53,6 @@ tasks:
     desc: Generate and save git repository statistics
     cmds:
       - go run ./tools/repo-statistics
-      - mkdir -p .github/images
-      - cp /tmp/repo_graph.png .github/images/repo_statistics.png
-      - echo "Statistics saved to .github/images/repo_statistics.png"
       - xdg-open .github/images/repo_statistics.png 2>/dev/null || open .github/images/repo_statistics.png 2>/dev/null || echo "Graph saved at .github/images/repo_statistics.png"
 
   ci:
