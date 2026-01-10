@@ -3,7 +3,7 @@ package embeddingstore
 import (
 	"context"
 	"fmt"
-	"school-with-ai/services/chatwrite/rag"
+	"school-with-ai/domain"
 	"strings"
 	"time"
 
@@ -34,7 +34,7 @@ type Typesense struct {
 }
 
 // Verify Typesense implements RAG interface at compile time
-var _ rag.RAG = (*Typesense)(nil)
+var _ domain.RAG = (*Typesense)(nil)
 
 // NewTypesense creates a new Typesense instance
 func NewTypesense(cfg *TypesenseConfig) (*Typesense, error) {
@@ -106,7 +106,7 @@ func (t *Typesense) ensureReady(ctx context.Context) error {
 }
 
 // Index adds or updates embeddings for the given chunks
-func (t *Typesense) Index(ctx context.Context, indexReqs ...*rag.SessionRAGIndexChunk) error {
+func (t *Typesense) Index(ctx context.Context, indexReqs ...*domain.SessionRAGIndexChunk) error {
 	if err := t.ensureReady(ctx); err != nil {
 		return err
 	}
@@ -114,7 +114,7 @@ func (t *Typesense) Index(ctx context.Context, indexReqs ...*rag.SessionRAGIndex
 }
 
 // index performs the actual indexing operation
-func (t *Typesense) index(ctx context.Context, indexReqs ...*rag.SessionRAGIndexChunk) error {
+func (t *Typesense) index(ctx context.Context, indexReqs ...*domain.SessionRAGIndexChunk) error {
 	if len(indexReqs) == 0 {
 		return fmt.Errorf("no index requests provided")
 	}
@@ -165,7 +165,7 @@ func (t *Typesense) index(ctx context.Context, indexReqs ...*rag.SessionRAGIndex
 }
 
 // Query searches for similar chunks based on the query
-func (t *Typesense) Query(ctx context.Context, q *rag.SessionRAGQuery) ([]*rag.SessionRAGResult, error) {
+func (t *Typesense) Query(ctx context.Context, q *domain.SessionRAGQuery) ([]*domain.SessionRAGResult, error) {
 	if err := t.ensureReady(ctx); err != nil {
 		return nil, err
 	}
@@ -209,9 +209,9 @@ func (t *Typesense) Query(ctx context.Context, q *rag.SessionRAGQuery) ([]*rag.S
 
 	log.Info().Int("num_results", len(*results.Hits)).Msg("typesense results")
 
-	ragResults := make([]*rag.SessionRAGResult, 0, len(*results.Hits))
+	ragResults := make([]*domain.SessionRAGResult, 0, len(*results.Hits))
 	for _, hit := range *results.Hits {
-		ragResult := &rag.SessionRAGResult{
+		ragResult := &domain.SessionRAGResult{
 			DataEntityID:    getStrVariable(&hit, "data_entity_id"),
 			DocumentGroupID: getStrVariable(&hit, "document_group_id"),
 			DocumentID:      getStrVariable(&hit, "document_id"),
@@ -227,7 +227,7 @@ func (t *Typesense) Query(ctx context.Context, q *rag.SessionRAGQuery) ([]*rag.S
 }
 
 // Delete removes embeddings for the specified entity/document
-func (t *Typesense) Delete(ctx context.Context, req *rag.DeleteIndexRequest) error {
+func (t *Typesense) Delete(ctx context.Context, req *domain.DeleteIndexRequest) error {
 	if err := t.ensureReady(ctx); err != nil {
 		return err
 	}

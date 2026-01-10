@@ -3,13 +3,12 @@ package projections
 import (
 	"errors"
 	"fmt"
-	"sort"
-	"time"
-
 	"school-with-ai/domain"
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/infra/projection/whiteboard"
 	"school-with-ai/services"
+	"sort"
+	"time"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )

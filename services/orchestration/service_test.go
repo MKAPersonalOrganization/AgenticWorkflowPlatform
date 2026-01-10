@@ -2,9 +2,8 @@ package orchestration
 
 import (
 	"context"
-	"testing"
-
 	"school-with-ai/domain"
+	"testing"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
@@ -42,6 +41,7 @@ func (m *mockEventEmitter) GetEventTypes() []string {
 
 // TestServiceCreation verifies that the orchestration service can be created.
 func TestServiceCreation(t *testing.T) {
+	t.Parallel()
 	// This test ensures the Service struct can be instantiated
 	service := NewService(
 		nil, // chatWriteService
@@ -62,6 +62,7 @@ func TestServiceCreation(t *testing.T) {
 
 // TestEventEmitterInterface verifies the EventEmitter interface works correctly.
 func TestEventEmitterInterface(t *testing.T) {
+	t.Parallel()
 	emitter := &mockEventEmitter{}
 
 	// Test emitting a RUN_STARTED event
@@ -86,6 +87,7 @@ func TestEventEmitterInterface(t *testing.T) {
 
 // TestUserMessageParamsValidation verifies that UserMessageParams is created correctly.
 func TestUserMessageParamsValidation(t *testing.T) {
+	t.Parallel()
 	params := UserMessageParams{
 		ThreadID:  "thread-123",
 		MessageID: "msg-456",
@@ -104,6 +106,7 @@ func TestUserMessageParamsValidation(t *testing.T) {
 
 // TestHandleUserMessageCancellation verifies that HandleUserMessage respects context cancellation.
 func TestHandleUserMessageCancellation(t *testing.T) {
+	t.Parallel()
 	service := NewService(nil, nil, nil, nil, nil)
 	emitter := &mockEventEmitter{}
 
@@ -131,6 +134,7 @@ func TestHandleUserMessageCancellation(t *testing.T) {
 
 // TestAguiEventAdapter verifies that the AGUI adapter converts domain events to AGUI events.
 func TestAguiEventAdapter(t *testing.T) {
+	t.Parallel()
 	mockEmitter := &mockEventEmitter{}
 	aguiAdapter := NewAguiEventEmitter(mockEmitter)
 
