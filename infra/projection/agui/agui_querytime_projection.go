@@ -3,6 +3,7 @@ package agui
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 	"time"
@@ -45,11 +46,15 @@ func (p *QueryTimeAguiProjection) GetThreadState(threadID string) (*AguiThreadSt
 	streamName := fmt.Sprintf("Thread-%s", threadID)
 	events, err := p.eventStore.ReadStream(ctx, streamName, 0)
 	if err != nil || len(events) == 0 {
-		fmt.Printf("[AGUI QueryTime] GetThreadState: No events for thread %s (err=%v)\n", threadID, err)
+		slog.Debug("GetThreadState: No events for thread",
+			"threadID", threadID,
+			"error", err)
 		return nil, false
 	}
 
-	fmt.Printf("[AGUI QueryTime] GetThreadState: Reading %d events for thread %s\n", len(events), threadID)
+	slog.Debug("GetThreadState: Reading events for thread",
+		"threadID", threadID,
+		"eventCount", len(events))
 
 	state := &AguiThreadState{
 		ThreadID:      threadID,
@@ -65,11 +70,19 @@ func (p *QueryTimeAguiProjection) GetThreadState(threadID string) (*AguiThreadSt
 	var activeRun *AguiRunState
 
 	for i, event := range events {
-		fmt.Printf("[AGUI QueryTime] Event %d: %T - %s\n", i, event, event.EventType())
+		slog.Debug("Applying event to thread state",
+			"threadID", threadID,
+			"eventIndex", i,
+			"eventType", event.EventType())
 		p.applyEventToState(event, state, streamingMessages, toolCallsByID, &activeRun)
 	}
 
-	fmt.Printf("[AGUI QueryTime] GetThreadState: Final state - Title=%q, Messages=%d, Version=%d, IsDeleted=%v\n", state.Title, len(state.Messages), state.Version, state.IsDeleted)
+	slog.Debug("GetThreadState: Final state",
+		"threadID", threadID,
+		"title", state.Title,
+		"messageCount", len(state.Messages),
+		"version", state.Version,
+		"isDeleted", state.IsDeleted)
 
 	// Don't return deleted threads
 	if state.IsDeleted {
@@ -105,19 +118,17 @@ func (p *QueryTimeAguiProjection) GetMessages(threadID string) []aguievents.Mess
 // Requires the event store to implement ThreadIDLister.
 func (p *QueryTimeAguiProjection) ListThreads() []string {
 	if p.threadIDLister == nil {
-		fmt.Println("[AGUI QueryTime] threadIDLister is nil")
-
+		slog.Debug("ListThreads: threadIDLister is nil")
 		return []string{}
 	}
 
 	ctx := context.Background()
 	threadIDs, err := p.threadIDLister.ReadAllThreadIDs(ctx)
 	if err != nil {
-		fmt.Printf("[AGUI QueryTime] Error reading thread IDs: %v\n", err)
-
+		slog.Debug("ListThreads: Error reading thread IDs", "error", err)
 		return []string{}
 	}
-	fmt.Printf("[AGUI QueryTime] ListThreads returning %d threads\n", len(threadIDs))
+	slog.Debug("ListThreads returning threads", "count", len(threadIDs))
 
 	return threadIDs
 }

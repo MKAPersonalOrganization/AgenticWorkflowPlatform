@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"math"
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
@@ -67,6 +68,11 @@ func (s *KurrentDBEventStore) AppendWithVersion(ctx context.Context, streamID st
 		return 0, nil
 	}
 
+	slog.Debug("Appending events to KurrentDB stream",
+		"stream", streamID,
+		"expectedVersion", expectedVersion,
+		"eventCount", len(events))
+
 	// Convert domain events to KurrentDB events
 	eventDataList := make([]kurrentdb.EventData, 0, len(events))
 	for _, event := range events {
@@ -84,14 +90,29 @@ func (s *KurrentDBEventStore) AppendWithVersion(ctx context.Context, streamID st
 
 	// Set expected version for optimistic concurrency
 	opts := kurrentdb.AppendToStreamOptions{}
-	if expectedVersion >= 0 {
-		// Specific revision expected
-		opts.StreamState = kurrentdb.Revision(uint64(expectedVersion))
+	if expectedVersion > 0 {
+		// KurrentDB uses 0-based revision numbers (revision of last event)
+		// Our aggregate Version tracks event count (1-based)
+		// Convert: count -> last event revision by subtracting 1
+		// Example: Version=2 (2 events) -> last event at revision 1
+		// Safe conversion: expectedVersion is guaranteed > 0 by the if condition
+		lastEventRevision := uint64(expectedVersion - 1) // #nosec G115
+		slog.Debug("Using revision-based concurrency check",
+			"revision", lastEventRevision,
+			"versionCount", expectedVersion)
+		opts.StreamState = kurrentdb.Revision(lastEventRevision)
+	} else if expectedVersion == 0 {
+		// Version=0 means no events loaded - should use NoStream
+		// This case should normally use SaveNew(), not Save()
+		slog.Debug("Using NoStream (expectedVersion=0)")
+		opts.StreamState = kurrentdb.NoStream{}
 	} else if expectedVersion == -2 {
 		// -2 means NoStream (stream must not exist)
+		slog.Debug("Using NoStream for new stream")
 		opts.StreamState = kurrentdb.NoStream{}
 	} else {
 		// -1 means Any (no concurrency check)
+		slog.Debug("Using Any (no concurrency check)")
 		opts.StreamState = kurrentdb.Any{}
 	}
 
@@ -100,8 +121,10 @@ func (s *KurrentDBEventStore) AppendWithVersion(ctx context.Context, streamID st
 	if err != nil {
 		// Check if it's a concurrency conflict
 		if strings.Contains(err.Error(), "WrongExpectedVersion") {
+			slog.Debug("KurrentDB concurrency conflict", "stream", streamID, "error", err.Error())
 			return 0, core.ErrConcurrencyConflict
 		}
+		slog.Debug("KurrentDB AppendToStream failed", "stream", streamID, "error", err)
 		return 0, fmt.Errorf("failed to append to stream: %w", err)
 	}
 
@@ -109,6 +132,10 @@ func (s *KurrentDBEventStore) AppendWithVersion(ctx context.Context, streamID st
 	if result.NextExpectedVersion > math.MaxInt64 {
 		return 0, fmt.Errorf("%w: %d exceeds max int64", ErrVersionOverflow, result.NextExpectedVersion)
 	}
+
+	slog.Debug("KurrentDB append succeeded",
+		"stream", streamID,
+		"nextExpectedVersion", result.NextExpectedVersion)
 
 	return int64(result.NextExpectedVersion), nil
 }
@@ -235,14 +262,14 @@ func (s *KurrentDBEventStore) ReadAllThreadIDs(ctx context.Context) ([]string, e
 		// Only ignore that specific error, return other errors (network, permissions, etc.)
 		if strings.Contains(err.Error(), "stream not found") || strings.Contains(err.Error(), "STREAM_NOT_FOUND") {
 			// Projection not enabled - fallback to reading from $all stream
-			fmt.Println("[KurrentDB] $streams projection not available, falling back to $all stream")
+			slog.Debug("$streams projection not available, falling back to $all stream")
 			return s.readFromAllStream(ctx)
 		}
 		// Return actual errors (network, auth, etc.)
 		return nil, fmt.Errorf("failed to read thread IDs: %w", err)
 	}
 
-	fmt.Printf("[KurrentDB] ReadAllThreadIDs found %d threads from $streams\n", len(threadIDs))
+	slog.Debug("ReadAllThreadIDs found threads from $streams", "count", len(threadIDs))
 	return threadIDs, nil
 }
 
@@ -344,7 +371,7 @@ func (s *KurrentDBEventStore) readFromAllStream(ctx context.Context) ([]string, 
 		result = append(result, threadID)
 	}
 
-	fmt.Printf("[KurrentDB] readFromAllStream found %d threads\n", len(result))
+	slog.Debug("readFromAllStream found threads", "count", len(result))
 	return result, nil
 }
 

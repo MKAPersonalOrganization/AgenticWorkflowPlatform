@@ -18,76 +18,66 @@ type EventEnvelope struct {
 	Timestamp      time.Time
 }
 
-// AggregateState holds the common state for event-sourced aggregates.
-// Embed this in your concrete aggregate types to get event sourcing capabilities.
-//
-// Example:
-//
-//	type Thread struct {
-//	    AggregateState
-//	    Title    string
-//	    Messages []Message
-//	}
-type AggregateState struct {
+// Aggregate is the base interface for all event-sourced aggregates.
+type Aggregate interface {
+	// GetID returns the aggregate's unique identifier
+	GetID() string
+
+	// GetVersion returns the current version (number of applied events)
+	GetVersion() int64
+
+	// DequeueUncommittedEvents returns all uncommitted events and clears the queue
+	DequeueUncommittedEvents() []core.Event
+
+	// Apply applies an event to update the aggregate's state
+	// Each aggregate must implement this method for its specific events
+	Apply(event core.Event)
+}
+
+// BaseAggregate provides common functionality for event-sourced aggregates.
+// Embed this in your concrete aggregates.
+type BaseAggregate struct {
 	ID                string
 	Version           int64
 	uncommittedEvents []core.Event
 }
 
-// NewAggregateState creates a new aggregate state with the given ID.
-func NewAggregateState(id string) AggregateState {
-	return AggregateState{
-		ID:                id,
-		Version:           0,
-		uncommittedEvents: make([]core.Event, 0),
-	}
+// GetID returns the aggregate ID.
+func (a *BaseAggregate) GetID() string {
+	return a.ID
 }
 
-// Enqueue adds a new event to the uncommitted events queue.
-// Call this after validating business rules and before applying the event.
-func (a *AggregateState) Enqueue(event core.Event) {
+// GetVersion returns the aggregate version.
+func (a *BaseAggregate) GetVersion() int64 {
+	return a.Version
+}
+
+// Enqueue adds an event to the uncommitted events queue AND applies it to state.
+// This follows the pattern from EventSourcing.NetCore where Enqueue both queues and applies.
+// Version is NOT incremented here - it only tracks persisted events and is incremented in LoadFromHistory.
+func (a *BaseAggregate) Enqueue(event core.Event, apply func(core.Event)) {
 	a.uncommittedEvents = append(a.uncommittedEvents, event)
+	apply(event)
 }
 
 // DequeueUncommittedEvents returns all uncommitted events and clears the queue.
-// This is typically called by the repository after persisting events to the store.
-func (a *AggregateState) DequeueUncommittedEvents() []core.Event {
+func (a *BaseAggregate) DequeueUncommittedEvents() []core.Event {
 	events := a.uncommittedEvents
 	a.uncommittedEvents = make([]core.Event, 0)
 	return events
 }
 
-// UncommittedEventsCount returns the number of uncommitted events.
-func (a *AggregateState) UncommittedEventsCount() int {
-	return len(a.uncommittedEvents)
-}
-
-// IncrementVersion increments the version counter.
-// Called after successfully applying an event.
-func (a *AggregateState) IncrementVersion() {
-	a.Version++
-}
-
 // LoadFromHistory rebuilds aggregate state by replaying events.
-// Pass your concrete aggregate's Evolve function to apply state changes.
-//
-// Example:
-//
-//	err := thread.LoadFromHistory(events, thread.Evolve)
-func (a *AggregateState) LoadFromHistory(events []core.Event, evolve func(core.Event)) error {
+func (a *BaseAggregate) LoadFromHistory(events []core.Event, apply func(core.Event)) error {
 	for i, event := range events {
-		// Validate that event belongs to this aggregate
 		aggID := event.AggregateID()
 		if aggID != a.ID {
 			return fmt.Errorf("event %d (type=%s) aggregate ID %q does not match %s",
 				i, event.EventType(), aggID, a.ID)
 		}
 
-		// Apply the event to update state
-		evolve(event)
-
-		// Increment version to track number of applied events
-		a.IncrementVersion()
+		apply(event)
+		a.Version++
 	}
 	return nil
 }

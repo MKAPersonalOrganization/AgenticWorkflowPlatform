@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"log/slog"
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/sdk/agentsdk/llm"
@@ -480,66 +481,48 @@ func (h *ChatWriteService) executeToolCallWithExecutor(threadID string, toolCall
 
 // CreateThread creates a new chat thread using event sourcing.
 func (h *ChatWriteService) CreateThread(ctx context.Context, threadID, title string) error {
-	fmt.Printf("[ChatWrite] CreateThread called: threadID=%s, title=%s\n", threadID, title)
+	slog.Debug("CreateThread called",
+		"threadID", threadID,
+		"title", title)
 
-	// Create repository and decider
+	// Create repository
 	repo := domain.NewThreadRepository(h.writeModel)
-	decider := domain.NewThreadDecider()
 
 	// Try to load existing thread first (idempotency check)
 	existingThread, err := repo.Load(ctx, threadID)
-	if err == nil && existingThread.Version > 0 {
-		fmt.Printf("[ChatWrite] Thread already exists (version=%d), skipping create\n", existingThread.Version)
+	if err == nil && existingThread.GetVersion() > 0 {
+		slog.Debug("Thread already exists, skipping create",
+			"threadID", threadID,
+			"version", existingThread.GetVersion())
 		// Thread already exists, this is idempotent
 		return nil
 	}
-	fmt.Printf("[ChatWrite] Thread does not exist, creating new thread\n")
+	slog.Debug("Thread does not exist, creating new thread", "threadID", threadID)
 
-	fmt.Printf("[ChatWrite] Thread does not exist, creating new thread\n")
-
-	// Create new aggregate
-	thread := domain.NewThreadAggregate(threadID)
-
-	// Create command
-	cmd := domain.CreateThread{
-		ThreadID: threadID,
-		UserID:   "system", // TODO: Get from context
-		Title:    title,
-	}
-	fmt.Printf("[ChatWrite] CreateThread command: %+v\n", cmd)
-
-	// Execute command through decider
-	events, err := decider.Decide(cmd, thread)
+	// Create thread using static factory method (like ShoppingCart.Open)
+	thread, err := domain.OpenThread(threadID, "system", title) // TODO: Get userID from context
 	if err != nil {
-		// If thread already exists, ignore (idempotent)
-		if err.Error() == "thread already exists" {
-			fmt.Printf("[ChatWrite] Decider returned 'thread already exists', skipping\n")
-			return nil
-		}
-		return fmt.Errorf("failed to decide create thread: %w", err)
-	}
-	fmt.Printf("[ChatWrite] Decider returned %d events\n", len(events))
-
-	// Enqueue events and apply to in-memory state
-	for i, event := range events {
-		fmt.Printf("[ChatWrite] Event %d: %T - %s\n", i, event, event.EventType())
-		thread.Enqueue(event)
-		// Evolve for in-memory state
-		thread.Evolve(event)
+		return fmt.Errorf("failed to create thread: %w", err)
 	}
 
-	fmt.Printf("[ChatWrite] Saving new thread with %d events\n", len(events))
+	slog.Debug("Thread created, saving with uncommitted events",
+		"threadID", threadID,
+		"eventCount", len(thread.DequeueUncommittedEvents()))
+
+	// Save the new thread
 	err = repo.SaveNew(ctx, thread)
 	if err != nil {
-		fmt.Printf("[ChatWrite] SaveNew failed: %v\n", err)
+		slog.Debug("SaveNew failed",
+			"threadID", threadID,
+			"error", err)
 		// If concurrency conflict, thread was created by another request - this is fine
 		if errors.Is(err, core.ErrConcurrencyConflict) {
-			fmt.Printf("[ChatWrite] Concurrency conflict, thread already created\n")
+			slog.Debug("Concurrency conflict, thread already created", "threadID", threadID)
 			return nil
 		}
 		return fmt.Errorf("failed to save new thread: %w", err)
 	}
-	fmt.Printf("[ChatWrite] Thread created successfully: %s\n", threadID)
+	slog.Debug("Thread created successfully", "threadID", threadID)
 
 	// Emit UI event for frontend notification
 	_ = h.emitUIEvent(&core.ThreadCreatedEvent{
@@ -556,105 +539,84 @@ func (h *ChatWriteService) CreateThread(ctx context.Context, threadID, title str
 
 // AddUserMessage adds a user message to a thread using event sourcing.
 func (h *ChatWriteService) AddUserMessage(ctx context.Context, threadID, messageID, content string) error {
-	fmt.Printf("[ChatWrite] AddUserMessage called: threadID=%s, messageID=%s\n", threadID, messageID)
+	slog.Debug("AddUserMessage called",
+		"threadID", threadID,
+		"messageID", messageID)
 
-	// Create repository and decider
+	// Create repository
 	repo := domain.NewThreadRepository(h.writeModel)
-	decider := domain.NewThreadDecider()
 
 	// Load existing aggregate
 	thread, err := repo.Load(ctx, threadID)
 	if err != nil {
-		fmt.Printf("[ChatWrite] Failed to load thread for message: %v\n", err)
+		slog.Debug("Failed to load thread for message",
+			"threadID", threadID,
+			"error", err)
 		return fmt.Errorf("failed to load thread: %w", err)
 	}
 
-	fmt.Printf("[ChatWrite] Thread loaded for message: version=%d, title=%q\n", thread.Version, thread.Title)
+	slog.Debug("Thread loaded for message",
+		"threadID", threadID,
+		"version", thread.Version,
+		"title", thread.Title)
 
 	// Remember if this is a new thread (for choosing Save vs SaveNew)
-	isNewThread := thread.Version == 0
+	isNewThread := thread.GetVersion() == 0
 
 	// If this is a new thread (version 0), create it first with a default title
 	if isNewThread {
-		fmt.Printf("[ChatWrite] Thread is new (version 0), creating with ThreadCreated event first\n")
+		slog.Debug("Thread is new (version 0), creating first", "threadID", threadID)
 
-		createCmd := domain.CreateThread{
-			ThreadID: threadID,
-			UserID:   "system", // TODO: Get from context
-			Title:    "New Chat",
-		}
-
-		createEvents, err := decider.Decide(createCmd, thread)
+		// Create thread using static factory
+		thread, err = domain.OpenThread(threadID, "system", "New Chat") // TODO: Get userID from context
 		if err != nil {
-			fmt.Printf("[ChatWrite] Failed to create thread in AddUserMessage: %v\n", err)
 			return fmt.Errorf("failed to create thread: %w", err)
 		}
-
-		fmt.Printf("[ChatWrite] ThreadCreated event generated: %d events\n", len(createEvents))
-		for i, event := range createEvents {
-			fmt.Printf("[ChatWrite] Create event %d: %T - %s, aggregateID=%q\n",
-				i, event, event.EventType(), event.AggregateID())
-			thread.Enqueue(event)
-			// Evolve for in-memory state so the next Decide sees the thread as created
-			thread.Evolve(event)
-		}
-		fmt.Printf("[ChatWrite] After applying ThreadCreated: title=%q, ID=%q, version=%d\n",
-			thread.Title, thread.ID, thread.Version)
 	}
 
-	// Create command for adding the message
-	cmd := domain.AddMessage{
-		ThreadID:  threadID,
-		MessageID: messageID,
-		Role:      "user",
-		Content:   content,
-	}
-
-	// Execute command through decider
-	events, err := decider.Decide(cmd, thread)
+	// Add the user message using aggregate method
+	err = thread.AddMessage(messageID, "user", content, nil, "", "", nil)
 	if err != nil {
-		fmt.Printf("[ChatWrite] Failed to decide add message: %v\n", err)
-		return fmt.Errorf("failed to decide add message: %w", err)
+		slog.Debug("Failed to add message",
+			"threadID", threadID,
+			"messageID", messageID,
+			"error", err)
+		return fmt.Errorf("failed to add message: %w", err)
 	}
 
-	fmt.Printf("[ChatWrite] AddMessage decider returned %d events\n", len(events))
-
-	// Enqueue events and apply to in-memory state
-	for i, event := range events {
-		fmt.Printf("[ChatWrite] Message event %d: %T - %s\n", i, event, event.EventType())
-		thread.Enqueue(event)
-		// Evolve for in-memory state
-		thread.Evolve(event)
-	}
+	slog.Debug("Message added, saving thread",
+		"threadID", threadID,
+		"isNewThread", isNewThread)
 
 	// Save the thread
 	// For new threads: use SaveNew (expects version 0 in event store)
 	// For existing threads: use Save (expects current version)
 	if isNewThread {
-		fmt.Printf("[ChatWrite] New thread - using SaveNew (expects empty stream)\n")
-		fmt.Printf("[ChatWrite] Thread state before save: version=%d, uncommitted events=%d\n",
-			thread.Version, thread.UncommittedEventsCount())
-
+		slog.Debug("New thread - using SaveNew", "threadID", threadID)
 		err = repo.SaveNew(ctx, thread)
 		if err != nil {
-			fmt.Printf("[ChatWrite] SaveNew failed: %v\n", err)
+			slog.Debug("SaveNew failed",
+				"threadID", threadID,
+				"error", err)
 			// If concurrency conflict, thread was created by another request
 			if errors.Is(err, core.ErrConcurrencyConflict) {
-				fmt.Printf("[ChatWrite] Concurrency conflict - thread created by another request\n")
+				slog.Debug("Concurrency conflict - thread created by another request", "threadID", threadID)
 				return nil // Idempotent - thread exists, no error
 			}
 			return fmt.Errorf("failed to save new thread: %w", err)
 		}
 	} else {
-		fmt.Printf("[ChatWrite] Existing thread - using Save with version check\n")
+		slog.Debug("Existing thread - using Save with version check", "threadID", threadID)
 		err = repo.Save(ctx, thread)
 		if err != nil {
-			fmt.Printf("[ChatWrite] Failed to save thread: %v\n", err)
+			slog.Debug("Failed to save thread",
+				"threadID", threadID,
+				"error", err)
 			return fmt.Errorf("failed to save thread: %w", err)
 		}
 	}
 
-	fmt.Printf("[ChatWrite] Thread saved successfully\n")
+	slog.Debug("Thread saved successfully", "threadID", threadID)
 
 	// Emit UI event for frontend notification
 	_ = h.emitUIEvent(&core.UserMessageAddedEvent{
@@ -673,31 +635,16 @@ func (h *ChatWriteService) AddUserMessage(ctx context.Context, threadID, message
 // addAssistantMessage adds an assistant message to the thread using event sourcing.
 func (h *ChatWriteService) addAssistantMessage(ctx context.Context, threadID, messageID, content string, toolCalls []domain.ToolCall) error {
 	repo := domain.NewThreadRepository(h.writeModel)
-	decider := domain.NewThreadDecider()
 
 	thread, err := repo.Load(ctx, threadID)
 	if err != nil {
 		return fmt.Errorf("failed to load thread: %w", err)
 	}
 
-	cmd := domain.AddMessage{
-		ThreadID:  threadID,
-		MessageID: messageID,
-		Role:      "assistant",
-		Content:   content,
-		ToolCalls: toolCalls,
-		AgentName: h.config.Name,
-	}
-
-	events, err := decider.Decide(cmd, thread)
+	// Add message using aggregate method
+	err = thread.AddMessage(messageID, "assistant", content, toolCalls, "", h.config.Name, nil)
 	if err != nil {
-		return fmt.Errorf("failed to decide add assistant message: %w", err)
-	}
-
-	for _, event := range events {
-		thread.Enqueue(event)
-		// Evolve for in-memory state
-		thread.Evolve(event)
+		return fmt.Errorf("failed to add assistant message: %w", err)
 	}
 
 	return repo.Save(ctx, thread)
@@ -706,31 +653,16 @@ func (h *ChatWriteService) addAssistantMessage(ctx context.Context, threadID, me
 // addToolResultMessage adds a tool result message to the thread using event sourcing.
 func (h *ChatWriteService) addToolResultMessage(ctx context.Context, threadID, messageID, toolCallID, result string) error {
 	repo := domain.NewThreadRepository(h.writeModel)
-	decider := domain.NewThreadDecider()
 
 	thread, err := repo.Load(ctx, threadID)
 	if err != nil {
 		return fmt.Errorf("failed to load thread: %w", err)
 	}
 
-	cmd := domain.AddMessage{
-		ThreadID:   threadID,
-		MessageID:  messageID,
-		Role:       "tool",
-		Content:    result,
-		ToolCallID: toolCallID,
-		AgentName:  h.config.Name,
-	}
-
-	events, err := decider.Decide(cmd, thread)
+	// Add message using aggregate method
+	err = thread.AddMessage(messageID, "tool", result, nil, toolCallID, h.config.Name, nil)
 	if err != nil {
-		return fmt.Errorf("failed to decide add tool result: %w", err)
-	}
-
-	for _, event := range events {
-		thread.Enqueue(event)
-		// Evolve for in-memory state
-		thread.Evolve(event)
+		return fmt.Errorf("failed to add tool result: %w", err)
 	}
 
 	return repo.Save(ctx, thread)
@@ -757,56 +689,52 @@ func (h *ChatWriteService) addToolCallExecutedEvent(ctx context.Context, threadI
 		Timestamp:       time.Now(),
 	}
 
-	thread.Enqueue(event)
-	thread.Evolve(event)
+	thread.Enqueue(event, thread.Apply)
 
 	return repo.Save(ctx, thread)
 }
 
 // UpdateThreadTitle updates the title of a thread using event sourcing.
 func (h *ChatWriteService) UpdateThreadTitle(ctx context.Context, threadID, newTitle string) error {
-	fmt.Printf("[ChatWrite] UpdateThreadTitle called: threadID=%s, newTitle=%s\n", threadID, newTitle)
+	slog.Debug("UpdateThreadTitle called",
+		"threadID", threadID,
+		"newTitle", newTitle)
 
-	// Create repository and decider
+	// Create repository
 	repo := domain.NewThreadRepository(h.writeModel)
-	decider := domain.NewThreadDecider()
 
 	// Load existing aggregate
 	thread, err := repo.Load(ctx, threadID)
 	if err != nil {
-		fmt.Printf("[ChatWrite] Failed to load thread for title update: %v\n", err)
+		slog.Debug("Failed to load thread for title update",
+			"threadID", threadID,
+			"error", err)
 		return fmt.Errorf("failed to load thread: %w", err)
 	}
-	fmt.Printf("[ChatWrite] Thread loaded: version=%d, currentTitle=%s\n", thread.Version, thread.Title)
+	slog.Debug("Thread loaded",
+		"threadID", threadID,
+		"version", thread.GetVersion(),
+		"currentTitle", thread.Title)
 
-	// Create command
-	cmd := domain.ChangeThreadTitle{
-		ThreadID: threadID,
-		NewTitle: newTitle,
-	}
-
-	// Execute command through decider
-	events, err := decider.Decide(cmd, thread)
+	// Change title using aggregate method
+	err = thread.ChangeTitle(newTitle)
 	if err != nil {
-		fmt.Printf("[ChatWrite] Decider failed for title change: %v\n", err)
-		return fmt.Errorf("failed to decide change title: %w", err)
-	}
-	fmt.Printf("[ChatWrite] Decider returned %d events for title change\n", len(events))
-
-	// Enqueue events and apply to in-memory state
-	for i, event := range events {
-		fmt.Printf("[ChatWrite] Title change event %d: %T - %s\n", i, event, event.EventType())
-		thread.Enqueue(event)
-		// Evolve for in-memory state
-		thread.Evolve(event)
+		slog.Debug("Failed to change title",
+			"threadID", threadID,
+			"error", err)
+		return fmt.Errorf("failed to change title: %w", err)
 	}
 
 	err = repo.Save(ctx, thread)
 	if err != nil {
-		fmt.Printf("[ChatWrite] Failed to save thread after title change: %v\n", err)
+		slog.Debug("Failed to save thread after title change",
+			"threadID", threadID,
+			"error", err)
 		return fmt.Errorf("failed to save thread: %w", err)
 	}
-	fmt.Printf("[ChatWrite] Thread title updated successfully: %s -> %s\n", thread.Title, newTitle)
+	slog.Debug("Thread title updated successfully",
+		"threadID", threadID,
+		"newTitle", newTitle)
 
 	// Emit UI event for frontend notification
 	_ = h.emitUIEvent(&core.ThreadTitleUpdatedEvent{
