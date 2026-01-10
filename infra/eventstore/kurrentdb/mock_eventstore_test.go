@@ -3,9 +3,9 @@ package kurrentdb
 import (
 	"context"
 	"errors"
-	"fmt"
-	"school-with-ai/sdk/agentsdk/core"
 	"sync"
+
+	"school-with-ai/sdk/agentsdk/core"
 )
 
 // ErrStreamDeleted is returned when attempting to append to a deleted stream.
@@ -23,23 +23,6 @@ func NewMockEventStore() *MockEventStore {
 		streams: make(map[string][]core.Event),
 		deleted: make(map[string]bool),
 	}
-}
-
-func (m *MockEventStore) Append(ctx context.Context, streamID string, events ...core.Event) (int64, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if m.deleted[streamID] {
-		return 0, fmt.Errorf("stream %s: %w", streamID, ErrStreamDeleted)
-	}
-
-	if m.streams[streamID] == nil {
-		m.streams[streamID] = make([]core.Event, 0)
-	}
-
-	m.streams[streamID] = append(m.streams[streamID], events...)
-
-	return int64(len(m.streams[streamID])), nil
 }
 
 func (m *MockEventStore) ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]core.Event, error) {
@@ -89,6 +72,28 @@ func (m *MockEventStore) ReadAllThreadIDs(ctx context.Context) ([]string, error)
 	}
 
 	return ids, nil
+}
+
+// AppendWithVersion adds events to a stream with optimistic concurrency control.
+func (m *MockEventStore) AppendWithVersion(ctx context.Context, streamID string, expectedVersion int64, events ...core.Event) (int64, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.deleted[streamID] {
+		return 0, errors.New("stream is deleted")
+	}
+
+	// Check expected version if specified
+	if expectedVersion >= 0 {
+		currentVersion := int64(len(m.streams[streamID])) - 1
+		if currentVersion != expectedVersion {
+			return 0, core.ErrConcurrencyConflict
+		}
+	}
+
+	// Append events
+	m.streams[streamID] = append(m.streams[streamID], events...)
+	return int64(len(m.streams[streamID])), nil
 }
 
 // Verify MockEventStore implements EventStore.

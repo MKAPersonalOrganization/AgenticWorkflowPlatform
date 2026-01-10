@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"school-with-ai/sdk/agentsdk/core"
 	"strings"
+
+	"school-with-ai/domain"
+	"school-with-ai/sdk/agentsdk/core"
 
 	"github.com/kurrent-io/KurrentDB-Client-Go/kurrentdb"
 )
@@ -60,8 +62,8 @@ func (s *KurrentDBEventStore) enableSystemProjections() {
 	// No-op: System projections must be enabled externally
 }
 
-// Append adds events to a stream in KurrentDB.
-func (s *KurrentDBEventStore) Append(ctx context.Context, streamID string, events ...core.Event) (int64, error) {
+// AppendWithVersion adds events to a stream with optimistic concurrency control.
+func (s *KurrentDBEventStore) AppendWithVersion(ctx context.Context, streamID string, expectedVersion int64, events ...core.Event) (int64, error) {
 	if len(events) == 0 {
 		return 0, nil
 	}
@@ -81,9 +83,26 @@ func (s *KurrentDBEventStore) Append(ctx context.Context, streamID string, event
 		})
 	}
 
+	// Set expected version for optimistic concurrency
+	opts := kurrentdb.AppendToStreamOptions{}
+	if expectedVersion >= 0 {
+		// Specific revision expected
+		opts.StreamState = kurrentdb.Revision(uint64(expectedVersion))
+	} else if expectedVersion == -2 {
+		// -2 means NoStream (stream must not exist)
+		opts.StreamState = kurrentdb.NoStream{}
+	} else {
+		// -1 means Any (no concurrency check)
+		opts.StreamState = kurrentdb.Any{}
+	}
+
 	// Append to stream
-	result, err := s.client.AppendToStream(ctx, streamID, kurrentdb.AppendToStreamOptions{}, eventDataList...)
+	result, err := s.client.AppendToStream(ctx, streamID, opts, eventDataList...)
 	if err != nil {
+		// Check if it's a concurrency conflict
+		if strings.Contains(err.Error(), "WrongExpectedVersion") {
+			return 0, core.ErrConcurrencyConflict
+		}
 		return 0, fmt.Errorf("failed to append to stream: %w", err)
 	}
 
@@ -159,91 +178,44 @@ func (s *KurrentDBEventStore) convertFromRecordedEvent(recordedEvent *kurrentdb.
 	var event core.Event
 
 	switch recordedEvent.EventType {
-	case "ThreadCreatedEvent":
-		var e core.ThreadCreatedEvent
+	// Domain events (persisted)
+	case "ThreadCreated":
+		var e domain.ThreadCreated
 		err := json.Unmarshal(recordedEvent.Data, &e)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal ThreadCreatedEvent: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal ThreadCreated: %w", err)
 		}
 		event = e
 
-	case "UserMessageAddedEvent":
-		var e core.UserMessageAddedEvent
+	case "MessageAdded":
+		var e domain.MessageAdded
 		err := json.Unmarshal(recordedEvent.Data, &e)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal UserMessageAddedEvent: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal MessageAdded: %w", err)
 		}
 		event = e
 
-	case "AssistantMessageStartedEvent":
-		var e core.AssistantMessageStartedEvent
+	case "ThreadTitleChanged":
+		var e domain.ThreadTitleChanged
 		err := json.Unmarshal(recordedEvent.Data, &e)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal AssistantMessageStartedEvent: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal ThreadTitleChanged: %w", err)
 		}
 		event = e
 
-	case "AssistantContentStreamedEvent":
-		var e core.AssistantContentStreamedEvent
+	case "ThreadDeleted":
+		var e domain.ThreadDeleted
 		err := json.Unmarshal(recordedEvent.Data, &e)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal AssistantContentStreamedEvent: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal ThreadDeleted: %w", err)
 		}
 		event = e
 
-	case "ToolCallStartedEvent":
-		var e core.ToolCallStartedEvent
+	case "ToolCallExecuted":
+		var e domain.ToolCallExecuted
 		err := json.Unmarshal(recordedEvent.Data, &e)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal ToolCallStartedEvent: %w", err)
-		}
-		event = e
-
-	case "ToolCallArgumentsStreamedEvent":
-		var e core.ToolCallArgumentsStreamedEvent
-		err := json.Unmarshal(recordedEvent.Data, &e)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal ToolCallArgumentsStreamedEvent: %w", err)
-		}
-		event = e
-
-	case "ToolCallCompletedEvent":
-		var e core.ToolCallCompletedEvent
-		err := json.Unmarshal(recordedEvent.Data, &e)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal ToolCallCompletedEvent: %w", err)
-		}
-		event = e
-
-	case "AssistantMessageCompletedEvent":
-		var e core.AssistantMessageCompletedEvent
-		err := json.Unmarshal(recordedEvent.Data, &e)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal AssistantMessageCompletedEvent: %w", err)
-		}
-		event = e
-
-	case "ToolCallExecutedEvent":
-		var e core.ToolCallExecutedEvent
-		err := json.Unmarshal(recordedEvent.Data, &e)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal ToolCallExecutedEvent: %w", err)
-		}
-		event = e
-
-	case "ThreadTitleUpdatedEvent":
-		var e core.ThreadTitleUpdatedEvent
-		err := json.Unmarshal(recordedEvent.Data, &e)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal ThreadTitleUpdatedEvent: %w", err)
-		}
-		event = e
-
-	case "ThreadDeletedEvent":
-		var e core.ThreadDeletedEvent
-		err := json.Unmarshal(recordedEvent.Data, &e)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal ThreadDeletedEvent: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal ToolCallExecuted: %w", err)
 		}
 		event = e
 
@@ -263,13 +235,15 @@ func (s *KurrentDBEventStore) ReadAllThreadIDs(ctx context.Context) ([]string, e
 		// Check if error is specifically "stream not found" which indicates projection not available
 		// Only ignore that specific error, return other errors (network, permissions, etc.)
 		if strings.Contains(err.Error(), "stream not found") || strings.Contains(err.Error(), "STREAM_NOT_FOUND") {
-			// Projection not enabled - return empty list gracefully
-			return []string{}, nil
+			// Projection not enabled - fallback to reading from $all stream
+			fmt.Println("[KurrentDB] $streams projection not available, falling back to $all stream")
+			return s.readFromAllStream(ctx)
 		}
 		// Return actual errors (network, auth, etc.)
 		return nil, fmt.Errorf("failed to read thread IDs: %w", err)
 	}
 
+	fmt.Printf("[KurrentDB] ReadAllThreadIDs found %d threads from $streams\n", len(threadIDs))
 	return threadIDs, nil
 }
 
@@ -312,13 +286,15 @@ func (s *KurrentDBEventStore) readFromStreamsProjection(ctx context.Context) ([]
 		}
 
 		// Parse $streams event data format: "{version}@{stream-name}"
-		// Example: "0@thread_1234567890"
+		// Example: "0@Thread-thread_1234567890"
 		dataStr := string(resolvedEvent.Event.Data)
 		if atIndex := strings.Index(dataStr, "@"); atIndex != -1 && atIndex < len(dataStr)-1 {
 			streamName := dataStr[atIndex+1:]
-			// Filter for thread streams only
-			if len(streamName) >= 6 && streamName[:6] == "thread" {
-				threadIDs[streamName] = true
+			// Filter for Thread aggregate streams (format: "Thread-{threadID}")
+			if strings.HasPrefix(streamName, "Thread-") {
+				// Extract the thread ID part after "Thread-"
+				threadID := streamName[7:] // Skip "Thread-" prefix
+				threadIDs[threadID] = true
 			}
 		}
 	}
@@ -328,6 +304,48 @@ func (s *KurrentDBEventStore) readFromStreamsProjection(ctx context.Context) ([]
 		result = append(result, threadID)
 	}
 
+	return result, nil
+}
+
+// readFromAllStream reads all thread IDs from the $all stream by scanning for ThreadCreated events.
+// This is a fallback when the $streams projection is not available.
+func (s *KurrentDBEventStore) readFromAllStream(ctx context.Context) ([]string, error) {
+	readOpts := kurrentdb.ReadAllOptions{
+		From:      kurrentdb.Start{},
+		Direction: kurrentdb.Forwards,
+	}
+
+	stream, err := s.client.ReadAll(ctx, readOpts, 10000)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read $all: %w", err)
+	}
+	defer stream.Close()
+
+	threadIDs := make(map[string]bool)
+	for {
+		resolvedEvent, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to receive event from $all: %w", err)
+		}
+
+		// Filter for Thread streams and ThreadCreated events
+		if strings.HasPrefix(resolvedEvent.Event.StreamID, "Thread-") &&
+			resolvedEvent.Event.EventType == "ThreadCreated" {
+			// Extract thread ID from stream name "Thread-{threadID}"
+			threadID := resolvedEvent.Event.StreamID[7:] // Skip "Thread-" prefix
+			threadIDs[threadID] = true
+		}
+	}
+
+	result := make([]string, 0, len(threadIDs))
+	for threadID := range threadIDs {
+		result = append(result, threadID)
+	}
+
+	fmt.Printf("[KurrentDB] readFromAllStream found %d threads\n", len(result))
 	return result, nil
 }
 

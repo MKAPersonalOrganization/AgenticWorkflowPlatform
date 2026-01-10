@@ -4,12 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
+
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/sdk/agentsdk/core/middleware"
 	"school-with-ai/services/chatwrite"
 	"school-with-ai/services/chatwrite/agents/shared"
-	"time"
 )
 
 // Service provides transport-agnostic message orchestration.
@@ -65,19 +66,10 @@ func (s *Service) HandleUserMessage(
 		return fmt.Errorf("task cancelled: %w", ctx.Err())
 	}
 
-	// 1. Ensure thread exists, create if not
-	_, exists := s.threadStore.Get(params.ThreadID)
-	if !exists {
-		err := s.chatWriteService.CreateThread(ctx, params.ThreadID, "New Chat")
-		if err != nil {
-			slog.Error("Failed to create thread",
-				"threadID", params.ThreadID,
-				"error", err)
-			return fmt.Errorf("failed to create thread: %w", err)
-		}
-	}
+	// Note: Thread creation is now handled automatically by AddUserMessage
+	// if the thread doesn't exist (version 0)
 
-	// 2. Add user message to thread
+	// 1. Add user message to thread (creates thread if needed)
 	err := s.chatWriteService.AddUserMessage(ctx, params.ThreadID, params.MessageID, params.Content)
 	if err != nil {
 		slog.Error("Failed to add user message",
@@ -86,22 +78,42 @@ func (s *Service) HandleUserMessage(
 		return fmt.Errorf("failed to add user message: %w", err)
 	}
 
-	// 3. Generate unique run ID
+	// 2. Generate unique run ID
 	runID := domain.GenerateMessageID()
 
-	// 4. Auto-generate thread title if this is the first message
+	// 3. Auto-generate thread title if this is the first message
 	thread, threadExists := s.threadStore.Get(params.ThreadID)
+	fmt.Printf("[Orchestration] After adding message: threadExists=%v, title=%q, messageCount=%d\n",
+		threadExists,
+		func() string {
+			if threadExists {
+				return thread.Title
+			} else {
+				return ""
+			}
+		}(),
+		func() int {
+			if threadExists {
+				return len(thread.Messages)
+			} else {
+				return 0
+			}
+		}())
+
 	if threadExists && thread.Title == "New Chat" && len(thread.Messages) == 1 {
 		title := params.Content
 		if len(title) > 50 {
 			title = title[:50] + "..."
 		}
+		fmt.Printf("[Orchestration] Auto-generating title for thread %s: %q\n", params.ThreadID, title)
 
 		err := s.chatWriteService.UpdateThreadTitle(ctx, params.ThreadID, title)
 		if err != nil {
 			slog.Error("Failed to update thread title",
 				"threadID", params.ThreadID,
 				"error", err)
+		} else {
+			fmt.Printf("[Orchestration] Thread title updated successfully\n")
 		}
 
 		// Emit domain event for thread title update
@@ -187,6 +199,19 @@ func (s *Service) runAgent(ctx context.Context, threadID, agentName string, emit
 	thread, err := s.threadStore.GetOrCreateAgentThread(ctx, threadID)
 	if err != nil {
 		return "", fmt.Errorf("failed to get thread: %w", err)
+	}
+
+	// Debug: Log thread state
+	messages := thread.GetMessages()
+	slog.Info("Thread state before agent execution",
+		"threadID", threadID,
+		"messageCount", len(messages),
+		"agentName", agentName)
+	if len(messages) > 0 {
+		lastMsg := messages[len(messages)-1]
+		slog.Info("Last message in thread",
+			"role", lastMsg.Role,
+			"content", lastMsg.Content[:min(50, len(lastMsg.Content))])
 	}
 
 	// Execute agent

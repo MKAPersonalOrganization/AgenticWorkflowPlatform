@@ -1,9 +1,5 @@
 package core
 
-import (
-	"school-with-ai/domain"
-)
-
 // ThreadType represents the type of agent thread.
 type ThreadType string
 
@@ -40,10 +36,10 @@ type AgentThread interface {
 	GetID() string
 
 	// GetMessages returns all messages in the thread
-	GetMessages() []domain.Message
+	GetMessages() []Message
 
 	// AddMessages adds new messages to the thread
-	AddMessages(messages []domain.Message) error
+	AddMessages(messages []Message) error
 
 	// Serialize serializes the thread state to JSON
 	Serialize() ([]byte, error)

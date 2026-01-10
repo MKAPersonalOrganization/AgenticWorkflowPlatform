@@ -3,7 +3,6 @@ package core
 import (
 	"encoding/json"
 	"fmt"
-	"school-with-ai/domain"
 	"sync"
 )
 
@@ -11,13 +10,13 @@ import (
 // This abstraction allows for different storage backends and message reduction strategies.
 type MessageStore interface {
 	// AddMessages adds new messages to the store
-	AddMessages(messages []domain.Message) error
+	AddMessages(messages []Message) error
 
 	// GetMessages returns all messages from the store
-	GetMessages() []domain.Message
+	GetMessages() []Message
 
 	// GetMessagesByRole returns messages filtered by role
-	GetMessagesByRole(role string) []domain.Message
+	GetMessagesByRole(role string) []Message
 
 	// Clear removes all messages from the store
 	Clear() error
@@ -33,13 +32,13 @@ type MessageStore interface {
 // It stores chat messages entirely in local memory, providing fast access and manipulation capabilities.
 type InMemoryMessageStore struct {
 	mu       sync.RWMutex
-	messages []domain.Message
+	messages []Message
 }
 
 // NewInMemoryMessageStore creates a new in-memory message store.
 func NewInMemoryMessageStore() *InMemoryMessageStore {
 	return &InMemoryMessageStore{
-		messages: make([]domain.Message, 0),
+		messages: make([]Message, 0),
 	}
 }
 
@@ -48,13 +47,13 @@ func NewInMemoryMessageStoreFromState(data []byte) (*InMemoryMessageStore, error
 	store := &InMemoryMessageStore{}
 
 	if len(data) == 0 {
-		store.messages = make([]domain.Message, 0)
+		store.messages = make([]Message, 0)
 
 		return store, nil
 	}
 
 	var state struct {
-		Messages []domain.Message `json:"messages"`
+		Messages []Message `json:"messages"`
 	}
 
 	err := json.Unmarshal(data, &state)
@@ -64,14 +63,14 @@ func NewInMemoryMessageStoreFromState(data []byte) (*InMemoryMessageStore, error
 
 	store.messages = state.Messages
 	if store.messages == nil {
-		store.messages = make([]domain.Message, 0)
+		store.messages = make([]Message, 0)
 	}
 
 	return store, nil
 }
 
 // AddMessages adds new messages to the store.
-func (s *InMemoryMessageStore) AddMessages(messages []domain.Message) error {
+func (s *InMemoryMessageStore) AddMessages(messages []Message) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -81,23 +80,23 @@ func (s *InMemoryMessageStore) AddMessages(messages []domain.Message) error {
 }
 
 // GetMessages returns all messages from the store.
-func (s *InMemoryMessageStore) GetMessages() []domain.Message {
+func (s *InMemoryMessageStore) GetMessages() []Message {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	// Return a copy to prevent external mutation
-	result := make([]domain.Message, len(s.messages))
+	result := make([]Message, len(s.messages))
 	copy(result, s.messages)
 
 	return result
 }
 
 // GetMessagesByRole returns messages filtered by role.
-func (s *InMemoryMessageStore) GetMessagesByRole(role string) []domain.Message {
+func (s *InMemoryMessageStore) GetMessagesByRole(role string) []Message {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	result := make([]domain.Message, 0)
+	result := make([]Message, 0)
 	for _, msg := range s.messages {
 		if msg.Role == role {
 			result = append(result, msg)
@@ -112,7 +111,7 @@ func (s *InMemoryMessageStore) Clear() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.messages = make([]domain.Message, 0)
+	s.messages = make([]Message, 0)
 
 	return nil
 }
@@ -131,7 +130,7 @@ func (s *InMemoryMessageStore) Serialize() ([]byte, error) {
 	defer s.mu.RUnlock()
 
 	state := struct {
-		Messages []domain.Message `json:"messages"`
+		Messages []Message `json:"messages"`
 	}{
 		Messages: s.messages,
 	}

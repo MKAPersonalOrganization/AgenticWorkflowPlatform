@@ -2,9 +2,10 @@ package querytime
 
 import (
 	"context"
+	"time"
+
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
-	"time"
 )
 
 // ThreadLister provides a way to list all thread IDs.
@@ -44,8 +45,9 @@ func NewQueryTimeLLMContextProjection(eventStore core.EventStore, threadLister T
 func (p *QueryTimeLLMContextProjection) Get(threadID string) (*domain.Thread, bool) {
 	ctx := context.Background()
 
-	// Read all events for this thread
-	events, err := p.eventStore.ReadStream(ctx, threadID, 0)
+	// Read all events for this thread (using aggregate stream naming)
+	streamName := domain.StreamName("Thread", threadID)
+	events, err := p.eventStore.ReadStream(ctx, streamName, 0)
 	if err != nil || len(events) == 0 {
 		return nil, false
 	}
@@ -74,7 +76,9 @@ func (p *QueryTimeLLMContextProjection) Get(threadID string) (*domain.Thread, bo
 func (p *QueryTimeLLMContextProjection) GetAgentThread(threadID string) (core.AgentThread, bool) {
 	ctx := context.Background()
 
-	events, err := p.eventStore.ReadStream(ctx, threadID, 0)
+	// Read all events for this thread (using aggregate stream naming)
+	streamName := domain.StreamName("Thread", threadID)
+	events, err := p.eventStore.ReadStream(ctx, streamName, 0)
 	if err != nil || len(events) == 0 {
 		return nil, false
 	}
@@ -172,115 +176,53 @@ func (p *QueryTimeLLMContextProjection) RebuildAll(ctx context.Context, store co
 // applyEventToThread applies an event to rebuild thread state.
 func applyEventToThread(agentThread core.AgentThread, meta *threadMetadata, event core.Event) error {
 	switch evt := event.(type) {
-	case core.ThreadCreatedEvent:
+	// Domain events (persisted in event store)
+	case domain.ThreadCreated:
 		meta.Title = evt.Title
 		meta.CreatedAt = evt.Timestamp
 		meta.UpdatedAt = evt.Timestamp
-	case *core.ThreadCreatedEvent:
+	case *domain.ThreadCreated:
 		meta.Title = evt.Title
 		meta.CreatedAt = evt.Timestamp
 		meta.UpdatedAt = evt.Timestamp
 
-	case core.UserMessageAddedEvent:
-		msg := domain.Message{
-			ID:        evt.MessageID,
-			Role:      "user",
-			Content:   evt.Content,
-			Timestamp: evt.Timestamp,
-		}
-		_ = agentThread.AddMessages([]domain.Message{msg})
-		meta.UpdatedAt = evt.Timestamp
-	case *core.UserMessageAddedEvent:
-		msg := domain.Message{
-			ID:        evt.MessageID,
-			Role:      "user",
-			Content:   evt.Content,
-			Timestamp: evt.Timestamp,
-		}
-		_ = agentThread.AddMessages([]domain.Message{msg})
-		meta.UpdatedAt = evt.Timestamp
-
-	case *core.AssistantMessageStartedEvent:
-		meta.UpdatedAt = evt.Timestamp
-	case core.AssistantMessageStartedEvent:
-		meta.UpdatedAt = evt.Timestamp
-
-	case *core.AssistantContentStreamedEvent:
-		// Ephemeral streaming event - ignore in projection
-	case core.AssistantContentStreamedEvent:
-		// Ephemeral streaming event - ignore in projection
-
-	case *core.ToolCallStartedEvent:
-		// Ephemeral event
-	case core.ToolCallStartedEvent:
-		// Ephemeral event
-
-	case *core.ToolCallArgumentsStreamedEvent:
-		// Ephemeral streaming event
-	case core.ToolCallArgumentsStreamedEvent:
-		// Ephemeral streaming event
-
-	case *core.ToolCallCompletedEvent:
-		// Ephemeral streaming event
-	case core.ToolCallCompletedEvent:
-		// Ephemeral streaming event
-
-	case core.AssistantMessageCompletedEvent:
-		msg := domain.Message{
-			ID:        evt.MessageID,
-			Role:      "assistant",
-			Content:   evt.Content,
-			ToolCalls: evt.ToolCalls,
-			Timestamp: evt.Timestamp,
-			AgentName: evt.AgentName,
-		}
-		_ = agentThread.AddMessages([]domain.Message{msg})
-		meta.UpdatedAt = evt.Timestamp
-	case *core.AssistantMessageCompletedEvent:
-		msg := domain.Message{
-			ID:        evt.MessageID,
-			Role:      "assistant",
-			Content:   evt.Content,
-			ToolCalls: evt.ToolCalls,
-			Timestamp: evt.Timestamp,
-			AgentName: evt.AgentName,
-		}
-		_ = agentThread.AddMessages([]domain.Message{msg})
-		meta.UpdatedAt = evt.Timestamp
-
-	case core.ToolCallExecutedEvent:
+	case domain.MessageAdded:
 		msg := domain.Message{
 			ID:         evt.MessageID,
-			Role:       "tool",
-			Content:    evt.ToolResult,
+			Role:       evt.Role,
+			Content:    evt.Content,
+			ToolCalls:  evt.ToolCalls,
 			ToolCallID: evt.ToolCallID,
-			Timestamp:  evt.Timestamp,
 			AgentName:  evt.AgentName,
+			Timestamp:  evt.Timestamp,
+			Metadata:   evt.Metadata,
 		}
 		_ = agentThread.AddMessages([]domain.Message{msg})
 		meta.UpdatedAt = evt.Timestamp
-	case *core.ToolCallExecutedEvent:
+	case *domain.MessageAdded:
 		msg := domain.Message{
 			ID:         evt.MessageID,
-			Role:       "tool",
-			Content:    evt.ToolResult,
+			Role:       evt.Role,
+			Content:    evt.Content,
+			ToolCalls:  evt.ToolCalls,
 			ToolCallID: evt.ToolCallID,
-			Timestamp:  evt.Timestamp,
 			AgentName:  evt.AgentName,
+			Timestamp:  evt.Timestamp,
+			Metadata:   evt.Metadata,
 		}
 		_ = agentThread.AddMessages([]domain.Message{msg})
 		meta.UpdatedAt = evt.Timestamp
 
-	case core.ThreadTitleUpdatedEvent:
+	case domain.ThreadTitleChanged:
 		meta.Title = evt.NewTitle
 		meta.UpdatedAt = evt.Timestamp
-	case *core.ThreadTitleUpdatedEvent:
+	case *domain.ThreadTitleChanged:
 		meta.Title = evt.NewTitle
 		meta.UpdatedAt = evt.Timestamp
 
-	case core.ThreadDeletedEvent:
+	case domain.ThreadDeleted:
 		// Thread is deleted - caller should handle this
-	case *core.ThreadDeletedEvent:
+	case *domain.ThreadDeleted:
 		// Thread is deleted - caller should handle this
 	}
 

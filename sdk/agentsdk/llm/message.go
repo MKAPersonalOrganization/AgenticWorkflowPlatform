@@ -1,9 +1,34 @@
 package llm
 
 import (
-	"school-with-ai/domain"
 	"strings"
 )
+
+// Message represents a message in the domain layer.
+// Duplicated here to avoid circular import with core.
+type Message struct {
+	ID         string
+	Role       string
+	Content    string
+	Timestamp  interface{} // time.Time
+	ToolCalls  []ToolCall
+	ToolCallID string
+	AgentName  string
+	Metadata   map[string]any
+}
+
+// ToolCall represents a tool call.
+type ToolCall struct {
+	ID       string
+	Type     string
+	Function ToolFunction
+}
+
+// ToolFunction represents a function in a tool call.
+type ToolFunction struct {
+	Name      string
+	Arguments string
+}
 
 // ChatMessage represents a single message in a conversation.
 // A message has a role and contains one or more content items.
@@ -115,9 +140,9 @@ func NewToolErrorMessage(callID, errorMsg string) ChatMessage {
 	}
 }
 
-// FromDomainMessage converts a domain.Message to ChatMessage.
-// This bridges the persistence layer (domain.Message) with the LLM layer (ChatMessage).
-func FromDomainMessage(msg domain.Message) ChatMessage {
+// FromDomainMessage converts a Message to ChatMessage.
+// This bridges the persistence layer (Message) with the LLM layer (ChatMessage).
+func FromDomainMessage(msg Message) ChatMessage {
 	cm := ChatMessage{
 		Role:       ChatRole(msg.Role),
 		AuthorName: msg.AgentName,
@@ -149,10 +174,10 @@ func FromDomainMessage(msg domain.Message) ChatMessage {
 	return cm
 }
 
-// ToDomainMessage converts a ChatMessage to domain.Message.
-// This bridges the LLM layer (ChatMessage) with the persistence layer (domain.Message).
-func ToDomainMessage(cm ChatMessage) domain.Message {
-	msg := domain.Message{
+// ToDomainMessage converts a ChatMessage to Message.
+// This bridges the LLM layer (ChatMessage) with the persistence layer (Message).
+func ToDomainMessage(cm ChatMessage) Message {
+	msg := Message{
 		Role:      string(cm.Role),
 		AgentName: cm.AuthorName,
 		Content:   cm.Text(),
@@ -160,10 +185,10 @@ func ToDomainMessage(cm ChatMessage) domain.Message {
 
 	// Convert function calls to tool calls
 	for _, fc := range cm.FunctionCalls() {
-		msg.ToolCalls = append(msg.ToolCalls, domain.ToolCall{
+		msg.ToolCalls = append(msg.ToolCalls, ToolCall{
 			ID:   fc.CallID,
 			Type: "function",
-			Function: domain.ToolFunction{
+			Function: ToolFunction{
 				Name:      fc.Name,
 				Arguments: fc.ArgumentsJSON(),
 			},
@@ -183,9 +208,9 @@ func ToDomainMessage(cm ChatMessage) domain.Message {
 	return msg
 }
 
-// FromDomainMessages converts a slice of domain.Message to ChatMessage.
+// FromDomainMessages converts a slice of Message to ChatMessage.
 // Filters out system messages with agent_handoff metadata as they're UI-only.
-func FromDomainMessages(msgs []domain.Message) []ChatMessage {
+func FromDomainMessages(msgs []Message) []ChatMessage {
 	result := make([]ChatMessage, 0, len(msgs))
 	for _, m := range msgs {
 		// Skip agent handoff messages - they're for UI display only
@@ -200,9 +225,9 @@ func FromDomainMessages(msgs []domain.Message) []ChatMessage {
 	return result
 }
 
-// ToDomainMessages converts a slice of ChatMessage to domain.Message.
-func ToDomainMessages(msgs []ChatMessage) []domain.Message {
-	result := make([]domain.Message, len(msgs))
+// ToDomainMessages converts a slice of ChatMessage to Message.
+func ToDomainMessages(msgs []ChatMessage) []Message {
+	result := make([]Message, len(msgs))
 	for i, m := range msgs {
 		result[i] = ToDomainMessage(m)
 	}

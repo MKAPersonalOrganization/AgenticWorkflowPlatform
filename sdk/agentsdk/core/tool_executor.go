@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"school-with-ai/domain"
 )
 
 // ErrToolNotFound is returned when a tool is not registered.
@@ -13,7 +12,7 @@ var ErrToolNotFound = errors.New("tool not found")
 // ToolExecutor executes tool calls and returns results.
 type ToolExecutor interface {
 	// Execute runs a tool call and returns the result
-	Execute(toolCall domain.ToolCall) (string, error)
+	Execute(toolCall ToolCall) (string, error)
 }
 
 // RegistryToolExecutor executes tools using a ToolRegistry.
@@ -31,7 +30,7 @@ func NewRegistryToolExecutor(ctx context.Context, registry *ToolRegistry) *Regis
 }
 
 // Execute runs a tool call using the registry.
-func (e *RegistryToolExecutor) Execute(toolCall domain.ToolCall) (string, error) {
+func (e *RegistryToolExecutor) Execute(toolCall ToolCall) (string, error) {
 	tool, ok := e.registry.Get(toolCall.Function.Name)
 	if !ok {
 		return "", fmt.Errorf("%w: %s", ErrToolNotFound, toolCall.Function.Name)

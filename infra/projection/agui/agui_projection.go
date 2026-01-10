@@ -1,8 +1,9 @@
 package agui
 
 import (
-	"school-with-ai/infra/eventstore"
 	"time"
+
+	"school-with-ai/infra/eventstore"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
@@ -54,6 +55,7 @@ type AguiThreadState struct {
 	CreatedAt         time.Time                     `json:"createdAt"`
 	UpdatedAt         time.Time                     `json:"updatedAt"`
 	Version           int64                         `json:"version"` // Event version
+	IsDeleted         bool                          `json:"isDeleted"`
 }
 
 // AguiRunState tracks the lifecycle of an agent run.

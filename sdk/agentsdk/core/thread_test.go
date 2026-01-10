@@ -2,7 +2,6 @@ package core
 
 import (
 	"fmt"
-	"school-with-ai/domain"
 	"testing"
 	"time"
 
@@ -34,7 +33,7 @@ func TestInMemoryThreadCreation(t *testing.T) {
 
 	t.Run("create thread with initial messages", func(t *testing.T) {
 		t.Parallel()
-		messages := []domain.Message{
+		messages := []Message{
 			{
 				ID:        "msg1",
 				Role:      "user",
@@ -67,7 +66,7 @@ func TestThreadMessageManagement(t *testing.T) {
 		t.Parallel()
 		thread := NewInMemoryThread()
 
-		messages := []domain.Message{
+		messages := []Message{
 			{
 				ID:        "msg1",
 				Role:      "user",
@@ -89,10 +88,10 @@ func TestThreadMessageManagement(t *testing.T) {
 		t.Parallel()
 		thread := NewInMemoryThread()
 
-		batch1 := []domain.Message{
+		batch1 := []Message{
 			{ID: "msg1", Role: "user", Content: "Hello", Timestamp: time.Now()},
 		}
-		batch2 := []domain.Message{
+		batch2 := []Message{
 			{ID: "msg2", Role: "assistant", Content: "Hi", Timestamp: time.Now()},
 			{ID: "msg3", Role: "user", Content: "How are you?", Timestamp: time.Now()},
 		}
@@ -114,7 +113,7 @@ func TestThreadMessageManagement(t *testing.T) {
 		t.Parallel()
 		thread := NewInMemoryThread()
 
-		original := []domain.Message{
+		original := []Message{
 			{ID: "msg1", Role: "user", Content: "Original", Timestamp: time.Now()},
 		}
 
@@ -138,7 +137,7 @@ func TestThreadMessageManagement(t *testing.T) {
 		thread := NewInMemoryThread()
 		store := thread.GetMessageStore()
 
-		messages := []domain.Message{
+		messages := []Message{
 			{ID: "msg1", Role: "user", Content: "User message", Timestamp: time.Now()},
 			{ID: "msg2", Role: "assistant", Content: "Assistant message", Timestamp: time.Now()},
 			{ID: "msg3", Role: "user", Content: "Another user message", Timestamp: time.Now()},
@@ -171,7 +170,7 @@ func TestThreadSerialization(t *testing.T) {
 		t.Parallel()
 		// Create thread with messages
 		originalThread := NewInMemoryThreadWithID("thread-123")
-		messages := []domain.Message{
+		messages := []Message{
 			{
 				ID:        "msg1",
 				Role:      "user",
@@ -246,10 +245,10 @@ func TestThreadIsolation(t *testing.T) {
 		thread1 := NewInMemoryThreadWithID("thread-1")
 		thread2 := NewInMemoryThreadWithID("thread-2")
 
-		messages1 := []domain.Message{
+		messages1 := []Message{
 			{ID: "msg1", Role: "user", Content: "Thread 1 message", Timestamp: time.Now()},
 		}
-		messages2 := []domain.Message{
+		messages2 := []Message{
 			{ID: "msg2", Role: "user", Content: "Thread 2 message", Timestamp: time.Now()},
 		}
 
@@ -279,7 +278,7 @@ func TestThreadIsolation(t *testing.T) {
 		// Goroutine 1: writes to thread1
 		go func() {
 			for i := range 100 {
-				msg := []domain.Message{
+				msg := []Message{
 					{
 						ID:        fmt.Sprintf("msg-%d", i),
 						Role:      "user",
@@ -295,7 +294,7 @@ func TestThreadIsolation(t *testing.T) {
 		// Goroutine 2: writes to thread2
 		go func() {
 			for i := range 100 {
-				msg := []domain.Message{
+				msg := []Message{
 					{
 						ID:        fmt.Sprintf("msg-%d", i),
 						Role:      "assistant",
@@ -335,7 +334,7 @@ func TestMessageStoreThreadSafety(t *testing.T) {
 		// Writer goroutine
 		go func() {
 			for i := range 50 {
-				msg := []domain.Message{
+				msg := []Message{
 					{ID: fmt.Sprintf("msg-%d", i), Role: "user", Content: "Test", Timestamp: time.Now()},
 				}
 				_ = store.AddMessages(msg)
