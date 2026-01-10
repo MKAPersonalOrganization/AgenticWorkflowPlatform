@@ -5,10 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
+
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/services/chatwrite"
-	"time"
 
 	"github.com/hibiken/asynq"
 )
@@ -75,13 +76,18 @@ func NewAsynqServer(
 	// Create event buffer manager
 	eventBufferManager := NewEventBufferManager()
 
-	// Create chat worker
-	chatWorker := NewChatWorker(
-		log,
+	// Create orchestration service
+	orchestrationService := NewService(
+		chatWriteService,
 		state,
 		whiteboardProjection,
+		log,
 		chatClient,
-		chatWriteService,
+	)
+
+	// Create chat worker (thin wrapper around orchestration service)
+	chatWorker := NewChatWorker(
+		orchestrationService,
 		eventBufferManager,
 	)
 

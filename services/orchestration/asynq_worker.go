@@ -5,14 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"school-with-ai/domain"
-	"school-with-ai/sdk/agentsdk/core"
-	"school-with-ai/sdk/agentsdk/core/middleware"
-	"school-with-ai/services/chatwrite"
-	"school-with-ai/services/chatwrite/agents/shared"
 	"time"
 
-	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 	"github.com/hibiken/asynq"
 )
 
@@ -47,29 +41,17 @@ func NewProcessChatTask(payload ProcessChatPayload) (*asynq.Task, error) {
 
 // ChatWorker processes chat messages.
 type ChatWorker struct {
-	log                  core.EventStore
-	state                chatwrite.ThreadStore
-	whiteboardProjection domain.WhiteboardStore
-	chatClient           chatwrite.ChatClient
-	chatWriteService     *chatwrite.ChatWriteService
+	orchestrationService *Service
 	eventBufferManager   *EventBufferManager
 }
 
 // NewChatWorker creates a new chat worker.
 func NewChatWorker(
-	log core.EventStore,
-	state chatwrite.ThreadStore,
-	whiteboardProjection domain.WhiteboardStore,
-	chatClient chatwrite.ChatClient,
-	chatWriteService *chatwrite.ChatWriteService,
+	orchestrationService *Service,
 	eventBufferManager *EventBufferManager,
 ) *ChatWorker {
 	return &ChatWorker{
-		log:                  log,
-		state:                state,
-		whiteboardProjection: whiteboardProjection,
-		chatClient:           chatClient,
-		chatWriteService:     chatWriteService,
+		orchestrationService: orchestrationService,
 		eventBufferManager:   eventBufferManager,
 	}
 }
@@ -101,159 +83,27 @@ func (w *ChatWorker) ProcessTask(ctx context.Context, t *asynq.Task) error {
 	return nil
 }
 
-// processChat processes a single chat message (similar to processJob from worker_pool.go).
+// processChat processes a single chat message using the orchestration service.
 func (w *ChatWorker) processChat(ctx context.Context, payload ProcessChatPayload) error {
 	// Check if context was cancelled
 	if ctx.Err() != nil {
 		return fmt.Errorf("task cancelled: %w", ctx.Err())
 	}
 
-	// Check if thread exists, if not create it
-	_, exists := w.state.Get(payload.ThreadID)
-	if !exists {
-		err := w.chatWriteService.CreateThread(ctx, payload.ThreadID, "New Chat")
-		if err != nil {
-			slog.Error("Failed to create thread", "jobID", payload.JobID, "threadID", payload.ThreadID, "error", err)
-
-			return fmt.Errorf("failed to create thread: %w", err)
-		}
-	}
-
-	// Add user message
-	err := w.chatWriteService.AddUserMessage(ctx, payload.ThreadID, payload.MessageID, payload.Message)
-	if err != nil {
-		slog.Error("Failed to add user message", "jobID", payload.JobID, "error", err)
-
-		return fmt.Errorf("failed to add user message: %w", err)
-	}
-
-	// Generate unique run ID
-	runID := aguievents.GenerateRunID()
-
 	// Create event emitter for SSE streaming
 	emitter := w.eventBufferManager.CreateEmitter(payload.JobID, payload.ThreadID)
 	defer w.eventBufferManager.CloseEmitter(payload.JobID)
 
-	// Send RUN_STARTED event
-	runStartedEvent := aguievents.NewRunStartedEvent(payload.ThreadID, runID)
-	err = emitter.Emit(runStartedEvent)
-	if err != nil {
-		slog.Error("Failed to emit run started event", "jobID", payload.JobID, "error", err)
+	// Wrap emitter with AGUI adapter to convert domain events to AGUI events
+	aguiEmitter := NewAguiEventEmitter(emitter)
+
+	// Delegate to orchestration service
+	params := ProcessMessageParams{
+		ThreadID:  payload.ThreadID,
+		MessageID: payload.MessageID,
+		Content:   payload.Message,
+		UserID:    payload.UserID,
 	}
 
-	// Auto-generate thread title if this is the first message
-	thread, threadExists := w.state.Get(payload.ThreadID)
-	if threadExists && thread.Title == "New Chat" && len(thread.Messages) == 1 {
-		title := payload.Message
-		if len(title) > 50 {
-			title = title[:50] + "..."
-		}
-
-		err := w.chatWriteService.UpdateThreadTitle(ctx, payload.ThreadID, title)
-		if err != nil {
-			slog.Error("Failed to update thread title", "jobID", payload.JobID, "error", err)
-		}
-
-		customEvent := aguievents.NewCustomEvent(
-			"THREAD_TITLE_UPDATED",
-			aguievents.WithValue(map[string]string{
-				"threadId": payload.ThreadID,
-				"title":    title,
-			}),
-		)
-		err = emitter.Emit(customEvent)
-		if err != nil {
-			slog.Error("Failed to emit thread title updated event", "jobID", payload.JobID, "error", err)
-		}
-	}
-
-	// Execute student-facing agent
-	w.continueWithAgentDirect(ctx, payload.ThreadID, "student-facing-agent", emitter, runID)
-
-	// Send RUN_FINISHED event
-	runFinishedEvent := aguievents.NewRunFinishedEvent(payload.ThreadID, runID)
-	err = emitter.Emit(runFinishedEvent)
-	if err != nil {
-		slog.Error("Failed to emit run finished event", "jobID", payload.JobID, "error", err)
-	}
-
-	return nil
-}
-
-// continueWithAgentDirect runs an agent directly.
-func (w *ChatWorker) continueWithAgentDirect(ctx context.Context, threadID, agentName string, emitter EventEmitter, runID string) {
-	// Check if context was cancelled before starting agent
-	if ctx.Err() != nil {
-		slog.Warn("Agent execution cancelled", "threadID", threadID, "agent", agentName)
-
-		return
-	}
-
-	slog.Info("Continuing with agent (direct)", "threadID", threadID, "agent", agentName)
-
-	// Create UI notifier for this agent's event stream
-	notifier := NewUINotifier(emitter)
-
-	// Get the agent's factory
-	factory, ok := shared.GlobalAgents.Get(agentName)
-	if !ok {
-		slog.Error("No factory found for agent", "agent", agentName)
-
-		return
-	}
-
-	// Create agent config from factory
-	agentConfig := factory(notifier, w.whiteboardProjection)
-
-	// Create agent instance
-	var handoffReqCtx *core.RequestContext
-	agentInstance := chatwrite.New(
-		w.chatClient,
-		w.log,
-		w.state,
-		chatwrite.WithConfig(agentConfig),
-		chatwrite.WithShouldContinueIteration(shared.CreateShouldContinueIterationFn()),
-		chatwrite.WithRequestContextCapture(&handoffReqCtx),
-	)
-
-	// Get or create the thread (for new threads, this creates an empty one)
-	agentThread, err := w.state.GetOrCreateAgentThread(ctx, threadID)
-	if err != nil {
-		slog.Error("Failed to get/create thread", "threadID", threadID, "error", err)
-
-		return
-	}
-
-	// Generate message ID for this run
-	messageID := domain.GenerateMessageID()
-
-	// Run the agent
-	runOpts := core.DefaultRunOptions()
-	err = agentInstance.RunWithThread(ctx, threadID, messageID, agentThread, runOpts)
-	if err != nil {
-		slog.Error("Agent run failed", "agent", agentName, "error", err)
-		errorEvent := aguievents.NewRunErrorEvent(
-			fmt.Sprintf("Agent %s failed: %v", agentName, err),
-			aguievents.WithErrorCode("AGENT_RUN_ERROR"),
-		)
-		_ = emitter.Emit(errorEvent)
-
-		return
-	}
-
-	slog.Info("Agent run completed (direct)", "agent", agentName)
-
-	// Check for agent handoff
-	if handoffReqCtx != nil {
-		if handoff, ok := middleware.GetHandoff(handoffReqCtx); ok {
-			slog.Info("Processing agent handoff",
-				"threadID", threadID,
-				"from", agentName,
-				"to", handoff.TargetAgent,
-				"question", handoff.Question)
-
-			// Continue with target agent (recursive)
-			w.continueWithAgentDirect(ctx, threadID, handoff.TargetAgent, emitter, runID)
-		}
-	}
+	return w.orchestrationService.ProcessMessage(ctx, params, aguiEmitter)
 }

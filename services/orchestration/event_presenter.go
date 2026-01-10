@@ -2,6 +2,7 @@ package orchestration
 
 import (
 	"fmt"
+
 	"school-with-ai/sdk/agentsdk/core"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
@@ -21,6 +22,7 @@ func NewUINotifier(emitter EventEmitter) *UINotifier {
 }
 
 // HandleDomainEvent processes a domain event and emits corresponding UI events.
+// This method handles core.Event types from the agent SDK.
 func (n *UINotifier) HandleDomainEvent(event core.Event) error {
 	switch evt := event.(type) {
 	case *core.AssistantMessageStartedEvent:
