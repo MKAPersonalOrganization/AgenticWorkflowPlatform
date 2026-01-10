@@ -38,12 +38,6 @@ type AguiProjection interface {
 	// GetMessages retrieves all UI-formatted messages for a thread.
 	GetMessages(threadID string) []aguievents.Message
 
-	// GetToolCalls retrieves all tool calls for a thread.
-	GetToolCalls(threadID string) []AguiToolCall
-
-	// GetAgentActivity retrieves agent activity summary for a thread.
-	GetAgentActivity(threadID string) map[string]*AguiAgentActivity
-
 	// ListThreads returns all thread IDs in the projection.
 	ListThreads() []string
 }

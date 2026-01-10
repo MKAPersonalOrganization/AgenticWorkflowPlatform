@@ -818,36 +818,6 @@ document.addEventListener('alpine:init', () => {
             }) || this.createNewSession();
         },
 
-        createNewSession() {
-            const newSessionId = this.__generateThreadId();
-            const newState = this.__createEmptyState();
-
-            this.__threadStates[newSessionId] = newState;
-            this.__currentThreadId = newSessionId;
-            this.__currentState = newState;
-            localStorage.setItem('currentThreadId', newSessionId);
-
-            // Announce to screen readers
-            this.__announce('New chat session created');
-        },
-
-        switchSession(sessionId) {
-            // Allow switching even if current or other threads are streaming - threads are independent
-            this.__currentThreadId = sessionId;
-            localStorage.setItem('currentThreadId', sessionId);
-
-            // Note: __currentState is updated automatically via $watch on __currentThreadId
-            const state = this.__getThreadState(sessionId);
-
-            // Load messages if not already loaded
-            if (state.messages.length === 0) {
-                this.__loadMessages(sessionId);
-            }
-
-            // Scroll to bottom after switching
-            this.$nextTick(() => this.__scrollToBottom());
-        },
-
         async deleteSession(sessionId) {
             // Allow deletion even if streaming - threads are independent
 
@@ -897,6 +867,36 @@ document.addEventListener('alpine:init', () => {
                     throw new Error(`Failed to delete session: ${response.status}`);
                 }
             });
+        },
+
+        createNewSession() {
+            const newSessionId = this.__generateThreadId();
+            const newState = this.__createEmptyState();
+
+            this.__threadStates[newSessionId] = newState;
+            this.__currentThreadId = newSessionId;
+            this.__currentState = newState;
+            localStorage.setItem('currentThreadId', newSessionId);
+
+            // Announce to screen readers
+            this.__announce('New chat session created');
+        },
+
+        switchSession(sessionId) {
+            // Allow switching even if current or other threads are streaming - threads are independent
+            this.__currentThreadId = sessionId;
+            localStorage.setItem('currentThreadId', sessionId);
+
+            // Note: __currentState is updated automatically via $watch on __currentThreadId
+            const state = this.__getThreadState(sessionId);
+
+            // Load messages if not already loaded
+            if (state.messages.length === 0) {
+                this.__loadMessages(sessionId);
+            }
+
+            // Scroll to bottom after switching
+            this.$nextTick(() => this.__scrollToBottom());
         },
 
         async __updateSessionTitle() {

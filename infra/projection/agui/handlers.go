@@ -83,46 +83,6 @@ func (h *AguiProjectionHandler) GetMessages(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-// GetToolCalls returns all tool calls for a thread.
-// GET /api/agui/threads/{threadId}/tool-calls.
-func (h *AguiProjectionHandler) GetToolCalls(w http.ResponseWriter, r *http.Request) {
-	threadID := r.PathValue("threadId")
-	if threadID == "" {
-		http.Error(w, "threadId is required", http.StatusBadRequest)
-
-		return
-	}
-
-	toolCalls := h.projection.GetToolCalls(threadID)
-
-	w.Header().Set("Content-Type", "application/json")
-	err := json.NewEncoder(w).Encode(toolCalls)
-	if err != nil {
-		slog.Error("Failed to encode tool calls", "error", err)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-	}
-}
-
-// GetAgentActivity returns agent activity summary for a thread.
-// GET /api/agui/threads/{threadId}/agent-activity.
-func (h *AguiProjectionHandler) GetAgentActivity(w http.ResponseWriter, r *http.Request) {
-	threadID := r.PathValue("threadId")
-	if threadID == "" {
-		http.Error(w, "threadId is required", http.StatusBadRequest)
-
-		return
-	}
-
-	activity := h.projection.GetAgentActivity(threadID)
-
-	w.Header().Set("Content-Type", "application/json")
-	err := json.NewEncoder(w).Encode(activity)
-	if err != nil {
-		slog.Error("Failed to encode agent activity", "error", err)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-	}
-}
-
 // ListThreads returns all thread IDs in the projection.
 // GET /api/agui/threads.
 func (h *AguiProjectionHandler) ListThreads(w http.ResponseWriter, r *http.Request) {

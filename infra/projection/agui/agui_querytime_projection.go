@@ -86,26 +86,6 @@ func (p *QueryTimeAguiProjection) GetMessages(threadID string) []aguievents.Mess
 	return state.Messages
 }
 
-// GetToolCalls retrieves all tool calls for a thread.
-func (p *QueryTimeAguiProjection) GetToolCalls(threadID string) []AguiToolCall {
-	state, exists := p.GetThreadState(threadID)
-	if !exists {
-		return []AguiToolCall{}
-	}
-
-	return state.ToolCalls
-}
-
-// GetAgentActivity retrieves agent activity summary for a thread.
-func (p *QueryTimeAguiProjection) GetAgentActivity(threadID string) map[string]*AguiAgentActivity {
-	state, exists := p.GetThreadState(threadID)
-	if !exists {
-		return make(map[string]*AguiAgentActivity)
-	}
-
-	return state.AgentActivity
-}
-
 // ListThreads returns all thread IDs.
 // Requires the event store to implement ThreadIDLister.
 func (p *QueryTimeAguiProjection) ListThreads() []string {
