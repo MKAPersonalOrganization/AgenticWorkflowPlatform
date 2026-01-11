@@ -2,9 +2,10 @@ package querytime
 
 import (
 	"context"
+	"time"
+
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
-	"time"
 )
 
 // ThreadLister provides a way to list all thread IDs.
@@ -87,7 +88,10 @@ func (p *QueryTimeLLMContextProjection) GetAgentThread(threadID string) (core.Ag
 	meta := &threadMetadata{}
 
 	for _, event := range events {
-		_ = applyEventToThread(agentThread, meta, event)
+		if err := applyEventToThread(agentThread, meta, event); err != nil {
+			// Continue processing other events even if one fails
+			continue
+		}
 	}
 
 	return agentThread, true
@@ -196,7 +200,9 @@ func applyEventToThread(agentThread core.AgentThread, meta *threadMetadata, even
 			Timestamp:  evt.Timestamp,
 			Metadata:   evt.Metadata,
 		}
-		_ = agentThread.AddMessages([]domain.Message{msg})
+		if err := agentThread.AddMessages([]domain.Message{msg}); err != nil {
+			return err
+		}
 		meta.UpdatedAt = evt.Timestamp
 	case *domain.MessageAdded:
 		msg := domain.Message{
@@ -209,7 +215,9 @@ func applyEventToThread(agentThread core.AgentThread, meta *threadMetadata, even
 			Timestamp:  evt.Timestamp,
 			Metadata:   evt.Metadata,
 		}
-		_ = agentThread.AddMessages([]domain.Message{msg})
+		if err := agentThread.AddMessages([]domain.Message{msg}); err != nil {
+			return err
+		}
 		meta.UpdatedAt = evt.Timestamp
 
 	case domain.ThreadTitleChanged:

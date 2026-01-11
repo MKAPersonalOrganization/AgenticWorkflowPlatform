@@ -186,7 +186,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// Initialize Kratos client and auth handlers
 	kratosClient := auth.NewKratosClient()
-	authHandlers := auth.NewAuthHandlers(kratosClient)
+	authHandlers := auth.NewAuthHandlers(log, kratosClient)
 	authMiddleware := auth.NewMiddleware(kratosClient)
 
 	// Health check endpoints (public)
@@ -216,7 +216,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Delete("/api/agui/threads/{threadId}", authMiddleware.RequireAuthFunc(handler.DeleteThread))
 
 	// Home route
-	r.Get("/", authMiddleware.RequireAuthFunc(HandleViewChatInputScreen))
+	r.Get("/", authMiddleware.RequireAuthFunc(HandleViewChatInputScreen(log)))
 
 	// Create server with proper timeouts to prevent slowloris and similar attacks
 	server := &http.Server{
@@ -257,7 +257,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 		defer cancel()
 
 		if err := server.Shutdown(ctx); err != nil {
-			server.Close()
+			if closeErr := server.Close(); closeErr != nil {
+				log.Error(ctx, "failed to close server", "error", closeErr)
+			}
 			return fmt.Errorf("could not stop server gracefully: %w", err)
 		}
 	}
@@ -265,16 +267,14 @@ func run(ctx context.Context, log *logger.Logger) error {
 	return nil
 }
 
-func HandleViewChatInputScreen(w http.ResponseWriter, r *http.Request) {
-	// Get authenticated user from context
-	user := auth.GetUserFromContext(r.Context())
+func HandleViewChatInputScreen(log *logger.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Get authenticated user from context
+		user := auth.GetUserFromContext(r.Context())
 
-	component := components.ChatInputScreen(user)
-	err := component.Render(r.Context(), w)
-	if err != nil {
-		// Note: log would need to be passed to this function to use the logger
-		// For now, we'll leave this as is since it's just a render error
-		// Don't call http.Error after Render has already written headers
-		// Just log the error - the partial response will be sent
+		component := components.ChatInputScreen(user)
+		if err := component.Render(r.Context(), w); err != nil {
+			log.Error(r.Context(), "failed to render chat input screen", "error", err)
+		}
 	}
 }

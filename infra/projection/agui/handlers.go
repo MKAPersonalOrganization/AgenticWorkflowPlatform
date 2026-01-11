@@ -3,7 +3,6 @@ package agui
 import (
 	"encoding/json"
 	"net/http"
-
 	"school-with-ai/infra/projection/whiteboard"
 	"school-with-ai/services"
 )

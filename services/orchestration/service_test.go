@@ -44,6 +44,7 @@ func TestServiceCreation(t *testing.T) {
 	t.Parallel()
 	// This test ensures the Service struct can be instantiated
 	service := NewService(
+		nil, // log
 		nil, // chatWriteService
 		nil, // threadStore
 		nil, // whiteboardProjection
@@ -107,7 +108,7 @@ func TestUserMessageParamsValidation(t *testing.T) {
 // TestHandleUserMessageCancellation verifies that HandleUserMessage respects context cancellation.
 func TestHandleUserMessageCancellation(t *testing.T) {
 	t.Parallel()
-	service := NewService(nil, nil, nil, nil, nil)
+	service := NewService(nil, nil, nil, nil, nil, nil)
 	emitter := &mockEventEmitter{}
 
 	// Create cancelled context
