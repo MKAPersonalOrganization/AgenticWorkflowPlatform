@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"iter"
 	"log/slog"
+	"time"
+
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/sdk/agentsdk/llm"
 	"school-with-ai/services/chatwrite/rag"
-	"time"
 )
 
 var (
@@ -483,12 +484,15 @@ func (h *ChatWriteService) CreateThread(ctx context.Context, threadID, title str
 
 	// Try to load existing thread first (idempotency check)
 	existingThread, err := h.threadRepo.Load(ctx, threadID)
-	if err == nil && existingThread.GetVersion() > 0 {
+	if err == nil {
 		slog.Debug("Thread already exists, skipping create",
 			"threadID", threadID,
 			"version", existingThread.GetVersion())
 		// Thread already exists, this is idempotent
 		return nil
+	}
+	if err != nil && !errors.Is(err, domain.ErrThreadNotFound) {
+		return fmt.Errorf("failed to check existing thread: %w", err)
 	}
 	slog.Debug("Thread does not exist, creating new thread", "threadID", threadID)
 
@@ -538,31 +542,30 @@ func (h *ChatWriteService) AddUserMessage(ctx context.Context, threadID, message
 
 	// Load existing aggregate
 	thread, err := h.threadRepo.Load(ctx, threadID)
-	if err != nil {
-		slog.Debug("Failed to load thread for message",
-			"threadID", threadID,
-			"error", err)
-		return fmt.Errorf("failed to load thread: %w", err)
-	}
 
-	slog.Debug("Thread loaded for message",
-		"threadID", threadID,
-		"version", thread.Version,
-		"title", thread.Title)
-
-	// Remember if this is a new thread (for choosing Save vs SaveNew)
-	isNewThread := thread.GetVersion() == 0
-
-	// If this is a new thread (version 0), create it first with a default title
-	if isNewThread {
-		slog.Debug("Thread is new (version 0), creating first", "threadID", threadID)
+	// Handle thread not found - create it
+	if errors.Is(err, domain.ErrThreadNotFound) {
+		slog.Debug("Thread not found, creating new thread", "threadID", threadID)
 
 		// Create thread using static factory
 		thread, err = domain.OpenThread(threadID, "system", "New Chat") // TODO: Get userID from context
 		if err != nil {
 			return fmt.Errorf("failed to create thread: %w", err)
 		}
+	} else if err != nil {
+		slog.Debug("Failed to load thread for message",
+			"threadID", threadID,
+			"error", err)
+		return fmt.Errorf("failed to load thread: %w", err)
+	} else {
+		slog.Debug("Thread loaded for message",
+			"threadID", threadID,
+			"version", thread.Version,
+			"title", thread.Title)
 	}
+
+	// Remember if this is a new thread (for choosing Save vs SaveNew)
+	isNewThread := thread.GetVersion() == 0
 
 	// Add the user message using aggregate method
 	err = thread.AddMessage(messageID, "user", content, nil, "", "", nil)

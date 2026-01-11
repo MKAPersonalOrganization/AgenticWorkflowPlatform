@@ -44,6 +44,7 @@ func NewRepository[T interface {
 }
 
 // Load retrieves an aggregate by ID, rebuilding it from events.
+// Returns ErrThreadNotFound if the stream doesn't exist (no events).
 func (r *Repository[T]) Load(ctx context.Context, id string) (T, error) {
 	aggregate := r.newAggregate(id)
 	streamName := r.getStreamName(aggregate)
@@ -53,6 +54,12 @@ func (r *Repository[T]) Load(ctx context.Context, id string) (T, error) {
 	if err != nil {
 		var zero T
 		return zero, err
+	}
+
+	// Return error if aggregate doesn't exist (no events found)
+	if len(events) == 0 {
+		var zero T
+		return zero, ErrThreadNotFound
 	}
 
 	slog.Debug("Loading aggregate from event store",
