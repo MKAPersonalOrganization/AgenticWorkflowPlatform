@@ -42,14 +42,21 @@ func (m *EventBufferManager) GetEventBuffer(jobID string) (*EventBuffer, bool) {
 	return buffer, exists
 }
 
-// CloseEmitter closes and removes the event buffer for a job.
+// RemoveEventBuffer removes an event buffer from the manager (cleanup after SSE completes).
+func (m *EventBufferManager) RemoveEventBuffer(jobID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.eventBuffers, jobID)
+}
+
+// CloseEmitter closes the event buffer for a job (marks it as complete).
 func (m *EventBufferManager) CloseEmitter(jobID string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if buffer, exists := m.eventBuffers[jobID]; exists {
 		buffer.Close()
-		delete(m.eventBuffers, jobID)
+		// Don't delete immediately - SSE handler needs time to read all events
 	}
 }
 

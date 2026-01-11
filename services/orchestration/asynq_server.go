@@ -180,6 +180,11 @@ func (s *AsynqServer) GetEventBuffer(jobID string) (*EventBuffer, bool) {
 	return s.eventBufferManager.GetEventBuffer(jobID)
 }
 
+// RemoveEventBuffer removes an event buffer after SSE streaming completes.
+func (s *AsynqServer) RemoveEventBuffer(jobID string) {
+	s.eventBufferManager.RemoveEventBuffer(jobID)
+}
+
 // GetTaskInfo retrieves task information from Asynq.
 func (s *AsynqServer) GetTaskInfo(queue, taskID string) (*asynq.TaskInfo, error) {
 	inspector := asynq.NewInspector(asynq.RedisClientOpt{Addr: s.redisAddr})
