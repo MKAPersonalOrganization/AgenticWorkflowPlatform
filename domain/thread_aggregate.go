@@ -103,21 +103,6 @@ func (t *ThreadAggregate) ChangeTitle(newTitle string) error {
 	return nil
 }
 
-// ClearMessages clears all messages from the thread.
-func (t *ThreadAggregate) ClearMessages() error {
-	if t.IsDeleted {
-		return errors.New("cannot clear messages from deleted thread")
-	}
-
-	event := MessagesCleared{
-		ThreadID:  t.ID,
-		Timestamp: time.Now(),
-	}
-
-	t.Enqueue(event, t.Apply)
-	return nil
-}
-
 // Delete marks the thread as deleted.
 func (t *ThreadAggregate) Delete() error {
 	if t.IsDeleted {
@@ -161,10 +146,6 @@ func (t *ThreadAggregate) Apply(event core.Event) {
 
 	case ThreadTitleChanged:
 		t.Title = e.NewTitle
-		t.UpdatedAt = e.Timestamp
-
-	case MessagesCleared:
-		t.Messages = make([]Message, 0)
 		t.UpdatedAt = e.Timestamp
 
 	case ThreadDeleted:
