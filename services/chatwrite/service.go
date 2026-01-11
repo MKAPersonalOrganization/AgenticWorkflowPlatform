@@ -375,12 +375,6 @@ func (h *ChatWriteService) runIteration(
 				return fmt.Errorf("failed to add tool result message: %w", err)
 			}
 
-			// Persist ToolCallExecuted event to event store (for projections like whiteboard)
-			err = h.addToolCallExecutedEvent(ctx, threadID, toolResultID, toolCall, messageID, result)
-			if err != nil {
-				return fmt.Errorf("failed to add tool call executed event: %w", err)
-			}
-
 			// Emit UI event for real-time notification
 			toolEvent := &core.ToolCallExecutedEvent{
 				BaseEvent: core.BaseEvent{
@@ -657,30 +651,6 @@ func (h *ChatWriteService) addToolResultMessage(ctx context.Context, threadID, m
 	if err != nil {
 		return fmt.Errorf("failed to add tool result: %w", err)
 	}
-
-	return h.threadRepo.Save(ctx, thread)
-}
-
-// addToolCallExecutedEvent persists a ToolCallExecuted event to enable projection rebuilding.
-func (h *ChatWriteService) addToolCallExecutedEvent(ctx context.Context, threadID, messageID string, toolCall core.ToolCall, parentMessageID, result string) error {
-	thread, err := h.threadRepo.Load(ctx, threadID)
-	if err != nil {
-		return fmt.Errorf("failed to load thread: %w", err)
-	}
-
-	event := domain.ToolCallExecuted{
-		ThreadID:        threadID,
-		MessageID:       messageID,
-		ToolCallID:      toolCall.ID,
-		ToolName:        toolCall.Function.Name,
-		ToolArguments:   toolCall.Function.Arguments,
-		ToolResult:      result,
-		ParentMessageID: parentMessageID,
-		AgentName:       h.config.Name,
-		Timestamp:       time.Now(),
-	}
-
-	thread.Enqueue(event, thread.Apply)
 
 	return h.threadRepo.Save(ctx, thread)
 }

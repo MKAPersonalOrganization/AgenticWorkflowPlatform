@@ -170,11 +170,6 @@ func (t *ThreadAggregate) Apply(event core.Event) {
 	case ThreadDeleted:
 		t.IsDeleted = true
 		t.UpdatedAt = e.Timestamp
-
-	case ToolCallExecuted:
-		// Tool call execution doesn't modify aggregate state,
-		// but we track it for projections (e.g., whiteboard)
-		t.UpdatedAt = e.Timestamp
 	}
 }
 

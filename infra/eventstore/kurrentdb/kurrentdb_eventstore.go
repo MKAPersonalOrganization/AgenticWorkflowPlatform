@@ -8,9 +8,10 @@ import (
 	"io"
 	"log/slog"
 	"math"
+	"strings"
+
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
-	"strings"
 
 	"github.com/kurrent-io/KurrentDB-Client-Go/kurrentdb"
 )
@@ -234,14 +235,6 @@ func (s *KurrentDBEventStore) convertFromRecordedEvent(recordedEvent *kurrentdb.
 		err := json.Unmarshal(recordedEvent.Data, &e)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal ThreadDeleted: %w", err)
-		}
-		event = e
-
-	case "ToolCallExecuted":
-		var e domain.ToolCallExecuted
-		err := json.Unmarshal(recordedEvent.Data, &e)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal ToolCallExecuted: %w", err)
 		}
 		event = e
 

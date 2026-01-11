@@ -3,6 +3,7 @@ package whiteboard
 import (
 	"context"
 	"encoding/json"
+
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 )
@@ -24,9 +25,6 @@ type QueryTimeWhiteboardProjection struct {
 type ThreadIDLister interface {
 	ReadAllThreadIDs(ctx context.Context) ([]string, error)
 }
-
-// ToolCallExecuted is an alias to avoid repeated package qualifiers.
-type ToolCallExecuted = domain.ToolCallExecuted
 
 // NewQueryTimeWhiteboardProjection creates a new query-time whiteboard projection.
 func NewQueryTimeWhiteboardProjection(eventStore core.EventStore, threadIDLister ThreadIDLister) *QueryTimeWhiteboardProjection {
@@ -99,23 +97,21 @@ func (p *QueryTimeWhiteboardProjection) Rebuild(ctx context.Context, store core.
 
 // applyEventToWhiteboard applies an event to rebuild whiteboard state.
 func applyEventToWhiteboard(currentContent string, event core.Event) string {
-	// Handle both domain.ToolCallExecuted (persisted) and core.ToolCallExecutedEvent (UI events)
+	// Rebuild from MessageAdded events with toolCalls
 	switch evt := event.(type) {
-	case *ToolCallExecuted:
-		if evt.ToolName == "write_whiteboard" {
-			return applyWhiteboardTool(currentContent, evt.ToolArguments)
+	case *domain.MessageAdded:
+		// Check if assistant message has write_whiteboard tool call
+		for _, tc := range evt.ToolCalls {
+			if tc.Function.Name == "write_whiteboard" {
+				return applyWhiteboardTool(currentContent, tc.Function.Arguments)
+			}
 		}
-	case ToolCallExecuted:
-		if evt.ToolName == "write_whiteboard" {
-			return applyWhiteboardTool(currentContent, evt.ToolArguments)
-		}
-	case *core.ToolCallExecutedEvent:
-		if evt.ToolName == "write_whiteboard" {
-			return applyWhiteboardTool(currentContent, evt.ToolArguments)
-		}
-	case core.ToolCallExecutedEvent:
-		if evt.ToolName == "write_whiteboard" {
-			return applyWhiteboardTool(currentContent, evt.ToolArguments)
+	case domain.MessageAdded:
+		// Check if assistant message has write_whiteboard tool call
+		for _, tc := range evt.ToolCalls {
+			if tc.Function.Name == "write_whiteboard" {
+				return applyWhiteboardTool(currentContent, tc.Function.Arguments)
+			}
 		}
 	}
 
