@@ -1,12 +1,8 @@
 package middleware
 
 import (
-	"context"
-	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/metrics"
 	"testing"
 )
@@ -48,10 +44,6 @@ func TestPanics(t *testing.T) {
 		},
 	}
 
-	log := logger.New(io.Discard, logger.LevelInfo, "TEST", func(context.Context) string {
-		return "00000000-0000-0000-0000-000000000000"
-	})
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -64,7 +56,7 @@ func TestPanics(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			// Wrap handler with panic middleware
-			mw := Panics(log)
+			mw := Panics()
 			handler := mw(tt.handler)
 
 			// Execute handler
@@ -89,17 +81,13 @@ func TestPanics(t *testing.T) {
 func TestPanicsIntegration(t *testing.T) {
 	t.Parallel()
 
-	log := logger.New(os.Stdout, logger.LevelInfo, "TEST", func(context.Context) string {
-		return "00000000-0000-0000-0000-000000000000"
-	})
-
 	// Create a handler that panics
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		panic("integration test panic")
 	})
 
 	// Wrap with panic middleware
-	mw := Panics(log)
+	mw := Panics()
 	wrappedHandler := mw(handler)
 
 	// Create request
