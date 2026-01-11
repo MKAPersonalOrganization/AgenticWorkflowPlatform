@@ -1,8 +1,9 @@
 package domain
 
 import (
-	"school-with-ai/sdk/agentsdk/core"
 	"time"
+
+	"school-with-ai/sdk/agentsdk/core"
 )
 
 // Thread domain events
@@ -66,21 +67,3 @@ type MessagesCleared struct {
 func (e MessagesCleared) EventType() string         { return "MessagesCleared" }
 func (e MessagesCleared) EventTimestamp() time.Time { return e.Timestamp }
 func (e MessagesCleared) AggregateID() string       { return e.ThreadID }
-
-// ToolCallExecuted is emitted when a tool call is executed.
-// This event is persisted to enable projection rebuilding (e.g., whiteboard state).
-type ToolCallExecuted struct {
-	ThreadID        string    `json:"threadId"`
-	MessageID       string    `json:"messageId"` // ID of the tool result message
-	ToolCallID      string    `json:"toolCallId"`
-	ToolName        string    `json:"toolName"`
-	ToolArguments   string    `json:"toolArguments"`
-	ToolResult      string    `json:"toolResult"`
-	ParentMessageID string    `json:"parentMessageId"` // ID of the assistant message that initiated the tool call
-	AgentName       string    `json:"agentName"`
-	Timestamp       time.Time `json:"timestamp"`
-}
-
-func (e ToolCallExecuted) EventType() string         { return "ToolCallExecuted" }
-func (e ToolCallExecuted) EventTimestamp() time.Time { return e.Timestamp }
-func (e ToolCallExecuted) AggregateID() string       { return e.ThreadID }
