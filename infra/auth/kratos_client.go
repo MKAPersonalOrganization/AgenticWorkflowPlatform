@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"fmt"
-	"os"
 
 	client "github.com/ory/client-go"
 )
@@ -19,17 +18,13 @@ type KratosClient struct {
 	browserURL string
 }
 
-// NewKratosClient creates a new Kratos client from environment variables.
-func NewKratosClient() *KratosClient {
-	publicURL := requireEnv("KRATOS_PUBLIC_URL")
-	adminURL := requireEnv("KRATOS_ADMIN_URL")
-	browserURL := requireEnv("KRATOS_BROWSER_URL")
-
+// NewKratosClient creates a new Kratos client from the provided configuration.
+func NewKratosClient(cfg Config) *KratosClient {
 	// Configuration for public (frontend) API
 	frontendConfig := client.NewConfiguration()
 	frontendConfig.Servers = client.ServerConfigurations{
 		{
-			URL: publicURL,
+			URL: cfg.KratosPublic,
 		},
 	}
 
@@ -37,13 +32,13 @@ func NewKratosClient() *KratosClient {
 	adminConfig := client.NewConfiguration()
 	adminConfig.Servers = client.ServerConfigurations{
 		{
-			URL: adminURL,
+			URL: cfg.KratosAdmin,
 		},
 	}
 
 	// Add admin API token if configured
-	if token := os.Getenv("ORY_ADMIN_API_TOKEN"); token != "" {
-		adminConfig.AddDefaultHeader("Authorization", "Bearer "+token)
+	if cfg.AdminAPIToken != "" {
+		adminConfig.AddDefaultHeader("Authorization", "Bearer "+cfg.AdminAPIToken)
 	}
 
 	apiClient := client.NewAPIClient(frontendConfig)
@@ -52,9 +47,9 @@ func NewKratosClient() *KratosClient {
 		frontend:   apiClient.FrontendAPI,
 		identity:   client.NewAPIClient(adminConfig).IdentityAPI,
 		metadata:   apiClient.MetadataAPI,
-		publicURL:  publicURL,
-		adminURL:   adminURL,
-		browserURL: browserURL,
+		publicURL:  cfg.KratosPublic,
+		adminURL:   cfg.KratosAdmin,
+		browserURL: cfg.KratosBrowser,
 	}
 }
 
@@ -227,21 +222,3 @@ func (k *KratosClient) GetFlowError(ctx context.Context, errorID string) (*clien
 	return flowError, nil
 }
 
-// requireEnv gets an environment variable or panics if not set.
-func requireEnv(key string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		panic(fmt.Sprintf("required environment variable %s is not set", key))
-	}
-
-	return value
-}
-
-// getEnv gets an environment variable with a default fallback.
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-
-	return defaultValue
-}

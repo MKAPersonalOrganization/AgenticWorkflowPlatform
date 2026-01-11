@@ -3,7 +3,6 @@ package auth
 import (
 	"net/http"
 	"net/url"
-	"os"
 	"school-with-ai/components/auth"
 	"school-with-ai/foundation/logger"
 )
@@ -16,12 +15,7 @@ type AuthHandlers struct {
 }
 
 // NewAuthHandlers creates new authentication handlers.
-func NewAuthHandlers(log *logger.Logger, kratos *KratosClient) *AuthHandlers {
-	appURL := os.Getenv("APP_URL")
-	if appURL == "" {
-		panic("required environment variable APP_URL is not set")
-	}
-
+func NewAuthHandlers(log *logger.Logger, kratos *KratosClient, appURL string) *AuthHandlers {
 	return &AuthHandlers{
 		log:    log,
 		kratos: kratos,
