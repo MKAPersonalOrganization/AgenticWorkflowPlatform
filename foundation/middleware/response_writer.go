@@ -16,3 +16,11 @@ func (rw *responseWriter) WriteHeader(code int) {
 	}
 	rw.ResponseWriter.WriteHeader(code)
 }
+
+// Flush implements http.Flusher by delegating to the underlying ResponseWriter.
+// This is required for SSE (Server-Sent Events) streaming to work.
+func (rw *responseWriter) Flush() {
+	if flusher, ok := rw.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
