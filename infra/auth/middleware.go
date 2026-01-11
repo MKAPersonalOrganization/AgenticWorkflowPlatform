@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
 	"school-with-ai/domain"
 
 	client "github.com/ory/client-go"
@@ -26,12 +25,7 @@ type Middleware struct {
 }
 
 // NewMiddleware creates a new authentication middleware.
-func NewMiddleware(kratosClient *KratosClient) *Middleware {
-	appURL := os.Getenv("APP_URL")
-	if appURL == "" {
-		panic("required environment variable APP_URL is not set")
-	}
-
+func NewMiddleware(kratosClient *KratosClient, appURL string) *Middleware {
 	return &Middleware{
 		kratosClient: kratosClient,
 		appURL:       appURL,

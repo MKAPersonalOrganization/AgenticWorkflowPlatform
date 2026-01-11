@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"expvar"
 	"fmt"
-	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -36,8 +36,8 @@ import (
 
 	authService "school-with-ai/services/auth"
 
+	"github.com/ardanlabs/conf/v3"
 	"github.com/go-chi/chi/v5"
-	"github.com/openai/openai-go/v3"
 )
 
 var build = "develop"
@@ -72,62 +72,88 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// -------------------------------------------------------------------------
 	// Configuration
 
-	// Get server address
-	addr := os.Getenv("SERVER_ADDR")
-	if addr == "" {
-		return fmt.Errorf("SERVER_ADDR environment variable is not set")
+	cfg := struct {
+		conf.Version
+		Web struct {
+			ReadTimeout       time.Duration `conf:"default:15s"`
+			WriteTimeout      time.Duration `conf:"default:15s"`
+			IdleTimeout       time.Duration `conf:"default:60s"`
+			ReadHeaderTimeout time.Duration `conf:"default:10s"`
+			ShutdownTimeout   time.Duration `conf:"default:20s"`
+			APIHost           string        `conf:"default:localhost:8090"`
+			DebugHost         string        `conf:"default:0.0.0.0:4010"`
+		}
+		Auth struct {
+			AppURL         string `conf:"default:http://localhost:8090"`
+			KratosPublic   string `conf:"default:http://localhost:4433"`
+			KratosAdmin    string `conf:"default:http://localhost:4434"`
+			KratosBrowser  string `conf:"default:http://localhost:4433"`
+			AdminAPIToken  string
+		}
+		KurrentDB struct {
+			ConnectionString string `conf:"default:esdb://localhost:2113?tls=false"`
+		}
+		Redis struct {
+			Addr string `conf:"default:localhost:6379"`
+		}
+		Orchestration struct {
+			Concurrency         int           `conf:"default:5"`
+			ShutdownTimeout     time.Duration `conf:"default:10s"`
+			HealthCheckInterval time.Duration `conf:"default:15s"`
+		}
+		AI struct {
+			Model string `conf:"default:gpt-4o-mini"`
+		}
+	}{
+		Version: conf.Version{
+			Build: build,
+			Desc:  "School with AI",
+		},
 	}
 
-	host, port, err := net.SplitHostPort(addr)
+	const prefix = "SCHOOL"
+	help, err := conf.Parse(prefix, &cfg)
 	if err != nil {
-		return fmt.Errorf("invalid SERVER_ADDR: %v", err)
+		if errors.Is(err, conf.ErrHelpWanted) {
+			fmt.Println(help)
+			return nil
+		}
+		return fmt.Errorf("parsing config: %w", err)
 	}
 
-	log.Info(ctx, "startup", "status", "starting server", "host", host, "port", port)
+	// -------------------------------------------------------------------------
+	// App Starting
+
+	log.Info(ctx, "starting service", "version", cfg.Build)
 	defer log.Info(ctx, "shutdown complete")
 
-	// Set build info in expvar for metrics
-	expvar.NewString("build").Set(build)
-
-	// Get debug server address from environment
-	debugAddr := os.Getenv("DEBUG_ADDR")
-	if debugAddr == "" {
-		debugAddr = "0.0.0.0:4010"
-		log.Info(ctx, "startup", "status", "using default debug address", "addr", debugAddr)
+	out, err := conf.String(&cfg)
+	if err != nil {
+		return fmt.Errorf("generating config for output: %w", err)
 	}
+	log.Info(ctx, "startup", "config", out)
+
+	expvar.NewString("build").Set(cfg.Build)
 
 	// -------------------------------------------------------------------------
 	// Start Debug Service
 
 	go func() {
-		log.Info(ctx, "startup", "status", "debug server started", "host", debugAddr)
+		log.Info(ctx, "startup", "status", "debug server started", "host", cfg.Web.DebugHost)
 
-		debugServer := &http.Server{
-			Addr:              debugAddr,
-			Handler:           debug.Mux(),
-			ReadHeaderTimeout: 5 * time.Second,
-			ReadTimeout:       10 * time.Second,
-			WriteTimeout:      10 * time.Second,
-			IdleTimeout:       120 * time.Second,
-		}
-
-		if err := debugServer.ListenAndServe(); err != nil {
-			log.Error(ctx, "shutdown", "status", "debug server closed", "host", debugAddr, "err", err)
+		if err := http.ListenAndServe(cfg.Web.DebugHost, debug.Mux()); err != nil {
+			log.Error(ctx, "shutdown", "status", "debug server closed", "host", cfg.Web.DebugHost, "msg", err)
 		}
 	}()
 
 	// -------------------------------------------------------------------------
+	// Initialize KurrentDB EventStore
 
-	// Initialize KurrentDB EventStore (production-ready, PostgreSQL-backed)
-	kurrentDBConnectionString := os.Getenv("KURRENTDB_CONNECTION_STRING")
-	if kurrentDBConnectionString == "" {
-		kurrentDBConnectionString = "esdb://localhost:2113?tls=false"
-		log.Info(ctx, "startup", "status", "using default KurrentDB connection", "connectionString", kurrentDBConnectionString)
-	}
+	log.Info(ctx, "startup", "status", "initializing KurrentDB event store", "host", cfg.KurrentDB.ConnectionString)
 
-	baseEventStore, err := kurrentdb.NewKurrentDBEventStore(kurrentDBConnectionString)
+	baseEventStore, err := kurrentdb.NewKurrentDBEventStore(cfg.KurrentDB.ConnectionString)
 	if err != nil {
-		return fmt.Errorf("failed to create KurrentDB event store: %v", err)
+		return fmt.Errorf("failed to create KurrentDB event store: %w", err)
 	}
 	defer func() {
 		closeErr := baseEventStore.Close()
@@ -151,8 +177,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 	llmContextProjection := querytime.NewQueryTimeLLMContextProjection(baseEventStore, aguiProjection)
 
 	// Initialize OpenAI chat client with model
-	model := string(openai.ChatModelGPT4oMini) // Use GPT-4o-mini for cost efficiency
-	chatClient := llm.NewOpenAIClient(model)
+	log.Info(ctx, "startup", "status", "initializing AI client", "model", cfg.AI.Model)
+	chatClient := llm.NewOpenAIClient(cfg.AI.Model)
 
 	// Register all agent factories for routing
 	shared.GlobalAgents.Register("student-facing-agent", studentfacing.CreateStudentFacingAgent)
@@ -170,21 +196,18 @@ func run(ctx context.Context, log *logger.Logger) error {
 	authSvc := authService.NewAuthService()
 	projectionService := projections.NewProjectionService(aguiProjection, whiteboardProjection, llmContextProjection)
 
-	// Get Redis address from environment
-	redisAddr := os.Getenv("REDIS_ADDR")
-	if redisAddr == "" {
-		redisAddr = "localhost:6379"
-		log.Info(ctx, "startup", "status", "using default Redis address", "addr", redisAddr)
-	}
-
+	// -------------------------------------------------------------------------
 	// Initialize Asynq server
+
+	log.Info(ctx, "startup", "status", "initializing asynq server", "redis", cfg.Redis.Addr)
+
 	asynqServer := orchestration.NewAsynqServer(
 		log,
 		orchestration.AsynqConfig{
-			RedisAddr:           redisAddr,
-			Concurrency:         5,
-			ShutdownTimeout:     10 * time.Second, // Wait 10s for workers to finish
-			HealthCheckInterval: 15 * time.Second, // Check Redis every 15s
+			RedisAddr:           cfg.Redis.Addr,
+			Concurrency:         cfg.Orchestration.Concurrency,
+			ShutdownTimeout:     cfg.Orchestration.ShutdownTimeout,
+			HealthCheckInterval: cfg.Orchestration.HealthCheckInterval,
 		},
 		eventLog,
 		llmContextProjection,
@@ -194,10 +217,10 @@ func run(ctx context.Context, log *logger.Logger) error {
 	)
 	defer asynqServer.Shutdown()
 	log.Info(ctx, "startup", "status", "asynq server started",
-		"redis", redisAddr,
-		"concurrency", 5,
-		"shutdownTimeout", "10s",
-		"healthCheckInterval", "15s")
+		"redis", cfg.Redis.Addr,
+		"concurrency", cfg.Orchestration.Concurrency,
+		"shutdownTimeout", cfg.Orchestration.ShutdownTimeout,
+		"healthCheckInterval", cfg.Orchestration.HealthCheckInterval)
 
 	// Create HTTP handler
 	handler := handlers.NewAsynqHandler(log, chatClient, asynqServer, chatWriteService, authSvc, projectionService)
@@ -232,9 +255,16 @@ func run(ctx context.Context, log *logger.Logger) error {
 	aguiHandler := agui.NewAguiProjectionHandler(aguiProjection, whiteboardProjection, projectionService)
 
 	// Initialize Kratos client and auth handlers
-	kratosClient := auth.NewKratosClient()
-	authHandlers := auth.NewAuthHandlers(log, kratosClient)
-	authMiddleware := auth.NewMiddleware(kratosClient)
+	authConfig := auth.Config{
+		AppURL:         cfg.Auth.AppURL,
+		KratosPublic:   cfg.Auth.KratosPublic,
+		KratosAdmin:    cfg.Auth.KratosAdmin,
+		KratosBrowser:  cfg.Auth.KratosBrowser,
+		AdminAPIToken:  cfg.Auth.AdminAPIToken,
+	}
+	kratosClient := auth.NewKratosClient(authConfig)
+	authHandlers := auth.NewAuthHandlers(log, kratosClient, cfg.Auth.AppURL)
+	authMiddleware := auth.NewMiddleware(kratosClient, cfg.Auth.AppURL)
 
 	// Health check endpoints (public)
 	r.Get("/liveness", healthHandler.Liveness)
@@ -267,12 +297,12 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// Create server with proper timeouts to prevent slowloris and similar attacks
 	server := &http.Server{
-		Addr:              addr,
+		Addr:              cfg.Web.APIHost,
 		Handler:           r,
-		ReadTimeout:       15 * time.Second,
-		ReadHeaderTimeout: 10 * time.Second,
-		WriteTimeout:      15 * time.Second,
-		IdleTimeout:       60 * time.Second,
+		ReadTimeout:       cfg.Web.ReadTimeout,
+		ReadHeaderTimeout: cfg.Web.ReadHeaderTimeout,
+		WriteTimeout:      cfg.Web.WriteTimeout,
+		IdleTimeout:       cfg.Web.IdleTimeout,
 	}
 
 	// -------------------------------------------------------------------------
@@ -300,13 +330,11 @@ func run(ctx context.Context, log *logger.Logger) error {
 		log.Info(ctx, "shutdown", "status", "shutdown started", "signal", sig)
 		defer log.Info(ctx, "shutdown", "status", "shutdown complete", "signal", sig)
 
-		ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, cfg.Web.ShutdownTimeout)
 		defer cancel()
 
 		if err := server.Shutdown(ctx); err != nil {
-			if closeErr := server.Close(); closeErr != nil {
-				log.Error(ctx, "failed to close server", "error", closeErr)
-			}
+			server.Close()
 			return fmt.Errorf("could not stop server gracefully: %w", err)
 		}
 	}
