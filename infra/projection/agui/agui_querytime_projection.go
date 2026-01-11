@@ -3,10 +3,10 @@ package agui
 import (
 	"context"
 	"fmt"
-	"log/slog"
+	"time"
+
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
-	"time"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
@@ -46,15 +46,8 @@ func (p *QueryTimeAguiProjection) GetThreadState(threadID string) (*AguiThreadSt
 	streamName := fmt.Sprintf("Thread-%s", threadID)
 	events, err := p.eventStore.ReadStream(ctx, streamName, 0)
 	if err != nil || len(events) == 0 {
-		slog.Debug("GetThreadState: No events for thread",
-			"threadID", threadID,
-			"error", err)
 		return nil, false
 	}
-
-	slog.Debug("GetThreadState: Reading events for thread",
-		"threadID", threadID,
-		"eventCount", len(events))
 
 	state := &AguiThreadState{
 		ThreadID:      threadID,
@@ -69,20 +62,9 @@ func (p *QueryTimeAguiProjection) GetThreadState(threadID string) (*AguiThreadSt
 	toolCallsByID := make(map[string]*AguiToolCall)
 	var activeRun *AguiRunState
 
-	for i, event := range events {
-		slog.Debug("Applying event to thread state",
-			"threadID", threadID,
-			"eventIndex", i,
-			"eventType", event.EventType())
+	for _, event := range events {
 		p.applyEventToState(event, state, streamingMessages, toolCallsByID, &activeRun)
 	}
-
-	slog.Debug("GetThreadState: Final state",
-		"threadID", threadID,
-		"title", state.Title,
-		"messageCount", len(state.Messages),
-		"version", state.Version,
-		"isDeleted", state.IsDeleted)
 
 	// Don't return deleted threads
 	if state.IsDeleted {
@@ -118,17 +100,14 @@ func (p *QueryTimeAguiProjection) GetMessages(threadID string) []aguievents.Mess
 // Requires the event store to implement ThreadIDLister.
 func (p *QueryTimeAguiProjection) ListThreads() []string {
 	if p.threadIDLister == nil {
-		slog.Debug("ListThreads: threadIDLister is nil")
 		return []string{}
 	}
 
 	ctx := context.Background()
 	threadIDs, err := p.threadIDLister.ReadAllThreadIDs(ctx)
 	if err != nil {
-		slog.Debug("ListThreads: Error reading thread IDs", "error", err)
 		return []string{}
 	}
-	slog.Debug("ListThreads returning threads", "count", len(threadIDs))
 
 	return threadIDs
 }

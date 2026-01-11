@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"iter"
-	"log/slog"
 	"time"
 
 	"school-with-ai/domain"
+	"school-with-ai/foundation/logger"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/sdk/agentsdk/llm"
 	"school-with-ai/services/chatwrite/rag"
@@ -46,6 +46,7 @@ type ShouldContinueIterationFn func(toolCalls []domain.ToolCall) bool
 // ChatWriteService handles processing of user messages using pure event sourcing
 // Each agent is responsible for registering its own event notifications.
 type ChatWriteService struct {
+	log                     *logger.Logger
 	config                  core.AgentConfig
 	chatClient              ChatClient
 	writeModel              core.EventStore
@@ -90,11 +91,12 @@ func WithRAG(ragService rag.RAG) Option {
 }
 
 // New creates a new chat write service with event sourcing (no UI dependencies).
-func New(chatClient ChatClient, writeModel core.EventStore, readModel ThreadStore, opts ...Option) *ChatWriteService {
+func New(log *logger.Logger, chatClient ChatClient, writeModel core.EventStore, readModel ThreadStore, opts ...Option) *ChatWriteService {
 	// Create tool registry
 	toolRegistry := core.NewToolRegistry()
 
 	h := &ChatWriteService{
+		log:          log,
 		chatClient:   chatClient,
 		writeModel:   writeModel,
 		readModel:    readModel,
@@ -478,14 +480,14 @@ func (h *ChatWriteService) executeToolCallWithExecutor(threadID string, toolCall
 
 // CreateThread creates a new chat thread using event sourcing.
 func (h *ChatWriteService) CreateThread(ctx context.Context, threadID, title string) error {
-	slog.Debug("CreateThread called",
+	h.log.Debug(ctx, "CreateThread called",
 		"threadID", threadID,
 		"title", title)
 
 	// Try to load existing thread first (idempotency check)
 	existingThread, err := h.threadRepo.Load(ctx, threadID)
 	if err == nil {
-		slog.Debug("Thread already exists, skipping create",
+		h.log.Debug(ctx, "Thread already exists, skipping create",
 			"threadID", threadID,
 			"version", existingThread.GetVersion())
 		// Thread already exists, this is idempotent
@@ -494,7 +496,7 @@ func (h *ChatWriteService) CreateThread(ctx context.Context, threadID, title str
 	if err != nil && !errors.Is(err, domain.ErrThreadNotFound) {
 		return fmt.Errorf("failed to check existing thread: %w", err)
 	}
-	slog.Debug("Thread does not exist, creating new thread", "threadID", threadID)
+	h.log.Debug(ctx, "Thread does not exist, creating new thread", "threadID", threadID)
 
 	// Create thread using static factory method (like ShoppingCart.Open)
 	thread, err := domain.OpenThread(threadID, "system", title) // TODO: Get userID from context
@@ -502,24 +504,24 @@ func (h *ChatWriteService) CreateThread(ctx context.Context, threadID, title str
 		return fmt.Errorf("failed to create thread: %w", err)
 	}
 
-	slog.Debug("Thread created, saving with uncommitted events",
+	h.log.Debug(ctx, "Thread created, saving with uncommitted events",
 		"threadID", threadID,
 		"eventCount", len(thread.DequeueUncommittedEvents()))
 
 	// Save the new thread
 	err = h.threadRepo.SaveNew(ctx, thread)
 	if err != nil {
-		slog.Debug("SaveNew failed",
+		h.log.Debug(ctx, "SaveNew failed",
 			"threadID", threadID,
 			"error", err)
 		// If concurrency conflict, thread was created by another request - this is fine
 		if errors.Is(err, core.ErrConcurrencyConflict) {
-			slog.Debug("Concurrency conflict, thread already created", "threadID", threadID)
+			h.log.Debug(ctx, "Concurrency conflict, thread already created", "threadID", threadID)
 			return nil
 		}
 		return fmt.Errorf("failed to save new thread: %w", err)
 	}
-	slog.Debug("Thread created successfully", "threadID", threadID)
+	h.log.Debug(ctx, "Thread created successfully", "threadID", threadID)
 
 	// Emit UI event for frontend notification
 	_ = h.emitUIEvent(&core.ThreadCreatedEvent{
@@ -536,7 +538,7 @@ func (h *ChatWriteService) CreateThread(ctx context.Context, threadID, title str
 
 // AddUserMessage adds a user message to a thread using event sourcing.
 func (h *ChatWriteService) AddUserMessage(ctx context.Context, threadID, messageID, content string) error {
-	slog.Debug("AddUserMessage called",
+	h.log.Debug(ctx, "AddUserMessage called",
 		"threadID", threadID,
 		"messageID", messageID)
 
@@ -545,7 +547,7 @@ func (h *ChatWriteService) AddUserMessage(ctx context.Context, threadID, message
 
 	// Handle thread not found - create it
 	if errors.Is(err, domain.ErrThreadNotFound) {
-		slog.Debug("Thread not found, creating new thread", "threadID", threadID)
+		h.log.Debug(ctx, "Thread not found, creating new thread", "threadID", threadID)
 
 		// Create thread using static factory
 		thread, err = domain.OpenThread(threadID, "system", "New Chat") // TODO: Get userID from context
@@ -553,12 +555,12 @@ func (h *ChatWriteService) AddUserMessage(ctx context.Context, threadID, message
 			return fmt.Errorf("failed to create thread: %w", err)
 		}
 	} else if err != nil {
-		slog.Debug("Failed to load thread for message",
+		h.log.Debug(ctx, "Failed to load thread for message",
 			"threadID", threadID,
 			"error", err)
 		return fmt.Errorf("failed to load thread: %w", err)
 	} else {
-		slog.Debug("Thread loaded for message",
+		h.log.Debug(ctx, "Thread loaded for message",
 			"threadID", threadID,
 			"version", thread.Version,
 			"title", thread.Title)
@@ -570,14 +572,14 @@ func (h *ChatWriteService) AddUserMessage(ctx context.Context, threadID, message
 	// Add the user message using aggregate method
 	err = thread.AddMessage(messageID, "user", content, nil, "", "", nil)
 	if err != nil {
-		slog.Debug("Failed to add message",
+		h.log.Debug(ctx, "Failed to add message",
 			"threadID", threadID,
 			"messageID", messageID,
 			"error", err)
 		return fmt.Errorf("failed to add message: %w", err)
 	}
 
-	slog.Debug("Message added, saving thread",
+	h.log.Debug(ctx, "Message added, saving thread",
 		"threadID", threadID,
 		"isNewThread", isNewThread)
 
@@ -585,31 +587,31 @@ func (h *ChatWriteService) AddUserMessage(ctx context.Context, threadID, message
 	// For new threads: use SaveNew (expects version 0 in event store)
 	// For existing threads: use Save (expects current version)
 	if isNewThread {
-		slog.Debug("New thread - using SaveNew", "threadID", threadID)
+		h.log.Debug(ctx, "New thread - using SaveNew", "threadID", threadID)
 		err = h.threadRepo.SaveNew(ctx, thread)
 		if err != nil {
-			slog.Debug("SaveNew failed",
+			h.log.Debug(ctx, "SaveNew failed",
 				"threadID", threadID,
 				"error", err)
 			// If concurrency conflict, thread was created by another request
 			if errors.Is(err, core.ErrConcurrencyConflict) {
-				slog.Debug("Concurrency conflict - thread created by another request", "threadID", threadID)
+				h.log.Debug(ctx, "Concurrency conflict - thread created by another request", "threadID", threadID)
 				return nil // Idempotent - thread exists, no error
 			}
 			return fmt.Errorf("failed to save new thread: %w", err)
 		}
 	} else {
-		slog.Debug("Existing thread - using Save with version check", "threadID", threadID)
+		h.log.Debug(ctx, "Existing thread - using Save with version check", "threadID", threadID)
 		err = h.threadRepo.Save(ctx, thread)
 		if err != nil {
-			slog.Debug("Failed to save thread",
+			h.log.Debug(ctx, "Failed to save thread",
 				"threadID", threadID,
 				"error", err)
 			return fmt.Errorf("failed to save thread: %w", err)
 		}
 	}
 
-	slog.Debug("Thread saved successfully", "threadID", threadID)
+	h.log.Debug(ctx, "Thread saved successfully", "threadID", threadID)
 
 	// Emit UI event for frontend notification
 	_ = h.emitUIEvent(&core.UserMessageAddedEvent{
@@ -659,19 +661,19 @@ func (h *ChatWriteService) addToolResultMessage(ctx context.Context, threadID, m
 
 // UpdateThreadTitle updates the title of a thread using event sourcing.
 func (h *ChatWriteService) UpdateThreadTitle(ctx context.Context, threadID, newTitle string) error {
-	slog.Debug("UpdateThreadTitle called",
+	h.log.Debug(ctx, "UpdateThreadTitle called",
 		"threadID", threadID,
 		"newTitle", newTitle)
 
 	// Load existing aggregate
 	thread, err := h.threadRepo.Load(ctx, threadID)
 	if err != nil {
-		slog.Debug("Failed to load thread for title update",
+		h.log.Debug(ctx, "Failed to load thread for title update",
 			"threadID", threadID,
 			"error", err)
 		return fmt.Errorf("failed to load thread: %w", err)
 	}
-	slog.Debug("Thread loaded",
+	h.log.Debug(ctx, "Thread loaded",
 		"threadID", threadID,
 		"version", thread.GetVersion(),
 		"currentTitle", thread.Title)
@@ -679,7 +681,7 @@ func (h *ChatWriteService) UpdateThreadTitle(ctx context.Context, threadID, newT
 	// Change title using aggregate method
 	err = thread.ChangeTitle(newTitle)
 	if err != nil {
-		slog.Debug("Failed to change title",
+		h.log.Debug(ctx, "Failed to change title",
 			"threadID", threadID,
 			"error", err)
 		return fmt.Errorf("failed to change title: %w", err)
@@ -687,12 +689,12 @@ func (h *ChatWriteService) UpdateThreadTitle(ctx context.Context, threadID, newT
 
 	err = h.threadRepo.Save(ctx, thread)
 	if err != nil {
-		slog.Debug("Failed to save thread after title change",
+		h.log.Debug(ctx, "Failed to save thread after title change",
 			"threadID", threadID,
 			"error", err)
 		return fmt.Errorf("failed to save thread: %w", err)
 	}
-	slog.Debug("Thread title updated successfully",
+	h.log.Debug(ctx, "Thread title updated successfully",
 		"threadID", threadID,
 		"newTitle", newTitle)
 

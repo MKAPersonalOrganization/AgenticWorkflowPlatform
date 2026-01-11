@@ -1,8 +1,8 @@
 package orchestration
 
 import (
+	"context"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/hibiken/asynq"
@@ -38,7 +38,7 @@ func (s *AsynqServer) GetMetrics() (*ServerMetrics, error) {
 	defer func() {
 		err := inspector.Close()
 		if err != nil {
-			slog.Warn("Failed to close inspector", "error", err)
+			s.log.Warn(context.Background(), "Failed to close inspector", "error", err)
 		}
 	}()
 
