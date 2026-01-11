@@ -33,11 +33,6 @@ func (r *ThreadRepository) Delete(ctx context.Context, threadID string) error {
 		return err
 	}
 
-	// Check if thread exists (has events)
-	if thread.Version == 0 {
-		return ErrThreadNotFound
-	}
-
 	// Call the aggregate's Delete method
 	err = thread.Delete()
 	if err != nil {
