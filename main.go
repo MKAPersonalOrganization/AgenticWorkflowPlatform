@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"expvar"
 	"fmt"
 	"net"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"os/signal"
 	"runtime"
 	"school-with-ai/components"
+	"school-with-ai/foundation/debug"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/handlers"
 	"school-with-ai/infra/auth"
@@ -38,6 +40,8 @@ import (
 	"github.com/openai/openai-go/v3"
 )
 
+var build = "develop"
+
 func main() {
 	var log *logger.Logger
 
@@ -66,7 +70,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 	log.Info(ctx, "startup", "GOMAXPROCS", runtime.GOMAXPROCS(0))
 
 	// -------------------------------------------------------------------------
+	// Configuration
 
+	// Get server address
 	addr := os.Getenv("SERVER_ADDR")
 	if addr == "" {
 		return fmt.Errorf("SERVER_ADDR environment variable is not set")
@@ -79,6 +85,38 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	log.Info(ctx, "startup", "status", "starting server", "host", host, "port", port)
 	defer log.Info(ctx, "shutdown complete")
+
+	// Set build info in expvar for metrics
+	expvar.NewString("build").Set(build)
+
+	// Get debug server address from environment
+	debugAddr := os.Getenv("DEBUG_ADDR")
+	if debugAddr == "" {
+		debugAddr = "0.0.0.0:4010"
+		log.Info(ctx, "startup", "status", "using default debug address", "addr", debugAddr)
+	}
+
+	// -------------------------------------------------------------------------
+	// Start Debug Service
+
+	go func() {
+		log.Info(ctx, "startup", "status", "debug server started", "host", debugAddr)
+
+		debugServer := &http.Server{
+			Addr:              debugAddr,
+			Handler:           debug.Mux(),
+			ReadHeaderTimeout: 5 * time.Second,
+			ReadTimeout:       10 * time.Second,
+			WriteTimeout:      10 * time.Second,
+			IdleTimeout:       120 * time.Second,
+		}
+
+		if err := debugServer.ListenAndServe(); err != nil {
+			log.Error(ctx, "shutdown", "status", "debug server closed", "host", debugAddr, "err", err)
+		}
+	}()
+
+	// -------------------------------------------------------------------------
 
 	// Initialize KurrentDB EventStore (production-ready, PostgreSQL-backed)
 	kurrentDBConnectionString := os.Getenv("KURRENTDB_CONNECTION_STRING")
