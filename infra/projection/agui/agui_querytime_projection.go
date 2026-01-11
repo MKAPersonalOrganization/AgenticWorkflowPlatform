@@ -3,10 +3,9 @@ package agui
 import (
 	"context"
 	"fmt"
-	"time"
-
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
+	"time"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )

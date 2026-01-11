@@ -4,23 +4,27 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+
 	"school-with-ai/components/auth"
+	"school-with-ai/foundation/logger"
 )
 
 // AuthHandlers contains handlers for authentication routes.
 type AuthHandlers struct {
+	log    *logger.Logger
 	kratos *KratosClient
 	appURL string
 }
 
 // NewAuthHandlers creates new authentication handlers.
-func NewAuthHandlers(kratos *KratosClient) *AuthHandlers {
+func NewAuthHandlers(log *logger.Logger, kratos *KratosClient) *AuthHandlers {
 	appURL := os.Getenv("APP_URL")
 	if appURL == "" {
 		panic("required environment variable APP_URL is not set")
 	}
 
 	return &AuthHandlers{
+		log:    log,
 		kratos: kratos,
 		appURL: appURL,
 	}
@@ -132,8 +136,8 @@ func (h *AuthHandlers) LoginPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	component := auth.LoginPageWithNodes(flow.Ui.Nodes, props)
-	err = component.Render(r.Context(), w)
-	if err != nil {
+	if err := component.Render(r.Context(), w); err != nil {
+		h.log.Error(r.Context(), "failed to render login page", "error", err, "flowID", flowID)
 	}
 }
 
@@ -209,8 +213,8 @@ func (h *AuthHandlers) RegistrationPage(w http.ResponseWriter, r *http.Request) 
 	}
 
 	component := auth.RegistrationPageWithNodes(flow.Ui.Nodes, props)
-	err = component.Render(r.Context(), w)
-	if err != nil {
+	if err := component.Render(r.Context(), w); err != nil {
+		h.log.Error(r.Context(), "failed to render registration page", "error", err, "flowID", flowID)
 	}
 }
 
@@ -286,8 +290,8 @@ func (h *AuthHandlers) RecoveryPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	component := auth.RecoveryPageWithNodes(flow.Ui.Nodes, props)
-	err = component.Render(r.Context(), w)
-	if err != nil {
+	if err := component.Render(r.Context(), w); err != nil {
+		h.log.Error(r.Context(), "failed to render recovery page", "error", err, "flowID", flowID)
 	}
 }
 
@@ -363,8 +367,8 @@ func (h *AuthHandlers) VerificationPage(w http.ResponseWriter, r *http.Request) 
 	}
 
 	component := auth.VerificationPageWithNodes(flow.Ui.Nodes, props)
-	err = component.Render(r.Context(), w)
-	if err != nil {
+	if err := component.Render(r.Context(), w); err != nil {
+		h.log.Error(r.Context(), "failed to render verification page", "error", err, "flowID", flowID)
 	}
 }
 
@@ -433,8 +437,8 @@ func (h *AuthHandlers) SettingsPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	component := auth.SettingsPageWithNodes(flow.Ui.Nodes, props)
-	err = component.Render(r.Context(), w)
-	if err != nil {
+	if err := component.Render(r.Context(), w); err != nil {
+		h.log.Error(r.Context(), "failed to render settings page", "error", err, "flowID", flowID)
 	}
 }
 

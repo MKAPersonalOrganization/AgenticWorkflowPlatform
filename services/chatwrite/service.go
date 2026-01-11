@@ -245,7 +245,10 @@ func (h *ChatWriteService) runIteration(
 					Content:   completeContent,
 					AgentName: h.config.Name,
 				}
-				_ = h.emitUIEvent(evt)
+				if err := h.emitUIEvent(evt); err != nil {
+					h.log.Error(ctx, "failed to emit assistant message completed event on disconnect",
+						"error", err, "threadID", threadID, "messageID", messageID)
+				}
 			}
 
 			return fmt.Errorf("client disconnected during streaming: %w", ctx.Err())
@@ -524,14 +527,16 @@ func (h *ChatWriteService) CreateThread(ctx context.Context, threadID, title str
 	h.log.Debug(ctx, "Thread created successfully", "threadID", threadID)
 
 	// Emit UI event for frontend notification
-	_ = h.emitUIEvent(&core.ThreadCreatedEvent{
+	if err := h.emitUIEvent(&core.ThreadCreatedEvent{
 		BaseEvent: core.BaseEvent{
 			Type:      "ThreadCreatedEvent",
 			Timestamp: time.Now(),
 			ThreadID:  threadID,
 		},
 		Title: title,
-	})
+	}); err != nil {
+		h.log.Error(ctx, "failed to emit thread created event", "error", err, "threadID", threadID)
+	}
 
 	return nil
 }
@@ -614,7 +619,7 @@ func (h *ChatWriteService) AddUserMessage(ctx context.Context, threadID, message
 	h.log.Debug(ctx, "Thread saved successfully", "threadID", threadID)
 
 	// Emit UI event for frontend notification
-	_ = h.emitUIEvent(&core.UserMessageAddedEvent{
+	if err := h.emitUIEvent(&core.UserMessageAddedEvent{
 		BaseEvent: core.BaseEvent{
 			Type:      "UserMessageAddedEvent",
 			Timestamp: time.Now(),
@@ -622,7 +627,9 @@ func (h *ChatWriteService) AddUserMessage(ctx context.Context, threadID, message
 		},
 		MessageID: messageID,
 		Content:   content,
-	})
+	}); err != nil {
+		h.log.Error(ctx, "failed to emit user message added event", "error", err, "threadID", threadID)
+	}
 
 	return nil
 }
@@ -699,14 +706,16 @@ func (h *ChatWriteService) UpdateThreadTitle(ctx context.Context, threadID, newT
 		"newTitle", newTitle)
 
 	// Emit UI event for frontend notification
-	_ = h.emitUIEvent(&core.ThreadTitleUpdatedEvent{
+	if err := h.emitUIEvent(&core.ThreadTitleUpdatedEvent{
 		BaseEvent: core.BaseEvent{
 			Type:      "ThreadTitleUpdatedEvent",
 			Timestamp: time.Now(),
 			ThreadID:  threadID,
 		},
 		NewTitle: newTitle,
-	})
+	}); err != nil {
+		h.log.Error(ctx, "failed to emit thread title updated event", "error", err, "threadID", threadID)
+	}
 
 	return nil
 }

@@ -4,9 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
-
 	"school-with-ai/foundation/logger"
+	"time"
 
 	"github.com/hibiken/asynq"
 )

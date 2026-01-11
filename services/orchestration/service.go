@@ -114,19 +114,23 @@ func (s *Service) HandleUserMessage(
 	}
 
 	// 5. Run agent handoff chain starting with student-facing agent
-	_ = emitter.Emit(&domain.RunStartedEvent{
+	if err := emitter.Emit(&domain.RunStartedEvent{
 		ThreadID:  params.ThreadID,
 		RunID:     runID,
 		Timestamp: time.Now(),
-	})
+	}); err != nil {
+		s.log.Error(ctx, "failed to emit run started event", "error", err, "threadID", params.ThreadID)
+	}
 
 	s.runAgentHandoffChain(ctx, params.ThreadID, "student-facing-agent", emitter, runID)
 
-	_ = emitter.Emit(&domain.RunFinishedEvent{
+	if err := emitter.Emit(&domain.RunFinishedEvent{
 		ThreadID:  params.ThreadID,
 		RunID:     runID,
 		Timestamp: time.Now(),
-	})
+	}); err != nil {
+		s.log.Error(ctx, "failed to emit run finished event", "error", err, "threadID", params.ThreadID)
+	}
 
 	return nil
 }
@@ -142,12 +146,14 @@ func (s *Service) runAgentHandoffChain(ctx context.Context, threadID, startAgent
 
 		nextAgent, err := s.runAgent(ctx, threadID, currentAgent, emitter)
 		if err != nil {
-			_ = emitter.Emit(&domain.RunErrorEvent{
+			if emitErr := emitter.Emit(&domain.RunErrorEvent{
 				ThreadID:  threadID,
 				Message:   fmt.Sprintf("Agent %s failed: %v", currentAgent, err),
 				ErrorCode: "AGENT_RUN_ERROR",
 				Timestamp: time.Now(),
-			})
+			}); emitErr != nil {
+				s.log.Error(ctx, "failed to emit run error event", "error", emitErr, "threadID", threadID)
+			}
 			return
 		}
 

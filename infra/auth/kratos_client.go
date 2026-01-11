@@ -98,9 +98,6 @@ func (k *KratosClient) ToSession(ctx context.Context, cookie string) (*client.Se
 		defer func() { _ = resp.Body.Close() }()
 	}
 	if err != nil {
-		if resp != nil {
-		}
-
 		return nil, fmt.Errorf("failed to validate session: %w", err)
 	}
 
@@ -119,9 +116,6 @@ func (k *KratosClient) GetLoginFlow(ctx context.Context, flowID string, cookie s
 		defer func() { _ = resp.Body.Close() }()
 	}
 	if err != nil {
-		if resp != nil {
-		}
-
 		return nil, fmt.Errorf("failed to get login flow: %w", err)
 	}
 
@@ -140,9 +134,6 @@ func (k *KratosClient) GetRegistrationFlow(ctx context.Context, flowID string, c
 		defer func() { _ = resp.Body.Close() }()
 	}
 	if err != nil {
-		if resp != nil {
-		}
-
 		return nil, fmt.Errorf("failed to get registration flow: %w", err)
 	}
 
@@ -161,9 +152,6 @@ func (k *KratosClient) GetRecoveryFlow(ctx context.Context, flowID string, cooki
 		defer func() { _ = resp.Body.Close() }()
 	}
 	if err != nil {
-		if resp != nil {
-		}
-
 		return nil, fmt.Errorf("failed to get recovery flow: %w", err)
 	}
 
@@ -182,9 +170,6 @@ func (k *KratosClient) GetVerificationFlow(ctx context.Context, flowID string, c
 		defer func() { _ = resp.Body.Close() }()
 	}
 	if err != nil {
-		if resp != nil {
-		}
-
 		return nil, fmt.Errorf("failed to get verification flow: %w", err)
 	}
 
@@ -203,9 +188,6 @@ func (k *KratosClient) GetSettingsFlow(ctx context.Context, flowID string, cooki
 		defer func() { _ = resp.Body.Close() }()
 	}
 	if err != nil {
-		if resp != nil {
-		}
-
 		return nil, fmt.Errorf("failed to get settings flow: %w", err)
 	}
 
@@ -224,9 +206,6 @@ func (k *KratosClient) CreateBrowserLogoutFlow(ctx context.Context, cookie strin
 		defer func() { _ = resp.Body.Close() }()
 	}
 	if err != nil {
-		if resp != nil {
-		}
-
 		return nil, fmt.Errorf("failed to create logout flow: %w", err)
 	}
 
@@ -242,9 +221,6 @@ func (k *KratosClient) GetFlowError(ctx context.Context, errorID string) (*clien
 		defer func() { _ = resp.Body.Close() }()
 	}
 	if err != nil {
-		if resp != nil {
-		}
-
 		return nil, fmt.Errorf("failed to get flow error: %w", err)
 	}
 
