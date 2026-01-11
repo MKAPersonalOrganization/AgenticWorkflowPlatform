@@ -148,6 +148,13 @@ func (h *AsynqHandler) StreamJobEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Override the server's WriteTimeout for this long-lived SSE connection
+	rc := http.NewResponseController(w)
+	if err := rc.SetWriteDeadline(time.Time{}); err != nil {
+		h.log.Error(r.Context(), "[API] Failed to disable write deadline", "error", err)
+		// Continue anyway - connection might still work
+	}
+
 	// Setup SSE headers
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -224,6 +231,8 @@ streamEvents:
 
 			// Check if job is complete
 			if eventBuffer.IsClosed() && eventIndex >= eventBuffer.Len() {
+				// Cleanup: remove event buffer after all events have been sent
+				h.asynqServer.RemoveEventBuffer(jobID)
 				return
 			}
 		}
