@@ -1,12 +1,17 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
 	"school-with-ai/components"
 	"school-with-ai/handlers"
 	"school-with-ai/infra/auth"
@@ -26,7 +31,6 @@ import (
 	"school-with-ai/services/chatwrite/agents/statistics"
 	"school-with-ai/services/chatwrite/agents/studentfacing"
 	"school-with-ai/services/orchestration"
-	"time"
 
 	authService "school-with-ai/services/auth"
 
@@ -36,33 +40,48 @@ import (
 )
 
 func main() {
+	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
+
+	// -------------------------------------------------------------------------
+
+	ctx := context.Background()
+
+	if err := run(ctx, log); err != nil {
+		log.Error("startup", "err", err)
+		os.Exit(1)
+	}
+}
+
+func run(ctx context.Context, log *slog.Logger) error {
 	addr := os.Getenv("SERVER_ADDR")
 	if addr == "" {
-		panic("SERVER_ADDR environment variable is not set")
+		return fmt.Errorf("SERVER_ADDR environment variable is not set")
 	}
 
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
-		panic(fmt.Sprintf("invalid SERVER_ADDR: %v", err))
+		return fmt.Errorf("invalid SERVER_ADDR: %v", err)
 	}
 
-	slog.Info("Starting server with Asynq", "host", host, "port", port)
+	log.Info("Starting server with Asynq", "host", host, "port", port)
 
 	// Initialize KurrentDB EventStore (production-ready, PostgreSQL-backed)
 	kurrentDBConnectionString := os.Getenv("KURRENTDB_CONNECTION_STRING")
 	if kurrentDBConnectionString == "" {
 		kurrentDBConnectionString = "esdb://localhost:2113?tls=false"
-		slog.Info("Using default KurrentDB connection string", "connectionString", kurrentDBConnectionString)
+		log.Info("Using default KurrentDB connection string", "connectionString", kurrentDBConnectionString)
 	}
 
 	baseEventStore, err := kurrentdb.NewKurrentDBEventStore(kurrentDBConnectionString)
 	if err != nil {
-		panic(fmt.Sprintf("failed to create KurrentDB event store: %v", err))
+		return fmt.Errorf("failed to create KurrentDB event store: %v", err)
 	}
 	defer func() {
 		closeErr := baseEventStore.Close()
 		if closeErr != nil {
-			slog.Error("Failed to close event store", "error", closeErr)
+			log.Error("Failed to close event store", "error", closeErr)
 		}
 	}()
 
@@ -104,7 +123,7 @@ func main() {
 	redisAddr := os.Getenv("REDIS_ADDR")
 	if redisAddr == "" {
 		redisAddr = "localhost:6379"
-		slog.Info("Using default Redis address", "addr", redisAddr)
+		log.Info("Using default Redis address", "addr", redisAddr)
 	}
 
 	// Initialize Asynq server
@@ -122,7 +141,7 @@ func main() {
 		chatWriteService,
 	)
 	defer asynqServer.Shutdown()
-	slog.Info("Asynq server started",
+	log.Info("Asynq server started",
 		"redis", redisAddr,
 		"concurrency", 5,
 		"shutdownTimeout", "10s",
@@ -159,7 +178,7 @@ func main() {
 		// Get Asynq metrics
 		metrics, err := asynqServer.GetMetrics()
 		if err != nil {
-			slog.Error("Failed to get Asynq metrics", "error", err)
+			log.Error("Failed to get Asynq metrics", "error", err)
 			metrics = nil
 		}
 
@@ -175,7 +194,7 @@ func main() {
 		}
 
 		if err := json.NewEncoder(w).Encode(response); err != nil {
-			slog.Error("Failed to encode health response", "error", err)
+			log.Error("Failed to encode health response", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 		}
 	})
@@ -215,10 +234,41 @@ func main() {
 		IdleTimeout:       60 * time.Second,
 	}
 
-	err = server.ListenAndServe()
-	if err != nil {
-		panic(err)
+	// -------------------------------------------------------------------------
+	// Start API Service
+
+	shutdown := make(chan os.Signal, 1)
+	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
+
+	serverErrors := make(chan error, 1)
+
+	go func() {
+		log.Info("startup", "status", "api router started", "host", server.Addr)
+
+		serverErrors <- server.ListenAndServe()
+	}()
+
+	// -------------------------------------------------------------------------
+	// Shutdown
+
+	select {
+	case err := <-serverErrors:
+		return fmt.Errorf("server error: %w", err)
+
+	case sig := <-shutdown:
+		log.Info("shutdown", "status", "shutdown started", "signal", sig)
+		defer log.Info("shutdown", "status", "shutdown complete", "signal", sig)
+
+		ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+		defer cancel()
+
+		if err := server.Shutdown(ctx); err != nil {
+			server.Close()
+			return fmt.Errorf("could not stop server gracefully: %w", err)
+		}
 	}
+
+	return nil
 }
 
 func HandleViewChatInputScreen(w http.ResponseWriter, r *http.Request) {
