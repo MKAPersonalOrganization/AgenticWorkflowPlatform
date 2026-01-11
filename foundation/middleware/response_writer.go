@@ -24,3 +24,9 @@ func (rw *responseWriter) Flush() {
 		flusher.Flush()
 	}
 }
+
+// Unwrap returns the underlying ResponseWriter.
+// This is required for http.ResponseController to access deadline/timeout methods.
+func (rw *responseWriter) Unwrap() http.ResponseWriter {
+	return rw.ResponseWriter
+}
