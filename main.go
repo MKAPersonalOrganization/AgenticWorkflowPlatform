@@ -12,6 +12,8 @@ import (
 	"school-with-ai/components"
 	"school-with-ai/foundation/debug"
 	"school-with-ai/foundation/logger"
+	"school-with-ai/foundation/metrics"
+	"school-with-ai/foundation/middleware"
 	"school-with-ai/handlers"
 	"school-with-ai/infra/auth"
 	"school-with-ai/infra/eventstore/kurrentdb"
@@ -36,7 +38,7 @@ import (
 	authService "school-with-ai/services/auth"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/openai/openai-go/v3"
 )
 
@@ -208,9 +210,20 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Create chi router
 	r := chi.NewRouter()
 
+	// Add panic recovery middleware first (most important - must be first)
+	r.Use(middleware.Panics(log))
+
+	// Add metrics context to all requests
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := metrics.Set(r.Context())
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	})
+
 	// Add chi middleware
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
+	r.Use(chimiddleware.Logger)
+	r.Use(chimiddleware.Recoverer)
 
 	// Serve static assets
 	r.Handle("/assets/css/*", http.StripPrefix("/assets/css/", http.FileServer(http.Dir("./assets/css"))))
