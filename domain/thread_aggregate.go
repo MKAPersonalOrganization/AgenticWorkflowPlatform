@@ -2,10 +2,9 @@ package domain
 
 import (
 	"errors"
-	"fmt"
-	"log/slog"
-	"school-with-ai/sdk/agentsdk/core"
 	"time"
+
+	"school-with-ai/sdk/agentsdk/core"
 )
 
 // ThreadAggregate is an event-sourced aggregate representing a conversation thread.
@@ -43,7 +42,7 @@ func OpenThread(threadID, userID, title string) (*ThreadAggregate, error) {
 	}
 
 	thread := NewThreadAggregate(threadID)
-	event := &ThreadCreated{
+	event := ThreadCreated{
 		ThreadID:  threadID,
 		UserID:    userID,
 		Title:     title,
@@ -67,7 +66,7 @@ func (t *ThreadAggregate) AddMessage(messageID, role, content string, toolCalls 
 		return errors.New("message role is required")
 	}
 
-	event := &MessageAdded{
+	event := MessageAdded{
 		ThreadID:   t.ID,
 		MessageID:  messageID,
 		Role:       role,
@@ -94,7 +93,7 @@ func (t *ThreadAggregate) ChangeTitle(newTitle string) error {
 		return nil
 	}
 
-	event := &ThreadTitleChanged{
+	event := ThreadTitleChanged{
 		ThreadID:  t.ID,
 		NewTitle:  newTitle,
 		Timestamp: time.Now(),
@@ -110,7 +109,7 @@ func (t *ThreadAggregate) ClearMessages() error {
 		return errors.New("cannot clear messages from deleted thread")
 	}
 
-	event := &MessagesCleared{
+	event := MessagesCleared{
 		ThreadID:  t.ID,
 		Timestamp: time.Now(),
 	}
@@ -125,7 +124,7 @@ func (t *ThreadAggregate) Delete() error {
 		return errors.New("thread already deleted")
 	}
 
-	event := &ThreadDeleted{
+	event := ThreadDeleted{
 		ThreadID:  t.ID,
 		Timestamp: time.Now(),
 	}
@@ -136,13 +135,9 @@ func (t *ThreadAggregate) Delete() error {
 
 // Apply applies an event to update the thread's state.
 // This is the only place where state mutations happen.
-// Handles both pointer and value types since events may be stored as values.
 func (t *ThreadAggregate) Apply(event core.Event) {
-	slog.Debug("Applying event to aggregate", "eventType", event.EventType(), "concreteType", fmt.Sprintf("%T", event))
-
 	switch e := event.(type) {
-	case *ThreadCreated:
-		slog.Debug("Applying ThreadCreated", "pointer", true, "threadID", e.ThreadID, "title", e.Title)
+	case ThreadCreated:
 		t.ID = e.ThreadID
 		t.UserID = e.UserID
 		t.Title = e.Title
@@ -150,17 +145,7 @@ func (t *ThreadAggregate) Apply(event core.Event) {
 		t.UpdatedAt = e.Timestamp
 		t.IsDeleted = false
 
-	case ThreadCreated: // Handle value type
-		slog.Debug("Applying ThreadCreated", "pointer", false, "threadID", e.ThreadID, "title", e.Title)
-		t.ID = e.ThreadID
-		t.UserID = e.UserID
-		t.Title = e.Title
-		t.CreatedAt = e.Timestamp
-		t.UpdatedAt = e.Timestamp
-		t.IsDeleted = false
-
-	case *MessageAdded:
-		slog.Debug("Applying MessageAdded", "pointer", true, "messageID", e.MessageID, "role", e.Role)
+	case MessageAdded:
 		msg := Message{
 			ID:         e.MessageID,
 			Role:       e.Role,
@@ -174,65 +159,22 @@ func (t *ThreadAggregate) Apply(event core.Event) {
 		t.Messages = append(t.Messages, msg)
 		t.UpdatedAt = e.Timestamp
 
-	case MessageAdded: // Handle value type
-		slog.Debug("Applying MessageAdded", "pointer", false, "messageID", e.MessageID, "role", e.Role)
-		msg := Message{
-			ID:         e.MessageID,
-			Role:       e.Role,
-			Content:    e.Content,
-			Timestamp:  e.Timestamp,
-			ToolCalls:  e.ToolCalls,
-			ToolCallID: e.ToolCallID,
-			AgentName:  e.AgentName,
-			Metadata:   e.Metadata,
-		}
-		t.Messages = append(t.Messages, msg)
-		t.UpdatedAt = e.Timestamp
-
-	case *ThreadTitleChanged:
-		slog.Debug("Applying ThreadTitleChanged", "pointer", true, "newTitle", e.NewTitle)
+	case ThreadTitleChanged:
 		t.Title = e.NewTitle
 		t.UpdatedAt = e.Timestamp
 
-	case ThreadTitleChanged: // Handle value type
-		slog.Debug("Applying ThreadTitleChanged", "pointer", false, "newTitle", e.NewTitle)
-		t.Title = e.NewTitle
-		t.UpdatedAt = e.Timestamp
-
-	case *MessagesCleared:
-		slog.Debug("Applying MessagesCleared", "pointer", true)
+	case MessagesCleared:
 		t.Messages = make([]Message, 0)
 		t.UpdatedAt = e.Timestamp
 
-	case MessagesCleared: // Handle value type
-		slog.Debug("Applying MessagesCleared", "pointer", false)
-		t.Messages = make([]Message, 0)
-		t.UpdatedAt = e.Timestamp
-
-	case *ThreadDeleted:
-		slog.Debug("Applying ThreadDeleted", "pointer", true)
+	case ThreadDeleted:
 		t.IsDeleted = true
 		t.UpdatedAt = e.Timestamp
 
-	case ThreadDeleted: // Handle value type
-		slog.Debug("Applying ThreadDeleted", "pointer", false)
-		t.IsDeleted = true
-		t.UpdatedAt = e.Timestamp
-
-	case *ToolCallExecuted:
-		slog.Debug("Applying ToolCallExecuted", "pointer", true)
+	case ToolCallExecuted:
 		// Tool call execution doesn't modify aggregate state,
 		// but we track it for projections (e.g., whiteboard)
 		t.UpdatedAt = e.Timestamp
-
-	case ToolCallExecuted: // Handle value type
-		slog.Debug("Applying ToolCallExecuted", "pointer", false)
-		// Tool call execution doesn't modify aggregate state,
-		// but we track it for projections (e.g., whiteboard)
-		t.UpdatedAt = e.Timestamp
-
-	default:
-		slog.Warn("Unknown event type in Apply", "concreteType", fmt.Sprintf("%T", event))
 	}
 }
 

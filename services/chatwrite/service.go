@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"iter"
 	"log/slog"
+	"time"
+
 	"school-with-ai/domain"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/sdk/agentsdk/llm"
 	"school-with-ai/services/chatwrite/rag"
-	"time"
 )
 
 var (
@@ -667,7 +668,7 @@ func (h *ChatWriteService) addToolCallExecutedEvent(ctx context.Context, threadI
 		return fmt.Errorf("failed to load thread: %w", err)
 	}
 
-	event := &domain.ToolCallExecuted{
+	event := domain.ToolCallExecuted{
 		ThreadID:        threadID,
 		MessageID:       messageID,
 		ToolCallID:      toolCall.ID,
