@@ -27,9 +27,9 @@ func Metrics() func(http.Handler) http.Handler {
 				metrics.AddGoroutines(ctx)
 			}
 
-			// Track errors based on status code or error presence
+			// Track errors based on status code
 			if wr, ok := rw.(*responseWriter); ok {
-				if wr.err != nil || wr.statusCode < 200 || wr.statusCode >= 300 {
+				if wr.statusCode < 200 || wr.statusCode >= 300 {
 					metrics.AddErrors(ctx)
 				}
 			}

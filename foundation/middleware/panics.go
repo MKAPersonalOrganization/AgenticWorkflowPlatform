@@ -22,21 +22,16 @@ func Panics() func(http.Handler) http.Handler {
 				if rec := recover(); rec != nil {
 					trace := debug.Stack()
 
-					// Create an internal error that won't leak details to the client
+					// Log the panic with full details (never exposed to client)
 					err := errs.Errorf(errs.InternalOnlyLog, "PANIC [%v] TRACE[%s]", rec, string(trace))
+					slog.Error("panic recovered", "error", err)
 
 					metrics.AddPanics(ctx)
 
-					// Store error in response writer for Error middleware to handle
-					if rw, ok := w.(*responseWriter); ok {
-						rw.err = err
-						rw.statusCode = http.StatusInternalServerError
-					} else {
-						// Fallback if not wrapped
-						w.WriteHeader(http.StatusInternalServerError)
-						if _, err := w.Write([]byte("Internal Server Error")); err != nil {
-							slog.Error("failed to write panic response", "error", err)
-						}
+					// Return generic error to client (don't leak panic details)
+					w.WriteHeader(http.StatusInternalServerError)
+					if _, writeErr := w.Write([]byte("Internal Server Error")); writeErr != nil {
+						slog.Error("failed to write panic response", "error", writeErr)
 					}
 				}
 			}()

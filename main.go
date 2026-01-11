@@ -211,9 +211,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Add panic recovery middleware first (most important - must be first)
 	r.Use(middleware.Panics())
 
-	// Add error handling middleware (should be early in the chain)
-	r.Use(middleware.Errors(log))
-
 	// Add logging middleware
 	r.Use(middleware.Logger(log))
 
