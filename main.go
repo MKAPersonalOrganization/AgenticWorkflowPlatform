@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net"
@@ -150,6 +149,9 @@ func run(ctx context.Context, log *slog.Logger) error {
 	// Create HTTP handler
 	handler := handlers.NewAsynqHandler(chatClient, asynqServer, chatWriteService, authSvc, projectionService)
 
+	// Create health handler
+	healthHandler := handlers.NewHealthHandler(log)
+
 	// Create chi router
 	r := chi.NewRouter()
 
@@ -171,33 +173,9 @@ func run(ctx context.Context, log *slog.Logger) error {
 	authHandlers := auth.NewAuthHandlers(kratosClient)
 	authMiddleware := auth.NewMiddleware(kratosClient)
 
-	// Health check endpoint (public)
-	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-
-		// Get Asynq metrics
-		metrics, err := asynqServer.GetMetrics()
-		if err != nil {
-			log.Error("Failed to get Asynq metrics", "error", err)
-			metrics = nil
-		}
-
-		response := map[string]any{
-			"status":   "healthy",
-			"redis":    redisAddr,
-			"mode":     "asynq",
-			"asynqmon": "http://localhost:8080",
-		}
-
-		if metrics != nil {
-			response["metrics"] = metrics
-		}
-
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			log.Error("Failed to encode health response", "error", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-		}
-	})
+	// Health check endpoints (public)
+	r.Get("/liveness", healthHandler.Liveness)
+	r.Get("/readiness", healthHandler.Readiness)
 
 	// Auth routes (public)
 	r.Get("/auth/login", authHandlers.LoginPage)
