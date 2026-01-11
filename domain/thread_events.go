@@ -57,13 +57,3 @@ type ThreadDeleted struct {
 func (e ThreadDeleted) EventType() string         { return "ThreadDeleted" }
 func (e ThreadDeleted) EventTimestamp() time.Time { return e.Timestamp }
 func (e ThreadDeleted) AggregateID() string       { return e.ThreadID }
-
-// MessagesCleared is emitted when all messages in a thread are cleared.
-type MessagesCleared struct {
-	ThreadID  string    `json:"threadId"`
-	Timestamp time.Time `json:"timestamp"`
-}
-
-func (e MessagesCleared) EventType() string         { return "MessagesCleared" }
-func (e MessagesCleared) EventTimestamp() time.Time { return e.Timestamp }
-func (e MessagesCleared) AggregateID() string       { return e.ThreadID }
