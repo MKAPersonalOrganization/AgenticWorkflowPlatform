@@ -8,9 +8,6 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
-	"syscall"
-	"time"
-
 	"school-with-ai/components"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/handlers"
@@ -31,6 +28,8 @@ import (
 	"school-with-ai/services/chatwrite/agents/statistics"
 	"school-with-ai/services/chatwrite/agents/studentfacing"
 	"school-with-ai/services/orchestration"
+	"syscall"
+	"time"
 
 	authService "school-with-ai/services/auth"
 
