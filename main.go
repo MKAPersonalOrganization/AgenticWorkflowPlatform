@@ -12,7 +12,6 @@ import (
 	"school-with-ai/components"
 	"school-with-ai/foundation/debug"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/foundation/metrics"
 	"school-with-ai/foundation/middleware"
 	"school-with-ai/handlers"
 	"school-with-ai/infra/auth"
@@ -38,7 +37,6 @@ import (
 	authService "school-with-ai/services/auth"
 
 	"github.com/go-chi/chi/v5"
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/openai/openai-go/v3"
 )
 
@@ -211,19 +209,21 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r := chi.NewRouter()
 
 	// Add panic recovery middleware first (most important - must be first)
-	r.Use(middleware.Panics(log))
+	r.Use(middleware.Panics())
 
-	// Add metrics context to all requests
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := metrics.Set(r.Context())
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
-	})
+	// Add error handling middleware (should be early in the chain)
+	r.Use(middleware.Errors(log))
 
-	// Add chi middleware
-	r.Use(chimiddleware.Logger)
-	r.Use(chimiddleware.Recoverer)
+	// Add logging middleware
+	r.Use(middleware.Logger(log))
+
+	// Add metrics middleware
+	r.Use(middleware.Metrics())
+
+	// Add chi middleware (we can keep or remove these depending on preference)
+	// Note: We now have our own Logger and Recoverer, so chi's can be removed
+	// r.Use(chimiddleware.Logger)
+	// r.Use(chimiddleware.Recoverer)
 
 	// Serve static assets
 	r.Handle("/assets/css/*", http.StripPrefix("/assets/css/", http.FileServer(http.Dir("./assets/css"))))
