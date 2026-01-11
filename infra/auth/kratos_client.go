@@ -221,4 +221,3 @@ func (k *KratosClient) GetFlowError(ctx context.Context, errorID string) (*clien
 
 	return flowError, nil
 }
-
