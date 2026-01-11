@@ -1,9 +1,8 @@
 package domain
 
 import (
-	"time"
-
 	"school-with-ai/sdk/agentsdk/core"
+	"time"
 )
 
 // Thread domain events
