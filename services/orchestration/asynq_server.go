@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
+	"time"
+
 	"school-with-ai/domain"
+	"school-with-ai/foundation/logger"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/services/chatwrite"
-	"time"
 
 	"github.com/hibiken/asynq"
 )
@@ -22,6 +23,7 @@ var (
 
 // AsynqServer wraps Asynq server and client for chat task processing.
 type AsynqServer struct {
+	log                *logger.Logger
 	server             *asynq.Server
 	client             *asynq.Client
 	eventBufferManager *EventBufferManager
@@ -40,8 +42,9 @@ type AsynqConfig struct {
 
 // NewAsynqServer creates a new Asynq-based task processing server.
 func NewAsynqServer(
+	log *logger.Logger,
 	config AsynqConfig,
-	log core.EventStore,
+	eventLog core.EventStore,
 	state chatwrite.ThreadStore,
 	whiteboardProjection domain.WhiteboardStore,
 	chatClient chatwrite.ChatClient,
@@ -77,15 +80,17 @@ func NewAsynqServer(
 
 	// Create orchestration service
 	orchestrationService := NewService(
+		log,
 		chatWriteService,
 		state,
 		whiteboardProjection,
-		log,
+		eventLog,
 		chatClient,
 	)
 
 	// Create chat worker (thin wrapper around orchestration service)
 	chatWorker := NewChatWorker(
+		log,
 		orchestrationService,
 		eventBufferManager,
 	)
@@ -110,9 +115,9 @@ func NewAsynqServer(
 			// Health check
 			HealthCheckFunc: func(err error) {
 				if err != nil {
-					slog.Error("[ASYNQ] Redis health check failed", "error", err)
+					log.Error(context.Background(), "[ASYNQ] Redis health check failed", "error", err)
 				} else {
-					slog.Debug("[ASYNQ] Redis health check passed")
+					log.Debug(context.Background(), "[ASYNQ] Redis health check passed")
 				}
 			},
 			HealthCheckInterval: config.HealthCheckInterval,
@@ -120,7 +125,7 @@ func NewAsynqServer(
 			ErrorHandler: asynq.ErrorHandlerFunc(func(ctx context.Context, task *asynq.Task, err error) {
 				retried, _ := asynq.GetRetryCount(ctx)
 				maxRetry, _ := asynq.GetMaxRetry(ctx)
-				slog.Error("[ASYNQ] Task processing failed",
+				log.Error(ctx, "[ASYNQ] Task processing failed",
 					"type", task.Type(),
 					"error", err,
 					"retried", retried,
@@ -141,16 +146,16 @@ func NewAsynqServer(
 	go func() {
 		err := srv.Run(mux)
 		if err != nil {
-			slog.Error("Asynq server error", "error", err)
+			log.Error(context.Background(), "Asynq server error", "error", err)
 		}
 	}()
 
 	return &AsynqServer{
+		log:                log,
 		server:             srv,
 		client:             client,
 		eventBufferManager: eventBufferManager,
-
-		redisAddr: config.RedisAddr,
+		redisAddr:          config.RedisAddr,
 	}
 }
 
@@ -166,7 +171,7 @@ func (s *AsynqServer) EnqueueJob(payload ProcessChatPayload) (*asynq.TaskInfo, e
 		return nil, fmt.Errorf("failed to enqueue task: %w", err)
 	}
 
-	slog.Info("Enqueued chat task", "jobID", payload.JobID, "taskID", info.ID, "queue", info.Queue)
+	s.log.Info(context.Background(), "Enqueued chat task", "jobID", payload.JobID, "taskID", info.ID, "queue", info.Queue)
 
 	return info, nil
 }
@@ -182,7 +187,7 @@ func (s *AsynqServer) GetTaskInfo(queue, taskID string) (*asynq.TaskInfo, error)
 	defer func() {
 		err := inspector.Close()
 		if err != nil {
-			slog.Warn("Failed to close inspector", "error", err)
+			s.log.Warn(context.Background(), "Failed to close inspector", "error", err)
 		}
 	}()
 
@@ -201,14 +206,14 @@ func (s *AsynqServer) CancelTask(jobID string) error {
 	defer func() {
 		err := inspector.Close()
 		if err != nil {
-			slog.Warn("Failed to close inspector", "error", err)
+			s.log.Warn(context.Background(), "Failed to close inspector", "error", err)
 		}
 	}()
 
 	// Try to delete the task from the default queue first (for pending/scheduled/retry tasks)
 	err := inspector.DeleteTask("default", jobID)
 	if err == nil {
-		slog.Info("Deleted pending task", "jobID", jobID)
+		s.log.Info(context.Background(), "Deleted pending task", "jobID", jobID)
 
 		return nil
 	}
@@ -216,7 +221,7 @@ func (s *AsynqServer) CancelTask(jobID string) error {
 	// If delete failed, the task might be actively processing
 	// Try to send cancellation signal instead
 	if err := inspector.CancelProcessing(jobID); err != nil {
-		slog.Warn("Failed to send cancellation signal",
+		s.log.Warn(context.Background(), "Failed to send cancellation signal",
 			"jobID", jobID,
 			"error", err,
 			"note", "Task may have already completed or doesn't exist")
@@ -224,18 +229,18 @@ func (s *AsynqServer) CancelTask(jobID string) error {
 		return ErrTaskNotFound
 	}
 
-	slog.Info("Sent cancellation signal to active task", "jobID", jobID)
+	s.log.Info(context.Background(), "Sent cancellation signal to active task", "jobID", jobID)
 
 	return nil
 }
 
 // Shutdown gracefully shuts down the Asynq server.
 func (s *AsynqServer) Shutdown() {
-	slog.Info("Shutting down Asynq server")
+	s.log.Info(context.Background(), "Shutting down Asynq server")
 	s.server.Shutdown()
 	err := s.client.Close()
 	if err != nil {
-		slog.Error("Failed to close Asynq client", "error", err)
+		s.log.Error(context.Background(), "Failed to close Asynq client", "error", err)
 	}
-	slog.Info("Asynq server shut down")
+	s.log.Info(context.Background(), "Asynq server shut down")
 }

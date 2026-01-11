@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"time"
+
+	"school-with-ai/foundation/logger"
 
 	"github.com/hibiken/asynq"
 )
@@ -41,16 +42,19 @@ func NewProcessChatTask(payload ProcessChatPayload) (*asynq.Task, error) {
 
 // ChatWorker processes chat messages.
 type ChatWorker struct {
+	log                  *logger.Logger
 	orchestrationService *Service
 	eventBufferManager   *EventBufferManager
 }
 
 // NewChatWorker creates a new chat worker.
 func NewChatWorker(
+	log *logger.Logger,
 	orchestrationService *Service,
 	eventBufferManager *EventBufferManager,
 ) *ChatWorker {
 	return &ChatWorker{
+		log:                  log,
 		orchestrationService: orchestrationService,
 		eventBufferManager:   eventBufferManager,
 	}
@@ -64,7 +68,7 @@ func (w *ChatWorker) ProcessTask(ctx context.Context, t *asynq.Task) error {
 		return fmt.Errorf("json.Unmarshal failed: %w: %w", err, asynq.SkipRetry)
 	}
 
-	slog.Info("[WORKER] Picked up job from Redis queue",
+	w.log.Info(ctx, "[WORKER] Picked up job from Redis queue",
 		"jobID", payload.JobID,
 		"threadID", payload.ThreadID,
 		"message", payload.Message)
@@ -75,7 +79,7 @@ func (w *ChatWorker) ProcessTask(ctx context.Context, t *asynq.Task) error {
 		return err
 	}
 
-	slog.Info("[WORKER] Job completed successfully",
+	w.log.Info(ctx, "[WORKER] Job completed successfully",
 		"jobID", payload.JobID,
 		"threadID", payload.ThreadID,
 		"note", "Events streamed to client via SSE")

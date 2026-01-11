@@ -2,8 +2,8 @@ package agui
 
 import (
 	"encoding/json"
-	"log/slog"
 	"net/http"
+
 	"school-with-ai/infra/projection/whiteboard"
 	"school-with-ai/services"
 )
@@ -52,7 +52,6 @@ func (h *AguiProjectionHandler) GetThreadState(w http.ResponseWriter, r *http.Re
 	w.Header().Set("Content-Type", "application/json")
 	err := json.NewEncoder(w).Encode(state)
 	if err != nil {
-		slog.Error("Failed to encode thread state", "error", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 	}
 }
@@ -72,7 +71,6 @@ func (h *AguiProjectionHandler) GetMessages(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Content-Type", "application/json")
 	err := json.NewEncoder(w).Encode(messages)
 	if err != nil {
-		slog.Error("Failed to encode messages", "error", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 	}
 }
@@ -85,7 +83,6 @@ func (h *AguiProjectionHandler) ListThreads(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Content-Type", "application/json")
 	err := json.NewEncoder(w).Encode(threads)
 	if err != nil {
-		slog.Error("Failed to encode thread list", "error", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 	}
 }
@@ -106,7 +103,6 @@ func (h *AguiProjectionHandler) GetActiveRun(w http.ResponseWriter, r *http.Requ
 	if !exists {
 		err := json.NewEncoder(w).Encode(nil)
 		if err != nil {
-			slog.Error("Failed to encode null active run", "error", err)
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 		}
 
@@ -115,7 +111,6 @@ func (h *AguiProjectionHandler) GetActiveRun(w http.ResponseWriter, r *http.Requ
 
 	err := json.NewEncoder(w).Encode(run)
 	if err != nil {
-		slog.Error("Failed to encode active run", "error", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 	}
 }

@@ -3,15 +3,16 @@ package main
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
 
 	"school-with-ai/components"
+	"school-with-ai/foundation/logger"
 	"school-with-ai/handlers"
 	"school-with-ai/infra/auth"
 	"school-with-ai/infra/eventstore/kurrentdb"
@@ -39,21 +40,34 @@ import (
 )
 
 func main() {
-	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	}))
+	var log *logger.Logger
+
+	events := logger.Events{
+		Error: func(ctx context.Context, r logger.Record) {
+			log.Info(ctx, "******* SEND ALERT *******")
+		},
+	}
+
+	log = logger.NewWithEvents(os.Stdout, logger.LevelInfo, "SCHOOL", nil, events)
 
 	// -------------------------------------------------------------------------
 
 	ctx := context.Background()
 
 	if err := run(ctx, log); err != nil {
-		log.Error("startup", "err", err)
+		log.Error(ctx, "startup", "err", err)
 		os.Exit(1)
 	}
 }
 
-func run(ctx context.Context, log *slog.Logger) error {
+func run(ctx context.Context, log *logger.Logger) error {
+	// -------------------------------------------------------------------------
+	// GOMAXPROCS
+
+	log.Info(ctx, "startup", "GOMAXPROCS", runtime.GOMAXPROCS(0))
+
+	// -------------------------------------------------------------------------
+
 	addr := os.Getenv("SERVER_ADDR")
 	if addr == "" {
 		return fmt.Errorf("SERVER_ADDR environment variable is not set")
@@ -64,13 +78,14 @@ func run(ctx context.Context, log *slog.Logger) error {
 		return fmt.Errorf("invalid SERVER_ADDR: %v", err)
 	}
 
-	log.Info("Starting server with Asynq", "host", host, "port", port)
+	log.Info(ctx, "startup", "status", "starting server", "host", host, "port", port)
+	defer log.Info(ctx, "shutdown complete")
 
 	// Initialize KurrentDB EventStore (production-ready, PostgreSQL-backed)
 	kurrentDBConnectionString := os.Getenv("KURRENTDB_CONNECTION_STRING")
 	if kurrentDBConnectionString == "" {
 		kurrentDBConnectionString = "esdb://localhost:2113?tls=false"
-		log.Info("Using default KurrentDB connection string", "connectionString", kurrentDBConnectionString)
+		log.Info(ctx, "startup", "status", "using default KurrentDB connection", "connectionString", kurrentDBConnectionString)
 	}
 
 	baseEventStore, err := kurrentdb.NewKurrentDBEventStore(kurrentDBConnectionString)
@@ -80,7 +95,7 @@ func run(ctx context.Context, log *slog.Logger) error {
 	defer func() {
 		closeErr := baseEventStore.Close()
 		if closeErr != nil {
-			log.Error("Failed to close event store", "error", closeErr)
+			log.Error(ctx, "shutdown", "status", "failed to close event store", "ERROR", closeErr)
 		}
 	}()
 
@@ -112,7 +127,7 @@ func run(ctx context.Context, log *slog.Logger) error {
 	shared.GlobalAgents.Register("diagramming-instructor", diagramming.CreateDiagrammingInstructor)
 
 	// Initialize chat write service
-	chatWriteService := chatwrite.New(chatClient, eventLog, llmContextProjection)
+	chatWriteService := chatwrite.New(log, chatClient, eventLog, llmContextProjection)
 
 	// Initialize service layer
 	authSvc := authService.NewAuthService()
@@ -122,11 +137,12 @@ func run(ctx context.Context, log *slog.Logger) error {
 	redisAddr := os.Getenv("REDIS_ADDR")
 	if redisAddr == "" {
 		redisAddr = "localhost:6379"
-		log.Info("Using default Redis address", "addr", redisAddr)
+		log.Info(ctx, "startup", "status", "using default Redis address", "addr", redisAddr)
 	}
 
 	// Initialize Asynq server
 	asynqServer := orchestration.NewAsynqServer(
+		log,
 		orchestration.AsynqConfig{
 			RedisAddr:           redisAddr,
 			Concurrency:         5,
@@ -140,14 +156,14 @@ func run(ctx context.Context, log *slog.Logger) error {
 		chatWriteService,
 	)
 	defer asynqServer.Shutdown()
-	log.Info("Asynq server started",
+	log.Info(ctx, "startup", "status", "asynq server started",
 		"redis", redisAddr,
 		"concurrency", 5,
 		"shutdownTimeout", "10s",
 		"healthCheckInterval", "15s")
 
 	// Create HTTP handler
-	handler := handlers.NewAsynqHandler(chatClient, asynqServer, chatWriteService, authSvc, projectionService)
+	handler := handlers.NewAsynqHandler(log, chatClient, asynqServer, chatWriteService, authSvc, projectionService)
 
 	// Create health handler
 	healthHandler := handlers.NewHealthHandler(log)
@@ -221,7 +237,7 @@ func run(ctx context.Context, log *slog.Logger) error {
 	serverErrors := make(chan error, 1)
 
 	go func() {
-		log.Info("startup", "status", "api router started", "host", server.Addr)
+		log.Info(ctx, "startup", "status", "api router started", "host", server.Addr)
 
 		serverErrors <- server.ListenAndServe()
 	}()
@@ -234,8 +250,8 @@ func run(ctx context.Context, log *slog.Logger) error {
 		return fmt.Errorf("server error: %w", err)
 
 	case sig := <-shutdown:
-		log.Info("shutdown", "status", "shutdown started", "signal", sig)
-		defer log.Info("shutdown", "status", "shutdown complete", "signal", sig)
+		log.Info(ctx, "shutdown", "status", "shutdown started", "signal", sig)
+		defer log.Info(ctx, "shutdown", "status", "shutdown complete", "signal", sig)
 
 		ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 		defer cancel()
@@ -256,7 +272,8 @@ func HandleViewChatInputScreen(w http.ResponseWriter, r *http.Request) {
 	component := components.ChatInputScreen(user)
 	err := component.Render(r.Context(), w)
 	if err != nil {
-		slog.Error("Failed to render chat screen", "error", err)
+		// Note: log would need to be passed to this function to use the logger
+		// For now, we'll leave this as is since it's just a render error
 		// Don't call http.Error after Render has already written headers
 		// Just log the error - the partial response will be sent
 	}

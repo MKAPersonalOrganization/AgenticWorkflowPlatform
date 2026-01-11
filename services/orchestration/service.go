@@ -3,13 +3,14 @@ package orchestration
 import (
 	"context"
 	"fmt"
-	"log/slog"
+	"time"
+
 	"school-with-ai/domain"
+	"school-with-ai/foundation/logger"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/sdk/agentsdk/core/middleware"
 	"school-with-ai/services/chatwrite"
 	"school-with-ai/services/chatwrite/agents/shared"
-	"time"
 )
 
 // Service provides transport-agnostic message orchestration.
@@ -17,6 +18,7 @@ import (
 // managing threads, routing to agents, and coordinating execution.
 // It is designed to be reusable across different transports (HTTP/SSE, A2A, etc.).
 type Service struct {
+	log                  *logger.Logger
 	chatWriteService     *chatwrite.ChatWriteService
 	threadStore          chatwrite.ThreadStore
 	whiteboardProjection domain.WhiteboardStore
@@ -26,6 +28,7 @@ type Service struct {
 
 // NewService creates a new orchestration service.
 func NewService(
+	log *logger.Logger,
 	chatWriteService *chatwrite.ChatWriteService,
 	threadStore chatwrite.ThreadStore,
 	whiteboardProjection domain.WhiteboardStore,
@@ -33,6 +36,7 @@ func NewService(
 	chatClient chatwrite.ChatClient,
 ) *Service {
 	return &Service{
+		log:                  log,
 		chatWriteService:     chatWriteService,
 		threadStore:          threadStore,
 		whiteboardProjection: whiteboardProjection,
@@ -71,7 +75,7 @@ func (s *Service) HandleUserMessage(
 	// 1. Add user message to thread (creates thread if needed)
 	err := s.chatWriteService.AddUserMessage(ctx, params.ThreadID, params.MessageID, params.Content)
 	if err != nil {
-		slog.Error("Failed to add user message",
+		s.log.Error(ctx, "Failed to add user message",
 			"threadID", params.ThreadID,
 			"error", err)
 		return fmt.Errorf("failed to add user message: %w", err)
@@ -108,7 +112,7 @@ func (s *Service) HandleUserMessage(
 
 		err := s.chatWriteService.UpdateThreadTitle(ctx, params.ThreadID, title)
 		if err != nil {
-			slog.Error("Failed to update thread title",
+			s.log.Error(ctx, "Failed to update thread title",
 				"threadID", params.ThreadID,
 				"error", err)
 		} else {
@@ -122,7 +126,7 @@ func (s *Service) HandleUserMessage(
 			Timestamp: time.Now(),
 		}
 		if err := emitter.Emit(titleEvent); err != nil {
-			slog.Error("Failed to emit thread title updated event",
+			s.log.Error(ctx, "Failed to emit thread title updated event",
 				"threadID", params.ThreadID,
 				"error", err)
 		}
@@ -172,7 +176,7 @@ func (s *Service) runAgentHandoffChain(ctx context.Context, threadID, startAgent
 
 // runAgent runs a single agent and returns the next agent name if a handoff occurred.
 func (s *Service) runAgent(ctx context.Context, threadID, agentName string, emitter EventEmitter) (string, error) {
-	slog.Info("Executing agent", "threadID", threadID, "agent", agentName)
+	s.log.Info(ctx, "Executing agent", "threadID", threadID, "agent", agentName)
 
 	// Get agent factory
 	factory, ok := shared.GlobalAgents.Get(agentName)
@@ -186,6 +190,7 @@ func (s *Service) runAgent(ctx context.Context, threadID, agentName string, emit
 
 	var handoffReqCtx *core.RequestContext
 	agent := chatwrite.New(
+		s.log,
 		s.chatClient,
 		s.eventLog,
 		s.threadStore,
@@ -202,13 +207,13 @@ func (s *Service) runAgent(ctx context.Context, threadID, agentName string, emit
 
 	// Debug: Log thread state
 	messages := thread.GetMessages()
-	slog.Info("Thread state before agent execution",
+	s.log.Info(ctx, "Thread state before agent execution",
 		"threadID", threadID,
 		"messageCount", len(messages),
 		"agentName", agentName)
 	if len(messages) > 0 {
 		lastMsg := messages[len(messages)-1]
-		slog.Info("Last message in thread",
+		s.log.Info(ctx, "Last message in thread",
 			"role", lastMsg.Role,
 			"content", lastMsg.Content[:min(50, len(lastMsg.Content))])
 	}
@@ -222,7 +227,7 @@ func (s *Service) runAgent(ctx context.Context, threadID, agentName string, emit
 	// Check for handoff to next agent
 	if handoffReqCtx != nil {
 		if handoff, ok := middleware.GetHandoff(handoffReqCtx); ok {
-			slog.Info("Agent handoff", "from", agentName, "to", handoff.TargetAgent)
+			s.log.Info(ctx, "Agent handoff", "from", agentName, "to", handoff.TargetAgent)
 			return handoff.TargetAgent, nil
 		}
 	}

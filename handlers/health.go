@@ -2,19 +2,20 @@ package handlers
 
 import (
 	"encoding/json"
-	"log/slog"
 	"net/http"
 	"os"
 	"runtime"
+
+	"school-with-ai/foundation/logger"
 )
 
 // HealthHandler handles health check endpoints.
 type HealthHandler struct {
-	log *slog.Logger
+	log *logger.Logger
 }
 
 // NewHealthHandler creates a new health handler.
-func NewHealthHandler(log *slog.Logger) *HealthHandler {
+func NewHealthHandler(log *logger.Logger) *HealthHandler {
 	return &HealthHandler{
 		log: log,
 	}
@@ -36,7 +37,7 @@ func (h *HealthHandler) Liveness(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewEncoder(w).Encode(info); err != nil {
-		h.log.Error("Failed to encode liveness response", "error", err)
+		h.log.Error(r.Context(), "liveness", "status", "encode error", "ERROR", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }
@@ -58,7 +59,7 @@ func (h *HealthHandler) Readiness(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewEncoder(w).Encode(response); err != nil {
-		h.log.Error("Failed to encode readiness response", "error", err)
+		h.log.Error(r.Context(), "readiness", "status", "encode error", "ERROR", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }

@@ -4,15 +4,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
+	"time"
+
 	"school-with-ai/domain"
+	"school-with-ai/foundation/logger"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/sdk/agentsdk/llm"
 	"school-with-ai/services"
 	"school-with-ai/services/chatwrite"
 	"school-with-ai/services/orchestration"
-	"time"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 	"github.com/hibiken/asynq"
@@ -20,6 +21,7 @@ import (
 
 // AsynqHandler encapsulates dependencies for HTTP handlers using Asynq.
 type AsynqHandler struct {
+	log               *logger.Logger
 	chatClient        *llm.OpenAIClient
 	asynqServer       *orchestration.AsynqServer
 	chatWriteService  *chatwrite.ChatWriteService
@@ -29,6 +31,7 @@ type AsynqHandler struct {
 
 // NewAsynqHandler creates a new HTTP handler with Asynq dependencies.
 func NewAsynqHandler(
+	log *logger.Logger,
 	chatClient *llm.OpenAIClient,
 	asynqServer *orchestration.AsynqServer,
 	chatWriteService *chatwrite.ChatWriteService,
@@ -36,6 +39,7 @@ func NewAsynqHandler(
 	projectionService services.ProjectionService,
 ) *AsynqHandler {
 	return &AsynqHandler{
+		log:               log,
 		chatClient:        chatClient,
 		asynqServer:       asynqServer,
 		chatWriteService:  chatWriteService,
@@ -93,7 +97,7 @@ func (h *AsynqHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		UserID:    user.ID,
 	}
 
-	slog.Info("[API] Async chat request received",
+	h.log.Info(r.Context(), "[API] Async chat request received",
 		"userID", user.ID,
 		"email", user.Email,
 		"contextID", contextID,
@@ -103,13 +107,13 @@ func (h *AsynqHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	// Enqueue to Asynq for async processing
 	taskInfo, err := h.asynqServer.EnqueueJob(payload)
 	if err != nil {
-		slog.Error("[API] Failed to enqueue task", "error", err)
+		h.log.Error(r.Context(), "[API] Failed to enqueue task", "error", err)
 		http.Error(w, "Failed to enqueue task", http.StatusInternalServerError)
 
 		return
 	}
 
-	slog.Info("[API] Task enqueued successfully",
+	h.log.Info(r.Context(), "[API] Task enqueued successfully",
 		"jobID", jobID,
 		"taskID", taskInfo.ID,
 		"queue", taskInfo.Queue,
@@ -123,14 +127,14 @@ func (h *AsynqHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	task := NewTask(jobID, contextID, TaskStateSubmitted)
 	task.Metadata["streamUrl"] = fmt.Sprintf("/v1/tasks/%s:subscribe", jobID)
 
-	slog.Info("[API] Returning task response",
+	h.log.Info(r.Context(), "[API] Returning task response",
 		"taskID", task.ID,
 		"contextID", task.ContextID,
 		"status", task.Status.State,
 		"streamUrl", task.Metadata["streamUrl"])
 
 	if err := json.NewEncoder(w).Encode(task); err != nil {
-		slog.Error("[API] Failed to encode response", "error", err)
+		h.log.Error(r.Context(), "[API] Failed to encode response", "error", err)
 
 		return
 	}
@@ -188,7 +192,7 @@ streamEvents:
 		messagesSnapshotEvent := aguievents.NewMessagesSnapshotEvent(messages)
 		err := writeSSEEvent(w, messagesSnapshotEvent)
 		if err != nil {
-			slog.Error("[API] Failed to write messages snapshot event", "error", err, "jobID", jobID)
+			h.log.Error(r.Context(), "[API] Failed to write messages snapshot event", "error", err, "jobID", jobID)
 
 			return
 		}
@@ -415,7 +419,7 @@ func (h *AsynqHandler) GetThreads(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slog.Info("Getting threads for user", "userID", user.ID, "email", user.Email)
+	h.log.Info(r.Context(), "Getting threads for user", "userID", user.ID, "email", user.Email)
 
 	threads := h.projectionService.GetAllThreads()
 
@@ -453,7 +457,7 @@ func (h *AsynqHandler) DeleteThread(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slog.Info("Deleting thread", "userID", user.ID, "threadID", threadID)
+	h.log.Info(r.Context(), "Deleting thread", "userID", user.ID, "threadID", threadID)
 
 	// Delete thread using chat service
 	err := h.chatWriteService.DeleteThread(r.Context(), threadID)
@@ -472,6 +476,6 @@ func (h *AsynqHandler) DeleteThread(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	err = json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 	if err != nil {
-		slog.Error("[API] Failed to encode delete response", "error", err)
+		h.log.Error(r.Context(), "[API] Failed to encode delete response", "error", err)
 	}
 }
