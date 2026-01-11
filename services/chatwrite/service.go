@@ -49,6 +49,7 @@ type ChatWriteService struct {
 	chatClient              ChatClient
 	writeModel              core.EventStore
 	readModel               ThreadStore
+	threadRepo              *domain.ThreadRepository // Repository for thread aggregate persistence
 	toolRegistry            *core.ToolRegistry
 	notifier                core.EventNotifier // Agent's own notifier
 	shouldContinueIteration ShouldContinueIterationFn
@@ -96,8 +97,9 @@ func New(chatClient ChatClient, writeModel core.EventStore, readModel ThreadStor
 		chatClient:   chatClient,
 		writeModel:   writeModel,
 		readModel:    readModel,
-		config:       core.DefaultConfig("agent"), // Default config
-		toolRegistry: toolRegistry,                // Tool registry
+		threadRepo:   domain.NewThreadRepository(writeModel), // Create repository once
+		config:       core.DefaultConfig("agent"),            // Default config
+		toolRegistry: toolRegistry,                           // Tool registry
 	}
 
 	// Apply options
@@ -485,11 +487,8 @@ func (h *ChatWriteService) CreateThread(ctx context.Context, threadID, title str
 		"threadID", threadID,
 		"title", title)
 
-	// Create repository
-	repo := domain.NewThreadRepository(h.writeModel)
-
 	// Try to load existing thread first (idempotency check)
-	existingThread, err := repo.Load(ctx, threadID)
+	existingThread, err := h.threadRepo.Load(ctx, threadID)
 	if err == nil && existingThread.GetVersion() > 0 {
 		slog.Debug("Thread already exists, skipping create",
 			"threadID", threadID,
@@ -510,7 +509,7 @@ func (h *ChatWriteService) CreateThread(ctx context.Context, threadID, title str
 		"eventCount", len(thread.DequeueUncommittedEvents()))
 
 	// Save the new thread
-	err = repo.SaveNew(ctx, thread)
+	err = h.threadRepo.SaveNew(ctx, thread)
 	if err != nil {
 		slog.Debug("SaveNew failed",
 			"threadID", threadID,
@@ -543,11 +542,8 @@ func (h *ChatWriteService) AddUserMessage(ctx context.Context, threadID, message
 		"threadID", threadID,
 		"messageID", messageID)
 
-	// Create repository
-	repo := domain.NewThreadRepository(h.writeModel)
-
 	// Load existing aggregate
-	thread, err := repo.Load(ctx, threadID)
+	thread, err := h.threadRepo.Load(ctx, threadID)
 	if err != nil {
 		slog.Debug("Failed to load thread for message",
 			"threadID", threadID,
@@ -593,7 +589,7 @@ func (h *ChatWriteService) AddUserMessage(ctx context.Context, threadID, message
 	// For existing threads: use Save (expects current version)
 	if isNewThread {
 		slog.Debug("New thread - using SaveNew", "threadID", threadID)
-		err = repo.SaveNew(ctx, thread)
+		err = h.threadRepo.SaveNew(ctx, thread)
 		if err != nil {
 			slog.Debug("SaveNew failed",
 				"threadID", threadID,
@@ -607,7 +603,7 @@ func (h *ChatWriteService) AddUserMessage(ctx context.Context, threadID, message
 		}
 	} else {
 		slog.Debug("Existing thread - using Save with version check", "threadID", threadID)
-		err = repo.Save(ctx, thread)
+		err = h.threadRepo.Save(ctx, thread)
 		if err != nil {
 			slog.Debug("Failed to save thread",
 				"threadID", threadID,
@@ -634,9 +630,7 @@ func (h *ChatWriteService) AddUserMessage(ctx context.Context, threadID, message
 
 // addAssistantMessage adds an assistant message to the thread using event sourcing.
 func (h *ChatWriteService) addAssistantMessage(ctx context.Context, threadID, messageID, content string, toolCalls []domain.ToolCall) error {
-	repo := domain.NewThreadRepository(h.writeModel)
-
-	thread, err := repo.Load(ctx, threadID)
+	thread, err := h.threadRepo.Load(ctx, threadID)
 	if err != nil {
 		return fmt.Errorf("failed to load thread: %w", err)
 	}
@@ -647,14 +641,12 @@ func (h *ChatWriteService) addAssistantMessage(ctx context.Context, threadID, me
 		return fmt.Errorf("failed to add assistant message: %w", err)
 	}
 
-	return repo.Save(ctx, thread)
+	return h.threadRepo.Save(ctx, thread)
 }
 
 // addToolResultMessage adds a tool result message to the thread using event sourcing.
 func (h *ChatWriteService) addToolResultMessage(ctx context.Context, threadID, messageID, toolCallID, result string) error {
-	repo := domain.NewThreadRepository(h.writeModel)
-
-	thread, err := repo.Load(ctx, threadID)
+	thread, err := h.threadRepo.Load(ctx, threadID)
 	if err != nil {
 		return fmt.Errorf("failed to load thread: %w", err)
 	}
@@ -665,14 +657,12 @@ func (h *ChatWriteService) addToolResultMessage(ctx context.Context, threadID, m
 		return fmt.Errorf("failed to add tool result: %w", err)
 	}
 
-	return repo.Save(ctx, thread)
+	return h.threadRepo.Save(ctx, thread)
 }
 
 // addToolCallExecutedEvent persists a ToolCallExecuted event to enable projection rebuilding.
 func (h *ChatWriteService) addToolCallExecutedEvent(ctx context.Context, threadID, messageID string, toolCall core.ToolCall, parentMessageID, result string) error {
-	repo := domain.NewThreadRepository(h.writeModel)
-
-	thread, err := repo.Load(ctx, threadID)
+	thread, err := h.threadRepo.Load(ctx, threadID)
 	if err != nil {
 		return fmt.Errorf("failed to load thread: %w", err)
 	}
@@ -691,7 +681,7 @@ func (h *ChatWriteService) addToolCallExecutedEvent(ctx context.Context, threadI
 
 	thread.Enqueue(event, thread.Apply)
 
-	return repo.Save(ctx, thread)
+	return h.threadRepo.Save(ctx, thread)
 }
 
 // UpdateThreadTitle updates the title of a thread using event sourcing.
@@ -700,11 +690,8 @@ func (h *ChatWriteService) UpdateThreadTitle(ctx context.Context, threadID, newT
 		"threadID", threadID,
 		"newTitle", newTitle)
 
-	// Create repository
-	repo := domain.NewThreadRepository(h.writeModel)
-
 	// Load existing aggregate
-	thread, err := repo.Load(ctx, threadID)
+	thread, err := h.threadRepo.Load(ctx, threadID)
 	if err != nil {
 		slog.Debug("Failed to load thread for title update",
 			"threadID", threadID,
@@ -725,7 +712,7 @@ func (h *ChatWriteService) UpdateThreadTitle(ctx context.Context, threadID, newT
 		return fmt.Errorf("failed to change title: %w", err)
 	}
 
-	err = repo.Save(ctx, thread)
+	err = h.threadRepo.Save(ctx, thread)
 	if err != nil {
 		slog.Debug("Failed to save thread after title change",
 			"threadID", threadID,
@@ -752,8 +739,7 @@ func (h *ChatWriteService) UpdateThreadTitle(ctx context.Context, threadID, newT
 // DeleteThread deletes a thread using event sourcing (appends ThreadDeleted event).
 func (h *ChatWriteService) DeleteThread(ctx context.Context, threadID string) error {
 	// Use repository to handle deletion
-	repo := domain.NewThreadRepository(h.writeModel)
-	err := repo.Delete(ctx, threadID)
+	err := h.threadRepo.Delete(ctx, threadID)
 	if err != nil {
 		return fmt.Errorf("failed to delete thread: %w", err)
 	}
