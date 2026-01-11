@@ -22,7 +22,7 @@ var (
 
 func TestInitFlowURL(t *testing.T) {
 	t.Parallel()
-	kratosClient := NewKratosClient()
+	kratosClient := NewKratosClient(testConfig())
 
 	tests := []struct {
 		name     string
@@ -491,7 +491,7 @@ func TestKratosClient_GetLoginFlow_Integration(t *testing.T) {
 		t.Skip("Skipping integration test")
 	}
 
-	kratosClient := NewKratosClient()
+	kratosClient := NewKratosClient(testConfig())
 	ctx := context.Background()
 
 	// Try to get a non-existent flow
@@ -507,7 +507,7 @@ func TestKratosClient_GetFlowError_Integration(t *testing.T) {
 		t.Skip("Skipping integration test")
 	}
 
-	kratosClient := NewKratosClient()
+	kratosClient := NewKratosClient(testConfig())
 	ctx := context.Background()
 
 	// Try to get a non-existent error

@@ -84,11 +84,11 @@ func run(ctx context.Context, log *logger.Logger) error {
 			DebugHost         string        `conf:"default:0.0.0.0:4010"`
 		}
 		Auth struct {
-			AppURL         string `conf:"default:http://localhost:8090"`
-			KratosPublic   string `conf:"default:http://localhost:4433"`
-			KratosAdmin    string `conf:"default:http://localhost:4434"`
-			KratosBrowser  string `conf:"default:http://localhost:4433"`
-			AdminAPIToken  string
+			AppURL        string `conf:"default:http://localhost:8090"`
+			KratosPublic  string `conf:"default:http://localhost:4433"`
+			KratosAdmin   string `conf:"default:http://localhost:4434"`
+			KratosBrowser string `conf:"default:http://localhost:4433"`
+			AdminAPIToken string
 		}
 		KurrentDB struct {
 			ConnectionString string `conf:"default:esdb://localhost:2113?tls=false"`
@@ -141,7 +141,16 @@ func run(ctx context.Context, log *logger.Logger) error {
 	go func() {
 		log.Info(ctx, "startup", "status", "debug server started", "host", cfg.Web.DebugHost)
 
-		if err := http.ListenAndServe(cfg.Web.DebugHost, debug.Mux()); err != nil {
+		debugServer := &http.Server{
+			Addr:              cfg.Web.DebugHost,
+			Handler:           debug.Mux(),
+			ReadTimeout:       10 * time.Second,
+			WriteTimeout:      10 * time.Second,
+			IdleTimeout:       120 * time.Second,
+			ReadHeaderTimeout: 5 * time.Second,
+		}
+
+		if err := debugServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Error(ctx, "shutdown", "status", "debug server closed", "host", cfg.Web.DebugHost, "msg", err)
 		}
 	}()
@@ -256,11 +265,11 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// Initialize Kratos client and auth handlers
 	authConfig := auth.Config{
-		AppURL:         cfg.Auth.AppURL,
-		KratosPublic:   cfg.Auth.KratosPublic,
-		KratosAdmin:    cfg.Auth.KratosAdmin,
-		KratosBrowser:  cfg.Auth.KratosBrowser,
-		AdminAPIToken:  cfg.Auth.AdminAPIToken,
+		AppURL:        cfg.Auth.AppURL,
+		KratosPublic:  cfg.Auth.KratosPublic,
+		KratosAdmin:   cfg.Auth.KratosAdmin,
+		KratosBrowser: cfg.Auth.KratosBrowser,
+		AdminAPIToken: cfg.Auth.AdminAPIToken,
 	}
 	kratosClient := auth.NewKratosClient(authConfig)
 	authHandlers := auth.NewAuthHandlers(log, kratosClient, cfg.Auth.AppURL)
@@ -334,7 +343,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 		defer cancel()
 
 		if err := server.Shutdown(ctx); err != nil {
-			server.Close()
+			if closeErr := server.Close(); closeErr != nil {
+				return fmt.Errorf("could not stop server gracefully (shutdown: %w, close: %v)", err, closeErr)
+			}
 			return fmt.Errorf("could not stop server gracefully: %w", err)
 		}
 	}

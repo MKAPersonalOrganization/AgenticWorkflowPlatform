@@ -58,7 +58,7 @@ func TestNewKratosClient(t *testing.T) {
 			_ = os.Setenv("KRATOS_BROWSER_URL", tt.browserURL)
 
 			// Create client
-			client := NewKratosClient()
+			client := NewKratosClient(testConfig())
 
 			if client == nil {
 				t.Fatal("NewKratosClient() returned nil")
@@ -102,7 +102,7 @@ func TestKratosClient_Integration(t *testing.T) {
 	_ = os.Setenv("KRATOS_ADMIN_URL", "http://127.0.0.1:4434")
 	_ = os.Setenv("KRATOS_BROWSER_URL", "http://127.0.0.1:4433")
 
-	client := NewKratosClient()
+	client := NewKratosClient(testConfig())
 	ctx := context.Background()
 
 	t.Run("ToSession with invalid cookie", func(t *testing.T) {
@@ -128,56 +128,4 @@ func TestKratosClient_Integration(t *testing.T) {
 			t.Error("Expected error for invalid error ID, got nil")
 		}
 	})
-}
-
-func TestGetEnv(t *testing.T) {
-	t.Parallel()
-	// Save and restore env var
-	orig := os.Getenv("TEST_VAR")
-	defer func() {
-		if orig != "" {
-			_ = os.Setenv("TEST_VAR", orig)
-		} else {
-			_ = os.Unsetenv("TEST_VAR")
-		}
-	}()
-
-	tests := []struct {
-		name         string
-		key          string
-		defaultValue string
-		envValue     string
-		want         string
-	}{
-		{
-			name:         "env var set",
-			key:          "TEST_VAR",
-			defaultValue: "default",
-			envValue:     "custom",
-			want:         "custom",
-		},
-		{
-			name:         "env var not set",
-			key:          "TEST_VAR",
-			defaultValue: "default",
-			envValue:     "",
-			want:         "default",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			if tt.envValue != "" {
-				_ = os.Setenv(tt.key, tt.envValue)
-			} else {
-				_ = os.Unsetenv(tt.key)
-			}
-
-			got := getEnv(tt.key, tt.defaultValue)
-			if got != tt.want {
-				t.Errorf("getEnv() = %v, want %v", got, tt.want)
-			}
-		})
-	}
 }
