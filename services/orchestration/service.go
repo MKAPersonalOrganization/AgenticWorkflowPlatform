@@ -86,37 +86,18 @@ func (s *Service) HandleUserMessage(
 
 	// 3. Auto-generate thread title if this is the first message
 	thread, threadExists := s.threadStore.Get(params.ThreadID)
-	fmt.Printf("[Orchestration] After adding message: threadExists=%v, title=%q, messageCount=%d\n",
-		threadExists,
-		func() string {
-			if threadExists {
-				return thread.Title
-			} else {
-				return ""
-			}
-		}(),
-		func() int {
-			if threadExists {
-				return len(thread.Messages)
-			} else {
-				return 0
-			}
-		}())
 
 	if threadExists && thread.Title == "New Chat" && len(thread.Messages) == 1 {
 		title := params.Content
 		if len(title) > 50 {
 			title = title[:50] + "..."
 		}
-		fmt.Printf("[Orchestration] Auto-generating title for thread %s: %q\n", params.ThreadID, title)
 
 		err := s.chatWriteService.UpdateThreadTitle(ctx, params.ThreadID, title)
 		if err != nil {
 			s.log.Error(ctx, "Failed to update thread title",
 				"threadID", params.ThreadID,
 				"error", err)
-		} else {
-			fmt.Printf("[Orchestration] Thread title updated successfully\n")
 		}
 
 		// Emit domain event for thread title update

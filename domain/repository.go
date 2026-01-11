@@ -2,7 +2,6 @@ package domain
 
 import (
 	"context"
-	"log/slog"
 
 	"school-with-ai/sdk/agentsdk/core"
 )
@@ -62,10 +61,6 @@ func (r *Repository[T]) Load(ctx context.Context, id string) (T, error) {
 		return zero, ErrThreadNotFound
 	}
 
-	slog.Debug("Loading aggregate from event store",
-		"stream", streamName,
-		"eventCount", len(events))
-
 	// Rebuild state by replaying events
 	// Call the aggregate's Apply method through LoadFromHistory
 	err = aggregate.LoadFromHistory(events, aggregate.Apply)
@@ -73,10 +68,6 @@ func (r *Repository[T]) Load(ctx context.Context, id string) (T, error) {
 		var zero T
 		return zero, err
 	}
-
-	slog.Debug("Aggregate loaded from history",
-		"version", aggregate.GetVersion(),
-		"stream", streamName)
 
 	return aggregate, nil
 }
@@ -97,19 +88,7 @@ func (r *Repository[T]) Save(ctx context.Context, aggregate T) error {
 	// Following EventSourcing.NetCore pattern: Version tracks persisted events, NOT in-memory changes
 	expectedVersion := aggregate.GetVersion()
 
-	slog.Debug("Saving aggregate",
-		"stream", streamName,
-		"version", aggregate.GetVersion(),
-		"uncommittedEvents", len(uncommittedEvents),
-		"expectedVersion", expectedVersion)
-
 	_, err := r.eventStore.AppendWithVersion(ctx, streamName, expectedVersion, uncommittedEvents...)
-
-	if err != nil {
-		slog.Debug("Aggregate save failed", "stream", streamName, "error", err)
-	} else {
-		slog.Debug("Aggregate save succeeded", "stream", streamName)
-	}
 
 	return err
 }
@@ -124,20 +103,9 @@ func (r *Repository[T]) SaveNew(ctx context.Context, aggregate T) error {
 
 	streamName := r.getStreamName(aggregate)
 
-	slog.Debug("Saving new aggregate",
-		"stream", streamName,
-		"version", aggregate.GetVersion(),
-		"uncommittedEvents", len(uncommittedEvents))
-
 	// Use -2 to indicate NoStream (stream must not exist)
 	// This is different from -1 (Any) and >= 0 (specific revision)
 	_, err := r.eventStore.AppendWithVersion(ctx, streamName, -2, uncommittedEvents...)
-
-	if err != nil {
-		slog.Debug("Aggregate SaveNew failed", "stream", streamName, "error", err)
-	} else {
-		slog.Debug("Aggregate SaveNew succeeded", "stream", streamName)
-	}
 
 	return err
 }

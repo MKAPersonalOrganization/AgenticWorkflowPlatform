@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -36,7 +35,6 @@ func (h *AuthHandlers) LoginPage(w http.ResponseWriter, r *http.Request) {
 
 	// If no flow ID, redirect to Kratos to initialize flow
 	if flowID == "" {
-		slog.Debug("No flow ID found, redirecting to Kratos to initialize login flow")
 		initURL := h.kratos.InitFlowURL(FlowTypeLogin, FlowParams{
 			ReturnTo: returnTo,
 			AAL:      aal,
@@ -51,11 +49,8 @@ func (h *AuthHandlers) LoginPage(w http.ResponseWriter, r *http.Request) {
 	cookie := r.Header.Get("Cookie")
 	flow, err := h.kratos.GetLoginFlow(r.Context(), flowID, cookie)
 	if err != nil {
-		slog.Error("Failed to get login flow", "flowID", flowID, "error", err)
-
 		// If flow expired or not found, redirect to initialize new flow
 		if IsFlowExpired(err) {
-			slog.Debug("Flow expired or not found, redirecting to initialize new flow")
 			initURL := h.kratos.InitFlowURL(FlowTypeLogin, FlowParams{
 				ReturnTo: returnTo,
 				AAL:      aal,
@@ -75,7 +70,6 @@ func (h *AuthHandlers) LoginPage(w http.ResponseWriter, r *http.Request) {
 
 	// Check if verification is required
 	if flow.Ui.Messages != nil && ShouldRedirectToVerification(flow.Ui.Messages) {
-		slog.Debug("Email verification required, redirecting to verification flow")
 		verificationURL := h.kratos.InitFlowURL(FlowTypeVerification, FlowParams{
 			ReturnTo: flow.GetReturnTo(),
 		})
@@ -140,7 +134,6 @@ func (h *AuthHandlers) LoginPage(w http.ResponseWriter, r *http.Request) {
 	component := auth.LoginPageWithNodes(flow.Ui.Nodes, props)
 	err = component.Render(r.Context(), w)
 	if err != nil {
-		slog.Error("Failed to render login page", "error", err)
 	}
 }
 
@@ -151,7 +144,6 @@ func (h *AuthHandlers) RegistrationPage(w http.ResponseWriter, r *http.Request) 
 
 	// If no flow ID, redirect to Kratos to initialize flow
 	if flowID == "" {
-		slog.Debug("No flow ID found, redirecting to Kratos to initialize registration flow")
 		initURL := h.kratos.InitFlowURL(FlowTypeRegistration, FlowParams{
 			ReturnTo: returnTo,
 		})
@@ -164,11 +156,8 @@ func (h *AuthHandlers) RegistrationPage(w http.ResponseWriter, r *http.Request) 
 	cookie := r.Header.Get("Cookie")
 	flow, err := h.kratos.GetRegistrationFlow(r.Context(), flowID, cookie)
 	if err != nil {
-		slog.Error("Failed to get registration flow", "flowID", flowID, "error", err)
-
 		// If flow expired or not found, redirect to initialize new flow
 		if IsFlowExpired(err) {
-			slog.Debug("Flow expired or not found, redirecting to initialize new flow")
 			initURL := h.kratos.InitFlowURL(FlowTypeRegistration, FlowParams{
 				ReturnTo: returnTo,
 			})
@@ -222,7 +211,6 @@ func (h *AuthHandlers) RegistrationPage(w http.ResponseWriter, r *http.Request) 
 	component := auth.RegistrationPageWithNodes(flow.Ui.Nodes, props)
 	err = component.Render(r.Context(), w)
 	if err != nil {
-		slog.Error("Failed to render registration page", "error", err)
 	}
 }
 
@@ -233,7 +221,6 @@ func (h *AuthHandlers) RecoveryPage(w http.ResponseWriter, r *http.Request) {
 
 	// If no flow ID, redirect to Kratos to initialize flow
 	if flowID == "" {
-		slog.Debug("No flow ID found, redirecting to Kratos to initialize recovery flow")
 		initURL := h.kratos.InitFlowURL(FlowTypeRecovery, FlowParams{
 			ReturnTo: returnTo,
 		})
@@ -246,11 +233,8 @@ func (h *AuthHandlers) RecoveryPage(w http.ResponseWriter, r *http.Request) {
 	cookie := r.Header.Get("Cookie")
 	flow, err := h.kratos.GetRecoveryFlow(r.Context(), flowID, cookie)
 	if err != nil {
-		slog.Error("Failed to get recovery flow", "flowID", flowID, "error", err)
-
 		// If flow expired or not found, redirect to initialize new flow
 		if IsFlowExpired(err) {
-			slog.Debug("Flow expired or not found, redirecting to initialize new flow")
 			initURL := h.kratos.InitFlowURL(FlowTypeRecovery, FlowParams{
 				ReturnTo: returnTo,
 			})
@@ -304,7 +288,6 @@ func (h *AuthHandlers) RecoveryPage(w http.ResponseWriter, r *http.Request) {
 	component := auth.RecoveryPageWithNodes(flow.Ui.Nodes, props)
 	err = component.Render(r.Context(), w)
 	if err != nil {
-		slog.Error("Failed to render recovery page", "error", err)
 	}
 }
 
@@ -315,7 +298,6 @@ func (h *AuthHandlers) VerificationPage(w http.ResponseWriter, r *http.Request) 
 
 	// If no flow ID, redirect to Kratos to initialize flow
 	if flowID == "" {
-		slog.Debug("No flow ID found, redirecting to Kratos to initialize verification flow")
 		initURL := h.kratos.InitFlowURL(FlowTypeVerification, FlowParams{
 			ReturnTo: returnTo,
 		})
@@ -328,11 +310,8 @@ func (h *AuthHandlers) VerificationPage(w http.ResponseWriter, r *http.Request) 
 	cookie := r.Header.Get("Cookie")
 	flow, err := h.kratos.GetVerificationFlow(r.Context(), flowID, cookie)
 	if err != nil {
-		slog.Error("Failed to get verification flow", "flowID", flowID, "error", err)
-
 		// If flow expired or not found, redirect to initialize new flow
 		if IsFlowExpired(err) {
-			slog.Debug("Flow expired or not found, redirecting to initialize new flow")
 			initURL := h.kratos.InitFlowURL(FlowTypeVerification, FlowParams{
 				ReturnTo: returnTo,
 			})
@@ -386,7 +365,6 @@ func (h *AuthHandlers) VerificationPage(w http.ResponseWriter, r *http.Request) 
 	component := auth.VerificationPageWithNodes(flow.Ui.Nodes, props)
 	err = component.Render(r.Context(), w)
 	if err != nil {
-		slog.Error("Failed to render verification page", "error", err)
 	}
 }
 
@@ -397,7 +375,6 @@ func (h *AuthHandlers) SettingsPage(w http.ResponseWriter, r *http.Request) {
 
 	// If no flow ID, redirect to Kratos to initialize flow
 	if flowID == "" {
-		slog.Debug("No flow ID found, redirecting to Kratos to initialize settings flow")
 		initURL := h.kratos.InitFlowURL(FlowTypeSettings, FlowParams{
 			ReturnTo: returnTo,
 		})
@@ -410,11 +387,8 @@ func (h *AuthHandlers) SettingsPage(w http.ResponseWriter, r *http.Request) {
 	cookie := r.Header.Get("Cookie")
 	flow, err := h.kratos.GetSettingsFlow(r.Context(), flowID, cookie)
 	if err != nil {
-		slog.Error("Failed to get settings flow", "flowID", flowID, "error", err)
-
 		// If flow expired or not found, redirect to initialize new flow
 		if IsFlowExpired(err) {
-			slog.Debug("Flow expired or not found, redirecting to initialize new flow")
 			initURL := h.kratos.InitFlowURL(FlowTypeSettings, FlowParams{
 				ReturnTo: returnTo,
 			})
@@ -461,7 +435,6 @@ func (h *AuthHandlers) SettingsPage(w http.ResponseWriter, r *http.Request) {
 	component := auth.SettingsPageWithNodes(flow.Ui.Nodes, props)
 	err = component.Render(r.Context(), w)
 	if err != nil {
-		slog.Error("Failed to render settings page", "error", err)
 	}
 }
 
@@ -484,7 +457,6 @@ func (h *AuthHandlers) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	cookie := r.Header.Get("Cookie")
 	flow, err := h.kratos.CreateBrowserLogoutFlow(r.Context(), cookie)
 	if err != nil {
-		slog.Error("Failed to create logout flow", "error", err)
 		// On error, just redirect to login
 		http.Redirect(w, r, h.appURL+"/auth/login", http.StatusSeeOther)
 
@@ -507,7 +479,6 @@ func (h *AuthHandlers) ErrorPage(w http.ResponseWriter, r *http.Request) {
 	if errorID != "" {
 		flowError, err := h.kratos.GetFlowError(r.Context(), errorID)
 		if err != nil {
-			slog.Error("Failed to get flow error", "errorID", errorID, "error", err)
 			errorMessage = "An unexpected error occurred"
 			errorDetails = "We couldn't retrieve the error details. Please try again."
 		} else if flowError.Error != nil {
@@ -551,7 +522,6 @@ func (h *AuthHandlers) ErrorPage(w http.ResponseWriter, r *http.Request) {
 	component := auth.ErrorPage(props)
 	err := component.Render(r.Context(), w)
 	if err != nil {
-		slog.Error("Failed to render error page", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }
