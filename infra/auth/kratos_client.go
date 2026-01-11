@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"os"
 
 	client "github.com/ory/client-go"
@@ -100,9 +99,6 @@ func (k *KratosClient) ToSession(ctx context.Context, cookie string) (*client.Se
 	}
 	if err != nil {
 		if resp != nil {
-			slog.Debug("ToSession failed",
-				"status", resp.StatusCode,
-				"error", err)
 		}
 
 		return nil, fmt.Errorf("failed to validate session: %w", err)
@@ -124,10 +120,6 @@ func (k *KratosClient) GetLoginFlow(ctx context.Context, flowID string, cookie s
 	}
 	if err != nil {
 		if resp != nil {
-			slog.Debug("GetLoginFlow failed",
-				"flowID", flowID,
-				"status", resp.StatusCode,
-				"error", err)
 		}
 
 		return nil, fmt.Errorf("failed to get login flow: %w", err)
@@ -149,10 +141,6 @@ func (k *KratosClient) GetRegistrationFlow(ctx context.Context, flowID string, c
 	}
 	if err != nil {
 		if resp != nil {
-			slog.Debug("GetRegistrationFlow failed",
-				"flowID", flowID,
-				"status", resp.StatusCode,
-				"error", err)
 		}
 
 		return nil, fmt.Errorf("failed to get registration flow: %w", err)
@@ -174,10 +162,6 @@ func (k *KratosClient) GetRecoveryFlow(ctx context.Context, flowID string, cooki
 	}
 	if err != nil {
 		if resp != nil {
-			slog.Debug("GetRecoveryFlow failed",
-				"flowID", flowID,
-				"status", resp.StatusCode,
-				"error", err)
 		}
 
 		return nil, fmt.Errorf("failed to get recovery flow: %w", err)
@@ -199,10 +183,6 @@ func (k *KratosClient) GetVerificationFlow(ctx context.Context, flowID string, c
 	}
 	if err != nil {
 		if resp != nil {
-			slog.Debug("GetVerificationFlow failed",
-				"flowID", flowID,
-				"status", resp.StatusCode,
-				"error", err)
 		}
 
 		return nil, fmt.Errorf("failed to get verification flow: %w", err)
@@ -224,10 +204,6 @@ func (k *KratosClient) GetSettingsFlow(ctx context.Context, flowID string, cooki
 	}
 	if err != nil {
 		if resp != nil {
-			slog.Debug("GetSettingsFlow failed",
-				"flowID", flowID,
-				"status", resp.StatusCode,
-				"error", err)
 		}
 
 		return nil, fmt.Errorf("failed to get settings flow: %w", err)
@@ -249,9 +225,6 @@ func (k *KratosClient) CreateBrowserLogoutFlow(ctx context.Context, cookie strin
 	}
 	if err != nil {
 		if resp != nil {
-			slog.Debug("CreateBrowserLogoutFlow failed",
-				"status", resp.StatusCode,
-				"error", err)
 		}
 
 		return nil, fmt.Errorf("failed to create logout flow: %w", err)
@@ -270,10 +243,6 @@ func (k *KratosClient) GetFlowError(ctx context.Context, errorID string) (*clien
 	}
 	if err != nil {
 		if resp != nil {
-			slog.Debug("GetFlowError failed",
-				"errorID", errorID,
-				"status", resp.StatusCode,
-				"error", err)
 		}
 
 		return nil, fmt.Errorf("failed to get flow error: %w", err)

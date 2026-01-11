@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -46,10 +45,6 @@ func (m *Middleware) RequireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		session, err := m.validateSession(r)
 		if err != nil {
-			slog.Debug("Session validation failed, redirecting to login",
-				"path", r.URL.Path,
-				"error", err)
-
 			// Store the original URL for return_to
 			returnTo := r.URL.String()
 			loginURL := fmt.Sprintf("%s/auth/login?return_to=%s",
@@ -84,7 +79,6 @@ func (m *Middleware) RequireAuth(next http.Handler) http.Handler {
 		// Convert session to domain user
 		user, err := domain.NewUserFromSession(session)
 		if err != nil {
-			slog.Error("Failed to convert session to user", "error", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 
 			return
@@ -106,7 +100,6 @@ func (m *Middleware) OptionalAuth(next http.Handler) http.Handler {
 		session, err := m.validateSession(r)
 		if err != nil {
 			// Session not valid, but we continue anyway
-			slog.Debug("Optional auth: no valid session", "path", r.URL.Path)
 			next.ServeHTTP(w, r)
 
 			return
@@ -115,7 +108,6 @@ func (m *Middleware) OptionalAuth(next http.Handler) http.Handler {
 		// Convert session to domain user
 		user, err := domain.NewUserFromSession(session)
 		if err != nil {
-			slog.Warn("Failed to convert session to user", "error", err)
 			next.ServeHTTP(w, r)
 
 			return
