@@ -2,10 +2,8 @@
 package middleware
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
-	"school-with-ai/foundation/errs"
 	"school-with-ai/foundation/logger"
 	"time"
 )
@@ -32,21 +30,10 @@ func Logger(log *logger.Logger) func(http.Handler) http.Handler {
 
 			next.ServeHTTP(rw, r)
 
-			// Determine status code from error if present
-			statusCode := errs.None
+			// Get the status code
+			statusCode := http.StatusOK
 			if wr, ok := rw.(*responseWriter); ok {
-				if wr.err != nil {
-					statusCode = errs.Internal
-
-					var appErr *errs.Error
-					if errors.As(wr.err, &appErr) {
-						statusCode = appErr.Code
-					}
-				} else if wr.statusCode >= 200 && wr.statusCode < 300 {
-					statusCode = errs.None
-				} else {
-					statusCode = errs.Internal
-				}
+				statusCode = wr.statusCode
 			}
 
 			log.Info(ctx, "request completed", "method", r.Method, "path", path, "remoteaddr", r.RemoteAddr,
