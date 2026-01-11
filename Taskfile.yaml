@@ -27,9 +27,18 @@ tasks:
     cmds:
       - "{{.TAILWIND_CMD}} -i ./assets/css/input.css -o ./assets/css/output.css --watch"
 
+  kill-ports:
+    desc: Kill processes using app ports (8090, 4015, 7331)
+    cmds:
+      - fuser -k 8090/tcp 2>/dev/null || true
+      - fuser -k 4015/tcp 2>/dev/null || true
+      - fuser -k 7331/tcp 2>/dev/null || true
+      - echo "Ports 8090, 4015, and 7331 cleared"
+
   dev:
     desc: Start development server with hot reload
     cmds:
+      - task kill-ports
       - task --parallel tailwind templ
 
   run: "wgo -file=.go -file=.templ -xfile=_templ.go  go tool templ generate :: go run main.go"
