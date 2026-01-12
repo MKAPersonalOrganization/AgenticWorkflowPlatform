@@ -14,6 +14,14 @@ import (
 	"school-with-ai/services/chatwrite/agents/shared"
 )
 
+// ObservabilityConfig contains configuration for observability and tracing attributes
+type ObservabilityConfig struct {
+	Release    string   // Release version (e.g., "v1.2.3")
+	Env        string   // Environment (e.g., "production", "staging", "development")
+	Deployment string   // Deployment context (e.g., "us-east-1", "cluster-a")
+	Tags       []string // Additional custom tags
+}
+
 // Service provides transport-agnostic message orchestration.
 // This service handles the core business logic of processing messages,
 // managing threads, routing to agents, and coordinating execution.
@@ -26,6 +34,7 @@ type Service struct {
 	eventLog             core.EventStore
 	chatClient           chatwrite.ChatClient
 	langfuseTracer       *LangfuseTracer
+	observabilityConfig  ObservabilityConfig
 }
 
 // NewService creates a new orchestration service.
@@ -37,6 +46,7 @@ func NewService(
 	eventLog core.EventStore,
 	chatClient chatwrite.ChatClient,
 	langfuseTracer *LangfuseTracer,
+	observabilityConfig ObservabilityConfig,
 ) *Service {
 	return &Service{
 		log:                  log,
@@ -46,6 +56,7 @@ func NewService(
 		eventLog:             eventLog,
 		chatClient:           chatClient,
 		langfuseTracer:       langfuseTracer,
+		observabilityConfig:  observabilityConfig,
 	}
 }
 
@@ -129,6 +140,8 @@ func (s *Service) HandleUserMessage(
 					"messageId": params.MessageID,
 					"runId":     runID,
 				}),
+				langfuse.WithTraceTags(s.getTraceTags()),
+				langfuse.WithTraceRelease(s.getRelease()),
 			)
 			if err != nil {
 				s.log.Warn(ctx, "failed to start Langfuse trace", "error", err)
@@ -330,4 +343,35 @@ func (s *Service) runAgent(ctx context.Context, threadID, agentName string, emit
 	}
 
 	return "", nil
+}
+
+// getRelease returns the application release version from config
+func (s *Service) getRelease() string {
+	// Use configured release if available
+	if s.observabilityConfig.Release != "" {
+		return s.observabilityConfig.Release
+	}
+
+	// Final fallback
+	return "dev"
+}
+
+// getTraceTags returns configured tags for the trace
+func (s *Service) getTraceTags() []string {
+	tags := []string{}
+
+	// Add environment tag
+	if s.observabilityConfig.Env != "" {
+		tags = append(tags, "env:"+s.observabilityConfig.Env)
+	}
+
+	// Add deployment context if available
+	if s.observabilityConfig.Deployment != "" {
+		tags = append(tags, "deployment:"+s.observabilityConfig.Deployment)
+	}
+
+	// Add custom tags from config
+	tags = append(tags, s.observabilityConfig.Tags...)
+
+	return tags
 }

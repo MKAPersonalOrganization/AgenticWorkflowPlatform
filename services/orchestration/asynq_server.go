@@ -49,6 +49,7 @@ func NewAsynqServer(
 	chatClient chatwrite.ChatClient,
 	chatWriteService *chatwrite.ChatWriteService,
 	langfuseTracer *LangfuseTracer,
+	observabilityConfig ObservabilityConfig,
 ) *AsynqServer {
 	// Default Redis options if not provided
 	if config.RedisOptions.Addr == "" && config.RedisAddr == "" {
@@ -87,6 +88,7 @@ func NewAsynqServer(
 		eventLog,
 		chatClient,
 		langfuseTracer,
+		observabilityConfig,
 	)
 
 	// Create chat worker (thin wrapper around orchestration service)

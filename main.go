@@ -110,6 +110,12 @@ func run(ctx context.Context, log *logger.Logger) error {
 			PublicKey string
 			SecretKey string
 		}
+		Observability struct {
+			Release    string   // Release version override (defaults to build version)
+			Env        string   `conf:"default:development"`
+			Deployment string   // Optional deployment context (e.g., us-east-1)
+			Tags       []string // Additional custom tags for traces
+		}
 	}{
 		Version: conf.Version{
 			Build: build,
@@ -229,6 +235,18 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	log.Info(ctx, "startup", "status", "initializing asynq server", "redis", cfg.Redis.Addr)
 
+	// Prepare observability configuration
+	observabilityConfig := orchestration.ObservabilityConfig{
+		Release:    cfg.Observability.Release,
+		Env:        cfg.Observability.Env,
+		Deployment: cfg.Observability.Deployment,
+		Tags:       cfg.Observability.Tags,
+	}
+	// Use build version if no explicit release is configured
+	if observabilityConfig.Release == "" {
+		observabilityConfig.Release = build
+	}
+
 	asynqServer := orchestration.NewAsynqServer(
 		log,
 		orchestration.AsynqConfig{
@@ -243,6 +261,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		chatClient,
 		chatWriteService,
 		langfuseTracer,
+		observabilityConfig,
 	)
 	defer asynqServer.Shutdown()
 	log.Info(ctx, "startup", "status", "asynq server started",
