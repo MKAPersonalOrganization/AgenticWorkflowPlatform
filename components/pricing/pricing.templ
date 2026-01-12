@@ -29,43 +29,45 @@ templ PricingPage(props PricingPageProps) {
 		Title: "Pricing Plans",
 		User:  props.User,
 	}) {
-		<div class="container mx-auto max-w-7xl p-6 space-y-8">
+		<div class="min-h-screen bg-background">
+			<div class="container mx-auto max-w-7xl px-6 py-8 lg:py-12 space-y-10">
 			<!-- Header with Back Button -->
-			<div class="flex items-center justify-center gap-4 relative">
-				<a href="/auth/settings" class="absolute left-0">
+			<div class="flex items-center gap-6">
+				<a href="/">
 					@button.Button(button.Props{
 						Variant: button.VariantGhost,
 						Size:    button.SizeIcon,
 					}) {
 						@icon.ArrowLeft(icon.Props{Class: "size-5"})
-						<span class="sr-only">Back to Settings</span>
+						<span class="sr-only">Back to Home</span>
 					}
 				</a>
-				<div class="text-center space-y-4">
-					<h1 class="text-4xl font-bold tracking-tight">Choose Your Plan</h1>
-					<p class="text-lg text-muted-foreground max-w-2xl mx-auto">
+				<div class="flex-1 text-center lg:text-left">
+					<h1 class="text-4xl lg:text-5xl font-bold tracking-tight">Choose Your Plan</h1>
+					<p class="text-base lg:text-lg text-muted-foreground mt-3 max-w-2xl mx-auto lg:mx-0">
 						Unlock the full potential of AI-powered learning with our flexible pricing options
 					</p>
 				</div>
 			</div>
-			<!-- Pricing Cards -->
-			@PricingCards(props)
+				<!-- Pricing Cards -->
+				@PricingCards(props)
+			</div>
 		</div>
 	}
 }
 
 templ PricingCards(props PricingPageProps) {
-	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
 		for _, plan := range props.Plans {
 			if plan.Popular {
 				<div class="relative lg:scale-105 lg:z-10">
 					@card.Card(card.Props{
-						Class: "border-primary shadow-lg",
+						Class: "border-2 border-primary shadow-xl",
 					}) {
-						<div class="absolute -top-3 left-1/2 -translate-x-1/2">
+						<div class="absolute -top-4 left-1/2 -translate-x-1/2">
 							@badge.Badge(badge.Props{
 								Variant: badge.VariantDefault,
-								Class:   "px-3 py-1",
+								Class:   "px-4 py-2 text-xs font-bold shadow-lg",
 							}) {
 								<span>POPULAR</span>
 							}
@@ -75,7 +77,9 @@ templ PricingCards(props PricingPageProps) {
 				</div>
 			} else {
 				<div class="relative">
-					@card.Card(card.Props{}) {
+					@card.Card(card.Props{
+						Class: "border-2 border-border hover:border-ring transition-all hover:shadow-lg",
+					}) {
 						@planCardContent(plan)
 					}
 				</div>
@@ -85,40 +89,41 @@ templ PricingCards(props PricingPageProps) {
 }
 
 templ planCardContent(plan Plan) {
-	@card.Header(card.HeaderProps{Class: "text-center pb-8"}) {
-		@card.Title(card.TitleProps{Class: "text-2xl"}) {
+	@card.Header(card.HeaderProps{Class: "text-center pb-10 pt-8"}) {
+		@card.Title(card.TitleProps{Class: "text-2xl font-bold"}) {
 			{ plan.Name }
 		}
-		@card.Description(card.DescriptionProps{Class: "mt-2"}) {
+		@card.Description(card.DescriptionProps{Class: "mt-3 leading-relaxed"}) {
 			{ plan.Description }
 		}
-		<div class="mt-4">
-			<div class="flex items-baseline justify-center gap-1">
-				<span class="text-4xl font-bold">{ plan.Price }</span>
+		<div class="mt-6">
+			<div class="flex items-baseline justify-center gap-2">
+				<span class="text-5xl font-bold tracking-tight">{ plan.Price }</span>
 				if plan.Period != "" {
-					<span class="text-muted-foreground">{ plan.Period }</span>
+					<span class="text-base text-muted-foreground font-medium">{ plan.Period }</span>
 				}
 			</div>
 		</div>
 	}
-	@card.Content(card.ContentProps{Class: "space-y-4"}) {
-		<ul class="space-y-3">
+	@card.Content(card.ContentProps{Class: "space-y-5 pb-8"}) {
+		<ul class="space-y-4">
 			for _, feature := range plan.Features {
 				<li class="flex items-start gap-3">
-					<div class="mt-0.5">
-						@icon.Check(icon.Props{Class: "size-4 text-primary"})
+					<div class="mt-1">
+						@icon.Check(icon.Props{Class: "size-5 text-primary flex-shrink-0"})
 					</div>
-					<span class="text-sm">{ feature }</span>
+					<span class="text-sm leading-relaxed">{ feature }</span>
 				</li>
 			}
 		</ul>
 	}
-	@card.Footer(card.FooterProps{Class: "flex-col"}) {
+	@card.Footer(card.FooterProps{Class: "flex-col pt-6"}) {
 		if plan.Popular {
 			@button.Button(button.Props{
 				Variant:   button.VariantDefault,
 				FullWidth: true,
 				Href:      plan.ButtonHref,
+				Size:      button.SizeLg,
 			}) {
 				{ plan.ButtonText }
 			}
@@ -127,6 +132,7 @@ templ planCardContent(plan Plan) {
 				Variant:   button.VariantOutline,
 				FullWidth: true,
 				Href:      plan.ButtonHref,
+				Size:      button.SizeLg,
 			}) {
 				{ plan.ButtonText }
 			}
