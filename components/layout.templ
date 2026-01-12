@@ -19,9 +19,63 @@ templ AppLayout(props AppLayoutProps) {
 			<title>{ props.Title } - SchoolWithAI</title>
 			<link rel="icon" type="image/svg+xml" href="/assets/images/logo-black.svg"/>
 			<link rel="stylesheet" href="/assets/css/output.css"/>
+			<!-- Theme initialization (runs before page render to prevent flash) -->
+			<script>
+				(function() {
+					const theme = localStorage.getItem('theme') || 'system';
+					const root = document.documentElement;
+
+					if (theme === 'system') {
+						const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+						if (systemPrefersDark) {
+							root.classList.add('dark');
+						}
+					} else if (theme === 'dark') {
+						root.classList.add('dark');
+					}
+				})();
+			</script>
 			<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+			<!-- Alpine.js global data for theme management -->
+			<script>
+				document.addEventListener('alpine:init', () => {
+					Alpine.data('themeManager', () => ({
+						theme: localStorage.getItem('theme') || 'system',
+
+						toggleTheme() {
+							const themes = ['light', 'dark', 'system'];
+							const currentIndex = themes.indexOf(this.theme);
+							const nextTheme = themes[(currentIndex + 1) % themes.length];
+							this.setTheme(nextTheme);
+						},
+
+						setTheme(theme) {
+							this.theme = theme;
+							localStorage.setItem('theme', theme);
+							this.applyTheme(theme);
+						},
+
+						applyTheme(theme) {
+							const root = document.documentElement;
+
+							if (theme === 'system') {
+								const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+								if (systemPrefersDark) {
+									root.classList.add('dark');
+								} else {
+									root.classList.remove('dark');
+								}
+							} else if (theme === 'dark') {
+								root.classList.add('dark');
+							} else {
+								root.classList.remove('dark');
+							}
+						}
+					}));
+				});
+			</script>
 		</head>
-		<body class="flex min-h-screen bg-background text-foreground antialiased">
+		<body class="flex min-h-screen bg-background text-foreground antialiased" x-data="themeManager">
 			<!-- Left Navigation Bar -->
 			@navbar.Navbar(navbar.Props{User: props.User})
 			<!-- Main Content with margin for navbar -->
