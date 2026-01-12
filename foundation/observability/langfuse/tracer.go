@@ -191,6 +191,20 @@ func WithTraceTags(tags []string) TraceOption {
 	}
 }
 
+// WithTraceRelease sets the release version for the trace
+func WithTraceRelease(release string) TraceOption {
+	return func(t *Trace) {
+		t.Release = release
+	}
+}
+
+// WithTraceVersion sets the component/model version for the trace
+func WithTraceVersion(version string) TraceOption {
+	return func(t *Trace) {
+		t.Version = version
+	}
+}
+
 // GenerationOption is a functional option for configuring a generation
 type GenerationOption func(*Generation)
 

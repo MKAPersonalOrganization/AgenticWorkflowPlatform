@@ -142,6 +142,8 @@ type Trace struct {
 	Tags      []string       `json:"tags,omitempty"`
 	Timestamp *time.Time     `json:"timestamp,omitempty"`
 	Public    bool           `json:"public,omitempty"`
+	Release   string         `json:"release,omitempty"`   // Application release version
+	Version   string         `json:"version,omitempty"`   // Component or model version
 }
 
 // Generation represents an LLM generation (completion)
