@@ -11,24 +11,34 @@ A chat application built with Go, Templ, Tailwind CSS, and Alpine.js, implementi
 ```mermaid
 graph TB
     Browser[Web Browser<br/>Alpine.js + Tailwind]
-    
+
     GoApp[Go Application<br/>Event-Sourced Multi-Agent System]
-    
+
     KurrentDB[(KurrentDB<br/>Event Store)]
     Redis[(Redis<br/>Task Queue)]
     Kratos[Ory Kratos<br/>Identity & Auth]
     Postgres[(PostgreSQL<br/>Kratos DB)]
-    
+
+    Langfuse[Langfuse<br/>LLM Observability]
+    LangfuseDB[(PostgreSQL<br/>Langfuse DB)]
+    ClickHouse[(ClickHouse<br/>Analytics)]
+    MinIO[(MinIO<br/>Object Storage)]
+
     EmailService[Email Service]
-    
+
     Browser -->|HTTP/SSE| GoApp
     GoApp -->|Events| KurrentDB
     GoApp -->|Query-Time<br/>Projections| KurrentDB
     GoApp -->|Tasks| Redis
     GoApp -->|Auth API| Kratos
-    
+    GoApp -->|Traces & Metrics| Langfuse
+
     Kratos -->|SQL| Postgres
     Kratos -->|SMTP| EmailService
+
+    Langfuse -->|SQL| LangfuseDB
+    Langfuse -->|Analytics| ClickHouse
+    Langfuse -->|Media Storage| MinIO
 ```
 
 ### Component Overview
@@ -40,6 +50,10 @@ graph TB
 - **Ory Kratos**: Identity and session management
 - **PostgreSQL**: Database for Kratos user data
 - **Email Service**: Notification service for authentication emails
+- **Langfuse**: LLM observability platform for tracing agent executions, handoffs, and responses
+- **PostgreSQL (Langfuse)**: Database for Langfuse traces and metadata
+- **ClickHouse**: Analytics database for Langfuse metrics and aggregations
+- **MinIO**: S3-compatible object storage for Langfuse media and event logs
 
 ### Key Patterns
 
