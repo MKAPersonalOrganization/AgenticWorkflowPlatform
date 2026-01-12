@@ -16,7 +16,7 @@ tasks:
     cmds:
       - go install github.com/a-h/templ/cmd/templ@latest
       - go install github.com/templui/templui/cmd/templui@latest
-
+      - go install github.com/securego/gosec/v2/cmd/gosec@latest
   templ:
     desc: Run templ with integrated server and hot reload
     cmds:
