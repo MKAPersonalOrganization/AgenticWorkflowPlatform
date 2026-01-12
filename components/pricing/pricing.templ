@@ -1,0 +1,211 @@
+package pricing
+
+import "school-with-ai/components/card"
+import "school-with-ai/components/button"
+import "school-with-ai/components/icon"
+import "school-with-ai/components/badge"
+import "school-with-ai/components"
+import "school-with-ai/domain"
+
+type Plan struct {
+	ID          string
+	Name        string
+	Price       string
+	Period      string
+	Description string
+	Features    []string
+	Popular     bool
+	ButtonText  string
+	ButtonHref  string
+}
+
+type PricingPageProps struct {
+	Plans []Plan
+	User  *domain.User
+}
+
+templ PricingPage(props PricingPageProps) {
+	@components.AppLayout(components.AppLayoutProps{
+		Title: "Pricing Plans",
+		User:  props.User,
+	}) {
+		<div class="container mx-auto max-w-7xl p-6 space-y-8">
+			<!-- Header with Back Button -->
+			<div class="flex items-center justify-center gap-4 relative">
+				<a href="/auth/settings" class="absolute left-0">
+					@button.Button(button.Props{
+						Variant: button.VariantGhost,
+						Size:    button.SizeIcon,
+					}) {
+						@icon.ArrowLeft(icon.Props{Class: "size-5"})
+						<span class="sr-only">Back to Settings</span>
+					}
+				</a>
+				<div class="text-center space-y-4">
+					<h1 class="text-4xl font-bold tracking-tight">Choose Your Plan</h1>
+					<p class="text-lg text-muted-foreground max-w-2xl mx-auto">
+						Unlock the full potential of AI-powered learning with our flexible pricing options
+					</p>
+				</div>
+			</div>
+			<!-- Pricing Cards -->
+			@PricingCards(props)
+		</div>
+	}
+}
+
+templ PricingCards(props PricingPageProps) {
+	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+		for _, plan := range props.Plans {
+			if plan.Popular {
+				<div class="relative lg:scale-105 lg:z-10">
+					@card.Card(card.Props{
+						Class: "border-primary shadow-lg",
+					}) {
+						<div class="absolute -top-3 left-1/2 -translate-x-1/2">
+							@badge.Badge(badge.Props{
+								Variant: badge.VariantDefault,
+								Class:   "px-3 py-1",
+							}) {
+								<span>POPULAR</span>
+							}
+						</div>
+						@planCardContent(plan)
+					}
+				</div>
+			} else {
+				<div class="relative">
+					@card.Card(card.Props{}) {
+						@planCardContent(plan)
+					}
+				</div>
+			}
+		}
+	</div>
+}
+
+templ planCardContent(plan Plan) {
+	@card.Header(card.HeaderProps{Class: "text-center pb-8"}) {
+		@card.Title(card.TitleProps{Class: "text-2xl"}) {
+			{ plan.Name }
+		}
+		@card.Description(card.DescriptionProps{Class: "mt-2"}) {
+			{ plan.Description }
+		}
+		<div class="mt-4">
+			<div class="flex items-baseline justify-center gap-1">
+				<span class="text-4xl font-bold">{ plan.Price }</span>
+				if plan.Period != "" {
+					<span class="text-muted-foreground">{ plan.Period }</span>
+				}
+			</div>
+		</div>
+	}
+	@card.Content(card.ContentProps{Class: "space-y-4"}) {
+		<ul class="space-y-3">
+			for _, feature := range plan.Features {
+				<li class="flex items-start gap-3">
+					<div class="mt-0.5">
+						@icon.Check(icon.Props{Class: "size-4 text-primary"})
+					</div>
+					<span class="text-sm">{ feature }</span>
+				</li>
+			}
+		</ul>
+	}
+	@card.Footer(card.FooterProps{Class: "flex-col"}) {
+		if plan.Popular {
+			@button.Button(button.Props{
+				Variant:   button.VariantDefault,
+				FullWidth: true,
+				Href:      plan.ButtonHref,
+			}) {
+				{ plan.ButtonText }
+			}
+		} else {
+			@button.Button(button.Props{
+				Variant:   button.VariantOutline,
+				FullWidth: true,
+				Href:      plan.ButtonHref,
+			}) {
+				{ plan.ButtonText }
+			}
+		}
+	}
+}
+
+func GetDefaultPlans() []Plan {
+	return []Plan{
+		{
+			ID:          "free",
+			Name:        "Free",
+			Price:       "$0",
+			Period:      "",
+			Description: "Perfect for getting started",
+			Features: []string{
+				"10 conversations per day",
+				"Basic AI model",
+				"Community support",
+				"Standard response time",
+			},
+			Popular:    false,
+			ButtonText: "Current Plan",
+			ButtonHref: "#",
+		},
+		{
+			ID:          "go",
+			Name:        "Go",
+			Price:       "$9",
+			Period:      "/month",
+			Description: "For individuals who need more",
+			Features: []string{
+				"100 conversations per day",
+				"Advanced AI model",
+				"Priority support",
+				"Faster response time",
+				"Export conversation history",
+			},
+			Popular:    false,
+			ButtonText: "Upgrade",
+			ButtonHref: "/checkout?plan=go",
+		},
+		{
+			ID:          "plus",
+			Name:        "Plus",
+			Price:       "$19",
+			Period:      "/month",
+			Description: "Most popular for power users",
+			Features: []string{
+				"Unlimited conversations",
+				"Premium AI models",
+				"Priority support",
+				"Fastest response time",
+				"Export conversation history",
+				"Advanced analytics",
+				"Custom instructions",
+			},
+			Popular:    true,
+			ButtonText: "Upgrade",
+			ButtonHref: "/checkout?plan=plus",
+		},
+		{
+			ID:          "pro",
+			Name:        "Pro",
+			Price:       "$49",
+			Period:      "/month",
+			Description: "For professionals and teams",
+			Features: []string{
+				"Everything in Plus",
+				"Dedicated support",
+				"API access",
+				"Team collaboration",
+				"Custom integrations",
+				"SLA guarantee",
+				"Advanced security",
+			},
+			Popular:    false,
+			ButtonText: "Upgrade",
+			ButtonHref: "/checkout?plan=pro",
+		},
+	}
+}

@@ -8,11 +8,12 @@ import "school-with-ai/components"
 import "school-with-ai/domain"
 
 type SettingsPageProps struct {
-	FlowAction string
-	FlowMethod string
-	Messages   []UIMessage
-	LogoutURL  string
-	User       *domain.User
+	FlowAction     string
+	FlowMethod     string
+	Messages       []UIMessage
+	LogoutURL      string
+	User           *domain.User
+	SuccessMessage string
 }
 
 // SettingsPageWithNodes renders the settings page with all Kratos UI nodes
@@ -38,6 +39,17 @@ templ SettingsPageWithNodes(nodes []client.UiNode, props SettingsPageProps) {
 						<p class="text-muted-foreground mt-1">Manage your profile, password, and security settings</p>
 					</div>
 				</div>
+				<!-- Success Message (e.g., after upgrade) -->
+				if props.SuccessMessage != "" {
+					<div class="rounded-lg border border-primary bg-primary/10 p-4">
+						<div class="flex items-start gap-3">
+							<div class="mt-0.5">
+								@icon.CircleCheck(icon.Props{Class: "size-5 text-primary"})
+							</div>
+							<p class="text-sm text-primary">{ props.SuccessMessage }</p>
+						</div>
+					</div>
+				}
 				<!-- Flow-level messages -->
 				if len(props.Messages) > 0 {
 					<div class="rounded-lg border bg-card p-4">

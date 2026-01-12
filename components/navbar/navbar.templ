@@ -93,6 +93,16 @@ templ Navbar(props ...Props) {
 							</div>
 							<span class="flex-1 text-left">Account Settings</span>
 						</a>
+						<!-- Upgrade Plan Link -->
+						<a
+							href="/pricing"
+							class="flex items-center gap-3 w-full px-2 py-2 text-sm rounded-md hover:bg-accent transition-colors"
+						>
+							<div class="flex items-center justify-center size-5">
+								@icon.Crown(icon.Props{Class: "size-4"})
+							</div>
+							<span class="flex-1 text-left">Upgrade Plan</span>
+						</a>
 						<div class="border-t border-border my-1"></div>
 						<!-- Theme Toggle -->
 						<button
