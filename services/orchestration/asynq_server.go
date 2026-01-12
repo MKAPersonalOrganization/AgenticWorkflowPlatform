@@ -48,6 +48,7 @@ func NewAsynqServer(
 	whiteboardProjection domain.WhiteboardStore,
 	chatClient chatwrite.ChatClient,
 	chatWriteService *chatwrite.ChatWriteService,
+	langfuseTracer *LangfuseTracer,
 ) *AsynqServer {
 	// Default Redis options if not provided
 	if config.RedisOptions.Addr == "" && config.RedisAddr == "" {
@@ -85,6 +86,7 @@ func NewAsynqServer(
 		whiteboardProjection,
 		eventLog,
 		chatClient,
+		langfuseTracer,
 	)
 
 	// Create chat worker (thin wrapper around orchestration service)

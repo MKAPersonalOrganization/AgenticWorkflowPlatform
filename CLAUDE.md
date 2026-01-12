@@ -101,8 +101,31 @@ Educational tools available to instructors:
 ## Environment Variables
 
 ```
+# Server Configuration
 SERVER_ADDR=localhost:8090    # Required - HTTP server address
+
+# Langfuse Observability (Optional)
+SCHOOL_LANGFUSE_ENABLED=true                          # Enable/disable tracing
+SCHOOL_LANGFUSE_BASE_URL=http://localhost:3000        # Langfuse API URL
+SCHOOL_LANGFUSE_PUBLIC_KEY=pk-lf-local-dev-public-key # Auto-generated local key
+SCHOOL_LANGFUSE_SECRET_KEY=sk-lf-local-dev-secret-key # Auto-generated local key
 ```
+
+## Observability
+
+The application integrates with **Langfuse** for LLM observability (optional):
+
+- **Setup**: `task up` (starts all services including Langfuse)
+- **UI**: http://localhost:3000 (login: admin@schoolwithai.local / admin123)
+- **Traces**: Automatically captures all agent executions, handoffs, and responses
+- **Docs**: See `LANGFUSE_SETUP.md` and `services/observability/langfuse/README.md`
+
+When enabled, every user message creates a trace showing:
+- Agent routing decisions
+- Nested agent executions (e.g., math-instructor called by student-facing-agent)
+- Tool calls and results
+- Timing and performance
+- Errors and debugging info
 
 ## Test Requirements
 
