@@ -4,11 +4,11 @@ dsn: env://DATABASE_URL
 
 serve:
   public:
-    base_url: http://127.0.0.1:4433/
+    base_url: http://localhost:4433/
     cors:
       enabled: true
       allowed_origins:
-        - http://127.0.0.1:8090
+        - http://localhost:8090
       allowed_methods:
         - POST
         - GET
@@ -26,9 +26,9 @@ serve:
     base_url: http://kratos:4434/
 
 selfservice:
-  default_browser_return_url: http://127.0.0.1:8090/
+  default_browser_return_url: http://localhost:8090/
   allowed_return_urls:
-    - http://127.0.0.1:8090
+    - http://localhost:8090
 
   methods:
     password:
@@ -46,40 +46,40 @@ selfservice:
 
   flows:
     error:
-      ui_url: http://127.0.0.1:8090/auth/error
+      ui_url: http://localhost:8090/auth/error
 
     settings:
-      ui_url: http://127.0.0.1:8090/auth/settings
+      ui_url: http://localhost:8090/auth/settings
       privileged_session_max_age: 15m
       required_aal: highest_available
 
     recovery:
       enabled: true
-      ui_url: http://127.0.0.1:8090/auth/recovery
+      ui_url: http://localhost:8090/auth/recovery
       use: code
       after:
-        default_browser_return_url: http://127.0.0.1:8090/auth/login
+        default_browser_return_url: http://localhost:8090/auth/login
 
     verification:
       enabled: true
-      ui_url: http://127.0.0.1:8090/auth/verification
+      ui_url: http://localhost:8090/auth/verification
       use: code
       after:
-        default_browser_return_url: http://127.0.0.1:8090/
+        default_browser_return_url: http://localhost:8090/
 
     logout:
       after:
-        default_browser_return_url: http://127.0.0.1:8090/auth/login
+        default_browser_return_url: http://localhost:8090/auth/login
 
     login:
-      ui_url: http://127.0.0.1:8090/auth/login
+      ui_url: http://localhost:8090/auth/login
       lifespan: 10m
       after:
-        default_browser_return_url: http://127.0.0.1:8090/
+        default_browser_return_url: http://localhost:8090/
 
     registration:
       lifespan: 10m
-      ui_url: http://127.0.0.1:8090/auth/registration
+      ui_url: http://localhost:8090/auth/registration
       enable_legacy_one_step: true
       after:
         password:
