@@ -1,0 +1,232 @@
+package checkout
+
+import "school-with-ai/components"
+import "school-with-ai/components/card"
+import "school-with-ai/components/button"
+import "school-with-ai/components/icon"
+import "school-with-ai/components/input"
+import "school-with-ai/components/label"
+import "school-with-ai/domain"
+
+type PlanDetails struct {
+	ID          string
+	Name        string
+	Price       string
+	Period      string
+	Features    []string
+}
+
+type CheckoutPageProps struct {
+	Plan  PlanDetails
+	User  *domain.User
+	Error string
+}
+
+templ CheckoutPage(props CheckoutPageProps) {
+	@components.AppLayout(components.AppLayoutProps{
+		Title: "Checkout",
+		User:  props.User,
+	}) {
+		<div class="container mx-auto max-w-4xl p-6 space-y-6">
+			<!-- Header with Back Button -->
+			<div class="flex items-center gap-4">
+				<a href="/pricing">
+					@button.Button(button.Props{
+						Variant: button.VariantGhost,
+						Size:    button.SizeIcon,
+					}) {
+						@icon.ArrowLeft(icon.Props{Class: "size-5"})
+						<span class="sr-only">Back to Pricing</span>
+					}
+				</a>
+				<div class="flex-1">
+					<h1 class="text-3xl font-bold tracking-tight">Complete Your Purchase</h1>
+					<p class="text-muted-foreground mt-1">Subscribe to { props.Plan.Name } plan</p>
+				</div>
+			</div>
+			if props.Error != "" {
+				<div class="rounded-lg border border-destructive bg-destructive/10 p-4">
+					<p class="text-sm text-destructive">{ props.Error }</p>
+				</div>
+			}
+			<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+				<!-- Order Summary (Right sidebar on desktop) -->
+				<div class="lg:col-start-3">
+					@card.Card(card.Props{}) {
+						@card.Header(card.HeaderProps{}) {
+							@card.Title(card.TitleProps{}) {
+								Order Summary
+							}
+						}
+						@card.Content(card.ContentProps{Class: "space-y-4"}) {
+							<div class="space-y-2">
+								<div class="flex justify-between items-center">
+									<span class="font-semibold">{ props.Plan.Name } Plan</span>
+								</div>
+								<div class="flex justify-between items-baseline">
+									<span class="text-2xl font-bold">{ props.Plan.Price }</span>
+									<span class="text-muted-foreground">{ props.Plan.Period }</span>
+								</div>
+							</div>
+							<div class="border-t pt-4">
+								<p class="text-sm font-medium mb-2">Included features:</p>
+								<ul class="space-y-2">
+									for _, feature := range props.Plan.Features {
+										<li class="flex items-start gap-2 text-sm">
+											@icon.Check(icon.Props{Class: "size-4 text-primary mt-0.5"})
+											<span>{ feature }</span>
+										</li>
+									}
+								</ul>
+							</div>
+						}
+					}
+				</div>
+				<!-- Payment Form (Left side, spans 2 columns) -->
+				<div class="lg:col-span-2">
+					<form action="/api/subscriptions/checkout" method="POST" class="space-y-6">
+						<input type="hidden" name="plan_id" value={ props.Plan.ID }/>
+						<!-- Payment Method Tabs -->
+						<div x-data="{ paymentMethod: 'card' }">
+							@card.Card(card.Props{}) {
+								@card.Header(card.HeaderProps{}) {
+									@card.Title(card.TitleProps{}) {
+										Payment Method
+									}
+									@card.Description(card.DescriptionProps{}) {
+										Choose how you want to pay
+									}
+								}
+								@card.Content(card.ContentProps{Class: "space-y-6"}) {
+									<!-- Payment Method Selector -->
+									<div class="flex gap-4 border-b">
+										<button
+											type="button"
+											@click="paymentMethod = 'card'"
+											:class="paymentMethod === 'card' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground'"
+											class="pb-2 px-4 font-medium transition-colors"
+										>
+											<div class="flex items-center gap-2">
+												@icon.CreditCard(icon.Props{Class: "size-4"})
+												<span>Card</span>
+											</div>
+										</button>
+										<button
+											type="button"
+											@click="paymentMethod = 'paypal'"
+											:class="paymentMethod === 'paypal' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground'"
+											class="pb-2 px-4 font-medium transition-colors"
+										>
+											<span>PayPal</span>
+										</button>
+									</div>
+									<!-- Card Payment Form -->
+									<div x-show="paymentMethod === 'card'" class="space-y-4">
+										<div>
+											@label.Label(label.Props{For: "card_number"}) {
+												Card Number
+											}
+											@input.Input(input.Props{
+												ID:          "card_number",
+												Name:        "card_number",
+												Type:        input.TypeText,
+												Placeholder: "1234 5678 9012 3456",
+												Attributes: templ.Attributes{
+													"required":  true,
+													"pattern":   "[0-9]{13,19}",
+													"maxlength": "19",
+												},
+											})
+										</div>
+										<div class="grid grid-cols-2 gap-4">
+											<div>
+												@label.Label(label.Props{For: "expiry"}) {
+													Expiry Date
+												}
+												@input.Input(input.Props{
+													ID:          "expiry",
+													Name:        "expiry",
+													Type:        input.TypeText,
+													Placeholder: "MM/YY",
+													Attributes: templ.Attributes{
+														"required":  true,
+														"pattern":   "[0-9]{2}/[0-9]{2}",
+														"maxlength": "5",
+													},
+												})
+											</div>
+											<div>
+												@label.Label(label.Props{For: "cvv"}) {
+													CVV
+												}
+												@input.Input(input.Props{
+													ID:          "cvv",
+													Name:        "cvv",
+													Type:        input.TypeText,
+													Placeholder: "123",
+													Attributes: templ.Attributes{
+														"required":  true,
+														"pattern":   "[0-9]{3,4}",
+														"maxlength": "4",
+													},
+												})
+											</div>
+										</div>
+										<div>
+											@label.Label(label.Props{For: "cardholder_name"}) {
+												Cardholder Name
+											}
+											@input.Input(input.Props{
+												ID:          "cardholder_name",
+												Name:        "cardholder_name",
+												Type:        input.TypeText,
+												Placeholder: "John Doe",
+												Attributes: templ.Attributes{
+													"required": true,
+												},
+											})
+										</div>
+									</div>
+									<!-- PayPal Payment (Placeholder) -->
+									<div x-show="paymentMethod === 'paypal'" class="space-y-4">
+										<div class="text-center py-8">
+											<p class="text-muted-foreground mb-4">You will be redirected to PayPal to complete your purchase</p>
+											<div class="bg-muted rounded-lg p-8">
+												<p class="text-sm text-muted-foreground">PayPal button will appear here</p>
+											</div>
+										</div>
+									</div>
+								}
+							}
+							<!-- Submit Button -->
+							<div class="flex justify-end gap-4">
+								<a href="/pricing">
+									@button.Button(button.Props{
+										Variant: button.VariantOutline,
+									}) {
+										Cancel
+									}
+								</a>
+								<button
+									type="submit"
+									x-show="paymentMethod === 'card'"
+									class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all h-9 px-4 py-2 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90"
+								>
+									@icon.Lock(icon.Props{Class: "size-4"})
+									<span>Complete Purchase</span>
+								</button>
+								<button
+									type="button"
+									x-show="paymentMethod === 'paypal'"
+									class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all h-9 px-4 py-2 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90"
+								>
+									<span>Continue to PayPal</span>
+								</button>
+							</div>
+						</div>
+					</form>
+				</div>
+			</div>
+		</div>
+	}
+}

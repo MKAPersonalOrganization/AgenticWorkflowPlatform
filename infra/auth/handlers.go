@@ -420,13 +420,20 @@ func (h *AuthHandlers) SettingsPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Check for success messages from query params (e.g., after upgrade)
+	var successMessage string
+	if r.URL.Query().Get("upgraded") == "true" {
+		successMessage = "Successfully upgraded! Your new plan is now active."
+	}
+
 	// Render the settings page
 	props := auth.SettingsPageProps{
-		FlowAction: flow.Ui.Action,
-		FlowMethod: flow.Ui.Method,
-		Messages:   messages,
-		LogoutURL:  logoutURL,
-		User:       user,
+		FlowAction:     flow.Ui.Action,
+		FlowMethod:     flow.Ui.Method,
+		Messages:       messages,
+		LogoutURL:      logoutURL,
+		User:           user,
+		SuccessMessage: successMessage,
 	}
 
 	component := auth.SettingsPageWithNodes(flow.Ui.Nodes, props)

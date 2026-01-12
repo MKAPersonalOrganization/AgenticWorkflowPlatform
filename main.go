@@ -10,6 +10,8 @@ import (
 	"os/signal"
 	"runtime"
 	"school-with-ai/components"
+	"school-with-ai/components/checkout"
+	"school-with-ai/components/pricing"
 	"school-with-ai/foundation/debug"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/middleware"
@@ -329,6 +331,12 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Protected auth routes
 	r.Get("/auth/settings", authMiddleware.RequireAuthFunc(authHandlers.SettingsPage))
 
+	// Pricing page
+	r.Get("/pricing", authMiddleware.RequireAuthFunc(HandlePricingPage(log)))
+
+	// Checkout page
+	r.Get("/checkout", authMiddleware.RequireAuthFunc(HandleCheckoutPage(log)))
+
 	r.Post("/v1/message:send", authMiddleware.RequireAuthFunc(handler.SendMessage))
 	r.Get("/v1/tasks/{id}:subscribe", authMiddleware.RequireAuthFunc(handler.StreamJobEvents))
 	r.Post("/v1/tasks/{id}:cancel", authMiddleware.RequireAuthFunc(handler.CancelJob))
@@ -400,6 +408,70 @@ func HandleViewChatInputScreen(log *logger.Logger) http.HandlerFunc {
 		component := components.ChatInputScreen(user)
 		if err := component.Render(r.Context(), w); err != nil {
 			log.Error(r.Context(), "failed to render chat input screen", "error", err)
+		}
+	}
+}
+
+func HandlePricingPage(log *logger.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Get authenticated user from context
+		user := auth.GetUserFromContext(r.Context())
+
+		// Get default pricing plans
+		plans := pricing.GetDefaultPlans()
+
+		component := pricing.PricingPage(pricing.PricingPageProps{
+			Plans: plans,
+			User:  user,
+		})
+		if err := component.Render(r.Context(), w); err != nil {
+			log.Error(r.Context(), "failed to render pricing page", "error", err)
+		}
+	}
+}
+
+func HandleCheckoutPage(log *logger.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Get authenticated user from context
+		user := auth.GetUserFromContext(r.Context())
+
+		// Get plan from query parameter
+		planID := r.URL.Query().Get("plan")
+		if planID == "" {
+			http.Redirect(w, r, "/pricing", http.StatusSeeOther)
+			return
+		}
+
+		// Find the plan details
+		plans := pricing.GetDefaultPlans()
+		var selectedPlan *pricing.Plan
+		for _, p := range plans {
+			if p.ID == planID {
+				selectedPlan = &p
+				break
+			}
+		}
+
+		if selectedPlan == nil {
+			http.Redirect(w, r, "/pricing", http.StatusSeeOther)
+			return
+		}
+
+		// Convert to checkout plan details
+		planDetails := checkout.PlanDetails{
+			ID:       selectedPlan.ID,
+			Name:     selectedPlan.Name,
+			Price:    selectedPlan.Price,
+			Period:   selectedPlan.Period,
+			Features: selectedPlan.Features,
+		}
+
+		component := checkout.CheckoutPage(checkout.CheckoutPageProps{
+			Plan: planDetails,
+			User: user,
+		})
+		if err := component.Render(r.Context(), w); err != nil {
+			log.Error(r.Context(), "failed to render checkout page", "error", err)
 		}
 	}
 }
