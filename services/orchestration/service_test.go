@@ -50,6 +50,7 @@ func TestServiceCreation(t *testing.T) {
 		nil, // whiteboardProjection
 		nil, // eventLog
 		nil, // chatClient
+		nil, // langfuseTracer
 	)
 
 	if service == nil {
@@ -108,7 +109,7 @@ func TestUserMessageParamsValidation(t *testing.T) {
 // TestHandleUserMessageCancellation verifies that HandleUserMessage respects context cancellation.
 func TestHandleUserMessageCancellation(t *testing.T) {
 	t.Parallel()
-	service := NewService(nil, nil, nil, nil, nil, nil)
+	service := NewService(nil, nil, nil, nil, nil, nil, nil)
 	emitter := &mockEventEmitter{}
 
 	// Create cancelled context

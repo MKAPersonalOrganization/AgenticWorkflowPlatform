@@ -104,6 +104,12 @@ func run(ctx context.Context, log *logger.Logger) error {
 		AI struct {
 			Model string `conf:"default:gpt-4o-mini"`
 		}
+		Langfuse struct {
+			Enabled   bool   `conf:"default:false"`
+			BaseURL   string `conf:"default:http://localhost:3000"`
+			PublicKey string
+			SecretKey string
+		}
 	}{
 		Version: conf.Version{
 			Build: build,
@@ -189,6 +195,19 @@ func run(ctx context.Context, log *logger.Logger) error {
 	log.Info(ctx, "startup", "status", "initializing AI client", "model", cfg.AI.Model)
 	chatClient := llm.NewOpenAIClient(cfg.AI.Model)
 
+	// Initialize Langfuse tracer (optional observability)
+	var langfuseTracer *orchestration.LangfuseTracer
+	if cfg.Langfuse.Enabled {
+		log.Info(ctx, "startup", "status", "initializing Langfuse tracer", "baseURL", cfg.Langfuse.BaseURL)
+		langfuseTracer = orchestration.NewLangfuseTracer(orchestration.LangfuseConfig{
+			BaseURL:   cfg.Langfuse.BaseURL,
+			PublicKey: cfg.Langfuse.PublicKey,
+			SecretKey: cfg.Langfuse.SecretKey,
+		})
+	} else {
+		log.Info(ctx, "startup", "status", "Langfuse tracing disabled")
+	}
+
 	// Register all agent factories for routing
 	shared.GlobalAgents.Register("student-facing-agent", studentfacing.CreateStudentFacingAgent)
 	shared.GlobalAgents.Register("math-instructor", math.CreateMathInstructor)
@@ -223,6 +242,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		whiteboardProjection,
 		chatClient,
 		chatWriteService,
+		langfuseTracer,
 	)
 	defer asynqServer.Shutdown()
 	log.Info(ctx, "startup", "status", "asynq server started",

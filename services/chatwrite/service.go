@@ -56,6 +56,7 @@ type ChatWriteService struct {
 	shouldContinueIteration ShouldContinueIterationFn
 	reqCtxCapture           **core.RequestContext // Captures the request context for handoff detection
 	ragService              rag.RAG               // RAG service for retrieving relevant context
+	toolTracer              core.ToolTracer       // Optional tracer for tool execution observability
 }
 
 // Option is a functional option for configuring ChatWriteService.
@@ -86,6 +87,13 @@ func WithRequestContextCapture(capture **core.RequestContext) Option {
 func WithRAG(ragService rag.RAG) Option {
 	return func(h *ChatWriteService) {
 		h.ragService = ragService
+	}
+}
+
+// WithToolTracer configures the agent with a tool tracer for observability.
+func WithToolTracer(tracer core.ToolTracer) Option {
+	return func(h *ChatWriteService) {
+		h.toolTracer = tracer
 	}
 }
 
@@ -216,7 +224,11 @@ func (h *ChatWriteService) runIteration(
 	}
 
 	// Create a tool executor with the dynamic registry
-	dynamicExecutor := core.NewRegistryToolExecutor(ctx, dynamicRegistry)
+	executorOpts := []core.ToolExecutorOption{}
+	if h.toolTracer != nil {
+		executorOpts = append(executorOpts, core.WithToolTracer(h.toolTracer))
+	}
+	dynamicExecutor := core.NewRegistryToolExecutor(ctx, dynamicRegistry, executorOpts...)
 
 	// Get streaming response from ChatClient
 	streamIter := h.chatClient.GetStreamingResponse(ctx, chatMessages, chatOptions)
