@@ -6,7 +6,7 @@ A chat application built with Go, Templ, Tailwind CSS, and Alpine.js, implementi
 
 ![Repository Statistics](.github/images/repo_statistics.png)
 
-## System Architecture
+## Container Diagram
 
 ```mermaid
 graph TB
