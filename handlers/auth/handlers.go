@@ -5,20 +5,21 @@ import (
 	"net/url"
 	"school-with-ai/components/auth"
 	"school-with-ai/foundation/logger"
+	"school-with-ai/infra/kratos"
 )
 
 // AuthHandlers contains handlers for authentication routes.
 type AuthHandlers struct {
 	log    *logger.Logger
-	kratos *KratosClient
+	kratos *kratos.KratosClient
 	appURL string
 }
 
 // NewAuthHandlers creates new authentication handlers.
-func NewAuthHandlers(log *logger.Logger, kratos *KratosClient, appURL string) *AuthHandlers {
+func NewAuthHandlers(log *logger.Logger, kratosClient *kratos.KratosClient, appURL string) *AuthHandlers {
 	return &AuthHandlers{
 		log:    log,
-		kratos: kratos,
+		kratos: kratosClient,
 		appURL: appURL,
 	}
 }
@@ -32,7 +33,7 @@ func (h *AuthHandlers) LoginPage(w http.ResponseWriter, r *http.Request) {
 
 	// If no flow ID, redirect to Kratos to initialize flow
 	if flowID == "" {
-		initURL := h.kratos.InitFlowURL(FlowTypeLogin, FlowParams{
+		initURL := h.kratos.InitFlowURL(kratos.FlowTypeLogin, kratos.FlowParams{
 			ReturnTo: returnTo,
 			AAL:      aal,
 			Refresh:  refresh,
@@ -47,8 +48,8 @@ func (h *AuthHandlers) LoginPage(w http.ResponseWriter, r *http.Request) {
 	flow, err := h.kratos.GetLoginFlow(r.Context(), flowID, cookie)
 	if err != nil {
 		// If flow expired or not found, redirect to initialize new flow
-		if IsFlowExpired(err) {
-			initURL := h.kratos.InitFlowURL(FlowTypeLogin, FlowParams{
+		if kratos.IsFlowExpired(err) {
+			initURL := h.kratos.InitFlowURL(kratos.FlowTypeLogin, kratos.FlowParams{
 				ReturnTo: returnTo,
 				AAL:      aal,
 				Refresh:  refresh,
@@ -66,8 +67,8 @@ func (h *AuthHandlers) LoginPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if verification is required
-	if flow.Ui.Messages != nil && ShouldRedirectToVerification(flow.Ui.Messages) {
-		verificationURL := h.kratos.InitFlowURL(FlowTypeVerification, FlowParams{
+	if flow.Ui.Messages != nil && kratos.ShouldRedirectToVerification(flow.Ui.Messages) {
+		verificationURL := h.kratos.InitFlowURL(kratos.FlowTypeVerification, kratos.FlowParams{
 			ReturnTo: flow.GetReturnTo(),
 		})
 		http.Redirect(w, r, verificationURL, http.StatusSeeOther)
@@ -125,7 +126,7 @@ func (h *AuthHandlers) LoginPage(w http.ResponseWriter, r *http.Request) {
 		Messages:        messages,
 		RecoveryURL:     recoveryURL,
 		RegistrationURL: registrationURL,
-		User:            GetUserFromContext(r.Context()), // nil if not authenticated
+		User:            kratos.GetUserFromContext(r.Context()), // nil if not authenticated
 	}
 
 	component := auth.LoginPageWithNodes(flow.Ui.Nodes, props)
@@ -141,7 +142,7 @@ func (h *AuthHandlers) RegistrationPage(w http.ResponseWriter, r *http.Request) 
 
 	// If no flow ID, redirect to Kratos to initialize flow
 	if flowID == "" {
-		initURL := h.kratos.InitFlowURL(FlowTypeRegistration, FlowParams{
+		initURL := h.kratos.InitFlowURL(kratos.FlowTypeRegistration, kratos.FlowParams{
 			ReturnTo: returnTo,
 		})
 		http.Redirect(w, r, initURL, http.StatusSeeOther)
@@ -154,8 +155,8 @@ func (h *AuthHandlers) RegistrationPage(w http.ResponseWriter, r *http.Request) 
 	flow, err := h.kratos.GetRegistrationFlow(r.Context(), flowID, cookie)
 	if err != nil {
 		// If flow expired or not found, redirect to initialize new flow
-		if IsFlowExpired(err) {
-			initURL := h.kratos.InitFlowURL(FlowTypeRegistration, FlowParams{
+		if kratos.IsFlowExpired(err) {
+			initURL := h.kratos.InitFlowURL(kratos.FlowTypeRegistration, kratos.FlowParams{
 				ReturnTo: returnTo,
 			})
 			http.Redirect(w, r, initURL, http.StatusSeeOther)
@@ -202,7 +203,7 @@ func (h *AuthHandlers) RegistrationPage(w http.ResponseWriter, r *http.Request) 
 		FlowMethod: flow.Ui.Method,
 		Messages:   messages,
 		LoginURL:   loginURL,
-		User:       GetUserFromContext(r.Context()), // nil if not authenticated
+		User:       kratos.GetUserFromContext(r.Context()), // nil if not authenticated
 	}
 
 	component := auth.RegistrationPageWithNodes(flow.Ui.Nodes, props)
@@ -218,7 +219,7 @@ func (h *AuthHandlers) RecoveryPage(w http.ResponseWriter, r *http.Request) {
 
 	// If no flow ID, redirect to Kratos to initialize flow
 	if flowID == "" {
-		initURL := h.kratos.InitFlowURL(FlowTypeRecovery, FlowParams{
+		initURL := h.kratos.InitFlowURL(kratos.FlowTypeRecovery, kratos.FlowParams{
 			ReturnTo: returnTo,
 		})
 		http.Redirect(w, r, initURL, http.StatusSeeOther)
@@ -231,8 +232,8 @@ func (h *AuthHandlers) RecoveryPage(w http.ResponseWriter, r *http.Request) {
 	flow, err := h.kratos.GetRecoveryFlow(r.Context(), flowID, cookie)
 	if err != nil {
 		// If flow expired or not found, redirect to initialize new flow
-		if IsFlowExpired(err) {
-			initURL := h.kratos.InitFlowURL(FlowTypeRecovery, FlowParams{
+		if kratos.IsFlowExpired(err) {
+			initURL := h.kratos.InitFlowURL(kratos.FlowTypeRecovery, kratos.FlowParams{
 				ReturnTo: returnTo,
 			})
 			http.Redirect(w, r, initURL, http.StatusSeeOther)
@@ -279,7 +280,7 @@ func (h *AuthHandlers) RecoveryPage(w http.ResponseWriter, r *http.Request) {
 		FlowMethod: flow.Ui.Method,
 		Messages:   messages,
 		LoginURL:   loginURL,
-		User:       GetUserFromContext(r.Context()), // nil if not authenticated
+		User:       kratos.GetUserFromContext(r.Context()), // nil if not authenticated
 	}
 
 	component := auth.RecoveryPageWithNodes(flow.Ui.Nodes, props)
@@ -295,7 +296,7 @@ func (h *AuthHandlers) VerificationPage(w http.ResponseWriter, r *http.Request) 
 
 	// If no flow ID, redirect to Kratos to initialize flow
 	if flowID == "" {
-		initURL := h.kratos.InitFlowURL(FlowTypeVerification, FlowParams{
+		initURL := h.kratos.InitFlowURL(kratos.FlowTypeVerification, kratos.FlowParams{
 			ReturnTo: returnTo,
 		})
 		http.Redirect(w, r, initURL, http.StatusSeeOther)
@@ -308,8 +309,8 @@ func (h *AuthHandlers) VerificationPage(w http.ResponseWriter, r *http.Request) 
 	flow, err := h.kratos.GetVerificationFlow(r.Context(), flowID, cookie)
 	if err != nil {
 		// If flow expired or not found, redirect to initialize new flow
-		if IsFlowExpired(err) {
-			initURL := h.kratos.InitFlowURL(FlowTypeVerification, FlowParams{
+		if kratos.IsFlowExpired(err) {
+			initURL := h.kratos.InitFlowURL(kratos.FlowTypeVerification, kratos.FlowParams{
 				ReturnTo: returnTo,
 			})
 			http.Redirect(w, r, initURL, http.StatusSeeOther)
@@ -356,7 +357,7 @@ func (h *AuthHandlers) VerificationPage(w http.ResponseWriter, r *http.Request) 
 		FlowMethod: flow.Ui.Method,
 		Messages:   messages,
 		LoginURL:   loginURL,
-		User:       GetUserFromContext(r.Context()), // nil if not authenticated
+		User:       kratos.GetUserFromContext(r.Context()), // nil if not authenticated
 	}
 
 	component := auth.VerificationPageWithNodes(flow.Ui.Nodes, props)
@@ -372,7 +373,7 @@ func (h *AuthHandlers) SettingsPage(w http.ResponseWriter, r *http.Request) {
 
 	// If no flow ID, redirect to Kratos to initialize flow
 	if flowID == "" {
-		initURL := h.kratos.InitFlowURL(FlowTypeSettings, FlowParams{
+		initURL := h.kratos.InitFlowURL(kratos.FlowTypeSettings, kratos.FlowParams{
 			ReturnTo: returnTo,
 		})
 		http.Redirect(w, r, initURL, http.StatusSeeOther)
@@ -385,8 +386,8 @@ func (h *AuthHandlers) SettingsPage(w http.ResponseWriter, r *http.Request) {
 	flow, err := h.kratos.GetSettingsFlow(r.Context(), flowID, cookie)
 	if err != nil {
 		// If flow expired or not found, redirect to initialize new flow
-		if IsFlowExpired(err) {
-			initURL := h.kratos.InitFlowURL(FlowTypeSettings, FlowParams{
+		if kratos.IsFlowExpired(err) {
+			initURL := h.kratos.InitFlowURL(kratos.FlowTypeSettings, kratos.FlowParams{
 				ReturnTo: returnTo,
 			})
 			http.Redirect(w, r, initURL, http.StatusSeeOther)
@@ -405,7 +406,7 @@ func (h *AuthHandlers) SettingsPage(w http.ResponseWriter, r *http.Request) {
 	logoutURL := h.appURL + "/auth/logout"
 
 	// Get authenticated user from context
-	user := GetUserFromContext(r.Context())
+	user := kratos.GetUserFromContext(r.Context())
 
 	// Extract messages from flow
 	var messages []auth.UIMessage
@@ -520,7 +521,7 @@ func (h *AuthHandlers) ErrorPage(w http.ResponseWriter, r *http.Request) {
 		ErrorDetails: errorDetails,
 		LoginURL:     loginURL,
 		HomeURL:      homeURL,
-		User:         GetUserFromContext(r.Context()), // nil if not authenticated
+		User:         kratos.GetUserFromContext(r.Context()), // nil if not authenticated
 	}
 
 	component := auth.ErrorPage(props)

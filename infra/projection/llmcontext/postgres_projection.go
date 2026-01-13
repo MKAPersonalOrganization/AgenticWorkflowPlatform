@@ -251,7 +251,7 @@ func (p *PostgresLLMContextProjection) getMessages(ctx context.Context, threadID
 	messages := make([]domain.Message, 0, len(dbMessages))
 	for _, msg := range dbMessages {
 		// Unmarshal tool calls
-		var toolCalls []core.ToolCall
+		var toolCalls []domain.ToolCall
 		if msg.ToolCalls != nil {
 			if err := json.Unmarshal(*msg.ToolCalls, &toolCalls); err != nil {
 				p.log.Error(ctx, "failed to unmarshal tool calls", "messageID", msg.MessageID, "ERROR", err)

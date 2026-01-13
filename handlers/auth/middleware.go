@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"school-with-ai/domain"
+	"school-with-ai/infra/kratos"
 
 	client "github.com/ory/client-go"
 )
@@ -20,12 +21,12 @@ var (
 
 // Middleware wraps the Kratos client for authentication middleware.
 type Middleware struct {
-	kratosClient *KratosClient
+	kratosClient *kratos.KratosClient
 	appURL       string
 }
 
 // NewMiddleware creates a new authentication middleware.
-func NewMiddleware(kratosClient *KratosClient, appURL string) *Middleware {
+func NewMiddleware(kratosClient *kratos.KratosClient, appURL string) *Middleware {
 	return &Middleware{
 		kratosClient: kratosClient,
 		appURL:       appURL,

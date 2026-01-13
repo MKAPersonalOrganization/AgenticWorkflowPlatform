@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"school-with-ai/foundation/agentsdk/core"
-	"school-with-ai/services/agentorchestrator/agents/shared/tools"
 	"testing"
 )
 
@@ -142,9 +141,16 @@ func TestMockToolExecutor_DefaultResult(t *testing.T) {
 
 func TestBasicToolExecutor_Calculate(t *testing.T) {
 	t.Parallel()
-	// Create tool registry and register the calculator tool
+	// Create tool registry and register a mock calculator tool
 	toolRegistry := core.NewToolRegistry()
-	toolRegistry.Register(tools.NewCalculatorTool())
+	toolRegistry.Register(core.NewFunctionTool(
+		"calculate",
+		"Calculate an expression",
+		core.ObjectSchema(map[string]any{"expression": core.StringProperty("Expression")}, []string{"expression"}),
+		func(ctx context.Context, arguments string) (string, error) {
+			return `{"result": "4"}`, nil
+		},
+	))
 
 	executor := core.NewRegistryToolExecutor(context.Background(), toolRegistry)
 
@@ -169,10 +175,19 @@ func TestBasicToolExecutor_Calculate(t *testing.T) {
 
 func TestBasicToolExecutor_WriteWhiteboard(t *testing.T) {
 	t.Parallel()
-	// Create tool registry and register instructor tools
+	// Create tool registry and register a mock whiteboard tool
 	toolRegistry := core.NewToolRegistry()
-	// Register whiteboard tool
-	toolRegistry.Register(tools.NewWriteWhiteboardTool())
+	toolRegistry.Register(core.NewFunctionTool(
+		"write_whiteboard",
+		"Write to whiteboard",
+		core.ObjectSchema(map[string]any{
+			"content": core.StringProperty("Content"),
+			"action":  core.StringProperty("Action"),
+		}, []string{"content", "action"}),
+		func(ctx context.Context, arguments string) (string, error) {
+			return `{"status": "success"}`, nil
+		},
+	))
 
 	executor := core.NewRegistryToolExecutor(context.Background(), toolRegistry)
 

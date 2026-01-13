@@ -201,8 +201,37 @@ func (m *Manager) ToAgentThread(aggregate *domain.ThreadAggregate) core.AgentThr
 	agentThread := core.NewInMemoryThreadWithID(aggregate.ID)
 	if len(aggregate.Messages) > 0 {
 		messages := make([]core.Message, len(aggregate.Messages))
-		copy(messages, aggregate.Messages)
+		for i, dm := range aggregate.Messages {
+			messages[i] = core.Message{
+				ID:         dm.ID,
+				Role:       dm.Role,
+				Content:    dm.Content,
+				Timestamp:  dm.Timestamp,
+				ToolCalls:  toCoreToolCalls(dm.ToolCalls),
+				ToolCallID: dm.ToolCallID,
+				AgentName:  dm.AgentName,
+				Metadata:   dm.Metadata,
+			}
+		}
 		_ = agentThread.AddMessages(messages)
 	}
 	return agentThread
+}
+
+func toCoreToolCalls(dtcs []domain.ToolCall) []core.ToolCall {
+	if dtcs == nil {
+		return nil
+	}
+	result := make([]core.ToolCall, len(dtcs))
+	for i, dtc := range dtcs {
+		result[i] = core.ToolCall{
+			ID:   dtc.ID,
+			Type: dtc.Type,
+			Function: core.ToolFunction{
+				Name:      dtc.Function.Name,
+				Arguments: dtc.Function.Arguments,
+			},
+		}
+	}
+	return result
 }

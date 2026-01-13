@@ -2,7 +2,6 @@ package domain
 
 import (
 	"context"
-	"school-with-ai/foundation/agentsdk/core"
 )
 
 // ThreadRepository manages persistence of ThreadAggregate.
@@ -12,7 +11,7 @@ type ThreadRepository struct {
 }
 
 // NewThreadRepository creates a new thread repository using the generic repository pattern.
-func NewThreadRepository(eventStore core.EventStore) *ThreadRepository {
+func NewThreadRepository(eventStore EventStore) *ThreadRepository {
 	genericRepo := NewRepository(
 		eventStore,
 		NewThreadAggregate,

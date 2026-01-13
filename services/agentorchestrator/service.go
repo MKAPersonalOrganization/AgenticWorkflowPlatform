@@ -83,7 +83,7 @@ func New(log *logger.Logger, chatClient ChatClient, writeModel core.EventStore, 
 		chatClient:   chatClient,
 		writeModel:   writeModel,
 		readModel:    readModel,
-		threadRepo:   domain.NewThreadRepository(writeModel),
+		threadRepo:   domain.NewThreadRepository(NewEventStoreAdapter(writeModel)),
 		config:       core.DefaultConfig("agent"),
 		toolRegistry: core.NewToolRegistry(),
 	}

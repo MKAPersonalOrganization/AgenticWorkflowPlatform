@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"school-with-ai/domain"
+	"school-with-ai/infra/kratos"
 	"testing"
 	"time"
 
@@ -23,7 +24,7 @@ func TestMain(m *testing.M) {
 
 func TestNewMiddleware(t *testing.T) {
 	t.Parallel()
-	kratosClient := NewKratosClient(testConfig())
+	kratosClient := kratos.NewKratosClient(testConfig())
 	middleware := NewMiddleware(kratosClient, os.Getenv("APP_URL"))
 
 	if middleware == nil {
@@ -41,7 +42,7 @@ func TestNewMiddleware(t *testing.T) {
 
 func TestMiddleware_RequireAuth_NoSession(t *testing.T) {
 	t.Parallel()
-	kratosClient := NewKratosClient(testConfig())
+	kratosClient := kratos.NewKratosClient(testConfig())
 	middleware := NewMiddleware(kratosClient, os.Getenv("APP_URL"))
 
 	// Create a test handler
@@ -86,17 +87,17 @@ func TestMiddleware_RequireAuth_ValidSession(t *testing.T) {
 	_ = os.Setenv("KRATOS_BROWSER_URL", "http://127.0.0.1:4433")
 	_ = os.Setenv("APP_URL", "http://127.0.0.1:8090")
 
-	kratosClient := NewKratosClient(testConfig())
+	kratosClient := kratos.NewKratosClient(testConfig())
 	middleware := NewMiddleware(kratosClient, os.Getenv("APP_URL"))
 
 	// Create a test handler that checks for user in context
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		user := GetUserFromContext(r.Context())
+		user := kratos.GetUserFromContext(r.Context())
 		if user == nil {
 			t.Error("User not found in context")
 		}
 
-		session := GetSessionFromContext(r.Context())
+		session := kratos.GetSessionFromContext(r.Context())
 		if session == nil {
 			t.Error("Session not found in context")
 		}
@@ -120,13 +121,13 @@ func TestMiddleware_RequireAuth_ValidSession(t *testing.T) {
 
 func TestMiddleware_OptionalAuth_NoSession(t *testing.T) {
 	t.Parallel()
-	kratosClient := NewKratosClient(testConfig())
+	kratosClient := kratos.NewKratosClient(testConfig())
 	middleware := NewMiddleware(kratosClient, os.Getenv("APP_URL"))
 
 	called := false
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
-		user := GetUserFromContext(r.Context())
+		user := kratos.GetUserFromContext(r.Context())
 		if user != nil {
 			t.Error("User should be nil when no session")
 		}
@@ -151,7 +152,7 @@ func TestMiddleware_OptionalAuth_NoSession(t *testing.T) {
 
 func TestMiddleware_validateSession(t *testing.T) {
 	t.Parallel()
-	kratosClient := NewKratosClient(testConfig())
+	kratosClient := kratos.NewKratosClient(testConfig())
 	middleware := NewMiddleware(kratosClient, os.Getenv("APP_URL"))
 
 	tests := []struct {
@@ -198,7 +199,7 @@ func TestMiddleware_validateSession(t *testing.T) {
 
 func TestMiddleware_RequireAuthFunc(t *testing.T) {
 	t.Parallel()
-	kratosClient := NewKratosClient(testConfig())
+	kratosClient := kratos.NewKratosClient(testConfig())
 	middleware := NewMiddleware(kratosClient, os.Getenv("APP_URL"))
 
 	called := false
@@ -226,7 +227,7 @@ func TestMiddleware_RequireAuthFunc(t *testing.T) {
 
 func TestMiddleware_OptionalAuthFunc(t *testing.T) {
 	t.Parallel()
-	kratosClient := NewKratosClient(testConfig())
+	kratosClient := kratos.NewKratosClient(testConfig())
 	middleware := NewMiddleware(kratosClient, os.Getenv("APP_URL"))
 
 	called := false
@@ -256,7 +257,7 @@ func TestMiddleware_OptionalAuthFunc(t *testing.T) {
 func TestMiddleware_AAL2Redirect(t *testing.T) {
 	t.Parallel()
 	// Test that if AAL2 is required but not satisfied, we redirect
-	kratosClient := NewKratosClient(testConfig())
+	kratosClient := kratos.NewKratosClient(testConfig())
 	middleware := NewMiddleware(kratosClient, os.Getenv("APP_URL"))
 
 	// This would require mocking the session response
@@ -296,9 +297,9 @@ func TestGetUserFromContext(t *testing.T) {
 
 	ctx := context.WithValue(context.Background(), domain.UserContextKey, user)
 
-	retrieved := GetUserFromContext(ctx)
+	retrieved := kratos.GetUserFromContext(ctx)
 	if retrieved == nil {
-		t.Fatal("GetUserFromContext returned nil")
+		t.Fatal("kratos.GetUserFromContext returned nil")
 	}
 
 	if retrieved.ID != user.ID {
@@ -313,7 +314,7 @@ func TestGetUserFromContext(t *testing.T) {
 func TestGetUserFromContext_Nil(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	user := GetUserFromContext(ctx)
+	user := kratos.GetUserFromContext(ctx)
 	if user != nil {
 		t.Errorf("Expected nil user, got %+v", user)
 	}
@@ -325,9 +326,9 @@ func TestGetSessionFromContext(t *testing.T) {
 
 	ctx := context.WithValue(context.Background(), domain.SessionContextKey, session)
 
-	retrieved := GetSessionFromContext(ctx)
+	retrieved := kratos.GetSessionFromContext(ctx)
 	if retrieved == nil {
-		t.Fatal("GetSessionFromContext returned nil")
+		t.Fatal("kratos.GetSessionFromContext returned nil")
 	}
 
 	if retrieved.Id != session.Id {
@@ -338,7 +339,7 @@ func TestGetSessionFromContext(t *testing.T) {
 func TestGetSessionFromContext_Nil(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	session := GetSessionFromContext(ctx)
+	session := kratos.GetSessionFromContext(ctx)
 	if session != nil {
 		t.Errorf("Expected nil session, got %+v", session)
 	}
@@ -369,9 +370,9 @@ func TestIsAuthenticated(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := IsAuthenticated(tt.ctx)
+			got := kratos.IsAuthenticated(tt.ctx)
 			if got != tt.expected {
-				t.Errorf("IsAuthenticated() = %v, want %v", got, tt.expected)
+				t.Errorf("kratos.IsAuthenticated() = %v, want %v", got, tt.expected)
 			}
 		})
 	}
