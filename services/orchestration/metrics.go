@@ -31,7 +31,7 @@ type ServerMetrics struct {
 }
 
 // GetMetrics returns current server and queue metrics.
-func (s *AsynqServer) GetMetrics() (*ServerMetrics, error) {
+func (s *TaskManagementService) GetMetrics() (*ServerMetrics, error) {
 	inspector := asynq.NewInspector(asynq.RedisClientOpt{
 		Addr: s.redisAddr,
 	})

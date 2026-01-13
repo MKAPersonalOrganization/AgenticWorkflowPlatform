@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/sdk/agentsdk/core"
@@ -12,35 +14,34 @@ import (
 	"school-with-ai/services"
 	"school-with-ai/services/chatwrite"
 	"school-with-ai/services/orchestration"
-	"time"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 	"github.com/hibiken/asynq"
 )
 
-// AsynqHandler encapsulates dependencies for HTTP handlers using Asynq.
-type AsynqHandler struct {
+// TaskManagementHandler encapsulates dependencies for HTTP handlers for task management.
+type TaskManagementHandler struct {
 	log               *logger.Logger
 	chatClient        *llm.OpenAIClient
-	asynqServer       *orchestration.AsynqServer
+	taskMgmtService   *orchestration.TaskManagementService
 	chatWriteService  *chatwrite.ChatWriteService
 	authService       services.AuthService
 	projectionService services.ProjectionService
 }
 
-// NewAsynqHandler creates a new HTTP handler with Asynq dependencies.
-func NewAsynqHandler(
+// NewTaskManagementHandler creates a new HTTP handler for task management.
+func NewTaskManagementHandler(
 	log *logger.Logger,
 	chatClient *llm.OpenAIClient,
-	asynqServer *orchestration.AsynqServer,
+	taskMgmtService *orchestration.TaskManagementService,
 	chatWriteService *chatwrite.ChatWriteService,
 	authService services.AuthService,
 	projectionService services.ProjectionService,
-) *AsynqHandler {
-	return &AsynqHandler{
+) *TaskManagementHandler {
+	return &TaskManagementHandler{
 		log:               log,
 		chatClient:        chatClient,
-		asynqServer:       asynqServer,
+		taskMgmtService:   taskMgmtService,
 		chatWriteService:  chatWriteService,
 		authService:       authService,
 		projectionService: projectionService,
@@ -54,7 +55,7 @@ type SendMessageRequest struct {
 }
 
 // SendMessage handles POST /api/messages - async chat message processing.
-func (h *AsynqHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
+func (h *TaskManagementHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	// Get authenticated user from context
 	user := h.authService.GetUserFromContext(r.Context())
 	if user == nil {
@@ -104,7 +105,7 @@ func (h *AsynqHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		"messageLength", len(req.Message))
 
 	// Enqueue to Asynq for async processing
-	taskInfo, err := h.asynqServer.EnqueueJob(payload)
+	taskInfo, err := h.taskMgmtService.EnqueueJob(payload)
 	if err != nil {
 		h.log.Error(r.Context(), "[API] Failed to enqueue task", "error", err)
 		http.Error(w, "Failed to enqueue task", http.StatusInternalServerError)
@@ -140,7 +141,7 @@ func (h *AsynqHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 }
 
 // StreamJobEvents streams SSE events for a specific job.
-func (h *AsynqHandler) StreamJobEvents(w http.ResponseWriter, r *http.Request) {
+func (h *TaskManagementHandler) StreamJobEvents(w http.ResponseWriter, r *http.Request) {
 	jobID := r.PathValue("id")
 	if jobID == "" {
 		http.Error(w, "jobId is required", http.StatusBadRequest)
@@ -184,7 +185,7 @@ func (h *AsynqHandler) StreamJobEvents(w http.ResponseWriter, r *http.Request) {
 			return
 		case <-ticker.C:
 			var exists bool
-			eventBuffer, exists = h.asynqServer.GetEventBuffer(jobID)
+			eventBuffer, exists = h.taskMgmtService.GetEventBuffer(jobID)
 			if exists {
 				goto streamEvents
 			}
@@ -232,7 +233,7 @@ streamEvents:
 			// Check if job is complete
 			if eventBuffer.IsClosed() && eventIndex >= eventBuffer.Len() {
 				// Cleanup: remove event buffer after all events have been sent
-				h.asynqServer.RemoveEventBuffer(jobID)
+				h.taskMgmtService.RemoveEventBuffer(jobID)
 				return
 			}
 		}
@@ -240,7 +241,7 @@ streamEvents:
 }
 
 // translateAndWriteEvent translates domain events to AGUI events and writes them.
-func (h *AsynqHandler) translateAndWriteEvent(w http.ResponseWriter, flusher http.Flusher, event any) error {
+func (h *TaskManagementHandler) translateAndWriteEvent(w http.ResponseWriter, flusher http.Flusher, event any) error {
 	var aguiEvent any
 
 	// Translate domain events to agui events
@@ -292,7 +293,7 @@ func (h *AsynqHandler) translateAndWriteEvent(w http.ResponseWriter, flusher htt
 }
 
 // GetJobStatus retrieves the status of a task (A2A compliant).
-func (h *AsynqHandler) GetJobStatus(w http.ResponseWriter, r *http.Request) {
+func (h *TaskManagementHandler) GetJobStatus(w http.ResponseWriter, r *http.Request) {
 	taskID := r.PathValue("id")
 	if taskID == "" {
 		http.Error(w, "taskId is required", http.StatusBadRequest)
@@ -301,7 +302,7 @@ func (h *AsynqHandler) GetJobStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Try to get task info from Asynq
-	taskInfo, err := h.asynqServer.GetTaskInfo("default", taskID)
+	taskInfo, err := h.taskMgmtService.GetTaskInfo("default", taskID)
 
 	// Create A2A Task response
 	task := Task{
@@ -317,7 +318,7 @@ func (h *AsynqHandler) GetJobStatus(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		// Task not found in queue - check if completed via event buffer
-		_, exists := h.asynqServer.GetEventBuffer(taskID)
+		_, exists := h.taskMgmtService.GetEventBuffer(taskID)
 		if exists {
 			task.Status = NewTaskStatus(TaskStateCompleted, nil)
 		} else {
@@ -364,7 +365,7 @@ func (h *AsynqHandler) GetJobStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 // CancelJob cancels a pending or active job.
-func (h *AsynqHandler) CancelJob(w http.ResponseWriter, r *http.Request) {
+func (h *TaskManagementHandler) CancelJob(w http.ResponseWriter, r *http.Request) {
 	jobID := r.PathValue("id")
 	if jobID == "" {
 		http.Error(w, "jobId is required", http.StatusBadRequest)
@@ -373,7 +374,7 @@ func (h *AsynqHandler) CancelJob(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Use Asynq Inspector to cancel task
-	err := h.asynqServer.CancelTask(jobID)
+	err := h.taskMgmtService.CancelTask(jobID)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to cancel job: %v", err), http.StatusBadRequest)
 
@@ -393,7 +394,7 @@ func (h *AsynqHandler) CancelJob(w http.ResponseWriter, r *http.Request) {
 }
 
 // DeleteThread deletes a thread.
-func (h *AsynqHandler) DeleteThread(w http.ResponseWriter, r *http.Request) {
+func (h *TaskManagementHandler) DeleteThread(w http.ResponseWriter, r *http.Request) {
 	// Get authenticated user from context
 	user := h.authService.GetUserFromContext(r.Context())
 	if user == nil {
