@@ -1,4 +1,4 @@
-package orchestration
+package taskmanagement
 
 import (
 	"context"
@@ -21,7 +21,7 @@ type ObservabilityConfig struct {
 	Tags       []string // Additional custom tags
 }
 
-// Service provides transport-agnostic message orchestration.
+// Service provides transport-agnostic message taskmanagement.
 // This service handles the core business logic of processing messages,
 // managing threads, routing to agents, and coordinating execution.
 // It is designed to be reusable across different transports (HTTP/SSE, A2A, etc.).

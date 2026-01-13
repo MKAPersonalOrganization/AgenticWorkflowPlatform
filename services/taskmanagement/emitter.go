@@ -1,4 +1,4 @@
-package orchestration
+package taskmanagement
 
 // EventEmitter is an interface for emitting domain events.
 type EventEmitter interface {
