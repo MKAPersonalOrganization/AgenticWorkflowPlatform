@@ -1,14 +1,13 @@
 package geometry
 
 import (
-	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/services/agentorchestrator/agents/advancedmath/geometry/tools"
 	sharedtools "school-with-ai/services/agentorchestrator/agents/shared/tools"
 )
 
 // CreateGeometryProfessor creates the computational geometry professor agent.
-func CreateGeometryProfessor(notifier core.EventNotifier, whiteboardProjection domain.WhiteboardStore) core.AgentConfig {
+func CreateGeometryProfessor(notifier core.EventNotifier) core.AgentConfig {
 	registry := core.NewToolRegistry()
 
 	// Shared tools

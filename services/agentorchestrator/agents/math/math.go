@@ -1,7 +1,6 @@
 package math
 
 import (
-	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/core/middleware"
 	"school-with-ai/services/agentorchestrator/agents/math/tools"
@@ -18,7 +17,7 @@ func domainTools() []core.Tool {
 }
 
 // CreateMathInstructor creates the math instructor agent configuration.
-func CreateMathInstructor(notifier core.EventNotifier, whiteboardProjection domain.WhiteboardStore) core.AgentConfig {
+func CreateMathInstructor(notifier core.EventNotifier) core.AgentConfig {
 	registry := core.NewToolRegistry()
 
 	// Domain-specific tools
@@ -45,7 +44,7 @@ When you visualize a function:
 		Tools:    registry.All(),
 		Notifier: notifier,
 		Middleware: []core.Middleware{
-			middleware.NewWhiteboardMiddleware(whiteboardProjection),
+			middleware.NewWhiteboardMiddleware(),
 			middleware.NewHandoffMiddleware(map[string]string{
 				"linearalgebra-instructor": "Linear algebra ONLY: matrices, vectors, eigenvalues, matrix operations. Use ONLY for linear algebra.",
 				"physics-instructor":       "Physics concepts ONLY: forces, motion, energy, momentum. NOT for math calculations.",

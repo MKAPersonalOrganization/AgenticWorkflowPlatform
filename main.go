@@ -9,6 +9,9 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"syscall"
+	"time"
+
 	"school-with-ai/components"
 	"school-with-ai/components/checkout"
 	"school-with-ai/components/pricing"
@@ -22,7 +25,6 @@ import (
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/infra/projection/llmcontext"
 	"school-with-ai/infra/projection/subscriber"
-	"school-with-ai/infra/projection/whiteboard"
 	"school-with-ai/infra/projections"
 	"school-with-ai/infra/sqldb"
 	"school-with-ai/infra/sqldb/migrate"
@@ -36,8 +38,6 @@ import (
 	"school-with-ai/services/agentorchestrator/agents/statistics"
 	"school-with-ai/services/agentorchestrator/agents/studentfacing"
 	"school-with-ai/services/taskmanagement"
-	"syscall"
-	"time"
 
 	aguihandlers "school-with-ai/handlers/agui"
 	healthhandlers "school-with-ai/handlers/health"
@@ -236,9 +236,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Initialize PostgreSQL AGUI projection (materialized views for fast reads and writes)
 	aguiProjection := agui.NewPostgresAguiProjection(log, db)
 
-	// Initialize PostgreSQL Whiteboard projection (materialized views for fast reads)
-	whiteboardProjection := whiteboard.NewPostgresWhiteboardProjection(log, db)
-
 	// All projections are now query-time, so we use the base event store directly
 	// No need for ProjectionEventStore wrapper anymore
 	eventLog := baseEventStore
@@ -257,7 +254,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 		baseEventStore.Client(), // baseEventStore is already *KurrentDBEventStore
 		db,
 		aguiProjection,
-		whiteboardProjection,
 		llmContextProjection,
 	)
 
@@ -330,7 +326,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 		},
 		eventLog,
 		llmContextProjection,
-		whiteboardProjection,
 		chatClient,
 		orchestratorService,
 		agentFactory,
@@ -374,7 +369,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Handle("/assets/charts/*", http.StripPrefix("/assets/charts/", http.FileServer(http.Dir("./assets/charts"))))
 
 	// Create AGUI projection handler
-	aguiHandler := aguihandlers.NewAguiProjectionHandler(aguiProjection, whiteboardProjection, uiProjectionService)
+	aguiHandler := aguihandlers.NewAguiProjectionHandler(aguiProjection, uiProjectionService)
 
 	// Initialize Kratos client and auth handlers
 	kratosConfig := kratos.Config{
