@@ -2,7 +2,7 @@ package shared
 
 import (
 	"school-with-ai/domain"
-	"school-with-ai/sdk/agentsdk/core"
+	"school-with-ai/foundation/agentsdk/core"
 	"sync"
 )
 

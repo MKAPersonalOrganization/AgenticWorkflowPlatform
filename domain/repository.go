@@ -2,7 +2,7 @@ package domain
 
 import (
 	"context"
-	"school-with-ai/sdk/agentsdk/core"
+	"school-with-ai/foundation/agentsdk/core"
 )
 
 // Repository provides a generic interface for working with any aggregate that implements the Aggregate interface.

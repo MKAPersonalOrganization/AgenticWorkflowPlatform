@@ -2,7 +2,7 @@ package domain
 
 import (
 	"context"
-	"school-with-ai/sdk/agentsdk/core"
+	"school-with-ai/foundation/agentsdk/core"
 )
 
 // ThreadRepository manages persistence of ThreadAggregate.

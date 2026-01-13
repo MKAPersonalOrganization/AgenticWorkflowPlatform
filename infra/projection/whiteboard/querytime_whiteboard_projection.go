@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"school-with-ai/domain"
-	"school-with-ai/sdk/agentsdk/core"
+	"school-with-ai/foundation/agentsdk/core"
 )
 
 // QueryTimeWhiteboardProjection is a query-time projection that rebuilds whiteboard state

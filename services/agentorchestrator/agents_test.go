@@ -1,7 +1,7 @@
 package agentorchestrator_test
 
 import (
-	"school-with-ai/sdk/agentsdk/core"
+	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/services/agentorchestrator/agents/math"
 	"school-with-ai/services/agentorchestrator/agents/studentfacing"
 	"testing"

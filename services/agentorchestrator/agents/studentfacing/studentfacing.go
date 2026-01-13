@@ -2,8 +2,8 @@ package studentfacing
 
 import (
 	"school-with-ai/domain"
-	"school-with-ai/sdk/agentsdk/core"
-	"school-with-ai/sdk/agentsdk/core/middleware"
+	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/agentsdk/core/middleware"
 )
 
 // domainTools returns the domain-specific tools for the student-facing agent.

@@ -3,7 +3,7 @@ package core
 import (
 	"context"
 	"maps"
-	"school-with-ai/sdk/agentsdk/llm"
+	"school-with-ai/foundation/agentsdk/llm"
 )
 
 // EventNotifier is the interface for handling domain events from agents.

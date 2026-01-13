@@ -2,8 +2,8 @@ package chemistry
 
 import (
 	"school-with-ai/domain"
-	"school-with-ai/sdk/agentsdk/core"
-	"school-with-ai/sdk/agentsdk/core/middleware"
+	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/agentsdk/core/middleware"
 	sharedtools "school-with-ai/services/agentorchestrator/agents/shared/tools"
 )
 

@@ -2,7 +2,7 @@ package taskmanagement
 
 import (
 	"fmt"
-	"school-with-ai/sdk/agentsdk/core"
+	"school-with-ai/foundation/agentsdk/core"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )

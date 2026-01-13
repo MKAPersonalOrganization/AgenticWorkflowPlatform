@@ -2,7 +2,7 @@ package statistics
 
 import (
 	"school-with-ai/domain"
-	"school-with-ai/sdk/agentsdk/core"
+	"school-with-ai/foundation/agentsdk/core"
 	sharedtools "school-with-ai/services/agentorchestrator/agents/shared/tools"
 	"school-with-ai/services/agentorchestrator/agents/statistics/tools"
 )

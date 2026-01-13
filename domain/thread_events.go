@@ -1,7 +1,7 @@
 package domain
 
 import (
-	"school-with-ai/sdk/agentsdk/core"
+	"school-with-ai/foundation/agentsdk/core"
 	"time"
 )
 

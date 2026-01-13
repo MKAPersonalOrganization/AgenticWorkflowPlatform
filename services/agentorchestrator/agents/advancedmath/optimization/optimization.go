@@ -2,7 +2,7 @@ package optimization
 
 import (
 	"school-with-ai/domain"
-	"school-with-ai/sdk/agentsdk/core"
+	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/services/agentorchestrator/agents/advancedmath/optimization/tools"
 	sharedtools "school-with-ai/services/agentorchestrator/agents/shared/tools"
 )
