@@ -392,62 +392,6 @@ func (h *AsynqHandler) CancelJob(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// GetMessages retrieves all messages for a thread.
-func (h *AsynqHandler) GetMessages(w http.ResponseWriter, r *http.Request) {
-	threadID := r.PathValue("threadId")
-	if threadID == "" {
-		http.Error(w, "threadId is required", http.StatusBadRequest)
-
-		return
-	}
-
-	thread, exists := h.projectionService.GetThread(threadID)
-	if !exists {
-		http.Error(w, "Thread not found", http.StatusNotFound)
-
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	err := json.NewEncoder(w).Encode(thread.Messages)
-	if err != nil {
-		http.Error(w, "Failed to encode messages", http.StatusInternalServerError)
-
-		return
-	}
-}
-
-// GetThreads retrieves all threads.
-func (h *AsynqHandler) GetThreads(w http.ResponseWriter, r *http.Request) {
-	// Get authenticated user from context
-	user := h.authService.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-
-		return
-	}
-
-	h.log.Info(r.Context(), "Getting threads for user", "userID", user.ID, "email", user.Email)
-
-	threads := h.projectionService.GetAllThreads()
-
-	// Convert threads to response format
-	response := make([]ThreadResponse, len(threads))
-	for i, thread := range threads {
-		response[i] = ThreadResponse{
-			Thread: &thread,
-		}
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	err := json.NewEncoder(w).Encode(response)
-	if err != nil {
-		http.Error(w, "Failed to encode threads", http.StatusInternalServerError)
-
-		return
-	}
-}
-
 // DeleteThread deletes a thread.
 func (h *AsynqHandler) DeleteThread(w http.ResponseWriter, r *http.Request) {
 	// Get authenticated user from context

@@ -6,7 +6,7 @@ A chat application built with Go, Templ, Tailwind CSS, and Alpine.js, implementi
 
 ![Repository Statistics](.github/images/repo_statistics.png)
 
-## Container Diagram
+## Containers Diagram
 
 ```mermaid
 graph TB
@@ -41,7 +41,7 @@ graph TB
     Langfuse -->|Media Storage| MinIO
 ```
 
-### Component Overview
+### Containers Overview
 
 - **Web Browser**: Frontend with Alpine.js for reactivity, Tailwind CSS for styling
 - **Go Application**: Event-sourced multi-agent system with query-time projections
@@ -54,6 +54,49 @@ graph TB
 - **PostgreSQL (Langfuse)**: Database for Langfuse traces and metadata
 - **ClickHouse**: Analytics database for Langfuse metrics and aggregations
 - **MinIO**: S3-compatible object storage for Langfuse media and event logs
+
+## Components Diagram
+
+```mermaid
+graph TB
+    Client[HTTP Clients] --> Router[Chi Router]
+    Router --> Auth[Auth Middleware]
+    Auth --> Handlers[HTTP Handlers]
+    Handlers --> Asynq[Asynq Server]
+    Handlers --> UIProjection[UI Projection Service]
+    
+    Asynq --> Redis[(Redis)]
+    Asynq --> Orchestration[Orchestration Service]
+    Orchestration --> ChatWrite[ChatWrite Service]
+    Orchestration --> ThreadStore[LLM Context Projection]
+    Orchestration --> WhiteboardProj[Whiteboard Projection]
+    
+    ChatWrite --> EventStore[(KurrentDB)]
+    
+    UIProjection --> AGUI[AGUI Projection]
+    
+    AGUI --> EventStore
+    ThreadStore --> EventStore
+    WhiteboardProj --> EventStore
+    
+    ChatWrite --> LLM[OpenAI API]
+```
+
+### Components Overview
+
+- **Chi Router**: HTTP routing with middleware (panic recovery, logging, metrics)
+- **Auth Middleware**: Ory Kratos session validation
+- **HTTP Handlers**: REST API endpoints and SSE streaming
+- **Asynq Server**: Background task processor with configurable concurrency
+- **Orchestration Service**: Coordinates multi-agent execution and handoffs
+- **ChatWrite Service**: Processes user messages and manages agent interactions
+- **Query-Time Projections**: Rebuild state from events on each read
+  - **AGUI Projection**: Thread list and metadata
+  - **Whiteboard Projection**: Shared agent workspace
+  - **LLM Context Projection**: Conversation history for agents
+- **KurrentDB**: Event store (single source of truth)
+- **Redis**: Task queue and job state
+- **OpenAI API**: LLM provider for agent responses
 
 ### Key Patterns
 

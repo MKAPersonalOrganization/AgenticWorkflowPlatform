@@ -2,9 +2,8 @@ package langfuse
 
 import (
 	"context"
-	"time"
-
 	"school-with-ai/sdk/agentsdk/core"
+	"time"
 )
 
 // LangfuseToolTracer implements core.ToolTracer for tracking tool calls in

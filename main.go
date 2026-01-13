@@ -230,7 +230,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// Initialize service layer
 	authSvc := authService.NewAuthService()
-	projectionService := projections.NewProjectionService(aguiProjection, whiteboardProjection, llmContextProjection)
+	uiProjectionService := projections.NewUIProjectionService(aguiProjection)
 
 	// -------------------------------------------------------------------------
 	// Initialize Asynq server
@@ -273,7 +273,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		"healthCheckInterval", cfg.Orchestration.HealthCheckInterval)
 
 	// Create HTTP handler
-	handler := handlers.NewAsynqHandler(log, chatClient, asynqServer, chatWriteService, authSvc, projectionService)
+	handler := handlers.NewAsynqHandler(log, chatClient, asynqServer, chatWriteService, authSvc, uiProjectionService)
 
 	// Create health handler
 	healthHandler := handlers.NewHealthHandler(log)
@@ -302,7 +302,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Handle("/assets/charts/*", http.StripPrefix("/assets/charts/", http.FileServer(http.Dir("./assets/charts"))))
 
 	// Create AGUI projection handler
-	aguiHandler := agui.NewAguiProjectionHandler(aguiProjection, whiteboardProjection, projectionService)
+	aguiHandler := agui.NewAguiProjectionHandler(aguiProjection, whiteboardProjection, uiProjectionService)
 
 	// Initialize Kratos client and auth handlers
 	authConfig := auth.Config{

@@ -15,16 +15,8 @@ type AuthService interface {
 	IsAuthenticated(ctx context.Context) bool
 }
 
-// ProjectionService provides read access to projections.
+// ProjectionService provides read access to projections for UI.
 type ProjectionService interface {
-	// GetWhiteboardContent retrieves whiteboard content for a thread
-	GetWhiteboardContent(threadID string) string
-	// GetThreadHistory retrieves formatted AGUI message history
-	GetThreadHistory(threadID string) (any, error)
-	// GetThread retrieves a thread by ID
-	GetThread(threadID string) (*domain.Thread, bool)
-	// GetAllThreads retrieves all threads
-	GetAllThreads() []domain.Thread
 	// GetThreadMessages retrieves AGUI-formatted messages for a thread
 	GetThreadMessages(threadID string) []aguievents.Message
 	// ListThreadSummaries retrieves all threads with summaries, sorted by most recent
@@ -38,6 +30,5 @@ type ThreadSummary struct {
 	Messages          []aguievents.Message `json:"messages"`
 	CreatedAt         string               `json:"createdAt"`
 	UpdatedAt         string               `json:"updatedAt"`
-	WhiteboardContent string               `json:"whiteboardContent"`
 	CurrentInstructor string               `json:"currentInstructor,omitempty"`
 }

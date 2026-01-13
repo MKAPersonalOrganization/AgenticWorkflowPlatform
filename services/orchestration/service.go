@@ -3,8 +3,6 @@ package orchestration
 import (
 	"context"
 	"fmt"
-	"time"
-
 	"school-with-ai/domain"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/observability/langfuse"
@@ -12,6 +10,7 @@ import (
 	"school-with-ai/sdk/agentsdk/core/middleware"
 	"school-with-ai/services/chatwrite"
 	"school-with-ai/services/chatwrite/agents/shared"
+	"time"
 )
 
 // ObservabilityConfig contains configuration for observability and tracing attributes
