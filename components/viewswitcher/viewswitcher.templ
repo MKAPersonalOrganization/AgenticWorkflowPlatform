@@ -8,11 +8,11 @@ templ ViewSwitcher() {
 		class="absolute top-4 right-4 z-50"
 		x-transition
 	>
-		<div class="inline-flex items-center gap-1 p-1 rounded-lg bg-primary text-primary-foreground shadow-lg border border-primary">
+		<div class="inline-flex items-center gap-1 p-1 rounded-lg bg-secondary/80 shadow-sm border border-border">
 			<!-- Chat Only Button -->
 			<button
 				@click="showThread = true; showWhiteboard = false"
-				:class="(showThread && !showWhiteboard) ? 'bg-primary-foreground text-primary shadow-sm' : 'text-primary-foreground/60 hover:text-primary-foreground'"
+				:class="(showThread && !showWhiteboard) ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-accent'"
 				class="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-xs font-medium transition-all duration-150 h-7 px-2.5"
 				type="button"
 				aria-label="Chat view"
@@ -26,7 +26,7 @@ templ ViewSwitcher() {
 			<!-- Split View Button -->
 			<button
 				@click="showThread = true; showWhiteboard = true"
-				:class="(showThread && showWhiteboard) ? 'bg-primary-foreground text-primary shadow-sm' : 'text-primary-foreground/60 hover:text-primary-foreground'"
+				:class="(showThread && showWhiteboard) ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-accent'"
 				class="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-xs font-medium transition-all duration-150 h-7 px-2.5"
 				type="button"
 				aria-label="Split view"
@@ -40,7 +40,7 @@ templ ViewSwitcher() {
 			<!-- Whiteboard Only Button -->
 			<button
 				@click="showThread = false; showWhiteboard = true"
-				:class="(!showThread && showWhiteboard) ? 'bg-primary-foreground text-primary shadow-sm' : 'text-primary-foreground/60 hover:text-primary-foreground'"
+				:class="(!showThread && showWhiteboard) ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-accent'"
 				class="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-xs font-medium transition-all duration-150 h-7 px-2.5"
 				type="button"
 				aria-label="Whiteboard view"
