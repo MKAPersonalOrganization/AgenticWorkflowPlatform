@@ -2,7 +2,7 @@ package domain
 
 import (
 	"fmt"
-	"school-with-ai/sdk/agentsdk/core"
+	"school-with-ai/foundation/agentsdk/core"
 	"time"
 )
 

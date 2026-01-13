@@ -3,7 +3,7 @@ package kurrentdb
 import (
 	"context"
 	"errors"
-	"school-with-ai/sdk/agentsdk/core"
+	"school-with-ai/foundation/agentsdk/core"
 	"sync"
 )
 

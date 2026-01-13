@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"school-with-ai/domain"
-	"school-with-ai/sdk/agentsdk/core"
+	"school-with-ai/foundation/agentsdk/core"
 	"time"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"

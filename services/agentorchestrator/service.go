@@ -3,8 +3,8 @@ package agentorchestrator
 import (
 	"context"
 	"school-with-ai/domain"
+	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/services/agentorchestrator/engine"
 	"school-with-ai/services/agentorchestrator/rag"
 	"school-with-ai/services/agentorchestrator/threadmgmt"

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"school-with-ai/sdk/agentsdk/core"
+	"school-with-ai/foundation/agentsdk/core"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

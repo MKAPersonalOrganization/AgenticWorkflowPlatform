@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"school-with-ai/sdk/agentsdk/core"
+	"school-with-ai/foundation/agentsdk/core"
 )
 
 // ErrInvalidWhiteboardAction is returned when an invalid whiteboard action is provided.

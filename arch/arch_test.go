@@ -13,7 +13,7 @@ var (
 	servicesLayer = archunit.ArchLayer("Services", "school-with-ai/services/...")
 	handlersLayer = archunit.ArchLayer("Handlers", "school-with-ai/handlers/...")
 	infraLayer    = archunit.ArchLayer("Infra", "school-with-ai/infra/...")
-	agentSDKLayer = archunit.ArchLayer("AgentSDK", "school-with-ai/sdk/agentsdk/...")
+	agentSDKLayer = archunit.ArchLayer("AgentSDK", "school-with-ai/foundation/agentsdk/...")
 	agentsLayer   = archunit.ArchLayer("Agents", "school-with-ai/services/agentorchestrator/agents/...")
 )
 

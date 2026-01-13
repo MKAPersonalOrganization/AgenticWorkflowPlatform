@@ -4,8 +4,8 @@ import (
 	"context"
 	"iter"
 	"school-with-ai/domain"
-	"school-with-ai/sdk/agentsdk/core"
-	"school-with-ai/sdk/agentsdk/llm"
+	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/agentsdk/llm"
 )
 
 // ChatClient defines the interface for LLM providers.

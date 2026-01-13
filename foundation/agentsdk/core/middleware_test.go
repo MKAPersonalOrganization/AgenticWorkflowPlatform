@@ -3,7 +3,7 @@ package core
 import (
 	"context"
 	"errors"
-	"school-with-ai/sdk/agentsdk/llm"
+	"school-with-ai/foundation/agentsdk/llm"
 	"testing"
 )
 

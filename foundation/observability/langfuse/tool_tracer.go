@@ -2,7 +2,7 @@ package langfuse
 
 import (
 	"context"
-	"school-with-ai/sdk/agentsdk/core"
+	"school-with-ai/foundation/agentsdk/core"
 	"time"
 )
 
