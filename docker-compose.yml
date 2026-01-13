@@ -220,6 +220,25 @@ services:
       timeout: 5s
       retries: 5
 
+  # MinIO Bucket Initialization
+  minio-init:
+    image: minio/mc:latest
+    container_name: minio-init
+    depends_on:
+      langfuse-minio:
+        condition: service_healthy
+    networks:
+      - intranet
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://langfuse-minio:9000 minio miniosecret; do echo 'Waiting for MinIO...'; sleep 1; done;
+      mc mb --ignore-existing local/langfuse;
+      echo 'Bucket created';
+      exit 0;
+      "
+
+
+
   # Langfuse Worker
   langfuse-worker:
     image: docker.io/langfuse/langfuse-worker:3
