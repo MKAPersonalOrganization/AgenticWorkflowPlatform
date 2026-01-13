@@ -287,7 +287,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	shared.GlobalAgents.Register("physics-instructor", physics.CreatePhysicsInstructor)
 	shared.GlobalAgents.Register("chemistry-instructor", chemistry.CreateChemistryInstructor)
 	shared.GlobalAgents.Register("statistics-instructor", statistics.CreateStatisticsInstructor)
-	shared.GlobalAgents.Register("linear-algebra-instructor", linearalgebra.CreateLinearAlgebraProfessor)
+	shared.GlobalAgents.Register("linearalgebra-instructor", linearalgebra.CreateLinearAlgebraProfessor)
 	shared.GlobalAgents.Register("diagramming-instructor", diagramming.CreateDiagrammingInstructor)
 
 	// Initialize chat write service

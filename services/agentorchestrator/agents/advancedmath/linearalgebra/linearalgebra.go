@@ -31,7 +31,7 @@ func CreateLinearAlgebraProfessor(notifier core.EventNotifier) core.AgentConfig 
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
 
 	return core.AgentConfig{
-		Name: "linearalgebra-professor",
+		Name: "linearalgebra-instructor",
 		SystemPrompt: `# Linear Algebra Professor
 
 ## Core Rules
