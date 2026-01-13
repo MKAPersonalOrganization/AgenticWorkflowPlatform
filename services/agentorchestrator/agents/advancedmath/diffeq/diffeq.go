@@ -1,14 +1,13 @@
 package diffeq
 
 import (
-	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/services/agentorchestrator/agents/advancedmath/diffeq/tools"
 	sharedtools "school-with-ai/services/agentorchestrator/agents/shared/tools"
 )
 
 // CreateDifferentialEquationsProfessor creates the differential equations professor agent.
-func CreateDifferentialEquationsProfessor(notifier core.EventNotifier, whiteboardProjection domain.WhiteboardStore) core.AgentConfig {
+func CreateDifferentialEquationsProfessor(notifier core.EventNotifier) core.AgentConfig {
 	registry := core.NewToolRegistry()
 
 	// Shared tools

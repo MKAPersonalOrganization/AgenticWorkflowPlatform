@@ -14,12 +14,12 @@ func TestInstructorConfigurations(t *testing.T) {
 	// Mock whiteboard projection
 	mockWhiteboardProjection := &mockWhiteboardProjection{data: make(map[string]string)}
 
-	studentAgent := studentfacing.CreateStudentFacingAgent(mockNotifier, mockWhiteboardProjection)
+	studentAgent := studentfacing.CreateStudentFacingAgent(mockNotifier)
 	if studentAgent.Name != "student-facing-agent" {
 		t.Errorf("Expected student agent name 'student-facing-agent', got '%s'", studentAgent.Name)
 	}
 
-	mathAgent := math.CreateMathInstructor(mockNotifier, mockWhiteboardProjection)
+	mathAgent := math.CreateMathInstructor(mockNotifier)
 	if mathAgent.Name != "math-instructor" {
 		t.Errorf("Expected math name 'math-instructor', got '%s'", mathAgent.Name)
 	}

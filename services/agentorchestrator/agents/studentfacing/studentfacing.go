@@ -1,7 +1,6 @@
 package studentfacing
 
 import (
-	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/core/middleware"
 )
@@ -13,7 +12,7 @@ func domainTools() []core.Tool {
 }
 
 // CreateStudentFacingAgent creates the student-facing agent configuration.
-func CreateStudentFacingAgent(notifier core.EventNotifier, whiteboardProjection domain.WhiteboardStore) core.AgentConfig {
+func CreateStudentFacingAgent(notifier core.EventNotifier) core.AgentConfig {
 	registry := core.NewToolRegistry()
 
 	// Domain-specific tools (none for router agent)
@@ -41,8 +40,7 @@ SPECIALISTS:
 		Tools:    registry.All(),
 		Notifier: notifier,
 		Middleware: []core.Middleware{
-			middleware.NewTodoListMiddleware(),
-			middleware.NewWhiteboardMiddleware(whiteboardProjection),
+			middleware.NewWhiteboardMiddleware(),
 			middleware.NewHandoffMiddleware(map[string]string{
 				"math-instructor":          "ALL mathematics: algebra, calculus, trigonometry, derivatives, integrals, graphing, equations",
 				"physics-instructor":       "Physics concepts: mechanics, forces, energy, motion (delegates math to math-instructor)",

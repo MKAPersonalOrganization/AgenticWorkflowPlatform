@@ -1,7 +1,6 @@
 package chemistry
 
 import (
-	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/core/middleware"
 	sharedtools "school-with-ai/services/agentorchestrator/agents/shared/tools"
@@ -15,7 +14,7 @@ func domainTools() []core.Tool {
 }
 
 // CreateChemistryInstructor creates the chemistry instructor agent configuration.
-func CreateChemistryInstructor(notifier core.EventNotifier, whiteboardProjection domain.WhiteboardStore) core.AgentConfig {
+func CreateChemistryInstructor(notifier core.EventNotifier) core.AgentConfig {
 	registry := core.NewToolRegistry()
 
 	// Domain-specific tools
@@ -36,7 +35,7 @@ You are a Chemistry specialist.
 		Tools:    registry.All(),
 		Notifier: notifier,
 		Middleware: []core.Middleware{
-			middleware.NewWhiteboardMiddleware(whiteboardProjection),
+			middleware.NewWhiteboardMiddleware(),
 			middleware.NewHandoffMiddleware(map[string]string{
 				"math-instructor":      "For ALL math: stoichiometry calculations, equations, numerical problems",
 				"physics-instructor":   "Physics concepts ONLY",

@@ -1,14 +1,13 @@
 package specialfunctions
 
 import (
-	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/services/agentorchestrator/agents/advancedmath/specialfunctions/tools"
 	sharedtools "school-with-ai/services/agentorchestrator/agents/shared/tools"
 )
 
 // CreateSpecialFunctionsProfessor creates the special functions professor agent.
-func CreateSpecialFunctionsProfessor(notifier core.EventNotifier, whiteboardProjection domain.WhiteboardStore) core.AgentConfig {
+func CreateSpecialFunctionsProfessor(notifier core.EventNotifier) core.AgentConfig {
 	registry := core.NewToolRegistry()
 
 	// Shared tools

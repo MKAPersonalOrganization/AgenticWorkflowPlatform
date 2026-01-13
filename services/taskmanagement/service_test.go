@@ -49,7 +49,7 @@ func TestServiceCreation(t *testing.T) {
 		nil, // orchestratorService
 		nil, // agentFactory
 		nil, // threadStore
-		nil, // whiteboardProjection
+		
 		nil, // eventLog
 		nil, // chatClient
 		nil, // langfuseTracer

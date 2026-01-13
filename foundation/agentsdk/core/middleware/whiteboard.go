@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
 	"school-with-ai/foundation/agentsdk/core"
 )
 
@@ -326,30 +327,22 @@ func (t *WriteWhiteboardTool) Invoke(ctx context.Context, arguments string) (str
 	return fmt.Sprintf("Whiteboard updated (%s)", args.Action), nil
 }
 
-// WhiteboardProjection provides read access to whiteboard content.
-type WhiteboardProjection interface {
-	Get(threadID string) string
-}
-
 // WhiteboardMiddleware provides whiteboard management capabilities to agents.
 type WhiteboardMiddleware struct {
 	systemPrompt string
-	projection   WhiteboardProjection
 }
 
 // NewWhiteboardMiddleware creates a new WhiteboardMiddleware with default prompts.
-func NewWhiteboardMiddleware(projection WhiteboardProjection) *WhiteboardMiddleware {
+func NewWhiteboardMiddleware() *WhiteboardMiddleware {
 	return &WhiteboardMiddleware{
 		systemPrompt: WhiteboardSystemPrompt,
-		projection:   projection,
 	}
 }
 
 // NewWhiteboardMiddlewareWithPrompt creates a new WhiteboardMiddleware with custom prompt.
-func NewWhiteboardMiddlewareWithPrompt(projection WhiteboardProjection, systemPrompt string) *WhiteboardMiddleware {
+func NewWhiteboardMiddlewareWithPrompt(systemPrompt string) *WhiteboardMiddleware {
 	return &WhiteboardMiddleware{
 		systemPrompt: systemPrompt,
-		projection:   projection,
 	}
 }
 
@@ -361,11 +354,11 @@ func (m *WhiteboardMiddleware) Process(ctx context.Context, reqCtx *core.Request
 	// Add whiteboard instructions to system prompt
 	reqCtx.AddSystemPrompt(m.systemPrompt)
 
-	// Inject current whiteboard content from projection into system prompt
-	var whiteboardContent string
-	if m.projection != nil && reqCtx.ThreadID != "" {
-		whiteboardContent = m.projection.Get(reqCtx.ThreadID)
-	}
+	// Inject current whiteboard content from request context into system prompt
+	// Note: Whiteboard content is tracked in request context state during agent execution.
+	// Agents can see previous whiteboard updates from conversation history (MessageAdded events
+	// contain all tool calls including write_whiteboard).
+	whiteboardContent := GetWhiteboardContent(reqCtx)
 
 	if whiteboardContent != "" {
 		whiteboardSection := fmt.Sprintf("\n\n---\n\n## Current Whiteboard Content\n\n%s\n\n---\n", whiteboardContent)

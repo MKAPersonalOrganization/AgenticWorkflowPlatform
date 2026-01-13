@@ -1,7 +1,6 @@
 package statistics
 
 import (
-	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	sharedtools "school-with-ai/services/agentorchestrator/agents/shared/tools"
 	"school-with-ai/services/agentorchestrator/agents/statistics/tools"
@@ -24,7 +23,7 @@ func domainTools() []core.Tool {
 
 // CreateStatisticsInstructor creates the statistics instructor agent.
 // Event contract is defined in contract.go.
-func CreateStatisticsInstructor(notifier core.EventNotifier, whiteboardProjection domain.WhiteboardStore) core.AgentConfig {
+func CreateStatisticsInstructor(notifier core.EventNotifier) core.AgentConfig {
 	registry := core.NewToolRegistry()
 
 	// Domain-specific tools

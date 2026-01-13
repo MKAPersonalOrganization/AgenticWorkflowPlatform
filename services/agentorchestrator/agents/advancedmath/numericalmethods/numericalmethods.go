@@ -1,14 +1,13 @@
 package numericalmethods
 
 import (
-	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/services/agentorchestrator/agents/advancedmath/numericalmethods/tools"
 	sharedtools "school-with-ai/services/agentorchestrator/agents/shared/tools"
 )
 
 // CreateNumericalMethodsProfessor creates the numerical methods professor agent.
-func CreateNumericalMethodsProfessor(notifier core.EventNotifier, whiteboardProjection domain.WhiteboardStore) core.AgentConfig {
+func CreateNumericalMethodsProfessor(notifier core.EventNotifier) core.AgentConfig {
 	registry := core.NewToolRegistry()
 
 	// Shared tools

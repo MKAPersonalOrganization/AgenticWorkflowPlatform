@@ -3,6 +3,7 @@ package agui
 import (
 	"encoding/json"
 	"net/http"
+
 	"school-with-ai/domain"
 	"school-with-ai/services"
 )
@@ -10,7 +11,6 @@ import (
 // AguiProjectionHandler provides HTTP endpoints for querying the AGUI projection.
 type AguiProjectionHandler struct {
 	projection        domain.AguiProjection
-	whiteboardStore   domain.WhiteboardStore
 	projectionService ProjectionService
 }
 
@@ -20,10 +20,9 @@ type ProjectionService interface {
 }
 
 // NewAguiProjectionHandler creates a new handler for AGUI projection queries.
-func NewAguiProjectionHandler(projection domain.AguiProjection, whiteboardStore domain.WhiteboardStore, projectionService ProjectionService) *AguiProjectionHandler {
+func NewAguiProjectionHandler(projection domain.AguiProjection, projectionService ProjectionService) *AguiProjectionHandler {
 	return &AguiProjectionHandler{
 		projection:        projection,
-		whiteboardStore:   whiteboardStore,
 		projectionService: projectionService,
 	}
 }
@@ -44,9 +43,6 @@ func (h *AguiProjectionHandler) GetThreadState(w http.ResponseWriter, r *http.Re
 
 		return
 	}
-
-	// Add whiteboard content from dedicated projection
-	state.WhiteboardContent = h.whiteboardStore.Get(threadID)
 
 	w.Header().Set("Content-Type", "application/json")
 	err := json.NewEncoder(w).Encode(state)

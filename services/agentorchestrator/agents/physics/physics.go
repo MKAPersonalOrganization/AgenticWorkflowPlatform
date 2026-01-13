@@ -1,7 +1,6 @@
 package physics
 
 import (
-	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/core/middleware"
 	sharedtools "school-with-ai/services/agentorchestrator/agents/shared/tools"
@@ -15,7 +14,7 @@ func domainTools() []core.Tool {
 }
 
 // CreatePhysicsInstructor creates the physics instructor agent configuration.
-func CreatePhysicsInstructor(notifier core.EventNotifier, whiteboardProjection domain.WhiteboardStore) core.AgentConfig {
+func CreatePhysicsInstructor(notifier core.EventNotifier) core.AgentConfig {
 	registry := core.NewToolRegistry()
 
 	// Domain-specific tools
@@ -36,7 +35,7 @@ You are a Physics specialist.
 		Tools:    registry.All(),
 		Notifier: notifier,
 		Middleware: []core.Middleware{
-			middleware.NewWhiteboardMiddleware(whiteboardProjection),
+			middleware.NewWhiteboardMiddleware(),
 			middleware.NewHandoffMiddleware(map[string]string{
 				"math-instructor":      "For ALL math: calculus, derivatives, integrals, equations, numerical calculations",
 				"chemistry-instructor": "Chemistry concepts ONLY",

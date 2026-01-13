@@ -3,6 +3,8 @@ package taskmanagement
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/core/middleware"
@@ -11,7 +13,6 @@ import (
 	"school-with-ai/services"
 	"school-with-ai/services/agentorchestrator/agents/shared"
 	"school-with-ai/services/agentorchestrator/types"
-	"time"
 )
 
 // ObservabilityConfig contains configuration for observability and tracing attributes
@@ -27,15 +28,14 @@ type ObservabilityConfig struct {
 // managing threads, routing to agents, and coordinating execution.
 // It is designed to be reusable across different transports (HTTP/SSE, A2A, etc.).
 type Service struct {
-	log                  *logger.Logger
-	orchestratorService  services.AgentOrchestrator
-	agentFactory         services.AgentFactory
-	threadStore          types.ThreadStore
-	whiteboardProjection domain.WhiteboardStore
-	eventLog             core.EventStore
-	chatClient           types.ChatClient
-	langfuseTracer       *LangfuseTracer
-	observabilityConfig  ObservabilityConfig
+	log                 *logger.Logger
+	orchestratorService services.AgentOrchestrator
+	agentFactory        services.AgentFactory
+	threadStore         types.ThreadStore
+	eventLog            core.EventStore
+	chatClient          types.ChatClient
+	langfuseTracer      *LangfuseTracer
+	observabilityConfig ObservabilityConfig
 }
 
 // NewService creates a new orchestration service.
@@ -44,22 +44,20 @@ func NewService(
 	orchestratorService services.AgentOrchestrator,
 	agentFactory services.AgentFactory,
 	threadStore types.ThreadStore,
-	whiteboardProjection domain.WhiteboardStore,
 	eventLog core.EventStore,
 	chatClient types.ChatClient,
 	langfuseTracer *LangfuseTracer,
 	observabilityConfig ObservabilityConfig,
 ) *Service {
 	return &Service{
-		log:                  log,
-		orchestratorService:  orchestratorService,
-		agentFactory:         agentFactory,
-		threadStore:          threadStore,
-		whiteboardProjection: whiteboardProjection,
-		eventLog:             eventLog,
-		chatClient:           chatClient,
-		langfuseTracer:       langfuseTracer,
-		observabilityConfig:  observabilityConfig,
+		log:                 log,
+		orchestratorService: orchestratorService,
+		agentFactory:        agentFactory,
+		threadStore:         threadStore,
+		eventLog:            eventLog,
+		chatClient:          chatClient,
+		langfuseTracer:      langfuseTracer,
+		observabilityConfig: observabilityConfig,
 	}
 }
 
@@ -243,7 +241,7 @@ func (s *Service) runAgent(ctx context.Context, threadID, agentName string, emit
 
 	// Create agent instance with event notifier
 	notifier := NewUINotifier(emitter)
-	agentConfig := factory(notifier, s.whiteboardProjection)
+	agentConfig := factory(notifier)
 
 	var handoffReqCtx *core.RequestContext
 
