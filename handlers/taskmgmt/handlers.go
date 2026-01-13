@@ -5,13 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/llm"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services"
 	"school-with-ai/services/taskmanagement"
-	"time"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 	"github.com/hibiken/asynq"
@@ -191,20 +192,25 @@ func (h *TaskManagementHandler) StreamJobEvents(w http.ResponseWriter, r *http.R
 	}
 
 streamEvents:
+	// NOTE: Snapshot disabled to prevent overwriting live events
+	// The snapshot was causing student-facing agent's initial tool calls to be hidden
+	// because it would send the projection state BEFORE those events were emitted.
+	// For now, clients will receive all events from the live stream.
+	// TODO: Re-enable snapshots only for reconnections, not initial connections
+
 	// FIRST: Send MESSAGES_SNAPSHOT from projection (ensures client has current state)
-	messages := h.projectionService.GetThreadMessages(eventBuffer.ThreadID)
-	if len(messages) > 0 {
-		messagesSnapshotEvent := aguievents.NewMessagesSnapshotEvent(messages)
-		err := WriteSSEEvent(w, messagesSnapshotEvent)
-		if err != nil {
-			h.log.Error(r.Context(), "[API] Failed to write messages snapshot event", "error", err, "jobID", jobID)
+	// messages := h.projectionService.GetThreadMessages(eventBuffer.ThreadID)
+	// if len(messages) > 0 {
+	// 	messagesSnapshotEvent := aguievents.NewMessagesSnapshotEvent(messages)
+	// 	err := WriteSSEEvent(w, messagesSnapshotEvent)
+	// 	if err != nil {
+	// 		h.log.Error(r.Context(), "[API] Failed to write messages snapshot event", "error", err, "jobID", jobID)
+	// 		return
+	// 	}
+	// 	flusher.Flush()
+	// }
 
-			return
-		}
-		flusher.Flush()
-	}
-
-	// THEN: Stream realtime events from buffer
+	// Stream realtime events from buffer
 	eventIndex := 0
 	eventTicker := time.NewTicker(50 * time.Millisecond)
 	defer eventTicker.Stop()
