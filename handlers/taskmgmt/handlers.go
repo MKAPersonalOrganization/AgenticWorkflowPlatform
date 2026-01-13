@@ -10,7 +10,6 @@ import (
 	"school-with-ai/foundation/agentsdk/llm"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services"
-	"school-with-ai/services/agentorchestrator"
 	"school-with-ai/services/taskmanagement"
 	"time"
 
@@ -23,7 +22,7 @@ type TaskManagementHandler struct {
 	log                 *logger.Logger
 	chatClient          *llm.OpenAIClient
 	taskMgmtService     *taskmanagement.TaskManagementService
-	orchestratorService *agentorchestrator.Service
+	orchestratorService services.AgentOrchestrator
 	authService         services.AuthService
 	projectionService   services.ProjectionService
 }
@@ -33,7 +32,7 @@ func NewTaskManagementHandler(
 	log *logger.Logger,
 	chatClient *llm.OpenAIClient,
 	taskMgmtService *taskmanagement.TaskManagementService,
-	orchestratorService *agentorchestrator.Service,
+	orchestratorService services.AgentOrchestrator,
 	authService services.AuthService,
 	projectionService services.ProjectionService,
 ) *TaskManagementHandler {

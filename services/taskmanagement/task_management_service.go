@@ -7,7 +7,8 @@ import (
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/services/agentorchestrator"
+	"school-with-ai/services"
+	"school-with-ai/services/agentorchestrator/types"
 	"time"
 
 	"github.com/hibiken/asynq"
@@ -44,10 +45,11 @@ func NewTaskManagementService(
 	log *logger.Logger,
 	config AsynqConfig,
 	eventLog core.EventStore,
-	state agentorchestrator.ThreadStore,
+	state types.ThreadStore,
 	whiteboardProjection domain.WhiteboardStore,
-	chatClient agentorchestrator.ChatClient,
-	orchestratorService *agentorchestrator.Service,
+	chatClient types.ChatClient,
+	orchestratorService services.AgentOrchestrator, // decouple from concrete implementation
+	agentFactory services.AgentFactory,
 	langfuseTracer *LangfuseTracer,
 	observabilityConfig ObservabilityConfig,
 ) *TaskManagementService {
@@ -83,6 +85,7 @@ func NewTaskManagementService(
 	orchestrationService := NewService(
 		log,
 		orchestratorService,
+		agentFactory,
 		state,
 		whiteboardProjection,
 		eventLog,

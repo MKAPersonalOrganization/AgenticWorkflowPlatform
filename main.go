@@ -16,8 +16,9 @@ import (
 	"school-with-ai/foundation/debug"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/middleware"
-	"school-with-ai/infra/auth"
+	"school-with-ai/handlers/auth"
 	"school-with-ai/infra/eventstore/kurrentdb"
+	"school-with-ai/infra/kratos"
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/infra/projection/llmcontext"
 	"school-with-ai/infra/projection/subscriber"
@@ -312,10 +313,12 @@ func run(ctx context.Context, log *logger.Logger) error {
 		Deployment: cfg.Observability.Deployment,
 		Tags:       cfg.Observability.Tags,
 	}
-	// Use build version if no explicit release is configured
 	if observabilityConfig.Release == "" {
 		observabilityConfig.Release = build
 	}
+
+	// Initialize agent factory
+	agentFactory := agentorchestrator.NewFactory(log, chatClient, eventLog, llmContextProjection)
 
 	taskMgmtService := taskmanagement.NewTaskManagementService(
 		log,
@@ -330,6 +333,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		whiteboardProjection,
 		chatClient,
 		orchestratorService,
+		agentFactory,
 		langfuseTracer,
 		observabilityConfig,
 	)
@@ -373,14 +377,14 @@ func run(ctx context.Context, log *logger.Logger) error {
 	aguiHandler := aguihandlers.NewAguiProjectionHandler(aguiProjection, whiteboardProjection, uiProjectionService)
 
 	// Initialize Kratos client and auth handlers
-	authConfig := auth.Config{
+	kratosConfig := kratos.Config{
 		AppURL:        cfg.Auth.AppURL,
 		KratosPublic:  cfg.Auth.KratosPublic,
 		KratosAdmin:   cfg.Auth.KratosAdmin,
 		KratosBrowser: cfg.Auth.KratosBrowser,
 		AdminAPIToken: cfg.Auth.AdminAPIToken,
 	}
-	kratosClient := auth.NewKratosClient(authConfig)
+	kratosClient := kratos.NewKratosClient(kratosConfig)
 	authHandlers := auth.NewAuthHandlers(log, kratosClient, cfg.Auth.AppURL)
 	authMiddleware := auth.NewMiddleware(kratosClient, cfg.Auth.AppURL)
 
@@ -471,7 +475,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 func HandleViewChatInputScreen(log *logger.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get authenticated user from context
-		user := auth.GetUserFromContext(r.Context())
+		user := kratos.GetUserFromContext(r.Context())
 
 		component := components.ChatInputScreen(user)
 		if err := component.Render(r.Context(), w); err != nil {
@@ -483,7 +487,7 @@ func HandleViewChatInputScreen(log *logger.Logger) http.HandlerFunc {
 func HandlePricingPage(log *logger.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get authenticated user from context
-		user := auth.GetUserFromContext(r.Context())
+		user := kratos.GetUserFromContext(r.Context())
 
 		// Get default pricing plans
 		plans := pricing.GetDefaultPlans()
@@ -501,7 +505,7 @@ func HandlePricingPage(log *logger.Logger) http.HandlerFunc {
 func HandleCheckoutPage(log *logger.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get authenticated user from context
-		user := auth.GetUserFromContext(r.Context())
+		user := kratos.GetUserFromContext(r.Context())
 
 		// Get plan from query parameter
 		planID := r.URL.Query().Get("plan")

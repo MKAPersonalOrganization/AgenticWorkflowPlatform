@@ -219,7 +219,8 @@ func (e *Engine) RunIteration(
 	}
 
 	if toolCalls.HasToolCalls() {
-		agg, err := e.threadMgmt.AddAssistantMessage(ctx, threadID, messageID, completeContent, toolCallsList)
+		domainToolCalls := toDomainToolCalls(toolCallsList)
+		agg, err := e.threadMgmt.AddAssistantMessage(ctx, threadID, messageID, completeContent, domainToolCalls)
 		if err != nil {
 			return fmt.Errorf("failed to add assistant message: %w", err)
 		}
@@ -231,7 +232,7 @@ func (e *Engine) RunIteration(
 			ThreadID:  threadID,
 			MessageID: messageID,
 			Content:   completeContent,
-			ToolCalls: toolCallsList,
+			ToolCalls: domainToolCalls,
 			AgentName: e.config.Name,
 			Timestamp: time.Now(),
 		}
@@ -274,7 +275,7 @@ func (e *Engine) RunIteration(
 			}
 		}
 
-		if e.shouldContinueIteration != nil && !e.shouldContinueIteration(toolCallsList) {
+		if e.shouldContinueIteration != nil && !e.shouldContinueIteration(domainToolCalls) {
 			return nil
 		}
 
@@ -303,7 +304,7 @@ func (e *Engine) RunIteration(
 	return nil
 }
 
-func (e *Engine) executeToolCallWithExecutor(threadID string, toolCall domain.ToolCall, executor core.ToolExecutor) (string, error) {
+func (e *Engine) executeToolCallWithExecutor(threadID string, toolCall core.ToolCall, executor core.ToolExecutor) (string, error) {
 	result, err := executor.Execute(toolCall)
 	if err != nil {
 		return result, fmt.Errorf("failed to execute tool call %s: %w", toolCall.Function.Name, err)
@@ -340,6 +341,24 @@ func convertCoreMsgsToLLMMsgs(msgs []core.Message) []llm.Message {
 	result := make([]llm.Message, len(msgs))
 	for i, cm := range msgs {
 		result[i] = convertCoreMsgToLLMMsg(cm)
+	}
+	return result
+}
+
+func toDomainToolCalls(ctcs []core.ToolCall) []domain.ToolCall {
+	if ctcs == nil {
+		return nil
+	}
+	result := make([]domain.ToolCall, len(ctcs))
+	for i, ctc := range ctcs {
+		result[i] = domain.ToolCall{
+			ID:   ctc.ID,
+			Type: ctc.Type,
+			Function: domain.ToolFunction{
+				Name:      ctc.Function.Name,
+				Arguments: ctc.Function.Arguments,
+			},
+		}
 	}
 	return result
 }

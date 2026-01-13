@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"school-with-ai/foundation/agentsdk/core"
 	"time"
 )
 
@@ -23,15 +22,15 @@ func (e ThreadCreated) AggregateID() string       { return e.ThreadID }
 
 // MessageAdded is emitted when a message is added to the thread.
 type MessageAdded struct {
-	ThreadID   string          `json:"threadId"`
-	MessageID  string          `json:"messageId"`
-	Role       string          `json:"role"`
-	Content    string          `json:"content"`
-	ToolCalls  []core.ToolCall `json:"toolCalls,omitempty"`
-	ToolCallID string          `json:"toolCallId,omitempty"`
-	AgentName  string          `json:"agentName,omitempty"`
-	Metadata   map[string]any  `json:"metadata,omitempty"`
-	Timestamp  time.Time       `json:"timestamp"`
+	ThreadID   string         `json:"threadId"`
+	MessageID  string         `json:"messageId"`
+	Role       string         `json:"role"`
+	Content    string         `json:"content"`
+	ToolCalls  []ToolCall     `json:"toolCalls,omitempty"`
+	ToolCallID string         `json:"toolCallId,omitempty"`
+	AgentName  string         `json:"agentName,omitempty"`
+	Metadata   map[string]any `json:"metadata,omitempty"`
+	Timestamp  time.Time      `json:"timestamp"`
 }
 
 func (e MessageAdded) EventType() string         { return "MessageAdded" }
@@ -78,7 +77,7 @@ type AssistantMessageCompletedEvent struct {
 	MessageID string
 	Content   string
 	AgentName string
-	ToolCalls []core.ToolCall
+	ToolCalls []ToolCall
 	Timestamp time.Time
 }
 

@@ -1,4 +1,4 @@
-package auth
+package kratos
 
 // This file re-exports session functions from domain for backward compatibility
 // New code should use domain.GetUserFromContext(), domain.GetSessionFromContext(), etc.

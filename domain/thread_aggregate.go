@@ -2,7 +2,6 @@ package domain
 
 import (
 	"errors"
-	"school-with-ai/foundation/agentsdk/core"
 	"time"
 )
 
@@ -25,7 +24,7 @@ func NewThreadAggregate(id string) *ThreadAggregate {
 		BaseAggregate: BaseAggregate{
 			ID:                id,
 			Version:           0,
-			uncommittedEvents: make([]core.Event, 0),
+			uncommittedEvents: make([]Event, 0),
 		},
 		Messages: make([]Message, 0),
 	}
@@ -54,7 +53,7 @@ func OpenThread(threadID, userID, title string) (*ThreadAggregate, error) {
 
 // AddMessage adds a message to the thread.
 // This implements business logic like ShoppingCart.AddProduct.
-func (t *ThreadAggregate) AddMessage(messageID, role, content string, toolCalls []core.ToolCall, toolCallID, agentName string, metadata map[string]interface{}) error {
+func (t *ThreadAggregate) AddMessage(messageID, role, content string, toolCalls []ToolCall, toolCallID, agentName string, metadata map[string]interface{}) error {
 	if t.IsDeleted {
 		return errors.New("cannot add message to deleted thread")
 	}
@@ -119,7 +118,7 @@ func (t *ThreadAggregate) Delete() error {
 
 // Apply applies an event to update the thread's state.
 // This is the only place where state mutations happen.
-func (t *ThreadAggregate) Apply(event core.Event) {
+func (t *ThreadAggregate) Apply(event Event) {
 	switch e := event.(type) {
 	case ThreadCreated:
 		t.ID = e.ThreadID

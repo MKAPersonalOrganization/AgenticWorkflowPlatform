@@ -2,8 +2,20 @@ package domain
 
 import (
 	"context"
-	"school-with-ai/foundation/agentsdk/core"
 )
+
+// EventStore interface defines the contract for persisting events.
+// This interface allows the domain to be independent of the specific event store implementation.
+type EventStore interface {
+	// AppendWithVersion adds events to a stream with optimistic concurrency control.
+	AppendWithVersion(ctx context.Context, streamID string, expectedVersion int64, events ...Event) (int64, error)
+
+	// ReadStream reads all events for a stream from a specific version.
+	ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]Event, error)
+
+	// DeleteStream removes a stream and all its events.
+	DeleteStream(ctx context.Context, streamID string) error
+}
 
 // Repository provides a generic interface for working with any aggregate that implements the Aggregate interface.
 // It handles loading from events, saving uncommitted events, and optimistic concurrency.
@@ -14,9 +26,9 @@ import (
 // - Have a LoadFromHistory method (typically via BaseAggregate embedding)
 type Repository[T interface {
 	Aggregate
-	LoadFromHistory(events []core.Event, apply func(core.Event)) error
+	LoadFromHistory(events []Event, apply func(Event)) error
 }] struct {
-	eventStore    core.EventStore
+	eventStore    EventStore
 	newAggregate  func(id string) T
 	getStreamName func(T) string
 }
@@ -28,9 +40,9 @@ type Repository[T interface {
 //   - getStreamName: Function to get the stream name from an aggregate
 func NewRepository[T interface {
 	Aggregate
-	LoadFromHistory(events []core.Event, apply func(core.Event)) error
+	LoadFromHistory(events []Event, apply func(Event)) error
 }](
-	eventStore core.EventStore,
+	eventStore EventStore,
 	newAggregate func(id string) T,
 	getStreamName func(T) string,
 ) *Repository[T] {

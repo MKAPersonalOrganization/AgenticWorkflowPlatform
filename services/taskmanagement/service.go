@@ -8,8 +8,9 @@ import (
 	"school-with-ai/foundation/agentsdk/core/middleware"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/observability/langfuse"
-	"school-with-ai/services/agentorchestrator"
+	"school-with-ai/services"
 	"school-with-ai/services/agentorchestrator/agents/shared"
+	"school-with-ai/services/agentorchestrator/types"
 	"time"
 )
 
@@ -27,11 +28,12 @@ type ObservabilityConfig struct {
 // It is designed to be reusable across different transports (HTTP/SSE, A2A, etc.).
 type Service struct {
 	log                  *logger.Logger
-	orchestratorService  *agentorchestrator.Service
-	threadStore          agentorchestrator.ThreadStore
+	orchestratorService  services.AgentOrchestrator
+	agentFactory         services.AgentFactory
+	threadStore          types.ThreadStore
 	whiteboardProjection domain.WhiteboardStore
 	eventLog             core.EventStore
-	chatClient           agentorchestrator.ChatClient
+	chatClient           types.ChatClient
 	langfuseTracer       *LangfuseTracer
 	observabilityConfig  ObservabilityConfig
 }
@@ -39,17 +41,19 @@ type Service struct {
 // NewService creates a new orchestration service.
 func NewService(
 	log *logger.Logger,
-	orchestratorService *agentorchestrator.Service,
-	threadStore agentorchestrator.ThreadStore,
+	orchestratorService services.AgentOrchestrator,
+	agentFactory services.AgentFactory,
+	threadStore types.ThreadStore,
 	whiteboardProjection domain.WhiteboardStore,
 	eventLog core.EventStore,
-	chatClient agentorchestrator.ChatClient,
+	chatClient types.ChatClient,
 	langfuseTracer *LangfuseTracer,
 	observabilityConfig ObservabilityConfig,
 ) *Service {
 	return &Service{
 		log:                  log,
 		orchestratorService:  orchestratorService,
+		agentFactory:         agentFactory,
 		threadStore:          threadStore,
 		whiteboardProjection: whiteboardProjection,
 		eventLog:             eventLog,
@@ -242,28 +246,17 @@ func (s *Service) runAgent(ctx context.Context, threadID, agentName string, emit
 	agentConfig := factory(notifier, s.whiteboardProjection)
 
 	var handoffReqCtx *core.RequestContext
-	agentOpts := []agentorchestrator.Option{
-		agentorchestrator.WithConfig(agentConfig),
-		agentorchestrator.WithShouldContinueIteration(shared.CreateShouldContinueIterationFn()),
-		agentorchestrator.WithRequestContextCapture(&handoffReqCtx),
-	}
+
+	agent := s.agentFactory.Create(agentConfig, &handoffReqCtx, nil)
 
 	// Add tool tracer if Langfuse is enabled
 	if s.langfuseTracer != nil && traceCtx != nil {
 		tracer := s.langfuseTracer.GetTracer()
 		if tracer != nil {
 			toolTracer := langfuse.NewLangfuseToolTracer(tracer)
-			agentOpts = append(agentOpts, agentorchestrator.WithToolTracer(toolTracer))
+			agent = s.agentFactory.Create(agentConfig, &handoffReqCtx, toolTracer)
 		}
 	}
-
-	agent := agentorchestrator.New(
-		s.log,
-		s.chatClient,
-		s.eventLog,
-		s.threadStore,
-		agentOpts...,
-	)
 
 	// Note: thread is now passed in from the caller to ensure consistency
 

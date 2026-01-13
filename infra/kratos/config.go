@@ -1,4 +1,4 @@
-package auth
+package kratos
 
 // Config represents the authentication configuration.
 type Config struct {
