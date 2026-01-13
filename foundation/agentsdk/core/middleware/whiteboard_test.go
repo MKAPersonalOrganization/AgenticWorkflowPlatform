@@ -10,38 +10,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// mockWhiteboardProjection is a simple in-memory implementation for testing.
-type mockWhiteboardProjection struct {
-	data map[string]string
-}
-
-func newMockWhiteboardProjection() *mockWhiteboardProjection {
-	return &mockWhiteboardProjection{
-		data: make(map[string]string),
-	}
-}
-
-func (m *mockWhiteboardProjection) Get(threadID string) string {
-	if m.data == nil {
-		return ""
-	}
-
-	return m.data[threadID]
-}
-
-func (m *mockWhiteboardProjection) Set(threadID, content string) {
-	if m.data == nil {
-		m.data = make(map[string]string)
-	}
-	m.data[threadID] = content
-}
-
 func TestWhiteboardMiddleware(t *testing.T) {
 	t.Parallel()
 	t.Run("adds write whiteboard tool and injects content in system prompt", func(t *testing.T) {
 		t.Parallel()
-		projection := newMockWhiteboardProjection()
-		middleware := NewWhiteboardMiddleware(projection)
+
+		middleware := NewWhiteboardMiddleware()
 		reqCtx := &core.RequestContext{
 			ThreadID: "thread-123",
 			Tools:    []core.Tool{},
@@ -78,8 +52,8 @@ func TestWhiteboardMiddleware(t *testing.T) {
 
 	t.Run("adds system prompt with whiteboard info", func(t *testing.T) {
 		t.Parallel()
-		projection := newMockWhiteboardProjection()
-		middleware := NewWhiteboardMiddleware(projection)
+
+		middleware := NewWhiteboardMiddleware()
 		reqCtx := &core.RequestContext{
 			SystemPrompt: "",
 			State:        make(map[string]any),
@@ -100,17 +74,14 @@ func TestWhiteboardMiddleware(t *testing.T) {
 
 	t.Run("initializes whiteboard state", func(t *testing.T) {
 		t.Parallel()
-		projection := newMockWhiteboardProjection()
-		middleware := NewWhiteboardMiddleware(projection)
+
+		middleware := NewWhiteboardMiddleware()
 		reqCtx := &core.RequestContext{
 			ThreadID: "thread-123",
 			State:    make(map[string]any),
 		}
 
 		next := func(ctx context.Context, rc *core.RequestContext) error {
-			content := projection.Get(rc.ThreadID)
-			assert.Empty(t, content, "projection should have empty content initially")
-
 			return nil
 		}
 
@@ -120,15 +91,15 @@ func TestWhiteboardMiddleware(t *testing.T) {
 
 	t.Run("injects existing whiteboard content into system prompt", func(t *testing.T) {
 		t.Parallel()
-		projection := newMockWhiteboardProjection()
-		middleware := NewWhiteboardMiddleware(projection)
+
+		middleware := NewWhiteboardMiddleware()
 		reqCtx := &core.RequestContext{
 			ThreadID: "thread-123",
 			State:    make(map[string]any),
 		}
 
-		// Pre-populate projection with content
-		projection.Set("thread-123", "# Existing Content\n- Item 1\n- Item 2")
+		// Pre-populate whiteboard content in request context
+		SetWhiteboardContent(reqCtx, "# Existing Content\n- Item 1\n- Item 2")
 
 		next := func(ctx context.Context, rc *core.RequestContext) error {
 			prompt := rc.GetEffectiveSystemPrompt()
@@ -147,8 +118,8 @@ func TestWhiteboardMiddleware(t *testing.T) {
 	t.Run("custom system prompt", func(t *testing.T) {
 		t.Parallel()
 		customPrompt := "Custom whiteboard instructions"
-		projection := newMockWhiteboardProjection()
-		middleware := NewWhiteboardMiddlewareWithPrompt(projection, customPrompt)
+
+		middleware := NewWhiteboardMiddlewareWithPrompt(customPrompt)
 		reqCtx := &core.RequestContext{
 			ThreadID:     "thread-123",
 			SystemPrompt: "",
@@ -322,8 +293,8 @@ func TestWhiteboardMiddlewareIntegration(t *testing.T) {
 	t.Parallel()
 	t.Run("write and verify content in system prompt", func(t *testing.T) {
 		t.Parallel()
-		projection := newMockWhiteboardProjection()
-		middleware := NewWhiteboardMiddleware(projection)
+
+		middleware := NewWhiteboardMiddleware()
 		reqCtx := &core.RequestContext{
 			Tools: []core.Tool{},
 			State: make(map[string]any),
