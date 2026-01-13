@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"school-with-ai/sdk/agentsdk/core"
-	"school-with-ai/services/chatwrite/agents/shared/tools"
+	"school-with-ai/services/agentorchestrator/agents/shared/tools"
 	"testing"
 )
 

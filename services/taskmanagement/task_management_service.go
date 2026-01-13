@@ -4,12 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
-
 	"school-with-ai/domain"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/sdk/agentsdk/core"
-	"school-with-ai/services/chatwrite"
+	"school-with-ai/services/agentorchestrator"
+	"time"
 
 	"github.com/hibiken/asynq"
 )
@@ -45,10 +44,10 @@ func NewTaskManagementService(
 	log *logger.Logger,
 	config AsynqConfig,
 	eventLog core.EventStore,
-	state chatwrite.ThreadStore,
+	state agentorchestrator.ThreadStore,
 	whiteboardProjection domain.WhiteboardStore,
-	chatClient chatwrite.ChatClient,
-	chatWriteService *chatwrite.ChatWriteService,
+	chatClient agentorchestrator.ChatClient,
+	orchestratorService *agentorchestrator.Service,
 	langfuseTracer *LangfuseTracer,
 	observabilityConfig ObservabilityConfig,
 ) *TaskManagementService {
@@ -83,7 +82,7 @@ func NewTaskManagementService(
 	// Create orchestration service
 	orchestrationService := NewService(
 		log,
-		chatWriteService,
+		orchestratorService,
 		state,
 		whiteboardProjection,
 		eventLog,

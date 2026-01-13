@@ -55,62 +55,93 @@ graph TB
 - **ClickHouse**: Analytics database for Langfuse metrics and aggregations
 - **MinIO**: S3-compatible object storage for Langfuse media and event logs
 
-## Components Diagram
+## Components Diagram (Level 3)
+
+The following diagram zooms into the **Go Application** container to show its internal components, their responsibilities, technologies, and interactions.
 
 ```mermaid
 graph TB
-    Client[HTTP Clients] --> Router[Chi Router]
-    Router --> Auth[Auth Middleware]
+    subgraph GoApp["Go Application"]
+        Router["<b>Chi Router</b><br/>[Technology: Go Chi]<br/>Routes incoming HTTP requests to appropriate handlers and applies global middleware."]
+        AuthM["<b>Auth Middleware</b><br/>Intercepts requests to validate user sessions via Ory Kratos."]
+        HealthH["<b>Health Handlers</b><br/>Provides public endpoints for liveness and readiness probes."]
+        
+        TaskH["<b>Task Handlers</b><br/>Handles command-side interactions (POST/DELETE) for task and thread management."]
+        AGUIH["<b>AGUI Handlers</b><br/>Handles query-side interactions (GET) for AGUI-compatible thread state."]
+        
+        TaskS["<b>Task Management Service</b><br/>[Technology: Asynq/Redis]<br/>Orchestrates background workers and handles job concurrency."]
+        ProjS["<b>UI Projection Service</b><br/>Coordinates the reconstruction of UI state from events."]
+        
+        OrchS["<b>Agent Orchestrator</b><br/>Manages multi-agent execution, tool-calling, and event persistence."]
+        
+        LLMProj["<b>LLM Context Projection</b><br/>Provides historical conversation context for LLM prompts."]
+        WhiteProj["<b>Whiteboard Projection</b><br/>Maintains shared agent workspace state (artifacts, variables)."]
+        
+        AGUIProj["<b>AGUI Projection</b><br/>[Technology: Event-sourced Projection]<br/>Replays events from KurrentDB to rebuild current thread state."]
+    end
+
+    User["<b>User / Browser</b><br/>[Person/Client]"]
+    Kratos["<b>Ory Kratos</b><br/>[Software System]<br/>Identity Management"]
+    Redis["<b>Redis</b><br/>[Container]<br/>Task Queue Store"]
+    KurrentDB["<b>KurrentDB</b><br/>[Container]<br/>Event Store"]
+    LLM["<b>OpenAI API</b><br/>[Software System]<br/>LLM Provider"]
+    Langfuse["<b>Langfuse</b><br/>[Software System]<br/>LLM Observability"]
+
+    User -->|"Uses [HTTPS/SSE]"| Router
+    Router -->|"Routes to"| HealthH
+    Router -->|"Passes to"| AuthM
+    AuthM -->|"Routes to"| TaskH
+    AuthM -->|"Routes to"| AGUIH
     
-    Auth --> WriteHandlers[Task Management Handlers<br/>Write Operations]
-    Auth --> ReadHandlers[AGUI Projection Handlers<br/>Read Operations]
+    AuthM -->|"Validates session [HTTPS]"| Kratos
     
-    WriteHandlers --> TaskMgmt[Task Management Service]
-    ReadHandlers --> UIProjection[UI Projection Service]
+    TaskH -->|"Command to enqueue [In-process]"| TaskS
+    AGUIH -->|"Requests projection [In-process]"| ProjS
     
-    TaskMgmt --> Redis[(Redis)]
-    TaskMgmt --> Service[Orchestration Service]
-    Service --> ChatWrite[ChatWrite Service]
-    Service --> ThreadStore[LLM Context Projection]
-    Service --> WhiteboardProj[Whiteboard Projection]
+    TaskS -.->|"Enqueues job [Redis]"| Redis
+    Redis -.->|"Pulls job for processing [Redis]"| TaskS
     
-    ChatWrite --> EventStore[(KurrentDB)]
+    TaskS -->|"Executes business logic [In-process]"| OrchS
     
-    UIProjection --> AGUI[AGUI Projection]
+    OrchS -->|"Requests context [In-process]"| LLMProj
+    OrchS -->|"Accesses workspace [In-process]"| WhiteProj
     
-    AGUI --> EventStore
-    ThreadStore --> EventStore
-    WhiteboardProj --> EventStore
+    ProjS -->|"Retrieves state [In-process]"| AGUIProj
     
-    ChatWrite --> LLM[OpenAI API]
+    LLMProj -->|"Queries events [GRPC]"| KurrentDB
+    WhiteProj -->|"Queries events [GRPC]"| KurrentDB
+    AGUIProj -->|"Queries events [GRPC]"| KurrentDB
+    OrchS -->|"Appends events [GRPC]"| KurrentDB
+    OrchS -->|"Requests completions [HTTPS]"| LLM
+    
+    OrchS -.->|"Sends traces [HTTPS]"| Langfuse
+    AGUIProj -.->|"Sends traces [HTTPS]"| Langfuse
+    
+    note["<i>Note: Solid lines denote synchronous interactions; dashed lines denote asynchronous interactions.</i>"]
 ```
 
 ### Components Overview
 
-- **Chi Router**: HTTP routing with middleware (panic recovery, logging, metrics)
-- **Auth Middleware**: Ory Kratos session validation
-- **Task Management Handlers**: Write operations (commands) - POST/DELETE endpoints
-  - Send messages, cancel tasks, delete threads
-- **AGUI Projection Handlers**: Read operations (queries) - GET endpoints
-  - List threads, get messages, get thread state
-- **Task Management Service**: Background task processor with configurable concurrency (Asynq-based)
-- **UI Projection Service**: Business logic for read-side projections
-- **Orchestration Service**: Coordinates multi-agent execution and handoffs
-- **ChatWrite Service**: Processes user messages and manages agent interactions
-- **Query-Time Projections**: Rebuild state from events on each read
-  - **AGUI Projection**: Thread list and metadata
-  - **Whiteboard Projection**: Shared agent workspace
-  - **LLM Context Projection**: Conversation history for agents
-- **KurrentDB**: Event store (single source of truth)
-- **Redis**: Task queue and job state
-- **OpenAI API**: LLM provider for agent responses
+| Name | Technology | Description |
+| :--- | :--- | :--- |
+| **Chi Router** | Go Chi | High-performance routing with middleware for panic recovery, logging, and metrics. |
+| **Auth Middleware** | - | Security layer that enforces session requirements using external Kratos identity service. |
+| **Health Handlers** | - | Public system status endpoints used for infrastructure health checks. |
+| **Task Handlers** | - | The "Command" side of CQRS, transforming HTTP requests into background tasks. |
+| **AGUI Handlers** | - | The "Query" side of CQRS, serving structured JSON/SSE for the AGUI frontend. |
+| **Task Management Service** | Asynq/Redis | Reliable task queueing and processing with retry logic and priority management. |
+| **UI Projection Service** | - | Domain logic for mapping lower-level event streams into high-level AGUI UI state. |
+| **Agent Orchestrator** | - | Manages LLM interactions, tool-calling loops, and agent handoffs. (Package: `services/agentorchestrator`) |
+| **LLM Context Projection** | - | Re-constructs conversation history for agent prompts from the event store. |
+| **Whiteboard Projection** | - | Manages the collaborative state and shared variables used by agents during a run. |
+| **AGUI Projection** | Event-sourced Projection | Logic for aggregating historical events to produce a point-in-time view of a conversation thread. |
 
 ### Key Patterns
 
-- **Event Sourcing**: All state changes are stored as events in KurrentDB
-- **Query-Time Projections**: State is rebuilt from events on every query (no in-memory cache)
-- **CQRS**: Write commands append events, read queries rebuild from events
-- **Multi-Agent**: Tool-based agent collaboration with transfer_to_agent and shared whiteboard
+- **Event Sourcing**: All state changes are persisted as a sequence of events in KurrentDB.
+- **Query-Time Projections**: State is reconstructed by replaying events on every read request, ensuring strong consistency (or horizontal scalability if using read-models).
+- **CQRS**: Clear separation between command side (Task Handlers) and query side (AGUI Handlers).
+- **Multi-Agent Orchestration**: Collaborative agent execution with shared whiteboard state and explicit handoff protocols.
 
 ## Tech Stack
 

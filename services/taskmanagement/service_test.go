@@ -45,7 +45,7 @@ func TestServiceCreation(t *testing.T) {
 	// This test ensures the Service struct can be instantiated
 	service := NewService(
 		nil, // log
-		nil, // chatWriteService
+		nil, // orchestratorService
 		nil, // threadStore
 		nil, // whiteboardProjection
 		nil, // eventLog
@@ -61,8 +61,8 @@ func TestServiceCreation(t *testing.T) {
 		t.Fatal("NewService() returned nil")
 	}
 
-	if service.chatWriteService != nil {
-		t.Error("Expected nil chatWriteService")
+	if service.orchestratorService != nil {
+		t.Error("Expected nil orchestratorService")
 	}
 }
 

@@ -8,8 +8,8 @@ import (
 	"school-with-ai/foundation/observability/langfuse"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/sdk/agentsdk/core/middleware"
-	"school-with-ai/services/chatwrite"
-	"school-with-ai/services/chatwrite/agents/shared"
+	"school-with-ai/services/agentorchestrator"
+	"school-with-ai/services/agentorchestrator/agents/shared"
 	"time"
 )
 
@@ -27,11 +27,11 @@ type ObservabilityConfig struct {
 // It is designed to be reusable across different transports (HTTP/SSE, A2A, etc.).
 type Service struct {
 	log                  *logger.Logger
-	chatWriteService     *chatwrite.ChatWriteService
-	threadStore          chatwrite.ThreadStore
+	orchestratorService  *agentorchestrator.Service
+	threadStore          agentorchestrator.ThreadStore
 	whiteboardProjection domain.WhiteboardStore
 	eventLog             core.EventStore
-	chatClient           chatwrite.ChatClient
+	chatClient           agentorchestrator.ChatClient
 	langfuseTracer       *LangfuseTracer
 	observabilityConfig  ObservabilityConfig
 }
@@ -39,17 +39,17 @@ type Service struct {
 // NewService creates a new orchestration service.
 func NewService(
 	log *logger.Logger,
-	chatWriteService *chatwrite.ChatWriteService,
-	threadStore chatwrite.ThreadStore,
+	orchestratorService *agentorchestrator.Service,
+	threadStore agentorchestrator.ThreadStore,
 	whiteboardProjection domain.WhiteboardStore,
 	eventLog core.EventStore,
-	chatClient chatwrite.ChatClient,
+	chatClient agentorchestrator.ChatClient,
 	langfuseTracer *LangfuseTracer,
 	observabilityConfig ObservabilityConfig,
 ) *Service {
 	return &Service{
 		log:                  log,
-		chatWriteService:     chatWriteService,
+		orchestratorService:  orchestratorService,
 		threadStore:          threadStore,
 		whiteboardProjection: whiteboardProjection,
 		eventLog:             eventLog,
@@ -87,7 +87,7 @@ func (s *Service) HandleUserMessage(
 	// if the thread doesn't exist (version 0)
 
 	// 1. Add user message to thread (creates thread if needed)
-	err := s.chatWriteService.AddUserMessage(ctx, params.ThreadID, params.MessageID, params.Content)
+	err := s.orchestratorService.AddUserMessage(ctx, params.ThreadID, params.MessageID, params.Content)
 	if err != nil {
 		s.log.Error(ctx, "Failed to add user message",
 			"threadID", params.ThreadID,
@@ -107,7 +107,7 @@ func (s *Service) HandleUserMessage(
 			title = title[:50] + "..."
 		}
 
-		err := s.chatWriteService.UpdateThreadTitle(ctx, params.ThreadID, title)
+		err := s.orchestratorService.UpdateThreadTitle(ctx, params.ThreadID, title)
 		if err != nil {
 			s.log.Error(ctx, "Failed to update thread title",
 				"threadID", params.ThreadID,
@@ -237,10 +237,10 @@ func (s *Service) runAgent(ctx context.Context, threadID, agentName string, emit
 	agentConfig := factory(notifier, s.whiteboardProjection)
 
 	var handoffReqCtx *core.RequestContext
-	agentOpts := []chatwrite.Option{
-		chatwrite.WithConfig(agentConfig),
-		chatwrite.WithShouldContinueIteration(shared.CreateShouldContinueIterationFn()),
-		chatwrite.WithRequestContextCapture(&handoffReqCtx),
+	agentOpts := []agentorchestrator.Option{
+		agentorchestrator.WithConfig(agentConfig),
+		agentorchestrator.WithShouldContinueIteration(shared.CreateShouldContinueIterationFn()),
+		agentorchestrator.WithRequestContextCapture(&handoffReqCtx),
 	}
 
 	// Add tool tracer if Langfuse is enabled
@@ -248,11 +248,11 @@ func (s *Service) runAgent(ctx context.Context, threadID, agentName string, emit
 		tracer := s.langfuseTracer.GetTracer()
 		if tracer != nil {
 			toolTracer := langfuse.NewLangfuseToolTracer(tracer)
-			agentOpts = append(agentOpts, chatwrite.WithToolTracer(toolTracer))
+			agentOpts = append(agentOpts, agentorchestrator.WithToolTracer(toolTracer))
 		}
 	}
 
-	agent := chatwrite.New(
+	agent := agentorchestrator.New(
 		s.log,
 		s.chatClient,
 		s.eventLog,
