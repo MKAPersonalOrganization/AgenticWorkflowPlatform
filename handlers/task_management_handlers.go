@@ -13,7 +13,7 @@ import (
 	"school-with-ai/sdk/agentsdk/llm"
 	"school-with-ai/services"
 	"school-with-ai/services/chatwrite"
-	"school-with-ai/services/orchestration"
+	"school-with-ai/services/taskmanagement"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 	"github.com/hibiken/asynq"
@@ -23,7 +23,7 @@ import (
 type TaskManagementHandler struct {
 	log               *logger.Logger
 	chatClient        *llm.OpenAIClient
-	taskMgmtService   *orchestration.TaskManagementService
+	taskMgmtService   *taskmanagement.TaskManagementService
 	chatWriteService  *chatwrite.ChatWriteService
 	authService       services.AuthService
 	projectionService services.ProjectionService
@@ -33,7 +33,7 @@ type TaskManagementHandler struct {
 func NewTaskManagementHandler(
 	log *logger.Logger,
 	chatClient *llm.OpenAIClient,
-	taskMgmtService *orchestration.TaskManagementService,
+	taskMgmtService *taskmanagement.TaskManagementService,
 	chatWriteService *chatwrite.ChatWriteService,
 	authService services.AuthService,
 	projectionService services.ProjectionService,
@@ -89,7 +89,7 @@ func (h *TaskManagementHandler) SendMessage(w http.ResponseWriter, r *http.Reque
 	messageID := aguievents.GenerateMessageID()
 
 	// Create payload for async processing
-	payload := orchestration.ProcessChatPayload{
+	payload := taskmanagement.ProcessChatPayload{
 		JobID:     jobID,
 		ThreadID:  contextID,
 		MessageID: messageID,
@@ -172,7 +172,7 @@ func (h *TaskManagementHandler) StreamJobEvents(w http.ResponseWriter, r *http.R
 
 	// Wait for job to be picked up by Asynq worker
 	ctx := r.Context()
-	var eventBuffer *orchestration.EventBuffer
+	var eventBuffer *taskmanagement.EventBuffer
 
 	// Poll for event buffer until worker picks up job (or client disconnects)
 	ticker := time.NewTicker(50 * time.Millisecond)

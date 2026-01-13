@@ -35,7 +35,7 @@ import (
 	"school-with-ai/services/chatwrite/agents/shared"
 	"school-with-ai/services/chatwrite/agents/statistics"
 	"school-with-ai/services/chatwrite/agents/studentfacing"
-	"school-with-ai/services/orchestration"
+	"school-with-ai/services/taskmanagement"
 
 	authService "school-with-ai/services/auth"
 
@@ -205,10 +205,10 @@ func run(ctx context.Context, log *logger.Logger) error {
 	chatClient := llm.NewOpenAIClient(cfg.AI.Model)
 
 	// Initialize Langfuse tracer (optional observability)
-	var langfuseTracer *orchestration.LangfuseTracer
+	var langfuseTracer *taskmanagement.LangfuseTracer
 	if cfg.Langfuse.Enabled {
 		log.Info(ctx, "startup", "status", "initializing Langfuse tracer", "baseURL", cfg.Langfuse.BaseURL)
-		langfuseTracer = orchestration.NewLangfuseTracer(orchestration.LangfuseConfig{
+		langfuseTracer = taskmanagement.NewLangfuseTracer(taskmanagement.LangfuseConfig{
 			BaseURL:   cfg.Langfuse.BaseURL,
 			PublicKey: cfg.Langfuse.PublicKey,
 			SecretKey: cfg.Langfuse.SecretKey,
@@ -239,7 +239,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	log.Info(ctx, "startup", "status", "initializing asynq server", "redis", cfg.Redis.Addr)
 
 	// Prepare observability configuration
-	observabilityConfig := orchestration.ObservabilityConfig{
+	observabilityConfig := taskmanagement.ObservabilityConfig{
 		Release:    cfg.Observability.Release,
 		Env:        cfg.Observability.Env,
 		Deployment: cfg.Observability.Deployment,
@@ -250,9 +250,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 		observabilityConfig.Release = build
 	}
 
-	taskMgmtService := orchestration.NewTaskManagementService(
+	taskMgmtService := taskmanagement.NewTaskManagementService(
 		log,
-		orchestration.AsynqConfig{
+		taskmanagement.AsynqConfig{
 			RedisAddr:           cfg.Redis.Addr,
 			Concurrency:         cfg.Orchestration.Concurrency,
 			ShutdownTimeout:     cfg.Orchestration.ShutdownTimeout,

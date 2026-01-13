@@ -1,4 +1,4 @@
-package orchestration
+package taskmanagement
 
 import (
 	"school-with-ai/domain"
