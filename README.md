@@ -15,6 +15,7 @@ graph TB
     GoApp[Go Application<br/>Event-Sourced Multi-Agent System]
 
     KurrentDB[(KurrentDB<br/>Event Store)]
+    AppPostgres[(PostgreSQL<br/>Projections DB)]
     Redis[(Redis<br/>Task Queue)]
     Kratos[Ory Kratos<br/>Identity & Auth]
     Postgres[(PostgreSQL<br/>Kratos DB)]
@@ -28,7 +29,9 @@ graph TB
 
     Browser -->|HTTP/SSE| GoApp
     GoApp -->|Events| KurrentDB
-    GoApp -->|Query-Time<br/>Projections| KurrentDB
+    GoApp -->|Subscribe<br/>to Events| KurrentDB
+    GoApp -->|Fast Reads<br/>Materialized Views| AppPostgres
+    GoApp -->|Update<br/>Projections| AppPostgres
     GoApp -->|Tasks| Redis
     GoApp -->|Auth API| Kratos
     GoApp -->|Traces & Metrics| Langfuse
@@ -44,11 +47,12 @@ graph TB
 ### Containers Overview
 
 - **Web Browser**: Frontend with Alpine.js for reactivity, Tailwind CSS for styling
-- **Go Application**: Event-sourced multi-agent system with query-time projections
-- **KurrentDB**: PostgreSQL-backed event store (single source of truth)
+- **Go Application**: Event-sourced multi-agent system with PostgreSQL materialized projections
+- **KurrentDB**: PostgreSQL-backed event store (single source of truth for events)
+- **PostgreSQL (App)**: Materialized projection database for fast reads (updated in real-time via event subscription)
 - **Redis**: Task queue for async job processing (Asynq)
 - **Ory Kratos**: Identity and session management
-- **PostgreSQL**: Database for Kratos user data
+- **PostgreSQL (Kratos)**: Database for Kratos user data
 - **Email Service**: Notification service for authentication emails
 - **Langfuse**: LLM observability platform for tracing agent executions, handoffs, and responses
 - **PostgreSQL (Langfuse)**: Database for Langfuse traces and metadata
@@ -70,20 +74,23 @@ graph TB
         AGUIH["<b>AGUI Handlers</b><br/>Handles query-side interactions (GET) for AGUI-compatible thread state."]
         
         TaskS["<b>Task Management Service</b><br/>[Technology: Asynq/Redis]<br/>Orchestrates background workers and handles job concurrency."]
-        ProjS["<b>UI Projection Service</b><br/>Coordinates the reconstruction of UI state from events."]
+        ProjS["<b>UI Projection Service</b><br/>Coordinates fast reads from PostgreSQL materialized projections."]
         
         OrchS["<b>Agent Orchestrator</b><br/>Manages multi-agent execution, tool-calling, and event persistence."]
         
-        LLMProj["<b>LLM Context Projection</b><br/>Provides historical conversation context for LLM prompts."]
-        WhiteProj["<b>Whiteboard Projection</b><br/>Maintains shared agent workspace state (artifacts, variables)."]
+        ProjUpdater["<b>Projection Updater</b><br/>[Technology: KurrentDB Subscriptions]<br/>Subscribes to event stream and updates PostgreSQL projections in real-time."]
         
-        AGUIProj["<b>AGUI Projection</b><br/>[Technology: Event-sourced Projection]<br/>Replays events from KurrentDB to rebuild current thread state."]
+        LLMProj["<b>LLM Context Projection (PostgreSQL)</b><br/>[Technology: Materialized Views]<br/>Fast conversation history from PostgreSQL for LLM prompts."]
+        WhiteProj["<b>Whiteboard Projection (PostgreSQL)</b><br/>[Technology: Materialized Views]<br/>Agent workspace state maintained in PostgreSQL."]
+        
+        AGUIProj["<b>AGUI Projection (PostgreSQL)</b><br/>[Technology: Materialized Views]<br/>Fast reads from PostgreSQL for current thread state."]
     end
 
     User["<b>User / Browser</b><br/>[Person/Client]"]
     Kratos["<b>Ory Kratos</b><br/>[Software System]<br/>Identity Management"]
     Redis["<b>Redis</b><br/>[Container]<br/>Task Queue Store"]
     KurrentDB["<b>KurrentDB</b><br/>[Container]<br/>Event Store"]
+    AppPostgres["<b>PostgreSQL</b><br/>[Container]<br/>Projections DB"]
     LLM["<b>OpenAI API</b><br/>[Software System]<br/>LLM Provider"]
     Langfuse["<b>Langfuse</b><br/>[Software System]<br/>LLM Observability"]
 
@@ -106,11 +113,15 @@ graph TB
     OrchS -->|"Requests context [In-process]"| LLMProj
     OrchS -->|"Accesses workspace [In-process]"| WhiteProj
     
-    ProjS -->|"Retrieves state [In-process]"| AGUIProj
+    ProjS -->|"Fast reads [SQL]"| AGUIProj
+    AGUIProj -->|"Query [SQL]"| AppPostgres
     
-    LLMProj -->|"Queries events [GRPC]"| KurrentDB
-    WhiteProj -->|"Queries events [GRPC]"| KurrentDB
-    AGUIProj -->|"Queries events [GRPC]"| KurrentDB
+    LLMProj -->|"Query [SQL]"| AppPostgres
+    WhiteProj -->|"Query [SQL]"| AppPostgres
+    
+    ProjUpdater -->|"Subscribe to $all [GRPC]"| KurrentDB
+    ProjUpdater -->|"Update all projections [SQL]"| AppPostgres
+    
     OrchS -->|"Appends events [GRPC]"| KurrentDB
     OrchS -->|"Requests completions [HTTPS]"| LLM
     
@@ -130,17 +141,19 @@ graph TB
 | **Task Handlers** | - | The "Command" side of CQRS, transforming HTTP requests into background tasks. |
 | **AGUI Handlers** | - | The "Query" side of CQRS, serving structured JSON/SSE for the AGUI frontend. |
 | **Task Management Service** | Asynq/Redis | Reliable task queueing and processing with retry logic and priority management. |
-| **UI Projection Service** | - | Domain logic for mapping lower-level event streams into high-level AGUI UI state. |
+| **UI Projection Service** | - | Domain logic for fast reads from PostgreSQL materialized projections. |
 | **Agent Orchestrator** | - | Manages LLM interactions, tool-calling loops, and agent handoffs. (Package: `services/agentorchestrator`) |
-| **LLM Context Projection** | - | Re-constructs conversation history for agent prompts from the event store. |
-| **Whiteboard Projection** | - | Manages the collaborative state and shared variables used by agents during a run. |
-| **AGUI Projection** | Event-sourced Projection | Logic for aggregating historical events to produce a point-in-time view of a conversation thread. |
+| **Projection Updater** | KurrentDB Subscriptions | Subscribes to KurrentDB event stream and updates PostgreSQL projections in real-time. |
+| **LLM Context Projection** | PostgreSQL Materialized Views | Fast conversation history from PostgreSQL for LLM prompts (3-8ms reads). |
+| **Whiteboard Projection** | PostgreSQL Materialized Views | Agent workspace state maintained in PostgreSQL for instant access. |
+| **AGUI Projection** | PostgreSQL Materialized Views | Fast reads from PostgreSQL tables that are kept up-to-date via event subscription (3-8ms vs 50-500ms). |
 
 ### Key Patterns
 
 - **Event Sourcing**: All state changes are persisted as a sequence of events in KurrentDB.
-- **Query-Time Projections**: State is reconstructed by replaying events on every read request, ensuring strong consistency (or horizontal scalability if using read-models).
-- **CQRS**: Clear separation between command side (Task Handlers) and query side (AGUI Handlers).
+- **Materialized Projections**: PostgreSQL tables updated in real-time via event subscription for fast reads (~100x faster than query-time).
+- **Event Subscription**: Projection updater subscribes to KurrentDB `$all` stream and incrementally updates all three projections (AGUI, Whiteboard, LLM Context).
+- **CQRS**: Clear separation between command side (Task Handlers writing events) and query side (AGUI Handlers reading projections).
 - **Multi-Agent Orchestration**: Collaborative agent execution with shared whiteboard state and explicit handoff protocols.
 
 ## Tech Stack

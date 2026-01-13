@@ -1,0 +1,288 @@
+package agui
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"time"
+
+	"school-with-ai/domain"
+	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/logger"
+
+	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
+	"github.com/jmoiron/sqlx"
+)
+
+// PostgresAguiProjection is a PostgreSQL-backed implementation of AguiProjection.
+// It maintains materialized views in PostgreSQL tables that are incrementally updated
+// via the Apply() method when events are received from the subscription.
+type PostgresAguiProjection struct {
+	log *logger.Logger
+	db  *sqlx.DB
+}
+
+// NewPostgresAguiProjection creates a new PostgreSQL AGUI projection.
+func NewPostgresAguiProjection(log *logger.Logger, db *sqlx.DB) *PostgresAguiProjection {
+	return &PostgresAguiProjection{
+		log: log,
+		db:  db,
+	}
+}
+
+// Name returns the projection name for logging and checkpointing.
+func (p *PostgresAguiProjection) Name() string {
+	return "agui"
+}
+
+// Apply handles an event and updates the PostgreSQL projection.
+func (p *PostgresAguiProjection) Apply(ctx context.Context, event core.Event) error {
+	switch e := event.(type) {
+	case domain.ThreadCreated:
+		return p.applyThreadCreated(ctx, e)
+	case domain.MessageAdded:
+		return p.applyMessageAdded(ctx, e)
+	case domain.ThreadTitleChanged:
+		return p.applyThreadTitleChanged(ctx, e)
+	case domain.ThreadDeleted:
+		return p.applyThreadDeleted(ctx, e)
+	default:
+		// Ignore unknown events
+		return nil
+	}
+}
+
+// applyThreadCreated creates a new thread record.
+func (p *PostgresAguiProjection) applyThreadCreated(ctx context.Context, event domain.ThreadCreated) error {
+	query := `
+		INSERT INTO agui_threads (thread_id, user_id, title, created_at, updated_at, is_deleted, version)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (thread_id) DO NOTHING
+	`
+
+	_, err := p.db.ExecContext(ctx, query,
+		event.ThreadID,
+		event.UserID,
+		event.Title,
+		event.Timestamp,
+		event.Timestamp,
+		false,
+		0,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to insert thread: %w", err)
+	}
+
+	return nil
+}
+
+// applyMessageAdded adds a message to the thread.
+func (p *PostgresAguiProjection) applyMessageAdded(ctx context.Context, event domain.MessageAdded) error {
+	// First, get current message count for sequence number
+	var messageCount int
+	countQuery := `SELECT COUNT(*) FROM agui_messages WHERE thread_id = $1`
+	if err := p.db.GetContext(ctx, &messageCount, countQuery, event.ThreadID); err != nil {
+		return fmt.Errorf("failed to get message count: %w", err)
+	}
+
+	// Marshal metadata to JSONB
+	var metadataJSON []byte
+	if event.Metadata != nil {
+		var err error
+		metadataJSON, err = json.Marshal(event.Metadata)
+		if err != nil {
+			return fmt.Errorf("failed to marshal metadata: %w", err)
+		}
+	}
+
+	// Insert message
+	insertQuery := `
+		INSERT INTO agui_messages (message_id, thread_id, role, content, metadata, created_at, sequence_num)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (message_id) DO NOTHING
+	`
+
+	_, err := p.db.ExecContext(ctx, insertQuery,
+		event.MessageID,
+		event.ThreadID,
+		event.Role,
+		event.Content,
+		metadataJSON,
+		event.Timestamp,
+		messageCount, // 0-indexed sequence
+	)
+	if err != nil {
+		return fmt.Errorf("failed to insert message: %w", err)
+	}
+
+	// Update thread's updated_at timestamp
+	updateQuery := `
+		UPDATE agui_threads 
+		SET updated_at = $1, version = version + 1
+		WHERE thread_id = $2
+	`
+
+	_, err = p.db.ExecContext(ctx, updateQuery, event.Timestamp, event.ThreadID)
+	if err != nil {
+		return fmt.Errorf("failed to update thread timestamp: %w", err)
+	}
+
+	return nil
+}
+
+// applyThreadTitleChanged updates the thread title.
+func (p *PostgresAguiProjection) applyThreadTitleChanged(ctx context.Context, event domain.ThreadTitleChanged) error {
+	query := `
+		UPDATE agui_threads
+		SET title = $1, updated_at = $2, version = version + 1
+		WHERE thread_id = $3
+	`
+
+	_, err := p.db.ExecContext(ctx, query, event.NewTitle, time.Now(), event.ThreadID)
+	if err != nil {
+		return fmt.Errorf("failed to update thread title: %w", err)
+	}
+
+	return nil
+}
+
+// applyThreadDeleted marks a thread as deleted (messages cascade delete via FK).
+func (p *PostgresAguiProjection) applyThreadDeleted(ctx context.Context, event domain.ThreadDeleted) error {
+	query := `
+		UPDATE agui_threads
+		SET is_deleted = true, updated_at = $1, version = version + 1
+		WHERE thread_id = $2
+	`
+
+	_, err := p.db.ExecContext(ctx, query, time.Now(), event.ThreadID)
+	if err != nil {
+		return fmt.Errorf("failed to mark thread as deleted: %w", err)
+	}
+
+	return nil
+}
+
+// GetThreadState retrieves the complete UI state for a thread from PostgreSQL.
+func (p *PostgresAguiProjection) GetThreadState(threadID string) (*domain.AguiThreadState, bool) {
+	ctx := context.Background()
+
+	// Get thread record
+	var thread struct {
+		ThreadID  string    `db:"thread_id"`
+		UserID    string    `db:"user_id"`
+		Title     string    `db:"title"`
+		CreatedAt time.Time `db:"created_at"`
+		UpdatedAt time.Time `db:"updated_at"`
+		IsDeleted bool      `db:"is_deleted"`
+		Version   int64     `db:"version"`
+	}
+
+	threadQuery := `
+		SELECT thread_id, user_id, title, created_at, updated_at, is_deleted, version
+		FROM agui_threads
+		WHERE thread_id = $1
+	`
+
+	err := p.db.GetContext(ctx, &thread, threadQuery, threadID)
+	if err == sql.ErrNoRows {
+		return nil, false
+	}
+	if err != nil {
+		p.log.Error(ctx, "failed to get thread", "threadID", threadID, "ERROR", err)
+		return nil, false
+	}
+
+	// Don't return deleted threads
+	if thread.IsDeleted {
+		return nil, false
+	}
+
+	// Get messages
+	var messages []struct {
+		MessageID   string           `db:"message_id"`
+		Role        string           `db:"role"`
+		Content     string           `db:"content"`
+		Metadata    *json.RawMessage `db:"metadata"` // Pointer to handle NULL
+		CreatedAt   time.Time        `db:"created_at"`
+		SequenceNum int              `db:"sequence_num"`
+	}
+
+	messagesQuery := `
+		SELECT message_id, role, content, metadata, created_at, sequence_num
+		FROM agui_messages
+		WHERE thread_id = $1
+		ORDER BY sequence_num ASC
+	`
+
+	err = p.db.SelectContext(ctx, &messages, messagesQuery, threadID)
+	if err != nil && err != sql.ErrNoRows {
+		p.log.Error(ctx, "failed to get messages", "threadID", threadID, "ERROR", err)
+		return nil, false
+	}
+
+	// Convert database messages to AGUI SDK format
+	aguiMessages := make([]aguievents.Message, 0, len(messages))
+	for _, msg := range messages {
+		content := msg.Content
+		aguiMessages = append(aguiMessages, aguievents.Message{
+			ID:      msg.MessageID,
+			Role:    msg.Role,
+			Content: &content,
+		})
+	}
+
+	state := &domain.AguiThreadState{
+		ThreadID:      thread.ThreadID,
+		Title:         thread.Title,
+		Messages:      aguiMessages,
+		ToolCalls:     []domain.AguiToolCall{},
+		AgentActivity: make(map[string]*domain.AguiAgentActivity),
+		CreatedAt:     thread.CreatedAt,
+		UpdatedAt:     thread.UpdatedAt,
+		Version:       thread.Version,
+		IsDeleted:     thread.IsDeleted,
+	}
+
+	return state, true
+}
+
+// GetActiveRun retrieves the currently active run for a thread.
+func (p *PostgresAguiProjection) GetActiveRun(threadID string) (*domain.AguiRunState, bool) {
+	// TODO: Implement run tracking in PostgreSQL
+	// For now, return nil (no active run)
+	return nil, false
+}
+
+// GetMessages retrieves all UI-formatted messages for a thread.
+func (p *PostgresAguiProjection) GetMessages(threadID string) []aguievents.Message {
+	state, exists := p.GetThreadState(threadID)
+	if !exists {
+		return []aguievents.Message{}
+	}
+	return state.Messages
+}
+
+// ListThreads returns all non-deleted thread IDs.
+func (p *PostgresAguiProjection) ListThreads() []string {
+	ctx := context.Background()
+
+	var threadIDs []string
+	query := `
+		SELECT thread_id
+		FROM agui_threads
+		WHERE is_deleted = false
+		ORDER BY updated_at DESC
+	`
+
+	err := p.db.SelectContext(ctx, &threadIDs, query)
+	if err != nil {
+		p.log.Error(ctx, "failed to list threads", "ERROR", err)
+		return []string{}
+	}
+
+	return threadIDs
+}
+
+// Verify PostgresAguiProjection implements domain.AguiProjection.
+var _ domain.AguiProjection = (*PostgresAguiProjection)(nil)

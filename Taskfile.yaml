@@ -43,14 +43,14 @@ tasks:
   run: "wgo -file=.go -file=.templ -xfile=_templ.go  go tool templ generate :: go run main.go"
 
   up:
-    desc: Start all docker compose services (Redis, Asynqmon, Kratos, Postgres, MailSlurper, KurrentDB, Typesense, Langfuse)
+    desc: Start all docker compose services (Redis, Asynqmon, Kratos, Postgres, MailSlurper, KurrentDB, Typesense, Langfuse, App-Postgres)
     cmds:
       - docker compose up -d
 
   down:
-    desc: Stop all docker compose services
+    desc: Stop all docker compose services and remove volumes
     cmds:
-      - docker compose down
+      - docker compose down -v
 
   logs:
     desc: Show docker compose logs
