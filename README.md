@@ -61,15 +61,15 @@ graph TB
 graph TB
     Client[HTTP Clients] --> Router[Chi Router]
     Router --> Auth[Auth Middleware]
-    Auth --> Handlers[HTTP Handlers]
-    Handlers --> Asynq[Asynq Server]
+    Auth --> Handlers[Task Management Handlers]
+    Handlers --> TaskMgmt[Task Management Service]
     Handlers --> UIProjection[UI Projection Service]
     
-    Asynq --> Redis[(Redis)]
-    Asynq --> Orchestration[Orchestration Service]
-    Orchestration --> ChatWrite[ChatWrite Service]
-    Orchestration --> ThreadStore[LLM Context Projection]
-    Orchestration --> WhiteboardProj[Whiteboard Projection]
+    TaskMgmt --> Redis[(Redis)]
+    TaskMgmt --> Service[Orchestration Service]
+    Service --> ChatWrite[ChatWrite Service]
+    Service --> ThreadStore[LLM Context Projection]
+    Service --> WhiteboardProj[Whiteboard Projection]
     
     ChatWrite --> EventStore[(KurrentDB)]
     
@@ -86,8 +86,8 @@ graph TB
 
 - **Chi Router**: HTTP routing with middleware (panic recovery, logging, metrics)
 - **Auth Middleware**: Ory Kratos session validation
-- **HTTP Handlers**: REST API endpoints and SSE streaming
-- **Asynq Server**: Background task processor with configurable concurrency
+- **Task Management Handlers**: REST API endpoints and SSE streaming
+- **Task Management Service**: Background task processor with configurable concurrency (Asynq-based)
 - **Orchestration Service**: Coordinates multi-agent execution and handoffs
 - **ChatWrite Service**: Processes user messages and manages agent interactions
 - **Query-Time Projections**: Rebuild state from events on each read
