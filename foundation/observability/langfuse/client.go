@@ -71,7 +71,11 @@ func (c *Client) sendRequest(ctx context.Context, method, path string, body any)
 	if err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			err = fmt.Errorf("failed to close response body: %w", closeErr)
+		}
+	}()
 
 	// Check response status
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
@@ -79,7 +83,7 @@ func (c *Client) sendRequest(ctx context.Context, method, path string, body any)
 		return fmt.Errorf("langfuse API error: status=%d, body=%s", resp.StatusCode, string(bodyBytes))
 	}
 
-	return nil
+	return err
 }
 
 // CreateTrace creates a new trace in Langfuse
@@ -142,8 +146,8 @@ type Trace struct {
 	Tags      []string       `json:"tags,omitempty"`
 	Timestamp *time.Time     `json:"timestamp,omitempty"`
 	Public    bool           `json:"public,omitempty"`
-	Release   string         `json:"release,omitempty"`   // Application release version
-	Version   string         `json:"version,omitempty"`   // Component or model version
+	Release   string         `json:"release,omitempty"` // Application release version
+	Version   string         `json:"version,omitempty"` // Component or model version
 }
 
 // Generation represents an LLM generation (completion)
