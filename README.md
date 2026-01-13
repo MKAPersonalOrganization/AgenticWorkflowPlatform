@@ -59,6 +59,62 @@ graph TB
 - **ClickHouse**: Analytics database for Langfuse metrics and aggregations
 - **MinIO**: S3-compatible object storage for Langfuse media and event logs
 
+## Clean Architecture Diagram (Level 2)
+
+This diagram illustrates the separation of concerns and dependency rules in our architecture. The **Domain** layer is at the center, depending on nothing. **Services** depend only on the Domain. **Infrastructure** and **Handlers** depend on Services and Domain, effectively inverting dependencies via interfaces.
+
+```mermaid
+graph TD
+    subgraph Domain ["Domain Layer (Core Business Logic)"]
+        D_Types["Types<br/>(Event, Thread, Message)"]
+        D_Interfaces["Interfaces<br/>(EventStore, Repository, WhiteboardStore)"]
+        D_Aggregates["Aggregates<br/>(ThreadAggregate)"]
+    end
+
+    subgraph ServiceLayer ["Service Layer (Application Business Rules)"]
+        S_AgentOrch["Agent Orchestrator Service"]
+        S_TaskMgmt["Task Management Service"]
+        S_Factory["Agent Factory"]
+        S_Types["Service Interfaces"]
+    end
+
+    subgraph InfraLayer ["Infrastructure & Handlers (External Interfaces)"]
+        H_Task["Task Handlers"]
+        H_Auth["Auth Handlers"]
+        I_Kurrent["KurrentDB EventStore"]
+        I_Postgres["Postgres Projection"]
+        I_Asynq["Asynq/Redis"]
+        I_Kratos["Kratos Client"]
+        I_LLM["LLM Client"]
+    end
+
+    %% Dependencies
+    S_AgentOrch --> D_Types
+    S_AgentOrch --> D_Interfaces
+    S_TaskMgmt --> D_Types
+    S_TaskMgmt --> S_Types
+    
+    %% Dependency Inversion via Interfaces
+    S_TaskMgmt -.->|Uses Interface| S_Types
+    S_Factory -.->|Creates| S_AgentOrch
+    
+    %% Infra dependencies (Inward pointing)
+    H_Task --> S_TaskMgmt
+    H_Task --> S_AgentOrch
+    H_Auth --> D_Types
+    
+    I_Kurrent -.->|Implements| D_Interfaces
+    I_Postgres -.->|Implements| D_Interfaces
+    
+    %% Services using Domain Abstractions (not concrete infra)
+    S_AgentOrch -->|Uses| D_Interfaces
+    S_TaskMgmt -->|Uses| D_Interfaces
+
+    style Domain fill:#f9f,stroke:#333,stroke-width:2px
+    style ServiceLayer fill:#bbf,stroke:#333,stroke-width:2px
+    style InfraLayer fill:#dfd,stroke:#333,stroke-width:2px
+```
+
 ## Components Diagram (Level 3)
 
 The following diagram zooms into the **Go Application** container to show its internal components, their responsibilities, technologies, and interactions.
