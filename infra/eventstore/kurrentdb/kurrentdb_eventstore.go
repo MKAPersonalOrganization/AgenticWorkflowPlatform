@@ -7,10 +7,9 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"strings"
-
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
+	"strings"
 
 	"github.com/kurrent-io/KurrentDB-Client-Go/kurrentdb"
 )

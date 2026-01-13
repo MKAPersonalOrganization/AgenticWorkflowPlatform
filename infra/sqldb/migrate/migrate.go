@@ -5,7 +5,6 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-
 	"school-with-ai/infra/sqldb"
 
 	"github.com/ardanlabs/darwin/v3"

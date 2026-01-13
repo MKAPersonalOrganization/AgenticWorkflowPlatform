@@ -31,8 +31,7 @@ type Config struct {
 }
 
 // InitTracing configures open telemetry to be used with the service.
-func InitTracing(cfg Config) (trace.TracerProvider, func(ctx context.Context), error) {
-
+func InitTracing(cfg Config) (trace.TracerProvider, func(ctx context.Context) error, error) {
 	// WARNING: The current settings are using defaults which may not be
 	// compatible with your project. Please review the documentation for
 	// opentelemetry.
@@ -49,7 +48,7 @@ func InitTracing(cfg Config) (trace.TracerProvider, func(ctx context.Context), e
 	}
 
 	var traceProvider trace.TracerProvider
-	teardown := func(ctx context.Context) {}
+	teardown := func(ctx context.Context) error { return nil }
 
 	switch cfg.Host {
 	case "":
@@ -70,8 +69,8 @@ func InitTracing(cfg Config) (trace.TracerProvider, func(ctx context.Context), e
 			),
 		)
 
-		teardown = func(ctx context.Context) {
-			tp.Shutdown(ctx)
+		teardown = func(ctx context.Context) error {
+			return tp.Shutdown(ctx)
 		}
 
 		traceProvider = tp
