@@ -4,6 +4,7 @@ import "school-with-ai/components/card"
 import "school-with-ai/components/button"
 import "school-with-ai/components/icon"
 import "school-with-ai/components/badge"
+import "school-with-ai/components/pageheader"
 import "school-with-ai/components"
 import "school-with-ai/domain"
 
@@ -31,24 +32,13 @@ templ PricingPage(props PricingPageProps) {
 	}) {
 		<div class="min-h-screen bg-background">
 			<div class="container mx-auto max-w-7xl px-6 py-8 lg:py-12 space-y-10">
-			<!-- Header with Back Button -->
-			<div class="flex items-center gap-6">
-				<a href="/">
-					@button.Button(button.Props{
-						Variant: button.VariantGhost,
-						Size:    button.SizeIcon,
-					}) {
-						@icon.ArrowLeft(icon.Props{Class: "size-5"})
-						<span class="sr-only">Back to Home</span>
-					}
-				</a>
-				<div class="flex-1 text-center lg:text-left">
-					<h1 class="text-4xl lg:text-5xl font-bold tracking-tight">Choose Your Plan</h1>
-					<p class="text-base lg:text-lg text-muted-foreground mt-3 max-w-2xl mx-auto lg:mx-0">
-						Unlock the full potential of AI-powered learning with our flexible pricing options
-					</p>
-				</div>
-			</div>
+				<!-- Header with Back Button -->
+				@pageheader.PageHeader(pageheader.Props{
+					Title:       "Choose Your Plan",
+					Description: "Unlock the full potential of AI-powered learning with our flexible pricing options",
+					BackURL:     "/",
+					BackLabel:   "Back to Home",
+				})
 				<!-- Pricing Cards -->
 				@PricingCards(props)
 			</div>

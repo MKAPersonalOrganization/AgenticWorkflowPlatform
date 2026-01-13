@@ -22,7 +22,7 @@ templ AuthLayout(props LayoutProps) {
 			<link rel="icon" type="image/svg+xml" href="/assets/images/logo-black.svg"/>
 			<link rel="stylesheet" href="/assets/css/output.css"/>
 		</head>
-		<body class="flex min-h-screen bg-gray-50 dark:bg-gray-900">
+		<body class="flex min-h-screen bg-background">
 			<!-- Left Navigation Bar -->
 			@navbar.Navbar(navbar.Props{User: props.User})
 			<!-- Main Content with margin for navbar -->
@@ -61,13 +61,13 @@ templ AuthLayout(props LayoutProps) {
 							}
 						}
 						<!-- Footer Links -->
-						<div class="text-center text-sm text-gray-600 dark:text-gray-400">
+						<div class="text-center text-sm text-muted-foreground">
 							<div class="space-x-4">
-								<a href="/privacy" class="hover:text-gray-900 dark:hover:text-gray-100">Privacy</a>
+								<a href="/privacy" class="hover:text-foreground">Privacy</a>
 								<span>•</span>
-								<a href="/terms" class="hover:text-gray-900 dark:hover:text-gray-100">Terms</a>
+								<a href="/terms" class="hover:text-foreground">Terms</a>
 								<span>•</span>
-								<a href="/support" class="hover:text-gray-900 dark:hover:text-gray-100">Support</a>
+								<a href="/support" class="hover:text-foreground">Support</a>
 							</div>
 							<div class="mt-2 text-xs">
 								© { templ.EscapeString(getCurrentYear()) } SchoolWithAI. All rights reserved.
