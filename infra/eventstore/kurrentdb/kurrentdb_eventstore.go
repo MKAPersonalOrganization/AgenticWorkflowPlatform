@@ -206,11 +206,11 @@ func (s *KurrentDBEventStore) convertFromRecordedEvent(recordedEvent *kurrentdb.
 		}
 		event = e
 
-	case "ThreadTitleChanged":
-		var e domain.ThreadTitleChanged
+	case "ThreadTitleChanged", "ThreadTitleUpdated":
+		var e domain.ThreadTitleUpdatedEvent
 		err := json.Unmarshal(recordedEvent.Data, &e)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal ThreadTitleChanged: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal ThreadTitleUpdatedEvent: %w", err)
 		}
 		event = e
 

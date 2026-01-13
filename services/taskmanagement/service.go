@@ -87,7 +87,7 @@ func (s *Service) HandleUserMessage(
 	// if the thread doesn't exist (version 0)
 
 	// 1. Add user message to thread (creates thread if needed)
-	err := s.orchestratorService.AddUserMessage(ctx, params.ThreadID, params.MessageID, params.Content)
+	thread, err := s.orchestratorService.AddUserMessage(ctx, params.ThreadID, params.MessageID, params.Content)
 	if err != nil {
 		s.log.Error(ctx, "Failed to add user message",
 			"threadID", params.ThreadID,
@@ -99,9 +99,12 @@ func (s *Service) HandleUserMessage(
 	runID := domain.GenerateMessageID()
 
 	// 3. Auto-generate thread title if this is the first message
-	thread, threadExists := s.threadStore.Get(params.ThreadID)
+	// Use the thread aggregate returned by AddUserMessage to ensure consistency (bypass projection lag)
+	msgCount := len(thread.GetMessages())
 
-	if threadExists && thread.Title == "New Chat" && len(thread.Messages) == 1 {
+	// Check if this is a first message or if title is still default
+	// We use the returned 'thread' because it's the most up-to-date state
+	if msgCount == 1 {
 		title := params.Content
 		if len(title) > 50 {
 			title = title[:50] + "..."
@@ -114,7 +117,7 @@ func (s *Service) HandleUserMessage(
 				"error", err)
 		}
 
-		// Emit domain event for thread title update
+		// Emit domain event for thread title update to ensure real-time UI notification
 		titleEvent := &domain.ThreadTitleUpdatedEvent{
 			ThreadID:  params.ThreadID,
 			Title:     title,
@@ -159,7 +162,7 @@ func (s *Service) HandleUserMessage(
 		s.log.Error(ctx, "failed to emit run started event", "error", err, "threadID", params.ThreadID)
 	}
 
-	s.runAgentHandoffChain(ctx, params.ThreadID, "student-facing-agent", emitter, runID, traceCtx)
+	s.runAgentHandoffChain(ctx, params.ThreadID, "student-facing-agent", emitter, runID, traceCtx, thread)
 
 	if err := emitter.Emit(&domain.RunFinishedEvent{
 		ThreadID:  params.ThreadID,
@@ -173,15 +176,16 @@ func (s *Service) HandleUserMessage(
 }
 
 // runAgentHandoffChain runs agents in sequence, following handoffs until completion.
-func (s *Service) runAgentHandoffChain(ctx context.Context, threadID, startAgent string, emitter EventEmitter, runID string, traceCtx *langfuse.TraceContext) {
+func (s *Service) runAgentHandoffChain(ctx context.Context, threadID, startAgent string, emitter EventEmitter, runID string, traceCtx *langfuse.TraceContext, thread core.AgentThread) {
 	currentAgent := startAgent
+	currentThread := thread
 
 	for currentAgent != "" {
 		if ctx.Err() != nil {
 			return
 		}
 
-		nextAgent, err := s.runAgent(ctx, threadID, currentAgent, emitter, traceCtx)
+		nextAgent, nextThread, err := s.runAgent(ctx, threadID, currentAgent, emitter, traceCtx, currentThread)
 		if err != nil {
 			if emitErr := emitter.Emit(&domain.RunErrorEvent{
 				ThreadID:  threadID,
@@ -195,11 +199,12 @@ func (s *Service) runAgentHandoffChain(ctx context.Context, threadID, startAgent
 		}
 
 		currentAgent = nextAgent
+		currentThread = nextThread
 	}
 }
 
 // runAgent runs a single agent and returns the next agent name if a handoff occurred.
-func (s *Service) runAgent(ctx context.Context, threadID, agentName string, emitter EventEmitter, traceCtx *langfuse.TraceContext) (string, error) {
+func (s *Service) runAgent(ctx context.Context, threadID, agentName string, emitter EventEmitter, traceCtx *langfuse.TraceContext, thread core.AgentThread) (string, core.AgentThread, error) {
 	s.log.Info(ctx, "Executing agent", "threadID", threadID, "agent", agentName)
 
 	// Start generation tracking for this agent (if Langfuse is enabled)
@@ -229,7 +234,7 @@ func (s *Service) runAgent(ctx context.Context, threadID, agentName string, emit
 	// Get agent factory
 	factory, ok := shared.GlobalAgents.Get(agentName)
 	if !ok {
-		return "", fmt.Errorf("agent %s not found", agentName)
+		return "", nil, fmt.Errorf("agent %s not found", agentName)
 	}
 
 	// Create agent instance with event notifier
@@ -260,11 +265,7 @@ func (s *Service) runAgent(ctx context.Context, threadID, agentName string, emit
 		agentOpts...,
 	)
 
-	// Get thread state
-	thread, err := s.threadStore.GetOrCreateAgentThread(ctx, threadID)
-	if err != nil {
-		return "", fmt.Errorf("failed to get thread: %w", err)
-	}
+	// Note: thread is now passed in from the caller to ensure consistency
 
 	// Debug: Log thread state
 	messages := thread.GetMessages()
@@ -316,7 +317,7 @@ func (s *Service) runAgent(ctx context.Context, threadID, agentName string, emit
 	}
 
 	if agentErr != nil {
-		return "", agentErr
+		return "", nil, agentErr
 	}
 
 	// Check for handoff to next agent
@@ -337,11 +338,11 @@ func (s *Service) runAgent(ctx context.Context, threadID, agentName string, emit
 				}
 			}
 
-			return handoff.TargetAgent, nil
+			return handoff.TargetAgent, thread, nil
 		}
 	}
 
-	return "", nil
+	return "", thread, nil
 }
 
 // getRelease returns the application release version from config

@@ -41,7 +41,7 @@ func (p *PostgresLLMContextProjection) Apply(ctx context.Context, event core.Eve
 		return p.applyThreadCreated(ctx, e)
 	case domain.MessageAdded:
 		return p.applyMessageAdded(ctx, e)
-	case domain.ThreadTitleChanged:
+	case domain.ThreadTitleUpdatedEvent:
 		return p.applyThreadTitleChanged(ctx, e)
 	case domain.ThreadDeleted:
 		return p.applyThreadDeleted(ctx, e)
@@ -142,14 +142,14 @@ func (p *PostgresLLMContextProjection) applyMessageAdded(ctx context.Context, ev
 }
 
 // applyThreadTitleChanged updates the thread title.
-func (p *PostgresLLMContextProjection) applyThreadTitleChanged(ctx context.Context, event domain.ThreadTitleChanged) error {
+func (p *PostgresLLMContextProjection) applyThreadTitleChanged(ctx context.Context, event domain.ThreadTitleUpdatedEvent) error {
 	query := `
 		UPDATE llm_threads
 		SET title = $1, updated_at = $2
 		WHERE thread_id = $3
 	`
 
-	_, err := p.db.ExecContext(ctx, query, event.NewTitle, time.Now(), event.ThreadID)
+	_, err := p.db.ExecContext(ctx, query, event.Title, time.Now(), event.ThreadID)
 	if err != nil {
 		return fmt.Errorf("failed to update thread title: %w", err)
 	}
@@ -302,15 +302,18 @@ func (p *PostgresLLMContextProjection) GetAgentThread(threadID string) (core.Age
 
 	// Get messages
 	var dbMessages []struct {
+		MessageID  string           `db:"message_id"`
 		Role       string           `db:"role"`
 		Content    string           `db:"content"`
 		ToolCalls  *json.RawMessage `db:"tool_calls"`
 		ToolCallID string           `db:"tool_call_id"`
 		AgentName  string           `db:"agent_name"`
+		Metadata   *json.RawMessage `db:"metadata"`
+		CreatedAt  time.Time        `db:"created_at"`
 	}
 
 	messagesQuery := `
-		SELECT role, content, tool_calls, tool_call_id, agent_name
+		SELECT message_id, role, content, tool_calls, tool_call_id, agent_name, metadata, created_at
 		FROM llm_messages
 		WHERE thread_id = $1
 		ORDER BY sequence_num ASC
@@ -332,16 +335,27 @@ func (p *PostgresLLMContextProjection) GetAgentThread(threadID string) (core.Age
 		var toolCalls []core.ToolCall
 		if msg.ToolCalls != nil {
 			if err := json.Unmarshal(*msg.ToolCalls, &toolCalls); err != nil {
-				p.log.Error(ctx, "failed to unmarshal tool calls", "ERROR", err)
+				p.log.Error(ctx, "failed to unmarshal tool calls", "messageID", msg.MessageID, "ERROR", err)
+			}
+		}
+
+		// Unmarshal metadata
+		var metadata map[string]any
+		if msg.Metadata != nil {
+			if err := json.Unmarshal(*msg.Metadata, &metadata); err != nil {
+				p.log.Error(ctx, "failed to unmarshal metadata", "messageID", msg.MessageID, "ERROR", err)
 			}
 		}
 
 		messages = append(messages, core.Message{
+			ID:         msg.MessageID,
 			Role:       msg.Role,
 			Content:    msg.Content,
 			ToolCalls:  toolCalls,
 			ToolCallID: msg.ToolCallID,
 			AgentName:  msg.AgentName,
+			Timestamp:  msg.CreatedAt,
+			Metadata:   metadata,
 		})
 	}
 

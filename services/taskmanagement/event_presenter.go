@@ -2,6 +2,7 @@ package taskmanagement
 
 import (
 	"fmt"
+	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
@@ -21,29 +22,31 @@ func NewUINotifier(emitter EventEmitter) *UINotifier {
 }
 
 // HandleDomainEvent processes a domain event and emits corresponding UI events.
-// This method handles core.Event types from the agent SDK.
 func (n *UINotifier) HandleDomainEvent(event core.Event) error {
 	switch evt := event.(type) {
-	case *core.AssistantMessageStartedEvent:
+	case *domain.AssistantMessageStartedEvent:
 		return n.emitTextMessageStart(evt)
 
-	case *core.AssistantContentStreamedEvent:
+	case *domain.AssistantContentStreamedEvent:
 		return n.emitTextMessageContent(evt)
 
-	case *core.ToolCallStartedEvent:
+	case *domain.ToolCallStartedEvent:
 		return n.emitToolCallStart(evt)
 
-	case *core.ToolCallArgumentsStreamedEvent:
+	case *domain.ToolCallArgumentsStreamedEvent:
 		return n.emitToolCallArgs(evt)
 
-	case *core.ToolCallCompletedEvent:
+	case *domain.ToolCallCompletedEvent:
 		return n.emitToolCallEnd(evt)
 
-	case *core.AssistantMessageCompletedEvent:
+	case *domain.AssistantMessageCompletedEvent:
 		return n.emitTextMessageEnd(evt)
 
-	case *core.ToolCallExecutedEvent:
+	case *domain.ToolCallExecutedEvent:
 		return n.emitToolCallResult(evt)
+
+	case *domain.ThreadTitleUpdatedEvent:
+		return n.emitThreadTitleUpdated(evt)
 
 	// Other domain events don't need UI events
 	default:
@@ -51,7 +54,24 @@ func (n *UINotifier) HandleDomainEvent(event core.Event) error {
 	}
 }
 
-func (n *UINotifier) emitTextMessageStart(evt *core.AssistantMessageStartedEvent) error {
+func (n *UINotifier) emitThreadTitleUpdated(evt *domain.ThreadTitleUpdatedEvent) error {
+	uiEvent := aguievents.NewCustomEvent(
+		"THREAD_TITLE_UPDATED",
+		aguievents.WithValue(map[string]any{
+			"threadId": evt.ThreadID,
+			"title":    evt.Title,
+		}),
+	)
+
+	err := n.emitter.Emit(uiEvent)
+	if err != nil {
+		return fmt.Errorf("failed to emit thread title updated event: %w", err)
+	}
+
+	return nil
+}
+
+func (n *UINotifier) emitTextMessageStart(evt *domain.AssistantMessageStartedEvent) error {
 	uiEvent := aguievents.NewTextMessageStartEvent(
 		evt.MessageID,
 		aguievents.WithRole("assistant"),
@@ -65,7 +85,7 @@ func (n *UINotifier) emitTextMessageStart(evt *core.AssistantMessageStartedEvent
 	return nil
 }
 
-func (n *UINotifier) emitTextMessageContent(evt *core.AssistantContentStreamedEvent) error {
+func (n *UINotifier) emitTextMessageContent(evt *domain.AssistantContentStreamedEvent) error {
 	uiEvent := aguievents.NewTextMessageContentEvent(
 		evt.MessageID,
 		evt.Delta,
@@ -79,7 +99,7 @@ func (n *UINotifier) emitTextMessageContent(evt *core.AssistantContentStreamedEv
 	return nil
 }
 
-func (n *UINotifier) emitToolCallStart(evt *core.ToolCallStartedEvent) error {
+func (n *UINotifier) emitToolCallStart(evt *domain.ToolCallStartedEvent) error {
 	// First emit TOOL_CALL_AGENT to establish agent-tool call association
 	agentEvent := aguievents.NewCustomEvent(
 		"TOOL_CALL_AGENT",
@@ -107,7 +127,7 @@ func (n *UINotifier) emitToolCallStart(evt *core.ToolCallStartedEvent) error {
 	return nil
 }
 
-func (n *UINotifier) emitToolCallArgs(evt *core.ToolCallArgumentsStreamedEvent) error {
+func (n *UINotifier) emitToolCallArgs(evt *domain.ToolCallArgumentsStreamedEvent) error {
 	uiEvent := aguievents.NewToolCallArgsEvent(
 		evt.ToolCallID,
 		evt.Delta,
@@ -121,7 +141,7 @@ func (n *UINotifier) emitToolCallArgs(evt *core.ToolCallArgumentsStreamedEvent) 
 	return nil
 }
 
-func (n *UINotifier) emitToolCallEnd(evt *core.ToolCallCompletedEvent) error {
+func (n *UINotifier) emitToolCallEnd(evt *domain.ToolCallCompletedEvent) error {
 	uiEvent := aguievents.NewToolCallEndEvent(
 		evt.ToolCallID,
 	)
@@ -134,7 +154,7 @@ func (n *UINotifier) emitToolCallEnd(evt *core.ToolCallCompletedEvent) error {
 	return nil
 }
 
-func (n *UINotifier) emitTextMessageEnd(evt *core.AssistantMessageCompletedEvent) error {
+func (n *UINotifier) emitTextMessageEnd(evt *domain.AssistantMessageCompletedEvent) error {
 	uiEvent := aguievents.NewTextMessageEndEvent(
 		evt.MessageID,
 	)
@@ -147,7 +167,7 @@ func (n *UINotifier) emitTextMessageEnd(evt *core.AssistantMessageCompletedEvent
 	return nil
 }
 
-func (n *UINotifier) emitToolCallResult(evt *core.ToolCallExecutedEvent) error {
+func (n *UINotifier) emitToolCallResult(evt *domain.ToolCallExecutedEvent) error {
 	uiEvent := aguievents.NewToolCallResultEvent(
 		evt.MessageID,
 		evt.ToolCallID,

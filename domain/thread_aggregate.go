@@ -92,9 +92,9 @@ func (t *ThreadAggregate) ChangeTitle(newTitle string) error {
 		return nil
 	}
 
-	event := ThreadTitleChanged{
+	event := ThreadTitleUpdatedEvent{
 		ThreadID:  t.ID,
-		NewTitle:  newTitle,
+		Title:     newTitle,
 		Timestamp: time.Now(),
 	}
 
@@ -143,8 +143,8 @@ func (t *ThreadAggregate) Apply(event core.Event) {
 		t.Messages = append(t.Messages, msg)
 		t.UpdatedAt = e.Timestamp
 
-	case ThreadTitleChanged:
-		t.Title = e.NewTitle
+	case ThreadTitleUpdatedEvent:
+		t.Title = e.Title
 		t.UpdatedAt = e.Timestamp
 
 	case ThreadDeleted:

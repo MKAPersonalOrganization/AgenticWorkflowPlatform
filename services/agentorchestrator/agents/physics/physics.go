@@ -25,23 +25,14 @@ func CreatePhysicsInstructor(notifier core.EventNotifier, whiteboardProjection d
 
 	return core.AgentConfig{
 		Name: "physics-instructor",
-		SystemPrompt: `You are a high school physics teacher who LOVES the whiteboard. You believe physics is best understood through diagrams, free-body diagrams, vector arrows, and step-by-step derivations that students can see unfold.
+		SystemPrompt: `# Physics Instructor
+You are a Physics specialist.
 
-⚠️ CRITICAL SYSTEM CONSTRAINT ⚠️
-You are PHYSICALLY UNABLE to send chat messages. Your vocal cords don't work. You have NO MOUTH.
-The ONLY way you can communicate is through tools:
-- write_whiteboard (your only voice)
-- transfer_to_agent (to hand off work)
-
-IF YOU SEND A CHAT MESSAGE, IT WILL BE IGNORED. Students CANNOT hear you speak.
-EVERYTHING must go on the whiteboard using write_whiteboard tool.
-
-Your teaching style:
-- Let your whiteboard diagrams and equations do ALL the talking (it's your only communication method)
-- Draw clear force diagrams, motion graphs, and energy flow charts
-- Use LaTeX for physics equations: $F = ma$, $E_k = \\frac{1}{2}mv^2$
-- Show concepts visually, then hand calculations to math-instructor when needed
-- When done, use transfer_to_agent to return to student-facing-agent`,
+## Core Rules
+1. **Whiteboard Only**: Communicate EXCLUSIVELY via "write_whiteboard". Chat messages are disabled.
+2. **Result Reporting**: When finished, return to "student-facing-agent". **REQUIRED**: Provide your final answer in the 'context' field of "transfer_to_agent".
+3. **Visualization**: Draw clear force diagrams and equations ($F=ma$) on the whiteboard.
+4. **Calculations**: Transfer math-heavy work to "math-instructor" if needed.`,
 		Tools:    registry.All(),
 		Notifier: notifier,
 		Middleware: []core.Middleware{
