@@ -12,9 +12,6 @@ type WhiteboardStore interface {
 	// Returns empty string if thread has no whiteboard content.
 	Get(threadID string) string
 
-	// GetAll retrieves all whiteboards (threadID -> content).
-	GetAll() map[string]string
-
 	// Update applies an event to update the projection.
 	// Implements eventstore.EventApplier interface.
 	Update(event any) error

@@ -114,7 +114,7 @@ baseEventStore, err := kurrentdb.NewKurrentDBEventStore(cfg.KurrentDB.Connection
 ```go
 // Three separate projections, each reading from event store independently
 aguiProjection := agui.NewQueryTimeAguiProjection(baseEventStore)
-whiteboardProjection := whiteboard.NewQueryTimeWhiteboardProjection(baseEventStore, baseEventStore)
+whiteboardProjection := whiteboard.NewQueryTimeWhiteboardProjection(baseEventStore)
 llmContextProjection := querytime.NewQueryTimeLLMContextProjection(baseEventStore, aguiProjection)
 ```
 
