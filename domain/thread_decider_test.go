@@ -200,13 +200,13 @@ func TestThreadTitleChange(t *testing.T) {
 		t.Fatalf("expected 1 event, got %d", len(events))
 	}
 
-	changed, ok := events[0].(ThreadTitleChanged)
+	changed, ok := events[0].(ThreadTitleUpdatedEvent)
 	if !ok {
-		t.Fatalf("expected ThreadTitleChanged event, got %T", events[0])
+		t.Fatalf("expected ThreadTitleUpdatedEvent event, got %T", events[0])
 	}
 
-	if changed.NewTitle != "New Title" {
-		t.Errorf("expected NewTitle 'New Title', got '%s'", changed.NewTitle)
+	if changed.Title != "New Title" {
+		t.Errorf("expected Title 'New Title', got '%s'", changed.Title)
 	}
 
 	// Verify state was updated

@@ -172,10 +172,10 @@ func (u *ProjectionUpdater) convertEvent(event *kurrentdb.RecordedEvent) (core.E
 		}
 		return evt, nil
 
-	case "ThreadTitleChanged":
-		var evt domain.ThreadTitleChanged
+	case "ThreadTitleChanged", "ThreadTitleUpdated":
+		var evt domain.ThreadTitleUpdatedEvent
 		if err := json.Unmarshal(event.Data, &evt); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal ThreadTitleChanged: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal ThreadTitleUpdatedEvent: %w", err)
 		}
 		return evt, nil
 

@@ -68,7 +68,7 @@
 // ## Events
 //
 // Events represent facts that happened:
-//   - ThreadCreated, MessageAdded, ThreadTitleChanged
+//   - ThreadCreated, MessageAdded, ThreadTitleUpdatedEvent
 //   - Immutable and persisted in EventStore
 //   - Applied via the Apply() method to update state
 //     Decide     func(Command, State) ([]Event, error)  // Validate and generate events

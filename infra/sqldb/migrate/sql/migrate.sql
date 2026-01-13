@@ -35,6 +35,12 @@ CREATE TABLE IF NOT EXISTS agui_messages (
     CONSTRAINT fk_agui_thread FOREIGN KEY (thread_id) REFERENCES agui_threads(thread_id) ON DELETE CASCADE
 );
 
+-- Version: 1.08
+-- Description: Add tool-related columns to agui_messages
+ALTER TABLE agui_messages ADD COLUMN IF NOT EXISTS tool_calls JSONB;
+ALTER TABLE agui_messages ADD COLUMN IF NOT EXISTS tool_call_id VARCHAR(255);
+ALTER TABLE agui_messages ADD COLUMN IF NOT EXISTS agent_name VARCHAR(255);
+
 CREATE INDEX IF NOT EXISTS idx_agui_messages_thread_seq ON agui_messages(thread_id, sequence_num);
 
 -- Version: 1.04

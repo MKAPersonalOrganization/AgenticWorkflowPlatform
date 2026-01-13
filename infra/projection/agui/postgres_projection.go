@@ -42,7 +42,7 @@ func (p *PostgresAguiProjection) Apply(ctx context.Context, event core.Event) er
 		return p.applyThreadCreated(ctx, e)
 	case domain.MessageAdded:
 		return p.applyMessageAdded(ctx, e)
-	case domain.ThreadTitleChanged:
+	case domain.ThreadTitleUpdatedEvent:
 		return p.applyThreadTitleChanged(ctx, e)
 	case domain.ThreadDeleted:
 		return p.applyThreadDeleted(ctx, e)
@@ -95,10 +95,20 @@ func (p *PostgresAguiProjection) applyMessageAdded(ctx context.Context, event do
 		}
 	}
 
+	// Marshal tool calls to JSONB
+	var toolCallsJSON []byte
+	if len(event.ToolCalls) > 0 {
+		var err error
+		toolCallsJSON, err = json.Marshal(event.ToolCalls)
+		if err != nil {
+			return fmt.Errorf("failed to marshal tool calls: %w", err)
+		}
+	}
+
 	// Insert message
 	insertQuery := `
-		INSERT INTO agui_messages (message_id, thread_id, role, content, metadata, created_at, sequence_num)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO agui_messages (message_id, thread_id, role, content, tool_calls, tool_call_id, agent_name, metadata, created_at, sequence_num)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		ON CONFLICT (message_id) DO NOTHING
 	`
 
@@ -107,6 +117,9 @@ func (p *PostgresAguiProjection) applyMessageAdded(ctx context.Context, event do
 		event.ThreadID,
 		event.Role,
 		event.Content,
+		toolCallsJSON,
+		event.ToolCallID,
+		event.AgentName,
 		metadataJSON,
 		event.Timestamp,
 		messageCount, // 0-indexed sequence
@@ -131,14 +144,14 @@ func (p *PostgresAguiProjection) applyMessageAdded(ctx context.Context, event do
 }
 
 // applyThreadTitleChanged updates the thread title.
-func (p *PostgresAguiProjection) applyThreadTitleChanged(ctx context.Context, event domain.ThreadTitleChanged) error {
+func (p *PostgresAguiProjection) applyThreadTitleChanged(ctx context.Context, event domain.ThreadTitleUpdatedEvent) error {
 	query := `
 		UPDATE agui_threads
 		SET title = $1, updated_at = $2, version = version + 1
 		WHERE thread_id = $3
 	`
 
-	_, err := p.db.ExecContext(ctx, query, event.NewTitle, time.Now(), event.ThreadID)
+	_, err := p.db.ExecContext(ctx, query, event.Title, time.Now(), event.ThreadID)
 	if err != nil {
 		return fmt.Errorf("failed to update thread title: %w", err)
 	}
@@ -202,13 +215,16 @@ func (p *PostgresAguiProjection) GetThreadState(threadID string) (*domain.AguiTh
 		MessageID   string           `db:"message_id"`
 		Role        string           `db:"role"`
 		Content     string           `db:"content"`
+		ToolCalls   *json.RawMessage `db:"tool_calls"`
+		ToolCallID  *string          `db:"tool_call_id"`
+		AgentName   *string          `db:"agent_name"`
 		Metadata    *json.RawMessage `db:"metadata"` // Pointer to handle NULL
 		CreatedAt   time.Time        `db:"created_at"`
 		SequenceNum int              `db:"sequence_num"`
 	}
 
 	messagesQuery := `
-		SELECT message_id, role, content, metadata, created_at, sequence_num
+		SELECT message_id, role, content, tool_calls, tool_call_id, agent_name, metadata, created_at, sequence_num
 		FROM agui_messages
 		WHERE thread_id = $1
 		ORDER BY sequence_num ASC
@@ -224,11 +240,42 @@ func (p *PostgresAguiProjection) GetThreadState(threadID string) (*domain.AguiTh
 	aguiMessages := make([]aguievents.Message, 0, len(messages))
 	for _, msg := range messages {
 		content := msg.Content
-		aguiMessages = append(aguiMessages, aguievents.Message{
+		aguimsit := aguievents.Message{
 			ID:      msg.MessageID,
 			Role:    msg.Role,
 			Content: &content,
-		})
+		}
+
+		if msg.ToolCallID != nil {
+			aguimsit.ToolCallID = msg.ToolCallID
+		}
+
+		if msg.AgentName != nil {
+			aguimsit.Name = msg.AgentName
+		}
+
+		if msg.ToolCalls != nil {
+			var coreToolCalls []core.ToolCall
+			if err := json.Unmarshal([]byte(*msg.ToolCalls), &coreToolCalls); err == nil {
+				aguiToolCalls := make([]aguievents.ToolCall, 0, len(coreToolCalls))
+				for _, tc := range coreToolCalls {
+					aguiToolCalls = append(aguiToolCalls, aguievents.ToolCall{
+						ID:   tc.ID,
+						Type: "function",
+						Function: struct {
+							Name      string `json:"name"`
+							Arguments string `json:"arguments"`
+						}{
+							Name:      tc.Function.Name,
+							Arguments: tc.Function.Arguments,
+						},
+					})
+				}
+				aguimsit.ToolCalls = aguiToolCalls
+			}
+		}
+
+		aguiMessages = append(aguiMessages, aguimsit)
 	}
 
 	state := &domain.AguiThreadState{

@@ -4,6 +4,7 @@ import (
 	"context"
 	"school-with-ai/domain"
 	"testing"
+	"time"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
@@ -199,8 +200,9 @@ func TestAguiEventAdapter(t *testing.T) {
 	// Test ThreadTitleUpdatedEvent conversion
 	mockEmitter.events = nil // Reset
 	titleEvent := &domain.ThreadTitleUpdatedEvent{
-		ThreadID: "thread-123",
-		Title:    "New Title",
+		ThreadID:  "thread-123",
+		Title:     "New Title",
+		Timestamp: time.Now(),
 	}
 	err = aguiAdapter.Emit(titleEvent)
 	if err != nil {

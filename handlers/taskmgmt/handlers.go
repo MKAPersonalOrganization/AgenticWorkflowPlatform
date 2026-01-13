@@ -241,48 +241,8 @@ streamEvents:
 
 // translateAndWriteEvent translates domain events to AGUI events and writes them.
 func (h *TaskManagementHandler) translateAndWriteEvent(w http.ResponseWriter, flusher http.Flusher, event any) error {
-	var aguiEvent any
-
-	// Translate domain events to agui events
-	switch ev := event.(type) {
-	case *core.TextMessageStartEvent:
-		aguiEvent = aguievents.NewTextMessageStartEvent(
-			ev.MessageID,
-			aguievents.WithRole(ev.Role),
-		)
-
-	case *core.TextMessageContentEvent:
-		aguiEvent = aguievents.NewTextMessageContentEvent(ev.MessageID, ev.Delta)
-
-	case *core.TextMessageEndEvent:
-		aguiEvent = aguievents.NewTextMessageEndEvent(ev.MessageID)
-
-	case *core.ToolCallStartEvent:
-		aguiEvent = aguievents.NewToolCallStartEvent(
-			ev.ToolCallID,
-			ev.ToolCallName,
-			aguievents.WithParentMessageID(ev.ParentMessageID),
-		)
-
-	case *core.ToolCallArgsEvent:
-		aguiEvent = aguievents.NewToolCallArgsEvent(ev.ToolCallID, ev.Delta)
-
-	case *core.ToolCallEndEvent:
-		aguiEvent = aguievents.NewToolCallEndEvent(ev.ToolCallID)
-
-	case *core.ToolCallResultEvent:
-		aguiEvent = aguievents.NewToolCallResultEvent(
-			ev.MessageID,
-			ev.ToolCallID,
-			ev.Content,
-		)
-
-	default:
-		// If it's already an agui event, pass through
-		aguiEvent = event
-	}
-
-	err := WriteSSEEvent(w, aguiEvent)
+	// Events are already converted to AGUI events by the AguiEventEmitter before being buffered
+	err := WriteSSEEvent(w, event)
 	if err != nil {
 		return err
 	}

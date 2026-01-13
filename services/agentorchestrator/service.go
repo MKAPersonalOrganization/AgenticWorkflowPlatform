@@ -131,13 +131,21 @@ func (s *Service) RunWithThread(ctx context.Context, threadID, messageID string,
 }
 
 // CreateThread creates a new chat thread using event sourcing.
-func (s *Service) CreateThread(ctx context.Context, threadID, title string) error {
-	return s.threadMgmt.CreateThread(ctx, threadID, title)
+func (s *Service) CreateThread(ctx context.Context, threadID, title string) (core.AgentThread, error) {
+	agg, err := s.threadMgmt.CreateThread(ctx, threadID, title)
+	if err != nil {
+		return nil, err
+	}
+	return s.threadMgmt.ToAgentThread(agg), nil
 }
 
 // AddUserMessage adds a user message to a thread using event sourcing.
-func (s *Service) AddUserMessage(ctx context.Context, threadID, messageID, content string) error {
-	return s.threadMgmt.AddUserMessage(ctx, threadID, messageID, content)
+func (s *Service) AddUserMessage(ctx context.Context, threadID, messageID, content string) (core.AgentThread, error) {
+	agg, err := s.threadMgmt.AddUserMessage(ctx, threadID, messageID, content)
+	if err != nil {
+		return nil, err
+	}
+	return s.threadMgmt.ToAgentThread(agg), nil
 }
 
 // UpdateThreadTitle updates the title of a thread using event sourcing.

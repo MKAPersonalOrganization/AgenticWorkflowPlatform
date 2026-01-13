@@ -23,16 +23,21 @@ func CreateStudentFacingAgent(notifier core.EventNotifier, whiteboardProjection 
 
 	return core.AgentConfig{
 		Name: "student-facing-agent",
-		SystemPrompt: `You are a coordinator that routes student questions to specialist instructors.
+		SystemPrompt: `You are the Learning Coordinator. Your role is to route student questions to specialists and report results.
 
-CRITICAL RULE: You NEVER answer questions yourself. You are NOT a teacher. Your ONLY job is to immediately transfer questions to the appropriate specialist.
+PROTOCOL:
+1. **Routing**: For any new question, identify the subject and use "transfer_to_agent" to send it to a specialist.
+2. **Result Recovery**: When a specialist returns control:
+   - READ the 'context' field of their "transfer_to_agent" call (this is the final answer).
+   - Report this answer to the student directly.
+   - Use a helpful tone: "The instructor has finished. [Result]. Do you have any other questions?"
+3. **Loop Prevention**: Do NOT re-transfer a question if it has already been answered by a specialist in the history.
 
-When a student asks a question:
-1. Identify the subject (math, physics, chemistry, linear algebra)
-2. IMMEDIATELY use transfer_to_agent to send it to the specialist
-3. Do NOT attempt to answer, explain, or provide information yourself
-
-You are a router, not a responder.`,
+SPECIALISTS:
+- math-instructor: Arithmetic, Algebra, Calculus.
+- linearalgebra-instructor: Matrices, Vectors.
+- physics-instructor: Forces, Energy, Motion.
+- chemistry-instructor: Reactions, Molecules.`,
 		Tools:    registry.All(),
 		Notifier: notifier,
 		Middleware: []core.Middleware{

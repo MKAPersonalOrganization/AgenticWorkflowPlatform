@@ -65,8 +65,7 @@ func (e *Engine) RunWithThread(
 	thread core.AgentThread,
 	runOpts core.RunOptions,
 ) error {
-	messages := thread.GetMessages()
-	return e.RunIteration(ctx, threadID, messageID, messages, thread, runOpts)
+	return e.RunIteration(ctx, threadID, messageID, thread, runOpts)
 }
 
 // RunIteration processes a single LLM iteration and recursively continues if tools are called.
@@ -74,23 +73,20 @@ func (e *Engine) RunIteration(
 	ctx context.Context,
 	threadID string,
 	messageID string,
-	messages []domain.Message,
 	thread core.AgentThread,
 	runOpts core.RunOptions,
 ) error {
+	messages := thread.GetMessages()
 	select {
 	case <-ctx.Done():
 		return fmt.Errorf("client disconnected: %w", ctx.Err())
 	default:
 	}
 
-	startEvent := &core.AssistantMessageStartedEvent{
-		BaseEvent: core.BaseEvent{
-			Type:      "AssistantMessageStartedEvent",
-			Timestamp: time.Now(),
-			ThreadID:  threadID,
-		},
+	startEvent := &domain.AssistantMessageStartedEvent{
+		ThreadID:  threadID,
 		MessageID: messageID,
+		Timestamp: time.Now(),
 	}
 	if e.notifier != nil {
 		if err := e.notifier.HandleDomainEvent(startEvent); err != nil {
@@ -135,15 +131,12 @@ func (e *Engine) RunIteration(
 		case <-ctx.Done():
 			if completeContent != "" {
 				if e.notifier != nil {
-					evt := &core.AssistantMessageCompletedEvent{
-						BaseEvent: core.BaseEvent{
-							Type:      "AssistantMessageCompletedEvent",
-							Timestamp: time.Now(),
-							ThreadID:  threadID,
-						},
+					evt := &domain.AssistantMessageCompletedEvent{
+						ThreadID:  threadID,
 						MessageID: messageID,
 						Content:   completeContent,
 						AgentName: e.config.Name,
+						Timestamp: time.Now(),
 					}
 					if err := e.notifier.HandleDomainEvent(evt); err != nil {
 						e.log.Error(ctx, "failed to emit assistant message completed event on disconnect",
@@ -163,14 +156,11 @@ func (e *Engine) RunIteration(
 		if textDelta != "" {
 			completeContent += textDelta
 
-			contentEvent := &core.AssistantContentStreamedEvent{
-				BaseEvent: core.BaseEvent{
-					Type:      "AssistantContentStreamedEvent",
-					Timestamp: time.Now(),
-					ThreadID:  threadID,
-				},
+			contentEvent := &domain.AssistantContentStreamedEvent{
+				ThreadID:  threadID,
 				MessageID: messageID,
 				Delta:     textDelta,
+				Timestamp: time.Now(),
 			}
 			if e.notifier != nil {
 				if err := e.notifier.HandleDomainEvent(contentEvent); err != nil {
@@ -182,16 +172,13 @@ func (e *Engine) RunIteration(
 		tcUpdate, hasTool := toolCalls.ProcessUpdate(update)
 		if hasTool {
 			if tcUpdate.IsNew {
-				toolStartEvent := &core.ToolCallStartedEvent{
-					BaseEvent: core.BaseEvent{
-						Type:      "ToolCallStartedEvent",
-						Timestamp: time.Now(),
-						ThreadID:  threadID,
-					},
+				toolStartEvent := &domain.ToolCallStartedEvent{
+					ThreadID:        threadID,
 					ToolCallID:      tcUpdate.ID,
 					ToolCallName:    tcUpdate.Name,
 					ParentMessageID: messageID,
 					AgentName:       e.config.Name,
+					Timestamp:       time.Now(),
 				}
 				if e.notifier != nil {
 					if err := e.notifier.HandleDomainEvent(toolStartEvent); err != nil {
@@ -201,14 +188,11 @@ func (e *Engine) RunIteration(
 			}
 
 			if tcUpdate.ArgsDelta != "" {
-				argsEvent := &core.ToolCallArgumentsStreamedEvent{
-					BaseEvent: core.BaseEvent{
-						Type:      "ToolCallArgumentsStreamedEvent",
-						Timestamp: time.Now(),
-						ThreadID:  threadID,
-					},
+				argsEvent := &domain.ToolCallArgumentsStreamedEvent{
+					ThreadID:   threadID,
 					ToolCallID: tcUpdate.ID,
 					Delta:      tcUpdate.ArgsDelta,
+					Timestamp:  time.Now(),
 				}
 				if e.notifier != nil {
 					if err := e.notifier.HandleDomainEvent(argsEvent); err != nil {
@@ -222,13 +206,10 @@ func (e *Engine) RunIteration(
 	toolCallsList := toolCalls.GetAll()
 
 	for _, tc := range toolCallsList {
-		completedEvent := &core.ToolCallCompletedEvent{
-			BaseEvent: core.BaseEvent{
-				Type:      "ToolCallCompletedEvent",
-				Timestamp: time.Now(),
-				ThreadID:  threadID,
-			},
+		completedEvent := &domain.ToolCallCompletedEvent{
+			ThreadID:   threadID,
 			ToolCallID: tc.ID,
+			Timestamp:  time.Now(),
 		}
 		if e.notifier != nil {
 			if err := e.notifier.HandleDomainEvent(completedEvent); err != nil {
@@ -238,21 +219,21 @@ func (e *Engine) RunIteration(
 	}
 
 	if toolCalls.HasToolCalls() {
-		err = e.threadMgmt.AddAssistantMessage(ctx, threadID, messageID, completeContent, toolCallsList)
+		agg, err := e.threadMgmt.AddAssistantMessage(ctx, threadID, messageID, completeContent, toolCallsList)
 		if err != nil {
 			return fmt.Errorf("failed to add assistant message: %w", err)
 		}
 
-		assistantEvent := &core.AssistantMessageCompletedEvent{
-			BaseEvent: core.BaseEvent{
-				Type:      "AssistantMessageCompletedEvent",
-				Timestamp: time.Now(),
-				ThreadID:  threadID,
-			},
+		// Update local thread state with consistent state from repository
+		thread = e.threadMgmt.ToAgentThread(agg)
+
+		assistantEvent := &domain.AssistantMessageCompletedEvent{
+			ThreadID:  threadID,
 			MessageID: messageID,
 			Content:   completeContent,
 			ToolCalls: toolCallsList,
 			AgentName: e.config.Name,
+			Timestamp: time.Now(),
 		}
 		if e.notifier != nil {
 			if err := e.notifier.HandleDomainEvent(assistantEvent); err != nil {
@@ -267,17 +248,16 @@ func (e *Engine) RunIteration(
 			}
 
 			toolResultID := core.GenerateID()
-			err = e.threadMgmt.AddToolResultMessage(ctx, threadID, toolResultID, toolCall.ID, result)
+			agg, err = e.threadMgmt.AddToolResultMessage(ctx, threadID, toolResultID, toolCall.ID, result)
 			if err != nil {
 				return fmt.Errorf("failed to add tool result message: %w", err)
 			}
 
-			toolEvent := &core.ToolCallExecutedEvent{
-				BaseEvent: core.BaseEvent{
-					Type:      "ToolCallExecutedEvent",
-					Timestamp: time.Now(),
-					ThreadID:  threadID,
-				},
+			// Update local thread state with consistent state from repository
+			thread = e.threadMgmt.ToAgentThread(agg)
+
+			toolEvent := &domain.ToolCallExecutedEvent{
+				ThreadID:        threadID,
 				MessageID:       toolResultID,
 				ToolCallID:      toolCall.ID,
 				ToolName:        toolCall.Function.Name,
@@ -285,6 +265,7 @@ func (e *Engine) RunIteration(
 				ToolResult:      result,
 				ParentMessageID: messageID,
 				AgentName:       e.config.Name,
+				Timestamp:       time.Now(),
 			}
 			if e.notifier != nil {
 				if err := e.notifier.HandleDomainEvent(toolEvent); err != nil {
@@ -297,38 +278,21 @@ func (e *Engine) RunIteration(
 			return nil
 		}
 
-		stateWithAccess, ok := e.readModel.(core.ThreadStateWithAgentAccess)
-		if !ok {
-			return fmt.Errorf("state does not implement ThreadStateWithAgentAccess")
-		}
-
-		updatedThread, exists := stateWithAccess.GetAgentThread(threadID)
-		if !exists {
-			var err error
-			updatedThread, err = stateWithAccess.GetOrCreateAgentThread(ctx, threadID)
-			if err != nil {
-				return fmt.Errorf("failed to get/create thread %s after tool execution: %w", threadID, err)
-			}
-		}
-
+		// Continue with the already updated in-memory thread
 		continuationMessageID := core.GenerateID()
-		return e.RunIteration(ctx, threadID, continuationMessageID, updatedThread.GetMessages(), thread, runOpts)
+		return e.RunIteration(ctx, threadID, continuationMessageID, thread, runOpts)
 	}
 
-	err = e.threadMgmt.AddAssistantMessage(ctx, threadID, messageID, completeContent, nil)
-	if err != nil {
+	if _, err := e.threadMgmt.AddAssistantMessage(ctx, threadID, messageID, completeContent, nil); err != nil {
 		return fmt.Errorf("failed to add final assistant message: %w", err)
 	}
 
-	assistantEvent := &core.AssistantMessageCompletedEvent{
-		BaseEvent: core.BaseEvent{
-			Type:      "AssistantMessageCompletedEvent",
-			Timestamp: time.Now(),
-			ThreadID:  threadID,
-		},
+	assistantEvent := &domain.AssistantMessageCompletedEvent{
+		ThreadID:  threadID,
 		MessageID: messageID,
 		Content:   completeContent,
 		AgentName: e.config.Name,
+		Timestamp: time.Now(),
 	}
 	if e.notifier != nil {
 		if err := e.notifier.HandleDomainEvent(assistantEvent); err != nil {

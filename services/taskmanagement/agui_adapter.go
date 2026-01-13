@@ -21,8 +21,6 @@ func NewAguiEventEmitter(emitter EventEmitter) *AguiEventEmitter {
 }
 
 // Emit converts domain events to AGUI events and emits them.
-// Domain events from the orchestration service are converted to AGUI protocol events.
-// Other events (like those from UINotifier) are passed through unchanged.
 func (a *AguiEventEmitter) Emit(event any) error {
 	// Convert domain events to AGUI events
 	switch evt := event.(type) {
@@ -44,15 +42,51 @@ func (a *AguiEventEmitter) Emit(event any) error {
 	case *domain.ThreadTitleUpdatedEvent:
 		aguiEvent := aguievents.NewCustomEvent(
 			"THREAD_TITLE_UPDATED",
-			aguievents.WithValue(map[string]string{
+			aguievents.WithValue(map[string]any{
 				"threadId": evt.ThreadID,
 				"title":    evt.Title,
 			}),
 		)
 		return a.underlying.Emit(aguiEvent)
 
+	case *domain.AssistantMessageStartedEvent:
+		aguiEvent := aguievents.NewTextMessageStartEvent(evt.MessageID, aguievents.WithRole("assistant"))
+		return a.underlying.Emit(aguiEvent)
+
+	case *domain.AssistantContentStreamedEvent:
+		aguiEvent := aguievents.NewTextMessageContentEvent(evt.MessageID, evt.Delta)
+		return a.underlying.Emit(aguiEvent)
+
+	case *domain.AssistantMessageCompletedEvent:
+		aguiEvent := aguievents.NewTextMessageEndEvent(evt.MessageID)
+		return a.underlying.Emit(aguiEvent)
+
+	case *domain.ToolCallStartedEvent:
+		aguiEvent := aguievents.NewToolCallStartEvent(
+			evt.ToolCallID,
+			evt.ToolCallName,
+			aguievents.WithParentMessageID(evt.ParentMessageID),
+		)
+		return a.underlying.Emit(aguiEvent)
+
+	case *domain.ToolCallArgumentsStreamedEvent:
+		aguiEvent := aguievents.NewToolCallArgsEvent(evt.ToolCallID, evt.Delta)
+		return a.underlying.Emit(aguiEvent)
+
+	case *domain.ToolCallCompletedEvent:
+		aguiEvent := aguievents.NewToolCallEndEvent(evt.ToolCallID)
+		return a.underlying.Emit(aguiEvent)
+
+	case *domain.ToolCallExecutedEvent:
+		aguiEvent := aguievents.NewToolCallResultEvent(
+			evt.MessageID,
+			evt.ToolCallID,
+			evt.ToolResult,
+		)
+		return a.underlying.Emit(aguiEvent)
+
 	default:
-		// Pass through non-domain events (e.g., AGUI events from UINotifier)
+		// Pass through non-domain events (e.g., AGUI events that were already converted)
 		return a.underlying.Emit(event)
 	}
 }
