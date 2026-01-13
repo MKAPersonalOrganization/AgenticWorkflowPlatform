@@ -11,10 +11,10 @@ import (
 var (
 	domainLayer   = archunit.ArchLayer("Domain", "school-with-ai/domain")
 	servicesLayer = archunit.ArchLayer("Services", "school-with-ai/services/...")
-	handlersLayer = archunit.ArchLayer("Handlers", "school-with-ai/handlers")
+	handlersLayer = archunit.ArchLayer("Handlers", "school-with-ai/handlers/...")
 	infraLayer    = archunit.ArchLayer("Infra", "school-with-ai/infra/...")
 	agentSDKLayer = archunit.ArchLayer("AgentSDK", "school-with-ai/sdk/agentsdk/...")
-	agentsLayer   = archunit.ArchLayer("Agents", "school-with-ai/services/chatwrite/agents/...")
+	agentsLayer   = archunit.ArchLayer("Agents", "school-with-ai/services/agentorchestrator/agents/...")
 )
 
 func init() {

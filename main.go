@@ -9,16 +9,12 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
-	"syscall"
-	"time"
-
 	"school-with-ai/components"
 	"school-with-ai/components/checkout"
 	"school-with-ai/components/pricing"
 	"school-with-ai/foundation/debug"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/middleware"
-	"school-with-ai/handlers"
 	"school-with-ai/infra/auth"
 	"school-with-ai/infra/eventstore/kurrentdb"
 	"school-with-ai/infra/projection/agui"
@@ -26,16 +22,22 @@ import (
 	"school-with-ai/infra/projection/whiteboard"
 	"school-with-ai/infra/projections"
 	"school-with-ai/sdk/agentsdk/llm"
-	"school-with-ai/services/chatwrite"
-	"school-with-ai/services/chatwrite/agents/advancedmath/linearalgebra"
-	"school-with-ai/services/chatwrite/agents/chemistry"
-	"school-with-ai/services/chatwrite/agents/diagramming"
-	"school-with-ai/services/chatwrite/agents/math"
-	"school-with-ai/services/chatwrite/agents/physics"
-	"school-with-ai/services/chatwrite/agents/shared"
-	"school-with-ai/services/chatwrite/agents/statistics"
-	"school-with-ai/services/chatwrite/agents/studentfacing"
+	"school-with-ai/services/agentorchestrator"
+	"school-with-ai/services/agentorchestrator/agents/advancedmath/linearalgebra"
+	"school-with-ai/services/agentorchestrator/agents/chemistry"
+	"school-with-ai/services/agentorchestrator/agents/diagramming"
+	"school-with-ai/services/agentorchestrator/agents/math"
+	"school-with-ai/services/agentorchestrator/agents/physics"
+	"school-with-ai/services/agentorchestrator/agents/shared"
+	"school-with-ai/services/agentorchestrator/agents/statistics"
+	"school-with-ai/services/agentorchestrator/agents/studentfacing"
 	"school-with-ai/services/taskmanagement"
+	"syscall"
+	"time"
+
+	aguihandlers "school-with-ai/handlers/agui"
+	healthhandlers "school-with-ai/handlers/health"
+	taskmgmthandlers "school-with-ai/handlers/taskmgmt"
 
 	authService "school-with-ai/services/auth"
 
@@ -227,7 +229,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	shared.GlobalAgents.Register("diagramming-instructor", diagramming.CreateDiagrammingInstructor)
 
 	// Initialize chat write service
-	chatWriteService := chatwrite.New(log, chatClient, eventLog, llmContextProjection)
+	orchestratorService := agentorchestrator.New(log, chatClient, eventLog, llmContextProjection)
 
 	// Initialize service layer
 	authSvc := authService.NewAuthService()
@@ -262,7 +264,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		llmContextProjection,
 		whiteboardProjection,
 		chatClient,
-		chatWriteService,
+		orchestratorService,
 		langfuseTracer,
 		observabilityConfig,
 	)
@@ -274,10 +276,10 @@ func run(ctx context.Context, log *logger.Logger) error {
 		"healthCheckInterval", cfg.Orchestration.HealthCheckInterval)
 
 	// Create HTTP handler
-	handler := handlers.NewTaskManagementHandler(log, chatClient, taskMgmtService, chatWriteService, authSvc, uiProjectionService)
+	handler := taskmgmthandlers.NewTaskManagementHandler(log, chatClient, taskMgmtService, orchestratorService, authSvc, uiProjectionService)
 
 	// Create health handler
-	healthHandler := handlers.NewHealthHandler(log)
+	healthHandler := healthhandlers.NewHealthHandler(log)
 
 	// Create chi router
 	r := chi.NewRouter()
@@ -303,7 +305,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Handle("/assets/charts/*", http.StripPrefix("/assets/charts/", http.FileServer(http.Dir("./assets/charts"))))
 
 	// Create AGUI projection handler
-	aguiHandler := agui.NewAguiProjectionHandler(aguiProjection, whiteboardProjection, uiProjectionService)
+	aguiHandler := aguihandlers.NewAguiProjectionHandler(aguiProjection, whiteboardProjection, uiProjectionService)
 
 	// Initialize Kratos client and auth handlers
 	authConfig := auth.Config{
