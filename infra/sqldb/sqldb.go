@@ -7,11 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"strings"
-	"time"
-
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/otel"
+	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -213,7 +212,11 @@ func namedQuerySlice[T any](ctx context.Context, log *logger.Logger, db sqlx.Ext
 		}
 		return err
 	}
-	defer rows.Close()
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			log.Error(ctx, "failed to close rows", "ERROR", closeErr)
+		}
+	}()
 
 	var slice []T
 	for rows.Next() {
@@ -289,7 +292,11 @@ func namedQueryStruct(ctx context.Context, log *logger.Logger, db sqlx.ExtContex
 		}
 		return err
 	}
-	defer rows.Close()
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			log.Error(ctx, "failed to close rows", "ERROR", closeErr)
+		}
+	}()
 
 	if !rows.Next() {
 		return ErrDBNotFound

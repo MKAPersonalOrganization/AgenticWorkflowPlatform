@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/logger"
@@ -75,7 +74,11 @@ func (u *ProjectionUpdater) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to $all: %w", err)
 	}
-	defer stream.Close()
+	defer func() {
+		if closeErr := stream.Close(); closeErr != nil {
+			u.log.Error(ctx, "failed to close subscription stream", "ERROR", closeErr)
+		}
+	}()
 
 	u.log.Info(ctx, "subscribed to $all stream successfully")
 
