@@ -9,6 +9,9 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"syscall"
+	"time"
+
 	"school-with-ai/components"
 	"school-with-ai/components/checkout"
 	"school-with-ai/components/pricing"
@@ -35,8 +38,6 @@ import (
 	"school-with-ai/services/agentorchestrator/agents/statistics"
 	"school-with-ai/services/agentorchestrator/agents/studentfacing"
 	"school-with-ai/services/taskmanagement"
-	"syscall"
-	"time"
 
 	aguihandlers "school-with-ai/handlers/agui"
 	healthhandlers "school-with-ai/handlers/health"
@@ -59,7 +60,7 @@ func main() {
 		},
 	}
 
-	log = logger.NewWithEvents(os.Stdout, logger.LevelInfo, "SCHOOL", nil, events)
+	log = logger.NewWithEvents(os.Stdout, logger.LevelError, "SCHOOL", nil, events)
 
 	// -------------------------------------------------------------------------
 

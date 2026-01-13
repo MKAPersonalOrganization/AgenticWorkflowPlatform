@@ -3,6 +3,8 @@ package taskmanagement
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/core/middleware"
@@ -11,7 +13,6 @@ import (
 	"school-with-ai/services"
 	"school-with-ai/services/agentorchestrator/agents/shared"
 	"school-with-ai/services/agentorchestrator/types"
-	"time"
 )
 
 // ObservabilityConfig contains configuration for observability and tracing attributes
@@ -328,7 +329,16 @@ func (s *Service) runAgent(ctx context.Context, threadID, agentName string, emit
 				}
 			}
 
-			return handoff.TargetAgent, thread, nil
+			// CRITICAL: Reload the thread from the store to get all the latest messages
+			// The current thread object might not have the messages that were just added
+			updatedThread, err := s.threadStore.GetOrCreateAgentThread(ctx, threadID)
+			if err != nil {
+				s.log.Warn(ctx, "failed to reload thread for handoff", "error", err, "threadID", threadID)
+				// Fall back to the current thread if reload fails
+				return handoff.TargetAgent, thread, nil
+			}
+
+			return handoff.TargetAgent, updatedThread, nil
 		}
 	}
 

@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"school-with-ai/foundation/agentsdk/core"
 	"sort"
 	"strings"
+
+	"school-with-ai/foundation/agentsdk/core"
 )
 
 var (
@@ -192,12 +193,92 @@ func (m *HandoffMiddleware) Process(ctx context.Context, reqCtx *core.RequestCon
 	// Add transfer_to_agent tool
 	reqCtx.AddTool(NewTransferToAgentTool(m.availableAgents, reqCtx))
 
-	// Add system prompt with available agents list
+	messages := reqCtx.Messages
+
+	// Determine the current agent name
+	// First try from Config, then fall back to checking recent assistant messages
+	currentAgentName := ""
+	if reqCtx.Config != nil && reqCtx.Config.Name != "" {
+		currentAgentName = reqCtx.Config.Name
+	} else {
+		// Fall back: look for the most recent assistant message's author name
+		for i := len(messages) - 1; i >= 0; i-- {
+			if messages[i].Role == "assistant" && messages[i].AuthorName != "" {
+				currentAgentName = messages[i].AuthorName
+				break
+			}
+		}
+	}
+
+	// Check if this agent is receiving control back from another agent
+	// Look at recent messages (not just the last one, since tool results are added after transfers)
+	var returnHandoffPrompt string
+
+	// Check the last few messages for a return handoff
+	// We need to look back a bit because after transfer_to_agent is called,
+	// a tool result message is added, so the transfer isn't the last message
+	startIdx := len(messages) - 5
+	if startIdx < 0 {
+		startIdx = 0
+	}
+
+	for i := len(messages) - 1; i >= startIdx; i-- {
+		msg := messages[i]
+
+		// Check if this is an assistant message with function calls
+		if msg.Role == "assistant" {
+			functionCalls := msg.FunctionCalls()
+			for _, fc := range functionCalls {
+				if fc.Name == "transfer_to_agent" {
+					// Parse the arguments to see if this is a return handoff
+					var args struct {
+						AgentName string `json:"agent_name"`
+						Context   string `json:"context"`
+					}
+					if err := json.Unmarshal([]byte(fc.ArgumentsJSON()), &args); err == nil {
+						if args.AgentName == currentAgentName && currentAgentName != "" {
+							// This agent is receiving control back!
+							// The Context field contains the result from the previous agent
+							returnHandoffPrompt = fmt.Sprintf(`
+## IMPORTANT: You Are Receiving Control Back
+
+The previous agent has completed their work and returned control to you.
+
+**Their result:** %s
+
+**Your task:** Relay this result to the user in a natural, conversational way. 
+
+**CRITICAL:** DO NOT call transfer_to_agent again. The work is done. Simply respond to the user with the result.
+`, args.Context)
+							// Found it, stop looking
+							goto found
+						}
+					}
+				}
+			}
+		}
+	}
+found:
+
+	// Build system prompt
 	promptWithAgents := m.buildSystemPromptWithAgents()
+
+	// If this is a return handoff, prepend the special instructions
+	if returnHandoffPrompt != "" {
+		promptWithAgents = returnHandoffPrompt + "\n\n" + promptWithAgents
+	}
+
 	reqCtx.AddSystemPrompt(promptWithAgents)
 
 	// Continue with next middleware
 	return next(ctx, reqCtx)
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // buildSystemPromptWithAgents creates the system prompt including the list of available agents.
