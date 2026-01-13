@@ -192,7 +192,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	aguiProjection := agui.NewQueryTimeAguiProjection(baseEventStore)
 
 	// Initialize query-time Whiteboard projection (reads directly from event store on each query)
-	whiteboardProjection := whiteboard.NewQueryTimeWhiteboardProjection(baseEventStore, baseEventStore)
+	whiteboardProjection := whiteboard.NewQueryTimeWhiteboardProjection(baseEventStore)
 
 	// All projections are now query-time, so we use the base event store directly
 	// No need for ProjectionEventStore wrapper anymore

@@ -38,14 +38,6 @@ func (m *mockWhiteboardProjection) Get(threadID string) string {
 	return m.data[threadID]
 }
 
-func (m *mockWhiteboardProjection) GetAll() map[string]string {
-	if m.data == nil {
-		return make(map[string]string)
-	}
-
-	return m.data
-}
-
 func (m *mockWhiteboardProjection) Update(event any) error {
 	return nil
 }

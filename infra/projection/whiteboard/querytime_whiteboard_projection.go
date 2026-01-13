@@ -16,20 +16,13 @@ import (
 //   - Simpler architecture - no need to manage projection updates
 //   - Thread state persists across server restarts
 type QueryTimeWhiteboardProjection struct {
-	eventStore     core.EventStore
-	threadIDLister ThreadIDLister
-}
-
-// ThreadIDLister provides a way to list all thread IDs.
-type ThreadIDLister interface {
-	ReadAllThreadIDs(ctx context.Context) ([]string, error)
+	eventStore core.EventStore
 }
 
 // NewQueryTimeWhiteboardProjection creates a new query-time whiteboard projection.
-func NewQueryTimeWhiteboardProjection(eventStore core.EventStore, threadIDLister ThreadIDLister) *QueryTimeWhiteboardProjection {
+func NewQueryTimeWhiteboardProjection(eventStore core.EventStore) *QueryTimeWhiteboardProjection {
 	return &QueryTimeWhiteboardProjection{
-		eventStore:     eventStore,
-		threadIDLister: threadIDLister,
+		eventStore: eventStore,
 	}
 }
 
@@ -51,29 +44,6 @@ func (p *QueryTimeWhiteboardProjection) Get(threadID string) string {
 	}
 
 	return content
-}
-
-// GetAll retrieves all whiteboards by listing all threads and rebuilding each.
-func (p *QueryTimeWhiteboardProjection) GetAll() map[string]string {
-	if p.threadIDLister == nil {
-		return map[string]string{}
-	}
-
-	ctx := context.Background()
-	threadIDs, err := p.threadIDLister.ReadAllThreadIDs(ctx)
-	if err != nil {
-		return map[string]string{}
-	}
-
-	result := make(map[string]string, len(threadIDs))
-	for _, threadID := range threadIDs {
-		content := p.Get(threadID)
-		if content != "" {
-			result[threadID] = content
-		}
-	}
-
-	return result
 }
 
 // Update is a no-op for query-time projections since we read directly from the event store.
