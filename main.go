@@ -9,6 +9,9 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"syscall"
+	"time"
+
 	"school-with-ai/components"
 	"school-with-ai/components/checkout"
 	"school-with-ai/components/pricing"
@@ -19,9 +22,12 @@ import (
 	"school-with-ai/infra/auth"
 	"school-with-ai/infra/eventstore/kurrentdb"
 	"school-with-ai/infra/projection/agui"
-	"school-with-ai/infra/projection/querytime"
+	"school-with-ai/infra/projection/llmcontext"
+	"school-with-ai/infra/projection/subscriber"
 	"school-with-ai/infra/projection/whiteboard"
 	"school-with-ai/infra/projections"
+	"school-with-ai/infra/sqldb"
+	"school-with-ai/infra/sqldb/migrate"
 	"school-with-ai/services/agentorchestrator"
 	"school-with-ai/services/agentorchestrator/agents/advancedmath/linearalgebra"
 	"school-with-ai/services/agentorchestrator/agents/chemistry"
@@ -32,8 +38,6 @@ import (
 	"school-with-ai/services/agentorchestrator/agents/statistics"
 	"school-with-ai/services/agentorchestrator/agents/studentfacing"
 	"school-with-ai/services/taskmanagement"
-	"syscall"
-	"time"
 
 	aguihandlers "school-with-ai/handlers/agui"
 	healthhandlers "school-with-ai/handlers/health"
@@ -97,6 +101,15 @@ func run(ctx context.Context, log *logger.Logger) error {
 		}
 		KurrentDB struct {
 			ConnectionString string `conf:"default:esdb://localhost:2113?tls=false"`
+		}
+		DB struct {
+			User         string `conf:"default:schoolai"`
+			Password     string `conf:"default:dev-password,mask"`
+			Host         string `conf:"default:localhost:5435"`
+			Name         string `conf:"default:projections"`
+			MaxIdleConns int    `conf:"default:2"`
+			MaxOpenConns int    `conf:"default:0"`
+			DisableTLS   bool   `conf:"default:true"`
 		}
 		Redis struct {
 			Addr string `conf:"default:localhost:6379"`
@@ -188,19 +201,68 @@ func run(ctx context.Context, log *logger.Logger) error {
 		}
 	}()
 
-	// Initialize query-time AGUI projection (reads directly from event store on each query)
-	aguiProjection := agui.NewQueryTimeAguiProjection(baseEventStore)
+	// -------------------------------------------------------------------------
+	// Database Support for Projections
 
-	// Initialize query-time Whiteboard projection (reads directly from event store on each query)
-	whiteboardProjection := whiteboard.NewQueryTimeWhiteboardProjection(baseEventStore)
+	log.Info(ctx, "startup", "status", "initializing database support for projections", "host", cfg.DB.Host)
+
+	db, err := sqldb.Open(sqldb.Config{
+		User:         cfg.DB.User,
+		Password:     cfg.DB.Password,
+		Host:         cfg.DB.Host,
+		Name:         cfg.DB.Name,
+		MaxIdleConns: cfg.DB.MaxIdleConns,
+		MaxOpenConns: cfg.DB.MaxOpenConns,
+		DisableTLS:   cfg.DB.DisableTLS,
+	})
+	if err != nil {
+		return fmt.Errorf("connecting to db: %w", err)
+	}
+	defer db.Close()
+
+	// Run migrations
+	log.Info(ctx, "startup", "status", "running database migrations")
+	if err := migrate.Migrate(ctx, db); err != nil {
+		return fmt.Errorf("migrating database: %w", err)
+	}
+
+	// -------------------------------------------------------------------------
+	// Initialize Projections
+
+	// Initialize PostgreSQL AGUI projection (materialized views for fast reads and writes)
+	aguiProjection := agui.NewPostgresAguiProjection(log, db)
+
+	// Initialize PostgreSQL Whiteboard projection (materialized views for fast reads)
+	whiteboardProjection := whiteboard.NewPostgresWhiteboardProjection(log, db)
 
 	// All projections are now query-time, so we use the base event store directly
 	// No need for ProjectionEventStore wrapper anymore
 	eventLog := baseEventStore
 
-	// Initialize query-time LLM context projection (reads directly from event store)
-	// Uses AGUI projection to get list of all threads for the All() method
-	llmContextProjection := querytime.NewQueryTimeLLMContextProjection(baseEventStore, aguiProjection)
+	// Initialize PostgreSQL LLM context projection (materialized views for fast reads)
+	llmContextProjection := llmcontext.NewPostgresLLMContextProjection(log, db)
+
+	// -------------------------------------------------------------------------
+	// Start Projection Updater (subscribes to events and updates PostgreSQL)
+
+	log.Info(ctx, "startup", "status", "starting projection updater")
+
+	// Create projection updater with all projections
+	projectionUpdater := subscriber.NewProjectionUpdater(
+		log,
+		baseEventStore.Client(), // baseEventStore is already *KurrentDBEventStore
+		db,
+		aguiProjection,
+		whiteboardProjection,
+		llmContextProjection,
+	)
+
+	// Start projection updater in background
+	go func() {
+		if err := projectionUpdater.Start(ctx); err != nil {
+			log.Error(ctx, "projection updater stopped", "ERROR", err)
+		}
+	}()
 
 	// Initialize OpenAI chat client with model
 	log.Info(ctx, "startup", "status", "initializing AI client", "model", cfg.AI.Model)

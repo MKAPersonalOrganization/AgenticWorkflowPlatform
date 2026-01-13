@@ -88,6 +88,26 @@ services:
       kratos-migrate:
         condition: service_completed_successfully
 
+  # PostgreSQL for Application Projections (AGUI, Whiteboard, LLM Context)
+  app-postgres:
+    image: postgres:16-alpine
+    container_name: app-postgres
+    environment:
+      - POSTGRES_USER=schoolai
+      - POSTGRES_PASSWORD=dev-password
+      - POSTGRES_DB=projections
+    ports:
+      - "5435:5432"
+    volumes:
+      - app-postgres-data:/var/lib/postgresql/data
+    networks:
+      - intranet
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U schoolai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # KurrentDB - Event Store (PostgreSQL-backed)
   kurrentdb:
     image: docker.kurrent.io/eventstore/eventstoredb-ee:lts
@@ -321,3 +341,4 @@ volumes:
   langfuse-clickhouse-data:
   langfuse-clickhouse-logs:
   langfuse-minio-data:
+  app-postgres-data:

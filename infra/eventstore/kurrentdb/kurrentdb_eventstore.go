@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"strings"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
-	"strings"
 
 	"github.com/kurrent-io/KurrentDB-Client-Go/kurrentdb"
 )
@@ -49,6 +50,11 @@ func NewKurrentDBEventStore(connectionString string) (*KurrentDBEventStore, erro
 	go store.enableSystemProjections()
 
 	return store, nil
+}
+
+// Client returns the underlying KurrentDB client for subscriptions.
+func (s *KurrentDBEventStore) Client() *kurrentdb.Client {
+	return s.client
 }
 
 // enableSystemProjections enables required system projections
