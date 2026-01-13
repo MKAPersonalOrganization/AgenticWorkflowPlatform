@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/sdk/agentsdk/core"
 	"school-with-ai/services/chatwrite"
-	"time"
 
 	"github.com/hibiken/asynq"
 )
@@ -20,8 +21,8 @@ var (
 	ErrTaskNotFound = errors.New("failed to cancel task: task not found or already completed")
 )
 
-// AsynqServer wraps Asynq server and client for chat task processing.
-type AsynqServer struct {
+// TaskManagementService wraps Asynq server and client for chat task processing.
+type TaskManagementService struct {
 	log                *logger.Logger
 	server             *asynq.Server
 	client             *asynq.Client
@@ -39,8 +40,8 @@ type AsynqConfig struct {
 	RetryDelayFunc      asynq.RetryDelayFunc
 }
 
-// NewAsynqServer creates a new Asynq-based task processing server.
-func NewAsynqServer(
+// NewTaskManagementService creates a new Asynq-based task processing server.
+func NewTaskManagementService(
 	log *logger.Logger,
 	config AsynqConfig,
 	eventLog core.EventStore,
@@ -50,7 +51,7 @@ func NewAsynqServer(
 	chatWriteService *chatwrite.ChatWriteService,
 	langfuseTracer *LangfuseTracer,
 	observabilityConfig ObservabilityConfig,
-) *AsynqServer {
+) *TaskManagementService {
 	// Default Redis options if not provided
 	if config.RedisOptions.Addr == "" && config.RedisAddr == "" {
 		config.RedisAddr = "localhost:6379"
@@ -153,7 +154,7 @@ func NewAsynqServer(
 		}
 	}()
 
-	return &AsynqServer{
+	return &TaskManagementService{
 		log:                log,
 		server:             srv,
 		client:             client,
@@ -163,7 +164,7 @@ func NewAsynqServer(
 }
 
 // EnqueueJob enqueues a chat processing job and returns task info.
-func (s *AsynqServer) EnqueueJob(payload ProcessChatPayload) (*asynq.TaskInfo, error) {
+func (s *TaskManagementService) EnqueueJob(payload ProcessChatPayload) (*asynq.TaskInfo, error) {
 	task, err := NewProcessChatTask(payload)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create task: %w", err)
@@ -180,17 +181,17 @@ func (s *AsynqServer) EnqueueJob(payload ProcessChatPayload) (*asynq.TaskInfo, e
 }
 
 // GetEventBuffer gets the event buffer for a job (for SSE streaming).
-func (s *AsynqServer) GetEventBuffer(jobID string) (*EventBuffer, bool) {
+func (s *TaskManagementService) GetEventBuffer(jobID string) (*EventBuffer, bool) {
 	return s.eventBufferManager.GetEventBuffer(jobID)
 }
 
 // RemoveEventBuffer removes an event buffer after SSE streaming completes.
-func (s *AsynqServer) RemoveEventBuffer(jobID string) {
+func (s *TaskManagementService) RemoveEventBuffer(jobID string) {
 	s.eventBufferManager.RemoveEventBuffer(jobID)
 }
 
 // GetTaskInfo retrieves task information from Asynq.
-func (s *AsynqServer) GetTaskInfo(queue, taskID string) (*asynq.TaskInfo, error) {
+func (s *TaskManagementService) GetTaskInfo(queue, taskID string) (*asynq.TaskInfo, error) {
 	inspector := asynq.NewInspector(asynq.RedisClientOpt{Addr: s.redisAddr})
 	defer func() {
 		err := inspector.Close()
@@ -209,7 +210,7 @@ func (s *AsynqServer) GetTaskInfo(queue, taskID string) (*asynq.TaskInfo, error)
 }
 
 // CancelTask attempts to cancel a task by job ID.
-func (s *AsynqServer) CancelTask(jobID string) error {
+func (s *TaskManagementService) CancelTask(jobID string) error {
 	inspector := asynq.NewInspector(asynq.RedisClientOpt{Addr: s.redisAddr})
 	defer func() {
 		err := inspector.Close()
@@ -243,7 +244,7 @@ func (s *AsynqServer) CancelTask(jobID string) error {
 }
 
 // Shutdown gracefully shuts down the Asynq server.
-func (s *AsynqServer) Shutdown() {
+func (s *TaskManagementService) Shutdown() {
 	s.log.Info(context.Background(), "Shutting down Asynq server")
 	s.server.Shutdown()
 	err := s.client.Close()

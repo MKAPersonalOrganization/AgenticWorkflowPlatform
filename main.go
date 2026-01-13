@@ -9,6 +9,9 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"syscall"
+	"time"
+
 	"school-with-ai/components"
 	"school-with-ai/components/checkout"
 	"school-with-ai/components/pricing"
@@ -33,8 +36,6 @@ import (
 	"school-with-ai/services/chatwrite/agents/statistics"
 	"school-with-ai/services/chatwrite/agents/studentfacing"
 	"school-with-ai/services/orchestration"
-	"syscall"
-	"time"
 
 	authService "school-with-ai/services/auth"
 
@@ -249,7 +250,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		observabilityConfig.Release = build
 	}
 
-	asynqServer := orchestration.NewAsynqServer(
+	taskMgmtService := orchestration.NewTaskManagementService(
 		log,
 		orchestration.AsynqConfig{
 			RedisAddr:           cfg.Redis.Addr,
@@ -265,15 +266,15 @@ func run(ctx context.Context, log *logger.Logger) error {
 		langfuseTracer,
 		observabilityConfig,
 	)
-	defer asynqServer.Shutdown()
-	log.Info(ctx, "startup", "status", "asynq server started",
+	defer taskMgmtService.Shutdown()
+	log.Info(ctx, "startup", "status", "task management service started",
 		"redis", cfg.Redis.Addr,
 		"concurrency", cfg.Orchestration.Concurrency,
 		"shutdownTimeout", cfg.Orchestration.ShutdownTimeout,
 		"healthCheckInterval", cfg.Orchestration.HealthCheckInterval)
 
 	// Create HTTP handler
-	handler := handlers.NewAsynqHandler(log, chatClient, asynqServer, chatWriteService, authSvc, uiProjectionService)
+	handler := handlers.NewTaskManagementHandler(log, chatClient, taskMgmtService, chatWriteService, authSvc, uiProjectionService)
 
 	// Create health handler
 	healthHandler := handlers.NewHealthHandler(log)
