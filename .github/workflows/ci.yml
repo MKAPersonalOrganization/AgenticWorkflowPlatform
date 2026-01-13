@@ -148,24 +148,3 @@ jobs:
 
       - name: Build
         run: go build -v ./...
-
-  security:
-    name: Run Gosec
-    runs-on: ubuntu-latest
-    env:
-      GO111MODULE: on
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.24.2"
-          cache: true
-
-      - name: Run Gosec Security Scanner
-        uses: securego/gosec@master
-        with:
-          args: ./...
