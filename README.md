@@ -61,9 +61,12 @@ graph TB
 graph TB
     Client[HTTP Clients] --> Router[Chi Router]
     Router --> Auth[Auth Middleware]
-    Auth --> Handlers[Task Management Handlers]
-    Handlers --> TaskMgmt[Task Management Service]
-    Handlers --> UIProjection[UI Projection Service]
+    
+    Auth --> WriteHandlers[Task Management Handlers<br/>Write Operations]
+    Auth --> ReadHandlers[AGUI Projection Handlers<br/>Read Operations]
+    
+    WriteHandlers --> TaskMgmt[Task Management Service]
+    ReadHandlers --> UIProjection[UI Projection Service]
     
     TaskMgmt --> Redis[(Redis)]
     TaskMgmt --> Service[Orchestration Service]
@@ -86,8 +89,12 @@ graph TB
 
 - **Chi Router**: HTTP routing with middleware (panic recovery, logging, metrics)
 - **Auth Middleware**: Ory Kratos session validation
-- **Task Management Handlers**: REST API endpoints and SSE streaming
+- **Task Management Handlers**: Write operations (commands) - POST/DELETE endpoints
+  - Send messages, cancel tasks, delete threads
+- **AGUI Projection Handlers**: Read operations (queries) - GET endpoints
+  - List threads, get messages, get thread state
 - **Task Management Service**: Background task processor with configurable concurrency (Asynq-based)
+- **UI Projection Service**: Business logic for read-side projections
 - **Orchestration Service**: Coordinates multi-agent execution and handoffs
 - **ChatWrite Service**: Processes user messages and manages agent interactions
 - **Query-Time Projections**: Rebuild state from events on each read
