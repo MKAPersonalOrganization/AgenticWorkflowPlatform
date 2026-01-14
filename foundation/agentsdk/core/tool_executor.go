@@ -10,10 +10,25 @@ import (
 // ErrToolNotFound is returned when a tool is not registered.
 var ErrToolNotFound = errors.New("tool not found")
 
+// ToolExecutionResult contains the result of tool execution.
+// This struct exposes Command metadata to allow the engine to detect
+// routing commands without checking tool names.
+type ToolExecutionResult struct {
+	// Result is the string representation for adding to thread
+	Result string
+
+	// Command is the routing command if tool returned one (nil otherwise)
+	Command *Command
+
+	// StopIteration indicates the engine should stop iterating
+	// Extracted from Command.StopIteration for convenience
+	StopIteration bool
+}
+
 // ToolExecutor executes tool calls and returns results.
 type ToolExecutor interface {
-	// Execute runs a tool call and returns the result
-	Execute(toolCall ToolCall) (string, error)
+	// Execute runs a tool call and returns the result with Command metadata
+	Execute(toolCall ToolCall) (ToolExecutionResult, error)
 }
 
 // ToolTracer defines the interface for tracking tool executions (e.g., Langfuse).
@@ -55,23 +70,39 @@ func NewRegistryToolExecutor(ctx context.Context, registry *ToolRegistry, opts .
 }
 
 // Execute runs a tool call using the registry.
-func (e *RegistryToolExecutor) Execute(toolCall ToolCall) (string, error) {
+func (e *RegistryToolExecutor) Execute(toolCall ToolCall) (ToolExecutionResult, error) {
 	startTime := time.Now()
 
 	tool, ok := e.registry.Get(toolCall.Function.Name)
 	if !ok {
-		return "", fmt.Errorf("%w: %s", ErrToolNotFound, toolCall.Function.Name)
+		return ToolExecutionResult{}, fmt.Errorf("%w: %s", ErrToolNotFound, toolCall.Function.Name)
 	}
 
 	result, err := tool.Invoke(e.ctx, toolCall.Function.Arguments)
 	endTime := time.Now()
+
+	// Build execution result with Command detection
+	var execResult ToolExecutionResult
+
+	if result != nil {
+		// Check if result is a Command
+		if cmd, isCmd := IsCommand(result); isCmd {
+			execResult.Command = cmd
+			execResult.StopIteration = cmd.StopIteration
+			execResult.Result = fmt.Sprintf("Successfully transferred to %s", cmd.Goto)
+		} else if str, ok := result.(string); ok {
+			execResult.Result = str
+		} else {
+			execResult.Result = fmt.Sprintf("%v", result)
+		}
+	}
 
 	// Track tool execution if tracer is available
 	if e.tracer != nil {
 		// Extract trace context from ctx if available
 		traceID, parentObservationID := extractTraceContext(e.ctx)
 		if traceID != "" {
-			trackErr := e.tracer.TrackToolCall(e.ctx, traceID, parentObservationID, toolCall.Function.Name, toolCall.Function.Arguments, result, startTime, endTime, err)
+			trackErr := e.tracer.TrackToolCall(e.ctx, traceID, parentObservationID, toolCall.Function.Name, toolCall.Function.Arguments, execResult.Result, startTime, endTime, err)
 			if trackErr != nil {
 				// Log tracking error but don't fail the tool execution
 				// Note: In production, you'd want proper logging here
@@ -81,10 +112,10 @@ func (e *RegistryToolExecutor) Execute(toolCall ToolCall) (string, error) {
 	}
 
 	if err != nil {
-		return result, fmt.Errorf("failed to invoke tool %s: %w", toolCall.Function.Name, err)
+		return execResult, fmt.Errorf("failed to execute tool call %s: %w", toolCall.Function.Name, err)
 	}
 
-	return result, nil
+	return execResult, nil
 }
 
 // Context keys for trace information

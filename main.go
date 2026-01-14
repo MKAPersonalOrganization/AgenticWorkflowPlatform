@@ -290,7 +290,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	shared.GlobalAgents.Register("diagramming-instructor", diagramming.CreateDiagrammingInstructor)
 
 	// Initialize chat write service
-	orchestratorService := agentorchestrator.New(log, chatClient, eventLog, llmContextProjection)
+	orchestratorService := agentorchestrator.New(log, chatClient, eventLog)
 
 	// Initialize service layer
 	authSvc := authService.NewAuthService()
@@ -313,7 +313,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	}
 
 	// Initialize agent factory
-	agentFactory := agentorchestrator.NewFactory(log, chatClient, eventLog, llmContextProjection)
+	agentFactory := agentorchestrator.NewFactory(log, chatClient, eventLog)
 
 	taskMgmtService := taskmanagement.NewTaskManagementService(
 		log,

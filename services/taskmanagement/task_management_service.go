@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services"
-	"school-with-ai/services/agentorchestrator/types"
 	"time"
 
 	"github.com/hibiken/asynq"
@@ -44,8 +44,8 @@ func NewTaskManagementService(
 	log *logger.Logger,
 	config AsynqConfig,
 	eventLog core.EventStore,
-	state types.ThreadStore,
-	chatClient types.ChatClient,
+	state domain.ThreadStore,
+	chatClient ChatClient,
 	orchestratorService services.AgentOrchestrator, // decouple from concrete implementation
 	agentFactory services.AgentFactory,
 	langfuseTracer *LangfuseTracer,

@@ -12,26 +12,20 @@ import (
 )
 
 // Use central types
-type (
-	ChatClient                = types.ChatClient
-	ThreadStore               = types.ThreadStore
-	ShouldContinueIterationFn = types.ShouldContinueIterationFn
-)
+type ChatClient = types.ChatClient
 
 // Service handles processing of user messages using pure event sourcing.
 // It acts as an orchestrator, delegating specific responsibilities to internal components.
 type Service struct {
-	log                     *logger.Logger
-	config                  core.AgentConfig
-	chatClient              ChatClient
-	writeModel              core.EventStore
-	readModel               ThreadStore
-	threadRepo              *domain.ThreadRepository
-	toolRegistry            *core.ToolRegistry
-	shouldContinueIteration ShouldContinueIterationFn
-	reqCtxCapture           **core.RequestContext
-	ragService              rag.RAG
-	toolTracer              core.ToolTracer
+	log           *logger.Logger
+	config        core.AgentConfig
+	chatClient    ChatClient
+	writeModel    core.EventStore
+	threadRepo    *domain.ThreadRepository
+	toolRegistry  *core.ToolRegistry
+	reqCtxCapture **core.RequestContext
+	ragService    rag.RAG
+	toolTracer    core.ToolTracer
 
 	// Internal components
 	threadMgmt *threadmgmt.Manager
@@ -45,13 +39,6 @@ type Option func(*Service)
 func WithConfig(config core.AgentConfig) Option {
 	return func(s *Service) {
 		s.config = config
-	}
-}
-
-// WithShouldContinueIteration configures the agent with a function to determine if iteration should continue.
-func WithShouldContinueIteration(fn ShouldContinueIterationFn) Option {
-	return func(s *Service) {
-		s.shouldContinueIteration = fn
 	}
 }
 
@@ -77,12 +64,11 @@ func WithToolTracer(tracer core.ToolTracer) Option {
 }
 
 // New creates a new agent orchestrator service.
-func New(log *logger.Logger, chatClient ChatClient, writeModel core.EventStore, readModel ThreadStore, opts ...Option) *Service {
+func New(log *logger.Logger, chatClient ChatClient, writeModel core.EventStore, opts ...Option) *Service {
 	s := &Service{
 		log:          log,
 		chatClient:   chatClient,
 		writeModel:   writeModel,
-		readModel:    readModel,
 		threadRepo:   domain.NewThreadRepository(NewEventStoreAdapter(writeModel)),
 		config:       core.DefaultConfig("agent"),
 		toolRegistry: core.NewToolRegistry(),
@@ -105,9 +91,7 @@ func New(log *logger.Logger, chatClient ChatClient, writeModel core.EventStore, 
 		chatClient,
 		s.threadMgmt,
 		s.config.Notifier,
-		readModel,
 		s.config,
-		s.shouldContinueIteration,
 		s.reqCtxCapture,
 		s.toolTracer,
 	)

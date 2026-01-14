@@ -278,7 +278,7 @@ func (t *WriteWhiteboardTool) Parameters() map[string]any {
 	}
 }
 
-func (t *WriteWhiteboardTool) Invoke(ctx context.Context, arguments string) (string, error) {
+func (t *WriteWhiteboardTool) Invoke(ctx context.Context, arguments string) (any, error) {
 	var args struct {
 		Content string           `json:"content"`
 		Action  WhiteboardAction `json:"action"`

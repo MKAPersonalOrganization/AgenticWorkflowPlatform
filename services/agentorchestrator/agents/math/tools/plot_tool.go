@@ -117,7 +117,7 @@ Remember: The script will be executed as-is, so ensure it's complete and valid g
 	}
 }
 
-func (p *PlotTool) Invoke(ctx context.Context, arguments string) (string, error) {
+func (p *PlotTool) Invoke(ctx context.Context, arguments string) (any, error) {
 	var args PlotArgs
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		return "", fmt.Errorf("failed to parse plot args: %w", err)

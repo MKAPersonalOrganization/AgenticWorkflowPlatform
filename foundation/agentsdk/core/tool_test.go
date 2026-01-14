@@ -20,7 +20,7 @@ func TestFunctionTool(t *testing.T) {
 			},
 			[]string{"location"},
 		),
-		func(ctx context.Context, arguments string) (string, error) {
+		func(ctx context.Context, arguments string) (any, error) {
 			var args struct {
 				Location string `json:"location"`
 				Unit     string `json:"unit"`
@@ -61,7 +61,9 @@ func TestFunctionTool(t *testing.T) {
 		Unit        string `json:"unit"`
 		Location    string `json:"location"`
 	}
-	if err := json.Unmarshal([]byte(result), &response); err != nil {
+
+	// Parse result - tool returns string wrapped in any
+	if err := json.Unmarshal([]byte(result.(string)), &response); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}
 
@@ -82,14 +84,14 @@ func TestToolRegistry(t *testing.T) {
 		"get_weather",
 		"Get weather",
 		core.ObjectSchema(map[string]any{"location": core.StringProperty("City")}, []string{"location"}),
-		func(ctx context.Context, args string) (string, error) { return `{"temp": 20}`, nil },
+		func(ctx context.Context, args string) (any, error) { return `{"temp": 20}`, nil },
 	)
 
 	calcTool := core.NewFunctionTool(
 		"calculate",
 		"Calculate expression",
 		core.ObjectSchema(map[string]any{"expression": core.StringProperty("Math expression")}, []string{"expression"}),
-		func(ctx context.Context, args string) (string, error) { return `{"result": 42}`, nil },
+		func(ctx context.Context, args string) (any, error) { return `{"result": 42}`, nil },
 	)
 
 	registry.Register(weatherTool)
@@ -140,7 +142,7 @@ func TestToToolSpec(t *testing.T) {
 			},
 			[]string{"param1"},
 		),
-		func(ctx context.Context, args string) (string, error) { return "{}", nil },
+		func(ctx context.Context, args string) (any, error) { return "{}", nil },
 	)
 
 	spec := core.ToToolSpec(tool)

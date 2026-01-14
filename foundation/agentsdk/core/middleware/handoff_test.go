@@ -232,12 +232,14 @@ func TestTransferToAgentTool_Invoke_Success(t *testing.T) {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	if result == "" {
-		t.Error("Expected non-empty result")
+	// Result should be a Command
+	cmd, isCmd := core.IsCommand(result)
+	if !isCmd {
+		t.Fatal("Expected result to be a Command")
 	}
 
-	if !contains(result, "math") {
-		t.Error("Expected result to mention target agent")
+	if cmd.Goto != "math" {
+		t.Errorf("Expected Command.Goto to be 'math', got %q", cmd.Goto)
 	}
 
 	// Check that handoff was stored in state
@@ -304,8 +306,14 @@ func TestTransferToAgentTool_Invoke_MissingQuestion(t *testing.T) {
 		t.Errorf("Expected no error for missing question (it's optional), got %v", err)
 	}
 
-	if !contains(result, "Successfully") {
-		t.Errorf("Expected Successfully result, got %s", result)
+	// Result should be a Command
+	cmd, isCmd := core.IsCommand(result)
+	if !isCmd {
+		t.Fatal("Expected result to be a Command")
+	}
+
+	if cmd.Goto != "math" {
+		t.Errorf("Expected Command.Goto to be 'math', got %q", cmd.Goto)
 	}
 
 	// Verify handoff was stored
@@ -374,8 +382,10 @@ func TestTransferToAgentTool_Invoke_WithoutContext(t *testing.T) {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	if result == "" {
-		t.Error("Expected non-empty result")
+	// Result should be a Command
+	_, isCmd := core.IsCommand(result)
+	if !isCmd {
+		t.Fatal("Expected result to be a Command")
 	}
 
 	// Check that handoff was stored with empty context

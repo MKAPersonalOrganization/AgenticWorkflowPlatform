@@ -21,7 +21,7 @@ func (t *BesselFunctionsTool) Parameters() map[string]any {
 	return map[string]any{"type": "object", "properties": map[string]any{}}
 }
 
-func (t *BesselFunctionsTool) Invoke(ctx context.Context, arguments string) (string, error) {
+func (t *BesselFunctionsTool) Invoke(ctx context.Context, arguments string) (any, error) {
 	return `{"result": "Implementation pending"}`, nil
 }
 
@@ -44,7 +44,7 @@ func (t *OrthogonalPolynomialsTool) Parameters() map[string]any {
 	return map[string]any{"type": "object", "properties": map[string]any{}}
 }
 
-func (t *OrthogonalPolynomialsTool) Invoke(ctx context.Context, arguments string) (string, error) {
+func (t *OrthogonalPolynomialsTool) Invoke(ctx context.Context, arguments string) (any, error) {
 	return `{"result": "Implementation pending"}`, nil
 }
 
@@ -67,7 +67,7 @@ func (t *EllipticIntegralsTool) Parameters() map[string]any {
 	return map[string]any{"type": "object", "properties": map[string]any{}}
 }
 
-func (t *EllipticIntegralsTool) Invoke(ctx context.Context, arguments string) (string, error) {
+func (t *EllipticIntegralsTool) Invoke(ctx context.Context, arguments string) (any, error) {
 	return `{"result": "Implementation pending"}`, nil
 }
 
@@ -90,7 +90,7 @@ func (t *InterpolationTool) Parameters() map[string]any {
 	return map[string]any{"type": "object", "properties": map[string]any{}}
 }
 
-func (t *InterpolationTool) Invoke(ctx context.Context, arguments string) (string, error) {
+func (t *InterpolationTool) Invoke(ctx context.Context, arguments string) (any, error) {
 	return `{"result": "Implementation pending"}`, nil
 }
 
@@ -113,6 +113,6 @@ func (t *FFTTool) Parameters() map[string]any {
 	return map[string]any{"type": "object", "properties": map[string]any{}}
 }
 
-func (t *FFTTool) Invoke(ctx context.Context, arguments string) (string, error) {
+func (t *FFTTool) Invoke(ctx context.Context, arguments string) (any, error) {
 	return `{"result": "Implementation pending"}`, nil
 }

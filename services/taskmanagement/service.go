@@ -10,7 +10,6 @@ import (
 	"school-with-ai/foundation/observability/langfuse"
 	"school-with-ai/services"
 	"school-with-ai/services/agentorchestrator/agents/shared"
-	"school-with-ai/services/agentorchestrator/types"
 	"time"
 )
 
@@ -30,9 +29,9 @@ type Service struct {
 	log                 *logger.Logger
 	orchestratorService services.AgentOrchestrator
 	agentFactory        services.AgentFactory
-	threadStore         types.ThreadStore
+	threadStore         domain.ThreadStore
 	eventLog            core.EventStore
-	chatClient          types.ChatClient
+	chatClient          ChatClient
 	langfuseTracer      *LangfuseTracer
 	observabilityConfig ObservabilityConfig
 	titleGenerator      *TitleGenerator
@@ -43,9 +42,9 @@ func NewService(
 	log *logger.Logger,
 	orchestratorService services.AgentOrchestrator,
 	agentFactory services.AgentFactory,
-	threadStore types.ThreadStore,
+	threadStore domain.ThreadStore,
 	eventLog core.EventStore,
-	chatClient types.ChatClient,
+	chatClient ChatClient,
 	langfuseTracer *LangfuseTracer,
 	observabilityConfig ObservabilityConfig,
 	titleGenerator *TitleGenerator,

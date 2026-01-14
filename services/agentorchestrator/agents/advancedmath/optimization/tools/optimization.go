@@ -21,7 +21,7 @@ func (t *UnconstrainedOptimizationTool) Parameters() map[string]any {
 	return map[string]any{"type": "object", "properties": map[string]any{}}
 }
 
-func (t *UnconstrainedOptimizationTool) Invoke(ctx context.Context, arguments string) (string, error) {
+func (t *UnconstrainedOptimizationTool) Invoke(ctx context.Context, arguments string) (any, error) {
 	return `{"result": "Implementation pending"}`, nil
 }
 
@@ -44,6 +44,6 @@ func (t *ConstrainedOptimizationTool) Parameters() map[string]any {
 	return map[string]any{"type": "object", "properties": map[string]any{}}
 }
 
-func (t *ConstrainedOptimizationTool) Invoke(ctx context.Context, arguments string) (string, error) {
+func (t *ConstrainedOptimizationTool) Invoke(ctx context.Context, arguments string) (any, error) {
 	return `{"result": "Implementation pending"}`, nil
 }

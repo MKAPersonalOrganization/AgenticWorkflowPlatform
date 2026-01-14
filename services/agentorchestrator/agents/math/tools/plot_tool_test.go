@@ -35,7 +35,7 @@ plot sin(x) with lines linewidth 2 title 'y = sin(x)'`
 	}
 
 	var response map[string]any
-	if err := json.Unmarshal([]byte(result), &response); err != nil {
+	if err := json.Unmarshal([]byte(result.(string)), &response); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}
 
@@ -73,7 +73,7 @@ plot sin(x) title 'sin(x)', cos(x) title 'cos(x)', tan(x) title 'tan(x)'`
 	}
 
 	var response map[string]any
-	if err := json.Unmarshal([]byte(result), &response); err != nil {
+	if err := json.Unmarshal([]byte(result.(string)), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
 
@@ -108,7 +108,7 @@ plot x**2 - 4*x + 3 with lines title 'y = x² - 4x + 3', 0 with lines dashtype 2
 	}
 
 	var response map[string]any
-	if err := json.Unmarshal([]byte(result), &response); err != nil {
+	if err := json.Unmarshal([]byte(result.(string)), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
 
@@ -143,7 +143,7 @@ e`
 	}
 
 	var response map[string]any
-	if err := json.Unmarshal([]byte(result), &response); err != nil {
+	if err := json.Unmarshal([]byte(result.(string)), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
 
@@ -172,7 +172,7 @@ splot x**2 + y**2 with lines`
 	}
 
 	var response map[string]any
-	if err := json.Unmarshal([]byte(result), &response); err != nil {
+	if err := json.Unmarshal([]byte(result.(string)), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
 

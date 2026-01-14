@@ -67,7 +67,7 @@ func (m *MermaidDiagramTool) Parameters() map[string]any {
 	}
 }
 
-func (m *MermaidDiagramTool) Invoke(ctx context.Context, arguments string) (string, error) {
+func (m *MermaidDiagramTool) Invoke(ctx context.Context, arguments string) (any, error) {
 	var args MermaidDiagramArgs
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		return "", fmt.Errorf("failed to parse mermaid diagram args: %w", err)

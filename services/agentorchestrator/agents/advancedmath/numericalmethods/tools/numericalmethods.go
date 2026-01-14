@@ -32,7 +32,7 @@ func (t *RootFindingTool) Parameters() map[string]any {
 	}
 }
 
-func (t *RootFindingTool) Invoke(ctx context.Context, arguments string) (string, error) {
+func (t *RootFindingTool) Invoke(ctx context.Context, arguments string) (any, error) {
 	return `{"result": "Implementation pending"}`, nil
 }
 
@@ -55,7 +55,7 @@ func (t *NonlinearSolverTool) Parameters() map[string]any {
 	return map[string]any{"type": "object", "properties": map[string]any{}}
 }
 
-func (t *NonlinearSolverTool) Invoke(ctx context.Context, arguments string) (string, error) {
+func (t *NonlinearSolverTool) Invoke(ctx context.Context, arguments string) (any, error) {
 	return `{"result": "Implementation pending"}`, nil
 }
 
@@ -78,7 +78,7 @@ func (t *NumericalDerivativeTool) Parameters() map[string]any {
 	return map[string]any{"type": "object", "properties": map[string]any{}}
 }
 
-func (t *NumericalDerivativeTool) Invoke(ctx context.Context, arguments string) (string, error) {
+func (t *NumericalDerivativeTool) Invoke(ctx context.Context, arguments string) (any, error) {
 	return `{"result": "Implementation pending"}`, nil
 }
 
@@ -101,6 +101,6 @@ func (t *NumericalIntegrationTool) Parameters() map[string]any {
 	return map[string]any{"type": "object", "properties": map[string]any{}}
 }
 
-func (t *NumericalIntegrationTool) Invoke(ctx context.Context, arguments string) (string, error) {
+func (t *NumericalIntegrationTool) Invoke(ctx context.Context, arguments string) (any, error) {
 	return `{"result": "Implementation pending"}`, nil
 }

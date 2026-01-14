@@ -79,7 +79,7 @@ func (t *VectorOperationsTool) Parameters() map[string]any {
 	}
 }
 
-func (t *VectorOperationsTool) Invoke(ctx context.Context, arguments string) (string, error) {
+func (t *VectorOperationsTool) Invoke(ctx context.Context, arguments string) (any, error) {
 	var args struct {
 		Operation string    `json:"operation"`
 		Vector1   []float64 `json:"vector1"`

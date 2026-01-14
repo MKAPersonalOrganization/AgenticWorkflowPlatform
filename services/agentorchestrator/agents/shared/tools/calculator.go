@@ -70,7 +70,7 @@ func (c *CalculatorTool) Parameters() map[string]any {
 	}
 }
 
-func (c *CalculatorTool) Invoke(ctx context.Context, arguments string) (string, error) {
+func (c *CalculatorTool) Invoke(ctx context.Context, arguments string) (any, error) {
 	return ExecuteCalculatorTool(arguments)
 }
 

@@ -27,7 +27,7 @@ func TestMatrixOperationsTool_Multiply(t *testing.T) {
 	}
 
 	var response map[string]any
-	if err := json.Unmarshal([]byte(result), &response); err != nil {
+	if err := json.Unmarshal([]byte(result.(string)), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
 
@@ -60,7 +60,7 @@ func TestMatrixOperationsTool_Transpose(t *testing.T) {
 	}
 
 	var response map[string]any
-	if err := json.Unmarshal([]byte(result), &response); err != nil {
+	if err := json.Unmarshal([]byte(result.(string)), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
 
@@ -113,7 +113,7 @@ func TestMatrixOperationsTool_Determinant(t *testing.T) {
 			}
 
 			var response map[string]any
-			if err := json.Unmarshal([]byte(result), &response); err != nil {
+			if err := json.Unmarshal([]byte(result.(string)), &response); err != nil {
 				t.Fatalf("failed to unmarshal response: %v", err)
 			}
 
@@ -141,7 +141,7 @@ func TestMatrixOperationsTool_Inverse(t *testing.T) {
 	}
 
 	var response map[string]any
-	if err := json.Unmarshal([]byte(result), &response); err != nil {
+	if err := json.Unmarshal([]byte(result.(string)), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
 

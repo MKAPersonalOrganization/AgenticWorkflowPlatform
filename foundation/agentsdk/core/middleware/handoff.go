@@ -120,7 +120,7 @@ func (t *TransferToAgentTool) Parameters() map[string]any {
 	}
 }
 
-func (t *TransferToAgentTool) Invoke(ctx context.Context, arguments string) (string, error) {
+func (t *TransferToAgentTool) Invoke(ctx context.Context, arguments string) (any, error) {
 	var args struct {
 		AgentName string `json:"agent_name"`
 		Question  string `json:"question"`
@@ -153,7 +153,7 @@ func (t *TransferToAgentTool) Invoke(ctx context.Context, arguments string) (str
 		return "", fmt.Errorf("%w: %s. Available agents: %v", ErrUnknownAgent, args.AgentName, agentNames)
 	}
 
-	// Store handoff in request context state
+	// Store handoff in request context state for task management to detect
 	handoff := Handoff{
 		TargetAgent: args.AgentName,
 		Question:    args.Question,
@@ -162,7 +162,15 @@ func (t *TransferToAgentTool) Invoke(ctx context.Context, arguments string) (str
 
 	SetHandoff(t.reqCtx, handoff)
 
-	return "Successfully transferred to " + args.AgentName, nil
+	// Return Command following LangGraph pattern
+	// This signals the engine to stop iteration
+	return &core.Command{
+		Goto:          args.AgentName,
+		StopIteration: true,
+		Update: map[string]any{
+			"handoff": handoff,
+		},
+	}, nil
 }
 
 // HandoffMiddleware provides agent handoff/transfer capabilities.
