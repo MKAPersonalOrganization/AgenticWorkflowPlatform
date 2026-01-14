@@ -50,9 +50,3 @@ func (r ToolResult) HasCommand() bool {
 func (r ToolResult) StopIteration() bool {
 	return r.Command != nil && r.Command.StopIteration
 }
-
-// IsCommand checks if a tool result is a Command (deprecated - use ToolResult instead)
-func IsCommand(result any) (*Command, bool) {
-	cmd, ok := result.(*Command)
-	return cmd, ok
-}
