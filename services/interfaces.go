@@ -27,7 +27,7 @@ type ProjectionService interface {
 // AgentOrchestrator defines the interface for running agent-based workflows.
 type AgentOrchestrator interface {
 	// RunIteration processes the LLM response using an AgentThread
-	RunIteration(ctx context.Context, threadID, messageID string, thread core.AgentThread, runOpts core.RunOptions) error
+	RunIteration(ctx context.Context, iterCtx core.IterationContext) error
 	// AddUserMessage adds a user message to a thread using event sourcing
 	AddUserMessage(ctx context.Context, threadID, messageID, content string) (core.AgentThread, error)
 	// CreateThread creates a new chat thread using event sourcing
