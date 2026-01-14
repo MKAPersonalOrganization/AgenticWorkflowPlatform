@@ -51,7 +51,7 @@ func (t *EigenvalueTool) Parameters() map[string]any {
 	}
 }
 
-func (t *EigenvalueTool) Invoke(ctx context.Context, arguments string) (string, error) {
+func (t *EigenvalueTool) Invoke(ctx context.Context, arguments string) (any, error) {
 	var args struct {
 		Matrix         [][]float64 `json:"matrix"`
 		ComputeVectors bool        `json:"compute_vectors,omitempty"`

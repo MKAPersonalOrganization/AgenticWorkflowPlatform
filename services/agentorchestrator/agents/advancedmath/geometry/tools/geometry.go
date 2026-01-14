@@ -21,7 +21,7 @@ func (t *GeometricPrimitivesTool) Parameters() map[string]any {
 	return map[string]any{"type": "object", "properties": map[string]any{}}
 }
 
-func (t *GeometricPrimitivesTool) Invoke(ctx context.Context, arguments string) (string, error) {
+func (t *GeometricPrimitivesTool) Invoke(ctx context.Context, arguments string) (any, error) {
 	return `{"result": "Implementation pending"}`, nil
 }
 
@@ -44,7 +44,7 @@ func (t *CurvesTool) Parameters() map[string]any {
 	return map[string]any{"type": "object", "properties": map[string]any{}}
 }
 
-func (t *CurvesTool) Invoke(ctx context.Context, arguments string) (string, error) {
+func (t *CurvesTool) Invoke(ctx context.Context, arguments string) (any, error) {
 	return `{"result": "Implementation pending"}`, nil
 }
 
@@ -67,6 +67,6 @@ func (t *MeshingTool) Parameters() map[string]any {
 	return map[string]any{"type": "object", "properties": map[string]any{}}
 }
 
-func (t *MeshingTool) Invoke(ctx context.Context, arguments string) (string, error) {
+func (t *MeshingTool) Invoke(ctx context.Context, arguments string) (any, error) {
 	return `{"result": "Implementation pending"}`, nil
 }

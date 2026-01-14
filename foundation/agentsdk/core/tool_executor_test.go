@@ -26,18 +26,21 @@ func NewMockToolExecutor() *MockToolExecutor {
 	}
 }
 
-func (m *MockToolExecutor) Execute(toolCall core.ToolCall) (string, error) {
+func (m *MockToolExecutor) Execute(toolCall core.ToolCall) (core.ToolExecutionResult, error) {
 	m.calls = append(m.calls, toolCall)
 
 	if err, ok := m.errors[toolCall.Function.Name]; ok {
-		return "", err
+		return core.ToolExecutionResult{}, err
 	}
 
-	if result, ok := m.results[toolCall.Function.Name]; ok {
-		return result, nil
+	var result string
+	if res, ok := m.results[toolCall.Function.Name]; ok {
+		result = res
+	} else {
+		result = `{"status": "ok"}`
 	}
 
-	return `{"status": "ok"}`, nil
+	return core.ToolExecutionResult{Result: result}, nil
 }
 
 func (m *MockToolExecutor) SetResult(toolName, result string) {
@@ -82,8 +85,8 @@ func TestMockToolExecutor_Execute(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if result != `{"temperature": 72}` {
-		t.Errorf("expected temperature result, got %s", result)
+	if result.Result != `{"temperature": 72}` {
+		t.Errorf("expected temperature result, got %s", result.Result)
 	}
 
 	if executor.CallCount() != 1 {
@@ -134,8 +137,8 @@ func TestMockToolExecutor_DefaultResult(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if result != `{"status": "ok"}` {
-		t.Errorf("expected default result, got %s", result)
+	if result.Result != `{"status": "ok"}` {
+		t.Errorf("expected default result, got %s", result.Result)
 	}
 }
 
@@ -147,7 +150,7 @@ func TestBasicToolExecutor_Calculate(t *testing.T) {
 		"calculate",
 		"Calculate an expression",
 		core.ObjectSchema(map[string]any{"expression": core.StringProperty("Expression")}, []string{"expression"}),
-		func(ctx context.Context, arguments string) (string, error) {
+		func(ctx context.Context, arguments string) (any, error) {
 			return `{"result": "4"}`, nil
 		},
 	))
@@ -168,7 +171,7 @@ func TestBasicToolExecutor_Calculate(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if result == "" {
+	if result.Result == "" {
 		t.Error("expected non-empty result")
 	}
 }
@@ -184,7 +187,7 @@ func TestBasicToolExecutor_WriteWhiteboard(t *testing.T) {
 			"content": core.StringProperty("Content"),
 			"action":  core.StringProperty("Action"),
 		}, []string{"content", "action"}),
-		func(ctx context.Context, arguments string) (string, error) {
+		func(ctx context.Context, arguments string) (any, error) {
 			return `{"status": "success"}`, nil
 		},
 	))
@@ -206,7 +209,7 @@ func TestBasicToolExecutor_WriteWhiteboard(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if result == "" {
+	if result.Result == "" {
 		t.Error("expected non-empty result from instructor tool")
 	}
 }
@@ -224,7 +227,7 @@ func TestRegistryToolExecutor(t *testing.T) {
 			map[string]any{"name": core.StringProperty("The name")},
 			[]string{"name"},
 		),
-		func(ctx context.Context, arguments string) (string, error) {
+		func(ctx context.Context, arguments string) (any, error) {
 			var args struct {
 				Name string `json:"name"`
 			}
@@ -252,8 +255,8 @@ func TestRegistryToolExecutor(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if result != `{"message": "Hello, World!"}` {
-		t.Errorf("unexpected result: %s", result)
+	if result.Result != `{"message": "Hello, World!"}` {
+		t.Errorf("unexpected result: %s", result.Result)
 	}
 }
 

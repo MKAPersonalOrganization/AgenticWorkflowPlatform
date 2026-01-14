@@ -73,3 +73,8 @@ tasks:
       - go test -v ./arch/...
       - go build -o bin/app ./main.go
       - rm -f bin/app
+      - find ./services/agentorchestrator/agents -type d -name "charts" -exec rm -rf {} + 2>/dev/null || true
+      - find ./services/agentorchestrator/agents -type d -name "animations" -exec rm -rf {} + 2>/dev/null || true
+      - find . -name "*.gp" -path "*/assets/*" -delete 2>/dev/null || true
+      - find . -name "*.png" -path "*/assets/charts/*" -delete 2>/dev/null || true
+      - find . -name "*.gif" -path "*/assets/animations/*" -delete 2>/dev/null || true

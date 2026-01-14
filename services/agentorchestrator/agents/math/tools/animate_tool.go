@@ -130,7 +130,7 @@ do for [n=1:10] {
 	}
 }
 
-func (a *AnimateTool) Invoke(ctx context.Context, arguments string) (string, error) {
+func (a *AnimateTool) Invoke(ctx context.Context, arguments string) (any, error) {
 	var args AnimateArgs
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		return "", fmt.Errorf("failed to parse animate args: %w", err)

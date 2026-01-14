@@ -13,23 +13,17 @@ import (
 )
 
 // Use central types
-type (
-	ChatClient                = types.ChatClient
-	ThreadStore               = types.ThreadStore
-	ShouldContinueIterationFn = types.ShouldContinueIterationFn
-)
+type ChatClient = types.ChatClient
 
 // Engine handles the core LLM iteration and streaming logic.
 type Engine struct {
-	log                     *logger.Logger
-	chatClient              ChatClient
-	threadMgmt              *threadmgmt.Manager
-	notifier                core.EventNotifier
-	readModel               ThreadStore
-	config                  core.AgentConfig
-	shouldContinueIteration ShouldContinueIterationFn
-	reqCtxCapture           **core.RequestContext
-	toolTracer              core.ToolTracer
+	log           *logger.Logger
+	chatClient    ChatClient
+	threadMgmt    *threadmgmt.Manager
+	notifier      core.EventNotifier
+	config        core.AgentConfig
+	reqCtxCapture **core.RequestContext
+	toolTracer    core.ToolTracer
 }
 
 // New creates a new execution engine.
@@ -38,22 +32,18 @@ func New(
 	chatClient ChatClient,
 	threadMgmt *threadmgmt.Manager,
 	notifier core.EventNotifier,
-	readModel ThreadStore,
 	config core.AgentConfig,
-	shouldContinueIteration ShouldContinueIterationFn,
 	reqCtxCapture **core.RequestContext,
 	toolTracer core.ToolTracer,
 ) *Engine {
 	return &Engine{
-		log:                     log,
-		chatClient:              chatClient,
-		threadMgmt:              threadMgmt,
-		notifier:                notifier,
-		readModel:               readModel,
-		config:                  config,
-		shouldContinueIteration: shouldContinueIteration,
-		reqCtxCapture:           reqCtxCapture,
-		toolTracer:              toolTracer,
+		log:           log,
+		chatClient:    chatClient,
+		threadMgmt:    threadMgmt,
+		notifier:      notifier,
+		config:        config,
+		reqCtxCapture: reqCtxCapture,
+		toolTracer:    toolTracer,
 	}
 }
 
@@ -242,10 +232,20 @@ func (e *Engine) RunIteration(
 			}
 		}
 
+		// Execute tools and check for Commands
+		shouldContinue := true
 		for _, toolCall := range toolCallsList {
-			result, err := e.executeToolCallWithExecutor(threadID, toolCall, dynamicExecutor)
+			execResult, err := e.executeToolCallWithExecutor(threadID, toolCall, dynamicExecutor)
+			var result string
 			if err != nil {
 				result = fmt.Sprintf(`{"error": "%v"}`, err)
+			} else {
+				result = execResult.Result
+			}
+
+			// Check if this tool wants to stop iteration
+			if execResult.StopIteration {
+				shouldContinue = false
 			}
 
 			toolResultID := core.GenerateID()
@@ -275,7 +275,7 @@ func (e *Engine) RunIteration(
 			}
 		}
 
-		if e.shouldContinueIteration != nil && !e.shouldContinueIteration(domainToolCalls) {
+		if !shouldContinue {
 			return nil
 		}
 
@@ -304,12 +304,12 @@ func (e *Engine) RunIteration(
 	return nil
 }
 
-func (e *Engine) executeToolCallWithExecutor(threadID string, toolCall core.ToolCall, executor core.ToolExecutor) (string, error) {
-	result, err := executor.Execute(toolCall)
+func (e *Engine) executeToolCallWithExecutor(threadID string, toolCall core.ToolCall, executor core.ToolExecutor) (core.ToolExecutionResult, error) {
+	execResult, err := executor.Execute(toolCall)
 	if err != nil {
-		return result, fmt.Errorf("failed to execute tool call %s: %w", toolCall.Function.Name, err)
+		return execResult, fmt.Errorf("failed to execute tool call %s: %w", toolCall.Function.Name, err)
 	}
-	return result, nil
+	return execResult, nil
 }
 
 func convertCoreMsgToLLMMsg(cm core.Message) llm.Message {

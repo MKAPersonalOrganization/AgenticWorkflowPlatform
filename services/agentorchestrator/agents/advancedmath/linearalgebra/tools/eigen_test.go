@@ -27,7 +27,7 @@ func TestEigenvalueTool_Basic(t *testing.T) {
 	}
 
 	var response map[string]any
-	if err := json.Unmarshal([]byte(result), &response); err != nil {
+	if err := json.Unmarshal([]byte(result.(string)), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
 
@@ -86,7 +86,7 @@ func TestEigenvalueTool_Symmetric2x2(t *testing.T) {
 	}
 
 	var response map[string]any
-	if err := json.Unmarshal([]byte(result), &response); err != nil {
+	if err := json.Unmarshal([]byte(result.(string)), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
 
@@ -145,7 +145,7 @@ func TestEigenvalueTool_Identity(t *testing.T) {
 	}
 
 	var response map[string]any
-	if err := json.Unmarshal([]byte(result), &response); err != nil {
+	if err := json.Unmarshal([]byte(result.(string)), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
 

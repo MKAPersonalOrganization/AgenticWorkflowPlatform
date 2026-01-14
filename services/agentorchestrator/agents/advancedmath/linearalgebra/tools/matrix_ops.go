@@ -91,7 +91,7 @@ func (t *MatrixOperationsTool) Parameters() map[string]any {
 	}
 }
 
-func (t *MatrixOperationsTool) Invoke(ctx context.Context, arguments string) (string, error) {
+func (t *MatrixOperationsTool) Invoke(ctx context.Context, arguments string) (any, error) {
 	var args struct {
 		Operation string      `json:"operation"`
 		Matrix    [][]float64 `json:"matrix"`

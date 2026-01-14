@@ -60,7 +60,7 @@ func (t *LinearSolverTool) Parameters() map[string]any {
 	}
 }
 
-func (t *LinearSolverTool) Invoke(ctx context.Context, arguments string) (string, error) {
+func (t *LinearSolverTool) Invoke(ctx context.Context, arguments string) (any, error) {
 	var args struct {
 		A      [][]float64 `json:"A"`
 		B      []float64   `json:"b"`

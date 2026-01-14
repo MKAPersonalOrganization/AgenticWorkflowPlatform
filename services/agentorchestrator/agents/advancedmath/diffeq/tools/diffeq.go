@@ -21,7 +21,7 @@ func (t *ODESolverTool) Parameters() map[string]any {
 	return map[string]any{"type": "object", "properties": map[string]any{}}
 }
 
-func (t *ODESolverTool) Invoke(ctx context.Context, arguments string) (string, error) {
+func (t *ODESolverTool) Invoke(ctx context.Context, arguments string) (any, error) {
 	return `{"result": "Implementation pending"}`, nil
 }
 
@@ -44,6 +44,6 @@ func (t *StiffODESolverTool) Parameters() map[string]any {
 	return map[string]any{"type": "object", "properties": map[string]any{}}
 }
 
-func (t *StiffODESolverTool) Invoke(ctx context.Context, arguments string) (string, error) {
+func (t *StiffODESolverTool) Invoke(ctx context.Context, arguments string) (any, error) {
 	return `{"result": "Implementation pending"}`, nil
 }

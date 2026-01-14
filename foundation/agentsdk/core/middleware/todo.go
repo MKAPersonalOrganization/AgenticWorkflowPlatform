@@ -151,7 +151,7 @@ func (t *WriteTodosTool) Parameters() map[string]any {
 	}
 }
 
-func (t *WriteTodosTool) Invoke(ctx context.Context, arguments string) (string, error) {
+func (t *WriteTodosTool) Invoke(ctx context.Context, arguments string) (any, error) {
 	var args struct {
 		Todos []Todo `json:"todos"`
 	}
