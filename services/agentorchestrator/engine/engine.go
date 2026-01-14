@@ -47,17 +47,6 @@ func New(
 	}
 }
 
-// RunWithThread processes the LLM streaming response using an AgentThread.
-func (e *Engine) RunWithThread(
-	ctx context.Context,
-	threadID string,
-	messageID string,
-	thread core.AgentThread,
-	runOpts core.RunOptions,
-) error {
-	return e.RunIteration(ctx, threadID, messageID, thread, runOpts)
-}
-
 // RunIteration processes a single LLM iteration and recursively continues if tools are called.
 func (e *Engine) RunIteration(
 	ctx context.Context,
