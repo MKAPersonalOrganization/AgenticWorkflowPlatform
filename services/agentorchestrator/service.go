@@ -109,9 +109,9 @@ func (s *Service) DeserializeThread(data []byte) (core.AgentThread, error) {
 	return core.NewInMemoryThreadFromState(data)
 }
 
-// RunWithThread processes the LLM response using an AgentThread.
-func (s *Service) RunWithThread(ctx context.Context, threadID, messageID string, thread core.AgentThread, runOpts core.RunOptions) error {
-	return s.engine.RunWithThread(ctx, threadID, messageID, thread, runOpts)
+// RunIteration processes the LLM response using an AgentThread.
+func (s *Service) RunIteration(ctx context.Context, threadID, messageID string, thread core.AgentThread, runOpts core.RunOptions) error {
+	return s.engine.RunIteration(ctx, threadID, messageID, thread, runOpts)
 }
 
 // CreateThread creates a new chat thread using event sourcing.
