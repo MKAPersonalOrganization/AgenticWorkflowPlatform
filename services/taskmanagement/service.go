@@ -3,8 +3,6 @@ package taskmanagement
 import (
 	"context"
 	"fmt"
-	"time"
-
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/core/middleware"
@@ -13,6 +11,7 @@ import (
 	"school-with-ai/services"
 	"school-with-ai/services/agentorchestrator/agents/shared"
 	"school-with-ai/services/agentorchestrator/types"
+	"time"
 )
 
 // ObservabilityConfig contains configuration for observability and tracing attributes
@@ -239,8 +238,9 @@ func (s *Service) runAgent(ctx context.Context, threadID, agentName string, emit
 		return "", nil, fmt.Errorf("agent %s not found", agentName)
 	}
 
-	// Create agent instance with event notifier
-	notifier := NewUINotifier(emitter)
+	// Create agent instance with domain event notifier
+	// The notifier emits domain events directly without UI conversion
+	notifier := NewDomainEventNotifier(emitter)
 	agentConfig := factory(notifier)
 
 	var handoffReqCtx *core.RequestContext

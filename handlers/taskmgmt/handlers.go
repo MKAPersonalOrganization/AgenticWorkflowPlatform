@@ -5,14 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"time"
-
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/llm"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services"
 	"school-with-ai/services/taskmanagement"
+	"time"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 	"github.com/hibiken/asynq"
@@ -226,11 +225,11 @@ streamEvents:
 			newEvents := eventBuffer.GetEvents(eventIndex)
 
 			for _, event := range newEvents {
-				// Translate and write event
-				err := h.translateAndWriteEvent(w, flusher, event)
-				if err != nil {
+				// Events are already converted from domain to AGUI by the worker layer
+				if err := WriteSSEEvent(w, event); err != nil {
 					return
 				}
+				flusher.Flush()
 				eventIndex++
 			}
 
@@ -242,18 +241,6 @@ streamEvents:
 			}
 		}
 	}
-}
-
-// translateAndWriteEvent translates domain events to AGUI events and writes them.
-func (h *TaskManagementHandler) translateAndWriteEvent(w http.ResponseWriter, flusher http.Flusher, event any) error {
-	// Events are already converted to AGUI events by the AguiEventEmitter before being buffered
-	err := WriteSSEEvent(w, event)
-	if err != nil {
-		return err
-	}
-	flusher.Flush()
-
-	return nil
 }
 
 // GetJobStatus retrieves the status of a task (A2A compliant).
