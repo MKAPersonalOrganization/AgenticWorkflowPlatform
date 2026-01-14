@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"school-with-ai/foundation/agentsdk/core"
 
 	"github.com/cpmech/gosl/la"
 )
@@ -51,7 +52,7 @@ func (t *EigenvalueTool) Parameters() map[string]any {
 	}
 }
 
-func (t *EigenvalueTool) Invoke(ctx context.Context, arguments string) (any, error) {
+func (t *EigenvalueTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
 	var args struct {
 		Matrix         [][]float64 `json:"matrix"`
 		ComputeVectors bool        `json:"compute_vectors,omitempty"`
@@ -59,12 +60,12 @@ func (t *EigenvalueTool) Invoke(ctx context.Context, arguments string) (any, err
 	}
 
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
-		return "", fmt.Errorf("invalid arguments: %w", err)
+		return core.ToolResult{}, fmt.Errorf("invalid arguments: %w", err)
 	}
 
 	n := len(args.Matrix)
 	if n == 0 || len(args.Matrix[0]) != n {
-		return "", ErrEigenSquareMatrix
+		return core.ToolResult{}, ErrEigenSquareMatrix
 	}
 
 	A := la.NewMatrixDeep2(args.Matrix)
@@ -116,8 +117,8 @@ func (t *EigenvalueTool) Invoke(ctx context.Context, arguments string) (any, err
 
 	data, err := json.Marshal(response)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal response: %w", err)
+		return core.ToolResult{}, fmt.Errorf("failed to marshal response: %w", err)
 	}
 
-	return string(data), nil
+	return core.NewToolResult(string(data)), nil
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"school-with-ai/foundation/agentsdk/core"
 
 	"github.com/cpmech/gosl/la"
 )
@@ -60,7 +61,7 @@ func (t *LinearSolverTool) Parameters() map[string]any {
 	}
 }
 
-func (t *LinearSolverTool) Invoke(ctx context.Context, arguments string) (any, error) {
+func (t *LinearSolverTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
 	var args struct {
 		A      [][]float64 `json:"A"`
 		B      []float64   `json:"b"`
@@ -68,7 +69,7 @@ func (t *LinearSolverTool) Invoke(ctx context.Context, arguments string) (any, e
 	}
 
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
-		return "", fmt.Errorf("invalid arguments: %w", err)
+		return core.ToolResult{}, fmt.Errorf("invalid arguments: %w", err)
 	}
 
 	if args.Method == "" {
@@ -78,10 +79,10 @@ func (t *LinearSolverTool) Invoke(ctx context.Context, arguments string) (any, e
 	// Validate dimensions
 	n := len(args.A)
 	if n == 0 || len(args.A[0]) != n {
-		return "", ErrLinearSquareMatrix
+		return core.ToolResult{}, ErrLinearSquareMatrix
 	}
 	if len(args.B) != n {
-		return "", ErrLinearDimensionMismatch
+		return core.ToolResult{}, ErrLinearDimensionMismatch
 	}
 
 	var x []float64
@@ -101,7 +102,7 @@ func (t *LinearSolverTool) Invoke(ctx context.Context, arguments string) (any, e
 		la.SolveRealLinSysSPD(x, A_mat, b_vec)
 
 	default:
-		return "", fmt.Errorf("%w: %s", ErrUnknownMethod, args.Method)
+		return core.ToolResult{}, fmt.Errorf("%w: %s", ErrUnknownMethod, args.Method)
 	}
 
 	response := map[string]any{
@@ -112,8 +113,8 @@ func (t *LinearSolverTool) Invoke(ctx context.Context, arguments string) (any, e
 
 	data, err := json.Marshal(response)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal response: %w", err)
+		return core.ToolResult{}, fmt.Errorf("failed to marshal response: %w", err)
 	}
 
-	return string(data), nil
+	return core.NewToolResult(string(data)), nil
 }

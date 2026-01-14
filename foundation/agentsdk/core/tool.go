@@ -21,8 +21,8 @@ type Tool interface {
 
 	// Invoke executes the tool with the given arguments
 	// The arguments are passed as a JSON string
-	// Returns either a string result or a Command for routing control
-	Invoke(ctx context.Context, arguments string) (any, error)
+	// Returns a ToolResult containing both the display result and optional routing command
+	Invoke(ctx context.Context, arguments string) (ToolResult, error)
 }
 
 // ToolSpec represents the JSON schema specification of a tool
@@ -56,7 +56,7 @@ type FunctionTool struct {
 	name        string
 	description string
 	parameters  map[string]any
-	handler     func(ctx context.Context, arguments string) (any, error)
+	handler     func(ctx context.Context, arguments string) (ToolResult, error)
 }
 
 // NewFunctionTool creates a new function tool.
@@ -64,7 +64,7 @@ func NewFunctionTool(
 	name string,
 	description string,
 	parameters map[string]any,
-	handler func(ctx context.Context, arguments string) (any, error),
+	handler func(ctx context.Context, arguments string) (ToolResult, error),
 ) *FunctionTool {
 	return &FunctionTool{
 		name:        name,
@@ -86,7 +86,7 @@ func (f *FunctionTool) Parameters() map[string]any {
 	return f.parameters
 }
 
-func (f *FunctionTool) Invoke(ctx context.Context, arguments string) (any, error) {
+func (f *FunctionTool) Invoke(ctx context.Context, arguments string) (ToolResult, error) {
 	return f.handler(ctx, arguments)
 }
 

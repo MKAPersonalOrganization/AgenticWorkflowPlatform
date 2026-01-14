@@ -170,7 +170,7 @@ func TestWriteWhiteboardTool(t *testing.T) {
 		result, err := tool.Invoke(context.Background(), string(argsJSON))
 
 		require.NoError(t, err)
-		assert.Contains(t, result, "Whiteboard updated")
+		assert.Contains(t, result.Result, "Whiteboard updated")
 		assert.Equal(t, "New content", GetWhiteboardContent(reqCtx))
 	})
 
@@ -189,7 +189,7 @@ func TestWriteWhiteboardTool(t *testing.T) {
 		result, err := tool.Invoke(context.Background(), string(argsJSON))
 
 		require.NoError(t, err)
-		assert.Contains(t, result, "Whiteboard updated")
+		assert.Contains(t, result.Result, "Whiteboard updated")
 		assert.Equal(t, "First line\nSecond line", GetWhiteboardContent(reqCtx))
 	})
 
@@ -226,7 +226,7 @@ func TestWriteWhiteboardTool(t *testing.T) {
 		result, err := tool.Invoke(context.Background(), string(argsJSON))
 
 		require.NoError(t, err)
-		assert.Contains(t, result, "Whiteboard updated")
+		assert.Contains(t, result.Result, "Whiteboard updated")
 		assert.Empty(t, GetWhiteboardContent(reqCtx))
 	})
 

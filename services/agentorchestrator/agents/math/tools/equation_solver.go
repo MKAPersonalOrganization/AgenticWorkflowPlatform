@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"school-with-ai/foundation/agentsdk/core"
 	"strings"
 )
 
@@ -46,10 +47,10 @@ func (e *EquationSolverTool) Parameters() map[string]any {
 	}
 }
 
-func (e *EquationSolverTool) Invoke(ctx context.Context, arguments string) (any, error) {
+func (e *EquationSolverTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
 	var args EquationSolverArgs
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
-		return "", fmt.Errorf("failed to parse equation solver args: %w", err)
+		return core.ToolResult{}, fmt.Errorf("failed to parse equation solver args: %w", err)
 	}
 
 	if args.Variable == "" {
@@ -61,10 +62,10 @@ func (e *EquationSolverTool) Invoke(ctx context.Context, arguments string) (any,
 
 	resultJSON, err := json.Marshal(solution)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal solution: %w", err)
+		return core.ToolResult{}, fmt.Errorf("failed to marshal solution: %w", err)
 	}
 
-	return string(resultJSON), nil
+	return core.NewToolResult(string(resultJSON)), nil
 }
 
 func solveEquation(equation, variable string) map[string]any {

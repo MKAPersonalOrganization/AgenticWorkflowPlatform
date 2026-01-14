@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"school-with-ai/foundation/agentsdk/core"
 
 	"github.com/cpmech/gosl/la"
 )
@@ -91,7 +92,7 @@ func (t *MatrixOperationsTool) Parameters() map[string]any {
 	}
 }
 
-func (t *MatrixOperationsTool) Invoke(ctx context.Context, arguments string) (any, error) {
+func (t *MatrixOperationsTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
 	var args struct {
 		Operation string      `json:"operation"`
 		Matrix    [][]float64 `json:"matrix"`
@@ -103,7 +104,7 @@ func (t *MatrixOperationsTool) Invoke(ctx context.Context, arguments string) (an
 	}
 
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
-		return "", fmt.Errorf("invalid arguments: %w", err)
+		return core.ToolResult{}, fmt.Errorf("invalid arguments: %w", err)
 	}
 
 	// Set defaults
@@ -119,7 +120,7 @@ func (t *MatrixOperationsTool) Invoke(ctx context.Context, arguments string) (an
 	switch args.Operation {
 	case "multiply":
 		if len(args.Matrix2) == 0 {
-			return "", ErrMatrix2Required
+			return core.ToolResult{}, ErrMatrix2Required
 		}
 		a := la.NewMatrixDeep2(args.Matrix)
 		b := la.NewMatrixDeep2(args.Matrix2)
@@ -129,12 +130,12 @@ func (t *MatrixOperationsTool) Invoke(ctx context.Context, arguments string) (an
 
 	case "add":
 		if len(args.Matrix2) == 0 {
-			return "", ErrMatrix2Required
+			return core.ToolResult{}, ErrMatrix2Required
 		}
 		// gosl doesn't have direct matrix add, so we'll use manual implementation
 		a, b := args.Matrix, args.Matrix2
 		if len(a) != len(b) || len(a[0]) != len(b[0]) {
-			return "", ErrMatrixSameDimensions
+			return core.ToolResult{}, ErrMatrixSameDimensions
 		}
 		m, n := len(a), len(a[0])
 		c := make([][]float64, m)
@@ -148,11 +149,11 @@ func (t *MatrixOperationsTool) Invoke(ctx context.Context, arguments string) (an
 
 	case "subtract":
 		if len(args.Matrix2) == 0 {
-			return "", ErrMatrix2Required
+			return core.ToolResult{}, ErrMatrix2Required
 		}
 		a, b := args.Matrix, args.Matrix2
 		if len(a) != len(b) || len(a[0]) != len(b[0]) {
-			return "", ErrMatrixSameDimensions
+			return core.ToolResult{}, ErrMatrixSameDimensions
 		}
 		m, n := len(a), len(a[0])
 		c := make([][]float64, m)
@@ -171,7 +172,7 @@ func (t *MatrixOperationsTool) Invoke(ctx context.Context, arguments string) (an
 	case "inverse":
 		a := la.NewMatrixDeep2(args.Matrix)
 		if a.M != a.N {
-			return "", ErrSquareMatrixRequired
+			return core.ToolResult{}, ErrSquareMatrixRequired
 		}
 		ai := la.NewMatrix(a.N, a.M)
 		la.MatInv(ai, a, false)
@@ -180,13 +181,13 @@ func (t *MatrixOperationsTool) Invoke(ctx context.Context, arguments string) (an
 	case "determinant":
 		a := la.NewMatrixDeep2(args.Matrix)
 		if a.M != a.N {
-			return "", ErrSquareMatrixRequired
+			return core.ToolResult{}, ErrSquareMatrixRequired
 		}
 		result = a.Det()
 
 	case "trace":
 		if len(args.Matrix) != len(args.Matrix[0]) {
-			return "", ErrSquareMatrixRequired
+			return core.ToolResult{}, ErrSquareMatrixRequired
 		}
 		var trace float64
 		for i := range len(args.Matrix) {
@@ -206,12 +207,12 @@ func (t *MatrixOperationsTool) Invoke(ctx context.Context, arguments string) (an
 
 	case "matrix_vector_multiply":
 		if len(args.Vector) == 0 {
-			return "", ErrVectorRequired
+			return core.ToolResult{}, ErrVectorRequired
 		}
 		a := la.NewMatrixDeep2(args.Matrix)
 		u := la.Vector(args.Vector)
 		if a.N != len(u) {
-			return "", fmt.Errorf("%w: matrix columns (%d) != vector length (%d)", ErrIncompatibleDimensions, a.N, len(u))
+			return core.ToolResult{}, fmt.Errorf("%w: matrix columns (%d) != vector length (%d)", ErrIncompatibleDimensions, a.N, len(u))
 		}
 		v := la.NewVector(a.M)
 		la.MatVecMul(v, args.Alpha, a, u)
@@ -219,19 +220,19 @@ func (t *MatrixOperationsTool) Invoke(ctx context.Context, arguments string) (an
 
 	case "vector_matrix_multiply":
 		if len(args.Vector) == 0 {
-			return "", ErrVectorRequired
+			return core.ToolResult{}, ErrVectorRequired
 		}
 		a := la.NewMatrixDeep2(args.Matrix)
 		u := la.Vector(args.Vector)
 		if len(u) != a.M {
-			return "", fmt.Errorf("%w: vector length (%d) != matrix rows (%d)", ErrIncompatibleDimensions, len(u), a.M)
+			return core.ToolResult{}, fmt.Errorf("%w: vector length (%d) != matrix rows (%d)", ErrIncompatibleDimensions, len(u), a.M)
 		}
 		v := la.NewVector(a.N)
 		la.MatTrVecMul(v, args.Alpha, a, u)
 		result = []float64(v)
 
 	default:
-		return "", fmt.Errorf("%w: %s", ErrUnknownMatrixOperation, args.Operation)
+		return core.ToolResult{}, fmt.Errorf("%w: %s", ErrUnknownMatrixOperation, args.Operation)
 	}
 
 	response := map[string]any{
@@ -241,8 +242,8 @@ func (t *MatrixOperationsTool) Invoke(ctx context.Context, arguments string) (an
 
 	data, err := json.Marshal(response)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal response: %w", err)
+		return core.ToolResult{}, fmt.Errorf("failed to marshal response: %w", err)
 	}
 
-	return string(data), nil
+	return core.NewToolResult(string(data)), nil
 }

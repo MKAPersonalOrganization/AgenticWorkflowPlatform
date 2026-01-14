@@ -150,8 +150,8 @@ func TestBasicToolExecutor_Calculate(t *testing.T) {
 		"calculate",
 		"Calculate an expression",
 		core.ObjectSchema(map[string]any{"expression": core.StringProperty("Expression")}, []string{"expression"}),
-		func(ctx context.Context, arguments string) (any, error) {
-			return `{"result": "4"}`, nil
+		func(ctx context.Context, arguments string) (core.ToolResult, error) {
+			return core.NewToolResult(`{"result": "4"}`), nil
 		},
 	))
 
@@ -187,8 +187,8 @@ func TestBasicToolExecutor_WriteWhiteboard(t *testing.T) {
 			"content": core.StringProperty("Content"),
 			"action":  core.StringProperty("Action"),
 		}, []string{"content", "action"}),
-		func(ctx context.Context, arguments string) (any, error) {
-			return `{"status": "success"}`, nil
+		func(ctx context.Context, arguments string) (core.ToolResult, error) {
+			return core.NewToolResult(`{"status": "success"}`), nil
 		},
 	))
 
@@ -227,16 +227,16 @@ func TestRegistryToolExecutor(t *testing.T) {
 			map[string]any{"name": core.StringProperty("The name")},
 			[]string{"name"},
 		),
-		func(ctx context.Context, arguments string) (any, error) {
+		func(ctx context.Context, arguments string) (core.ToolResult, error) {
 			var args struct {
 				Name string `json:"name"`
 			}
 			err := json.Unmarshal([]byte(arguments), &args)
 			if err != nil {
-				return "", fmt.Errorf("failed to unmarshal arguments: %w", err)
+				return core.ToolResult{}, fmt.Errorf("failed to unmarshal arguments: %w", err)
 			}
 
-			return `{"message": "Hello, ` + args.Name + `!"}`, nil
+			return core.NewToolResult(`{"message": "Hello, ` + args.Name + `!"}`), nil
 		},
 	))
 

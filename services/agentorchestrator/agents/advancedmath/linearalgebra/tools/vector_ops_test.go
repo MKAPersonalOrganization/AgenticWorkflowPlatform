@@ -66,7 +66,7 @@ func TestVectorOperationsTool_Add(t *testing.T) {
 			}
 
 			var response map[string]any
-			if err := json.Unmarshal([]byte(result.(string)), &response); err != nil {
+			if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
 				t.Fatalf("failed to unmarshal response: %v", err)
 			}
 
@@ -121,7 +121,7 @@ func TestVectorOperationsTool_Dot(t *testing.T) {
 			}
 
 			var response map[string]any
-			if err := json.Unmarshal([]byte(result.(string)), &response); err != nil {
+			if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
 				t.Fatalf("failed to unmarshal response: %v", err)
 			}
 
@@ -173,7 +173,7 @@ func TestVectorOperationsTool_Cross(t *testing.T) {
 			}
 
 			var response map[string]any
-			if err := json.Unmarshal([]byte(result.(string)), &response); err != nil {
+			if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
 				t.Fatalf("failed to unmarshal response: %v", err)
 			}
 
@@ -229,7 +229,7 @@ func TestVectorOperationsTool_Norm(t *testing.T) {
 			}
 
 			var response map[string]any
-			if err := json.Unmarshal([]byte(result.(string)), &response); err != nil {
+			if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
 				t.Fatalf("failed to unmarshal response: %v", err)
 			}
 
@@ -257,7 +257,7 @@ func TestVectorOperationsTool_Unit(t *testing.T) {
 	}
 
 	var response map[string]any
-	if err := json.Unmarshal([]byte(result.(string)), &response); err != nil {
+	if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
 

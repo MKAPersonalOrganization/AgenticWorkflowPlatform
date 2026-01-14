@@ -20,20 +20,20 @@ func TestFunctionTool(t *testing.T) {
 			},
 			[]string{"location"},
 		),
-		func(ctx context.Context, arguments string) (any, error) {
+		func(ctx context.Context, arguments string) (core.ToolResult, error) {
 			var args struct {
 				Location string `json:"location"`
 				Unit     string `json:"unit"`
 			}
 			err := json.Unmarshal([]byte(arguments), &args)
 			if err != nil {
-				return "", fmt.Errorf("failed to unmarshal arguments: %w", err)
+				return core.ToolResult{}, fmt.Errorf("failed to unmarshal arguments: %w", err)
 			}
 			if args.Unit == "" {
 				args.Unit = "celsius"
 			}
 
-			return `{"temperature": 22, "unit": "` + args.Unit + `", "location": "` + args.Location + `"}`, nil
+			return core.NewToolResult(`{"temperature": 22, "unit": "` + args.Unit + `", "location": "` + args.Location + `"}`), nil
 		},
 	)
 
@@ -62,8 +62,8 @@ func TestFunctionTool(t *testing.T) {
 		Location    string `json:"location"`
 	}
 
-	// Parse result - tool returns string wrapped in any
-	if err := json.Unmarshal([]byte(result.(string)), &response); err != nil {
+	// Parse result - tool returns ToolResult
+	if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}
 
@@ -84,14 +84,18 @@ func TestToolRegistry(t *testing.T) {
 		"get_weather",
 		"Get weather",
 		core.ObjectSchema(map[string]any{"location": core.StringProperty("City")}, []string{"location"}),
-		func(ctx context.Context, args string) (any, error) { return `{"temp": 20}`, nil },
+		func(ctx context.Context, args string) (core.ToolResult, error) {
+			return core.NewToolResult(`{"temp": 20}`), nil
+		},
 	)
 
 	calcTool := core.NewFunctionTool(
 		"calculate",
 		"Calculate expression",
 		core.ObjectSchema(map[string]any{"expression": core.StringProperty("Math expression")}, []string{"expression"}),
-		func(ctx context.Context, args string) (any, error) { return `{"result": 42}`, nil },
+		func(ctx context.Context, args string) (core.ToolResult, error) {
+			return core.NewToolResult(`{"result": 42}`), nil
+		},
 	)
 
 	registry.Register(weatherTool)
@@ -142,7 +146,7 @@ func TestToToolSpec(t *testing.T) {
 			},
 			[]string{"param1"},
 		),
-		func(ctx context.Context, args string) (any, error) { return "{}", nil },
+		func(ctx context.Context, args string) (core.ToolResult, error) { return core.NewToolResult("{}"), nil },
 	)
 
 	spec := core.ToToolSpec(tool)

@@ -237,7 +237,7 @@ func TestCalculatorTool_Invoke(t *testing.T) {
 		Expression string  `json:"expression"`
 		Result     float64 `json:"result"`
 	}
-	if err := json.Unmarshal([]byte(result.(string)), &response); err != nil {
+	if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
 		t.Fatalf("Failed to parse result: %v", err)
 	}
 
@@ -272,7 +272,7 @@ func TestCalculatorTool_InvokeComplex(t *testing.T) {
 			var response struct {
 				Result float64 `json:"result"`
 			}
-			if err := json.Unmarshal([]byte(result.(string)), &response); err != nil {
+			if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
 				t.Fatalf("Failed to parse result: %v", err)
 			}
 

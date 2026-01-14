@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"school-with-ai/foundation/agentsdk/core"
 	"strconv"
 	"strings"
 	"time"
@@ -130,24 +131,24 @@ do for [n=1:10] {
 	}
 }
 
-func (a *AnimateTool) Invoke(ctx context.Context, arguments string) (any, error) {
+func (a *AnimateTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
 	var args AnimateArgs
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
-		return "", fmt.Errorf("failed to parse animate args: %w", err)
+		return core.ToolResult{}, fmt.Errorf("failed to parse animate args: %w", err)
 	}
 
 	// Validate required gnuplot_script parameter
 	if args.GnuplotScript == "" {
-		return "", ErrGnuplotScriptRequired
+		return core.ToolResult{}, ErrGnuplotScriptRequired
 	}
 
 	// Validate script doesn't contain terminal/output commands
 	scriptLower := strings.ToLower(args.GnuplotScript)
 	if strings.Contains(scriptLower, "set terminal") || strings.Contains(scriptLower, "set term") {
-		return "", ErrTerminalCommandNotAllowed
+		return core.ToolResult{}, ErrTerminalCommandNotAllowed
 	}
 	if strings.Contains(scriptLower, "set output") {
-		return "", ErrOutputCommandNotAllowed
+		return core.ToolResult{}, ErrOutputCommandNotAllowed
 	}
 
 	// Validate format
@@ -155,7 +156,7 @@ func (a *AnimateTool) Invoke(ctx context.Context, arguments string) (any, error)
 		args.Format = "gif"
 	}
 	if args.Format != "gif" && args.Format != "webp" {
-		return "", fmt.Errorf("%w, got: %s", ErrInvalidAnimationFormat, args.Format)
+		return core.ToolResult{}, fmt.Errorf("%w, got: %s", ErrInvalidAnimationFormat, args.Format)
 	}
 
 	// Validate delay
@@ -163,18 +164,18 @@ func (a *AnimateTool) Invoke(ctx context.Context, arguments string) (any, error)
 		args.Delay = 50 // Default to 20fps
 	}
 	if args.Delay > 500 {
-		return "", fmt.Errorf("%w (got: %d)", ErrDelayTooLarge, args.Delay)
+		return core.ToolResult{}, fmt.Errorf("%w (got: %d)", ErrDelayTooLarge, args.Delay)
 	}
 
 	// Validate title length
 	if len(args.Title) > 100 {
-		return "", ErrAnimateTitleTooLong
+		return core.ToolResult{}, ErrAnimateTitleTooLong
 	}
 
 	// Generate the animation
 	animationPath, err := executeGnuplotAnimation(args.GnuplotScript, args.Format, args.Delay, args.Title)
 	if err != nil {
-		return "", fmt.Errorf("failed to generate animation: %w", err)
+		return core.ToolResult{}, fmt.Errorf("failed to generate animation: %w", err)
 	}
 
 	// Return result with animation path
@@ -192,10 +193,10 @@ func (a *AnimateTool) Invoke(ctx context.Context, arguments string) (any, error)
 
 	resultJSON, err := json.Marshal(result)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal animation result: %w", err)
+		return core.ToolResult{}, fmt.Errorf("failed to marshal animation result: %w", err)
 	}
 
-	return string(resultJSON), nil
+	return core.NewToolResult(string(resultJSON)), nil
 }
 
 // executeGnuplotAnimation executes a gnuplot animation script and generates the animation file.

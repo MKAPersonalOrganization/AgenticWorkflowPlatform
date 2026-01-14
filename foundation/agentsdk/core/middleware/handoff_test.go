@@ -233,7 +233,7 @@ func TestTransferToAgentTool_Invoke_Success(t *testing.T) {
 	}
 
 	// Result should be a Command
-	cmd, isCmd := core.IsCommand(result)
+	cmd, isCmd := result.Command, result.Command != nil
 	if !isCmd {
 		t.Fatal("Expected result to be a Command")
 	}
@@ -307,7 +307,7 @@ func TestTransferToAgentTool_Invoke_MissingQuestion(t *testing.T) {
 	}
 
 	// Result should be a Command
-	cmd, isCmd := core.IsCommand(result)
+	cmd, isCmd := result.Command, result.Command != nil
 	if !isCmd {
 		t.Fatal("Expected result to be a Command")
 	}
@@ -383,7 +383,7 @@ func TestTransferToAgentTool_Invoke_WithoutContext(t *testing.T) {
 	}
 
 	// Result should be a Command
-	_, isCmd := core.IsCommand(result)
+	_, isCmd := result.Command, result.Command != nil
 	if !isCmd {
 		t.Fatal("Expected result to be a Command")
 	}

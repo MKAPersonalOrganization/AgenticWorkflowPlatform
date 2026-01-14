@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"school-with-ai/foundation/agentsdk/core"
 	"strconv"
 	"strings"
 )
@@ -70,8 +71,12 @@ func (c *CalculatorTool) Parameters() map[string]any {
 	}
 }
 
-func (c *CalculatorTool) Invoke(ctx context.Context, arguments string) (any, error) {
-	return ExecuteCalculatorTool(arguments)
+func (c *CalculatorTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
+	result, err := ExecuteCalculatorTool(arguments)
+	if err != nil {
+		return core.ToolResult{}, err
+	}
+	return core.NewToolResult(result), nil
 }
 
 // ExecuteCalculatorTool evaluates a mathematical expression.

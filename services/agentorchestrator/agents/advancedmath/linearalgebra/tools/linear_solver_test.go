@@ -47,7 +47,7 @@ func TestLinearSolverTool_GaussianElimination(t *testing.T) {
 			}
 
 			var response map[string]any
-			if err := json.Unmarshal([]byte(result.(string)), &response); err != nil {
+			if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
 				t.Fatalf("failed to unmarshal response: %v", err)
 			}
 
@@ -79,7 +79,7 @@ func TestLinearSolverTool_LU(t *testing.T) {
 	}
 
 	var response map[string]any
-	if err := json.Unmarshal([]byte(result.(string)), &response); err != nil {
+	if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
 
@@ -110,7 +110,7 @@ func TestLinearSolverTool_Cholesky(t *testing.T) {
 	}
 
 	var response map[string]any
-	if err := json.Unmarshal([]byte(result.(string)), &response); err != nil {
+	if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
 

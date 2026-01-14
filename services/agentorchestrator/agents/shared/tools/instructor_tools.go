@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"school-with-ai/foundation/agentsdk/core"
 )
 
 var (
@@ -51,8 +52,12 @@ func (t *WriteWhiteboardTool) Parameters() map[string]any {
 	}
 }
 
-func (t *WriteWhiteboardTool) Invoke(ctx context.Context, arguments string) (any, error) {
-	return WriteWhiteboard(arguments)
+func (t *WriteWhiteboardTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
+	res, err := WriteWhiteboard(arguments)
+	if err != nil {
+		return core.ToolResult{}, err
+	}
+	return core.NewToolResult(res), nil
 }
 
 // WriteWhiteboard allows instructors to write to the shared whiteboard.

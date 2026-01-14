@@ -1,6 +1,9 @@
 package tools
 
-import "context"
+import (
+	"context"
+	"school-with-ai/foundation/agentsdk/core"
+)
 
 // UnconstrainedOptimizationTool performs unconstrained optimization.
 type UnconstrainedOptimizationTool struct{}
@@ -21,8 +24,8 @@ func (t *UnconstrainedOptimizationTool) Parameters() map[string]any {
 	return map[string]any{"type": "object", "properties": map[string]any{}}
 }
 
-func (t *UnconstrainedOptimizationTool) Invoke(ctx context.Context, arguments string) (any, error) {
-	return `{"result": "Implementation pending"}`, nil
+func (t *UnconstrainedOptimizationTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
+	return core.NewToolResult(`{"result": "Implementation pending"}`), nil
 }
 
 // ConstrainedOptimizationTool performs constrained optimization.
@@ -44,6 +47,6 @@ func (t *ConstrainedOptimizationTool) Parameters() map[string]any {
 	return map[string]any{"type": "object", "properties": map[string]any{}}
 }
 
-func (t *ConstrainedOptimizationTool) Invoke(ctx context.Context, arguments string) (any, error) {
-	return `{"result": "Implementation pending"}`, nil
+func (t *ConstrainedOptimizationTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
+	return core.NewToolResult(`{"result": "Implementation pending"}`), nil
 }

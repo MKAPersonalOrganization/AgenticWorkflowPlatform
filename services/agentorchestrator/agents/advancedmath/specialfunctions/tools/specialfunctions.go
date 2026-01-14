@@ -1,6 +1,9 @@
 package tools
 
-import "context"
+import (
+	"context"
+	"school-with-ai/foundation/agentsdk/core"
+)
 
 // BesselFunctionsTool computes Bessel functions.
 type BesselFunctionsTool struct{}
@@ -21,8 +24,8 @@ func (t *BesselFunctionsTool) Parameters() map[string]any {
 	return map[string]any{"type": "object", "properties": map[string]any{}}
 }
 
-func (t *BesselFunctionsTool) Invoke(ctx context.Context, arguments string) (any, error) {
-	return `{"result": "Implementation pending"}`, nil
+func (t *BesselFunctionsTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
+	return core.NewToolResult(`{"result": "Implementation pending"}`), nil
 }
 
 // OrthogonalPolynomialsTool computes orthogonal polynomials.
@@ -44,8 +47,8 @@ func (t *OrthogonalPolynomialsTool) Parameters() map[string]any {
 	return map[string]any{"type": "object", "properties": map[string]any{}}
 }
 
-func (t *OrthogonalPolynomialsTool) Invoke(ctx context.Context, arguments string) (any, error) {
-	return `{"result": "Implementation pending"}`, nil
+func (t *OrthogonalPolynomialsTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
+	return core.NewToolResult(`{"result": "Implementation pending"}`), nil
 }
 
 // EllipticIntegralsTool computes elliptic integrals.
@@ -67,8 +70,8 @@ func (t *EllipticIntegralsTool) Parameters() map[string]any {
 	return map[string]any{"type": "object", "properties": map[string]any{}}
 }
 
-func (t *EllipticIntegralsTool) Invoke(ctx context.Context, arguments string) (any, error) {
-	return `{"result": "Implementation pending"}`, nil
+func (t *EllipticIntegralsTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
+	return core.NewToolResult(`{"result": "Implementation pending"}`), nil
 }
 
 // InterpolationTool performs interpolation.
@@ -90,8 +93,8 @@ func (t *InterpolationTool) Parameters() map[string]any {
 	return map[string]any{"type": "object", "properties": map[string]any{}}
 }
 
-func (t *InterpolationTool) Invoke(ctx context.Context, arguments string) (any, error) {
-	return `{"result": "Implementation pending"}`, nil
+func (t *InterpolationTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
+	return core.NewToolResult(`{"result": "Implementation pending"}`), nil
 }
 
 // FFTTool performs Fast Fourier Transform.
@@ -113,6 +116,6 @@ func (t *FFTTool) Parameters() map[string]any {
 	return map[string]any{"type": "object", "properties": map[string]any{}}
 }
 
-func (t *FFTTool) Invoke(ctx context.Context, arguments string) (any, error) {
-	return `{"result": "Implementation pending"}`, nil
+func (t *FFTTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
+	return core.NewToolResult(`{"result": "Implementation pending"}`), nil
 }
