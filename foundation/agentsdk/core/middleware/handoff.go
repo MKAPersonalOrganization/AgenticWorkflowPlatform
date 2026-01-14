@@ -5,10 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"school-with-ai/foundation/agentsdk/core"
 	"sort"
 	"strings"
-
-	"school-with-ai/foundation/agentsdk/core"
 )
 
 var (
@@ -272,13 +271,6 @@ found:
 
 	// Continue with next middleware
 	return next(ctx, reqCtx)
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 // buildSystemPromptWithAgents creates the system prompt including the list of available agents.
