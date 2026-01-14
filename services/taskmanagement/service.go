@@ -277,12 +277,20 @@ func (s *Service) runAgent(ctx context.Context, threadID, agentName string, emit
 
 	// Execute agent
 	messageID := domain.GenerateMessageID()
-	agentErr := agent.RunIteration(ctx, core.IterationContext{
+	runIter := agent.Run(ctx, core.RunContext{
 		ThreadID:  threadID,
 		MessageID: messageID,
 		Thread:    thread,
 		Options:   core.DefaultRunOptions(),
 	})
+
+	var agentErr error
+	for _, err := range runIter {
+		if err != nil {
+			agentErr = err
+			break
+		}
+	}
 
 	// Complete generation tracking (if enabled)
 	if genTracker != nil {
