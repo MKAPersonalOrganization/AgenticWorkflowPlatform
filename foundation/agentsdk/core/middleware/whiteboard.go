@@ -278,7 +278,7 @@ func (t *WriteWhiteboardTool) Parameters() map[string]any {
 	}
 }
 
-func (t *WriteWhiteboardTool) Invoke(ctx context.Context, arguments string) (any, error) {
+func (t *WriteWhiteboardTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
 	var args struct {
 		Content string           `json:"content"`
 		Action  WhiteboardAction `json:"action"`
@@ -286,7 +286,7 @@ func (t *WriteWhiteboardTool) Invoke(ctx context.Context, arguments string) (any
 
 	err := json.Unmarshal([]byte(arguments), &args)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse whiteboard arguments: %w", err)
+		return core.ToolResult{}, fmt.Errorf("failed to parse whiteboard arguments: %w", err)
 	}
 
 	// Validate action
@@ -297,7 +297,7 @@ func (t *WriteWhiteboardTool) Invoke(ctx context.Context, arguments string) (any
 	}
 
 	if !validActions[args.Action] {
-		return "", fmt.Errorf("%w: %s", ErrInvalidWhiteboardAction, args.Action)
+		return core.ToolResult{}, fmt.Errorf("%w: %s", ErrInvalidWhiteboardAction, args.Action)
 	}
 
 	var finalContent string
@@ -323,7 +323,7 @@ func (t *WriteWhiteboardTool) Invoke(ctx context.Context, arguments string) (any
 	// No need to emit custom event - ToolCallExecutedEvent is emitted automatically
 	// by the service layer and contains all the tool execution details
 
-	return fmt.Sprintf("Whiteboard updated (%s)", args.Action), nil
+	return core.NewToolResult(fmt.Sprintf("Whiteboard updated (%s)", args.Action)), nil
 }
 
 // WhiteboardMiddleware provides whiteboard management capabilities to agents.

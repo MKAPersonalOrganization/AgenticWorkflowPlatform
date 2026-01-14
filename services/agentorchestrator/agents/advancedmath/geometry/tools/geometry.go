@@ -1,6 +1,9 @@
 package tools
 
-import "context"
+import (
+	"context"
+	"school-with-ai/foundation/agentsdk/core"
+)
 
 // GeometricPrimitivesTool performs operations with geometric primitives.
 type GeometricPrimitivesTool struct{}
@@ -21,8 +24,8 @@ func (t *GeometricPrimitivesTool) Parameters() map[string]any {
 	return map[string]any{"type": "object", "properties": map[string]any{}}
 }
 
-func (t *GeometricPrimitivesTool) Invoke(ctx context.Context, arguments string) (any, error) {
-	return `{"result": "Implementation pending"}`, nil
+func (t *GeometricPrimitivesTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
+	return core.NewToolResult(`{"result": "Implementation pending"}`), nil
 }
 
 // CurvesTool works with curves and surfaces.
@@ -44,8 +47,8 @@ func (t *CurvesTool) Parameters() map[string]any {
 	return map[string]any{"type": "object", "properties": map[string]any{}}
 }
 
-func (t *CurvesTool) Invoke(ctx context.Context, arguments string) (any, error) {
-	return `{"result": "Implementation pending"}`, nil
+func (t *CurvesTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
+	return core.NewToolResult(`{"result": "Implementation pending"}`), nil
 }
 
 // MeshingTool performs mesh generation.
@@ -67,6 +70,6 @@ func (t *MeshingTool) Parameters() map[string]any {
 	return map[string]any{"type": "object", "properties": map[string]any{}}
 }
 
-func (t *MeshingTool) Invoke(ctx context.Context, arguments string) (any, error) {
-	return `{"result": "Implementation pending"}`, nil
+func (t *MeshingTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
+	return core.NewToolResult(`{"result": "Implementation pending"}`), nil
 }

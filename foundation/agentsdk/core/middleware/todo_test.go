@@ -150,11 +150,11 @@ func TestWriteTodosTool_Invoke(t *testing.T) {
 		t.Fatalf("Tool invocation failed: %v", err)
 	}
 
-	if !strings.Contains(result.(string), "Updated todo list") {
-		t.Errorf("Expected confirmation message in result, got: %s", result)
+	if !strings.Contains(result.Result, "Updated todo list") {
+		t.Errorf("Expected confirmation message in result, got: %s", result.Result)
 	}
 
-	if !strings.Contains(result.(string), "Task 1") {
+	if !strings.Contains(result.Result, "Task 1") {
 		t.Error("Result should contain Task 1")
 	}
 }
@@ -427,6 +427,6 @@ func (m *MockTool) Parameters() map[string]any {
 	}
 }
 
-func (m *MockTool) Invoke(ctx context.Context, arguments string) (any, error) {
-	return "mock result", nil
+func (m *MockTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
+	return core.NewToolResult("mock result"), nil
 }

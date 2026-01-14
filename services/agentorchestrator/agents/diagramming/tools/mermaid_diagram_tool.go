@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"school-with-ai/foundation/agentsdk/core"
 	"strconv"
 	"time"
 )
@@ -67,15 +68,15 @@ func (m *MermaidDiagramTool) Parameters() map[string]any {
 	}
 }
 
-func (m *MermaidDiagramTool) Invoke(ctx context.Context, arguments string) (any, error) {
+func (m *MermaidDiagramTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
 	var args MermaidDiagramArgs
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
-		return "", fmt.Errorf("failed to parse mermaid diagram args: %w", err)
+		return core.ToolResult{}, fmt.Errorf("failed to parse mermaid diagram args: %w", err)
 	}
 
 	// Validate required mermaid_code parameter
 	if args.MermaidCode == "" {
-		return "", ErrMermaidCodeRequired
+		return core.ToolResult{}, ErrMermaidCodeRequired
 	}
 
 	// Set default output type
@@ -85,18 +86,18 @@ func (m *MermaidDiagramTool) Invoke(ctx context.Context, arguments string) (any,
 
 	// Validate output type
 	if args.OutputType != "svg" && args.OutputType != "png" {
-		return "", fmt.Errorf("%w, got: %s", ErrInvalidOutputType, args.OutputType)
+		return core.ToolResult{}, fmt.Errorf("%w, got: %s", ErrInvalidOutputType, args.OutputType)
 	}
 
 	// Validate title length
 	if len(args.Title) > 100 {
-		return "", ErrTitleTooLong
+		return core.ToolResult{}, ErrTitleTooLong
 	}
 
 	// Generate the diagram
 	imagePath, err := executeMermaidDiagram(args.MermaidCode, args.Title, args.OutputType)
 	if err != nil {
-		return "", fmt.Errorf("failed to generate diagram: %w", err)
+		return core.ToolResult{}, fmt.Errorf("failed to generate diagram: %w", err)
 	}
 
 	// Return result with image path
@@ -113,10 +114,10 @@ func (m *MermaidDiagramTool) Invoke(ctx context.Context, arguments string) (any,
 
 	resultJSON, err := json.Marshal(result)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal diagram result: %w", err)
+		return core.ToolResult{}, fmt.Errorf("failed to marshal diagram result: %w", err)
 	}
 
-	return string(resultJSON), nil
+	return core.NewToolResult(string(resultJSON)), nil
 }
 
 // executeMermaidDiagram executes mermaid-cli via Docker to generate the diagram.

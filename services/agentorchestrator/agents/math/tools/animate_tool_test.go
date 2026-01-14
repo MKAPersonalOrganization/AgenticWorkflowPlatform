@@ -39,7 +39,7 @@ do for [i=0:40] {
 	}
 
 	var response map[string]any
-	if err := json.Unmarshal([]byte(result.(string)), &response); err != nil {
+	if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}
 
@@ -84,7 +84,7 @@ do for [ang=0:360:10] {
 	}
 
 	var response map[string]any
-	if err := json.Unmarshal([]byte(result.(string)), &response); err != nil {
+	if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
 
@@ -119,7 +119,7 @@ do for [i=1:30] {
 	}
 
 	var response map[string]any
-	if err := json.Unmarshal([]byte(result.(string)), &response); err != nil {
+	if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
 
@@ -206,7 +206,7 @@ func TestAnimateTool_DefaultValues(t *testing.T) {
 	}
 
 	var response map[string]any
-	if err := json.Unmarshal([]byte(result.(string)), &response); err != nil {
+	if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
 

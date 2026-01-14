@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"school-with-ai/foundation/agentsdk/core"
 
 	"github.com/cpmech/gosl/la"
 )
@@ -79,7 +80,7 @@ func (t *VectorOperationsTool) Parameters() map[string]any {
 	}
 }
 
-func (t *VectorOperationsTool) Invoke(ctx context.Context, arguments string) (any, error) {
+func (t *VectorOperationsTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
 	var args struct {
 		Operation string    `json:"operation"`
 		Vector1   []float64 `json:"vector1"`
@@ -90,7 +91,7 @@ func (t *VectorOperationsTool) Invoke(ctx context.Context, arguments string) (an
 	}
 
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
-		return "", fmt.Errorf("invalid arguments: %w", err)
+		return core.ToolResult{}, fmt.Errorf("invalid arguments: %w", err)
 	}
 
 	// Set default values
@@ -106,10 +107,10 @@ func (t *VectorOperationsTool) Invoke(ctx context.Context, arguments string) (an
 	switch args.Operation {
 	case "add":
 		if len(args.Vector2) == 0 {
-			return "", ErrVector2Required
+			return core.ToolResult{}, ErrVector2Required
 		}
 		if len(args.Vector1) != len(args.Vector2) {
-			return "", ErrVectorLengthMismatch
+			return core.ToolResult{}, ErrVectorLengthMismatch
 		}
 		res := la.NewVector(len(args.Vector1))
 		la.VecAdd(res, args.Alpha, la.Vector(args.Vector1), args.Beta, la.Vector(args.Vector2))
@@ -117,10 +118,10 @@ func (t *VectorOperationsTool) Invoke(ctx context.Context, arguments string) (an
 
 	case "subtract":
 		if len(args.Vector2) == 0 {
-			return "", ErrVector2Required
+			return core.ToolResult{}, ErrVector2Required
 		}
 		if len(args.Vector1) != len(args.Vector2) {
-			return "", ErrVectorLengthMismatch
+			return core.ToolResult{}, ErrVectorLengthMismatch
 		}
 		res := la.NewVector(len(args.Vector1))
 		la.VecAdd(res, 1.0, la.Vector(args.Vector1), -1.0, la.Vector(args.Vector2))
@@ -134,19 +135,19 @@ func (t *VectorOperationsTool) Invoke(ctx context.Context, arguments string) (an
 
 	case "dot":
 		if len(args.Vector2) == 0 {
-			return "", ErrVector2Required
+			return core.ToolResult{}, ErrVector2Required
 		}
 		if len(args.Vector1) != len(args.Vector2) {
-			return "", ErrVectorLengthMismatch
+			return core.ToolResult{}, ErrVectorLengthMismatch
 		}
 		result = la.VecDot(la.Vector(args.Vector1), la.Vector(args.Vector2))
 
 	case "cross":
 		if len(args.Vector2) == 0 {
-			return "", ErrVector2Required
+			return core.ToolResult{}, ErrVector2Required
 		}
 		if len(args.Vector1) != 3 || len(args.Vector2) != 3 {
-			return "", ErrCrossProduct3DOnly
+			return core.ToolResult{}, ErrCrossProduct3DOnly
 		}
 		// gosl doesn't have cross product, use standard formula
 		u, v := args.Vector1, args.Vector2
@@ -177,15 +178,15 @@ func (t *VectorOperationsTool) Invoke(ctx context.Context, arguments string) (an
 
 	case "norm_diff":
 		if len(args.Vector2) == 0 {
-			return "", ErrVector2Required
+			return core.ToolResult{}, ErrVector2Required
 		}
 		if len(args.Vector1) != len(args.Vector2) {
-			return "", ErrVectorLengthMismatch
+			return core.ToolResult{}, ErrVectorLengthMismatch
 		}
 		result = la.Vector(args.Vector1).NormDiff(la.Vector(args.Vector2))
 
 	default:
-		return "", fmt.Errorf("%w: %s", ErrUnknownOperation, args.Operation)
+		return core.ToolResult{}, fmt.Errorf("%w: %s", ErrUnknownOperation, args.Operation)
 	}
 
 	response := map[string]any{
@@ -195,8 +196,8 @@ func (t *VectorOperationsTool) Invoke(ctx context.Context, arguments string) (an
 
 	data, err := json.Marshal(response)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal response: %w", err)
+		return core.ToolResult{}, fmt.Errorf("failed to marshal response: %w", err)
 	}
 
-	return string(data), nil
+	return core.NewToolResult(string(data)), nil
 }

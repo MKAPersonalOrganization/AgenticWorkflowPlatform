@@ -1,6 +1,9 @@
 package tools
 
-import "context"
+import (
+	"context"
+	"school-with-ai/foundation/agentsdk/core"
+)
 
 // ODESolverTool solves ordinary differential equations.
 type ODESolverTool struct{}
@@ -21,8 +24,8 @@ func (t *ODESolverTool) Parameters() map[string]any {
 	return map[string]any{"type": "object", "properties": map[string]any{}}
 }
 
-func (t *ODESolverTool) Invoke(ctx context.Context, arguments string) (any, error) {
-	return `{"result": "Implementation pending"}`, nil
+func (t *ODESolverTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
+	return core.NewToolResult(`{"result": "Implementation pending"}`), nil
 }
 
 // StiffODESolverTool solves stiff ODEs.
@@ -44,6 +47,6 @@ func (t *StiffODESolverTool) Parameters() map[string]any {
 	return map[string]any{"type": "object", "properties": map[string]any{}}
 }
 
-func (t *StiffODESolverTool) Invoke(ctx context.Context, arguments string) (any, error) {
-	return `{"result": "Implementation pending"}`, nil
+func (t *StiffODESolverTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
+	return core.NewToolResult(`{"result": "Implementation pending"}`), nil
 }

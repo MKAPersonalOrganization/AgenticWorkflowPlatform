@@ -151,22 +151,22 @@ func (t *WriteTodosTool) Parameters() map[string]any {
 	}
 }
 
-func (t *WriteTodosTool) Invoke(ctx context.Context, arguments string) (any, error) {
+func (t *WriteTodosTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
 	var args struct {
 		Todos []Todo `json:"todos"`
 	}
 
 	err := json.Unmarshal([]byte(arguments), &args)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse todo arguments: %w", err)
+		return core.ToolResult{}, fmt.Errorf("failed to parse todo arguments: %w", err)
 	}
 
 	todosJSON, err := json.Marshal(args.Todos)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal todos: %w", err)
+		return core.ToolResult{}, fmt.Errorf("failed to marshal todos: %w", err)
 	}
 
-	return "Updated todo list to " + string(todosJSON), nil
+	return core.NewToolResult("Updated todo list to " + string(todosJSON)), nil
 }
 
 // TodoListMiddleware provides todo list management capabilities to agents.

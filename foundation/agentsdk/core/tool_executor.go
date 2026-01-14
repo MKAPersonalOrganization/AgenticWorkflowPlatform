@@ -78,23 +78,14 @@ func (e *RegistryToolExecutor) Execute(toolCall ToolCall) (ToolExecutionResult, 
 		return ToolExecutionResult{}, fmt.Errorf("%w: %s", ErrToolNotFound, toolCall.Function.Name)
 	}
 
-	result, err := tool.Invoke(e.ctx, toolCall.Function.Arguments)
+	toolResult, err := tool.Invoke(e.ctx, toolCall.Function.Arguments)
 	endTime := time.Now()
 
-	// Build execution result with Command detection
-	var execResult ToolExecutionResult
-
-	if result != nil {
-		// Check if result is a Command
-		if cmd, isCmd := IsCommand(result); isCmd {
-			execResult.Command = cmd
-			execResult.StopIteration = cmd.StopIteration
-			execResult.Result = fmt.Sprintf("Successfully transferred to %s", cmd.Goto)
-		} else if str, ok := result.(string); ok {
-			execResult.Result = str
-		} else {
-			execResult.Result = fmt.Sprintf("%v", result)
-		}
+	// Build execution result from ToolResult
+	execResult := ToolExecutionResult{
+		Result:        toolResult.Result,
+		Command:       toolResult.Command,
+		StopIteration: toolResult.StopIteration(),
 	}
 
 	// Track tool execution if tracer is available

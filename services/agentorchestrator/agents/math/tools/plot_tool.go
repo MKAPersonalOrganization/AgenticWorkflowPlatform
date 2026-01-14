@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"school-with-ai/foundation/agentsdk/core"
 	"strings"
 	"time"
 )
@@ -117,38 +118,38 @@ Remember: The script will be executed as-is, so ensure it's complete and valid g
 	}
 }
 
-func (p *PlotTool) Invoke(ctx context.Context, arguments string) (any, error) {
+func (p *PlotTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
 	var args PlotArgs
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
-		return "", fmt.Errorf("failed to parse plot args: %w", err)
+		return core.ToolResult{}, fmt.Errorf("failed to parse plot args: %w", err)
 	}
 
 	// Validate required parameters
 	if args.GnuplotScript == "" {
-		return "", ErrPlotScriptRequired
+		return core.ToolResult{}, ErrPlotScriptRequired
 	}
 	if args.Title == "" {
-		return "", ErrPlotTitleRequired
+		return core.ToolResult{}, ErrPlotTitleRequired
 	}
 
 	// Validate script doesn't contain terminal/output commands (we manage these)
 	scriptLower := strings.ToLower(args.GnuplotScript)
 	if strings.Contains(scriptLower, "set terminal") {
-		return "", ErrPlotTerminalCommandNotAllowed
+		return core.ToolResult{}, ErrPlotTerminalCommandNotAllowed
 	}
 	if strings.Contains(scriptLower, "set output") {
-		return "", ErrPlotOutputCommandNotAllowed
+		return core.ToolResult{}, ErrPlotOutputCommandNotAllowed
 	}
 
 	// Validate title length
 	if len(args.Title) > 100 {
-		return "", ErrPlotTitleTooLong
+		return core.ToolResult{}, ErrPlotTitleTooLong
 	}
 
 	// Generate the plot
 	imagePath, err := executeGnuplotScript(args.GnuplotScript, args.Title)
 	if err != nil {
-		return "", fmt.Errorf("failed to generate plot: %w", err)
+		return core.ToolResult{}, fmt.Errorf("failed to generate plot: %w", err)
 	}
 
 	// Return result with image path
@@ -164,10 +165,10 @@ func (p *PlotTool) Invoke(ctx context.Context, arguments string) (any, error) {
 
 	resultJSON, err := json.Marshal(result)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal plot result: %w", err)
+		return core.ToolResult{}, fmt.Errorf("failed to marshal plot result: %w", err)
 	}
 
-	return string(resultJSON), nil
+	return core.NewToolResult(string(resultJSON)), nil
 }
 
 // executeGnuplotScript executes a gnuplot script and generates the plot image.
