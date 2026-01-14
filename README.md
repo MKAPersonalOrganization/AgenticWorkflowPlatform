@@ -2,6 +2,8 @@
 
 A chat application built with Go, Templ, Tailwind CSS, and Alpine.js, implementing the AG-UI protocol for AI agent interactions.
 
+[Changelog](CHANGELOG.md)
+
 ## Repository Statistics
 
 ![Repository Statistics](.github/images/repo_statistics.png)
