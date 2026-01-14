@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"iter"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 
@@ -26,8 +27,8 @@ type ProjectionService interface {
 
 // AgentOrchestrator defines the interface for running agent-based workflows.
 type AgentOrchestrator interface {
-	// RunIteration processes the LLM response using an AgentThread
-	RunIteration(ctx context.Context, iterCtx core.IterationContext) error
+	// Run processes the LLM response using an AgentThread and yields events.
+	Run(ctx context.Context, runCtx core.RunContext) iter.Seq2[core.Event, error]
 	// AddUserMessage adds a user message to a thread using event sourcing
 	AddUserMessage(ctx context.Context, threadID, messageID, content string) (core.AgentThread, error)
 	// CreateThread creates a new chat thread using event sourcing

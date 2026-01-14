@@ -2,6 +2,7 @@ package agentorchestrator
 
 import (
 	"context"
+	"iter"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/logger"
@@ -90,7 +91,6 @@ func New(log *logger.Logger, chatClient ChatClient, writeModel core.EventStore, 
 		log,
 		chatClient,
 		s.threadMgmt,
-		s.config.Notifier,
 		s.config,
 		s.reqCtxCapture,
 		s.toolTracer,
@@ -109,9 +109,21 @@ func (s *Service) DeserializeThread(data []byte) (core.AgentThread, error) {
 	return core.NewInMemoryThreadFromState(data)
 }
 
-// RunIteration processes the LLM response using an AgentThread.
-func (s *Service) RunIteration(ctx context.Context, iterCtx core.IterationContext) error {
-	return s.engine.RunIteration(ctx, iterCtx)
+// Run processes the LLM response using an AgentThread and yields events.
+func (s *Service) Run(ctx context.Context, runCtx core.RunContext) iter.Seq2[core.Event, error] {
+	return func(yield func(core.Event, error) bool) {
+		for event, err := range s.engine.Run(ctx, runCtx) {
+			if s.config.Notifier != nil && event != nil {
+				// We ignore the error here to keep the stream moving, but log it
+				if nErr := s.config.Notifier.HandleDomainEvent(event); nErr != nil {
+					s.log.Error(ctx, "failed to notify event", "error", nErr, "eventType", event.EventType())
+				}
+			}
+			if !yield(event, err) {
+				return
+			}
+		}
+	}
 }
 
 // CreateThread creates a new chat thread using event sourcing.
