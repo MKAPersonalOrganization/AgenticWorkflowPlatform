@@ -35,6 +35,7 @@ type Service struct {
 	chatClient          types.ChatClient
 	langfuseTracer      *LangfuseTracer
 	observabilityConfig ObservabilityConfig
+	titleGenerator      *TitleGenerator
 }
 
 // NewService creates a new orchestration service.
@@ -47,6 +48,7 @@ func NewService(
 	chatClient types.ChatClient,
 	langfuseTracer *LangfuseTracer,
 	observabilityConfig ObservabilityConfig,
+	titleGenerator *TitleGenerator,
 ) *Service {
 	return &Service{
 		log:                 log,
@@ -57,6 +59,7 @@ func NewService(
 		chatClient:          chatClient,
 		langfuseTracer:      langfuseTracer,
 		observabilityConfig: observabilityConfig,
+		titleGenerator:      titleGenerator,
 	}
 }
 
@@ -106,10 +109,7 @@ func (s *Service) HandleUserMessage(
 	// Check if this is a first message or if title is still default
 	// We use the returned 'thread' because it's the most up-to-date state
 	if msgCount == 1 {
-		title := params.Content
-		if len(title) > 50 {
-			title = title[:50] + "..."
-		}
+		title := s.titleGenerator.FromFirstMessage(params.Content)
 
 		err := s.orchestratorService.UpdateThreadTitle(ctx, params.ThreadID, title)
 		if err != nil {

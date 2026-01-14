@@ -79,6 +79,9 @@ func NewTaskManagementService(
 	// Create event buffer manager
 	eventBufferManager := NewEventBufferManager()
 
+	// Create title generator
+	titleGenerator := NewTitleGenerator()
+
 	// Create orchestration service
 	orchestrationService := NewService(
 		log,
@@ -89,6 +92,7 @@ func NewTaskManagementService(
 		chatClient,
 		langfuseTracer,
 		observabilityConfig,
+		titleGenerator,
 	)
 
 	// Create chat worker (thin wrapper around orchestration service)
