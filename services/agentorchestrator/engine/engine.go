@@ -80,13 +80,6 @@ func (e *Engine) Run(
 	runCtx core.RunContext,
 ) iter.Seq2[core.Event, error] {
 	return func(yield func(core.Event, error) bool) {
-		messages := runCtx.Thread.GetMessages()
-		select {
-		case <-ctx.Done():
-			yield(nil, fmt.Errorf("client disconnected: %w", ctx.Err()))
-			return
-		default:
-		}
 		startEvent := &domain.AssistantMessageStartedEvent{
 			ThreadID:  runCtx.ThreadID,
 			MessageID: runCtx.MessageID,
@@ -94,6 +87,14 @@ func (e *Engine) Run(
 		}
 		if !yield(startEvent, nil) {
 			return
+		}
+
+		messages := runCtx.Thread.GetMessages()
+		select {
+		case <-ctx.Done():
+			yield(nil, fmt.Errorf("client disconnected: %w", ctx.Err()))
+			return
+		default:
 		}
 
 		llmMsgs := convertCoreMsgsToLLMMsgs(messages)
