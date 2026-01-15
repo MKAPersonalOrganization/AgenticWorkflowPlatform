@@ -100,16 +100,6 @@ func New(log *logger.Logger, chatClient ChatClient, writeModel core.EventStore, 
 	return s
 }
 
-// GetNewThread creates a new conversation thread.
-func (s *Service) GetNewThread() core.AgentThread {
-	return core.NewInMemoryThread()
-}
-
-// DeserializeThread restores an agent thread from state.
-func (s *Service) DeserializeThread(data []byte) (core.AgentThread, error) {
-	return core.NewInMemoryThreadFromState(data)
-}
-
 // Run processes the LLM response using an AgentThread and yields events.
 func (s *Service) Run(ctx context.Context, runCtx core.RunContext) iter.Seq2[core.Event, error] {
 	return func(yield func(core.Event, error) bool) {
