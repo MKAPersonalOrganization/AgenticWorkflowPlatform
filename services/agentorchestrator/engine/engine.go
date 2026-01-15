@@ -45,6 +45,35 @@ func New(
 	}
 }
 
+// setAgentName automatically sets the agent name on events that have an AgentName field.
+// This helper reduces boilerplate and prevents bugs from forgetting to set the agent name.
+func (e *Engine) setAgentName(event domain.Event) {
+	// Use type switch to set AgentName on events that support it
+	switch evt := event.(type) {
+	case *domain.AssistantMessageCompletedEvent:
+		if evt.AgentName == "" {
+			evt.AgentName = e.config.Name
+		}
+	case *domain.ToolCallStartedEvent:
+		if evt.AgentName == "" {
+			evt.AgentName = e.config.Name
+		}
+	case *domain.ToolCallExecutedEvent:
+		if evt.AgentName == "" {
+			evt.AgentName = e.config.Name
+		}
+	}
+}
+
+// yieldEvent is a helper that auto-assigns the agent name before yielding an event.
+// This ensures all events have the correct agent name without manual assignment.
+func (e *Engine) yieldEvent(yield func(core.Event, error) bool, event core.Event, err error) bool {
+	if event != nil {
+		e.setAgentName(event)
+	}
+	return yield(event, err)
+}
+
 // Run processes the LLM response using an AgentThread and yields events.
 func (e *Engine) Run(
 	ctx context.Context,
@@ -108,10 +137,9 @@ func (e *Engine) Run(
 						ThreadID:  runCtx.ThreadID,
 						MessageID: runCtx.MessageID,
 						Content:   completeContent,
-						AgentName: e.config.Name,
 						Timestamp: time.Now(),
 					}
-					if !yield(evt, nil) {
+					if !e.yieldEvent(yield, evt, nil) {
 						return
 					}
 				}
@@ -148,10 +176,9 @@ func (e *Engine) Run(
 						ToolCallID:      tcUpdate.ID,
 						ToolCallName:    tcUpdate.Name,
 						ParentMessageID: runCtx.MessageID,
-						AgentName:       e.config.Name,
 						Timestamp:       time.Now(),
 					}
-					if !yield(toolStartEvent, nil) {
+					if !e.yieldEvent(yield, toolStartEvent, nil) {
 						return
 					}
 				}
@@ -199,10 +226,9 @@ func (e *Engine) Run(
 				MessageID: runCtx.MessageID,
 				Content:   completeContent,
 				ToolCalls: domainToolCalls,
-				AgentName: e.config.Name,
 				Timestamp: time.Now(),
 			}
-			if !yield(assistantEvent, nil) {
+			if !e.yieldEvent(yield, assistantEvent, nil) {
 				return
 			}
 
@@ -240,10 +266,9 @@ func (e *Engine) Run(
 					ToolArguments:   toolCall.Function.Arguments,
 					ToolResult:      result,
 					ParentMessageID: runCtx.MessageID,
-					AgentName:       e.config.Name,
 					Timestamp:       time.Now(),
 				}
-				if !yield(toolEvent, nil) {
+				if !e.yieldEvent(yield, toolEvent, nil) {
 					return
 				}
 			}
@@ -271,10 +296,9 @@ func (e *Engine) Run(
 			ThreadID:  runCtx.ThreadID,
 			MessageID: runCtx.MessageID,
 			Content:   completeContent,
-			AgentName: e.config.Name,
 			Timestamp: time.Now(),
 		}
-		yield(assistantEvent, nil)
+		e.yieldEvent(yield, assistantEvent, nil)
 	}
 }
 
