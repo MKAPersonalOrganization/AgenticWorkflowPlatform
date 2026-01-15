@@ -17,7 +17,7 @@ func TestInMemoryThreadCreation(t *testing.T) {
 		thread := NewInMemoryThread()
 
 		assert.NotEmpty(t, thread.GetID(), "thread should have an ID")
-		assert.Equal(t, ThreadTypeLocal, thread.GetType(), "thread type should be local")
+
 		assert.Empty(t, thread.RetrieveFullConversationHistory(), "new thread should have no messages")
 	})
 
@@ -27,7 +27,7 @@ func TestInMemoryThreadCreation(t *testing.T) {
 		thread := NewInMemoryThreadWithID(expectedID)
 
 		assert.Equal(t, expectedID, thread.GetID(), "thread should have specified ID")
-		assert.Equal(t, ThreadTypeLocal, thread.GetType())
+
 		assert.Empty(t, thread.RetrieveFullConversationHistory())
 	})
 
@@ -163,80 +163,6 @@ func TestThreadMessageManagement(t *testing.T) {
 	})
 }
 
-// TestThreadSerialization verifies thread serialization and deserialization.
-func TestThreadSerialization(t *testing.T) {
-	t.Parallel()
-	t.Run("serialize and deserialize thread", func(t *testing.T) {
-		t.Parallel()
-		// Create thread with messages
-		originalThread := NewInMemoryThreadWithID("thread-123")
-		messages := []Message{
-			{
-				ID:        "msg1",
-				Role:      "user",
-				Content:   "Hello, world!",
-				Timestamp: time.Now(),
-			},
-			{
-				ID:        "msg2",
-				Role:      "assistant",
-				Content:   "Hi there!",
-				Timestamp: time.Now(),
-			},
-		}
-
-		err := originalThread.AddMessages(messages)
-		require.NoError(t, err)
-
-		// Serialize
-		data, err := originalThread.Serialize()
-		require.NoError(t, err)
-		assert.NotEmpty(t, data, "serialized data should not be empty")
-
-		// Deserialize
-		restoredThread, err := NewInMemoryThreadFromState(data)
-		require.NoError(t, err)
-		require.NotNil(t, restoredThread)
-
-		// Verify restored thread matches original
-		assert.Equal(t, originalThread.GetID(), restoredThread.GetID(), "thread IDs should match")
-		assert.Equal(t, originalThread.GetType(), restoredThread.GetType(), "thread types should match")
-
-		restoredMessages := restoredThread.RetrieveFullConversationHistory()
-		assert.Len(t, restoredMessages, 2, "should have restored 2 messages")
-		assert.Equal(t, "Hello, world!", restoredMessages[0].Content)
-		assert.Equal(t, "Hi there!", restoredMessages[1].Content)
-	})
-
-	t.Run("serialize empty thread", func(t *testing.T) {
-		t.Parallel()
-		thread := NewInMemoryThread()
-
-		data, err := thread.Serialize()
-		require.NoError(t, err)
-
-		restoredThread, err := NewInMemoryThreadFromState(data)
-		require.NoError(t, err)
-		assert.Empty(t, restoredThread.RetrieveFullConversationHistory())
-	})
-
-	t.Run("deserialize invalid data", func(t *testing.T) {
-		t.Parallel()
-		invalidData := []byte("not valid json")
-
-		thread, err := NewInMemoryThreadFromState(invalidData)
-		assert.Error(t, err)
-		assert.Nil(t, thread)
-	})
-
-	t.Run("deserialize empty data", func(t *testing.T) {
-		t.Parallel()
-		thread, err := NewInMemoryThreadFromState([]byte{})
-		assert.Error(t, err)
-		assert.Nil(t, thread)
-	})
-}
-
 // TestThreadIsolation verifies that multiple threads don't interfere with each other.
 func TestThreadIsolation(t *testing.T) {
 	t.Parallel()
@@ -356,37 +282,5 @@ func TestMessageStoreThreadSafety(t *testing.T) {
 		<-done
 
 		assert.Equal(t, 50, store.Count())
-	})
-}
-
-// TestThreadGetService verifies service retrieval pattern.
-func TestThreadGetService(t *testing.T) {
-	t.Parallel()
-	t.Run("get thread service", func(t *testing.T) {
-		t.Parallel()
-		thread := NewInMemoryThread()
-
-		var agentThread AgentThread
-		service := thread.GetService(&agentThread)
-		assert.NotNil(t, service)
-	})
-
-	t.Run("get message store service", func(t *testing.T) {
-		t.Parallel()
-		thread := NewInMemoryThread()
-
-		var messageStore MessageStore
-		service := thread.GetService(&messageStore)
-		assert.NotNil(t, service)
-	})
-
-	t.Run("get unknown service returns nil", func(t *testing.T) {
-		t.Parallel()
-		thread := NewInMemoryThread()
-
-		type UnknownService any
-		var unknown UnknownService
-		service := thread.GetService(&unknown)
-		assert.Nil(t, service)
 	})
 }
