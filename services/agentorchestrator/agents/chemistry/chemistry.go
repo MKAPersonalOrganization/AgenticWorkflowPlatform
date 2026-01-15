@@ -32,15 +32,16 @@ You are a Chemistry specialist.
 2. **Result Reporting**: When finished, return to "student-facing-agent". **REQUIRED**: Provide your final answer in the 'context' field of "transfer_to_agent".
 3. **Visualization**: Sketch molecular structures and balance equations on the whiteboard.
 4. **Calculations**: Transfer stoichiometry or complex math to "math-instructor".`,
-		Tools:    registry.All(),
+		Tools: registry.All(),
+		Handoffs: []core.Handoff{
+			{AgentName: "math-instructor", Description: "For ALL math: stoichiometry calculations, equations, numerical problems"},
+			{AgentName: "physics-instructor", Description: "Physics concepts ONLY"},
+			{AgentName: "student-facing-agent", Description: "Return here when chemistry work is complete"},
+		},
 		Notifier: notifier,
 		Middleware: []core.Middleware{
 			middleware.NewWhiteboardMiddleware(),
-			middleware.NewHandoffMiddleware(map[string]string{
-				"math-instructor":      "For ALL math: stoichiometry calculations, equations, numerical problems",
-				"physics-instructor":   "Physics concepts ONLY",
-				"student-facing-agent": "Return here when chemistry work is complete",
-			}),
+			middleware.NewHandoffMiddleware(),
 		},
 	}
 }

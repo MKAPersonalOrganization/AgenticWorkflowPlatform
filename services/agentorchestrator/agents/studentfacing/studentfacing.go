@@ -47,16 +47,17 @@ You do NOT answer questions directly. You route questions to specialists and rel
 
 # Tone
 Be friendly and helpful, but concise. You're a coordinator, not a teacher.`,
-		Tools:    registry.All(),
+		Tools: registry.All(),
+		Handoffs: []core.Handoff{
+			{AgentName: "math-instructor", Description: "ALL mathematics: algebra, calculus, trigonometry, derivatives, integrals, graphing, equations"},
+			{AgentName: "physics-instructor", Description: "Physics concepts: mechanics, forces, energy, motion (delegates math to math-instructor)"},
+			{AgentName: "chemistry-instructor", Description: "Chemistry: reactions, stoichiometry, molecules (delegates math to math-instructor)"},
+			{AgentName: "linearalgebra-instructor", Description: "Linear algebra ONLY: matrices, vectors, eigenvalues, matrix operations"},
+		},
 		Notifier: notifier,
 		Middleware: []core.Middleware{
 			middleware.NewWhiteboardMiddleware(),
-			middleware.NewHandoffMiddleware(map[string]string{
-				"math-instructor":          "ALL mathematics: algebra, calculus, trigonometry, derivatives, integrals, graphing, equations",
-				"physics-instructor":       "Physics concepts: mechanics, forces, energy, motion (delegates math to math-instructor)",
-				"chemistry-instructor":     "Chemistry: reactions, stoichiometry, molecules (delegates math to math-instructor)",
-				"linearalgebra-instructor": "Linear algebra ONLY: matrices, vectors, eigenvalues, matrix operations",
-			}),
+			middleware.NewHandoffMiddleware(),
 		},
 	}
 }
