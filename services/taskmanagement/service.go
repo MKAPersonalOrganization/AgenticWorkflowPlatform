@@ -3,14 +3,13 @@ package taskmanagement
 import (
 	"context"
 	"fmt"
-	"time"
-
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/observability/langfuse"
 	"school-with-ai/services"
 	"school-with-ai/services/agentorchestrator/agents/shared"
+	"time"
 )
 
 // ObservabilityConfig contains configuration for observability and tracing attributes

@@ -1,17 +1,11 @@
 package core
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
 )
 
-// ErrEmptyThreadState is returned when attempting to deserialize empty thread state.
-var ErrEmptyThreadState = errors.New("serialized thread state is empty")
-
-// InMemoryThread provides an abstract base for agent threads that maintain
 // all conversation state in local memory.
 //
 // InMemoryThread is designed for scenarios where conversation state should be stored locally
@@ -23,12 +17,6 @@ var ErrEmptyThreadState = errors.New("serialized thread state is empty")
 type InMemoryThread struct {
 	id           string
 	messageStore MessageStore
-}
-
-// inMemoryThreadState is used for JSON serialization/deserialization.
-type inMemoryThreadState struct {
-	ID         string          `json:"id"`
-	StoreState json.RawMessage `json:"storeState,omitempty"`
 }
 
 // NewInMemoryThread creates a new in-memory thread with a generated ID.
@@ -62,29 +50,6 @@ func NewInMemoryThreadWithMessages(messages []Message) (*InMemoryThread, error) 
 	return thread, nil
 }
 
-// NewInMemoryThreadFromState creates a new in-memory thread from previously serialized state.
-func NewInMemoryThreadFromState(data []byte) (*InMemoryThread, error) {
-	if len(data) == 0 {
-		return nil, ErrEmptyThreadState
-	}
-
-	var state inMemoryThreadState
-	if err := json.Unmarshal(data, &state); err != nil {
-		return nil, fmt.Errorf("failed to deserialize thread state: %w", err)
-	}
-
-	// Create message store from state
-	messageStore, err := NewInMemoryMessageStoreFromState(state.StoreState)
-	if err != nil {
-		return nil, fmt.Errorf("failed to deserialize message store: %w", err)
-	}
-
-	return &InMemoryThread{
-		id:           state.ID,
-		messageStore: messageStore,
-	}, nil
-}
-
 // GetID returns the unique identifier for this thread.
 func (t *InMemoryThread) GetID() string {
 	return t.id
@@ -100,46 +65,6 @@ func (t *InMemoryThread) AddMessages(messages []Message) error {
 	err := t.messageStore.AddMessages(messages)
 	if err != nil {
 		return fmt.Errorf("failed to add messages to thread: %w", err)
-	}
-
-	return nil
-}
-
-// Serialize serializes the thread state to JSON.
-func (t *InMemoryThread) Serialize() ([]byte, error) {
-	storeData, err := t.messageStore.Serialize()
-	if err != nil {
-		return nil, fmt.Errorf("failed to serialize message store: %w", err)
-	}
-
-	state := inMemoryThreadState{
-		ID:         t.id,
-		StoreState: storeData,
-	}
-
-	data, err := json.Marshal(state)
-	if err != nil {
-		return nil, fmt.Errorf("failed to serialize thread state: %w", err)
-	}
-
-	return data, nil
-}
-
-// GetType returns the thread type (always local for InMemoryThread).
-func (t *InMemoryThread) GetType() ThreadType {
-	return ThreadTypeLocal
-}
-
-// GetService asks the thread for an object of the specified type.
-func (t *InMemoryThread) GetService(serviceType any) any {
-	// Return self if requesting AgentThread type
-	if _, ok := serviceType.(*AgentThread); ok {
-		return t
-	}
-
-	// Return message store if requesting MessageStore type
-	if _, ok := serviceType.(*MessageStore); ok {
-		return t.messageStore
 	}
 
 	return nil

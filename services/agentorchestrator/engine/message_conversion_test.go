@@ -2,13 +2,13 @@ package engine
 
 import (
 	"reflect"
-	"testing"
-
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/llm"
+	"testing"
 )
 
 func TestToLLMChatMessages(t *testing.T) {
+	t.Parallel()
 	// Setup test data
 	userMsg := core.Message{
 		Role:    "user",
