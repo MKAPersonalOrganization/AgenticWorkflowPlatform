@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"school-with-ai/foundation/agentsdk/core"
-	"sort"
 	"strings"
 )
 
@@ -54,15 +53,15 @@ type Handoff struct {
 
 // TransferToAgentTool is the tool for transferring to another agent.
 type TransferToAgentTool struct {
-	availableAgents map[string]string // agent_name -> description
-	reqCtx          *core.RequestContext
+	handoffs []core.Handoff
+	reqCtx   *core.RequestContext
 }
 
 // NewTransferToAgentTool creates a new TransferToAgentTool.
-func NewTransferToAgentTool(availableAgents map[string]string, reqCtx *core.RequestContext) *TransferToAgentTool {
+func NewTransferToAgentTool(handoffs []core.Handoff, reqCtx *core.RequestContext) *TransferToAgentTool {
 	return &TransferToAgentTool{
-		availableAgents: availableAgents,
-		reqCtx:          reqCtx,
+		handoffs: handoffs,
+		reqCtx:   reqCtx,
 	}
 }
 
@@ -71,21 +70,12 @@ func (t *TransferToAgentTool) Name() string {
 }
 
 func (t *TransferToAgentTool) Description() string {
-	// Build description with available agents
 	var sb strings.Builder
 	sb.WriteString(TransferToAgentToolDescription)
 	sb.WriteString("\n\nAvailable agents:\n")
 
-	// Sort agents by name for consistent ordering
-	agentNames := make([]string, 0, len(t.availableAgents))
-	for name := range t.availableAgents {
-		agentNames = append(agentNames, name)
-	}
-	sort.Strings(agentNames)
-
-	for _, name := range agentNames {
-		desc := t.availableAgents[name]
-		sb.WriteString(fmt.Sprintf("- %s: %s\n", name, desc))
+	for _, handoff := range t.handoffs {
+		sb.WriteString(fmt.Sprintf("- %s: %s\n", handoff.AgentName, handoff.Description))
 	}
 
 	return sb.String()
@@ -93,11 +83,10 @@ func (t *TransferToAgentTool) Description() string {
 
 func (t *TransferToAgentTool) Parameters() map[string]any {
 	// Build enum of available agent names
-	agentNames := make([]string, 0, len(t.availableAgents))
-	for name := range t.availableAgents {
-		agentNames = append(agentNames, name)
+	agentNames := make([]string, 0, len(t.handoffs))
+	for _, handoff := range t.handoffs {
+		agentNames = append(agentNames, handoff.AgentName)
 	}
-	sort.Strings(agentNames)
 
 	return map[string]any{
 		"type": "object",
@@ -143,12 +132,18 @@ func (t *TransferToAgentTool) Invoke(ctx core.ToolContext, args any) (any, error
 	}
 
 	// Validate agent exists
-	if _, exists := t.availableAgents[params.AgentName]; !exists {
-		agentNames := make([]string, 0, len(t.availableAgents))
-		for name := range t.availableAgents {
-			agentNames = append(agentNames, name)
+	found := false
+	for _, handoff := range t.handoffs {
+		if handoff.AgentName == params.AgentName {
+			found = true
+			break
 		}
-
+	}
+	if !found {
+		agentNames := make([]string, 0, len(t.handoffs))
+		for _, handoff := range t.handoffs {
+			agentNames = append(agentNames, handoff.AgentName)
+		}
 		return nil, fmt.Errorf("%w: %s. Available agents: %v", ErrUnknownAgent, params.AgentName, agentNames)
 	}
 
@@ -205,20 +200,14 @@ func (m *HandoffMiddleware) Process(ctx context.Context, reqCtx *core.RequestCon
 		return next(ctx, reqCtx)
 	}
 
-	// Build available agents map from config handoffs
-	availableAgents := make(map[string]string, len(reqCtx.Config.Handoffs))
-	for _, handoff := range reqCtx.Config.Handoffs {
-		availableAgents[handoff.AgentName] = handoff.Description
-	}
-
 	// Add transfer_to_agent tool
-	reqCtx.AddTool(NewTransferToAgentTool(availableAgents, reqCtx))
+	reqCtx.AddTool(NewTransferToAgentTool(reqCtx.Config.Handoffs, reqCtx))
 
 	// Check if this agent is receiving control back from another agent
 	returnHandoffPrompt := m.detectReturnHandoff(reqCtx)
 
 	// Build and add system prompt
-	promptWithAgents := m.buildSystemPromptWithAgents(availableAgents)
+	promptWithAgents := m.buildSystemPromptWithAgents(reqCtx.Config.Handoffs)
 	if returnHandoffPrompt != "" {
 		promptWithAgents = returnHandoffPrompt + "\n\n" + promptWithAgents
 	}
@@ -282,21 +271,13 @@ The previous agent has completed their work and returned control to you.
 }
 
 // buildSystemPromptWithAgents creates the system prompt including the list of available agents.
-func (m *HandoffMiddleware) buildSystemPromptWithAgents(availableAgents map[string]string) string {
+func (m *HandoffMiddleware) buildSystemPromptWithAgents(handoffs []core.Handoff) string {
 	var sb strings.Builder
 	sb.WriteString(m.systemPrompt)
 	sb.WriteString("\n\nAvailable agents:\n")
 
-	// Sort agents by name for consistent ordering
-	agentNames := make([]string, 0, len(availableAgents))
-	for name := range availableAgents {
-		agentNames = append(agentNames, name)
-	}
-	sort.Strings(agentNames)
-
-	for _, name := range agentNames {
-		desc := availableAgents[name]
-		sb.WriteString(fmt.Sprintf("- **%s**: %s\n", name, desc))
+	for _, handoff := range handoffs {
+		sb.WriteString(fmt.Sprintf("- **%s**: %s\n", handoff.AgentName, handoff.Description))
 	}
 
 	return sb.String()
