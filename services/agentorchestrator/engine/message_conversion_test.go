@@ -77,6 +77,10 @@ func TestToLLMChatMessages(t *testing.T) {
 				},
 			},
 		},
+		{
+			Role:     llm.ChatRoleSystem,
+			Contents: []llm.AIContent{},
+		},
 	}
 
 	// Execute
