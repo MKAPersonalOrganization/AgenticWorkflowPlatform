@@ -35,8 +35,8 @@ type AgentThread interface {
 	// GetID returns the unique identifier for this thread
 	GetID() string
 
-	// GetMessages returns all messages in the thread
-	GetMessages() []Message
+	// RetrieveFullConversationHistory returns all messages in the thread
+	RetrieveFullConversationHistory() []Message
 
 	// AddMessages adds new messages to the thread
 	AddMessages(messages []Message) error

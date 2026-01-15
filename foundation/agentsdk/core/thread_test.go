@@ -18,7 +18,7 @@ func TestInMemoryThreadCreation(t *testing.T) {
 
 		assert.NotEmpty(t, thread.GetID(), "thread should have an ID")
 		assert.Equal(t, ThreadTypeLocal, thread.GetType(), "thread type should be local")
-		assert.Empty(t, thread.GetMessages(), "new thread should have no messages")
+		assert.Empty(t, thread.RetrieveFullConversationHistory(), "new thread should have no messages")
 	})
 
 	t.Run("create thread with ID", func(t *testing.T) {
@@ -28,7 +28,7 @@ func TestInMemoryThreadCreation(t *testing.T) {
 
 		assert.Equal(t, expectedID, thread.GetID(), "thread should have specified ID")
 		assert.Equal(t, ThreadTypeLocal, thread.GetType())
-		assert.Empty(t, thread.GetMessages())
+		assert.Empty(t, thread.RetrieveFullConversationHistory())
 	})
 
 	t.Run("create thread with initial messages", func(t *testing.T) {
@@ -52,7 +52,7 @@ func TestInMemoryThreadCreation(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, thread)
 
-		retrievedMessages := thread.GetMessages()
+		retrievedMessages := thread.RetrieveFullConversationHistory()
 		assert.Len(t, retrievedMessages, 2, "thread should have 2 messages")
 		assert.Equal(t, messages[0].Content, retrievedMessages[0].Content)
 		assert.Equal(t, messages[1].Content, retrievedMessages[1].Content)
@@ -78,7 +78,7 @@ func TestThreadMessageManagement(t *testing.T) {
 		err := thread.AddMessages(messages)
 		require.NoError(t, err)
 
-		retrievedMessages := thread.GetMessages()
+		retrievedMessages := thread.RetrieveFullConversationHistory()
 		assert.Len(t, retrievedMessages, 1)
 		assert.Equal(t, "What is 2+2?", retrievedMessages[0].Content)
 		assert.Equal(t, "user", retrievedMessages[0].Role)
@@ -102,7 +102,7 @@ func TestThreadMessageManagement(t *testing.T) {
 		err = thread.AddMessages(batch2)
 		require.NoError(t, err)
 
-		messages := thread.GetMessages()
+		messages := thread.RetrieveFullConversationHistory()
 		assert.Len(t, messages, 3, "should have all 3 messages")
 		assert.Equal(t, "Hello", messages[0].Content)
 		assert.Equal(t, "Hi", messages[1].Content)
@@ -120,14 +120,14 @@ func TestThreadMessageManagement(t *testing.T) {
 		err := thread.AddMessages(original)
 		require.NoError(t, err)
 
-		retrieved1 := thread.GetMessages()
-		retrieved2 := thread.GetMessages()
+		retrieved1 := thread.RetrieveFullConversationHistory()
+		retrieved2 := thread.RetrieveFullConversationHistory()
 
 		// Modify one of the retrieved slices
 		retrieved1[0].Content = "Modified"
 
 		// Verify thread still has original content
-		current := thread.GetMessages()
+		current := thread.RetrieveFullConversationHistory()
 		assert.Equal(t, "Original", current[0].Content, "thread content should not be affected")
 		assert.Equal(t, "Original", retrieved2[0].Content, "other retrieved copy should not be affected")
 	})
@@ -202,7 +202,7 @@ func TestThreadSerialization(t *testing.T) {
 		assert.Equal(t, originalThread.GetID(), restoredThread.GetID(), "thread IDs should match")
 		assert.Equal(t, originalThread.GetType(), restoredThread.GetType(), "thread types should match")
 
-		restoredMessages := restoredThread.GetMessages()
+		restoredMessages := restoredThread.RetrieveFullConversationHistory()
 		assert.Len(t, restoredMessages, 2, "should have restored 2 messages")
 		assert.Equal(t, "Hello, world!", restoredMessages[0].Content)
 		assert.Equal(t, "Hi there!", restoredMessages[1].Content)
@@ -217,7 +217,7 @@ func TestThreadSerialization(t *testing.T) {
 
 		restoredThread, err := NewInMemoryThreadFromState(data)
 		require.NoError(t, err)
-		assert.Empty(t, restoredThread.GetMessages())
+		assert.Empty(t, restoredThread.RetrieveFullConversationHistory())
 	})
 
 	t.Run("deserialize invalid data", func(t *testing.T) {
@@ -259,8 +259,8 @@ func TestThreadIsolation(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify isolation
-		msgs1 := thread1.GetMessages()
-		msgs2 := thread2.GetMessages()
+		msgs1 := thread1.RetrieveFullConversationHistory()
+		msgs2 := thread2.RetrieveFullConversationHistory()
 
 		assert.Len(t, msgs1, 1)
 		assert.Len(t, msgs2, 1)
@@ -312,12 +312,12 @@ func TestThreadIsolation(t *testing.T) {
 		<-done
 
 		// Verify both threads have their messages
-		assert.Len(t, thread1.GetMessages(), 100)
-		assert.Len(t, thread2.GetMessages(), 100)
+		assert.Len(t, thread1.RetrieveFullConversationHistory(), 100)
+		assert.Len(t, thread2.RetrieveFullConversationHistory(), 100)
 
 		// Verify content is correct
-		msgs1 := thread1.GetMessages()
-		msgs2 := thread2.GetMessages()
+		msgs1 := thread1.RetrieveFullConversationHistory()
+		msgs2 := thread2.RetrieveFullConversationHistory()
 		assert.Equal(t, "user", msgs1[0].Role)
 		assert.Equal(t, "assistant", msgs2[0].Role)
 	})

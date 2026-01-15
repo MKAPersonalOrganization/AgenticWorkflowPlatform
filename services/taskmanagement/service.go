@@ -102,7 +102,7 @@ func (s *Service) HandleUserMessage(
 
 	// 3. Auto-generate thread title if this is the first message
 	// Use the thread aggregate returned by AddUserMessage to ensure consistency (bypass projection lag)
-	msgCount := len(thread.GetMessages())
+	msgCount := len(thread.RetrieveFullConversationHistory())
 
 	// Check if this is a first message or if title is still default
 	// We use the returned 'thread' because it's the most up-to-date state
@@ -257,7 +257,7 @@ func (s *Service) runAgent(ctx context.Context, threadID, agentName string, emit
 	// Note: thread is now passed in from the caller to ensure consistency
 
 	// Debug: Log thread state
-	messages := thread.GetMessages()
+	messages := thread.RetrieveFullConversationHistory()
 	s.log.Info(ctx, "Thread state before agent execution",
 		"threadID", threadID,
 		"messageCount", len(messages),
@@ -303,7 +303,7 @@ func (s *Service) runAgent(ctx context.Context, threadID, agentName string, emit
 			// Get the agent's response from the thread
 			updatedThread, _ := s.threadStore.GetOrCreateAgentThread(ctx, threadID)
 			var response string
-			if updatedMessages := updatedThread.GetMessages(); len(updatedMessages) > 0 {
+			if updatedMessages := updatedThread.RetrieveFullConversationHistory(); len(updatedMessages) > 0 {
 				lastMsg := updatedMessages[len(updatedMessages)-1]
 				if lastMsg.Role == "assistant" {
 					response = lastMsg.Content
