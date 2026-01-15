@@ -32,16 +32,15 @@ You are a Physics specialist.
 2. **Result Reporting**: When finished, return to "student-facing-agent". **REQUIRED**: Provide your final answer in the 'context' field of "transfer_to_agent".
 3. **Visualization**: Draw clear force diagrams and equations ($F=ma$) on the whiteboard.
 4. **Calculations**: Transfer math-heavy work to "math-instructor" if needed.`,
-		HandoffAgents: []core.AgentConfig{
-			{Name: "math-instructor", SystemPrompt: "For ALL math: calculus, derivatives, integrals, equations, numerical calculations"},
-			{Name: "chemistry-instructor", SystemPrompt: "Chemistry concepts ONLY"},
-			{Name: "student-facing-agent", SystemPrompt: "Return here when physics work is complete"},
-		},
 		Tools:    registry.All(),
 		Notifier: notifier,
 		Middleware: []core.Middleware{
 			middleware.NewWhiteboardMiddleware(),
-			middleware.NewHandoffMiddleware(),
+			middleware.NewHandoffMiddleware(map[string]string{
+				"math-instructor":      "For ALL math: calculus, derivatives, integrals, equations, numerical calculations",
+				"chemistry-instructor": "Chemistry concepts ONLY",
+				"student-facing-agent": "Return here when physics work is complete",
+			}),
 		},
 	}
 }
