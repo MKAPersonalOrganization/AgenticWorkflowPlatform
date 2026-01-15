@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -102,14 +103,42 @@ func (e *RegistryToolExecutor) Execute(toolCall ToolCall) (ToolExecutionResult, 
 		e.requestCtx,
 	)
 
-	toolResult, err := tool.Invoke(toolCtx, toolCall.Function.Arguments)
+	// Unmarshal JSON arguments to map[string]any
+	var args map[string]any
+	if toolCall.Function.Arguments != "" {
+		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
+			return ToolExecutionResult{}, fmt.Errorf("failed to unmarshal tool arguments: %w", err)
+		}
+	}
+
+	// Invoke tool with typed arguments
+	result, err := tool.Invoke(toolCtx, args)
 	endTime := time.Now()
 
-	// Build execution result from ToolResult
+	// Build execution result
 	execResult := ToolExecutionResult{
-		Result:        toolResult.Result,
-		Command:       toolResult.Command,
-		StopIteration: toolResult.StopIteration(),
+		StopIteration: false,
+	}
+
+	// Handle result based on its type
+	if result != nil {
+		finalResult := result
+
+		// If the tool returned an explicit ToolResult (possibly for routing), extract metadata
+		if tr, ok := result.(ToolResult); ok {
+			finalResult = tr.Result
+			execResult.Command = tr.Command
+			if tr.Command != nil {
+				execResult.StopIteration = tr.Command.StopIteration
+			}
+		}
+
+		// Marshal the result back to JSON string for LLM
+		resultBytes, marshalErr := json.Marshal(finalResult)
+		if marshalErr != nil {
+			return ToolExecutionResult{}, fmt.Errorf("failed to marshal tool result: %w", marshalErr)
+		}
+		execResult.Result = string(resultBytes)
 	}
 
 	// Track tool execution if tracer is available

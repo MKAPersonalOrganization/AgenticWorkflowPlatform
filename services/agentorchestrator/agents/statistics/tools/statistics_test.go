@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"encoding/json"
 	"school-with-ai/foundation/agentsdk/core"
 	"testing"
 )
@@ -14,17 +13,17 @@ func TestDescriptiveStatsTool_Mean(t *testing.T) {
 		"operation": "mean",
 		"data":      []float64{1, 2, 3, 4, 5},
 	}
-	argsJSON, _ := json.Marshal(args)
 
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	var response map[string]any
-	if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
-		t.Fatalf("Failed to unmarshal response: %v", err)
+	response, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("Expected map[string]any result, got %T", result)
 	}
+
 	if response["result"] != 3.0 {
 		t.Errorf("Expected mean 3.0, got %v", response["result"])
 	}
@@ -37,21 +36,21 @@ func TestDescriptiveStatsTool_Describe(t *testing.T) {
 		"operation": "describe",
 		"data":      []float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
 	}
-	argsJSON, _ := json.Marshal(args)
 
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	var response map[string]any
-	if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
-		t.Fatalf("Failed to unmarshal response: %v", err)
+	response, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("Expected map[string]any result, got %T", result)
 	}
+
 	resultMap := response["result"].(map[string]any)
 
-	if resultMap["count"] != float64(10) {
-		t.Errorf("Expected count 10, got %v", resultMap["count"])
+	if response["result"].(map[string]any)["count"].(int) != 10 {
+		t.Errorf("Expected count 10, got %v", response["result"].(map[string]any)["count"])
 	}
 	if resultMap["mean"] != 5.5 {
 		t.Errorf("Expected mean 5.5, got %v", resultMap["mean"])
@@ -66,17 +65,17 @@ func TestCorrelationTool_Pearson(t *testing.T) {
 		"data1":     []float64{1, 2, 3, 4, 5},
 		"data2":     []float64{2, 4, 6, 8, 10},
 	}
-	argsJSON, _ := json.Marshal(args)
 
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	var response map[string]any
-	if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
-		t.Fatalf("Failed to unmarshal response: %v", err)
+	response, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("Expected map[string]any result, got %T", result)
 	}
+
 	correlation := response["result"].(float64)
 
 	if correlation < 0.99 || correlation > 1.01 {
@@ -92,17 +91,17 @@ func TestDistanceMetricsTool_Euclidean(t *testing.T) {
 		"point1":    []float64{0, 0, 0},
 		"point2":    []float64{3, 4, 0},
 	}
-	argsJSON, _ := json.Marshal(args)
 
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	var response map[string]any
-	if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
-		t.Fatalf("Failed to unmarshal response: %v", err)
+	response, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("Expected map[string]any result, got %T", result)
 	}
+
 	distance := response["distance"].(float64)
 
 	if distance != 5.0 {
@@ -117,17 +116,17 @@ func TestSamplingTool_QuartileOutliers(t *testing.T) {
 		"operation": "quartile_outliers",
 		"data":      []float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 100},
 	}
-	argsJSON, _ := json.Marshal(args)
 
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	var response map[string]any
-	if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
-		t.Fatalf("Failed to unmarshal response: %v", err)
+	response, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("Expected map[string]any result, got %T", result)
 	}
+
 	resultMap := response["result"].(map[string]any)
 
 	if resultMap["extreme"] == nil {
@@ -142,16 +141,15 @@ func TestDataTransformTool_Sigmoid(t *testing.T) {
 		"operation": "sigmoid",
 		"data":      []float64{0, 1, -1},
 	}
-	argsJSON, _ := json.Marshal(args)
 
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	var response map[string]any
-	if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
-		t.Fatalf("Failed to unmarshal response: %v", err)
+	response, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("Expected map[string]any result, got %T", result)
 	}
 
 	if response["result"] == nil {
@@ -167,16 +165,15 @@ func TestDataTransformTool_Round(t *testing.T) {
 		"value":     3.14159,
 		"places":    2,
 	}
-	argsJSON, _ := json.Marshal(args)
 
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	var response map[string]any
-	if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
-		t.Fatalf("Failed to unmarshal response: %v", err)
+	response, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("Expected map[string]any result, got %T", result)
 	}
 
 	if response["result"] != 3.14 {
@@ -193,16 +190,15 @@ func TestNormalDistributionTool_Pdf(t *testing.T) {
 		"loc":       0.0,
 		"scale":     1.0,
 	}
-	argsJSON, _ := json.Marshal(args)
 
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	var response map[string]any
-	if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
-		t.Fatalf("Failed to unmarshal response: %v", err)
+	response, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("Expected map[string]any result, got %T", result)
 	}
 
 	pdf := response["result"].(float64)
@@ -220,17 +216,17 @@ func TestNormalDistributionTool_Fit(t *testing.T) {
 		"operation": "norm_fit",
 		"data":      []float64{1, 2, 3, 4, 5},
 	}
-	argsJSON, _ := json.Marshal(args)
 
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	var response map[string]any
-	if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
-		t.Fatalf("Failed to unmarshal response: %v", err)
+	response, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("Expected map[string]any result, got %T", result)
 	}
+
 	resultMap := response["result"].(map[string]any)
 
 	if resultMap["loc"] != 3.0 {
@@ -245,16 +241,15 @@ func TestGeometricDistributionTool_ExpGeom(t *testing.T) {
 		"operation": "exp_geom",
 		"p":         0.5,
 	}
-	argsJSON, _ := json.Marshal(args)
 
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	var response map[string]any
-	if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
-		t.Fatalf("Failed to unmarshal response: %v", err)
+	response, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("Expected map[string]any result, got %T", result)
 	}
 
 	if response["result"] != 2.0 {
@@ -270,16 +265,15 @@ func TestRegressionTool_Linear(t *testing.T) {
 		"x":    []float64{1, 2, 3, 4, 5},
 		"y":    []float64{2, 4, 6, 8, 10},
 	}
-	argsJSON, _ := json.Marshal(args)
 
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	var response map[string]any
-	if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
-		t.Fatalf("Failed to unmarshal response: %v", err)
+	response, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("Expected map[string]any result, got %T", result)
 	}
 
 	if response["type"] != "linear" {

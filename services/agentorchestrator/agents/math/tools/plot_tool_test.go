@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"school-with-ai/foundation/agentsdk/core"
 	"strings"
@@ -25,19 +24,14 @@ plot sin(x) with lines linewidth 2 title 'y = sin(x)'`
 		Title:         "Sine wave test",
 	}
 
-	argsJSON, err := json.Marshal(args)
-	if err != nil {
-		t.Fatalf("failed to marshal args: %v", err)
-	}
-
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	if err != nil {
 		t.Fatalf("failed to invoke plot tool: %v", err)
 	}
 
-	var response map[string]any
-	if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
-		t.Fatalf("failed to unmarshal result: %v", err)
+	response, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("expected map[string]any result, got %T", result)
 	}
 
 	if !response["success"].(bool) {
@@ -67,15 +61,14 @@ plot sin(x) title 'sin(x)', cos(x) title 'cos(x)', tan(x) title 'tan(x)'`
 		Title:         "Multiple trig functions",
 	}
 
-	argsJSON, _ := json.Marshal(args)
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	if err != nil {
 		t.Fatalf("failed to create plot: %v", err)
 	}
 
-	var response map[string]any
-	if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
-		t.Fatalf("failed to unmarshal response: %v", err)
+	response, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("expected map[string]any result, got %T", result)
 	}
 
 	imagePath := response["image_path"].(string)
@@ -102,15 +95,14 @@ plot x**2 - 4*x + 3 with lines title 'y = x² - 4x + 3', 0 with lines dashtype 2
 		Title:         "Quadratic function",
 	}
 
-	argsJSON, _ := json.Marshal(args)
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	if err != nil {
 		t.Fatalf("failed to create plot: %v", err)
 	}
 
-	var response map[string]any
-	if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
-		t.Fatalf("failed to unmarshal response: %v", err)
+	response, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("expected map[string]any result, got %T", result)
 	}
 
 	imagePath := response["image_path"].(string)
@@ -137,15 +129,14 @@ e`
 		Title:         "Scatter data",
 	}
 
-	argsJSON, _ := json.Marshal(args)
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	if err != nil {
 		t.Fatalf("failed to create plot: %v", err)
 	}
 
-	var response map[string]any
-	if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
-		t.Fatalf("failed to unmarshal response: %v", err)
+	response, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("expected map[string]any result, got %T", result)
 	}
 
 	imagePath := response["image_path"].(string)
@@ -166,15 +157,14 @@ splot x**2 + y**2 with lines`
 		Title:         "3D surface",
 	}
 
-	argsJSON, _ := json.Marshal(args)
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	if err != nil {
 		t.Fatalf("failed to create plot: %v", err)
 	}
 
-	var response map[string]any
-	if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
-		t.Fatalf("failed to unmarshal response: %v", err)
+	response, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("expected map[string]any result, got %T", result)
 	}
 
 	imagePath := response["image_path"].(string)
@@ -195,8 +185,7 @@ func TestPlotTool_ValidationMissingScript(t *testing.T) {
 		Title: "Test",
 	}
 
-	argsJSON, _ := json.Marshal(args)
-	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 
 	if err == nil {
 		t.Error("expected error for missing gnuplot_script parameter")
@@ -214,8 +203,7 @@ func TestPlotTool_ValidationSetTerminal(t *testing.T) {
 		Title:         "Test",
 	}
 
-	argsJSON, _ := json.Marshal(args)
-	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 
 	if err == nil {
 		t.Error("expected error for script containing 'set terminal'")
@@ -233,8 +221,7 @@ func TestPlotTool_ValidationSetOutput(t *testing.T) {
 		Title:         "Test",
 	}
 
-	argsJSON, _ := json.Marshal(args)
-	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 
 	if err == nil {
 		t.Error("expected error for script containing 'set output'")
@@ -253,8 +240,7 @@ func TestPlotTool_ValidationTitleTooLong(t *testing.T) {
 		Title:         longTitle,
 	}
 
-	argsJSON, _ := json.Marshal(args)
-	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 
 	if err == nil {
 		t.Error("expected error for title too long")

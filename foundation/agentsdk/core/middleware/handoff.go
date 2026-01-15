@@ -120,59 +120,59 @@ func (t *TransferToAgentTool) Parameters() map[string]any {
 	}
 }
 
-func (t *TransferToAgentTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
-	var args struct {
+func (t *TransferToAgentTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+	var params struct {
 		AgentName string `json:"agent_name"`
 		Question  string `json:"question"`
 		Context   string `json:"context"`
 	}
 
-	err := json.Unmarshal([]byte(arguments), &args)
-	if err != nil {
-		return core.ToolResult{}, fmt.Errorf("failed to parse transfer arguments: %w", err)
+	if err := core.UnmarshalArgs(args, &params); err != nil {
+		return nil, fmt.Errorf("failed to parse transfer arguments: %w", err)
 	}
 
 	// Validate agent_name is provided
-	if args.AgentName == "" {
-		return core.ToolResult{}, ErrAgentNameRequired
+	if params.AgentName == "" {
+		return nil, ErrAgentNameRequired
 	}
 
 	// Prevent self-transfer
 	currentAgentName := t.reqCtx.Config.Name
-	if args.AgentName == currentAgentName {
-		return core.ToolResult{}, fmt.Errorf("%w (%s). If you can handle this task, answer directly instead of transferring", ErrSelfTransfer, currentAgentName)
+	if params.AgentName == currentAgentName {
+		return nil, fmt.Errorf("%w (%s). If you can handle this task, answer directly instead of transferring", ErrSelfTransfer, currentAgentName)
 	}
 
 	// Validate agent exists
-	if _, exists := t.availableAgents[args.AgentName]; !exists {
+	if _, exists := t.availableAgents[params.AgentName]; !exists {
 		agentNames := make([]string, 0, len(t.availableAgents))
 		for name := range t.availableAgents {
 			agentNames = append(agentNames, name)
 		}
 
-		return core.ToolResult{}, fmt.Errorf("%w: %s. Available agents: %v", ErrUnknownAgent, args.AgentName, agentNames)
+		return nil, fmt.Errorf("%w: %s. Available agents: %v", ErrUnknownAgent, params.AgentName, agentNames)
 	}
 
 	// Store handoff in request context state for task management to detect
 	handoff := Handoff{
-		TargetAgent: args.AgentName,
-		Question:    args.Question,
-		Context:     args.Context,
+		TargetAgent: params.AgentName,
+		Question:    params.Question,
+		Context:     params.Context,
 	}
 
 	SetHandoff(t.reqCtx, handoff)
 
-	// Return ToolResult with Command following LangGraph pattern
-	return core.NewToolResultWithCommand(
-		fmt.Sprintf("Successfully transferred to %s", args.AgentName),
-		&core.Command{
-			Goto:          args.AgentName,
-			StopIteration: true,
-			Update: map[string]any{
-				"handoff": handoff,
-			},
-		},
-	), nil
+	// In the new pattern, we return a ToolResult that wraps the display map
+	// AND includes a Command for the engine to handle the routing/stop iteration.
+	resultMap := map[string]any{
+		"status":      fmt.Sprintf("Successfully transferred to %s", params.AgentName),
+		"next_agent":  params.AgentName,
+		"is_transfer": true,
+	}
+
+	return core.NewToolResultWithCommand(resultMap, &core.Command{
+		Goto:          params.AgentName,
+		StopIteration: true,
+	}), nil
 }
 
 // HandoffMiddleware provides agent handoff/transfer capabilities.

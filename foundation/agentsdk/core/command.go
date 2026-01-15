@@ -18,15 +18,15 @@ type Command struct {
 // ToolResult represents the result of a tool invocation.
 // It contains both the display result and optional routing command.
 type ToolResult struct {
-	// Result is the string result to display/add to conversation
-	Result string
+	// Result is the result to display/add to conversation (marshaled to JSON)
+	Result any
 
 	// Command is an optional routing command (nil for regular tools)
 	Command *Command
 }
 
-// NewToolResult creates a simple tool result with just a string result.
-func NewToolResult(result string) ToolResult {
+// NewToolResult creates a simple tool result with just a result.
+func NewToolResult(result any) ToolResult {
 	return ToolResult{
 		Result:  result,
 		Command: nil,
@@ -34,7 +34,7 @@ func NewToolResult(result string) ToolResult {
 }
 
 // NewToolResultWithCommand creates a tool result with both result and command.
-func NewToolResultWithCommand(result string, cmd *Command) ToolResult {
+func NewToolResultWithCommand(result any, cmd *Command) ToolResult {
 	return ToolResult{
 		Result:  result,
 		Command: cmd,

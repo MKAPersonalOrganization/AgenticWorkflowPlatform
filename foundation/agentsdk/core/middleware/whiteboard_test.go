@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"encoding/json"
 	"school-with-ai/foundation/agentsdk/core"
 	"testing"
 
@@ -161,16 +160,16 @@ func TestWriteWhiteboardTool(t *testing.T) {
 		SetWhiteboardContent(reqCtx, "Old content")
 
 		tool := NewWriteWhiteboardTool(reqCtx)
-		args := map[string]string{
+		args := map[string]any{
 			"content": "New content",
 			"action":  "write",
 		}
-		argsJSON, _ := json.Marshal(args)
 
-		result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+		result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 
 		require.NoError(t, err)
-		assert.Contains(t, result.Result, "Whiteboard updated")
+		resMap := result.(map[string]any)
+		assert.Contains(t, resMap["message"], "Whiteboard updated")
 		assert.Equal(t, "New content", GetWhiteboardContent(reqCtx))
 	})
 
@@ -180,16 +179,16 @@ func TestWriteWhiteboardTool(t *testing.T) {
 		SetWhiteboardContent(reqCtx, "First line")
 
 		tool := NewWriteWhiteboardTool(reqCtx)
-		args := map[string]string{
+		args := map[string]any{
 			"content": "Second line",
 			"action":  "append",
 		}
-		argsJSON, _ := json.Marshal(args)
 
-		result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+		result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 
 		require.NoError(t, err)
-		assert.Contains(t, result.Result, "Whiteboard updated")
+		resMap := result.(map[string]any)
+		assert.Contains(t, resMap["message"], "Whiteboard updated")
 		assert.Equal(t, "First line\nSecond line", GetWhiteboardContent(reqCtx))
 	})
 
@@ -199,13 +198,12 @@ func TestWriteWhiteboardTool(t *testing.T) {
 		SetWhiteboardContent(reqCtx, "")
 
 		tool := NewWriteWhiteboardTool(reqCtx)
-		args := map[string]string{
+		args := map[string]any{
 			"content": "First content",
 			"action":  "append",
 		}
-		argsJSON, _ := json.Marshal(args)
 
-		_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+		_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 
 		require.NoError(t, err)
 		assert.Equal(t, "First content", GetWhiteboardContent(reqCtx))
@@ -217,16 +215,16 @@ func TestWriteWhiteboardTool(t *testing.T) {
 		SetWhiteboardContent(reqCtx, "Some content to clear")
 
 		tool := NewWriteWhiteboardTool(reqCtx)
-		args := map[string]string{
+		args := map[string]any{
 			"content": "",
 			"action":  "clear",
 		}
-		argsJSON, _ := json.Marshal(args)
 
-		result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+		result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 
 		require.NoError(t, err)
-		assert.Contains(t, result.Result, "Whiteboard updated")
+		resMap := result.(map[string]any)
+		assert.Contains(t, resMap["message"], "Whiteboard updated")
 		assert.Empty(t, GetWhiteboardContent(reqCtx))
 	})
 
@@ -235,13 +233,12 @@ func TestWriteWhiteboardTool(t *testing.T) {
 		reqCtx := &core.RequestContext{State: make(map[string]any)}
 		tool := NewWriteWhiteboardTool(reqCtx)
 
-		args := map[string]string{
+		args := map[string]any{
 			"content": "content",
 			"action":  "invalid",
 		}
-		argsJSON, _ := json.Marshal(args)
 
-		_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+		_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid action")
@@ -314,11 +311,11 @@ func TestWhiteboardMiddlewareIntegration(t *testing.T) {
 			require.NotNil(t, writeTool)
 
 			// Initial write
-			writeArgs, _ := json.Marshal(map[string]string{
+			writeArgs := map[string]any{
 				"content": "# Initial Content\nFirst section",
 				"action":  "write",
-			})
-			_, err := writeTool.Invoke(core.NewToolContext(ctx, "", "", "", nil), string(writeArgs))
+			}
+			_, err := writeTool.Invoke(core.NewToolContext(ctx, "", "", "", nil), writeArgs)
 			require.NoError(t, err)
 
 			// Verify content is accessible via GetWhiteboardContent
@@ -328,11 +325,11 @@ func TestWhiteboardMiddlewareIntegration(t *testing.T) {
 
 			// Modify and write (simulating read-modify-write using GetWhiteboardContent)
 			modified := content + "\n\n# New Section\nAdded content"
-			writeArgs2, _ := json.Marshal(map[string]string{
+			writeArgs2 := map[string]any{
 				"content": modified,
 				"action":  "write",
-			})
-			_, err = writeTool.Invoke(core.NewToolContext(ctx, "", "", "", nil), string(writeArgs2))
+			}
+			_, err = writeTool.Invoke(core.NewToolContext(ctx, "", "", "", nil), writeArgs2)
 			require.NoError(t, err)
 
 			// Verify final content

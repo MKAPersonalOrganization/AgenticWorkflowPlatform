@@ -2,7 +2,6 @@ package core_test
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"school-with-ai/foundation/agentsdk/core"
 	"testing"
@@ -20,20 +19,23 @@ func TestFunctionTool(t *testing.T) {
 			},
 			[]string{"location"},
 		),
-		func(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
-			var args struct {
+		func(ctx core.ToolContext, args any) (any, error) {
+			var params struct {
 				Location string `json:"location"`
 				Unit     string `json:"unit"`
 			}
-			err := json.Unmarshal([]byte(arguments), &args)
-			if err != nil {
-				return core.ToolResult{}, fmt.Errorf("failed to unmarshal arguments: %w", err)
+			if err := core.UnmarshalArgs(args, &params); err != nil {
+				return nil, fmt.Errorf("failed to parse arguments: %w", err)
 			}
-			if args.Unit == "" {
-				args.Unit = "celsius"
+			if params.Unit == "" {
+				params.Unit = "celsius"
 			}
 
-			return core.NewToolResult(`{"temperature": 22, "unit": "` + args.Unit + `", "location": "` + args.Location + `"}`), nil
+			return map[string]any{
+				"temperature": 22,
+				"unit":        params.Unit,
+				"location":    params.Location,
+			}, nil
 		},
 	)
 
@@ -51,27 +53,21 @@ func TestFunctionTool(t *testing.T) {
 	}
 
 	// Test invocation
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), `{"location": "London", "unit": "celsius"}`)
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), map[string]any{"location": "London", "unit": "celsius"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var response struct {
-		Temperature int    `json:"temperature"`
-		Unit        string `json:"unit"`
-		Location    string `json:"location"`
+	resMap, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("expected map[string]any result, got %T", result)
 	}
 
-	// Parse result - tool returns ToolResult
-	if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
-		t.Fatalf("failed to parse response: %v", err)
+	if resMap["location"] != "London" {
+		t.Errorf("expected location 'London', got '%v'", resMap["location"])
 	}
-
-	if response.Location != "London" {
-		t.Errorf("expected location 'London', got '%s'", response.Location)
-	}
-	if response.Temperature != 22 {
-		t.Errorf("expected temperature 22, got %d", response.Temperature)
+	if resMap["temperature"] != 22 {
+		t.Errorf("expected temperature 22, got %v", resMap["temperature"])
 	}
 }
 
@@ -84,8 +80,8 @@ func TestToolRegistry(t *testing.T) {
 		"get_weather",
 		"Get weather",
 		core.ObjectSchema(map[string]any{"location": core.StringProperty("City")}, []string{"location"}),
-		func(ctx core.ToolContext, args string) (core.ToolResult, error) {
-			return core.NewToolResult(`{"temp": 20}`), nil
+		func(ctx core.ToolContext, args any) (any, error) {
+			return map[string]any{"temp": 20}, nil
 		},
 	)
 
@@ -93,8 +89,8 @@ func TestToolRegistry(t *testing.T) {
 		"calculate",
 		"Calculate expression",
 		core.ObjectSchema(map[string]any{"expression": core.StringProperty("Math expression")}, []string{"expression"}),
-		func(ctx core.ToolContext, args string) (core.ToolResult, error) {
-			return core.NewToolResult(`{"result": 42}`), nil
+		func(ctx core.ToolContext, args any) (any, error) {
+			return map[string]any{"result": 42}, nil
 		},
 	)
 
@@ -146,7 +142,7 @@ func TestToToolSpec(t *testing.T) {
 			},
 			[]string{"param1"},
 		),
-		func(ctx core.ToolContext, args string) (core.ToolResult, error) { return core.NewToolResult("{}"), nil },
+		func(ctx core.ToolContext, args any) (any, error) { return map[string]any{}, nil },
 	)
 
 	spec := core.ToToolSpec(tool)

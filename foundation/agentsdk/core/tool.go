@@ -6,8 +6,7 @@ import (
 )
 
 // Tool represents a tool that can be called by an LLM.
-// This interface follows the agent-framework pattern where tools are
-// self-describing and invokable.
+// This interface follows the ADK-Go pattern where tools receive typed arguments.
 type Tool interface {
 	// Name returns the unique name of the tool
 	Name() string
@@ -18,10 +17,10 @@ type Tool interface {
 	// Parameters returns the JSON schema for the tool's parameters
 	Parameters() map[string]any
 
-	// Invoke executes the tool with the given ToolContext and arguments
-	// The arguments are passed as a JSON string
-	// Returns a ToolResult containing both the display result and optional routing command
-	Invoke(ctx ToolContext, arguments string) (ToolResult, error)
+	// Invoke executes the tool with the given ToolContext and typed arguments
+	// The arguments are typically map[string]any unmarshaled from the LLM's JSON
+	// Returns any result that will be marshaled back to JSON for the LLM
+	Invoke(ctx ToolContext, args any) (any, error)
 }
 
 // ToolSpec represents the JSON schema specification of a tool
@@ -50,12 +49,34 @@ func ToToolSpec(t Tool) ToolSpec {
 	}
 }
 
+// UnmarshalArgs is a helper function to unmarshal typed arguments into a struct.
+// This reduces boilerplate in tool implementations.
+//
+// Example usage:
+//
+//	var params struct {
+//	    Expression string `json:"expression"`
+//	}
+//	if err := core.UnmarshalArgs(args, &params); err != nil {
+//	    return nil, err
+//	}
+func UnmarshalArgs(args any, target any) error {
+	jsonBytes, err := json.Marshal(args)
+	if err != nil {
+		return fmt.Errorf("failed to marshal args: %w", err)
+	}
+	if err := json.Unmarshal(jsonBytes, target); err != nil {
+		return fmt.Errorf("failed to unmarshal args: %w", err)
+	}
+	return nil
+}
+
 // FunctionTool is a Tool implementation that wraps a function.
 type FunctionTool struct {
 	name        string
 	description string
 	parameters  map[string]any
-	handler     func(ctx ToolContext, arguments string) (ToolResult, error)
+	handler     func(ctx ToolContext, args any) (any, error)
 }
 
 // NewFunctionTool creates a new function tool.
@@ -63,7 +84,7 @@ func NewFunctionTool(
 	name string,
 	description string,
 	parameters map[string]any,
-	handler func(ctx ToolContext, arguments string) (ToolResult, error),
+	handler func(ctx ToolContext, args any) (any, error),
 ) *FunctionTool {
 	return &FunctionTool{
 		name:        name,
@@ -85,8 +106,8 @@ func (f *FunctionTool) Parameters() map[string]any {
 	return f.parameters
 }
 
-func (f *FunctionTool) Invoke(ctx ToolContext, arguments string) (ToolResult, error) {
-	return f.handler(ctx, arguments)
+func (f *FunctionTool) Invoke(ctx ToolContext, args any) (any, error) {
+	return f.handler(ctx, args)
 }
 
 // Verify FunctionTool implements Tool.

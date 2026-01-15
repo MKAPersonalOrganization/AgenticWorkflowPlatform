@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"school-with-ai/foundation/agentsdk/core"
 )
@@ -151,22 +150,22 @@ func (t *WriteTodosTool) Parameters() map[string]any {
 	}
 }
 
-func (t *WriteTodosTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
-	var args struct {
+func (t *WriteTodosTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+	var params struct {
 		Todos []Todo `json:"todos"`
 	}
 
-	err := json.Unmarshal([]byte(arguments), &args)
-	if err != nil {
-		return core.ToolResult{}, fmt.Errorf("failed to parse todo arguments: %w", err)
+	if err := core.UnmarshalArgs(args, &params); err != nil {
+		return nil, fmt.Errorf("failed to parse todo arguments: %w", err)
 	}
 
-	todosJSON, err := json.Marshal(args.Todos)
-	if err != nil {
-		return core.ToolResult{}, fmt.Errorf("failed to marshal todos: %w", err)
-	}
-
-	return core.NewToolResult("Updated todo list to " + string(todosJSON)), nil
+	// In the original code, this tool just returned a string status.
+	// Since we are moving to typed results, we'll return a map.
+	return map[string]any{
+		"message": "Updated todo list",
+		"count":   len(params.Todos),
+		"todos":   params.Todos,
+	}, nil
 }
 
 // TodoListMiddleware provides todo list management capabilities to agents.

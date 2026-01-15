@@ -2,7 +2,6 @@ package tools
 
 import (
 	"crypto/sha256"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -67,56 +66,49 @@ func (m *MermaidDiagramTool) Parameters() map[string]any {
 	}
 }
 
-func (m *MermaidDiagramTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
-	var args MermaidDiagramArgs
-	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
-		return core.ToolResult{}, fmt.Errorf("failed to parse mermaid diagram args: %w", err)
+func (m *MermaidDiagramTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+	var params MermaidDiagramArgs
+	if err := core.UnmarshalArgs(args, &params); err != nil {
+		return nil, fmt.Errorf("failed to parse mermaid diagram args: %w", err)
 	}
 
 	// Validate required mermaid_code parameter
-	if args.MermaidCode == "" {
-		return core.ToolResult{}, ErrMermaidCodeRequired
+	if params.MermaidCode == "" {
+		return nil, ErrMermaidCodeRequired
 	}
 
 	// Set default output type
-	if args.OutputType == "" {
-		args.OutputType = "png"
+	if params.OutputType == "" {
+		params.OutputType = "png"
 	}
 
 	// Validate output type
-	if args.OutputType != "svg" && args.OutputType != "png" {
-		return core.ToolResult{}, fmt.Errorf("%w, got: %s", ErrInvalidOutputType, args.OutputType)
+	if params.OutputType != "svg" && params.OutputType != "png" {
+		return nil, fmt.Errorf("%w, got: %s", ErrInvalidOutputType, params.OutputType)
 	}
 
 	// Validate title length
-	if len(args.Title) > 100 {
-		return core.ToolResult{}, ErrTitleTooLong
+	if len(params.Title) > 100 {
+		return nil, ErrTitleTooLong
 	}
 
 	// Generate the diagram
-	imagePath, err := executeMermaidDiagram(args.MermaidCode, args.Title, args.OutputType)
+	imagePath, err := executeMermaidDiagram(params.MermaidCode, params.Title, params.OutputType)
 	if err != nil {
-		return core.ToolResult{}, fmt.Errorf("failed to generate diagram: %w", err)
+		return nil, fmt.Errorf("failed to generate diagram: %w", err)
 	}
 
-	// Return result with image path
+	// Return result as map
 	result := map[string]any{
 		"success":     true,
 		"image_path":  imagePath,
 		"image_url":   "/assets/charts/" + filepath.Base(imagePath),
-		"output_type": args.OutputType,
+		"output_type": params.OutputType,
 		"message":     "Diagram generated successfully",
-	}
-	if args.Title != "" {
-		result["title"] = args.Title
+		"title":       params.Title,
 	}
 
-	resultJSON, err := json.Marshal(result)
-	if err != nil {
-		return core.ToolResult{}, fmt.Errorf("failed to marshal diagram result: %w", err)
-	}
-
-	return core.NewToolResult(string(resultJSON)), nil
+	return result, nil
 }
 
 // executeMermaidDiagram executes mermaid-cli via Docker to generate the diagram.

@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"school-with-ai/foundation/agentsdk/core"
 	"strings"
@@ -29,19 +28,14 @@ do for [i=0:40] {
 		Title:         "Wave propagation animation",
 	}
 
-	argsJSON, err := json.Marshal(args)
-	if err != nil {
-		t.Fatalf("failed to marshal args: %v", err)
-	}
-
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	if err != nil {
 		t.Fatalf("failed to invoke animate tool: %v", err)
 	}
 
-	var response map[string]any
-	if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
-		t.Fatalf("failed to unmarshal result: %v", err)
+	response, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("expected map[string]any result, got %T", result)
 	}
 
 	if !response["success"].(bool) {
@@ -78,15 +72,14 @@ do for [ang=0:360:10] {
 		Title:         "Rotating 3D surface",
 	}
 
-	argsJSON, _ := json.Marshal(args)
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	if err != nil {
 		t.Fatalf("failed to create animation: %v", err)
 	}
 
-	var response map[string]any
-	if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
-		t.Fatalf("failed to unmarshal response: %v", err)
+	response, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("expected map[string]any result, got %T", result)
 	}
 
 	animationPath := response["animation_path"].(string)
@@ -113,15 +106,14 @@ do for [i=1:30] {
 		Title:         "Amplitude variation",
 	}
 
-	argsJSON, _ := json.Marshal(args)
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	if err != nil {
 		t.Fatalf("failed to create webp animation: %v", err)
 	}
 
-	var response map[string]any
-	if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
-		t.Fatalf("failed to unmarshal response: %v", err)
+	response, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("expected map[string]any result, got %T", result)
 	}
 
 	animationPath := response["animation_path"].(string)
@@ -140,8 +132,7 @@ func TestAnimateTool_ValidationMissingScript(t *testing.T) {
 		Title:  "Test",
 	}
 
-	argsJSON, _ := json.Marshal(args)
-	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 
 	if err == nil {
 		t.Error("expected error for missing gnuplot_script parameter")
@@ -159,8 +150,7 @@ func TestAnimateTool_ValidationInvalidFormat(t *testing.T) {
 		Format:        "mp4", // Invalid format
 	}
 
-	argsJSON, _ := json.Marshal(args)
-	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 
 	if err == nil {
 		t.Error("expected error for invalid format")
@@ -178,8 +168,7 @@ func TestAnimateTool_ValidationSetTerminal(t *testing.T) {
 		Format:        "gif",
 	}
 
-	argsJSON, _ := json.Marshal(args)
-	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 
 	if err == nil {
 		t.Error("expected error for script containing 'set terminal'")
@@ -200,23 +189,22 @@ func TestAnimateTool_DefaultValues(t *testing.T) {
 		// Format and Delay not specified - should use defaults
 	}
 
-	argsJSON, _ := json.Marshal(args)
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	if err != nil {
 		t.Fatalf("failed with defaults: %v", err)
 	}
 
-	var response map[string]any
-	if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
-		t.Fatalf("failed to unmarshal response: %v", err)
+	response, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("expected map[string]any result, got %T", result)
 	}
 
 	if response["format"].(string) != "gif" {
 		t.Errorf("expected default format 'gif', got: %s", response["format"])
 	}
 
-	if int(response["delay"].(float64)) != 50 {
-		t.Errorf("expected default delay 50, got: %d", int(response["delay"].(float64)))
+	if response["delay"].(int) != 50 {
+		t.Errorf("expected default delay 50, got: %v", response["delay"])
 	}
 
 	animationPath := response["animation_path"].(string)
