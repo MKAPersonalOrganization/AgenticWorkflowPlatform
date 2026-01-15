@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"iter"
+	"time"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
-	"school-with-ai/foundation/agentsdk/llm"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/agentorchestrator/threadmgmt"
 	"school-with-ai/services/agentorchestrator/types"
-	"time"
 )
 
 // Use central types
@@ -97,8 +97,7 @@ func (e *Engine) Run(
 		default:
 		}
 
-		llmMsgs := convertCoreMsgsToLLMMsgs(messages)
-		chatMessages := llm.FromDomainMessages(llmMsgs)
+		chatMessages := toLLMChatMessages(messages)
 
 		chatOptions, reqCtx, err := core.ToChatOptionsWithMiddleware(ctx, e.config, chatMessages, runCtx.ThreadID, runCtx.Options)
 		if err != nil {
@@ -316,39 +315,6 @@ func (e *Engine) executeToolCallWithExecutor(threadID string, toolCall core.Tool
 		return execResult, fmt.Errorf("failed to execute tool call %s: %w", toolCall.Function.Name, err)
 	}
 	return execResult, nil
-}
-
-func convertCoreMsgToLLMMsg(cm core.Message) llm.Message {
-	msg := llm.Message{
-		ID:         cm.ID,
-		Role:       cm.Role,
-		Content:    cm.Content,
-		Timestamp:  cm.Timestamp,
-		ToolCallID: cm.ToolCallID,
-		AgentName:  cm.AgentName,
-		Metadata:   cm.Metadata,
-	}
-
-	for _, tc := range cm.ToolCalls {
-		msg.ToolCalls = append(msg.ToolCalls, llm.ToolCall{
-			ID:   tc.ID,
-			Type: tc.Type,
-			Function: llm.ToolFunction{
-				Name:      tc.Function.Name,
-				Arguments: tc.Function.Arguments,
-			},
-		})
-	}
-
-	return msg
-}
-
-func convertCoreMsgsToLLMMsgs(msgs []core.Message) []llm.Message {
-	result := make([]llm.Message, len(msgs))
-	for i, cm := range msgs {
-		result[i] = convertCoreMsgToLLMMsg(cm)
-	}
-	return result
 }
 
 func toDomainToolCalls(ctcs []core.ToolCall) []domain.ToolCall {
