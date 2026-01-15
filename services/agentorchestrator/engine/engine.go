@@ -89,7 +89,7 @@ func (e *Engine) Run(
 			return
 		}
 
-		messages := runCtx.Thread.GetMessages()
+		messages := runCtx.Thread.RetrieveFullConversationHistory()
 		select {
 		case <-ctx.Done():
 			yield(nil, fmt.Errorf("client disconnected: %w", ctx.Err()))

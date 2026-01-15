@@ -90,8 +90,8 @@ func (t *InMemoryThread) GetID() string {
 	return t.id
 }
 
-// GetMessages returns all messages in the thread.
-func (t *InMemoryThread) GetMessages() []Message {
+// RetrieveFullConversationHistory returns all messages in the thread.
+func (t *InMemoryThread) RetrieveFullConversationHistory() []Message {
 	return t.messageStore.GetMessages()
 }
 
