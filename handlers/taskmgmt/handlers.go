@@ -327,7 +327,7 @@ func (h *TaskManagementHandler) CancelJob(w http.ResponseWriter, r *http.Request
 	// Use Asynq Inspector to cancel task
 	err := h.taskMgmtService.CancelTask(jobID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to cancel job: %v", err), http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("Failed to cancel job: %s", err), http.StatusBadRequest)
 
 		return
 	}
