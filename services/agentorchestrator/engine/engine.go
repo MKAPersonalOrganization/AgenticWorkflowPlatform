@@ -219,15 +219,6 @@ func (e *Engine) Run(
 
 		if toolCalls.HasToolCalls() {
 			domainToolCalls := toDomainToolCalls(toolCallsList)
-			agg, err := e.threadMgmt.AddAssistantMessage(ctx, runCtx.ThreadID, runCtx.MessageID, completeContent, domainToolCalls)
-			if err != nil {
-				yield(nil, fmt.Errorf("failed to add assistant message: %w", err))
-				return
-			}
-
-			// Update local thread state with consistent state from repository
-			runCtx.Thread = e.threadMgmt.ToAgentThread(agg)
-
 			assistantEvent := &domain.AssistantMessageCompletedEvent{
 				ThreadID:  runCtx.ThreadID,
 				MessageID: runCtx.MessageID,
@@ -235,6 +226,31 @@ func (e *Engine) Run(
 				ToolCalls: domainToolCalls,
 				Timestamp: time.Now(),
 			}
+
+			if e.threadMgmt != nil {
+				agg, err := e.threadMgmt.AddAssistantMessage(ctx, runCtx.ThreadID, runCtx.MessageID, completeContent, domainToolCalls)
+				if err != nil {
+					yield(nil, fmt.Errorf("failed to add assistant message: %w", err))
+					return
+				}
+
+				// Update local thread state with consistent state from repository
+				runCtx.Thread = e.threadMgmt.ToAgentThread(agg)
+			} else {
+				// Update local thread state directly if no thread management
+				msg := core.Message{
+					ID:        runCtx.MessageID,
+					Role:      "assistant",
+					Content:   completeContent,
+					Timestamp: time.Now(),
+					ToolCalls: toolCallsList,
+				}
+				if err := runCtx.Thread.AddMessages([]core.Message{msg}); err != nil {
+					yield(nil, fmt.Errorf("failed to add assistant message to thread: %w", err))
+					return
+				}
+			}
+
 			if !e.yieldEvent(yield, assistantEvent, nil) {
 				return
 			}
@@ -256,14 +272,29 @@ func (e *Engine) Run(
 				}
 
 				toolResultID := core.GenerateID()
-				agg, err = e.threadMgmt.AddToolResultMessage(ctx, runCtx.ThreadID, toolResultID, toolCall.ID, result)
-				if err != nil {
-					yield(nil, fmt.Errorf("failed to add tool result message: %w", err))
-					return
-				}
+				if e.threadMgmt != nil {
+					agg, err := e.threadMgmt.AddToolResultMessage(ctx, runCtx.ThreadID, toolResultID, toolCall.ID, result)
+					if err != nil {
+						yield(nil, fmt.Errorf("failed to add tool result message: %w", err))
+						return
+					}
 
-				// Update local thread state with consistent state from repository
-				runCtx.Thread = e.threadMgmt.ToAgentThread(agg)
+					// Update local thread state with consistent state from repository
+					runCtx.Thread = e.threadMgmt.ToAgentThread(agg)
+				} else {
+					// Update local thread state directly if no thread management
+					msg := core.Message{
+						ID:         toolResultID,
+						Role:       "tool",
+						Content:    result,
+						Timestamp:  time.Now(),
+						ToolCallID: toolCall.ID,
+					}
+					if err := runCtx.Thread.AddMessages([]core.Message{msg}); err != nil {
+						yield(nil, fmt.Errorf("failed to add tool result to thread: %w", err))
+						return
+					}
+				}
 
 				toolEvent := &domain.ToolCallExecutedEvent{
 					ThreadID:        runCtx.ThreadID,
@@ -294,9 +325,23 @@ func (e *Engine) Run(
 			return
 		}
 
-		if _, err := e.threadMgmt.AddAssistantMessage(ctx, runCtx.ThreadID, runCtx.MessageID, completeContent, nil); err != nil {
-			yield(nil, fmt.Errorf("failed to add final assistant message: %w", err))
-			return
+		if e.threadMgmt != nil {
+			if _, err := e.threadMgmt.AddAssistantMessage(ctx, runCtx.ThreadID, runCtx.MessageID, completeContent, nil); err != nil {
+				yield(nil, fmt.Errorf("failed to add final assistant message: %w", err))
+				return
+			}
+		} else {
+			// Update local thread state directly if no thread management
+			msg := core.Message{
+				ID:        runCtx.MessageID,
+				Role:      "assistant",
+				Content:   completeContent,
+				Timestamp: time.Now(),
+			}
+			if err := runCtx.Thread.AddMessages([]core.Message{msg}); err != nil {
+				yield(nil, fmt.Errorf("failed to add final assistant message to thread: %w", err))
+				return
+			}
 		}
 
 		assistantEvent := &domain.AssistantMessageCompletedEvent{

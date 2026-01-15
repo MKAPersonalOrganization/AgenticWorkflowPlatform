@@ -41,16 +41,17 @@ When you visualize a function:
 1. Use plot tool -> returns {"image_url": "..."}
 2. COPY the image_url (e.g., /assets/charts/plot.png)
 3. Embed on whiteboard: ![Description](/assets/charts/plot.png)`,
+		HandoffAgents: []core.AgentConfig{
+			{Name: "linearalgebra-instructor", SystemPrompt: "Linear algebra ONLY: matrices, vectors, eigenvalues, matrix operations. Use ONLY for linear algebra."},
+			{Name: "physics-instructor", SystemPrompt: "Physics concepts ONLY: forces, motion, energy, momentum. NOT for math calculations."},
+			{Name: "chemistry-instructor", SystemPrompt: "Chemistry ONLY: chemical reactions, molecules, stoichiometry. NOT for math."},
+			{Name: "student-facing-agent", SystemPrompt: "Return here when ALL math work is complete"},
+		},
 		Tools:    registry.All(),
 		Notifier: notifier,
 		Middleware: []core.Middleware{
 			middleware.NewWhiteboardMiddleware(),
-			middleware.NewHandoffMiddleware(map[string]string{
-				"linearalgebra-instructor": "Linear algebra ONLY: matrices, vectors, eigenvalues, matrix operations. Use ONLY for linear algebra.",
-				"physics-instructor":       "Physics concepts ONLY: forces, motion, energy, momentum. NOT for math calculations.",
-				"chemistry-instructor":     "Chemistry ONLY: chemical reactions, molecules, stoichiometry. NOT for math.",
-				"student-facing-agent":     "Return here when ALL math work is complete",
-			}),
+			middleware.NewHandoffMiddleware(),
 		},
 	}
 }

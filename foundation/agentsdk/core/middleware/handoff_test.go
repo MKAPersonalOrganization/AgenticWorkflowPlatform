@@ -18,19 +18,10 @@ func newTestRequestContext() *core.RequestContext {
 
 func TestNewHandoffMiddleware(t *testing.T) {
 	t.Parallel()
-	agents := map[string]string{
-		"math":    "Mathematics specialist",
-		"physics": "Physics specialist",
-	}
-
-	middleware := NewHandoffMiddleware(agents)
+	middleware := NewHandoffMiddleware()
 
 	if middleware == nil {
 		t.Fatal("Expected middleware to be created, got nil")
-	}
-
-	if len(middleware.availableAgents) != 2 {
-		t.Errorf("Expected 2 agents, got %d", len(middleware.availableAgents))
 	}
 
 	if middleware.systemPrompt == "" {
@@ -40,12 +31,9 @@ func TestNewHandoffMiddleware(t *testing.T) {
 
 func TestNewHandoffMiddlewareWithPrompt(t *testing.T) {
 	t.Parallel()
-	agents := map[string]string{
-		"math": "Mathematics specialist",
-	}
 	customPrompt := "Custom handoff prompt"
 
-	middleware := NewHandoffMiddlewareWithPrompt(agents, customPrompt)
+	middleware := NewHandoffMiddlewareWithPrompt(customPrompt)
 
 	if middleware == nil {
 		t.Fatal("Expected middleware to be created, got nil")
@@ -58,13 +46,12 @@ func TestNewHandoffMiddlewareWithPrompt(t *testing.T) {
 
 func TestHandoffMiddleware_Process(t *testing.T) {
 	t.Parallel()
-	agents := map[string]string{
-		"math":    "Mathematics specialist",
-		"physics": "Physics specialist",
-	}
-
-	middleware := NewHandoffMiddleware(agents)
+	middleware := NewHandoffMiddleware()
 	reqCtx := newTestRequestContext()
+	reqCtx.Config.HandoffAgents = []core.AgentConfig{
+		{Name: "math", SystemPrompt: "Mathematics specialist"},
+		{Name: "physics", SystemPrompt: "Physics specialist"},
+	}
 
 	called := false
 	next := func(ctx context.Context, rc *core.RequestContext) error {
@@ -105,7 +92,7 @@ func TestHandoffMiddleware_Process(t *testing.T) {
 
 func TestTransferToAgentTool_Name(t *testing.T) {
 	t.Parallel()
-	tool := NewTransferToAgentTool(map[string]string{}, nil)
+	tool := NewTransferToAgentTool(nil)
 
 	if tool.Name() != "transfer_to_agent" {
 		t.Errorf("Expected name 'transfer_to_agent', got %q", tool.Name())
@@ -114,12 +101,13 @@ func TestTransferToAgentTool_Name(t *testing.T) {
 
 func TestTransferToAgentTool_Description(t *testing.T) {
 	t.Parallel()
-	agents := map[string]string{
-		"math":    "Mathematics specialist for calculations",
-		"physics": "Physics specialist for mechanics",
+	reqCtx := newTestRequestContext()
+	reqCtx.Config.HandoffAgents = []core.AgentConfig{
+		{Name: "math", SystemPrompt: "Mathematics specialist for calculations"},
+		{Name: "physics", SystemPrompt: "Physics specialist for mechanics"},
 	}
 
-	tool := NewTransferToAgentTool(agents, nil)
+	tool := NewTransferToAgentTool(reqCtx)
 	desc := tool.Description()
 
 	if desc == "" {
@@ -146,12 +134,13 @@ func TestTransferToAgentTool_Description(t *testing.T) {
 
 func TestTransferToAgentTool_Parameters(t *testing.T) {
 	t.Parallel()
-	agents := map[string]string{
-		"math":    "Mathematics specialist",
-		"physics": "Physics specialist",
+	reqCtx := newTestRequestContext()
+	reqCtx.Config.HandoffAgents = []core.AgentConfig{
+		{Name: "math", SystemPrompt: "Mathematics specialist"},
+		{Name: "physics", SystemPrompt: "Physics specialist"},
 	}
 
-	tool := NewTransferToAgentTool(agents, nil)
+	tool := NewTransferToAgentTool(reqCtx)
 	params := tool.Parameters()
 
 	if params == nil {
@@ -209,15 +198,11 @@ func TestTransferToAgentTool_Parameters(t *testing.T) {
 
 func TestTransferToAgentTool_Invoke_Success(t *testing.T) {
 	t.Parallel()
-	agents := map[string]string{
-		"math": "Mathematics specialist",
+	reqCtx := newTestRequestContext()
+	reqCtx.Config.HandoffAgents = []core.AgentConfig{
+		{Name: "math", SystemPrompt: "Mathematics specialist"},
 	}
-
-	config := &core.AgentConfig{
-		Name: "test-agent",
-	}
-	reqCtx := core.NewRequestContext("", nil, "", nil, config)
-	tool := NewTransferToAgentTool(agents, reqCtx)
+	tool := NewTransferToAgentTool(reqCtx)
 
 	args := map[string]any{
 		"agent_name": "math",
@@ -269,12 +254,11 @@ func TestTransferToAgentTool_Invoke_Success(t *testing.T) {
 
 func TestTransferToAgentTool_Invoke_MissingAgentName(t *testing.T) {
 	t.Parallel()
-	agents := map[string]string{
-		"math": "Mathematics specialist",
-	}
-
 	reqCtx := newTestRequestContext()
-	tool := NewTransferToAgentTool(agents, reqCtx)
+	reqCtx.Config.HandoffAgents = []core.AgentConfig{
+		{Name: "math", SystemPrompt: "Mathematics specialist"},
+	}
+	tool := NewTransferToAgentTool(reqCtx)
 
 	args := map[string]any{
 		"question": "What is 2 + 2?",
@@ -293,12 +277,12 @@ func TestTransferToAgentTool_Invoke_MissingAgentName(t *testing.T) {
 
 func TestTransferToAgentTool_Invoke_MissingQuestion(t *testing.T) {
 	t.Parallel()
-	agents := map[string]string{
-		"math": "Mathematics specialist",
+	reqCtx := newTestRequestContext()
+	reqCtx.Config.HandoffAgents = []core.AgentConfig{
+		{Name: "math", SystemPrompt: "Mathematics specialist"},
 	}
 
-	reqCtx := newTestRequestContext()
-	tool := NewTransferToAgentTool(agents, reqCtx)
+	tool := NewTransferToAgentTool(reqCtx)
 
 	args := map[string]any{
 		"agent_name": "math",
@@ -341,12 +325,11 @@ func TestTransferToAgentTool_Invoke_MissingQuestion(t *testing.T) {
 
 func TestTransferToAgentTool_Invoke_UnknownAgent(t *testing.T) {
 	t.Parallel()
-	agents := map[string]string{
-		"math": "Mathematics specialist",
-	}
-
 	reqCtx := newTestRequestContext()
-	tool := NewTransferToAgentTool(agents, reqCtx)
+	reqCtx.Config.HandoffAgents = []core.AgentConfig{
+		{Name: "math", SystemPrompt: "Mathematics specialist"},
+	}
+	tool := NewTransferToAgentTool(reqCtx)
 
 	args := map[string]any{
 		"agent_name": "biology", // Not in available agents
@@ -370,12 +353,12 @@ func TestTransferToAgentTool_Invoke_UnknownAgent(t *testing.T) {
 
 func TestTransferToAgentTool_Invoke_WithoutContext(t *testing.T) {
 	t.Parallel()
-	agents := map[string]string{
-		"math": "Mathematics specialist",
+	reqCtx := newTestRequestContext()
+	reqCtx.Config.HandoffAgents = []core.AgentConfig{
+		{Name: "math", SystemPrompt: "Mathematics specialist"},
 	}
 
-	reqCtx := newTestRequestContext()
-	tool := NewTransferToAgentTool(agents, reqCtx)
+	tool := NewTransferToAgentTool(reqCtx)
 
 	// Context is optional, should work without it
 	args := map[string]any{
@@ -415,12 +398,12 @@ func TestTransferToAgentTool_Invoke_WithoutContext(t *testing.T) {
 
 func TestTransferToAgentTool_Invoke_InvalidJSON(t *testing.T) {
 	t.Parallel()
-	agents := map[string]string{
-		"math": "Mathematics specialist",
+	reqCtx := newTestRequestContext()
+	reqCtx.Config.HandoffAgents = []core.AgentConfig{
+		{Name: "math", SystemPrompt: "Mathematics specialist"},
 	}
 
-	reqCtx := newTestRequestContext()
-	tool := NewTransferToAgentTool(agents, reqCtx)
+	tool := NewTransferToAgentTool(reqCtx)
 
 	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), "invalid json")
 
@@ -534,13 +517,13 @@ func TestHasHandoff(t *testing.T) {
 
 func TestBuildSystemPromptWithAgents(t *testing.T) {
 	t.Parallel()
-	agents := map[string]string{
-		"math":    "Mathematics specialist",
-		"physics": "Physics specialist for mechanics",
+	agents := []core.AgentConfig{
+		{Name: "math", SystemPrompt: "Mathematics specialist"},
+		{Name: "physics", SystemPrompt: "Physics specialist for mechanics"},
 	}
 
-	middleware := NewHandoffMiddleware(agents)
-	prompt := middleware.buildSystemPromptWithAgents()
+	middleware := NewHandoffMiddleware()
+	prompt := middleware.buildSystemPromptWithAgents(agents)
 
 	if prompt == "" {
 		t.Error("Expected non-empty system prompt")
@@ -572,15 +555,15 @@ func TestBuildSystemPromptWithAgents(t *testing.T) {
 
 func TestHandoffMiddleware_MultipleAgents(t *testing.T) {
 	t.Parallel()
-	agents := map[string]string{
-		"math":          "Mathematics specialist",
-		"physics":       "Physics specialist",
-		"chemistry":     "Chemistry specialist",
-		"linearalgebra": "Linear algebra specialist",
+	reqCtx := newTestRequestContext()
+	reqCtx.Config.HandoffAgents = []core.AgentConfig{
+		{Name: "math", SystemPrompt: "Mathematics specialist"},
+		{Name: "physics", SystemPrompt: "Physics specialist"},
+		{Name: "chemistry", SystemPrompt: "Chemistry specialist"},
+		{Name: "linearalgebra", SystemPrompt: "Linear algebra specialist"},
 	}
 
-	middleware := NewHandoffMiddleware(agents)
-	reqCtx := newTestRequestContext()
+	middleware := NewHandoffMiddleware()
 
 	next := func(ctx context.Context, rc *core.RequestContext) error {
 		return nil
@@ -616,7 +599,8 @@ func TestHandoffMiddleware_MultipleAgents(t *testing.T) {
 	}
 
 	// Check all agents are in enum
-	for agent := range agents {
+	expectedAgents := []string{"math", "physics", "chemistry", "linearalgebra"}
+	for _, agent := range expectedAgents {
 		if !containsString(enum, agent) {
 			t.Errorf("Expected %q to be in agent enum", agent)
 		}
