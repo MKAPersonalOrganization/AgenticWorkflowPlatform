@@ -11,6 +11,14 @@ type EventNotifier interface {
 	HandleDomainEvent(event Event) error
 }
 
+// Handoff represents a single handoff destination for an agent.
+// This aligns with LangGraph's handoff pattern where agents declaratively
+// specify which other agents they can transfer control to.
+type Handoff struct {
+	AgentName   string // Name of the agent to hand off to
+	Description string // Description of when to use this handoff
+}
+
 // AgentConfig defines the configuration for an agent.
 type AgentConfig struct {
 	// Identity
@@ -19,6 +27,10 @@ type AgentConfig struct {
 	// Behavior
 	SystemPrompt string // Instructions for how the agent should behave
 	Tools        []Tool // Available tools for this agent (implements Tool interface)
+
+	// Handoffs declares which agents this agent can transfer control to.
+	// This is used by HandoffMiddleware to automatically create transfer tools.
+	Handoffs []Handoff // Declarative handoff configuration
 
 	// Middleware
 	Middleware []Middleware // Middleware chain for request/response processing
@@ -125,6 +137,10 @@ func ApplyMiddleware(ctx context.Context, config AgentConfig, messages []llm.Cha
 	// Build initial request context with minimal config
 	initialConfig := &AgentConfig{}
 	reqCtx := NewRequestContext(threadID, messages, config.SystemPrompt, config.Tools, initialConfig)
+
+	// Copy essential config fields to request context
+	reqCtx.Config.Name = config.Name
+	reqCtx.Config.Handoffs = config.Handoffs
 
 	// Copy config parameters to request context
 	if config.Temperature != nil {

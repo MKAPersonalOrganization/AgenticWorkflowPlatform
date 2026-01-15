@@ -16,21 +16,23 @@ func newTestRequestContext() *core.RequestContext {
 	return core.NewRequestContext("", nil, "", nil, config)
 }
 
-func TestNewHandoffMiddleware(t *testing.T) {
-	t.Parallel()
-	agents := map[string]string{
-		"math":    "Mathematics specialist",
-		"physics": "Physics specialist",
+// Helper to create a test request context with handoffs configured.
+func newTestRequestContextWithHandoffs(handoffs []core.Handoff) *core.RequestContext {
+	config := &core.AgentConfig{
+		Name:     "test-agent",
+		Handoffs: handoffs,
 	}
 
-	middleware := NewHandoffMiddleware(agents)
+	return core.NewRequestContext("", nil, "", nil, config)
+}
+
+func TestNewHandoffMiddleware(t *testing.T) {
+	t.Parallel()
+
+	middleware := NewHandoffMiddleware()
 
 	if middleware == nil {
 		t.Fatal("Expected middleware to be created, got nil")
-	}
-
-	if len(middleware.availableAgents) != 2 {
-		t.Errorf("Expected 2 agents, got %d", len(middleware.availableAgents))
 	}
 
 	if middleware.systemPrompt == "" {
@@ -40,12 +42,9 @@ func TestNewHandoffMiddleware(t *testing.T) {
 
 func TestNewHandoffMiddlewareWithPrompt(t *testing.T) {
 	t.Parallel()
-	agents := map[string]string{
-		"math": "Mathematics specialist",
-	}
 	customPrompt := "Custom handoff prompt"
 
-	middleware := NewHandoffMiddlewareWithPrompt(agents, customPrompt)
+	middleware := NewHandoffMiddlewareWithPrompt(customPrompt)
 
 	if middleware == nil {
 		t.Fatal("Expected middleware to be created, got nil")
@@ -58,13 +57,13 @@ func TestNewHandoffMiddlewareWithPrompt(t *testing.T) {
 
 func TestHandoffMiddleware_Process(t *testing.T) {
 	t.Parallel()
-	agents := map[string]string{
-		"math":    "Mathematics specialist",
-		"physics": "Physics specialist",
+	handoffs := []core.Handoff{
+		{AgentName: "math", Description: "Mathematics specialist"},
+		{AgentName: "physics", Description: "Physics specialist"},
 	}
 
-	middleware := NewHandoffMiddleware(agents)
-	reqCtx := newTestRequestContext()
+	middleware := NewHandoffMiddleware()
+	reqCtx := newTestRequestContextWithHandoffs(handoffs)
 
 	called := false
 	next := func(ctx context.Context, rc *core.RequestContext) error {
@@ -539,8 +538,8 @@ func TestBuildSystemPromptWithAgents(t *testing.T) {
 		"physics": "Physics specialist for mechanics",
 	}
 
-	middleware := NewHandoffMiddleware(agents)
-	prompt := middleware.buildSystemPromptWithAgents()
+	middleware := NewHandoffMiddleware()
+	prompt := middleware.buildSystemPromptWithAgents(agents)
 
 	if prompt == "" {
 		t.Error("Expected non-empty system prompt")
@@ -572,15 +571,15 @@ func TestBuildSystemPromptWithAgents(t *testing.T) {
 
 func TestHandoffMiddleware_MultipleAgents(t *testing.T) {
 	t.Parallel()
-	agents := map[string]string{
-		"math":          "Mathematics specialist",
-		"physics":       "Physics specialist",
-		"chemistry":     "Chemistry specialist",
-		"linearalgebra": "Linear algebra specialist",
+	handoffs := []core.Handoff{
+		{AgentName: "math", Description: "Mathematics specialist"},
+		{AgentName: "physics", Description: "Physics specialist"},
+		{AgentName: "chemistry", Description: "Chemistry specialist"},
+		{AgentName: "linearalgebra", Description: "Linear algebra specialist"},
 	}
 
-	middleware := NewHandoffMiddleware(agents)
-	reqCtx := newTestRequestContext()
+	middleware := NewHandoffMiddleware()
+	reqCtx := newTestRequestContextWithHandoffs(handoffs)
 
 	next := func(ctx context.Context, rc *core.RequestContext) error {
 		return nil
@@ -616,9 +615,9 @@ func TestHandoffMiddleware_MultipleAgents(t *testing.T) {
 	}
 
 	// Check all agents are in enum
-	for agent := range agents {
-		if !containsString(enum, agent) {
-			t.Errorf("Expected %q to be in agent enum", agent)
+	for _, handoff := range handoffs {
+		if !containsString(enum, handoff.AgentName) {
+			t.Errorf("Expected %q to be in agent enum", handoff.AgentName)
 		}
 	}
 }
