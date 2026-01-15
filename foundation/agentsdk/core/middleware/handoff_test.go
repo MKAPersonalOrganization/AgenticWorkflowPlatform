@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"encoding/json"
 	"school-with-ai/foundation/agentsdk/core"
 	"slices"
 	"testing"
@@ -226,20 +225,27 @@ func TestTransferToAgentTool_Invoke_Success(t *testing.T) {
 		"context":    "Basic arithmetic question",
 	}
 
-	argsJSON, _ := json.Marshal(args)
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	// Result should be a Command
-	cmd, isCmd := result.Command, result.Command != nil
-	if !isCmd {
-		t.Fatal("Expected result to be a Command")
+	tr, ok := result.(core.ToolResult)
+	if !ok {
+		t.Fatalf("Expected core.ToolResult result, got %T", result)
 	}
 
-	if cmd.Goto != "math" {
-		t.Errorf("Expected Command.Goto to be 'math', got %q", cmd.Goto)
+	resMap, ok := tr.Result.(map[string]any)
+	if !ok {
+		t.Fatalf("Expected map[string]any in ToolResult.Result, got %T", tr.Result)
+	}
+
+	if resMap["next_agent"] != "math" {
+		t.Errorf("Expected next_agent to be 'math', got %v", resMap["next_agent"])
+	}
+
+	if tr.Command == nil || tr.Command.Goto != "math" || !tr.Command.StopIteration {
+		t.Errorf("Expected Command with Goto: 'math' and StopIteration: true, got %+v", tr.Command)
 	}
 
 	// Check that handoff was stored in state
@@ -274,8 +280,7 @@ func TestTransferToAgentTool_Invoke_MissingAgentName(t *testing.T) {
 		"question": "What is 2 + 2?",
 	}
 
-	argsJSON, _ := json.Marshal(args)
-	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 
 	if err == nil {
 		t.Error("Expected error for missing agent_name")
@@ -299,21 +304,24 @@ func TestTransferToAgentTool_Invoke_MissingQuestion(t *testing.T) {
 		"agent_name": "math",
 	}
 
-	argsJSON, _ := json.Marshal(args)
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	// question is optional, so this should succeed
 	if err != nil {
 		t.Errorf("Expected no error for missing question (it's optional), got %v", err)
 	}
 
-	// Result should be a Command
-	cmd, isCmd := result.Command, result.Command != nil
-	if !isCmd {
-		t.Fatal("Expected result to be a Command")
+	tr, ok := result.(core.ToolResult)
+	if !ok {
+		t.Fatalf("Expected core.ToolResult result, got %T", result)
 	}
 
-	if cmd.Goto != "math" {
-		t.Errorf("Expected Command.Goto to be 'math', got %q", cmd.Goto)
+	resMap, ok := tr.Result.(map[string]any)
+	if !ok {
+		t.Fatalf("Expected map[string]any in ToolResult.Result, got %T", tr.Result)
+	}
+
+	if resMap["next_agent"] != "math" {
+		t.Errorf("Expected next_agent 'math', got %v", resMap["next_agent"])
 	}
 
 	// Verify handoff was stored
@@ -345,8 +353,7 @@ func TestTransferToAgentTool_Invoke_UnknownAgent(t *testing.T) {
 		"question":   "What is photosynthesis?",
 	}
 
-	argsJSON, _ := json.Marshal(args)
-	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 
 	if err == nil {
 		t.Error("Expected error for unknown agent")
@@ -376,16 +383,23 @@ func TestTransferToAgentTool_Invoke_WithoutContext(t *testing.T) {
 		"question":   "What is 2 + 2?",
 	}
 
-	argsJSON, _ := json.Marshal(args)
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	// Result should be a Command
-	_, isCmd := result.Command, result.Command != nil
-	if !isCmd {
-		t.Fatal("Expected result to be a Command")
+	tr, ok := result.(core.ToolResult)
+	if !ok {
+		t.Fatalf("Expected core.ToolResult result, got %T", result)
+	}
+
+	resMap, ok := tr.Result.(map[string]any)
+	if !ok {
+		t.Fatalf("Expected map[string]any in ToolResult.Result, got %T", tr.Result)
+	}
+
+	if resMap["next_agent"] != "math" {
+		t.Errorf("Expected next_agent 'math', got %v", resMap["next_agent"])
 	}
 
 	// Check that handoff was stored with empty context

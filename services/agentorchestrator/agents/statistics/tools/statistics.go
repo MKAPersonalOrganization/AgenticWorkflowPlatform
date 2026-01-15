@@ -1,7 +1,6 @@
 package tools
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"school-with-ai/foundation/agentsdk/core"
@@ -79,8 +78,8 @@ func (t *DescriptiveStatsTool) Parameters() map[string]any {
 	}
 }
 
-func (t *DescriptiveStatsTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
-	var args struct {
+func (t *DescriptiveStatsTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+	var params struct {
 		Operation   string    `json:"operation"`
 		Data        []float64 `json:"data"`
 		Percent     float64   `json:"percent,omitempty"`
@@ -88,15 +87,15 @@ func (t *DescriptiveStatsTool) Invoke(ctx core.ToolContext, arguments string) (c
 		Percentiles []float64 `json:"percentiles,omitempty"`
 	}
 
-	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
-		return core.ToolResult{}, fmt.Errorf("invalid arguments: %w", err)
+	if err := core.UnmarshalArgs(args, &params); err != nil {
+		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 
-	data := stats.Float64Data(args.Data)
+	data := stats.Float64Data(params.Data)
 	var result any
 	var err error
 
-	switch args.Operation {
+	switch params.Operation {
 	case "mean":
 		result, err = stats.Mean(data)
 	case "median":
@@ -124,9 +123,9 @@ func (t *DescriptiveStatsTool) Invoke(ctx core.ToolContext, arguments string) (c
 	case "quartile":
 		result, err = stats.Quartile(data)
 	case "percentile":
-		result, err = stats.Percentile(data, args.Percent)
+		result, err = stats.Percentile(data, params.Percent)
 	case "percentile_nearest_rank":
-		result, err = stats.PercentileNearestRank(data, args.Percent)
+		result, err = stats.PercentileNearestRank(data, params.Percent)
 	case "geometric_mean":
 		result, err = stats.GeometricMean(data)
 	case "harmonic_mean":
@@ -143,10 +142,10 @@ func (t *DescriptiveStatsTool) Invoke(ctx core.ToolContext, arguments string) (c
 		result, err = stats.MedianAbsoluteDeviationPopulation(data)
 	case "describe":
 		var percentiles *[]float64
-		if len(args.Percentiles) > 0 {
-			percentiles = &args.Percentiles
+		if len(params.Percentiles) > 0 {
+			percentiles = &params.Percentiles
 		}
-		desc, err1 := stats.Describe(data, args.AllowNaN, percentiles)
+		desc, err1 := stats.Describe(data, params.AllowNaN, percentiles)
 		if err1 != nil {
 			err = err1
 		} else {
@@ -163,31 +162,17 @@ func (t *DescriptiveStatsTool) Invoke(ctx core.ToolContext, arguments string) (c
 			}
 		}
 	default:
-		return core.ToolResult{}, fmt.Errorf("%w: %s", ErrUnknownOperation, args.Operation)
+		return nil, fmt.Errorf("%w: %s", ErrUnknownOperation, params.Operation)
 	}
 
 	if err != nil {
-		return core.ToolResult{}, fmt.Errorf("operation failed: %w", err)
+		return nil, fmt.Errorf("operation failed: %w", err)
 	}
 
-	res, err := t.formatResponse(args.Operation, result)
-	if err != nil {
-		return core.ToolResult{}, err
-	}
-	return core.NewToolResult(res), nil
-}
-
-func (t *DescriptiveStatsTool) formatResponse(operation string, result any) (string, error) {
-	response := map[string]any{
-		"operation": operation,
+	return map[string]any{
+		"operation": params.Operation,
 		"result":    result,
-	}
-	data, err := json.Marshal(response)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal response: %w", err)
-	}
-
-	return string(data), nil
+	}, nil
 }
 
 // =============================================================================
@@ -236,65 +221,59 @@ func (t *CorrelationTool) Parameters() map[string]any {
 	}
 }
 
-func (t *CorrelationTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
-	var args struct {
+func (t *CorrelationTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+	var params struct {
 		Operation string    `json:"operation"`
 		Data1     []float64 `json:"data1,omitempty"`
 		Data2     []float64 `json:"data2,omitempty"`
 		Lags      int       `json:"lags,omitempty"`
 	}
 
-	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
-		return core.ToolResult{}, fmt.Errorf("invalid arguments: %w", err)
+	if err := core.UnmarshalArgs(args, &params); err != nil {
+		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 
 	var result any
 	var err error
 
-	switch args.Operation {
+	switch params.Operation {
 	case "correlation":
-		if len(args.Data1) == 0 || len(args.Data2) == 0 {
-			return core.ToolResult{}, ErrCorrelationRequiresData
+		if len(params.Data1) == 0 || len(params.Data2) == 0 {
+			return nil, ErrCorrelationRequiresData
 		}
-		result, err = stats.Correlation(stats.Float64Data(args.Data1), stats.Float64Data(args.Data2))
+		result, err = stats.Correlation(stats.Float64Data(params.Data1), stats.Float64Data(params.Data2))
 	case "pearson":
-		if len(args.Data1) == 0 || len(args.Data2) == 0 {
-			return core.ToolResult{}, ErrPearsonRequiresData
+		if len(params.Data1) == 0 || len(params.Data2) == 0 {
+			return nil, ErrPearsonRequiresData
 		}
-		result, err = stats.Pearson(stats.Float64Data(args.Data1), stats.Float64Data(args.Data2))
+		result, err = stats.Pearson(stats.Float64Data(params.Data1), stats.Float64Data(params.Data2))
 	case "covariance":
-		if len(args.Data1) == 0 || len(args.Data2) == 0 {
-			return core.ToolResult{}, ErrCovarianceRequiresData
+		if len(params.Data1) == 0 || len(params.Data2) == 0 {
+			return nil, ErrCovarianceRequiresData
 		}
-		result, err = stats.Covariance(stats.Float64Data(args.Data1), stats.Float64Data(args.Data2))
+		result, err = stats.Covariance(stats.Float64Data(params.Data1), stats.Float64Data(params.Data2))
 	case "covariance_population":
-		if len(args.Data1) == 0 || len(args.Data2) == 0 {
-			return core.ToolResult{}, ErrCovariancePopulationRequiresData
+		if len(params.Data1) == 0 || len(params.Data2) == 0 {
+			return nil, ErrCovariancePopulationRequiresData
 		}
-		result, err = stats.CovariancePopulation(stats.Float64Data(args.Data1), stats.Float64Data(args.Data2))
+		result, err = stats.CovariancePopulation(stats.Float64Data(params.Data1), stats.Float64Data(params.Data2))
 	case "autocorrelation":
-		if len(args.Data1) == 0 {
-			return core.ToolResult{}, ErrAutocorrelationRequiresData
+		if len(params.Data1) == 0 {
+			return nil, ErrAutocorrelationRequiresData
 		}
-		result, err = stats.AutoCorrelation(stats.Float64Data(args.Data1), args.Lags)
+		result, err = stats.AutoCorrelation(stats.Float64Data(params.Data1), params.Lags)
 	default:
-		return core.ToolResult{}, fmt.Errorf("%w: %s", ErrUnknownOperation, args.Operation)
+		return nil, fmt.Errorf("%w: %s", ErrUnknownOperation, params.Operation)
 	}
 
 	if err != nil {
-		return core.ToolResult{}, fmt.Errorf("operation failed: %w", err)
+		return nil, fmt.Errorf("operation failed: %w", err)
 	}
 
-	response := map[string]any{
-		"operation": args.Operation,
+	return map[string]any{
+		"operation": params.Operation,
 		"result":    result,
-	}
-	data, err := json.Marshal(response)
-	if err != nil {
-		return core.ToolResult{}, fmt.Errorf("failed to marshal response: %w", err)
-	}
-
-	return core.NewToolResult(string(data)), nil
+	}, nil
 }
 
 // =============================================================================
@@ -343,25 +322,25 @@ func (t *DistanceMetricsTool) Parameters() map[string]any {
 	}
 }
 
-func (t *DistanceMetricsTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
-	var args struct {
+func (t *DistanceMetricsTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+	var params struct {
 		Operation string    `json:"operation"`
 		Point1    []float64 `json:"point1"`
 		Point2    []float64 `json:"point2"`
 		Lambda    float64   `json:"lambda,omitempty"`
 	}
 
-	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
-		return core.ToolResult{}, fmt.Errorf("invalid arguments: %w", err)
+	if err := core.UnmarshalArgs(args, &params); err != nil {
+		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 
 	var result float64
 	var err error
 
-	p1 := stats.Float64Data(args.Point1)
-	p2 := stats.Float64Data(args.Point2)
+	p1 := stats.Float64Data(params.Point1)
+	p2 := stats.Float64Data(params.Point2)
 
-	switch args.Operation {
+	switch params.Operation {
 	case "euclidean_distance":
 		result, err = stats.EuclideanDistance(p1, p2)
 	case "manhattan_distance":
@@ -369,29 +348,23 @@ func (t *DistanceMetricsTool) Invoke(ctx core.ToolContext, arguments string) (co
 	case "chebyshev_distance":
 		result, err = stats.ChebyshevDistance(p1, p2)
 	case "minkowski_distance":
-		lambda := args.Lambda
+		lambda := params.Lambda
 		if lambda == 0 {
 			lambda = 2
 		}
 		result, err = stats.MinkowskiDistance(p1, p2, lambda)
 	default:
-		return core.ToolResult{}, fmt.Errorf("%w: %s", ErrUnknownOperation, args.Operation)
+		return nil, fmt.Errorf("%w: %s", ErrUnknownOperation, params.Operation)
 	}
 
 	if err != nil {
-		return core.ToolResult{}, fmt.Errorf("operation failed: %w", err)
+		return nil, fmt.Errorf("operation failed: %w", err)
 	}
 
-	response := map[string]any{
-		"operation": args.Operation,
+	return map[string]any{
+		"operation": params.Operation,
 		"distance":  result,
-	}
-	data, err := json.Marshal(response)
-	if err != nil {
-		return core.ToolResult{}, fmt.Errorf("failed to marshal response: %w", err)
-	}
-
-	return core.NewToolResult(string(data)), nil
+	}, nil
 }
 
 // =============================================================================
@@ -439,33 +412,33 @@ func (t *SamplingTool) Parameters() map[string]any {
 	}
 }
 
-func (t *SamplingTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
-	var args struct {
+func (t *SamplingTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+	var params struct {
 		Operation   string    `json:"operation"`
 		Data        []float64 `json:"data"`
 		TakeNum     int       `json:"takeNum,omitempty"`
 		Replacement bool      `json:"replacement,omitempty"`
 	}
 
-	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
-		return core.ToolResult{}, fmt.Errorf("invalid arguments: %w", err)
+	if err := core.UnmarshalArgs(args, &params); err != nil {
+		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 
-	data := stats.Float64Data(args.Data)
+	data := stats.Float64Data(params.Data)
 	var result any
 	var err error
 
-	switch args.Operation {
+	switch params.Operation {
 	case "sample":
-		if args.TakeNum == 0 {
-			args.TakeNum = len(args.Data) / 2
+		if params.TakeNum == 0 {
+			params.TakeNum = len(params.Data) / 2
 		}
-		result, err = stats.Sample(data, args.TakeNum, args.Replacement)
+		result, err = stats.Sample(data, params.TakeNum, params.Replacement)
 	case "stable_sample":
-		if args.TakeNum == 0 {
-			args.TakeNum = len(args.Data) / 2
+		if params.TakeNum == 0 {
+			params.TakeNum = len(params.Data) / 2
 		}
-		result, err = stats.StableSample(data, args.TakeNum)
+		result, err = stats.StableSample(data, params.TakeNum)
 	case "quartile_outliers":
 		outliers, err1 := stats.QuartileOutliers(data)
 		if err1 != nil {
@@ -477,23 +450,17 @@ func (t *SamplingTool) Invoke(ctx core.ToolContext, arguments string) (core.Tool
 			}
 		}
 	default:
-		return core.ToolResult{}, fmt.Errorf("%w: %s", ErrUnknownOperation, args.Operation)
+		return nil, fmt.Errorf("%w: %s", ErrUnknownOperation, params.Operation)
 	}
 
 	if err != nil {
-		return core.ToolResult{}, fmt.Errorf("operation failed: %w", err)
+		return nil, fmt.Errorf("operation failed: %w", err)
 	}
 
-	response := map[string]any{
-		"operation": args.Operation,
+	return map[string]any{
+		"operation": params.Operation,
 		"result":    result,
-	}
-	responseData, err := json.Marshal(response)
-	if err != nil {
-		return core.ToolResult{}, fmt.Errorf("failed to marshal response: %w", err)
-	}
-
-	return core.NewToolResult(string(responseData)), nil
+	}, nil
 }
 
 // =============================================================================
@@ -541,50 +508,44 @@ func (t *DataTransformTool) Parameters() map[string]any {
 	}
 }
 
-func (t *DataTransformTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
-	var args struct {
+func (t *DataTransformTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+	var params struct {
 		Operation string    `json:"operation"`
 		Data      []float64 `json:"data,omitempty"`
 		Value     float64   `json:"value,omitempty"`
 		Places    int       `json:"places,omitempty"`
 	}
 
-	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
-		return core.ToolResult{}, fmt.Errorf("invalid arguments: %w", err)
+	if err := core.UnmarshalArgs(args, &params); err != nil {
+		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 
 	var result any
 	var err error
 
-	switch args.Operation {
+	switch params.Operation {
 	case "sigmoid":
-		result, err = stats.Sigmoid(stats.Float64Data(args.Data))
+		result, err = stats.Sigmoid(stats.Float64Data(params.Data))
 	case "softmax":
-		result, err = stats.SoftMax(stats.Float64Data(args.Data))
+		result, err = stats.SoftMax(stats.Float64Data(params.Data))
 	case "cumulative_sum":
-		result, err = stats.CumulativeSum(stats.Float64Data(args.Data))
+		result, err = stats.CumulativeSum(stats.Float64Data(params.Data))
 	case "entropy":
-		result, err = stats.Entropy(stats.Float64Data(args.Data))
+		result, err = stats.Entropy(stats.Float64Data(params.Data))
 	case "round":
-		result, err = stats.Round(args.Value, args.Places)
+		result, err = stats.Round(params.Value, params.Places)
 	default:
-		return core.ToolResult{}, fmt.Errorf("%w: %s", ErrUnknownOperation, args.Operation)
+		return nil, fmt.Errorf("%w: %s", ErrUnknownOperation, params.Operation)
 	}
 
 	if err != nil {
-		return core.ToolResult{}, fmt.Errorf("operation failed: %w", err)
+		return nil, fmt.Errorf("operation failed: %w", err)
 	}
 
-	response := map[string]any{
-		"operation": args.Operation,
+	return map[string]any{
+		"operation": params.Operation,
 		"result":    result,
-	}
-	data, err := json.Marshal(response)
-	if err != nil {
-		return core.ToolResult{}, fmt.Errorf("failed to marshal response: %w", err)
-	}
-
-	return core.NewToolResult(string(data)), nil
+	}, nil
 }
 
 // =============================================================================
@@ -666,8 +627,8 @@ func (t *NormalDistributionTool) Parameters() map[string]any {
 	}
 }
 
-func (t *NormalDistributionTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
-	var args struct {
+func (t *NormalDistributionTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+	var params struct {
 		Operation string    `json:"operation"`
 		X         float64   `json:"x,omitempty"`
 		P         float64   `json:"p,omitempty"`
@@ -681,87 +642,81 @@ func (t *NormalDistributionTool) Invoke(ctx core.ToolContext, arguments string) 
 		Data      []float64 `json:"data,omitempty"`
 	}
 
-	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
-		return core.ToolResult{}, fmt.Errorf("invalid arguments: %w", err)
+	if err := core.UnmarshalArgs(args, &params); err != nil {
+		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 
 	var result any
 
-	switch args.Operation {
+	switch params.Operation {
 	case "norm_pdf":
-		result = stats.NormPdf(args.X, args.Loc, args.Scale)
+		result = stats.NormPdf(params.X, params.Loc, params.Scale)
 	case "norm_cdf":
-		result = stats.NormCdf(args.X, args.Loc, args.Scale)
+		result = stats.NormCdf(params.X, params.Loc, params.Scale)
 	case "norm_ppf":
-		result = stats.NormPpf(args.P, args.Loc, args.Scale)
+		result = stats.NormPpf(params.P, params.Loc, params.Scale)
 	case "norm_sf":
-		result = stats.NormSf(args.X, args.Loc, args.Scale)
+		result = stats.NormSf(params.X, params.Loc, params.Scale)
 	case "norm_isf":
-		result = stats.NormIsf(args.P, args.Loc, args.Scale)
+		result = stats.NormIsf(params.P, params.Loc, params.Scale)
 	case "norm_log_pdf":
-		result = stats.NormLogPdf(args.X, args.Loc, args.Scale)
+		result = stats.NormLogPdf(params.X, params.Loc, params.Scale)
 	case "norm_log_cdf":
-		result = stats.NormLogCdf(args.X, args.Loc, args.Scale)
+		result = stats.NormLogCdf(params.X, params.Loc, params.Scale)
 	case "norm_log_sf":
-		result = stats.NormLogSf(args.X, args.Loc, args.Scale)
+		result = stats.NormLogSf(params.X, params.Loc, params.Scale)
 	case "norm_mean":
-		result = stats.NormMean(args.Loc, args.Scale)
+		result = stats.NormMean(params.Loc, params.Scale)
 	case "norm_median":
-		result = stats.NormMedian(args.Loc, args.Scale)
+		result = stats.NormMedian(params.Loc, params.Scale)
 	case "norm_std":
-		result = stats.NormStd(args.Loc, args.Scale)
+		result = stats.NormStd(params.Loc, params.Scale)
 	case "norm_var":
-		result = stats.NormVar(args.Loc, args.Scale)
+		result = stats.NormVar(params.Loc, params.Scale)
 	case "norm_entropy":
-		result = stats.NormEntropy(args.Loc, args.Scale)
+		result = stats.NormEntropy(params.Loc, params.Scale)
 	case "norm_moment":
-		result = stats.NormMoment(args.N, args.Loc, args.Scale)
+		result = stats.NormMoment(params.N, params.Loc, params.Scale)
 	case "norm_stats":
-		if args.Moments == "" {
-			args.Moments = "mv"
+		if params.Moments == "" {
+			params.Moments = "mv"
 		}
-		result = stats.NormStats(args.Loc, args.Scale, args.Moments)
+		result = stats.NormStats(params.Loc, params.Scale, params.Moments)
 	case "norm_interval":
-		interval := stats.NormInterval(args.Alpha, args.Loc, args.Scale)
+		interval := stats.NormInterval(params.Alpha, params.Loc, params.Scale)
 		result = map[string]any{
 			"lower": interval[0],
 			"upper": interval[1],
 		}
 	case "norm_fit":
-		if len(args.Data) == 0 {
-			return core.ToolResult{}, ErrNormFitRequiresData
+		if len(params.Data) == 0 {
+			return nil, ErrNormFitRequiresData
 		}
-		params := stats.NormFit(args.Data)
+		fitParams := stats.NormFit(params.Data)
 		result = map[string]any{
-			"loc":   params[0],
-			"scale": params[1],
+			"loc":   fitParams[0],
+			"scale": fitParams[1],
 		}
 	case "norm_box_muller_rvs":
-		if args.Size == 0 {
-			args.Size = 100
+		if params.Size == 0 {
+			params.Size = 100
 		}
-		result = stats.NormBoxMullerRvs(args.Loc, args.Scale, args.Size)
+		result = stats.NormBoxMullerRvs(params.Loc, params.Scale, params.Size)
 	case "norm_ppf_rvs":
-		if args.Size == 0 {
-			args.Size = 100
+		if params.Size == 0 {
+			params.Size = 100
 		}
-		result = stats.NormPpfRvs(args.Loc, args.Scale, args.Size)
+		result = stats.NormPpfRvs(params.Loc, params.Scale, params.Size)
 	case "ncr":
-		result = stats.Ncr(args.N, args.R)
+		result = stats.Ncr(params.N, params.R)
 	default:
-		return core.ToolResult{}, fmt.Errorf("%w: %s", ErrUnknownOperation, args.Operation)
+		return nil, fmt.Errorf("%w: %s", ErrUnknownOperation, params.Operation)
 	}
 
-	response := map[string]any{
-		"operation": args.Operation,
+	return map[string]any{
+		"operation": params.Operation,
 		"result":    result,
-	}
-	data, err := json.Marshal(response)
-	if err != nil {
-		return core.ToolResult{}, fmt.Errorf("failed to marshal response: %w", err)
-	}
-
-	return core.NewToolResult(string(data)), nil
+	}, nil
 }
 
 // =============================================================================
@@ -808,46 +763,40 @@ func (t *GeometricDistributionTool) Parameters() map[string]any {
 	}
 }
 
-func (t *GeometricDistributionTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
-	var args struct {
+func (t *GeometricDistributionTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+	var params struct {
 		Operation string  `json:"operation"`
 		P         float64 `json:"p"`
 		A         int     `json:"a,omitempty"`
 		B         int     `json:"b,omitempty"`
 	}
 
-	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
-		return core.ToolResult{}, fmt.Errorf("invalid arguments: %w", err)
+	if err := core.UnmarshalArgs(args, &params); err != nil {
+		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 
 	var result float64
 	var err error
 
-	switch args.Operation {
+	switch params.Operation {
 	case "prob_geom":
-		result, err = stats.ProbGeom(args.A, args.B, args.P)
+		result, err = stats.ProbGeom(params.A, params.B, params.P)
 	case "exp_geom":
-		result, err = stats.ExpGeom(args.P)
+		result, err = stats.ExpGeom(params.P)
 	case "var_geom":
-		result, err = stats.VarGeom(args.P)
+		result, err = stats.VarGeom(params.P)
 	default:
-		return core.ToolResult{}, fmt.Errorf("%w: %s", ErrUnknownOperation, args.Operation)
+		return nil, fmt.Errorf("%w: %s", ErrUnknownOperation, params.Operation)
 	}
 
 	if err != nil {
-		return core.ToolResult{}, fmt.Errorf("operation failed: %w", err)
+		return nil, fmt.Errorf("operation failed: %w", err)
 	}
 
-	response := map[string]any{
-		"operation": args.Operation,
+	return map[string]any{
+		"operation": params.Operation,
 		"result":    result,
-	}
-	data, err := json.Marshal(response)
-	if err != nil {
-		return core.ToolResult{}, fmt.Errorf("failed to marshal response: %w", err)
-	}
-
-	return core.NewToolResult(string(data)), nil
+	}, nil
 }
 
 // =============================================================================
@@ -892,30 +841,30 @@ func (r *RegressionTool) Parameters() map[string]any {
 	}
 }
 
-func (r *RegressionTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
-	var args struct {
+func (r *RegressionTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+	var params struct {
 		Type string    `json:"type"`
 		X    []float64 `json:"x"`
 		Y    []float64 `json:"y"`
 	}
 
-	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
-		return core.ToolResult{}, fmt.Errorf("invalid arguments: %w", err)
+	if err := core.UnmarshalArgs(args, &params); err != nil {
+		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 
-	if len(args.X) != len(args.Y) {
-		return core.ToolResult{}, ErrXYArrayLengthMismatch
+	if len(params.X) != len(params.Y) {
+		return nil, ErrXYArrayLengthMismatch
 	}
 
-	series := make(stats.Series, len(args.X))
-	for i := range args.X {
-		series[i] = stats.Coordinate{X: args.X[i], Y: args.Y[i]}
+	series := make(stats.Series, len(params.X))
+	for i := range params.X {
+		series[i] = stats.Coordinate{X: params.X[i], Y: params.Y[i]}
 	}
 
 	var result stats.Series
 	var err error
 
-	switch args.Type {
+	switch params.Type {
 	case "linear":
 		result, err = stats.LinearRegression(series)
 	case "exponential":
@@ -923,11 +872,11 @@ func (r *RegressionTool) Invoke(ctx core.ToolContext, arguments string) (core.To
 	case "logarithmic":
 		result, err = stats.LogarithmicRegression(series)
 	default:
-		return core.ToolResult{}, fmt.Errorf("%w: %s", ErrUnknownRegressionType, args.Type)
+		return nil, fmt.Errorf("%w: %s", ErrUnknownRegressionType, params.Type)
 	}
 
 	if err != nil {
-		return core.ToolResult{}, fmt.Errorf("regression failed: %w", err)
+		return nil, fmt.Errorf("regression failed: %w", err)
 	}
 
 	resultCoords := make([]map[string]float64, len(result))
@@ -938,14 +887,8 @@ func (r *RegressionTool) Invoke(ctx core.ToolContext, arguments string) (core.To
 		}
 	}
 
-	response := map[string]any{
-		"type":       args.Type,
+	return map[string]any{
+		"type":       params.Type,
 		"regression": resultCoords,
-	}
-	data, err := json.Marshal(response)
-	if err != nil {
-		return core.ToolResult{}, fmt.Errorf("failed to marshal response: %w", err)
-	}
-
-	return core.NewToolResult(string(data)), nil
+	}, nil
 }

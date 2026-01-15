@@ -51,12 +51,29 @@ func (t *WriteWhiteboardTool) Parameters() map[string]any {
 	}
 }
 
-func (t *WriteWhiteboardTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
-	res, err := WriteWhiteboard(arguments)
-	if err != nil {
-		return core.ToolResult{}, err
+func (t *WriteWhiteboardTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+	var params WriteWhiteboardInput
+	if err := core.UnmarshalArgs(args, &params); err != nil {
+		return nil, fmt.Errorf("failed to parse whiteboard arguments: %w", err)
 	}
-	return core.NewToolResult(res), nil
+
+	// Validate action
+	validActions := map[string]bool{
+		"write":  true,
+		"append": true,
+		"clear":  true,
+	}
+
+	if !validActions[params.Action] {
+		return nil, fmt.Errorf("%w: %s (must be write, append, or clear)", ErrInvalidAction, params.Action)
+	}
+
+	// Return confirmation as map
+	return map[string]any{
+		"message": fmt.Sprintf("Whiteboard updated (%s)", params.Action),
+		"action":  params.Action,
+		"content": params.Content,
+	}, nil
 }
 
 // WriteWhiteboard allows instructors to write to the shared whiteboard.

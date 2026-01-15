@@ -2,7 +2,6 @@ package tools
 
 import (
 	"crypto/sha256"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -130,72 +129,65 @@ do for [n=1:10] {
 	}
 }
 
-func (a *AnimateTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
-	var args AnimateArgs
-	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
-		return core.ToolResult{}, fmt.Errorf("failed to parse animate args: %w", err)
+func (a *AnimateTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+	var params AnimateArgs
+	if err := core.UnmarshalArgs(args, &params); err != nil {
+		return nil, fmt.Errorf("failed to parse animate args: %w", err)
 	}
 
 	// Validate required gnuplot_script parameter
-	if args.GnuplotScript == "" {
-		return core.ToolResult{}, ErrGnuplotScriptRequired
+	if params.GnuplotScript == "" {
+		return nil, ErrGnuplotScriptRequired
 	}
 
 	// Validate script doesn't contain terminal/output commands
-	scriptLower := strings.ToLower(args.GnuplotScript)
+	scriptLower := strings.ToLower(params.GnuplotScript)
 	if strings.Contains(scriptLower, "set terminal") || strings.Contains(scriptLower, "set term") {
-		return core.ToolResult{}, ErrTerminalCommandNotAllowed
+		return nil, ErrTerminalCommandNotAllowed
 	}
 	if strings.Contains(scriptLower, "set output") {
-		return core.ToolResult{}, ErrOutputCommandNotAllowed
+		return nil, ErrOutputCommandNotAllowed
 	}
 
 	// Validate format
-	if args.Format == "" {
-		args.Format = "gif"
+	if params.Format == "" {
+		params.Format = "gif"
 	}
-	if args.Format != "gif" && args.Format != "webp" {
-		return core.ToolResult{}, fmt.Errorf("%w, got: %s", ErrInvalidAnimationFormat, args.Format)
+	if params.Format != "gif" && params.Format != "webp" {
+		return nil, fmt.Errorf("%w, got: %s", ErrInvalidAnimationFormat, params.Format)
 	}
 
 	// Validate delay
-	if args.Delay <= 0 {
-		args.Delay = 50 // Default to 20fps
+	if params.Delay <= 0 {
+		params.Delay = 50 // Default to 20fps
 	}
-	if args.Delay > 500 {
-		return core.ToolResult{}, fmt.Errorf("%w (got: %d)", ErrDelayTooLarge, args.Delay)
+	if params.Delay > 500 {
+		return nil, fmt.Errorf("%w (got: %d)", ErrDelayTooLarge, params.Delay)
 	}
 
 	// Validate title length
-	if len(args.Title) > 100 {
-		return core.ToolResult{}, ErrAnimateTitleTooLong
+	if len(params.Title) > 100 {
+		return nil, ErrAnimateTitleTooLong
 	}
 
 	// Generate the animation
-	animationPath, err := executeGnuplotAnimation(args.GnuplotScript, args.Format, args.Delay, args.Title)
+	animationPath, err := executeGnuplotAnimation(params.GnuplotScript, params.Format, params.Delay, params.Title)
 	if err != nil {
-		return core.ToolResult{}, fmt.Errorf("failed to generate animation: %w", err)
+		return nil, fmt.Errorf("failed to generate animation: %w", err)
 	}
 
-	// Return result with animation path
+	// Return result as map
 	result := map[string]any{
 		"success":        true,
 		"animation_path": animationPath,
 		"animation_url":  "/assets/charts/" + filepath.Base(animationPath),
-		"format":         args.Format,
-		"delay":          args.Delay,
+		"format":         params.Format,
+		"delay":          params.Delay,
 		"message":        "Animation generated successfully",
-	}
-	if args.Title != "" {
-		result["title"] = args.Title
+		"title":          params.Title,
 	}
 
-	resultJSON, err := json.Marshal(result)
-	if err != nil {
-		return core.ToolResult{}, fmt.Errorf("failed to marshal animation result: %w", err)
-	}
-
-	return core.NewToolResult(string(resultJSON)), nil
+	return result, nil
 }
 
 // executeGnuplotAnimation executes a gnuplot animation script and generates the animation file.

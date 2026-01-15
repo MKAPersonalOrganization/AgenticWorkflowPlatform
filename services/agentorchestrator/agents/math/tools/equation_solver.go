@@ -1,7 +1,6 @@
 package tools
 
 import (
-	"encoding/json"
 	"fmt"
 	"school-with-ai/foundation/agentsdk/core"
 	"strings"
@@ -46,25 +45,19 @@ func (e *EquationSolverTool) Parameters() map[string]any {
 	}
 }
 
-func (e *EquationSolverTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
-	var args EquationSolverArgs
-	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
-		return core.ToolResult{}, fmt.Errorf("failed to parse equation solver args: %w", err)
+func (e *EquationSolverTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+	var params EquationSolverArgs
+	if err := core.UnmarshalArgs(args, &params); err != nil {
+		return nil, fmt.Errorf("failed to parse equation solver args: %w", err)
 	}
 
-	if args.Variable == "" {
-		args.Variable = "x"
+	if params.Variable == "" {
+		params.Variable = "x"
 	}
 
-	// Mock equation solving
-	solution := solveEquation(args.Equation, args.Variable)
-
-	resultJSON, err := json.Marshal(solution)
-	if err != nil {
-		return core.ToolResult{}, fmt.Errorf("failed to marshal solution: %w", err)
-	}
-
-	return core.NewToolResult(string(resultJSON)), nil
+	// Solve equation and return result as map
+	solution := solveEquation(params.Equation, params.Variable)
+	return solution, nil
 }
 
 func solveEquation(equation, variable string) map[string]any {

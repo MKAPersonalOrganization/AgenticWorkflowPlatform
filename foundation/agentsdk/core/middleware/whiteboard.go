@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"school-with-ai/foundation/agentsdk/core"
@@ -278,15 +277,14 @@ func (t *WriteWhiteboardTool) Parameters() map[string]any {
 	}
 }
 
-func (t *WriteWhiteboardTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
-	var args struct {
+func (t *WriteWhiteboardTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+	var params struct {
 		Content string           `json:"content"`
 		Action  WhiteboardAction `json:"action"`
 	}
 
-	err := json.Unmarshal([]byte(arguments), &args)
-	if err != nil {
-		return core.ToolResult{}, fmt.Errorf("failed to parse whiteboard arguments: %w", err)
+	if err := core.UnmarshalArgs(args, &params); err != nil {
+		return nil, fmt.Errorf("failed to parse whiteboard arguments: %w", err)
 	}
 
 	// Validate action
@@ -296,23 +294,23 @@ func (t *WriteWhiteboardTool) Invoke(ctx core.ToolContext, arguments string) (co
 		WhiteboardActionClear:  true,
 	}
 
-	if !validActions[args.Action] {
-		return core.ToolResult{}, fmt.Errorf("%w: %s", ErrInvalidWhiteboardAction, args.Action)
+	if !validActions[params.Action] {
+		return nil, fmt.Errorf("%w: %s", ErrInvalidWhiteboardAction, params.Action)
 	}
 
 	var finalContent string
 
 	// Update whiteboard based on action
-	switch args.Action {
+	switch params.Action {
 	case WhiteboardActionWrite:
-		finalContent = args.Content
+		finalContent = params.Content
 		SetWhiteboardContent(t.reqCtx, finalContent)
 	case WhiteboardActionAppend:
 		current := GetWhiteboardContent(t.reqCtx)
 		if current == "" {
-			finalContent = args.Content
+			finalContent = params.Content
 		} else {
-			finalContent = current + "\n" + args.Content
+			finalContent = current + "\n" + params.Content
 		}
 		SetWhiteboardContent(t.reqCtx, finalContent)
 	case WhiteboardActionClear:
@@ -323,7 +321,10 @@ func (t *WriteWhiteboardTool) Invoke(ctx core.ToolContext, arguments string) (co
 	// No need to emit custom event - ToolCallExecutedEvent is emitted automatically
 	// by the service layer and contains all the tool execution details
 
-	return core.NewToolResult(fmt.Sprintf("Whiteboard updated (%s)", args.Action)), nil
+	return map[string]any{
+		"message": fmt.Sprintf("Whiteboard updated (%s)", params.Action),
+		"action":  string(params.Action),
+	}, nil
 }
 
 // WhiteboardMiddleware provides whiteboard management capabilities to agents.

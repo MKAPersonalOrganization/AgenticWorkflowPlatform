@@ -140,32 +140,34 @@ func TestWriteTodosTool_Invoke(t *testing.T) {
 		"todos": todos,
 	}
 
-	argsJSON, err := json.Marshal(args)
-	if err != nil {
-		t.Fatalf("Failed to marshal arguments: %v", err)
-	}
-
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	if err != nil {
 		t.Fatalf("Tool invocation failed: %v", err)
 	}
 
-	if !strings.Contains(result.Result, "Updated todo list") {
-		t.Errorf("Expected confirmation message in result, got: %s", result.Result)
+	resMap, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("Expected map[string]any result, got %T", result)
 	}
 
-	if !strings.Contains(result.Result, "Task 1") {
-		t.Error("Result should contain Task 1")
+	msg := resMap["message"].(string)
+	if !strings.Contains(msg, "Updated todo list") {
+		t.Errorf("Expected confirmation message in result, got: %s", msg)
+	}
+
+	count := resMap["count"].(int)
+	if count != 3 {
+		t.Errorf("Expected count 3, got %d", count)
 	}
 }
 
-func TestWriteTodosTool_Invoke_InvalidJSON(t *testing.T) {
+func TestWriteTodosTool_Invoke_InvalidArgs(t *testing.T) {
 	t.Parallel()
 	tool := NewWriteTodosTool()
 
-	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), "invalid json")
+	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), "invalid args")
 	if err == nil {
-		t.Error("Expected error for invalid JSON")
+		t.Error("Expected error for invalid arguments")
 	}
 }
 
@@ -427,6 +429,6 @@ func (m *MockTool) Parameters() map[string]any {
 	}
 }
 
-func (m *MockTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
-	return core.NewToolResult("mock result"), nil
+func (m *MockTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+	return map[string]any{"result": "mock result"}, nil
 }

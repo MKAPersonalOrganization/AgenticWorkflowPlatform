@@ -39,8 +39,8 @@ func (m *MockTool) Parameters() map[string]any {
 	}
 }
 
-func (m *MockTool) Invoke(ctx ToolContext, arguments string) (ToolResult, error) {
-	return NewToolResult("mock result"), nil
+func (m *MockTool) Invoke(ctx ToolContext, args any) (any, error) {
+	return map[string]any{"result": "mock result"}, nil
 }
 
 // TestToChatOptionsWithMiddleware_WithoutMiddleware ensures backward compatibility.

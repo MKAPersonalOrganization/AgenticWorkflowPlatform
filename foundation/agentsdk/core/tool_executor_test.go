@@ -2,7 +2,6 @@ package core_test
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"school-with-ai/foundation/agentsdk/core"
@@ -150,7 +149,7 @@ func TestBasicToolExecutor_Calculate(t *testing.T) {
 		"calculate",
 		"Calculate an expression",
 		core.ObjectSchema(map[string]any{"expression": core.StringProperty("Expression")}, []string{"expression"}),
-		func(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
+		func(ctx core.ToolContext, args any) (any, error) {
 			return core.NewToolResult(`{"result": "4"}`), nil
 		},
 	))
@@ -187,7 +186,7 @@ func TestBasicToolExecutor_WriteWhiteboard(t *testing.T) {
 			"content": core.StringProperty("Content"),
 			"action":  core.StringProperty("Action"),
 		}, []string{"content", "action"}),
-		func(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
+		func(ctx core.ToolContext, args any) (any, error) {
 			return core.NewToolResult(`{"status": "success"}`), nil
 		},
 	))
@@ -227,16 +226,16 @@ func TestRegistryToolExecutor(t *testing.T) {
 			map[string]any{"name": core.StringProperty("The name")},
 			[]string{"name"},
 		),
-		func(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
-			var args struct {
+		func(ctx core.ToolContext, args any) (any, error) {
+			var params struct {
 				Name string `json:"name"`
 			}
-			err := json.Unmarshal([]byte(arguments), &args)
+			err := core.UnmarshalArgs(args, &params)
 			if err != nil {
-				return core.ToolResult{}, fmt.Errorf("failed to unmarshal arguments: %w", err)
+				return nil, fmt.Errorf("failed to unmarshal arguments: %w", err)
 			}
 
-			return core.NewToolResult(`{"message": "Hello, ` + args.Name + `!"}`), nil
+			return map[string]any{"message": "Hello, " + params.Name + "!"}, nil
 		},
 	))
 
@@ -255,7 +254,7 @@ func TestRegistryToolExecutor(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if result.Result != `{"message": "Hello, World!"}` {
+	if result.Result != `{"message":"Hello, World!"}` {
 		t.Errorf("unexpected result: %s", result.Result)
 	}
 }

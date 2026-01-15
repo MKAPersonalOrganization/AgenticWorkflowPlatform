@@ -1,7 +1,6 @@
 package tools
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -70,39 +69,28 @@ func (c *CalculatorTool) Parameters() map[string]any {
 	}
 }
 
-func (c *CalculatorTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
-	result, err := ExecuteCalculatorTool(arguments)
-	if err != nil {
-		return core.ToolResult{}, err
-	}
-	return core.NewToolResult(result), nil
+func (c *CalculatorTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+	return ExecuteCalculatorTool(args)
 }
 
 // ExecuteCalculatorTool evaluates a mathematical expression.
-func ExecuteCalculatorTool(argsJSON string) (string, error) {
-	var args CalculatorArgs
-	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
-		return "", fmt.Errorf("failed to parse calculator args: %w", err)
+func ExecuteCalculatorTool(args any) (any, error) {
+	var params CalculatorArgs
+	if err := core.UnmarshalArgs(args, &params); err != nil {
+		return nil, fmt.Errorf("failed to parse calculator args: %w", err)
 	}
 
 	// Evaluate the expression
-	result, err := evaluateExpression(args.Expression)
+	result, err := evaluateExpression(params.Expression)
 	if err != nil {
-		return "", fmt.Errorf("failed to evaluate expression: %w", err)
+		return nil, fmt.Errorf("failed to evaluate expression: %w", err)
 	}
 
-	// Return result as JSON
-	resultData := map[string]any{
-		"expression": args.Expression,
+	// Return result as map
+	return map[string]any{
+		"expression": params.Expression,
 		"result":     result,
-	}
-
-	resultJSON, err := json.Marshal(resultData)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal calculator result: %w", err)
-	}
-
-	return string(resultJSON), nil
+	}, nil
 }
 
 // evaluateExpression evaluates a simple mathematical expression

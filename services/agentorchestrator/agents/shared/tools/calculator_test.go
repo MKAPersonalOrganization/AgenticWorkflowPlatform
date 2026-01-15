@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"encoding/json"
 	"school-with-ai/foundation/agentsdk/core"
 	"testing"
 )
@@ -11,123 +10,118 @@ func TestExecuteCalculatorTool(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name           string
-		argsJSON       string
+		args           any
 		wantExpression string
 		wantResult     float64
 		wantErr        bool
 	}{
 		{
 			name:           "simple addition",
-			argsJSON:       `{"expression": "2 + 2"}`,
+			args:           map[string]any{"expression": "2 + 2"},
 			wantExpression: "2 + 2",
 			wantResult:     4,
 			wantErr:        false,
 		},
 		{
 			name:           "simple subtraction",
-			argsJSON:       `{"expression": "10 - 3"}`,
+			args:           map[string]any{"expression": "10 - 3"},
 			wantExpression: "10 - 3",
 			wantResult:     7,
 			wantErr:        false,
 		},
 		{
 			name:           "simple multiplication",
-			argsJSON:       `{"expression": "5 * 6"}`,
+			args:           map[string]any{"expression": "5 * 6"},
 			wantExpression: "5 * 6",
 			wantResult:     30,
 			wantErr:        false,
 		},
 		{
 			name:           "simple division",
-			argsJSON:       `{"expression": "20 / 4"}`,
+			args:           map[string]any{"expression": "20 / 4"},
 			wantExpression: "20 / 4",
 			wantResult:     5,
 			wantErr:        false,
 		},
 		{
 			name:           "complex expression",
-			argsJSON:       `{"expression": "2 + 3 * 4"}`,
+			args:           map[string]any{"expression": "2 + 3 * 4"},
 			wantExpression: "2 + 3 * 4",
-			wantResult:     14, // 2 + (3 * 4) = 2 + 12 = 14
+			wantResult:     14,
 			wantErr:        false,
 		},
 		{
 			name:           "parentheses",
-			argsJSON:       `{"expression": "(2 + 3) * 4"}`,
+			args:           map[string]any{"expression": "(2 + 3) * 4"},
 			wantExpression: "(2 + 3) * 4",
-			wantResult:     20, // (2 + 3) * 4 = 5 * 4 = 20
+			wantResult:     20,
 			wantErr:        false,
 		},
 		{
 			name:           "exponentiation",
-			argsJSON:       `{"expression": "2^8"}`,
+			args:           map[string]any{"expression": "2^8"},
 			wantExpression: "2^8",
 			wantResult:     256,
 			wantErr:        false,
 		},
 		{
 			name:           "square root",
-			argsJSON:       `{"expression": "sqrt(16)"}`,
+			args:           map[string]any{"expression": "sqrt(16)"},
 			wantExpression: "sqrt(16)",
 			wantResult:     4,
 			wantErr:        false,
 		},
 		{
 			name:           "negative numbers",
-			argsJSON:       `{"expression": "-5 + 10"}`,
+			args:           map[string]any{"expression": "-5 + 10"},
 			wantExpression: "-5 + 10",
 			wantResult:     5,
 			wantErr:        false,
 		},
 		{
 			name:           "decimal numbers",
-			argsJSON:       `{"expression": "3.5 * 2"}`,
+			args:           map[string]any{"expression": "3.5 * 2"},
 			wantExpression: "3.5 * 2",
 			wantResult:     7,
 			wantErr:        false,
 		},
 		{
-			name:     "invalid JSON",
-			argsJSON: `{invalid}`,
-			wantErr:  true,
+			name:    "invalid arguments type",
+			args:    "not a map or struct",
+			wantErr: true,
 		},
 		{
-			name:     "division by zero",
-			argsJSON: `{"expression": "10 / 0"}`,
-			wantErr:  true,
+			name:    "division by zero",
+			args:    map[string]any{"expression": "10 / 0"},
+			wantErr: true,
 		},
 		{
-			name:     "empty expression",
-			argsJSON: `{"expression": ""}`,
-			wantErr:  true,
+			name:    "empty expression",
+			args:    map[string]any{"expression": ""},
+			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result, err := ExecuteCalculatorTool(tt.argsJSON)
+			result, err := ExecuteCalculatorTool(tt.args)
 
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("ExecuteCalculatorTool() expected error but got none")
 				}
-
 				return
 			}
 
 			if err != nil {
 				t.Errorf("ExecuteCalculatorTool() unexpected error: %v", err)
-
 				return
 			}
 
-			// Parse the result JSON
-			var resultData map[string]any
-			if err := json.Unmarshal([]byte(result), &resultData); err != nil {
-				t.Errorf("Failed to parse result JSON: %v", err)
-
-				return
+			resultData, ok := result.(map[string]any)
+			if !ok {
+				t.Fatalf("Expected map[string]any result, got %T", result)
 			}
 
 			// Check expression
@@ -168,7 +162,7 @@ func TestEvaluateExpression(t *testing.T) {
 		{"nested parentheses", "((2 + 3) * 4) - 5", 15, false},
 		{"exponentiation", "3^2", 9, false},
 		{"square root", "sqrt(25)", 5, false},
-		{"complex", "sqrt(16) + 2^3", 12, false}, // sqrt(16) = 4, 2^3 = 8, 4 + 8 = 12
+		{"complex", "sqrt(16) + 2^3", 12, false},
 		{"negative", "-10 + 5", -5, false},
 		{"decimal", "3.14 * 2", 6.28, false},
 	}
@@ -179,7 +173,6 @@ func TestEvaluateExpression(t *testing.T) {
 			got, err := evaluateExpression(tt.expression)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("evaluateExpression() error = %v, wantErr %v", err, tt.wantErr)
-
 				return
 			}
 			if !tt.wantErr && got != tt.want {
@@ -193,32 +186,26 @@ func TestCalculatorTool_Interface(t *testing.T) {
 	t.Parallel()
 	calc := NewCalculatorTool()
 
-	// Test Name
 	if calc.Name() != "calculate" {
 		t.Errorf("Name() = %s, want 'calculate'", calc.Name())
 	}
 
-	// Test Description
 	if calc.Description() == "" {
 		t.Error("Description() should not be empty")
 	}
 
-	// Test Parameters schema
 	params := calc.Parameters()
 	if params["type"] != "object" {
 		t.Errorf("Parameters type = %v, want 'object'", params["type"])
 	}
 
-	props, ok := params["properties"].(map[string]any)
-	if !ok {
-		t.Fatal("Parameters should have properties")
-	}
+	props := params["properties"].(map[string]any)
 	if _, ok := props["expression"]; !ok {
 		t.Error("Parameters should have 'expression' property")
 	}
 
-	required, ok := params["required"].([]string)
-	if !ok || len(required) != 1 || required[0] != "expression" {
+	required := params["required"].([]string)
+	if len(required) != 1 || required[0] != "expression" {
 		t.Errorf("Parameters required = %v, want ['expression']", params["required"])
 	}
 }
@@ -229,57 +216,17 @@ func TestCalculatorTool_Invoke(t *testing.T) {
 	ctx := context.Background()
 
 	// Test successful invocation
-	result, err := calc.Invoke(core.NewToolContext(ctx, "", "", "", nil), `{"expression": "2 + 2"}`)
+	result, err := calc.Invoke(core.NewToolContext(ctx, "", "", "", nil), map[string]any{"expression": "2 + 2"})
 	if err != nil {
 		t.Fatalf("Invoke() unexpected error: %v", err)
 	}
 
-	var response struct {
-		Expression string  `json:"expression"`
-		Result     float64 `json:"result"`
-	}
-	if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
-		t.Fatalf("Failed to parse result: %v", err)
+	response, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("Expected map[string]any result, got %T", result)
 	}
 
-	if response.Result != 4 {
-		t.Errorf("Invoke() result = %v, want 4", response.Result)
-	}
-}
-
-func TestCalculatorTool_InvokeComplex(t *testing.T) {
-	t.Parallel()
-	calc := NewCalculatorTool()
-	ctx := context.Background()
-
-	tests := []struct {
-		name       string
-		expression string
-		want       float64
-	}{
-		{"sqrt", `{"expression": "sqrt(16)"}`, 4},
-		{"power", `{"expression": "2^10"}`, 1024},
-		{"complex", `{"expression": "(10 + 5) * 2"}`, 30},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			result, err := calc.Invoke(core.NewToolContext(ctx, "", "", "", nil), tt.expression)
-			if err != nil {
-				t.Fatalf("Invoke() error: %v", err)
-			}
-
-			var response struct {
-				Result float64 `json:"result"`
-			}
-			if err := json.Unmarshal([]byte(result.Result), &response); err != nil {
-				t.Fatalf("Failed to parse result: %v", err)
-			}
-
-			if response.Result != tt.want {
-				t.Errorf("Invoke() result = %v, want %v", response.Result, tt.want)
-			}
-		})
+	if response["result"] != 4.0 {
+		t.Errorf("Invoke() result = %v, want 4", response["result"])
 	}
 }
