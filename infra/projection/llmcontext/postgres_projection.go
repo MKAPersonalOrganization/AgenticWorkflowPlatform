@@ -5,10 +5,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/logger"
-	"time"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -344,6 +345,11 @@ func (p *PostgresLLMContextProjection) GetAgentThread(threadID string) (core.Age
 		if msg.Metadata != nil {
 			if err := json.Unmarshal(*msg.Metadata, &metadata); err != nil {
 				p.log.Error(ctx, "failed to unmarshal metadata", "messageID", msg.MessageID, "ERROR", err)
+			}
+
+			// Filter out agent_handoff messages for LLM context
+			if msgType, ok := metadata["type"].(string); ok && msgType == "agent_handoff" {
+				continue
 			}
 		}
 

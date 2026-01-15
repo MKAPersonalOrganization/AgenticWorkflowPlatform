@@ -10,12 +10,6 @@ import (
 func toLLMChatMessages(msgs []core.Message) []llm.ChatMessage {
 	result := make([]llm.ChatMessage, 0, len(msgs))
 	for _, m := range msgs {
-		// Skip agent handoff messages - they're for UI display only
-		if m.Metadata != nil {
-			if msgType, ok := m.Metadata["type"].(string); ok && msgType == "agent_handoff" {
-				continue
-			}
-		}
 		result = append(result, toLLMChatMessage(m))
 	}
 
