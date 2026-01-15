@@ -2,6 +2,7 @@ package agentorchestrator
 
 import (
 	"context"
+	"fmt"
 	"iter"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
@@ -10,6 +11,7 @@ import (
 	"school-with-ai/services/agentorchestrator/rag"
 	"school-with-ai/services/agentorchestrator/threadmgmt"
 	"school-with-ai/services/agentorchestrator/types"
+	"time"
 )
 
 // Use central types
@@ -79,6 +81,9 @@ func New(log *logger.Logger, chatClient ChatClient, writeModel core.EventStore, 
 	for _, opt := range opts {
 		opt(s)
 	}
+
+	// Set the runner for subagent delegation
+	s.config.Runner = s
 
 	// Register tools
 	for _, tool := range s.config.Tools {
@@ -152,4 +157,52 @@ func (s *Service) UpdateThreadTitle(ctx context.Context, threadID, newTitle stri
 // DeleteThread deletes a thread using event sourcing.
 func (s *Service) DeleteThread(ctx context.Context, threadID string) error {
 	return s.threadMgmt.DeleteThread(ctx, threadID)
+}
+
+// RunSubagent implements core.SubagentRunner.
+func (s *Service) RunSubagent(ctx context.Context, agent core.AgentConfig, threadID string, question string) (string, error) {
+	s.log.Debug(ctx, "RunSubagent called", "subagent", agent.Name, "question", question)
+
+	// Create a temporary thread for this subagent call
+	subThread := core.NewInMemoryThread()
+	if err := subThread.AddMessages([]core.Message{
+		{
+			ID:        core.GenerateID(),
+			Role:      "user",
+			Content:   question,
+			Timestamp: time.Now(),
+		},
+	}); err != nil {
+		return "", fmt.Errorf("failed to add message to sub-thread: %w", err)
+	}
+
+	// Create a fresh engine for the subagent to avoid config leakage from the main service
+	// We pass nil for threadMgmt because subagents are stateless and use the temporary in-memory thread
+	subEngine := engine.New(
+		s.log,
+		s.chatClient,
+		nil,
+		agent,
+		nil, // No reqCtxCapture for subagents
+		s.toolTracer,
+	)
+
+	runCtx := core.RunContext{
+		ThreadID:  threadID + ":sub:" + agent.Name,
+		MessageID: core.GenerateID(),
+		Thread:    subThread,
+	}
+
+	var finalResponse string
+	for event, err := range subEngine.Run(ctx, runCtx) {
+		if err != nil {
+			return "", err
+		}
+		// Capture the final assistant response
+		if completed, ok := event.(*domain.AssistantMessageCompletedEvent); ok {
+			finalResponse = completed.Content
+		}
+	}
+
+	return finalResponse, nil
 }

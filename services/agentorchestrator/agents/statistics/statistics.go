@@ -2,6 +2,7 @@ package statistics
 
 import (
 	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/agentsdk/core/middleware"
 	sharedtools "school-with-ai/services/agentorchestrator/agents/shared/tools"
 	"school-with-ai/services/agentorchestrator/agents/statistics/tools"
 )
@@ -30,9 +31,6 @@ func CreateStatisticsInstructor(notifier core.EventNotifier) core.AgentConfig {
 	for _, tool := range domainTools() {
 		registry.Register(tool)
 	}
-
-	// Shared collaboration tools
-	registry.Register(sharedtools.NewWriteWhiteboardTool())
 
 	return core.AgentConfig{
 		Name: "statistics-instructor",
@@ -73,7 +71,8 @@ func CreateStatisticsInstructor(notifier core.EventNotifier) core.AgentConfig {
 **Std Dev:** $s = \\sqrt{\\frac{1}{n-1}\\sum_{i=1}^{n}(x_i - \\bar{x})^2}$
 **Correlation:** $r = \\frac{\\sum(x_i - \\bar{x})(y_i - \\bar{y})}{\\sqrt{\\sum(x_i - \\bar{x})^2\\sum(y_i - \\bar{y})^2}}$
 **Regression:** $y = mx + b$ with $R^2$`,
-		Tools:    registry.All(),
-		Notifier: notifier,
+		Tools:      registry.All(),
+		Middleware: []core.Middleware{middleware.NewWhiteboardMiddleware()},
+		Notifier:   notifier,
 	}
 }
