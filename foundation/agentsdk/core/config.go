@@ -15,13 +15,6 @@ type EventNotifier interface {
 type AgentConfig struct {
 	// Identity
 	Name string // Unique identifier for the agent
-	// SubAgents are child agents that this agent can delegate tasks to as tools.
-	// This enables the "Centralized Orchestration" pattern.
-	SubAgents []AgentConfig
-
-	// HandoffAgents are peer agents that this agent can transfer control to.
-	// This enables the "State-driven Transitions" (Handoffs) pattern.
-	HandoffAgents []AgentConfig
 
 	// Behavior
 	SystemPrompt string // Instructions for how the agent should behave
@@ -42,15 +35,6 @@ type AgentConfig struct {
 
 	// Event handling
 	Notifier EventNotifier // UI/Event notifier for this agent
-
-	// Execution delegation
-	Runner SubagentRunner // For centralized orchestration of subagents
-}
-
-// SubagentRunner defines the interface for running specialized subagents.
-// This is typically implemented by the service or engine to avoid circular dependencies.
-type SubagentRunner interface {
-	RunSubagent(ctx context.Context, agent AgentConfig, threadID string, question string) (string, error)
 }
 
 // DefaultConfig returns a basic agent configuration.
@@ -138,17 +122,11 @@ func ToChatOptionsWithMiddleware(ctx context.Context, config AgentConfig, messag
 // to collect additional tools and system prompt modifications. This is called
 // before the LLM request to gather middleware contributions.
 func ApplyMiddleware(ctx context.Context, config AgentConfig, messages []llm.ChatMessage, threadID string, runOpts RunOptions) (*RequestContext, error) {
-	// Build initial request context with the base configuration
-	reqCtxConfig := &AgentConfig{
-		Name:          config.Name,
-		SubAgents:     config.SubAgents,
-		HandoffAgents: config.HandoffAgents,
-		Runner:        config.Runner,
-		Notifier:      config.Notifier,
-	}
-	reqCtx := NewRequestContext(threadID, messages, config.SystemPrompt, config.Tools, reqCtxConfig)
+	// Build initial request context with minimal config
+	initialConfig := &AgentConfig{}
+	reqCtx := NewRequestContext(threadID, messages, config.SystemPrompt, config.Tools, initialConfig)
 
-	// Copy LLM config parameters to request context
+	// Copy config parameters to request context
 	if config.Temperature != nil {
 		reqCtx.Config.Temperature = config.Temperature
 	}

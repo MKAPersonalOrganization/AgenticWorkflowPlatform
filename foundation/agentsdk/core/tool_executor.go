@@ -89,21 +89,7 @@ func NewRegistryToolExecutor(
 func (e *RegistryToolExecutor) Execute(toolCall ToolCall) (ToolExecutionResult, error) {
 	startTime := time.Now()
 
-	// Try to find the tool in the registry first
 	tool, ok := e.registry.Get(toolCall.Function.Name)
-	if !ok {
-		// If not found in registry, check additional tools from context
-		if e.requestCtx != nil {
-			for _, t := range e.requestCtx.AdditionalTools {
-				if t.Name() == toolCall.Function.Name {
-					tool = t
-					ok = true
-					break
-				}
-			}
-		}
-	}
-
 	if !ok {
 		return ToolExecutionResult{}, fmt.Errorf("%w: %s", ErrToolNotFound, toolCall.Function.Name)
 	}
