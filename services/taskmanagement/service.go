@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
-	"school-with-ai/foundation/agentsdk/core/middleware"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/observability/langfuse"
 	"school-with-ai/services"
@@ -325,8 +324,8 @@ func (s *Service) runAgent(ctx context.Context, threadID, agentName string, emit
 
 	// Check for handoff to next agent
 	if handoffReqCtx != nil {
-		if handoff, ok := middleware.GetHandoff(handoffReqCtx); ok {
-			s.log.Info(ctx, "Agent handoff", "from", agentName, "to", handoff.TargetAgent)
+		if targetAgent, ok := handoffReqCtx.State["handoff"].(string); ok && targetAgent != "" {
+			s.log.Info(ctx, "Agent handoff", "from", agentName, "to", targetAgent)
 
 			// Log handoff event in Langfuse
 			if s.langfuseTracer != nil && traceCtx != nil {
@@ -335,7 +334,7 @@ func (s *Service) runAgent(ctx context.Context, threadID, agentName string, emit
 					_ = tracer.LogEvent(ctx, traceCtx, "agent-handoff",
 						langfuse.WithEventInput(map[string]any{
 							"from": agentName,
-							"to":   handoff.TargetAgent,
+							"to":   targetAgent,
 						}),
 					)
 				}
@@ -347,10 +346,10 @@ func (s *Service) runAgent(ctx context.Context, threadID, agentName string, emit
 			if err != nil {
 				s.log.Warn(ctx, "failed to reload thread for handoff", "error", err, "threadID", threadID)
 				// Fall back to the current thread if reload fails
-				return handoff.TargetAgent, thread, nil
+				return targetAgent, thread, nil
 			}
 
-			return handoff.TargetAgent, updatedThread, nil
+			return targetAgent, updatedThread, nil
 		}
 	}
 

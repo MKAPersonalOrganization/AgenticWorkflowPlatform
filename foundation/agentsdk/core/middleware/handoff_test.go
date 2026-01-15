@@ -34,25 +34,6 @@ func TestNewHandoffMiddleware(t *testing.T) {
 	if middleware == nil {
 		t.Fatal("Expected middleware to be created, got nil")
 	}
-
-	if middleware.systemPrompt == "" {
-		t.Error("Expected system prompt to be set")
-	}
-}
-
-func TestNewHandoffMiddlewareWithPrompt(t *testing.T) {
-	t.Parallel()
-	customPrompt := "Custom handoff prompt"
-
-	middleware := NewHandoffMiddlewareWithPrompt(customPrompt)
-
-	if middleware == nil {
-		t.Fatal("Expected middleware to be created, got nil")
-	}
-
-	if middleware.systemPrompt != customPrompt {
-		t.Errorf("Expected custom prompt %q, got %q", customPrompt, middleware.systemPrompt)
-	}
 }
 
 func TestHandoffMiddleware_Process(t *testing.T) {
@@ -186,14 +167,6 @@ func TestTransferToAgentTool_Parameters(t *testing.T) {
 		t.Error("Expected agent_name property")
 	}
 
-	if _, exists := props["question"]; !exists {
-		t.Error("Expected question property")
-	}
-
-	if _, exists := props["context"]; !exists {
-		t.Error("Expected context property")
-	}
-
 	// Check agent_name has enum
 	agentNameProp := props["agent_name"].(map[string]any)
 	enum, ok := agentNameProp["enum"].([]string)
@@ -234,35 +207,13 @@ func TestTransferToAgentTool_Invoke_Success(t *testing.T) {
 		t.Fatalf("Expected core.ToolResult result, got %T", result)
 	}
 
-	resMap, ok := tr.Result.(map[string]any)
-	if !ok {
-		t.Fatalf("Expected map[string]any in ToolResult.Result, got %T", tr.Result)
-	}
-
-	if resMap["next_agent"] != "math" {
-		t.Errorf("Expected next_agent to be 'math', got %v", resMap["next_agent"])
-	}
-
 	if tr.Command == nil || tr.Command.Goto != "math" || !tr.Command.StopIteration {
 		t.Errorf("Expected Command with Goto: 'math' and StopIteration: true, got %+v", tr.Command)
 	}
 
 	// Check that handoff was stored in state
-	handoff, ok := GetHandoff(reqCtx)
-	if !ok {
+	if targetAgent, ok := reqCtx.State["handoff"].(string); !ok || targetAgent != "math" {
 		t.Fatal("Expected handoff to be stored in state")
-	}
-
-	if handoff.TargetAgent != "math" {
-		t.Errorf("Expected target agent 'math', got %q", handoff.TargetAgent)
-	}
-
-	if handoff.Question != "What is 2 + 2?" {
-		t.Errorf("Expected question 'What is 2 + 2?', got %q", handoff.Question)
-	}
-
-	if handoff.Context != "Basic arithmetic question" {
-		t.Errorf("Expected context 'Basic arithmetic question', got %q", handoff.Context)
 	}
 }
 
@@ -303,67 +254,14 @@ func TestTransferToAgentTool_Invoke_MissingQuestion(t *testing.T) {
 		"agent_name": "math",
 	}
 
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
+	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	// question is optional, so this should succeed
 	if err != nil {
 		t.Errorf("Expected no error for missing question (it's optional), got %v", err)
 	}
-
-	tr, ok := result.(core.ToolResult)
-	if !ok {
-		t.Fatalf("Expected core.ToolResult result, got %T", result)
-	}
-
-	resMap, ok := tr.Result.(map[string]any)
-	if !ok {
-		t.Fatalf("Expected map[string]any in ToolResult.Result, got %T", tr.Result)
-	}
-
-	if resMap["next_agent"] != "math" {
-		t.Errorf("Expected next_agent 'math', got %v", resMap["next_agent"])
-	}
-
 	// Verify handoff was stored
-	handoff, ok := GetHandoff(reqCtx)
-	if !ok || handoff == nil {
+	if targetAgent, ok := reqCtx.State["handoff"].(string); !ok || targetAgent != "math" {
 		t.Fatal("Expected handoff to be stored")
-	}
-
-	if handoff.TargetAgent != "math" {
-		t.Errorf("Expected ToAgent to be math, got %s", handoff.TargetAgent)
-	}
-
-	if handoff.Question != "" {
-		t.Errorf("Expected Question to be empty, got %s", handoff.Question)
-	}
-}
-
-func TestTransferToAgentTool_Invoke_UnknownAgent(t *testing.T) {
-	t.Parallel()
-	handoffs := []core.Handoff{
-		{AgentName: "math", Description: "Mathematics specialist"},
-	}
-
-	reqCtx := newTestRequestContext()
-	tool := NewTransferToAgentTool(handoffs, reqCtx)
-
-	args := map[string]any{
-		"agent_name": "biology", // Not in available agents
-		"question":   "What is photosynthesis?",
-	}
-
-	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
-
-	if err == nil {
-		t.Error("Expected error for unknown agent")
-	}
-
-	if !contains(err.Error(), "unknown agent") {
-		t.Errorf("Expected error to mention unknown agent, got %v", err)
-	}
-
-	if !contains(err.Error(), "biology") {
-		t.Errorf("Expected error to mention 'biology', got %v", err)
 	}
 }
 
@@ -382,33 +280,13 @@ func TestTransferToAgentTool_Invoke_WithoutContext(t *testing.T) {
 		"question":   "What is 2 + 2?",
 	}
 
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
+	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
-
-	tr, ok := result.(core.ToolResult)
-	if !ok {
-		t.Fatalf("Expected core.ToolResult result, got %T", result)
-	}
-
-	resMap, ok := tr.Result.(map[string]any)
-	if !ok {
-		t.Fatalf("Expected map[string]any in ToolResult.Result, got %T", tr.Result)
-	}
-
-	if resMap["next_agent"] != "math" {
-		t.Errorf("Expected next_agent 'math', got %v", resMap["next_agent"])
-	}
-
 	// Check that handoff was stored with empty context
-	handoff, ok := GetHandoff(reqCtx)
-	if !ok {
+	if targetAgent, ok := reqCtx.State["handoff"].(string); !ok || targetAgent != "math" {
 		t.Fatal("Expected handoff to be stored in state")
-	}
-
-	if handoff.Context != "" {
-		t.Errorf("Expected empty context, got %q", handoff.Context)
 	}
 }
 
@@ -425,147 +303,6 @@ func TestTransferToAgentTool_Invoke_InvalidJSON(t *testing.T) {
 
 	if err == nil {
 		t.Error("Expected error for invalid JSON")
-	}
-}
-
-func TestGetHandoff_NotSet(t *testing.T) {
-	t.Parallel()
-	reqCtx := newTestRequestContext()
-
-	handoff, ok := GetHandoff(reqCtx)
-
-	if ok {
-		t.Error("Expected GetHandoff to return false when not set")
-	}
-
-	if handoff != nil {
-		t.Error("Expected handoff to be nil when not set")
-	}
-}
-
-func TestSetHandoff_AndGet(t *testing.T) {
-	t.Parallel()
-	reqCtx := newTestRequestContext()
-
-	expectedHandoff := Handoff{
-		TargetAgent: "math",
-		Question:    "Calculate 2 + 2",
-		Context:     "Basic arithmetic",
-	}
-
-	SetHandoff(reqCtx, expectedHandoff)
-
-	handoff, ok := GetHandoff(reqCtx)
-
-	if !ok {
-		t.Fatal("Expected GetHandoff to return true after SetHandoff")
-	}
-
-	if handoff == nil {
-		t.Fatal("Expected handoff to be non-nil")
-	}
-
-	if handoff.TargetAgent != expectedHandoff.TargetAgent {
-		t.Errorf("Expected TargetAgent %q, got %q", expectedHandoff.TargetAgent, handoff.TargetAgent)
-	}
-
-	if handoff.Question != expectedHandoff.Question {
-		t.Errorf("Expected Question %q, got %q", expectedHandoff.Question, handoff.Question)
-	}
-
-	if handoff.Context != expectedHandoff.Context {
-		t.Errorf("Expected Context %q, got %q", expectedHandoff.Context, handoff.Context)
-	}
-}
-
-func TestClearHandoff(t *testing.T) {
-	t.Parallel()
-	reqCtx := newTestRequestContext()
-
-	// Set handoff
-	SetHandoff(reqCtx, Handoff{
-		TargetAgent: "math",
-		Question:    "Test",
-	})
-
-	// Verify it's set
-	if !HasHandoff(reqCtx) {
-		t.Fatal("Expected handoff to be set")
-	}
-
-	// Clear it
-	ClearHandoff(reqCtx)
-
-	// Verify it's cleared
-	if HasHandoff(reqCtx) {
-		t.Error("Expected handoff to be cleared")
-	}
-
-	_, ok := GetHandoff(reqCtx)
-	if ok {
-		t.Error("Expected GetHandoff to return false after clear")
-	}
-}
-
-func TestHasHandoff(t *testing.T) {
-	t.Parallel()
-	reqCtx := newTestRequestContext()
-
-	// Initially should not have handoff
-	if HasHandoff(reqCtx) {
-		t.Error("Expected HasHandoff to return false initially")
-	}
-
-	// After setting should have handoff
-	SetHandoff(reqCtx, Handoff{TargetAgent: "math", Question: "Test"})
-
-	if !HasHandoff(reqCtx) {
-		t.Error("Expected HasHandoff to return true after setting")
-	}
-
-	// After clearing should not have handoff
-	ClearHandoff(reqCtx)
-
-	if HasHandoff(reqCtx) {
-		t.Error("Expected HasHandoff to return false after clearing")
-	}
-}
-
-func TestBuildSystemPromptWithAgents(t *testing.T) {
-	t.Parallel()
-	handoffs := []core.Handoff{
-		{AgentName: "math", Description: "Mathematics specialist"},
-		{AgentName: "physics", Description: "Physics specialist for mechanics"},
-	}
-
-	middleware := NewHandoffMiddleware()
-	prompt := middleware.buildSystemPromptWithAgents(handoffs)
-
-	if prompt == "" {
-		t.Error("Expected non-empty system prompt")
-	}
-
-	// Should contain base prompt
-	if !contains(prompt, "transfer_to_agent") {
-		t.Error("Expected prompt to mention transfer_to_agent tool")
-	}
-
-	// Should contain available agents
-	if !contains(prompt, "math") {
-		t.Error("Expected prompt to contain 'math'")
-	}
-
-	if !contains(prompt, "physics") {
-		t.Error("Expected prompt to contain 'physics'")
-	}
-
-	// Should contain descriptions
-	if !contains(prompt, "Mathematics specialist") {
-		t.Error("Expected prompt to contain math description")
-	}
-
-	if !contains(prompt, "Physics specialist") {
-		t.Error("Expected prompt to contain physics description")
 	}
 }
 
