@@ -1,7 +1,6 @@
 package tools
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -80,7 +79,7 @@ func (t *DescriptiveStatsTool) Parameters() map[string]any {
 	}
 }
 
-func (t *DescriptiveStatsTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
+func (t *DescriptiveStatsTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
 	var args struct {
 		Operation   string    `json:"operation"`
 		Data        []float64 `json:"data"`
@@ -237,7 +236,7 @@ func (t *CorrelationTool) Parameters() map[string]any {
 	}
 }
 
-func (t *CorrelationTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
+func (t *CorrelationTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
 	var args struct {
 		Operation string    `json:"operation"`
 		Data1     []float64 `json:"data1,omitempty"`
@@ -344,7 +343,7 @@ func (t *DistanceMetricsTool) Parameters() map[string]any {
 	}
 }
 
-func (t *DistanceMetricsTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
+func (t *DistanceMetricsTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
 	var args struct {
 		Operation string    `json:"operation"`
 		Point1    []float64 `json:"point1"`
@@ -440,7 +439,7 @@ func (t *SamplingTool) Parameters() map[string]any {
 	}
 }
 
-func (t *SamplingTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
+func (t *SamplingTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
 	var args struct {
 		Operation   string    `json:"operation"`
 		Data        []float64 `json:"data"`
@@ -542,7 +541,7 @@ func (t *DataTransformTool) Parameters() map[string]any {
 	}
 }
 
-func (t *DataTransformTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
+func (t *DataTransformTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
 	var args struct {
 		Operation string    `json:"operation"`
 		Data      []float64 `json:"data,omitempty"`
@@ -667,7 +666,7 @@ func (t *NormalDistributionTool) Parameters() map[string]any {
 	}
 }
 
-func (t *NormalDistributionTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
+func (t *NormalDistributionTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
 	var args struct {
 		Operation string    `json:"operation"`
 		X         float64   `json:"x,omitempty"`
@@ -809,7 +808,7 @@ func (t *GeometricDistributionTool) Parameters() map[string]any {
 	}
 }
 
-func (t *GeometricDistributionTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
+func (t *GeometricDistributionTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
 	var args struct {
 		Operation string  `json:"operation"`
 		P         float64 `json:"p"`
@@ -893,7 +892,7 @@ func (r *RegressionTool) Parameters() map[string]any {
 	}
 }
 
-func (r *RegressionTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
+func (r *RegressionTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
 	var args struct {
 		Type string    `json:"type"`
 		X    []float64 `json:"x"`

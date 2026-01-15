@@ -1,7 +1,6 @@
 package tools
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
@@ -68,7 +67,7 @@ func (m *MermaidDiagramTool) Parameters() map[string]any {
 	}
 }
 
-func (m *MermaidDiagramTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
+func (m *MermaidDiagramTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
 	var args MermaidDiagramArgs
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		return core.ToolResult{}, fmt.Errorf("failed to parse mermaid diagram args: %w", err)

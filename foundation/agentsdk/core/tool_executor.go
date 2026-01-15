@@ -39,9 +39,12 @@ type ToolTracer interface {
 
 // RegistryToolExecutor executes tools using a ToolRegistry.
 type RegistryToolExecutor struct {
-	registry *ToolRegistry
-	ctx      context.Context
-	tracer   ToolTracer // Optional tracer for observability
+	registry   *ToolRegistry
+	ctx        context.Context
+	threadID   string
+	messageID  string
+	requestCtx *RequestContext
+	tracer     ToolTracer // Optional tracer for observability
 }
 
 // ToolExecutorOption is a functional option for configuring the tool executor.
@@ -55,10 +58,22 @@ func WithToolTracer(tracer ToolTracer) ToolExecutorOption {
 }
 
 // NewRegistryToolExecutor creates a new executor with the given registry.
-func NewRegistryToolExecutor(ctx context.Context, registry *ToolRegistry, opts ...ToolExecutorOption) *RegistryToolExecutor {
+// The threadID, messageID, and requestCtx are optional and can be empty/nil.
+// If provided, they will be made available to tools via ToolContext.
+func NewRegistryToolExecutor(
+	ctx context.Context,
+	registry *ToolRegistry,
+	threadID string,
+	messageID string,
+	requestCtx *RequestContext,
+	opts ...ToolExecutorOption,
+) *RegistryToolExecutor {
 	executor := &RegistryToolExecutor{
-		registry: registry,
-		ctx:      ctx,
+		registry:   registry,
+		ctx:        ctx,
+		threadID:   threadID,
+		messageID:  messageID,
+		requestCtx: requestCtx,
 	}
 
 	// Apply options
@@ -78,7 +93,16 @@ func (e *RegistryToolExecutor) Execute(toolCall ToolCall) (ToolExecutionResult, 
 		return ToolExecutionResult{}, fmt.Errorf("%w: %s", ErrToolNotFound, toolCall.Function.Name)
 	}
 
-	toolResult, err := tool.Invoke(e.ctx, toolCall.Function.Arguments)
+	// Create ToolContext with additional data for tools to access
+	toolCtx := NewToolContext(
+		e.ctx,
+		e.threadID,
+		e.messageID,
+		toolCall.ID,
+		e.requestCtx,
+	)
+
+	toolResult, err := tool.Invoke(toolCtx, toolCall.Function.Arguments)
 	endTime := time.Now()
 
 	// Build execution result from ToolResult

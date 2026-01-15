@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"school-with-ai/foundation/agentsdk/core"
 	"testing"
 )
 
@@ -15,7 +16,7 @@ func TestDescriptiveStatsTool_Mean(t *testing.T) {
 	}
 	argsJSON, _ := json.Marshal(args)
 
-	result, err := tool.Invoke(context.Background(), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -38,7 +39,7 @@ func TestDescriptiveStatsTool_Describe(t *testing.T) {
 	}
 	argsJSON, _ := json.Marshal(args)
 
-	result, err := tool.Invoke(context.Background(), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -67,7 +68,7 @@ func TestCorrelationTool_Pearson(t *testing.T) {
 	}
 	argsJSON, _ := json.Marshal(args)
 
-	result, err := tool.Invoke(context.Background(), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -93,7 +94,7 @@ func TestDistanceMetricsTool_Euclidean(t *testing.T) {
 	}
 	argsJSON, _ := json.Marshal(args)
 
-	result, err := tool.Invoke(context.Background(), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -118,7 +119,7 @@ func TestSamplingTool_QuartileOutliers(t *testing.T) {
 	}
 	argsJSON, _ := json.Marshal(args)
 
-	result, err := tool.Invoke(context.Background(), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -143,7 +144,7 @@ func TestDataTransformTool_Sigmoid(t *testing.T) {
 	}
 	argsJSON, _ := json.Marshal(args)
 
-	result, err := tool.Invoke(context.Background(), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -168,7 +169,7 @@ func TestDataTransformTool_Round(t *testing.T) {
 	}
 	argsJSON, _ := json.Marshal(args)
 
-	result, err := tool.Invoke(context.Background(), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -194,7 +195,7 @@ func TestNormalDistributionTool_Pdf(t *testing.T) {
 	}
 	argsJSON, _ := json.Marshal(args)
 
-	result, err := tool.Invoke(context.Background(), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -221,7 +222,7 @@ func TestNormalDistributionTool_Fit(t *testing.T) {
 	}
 	argsJSON, _ := json.Marshal(args)
 
-	result, err := tool.Invoke(context.Background(), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -246,7 +247,7 @@ func TestGeometricDistributionTool_ExpGeom(t *testing.T) {
 	}
 	argsJSON, _ := json.Marshal(args)
 
-	result, err := tool.Invoke(context.Background(), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -271,7 +272,7 @@ func TestRegressionTool_Linear(t *testing.T) {
 	}
 	argsJSON, _ := json.Marshal(args)
 
-	result, err := tool.Invoke(context.Background(), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}

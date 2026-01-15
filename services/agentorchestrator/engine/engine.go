@@ -122,7 +122,14 @@ func (e *Engine) Run(
 		if e.toolTracer != nil {
 			executorOpts = append(executorOpts, core.WithToolTracer(e.toolTracer))
 		}
-		dynamicExecutor := core.NewRegistryToolExecutor(ctx, dynamicRegistry, executorOpts...)
+		dynamicExecutor := core.NewRegistryToolExecutor(
+			ctx,
+			dynamicRegistry,
+			runCtx.ThreadID,
+			runCtx.MessageID,
+			reqCtx,
+			executorOpts...,
+		)
 
 		streamIter := e.chatClient.GetStreamingResponse(ctx, chatMessages, chatOptions)
 

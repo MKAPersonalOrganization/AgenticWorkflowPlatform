@@ -120,7 +120,7 @@ func (t *TransferToAgentTool) Parameters() map[string]any {
 	}
 }
 
-func (t *TransferToAgentTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
+func (t *TransferToAgentTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
 	var args struct {
 		AgentName string `json:"agent_name"`
 		Question  string `json:"question"`

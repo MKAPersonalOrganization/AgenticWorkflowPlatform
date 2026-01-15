@@ -227,7 +227,7 @@ func TestTransferToAgentTool_Invoke_Success(t *testing.T) {
 	}
 
 	argsJSON, _ := json.Marshal(args)
-	result, err := tool.Invoke(context.Background(), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -275,7 +275,7 @@ func TestTransferToAgentTool_Invoke_MissingAgentName(t *testing.T) {
 	}
 
 	argsJSON, _ := json.Marshal(args)
-	_, err := tool.Invoke(context.Background(), string(argsJSON))
+	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
 
 	if err == nil {
 		t.Error("Expected error for missing agent_name")
@@ -300,7 +300,7 @@ func TestTransferToAgentTool_Invoke_MissingQuestion(t *testing.T) {
 	}
 
 	argsJSON, _ := json.Marshal(args)
-	result, err := tool.Invoke(context.Background(), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
 	// question is optional, so this should succeed
 	if err != nil {
 		t.Errorf("Expected no error for missing question (it's optional), got %v", err)
@@ -346,7 +346,7 @@ func TestTransferToAgentTool_Invoke_UnknownAgent(t *testing.T) {
 	}
 
 	argsJSON, _ := json.Marshal(args)
-	_, err := tool.Invoke(context.Background(), string(argsJSON))
+	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
 
 	if err == nil {
 		t.Error("Expected error for unknown agent")
@@ -377,7 +377,7 @@ func TestTransferToAgentTool_Invoke_WithoutContext(t *testing.T) {
 	}
 
 	argsJSON, _ := json.Marshal(args)
-	result, err := tool.Invoke(context.Background(), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -408,7 +408,7 @@ func TestTransferToAgentTool_Invoke_InvalidJSON(t *testing.T) {
 	reqCtx := newTestRequestContext()
 	tool := NewTransferToAgentTool(agents, reqCtx)
 
-	_, err := tool.Invoke(context.Background(), "invalid json")
+	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), "invalid json")
 
 	if err == nil {
 		t.Error("Expected error for invalid JSON")

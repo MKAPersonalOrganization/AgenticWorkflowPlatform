@@ -39,7 +39,7 @@ func (m *MockTool) Parameters() map[string]any {
 	}
 }
 
-func (m *MockTool) Invoke(ctx context.Context, arguments string) (ToolResult, error) {
+func (m *MockTool) Invoke(ctx ToolContext, arguments string) (ToolResult, error) {
 	return NewToolResult("mock result"), nil
 }
 

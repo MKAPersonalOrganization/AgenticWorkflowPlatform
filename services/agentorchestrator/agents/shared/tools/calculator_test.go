@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"school-with-ai/foundation/agentsdk/core"
 	"testing"
 )
 
@@ -228,7 +229,7 @@ func TestCalculatorTool_Invoke(t *testing.T) {
 	ctx := context.Background()
 
 	// Test successful invocation
-	result, err := calc.Invoke(ctx, `{"expression": "2 + 2"}`)
+	result, err := calc.Invoke(core.NewToolContext(ctx, "", "", "", nil), `{"expression": "2 + 2"}`)
 	if err != nil {
 		t.Fatalf("Invoke() unexpected error: %v", err)
 	}
@@ -264,7 +265,7 @@ func TestCalculatorTool_InvokeComplex(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result, err := calc.Invoke(ctx, tt.expression)
+			result, err := calc.Invoke(core.NewToolContext(ctx, "", "", "", nil), tt.expression)
 			if err != nil {
 				t.Fatalf("Invoke() error: %v", err)
 			}

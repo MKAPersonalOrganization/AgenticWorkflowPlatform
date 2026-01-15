@@ -167,7 +167,7 @@ func TestWriteWhiteboardTool(t *testing.T) {
 		}
 		argsJSON, _ := json.Marshal(args)
 
-		result, err := tool.Invoke(context.Background(), string(argsJSON))
+		result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
 
 		require.NoError(t, err)
 		assert.Contains(t, result.Result, "Whiteboard updated")
@@ -186,7 +186,7 @@ func TestWriteWhiteboardTool(t *testing.T) {
 		}
 		argsJSON, _ := json.Marshal(args)
 
-		result, err := tool.Invoke(context.Background(), string(argsJSON))
+		result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
 
 		require.NoError(t, err)
 		assert.Contains(t, result.Result, "Whiteboard updated")
@@ -205,7 +205,7 @@ func TestWriteWhiteboardTool(t *testing.T) {
 		}
 		argsJSON, _ := json.Marshal(args)
 
-		_, err := tool.Invoke(context.Background(), string(argsJSON))
+		_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
 
 		require.NoError(t, err)
 		assert.Equal(t, "First content", GetWhiteboardContent(reqCtx))
@@ -223,7 +223,7 @@ func TestWriteWhiteboardTool(t *testing.T) {
 		}
 		argsJSON, _ := json.Marshal(args)
 
-		result, err := tool.Invoke(context.Background(), string(argsJSON))
+		result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
 
 		require.NoError(t, err)
 		assert.Contains(t, result.Result, "Whiteboard updated")
@@ -241,7 +241,7 @@ func TestWriteWhiteboardTool(t *testing.T) {
 		}
 		argsJSON, _ := json.Marshal(args)
 
-		_, err := tool.Invoke(context.Background(), string(argsJSON))
+		_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid action")
@@ -252,7 +252,7 @@ func TestWriteWhiteboardTool(t *testing.T) {
 		reqCtx := &core.RequestContext{State: make(map[string]any)}
 		tool := NewWriteWhiteboardTool(reqCtx)
 
-		_, err := tool.Invoke(context.Background(), "invalid json")
+		_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), "invalid json")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to parse")
@@ -318,7 +318,7 @@ func TestWhiteboardMiddlewareIntegration(t *testing.T) {
 				"content": "# Initial Content\nFirst section",
 				"action":  "write",
 			})
-			_, err := writeTool.Invoke(ctx, string(writeArgs))
+			_, err := writeTool.Invoke(core.NewToolContext(ctx, "", "", "", nil), string(writeArgs))
 			require.NoError(t, err)
 
 			// Verify content is accessible via GetWhiteboardContent
@@ -332,7 +332,7 @@ func TestWhiteboardMiddlewareIntegration(t *testing.T) {
 				"content": modified,
 				"action":  "write",
 			})
-			_, err = writeTool.Invoke(ctx, string(writeArgs2))
+			_, err = writeTool.Invoke(core.NewToolContext(ctx, "", "", "", nil), string(writeArgs2))
 			require.NoError(t, err)
 
 			// Verify final content

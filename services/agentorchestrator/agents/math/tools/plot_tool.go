@@ -1,7 +1,6 @@
 package tools
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -118,7 +117,7 @@ Remember: The script will be executed as-is, so ensure it's complete and valid g
 	}
 }
 
-func (p *PlotTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
+func (p *PlotTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
 	var args PlotArgs
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		return core.ToolResult{}, fmt.Errorf("failed to parse plot args: %w", err)
