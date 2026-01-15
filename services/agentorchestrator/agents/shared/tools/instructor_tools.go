@@ -1,7 +1,6 @@
 package tools
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -52,7 +51,7 @@ func (t *WriteWhiteboardTool) Parameters() map[string]any {
 	}
 }
 
-func (t *WriteWhiteboardTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
+func (t *WriteWhiteboardTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
 	res, err := WriteWhiteboard(arguments)
 	if err != nil {
 		return core.ToolResult{}, err

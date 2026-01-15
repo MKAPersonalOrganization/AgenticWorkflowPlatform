@@ -1,7 +1,6 @@
 package core
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 )
@@ -19,10 +18,10 @@ type Tool interface {
 	// Parameters returns the JSON schema for the tool's parameters
 	Parameters() map[string]any
 
-	// Invoke executes the tool with the given arguments
+	// Invoke executes the tool with the given ToolContext and arguments
 	// The arguments are passed as a JSON string
 	// Returns a ToolResult containing both the display result and optional routing command
-	Invoke(ctx context.Context, arguments string) (ToolResult, error)
+	Invoke(ctx ToolContext, arguments string) (ToolResult, error)
 }
 
 // ToolSpec represents the JSON schema specification of a tool
@@ -56,7 +55,7 @@ type FunctionTool struct {
 	name        string
 	description string
 	parameters  map[string]any
-	handler     func(ctx context.Context, arguments string) (ToolResult, error)
+	handler     func(ctx ToolContext, arguments string) (ToolResult, error)
 }
 
 // NewFunctionTool creates a new function tool.
@@ -64,7 +63,7 @@ func NewFunctionTool(
 	name string,
 	description string,
 	parameters map[string]any,
-	handler func(ctx context.Context, arguments string) (ToolResult, error),
+	handler func(ctx ToolContext, arguments string) (ToolResult, error),
 ) *FunctionTool {
 	return &FunctionTool{
 		name:        name,
@@ -86,7 +85,7 @@ func (f *FunctionTool) Parameters() map[string]any {
 	return f.parameters
 }
 
-func (f *FunctionTool) Invoke(ctx context.Context, arguments string) (ToolResult, error) {
+func (f *FunctionTool) Invoke(ctx ToolContext, arguments string) (ToolResult, error) {
 	return f.handler(ctx, arguments)
 }
 

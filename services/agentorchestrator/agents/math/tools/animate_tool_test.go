@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"school-with-ai/foundation/agentsdk/core"
 	"strings"
 	"testing"
 )
@@ -33,7 +34,7 @@ do for [i=0:40] {
 		t.Fatalf("failed to marshal args: %v", err)
 	}
 
-	result, err := tool.Invoke(context.Background(), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
 	if err != nil {
 		t.Fatalf("failed to invoke animate tool: %v", err)
 	}
@@ -78,7 +79,7 @@ do for [ang=0:360:10] {
 	}
 
 	argsJSON, _ := json.Marshal(args)
-	result, err := tool.Invoke(context.Background(), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
 	if err != nil {
 		t.Fatalf("failed to create animation: %v", err)
 	}
@@ -113,7 +114,7 @@ do for [i=1:30] {
 	}
 
 	argsJSON, _ := json.Marshal(args)
-	result, err := tool.Invoke(context.Background(), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
 	if err != nil {
 		t.Fatalf("failed to create webp animation: %v", err)
 	}
@@ -140,7 +141,7 @@ func TestAnimateTool_ValidationMissingScript(t *testing.T) {
 	}
 
 	argsJSON, _ := json.Marshal(args)
-	_, err := tool.Invoke(context.Background(), string(argsJSON))
+	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
 
 	if err == nil {
 		t.Error("expected error for missing gnuplot_script parameter")
@@ -159,7 +160,7 @@ func TestAnimateTool_ValidationInvalidFormat(t *testing.T) {
 	}
 
 	argsJSON, _ := json.Marshal(args)
-	_, err := tool.Invoke(context.Background(), string(argsJSON))
+	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
 
 	if err == nil {
 		t.Error("expected error for invalid format")
@@ -178,7 +179,7 @@ func TestAnimateTool_ValidationSetTerminal(t *testing.T) {
 	}
 
 	argsJSON, _ := json.Marshal(args)
-	_, err := tool.Invoke(context.Background(), string(argsJSON))
+	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
 
 	if err == nil {
 		t.Error("expected error for script containing 'set terminal'")
@@ -200,7 +201,7 @@ func TestAnimateTool_DefaultValues(t *testing.T) {
 	}
 
 	argsJSON, _ := json.Marshal(args)
-	result, err := tool.Invoke(context.Background(), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
 	if err != nil {
 		t.Fatalf("failed with defaults: %v", err)
 	}

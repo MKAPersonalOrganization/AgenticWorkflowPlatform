@@ -1,7 +1,6 @@
 package tools
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -71,7 +70,7 @@ func (c *CalculatorTool) Parameters() map[string]any {
 	}
 }
 
-func (c *CalculatorTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
+func (c *CalculatorTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
 	result, err := ExecuteCalculatorTool(arguments)
 	if err != nil {
 		return core.ToolResult{}, err

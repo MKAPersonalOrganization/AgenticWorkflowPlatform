@@ -1,7 +1,6 @@
 package tools
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
@@ -131,7 +130,7 @@ do for [n=1:10] {
 	}
 }
 
-func (a *AnimateTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
+func (a *AnimateTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
 	var args AnimateArgs
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		return core.ToolResult{}, fmt.Errorf("failed to parse animate args: %w", err)

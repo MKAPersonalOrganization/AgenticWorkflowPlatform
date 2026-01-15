@@ -145,7 +145,7 @@ func TestWriteTodosTool_Invoke(t *testing.T) {
 		t.Fatalf("Failed to marshal arguments: %v", err)
 	}
 
-	result, err := tool.Invoke(context.Background(), string(argsJSON))
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), string(argsJSON))
 	if err != nil {
 		t.Fatalf("Tool invocation failed: %v", err)
 	}
@@ -163,7 +163,7 @@ func TestWriteTodosTool_Invoke_InvalidJSON(t *testing.T) {
 	t.Parallel()
 	tool := NewWriteTodosTool()
 
-	_, err := tool.Invoke(context.Background(), "invalid json")
+	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), "invalid json")
 	if err == nil {
 		t.Error("Expected error for invalid JSON")
 	}
@@ -427,6 +427,6 @@ func (m *MockTool) Parameters() map[string]any {
 	}
 }
 
-func (m *MockTool) Invoke(ctx context.Context, arguments string) (core.ToolResult, error) {
+func (m *MockTool) Invoke(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
 	return core.NewToolResult("mock result"), nil
 }

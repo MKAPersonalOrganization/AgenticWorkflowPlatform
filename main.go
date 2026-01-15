@@ -26,7 +26,6 @@ import (
 	"school-with-ai/infra/sqldb"
 	"school-with-ai/infra/sqldb/migrate"
 	"school-with-ai/services/agentorchestrator"
-	"school-with-ai/services/agentorchestrator/agents/advancedmath/linearalgebra"
 	"school-with-ai/services/agentorchestrator/agents/chemistry"
 	"school-with-ai/services/agentorchestrator/agents/diagramming"
 	"school-with-ai/services/agentorchestrator/agents/math"
@@ -286,7 +285,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 	shared.GlobalAgents.Register("physics-instructor", physics.CreatePhysicsInstructor)
 	shared.GlobalAgents.Register("chemistry-instructor", chemistry.CreateChemistryInstructor)
 	shared.GlobalAgents.Register("statistics-instructor", statistics.CreateStatisticsInstructor)
-	shared.GlobalAgents.Register("linearalgebra-instructor", linearalgebra.CreateLinearAlgebraProfessor)
 	shared.GlobalAgents.Register("diagramming-instructor", diagramming.CreateDiagrammingInstructor)
 
 	// Initialize chat write service

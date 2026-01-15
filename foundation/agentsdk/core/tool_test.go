@@ -20,7 +20,7 @@ func TestFunctionTool(t *testing.T) {
 			},
 			[]string{"location"},
 		),
-		func(ctx context.Context, arguments string) (core.ToolResult, error) {
+		func(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
 			var args struct {
 				Location string `json:"location"`
 				Unit     string `json:"unit"`
@@ -51,7 +51,7 @@ func TestFunctionTool(t *testing.T) {
 	}
 
 	// Test invocation
-	result, err := tool.Invoke(context.Background(), `{"location": "London", "unit": "celsius"}`)
+	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), `{"location": "London", "unit": "celsius"}`)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -84,7 +84,7 @@ func TestToolRegistry(t *testing.T) {
 		"get_weather",
 		"Get weather",
 		core.ObjectSchema(map[string]any{"location": core.StringProperty("City")}, []string{"location"}),
-		func(ctx context.Context, args string) (core.ToolResult, error) {
+		func(ctx core.ToolContext, args string) (core.ToolResult, error) {
 			return core.NewToolResult(`{"temp": 20}`), nil
 		},
 	)
@@ -93,7 +93,7 @@ func TestToolRegistry(t *testing.T) {
 		"calculate",
 		"Calculate expression",
 		core.ObjectSchema(map[string]any{"expression": core.StringProperty("Math expression")}, []string{"expression"}),
-		func(ctx context.Context, args string) (core.ToolResult, error) {
+		func(ctx core.ToolContext, args string) (core.ToolResult, error) {
 			return core.NewToolResult(`{"result": 42}`), nil
 		},
 	)
@@ -146,7 +146,7 @@ func TestToToolSpec(t *testing.T) {
 			},
 			[]string{"param1"},
 		),
-		func(ctx context.Context, args string) (core.ToolResult, error) { return core.NewToolResult("{}"), nil },
+		func(ctx core.ToolContext, args string) (core.ToolResult, error) { return core.NewToolResult("{}"), nil },
 	)
 
 	spec := core.ToToolSpec(tool)

@@ -150,12 +150,12 @@ func TestBasicToolExecutor_Calculate(t *testing.T) {
 		"calculate",
 		"Calculate an expression",
 		core.ObjectSchema(map[string]any{"expression": core.StringProperty("Expression")}, []string{"expression"}),
-		func(ctx context.Context, arguments string) (core.ToolResult, error) {
+		func(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
 			return core.NewToolResult(`{"result": "4"}`), nil
 		},
 	))
 
-	executor := core.NewRegistryToolExecutor(context.Background(), toolRegistry)
+	executor := core.NewRegistryToolExecutor(context.Background(), toolRegistry, "", "", nil)
 
 	toolCall := core.ToolCall{
 		ID:   "call_calc",
@@ -187,12 +187,12 @@ func TestBasicToolExecutor_WriteWhiteboard(t *testing.T) {
 			"content": core.StringProperty("Content"),
 			"action":  core.StringProperty("Action"),
 		}, []string{"content", "action"}),
-		func(ctx context.Context, arguments string) (core.ToolResult, error) {
+		func(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
 			return core.NewToolResult(`{"status": "success"}`), nil
 		},
 	))
 
-	executor := core.NewRegistryToolExecutor(context.Background(), toolRegistry)
+	executor := core.NewRegistryToolExecutor(context.Background(), toolRegistry, "", "", nil)
 
 	toolCall := core.ToolCall{
 		ID:   "call_whiteboard",
@@ -227,7 +227,7 @@ func TestRegistryToolExecutor(t *testing.T) {
 			map[string]any{"name": core.StringProperty("The name")},
 			[]string{"name"},
 		),
-		func(ctx context.Context, arguments string) (core.ToolResult, error) {
+		func(ctx core.ToolContext, arguments string) (core.ToolResult, error) {
 			var args struct {
 				Name string `json:"name"`
 			}
@@ -240,7 +240,7 @@ func TestRegistryToolExecutor(t *testing.T) {
 		},
 	))
 
-	executor := core.NewRegistryToolExecutor(ctx, registry)
+	executor := core.NewRegistryToolExecutor(ctx, registry, "", "", nil)
 
 	// Test successful execution
 	result, err := executor.Execute(core.ToolCall{
@@ -264,7 +264,7 @@ func TestRegistryToolExecutor_ToolNotFound(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	registry := core.NewToolRegistry()
-	executor := core.NewRegistryToolExecutor(ctx, registry)
+	executor := core.NewRegistryToolExecutor(ctx, registry, "", "", nil)
 
 	_, err := executor.Execute(core.ToolCall{
 		ID:   "call_1",
