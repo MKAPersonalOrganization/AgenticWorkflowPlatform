@@ -13,7 +13,7 @@ func GenerateMessageID() string {
 	if _, err := rand.Read(b); err != nil {
 		// This should never happen, but if it does, panic is appropriate
 		// since we can't generate a secure random ID
-		panic(fmt.Sprintf("failed to generate random ID: %v", err))
+		panic(fmt.Sprintf("failed to generate random ID: %s", err))
 	}
 
 	return hex.EncodeToString(b)

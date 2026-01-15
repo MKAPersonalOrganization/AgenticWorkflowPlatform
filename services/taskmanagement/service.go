@@ -189,7 +189,7 @@ func (s *Service) runAgentHandoffChain(ctx context.Context, threadID, startAgent
 		if err != nil {
 			if emitErr := emitter.Emit(&domain.RunErrorEvent{
 				ThreadID:  threadID,
-				Message:   fmt.Sprintf("Agent %s failed: %v", currentAgent, err),
+				Message:   fmt.Sprintf("Agent %s failed: %s", currentAgent, err),
 				ErrorCode: "AGENT_RUN_ERROR",
 				Timestamp: time.Now(),
 			}); emitErr != nil {

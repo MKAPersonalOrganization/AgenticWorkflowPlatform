@@ -212,7 +212,7 @@ func (e *Engine) Run(
 				execResult, err := e.executeToolCallWithExecutor(runCtx.ThreadID, toolCall, dynamicExecutor)
 				var result string
 				if err != nil {
-					result = fmt.Sprintf(`{"error": "%v"}`, err)
+					result = fmt.Sprintf(`{"error": "%s"}`, err)
 				} else {
 					result = execResult.Result
 				}
