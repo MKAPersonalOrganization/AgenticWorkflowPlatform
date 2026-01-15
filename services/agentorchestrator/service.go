@@ -133,14 +133,7 @@ func (s *Service) CreateThread(ctx context.Context, threadID, title string) (cor
 	if err != nil {
 		return nil, err
 	}
-
-	// Notify for persistence
-	if s.config.Notifier != nil && event != nil {
-		if err := s.config.Notifier.HandleDomainEvent(event); err != nil {
-			s.log.Error(ctx, "failed to notify thread created event", "error", err)
-		}
-	}
-
+	s.notify(ctx, event)
 	return s.threadMgmt.ToAgentThread(agg), nil
 }
 
@@ -150,15 +143,17 @@ func (s *Service) AddUserMessage(ctx context.Context, threadID, messageID, conte
 	if err != nil {
 		return nil, err
 	}
+	s.notify(ctx, event)
+	return s.threadMgmt.ToAgentThread(agg), nil
+}
 
-	// Notify for persistence
+// notify emits a domain event if a notifier is configured.
+func (s *Service) notify(ctx context.Context, event core.Event) {
 	if s.config.Notifier != nil && event != nil {
 		if err := s.config.Notifier.HandleDomainEvent(event); err != nil {
-			s.log.Error(ctx, "failed to notify message added event", "error", err)
+			s.log.Error(ctx, "failed to notify event", "error", err, "eventType", event.EventType())
 		}
 	}
-
-	return s.threadMgmt.ToAgentThread(agg), nil
 }
 
 // UpdateThreadTitle updates the title of a thread using event sourcing.
