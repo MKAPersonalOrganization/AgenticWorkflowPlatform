@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"iter"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 
@@ -34,7 +35,7 @@ type AgentOrchestrator interface {
 	// CreateThread creates a new chat thread using event sourcing
 	CreateThread(ctx context.Context, threadID, title string) (core.AgentThread, error)
 	// UpdateThreadTitle updates the title of a thread using event sourcing
-	UpdateThreadTitle(ctx context.Context, threadID, newTitle string) error
+	UpdateThreadTitle(ctx context.Context, threadID, newTitle string) (*domain.ThreadTitleUpdatedEvent, error)
 	// DeleteThread deletes a thread using event sourcing
 	DeleteThread(ctx context.Context, threadID string) error
 }

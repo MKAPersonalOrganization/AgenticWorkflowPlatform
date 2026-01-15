@@ -3,6 +3,7 @@ package agentorchestrator
 import (
 	"context"
 	"iter"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/logger"
@@ -86,7 +87,7 @@ func New(log *logger.Logger, chatClient ChatClient, writeModel core.EventStore, 
 	}
 
 	// Initialize components
-	s.threadMgmt = threadmgmt.New(log, s.threadRepo, s.config.Notifier, s.config.Name)
+	s.threadMgmt = threadmgmt.New(log, s.threadRepo, s.config.Name)
 	s.engine = engine.New(
 		log,
 		chatClient,
@@ -128,24 +129,40 @@ func (s *Service) Run(ctx context.Context, runCtx core.RunContext) iter.Seq2[cor
 
 // CreateThread creates a new chat thread using event sourcing.
 func (s *Service) CreateThread(ctx context.Context, threadID, title string) (core.AgentThread, error) {
-	agg, err := s.threadMgmt.CreateThread(ctx, threadID, title)
+	agg, event, err := s.threadMgmt.CreateThread(ctx, threadID, title)
 	if err != nil {
 		return nil, err
 	}
+
+	// Notify for persistence
+	if s.config.Notifier != nil && event != nil {
+		if err := s.config.Notifier.HandleDomainEvent(event); err != nil {
+			s.log.Error(ctx, "failed to notify thread created event", "error", err)
+		}
+	}
+
 	return s.threadMgmt.ToAgentThread(agg), nil
 }
 
 // AddUserMessage adds a user message to a thread using event sourcing.
 func (s *Service) AddUserMessage(ctx context.Context, threadID, messageID, content string) (core.AgentThread, error) {
-	agg, err := s.threadMgmt.AddUserMessage(ctx, threadID, messageID, content)
+	agg, event, err := s.threadMgmt.AddUserMessage(ctx, threadID, messageID, content)
 	if err != nil {
 		return nil, err
 	}
+
+	// Notify for persistence
+	if s.config.Notifier != nil && event != nil {
+		if err := s.config.Notifier.HandleDomainEvent(event); err != nil {
+			s.log.Error(ctx, "failed to notify message added event", "error", err)
+		}
+	}
+
 	return s.threadMgmt.ToAgentThread(agg), nil
 }
 
 // UpdateThreadTitle updates the title of a thread using event sourcing.
-func (s *Service) UpdateThreadTitle(ctx context.Context, threadID, newTitle string) error {
+func (s *Service) UpdateThreadTitle(ctx context.Context, threadID, newTitle string) (*domain.ThreadTitleUpdatedEvent, error) {
 	return s.threadMgmt.UpdateThreadTitle(ctx, threadID, newTitle)
 }
 

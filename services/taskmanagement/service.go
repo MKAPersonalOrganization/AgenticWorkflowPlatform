@@ -3,13 +3,14 @@ package taskmanagement
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/observability/langfuse"
 	"school-with-ai/services"
 	"school-with-ai/services/agentorchestrator/agents/shared"
-	"time"
 )
 
 // ObservabilityConfig contains configuration for observability and tracing attributes
@@ -109,24 +110,20 @@ func (s *Service) HandleUserMessage(
 	if msgCount == 1 {
 		title := s.titleGenerator.FromFirstMessage(params.Content)
 
-		err := s.orchestratorService.UpdateThreadTitle(ctx, params.ThreadID, title)
+		// Emit domain event for thread title update to ensure real-time UI notification
+		titleEvent, err := s.orchestratorService.UpdateThreadTitle(ctx, params.ThreadID, title)
 		if err != nil {
 			s.log.Error(ctx, "Failed to update thread title",
 				"threadID", params.ThreadID,
 				"error", err)
+		} else if titleEvent != nil {
+			if err := emitter.Emit(titleEvent); err != nil {
+				s.log.Error(ctx, "Failed to emit thread title updated event",
+					"threadID", params.ThreadID,
+					"error", err)
+			}
 		}
 
-		// Emit domain event for thread title update to ensure real-time UI notification
-		titleEvent := &domain.ThreadTitleUpdatedEvent{
-			ThreadID:  params.ThreadID,
-			Title:     title,
-			Timestamp: time.Now(),
-		}
-		if err := emitter.Emit(titleEvent); err != nil {
-			s.log.Error(ctx, "Failed to emit thread title updated event",
-				"threadID", params.ThreadID,
-				"error", err)
-		}
 	}
 
 	// 5. Start Langfuse trace (if enabled)
