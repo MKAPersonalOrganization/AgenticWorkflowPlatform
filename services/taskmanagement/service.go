@@ -25,10 +25,11 @@ type ObservabilityConfig struct {
 // managing threads, routing to agents, and coordinating execution.
 // It is designed to be reusable across different transports (HTTP/SSE, A2A, etc.).
 type Service struct {
-	log                 *logger.Logger
-	orchestratorService services.AgentOrchestrator
-	agentFactory        services.AgentFactory
-	threadStore         domain.ThreadStore
+	log                  *logger.Logger
+	orchestratorService  services.AgentOrchestrator
+	threadCommandService services.ThreadCommandService
+	agentFactory         services.AgentFactory
+	threadStore          domain.ThreadStore
 	eventLog            core.EventStore
 	chatClient          ChatClient
 	langfuseTracer      *LangfuseTracer
@@ -40,6 +41,7 @@ type Service struct {
 func NewService(
 	log *logger.Logger,
 	orchestratorService services.AgentOrchestrator,
+	threadCommandService services.ThreadCommandService,
 	agentFactory services.AgentFactory,
 	threadStore domain.ThreadStore,
 	eventLog core.EventStore,
@@ -49,15 +51,16 @@ func NewService(
 	titleGenerator *TitleGenerator,
 ) *Service {
 	return &Service{
-		log:                 log,
-		orchestratorService: orchestratorService,
-		agentFactory:        agentFactory,
-		threadStore:         threadStore,
-		eventLog:            eventLog,
-		chatClient:          chatClient,
-		langfuseTracer:      langfuseTracer,
-		observabilityConfig: observabilityConfig,
-		titleGenerator:      titleGenerator,
+		log:                  log,
+		orchestratorService:  orchestratorService,
+		threadCommandService: threadCommandService,
+		agentFactory:         agentFactory,
+		threadStore:          threadStore,
+		eventLog:             eventLog,
+		chatClient:           chatClient,
+		langfuseTracer:       langfuseTracer,
+		observabilityConfig:  observabilityConfig,
+		titleGenerator:       titleGenerator,
 	}
 }
 
@@ -89,7 +92,7 @@ func (s *Service) HandleUserMessage(
 	// if the thread doesn't exist (version 0)
 
 	// 1. Add user message to thread (creates thread if needed)
-	thread, err := s.orchestratorService.AddUserMessage(ctx, params.ThreadID, params.MessageID, params.Content)
+	thread, err := s.threadCommandService.AddUserMessage(ctx, params.ThreadID, params.MessageID, params.Content)
 	if err != nil {
 		s.log.Error(ctx, "Failed to add user message",
 			"threadID", params.ThreadID,
@@ -101,32 +104,10 @@ func (s *Service) HandleUserMessage(
 	runID := domain.GenerateMessageID()
 
 	// 3. Auto-generate thread title if this is the first message
-	// Use the thread aggregate returned by AddUserMessage to ensure consistency (bypass projection lag)
-	msgs, err := thread.RetrieveFullConversationHistory(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to retrieve messages: %w", err)
-	}
-	msgCount := len(msgs)
-
-	// Check if this is a first message or if title is still default
-	// We use the returned 'thread' because it's the most up-to-date state
-	if msgCount == 1 {
-		title := s.titleGenerator.FromFirstMessage(params.Content)
-
-		// Emit domain event for thread title update to ensure real-time UI notification
-		titleEvent, err := s.orchestratorService.UpdateThreadTitle(ctx, params.ThreadID, title)
-		if err != nil {
-			s.log.Error(ctx, "Failed to update thread title",
-				"threadID", params.ThreadID,
-				"error", err)
-		} else if titleEvent != nil {
-			if err := emitter.Emit(titleEvent); err != nil {
-				s.log.Error(ctx, "Failed to emit thread title updated event",
-					"threadID", params.ThreadID,
-					"error", err)
-			}
-		}
-
+	if err := s.handleThreadTitle(ctx, thread, params.Content, emitter); err != nil {
+		s.log.Error(ctx, "Failed to handle thread title",
+			"threadID", params.ThreadID,
+			"error", err)
 	}
 
 	// 5. Start Langfuse trace (if enabled)
@@ -361,6 +342,36 @@ func (s *Service) runAgent(ctx context.Context, threadID, agentName string, emit
 	}
 
 	return "", thread, nil
+}
+
+// handleThreadTitle generates and updates a thread title if it's the first message.
+func (s *Service) handleThreadTitle(ctx context.Context, thread core.AgentThread, content string, emitter EventEmitter) error {
+	msgs, err := thread.RetrieveFullConversationHistory(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve conversation history: %w", err)
+	}
+
+	// Only generate title on the first message
+	if len(msgs) != 1 {
+		return nil
+	}
+
+	title := s.titleGenerator.FromFirstMessage(content)
+
+	// Update thread title via thread command service
+	titleEvent, err := s.threadCommandService.UpdateThreadTitle(ctx, thread.GetID(), title)
+	if err != nil {
+		return fmt.Errorf("failed to update thread title: %w", err)
+	}
+
+	// Emit notification event if something changed
+	if titleEvent != nil {
+		if err := emitter.Emit(titleEvent); err != nil {
+			return fmt.Errorf("failed to emit title update event: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // getRelease returns the application release version from config

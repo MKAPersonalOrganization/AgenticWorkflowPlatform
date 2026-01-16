@@ -8,8 +8,8 @@ import (
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/agentorchestrator/engine"
 	"school-with-ai/services/agentorchestrator/rag"
-	"school-with-ai/services/agentorchestrator/threadmgmt"
 	"school-with-ai/services/agentorchestrator/types"
+	"school-with-ai/services/threadmgmt"
 )
 
 // Use central types
@@ -70,7 +70,7 @@ func New(log *logger.Logger, chatClient ChatClient, writeModel core.EventStore, 
 		log:          log,
 		chatClient:   chatClient,
 		writeModel:   writeModel,
-		threadRepo:   domain.NewThreadRepository(NewEventStoreAdapter(writeModel)),
+		threadRepo:   domain.NewThreadRepository(threadmgmt.NewEventStoreAdapter(writeModel)),
 		config:       core.DefaultConfig("agent"),
 		toolRegistry: core.NewToolRegistry(),
 	}
@@ -116,26 +116,6 @@ func (s *Service) Run(ctx context.Context, runCtx core.RunContext) iter.Seq2[cor
 	}
 }
 
-// CreateThread creates a new chat thread using event sourcing.
-func (s *Service) CreateThread(ctx context.Context, threadID, title string) (core.AgentThread, error) {
-	agg, event, err := s.threadMgmt.CreateThread(ctx, threadID, title)
-	if err != nil {
-		return nil, err
-	}
-	s.notify(ctx, event)
-	return s.threadMgmt.ToAgentThread(agg), nil
-}
-
-// AddUserMessage adds a user message to a thread using event sourcing.
-func (s *Service) AddUserMessage(ctx context.Context, threadID, messageID, content string) (core.AgentThread, error) {
-	agg, event, err := s.threadMgmt.AddUserMessage(ctx, threadID, messageID, content)
-	if err != nil {
-		return nil, err
-	}
-	s.notify(ctx, event)
-	return s.threadMgmt.ToAgentThread(agg), nil
-}
-
 // notify emits a domain event if a notifier is configured.
 func (s *Service) notify(ctx context.Context, event core.Event) {
 	if s.config.Notifier != nil && event != nil {
@@ -143,14 +123,4 @@ func (s *Service) notify(ctx context.Context, event core.Event) {
 			s.log.Error(ctx, "failed to notify event", "error", err, "eventType", event.EventType())
 		}
 	}
-}
-
-// UpdateThreadTitle updates the title of a thread using event sourcing.
-func (s *Service) UpdateThreadTitle(ctx context.Context, threadID, newTitle string) (*domain.ThreadTitleUpdatedEvent, error) {
-	return s.threadMgmt.UpdateThreadTitle(ctx, threadID, newTitle)
-}
-
-// DeleteThread deletes a thread using event sourcing.
-func (s *Service) DeleteThread(ctx context.Context, threadID string) error {
-	return s.threadMgmt.DeleteThread(ctx, threadID)
 }

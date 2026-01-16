@@ -19,12 +19,13 @@ import (
 
 // TaskManagementHandler encapsulates dependencies for HTTP handlers for task management.
 type TaskManagementHandler struct {
-	log                 *logger.Logger
-	chatClient          *llm.OpenAIClient
-	taskMgmtService     *taskmanagement.TaskManagementService
-	orchestratorService services.AgentOrchestrator
-	authService         services.AuthService
-	projectionService   services.ProjectionService
+	log                  *logger.Logger
+	chatClient           *llm.OpenAIClient
+	taskMgmtService      *taskmanagement.TaskManagementService
+	orchestratorService   services.AgentOrchestrator
+	threadCommandService services.ThreadCommandService
+	authService          services.AuthService
+	threadQueryService   services.ThreadQueryService
 }
 
 // NewTaskManagementHandler creates a new HTTP handler for task management.
@@ -33,16 +34,18 @@ func NewTaskManagementHandler(
 	chatClient *llm.OpenAIClient,
 	taskMgmtService *taskmanagement.TaskManagementService,
 	orchestratorService services.AgentOrchestrator,
+	threadCommandService services.ThreadCommandService,
 	authService services.AuthService,
-	projectionService services.ProjectionService,
+	threadQueryService services.ThreadQueryService,
 ) *TaskManagementHandler {
 	return &TaskManagementHandler{
-		log:                 log,
-		chatClient:          chatClient,
-		taskMgmtService:     taskMgmtService,
-		orchestratorService: orchestratorService,
-		authService:         authService,
-		projectionService:   projectionService,
+		log:                  log,
+		chatClient:           chatClient,
+		taskMgmtService:      taskMgmtService,
+		orchestratorService:  orchestratorService,
+		threadCommandService: threadCommandService,
+		authService:          authService,
+		threadQueryService:   threadQueryService,
 	}
 }
 
@@ -198,7 +201,7 @@ streamEvents:
 	// TODO: Re-enable snapshots only for reconnections, not initial connections
 
 	// FIRST: Send MESSAGES_SNAPSHOT from projection (ensures client has current state)
-	// messages := h.projectionService.GetThreadMessages(eventBuffer.ThreadID)
+	// messages := h.threadQueryService.GetThreadMessages(eventBuffer.ThreadID)
 	// if len(messages) > 0 {
 	// 	messagesSnapshotEvent := aguievents.NewMessagesSnapshotEvent(messages)
 	// 	err := WriteSSEEvent(w, messagesSnapshotEvent)
@@ -363,8 +366,8 @@ func (h *TaskManagementHandler) DeleteThread(w http.ResponseWriter, r *http.Requ
 
 	h.log.Info(r.Context(), "Deleting thread", "userID", user.ID, "threadID", threadID)
 
-	// Delete thread using chat service
-	err := h.orchestratorService.DeleteThread(r.Context(), threadID)
+	// Delete thread using thread command service
+	err := h.threadCommandService.DeleteThread(r.Context(), threadID)
 	if err != nil {
 		if errors.Is(err, domain.ErrThreadNotFound) {
 			http.Error(w, "Thread not found", http.StatusNotFound)

@@ -47,6 +47,7 @@ func NewTaskManagementService(
 	state domain.ThreadStore,
 	chatClient ChatClient,
 	orchestratorService services.AgentOrchestrator, // decouple from concrete implementation
+	threadCommandService services.ThreadCommandService,
 	agentFactory services.AgentFactory,
 	langfuseTracer *LangfuseTracer,
 	observabilityConfig ObservabilityConfig,
@@ -82,10 +83,10 @@ func NewTaskManagementService(
 	// Create title generator
 	titleGenerator := NewTitleGenerator()
 
-	// Create orchestration service
 	orchestrationService := NewService(
 		log,
 		orchestratorService,
+		threadCommandService,
 		agentFactory,
 		state,
 		eventLog,

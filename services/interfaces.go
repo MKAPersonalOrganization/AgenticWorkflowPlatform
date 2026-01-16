@@ -17,8 +17,8 @@ type AuthService interface {
 	IsAuthenticated(ctx context.Context) bool
 }
 
-// ProjectionService provides read access to projections for UI.
-type ProjectionService interface {
+// ThreadQueryService provides read access to projections (queries) for UI.
+type ThreadQueryService interface {
 	// GetThreadMessages retrieves AGUI-formatted messages for a thread
 	GetThreadMessages(threadID string) []aguievents.Message
 	// ListThreadSummaries retrieves all threads with summaries, sorted by most recent
@@ -29,6 +29,10 @@ type ProjectionService interface {
 type AgentOrchestrator interface {
 	// Run processes the LLM response using an AgentThread and yields events.
 	Run(ctx context.Context, runCtx core.RunContext) iter.Seq2[core.Event, error]
+}
+
+// ThreadCommandService defines the interface for thread lifecycle management (commands).
+type ThreadCommandService interface {
 	// AddUserMessage adds a user message to a thread using event sourcing
 	AddUserMessage(ctx context.Context, threadID, messageID, content string) (core.AgentThread, error)
 	// CreateThread creates a new chat thread using event sourcing
