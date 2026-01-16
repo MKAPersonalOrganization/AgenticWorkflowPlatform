@@ -35,7 +35,8 @@ func CreateStatisticsInstructor(notifier core.EventNotifier) core.AgentConfig {
 	registry.Register(sharedtools.NewWriteWhiteboardTool())
 
 	return core.AgentConfig{
-		Name: "statistics-instructor",
+		Name:          "statistics-instructor",
+		MaxIterations: 5,
 		SystemPrompt: `# Statistics Instructor
 
 ## Core Rules

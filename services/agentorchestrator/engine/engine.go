@@ -114,6 +114,10 @@ func (s *executionState) initAgentComponents(agentName string) error {
 		return err
 	}
 
+	if err := config.Validate(); err != nil {
+		return err
+	}
+
 	s.agentName = agentName
 	s.llmCtx = NewLLMContextManager(config, s.engine.threadMgmt, s.engine.reqCtxCapture)
 	s.events = NewEventFactory(config.Name)
@@ -273,10 +277,19 @@ func (s *executionState) handleStart() error {
 }
 
 func (s *executionState) handleStream() error {
-	// Check iteration limit (must check BEFORE making LLM call)
 	if s.iteration >= s.maxIterations {
 		return fmt.Errorf("agent %q exceeded maximum iterations (%d)", s.agentName, s.maxIterations)
 	}
+
+	// Warn if we're about to hit the limit
+	if s.iteration == s.maxIterations-1 {
+		s.engine.log.Warn(s.ctx, "Agent approaching iteration limit",
+			"agent", s.agentName,
+			"iteration", s.iteration+1,
+			"max_iterations", s.maxIterations,
+		)
+	}
+
 	s.iteration++
 
 	// Prepare

@@ -23,7 +23,8 @@ func CreateChemistryInstructor(notifier core.EventNotifier) core.AgentConfig {
 	}
 
 	return core.AgentConfig{
-		Name: "chemistry-instructor",
+		Name:          "chemistry-instructor",
+		MaxIterations: 5,
 		SystemPrompt: `# Chemistry Instructor
 You are a Chemistry specialist.
 
