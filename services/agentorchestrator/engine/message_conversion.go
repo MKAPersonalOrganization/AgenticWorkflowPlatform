@@ -7,7 +7,6 @@ import (
 )
 
 // mapFromCoreToLLMMessages converts a slice of core.Message to llm.ChatMessage.
-// Filters out system messages with agent_handoff metadata as they're UI-only.
 func mapFromCoreToLLMMessages(msgs []core.Message) []llm.ChatMessage {
 	result := make([]llm.ChatMessage, 0, len(msgs))
 	for _, m := range msgs {

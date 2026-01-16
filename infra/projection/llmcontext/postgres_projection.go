@@ -345,11 +345,6 @@ func (p *PostgresLLMContextProjection) GetAgentThread(threadID string) (core.Age
 			if err := json.Unmarshal(*msg.Metadata, &metadata); err != nil {
 				p.log.Error(ctx, "failed to unmarshal metadata", "messageID", msg.MessageID, "ERROR", err)
 			}
-
-			// Filter out agent_handoff messages for LLM context
-			if msgType, ok := metadata["type"].(string); ok && msgType == "agent_handoff" {
-				continue
-			}
 		}
 
 		messages = append(messages, core.Message{
