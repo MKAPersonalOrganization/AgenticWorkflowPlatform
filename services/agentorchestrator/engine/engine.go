@@ -72,29 +72,15 @@ func (e *Engine) Run(ctx context.Context, runCtx core.RunContext) iter.Seq2[core
 			OnEntry(func(_ context.Context, _ ...any) error {
 				return e.handleStream(execState)
 			}).
-			PermitDynamic(triggerStreamProcessed, func(_ context.Context, args ...any) (stateless.State, error) {
-				data := args[0].(transitionData)
-				if data.Terminated {
-					return stateDone, nil
-				}
-				if data.HasTools {
-					return stateTools, nil
-				}
-				return stateDone, nil
-			})
+			Permit(triggerToolsFound, stateTools).
+			Permit(triggerStreamDone, stateDone)
 
 		execState.sm.Configure(stateTools).
 			OnEntry(func(_ context.Context, _ ...any) error {
 				return e.handleTools(execState)
 			}).
-			PermitDynamic(triggerToolsExecuted, func(_ context.Context, args ...any) (stateless.State, error) {
-				data := args[0].(transitionData)
-				if data.Stop {
-					return stateDone, nil
-				}
-				execState.messageID = core.GenerateID()
-				return stateStream, nil
-			})
+			Permit(triggerToolsContinue, stateStream).
+			Permit(triggerToolsDone, stateDone)
 
 		// Start execution
 		if err := execState.sm.Fire(triggerStart); err != nil {
@@ -129,12 +115,6 @@ func (s *executionState) emit(event core.Event) bool {
 	return true
 }
 
-type transitionData struct {
-	Terminated bool
-	HasTools   bool
-	Stop       bool
-}
-
 func (e *Engine) handleStart(s *executionState) error {
 	if !s.emit(e.events.AssistantStarted(s.threadID, s.messageID)) {
 		return context.Canceled
@@ -155,7 +135,7 @@ func (e *Engine) handleStream(s *executionState) error {
 		return err
 	}
 	if prepareResult.Terminated {
-		return s.sm.Fire(triggerStreamProcessed, transitionData{Terminated: true})
+		return s.sm.Fire(triggerStreamDone)
 	}
 
 	// Stream
@@ -174,7 +154,7 @@ func (e *Engine) handleStream(s *executionState) error {
 	}
 	if res == nil {
 		// Verify if we should consider this terminated or just done
-		return s.sm.Fire(triggerStreamProcessed, transitionData{Terminated: true})
+		return s.sm.Fire(triggerStreamDone)
 	}
 	s.streamResult = res
 
@@ -190,9 +170,10 @@ func (e *Engine) handleStream(s *executionState) error {
 		return context.Canceled
 	}
 
-	return s.sm.Fire(triggerStreamProcessed, transitionData{
-		HasTools: s.streamResult.HasToolCalls(),
-	})
+	if s.streamResult.HasToolCalls() {
+		return s.sm.Fire(triggerToolsFound)
+	}
+	return s.sm.Fire(triggerStreamDone)
 }
 
 func (e *Engine) handleTools(s *executionState) error {
@@ -224,7 +205,11 @@ func (e *Engine) handleTools(s *executionState) error {
 		}
 	}
 
-	return s.sm.Fire(triggerToolsExecuted, transitionData{Stop: shouldStop})
+	if shouldStop {
+		return s.sm.Fire(triggerToolsDone)
+	}
+	s.messageID = core.GenerateID()
+	return s.sm.Fire(triggerToolsContinue)
 }
 
 // State machine states
@@ -239,9 +224,11 @@ const (
 )
 
 const (
-	triggerStart           = "Start"
-	triggerStreamProcessed = "StreamProcessed"
-	triggerToolsExecuted   = "ToolsExecuted"
+	triggerStart         = "Start"
+	triggerToolsFound    = "ToolsFound"
+	triggerStreamDone    = "StreamDone"
+	triggerToolsContinue = "ToolsContinue"
+	triggerToolsDone     = "ToolsDone"
 )
 
 
