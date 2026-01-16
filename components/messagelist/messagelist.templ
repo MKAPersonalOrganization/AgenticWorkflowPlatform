@@ -4,7 +4,6 @@ import "school-with-ai/components/message"
 import "school-with-ai/components/errormessage"
 import "school-with-ai/components/alert"
 import "school-with-ai/components/badge"
-import "school-with-ai/components/agenthandoff"
 
 templ MessageList() {
 	<div class="space-y-4">
@@ -147,8 +146,6 @@ templ MessageList() {
 				<div x-show="message.type === 'tool_result'" class="my-2" style="display: none;">
 					<!-- Hidden - tool results are now embedded in tool call messages -->
 				</div>
-				<!-- Agent Handoff Message -->
-				@agenthandoff.AgentHandoff()
 				<!-- Assistant Message -->
 				@message.AssistantMessage()
 			</div>
