@@ -1,5 +1,7 @@
 package core
 
+import "context"
+
 // AgentThread is the base abstraction for all agent threads.
 //
 // An AgentThread contains the state of a specific conversation with an agent which may include:
@@ -25,7 +27,7 @@ type AgentThread interface {
 	GetID() string
 
 	// RetrieveFullConversationHistory returns all messages in the thread
-	RetrieveFullConversationHistory() []Message
+	RetrieveFullConversationHistory(ctx context.Context) ([]Message, error)
 
 	// AddMessages adds new messages to the thread
 	AddMessages(messages []Message) error

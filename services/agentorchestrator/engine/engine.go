@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"iter"
 	"school-with-ai/domain"
@@ -88,12 +89,10 @@ func (e *Engine) Run(
 			return
 		}
 
-		messages := runCtx.Thread.RetrieveFullConversationHistory()
-		select {
-		case <-ctx.Done():
-			yield(nil, fmt.Errorf("client disconnected: %w", ctx.Err()))
+		messages, err := runCtx.Thread.RetrieveFullConversationHistory(ctx)
+		if err != nil {
+			yield(nil, err)
 			return
-		default:
 		}
 
 		chatMessages := toLLMChatMessages(messages)
@@ -136,8 +135,8 @@ func (e *Engine) Run(
 		toolCalls := core.NewToolCallAccumulator()
 
 		for update, err := range streamIter {
-			select {
-			case <-ctx.Done():
+			// Check if stream finished early due to cancellation
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				if completeContent != "" {
 					evt := &domain.AssistantMessageCompletedEvent{
 						ThreadID:  runCtx.ThreadID,
@@ -149,9 +148,8 @@ func (e *Engine) Run(
 						return
 					}
 				}
-				yield(nil, fmt.Errorf("client disconnected during streaming: %w", ctx.Err()))
+				yield(nil, fmt.Errorf("client disconnected: %w", err))
 				return
-			default:
 			}
 
 			if err != nil {

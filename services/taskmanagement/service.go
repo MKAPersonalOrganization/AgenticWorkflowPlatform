@@ -102,7 +102,11 @@ func (s *Service) HandleUserMessage(
 
 	// 3. Auto-generate thread title if this is the first message
 	// Use the thread aggregate returned by AddUserMessage to ensure consistency (bypass projection lag)
-	msgCount := len(thread.RetrieveFullConversationHistory())
+	msgs, err := thread.RetrieveFullConversationHistory(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve messages: %w", err)
+	}
+	msgCount := len(msgs)
 
 	// Check if this is a first message or if title is still default
 	// We use the returned 'thread' because it's the most up-to-date state
@@ -253,7 +257,11 @@ func (s *Service) runAgent(ctx context.Context, threadID, agentName string, emit
 	// Note: thread is now passed in from the caller to ensure consistency
 
 	// Debug: Log thread state
-	messages := thread.RetrieveFullConversationHistory()
+	messages, err := thread.RetrieveFullConversationHistory(ctx)
+	if err != nil {
+		s.log.Error(ctx, "Failed to retrieve conversation history", "threadID", threadID, "error", err)
+		return "", nil, fmt.Errorf("failed to retrieve conversation history: %w", err)
+	}
 	s.log.Info(ctx, "Thread state before agent execution",
 		"threadID", threadID,
 		"messageCount", len(messages),
@@ -299,7 +307,10 @@ func (s *Service) runAgent(ctx context.Context, threadID, agentName string, emit
 			// Get the agent's response from the thread
 			updatedThread, _ := s.threadStore.GetOrCreateAgentThread(ctx, threadID)
 			var response string
-			if updatedMessages := updatedThread.RetrieveFullConversationHistory(); len(updatedMessages) > 0 {
+			updatedMessages, err := updatedThread.RetrieveFullConversationHistory(ctx)
+			if err != nil {
+				s.log.Warn(ctx, "failed to retrieve conversation history for generation tracking", "error", err)
+			} else if len(updatedMessages) > 0 {
 				lastMsg := updatedMessages[len(updatedMessages)-1]
 				if lastMsg.Role == "assistant" {
 					response = lastMsg.Content
