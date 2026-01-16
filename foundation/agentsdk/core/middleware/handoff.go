@@ -72,18 +72,23 @@ func (t *TransferToAgentTool) Description() string {
 
 func (t *TransferToAgentTool) Parameters() map[string]any {
 	// Build enum of available agent names
-	agentNames := make([]string, 0, len(t.handoffs))
+	agentNames := make([]string, 0, len(t.handoffs)+1)
 	for _, handoff := range t.handoffs {
 		agentNames = append(agentNames, handoff.AgentName)
 	}
+	agentNames = append(agentNames, "human")
 
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
 			"agent_name": map[string]any{
 				"type":        "string",
-				"description": "The name of the agent to transfer to",
+				"description": "The name of the agent to transfer to. Use 'human' to ask for clarification, guidance, or help from the user.",
 				"enum":        agentNames,
+			},
+			"question": map[string]any{
+				"type":        "string",
+				"description": "The specific question or clarification needed from the human (required if agent_name is 'human').",
 			},
 		},
 		"required": []string{"agent_name"},
@@ -93,6 +98,7 @@ func (t *TransferToAgentTool) Parameters() map[string]any {
 func (t *TransferToAgentTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
 		AgentName string `json:"agent_name"`
+		Question  string `json:"question"`
 	}
 
 	if err := core.UnmarshalArgs(args, &params); err != nil {
@@ -107,6 +113,25 @@ func (t *TransferToAgentTool) Invoke(ctx core.ToolContext, args any) (any, error
 	// Prevent self-transfer
 	if params.AgentName == t.reqCtx.Config.Name {
 		return nil, fmt.Errorf("%w (%s)", ErrSelfTransfer, params.AgentName)
+	}
+
+	// Handle human handoff
+	if params.AgentName == "human" {
+		status := "Awaiting human input"
+		if params.Question != "" {
+			status = fmt.Sprintf("Awaiting human input: %s", params.Question)
+		}
+		return core.NewToolResultWithCommand(
+			map[string]any{
+				"status":   status,
+				"to":       "human",
+				"question": params.Question,
+			},
+			&core.Command{
+				Goto:          "human",
+				StopIteration: true,
+			},
+		), nil
 	}
 
 	// Store handoff in request context state
@@ -146,6 +171,7 @@ func (m *HandoffMiddleware) Process(ctx context.Context, reqCtx *core.RequestCon
 	for _, handoff := range reqCtx.Config.Handoffs {
 		sb.WriteString(fmt.Sprintf("- **%s**: %s\n", handoff.AgentName, handoff.Description))
 	}
+	sb.WriteString("- **human**: Use this to ask for clarification, guidance, or help from the user when you are stuck or need more information.\n")
 	reqCtx.AddSystemPrompt(sb.String())
 
 	// Continue with next middleware

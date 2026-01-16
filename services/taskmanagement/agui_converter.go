@@ -70,6 +70,17 @@ func ToAguiEvents(event any) []any {
 			evt.ToolResult,
 		)}
 
+	case *domain.HumanInputRequestedEvent:
+		return []any{aguievents.NewCustomEvent(
+			"HUMAN_INPUT_REQUESTED",
+			aguievents.WithValue(map[string]any{
+				"threadId":   evt.ThreadID,
+				"messageId":  evt.MessageID,
+				"toolCallId": evt.ToolCallID,
+				"question":   evt.Question,
+			}),
+		)}
+
 	default:
 		return nil
 	}
