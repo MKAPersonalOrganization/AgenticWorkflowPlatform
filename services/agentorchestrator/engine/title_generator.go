@@ -1,4 +1,4 @@
-package agentorchestrator
+package engine
 
 // TitleGenerator handles the logic for generating thread titles.
 type TitleGenerator struct{}

@@ -83,3 +83,30 @@ func (f *EventFactory) AgentHandoff(threadID, targetAgent string) *domain.AgentH
 		Timestamp:   time.Now(),
 	}
 }
+// RunStarted creates a RunStartedEvent.
+func (f *EventFactory) RunStarted(threadID, runID string) *domain.RunStartedEvent {
+	return &domain.RunStartedEvent{
+		ThreadID:  threadID,
+		RunID:     runID,
+		Timestamp: time.Now(),
+	}
+}
+
+// RunFinished creates a RunFinishedEvent.
+func (f *EventFactory) RunFinished(threadID, runID string) *domain.RunFinishedEvent {
+	return &domain.RunFinishedEvent{
+		ThreadID:  threadID,
+		RunID:     runID,
+		Timestamp: time.Now(),
+	}
+}
+
+// RunError creates a RunErrorEvent.
+func (f *EventFactory) RunError(threadID, message, errorCode string) *domain.RunErrorEvent {
+	return &domain.RunErrorEvent{
+		ThreadID:  threadID,
+		Message:   message,
+		ErrorCode: errorCode,
+		Timestamp: time.Now(),
+	}
+}

@@ -8,7 +8,7 @@ import (
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/observability/langfuse"
 	"school-with-ai/services"
-	"time"
+
 )
 
 // ObservabilityConfig contains configuration for observability and tracing attributes
@@ -127,14 +127,6 @@ func (s *Service) HandleUserMessage(
 	// 3. Emit events
 	for event, err := range events {
 		if err != nil {
-			if emitErr := emitter.Emit(&domain.RunErrorEvent{
-				ThreadID:  params.ThreadID,
-				Message:   fmt.Sprintf("Agent execution failed: %s", err),
-				ErrorCode: "AGENT_RUN_ERROR",
-				Timestamp: time.Now(),
-			}); emitErr != nil {
-				s.log.Error(ctx, "failed to emit run error event", "error", emitErr, "threadID", params.ThreadID)
-			}
 			return fmt.Errorf("agent run failed: %w", err)
 		}
 

@@ -33,7 +33,6 @@ type Service struct {
 	// Internal components
 	threadMgmt     *threadmgmt.Manager
 	engine         *engine.Engine
-	titleGenerator *TitleGenerator
 }
 
 // Option is a functional option for configuring Service.
@@ -53,7 +52,6 @@ func New(
 		toolRegistry:   core.NewToolRegistry(),
 		threadRepo:     domain.NewThreadRepository(threadmgmt.NewEventStoreAdapter(eventLog)),
 		threadMgmt:     threadmgmt.New(log, domain.NewThreadRepository(threadmgmt.NewEventStoreAdapter(eventLog))),
-		titleGenerator: NewTitleGenerator(),
 	}
 
 	for _, opt := range opts {
@@ -152,74 +150,8 @@ func (s *Service) Run(ctx context.Context, agentName string, runCtx core.RunCont
 // 2. Generates/Updates the thread title (if new).
 // 3. Runs the agent execution loop.
 func (s *Service) ProcessUserMessage(ctx context.Context, threadID, content, userID string) (iter.Seq2[core.Event, error], error) {
-	// 1. Add user message
-	messageID := domain.GenerateMessageID()
-	runID := domain.GenerateMessageID() // Unique ID for this execution run
-
-	agg, event, err := s.threadMgmt.AddUserMessage(ctx, threadID, messageID, content)
-	if err != nil {
-		return nil, fmt.Errorf("failed to add user message: %w", err)
-	}
-
-	// 2. Handle Title
-	thread := s.threadMgmt.ToAgentThread(agg)
-	titleEvent, err := s.handleThreadTitle(ctx, thread, content)
-	if err != nil {
-		s.log.Error(ctx, "failed to handle thread title", "error", err)
-	}
-
-	// 3. Run Agent
-	runIter := s.Run(ctx, "student-facing-agent", core.RunContext{
-		ThreadID:  threadID,
-		MessageID: runID,
-		Thread:    thread,
-		Options:   core.DefaultRunOptions(),
-	})
-
-	// Return combined iterator
-	return func(yield func(core.Event, error) bool) {
-		// Yield UserMessageAdded
-		if !yield(event, nil) {
-			return
-		}
-
-		// Yield TitleUpdated if any
-		if titleEvent != nil {
-			if !yield(titleEvent, nil) {
-				return
-			}
-		}
-
-		// Yield Run events
-		for evt, err := range runIter {
-			if !yield(evt, err) {
-				return
-			}
-		}
-	}, nil
-}
-
-// handleThreadTitle generates and updates a thread title if it's the first message.
-func (s *Service) handleThreadTitle(ctx context.Context, thread core.AgentThread, content string) (core.Event, error) {
-	msgs, err := thread.RetrieveFullConversationHistory(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve conversation history: %w", err)
-	}
-
-	// Only generate title on the first message
-	if len(msgs) != 1 {
-		return nil, nil
-	}
-
-	title := s.titleGenerator.FromFirstMessage(content)
-
-	// Update thread title via thread command service (internal threadMgmt)
-	event, err := s.threadMgmt.UpdateThreadTitle(ctx, thread.GetID(), title)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update thread title: %w", err)
-	}
-
-	return event, nil
+	// Delegate to Engine
+	return s.engine.ProcessUserMessage(ctx, "student-facing-agent", threadID, content, userID)
 }
 
 // notify emits a domain event if a notifier is configured.
