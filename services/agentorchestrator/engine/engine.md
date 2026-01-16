@@ -2,12 +2,12 @@
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Start
-    Start --> Stream : triggerStart
-    Stream --> Tools : triggerToolsFound
-    Stream --> Done : triggerStreamDone
-    Tools --> Stream : triggerToolsContinue
-    Tools --> Switch : triggerToolsHandoff
-    Switch --> Start : triggerSwitchDone
+    [*] --> Initial
+    Initial --> DeterminingNextStep : TriggerBegin
+    DeterminingNextStep --> ExecutingActions : TriggerActionRequired
+    DeterminingNextStep --> Done : TriggerStepComplete
+    ExecutingActions --> DeterminingNextStep : TriggerActionDone
+    ExecutingActions --> Transferring : TriggerHandoffSwitch
+    Transferring --> Initial : TriggerTransferComplete
     Done --> [*]
 ```
