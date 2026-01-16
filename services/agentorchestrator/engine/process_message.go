@@ -105,7 +105,7 @@ func (e *Engine) handleThreadTitle(ctx context.Context, thread core.AgentThread,
 		return nil, nil
 	}
 
-	title := e.titleGenerator.FromFirstMessage(content)
+	title := GenerateThreadTitle(content)
 
 	// Update thread title via thread command service (internal threadMgmt)
 	event, err := e.threadMgmt.UpdateThreadTitle(ctx, thread.GetID(), title)
