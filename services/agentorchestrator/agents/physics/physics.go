@@ -23,7 +23,8 @@ func CreatePhysicsInstructor(notifier core.EventNotifier) core.AgentConfig {
 	}
 
 	return core.AgentConfig{
-		Name: "physics-instructor",
+		Name:          "physics-instructor",
+		MaxIterations: 5,
 		SystemPrompt: `# Physics Instructor
 You are a Physics specialist.
 

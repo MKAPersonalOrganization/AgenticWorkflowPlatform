@@ -21,7 +21,8 @@ func CreateStudentFacingAgent(notifier core.EventNotifier) core.AgentConfig {
 	}
 
 	return core.AgentConfig{
-		Name: "student-facing-agent",
+		Name:          "student-facing-agent",
+		MaxIterations: 3,
 		SystemPrompt: `You are the Learning Coordinator, a routing agent that connects students with subject specialists.
 
 # Your Role

@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"maps"
 	"school-with-ai/foundation/agentsdk/llm"
 )
@@ -50,6 +51,17 @@ type AgentConfig struct {
 
 	// Event handling
 	Notifier EventNotifier // UI/Event notifier for this agent
+}
+
+// Validate ensures the agent configuration is valid.
+func (c *AgentConfig) Validate() error {
+	if c.Name == "" {
+		return fmt.Errorf("agent name is required")
+	}
+	if c.MaxIterations <= 0 {
+		return fmt.Errorf("agent %q: MaxIterations must be greater than 0", c.Name)
+	}
+	return nil
 }
 
 // DefaultConfig returns a basic agent configuration.

@@ -176,7 +176,8 @@ func TestEngine_Run(t *testing.T) {
 	}
 
 	config := core.AgentConfig{
-		Name: "TestAgent",
+		Name:          "TestAgent",
+		MaxIterations: 5,
 	}
 	
 	provider := &MockAgentProvider{
@@ -308,11 +309,13 @@ func TestEngine_Handoff(t *testing.T) {
     handoffTool := &MockHandoffTool{Target: "NextAgent"}
 	
 	config1 := core.AgentConfig{
-		Name: "TestAgent",
-        Tools: []core.Tool{handoffTool},
+		Name:          "TestAgent",
+		MaxIterations: 5,
+		Tools:         []core.Tool{handoffTool},
 	}
 	config2 := core.AgentConfig{
-		Name: "NextAgent",
+		Name:          "NextAgent",
+		MaxIterations: 5,
 	}
 
 	provider := &MockAgentProvider{
