@@ -7,7 +7,6 @@ import (
 	"iter"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
-	"school-with-ai/foundation/agentsdk/llm"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/agentorchestrator/types"
 	"school-with-ai/services/threadmgmt"
@@ -18,12 +17,11 @@ import (
 type ChatClient = types.ChatClient
 // Engine handles the core LLM iteration and streaming logic.
 type Engine struct {
-	log           *logger.Logger
-	chatClient    ChatClient
-	threadMgmt    *threadmgmt.Manager
-	config        core.AgentConfig
-	reqCtxCapture **core.RequestContext
-	toolExec      *ToolExecutionService
+	log        *logger.Logger
+	chatClient ChatClient
+	config     core.AgentConfig
+	toolExec   *ToolExecutionService
+	llmCtx     *LLMContextManager
 }
 
 // New creates a new execution engine.
@@ -36,12 +34,11 @@ func New(
 	toolTracer core.ToolTracer,
 ) *Engine {
 	return &Engine{
-		log:           log,
-		chatClient:    chatClient,
-		threadMgmt:    threadMgmt,
-		config:        config,
-		reqCtxCapture: reqCtxCapture,
-		toolExec:      NewToolExecutionService(toolTracer),
+		log:        log,
+		chatClient: chatClient,
+		config:     config,
+		toolExec:   NewToolExecutionService(toolTracer),
+		llmCtx:     NewLLMContextManager(config, threadMgmt, reqCtxCapture),
 	}
 }
 
@@ -89,19 +86,20 @@ func (e *Engine) Run(
 			return
 		}
 
-		session, err := e.newSession(ctx, runCtx)
+		prepareResult, err := e.llmCtx.Prepare(ctx, runCtx)
 		if err != nil {
 			yield(nil, err)
 			return
 		}
-		if session == nil {
-			// Session terminated by middleware
+		if prepareResult.Terminated {
+			// Middleware terminated early
 			return
 		}
 
-		executor := e.toolExec.CreateExecutor(ctx, session.ctx.GetEffectiveTools(), runCtx.ThreadID, runCtx.MessageID, session.ctx)
+		llmContext := prepareResult.Context
+		executor := e.toolExec.CreateExecutor(ctx, llmContext.GetEffectiveTools(), runCtx.ThreadID, runCtx.MessageID, llmContext.RequestCtx)
 
-		streamIter := e.chatClient.GetStreamingResponse(ctx, session.messages, session.options)
+		streamIter := e.chatClient.GetStreamingResponse(ctx, llmContext.Messages, llmContext.Options)
 
 		var completeContent string
 		toolCalls := core.NewToolCallAccumulator()
@@ -188,14 +186,12 @@ func (e *Engine) Run(
 
 		if toolCalls.HasToolCalls() {
 			domainToolCalls := toDomainToolCalls(toolCallsList)
-			agg, err := e.threadMgmt.AddAssistantMessage(ctx, runCtx.ThreadID, runCtx.MessageID, completeContent, domainToolCalls)
+			thread, err := e.llmCtx.AddAssistantMessage(ctx, runCtx.ThreadID, runCtx.MessageID, completeContent, domainToolCalls)
 			if err != nil {
-				yield(nil, fmt.Errorf("failed to add assistant message: %w", err))
+				yield(nil, err)
 				return
 			}
-
-			// Update local thread state with consistent state from repository
-			runCtx.Thread = e.threadMgmt.ToAgentThread(agg)
+			runCtx.Thread = thread
 
 			assistantEvent := &domain.AssistantMessageCompletedEvent{
 				ThreadID:  runCtx.ThreadID,
@@ -214,14 +210,12 @@ func (e *Engine) Run(
 			// Persist results and emit events
 			for _, result := range execResults.Results {
 				toolResultID := core.GenerateID()
-				agg, err = e.threadMgmt.AddToolResultMessage(ctx, runCtx.ThreadID, toolResultID, result.ToolCallID, result.Result)
+				thread, err = e.llmCtx.AddToolResultMessage(ctx, runCtx.ThreadID, toolResultID, result.ToolCallID, result.Result)
 				if err != nil {
-					yield(nil, fmt.Errorf("failed to add tool result message: %w", err))
+					yield(nil, err)
 					return
 				}
-
-				// Update local thread state with consistent state from repository
-				runCtx.Thread = e.threadMgmt.ToAgentThread(agg)
+				runCtx.Thread = thread
 
 				toolEvent := &domain.ToolCallExecutedEvent{
 					ThreadID:        runCtx.ThreadID,
@@ -252,8 +246,8 @@ func (e *Engine) Run(
 			return
 		}
 
-		if _, err := e.threadMgmt.AddAssistantMessage(ctx, runCtx.ThreadID, runCtx.MessageID, completeContent, nil); err != nil {
-			yield(nil, fmt.Errorf("failed to add final assistant message: %w", err))
+		if _, err := e.llmCtx.AddAssistantMessage(ctx, runCtx.ThreadID, runCtx.MessageID, completeContent, nil); err != nil {
+			yield(nil, err)
 			return
 		}
 
@@ -285,40 +279,4 @@ func toDomainToolCalls(ctcs []core.ToolCall) []domain.ToolCall {
 	return result
 }
 
-// runSession encapsulates the prepared state for an LLM run.
-type runSession struct {
-	options  *llm.ChatOptions
-	ctx      *core.RequestContext
-	messages []llm.ChatMessage
-}
-
-// newSession initializes the conversation history, applies middleware, and returns the execution session.
-// Returns (nil, nil) if the session was terminated by middleware.
-func (e *Engine) newSession(ctx context.Context, runCtx core.RunContext) (*runSession, error) {
-	messages, err := runCtx.Thread.RetrieveFullConversationHistory(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	chatMessages := mapFromCoreToLLMMessages(messages)
-
-	chatOptions, reqCtx, err := core.ToChatOptionsWithMiddleware(ctx, e.config, chatMessages, runCtx.ThreadID, runCtx.Options)
-	if err != nil {
-		return nil, fmt.Errorf("failed to apply middleware: %w", err)
-	}
-
-	if e.reqCtxCapture != nil {
-		*e.reqCtxCapture = reqCtx
-	}
-
-	if reqCtx.Terminate {
-		return nil, nil
-	}
-
-	return &runSession{
-		options:  chatOptions,
-		ctx:      reqCtx,
-		messages: chatMessages,
-	}, nil
-}
 
