@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -13,10 +14,10 @@ type MessageStore interface {
 	AddMessages(messages []Message) error
 
 	// GetMessages returns all messages from the store
-	GetMessages() []Message
+	GetMessages(ctx context.Context) ([]Message, error)
 
 	// GetMessagesByRole returns messages filtered by role
-	GetMessagesByRole(role string) []Message
+	GetMessagesByRole(ctx context.Context, role string) ([]Message, error)
 
 	// Clear removes all messages from the store
 	Clear() error
@@ -80,7 +81,11 @@ func (s *InMemoryMessageStore) AddMessages(messages []Message) error {
 }
 
 // GetMessages returns all messages from the store.
-func (s *InMemoryMessageStore) GetMessages() []Message {
+func (s *InMemoryMessageStore) GetMessages(ctx context.Context) ([]Message, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -88,11 +93,15 @@ func (s *InMemoryMessageStore) GetMessages() []Message {
 	result := make([]Message, len(s.messages))
 	copy(result, s.messages)
 
-	return result
+	return result, nil
 }
 
 // GetMessagesByRole returns messages filtered by role.
-func (s *InMemoryMessageStore) GetMessagesByRole(role string) []Message {
+func (s *InMemoryMessageStore) GetMessagesByRole(ctx context.Context, role string) ([]Message, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -103,7 +112,7 @@ func (s *InMemoryMessageStore) GetMessagesByRole(role string) []Message {
 		}
 	}
 
-	return result
+	return result, nil
 }
 
 // Clear removes all messages from the store.

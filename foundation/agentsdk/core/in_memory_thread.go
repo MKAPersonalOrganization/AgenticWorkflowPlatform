@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -56,8 +57,8 @@ func (t *InMemoryThread) GetID() string {
 }
 
 // RetrieveFullConversationHistory returns all messages in the thread.
-func (t *InMemoryThread) RetrieveFullConversationHistory() []Message {
-	return t.messageStore.GetMessages()
+func (t *InMemoryThread) RetrieveFullConversationHistory(ctx context.Context) ([]Message, error) {
+	return t.messageStore.GetMessages(ctx)
 }
 
 // AddMessages adds new messages to the thread.
