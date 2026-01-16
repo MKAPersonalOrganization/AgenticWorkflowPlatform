@@ -26,7 +26,8 @@ func CreateMathInstructor(notifier core.EventNotifier) core.AgentConfig {
 	}
 
 	return core.AgentConfig{
-		Name: "math-instructor",
+		Name:          "math-instructor",
+		MaxIterations: 2,
 		SystemPrompt: `# Math Instructor
 You are a Mathematics specialist.
 

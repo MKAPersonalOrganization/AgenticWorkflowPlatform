@@ -253,6 +253,26 @@ document.addEventListener('alpine:init', () => {
                 return isValidJSON(str);
             },
 
+            /**
+             * Get parallel tool call info for display
+             * @param {Object} message - The tool call message
+             * @returns {Object} { count: number, position: number, isParallel: boolean }
+             */
+            getParallelToolCallInfo(message) {
+                if (!message?.parentMessageId) {
+                    return { count: 1, position: 1, isParallel: false };
+                }
+                const siblings = this.messages.filter(m =>
+                    m.type === 'tool_call' && m.parentMessageId === message.parentMessageId
+                );
+                const position = siblings.findIndex(m => m.id === message.id) + 1;
+                return {
+                    count: siblings.length,
+                    position: position,
+                    isParallel: siblings.length > 1
+                };
+            },
+
             __log(level, message, context = {}) {
                 log(level, message, {
                     ...context,
