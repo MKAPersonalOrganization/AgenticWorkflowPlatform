@@ -24,6 +24,7 @@ type Engine struct {
 	config        core.AgentConfig
 	reqCtxCapture **core.RequestContext
 	toolTracer    core.ToolTracer
+	toolExec      *ToolExecutionService
 }
 
 // New creates a new execution engine.
@@ -42,6 +43,7 @@ func New(
 		config:        config,
 		reqCtxCapture: reqCtxCapture,
 		toolTracer:    toolTracer,
+		toolExec:      NewToolExecutionService(),
 	}
 }
 
@@ -208,24 +210,13 @@ func (e *Engine) Run(
 				return
 			}
 
-			// Execute tools and check for Commands
-			shouldContinue := true
-			for _, toolCall := range toolCallsList {
-				execResult, err := e.executeToolCallWithExecutor(runCtx.ThreadID, toolCall, executor)
-				var result string
-				if err != nil {
-					result = fmt.Sprintf(`{"error": "%s"}`, err)
-				} else {
-					result = execResult.Result
-				}
+			// Execute all tools
+			execResults := e.toolExec.ExecuteAll(toolCallsList, executor)
 
-				// Check if this tool wants to stop iteration
-				if execResult.StopIteration {
-					shouldContinue = false
-				}
-
+			// Persist results and emit events
+			for _, result := range execResults.Results {
 				toolResultID := core.GenerateID()
-				agg, err = e.threadMgmt.AddToolResultMessage(ctx, runCtx.ThreadID, toolResultID, toolCall.ID, result)
+				agg, err = e.threadMgmt.AddToolResultMessage(ctx, runCtx.ThreadID, toolResultID, result.ToolCallID, result.Result)
 				if err != nil {
 					yield(nil, fmt.Errorf("failed to add tool result message: %w", err))
 					return
@@ -237,10 +228,10 @@ func (e *Engine) Run(
 				toolEvent := &domain.ToolCallExecutedEvent{
 					ThreadID:        runCtx.ThreadID,
 					MessageID:       toolResultID,
-					ToolCallID:      toolCall.ID,
-					ToolName:        toolCall.Function.Name,
-					ToolArguments:   toolCall.Function.Arguments,
-					ToolResult:      result,
+					ToolCallID:      result.ToolCallID,
+					ToolName:        result.ToolName,
+					ToolArguments:   result.Arguments,
+					ToolResult:      result.Result,
 					ParentMessageID: runCtx.MessageID,
 					Timestamp:       time.Now(),
 				}
@@ -249,7 +240,7 @@ func (e *Engine) Run(
 				}
 			}
 
-			if !shouldContinue {
+			if execResults.ShouldStop {
 				return
 			}
 
@@ -276,14 +267,6 @@ func (e *Engine) Run(
 		}
 		e.yieldEvent(yield, assistantEvent, nil)
 	}
-}
-
-func (e *Engine) executeToolCallWithExecutor(threadID string, toolCall core.ToolCall, executor core.ToolExecutor) (core.ToolExecutionResult, error) {
-	execResult, err := executor.Execute(toolCall)
-	if err != nil {
-		return execResult, fmt.Errorf("failed to execute tool call %s: %w", toolCall.Function.Name, err)
-	}
-	return execResult, nil
 }
 
 func toDomainToolCalls(ctcs []core.ToolCall) []domain.ToolCall {
