@@ -30,6 +30,7 @@ type Engine struct {
 	reqCtxCapture **core.RequestContext // optional capture for testing
 	toolTracer   core.ToolTracer
 	toolExec     *ToolExecutionService
+	titleGenerator *TitleGenerator
 }
 
 // New creates a new generic execution engine.
@@ -42,13 +43,14 @@ func New(
 	toolTracer core.ToolTracer,
 ) *Engine {
 	return &Engine{
-		log:           log,
-		chatClient:    chatClient,
-		provider:      provider,
-		threadMgmt:    threadMgmt,
-		reqCtxCapture: reqCtxCapture,
-		toolTracer:    toolTracer,
-		toolExec:      NewToolExecutionService(toolTracer),
+		log:            log,
+		chatClient:     chatClient,
+		provider:       provider,
+		threadMgmt:     threadMgmt,
+		reqCtxCapture:  reqCtxCapture,
+		toolTracer:     toolTracer,
+		toolExec:       NewToolExecutionService(toolTracer),
+		titleGenerator: NewTitleGenerator(),
 	}
 }
 
