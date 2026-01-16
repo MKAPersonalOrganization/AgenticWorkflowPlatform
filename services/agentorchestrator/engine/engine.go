@@ -23,7 +23,6 @@ type Engine struct {
 	threadMgmt    *threadmgmt.Manager
 	config        core.AgentConfig
 	reqCtxCapture **core.RequestContext
-	toolTracer    core.ToolTracer
 	toolExec      *ToolExecutionService
 }
 
@@ -42,8 +41,7 @@ func New(
 		threadMgmt:    threadMgmt,
 		config:        config,
 		reqCtxCapture: reqCtxCapture,
-		toolTracer:    toolTracer,
-		toolExec:      NewToolExecutionService(),
+		toolExec:      NewToolExecutionService(toolTracer),
 	}
 }
 
@@ -101,7 +99,7 @@ func (e *Engine) Run(
 			return
 		}
 
-		executor := e.newExecutor(ctx, runCtx, session.ctx)
+		executor := e.toolExec.CreateExecutor(ctx, session.ctx.GetEffectiveTools(), runCtx.ThreadID, runCtx.MessageID, session.ctx)
 
 		streamIter := e.chatClient.GetStreamingResponse(ctx, session.messages, session.options)
 
@@ -324,24 +322,3 @@ func (e *Engine) newSession(ctx context.Context, runCtx core.RunContext) (*runSe
 	}, nil
 }
 
-// newExecutor creates a tool executor initialized with the effective tools from the request context.
-func (e *Engine) newExecutor(ctx context.Context, runCtx core.RunContext, reqCtx *core.RequestContext) core.ToolExecutor {
-	dynamicRegistry := core.NewToolRegistry()
-	for _, tool := range reqCtx.GetEffectiveTools() {
-		dynamicRegistry.Register(tool)
-	}
-
-	executorOpts := []core.ToolExecutorOption{}
-	if e.toolTracer != nil {
-		executorOpts = append(executorOpts, core.WithToolTracer(e.toolTracer))
-	}
-
-	return core.NewRegistryToolExecutor(
-		ctx,
-		dynamicRegistry,
-		runCtx.ThreadID,
-		runCtx.MessageID,
-		reqCtx,
-		executorOpts...,
-	)
-}
