@@ -208,25 +208,13 @@ export function createMessagingMethods() {
 
                     case 'system':
                     case 'developer':
-                        if (msg.content && msg.content.startsWith('AGENT_HANDOFF|')) {
-                            const parts = msg.content.split('|');
-                            uiMessages.push({
-                                id: msg.id,
-                                type: 'agent_handoff',
-                                fromAgent: parts[1] || '',
-                                toAgent: parts[2] || '',
-                                reason: parts[3] || '',
-                                timestamp: msg.timestamp || new Date().toISOString()
-                            });
-                        } else {
-                            uiMessages.push({
-                                id: msg.id,
-                                role: msg.role,
-                                content: msg.content || '',
-                                timestamp: msg.timestamp || new Date().toISOString(),
-                                streaming: false
-                            });
-                        }
+                        uiMessages.push({
+                            id: msg.id,
+                            role: msg.role,
+                            content: msg.content || '',
+                            timestamp: msg.timestamp || new Date().toISOString(),
+                            streaming: false
+                        });
                         break;
 
                     default:
