@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"fmt"
 	"school-with-ai/foundation/agentsdk/core"
 )
@@ -16,17 +17,49 @@ type ToolExecutionResult struct {
 
 // ToolExecutionResults represents the outcome of executing multiple tool calls.
 type ToolExecutionResults struct {
-	Results      []ToolExecutionResult
-	ShouldStop   bool // true if any tool signaled to stop iteration
+	Results    []ToolExecutionResult
+	ShouldStop bool // true if any tool signaled to stop iteration
 }
 
-// ToolExecutionService handles the execution of tool calls.
-// It is focused solely on execution - no persistence, no event emission.
-type ToolExecutionService struct{}
+// ToolExecutionService handles executor creation and tool call execution.
+// It centralizes all tool execution logic - no persistence, no event emission.
+type ToolExecutionService struct {
+	tracer core.ToolTracer
+}
 
 // NewToolExecutionService creates a new ToolExecutionService.
-func NewToolExecutionService() *ToolExecutionService {
-	return &ToolExecutionService{}
+func NewToolExecutionService(tracer core.ToolTracer) *ToolExecutionService {
+	return &ToolExecutionService{
+		tracer: tracer,
+	}
+}
+
+// CreateExecutor creates a tool executor initialized with the given tools.
+func (s *ToolExecutionService) CreateExecutor(
+	ctx context.Context,
+	tools []core.Tool,
+	threadID string,
+	messageID string,
+	reqCtx *core.RequestContext,
+) core.ToolExecutor {
+	registry := core.NewToolRegistry()
+	for _, tool := range tools {
+		registry.Register(tool)
+	}
+
+	var opts []core.ToolExecutorOption
+	if s.tracer != nil {
+		opts = append(opts, core.WithToolTracer(s.tracer))
+	}
+
+	return core.NewRegistryToolExecutor(
+		ctx,
+		registry,
+		threadID,
+		messageID,
+		reqCtx,
+		opts...,
+	)
 }
 
 // ExecuteAll executes all tool calls and returns their results.
