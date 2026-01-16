@@ -55,21 +55,40 @@ func (e *Engine) Run(ctx context.Context, runCtx core.RunContext) iter.Seq2[core
 			messageID: runCtx.MessageID,
 			thread:    runCtx.Thread,
 			options:   runCtx.Options,
-			state:     stateStart,
 		}
+		m.state = StateStart
 		m.run()
 	}
 }
 
+func (m *machine) emit(event core.Event) bool {
+	if !m.yield(event, nil) {
+		m.state = StateDone
+		return false
+	}
+	return true
+}
+
+
+
+
+
 // State machine states
-type state int
+type State int
 
 const (
-	stateStart state = iota
-	stateStream
-	stateTools
-	stateDone
+	StateStart State = iota
+	StateStream
+	StateTools
+	StateDone
+	StateError
 )
+
+type TransitionData struct {
+	Terminated bool
+	HasTools   bool
+	Stop       bool
+}
 
 // machine implements the engine state machine.
 type machine struct {
@@ -87,56 +106,74 @@ type machine struct {
 	streamResult *StreamResult
 	executor     core.ToolExecutor
 
-	state state
+	state State
 	err   error
 }
 
 func (m *machine) run() {
-	for m.state != stateDone {
-		m.step()
+	for m.state != StateDone && m.state != StateError {
+		data, err := m.executeHandler()
+		if err != nil {
+			m.err = err
+			m.state = StateError
+			break
+		}
+		m.state = m.Transition(m.state, data)
 	}
+
 	if m.err != nil {
 		m.yield(nil, m.err)
 	}
 }
 
-func (m *machine) step() {
+func (m *machine) executeHandler() (TransitionData, error) {
 	switch m.state {
-	case stateStart:
-		m.doStart()
-	case stateStream:
-		m.doStream()
-	case stateTools:
-		m.doTools()
+	case StateStart:
+		return TransitionData{}, m.HandleStart()
+	case StateStream:
+		terminated, hasTools, err := m.HandleStream()
+		return TransitionData{Terminated: terminated, HasTools: hasTools}, err
+	case StateTools:
+		stop, err := m.HandleTools()
+		return TransitionData{Stop: stop}, err
+	default:
+		return TransitionData{}, nil
 	}
 }
 
-func (m *machine) emit(event core.Event) bool {
-	if !m.yield(event, nil) {
-		m.state = stateDone
-		return false
+func (m *machine) Transition(currentState State, data TransitionData) State {
+	switch currentState {
+	case StateStart:
+		return StateStream
+	case StateStream:
+		if data.Terminated {
+			return StateDone
+		}
+		if data.HasTools {
+			return StateTools
+		}
+		return StateDone
+	case StateTools:
+		if data.Stop {
+			return StateDone
+		}
+		m.messageID = core.GenerateID()
+		return StateStream
+	default:
+		return StateDone
 	}
-	return true
 }
 
-func (m *machine) fail(err error) {
-	m.err = err
-	m.state = stateDone
-}
-
-func (m *machine) done() {
-	m.state = stateDone
-}
-
-// doStart emits AssistantStarted and transitions to Stream.
-func (m *machine) doStart() {
-	if m.emit(m.engine.events.AssistantStarted(m.threadID, m.messageID)) {
-		m.state = stateStream
+// HandleStart emits the AssistantStarted event.
+func (m *machine) HandleStart() error {
+	if !m.emit(m.engine.events.AssistantStarted(m.threadID, m.messageID)) {
+		return context.Canceled
 	}
+	return nil
 }
 
-// doStream prepares context, streams LLM response, and emits AssistantCompleted.
-func (m *machine) doStream() {
+// HandleStream prepares context, streams LLM response, and emits events.
+func (m *machine) HandleStream() (terminated bool, hasTools bool, err error) {
 	// Prepare
 	runCtx := core.RunContext{
 		ThreadID:  m.threadID,
@@ -146,12 +183,10 @@ func (m *machine) doStream() {
 	}
 	prepareResult, err := m.engine.llmCtx.Prepare(m.ctx, runCtx)
 	if err != nil {
-		m.fail(err)
-		return
+		return false, false, err
 	}
 	if prepareResult.Terminated {
-		m.done()
-		return
+		return true, false, nil
 	}
 
 	// Stream
@@ -166,12 +201,11 @@ func (m *machine) doStream() {
 		MessageID: m.messageID,
 	}, m.yield)
 	if err != nil {
-		m.fail(err)
-		return
+		return false, false, err
 	}
 	if streamResult == nil {
-		m.done()
-		return
+		// Verify if we should consider this terminated or just done
+		return true, false, nil
 	}
 	m.streamResult = streamResult
 
@@ -179,30 +213,24 @@ func (m *machine) doStream() {
 	toolCalls := toDomainToolCalls(m.streamResult.ToolCalls)
 	thread, err := m.engine.llmCtx.AddAssistantMessage(m.ctx, m.threadID, m.messageID, m.streamResult.Content, toolCalls)
 	if err != nil {
-		m.fail(err)
-		return
+		return false, false, err
 	}
 	m.thread = thread
 
 	if !m.emit(m.engine.events.AssistantCompleted(m.threadID, m.messageID, m.streamResult.Content, toolCalls)) {
-		return
+		return false, false, context.Canceled
 	}
 
-	// Transition
-	if m.streamResult.HasToolCalls() {
-		m.state = stateTools
-	} else {
-		m.done()
-	}
+	return false, m.streamResult.HasToolCalls(), nil
 }
 
-// doTools executes all tool calls and emits their results.
-func (m *machine) doTools() {
+// HandleTools executes tool calls and emits results.
+func (m *machine) HandleTools() (stop bool, err error) {
 	shouldStop := false
 
 	for _, tc := range m.streamResult.ToolCalls {
 		if !m.emit(m.engine.events.ToolCallCompleted(m.threadID, tc.ID)) {
-			return
+			return false, context.Canceled
 		}
 
 		result := m.engine.toolExec.Execute(tc, m.executor)
@@ -210,8 +238,7 @@ func (m *machine) doTools() {
 		toolResultID := core.GenerateID()
 		thread, err := m.engine.llmCtx.AddToolResultMessage(m.ctx, m.threadID, toolResultID, result.ToolCallID, result.Result)
 		if err != nil {
-			m.fail(err)
-			return
+			return false, err
 		}
 		m.thread = thread
 
@@ -219,7 +246,7 @@ func (m *machine) doTools() {
 			m.threadID, toolResultID, result.ToolCallID,
 			result.ToolName, result.Arguments, result.Result, m.messageID,
 		)) {
-			return
+			return false, context.Canceled
 		}
 
 		if result.StopIteration {
@@ -227,13 +254,7 @@ func (m *machine) doTools() {
 		}
 	}
 
-	// Transition
-	if shouldStop {
-		m.done()
-	} else {
-		m.messageID = core.GenerateID()
-		m.state = stateStream
-	}
+	return shouldStop, nil
 }
 
 func toDomainToolCalls(ctcs []core.ToolCall) []domain.ToolCall {
