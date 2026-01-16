@@ -121,37 +121,37 @@ func (s *executionState) initAgentComponents(agentName string) error {
 
 func (s *executionState) setup() error {
 	// Configure State Machine
-	s.sm = stateless.NewStateMachine(stateStart)
+	s.sm = stateless.NewStateMachine(StateInitial)
 
-	s.sm.Configure(stateStart).
+	s.sm.Configure(StateInitial).
 		OnEntry(func(_ context.Context, _ ...any) error {
-			return s.sm.Fire(triggerStart)
+			return s.sm.Fire(TriggerBegin)
 		}).
 		OnExit(func(_ context.Context, _ ...any) error {
 			return s.handleStart()
 		}).
-		Permit(triggerStart, stateStream)
+		Permit(TriggerBegin, StateDeterminingNextStep)
 
-	s.sm.Configure(stateStream).
+	s.sm.Configure(StateDeterminingNextStep).
 		OnEntry(func(_ context.Context, _ ...any) error {
 			return s.handleStream()
 		}).
-		Permit(triggerToolsFound, stateTools).
-		Permit(triggerStreamDone, stateDone)
+		Permit(TriggerActionRequired, StateExecutingActions).
+		Permit(TriggerStepComplete, StateDone)
 
-	s.sm.Configure(stateTools).
+	s.sm.Configure(StateExecutingActions).
 		OnEntry(func(_ context.Context, _ ...any) error {
 			return s.handleTools()
 		}).
-		Permit(triggerToolsContinue, stateStream).
-		Permit(triggerToolsHandoff, stateSwitch)
+		Permit(TriggerActionDone, StateDeterminingNextStep).
+		Permit(TriggerHandoffSwitch, StateTransferring)
 
-	s.sm.Configure(stateSwitch).
+	s.sm.Configure(StateTransferring).
 		OnEntry(func(_ context.Context, args ...any) error {
 			targetAgent := args[0].(string)
 			return s.handleSwitch(targetAgent)
 		}).
-		Permit(triggerSwitchDone, stateStart)
+		Permit(TriggerTransferComplete, StateInitial)
 
 	return nil
 }
@@ -162,7 +162,69 @@ func (s *executionState) run() error {
 			return err
 		}
 	}
-	return s.sm.Fire(triggerStart)
+
+	// State Reconciliation: Infer starting state from thread history
+	startState := s.inferState()
+	if startState != StateInitial {
+		s.engine.log.Debug(s.ctx, "State reconciled from thread history", "startState", startState)
+		// If we start from a non-initial state, we jump straight to it
+		// Note: stateless doesn't allow direct jump easily without firing,
+		// so we'll just re-initialize the machine to that state if needed,
+		// but since we just created it, we can just use Fire if possible or re-create it.
+		// For simplicity, we fire a trigger that takes us there or re-create machine.
+		s.sm = stateless.NewStateMachine(startState)
+		if err := s.setup(); err != nil { // Re-configure for the new start state
+			return err
+		}
+	}
+
+	return s.sm.Fire(TriggerBegin)
+}
+
+func (s *executionState) inferState() state {
+	messages, err := s.thread.RetrieveFullConversationHistory(s.ctx)
+	if err != nil || len(messages) == 0 {
+		return StateInitial
+	}
+
+	lastMsg := messages[len(messages)-1]
+
+	// Factor 5 & 12 Alignment: If last message is Assistant with pending ToolCalls,
+	// we should be in StateExecutingActions.
+	if lastMsg.Role == "assistant" && len(lastMsg.ToolCalls) > 0 {
+		// Check if all tool calls have results
+		completedCalls := make(map[string]bool)
+		for i := len(messages) - 1; i >= 0; i-- {
+			if messages[i].Role == "tool" {
+				completedCalls[messages[i].ToolCallID] = true
+			} else if messages[i].Role == "assistant" {
+				// Optimization: break if we hit previous assistant message
+				if i < len(messages)-1 {
+					break
+				}
+			}
+		}
+
+		allCompleted := true
+		for _, tc := range lastMsg.ToolCalls {
+			if !completedCalls[tc.ID] {
+				allCompleted = false
+				break
+			}
+		}
+
+		if !allCompleted {
+			// We found tool calls that need execution.
+			// Populate streamResult so handleTools has something to work with.
+			s.streamResult = &StreamResult{
+				Content:   lastMsg.Content,
+				ToolCalls: lastMsg.ToolCalls,
+			}
+			return StateExecutingActions
+		}
+	}
+
+	return StateInitial
 }
 
 func (s *executionState) handleStart() error {
@@ -185,7 +247,7 @@ func (s *executionState) handleStream() error {
 		return err
 	}
 	if prepareResult.Terminated {
-		return s.sm.Fire(triggerStreamDone)
+		return s.sm.Fire(TriggerStepComplete)
 	}
 
 	// Stream
@@ -203,7 +265,7 @@ func (s *executionState) handleStream() error {
 		return err
 	}
 	if res == nil {
-		return s.sm.Fire(triggerStreamDone)
+		return s.sm.Fire(TriggerStepComplete)
 	}
 	s.streamResult = res
 
@@ -220,9 +282,9 @@ func (s *executionState) handleStream() error {
 	}
 
 	if s.streamResult.HasToolCalls() {
-		return s.sm.Fire(triggerToolsFound)
+		return s.sm.Fire(TriggerActionRequired)
 	}
-	return s.sm.Fire(triggerStreamDone)
+	return s.sm.Fire(TriggerStepComplete)
 }
 
 func (s *executionState) handleTools() error {
@@ -234,6 +296,10 @@ func (s *executionState) handleTools() error {
 		}
 
 		result := s.engine.toolExec.Execute(tc, s.executor)
+
+		if result.ToolCallID == "" {
+			result.ToolCallID = tc.ID // Fallback
+		}
 
 		toolResultID := core.GenerateID()
 		agg, err := s.engine.threadMgmt.AddToolResultMessage(s.ctx, s.threadID, toolResultID, result.ToolCallID, result.Result, s.agentName)
@@ -256,11 +322,11 @@ func (s *executionState) handleTools() error {
 	}
 
 	if handoffTarget != "" {
-		return s.sm.Fire(triggerToolsHandoff, handoffTarget)
+		return s.sm.Fire(TriggerHandoffSwitch, handoffTarget)
 	}
 
 	s.messageID = core.GenerateID()
-	return s.sm.Fire(triggerToolsContinue)
+	return s.sm.Fire(TriggerActionDone)
 }
 
 func (s *executionState) handleSwitch(targetAgent string) error {
@@ -275,28 +341,28 @@ func (s *executionState) handleSwitch(targetAgent string) error {
 	// Start next iteration with fresh message ID
 	s.messageID = core.GenerateID()
 
-	return s.sm.Fire(triggerSwitchDone)
+	return s.sm.Fire(TriggerTransferComplete)
 }
 
 // State machine states
 type state int
 
 const (
-	stateStart state = iota
-	stateStream
-	stateTools
-	stateSwitch
-	stateDone
-	stateError
+	StateInitial state = iota
+	StateDeterminingNextStep
+	StateExecutingActions
+	StateTransferring
+	StateDone
+	StateError
 )
 
 const (
-	triggerStart         = "Start"
-	triggerToolsFound    = "ToolsFound"
-	triggerStreamDone    = "StreamDone"
-	triggerToolsContinue = "ToolsContinue"
-	triggerToolsHandoff  = "ToolsHandoff"
-	triggerSwitchDone    = "SwitchDone"
+	TriggerBegin            = "Begin"
+	TriggerActionRequired   = "ActionRequired"
+	TriggerStepComplete     = "StepComplete"
+	TriggerActionDone       = "ActionDone"
+	TriggerHandoffSwitch    = "HandoffSwitch"
+	TriggerTransferComplete = "TransferComplete"
 )
 
 
