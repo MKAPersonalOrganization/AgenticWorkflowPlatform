@@ -13,7 +13,7 @@ import (
 // ErrThreadNotFound is returned when a thread is not found in the projection.
 var ErrThreadNotFound = errors.New("thread not found")
 
-// UIProjectionService implements the services.ProjectionService interface.
+// UIProjectionService implements the services.ThreadQueryService interface.
 // This is in the infra layer and can use concrete projection types.
 // It provides read access to AGUI projection for UI queries only.
 type UIProjectionService struct {

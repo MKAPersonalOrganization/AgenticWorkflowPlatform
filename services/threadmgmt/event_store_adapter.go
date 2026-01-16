@@ -1,4 +1,4 @@
-package agentorchestrator
+package threadmgmt
 
 import (
 	"context"

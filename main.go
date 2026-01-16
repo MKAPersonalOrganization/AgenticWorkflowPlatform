@@ -25,6 +25,8 @@ import (
 	"school-with-ai/infra/projections"
 	"school-with-ai/infra/sqldb"
 	"school-with-ai/infra/sqldb/migrate"
+	"school-with-ai/domain"
+	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/services/agentorchestrator"
 	"school-with-ai/services/agentorchestrator/agents/chemistry"
 	"school-with-ai/services/agentorchestrator/agents/diagramming"
@@ -34,6 +36,8 @@ import (
 	"school-with-ai/services/agentorchestrator/agents/statistics"
 	"school-with-ai/services/agentorchestrator/agents/studentfacing"
 	"school-with-ai/services/taskmanagement"
+	"school-with-ai/services/threadservice"
+	"school-with-ai/services/threadmgmt"
 	"syscall"
 	"time"
 
@@ -287,12 +291,15 @@ func run(ctx context.Context, log *logger.Logger) error {
 	shared.GlobalAgents.Register("statistics-instructor", statistics.CreateStatisticsInstructor)
 	shared.GlobalAgents.Register("diagramming-instructor", diagramming.CreateDiagrammingInstructor)
 
-	// Initialize chat write service
-	orchestratorService := agentorchestrator.New(log, chatClient, eventLog)
+	// Initialize orchestrator and thread services
+	agentOrchestrator := agentorchestrator.New(log, chatClient, eventLog)
+
+	threadRepo := domain.NewThreadRepository(threadmgmt.NewEventStoreAdapter(eventLog))
+	threadCommandService := threadservice.New(log, threadRepo, core.DefaultConfig("thread-service"))
 
 	// Initialize service layer
 	authSvc := authService.NewAuthService()
-	uiProjectionService := projections.NewUIProjectionService(aguiProjection)
+	threadQueryService := projections.NewUIProjectionService(aguiProjection)
 
 	// -------------------------------------------------------------------------
 	// Initialize Asynq server
@@ -324,7 +331,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 		eventLog,
 		llmContextProjection,
 		chatClient,
-		orchestratorService,
+		agentOrchestrator,
+		threadCommandService,
 		agentFactory,
 		langfuseTracer,
 		observabilityConfig,
@@ -337,7 +345,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		"healthCheckInterval", cfg.Orchestration.HealthCheckInterval)
 
 	// Create HTTP handler
-	handler := taskmgmthandlers.NewTaskManagementHandler(log, chatClient, taskMgmtService, orchestratorService, authSvc, uiProjectionService)
+	handler := taskmgmthandlers.NewTaskManagementHandler(log, chatClient, taskMgmtService, agentOrchestrator, threadCommandService, authSvc, threadQueryService)
 
 	// Create health handler
 	healthHandler := healthhandlers.NewHealthHandler(log)
@@ -366,7 +374,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Handle("/assets/charts/*", http.StripPrefix("/assets/charts/", http.FileServer(http.Dir("./assets/charts"))))
 
 	// Create AGUI projection handler
-	aguiHandler := aguihandlers.NewAguiProjectionHandler(aguiProjection, uiProjectionService)
+	aguiHandler := aguihandlers.NewAguiProjectionHandler(aguiProjection, threadQueryService)
 
 	// Initialize Kratos client and auth handlers
 	kratosConfig := kratos.Config{

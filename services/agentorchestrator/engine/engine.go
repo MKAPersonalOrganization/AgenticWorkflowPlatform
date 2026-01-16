@@ -8,8 +8,8 @@ import (
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/services/agentorchestrator/threadmgmt"
 	"school-with-ai/services/agentorchestrator/types"
+	"school-with-ai/services/threadmgmt"
 	"time"
 )
 
