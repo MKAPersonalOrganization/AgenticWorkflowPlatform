@@ -2,12 +2,12 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"iter"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/agentorchestrator/types"
 	"school-with-ai/services/threadmgmt"
-
 
 	"github.com/qmuntal/stateless"
 )
@@ -95,8 +95,10 @@ type executionState struct {
 	events *EventFactory
 
 	// Iteration state
-	streamResult *StreamResult
-	executor     core.ToolExecutor
+	streamResult  *StreamResult
+	executor      core.ToolExecutor
+	iteration     int // Current iteration count within this agent's cycle
+	maxIterations int // Maximum allowed iterations (from agent config)
 
 	// State Machine
 	sm *stateless.StateMachine
@@ -116,6 +118,14 @@ func (s *executionState) initAgentComponents(agentName string) error {
 	s.llmCtx = NewLLMContextManager(config, s.engine.threadMgmt, s.engine.reqCtxCapture)
 	s.events = NewEventFactory(config.Name)
 	s.stream = NewStreamProcessor(s.events)
+
+	// Set iteration limit from config (default to 5 if not set)
+	s.maxIterations = config.MaxIterations
+	if s.maxIterations <= 0 {
+		s.maxIterations = 5
+	}
+	s.iteration = 0 // Reset iteration counter for new agent
+
 	return nil
 }
 
@@ -263,6 +273,12 @@ func (s *executionState) handleStart() error {
 }
 
 func (s *executionState) handleStream() error {
+	// Check iteration limit (must check BEFORE making LLM call)
+	if s.iteration >= s.maxIterations {
+		return fmt.Errorf("agent %q exceeded maximum iterations (%d)", s.agentName, s.maxIterations)
+	}
+	s.iteration++
+
 	// Prepare
 	prepareCtx := core.RunContext{
 		ThreadID:  s.threadID,
@@ -318,6 +334,7 @@ func (s *executionState) handleStream() error {
 func (s *executionState) handleTools() error {
 	var handoffTarget string
 
+	// Process all tool calls sequentially (OpenAI requires results for all tool_call_ids)
 	for _, tc := range s.streamResult.ToolCalls {
 		if !s.emit(s.events.ToolCallCompleted(s.threadID, tc.ID)) {
 			return context.Canceled
@@ -343,7 +360,7 @@ func (s *executionState) handleTools() error {
 			return context.Canceled
 		}
 
-		// Check for routing command
+		// Check for routing command (handoff)
 		if result.Command != nil && result.Command.Goto != "" {
 			handoffTarget = result.Command.Goto
 

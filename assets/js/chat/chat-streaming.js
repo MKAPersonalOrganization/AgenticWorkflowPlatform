@@ -373,6 +373,7 @@ export function createStreamingMethods() {
          */
         __handleToolCallStart(event, state, threadId) {
             const agentName = state.pendingToolCallAgents?.[event.toolCallId] || null;
+            const parentMessageId = event.parentMessageId || null;
 
             state.toolCalls[event.toolCallId] = {
                 id: event.toolCallId,
@@ -380,7 +381,8 @@ export function createStreamingMethods() {
                 args: '',
                 status: 'streaming',
                 timestamp: new Date(event.timestamp).toISOString(),
-                agentName: agentName
+                agentName: agentName,
+                parentMessageId: parentMessageId
             };
 
             state.messages.push({
@@ -391,7 +393,8 @@ export function createStreamingMethods() {
                 parsedArgs: {},
                 status: 'streaming',
                 timestamp: new Date(event.timestamp).toISOString(),
-                agentName: agentName
+                agentName: agentName,
+                parentMessageId: parentMessageId
             });
 
             if (agentName) {

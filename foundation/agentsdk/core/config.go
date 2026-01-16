@@ -35,6 +35,9 @@ type AgentConfig struct {
 	// Middleware
 	Middleware []Middleware // Middleware chain for request/response processing
 
+	// Execution Limits
+	MaxIterations int // Maximum LLM iterations per run cycle (prevents infinite loops)
+
 	// LLM Parameters (defaults for all runs)
 	Temperature      *float64 // Default temperature (0.0-2.0)
 	MaxTokens        *int     // Default max tokens to generate
@@ -52,10 +55,11 @@ type AgentConfig struct {
 // DefaultConfig returns a basic agent configuration.
 func DefaultConfig(name string) AgentConfig {
 	return AgentConfig{
-		Name:         name,
-		SystemPrompt: "You are a helpful assistant.",
-		Tools:        []Tool{},
-		Middleware:   []Middleware{},
+		Name:          name,
+		SystemPrompt:  "You are a helpful assistant.",
+		Tools:         []Tool{},
+		Middleware:    []Middleware{},
+		MaxIterations: 5,
 	}
 }
 
