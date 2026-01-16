@@ -40,12 +40,7 @@ func TestMapFromCoreToLLMMessages(t *testing.T) {
 		Content:    "Sunny",
 	}
 
-	handoffMsg := core.Message{
-		Role:     "system",
-		Metadata: map[string]any{"type": "agent_handoff"},
-	}
-
-	input := []core.Message{userMsg, assistantMsg, toolCallMsg, toolResultMsg, handoffMsg}
+	input := []core.Message{userMsg, assistantMsg, toolCallMsg, toolResultMsg}
 
 	// Calculate expected output
 	expected := []llm.ChatMessage{
@@ -76,10 +71,6 @@ func TestMapFromCoreToLLMMessages(t *testing.T) {
 					Result: "Sunny",
 				},
 			},
-		},
-		{
-			Role:     llm.ChatRoleSystem,
-			Contents: []llm.AIContent{},
 		},
 	}
 

@@ -227,7 +227,6 @@ func (s *executionState) handleStream() error {
 
 func (s *executionState) handleTools() error {
 	var handoffTarget string
-	var shouldStop bool
 
 	for _, tc := range s.streamResult.ToolCalls {
 		if !s.emit(s.events.ToolCallCompleted(s.threadID, tc.ID)) {
@@ -254,18 +253,10 @@ func (s *executionState) handleTools() error {
 		if result.Command != nil && result.Command.Goto != "" {
 			handoffTarget = result.Command.Goto
 		}
-		// Respect stop iteration
-		if result.StopIteration {
-			shouldStop = true
-		}
 	}
 
 	if handoffTarget != "" {
 		return s.sm.Fire(triggerToolsHandoff, handoffTarget)
-	}
-
-	if shouldStop {
-		return s.sm.Fire(triggerStreamDone)
 	}
 
 	s.messageID = core.GenerateID()
