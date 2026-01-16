@@ -2,8 +2,6 @@ package engine
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"iter"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
@@ -22,6 +20,7 @@ type Engine struct {
 	config     core.AgentConfig
 	toolExec   *ToolExecutionService
 	llmCtx     *LLMContextManager
+	stream     *StreamProcessor
 }
 
 // New creates a new execution engine.
@@ -39,6 +38,7 @@ func New(
 		config:     config,
 		toolExec:   NewToolExecutionService(toolTracer),
 		llmCtx:     NewLLMContextManager(config, threadMgmt, reqCtxCapture),
+		stream:     NewStreamProcessor(config.Name),
 	}
 }
 
@@ -101,79 +101,22 @@ func (e *Engine) Run(
 
 		streamIter := e.chatClient.GetStreamingResponse(ctx, llmContext.Messages, llmContext.Options)
 
-		var completeContent string
-		toolCalls := core.NewToolCallAccumulator()
-
-		for update, err := range streamIter {
-			// Check if stream finished early due to cancellation
-			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				if completeContent != "" {
-					evt := &domain.AssistantMessageCompletedEvent{
-						ThreadID:  runCtx.ThreadID,
-						MessageID: runCtx.MessageID,
-						Content:   completeContent,
-						Timestamp: time.Now(),
-					}
-					if !e.yieldEvent(yield, evt, nil) {
-						return
-					}
-				}
-				yield(nil, fmt.Errorf("client disconnected: %w", err))
-				return
-			}
-
-			if err != nil {
-				yield(nil, fmt.Errorf("stream error: %w", err))
-				return
-			}
-
-			textDelta := update.Text()
-			if textDelta != "" {
-				completeContent += textDelta
-
-				contentEvent := &domain.AssistantContentStreamedEvent{
-					ThreadID:  runCtx.ThreadID,
-					MessageID: runCtx.MessageID,
-					Delta:     textDelta,
-					Timestamp: time.Now(),
-				}
-				if !yield(contentEvent, nil) {
-					return
-				}
-			}
-
-			tcUpdate, hasTool := toolCalls.ProcessUpdate(update)
-			if hasTool {
-				if tcUpdate.IsNew {
-					toolStartEvent := &domain.ToolCallStartedEvent{
-						ThreadID:        runCtx.ThreadID,
-						ToolCallID:      tcUpdate.ID,
-						ToolCallName:    tcUpdate.Name,
-						ParentMessageID: runCtx.MessageID,
-						Timestamp:       time.Now(),
-					}
-					if !e.yieldEvent(yield, toolStartEvent, nil) {
-						return
-					}
-				}
-
-				if tcUpdate.ArgsDelta != "" {
-					argsEvent := &domain.ToolCallArgumentsStreamedEvent{
-						ThreadID:   runCtx.ThreadID,
-						ToolCallID: tcUpdate.ID,
-						Delta:      tcUpdate.ArgsDelta,
-						Timestamp:  time.Now(),
-					}
-					if !yield(argsEvent, nil) {
-						return
-					}
-				}
-			}
+		// Process the stream
+		streamResult, err := e.stream.Process(ctx, streamIter, ProcessParams{
+			ThreadID:  runCtx.ThreadID,
+			MessageID: runCtx.MessageID,
+		}, yield)
+		if err != nil {
+			yield(nil, err)
+			return
+		}
+		if streamResult == nil {
+			// yield returned false, stop processing
+			return
 		}
 
-		toolCallsList := toolCalls.GetAll()
-
-		for _, tc := range toolCallsList {
+		// Emit tool call completed events
+		for _, tc := range streamResult.ToolCalls {
 			completedEvent := &domain.ToolCallCompletedEvent{
 				ThreadID:   runCtx.ThreadID,
 				ToolCallID: tc.ID,
@@ -184,9 +127,9 @@ func (e *Engine) Run(
 			}
 		}
 
-		if toolCalls.HasToolCalls() {
-			domainToolCalls := toDomainToolCalls(toolCallsList)
-			thread, err := e.llmCtx.AddAssistantMessage(ctx, runCtx.ThreadID, runCtx.MessageID, completeContent, domainToolCalls)
+		if streamResult.HasToolCalls() {
+			domainToolCalls := toDomainToolCalls(streamResult.ToolCalls)
+			thread, err := e.llmCtx.AddAssistantMessage(ctx, runCtx.ThreadID, runCtx.MessageID, streamResult.Content, domainToolCalls)
 			if err != nil {
 				yield(nil, err)
 				return
@@ -196,7 +139,7 @@ func (e *Engine) Run(
 			assistantEvent := &domain.AssistantMessageCompletedEvent{
 				ThreadID:  runCtx.ThreadID,
 				MessageID: runCtx.MessageID,
-				Content:   completeContent,
+				Content:   streamResult.Content,
 				ToolCalls: domainToolCalls,
 				Timestamp: time.Now(),
 			}
@@ -205,7 +148,7 @@ func (e *Engine) Run(
 			}
 
 			// Execute all tools
-			execResults := e.toolExec.ExecuteAll(toolCallsList, executor)
+			execResults := e.toolExec.ExecuteAll(streamResult.ToolCalls, executor)
 
 			// Persist results and emit events
 			for _, result := range execResults.Results {
@@ -246,7 +189,7 @@ func (e *Engine) Run(
 			return
 		}
 
-		if _, err := e.llmCtx.AddAssistantMessage(ctx, runCtx.ThreadID, runCtx.MessageID, completeContent, nil); err != nil {
+		if _, err := e.llmCtx.AddAssistantMessage(ctx, runCtx.ThreadID, runCtx.MessageID, streamResult.Content, nil); err != nil {
 			yield(nil, err)
 			return
 		}
@@ -254,7 +197,7 @@ func (e *Engine) Run(
 		assistantEvent := &domain.AssistantMessageCompletedEvent{
 			ThreadID:  runCtx.ThreadID,
 			MessageID: runCtx.MessageID,
-			Content:   completeContent,
+			Content:   streamResult.Content,
 			Timestamp: time.Now(),
 		}
 		e.yieldEvent(yield, assistantEvent, nil)
