@@ -5,10 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"iter"
-	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/llm"
-	"time"
 )
 
 // StreamResult holds the accumulated output from processing an LLM stream.
@@ -17,17 +15,19 @@ type StreamResult struct {
 	ToolCalls []core.ToolCall
 }
 
+// NewStreamProcessor creates a new StreamProcessor.
+func NewStreamProcessor(agentName string, events *EventFactory) *StreamProcessor {
+	return &StreamProcessor{
+		agentName: agentName,
+		events:    events,
+	}
+}
+
 // StreamProcessor handles LLM stream iteration and event emission.
 // It accumulates content and tool calls while emitting streaming events.
 type StreamProcessor struct {
 	agentName string
-}
-
-// NewStreamProcessor creates a new StreamProcessor.
-func NewStreamProcessor(agentName string) *StreamProcessor {
-	return &StreamProcessor{
-		agentName: agentName,
-	}
+	events    *EventFactory
 }
 
 // ProcessParams contains the parameters for processing a stream.
@@ -55,13 +55,7 @@ func (p *StreamProcessor) Process(
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 			// Emit partial completion if we have content
 			if content != "" {
-				evt := &domain.AssistantMessageCompletedEvent{
-					ThreadID:  params.ThreadID,
-					MessageID: params.MessageID,
-					Content:   content,
-					AgentName: p.agentName,
-					Timestamp: time.Now(),
-				}
+				evt := p.events.AssistantCompleted(params.ThreadID, params.MessageID, content, nil)
 				if !yield(evt, nil) {
 					return &StreamResult{Content: content, ToolCalls: toolCalls.GetAll()}, nil
 				}
@@ -77,12 +71,7 @@ func (p *StreamProcessor) Process(
 		if textDelta := update.Text(); textDelta != "" {
 			content += textDelta
 
-			contentEvent := &domain.AssistantContentStreamedEvent{
-				ThreadID:  params.ThreadID,
-				MessageID: params.MessageID,
-				Delta:     textDelta,
-				Timestamp: time.Now(),
-			}
+			contentEvent := p.events.AssistantContentStreamed(params.ThreadID, params.MessageID, textDelta)
 			if !yield(contentEvent, nil) {
 				return &StreamResult{Content: content, ToolCalls: toolCalls.GetAll()}, nil
 			}
@@ -92,26 +81,14 @@ func (p *StreamProcessor) Process(
 		tcUpdate, hasTool := toolCalls.ProcessUpdate(update)
 		if hasTool {
 			if tcUpdate.IsNew {
-				toolStartEvent := &domain.ToolCallStartedEvent{
-					ThreadID:        params.ThreadID,
-					ToolCallID:      tcUpdate.ID,
-					ToolCallName:    tcUpdate.Name,
-					ParentMessageID: params.MessageID,
-					AgentName:       p.agentName,
-					Timestamp:       time.Now(),
-				}
+				toolStartEvent := p.events.ToolCallStarted(params.ThreadID, tcUpdate.ID, tcUpdate.Name, params.MessageID)
 				if !yield(toolStartEvent, nil) {
 					return &StreamResult{Content: content, ToolCalls: toolCalls.GetAll()}, nil
 				}
 			}
 
 			if tcUpdate.ArgsDelta != "" {
-				argsEvent := &domain.ToolCallArgumentsStreamedEvent{
-					ThreadID:   params.ThreadID,
-					ToolCallID: tcUpdate.ID,
-					Delta:      tcUpdate.ArgsDelta,
-					Timestamp:  time.Now(),
-				}
+				argsEvent := p.events.ToolCallArgumentsStreamed(params.ThreadID, tcUpdate.ID, tcUpdate.ArgsDelta)
 				if !yield(argsEvent, nil) {
 					return &StreamResult{Content: content, ToolCalls: toolCalls.GetAll()}, nil
 				}
