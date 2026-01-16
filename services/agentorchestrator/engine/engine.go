@@ -7,6 +7,7 @@ import (
 	"iter"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/agentsdk/llm"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/agentorchestrator/types"
 	"school-with-ai/services/threadmgmt"
@@ -15,7 +16,6 @@ import (
 
 // Use central types
 type ChatClient = types.ChatClient
-
 // Engine handles the core LLM iteration and streaming logic.
 type Engine struct {
 	log           *logger.Logger
@@ -89,47 +89,19 @@ func (e *Engine) Run(
 			return
 		}
 
-		messages, err := runCtx.Thread.RetrieveFullConversationHistory(ctx)
+		session, err := e.newSession(ctx, runCtx)
 		if err != nil {
 			yield(nil, err)
 			return
 		}
-
-		chatMessages := mapFromCoreToLLMMessages(messages)
-
-		chatOptions, reqCtx, err := core.ToChatOptionsWithMiddleware(ctx, e.config, chatMessages, runCtx.ThreadID, runCtx.Options)
-		if err != nil {
-			yield(nil, fmt.Errorf("failed to apply middleware: %w", err))
+		if session == nil {
+			// Session terminated by middleware
 			return
 		}
 
-		if e.reqCtxCapture != nil {
-			*e.reqCtxCapture = reqCtx
-		}
+		executor := e.newExecutor(ctx, runCtx, session.ctx)
 
-		if reqCtx.Terminate {
-			return
-		}
-
-		dynamicRegistry := core.NewToolRegistry()
-		for _, tool := range reqCtx.GetEffectiveTools() {
-			dynamicRegistry.Register(tool)
-		}
-
-		executorOpts := []core.ToolExecutorOption{}
-		if e.toolTracer != nil {
-			executorOpts = append(executorOpts, core.WithToolTracer(e.toolTracer))
-		}
-		dynamicExecutor := core.NewRegistryToolExecutor(
-			ctx,
-			dynamicRegistry,
-			runCtx.ThreadID,
-			runCtx.MessageID,
-			reqCtx,
-			executorOpts...,
-		)
-
-		streamIter := e.chatClient.GetStreamingResponse(ctx, chatMessages, chatOptions)
+		streamIter := e.chatClient.GetStreamingResponse(ctx, session.messages, session.options)
 
 		var completeContent string
 		toolCalls := core.NewToolCallAccumulator()
@@ -239,7 +211,7 @@ func (e *Engine) Run(
 			// Execute tools and check for Commands
 			shouldContinue := true
 			for _, toolCall := range toolCallsList {
-				execResult, err := e.executeToolCallWithExecutor(runCtx.ThreadID, toolCall, dynamicExecutor)
+				execResult, err := e.executeToolCallWithExecutor(runCtx.ThreadID, toolCall, executor)
 				var result string
 				if err != nil {
 					result = fmt.Sprintf(`{"error": "%s"}`, err)
@@ -330,4 +302,63 @@ func toDomainToolCalls(ctcs []core.ToolCall) []domain.ToolCall {
 		}
 	}
 	return result
+}
+
+// runSession encapsulates the prepared state for an LLM run.
+type runSession struct {
+	options  *llm.ChatOptions
+	ctx      *core.RequestContext
+	messages []llm.ChatMessage
+}
+
+// newSession initializes the conversation history, applies middleware, and returns the execution session.
+// Returns (nil, nil) if the session was terminated by middleware.
+func (e *Engine) newSession(ctx context.Context, runCtx core.RunContext) (*runSession, error) {
+	messages, err := runCtx.Thread.RetrieveFullConversationHistory(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	chatMessages := mapFromCoreToLLMMessages(messages)
+
+	chatOptions, reqCtx, err := core.ToChatOptionsWithMiddleware(ctx, e.config, chatMessages, runCtx.ThreadID, runCtx.Options)
+	if err != nil {
+		return nil, fmt.Errorf("failed to apply middleware: %w", err)
+	}
+
+	if e.reqCtxCapture != nil {
+		*e.reqCtxCapture = reqCtx
+	}
+
+	if reqCtx.Terminate {
+		return nil, nil
+	}
+
+	return &runSession{
+		options:  chatOptions,
+		ctx:      reqCtx,
+		messages: chatMessages,
+	}, nil
+}
+
+// newExecutor creates a tool executor initialized with the effective tools from the request context.
+func (e *Engine) newExecutor(ctx context.Context, runCtx core.RunContext, reqCtx *core.RequestContext) core.ToolExecutor {
+	dynamicRegistry := core.NewToolRegistry()
+	for _, tool := range reqCtx.GetEffectiveTools() {
+		dynamicRegistry.Register(tool)
+	}
+
+	executorOpts := []core.ToolExecutorOption{}
+	if e.toolTracer != nil {
+		executorOpts = append(executorOpts, core.WithToolTracer(e.toolTracer))
+	}
+
+	return core.NewRegistryToolExecutor(
+		ctx,
+		dynamicRegistry,
+		runCtx.ThreadID,
+		runCtx.MessageID,
+		reqCtx,
+		executorOpts...,
+	)
 }
