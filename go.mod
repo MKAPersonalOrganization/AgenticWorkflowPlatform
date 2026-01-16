@@ -62,6 +62,7 @@ require (
 	github.com/natefinch/atomic v1.0.1 // indirect
 	github.com/oapi-codegen/runtime v1.1.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
+	github.com/qmuntal/stateless v1.7.2 // indirect
 	github.com/redis/go-redis/v9 v9.7.0 // indirect
 	github.com/robfig/cron/v3 v3.0.2-0.20210106135023-bc59245fe10e // indirect
 	github.com/samber/lo v1.52.0 // indirect

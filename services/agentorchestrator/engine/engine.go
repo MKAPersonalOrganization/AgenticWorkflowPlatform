@@ -8,6 +8,9 @@ import (
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/agentorchestrator/types"
 	"school-with-ai/services/threadmgmt"
+
+
+	"github.com/qmuntal/stateless"
 )
 
 // Use central types
@@ -47,214 +50,233 @@ func New(
 // Run processes the LLM response using an AgentThread and yields events.
 func (e *Engine) Run(ctx context.Context, runCtx core.RunContext) iter.Seq2[core.Event, error] {
 	return func(yield func(core.Event, error) bool) {
-		m := &machine{
-			engine:    e,
-			ctx:       ctx,
-			yield:     yield,
-			threadID:  runCtx.ThreadID,
-			messageID: runCtx.MessageID,
-			thread:    runCtx.Thread,
-			options:   runCtx.Options,
-		}
-		m.state = StateStart
-		m.run()
-	}
-}
+		// State variables
+		var (
+			// Context
+			threadID  = runCtx.ThreadID
+			messageID = runCtx.MessageID
+			thread    = runCtx.Thread
+			options   = runCtx.Options
 
-func (m *machine) emit(event core.Event) bool {
-	if !m.yield(event, nil) {
-		m.state = StateDone
-		return false
-	}
-	return true
-}
+			// Iteration state
+			streamResult *StreamResult
+			executor     core.ToolExecutor
+			executionErr error
+		)
 
+		// State machine states
+		type State int
+		const (
+			StateStart State = iota
+			StateStream
+			StateTools
+			StateDone
+			StateError
+		)
 
+		const (
+			TriggerStart           = "Start"
+			TriggerStreamProcessed = "StreamProcessed"
+			TriggerToolsExecuted   = "ToolsExecuted"
+		)
 
-
-
-// State machine states
-type State int
-
-const (
-	StateStart State = iota
-	StateStream
-	StateTools
-	StateDone
-	StateError
-)
-
-type TransitionData struct {
-	Terminated bool
-	HasTools   bool
-	Stop       bool
-}
-
-// machine implements the engine state machine.
-type machine struct {
-	engine *Engine
-	ctx    context.Context
-	yield  func(core.Event, error) bool
-
-	// Run context
-	threadID  string
-	messageID string
-	thread    core.AgentThread
-	options   core.RunOptions
-
-	// Iteration state
-	streamResult *StreamResult
-	executor     core.ToolExecutor
-
-	state State
-	err   error
-}
-
-func (m *machine) run() {
-	for m.state != StateDone && m.state != StateError {
-		data, err := m.executeHandler()
-		if err != nil {
-			m.err = err
-			m.state = StateError
-			break
-		}
-		m.state = m.Transition(m.state, data)
-	}
-
-	if m.err != nil {
-		m.yield(nil, m.err)
-	}
-}
-
-func (m *machine) executeHandler() (TransitionData, error) {
-	switch m.state {
-	case StateStart:
-		return TransitionData{}, m.HandleStart()
-	case StateStream:
-		terminated, hasTools, err := m.HandleStream()
-		return TransitionData{Terminated: terminated, HasTools: hasTools}, err
-	case StateTools:
-		stop, err := m.HandleTools()
-		return TransitionData{Stop: stop}, err
-	default:
-		return TransitionData{}, nil
-	}
-}
-
-func (m *machine) Transition(currentState State, data TransitionData) State {
-	switch currentState {
-	case StateStart:
-		return StateStream
-	case StateStream:
-		if data.Terminated {
-			return StateDone
-		}
-		if data.HasTools {
-			return StateTools
-		}
-		return StateDone
-	case StateTools:
-		if data.Stop {
-			return StateDone
-		}
-		m.messageID = core.GenerateID()
-		return StateStream
-	default:
-		return StateDone
-	}
-}
-
-// HandleStart emits the AssistantStarted event.
-func (m *machine) HandleStart() error {
-	if !m.emit(m.engine.events.AssistantStarted(m.threadID, m.messageID)) {
-		return context.Canceled
-	}
-	return nil
-}
-
-// HandleStream prepares context, streams LLM response, and emits events.
-func (m *machine) HandleStream() (terminated bool, hasTools bool, err error) {
-	// Prepare
-	runCtx := core.RunContext{
-		ThreadID:  m.threadID,
-		MessageID: m.messageID,
-		Thread:    m.thread,
-		Options:   m.options,
-	}
-	prepareResult, err := m.engine.llmCtx.Prepare(m.ctx, runCtx)
-	if err != nil {
-		return false, false, err
-	}
-	if prepareResult.Terminated {
-		return true, false, nil
-	}
-
-	// Stream
-	llmContext := prepareResult.Context
-	m.executor = m.engine.toolExec.CreateExecutor(
-		m.ctx, llmContext.GetEffectiveTools(),
-		m.threadID, m.messageID, llmContext.RequestCtx,
-	)
-	streamIter := m.engine.chatClient.GetStreamingResponse(m.ctx, llmContext.Messages, llmContext.Options)
-	streamResult, err := m.engine.stream.Process(m.ctx, streamIter, ProcessParams{
-		ThreadID:  m.threadID,
-		MessageID: m.messageID,
-	}, m.yield)
-	if err != nil {
-		return false, false, err
-	}
-	if streamResult == nil {
-		// Verify if we should consider this terminated or just done
-		return true, false, nil
-	}
-	m.streamResult = streamResult
-
-	// Persist and emit completed
-	toolCalls := toDomainToolCalls(m.streamResult.ToolCalls)
-	thread, err := m.engine.llmCtx.AddAssistantMessage(m.ctx, m.threadID, m.messageID, m.streamResult.Content, toolCalls)
-	if err != nil {
-		return false, false, err
-	}
-	m.thread = thread
-
-	if !m.emit(m.engine.events.AssistantCompleted(m.threadID, m.messageID, m.streamResult.Content, toolCalls)) {
-		return false, false, context.Canceled
-	}
-
-	return false, m.streamResult.HasToolCalls(), nil
-}
-
-// HandleTools executes tool calls and emits results.
-func (m *machine) HandleTools() (stop bool, err error) {
-	shouldStop := false
-
-	for _, tc := range m.streamResult.ToolCalls {
-		if !m.emit(m.engine.events.ToolCallCompleted(m.threadID, tc.ID)) {
-			return false, context.Canceled
+		// Helpers
+		emit := func(event core.Event) bool {
+			if !yield(event, nil) {
+				return false
+			}
+			return true
 		}
 
-		result := m.engine.toolExec.Execute(tc, m.executor)
-
-		toolResultID := core.GenerateID()
-		thread, err := m.engine.llmCtx.AddToolResultMessage(m.ctx, m.threadID, toolResultID, result.ToolCallID, result.Result)
-		if err != nil {
-			return false, err
-		}
-		m.thread = thread
-
-		if !m.emit(m.engine.events.ToolCallExecuted(
-			m.threadID, toolResultID, result.ToolCallID,
-			result.ToolName, result.Arguments, result.Result, m.messageID,
-		)) {
-			return false, context.Canceled
+		type transitionData struct {
+			Terminated bool
+			HasTools   bool
+			Stop       bool
 		}
 
-		if result.StopIteration {
-			shouldStop = true
+		// Handlers
+		handleStart := func() error {
+			if !emit(e.events.AssistantStarted(threadID, messageID)) {
+				return context.Canceled
+			}
+			return nil
+		}
+
+		handleStream := func() (bool, bool, error) {
+			// Prepare
+			prepareCtx := core.RunContext{
+				ThreadID:  threadID,
+				MessageID: messageID,
+				Thread:    thread,
+				Options:   options,
+			}
+			prepareResult, err := e.llmCtx.Prepare(ctx, prepareCtx)
+			if err != nil {
+				return false, false, err
+			}
+			if prepareResult.Terminated {
+				return true, false, nil
+			}
+
+			// Stream
+			llmContext := prepareResult.Context
+			executor = e.toolExec.CreateExecutor(
+				ctx, llmContext.GetEffectiveTools(),
+				threadID, messageID, llmContext.RequestCtx,
+			)
+			streamIter := e.chatClient.GetStreamingResponse(ctx, llmContext.Messages, llmContext.Options)
+			res, err := e.stream.Process(ctx, streamIter, ProcessParams{
+				ThreadID:  threadID,
+				MessageID: messageID,
+			}, yield)
+			if err != nil {
+				return false, false, err
+			}
+			if res == nil {
+				// Verify if we should consider this terminated or just done
+				return true, false, nil
+			}
+			streamResult = res
+
+			// Persist and emit completed
+			toolCalls := toDomainToolCalls(streamResult.ToolCalls)
+			updatedThread, err := e.llmCtx.AddAssistantMessage(ctx, threadID, messageID, streamResult.Content, toolCalls)
+			if err != nil {
+				return false, false, err
+			}
+			thread = updatedThread
+
+			if !emit(e.events.AssistantCompleted(threadID, messageID, streamResult.Content, toolCalls)) {
+				return false, false, context.Canceled
+			}
+
+			return false, streamResult.HasToolCalls(), nil
+		}
+
+		handleTools := func() (bool, error) {
+			shouldStop := false
+
+			for _, tc := range streamResult.ToolCalls {
+				if !emit(e.events.ToolCallCompleted(threadID, tc.ID)) {
+					return false, context.Canceled
+				}
+
+				result := e.toolExec.Execute(tc, executor)
+
+				toolResultID := core.GenerateID()
+				updatedThread, err := e.llmCtx.AddToolResultMessage(ctx, threadID, toolResultID, result.ToolCallID, result.Result)
+				if err != nil {
+					return false, err
+				}
+				thread = updatedThread
+
+				if !emit(e.events.ToolCallExecuted(
+					threadID, toolResultID, result.ToolCallID,
+					result.ToolName, result.Arguments, result.Result, messageID,
+				)) {
+					return false, context.Canceled
+				}
+
+				if result.StopIteration {
+					shouldStop = true
+				}
+			}
+
+			return shouldStop, nil
+		}
+
+		// Configure State Machine
+		sm := stateless.NewStateMachine(StateStart)
+
+		sm.Configure(StateStart).
+			Permit(TriggerStart, StateStream)
+
+		sm.Configure(StateStream).
+			PermitDynamic(TriggerStreamProcessed, func(ctx context.Context, args ...interface{}) (stateless.State, error) {
+				data := args[0].(transitionData)
+				if data.Terminated {
+					return StateDone, nil
+				}
+				if data.HasTools {
+					return StateTools, nil
+				}
+				return StateDone, nil
+			})
+
+		sm.Configure(StateTools).
+			PermitDynamic(TriggerToolsExecuted, func(ctx context.Context, args ...interface{}) (stateless.State, error) {
+				data := args[0].(transitionData)
+				if data.Stop {
+					return StateDone, nil
+				}
+				messageID = core.GenerateID()
+				return StateStream, nil
+			})
+
+		// Run Loop
+		if err := handleStart(); err != nil {
+			executionErr = err
+			yield(nil, executionErr)
+			return
+		}
+
+		if err := sm.Fire(TriggerStart); err != nil {
+			executionErr = err
+			yield(nil, executionErr)
+			return
+		}
+
+		for {
+			state, _ := sm.State(ctx)
+			currentState := state.(State)
+
+			if currentState == StateDone || currentState == StateError {
+				break
+			}
+
+			var trigger string
+			var data transitionData
+
+			switch currentState {
+			case StateStream:
+				terminated, hasTools, err := handleStream()
+				if err != nil {
+					executionErr = err
+					_ = sm.Fire(StateError)
+					break
+				}
+				trigger = TriggerStreamProcessed
+				data = transitionData{Terminated: terminated, HasTools: hasTools}
+			case StateTools:
+				stop, err := handleTools()
+				if err != nil {
+					executionErr = err
+					_ = sm.Fire(StateError)
+					break
+				}
+				trigger = TriggerToolsExecuted
+				data = transitionData{Stop: stop}
+			}
+
+			if executionErr != nil {
+				break
+			}
+
+			if trigger != "" {
+				if err := sm.Fire(trigger, data); err != nil {
+					executionErr = err
+					_ = sm.Fire(StateError)
+					break
+				}
+			} else {
+				break
+			}
+		}
+
+		if executionErr != nil {
+			yield(nil, executionErr)
 		}
 	}
-
-	return shouldStop, nil
 }
 
 func toDomainToolCalls(ctcs []core.ToolCall) []domain.ToolCall {
@@ -274,5 +296,7 @@ func toDomainToolCalls(ctcs []core.ToolCall) []domain.ToolCall {
 	}
 	return result
 }
+
+
 
 
