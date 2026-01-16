@@ -62,6 +62,14 @@ export function createMessagingMethods() {
                 // Clear input immediately for better UX
                 this.currentMessage = '';
 
+                // Clear human input state if responding
+                if (state.humanInputToastId) {
+                    this.dismissToast(state.humanInputToastId);
+                }
+                state.awaitingHumanInput = false;
+                state.humanInputQuestion = null;
+                state.humanInputToastId = null;
+
                 // Focus management
                 this.$nextTick(() => {
                     const input = this.$refs?.messageInput;
@@ -246,6 +254,16 @@ export function createMessagingMethods() {
                     }
                 } else {
                     pairedMessages.push(msg);
+                }
+            }
+
+            // Detect awaiting human input from last message
+            if (pairedMessages.length > 0) {
+                const lastMsg = pairedMessages[pairedMessages.length - 1];
+                if (lastMsg.type === 'tool_call' && lastMsg.name === 'transfer_to_agent' && lastMsg.parsedArgs?.agent_name === 'human' && !lastMsg.result) {
+                    const state = this.__getThreadState();
+                    state.awaitingHumanInput = true;
+                    state.humanInputQuestion = lastMsg.parsedArgs?.question;
                 }
             }
 

@@ -119,14 +119,11 @@ func (s *executionState) initAgentComponents(agentName string) error {
 	return nil
 }
 
-func (s *executionState) setup() error {
+func (s *executionState) setup(initialState state) error {
 	// Configure State Machine
-	s.sm = stateless.NewStateMachine(StateInitial)
+	s.sm = stateless.NewStateMachine(initialState)
 
 	s.sm.Configure(StateInitial).
-		OnEntry(func(_ context.Context, _ ...any) error {
-			return s.sm.Fire(TriggerBegin)
-		}).
 		OnExit(func(_ context.Context, _ ...any) error {
 			return s.handleStart()
 		}).
@@ -136,6 +133,7 @@ func (s *executionState) setup() error {
 		OnEntry(func(_ context.Context, _ ...any) error {
 			return s.handleStream()
 		}).
+		PermitReentry(TriggerBegin). // Permit if reconciled here
 		Permit(TriggerActionRequired, StateExecutingActions).
 		Permit(TriggerStepComplete, StateDone)
 
@@ -143,8 +141,10 @@ func (s *executionState) setup() error {
 		OnEntry(func(_ context.Context, _ ...any) error {
 			return s.handleTools()
 		}).
+		PermitReentry(TriggerBegin). // Permit if reconciled here
 		Permit(TriggerActionDone, StateDeterminingNextStep).
-		Permit(TriggerHandoffSwitch, StateTransferring)
+		Permit(TriggerHandoffSwitch, StateTransferring).
+		Permit(TriggerHumanInputRequired, StateAwaitingHumanInput)
 
 	s.sm.Configure(StateTransferring).
 		OnEntry(func(_ context.Context, args ...any) error {
@@ -153,32 +153,41 @@ func (s *executionState) setup() error {
 		}).
 		Permit(TriggerTransferComplete, StateInitial)
 
+	s.sm.Configure(StateAwaitingHumanInput).
+		PermitReentry(TriggerBegin) // Self-transition if run starts here
+
 	return nil
 }
 
 func (s *executionState) run() error {
-	if s.sm == nil {
-		if err := s.setup(); err != nil {
+	for {
+		// State Reconciliation: Infer starting state from thread history
+		startState := s.inferState()
+		if startState == StateAwaitingHumanInput {
+			s.engine.log.Debug(s.ctx, "State reconciled: Awaiting human input")
+			return nil // Stop execution, wait for user
+		}
+
+		if err := s.setup(startState); err != nil {
 			return err
+		}
+
+		if err := s.sm.Fire(TriggerBegin); err != nil {
+			return err
+		}
+
+		// If we are back in StateInitial, it means an agent handoff occurred.
+		// We loop to run the next agent's cycle.
+		state, err := s.sm.State(s.ctx)
+		if err != nil {
+			return err
+		}
+		if state != StateInitial {
+			break
 		}
 	}
 
-	// State Reconciliation: Infer starting state from thread history
-	startState := s.inferState()
-	if startState != StateInitial {
-		s.engine.log.Debug(s.ctx, "State reconciled from thread history", "startState", startState)
-		// If we start from a non-initial state, we jump straight to it
-		// Note: stateless doesn't allow direct jump easily without firing,
-		// so we'll just re-initialize the machine to that state if needed,
-		// but since we just created it, we can just use Fire if possible or re-create it.
-		// For simplicity, we fire a trigger that takes us there or re-create machine.
-		s.sm = stateless.NewStateMachine(startState)
-		if err := s.setup(); err != nil { // Re-configure for the new start state
-			return err
-		}
-	}
-
-	return s.sm.Fire(TriggerBegin)
+	return nil
 }
 
 func (s *executionState) inferState() state {
@@ -187,44 +196,70 @@ func (s *executionState) inferState() state {
 		return StateInitial
 	}
 
-	lastMsg := messages[len(messages)-1]
-
-	// Factor 5 & 12 Alignment: If last message is Assistant with pending ToolCalls,
-	// we should be in StateExecutingActions.
-	if lastMsg.Role == "assistant" && len(lastMsg.ToolCalls) > 0 {
-		// Check if all tool calls have results
-		completedCalls := make(map[string]bool)
-		for i := len(messages) - 1; i >= 0; i-- {
-			if messages[i].Role == "tool" {
-				completedCalls[messages[i].ToolCallID] = true
-			} else if messages[i].Role == "assistant" {
-				// Optimization: break if we hit previous assistant message
-				if i < len(messages)-1 {
-					break
-				}
-			}
-		}
-
-		allCompleted := true
-		for _, tc := range lastMsg.ToolCalls {
-			if !completedCalls[tc.ID] {
-				allCompleted = false
-				break
-			}
-		}
-
-		if !allCompleted {
-			// We found tool calls that need execution.
-			// Populate streamResult so handleTools has something to work with.
-			s.streamResult = &StreamResult{
-				Content:   lastMsg.Content,
-				ToolCalls: lastMsg.ToolCalls,
-			}
-			return StateExecutingActions
+	// 1. Find the last assistant message with tool calls
+	var lastAssistantWithTools *core.Message
+	for i := len(messages) - 1; i >= 0; i-- {
+		if messages[i].Role == "assistant" && len(messages[i].ToolCalls) > 0 {
+			lastAssistantWithTools = &messages[i]
+			break
 		}
 	}
 
-	return StateInitial
+	if lastAssistantWithTools == nil {
+		return StateInitial
+	}
+
+	// 2. Check if all tool calls of that message have results
+	completedCalls := make(map[string]bool)
+	for i := len(messages) - 1; i >= 0; i-- {
+		if messages[i].Role == "tool" {
+			completedCalls[messages[i].ToolCallID] = true
+		}
+	}
+
+	var pendingTC *core.ToolCall
+	allCompleted := true
+	for _, tc := range lastAssistantWithTools.ToolCalls {
+		if !completedCalls[tc.ID] {
+			allCompleted = false
+			pendingTC = &tc
+			break
+		}
+	}
+
+	if allCompleted {
+		return StateInitial
+	}
+
+	// 3. Resumption Logic: Check for human response
+	if pendingTC.Function.Name == "transfer_to_agent" {
+		var args struct {
+			AgentName string `json:"agent_name"`
+		}
+		if err := core.UnmarshalArgs(pendingTC.Function.Arguments, &args); err == nil && args.AgentName == "human" {
+			// If we have a user message after this assistant message, it's the response
+			lastMsg := messages[len(messages)-1]
+			if lastMsg.Role == "user" {
+				// Pair: Fulfill the tool call with the user message
+				toolResultID := core.GenerateID()
+				agg, err := s.engine.threadMgmt.AddToolResultMessage(s.ctx, s.threadID, toolResultID, pendingTC.ID, lastMsg.Content, s.agentName)
+				if err == nil {
+					s.thread = s.engine.threadMgmt.ToAgentThread(agg)
+					// Successfully paired, now determine next step
+					return StateDeterminingNextStep
+				}
+			}
+			// Still waiting for user input
+			return StateAwaitingHumanInput
+		}
+	}
+
+	// Populate streamResult for traditional tool execution
+	s.streamResult = &StreamResult{
+		Content:   lastAssistantWithTools.Content,
+		ToolCalls: lastAssistantWithTools.ToolCalls,
+	}
+	return StateExecutingActions
 }
 
 func (s *executionState) handleStart() error {
@@ -321,6 +356,38 @@ func (s *executionState) handleTools() error {
 		}
 	}
 
+	if handoffTarget == "human" {
+		// Emit human input requested event
+		var question string
+
+		// Look for the human handoff tool call to get the question
+		var toolCallID string
+		for _, tc := range s.streamResult.ToolCalls {
+			if tc.Function.Name == "transfer_to_agent" {
+				var params struct {
+					AgentName string `json:"agent_name"`
+					Question  string `json:"question"`
+				}
+				if err := core.UnmarshalArgs(tc.Function.Arguments, &params); err == nil {
+					if params.AgentName == "human" {
+						question = params.Question
+						toolCallID = tc.ID
+						break
+					}
+				}
+			}
+		}
+
+		if question == "" {
+			question = "Please provide the requested information."
+		}
+
+		if !s.emit(s.events.HumanInputRequested(s.threadID, s.messageID, toolCallID, question)) {
+			return context.Canceled
+		}
+		return s.sm.Fire(TriggerHumanInputRequired)
+	}
+
 	if handoffTarget != "" {
 		return s.sm.Fire(TriggerHandoffSwitch, handoffTarget)
 	}
@@ -352,6 +419,7 @@ const (
 	StateDeterminingNextStep
 	StateExecutingActions
 	StateTransferring
+	StateAwaitingHumanInput
 	StateDone
 	StateError
 )
@@ -362,6 +430,7 @@ const (
 	TriggerStepComplete     = "StepComplete"
 	TriggerActionDone       = "ActionDone"
 	TriggerHandoffSwitch    = "HandoffSwitch"
+	TriggerHumanInputRequired = "HumanInputRequired"
 	TriggerTransferComplete = "TransferComplete"
 )
 

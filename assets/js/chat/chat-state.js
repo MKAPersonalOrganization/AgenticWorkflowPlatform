@@ -30,7 +30,10 @@ export function createEmptyThreadState() {
         retryCount: 0,
         activeJobStreams: new Set(),
         jobRetryMap: new Map(),
-        currentJobId: null
+        currentJobId: null,
+        awaitingHumanInput: false,
+        humanInputQuestion: null,
+        humanInputToastId: null
     };
 }
 
@@ -56,7 +59,10 @@ export function createInitialState() {
             currentStreamingId: null,
             currentStreamingContent: '',
             whiteboardContent: '',
-            whiteboardLastAgent: null
+            whiteboardLastAgent: null,
+            awaitingHumanInput: false,
+            humanInputQuestion: null,
+            humanInputToastId: null
         },
 
         // User input

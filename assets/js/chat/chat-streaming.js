@@ -356,6 +356,15 @@ export function createStreamingMethods() {
             } else if (event.name === 'AGENT_CALLED') {
                 const { callerAgent, calledAgent, reason } = event.value;
                 console.log(`Agent collaboration: ${callerAgent} → ${calledAgent} (${reason})`);
+            } else if (event.name === 'HUMAN_INPUT_REQUESTED') {
+                const { threadId, messageId, toolCallId, question } = event.value;
+                state.awaitingHumanInput = true;
+                state.humanInputQuestion = question;
+                console.log(`Human input requested for thread ${threadId}: ${question}`);
+
+                if (threadId === this.__currentThreadId) {
+                    state.humanInputToastId = this.showToast(question || 'Specialist needs your help', 'warning', 0); // Persistent until dismiss or reply
+                }
             }
         },
 
