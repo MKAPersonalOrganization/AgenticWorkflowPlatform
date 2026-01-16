@@ -3,7 +3,6 @@ package engine
 import (
 	"context"
 	"iter"
-	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/agentorchestrator/types"
@@ -57,62 +56,23 @@ func New(
 // Run processes the LLM response using an AgentThread and yields events.
 func (e *Engine) Run(ctx context.Context, agentName string, runCtx core.RunContext) iter.Seq2[core.Event, error] {
 	return func(yield func(core.Event, error) bool) {
-		execState := &executionState{
-			ctx:            ctx,
-			threadID:       runCtx.ThreadID,
-			messageID:      runCtx.MessageID,
-			thread:         runCtx.Thread,
-			options:        runCtx.Options,
-			yield:          yield,
-			agentName:      agentName,
+		exec := &executionState{
+			engine:    e,
+			ctx:       ctx,
+			yield:     yield,
+			threadID:  runCtx.ThreadID,
+			messageID: runCtx.MessageID,
+			thread:    runCtx.Thread,
+			options:   runCtx.Options,
+			agentName: agentName,
 		}
 
-		// Initialize initial agent components
-		config, err := e.provider.GetConfig(agentName)
-		if err != nil {
+		if err := exec.setup(); err != nil {
 			yield(nil, err)
 			return
 		}
-		execState.llmCtx = NewLLMContextManager(config, e.threadMgmt, e.reqCtxCapture)
-		execState.stream = NewStreamProcessor(config.Name)
-		execState.events = NewEventFactory(config.Name)
 
-
-		// Configure State Machine
-		execState.sm = stateless.NewStateMachine(stateStart)
-
-		execState.sm.Configure(stateStart).
-			OnEntry(func(_ context.Context, _ ...any) error {
-				return execState.sm.Fire(triggerStart)
-			}).
-			OnExit(func(_ context.Context, _ ...any) error {
-				return e.handleStart(execState)
-			}).
-			Permit(triggerStart, stateStream)
-
-		execState.sm.Configure(stateStream).
-			OnEntry(func(_ context.Context, _ ...any) error {
-				return e.handleStream(execState)
-			}).
-			Permit(triggerToolsFound, stateTools).
-			Permit(triggerStreamDone, stateDone)
-
-		execState.sm.Configure(stateTools).
-			OnEntry(func(_ context.Context, _ ...any) error {
-				return e.handleTools(execState)
-			}).
-			Permit(triggerToolsContinue, stateStream).
-			Permit(triggerToolsHandoff, stateSwitch)
-
-		execState.sm.Configure(stateSwitch).
-			OnEntry(func(_ context.Context, args ...any) error {
-				targetAgent := args[0].(string)
-				return e.handleSwitch(execState, targetAgent)
-			}).
-			Permit(triggerSwitchDone, stateStart)
-
-		// Start execution
-		if err := execState.sm.Fire(triggerStart); err != nil {
+		if err := exec.run(); err != nil {
 			yield(nil, err)
 		}
 	}
@@ -120,8 +80,9 @@ func (e *Engine) Run(ctx context.Context, agentName string, runCtx core.RunConte
 
 // executionState holds the state and context for an execution run.
 type executionState struct {
-	ctx   context.Context
-	yield func(core.Event, error) bool
+	engine *Engine
+	ctx    context.Context
+	yield  func(core.Event, error) bool
 
 	// Run context
 	threadID  string
@@ -144,20 +105,67 @@ type executionState struct {
 }
 
 func (s *executionState) emit(event core.Event) bool {
-	if !s.yield(event, nil) {
-		return false
-	}
-	return true
+	return s.yield(event, nil)
 }
 
-func (e *Engine) handleStart(s *executionState) error {
+func (s *executionState) setup() error {
+	config, err := s.engine.provider.GetConfig(s.agentName)
+	if err != nil {
+		return err
+	}
+
+	s.llmCtx = NewLLMContextManager(config, s.engine.threadMgmt, s.engine.reqCtxCapture)
+	s.events = NewEventFactory(config.Name)
+	s.stream = NewStreamProcessor(config.Name, s.events)
+
+	// Configure State Machine
+	s.sm = stateless.NewStateMachine(stateStart)
+
+	s.sm.Configure(stateStart).
+		OnEntry(func(_ context.Context, _ ...any) error {
+			return s.sm.Fire(triggerStart)
+		}).
+		OnExit(func(_ context.Context, _ ...any) error {
+			return s.handleStart()
+		}).
+		Permit(triggerStart, stateStream)
+
+	s.sm.Configure(stateStream).
+		OnEntry(func(_ context.Context, _ ...any) error {
+			return s.handleStream()
+		}).
+		Permit(triggerToolsFound, stateTools).
+		Permit(triggerStreamDone, stateDone)
+
+	s.sm.Configure(stateTools).
+		OnEntry(func(_ context.Context, _ ...any) error {
+			return s.handleTools()
+		}).
+		Permit(triggerToolsContinue, stateStream).
+		Permit(triggerToolsHandoff, stateSwitch)
+
+	s.sm.Configure(stateSwitch).
+		OnEntry(func(_ context.Context, args ...any) error {
+			targetAgent := args[0].(string)
+			return s.handleSwitch(targetAgent)
+		}).
+		Permit(triggerSwitchDone, stateStart)
+
+	return nil
+}
+
+func (s *executionState) run() error {
+	return s.sm.Fire(triggerStart)
+}
+
+func (s *executionState) handleStart() error {
 	if !s.emit(s.events.AssistantStarted(s.threadID, s.messageID)) {
 		return context.Canceled
 	}
 	return nil
 }
 
-func (e *Engine) handleStream(s *executionState) error {
+func (s *executionState) handleStream() error {
 	// Prepare
 	prepareCtx := core.RunContext{
 		ThreadID:  s.threadID,
@@ -175,11 +183,11 @@ func (e *Engine) handleStream(s *executionState) error {
 
 	// Stream
 	llmContext := prepareResult.Context
-	s.executor = e.toolExec.CreateExecutor(
+	s.executor = s.engine.toolExec.CreateExecutor(
 		s.ctx, llmContext.GetEffectiveTools(),
 		s.threadID, s.messageID, llmContext.RequestCtx,
 	)
-	streamIter := e.chatClient.GetStreamingResponse(s.ctx, llmContext.Messages, llmContext.Options)
+	streamIter := s.engine.chatClient.GetStreamingResponse(s.ctx, llmContext.Messages, llmContext.Options)
 	res, err := s.stream.Process(s.ctx, streamIter, ProcessParams{
 		ThreadID:  s.threadID,
 		MessageID: s.messageID,
@@ -188,7 +196,6 @@ func (e *Engine) handleStream(s *executionState) error {
 		return err
 	}
 	if res == nil {
-		// Verify if we should consider this terminated or just done
 		return s.sm.Fire(triggerStreamDone)
 	}
 	s.streamResult = res
@@ -211,7 +218,7 @@ func (e *Engine) handleStream(s *executionState) error {
 	return s.sm.Fire(triggerStreamDone)
 }
 
-func (e *Engine) handleTools(s *executionState) error {
+func (s *executionState) handleTools() error {
 	var handoffTarget string
 
 	for _, tc := range s.streamResult.ToolCalls {
@@ -219,7 +226,7 @@ func (e *Engine) handleTools(s *executionState) error {
 			return context.Canceled
 		}
 
-		result := e.toolExec.Execute(tc, s.executor)
+		result := s.engine.toolExec.Execute(tc, s.executor)
 
 		toolResultID := core.GenerateID()
 		updatedThread, err := s.llmCtx.AddToolResultMessage(s.ctx, s.threadID, toolResultID, result.ToolCallID, result.Result)
@@ -249,24 +256,24 @@ func (e *Engine) handleTools(s *executionState) error {
 	return s.sm.Fire(triggerToolsContinue)
 }
 
-func (e *Engine) handleSwitch(s *executionState, targetAgent string) error {
+func (s *executionState) handleSwitch(targetAgent string) error {
 	if !s.emit(s.events.AgentHandoff(s.threadID, targetAgent)) {
 		return context.Canceled
 	}
 
-	newConfig, err := e.provider.GetConfig(targetAgent)
+	newConfig, err := s.engine.provider.GetConfig(targetAgent)
 	if err != nil {
 		return err
 	}
 
 	s.agentName = targetAgent
-	s.llmCtx = NewLLMContextManager(newConfig, e.threadMgmt, e.reqCtxCapture)
-	s.stream = NewStreamProcessor(newConfig.Name)
+	s.llmCtx = NewLLMContextManager(newConfig, s.engine.threadMgmt, s.engine.reqCtxCapture)
 	s.events = NewEventFactory(newConfig.Name)
-	
+	s.stream = NewStreamProcessor(newConfig.Name, s.events)
+
 	// Start next iteration with fresh message ID
 	s.messageID = core.GenerateID()
-	
+
 	return s.sm.Fire(triggerSwitchDone)
 }
 
@@ -283,32 +290,13 @@ const (
 )
 
 const (
-	triggerStart           = "Start"
-	triggerToolsFound      = "ToolsFound"
-	triggerStreamDone      = "StreamDone"
-	triggerToolsContinue   = "ToolsContinue"
-	triggerToolsHandoff    = "ToolsHandoff"
-	triggerSwitchDone      = "SwitchDone"
+	triggerStart         = "Start"
+	triggerToolsFound    = "ToolsFound"
+	triggerStreamDone    = "StreamDone"
+	triggerToolsContinue = "ToolsContinue"
+	triggerToolsHandoff  = "ToolsHandoff"
+	triggerSwitchDone    = "SwitchDone"
 )
-
-
-func toDomainToolCalls(ctcs []core.ToolCall) []domain.ToolCall {
-	if ctcs == nil {
-		return nil
-	}
-	result := make([]domain.ToolCall, len(ctcs))
-	for i, ctc := range ctcs {
-		result[i] = domain.ToolCall{
-			ID:   ctc.ID,
-			Type: ctc.Type,
-			Function: domain.ToolFunction{
-				Name:      ctc.Function.Name,
-				Arguments: ctc.Function.Arguments,
-			},
-		}
-	}
-	return result
-}
 
 
 

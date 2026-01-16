@@ -43,6 +43,38 @@ func (f *EventFactory) AssistantCompleted(
 	}
 }
 
+// AssistantContentStreamed creates an AssistantContentStreamedEvent.
+func (f *EventFactory) AssistantContentStreamed(threadID, messageID, delta string) *domain.AssistantContentStreamedEvent {
+	return &domain.AssistantContentStreamedEvent{
+		ThreadID:  threadID,
+		MessageID: messageID,
+		Delta:     delta,
+		Timestamp: time.Now(),
+	}
+}
+
+// ToolCallStarted creates a ToolCallStartedEvent.
+func (f *EventFactory) ToolCallStarted(threadID, toolCallID, toolCallName, parentMessageID string) *domain.ToolCallStartedEvent {
+	return &domain.ToolCallStartedEvent{
+		ThreadID:        threadID,
+		ToolCallID:      toolCallID,
+		ToolCallName:    toolCallName,
+		ParentMessageID: parentMessageID,
+		AgentName:       f.agentName,
+		Timestamp:       time.Now(),
+	}
+}
+
+// ToolCallArgumentsStreamed creates a ToolCallArgumentsStreamedEvent.
+func (f *EventFactory) ToolCallArgumentsStreamed(threadID, toolCallID, delta string) *domain.ToolCallArgumentsStreamedEvent {
+	return &domain.ToolCallArgumentsStreamedEvent{
+		ThreadID:   threadID,
+		ToolCallID: toolCallID,
+		Delta:      delta,
+		Timestamp:  time.Now(),
+	}
+}
+
 // ToolCallCompleted creates a ToolCallCompletedEvent.
 func (f *EventFactory) ToolCallCompleted(threadID, toolCallID string) *domain.ToolCallCompletedEvent {
 	return &domain.ToolCallCompletedEvent{
