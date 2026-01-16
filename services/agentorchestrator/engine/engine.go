@@ -163,10 +163,6 @@ func (s *executionState) run() error {
 	for {
 		// State Reconciliation: Infer starting state from thread history
 		startState := s.inferState()
-		if startState == StateAwaitingHumanInput {
-			s.engine.log.Debug(s.ctx, "State reconciled: Awaiting human input")
-			return nil // Stop execution, wait for user
-		}
 
 		if err := s.setup(startState); err != nil {
 			return err
@@ -178,10 +174,7 @@ func (s *executionState) run() error {
 
 		// If we are back in StateInitial, it means an agent handoff occurred.
 		// We loop to run the next agent's cycle.
-		state, err := s.sm.State(s.ctx)
-		if err != nil {
-			return err
-		}
+		state, _ := s.sm.State(s.ctx)
 		if state != StateInitial {
 			break
 		}
@@ -353,38 +346,24 @@ func (s *executionState) handleTools() error {
 		// Check for routing command
 		if result.Command != nil && result.Command.Goto != "" {
 			handoffTarget = result.Command.Goto
+
+			// Special case: Human intervention (Factor 7)
+			if handoffTarget == "human" {
+				var params struct {
+					Question string `json:"question"`
+				}
+				core.UnmarshalArgs(result.Result, &params)
+				if params.Question == "" {
+					params.Question = "Please provide the requested information."
+				}
+				if !s.emit(s.events.HumanInputRequested(s.threadID, s.messageID, tc.ID, params.Question)) {
+					return context.Canceled
+				}
+			}
 		}
 	}
 
 	if handoffTarget == "human" {
-		// Emit human input requested event
-		var question string
-
-		// Look for the human handoff tool call to get the question
-		var toolCallID string
-		for _, tc := range s.streamResult.ToolCalls {
-			if tc.Function.Name == "transfer_to_agent" {
-				var params struct {
-					AgentName string `json:"agent_name"`
-					Question  string `json:"question"`
-				}
-				if err := core.UnmarshalArgs(tc.Function.Arguments, &params); err == nil {
-					if params.AgentName == "human" {
-						question = params.Question
-						toolCallID = tc.ID
-						break
-					}
-				}
-			}
-		}
-
-		if question == "" {
-			question = "Please provide the requested information."
-		}
-
-		if !s.emit(s.events.HumanInputRequested(s.threadID, s.messageID, toolCallID, question)) {
-			return context.Canceled
-		}
 		return s.sm.Fire(TriggerHumanInputRequired)
 	}
 
