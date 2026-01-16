@@ -6,9 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestTitleGenerator_FromFirstMessage(t *testing.T) {
+func TestGenerateThreadTitle(t *testing.T) {
 	t.Parallel()
-	tg := NewTitleGenerator()
 
 	tests := []struct {
 		name     string
@@ -21,21 +20,21 @@ func TestTitleGenerator_FromFirstMessage(t *testing.T) {
 			expected: "Hello world",
 		},
 		{
-			name:     "Exactly 50 chars stays same",
-			content:  "This is a message that is exactly fifty chars lo!!",
-			expected: "This is a message that is exactly fifty chars lo!!",
+			name:     "Exactly 30 chars stays same",
+			content:  "This is a message exactly 30..",
+			expected: "This is a message exactly 30..",
 		},
 		{
 			name:     "Long content is truncated",
-			content:  "This is a message that is longer than fifty characters and should be truncated with an ellipsis.",
-			expected: "This is a message that is longer than fifty charac...",
+			content:  "This is a message that is longer than thirty characters and should be truncated with an ellipsis.",
+			expected: "This is a message that is l...",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			assert.Equal(t, tt.expected, tg.FromFirstMessage(tt.content))
+			assert.Equal(t, tt.expected, GenerateThreadTitle(tt.content))
 		})
 	}
 }

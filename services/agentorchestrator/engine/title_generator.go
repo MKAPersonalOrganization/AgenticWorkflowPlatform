@@ -1,20 +1,9 @@
 package engine
 
-// TitleGenerator handles the logic for generating thread titles.
-type TitleGenerator struct{}
-
-// NewTitleGenerator creates a new TitleGenerator.
-func NewTitleGenerator() *TitleGenerator {
-	return &TitleGenerator{}
-}
-
-// FromFirstMessage generates a thread title from the content of the first message.
-// It truncates the content to 50 characters and adds an ellipsis if needed.
-func (tg *TitleGenerator) FromFirstMessage(content string) string {
-	title := content
-	if len(title) > 50 {
-		title = title[:50] + "..."
+// GenerateThreadTitle produces a thread title from the content of the first message.
+func GenerateThreadTitle(content string) string {
+	if len(content) > 30 {
+		return content[:27] + "..."
 	}
-
-	return title
+	return content
 }

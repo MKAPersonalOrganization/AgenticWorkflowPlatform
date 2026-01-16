@@ -22,14 +22,13 @@ type AgentProvider interface {
 
 // Engine handles the core LLM iteration and streaming logic in a generic way.
 type Engine struct {
-	log          *logger.Logger
-	chatClient   ChatClient
-	provider     AgentProvider
-	threadMgmt   *threadmgmt.Manager
+	log           *logger.Logger
+	chatClient    ChatClient
+	provider      AgentProvider
+	threadMgmt    *threadmgmt.Manager
 	reqCtxCapture **core.RequestContext // optional capture for testing
-	toolTracer   core.ToolTracer
-	toolExec     *ToolExecutionService
-	titleGenerator *TitleGenerator
+	toolTracer    core.ToolTracer
+	toolExec      *ToolExecutionService
 }
 
 // New creates a new generic execution engine.
@@ -42,14 +41,13 @@ func New(
 	toolTracer core.ToolTracer,
 ) *Engine {
 	return &Engine{
-		log:            log,
-		chatClient:     chatClient,
-		provider:       provider,
-		threadMgmt:     threadMgmt,
-		reqCtxCapture:  reqCtxCapture,
-		toolTracer:     toolTracer,
-		toolExec:       NewToolExecutionService(toolTracer),
-		titleGenerator: NewTitleGenerator(),
+		log:           log,
+		chatClient:    chatClient,
+		provider:      provider,
+		threadMgmt:    threadMgmt,
+		reqCtxCapture: reqCtxCapture,
+		toolTracer:    toolTracer,
+		toolExec:      NewToolExecutionService(toolTracer),
 	}
 }
 
@@ -67,7 +65,7 @@ func (e *Engine) Run(ctx context.Context, agentName string, runCtx core.RunConte
 			agentName: agentName,
 		}
 
-		if err := exec.setup(); err != nil {
+		if err := exec.initAgentComponents(agentName); err != nil {
 			yield(nil, err)
 			return
 		}
@@ -108,16 +106,20 @@ func (s *executionState) emit(event core.Event) bool {
 	return s.yield(event, nil)
 }
 
-func (s *executionState) setup() error {
-	config, err := s.engine.provider.GetConfig(s.agentName)
+func (s *executionState) initAgentComponents(agentName string) error {
+	config, err := s.engine.provider.GetConfig(agentName)
 	if err != nil {
 		return err
 	}
 
+	s.agentName = agentName
 	s.llmCtx = NewLLMContextManager(config, s.engine.threadMgmt, s.engine.reqCtxCapture)
 	s.events = NewEventFactory(config.Name)
-	s.stream = NewStreamProcessor(config.Name, s.events)
+	s.stream = NewStreamProcessor(s.events)
+	return nil
+}
 
+func (s *executionState) setup() error {
 	// Configure State Machine
 	s.sm = stateless.NewStateMachine(stateStart)
 
@@ -155,6 +157,11 @@ func (s *executionState) setup() error {
 }
 
 func (s *executionState) run() error {
+	if s.sm == nil {
+		if err := s.setup(); err != nil {
+			return err
+		}
+	}
 	return s.sm.Fire(triggerStart)
 }
 
@@ -202,11 +209,11 @@ func (s *executionState) handleStream() error {
 
 	// Persist and emit completed
 	toolCalls := toDomainToolCalls(s.streamResult.ToolCalls)
-	updatedThread, err := s.llmCtx.AddAssistantMessage(s.ctx, s.threadID, s.messageID, s.streamResult.Content, toolCalls)
+	agg, err := s.engine.threadMgmt.AddAssistantMessage(s.ctx, s.threadID, s.messageID, s.streamResult.Content, toolCalls, s.agentName)
 	if err != nil {
 		return err
 	}
-	s.thread = updatedThread
+	s.thread = s.engine.threadMgmt.ToAgentThread(agg)
 
 	if !s.emit(s.events.AssistantCompleted(s.threadID, s.messageID, s.streamResult.Content, toolCalls)) {
 		return context.Canceled
@@ -220,6 +227,7 @@ func (s *executionState) handleStream() error {
 
 func (s *executionState) handleTools() error {
 	var handoffTarget string
+	var shouldStop bool
 
 	for _, tc := range s.streamResult.ToolCalls {
 		if !s.emit(s.events.ToolCallCompleted(s.threadID, tc.ID)) {
@@ -229,11 +237,11 @@ func (s *executionState) handleTools() error {
 		result := s.engine.toolExec.Execute(tc, s.executor)
 
 		toolResultID := core.GenerateID()
-		updatedThread, err := s.llmCtx.AddToolResultMessage(s.ctx, s.threadID, toolResultID, result.ToolCallID, result.Result)
+		agg, err := s.engine.threadMgmt.AddToolResultMessage(s.ctx, s.threadID, toolResultID, result.ToolCallID, result.Result, s.agentName)
 		if err != nil {
 			return err
 		}
-		s.thread = updatedThread
+		s.thread = s.engine.threadMgmt.ToAgentThread(agg)
 
 		if !s.emit(s.events.ToolCallExecuted(
 			s.threadID, toolResultID, result.ToolCallID,
@@ -246,10 +254,18 @@ func (s *executionState) handleTools() error {
 		if result.Command != nil && result.Command.Goto != "" {
 			handoffTarget = result.Command.Goto
 		}
+		// Respect stop iteration
+		if result.StopIteration {
+			shouldStop = true
+		}
 	}
 
 	if handoffTarget != "" {
 		return s.sm.Fire(triggerToolsHandoff, handoffTarget)
+	}
+
+	if shouldStop {
+		return s.sm.Fire(triggerStreamDone)
 	}
 
 	s.messageID = core.GenerateID()
@@ -261,15 +277,9 @@ func (s *executionState) handleSwitch(targetAgent string) error {
 		return context.Canceled
 	}
 
-	newConfig, err := s.engine.provider.GetConfig(targetAgent)
-	if err != nil {
+	if err := s.initAgentComponents(targetAgent); err != nil {
 		return err
 	}
-
-	s.agentName = targetAgent
-	s.llmCtx = NewLLMContextManager(newConfig, s.engine.threadMgmt, s.engine.reqCtxCapture)
-	s.events = NewEventFactory(newConfig.Name)
-	s.stream = NewStreamProcessor(newConfig.Name, s.events)
 
 	// Start next iteration with fresh message ID
 	s.messageID = core.GenerateID()

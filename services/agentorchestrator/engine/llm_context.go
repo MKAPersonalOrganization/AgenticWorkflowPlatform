@@ -3,7 +3,6 @@ package engine
 import (
 	"context"
 	"fmt"
-	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/llm"
 	"school-with-ai/services/threadmgmt"
@@ -90,38 +89,6 @@ func (m *LLMContextManager) Prepare(ctx context.Context, runCtx core.RunContext)
 		},
 		Terminated: false,
 	}, nil
-}
-
-// AddAssistantMessage persists an assistant message to the thread.
-// Returns the updated AgentThread for continuing the conversation.
-func (m *LLMContextManager) AddAssistantMessage(
-	ctx context.Context,
-	threadID string,
-	messageID string,
-	content string,
-	toolCalls []domain.ToolCall,
-) (core.AgentThread, error) {
-	agg, err := m.threadMgmt.AddAssistantMessage(ctx, threadID, messageID, content, toolCalls, m.config.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to add assistant message: %w", err)
-	}
-	return m.threadMgmt.ToAgentThread(agg), nil
-}
-
-// AddToolResultMessage persists a tool result message to the thread.
-// Returns the updated AgentThread for continuing the conversation.
-func (m *LLMContextManager) AddToolResultMessage(
-	ctx context.Context,
-	threadID string,
-	messageID string,
-	toolCallID string,
-	result string,
-) (core.AgentThread, error) {
-	agg, err := m.threadMgmt.AddToolResultMessage(ctx, threadID, messageID, toolCallID, result, m.config.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to add tool result message: %w", err)
-	}
-	return m.threadMgmt.ToAgentThread(agg), nil
 }
 
 // convertMessages converts core messages to LLM chat messages.

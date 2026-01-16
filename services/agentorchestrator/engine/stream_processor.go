@@ -16,18 +16,16 @@ type StreamResult struct {
 }
 
 // NewStreamProcessor creates a new StreamProcessor.
-func NewStreamProcessor(agentName string, events *EventFactory) *StreamProcessor {
+func NewStreamProcessor(events *EventFactory) *StreamProcessor {
 	return &StreamProcessor{
-		agentName: agentName,
-		events:    events,
+		events: events,
 	}
 }
 
 // StreamProcessor handles LLM stream iteration and event emission.
 // It accumulates content and tool calls while emitting streaming events.
 type StreamProcessor struct {
-	agentName string
-	events    *EventFactory
+	events *EventFactory
 }
 
 // ProcessParams contains the parameters for processing a stream.
