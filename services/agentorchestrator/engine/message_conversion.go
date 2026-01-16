@@ -5,20 +5,20 @@ import (
 	"school-with-ai/foundation/agentsdk/llm"
 )
 
-// toLLMChatMessages converts a slice of core.Message to llm.ChatMessage.
+// mapFromCoreToLLMMessages converts a slice of core.Message to llm.ChatMessage.
 // Filters out system messages with agent_handoff metadata as they're UI-only.
-func toLLMChatMessages(msgs []core.Message) []llm.ChatMessage {
+func mapFromCoreToLLMMessages(msgs []core.Message) []llm.ChatMessage {
 	result := make([]llm.ChatMessage, 0, len(msgs))
 	for _, m := range msgs {
-		result = append(result, toLLMChatMessage(m))
+		result = append(result, mapFromCoreToLLMMessage(m))
 	}
 
 	return result
 }
 
-// toLLMChatMessage converts a core.Message to llm.ChatMessage.
+// mapFromCoreToLLMMessage converts a core.Message to llm.ChatMessage.
 // This bridges the persistence layer (core.Message) with the LLM layer (ChatMessage).
-func toLLMChatMessage(msg core.Message) llm.ChatMessage {
+func mapFromCoreToLLMMessage(msg core.Message) llm.ChatMessage {
 	cm := llm.ChatMessage{
 		Role:       llm.ChatRole(msg.Role),
 		AuthorName: msg.AgentName,

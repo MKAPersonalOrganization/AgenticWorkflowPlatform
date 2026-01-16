@@ -95,7 +95,7 @@ func (e *Engine) Run(
 			return
 		}
 
-		chatMessages := toLLMChatMessages(messages)
+		chatMessages := mapFromCoreToLLMMessages(messages)
 
 		chatOptions, reqCtx, err := core.ToChatOptionsWithMiddleware(ctx, e.config, chatMessages, runCtx.ThreadID, runCtx.Options)
 		if err != nil {

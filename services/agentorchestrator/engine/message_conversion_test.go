@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestToLLMChatMessages(t *testing.T) {
+func TestMapFromCoreToLLMMessages(t *testing.T) {
 	t.Parallel()
 	// Setup test data
 	userMsg := core.Message{
@@ -84,7 +84,7 @@ func TestToLLMChatMessages(t *testing.T) {
 	}
 
 	// Execute
-	result := toLLMChatMessages(input)
+	result := mapFromCoreToLLMMessages(input)
 
 	// Verify
 	if len(result) != len(expected) {
