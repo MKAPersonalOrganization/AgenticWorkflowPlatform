@@ -61,7 +61,9 @@ func (e *Engine) Run(ctx context.Context, runCtx core.RunContext) iter.Seq2[core
 			// Iteration state
 			streamResult *StreamResult
 			executor     core.ToolExecutor
-			executionErr error
+			
+			// State Machine
+			sm *stateless.StateMachine
 		)
 
 		// State machine states
@@ -95,14 +97,14 @@ func (e *Engine) Run(ctx context.Context, runCtx core.RunContext) iter.Seq2[core
 		}
 
 		// Handlers
-		handleStart := func() error {
+		handleStart := func(ctx context.Context, args ...interface{}) error {
 			if !emit(e.events.AssistantStarted(threadID, messageID)) {
 				return context.Canceled
 			}
 			return nil
 		}
 
-		handleStream := func() (bool, bool, error) {
+		handleStream := func(ctx context.Context, args ...interface{}) error {
 			// Prepare
 			prepareCtx := core.RunContext{
 				ThreadID:  threadID,
@@ -112,10 +114,10 @@ func (e *Engine) Run(ctx context.Context, runCtx core.RunContext) iter.Seq2[core
 			}
 			prepareResult, err := e.llmCtx.Prepare(ctx, prepareCtx)
 			if err != nil {
-				return false, false, err
+				return err
 			}
 			if prepareResult.Terminated {
-				return true, false, nil
+				return sm.Fire(TriggerStreamProcessed, transitionData{Terminated: true})
 			}
 
 			// Stream
@@ -130,11 +132,11 @@ func (e *Engine) Run(ctx context.Context, runCtx core.RunContext) iter.Seq2[core
 				MessageID: messageID,
 			}, yield)
 			if err != nil {
-				return false, false, err
+				return err
 			}
 			if res == nil {
 				// Verify if we should consider this terminated or just done
-				return true, false, nil
+				return sm.Fire(TriggerStreamProcessed, transitionData{Terminated: true})
 			}
 			streamResult = res
 
@@ -142,23 +144,25 @@ func (e *Engine) Run(ctx context.Context, runCtx core.RunContext) iter.Seq2[core
 			toolCalls := toDomainToolCalls(streamResult.ToolCalls)
 			updatedThread, err := e.llmCtx.AddAssistantMessage(ctx, threadID, messageID, streamResult.Content, toolCalls)
 			if err != nil {
-				return false, false, err
+				return err
 			}
 			thread = updatedThread
 
 			if !emit(e.events.AssistantCompleted(threadID, messageID, streamResult.Content, toolCalls)) {
-				return false, false, context.Canceled
+				return context.Canceled
 			}
 
-			return false, streamResult.HasToolCalls(), nil
+			return sm.Fire(TriggerStreamProcessed, transitionData{
+				HasTools: streamResult.HasToolCalls(),
+			})
 		}
 
-		handleTools := func() (bool, error) {
+		handleTools := func(ctx context.Context, args ...interface{}) error {
 			shouldStop := false
 
 			for _, tc := range streamResult.ToolCalls {
 				if !emit(e.events.ToolCallCompleted(threadID, tc.ID)) {
-					return false, context.Canceled
+					return context.Canceled
 				}
 
 				result := e.toolExec.Execute(tc, executor)
@@ -166,7 +170,7 @@ func (e *Engine) Run(ctx context.Context, runCtx core.RunContext) iter.Seq2[core
 				toolResultID := core.GenerateID()
 				updatedThread, err := e.llmCtx.AddToolResultMessage(ctx, threadID, toolResultID, result.ToolCallID, result.Result)
 				if err != nil {
-					return false, err
+					return err
 				}
 				thread = updatedThread
 
@@ -174,7 +178,7 @@ func (e *Engine) Run(ctx context.Context, runCtx core.RunContext) iter.Seq2[core
 					threadID, toolResultID, result.ToolCallID,
 					result.ToolName, result.Arguments, result.Result, messageID,
 				)) {
-					return false, context.Canceled
+					return context.Canceled
 				}
 
 				if result.StopIteration {
@@ -182,16 +186,18 @@ func (e *Engine) Run(ctx context.Context, runCtx core.RunContext) iter.Seq2[core
 				}
 			}
 
-			return shouldStop, nil
+			return sm.Fire(TriggerToolsExecuted, transitionData{Stop: shouldStop})
 		}
 
 		// Configure State Machine
-		sm := stateless.NewStateMachine(StateStart)
+		sm = stateless.NewStateMachine(StateStart)
 
 		sm.Configure(StateStart).
+			OnExit(handleStart).
 			Permit(TriggerStart, StateStream)
 
 		sm.Configure(StateStream).
+			OnEntry(handleStream).
 			PermitDynamic(TriggerStreamProcessed, func(ctx context.Context, args ...interface{}) (stateless.State, error) {
 				data := args[0].(transitionData)
 				if data.Terminated {
@@ -204,6 +210,7 @@ func (e *Engine) Run(ctx context.Context, runCtx core.RunContext) iter.Seq2[core
 			})
 
 		sm.Configure(StateTools).
+			OnEntry(handleTools).
 			PermitDynamic(TriggerToolsExecuted, func(ctx context.Context, args ...interface{}) (stateless.State, error) {
 				data := args[0].(transitionData)
 				if data.Stop {
@@ -213,68 +220,9 @@ func (e *Engine) Run(ctx context.Context, runCtx core.RunContext) iter.Seq2[core
 				return StateStream, nil
 			})
 
-		// Run Loop
-		if err := handleStart(); err != nil {
-			executionErr = err
-			yield(nil, executionErr)
-			return
-		}
-
+		// Start execution
 		if err := sm.Fire(TriggerStart); err != nil {
-			executionErr = err
-			yield(nil, executionErr)
-			return
-		}
-
-		for {
-			state, _ := sm.State(ctx)
-			currentState := state.(State)
-
-			if currentState == StateDone || currentState == StateError {
-				break
-			}
-
-			var trigger string
-			var data transitionData
-
-			switch currentState {
-			case StateStream:
-				terminated, hasTools, err := handleStream()
-				if err != nil {
-					executionErr = err
-					_ = sm.Fire(StateError)
-					break
-				}
-				trigger = TriggerStreamProcessed
-				data = transitionData{Terminated: terminated, HasTools: hasTools}
-			case StateTools:
-				stop, err := handleTools()
-				if err != nil {
-					executionErr = err
-					_ = sm.Fire(StateError)
-					break
-				}
-				trigger = TriggerToolsExecuted
-				data = transitionData{Stop: stop}
-			}
-
-			if executionErr != nil {
-				break
-			}
-
-			if trigger != "" {
-				if err := sm.Fire(trigger, data); err != nil {
-					executionErr = err
-					_ = sm.Fire(StateError)
-					break
-				}
-			} else {
-				break
-			}
-		}
-
-		if executionErr != nil {
-			yield(nil, executionErr)
+			yield(nil, err)
 		}
 	}
 }
