@@ -77,6 +77,7 @@ func (e *Engine) Run(
 	runCtx core.RunContext,
 ) iter.Seq2[core.Event, error] {
 	return func(yield func(core.Event, error) bool) {
+		// Emit start event once at the beginning
 		startEvent := &domain.AssistantMessageStartedEvent{
 			ThreadID:  runCtx.ThreadID,
 			MessageID: runCtx.MessageID,
@@ -86,48 +87,64 @@ func (e *Engine) Run(
 			return
 		}
 
-		prepareResult, err := e.llmCtx.Prepare(ctx, runCtx)
-		if err != nil {
-			yield(nil, err)
-			return
-		}
-		if prepareResult.Terminated {
-			// Middleware terminated early
-			return
-		}
-
-		llmContext := prepareResult.Context
-		executor := e.toolExec.CreateExecutor(ctx, llmContext.GetEffectiveTools(), runCtx.ThreadID, runCtx.MessageID, llmContext.RequestCtx)
-
-		streamIter := e.chatClient.GetStreamingResponse(ctx, llmContext.Messages, llmContext.Options)
-
-		// Process the stream
-		streamResult, err := e.stream.Process(ctx, streamIter, ProcessParams{
-			ThreadID:  runCtx.ThreadID,
-			MessageID: runCtx.MessageID,
-		}, yield)
-		if err != nil {
-			yield(nil, err)
-			return
-		}
-		if streamResult == nil {
-			// yield returned false, stop processing
-			return
-		}
-
-		// Emit tool call completed events
-		for _, tc := range streamResult.ToolCalls {
-			completedEvent := &domain.ToolCallCompletedEvent{
-				ThreadID:   runCtx.ThreadID,
-				ToolCallID: tc.ID,
-				Timestamp:  time.Now(),
-			}
-			if !yield(completedEvent, nil) {
+		// Main iteration loop - continues while there are tool calls to process
+		for {
+			prepareResult, err := e.llmCtx.Prepare(ctx, runCtx)
+			if err != nil {
+				yield(nil, err)
 				return
 			}
-		}
+			if prepareResult.Terminated {
+				return
+			}
 
-		if streamResult.HasToolCalls() {
+			llmContext := prepareResult.Context
+			executor := e.toolExec.CreateExecutor(ctx, llmContext.GetEffectiveTools(), runCtx.ThreadID, runCtx.MessageID, llmContext.RequestCtx)
+
+			streamIter := e.chatClient.GetStreamingResponse(ctx, llmContext.Messages, llmContext.Options)
+
+			streamResult, err := e.stream.Process(ctx, streamIter, ProcessParams{
+				ThreadID:  runCtx.ThreadID,
+				MessageID: runCtx.MessageID,
+			}, yield)
+			if err != nil {
+				yield(nil, err)
+				return
+			}
+			if streamResult == nil {
+				return
+			}
+
+			// Emit tool call completed events
+			for _, tc := range streamResult.ToolCalls {
+				completedEvent := &domain.ToolCallCompletedEvent{
+					ThreadID:   runCtx.ThreadID,
+					ToolCallID: tc.ID,
+					Timestamp:  time.Now(),
+				}
+				if !yield(completedEvent, nil) {
+					return
+				}
+			}
+
+			// No tool calls - persist final message and exit
+			if !streamResult.HasToolCalls() {
+				if _, err := e.llmCtx.AddAssistantMessage(ctx, runCtx.ThreadID, runCtx.MessageID, streamResult.Content, nil); err != nil {
+					yield(nil, err)
+					return
+				}
+
+				assistantEvent := &domain.AssistantMessageCompletedEvent{
+					ThreadID:  runCtx.ThreadID,
+					MessageID: runCtx.MessageID,
+					Content:   streamResult.Content,
+					Timestamp: time.Now(),
+				}
+				e.yieldEvent(yield, assistantEvent, nil)
+				return
+			}
+
+			// Has tool calls - persist, execute, and continue loop
 			domainToolCalls := toDomainToolCalls(streamResult.ToolCalls)
 			thread, err := e.llmCtx.AddAssistantMessage(ctx, runCtx.ThreadID, runCtx.MessageID, streamResult.Content, domainToolCalls)
 			if err != nil {
@@ -175,32 +192,14 @@ func (e *Engine) Run(
 				}
 			}
 
+			// Check if tools signaled to stop
 			if execResults.ShouldStop {
 				return
 			}
 
-			// Continue with the already updated in-memory thread
+			// Continue loop with new message ID
 			runCtx.MessageID = core.GenerateID()
-			for event, err := range e.Run(ctx, runCtx) {
-				if !yield(event, err) {
-					return
-				}
-			}
-			return
 		}
-
-		if _, err := e.llmCtx.AddAssistantMessage(ctx, runCtx.ThreadID, runCtx.MessageID, streamResult.Content, nil); err != nil {
-			yield(nil, err)
-			return
-		}
-
-		assistantEvent := &domain.AssistantMessageCompletedEvent{
-			ThreadID:  runCtx.ThreadID,
-			MessageID: runCtx.MessageID,
-			Content:   streamResult.Content,
-			Timestamp: time.Now(),
-		}
-		e.yieldEvent(yield, assistantEvent, nil)
 	}
 }
 
