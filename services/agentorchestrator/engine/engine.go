@@ -8,7 +8,6 @@ import (
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/agentorchestrator/types"
 	"school-with-ai/services/threadmgmt"
-	"time"
 )
 
 // Use central types
@@ -21,6 +20,7 @@ type Engine struct {
 	toolExec   *ToolExecutionService
 	llmCtx     *LLMContextManager
 	stream     *StreamProcessor
+	events     *EventFactory
 }
 
 // New creates a new execution engine.
@@ -39,36 +39,8 @@ func New(
 		toolExec:   NewToolExecutionService(toolTracer),
 		llmCtx:     NewLLMContextManager(config, threadMgmt, reqCtxCapture),
 		stream:     NewStreamProcessor(config.Name),
+		events:     NewEventFactory(config.Name),
 	}
-}
-
-// setAgentName automatically sets the agent name on events that have an AgentName field.
-// This helper reduces boilerplate and prevents bugs from forgetting to set the agent name.
-func (e *Engine) setAgentName(event domain.Event) {
-	// Use type switch to set AgentName on events that support it
-	switch evt := event.(type) {
-	case *domain.AssistantMessageCompletedEvent:
-		if evt.AgentName == "" {
-			evt.AgentName = e.config.Name
-		}
-	case *domain.ToolCallStartedEvent:
-		if evt.AgentName == "" {
-			evt.AgentName = e.config.Name
-		}
-	case *domain.ToolCallExecutedEvent:
-		if evt.AgentName == "" {
-			evt.AgentName = e.config.Name
-		}
-	}
-}
-
-// yieldEvent is a helper that auto-assigns the agent name before yielding an event.
-// This ensures all events have the correct agent name without manual assignment.
-func (e *Engine) yieldEvent(yield func(core.Event, error) bool, event core.Event, err error) bool {
-	if event != nil {
-		e.setAgentName(event)
-	}
-	return yield(event, err)
 }
 
 // Run processes the LLM response using an AgentThread and yields events.
@@ -78,12 +50,7 @@ func (e *Engine) Run(
 ) iter.Seq2[core.Event, error] {
 	return func(yield func(core.Event, error) bool) {
 		// Emit start event once at the beginning
-		startEvent := &domain.AssistantMessageStartedEvent{
-			ThreadID:  runCtx.ThreadID,
-			MessageID: runCtx.MessageID,
-			Timestamp: time.Now(),
-		}
-		if !yield(startEvent, nil) {
+		if !yield(e.events.AssistantStarted(runCtx.ThreadID, runCtx.MessageID), nil) {
 			return
 		}
 
@@ -117,12 +84,7 @@ func (e *Engine) Run(
 
 			// Emit tool call completed events
 			for _, tc := range streamResult.ToolCalls {
-				completedEvent := &domain.ToolCallCompletedEvent{
-					ThreadID:   runCtx.ThreadID,
-					ToolCallID: tc.ID,
-					Timestamp:  time.Now(),
-				}
-				if !yield(completedEvent, nil) {
+				if !yield(e.events.ToolCallCompleted(runCtx.ThreadID, tc.ID), nil) {
 					return
 				}
 			}
@@ -133,14 +95,7 @@ func (e *Engine) Run(
 					yield(nil, err)
 					return
 				}
-
-				assistantEvent := &domain.AssistantMessageCompletedEvent{
-					ThreadID:  runCtx.ThreadID,
-					MessageID: runCtx.MessageID,
-					Content:   streamResult.Content,
-					Timestamp: time.Now(),
-				}
-				e.yieldEvent(yield, assistantEvent, nil)
+				yield(e.events.AssistantCompleted(runCtx.ThreadID, runCtx.MessageID, streamResult.Content, nil), nil)
 				return
 			}
 
@@ -153,14 +108,7 @@ func (e *Engine) Run(
 			}
 			runCtx.Thread = thread
 
-			assistantEvent := &domain.AssistantMessageCompletedEvent{
-				ThreadID:  runCtx.ThreadID,
-				MessageID: runCtx.MessageID,
-				Content:   streamResult.Content,
-				ToolCalls: domainToolCalls,
-				Timestamp: time.Now(),
-			}
-			if !e.yieldEvent(yield, assistantEvent, nil) {
+			if !yield(e.events.AssistantCompleted(runCtx.ThreadID, runCtx.MessageID, streamResult.Content, domainToolCalls), nil) {
 				return
 			}
 
@@ -177,17 +125,7 @@ func (e *Engine) Run(
 				}
 				runCtx.Thread = thread
 
-				toolEvent := &domain.ToolCallExecutedEvent{
-					ThreadID:        runCtx.ThreadID,
-					MessageID:       toolResultID,
-					ToolCallID:      result.ToolCallID,
-					ToolName:        result.ToolName,
-					ToolArguments:   result.Arguments,
-					ToolResult:      result.Result,
-					ParentMessageID: runCtx.MessageID,
-					Timestamp:       time.Now(),
-				}
-				if !e.yieldEvent(yield, toolEvent, nil) {
+				if !yield(e.events.ToolCallExecuted(runCtx.ThreadID, toolResultID, result.ToolCallID, result.ToolName, result.Arguments, result.Result, runCtx.MessageID), nil) {
 					return
 				}
 			}
