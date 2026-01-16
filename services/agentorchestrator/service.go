@@ -2,10 +2,12 @@ package agentorchestrator
 
 import (
 	"context"
+	"fmt"
 	"iter"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/logger"
+	"school-with-ai/services/agentorchestrator/agents/shared"
 	"school-with-ai/services/agentorchestrator/engine"
 	"school-with-ai/services/agentorchestrator/rag"
 	"school-with-ai/services/agentorchestrator/types"
@@ -29,12 +31,54 @@ type Service struct {
 	toolTracer    core.ToolTracer
 
 	// Internal components
-	threadMgmt *threadmgmt.Manager
-	engine     *engine.Engine
+	threadMgmt     *threadmgmt.Manager
+	engine         *engine.Engine
+	titleGenerator *TitleGenerator
 }
 
 // Option is a functional option for configuring Service.
 type Option func(*Service)
+
+// New creates a new agent orchestration service.
+func New(
+	log *logger.Logger,
+	chatClient ChatClient,
+	eventLog core.EventStore,
+	opts ...Option,
+) *Service {
+	s := &Service{
+		log:            log,
+		chatClient:     chatClient,
+		writeModel:     eventLog,
+		toolRegistry:   core.NewToolRegistry(),
+		threadRepo:     domain.NewThreadRepository(threadmgmt.NewEventStoreAdapter(eventLog)),
+		threadMgmt:     threadmgmt.New(log, domain.NewThreadRepository(threadmgmt.NewEventStoreAdapter(eventLog))),
+		titleGenerator: NewTitleGenerator(),
+	}
+
+	for _, opt := range opts {
+		opt(s)
+	}
+
+	// Initialize Provider and Engine
+	provider := &RegistryAgentProvider{
+		initialConfig: s.config,
+		registry:      shared.GlobalAgents,
+	}
+
+	s.engine = engine.New(
+		log,
+		s.chatClient,
+		s.threadMgmt,
+		provider,
+		s.reqCtxCapture,
+		s.toolTracer,
+	)
+
+	return s
+}
+
+
 
 // WithConfig configures the agent with a complete configuration.
 func WithConfig(config core.AgentConfig) Option {
@@ -64,45 +108,32 @@ func WithToolTracer(tracer core.ToolTracer) Option {
 	}
 }
 
-// New creates a new agent orchestrator service.
-func New(log *logger.Logger, chatClient ChatClient, writeModel core.EventStore, opts ...Option) *Service {
-	s := &Service{
-		log:          log,
-		chatClient:   chatClient,
-		writeModel:   writeModel,
-		threadRepo:   domain.NewThreadRepository(threadmgmt.NewEventStoreAdapter(writeModel)),
-		config:       core.DefaultConfig("agent"),
-		toolRegistry: core.NewToolRegistry(),
+// RegistryAgentProvider implements engine.AgentProvider using GlobalAgents.
+type RegistryAgentProvider struct {
+	initialConfig core.AgentConfig
+	registry      *shared.AgentRegistry
+}
+
+func (p *RegistryAgentProvider) GetConfig(name string) (core.AgentConfig, error) {
+	if name == p.initialConfig.Name {
+		return p.initialConfig, nil
 	}
 
-	// Apply options
-	for _, opt := range opts {
-		opt(s)
+	// Use provided registry
+	factory, ok := p.registry.Get(name)
+	if !ok {
+		return core.AgentConfig{}, fmt.Errorf("agent %s not found", name)
 	}
 
-	// Register tools
-	for _, tool := range s.config.Tools {
-		s.toolRegistry.Register(tool)
-	}
-
-	// Initialize components
-	s.threadMgmt = threadmgmt.New(log, s.threadRepo, s.config.Name)
-	s.engine = engine.New(
-		log,
-		chatClient,
-		s.threadMgmt,
-		s.config,
-		s.reqCtxCapture,
-		s.toolTracer,
-	)
-
-	return s
+	// Create new agent config using factory
+	// Note: We pass nil for notifier as events are yielded by the engine directly
+	return factory(nil), nil
 }
 
 // Run processes the LLM response using an AgentThread and yields events.
-func (s *Service) Run(ctx context.Context, runCtx core.RunContext) iter.Seq2[core.Event, error] {
+func (s *Service) Run(ctx context.Context, agentName string, runCtx core.RunContext) iter.Seq2[core.Event, error] {
 	return func(yield func(core.Event, error) bool) {
-		for event, err := range s.engine.Run(ctx, runCtx) {
+		for event, err := range s.engine.Run(ctx, agentName, runCtx) {
 			if s.config.Notifier != nil && event != nil {
 				// We ignore the error here to keep the stream moving, but log it
 				if nErr := s.config.Notifier.HandleDomainEvent(event); nErr != nil {
@@ -114,6 +145,81 @@ func (s *Service) Run(ctx context.Context, runCtx core.RunContext) iter.Seq2[cor
 			}
 		}
 	}
+}
+
+// ProcessUserMessage handles the full flow of processing a user message:
+// 1. Adds the message to the thread.
+// 2. Generates/Updates the thread title (if new).
+// 3. Runs the agent execution loop.
+func (s *Service) ProcessUserMessage(ctx context.Context, threadID, content, userID string) (iter.Seq2[core.Event, error], error) {
+	// 1. Add user message
+	messageID := domain.GenerateMessageID()
+	runID := domain.GenerateMessageID() // Unique ID for this execution run
+
+	agg, event, err := s.threadMgmt.AddUserMessage(ctx, threadID, messageID, content)
+	if err != nil {
+		return nil, fmt.Errorf("failed to add user message: %w", err)
+	}
+
+	// 2. Handle Title
+	thread := s.threadMgmt.ToAgentThread(agg)
+	titleEvent, err := s.handleThreadTitle(ctx, thread, content)
+	if err != nil {
+		s.log.Error(ctx, "failed to handle thread title", "error", err)
+	}
+
+	// 3. Run Agent
+	runIter := s.Run(ctx, "student-facing-agent", core.RunContext{
+		ThreadID:  threadID,
+		MessageID: runID,
+		Thread:    thread,
+		Options:   core.DefaultRunOptions(),
+	})
+
+	// Return combined iterator
+	return func(yield func(core.Event, error) bool) {
+		// Yield UserMessageAdded
+		if !yield(event, nil) {
+			return
+		}
+
+		// Yield TitleUpdated if any
+		if titleEvent != nil {
+			if !yield(titleEvent, nil) {
+				return
+			}
+		}
+
+		// Yield Run events
+		for evt, err := range runIter {
+			if !yield(evt, err) {
+				return
+			}
+		}
+	}, nil
+}
+
+// handleThreadTitle generates and updates a thread title if it's the first message.
+func (s *Service) handleThreadTitle(ctx context.Context, thread core.AgentThread, content string) (core.Event, error) {
+	msgs, err := thread.RetrieveFullConversationHistory(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve conversation history: %w", err)
+	}
+
+	// Only generate title on the first message
+	if len(msgs) != 1 {
+		return nil, nil
+	}
+
+	title := s.titleGenerator.FromFirstMessage(content)
+
+	// Update thread title via thread command service (internal threadMgmt)
+	event, err := s.threadMgmt.UpdateThreadTitle(ctx, thread.GetID(), title)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update thread title: %w", err)
+	}
+
+	return event, nil
 }
 
 // notify emits a domain event if a notifier is configured.
