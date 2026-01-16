@@ -8,7 +8,6 @@ import (
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/observability/langfuse"
 	"school-with-ai/services"
-	"school-with-ai/services/agentorchestrator/agents/shared"
 	"time"
 )
 
@@ -34,7 +33,6 @@ type Service struct {
 	chatClient          ChatClient
 	langfuseTracer      *LangfuseTracer
 	observabilityConfig ObservabilityConfig
-	titleGenerator      *TitleGenerator
 }
 
 // NewService creates a new orchestration service.
@@ -48,7 +46,6 @@ func NewService(
 	chatClient ChatClient,
 	langfuseTracer *LangfuseTracer,
 	observabilityConfig ObservabilityConfig,
-	titleGenerator *TitleGenerator,
 ) *Service {
 	return &Service{
 		log:                  log,
@@ -60,7 +57,6 @@ func NewService(
 		chatClient:           chatClient,
 		langfuseTracer:       langfuseTracer,
 		observabilityConfig:  observabilityConfig,
-		titleGenerator:       titleGenerator,
 	}
 }
 
@@ -88,30 +84,16 @@ func (s *Service) HandleUserMessage(
 		return fmt.Errorf("task cancelled: %w", ctx.Err())
 	}
 
-	// Note: Thread creation is now handled automatically by AddUserMessage
-	// if the thread doesn't exist (version 0)
-
-	// 1. Add user message to thread (creates thread if needed)
-	thread, err := s.threadCommandService.AddUserMessage(ctx, params.ThreadID, params.MessageID, params.Content)
-	if err != nil {
-		s.log.Error(ctx, "Failed to add user message",
-			"threadID", params.ThreadID,
-			"error", err)
-		return fmt.Errorf("failed to add user message: %w", err)
-	}
-
-	// 2. Generate unique run ID
-	runID := domain.GenerateMessageID()
-
-	// 3. Auto-generate thread title if this is the first message
-	if err := s.handleThreadTitle(ctx, thread, params.Content, emitter); err != nil {
-		s.log.Error(ctx, "Failed to handle thread title",
-			"threadID", params.ThreadID,
-			"error", err)
-	}
-
-	// 5. Start Langfuse trace (if enabled)
+	// 1. Start Langfuse trace (if enabled)
 	var traceCtx *langfuse.TraceContext
+	// We generate runID here just for tracing metadata if needed?
+	// ProcessUserMessage generates its own IDs.
+	// But we can pass a CorrelationID? ProcessUserMessage signature doesn't take it.
+	// We can let ProcessUserMessage generate IDs.
+	// For tracing, we might want to know the runID. 
+	// But if we trust Orchestrator, we can skip tracing specific runID here or rely on returned events?
+	// Let's keep it simple.
+	
 	if s.langfuseTracer != nil {
 		tracer := s.langfuseTracer.GetTracer()
 		if tracer != nil {
@@ -120,7 +102,6 @@ func (s *Service) HandleUserMessage(
 				langfuse.WithTraceSessionID(params.ThreadID),
 				langfuse.WithTraceMetadata(map[string]any{
 					"messageId": params.MessageID,
-					"runId":     runID,
 				}),
 				langfuse.WithTraceTags(s.getTraceTags()),
 				langfuse.WithTraceRelease(s.getRelease()),
@@ -133,241 +114,32 @@ func (s *Service) HandleUserMessage(
 		}
 	}
 
-	// 6. Run agent handoff chain starting with student-facing agent
-	if err := emitter.Emit(&domain.RunStartedEvent{
-		ThreadID:  params.ThreadID,
-		RunID:     runID,
-		Timestamp: time.Now(),
-	}); err != nil {
-		s.log.Error(ctx, "failed to emit run started event", "error", err, "threadID", params.ThreadID)
-	}
-
-	s.runAgentHandoffChain(ctx, params.ThreadID, "student-facing-agent", emitter, runID, traceCtx, thread)
-
-	if err := emitter.Emit(&domain.RunFinishedEvent{
-		ThreadID:  params.ThreadID,
-		RunID:     runID,
-		Timestamp: time.Now(),
-	}); err != nil {
-		s.log.Error(ctx, "failed to emit run finished event", "error", err, "threadID", params.ThreadID)
-	}
-
-	return nil
-}
-
-// runAgentHandoffChain runs agents in sequence, following handoffs until completion.
-func (s *Service) runAgentHandoffChain(ctx context.Context, threadID, startAgent string, emitter EventEmitter, runID string, traceCtx *langfuse.TraceContext, thread core.AgentThread) {
-	currentAgent := startAgent
-	currentThread := thread
-
-	for currentAgent != "" {
-		if ctx.Err() != nil {
-			return
-		}
-
-		nextAgent, nextThread, err := s.runAgent(ctx, threadID, currentAgent, emitter, traceCtx, currentThread)
-		if err != nil {
-			if emitErr := emitter.Emit(&domain.RunErrorEvent{
-				ThreadID:  threadID,
-				Message:   fmt.Sprintf("Agent %s failed: %s", currentAgent, err),
-				ErrorCode: "AGENT_RUN_ERROR",
-				Timestamp: time.Now(),
-			}); emitErr != nil {
-				s.log.Error(ctx, "failed to emit run error event", "error", emitErr, "threadID", threadID)
-			}
-			return
-		}
-
-		currentAgent = nextAgent
-		currentThread = nextThread
-	}
-}
-
-// runAgent runs a single agent and returns the next agent name if a handoff occurred.
-func (s *Service) runAgent(ctx context.Context, threadID, agentName string, emitter EventEmitter, traceCtx *langfuse.TraceContext, thread core.AgentThread) (string, core.AgentThread, error) {
-	s.log.Info(ctx, "Executing agent", "threadID", threadID, "agent", agentName)
-
-	// Start generation tracking for this agent (if Langfuse is enabled)
-	var genTracker *langfuse.GenerationTracker
-	if s.langfuseTracer != nil && traceCtx != nil {
-		tracer := s.langfuseTracer.GetTracer()
-		if tracer != nil {
-			// Start generation for this agent
-			tracker, err := tracer.StartGeneration(ctx, traceCtx, agentName, "gpt-4o",
-				langfuse.WithGenerationMetadata(map[string]any{
-					"threadId": threadID,
-				}),
-			)
-			if err != nil {
-				s.log.Warn(ctx, "failed to start generation tracking", "agent", agentName, "error", err)
-			} else {
-				genTracker = tracker
-				// Update trace context to nest child observations under this generation
-				traceCtx = &langfuse.TraceContext{
-					TraceID:             traceCtx.TraceID,
-					ParentObservationID: genTracker.GetObservationID(),
-				}
-			}
-		}
-	}
-
-	// Get agent factory
-	factory, ok := shared.GlobalAgents.Get(agentName)
-	if !ok {
-		return "", nil, fmt.Errorf("agent %s not found", agentName)
-	}
-
-	// Create agent instance with domain event notifier
-	// The notifier emits domain events directly without UI conversion
-	notifier := NewDomainEventNotifier(emitter)
-	agentConfig := factory(notifier)
-
-	var handoffReqCtx *core.RequestContext
-
-	agent := s.agentFactory.Create(agentConfig, &handoffReqCtx, nil)
-
-	// Add tool tracer if Langfuse is enabled
-	if s.langfuseTracer != nil && traceCtx != nil {
-		tracer := s.langfuseTracer.GetTracer()
-		if tracer != nil {
-			toolTracer := langfuse.NewLangfuseToolTracer(tracer)
-			agent = s.agentFactory.Create(agentConfig, &handoffReqCtx, toolTracer)
-		}
-	}
-
-	// Note: thread is now passed in from the caller to ensure consistency
-
-	// Debug: Log thread state
-	messages, err := thread.RetrieveFullConversationHistory(ctx)
-	if err != nil {
-		s.log.Error(ctx, "Failed to retrieve conversation history", "threadID", threadID, "error", err)
-		return "", nil, fmt.Errorf("failed to retrieve conversation history: %w", err)
-	}
-	s.log.Info(ctx, "Thread state before agent execution",
-		"threadID", threadID,
-		"messageCount", len(messages),
-		"agentName", agentName)
-	if len(messages) > 0 {
-		lastMsg := messages[len(messages)-1]
-		s.log.Info(ctx, "Last message in thread",
-			"role", lastMsg.Role,
-			"content", lastMsg.Content[:min(50, len(lastMsg.Content))])
-	}
-
-	// Add trace context to ctx for tool tracking (if enabled)
 	if traceCtx != nil {
 		ctx = core.WithTraceContext(ctx, traceCtx.TraceID, traceCtx.ParentObservationID)
 	}
 
-	// Execute agent
-	messageID := domain.GenerateMessageID()
-	runIter := agent.Run(ctx, core.RunContext{
-		ThreadID:  threadID,
-		MessageID: messageID,
-		Thread:    thread,
-		Options:   core.DefaultRunOptions(),
-	})
+	// 2. Delegate to AgentOrchestrator
+	events, err := s.orchestratorService.ProcessUserMessage(ctx, params.ThreadID, params.Content, params.UserID)
+	if err != nil {
+		return fmt.Errorf("failed to process user message: %w", err)
+	}
 
-	var agentErr error
-	for _, err := range runIter {
+	// 3. Emit events
+	for event, err := range events {
 		if err != nil {
-			agentErr = err
-			break
+			if emitErr := emitter.Emit(&domain.RunErrorEvent{
+				ThreadID:  params.ThreadID,
+				Message:   fmt.Sprintf("Agent execution failed: %s", err),
+				ErrorCode: "AGENT_RUN_ERROR",
+				Timestamp: time.Now(),
+			}); emitErr != nil {
+				s.log.Error(ctx, "failed to emit run error event", "error", emitErr, "threadID", params.ThreadID)
+			}
+			return fmt.Errorf("agent run failed: %w", err)
 		}
-	}
 
-	// Complete generation tracking (if enabled)
-	if genTracker != nil {
-		if agentErr != nil {
-			// Agent execution failed
-			if err := genTracker.EndWithError(ctx, agentErr); err != nil {
-				s.log.Warn(ctx, "failed to complete generation tracking with error", "agent", agentName, "error", err)
-			}
-		} else {
-			// Agent execution succeeded
-			// Get the agent's response from the thread
-			updatedThread, _ := s.threadStore.GetOrCreateAgentThread(ctx, threadID)
-			var response string
-			updatedMessages, err := updatedThread.RetrieveFullConversationHistory(ctx)
-			if err != nil {
-				s.log.Warn(ctx, "failed to retrieve conversation history for generation tracking", "error", err)
-			} else if len(updatedMessages) > 0 {
-				lastMsg := updatedMessages[len(updatedMessages)-1]
-				if lastMsg.Role == "assistant" {
-					response = lastMsg.Content
-				}
-			}
-
-			if err := genTracker.End(ctx, map[string]any{
-				"response": response,
-			}, nil); err != nil { // Note: We don't have token usage info here
-				s.log.Warn(ctx, "failed to complete generation tracking", "agent", agentName, "error", err)
-			}
-		}
-	}
-
-	if agentErr != nil {
-		return "", nil, agentErr
-	}
-
-	// Check for handoff to next agent
-	if handoffReqCtx != nil {
-		if targetAgent, ok := handoffReqCtx.State["handoff"].(string); ok && targetAgent != "" {
-			s.log.Info(ctx, "Agent handoff", "from", agentName, "to", targetAgent)
-
-			// Log handoff event in Langfuse
-			if s.langfuseTracer != nil && traceCtx != nil {
-				tracer := s.langfuseTracer.GetTracer()
-				if tracer != nil {
-					_ = tracer.LogEvent(ctx, traceCtx, "agent-handoff",
-						langfuse.WithEventInput(map[string]any{
-							"from": agentName,
-							"to":   targetAgent,
-						}),
-					)
-				}
-			}
-
-			// CRITICAL: Reload the thread from the store to get all the latest messages
-			// The current thread object might not have the messages that were just added
-			updatedThread, err := s.threadStore.GetOrCreateAgentThread(ctx, threadID)
-			if err != nil {
-				s.log.Warn(ctx, "failed to reload thread for handoff", "error", err, "threadID", threadID)
-				// Fall back to the current thread if reload fails
-				return targetAgent, thread, nil
-			}
-
-			return targetAgent, updatedThread, nil
-		}
-	}
-
-	return "", thread, nil
-}
-
-// handleThreadTitle generates and updates a thread title if it's the first message.
-func (s *Service) handleThreadTitle(ctx context.Context, thread core.AgentThread, content string, emitter EventEmitter) error {
-	msgs, err := thread.RetrieveFullConversationHistory(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to retrieve conversation history: %w", err)
-	}
-
-	// Only generate title on the first message
-	if len(msgs) != 1 {
-		return nil
-	}
-
-	title := s.titleGenerator.FromFirstMessage(content)
-
-	// Update thread title via thread command service
-	titleEvent, err := s.threadCommandService.UpdateThreadTitle(ctx, thread.GetID(), title)
-	if err != nil {
-		return fmt.Errorf("failed to update thread title: %w", err)
-	}
-
-	// Emit notification event if something changed
-	if titleEvent != nil {
-		if err := emitter.Emit(titleEvent); err != nil {
-			return fmt.Errorf("failed to emit title update event: %w", err)
+		if emitErr := emitter.Emit(event); emitErr != nil {
+			s.log.Error(ctx, "failed to emit domain event", "error", emitErr, "threadID", params.ThreadID)
 		}
 	}
 

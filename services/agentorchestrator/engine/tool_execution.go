@@ -13,6 +13,7 @@ type ToolExecutionResult struct {
 	Arguments     string
 	Result        string
 	StopIteration bool
+	Command       *core.Command
 }
 
 // ToolExecutionResults represents the outcome of executing multiple tool calls.
@@ -99,5 +100,6 @@ func (s *ToolExecutionService) Execute(toolCall core.ToolCall, executor core.Too
 		Arguments:     toolCall.Function.Arguments,
 		Result:        resultStr,
 		StopIteration: execResult.StopIteration,
+		Command:       execResult.Command,
 	}
 }

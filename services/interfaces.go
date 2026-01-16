@@ -28,7 +28,10 @@ type ThreadQueryService interface {
 // AgentOrchestrator defines the interface for running agent-based workflows.
 type AgentOrchestrator interface {
 	// Run processes the LLM response using an AgentThread and yields events.
-	Run(ctx context.Context, runCtx core.RunContext) iter.Seq2[core.Event, error]
+	Run(ctx context.Context, agentName string, runCtx core.RunContext) iter.Seq2[core.Event, error]
+
+	// ProcessUserMessage handles a new user message from start to finish.
+	ProcessUserMessage(ctx context.Context, threadID, content, userID string) (iter.Seq2[core.Event, error], error)
 }
 
 // ThreadCommandService defines the interface for thread lifecycle management (commands).

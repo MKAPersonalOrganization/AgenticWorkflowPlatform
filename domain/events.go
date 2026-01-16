@@ -182,3 +182,14 @@ type ThreadDeleted struct {
 func (e ThreadDeleted) EventType() string         { return "ThreadDeleted" }
 func (e ThreadDeleted) EventTimestamp() time.Time { return e.Timestamp }
 func (e ThreadDeleted) AggregateID() string       { return e.ThreadID }
+
+// AgentHandoffEvent is emitted when control is transferred to another agent.
+type AgentHandoffEvent struct {
+	ThreadID    string
+	TargetAgent string
+	Timestamp   time.Time
+}
+
+func (e AgentHandoffEvent) EventType() string         { return "AgentHandoff" }
+func (e AgentHandoffEvent) EventTimestamp() time.Time { return e.Timestamp }
+func (e AgentHandoffEvent) AggregateID() string       { return e.ThreadID }

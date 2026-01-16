@@ -1,4 +1,4 @@
-package taskmanagement
+package agentorchestrator
 
 // TitleGenerator handles the logic for generating thread titles.
 type TitleGenerator struct{}

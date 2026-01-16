@@ -19,7 +19,7 @@ type Service struct {
 func New(log *logger.Logger, threadRepo *domain.ThreadRepository, config core.AgentConfig) *Service {
 	return &Service{
 		log:        log,
-		threadMgmt: threadmgmt.New(log, threadRepo, config.Name),
+		threadMgmt: threadmgmt.New(log, threadRepo),
 		config:     config,
 	}
 }

@@ -101,7 +101,7 @@ func (m *LLMContextManager) AddAssistantMessage(
 	content string,
 	toolCalls []domain.ToolCall,
 ) (core.AgentThread, error) {
-	agg, err := m.threadMgmt.AddAssistantMessage(ctx, threadID, messageID, content, toolCalls)
+	agg, err := m.threadMgmt.AddAssistantMessage(ctx, threadID, messageID, content, toolCalls, m.config.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to add assistant message: %w", err)
 	}
@@ -117,7 +117,7 @@ func (m *LLMContextManager) AddToolResultMessage(
 	toolCallID string,
 	result string,
 ) (core.AgentThread, error) {
-	agg, err := m.threadMgmt.AddToolResultMessage(ctx, threadID, messageID, toolCallID, result)
+	agg, err := m.threadMgmt.AddToolResultMessage(ctx, threadID, messageID, toolCallID, result, m.config.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to add tool result message: %w", err)
 	}

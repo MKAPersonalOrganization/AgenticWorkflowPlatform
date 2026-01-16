@@ -14,15 +14,13 @@ import (
 type Manager struct {
 	log        *logger.Logger
 	threadRepo *domain.ThreadRepository
-	agentName  string
 }
 
 // New creates a new thread management component.
-func New(log *logger.Logger, threadRepo *domain.ThreadRepository, agentName string) *Manager {
+func New(log *logger.Logger, threadRepo *domain.ThreadRepository) *Manager {
 	return &Manager{
 		log:        log,
 		threadRepo: threadRepo,
-		agentName:  agentName,
 	}
 }
 
@@ -112,13 +110,13 @@ func (m *Manager) AddUserMessage(ctx context.Context, threadID, messageID, conte
 }
 
 // AddAssistantMessage adds an assistant message to the thread.
-func (m *Manager) AddAssistantMessage(ctx context.Context, threadID, messageID, content string, toolCalls []domain.ToolCall) (*domain.ThreadAggregate, error) {
+func (m *Manager) AddAssistantMessage(ctx context.Context, threadID, messageID, content string, toolCalls []domain.ToolCall, agentName string) (*domain.ThreadAggregate, error) {
 	thread, err := m.threadRepo.Load(ctx, threadID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load thread: %w", err)
 	}
 
-	err = thread.AddMessage(messageID, "assistant", content, toolCalls, "", m.agentName, nil)
+	err = thread.AddMessage(messageID, "assistant", content, toolCalls, "", agentName, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to add assistant message: %w", err)
 	}
@@ -131,13 +129,13 @@ func (m *Manager) AddAssistantMessage(ctx context.Context, threadID, messageID, 
 }
 
 // AddToolResultMessage adds a tool result message to the thread.
-func (m *Manager) AddToolResultMessage(ctx context.Context, threadID, messageID, toolCallID, result string) (*domain.ThreadAggregate, error) {
+func (m *Manager) AddToolResultMessage(ctx context.Context, threadID, messageID, toolCallID, result, agentName string) (*domain.ThreadAggregate, error) {
 	thread, err := m.threadRepo.Load(ctx, threadID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load thread: %w", err)
 	}
 
-	err = thread.AddMessage(messageID, "tool", result, nil, toolCallID, m.agentName, nil)
+	err = thread.AddMessage(messageID, "tool", result, nil, toolCallID, agentName, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to add tool result: %w", err)
 	}
