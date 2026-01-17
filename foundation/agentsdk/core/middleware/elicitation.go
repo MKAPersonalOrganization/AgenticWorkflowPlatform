@@ -161,6 +161,14 @@ For True/False (single checkbox), use 'type': 'true_false':
   "schema": {
     "type": "true_false"
   }
+}
+
+For short free-form answer, use 'type': 'short_answer':
+{
+  "question": "What is your name?",
+  "schema": {
+    "type": "short_answer"
+  }
 }`)
 
 	return next(ctx, reqCtx)
