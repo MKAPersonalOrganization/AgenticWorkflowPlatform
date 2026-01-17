@@ -14,6 +14,7 @@ type mockEvent struct {
 func (m *mockEvent) EventType() string { return "MockEvent" }
 
 func TestRouter(t *testing.T) {
+	t.Parallel()
 	router := NewRouter()
 	ctx := context.Background()
 
@@ -43,6 +44,7 @@ func TestRouter(t *testing.T) {
 }
 
 func TestRouter_Error(t *testing.T) {
+	t.Parallel()
 	router := NewRouter()
 	ctx := context.Background()
 
