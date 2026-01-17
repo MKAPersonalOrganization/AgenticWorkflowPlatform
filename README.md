@@ -100,27 +100,27 @@ graph TB
     TaskH -->|"Manages threads [In-process]"| ThreadMgmt
     AGUIH -->|"Requests projection [In-process]"| ProjS
     
-    TaskS -.->|"Enqueues job [Redis]"| Redis
-    Redis -.->|"Pulls job for processing [Redis]"| TaskS
+    TaskS -.->|"Enqueues job"| Redis
+    Redis -.->|"Pulls job for processing"| TaskS
     
     TaskS -->|"Executes business logic [In-process]"| OrchS
     
     OrchS -->|"Requests context [In-process]"| LLMProj
     
-    ProjS -->|"Fast reads [SQL]"| AGUIProj
-    AGUIProj -->|"Query [SQL]"| AppPostgres
+    ProjS -->|"Fast reads"| AGUIProj
+    AGUIProj -->|"Query"| AppPostgres
     
-    AGUIH -->|"Subscribes (Live) [Go Channel]"| RedisB
-    RedisB -.->|"Subscribe/Publish [Redis]"| Redis
-    ProjUpdater -.->|"Notify (Live) [In-Memory]"| RedisB
+    AGUIH -->|"Subscribes (Live)"| RedisB
+    RedisB -.->|"Subscribe/Publish"| Redis
+    ProjUpdater -.->|"Notify (Live)"| RedisB
     
-    LLMProj -->|"Query [SQL]"| AppPostgres
+    LLMProj -->|"Query"| AppPostgres
     
-    ProjUpdater -->|"Subscribe to $all [GRPC]"| KurrentDB
-    ProjUpdater -->|"Update all projections [SQL]"| AppPostgres
+    ProjUpdater -->|"Subscribe to $all"| KurrentDB
+    ProjUpdater -->|"Update all projections"| AppPostgres
     
-    OrchS -->|"Appends events [GRPC]"| KurrentDB
-    ThreadMgmt -->|"Appends events [GRPC]"| KurrentDB
+    OrchS -->|"Appends events"| KurrentDB
+    ThreadMgmt -->|"Appends events"| KurrentDB
     
     note["<i>Note: Solid lines denote synchronous interactions; dashed lines denote asynchronous interactions. LLM interactions and detailed tracing (via Langfuse) are omitted for clarity as they are considered implicit.</i>"]
 ```
