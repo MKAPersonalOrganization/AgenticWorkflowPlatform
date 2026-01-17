@@ -83,7 +83,6 @@ graph TB
         ProjUpdater["<b>Projection Updater</b><br/>[Technology: KurrentDB Subscriptions]<br/>Subscribes to event stream and updates PostgreSQL projections in real-time."]
         
         LLMProj["<b>LLM Context Projection (PostgreSQL)</b><br/>[Technology: Materialized Views]<br/>Fast conversation history from PostgreSQL for LLM prompts."]
-        WhiteProj["<b>Whiteboard Projection (PostgreSQL)</b><br/>[Technology: Materialized Views]<br/>Agent workspace state maintained in PostgreSQL."]
         
         AGUIProj["<b>AGUI Projection (PostgreSQL)</b><br/>[Technology: Materialized Views]<br/>Fast reads from PostgreSQL for current thread state."]
     end
@@ -118,8 +117,10 @@ graph TB
     ProjS -->|"Fast reads [SQL]"| AGUIProj
     AGUIProj -->|"Query [SQL]"| AppPostgres
     
+    AGUIH -->|"Subscribes (Live) [Go Channel]"| AGUIProj
+    ProjUpdater -.->|"Notify (Live) [In-Memory]"| AGUIProj
+    
     LLMProj -->|"Query [SQL]"| AppPostgres
-    WhiteProj -->|"Query [SQL]"| AppPostgres
     
     ProjUpdater -->|"Subscribe to $all [GRPC]"| KurrentDB
     ProjUpdater -->|"Update all projections [SQL]"| AppPostgres
@@ -147,7 +148,6 @@ graph TB
 | **Agent Orchestrator** | - | Manages LLM interactions, tool-calling loops, and agent handoffs. (Package: `services/agentorchestrator`) |
 | **Projection Updater** | KurrentDB Subscriptions | Subscribes to KurrentDB event stream and updates PostgreSQL projections in real-time. |
 | **LLM Context Projection** | PostgreSQL Materialized Views | Fast conversation history from PostgreSQL for LLM prompts (3-8ms reads). |
-| **Whiteboard Projection** | PostgreSQL Materialized Views | Agent workspace state maintained in PostgreSQL for instant access. |
 | **AGUI Projection** | PostgreSQL Materialized Views | Fast reads from PostgreSQL tables that are kept up-to-date via event subscription (3-8ms vs 50-500ms). |
 
 ### Key Patterns
