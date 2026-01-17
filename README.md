@@ -18,7 +18,8 @@ graph TB
 
     KurrentDB[(KurrentDB<br/>Event Store)]
     AppPostgres[(PostgreSQL<br/>Projections DB)]
-    Redis[(Redis<br/>Task Queue & Pub/Sub)]
+    RedisTQ[(Redis<br/>Task Queue)]
+    RedisPS[(Redis<br/>Pub/Sub)]
     Kratos[Ory Kratos<br/>Identity & Auth]
     Postgres[(PostgreSQL<br/>Kratos DB)]
 
@@ -29,7 +30,8 @@ graph TB
     GoApp -->|Subscribe<br/>to Events| KurrentDB
     GoApp -->|Fast Reads<br/>Materialized Views| AppPostgres
     GoApp -->|Update<br/>Projections| AppPostgres
-    GoApp -->|Tasks & Pub/Sub| Redis
+    GoApp -->|Tasks| RedisTQ
+    GoApp -->|Pub/Sub| RedisPS
     GoApp -->|Auth API| Kratos
 
     Kratos -->|SQL| Postgres
@@ -44,7 +46,8 @@ graph TB
 - **Go Application**: Event-sourced multi-agent system with PostgreSQL materialized projections
 - **KurrentDB**: PostgreSQL-backed event store (single source of truth for events)
 - **PostgreSQL (App)**: Materialized projection database for fast reads (updated in real-time via event subscription)
-- **Redis**: Distributed task queue (Asynq) and real-time event broadcaster (Pub/Sub) for multi-pod scalability
+- **Redis (Task Queue)**: Distributed task queue (Asynq) for background agent execution
+- **Redis (Pub/Sub)**: Real-time event broadcaster for multi-pod scalability
 - **Ory Kratos**: Identity and session management
 - **PostgreSQL (Kratos)**: Database for Kratos user data
 - **Email Service**: Notification service for authentication emails
@@ -84,7 +87,8 @@ graph TB
 
     User["<b>User / Browser</b><br/>[Person/Client]"]
     Kratos["<b>Ory Kratos</b><br/>[Software System]<br/>Identity Management"]
-    Redis["<b>Redis</b><br/>[Container]<br/>Task Queue & Pub/Sub Store"]
+    RedisTQ["<b>Redis (Task Queue)</b><br/>[Container]<br/>Asynq Backend"]
+    RedisPS["<b>Redis (Pub/Sub)</b><br/>[Container]<br/>Real-time Broadcaster"]
     KurrentDB["<b>KurrentDB</b><br/>[Container]<br/>Event Store"]
     AppPostgres["<b>PostgreSQL</b><br/>[Container]<br/>Projections DB"]
 
@@ -100,8 +104,8 @@ graph TB
     TaskH -->|"Manages threads [In-process]"| ThreadMgmt
     AGUIH -->|"Requests projection [In-process]"| ProjS
     
-    TaskS -.->|"Enqueues job"| Redis
-    Redis -.->|"Pulls job for processing"| TaskS
+    TaskS -.->|"Enqueues job"| RedisTQ
+    RedisTQ -.->|"Pulls job for processing"| TaskS
     
     TaskS -->|"Executes business logic [In-process]"| OrchS
     
@@ -111,7 +115,7 @@ graph TB
     AGUIProj -->|"Query"| AppPostgres
     
     AGUIH -->|"Subscribes (Live)"| RedisB
-    RedisB -.->|"Subscribe/Publish"| Redis
+    RedisB -.->|"Subscribe/Publish"| RedisPS
     ProjUpdater -.->|"Notify (Live)"| RedisB
     
     LLMProj -->|"Query"| AppPostgres

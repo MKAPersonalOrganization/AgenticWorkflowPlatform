@@ -43,7 +43,7 @@ ALTER TABLE agui_messages ADD COLUMN IF NOT EXISTS agent_name VARCHAR(255);
 
 CREATE INDEX IF NOT EXISTS idx_agui_messages_thread_seq ON agui_messages(thread_id, sequence_num);
 
--- Version: 1.05
+-- Version: 1.04
 -- Description: Create LLM context projection tables
 CREATE TABLE IF NOT EXISTS llm_threads (
     thread_id VARCHAR(255) PRIMARY KEY,
@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS llm_threads (
 CREATE INDEX IF NOT EXISTS idx_llm_threads_user ON llm_threads(user_id);
 CREATE INDEX IF NOT EXISTS idx_llm_threads_deleted ON llm_threads(is_deleted) WHERE is_deleted = FALSE;
 
--- Version: 1.06
+-- Version: 1.05
 -- Description: Create LLM messages table
 CREATE TABLE IF NOT EXISTS llm_messages (
     message_id VARCHAR(255) PRIMARY KEY,
@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS llm_messages (
 CREATE INDEX IF NOT EXISTS idx_llm_messages_thread_seq ON llm_messages(thread_id, sequence_num);
 CREATE INDEX IF NOT EXISTS idx_llm_messages_created ON llm_messages(created_at);
 
--- Version: 1.07
+-- Version: 1.06
 -- Description: Insert initial checkpoint data
 INSERT INTO projection_checkpoints (projection_name, commit_position, prepare_position)
 VALUES 
