@@ -27,6 +27,7 @@ type TaskManagementHandler struct {
 	authService         services.AuthService
 	threadQueryService  services.ThreadQueryService
 	aguiProjection      agui.AguiProjection
+	broadcaster         agui.AguiBroadcaster
 }
 
 // NewTaskManagementHandler creates a new HTTP handler for task management.
@@ -39,6 +40,7 @@ func NewTaskManagementHandler(
 	authService services.AuthService,
 	threadQueryService services.ThreadQueryService,
 	aguiProjection agui.AguiProjection,
+	broadcaster agui.AguiBroadcaster,
 ) *TaskManagementHandler {
 	return &TaskManagementHandler{
 		log:                 log,
@@ -49,6 +51,7 @@ func NewTaskManagementHandler(
 		authService:         authService,
 		threadQueryService:  threadQueryService,
 		aguiProjection:      aguiProjection,
+		broadcaster:         broadcaster,
 	}
 }
 
@@ -173,8 +176,8 @@ func (h *TaskManagementHandler) StreamJobEvents(w http.ResponseWriter, r *http.R
 
 	h.log.Info(r.Context(), "[API] Starting SSE stream from Projection", "jobID", jobID, "threadID", threadID)
 
-	// 3. Subscribe to Projection (Live Path)
-	eventCh, cancel := h.aguiProjection.Subscribe(threadID)
+	// 3. Subscribe to Broadcaster (Live Path)
+	eventCh, cancel := h.broadcaster.Subscribe(threadID)
 	defer cancel()
 
 	// 4. Send Initial Snapshot (Historical Path - optional but recommended)

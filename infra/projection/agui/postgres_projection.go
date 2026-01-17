@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/event"
 	"school-with-ai/foundation/logger"
-	"sync"
 	"time"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
@@ -19,83 +19,33 @@ import (
 type PostgresAguiProjection struct {
 	log *logger.Logger
 	db  *sqlx.DB
-
-	mu          sync.RWMutex
-	subscribers map[string][]chan any
 }
 
 // NewPostgresAguiProjection creates a new PostgreSQL AGUI projection.
 func NewPostgresAguiProjection(log *logger.Logger, db *sqlx.DB) *PostgresAguiProjection {
 	return &PostgresAguiProjection{
-		log:         log,
-		db:          db,
-		subscribers: make(map[string][]chan any),
+		log: log,
+		db:  db,
 	}
 }
 
-// Name returns the projection name for logging and checkpointing.
-func (p *PostgresAguiProjection) Name() string {
-	return "agui"
-}
 
-// Apply handles an event and updates the PostgreSQL projection.
-func (p *PostgresAguiProjection) Apply(ctx context.Context, event core.Event) error {
-	var err error
-	var threadID string
-
-	switch e := event.(type) {
-	case *domain.ThreadCreated:
-		err = p.applyThreadCreated(ctx, *e)
-		threadID = e.ThreadID
-	case *domain.MessageAdded:
-		err = p.applyMessageAdded(ctx, *e)
-		threadID = e.ThreadID
-	case *domain.ThreadTitleUpdatedEvent:
-		err = p.applyThreadTitleChanged(ctx, *e)
-		threadID = e.ThreadID
-	case *domain.ThreadDeleted:
-		err = p.applyThreadDeleted(ctx, *e)
-		threadID = e.ThreadID
-	case *domain.RunStartedEvent:
-		threadID = e.ThreadID
-	case *domain.RunFinishedEvent:
-		threadID = e.ThreadID
-	case *domain.RunErrorEvent:
-		threadID = e.ThreadID
-	case *domain.AssistantMessageStartedEvent:
-		threadID = e.ThreadID
-	case *domain.AssistantContentStreamedEvent:
-		threadID = e.ThreadID
-	case *domain.AssistantMessageCompletedEvent:
-		threadID = e.ThreadID
-	case *domain.ToolCallStartedEvent:
-		threadID = e.ThreadID
-	case *domain.ToolCallArgumentsStreamedEvent:
-		threadID = e.ThreadID
-	case *domain.ToolCallCompletedEvent:
-		threadID = e.ThreadID
-	case *domain.ToolCallExecutedEvent:
-		threadID = e.ThreadID
-	case *domain.HumanInputRequestedEvent:
-		threadID = e.ThreadID
-	case *domain.AgentHandoffEvent:
-		threadID = e.ThreadID
-	default:
-		// Ignore unknown events
-		return nil
-	}
-
-	if err != nil {
-		return err
-	}
-
-	// Notify subscribers
-	if threadID != "" {
-		p.log.Debug(ctx, "PostgresAguiProjection notifying subscribers", "threadID", threadID, "eventType", fmt.Sprintf("%T", event))
-		p.notifySubscribers(threadID, event)
-	}
-
-	return nil
+// RegisterHandlers registers database update handlers to the provided router.
+func (p *PostgresAguiProjection) RegisterHandlers(router interface {
+	Register(eventPrototype any, handler event.HandlerFunc)
+}) {
+	router.Register(&domain.ThreadCreated{}, func(ctx context.Context, e core.Event) error {
+		return p.applyThreadCreated(ctx, *e.(*domain.ThreadCreated))
+	})
+	router.Register(&domain.MessageAdded{}, func(ctx context.Context, e core.Event) error {
+		return p.applyMessageAdded(ctx, *e.(*domain.MessageAdded))
+	})
+	router.Register(&domain.ThreadTitleUpdatedEvent{}, func(ctx context.Context, e core.Event) error {
+		return p.applyThreadTitleChanged(ctx, *e.(*domain.ThreadTitleUpdatedEvent))
+	})
+	router.Register(&domain.ThreadDeleted{}, func(ctx context.Context, e core.Event) error {
+		return p.applyThreadDeleted(ctx, *e.(*domain.ThreadDeleted))
+	})
 }
 
 // applyThreadCreated creates a new thread record.
@@ -376,56 +326,6 @@ func (p *PostgresAguiProjection) ListThreads() []string {
 	return threadIDs
 }
 
-// Subscribe returns a channel of events for a thread.
-func (p *PostgresAguiProjection) Subscribe(threadID string) (<-chan any, func()) {
-	ch := make(chan any, 100)
-
-	p.mu.Lock()
-	p.subscribers[threadID] = append(p.subscribers[threadID], ch)
-	p.mu.Unlock()
-
-	return ch, func() {
-		p.mu.Lock()
-		defer p.mu.Unlock()
-
-		subs, ok := p.subscribers[threadID]
-		if !ok {
-			return
-		}
-		for i, sub := range subs {
-			if sub == ch {
-				// Remove subscriber
-				p.subscribers[threadID] = append(subs[:i], subs[i+1:]...)
-				close(ch)
-				break
-			}
-		}
-	}
-}
-
-// notifySubscribers sends an event to all subscribers of a thread.
-func (p *PostgresAguiProjection) notifySubscribers(threadID string, event any) {
-	p.mu.RLock()
-	subscribers := p.subscribers[threadID]
-	count := len(subscribers)
-	p.mu.RUnlock()
-
-	if count > 0 {
-		p.log.Info(context.Background(), "Dispatching event to subscribers", "threadID", threadID, "subscriberCount", count)
-	}
-
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-
-	for _, ch := range p.subscribers[threadID] {
-		select {
-		case ch <- event:
-		default:
-			// Drop event if channel is full to prevent blocking
-			p.log.Warn(context.Background(), "subscriber channel full, dropping event", "threadID", threadID)
-		}
-	}
-}
 
 // Verify PostgresAguiProjection implements AguiProjection.
 var _ AguiProjection = (*PostgresAguiProjection)(nil)
