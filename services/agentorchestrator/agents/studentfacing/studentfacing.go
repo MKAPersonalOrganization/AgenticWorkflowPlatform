@@ -7,10 +7,7 @@ import (
 
 // domainTools returns the domain-specific tools for the student-facing agent.
 func domainTools() []core.Tool {
-	// Explicitly register elicitation tool to ensure visibility
-	return []core.Tool{
-		middleware.NewElicitInputTool(),
-	}
+	return []core.Tool{}
 }
 
 // CreateStudentFacingAgent creates the student-facing agent configuration.

@@ -29,21 +29,12 @@ func (e *Engine) ProcessUserMessage(ctx context.Context, agentName, threadID, co
 		e.log.Error(ctx, "failed to handle thread title", "error", err)
 	}
 
-	// 3. Run Agent
-	// Note: We shouldn't hardcode "student-facing-agent" here if we want Engine to be generic.
-	// However, ProcessUserMessage is currently a specific flow.
-	// Ideally, the agent name should be passed in or determined by the thread state?
-	// For now, I will accept agentName as parameter?
-	// The interface in AgentOrchestrator didn't take agentName.
-	// But AgentOrchestrator hardcoded it to "student-facing-agent".
-	// Since Engine describes a generic engine, maybe ProcessUserMessage should take agentName?
-	// Let's check the AgentOrchestrator implementation. It hardcoded "student-facing-agent".
-	// The user request said "the processuser message function should go to the engine!".
-	// If I modify signature, I break the interface in AgentOrchestrator service layer if I want to expose it directly?
-	// Or AgentOrchestrator delegates to Engine.ProcessUserMessage(..., agentName).
-	// Yes. I will add agentName parameter to Engine.ProcessUserMessage.
+	// 3. Determine Target Agent (Sticky Session)
+	// We check the conversation history to see which agent was last active.
+	// This ensures that if the user is talking to a specialist, they stay with them.
+	targetAgent := e.determineTargetAgent(ctx, thread, agentName)
 
-	runIter := e.Run(ctx, agentName, core.RunContext{
+	runIter := e.Run(ctx, targetAgent, core.RunContext{
 		ThreadID:  threadID,
 		MessageID: runID,
 		Thread:    thread,
@@ -113,4 +104,24 @@ func (e *Engine) handleThreadTitle(ctx context.Context, thread core.AgentThread,
 	}
 
 	return event, nil
+}
+
+// determineTargetAgent inspects the thread history to find the last active agent.
+// If found, it returns that agent's name. Otherwise, it returns the defaultAgent.
+func (e *Engine) determineTargetAgent(ctx context.Context, thread core.AgentThread, defaultAgent string) string {
+	history, err := thread.RetrieveFullConversationHistory(ctx)
+	if err != nil {
+		e.log.Warn(ctx, "failed to retrieve history for sticky session check", "error", err)
+		return defaultAgent
+	}
+
+	// Iterate backwards to find the last assistant message
+	for i := len(history) - 1; i >= 0; i-- {
+		msg := history[i]
+		if msg.Role == "assistant" && msg.AgentName != "" {
+			return msg.AgentName
+		}
+	}
+
+	return defaultAgent
 }
