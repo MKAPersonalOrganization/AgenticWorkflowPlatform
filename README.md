@@ -11,6 +11,7 @@ A chat application built with Go, Templ, Tailwind CSS, and Alpine.js, implementi
 ## Containers Diagram
 
 ```mermaid
+%%{init: {'flowchart': {'curve': 'linear'}}}%%
 graph TB
     Browser[Web Browser<br/>Alpine.js + Tailwind]
 
@@ -61,6 +62,7 @@ graph TB
 The following diagram zooms into the **Go Application** container to show its internal components, their responsibilities, technologies, and interactions.
 
 ```mermaid
+%%{init: {'flowchart': {'curve': 'linear'}}}%%
 graph TB
     subgraph GoApp["Go Application"]
         Router["<b>Chi Router</b><br/>[Technology: Go Chi]<br/>Routes incoming HTTP requests to appropriate handlers and applies global middleware."]
