@@ -23,22 +23,20 @@ type ObservabilityConfig struct {
 // managing threads, routing to agents, and coordinating execution.
 // It is designed to be reusable across different transports (HTTP/SSE, A2A, etc.).
 type Service struct {
-	log                  *logger.Logger
-	orchestratorService  services.AgentOrchestrator
-	threadCommandService services.ThreadCommandService
-	agentFactory         services.AgentFactory
-	threadStore          domain.ThreadStore
-	eventLog             core.EventStore
-	chatClient           ChatClient
-	langfuseTracer       *LangfuseTracer
-	observabilityConfig  ObservabilityConfig
+	log                 *logger.Logger
+	orchestratorService services.AgentOrchestrator
+	agentFactory        services.AgentFactory
+	threadStore         domain.ThreadStore
+	eventLog            core.EventStore
+	chatClient          ChatClient
+	langfuseTracer      *LangfuseTracer
+	observabilityConfig ObservabilityConfig
 }
 
 // NewService creates a new orchestration service.
 func NewService(
 	log *logger.Logger,
 	orchestratorService services.AgentOrchestrator,
-	threadCommandService services.ThreadCommandService,
 	agentFactory services.AgentFactory,
 	threadStore domain.ThreadStore,
 	eventLog core.EventStore,
@@ -47,15 +45,14 @@ func NewService(
 	observabilityConfig ObservabilityConfig,
 ) *Service {
 	return &Service{
-		log:                  log,
-		orchestratorService:  orchestratorService,
-		threadCommandService: threadCommandService,
-		agentFactory:         agentFactory,
-		threadStore:          threadStore,
-		eventLog:             eventLog,
-		chatClient:           chatClient,
-		langfuseTracer:       langfuseTracer,
-		observabilityConfig:  observabilityConfig,
+		log:                 log,
+		orchestratorService: orchestratorService,
+		agentFactory:        agentFactory,
+		threadStore:         threadStore,
+		eventLog:            eventLog,
+		chatClient:          chatClient,
+		langfuseTracer:      langfuseTracer,
+		observabilityConfig: observabilityConfig,
 	}
 }
 

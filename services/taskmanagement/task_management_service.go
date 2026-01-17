@@ -22,10 +22,10 @@ var (
 
 // TaskManagementService wraps Asynq server and client for chat task processing.
 type TaskManagementService struct {
-	log                *logger.Logger
-	server             *asynq.Server
-	client             *asynq.Client
-	redisAddr          string // Store for metrics
+	log       *logger.Logger
+	server    *asynq.Server
+	client    *asynq.Client
+	redisAddr string // Store for metrics
 }
 
 // AsynqConfig contains configuration for the Asynq server.
@@ -46,7 +46,6 @@ func NewTaskManagementService(
 	state domain.ThreadStore,
 	chatClient ChatClient,
 	orchestratorService services.AgentOrchestrator, // decouple from concrete implementation
-	threadCommandService services.ThreadCommandService,
 	agentFactory services.AgentFactory,
 	langfuseTracer *LangfuseTracer,
 	observabilityConfig ObservabilityConfig,
@@ -80,7 +79,6 @@ func NewTaskManagementService(
 	orchestrationService := NewService(
 		log,
 		orchestratorService,
-		threadCommandService,
 		agentFactory,
 		state,
 		eventLog,
@@ -151,10 +149,10 @@ func NewTaskManagementService(
 	}()
 
 	return &TaskManagementService{
-		log:                log,
-		server:             srv,
-		client:             client,
-		redisAddr:          config.RedisAddr,
+		log:       log,
+		server:    srv,
+		client:    client,
+		redisAddr: config.RedisAddr,
 	}
 }
 
@@ -174,7 +172,6 @@ func (s *TaskManagementService) EnqueueJob(payload ProcessChatPayload) (*asynq.T
 
 	return info, nil
 }
-
 
 // GetTaskInfo retrieves task information from Asynq.
 func (s *TaskManagementService) GetTaskInfo(queue, taskID string) (*asynq.TaskInfo, error) {

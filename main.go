@@ -13,7 +13,6 @@ import (
 	"school-with-ai/components/checkout"
 	"school-with-ai/components/pricing"
 	"school-with-ai/domain"
-	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/llm"
 	"school-with-ai/foundation/debug"
 	"school-with-ai/foundation/logger"
@@ -37,7 +36,6 @@ import (
 	"school-with-ai/services/agentorchestrator/agents/studentfacing"
 	"school-with-ai/services/taskmanagement"
 	"school-with-ai/services/threadmgmt"
-	"school-with-ai/services/threadservice"
 	"syscall"
 	"time"
 
@@ -295,7 +293,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	agentOrchestrator := agentorchestrator.New(log, chatClient, eventLog)
 
 	threadRepo := domain.NewThreadRepository(threadmgmt.NewEventStoreAdapter(eventLog))
-	threadCommandService := threadservice.New(log, threadRepo, core.DefaultConfig("thread-service"))
+	threadMgmt := threadmgmt.New(log, threadRepo)
 
 	// Initialize service layer
 	authSvc := authService.NewAuthService()
@@ -332,7 +330,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 		llmContextProjection,
 		chatClient,
 		agentOrchestrator,
-		threadCommandService,
 		agentFactory,
 		langfuseTracer,
 		observabilityConfig,
@@ -345,7 +342,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		"healthCheckInterval", cfg.Orchestration.HealthCheckInterval)
 
 	// Create HTTP handler
-	handler := taskmgmthandlers.NewTaskManagementHandler(log, chatClient, taskMgmtService, agentOrchestrator, threadCommandService, authSvc, threadQueryService, aguiProjection)
+	handler := taskmgmthandlers.NewTaskManagementHandler(log, chatClient, taskMgmtService, agentOrchestrator, threadMgmt, authSvc, threadQueryService, aguiProjection)
 
 	// Create health handler
 	healthHandler := healthhandlers.NewHealthHandler(log)
