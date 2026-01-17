@@ -43,17 +43,6 @@ ALTER TABLE agui_messages ADD COLUMN IF NOT EXISTS agent_name VARCHAR(255);
 
 CREATE INDEX IF NOT EXISTS idx_agui_messages_thread_seq ON agui_messages(thread_id, sequence_num);
 
--- Version: 1.04
--- Description: Create whiteboard projection table
-CREATE TABLE IF NOT EXISTS whiteboards (
-    thread_id VARCHAR(255) PRIMARY KEY,
-    content TEXT NOT NULL DEFAULT '',
-    updated_at TIMESTAMP NOT NULL,
-    version BIGINT DEFAULT 0
-);
-
-CREATE INDEX IF NOT EXISTS idx_whiteboards_updated ON whiteboards(updated_at DESC);
-
 -- Version: 1.05
 -- Description: Create LLM context projection tables
 CREATE TABLE IF NOT EXISTS llm_threads (
@@ -92,6 +81,5 @@ CREATE INDEX IF NOT EXISTS idx_llm_messages_created ON llm_messages(created_at);
 INSERT INTO projection_checkpoints (projection_name, commit_position, prepare_position)
 VALUES 
     ('agui', 0, 0),
-    ('whiteboard', 0, 0),
     ('llm_context', 0, 0)
 ON CONFLICT (projection_name) DO NOTHING;

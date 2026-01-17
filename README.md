@@ -116,7 +116,6 @@ graph TB
     TaskS -->|"Executes business logic [In-process]"| OrchS
     
     OrchS -->|"Requests context [In-process]"| LLMProj
-    OrchS -->|"Accesses workspace [In-process]"| WhiteProj
     
     ProjS -->|"Fast reads [SQL]"| AGUIProj
     AGUIProj -->|"Query [SQL]"| AppPostgres
@@ -162,10 +161,10 @@ graph TB
 
 - **Event Sourcing**: All state changes are persisted as a sequence of events in KurrentDB.
 - **Materialized Projections**: PostgreSQL tables updated in real-time via event subscription for fast reads (~100x faster than query-time).
-- **Event Subscription**: Projection updater subscribes to KurrentDB `$all` stream and incrementally updates all three projections (AGUI, Whiteboard, LLM Context).
+- **Event Subscription**: Projection updater subscribes to KurrentDB `$all` stream and incrementally updates both projections (AGUI, LLM Context).
 - **CQRS**: Clear separation between command side (Task Handlers writing events) and query side (AGUI Handlers reading projections).
 - **Multi-Pod Scalability**: Real-time events are broadcasted via **Redis Pub/Sub**. This ensures that even if a user is connected to Pod A but their background task is running on Pod B, they still receive real-time UI updates seamlessly.
-- **Multi-Agent Orchestration**: Collaborative agent execution with shared whiteboard state and explicit handoff protocols.
+- **Multi-Agent Orchestration**: Collaborative agent execution with explicit handoff protocols.
 
 ## Tech Stack
 

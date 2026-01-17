@@ -54,7 +54,7 @@ Agents communicate via **event emission** - they cannot directly call other agen
 
 This creates a **hard architectural constraint**: only math-instructor can delegate to linear algebra specialist.
 
-Agents write answers to a shared **whiteboard** and emit events to coordinate work. The student-facing-agent receives callbacks when instructors complete their work.
+Agents emit events to coordinate work. The student-facing-agent receives callbacks when instructors complete their work.
 
 **Infrastructure** (`infra/`):
 - **WorkerPool**: Manages 5 concurrent workers processing jobs from a queue
@@ -88,7 +88,6 @@ DELETE /api/threads/{threadId}            → Delete thread
 Educational tools available to instructors:
 - `calculator`, `equation_solver`, `graphing`, `plot_tool` (gnuplot), `animate_tool`
 - `periodic_table`, `unit_conversion`
-- `write_whiteboard` (shared state - whiteboard content is always available in system prompt)
 - Event emission tools (auto-generated from agent contracts: `emit_math_question`, `emit_physics_question`, etc.)
 
 ### Frontend Stack
