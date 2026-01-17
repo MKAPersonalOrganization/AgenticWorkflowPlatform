@@ -13,6 +13,15 @@ type Command struct {
 	// StopIteration indicates the engine should stop iterating
 	// This is set to true for handoff tools to prevent infinite loops
 	StopIteration bool
+
+	// Elicitation specifies a request for structured user input
+	Elicitation *ElicitationSpec
+}
+
+// ElicitationSpec defines the structure for user input requests
+type ElicitationSpec struct {
+	Question string         `json:"question"`
+	Schema   map[string]any `json:"schema,omitempty"`
 }
 
 // ToolResult represents the result of a tool invocation.

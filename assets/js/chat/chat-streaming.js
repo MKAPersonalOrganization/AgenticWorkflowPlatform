@@ -357,10 +357,14 @@ export function createStreamingMethods() {
                 const { callerAgent, calledAgent, reason } = event.value;
                 console.log(`Agent collaboration: ${callerAgent} → ${calledAgent} (${reason})`);
             } else if (event.name === 'HUMAN_INPUT_REQUESTED') {
-                const { threadId, messageId, toolCallId, question } = event.value;
-                state.awaitingHumanInput = true;
+                const { threadId, messageId, toolCallId, question, schema } = event.value;
+
+                // Order matters: set data before enabling the UI to avoid partial/invalid state rendering
                 state.humanInputQuestion = question;
-                console.log(`Human input requested for thread ${threadId}: ${question}`);
+                state.humanInputSchema = schema;
+                state.awaitingHumanInput = true;
+
+                console.log(`Human input requested for thread ${threadId}: ${question}`, schema);
 
                 if (threadId === this.__currentThreadId) {
                     state.humanInputToastId = this.showToast(question || 'Specialist needs your help', 'warning', 0); // Persistent until dismiss or reply

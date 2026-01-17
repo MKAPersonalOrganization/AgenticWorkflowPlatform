@@ -78,8 +78,13 @@ func ToAguiEvents(event any) []any {
 				"messageId":  evt.MessageID,
 				"toolCallId": evt.ToolCallID,
 				"question":   evt.Question,
+				"schema":     evt.Schema,
 			}),
 		)}
+
+	case *domain.MessageAdded, *domain.ThreadCreated, *domain.AgentHandoffEvent:
+		// These are handled by the frontend locally or via snapshots, no need to stream
+		return []any{}
 
 	default:
 		return nil
