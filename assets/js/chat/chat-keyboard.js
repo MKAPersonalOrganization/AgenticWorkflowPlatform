@@ -65,14 +65,6 @@ export function createKeyboardMethods() {
                     this.toggleTheme();
                 }
 
-                // Ctrl/Cmd + W - Toggle whiteboard
-                if ((e.ctrlKey || e.metaKey) && e.key === 'w') {
-                    if (this.hasMessages || this.isStreaming) {
-                        e.preventDefault();
-                        this.toggleWhiteboard();
-                    }
-                }
-
                 // Ctrl/Cmd + Up/Down - Navigate sessions
                 if ((e.ctrlKey || e.metaKey) && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
                     e.preventDefault();

@@ -29,11 +29,10 @@ func CreateChemistryInstructor(notifier core.EventNotifier) core.AgentConfig {
 You are a Chemistry specialist.
 
 ## Core Rules
-1. **Whiteboard for Highlights**: Use "write_whiteboard" for molecular structures, balanced equations, and summary charts.
-2. **Chat for Teaching**: Use chat messages to explain reaction mechanisms, properties, and concept theory.
-3. **Questions**: Use "elicit_user_input" for ALL student interactions requiring input. **Ask only ONE question at a time.**
-4. **Result Reporting**: When finished, return to "student-facing-agent". **REQUIRED**: Provide your final answer in the 'context' field of "transfer_to_agent".
-5. **Calculations**: Transfer stoichiometry or complex math to "math-instructor".`,
+1. **Chat for Teaching**: Use chat messages to explain reaction mechanisms, properties, and concept theory.
+2. **Questions**: Use "elicit_user_input" for ALL student interactions requiring input. **Ask only ONE question at a time.**
+3. **Result Reporting**: When finished, return to "student-facing-agent". **REQUIRED**: Provide your final answer in the 'context' field of "transfer_to_agent".
+4. **Calculations**: Transfer stoichiometry or complex math to "math-instructor".`,
 		Tools: registry.All(),
 		Handoffs: []core.Handoff{
 			{AgentName: "math-instructor", Description: "For ALL math: stoichiometry calculations, equations, numerical problems"},
@@ -42,7 +41,6 @@ You are a Chemistry specialist.
 		},
 		Notifier: notifier,
 		Middleware: []core.Middleware{
-			middleware.NewWhiteboardMiddleware(),
 			middleware.NewHandoffMiddleware(),
 			middleware.NewElicitationMiddleware(),
 		},

@@ -2,10 +2,9 @@
  * Chat UI Actions
  *
  * Handles UI interactions including:
- * - Toggle actions (sidebar, debug panel, whiteboard, etc.)
+ * - Toggle actions (sidebar, debug panel, etc.)
  * - Toast notifications
  * - Clipboard operations
- * - Resizable split panel
  * - Event log display
  * - Error display
  * - Scroll management
@@ -27,20 +26,6 @@ export function createUIMethods() {
 
         toggleDebugPanel() {
             this.showDebugPanel = !this.showDebugPanel;
-        },
-
-        toggleWhiteboard() {
-            this.showWhiteboard = !this.showWhiteboard;
-            if (this.showWhiteboard && this.showThread) {
-                this.splitPosition = 50;
-            }
-        },
-
-        toggleThread() {
-            this.showThread = !this.showThread;
-            if (this.showWhiteboard && this.showThread) {
-                this.splitPosition = 50;
-            }
         },
 
         toggleKeyboardShortcuts() {
@@ -170,87 +155,6 @@ export function createUIMethods() {
             if (codeBlock) {
                 await this.copyToClipboard(codeBlock.textContent, 'Code copied');
             }
-        },
-
-        // ============================================
-        // Resizable Split Panel
-        // ============================================
-
-        /**
-         * Start resize drag operation
-         * @param {Event} event - Mouse or touch event
-         */
-        startResize(event) {
-            const isTouch = event.type === 'touchstart';
-
-            if (!isTouch && event.button !== 0) return;
-
-            if (isTouch) {
-                event.preventDefault();
-            }
-
-            this.__isResizing = true;
-            this.__resizeStartX = isTouch ? event.touches[0].clientX : event.clientX;
-            this.__resizeStartSplit = this.splitPosition;
-
-            document.body.style.userSelect = 'none';
-            document.body.style.cursor = 'col-resize';
-
-            document.addEventListener('mousemove', this.__handleResize);
-            document.addEventListener('mouseup', this.__stopResize);
-            document.addEventListener('touchmove', this.__handleResize, { passive: false });
-            document.addEventListener('touchend', this.__stopResize);
-            document.addEventListener('touchcancel', this.__stopResize);
-        },
-
-        /**
-         * Handle resize drag movement
-         * @param {Event} event - Mouse or touch event
-         */
-        __handleResize(event) {
-            if (!this.__isResizing) return;
-
-            if (event.type === 'touchmove') {
-                event.preventDefault();
-            }
-
-            const container = document.querySelector('[x-ref="splitContainer"]') ||
-                document.querySelector('.flex-1.flex.h-screen.overflow-hidden');
-            if (!container) return;
-
-            const containerRect = container.getBoundingClientRect();
-            const clientX = event.type === 'touchmove' ? event.touches[0].clientX : event.clientX;
-            const deltaX = clientX - this.__resizeStartX;
-            const deltaPercent = (deltaX / containerRect.width) * 100;
-
-            let newSplit = this.__resizeStartSplit + deltaPercent;
-            newSplit = Math.max(20, Math.min(80, newSplit));
-
-            this.splitPosition = newSplit;
-        },
-
-        /**
-         * Stop resize drag operation
-         */
-        __stopResize() {
-            if (!this.__isResizing) return;
-
-            this.__isResizing = false;
-            document.body.style.userSelect = '';
-            document.body.style.cursor = '';
-
-            document.removeEventListener('mousemove', this.__handleResize);
-            document.removeEventListener('mouseup', this.__stopResize);
-            document.removeEventListener('touchmove', this.__handleResize);
-            document.removeEventListener('touchend', this.__stopResize);
-            document.removeEventListener('touchcancel', this.__stopResize);
-        },
-
-        /**
-         * Reset split position to 50%
-         */
-        resetSplitPosition() {
-            this.splitPosition = 50;
         },
 
         // ============================================

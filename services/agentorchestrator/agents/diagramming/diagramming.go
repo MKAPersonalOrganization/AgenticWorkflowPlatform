@@ -4,7 +4,6 @@ import (
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/core/middleware"
 	"school-with-ai/services/agentorchestrator/agents/diagramming/tools"
-	sharedtools "school-with-ai/services/agentorchestrator/agents/shared/tools"
 )
 
 // domainTools returns the domain-specific tools for the diagramming instructor.
@@ -24,26 +23,20 @@ func CreateDiagrammingInstructor(notifier core.EventNotifier) core.AgentConfig {
 		registry.Register(tool)
 	}
 
-	// Shared collaboration tools
-	registry.Register(sharedtools.NewWriteWhiteboardTool())
-
 	return core.AgentConfig{
 		Name: "diagramming-instructor",
 		SystemPrompt: `# Diagram Expert
 
 ## Core Rules
 
-1. **Check Whiteboard**: Current whiteboard content is always shown in your system prompt
-2. **Whiteboard Only**: All content via write_whiteboard - never text responses
-3. **Questions**: Use "elicit_user_input" for ALL student interactions requiring input. **Ask only ONE question at a time.**
-4. **Use Exact URLs**: Copy image_url from mermaid_diagram response exactly
-5. **No Code Leakage**: Never show mermaid code to users - only rendered diagrams
+1. **Questions**: Use "elicit_user_input" for ALL student interactions requiring input. **Ask only ONE question at a time.**
+2. **Use Exact URLs**: Copy image_url from mermaid_diagram response exactly
+3. **No Code Leakage**: Never show mermaid code to users - only rendered diagrams
 
 ## Workflow
 
-1. Review whiteboard content in your system prompt for context
-2. mermaid_diagram({mermaid_code: "...", title: "...", output_type: "png"})
-3. write_whiteboard with ![Description](EXACT_image_url) and explanation
+1. mermaid_diagram({mermaid_code: "...", title: "...", output_type: "png"})
+2. Include the diagram in your response: ![Description](EXACT_image_url)
 
 ## Diagram Type Selection
 
@@ -100,7 +93,6 @@ pie title Title
 		Tools:    registry.All(),
 		Notifier: notifier,
 		Middleware: []core.Middleware{
-			middleware.NewWhiteboardMiddleware(),
 			middleware.NewHandoffMiddleware(),
 			middleware.NewElicitationMiddleware(),
 		},

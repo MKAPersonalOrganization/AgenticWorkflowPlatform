@@ -8,7 +8,6 @@
  * - Message snapshot handling
  */
 
-import { ToolHandlers } from '../tool-handlers.js';
 import { createUserMessage, safeParseJSON, generateInteractionId } from './chat-utils.js';
 
 /**
@@ -110,9 +109,6 @@ export function createMessagingMethods() {
                     const messages = Array.isArray(data) ? data : (data.messages || []);
                     state.messages = this.__convertBackendMessagesToUI(messages);
 
-                    // Reconstruct whiteboard content
-                    this.__reconstructWhiteboardFromMessages(id, state.messages);
-
                     // Scroll to bottom after loading
                     if (id === this.__currentThreadId) {
                         this.$nextTick(() => this.__scrollToBottom());
@@ -121,22 +117,6 @@ export function createMessagingMethods() {
                     throw new Error(`Failed to fetch messages: ${response.status}`);
                 }
             });
-        },
-
-        /**
-         * Reconstruct whiteboard content from message history
-         * @param {string} threadId - Thread ID
-         * @param {Array} messages - UI messages array
-         */
-        __reconstructWhiteboardFromMessages(threadId, messages) {
-            const session = this.sessions.find(s => s.id === threadId);
-
-            const result = ToolHandlers.whiteboard.reconstructFromMessages(session, messages);
-            const lastAgent = ToolHandlers.whiteboard.applyToSession(session, result);
-
-            if (lastAgent) {
-                this.whiteboardLastAgent = lastAgent;
-            }
         },
 
         /**
@@ -299,9 +279,6 @@ export function createMessagingMethods() {
             state.messages = this.__convertBackendMessagesToUI(event.messages);
 
             console.log('[MESSAGES_SNAPSHOT] Processing', state.messages.length, 'messages');
-
-            // Reconstruct whiteboard
-            this.__reconstructWhiteboardFromMessages(threadId, state.messages);
 
             // Scroll to bottom
             if (threadId === this.__currentThreadId) {

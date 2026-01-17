@@ -455,11 +455,6 @@ export function createStreamingMethods() {
             if (resultToolCallIndex !== -1) {
                 state.messages[resultToolCallIndex].result = event.content;
                 state.messages[resultToolCallIndex].resultTimestamp = new Date(event.timestamp).toISOString();
-
-                // Handle whiteboard tool calls
-                if (state.messages[resultToolCallIndex].name === 'write_whiteboard') {
-                    this.__handleWhiteboardUpdate(state.messages[resultToolCallIndex], threadId);
-                }
             }
 
             if (state.toolCalls[event.toolCallId]) {
@@ -468,36 +463,6 @@ export function createStreamingMethods() {
 
             if (threadId === this.__currentThreadId) {
                 this.$nextTick(() => this.__scrollToBottom());
-            }
-        },
-
-        /**
-         * Handle whiteboard update from tool call
-         */
-        __handleWhiteboardUpdate(toolMessage, threadId) {
-            const parsed = toolMessage.parsedArgs;
-            if (parsed) {
-                const { content, action } = parsed;
-                const agentName = toolMessage.agentName || 'Agent';
-
-                this.whiteboardTyping = `${agentName} is writing...`;
-                setTimeout(() => { this.whiteboardTyping = null; }, 500);
-
-                const session = this.sessions.find(s => s.id === threadId);
-                if (session && content !== undefined) {
-                    switch (action) {
-                        case 'write':
-                            session.whiteboardContent = content;
-                            break;
-                        case 'append':
-                            session.whiteboardContent = (session.whiteboardContent || '') + '\n' + content;
-                            break;
-                        case 'clear':
-                            session.whiteboardContent = '';
-                            break;
-                    }
-                    this.whiteboardLastAgent = agentName;
-                }
             }
         },
 
