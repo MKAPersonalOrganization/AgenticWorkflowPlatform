@@ -3,27 +3,27 @@ package engine
 import (
 	"context"
 	"io"
-	"testing"
-
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/core/middleware"
 	"school-with-ai/foundation/agentsdk/llm"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/threadmgmt"
+	"testing"
 )
 
 func TestEngine_ElicitationFlow(t *testing.T) {
+	t.Parallel()
 	// Setup
 	log := logger.New(io.Discard, logger.LevelInfo, "test", nil)
 	eventStore := NewMockEventStore()
 	repo := domain.NewThreadRepository(eventStore)
 	tm := threadmgmt.New(log, repo)
-	
+
 	ctx := context.Background()
 	threadID := "thread-elicitation"
 	_, _, _ = tm.CreateThread(ctx, threadID, "Elicitation Thread")
-	
+
 	// Mock Chat Client
 	mockClient := &MockChatClient{
 		streams: [][]llm.ChatResponseUpdate{
@@ -33,8 +33,8 @@ func TestEngine_ElicitationFlow(t *testing.T) {
 					Contents: []llm.AIContent{
 						llm.TextContent{Text: "I need input. "},
 						llm.FunctionCallContent{
-							CallID: "call_1",
-							Name: "elicit_user_input",
+							CallID:       "call_1",
+							Name:         "elicit_user_input",
 							RawArguments: `{"question": "What is your favorite color?", "schema": {"type": "string"}}`,
 						},
 					},
@@ -52,7 +52,7 @@ func TestEngine_ElicitationFlow(t *testing.T) {
 			},
 		},
 	}
-	
+
 	agentConfig := core.AgentConfig{
 		Name:          "test-elicitor",
 		MaxIterations: 5,
@@ -61,13 +61,13 @@ func TestEngine_ElicitationFlow(t *testing.T) {
 			middleware.NewElicitationMiddleware(),
 		},
 	}
-	
+
 	provider := &MockAgentProvider{
 		configs: map[string]core.AgentConfig{
 			"test-elicitor": agentConfig,
 		},
 	}
-	
+
 	eng := New(
 		log,
 		mockClient,
@@ -99,13 +99,13 @@ func TestEngine_ElicitationFlow(t *testing.T) {
 
 	// Verify conversation flow
 	msgs, _ := thread.RetrieveFullConversationHistory(ctx)
-	
+
 	// Expect assistant message with tool call (second to last, as tool result is last)
 	// msgs[0]=User, msgs[1]=Assistant, msgs[2]=Tool
 	if len(msgs) < 3 {
 		t.Fatalf("Expected at least 3 messages, got %d", len(msgs))
 	}
-	
+
 	asstMsg := msgs[len(msgs)-2]
 	if asstMsg.Role != "assistant" {
 		t.Errorf("Expected assistant message, got %s", asstMsg.Role)
@@ -120,7 +120,7 @@ func TestEngine_ElicitationFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ProcessUserMessage 2 failed: %v", err)
 	}
-	
+
 	t.Log("--- Starting Run 2 ---")
 	for event, err := range seq {
 		if err != nil {
@@ -139,21 +139,21 @@ func TestEngine_ElicitationFlow(t *testing.T) {
 
 	// Verify conversation flow
 	msgs, _ = thread.RetrieveFullConversationHistory(ctx)
-	
+
 	// We expect:
 	// 1. User: Hello
 	// 2. Assistant: (elicit_user_input)
 	// 3. Tool: (Status update from elicit tool)
 	// 4. User: Blue (This acts as the tool result/answer)
 	// 5. Assistant: Thanks! I see you like blue.
-	
+
 	if len(msgs) != 5 {
 		t.Errorf("Expected 5 messages, got %d", len(msgs))
 		for i, m := range msgs {
 			t.Logf("Msg %d: %s (%s)", i, m.Role, m.Content)
 		}
 	}
-	
+
 	finalMsg := msgs[len(msgs)-1]
 	if finalMsg.Role != "assistant" || finalMsg.Content != "Thanks! I see you like blue." {
 		t.Errorf("Unexpected final message: %+v", finalMsg)

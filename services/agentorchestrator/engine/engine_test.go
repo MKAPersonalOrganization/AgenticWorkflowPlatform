@@ -5,14 +5,13 @@ import (
 	"errors"
 	"io"
 	"iter"
-	"sync"
-	"testing"
-
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/llm"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/threadmgmt"
+	"sync"
+	"testing"
 )
 
 // MockChatClient implements types.ChatClient for testing
@@ -83,7 +82,7 @@ func (m *MockEventStore) AppendWithVersion(ctx context.Context, streamID string,
 	defer m.mu.Unlock()
 
 	currentVersion, exists := m.streams[streamID]
-	
+
 	// Check concurrency
 	if expectedVersion == -2 { // NoStream
 		if exists {
@@ -92,10 +91,10 @@ func (m *MockEventStore) AppendWithVersion(ctx context.Context, streamID string,
 		currentVersion = 0
 	} else if expectedVersion != -1 { // Any
 		if !exists && expectedVersion != 0 {
-             if expectedVersion != 0 {
-                  return 0, core.ErrConcurrencyConflict
-             }
-             currentVersion = 0
+			if expectedVersion != 0 {
+				return 0, core.ErrConcurrencyConflict
+			}
+			currentVersion = 0
 		} else if exists && currentVersion != expectedVersion {
 			return 0, core.ErrConcurrencyConflict
 		}
@@ -109,7 +108,7 @@ func (m *MockEventStore) AppendWithVersion(ctx context.Context, streamID string,
 	for range events {
 		currentVersion++
 	}
-	
+
 	m.streams[streamID] = currentVersion
 	m.events[streamID] = append(m.events[streamID], events...)
 
@@ -137,12 +136,13 @@ func (m *MockEventStore) DeleteStream(ctx context.Context, streamID string) erro
 }
 
 func TestEngine_Run(t *testing.T) {
+	t.Parallel()
 	// Setup
 	log := logger.New(io.Discard, logger.LevelInfo, "test", nil)
 	eventStore := NewMockEventStore()
 	repo := domain.NewThreadRepository(eventStore)
 	tm := threadmgmt.New(log, repo) // No name
-	
+
 	// Create a thread
 	ctx := context.Background()
 	threadID := "thread-1"
@@ -151,11 +151,11 @@ func TestEngine_Run(t *testing.T) {
 		t.Fatalf("Failed to create thread: %v", err)
 	}
 
-    // Add user message via manager so event store is populated
-    _, _, err = tm.AddUserMessage(ctx, threadID, "msg-1", "Hello")
-    if err != nil {
-        t.Fatalf("Failed to add user message: %v", err)
-    }
+	// Add user message via manager so event store is populated
+	_, _, err = tm.AddUserMessage(ctx, threadID, "msg-1", "Hello")
+	if err != nil {
+		t.Fatalf("Failed to add user message: %v", err)
+	}
 
 	mockChatClient := &MockChatClient{
 		streams: [][]llm.ChatResponseUpdate{
@@ -179,7 +179,7 @@ func TestEngine_Run(t *testing.T) {
 		Name:          "TestAgent",
 		MaxIterations: 5,
 	}
-	
+
 	provider := &MockAgentProvider{
 		configs: map[string]core.AgentConfig{
 			"TestAgent": config,
@@ -195,12 +195,12 @@ func TestEngine_Run(t *testing.T) {
 		nil, // toolTracer
 	)
 
-    // Load the thread aggregate to create agent thread
-    threadAgg, err := repo.Load(ctx, threadID)
-    if err != nil {
-        t.Fatalf("Failed to load thread: %v", err)
-    }
-    agentThread := tm.ToAgentThread(threadAgg)
+	// Load the thread aggregate to create agent thread
+	threadAgg, err := repo.Load(ctx, threadID)
+	if err != nil {
+		t.Fatalf("Failed to load thread: %v", err)
+	}
+	agentThread := tm.ToAgentThread(threadAgg)
 
 	runCtx := core.RunContext{
 		ThreadID:  threadID,
@@ -219,34 +219,34 @@ func TestEngine_Run(t *testing.T) {
 	}
 
 	// Verify
-	
+
 	if len(events) < 3 {
 		t.Errorf("Expected at least 3 events, got %d", len(events))
 	}
 
-    var foundStarted, foundStreamed, foundCompleted bool
-    
-    for _, evt := range events {
-        switch e := evt.(type) {
-        case *domain.AssistantMessageStartedEvent:
-            foundStarted = true
-        case *domain.AssistantContentStreamedEvent:
-            foundStreamed = true
-        case *domain.AssistantMessageCompletedEvent:
-            foundCompleted = true
-            if e.Content != "Hello World" {
-                t.Errorf("Expected content 'Hello World', got '%s'", e.Content)
-            }
-        }
-    }
+	var foundStarted, foundStreamed, foundCompleted bool
 
-    if !foundStarted {
-        t.Error("Did not find AssistantStartedEvent")
-    }
-    if !foundStreamed {
-        t.Error("Did not find AssistantContentStreamedEvent")
-    }
-    if !foundCompleted {
+	for _, evt := range events {
+		switch e := evt.(type) {
+		case *domain.AssistantMessageStartedEvent:
+			foundStarted = true
+		case *domain.AssistantContentStreamedEvent:
+			foundStreamed = true
+		case *domain.AssistantMessageCompletedEvent:
+			foundCompleted = true
+			if e.Content != "Hello World" {
+				t.Errorf("Expected content 'Hello World', got '%s'", e.Content)
+			}
+		}
+	}
+
+	if !foundStarted {
+		t.Error("Did not find AssistantStartedEvent")
+	}
+	if !foundStreamed {
+		t.Error("Did not find AssistantContentStreamedEvent")
+	}
+	if !foundCompleted {
 		t.Error("Did not find AssistantCompletedEvent")
 	}
 }
@@ -255,8 +255,8 @@ type MockHandoffTool struct {
 	Target string
 }
 
-func (t *MockHandoffTool) Name() string { return "mock_handoff" }
-func (t *MockHandoffTool) Description() string { return "handoffs" }
+func (t *MockHandoffTool) Name() string               { return "mock_handoff" }
+func (t *MockHandoffTool) Description() string        { return "handoffs" }
 func (t *MockHandoffTool) Parameters() map[string]any { return map[string]any{} }
 func (t *MockHandoffTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	return core.NewToolResultWithCommand(
@@ -266,18 +266,19 @@ func (t *MockHandoffTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 }
 
 func TestEngine_Handoff(t *testing.T) {
+	t.Parallel()
 	// Setup
 	log := logger.New(io.Discard, logger.LevelInfo, "test", nil)
 	eventStore := NewMockEventStore()
 	repo := domain.NewThreadRepository(eventStore)
 	tm := threadmgmt.New(log, repo)
-	
+
 	ctx := context.Background()
 	threadID := "thread-handoff"
 	_, _, _ = tm.CreateThread(ctx, threadID, "Handoff Thread")
-    _, _, _ = tm.AddUserMessage(ctx, threadID, "msg-1", "Transfer me")
+	_, _, _ = tm.AddUserMessage(ctx, threadID, "msg-1", "Transfer me")
 
-    // Mock Chat with 2 turns
+	// Mock Chat with 2 turns
 	mockChatClient := &MockChatClient{
 		streams: [][]llm.ChatResponseUpdate{
 			// Turn 1: TestAgent triggers handoff
@@ -285,13 +286,13 @@ func TestEngine_Handoff(t *testing.T) {
 				{
 					Contents: []llm.AIContent{
 						llm.TextContent{Text: "Transferring..."},
-	                    llm.FunctionCallContent{
-	                        CallID: "call-1",
-	                        Name: "mock_handoff",
-	                        RawArguments: "{}",
-	                    },
+						llm.FunctionCallContent{
+							CallID:       "call-1",
+							Name:         "mock_handoff",
+							RawArguments: "{}",
+						},
 					},
-	                FinishReason: "tool_calls",
+					FinishReason: "tool_calls",
 				},
 			},
 			// Turn 2: NextAgent responds
@@ -306,8 +307,8 @@ func TestEngine_Handoff(t *testing.T) {
 		},
 	}
 
-    handoffTool := &MockHandoffTool{Target: "NextAgent"}
-	
+	handoffTool := &MockHandoffTool{Target: "NextAgent"}
+
 	config1 := core.AgentConfig{
 		Name:          "TestAgent",
 		MaxIterations: 5,
@@ -327,11 +328,11 @@ func TestEngine_Handoff(t *testing.T) {
 
 	eng := New(log, mockChatClient, tm, provider, nil, nil)
 
-    threadAgg, _ := repo.Load(ctx, threadID)
-    agentThread := tm.ToAgentThread(threadAgg)
+	threadAgg, _ := repo.Load(ctx, threadID)
+	agentThread := tm.ToAgentThread(threadAgg)
 	runCtx := core.RunContext{
 		ThreadID:  threadID,
-		MessageID: "msg-handoff", 
+		MessageID: "msg-handoff",
 		Thread:    agentThread,
 	}
 
@@ -345,41 +346,41 @@ func TestEngine_Handoff(t *testing.T) {
 	}
 
 	// Verify
-    var foundHandoff bool
-    var nextAgentStarted bool
-    var nextAgentCompleted bool
+	var foundHandoff bool
+	var nextAgentStarted bool
+	var nextAgentCompleted bool
 
-    for _, evt := range events {
-        if e, ok := evt.(*domain.AgentHandoffEvent); ok {
-            foundHandoff = true
-            if e.TargetAgent != "NextAgent" {
-                t.Errorf("Expected target 'NextAgent', got '%s'", e.TargetAgent)
-            }
-        }
-        if _, ok := evt.(*domain.AssistantMessageStartedEvent); ok {
-        	// Note: Engine doesn't include AgentName in Started event, 
-        	// but the second started event implies loop back.
-        	if foundHandoff {
-        		nextAgentStarted = true
-        	}
-        }
-        if e, ok := evt.(*domain.AssistantMessageCompletedEvent); ok {
-        	if e.AgentName == "NextAgent" {
-        		nextAgentCompleted = true
-        		if e.Content != "Hello from NextAgent" {
-        			t.Errorf("Expected content 'Hello from NextAgent', got '%s'", e.Content)
-        		}
-        	}
-        }
-    }
+	for _, evt := range events {
+		if e, ok := evt.(*domain.AgentHandoffEvent); ok {
+			foundHandoff = true
+			if e.TargetAgent != "NextAgent" {
+				t.Errorf("Expected target 'NextAgent', got '%s'", e.TargetAgent)
+			}
+		}
+		if _, ok := evt.(*domain.AssistantMessageStartedEvent); ok {
+			// Note: Engine doesn't include AgentName in Started event,
+			// but the second started event implies loop back.
+			if foundHandoff {
+				nextAgentStarted = true
+			}
+		}
+		if e, ok := evt.(*domain.AssistantMessageCompletedEvent); ok {
+			if e.AgentName == "NextAgent" {
+				nextAgentCompleted = true
+				if e.Content != "Hello from NextAgent" {
+					t.Errorf("Expected content 'Hello from NextAgent', got '%s'", e.Content)
+				}
+			}
+		}
+	}
 
-    if !foundHandoff {
-        t.Error("Did not find AgentHandoffEvent")
-    }
-    if !nextAgentStarted {
-    	t.Error("Did not find AssistantMessageStartedEvent for NextAgent")
-    }
-    if !nextAgentCompleted {
-    	t.Error("Did not find AssistantMessageCompletedEvent for NextAgent")
-    }
+	if !foundHandoff {
+		t.Error("Did not find AgentHandoffEvent")
+	}
+	if !nextAgentStarted {
+		t.Error("Did not find AssistantMessageStartedEvent for NextAgent")
+	}
+	if !nextAgentCompleted {
+		t.Error("Did not find AssistantMessageCompletedEvent for NextAgent")
+	}
 }

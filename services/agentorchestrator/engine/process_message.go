@@ -76,7 +76,6 @@ func (e *Engine) ProcessUserMessage(ctx context.Context, agentName, threadID, co
 		var runErr error
 		for evt, err := range runIter {
 			if err != nil {
-				runErr = err
 				// Emit RunError
 				yield(events.RunError(threadID, err.Error(), "RUN_EXECUTION_ERROR"), nil)
 				return // Stop iteration on error

@@ -8,7 +8,6 @@ import (
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/observability/langfuse"
 	"school-with-ai/services"
-
 )
 
 // ObservabilityConfig contains configuration for observability and tracing attributes
@@ -29,10 +28,10 @@ type Service struct {
 	threadCommandService services.ThreadCommandService
 	agentFactory         services.AgentFactory
 	threadStore          domain.ThreadStore
-	eventLog            core.EventStore
-	chatClient          ChatClient
-	langfuseTracer      *LangfuseTracer
-	observabilityConfig ObservabilityConfig
+	eventLog             core.EventStore
+	chatClient           ChatClient
+	langfuseTracer       *LangfuseTracer
+	observabilityConfig  ObservabilityConfig
 }
 
 // NewService creates a new orchestration service.
@@ -90,10 +89,10 @@ func (s *Service) HandleUserMessage(
 	// ProcessUserMessage generates its own IDs.
 	// But we can pass a CorrelationID? ProcessUserMessage signature doesn't take it.
 	// We can let ProcessUserMessage generate IDs.
-	// For tracing, we might want to know the runID. 
+	// For tracing, we might want to know the runID.
 	// But if we trust Orchestrator, we can skip tracing specific runID here or rely on returned events?
 	// Let's keep it simple.
-	
+
 	if s.langfuseTracer != nil {
 		tracer := s.langfuseTracer.GetTracer()
 		if tracer != nil {

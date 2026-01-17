@@ -238,8 +238,6 @@ func (s *executionState) inferState() state {
 		return StateInitial
 	}
 
-
-
 	// 3. Resumption Logic: Check for Elicitation response
 	if pendingTC.Function.Name == "elicit_user_input" {
 		// If we have a user message after this assistant message, it's the response
@@ -247,7 +245,7 @@ func (s *executionState) inferState() state {
 		if lastMsg.Role == "user" {
 			// Pair: Fulfill the tool call with the user message
 			toolResultID := core.GenerateID()
-			
+
 			// For elicitation, the result is just the user's text message content
 			// logic could be expanded to parse JSON if we implement trusted UI forms later
 			// but for now, the user message content IS the result.
@@ -382,7 +380,7 @@ func (s *executionState) handleTools() error {
 			if result.Command.Goto != "" {
 				handoffTarget = result.Command.Goto
 			}
-			
+
 			// Check for elicitation
 			if result.Command.Elicitation != nil {
 				elicitationSpec = result.Command.Elicitation
@@ -436,15 +434,11 @@ const (
 )
 
 const (
-	TriggerBegin            = "Begin"
-	TriggerActionRequired   = "ActionRequired"
-	TriggerStepComplete     = "StepComplete"
-	TriggerActionDone       = "ActionDone"
-	TriggerHandoffSwitch    = "HandoffSwitch"
+	TriggerBegin              = "Begin"
+	TriggerActionRequired     = "ActionRequired"
+	TriggerStepComplete       = "StepComplete"
+	TriggerActionDone         = "ActionDone"
+	TriggerHandoffSwitch      = "HandoffSwitch"
 	TriggerHumanInputRequired = "HumanInputRequired"
-	TriggerTransferComplete = "TransferComplete"
+	TriggerTransferComplete   = "TransferComplete"
 )
-
-
-
-

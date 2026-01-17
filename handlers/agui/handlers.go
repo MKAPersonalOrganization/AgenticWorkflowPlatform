@@ -3,13 +3,13 @@ package agui
 import (
 	"encoding/json"
 	"net/http"
-	"school-with-ai/domain"
+	"school-with-ai/infra/projection/agui"
 	"school-with-ai/services"
 )
 
 // AguiProjectionHandler provides HTTP endpoints for querying the AGUI projection.
 type AguiProjectionHandler struct {
-	projection        domain.AguiProjection
+	projection        agui.AguiProjection
 	projectionService ProjectionService
 }
 
@@ -19,7 +19,7 @@ type ProjectionService interface {
 }
 
 // NewAguiProjectionHandler creates a new handler for AGUI projection queries.
-func NewAguiProjectionHandler(projection domain.AguiProjection, projectionService ProjectionService) *AguiProjectionHandler {
+func NewAguiProjectionHandler(projection agui.AguiProjection, projectionService ProjectionService) *AguiProjectionHandler {
 	return &AguiProjectionHandler{
 		projection:        projection,
 		projectionService: projectionService,
