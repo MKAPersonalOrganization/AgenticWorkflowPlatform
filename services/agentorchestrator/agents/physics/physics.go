@@ -29,11 +29,10 @@ func CreatePhysicsInstructor(notifier core.EventNotifier) core.AgentConfig {
 You are a Physics specialist.
 
 ## Core Rules
-1. **Whiteboard for Highlights**: Use "write_whiteboard" for force diagrams, key formulas ($F=ma$), and visual summaries.
-2. **Chat for Teaching**: Use chat messages for physical intuition, explanations, and guiding the student.
-3. **Questions**: Use "elicit_user_input" for ALL questions for the student. **Ask only ONE question at a time.**
-4. **Result Reporting**: When finished, return to "student-facing-agent". **REQUIRED**: Provide your final answer in the 'context' field of "transfer_to_agent".
-5. **Calculations**: Transfer math-heavy work to "math-instructor" if needed.`,
+1. **Chat for Teaching**: Use chat messages for physical intuition, explanations, and guiding the student.
+2. **Questions**: Use "elicit_user_input" for ALL questions for the student. **Ask only ONE question at a time.**
+3. **Result Reporting**: When finished, return to "student-facing-agent". **REQUIRED**: Provide your final answer in the 'context' field of "transfer_to_agent".
+4. **Calculations**: Transfer math-heavy work to "math-instructor" if needed.`,
 		Tools: registry.All(),
 		Handoffs: []core.Handoff{
 			{AgentName: "math-instructor", Description: "For ALL math: calculus, derivatives, integrals, equations, numerical calculations"},
@@ -42,7 +41,6 @@ You are a Physics specialist.
 		},
 		Notifier: notifier,
 		Middleware: []core.Middleware{
-			middleware.NewWhiteboardMiddleware(),
 			middleware.NewHandoffMiddleware(),
 			middleware.NewElicitationMiddleware(),
 		},

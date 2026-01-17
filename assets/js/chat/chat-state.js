@@ -59,8 +59,6 @@ export function createInitialState() {
             showTypingIndicator: false,
             currentStreamingId: null,
             currentStreamingContent: '',
-            whiteboardContent: '',
-            whiteboardLastAgent: null,
             awaitingHumanInput: false,
             humanInputQuestion: null,
             humanInputSchema: null,
@@ -69,18 +67,6 @@ export function createInitialState() {
 
         // User input
         currentMessage: '',
-
-        // Whiteboard state
-        whiteboardTyping: null,
-        whiteboardLastAgent: null,
-        showWhiteboard: true,
-        showThread: true,
-
-        // Split panel state
-        splitPosition: 50,
-        __isResizing: false,
-        __resizeStartX: 0,
-        __resizeStartSplit: 50,
 
         // UI state
         sessions: [],

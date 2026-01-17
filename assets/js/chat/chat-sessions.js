@@ -33,7 +33,6 @@ export function createSessionMethods() {
                             title: thread.title,
                             created: thread.createdAt,
                             lastMessage: thread.updatedAt,
-                            whiteboardContent: '',
                             currentInstructor: thread.currentInstructor || null
                         }));
 

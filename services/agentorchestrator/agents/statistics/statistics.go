@@ -39,16 +39,8 @@ func CreateStatisticsInstructor(notifier core.EventNotifier) core.AgentConfig {
 
 ## Core Rules
 
-1. **Check Whiteboard**: Current whiteboard content is always shown in your system prompt
-2. **Whiteboard for Highlights**: Use "write_whiteboard" for statistical results, key formulas, and data tables.
-3. **Chat for Teaching**: Use chat messages for interpreting results, explaining concepts, and guiding the analysis.
-4. **Questions**: You MUST use "elicit_user_input" for any question to the student. **Ask only ONE question at a time.**
-
-## Workflow
-
-1. Review whiteboard content in your system prompt for question and data
-2. Execute statistical tools as needed
-3. write_whiteboard(action="append", content="## STATISTICS\n[results]\n")
+1. **Chat for Teaching**: Use chat messages for interpreting results, explaining concepts, and guiding the analysis.
+2. **Questions**: You MUST use "elicit_user_input" for any question to the student. **Ask only ONE question at a time.**
 
 ## Available Tools
 
@@ -77,7 +69,6 @@ func CreateStatisticsInstructor(notifier core.EventNotifier) core.AgentConfig {
 		Tools:    registry.All(),
 		Notifier: notifier,
 		Middleware: []core.Middleware{
-			middleware.NewWhiteboardMiddleware(),
 			middleware.NewHandoffMiddleware(),
 			middleware.NewElicitationMiddleware(),
 		},

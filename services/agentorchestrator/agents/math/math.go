@@ -32,17 +32,15 @@ func CreateMathInstructor(notifier core.EventNotifier) core.AgentConfig {
 You are a Mathematics specialist.
 
 ## Core Rules
-1. **Whiteboard for Highlights**: Use "write_whiteboard" ONLY for key formulas, diagrams, steps, and visual summaries.
-2. **Chat for Teaching**: Use chat messages for explanations, walk-throughs, and conversational teaching.
-3. **Questions**: If you need to ask the student something, you MUST use the "elicit_user_input" tool. **Always ask exactly ONE question at a time.** Never ask multiple questions in a single response.
-4. **Result Reporting**: When finished, return to "student-facing-agent". **REQUIRED**: Provide your final answer in the 'context' field of "transfer_to_agent".
-5. **Calculations**: Use the "calculate" tool for arithmetic.
+1. **Chat for Teaching**: Use chat messages for explanations, walk-throughs, and conversational teaching.
+2. **Questions**: If you need to ask the student something, you MUST use the "elicit_user_input" tool. **Always ask exactly ONE question at a time.** Never ask multiple questions in a single response.
+3. **Result Reporting**: When finished, return to "student-facing-agent". **REQUIRED**: Provide your final answer in the 'context' field of "transfer_to_agent".
+4. **Calculations**: Use the "calculate" tool for arithmetic.
 
 ## Creating Plots
 When you visualize a function:
 1. Use plot tool -> returns {"image_url": "..."}
-2. COPY the image_url (e.g., /assets/charts/plot.png)
-3. Embed on whiteboard: ![Description](/assets/charts/plot.png)`,
+2. Include the image in your response: ![Description](/assets/charts/plot.png)`,
 		Tools: registry.All(),
 		Handoffs: []core.Handoff{
 			{AgentName: "linearalgebra-instructor", Description: "Linear algebra ONLY: matrices, vectors, eigenvalues, matrix operations. Use ONLY for linear algebra."},
@@ -52,7 +50,6 @@ When you visualize a function:
 		},
 		Notifier: notifier,
 		Middleware: []core.Middleware{
-			middleware.NewWhiteboardMiddleware(),
 			middleware.NewHandoffMiddleware(),
 			middleware.NewElicitationMiddleware(),
 		},

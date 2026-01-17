@@ -33,17 +33,16 @@ type AguiBroadcaster interface {
 
 // AguiThreadState represents the complete UI state for a thread.
 type AguiThreadState struct {
-	ThreadID          string                        `json:"threadId"`
-	Title             string                        `json:"title,omitempty"`
-	Messages          []aguievents.Message          `json:"messages"` // AG-UI SDK format
-	ActiveRun         *AguiRunState                 `json:"activeRun"`
-	ToolCalls         []AguiToolCall                `json:"toolCalls"`
-	AgentActivity     map[string]*AguiAgentActivity `json:"agentActivity"`
-	WhiteboardContent string                        `json:"whiteboardContent,omitempty"`
-	CreatedAt         time.Time                     `json:"createdAt"`
-	UpdatedAt         time.Time                     `json:"updatedAt"`
-	Version           int64                         `json:"version"` // Event version
-	IsDeleted         bool                          `json:"isDeleted"`
+	ThreadID      string                        `json:"threadId"`
+	Title         string                        `json:"title,omitempty"`
+	Messages      []aguievents.Message          `json:"messages"` // AG-UI SDK format
+	ActiveRun     *AguiRunState                 `json:"activeRun"`
+	ToolCalls     []AguiToolCall                `json:"toolCalls"`
+	AgentActivity map[string]*AguiAgentActivity `json:"agentActivity"`
+	CreatedAt     time.Time                     `json:"createdAt"`
+	UpdatedAt     time.Time                     `json:"updatedAt"`
+	Version       int64                         `json:"version"` // Event version
+	IsDeleted     bool                          `json:"isDeleted"`
 }
 
 // AguiRunState tracks the lifecycle of an agent run.

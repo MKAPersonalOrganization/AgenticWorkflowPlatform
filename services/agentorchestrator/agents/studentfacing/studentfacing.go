@@ -60,7 +60,6 @@ Be friendly and helpful, but concise. You're a coordinator, not a teacher.`,
 		},
 		Notifier: notifier,
 		Middleware: []core.Middleware{
-			middleware.NewWhiteboardMiddleware(),
 			middleware.NewHandoffMiddleware(),
 			middleware.NewElicitationMiddleware(),
 		},

@@ -175,13 +175,13 @@ func TestBasicToolExecutor_Calculate(t *testing.T) {
 	}
 }
 
-func TestBasicToolExecutor_WriteWhiteboard(t *testing.T) {
+func TestBasicToolExecutor_CustomTool(t *testing.T) {
 	t.Parallel()
-	// Create tool registry and register a mock whiteboard tool
+	// Create tool registry and register a mock custom tool
 	toolRegistry := core.NewToolRegistry()
 	toolRegistry.Register(core.NewFunctionTool(
-		"write_whiteboard",
-		"Write to whiteboard",
+		"save_note",
+		"Save a note",
 		core.ObjectSchema(map[string]any{
 			"content": core.StringProperty("Content"),
 			"action":  core.StringProperty("Action"),
@@ -194,22 +194,21 @@ func TestBasicToolExecutor_WriteWhiteboard(t *testing.T) {
 	executor := core.NewRegistryToolExecutor(context.Background(), toolRegistry, "", "", nil)
 
 	toolCall := core.ToolCall{
-		ID:   "call_whiteboard",
+		ID:   "call_note",
 		Type: "function",
 		Function: core.ToolFunction{
-			Name:      "write_whiteboard",
+			Name:      "save_note",
 			Arguments: `{"content": "test content", "action": "write"}`,
 		},
 	}
 
-	// write_whiteboard is an instructor tool
 	result, err := executor.Execute(toolCall)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	if result.Result == "" {
-		t.Error("expected non-empty result from instructor tool")
+		t.Error("expected non-empty result from custom tool")
 	}
 }
 
