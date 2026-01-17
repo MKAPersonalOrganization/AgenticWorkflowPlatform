@@ -14,7 +14,6 @@ require (
 	github.com/ardanlabs/darwin/v3 v3.3.1
 	github.com/arl/statsviz v0.8.0
 	github.com/avast/retry-go/v4 v4.7.0
-	github.com/cpmech/gosl v1.2.13-0.20250408030823-d25acbe85e13
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/google/uuid v1.6.0
 	github.com/hibiken/asynq v0.25.1
@@ -27,6 +26,8 @@ require (
 	github.com/openai/openai-go/v3 v3.15.0
 	github.com/ory/client-go v1.22.16
 	github.com/pgvector/pgvector-go v0.3.0
+	github.com/qmuntal/stateless v1.7.2
+	github.com/redis/go-redis/v9 v9.7.0
 	github.com/rs/zerolog v1.34.0
 	github.com/sashabaranov/go-openai v1.41.2
 	github.com/stretchr/testify v1.11.1
@@ -62,8 +63,6 @@ require (
 	github.com/natefinch/atomic v1.0.1 // indirect
 	github.com/oapi-codegen/runtime v1.1.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/qmuntal/stateless v1.7.2 // indirect
-	github.com/redis/go-redis/v9 v9.7.0 // indirect
 	github.com/robfig/cron/v3 v3.0.2-0.20210106135023-bc59245fe10e // indirect
 	github.com/samber/lo v1.52.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
