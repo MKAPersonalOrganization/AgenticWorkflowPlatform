@@ -1,24 +1,20 @@
 package elicitation
 
-// FreeTextProps - no specific props needed as it relies on parent Alpine context
-type FreeTextProps struct {}
+// ShortAnswerProps - no specific props needed as it relies on parent Alpine context
+type ShortAnswerProps struct {}
 
-templ FreeText() {
+templ ShortAnswer() {
     <template x-if="awaitingHumanInput && index === messages.length - 1">
         <div class="mt-4 pt-4 border-t border-primary/10 animate-in fade-in slide-in-from-top-2">
             <form @submit.prevent="sendMessage" class="flex flex-col gap-2">
                 <div class="relative">
-                    <textarea
+                    <input
+                        type="text"
                         x-model="currentMessage"
-                        @keydown.enter.prevent="if(!$event.shiftKey) sendMessage()"
-                        class="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 resize-y"
+                        class="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                         placeholder="Type your answer here..."
-                        rows="3"
                         autofocus
-                    ></textarea>
-                    <div class="absolute bottom-2 right-2 flex gap-2">
-                         <span class="text-[10px] text-muted-foreground self-center">Shift+Enter for newline</span>
-                    </div>
+                    />
                 </div>
                 <div class="flex justify-end">
                     <button 

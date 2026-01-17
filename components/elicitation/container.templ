@@ -51,9 +51,9 @@ templ Container() {
                     @TrueFalse()
                 </template>
 
-                <!-- FREE TEXT: Default -->
-                <template x-if="!message.parsedArgs?.schema?.enum && !['choose_one', 'choose_multiple', 'scale', 'true_false'].includes(message.parsedArgs?.schema?.type) && !message.parsedArgs?.schema?.type?.includes('array')">
-                    @FreeText()
+                <!-- SHORT ANSWER (INPUT FIELD) -->
+                <template x-if="message.parsedArgs?.schema?.type === 'short_answer' || (!message.parsedArgs?.schema?.enum && !['choose_one', 'choose_multiple', 'numeric_range', 'true_false'].includes(message.parsedArgs?.schema?.type) && !message.parsedArgs?.schema?.type?.includes('array'))">
+                    @ShortAnswer()
                 </template>
             }
         }
