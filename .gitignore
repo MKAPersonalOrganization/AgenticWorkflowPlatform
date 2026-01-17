@@ -13,3 +13,7 @@ assets/charts/linter-output.txt
 assets/charts/*.png
 assets/charts/*.gif
 assets/charts/*.webp
+
+# Binaries
+bin/
+
