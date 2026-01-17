@@ -6,7 +6,7 @@ import "school-with-ai/components/alert"
 type Props struct {}
 
 templ Container() {
-    <div class="my-4 relative group/message animate-in fade-in slide-in-from-bottom-2 duration-300">
+    <div class="my-4 relative group/message animate-in fade-in slide-in-from-bottom-2 duration-300 w-full">
         @alert.Alert(alert.Props{
             Class: "border-l-4 border-primary/50 bg-gradient-to-r from-primary/5 to-transparent",
         }) {
@@ -42,7 +42,7 @@ templ Container() {
                 </template>
                 
                 <!-- NUMERIC RANGE (SLIDER) -->
-                <template x-if="message.parsedArgs?.schema?.type === 'numeric_range'">
+                <template x-if="message.parsedArgs?.schema?.type === 'numeric_range' || message.parsedArgs?.schema?.type === 'scale'">
                     @NumericRange()
                 </template>
 
@@ -52,7 +52,7 @@ templ Container() {
                 </template>
 
                 <!-- SHORT ANSWER (INPUT FIELD) -->
-                <template x-if="message.parsedArgs?.schema?.type === 'short_answer' || (!message.parsedArgs?.schema?.enum && !['choose_one', 'choose_multiple', 'numeric_range', 'true_false'].includes(message.parsedArgs?.schema?.type) && !message.parsedArgs?.schema?.type?.includes('array'))">
+                <template x-if="message.parsedArgs?.schema?.type === 'short_answer' || (!message.parsedArgs?.schema?.enum && !['choose_one', 'choose_multiple', 'numeric_range', 'scale', 'true_false'].includes(message.parsedArgs?.schema?.type) && !message.parsedArgs?.schema?.type?.includes('array'))">
                     @ShortAnswer()
                 </template>
             }
