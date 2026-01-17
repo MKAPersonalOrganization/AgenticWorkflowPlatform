@@ -115,6 +115,7 @@ func (f *EventFactory) AgentHandoff(threadID, targetAgent string) *domain.AgentH
 		Timestamp:   time.Now(),
 	}
 }
+
 // RunStarted creates a RunStartedEvent.
 func (f *EventFactory) RunStarted(threadID, runID string) *domain.RunStartedEvent {
 	return &domain.RunStartedEvent{

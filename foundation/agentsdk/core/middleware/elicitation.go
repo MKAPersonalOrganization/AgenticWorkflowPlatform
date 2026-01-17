@@ -36,7 +36,7 @@ func (t *ElicitInputTool) Parameters() map[string]any {
 				"description": "The question or prompt to display to the user.",
 			},
 			"schema": map[string]any{
-				"type": "object",
+				"type":        "object",
 				"description": "Optional JSON schema describing the expected response structure.",
 				"properties": map[string]any{
 					"enum": map[string]any{
@@ -78,7 +78,7 @@ func (t *ElicitInputTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	}
 
 	status := fmt.Sprintf("Requesting input: %s", params.Question)
-	
+
 	// Return a result that indicates we are waiting
 	return core.NewToolResultWithCommand(
 		map[string]any{

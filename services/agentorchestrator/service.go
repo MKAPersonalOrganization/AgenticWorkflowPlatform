@@ -31,8 +31,8 @@ type Service struct {
 	toolTracer    core.ToolTracer
 
 	// Internal components
-	threadMgmt     *threadmgmt.Manager
-	engine         *engine.Engine
+	threadMgmt *threadmgmt.Manager
+	engine     *engine.Engine
 }
 
 // Option is a functional option for configuring Service.
@@ -46,12 +46,12 @@ func New(
 	opts ...Option,
 ) *Service {
 	s := &Service{
-		log:            log,
-		chatClient:     chatClient,
-		writeModel:     eventLog,
-		toolRegistry:   core.NewToolRegistry(),
-		threadRepo:     domain.NewThreadRepository(threadmgmt.NewEventStoreAdapter(eventLog)),
-		threadMgmt:     threadmgmt.New(log, domain.NewThreadRepository(threadmgmt.NewEventStoreAdapter(eventLog))),
+		log:          log,
+		chatClient:   chatClient,
+		writeModel:   eventLog,
+		toolRegistry: core.NewToolRegistry(),
+		threadRepo:   domain.NewThreadRepository(threadmgmt.NewEventStoreAdapter(eventLog)),
+		threadMgmt:   threadmgmt.New(log, domain.NewThreadRepository(threadmgmt.NewEventStoreAdapter(eventLog))),
 	}
 
 	for _, opt := range opts {
@@ -75,8 +75,6 @@ func New(
 
 	return s
 }
-
-
 
 // WithConfig configures the agent with a complete configuration.
 func WithConfig(config core.AgentConfig) Option {
@@ -152,13 +150,4 @@ func (s *Service) Run(ctx context.Context, agentName string, runCtx core.RunCont
 func (s *Service) ProcessUserMessage(ctx context.Context, threadID, content, userID string) (iter.Seq2[core.Event, error], error) {
 	// Delegate to Engine
 	return s.engine.ProcessUserMessage(ctx, "student-facing-agent", threadID, content, userID)
-}
-
-// notify emits a domain event if a notifier is configured.
-func (s *Service) notify(ctx context.Context, event core.Event) {
-	if s.config.Notifier != nil && event != nil {
-		if err := s.config.Notifier.HandleDomainEvent(event); err != nil {
-			s.log.Error(ctx, "failed to notify event", "error", err, "eventType", event.EventType())
-		}
-	}
 }

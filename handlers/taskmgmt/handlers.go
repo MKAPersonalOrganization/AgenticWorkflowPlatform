@@ -22,7 +22,7 @@ type TaskManagementHandler struct {
 	log                  *logger.Logger
 	chatClient           *llm.OpenAIClient
 	taskMgmtService      *taskmanagement.TaskManagementService
-	orchestratorService   services.AgentOrchestrator
+	orchestratorService  services.AgentOrchestrator
 	threadCommandService services.ThreadCommandService
 	authService          services.AuthService
 	threadQueryService   services.ThreadQueryService

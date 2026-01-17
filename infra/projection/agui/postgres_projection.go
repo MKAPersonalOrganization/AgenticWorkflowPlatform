@@ -176,7 +176,7 @@ func (p *PostgresAguiProjection) applyThreadDeleted(ctx context.Context, event d
 }
 
 // GetThreadState retrieves the complete UI state for a thread from PostgreSQL.
-func (p *PostgresAguiProjection) GetThreadState(threadID string) (*domain.AguiThreadState, bool) {
+func (p *PostgresAguiProjection) GetThreadState(threadID string) (*AguiThreadState, bool) {
 	ctx := context.Background()
 
 	// Get thread record
@@ -278,12 +278,12 @@ func (p *PostgresAguiProjection) GetThreadState(threadID string) (*domain.AguiTh
 		aguiMessages = append(aguiMessages, aguimsit)
 	}
 
-	state := &domain.AguiThreadState{
+	state := &AguiThreadState{
 		ThreadID:      thread.ThreadID,
 		Title:         thread.Title,
 		Messages:      aguiMessages,
-		ToolCalls:     []domain.AguiToolCall{},
-		AgentActivity: make(map[string]*domain.AguiAgentActivity),
+		ToolCalls:     []AguiToolCall{},
+		AgentActivity: make(map[string]*AguiAgentActivity),
 		CreatedAt:     thread.CreatedAt,
 		UpdatedAt:     thread.UpdatedAt,
 		Version:       thread.Version,
@@ -294,7 +294,7 @@ func (p *PostgresAguiProjection) GetThreadState(threadID string) (*domain.AguiTh
 }
 
 // GetActiveRun retrieves the currently active run for a thread.
-func (p *PostgresAguiProjection) GetActiveRun(threadID string) (*domain.AguiRunState, bool) {
+func (p *PostgresAguiProjection) GetActiveRun(threadID string) (*AguiRunState, bool) {
 	// TODO: Implement run tracking in PostgreSQL
 	// For now, return nil (no active run)
 	return nil, false
@@ -330,5 +330,5 @@ func (p *PostgresAguiProjection) ListThreads() []string {
 	return threadIDs
 }
 
-// Verify PostgresAguiProjection implements domain.AguiProjection.
-var _ domain.AguiProjection = (*PostgresAguiProjection)(nil)
+// Verify PostgresAguiProjection implements AguiProjection.
+var _ AguiProjection = (*PostgresAguiProjection)(nil)

@@ -20,10 +20,15 @@ func TestToolCallAccumulator_NewToolCall(t *testing.T) {
 		}},
 	}
 
-	result, ok := acc.ProcessUpdate(update)
+	updates, ok := acc.ProcessUpdate(update)
 	if !ok {
 		t.Fatal("expected update to be processed")
 	}
+
+	if len(updates) != 1 {
+		t.Fatalf("expected 1 update, got %d", len(updates))
+	}
+	result := updates[0]
 
 	if !result.IsNew {
 		t.Error("expected IsNew to be true")
@@ -54,7 +59,7 @@ func TestToolCallAccumulator_ArgumentStreaming(t *testing.T) {
 	})
 
 	// Stream arguments in chunks
-	update1, ok := acc.ProcessUpdate(llm.ChatResponseUpdate{
+	updates1, ok := acc.ProcessUpdate(llm.ChatResponseUpdate{
 		ToolCallIndex: 0,
 		Contents: []llm.AIContent{llm.FunctionCallContent{
 			RawArguments: `{"city":`,
@@ -63,6 +68,11 @@ func TestToolCallAccumulator_ArgumentStreaming(t *testing.T) {
 	if !ok {
 		t.Fatal("expected update to be processed")
 	}
+	if len(updates1) != 1 {
+		t.Fatalf("expected 1 update, got %d", len(updates1))
+	}
+	update1 := updates1[0]
+
 	if update1.IsNew {
 		t.Error("expected IsNew to be false for continuation")
 	}
@@ -70,12 +80,17 @@ func TestToolCallAccumulator_ArgumentStreaming(t *testing.T) {
 		t.Errorf("unexpected args delta: %s", update1.ArgsDelta)
 	}
 
-	update2, _ := acc.ProcessUpdate(llm.ChatResponseUpdate{
+	updates2, _ := acc.ProcessUpdate(llm.ChatResponseUpdate{
 		ToolCallIndex: 0,
 		Contents: []llm.AIContent{llm.FunctionCallContent{
 			RawArguments: `"London"}`,
 		}},
 	})
+	if len(updates2) != 1 {
+		t.Fatalf("expected 1 update, got %d", len(updates2))
+	}
+	update2 := updates2[0]
+
 	if update2.ArgsDelta != `"London"}` {
 		t.Errorf("unexpected args delta: %s", update2.ArgsDelta)
 	}
