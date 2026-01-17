@@ -119,7 +119,9 @@ func (m *ElicitationMiddleware) Process(ctx context.Context, reqCtx *core.Reques
 	reqCtx.AddSystemPrompt(`
 ## User Input
 You MUST use the 'elicit_user_input' tool whenever you need to ask the user a question.
-NEVER ask the user a question directly in your response text. **Always ask exactly ONE question at a time.** Never ask multiple questions in a single response.
+NEVER ask the user a question directly in your response text.
+**CRITICAL**: Always ask exactly ONE question at a time. Never ask multiple questions in a single response.
+**NO LISTS**: Even when giving a quiz, test, or exercise, you MUST ask the first question via 'elicit_user_input' and wait for the answer before asking the next. Never provide a list of questions for the user to answer later.
 Use this tool for:
 - Clarification on a request
 - Selection from a list of options

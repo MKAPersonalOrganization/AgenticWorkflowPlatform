@@ -60,6 +60,9 @@ type ChatOptions struct {
 	// Seed enables reproducible outputs when set.
 	Seed *int64 `json:"seed,omitempty"`
 
+	// ParallelToolCalls enables/disables parallel tool execution if supported by the provider.
+	ParallelToolCalls *bool `json:"parallelToolCalls,omitempty"`
+
 	// AdditionalProperties holds provider-specific options.
 	AdditionalProperties map[string]any `json:"additionalProperties,omitempty"`
 }
