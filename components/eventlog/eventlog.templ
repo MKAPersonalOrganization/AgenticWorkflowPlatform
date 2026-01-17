@@ -81,30 +81,12 @@ templ EventLog() {
 						</div>
 						<span class="text-[10px] text-muted-foreground/60" x-text="`ID: ${event.id.slice(-6)}`"></span>
 					</div>
-					<div class="space-y-1.5 text-[11px]" x-show="Object.keys(event.data).length > 0">
-						<template x-for="(value, key) in event.data" :key="key">
-							<div class="flex gap-2 items-start">
-								<span class="text-primary/80 font-semibold min-w-[80px]" x-text="key + ':'"></span>
-								<template x-if="typeof value === 'string' && value.length > 100">
-									<div class="flex-1">
-										<div class="text-muted-foreground break-all" x-text="value.substring(0, 100) + '...'"></div>
-										<button
-											@click="navigator.clipboard.writeText(value); alert('Copied to clipboard!')"
-											class="text-primary/60 hover:text-primary text-[10px] mt-1 underline"
-										>
-											Copy full value
-										</button>
-									</div>
-								</template>
-								<template x-if="typeof value === 'object'">
-									<div class="flex-1">
-										<pre class="text-muted-foreground bg-background/50 p-1.5 rounded text-[10px] overflow-x-auto" x-text="JSON.stringify(value, null, 2)"></pre>
-									</div>
-								</template>
-								<template x-if="typeof value !== 'object' && (typeof value !== 'string' || value.length <= 100)">
-									<span class="text-muted-foreground break-all flex-1" x-text="value"></span>
-								</template>
-							</div>
+					<div class="mt-1 text-[11px] text-muted-foreground break-all">
+						<template x-if="event.data && (event.data.value || event.data.message || event.data.content)">
+							<span x-text="event.data.value || event.data.message || event.data.content"></span>
+						</template>
+						<template x-if="!event.data || (!event.data.value && !event.data.message && !event.data.content)">
+							<span x-text="JSON.stringify(event.data)"></span>
 						</template>
 					</div>
 				</div>
