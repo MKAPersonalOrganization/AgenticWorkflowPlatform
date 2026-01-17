@@ -43,19 +43,16 @@ func NewProcessChatTask(payload ProcessChatPayload) (*asynq.Task, error) {
 type ChatWorker struct {
 	log                  *logger.Logger
 	orchestrationService *Service
-	eventBufferManager   *EventBufferManager
 }
 
 // NewChatWorker creates a new chat worker.
 func NewChatWorker(
 	log *logger.Logger,
 	orchestrationService *Service,
-	eventBufferManager *EventBufferManager,
 ) *ChatWorker {
 	return &ChatWorker{
 		log:                  log,
 		orchestrationService: orchestrationService,
-		eventBufferManager:   eventBufferManager,
 	}
 }
 
@@ -93,13 +90,6 @@ func (w *ChatWorker) processChat(ctx context.Context, payload ProcessChatPayload
 		return fmt.Errorf("task cancelled: %w", ctx.Err())
 	}
 
-	// Create event emitter for SSE streaming
-	emitter := w.eventBufferManager.CreateEmitter(payload.JobID, payload.ThreadID)
-	defer w.eventBufferManager.CloseEmitter(payload.JobID)
-
-	// Wrap emitter with AGUI adapter to convert domain events to AGUI events
-	aguiEmitter := NewAguiEventEmitter(emitter)
-
 	// Delegate to orchestration service
 	params := UserMessageParams{
 		ThreadID:  payload.ThreadID,
@@ -108,5 +98,5 @@ func (w *ChatWorker) processChat(ctx context.Context, payload ProcessChatPayload
 		UserID:    payload.UserID,
 	}
 
-	return w.orchestrationService.HandleUserMessage(ctx, params, aguiEmitter)
+	return w.orchestrationService.HandleUserMessage(ctx, params)
 }

@@ -9,6 +9,7 @@ import (
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/llm"
 	"school-with-ai/foundation/logger"
+	"school-with-ai/infra/projection/agui"
 	"school-with-ai/services"
 	"school-with-ai/services/taskmanagement"
 	"time"
@@ -26,6 +27,7 @@ type TaskManagementHandler struct {
 	threadCommandService services.ThreadCommandService
 	authService          services.AuthService
 	threadQueryService   services.ThreadQueryService
+	aguiProjection       agui.AguiProjection
 }
 
 // NewTaskManagementHandler creates a new HTTP handler for task management.
@@ -37,6 +39,7 @@ func NewTaskManagementHandler(
 	threadCommandService services.ThreadCommandService,
 	authService services.AuthService,
 	threadQueryService services.ThreadQueryService,
+	aguiProjection agui.AguiProjection,
 ) *TaskManagementHandler {
 	return &TaskManagementHandler{
 		log:                  log,
@@ -46,6 +49,7 @@ func NewTaskManagementHandler(
 		threadCommandService: threadCommandService,
 		authService:          authService,
 		threadQueryService:   threadQueryService,
+		aguiProjection:       aguiProjection,
 	}
 }
 
@@ -146,7 +150,6 @@ func (h *TaskManagementHandler) StreamJobEvents(w http.ResponseWriter, r *http.R
 	jobID := r.PathValue("id")
 	if jobID == "" {
 		http.Error(w, "jobId is required", http.StatusBadRequest)
-
 		return
 	}
 
@@ -167,80 +170,65 @@ func (h *TaskManagementHandler) StreamJobEvents(w http.ResponseWriter, r *http.R
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
-
 		return
 	}
 
-	// Wait for job to be picked up by Asynq worker
-	ctx := r.Context()
-	var eventBuffer *taskmanagement.EventBuffer
-
-	// Poll for event buffer until worker picks up job (or client disconnects)
-	ticker := time.NewTicker(50 * time.Millisecond)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			// Client disconnected while waiting
-			return
-		case <-ticker.C:
-			var exists bool
-			eventBuffer, exists = h.taskMgmtService.GetEventBuffer(jobID)
-			if exists {
-				goto streamEvents
-			}
-		}
+	// 1. Get Task Info to find Thread ID
+	// We need to know which thread to subscribe to.
+	taskInfo, err := h.taskMgmtService.GetTaskInfo("default", jobID)
+	if err != nil {
+		// Try to see if it exists in other states or complete?
+		h.log.Warn(r.Context(), "[API] Failed to get task info", "jobID", jobID, "error", err)
+		// If we can't find the task, we can't get the threadID easily unless we query all threads?
+		// Client should ideally pass threadID, but API is /tasks/{id}:subscribe.
+		// Assuming task is found. If not, maybe it's already done?
+		// If done, we don't need to stream.
+		http.Error(w, "Task not found", http.StatusNotFound)
+		return
 	}
 
-streamEvents:
-	// NOTE: Snapshot disabled to prevent overwriting live events
-	// The snapshot was causing student-facing agent's initial tool calls to be hidden
-	// because it would send the projection state BEFORE those events were emitted.
-	// For now, clients will receive all events from the live stream.
-	// TODO: Re-enable snapshots only for reconnections, not initial connections
+	// 2. Extract ThreadID from payload
+	var payload taskmanagement.ProcessChatPayload
+	if err := json.Unmarshal(taskInfo.Payload, &payload); err != nil {
+		h.log.Error(r.Context(), "[API] Failed to unmarshal task payload", "error", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	threadID := payload.ThreadID
 
-	// FIRST: Send MESSAGES_SNAPSHOT from projection (ensures client has current state)
-	// messages := h.threadQueryService.GetThreadMessages(eventBuffer.ThreadID)
+	h.log.Info(r.Context(), "[API] Starting SSE stream from Projection", "jobID", jobID, "threadID", threadID)
+
+	// 3. Subscribe to Projection (Live Path)
+	eventCh, cancel := h.aguiProjection.Subscribe(threadID)
+	defer cancel()
+
+	// 4. Send Initial Snapshot (Historical Path - optional but recommended)
+	// messages := h.threadQueryService.GetThreadMessages(threadID)
 	// if len(messages) > 0 {
-	// 	messagesSnapshotEvent := aguievents.NewMessagesSnapshotEvent(messages)
-	// 	err := WriteSSEEvent(w, messagesSnapshotEvent)
-	// 	if err != nil {
-	// 		h.log.Error(r.Context(), "[API] Failed to write messages snapshot event", "error", err, "jobID", jobID)
+	// 	if err := WriteSSEEvent(w, aguievents.NewMessagesSnapshotEvent(messages)); err != nil {
 	// 		return
 	// 	}
 	// 	flusher.Flush()
 	// }
 
-	// Stream realtime events from buffer
-	eventIndex := 0
-	eventTicker := time.NewTicker(50 * time.Millisecond)
-	defer eventTicker.Stop()
-
+	// 5. Stream events
+	ctx := r.Context()
 	for {
 		select {
 		case <-ctx.Done():
-			// Client disconnected
 			return
-
-		case <-eventTicker.C:
-			// Get new events since last index
-			newEvents := eventBuffer.GetEvents(eventIndex)
-
-			for _, event := range newEvents {
-				// Events are already converted from domain to AGUI by the worker layer
-				if err := WriteSSEEvent(w, event); err != nil {
+		case event, ok := <-eventCh:
+			if !ok {
+				// Channel closed
+				return
+			}
+			// Convert Domain Event to Agui Event(s)
+			aguiEvents := taskmanagement.ToAguiEvents(event)
+			for _, ae := range aguiEvents {
+				if err := WriteSSEEvent(w, ae); err != nil {
 					return
 				}
 				flusher.Flush()
-				eventIndex++
-			}
-
-			// Check if job is complete
-			if eventBuffer.IsClosed() && eventIndex >= eventBuffer.Len() {
-				// Cleanup: remove event buffer after all events have been sent
-				h.taskMgmtService.RemoveEventBuffer(jobID)
-				return
 			}
 		}
 	}
@@ -271,13 +259,7 @@ func (h *TaskManagementHandler) GetJobStatus(w http.ResponseWriter, r *http.Requ
 	task.Metadata["streamUrl"] = fmt.Sprintf("/v1/tasks/%s:subscribe", taskID)
 
 	if err != nil {
-		// Task not found in queue - check if completed via event buffer
-		_, exists := h.taskMgmtService.GetEventBuffer(taskID)
-		if exists {
-			task.Status = NewTaskStatus(TaskStateCompleted, nil)
-		} else {
-			task.Status = NewTaskStatus(TaskStateUnknown, nil)
-		}
+		task.Status = NewTaskStatus(TaskStateUnknown, nil)
 	} else {
 		// Map Asynq state to A2A TaskState
 		var state TaskState

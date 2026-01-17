@@ -76,7 +76,6 @@ type UserMessageParams struct {
 func (s *Service) HandleUserMessage(
 	ctx context.Context,
 	params UserMessageParams,
-	emitter EventEmitter,
 ) error {
 	// Check if context was cancelled
 	if ctx.Err() != nil {
@@ -85,14 +84,6 @@ func (s *Service) HandleUserMessage(
 
 	// 1. Start Langfuse trace (if enabled)
 	var traceCtx *langfuse.TraceContext
-	// We generate runID here just for tracing metadata if needed?
-	// ProcessUserMessage generates its own IDs.
-	// But we can pass a CorrelationID? ProcessUserMessage signature doesn't take it.
-	// We can let ProcessUserMessage generate IDs.
-	// For tracing, we might want to know the runID.
-	// But if we trust Orchestrator, we can skip tracing specific runID here or rely on returned events?
-	// Let's keep it simple.
-
 	if s.langfuseTracer != nil {
 		tracer := s.langfuseTracer.GetTracer()
 		if tracer != nil {
@@ -123,14 +114,25 @@ func (s *Service) HandleUserMessage(
 		return fmt.Errorf("failed to process user message: %w", err)
 	}
 
-	// 3. Emit events
+	// 3. Persist ephemeral events to EventStore
+	// This ensures that streaming events (processed by ProjectionUpdater) reach the AguiProjection
 	for event, err := range events {
 		if err != nil {
 			return fmt.Errorf("agent run failed: %w", err)
 		}
 
-		if emitErr := emitter.Emit(event); emitErr != nil {
-			s.log.Error(ctx, "failed to emit domain event", "error", emitErr, "threadID", params.ThreadID)
+		// Filter out events that were already persisted by the Engine/ThreadMgmt to avoid duplication
+		switch event.EventType() {
+		case "MessageAdded", "ThreadCreated", "ThreadTitleUpdated", "ThreadDeleted":
+			// These are handled by threadMgmt internal calls
+			continue
+		default:
+			// Write ephemeral events (streaming tokens, run status, etc.) to EventStore
+			// We use a specific streaming stream to avoid optimistic concurrency conflicts with the main thread stream
+			streamID := fmt.Sprintf("streaming-%s", params.ThreadID)
+			if _, err := s.eventLog.AppendWithVersion(ctx, streamID, -1, event); err != nil {
+				s.log.Error(ctx, "failed to append ephemeral event", "error", err, "type", event.EventType())
+			}
 		}
 	}
 

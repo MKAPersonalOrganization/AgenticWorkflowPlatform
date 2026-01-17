@@ -23,6 +23,10 @@ type AguiProjection interface {
 
 	// ListThreads returns all thread IDs in the projection.
 	ListThreads() []string
+
+	// Subscribe subscribes to real-time events for a thread.
+	// Returns a channel of events (type core.Event) and a cancel function.
+	Subscribe(threadID string) (<-chan any, func())
 }
 
 // AguiThreadState represents the complete UI state for a thread.
