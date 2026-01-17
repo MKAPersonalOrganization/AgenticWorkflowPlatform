@@ -250,13 +250,7 @@ export function createMessagingMethods() {
                     state.humanInputQuestion = lastMsg.parsedArgs?.question;
                     state.humanInputSchema = lastMsg.parsedArgs?.schema;
 
-                    // Show toast if just loaded
-                    if (state.awaitingHumanInput) {
-                        // Small delay to ensure UI is ready
-                        setTimeout(() => {
-                            state.humanInputToastId = this.showToast(state.humanInputQuestion || 'Specialist needs your help', 'warning', 0);
-                        }, 500);
-                    }
+
                 }
             }
 
