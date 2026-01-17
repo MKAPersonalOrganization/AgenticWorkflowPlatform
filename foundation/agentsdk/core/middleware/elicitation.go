@@ -51,6 +51,20 @@ func (t *ElicitInputTool) Parameters() map[string]any {
 					"description": map[string]any{
 						"type": "string",
 					},
+					"items": map[string]any{
+						"type":        "object",
+						"description": "For array types, describes the items (e.g., enum options).",
+						"properties": map[string]any{
+							"enum": map[string]any{
+								"type":        "array",
+								"items":       map[string]any{"type": "string"},
+								"description": "List of valid options.",
+							},
+							"type": map[string]any{
+								"type": "string",
+							},
+						},
+					},
 				},
 			},
 		},
@@ -113,38 +127,39 @@ Use this tool for:
 - Specific missing information
 Execution will pause until the user answers.
 
-To present options (quick replies), use the 'schema' parameter with 'enum':
+To present options (quick replies), use 'type': 'choose_one' with 'enum':
 {
   "question": "Which subject?",
   "schema": {
+    "type": "choose_one",
     "enum": ["Math", "Physics", "Chemistry"]
   }
 }
 
-For multiple selection, use 'type': 'array' with 'items':
+For multiple selection (checkboxes), use 'type': 'choose_multiple':
 {
   "question": "Select all that apply",
   "schema": {
-    "type": "array",
-    "items": { "enum": ["Red", "Green", "Blue"] }
+    "type": "choose_multiple",
+    "enum": ["Red", "Green", "Blue"]
   }
 }
 
-For numeric ranges, use 'minimum' and 'maximum':
+For numeric ranges, use 'type': 'numeric_range':
 {
   "question": "Rate from 1 to 5",
   "schema": {
-    "type": "number",
+    "type": "numeric_range",
     "minimum": 1,
     "maximum": 5
   }
 }
 
-For Yes/No, use 'type': 'boolean':
+For True/False (single checkbox), use 'type': 'true_false':
 {
-  "question": "Is this urgent?",
+  "question": "I agree to the terms",
   "schema": {
-    "type": "boolean"
+    "type": "true_false"
   }
 }`)
 
