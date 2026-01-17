@@ -22,11 +22,6 @@ graph TB
     Kratos[Ory Kratos<br/>Identity & Auth]
     Postgres[(PostgreSQL<br/>Kratos DB)]
 
-    Langfuse[Langfuse<br/>LLM Observability]
-    LangfuseDB[(PostgreSQL<br/>Langfuse DB)]
-    ClickHouse[(ClickHouse<br/>Analytics)]
-    MinIO[(MinIO<br/>Object Storage)]
-
     EmailService[Email Service]
 
     Browser -->|HTTP/SSE| GoApp
@@ -36,14 +31,11 @@ graph TB
     GoApp -->|Update<br/>Projections| AppPostgres
     GoApp -->|Tasks & Pub/Sub| Redis
     GoApp -->|Auth API| Kratos
-    GoApp -->|Traces & Metrics| Langfuse
 
     Kratos -->|SQL| Postgres
     Kratos -->|SMTP| EmailService
 
-    Langfuse -->|SQL| LangfuseDB
-    Langfuse -->|Analytics| ClickHouse
-    Langfuse -->|Media Storage| MinIO
+    note["<i>Note: Solid lines denote synchronous interactions; dashed lines denote asynchronous interactions. The system also supports optional LLM observability via Langfuse (not shown here for clarity).</i>"]
 ```
 
 ### Containers Overview
@@ -96,7 +88,6 @@ graph TB
     KurrentDB["<b>KurrentDB</b><br/>[Container]<br/>Event Store"]
     AppPostgres["<b>PostgreSQL</b><br/>[Container]<br/>Projections DB"]
     LLM["<b>OpenAI API</b><br/>[Software System]<br/>LLM Provider"]
-    Langfuse["<b>Langfuse</b><br/>[Software System]<br/>LLM Observability"]
 
     User -->|"Uses [HTTPS/SSE]"| Router
     Router -->|"Routes to"| HealthH
@@ -133,10 +124,7 @@ graph TB
     ThreadMgmt -->|"Appends events [GRPC]"| KurrentDB
     OrchS -->|"Requests completions [HTTPS]"| LLM
     
-    OrchS -.->|"Sends traces [HTTPS]"| Langfuse
-    AGUIProj -.->|"Sends traces [HTTPS]"| Langfuse
-    
-    note["<i>Note: Solid lines denote synchronous interactions; dashed lines denote asynchronous interactions.</i>"]
+    note["<i>Note: Solid lines denote synchronous interactions; dashed lines denote asynchronous interactions. Detailed LLM tracing is optionally handled by Langfuse.</i>"]
 ```
 
 ### Components Overview
