@@ -13,6 +13,7 @@ func domainTools() []core.Tool {
 		sharedtools.NewCalculatorTool(),
 		tools.NewPlotTool(),    // gnuplot-based plotting
 		tools.NewAnimateTool(), // gnuplot-based animations
+		core.NewWriteTodosTool(),
 	}
 }
 
@@ -42,7 +43,9 @@ You are a Mathematics specialist.
 ## Creating Plots
 When you visualize a function:
 1. Use plot tool -> returns {"image_url": "..."}
-2. Include the image in your response: ![Description](/assets/charts/plot.png)`,
+2. Include the image in your response: ![Description](/assets/charts/plot.png)
+
+` + core.WriteTodosSystemPrompt,
 		Tools: registry.All(),
 		Handoffs: []core.Handoff{
 			{AgentName: "linearalgebra-instructor", Description: "Linear algebra ONLY: matrices, vectors, eigenvalues, matrix operations. Use ONLY for linear algebra."},

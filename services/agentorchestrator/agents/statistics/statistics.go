@@ -19,6 +19,7 @@ func domainTools() []core.Tool {
 		tools.NewNormalDistributionTool(),
 		tools.NewGeometricDistributionTool(),
 		tools.NewRegressionTool(),
+		core.NewWriteTodosTool(),
 	}
 }
 
@@ -67,7 +68,9 @@ func CreateStatisticsInstructor(notifier core.EventNotifier) core.AgentConfig {
 **Mean:** $\bar{x} = \frac{1}{n}\sum_{i=1}^{n} x_i$
 **Std Dev:** $s = \sqrt{\frac{1}{n-1}\sum_{i=1}^{n}(x_i - \bar{x})^2}$
 **Correlation:** $r = \frac{\sum(x_i - \bar{x})(y_i - \bar{y})}{\sqrt{\sum(x_i - \bar{x})^2\sum(y_i - \bar{y})^2}}$
-**Regression:** $y = mx + b$ with $R^2$`,
+**Regression:** $y = mx + b$ with $R^2$
+
+` + core.WriteTodosSystemPrompt,
 		Tools:    registry.All(),
 		Notifier: notifier,
 		Middleware: []core.Middleware{
