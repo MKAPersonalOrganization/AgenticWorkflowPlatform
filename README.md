@@ -75,7 +75,8 @@ graph TB
         TaskH["<b>Task Handlers</b><br/>Handles command-side interactions (POST/DELETE) for task and thread management."]
         AGUIH["<b>AGUI Handlers</b><br/>Handles query-side interactions (GET) for AGUI-compatible thread state."]
         
-        TaskS["<b>Task Management Service</b><br/>[Technology: Asynq/Redis]<br/>Orchestrates background workers and handles job concurrency."]
+        TaskS["<b>Asynq Task Manager</b><br/>[Technology: Asynq/Redis]<br/>Orchestrates background workers and handles job concurrency."]
+        ThreadMgmt["<b>Thread Manager</b><br/>[Module]<br/>Handles thread lifecycle events directly via event store."]
         ProjS["<b>UI Projection Service</b><br/>Coordinates fast reads from PostgreSQL materialized projections."]
         
         OrchS["<b>Agent Orchestrator</b><br/>Manages multi-agent execution, tool-calling, and event persistence."]
@@ -104,6 +105,7 @@ graph TB
     AuthM -->|"Validates session [HTTPS]"| Kratos
     
     TaskH -->|"Command to enqueue [In-process]"| TaskS
+    TaskH -->|"Manages threads [In-process]"| ThreadMgmt
     AGUIH -->|"Requests projection [In-process]"| ProjS
     
     TaskS -.->|"Enqueues job [Redis]"| Redis
@@ -126,6 +128,7 @@ graph TB
     ProjUpdater -->|"Update all projections [SQL]"| AppPostgres
     
     OrchS -->|"Appends events [GRPC]"| KurrentDB
+    ThreadMgmt -->|"Appends events [GRPC]"| KurrentDB
     OrchS -->|"Requests completions [HTTPS]"| LLM
     
     OrchS -.->|"Sends traces [HTTPS]"| Langfuse
@@ -143,7 +146,8 @@ graph TB
 | **Health Handlers** | - | Public system status endpoints used for infrastructure health checks. |
 | **Task Handlers** | - | The "Command" side of CQRS, transforming HTTP requests into background tasks. |
 | **AGUI Handlers** | - | The "Query" side of CQRS, serving structured JSON/SSE for the AGUI frontend. |
-| **Task Management Service** | Asynq/Redis | Reliable task queueing and processing with retry logic and priority management. |
+| **Asynq Task Manager** | Asynq/Redis | Reliable task queueing and processing with retry logic and priority management. |
+| **Thread Manager** | - | Handles thread lifecycle events (creation, deletion) directly via event store adapter. |
 | **UI Projection Service** | - | Domain logic for fast reads from PostgreSQL materialized projections. |
 | **Agent Orchestrator** | - | Manages LLM interactions, tool-calling loops, and agent handoffs. (Package: `services/agentorchestrator`) |
 | **Projection Updater** | KurrentDB Subscriptions | Subscribes to KurrentDB event stream and updates PostgreSQL projections in real-time. |
