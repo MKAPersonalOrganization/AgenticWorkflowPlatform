@@ -346,7 +346,10 @@ func (s *executionState) handleStream() error {
 }
 
 func (s *executionState) handleTools() error {
+	// Collect any transition triggers to fire after all tools are processed
 	var handoffTarget string
+	var elicitationSpec *core.ElicitationSpec
+	var elicitationToolID string
 
 	// Process all tool calls sequentially (OpenAI requires results for all tool_call_ids)
 	for _, tc := range s.streamResult.ToolCalls {
@@ -374,7 +377,6 @@ func (s *executionState) handleTools() error {
 			return context.Canceled
 		}
 
-
 		// Check for routing command (handoff or elicitation)
 		if result.Command != nil {
 			if result.Command.Goto != "" {
@@ -383,14 +385,18 @@ func (s *executionState) handleTools() error {
 			
 			// Check for elicitation
 			if result.Command.Elicitation != nil {
-				elicitation := result.Command.Elicitation
-				if !s.emit(s.events.HumanInputRequested(s.threadID, s.messageID, tc.ID, elicitation.Question, elicitation.Schema)) {
-					return context.Canceled
-				}
-				// Directly trigger state transition for elicitation
-				return s.sm.Fire(TriggerHumanInputRequired)
+				elicitationSpec = result.Command.Elicitation
+				elicitationToolID = tc.ID
 			}
 		}
+	}
+
+	// Now handle state transitions after ALL tool results have been recorded
+	if elicitationSpec != nil {
+		if !s.emit(s.events.HumanInputRequested(s.threadID, s.messageID, elicitationToolID, elicitationSpec.Question, elicitationSpec.Schema)) {
+			return context.Canceled
+		}
+		return s.sm.Fire(TriggerHumanInputRequired)
 	}
 
 	if handoffTarget != "" {

@@ -32,10 +32,11 @@ func CreateMathInstructor(notifier core.EventNotifier) core.AgentConfig {
 You are a Mathematics specialist.
 
 ## Core Rules
-1. **Whiteboard Only**: Communicate EXCLUSIVELY via "write_whiteboard". Chat messages are disabled.
-2. **Result Reporting**: When finished, return to "student-facing-agent". **REQUIRED**: Provide your final answer in the 'context' field of "transfer_to_agent".
-3. **Clarity**: Show steps visually on the whiteboard using LaTeX ($x=1$).
-4. **Calculations**: Use the "calculate" tool for arithmetic.
+1. **Whiteboard for Highlights**: Use "write_whiteboard" ONLY for key formulas, diagrams, steps, and visual summaries.
+2. **Chat for Teaching**: Use chat messages for explanations, walk-throughs, and conversational teaching.
+3. **Questions**: If you need to ask the student something, you MUST use the "elicit_user_input" tool. **Always ask exactly ONE question at a time.** Never ask multiple questions in a single response.
+4. **Result Reporting**: When finished, return to "student-facing-agent". **REQUIRED**: Provide your final answer in the 'context' field of "transfer_to_agent".
+5. **Calculations**: Use the "calculate" tool for arithmetic.
 
 ## Creating Plots
 When you visualize a function:
@@ -53,6 +54,7 @@ When you visualize a function:
 		Middleware: []core.Middleware{
 			middleware.NewWhiteboardMiddleware(),
 			middleware.NewHandoffMiddleware(),
+			middleware.NewElicitationMiddleware(),
 		},
 	}
 }

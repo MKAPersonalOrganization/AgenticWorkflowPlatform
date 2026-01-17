@@ -2,6 +2,7 @@ package statistics
 
 import (
 	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/agentsdk/core/middleware"
 	sharedtools "school-with-ai/services/agentorchestrator/agents/shared/tools"
 	"school-with-ai/services/agentorchestrator/agents/statistics/tools"
 )
@@ -31,9 +32,6 @@ func CreateStatisticsInstructor(notifier core.EventNotifier) core.AgentConfig {
 		registry.Register(tool)
 	}
 
-	// Shared collaboration tools
-	registry.Register(sharedtools.NewWriteWhiteboardTool())
-
 	return core.AgentConfig{
 		Name:          "statistics-instructor",
 		MaxIterations: 5,
@@ -42,7 +40,9 @@ func CreateStatisticsInstructor(notifier core.EventNotifier) core.AgentConfig {
 ## Core Rules
 
 1. **Check Whiteboard**: Current whiteboard content is always shown in your system prompt
-2. **Whiteboard Only**: All content via write_whiteboard - never text responses
+2. **Whiteboard for Highlights**: Use "write_whiteboard" for statistical results, key formulas, and data tables.
+3. **Chat for Teaching**: Use chat messages for interpreting results, explaining concepts, and guiding the analysis.
+4. **Questions**: You MUST use "elicit_user_input" for any question to the student. **Ask only ONE question at a time.**
 
 ## Workflow
 
@@ -70,11 +70,16 @@ func CreateStatisticsInstructor(notifier core.EventNotifier) core.AgentConfig {
 
 ## LaTeX Examples
 
-**Mean:** $\\bar{x} = \\frac{1}{n}\\sum_{i=1}^{n} x_i$
-**Std Dev:** $s = \\sqrt{\\frac{1}{n-1}\\sum_{i=1}^{n}(x_i - \\bar{x})^2}$
-**Correlation:** $r = \\frac{\\sum(x_i - \\bar{x})(y_i - \\bar{y})}{\\sqrt{\\sum(x_i - \\bar{x})^2\\sum(y_i - \\bar{y})^2}}$
+**Mean:** $\bar{x} = \frac{1}{n}\sum_{i=1}^{n} x_i$
+**Std Dev:** $s = \sqrt{\frac{1}{n-1}\sum_{i=1}^{n}(x_i - \bar{x})^2}$
+**Correlation:** $r = \frac{\sum(x_i - \bar{x})(y_i - \bar{y})}{\sqrt{\sum(x_i - \bar{x})^2\sum(y_i - \bar{y})^2}}$
 **Regression:** $y = mx + b$ with $R^2$`,
 		Tools:    registry.All(),
 		Notifier: notifier,
+		Middleware: []core.Middleware{
+			middleware.NewWhiteboardMiddleware(),
+			middleware.NewHandoffMiddleware(),
+			middleware.NewElicitationMiddleware(),
+		},
 	}
 }

@@ -1,0 +1,10 @@
+package chatinput
+
+templ Description() {
+	<template x-if="awaitingHumanInput && humanInputSchema?.description">
+		<p
+			x-text="humanInputSchema.description"
+			class="text-xs text-muted-foreground/70 text-center mb-3 animate-in fade-in duration-700 tracking-wide leading-relaxed px-4"
+		></p>
+	</template>
+}

@@ -35,57 +35,65 @@ type ToolCallUpdate struct {
 }
 
 // ProcessUpdate processes a ChatResponseUpdate and extracts tool call information.
-// Returns the update info and whether any tool call content was found.
-func (a *ToolCallAccumulator) ProcessUpdate(update llm.ChatResponseUpdate) (ToolCallUpdate, bool) {
+// Returns a slice of update info and whether any tool call content was found.
+func (a *ToolCallAccumulator) ProcessUpdate(update llm.ChatResponseUpdate) ([]ToolCallUpdate, bool) {
 	// Get function calls from the update
 	functionCalls := update.FunctionCalls()
 	if len(functionCalls) == 0 {
-		return ToolCallUpdate{}, false
+		return nil, false
 	}
 
-	// Process the first function call in the update
-	fc := functionCalls[0]
+	var updates []ToolCallUpdate
 	index := update.ToolCallIndex
 
-	// Check if this is a new tool call (has CallID and Name)
-	if fc.CallID != "" && fc.Name != "" {
-		state := &toolCallState{
-			ID:        fc.CallID,
-			Index:     index,
-			Name:      fc.Name,
-			Arguments: fc.RawArguments,
+	for i, fc := range functionCalls {
+		// If multiple function calls are present, the index usually increments
+		// but providers vary. We use the updated index if provided for the first one,
+		// and increment for subsequent ones if they are part of the same chunk.
+		currentIndex := index + i
+
+		// Check if this is a new tool call (has CallID and Name)
+		if fc.CallID != "" && fc.Name != "" {
+			state := &toolCallState{
+				ID:        fc.CallID,
+				Index:     currentIndex,
+				Name:      fc.Name,
+				Arguments: fc.RawArguments,
+			}
+			a.byID[fc.CallID] = state
+			a.byIndex[currentIndex] = state
+
+			updates = append(updates, ToolCallUpdate{
+				ID:        fc.CallID,
+				Name:      fc.Name,
+				IsNew:     true,
+				ArgsDelta: fc.RawArguments,
+			})
+			continue
 		}
-		a.byID[fc.CallID] = state
-		a.byIndex[index] = state
 
-		return ToolCallUpdate{
-			ID:        fc.CallID,
-			Name:      fc.Name,
-			IsNew:     true,
-			ArgsDelta: fc.RawArguments,
-		}, true
+		// This is a continuation - find by index or ID
+		state, exists := a.byIndex[currentIndex]
+		if !exists && update.ToolCallID != "" {
+			state, exists = a.byID[update.ToolCallID]
+		}
+
+		if exists {
+			// Accumulate arguments
+			if fc.RawArguments != "" {
+				state.Arguments += fc.RawArguments
+			}
+
+			updates = append(updates, ToolCallUpdate{
+				ID:        state.ID,
+				Name:      state.Name,
+				IsNew:     false,
+				ArgsDelta: fc.RawArguments,
+			})
+		}
 	}
 
-	// This is a continuation - find by index or ID
-	state, exists := a.byIndex[index]
-	if !exists && update.ToolCallID != "" {
-		state, exists = a.byID[update.ToolCallID]
-	}
-	if !exists {
-		return ToolCallUpdate{}, false
-	}
-
-	// Accumulate arguments
-	if fc.RawArguments != "" {
-		state.Arguments += fc.RawArguments
-	}
-
-	return ToolCallUpdate{
-		ID:        state.ID,
-		Name:      state.Name,
-		IsNew:     false,
-		ArgsDelta: fc.RawArguments,
-	}, true
+	return updates, len(updates) > 0
 }
 
 // GetAll returns all accumulated tool calls as ToolCall slices.
