@@ -124,7 +124,11 @@ document.addEventListener('alpine:init', () => {
             },
 
             get canSendMessage() {
-                return this.currentMessage.trim() !== '' && !this.isStreaming;
+                return this.currentMessage.trim() !== '' && !this.isStreaming && !this.awaitingHumanInput;
+            },
+
+            get canSendElicitation() {
+                return this.elicitationAnswer.trim() !== '' && !this.isStreaming;
             },
 
             get currentThread() {
