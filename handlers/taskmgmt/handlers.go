@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"school-with-ai/domain"
-	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/llm"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/infra/projection/agui"
@@ -15,7 +14,6 @@ import (
 	"school-with-ai/services/threadmgmt"
 	"time"
 
-	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 	"github.com/hibiken/asynq"
 )
 
@@ -84,54 +82,30 @@ func (h *TaskManagementHandler) SendMessage(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Generate context ID (thread ID) if not provided
-	contextID := req.ContextID
-	if contextID == "" {
-		contextID = fmt.Sprintf("thread_%s_%d", user.ID, time.Now().UnixNano())
-	}
-
-	// Generate IDs for async task
-	jobID := core.GenerateID()
-	messageID := aguievents.GenerateMessageID()
-
-	// Create payload for async processing
-	payload := taskmanagement.ProcessChatPayload{
-		JobID:     jobID,
-		ThreadID:  contextID,
-		MessageID: messageID,
-		Message:   req.Message,
-		UserID:    user.ID,
-	}
-
 	h.log.Info(r.Context(), "[API] Async chat request received",
 		"userID", user.ID,
-		"email", user.Email,
-		"contextID", contextID,
-		"taskID", jobID,
-		"messageLength", len(req.Message))
+		"contextID", req.ContextID)
 
-	// Enqueue to Asynq for async processing
-	taskInfo, err := h.taskManager.EnqueueJob(payload)
+	// Submit task via manager (handles ID generation and payload construction)
+	result, err := h.taskManager.SubmitChatTask(r.Context(), user.ID, req.Message, req.ContextID)
 	if err != nil {
-		h.log.Error(r.Context(), "[API] Failed to enqueue task", "error", err)
-		http.Error(w, "Failed to enqueue task", http.StatusInternalServerError)
-
+		h.log.Error(r.Context(), "[API] Failed to submit task", "error", err)
+		http.Error(w, fmt.Sprintf("Failed to submit task: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	h.log.Info(r.Context(), "[API] Task enqueued successfully",
-		"jobID", jobID,
-		"taskID", taskInfo.ID,
-		"queue", taskInfo.Queue,
-		"state", taskInfo.State)
+	h.log.Info(r.Context(), "[API] Task submitted successfully",
+		"jobID", result.JobID,
+		"taskID", result.TaskInfo.ID,
+		"queue", result.TaskInfo.Queue)
 
 	// Return A2A-compliant task response
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted) // 202 Accepted for async operations
 
 	// Create A2A Task
-	task := NewTask(jobID, contextID, TaskStateSubmitted)
-	task.Metadata["streamUrl"] = fmt.Sprintf("/v1/tasks/%s:subscribe", jobID)
+	task := NewTask(result.JobID, result.ContextID, TaskStateSubmitted)
+	task.Metadata["streamUrl"] = fmt.Sprintf("/v1/tasks/%s:subscribe", result.JobID)
 
 	h.log.Info(r.Context(), "[API] Returning task response",
 		"taskID", task.ID,
