@@ -1,7 +1,6 @@
 package agui
 
 import (
-	"school-with-ai/infra/eventstore"
 	"time"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
@@ -23,7 +22,10 @@ type AguiProjection interface {
 
 	// ListThreads returns all thread IDs in the projection.
 	ListThreads() []string
+}
 
+// AguiBroadcaster is an interface for subscribing to real-time events.
+type AguiBroadcaster interface {
 	// Subscribe subscribes to real-time events for a thread.
 	// Returns a channel of events (type core.Event) and a cancel function.
 	Subscribe(threadID string) (<-chan any, func())
@@ -78,9 +80,3 @@ type AguiAgentActivity struct {
 	CurrentlyActive bool      `json:"currentlyActive"`
 }
 
-// AguiProjectionImpl is an implementation of AguiProjection.
-// We keep the implementation in infra, but the interface is in domain.
-type AguiProjectionImpl interface {
-	AguiProjection
-	eventstore.Projection
-}

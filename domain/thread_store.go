@@ -25,6 +25,4 @@ type ThreadStore interface {
 	// All retrieves all non-deleted threads.
 	All() []Thread
 
-	// Update applies an event to update the projection (for event subscribers).
-	Update(event core.Event) error
 }

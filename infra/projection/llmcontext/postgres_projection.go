@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/event"
 	"school-with-ai/foundation/logger"
 	"time"
 
@@ -29,26 +30,23 @@ func NewPostgresLLMContextProjection(log *logger.Logger, db *sqlx.DB) *PostgresL
 	}
 }
 
-// Name returns the projection name for logging and checkpointing.
-func (p *PostgresLLMContextProjection) Name() string {
-	return "llm_context"
-}
 
-// Apply handles an event and updates the PostgreSQL projection.
-func (p *PostgresLLMContextProjection) Apply(ctx context.Context, event core.Event) error {
-	switch e := event.(type) {
-	case domain.ThreadCreated:
-		return p.applyThreadCreated(ctx, e)
-	case domain.MessageAdded:
-		return p.applyMessageAdded(ctx, e)
-	case domain.ThreadTitleUpdatedEvent:
-		return p.applyThreadTitleChanged(ctx, e)
-	case domain.ThreadDeleted:
-		return p.applyThreadDeleted(ctx, e)
-	default:
-		// Ignore unknown events
-		return nil
-	}
+// RegisterHandlers registers database update handlers to the provided router.
+func (p *PostgresLLMContextProjection) RegisterHandlers(router interface {
+	Register(eventPrototype any, handler event.HandlerFunc)
+}) {
+	router.Register(&domain.ThreadCreated{}, func(ctx context.Context, e core.Event) error {
+		return p.applyThreadCreated(ctx, *e.(*domain.ThreadCreated))
+	})
+	router.Register(&domain.MessageAdded{}, func(ctx context.Context, e core.Event) error {
+		return p.applyMessageAdded(ctx, *e.(*domain.MessageAdded))
+	})
+	router.Register(&domain.ThreadTitleUpdatedEvent{}, func(ctx context.Context, e core.Event) error {
+		return p.applyThreadTitleChanged(ctx, *e.(*domain.ThreadTitleUpdatedEvent))
+	})
+	router.Register(&domain.ThreadDeleted{}, func(ctx context.Context, e core.Event) error {
+		return p.applyThreadDeleted(ctx, *e.(*domain.ThreadDeleted))
+	})
 }
 
 // applyThreadCreated creates a new thread record.
@@ -415,8 +413,3 @@ func (p *PostgresLLMContextProjection) All() []domain.Thread {
 	return threads
 }
 
-// Update is kept for interface compatibility.
-func (p *PostgresLLMContextProjection) Update(event core.Event) error {
-	ctx := context.Background()
-	return p.Apply(ctx, event)
-}

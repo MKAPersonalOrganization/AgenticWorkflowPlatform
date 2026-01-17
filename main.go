@@ -14,6 +14,7 @@ import (
 	"school-with-ai/components/pricing"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/llm"
+	"school-with-ai/foundation/event"
 	"school-with-ai/foundation/debug"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/middleware"
@@ -233,28 +234,36 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// -------------------------------------------------------------------------
 	// Initialize Projections
 
+	// Initialize Event Router for decoupled dispatching
+	eventRouter := event.NewRouter()
+
+	// Initialize UI broadcaster (live notifications)
+	uiBroadcaster := subscriber.NewUIBroadcaster(log)
+	eventRouter.RegisterAny(uiBroadcaster.Broadcast)
+
 	// Initialize PostgreSQL AGUI projection (materialized views for fast reads and writes)
 	aguiProjection := agui.NewPostgresAguiProjection(log, db)
+	aguiProjection.RegisterHandlers(eventRouter)
+
+	// Initialize PostgreSQL LLM context projection (materialized views for fast reads)
+	llmContextProjection := llmcontext.NewPostgresLLMContextProjection(log, db)
+	llmContextProjection.RegisterHandlers(eventRouter)
 
 	// All projections are now query-time, so we use the base event store directly
 	// No need for ProjectionEventStore wrapper anymore
 	eventLog := baseEventStore
-
-	// Initialize PostgreSQL LLM context projection (materialized views for fast reads)
-	llmContextProjection := llmcontext.NewPostgresLLMContextProjection(log, db)
 
 	// -------------------------------------------------------------------------
 	// Start Projection Updater (subscribes to events and updates PostgreSQL)
 
 	log.Info(ctx, "startup", "status", "starting projection updater")
 
-	// Create projection updater with all projections
+	// Create projection updater with the router
 	projectionUpdater := subscriber.NewProjectionUpdater(
 		log,
 		baseEventStore.Client(), // baseEventStore is already *KurrentDBEventStore
 		db,
-		aguiProjection,
-		llmContextProjection,
+		eventRouter,
 	)
 
 	// Start projection updater in background
@@ -342,7 +351,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		"healthCheckInterval", cfg.Orchestration.HealthCheckInterval)
 
 	// Create HTTP handler
-	handler := taskmgmthandlers.NewTaskManagementHandler(log, chatClient, taskManager, agentOrchestrator, threadMgmt, authSvc, threadQueryService, aguiProjection)
+	handler := taskmgmthandlers.NewTaskManagementHandler(log, chatClient, taskManager, agentOrchestrator, threadMgmt, authSvc, threadQueryService, aguiProjection, uiBroadcaster)
 
 	// Create health handler
 	healthHandler := healthhandlers.NewHealthHandler(log)

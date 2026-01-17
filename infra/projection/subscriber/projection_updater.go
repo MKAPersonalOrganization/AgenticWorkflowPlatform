@@ -15,18 +15,17 @@ import (
 	"github.com/kurrent-io/KurrentDB-Client-Go/kurrentdb"
 )
 
-// Projection defines the interface that projections must implement to receive events.
-type Projection interface {
-	Apply(ctx context.Context, event core.Event) error
-	Name() string
+// EventRouter defines the interface for dispatching events.
+type EventRouter interface {
+	Dispatch(ctx context.Context, event core.Event) error
 }
 
-// ProjectionUpdater subscribes to all events and updates registered projections.
+// ProjectionUpdater subscribes to all events and updates registered projections via a router.
 type ProjectionUpdater struct {
 	log             *logger.Logger
 	client          *kurrentdb.Client
 	checkpointStore *CheckpointStore
-	projections     []Projection
+	router          EventRouter
 	shutdownChan    chan struct{}
 }
 
@@ -35,20 +34,20 @@ func NewProjectionUpdater(
 	log *logger.Logger,
 	client *kurrentdb.Client,
 	db *sqlx.DB,
-	projections ...Projection,
+	router EventRouter,
 ) *ProjectionUpdater {
 	return &ProjectionUpdater{
 		log:             log,
 		client:          client,
 		checkpointStore: NewCheckpointStore(db),
-		projections:     projections,
+		router:          router,
 		shutdownChan:    make(chan struct{}),
 	}
 }
 
 // Start begins the subscription loop. This is a blocking call.
 func (u *ProjectionUpdater) Start(ctx context.Context) error {
-	u.log.Info(ctx, "projection updater starting", "projections", len(u.projections))
+	u.log.Info(ctx, "projection updater starting")
 
 	// Get last checkpoint position (use "all_projections" as the checkpoint name)
 	checkpoint, err := u.checkpointStore.Get(ctx, "all_projections")
@@ -122,15 +121,11 @@ func (u *ProjectionUpdater) Start(ctx context.Context) error {
 					continue
 				}
 
-				// Apply event to all projections
-				for _, projection := range u.projections {
-					if err := projection.Apply(ctx, domainEvent); err != nil {
-						u.log.Error(ctx, "failed to apply event to projection",
-							"projection", projection.Name(),
-							"eventType", event.EventType,
-							"ERROR", err)
-						// Continue to other projections even if one fails
-					}
+				// Dispatch event to all registered handlers via router
+				if err := u.router.Dispatch(ctx, domainEvent); err != nil {
+					u.log.Error(ctx, "failed to dispatch event",
+						"eventType", event.EventType,
+						"ERROR", err)
 				}
 
 				eventsSinceCheckpoint++
