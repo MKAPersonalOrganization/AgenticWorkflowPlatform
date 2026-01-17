@@ -76,19 +76,21 @@ func (p *StreamProcessor) Process(
 		}
 
 		// Process tool calls
-		tcUpdate, hasTool := toolCalls.ProcessUpdate(update)
+		tcUpdates, hasTool := toolCalls.ProcessUpdate(update)
 		if hasTool {
-			if tcUpdate.IsNew {
-				toolStartEvent := p.events.ToolCallStarted(params.ThreadID, tcUpdate.ID, tcUpdate.Name, params.MessageID)
-				if !yield(toolStartEvent, nil) {
-					return &StreamResult{Content: content, ToolCalls: toolCalls.GetAll()}, nil
+			for _, tcUpdate := range tcUpdates {
+				if tcUpdate.IsNew {
+					toolStartEvent := p.events.ToolCallStarted(params.ThreadID, tcUpdate.ID, tcUpdate.Name, params.MessageID)
+					if !yield(toolStartEvent, nil) {
+						return &StreamResult{Content: content, ToolCalls: toolCalls.GetAll()}, nil
+					}
 				}
-			}
 
-			if tcUpdate.ArgsDelta != "" {
-				argsEvent := p.events.ToolCallArgumentsStreamed(params.ThreadID, tcUpdate.ID, tcUpdate.ArgsDelta)
-				if !yield(argsEvent, nil) {
-					return &StreamResult{Content: content, ToolCalls: toolCalls.GetAll()}, nil
+				if tcUpdate.ArgsDelta != "" {
+					argsEvent := p.events.ToolCallArgumentsStreamed(params.ThreadID, tcUpdate.ID, tcUpdate.ArgsDelta)
+					if !yield(argsEvent, nil) {
+						return &StreamResult{Content: content, ToolCalls: toolCalls.GetAll()}, nil
+					}
 				}
 			}
 		}

@@ -1,0 +1,16 @@
+package chatinput
+
+templ MultipleChoice() {
+	<template x-if="awaitingHumanInput && humanInputSchema?.enum && humanInputSchema?.type !== 'array'">
+		<div class="flex flex-wrap gap-3 mb-4 justify-center animate-in fade-in slide-in-from-bottom-3 duration-500">
+			<template x-for="option in humanInputSchema.enum" :key="option">
+				<button
+					type="button"
+					@click="currentMessage = option; sendMessage()"
+					class="px-5 py-2.5 bg-primary/5 text-primary hover:bg-primary/15 border border-primary/20 rounded-full text-sm font-semibold transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-sm hover:shadow-md"
+					x-text="option"
+				></button>
+			</template>
+		</div>
+	</template>
+}

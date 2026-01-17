@@ -11,92 +11,12 @@ templ ChatInput() {
 		aria-label="Message input area"
 	>
 		<form @submit.prevent="sendMessage" class="mx-auto grid max-w-3xl grid-rows-[1fr_auto] gap-2 p-2">
-			<!-- Generic Options (Enum) -->
-			<template x-if="awaitingHumanInput && humanInputSchema?.enum && humanInputSchema?.type !== 'array'">
-				<div class="flex flex-wrap gap-2 mb-2 justify-center animate-in fade-in slide-in-from-bottom-2 duration-300">
-					<template x-for="option in humanInputSchema.enum" :key="option">
-						<button
-							type="button"
-							@click="currentMessage = option; sendMessage()"
-							class="px-3 py-1.5 bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 rounded-full text-sm font-medium transition-colors"
-							x-text="option"
-						></button>
-					</template>
-				</div>
-			</template>
-
-			<!-- Boolean (Yes/No) -->
-			<template x-if="awaitingHumanInput && humanInputSchema?.type === 'boolean'">
-				<div class="flex flex-wrap gap-2 mb-2 justify-center animate-in fade-in slide-in-from-bottom-2 duration-300">
-					<button
-						type="button"
-						@click="currentMessage = 'Yes'; sendMessage()"
-						class="px-4 py-2 bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 rounded-md text-sm font-medium transition-colors"
-					>Yes</button>
-					<button
-						type="button"
-						@click="currentMessage = 'No'; sendMessage()"
-						class="px-4 py-2 bg-destructive/10 text-destructive hover:bg-destructive/20 border border-destructive/20 rounded-md text-sm font-medium transition-colors"
-					>No</button>
-				</div>
-			</template>
-
-			<!-- Multiple Select (Array of Enums) -->
-			<template x-if="awaitingHumanInput && humanInputSchema?.type === 'array' && humanInputSchema?.items?.enum">
-				<div class="w-full mb-3 p-3 bg-muted/50 rounded-lg animate-in fade-in slide-in-from-bottom-2 duration-300" x-data="{ selected: [] }" x-effect="if (!awaitingHumanInput) selected = []">
-					<div class="flex flex-wrap gap-2 mb-3">
-						<template x-for="option in humanInputSchema.items.enum" :key="option">
-							<button
-								type="button"
-								@click="selected.includes(option) ? selected = selected.filter(i => i !== option) : selected.push(option)"
-								:class="selected.includes(option) ? 'bg-primary text-primary-foreground' : 'bg-background hover:bg-accent'"
-								class="px-3 py-1.5 border rounded-full text-xs font-medium transition-colors"
-								x-text="option"
-							></button>
-						</template>
-					</div>
-					<button
-						type="button"
-						x-show="selected.length > 0"
-						@click="currentMessage = selected.join(', '); sendMessage()"
-						class="w-full py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-bold"
-					>Submit Selections</button>
-				</div>
-			</template>
-
-			<!-- Number Range -->
-			<template x-if="awaitingHumanInput && humanInputSchema?.type === 'number' && (humanInputSchema?.minimum !== undefined || humanInputSchema?.maximum !== undefined)">
-				<div class="w-full mb-3 px-4 py-2 animate-in fade-in slide-in-from-bottom-2" x-data="{ val: 0 }" x-effect="val = humanInputSchema?.minimum || 0">
-					<div class="flex items-center gap-4">
-						<span class="text-xs font-mono" x-text="humanInputSchema.minimum"></span>
-						<input
-							type="range"
-							:min="humanInputSchema.minimum"
-							:max="humanInputSchema.maximum"
-							x-model="val"
-							class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-						>
-						<span class="text-xs font-mono" x-text="humanInputSchema.maximum"></span>
-					</div>
-					<div class="text-center mt-2">
-						<button
-							type="button"
-							@click="currentMessage = val.toString(); sendMessage()"
-							class="px-3 py-1 bg-primary text-primary-foreground rounded text-xs font-bold"
-						>
-							Submit: <span x-text="val"></span>
-						</button>
-					</div>
-				</div>
-			</template>
-
-			<!-- Helper Text (Description) -->
-			<template x-if="awaitingHumanInput && humanInputSchema?.description">
-				<p
-					x-text="humanInputSchema.description"
-					class="text-xs text-muted-foreground text-center mb-2 animate-in fade-in duration-300"
-				></p>
-			</template>
+			@MultipleChoice()
+			@TrueFalse()
+			@ChooseMultiple()
+			@NumericRange()
+			@ShortAnswer()
+			@Description()
 
 			@textarea.Textarea(textarea.Props{
 				Attributes: templ.Attributes{
