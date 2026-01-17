@@ -173,6 +173,62 @@ func (s *AsynqTaskManager) EnqueueJob(payload ProcessChatPayload) (*asynq.TaskIn
 	return info, nil
 }
 
+// SubmitChatTaskResult contains the result of submitting a chat task.
+type SubmitChatTaskResult struct {
+	JobID     string          `json:"jobId"`
+	ContextID string          `json:"contextId"`
+	TaskInfo  *asynq.TaskInfo `json:"-"`
+}
+
+// SubmitChatTask submits a chat task for async processing.
+// It handles validation, ID generation, and payload construction.
+func (s *AsynqTaskManager) SubmitChatTask(ctx context.Context, userID, message, contextID string) (*SubmitChatTaskResult, error) {
+	if message == "" {
+		return nil, errors.New("message is required")
+	}
+
+	// Generate context ID (thread ID) if not provided
+	if contextID == "" {
+		contextID = fmt.Sprintf("thread_%s_%d", userID, time.Now().UnixNano())
+	}
+
+	// Generate IDs for async task
+	jobID := core.GenerateID()
+	messageID := core.GenerateID()
+
+	// Create payload for async processing
+	payload := ProcessChatPayload{
+		JobID:     jobID,
+		ThreadID:  contextID,
+		MessageID: messageID,
+		Message:   message,
+		UserID:    userID,
+	}
+
+	s.log.Info(ctx, "Submitting chat task",
+		"userID", userID,
+		"contextID", contextID,
+		"taskID", jobID,
+		"messageLength", len(message))
+
+	// Enqueue to Asynq for async processing
+	taskInfo, err := s.EnqueueJob(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to enqueue task: %w", err)
+	}
+
+	s.log.Info(ctx, "Task submitted successfully",
+		"jobID", jobID,
+		"taskID", taskInfo.ID,
+		"queue", taskInfo.Queue)
+
+	return &SubmitChatTaskResult{
+		JobID:     jobID,
+		ContextID: contextID,
+		TaskInfo:  taskInfo,
+	}, nil
+}
+
 // GetTaskInfo retrieves task information from Asynq.
 func (s *AsynqTaskManager) GetTaskInfo(queue, taskID string) (*asynq.TaskInfo, error) {
 	inspector := asynq.NewInspector(asynq.RedisClientOpt{Addr: s.redisAddr})
