@@ -23,7 +23,7 @@ import (
 type TaskManagementHandler struct {
 	log                 *logger.Logger
 	chatClient          *llm.OpenAIClient
-	taskMgmtService     *taskmanagement.TaskManagementService
+	taskManager         *taskmanagement.AsynqTaskManager
 	orchestratorService services.AgentOrchestrator
 	threadMgmt          *threadmgmt.Manager
 	authService         services.AuthService
@@ -35,7 +35,7 @@ type TaskManagementHandler struct {
 func NewTaskManagementHandler(
 	log *logger.Logger,
 	chatClient *llm.OpenAIClient,
-	taskMgmtService *taskmanagement.TaskManagementService,
+	taskManager *taskmanagement.AsynqTaskManager,
 	orchestratorService services.AgentOrchestrator,
 	threadMgmt *threadmgmt.Manager,
 	authService services.AuthService,
@@ -45,7 +45,7 @@ func NewTaskManagementHandler(
 	return &TaskManagementHandler{
 		log:                 log,
 		chatClient:          chatClient,
-		taskMgmtService:     taskMgmtService,
+		taskManager:         taskManager,
 		orchestratorService: orchestratorService,
 		threadMgmt:          threadMgmt,
 		authService:         authService,
@@ -111,7 +111,7 @@ func (h *TaskManagementHandler) SendMessage(w http.ResponseWriter, r *http.Reque
 		"messageLength", len(req.Message))
 
 	// Enqueue to Asynq for async processing
-	taskInfo, err := h.taskMgmtService.EnqueueJob(payload)
+	taskInfo, err := h.taskManager.EnqueueJob(payload)
 	if err != nil {
 		h.log.Error(r.Context(), "[API] Failed to enqueue task", "error", err)
 		http.Error(w, "Failed to enqueue task", http.StatusInternalServerError)
@@ -176,7 +176,7 @@ func (h *TaskManagementHandler) StreamJobEvents(w http.ResponseWriter, r *http.R
 
 	// 1. Get Task Info to find Thread ID
 	// We need to know which thread to subscribe to.
-	taskInfo, err := h.taskMgmtService.GetTaskInfo("default", jobID)
+	taskInfo, err := h.taskManager.GetTaskInfo("default", jobID)
 	if err != nil {
 		// Try to see if it exists in other states or complete?
 		h.log.Warn(r.Context(), "[API] Failed to get task info", "jobID", jobID, "error", err)
@@ -245,7 +245,7 @@ func (h *TaskManagementHandler) GetJobStatus(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Try to get task info from Asynq
-	taskInfo, err := h.taskMgmtService.GetTaskInfo("default", taskID)
+	taskInfo, err := h.taskManager.GetTaskInfo("default", taskID)
 
 	// Create A2A Task response
 	task := Task{
@@ -311,7 +311,7 @@ func (h *TaskManagementHandler) CancelJob(w http.ResponseWriter, r *http.Request
 	}
 
 	// Use Asynq Inspector to cancel task
-	err := h.taskMgmtService.CancelTask(jobID)
+	err := h.taskManager.CancelTask(jobID)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to cancel job: %s", err), http.StatusBadRequest)
 
