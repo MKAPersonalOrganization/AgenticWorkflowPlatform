@@ -25,7 +25,6 @@ type TaskManagementService struct {
 	log                *logger.Logger
 	server             *asynq.Server
 	client             *asynq.Client
-	eventBufferManager *EventBufferManager
 	redisAddr          string // Store for metrics
 }
 
@@ -77,12 +76,7 @@ func NewTaskManagementService(
 		config.HealthCheckInterval = 15 * time.Second
 	}
 
-	// Create event buffer manager
-	eventBufferManager := NewEventBufferManager()
-
-	// Create title generator (removed - moved to orchestrator)
-	// titleGenerator := NewTitleGenerator()
-
+	// Create orchestration service
 	orchestrationService := NewService(
 		log,
 		orchestratorService,
@@ -99,7 +93,6 @@ func NewTaskManagementService(
 	chatWorker := NewChatWorker(
 		log,
 		orchestrationService,
-		eventBufferManager,
 	)
 
 	// Create Asynq server with dynamic queue configuration
@@ -161,7 +154,6 @@ func NewTaskManagementService(
 		log:                log,
 		server:             srv,
 		client:             client,
-		eventBufferManager: eventBufferManager,
 		redisAddr:          config.RedisAddr,
 	}
 }
@@ -173,7 +165,7 @@ func (s *TaskManagementService) EnqueueJob(payload ProcessChatPayload) (*asynq.T
 		return nil, fmt.Errorf("failed to create task: %w", err)
 	}
 
-	info, err := s.client.Enqueue(task)
+	info, err := s.client.Enqueue(task, asynq.TaskID(payload.JobID))
 	if err != nil {
 		return nil, fmt.Errorf("failed to enqueue task: %w", err)
 	}
@@ -183,15 +175,6 @@ func (s *TaskManagementService) EnqueueJob(payload ProcessChatPayload) (*asynq.T
 	return info, nil
 }
 
-// GetEventBuffer gets the event buffer for a job (for SSE streaming).
-func (s *TaskManagementService) GetEventBuffer(jobID string) (*EventBuffer, bool) {
-	return s.eventBufferManager.GetEventBuffer(jobID)
-}
-
-// RemoveEventBuffer removes an event buffer after SSE streaming completes.
-func (s *TaskManagementService) RemoveEventBuffer(jobID string) {
-	s.eventBufferManager.RemoveEventBuffer(jobID)
-}
 
 // GetTaskInfo retrieves task information from Asynq.
 func (s *TaskManagementService) GetTaskInfo(queue, taskID string) (*asynq.TaskInfo, error) {

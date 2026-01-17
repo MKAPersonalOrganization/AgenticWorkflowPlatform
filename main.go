@@ -345,7 +345,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		"healthCheckInterval", cfg.Orchestration.HealthCheckInterval)
 
 	// Create HTTP handler
-	handler := taskmgmthandlers.NewTaskManagementHandler(log, chatClient, taskMgmtService, agentOrchestrator, threadCommandService, authSvc, threadQueryService)
+	handler := taskmgmthandlers.NewTaskManagementHandler(log, chatClient, taskMgmtService, agentOrchestrator, threadCommandService, authSvc, threadQueryService, aguiProjection)
 
 	// Create health handler
 	healthHandler := healthhandlers.NewHealthHandler(log)
