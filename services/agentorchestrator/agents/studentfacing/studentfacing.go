@@ -32,6 +32,12 @@ func CreateStudentFacingAgent(notifier core.EventNotifier) core.AgentConfig {
 			{Name: "physics-instructor", Description: "Physics (mechanics, forces, energy, motion, thermodynamics)"},
 			{Name: "chemistry-instructor", Description: "Chemistry (reactions, stoichiometry, molecules, bonding)"},
 		},
+		StudentProfile: &core.StudentProfile{
+			Name:          "Jordan",
+			LearningStyle: "Visual and Hands-on",
+			Struggles:     []string{"Abstract Algebra", "Chemical Bonding Theory"},
+			Strengths:     []string{"Mechanics", "Geometry", "Experimental setups"},
+		},
 		ExtraRules: `- **No Direct Teaching**: You do NOT answer academic questions yourself. Always delegate.
 - **Minimal Clarification**: If a subject area is obvious, transfer IMMEDIATELY. Do NOT ask for clarification if the specialist can handle it.
 - **Full Context**: Always include the student's original query and any context you gathered in the transfer call.`,

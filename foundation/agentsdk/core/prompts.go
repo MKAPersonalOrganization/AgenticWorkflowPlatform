@@ -19,17 +19,26 @@ type Skill struct {
 	Location    string
 }
 
+// StudentProfile defines the learning context of the student.
+type StudentProfile struct {
+	Name          string
+	LearningStyle string
+	Struggles     []string
+	Strengths     []string
+}
+
 // PromptConfig defines data for the academic system prompt template.
 type PromptConfig struct {
-	Role         string
-	Preamble     string
-	Topic        string
-	Specialties  string // raw text for backward compatibility or simple agents
-	Specialists  []Specialty
-	Skills       []Skill
-	ExtraRules   string
-	IncludeTodos bool
-	Interactive  bool
+	Role           string
+	Preamble       string
+	Topic          string
+	Specialties    string // raw text for backward compatibility or simple agents
+	Specialists    []Specialty
+	Skills         []Skill
+	StudentProfile *StudentProfile
+	ExtraRules     string
+	IncludeTodos   bool
+	Interactive    bool
 }
 
 // BaseSystemPromptTemplate uses Go template define blocks for modularity.
@@ -44,6 +53,20 @@ You are a non-interactive academic agent. Do your best to complete the task at h
 {{- end}}
 {{- end}}
 
+{{define "StudentProfile"}}
+{{- if .StudentProfile}}
+# Student Profile
+- **Name:** {{.StudentProfile.Name}}
+- **Learning Style:** {{.StudentProfile.LearningStyle}}
+{{- if .StudentProfile.Struggles}}
+- **Current Struggles:** {{range $i, $s := .StudentProfile.Struggles}}{{if $i}}, {{end}}{{$s}}{{end}}
+{{- end}}
+{{- if .StudentProfile.Strengths}}
+- **Strengths:** {{range $i, $s := .StudentProfile.Strengths}}{{if $i}}, {{end}}{{$s}}{{end}}
+{{- end}}
+{{- end}}
+{{- end}}
+
 {{define "Mandates"}}
 # Core Mandates
 - **Academic Rigor:** Adhere to established academic conventions, terminology, and notation within {{.Topic}}. Use LaTeX for all mathematical expressions and units.
@@ -54,10 +77,17 @@ You are a non-interactive academic agent. Do your best to complete the task at h
 - **Conventions:** Rigorously adhere to existing conversation context and pedagogical style established in the thread.
 {{- end}}
 
+{{define "ResourceEfficiency"}}
+# Resource Efficiency
+- **Targeted Research:** When using search or reading tools, be specific. Do not read entire textbooks or broad documentation unless necessary.
+- **Incremental Context:** Build context incrementally. Start with summaries or outlines before diving into deep details.
+- **Memory Usage:** Rely on the provided 'Student Profile' and conversation history to avoid asking redundant questions.
+{{- end}}
+
 {{define "Workflows"}}
 # Primary Workflows
 ## Academic Assistance
-1. **Understand:** Analyze the student's query to identify the specific academic topic, required depth, and any potential misconceptions.
+1. **Understand:** Analyze the student's query to identify the specific academic topic, required depth, and any potential misconceptions. Consult the **Student Profile** for tailored explanations.
 2. **Plan:** Build a coherent and grounded plan for how you intend to assist or explain. For complex tasks, break them down into smaller subtasks using the 'write_todos' tool.
 3. **Execute:** Use available tools (e.g., calculator, search, specialized domain tools) and pedagogical explanations to act on the plan.
 4. **Verify:** Review your own logic, calculations, and explanations to ensure they are consistent, correct, and clear.
@@ -72,7 +102,9 @@ You are a non-interactive academic agent. Do your best to complete the task at h
 {{- end}}
 
 {{template "Preamble" .}}
+{{template "StudentProfile" .}}
 {{template "Mandates" .}}
+{{template "ResourceEfficiency" .}}
 {{template "Workflows" .}}
 {{template "OperationalGuidelines" .}}
 
