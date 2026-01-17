@@ -18,9 +18,10 @@ export function createMessagingMethods() {
     return {
         /**
          * Send a message
+         * @param {string|null} overrideMessage - Optional message to send (e.g. from elicitation)
          */
-        sendMessage() {
-            return this.__tryCatch('send message', { messageLength: this.currentMessage.length }, () => {
+        sendMessage(overrideMessage = null) {
+            return this.__tryCatch('send message', { isElicitation: overrideMessage !== null }, () => {
                 // Guard: Check initialization
                 if (!this.__initialized) {
                     console.warn('Component not initialized');
@@ -29,9 +30,24 @@ export function createMessagingMethods() {
 
                 const state = this.__getThreadState();
 
+                // Determine which message to send
+                let userMessage;
+                if (overrideMessage !== null) {
+                    userMessage = overrideMessage.trim();
+                } else if (!this.awaitingHumanInput) {
+                    userMessage = this.currentMessage.trim();
+                } else {
+                    console.warn('Cannot send message: awaiting human input through specific controls');
+                    return;
+                }
+
                 // Validation
-                if (!this.canSendMessage) {
-                    console.warn('Cannot send message: invalid state');
+                if (!userMessage) {
+                    return;
+                }
+
+                if (!this.canSendMessage && overrideMessage === null) {
+                    console.warn('Cannot send regular message: invalid state');
                     return;
                 }
 
@@ -40,7 +56,6 @@ export function createMessagingMethods() {
                     return;
                 }
 
-                const userMessage = this.currentMessage.trim();
                 const interactionId = generateInteractionId();
 
                 // Track performance metrics
@@ -58,10 +73,14 @@ export function createMessagingMethods() {
                 // Update session title with first message
                 this.__updateSessionTitle();
 
-                // Clear input immediately for better UX
-                this.currentMessage = '';
+                // Clear the correct input buffer
+                if (overrideMessage !== null) {
+                    this.elicitationAnswer = '';
+                } else {
+                    this.currentMessage = '';
+                }
 
-                // Clear human input state if responding
+                // Clear human input state
                 if (state.humanInputToastId) {
                     this.dismissToast(state.humanInputToastId);
                 }
@@ -69,7 +88,7 @@ export function createMessagingMethods() {
                 state.humanInputQuestion = null;
                 state.humanInputToastId = null;
 
-                // Focus management
+                // Focus management (back to main input)
                 this.$nextTick(() => {
                     const input = this.$refs?.messageInput;
                     if (input?.isConnected && typeof input.focus === 'function') {

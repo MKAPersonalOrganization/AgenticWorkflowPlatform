@@ -23,7 +23,7 @@ templ TrueFalse() {
             
             <div class="mt-4 flex justify-end w-full">
                 <button 
-                    @click="setQuickResponse(checked ? 'True' : 'False'); sendMessage()"
+                    @click="sendMessage(checked ? 'True' : 'False')"
                     class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 shadow-sm gap-2"
                 >
                     <span>Submit Answer</span>

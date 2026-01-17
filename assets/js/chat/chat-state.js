@@ -67,6 +67,7 @@ export function createInitialState() {
 
         // User input
         currentMessage: '',
+        elicitationAnswer: '',
 
         // UI state
         sessions: [],
