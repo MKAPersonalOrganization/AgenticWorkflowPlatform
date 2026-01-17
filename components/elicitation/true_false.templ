@@ -1,0 +1,41 @@
+package elicitation
+
+// TrueFalseProps - no specific props as it relies on Alpine context
+type TrueFalseProps struct {}
+
+templ TrueFalse() {
+    <template x-if="awaitingHumanInput && index === messages.length - 1">
+        <div 
+            class="mt-4 pt-4 border-t border-primary/10 animate-in fade-in slide-in-from-top-2"
+            x-data="{ checked: false }"
+        >
+            <div class="flex items-start space-x-3 space-y-0 rounded-md border p-4 shadow-sm bg-background">
+                <input 
+                    type="checkbox" 
+                    x-model="checked"
+                    class="h-5 w-5 rounded border-primary text-primary shadow focus:ring-primary translate-y-0.5"
+                >
+                <div class="flex flex-col space-y-1 leading-none">
+                    <span class="font-medium">Confirm Selection</span>
+                    <span class="text-sm text-muted-foreground">Check the box to signal True, verify your choice before submitting.</span>
+                </div>
+            </div>
+            
+            <div class="mt-4 flex justify-end">
+                <button 
+                    @click="setQuickResponse(checked ? 'True' : 'False'); sendMessage()"
+                    class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 shadow-sm gap-2"
+                >
+                    <span>Submit Answer</span>
+                </button>
+            </div>
+        </div>
+    </template>
+
+     <!-- History State -->
+    <template x-if="!awaitingHumanInput || index !== messages.length - 1">
+         <div class="mt-2 text-sm text-muted-foreground italic">
+            (Boolean Choice)
+         </div>
+    </template>
+}
