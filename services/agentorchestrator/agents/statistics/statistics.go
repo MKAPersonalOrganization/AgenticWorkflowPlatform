@@ -40,7 +40,7 @@ func CreateStatisticsInstructor(notifier core.EventNotifier) core.AgentConfig {
 ## Core Rules
 
 1. **Chat for Teaching**: Use chat messages for interpreting results, explaining concepts, and guiding the analysis.
-2. **Questions**: You MUST use "elicit_user_input" for any question to the student. **Ask only ONE question at a time.**
+2. **Questions**: If you need to ask the student something, you MUST use the "elicit_user_input" tool. **Always ask exactly ONE question at a time.** Never ask multiple questions in a single response.
 
 ## Available Tools
 

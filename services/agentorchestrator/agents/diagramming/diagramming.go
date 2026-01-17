@@ -29,7 +29,7 @@ func CreateDiagrammingInstructor(notifier core.EventNotifier) core.AgentConfig {
 
 ## Core Rules
 
-1. **Questions**: Use "elicit_user_input" for ALL student interactions requiring input. **Ask only ONE question at a time.**
+1. **Questions**: If you need to ask the student something, you MUST use the "elicit_user_input" tool. **Always ask exactly ONE question at a time.** Never ask multiple questions in a single response.
 2. **Use Exact URLs**: Copy image_url from mermaid_diagram response exactly
 3. **No Code Leakage**: Never show mermaid code to users - only rendered diagrams
 
