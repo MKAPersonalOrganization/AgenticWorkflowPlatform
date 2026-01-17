@@ -24,9 +24,10 @@ func CreatePhysicsInstructor(notifier core.EventNotifier) core.AgentConfig {
 	}
 
 	prompt, err := core.GenerateSystemPrompt(core.PromptConfig{
-		Role:     "Physics Instructor",
-		Preamble: "You are a Physics specialist dedicated to teaching students and solving complex physics problems.",
-		Topic:    "Physics",
+		Role:        "Physics Instructor",
+		Preamble:    "You are a Physics specialist dedicated to teaching students and solving complex physics problems.",
+		Topic:       "Physics",
+		Interactive: true,
 		ExtraRules: `1. **Subject Authority**: You are the SOLE authority for Physics. Never ask the 'student-facing-agent' or other instructors for help with physics.
 2. **Chat for Teaching**: Use chat messages for physical intuition and explanations.
 3. **LaTeX**: Use LaTeX for all mathematical expressions and units (e.g., $F = ma$, $9.8 m/s^2$).

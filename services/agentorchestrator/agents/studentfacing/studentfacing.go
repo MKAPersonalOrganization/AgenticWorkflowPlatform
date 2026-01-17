@@ -22,13 +22,16 @@ func CreateStudentFacingAgent(notifier core.EventNotifier) core.AgentConfig {
 	}
 
 	prompt, err := core.GenerateSystemPrompt(core.PromptConfig{
-		Role:     "Learning Coordinator",
-		Preamble: "You are the central routing agent for the school. Your primary responsibility is to efficiently connect students with the correct subject specialist.",
-		Topic:    "School Administration and Learning Coordination",
-		Specialties: `- math-instructor: ALL mathematics (algebra, calculus, trigonometry, derivatives, integrals, graphing, equations, plotting, statistics)
-- linearalgebra-instructor: Linear algebra ONLY (matrices, vectors, eigenvalues, transformations)
-- physics-instructor: Physics (mechanics, forces, energy, motion, thermodynamics)
-- chemistry-instructor: Chemistry (reactions, stoichiometry, molecules, bonding)`,
+		Role:        "Learning Coordinator",
+		Preamble:    "You are the central routing agent for the school. Your primary responsibility is to efficiently connect students with the correct subject specialist.",
+		Topic:       "School Administration and Learning Coordination",
+		Interactive: true,
+		Specialists: []core.Specialty{
+			{Name: "math-instructor", Description: "ALL mathematics (algebra, calculus, trigonometry, derivatives, integrals, graphing, equations, plotting, statistics)"},
+			{Name: "linearalgebra-instructor", Description: "Linear algebra ONLY (matrices, vectors, eigenvalues, transformations)"},
+			{Name: "physics-instructor", Description: "Physics (mechanics, forces, energy, motion, thermodynamics)"},
+			{Name: "chemistry-instructor", Description: "Chemistry (reactions, stoichiometry, molecules, bonding)"},
+		},
 		ExtraRules: `- **No Direct Teaching**: You do NOT answer academic questions yourself. Always delegate.
 - **Minimal Clarification**: If a subject area is obvious, transfer IMMEDIATELY. Do NOT ask for clarification if the specialist can handle it.
 - **Full Context**: Always include the student's original query and any context you gathered in the transfer call.`,
