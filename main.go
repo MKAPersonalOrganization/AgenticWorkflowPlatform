@@ -318,7 +318,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Initialize agent factory
 	agentFactory := agentorchestrator.NewFactory(log, chatClient, eventLog)
 
-	taskMgmtService := taskmanagement.NewTaskManagementService(
+	taskManager := taskmanagement.NewAsynqTaskManager(
 		log,
 		taskmanagement.AsynqConfig{
 			RedisAddr:           cfg.Redis.Addr,
@@ -334,15 +334,15 @@ func run(ctx context.Context, log *logger.Logger) error {
 		langfuseTracer,
 		observabilityConfig,
 	)
-	defer taskMgmtService.Shutdown()
-	log.Info(ctx, "startup", "status", "task management service started",
+	defer taskManager.Shutdown()
+	log.Info(ctx, "startup", "status", "task manager started",
 		"redis", cfg.Redis.Addr,
 		"concurrency", cfg.Orchestration.Concurrency,
 		"shutdownTimeout", cfg.Orchestration.ShutdownTimeout,
 		"healthCheckInterval", cfg.Orchestration.HealthCheckInterval)
 
 	// Create HTTP handler
-	handler := taskmgmthandlers.NewTaskManagementHandler(log, chatClient, taskMgmtService, agentOrchestrator, threadMgmt, authSvc, threadQueryService, aguiProjection)
+	handler := taskmgmthandlers.NewTaskManagementHandler(log, chatClient, taskManager, agentOrchestrator, threadMgmt, authSvc, threadQueryService, aguiProjection)
 
 	// Create health handler
 	healthHandler := healthhandlers.NewHealthHandler(log)

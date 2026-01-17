@@ -20,8 +20,8 @@ var (
 	ErrTaskNotFound = errors.New("failed to cancel task: task not found or already completed")
 )
 
-// TaskManagementService wraps Asynq server and client for chat task processing.
-type TaskManagementService struct {
+// AsynqTaskManager wraps Asynq server and client for chat task processing.
+type AsynqTaskManager struct {
 	log       *logger.Logger
 	server    *asynq.Server
 	client    *asynq.Client
@@ -38,8 +38,8 @@ type AsynqConfig struct {
 	RetryDelayFunc      asynq.RetryDelayFunc
 }
 
-// NewTaskManagementService creates a new Asynq-based task processing server.
-func NewTaskManagementService(
+// NewAsynqTaskManager creates a new Asynq-based task processing server.
+func NewAsynqTaskManager(
 	log *logger.Logger,
 	config AsynqConfig,
 	eventLog core.EventStore,
@@ -49,7 +49,7 @@ func NewTaskManagementService(
 	agentFactory services.AgentFactory,
 	langfuseTracer *LangfuseTracer,
 	observabilityConfig ObservabilityConfig,
-) *TaskManagementService {
+) *AsynqTaskManager {
 	// Default Redis options if not provided
 	if config.RedisOptions.Addr == "" && config.RedisAddr == "" {
 		config.RedisAddr = "localhost:6379"
@@ -148,7 +148,7 @@ func NewTaskManagementService(
 		}
 	}()
 
-	return &TaskManagementService{
+	return &AsynqTaskManager{
 		log:       log,
 		server:    srv,
 		client:    client,
@@ -157,7 +157,7 @@ func NewTaskManagementService(
 }
 
 // EnqueueJob enqueues a chat processing job and returns task info.
-func (s *TaskManagementService) EnqueueJob(payload ProcessChatPayload) (*asynq.TaskInfo, error) {
+func (s *AsynqTaskManager) EnqueueJob(payload ProcessChatPayload) (*asynq.TaskInfo, error) {
 	task, err := NewProcessChatTask(payload)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create task: %w", err)
@@ -174,7 +174,7 @@ func (s *TaskManagementService) EnqueueJob(payload ProcessChatPayload) (*asynq.T
 }
 
 // GetTaskInfo retrieves task information from Asynq.
-func (s *TaskManagementService) GetTaskInfo(queue, taskID string) (*asynq.TaskInfo, error) {
+func (s *AsynqTaskManager) GetTaskInfo(queue, taskID string) (*asynq.TaskInfo, error) {
 	inspector := asynq.NewInspector(asynq.RedisClientOpt{Addr: s.redisAddr})
 	defer func() {
 		err := inspector.Close()
@@ -193,7 +193,7 @@ func (s *TaskManagementService) GetTaskInfo(queue, taskID string) (*asynq.TaskIn
 }
 
 // CancelTask attempts to cancel a task by job ID.
-func (s *TaskManagementService) CancelTask(jobID string) error {
+func (s *AsynqTaskManager) CancelTask(jobID string) error {
 	inspector := asynq.NewInspector(asynq.RedisClientOpt{Addr: s.redisAddr})
 	defer func() {
 		err := inspector.Close()
@@ -227,7 +227,7 @@ func (s *TaskManagementService) CancelTask(jobID string) error {
 }
 
 // Shutdown gracefully shuts down the Asynq server.
-func (s *TaskManagementService) Shutdown() {
+func (s *AsynqTaskManager) Shutdown() {
 	s.log.Info(context.Background(), "Shutting down Asynq server")
 	s.server.Shutdown()
 	err := s.client.Close()
