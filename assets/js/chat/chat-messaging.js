@@ -171,7 +171,6 @@ export function createMessagingMethods() {
                                 });
                             }
                         }
-
                         if (msg.content) {
                             uiMessages.push({
                                 id: msg.id,
@@ -184,7 +183,8 @@ export function createMessagingMethods() {
                         break;
 
                     case 'tool':
-                        const toolCallId = msg.toolCallID || null;
+                        // console.log('[DEBUG] Raw Tool Message Keys:', Object.keys(msg));
+                        const toolCallId = msg.toolCallId || msg.toolCallID || msg.tool_call_id || null;
                         uiMessages.push({
                             id: msg.id,
                             type: 'tool_result',
@@ -240,10 +240,23 @@ export function createMessagingMethods() {
             // Detect awaiting human input from last message
             if (pairedMessages.length > 0) {
                 const lastMsg = pairedMessages[pairedMessages.length - 1];
-                if (lastMsg.type === 'tool_call' && lastMsg.name === 'transfer_to_agent' && lastMsg.parsedArgs?.agent_name === 'human' && !lastMsg.result) {
+
+
+
+                if (lastMsg.type === 'tool_call' && lastMsg.name === 'elicit_user_input') {
+
                     const state = this.__getThreadState();
                     state.awaitingHumanInput = true;
                     state.humanInputQuestion = lastMsg.parsedArgs?.question;
+                    state.humanInputSchema = lastMsg.parsedArgs?.schema;
+
+                    // Show toast if just loaded
+                    if (state.awaitingHumanInput) {
+                        // Small delay to ensure UI is ready
+                        setTimeout(() => {
+                            state.humanInputToastId = this.showToast(state.humanInputQuestion || 'Specialist needs your help', 'warning', 0);
+                        }, 500);
+                    }
                 }
             }
 
