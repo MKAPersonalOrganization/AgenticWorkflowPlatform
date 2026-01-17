@@ -110,6 +110,14 @@ export function createUIMethods() {
             }
         },
 
+        /**
+         * Set quick response text
+         * @param {string} text - Response text to set
+         */
+        setQuickResponse(text) {
+            this.currentMessage = text;
+        },
+
         // ============================================
         // Clipboard Operations
         // ============================================
