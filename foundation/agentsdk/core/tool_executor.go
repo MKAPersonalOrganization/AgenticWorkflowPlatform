@@ -130,6 +130,16 @@ func (e *RegistryToolExecutor) Execute(toolCall ToolCall) (ToolExecutionResult, 
 			execResult.Command = tr.Command
 			if tr.Command != nil {
 				execResult.StopIteration = tr.Command.StopIteration
+
+				// Apply state updates if RequestCtx is available
+				if e.requestCtx != nil && tr.Command.Update != nil {
+					if e.requestCtx.State == nil {
+						e.requestCtx.State = make(map[string]any)
+					}
+					for k, v := range tr.Command.Update {
+						e.requestCtx.State[k] = v
+					}
+				}
 			}
 		}
 

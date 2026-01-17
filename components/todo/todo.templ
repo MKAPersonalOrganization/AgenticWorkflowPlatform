@@ -1,0 +1,99 @@
+package todo
+
+import (
+	"school-with-ai/components/badge"
+	"school-with-ai/components/card"
+)
+
+templ Todo() {
+	<div class="space-y-4 w-full">
+		@card.Card(card.Props{Class: "border-l-4 border-primary overflow-hidden bg-card/50 backdrop-blur-sm"}) {
+			@card.Header() {
+				<div class="flex items-center justify-between">
+					<div class="flex items-center gap-2">
+						<svg class="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+						</svg>
+						<span class="font-semibold text-foreground">Task Progress</span>
+					</div>
+					<template x-if="message.parsedArgs?.todos">
+						<span class="text-xs text-muted-foreground" x-text="`${message.parsedArgs.todos.filter(t => t.status === 'completed').length}/${message.parsedArgs.todos.length} complete`"></span>
+					</template>
+				</div>
+			}
+			@card.Content() {
+				<div class="space-y-3">
+					<template x-for="(todo, tIndex) in message.parsedArgs?.todos" :key="tIndex">
+						<div 
+							class="flex items-start gap-3 p-2 rounded-lg transition-colors hover:bg-muted/50 group/todoitem"
+							:class="{
+								'opacity-50': todo.status === 'cancelled',
+								'bg-primary/5 border border-primary/20': todo.status === 'in_progress'
+							}"
+						>
+							<!-- Status Icon -->
+							<div class="mt-1 shrink-0">
+								<template x-if="todo.status === 'completed'">
+									<div class="bg-green-500/10 text-green-500 rounded-full p-0.5">
+										<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+										</svg>
+									</div>
+								</template>
+								<template x-if="todo.status === 'in_progress'">
+									<div class="text-primary animate-pulse">
+										<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+										</svg>
+									</div>
+								</template>
+								<template x-if="todo.status === 'pending'">
+									<div class="text-muted-foreground">
+										<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+										</svg>
+										<div class="w-4 h-4 border-2 border-muted-foreground/30 rounded-full"></div>
+									</div>
+								</template>
+								<template x-if="todo.status === 'cancelled'">
+									<div class="text-muted-foreground">
+										<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+										</svg>
+									</div>
+								</template>
+							</div>
+
+							<!-- Task Description -->
+							<div class="flex-1 min-w-0">
+								<p 
+									class="text-sm leading-relaxed break-words"
+									:class="{ 
+										'line-through text-muted-foreground': todo.status === 'cancelled',
+										'font-medium text-foreground': todo.status === 'in_progress',
+										'text-muted-foreground': todo.status === 'completed' || todo.status === 'pending'
+									}"
+									x-text="todo.description"
+								></p>
+							</div>
+
+							<!-- Status Badge -->
+							<div class="shrink-0">
+								<template x-if="todo.status === 'in_progress'">
+									@badge.Badge(badge.Props{Variant: badge.VariantDefault, Class: "text-[10px] h-5 px-1.5 animate-pulse"}) {
+										WORKING
+									}
+								</template>
+								<template x-if="todo.status === 'completed'">
+									@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "text-[10px] h-5 px-1.5 bg-green-500/10 text-green-600 border-green-500/20"}) {
+										DONE
+									}
+								</template>
+							</div>
+						</div>
+					</template>
+				</div>
+			}
+		}
+	</div>
+}

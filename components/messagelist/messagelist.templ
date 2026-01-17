@@ -7,6 +7,7 @@ import (
 	"school-with-ai/components/badge"
 	"school-with-ai/components/utils"
 	"school-with-ai/components/elicitation"
+	"school-with-ai/components/todo"
 )
 
 templ MessageList() {
@@ -101,12 +102,16 @@ templ MessageList() {
 						}
 					}
 				</div>
+				<!-- ToDo List Tool Call - Special Rendering -->
+				<div x-show="message.type === 'tool_call' && message.name === 'write_todos'" class="my-2 relative group/message w-full">
+					@todo.Todo()
+				</div>
 				<!-- Elicitation Request (Refactored Component) -->
 				<div x-show="message.type === 'tool_call' && message.name === 'elicit_user_input'" class="my-2 relative group/message w-full">
 					@elicitation.Container()
 				</div>
 				<!-- Regular Tool Call Message (with result if available) -->
-				<div x-show="message.type === 'tool_call' && message.name !== 'transfer_to_agent' && message.name !== 'elicit_user_input' && message.status === 'completed'" class="my-2 relative group/message">
+				<div x-show="message.type === 'tool_call' && message.name !== 'transfer_to_agent' && message.name !== 'elicit_user_input' && message.name !== 'write_todos' && message.status === 'completed'" class="my-2 relative group/message">
 					<!-- Parallel indicator bar (shown only for parallel tool calls) -->
 					<template x-if="getParallelToolCallInfo(message).isParallel">
 						<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary/30 rounded-l" title="Parallel tool call"></div>

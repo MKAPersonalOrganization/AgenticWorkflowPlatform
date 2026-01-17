@@ -7,7 +7,9 @@ import (
 
 // domainTools returns the domain-specific tools for the student-facing agent.
 func domainTools() []core.Tool {
-	return []core.Tool{}
+	return []core.Tool{
+		core.NewWriteTodosTool(),
+	}
 }
 
 // CreateStudentFacingAgent creates the student-facing agent configuration.
@@ -45,7 +47,9 @@ You are the central routing agent for the school. Your primary responsibility is
 - chemistry-instructor: Chemistry (reactions, stoichiometry, molecules, bonding)
 
 # Tone
-Sleek, efficient, and professional. You are a high-end concierge for learning.`,
+Sleek, efficient, and professional. You are a high-end concierge for learning.
+
+` + core.WriteTodosSystemPrompt,
 		Tools: registry.All(),
 		Handoffs: []core.Handoff{
 			{AgentName: "math-instructor", Description: "ALL mathematics: algebra, calculus, trigonometry, derivatives, integrals, graphing, equations"},

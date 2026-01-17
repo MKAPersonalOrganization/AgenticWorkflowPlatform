@@ -10,6 +10,7 @@ import (
 func domainTools() []core.Tool {
 	return []core.Tool{
 		tools.NewMermaidDiagramTool(),
+		core.NewWriteTodosTool(),
 	}
 }
 
@@ -90,7 +91,9 @@ erDiagram
 **Pie:**
 pie title Title
     "A" : 45
-    "B" : 30`,
+    "B" : 30
+
+` + core.WriteTodosSystemPrompt,
 		Tools:    registry.All(),
 		Notifier: notifier,
 		Middleware: []core.Middleware{
