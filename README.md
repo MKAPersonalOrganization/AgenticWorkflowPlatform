@@ -18,7 +18,7 @@ graph TB
 
     KurrentDB[(KurrentDB<br/>Event Store)]
     AppPostgres[(PostgreSQL<br/>Projections DB)]
-    Redis[(Redis<br/>Task Queue)]
+    Redis[(Redis<br/>Task Queue & Pub/Sub)]
     Kratos[Ory Kratos<br/>Identity & Auth]
     Postgres[(PostgreSQL<br/>Kratos DB)]
 
@@ -34,7 +34,7 @@ graph TB
     GoApp -->|Subscribe<br/>to Events| KurrentDB
     GoApp -->|Fast Reads<br/>Materialized Views| AppPostgres
     GoApp -->|Update<br/>Projections| AppPostgres
-    GoApp -->|Tasks| Redis
+    GoApp -->|Tasks & Pub/Sub| Redis
     GoApp -->|Auth API| Kratos
     GoApp -->|Traces & Metrics| Langfuse
 
@@ -52,7 +52,7 @@ graph TB
 - **Go Application**: Event-sourced multi-agent system with PostgreSQL materialized projections
 - **KurrentDB**: PostgreSQL-backed event store (single source of truth for events)
 - **PostgreSQL (App)**: Materialized projection database for fast reads (updated in real-time via event subscription)
-- **Redis**: Task queue for async job processing (Asynq)
+- **Redis**: Distributed task queue (Asynq) and real-time event broadcaster (Pub/Sub) for multi-pod scalability
 - **Ory Kratos**: Identity and session management
 - **PostgreSQL (Kratos)**: Database for Kratos user data
 - **Email Service**: Notification service for authentication emails
@@ -83,6 +83,8 @@ graph TB
         
         ProjUpdater["<b>Projection Updater</b><br/>[Technology: KurrentDB Subscriptions]<br/>Subscribes to event stream and updates PostgreSQL projections in real-time."]
         
+        RedisB["<b>Redis Broadcaster</b><br/>[Technology: Redis Pub/Sub]<br/>Broadcasts events across multiple pods for real-time UI updates."]
+
         LLMProj["<b>LLM Context Projection (PostgreSQL)</b><br/>[Technology: Materialized Views]<br/>Fast conversation history from PostgreSQL for LLM prompts."]
         
         AGUIProj["<b>AGUI Projection (PostgreSQL)</b><br/>[Technology: Materialized Views]<br/>Fast reads from PostgreSQL for current thread state."]
@@ -90,7 +92,7 @@ graph TB
 
     User["<b>User / Browser</b><br/>[Person/Client]"]
     Kratos["<b>Ory Kratos</b><br/>[Software System]<br/>Identity Management"]
-    Redis["<b>Redis</b><br/>[Container]<br/>Task Queue Store"]
+    Redis["<b>Redis</b><br/>[Container]<br/>Task Queue & Pub/Sub Store"]
     KurrentDB["<b>KurrentDB</b><br/>[Container]<br/>Event Store"]
     AppPostgres["<b>PostgreSQL</b><br/>[Container]<br/>Projections DB"]
     LLM["<b>OpenAI API</b><br/>[Software System]<br/>LLM Provider"]
@@ -119,8 +121,9 @@ graph TB
     ProjS -->|"Fast reads [SQL]"| AGUIProj
     AGUIProj -->|"Query [SQL]"| AppPostgres
     
-    AGUIH -->|"Subscribes (Live) [Go Channel]"| AGUIProj
-    ProjUpdater -.->|"Notify (Live) [In-Memory]"| AGUIProj
+    AGUIH -->|"Subscribes (Live) [Go Channel]"| RedisB
+    RedisB -.->|"Subscribe/Publish [Redis]"| Redis
+    ProjUpdater -.->|"Notify (Live) [In-Memory]"| RedisB
     
     LLMProj -->|"Query [SQL]"| AppPostgres
     
@@ -151,6 +154,7 @@ graph TB
 | **UI Projection Service** | - | Domain logic for fast reads from PostgreSQL materialized projections. |
 | **Agent Orchestrator** | - | Manages LLM interactions, tool-calling loops, and agent handoffs. (Package: `services/agentorchestrator`) |
 | **Projection Updater** | KurrentDB Subscriptions | Subscribes to KurrentDB event stream and updates PostgreSQL projections in real-time. |
+| **Redis Broadcaster** | Redis Pub/Sub | Distributed event broadcaster that ensures real-time updates are delivered across all application pods. |
 | **LLM Context Projection** | PostgreSQL Materialized Views | Fast conversation history from PostgreSQL for LLM prompts (3-8ms reads). |
 | **AGUI Projection** | PostgreSQL Materialized Views | Fast reads from PostgreSQL tables that are kept up-to-date via event subscription (3-8ms vs 50-500ms). |
 
@@ -160,6 +164,7 @@ graph TB
 - **Materialized Projections**: PostgreSQL tables updated in real-time via event subscription for fast reads (~100x faster than query-time).
 - **Event Subscription**: Projection updater subscribes to KurrentDB `$all` stream and incrementally updates all three projections (AGUI, Whiteboard, LLM Context).
 - **CQRS**: Clear separation between command side (Task Handlers writing events) and query side (AGUI Handlers reading projections).
+- **Multi-Pod Scalability**: Real-time events are broadcasted via **Redis Pub/Sub**. This ensures that even if a user is connected to Pod A but their background task is running on Pod B, they still receive real-time UI updates seamlessly.
 - **Multi-Agent Orchestration**: Collaborative agent execution with shared whiteboard state and explicit handoff protocols.
 
 ## Tech Stack
