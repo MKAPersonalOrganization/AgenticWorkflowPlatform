@@ -260,6 +260,14 @@ func (c *OpenAIClient) applyOptions(params *openai.ChatCompletionNewParams, opti
 		params.Seed = openai.Int(*options.Seed)
 	}
 
+	// Disable parallel tool calls by default as requested
+	params.ParallelToolCalls = openai.Bool(false)
+
+	// Override if explicitly set in options
+	if options.ParallelToolCalls != nil {
+		params.ParallelToolCalls = openai.Bool(*options.ParallelToolCalls)
+	}
+
 	// Apply tools
 	if len(options.Tools) > 0 {
 		openaiTools := make([]openai.ChatCompletionToolUnionParam, 0, len(options.Tools))
