@@ -87,7 +87,6 @@ graph TB
     Redis["<b>Redis</b><br/>[Container]<br/>Task Queue & Pub/Sub Store"]
     KurrentDB["<b>KurrentDB</b><br/>[Container]<br/>Event Store"]
     AppPostgres["<b>PostgreSQL</b><br/>[Container]<br/>Projections DB"]
-    LLM["<b>OpenAI API</b><br/>[Software System]<br/>LLM Provider"]
 
     User -->|"Uses [HTTPS/SSE]"| Router
     Router -->|"Routes to"| HealthH
@@ -122,9 +121,8 @@ graph TB
     
     OrchS -->|"Appends events [GRPC]"| KurrentDB
     ThreadMgmt -->|"Appends events [GRPC]"| KurrentDB
-    OrchS -->|"Requests completions [HTTPS]"| LLM
     
-    note["<i>Note: Solid lines denote synchronous interactions; dashed lines denote asynchronous interactions. Detailed LLM tracing is optionally handled by Langfuse.</i>"]
+    note["<i>Note: Solid lines denote synchronous interactions; dashed lines denote asynchronous interactions. LLM interactions and detailed tracing (via Langfuse) are omitted for clarity as they are considered implicit.</i>"]
 ```
 
 ### Components Overview
