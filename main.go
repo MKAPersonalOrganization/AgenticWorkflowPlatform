@@ -237,9 +237,15 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Initialize Event Router for decoupled dispatching
 	eventRouter := event.NewRouter()
 
-	// Initialize UI broadcaster (live notifications)
-	uiBroadcaster := subscriber.NewUIBroadcaster(log)
-	eventRouter.RegisterAny(uiBroadcaster.Broadcast)
+	// Initialize Redis broadcaster for cross-pod event delivery
+	// This enables horizontal scaling by using Redis pub/sub instead of in-memory channels
+	redisBroadcaster := subscriber.NewRedisBroadcaster(log, cfg.Redis.Addr)
+	defer func() {
+		if closeErr := redisBroadcaster.Close(); closeErr != nil {
+			log.Error(ctx, "shutdown", "status", "failed to close Redis broadcaster", "ERROR", closeErr)
+		}
+	}()
+	eventRouter.RegisterAny(redisBroadcaster.Broadcast)
 
 	// Initialize PostgreSQL AGUI projection (materialized views for fast reads and writes)
 	aguiProjection := agui.NewPostgresAguiProjection(log, db)
@@ -351,7 +357,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		"healthCheckInterval", cfg.Orchestration.HealthCheckInterval)
 
 	// Create HTTP handler
-	handler := taskmgmthandlers.NewTaskManagementHandler(log, chatClient, taskManager, agentOrchestrator, threadMgmt, authSvc, threadQueryService, aguiProjection, uiBroadcaster)
+	handler := taskmgmthandlers.NewTaskManagementHandler(log, chatClient, taskManager, agentOrchestrator, threadMgmt, authSvc, threadQueryService, aguiProjection, redisBroadcaster)
 
 	// Create health handler
 	healthHandler := healthhandlers.NewHealthHandler(log)

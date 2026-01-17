@@ -27,6 +27,20 @@ services:
       redis:
         condition: service_healthy
 
+  # RedisInsight - Redis GUI for monitoring pub/sub, keys, and streams
+  # Access at http://localhost:5540
+  redis-insight:
+    image: redis/redisinsight:latest
+    ports:
+      - "5540:5540"
+    volumes:
+      - redis-insight-data:/data
+    networks:
+      - intranet
+    depends_on:
+      redis:
+        condition: service_healthy
+
   # PostgreSQL database for Kratos
   postgres:
     image: postgres:16-alpine
@@ -353,6 +367,7 @@ volumes:
   go-modules:
   kratos-postgres:
   redis-data:
+  redis-insight-data:
   kurrentdb-data:
   kurrentdb-logs:
   typesense-data:
