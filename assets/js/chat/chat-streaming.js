@@ -366,9 +366,7 @@ export function createStreamingMethods() {
 
                 console.log(`Human input requested for thread ${threadId}: ${question}`, schema);
 
-                if (threadId === this.__currentThreadId) {
-                    state.humanInputToastId = this.showToast(question || 'Specialist needs your help', 'warning', 0); // Persistent until dismiss or reply
-                }
+
             }
         },
 
