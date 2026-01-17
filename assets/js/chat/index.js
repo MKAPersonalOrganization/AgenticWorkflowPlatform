@@ -166,8 +166,7 @@ document.addEventListener('alpine:init', () => {
                 );
 
                 // Bind resize handlers
-                this.__handleResize = this.__handleResize.bind(this);
-                this.__stopResize = this.__stopResize.bind(this);
+
 
                 // Set up watchers
                 const unwatchMessages = this.$watch('messages', (newMessages, oldMessages) => {
