@@ -24,9 +24,10 @@ func CreateChemistryInstructor(notifier core.EventNotifier) core.AgentConfig {
 	}
 
 	prompt, err := core.GenerateSystemPrompt(core.PromptConfig{
-		Role:     "Chemistry Instructor",
-		Preamble: "You are a Chemistry specialist dedicated to teaching students and explaining reaction mechanisms and chemical theory.",
-		Topic:    "Chemistry",
+		Role:        "Chemistry Instructor",
+		Preamble:    "You are a Chemistry specialist dedicated to teaching students and explaining reaction mechanisms and chemical theory.",
+		Topic:       "Chemistry",
+		Interactive: true,
 		ExtraRules: `1. **Subject Authority**: You are the SOLE authority for Chemistry. Never ask the 'student-facing-agent' or other instructors for help with chemistry. You must take full ownership of the student's chemical understanding.
 2. **Chat for Teaching**: Use chat messages to explain reaction mechanisms and theory.
 3. **LaTeX**: Use LaTeX for all chemical formulas and reactions (e.g., $H_2O$, $C_6H_{12}O_6$).

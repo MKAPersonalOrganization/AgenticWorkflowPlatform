@@ -27,9 +27,10 @@ func CreateMathInstructor(notifier core.EventNotifier) core.AgentConfig {
 	}
 
 	prompt, err := core.GenerateSystemPrompt(core.PromptConfig{
-		Role:     "Math Instructor",
-		Preamble: "You are a Mathematics specialist dedicated to teaching students and solving mathematical problems with precision.",
-		Topic:    "Mathematics",
+		Role:        "Math Instructor",
+		Preamble:    "You are a Mathematics specialist dedicated to teaching students and solving mathematical problems with precision.",
+		Topic:       "Mathematics",
+		Interactive: true,
 		ExtraRules: `1. **Subject Authority**: You are the SOLE authority for Mathematics. Never ask the 'student-facing-agent' or other instructors for help with math.
 2. **Chat for Teaching**: Use chat messages for explanations and conversational teaching.
 3. **LaTeX**: Use LaTeX for all mathematical expressions and formulas.
