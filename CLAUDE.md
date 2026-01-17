@@ -58,8 +58,7 @@ Agents emit events to coordinate work. The student-facing-agent receives callbac
 
 **Infrastructure** (`infra/`):
 - **WorkerPool**: Manages 5 concurrent workers processing jobs from a queue
-- **EventLog**: In-memory event sourcing storage for all domain events
-- **ThreadState**: Maintains thread state reconstructed from events
+- **ProjectionUpdater**: Materializes events from KurrentDB into PostgreSQL
 - **AG-UI Protocol** (`infra/agui/`): SSE streaming types (TextMessageStart/Content/End, ToolCall events)
 
 **Data Flow**:
