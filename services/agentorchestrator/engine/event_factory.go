@@ -144,12 +144,13 @@ func (f *EventFactory) RunError(threadID, message, errorCode string) *domain.Run
 }
 
 // HumanInputRequested creates a HumanInputRequestedEvent.
-func (f *EventFactory) HumanInputRequested(threadID, messageID, toolCallID, question string) *domain.HumanInputRequestedEvent {
+func (f *EventFactory) HumanInputRequested(threadID, messageID, toolCallID, question string, schema map[string]any) *domain.HumanInputRequestedEvent {
 	return &domain.HumanInputRequestedEvent{
 		ThreadID:   threadID,
 		MessageID:  messageID,
 		ToolCallID: toolCallID,
 		Question:   question,
+		Schema:     schema,
 		Timestamp:  time.Now(),
 	}
 }

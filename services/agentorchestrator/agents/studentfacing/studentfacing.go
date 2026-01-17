@@ -7,8 +7,10 @@ import (
 
 // domainTools returns the domain-specific tools for the student-facing agent.
 func domainTools() []core.Tool {
-	// No domain-specific tools - this agent only routes
-	return []core.Tool{}
+	// Explicitly register elicitation tool to ensure visibility
+	return []core.Tool{
+		middleware.NewElicitInputTool(),
+	}
 }
 
 // CreateStudentFacingAgent creates the student-facing agent configuration.
@@ -32,7 +34,8 @@ You do NOT answer questions directly. You route questions to specialists and rel
 
 **New Question from User:**
 - Identify the subject area
-- Use transfer_to_agent to send the question to the appropriate specialist
+- If the request is ambiguous or you need more information to choose the right specialist, you MUST use 'elicit_user_input' to ask the user for clarification. NEVER ask in plain text.
+- Once you have enough information, use transfer_to_agent to send the question to the appropriate specialist
 - Include the full question in the transfer
 
 **When You Receive Control Back:**
@@ -59,6 +62,7 @@ Be friendly and helpful, but concise. You're a coordinator, not a teacher.`,
 		Middleware: []core.Middleware{
 			middleware.NewWhiteboardMiddleware(),
 			middleware.NewHandoffMiddleware(),
+			middleware.NewElicitationMiddleware(),
 		},
 	}
 }

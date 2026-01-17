@@ -33,6 +33,7 @@ export function createEmptyThreadState() {
         currentJobId: null,
         awaitingHumanInput: false,
         humanInputQuestion: null,
+        humanInputSchema: null,
         humanInputToastId: null
     };
 }
@@ -62,6 +63,7 @@ export function createInitialState() {
             whiteboardLastAgent: null,
             awaitingHumanInput: false,
             humanInputQuestion: null,
+            humanInputSchema: null,
             humanInputToastId: null
         },
 

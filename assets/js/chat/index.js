@@ -115,6 +115,10 @@ document.addEventListener('alpine:init', () => {
                 return this.__currentState.humanInputQuestion;
             },
 
+            get humanInputSchema() {
+                return this.__currentState.humanInputSchema;
+            },
+
             get hasEvents() {
                 return this.__currentState.events.length > 0;
             },

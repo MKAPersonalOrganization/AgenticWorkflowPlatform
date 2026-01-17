@@ -158,7 +158,7 @@ func (s *executionState) setup(initialState state) error {
 		PermitReentry(TriggerBegin). // Permit if reconciled here
 		Permit(TriggerActionDone, StateDeterminingNextStep).
 		Permit(TriggerHandoffSwitch, StateTransferring).
-		Permit(TriggerHumanInputRequired, StateAwaitingHumanInput)
+		Permit(TriggerHumanInputRequired, StateElicitingInput)
 
 	s.sm.Configure(StateTransferring).
 		OnEntry(func(_ context.Context, args ...any) error {
@@ -167,7 +167,7 @@ func (s *executionState) setup(initialState state) error {
 		}).
 		Permit(TriggerTransferComplete, StateInitial)
 
-	s.sm.Configure(StateAwaitingHumanInput).
+	s.sm.Configure(StateElicitingInput).
 		PermitReentry(TriggerBegin) // Self-transition if run starts here
 
 	return nil
@@ -238,27 +238,28 @@ func (s *executionState) inferState() state {
 		return StateInitial
 	}
 
-	// 3. Resumption Logic: Check for human response
-	if pendingTC.Function.Name == "transfer_to_agent" {
-		var args struct {
-			AgentName string `json:"agent_name"`
-		}
-		if err := core.UnmarshalArgs(pendingTC.Function.Arguments, &args); err == nil && args.AgentName == "human" {
-			// If we have a user message after this assistant message, it's the response
-			lastMsg := messages[len(messages)-1]
-			if lastMsg.Role == "user" {
-				// Pair: Fulfill the tool call with the user message
-				toolResultID := core.GenerateID()
-				agg, err := s.engine.threadMgmt.AddToolResultMessage(s.ctx, s.threadID, toolResultID, pendingTC.ID, lastMsg.Content, s.agentName)
-				if err == nil {
-					s.thread = s.engine.threadMgmt.ToAgentThread(agg)
-					// Successfully paired, now determine next step
-					return StateDeterminingNextStep
-				}
+
+
+	// 3. Resumption Logic: Check for Elicitation response
+	if pendingTC.Function.Name == "elicit_user_input" {
+		// If we have a user message after this assistant message, it's the response
+		lastMsg := messages[len(messages)-1]
+		if lastMsg.Role == "user" {
+			// Pair: Fulfill the tool call with the user message
+			toolResultID := core.GenerateID()
+			
+			// For elicitation, the result is just the user's text message content
+			// logic could be expanded to parse JSON if we implement trusted UI forms later
+			// but for now, the user message content IS the result.
+			agg, err := s.engine.threadMgmt.AddToolResultMessage(s.ctx, s.threadID, toolResultID, pendingTC.ID, lastMsg.Content, s.agentName)
+			if err == nil {
+				s.thread = s.engine.threadMgmt.ToAgentThread(agg)
+				// Successfully paired, now determine next step
+				return StateDeterminingNextStep
 			}
-			// Still waiting for user input
-			return StateAwaitingHumanInput
 		}
+		// Still waiting for user input
+		return StateElicitingInput
 	}
 
 	// Populate streamResult for traditional tool execution
@@ -373,28 +374,23 @@ func (s *executionState) handleTools() error {
 			return context.Canceled
 		}
 
-		// Check for routing command (handoff)
-		if result.Command != nil && result.Command.Goto != "" {
-			handoffTarget = result.Command.Goto
 
-			// Special case: Human intervention (Factor 7)
-			if handoffTarget == "human" {
-				var params struct {
-					Question string `json:"question"`
-				}
-				core.UnmarshalArgs(result.Result, &params)
-				if params.Question == "" {
-					params.Question = "Please provide the requested information."
-				}
-				if !s.emit(s.events.HumanInputRequested(s.threadID, s.messageID, tc.ID, params.Question)) {
+		// Check for routing command (handoff or elicitation)
+		if result.Command != nil {
+			if result.Command.Goto != "" {
+				handoffTarget = result.Command.Goto
+			}
+			
+			// Check for elicitation
+			if result.Command.Elicitation != nil {
+				elicitation := result.Command.Elicitation
+				if !s.emit(s.events.HumanInputRequested(s.threadID, s.messageID, tc.ID, elicitation.Question, elicitation.Schema)) {
 					return context.Canceled
 				}
+				// Directly trigger state transition for elicitation
+				return s.sm.Fire(TriggerHumanInputRequired)
 			}
 		}
-	}
-
-	if handoffTarget == "human" {
-		return s.sm.Fire(TriggerHumanInputRequired)
 	}
 
 	if handoffTarget != "" {
@@ -428,7 +424,7 @@ const (
 	StateDeterminingNextStep
 	StateExecutingActions
 	StateTransferring
-	StateAwaitingHumanInput
+	StateElicitingInput
 	StateDone
 	StateError
 )

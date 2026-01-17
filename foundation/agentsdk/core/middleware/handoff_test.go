@@ -152,11 +152,6 @@ func TestTransferToAgentTool_Parameters(t *testing.T) {
 		t.Error("Expected agent_name to be required")
 	}
 
-	// question is optional for return handoffs
-	if containsString(required, "question") {
-		t.Error("Expected question to be optional (not required)")
-	}
-
 	// Check properties
 	props, ok := params["properties"].(map[string]any)
 	if !ok {
@@ -193,8 +188,6 @@ func TestTransferToAgentTool_Invoke_Success(t *testing.T) {
 
 	args := map[string]any{
 		"agent_name": "math",
-		"question":   "What is 2 + 2?",
-		"context":    "Basic arithmetic question",
 	}
 
 	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
@@ -226,9 +219,7 @@ func TestTransferToAgentTool_Invoke_MissingAgentName(t *testing.T) {
 	reqCtx := newTestRequestContext()
 	tool := NewTransferToAgentTool(handoffs, reqCtx)
 
-	args := map[string]any{
-		"question": "What is 2 + 2?",
-	}
+	args := map[string]any{}
 
 	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 
@@ -238,30 +229,6 @@ func TestTransferToAgentTool_Invoke_MissingAgentName(t *testing.T) {
 
 	if !contains(err.Error(), "agent_name") {
 		t.Errorf("Expected error to mention agent_name, got %v", err)
-	}
-}
-
-func TestTransferToAgentTool_Invoke_MissingQuestion(t *testing.T) {
-	t.Parallel()
-	handoffs := []core.Handoff{
-		{AgentName: "math", Description: "Mathematics specialist"},
-	}
-
-	reqCtx := newTestRequestContext()
-	tool := NewTransferToAgentTool(handoffs, reqCtx)
-
-	args := map[string]any{
-		"agent_name": "math",
-	}
-
-	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
-	// question is optional, so this should succeed
-	if err != nil {
-		t.Errorf("Expected no error for missing question (it's optional), got %v", err)
-	}
-	// Verify handoff was stored
-	if targetAgent, ok := reqCtx.State["handoff"].(string); !ok || targetAgent != "math" {
-		t.Fatal("Expected handoff to be stored")
 	}
 }
 
@@ -277,7 +244,6 @@ func TestTransferToAgentTool_Invoke_WithoutContext(t *testing.T) {
 	// Context is optional, should work without it
 	args := map[string]any{
 		"agent_name": "math",
-		"question":   "What is 2 + 2?",
 	}
 
 	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
