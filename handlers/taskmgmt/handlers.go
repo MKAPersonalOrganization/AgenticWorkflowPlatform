@@ -12,6 +12,7 @@ import (
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/services"
 	"school-with-ai/services/taskmanagement"
+	"school-with-ai/services/threadmgmt"
 	"time"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
@@ -20,14 +21,14 @@ import (
 
 // TaskManagementHandler encapsulates dependencies for HTTP handlers for task management.
 type TaskManagementHandler struct {
-	log                  *logger.Logger
-	chatClient           *llm.OpenAIClient
-	taskMgmtService      *taskmanagement.TaskManagementService
-	orchestratorService  services.AgentOrchestrator
-	threadCommandService services.ThreadCommandService
-	authService          services.AuthService
-	threadQueryService   services.ThreadQueryService
-	aguiProjection       agui.AguiProjection
+	log                 *logger.Logger
+	chatClient          *llm.OpenAIClient
+	taskMgmtService     *taskmanagement.TaskManagementService
+	orchestratorService services.AgentOrchestrator
+	threadMgmt          *threadmgmt.Manager
+	authService         services.AuthService
+	threadQueryService  services.ThreadQueryService
+	aguiProjection      agui.AguiProjection
 }
 
 // NewTaskManagementHandler creates a new HTTP handler for task management.
@@ -36,20 +37,20 @@ func NewTaskManagementHandler(
 	chatClient *llm.OpenAIClient,
 	taskMgmtService *taskmanagement.TaskManagementService,
 	orchestratorService services.AgentOrchestrator,
-	threadCommandService services.ThreadCommandService,
+	threadMgmt *threadmgmt.Manager,
 	authService services.AuthService,
 	threadQueryService services.ThreadQueryService,
 	aguiProjection agui.AguiProjection,
 ) *TaskManagementHandler {
 	return &TaskManagementHandler{
-		log:                  log,
-		chatClient:           chatClient,
-		taskMgmtService:      taskMgmtService,
-		orchestratorService:  orchestratorService,
-		threadCommandService: threadCommandService,
-		authService:          authService,
-		threadQueryService:   threadQueryService,
-		aguiProjection:       aguiProjection,
+		log:                 log,
+		chatClient:          chatClient,
+		taskMgmtService:     taskMgmtService,
+		orchestratorService: orchestratorService,
+		threadMgmt:          threadMgmt,
+		authService:         authService,
+		threadQueryService:  threadQueryService,
+		aguiProjection:      aguiProjection,
 	}
 }
 
@@ -348,8 +349,8 @@ func (h *TaskManagementHandler) DeleteThread(w http.ResponseWriter, r *http.Requ
 
 	h.log.Info(r.Context(), "Deleting thread", "userID", user.ID, "threadID", threadID)
 
-	// Delete thread using thread command service
-	err := h.threadCommandService.DeleteThread(r.Context(), threadID)
+	// Delete thread using thread manager
+	err := h.threadMgmt.DeleteThread(r.Context(), threadID)
 	if err != nil {
 		if errors.Is(err, domain.ErrThreadNotFound) {
 			http.Error(w, "Thread not found", http.StatusNotFound)

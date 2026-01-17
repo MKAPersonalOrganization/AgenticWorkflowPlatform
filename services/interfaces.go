@@ -34,18 +34,6 @@ type AgentOrchestrator interface {
 	ProcessUserMessage(ctx context.Context, threadID, content, userID string) (iter.Seq2[core.Event, error], error)
 }
 
-// ThreadCommandService defines the interface for thread lifecycle management (commands).
-type ThreadCommandService interface {
-	// AddUserMessage adds a user message to a thread using event sourcing
-	AddUserMessage(ctx context.Context, threadID, messageID, content string) (core.AgentThread, error)
-	// CreateThread creates a new chat thread using event sourcing
-	CreateThread(ctx context.Context, threadID, title string) (core.AgentThread, error)
-	// UpdateThreadTitle updates the title of a thread using event sourcing
-	UpdateThreadTitle(ctx context.Context, threadID, newTitle string) (*domain.ThreadTitleUpdatedEvent, error)
-	// DeleteThread deletes a thread using event sourcing
-	DeleteThread(ctx context.Context, threadID string) error
-}
-
 // AgentFactory creates instances of AgentOrchestrator for specific agents.
 type AgentFactory interface {
 	// Create creates a new AgentOrchestrator with the given configuration and options.
