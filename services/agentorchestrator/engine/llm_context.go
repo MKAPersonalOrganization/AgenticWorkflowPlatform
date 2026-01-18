@@ -51,18 +51,11 @@ type PrepareResult struct {
 	Terminated bool // true if middleware terminated early
 }
 
-// Prepare loads conversation history, converts messages to LLM format,
-// applies middleware, and returns the complete context needed for an LLM call.
+// Prepare converts messages to LLM format, applies middleware, and returns the complete context needed for an LLM call.
 //
 // Returns PrepareResult with Terminated=true if middleware signals early termination.
-func (m *LLMContextManager) Prepare(ctx context.Context, runCtx core.RunContext) (*PrepareResult, error) {
-	// 1. Retrieve conversation history from thread
-	messages, err := runCtx.Thread.RetrieveFullConversationHistory(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve conversation history: %w", err)
-	}
-
-	// 2. Convert core messages to LLM format
+func (m *LLMContextManager) Prepare(ctx context.Context, runCtx core.RunContext, messages []core.Message) (*PrepareResult, error) {
+	// 1. Convert core messages to LLM format
 	chatMessages := m.convertMessages(messages)
 
 	// 3. Apply middleware and build chat options

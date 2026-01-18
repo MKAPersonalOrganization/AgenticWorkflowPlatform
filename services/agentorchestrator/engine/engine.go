@@ -57,35 +57,8 @@ func New(
 // Run processes the LLM response using an AgentThread and yields events.
 func (e *Engine) Run(ctx context.Context, agentName string, runCtx core.RunContext) iter.Seq2[core.Event, error] {
 	return func(yield func(core.Event, error) bool) {
-		exec := &executionState{
-			engine:    e,
-			ctx:       ctx,
-			threadID:  runCtx.ThreadID,
-			messageID: runCtx.MessageID,
-			thread:    runCtx.Thread,
-			options:   runCtx.Options,
-			agentName: agentName,
-			history:   runCtx.InitialHistory,
-			observer: &ObserverUnit{
-				yield:     yield,
-				startTime: timeNowNano(),
-				result: &ExecutionResult{
-					Success:    true,
-					Reason:     TerminationGoalReached,
-					FinalAgent: agentName,
-				},
-			},
-			safety: &SafetyUnit{
-				maxTotal:     20,
-				loopDetector: NewLoopDetector(DefaultLoopDetectorConfig()),
-			},
-			workers: &WorkersUnit{},
-		}
-
-		if err := exec.initAgentComponents(agentName); err != nil {
-			exec.observer.result.Success = false
-			exec.observer.result.Reason = TerminationError
-			exec.observer.result.Error = err
+		exec, err := e.newExecutionState(ctx, agentName, runCtx, yield)
+		if err != nil {
 			yield(nil, err)
 			return
 		}
@@ -97,14 +70,16 @@ func (e *Engine) Run(ctx context.Context, agentName string, runCtx core.RunConte
 		}
 
 		if err := exec.run(); err != nil {
-			// Update result based on error type
-			if ctx.Err() != nil {
-				exec.observer.result.Reason = TerminationUserAborted
-			} else {
-				exec.observer.result.Reason = TerminationError
-				exec.observer.result.Error = err
+			// Update result based on error type, but only if not already set to a specific reason
+			if exec.observer.result.Reason == TerminationGoalReached {
+				if ctx.Err() != nil {
+					exec.observer.result.Reason = TerminationUserAborted
+				} else {
+					exec.observer.result.Reason = TerminationError
+					exec.observer.result.Error = err
+				}
+				exec.observer.result.Success = false
 			}
-			exec.observer.result.Success = false
 			yield(nil, err)
 		}
 
@@ -115,6 +90,46 @@ func (e *Engine) Run(ctx context.Context, agentName string, runCtx core.RunConte
 		res.ToolsCalled = exec.observer.toolNames
 		res.Duration = timeSince(exec.observer.startTime)
 	}
+}
+
+func (e *Engine) newExecutionState(ctx context.Context, agentName string, runCtx core.RunContext, yield func(core.Event, error) bool) (*executionState, error) {
+	exec := &executionState{
+		engine:    e,
+		ctx:       ctx,
+		threadID:  runCtx.ThreadID,
+		messageID: runCtx.MessageID,
+		thread:    runCtx.Thread,
+		options:   runCtx.Options,
+		agentName: agentName,
+		history:   runCtx.InitialHistory,
+		observer: &ObserverUnit{
+			yield:     yield,
+			startTime: timeNowNano(),
+			result: &ExecutionResult{
+				Success:    true,
+				Reason:     TerminationGoalReached,
+				FinalAgent: agentName,
+			},
+		},
+		safety: &SafetyUnit{
+			maxTotal:     20,
+			loopDetector: NewLoopDetector(DefaultLoopDetectorConfig()),
+		},
+		workers: &WorkersUnit{},
+		persistence: &PersistenceUnit{
+			mgmt: e.threadMgmt,
+		},
+	}
+	exec.persistence.state = exec
+
+	if err := exec.initAgentComponents(agentName); err != nil {
+		exec.observer.result.Success = false
+		exec.observer.result.Reason = TerminationError
+		exec.observer.result.Error = err
+		return nil, err
+	}
+
+	return exec, nil
 }
 
 // timeNowNano returns the current time in nanoseconds (extracted for testing).
@@ -141,9 +156,10 @@ type executionState struct {
 	history   []core.Message
 
 	// Cohesive Units
-	safety   *SafetyUnit
-	observer *ObserverUnit
-	workers  *WorkersUnit
+	safety      *SafetyUnit
+	observer    *ObserverUnit
+	workers     *WorkersUnit
+	persistence *PersistenceUnit
 
 	// Current Turn State
 	sm           *stateless.StateMachine
@@ -154,8 +170,12 @@ type executionState struct {
 type HistoryReconciler struct {
 	history   []core.Message
 	agentName string
-	threadID  string
-	mgmt      *threadmgmt.Manager
+}
+
+// ResumptionPlan describes an action to take to pair a message during state inference.
+type ResumptionPlan struct {
+	ToolCallID string
+	Content    string
 }
 
 // SafetyUnit enforces execution limits and detects infinite loops.
@@ -183,13 +203,38 @@ type WorkersUnit struct {
 	executor core.ToolExecutor
 }
 
-func (s *executionState) emit(event core.Event) bool {
-	return s.observer.yield(event, nil)
+// PersistenceUnit ensures atomic updates between the database and in-memory state.
+type PersistenceUnit struct {
+	mgmt  *threadmgmt.Manager
+	state *executionState
 }
 
-func (s *executionState) updateState(agg *domain.ThreadAggregate) {
-	s.thread = s.engine.threadMgmt.ToAgentThread(agg)
-	s.history = s.engine.threadMgmt.ToCoreMessages(agg)
+func (p *PersistenceUnit) AddAssistantMessage(ctx context.Context, content string, toolCalls []domain.ToolCall) error {
+	agg, err := p.mgmt.AddAssistantMessage(ctx, p.state.threadID, p.state.messageID, content, toolCalls, p.state.agentName)
+	if err != nil {
+		return err
+	}
+	p.refreshState(agg)
+	return nil
+}
+
+func (p *PersistenceUnit) AddToolResultMessage(ctx context.Context, toolCallID, result string) error {
+	toolResultID := core.GenerateID()
+	agg, err := p.mgmt.AddToolResultMessage(ctx, p.state.threadID, toolResultID, toolCallID, result, p.state.agentName)
+	if err != nil {
+		return err
+	}
+	p.refreshState(agg)
+	return nil
+}
+
+func (p *PersistenceUnit) refreshState(agg *domain.ThreadAggregate) {
+	p.state.thread = p.mgmt.ToAgentThread(agg)
+	p.state.history = p.mgmt.ToCoreMessages(agg)
+}
+
+func (s *executionState) emit(event core.Event) bool {
+	return s.observer.yield(event, nil)
 }
 
 func (s *executionState) initAgentComponents(name string) error {
@@ -251,21 +296,23 @@ func (s *executionState) inferState() state {
 	reconciler := &HistoryReconciler{
 		history:   s.history,
 		agentName: s.agentName,
-		threadID:  s.threadID,
-		mgmt:      s.engine.threadMgmt,
 	}
-	st, res, agg := reconciler.Reconcile(s.ctx)
-	if agg != nil {
-		s.updateState(agg)
+	st, res, plan := reconciler.Reconcile()
+
+	if plan != nil {
+		if err := s.persistence.AddToolResultMessage(s.ctx, plan.ToolCallID, plan.Content); err != nil {
+			return StateError // Or handle error appropriately
+		}
 	}
+
 	s.streamResult = res
 	if s.streamResult != nil {
-		s.workers.events = NewEventFactory(s.agentName) // Ensure factory matches current agent
+		s.workers.events = NewEventFactory(s.agentName)
 	}
 	return st
 }
 
-func (r *HistoryReconciler) Reconcile(ctx context.Context) (state, *StreamResult, *domain.ThreadAggregate) {
+func (r *HistoryReconciler) Reconcile() (state, *StreamResult, *ResumptionPlan) {
 	if len(r.history) == 0 {
 		return StateAwaitingTurn, nil, nil
 	}
@@ -284,8 +331,7 @@ func (r *HistoryReconciler) Reconcile(ctx context.Context) (state, *StreamResult
 
 	// 3. Resumption Logic: Check for Elicitation response
 	if pendingTC.Function.Name == middleware.ElicitInputToolName {
-		st, agg := r.reconcileElicitation(ctx, pendingTC)
-		return st, nil, agg
+		return r.reconcileElicitation(pendingTC)
 	}
 
 	// Populate streamResult for traditional tool execution
@@ -321,23 +367,22 @@ func (r *HistoryReconciler) findPendingToolCall(msg *core.Message) *core.ToolCal
 	return nil
 }
 
-func (r *HistoryReconciler) reconcileElicitation(ctx context.Context, tc *core.ToolCall) (state, *domain.ThreadAggregate) {
+func (r *HistoryReconciler) reconcileElicitation(tc *core.ToolCall) (state, *StreamResult, *ResumptionPlan) {
 	lastMsg := r.history[len(r.history)-1]
 
 	if lastMsg.Role == "user" {
-		// Automate Pairing: Fulfill the tool call with the user message content
-		toolResultID := core.GenerateID()
-		agg, err := r.mgmt.AddToolResultMessage(ctx, r.threadID, toolResultID, tc.ID, lastMsg.Content, r.agentName)
-		if err == nil {
-			return StateGeneratingResponse, agg
+		// Plan to automate Pairing: Fulfill the tool call with the user message content
+		return StateGeneratingResponse, nil, &ResumptionPlan{
+			ToolCallID: tc.ID,
+			Content:    lastMsg.Content,
 		}
 	}
 
 	if lastMsg.Role == "tool" && lastMsg.ToolCallID == tc.ID {
-		return StateGeneratingResponse, nil
+		return StateGeneratingResponse, nil, nil
 	}
 
-	return StateWaitingForHuman, nil
+	return StateWaitingForHuman, nil, nil
 }
 
 func (s *executionState) generateAgentResponse() error {
@@ -392,7 +437,7 @@ func (s *executionState) prepareContextForLLM() (*PrepareResult, error) {
 		Thread:    s.thread,
 		Options:   s.options,
 	}
-	return s.workers.llm.Prepare(s.ctx, runCtx)
+	return s.workers.llm.Prepare(s.ctx, runCtx, s.history)
 }
 
 func (s *executionState) streamAndProcessLLMResponse(llmContext *LLMContext) error {
@@ -432,11 +477,9 @@ func (s *executionState) validateAgentOutput() error {
 
 func (s *executionState) saveAgentMessageAndEmitEvents() error {
 	toolCalls := toDomainToolCalls(s.streamResult.ToolCalls)
-	agg, err := s.engine.threadMgmt.AddAssistantMessage(s.ctx, s.threadID, s.messageID, s.streamResult.Content, toolCalls, s.agentName)
-	if err != nil {
+	if err := s.persistence.AddAssistantMessage(s.ctx, s.streamResult.Content, toolCalls); err != nil {
 		return err
 	}
-	s.updateState(agg)
 
 	if !s.emit(s.workers.events.AssistantCompleted(s.threadID, s.messageID, s.streamResult.Content, toolCalls)) {
 		return context.Canceled
@@ -477,13 +520,13 @@ func (s *executionState) executeAllScheduledTools(route *toolRoute) error {
 			return s.failWithLoop(TerminationLoopDetected, info)
 		}
 
-		toolResultID := core.GenerateID()
-		agg, err := s.engine.threadMgmt.AddToolResultMessage(s.ctx, s.threadID, toolResultID, tc.ID, result.Result, s.agentName)
-		if err != nil {
+		if err := s.persistence.AddToolResultMessage(s.ctx, tc.ID, result.Result); err != nil {
 			return err
 		}
-		s.updateState(agg)
 
+		// Emit execution event (Note: we use the internal message index/history to find the true toolResultID if strictly needed,
+		// but typically core.GenerateID() is used here for event tracking consistency)
+		toolResultID := core.GenerateID()
 		if !s.emit(s.workers.events.ToolCallExecuted(s.threadID, toolResultID, tc.ID, result.ToolName, result.Arguments, result.Result, s.messageID)) {
 			return context.Canceled
 		}
