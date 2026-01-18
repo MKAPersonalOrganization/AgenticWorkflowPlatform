@@ -35,6 +35,7 @@ import (
 	"school-with-ai/services/agentorchestrator/agents/shared"
 	"school-with-ai/services/agentorchestrator/agents/statistics"
 	"school-with-ai/services/agentorchestrator/agents/studentfacing"
+	"school-with-ai/services/artifact"
 	"school-with-ai/services/taskmanagement"
 	"school-with-ai/services/threadmgmt"
 	"syscall"
@@ -134,6 +135,17 @@ func run(ctx context.Context, log *logger.Logger) error {
 			Env        string   `conf:"default:development"`
 			Deployment string   // Optional deployment context (e.g., us-east-1)
 			Tags       []string // Additional custom tags for traces
+		}
+		Artifacts struct {
+			S3Endpoint      string `conf:"default:localhost:9100"`
+			S3AccessKey     string `conf:"default:minio"`
+			S3SecretKey     string `conf:"default:miniosecret"`
+			S3Bucket        string `conf:"default:artifacts"`
+			S3UseSSL        bool   `conf:"default:false"`
+			S3Region        string `conf:"default:us-east-1"`
+		}
+		AgentCapabilities struct {
+			LongTermMemory bool `conf:"default:true"`
 		}
 	}{
 		Version: conf.Version{
@@ -304,8 +316,25 @@ func run(ctx context.Context, log *logger.Logger) error {
 	shared.GlobalAgents.Register("statistics-instructor", statistics.CreateStatisticsInstructor)
 	shared.GlobalAgents.Register("diagramming-instructor", diagramming.CreateDiagrammingInstructor)
 
+	// Initialize artifact service
+	log.Info(ctx, "startup", "status", "initializing s3 artifact service", "endpoint", cfg.Artifacts.S3Endpoint, "bucket", cfg.Artifacts.S3Bucket)
+	artifactService, err := artifact.NewS3Service(ctx, artifact.S3Config{
+		Endpoint:        cfg.Artifacts.S3Endpoint,
+		AccessKeyID:     cfg.Artifacts.S3AccessKey,
+		SecretAccessKey: cfg.Artifacts.S3SecretKey,
+		UseSSL:          cfg.Artifacts.S3UseSSL,
+		BucketName:      cfg.Artifacts.S3Bucket,
+		Region:          cfg.Artifacts.S3Region,
+	})
+	if err != nil {
+		return fmt.Errorf("initializing s3 artifact service: %w", err)
+	}
+
 	// Initialize orchestrator and thread services
-	agentOrchestrator := agentorchestrator.New(log, chatClient, eventLog)
+	agentOrchestrator := agentorchestrator.New(log, chatClient, eventLog,
+		agentorchestrator.WithArtifactService(artifactService),
+		agentorchestrator.WithMemoryEnabled(cfg.AgentCapabilities.LongTermMemory),
+	)
 
 	threadRepo := domain.NewThreadRepository(threadmgmt.NewEventStoreAdapter(eventLog))
 	threadMgmt := threadmgmt.New(log, threadRepo)

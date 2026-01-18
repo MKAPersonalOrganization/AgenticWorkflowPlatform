@@ -34,6 +34,12 @@ func (e *Engine) ProcessUserMessage(ctx context.Context, agentName, threadID, co
 	// This ensures that if the user is talking to a specialist, they stay with them.
 	targetAgent := e.determineTargetAgent(ctx, thread, agentName)
 
+	// Inject User into context for tools that need it (e.g. MemoryTool)
+	// We construct a partial user object with the ID we have.
+	if userID != "" {
+		ctx = context.WithValue(ctx, domain.UserContextKey, &domain.User{ID: userID})
+	}
+
 	runIter := e.Run(ctx, targetAgent, core.RunContext{
 		ThreadID:  threadID,
 		MessageID: runID,
