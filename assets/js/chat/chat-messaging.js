@@ -8,7 +8,7 @@
  * - Message snapshot handling
  */
 
-import { createUserMessage, safeParseJSON, generateInteractionId } from './chat-utils.js';
+import { createUserMessage, safeParseJSON, generateInteractionId, enrichToolResult } from './chat-utils.js';
 
 /**
  * Create messaging methods mixin
@@ -247,7 +247,8 @@ export function createMessagingMethods() {
                 } else if (msg.type === 'tool_result') {
                     const toolCall = toolCallMap.get(msg.toolCallId);
                     if (toolCall) {
-                        toolCall.result = msg.content;
+                        // Use shared enrichment logic
+                        enrichToolResult(toolCall, msg.content);
                     } else {
                         pairedMessages.push(msg);
                     }
@@ -262,7 +263,7 @@ export function createMessagingMethods() {
 
 
 
-                if (lastMsg.type === 'tool_call' && lastMsg.name === 'ask_for_clarification_from_student') {
+                if (lastMsg.type === 'tool_call' && lastMsg.name === 'ask_human') {
 
                     const state = this.__getThreadState();
                     state.awaitingHumanInput = true;

@@ -6,11 +6,15 @@ import (
 	"school-with-ai/foundation/agentsdk/core"
 )
 
-const ElicitInputToolName = "ask_for_clarification_from_student"
+const ElicitInputToolName = "ask_human"
 
-const ElicitInputToolDescription = `Request structured input from the user.
-Use this tool when you need specific information, confirmation, or choices from the user.
-Execution will pause until the user provides the requested input.`
+const ElicitInputToolDescription = `Request input from the human user.
+Use this tool for ANY interaction requiring user response, including:
+- Asking for clarification
+- Administering a quiz or test question
+- Requesting approval or confirmation
+- Collecting missing information
+Execution will pause until the user provides the answer.`
 
 // ElicitInputTool allows agents to request structured input from users.
 type ElicitInputTool struct{}
@@ -33,7 +37,7 @@ func (t *ElicitInputTool) Parameters() map[string]any {
 		"properties": map[string]any{
 			"question": map[string]any{
 				"type":        "string",
-				"description": "The question or prompt to display to the user.",
+				"description": "The question, quiz item, or prompt to display to the user.",
 			},
 			"schema": map[string]any{
 				"type":        "object",
@@ -117,49 +121,57 @@ func (m *ElicitationMiddleware) Process(ctx context.Context, reqCtx *core.Reques
 
 	// Add system prompt instruction
 	reqCtx.AddSystemPrompt(`
-## User Input
-You MUST use the 'ask_for_clarification_from_student' tool whenever you need to ask the user a question.
-NEVER ask the user a question directly in your response text.
-**CRITICAL**: Always ask exactly ONE question at a time. Never ask multiple questions in a single response.
-**NO LISTS**: Even when giving a quiz, test, or exercise, you MUST ask the first question via 'ask_for_clarification_from_student' and wait for the answer before asking the next. Never provide a list of questions for the user to answer later.
-Use this tool for:
-- Clarification on a request
-- Selection from a list of options
-- Approval for an action
-- Specific missing information
-Execution will pause until the user answers.
+## Human Interaction (STRICT ENFORCEMENT)
+STOP. READ THIS CAREFULLY.
+You are PROHIBITED from asking questions, giving quizzes, or requesting information in your text response.
+You MUST use the 'ask_human' tool for ALL interactions requiring a user response.
 
-To present options (quick replies), use 'type': 'choose_one' with 'enum':
+Violations (DO NOT DO THIS):
+- "Can you clarify what you mean?" (VIOLATION: Text question)
+- "Here is the first question: What is 2+2?" (VIOLATION: Text quiz)
+- "Do you want to proceed?" (VIOLATION: Text confirmation)
+
+Correct Usage (DO THIS):
+- Call 'ask_human' with question="Can you clarify what you mean?"
+- Call 'ask_human' with question="What is 2+2?"
+- Call 'ask_human' with question="Do you want to proceed?" type="true_false"
+
+**CRITICAL RULES**:
+1. **ONE Question Per Turn**: Always ask exactly ONE question at a time using the tool.
+2. **QUIZZES**: Administer quizzes one question at a time. Ask Q1 -> Wait for Answer -> Grade -> Ask Q2.
+3. **Execution Pauses**: The tool will pause execution. Do not say "I will wait for your answer". Just call the tool.
+
+To present options (quick replies or multiple choice), use 'type': 'choose_one' with 'enum':
 {
-  "question": "Which subject?",
+  "question": "What is 2 + 2?",
   "schema": {
     "type": "choose_one",
-    "enum": ["Math", "Physics", "Chemistry"]
+    "enum": ["3", "4", "5"]
   }
 }
 
 For multiple selection (checkboxes), use 'type': 'choose_multiple':
 {
-  "question": "Select all that apply",
+  "question": "Select all prime numbers",
   "schema": {
     "type": "choose_multiple",
-    "enum": ["Red", "Green", "Blue"]
+    "enum": ["2", "4", "5", "9"]
   }
 }
 
 For numeric ranges, use 'type': 'numeric_range':
 {
-  "question": "Rate from 1 to 5",
+  "question": "Rate your confidence (1-10)",
   "schema": {
     "type": "numeric_range",
     "minimum": 1,
-    "maximum": 5
+    "maximum": 10
   }
 }
 
-For True/False (single checkbox), use 'type': 'true_false':
+For True/False, use 'type': 'true_false':
 {
-  "question": "I agree to the terms",
+  "question": "The earth is flat.",
   "schema": {
     "type": "true_false"
   }
@@ -167,7 +179,7 @@ For True/False (single checkbox), use 'type': 'true_false':
 
 For short free-form answer, use 'type': 'short_answer':
 {
-  "question": "What is your name?",
+  "question": "Explain the concept of inertia.",
   "schema": {
     "type": "short_answer"
   }

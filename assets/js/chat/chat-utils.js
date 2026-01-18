@@ -157,6 +157,26 @@ export function safeParseJSON(jsonString) {
 }
 
 /**
+ * Enrich a tool result message or object with parsed content
+ * Centralizes logic for tools that require structured result data (like browse_library)
+ * @param {Object} toolResult - The tool result object/message
+ * @param {string} content - The JSON string content
+ * @returns {Object} The enriched tool result object
+ */
+export function enrichToolResult(toolResult, content) {
+    if (!toolResult) return toolResult;
+
+    // Always set the raw result
+    toolResult.result = content;
+
+    // Always attempt to parse into parsedResult for UI components expecting objects
+    // This is shared logic between streaming (live) and messaging (history hydration)
+    toolResult.parsedResult = safeParseJSON(content);
+
+    return toolResult;
+}
+
+/**
  * Create a user message object
  * @param {string} content - Message content
  * @param {string} interactionId - Interaction ID

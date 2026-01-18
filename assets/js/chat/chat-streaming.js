@@ -9,6 +9,7 @@
  */
 
 import { LIFECYCLE_EVENT_TYPES } from './constants.js';
+import { enrichToolResult } from './chat-utils.js';
 
 /**
  * Create streaming methods mixin
@@ -453,6 +454,9 @@ export function createStreamingMethods() {
             if (resultToolCallIndex !== -1) {
                 state.messages[resultToolCallIndex].result = event.content;
                 state.messages[resultToolCallIndex].resultTimestamp = new Date(event.timestamp).toISOString();
+
+                // Use shared enrichment logic
+                enrichToolResult(state.messages[resultToolCallIndex], event.content);
             }
 
             if (state.toolCalls[event.toolCallId]) {

@@ -17,5 +17,6 @@ func InitStudentBooks(svc studentbooks.Service) {
 func NewLibraryTools() []core.Tool {
 	return []core.Tool{
 		sdktools.NewBrowseLibraryTool(globalStudentBooks),
+		sdktools.NewLookupSectionTool(globalStudentBooks),
 	}
 }
