@@ -16,9 +16,10 @@ import (
 
 // MockChatClient implements types.ChatClient for testing
 type MockChatClient struct {
-	streams [][]llm.ChatResponseUpdate
-	mu      sync.Mutex
-	err     error
+	streams          [][]llm.ChatResponseUpdate
+	mu               sync.Mutex
+	err              error
+	capturedMessages [][]llm.ChatMessage
 }
 
 func (m *MockChatClient) GetStreamingResponse(
@@ -26,6 +27,10 @@ func (m *MockChatClient) GetStreamingResponse(
 	messages []llm.ChatMessage,
 	options *llm.ChatOptions,
 ) iter.Seq2[llm.ChatResponseUpdate, error] {
+	m.mu.Lock()
+	m.capturedMessages = append(m.capturedMessages, messages)
+	m.mu.Unlock()
+
 	return func(yield func(llm.ChatResponseUpdate, error) bool) {
 		m.mu.Lock()
 		defer m.mu.Unlock()
@@ -382,5 +387,31 @@ func TestEngine_Handoff(t *testing.T) {
 	}
 	if !nextAgentCompleted {
 		t.Error("Did not find AssistantMessageCompletedEvent for NextAgent")
+	}
+
+	// Verify that the second request (NextAgent) contained the tool result from the first request
+	if len(mockChatClient.capturedMessages) < 2 {
+		t.Fatalf("Expected at least 2 LLM requests, got %d", len(mockChatClient.capturedMessages))
+	}
+
+	secondRequest := mockChatClient.capturedMessages[1]
+	// We expect:
+	// 1. System prompt (implied, but strictly messages passed in)
+	// 2. User "Transfer me"
+	// 3. Assistant "Transferring..." + ToolCall
+	// 4. Tool Result (this is what was missing before the fix)
+
+	foundToolResult := false
+	for _, msg := range secondRequest {
+		for _, content := range msg.Contents {
+			if _, ok := content.(llm.FunctionResultContent); ok {
+				foundToolResult = true
+				break
+			}
+		}
+	}
+
+	if !foundToolResult {
+		t.Error("Did not find ToolResult in the history sent to the second agent (NextAgent)")
 	}
 }
