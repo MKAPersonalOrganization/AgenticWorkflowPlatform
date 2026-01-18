@@ -11,6 +11,8 @@ import (
 	"school-with-ai/components/library"
 	"school-with-ai/components/lookupsection"
 	"school-with-ai/components/searchtext"
+	"school-with-ai/components/calculate"
+	"school-with-ai/components/plot"
 )
 
 templ MessageList() {
@@ -125,8 +127,16 @@ templ MessageList() {
 				<div x-show="message.type === 'tool_call' && message.name === 'search_text_in_file'" class="my-2 relative group/message w-full">
 					@searchtext.Container()
 				</div>
+				<!-- Calculate Tool Call - Special Rendering -->
+				<div x-show="message.type === 'tool_call' && message.name === 'calculate'" class="my-2 relative group/message w-full">
+					@calculate.Container()
+				</div>
+				<!-- Plot Tool Call - Special Rendering -->
+				<div x-show="message.type === 'tool_call' && message.name === 'plot'" class="my-2 relative group/message w-full">
+					@plot.Container()
+				</div>
 				<!-- Regular Tool Call Message (with result if available) -->
-				<div x-show="message.type === 'tool_call' && !['transfer_to_agent', 'ask_human', 'write_todos', 'browse_library', 'lookup_section', 'search_text_in_file'].includes(message.name) && message.status === 'completed'" class="my-2 relative group/message">
+				<div x-show="message.type === 'tool_call' && !['transfer_to_agent', 'ask_human', 'write_todos', 'browse_library', 'lookup_section', 'search_text_in_file', 'calculate', 'plot'].includes(message.name) && message.status === 'completed'" class="my-2 relative group/message">
 					<!-- Parallel indicator bar (shown only for parallel tool calls) -->
 					<template x-if="getParallelToolCallInfo(message).isParallel">
 						<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary/30 rounded-l" title="Parallel tool call"></div>

@@ -1,0 +1,37 @@
+package plot
+
+templ Container() {
+	<div class="flex flex-col p-0 bg-base-100 rounded-lg border border-base-200 shadow-sm overflow-hidden w-full max-w-lg mx-auto">
+		<!-- Header -->
+		<div class="px-4 py-3 bg-base-200/50 border-b border-base-200 flex items-center gap-2">
+			<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-activity text-primary"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+			<span class="text-xs font-bold uppercase tracking-wider text-base-content/70 truncate" x-text="message.parsedResult?.title || message.parsedArgs?.title || 'Generated Plot'"></span>
+		</div>
+
+		<!-- Image Display -->
+		<div class="relative bg-white flex items-center justify-center p-4 min-h-[200px]">
+             <!-- Loading State -->
+            <div x-show="!message.parsedResult?.image_url" class="absolute inset-0 flex items-center justify-center bg-base-100/50 z-10">
+                <span class="loading loading-spinner loading-md text-primary"></span>
+            </div>
+
+            <!-- Image -->
+			<template x-if="message.parsedResult?.image_url">
+				<img 
+                    :src="message.parsedResult?.image_url" 
+                    :alt="message.parsedResult?.title || 'Plot'"
+                    class="max-w-full h-auto rounded shadow-sm border border-base-200"
+                />
+			</template>
+            <!-- Fallback if no URL yet (e.g. streaming) -->
+            <template x-if="!message.parsedResult?.image_url">
+                 <div class="text-sm text-base-content/40 italic">Generating plot...</div>
+            </template>
+		</div>
+        
+        <!-- Footer / Metadata -->
+         <div class="px-4 py-2 bg-base-200/30 border-t border-base-200 text-[10px] text-base-content/50 flex justify-end">
+            Generated via gnuplot
+        </div>
+	</div>
+}
