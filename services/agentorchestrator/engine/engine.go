@@ -226,12 +226,13 @@ func (s *executionState) executeRequiredActions() error {
 		ToolExec:      s.engine.toolExec,
 		AgentExecutor: s.agent.Executor,
 		AgentName:     s.agent.Name,
-		OnStateUpdate: s.refreshState,
 	}
-
-	resolution, err := s.tools.ProcessActions(tctx)
+	resolution, agg, err := s.tools.ProcessActions(tctx)
 	if err != nil {
 		return err
+	}
+	if agg != nil {
+		s.refreshState(agg)
 	}
 	s.resolution = resolution
 	return s.nextStep()
@@ -262,12 +263,7 @@ func (s *executionState) nextStep() error {
 			// Check if guard condition is met
 			if trans.Guard(s) {
 				if trans.WithParam && trans.Trigger == TrigHandoffInitiated {
-					// Execute handoff as a side-effect of the transition
-					if err := s.executeHandoff(s.resolution.HandoffAgent); err != nil {
-						return err
-					}
-					// Transition to next state (GeneratingResponse) with new agent context ready
-					return s.sm.Fire(trans.Trigger)
+					return s.sm.Fire(trans.Trigger, s.resolution.HandoffAgent)
 				}
 				return s.sm.Fire(trans.Trigger)
 			}
@@ -434,7 +430,10 @@ func (p *PersistenceUnit) AddAssistantMessage(
 
 func (p *PersistenceUnit) AddToolResultMessage(
 	ctx context.Context,
-	threadID, toolCallID, result, agentName string,
+	threadID string,
+	toolCallID string,
+	result string,
+	agentName string,
 ) (*domain.ThreadAggregate, error) {
 	toolResultID := core.GenerateID()
 	return p.mgmt.AddToolResultMessage(ctx, threadID, toolResultID, toolCallID, result, agentName)
@@ -455,25 +454,25 @@ type ToolProcessorContext struct {
 	ToolExec      *ToolExecutionService
 	AgentExecutor core.ToolExecutor
 	AgentName     string
-	OnStateUpdate func(*domain.ThreadAggregate) // Callback for state propagation
 }
 
-func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolver, error) {
+func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolver, *domain.ThreadAggregate, error) {
 	var route RouteResolver
+	var latestAgg *domain.ThreadAggregate
 	for _, tc := range tctx.StreamResult.ToolCalls {
 		tctx.Observer.toolNames = append(tctx.Observer.toolNames, tc.Function.Name)
 
 		if info := tctx.Safety.RecordToolCall(tc); info != nil {
-			return nil, tctx.Observer.FailWithLoop(info)
+			return nil, nil, tctx.Observer.FailWithLoop(info)
 		}
 
 		if !tctx.Observer.TrackToolCall(tc.ID) {
-			return nil, context.Canceled
+			return nil, nil, context.Canceled
 		}
 
 		result := tctx.ToolExec.Execute(tc, tctx.AgentExecutor)
 		if info := tctx.Safety.RecordToolResult(result.ToolName, result.Result, result.IsError); info != nil {
-			return nil, tctx.Observer.FailWithLoop(info)
+			return nil, nil, tctx.Observer.FailWithLoop(info)
 		}
 
 		agg, err := tctx.Persistence.AddToolResultMessage(
@@ -484,16 +483,13 @@ func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolve
 			tctx.AgentName,
 		)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		// Explicitly propagate state update
-		if tctx.OnStateUpdate != nil {
-			tctx.OnStateUpdate(agg)
-		}
+		latestAgg = agg
 
 		toolResultID := core.GenerateID()
 		if !tctx.Observer.TrackToolExecuted(toolResultID, tc.ID, result.ToolName, result.Arguments, result.Result, tctx.MessageID) {
-			return nil, context.Canceled
+			return nil, nil, context.Canceled
 		}
 
 		if res := result.Command; res != nil {
@@ -506,7 +502,7 @@ func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolve
 			}
 		}
 	}
-	return &route, nil
+	return &route, latestAgg, nil
 }
 
 // RouteResolver determines the next state based on tool results.
@@ -554,6 +550,10 @@ func (s *executionState) setup(initialState state) error {
 		// Attach lifecycle hooks
 		if stateDef.OnEntry != nil {
 			config.OnEntry(func(_ context.Context, args ...any) error {
+				if stateDef.State == StateSwitchingAgent && len(args) > 0 {
+					// Special case: handoff needs target agent parameter
+					return s.performHandoff(args[0].(string))
+				}
 				return stateDef.OnEntry(s)
 			})
 		}
@@ -629,13 +629,23 @@ func (s *executionState) stateConfiguration() []StateDefinition {
 				},
 				{
 					Trigger:   TrigHandoffInitiated,
-					Target:    StateGeneratingResponse,
+					Target:    StateSwitchingAgent,
 					WithParam: true,
 					Guard: func(s *executionState) bool {
 						return s.resolution != nil && s.resolution.HandoffAgent != ""
 					},
 				},
 				{Trigger: TrigActionsCompleted, Target: StateGeneratingResponse},
+			},
+		},
+		{
+			State: StateSwitchingAgent,
+			OnEntry: func(s *executionState) error {
+				// Note: actual handoff logic with parameter is in setup()
+				return nil
+			},
+			Transitions: []TransitionRule{
+				{Trigger: TrigAgentSwitched, Target: StateGeneratingResponse},
 			},
 		},
 		{
@@ -812,7 +822,7 @@ func (s *executionState) trackElicitation() error {
 	return nil
 }
 
-func (s *executionState) executeHandoff(targetAgent string) error {
+func (s *executionState) performHandoff(targetAgent string) error {
 	// 1. Record Handoff
 	s.observer.result.Reason = TerminationHandoff
 	s.observer.result.HandoffTarget = targetAgent
@@ -826,7 +836,8 @@ func (s *executionState) executeHandoff(targetAgent string) error {
 		return err
 	}
 
-	return nil
+	// 3. Complete Transition
+	return s.sm.Fire(TrigAgentSwitched)
 }
 
 // State machine states
@@ -836,6 +847,7 @@ const (
 	StateAwaitingTurn state = iota
 	StateGeneratingResponse
 	StatePerformingActions
+	StateSwitchingAgent
 	StateWaitingForHuman
 	StateDone
 	StateError
@@ -850,6 +862,8 @@ func (s state) String() string {
 		return "GeneratingResponse"
 	case StatePerformingActions:
 		return "PerformingActions"
+	case StateSwitchingAgent:
+		return "SwitchingAgent"
 	case StateWaitingForHuman:
 		return "WaitingForHuman"
 	case StateDone:
@@ -868,6 +882,7 @@ const (
 	TrigActionsCompleted = "ActionsCompleted"
 	TrigHandoffInitiated = "HandoffInitiated"
 	TrigHumanInputNeeded = "HumanInputNeeded"
+	TrigAgentSwitched    = "AgentSwitched"
 )
 
 // Safety and iteration limits
