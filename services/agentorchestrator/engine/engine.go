@@ -262,7 +262,12 @@ func (s *executionState) nextStep() error {
 			// Check if guard condition is met
 			if trans.Guard(s) {
 				if trans.WithParam && trans.Trigger == TrigHandoffInitiated {
-					return s.sm.Fire(trans.Trigger, s.resolution.HandoffAgent)
+					// Execute handoff as a side-effect of the transition
+					if err := s.executeHandoff(s.resolution.HandoffAgent); err != nil {
+						return err
+					}
+					// Transition to next state (GeneratingResponse) with new agent context ready
+					return s.sm.Fire(trans.Trigger)
 				}
 				return s.sm.Fire(trans.Trigger)
 			}
@@ -549,10 +554,6 @@ func (s *executionState) setup(initialState state) error {
 		// Attach lifecycle hooks
 		if stateDef.OnEntry != nil {
 			config.OnEntry(func(_ context.Context, args ...any) error {
-				if stateDef.State == StateSwitchingAgent && len(args) > 0 {
-					// Special case: handoff needs target agent parameter
-					return s.performHandoff(args[0].(string))
-				}
 				return stateDef.OnEntry(s)
 			})
 		}
@@ -628,23 +629,13 @@ func (s *executionState) stateConfiguration() []StateDefinition {
 				},
 				{
 					Trigger:   TrigHandoffInitiated,
-					Target:    StateSwitchingAgent,
+					Target:    StateGeneratingResponse,
 					WithParam: true,
 					Guard: func(s *executionState) bool {
 						return s.resolution != nil && s.resolution.HandoffAgent != ""
 					},
 				},
 				{Trigger: TrigActionsCompleted, Target: StateGeneratingResponse},
-			},
-		},
-		{
-			State: StateSwitchingAgent,
-			OnEntry: func(s *executionState) error {
-				// Note: actual handoff logic with parameter is in setup()
-				return nil
-			},
-			Transitions: []TransitionRule{
-				{Trigger: TrigAgentSwitched, Target: StateGeneratingResponse},
 			},
 		},
 		{
@@ -821,7 +812,7 @@ func (s *executionState) trackElicitation() error {
 	return nil
 }
 
-func (s *executionState) performHandoff(targetAgent string) error {
+func (s *executionState) executeHandoff(targetAgent string) error {
 	// 1. Record Handoff
 	s.observer.result.Reason = TerminationHandoff
 	s.observer.result.HandoffTarget = targetAgent
@@ -835,8 +826,7 @@ func (s *executionState) performHandoff(targetAgent string) error {
 		return err
 	}
 
-	// 3. Complete Transition
-	return s.sm.Fire(TrigAgentSwitched)
+	return nil
 }
 
 // State machine states
@@ -846,7 +836,6 @@ const (
 	StateAwaitingTurn state = iota
 	StateGeneratingResponse
 	StatePerformingActions
-	StateSwitchingAgent
 	StateWaitingForHuman
 	StateDone
 	StateError
@@ -861,8 +850,6 @@ func (s state) String() string {
 		return "GeneratingResponse"
 	case StatePerformingActions:
 		return "PerformingActions"
-	case StateSwitchingAgent:
-		return "SwitchingAgent"
 	case StateWaitingForHuman:
 		return "WaitingForHuman"
 	case StateDone:
@@ -881,7 +868,6 @@ const (
 	TrigActionsCompleted = "ActionsCompleted"
 	TrigHandoffInitiated = "HandoffInitiated"
 	TrigHumanInputNeeded = "HumanInputNeeded"
-	TrigAgentSwitched    = "AgentSwitched"
 )
 
 // Safety and iteration limits
