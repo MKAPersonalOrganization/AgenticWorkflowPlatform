@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 	"iter"
+	"time"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/core/middleware"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/agentorchestrator/types"
 	"school-with-ai/services/threadmgmt"
-	"time"
 
 	"github.com/qmuntal/stateless"
 )
@@ -70,29 +71,44 @@ func (e *Engine) Run(ctx context.Context, agentName string, runCtx core.RunConte
 		}
 
 		if err := exec.run(); err != nil {
-			// Update result based on error type, but only if not already set to a specific reason
-			if exec.observer.result.Reason == TerminationGoalReached {
-				if ctx.Err() != nil {
-					exec.observer.result.Reason = TerminationUserAborted
-				} else {
-					exec.observer.result.Reason = TerminationError
-					exec.observer.result.Error = err
-				}
-				exec.observer.result.Success = false
-			}
+			exec.handleExecutionError(ctx, err)
 			yield(nil, err)
 		}
 
-		// Finalize execution result
-		res := exec.observer.result
-		res.FinalAgent = exec.agentName
-		res.Iterations = exec.safety.iteration
-		res.ToolsCalled = exec.observer.toolNames
-		res.Duration = timeSince(exec.observer.startTime)
+		// Finalize and return execution result
+		exec.finalizeResult()
 	}
 }
 
+// handleExecutionError updates the result based on error type.
+func (exec *executionState) handleExecutionError(ctx context.Context, err error) {
+	// Update result based on error type, but only if not already set to a specific reason
+	if exec.observer.result.Reason == TerminationGoalReached {
+		if ctx.Err() != nil {
+			exec.observer.result.Reason = TerminationUserAborted
+		} else {
+			exec.observer.result.Reason = TerminationError
+			exec.observer.result.Error = err
+		}
+		exec.observer.result.Success = false
+	}
+}
+
+// finalizeResult completes the execution result with final metrics.
+func (exec *executionState) finalizeResult() {
+	res := exec.observer.result
+	res.FinalAgent = exec.agent.Name
+	res.Iterations = exec.safety.iteration
+	res.ToolsCalled = exec.observer.toolNames
+	res.Duration = timeSince(exec.observer.startTime)
+}
+
 func (e *Engine) newExecutionState(ctx context.Context, agentName string, runCtx core.RunContext, yield func(core.Event, error) bool) (*executionState, error) {
+	instance, err := e.newAgentInstance(agentName)
+	if err != nil {
+		return nil, err
+	}
+
 	exec := &executionState{
 		engine:    e,
 		ctx:       ctx,
@@ -100,12 +116,13 @@ func (e *Engine) newExecutionState(ctx context.Context, agentName string, runCtx
 		messageID: runCtx.MessageID,
 		thread:    runCtx.Thread,
 		options:   runCtx.Options,
-		agentName: agentName,
+		agent:     instance,
 		history:   runCtx.InitialHistory,
 		observer: &ObserverUnit{
 			yield:     yield,
 			startTime: timeNowNano(),
 			threadID:  runCtx.ThreadID,
+			events:    instance.Events,
 			result: &ExecutionResult{
 				Success:    true,
 				Reason:     TerminationGoalReached,
@@ -113,10 +130,10 @@ func (e *Engine) newExecutionState(ctx context.Context, agentName string, runCtx
 			},
 		},
 		safety: &SafetyUnit{
-			maxTotal:     20,
+			maxTotal:     DefaultMaxTotalIterations,
 			loopDetector: NewLoopDetector(DefaultLoopDetectorConfig()),
+			maxAgent:     instance.Config.MaxIterations,
 		},
-		workers: &WorkersUnit{},
 		persistence: &PersistenceUnit{
 			mgmt: e.threadMgmt,
 		},
@@ -125,11 +142,8 @@ func (e *Engine) newExecutionState(ctx context.Context, agentName string, runCtx
 	exec.persistence.state = exec
 	exec.tools.state = exec
 
-	if err := exec.initAgentComponents(agentName); err != nil {
-		exec.observer.result.Success = false
-		exec.observer.result.Reason = TerminationError
-		exec.observer.result.Error = err
-		return nil, err
+	if exec.safety.maxAgent <= 0 {
+		exec.safety.maxAgent = DefaultMaxAgentIterations
 	}
 
 	return exec, nil
@@ -151,23 +165,110 @@ type executionState struct {
 	ctx    context.Context
 
 	// Context of the current turn
+	// turn-specific state
 	threadID  string
 	messageID string
-	agentName string
 	thread    core.AgentThread
 	options   core.RunOptions
 	history   []core.Message
 
+	// agent-specific state (swappable during handoff)
+	agent *AgentInstance
+
 	// Cohesive Units
 	safety      *SafetyUnit
 	observer    *ObserverUnit
-	workers     *WorkersUnit
 	persistence *PersistenceUnit
 	tools       *ToolProcessor
 
 	// Current Turn State
-	sm           *stateless.StateMachine
-	streamResult *StreamResult
+	sm               *stateless.StateMachine
+	streamResult     *StreamResult
+	resolution       *RouteResolver
+	stateConfigCache []StateDefinition // Cached to avoid recreation in nextStep()
+}
+
+func (s *executionState) generateAgentResponse() error {
+	if err := s.safety.Guard(); err != nil {
+		s.observer.Fail(TerminationMaxIterations, err)
+		return err
+	}
+
+	prepped, err := s.prepareContextForLLM()
+	if err != nil {
+		return err
+	}
+	if prepped.Terminated {
+		return s.nextStep()
+	}
+
+	if err := s.streamAndProcessLLMResponse(prepped.Context); err != nil {
+		return err
+	}
+
+	if err := s.validateAgentOutput(); err != nil {
+		return err
+	}
+
+	if err := s.saveAgentMessageAndEmitEvents(); err != nil {
+		return err
+	}
+
+	return s.nextStep()
+}
+
+func (s *executionState) executeRequiredActions() error {
+	resolution, err := s.tools.ProcessActions()
+	if err != nil {
+		return err
+	}
+	s.resolution = resolution
+	return s.nextStep()
+}
+
+// nextStep determines the appropriate state transition based on declarative guards.
+// The actual transition logic is now encoded in the state configuration.
+func (s *executionState) nextStep() error {
+	currentState := s.sm.MustState()
+
+	// Find the state definition to access guards (using cached config)
+	for _, stateDef := range s.stateConfigCache {
+		if stateDef.State != currentState {
+			continue
+		}
+
+		// Evaluate transitions with guards in priority order
+		for _, trans := range stateDef.Transitions {
+			if trans.Guard == nil {
+				continue // Skip unconditional transitions for now
+			}
+
+			// Check if guard condition is met
+			if trans.Guard(s) {
+				if trans.WithParam && trans.Trigger == TrigHandoffInitiated {
+					return s.sm.Fire(trans.Trigger, s.resolution.HandoffAgent)
+				}
+				return s.sm.Fire(trans.Trigger)
+			}
+		}
+
+		// Fall through to default transitions based on state
+		break
+	}
+
+	// Default behavior for each state
+	switch currentState {
+	case StateGeneratingResponse:
+		return s.sm.Fire(TrigTurnFinished)
+	case StatePerformingActions:
+		// Prepare for next iteration
+		s.messageID = core.GenerateID()
+		s.streamResult = nil
+		s.resolution = nil
+		return s.sm.Fire(TrigActionsCompleted)
+	default:
+		return s.sm.Fire(TrigTurnFinished)
+	}
 }
 
 // HistoryReconciler analyzes the conversation history to determine the resumption state.
@@ -266,12 +367,33 @@ func (o *ObserverUnit) FailWithLoop(info *LoopInfo) error {
 	return o.result.Error
 }
 
-// WorkersUnit provides the specialized tools and processors for the turn.
-type WorkersUnit struct {
-	llm      *LLMContextManager
-	stream   *StreamProcessor
-	events   *EventFactory
-	executor core.ToolExecutor
+// AgentInstance holds everything specific to the agent currently in control.
+type AgentInstance struct {
+	Name     string
+	Config   core.AgentConfig
+	LLM      *LLMContextManager
+	Stream   *StreamProcessor
+	Events   *EventFactory
+	Executor core.ToolExecutor
+}
+
+func (e *Engine) newAgentInstance(name string) (*AgentInstance, error) {
+	config, err := e.provider.GetConfig(name)
+	if err != nil {
+		return nil, err
+	}
+	if err := config.Validate(); err != nil {
+		return nil, err
+	}
+
+	events := NewEventFactory(config.Name)
+	return &AgentInstance{
+		Name:   config.Name,
+		Config: config,
+		LLM:    NewLLMContextManager(config, e.threadMgmt, e.reqCtxCapture),
+		Events: events,
+		Stream: NewStreamProcessor(events),
+	}, nil
 }
 
 // PersistenceUnit ensures atomic updates between the database and in-memory state.
@@ -281,7 +403,7 @@ type PersistenceUnit struct {
 }
 
 func (p *PersistenceUnit) AddAssistantMessage(ctx context.Context, content string, toolCalls []domain.ToolCall) error {
-	agg, err := p.mgmt.AddAssistantMessage(ctx, p.state.threadID, p.state.messageID, content, toolCalls, p.state.agentName)
+	agg, err := p.mgmt.AddAssistantMessage(ctx, p.state.threadID, p.state.messageID, content, toolCalls, p.state.agent.Name)
 	if err != nil {
 		return err
 	}
@@ -291,7 +413,7 @@ func (p *PersistenceUnit) AddAssistantMessage(ctx context.Context, content strin
 
 func (p *PersistenceUnit) AddToolResultMessage(ctx context.Context, toolCallID, result string) error {
 	toolResultID := core.GenerateID()
-	agg, err := p.mgmt.AddToolResultMessage(ctx, p.state.threadID, toolResultID, toolCallID, result, p.state.agentName)
+	agg, err := p.mgmt.AddToolResultMessage(ctx, p.state.threadID, toolResultID, toolCallID, result, p.state.agent.Name)
 	if err != nil {
 		return err
 	}
@@ -322,7 +444,7 @@ func (p *ToolProcessor) ProcessActions() (*RouteResolver, error) {
 			return nil, context.Canceled
 		}
 
-		result := p.state.engine.toolExec.Execute(tc, p.state.workers.executor)
+		result := p.state.engine.toolExec.Execute(tc, p.state.agent.Executor)
 		if info := p.state.safety.RecordToolResult(result.ToolName, result.Result, result.IsError); info != nil {
 			return nil, p.state.observer.FailWithLoop(info)
 		}
@@ -367,60 +489,145 @@ func (s *executionState) prepareContextForLLM() (*PrepareResult, error) {
 		Thread:    s.thread,
 		Options:   s.options,
 	}
-	return s.workers.llm.Prepare(s.ctx, runCtx, s.history)
+	return s.agent.LLM.Prepare(s.ctx, runCtx, s.history)
 }
 
 func (s *executionState) initAgentComponents(name string) error {
-	config, err := s.engine.provider.GetConfig(name)
+	instance, err := s.engine.newAgentInstance(name)
 	if err != nil {
 		return err
 	}
-	if err := config.Validate(); err != nil {
-		return err
-	}
-
-	s.agentName = name
-	s.workers.llm = NewLLMContextManager(config, s.engine.threadMgmt, s.engine.reqCtxCapture)
-	s.workers.events = NewEventFactory(config.Name)
-	s.workers.stream = NewStreamProcessor(s.workers.events)
-
-	s.observer.events = s.workers.events
-
-	s.safety.maxAgent = config.MaxIterations
-	if s.safety.maxAgent <= 0 {
-		s.safety.maxAgent = 5
-	}
-	s.safety.iteration = 0
+	s.agent = instance
+	s.observer.events = instance.Events
+	s.safety.ResetAgentLimits()
 	return nil
 }
 
 func (s *executionState) setup(initialState state) error {
 	s.sm = stateless.NewStateMachine(initialState)
 
-	s.sm.Configure(StateAwaitingTurn).
-		Permit(TrigStartExecution, StateGeneratingResponse)
+	// Cache state configuration for efficient lookup in nextStep()
+	s.stateConfigCache = s.stateConfiguration()
 
-	s.sm.Configure(StateGeneratingResponse).
-		OnEntry(func(_ context.Context, _ ...any) error { return s.generateAgentResponse() }).
-		PermitReentry(TrigStartExecution).
-		Permit(TrigActionsDetected, StatePerformingActions).
-		Permit(TrigTurnFinished, StateDone)
+	// Build state machine from declarative configuration
+	for _, stateDef := range s.stateConfigCache {
+		config := s.sm.Configure(stateDef.State)
 
-	s.sm.Configure(StatePerformingActions).
-		OnEntry(func(_ context.Context, _ ...any) error { return s.executeRequiredActions() }).
-		PermitReentry(TrigStartExecution).
-		Permit(TrigActionsCompleted, StateGeneratingResponse).
-		Permit(TrigHandoffInitiated, StateSwitchingAgent).
-		Permit(TrigHumanInputNeeded, StateWaitingForHuman)
+		// Attach lifecycle hooks
+		if stateDef.OnEntry != nil {
+			config.OnEntry(func(_ context.Context, args ...any) error {
+				if stateDef.State == StateSwitchingAgent && len(args) > 0 {
+					// Special case: handoff needs target agent parameter
+					return s.performHandoff(args[0].(string))
+				}
+				return stateDef.OnEntry(s)
+			})
+		}
+		if stateDef.OnExit != nil {
+			config.OnExit(func(_ context.Context, _ ...any) error {
+				return stateDef.OnExit(s)
+			})
+		}
 
-	s.sm.Configure(StateSwitchingAgent).
-		OnEntry(func(_ context.Context, args ...any) error { return s.transferControlToAgent(args[0].(string)) }).
-		Permit(TrigAgentSwitched, StateGeneratingResponse)
-
-	s.sm.Configure(StateWaitingForHuman).
-		PermitReentry(TrigStartExecution)
+		// Configure transitions
+		for _, trans := range stateDef.Transitions {
+			if trans.Reentry {
+				config.PermitReentry(trans.Trigger)
+			} else {
+				// Note: Guards are evaluated in nextStep() using CanFire
+				// The stateless library will check them via CanFire before Fire
+				config.Permit(trans.Trigger, trans.Target)
+			}
+		}
+	}
 
 	return nil
+}
+
+// stateConfiguration provides the complete declarative state machine specification.
+func (s *executionState) stateConfiguration() []StateDefinition {
+	return []StateDefinition{
+		{
+			State: StateAwaitingTurn,
+			Transitions: []TransitionRule{
+				{Trigger: TrigStartExecution, Target: StateGeneratingResponse},
+			},
+		},
+		{
+			State: StateGeneratingResponse,
+			OnEntry: func(s *executionState) error {
+				s.observer.TrackStarted(s.messageID)
+				return s.generateAgentResponse()
+			},
+			OnExit: func(s *executionState) error {
+				if s.streamResult != nil {
+					s.observer.TrackCompleted(s.messageID, s.streamResult.Content, toDomainToolCalls(s.streamResult.ToolCalls))
+				}
+				return nil
+			},
+			Transitions: []TransitionRule{
+				{Trigger: TrigStartExecution, Target: StateGeneratingResponse, Reentry: true},
+				// Conditional transitions based on response content
+				{
+					Trigger: TrigActionsDetected,
+					Target:  StatePerformingActions,
+					Guard: func(s *executionState) bool {
+						return s.streamResult != nil && s.streamResult.HasToolCalls()
+					},
+				},
+				{Trigger: TrigTurnFinished, Target: StateDone},
+			},
+		},
+		{
+			State: StatePerformingActions,
+			OnEntry: func(s *executionState) error {
+				return s.executeRequiredActions()
+			},
+			Transitions: []TransitionRule{
+				{Trigger: TrigStartExecution, Target: StatePerformingActions, Reentry: true},
+				// Conditional transitions based on tool results
+				{
+					Trigger: TrigHumanInputNeeded,
+					Target:  StateWaitingForHuman,
+					Guard: func(s *executionState) bool {
+						return s.resolution != nil && s.resolution.Elicitation != nil
+					},
+				},
+				{
+					Trigger:   TrigHandoffInitiated,
+					Target:    StateSwitchingAgent,
+					WithParam: true,
+					Guard: func(s *executionState) bool {
+						return s.resolution != nil && s.resolution.HandoffAgent != ""
+					},
+				},
+				{Trigger: TrigActionsCompleted, Target: StateGeneratingResponse},
+			},
+		},
+		{
+			State: StateSwitchingAgent,
+			OnEntry: func(s *executionState) error {
+				// Note: actual handoff logic with parameter is in setup()
+				return nil
+			},
+			Transitions: []TransitionRule{
+				{Trigger: TrigAgentSwitched, Target: StateGeneratingResponse},
+			},
+		},
+		{
+			State: StateWaitingForHuman,
+			OnEntry: func(s *executionState) error {
+				return s.trackElicitation()
+			},
+			Transitions: []TransitionRule{
+				{Trigger: TrigStartExecution, Target: StateWaitingForHuman, Reentry: true},
+			},
+		},
+		{
+			State:       StateDone,
+			Transitions: []TransitionRule{}, // Terminal state
+		},
+	}
 }
 
 func (s *executionState) run() error {
@@ -430,20 +637,17 @@ func (s *executionState) run() error {
 func (s *executionState) inferState() state {
 	reconciler := &HistoryReconciler{
 		history:   s.history,
-		agentName: s.agentName,
+		agentName: s.agent.Name,
 	}
 	st, res, plan := reconciler.Reconcile()
 
 	if plan != nil {
 		if err := s.persistence.AddToolResultMessage(s.ctx, plan.ToolCallID, plan.Content); err != nil {
-			return StateError // Or handle error appropriately
+			return StateError
 		}
 	}
 
 	s.streamResult = res
-	if s.streamResult != nil {
-		s.workers.events = NewEventFactory(s.agentName)
-	}
 	return st
 }
 
@@ -520,59 +724,19 @@ func (r *HistoryReconciler) reconcileElicitation(tc *core.ToolCall) (state, *Str
 	return StateWaitingForHuman, nil, nil
 }
 
-func (s *executionState) generateAgentResponse() error {
-	if err := s.safety.Guard(); err != nil {
-		s.observer.Fail(TerminationMaxIterations, err)
-		return err
-	}
-
-	prepped, err := s.prepareContextForLLM()
-	if err != nil {
-		return err
-	}
-	if prepped.Terminated {
-		return s.sm.Fire(TrigTurnFinished)
-	}
-
-	if err := s.streamAndProcessLLMResponse(prepped.Context); err != nil {
-		return err
-	}
-
-	if err := s.validateAgentOutput(); err != nil {
-		return err
-	}
-
-	if err := s.saveAgentMessageAndEmitEvents(); err != nil {
-		return err
-	}
-
-	if s.streamResult.HasToolCalls() {
-		return s.sm.Fire(TrigActionsDetected)
-	}
-	return s.sm.Fire(TrigTurnFinished)
-}
-
 func (s *executionState) streamAndProcessLLMResponse(llmContext *LLMContext) error {
-	if !s.observer.TrackStarted(s.messageID) {
-		return context.Canceled
-	}
-
-	s.workers.executor = s.engine.toolExec.CreateExecutor(
+	s.agent.Executor = s.engine.toolExec.CreateExecutor(
 		s.ctx, llmContext.GetEffectiveTools(),
 		s.threadID, s.messageID, llmContext.RequestCtx,
 	)
 
 	streamIter := s.engine.chatClient.GetStreamingResponse(s.ctx, llmContext.Messages, llmContext.Options)
-	res, err := s.workers.stream.Process(s.ctx, streamIter, ProcessParams{
+	res, err := s.agent.Stream.Process(s.ctx, streamIter, ProcessParams{
 		ThreadID:  s.threadID,
 		MessageID: s.messageID,
 	}, s.observer.yield)
-
 	if err != nil {
 		return err
-	}
-	if res == nil {
-		return s.sm.Fire(TrigTurnFinished)
 	}
 	s.streamResult = res
 	return nil
@@ -589,59 +753,23 @@ func (s *executionState) validateAgentOutput() error {
 
 func (s *executionState) saveAgentMessageAndEmitEvents() error {
 	toolCalls := toDomainToolCalls(s.streamResult.ToolCalls)
-	if err := s.persistence.AddAssistantMessage(s.ctx, s.streamResult.Content, toolCalls); err != nil {
-		return err
-	}
+	return s.persistence.AddAssistantMessage(s.ctx, s.streamResult.Content, toolCalls)
+}
 
-	if !s.observer.TrackCompleted(s.messageID, s.streamResult.Content, toolCalls) {
+func (s *executionState) trackElicitation() error {
+	if s.resolution == nil || s.resolution.Elicitation == nil {
+		return nil
+	}
+	spec := s.resolution.Elicitation
+	s.observer.result.Reason = TerminationElicitation
+	if !s.observer.TrackHumanInput(s.messageID, s.resolution.ToolCallID, spec.Question, spec.Schema) {
 		return context.Canceled
 	}
 	return nil
 }
 
-func (s *executionState) executeRequiredActions() error {
-	resolution, err := s.tools.ProcessActions()
-	if err != nil {
-		return err
-	}
-
-	if resolution.Elicitation != nil {
-		return s.pauseWaitingForHumanInput(resolution.ToolCallID, resolution.Elicitation)
-	}
-
-	if resolution.HandoffAgent != "" {
-		return s.transferControlToAgent(resolution.HandoffAgent)
-	}
-
-	return s.prepareForNextMessageTurn()
-}
-
-func (s *executionState) failWithLoop(reason TerminationReason, info *LoopInfo) error {
-	s.observer.result.Reason = reason
-	s.observer.result.LoopInfo = info
-	s.observer.result.Success = false
-	return fmt.Errorf("loop detected: %s (%d occurrences)", info.Description, info.Occurrences)
-}
-
-
-func (s *executionState) pauseWaitingForHumanInput(toolID string, spec *core.ElicitationSpec) error {
-	s.observer.result.Reason = TerminationElicitation
-	if !s.observer.TrackHumanInput(s.messageID, toolID, spec.Question, spec.Schema) {
-		return context.Canceled
-	}
-	return s.sm.Fire(TrigHumanInputNeeded)
-}
-
-func (s *executionState) transferControlToAgent(targetAgent string) error {
-	// If already in StateSwitchingAgent, we are finishing the switch
-	state, _ := s.sm.State(s.ctx)
-	if state == StateSwitchingAgent {
-		s.observer.result.FinalAgent = targetAgent
-		s.observer.result.HandoffTarget = "" // Clear transient target
-		return s.sm.Fire(TrigAgentSwitched)
-	}
-
-	// Otherwise, we are initiating the switch
+func (s *executionState) performHandoff(targetAgent string) error {
+	// 1. Record Handoff
 	s.observer.result.Reason = TerminationHandoff
 	s.observer.result.HandoffTarget = targetAgent
 
@@ -649,19 +777,13 @@ func (s *executionState) transferControlToAgent(targetAgent string) error {
 		return context.Canceled
 	}
 
+	// 2. Switch Context
 	if err := s.initAgentComponents(targetAgent); err != nil {
 		return err
 	}
 
-	s.safety.ResetAgentLimits()
-	s.messageID = core.GenerateID()
-
-	return s.sm.Fire(TrigHandoffInitiated, targetAgent)
-}
-
-func (s *executionState) prepareForNextMessageTurn() error {
-	s.messageID = core.GenerateID()
-	return s.sm.Fire(TrigActionsCompleted)
+	// 3. Complete Transition
+	return s.sm.Fire(TrigAgentSwitched)
 }
 
 // State machine states
@@ -677,6 +799,28 @@ const (
 	StateError
 )
 
+// String provides human-readable state names for debugging.
+func (s state) String() string {
+	switch s {
+	case StateAwaitingTurn:
+		return "AwaitingTurn"
+	case StateGeneratingResponse:
+		return "GeneratingResponse"
+	case StatePerformingActions:
+		return "PerformingActions"
+	case StateSwitchingAgent:
+		return "SwitchingAgent"
+	case StateWaitingForHuman:
+		return "WaitingForHuman"
+	case StateDone:
+		return "Done"
+	case StateError:
+		return "Error"
+	default:
+		return fmt.Sprintf("Unknown(%d)", s)
+	}
+}
+
 const (
 	TrigStartExecution   = "StartExecution"
 	TrigActionsDetected  = "ActionsDetected"
@@ -686,3 +830,26 @@ const (
 	TrigHumanInputNeeded = "HumanInputNeeded"
 	TrigAgentSwitched    = "AgentSwitched"
 )
+
+// Safety and iteration limits
+const (
+	DefaultMaxTotalIterations = 20
+	DefaultMaxAgentIterations = 5
+)
+
+// StateDefinition declaratively defines a state's behavior and transitions.
+type StateDefinition struct {
+	State       state
+	OnEntry     func(*executionState) error
+	OnExit      func(*executionState) error
+	Transitions []TransitionRule
+}
+
+// TransitionRule declaratively defines when and how a state transition occurs.
+type TransitionRule struct {
+	Trigger   string
+	Target    state
+	Guard     func(*executionState) bool // Optional condition for transition
+	Reentry   bool                       // If true, allows transition to same state
+	WithParam bool                       // If true, transition requires a parameter
+}

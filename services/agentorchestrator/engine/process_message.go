@@ -126,4 +126,3 @@ func (e *Engine) determineTargetAgent(ctx context.Context, history []core.Messag
 
 	return defaultAgent
 }
-
