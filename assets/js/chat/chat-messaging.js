@@ -262,7 +262,7 @@ export function createMessagingMethods() {
 
 
 
-                if (lastMsg.type === 'tool_call' && lastMsg.name === 'elicit_user_input') {
+                if (lastMsg.type === 'tool_call' && lastMsg.name === 'ask_for_clarification_from_student') {
 
                     const state = this.__getThreadState();
                     state.awaitingHumanInput = true;
