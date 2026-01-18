@@ -139,8 +139,6 @@ func (e *Engine) newExecutionState(ctx context.Context, agentName string, runCtx
 		},
 		tools: &ToolProcessor{},
 	}
-	exec.persistence.state = exec
-	exec.tools.state = exec
 
 	if exec.safety.maxAgent <= 0 {
 		exec.safety.maxAgent = DefaultMaxAgentIterations
@@ -218,7 +216,19 @@ func (s *executionState) generateAgentResponse() error {
 }
 
 func (s *executionState) executeRequiredActions() error {
-	resolution, err := s.tools.ProcessActions()
+	tctx := ToolProcessorContext{
+		Ctx:           s.ctx,
+		ThreadID:      s.threadID,
+		MessageID:     s.messageID,
+		StreamResult:  s.streamResult,
+		Safety:        s.safety,
+		Observer:      s.observer,
+		Persistence:   s.persistence,
+		ToolExec:      s.engine.toolExec,
+		AgentExecutor: s.agent.Executor,
+		AgentName:     s.agent.Name,
+	}
+	resolution, err := s.tools.ProcessActions(tctx)
 	if err != nil {
 		return err
 	}
@@ -398,63 +408,92 @@ func (e *Engine) newAgentInstance(name string) (*AgentInstance, error) {
 
 // PersistenceUnit ensures atomic updates between the database and in-memory state.
 type PersistenceUnit struct {
-	mgmt  *threadmgmt.Manager
-	state *executionState
+	mgmt *threadmgmt.Manager
 }
 
-func (p *PersistenceUnit) AddAssistantMessage(ctx context.Context, content string, toolCalls []domain.ToolCall) error {
-	agg, err := p.mgmt.AddAssistantMessage(ctx, p.state.threadID, p.state.messageID, content, toolCalls, p.state.agent.Name)
+func (p *PersistenceUnit) AddAssistantMessage(
+	ctx context.Context,
+	threadID, messageID string,
+	content string,
+	toolCalls []domain.ToolCall,
+	agentName string,
+	refreshFn func(thread core.AgentThread, history []core.Message),
+) error {
+	agg, err := p.mgmt.AddAssistantMessage(ctx, threadID, messageID, content, toolCalls, agentName)
 	if err != nil {
 		return err
 	}
-	p.refreshState(agg)
+	refreshFn(p.mgmt.ToAgentThread(agg), p.mgmt.ToCoreMessages(agg))
 	return nil
 }
 
-func (p *PersistenceUnit) AddToolResultMessage(ctx context.Context, toolCallID, result string) error {
+func (p *PersistenceUnit) AddToolResultMessage(
+	ctx context.Context,
+	threadID string,
+	toolCallID string,
+	result string,
+	agentName string,
+	refreshFn func(thread core.AgentThread, history []core.Message),
+) error {
 	toolResultID := core.GenerateID()
-	agg, err := p.mgmt.AddToolResultMessage(ctx, p.state.threadID, toolResultID, toolCallID, result, p.state.agent.Name)
+	agg, err := p.mgmt.AddToolResultMessage(ctx, threadID, toolResultID, toolCallID, result, agentName)
 	if err != nil {
 		return err
 	}
-	p.refreshState(agg)
+	refreshFn(p.mgmt.ToAgentThread(agg), p.mgmt.ToCoreMessages(agg))
 	return nil
-}
-
-func (p *PersistenceUnit) refreshState(agg *domain.ThreadAggregate) {
-	p.state.thread = p.mgmt.ToAgentThread(agg)
-	p.state.history = p.mgmt.ToCoreMessages(agg)
 }
 
 // ToolProcessor handles the execution of tools and determination of next steps.
-type ToolProcessor struct {
-	state *executionState
+type ToolProcessor struct{}
+
+// ToolProcessorContext provides the dependencies needed for tool processing.
+type ToolProcessorContext struct {
+	Ctx           context.Context
+	ThreadID      string
+	MessageID     string
+	StreamResult  *StreamResult
+	Safety        *SafetyUnit
+	Observer      *ObserverUnit
+	Persistence   *PersistenceUnit
+	ToolExec      *ToolExecutionService
+	AgentExecutor core.ToolExecutor
+	AgentName     string
 }
 
-func (p *ToolProcessor) ProcessActions() (*RouteResolver, error) {
+func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolver, error) {
 	var route RouteResolver
-	for _, tc := range p.state.streamResult.ToolCalls {
-		p.state.observer.toolNames = append(p.state.observer.toolNames, tc.Function.Name)
+	for _, tc := range tctx.StreamResult.ToolCalls {
+		tctx.Observer.toolNames = append(tctx.Observer.toolNames, tc.Function.Name)
 
-		if info := p.state.safety.RecordToolCall(tc); info != nil {
-			return nil, p.state.observer.FailWithLoop(info)
+		if info := tctx.Safety.RecordToolCall(tc); info != nil {
+			return nil, tctx.Observer.FailWithLoop(info)
 		}
 
-		if !p.state.observer.TrackToolCall(tc.ID) {
+		if !tctx.Observer.TrackToolCall(tc.ID) {
 			return nil, context.Canceled
 		}
 
-		result := p.state.engine.toolExec.Execute(tc, p.state.agent.Executor)
-		if info := p.state.safety.RecordToolResult(result.ToolName, result.Result, result.IsError); info != nil {
-			return nil, p.state.observer.FailWithLoop(info)
+		result := tctx.ToolExec.Execute(tc, tctx.AgentExecutor)
+		if info := tctx.Safety.RecordToolResult(result.ToolName, result.Result, result.IsError); info != nil {
+			return nil, tctx.Observer.FailWithLoop(info)
 		}
 
-		if err := p.state.persistence.AddToolResultMessage(p.state.ctx, tc.ID, result.Result); err != nil {
+		if err := tctx.Persistence.AddToolResultMessage(
+			tctx.Ctx,
+			tctx.ThreadID,
+			tc.ID,
+			result.Result,
+			tctx.AgentName,
+			func(thread core.AgentThread, history []core.Message) {
+				// State refresh is handled by executionState
+			},
+		); err != nil {
 			return nil, err
 		}
 
 		toolResultID := core.GenerateID()
-		if !p.state.observer.TrackToolExecuted(toolResultID, tc.ID, result.ToolName, result.Arguments, result.Result, p.state.messageID) {
+		if !tctx.Observer.TrackToolExecuted(toolResultID, tc.ID, result.ToolName, result.Arguments, result.Result, tctx.MessageID) {
 			return nil, context.Canceled
 		}
 
@@ -642,7 +681,17 @@ func (s *executionState) inferState() state {
 	st, res, plan := reconciler.Reconcile()
 
 	if plan != nil {
-		if err := s.persistence.AddToolResultMessage(s.ctx, plan.ToolCallID, plan.Content); err != nil {
+		if err := s.persistence.AddToolResultMessage(
+			s.ctx,
+			s.threadID,
+			plan.ToolCallID,
+			plan.Content,
+			s.agent.Name,
+			func(thread core.AgentThread, history []core.Message) {
+				s.thread = thread
+				s.history = history
+			},
+		); err != nil {
 			return StateError
 		}
 	}
@@ -753,7 +802,18 @@ func (s *executionState) validateAgentOutput() error {
 
 func (s *executionState) saveAgentMessageAndEmitEvents() error {
 	toolCalls := toDomainToolCalls(s.streamResult.ToolCalls)
-	return s.persistence.AddAssistantMessage(s.ctx, s.streamResult.Content, toolCalls)
+	return s.persistence.AddAssistantMessage(
+		s.ctx,
+		s.threadID,
+		s.messageID,
+		s.streamResult.Content,
+		toolCalls,
+		s.agent.Name,
+		func(thread core.AgentThread, history []core.Message) {
+			s.thread = thread
+			s.history = history
+		},
+	)
 }
 
 func (s *executionState) trackElicitation() error {
