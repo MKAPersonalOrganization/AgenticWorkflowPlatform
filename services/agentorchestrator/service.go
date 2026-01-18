@@ -6,11 +6,13 @@ import (
 	"iter"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/agentsdk/tools"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/agentorchestrator/agents/shared"
 	"school-with-ai/services/agentorchestrator/engine"
 	"school-with-ai/services/agentorchestrator/rag"
 	"school-with-ai/services/agentorchestrator/types"
+	"school-with-ai/services/artifact"
 	"school-with-ai/services/threadmgmt"
 )
 
@@ -29,6 +31,9 @@ type Service struct {
 	reqCtxCapture **core.RequestContext
 	ragService    rag.RAG
 	toolTracer    core.ToolTracer
+
+	artifactStore artifact.Service
+	enableMemory  bool
 
 	// Internal components
 	threadMgmt *threadmgmt.Manager
@@ -62,6 +67,8 @@ func New(
 	provider := &RegistryAgentProvider{
 		initialConfig: s.config,
 		registry:      shared.GlobalAgents,
+		artifactStore: s.artifactStore,
+		enableMemory:  s.enableMemory,
 	}
 
 	s.engine = engine.New(
@@ -104,10 +111,26 @@ func WithToolTracer(tracer core.ToolTracer) Option {
 	}
 }
 
+// WithArtifactService configures the agent with an artifact service.
+func WithArtifactService(store artifact.Service) Option {
+	return func(s *Service) {
+		s.artifactStore = store
+	}
+}
+
+// WithMemoryEnabled configures whether the memory tool should be enabled.
+func WithMemoryEnabled(enabled bool) Option {
+	return func(s *Service) {
+		s.enableMemory = enabled
+	}
+}
+
 // RegistryAgentProvider implements engine.AgentProvider using GlobalAgents.
 type RegistryAgentProvider struct {
 	initialConfig core.AgentConfig
 	registry      *shared.AgentRegistry
+	artifactStore artifact.Service
+	enableMemory  bool
 }
 
 func (p *RegistryAgentProvider) GetConfig(name string) (core.AgentConfig, error) {
@@ -123,7 +146,20 @@ func (p *RegistryAgentProvider) GetConfig(name string) (core.AgentConfig, error)
 
 	// Create new agent config using factory
 	// Note: We pass nil for notifier as events are yielded by the engine directly
-	return factory(nil), nil
+	config := factory(nil)
+
+	// Inject Memory Tool and Context if available and enabled
+	if p.artifactStore != nil && p.enableMemory {
+		memoryTool := tools.NewMemoryTool(p.artifactStore)
+		config.Tools = append(config.Tools, memoryTool.Definition()...)
+
+		// Load long-term memory for context injection
+		// We use a middleware to inject memory dynamically based on the user context
+		memoryMiddleware := tools.NewMemoryInjectorMiddleware(memoryTool)
+		config.Middleware = append(config.Middleware, memoryMiddleware)
+	}
+
+	return config, nil
 }
 
 // Run processes the LLM response using an AgentThread and yields events.
