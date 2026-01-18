@@ -58,30 +58,34 @@ func New(
 func (e *Engine) Run(ctx context.Context, agentName string, runCtx core.RunContext) iter.Seq2[core.Event, error] {
 	return func(yield func(core.Event, error) bool) {
 		exec := &executionState{
-			engine:         e,
-			ctx:            ctx,
-			yield:          yield,
-			threadID:       runCtx.ThreadID,
-			messageID:      runCtx.MessageID,
-			thread:         runCtx.Thread,
-			options:        runCtx.Options,
-			agentName:      agentName,
-			loopDetector:   NewLoopDetector(DefaultLoopDetectorConfig()),
-			totalIterations: 0,
-			totalToolCalls:  make([]string, 0),
-			startTime:       timeNowNano(),
-			history:         runCtx.InitialHistory,
-			result: &ExecutionResult{
-				Success:    true,
-				Reason:     TerminationGoalReached,
-				FinalAgent: agentName,
+			engine:    e,
+			ctx:       ctx,
+			threadID:  runCtx.ThreadID,
+			messageID: runCtx.MessageID,
+			thread:    runCtx.Thread,
+			options:   runCtx.Options,
+			agentName: agentName,
+			history:   runCtx.InitialHistory,
+			observer: &ObserverUnit{
+				yield:     yield,
+				startTime: timeNowNano(),
+				result: &ExecutionResult{
+					Success:    true,
+					Reason:     TerminationGoalReached,
+					FinalAgent: agentName,
+				},
 			},
+			safety: &SafetyUnit{
+				maxTotal:     20,
+				loopDetector: NewLoopDetector(DefaultLoopDetectorConfig()),
+			},
+			workers: &WorkersUnit{},
 		}
 
 		if err := exec.initAgentComponents(agentName); err != nil {
-			exec.result.Success = false
-			exec.result.Reason = TerminationError
-			exec.result.Error = err
+			exec.observer.result.Success = false
+			exec.observer.result.Reason = TerminationError
+			exec.observer.result.Error = err
 			yield(nil, err)
 			return
 		}
@@ -95,20 +99,21 @@ func (e *Engine) Run(ctx context.Context, agentName string, runCtx core.RunConte
 		if err := exec.run(); err != nil {
 			// Update result based on error type
 			if ctx.Err() != nil {
-				exec.result.Reason = TerminationUserAborted
+				exec.observer.result.Reason = TerminationUserAborted
 			} else {
-				exec.result.Reason = TerminationError
-				exec.result.Error = err
+				exec.observer.result.Reason = TerminationError
+				exec.observer.result.Error = err
 			}
-			exec.result.Success = false
+			exec.observer.result.Success = false
 			yield(nil, err)
 		}
 
 		// Finalize execution result
-		exec.result.FinalAgent = exec.agentName
-		exec.result.Iterations = exec.iteration
-		exec.result.ToolsCalled = exec.totalToolCalls
-		exec.result.Duration = timeSince(exec.startTime)
+		res := exec.observer.result
+		res.FinalAgent = exec.agentName
+		res.Iterations = exec.safety.iteration
+		res.ToolsCalled = exec.observer.toolNames
+		res.Duration = timeSince(exec.observer.startTime)
 	}
 }
 
@@ -122,45 +127,64 @@ func timeSince(startNano int64) time.Duration {
 	return time.Duration(timeNowNano() - startNano)
 }
 
-// executionState holds the state and context for an execution run.
+// executionState coordinates the agent's turn.
 type executionState struct {
 	engine *Engine
 	ctx    context.Context
-	yield  func(core.Event, error) bool
 
-	// Run context
+	// Context of the current turn
 	threadID  string
 	messageID string
+	agentName string
 	thread    core.AgentThread
 	options   core.RunOptions
+	history   []core.Message
+
+	// Cohesive Units
+	safety   *SafetyUnit
+	observer *ObserverUnit
+	workers  *WorkersUnit
+
+	// Current Turn State
+	sm           *stateless.StateMachine
+	streamResult *StreamResult
+}
+
+// HistoryReconciler analyzes the conversation history to determine the resumption state.
+type HistoryReconciler struct {
+	history   []core.Message
 	agentName string
+	threadID  string
+	mgmt      *threadmgmt.Manager
+}
 
-	// Components (Mutable per agent)
-	llmCtx *LLMContextManager
-	stream *StreamProcessor
-	events *EventFactory
+// SafetyUnit enforces execution limits and detects infinite loops.
+type SafetyUnit struct {
+	iteration     int
+	total         int
+	maxAgent      int
+	maxTotal      int
+	loopDetector  *LoopDetector
+}
 
-	// Iteration state
-	streamResult  *StreamResult
-	executor      core.ToolExecutor
-	iteration       int // Iterations for the current agent
-	totalIterations int // Total iterations across ALL agents in this run
-	maxIterations   int // Per-agent iteration limit
-	maxTotalLimit   int // Global safety limit
+// ObserverUnit handles event emission and result reporting.
+type ObserverUnit struct {
+	yield      func(core.Event, error) bool
+	result     *ExecutionResult
+	startTime  int64
+	toolNames  []string
+}
 
-	// State Machine
-	sm *stateless.StateMachine
-
-	// Execution tracking (enhanced)
-	loopDetector   *LoopDetector
-	result         *ExecutionResult
-	totalToolCalls []string
-	startTime      int64 // Unix nano timestamp
-	history        []core.Message
+// WorkersUnit provides the specialized tools and processors for the turn.
+type WorkersUnit struct {
+	llm      *LLMContextManager
+	stream   *StreamProcessor
+	events   *EventFactory
+	executor core.ToolExecutor
 }
 
 func (s *executionState) emit(event core.Event) bool {
-	return s.yield(event, nil)
+	return s.observer.yield(event, nil)
 }
 
 func (s *executionState) updateState(agg *domain.ThreadAggregate) {
@@ -178,15 +202,15 @@ func (s *executionState) initAgentComponents(name string) error {
 	}
 
 	s.agentName = name
-	s.llmCtx = NewLLMContextManager(config, s.engine.threadMgmt, s.engine.reqCtxCapture)
-	s.events = NewEventFactory(config.Name)
-	s.stream = NewStreamProcessor(s.events)
-	s.maxIterations = config.MaxIterations
-	if s.maxIterations <= 0 {
-		s.maxIterations = 5
+	s.workers.llm = NewLLMContextManager(config, s.engine.threadMgmt, s.engine.reqCtxCapture)
+	s.workers.events = NewEventFactory(config.Name)
+	s.workers.stream = NewStreamProcessor(s.workers.events)
+
+	s.safety.maxAgent = config.MaxIterations
+	if s.safety.maxAgent <= 0 {
+		s.safety.maxAgent = 5
 	}
-	s.maxTotalLimit = 20
-	s.iteration = 0
+	s.safety.iteration = 0
 	return nil
 }
 
@@ -224,78 +248,96 @@ func (s *executionState) run() error {
 }
 
 func (s *executionState) inferState() state {
-	if len(s.history) == 0 {
-		return StateAwaitingTurn
+	reconciler := &HistoryReconciler{
+		history:   s.history,
+		agentName: s.agentName,
+		threadID:  s.threadID,
+		mgmt:      s.engine.threadMgmt,
 	}
+	st, res, agg := reconciler.Reconcile(s.ctx)
+	if agg != nil {
+		s.updateState(agg)
+	}
+	s.streamResult = res
+	if s.streamResult != nil {
+		s.workers.events = NewEventFactory(s.agentName) // Ensure factory matches current agent
+	}
+	return st
+}
 
-	messages := s.history
+func (r *HistoryReconciler) Reconcile(ctx context.Context) (state, *StreamResult, *domain.ThreadAggregate) {
+	if len(r.history) == 0 {
+		return StateAwaitingTurn, nil, nil
+	}
 
 	// 1. Find the last assistant message with tool calls
-	var lastAssistantWithTools *core.Message
-	for i := len(messages) - 1; i >= 0; i-- {
-		if messages[i].Role == "assistant" && len(messages[i].ToolCalls) > 0 {
-			lastAssistantWithTools = &messages[i]
-			break
-		}
-	}
-
+	lastAssistantWithTools := r.findLastAssistantWithTools()
 	if lastAssistantWithTools == nil {
-		return StateAwaitingTurn
+		return StateAwaitingTurn, nil, nil
 	}
 
 	// 2. Check if all tool calls of that message have results
-	completedCalls := make(map[string]bool)
-	for i := len(messages) - 1; i >= 0; i-- {
-		if messages[i].Role == "tool" {
-			completedCalls[messages[i].ToolCallID] = true
-		}
-	}
-
-	var pendingTC *core.ToolCall
-	allCompleted := true
-	for _, tc := range lastAssistantWithTools.ToolCalls {
-		if !completedCalls[tc.ID] {
-			allCompleted = false
-			pendingTC = &tc
-			break
-		}
-	}
-
-	if allCompleted {
-		return StateAwaitingTurn
+	pendingTC := r.findPendingToolCall(lastAssistantWithTools)
+	if pendingTC == nil {
+		return StateAwaitingTurn, nil, nil
 	}
 
 	// 3. Resumption Logic: Check for Elicitation response
-	if tc := pendingTC; tc != nil {
-		if tc.Function.Name == middleware.ElicitInputToolName {
-			// Check if the last message is a user response that hasn't been paired yet
-			lastMsg := messages[len(messages)-1]
-			if lastMsg.Role == "user" {
-				// Automate Pairing: Fulfill the tool call with the user message content
-				toolResultID := core.GenerateID()
-				agg, err := s.engine.threadMgmt.AddToolResultMessage(s.ctx, s.threadID, toolResultID, tc.ID, lastMsg.Content, s.agentName)
-				if err == nil {
-					// Refresh state and transition to generating response
-					s.updateState(agg)
-					return StateGeneratingResponse
-				}
-			}
-
-			if lastMsg.Role == "tool" && lastMsg.ToolCallID == tc.ID {
-				// Tool result exists, so we can determine next step
-				return StateGeneratingResponse
-			}
-			// Still waiting for user input
-			return StateWaitingForHuman
-		}
+	if pendingTC.Function.Name == middleware.ElicitInputToolName {
+		st, agg := r.reconcileElicitation(ctx, pendingTC)
+		return st, nil, agg
 	}
 
 	// Populate streamResult for traditional tool execution
-	s.streamResult = &StreamResult{
+	res := &StreamResult{
 		Content:   lastAssistantWithTools.Content,
 		ToolCalls: lastAssistantWithTools.ToolCalls,
 	}
-	return StatePerformingActions
+	return StatePerformingActions, res, nil
+}
+
+func (r *HistoryReconciler) findLastAssistantWithTools() *core.Message {
+	for i := len(r.history) - 1; i >= 0; i-- {
+		if r.history[i].Role == "assistant" && len(r.history[i].ToolCalls) > 0 {
+			return &r.history[i]
+		}
+	}
+	return nil
+}
+
+func (r *HistoryReconciler) findPendingToolCall(msg *core.Message) *core.ToolCall {
+	completedCalls := make(map[string]bool)
+	for i := len(r.history) - 1; i >= 0; i-- {
+		if r.history[i].Role == "tool" {
+			completedCalls[r.history[i].ToolCallID] = true
+		}
+	}
+
+	for _, tc := range msg.ToolCalls {
+		if !completedCalls[tc.ID] {
+			return &tc
+		}
+	}
+	return nil
+}
+
+func (r *HistoryReconciler) reconcileElicitation(ctx context.Context, tc *core.ToolCall) (state, *domain.ThreadAggregate) {
+	lastMsg := r.history[len(r.history)-1]
+
+	if lastMsg.Role == "user" {
+		// Automate Pairing: Fulfill the tool call with the user message content
+		toolResultID := core.GenerateID()
+		agg, err := r.mgmt.AddToolResultMessage(ctx, r.threadID, toolResultID, tc.ID, lastMsg.Content, r.agentName)
+		if err == nil {
+			return StateGeneratingResponse, agg
+		}
+	}
+
+	if lastMsg.Role == "tool" && lastMsg.ToolCallID == tc.ID {
+		return StateGeneratingResponse, nil
+	}
+
+	return StateWaitingForHuman, nil
 }
 
 func (s *executionState) generateAgentResponse() error {
@@ -330,16 +372,16 @@ func (s *executionState) generateAgentResponse() error {
 }
 
 func (s *executionState) ensureUnderSafetyLimits() error {
-	if s.iteration >= s.maxIterations || s.totalIterations >= s.maxTotalLimit {
-		s.result.Reason = TerminationMaxIterations
-		s.result.Success = false
-		if s.totalIterations >= s.maxTotalLimit {
-			return fmt.Errorf("run exceeded total iteration limit (%d)", s.maxTotalLimit)
+	if s.safety.iteration >= s.safety.maxAgent || s.safety.total >= s.safety.maxTotal {
+		s.observer.result.Reason = TerminationMaxIterations
+		s.observer.result.Success = false
+		if s.safety.total >= s.safety.maxTotal {
+			return fmt.Errorf("run exceeded total iteration limit (%d)", s.safety.maxTotal)
 		}
-		return fmt.Errorf("agent %q exceeded maximum iterations (%d)", s.agentName, s.maxIterations)
+		return fmt.Errorf("agent %q exceeded maximum iterations (%d)", s.agentName, s.safety.maxAgent)
 	}
-	s.iteration++
-	s.totalIterations++
+	s.safety.iteration++
+	s.safety.total++
 	return nil
 }
 
@@ -350,24 +392,24 @@ func (s *executionState) prepareContextForLLM() (*PrepareResult, error) {
 		Thread:    s.thread,
 		Options:   s.options,
 	}
-	return s.llmCtx.Prepare(s.ctx, runCtx)
+	return s.workers.llm.Prepare(s.ctx, runCtx)
 }
 
 func (s *executionState) streamAndProcessLLMResponse(llmContext *LLMContext) error {
-	if !s.emit(s.events.AssistantStarted(s.threadID, s.messageID)) {
+	if !s.emit(s.workers.events.AssistantStarted(s.threadID, s.messageID)) {
 		return context.Canceled
 	}
 
-	s.executor = s.engine.toolExec.CreateExecutor(
+	s.workers.executor = s.engine.toolExec.CreateExecutor(
 		s.ctx, llmContext.GetEffectiveTools(),
 		s.threadID, s.messageID, llmContext.RequestCtx,
 	)
 
 	streamIter := s.engine.chatClient.GetStreamingResponse(s.ctx, llmContext.Messages, llmContext.Options)
-	res, err := s.stream.Process(s.ctx, streamIter, ProcessParams{
+	res, err := s.workers.stream.Process(s.ctx, streamIter, ProcessParams{
 		ThreadID:  s.threadID,
 		MessageID: s.messageID,
-	}, s.yield)
+	}, s.observer.yield)
 
 	if err != nil {
 		return err
@@ -381,7 +423,7 @@ func (s *executionState) streamAndProcessLLMResponse(llmContext *LLMContext) err
 
 func (s *executionState) validateAgentOutput() error {
 	if s.streamResult.Content != "" {
-		if info := s.loopDetector.RecordContent(s.streamResult.Content); info != nil {
+		if info := s.safety.loopDetector.RecordContent(s.streamResult.Content); info != nil {
 			return s.failWithLoop(TerminationLoopDetected, info)
 		}
 	}
@@ -396,7 +438,7 @@ func (s *executionState) saveAgentMessageAndEmitEvents() error {
 	}
 	s.updateState(agg)
 
-	if !s.emit(s.events.AssistantCompleted(s.threadID, s.messageID, s.streamResult.Content, toolCalls)) {
+	if !s.emit(s.workers.events.AssistantCompleted(s.threadID, s.messageID, s.streamResult.Content, toolCalls)) {
 		return context.Canceled
 	}
 	return nil
@@ -412,26 +454,26 @@ func (s *executionState) executeRequiredActions() error {
 }
 
 func (s *executionState) failWithLoop(reason TerminationReason, info *LoopInfo) error {
-	s.result.Reason = reason
-	s.result.LoopInfo = info
-	s.result.Success = false
+	s.observer.result.Reason = reason
+	s.observer.result.LoopInfo = info
+	s.observer.result.Success = false
 	return fmt.Errorf("loop detected: %s (%d occurrences)", info.Description, info.Occurrences)
 }
 
 func (s *executionState) executeAllScheduledTools(route *toolRoute) error {
 	for _, tc := range s.streamResult.ToolCalls {
-		s.totalToolCalls = append(s.totalToolCalls, tc.Function.Name)
+		s.observer.toolNames = append(s.observer.toolNames, tc.Function.Name)
 
-		if info := s.loopDetector.RecordToolCall(tc); info != nil {
+		if info := s.safety.loopDetector.RecordToolCall(tc); info != nil {
 			return s.failWithLoop(TerminationLoopDetected, info)
 		}
 
-		if !s.emit(s.events.ToolCallCompleted(s.threadID, tc.ID)) {
+		if !s.emit(s.workers.events.ToolCallCompleted(s.threadID, tc.ID)) {
 			return context.Canceled
 		}
 
-		result := s.engine.toolExec.Execute(tc, s.executor)
-		if info := s.loopDetector.RecordToolResult(result.ToolName, result.Result, result.IsError); info != nil {
+		result := s.engine.toolExec.Execute(tc, s.workers.executor)
+		if info := s.safety.loopDetector.RecordToolResult(result.ToolName, result.Result, result.IsError); info != nil {
 			return s.failWithLoop(TerminationLoopDetected, info)
 		}
 
@@ -442,7 +484,7 @@ func (s *executionState) executeAllScheduledTools(route *toolRoute) error {
 		}
 		s.updateState(agg)
 
-		if !s.emit(s.events.ToolCallExecuted(s.threadID, toolResultID, tc.ID, result.ToolName, result.Arguments, result.Result, s.messageID)) {
+		if !s.emit(s.workers.events.ToolCallExecuted(s.threadID, toolResultID, tc.ID, result.ToolName, result.Arguments, result.Result, s.messageID)) {
 			return context.Canceled
 		}
 
@@ -478,8 +520,8 @@ func (s *executionState) handleSpecificRoutingTriggers(route toolRoute) error {
 }
 
 func (s *executionState) pauseWaitingForHumanInput(toolID string, spec *core.ElicitationSpec) error {
-	s.result.Reason = TerminationElicitation
-	if !s.emit(s.events.HumanInputRequested(s.threadID, s.messageID, toolID, spec.Question, spec.Schema)) {
+	s.observer.result.Reason = TerminationElicitation
+	if !s.emit(s.workers.events.HumanInputRequested(s.threadID, s.messageID, toolID, spec.Question, spec.Schema)) {
 		return context.Canceled
 	}
 	return s.sm.Fire(TrigHumanInputNeeded)
@@ -489,16 +531,16 @@ func (s *executionState) transferControlToAgent(targetAgent string) error {
 	// If already in StateSwitchingAgent, we are finishing the switch
 	state, _ := s.sm.State(s.ctx)
 	if state == StateSwitchingAgent {
-		s.result.FinalAgent = targetAgent
-		s.result.HandoffTarget = "" // Clear transient target
+		s.observer.result.FinalAgent = targetAgent
+		s.observer.result.HandoffTarget = "" // Clear transient target
 		return s.sm.Fire(TrigAgentSwitched)
 	}
 
 	// Otherwise, we are initiating the switch
-	s.result.Reason = TerminationHandoff
-	s.result.HandoffTarget = targetAgent
+	s.observer.result.Reason = TerminationHandoff
+	s.observer.result.HandoffTarget = targetAgent
 
-	if !s.emit(s.events.AgentHandoff(s.threadID, targetAgent)) {
+	if !s.emit(s.workers.events.AgentHandoff(s.threadID, targetAgent)) {
 		return context.Canceled
 	}
 
@@ -506,7 +548,7 @@ func (s *executionState) transferControlToAgent(targetAgent string) error {
 		return err
 	}
 
-	s.loopDetector.Reset()
+	s.safety.loopDetector.Reset()
 	s.messageID = core.GenerateID()
 
 	return s.sm.Fire(TrigHandoffInitiated, targetAgent)
