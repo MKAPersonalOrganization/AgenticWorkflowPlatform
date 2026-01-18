@@ -66,9 +66,10 @@ func (e *Engine) Run(ctx context.Context, agentName string, runCtx core.RunConte
 			options:        runCtx.Options,
 			agentName:      agentName,
 			loopDetector:   NewLoopDetector(DefaultLoopDetectorConfig()),
-			totalToolCalls: make([]string, 0),
-			startTime:      timeNowNano(),
-			history:        runCtx.InitialHistory,
+			totalIterations: 0,
+			totalToolCalls:  make([]string, 0),
+			startTime:       timeNowNano(),
+			history:         runCtx.InitialHistory,
 			result: &ExecutionResult{
 				Success:    true,
 				Reason:     TerminationGoalReached,
@@ -80,6 +81,12 @@ func (e *Engine) Run(ctx context.Context, agentName string, runCtx core.RunConte
 			exec.result.Success = false
 			exec.result.Reason = TerminationError
 			exec.result.Error = err
+			yield(nil, err)
+			return
+		}
+
+		startState := exec.inferState()
+		if err := exec.setup(startState); err != nil {
 			yield(nil, err)
 			return
 		}
@@ -135,8 +142,10 @@ type executionState struct {
 	// Iteration state
 	streamResult  *StreamResult
 	executor      core.ToolExecutor
-	iteration     int // Current iteration count within this agent's cycle
-	maxIterations int // Maximum allowed iterations (from agent config)
+	iteration       int // Iterations for the current agent
+	totalIterations int // Total iterations across ALL agents in this run
+	maxIterations   int // Per-agent iteration limit
+	maxTotalLimit   int // Global safety limit
 
 	// State Machine
 	sm *stateless.StateMachine
@@ -173,7 +182,8 @@ func (s *executionState) initAgentComponents(agentName string) error {
 	if s.maxIterations <= 0 {
 		s.maxIterations = 5
 	}
-	s.iteration = 0 // Reset iteration counter for new agent
+	s.maxTotalLimit = 20 // Safety cap to prevent cross-agent ping-pong
+	s.iteration = 0      // Reset iteration counter for new agent
 
 	return nil
 }
@@ -207,7 +217,7 @@ func (s *executionState) setup(initialState state) error {
 			targetAgent := args[0].(string)
 			return s.handleSwitch(targetAgent)
 		}).
-		Permit(TriggerTransferComplete, StateInitial)
+		Permit(TriggerTransferComplete, StateDeterminingNextStep)
 
 	s.sm.Configure(StateElicitingInput).
 		PermitReentry(TriggerBegin) // Self-transition if run starts here
@@ -216,25 +226,7 @@ func (s *executionState) setup(initialState state) error {
 }
 
 func (s *executionState) run() error {
-	startState := s.inferState()
-	if err := s.setup(startState); err != nil {
-		return err
-	}
-
-	for {
-		if err := s.sm.Fire(TriggerBegin); err != nil {
-			return err
-		}
-
-		// If we are back in StateInitial, it means an agent handoff occurred.
-		// We loop to run the next agent's cycle.
-		state, _ := s.sm.State(s.ctx)
-		if state != StateInitial {
-			break
-		}
-	}
-
-	return nil
+	return s.sm.Fire(TriggerBegin)
 }
 
 func (s *executionState) inferState() state {
@@ -282,9 +274,20 @@ func (s *executionState) inferState() state {
 	// 3. Resumption Logic: Check for Elicitation response
 	if tc := pendingTC; tc != nil {
 		if tc.Function.Name == middleware.ElicitInputToolName {
-			// In Step 2.2, we moved the pairing logic to ProcessUserMessage.
-			// If we are here, it means we still haven't paired, or we are waiting.
+			// Check if the last message is a user response that hasn't been paired yet
 			lastMsg := messages[len(messages)-1]
+			if lastMsg.Role == "user" {
+				// Automate Pairing: Fulfill the tool call with the user message content
+				toolResultID := core.GenerateID()
+				agg, err := s.engine.threadMgmt.AddToolResultMessage(s.ctx, s.threadID, toolResultID, tc.ID, lastMsg.Content, s.agentName)
+				if err == nil {
+					// Refresh state and transition to determining next step
+					s.thread = s.engine.threadMgmt.ToAgentThread(agg)
+					s.history = s.engine.threadMgmt.ToCoreMessages(agg)
+					return StateDeterminingNextStep
+				}
+			}
+
 			if lastMsg.Role == "tool" && lastMsg.ToolCallID == tc.ID {
 				// Tool result exists, so we can determine next step
 				return StateDeterminingNextStep
@@ -303,22 +306,17 @@ func (s *executionState) inferState() state {
 }
 
 func (s *executionState) handleStream() error {
-	if s.iteration >= s.maxIterations {
+	if s.iteration >= s.maxIterations || s.totalIterations >= s.maxTotalLimit {
 		s.result.Reason = TerminationMaxIterations
 		s.result.Success = false
+		if s.totalIterations >= s.maxTotalLimit {
+			return fmt.Errorf("run exceeded total iteration limit (%d)", s.maxTotalLimit)
+		}
 		return fmt.Errorf("agent %q exceeded maximum iterations (%d)", s.agentName, s.maxIterations)
 	}
 
-	// Warn if we're about to hit the limit
-	if s.iteration == s.maxIterations-1 {
-		s.engine.log.Warn(s.ctx, "Agent approaching iteration limit",
-			"agent", s.agentName,
-			"iteration", s.iteration+1,
-			"max_iterations", s.maxIterations,
-		)
-	}
-
 	s.iteration++
+	s.totalIterations++
 
 	// Prepare
 	prepareCtx := core.RunContext{
