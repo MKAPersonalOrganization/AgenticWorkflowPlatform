@@ -12,6 +12,7 @@ type ToolExecutionResult struct {
 	ToolName      string
 	Arguments     string
 	Result        string
+	IsError       bool // True if the tool execution resulted in an error
 	StopIteration bool
 	Command       *core.Command
 }
@@ -88,8 +89,10 @@ func (s *ToolExecutionService) Execute(toolCall core.ToolCall, executor core.Too
 	execResult, err := executor.Execute(toolCall)
 
 	var resultStr string
+	isError := false
 	if err != nil {
 		resultStr = fmt.Sprintf(`{"error": "%s"}`, err)
+		isError = true
 	} else {
 		resultStr = execResult.Result
 	}
@@ -99,6 +102,7 @@ func (s *ToolExecutionService) Execute(toolCall core.ToolCall, executor core.Too
 		ToolName:      toolCall.Function.Name,
 		Arguments:     toolCall.Function.Arguments,
 		Result:        resultStr,
+		IsError:       isError,
 		StopIteration: execResult.StopIteration,
 		Command:       execResult.Command,
 	}

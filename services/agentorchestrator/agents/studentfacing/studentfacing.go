@@ -43,9 +43,10 @@ func CreateStudentFacingAgent(notifier core.EventNotifier) core.AgentConfig {
 		},
 		Interactive: true,
 		Specialists: []core.Specialty{
-			{Name: "math-instructor", Description: "ALL mathematics (algebra, calculus, trigonometry, derivatives, integrals, graphing, equations, plotting, statistics)"},
-			{Name: "physics-instructor", Description: "Physics (mechanics, forces, energy, motion, thermodynamics)"},
-			{Name: "chemistry-instructor", Description: "Chemistry (reactions, stoichiometry, molecules, bonding)"},
+			{Name: "math-instructor", Description: "Pure mathematics: algebra, calculus, trigonometry, derivatives, integrals, graphing, equations, plotting"},
+			{Name: "statistics-instructor", Description: "Statistics and probability: mean, median, mode, standard deviation, variance, correlation, regression, distributions, hypothesis testing"},
+			{Name: "physics-instructor", Description: "Physics: mechanics, forces, energy, motion, thermodynamics"},
+			{Name: "chemistry-instructor", Description: "Chemistry: reactions, stoichiometry, molecules, bonding"},
 		},
 		ExtraRules: `## Core Routing Principles (NON-NEGOTIABLE)
 **PAY EXTREMELY CLOSE ATTENTION TO THESE RULES.**
@@ -81,6 +82,19 @@ IF the question involves chemical reactions, molecules, or substances:
   → Transfer to **chemistry-instructor** (they will delegate stoichiometry math if needed)
 IF the question is about ratios, proportions, or calculations without chemical context:
   → Transfer to **math-instructor**
+
+### Mathematics vs. Statistics
+IF the question involves data analysis, mean, median, mode, standard deviation, variance:
+  → Transfer to **statistics-instructor**
+IF the question involves probability, distributions, correlation, regression:
+  → Transfer to **statistics-instructor**
+IF the question is about pure calculation or algebra without data context:
+  → Transfer to **math-instructor**
+EXAMPLES:
+  - "Calculate the mean of 4, 8, 6, 5, 3, 7" → **statistics-instructor**
+  - "What is the standard deviation?" → **statistics-instructor**
+  - "Find the correlation between X and Y" → **statistics-instructor**
+  - "Solve for x in 2x + 5 = 15" → **math-instructor**
 
 ### Multi-Domain Questions
 IF a question spans multiple domains (e.g., "physics problem involving chemistry"):
@@ -118,7 +132,8 @@ Additional context: [any relevant history or clarification gathered]"`,
 		SystemPrompt:  prompt,
 		Tools:         registry.All(),
 		Handoffs: []core.Handoff{
-			{AgentName: "math-instructor", Description: "ALL mathematics: algebra, calculus, trigonometry, derivatives, integrals, graphing, equations"},
+			{AgentName: "math-instructor", Description: "Pure mathematics: algebra, calculus, trigonometry, derivatives, integrals, graphing, equations"},
+			{AgentName: "statistics-instructor", Description: "Statistics: mean, median, mode, standard deviation, variance, correlation, regression, probability distributions"},
 			{AgentName: "physics-instructor", Description: "Physics concepts: mechanics, forces, energy, motion (delegates math to math-instructor)"},
 			{AgentName: "chemistry-instructor", Description: "Chemistry: reactions, stoichiometry, molecules (delegates math to math-instructor)"},
 		},

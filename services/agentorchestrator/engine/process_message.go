@@ -24,7 +24,12 @@ func (e *Engine) ProcessUserMessage(ctx context.Context, agentName, threadID, co
 
 	// 2. Handle Title
 	thread := e.threadMgmt.ToAgentThread(agg)
-	titleEvent, err := e.handleThreadTitle(ctx, thread, content)
+	messages, err := thread.RetrieveFullConversationHistory(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve conversation history: %w", err)
+	}
+
+	titleEvent, err := e.handleThreadTitle(ctx, thread.GetID(), content, messages)
 	if err != nil {
 		e.log.Error(ctx, "failed to handle thread title", "error", err)
 	}
@@ -90,21 +95,16 @@ func (e *Engine) ProcessUserMessage(ctx context.Context, agentName, threadID, co
 }
 
 // handleThreadTitle generates and updates a thread title if it's the first message.
-func (e *Engine) handleThreadTitle(ctx context.Context, thread core.AgentThread, content string) (core.Event, error) {
-	msgs, err := thread.RetrieveFullConversationHistory(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve conversation history: %w", err)
-	}
-
+func (e *Engine) handleThreadTitle(ctx context.Context, threadID, content string, messages []core.Message) (core.Event, error) {
 	// Only generate title on the first message
-	if len(msgs) != 1 {
+	if len(messages) != 1 {
 		return nil, nil
 	}
 
 	title := GenerateThreadTitle(content)
 
 	// Update thread title via thread command service (internal threadMgmt)
-	event, err := e.threadMgmt.UpdateThreadTitle(ctx, thread.GetID(), title)
+	event, err := e.threadMgmt.UpdateThreadTitle(ctx, threadID, title)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update thread title: %w", err)
 	}

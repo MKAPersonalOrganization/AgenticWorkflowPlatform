@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"iter"
+	"time"
+
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/agentorchestrator/types"
@@ -55,25 +57,60 @@ func New(
 func (e *Engine) Run(ctx context.Context, agentName string, runCtx core.RunContext) iter.Seq2[core.Event, error] {
 	return func(yield func(core.Event, error) bool) {
 		exec := &executionState{
-			engine:    e,
-			ctx:       ctx,
-			yield:     yield,
-			threadID:  runCtx.ThreadID,
-			messageID: runCtx.MessageID,
-			thread:    runCtx.Thread,
-			options:   runCtx.Options,
-			agentName: agentName,
+			engine:         e,
+			ctx:            ctx,
+			yield:          yield,
+			threadID:       runCtx.ThreadID,
+			messageID:      runCtx.MessageID,
+			thread:         runCtx.Thread,
+			options:        runCtx.Options,
+			agentName:      agentName,
+			loopDetector:   NewLoopDetector(DefaultLoopDetectorConfig()),
+			totalToolCalls: make([]string, 0),
+			startTime:      timeNowNano(),
+			result: &ExecutionResult{
+				Success:    true,
+				Reason:     TerminationGoalReached,
+				FinalAgent: agentName,
+			},
 		}
 
 		if err := exec.initAgentComponents(agentName); err != nil {
+			exec.result.Success = false
+			exec.result.Reason = TerminationError
+			exec.result.Error = err
 			yield(nil, err)
 			return
 		}
 
 		if err := exec.run(); err != nil {
+			// Update result based on error type
+			if ctx.Err() != nil {
+				exec.result.Reason = TerminationUserAborted
+			} else {
+				exec.result.Reason = TerminationError
+				exec.result.Error = err
+			}
+			exec.result.Success = false
 			yield(nil, err)
 		}
+
+		// Finalize execution result
+		exec.result.FinalAgent = exec.agentName
+		exec.result.Iterations = exec.iteration
+		exec.result.ToolsCalled = exec.totalToolCalls
+		exec.result.Duration = timeSince(exec.startTime)
 	}
+}
+
+// timeNowNano returns the current time in nanoseconds (extracted for testing).
+var timeNowNano = func() int64 {
+	return time.Now().UnixNano()
+}
+
+// timeSince calculates duration since a start time in nanoseconds.
+func timeSince(startNano int64) time.Duration {
+	return time.Duration(timeNowNano() - startNano)
 }
 
 // executionState holds the state and context for an execution run.
@@ -102,6 +139,12 @@ type executionState struct {
 
 	// State Machine
 	sm *stateless.StateMachine
+
+	// Execution tracking (enhanced)
+	loopDetector   *LoopDetector
+	result         *ExecutionResult
+	totalToolCalls []string
+	startTime      int64 // Unix nano timestamp
 }
 
 func (s *executionState) emit(event core.Event) bool {
@@ -268,6 +311,8 @@ func (s *executionState) inferState() state {
 
 func (s *executionState) handleStream() error {
 	if s.iteration >= s.maxIterations {
+		s.result.Reason = TerminationMaxIterations
+		s.result.Success = false
 		return fmt.Errorf("agent %q exceeded maximum iterations (%d)", s.agentName, s.maxIterations)
 	}
 
@@ -319,6 +364,21 @@ func (s *executionState) handleStream() error {
 	}
 	s.streamResult = res
 
+	// Check for content repetition loop
+	if res.Content != "" {
+		if loopInfo := s.loopDetector.RecordContent(res.Content); loopInfo != nil {
+			s.engine.log.Warn(s.ctx, "Content repetition loop detected",
+				"agent", s.agentName,
+				"occurrences", loopInfo.Occurrences,
+			)
+			s.result.Reason = TerminationLoopDetected
+			s.result.LoopInfo = loopInfo
+			s.result.Success = false
+			return fmt.Errorf("content loop detected: %s (occurrences: %d)",
+				loopInfo.Description, loopInfo.Occurrences)
+		}
+	}
+
 	// Persist and emit completed
 	toolCalls := toDomainToolCalls(s.streamResult.ToolCalls)
 	agg, err := s.engine.threadMgmt.AddAssistantMessage(s.ctx, s.threadID, s.messageID, s.streamResult.Content, toolCalls, s.agentName)
@@ -345,11 +405,43 @@ func (s *executionState) handleTools() error {
 
 	// Process all tool calls sequentially (OpenAI requires results for all tool_call_ids)
 	for _, tc := range s.streamResult.ToolCalls {
+		// Track tool call for statistics
+		s.totalToolCalls = append(s.totalToolCalls, tc.Function.Name)
+
+		// Check for tool call loop BEFORE execution
+		if loopInfo := s.loopDetector.RecordToolCall(tc); loopInfo != nil {
+			s.engine.log.Warn(s.ctx, "Tool call loop detected",
+				"agent", s.agentName,
+				"tool", tc.Function.Name,
+				"occurrences", loopInfo.Occurrences,
+			)
+			s.result.Reason = TerminationLoopDetected
+			s.result.LoopInfo = loopInfo
+			s.result.Success = false
+			return fmt.Errorf("loop detected: %s (tool: %s, occurrences: %d)",
+				loopInfo.Description, loopInfo.Pattern, loopInfo.Occurrences)
+		}
+
 		if !s.emit(s.events.ToolCallCompleted(s.threadID, tc.ID)) {
 			return context.Canceled
 		}
 
 		result := s.engine.toolExec.Execute(tc, s.executor)
+
+		// Check for tool error loop AFTER execution
+		if loopInfo := s.loopDetector.RecordToolResult(result.ToolName, result.Result, result.IsError); loopInfo != nil {
+			s.engine.log.Warn(s.ctx, "Tool error loop detected",
+				"agent", s.agentName,
+				"tool", result.ToolName,
+				"occurrences", loopInfo.Occurrences,
+				"pattern", loopInfo.Pattern,
+			)
+			s.result.Reason = TerminationLoopDetected
+			s.result.LoopInfo = loopInfo
+			s.result.Success = false
+			return fmt.Errorf("tool error loop detected: %s (tool: %s, occurrences: %d)",
+				loopInfo.Description, result.ToolName, loopInfo.Occurrences)
+		}
 
 		if result.ToolCallID == "" {
 			result.ToolCallID = tc.ID // Fallback
@@ -385,6 +477,7 @@ func (s *executionState) handleTools() error {
 
 	// Now handle state transitions after ALL tool results have been recorded
 	if elicitationSpec != nil {
+		s.result.Reason = TerminationElicitation
 		if !s.emit(s.events.HumanInputRequested(s.threadID, s.messageID, elicitationToolID, elicitationSpec.Question, elicitationSpec.Schema)) {
 			return context.Canceled
 		}
@@ -400,6 +493,10 @@ func (s *executionState) handleTools() error {
 }
 
 func (s *executionState) handleSwitch(targetAgent string) error {
+	// Record handoff in result
+	s.result.Reason = TerminationHandoff
+	s.result.HandoffTarget = targetAgent
+
 	if !s.emit(s.events.AgentHandoff(s.threadID, targetAgent)) {
 		return context.Canceled
 	}
@@ -407,6 +504,9 @@ func (s *executionState) handleSwitch(targetAgent string) error {
 	if err := s.initAgentComponents(targetAgent); err != nil {
 		return err
 	}
+
+	// Reset loop detector for new agent
+	s.loopDetector.Reset()
 
 	// Start next iteration with fresh message ID
 	s.messageID = core.GenerateID()
