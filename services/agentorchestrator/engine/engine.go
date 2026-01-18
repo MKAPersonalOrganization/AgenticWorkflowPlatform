@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"iter"
+	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/core/middleware"
 	"school-with-ai/foundation/logger"
@@ -162,76 +163,69 @@ func (s *executionState) emit(event core.Event) bool {
 	return s.yield(event, nil)
 }
 
-func (s *executionState) initAgentComponents(agentName string) error {
-	config, err := s.engine.provider.GetConfig(agentName)
+func (s *executionState) updateState(agg *domain.ThreadAggregate) {
+	s.thread = s.engine.threadMgmt.ToAgentThread(agg)
+	s.history = s.engine.threadMgmt.ToCoreMessages(agg)
+}
+
+func (s *executionState) initAgentComponents(name string) error {
+	config, err := s.engine.provider.GetConfig(name)
 	if err != nil {
 		return err
 	}
-
 	if err := config.Validate(); err != nil {
 		return err
 	}
 
-	s.agentName = agentName
+	s.agentName = name
 	s.llmCtx = NewLLMContextManager(config, s.engine.threadMgmt, s.engine.reqCtxCapture)
 	s.events = NewEventFactory(config.Name)
 	s.stream = NewStreamProcessor(s.events)
-
-	// Set iteration limit from config (default to 5 if not set)
 	s.maxIterations = config.MaxIterations
 	if s.maxIterations <= 0 {
 		s.maxIterations = 5
 	}
-	s.maxTotalLimit = 20 // Safety cap to prevent cross-agent ping-pong
-	s.iteration = 0      // Reset iteration counter for new agent
-
+	s.maxTotalLimit = 20
+	s.iteration = 0
 	return nil
 }
 
 func (s *executionState) setup(initialState state) error {
-	// Configure State Machine
 	s.sm = stateless.NewStateMachine(initialState)
 
-	s.sm.Configure(StateInitial).
-		Permit(TriggerBegin, StateDeterminingNextStep)
+	s.sm.Configure(StateAwaitingTurn).
+		Permit(TrigStartExecution, StateGeneratingResponse)
 
-	s.sm.Configure(StateDeterminingNextStep).
-		OnEntry(func(_ context.Context, _ ...any) error {
-			return s.handleStream()
-		}).
-		PermitReentry(TriggerBegin). // Permit if reconciled here
-		Permit(TriggerActionRequired, StateExecutingActions).
-		Permit(TriggerStepComplete, StateDone)
+	s.sm.Configure(StateGeneratingResponse).
+		OnEntry(func(_ context.Context, _ ...any) error { return s.generateAgentResponse() }).
+		PermitReentry(TrigStartExecution).
+		Permit(TrigActionsDetected, StatePerformingActions).
+		Permit(TrigTurnFinished, StateDone)
 
-	s.sm.Configure(StateExecutingActions).
-		OnEntry(func(_ context.Context, _ ...any) error {
-			return s.handleTools()
-		}).
-		PermitReentry(TriggerBegin). // Permit if reconciled here
-		Permit(TriggerActionDone, StateDeterminingNextStep).
-		Permit(TriggerHandoffSwitch, StateTransferring).
-		Permit(TriggerHumanInputRequired, StateElicitingInput)
+	s.sm.Configure(StatePerformingActions).
+		OnEntry(func(_ context.Context, _ ...any) error { return s.executeRequiredActions() }).
+		PermitReentry(TrigStartExecution).
+		Permit(TrigActionsCompleted, StateGeneratingResponse).
+		Permit(TrigHandoffInitiated, StateSwitchingAgent).
+		Permit(TrigHumanInputNeeded, StateWaitingForHuman)
 
-	s.sm.Configure(StateTransferring).
-		OnEntry(func(_ context.Context, args ...any) error {
-			targetAgent := args[0].(string)
-			return s.handleSwitch(targetAgent)
-		}).
-		Permit(TriggerTransferComplete, StateDeterminingNextStep)
+	s.sm.Configure(StateSwitchingAgent).
+		OnEntry(func(_ context.Context, args ...any) error { return s.transferControlToAgent(args[0].(string)) }).
+		Permit(TrigAgentSwitched, StateGeneratingResponse)
 
-	s.sm.Configure(StateElicitingInput).
-		PermitReentry(TriggerBegin) // Self-transition if run starts here
+	s.sm.Configure(StateWaitingForHuman).
+		PermitReentry(TrigStartExecution)
 
 	return nil
 }
 
 func (s *executionState) run() error {
-	return s.sm.Fire(TriggerBegin)
+	return s.sm.Fire(TrigStartExecution)
 }
 
 func (s *executionState) inferState() state {
 	if len(s.history) == 0 {
-		return StateInitial
+		return StateAwaitingTurn
 	}
 
 	messages := s.history
@@ -246,7 +240,7 @@ func (s *executionState) inferState() state {
 	}
 
 	if lastAssistantWithTools == nil {
-		return StateInitial
+		return StateAwaitingTurn
 	}
 
 	// 2. Check if all tool calls of that message have results
@@ -268,7 +262,7 @@ func (s *executionState) inferState() state {
 	}
 
 	if allCompleted {
-		return StateInitial
+		return StateAwaitingTurn
 	}
 
 	// 3. Resumption Logic: Check for Elicitation response
@@ -281,19 +275,18 @@ func (s *executionState) inferState() state {
 				toolResultID := core.GenerateID()
 				agg, err := s.engine.threadMgmt.AddToolResultMessage(s.ctx, s.threadID, toolResultID, tc.ID, lastMsg.Content, s.agentName)
 				if err == nil {
-					// Refresh state and transition to determining next step
-					s.thread = s.engine.threadMgmt.ToAgentThread(agg)
-					s.history = s.engine.threadMgmt.ToCoreMessages(agg)
-					return StateDeterminingNextStep
+					// Refresh state and transition to generating response
+					s.updateState(agg)
+					return StateGeneratingResponse
 				}
 			}
 
 			if lastMsg.Role == "tool" && lastMsg.ToolCallID == tc.ID {
 				// Tool result exists, so we can determine next step
-				return StateDeterminingNextStep
+				return StateGeneratingResponse
 			}
 			// Still waiting for user input
-			return StateElicitingInput
+			return StateWaitingForHuman
 		}
 	}
 
@@ -302,10 +295,41 @@ func (s *executionState) inferState() state {
 		Content:   lastAssistantWithTools.Content,
 		ToolCalls: lastAssistantWithTools.ToolCalls,
 	}
-	return StateExecutingActions
+	return StatePerformingActions
 }
 
-func (s *executionState) handleStream() error {
+func (s *executionState) generateAgentResponse() error {
+	if err := s.ensureUnderSafetyLimits(); err != nil {
+		return err
+	}
+
+	prepped, err := s.prepareContextForLLM()
+	if err != nil {
+		return err
+	}
+	if prepped.Terminated {
+		return s.sm.Fire(TrigTurnFinished)
+	}
+
+	if err := s.streamAndProcessLLMResponse(prepped.Context); err != nil {
+		return err
+	}
+
+	if err := s.validateAgentOutput(); err != nil {
+		return err
+	}
+
+	if err := s.saveAgentMessageAndEmitEvents(); err != nil {
+		return err
+	}
+
+	if s.streamResult.HasToolCalls() {
+		return s.sm.Fire(TrigActionsDetected)
+	}
+	return s.sm.Fire(TrigTurnFinished)
+}
+
+func (s *executionState) ensureUnderSafetyLimits() error {
 	if s.iteration >= s.maxIterations || s.totalIterations >= s.maxTotalLimit {
 		s.result.Reason = TerminationMaxIterations
 		s.result.Success = false
@@ -314,104 +338,92 @@ func (s *executionState) handleStream() error {
 		}
 		return fmt.Errorf("agent %q exceeded maximum iterations (%d)", s.agentName, s.maxIterations)
 	}
-
 	s.iteration++
 	s.totalIterations++
+	return nil
+}
 
-	// Prepare
-	prepareCtx := core.RunContext{
+func (s *executionState) prepareContextForLLM() (*PrepareResult, error) {
+	runCtx := core.RunContext{
 		ThreadID:  s.threadID,
 		MessageID: s.messageID,
 		Thread:    s.thread,
 		Options:   s.options,
 	}
-	prepareResult, err := s.llmCtx.Prepare(s.ctx, prepareCtx)
-	if err != nil {
-		return err
-	}
-	if prepareResult.Terminated {
-		return s.sm.Fire(TriggerStepComplete)
-	}
+	return s.llmCtx.Prepare(s.ctx, runCtx)
+}
 
-	// Stream
+func (s *executionState) streamAndProcessLLMResponse(llmContext *LLMContext) error {
 	if !s.emit(s.events.AssistantStarted(s.threadID, s.messageID)) {
 		return context.Canceled
 	}
-	llmContext := prepareResult.Context
+
 	s.executor = s.engine.toolExec.CreateExecutor(
 		s.ctx, llmContext.GetEffectiveTools(),
 		s.threadID, s.messageID, llmContext.RequestCtx,
 	)
+
 	streamIter := s.engine.chatClient.GetStreamingResponse(s.ctx, llmContext.Messages, llmContext.Options)
 	res, err := s.stream.Process(s.ctx, streamIter, ProcessParams{
 		ThreadID:  s.threadID,
 		MessageID: s.messageID,
 	}, s.yield)
+
 	if err != nil {
 		return err
 	}
 	if res == nil {
-		return s.sm.Fire(TriggerStepComplete)
+		return s.sm.Fire(TrigTurnFinished)
 	}
 	s.streamResult = res
+	return nil
+}
 
-	// Check for content repetition loop
-	if res.Content != "" {
-		if loopInfo := s.loopDetector.RecordContent(res.Content); loopInfo != nil {
-			s.engine.log.Warn(s.ctx, "Content repetition loop detected",
-				"agent", s.agentName,
-				"occurrences", loopInfo.Occurrences,
-			)
-			s.result.Reason = TerminationLoopDetected
-			s.result.LoopInfo = loopInfo
-			s.result.Success = false
-			return fmt.Errorf("content loop detected: %s (occurrences: %d)",
-				loopInfo.Description, loopInfo.Occurrences)
+func (s *executionState) validateAgentOutput() error {
+	if s.streamResult.Content != "" {
+		if info := s.loopDetector.RecordContent(s.streamResult.Content); info != nil {
+			return s.failWithLoop(TerminationLoopDetected, info)
 		}
 	}
+	return nil
+}
 
-	// Persist and emit completed
+func (s *executionState) saveAgentMessageAndEmitEvents() error {
 	toolCalls := toDomainToolCalls(s.streamResult.ToolCalls)
 	agg, err := s.engine.threadMgmt.AddAssistantMessage(s.ctx, s.threadID, s.messageID, s.streamResult.Content, toolCalls, s.agentName)
 	if err != nil {
 		return err
 	}
-	s.thread = s.engine.threadMgmt.ToAgentThread(agg)
-	s.history = s.engine.threadMgmt.ToCoreMessages(agg)
+	s.updateState(agg)
 
 	if !s.emit(s.events.AssistantCompleted(s.threadID, s.messageID, s.streamResult.Content, toolCalls)) {
 		return context.Canceled
 	}
-
-	if s.streamResult.HasToolCalls() {
-		return s.sm.Fire(TriggerActionRequired)
-	}
-	return s.sm.Fire(TriggerStepComplete)
+	return nil
 }
 
-func (s *executionState) handleTools() error {
-	// Collect any transition triggers to fire after all tools are processed
-	var handoffTarget string
-	var elicitationSpec *core.ElicitationSpec
-	var elicitationToolID string
+func (s *executionState) executeRequiredActions() error {
+	var route toolRoute
+	if err := s.executeAllScheduledTools(&route); err != nil {
+		return err
+	}
 
-	// Process all tool calls sequentially (OpenAI requires results for all tool_call_ids)
+	return s.handleSpecificRoutingTriggers(route)
+}
+
+func (s *executionState) failWithLoop(reason TerminationReason, info *LoopInfo) error {
+	s.result.Reason = reason
+	s.result.LoopInfo = info
+	s.result.Success = false
+	return fmt.Errorf("loop detected: %s (%d occurrences)", info.Description, info.Occurrences)
+}
+
+func (s *executionState) executeAllScheduledTools(route *toolRoute) error {
 	for _, tc := range s.streamResult.ToolCalls {
-		// Track tool call for statistics
 		s.totalToolCalls = append(s.totalToolCalls, tc.Function.Name)
 
-		// Check for tool call loop BEFORE execution
-		if loopInfo := s.loopDetector.RecordToolCall(tc); loopInfo != nil {
-			s.engine.log.Warn(s.ctx, "Tool call loop detected",
-				"agent", s.agentName,
-				"tool", tc.Function.Name,
-				"occurrences", loopInfo.Occurrences,
-			)
-			s.result.Reason = TerminationLoopDetected
-			s.result.LoopInfo = loopInfo
-			s.result.Success = false
-			return fmt.Errorf("loop detected: %s (tool: %s, occurrences: %d)",
-				loopInfo.Description, loopInfo.Pattern, loopInfo.Occurrences)
+		if info := s.loopDetector.RecordToolCall(tc); info != nil {
+			return s.failWithLoop(TerminationLoopDetected, info)
 		}
 
 		if !s.emit(s.events.ToolCallCompleted(s.threadID, tc.ID)) {
@@ -419,74 +431,70 @@ func (s *executionState) handleTools() error {
 		}
 
 		result := s.engine.toolExec.Execute(tc, s.executor)
-
-		// Check for tool error loop AFTER execution
-		if loopInfo := s.loopDetector.RecordToolResult(result.ToolName, result.Result, result.IsError); loopInfo != nil {
-			s.engine.log.Warn(s.ctx, "Tool error loop detected",
-				"agent", s.agentName,
-				"tool", result.ToolName,
-				"occurrences", loopInfo.Occurrences,
-				"pattern", loopInfo.Pattern,
-			)
-			s.result.Reason = TerminationLoopDetected
-			s.result.LoopInfo = loopInfo
-			s.result.Success = false
-			return fmt.Errorf("tool error loop detected: %s (tool: %s, occurrences: %d)",
-				loopInfo.Description, result.ToolName, loopInfo.Occurrences)
-		}
-
-		if result.ToolCallID == "" {
-			result.ToolCallID = tc.ID // Fallback
+		if info := s.loopDetector.RecordToolResult(result.ToolName, result.Result, result.IsError); info != nil {
+			return s.failWithLoop(TerminationLoopDetected, info)
 		}
 
 		toolResultID := core.GenerateID()
-		agg, err := s.engine.threadMgmt.AddToolResultMessage(s.ctx, s.threadID, toolResultID, result.ToolCallID, result.Result, s.agentName)
+		agg, err := s.engine.threadMgmt.AddToolResultMessage(s.ctx, s.threadID, toolResultID, tc.ID, result.Result, s.agentName)
 		if err != nil {
 			return err
 		}
-		s.thread = s.engine.threadMgmt.ToAgentThread(agg)
-		s.history = s.engine.threadMgmt.ToCoreMessages(agg)
+		s.updateState(agg)
 
-		if !s.emit(s.events.ToolCallExecuted(
-			s.threadID, toolResultID, result.ToolCallID,
-			result.ToolName, result.Arguments, result.Result, s.messageID,
-		)) {
+		if !s.emit(s.events.ToolCallExecuted(s.threadID, toolResultID, tc.ID, result.ToolName, result.Arguments, result.Result, s.messageID)) {
 			return context.Canceled
 		}
 
-		// Check for routing command (handoff or elicitation)
-		if result.Command != nil {
-			if result.Command.Goto != "" {
-				handoffTarget = result.Command.Goto
+		if res := result.Command; res != nil {
+			if res.Goto != "" {
+				route.handoff = res.Goto
 			}
-
-			// Check for elicitation
-			if result.Command.Elicitation != nil {
-				elicitationSpec = result.Command.Elicitation
-				elicitationToolID = tc.ID
+			if res.Elicitation != nil {
+				route.elicitation = res.Elicitation
+				route.toolID = tc.ID
 			}
 		}
 	}
-
-	// Now handle state transitions after ALL tool results have been recorded
-	if elicitationSpec != nil {
-		s.result.Reason = TerminationElicitation
-		if !s.emit(s.events.HumanInputRequested(s.threadID, s.messageID, elicitationToolID, elicitationSpec.Question, elicitationSpec.Schema)) {
-			return context.Canceled
-		}
-		return s.sm.Fire(TriggerHumanInputRequired)
-	}
-
-	if handoffTarget != "" {
-		return s.sm.Fire(TriggerHandoffSwitch, handoffTarget)
-	}
-
-	s.messageID = core.GenerateID()
-	return s.sm.Fire(TriggerActionDone)
+	return nil
 }
 
-func (s *executionState) handleSwitch(targetAgent string) error {
-	// Record handoff in result
+type toolRoute struct {
+	handoff     string
+	elicitation *core.ElicitationSpec
+	toolID      string
+}
+
+func (s *executionState) handleSpecificRoutingTriggers(route toolRoute) error {
+	if route.elicitation != nil {
+		return s.pauseWaitingForHumanInput(route.toolID, route.elicitation)
+	}
+
+	if route.handoff != "" {
+		return s.transferControlToAgent(route.handoff)
+	}
+
+	return s.prepareForNextMessageTurn()
+}
+
+func (s *executionState) pauseWaitingForHumanInput(toolID string, spec *core.ElicitationSpec) error {
+	s.result.Reason = TerminationElicitation
+	if !s.emit(s.events.HumanInputRequested(s.threadID, s.messageID, toolID, spec.Question, spec.Schema)) {
+		return context.Canceled
+	}
+	return s.sm.Fire(TrigHumanInputNeeded)
+}
+
+func (s *executionState) transferControlToAgent(targetAgent string) error {
+	// If already in StateSwitchingAgent, we are finishing the switch
+	state, _ := s.sm.State(s.ctx)
+	if state == StateSwitchingAgent {
+		s.result.FinalAgent = targetAgent
+		s.result.HandoffTarget = "" // Clear transient target
+		return s.sm.Fire(TrigAgentSwitched)
+	}
+
+	// Otherwise, we are initiating the switch
 	s.result.Reason = TerminationHandoff
 	s.result.HandoffTarget = targetAgent
 
@@ -498,34 +506,36 @@ func (s *executionState) handleSwitch(targetAgent string) error {
 		return err
 	}
 
-	// Reset loop detector for new agent
 	s.loopDetector.Reset()
-
-	// Start next iteration with fresh message ID
 	s.messageID = core.GenerateID()
 
-	return s.sm.Fire(TriggerTransferComplete)
+	return s.sm.Fire(TrigHandoffInitiated, targetAgent)
+}
+
+func (s *executionState) prepareForNextMessageTurn() error {
+	s.messageID = core.GenerateID()
+	return s.sm.Fire(TrigActionsCompleted)
 }
 
 // State machine states
 type state int
 
 const (
-	StateInitial state = iota
-	StateDeterminingNextStep
-	StateExecutingActions
-	StateTransferring
-	StateElicitingInput
+	StateAwaitingTurn state = iota
+	StateGeneratingResponse
+	StatePerformingActions
+	StateSwitchingAgent
+	StateWaitingForHuman
 	StateDone
 	StateError
 )
 
 const (
-	TriggerBegin              = "Begin"
-	TriggerActionRequired     = "ActionRequired"
-	TriggerStepComplete       = "StepComplete"
-	TriggerActionDone         = "ActionDone"
-	TriggerHandoffSwitch      = "HandoffSwitch"
-	TriggerHumanInputRequired = "HumanInputRequired"
-	TriggerTransferComplete   = "TransferComplete"
+	TrigStartExecution   = "StartExecution"
+	TrigActionsDetected  = "ActionsDetected"
+	TrigTurnFinished     = "TurnFinished"
+	TrigActionsCompleted = "ActionsCompleted"
+	TrigHandoffInitiated = "HandoffInitiated"
+	TrigHumanInputNeeded = "HumanInputNeeded"
+	TrigAgentSwitched    = "AgentSwitched"
 )
