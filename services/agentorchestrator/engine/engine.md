@@ -7,30 +7,30 @@ Represents the standard autonomous loop and agent-to-agent transfers.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Initial : New Message
-    Initial --> DeterminingNextStep : TriggerBegin
+    [*] --> AwaitingTurn : New Message
+    AwaitingTurn --> GeneratingResponse : StartExecution
     
-    DeterminingNextStep --> ExecutingActions : TriggerActionRequired
-    DeterminingNextStep --> Done : TriggerStepComplete
+    GeneratingResponse --> PerformingActions : ActionsDetected
+    GeneratingResponse --> Done : TurnFinished
     
-    ExecutingActions --> DeterminingNextStep : TriggerActionDone
-    ExecutingActions --> Transferring : TriggerHandoffSwitch
+    PerformingActions --> GeneratingResponse : ActionsCompleted
+    PerformingActions --> SwitchingAgent : HandoffInitiated
     
-    Transferring --> Initial : TriggerTransferComplete
+    SwitchingAgent --> GeneratingResponse : AgentSwitched
+    
     Done --> [*]
 ```
 
-## 2. Human-in-the-Loop Lifecycle (Factor 7)
-Shows how the "Wait" state is treated as just another tool execution.
+## 2. Human-in-the-Loop Lifecycle
+Shows how the "Wait" state is used to persist an elicitation request.
 
 ```mermaid
 stateDiagram-v2
     direction LR
     
-    ExecutingActions --> AwaitingHumanInput : TriggerHumanInputRequired
-    AwaitingHumanInput --> DeterminingNextStep : TriggerActionDone (User Response)
-    DeterminingNextStep --> Done : TriggerStepComplete
+    PerformingActions --> WaitingForHuman : HumanInputNeeded
+    WaitingForHuman --> [*] : (Engine Helps)
 ```
 
 > [!NOTE]
-> When a user provides input, the Engine is re-started. `inferState` identifies the pending request and puts the engine into `AwaitingHumanInput`, which then immediately consumes the user's message as a tool result via `TriggerActionDone`.
+> When a user provides input, the Engine is re-started with the new message history. `inferState` identifies that the previous elicitation has been answered, and the engine resumes (typically determining the next step based on the provided input).
