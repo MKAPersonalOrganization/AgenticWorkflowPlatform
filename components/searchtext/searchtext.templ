@@ -1,0 +1,25 @@
+package searchtext
+
+templ Container() {
+	<div class="flex flex-col gap-2 p-3 bg-base-100 rounded-lg border border-base-200 shadow-sm transition-all hover:shadow-md">
+		<!-- Header: File Path and Info -->
+		<div class="flex items-center justify-between text-xs text-base-content/60 border-b border-base-200 pb-2">
+			<div class="flex items-center gap-2 overflow-hidden">
+				<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search flex-shrink-0"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+				<span class="font-medium truncate" x-text="(message.parsedArgs?.file_path || '').split('/').pop()"></span>
+                <span class="opacity-50">/</span>
+                <span class="font-mono text-[10px] bg-base-200 px-1 rounded truncate" x-text="message.parsedArgs?.pattern || 'search'"></span>
+			</div>
+			<div class="flex-shrink-0 text-[10px] uppercase tracking-wider font-bold mx-2">
+				Search Results
+			</div>
+		</div>
+
+		<!-- Content Area -->
+		<div class="relative group mt-1">
+			<div class="bg-base-200/50 rounded p-3 text-xs font-mono overflow-x-auto whitespace-pre-wrap leading-relaxed text-base-content/80">
+				<span x-text="message.result"></span>
+			</div>
+		</div>
+	</div>
+}
