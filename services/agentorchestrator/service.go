@@ -34,6 +34,7 @@ type Service struct {
 
 	artifactStore artifact.Service
 	enableMemory  bool
+	profileRepo   domain.StudentProfileRepository
 
 	// Internal components
 	threadMgmt *threadmgmt.Manager
@@ -69,6 +70,7 @@ func New(
 		registry:      shared.GlobalAgents,
 		artifactStore: s.artifactStore,
 		enableMemory:  s.enableMemory,
+		profileRepo:   s.profileRepo,
 	}
 
 	s.engine = engine.New(
@@ -125,12 +127,20 @@ func WithMemoryEnabled(enabled bool) Option {
 	}
 }
 
+// WithStudentProfileRepository configures the agent with a student profile repository.
+func WithStudentProfileRepository(repo domain.StudentProfileRepository) Option {
+	return func(s *Service) {
+		s.profileRepo = repo
+	}
+}
+
 // RegistryAgentProvider implements engine.AgentProvider using GlobalAgents.
 type RegistryAgentProvider struct {
 	initialConfig core.AgentConfig
 	registry      *shared.AgentRegistry
 	artifactStore artifact.Service
 	enableMemory  bool
+	profileRepo   domain.StudentProfileRepository
 }
 
 func (p *RegistryAgentProvider) GetConfig(name string) (core.AgentConfig, error) {
@@ -157,6 +167,12 @@ func (p *RegistryAgentProvider) GetConfig(name string) (core.AgentConfig, error)
 		// We use a middleware to inject memory dynamically based on the user context
 		memoryMiddleware := tools.NewMemoryInjectorMiddleware(memoryTool)
 		config.Middleware = append(config.Middleware, memoryMiddleware)
+	}
+
+	// Inject Student Profile Middleware
+	if p.profileRepo != nil {
+		profileMiddleware := tools.NewStudentProfileInjectorMiddleware(p.profileRepo)
+		config.Middleware = append(config.Middleware, profileMiddleware)
 	}
 
 	return config, nil
