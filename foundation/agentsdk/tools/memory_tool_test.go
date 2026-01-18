@@ -4,12 +4,11 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"strings"
-	"testing"
-
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/services/artifact"
+	"strings"
+	"testing"
 )
 
 // MockArtifactService for testing
@@ -40,14 +39,16 @@ func (m *MockArtifactService) Load(ctx context.Context, userID, sessionID, fileN
 func (m *MockArtifactService) List(ctx context.Context, userID, sessionID string) ([]string, error) {
 	return nil, nil
 }
+
 func (m *MockArtifactService) Delete(ctx context.Context, userID, sessionID, fileName string) error {
 	return nil
 }
 
 func TestMemoryTool_SaveMemory(t *testing.T) {
+	t.Parallel()
 	store := NewMockArtifactService()
 	tool := NewMemoryTool(store)
-	
+
 	// Create context with user
 	user := &domain.User{ID: "test-user-123"}
 	ctx := context.WithValue(context.Background(), domain.UserContextKey, user)
@@ -70,7 +71,7 @@ func TestMemoryTool_SaveMemory(t *testing.T) {
 	if !strings.Contains(content, "- My favorite color is blue.") {
 		t.Error("Missing fact")
 	}
-	
+
 	// Verify it used the correct path in mock store
 	key := "test-user-123/user_shared/SCHOOLAI.md"
 	if _, ok := store.files[key]; !ok {
@@ -89,7 +90,7 @@ func TestMemoryTool_SaveMemory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadMemory failed: %v", err)
 	}
-	
+
 	if !strings.Contains(content, "- My favorite color is blue.") {
 		t.Error("Missing first fact")
 	}
@@ -103,9 +104,11 @@ func TestMemoryTool_SaveMemory(t *testing.T) {
 }
 
 func TestMemoryTool_ComputeNewContent(t *testing.T) {
+	t.Parallel()
 	tool := &MemoryTool{}
-	
+
 	t.Run("Empty Content", func(t *testing.T) {
+		t.Parallel()
 		res := tool.computeNewContent("", "Fact 1")
 		if !strings.Contains(res, "## SchoolAI Memories") {
 			t.Error("Missing header")
@@ -116,12 +119,13 @@ func TestMemoryTool_ComputeNewContent(t *testing.T) {
 	})
 
 	t.Run("Existing Content with Header", func(t *testing.T) {
+		t.Parallel()
 		initial := "## SchoolAI Memories\n- Old Fact\n"
 		res := tool.computeNewContent(initial, "New Fact")
-		
+
 		expectedLines := []string{
 			"## SchoolAI Memories",
-			"- Old Fact", 
+			"- Old Fact",
 			"- New Fact",
 		}
 		for _, line := range expectedLines {
@@ -134,11 +138,12 @@ func TestMemoryTool_ComputeNewContent(t *testing.T) {
 			t.Errorf("Format issue: %q", res)
 		}
 	})
-	
+
 	t.Run("Existing Content without Header/New Section", func(t *testing.T) {
+		t.Parallel()
 		initial := "Some existing system prompt content."
 		res := tool.computeNewContent(initial, "New Fact")
-		
+
 		if !strings.Contains(res, "Some existing system prompt content.") {
 			t.Error("Lost original content")
 		}

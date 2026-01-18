@@ -75,15 +75,15 @@ func (s *S3Service) Save(ctx context.Context, userID, sessionID, fileName string
 	}
 
 	objectKey := s.getObjectKey(userID, sessionID, fileName)
-	
+
 	// Prepare for PutObject. We need to know size or let PutObject determine it.
 	// Since we take io.Reader, if it's mostly a buffer we might know size.
 	// PutObject takes objectSize. -1 means unknown.
-	
-	// Read into buffer if needed to get size? No, io.Reader can be streamed. 
+
+	// Read into buffer if needed to get size? No, io.Reader can be streamed.
 	// However, without size, MinIO client buffers in memory up to part size.
 	// Let's assume content is typically small text files for now.
-	
+
 	info, err := s.client.PutObject(ctx, s.bucketName, objectKey, content, -1, minio.PutObjectOptions{
 		ContentType: "text/plain", // Default to text/plain for our artifacts
 	})
@@ -105,7 +105,7 @@ func (s *S3Service) Load(ctx context.Context, userID, sessionID, fileName string
 	// Verify existence (GetObject doesn't error immediately if doesn't exist, stat does)
 	_, err = obj.Stat()
 	if err != nil {
-		obj.Close() // Close underlying if stat fails
+		_ = obj.Close() // Close underlying if stat fails
 		if minio.ToErrorResponse(err).Code == "NoSuchKey" {
 			return nil, ErrNotFound
 		}
@@ -121,9 +121,9 @@ func (s *S3Service) List(ctx context.Context, userID, sessionID string) ([]strin
 	}
 
 	prefix := path.Join(userID, sessionID) + "/"
-	
+
 	var files []string
-	
+
 	// ListObjects returns a channel
 	opts := minio.ListObjectsOptions{
 		Prefix:    prefix,
@@ -138,8 +138,8 @@ func (s *S3Service) List(ctx context.Context, userID, sessionID string) ([]strin
 		// We want just "fileName"
 		_, fileName := path.Split(object.Key)
 		// If recursive is false, it might return "userID/sessionID/" as a directory, ignore it
-		if fileName == "" { 
-			continue 
+		if fileName == "" {
+			continue
 		}
 		files = append(files, fileName)
 	}

@@ -10,7 +10,6 @@ import (
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/agentorchestrator/agents/shared"
 	"school-with-ai/services/agentorchestrator/engine"
-	"school-with-ai/services/agentorchestrator/rag"
 	"school-with-ai/services/agentorchestrator/types"
 	"school-with-ai/services/artifact"
 	"school-with-ai/services/threadmgmt"
@@ -29,7 +28,7 @@ type Service struct {
 	threadRepo    *domain.ThreadRepository
 	toolRegistry  *core.ToolRegistry
 	reqCtxCapture **core.RequestContext
-	ragService    rag.RAG
+	ragService    domain.RAG
 	toolTracer    core.ToolTracer
 
 	artifactStore artifact.Service
@@ -100,7 +99,7 @@ func WithRequestContextCapture(capture **core.RequestContext) Option {
 }
 
 // WithRAG configures the agent with a RAG service for context retrieval.
-func WithRAG(ragService rag.RAG) Option {
+func WithRAG(ragService domain.RAG) Option {
 	return func(s *Service) {
 		s.ragService = ragService
 	}

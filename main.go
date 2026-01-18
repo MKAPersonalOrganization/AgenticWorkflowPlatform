@@ -14,11 +14,12 @@ import (
 	"school-with-ai/components/pricing"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/llm"
-	"school-with-ai/foundation/event"
 	"school-with-ai/foundation/debug"
+	"school-with-ai/foundation/event"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/middleware"
 	"school-with-ai/handlers/auth"
+	"school-with-ai/handlers/profile"
 	"school-with-ai/infra/eventstore/kurrentdb"
 	"school-with-ai/infra/kratos"
 	"school-with-ai/infra/projection/agui"
@@ -33,7 +34,6 @@ import (
 	"school-with-ai/services/agentorchestrator/agents/math"
 	"school-with-ai/services/agentorchestrator/agents/physics"
 	"school-with-ai/services/agentorchestrator/agents/shared"
-	sharedtools "school-with-ai/services/agentorchestrator/agents/shared/tools"
 	"school-with-ai/services/agentorchestrator/agents/statistics"
 	"school-with-ai/services/agentorchestrator/agents/studentfacing"
 	"school-with-ai/services/artifact"
@@ -43,10 +43,12 @@ import (
 	"syscall"
 	"time"
 
+	sharedtools "school-with-ai/services/agentorchestrator/agents/shared/tools"
+
 	aguihandlers "school-with-ai/handlers/agui"
 	healthhandlers "school-with-ai/handlers/health"
+
 	taskmgmthandlers "school-with-ai/handlers/taskmgmt"
-	"school-with-ai/handlers/profile"
 
 	authService "school-with-ai/services/auth"
 
@@ -140,12 +142,12 @@ func run(ctx context.Context, log *logger.Logger) error {
 			Tags       []string // Additional custom tags for traces
 		}
 		Artifacts struct {
-			S3Endpoint      string `conf:"default:localhost:9100"`
-			S3AccessKey     string `conf:"default:minio"`
-			S3SecretKey     string `conf:"default:miniosecret"`
-			S3Bucket        string `conf:"default:artifacts"`
-			S3UseSSL        bool   `conf:"default:false"`
-			S3Region        string `conf:"default:us-east-1"`
+			S3Endpoint  string `conf:"default:localhost:9100"`
+			S3AccessKey string `conf:"default:minio"`
+			S3SecretKey string `conf:"default:miniosecret"`
+			S3Bucket    string `conf:"default:artifacts"`
+			S3UseSSL    bool   `conf:"default:false"`
+			S3Region    string `conf:"default:us-east-1"`
 		}
 		AgentCapabilities struct {
 			LongTermMemory bool `conf:"default:true"`
@@ -535,7 +537,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 func HandleViewChatInputScreen(log *logger.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get authenticated user from context
-		user := kratos.GetUserFromContext(r.Context())
+		user := domain.GetUserFromContext(r.Context())
 
 		component := components.ChatInputScreen(user)
 		if err := component.Render(r.Context(), w); err != nil {
@@ -547,7 +549,7 @@ func HandleViewChatInputScreen(log *logger.Logger) http.HandlerFunc {
 func HandlePricingPage(log *logger.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get authenticated user from context
-		user := kratos.GetUserFromContext(r.Context())
+		user := domain.GetUserFromContext(r.Context())
 
 		// Get default pricing plans
 		plans := pricing.GetDefaultPlans()
@@ -565,7 +567,7 @@ func HandlePricingPage(log *logger.Logger) http.HandlerFunc {
 func HandleCheckoutPage(log *logger.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get authenticated user from context
-		user := kratos.GetUserFromContext(r.Context())
+		user := domain.GetUserFromContext(r.Context())
 
 		// Get plan from query parameter
 		planID := r.URL.Query().Get("plan")

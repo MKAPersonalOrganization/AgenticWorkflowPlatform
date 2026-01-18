@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/url"
 	"school-with-ai/components/auth"
+	"school-with-ai/domain"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/infra/kratos"
 )
@@ -126,7 +127,7 @@ func (h *AuthHandlers) LoginPage(w http.ResponseWriter, r *http.Request) {
 		Messages:        messages,
 		RecoveryURL:     recoveryURL,
 		RegistrationURL: registrationURL,
-		User:            kratos.GetUserFromContext(r.Context()), // nil if not authenticated
+		User:            domain.GetUserFromContext(r.Context()), // nil if not authenticated
 	}
 
 	component := auth.LoginPageWithNodes(flow.Ui.Nodes, props)
@@ -203,7 +204,7 @@ func (h *AuthHandlers) RegistrationPage(w http.ResponseWriter, r *http.Request) 
 		FlowMethod: flow.Ui.Method,
 		Messages:   messages,
 		LoginURL:   loginURL,
-		User:       kratos.GetUserFromContext(r.Context()), // nil if not authenticated
+		User:       domain.GetUserFromContext(r.Context()), // nil if not authenticated
 	}
 
 	component := auth.RegistrationPageWithNodes(flow.Ui.Nodes, props)
@@ -280,7 +281,7 @@ func (h *AuthHandlers) RecoveryPage(w http.ResponseWriter, r *http.Request) {
 		FlowMethod: flow.Ui.Method,
 		Messages:   messages,
 		LoginURL:   loginURL,
-		User:       kratos.GetUserFromContext(r.Context()), // nil if not authenticated
+		User:       domain.GetUserFromContext(r.Context()), // nil if not authenticated
 	}
 
 	component := auth.RecoveryPageWithNodes(flow.Ui.Nodes, props)
@@ -357,7 +358,7 @@ func (h *AuthHandlers) VerificationPage(w http.ResponseWriter, r *http.Request) 
 		FlowMethod: flow.Ui.Method,
 		Messages:   messages,
 		LoginURL:   loginURL,
-		User:       kratos.GetUserFromContext(r.Context()), // nil if not authenticated
+		User:       domain.GetUserFromContext(r.Context()), // nil if not authenticated
 	}
 
 	component := auth.VerificationPageWithNodes(flow.Ui.Nodes, props)
@@ -406,7 +407,7 @@ func (h *AuthHandlers) SettingsPage(w http.ResponseWriter, r *http.Request) {
 	logoutURL := h.appURL + "/auth/logout"
 
 	// Get authenticated user from context
-	user := kratos.GetUserFromContext(r.Context())
+	user := domain.GetUserFromContext(r.Context())
 
 	// Extract messages from flow
 	var messages []auth.UIMessage
@@ -521,7 +522,7 @@ func (h *AuthHandlers) ErrorPage(w http.ResponseWriter, r *http.Request) {
 		ErrorDetails: errorDetails,
 		LoginURL:     loginURL,
 		HomeURL:      homeURL,
-		User:         kratos.GetUserFromContext(r.Context()), // nil if not authenticated
+		User:         domain.GetUserFromContext(r.Context()), // nil if not authenticated
 	}
 
 	component := auth.ErrorPage(props)

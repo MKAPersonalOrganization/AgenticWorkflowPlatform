@@ -3,11 +3,10 @@ package profile
 import (
 	"encoding/json"
 	"net/http"
-	"strings"
-
+	"school-with-ai/components/profile"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/components/profile"
+	"strings"
 )
 
 // Handler manages student profile requests.
@@ -70,7 +69,9 @@ func (h *Handler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(profile)
+	if err := json.NewEncoder(w).Encode(profile); err != nil {
+		h.Log.Error(r.Context(), "failed to encode profile response", "error", err)
+	}
 }
 
 // UpdateProfile handles PUT /api/profile
@@ -82,10 +83,10 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		LearningStyle string   `json:"learning_style"`
-		Struggles     string   `json:"struggles"` // Receive as comma-separated or raw string
-		Strengths     string   `json:"strengths"` // Receive as comma-separated or raw string
-		Goals         string   `json:"goals"`
+		LearningStyle string `json:"learning_style"`
+		Struggles     string `json:"struggles"` // Receive as comma-separated or raw string
+		Strengths     string `json:"strengths"` // Receive as comma-separated or raw string
+		Goals         string `json:"goals"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

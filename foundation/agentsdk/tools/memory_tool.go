@@ -4,11 +4,10 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"strings"
-
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/services/artifact"
+	"strings"
 )
 
 const (
@@ -71,7 +70,7 @@ func (t *MemoryTool) saveMemory(ctx core.ToolContext, args any) (any, error) {
 	var currentContent string
 	rc, err := t.store.Load(ctx, userID, sessionID, MemoryFileName)
 	if err == nil {
-		defer rc.Close()
+		defer func() { _ = rc.Close() }()
 		data, err := io.ReadAll(rc)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read memory file: %w", err)
@@ -100,7 +99,7 @@ func (t *MemoryTool) computeNewContent(currentContent, fact string) string {
 	// Go approximate equivalent:
 	processedFact = strings.TrimLeft(processedFact, "- ")
 	processedFact = strings.TrimSpace(processedFact)
-	
+
 	newEntry := fmt.Sprintf("- %s", processedFact)
 
 	if strings.Contains(currentContent, MemoryHeaderCheck) {
@@ -158,7 +157,7 @@ func (t *MemoryTool) LoadMemory(ctx context.Context) (string, error) {
 		}
 		return "", err
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 
 	data, err := io.ReadAll(rc)
 	if err != nil {

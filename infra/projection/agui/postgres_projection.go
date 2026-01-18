@@ -29,11 +29,11 @@ func NewPostgresAguiProjection(log *logger.Logger, db *sqlx.DB) *PostgresAguiPro
 	}
 }
 
-
 // RegisterHandlers registers database update handlers to the provided router.
 func (p *PostgresAguiProjection) RegisterHandlers(router interface {
 	Register(eventPrototype any, handler event.HandlerFunc)
-}) {
+},
+) {
 	router.Register(&domain.ThreadCreated{}, func(ctx context.Context, e core.Event) error {
 		return p.applyThreadCreated(ctx, *e.(*domain.ThreadCreated))
 	})
@@ -325,7 +325,6 @@ func (p *PostgresAguiProjection) ListThreads() []string {
 
 	return threadIDs
 }
-
 
 // Verify PostgresAguiProjection implements AguiProjection.
 var _ AguiProjection = (*PostgresAguiProjection)(nil)

@@ -185,23 +185,32 @@ func (m *Manager) DeleteThread(ctx context.Context, threadID string) error {
 // ToAgentThread converts a ThreadAggregate to a core.AgentThread.
 func (m *Manager) ToAgentThread(aggregate *domain.ThreadAggregate) core.AgentThread {
 	agentThread := core.NewInMemoryThreadWithID(aggregate.ID)
-	if len(aggregate.Messages) > 0 {
-		messages := make([]core.Message, len(aggregate.Messages))
-		for i, dm := range aggregate.Messages {
-			messages[i] = core.Message{
-				ID:         dm.ID,
-				Role:       dm.Role,
-				Content:    dm.Content,
-				Timestamp:  dm.Timestamp,
-				ToolCalls:  toCoreToolCalls(dm.ToolCalls),
-				ToolCallID: dm.ToolCallID,
-				AgentName:  dm.AgentName,
-				Metadata:   dm.Metadata,
-			}
-		}
+	messages := m.ToCoreMessages(aggregate)
+	if len(messages) > 0 {
 		_ = agentThread.AddMessages(messages)
 	}
 	return agentThread
+}
+
+// ToCoreMessages converts domain messages in an aggregate to core messages.
+func (m *Manager) ToCoreMessages(aggregate *domain.ThreadAggregate) []core.Message {
+	if len(aggregate.Messages) == 0 {
+		return nil
+	}
+	messages := make([]core.Message, len(aggregate.Messages))
+	for i, dm := range aggregate.Messages {
+		messages[i] = core.Message{
+			ID:         dm.ID,
+			Role:       dm.Role,
+			Content:    dm.Content,
+			Timestamp:  dm.Timestamp,
+			ToolCalls:  toCoreToolCalls(dm.ToolCalls),
+			ToolCallID: dm.ToolCallID,
+			AgentName:  dm.AgentName,
+			Metadata:   dm.Metadata,
+		}
+	}
+	return messages
 }
 
 func toCoreToolCalls(dtcs []domain.ToolCall) []core.ToolCall {

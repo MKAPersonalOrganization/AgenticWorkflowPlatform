@@ -6,6 +6,7 @@ import (
 	"iter"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/agentsdk/core/middleware"
 )
 
 // ProcessUserMessage handles the full flow of processing a user message:
@@ -22,22 +23,39 @@ func (e *Engine) ProcessUserMessage(ctx context.Context, agentName, threadID, co
 		return nil, fmt.Errorf("failed to add user message: %w", err)
 	}
 
-	// 2. Handle Title
+	// 2. State Reconciliation & Elicitation Pairing
 	thread := e.threadMgmt.ToAgentThread(agg)
 	messages, err := thread.RetrieveFullConversationHistory(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve conversation history: %w", err)
 	}
 
-	titleEvent, err := e.handleThreadTitle(ctx, thread.GetID(), content, messages)
-	if err != nil {
-		e.log.Error(ctx, "failed to handle thread title", "error", err)
-	}
-
 	// 3. Determine Target Agent (Sticky Session)
 	// We check the conversation history to see which agent was last active.
 	// This ensures that if the user is talking to a specialist, they stay with them.
-	targetAgent := e.determineTargetAgent(ctx, thread, agentName)
+	targetAgent := e.determineTargetAgent(ctx, messages, agentName)
+
+	// Check if this user message is a response to an elicitation request
+	hasPendingElicitation, pendingTC := e.findPendingElicitation(messages)
+	if hasPendingElicitation {
+		// Pair: Fulfill the tool call with the user message content
+		toolResultID := domain.GenerateMessageID()
+		// Re-using the content of the new user message as the tool result
+		agg, err = e.threadMgmt.AddToolResultMessage(ctx, threadID, toolResultID, pendingTC.ID, content, targetAgent)
+		if err == nil {
+			// Update state with the tool result
+			thread = e.threadMgmt.ToAgentThread(agg)
+			messages, err = thread.RetrieveFullConversationHistory(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to refresh conversation history: %w", err)
+			}
+		}
+	}
+
+	titleEvent, err := e.handleThreadTitle(ctx, threadID, content, messages)
+	if err != nil {
+		e.log.Error(ctx, "failed to handle thread title", "error", err)
+	}
 
 	// Inject User into context for tools that need it (e.g. MemoryTool)
 	// We construct a partial user object with the ID we have.
@@ -46,10 +64,11 @@ func (e *Engine) ProcessUserMessage(ctx context.Context, agentName, threadID, co
 	}
 
 	runIter := e.Run(ctx, targetAgent, core.RunContext{
-		ThreadID:  threadID,
-		MessageID: runID,
-		Thread:    thread,
-		Options:   core.DefaultRunOptions(),
+		ThreadID:       threadID,
+		MessageID:      runID,
+		Thread:         thread,
+		InitialHistory: messages,
+		Options:        core.DefaultRunOptions(),
 	})
 
 	// Create event factory for run events
@@ -112,15 +131,9 @@ func (e *Engine) handleThreadTitle(ctx context.Context, threadID, content string
 	return event, nil
 }
 
-// determineTargetAgent inspects the thread history to find the last active agent.
+// determineTargetAgent inspects the history to find the last active agent.
 // If found, it returns that agent's name. Otherwise, it returns the defaultAgent.
-func (e *Engine) determineTargetAgent(ctx context.Context, thread core.AgentThread, defaultAgent string) string {
-	history, err := thread.RetrieveFullConversationHistory(ctx)
-	if err != nil {
-		e.log.Warn(ctx, "failed to retrieve history for sticky session check", "error", err)
-		return defaultAgent
-	}
-
+func (e *Engine) determineTargetAgent(ctx context.Context, history []core.Message, defaultAgent string) string {
 	// Iterate backwards to find the last assistant message
 	for i := len(history) - 1; i >= 0; i-- {
 		msg := history[i]
@@ -130,4 +143,45 @@ func (e *Engine) determineTargetAgent(ctx context.Context, thread core.AgentThre
 	}
 
 	return defaultAgent
+}
+
+// findPendingElicitation checks if the conversation is waiting for an elicitation response.
+// It returns true and the pending tool call if found.
+func (e *Engine) findPendingElicitation(messages []core.Message) (bool, *core.ToolCall) {
+	if len(messages) < 2 {
+		return false, nil
+	}
+
+	// 1. Find the last assistant message with tool calls
+	var lastAssistantWithTools *core.Message
+	for i := len(messages) - 2; i >= 0; i-- { // Search excluding the latest user message
+		if messages[i].Role == "assistant" && len(messages[i].ToolCalls) > 0 {
+			lastAssistantWithTools = &messages[i]
+			break
+		}
+	}
+
+	if lastAssistantWithTools == nil {
+		return false, nil
+	}
+
+	// 2. Check if all tool calls of that message have results
+	completedCalls := make(map[string]bool)
+	for _, msg := range messages {
+		if msg.Role == "tool" {
+			completedCalls[msg.ToolCallID] = true
+		}
+	}
+
+	for _, tc := range lastAssistantWithTools.ToolCalls {
+		if !completedCalls[tc.ID] {
+			// Found a pending tool call. Check if it's elicitation.
+			if tc.Function.Name == middleware.ElicitInputToolName {
+				return true, &tc
+			}
+			return false, nil // Another tool call is pending, not elicitation
+		}
+	}
+
+	return false, nil
 }

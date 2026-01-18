@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 	"iter"
-	"time"
-
 	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/agentsdk/core/middleware"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/agentorchestrator/types"
 	"school-with-ai/services/threadmgmt"
+	"time"
 
 	"github.com/qmuntal/stateless"
 )
@@ -68,6 +68,7 @@ func (e *Engine) Run(ctx context.Context, agentName string, runCtx core.RunConte
 			loopDetector:   NewLoopDetector(DefaultLoopDetectorConfig()),
 			totalToolCalls: make([]string, 0),
 			startTime:      timeNowNano(),
+			history:        runCtx.InitialHistory,
 			result: &ExecutionResult{
 				Success:    true,
 				Reason:     TerminationGoalReached,
@@ -145,6 +146,7 @@ type executionState struct {
 	result         *ExecutionResult
 	totalToolCalls []string
 	startTime      int64 // Unix nano timestamp
+	history        []core.Message
 }
 
 func (s *executionState) emit(event core.Event) bool {
@@ -214,14 +216,12 @@ func (s *executionState) setup(initialState state) error {
 }
 
 func (s *executionState) run() error {
+	startState := s.inferState()
+	if err := s.setup(startState); err != nil {
+		return err
+	}
+
 	for {
-		// State Reconciliation: Infer starting state from thread history
-		startState := s.inferState()
-
-		if err := s.setup(startState); err != nil {
-			return err
-		}
-
 		if err := s.sm.Fire(TriggerBegin); err != nil {
 			return err
 		}
@@ -238,10 +238,11 @@ func (s *executionState) run() error {
 }
 
 func (s *executionState) inferState() state {
-	messages, err := s.thread.RetrieveFullConversationHistory(s.ctx)
-	if err != nil || len(messages) == 0 {
+	if len(s.history) == 0 {
 		return StateInitial
 	}
+
+	messages := s.history
 
 	// 1. Find the last assistant message with tool calls
 	var lastAssistantWithTools *core.Message
@@ -279,25 +280,18 @@ func (s *executionState) inferState() state {
 	}
 
 	// 3. Resumption Logic: Check for Elicitation response
-	if pendingTC.Function.Name == "elicit_user_input" {
-		// If we have a user message after this assistant message, it's the response
-		lastMsg := messages[len(messages)-1]
-		if lastMsg.Role == "user" {
-			// Pair: Fulfill the tool call with the user message
-			toolResultID := core.GenerateID()
-
-			// For elicitation, the result is just the user's text message content
-			// logic could be expanded to parse JSON if we implement trusted UI forms later
-			// but for now, the user message content IS the result.
-			agg, err := s.engine.threadMgmt.AddToolResultMessage(s.ctx, s.threadID, toolResultID, pendingTC.ID, lastMsg.Content, s.agentName)
-			if err == nil {
-				s.thread = s.engine.threadMgmt.ToAgentThread(agg)
-				// Successfully paired, now determine next step
+	if tc := pendingTC; tc != nil {
+		if tc.Function.Name == middleware.ElicitInputToolName {
+			// In Step 2.2, we moved the pairing logic to ProcessUserMessage.
+			// If we are here, it means we still haven't paired, or we are waiting.
+			lastMsg := messages[len(messages)-1]
+			if lastMsg.Role == "tool" && lastMsg.ToolCallID == tc.ID {
+				// Tool result exists, so we can determine next step
 				return StateDeterminingNextStep
 			}
+			// Still waiting for user input
+			return StateElicitingInput
 		}
-		// Still waiting for user input
-		return StateElicitingInput
 	}
 
 	// Populate streamResult for traditional tool execution
@@ -307,7 +301,6 @@ func (s *executionState) inferState() state {
 	}
 	return StateExecutingActions
 }
-
 
 func (s *executionState) handleStream() error {
 	if s.iteration >= s.maxIterations {
@@ -386,6 +379,7 @@ func (s *executionState) handleStream() error {
 		return err
 	}
 	s.thread = s.engine.threadMgmt.ToAgentThread(agg)
+	s.history = s.engine.threadMgmt.ToCoreMessages(agg)
 
 	if !s.emit(s.events.AssistantCompleted(s.threadID, s.messageID, s.streamResult.Content, toolCalls)) {
 		return context.Canceled
@@ -453,6 +447,7 @@ func (s *executionState) handleTools() error {
 			return err
 		}
 		s.thread = s.engine.threadMgmt.ToAgentThread(agg)
+		s.history = s.engine.threadMgmt.ToCoreMessages(agg)
 
 		if !s.emit(s.events.ToolCallExecuted(
 			s.threadID, toolResultID, result.ToolCallID,

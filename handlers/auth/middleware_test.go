@@ -92,12 +92,12 @@ func TestMiddleware_RequireAuth_ValidSession(t *testing.T) {
 
 	// Create a test handler that checks for user in context
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		user := kratos.GetUserFromContext(r.Context())
+		user := domain.GetUserFromContext(r.Context())
 		if user == nil {
 			t.Error("User not found in context")
 		}
 
-		session := kratos.GetSessionFromContext(r.Context())
+		session := domain.GetSessionFromContext(r.Context())
 		if session == nil {
 			t.Error("Session not found in context")
 		}
@@ -127,7 +127,7 @@ func TestMiddleware_OptionalAuth_NoSession(t *testing.T) {
 	called := false
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
-		user := kratos.GetUserFromContext(r.Context())
+		user := domain.GetUserFromContext(r.Context())
 		if user != nil {
 			t.Error("User should be nil when no session")
 		}
@@ -297,9 +297,9 @@ func TestGetUserFromContext(t *testing.T) {
 
 	ctx := context.WithValue(context.Background(), domain.UserContextKey, user)
 
-	retrieved := kratos.GetUserFromContext(ctx)
+	retrieved := domain.GetUserFromContext(ctx)
 	if retrieved == nil {
-		t.Fatal("kratos.GetUserFromContext returned nil")
+		t.Fatal("domain.GetUserFromContext returned nil")
 	}
 
 	if retrieved.ID != user.ID {
@@ -314,7 +314,7 @@ func TestGetUserFromContext(t *testing.T) {
 func TestGetUserFromContext_Nil(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	user := kratos.GetUserFromContext(ctx)
+	user := domain.GetUserFromContext(ctx)
 	if user != nil {
 		t.Errorf("Expected nil user, got %+v", user)
 	}
@@ -326,9 +326,9 @@ func TestGetSessionFromContext(t *testing.T) {
 
 	ctx := context.WithValue(context.Background(), domain.SessionContextKey, session)
 
-	retrieved := kratos.GetSessionFromContext(ctx)
+	retrieved := domain.GetSessionFromContext(ctx)
 	if retrieved == nil {
-		t.Fatal("kratos.GetSessionFromContext returned nil")
+		t.Fatal("domain.GetSessionFromContext returned nil")
 	}
 
 	if retrieved.Id != session.Id {
@@ -339,7 +339,7 @@ func TestGetSessionFromContext(t *testing.T) {
 func TestGetSessionFromContext_Nil(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	session := kratos.GetSessionFromContext(ctx)
+	session := domain.GetSessionFromContext(ctx)
 	if session != nil {
 		t.Errorf("Expected nil session, got %+v", session)
 	}
@@ -370,7 +370,7 @@ func TestIsAuthenticated(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := kratos.IsAuthenticated(tt.ctx)
+			got := domain.IsAuthenticated(tt.ctx)
 			if got != tt.expected {
 				t.Errorf("kratos.IsAuthenticated() = %v, want %v", got, tt.expected)
 			}

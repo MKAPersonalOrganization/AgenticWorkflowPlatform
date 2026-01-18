@@ -24,5 +24,4 @@ type ThreadStore interface {
 
 	// All retrieves all non-deleted threads.
 	All() []Thread
-
 }

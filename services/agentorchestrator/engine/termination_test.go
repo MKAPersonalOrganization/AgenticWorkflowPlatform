@@ -7,6 +7,7 @@ import (
 )
 
 func TestExecutionResult_String(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		result   ExecutionResult
@@ -65,7 +66,9 @@ func TestExecutionResult_String(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			str := tt.result.String()
 			for _, substr := range tt.contains {
 				if !containsString(str, substr) {
@@ -77,6 +80,7 @@ func TestExecutionResult_String(t *testing.T) {
 }
 
 func TestExecutionResult_IsRecoverable(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		reason      TerminationReason
 		recoverable bool
@@ -87,12 +91,14 @@ func TestExecutionResult_IsRecoverable(t *testing.T) {
 		{TerminationUserAborted, false},
 		{TerminationLoopDetected, false},
 		{TerminationError, false},
-		{TerminationHandoff, true},      // Recoverable
-		{TerminationElicitation, true},  // Recoverable
+		{TerminationHandoff, true},     // Recoverable
+		{TerminationElicitation, true}, // Recoverable
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(string(tt.reason), func(t *testing.T) {
+			t.Parallel()
 			result := ExecutionResult{Reason: tt.reason}
 			if result.IsRecoverable() != tt.recoverable {
 				t.Errorf("Expected IsRecoverable()=%v for reason %s", tt.recoverable, tt.reason)
@@ -102,6 +108,7 @@ func TestExecutionResult_IsRecoverable(t *testing.T) {
 }
 
 func TestLoopInfo(t *testing.T) {
+	t.Parallel()
 	info := LoopInfo{
 		Type:        LoopTypeToolCall,
 		Description: "Agent is repeatedly calling the same tool",

@@ -78,4 +78,3 @@ type AguiAgentActivity struct {
 	TotalRunTime    int64     `json:"totalRunTime"` // milliseconds
 	CurrentlyActive bool      `json:"currentlyActive"`
 }
-

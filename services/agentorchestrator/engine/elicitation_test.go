@@ -34,7 +34,7 @@ func TestEngine_ElicitationFlow(t *testing.T) {
 						llm.TextContent{Text: "I need input. "},
 						llm.FunctionCallContent{
 							CallID:       "call_1",
-							Name:         "ask_for_clarification_from_student",
+							Name:         "ask_human",
 							RawArguments: `{"question": "What is your favorite color?", "schema": {"type": "string"}}`,
 						},
 					},
@@ -110,8 +110,8 @@ func TestEngine_ElicitationFlow(t *testing.T) {
 	if asstMsg.Role != "assistant" {
 		t.Errorf("Expected assistant message, got %s", asstMsg.Role)
 	}
-	if len(asstMsg.ToolCalls) == 0 || asstMsg.ToolCalls[0].Function.Name != "ask_for_clarification_from_student" {
-		t.Errorf("Expected ask_for_clarification_from_student tool call")
+	if len(asstMsg.ToolCalls) == 0 || asstMsg.ToolCalls[0].Function.Name != middleware.ElicitInputToolName {
+		t.Errorf("Expected %s tool call", middleware.ElicitInputToolName)
 	}
 
 	// 2. User Response (Answering the elicitation)

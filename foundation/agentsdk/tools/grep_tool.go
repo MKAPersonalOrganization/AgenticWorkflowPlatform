@@ -8,11 +8,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"school-with-ai/foundation/agentsdk/core"
 	"sort"
 	"strconv"
 	"strings"
-
-	"school-with-ai/foundation/agentsdk/core"
 )
 
 const (
@@ -119,11 +118,11 @@ type rgMessage struct {
 }
 
 type rgMatchData struct {
-	Path       rgPathData  `json:"path"`
-	Lines      rgLineData  `json:"lines"`
-	LineNumber int         `json:"line_number"`
-	AbsoluteOffset int     `json:"absolute_offset"`
-	Submatches []rgSubmatch `json:"submatches"`
+	Path           rgPathData   `json:"path"`
+	Lines          rgLineData   `json:"lines"`
+	LineNumber     int          `json:"line_number"`
+	AbsoluteOffset int          `json:"absolute_offset"`
+	Submatches     []rgSubmatch `json:"submatches"`
 }
 
 type rgPathData struct {
@@ -135,15 +134,14 @@ type rgLineData struct {
 }
 
 type rgSubmatch struct {
-    Match   rgMatchText `json:"match"`
-    Start   int         `json:"start"`
-    End     int         `json:"end"`
+	Match rgMatchText `json:"match"`
+	Start int         `json:"start"`
+	End   int         `json:"end"`
 }
 
 type rgMatchText struct {
-    Text string `json:"text"`
+	Text string `json:"text"`
 }
-
 
 func (t *GrepTool) execute(ctx core.ToolContext, args any) (any, error) {
 	var input grepArgs
@@ -155,12 +153,12 @@ func (t *GrepTool) execute(ctx core.ToolContext, args any) (any, error) {
 	if searchPath == "" {
 		return nil, fmt.Errorf("file_path is required for search_text")
 	}
-    
-    // Resolve absolute path
-    absSearchPath, err := filepath.Abs(filepath.Join(t.RootDir, searchPath))
-    if err != nil {
-        return nil, fmt.Errorf("failed to resolve search path: %w", err)
-    }
+
+	// Resolve absolute path
+	absSearchPath, err := filepath.Abs(filepath.Join(t.RootDir, searchPath))
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve search path: %w", err)
+	}
 
 	// Verify path exists and is a file
 	info, err := os.Stat(absSearchPath)
@@ -172,10 +170,10 @@ func (t *GrepTool) execute(ctx core.ToolContext, args any) (any, error) {
 	}
 
 	if info.IsDir() {
-		return nil, fmt.Errorf("path '%s' is a directory. 'search_text' is strictly for single-file search. Use 'browse_library' to find the specific file first.", searchPath)
+		return nil, fmt.Errorf("path '%s' is a directory; 'search_text' is strictly for single-file search; use 'browse_library' to find the specific file first", searchPath)
 	}
-    // Allow file search too, but if it is a directory check if it is within root logic here if strict security needed.
-    // For now assuming the tool is trusted or sandboxed.
+	// Allow file search too, but if it is a directory check if it is within root logic here if strict security needed.
+	// For now assuming the tool is trusted or sandboxed.
 
 	// Build rg command arguments
 	cmdArgs := []string{"--json"}
@@ -208,16 +206,16 @@ func (t *GrepTool) execute(ctx core.ToolContext, args any) (any, error) {
 	if input.Include != "" {
 		cmdArgs = append(cmdArgs, "--glob", input.Include)
 	}
-    
-    // Add default excludes
-    if !input.NoIgnore {
-        defaultExcludes := []string{"*.log", "*.tmp", ".git/*", "node_modules/*", "metadata.json"} 
-        for _, exclude := range defaultExcludes {
-            cmdArgs = append(cmdArgs, "--glob", "!"+exclude)
-        }
-    }
 
-    cmdArgs = append(cmdArgs, "--threads", "4")
+	// Add default excludes
+	if !input.NoIgnore {
+		defaultExcludes := []string{"*.log", "*.tmp", ".git/*", "node_modules/*", "metadata.json"}
+		for _, exclude := range defaultExcludes {
+			cmdArgs = append(cmdArgs, "--glob", "!"+exclude)
+		}
+	}
+
+	cmdArgs = append(cmdArgs, "--threads", "4")
 	cmdArgs = append(cmdArgs, absSearchPath)
 
 	// Check if rg is available
@@ -236,8 +234,8 @@ func (t *GrepTool) execute(ctx core.ToolContext, args any) (any, error) {
 				return nil, fmt.Errorf("ripgrep failed with code %d", exitErr.ExitCode())
 			}
 		} else {
-            return nil, fmt.Errorf("failed to execute ripgrep: %w", err)
-        }
+			return nil, fmt.Errorf("failed to execute ripgrep: %w", err)
+		}
 	}
 
 	allMatches := t.parseRipgrepJsonOutput(stdout.Bytes(), filepath.Dir(absSearchPath))
@@ -261,7 +259,7 @@ func (t *GrepTool) execute(ctx core.ToolContext, args any) (any, error) {
 	if end > totalMatches {
 		end = totalMatches
 	}
-	
+
 	pagedMatches := allMatches[offset:end]
 
 	// Post-process to find parent headings
@@ -278,7 +276,7 @@ func (t *GrepTool) execute(ctx core.ToolContext, args any) (any, error) {
 
 	matchCount := len(pagedMatches)
 	sb := strings.Builder{}
-	sb.WriteString(fmt.Sprintf("Found %d matches (Showing %d-%d of %d) for pattern \"%s\" %s:\n---\n", 
+	sb.WriteString(fmt.Sprintf("Found %d matches (Showing %d-%d of %d) for pattern \"%s\" %s:\n---\n",
 		matchCount, offset+1, end, totalMatches, input.Pattern, searchLocationDescription))
 
 	if end < totalMatches {
@@ -287,26 +285,26 @@ func (t *GrepTool) execute(ctx core.ToolContext, args any) (any, error) {
 
 	// Group by file
 	matchesByFile := make(map[string][]grepMatch)
-    var files []string
-    seenFiles := make(map[string]bool)
+	var files []string
+	seenFiles := make(map[string]bool)
 
 	for _, m := range pagedMatches {
 		if _, exists := matchesByFile[m.FilePath]; !exists {
-            matchesByFile[m.FilePath] = []grepMatch{}
-            if !seenFiles[m.FilePath] {
-                seenFiles[m.FilePath] = true
-                files = append(files, m.FilePath)
-            }
-        }
+			matchesByFile[m.FilePath] = []grepMatch{}
+			if !seenFiles[m.FilePath] {
+				seenFiles[m.FilePath] = true
+				files = append(files, m.FilePath)
+			}
+		}
 		matchesByFile[m.FilePath] = append(matchesByFile[m.FilePath], m)
 	}
 
-    sort.Strings(files)
+	sort.Strings(files)
 
 	for _, filePath := range files {
 		sb.WriteString(fmt.Sprintf("File: %s\n", filePath))
-        matches := matchesByFile[filePath]
-        
+		matches := matchesByFile[filePath]
+
 		for _, m := range matches {
 			trimmedLine := strings.TrimSpace(m.Line)
 			contextInfo := ""
@@ -323,11 +321,11 @@ func (t *GrepTool) execute(ctx core.ToolContext, args any) (any, error) {
 
 // findParentHeading scans the file backwards from lineNumber to find the nearest heading.
 func (t *GrepTool) findParentHeading(fullPath string, lineNumber int) string {
-	file, err := os.Open(fullPath)
+	file, err := os.Open(filepath.Clean(fullPath))
 	if err != nil {
 		return ""
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	scanner := bufio.NewScanner(file)
 	currentLine := 0
@@ -366,34 +364,27 @@ func (t *GrepTool) parseRipgrepJsonOutput(output []byte, basePath string) []grep
 			}
 
 			if data.Path.Text != "" && data.Lines.Text != "" {
-                if !filepath.IsAbs(basePath) {
-                   // Should typically be absolute, but good to handle if not
-                   basePath, _ = filepath.Abs(basePath)
-                }
-                
-                // Construct relative path
-                absPath := data.Path.Text
-                if !filepath.IsAbs(absPath) {
-                    // rg output might be absolute or relative depending on how it was invoked
-                    absPath = filepath.Join(basePath, absPath)
-                }
+				if !filepath.IsAbs(basePath) {
+					// Should typically be absolute, but good to handle if not
+					basePath, _ = filepath.Abs(basePath)
+				}
 
-                // Correct logic:
-                // The provided 'basePath' is the searched directory.  
-                // However, we want to report paths relative to the RootDir (Workspace Root) usually, or relative to the search dir? 
-                // TS implementation does: filePath: relativeFilePath || path.basename(absoluteFilePath)
-                // where relativeFilePath = path.relative(basePath, absoluteFilePath);
-                // So it reports relative to the SEARCH directory.
-                
-                matchAbsPath := data.Path.Text
-                if !filepath.IsAbs(matchAbsPath) {
-                     matchAbsPath = filepath.Join(basePath, matchAbsPath)
-                }
-                
-                displayPath, err := filepath.Rel(basePath, matchAbsPath)
-                if err != nil {
-                    displayPath = matchAbsPath
-                }
+				// Correct logic:
+				// The provided 'basePath' is the searched directory.
+				// However, we want to report paths relative to the RootDir (Workspace Root) usually, or relative to the search dir?
+				// TS implementation does: filePath: relativeFilePath || path.basename(absoluteFilePath)
+				// where relativeFilePath = path.relative(basePath, absoluteFilePath);
+				// So it reports relative to the SEARCH directory.
+
+				matchAbsPath := data.Path.Text
+				if !filepath.IsAbs(matchAbsPath) {
+					matchAbsPath = filepath.Join(basePath, matchAbsPath)
+				}
+
+				displayPath, err := filepath.Rel(basePath, matchAbsPath)
+				if err != nil {
+					displayPath = matchAbsPath
+				}
 
 				results = append(results, grepMatch{
 					FilePath:   displayPath,

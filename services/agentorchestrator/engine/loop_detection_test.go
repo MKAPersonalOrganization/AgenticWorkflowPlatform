@@ -2,12 +2,12 @@ package engine
 
 import (
 	"fmt"
-	"testing"
-
 	"school-with-ai/foundation/agentsdk/core"
+	"testing"
 )
 
 func TestLoopDetector_ToolCallLoop(t *testing.T) {
+	t.Parallel()
 	config := DefaultLoopDetectorConfig()
 	config.ToolLoopThreshold = 3 // Lower threshold for testing
 	detector := NewLoopDetector(config)
@@ -48,6 +48,7 @@ func TestLoopDetector_ToolCallLoop(t *testing.T) {
 }
 
 func TestLoopDetector_DifferentArgsNoLoop(t *testing.T) {
+	t.Parallel()
 	config := DefaultLoopDetectorConfig()
 	config.ToolLoopThreshold = 3
 	detector := NewLoopDetector(config)
@@ -69,6 +70,7 @@ func TestLoopDetector_DifferentArgsNoLoop(t *testing.T) {
 }
 
 func TestLoopDetector_ContentLoop(t *testing.T) {
+	t.Parallel()
 	config := LoopDetectorConfig{
 		ContentChunkSize:     10, // Small chunks for testing
 		ContentLoopThreshold: 3,  // Lower threshold
@@ -93,6 +95,7 @@ func TestLoopDetector_ContentLoop(t *testing.T) {
 }
 
 func TestLoopDetector_NoContentLoopWithVariedContent(t *testing.T) {
+	t.Parallel()
 	config := DefaultLoopDetectorConfig()
 	detector := NewLoopDetector(config)
 
@@ -112,6 +115,7 @@ func TestLoopDetector_NoContentLoopWithVariedContent(t *testing.T) {
 }
 
 func TestLoopDetector_PedagogicalLoop(t *testing.T) {
+	t.Parallel()
 	config := DefaultLoopDetectorConfig()
 	config.PedagogicalThreshold = 3
 	detector := NewLoopDetector(config)
@@ -142,6 +146,7 @@ func TestLoopDetector_PedagogicalLoop(t *testing.T) {
 }
 
 func TestLoopDetector_QuizSuccessResetsPedagogicalLoop(t *testing.T) {
+	t.Parallel()
 	config := DefaultLoopDetectorConfig()
 	config.PedagogicalThreshold = 3
 	detector := NewLoopDetector(config)
@@ -166,6 +171,7 @@ func TestLoopDetector_QuizSuccessResetsPedagogicalLoop(t *testing.T) {
 }
 
 func TestLoopDetector_Reset(t *testing.T) {
+	t.Parallel()
 	config := DefaultLoopDetectorConfig()
 	config.ToolLoopThreshold = 3
 	detector := NewLoopDetector(config)
@@ -199,6 +205,7 @@ func TestLoopDetector_Reset(t *testing.T) {
 }
 
 func TestLoopDetector_ToolErrorLoop(t *testing.T) {
+	t.Parallel()
 	config := DefaultLoopDetectorConfig()
 	config.ToolErrorThreshold = 3 // Lower threshold for testing
 	detector := NewLoopDetector(config)
@@ -230,6 +237,7 @@ func TestLoopDetector_ToolErrorLoop(t *testing.T) {
 }
 
 func TestLoopDetector_ToolErrorLoopWithDifferentArgs(t *testing.T) {
+	t.Parallel()
 	config := DefaultLoopDetectorConfig()
 	config.ToolErrorThreshold = 3
 	detector := NewLoopDetector(config)
@@ -257,6 +265,7 @@ func TestLoopDetector_ToolErrorLoopWithDifferentArgs(t *testing.T) {
 }
 
 func TestLoopDetector_SuccessBreaksErrorLoop(t *testing.T) {
+	t.Parallel()
 	config := DefaultLoopDetectorConfig()
 	config.ToolErrorThreshold = 3
 	detector := NewLoopDetector(config)
@@ -278,6 +287,7 @@ func TestLoopDetector_SuccessBreaksErrorLoop(t *testing.T) {
 }
 
 func TestLoopDetector_DifferentToolNoErrorLoop(t *testing.T) {
+	t.Parallel()
 	config := DefaultLoopDetectorConfig()
 	config.ToolErrorThreshold = 3
 	detector := NewLoopDetector(config)
@@ -298,6 +308,7 @@ func TestLoopDetector_DifferentToolNoErrorLoop(t *testing.T) {
 }
 
 func TestLoopDetector_ErrorPatternExtraction(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		errorMsg        string
 		expectedPattern string
@@ -314,7 +325,9 @@ func TestLoopDetector_ErrorPatternExtraction(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.errorMsg, func(t *testing.T) {
+			t.Parallel()
 			pattern := extractErrorPattern(tt.errorMsg)
 			if pattern != tt.expectedPattern {
 				t.Errorf("Expected pattern %q, got %q", tt.expectedPattern, pattern)
@@ -324,6 +337,7 @@ func TestLoopDetector_ErrorPatternExtraction(t *testing.T) {
 }
 
 func TestLoopDetector_ResetClearsToolErrors(t *testing.T) {
+	t.Parallel()
 	config := DefaultLoopDetectorConfig()
 	config.ToolErrorThreshold = 3
 	detector := NewLoopDetector(config)
@@ -342,6 +356,7 @@ func TestLoopDetector_ResetClearsToolErrors(t *testing.T) {
 }
 
 func TestLoopDetector_CodeBlocksExcluded(t *testing.T) {
+	t.Parallel()
 	config := LoopDetectorConfig{
 		ContentChunkSize:     10,
 		ContentLoopThreshold: 3,

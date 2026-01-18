@@ -30,11 +30,11 @@ func NewPostgresLLMContextProjection(log *logger.Logger, db *sqlx.DB) *PostgresL
 	}
 }
 
-
 // RegisterHandlers registers database update handlers to the provided router.
 func (p *PostgresLLMContextProjection) RegisterHandlers(router interface {
 	Register(eventPrototype any, handler event.HandlerFunc)
-}) {
+},
+) {
 	router.Register(&domain.ThreadCreated{}, func(ctx context.Context, e core.Event) error {
 		return p.applyThreadCreated(ctx, *e.(*domain.ThreadCreated))
 	})
@@ -412,4 +412,3 @@ func (p *PostgresLLMContextProjection) All() []domain.Thread {
 
 	return threads
 }
-

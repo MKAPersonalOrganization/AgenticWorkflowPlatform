@@ -111,7 +111,7 @@ func (s *FileSystemService) ListNodes(path string) ([]Node, error) {
 
 // extractHeadings reads a markdown file and returns its heading structure as nodes.
 func (s *FileSystemService) extractHeadings(relPath, fullPath string) ([]Node, error) {
-	content, err := os.ReadFile(fullPath)
+	content, err := os.ReadFile(filepath.Clean(fullPath))
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +148,7 @@ func (s *FileSystemService) GetChapterContent(path string) (string, error) {
 	}
 
 	fullPath := filepath.Join(s.baseDir, path)
-	content, err := os.ReadFile(fullPath)
+	content, err := os.ReadFile(filepath.Clean(fullPath))
 	if err != nil {
 		return "", fmt.Errorf("failed to read file: %w", err)
 	}

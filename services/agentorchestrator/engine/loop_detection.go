@@ -3,10 +3,9 @@ package engine
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"school-with-ai/foundation/agentsdk/core"
 	"strings"
 	"unicode"
-
-	"school-with-ai/foundation/agentsdk/core"
 )
 
 // LoopDetector detects various types of loops in agent execution.
@@ -344,10 +343,10 @@ func (d *LoopDetector) Reset() {
 // GetStats returns statistics about the current detection state.
 func (d *LoopDetector) GetStats() map[string]any {
 	return map[string]any{
-		"tool_calls_recorded":     len(d.toolCallHistory),
+		"tool_calls_recorded":      len(d.toolCallHistory),
 		"content_repetition_count": d.contentRepetitionCount,
-		"concepts_explained":      len(d.conceptExplanations),
-		"concepts_with_failures":  len(d.conceptQuizFailures),
+		"concepts_explained":       len(d.conceptExplanations),
+		"concepts_with_failures":   len(d.conceptQuizFailures),
 	}
 }
 

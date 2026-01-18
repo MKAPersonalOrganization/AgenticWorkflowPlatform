@@ -13,8 +13,8 @@ type HandlerFunc func(ctx context.Context, event core.Event) error
 
 // Router dispatches events to registered handlers based on their type.
 type Router struct {
-	mu           sync.RWMutex
-	handlers     map[reflect.Type][]HandlerFunc
+	mu          sync.RWMutex
+	handlers    map[reflect.Type][]HandlerFunc
 	anyHandlers []HandlerFunc
 }
 

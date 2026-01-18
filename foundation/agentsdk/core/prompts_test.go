@@ -6,6 +6,7 @@ import (
 )
 
 func TestGenerateSystemPrompt_MissionAndObjectives(t *testing.T) {
+	t.Parallel()
 	config := PromptConfig{
 		Role:     "Test Instructor",
 		Preamble: "You are a test instructor.",
@@ -39,15 +40,16 @@ func TestGenerateSystemPrompt_MissionAndObjectives(t *testing.T) {
 }
 
 func TestGenerateSystemPrompt_LearningPath(t *testing.T) {
+	t.Parallel()
 	config := PromptConfig{
 		Role:     "Math Instructor",
 		Preamble: "You are a math instructor.",
 		Topic:    "Mathematics",
 		LearningPath: &LearningPath{
-			Prerequisites:  []string{"Basic arithmetic", "Algebra fundamentals"},
-			NextConcepts:   []string{"Calculus", "Linear algebra"},
-			RelatedTopics:  []string{"Physics", "Computer Science"},
-			PracticeAreas:  []string{"Word problems", "Proof exercises"},
+			Prerequisites: []string{"Basic arithmetic", "Algebra fundamentals"},
+			NextConcepts:  []string{"Calculus", "Linear algebra"},
+			RelatedTopics: []string{"Physics", "Computer Science"},
+			PracticeAreas: []string{"Word problems", "Proof exercises"},
 		},
 		Interactive: true,
 	}
@@ -82,6 +84,7 @@ func TestGenerateSystemPrompt_LearningPath(t *testing.T) {
 }
 
 func TestGenerateSystemPrompt_NoHallucinationPolicy(t *testing.T) {
+	t.Parallel()
 	config := PromptConfig{
 		Role:        "Chemistry Instructor",
 		Preamble:    "You are a chemistry instructor.",
@@ -107,6 +110,7 @@ func TestGenerateSystemPrompt_NoHallucinationPolicy(t *testing.T) {
 }
 
 func TestGenerateSystemPrompt_PedagogicalDecisionTrees(t *testing.T) {
+	t.Parallel()
 	config := PromptConfig{
 		Role:        "Physics Instructor",
 		Preamble:    "You are a physics instructor.",
@@ -138,6 +142,7 @@ func TestGenerateSystemPrompt_PedagogicalDecisionTrees(t *testing.T) {
 }
 
 func TestGenerateSystemPrompt_CognitivePrioritization(t *testing.T) {
+	t.Parallel()
 	config := PromptConfig{
 		Role:        "Statistics Instructor",
 		Preamble:    "You are a statistics instructor.",
@@ -160,6 +165,7 @@ func TestGenerateSystemPrompt_CognitivePrioritization(t *testing.T) {
 }
 
 func TestGenerateSystemPrompt_SourceGrounding(t *testing.T) {
+	t.Parallel()
 	config := PromptConfig{
 		Role:        "Math Instructor",
 		Preamble:    "You are a math instructor.",

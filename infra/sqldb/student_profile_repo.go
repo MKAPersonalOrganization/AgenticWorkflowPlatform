@@ -5,9 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"time"
-
 	"school-with-ai/domain"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
@@ -44,7 +43,6 @@ func (r *PostgresStudentProfileRepository) GetByUserID(ctx context.Context, user
 		&profile.CreatedAt,
 		&profile.UpdatedAt,
 	)
-
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil // Return nil if not found, let caller handle
@@ -86,7 +84,6 @@ func (r *PostgresStudentProfileRepository) Upsert(ctx context.Context, profile *
 		profile.CreatedAt,
 		profile.UpdatedAt,
 	)
-
 	if err != nil {
 		return fmt.Errorf("failed to upsert student profile: %w", err)
 	}

@@ -8,7 +8,7 @@ import (
 
 // BrowseLibraryArgs represents the arguments for the browse_library tool.
 type BrowseLibraryArgs struct {
-	// The path to browse (e.g., 'grade-10' or 'grade-12/Think-Stats'). 
+	// The path to browse (e.g., 'grade-10' or 'grade-12/Think-Stats').
 	// If empty, returns available grade levels.
 	Path string `json:"path,omitempty"`
 }

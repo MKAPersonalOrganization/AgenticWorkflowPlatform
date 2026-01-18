@@ -29,10 +29,10 @@ type StudentProfile struct {
 
 // LearningPath defines related concepts and resources for progressive learning.
 type LearningPath struct {
-	Prerequisites  []string // Concepts the student should know first
-	NextConcepts   []string // Logical next topics to explore
-	RelatedTopics  []string // Cross-domain connections
-	PracticeAreas  []string // Suggested practice problems or exercises
+	Prerequisites []string // Concepts the student should know first
+	NextConcepts  []string // Logical next topics to explore
+	RelatedTopics []string // Cross-domain connections
+	PracticeAreas []string // Suggested practice problems or exercises
 }
 
 // PromptConfig defines data for the academic system prompt template.
@@ -40,9 +40,9 @@ type PromptConfig struct {
 	Role           string
 	Preamble       string
 	Topic          string
-	Mission        string        // Clear mission statement for the agent
-	Objectives     []string      // Specific objectives to achieve
-	Specialties    string        // raw text for backward compatibility or simple agents
+	Mission        string   // Clear mission statement for the agent
+	Objectives     []string // Specific objectives to achieve
+	Specialties    string   // raw text for backward compatibility or simple agents
 	Specialists    []Specialty
 	Skills         []Skill
 	StudentProfile *StudentProfile
