@@ -33,9 +33,11 @@ import (
 	"school-with-ai/services/agentorchestrator/agents/math"
 	"school-with-ai/services/agentorchestrator/agents/physics"
 	"school-with-ai/services/agentorchestrator/agents/shared"
+	sharedtools "school-with-ai/services/agentorchestrator/agents/shared/tools"
 	"school-with-ai/services/agentorchestrator/agents/statistics"
 	"school-with-ai/services/agentorchestrator/agents/studentfacing"
 	"school-with-ai/services/artifact"
+	"school-with-ai/services/studentbooks"
 	"school-with-ai/services/taskmanagement"
 	"school-with-ai/services/threadmgmt"
 	"syscall"
@@ -319,6 +321,10 @@ func run(ctx context.Context, log *logger.Logger) error {
 	shared.GlobalAgents.Register("chemistry-instructor", chemistry.CreateChemistryInstructor)
 	shared.GlobalAgents.Register("statistics-instructor", statistics.CreateStatisticsInstructor)
 	shared.GlobalAgents.Register("diagramming-instructor", diagramming.CreateDiagrammingInstructor)
+
+	// Initialize Student Books Service
+	booksSvc := studentbooks.NewFileSystemService("books")
+	sharedtools.InitStudentBooks(booksSvc)
 
 	// Initialize artifact service
 	log.Info(ctx, "startup", "status", "initializing s3 artifact service", "endpoint", cfg.Artifacts.S3Endpoint, "bucket", cfg.Artifacts.S3Bucket)

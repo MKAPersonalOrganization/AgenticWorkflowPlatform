@@ -468,9 +468,9 @@ export function createStreamingMethods() {
          * Handle TEXT_MESSAGE_START event
          */
         __handleTextMessageStart(event, state, threadId) {
+            console.log(`[STREAM] TEXT_MESSAGE_START for messageId: ${event.messageId}`);
             state.showTypingIndicator = false;
             state.currentStreamingId = event.messageId;
-            state.currentStreamingContent = '';
 
             this.__perfMetrics.messagesReceived++;
 
@@ -487,24 +487,50 @@ export function createStreamingMethods() {
                 this.__announce('Assistant is responding');
             }
 
-            state.messages.push({
-                id: event.messageId,
-                role: 'assistant',
-                content: '',
-                timestamp: new Date(event.timestamp).toISOString(),
-                streaming: true
-            });
+            // Check if we already have this message (e.g. from history or snapshot)
+            const existingMsg = state.messages.find(m => m.id === event.messageId);
+            if (!existingMsg) {
+                console.log(`[STREAM] Adding new assistant message for ID: ${event.messageId}`);
+                state.messages.push({
+                    id: event.messageId,
+                    role: 'assistant',
+                    content: '',
+                    timestamp: new Date(event.timestamp || Date.now()).toISOString(),
+                    streaming: true
+                });
+            } else {
+                console.log(`[STREAM] Message already exists for ID: ${event.messageId}, marking as streaming`);
+                existingMsg.streaming = true;
+            }
+
+            if (threadId === this.__currentThreadId) {
+                this.$nextTick(() => this.__scrollToBottom());
+            }
         },
 
         /**
          * Handle TEXT_MESSAGE_CONTENT event
          */
         __handleTextMessageContent(event, state, threadId) {
-            state.currentStreamingContent += event.delta;
+            let msgIndex = state.messages.findIndex(m => m.id === event.messageId);
+            if (msgIndex === -1) {
+                console.warn(`[STREAM] TEXT_MESSAGE_CONTENT for unknown ID: ${event.messageId}, lazily creating segment.`);
+                state.messages.push({
+                    id: event.messageId,
+                    role: 'assistant',
+                    content: '',
+                    timestamp: new Date().toISOString(),
+                    streaming: true
+                });
+                msgIndex = state.messages.length - 1;
+            }
 
-            const msgIndex = state.messages.findIndex(m => m.id === event.messageId);
-            if (msgIndex !== -1) {
-                state.messages[msgIndex].content = state.currentStreamingContent;
+            // Append directly to the message's content property
+            state.messages[msgIndex].content += event.delta;
+
+            // Log very selectively (first few chars) to avoid log spam but confirm it's working
+            if (state.messages[msgIndex].content.length <= event.delta.length) {
+                console.log(`[STREAM] First token for ${event.messageId}: "${event.delta}"`);
             }
 
             if (threadId === this.__currentThreadId) {
@@ -516,6 +542,7 @@ export function createStreamingMethods() {
          * Handle TEXT_MESSAGE_END event
          */
         __handleTextMessageEnd(event, state, threadId) {
+            console.log(`[STREAM] TEXT_MESSAGE_END for messageId: ${event.messageId}`);
             const endMsgIndex = state.messages.findIndex(m => m.id === event.messageId);
             if (endMsgIndex !== -1) {
                 state.messages[endMsgIndex].streaming = false;
@@ -525,8 +552,9 @@ export function createStreamingMethods() {
                 this.__announce('Response complete');
             }
 
-            state.currentStreamingId = null;
-            state.currentStreamingContent = '';
+            if (state.currentStreamingId === event.messageId) {
+                state.currentStreamingId = null;
+            }
         },
 
         /**

@@ -138,9 +138,6 @@ func (s *executionState) setup(initialState state) error {
 	s.sm = stateless.NewStateMachine(initialState)
 
 	s.sm.Configure(StateInitial).
-		OnExit(func(_ context.Context, _ ...any) error {
-			return s.handleStart()
-		}).
 		Permit(TriggerBegin, StateDeterminingNextStep)
 
 	s.sm.Configure(StateDeterminingNextStep).
@@ -268,12 +265,6 @@ func (s *executionState) inferState() state {
 	return StateExecutingActions
 }
 
-func (s *executionState) handleStart() error {
-	if !s.emit(s.events.AssistantStarted(s.threadID, s.messageID)) {
-		return context.Canceled
-	}
-	return nil
-}
 
 func (s *executionState) handleStream() error {
 	if s.iteration >= s.maxIterations {
@@ -307,6 +298,9 @@ func (s *executionState) handleStream() error {
 	}
 
 	// Stream
+	if !s.emit(s.events.AssistantStarted(s.threadID, s.messageID)) {
+		return context.Canceled
+	}
 	llmContext := prepareResult.Context
 	s.executor = s.engine.toolExec.CreateExecutor(
 		s.ctx, llmContext.GetEffectiveTools(),

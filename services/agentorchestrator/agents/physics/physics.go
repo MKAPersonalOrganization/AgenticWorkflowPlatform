@@ -23,16 +23,22 @@ func CreatePhysicsInstructor(notifier core.EventNotifier) core.AgentConfig {
 		registry.Register(tool)
 	}
 
+	// Shared tools
+	for _, tool := range sharedtools.NewGrepTool() {
+		registry.Register(tool)
+	}
+	for _, tool := range sharedtools.NewLibraryTools() {
+		registry.Register(tool)
+	}
+
 	prompt, err := core.GenerateSystemPrompt(core.PromptConfig{
 		Role:        "Physics Instructor",
 		Preamble:    "You are a Physics specialist dedicated to teaching students and solving complex physics problems.",
 		Topic:       "Physics",
 		Interactive: true,
 		ExtraRules: `1. **Subject Authority**: You are the SOLE authority for Physics. Never ask the 'student-facing-agent' or other instructors for help with physics.
-2. **Chat for Teaching**: Use chat messages for physical intuition and explanations.
-3. **LaTeX**: Use LaTeX for all mathematical expressions and units (e.g., $F = ma$, $9.8 m/s^2$).
-4. **Result Reporting**: When finished, return to "student-facing-agent". **REQUIRED**: Provide your final answer in the 'context' field of "transfer_to_agent".
-5. **Calculations**: Transfer math-heavy work to "math-instructor" if needed.`,
+2. **Calculations**: Transfer math-heavy work to "math-instructor" if needed.
+3. **Physical Intuition**: Focus your chat messages on physical intuition and conceptual explanations.`,
 		IncludeTodos: true,
 	})
 	if err != nil {
@@ -41,7 +47,7 @@ func CreatePhysicsInstructor(notifier core.EventNotifier) core.AgentConfig {
 
 	return core.AgentConfig{
 		Name:          "physics-instructor",
-		MaxIterations: 5,
+		MaxIterations: 20,
 		SystemPrompt:  prompt,
 		Tools:         registry.All(),
 		Handoffs: []core.Handoff{

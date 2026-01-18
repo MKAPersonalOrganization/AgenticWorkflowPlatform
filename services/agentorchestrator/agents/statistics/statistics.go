@@ -33,46 +33,41 @@ func CreateStatisticsInstructor(notifier core.EventNotifier) core.AgentConfig {
 		registry.Register(tool)
 	}
 
-	return core.AgentConfig{
-		Name:          "statistics-instructor",
-		MaxIterations: 5,
-		SystemPrompt: `# Statistics Instructor
+	// Shared tools
+	for _, tool := range sharedtools.NewGrepTool() {
+		registry.Register(tool)
+	}
+	for _, tool := range sharedtools.NewLibraryTools() {
+		registry.Register(tool)
+	}
 
-## Core Rules
-
+	prompt, err := core.GenerateSystemPrompt(core.PromptConfig{
+		Role:        "Statistics Instructor",
+		Preamble:    "You are an expert statistics educator focused on teaching students how to collect, analyze, interpret, and present data.",
+		Topic:       "Statistics and Probability",
+		Interactive: true,
+		ExtraRules: `## Core Statistics Rules
 1. **Subject Authority**: You are the SOLE authority for Statistics. Never ask the 'student-facing-agent' or other instructors for help with statistics.
-2. **Chat for Teaching**: Use chat messages for interpreting results and explaining concepts.
-3. **Elicitation**: You MUST use the "elicit_user_input" tool for ALL questions. **Always ask exactly ONE question at a time.** Never ask multiple questions. **NO LISTS**: Even for quizzes or exercises, ask one question, wait for the answer, then ask the next.
-4. **LaTeX**: Use LaTeX for all statistical formulas and notation.
+2. **Calculations**: Use specialized domain tools for arithmetic, distributions, and regression.
+3. **Teaching Style**: Interpret results in context. Check assumptions (e.g., positive values for geometric mean). Use tables for clarity.
 
-## Available Tools
-
-- **descriptive_statistics**: mean, median, mode, variance, std dev, quartiles, IQR
-- **correlation_analysis**: correlation, pearson, covariance, autocorrelation
-- **distance_metrics**: euclidean, manhattan, chebyshev, minkowski
-- **sampling_and_outliers**: sample, stable_sample, quartile_outliers
-- **data_transformation**: sigmoid, softmax, cumulative_sum, entropy
-- **normal_distribution**: pdf, cdf, ppf, sf, isf, fit, interval
-- **geometric_distribution**: prob_geom, exp_geom, var_geom
-- **regression_analysis**: linear, exponential, logarithmic
-
-## Teaching Style
-
-- Interpret results in context
-- Check assumptions (e.g., positive values for geometric mean)
-- Use tables and LaTeX for clarity
-- Discuss statistical significance when relevant
-
-## LaTeX Examples
-
+## LaTeX Examples (Use LaTeX for all math)
 **Mean:** $\bar{x} = \frac{1}{n}\sum_{i=1}^{n} x_i$
 **Std Dev:** $s = \sqrt{\frac{1}{n-1}\sum_{i=1}^{n}(x_i - \bar{x})^2}$
 **Correlation:** $r = \frac{\sum(x_i - \bar{x})(y_i - \bar{y})}{\sqrt{\sum(x_i - \bar{x})^2\sum(y_i - \bar{y})^2}}$
-**Regression:** $y = mx + b$ with $R^2$
+**Regression:** $y = mx + b$ with $R^2$`,
+		IncludeTodos: true,
+	})
+	if err != nil {
+		panic(err)
+	}
 
-` + core.WriteTodosSystemPrompt,
-		Tools:    registry.All(),
-		Notifier: notifier,
+	return core.AgentConfig{
+		Name:          "statistics-instructor",
+		MaxIterations: 20,
+		SystemPrompt:  prompt,
+		Tools:         registry.All(),
+		Notifier:      notifier,
 		Middleware: []core.Middleware{
 			middleware.NewHandoffMiddleware(),
 			middleware.NewElicitationMiddleware(),

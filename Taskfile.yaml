@@ -12,10 +12,57 @@ vars:
     sh: command -v tailwindcss >/dev/null 2>&1 && echo "tailwindcss" || echo "npx tailwindcss@latest"
 
 tasks:
+  add-book:
+    desc: "Convert EPUB to Markdown in books/ directory. Usage: task add-book -- path/to/file.epub"
+    cmds:
+      - mkdir -p books
+      - mkdir -p .conversion_tmp
+      - |
+        FILE="{{.CLI_ARGS}}"
+        # Strip potential surrounding quotes passed by task/shell
+        FILE=$(echo "$FILE" | sed "s/^'//;s/'$//;s/^\"//;s/\"$//")
+        if [ -z "$FILE" ]; then echo "Usage: task add-book -- path/to/file.epub"; exit 1; fi
+        NAME=$(basename "$FILE" .epub)
+        
+        # Copy to temp dir to control output location and avoid path joining issues
+        cp "$FILE" ".conversion_tmp/$NAME.epub"
+        
+        # Run conversion in temp dir
+        # Output will be a directory at .conversion_tmp/NAME/ because we are not merging
+        epub2md ".conversion_tmp/$NAME.epub"
+        
+        # Move to final destination
+        if [ -d ".conversion_tmp/$NAME" ]; then
+          # Remove existing directory if it exists to ensure clean state
+          rm -rf "books/$NAME"
+          mv ".conversion_tmp/$NAME" "books/"
+          
+          # Rename chapters based on content
+          echo "Renaming chapters..."
+          node tools/rename_chapters.js "books/$NAME"
+          
+          echo "Successfully converted to books/$NAME/"
+        else
+          echo "Error: Output directory not found at .conversion_tmp/$NAME"
+          ls -R .conversion_tmp
+          exit 1
+        fi
+        
+        # Cleanup
+        rm -rf .conversion_tmp
+
   setup-ubuntu:
     cmds:
       - go install github.com/a-h/templ/cmd/templ@latest
       - go install github.com/templui/templui/cmd/templui@latest
+
+  install-epub2md:
+    desc: Install dependencies and build epub2MD
+    dir: .READ/epub2MD
+    cmds:
+      - pnpm install
+      - pnpm build
+
   templ:
     desc: Run templ with integrated server and hot reload
     cmds:

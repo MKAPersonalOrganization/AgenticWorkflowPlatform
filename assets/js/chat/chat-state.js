@@ -23,7 +23,6 @@ export function createEmptyThreadState() {
         errorMessage: null,
         showTypingIndicator: false,
         currentStreamingId: null,
-        currentStreamingContent: '',
         // Connection tracking
         connectionState: null,
         heartbeatInterval: null,
@@ -58,7 +57,6 @@ export function createInitialState() {
             errorMessage: null,
             showTypingIndicator: false,
             currentStreamingId: null,
-            currentStreamingContent: '',
             awaitingHumanInput: false,
             humanInputQuestion: null,
             humanInputSchema: null,

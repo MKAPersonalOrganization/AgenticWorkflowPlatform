@@ -3,6 +3,7 @@ package studentfacing
 import (
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/core/middleware"
+	sharedtools "school-with-ai/services/agentorchestrator/agents/shared/tools"
 )
 
 // domainTools returns the domain-specific tools for the student-facing agent.
@@ -18,6 +19,14 @@ func CreateStudentFacingAgent(notifier core.EventNotifier) core.AgentConfig {
 
 	// Domain-specific tools (none for router agent)
 	for _, tool := range domainTools() {
+		registry.Register(tool)
+	}
+
+	// Shared tools
+	for _, tool := range sharedtools.NewGrepTool() {
+		registry.Register(tool)
+	}
+	for _, tool := range sharedtools.NewLibraryTools() {
 		registry.Register(tool)
 	}
 
@@ -44,7 +53,7 @@ func CreateStudentFacingAgent(notifier core.EventNotifier) core.AgentConfig {
 
 	return core.AgentConfig{
 		Name:          "student-facing-agent",
-		MaxIterations: 3,
+		MaxIterations: 20,
 		SystemPrompt:  prompt,
 		Tools:         registry.All(),
 		Handoffs: []core.Handoff{

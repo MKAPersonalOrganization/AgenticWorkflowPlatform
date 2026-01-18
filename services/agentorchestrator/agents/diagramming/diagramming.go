@@ -4,6 +4,7 @@ import (
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/core/middleware"
 	"school-with-ai/services/agentorchestrator/agents/diagramming/tools"
+	sharedtools "school-with-ai/services/agentorchestrator/agents/shared/tools"
 )
 
 // domainTools returns the domain-specific tools for the diagramming instructor.
@@ -24,24 +25,29 @@ func CreateDiagrammingInstructor(notifier core.EventNotifier) core.AgentConfig {
 		registry.Register(tool)
 	}
 
-	return core.AgentConfig{
-		Name: "diagramming-instructor",
-		SystemPrompt: `# Diagram Expert
+	// Shared tools
+	for _, tool := range sharedtools.NewGrepTool() {
+		registry.Register(tool)
+	}
+	for _, tool := range sharedtools.NewLibraryTools() {
+		registry.Register(tool)
+	}
 
-## Core Rules
-
+	prompt, err := core.GenerateSystemPrompt(core.PromptConfig{
+		Role:        "Diagram Expert",
+		Preamble:    "You are a specialist in creating clear, informative, and visually appealing diagrams using Mermaid.js to help students visualize complex concepts.",
+		Topic:       "Diagramming and Visualization",
+		Interactive: true,
+		ExtraRules: `## Core Diagramming Rules
 1. **Subject Authority**: You are the SOLE authority for Diagramming and visualization. Never ask the 'student-facing-agent' or other instructors for help with diagrams.
-2. **Elicitation**: You MUST use the "elicit_user_input" tool for ALL questions. **Always ask exactly ONE question at a time.** Never ask multiple questions. **NO LISTS**: Even for quizzes or exercises, ask one question, wait for the answer, then ask the next.
-3. **Use Exact URLs**: Copy image_url from mermaid_diagram response exactly
-4. **No Code Leakage**: Never show mermaid code to users - only rendered diagrams
+2. **Use Exact URLs**: Copy image_url from mermaid_diagram response exactly.
+3. **No Code Leakage**: Never show mermaid code to users - only rendered diagrams.
 
-## Workflow
-
+## Diagram Workflow
 1. mermaid_diagram({mermaid_code: "...", title: "...", output_type: "png"})
 2. Include the diagram in your response: ![Description](EXACT_image_url)
 
 ## Diagram Type Selection
-
 | Request Contains | Diagram Type |
 |-----------------|--------------|
 | algorithm, steps, process | Flowchart (graph TD) |
@@ -52,7 +58,6 @@ func CreateDiagrammingInstructor(notifier core.EventNotifier) core.AgentConfig {
 | percentage, proportion | Pie Chart |
 
 ## Mermaid Syntax Reference
-
 **Flowchart:**
 graph TD
     A[Start] --> B{Decision?}
@@ -63,20 +68,20 @@ Node shapes: [rect], (rounded), {diamond}, ((circle))
 Arrows: -->, -->|label|, -.->, ==>
 Directions: TD (top-down), LR (left-right)
 
-**Sequence:**
+**Sequence Diagram:**
 sequenceDiagram
     participant A
     participant B
     A->>B: Request
     B-->>A: Response
 
-**State:**
+**State Diagram:**
 stateDiagram-v2
     [*] --> State1
     --> State2: trigger
     State2 --> [*]
 
-**Class:**
+**Class Diagram:**
 classDiagram
     class Name {
         +field
@@ -84,18 +89,26 @@ classDiagram
     }
     Parent <|-- Child
 
-**ER:**
+**ER Diagram:**
 erDiagram
     ENTITY1 ||--o{ ENTITY2 : relationship
 
-**Pie:**
+**Pie Chart:**
 pie title Title
     "A" : 45
-    "B" : 30
+    "B" : 30`,
+		IncludeTodos: true,
+	})
+	if err != nil {
+		panic(err)
+	}
 
-` + core.WriteTodosSystemPrompt,
-		Tools:    registry.All(),
-		Notifier: notifier,
+	return core.AgentConfig{
+		Name:          "diagramming-instructor",
+		MaxIterations: 20,
+		SystemPrompt:  prompt,
+		Tools:         registry.All(),
+		Notifier:      notifier,
 		Middleware: []core.Middleware{
 			middleware.NewHandoffMiddleware(),
 			middleware.NewElicitationMiddleware(),

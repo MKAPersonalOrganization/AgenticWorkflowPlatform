@@ -16,4 +16,5 @@ assets/charts/*.webp
 
 # Binaries
 bin/
-
+books/
+_tmp/
