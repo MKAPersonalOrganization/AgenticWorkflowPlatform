@@ -105,6 +105,7 @@ func (e *Engine) newExecutionState(ctx context.Context, agentName string, runCtx
 		observer: &ObserverUnit{
 			yield:     yield,
 			startTime: timeNowNano(),
+			threadID:  runCtx.ThreadID,
 			result: &ExecutionResult{
 				Success:    true,
 				Reason:     TerminationGoalReached,
@@ -119,8 +120,10 @@ func (e *Engine) newExecutionState(ctx context.Context, agentName string, runCtx
 		persistence: &PersistenceUnit{
 			mgmt: e.threadMgmt,
 		},
+		tools: &ToolProcessor{},
 	}
 	exec.persistence.state = exec
+	exec.tools.state = exec
 
 	if err := exec.initAgentComponents(agentName); err != nil {
 		exec.observer.result.Success = false
@@ -160,6 +163,7 @@ type executionState struct {
 	observer    *ObserverUnit
 	workers     *WorkersUnit
 	persistence *PersistenceUnit
+	tools       *ToolProcessor
 
 	// Current Turn State
 	sm           *stateless.StateMachine
@@ -180,19 +184,86 @@ type ResumptionPlan struct {
 
 // SafetyUnit enforces execution limits and detects infinite loops.
 type SafetyUnit struct {
-	iteration     int
-	total         int
-	maxAgent      int
-	maxTotal      int
-	loopDetector  *LoopDetector
+	iteration    int
+	total        int
+	maxAgent     int
+	maxTotal     int
+	loopDetector *LoopDetector
+}
+
+func (s *SafetyUnit) Guard() error {
+	if s.iteration >= s.maxAgent || s.total >= s.maxTotal {
+		if s.total >= s.maxTotal {
+			return fmt.Errorf("run exceeded total iteration limit (%d)", s.maxTotal)
+		}
+		return fmt.Errorf("agent exceeded maximum iterations (%d)", s.maxAgent)
+	}
+	s.iteration++
+	s.total++
+	return nil
+}
+
+func (s *SafetyUnit) RecordContent(content string) *LoopInfo {
+	return s.loopDetector.RecordContent(content)
+}
+
+func (s *SafetyUnit) RecordToolCall(tc core.ToolCall) *LoopInfo {
+	return s.loopDetector.RecordToolCall(tc)
+}
+
+func (s *SafetyUnit) RecordToolResult(name, result string, isErr bool) *LoopInfo {
+	return s.loopDetector.RecordToolResult(name, result, isErr)
+}
+
+func (s *SafetyUnit) ResetAgentLimits() {
+	s.iteration = 0
+	s.loopDetector.Reset()
 }
 
 // ObserverUnit handles event emission and result reporting.
 type ObserverUnit struct {
-	yield      func(core.Event, error) bool
-	result     *ExecutionResult
-	startTime  int64
-	toolNames  []string
+	yield     func(core.Event, error) bool
+	result    *ExecutionResult
+	startTime int64
+	toolNames []string
+	events    *EventFactory
+	threadID  string
+}
+
+func (o *ObserverUnit) TrackStarted(messageID string) bool {
+	return o.yield(o.events.AssistantStarted(o.threadID, messageID), nil)
+}
+
+func (o *ObserverUnit) TrackCompleted(messageID, content string, toolCalls []domain.ToolCall) bool {
+	return o.yield(o.events.AssistantCompleted(o.threadID, messageID, content, toolCalls), nil)
+}
+
+func (o *ObserverUnit) TrackToolCall(tcID string) bool {
+	return o.yield(o.events.ToolCallCompleted(o.threadID, tcID), nil)
+}
+
+func (o *ObserverUnit) TrackToolExecuted(toolResultID, tcID, name, args, res, messageID string) bool {
+	return o.yield(o.events.ToolCallExecuted(o.threadID, toolResultID, tcID, name, args, res, messageID), nil)
+}
+
+func (o *ObserverUnit) TrackHandoff(target string) bool {
+	return o.yield(o.events.AgentHandoff(o.threadID, target), nil)
+}
+
+func (o *ObserverUnit) TrackHumanInput(messageID, tcID, question string, schema map[string]any) bool {
+	return o.yield(o.events.HumanInputRequested(o.threadID, messageID, tcID, question, schema), nil)
+}
+
+func (o *ObserverUnit) Fail(reason TerminationReason, err error) {
+	o.result.Success = false
+	o.result.Reason = reason
+	o.result.Error = err
+}
+
+func (o *ObserverUnit) FailWithLoop(info *LoopInfo) error {
+	o.Fail(TerminationLoopDetected, fmt.Errorf("loop detected: %s (%d occurrences)", info.Description, info.Occurrences))
+	o.result.LoopInfo = info
+	return o.result.Error
 }
 
 // WorkersUnit provides the specialized tools and processors for the turn.
@@ -233,8 +304,70 @@ func (p *PersistenceUnit) refreshState(agg *domain.ThreadAggregate) {
 	p.state.history = p.mgmt.ToCoreMessages(agg)
 }
 
-func (s *executionState) emit(event core.Event) bool {
-	return s.observer.yield(event, nil)
+// ToolProcessor handles the execution of tools and determination of next steps.
+type ToolProcessor struct {
+	state *executionState
+}
+
+func (p *ToolProcessor) ProcessActions() (*RouteResolver, error) {
+	var route RouteResolver
+	for _, tc := range p.state.streamResult.ToolCalls {
+		p.state.observer.toolNames = append(p.state.observer.toolNames, tc.Function.Name)
+
+		if info := p.state.safety.RecordToolCall(tc); info != nil {
+			return nil, p.state.observer.FailWithLoop(info)
+		}
+
+		if !p.state.observer.TrackToolCall(tc.ID) {
+			return nil, context.Canceled
+		}
+
+		result := p.state.engine.toolExec.Execute(tc, p.state.workers.executor)
+		if info := p.state.safety.RecordToolResult(result.ToolName, result.Result, result.IsError); info != nil {
+			return nil, p.state.observer.FailWithLoop(info)
+		}
+
+		if err := p.state.persistence.AddToolResultMessage(p.state.ctx, tc.ID, result.Result); err != nil {
+			return nil, err
+		}
+
+		toolResultID := core.GenerateID()
+		if !p.state.observer.TrackToolExecuted(toolResultID, tc.ID, result.ToolName, result.Arguments, result.Result, p.state.messageID) {
+			return nil, context.Canceled
+		}
+
+		if res := result.Command; res != nil {
+			if res.Goto != "" {
+				route.HandoffAgent = res.Goto
+			}
+			if res.Elicitation != nil {
+				route.Elicitation = res.Elicitation
+				route.ToolCallID = tc.ID
+			}
+		}
+	}
+	return &route, nil
+}
+
+// RouteResolver determines the next state based on tool results.
+type RouteResolver struct {
+	HandoffAgent string
+	Elicitation  *core.ElicitationSpec
+	ToolCallID   string
+}
+
+func (r *RouteResolver) HasAction() bool {
+	return r.HandoffAgent != "" || r.Elicitation != nil
+}
+
+func (s *executionState) prepareContextForLLM() (*PrepareResult, error) {
+	runCtx := core.RunContext{
+		ThreadID:  s.threadID,
+		MessageID: s.messageID,
+		Thread:    s.thread,
+		Options:   s.options,
+	}
+	return s.workers.llm.Prepare(s.ctx, runCtx, s.history)
 }
 
 func (s *executionState) initAgentComponents(name string) error {
@@ -250,6 +383,8 @@ func (s *executionState) initAgentComponents(name string) error {
 	s.workers.llm = NewLLMContextManager(config, s.engine.threadMgmt, s.engine.reqCtxCapture)
 	s.workers.events = NewEventFactory(config.Name)
 	s.workers.stream = NewStreamProcessor(s.workers.events)
+
+	s.observer.events = s.workers.events
 
 	s.safety.maxAgent = config.MaxIterations
 	if s.safety.maxAgent <= 0 {
@@ -386,7 +521,8 @@ func (r *HistoryReconciler) reconcileElicitation(tc *core.ToolCall) (state, *Str
 }
 
 func (s *executionState) generateAgentResponse() error {
-	if err := s.ensureUnderSafetyLimits(); err != nil {
+	if err := s.safety.Guard(); err != nil {
+		s.observer.Fail(TerminationMaxIterations, err)
 		return err
 	}
 
@@ -416,32 +552,8 @@ func (s *executionState) generateAgentResponse() error {
 	return s.sm.Fire(TrigTurnFinished)
 }
 
-func (s *executionState) ensureUnderSafetyLimits() error {
-	if s.safety.iteration >= s.safety.maxAgent || s.safety.total >= s.safety.maxTotal {
-		s.observer.result.Reason = TerminationMaxIterations
-		s.observer.result.Success = false
-		if s.safety.total >= s.safety.maxTotal {
-			return fmt.Errorf("run exceeded total iteration limit (%d)", s.safety.maxTotal)
-		}
-		return fmt.Errorf("agent %q exceeded maximum iterations (%d)", s.agentName, s.safety.maxAgent)
-	}
-	s.safety.iteration++
-	s.safety.total++
-	return nil
-}
-
-func (s *executionState) prepareContextForLLM() (*PrepareResult, error) {
-	runCtx := core.RunContext{
-		ThreadID:  s.threadID,
-		MessageID: s.messageID,
-		Thread:    s.thread,
-		Options:   s.options,
-	}
-	return s.workers.llm.Prepare(s.ctx, runCtx, s.history)
-}
-
 func (s *executionState) streamAndProcessLLMResponse(llmContext *LLMContext) error {
-	if !s.emit(s.workers.events.AssistantStarted(s.threadID, s.messageID)) {
+	if !s.observer.TrackStarted(s.messageID) {
 		return context.Canceled
 	}
 
@@ -468,8 +580,8 @@ func (s *executionState) streamAndProcessLLMResponse(llmContext *LLMContext) err
 
 func (s *executionState) validateAgentOutput() error {
 	if s.streamResult.Content != "" {
-		if info := s.safety.loopDetector.RecordContent(s.streamResult.Content); info != nil {
-			return s.failWithLoop(TerminationLoopDetected, info)
+		if info := s.safety.RecordContent(s.streamResult.Content); info != nil {
+			return s.observer.FailWithLoop(info)
 		}
 	}
 	return nil
@@ -481,19 +593,27 @@ func (s *executionState) saveAgentMessageAndEmitEvents() error {
 		return err
 	}
 
-	if !s.emit(s.workers.events.AssistantCompleted(s.threadID, s.messageID, s.streamResult.Content, toolCalls)) {
+	if !s.observer.TrackCompleted(s.messageID, s.streamResult.Content, toolCalls) {
 		return context.Canceled
 	}
 	return nil
 }
 
 func (s *executionState) executeRequiredActions() error {
-	var route toolRoute
-	if err := s.executeAllScheduledTools(&route); err != nil {
+	resolution, err := s.tools.ProcessActions()
+	if err != nil {
 		return err
 	}
 
-	return s.handleSpecificRoutingTriggers(route)
+	if resolution.Elicitation != nil {
+		return s.pauseWaitingForHumanInput(resolution.ToolCallID, resolution.Elicitation)
+	}
+
+	if resolution.HandoffAgent != "" {
+		return s.transferControlToAgent(resolution.HandoffAgent)
+	}
+
+	return s.prepareForNextMessageTurn()
 }
 
 func (s *executionState) failWithLoop(reason TerminationReason, info *LoopInfo) error {
@@ -503,68 +623,10 @@ func (s *executionState) failWithLoop(reason TerminationReason, info *LoopInfo) 
 	return fmt.Errorf("loop detected: %s (%d occurrences)", info.Description, info.Occurrences)
 }
 
-func (s *executionState) executeAllScheduledTools(route *toolRoute) error {
-	for _, tc := range s.streamResult.ToolCalls {
-		s.observer.toolNames = append(s.observer.toolNames, tc.Function.Name)
-
-		if info := s.safety.loopDetector.RecordToolCall(tc); info != nil {
-			return s.failWithLoop(TerminationLoopDetected, info)
-		}
-
-		if !s.emit(s.workers.events.ToolCallCompleted(s.threadID, tc.ID)) {
-			return context.Canceled
-		}
-
-		result := s.engine.toolExec.Execute(tc, s.workers.executor)
-		if info := s.safety.loopDetector.RecordToolResult(result.ToolName, result.Result, result.IsError); info != nil {
-			return s.failWithLoop(TerminationLoopDetected, info)
-		}
-
-		if err := s.persistence.AddToolResultMessage(s.ctx, tc.ID, result.Result); err != nil {
-			return err
-		}
-
-		// Emit execution event (Note: we use the internal message index/history to find the true toolResultID if strictly needed,
-		// but typically core.GenerateID() is used here for event tracking consistency)
-		toolResultID := core.GenerateID()
-		if !s.emit(s.workers.events.ToolCallExecuted(s.threadID, toolResultID, tc.ID, result.ToolName, result.Arguments, result.Result, s.messageID)) {
-			return context.Canceled
-		}
-
-		if res := result.Command; res != nil {
-			if res.Goto != "" {
-				route.handoff = res.Goto
-			}
-			if res.Elicitation != nil {
-				route.elicitation = res.Elicitation
-				route.toolID = tc.ID
-			}
-		}
-	}
-	return nil
-}
-
-type toolRoute struct {
-	handoff     string
-	elicitation *core.ElicitationSpec
-	toolID      string
-}
-
-func (s *executionState) handleSpecificRoutingTriggers(route toolRoute) error {
-	if route.elicitation != nil {
-		return s.pauseWaitingForHumanInput(route.toolID, route.elicitation)
-	}
-
-	if route.handoff != "" {
-		return s.transferControlToAgent(route.handoff)
-	}
-
-	return s.prepareForNextMessageTurn()
-}
 
 func (s *executionState) pauseWaitingForHumanInput(toolID string, spec *core.ElicitationSpec) error {
 	s.observer.result.Reason = TerminationElicitation
-	if !s.emit(s.workers.events.HumanInputRequested(s.threadID, s.messageID, toolID, spec.Question, spec.Schema)) {
+	if !s.observer.TrackHumanInput(s.messageID, toolID, spec.Question, spec.Schema) {
 		return context.Canceled
 	}
 	return s.sm.Fire(TrigHumanInputNeeded)
@@ -583,7 +645,7 @@ func (s *executionState) transferControlToAgent(targetAgent string) error {
 	s.observer.result.Reason = TerminationHandoff
 	s.observer.result.HandoffTarget = targetAgent
 
-	if !s.emit(s.workers.events.AgentHandoff(s.threadID, targetAgent)) {
+	if !s.observer.TrackHandoff(targetAgent) {
 		return context.Canceled
 	}
 
@@ -591,7 +653,7 @@ func (s *executionState) transferControlToAgent(targetAgent string) error {
 		return err
 	}
 
-	s.safety.loopDetector.Reset()
+	s.safety.ResetAgentLimits()
 	s.messageID = core.GenerateID()
 
 	return s.sm.Fire(TrigHandoffInitiated, targetAgent)
