@@ -44,6 +44,7 @@ import (
 	aguihandlers "school-with-ai/handlers/agui"
 	healthhandlers "school-with-ai/handlers/health"
 	taskmgmthandlers "school-with-ai/handlers/taskmgmt"
+	"school-with-ai/handlers/profile"
 
 	authService "school-with-ai/services/auth"
 
@@ -237,6 +238,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 		}
 	}()
 
+	// Initialize Student Profile Repository
+	studentProfileRepo := sqldb.NewPostgresStudentProfileRepository(db)
+
 	// Run migrations
 	log.Info(ctx, "startup", "status", "running database migrations")
 	if err := migrate.Migrate(ctx, db); err != nil {
@@ -334,6 +338,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	agentOrchestrator := agentorchestrator.New(log, chatClient, eventLog,
 		agentorchestrator.WithArtifactService(artifactService),
 		agentorchestrator.WithMemoryEnabled(cfg.AgentCapabilities.LongTermMemory),
+		agentorchestrator.WithStudentProfileRepository(studentProfileRepo),
 	)
 
 	threadRepo := domain.NewThreadRepository(threadmgmt.NewEventStoreAdapter(eventLog))
@@ -429,6 +434,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 	authHandlers := auth.NewAuthHandlers(log, kratosClient, cfg.Auth.AppURL)
 	authMiddleware := auth.NewMiddleware(kratosClient, cfg.Auth.AppURL)
 
+	// Profile Handler
+	profileHandler := profile.NewHandler(log, studentProfileRepo)
+
 	// Health check endpoints (public)
 	r.Get("/liveness", healthHandler.Liveness)
 	r.Get("/readiness", healthHandler.Readiness)
@@ -443,6 +451,11 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// Protected auth routes
 	r.Get("/auth/settings", authMiddleware.RequireAuthFunc(authHandlers.SettingsPage))
+
+	// Profile routes (protected)
+	r.Get("/profile", authMiddleware.RequireAuthFunc(profileHandler.HandleProfilePage))
+	r.Get("/api/profile", authMiddleware.RequireAuthFunc(profileHandler.GetProfile))
+	r.Put("/api/profile", authMiddleware.RequireAuthFunc(profileHandler.UpdateProfile))
 
 	// Pricing page
 	r.Get("/pricing", authMiddleware.RequireAuthFunc(HandlePricingPage(log)))

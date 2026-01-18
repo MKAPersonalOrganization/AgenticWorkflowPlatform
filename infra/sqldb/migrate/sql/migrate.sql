@@ -83,3 +83,17 @@ VALUES
     ('agui', 0, 0),
     ('llm_context', 0, 0)
 ON CONFLICT (projection_name) DO NOTHING;
+
+-- Version: 1.09
+-- Description: Create student profiles table
+CREATE TABLE IF NOT EXISTS student_profiles (
+    user_id VARCHAR(255) PRIMARY KEY,
+    learning_style VARCHAR(255),
+    struggles TEXT[],
+    strengths TEXT[],
+    goals TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_student_profiles_updated ON student_profiles(updated_at);
