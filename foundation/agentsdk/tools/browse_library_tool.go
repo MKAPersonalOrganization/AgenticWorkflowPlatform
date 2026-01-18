@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/services/studentbooks"
-	"strings"
 )
 
 // BrowseLibraryArgs represents the arguments for the browse_library tool.
@@ -64,44 +63,7 @@ func (t *BrowseLibraryTool) Invoke(ctx core.ToolContext, args any) (any, error) 
 		}, nil
 	}
 
-	var sb strings.Builder
-	if params.Path == "" || params.Path == "." {
-		sb.WriteString("Academic Library (Root):\n\n")
-	} else {
-		// Detect if this is a resource map (headings) or directory listing
-		isResourceMap := false
-		for _, node := range nodes {
-			if strings.HasPrefix(string(node.Type), "heading-") {
-				isResourceMap = true
-				break
-			}
-		}
-
-		if isResourceMap {
-			sb.WriteString(fmt.Sprintf("Resource Map for '%s':\n\n", params.Path))
-		} else {
-			sb.WriteString(fmt.Sprintf("Contents of '%s':\n\n", params.Path))
-		}
-	}
-
-	for _, node := range nodes {
-		if strings.HasPrefix(string(node.Type), "heading-") {
-			// Prettify resource map
-			level := 0
-			fmt.Sscanf(string(node.Type), "heading-%d", &level)
-			indent := strings.Repeat("  ", level-1)
-			sb.WriteString(fmt.Sprintf("%s- %s\n", indent, node.Name))
-		} else {
-			sb.WriteString(fmt.Sprintf("- [%s] %s (Path: %s)\n", node.Type, node.Name, node.Path))
-		}
-	}
-
-	if len(nodes) == 0 {
-		sb.WriteString("No items found at this location.")
-	}
-
 	return map[string]any{
-		"content": sb.String(),
-		"nodes":   nodes,
+		"nodes": nodes,
 	}, nil
 }

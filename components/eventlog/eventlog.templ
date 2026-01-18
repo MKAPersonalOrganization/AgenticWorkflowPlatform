@@ -82,11 +82,23 @@ templ EventLog() {
 						<span class="text-[10px] text-muted-foreground/60" x-text="`ID: ${event.id.slice(-6)}`"></span>
 					</div>
 					<div class="mt-1 text-[11px] text-muted-foreground break-all">
-						<template x-if="event.data && (event.data.value || event.data.message || event.data.content)">
-							<span x-text="event.data.value || event.data.message || event.data.content"></span>
+						<template x-if="event.type === 'CUSTOM'">
+							<div class="space-y-1">
+								<div class="font-semibold text-foreground/80" x-text="event.data.name"></div>
+								<template x-if="event.data.value">
+									<pre class="p-1.5 bg-background/50 rounded text-[10px] overflow-x-auto" x-text="JSON.stringify(event.data.value, null, 2)"></pre>
+								</template>
+							</div>
 						</template>
-						<template x-if="!event.data || (!event.data.value && !event.data.message && !event.data.content)">
-							<span x-text="JSON.stringify(event.data)"></span>
+						<template x-if="event.type !== 'CUSTOM'">
+							<div>
+								<template x-if="event.data && (event.data.value || event.data.message || event.data.content || event.data.delta)">
+									<span x-text="typeof (event.data.value || event.data.message || event.data.content || event.data.delta) === 'object' ? JSON.stringify(event.data.value || event.data.message || event.data.content || event.data.delta, null, 2) : (event.data.value || event.data.message || event.data.content || event.data.delta)"></span>
+								</template>
+								<template x-if="!event.data || (!event.data.value && !event.data.message && !event.data.content && !event.data.delta)">
+									<pre class="p-1.5 bg-background/50 rounded text-[10px] overflow-x-auto" x-text="JSON.stringify(event.data, null, 2)"></pre>
+								</template>
+							</div>
 						</template>
 					</div>
 				</div>
