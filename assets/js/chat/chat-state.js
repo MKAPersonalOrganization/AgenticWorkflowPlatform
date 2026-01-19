@@ -91,6 +91,7 @@ export function createInitialState() {
         __toastIdCounter: 0,
 
         // Theme management
+        // Theme management
         theme: 'system',
 
         // Accessibility
