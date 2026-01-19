@@ -4,8 +4,19 @@ import "school-with-ai/components/button"
 import "school-with-ai/components/separator"
 import "school-with-ai/components/sidebar"
 import "school-with-ai/components/icon"
+import "school-with-ai/components/tooltip"
+import "school-with-ai/components/popover"
+import "school-with-ai/domain"
 
-templ ThreadHistory() {
+type Props struct {
+	User *domain.User
+}
+
+templ ThreadHistory(props ...Props) {
+	{{ var p Props }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
 	@sidebar.Sidebar(sidebar.Props{
 		ID:          "thread-history-sidebar",
 		Side:        sidebar.SideLeft,
@@ -18,87 +29,227 @@ templ ThreadHistory() {
 		},
 	}) {
 		@sidebar.Header() {
-			<div class="flex items-center justify-end px-2 pt-2">
-				<!-- Close Sidebar Button -->
-				@button.Button(button.Props{
-					Size:    button.SizeIcon,
-					Variant: button.VariantGhost,
-					Class:   "size-8 md:hidden hover:bg-sidebar-accent/50",
-					Attributes: templ.Attributes{
-						"data-tui-sheet-close": "thread-history-sidebar-mobile",
-					},
-				}) {
-					@icon.X(icon.Props{Class: "size-5"})
-					<span class="sr-only">Close Thread History</span>
-				}
-				<div class="hidden md:block">
+				<div class="flex items-center justify-between w-full px-2 pt-2">
+					<!-- Sidebar Toggle (Left) -->
 					@button.Button(button.Props{
 						Size:    button.SizeIcon,
 						Variant: button.VariantGhost,
-						Class:   "size-8 hover:bg-sidebar-accent/50",
+						Class:   "size-9 hover:bg-sidebar-accent/50 rounded-lg",
 						Attributes: templ.Attributes{
 							"data-tui-sidebar-trigger": true,
 							"data-tui-sidebar-target":  "thread-history-sidebar",
+							"class":                    "hidden md:inline-flex",
 						},
 					}) {
-						@icon.PanelLeftClose(icon.Props{Class: "size-5"})
-						<span class="sr-only">Close Thread History</span>
+						@icon.PanelLeftClose(icon.Props{Class: "size-5 text-sidebar-foreground"})
+						<span class="sr-only">Close Sidebar</span>
 					}
-				</div>
-			</div>
-			@separator.Separator(separator.Props{Class: "mt-2 mb-4 opacity-50"})
-		}
-		@sidebar.Content() {
-			<!-- Action Buttons Stack -->
-			<div class="px-4 py-2 space-y-3">
-				<!-- New Chat Button -->
-				@button.Button(button.Props{
-					Variant: button.VariantDefault,
-					Class:   "w-full justify-start gap-3 shadow-md h-12 text-base font-medium transition-all hover:shadow-lg hover:-translate-y-0.5",
-					Attributes: templ.Attributes{
-						"@click": "createNewSession()",
-					},
-				}) {
-					@icon.Plus(icon.Props{Class: "size-5"})
-					<span>New Chat</span>
-				}
-				<!-- Future buttons can be added here -->
-			</div>
-			@separator.Separator(separator.Props{Class: "my-4 opacity-50"})
-			<!-- Thread List -->
-			@sidebar.Menu(sidebar.MenuProps{Class: "px-2 gap-1.5"}) {
-				<template x-for="session in sessions" :key="session.id">
-					@sidebar.MenuItem() {
-						<div class="flex items-center gap-2 w-full group/item px-2">
-							@sidebar.MenuButton(sidebar.MenuButtonProps{
-								Class: "flex-1 relative h-11 text-base py-2.5 transition-all duration-200",
+					<!-- Mobile Toggle -->
+					@button.Button(button.Props{
+						Size:    button.SizeIcon,
+						Variant: button.VariantGhost,
+						Class:   "size-9 md:hidden hover:bg-sidebar-accent/50 rounded-lg",
+						Attributes: templ.Attributes{
+							"data-tui-sheet-close": "thread-history-sidebar-mobile",
+						},
+					}) {
+						@icon.X(icon.Props{Class: "size-5 text-sidebar-foreground"})
+						<span class="sr-only">Close Sidebar</span>
+					}
+
+					<!-- New Chat Button (Right) -->
+					@tooltip.Tooltip(tooltip.Props{}) {
+						@tooltip.Trigger(tooltip.TriggerProps{}) {
+							@button.Button(button.Props{
+								Size:    button.SizeIcon,
+								Variant: button.VariantGhost,
+								Class:   "size-9 hover:bg-sidebar-accent/50 rounded-lg",
 								Attributes: templ.Attributes{
-									"@click":             "switchSession(session.id)",
-									":class":             "threadId === session.id ? 'bg-sidebar-accent font-medium text-foreground shadow-sm scale-[1.02]' : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'",
-									"x-bind:data-active": "threadId === session.id",
-									"class":              "transition-all duration-300 ease-out",
+									"@click": "createNewSession()",
 								},
 							}) {
-								<div class="flex items-center gap-3 w-full">
-									<!-- Streaming indicator -->
-									<span x-show="isThreadStreaming(session.id)" class="flex h-2.5 w-2.5 relative shrink-0">
-										<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-										<span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary"></span>
-									</span>
-									<span class="truncate flex-1" x-text="session.title"></span>
-								</div>
+								@icon.SquarePen(icon.Props{Class: "size-5 text-sidebar-foreground"})
+								<span class="sr-only">New Chat</span>
 							}
-							@ContextMenu(ContextMenuProps{
-								ThreadID: "session.id",
-							})
-						</div>
+						}
+						@tooltip.Content(tooltip.ContentProps{Class: "bg-popover text-popover-foreground"}) {
+							 New Chat
+						}
 					}
+				</div>
+			<!-- Search Bar -->
+			<div class="px-3 pb-2 pt-1">
+				<div class="group relative flex h-10 items-center gap-3 rounded-lg border-2 border-transparent px-3 py-2 text-foreground focus-within:border-ring/20 focus-within:bg-sidebar-accent/50 hover:bg-sidebar-accent/30 transition-all cursor-text"
+					@click="$refs.searchInput.focus()">
+					@icon.Search(icon.Props{Class: "absolute left-3 h-4 w-4 text-muted-foreground group-focus-within:text-foreground"})
+					<input 
+						x-ref="searchInput"
+						type="text" 
+						placeholder="Search chats..." 
+						class="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none pl-7"
+					/>
+				</div>
+			</div>
+
+			@separator.Separator(separator.Props{Class: "opacity-50"})
+			
+			<!-- Thread List -->
+			<div class="flex-1 overflow-y-auto scrollbar-transparent scrollbar-hover px-2 gap-0.5 pt-2">
+				<template x-for="group in getGroupedSessions()" :key="group.title">
+					<div class="mb-4">
+						<div class="px-2 py-1 text-xs font-semibold text-muted-foreground mb-1 sticky top-0 bg-sidebar/95 backdrop-blur-sm z-10" x-text="group.title"></div>
+						<ul class="space-y-0.5">
+							<template x-for="session in group.sessions" :key="session.id">
+								<li>
+									<div class="group relative flex h-[34px] w-full items-center rounded-lg px-2 gap-2 hover:bg-sidebar-accent/50 transition-colors cursor-pointer"
+										:class="threadId === session.id ? 'bg-sidebar-accent' : ''"
+										@click="switchSession(session.id)"
+										x-bind:data-active="threadId === session.id">
+										
+										<!-- LibreChat Style Vertical Active Indicator -->
+										<!-- Adjusted: w-0.5 (2px), rounded-full, bg-foreground (black/white), left-0 -->
+										<div class="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-foreground transition-opacity"
+											x-show="threadId === session.id"
+											x-transition:enter="transition ease-out duration-200"
+											x-transition:enter-start="opacity-0 scale-y-50"
+											x-transition:enter-end="opacity-100 scale-y-100"
+											style="display: none;"></div>
+
+										<div class="flex items-center gap-2 w-full overflow-hidden">
+											<!-- Chat Icon (Placeholder for EndpointIcon) -->
+											<!-- Using MessageSquare as generic chat icon, simpler than endpoint logos for now -->
+											<div class="shrink-0 text-muted-foreground group-hover:text-foreground transition-colors"
+												:class="threadId === session.id ? 'text-foreground' : ''">
+												@icon.MessageSquare(icon.Props{Class: "size-4"})
+											</div>
+
+											<!-- Streaming indicator (replaces icon if streaming?) - keeping it separate/overlay for now -->
+											<span x-show="isThreadStreaming(session.id)" class="absolute left-2 flex h-2 w-2">
+												<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+												<span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+											</span>
+											
+											<!-- Title with Gradient Fade -->
+											<div class="relative flex-1 overflow-hidden whitespace-nowrap text-sm"
+												:class="threadId === session.id ? 'font-medium text-foreground' : 'text-sidebar-foreground'">
+												<span x-text="session.title"></span>
+												
+												<!-- Gradient Overlay for long text -->
+												<div class="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-sidebar group-hover:from-sidebar-accent/50 transition-colors"
+													:class="threadId === session.id ? 'from-sidebar-accent' : ''"></div>
+											</div>
+										</div>
+										
+										<!-- Context Menu (only visible on hover/active) -->
+										<div class="shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+											:class="threadId === session.id ? 'opacity-100' : ''">
+											@ContextMenu(ContextMenuProps{
+												ThreadID: "session.id",
+											})
+										</div>
+									</div>
+								</li>
+							</template>
+						</ul>
+					</div>
 				</template>
-				<!-- Loading indicator for infinite scroll -->
-				<li x-show="sessionsLoading" class="flex justify-center py-2">
-					<span class="animate-spin size-4 border-2 border-primary border-t-transparent rounded-full"></span>
-				</li>
-			}
+
+				<!-- Infinite Scroll Sentinel & Loading Indicator -->
+				<div x-show="sessionsHasMore" x-intersect.margin.200px="__loadMoreSessions()" class="flex justify-center py-2 h-10 w-full">
+					<span x-show="sessionsLoading" class="animate-spin size-4 border-2 border-primary border-t-transparent rounded-full"></span>
+				</div>
+			</div>
+
+			<!-- Footer: User Profile -->
+			@separator.Separator(separator.Props{Class: "opacity-50"})
+			<!-- Footer: User Profile -->
+			@separator.Separator(separator.Props{Class: "opacity-50"})
+			<div class="p-2">
+			    @popover.Trigger(popover.TriggerProps{
+                    For: "sidebar-profile-popover",
+                }) {
+                    @button.Button(button.Props{
+                        Variant: button.VariantGhost,
+                        Class:   "w-full justify-start h-12 px-2 hover:bg-sidebar-accent/50 rounded-lg gap-3",
+                    }) {
+                        if p.User != nil {
+                            <div class="size-8 rounded-full bg-muted flex items-center justify-center overflow-hidden shrink-0">
+                                @icon.User(icon.Props{Class: "size-5 text-muted-foreground"})
+                            </div>
+                            <div class="flex flex-col items-start overflow-hidden text-left flex-1">
+                                <span class="text-sm font-medium truncate w-full">{ p.User.GetDisplayName() }</span>
+                                <span class="text-xs text-muted-foreground truncate w-full">{ p.User.Email }</span>
+                            </div>
+                        } else {
+                             <div class="size-8 rounded-full bg-muted flex items-center justify-center overflow-hidden shrink-0">
+                                @icon.User(icon.Props{Class: "size-5 text-muted-foreground"})
+                            </div>
+                            <div class="flex flex-col items-start overflow-hidden text-left flex-1">
+                                <span class="text-sm font-medium truncate w-full">Guest</span>
+                            </div>
+                        }
+                        @icon.Settings(icon.Props{Class: "size-4 text-muted-foreground ml-auto"})
+                    }
+                }
+                @popover.Content(popover.ContentProps{
+                    ID:        "sidebar-profile-popover",
+                    Class:     "w-64 mb-2 ml-2", 
+                    Placement: popover.PlacementTop,
+                }) {
+                    <div class="space-y-1">
+                        if p.User != nil {
+                            <!-- Authenticated User Section -->
+                            <div class="px-2 py-1.5">
+                                <div class="text-sm font-semibold truncate">{ p.User.Email }</div>
+                                <div class="text-xs text-muted-foreground truncate">{ p.User.ID }</div>
+                            </div>
+                            <div class="border-t border-border my-1"></div>
+                            
+                            <!-- Student Profile Link -->
+                            <a href="/profile" class="flex items-center gap-3 w-full px-2 py-2 text-sm rounded-md hover:bg-accent transition-colors">
+                                @icon.BookOpen(icon.Props{Class: "size-4"})
+                                <span class="flex-1 text-left">Student Profile</span>
+                            </a>
+
+                            <!-- Account Settings Link -->
+                            <a href="/auth/settings" class="flex items-center gap-3 w-full px-2 py-2 text-sm rounded-md hover:bg-accent transition-colors">
+                                @icon.Settings(icon.Props{Class: "size-4"})
+                                <span class="flex-1 text-left">Settings</span>
+                            </a>
+                            
+                            <div class="border-t border-border my-1"></div>
+
+                            <!-- Theme Toggle -->
+                            <button
+                                @click="toggleTheme()"
+                                class="flex items-center gap-3 w-full px-2 py-2 text-sm rounded-md hover:bg-accent transition-colors"
+                                type="button"
+                            >
+                                <div class="flex items-center justify-center size-4">
+                                     <svg x-show="theme === 'light'" class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                                     <svg x-show="theme === 'dark'" class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+                                     <svg x-show="theme === 'system'" class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                                </div>
+                                <span class="flex-1 text-left">Theme: <span x-text="theme.charAt(0).toUpperCase() + theme.slice(1)"></span></span>
+                            </button>
+
+                            <div class="border-t border-border my-1"></div>
+
+                            <!-- Logout Button -->
+                            <a href="/auth/logout" class="flex items-center gap-3 w-full px-2 py-2 text-sm rounded-md hover:bg-accent text-destructive hover:text-destructive transition-colors">
+                                @icon.LogOut(icon.Props{Class: "size-4"})
+                                <span class="flex-1 text-left">Log out</span>
+                            </a>
+                        } else {
+                            <!-- Login/Register for Guests -->
+                             <a href="/auth/login" class="flex items-center gap-3 w-full px-2 py-2 text-sm rounded-md hover:bg-accent transition-colors">
+                                @icon.LogIn(icon.Props{Class: "size-4"})
+                                <span class="flex-1 text-left">Log in</span>
+                            </a>
+                        }
+                    </div>
+                }
+			</div>
 		}
 	}
 }

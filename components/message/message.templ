@@ -15,7 +15,7 @@ templ UserMessage() {
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
 				</svg>
 			</button>
-			<div class="bg-muted ml-auto w-fit rounded-3xl px-4 py-2 text-right prose prose-sm text-sm text-foreground" x-html="renderMarkdown(message.content)"></div>
+			<div class="bg-muted ml-auto w-fit rounded-3xl px-4 py-2 text-right prose prose-sm text-sm text-foreground dark:[&_*]:text-white" x-html="renderMarkdown(message.content)"></div>
 		</div>
 	</div>
 }
@@ -34,7 +34,7 @@ templ AssistantMessage() {
 				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
 			</svg>
 		</button>
-		<div class="prose prose-sm max-w-none text-sm leading-relaxed" x-html="renderMarkdown(message.content)"></div>
+		<div class="prose prose-sm max-w-none text-sm leading-relaxed text-foreground dark:[&_*]:text-white" x-html="renderMarkdown(message.content)"></div>
 		<!-- Streaming Indicator -->
 		<div x-show="message.streaming" class="flex items-center gap-1 text-muted-foreground">
 			<span class="w-1 h-1 bg-current rounded-full animate-pulse"></span>

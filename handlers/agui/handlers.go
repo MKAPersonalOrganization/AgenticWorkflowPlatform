@@ -83,7 +83,7 @@ func (h *AguiProjectionHandler) ListThreads(w http.ResponseWriter, r *http.Reque
 
 	// Parse query params
 	cursor := r.URL.Query().Get("cursor")
-	limit := 20 // default
+	limit := 10 // default
 	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
 		parsedLimit, err := strconv.Atoi(limitStr)
 		if err != nil || parsedLimit < 1 {
