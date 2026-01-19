@@ -1,4 +1,4 @@
-// templui component textarea - version: v1.0.0 installed by templui v1.0.0
+// templui component textarea - version: v1.2.0 installed by templui v1.2.0
 // 📚 Documentation: https://templui.io/docs/components/textarea
 package textarea
 
@@ -56,7 +56,7 @@ templ Textarea(props ...Props) {
 		class={
 			utils.TwMerge(
 				// Base styles
-				"flex w-full min-w-0 rounded-xl border border-input bg-transparent px-3 py-2 text-base shadow-sm transition-all duration-200 outline-none md:text-sm",
+				"flex w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none md:text-sm",
 				"min-h-[80px]", // Default min-height
 				// Dark mode background
 				"dark:bg-input/30",
@@ -65,7 +65,7 @@ templ Textarea(props ...Props) {
 				// Placeholder
 				"placeholder:text-muted-foreground",
 				// Focus styles
-				"focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0 focus:border-ring",
+				"focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
 				// Disabled styles
 				"disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
 				// Error/Invalid styles
@@ -81,5 +81,5 @@ templ Textarea(props ...Props) {
 }
 
 templ Script() {
-	<script defer nonce={ templ.GetNonce(ctx) } src={ "/assets/js/textarea.min.js?v=" + utils.ScriptVersion }></script>
+	<script defer nonce={ templ.GetNonce(ctx) } src={ utils.ScriptURL("/assets/js/textarea.min.js") }></script>
 }
