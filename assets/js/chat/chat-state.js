@@ -161,6 +161,53 @@ export function createStateMethods() {
                     this.__updatePending = false;
                 });
             }
+        },
+
+        /**
+         * Update derived state based on current messages.
+         * This ensures a Single Source of Truth for UI state.
+         */
+        __updateDerivedState() {
+            const state = this.__getThreadState();
+            const msgs = state.messages;
+
+            // Default: reset state
+            let isWaiting = false;
+            let question = null;
+            let schema = null;
+
+            if (msgs && msgs.length > 0) {
+                const lastMsg = msgs[msgs.length - 1];
+
+                // Check if last message is an 'ask_human' tool call
+                // Criteria:
+                // 1. Type is tool_call
+                // 2. Name is ask_human
+                // 3. Status is completed (arguments fully received)
+                // 4. No result (not answered yet)
+                if (
+                    lastMsg.type === 'tool_call' &&
+                    lastMsg.name === 'ask_human' &&
+                    lastMsg.status === 'completed' &&
+                    !lastMsg.result
+                ) {
+                    isWaiting = true;
+                    question = lastMsg.parsedArgs?.question || null;
+                    schema = lastMsg.parsedArgs?.schema || null;
+                }
+            }
+
+            // Only update if changed to avoid unnecessary re-renders
+            if (
+                state.awaitingHumanInput !== isWaiting ||
+                state.humanInputQuestion !== question ||
+                state.humanInputSchema !== schema
+            ) {
+                state.awaitingHumanInput = isWaiting;
+                state.humanInputQuestion = question;
+                state.humanInputSchema = schema;
+                console.log(`[State] Derived elicitation state: ${isWaiting ? 'Active' : 'Inactive'}`);
+            }
         }
     };
 }

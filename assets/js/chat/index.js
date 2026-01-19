@@ -128,7 +128,12 @@ document.addEventListener('alpine:init', () => {
             },
 
             get canSendElicitation() {
-                return this.elicitationAnswer.trim() !== '' && !this.isStreaming;
+                // Allow replying if we have an answer AND:
+                // 1. We are NOT streaming (standard case)
+                // OR
+                // 2. We ARE streaming BUT we are explicitly waiting for human input (blocking tool call)
+                // This fixes the bug where the reply button was disabled during the 'ask_human' state
+                return this.elicitationAnswer.trim() !== '' && (!this.isStreaming || this.awaitingHumanInput);
             },
 
             get currentThread() {

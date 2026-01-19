@@ -194,16 +194,3 @@ func (e AgentHandoffEvent) EventType() string         { return "AgentHandoff" }
 func (e AgentHandoffEvent) EventTimestamp() time.Time { return e.Timestamp }
 func (e AgentHandoffEvent) AggregateID() string       { return e.ThreadID }
 
-// HumanInputRequestedEvent is emitted when an agent requests input from a human.
-type HumanInputRequestedEvent struct {
-	ThreadID   string         `json:"threadId"`
-	MessageID  string         `json:"messageId"`
-	ToolCallID string         `json:"toolCallId"`
-	Question   string         `json:"question"`
-	Schema     map[string]any `json:"schema"`
-	Timestamp  time.Time      `json:"timestamp"`
-}
-
-func (e HumanInputRequestedEvent) EventType() string         { return "HumanInputRequested" }
-func (e HumanInputRequestedEvent) EventTimestamp() time.Time { return e.Timestamp }
-func (e HumanInputRequestedEvent) AggregateID() string       { return e.ThreadID }

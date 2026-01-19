@@ -108,12 +108,6 @@ func deserializeDomainEvent(eventType string, data []byte) (core.Event, error) {
 		}
 		return &evt, nil
 
-	case "HumanInputRequested":
-		var evt domain.HumanInputRequestedEvent
-		if err := json.Unmarshal(data, &evt); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal HumanInputRequested: %w", err)
-		}
-		return &evt, nil
 
 	case "AgentHandoff":
 		var evt domain.AgentHandoffEvent

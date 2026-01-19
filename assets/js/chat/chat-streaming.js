@@ -434,12 +434,10 @@ export function createStreamingMethods() {
                     });
                     toolMsg.parsedArgs = parsed || { raw: argsString };
 
-                    // Detect elicitation: if this is ask_human, set elicitation state
+                    // Detect elicitation: if this is ask_human, allow component to react via derived state
                     if (toolMsg.name === 'ask_human') {
-                        state.humanInputQuestion = toolMsg.parsedArgs?.question;
-                        state.humanInputSchema = toolMsg.parsedArgs?.schema;
-                        state.awaitingHumanInput = true;
-                        console.log('Elicitation detected from ask_human tool:', toolMsg.parsedArgs?.question);
+                        console.log('Elicitation tool call ended:', toolMsg.parsedArgs?.question);
+                        this.__updateDerivedState();
                     }
                 }
             }
