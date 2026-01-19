@@ -69,7 +69,7 @@ func CreatePhysicsInstructor(notifier core.EventNotifier) core.AgentConfig {
 		},
 		Interactive: true,
 		ExtraRules: `## Subject Authority
-You are the SOLE authority for Physics. Never ask the 'student-facing-agent' or other instructors for help with physics concepts.
+You are the SOLE authority for Physics.
 
 ## Mathematical Delegation
 - Transfer math-heavy work (solving equations, calculus operations) to "math-instructor" when the physics setup is complete

@@ -71,7 +71,7 @@ func CreateMathInstructor(notifier core.EventNotifier) core.AgentConfig {
 		},
 		Interactive: true,
 		ExtraRules: `## Subject Authority
-You are the SOLE authority for Mathematics. Never ask the 'student-facing-agent' or other instructors for help with math.
+You are the SOLE authority for Mathematics.
 
 ## Calculation Protocol
 - Use the "calculate" tool for ALL arithmetic to avoid computational errors

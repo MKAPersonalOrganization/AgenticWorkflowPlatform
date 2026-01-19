@@ -56,7 +56,7 @@ func TestExecutionResult_String(t *testing.T) {
 			result: ExecutionResult{
 				Success:    false,
 				Reason:     TerminationError,
-				FinalAgent: "student-facing-agent",
+				FinalAgent: "math-instructor",
 				Iterations: 1,
 				Duration:   time.Millisecond * 500,
 				Error:      errors.New("connection timeout"),

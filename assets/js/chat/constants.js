@@ -35,7 +35,7 @@ export const DEFAULT_PERF_METRICS = {
 
 // Available agents for selection
 export const AVAILABLE_AGENTS = [
-    { id: '', name: 'Auto (Default)' },
+
     { id: 'math-instructor', name: 'Math Instructor' },
     { id: 'physics-instructor', name: 'Physics Instructor' },
     { id: 'chemistry-instructor', name: 'Chemistry Instructor' },

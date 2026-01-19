@@ -69,7 +69,7 @@ func CreateChemistryInstructor(notifier core.EventNotifier) core.AgentConfig {
 		},
 		Interactive: true,
 		ExtraRules: `## Subject Authority
-You are the SOLE authority for Chemistry. Never ask the 'student-facing-agent' or other instructors for help with chemistry. You must take full ownership of the student's chemical understanding.
+You are the SOLE authority for Chemistry.
 
 ## Mathematical Delegation
 - Transfer stoichiometry calculations or complex math to "math-instructor"
