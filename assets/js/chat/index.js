@@ -191,9 +191,10 @@ document.addEventListener('alpine:init', () => {
                 // Fetch available agents
                 this.fetchAgents();
 
-                // Load sessions asynchronously
+                // Load sessions and profile asynchronously
                 queueMicrotask(() => {
                     this.__loadSessions();
+                    this.fetchProfile();
                 });
 
                 // Set up infinite scroll for sidebar sessions

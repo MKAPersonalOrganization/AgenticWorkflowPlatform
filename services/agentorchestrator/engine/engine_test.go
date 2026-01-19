@@ -255,5 +255,3 @@ func TestEngine_Run(t *testing.T) {
 		t.Error("Did not find AssistantCompletedEvent")
 	}
 }
-
-

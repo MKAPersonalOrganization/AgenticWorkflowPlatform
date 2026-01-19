@@ -107,8 +107,6 @@ func (f *EventFactory) ToolCallExecuted(
 	}
 }
 
-
-
 // RunStarted creates a RunStartedEvent.
 func (f *EventFactory) RunStarted(threadID, runID string) *domain.RunStartedEvent {
 	return &domain.RunStartedEvent{
@@ -136,4 +134,3 @@ func (f *EventFactory) RunError(threadID, message, errorCode string) *domain.Run
 		Timestamp: time.Now(),
 	}
 }
-

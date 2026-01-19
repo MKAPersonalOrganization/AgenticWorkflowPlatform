@@ -109,7 +109,7 @@ When you detect these, explicitly name the misconception and correct it.
 		MaxIterations: 20,
 		SystemPrompt:  prompt,
 		Tools:         registry.All(),
-		Notifier: notifier,
+		Notifier:      notifier,
 		Middleware: []core.Middleware{
 			middleware.NewElicitationMiddleware(),
 		},

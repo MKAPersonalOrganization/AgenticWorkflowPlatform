@@ -32,6 +32,51 @@ export function createUIMethods() {
             this.showKeyboardShortcuts = !this.showKeyboardShortcuts;
         },
 
+        toggleSettings() {
+            this.showSettings = !this.showSettings;
+            if (this.showSettings) {
+                this.fetchProfile();
+            }
+        },
+
+        async fetchProfile() {
+            this.profileLoading = true;
+            try {
+                const response = await fetch('/api/profile');
+                if (response.ok) {
+                    const data = await response.json();
+                    this.profile = {
+                        ...data,
+                        struggles: Array.isArray(data.struggles) ? data.struggles.join(', ') : (data.struggles || ''),
+                        strengths: Array.isArray(data.strengths) ? data.strengths.join(', ') : (data.strengths || '')
+                    };
+                }
+            } catch (error) {
+                console.error('Failed to fetch profile:', error);
+                this.showToast('Failed to load profile', 'error');
+            } finally {
+                this.profileLoading = false;
+            }
+        },
+
+        async updateProfile() {
+            try {
+                const response = await fetch('/api/profile', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(this.profile)
+                });
+                if (response.ok) {
+                    this.showToast('Profile updated successfully', 'success');
+                } else {
+                    this.showToast('Failed to update profile', 'error');
+                }
+            } catch (error) {
+                console.error('Failed to update profile:', error);
+                this.showToast('Failed to update profile', 'error');
+            }
+        },
+
         toggleEventLog() {
             this.showEventLog = !this.showEventLog;
             if (this.showEventLog) {

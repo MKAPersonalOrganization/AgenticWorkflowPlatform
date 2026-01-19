@@ -111,4 +111,3 @@ func (h *AguiProjectionHandler) ListThreads(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 	}
 }
-

@@ -6,12 +6,12 @@ import "school-with-ai/components/icon"
 
 templ ChatInput() {
 	<div
-		class="relative z-10 mx-auto w-full max-w-3xl rounded-3xl border border-transparent bg-background shadow-xl transition-all duration-300 focus-within:shadow-2xl focus-within:border-border/50"
+		class="relative z-10 mx-auto w-full max-w-3xl rounded-2xl border border-border bg-background shadow-[0_9px_25px_0_rgba(0,0,0,0.05)] transition-all duration-300 focus-within:shadow-[0_9px_25px_0_rgba(0,0,0,0.1)] focus-within:border-border/80"
 		:class="awaitingHumanInput ? 'opacity-50 pointer-events-none grayscale' : ''"
 		role="region"
 		aria-label="Message input area"
 	>
-		<form @submit.prevent="sendMessage" class="mx-auto flex flex-col w-full p-3">
+		<form @submit.prevent="sendMessage" class="mx-auto flex flex-col w-full p-2">
             <!-- Textarea Area -->
 			<div class="relative w-full">
                 @textarea.Textarea(textarea.Props{
@@ -33,8 +33,17 @@ templ ChatInput() {
 
             <!-- Footer Area -->
 			<div class="flex items-center justify-between pl-1 pr-1 pb-1">
-				<!-- Left: Agents & Attachments (Future) -->
+				<!-- Left: Agents & Attachments -->
 				<div class="flex items-center gap-2">
+                    <!-- Attachment Button -->
+                     <button 
+                        type="button" 
+                        class="p-2 text-muted-foreground hover:text-foreground transition-colors rounded-full hover:bg-muted/50 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
+                        aria-label="Attach file"
+                    >
+                        @icon.Paperclip(icon.Props{Class: "size-5"})
+                    </button>
+
                     <!-- Agent Selector (Styled as a pill/badge) -->
 					<div class="relative" x-data="{ open: false }">
 						<select
@@ -49,34 +58,30 @@ templ ChatInput() {
 							</template>
 						</select>
 					</div>
-
-                    <!-- Attachment Icon (Visual Placeholder for now) -->
-                     <button type="button" class="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded-full hover:bg-muted/50">
-                        @icon.Plus(icon.Props{Class: "size-5"})
-                    </button>
 				</div>
 
 				<!-- Right: Send Button -->
                 <div class="flex items-center gap-2">
-                    <!-- Help/Shortcuts (Moved slightly to avoid clutter, kept near send) -->
+                    <!-- Help/Shortcuts -->
                     <button
                         @click="toggleKeyboardShortcuts()"
-                        class="text-muted-foreground hover:text-foreground transition-colors p-2"
+                        class="text-muted-foreground hover:text-foreground transition-colors p-2 rounded-full hover:bg-muted/50"
                         type="button"
                         aria-label="Show keyboard shortcuts"
                     >
-                        <span class="text-xs font-medium">?</span>
+                        <!-- Use a small keyboard icon or question mark -->
+                         <div class="size-5 flex items-center justify-center border border-current rounded text-[10px] font-medium opacity-70">?</div>
                     </button>
 
                     @button.Button(button.Props{
                         Variant: button.VariantDefault,
                         Size:    button.SizeIcon,
-                        Class:   "rounded-full size-10 bg-foreground text-background hover:opacity-90 transition-opacity shadow-sm",
+                        Class:   "rounded-lg size-8 bg-foreground text-background transition-all shadow-none hover:opacity-90",
                         Attributes: templ.Attributes{
                             "@click.prevent": "isStreaming ? cancelJob() : sendMessage()",
                             "type":           "button",
                             ":disabled":      "!canSendMessage && !isStreaming",
-                            ":class":         "(canSendMessage || isStreaming) ? '' : 'opacity-10 cursor-not-allowed'",
+                            ":class":         "(canSendMessage || isStreaming) ? '' : 'opacity-20 cursor-not-allowed'",
                             ":aria-busy":     "isStreaming",
                             ":aria-label":    "isStreaming ? 'Cancel message' : 'Send message'",
                         },

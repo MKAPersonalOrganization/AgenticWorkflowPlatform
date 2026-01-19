@@ -251,7 +251,6 @@ func (u *ProjectionUpdater) convertEvent(event *kurrentdb.RecordedEvent) (core.E
 		}
 		return &evt, nil
 
-
 	case "AgentHandoff":
 		var evt domain.AgentHandoffEvent
 		if err := json.Unmarshal(event.Data, &evt); err != nil {

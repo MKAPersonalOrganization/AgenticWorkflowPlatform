@@ -119,9 +119,11 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.Repo.Upsert(r.Context(), profile); err != nil {
+		h.Log.Error(r.Context(), "failed to update profile", "error", err, "user_id", user.ID)
 		http.Error(w, "Failed to update profile", http.StatusInternalServerError)
 		return
 	}
 
+	h.Log.Info(r.Context(), "profile updated successfully", "user_id", user.ID, "learning_style", profile.LearningStyle)
 	w.WriteHeader(http.StatusOK)
 }

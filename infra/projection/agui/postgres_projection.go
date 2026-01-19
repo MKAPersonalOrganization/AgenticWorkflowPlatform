@@ -289,7 +289,6 @@ func (p *PostgresAguiProjection) GetThreadState(threadID string) (*AguiThreadSta
 	return state, true
 }
 
-
 // GetMessages retrieves all UI-formatted messages for a thread.
 func (p *PostgresAguiProjection) GetMessages(threadID string) []aguievents.Message {
 	state, exists := p.GetThreadState(threadID)
