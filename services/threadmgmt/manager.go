@@ -63,10 +63,10 @@ func (m *Manager) CreateThread(ctx context.Context, threadID, title string) (*do
 }
 
 // AddUserMessage adds a user message to a thread.
-func (m *Manager) AddUserMessage(ctx context.Context, threadID, messageID, content string) (*domain.ThreadAggregate, *domain.MessageAdded, error) {
+func (m *Manager) AddUserMessage(ctx context.Context, threadID, messageID, content, userID string) (*domain.ThreadAggregate, *domain.MessageAdded, error) {
 	thread, err := m.threadRepo.Load(ctx, threadID)
 	if errors.Is(err, domain.ErrThreadNotFound) {
-		thread, err = domain.OpenThread(threadID, "system", "New Chat")
+		thread, err = domain.OpenThread(threadID, userID, "New Chat")
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create thread: %w", err)
 		}

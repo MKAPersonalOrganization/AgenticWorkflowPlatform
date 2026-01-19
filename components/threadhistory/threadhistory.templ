@@ -98,6 +98,10 @@ templ ThreadHistory() {
 						</div>
 					}
 				</template>
+				<!-- Loading indicator for infinite scroll -->
+				<li x-show="sessionsLoading" class="flex justify-center py-2">
+					<span class="animate-spin size-4 border-2 border-primary border-t-transparent rounded-full"></span>
+				</li>
 			}
 		}
 	}

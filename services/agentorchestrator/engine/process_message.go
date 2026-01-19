@@ -18,7 +18,7 @@ func (e *Engine) ProcessUserMessage(ctx context.Context, agentName, threadID, co
 	messageID := domain.GenerateMessageID()
 	runID := domain.GenerateMessageID() // Unique ID for this execution run
 
-	agg, event, err := e.threadMgmt.AddUserMessage(ctx, threadID, messageID, content)
+	agg, event, err := e.threadMgmt.AddUserMessage(ctx, threadID, messageID, content, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to add user message: %w", err)
 	}

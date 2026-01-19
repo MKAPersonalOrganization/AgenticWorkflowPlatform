@@ -70,6 +70,9 @@ export function createInitialState() {
 
         // UI state
         sessions: [],
+        sessionsNextCursor: null,
+        sessionsHasMore: false,
+        sessionsLoading: false,
         sidebarOpen: true,
         showDebugPanel: false,
         showEventLog: false,

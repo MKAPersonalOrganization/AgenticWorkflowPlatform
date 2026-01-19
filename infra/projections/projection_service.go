@@ -4,8 +4,6 @@ import (
 	"errors"
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/services"
-	"sort"
-	"time"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
@@ -35,42 +33,14 @@ func (s *UIProjectionService) GetThreadMessages(threadID string) []aguievents.Me
 }
 
 // ListThreadSummaries retrieves all threads with summaries, sorted by most recent.
+// Deprecated: Use ListThreads on the projection directly with pagination.
 func (s *UIProjectionService) ListThreadSummaries() []services.ThreadSummary {
-	threadIDs := s.aguiProjection.ListThreads()
+	// Note: This method is deprecated. The handler should call projection.ListThreads directly
+	// with proper user ID from auth context. Keeping for backward compatibility.
+	return []services.ThreadSummary{}
+}
 
-	threads := make([]services.ThreadSummary, 0, len(threadIDs))
-	for _, threadID := range threadIDs {
-		state, exists := s.aguiProjection.GetThreadState(threadID)
-		if !exists {
-			continue
-		}
-
-		// Determine current instructor from agent activity
-		var currentInstructor string
-		if len(state.AgentActivity) > 0 {
-			var latestTime time.Time
-			for agentName, activity := range state.AgentActivity {
-				if activity.LastActiveAt.After(latestTime) {
-					latestTime = activity.LastActiveAt
-					currentInstructor = agentName
-				}
-			}
-		}
-
-		threads = append(threads, services.ThreadSummary{
-			ID:                threadID,
-			Title:             state.Title,
-			Messages:          state.Messages,
-			CreatedAt:         state.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:         state.UpdatedAt.Format(time.RFC3339),
-			CurrentInstructor: currentInstructor,
-		})
-	}
-
-	// Sort threads by UpdatedAt descending (most recent first)
-	sort.Slice(threads, func(i, j int) bool {
-		return threads[i].UpdatedAt > threads[j].UpdatedAt
-	})
-
-	return threads
+// ListThreadsPaginated retrieves paginated threads for a user.
+func (s *UIProjectionService) ListThreadsPaginated(req agui.ThreadListRequest) (*agui.ThreadListResponse, error) {
+	return s.aguiProjection.ListThreads(req)
 }

@@ -18,23 +18,24 @@ import { createEmptyThreadState } from './chat-state.js';
 export function createSessionMethods() {
     return {
         /**
-         * Load sessions from the server
+         * Load sessions from the server (first page)
          */
         async __loadSessions() {
             return await this.__tryCatchAsync('load sessions', {}, async () => {
-                const response = await fetch('/api/agui/threads');
+                const response = await fetch('/api/agui/threads?limit=20');
                 if (response.ok) {
-                    const threads = await response.json();
-                    // Only show threads that have messages
-                    this.sessions = threads
-                        .filter(thread => thread.messages && thread.messages.length > 0)
-                        .map(thread => ({
-                            id: thread.id,
-                            title: thread.title,
-                            created: thread.createdAt,
-                            lastMessage: thread.updatedAt,
-                            currentInstructor: thread.currentInstructor || null
-                        }));
+                    const data = await response.json();
+
+                    // Map threads to session format
+                    this.sessions = (data.threads || []).map(thread => ({
+                        id: thread.id,
+                        title: thread.title || 'New Chat',
+                        lastMessage: thread.updatedAt
+                    }));
+
+                    // Store pagination state
+                    this.sessionsNextCursor = data.nextCursor || null;
+                    this.sessionsHasMore = data.hasMore || false;
 
                     // Get or create current thread ID
                     const savedThreadId = localStorage.getItem('currentThreadId');
@@ -55,6 +56,56 @@ export function createSessionMethods() {
                     throw new Error(`Failed to fetch threads: ${response.status}`);
                 }
             }) || this.createNewSession();
+        },
+
+        /**
+         * Load more sessions (infinite scroll)
+         */
+        async __loadMoreSessions() {
+            if (!this.sessionsHasMore || this.sessionsLoading || !this.sessionsNextCursor) {
+                return;
+            }
+
+            this.sessionsLoading = true;
+
+            return await this.__tryCatchAsync('load more sessions', {}, async () => {
+                const url = `/api/agui/threads?limit=20&cursor=${encodeURIComponent(this.sessionsNextCursor)}`;
+                const response = await fetch(url);
+
+                if (response.ok) {
+                    const data = await response.json();
+
+                    // Append new threads to existing sessions
+                    const newSessions = (data.threads || []).map(thread => ({
+                        id: thread.id,
+                        title: thread.title || 'New Chat',
+                        lastMessage: thread.updatedAt
+                    }));
+
+                    this.sessions = [...this.sessions, ...newSessions];
+
+                    // Update pagination state
+                    this.sessionsNextCursor = data.nextCursor || null;
+                    this.sessionsHasMore = data.hasMore || false;
+                } else {
+                    throw new Error(`Failed to fetch more threads: ${response.status}`);
+                }
+            }).finally(() => {
+                this.sessionsLoading = false;
+            });
+        },
+
+        /**
+         * Handle sidebar scroll for infinite loading
+         * @param {Event} event - Scroll event
+         */
+        __onSidebarScroll(event) {
+            const el = event.target;
+            const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+
+            if (nearBottom && this.sessionsHasMore && !this.sessionsLoading) {
+                this.__loadMoreSessions();
+            }
         },
 
         /**
