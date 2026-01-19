@@ -27,8 +27,8 @@ const (
 	// TerminationHandoff indicates control was transferred to another agent.
 	TerminationHandoff TerminationReason = "handoff"
 
-	// TerminationElicitation indicates the agent is waiting for user input.
-	TerminationElicitation TerminationReason = "awaiting_input"
+	// TerminationAwaitingInput indicates the agent is waiting for user input.
+	TerminationAwaitingInput TerminationReason = "awaiting_input"
 
 	// TerminationError indicates an error occurred during execution.
 	TerminationError TerminationReason = "error"
@@ -113,7 +113,7 @@ func (r *ExecutionResult) String() string {
 // IsRecoverable returns true if the termination reason allows resumption.
 func (r *ExecutionResult) IsRecoverable() bool {
 	switch r.Reason {
-	case TerminationElicitation, TerminationHandoff:
+	case TerminationAwaitingInput, TerminationHandoff:
 		return true
 	default:
 		return false

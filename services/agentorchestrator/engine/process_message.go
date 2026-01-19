@@ -98,7 +98,7 @@ func (e *Engine) ProcessUserMessage(ctx context.Context, agentName, threadID, co
 		}
 
 		// Only emit RunFinished if the run truly completed (not paused for elicitation)
-		if terminationReason != TerminationElicitation {
+		if terminationReason != TerminationAwaitingInput {
 			yield(events.RunFinished(threadID, runID), nil)
 		}
 	}, nil
