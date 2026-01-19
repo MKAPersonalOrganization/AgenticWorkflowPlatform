@@ -4,14 +4,13 @@ import (
 	"context"
 	"fmt"
 	"iter"
-	"time"
-
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/core/middleware"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/agentorchestrator/types"
 	"school-with-ai/services/threadmgmt"
+	"time"
 
 	"github.com/qmuntal/stateless"
 )
@@ -369,8 +368,6 @@ func (o *ObserverUnit) TrackToolCall(tcID string) bool {
 func (o *ObserverUnit) TrackToolExecuted(toolResultID, tcID, name, args, res, messageID string) bool {
 	return o.yield(o.events.ToolCallExecuted(o.threadID, toolResultID, tcID, name, args, res, messageID), nil)
 }
-
-
 
 func (o *ObserverUnit) Fail(reason TerminationReason, err error) {
 	o.result.Success = false
@@ -777,8 +774,6 @@ func (s *executionState) saveAgentMessageAndEmitEvents() error {
 	return nil
 }
 
-
-
 // State machine states
 type state int
 
@@ -816,7 +811,7 @@ const (
 	TrigTurnFinished     = "TurnFinished"
 	TrigActionsCompleted = "ActionsCompleted"
 
-	TrigStopIteration    = "StopIteration" // Tool requested to stop (e.g., elicitation)
+	TrigStopIteration = "StopIteration" // Tool requested to stop (e.g., elicitation)
 )
 
 // Safety and iteration limits

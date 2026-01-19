@@ -1,12 +1,15 @@
 package threadhistory
 
-import "school-with-ai/components/button"
-import "school-with-ai/components/separator"
-import "school-with-ai/components/sidebar"
-import "school-with-ai/components/icon"
-import "school-with-ai/components/tooltip"
-import "school-with-ai/components/popover"
-import "school-with-ai/domain"
+import (
+	"strings"
+
+	"school-with-ai/components/button"
+	"school-with-ai/components/icon"
+	"school-with-ai/components/popover"
+	"school-with-ai/components/sidebar"
+	"school-with-ai/components/tooltip"
+	"school-with-ai/domain"
+)
 
 type Props struct {
 	User *domain.User
@@ -22,234 +25,197 @@ templ ThreadHistory(props ...Props) {
 		Side:        sidebar.SideLeft,
 		Variant:     sidebar.VariantSidebar,
 		Collapsible: sidebar.CollapsibleOffcanvas,
-		Collapsed:   true,
+		Collapsed:   false,
 		Class:       "z-30 !left-0 !border-r-0",
 		Attributes:  templ.Attributes{
-			"style": "--sidebar-width: 22rem", 
+			"style": "--sidebar-width: 260px", 
 		},
 	}) {
 		@sidebar.Header() {
-				<div class="flex items-center justify-between w-full px-2 pt-2">
-					<!-- Sidebar Toggle (Left) -->
-					@button.Button(button.Props{
-						Size:    button.SizeIcon,
-						Variant: button.VariantGhost,
-						Class:   "size-9 hover:bg-sidebar-accent/50 rounded-lg",
-						Attributes: templ.Attributes{
-							"data-tui-sidebar-trigger": true,
-							"data-tui-sidebar-target":  "thread-history-sidebar",
-							"class":                    "hidden md:inline-flex",
-						},
-					}) {
-						@icon.PanelLeftClose(icon.Props{Class: "size-5 text-sidebar-foreground"})
-						<span class="sr-only">Close Sidebar</span>
-					}
-					<!-- Mobile Toggle -->
-					@button.Button(button.Props{
-						Size:    button.SizeIcon,
-						Variant: button.VariantGhost,
-						Class:   "size-9 md:hidden hover:bg-sidebar-accent/50 rounded-lg",
-						Attributes: templ.Attributes{
-							"data-tui-sheet-close": "thread-history-sidebar-mobile",
-						},
-					}) {
-						@icon.X(icon.Props{Class: "size-5 text-sidebar-foreground"})
-						<span class="sr-only">Close Sidebar</span>
-					}
+			<div class="flex items-center justify-between w-full px-1">
+				<!-- Sidebar Toggle (Left) -->
+				@button.Button(button.Props{
+					Size:    button.SizeIcon,
+					Variant: button.VariantGhost,
+					Class:   "size-8 hover:bg-sidebar-accent/50 rounded-lg",
+					Attributes: templ.Attributes{
+						"data-tui-sidebar-trigger": true,
+						"data-tui-sidebar-target":  "thread-history-sidebar",
+						"class":                    "hidden md:inline-flex",
+					},
+				}) {
+					@icon.PanelLeftClose(icon.Props{Class: "size-5 text-sidebar-foreground"})
+					<span class="sr-only">Close Sidebar</span>
+				}
+				<!-- Mobile Toggle -->
+				@button.Button(button.Props{
+					Size:    button.SizeIcon,
+					Variant: button.VariantGhost,
+					Class:   "size-8 md:hidden hover:bg-sidebar-accent/50 rounded-lg",
+					Attributes: templ.Attributes{
+						"data-tui-sheet-close": "thread-history-sidebar-mobile",
+					},
+				}) {
+					@icon.X(icon.Props{Class: "size-5 text-sidebar-foreground"})
+					<span class="sr-only">Close Sidebar</span>
+				}
 
-					<!-- New Chat Button (Right) -->
-					@tooltip.Tooltip(tooltip.Props{}) {
-						@tooltip.Trigger(tooltip.TriggerProps{}) {
-							@button.Button(button.Props{
-								Size:    button.SizeIcon,
-								Variant: button.VariantGhost,
-								Class:   "size-9 hover:bg-sidebar-accent/50 rounded-lg",
-								Attributes: templ.Attributes{
-									"@click": "createNewSession()",
-								},
-							}) {
-								@icon.SquarePen(icon.Props{Class: "size-5 text-sidebar-foreground"})
-								<span class="sr-only">New Chat</span>
-							}
-						}
-						@tooltip.Content(tooltip.ContentProps{Class: "bg-popover text-popover-foreground"}) {
-							 New Chat
+				<!-- New Chat Button (Right) -->
+				@tooltip.Tooltip(tooltip.Props{}) {
+					@tooltip.Trigger(tooltip.TriggerProps{}) {
+						@button.Button(button.Props{
+							Size:    button.SizeIcon,
+							Variant: button.VariantGhost,
+							Class:   "size-8 hover:bg-sidebar-accent/50 rounded-lg",
+							Attributes: templ.Attributes{
+								"@click": "createNewSession()",
+							},
+						}) {
+							@icon.SquarePen(icon.Props{Class: "size-5 text-sidebar-foreground"})
+							<span class="sr-only">New Chat</span>
 						}
 					}
-				</div>
+					@tooltip.Content(tooltip.ContentProps{Class: "bg-popover text-popover-foreground"}) {
+						 New Chat
+					}
+				}
+			</div>
 			<!-- Search Bar -->
-			<div class="px-3 pb-2 pt-1">
-				<div class="group relative flex h-10 items-center gap-3 rounded-lg border-2 border-transparent px-3 py-2 text-foreground focus-within:border-ring/20 focus-within:bg-sidebar-accent/50 hover:bg-sidebar-accent/30 transition-all cursor-text"
+			<div class="px-2 pb-1 pt-1">
+				<div class="group relative flex h-9 items-center gap-2 rounded-lg border-2 border-transparent px-2 py-1.5 text-foreground focus-within:border-ring/20 focus-within:bg-sidebar-accent/50 hover:bg-sidebar-accent/30 transition-all cursor-text"
 					@click="$refs.searchInput.focus()">
-					@icon.Search(icon.Props{Class: "absolute left-3 h-4 w-4 text-muted-foreground group-focus-within:text-foreground"})
+					@icon.Search(icon.Props{Class: "absolute left-2.5 h-4 w-4 text-muted-foreground group-focus-within:text-foreground"})
 					<input 
 						x-ref="searchInput"
 						type="text" 
 						placeholder="Search chats..." 
-						class="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none pl-7"
+						class="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none pl-6"
 					/>
 				</div>
 			</div>
+		}
 
-			@separator.Separator(separator.Props{Class: "opacity-50"})
+		@sidebar.Content(sidebar.ContentProps{Class: "gap-0 scrollbar-transparent scrollbar-hover overflow-y-auto"}) {
+			<!-- Infinite Scroll Sentinel & Loading Indicator (Top for reverse scroll? No, traditionally bottom for chat history loading older) -->
+			<!-- Actually for thread list, usually we load more as we scroll down. -->
 			
-			<!-- Thread List -->
-			<div class="flex-1 overflow-y-auto scrollbar-transparent scrollbar-hover px-2 gap-0.5 pt-2">
-				<template x-for="group in getGroupedSessions()" :key="group.title">
-					<div class="mb-4">
-						<div class="px-2 py-1 text-xs font-semibold text-muted-foreground mb-1 sticky top-0 bg-sidebar/95 backdrop-blur-sm z-10" x-text="group.title"></div>
-						<ul class="space-y-0.5">
-							<template x-for="session in group.sessions" :key="session.id">
-								<li>
-									<div class="group relative flex h-[34px] w-full items-center rounded-lg px-2 gap-2 hover:bg-sidebar-accent/50 transition-colors cursor-pointer"
-										:class="threadId === session.id ? 'bg-sidebar-accent' : ''"
-										@click="switchSession(session.id)"
-										x-bind:data-active="threadId === session.id">
+			<template x-for="group in getGroupedSessions()" :key="group.title">
+				@sidebar.Group(sidebar.GroupProps{Class: "px-2 py-0"}) {
+					@sidebar.GroupLabel(sidebar.GroupLabelProps{
+						Class: "text-muted-foreground/50 px-3 py-3 h-auto text-[11px] font-semibold sticky top-0 bg-sidebar z-10 uppercase tracking-wider",
+					}) {
+						<span x-text="group.title"></span>
+					}
+					@sidebar.Menu(sidebar.MenuProps{Class: "gap-0.5"}) {
+						<template x-for="session in group.sessions" :key="session.id">
+							@sidebar.MenuItem(sidebar.MenuItemProps{ Class: "group/item relative" }) {
+								@sidebar.MenuButton(sidebar.MenuButtonProps{
+									Class: "w-full justify-start h-[42px] px-3 gap-3 text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors data-[tui-sidebar-active=true]:bg-sidebar-accent data-[tui-sidebar-active=true]:text-sidebar-accent-foreground data-[tui-sidebar-active=true]:font-medium pr-10 rounded-lg",
+									Attributes: templ.Attributes{
+										"@click": "switchSession(session.id)",
+										"x-bind:data-tui-sidebar-active": "threadId === session.id",
+									},
+								}) {
+									<div class="flex items-center gap-2 w-full overflow-hidden">
+										<!-- Active Indicator Bar (LibreChat Style) -->
+										<div class="absolute left-0 top-0 bottom-0 w-[2px] bg-foreground transition-all duration-200"
+ 											x-show="threadId === session.id"
+ 											x-transition:enter="transition ease-out duration-200"
+ 											x-transition:enter-start="opacity-0 scale-y-50"
+ 											x-transition:enter-end="opacity-100 scale-y-100"
+ 										></div>
 										
-										<!-- LibreChat Style Vertical Active Indicator -->
-										<!-- Adjusted: w-0.5 (2px), rounded-full, bg-foreground (black/white), left-0 -->
-										<div class="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-foreground transition-opacity"
-											x-show="threadId === session.id"
-											x-transition:enter="transition ease-out duration-200"
-											x-transition:enter-start="opacity-0 scale-y-50"
-											x-transition:enter-end="opacity-100 scale-y-100"
-											style="display: none;"></div>
-
-										<div class="flex items-center gap-2 w-full overflow-hidden">
-											<!-- Chat Icon (Placeholder for EndpointIcon) -->
-											<!-- Using MessageSquare as generic chat icon, simpler than endpoint logos for now -->
-											<div class="shrink-0 text-muted-foreground group-hover:text-foreground transition-colors"
-												:class="threadId === session.id ? 'text-foreground' : ''">
-												@icon.MessageSquare(icon.Props{Class: "size-4"})
-											</div>
-
-											<!-- Streaming indicator (replaces icon if streaming?) - keeping it separate/overlay for now -->
-											<span x-show="isThreadStreaming(session.id)" class="absolute left-2 flex h-2 w-2">
-												<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-												<span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-											</span>
-											
-											<!-- Title with Gradient Fade -->
-											<div class="relative flex-1 overflow-hidden whitespace-nowrap text-sm"
-												:class="threadId === session.id ? 'font-medium text-foreground' : 'text-sidebar-foreground'">
-												<span x-text="session.title"></span>
-												
-												<!-- Gradient Overlay for long text -->
-												<div class="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-sidebar group-hover:from-sidebar-accent/50 transition-colors"
-													:class="threadId === session.id ? 'from-sidebar-accent' : ''"></div>
-											</div>
-										</div>
-										
-										<!-- Context Menu (only visible on hover/active) -->
-										<div class="shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
-											:class="threadId === session.id ? 'opacity-100' : ''">
-											@ContextMenu(ContextMenuProps{
-												ThreadID: "session.id",
-											})
-										</div>
+										<!-- Title -->
+										<span class="truncate text-sm flex-1 text-left" x-text="session.title"></span>
 									</div>
-								</li>
-							</template>
-						</ul>
-					</div>
-				</template>
+								}
 
-				<!-- Infinite Scroll Sentinel & Loading Indicator -->
-				<div x-show="sessionsHasMore" x-intersect.margin.200px="__loadMoreSessions()" class="flex justify-center py-2 h-10 w-full">
-					<span x-show="sessionsLoading" class="animate-spin size-4 border-2 border-primary border-t-transparent rounded-full"></span>
-				</div>
+								<!-- Context Menu (Trigger) -->
+								<div class="absolute right-1 top-1.5 z-10"
+									:class="threadId === session.id ? 'opacity-100' : 'opacity-0 group-hover/item:opacity-100'"
+									@click.stop>
+									@ContextMenu(ContextMenuProps{
+										ThreadID: "session.id",
+									})
+								</div>
+							}
+						</template>
+					}
+				}
+			</template>
+
+			<!-- Loading Indicator -->
+			<div x-show="sessionsHasMore" x-intersect.margin.200px="__loadMoreSessions()" class="flex justify-center py-4 h-12 w-full">
+				<span x-show="sessionsLoading" class="animate-spin size-4 border-2 border-primary border-t-transparent rounded-full"></span>
 			</div>
+		}
 
-			<!-- Footer: User Profile -->
-			@separator.Separator(separator.Props{Class: "opacity-50"})
-			<!-- Footer: User Profile -->
-			@separator.Separator(separator.Props{Class: "opacity-50"})
-			<div class="p-2">
-			    @popover.Trigger(popover.TriggerProps{
-                    For: "sidebar-profile-popover",
-                }) {
-                    @button.Button(button.Props{
-                        Variant: button.VariantGhost,
-                        Class:   "w-full justify-start h-12 px-2 hover:bg-sidebar-accent/50 rounded-lg gap-3",
-                    }) {
-                        if p.User != nil {
-                            <div class="size-8 rounded-full bg-muted flex items-center justify-center overflow-hidden shrink-0">
-                                @icon.User(icon.Props{Class: "size-5 text-muted-foreground"})
-                            </div>
-                            <div class="flex flex-col items-start overflow-hidden text-left flex-1">
-                                <span class="text-sm font-medium truncate w-full">{ p.User.GetDisplayName() }</span>
-                                <span class="text-xs text-muted-foreground truncate w-full">{ p.User.Email }</span>
-                            </div>
-                        } else {
-                             <div class="size-8 rounded-full bg-muted flex items-center justify-center overflow-hidden shrink-0">
-                                @icon.User(icon.Props{Class: "size-5 text-muted-foreground"})
-                            </div>
-                            <div class="flex flex-col items-start overflow-hidden text-left flex-1">
-                                <span class="text-sm font-medium truncate w-full">Guest</span>
-                            </div>
-                        }
-                        @icon.Settings(icon.Props{Class: "size-4 text-muted-foreground ml-auto"})
-                    }
-                }
-                @popover.Content(popover.ContentProps{
-                    ID:        "sidebar-profile-popover",
-                    Class:     "w-64 mb-2 ml-2", 
-                    Placement: popover.PlacementTop,
-                }) {
-                    <div class="space-y-1">
-                        if p.User != nil {
-                            <!-- Authenticated User Section -->
-                            <div class="px-2 py-1.5">
-                                <div class="text-sm font-semibold truncate">{ p.User.Email }</div>
-                                <div class="text-xs text-muted-foreground truncate">{ p.User.ID }</div>
-                            </div>
-                            <div class="border-t border-border my-1"></div>
-                            
-                            <!-- Student Profile Link -->
-                            <a href="/profile" class="flex items-center gap-3 w-full px-2 py-2 text-sm rounded-md hover:bg-accent transition-colors">
-                                @icon.BookOpen(icon.Props{Class: "size-4"})
-                                <span class="flex-1 text-left">Student Profile</span>
-                            </a>
-
-                            <!-- Account Settings Link -->
-                            <a href="/auth/settings" class="flex items-center gap-3 w-full px-2 py-2 text-sm rounded-md hover:bg-accent transition-colors">
-                                @icon.Settings(icon.Props{Class: "size-4"})
-                                <span class="flex-1 text-left">Settings</span>
-                            </a>
-                            
-                            <div class="border-t border-border my-1"></div>
-
-                            <!-- Theme Toggle -->
-                            <button
-                                @click="toggleTheme()"
-                                class="flex items-center gap-3 w-full px-2 py-2 text-sm rounded-md hover:bg-accent transition-colors"
-                                type="button"
-                            >
-                                <div class="flex items-center justify-center size-4">
-                                     <svg x-show="theme === 'light'" class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-                                     <svg x-show="theme === 'dark'" class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
-                                     <svg x-show="theme === 'system'" class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
-                                </div>
-                                <span class="flex-1 text-left">Theme: <span x-text="theme.charAt(0).toUpperCase() + theme.slice(1)"></span></span>
-                            </button>
-
-                            <div class="border-t border-border my-1"></div>
-
-                            <!-- Logout Button -->
-                            <a href="/auth/logout" class="flex items-center gap-3 w-full px-2 py-2 text-sm rounded-md hover:bg-accent text-destructive hover:text-destructive transition-colors">
-                                @icon.LogOut(icon.Props{Class: "size-4"})
-                                <span class="flex-1 text-left">Log out</span>
-                            </a>
-                        } else {
-                            <!-- Login/Register for Guests -->
-                             <a href="/auth/login" class="flex items-center gap-3 w-full px-2 py-2 text-sm rounded-md hover:bg-accent transition-colors">
-                                @icon.LogIn(icon.Props{Class: "size-4"})
-                                <span class="flex-1 text-left">Log in</span>
-                            </a>
-                        }
-                    </div>
-                }
-			</div>
+		@sidebar.Footer() {
+			@sidebar.Menu() {
+				@sidebar.MenuItem() {
+					@popover.Trigger(popover.TriggerProps{
+						For: "sidebar-profile-popover",
+					}) {
+						@sidebar.MenuButton(sidebar.MenuButtonProps{
+							Size: "lg",
+							Class: "hover:bg-sidebar-accent/50 transition-colors py-2 px-2 rounded-xl",
+						}) {
+							if p.User != nil {
+								<div class="flex items-center gap-2 w-full">
+									<div class="size-8 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden shrink-0 border border-border/50">
+										<span class="text-xs font-bold text-primary">{ strings.ToUpper(p.User.Email[:1]) }</span>
+									</div>
+									<div class="grid flex-1 text-left text-sm leading-tight">
+										<span class="truncate font-medium text-sidebar-foreground">{ p.User.GetDisplayName() }</span>
+									</div>
+									@icon.ChevronsUpDown(icon.Props{Class: "size-4 text-muted-foreground/70"})
+								</div>
+							} else {
+								<div class="flex items-center gap-2 w-full">
+									<div class="size-8 rounded-full bg-muted flex items-center justify-center overflow-hidden shrink-0 border border-border/50">
+										@icon.User(icon.Props{Class: "size-4 text-muted-foreground"})
+									</div>
+									<div class="grid flex-1 text-left text-sm leading-tight">
+										<span class="truncate font-medium text-sidebar-foreground">Guest</span>
+									</div>
+									@icon.ChevronsUpDown(icon.Props{Class: "size-4 text-muted-foreground/70"})
+								</div>
+							}
+						}
+					}
+					@popover.Content(popover.ContentProps{
+						ID:        "sidebar-profile-popover",
+						Placement: popover.PlacementTopStart,
+						Class:     "w-64 overflow-hidden p-1 border border-border bg-popover text-popover-foreground shadow-lg rounded-xl mb-2",
+					}) {
+						<div class="flex flex-col">
+							@sidebar.Menu() {
+								@sidebar.MenuItem() {
+									@sidebar.MenuButton(sidebar.MenuButtonProps{
+										Class: "hover:bg-sidebar-accent/50 transition-colors py-2 px-3 rounded-lg flex items-center gap-3 w-full text-left",
+										Attributes: templ.Attributes{
+											"@click": "showSettings = true", 
+										},
+									}) {
+										@icon.Settings(icon.Props{Class: "size-4 text-muted-foreground"})
+										<span class="text-sm font-medium">Settings</span>
+									}
+								}
+								<div class="my-1 h-px bg-border/50"></div>
+								@sidebar.MenuItem() {
+									@sidebar.MenuButton(sidebar.MenuButtonProps{
+										Href:  "/logout",
+										Class: "hover:bg-sidebar-accent/50 transition-colors py-2 px-3 rounded-lg flex items-center gap-3 w-full text-left text-destructive hover:text-destructive",
+									}) {
+										@icon.LogOut(icon.Props{Class: "size-4"})
+										<span class="text-sm font-medium">Log out</span>
+									}
+								}
+							}
+						</div>
+					}
+				}
+			}
 		}
 	}
 }

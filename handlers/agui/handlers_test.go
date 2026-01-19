@@ -17,11 +17,11 @@ import (
 
 // mockProjection implements agui.AguiProjection for testing.
 type mockProjection struct {
-	threads       []agui.ThreadSummary
-	returnError   error
-	lastRequest   agui.ThreadListRequest
-	callCount     int
-	totalThreads  int // Total threads in "database"
+	threads      []agui.ThreadSummary
+	returnError  error
+	lastRequest  agui.ThreadListRequest
+	callCount    int
+	totalThreads int // Total threads in "database"
 }
 
 func (m *mockProjection) GetThreadState(threadID string) (*agui.AguiThreadState, bool) {

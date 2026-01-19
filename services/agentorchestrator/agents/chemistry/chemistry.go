@@ -120,7 +120,7 @@ This builds good laboratory intuition.`,
 		MaxIterations: 20,
 		SystemPrompt:  prompt,
 		Tools:         registry.All(),
-		Notifier: notifier,
+		Notifier:      notifier,
 		Middleware: []core.Middleware{
 			middleware.NewElicitationMiddleware(),
 		},

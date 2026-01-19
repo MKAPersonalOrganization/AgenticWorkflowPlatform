@@ -193,4 +193,3 @@ type AgentHandoffEvent struct {
 func (e AgentHandoffEvent) EventType() string         { return "AgentHandoff" }
 func (e AgentHandoffEvent) EventTimestamp() time.Time { return e.Timestamp }
 func (e AgentHandoffEvent) AggregateID() string       { return e.ThreadID }
-

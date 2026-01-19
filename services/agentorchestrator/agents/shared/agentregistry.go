@@ -38,7 +38,6 @@ func (r *AgentRegistry) Get(name string) (AgentFactory, bool) {
 	defer r.mu.RUnlock()
 	factory, ok := r.agents[name]
 
-
 	return factory, ok
 }
 

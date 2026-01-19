@@ -4,6 +4,7 @@ import "school-with-ai/components/input"
 import "school-with-ai/components/chatinput"
 import "school-with-ai/components/threadhistory"
 import "school-with-ai/components/messagelist"
+import "school-with-ai/components/settings"
 import "school-with-ai/components/eventlog"
 import "school-with-ai/components/collapsible"
 import "school-with-ai/components/popover"
@@ -12,7 +13,6 @@ import "school-with-ai/components/sidebar"
 import "school-with-ai/components/code"
 import "school-with-ai/components/dialog"
 import "school-with-ai/components/keyboardshortcuts"
-import "school-with-ai/components/navbar"
 import "school-with-ai/components/sampleprompts"
 import "school-with-ai/domain"
 
@@ -106,22 +106,29 @@ templ ChatInputScreen(user *domain.User) {
 		</head>
 		<body class="flex min-h-screen bg-background text-foreground antialiased">
 			<div class="w-full h-screen" x-data="chat">
-				<!-- Left Navigation Bar -->
-				@navbar.Navbar(navbar.Props{SidebarID: "thread-history-sidebar", User: user})
-				<!-- Sidebar Layout with left margin for navbar -->
-				<div class="ml-16 flex-1">
+				<!-- Sidebar Layout -->
+				<div class="flex-1">
 					@sidebar.Layout() {
 						<!-- Left Sidebar - Chat History -->
 						@threadhistory.ThreadHistory(threadhistory.Props{User: user})
+
+						<!-- Floating Sidebar Toggle (Visible when sidebar is closed) -->
+						<div class="fixed top-3 left-3 z-40 hidden peer-data-[tui-sidebar-state=collapsed]:block transition-opacity duration-200">
+							@sidebar.Trigger(sidebar.TriggerProps{
+								Target: "thread-history-sidebar",
+								Class:  "size-9 hover:bg-sidebar-accent/50 text-sidebar-foreground bg-sidebar border border-sidebar-border shadow-sm rounded-lg flex items-center justify-center",
+							})
+						</div>
+
 						<!-- Main Content Area -->
 						<div class="flex-1 flex h-screen overflow-hidden relative">
 							<!-- Main Chat Panel -->
 							<main
-								class="flex flex-col relative overflow-hidden w-full"
+								class="flex flex-col relative overflow-hidden w-full h-full"
 							>
 								<!-- Messages Container -->
 								<div
-									class="flex-1 overflow-y-auto scrollbar-thin"
+									class="flex-1 overflow-y-auto scrollbar-transparent scrollbar-hover"
 									style="overflow-anchor: none;"
 									x-ref="messageList"
 									role="log"
@@ -170,6 +177,8 @@ templ ChatInputScreen(user *domain.User) {
 						</div>
 					}
 				</div>
+				<!-- Settings Dialog -->
+				@settings.Settings()
 				<!-- Toast Notifications -->
 				<div
 					class="toast-container"

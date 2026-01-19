@@ -1,8 +1,8 @@
 package message
 
 templ UserMessage() {
-	<div x-show="message.role === 'user'" class="flex items-center gap-2 justify-end group/usermessage">
-		<div class="flex flex-col gap-2 relative">
+	<div x-show="message.role === 'user'" class="flex items-start gap-4 justify-end group/usermessage w-full pl-10">
+		<div class="flex flex-col items-end gap-1 max-w-full relative">
 			<!-- Copy button -->
 			<button
 				@click="copyMessage(message.id)"
@@ -15,31 +15,47 @@ templ UserMessage() {
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
 				</svg>
 			</button>
-			<div class="bg-muted ml-auto w-fit rounded-3xl px-4 py-2 text-right prose prose-sm text-sm text-foreground dark:[&_*]:text-white" x-html="renderMarkdown(message.content)"></div>
+			<!-- User Message Bubble -->
+			<div 
+				class="bg-secondary/80 px-4 py-2.5 rounded-2xl text-left prose prose-sm max-w-none text-foreground leading-relaxed shadow-xs" 
+				x-html="renderMarkdown(message.content)"
+			></div>
 		</div>
 	</div>
 }
 
 templ AssistantMessage() {
-	<div x-show="message.role === 'assistant'" class="flex flex-col gap-2 group/assistantmessage relative">
-		<!-- Copy button -->
-		<button
-			@click="copyMessage(message.id)"
-			class="absolute -right-10 top-2 opacity-0 group-hover/assistantmessage:opacity-100 transition-opacity inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background hover:bg-accent hover:text-accent-foreground h-8 w-8 touch-target"
-			type="button"
-			aria-label="Copy message"
-			title="Copy message"
-		>
-			<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-			</svg>
-		</button>
-		<div class="prose prose-sm max-w-none text-sm leading-relaxed text-foreground dark:[&_*]:text-white" x-html="renderMarkdown(message.content)"></div>
-		<!-- Streaming Indicator -->
-		<div x-show="message.streaming" class="flex items-center gap-1 text-muted-foreground">
-			<span class="w-1 h-1 bg-current rounded-full animate-pulse"></span>
-			<span class="w-1 h-1 bg-current rounded-full animate-pulse" style="animation-delay: 150ms;"></span>
-			<span class="w-1 h-1 bg-current rounded-full animate-pulse" style="animation-delay: 300ms;"></span>
+	<div x-show="message.role === 'assistant'" class="flex items-start gap-4 group/assistantmessage w-full pr-10">
+		<div class="flex flex-col gap-1 min-w-0 flex-1 relative">
+			<!-- Assistant Name -->
+			<div class="flex items-center gap-2">
+				<span class="text-sm font-semibold text-foreground">SchoolWithAI</span>
+			</div>
+
+			<!-- Message Content -->
+			<div class="prose prose-sm max-w-none text-sm leading-relaxed text-foreground dark:[&_*]:text-white" x-html="renderMarkdown(message.content)"></div>
+			
+			<!-- Streaming Indicator -->
+			<div x-show="message.streaming" class="flex items-center gap-1 text-muted-foreground mt-2">
+				<span class="w-1.5 h-1.5 bg-primary rounded-full animate-bounce"></span>
+				<span class="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style="animation-delay: 150ms;"></span>
+				<span class="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style="animation-delay: 300ms;"></span>
+			</div>
+
+			<!-- Interaction Actions (Copy, etc.) - Show on Hover -->
+			<div class="flex items-center gap-2 mt-1 opacity-0 group-hover/assistantmessage:opacity-100 transition-opacity">
+				<button
+					@click="copyMessage(message.id)"
+					class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-xs font-medium ring-offset-background hover:bg-accent hover:text-accent-foreground h-7 w-7 transition-colors"
+					type="button"
+					aria-label="Copy message"
+					title="Copy message"
+				>
+					<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+					</svg>
+				</button>
+			</div>
 		</div>
 	</div>
 }

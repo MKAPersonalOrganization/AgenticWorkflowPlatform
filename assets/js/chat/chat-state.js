@@ -79,6 +79,14 @@ export function createInitialState() {
         eventLogCopied: false,
         hideLifecycleEvents: false,
         showKeyboardShortcuts: false,
+        showSettings: false,
+        profile: {
+            learning_style: '',
+            struggles: '',
+            strengths: '',
+            goals: ''
+        },
+        profileLoading: false,
         toasts: [],
         __toastIdCounter: 0,
 

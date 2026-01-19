@@ -24,8 +24,6 @@ const (
 	// TerminationLoopDetected indicates a loop pattern was detected.
 	TerminationLoopDetected TerminationReason = "loop_detected"
 
-
-
 	// TerminationAwaitingInput indicates the agent is waiting for user input.
 	TerminationAwaitingInput TerminationReason = "awaiting_input"
 
@@ -75,8 +73,6 @@ type ExecutionResult struct {
 
 	// Error contains the error if Reason is TerminationError.
 	Error error
-
-
 }
 
 // LoopInfo contains details about a detected loop.

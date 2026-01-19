@@ -1,0 +1,26 @@
+package chatheader
+
+import "school-with-ai/components/icon"
+
+templ ChatHeader() {
+	<div class="sticky top-0 z-10 flex h-14 w-full items-center justify-between border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4">
+		<div class="flex items-center gap-2">
+            <!-- Left side fallback (e.g. mobile toggle spacer) -->
+		</div>
+        
+        <!-- Center: Model Switcher -->
+		<div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+			<button class="flex items-center gap-1.5 cursor-pointer hover:bg-muted/50 px-3 py-1.5 rounded-lg transition-colors group">
+				<span class="text-sm font-medium text-foreground/90 group-hover:text-foreground">SchoolWithAI 1.0</span>
+				@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground/70 group-hover:text-foreground transition-colors"})
+			</button>
+		</div>
+
+        <div class="flex items-center gap-2">
+            <!-- Right side actions (Share, etc) -->
+			<button class="flex items-center justify-center size-9 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors" title="Share Chat">
+				@icon.Share(icon.Props{Class: "size-4"})
+			</button>
+		</div>
+	</div>
+}

@@ -108,7 +108,6 @@ func deserializeDomainEvent(eventType string, data []byte) (core.Event, error) {
 		}
 		return &evt, nil
 
-
 	case "AgentHandoff":
 		var evt domain.AgentHandoffEvent
 		if err := json.Unmarshal(data, &evt); err != nil {
