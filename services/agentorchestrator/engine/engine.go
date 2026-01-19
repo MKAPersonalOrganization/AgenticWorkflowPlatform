@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 	"iter"
+	"time"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/core/middleware"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/agentorchestrator/types"
 	"school-with-ai/services/threadmgmt"
-	"time"
 
 	"github.com/qmuntal/stateless"
 )
@@ -72,10 +73,12 @@ func (e *Engine) Run(ctx context.Context, agentName string, runCtx core.RunConte
 		if err := exec.run(); err != nil {
 			exec.handleExecutionError(ctx, err)
 			yield(nil, err)
+			return
 		}
 
-		// Finalize and return execution result
+		// Finalize and yield internal completion event with termination reason
 		exec.finalizeResult()
+		yield(runCompletedEvent{Reason: exec.observer.result.Reason}, nil)
 	}
 }
 
@@ -235,6 +238,12 @@ func (s *executionState) executeRequiredActions() error {
 		s.refreshState(agg)
 	}
 	s.resolution = resolution
+
+	// Set termination reason when a tool requests to stop (e.g., elicitation)
+	if resolution.StopIteration {
+		s.observer.result.Reason = TerminationElicitation
+	}
+
 	return s.nextStep()
 }
 
@@ -368,10 +377,6 @@ func (o *ObserverUnit) TrackHandoff(target string) bool {
 	return o.yield(o.events.AgentHandoff(o.threadID, target), nil)
 }
 
-func (o *ObserverUnit) TrackHumanInput(messageID, tcID, question string, schema map[string]any) bool {
-	return o.yield(o.events.HumanInputRequested(o.threadID, messageID, tcID, question, schema), nil)
-}
-
 func (o *ObserverUnit) Fail(reason TerminationReason, err error) {
 	o.result.Success = false
 	o.result.Reason = reason
@@ -496,9 +501,8 @@ func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolve
 			if res.Goto != "" {
 				route.HandoffAgent = res.Goto
 			}
-			if res.Elicitation != nil {
-				route.Elicitation = res.Elicitation
-				route.ToolCallID = tc.ID
+			if res.StopIteration {
+				route.StopIteration = true
 			}
 		}
 	}
@@ -507,13 +511,12 @@ func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolve
 
 // RouteResolver determines the next state based on tool results.
 type RouteResolver struct {
-	HandoffAgent string
-	Elicitation  *core.ElicitationSpec
-	ToolCallID   string
+	HandoffAgent  string
+	StopIteration bool // Tool requested to stop iteration (e.g., elicitation)
 }
 
 func (r *RouteResolver) HasAction() bool {
-	return r.HandoffAgent != "" || r.Elicitation != nil
+	return r.HandoffAgent != "" || r.StopIteration
 }
 
 func (s *executionState) prepareContextForLLM() (*PrepareResult, error) {
@@ -620,19 +623,21 @@ func (s *executionState) stateConfiguration() []StateDefinition {
 			Transitions: []TransitionRule{
 				{Trigger: TrigStartExecution, Target: StatePerformingActions, Reentry: true},
 				// Conditional transitions based on tool results
-				{
-					Trigger: TrigHumanInputNeeded,
-					Target:  StateWaitingForHuman,
-					Guard: func(s *executionState) bool {
-						return s.resolution != nil && s.resolution.Elicitation != nil
-					},
-				},
+				// Note: Handoff takes priority over StopIteration (handoffs also set StopIteration)
 				{
 					Trigger:   TrigHandoffInitiated,
 					Target:    StateSwitchingAgent,
 					WithParam: true,
 					Guard: func(s *executionState) bool {
 						return s.resolution != nil && s.resolution.HandoffAgent != ""
+					},
+				},
+				{
+					Trigger: TrigStopIteration,
+					Target:  StateDone,
+					Guard: func(s *executionState) bool {
+						// Only stop for StopIteration if NOT a handoff
+						return s.resolution != nil && s.resolution.StopIteration && s.resolution.HandoffAgent == ""
 					},
 				},
 				{Trigger: TrigActionsCompleted, Target: StateGeneratingResponse},
@@ -646,15 +651,6 @@ func (s *executionState) stateConfiguration() []StateDefinition {
 			},
 			Transitions: []TransitionRule{
 				{Trigger: TrigAgentSwitched, Target: StateGeneratingResponse},
-			},
-		},
-		{
-			State: StateWaitingForHuman,
-			OnEntry: func(s *executionState) error {
-				return s.trackElicitation()
-			},
-			Transitions: []TransitionRule{
-				{Trigger: TrigStartExecution, Target: StateWaitingForHuman, Reentry: true},
 			},
 		},
 		{
@@ -763,7 +759,8 @@ func (r *HistoryReconciler) reconcileElicitation(tc *core.ToolCall) (state, *Str
 		return StateGeneratingResponse, nil, nil
 	}
 
-	return StateWaitingForHuman, nil, nil
+	// Still waiting for user input - return Done (paused state)
+	return StateDone, nil, nil
 }
 
 func (s *executionState) streamAndProcessLLMResponse(llmContext *LLMContext) error {
@@ -810,18 +807,6 @@ func (s *executionState) saveAgentMessageAndEmitEvents() error {
 	return nil
 }
 
-func (s *executionState) trackElicitation() error {
-	if s.resolution == nil || s.resolution.Elicitation == nil {
-		return nil
-	}
-	spec := s.resolution.Elicitation
-	s.observer.result.Reason = TerminationElicitation
-	if !s.observer.TrackHumanInput(s.messageID, s.resolution.ToolCallID, spec.Question, spec.Schema) {
-		return context.Canceled
-	}
-	return nil
-}
-
 func (s *executionState) performHandoff(targetAgent string) error {
 	// 1. Record Handoff
 	s.observer.result.Reason = TerminationHandoff
@@ -848,7 +833,6 @@ const (
 	StateGeneratingResponse
 	StatePerformingActions
 	StateSwitchingAgent
-	StateWaitingForHuman
 	StateDone
 	StateError
 )
@@ -864,8 +848,6 @@ func (s state) String() string {
 		return "PerformingActions"
 	case StateSwitchingAgent:
 		return "SwitchingAgent"
-	case StateWaitingForHuman:
-		return "WaitingForHuman"
 	case StateDone:
 		return "Done"
 	case StateError:
@@ -881,8 +863,8 @@ const (
 	TrigTurnFinished     = "TurnFinished"
 	TrigActionsCompleted = "ActionsCompleted"
 	TrigHandoffInitiated = "HandoffInitiated"
-	TrigHumanInputNeeded = "HumanInputNeeded"
 	TrigAgentSwitched    = "AgentSwitched"
+	TrigStopIteration    = "StopIteration" // Tool requested to stop (e.g., elicitation)
 )
 
 // Safety and iteration limits

@@ -119,3 +119,14 @@ func (r *ExecutionResult) IsRecoverable() bool {
 		return false
 	}
 }
+
+// runCompletedEvent is an internal event emitted at the end of Run()
+// to communicate the termination reason to ProcessUserMessage.
+// This event is NOT forwarded to the frontend.
+type runCompletedEvent struct {
+	Reason TerminationReason
+}
+
+func (e runCompletedEvent) EventType() string         { return "RunCompleted" }
+func (e runCompletedEvent) EventTimestamp() time.Time { return time.Now() }
+func (e runCompletedEvent) AggregateID() string       { return "" }
