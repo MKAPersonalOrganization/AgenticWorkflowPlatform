@@ -125,7 +125,7 @@ func (e *Engine) handleThreadTitle(ctx context.Context, threadID, content string
 // determineTargetAgent inspects the history to find the last active agent.
 // If an explicit agent is requested, it takes precedence.
 // Otherwise, it checks sticky session (last active agent).
-// If neither, it defaults to "student-facing-agent".
+// If neither, it defaults to "math-instructor".
 func (e *Engine) determineTargetAgent(ctx context.Context, history []core.Message, requestedAgent string) string {
 	// 1. Explicit request takes precedence
 	if requestedAgent != "" {
@@ -141,5 +141,5 @@ func (e *Engine) determineTargetAgent(ctx context.Context, history []core.Messag
 	}
 
 	// 3. Default fallback
-	return "student-facing-agent"
+	return "math-instructor"
 }

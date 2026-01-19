@@ -80,7 +80,7 @@ func CreateStatisticsInstructor(notifier core.EventNotifier) core.AgentConfig {
 		},
 		Interactive: true,
 		ExtraRules: `## Subject Authority
-You are the SOLE authority for Statistics. Never ask the 'student-facing-agent' or other instructors for help with statistics.
+You are the SOLE authority for Statistics.
 
 ## Tool Usage Protocol
 **PAY EXTREMELY CLOSE ATTENTION:** Use the specialized domain tools for ALL calculations:

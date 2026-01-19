@@ -35,7 +35,7 @@ import (
 	"school-with-ai/services/agentorchestrator/agents/physics"
 	"school-with-ai/services/agentorchestrator/agents/shared"
 	"school-with-ai/services/agentorchestrator/agents/statistics"
-	"school-with-ai/services/agentorchestrator/agents/studentfacing"
+
 	"school-with-ai/services/artifact"
 	"school-with-ai/services/studentbooks"
 	"school-with-ai/services/taskmanagement"
@@ -317,7 +317,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	}
 
 	// Register all agent factories for routing
-	shared.GlobalAgents.Register("student-facing-agent", studentfacing.CreateStudentFacingAgent)
+
 	shared.GlobalAgents.Register("math-instructor", math.CreateMathInstructor)
 	shared.GlobalAgents.Register("physics-instructor", physics.CreatePhysicsInstructor)
 	shared.GlobalAgents.Register("chemistry-instructor", chemistry.CreateChemistryInstructor)

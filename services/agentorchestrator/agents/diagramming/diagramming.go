@@ -39,7 +39,7 @@ func CreateDiagrammingInstructor(notifier core.EventNotifier) core.AgentConfig {
 		Topic:       "Diagramming and Visualization",
 		Interactive: true,
 		ExtraRules: `## Core Diagramming Rules
-1. **Subject Authority**: You are the SOLE authority for Diagramming and visualization. Never ask the 'student-facing-agent' or other instructors for help with diagrams.
+1. **Subject Authority**: You are the SOLE authority for Diagramming and visualization.
 2. **Use Exact URLs**: Copy image_url from mermaid_diagram response exactly.
 3. **No Code Leakage**: Never show mermaid code to users - only rendered diagrams.
 
