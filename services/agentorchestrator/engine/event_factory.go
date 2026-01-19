@@ -107,14 +107,7 @@ func (f *EventFactory) ToolCallExecuted(
 	}
 }
 
-// AgentHandoff creates an AgentHandoffEvent.
-func (f *EventFactory) AgentHandoff(threadID, targetAgent string) *domain.AgentHandoffEvent {
-	return &domain.AgentHandoffEvent{
-		ThreadID:    threadID,
-		TargetAgent: targetAgent,
-		Timestamp:   time.Now(),
-	}
-}
+
 
 // RunStarted creates a RunStartedEvent.
 func (f *EventFactory) RunStarted(threadID, runID string) *domain.RunStartedEvent {

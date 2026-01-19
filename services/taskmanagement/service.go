@@ -62,6 +62,7 @@ type UserMessageParams struct {
 	MessageID string
 	Content   string
 	UserID    string
+	AgentName string
 }
 
 // HandleUserMessage processes an incoming user message and coordinates agent execution.
@@ -106,7 +107,7 @@ func (s *Service) HandleUserMessage(
 	}
 
 	// 2. Delegate to AgentOrchestrator
-	events, err := s.orchestratorService.ProcessUserMessage(ctx, params.ThreadID, params.Content, params.UserID)
+	events, err := s.orchestratorService.ProcessUserMessage(ctx, params.AgentName, params.ThreadID, params.Content, params.UserID)
 	if err != nil {
 		return fmt.Errorf("failed to process user message: %w", err)
 	}

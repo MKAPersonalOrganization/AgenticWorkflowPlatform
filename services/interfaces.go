@@ -30,8 +30,8 @@ type AgentOrchestrator interface {
 	// Run processes the LLM response using an AgentThread and yields events.
 	Run(ctx context.Context, agentName string, runCtx core.RunContext) iter.Seq2[core.Event, error]
 
-	// ProcessUserMessage handles a new user message from start to finish.
-	ProcessUserMessage(ctx context.Context, threadID, content, userID string) (iter.Seq2[core.Event, error], error)
+	// ProcessUserMessage processes a user message
+	ProcessUserMessage(ctx context.Context, agentName, threadID, content, userID string) (iter.Seq2[core.Event, error], error)
 }
 
 // AgentFactory creates instances of AgentOrchestrator for specific agents.

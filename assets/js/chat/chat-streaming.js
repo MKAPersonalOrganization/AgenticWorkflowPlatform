@@ -21,8 +21,9 @@ export function createStreamingMethods() {
          * Start SSE streaming for a message
          * @param {string} message - User message
          * @param {string} threadId - Thread ID
+         * @param {string} agentName - Optional agent name to target
          */
-        async __streamResponse(message, threadId) {
+        async __streamResponse(message, threadId, agentName = '') {
             const state = this.__getThreadState(threadId);
 
             // Close existing stream if any (expected during elicitation responses)
@@ -38,13 +39,19 @@ export function createStreamingMethods() {
 
             try {
                 // Step 1: Enqueue the task (A2A compliant)
+                const body = {
+                    contextId: threadId,
+                    message: message,
+                };
+
+                if (agentName) {
+                    body.agentName = agentName;
+                }
+
                 const response = await fetch('/v1/message:send', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contextId: threadId,
-                        message: message,
-                    }),
+                    body: JSON.stringify(body),
                 });
 
                 if (!response.ok) {

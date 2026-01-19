@@ -24,8 +24,7 @@ const (
 	// TerminationLoopDetected indicates a loop pattern was detected.
 	TerminationLoopDetected TerminationReason = "loop_detected"
 
-	// TerminationHandoff indicates control was transferred to another agent.
-	TerminationHandoff TerminationReason = "handoff"
+
 
 	// TerminationAwaitingInput indicates the agent is waiting for user input.
 	TerminationAwaitingInput TerminationReason = "awaiting_input"
@@ -77,8 +76,7 @@ type ExecutionResult struct {
 	// Error contains the error if Reason is TerminationError.
 	Error error
 
-	// HandoffTarget contains the target agent if Reason is TerminationHandoff.
-	HandoffTarget string
+
 }
 
 // LoopInfo contains details about a detected loop.
@@ -113,7 +111,7 @@ func (r *ExecutionResult) String() string {
 // IsRecoverable returns true if the termination reason allows resumption.
 func (r *ExecutionResult) IsRecoverable() bool {
 	switch r.Reason {
-	case TerminationAwaitingInput, TerminationHandoff:
+	case TerminationAwaitingInput:
 		return true
 	default:
 		return false

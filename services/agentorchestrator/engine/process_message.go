@@ -123,9 +123,16 @@ func (e *Engine) handleThreadTitle(ctx context.Context, threadID, content string
 }
 
 // determineTargetAgent inspects the history to find the last active agent.
-// If found, it returns that agent's name. Otherwise, it returns the defaultAgent.
-func (e *Engine) determineTargetAgent(ctx context.Context, history []core.Message, defaultAgent string) string {
-	// Iterate backwards to find the last assistant message
+// If an explicit agent is requested, it takes precedence.
+// Otherwise, it checks sticky session (last active agent).
+// If neither, it defaults to "student-facing-agent".
+func (e *Engine) determineTargetAgent(ctx context.Context, history []core.Message, requestedAgent string) string {
+	// 1. Explicit request takes precedence
+	if requestedAgent != "" {
+		return requestedAgent
+	}
+
+	// 2. Sticky Session: Iterate backwards to find the last assistant message
 	for i := len(history) - 1; i >= 0; i-- {
 		msg := history[i]
 		if msg.Role == "assistant" && msg.AgentName != "" {
@@ -133,5 +140,6 @@ func (e *Engine) determineTargetAgent(ctx context.Context, history []core.Messag
 		}
 	}
 
-	return defaultAgent
+	// 3. Default fallback
+	return "student-facing-agent"
 }

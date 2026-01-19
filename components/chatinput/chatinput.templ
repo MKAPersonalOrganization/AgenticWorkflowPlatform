@@ -30,6 +30,20 @@ templ ChatInput() {
 			<div class="flex items-center justify-between pt-2">
 				<!-- Left: Controls -->
 				<div class="flex items-center gap-3">
+					<!-- Agent Selector -->
+					<div class="relative" x-data="{ open: false }">
+						<select
+							x-model="selectedAgent"
+							class="h-8 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+							aria-label="Select Agent"
+							:disabled="isStreaming"
+						>
+							<template x-for="agent in AVAILABLE_AGENTS" :key="agent.id">
+								<option :value="agent.id" x-text="agent.name"></option>
+							</template>
+						</select>
+					</div>
+
 					<!-- Help Button -->
 					<button
 						@click="toggleKeyboardShortcuts()"
