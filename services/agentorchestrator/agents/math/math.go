@@ -109,14 +109,8 @@ When you detect these, explicitly name the misconception and correct it.
 		MaxIterations: 20,
 		SystemPrompt:  prompt,
 		Tools:         registry.All(),
-		Handoffs: []core.Handoff{
-			{AgentName: "physics-instructor", Description: "Physics concepts ONLY: forces, motion, energy, momentum. NOT for math calculations."},
-			{AgentName: "chemistry-instructor", Description: "Chemistry ONLY: chemical reactions, molecules, stoichiometry. NOT for math."},
-			{AgentName: "student-facing-agent", Description: "Return here when ALL math work is complete"},
-		},
 		Notifier: notifier,
 		Middleware: []core.Middleware{
-			middleware.NewHandoffMiddleware(),
 			middleware.NewElicitationMiddleware(),
 		},
 	}

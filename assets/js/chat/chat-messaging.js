@@ -98,7 +98,7 @@ export function createMessagingMethods() {
                 });
 
                 // Start SSE connection
-                this.__streamResponse(userMessage, this.__currentThreadId);
+                this.__streamResponse(userMessage, this.__currentThreadId, this.selectedAgent);
             });
         },
 

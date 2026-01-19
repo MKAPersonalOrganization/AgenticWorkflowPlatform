@@ -271,9 +271,6 @@ func (s *executionState) nextStep() error {
 
 			// Check if guard condition is met
 			if trans.Guard(s) {
-				if trans.WithParam && trans.Trigger == TrigHandoffInitiated {
-					return s.sm.Fire(trans.Trigger, s.resolution.HandoffAgent)
-				}
 				return s.sm.Fire(trans.Trigger)
 			}
 		}
@@ -373,9 +370,7 @@ func (o *ObserverUnit) TrackToolExecuted(toolResultID, tcID, name, args, res, me
 	return o.yield(o.events.ToolCallExecuted(o.threadID, toolResultID, tcID, name, args, res, messageID), nil)
 }
 
-func (o *ObserverUnit) TrackHandoff(target string) bool {
-	return o.yield(o.events.AgentHandoff(o.threadID, target), nil)
-}
+
 
 func (o *ObserverUnit) Fail(reason TerminationReason, err error) {
 	o.result.Success = false
@@ -498,9 +493,6 @@ func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolve
 		}
 
 		if res := result.Command; res != nil {
-			if res.Goto != "" {
-				route.HandoffAgent = res.Goto
-			}
 			if res.StopIteration {
 				route.StopIteration = true
 			}
@@ -511,12 +503,11 @@ func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolve
 
 // RouteResolver determines the next state based on tool results.
 type RouteResolver struct {
-	HandoffAgent  string
 	StopIteration bool // Tool requested to stop iteration (e.g., elicitation)
 }
 
 func (r *RouteResolver) HasAction() bool {
-	return r.HandoffAgent != "" || r.StopIteration
+	return r.StopIteration
 }
 
 func (s *executionState) prepareContextForLLM() (*PrepareResult, error) {
@@ -553,10 +544,6 @@ func (s *executionState) setup(initialState state) error {
 		// Attach lifecycle hooks
 		if stateDef.OnEntry != nil {
 			config.OnEntry(func(_ context.Context, args ...any) error {
-				if stateDef.State == StateSwitchingAgent && len(args) > 0 {
-					// Special case: handoff needs target agent parameter
-					return s.performHandoff(args[0].(string))
-				}
 				return stateDef.OnEntry(s)
 			})
 		}
@@ -623,36 +610,19 @@ func (s *executionState) stateConfiguration() []StateDefinition {
 			Transitions: []TransitionRule{
 				{Trigger: TrigStartExecution, Target: StatePerformingActions, Reentry: true},
 				// Conditional transitions based on tool results
-				// Note: Handoff takes priority over StopIteration (handoffs also set StopIteration)
-				{
-					Trigger:   TrigHandoffInitiated,
-					Target:    StateSwitchingAgent,
-					WithParam: true,
-					Guard: func(s *executionState) bool {
-						return s.resolution != nil && s.resolution.HandoffAgent != ""
-					},
-				},
+
 				{
 					Trigger: TrigStopIteration,
 					Target:  StateDone,
 					Guard: func(s *executionState) bool {
 						// Only stop for StopIteration if NOT a handoff
-						return s.resolution != nil && s.resolution.StopIteration && s.resolution.HandoffAgent == ""
+						return s.resolution != nil && s.resolution.StopIteration
 					},
 				},
 				{Trigger: TrigActionsCompleted, Target: StateGeneratingResponse},
 			},
 		},
-		{
-			State: StateSwitchingAgent,
-			OnEntry: func(s *executionState) error {
-				// Note: actual handoff logic with parameter is in setup()
-				return nil
-			},
-			Transitions: []TransitionRule{
-				{Trigger: TrigAgentSwitched, Target: StateGeneratingResponse},
-			},
-		},
+
 		{
 			State:       StateDone,
 			Transitions: []TransitionRule{}, // Terminal state
@@ -807,23 +777,7 @@ func (s *executionState) saveAgentMessageAndEmitEvents() error {
 	return nil
 }
 
-func (s *executionState) performHandoff(targetAgent string) error {
-	// 1. Record Handoff
-	s.observer.result.Reason = TerminationHandoff
-	s.observer.result.HandoffTarget = targetAgent
 
-	if !s.observer.TrackHandoff(targetAgent) {
-		return context.Canceled
-	}
-
-	// 2. Switch Context
-	if err := s.initAgentComponents(targetAgent); err != nil {
-		return err
-	}
-
-	// 3. Complete Transition
-	return s.sm.Fire(TrigAgentSwitched)
-}
 
 // State machine states
 type state int
@@ -832,7 +786,7 @@ const (
 	StateAwaitingTurn state = iota
 	StateGeneratingResponse
 	StatePerformingActions
-	StateSwitchingAgent
+
 	StateDone
 	StateError
 )
@@ -846,8 +800,7 @@ func (s state) String() string {
 		return "GeneratingResponse"
 	case StatePerformingActions:
 		return "PerformingActions"
-	case StateSwitchingAgent:
-		return "SwitchingAgent"
+
 	case StateDone:
 		return "Done"
 	case StateError:
@@ -862,8 +815,7 @@ const (
 	TrigActionsDetected  = "ActionsDetected"
 	TrigTurnFinished     = "TurnFinished"
 	TrigActionsCompleted = "ActionsCompleted"
-	TrigHandoffInitiated = "HandoffInitiated"
-	TrigAgentSwitched    = "AgentSwitched"
+
 	TrigStopIteration    = "StopIteration" // Tool requested to stop (e.g., elicitation)
 )
 

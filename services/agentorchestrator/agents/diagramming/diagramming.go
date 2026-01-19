@@ -110,7 +110,6 @@ pie title Title
 		Tools:         registry.All(),
 		Notifier:      notifier,
 		Middleware: []core.Middleware{
-			middleware.NewHandoffMiddleware(),
 			middleware.NewElicitationMiddleware(),
 		},
 	}

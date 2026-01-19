@@ -32,3 +32,13 @@ export const DEFAULT_PERF_METRICS = {
     reconnects: 0,
     avgResponseTime: 0
 };
+
+// Available agents for selection
+export const AVAILABLE_AGENTS = [
+    { id: '', name: 'Auto (Default)' },
+    { id: 'math-instructor', name: 'Math Instructor' },
+    { id: 'physics-instructor', name: 'Physics Instructor' },
+    { id: 'chemistry-instructor', name: 'Chemistry Instructor' },
+    { id: 'statistics-instructor', name: 'Statistics Instructor' },
+    { id: 'diagramming-instructor', name: 'Diagramming Instructor' }
+];

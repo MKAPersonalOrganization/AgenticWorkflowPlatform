@@ -22,6 +22,7 @@ type ProcessChatPayload struct {
 	MessageID string `json:"message_id"`
 	Message   string `json:"message"`
 	UserID    string `json:"user_id"`
+	AgentName string `json:"agent_name,omitempty"`
 }
 
 // NewProcessChatTask creates a new task for processing a chat message.
@@ -96,6 +97,7 @@ func (w *ChatWorker) processChat(ctx context.Context, payload ProcessChatPayload
 		MessageID: payload.MessageID,
 		Content:   payload.Message,
 		UserID:    payload.UserID,
+		AgentName: payload.AgentName,
 	}
 
 	return w.orchestrationService.HandleUserMessage(ctx, params)

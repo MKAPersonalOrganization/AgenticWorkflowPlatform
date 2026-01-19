@@ -28,6 +28,7 @@
 // Import all modules
 import { renderMarkdown } from './markdown-renderer.js';
 import { throttle, formatSessionTime, log, createErrorHandlers, isValidJSON } from './chat-utils.js';
+import { AVAILABLE_AGENTS } from './constants.js';
 import { createInitialState, createStateMethods, createEmptyThreadState } from './chat-state.js';
 import { createSessionMethods } from './chat-sessions.js';
 import { createMessagingMethods } from './chat-messaging.js';
@@ -75,6 +76,9 @@ document.addEventListener('alpine:init', () => {
             ...themeMethods,
             ...accessibilityMethods,
             ...healthMethods,
+
+            // Constants
+            AVAILABLE_AGENTS,
 
             // ============================================
             // Computed Properties (Getters must be defined directly)

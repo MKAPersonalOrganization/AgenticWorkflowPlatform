@@ -149,7 +149,6 @@ When you detect these, explicitly name the misconception and provide a concrete 
 		Tools:         registry.All(),
 		Notifier:      notifier,
 		Middleware: []core.Middleware{
-			middleware.NewHandoffMiddleware(),
 			middleware.NewElicitationMiddleware(),
 		},
 	}

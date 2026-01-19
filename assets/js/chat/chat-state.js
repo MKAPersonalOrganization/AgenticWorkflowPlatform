@@ -66,6 +66,7 @@ export function createInitialState() {
         // User input
         currentMessage: '',
         elicitationAnswer: '',
+        selectedAgent: '',
 
         // UI state
         sessions: [],

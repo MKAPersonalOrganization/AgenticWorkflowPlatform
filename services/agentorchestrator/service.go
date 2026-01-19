@@ -198,7 +198,7 @@ func (s *Service) Run(ctx context.Context, agentName string, runCtx core.RunCont
 // 1. Adds the message to the thread.
 // 2. Generates/Updates the thread title (if new).
 // 3. Runs the agent execution loop.
-func (s *Service) ProcessUserMessage(ctx context.Context, threadID, content, userID string) (iter.Seq2[core.Event, error], error) {
+func (s *Service) ProcessUserMessage(ctx context.Context, agentName, threadID, content, userID string) (iter.Seq2[core.Event, error], error) {
 	// Delegate to Engine
-	return s.engine.ProcessUserMessage(ctx, "student-facing-agent", threadID, content, userID)
+	return s.engine.ProcessUserMessage(ctx, agentName, threadID, content, userID)
 }

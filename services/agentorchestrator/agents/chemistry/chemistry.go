@@ -120,14 +120,8 @@ This builds good laboratory intuition.`,
 		MaxIterations: 20,
 		SystemPrompt:  prompt,
 		Tools:         registry.All(),
-		Handoffs: []core.Handoff{
-			{AgentName: "math-instructor", Description: "For ALL math: stoichiometry calculations, equations, numerical problems"},
-			{AgentName: "physics-instructor", Description: "Physics concepts ONLY"},
-			{AgentName: "student-facing-agent", Description: "Return here when chemistry work is complete"},
-		},
 		Notifier: notifier,
 		Middleware: []core.Middleware{
-			middleware.NewHandoffMiddleware(),
 			middleware.NewElicitationMiddleware(),
 		},
 	}

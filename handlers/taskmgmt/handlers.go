@@ -59,6 +59,7 @@ func NewTaskManagementHandler(
 type SendMessageRequest struct {
 	ContextID string `json:"contextId,omitempty"` // Optional: existing context (threadID)
 	Message   string `json:"message"`             // The message/input for the task
+	AgentName string `json:"agentName,omitempty"` // Optional: specific agent to target
 }
 
 // SendMessage handles POST /api/messages - async chat message processing.
@@ -90,7 +91,7 @@ func (h *TaskManagementHandler) SendMessage(w http.ResponseWriter, r *http.Reque
 		"contextID", req.ContextID)
 
 	// Submit task via manager (handles ID generation and payload construction)
-	result, err := h.taskManager.SubmitChatTask(r.Context(), user.ID, req.Message, req.ContextID)
+	result, err := h.taskManager.SubmitChatTask(r.Context(), user.ID, req.Message, req.ContextID, req.AgentName)
 	if err != nil {
 		h.log.Error(r.Context(), "[API] Failed to submit task", "error", err)
 		http.Error(w, fmt.Sprintf("Failed to submit task: %v", err), http.StatusInternalServerError)

@@ -91,7 +91,7 @@ func TestExecutionResult_IsRecoverable(t *testing.T) {
 		{TerminationUserAborted, false},
 		{TerminationLoopDetected, false},
 		{TerminationError, false},
-		{TerminationHandoff, true},     // Recoverable
+
 		{TerminationAwaitingInput, true}, // Recoverable
 	}
 
