@@ -251,12 +251,6 @@ func (u *ProjectionUpdater) convertEvent(event *kurrentdb.RecordedEvent) (core.E
 		}
 		return &evt, nil
 
-	case "HumanInputRequested":
-		var evt domain.HumanInputRequestedEvent
-		if err := json.Unmarshal(event.Data, &evt); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal HumanInputRequested: %w", err)
-		}
-		return &evt, nil
 
 	case "AgentHandoff":
 		var evt domain.AgentHandoffEvent

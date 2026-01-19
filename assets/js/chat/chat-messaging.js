@@ -84,9 +84,10 @@ export function createMessagingMethods() {
                 if (state.humanInputToastId) {
                     this.dismissToast(state.humanInputToastId);
                 }
-                state.awaitingHumanInput = false;
-                state.humanInputQuestion = null;
                 state.humanInputToastId = null;
+
+                // Update derived state (will clear waiting status since calling push() added a user message)
+                this.__updateDerivedState();
 
                 // Focus management (back to main input)
                 this.$nextTick(() => {
@@ -127,6 +128,9 @@ export function createMessagingMethods() {
                     const state = this.__getThreadState(id);
                     const messages = Array.isArray(data) ? data : (data.messages || []);
                     state.messages = this.__convertBackendMessagesToUI(messages);
+
+                    // Update derived state based on loaded messages
+                    this.__updateDerivedState();
 
                     // Scroll to bottom after loading
                     if (id === this.__currentThreadId) {
@@ -257,22 +261,7 @@ export function createMessagingMethods() {
                 }
             }
 
-            // Detect awaiting human input from last message
-            if (pairedMessages.length > 0) {
-                const lastMsg = pairedMessages[pairedMessages.length - 1];
-
-
-
-                if (lastMsg.type === 'tool_call' && lastMsg.name === 'ask_human') {
-
-                    const state = this.__getThreadState();
-                    state.awaitingHumanInput = true;
-                    state.humanInputQuestion = lastMsg.parsedArgs?.question;
-                    state.humanInputSchema = lastMsg.parsedArgs?.schema;
-
-
-                }
-            }
+            // Note: awaitingHumanInput is derived centrally via __updateDerivedState() set in chat-state.js
 
             return pairedMessages;
         },
@@ -304,6 +293,9 @@ export function createMessagingMethods() {
 
             // Convert and set messages
             state.messages = this.__convertBackendMessagesToUI(event.messages);
+
+            // Update derived state
+            this.__updateDerivedState();
 
             console.log('[MESSAGES_SNAPSHOT] Processing', state.messages.length, 'messages');
 

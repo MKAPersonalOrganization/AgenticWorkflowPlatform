@@ -70,17 +70,6 @@ func ToAguiEvents(event any) []any {
 			evt.ToolResult,
 		)}
 
-	case *domain.HumanInputRequestedEvent:
-		return []any{aguievents.NewCustomEvent(
-			"HUMAN_INPUT_REQUESTED",
-			aguievents.WithValue(map[string]any{
-				"threadId":   evt.ThreadID,
-				"messageId":  evt.MessageID,
-				"toolCallId": evt.ToolCallID,
-				"question":   evt.Question,
-				"schema":     evt.Schema,
-			}),
-		)}
 
 	case *domain.MessageAdded, *domain.ThreadCreated, *domain.AgentHandoffEvent:
 		// These are handled by the frontend locally or via snapshots, no need to stream
