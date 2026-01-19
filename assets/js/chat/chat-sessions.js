@@ -51,8 +51,6 @@ export function createSessionMethods() {
                         await this.__loadMessages(savedThreadId);
                     }
 
-                    // Reconnect to active jobs for ALL threads
-                    await this.__reconnectToAllActiveJobs();
                 } else {
                     throw new Error(`Failed to fetch threads: ${response.status}`);
                 }
