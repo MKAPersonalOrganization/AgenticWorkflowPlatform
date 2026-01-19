@@ -2,6 +2,7 @@ package shared
 
 import (
 	"school-with-ai/foundation/agentsdk/core"
+	"sort"
 	"sync"
 )
 
@@ -37,5 +38,19 @@ func (r *AgentRegistry) Get(name string) (AgentFactory, bool) {
 	defer r.mu.RUnlock()
 	factory, ok := r.agents[name]
 
+
 	return factory, ok
+}
+
+// List returns a sorted list of registered agent names.
+func (r *AgentRegistry) List() []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	names := make([]string, 0, len(r.agents))
+	for name := range r.agents {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }

@@ -474,6 +474,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Post("/v1/message:send", authMiddleware.RequireAuthFunc(handler.SendMessage))
 	r.Get("/v1/tasks/{id}:subscribe", authMiddleware.RequireAuthFunc(handler.StreamJobEvents))
 	r.Post("/v1/tasks/{id}:cancel", authMiddleware.RequireAuthFunc(handler.CancelJob))
+	r.Get("/v1/agents", authMiddleware.RequireAuthFunc(handler.ListAgents))
 
 	// AGUI projection query endpoints (protected)
 	r.Get("/api/agui/threads", authMiddleware.RequireAuthFunc(aguiHandler.ListThreads))

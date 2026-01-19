@@ -32,6 +32,9 @@ type AgentOrchestrator interface {
 
 	// ProcessUserMessage processes a user message
 	ProcessUserMessage(ctx context.Context, agentName, threadID, content, userID string) (iter.Seq2[core.Event, error], error)
+
+	// GetAvailableAgents returns a list of available agents
+	GetAvailableAgents() []string
 }
 
 // AgentFactory creates instances of AgentOrchestrator for specific agents.
