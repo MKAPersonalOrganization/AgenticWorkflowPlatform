@@ -6,12 +6,12 @@ import "school-with-ai/components/icon"
 
 templ ChatInput() {
 	<div
-		class="relative z-10 mx-auto w-full max-w-3xl rounded-2xl border border-border bg-background shadow-[0_9px_25px_0_rgba(0,0,0,0.05)] transition-all duration-300 focus-within:shadow-[0_9px_25px_0_rgba(0,0,0,0.1)] focus-within:border-border/80"
+		class="relative z-10 mx-auto w-full max-w-3xl rounded-2xl border border-border bg-background shadow-[0_9px_25px_0_rgba(0,0,0,0.03)] transition-all duration-300 focus-within:shadow-[0_9px_25px_0_rgba(0,0,0,0.08)] focus-within:border-border/80"
 		:class="awaitingHumanInput ? 'opacity-50 pointer-events-none grayscale' : ''"
 		role="region"
 		aria-label="Message input area"
 	>
-		<form @submit.prevent="sendMessage" class="mx-auto flex flex-col w-full p-2">
+		<form @submit.prevent="sendMessage" class="mx-auto flex flex-col w-full p-1.5">
             <!-- Textarea Area -->
 			<div class="relative w-full">
                 @textarea.Textarea(textarea.Props{
@@ -27,18 +27,18 @@ templ ChatInput() {
                         ":aria-describedby": "errorMessage ? 'error-message' : null",
                         "x-ref":             "messageInput",
                     },
-                    Class: "w-full resize-none border-none bg-transparent shadow-none text-base min-h-[44px] py-3 px-2 focus:ring-0 focus:outline-none placeholder:text-muted-foreground/50",
+                    Class: "w-full resize-none border-none bg-transparent shadow-none text-base min-h-[44px] py-3.5 px-3 focus:ring-0 focus:outline-none placeholder:text-muted-foreground/50",
                 })
             </div>
 
             <!-- Footer Area -->
-			<div class="flex items-center justify-between pl-1 pr-1 pb-1">
+			<div class="flex items-center justify-between px-1.5 pb-1 gap-2">
 				<!-- Left: Agents & Attachments -->
-				<div class="flex items-center gap-2">
+				<div class="flex items-center gap-1">
                     <!-- Attachment Button -->
                      <button 
                         type="button" 
-                        class="p-2 text-muted-foreground hover:text-foreground transition-colors rounded-full hover:bg-muted/50 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
+                        class="p-2 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-muted/50 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
                         aria-label="Attach file"
                     >
                         @icon.Paperclip(icon.Props{Class: "size-5"})
@@ -48,7 +48,7 @@ templ ChatInput() {
 					<div class="relative" x-data="{ open: false }">
 						<select
 							x-model="selectedAgent"
-							class="h-8 rounded-full border border-input/50 bg-muted/50 px-3 py-1 text-xs font-medium shadow-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer appearance-none pl-3 pr-8"
+							class="h-8 rounded-xl border border-input/30 bg-muted/30 px-3 py-1 text-xs font-medium shadow-none transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer appearance-none pl-3 pr-8"
 							aria-label="Select Agent"
 							:disabled="isStreaming"
                             style="background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23666%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E'); background-repeat: no-repeat; background-position: right 0.7em top 50%; background-size: 0.65em auto;"
@@ -61,11 +61,11 @@ templ ChatInput() {
 				</div>
 
 				<!-- Right: Send Button -->
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-1">
                     <!-- Help/Shortcuts -->
                     <button
                         @click="toggleKeyboardShortcuts()"
-                        class="text-muted-foreground hover:text-foreground transition-colors p-2 rounded-full hover:bg-muted/50"
+                        class="text-muted-foreground hover:text-foreground transition-colors p-2 rounded-xl hover:bg-muted/50"
                         type="button"
                         aria-label="Show keyboard shortcuts"
                     >
@@ -76,7 +76,7 @@ templ ChatInput() {
                     @button.Button(button.Props{
                         Variant: button.VariantDefault,
                         Size:    button.SizeIcon,
-                        Class:   "rounded-lg size-8 bg-foreground text-background transition-all shadow-none hover:opacity-90",
+                        Class:   "bg-foreground text-background transition-all shadow-none hover:opacity-90 rounded-xl",
                         Attributes: templ.Attributes{
                             "@click.prevent": "isStreaming ? cancelJob() : sendMessage()",
                             "type":           "button",
