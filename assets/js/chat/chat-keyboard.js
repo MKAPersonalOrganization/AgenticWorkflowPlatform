@@ -18,8 +18,8 @@ export function createKeyboardMethods() {
          */
         __registerKeyboardShortcuts() {
             const handler = (e) => {
-                // ? or Ctrl+/ - Show keyboard shortcuts (works even in inputs)
-                if (e.key === '?' || ((e.ctrlKey || e.metaKey) && e.key === '/')) {
+                // Ctrl+/ - Show keyboard shortcuts
+                if ((e.ctrlKey || e.metaKey) && e.key === '/') {
                     e.preventDefault();
                     this.toggleKeyboardShortcuts();
                     return;
