@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"iter"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 )
@@ -76,20 +77,28 @@ func (e *Engine) ProcessUserMessage(ctx context.Context, agentName, threadID, co
 		}
 
 		// Yield Run events
-		var runErr error
+		// The last event will be an internal runCompletedEvent with termination reason
+		var terminationReason TerminationReason
 		for evt, err := range runIter {
 			if err != nil {
 				// Emit RunError
 				yield(events.RunError(threadID, err.Error(), "RUN_EXECUTION_ERROR"), nil)
 				return // Stop iteration on error
 			}
+
+			// Catch the internal completion event (don't forward to frontend)
+			if completed, ok := evt.(runCompletedEvent); ok {
+				terminationReason = completed.Reason
+				continue // Don't yield this internal event
+			}
+
 			if !yield(evt, nil) {
 				return
 			}
 		}
 
-		if runErr == nil {
-			// Yield RunFinished
+		// Only emit RunFinished if the run truly completed (not paused for elicitation)
+		if terminationReason != TerminationElicitation {
 			yield(events.RunFinished(threadID, runID), nil)
 		}
 	}, nil

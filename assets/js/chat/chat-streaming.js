@@ -25,9 +25,9 @@ export function createStreamingMethods() {
         async __streamResponse(message, threadId) {
             const state = this.__getThreadState(threadId);
 
-            // Guard: Prevent duplicate connections
+            // Close existing stream if any (expected during elicitation responses)
             if (state.eventSource) {
-                console.warn('Stream already active for thread:', threadId);
+                console.log('Closing existing stream for thread:', threadId);
                 state.eventSource.close();
                 state.eventSource = null;
             }
@@ -357,18 +357,9 @@ export function createStreamingMethods() {
             } else if (event.name === 'AGENT_CALLED') {
                 const { callerAgent, calledAgent, reason } = event.value;
                 console.log(`Agent collaboration: ${callerAgent} → ${calledAgent} (${reason})`);
-            } else if (event.name === 'HUMAN_INPUT_REQUESTED') {
-                const { threadId, messageId, toolCallId, question, schema } = event.value;
-
-                // Order matters: set data before enabling the UI to avoid partial/invalid state rendering
-                state.humanInputQuestion = question;
-                state.humanInputSchema = schema;
-                state.awaitingHumanInput = true;
-
-                console.log(`Human input requested for thread ${threadId}: ${question}`, schema);
-
-
             }
+            // Note: HUMAN_INPUT_REQUESTED is no longer emitted by the backend.
+            // Elicitation state is derived from pending ask_human tool calls in __convertBackendMessagesToUI
         },
 
         /**
@@ -434,13 +425,22 @@ export function createStreamingMethods() {
 
                 const toolMsgIndex = state.messages.findIndex(m => m.id === event.toolCallId);
                 if (toolMsgIndex !== -1) {
-                    state.messages[toolMsgIndex].status = 'completed';
+                    const toolMsg = state.messages[toolMsgIndex];
+                    toolMsg.status = 'completed';
 
-                    const argsString = state.messages[toolMsgIndex].args || '{}';
+                    const argsString = toolMsg.args || '{}';
                     const parsed = this.__tryCatch('parse tool args', { toolCallId: event.toolCallId }, () => {
                         return JSON.parse(argsString);
                     });
-                    state.messages[toolMsgIndex].parsedArgs = parsed || { raw: argsString };
+                    toolMsg.parsedArgs = parsed || { raw: argsString };
+
+                    // Detect elicitation: if this is ask_human, set elicitation state
+                    if (toolMsg.name === 'ask_human') {
+                        state.humanInputQuestion = toolMsg.parsedArgs?.question;
+                        state.humanInputSchema = toolMsg.parsedArgs?.schema;
+                        state.awaitingHumanInput = true;
+                        console.log('Elicitation detected from ask_human tool:', toolMsg.parsedArgs?.question);
+                    }
                 }
             }
         },
