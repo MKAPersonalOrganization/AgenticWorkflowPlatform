@@ -13,75 +13,77 @@ templ ThreadHistory() {
 		Collapsible: sidebar.CollapsibleOffcanvas,
 		Collapsed:   true,
 		Class:       "z-30 !left-0 !border-r-0",
+		Attributes:  templ.Attributes{
+			"style": "--sidebar-width: 22rem", 
+		},
 	}) {
 		@sidebar.Header() {
-			<div class="flex items-center justify-end">
+			<div class="flex items-center justify-end px-2 pt-2">
 				<!-- Close Sidebar Button -->
 				@button.Button(button.Props{
 					Size:    button.SizeIcon,
 					Variant: button.VariantGhost,
-					Class:   "size-7 md:hidden",
+					Class:   "size-8 md:hidden hover:bg-sidebar-accent/50",
 					Attributes: templ.Attributes{
 						"data-tui-sheet-close": "thread-history-sidebar-mobile",
 					},
 				}) {
-					@icon.X(icon.Props{Class: "size-4"})
+					@icon.X(icon.Props{Class: "size-5"})
 					<span class="sr-only">Close Thread History</span>
 				}
 				<div class="hidden md:block">
 					@button.Button(button.Props{
 						Size:    button.SizeIcon,
 						Variant: button.VariantGhost,
-						Class:   "size-7",
+						Class:   "size-8 hover:bg-sidebar-accent/50",
 						Attributes: templ.Attributes{
 							"data-tui-sidebar-trigger": true,
 							"data-tui-sidebar-target":  "thread-history-sidebar",
 						},
 					}) {
-						@icon.PanelLeftClose(icon.Props{Class: "size-4"})
+						@icon.PanelLeftClose(icon.Props{Class: "size-5"})
 						<span class="sr-only">Close Thread History</span>
 					}
 				</div>
 			</div>
-			@separator.Separator(separator.Props{Class: "mt-1"})
+			@separator.Separator(separator.Props{Class: "mt-2 mb-4 opacity-50"})
 		}
 		@sidebar.Content() {
 			<!-- Action Buttons Stack -->
-			<div class="px-3 py-2 space-y-2">
+			<div class="px-4 py-2 space-y-3">
 				<!-- New Chat Button -->
 				@button.Button(button.Props{
 					Variant: button.VariantDefault,
-					Size:    button.SizeSm,
-					Class:   "w-full justify-start gap-2 shadow-sm",
+					Class:   "w-full justify-start gap-3 shadow-md h-12 text-base font-medium transition-all hover:shadow-lg hover:-translate-y-0.5",
 					Attributes: templ.Attributes{
 						"@click": "createNewSession()",
 					},
 				}) {
-					@icon.Plus(icon.Props{Class: "size-4"})
+					@icon.Plus(icon.Props{Class: "size-5"})
 					<span>New Chat</span>
 				}
 				<!-- Future buttons can be added here -->
 			</div>
-			@separator.Separator()
+			@separator.Separator(separator.Props{Class: "my-4 opacity-50"})
 			<!-- Thread List -->
-			@sidebar.Menu() {
+			@sidebar.Menu(sidebar.MenuProps{Class: "px-2 gap-1.5"}) {
 				<template x-for="session in sessions" :key="session.id">
 					@sidebar.MenuItem() {
-						<div class="flex items-center gap-2 w-full group/item">
+						<div class="flex items-center gap-2 w-full group/item px-2">
 							@sidebar.MenuButton(sidebar.MenuButtonProps{
-								Class: "flex-1 relative",
+								Class: "flex-1 relative h-11 text-base py-2.5 transition-all duration-200",
 								Attributes: templ.Attributes{
 									"@click":             "switchSession(session.id)",
-									":class":             "threadId === session.id ? 'bg-sidebar-accent/50 font-medium before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:h-5 before:w-0.5 before:bg-primary before:rounded-r-full' : 'hover:bg-sidebar-accent/30'",
+									":class":             "threadId === session.id ? 'bg-sidebar-accent font-medium text-foreground shadow-sm scale-[1.02]' : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'",
 									"x-bind:data-active": "threadId === session.id",
 									"class":              "transition-all duration-300 ease-out",
 								},
 							}) {
-								<div class="flex items-center gap-2 w-full">
+								<div class="flex items-center gap-3 w-full">
 									<!-- Streaming indicator -->
-									<span x-show="isThreadStreaming(session.id)" class="flex h-2 w-2 relative">
+									<span x-show="isThreadStreaming(session.id)" class="flex h-2.5 w-2.5 relative shrink-0">
 										<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-										<span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+										<span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary"></span>
 									</span>
 									<span class="truncate flex-1" x-text="session.title"></span>
 								</div>
