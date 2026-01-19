@@ -59,3 +59,8 @@ func RandomID() string {
 // ScriptVersion is a timestamp generated at app start for cache busting.
 // Used in Script() templates to append ?v=<timestamp> to script URLs.
 var ScriptVersion = strconv.FormatInt(time.Now().Unix(), 10)
+
+// ScriptURL appends the current ScriptVersion to the provided URL.
+func ScriptURL(url string) string {
+	return url + "?v=" + ScriptVersion
+}

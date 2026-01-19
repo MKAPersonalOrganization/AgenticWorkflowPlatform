@@ -1,19 +1,15 @@
-// templui component icon - version: v1.0.0 installed by templui v1.0.0
+// templui component icon - version: v1.2.0 installed by templui v1.2.0
 // 📚 Documentation: https://templui.io/docs/components/icon
 package icon
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"sync"
 
 	"github.com/a-h/templ"
 )
-
-// ErrIconNotFound is returned when an icon is not found in the internal data map.
-var ErrIconNotFound = errors.New("icon not found in internalSvgData map")
 
 // iconContents caches the fully generated SVG strings for icons that have been used,
 // keyed by a composite key of name and props to handle different stylings.
@@ -52,11 +48,7 @@ func Icon(name string) func(...Props) templ.Component {
 
 			if cached {
 				_, err = w.Write([]byte(svg))
-				if err != nil {
-					return fmt.Errorf("failed to write cached icon '%s': %w", name, err)
-				}
-
-				return nil
+				return err
 			}
 
 			// Not cached, generate it
@@ -72,11 +64,7 @@ func Icon(name string) func(...Props) templ.Component {
 			iconMutex.Unlock()
 
 			_, err = w.Write([]byte(generatedSvg))
-			if err != nil {
-				return fmt.Errorf("failed to write generated icon '%s': %w", name, err)
-			}
-
-			return nil
+			return err
 		})
 	}
 }
@@ -124,8 +112,7 @@ func generateSVG(name string, props Props) (string, error) {
 func getIconContent(name string) (string, error) {
 	content, exists := internalSvgData[name]
 	if !exists {
-		return "", fmt.Errorf("icon '%s': %w", name, ErrIconNotFound)
+		return "", fmt.Errorf("icon '%s' not found in internalSvgData map", name)
 	}
-
 	return content, nil
 }
