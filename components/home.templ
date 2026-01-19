@@ -5,8 +5,6 @@ import "school-with-ai/components/chatinput"
 import "school-with-ai/components/threadhistory"
 import "school-with-ai/components/messagelist"
 import "school-with-ai/components/settings"
-import "school-with-ai/components/button"
-import "school-with-ai/components/icon"
 import "school-with-ai/components/eventlog"
 import "school-with-ai/components/collapsible"
 import "school-with-ai/components/popover"
@@ -16,6 +14,7 @@ import "school-with-ai/components/code"
 import "school-with-ai/components/dialog"
 import "school-with-ai/components/keyboardshortcuts"
 import "school-with-ai/components/sampleprompts"
+import "school-with-ai/components/chatheader"
 import "school-with-ai/domain"
 
 templ ChatInputScreen(user *domain.User) {
@@ -114,24 +113,7 @@ templ ChatInputScreen(user *domain.User) {
 						<!-- Left Sidebar - Chat History -->
 						@threadhistory.ThreadHistory(threadhistory.Props{User: user})
 
-						<!-- Floating Sidebar Toggle (Visible when sidebar is closed) -->
-						<div class="fixed top-3 left-3 z-40 hidden peer-data-[tui-sidebar-state=collapsed]:flex items-center gap-1 transition-opacity duration-200">
-							@sidebar.Trigger(sidebar.TriggerProps{
-								Target: "thread-history-sidebar",
-								Class:  "size-9 hover:bg-sidebar-accent/50 text-sidebar-foreground bg-sidebar border border-sidebar-border shadow-sm rounded-lg flex items-center justify-center",
-							})
-							@button.Button(button.Props{
-								Size:    button.SizeIcon,
-								Variant: button.VariantGhost,
-								Class:   "size-9 hover:bg-sidebar-accent/50 text-sidebar-foreground bg-sidebar border border-sidebar-border shadow-sm rounded-lg flex items-center justify-center",
-								Attributes: templ.Attributes{
-									"@click": "createNewSession()",
-								},
-							}) {
-								@icon.SquarePen(icon.Props{Class: "size-5"})
-								<span class="sr-only">New Chat</span>
-							}
-						</div>
+						<!-- Floating Sidebar Toggle Removed (Replaced by Header Toggle) -->
 
 						<!-- Main Content Area -->
 						<div class="flex-1 flex h-screen overflow-hidden relative">
@@ -139,6 +121,9 @@ templ ChatInputScreen(user *domain.User) {
 							<main
 								class="flex flex-col relative overflow-hidden w-full h-full"
 							>
+                                <!-- Header -->
+                                @chatheader.ChatHeader(user)
+                                
 								<!-- Messages Container -->
 								<div
 									class="flex-1 overflow-y-auto scrollbar-transparent scrollbar-hover"
