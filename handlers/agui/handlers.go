@@ -3,8 +3,10 @@ package agui
 import (
 	"encoding/json"
 	"net/http"
+	"school-with-ai/domain"
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/services"
+	"strconv"
 )
 
 // AguiProjectionHandler provides HTTP endpoints for querying the AGUI projection.
@@ -69,14 +71,43 @@ func (h *AguiProjectionHandler) GetMessages(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-// ListThreads returns all thread summaries, sorted by most recent.
-// GET /api/agui/threads.
+// ListThreads returns paginated thread summaries, sorted by most recent.
+// GET /api/agui/threads?cursor=<timestamp>&limit=<int>.
 func (h *AguiProjectionHandler) ListThreads(w http.ResponseWriter, r *http.Request) {
-	threads := h.projectionService.ListThreadSummaries()
+	// Get user from auth context
+	user := domain.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Parse query params
+	cursor := r.URL.Query().Get("cursor")
+	limit := 20 // default
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		parsedLimit, err := strconv.Atoi(limitStr)
+		if err != nil || parsedLimit < 1 {
+			http.Error(w, "invalid limit parameter", http.StatusBadRequest)
+			return
+		}
+		limit = parsedLimit
+	}
+
+	// Build request and fetch paginated threads
+	req := agui.ThreadListRequest{
+		UserID: user.ID,
+		Cursor: cursor,
+		Limit:  limit,
+	}
+
+	response, err := h.projection.ListThreads(req)
+	if err != nil {
+		http.Error(w, "invalid cursor format", http.StatusBadRequest)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
-	err := json.NewEncoder(w).Encode(threads)
-	if err != nil {
+	if err := json.NewEncoder(w).Encode(response); err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 	}
 }

@@ -196,6 +196,14 @@ document.addEventListener('alpine:init', () => {
                     this.__loadSessions();
                 });
 
+                // Set up infinite scroll for sidebar sessions
+                this.$nextTick(() => {
+                    const sidebarContent = document.querySelector('[data-tui-sidebar="content"]');
+                    if (sidebarContent) {
+                        sidebarContent.addEventListener('scroll', (e) => this.__onSidebarScroll(e));
+                    }
+                });
+
                 // Initialize accessibility
                 this.__initScreenReaderAnnouncer();
 

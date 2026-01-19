@@ -157,7 +157,7 @@ func TestEngine_Run(t *testing.T) {
 	}
 
 	// Add user message via manager so event store is populated
-	_, _, err = tm.AddUserMessage(ctx, threadID, "msg-1", "Hello")
+	_, _, err = tm.AddUserMessage(ctx, threadID, "msg-1", "Hello", "test-user")
 	if err != nil {
 		t.Fatalf("Failed to add user message: %v", err)
 	}

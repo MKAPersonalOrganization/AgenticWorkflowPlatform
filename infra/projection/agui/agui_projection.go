@@ -17,8 +17,8 @@ type AguiProjection interface {
 	// GetMessages retrieves all UI-formatted messages for a thread.
 	GetMessages(threadID string) []aguievents.Message
 
-	// ListThreads returns all thread IDs in the projection.
-	ListThreads() []string
+	// ListThreads returns paginated threads for a user.
+	ListThreads(req ThreadListRequest) (*ThreadListResponse, error)
 }
 
 // AguiBroadcaster is an interface for subscribing to real-time events.
@@ -63,4 +63,25 @@ type AguiAgentActivity struct {
 	FirstActiveAt   time.Time `json:"firstActiveAt"`
 	TotalRunTime    int64     `json:"totalRunTime"` // milliseconds
 	CurrentlyActive bool      `json:"currentlyActive"`
+}
+
+// ThreadListRequest contains pagination parameters for listing threads.
+type ThreadListRequest struct {
+	UserID string // Required: filter by user
+	Cursor string // Optional: RFC3339 timestamp of last item's updated_at
+	Limit  int    // Optional: max items to return (default 20, max 100)
+}
+
+// ThreadListResponse contains paginated thread results.
+type ThreadListResponse struct {
+	Threads    []ThreadSummary `json:"threads"`
+	NextCursor string          `json:"nextCursor,omitempty"`
+	HasMore    bool            `json:"hasMore"`
+}
+
+// ThreadSummary is a lightweight thread representation for list views.
+type ThreadSummary struct {
+	ID        string    `json:"id"`
+	Title     string    `json:"title,omitempty"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }

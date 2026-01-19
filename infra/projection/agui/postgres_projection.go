@@ -299,25 +299,92 @@ func (p *PostgresAguiProjection) GetMessages(threadID string) []aguievents.Messa
 	return state.Messages
 }
 
-// ListThreads returns all non-deleted thread IDs.
-func (p *PostgresAguiProjection) ListThreads() []string {
+// ListThreads returns paginated threads for a user.
+func (p *PostgresAguiProjection) ListThreads(req ThreadListRequest) (*ThreadListResponse, error) {
 	ctx := context.Background()
 
-	var threadIDs []string
-	query := `
-		SELECT thread_id
-		FROM agui_threads
-		WHERE is_deleted = false
-		ORDER BY updated_at DESC
-	`
-
-	err := p.db.SelectContext(ctx, &threadIDs, query)
-	if err != nil {
-		p.log.Error(ctx, "failed to list threads", "ERROR", err)
-		return []string{}
+	// Apply defaults and limits
+	limit := req.Limit
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
 	}
 
-	return threadIDs
+	// Fetch one extra to determine if there are more pages
+	fetchLimit := limit + 1
+
+	var threads []struct {
+		ThreadID  string    `db:"thread_id"`
+		Title     *string   `db:"title"`
+		UpdatedAt time.Time `db:"updated_at"`
+	}
+
+	var err error
+	if req.Cursor == "" {
+		// First page - no cursor
+		query := `
+			SELECT thread_id, title, updated_at
+			FROM agui_threads
+			WHERE user_id = $1 AND is_deleted = false
+			ORDER BY updated_at DESC
+			LIMIT $2
+		`
+		err = p.db.SelectContext(ctx, &threads, query, req.UserID, fetchLimit)
+	} else {
+		// Subsequent pages - use cursor
+		cursorTime, parseErr := time.Parse(time.RFC3339Nano, req.Cursor)
+		if parseErr != nil {
+			return nil, fmt.Errorf("invalid cursor format: %w", parseErr)
+		}
+
+		query := `
+			SELECT thread_id, title, updated_at
+			FROM agui_threads
+			WHERE user_id = $1 AND is_deleted = false AND updated_at < $2
+			ORDER BY updated_at DESC
+			LIMIT $3
+		`
+		err = p.db.SelectContext(ctx, &threads, query, req.UserID, cursorTime, fetchLimit)
+	}
+
+	if err != nil {
+		p.log.Error(ctx, "failed to list threads", "userID", req.UserID, "ERROR", err)
+		return nil, fmt.Errorf("failed to list threads: %w", err)
+	}
+
+	// Determine if there are more pages
+	hasMore := len(threads) > limit
+	if hasMore {
+		threads = threads[:limit] // Trim the extra item
+	}
+
+	// Convert to response format
+	result := &ThreadListResponse{
+		Threads: make([]ThreadSummary, 0, len(threads)),
+		HasMore: hasMore,
+	}
+
+	for _, t := range threads {
+		title := ""
+		if t.Title != nil {
+			title = *t.Title
+		}
+		result.Threads = append(result.Threads, ThreadSummary{
+			ID:        t.ThreadID,
+			Title:     title,
+			UpdatedAt: t.UpdatedAt,
+		})
+	}
+
+	// Set next cursor if there are more pages
+	if hasMore && len(result.Threads) > 0 {
+		lastThread := result.Threads[len(result.Threads)-1]
+		result.NextCursor = lastThread.UpdatedAt.Format(time.RFC3339Nano)
+	}
+
+	return result, nil
 }
 
 // Verify PostgresAguiProjection implements AguiProjection.
