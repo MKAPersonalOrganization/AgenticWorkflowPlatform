@@ -28,7 +28,6 @@
 // Import all modules
 import { renderMarkdown } from './markdown-renderer.js';
 import { throttle, formatSessionTime, log, createErrorHandlers, isValidJSON } from './chat-utils.js';
-import { AVAILABLE_AGENTS } from './constants.js';
 import { createInitialState, createStateMethods, createEmptyThreadState } from './chat-state.js';
 import { createSessionMethods } from './chat-sessions.js';
 import { createMessagingMethods } from './chat-messaging.js';
@@ -78,7 +77,32 @@ document.addEventListener('alpine:init', () => {
             ...healthMethods,
 
             // Constants
-            AVAILABLE_AGENTS,
+            AVAILABLE_AGENTS: [],
+
+            // Fetch agents from backend
+            async fetchAgents() {
+                this.__tryCatchAsync('fetch agents', {}, async () => {
+                    const response = await fetch('/v1/agents');
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.agents && Array.isArray(data.agents)) {
+                            this.AVAILABLE_AGENTS = data.agents.map(id => ({
+                                id: id,
+                                name: id.split('-')
+                                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                                    .join(' ')
+                            }));
+
+                            // Set default if not set
+                            if (!this.selectedAgent && this.AVAILABLE_AGENTS.length > 0) {
+                                // Prefer math-instructor as default
+                                const defaultAgent = this.AVAILABLE_AGENTS.find(a => a.id === 'math-instructor') || this.AVAILABLE_AGENTS[0];
+                                this.selectedAgent = defaultAgent.id;
+                            }
+                        }
+                    }
+                });
+            },
 
             // ============================================
             // Computed Properties (Getters must be defined directly)
@@ -163,6 +187,9 @@ document.addEventListener('alpine:init', () => {
 
                 // Initialize theme
                 this.__initTheme();
+
+                // Fetch available agents
+                this.fetchAgents();
 
                 // Load sessions asynchronously
                 queueMicrotask(() => {

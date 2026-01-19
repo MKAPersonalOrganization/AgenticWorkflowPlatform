@@ -347,3 +347,14 @@ func (h *TaskManagementHandler) DeleteThread(w http.ResponseWriter, r *http.Requ
 		h.log.Error(r.Context(), "[API] Failed to encode delete response", "error", err)
 	}
 }
+
+// ListAgents returns a list of available agents.
+func (h *TaskManagementHandler) ListAgents(w http.ResponseWriter, r *http.Request) {
+	agents := h.orchestratorService.GetAvailableAgents()
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string][]string{"agents": agents}); err != nil {
+		h.log.Error(r.Context(), "failed to encode agents list", "error", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	}
+}

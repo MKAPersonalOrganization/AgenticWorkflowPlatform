@@ -202,3 +202,8 @@ func (s *Service) ProcessUserMessage(ctx context.Context, agentName, threadID, c
 	// Delegate to Engine
 	return s.engine.ProcessUserMessage(ctx, agentName, threadID, content, userID)
 }
+
+// GetAvailableAgents returns a list of available agents
+func (s *Service) GetAvailableAgents() []string {
+	return shared.GlobalAgents.List()
+}
