@@ -15,8 +15,7 @@ templ ThreadHistory() {
 		Class:       "z-30 !left-0 !border-r-0",
 	}) {
 		@sidebar.Header() {
-			<div class="flex items-center justify-between">
-				<h1 class="text-xl font-semibold tracking-tight">Thread History</h1>
+			<div class="flex items-center justify-end">
 				<!-- Close Sidebar Button -->
 				@button.Button(button.Props{
 					Size:    button.SizeIcon,
@@ -44,7 +43,7 @@ templ ThreadHistory() {
 					}
 				</div>
 			</div>
-			@separator.Separator(separator.Props{Class: "mt-3"})
+			@separator.Separator(separator.Props{Class: "mt-1"})
 		}
 		@sidebar.Content() {
 			<!-- Action Buttons Stack -->
