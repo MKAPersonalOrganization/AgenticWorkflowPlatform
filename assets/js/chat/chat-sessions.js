@@ -22,7 +22,7 @@ export function createSessionMethods() {
          */
         async __loadSessions() {
             return await this.__tryCatchAsync('load sessions', {}, async () => {
-                const response = await fetch('/api/agui/threads?limit=20');
+                const response = await fetch('/api/agui/threads?limit=10');
                 if (response.ok) {
                     const data = await response.json();
 
@@ -69,7 +69,7 @@ export function createSessionMethods() {
             this.sessionsLoading = true;
 
             return await this.__tryCatchAsync('load more sessions', {}, async () => {
-                const url = `/api/agui/threads?limit=20&cursor=${encodeURIComponent(this.sessionsNextCursor)}`;
+                const url = `/api/agui/threads?limit=10&cursor=${encodeURIComponent(this.sessionsNextCursor)}`;
                 const response = await fetch(url);
 
                 if (response.ok) {
@@ -91,7 +91,10 @@ export function createSessionMethods() {
                     throw new Error(`Failed to fetch more threads: ${response.status}`);
                 }
             }).finally(() => {
-                this.sessionsLoading = false;
+                // Add a small delay to prevent rapid-fire loading and allow user to perceive the pagination
+                setTimeout(() => {
+                    this.sessionsLoading = false;
+                }, 500);
             });
         },
 
@@ -235,6 +238,47 @@ export function createSessionMethods() {
          * @param {string} newThreadId - New thread ID
          * @param {string} oldThreadId - Old thread ID
          */
+        /**
+         * Group sessions by date for display
+         * @returns {Array} Array of groups { title: string, sessions: Array }
+         */
+        getGroupedSessions() {
+            const today = new Date();
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+
+            const groups = {
+                'Today': [],
+                'Yesterday': [],
+                'Previous 7 Days': [],
+                'Previous 30 Days': [],
+                'Older': []
+            };
+
+            this.sessions.forEach(session => {
+                const date = new Date(session.lastMessage || session.created || new Date());
+                const diffTime = Math.abs(today - date);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                if (date.toDateString() === today.toDateString()) {
+                    groups['Today'].push(session);
+                } else if (date.toDateString() === yesterday.toDateString()) {
+                    groups['Yesterday'].push(session);
+                } else if (diffDays <= 7) {
+                    groups['Previous 7 Days'].push(session);
+                } else if (diffDays <= 30) {
+                    groups['Previous 30 Days'].push(session);
+                } else {
+                    groups['Older'].push(session);
+                }
+            });
+
+            // Return non-empty groups in order
+            return Object.entries(groups)
+                .filter(([_, items]) => items.length > 0)
+                .map(([title, sessions]) => ({ title, sessions }));
+        },
+
         __onThreadSwitch(newThreadId, oldThreadId) {
             // Pause/background old thread if streaming
             if (oldThreadId) {
