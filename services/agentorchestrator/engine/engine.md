@@ -15,6 +15,7 @@ stateDiagram-v2
     
     PerformingActions --> GeneratingResponse : ActionsCompleted
     PerformingActions --> SwitchingAgent : HandoffInitiated
+    PerformingActions --> Done : StopIteration (AwaitingInput)
     
     SwitchingAgent --> GeneratingResponse : AgentSwitched
     
@@ -22,14 +23,17 @@ stateDiagram-v2
 ```
 
 ## 2. Human-in-the-Loop Lifecycle
-Shows how the "Wait" state is used to persist an elicitation request.
+When a tool requests user input (e.g. `ask_human`), the engine transitions to `Done` with `TerminationAwaitingInput`.
 
 ```mermaid
 stateDiagram-v2
     direction LR
     
-    PerformingActions --> WaitingForHuman : HumanInputNeeded
-    WaitingForHuman --> [*] : (Engine Helps)
+    PerformingActions --> Done : StopIteration
+    note right of Done
+        Reason: TerminationAwaitingInput
+        (Engine yields control)
+    end note
 ```
 
 > [!NOTE]

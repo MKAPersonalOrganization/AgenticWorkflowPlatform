@@ -92,7 +92,7 @@ func TestExecutionResult_IsRecoverable(t *testing.T) {
 		{TerminationLoopDetected, false},
 		{TerminationError, false},
 		{TerminationHandoff, true},     // Recoverable
-		{TerminationElicitation, true}, // Recoverable
+		{TerminationAwaitingInput, true}, // Recoverable
 	}
 
 	for _, tt := range tests {

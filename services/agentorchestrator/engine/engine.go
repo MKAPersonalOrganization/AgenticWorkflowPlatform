@@ -241,7 +241,7 @@ func (s *executionState) executeRequiredActions() error {
 
 	// Set termination reason when a tool requests to stop (e.g., elicitation)
 	if resolution.StopIteration {
-		s.observer.result.Reason = TerminationElicitation
+		s.observer.result.Reason = TerminationAwaitingInput
 	}
 
 	return s.nextStep()
