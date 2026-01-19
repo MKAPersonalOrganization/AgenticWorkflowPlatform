@@ -12,6 +12,27 @@
  * @returns {Object} Methods for theme management
  */
 export function createThemeMethods() {
+    /**
+     * Private helper: Apply theme to document
+     * @param {'light'|'dark'|'system'} theme - Theme to apply
+     */
+    const _applyThemeToDOM = (theme) => {
+        const root = document.documentElement;
+
+        if (theme === 'system') {
+            const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (systemPrefersDark) {
+                root.classList.add('dark');
+            } else {
+                root.classList.remove('dark');
+            }
+        } else if (theme === 'dark') {
+            root.classList.add('dark');
+        } else {
+            root.classList.remove('dark');
+        }
+    };
+
     return {
         /**
          * Toggle theme: light -> dark -> system -> light
@@ -38,7 +59,7 @@ export function createThemeMethods() {
         setTheme(theme) {
             this.theme = theme;
             localStorage.setItem('theme', theme);
-            this.__applyTheme(theme);
+            _applyThemeToDOM(theme);
 
             // Update Alpine store if available
             if (Alpine.store('chatSettings')) {
@@ -55,39 +76,18 @@ export function createThemeMethods() {
         },
 
         /**
-         * Apply theme to document
-         * @param {'light'|'dark'|'system'} theme - Theme to apply
-         */
-        __applyTheme(theme) {
-            const root = document.documentElement;
-
-            if (theme === 'system') {
-                const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                if (systemPrefersDark) {
-                    root.classList.add('dark');
-                } else {
-                    root.classList.remove('dark');
-                }
-            } else if (theme === 'dark') {
-                root.classList.add('dark');
-            } else {
-                root.classList.remove('dark');
-            }
-        },
-
-        /**
          * Initialize theme from localStorage or system preference
          */
         __initTheme() {
             const savedTheme = localStorage.getItem('theme') || 'system';
             this.theme = savedTheme;
-            this.__applyTheme(savedTheme);
+            _applyThemeToDOM(savedTheme);
 
             // Listen for system theme changes when in system mode
             const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
             mediaQuery.addEventListener('change', () => {
                 if (this.theme === 'system') {
-                    this.__applyTheme('system');
+                    _applyThemeToDOM('system');
                 }
             });
         }
