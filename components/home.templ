@@ -5,6 +5,8 @@ import "school-with-ai/components/chatinput"
 import "school-with-ai/components/threadhistory"
 import "school-with-ai/components/messagelist"
 import "school-with-ai/components/settings"
+import "school-with-ai/components/button"
+import "school-with-ai/components/icon"
 import "school-with-ai/components/eventlog"
 import "school-with-ai/components/collapsible"
 import "school-with-ai/components/popover"
@@ -113,11 +115,22 @@ templ ChatInputScreen(user *domain.User) {
 						@threadhistory.ThreadHistory(threadhistory.Props{User: user})
 
 						<!-- Floating Sidebar Toggle (Visible when sidebar is closed) -->
-						<div class="fixed top-3 left-3 z-40 hidden peer-data-[tui-sidebar-state=collapsed]:block transition-opacity duration-200">
+						<div class="fixed top-3 left-3 z-40 hidden peer-data-[tui-sidebar-state=collapsed]:flex items-center gap-1 transition-opacity duration-200">
 							@sidebar.Trigger(sidebar.TriggerProps{
 								Target: "thread-history-sidebar",
 								Class:  "size-9 hover:bg-sidebar-accent/50 text-sidebar-foreground bg-sidebar border border-sidebar-border shadow-sm rounded-lg flex items-center justify-center",
 							})
+							@button.Button(button.Props{
+								Size:    button.SizeIcon,
+								Variant: button.VariantGhost,
+								Class:   "size-9 hover:bg-sidebar-accent/50 text-sidebar-foreground bg-sidebar border border-sidebar-border shadow-sm rounded-lg flex items-center justify-center",
+								Attributes: templ.Attributes{
+									"@click": "createNewSession()",
+								},
+							}) {
+								@icon.SquarePen(icon.Props{Class: "size-5"})
+								<span class="sr-only">New Chat</span>
+							}
 						</div>
 
 						<!-- Main Content Area -->
