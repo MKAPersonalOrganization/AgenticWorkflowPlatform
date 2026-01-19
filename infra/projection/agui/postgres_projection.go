@@ -289,12 +289,6 @@ func (p *PostgresAguiProjection) GetThreadState(threadID string) (*AguiThreadSta
 	return state, true
 }
 
-// GetActiveRun retrieves the currently active run for a thread.
-func (p *PostgresAguiProjection) GetActiveRun(threadID string) (*AguiRunState, bool) {
-	// TODO: Implement run tracking in PostgreSQL
-	// For now, return nil (no active run)
-	return nil, false
-}
 
 // GetMessages retrieves all UI-formatted messages for a thread.
 func (p *PostgresAguiProjection) GetMessages(threadID string) []aguievents.Message {

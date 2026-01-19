@@ -81,30 +81,3 @@ func (h *AguiProjectionHandler) ListThreads(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-// GetActiveRun returns information about the currently active run for a thread.
-// GET /api/agui/threads/{threadId}/active-run.
-func (h *AguiProjectionHandler) GetActiveRun(w http.ResponseWriter, r *http.Request) {
-	threadID := r.PathValue("threadId")
-	if threadID == "" {
-		http.Error(w, "threadId is required", http.StatusBadRequest)
-
-		return
-	}
-
-	run, exists := h.projection.GetActiveRun(threadID)
-
-	w.Header().Set("Content-Type", "application/json")
-	if !exists {
-		err := json.NewEncoder(w).Encode(nil)
-		if err != nil {
-			http.Error(w, "internal server error", http.StatusInternalServerError)
-		}
-
-		return
-	}
-
-	err := json.NewEncoder(w).Encode(run)
-	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-	}
-}

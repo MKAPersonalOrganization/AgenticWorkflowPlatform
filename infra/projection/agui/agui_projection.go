@@ -14,9 +14,6 @@ type AguiProjection interface {
 	// GetThreadState retrieves the UI state for a thread.
 	GetThreadState(threadID string) (*AguiThreadState, bool)
 
-	// GetActiveRun retrieves information about the currently active run for a thread.
-	GetActiveRun(threadID string) (*AguiRunState, bool)
-
 	// GetMessages retrieves all UI-formatted messages for a thread.
 	GetMessages(threadID string) []aguievents.Message
 
@@ -36,23 +33,12 @@ type AguiThreadState struct {
 	ThreadID      string                        `json:"threadId"`
 	Title         string                        `json:"title,omitempty"`
 	Messages      []aguievents.Message          `json:"messages"` // AG-UI SDK format
-	ActiveRun     *AguiRunState                 `json:"activeRun"`
 	ToolCalls     []AguiToolCall                `json:"toolCalls"`
 	AgentActivity map[string]*AguiAgentActivity `json:"agentActivity"`
 	CreatedAt     time.Time                     `json:"createdAt"`
 	UpdatedAt     time.Time                     `json:"updatedAt"`
 	Version       int64                         `json:"version"` // Event version
 	IsDeleted     bool                          `json:"isDeleted"`
-}
-
-// AguiRunState tracks the lifecycle of an agent run.
-type AguiRunState struct {
-	RunID      string    `json:"runId"`
-	AgentName  string    `json:"agentName"`
-	Status     string    `json:"status"` // "running", "completed", "error"
-	StartedAt  time.Time `json:"startedAt"`
-	FinishedAt time.Time `json:"finishedAt"`
-	Error      string    `json:"error,omitempty"`
 }
 
 // AguiToolCall represents a complete tool call execution.

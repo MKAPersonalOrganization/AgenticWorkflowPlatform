@@ -149,47 +149,6 @@ export function createStreamingMethods() {
             };
         },
 
-        /**
-         * Reconnect to all active jobs across sessions
-         */
-        async __reconnectToAllActiveJobs() {
-            try {
-                for (const session of this.sessions) {
-                    await this.__reconnectToActiveJobs(session.id);
-                }
-            } catch (error) {
-                console.error('Error reconnecting to all active jobs:', error);
-            }
-        },
-
-        /**
-         * Reconnect to active jobs for a thread
-         * @param {string} threadId - Thread ID
-         */
-        async __reconnectToActiveJobs(threadId) {
-            try {
-                const response = await fetch(`/api/agui/threads/${encodeURIComponent(threadId)}/active-run`);
-
-                if (!response.ok) {
-                    console.warn('Failed to fetch active run:', response.statusText);
-                    return;
-                }
-
-                const data = await response.json();
-
-                if (!data) return;
-
-                if (data.status === 'running') {
-                    console.log('Reconnecting to active run:', data);
-                    const state = this.__getThreadState(threadId);
-                    state.isStreaming = true;
-                    state.showTypingIndicator = true;
-                    console.log('Active run detected:', data.runId, data.status);
-                }
-            } catch (error) {
-                console.error('Error reconnecting to active jobs:', error);
-            }
-        },
 
         /**
          * Cancel the current job
