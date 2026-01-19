@@ -255,10 +255,10 @@ templ Settings() {
 								</div>
 								
 								<div class="space-y-4 border-t border-border pt-4">
-									<button class="w-full text-left p-3 rounded-xl border border-border hover:bg-accent transition-colors flex items-center justify-between group">
-										<span class="font-medium">Change Password</span>
+									<a href="/auth/settings?flow=settings" class="w-full text-left p-3 rounded-xl border border-border hover:bg-accent transition-colors flex items-center justify-between group">
+										<span class="font-medium">Manage Account & Security</span>
 										@icon.ChevronRight(icon.Props{Class: "size-4 text-muted-foreground group-hover:text-foreground"})
-									</button>
+									</a>
 									<button class="w-full text-left p-3 rounded-xl border border-destructive/20 bg-destructive/5 hover:bg-destructive/10 transition-colors flex items-center justify-between group">
 										<span class="text-destructive font-medium">Delete Account</span>
 										@icon.UserX(icon.Props{Class: "size-4 text-destructive"})
