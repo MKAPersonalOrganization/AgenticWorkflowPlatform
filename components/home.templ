@@ -16,6 +16,7 @@ import "school-with-ai/components/keyboardshortcuts"
 import "school-with-ai/components/sampleprompts"
 import "school-with-ai/components/chatheader"
 import "school-with-ai/domain"
+import "school-with-ai/components/artifacts"
 
 templ ChatInputScreen(user *domain.User) {
 	<!DOCTYPE html>
@@ -112,6 +113,7 @@ templ ChatInputScreen(user *domain.User) {
 					@sidebar.Layout() {
 						<!-- Left Sidebar - Chat History -->
 						@threadhistory.ThreadHistory(threadhistory.Props{User: user})
+						
 
 						<!-- Floating Sidebar Toggle Removed (Replaced by Header Toggle) -->
 
@@ -165,6 +167,9 @@ templ ChatInputScreen(user *domain.User) {
 								@eventlog.EventLog()
 							</main>
 						</div>
+
+						<!-- Right Sidebar - Artifacts -->
+						@artifacts.Artifacts()
 					}
 				</div>
 				<!-- Keyboard Shortcuts Dialog -->

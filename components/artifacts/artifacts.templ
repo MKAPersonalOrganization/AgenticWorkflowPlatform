@@ -1,0 +1,56 @@
+package artifacts
+
+import (
+	"school-with-ai/components/sidebar"
+	"school-with-ai/components/button"
+	"school-with-ai/components/icon"
+)
+
+templ Artifacts() {
+	@sidebar.Sidebar(sidebar.Props{
+		ID:          "artifacts-sidebar",
+		Side:        sidebar.SideRight,
+		Variant:     sidebar.VariantSidebar,
+		Collapsible: sidebar.CollapsibleOffcanvas,
+		Collapsed:   true, // Default to closed
+		Class:       "z-30 !right-0 !border-l-0 border-l border-border bg-background",
+		Attributes: templ.Attributes{
+			"style": "--sidebar-width: 400px",
+		},
+	}) {
+		@sidebar.Header(sidebar.HeaderProps{
+			Class: "flex flex-row items-center justify-between px-4 py-3 border-b border-border/50",
+		}) {
+			<div class="flex items-center gap-2">
+				@icon.LayoutDashboard(icon.Props{Class: "size-4 text-muted-foreground"})
+				<span class="text-sm font-medium">Artifacts</span>
+			</div>
+			
+			<!-- Close Button -->
+			@button.Button(button.Props{
+				Size:    button.SizeIcon,
+				Variant: button.VariantGhost,
+				Class:   "size-8 hover:bg-sidebar-accent/50 rounded-lg",
+				Attributes: templ.Attributes{
+					"data-tui-sidebar-trigger": "true",
+					"data-tui-sidebar-target":  "artifacts-sidebar",
+				},
+			}) {
+				@icon.X(icon.Props{Class: "size-4 text-muted-foreground"})
+				<span class="sr-only">Close Artifacts</span>
+			}
+		}
+
+		@sidebar.Content(sidebar.ContentProps{Class: "p-4"}) {
+			<div class="flex flex-col items-center justify-center h-full text-center text-muted-foreground gap-4">
+				<div class="size-12 rounded-full bg-muted flex items-center justify-center">
+					@icon.FileText(icon.Props{Class: "size-6"})
+				</div>
+				<div class="space-y-1">
+					<p class="font-medium text-foreground">No artifacts yet</p>
+					<p class="text-xs">Generated content like code, documents, and designs will appear here.</p>
+				</div>
+			</div>
+		}
+	}
+}

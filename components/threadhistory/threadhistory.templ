@@ -48,8 +48,8 @@ templ ThreadHistory(props ...Props) {
 
 			</div>
 			<!-- Search Bar -->
-			<div class="px-2 pb-1 pt-1">
-				<div class="group relative flex h-9 items-center gap-2 rounded-lg border-2 border-transparent px-2 py-1.5 text-foreground focus-within:border-ring/20 focus-within:bg-sidebar-accent/50 hover:bg-sidebar-accent/30 transition-all cursor-text"
+			<div class="px-2 pb-2 pt-1">
+				<div class="group relative flex h-9 items-center gap-2 rounded-lg bg-muted/40 border border-transparent px-2 py-1.5 text-foreground focus-within:border-ring/20 focus-within:bg-background transition-all cursor-text"
 					@click="$refs.searchInput.focus()">
 					@icon.Search(icon.Props{Class: "absolute left-2.5 h-4 w-4 text-muted-foreground group-focus-within:text-foreground"})
 					<input 
