@@ -16,7 +16,7 @@ import "school-with-ai/components/keyboardshortcuts"
 import "school-with-ai/components/sampleprompts"
 import "school-with-ai/components/chatheader"
 import "school-with-ai/domain"
-import "school-with-ai/components/artifacts"
+import "school-with-ai/components/sidepanel"
 
 templ ChatInputScreen(user *domain.User) {
 	<!DOCTYPE html>
@@ -168,8 +168,8 @@ templ ChatInputScreen(user *domain.User) {
 							</main>
 						</div>
 
-						<!-- Right Sidebar - Artifacts -->
-						@artifacts.Artifacts()
+						<!-- Right Sidebar - Premium Side Panel -->
+						@sidepanel.SidePanel()
 					}
 				</div>
 				<!-- Keyboard Shortcuts Dialog -->

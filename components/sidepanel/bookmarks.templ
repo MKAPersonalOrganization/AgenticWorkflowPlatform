@@ -1,0 +1,49 @@
+package sidepanel
+
+import "school-with-ai/components/icon"
+
+templ Bookmarks() {
+    <div class="flex flex-col gap-1 p-3">
+        <h3 class="px-2 py-1.5 text-xs font-medium text-muted-foreground mb-1 uppercase tracking-wider">All Bookmarks</h3>
+        
+        // Mock Item 1
+        <button class="group flex w-full items-start gap-3 rounded-lg p-2.5 text-sm text-foreground transition-colors hover:bg-accent/50 text-left">
+            @icon.Bookmark(icon.Props{Class: "size-4 mt-0.5 shrink-0 text-muted-foreground group-hover:text-primary transition-colors"})
+            <div class="flex flex-col gap-1 min-w-0">
+                 <span class="font-medium truncate w-full">Quantum Entanglement</span>
+                 <span class="text-xs text-muted-foreground line-clamp-2 leading-relaxed">Here's an explanation of how quantum entanglement works via the Einstein-Podolsky-Rosen paradox. It explores the non-local properties of particles...</span>
+                 <span class="text-[10px] text-muted-foreground/60 mt-1">Physics 101 • 2 hours ago</span>
+            </div>
+        </button>
+
+        // Mock Item 2
+        <button class="group flex w-full items-start gap-3 rounded-lg p-2.5 text-sm text-foreground transition-colors hover:bg-accent/50 text-left">
+            @icon.Code(icon.Props{Class: "size-4 mt-0.5 shrink-0 text-muted-foreground group-hover:text-primary transition-colors"})
+            <div class="flex flex-col gap-1 min-w-0">
+                 <span class="font-medium truncate w-full">Python Error Handling</span>
+                 <span class="text-xs text-muted-foreground line-clamp-2 leading-relaxed">The updated script includes robust try-except blocks for API calls and file I/O operations as requested.</span>
+                 <span class="text-[10px] text-muted-foreground/60 mt-1">Coding Assistant • Yesterday</span>
+            </div>
+        </button>
+
+         // Mock Item 3
+        <button class="group flex w-full items-start gap-3 rounded-lg p-2.5 text-sm text-foreground transition-colors hover:bg-accent/50 text-left">
+            @icon.Table(icon.Props{Class: "size-4 mt-0.5 shrink-0 text-muted-foreground group-hover:text-primary transition-colors"})
+            <div class="flex flex-col gap-1 min-w-0">
+                 <span class="font-medium truncate w-full">Database Comparison</span>
+                 <span class="text-xs text-muted-foreground line-clamp-2 leading-relaxed">Evaluation of PostgreSQL vs MongoDB focusing on ACID compliance and scalability for the new user service.</span>
+                 <span class="text-[10px] text-muted-foreground/60 mt-1">System Design • 2 days ago</span>
+            </div>
+        </button>
+
+        <div class="mt-8 mx-4 flex flex-col items-center justify-center text-center text-muted-foreground gap-3 py-10 border border-dashed border-border/60 rounded-xl bg-muted/10">
+            <div class="p-2 bg-background rounded-full shadow-sm">
+                @icon.Bookmark(icon.Props{Class: "size-4 text-muted-foreground/70"})
+            </div>
+            <div class="space-y-0.5">
+                <p class="text-sm font-medium text-foreground">No more bookmarks</p>
+                <p class="text-xs text-muted-foreground/80">Bookmark messages to save them here.</p>
+            </div>
+        </div>
+    </div>
+}
