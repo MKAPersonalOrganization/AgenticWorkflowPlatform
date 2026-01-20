@@ -18,6 +18,8 @@ import "school-with-ai/components/chatheader"
 import "school-with-ai/domain"
 import "school-with-ai/components/sidepanel"
 import "school-with-ai/components/tabs"
+import "school-with-ai/components/switch"
+import "school-with-ai/components/selectbox"
 
 templ ChatInputScreen(user *domain.User) {
 	<!DOCTYPE html>
@@ -107,6 +109,8 @@ templ ChatInputScreen(user *domain.User) {
 			@sidebar.Script()
 			@code.Script()
 			@tabs.Script()
+			@switch.Script()
+			@selectbox.Script()
 		</head>
 		<body class="flex min-h-screen bg-background text-foreground antialiased">
 			<div class="w-full h-screen" x-data="chat">
