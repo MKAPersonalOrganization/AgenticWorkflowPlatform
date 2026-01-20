@@ -2,7 +2,11 @@
 // 📚 Documentation: https://templui.io/docs/components/code
 package code
 
-import "school-with-ai/components/utils"
+import (
+	"school-with-ai/components/utils"
+	"school-with-ai/components/copybutton"
+	"school-with-ai/components/tooltip"
+)
 
 type Props struct {
 	ID        string
@@ -27,19 +31,44 @@ templ Code(props ...Props) {
 	if p.ID == "" {
 		{{ p.ID = "code-" + utils.RandomID() }}
 	}
+    // Ensure we have a unique ID for the code block itself to target with copy button
+    {{ codeBlockID := p.ID + "-content" }}
+
 	<div
 		id={ p.ID }
-		class={ utils.TwMerge("relative code-component", p.Class) }
+		class={ utils.TwMerge("relative code-component rounded-md border border-border bg-muted/50 my-4", p.Class) }
 		data-tui-code-component
 		{ p.Attrs... }
 	>
-		<pre class="overflow-hidden!">
+        <div class="flex items-center justify-between px-3 py-1.5 border-b border-border bg-muted/50 rounded-t-md">
+            <span class="text-xs text-muted-foreground font-sans font-medium select-none uppercase">{ p.Language }</span>
+            <div class="flex items-center gap-2">
+                {{ tooltipID := "tooltip-" + codeBlockID }}
+                @tooltip.Tooltip() {
+                    @tooltip.Trigger(tooltip.TriggerProps{
+                        For: tooltipID,
+                    }) {
+                        @copybutton.CopyButton(copybutton.Props{
+                            TargetID: codeBlockID,
+                            Class: "h-6 w-6 hover:bg-background/80 hover:text-foreground",
+                        })
+                    }
+                    @tooltip.Content(tooltip.ContentProps{
+                        ID: tooltipID,
+                    }) {
+                        Copy code
+                    }
+                }
+            </div>
+        </div>
+		<pre class="overflow-hidden! m-0! p-0! bg-transparent!">
 			<code
+                id={ codeBlockID }
 				data-tui-code-block
 				class={
 					utils.TwMerge(
 						"language-"+p.Language,
-						"overflow-y-auto! rounded-md block text-sm max-h-[500px]",
+						"overflow-y-auto! block text-sm max-h-[500px] p-4! bg-[#fafafa] dark:bg-[#282c34]!", // Force specific bg to match theme or let hljs handle it, but container needs to match
 						"hljs-target",
 						p.CodeClass,
 					),
