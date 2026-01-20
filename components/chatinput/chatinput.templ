@@ -43,6 +43,16 @@ templ ChatInput() {
                     >
                         @icon.Paperclip(icon.Props{Class: "size-5"})
                     </button>
+
+                    <!-- Artifacts Toggle (Wand) -->
+                     <button 
+                        type="button" 
+                        class="p-2 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-muted/50 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
+                        aria-label="Artifacts mode"
+                        @click="$dispatch('open-sidebar', 'artifacts-sidebar')" 
+                    >
+                        @icon.Wand(icon.Props{Class: "size-5"})
+                    </button>
 				</div>
 
 				<!-- Right: Send Button -->
