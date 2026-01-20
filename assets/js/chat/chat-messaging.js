@@ -107,10 +107,12 @@ export function createMessagingMethods() {
          * @param {KeyboardEvent} event - Keyboard event
          */
         handleKeydown(event) {
-            if (event.key === 'Enter' && !event.shiftKey && this.canSendMessage) {
+            // Shift+Enter to send
+            if (event.key === 'Enter' && event.shiftKey && this.canSendMessage) {
                 event.preventDefault();
                 this.sendMessage();
             }
+            // Enter alone inserts newline (default behavior), so we don't need to prevent default
         },
 
         /**

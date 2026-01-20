@@ -131,13 +131,19 @@ export function createUIMethods() {
                 // Replace everything from the last slash with the prompt content
                 this.currentMessage = value.substring(0, slashIndex) + prompt.content;
                 this.showSlashMenu = false;
-
-                // Focus back on textarea (handled by x-model, but ensure focus)
-                this.$nextTick(() => {
-                    this.$refs.messageInput.focus();
-                    // Optionally move cursor to end
-                });
+            } else {
+                // Direct use (e.g. from Side Panel)
+                this.currentMessage = prompt.content;
             }
+
+            // Focus back on textarea (handled by x-model, but ensure focus)
+            this.$nextTick(() => {
+                // Check if refs exist before accessing
+                if (this.$refs.messageInput) {
+                    this.$refs.messageInput.focus();
+                }
+                // Optionally move cursor to end
+            });
         },
 
         // ============================================

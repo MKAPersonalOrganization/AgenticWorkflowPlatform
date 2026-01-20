@@ -18,6 +18,7 @@ templ ChatInput() {
             <!-- Textarea Area -->
 			<div class="relative w-full">
                 @textarea.Textarea(textarea.Props{
+                    AutoResize:      true,
                     Attributes: templ.Attributes{
                         "x-model":           "currentMessage",
                         ":disabled":         "isStreaming",
@@ -25,7 +26,7 @@ templ ChatInput() {
                         "@input":            "handleInput($event)",
                         "placeholder":      "Message SchoolWithAI...",
                         "rows":              "1",
-                        "style":             "field-sizing: content; max-height: 200px;",
+                        "style":             "max-height: 200px;",
                         "aria-label":        "Type your message",
                         ":aria-disabled":    "isStreaming",
                         ":aria-describedby": "errorMessage ? 'error-message' : null",
