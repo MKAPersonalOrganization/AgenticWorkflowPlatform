@@ -86,18 +86,13 @@ templ ChatHeader(user *domain.User) {
 
         <div class="flex items-center gap-2">
             <!-- Right Side Actions -->
-            @button.Button(button.Props{
-                Size:    button.SizeIcon,
-                Variant: button.VariantGhost,
-                Class:   "size-9 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors",
-                Attributes: templ.Attributes{
-                    "data-tui-sidebar-trigger": "true",
-                    "data-tui-sidebar-target":  "artifacts-sidebar",
-                    "title":  "Open Artifacts",
-                },
-            }) {
-                @icon.LayoutDashboard(icon.Props{Class: "size-5"})
-            }
+            <!-- Search Toggle -->
+            <div x-show="hasMessages" x-transition.opacity>
+                @Search()
+            </div>
+
+            <!-- Artifacts Toggle -->
+            @ArtifactsToggle()
 		</div>
 	</div>
 }
