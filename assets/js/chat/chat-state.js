@@ -79,7 +79,10 @@ export function createInitialState() {
             { command: '/summary', description: 'Summarize text or notes', content: 'Please provide a concise summary of the following text:\n\n' },
             { command: '/analogy', description: 'Explain with an analogy', content: 'Please explain this concept using a real-world analogy:\n\n' },
         ],
-        elicitationAnswer: '',
+        // Search
+        showSearch: false,
+        searchQuery: '',
+
         selectedAgent: '',
 
         // UI state
