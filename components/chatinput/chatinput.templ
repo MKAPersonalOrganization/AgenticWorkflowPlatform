@@ -3,6 +3,7 @@ package chatinput
 import "school-with-ai/components/button"
 import "school-with-ai/components/textarea"
 import "school-with-ai/components/icon"
+import "school-with-ai/components/tooltip"
 
 templ ChatInput() {
 	<div
@@ -75,37 +76,51 @@ templ ChatInput() {
 				<!-- Right: Send Button -->
                 <div class="flex items-center gap-1">
                     <!-- Help/Shortcuts -->
-                    <button
-                        @click="toggleKeyboardShortcuts()"
-                        class="text-muted-foreground hover:text-foreground transition-colors p-2 rounded-xl hover:bg-muted/50"
-                        type="button"
-                        aria-label="Show keyboard shortcuts"
-                    >
-                        <!-- Use a small keyboard icon or question mark -->
-                         <div class="size-5 flex items-center justify-center border border-current rounded text-[10px] font-medium opacity-70">?</div>
-                    </button>
+                    @tooltip.Tooltip() {
+                        @tooltip.Trigger(tooltip.TriggerProps{}) {
+                            <button
+                                @click="toggleKeyboardShortcuts()"
+                                class="text-muted-foreground hover:text-foreground transition-colors p-2 rounded-xl hover:bg-muted/50"
+                                type="button"
+                                aria-label="Show keyboard shortcuts"
+                            >
+                                <!-- Use a small keyboard icon or question mark -->
+                                 <div class="size-5 flex items-center justify-center border border-current rounded text-[10px] font-medium opacity-70">?</div>
+                            </button>
+                        }
+                        @tooltip.Content(tooltip.ContentProps{Class: "text-xs"}) {
+                            Keyboard shortcuts
+                        }
+                    }
 
-                    @button.Button(button.Props{
-                        Variant: button.VariantDefault,
-                        Size:    button.SizeIcon,
-                        Class:   "bg-foreground text-background transition-all shadow-none hover:opacity-90 rounded-xl",
-                        Attributes: templ.Attributes{
-                            "@click.prevent": "isStreaming ? cancelJob() : sendMessage()",
-                            "type":           "button",
-                            ":disabled":      "!canSendMessage && !isStreaming",
-                            ":class":         "(canSendMessage || isStreaming) ? '' : 'opacity-20 cursor-not-allowed'",
-                            ":aria-busy":     "isStreaming",
-                            ":aria-label":    "isStreaming ? 'Cancel message' : 'Send message'",
-                        },
-                    }) {
-                        <!-- Send Icon -->
-                        <div x-show="!isStreaming">
-                           @icon.ArrowUp(icon.Props{Class: "size-5"})
-                        </div>
-                        <!-- Cancel/Stop Icon -->
-                        <div x-show="isStreaming">
-                           <div class="size-3 bg-current rounded-[2px]"></div>
-                        </div>
+                    @tooltip.Tooltip() {
+                        @tooltip.Trigger(tooltip.TriggerProps{}) {
+                            @button.Button(button.Props{
+                                Variant: button.VariantDefault,
+                                Size:    button.SizeIcon,
+                                Class:   "bg-foreground text-background transition-all shadow-none hover:opacity-90 rounded-xl",
+                                Attributes: templ.Attributes{
+                                    "@click.prevent": "isStreaming ? cancelJob() : sendMessage()",
+                                    "type":           "button",
+                                    ":disabled":      "!canSendMessage && !isStreaming",
+                                    ":class":         "(canSendMessage || isStreaming) ? '' : 'opacity-20 cursor-not-allowed'",
+                                    ":aria-busy":     "isStreaming",
+                                    ":aria-label":    "isStreaming ? 'Cancel message' : 'Send message'",
+                                },
+                            }) {
+                                <!-- Send Icon -->
+                                <div x-show="!isStreaming">
+                                   @icon.ArrowUp(icon.Props{Class: "size-5"})
+                                </div>
+                                <!-- Cancel/Stop Icon -->
+                                <div x-show="isStreaming">
+                                   <div class="size-3 bg-current rounded-[2px]"></div>
+                                </div>
+                            }
+                        }
+                        @tooltip.Content(tooltip.ContentProps{Class: "text-xs"}) {
+                            <span x-text="isStreaming ? 'Stop generating' : 'Send message'"></span>
+                        }
                     }
                 </div>
 			</div>
