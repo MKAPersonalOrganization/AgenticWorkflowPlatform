@@ -66,6 +66,19 @@ export function createInitialState() {
         // User input
         currentMessage: '',
         files: [],
+
+        // Slash Command Menu
+        showSlashMenu: false,
+        slashMenuIndex: 0,
+        slashQuery: '',
+        filteredPrompts: [],
+        prompts: [
+            { command: '/study', description: 'Create a study plan', content: 'Can you help me create a structured study plan for:\n\n' },
+            { command: '/explain', description: 'Explain a complex concept', content: 'Please explain the following concept in simple terms:\n\n' },
+            { command: '/quiz', description: 'Generate a quiz', content: 'Generate a 5-question multiple choice quiz about:\n\n' },
+            { command: '/summary', description: 'Summarize text or notes', content: 'Please provide a concise summary of the following text:\n\n' },
+            { command: '/analogy', description: 'Explain with an analogy', content: 'Please explain this concept using a real-world analogy:\n\n' },
+        ],
         elicitationAnswer: '',
         selectedAgent: '',
 
