@@ -12,6 +12,9 @@ templ ChatInput() {
 		aria-label="Message input area"
 	>
 		<form @submit.prevent="sendMessage" class="mx-auto flex flex-col w-full p-1.5">
+            <!-- File Previews -->
+            @FileRow()
+
             <!-- Textarea Area -->
 			<div class="relative w-full">
                 @textarea.Textarea(textarea.Props{
@@ -40,16 +43,25 @@ templ ChatInput() {
                         type="button" 
                         class="p-2 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-muted/50 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
                         aria-label="Attach file"
+                        @click="$refs.fileInput.click()"
                     >
                         @icon.Paperclip(icon.Props{Class: "size-5"})
                     </button>
+                    <input 
+                        type="file" 
+                        x-ref="fileInput"
+                        class="hidden" 
+                        multiple 
+                        @change="handleFileSelect($event)"
+                    />
 
                     <!-- Artifacts Toggle (Wand) -->
                      <button 
                         type="button" 
                         class="p-2 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-muted/50 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
                         aria-label="Artifacts mode"
-                        @click="$dispatch('open-sidebar', 'artifacts-sidebar')" 
+                        data-tui-sidebar-trigger="true"
+                        data-tui-sidebar-target="artifacts-sidebar"
                     >
                         @icon.Wand(icon.Props{Class: "size-5"})
                     </button>

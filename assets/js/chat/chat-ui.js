@@ -17,6 +17,48 @@
 export function createUIMethods() {
     return {
         // ============================================
+        // File Management
+        // ============================================
+
+        /**
+         * Remove a file from the attachment list
+         * @param {number} index - Index of file to remove
+         */
+        removeFile(index) {
+            if (index >= 0 && index < this.files.length) {
+                this.files.splice(index, 1);
+            }
+        },
+
+        /**
+         * Handle file selection from input
+         * @param {Event} event - Change event
+         */
+        handleFileSelect(event) {
+            const files = event.target.files;
+            if (!files || files.length === 0) return;
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const reader = new FileReader();
+
+                reader.onload = (e) => {
+                    this.files.push({
+                        name: file.name,
+                        type: file.type,
+                        size: file.size,
+                        data: e.target.result // Base64 data
+                    });
+                };
+
+                reader.readAsDataURL(file);
+            }
+
+            // Reset input so same file can be selected again
+            event.target.value = '';
+        },
+
+        // ============================================
         // Toggle Actions
         // ============================================
 

@@ -1,0 +1,38 @@
+package chatinput
+
+import "school-with-ai/components/icon"
+
+// FilePreview Props
+// We assume Alpine JS is handling the data binding, so we pass indices or specialized attributes.
+// However, since we are rendering a list using x-for, the internal content refers to the iterator item (e.g., 'file').
+
+templ FilePreview() {
+    <div class="relative group inline-block">
+        <div class="relative overflow-hidden rounded-xl border border-border bg-card w-16 h-16 flex items-center justify-center">
+            <!-- Image Preview -->
+            <template x-if="file.type.startsWith('image/')">
+                <img :src="file.data" class="w-full h-full object-cover" :alt="file.name" />
+            </template>
+            
+            <!-- Generic File Preview -->
+            <template x-if="!file.type.startsWith('image/')">
+                 <div class="flex flex-col items-center justify-center p-1 text-center">
+                    @icon.FileText(icon.Props{Class: "size-6 text-muted-foreground"})
+                    <!-- Truncated extension or name could go here, but fitting in 16x16 is hard. -->
+                </div>
+            </template>
+
+            <!-- Loading overlay if progress < 1 (Future) -->
+        </div>
+
+        <!-- Remove Button -->
+        <button
+            type="button"
+            @click="removeFile(index)"
+            class="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+            aria-label="Remove file"
+        >
+            @icon.X(icon.Props{Class: "size-3"})
+        </button>
+    </div>
+}

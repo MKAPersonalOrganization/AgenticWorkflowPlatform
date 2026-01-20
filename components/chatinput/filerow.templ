@@ -1,0 +1,9 @@
+package chatinput
+
+templ FileRow() {
+    <div x-show="files.length > 0" class="flex flex-wrap gap-2 px-4 pb-2 w-full animate-in fade-in slide-in-from-bottom-2 duration-200">
+        <template x-for="(file, index) in files" :key="index">
+            @FilePreview()
+        </template>
+    </div>
+}

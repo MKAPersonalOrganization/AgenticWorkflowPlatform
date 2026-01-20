@@ -65,6 +65,7 @@ export function createInitialState() {
 
         // User input
         currentMessage: '',
+        files: [],
         elicitationAnswer: '',
         selectedAgent: '',
 
