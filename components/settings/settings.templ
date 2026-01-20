@@ -3,6 +3,7 @@ package settings
 import (
 	"school-with-ai/components/dialog"
 	"school-with-ai/components/icon"
+    "school-with-ai/components/tabs"
 )
 
 templ Settings() {
@@ -33,7 +34,6 @@ templ Settings() {
 			>
 				<div 
 					class="w-full md:w-[680px] max-h-[90vh] bg-background rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-border"
-					x-data="{ activeTab: 'general' }"
 					@click.away="showSettings = false"
 					@keydown.escape.window="showSettings = false"
 				>
@@ -48,225 +48,230 @@ templ Settings() {
 						</button>
 					</div>
 
-					<!-- Body -->
-					<div class="flex flex-col md:flex-row h-full overflow-hidden px-6 pb-6 gap-6">
-						<!-- Tab List -->
-						<nav class="flex flex-row md:flex-col gap-1 min-w-[160px] overflow-x-auto md:overflow-y-auto scrollbar-none pb-2 md:pb-0 border-b md:border-b-0 md:border-r border-border pr-0 md:pr-4">
-							<button 
-								@click="activeTab = 'general'"
-								:class="activeTab === 'general' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'"
-								class="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200"
-							>
-								@icon.Settings(icon.Props{Class: "size-4"})
-								<span>General</span>
-							</button>
-							<button 
-								@click="activeTab = 'personalization'"
-								:class="activeTab === 'personalization' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'"
-								class="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200"
-							>
-								@icon.UserCog(icon.Props{Class: "size-4"})
-								<span>Personalization</span>
-							</button>
-							<button 
-								@click="activeTab = 'speech'"
-								:class="activeTab === 'speech' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'"
-								class="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200"
-							>
-								@icon.Mic(icon.Props{Class: "size-4"})
-								<span>Speech</span>
-							</button>
-							<button 
-								@click="activeTab = 'data'"
-								:class="activeTab === 'data' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'"
-								class="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200"
-							>
-								@icon.Database(icon.Props{Class: "size-4"})
-								<span>Data</span>
-							</button>
-							<button 
-								@click="activeTab = 'account'"
-								:class="activeTab === 'account' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'"
-								class="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200"
-							>
-								@icon.User(icon.Props{Class: "size-4"})
-								<span>Account</span>
-							</button>
-						</nav>
+					<!-- Use Tabs Component -->
+                    @tabs.Tabs(tabs.Props{
+                        Class: "flex flex-col md:flex-row h-full overflow-hidden px-6 pb-6 gap-6",
+                        Attributes: templ.Attributes{
+                            "data-orientation": "vertical", 
+                        },
+                    }) {
+                        <!-- Tab List -->
+                        <div class="flex flex-row md:flex-col gap-1 min-w-[160px] overflow-x-auto md:overflow-y-auto scrollbar-none pb-2 md:pb-0 border-b md:border-b-0 md:border-r border-border pr-0 md:pr-4">
+                            @tabs.List(tabs.ListProps{Class: "flex flex-row md:flex-col gap-1 bg-transparent p-0 w-full h-auto items-stretch"}) {
+                                @tabs.Trigger(tabs.TriggerProps{
+                                    Value: "general",
+                                    IsActive: true,
+                                    Class: "justify-start gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 data-[tui-tabs-state=active]:bg-accent data-[tui-tabs-state=active]:text-foreground data-[tui-tabs-state=inactive]:text-muted-foreground hover:bg-accent/50 hover:text-foreground shadow-none border-none",
+                                }) {
+                                    @icon.Settings(icon.Props{Class: "size-4"})
+                                    <span>General</span>
+                                }
+                                @tabs.Trigger(tabs.TriggerProps{
+                                    Value: "personalization",
+                                    Class: "justify-start gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 data-[tui-tabs-state=active]:bg-accent data-[tui-tabs-state=active]:text-foreground data-[tui-tabs-state=inactive]:text-muted-foreground hover:bg-accent/50 hover:text-foreground shadow-none border-none",
+                                }) {
+                                    @icon.UserCog(icon.Props{Class: "size-4"})
+                                    <span>Personalization</span>
+                                }
+                                @tabs.Trigger(tabs.TriggerProps{
+                                    Value: "speech",
+                                    Class: "justify-start gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 data-[tui-tabs-state=active]:bg-accent data-[tui-tabs-state=active]:text-foreground data-[tui-tabs-state=inactive]:text-muted-foreground hover:bg-accent/50 hover:text-foreground shadow-none border-none",
+                                }) {
+                                    @icon.Mic(icon.Props{Class: "size-4"})
+                                    <span>Speech</span>
+                                }
+                                @tabs.Trigger(tabs.TriggerProps{
+                                    Value: "data",
+                                    Class: "justify-start gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 data-[tui-tabs-state=active]:bg-accent data-[tui-tabs-state=active]:text-foreground data-[tui-tabs-state=inactive]:text-muted-foreground hover:bg-accent/50 hover:text-foreground shadow-none border-none",
+                                }) {
+                                    @icon.Database(icon.Props{Class: "size-4"})
+                                    <span>Data</span>
+                                }
+                                @tabs.Trigger(tabs.TriggerProps{
+                                    Value: "account",
+                                    Class: "justify-start gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 data-[tui-tabs-state=active]:bg-accent data-[tui-tabs-state=active]:text-foreground data-[tui-tabs-state=inactive]:text-muted-foreground hover:bg-accent/50 hover:text-foreground shadow-none border-none",
+                                }) {
+                                    @icon.User(icon.Props{Class: "size-4"})
+                                    <span>Account</span>
+                                }
+                            }
+                        </div>
 
-						<!-- Tab Content -->
-						<div class="flex-1 overflow-y-auto pr-2 scrollbar-transparent scrollbar-hover text-sm">
-							<!-- General Tab -->
-							<div x-show="activeTab === 'general'" class="space-y-6 animate-in fade-in duration-200">
-								<div class="flex items-center justify-between gap-4">
-									<div class="text-foreground">Theme</div>
-									<select 
-										x-model="theme" 
-										@change="setTheme($event.target.value)"
-										class="w-[180px] bg-card border border-border rounded-lg p-2 outline-none focus:ring-1 focus:ring-primary"
-									>
-										<option value="system">System</option>
-										<option value="dark">Dark</option>
-										<option value="light">Light</option>
-									</select>
-								</div>
+                        <!-- Tab Content Wrapper -->
+                        <div class="flex-1 overflow-y-auto pr-2 scrollbar-transparent scrollbar-hover text-sm">
+                            
+                            <!-- General Tab -->
+                            @tabs.Content(tabs.ContentProps{Value: "general", IsActive: true, Class: "space-y-6 animate-in fade-in duration-200"}) {
+                                <div class="flex items-center justify-between gap-4">
+                                    <div class="text-foreground">Theme</div>
+                                    <select 
+                                        x-model="theme" 
+                                        @change="setTheme($event.target.value)"
+                                        class="w-[180px] bg-card border border-border rounded-lg p-2 outline-none focus:ring-1 focus:ring-primary"
+                                    >
+                                        <option value="system">System</option>
+                                        <option value="dark">Dark</option>
+                                        <option value="light">Light</option>
+                                    </select>
+                                </div>
 
-								<div class="flex items-center justify-between gap-4">
-									<div class="text-foreground">Language</div>
-									<select class="w-[180px] bg-card border border-border rounded-lg p-2 outline-none focus:ring-1 focus:ring-primary">
-										<option value="en">English</option>
-										<option value="es">Español</option>
-										<option value="fr">Français</option>
-									</select>
-								</div>
+                                <div class="flex items-center justify-between gap-4">
+                                    <div class="text-foreground">Language</div>
+                                    <select class="w-[180px] bg-card border border-border rounded-lg p-2 outline-none focus:ring-1 focus:ring-primary">
+                                        <option value="en">English</option>
+                                        <option value="es">Español</option>
+                                        <option value="fr">Français</option>
+                                    </select>
+                                </div>
 
-								<div class="border-t border-border pt-4 space-y-4">
-									<div class="flex items-center justify-between gap-4">
-										<div class="text-foreground">Enable Markdown for user messages</div>
-										<button 
-											class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 bg-primary"
-										>
-											<span class="translate-x-5 pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"></span>
-										</button>
-									</div>
-									<div class="flex items-center justify-between gap-4">
-										<div class="text-foreground">Auto-scroll during response</div>
-										<button 
-											class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 bg-primary"
-										>
-											<span class="translate-x-5 pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"></span>
-										</button>
-									</div>
-								</div>
-							</div>
+                                <div class="border-t border-border pt-4 space-y-4">
+                                    <div class="flex items-center justify-between gap-4">
+                                        <div class="text-foreground">Enable Markdown for user messages</div>
+                                        <button 
+                                            class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 bg-primary"
+                                        >
+                                            <span class="translate-x-5 pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"></span>
+                                        </button>
+                                    </div>
+                                    <div class="flex items-center justify-between gap-4">
+                                        <div class="text-foreground">Auto-scroll during response</div>
+                                        <button 
+                                            class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 bg-primary"
+                                        >
+                                            <span class="translate-x-5 pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"></span>
+                                        </button>
+                                    </div>
+                                </div>
+                            }
 
-							<!-- Personalization Tab -->
-							<div x-show="activeTab === 'personalization'" class="space-y-6 animate-in fade-in duration-200">
-								<div class="space-y-4">
-									<div class="flex flex-col gap-2">
-										<label class="text-foreground font-medium">Learning Style</label>
-										<select 
-											x-model="profile.learning_style"
-											@change="updateProfile()"
-											class="w-full bg-card border border-border rounded-lg p-2 outline-none focus:ring-1 focus:ring-primary"
-										>
-											<option value="">Select a style...</option>
-											<option value="Visual">Visual</option>
-											<option value="Auditory">Auditory</option>
-											<option value="Read/Write">Read/Write</option>
-											<option value="Kinesthetic">Kinesthetic</option>
-											<option value="Multimodal">Multimodal</option>
-										</select>
-										<p class="text-[12px] text-muted-foreground">How you prefer to take in and process information.</p>
-									</div>
+                            <!-- Personalization Tab -->
+                            @tabs.Content(tabs.ContentProps{Value: "personalization", Class: "space-y-6 animate-in fade-in duration-200"}) {
+                                <div class="space-y-4">
+                                    <div class="flex flex-col gap-2">
+                                        <label class="text-foreground font-medium">Learning Style</label>
+                                        <select 
+                                            x-model="profile.learning_style"
+                                            @change="updateProfile()"
+                                            class="w-full bg-card border border-border rounded-lg p-2 outline-none focus:ring-1 focus:ring-primary"
+                                        >
+                                            <option value="">Select a style...</option>
+                                            <option value="Visual">Visual</option>
+                                            <option value="Auditory">Auditory</option>
+                                            <option value="Read/Write">Read/Write</option>
+                                            <option value="Kinesthetic">Kinesthetic</option>
+                                            <option value="Multimodal">Multimodal</option>
+                                        </select>
+                                        <p class="text-[12px] text-muted-foreground">How you prefer to take in and process information.</p>
+                                    </div>
 
-									<div class="flex flex-col gap-2 pt-2">
-										<label class="text-foreground font-medium">Struggles</label>
-										<textarea 
-											x-model="profile.struggles"
-											@blur="updateProfile()"
-											placeholder="e.g. Algebra, focus, time management..."
-											class="w-full h-20 bg-card border border-border rounded-xl p-3 outline-none focus:ring-1 focus:ring-primary resize-none"
-										></textarea>
-										<p class="text-[12px] text-muted-foreground">Topics or skills you find challenging (comma separated).</p>
-									</div>
+                                    <div class="flex flex-col gap-2 pt-2">
+                                        <label class="text-foreground font-medium">Struggles</label>
+                                        <textarea 
+                                            x-model="profile.struggles"
+                                            @blur="updateProfile()"
+                                            placeholder="e.g. Algebra, focus, time management..."
+                                            class="w-full h-20 bg-card border border-border rounded-xl p-3 outline-none focus:ring-1 focus:ring-primary resize-none"
+                                        ></textarea>
+                                        <p class="text-[12px] text-muted-foreground">Topics or skills you find challenging (comma separated).</p>
+                                    </div>
 
-									<div class="flex flex-col gap-2 pt-2">
-										<label class="text-foreground font-medium">Strengths</label>
-										<textarea 
-											x-model="profile.strengths"
-											@blur="updateProfile()"
-											placeholder="e.g. Critical thinking, geometry, writing..."
-											class="w-full h-20 bg-card border border-border rounded-xl p-3 outline-none focus:ring-1 focus:ring-primary resize-none"
-										></textarea>
-										<p class="text-[12px] text-muted-foreground">Areas where you excel or feel confident (comma separated).</p>
-									</div>
+                                    <div class="flex flex-col gap-2 pt-2">
+                                        <label class="text-foreground font-medium">Strengths</label>
+                                        <textarea 
+                                            x-model="profile.strengths"
+                                            @blur="updateProfile()"
+                                            placeholder="e.g. Critical thinking, geometry, writing..."
+                                            class="w-full h-20 bg-card border border-border rounded-xl p-3 outline-none focus:ring-1 focus:ring-primary resize-none"
+                                        ></textarea>
+                                        <p class="text-[12px] text-muted-foreground">Areas where you excel or feel confident (comma separated).</p>
+                                    </div>
 
-									<div class="flex flex-col gap-2 pt-2">
-										<label class="text-foreground font-medium">Academic Goals</label>
-										<textarea 
-											x-model="profile.goals"
-											@blur="updateProfile()"
-											placeholder="e.g. Master calculus, improve essay structure..."
-											class="w-full h-24 bg-card border border-border rounded-xl p-3 outline-none focus:ring-1 focus:ring-primary resize-none"
-										></textarea>
-										<p class="text-[12px] text-muted-foreground">What you hope to achieve with your AI assistant.</p>
-									</div>
-								</div>
+                                    <div class="flex flex-col gap-2 pt-2">
+                                        <label class="text-foreground font-medium">Academic Goals</label>
+                                        <textarea 
+                                            x-model="profile.goals"
+                                            @blur="updateProfile()"
+                                            placeholder="e.g. Master calculus, improve essay structure..."
+                                            class="w-full h-24 bg-card border border-border rounded-xl p-3 outline-none focus:ring-1 focus:ring-primary resize-none"
+                                        ></textarea>
+                                        <p class="text-[12px] text-muted-foreground">What you hope to achieve with your AI assistant.</p>
+                                    </div>
+                                </div>
 
-								<div x-show="profileLoading" class="flex items-center justify-center py-4">
-									<div class="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-								</div>
-							</div>
+                                <div x-show="profileLoading" class="flex items-center justify-center py-4">
+                                    <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                                </div>
+                            }
 
-							<!-- Speech Tab -->
-							<div x-show="activeTab === 'speech'" class="space-y-6 animate-in fade-in duration-200">
-								<div class="flex items-center justify-between gap-4">
-									<div class="space-y-0.5">
-										<div class="text-foreground font-medium">Text-to-Speech</div>
-										<p class="text-[12px] text-muted-foreground leading-tight">Enable reading assistant messages aloud.</p>
-									</div>
-									<button 
-										class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 bg-muted"
-									>
-										<span class="translate-x-0 pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"></span>
-									</button>
-								</div>
-								
-								<div class="flex flex-col gap-2 pt-4 border-t border-border">
-									<div class="text-foreground">Voice Engine</div>
-									<select class="w-full bg-card border border-border rounded-lg p-2 outline-none focus:ring-1 focus:ring-primary">
-										<option value="default">Default Browser Voice</option>
-										<option value="premium">Premium AI Voice (BETA)</option>
-									</select>
-								</div>
-							</div>
+                            <!-- Speech Tab -->
+                            @tabs.Content(tabs.ContentProps{Value: "speech", Class: "space-y-6 animate-in fade-in duration-200"}) {
+                                <div class="flex items-center justify-between gap-4">
+                                    <div class="space-y-0.5">
+                                        <div class="text-foreground font-medium">Text-to-Speech</div>
+                                        <p class="text-[12px] text-muted-foreground leading-tight">Enable reading assistant messages aloud.</p>
+                                    </div>
+                                    <button 
+                                        class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 bg-muted"
+                                    >
+                                        <span class="translate-x-0 pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"></span>
+                                    </button>
+                                </div>
+                                
+                                <div class="flex flex-col gap-2 pt-4 border-t border-border">
+                                    <div class="text-foreground">Voice Engine</div>
+                                    <select class="w-full bg-card border border-border rounded-lg p-2 outline-none focus:ring-1 focus:ring-primary">
+                                        <option value="default">Default Browser Voice</option>
+                                        <option value="premium">Premium AI Voice (BETA)</option>
+                                    </select>
+                                </div>
+                            }
 
-							<!-- Data Tab -->
-							<div x-show="activeTab === 'data'" class="space-y-4 animate-in fade-in duration-200">
-								<div class="flex items-center justify-between p-3 rounded-xl border border-destructive/20 bg-destructive/5 hover:bg-destructive/10 transition-colors group cursor-pointer"
-									 @click="if(confirm('Are you sure you want to clear all conversations?')) { sessions = []; showSettings = false; }">
-									<div class="space-y-0.5">
-										<div class="text-destructive font-medium">Clear all conversations</div>
-										<p class="text-[12px] text-muted-foreground">Permanently delete all thread history.</p>
-									</div>
-									@icon.Trash2(icon.Props{Class: "size-4 text-destructive"})
-								</div>
-								
-								<div class="flex items-center justify-between p-3 rounded-xl border border-border hover:bg-accent transition-colors group cursor-pointer">
-									<div class="space-y-0.5">
-										<div class="text-foreground font-medium">Export all data</div>
-										<p class="text-[12px] text-muted-foreground">Download a copy of your chat history.</p>
-									</div>
-									@icon.Download(icon.Props{Class: "size-4 text-muted-foreground group-hover:text-foreground"})
-								</div>
-							</div>
+                            <!-- Data Tab -->
+                            @tabs.Content(tabs.ContentProps{Value: "data", Class: "space-y-4 animate-in fade-in duration-200"}) {
+                                <div class="flex items-center justify-between p-3 rounded-xl border border-destructive/20 bg-destructive/5 hover:bg-destructive/10 transition-colors group cursor-pointer"
+                                     @click="if(confirm('Are you sure you want to clear all conversations?')) { sessions = []; showSettings = false; }">
+                                    <div class="space-y-0.5">
+                                        <div class="text-destructive font-medium">Clear all conversations</div>
+                                        <p class="text-[12px] text-muted-foreground">Permanently delete all thread history.</p>
+                                    </div>
+                                    @icon.Trash2(icon.Props{Class: "size-4 text-destructive"})
+                                </div>
+                                
+                                <div class="flex items-center justify-between p-3 rounded-xl border border-border hover:bg-accent transition-colors group cursor-pointer">
+                                    <div class="space-y-0.5">
+                                        <div class="text-foreground font-medium">Export all data</div>
+                                        <p class="text-[12px] text-muted-foreground">Download a copy of your chat history.</p>
+                                    </div>
+                                    @icon.Download(icon.Props{Class: "size-4 text-muted-foreground group-hover:text-foreground"})
+                                </div>
+                            }
 
-							<!-- Account Tab -->
-							<div x-show="activeTab === 'account'" class="space-y-6 animate-in fade-in duration-200">
-								<div class="flex items-center gap-4">
-									<div class="size-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg">
-										U
-									</div>
-									<div>
-										<div class="text-foreground font-medium">User Profile</div>
-										<p class="text-xs text-muted-foreground">Manage your account details and preferences.</p>
-									</div>
-								</div>
-								
-								<div class="space-y-4 border-t border-border pt-4">
-									<a href="/auth/settings?flow=settings" class="w-full text-left p-3 rounded-xl border border-border hover:bg-accent transition-colors flex items-center justify-between group">
-										<span class="font-medium">Manage Account & Security</span>
-										@icon.ChevronRight(icon.Props{Class: "size-4 text-muted-foreground group-hover:text-foreground"})
-									</a>
-									<button class="w-full text-left p-3 rounded-xl border border-destructive/20 bg-destructive/5 hover:bg-destructive/10 transition-colors flex items-center justify-between group">
-										<span class="text-destructive font-medium">Delete Account</span>
-										@icon.UserX(icon.Props{Class: "size-4 text-destructive"})
-									</button>
-								</div>
-							</div>
-						</div>
-					</div>
+                            <!-- Account Tab -->
+                            @tabs.Content(tabs.ContentProps{Value: "account", Class: "space-y-6 animate-in fade-in duration-200"}) {
+                                <div class="flex items-center gap-4">
+                                    <div class="size-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg">
+                                        U
+                                    </div>
+                                    <div>
+                                        <div class="text-foreground font-medium">User Profile</div>
+                                        <p class="text-xs text-muted-foreground">Manage your account details and preferences.</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="space-y-4 border-t border-border pt-4">
+                                    <a href="/auth/settings?flow=settings" class="w-full text-left p-3 rounded-xl border border-border hover:bg-accent transition-colors flex items-center justify-between group">
+                                        <span class="font-medium">Manage Account & Security</span>
+                                        @icon.ChevronRight(icon.Props{Class: "size-4 text-muted-foreground group-hover:text-foreground"})
+                                    </a>
+                                    <button class="w-full text-left p-3 rounded-xl border border-destructive/20 bg-destructive/5 hover:bg-destructive/10 transition-colors flex items-center justify-between group">
+                                        <span class="text-destructive font-medium">Delete Account</span>
+                                        @icon.UserX(icon.Props{Class: "size-4 text-destructive"})
+                                    </button>
+                                </div>
+                            }
+                        </div>
+                    }
+				</div>
 				</div>
 			</div>
 		}

@@ -3,6 +3,7 @@ package message
 import "school-with-ai/components/button"
 import "school-with-ai/components/icon"
 import "school-with-ai/components/utils"
+import "school-with-ai/components/tooltip"
 
 type ActionProps struct {
     MessageID string
@@ -19,63 +20,87 @@ templ Actions(props ActionProps) {
         "md:opacity-0", 
     ) }>
         <!-- Copy Button -->
-        @button.Button(button.Props{
-            Size:    button.SizeIcon,
-            Variant: button.VariantGhost,
-            Class:   "size-6 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-sm",
-            Attributes: templ.Attributes{
-                "@click": "copyMessage(" + props.MessageID + ")",
-                "title":  "Copy text",
-                "aria-label": "Copy text",
-            },
-        }) {
-            @icon.Copy(icon.Props{Class: "size-3.5"})
+        @tooltip.Tooltip() {
+            @tooltip.Trigger(tooltip.TriggerProps{}) {
+                @button.Button(button.Props{
+                    Size:    button.SizeIcon,
+                    Variant: button.VariantGhost,
+                    Class:   "size-6 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-sm",
+                    Attributes: templ.Attributes{
+                        "@click": "copyMessage(" + props.MessageID + ")",
+                        "aria-label": "Copy text",
+                    },
+                }) {
+                    @icon.Copy(icon.Props{Class: "size-3.5"})
+                }
+            }
+            @tooltip.Content(tooltip.ContentProps{Class: "text-xs"}) {
+                Copy text
+            }
         }
 
         <!-- Bookmark Button -->
-         @button.Button(button.Props{
-            Size:    button.SizeIcon,
-            Variant: button.VariantGhost,
-            Class:   "size-6 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-sm",
-            Attributes: templ.Attributes{
-                "title":  "Bookmark message",
-                "aria-label": "Bookmark message",
-                 // Future implementation: click handler to toggle bookmark state
-                 "@click": "$dispatch('toggle-bookmark', { id: " + props.MessageID + " })",
-            },
-        }) {
-            @icon.Bookmark(icon.Props{Class: "size-3.5"})
+        @tooltip.Tooltip() {
+            @tooltip.Trigger(tooltip.TriggerProps{}) {
+                @button.Button(button.Props{
+                    Size:    button.SizeIcon,
+                    Variant: button.VariantGhost,
+                    Class:   "size-6 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-sm",
+                    Attributes: templ.Attributes{
+                        "aria-label": "Bookmark message",
+                        // Future implementation: click handler to toggle bookmark state
+                        "@click": "$dispatch('toggle-bookmark', { id: " + props.MessageID + " })",
+                    },
+                }) {
+                    @icon.Bookmark(icon.Props{Class: "size-3.5"})
+                }
+            }
+            @tooltip.Content(tooltip.ContentProps{Class: "text-xs"}) {
+                Bookmark message
+            }
         }
 
         if props.Role == "user" {
             <!-- Edit Button (Visual for now) -->
-             @button.Button(button.Props{
-                Size:    button.SizeIcon,
-                Variant: button.VariantGhost,
-                Class:   "size-6 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-sm",
-                Attributes: templ.Attributes{
-                    "title":  "Edit message",
-                    "aria-label": "Edit message",
-                     // Future implementation: "@click": "startEditing('" + props.MessageID + "')",
-                },
-            }) {
-                @icon.SquarePen(icon.Props{Class: "size-3.5"})
+            @tooltip.Tooltip() {
+                @tooltip.Trigger(tooltip.TriggerProps{}) {
+                    @button.Button(button.Props{
+                        Size:    button.SizeIcon,
+                        Variant: button.VariantGhost,
+                        Class:   "size-6 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-sm",
+                        Attributes: templ.Attributes{
+                            "aria-label": "Edit message",
+                            // Future implementation: "@click": "startEditing('" + props.MessageID + "')",
+                        },
+                    }) {
+                        @icon.SquarePen(icon.Props{Class: "size-3.5"})
+                    }
+                }
+                @tooltip.Content(tooltip.ContentProps{Class: "text-xs"}) {
+                    Edit message
+                }
             }
         }
 
         if props.Role == "assistant" {
             <!-- Regenerate Button -->
-             @button.Button(button.Props{
-                Size:    button.SizeIcon,
-                Variant: button.VariantGhost,
-                Class:   "size-6 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-sm",
-                Attributes: templ.Attributes{
-                    "@click": "regenerateResponse(" + props.MessageID + ")", 
-                    "title":  "Regenerate response",
-                     "aria-label": "Regenerate response",
-                },
-            }) {
-                @icon.RotateCw(icon.Props{Class: "size-3.5"})
+            @tooltip.Tooltip() {
+                @tooltip.Trigger(tooltip.TriggerProps{}) {
+                    @button.Button(button.Props{
+                        Size:    button.SizeIcon,
+                        Variant: button.VariantGhost,
+                        Class:   "size-6 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-sm",
+                        Attributes: templ.Attributes{
+                            "@click": "regenerateResponse(" + props.MessageID + ")", 
+                            "aria-label": "Regenerate response",
+                        },
+                    }) {
+                        @icon.RotateCw(icon.Props{Class: "size-3.5"})
+                    }
+                }
+                @tooltip.Content(tooltip.ContentProps{Class: "text-xs"}) {
+                    Regenerate response
+                }
             }
         }
     </div>
