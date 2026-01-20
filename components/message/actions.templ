@@ -24,12 +24,27 @@ templ Actions(props ActionProps) {
             Variant: button.VariantGhost,
             Class:   "size-6 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-sm",
             Attributes: templ.Attributes{
-                "@click": "copyMessage('" + props.MessageID + "')",
+                "@click": "copyMessage(" + props.MessageID + ")",
                 "title":  "Copy text",
                 "aria-label": "Copy text",
             },
         }) {
             @icon.Copy(icon.Props{Class: "size-3.5"})
+        }
+
+        <!-- Bookmark Button -->
+         @button.Button(button.Props{
+            Size:    button.SizeIcon,
+            Variant: button.VariantGhost,
+            Class:   "size-6 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-sm",
+            Attributes: templ.Attributes{
+                "title":  "Bookmark message",
+                "aria-label": "Bookmark message",
+                 // Future implementation: click handler to toggle bookmark state
+                 "@click": "$dispatch('toggle-bookmark', { id: " + props.MessageID + " })",
+            },
+        }) {
+            @icon.Bookmark(icon.Props{Class: "size-3.5"})
         }
 
         if props.Role == "user" {
@@ -55,7 +70,7 @@ templ Actions(props ActionProps) {
                 Variant: button.VariantGhost,
                 Class:   "size-6 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-sm",
                 Attributes: templ.Attributes{
-                    "@click": "regenerateResponse('" + props.MessageID + "')", 
+                    "@click": "regenerateResponse(" + props.MessageID + ")", 
                     "title":  "Regenerate response",
                      "aria-label": "Regenerate response",
                 },

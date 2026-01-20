@@ -29,6 +29,9 @@ templ SidePanel() {
              <div class="h-full overflow-y-auto custom-scrollbar" x-show="activeView === 'bookmarks'" style="display: none;">
                 @Bookmarks()
              </div>
+             <div class="h-full overflow-y-auto custom-scrollbar" x-show="activeView === 'files'" style="display: none;">
+                @Files()
+             </div>
         }
     }
 }
@@ -54,6 +57,14 @@ templ Header() {
                 >
                     @icon.Bookmark(icon.Props{Class: "size-3.5"})
                     <span>Bookmarks</span>
+                </button>
+                <button 
+                    @click="activeView = 'files'"
+                    :class="activeView === 'files' ? 'bg-background shadow-sm text-foreground ring-1 ring-black/5 dark:ring-white/10' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'"
+                    class="flex items-center gap-2 px-3 py-1.5 rounded-[6px] text-xs font-medium transition-all duration-200"
+                >
+                    @icon.Folder(icon.Props{Class: "size-3.5"})
+                    <span>Files</span>
                 </button>
              </div>
 
