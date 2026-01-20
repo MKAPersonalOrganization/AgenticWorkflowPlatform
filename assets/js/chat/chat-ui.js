@@ -59,6 +59,88 @@ export function createUIMethods() {
         },
 
         // ============================================
+        // Slash Command Methods
+        // ============================================
+
+        /**
+         * Handle input changes to detect slash commands
+         */
+        handleInput(event) {
+            const value = event.target.value;
+            const slashIndex = value.lastIndexOf('/');
+
+            // If slash is found and is either at start or preceded by newline/space
+            if (slashIndex !== -1 && (slashIndex === 0 || /[\s\n]/.test(value[slashIndex - 1]))) {
+                const query = value.substring(slashIndex + 1);
+                // Only show if query doesn't contain spaces (command mode)
+                if (!/\s/.test(query)) {
+                    this.slashQuery = query;
+                    this.filteredPrompts = this.prompts.filter(p =>
+                        p.command.toLowerCase().includes('/' + query.toLowerCase()) ||
+                        p.description.toLowerCase().includes(query.toLowerCase())
+                    );
+
+                    if (this.filteredPrompts.length > 0) {
+                        this.showSlashMenu = true;
+                        this.slashMenuIndex = 0; // Reset selection
+                        return;
+                    }
+                }
+            }
+
+            this.showSlashMenu = false;
+        },
+
+        /**
+         * Handle keyboard navigation for slash menu
+         */
+        handleSlashKeydown(event) {
+            if (!this.showSlashMenu) return false; // Not handled
+
+            switch (event.key) {
+                case 'ArrowUp':
+                    event.preventDefault();
+                    this.slashMenuIndex = Math.max(0, this.slashMenuIndex - 1);
+                    return true;
+                case 'ArrowDown':
+                    event.preventDefault();
+                    this.slashMenuIndex = Math.min(this.filteredPrompts.length - 1, this.slashMenuIndex + 1);
+                    return true;
+                case 'Enter':
+                case 'Tab':
+                    event.preventDefault();
+                    if (this.filteredPrompts[this.slashMenuIndex]) {
+                        this.selectPrompt(this.filteredPrompts[this.slashMenuIndex]);
+                    }
+                    return true;
+                case 'Escape':
+                    this.showSlashMenu = false;
+                    return true;
+            }
+            return false;
+        },
+
+        /**
+         * Insert selected prompt into message
+         */
+        selectPrompt(prompt) {
+            const value = this.currentMessage;
+            const slashIndex = value.lastIndexOf('/');
+
+            if (slashIndex !== -1) {
+                // Replace everything from the last slash with the prompt content
+                this.currentMessage = value.substring(0, slashIndex) + prompt.content;
+                this.showSlashMenu = false;
+
+                // Focus back on textarea (handled by x-model, but ensure focus)
+                this.$nextTick(() => {
+                    this.$refs.messageInput.focus();
+                    // Optionally move cursor to end
+                });
+            }
+        },
+
+        // ============================================
         // Toggle Actions
         // ============================================
 
