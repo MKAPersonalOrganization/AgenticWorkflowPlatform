@@ -3,6 +3,7 @@ package chatheader
 import "school-with-ai/components/icon"
 import "school-with-ai/components/sidebar"
 import "school-with-ai/components/button"
+import "school-with-ai/components/dropdown"
 import "school-with-ai/domain"
 
 templ ChatHeader(user *domain.User) {
@@ -34,35 +35,38 @@ templ ChatHeader(user *domain.User) {
             <!-- Separator (optional, invisible in LibreChat usually, but good for spacing) -->
             
             <!-- Agent Selector (Mimicking LibreChat Model Select) -->
-             <div class="relative" x-data="{ open: false }">
-                <button 
-                    @click="open = !open" 
-                    @click.outside="open = false"
-                    class="flex items-center gap-1.5 cursor-pointer hover:bg-muted/50 px-2 py-1.5 rounded-lg transition-colors group"
-                >
+            <!-- Agent Selector (Mimicking LibreChat Model Select) -->
+            @dropdown.Dropdown(dropdown.Props{
+                ID: "agent-selector",
+            }) {
+                @dropdown.Trigger(dropdown.TriggerProps{
+                    Attributes: templ.Attributes{
+                        "class": "flex items-center gap-1.5 cursor-pointer hover:bg-muted/50 px-2 py-1.5 rounded-lg transition-colors group",
+                    },
+                }) {
                     <span x-text="AVAILABLE_AGENTS.find(a => a.id === selectedAgent)?.name || 'Select Agent'" class="text-lg font-semibold text-foreground/80 group-hover:text-foreground"></span>
-                    @icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground/50 group-hover:text-foreground transition-colors mt-1"})
-                </button>
-                
-                <!-- Dropdown Menu -->
-                <div 
-                    x-show="open" 
-                    x-transition:enter="transition ease-out duration-100"
-                    x-transition:enter-start="opacity-0 scale-95"
-                    x-transition:enter-end="opacity-100 scale-100"
-                    x-transition:leave="transition ease-in duration-75"
-                    x-transition:leave-start="opacity-100 scale-100"
-                    x-transition:leave-end="opacity-0 scale-95"
-                    class="absolute top-full left-0 mt-1 w-64 rounded-xl border border-border bg-popover p-1 shadow-lg text-popover-foreground z-50 origin-top-left"
-                    style="display: none;"
-                >
-                    <div class="px-2 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">Model</div>
+                }
+                @dropdown.Content(dropdown.ContentProps{
+                    Class: "w-64",
+                    Attributes: templ.Attributes{
+                        "x-show": "open", // Bind to dropdown's internal state if possible, but templui handles visibility. 
+                        // TemplUI Dropdown handles open/close via its own JS using data attributes.
+                        // We don't need x-show here, the component handles it.
+                    },
+                }) {
+                    @dropdown.Label(dropdown.LabelProps{
+                        Class: "text-xs font-medium text-muted-foreground uppercase tracking-wider",
+                    }) {
+                        Model
+                    }
                     <template x-for="agent in AVAILABLE_AGENTS" :key="agent.id">
-                        <button
-                            @click="selectedAgent = agent.id; open = false"
-                            class="relative flex w-full cursor-pointer select-none items-center gap-3 rounded-lg py-2.5 px-3 text-sm outline-none hover:bg-accent/50 hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 transition-colors"
-                            :class="selectedAgent === agent.id ? 'bg-accent/50 text-accent-foreground' : ''"
-                        >
+                        @dropdown.Item(dropdown.ItemProps{
+                            Attributes: templ.Attributes{
+                                "@click": "selectedAgent = agent.id",
+                                ":class": "selectedAgent === agent.id ? 'bg-accent/50 text-accent-foreground' : ''",
+                                "class": "relative flex w-full cursor-pointer select-none items-center gap-3 rounded-lg py-2.5 px-3 text-sm outline-none hover:bg-accent/50 hover:text-accent-foreground transition-colors",
+                            },
+                        }) {
                             <!-- Icon placeholder -->
                             <div class="size-5 rounded-sm bg-primary/10 flex items-center justify-center text-primary">
                                 <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -76,12 +80,12 @@ templ ChatHeader(user *domain.User) {
                                 <span class="text-xs text-muted-foreground" x-text="'Great for general tasks'"></span>
                             </div>
                             <template x-if="selectedAgent === agent.id">
-                                @icon.Check(icon.Props{Class: "size-4 text-primary"})
+                                @icon.Check(icon.Props{Class: "size-4 text-primary absolute right-3"})
                             </template>
-                        </button>
+                        }
                     </template>
-                </div>
-            </div>
+                }
+            }
 		</div>
 
         <div class="flex items-center gap-2">

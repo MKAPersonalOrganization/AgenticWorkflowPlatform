@@ -18,9 +18,11 @@ import "school-with-ai/components/chatheader"
 import "school-with-ai/domain"
 import "school-with-ai/components/sidepanel"
 import "school-with-ai/components/tabs"
-import "school-with-ai/components/switch"
+
 import "school-with-ai/components/selectbox"
 import "school-with-ai/components/copybutton"
+import "school-with-ai/components/icon"
+import "school-with-ai/components/dropdown"
 
 templ ChatInputScreen(user *domain.User) {
 	<!DOCTYPE html>
@@ -110,9 +112,16 @@ templ ChatInputScreen(user *domain.User) {
 			@sidebar.Script()
 			@code.Script()
 			@tabs.Script()
-			@switch.Script()
+
 			@selectbox.Script()
 			@copybutton.Script()
+			@dropdown.Script()
+            <style>
+                @keyframes shrink {
+                    from { transform: scaleX(1); }
+                    to { transform: scaleX(0); }
+                }
+            </style>
 		</head>
 		<body class="flex min-h-screen bg-background text-foreground antialiased">
 			<div class="w-full h-screen" x-data="chat">
@@ -200,26 +209,55 @@ templ ChatInputScreen(user *domain.User) {
 					<template x-for="toast in toasts" :key="toast.id">
 						<div
 							:class="toast.leaving ? 'toast-leave' : 'toast-enter'"
-							class="flex items-start gap-3 p-4 bg-card border border-border rounded-lg shadow-lg max-w-md min-w-[320px]"
+							class="w-full bg-popover text-popover-foreground rounded-lg shadow-xs border pt-5 pb-4 px-4 flex items-center justify-center relative overflow-hidden group max-w-md min-w-[320px] mb-2"
 							role="alert"
 							:aria-live="toast.type === 'error' ? 'assertive' : 'polite'"
 						>
+                            <!-- Progress Bar (Simulated) -->
+                            <div class="absolute top-0 left-0 right-0 h-1 overflow-hidden" x-show="toast.duration > 0">
+                                <div
+                                    class="toast-progress h-full origin-left transition-transform ease-linear"
+                                    :class="{
+                                        'bg-gray-500': !toast.type || toast.type === 'default',
+                                        'bg-green-500': toast.type === 'success',
+                                        'bg-red-500': toast.type === 'error',
+                                        'bg-yellow-500': toast.type === 'warning',
+                                        'bg-blue-500': toast.type === 'info'
+                                    }"
+                                    :style="`animation: shrink ${toast.duration || 3000}ms linear forwards`"
+                                ></div>
+                            </div>
+
 							<!-- Icon -->
-							<div class="shrink-0" x-html="getToastIcon(toast.type)"></div>
+							<div class="shrink-0 mr-3">
+                                <template x-if="toast.type === 'success'">
+                                    @icon.CircleCheck(icon.Props{Size: 22, Class: "text-green-500"})
+                                </template>
+                                <template x-if="toast.type === 'error'">
+                                    @icon.CircleX(icon.Props{Size: 22, Class: "text-red-500"})
+                                </template>
+                                <template x-if="toast.type === 'warning'">
+                                    @icon.TriangleAlert(icon.Props{Size: 22, Class: "text-yellow-500"})
+                                </template>
+                                <template x-if="toast.type === 'info'">
+                                    @icon.Info(icon.Props{Size: 22, Class: "text-blue-500"})
+                                </template>
+                            </div>
+
 							<!-- Content -->
 							<div class="flex-1 min-w-0">
-								<p class="text-sm font-medium break-words" x-text="toast.message"></p>
+								<p class="text-sm font-semibold truncate" x-text="toast.message"></p>
+                                <!-- Description support if we add it later -->
+                                <!-- <p class="text-sm opacity-90 mt-1" x-text="toast.description"></p> -->
 							</div>
 							<!-- Close Button -->
 							<button
 								@click="dismissToast(toast.id)"
-								class="shrink-0 inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 hover:bg-accent hover:text-accent-foreground h-6 w-6"
+								class="shrink-0 inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 hover:bg-accent hover:text-accent-foreground h-6 w-6 ml-2 opacity-75 hover:opacity-100"
 								type="button"
 								aria-label="Close notification"
 							>
-								<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-								</svg>
+								@icon.X(icon.Props{Size: 18})
 							</button>
 						</div>
 					</template>
