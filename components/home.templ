@@ -20,6 +20,7 @@ import "school-with-ai/components/sidepanel"
 import "school-with-ai/components/tabs"
 import "school-with-ai/components/switch"
 import "school-with-ai/components/selectbox"
+import "school-with-ai/components/copybutton"
 
 templ ChatInputScreen(user *domain.User) {
 	<!DOCTYPE html>
@@ -111,6 +112,7 @@ templ ChatInputScreen(user *domain.User) {
 			@tabs.Script()
 			@switch.Script()
 			@selectbox.Script()
+			@copybutton.Script()
 		</head>
 		<body class="flex min-h-screen bg-background text-foreground antialiased">
 			<div class="w-full h-screen" x-data="chat">
