@@ -1,0 +1,75 @@
+package sidepanel
+
+import (
+    "school-with-ai/components/sidebar"
+    "school-with-ai/components/icon"
+    "school-with-ai/components/button"
+    "school-with-ai/components/artifacts"
+)
+
+templ SidePanel() {
+    @sidebar.Sidebar(sidebar.Props{
+		ID:          "premium-sidepanel",
+		Side:        sidebar.SideRight,
+		Variant:     sidebar.VariantSidebar,
+		Collapsible: sidebar.CollapsibleOffcanvas,
+		Collapsed:   true, 
+		Class:       "z-30 !right-0 !border-l-0 border-l border-border bg-background shadow-2xl", 
+		Attributes: templ.Attributes{
+			"style": "--sidebar-width: 400px",
+            "x-data": "{ activeView: 'artifacts' }", 
+		},
+	}) {
+        @Header()
+        
+        @sidebar.Content(sidebar.ContentProps{Class: "flex-1 overflow-hidden bg-background"}) {
+             <div class="h-full overflow-y-auto custom-scrollbar" x-show="activeView === 'artifacts'">
+                @artifacts.ArtifactsContent()
+             </div>
+             <div class="h-full overflow-y-auto custom-scrollbar" x-show="activeView === 'bookmarks'" style="display: none;">
+                @Bookmarks()
+             </div>
+        }
+    }
+}
+
+templ Header() {
+    @sidebar.Header(sidebar.HeaderProps{
+        Class: "flex flex-col border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60",
+    }) {
+        <div class="flex flex-row items-center justify-between px-3 py-2.5">
+             <div class="flex items-center gap-1 bg-muted/50 p-0.5 rounded-lg border border-border/20">
+                <button 
+                    @click="activeView = 'artifacts'"
+                    :class="activeView === 'artifacts' ? 'bg-background shadow-sm text-foreground ring-1 ring-black/5 dark:ring-white/10' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'"
+                    class="flex items-center gap-2 px-3 py-1.5 rounded-[6px] text-xs font-medium transition-all duration-200"
+                >
+                    @icon.LayoutDashboard(icon.Props{Class: "size-3.5"})
+                    <span>Artifacts</span>
+                </button>
+                <button 
+                    @click="activeView = 'bookmarks'"
+                    :class="activeView === 'bookmarks' ? 'bg-background shadow-sm text-foreground ring-1 ring-black/5 dark:ring-white/10' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'"
+                    class="flex items-center gap-2 px-3 py-1.5 rounded-[6px] text-xs font-medium transition-all duration-200"
+                >
+                    @icon.Bookmark(icon.Props{Class: "size-3.5"})
+                    <span>Bookmarks</span>
+                </button>
+             </div>
+
+            <!-- Close Button -->
+			@button.Button(button.Props{
+				Size:    button.SizeIcon,
+				Variant: button.VariantGhost,
+				Class:   "size-7 hover:bg-muted text-muted-foreground rounded-md",
+				Attributes: templ.Attributes{
+					"data-tui-sidebar-trigger": "true",
+					"data-tui-sidebar-target":  "premium-sidepanel",
+				},
+			}) {
+				@icon.X(icon.Props{Class: "size-4"})
+				<span class="sr-only">Close</span>
+			}
+        </div>
+    }
+}
