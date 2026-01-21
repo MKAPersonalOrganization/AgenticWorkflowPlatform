@@ -7,7 +7,7 @@ import (
 
 templ Todo() {
 	<div class="space-y-4 w-full">
-		@card.Card(card.Props{Class: "border-l-4 border-primary overflow-hidden bg-card/50 backdrop-blur-sm"}) {
+		@card.Card(card.Props{Class: "border-s-4 border-primary overflow-hidden bg-card/50 backdrop-blur-sm"}) {
 			@card.Header() {
 				<div class="flex items-center justify-between">
 					<div class="flex items-center gap-2">
@@ -24,7 +24,7 @@ templ Todo() {
 			@card.Content() {
 				<div class="space-y-3">
 					<template x-for="(todo, tIndex) in message.parsedArgs?.todos" :key="tIndex">
-						<div 
+						<div
 							class="flex items-start gap-3 p-2 rounded-lg transition-colors hover:bg-muted/50 group/todoitem"
 							:class="{
 								'opacity-50': todo.status === 'cancelled',
@@ -63,10 +63,9 @@ templ Todo() {
 									</div>
 								</template>
 							</div>
-
 							<!-- Task Description -->
 							<div class="flex-1 min-w-0">
-								<p 
+								<p
 									class="text-sm leading-relaxed break-words"
 									:class="{ 
 										'line-through text-muted-foreground': todo.status === 'cancelled',
@@ -76,7 +75,6 @@ templ Todo() {
 									x-text="todo.description"
 								></p>
 							</div>
-
 							<!-- Status Badge -->
 							<div class="shrink-0">
 								<template x-if="todo.status === 'in_progress'">

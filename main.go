@@ -16,6 +16,7 @@ import (
 	"school-with-ai/foundation/agentsdk/llm"
 	"school-with-ai/foundation/debug"
 	"school-with-ai/foundation/event"
+	"school-with-ai/foundation/i18n"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/middleware"
 	"school-with-ai/handlers/auth"
@@ -167,6 +168,14 @@ func run(ctx context.Context, log *logger.Logger) error {
 			return nil
 		}
 		return fmt.Errorf("parsing config: %w", err)
+	}
+
+	// -------------------------------------------------------------------------
+	// Initialize I18n
+
+	if err := i18n.LoadCatalogs("assets/locales"); err != nil {
+		log.Error(ctx, "failed to load i18n catalogs", "error", err)
+		// Don't fail matching, just continue with defaults
 	}
 
 	// -------------------------------------------------------------------------
@@ -415,6 +424,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// Add metrics middleware
 	r.Use(middleware.Metrics())
+
+	// Add I18n middleware (detects lang from query/cookie/header)
+	r.Use(middleware.I18n)
 
 	// Add chi middleware (we can keep or remove these depending on preference)
 	// Note: We now have our own Logger and Recoverer, so chi's can be removed

@@ -1,8 +1,10 @@
 package settings
 
 import (
+	"fmt"
 	"school-with-ai/components/button"
 	"school-with-ai/components/dialog"
+	"school-with-ai/components/i18n"
 	"school-with-ai/components/icon"
 	"school-with-ai/components/nativeselect"
 	"school-with-ai/components/selectbox"
@@ -42,7 +44,7 @@ templ Settings() {
 				>
 					<!-- Header -->
 					<div class="flex items-center justify-between p-6 pb-4">
-						<h2 class="text-lg font-medium text-foreground">Settings</h2>
+						<h2 class="text-lg font-medium text-foreground">{ i18n.T(ctx, "Settings") }</h2>
 						@button.Button(button.Props{
 							Type:    button.TypeButton,
 							Variant: button.VariantGhost,
@@ -63,7 +65,7 @@ templ Settings() {
 						},
 					}) {
 						<!-- Tab List -->
-						<div class="flex flex-row md:flex-col gap-1 min-w-[160px] overflow-x-auto md:overflow-y-auto scrollbar-none pb-2 md:pb-0 border-b md:border-b-0 md:border-r border-border pr-0 md:pr-4">
+						<div class="flex flex-row md:flex-col gap-1 min-w-[160px] overflow-x-auto md:overflow-y-auto scrollbar-none pb-2 md:pb-0 border-b md:border-b-0 md:border-e border-border pe-0 md:pe-4">
 							@tabs.List(tabs.ListProps{Class: "flex flex-row md:flex-col gap-1 bg-transparent p-0 w-full h-auto items-stretch"}) {
 								@tabs.Trigger(tabs.TriggerProps{
 									Value:    "general",
@@ -71,80 +73,81 @@ templ Settings() {
 									Class:    "justify-start gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 data-[tui-tabs-state=active]:bg-accent data-[tui-tabs-state=active]:text-foreground data-[tui-tabs-state=inactive]:text-muted-foreground hover:bg-accent/50 hover:text-foreground shadow-none border-none",
 								}) {
 									@icon.Settings(icon.Props{Class: "size-4"})
-									<span>General</span>
+									<span>{ i18n.T(ctx, "General") }</span>
 								}
 								@tabs.Trigger(tabs.TriggerProps{
 									Value: "personalization",
 									Class: "justify-start gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 data-[tui-tabs-state=active]:bg-accent data-[tui-tabs-state=active]:text-foreground data-[tui-tabs-state=inactive]:text-muted-foreground hover:bg-accent/50 hover:text-foreground shadow-none border-none",
 								}) {
 									@icon.UserCog(icon.Props{Class: "size-4"})
-									<span>Personalization</span>
+									<span>{ i18n.T(ctx, "Personalization") }</span>
 								}
 								@tabs.Trigger(tabs.TriggerProps{
 									Value: "speech",
 									Class: "justify-start gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 data-[tui-tabs-state=active]:bg-accent data-[tui-tabs-state=active]:text-foreground data-[tui-tabs-state=inactive]:text-muted-foreground hover:bg-accent/50 hover:text-foreground shadow-none border-none",
 								}) {
 									@icon.Mic(icon.Props{Class: "size-4"})
-									<span>Speech</span>
+									<span>{ i18n.T(ctx, "Speech") }</span>
 								}
 								@tabs.Trigger(tabs.TriggerProps{
 									Value: "data",
 									Class: "justify-start gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 data-[tui-tabs-state=active]:bg-accent data-[tui-tabs-state=active]:text-foreground data-[tui-tabs-state=inactive]:text-muted-foreground hover:bg-accent/50 hover:text-foreground shadow-none border-none",
 								}) {
 									@icon.Database(icon.Props{Class: "size-4"})
-									<span>Data</span>
+									<span>{ i18n.T(ctx, "Data") }</span>
 								}
 								@tabs.Trigger(tabs.TriggerProps{
 									Value: "account",
 									Class: "justify-start gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 data-[tui-tabs-state=active]:bg-accent data-[tui-tabs-state=active]:text-foreground data-[tui-tabs-state=inactive]:text-muted-foreground hover:bg-accent/50 hover:text-foreground shadow-none border-none",
 								}) {
 									@icon.User(icon.Props{Class: "size-4"})
-									<span>Account</span>
+									<span>{ i18n.T(ctx, "Account") }</span>
 								}
 							}
 						</div>
 						<!-- Tab Content Wrapper -->
-						<div class="flex-1 overflow-y-auto pr-2 scrollbar-transparent scrollbar-hover text-sm">
+						<div class="flex-1 overflow-y-auto pe-2 scrollbar-transparent scrollbar-hover text-sm">
 							<!-- General Tab -->
 							@tabs.Content(tabs.ContentProps{Value: "general", IsActive: true, Class: "space-y-6 animate-in fade-in duration-200"}) {
 								<div class="flex items-center justify-between gap-4">
-									<div class="text-foreground">Theme</div>
+									<div class="text-foreground">{ i18n.T(ctx, "Theme") }</div>
 									@nativeselect.Select(
 										nativeselect.Props{
 											Class:       "w-[180px]",
 											Model:       "theme",
-											Label:       "Select Theme",
-											Placeholder: "Select Theme",
+											Label:       i18n.T(ctx, "Select Theme"),
+											Placeholder: i18n.T(ctx, "Select Theme"),
 										},
 										[]nativeselect.Option{
-											{Value: "system", Label: "System"},
-											{Value: "dark", Label: "Dark"},
-											{Value: "light", Label: "Light"},
+											{Value: "system", Label: i18n.T(ctx, "System")},
+											{Value: "dark", Label: i18n.T(ctx, "Dark")},
+											{Value: "light", Label: i18n.T(ctx, "Light")},
 										},
 									)
 								</div>
 								<div class="flex items-center justify-between gap-4">
-									<div class="text-foreground">Language</div>
+									<div class="text-foreground">{ i18n.T(ctx, "Language") }</div>
 									@selectbox.SelectBox(selectbox.Props{Class: "w-[180px]"}) {
-										@selectbox.Trigger(selectbox.TriggerProps{}) {
-											<span>English</span>
-										}
-										@selectbox.Content(selectbox.ContentProps{NoSearch: true}) {
-											@selectbox.Item(selectbox.ItemProps{Value: "en", Selected: true}) {
-												English 
-											}
-											@selectbox.Item(selectbox.ItemProps{Value: "es"}) {
-												Español 
-											}
-											@selectbox.Item(selectbox.ItemProps{Value: "fr"}) {
-												Français 
-											}
-										}
+										<div class="relative w-full" x-data="{ currentLang: '' }" x-init={ fmt.Sprintf("currentLang = '%s'", i18n.Lang(ctx)) }>
+											<select
+												x-model="currentLang"
+												@change="window.location.href = '?lang=' + $event.target.value"
+												class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+												aria-label="Select Language"
+											>
+												<option value="en">English</option>
+												<option value="ar">العربية</option>
+											</select>
+											<div class="w-full h-9 px-3 py-1 text-base md:text-sm flex items-center justify-between rounded-md border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground">
+												<span x-text="currentLang === 'ar' ? 'العربية' : 'English'"></span>
+												@icon.ChevronDown(icon.Props{Size: 16, Class: "text-muted-foreground"})
+											</div>
+										</div>
 									}
 								</div>
 								<div class="border-t border-border pt-4 space-y-4">
 									<div class="flex items-center justify-between gap-4">
-										<div class="text-foreground">Enable Markdown for user messages</div>
+										<div class="text-foreground">{ i18n.T(ctx, "Enable Markdown for user messages") }</div>
 										@switchcomp.Switch(switchcomp.Props{
 											Name:    "markdownEnabled",
 											Checked: true, // Default or bind to state
@@ -155,18 +158,18 @@ templ Settings() {
 												// However, templui switch might not support x-model directly changing its visual state if it relies on CSS peer-checked.
 												// x-model usually toggles the 'checked' property, which peer-checked relies on. So it SHOULD work.
 												"x-model":    "markdownEnabled",
-												"aria-label": "Enable Markdown",
+												"aria-label": i18n.T(ctx, "Enable Markdown"),
 											},
 										})
 									</div>
 									<div class="flex items-center justify-between gap-4">
-										<div class="text-foreground">Auto-scroll during response</div>
+										<div class="text-foreground">{ i18n.T(ctx, "Auto-scroll during response") }</div>
 										@switchcomp.Switch(switchcomp.Props{
 											Name:    "autoScroll",
 											Checked: true,
 											Attributes: templ.Attributes{
 												"x-model":    "autoScroll",
-												"aria-label": "Auto-scroll during response",
+												"aria-label": i18n.T(ctx, "Auto-scroll during response"),
 											},
 										})
 									</div>
@@ -176,77 +179,76 @@ templ Settings() {
 							@tabs.Content(tabs.ContentProps{Value: "personalization", Class: "space-y-6 animate-in fade-in duration-200"}) {
 								<div class="space-y-4">
 									<div class="flex flex-col gap-2">
-										<label class="text-foreground font-medium">Learning Style</label>
+										<label class="text-foreground font-medium">{ i18n.T(ctx, "Learning Style") }</label>
 										@selectbox.SelectBox(selectbox.Props{Class: "w-full"}) {
 											@selectbox.Trigger(selectbox.TriggerProps{
 												Attributes: templ.Attributes{
 													"x-model": "profile.learning_style",
 												},
 											}) {
-												<span x-text="profile.learning_style || 'Select a style...'">Select a style...</span>
+												<span x-text={ "profile.learning_style || '" + i18n.T(ctx, "Select a style...") + "'" }>{ i18n.T(ctx, "Select a style...") }</span>
 											}
 											@selectbox.Content(selectbox.ContentProps{NoSearch: true}) {
 												@selectbox.Item(selectbox.ItemProps{Value: "Visual"}) {
-													Visual 
+													{ i18n.T(ctx, "Visual") }
 												}
 												@selectbox.Item(selectbox.ItemProps{Value: "Auditory"}) {
-													Auditory 
+													{ i18n.T(ctx, "Auditory") }
 												}
 												@selectbox.Item(selectbox.ItemProps{Value: "Read/Write"}) {
-													Read/Write 
+													{ i18n.T(ctx, "Read/Write") }
 												}
 												@selectbox.Item(selectbox.ItemProps{Value: "Kinesthetic"}) {
-													Kinesthetic 
+													{ i18n.T(ctx, "Kinesthetic") }
 												}
 												@selectbox.Item(selectbox.ItemProps{Value: "Multimodal"}) {
-													Multimodal 
+													{ i18n.T(ctx, "Multimodal") }
 												}
 											}
 										}
-										<p class="text-[12px] text-muted-foreground">How you prefer to take in and process information.</p>
+										<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "How you prefer to take in and process information.") }</p>
 									</div>
 									<div class="flex flex-col gap-2 pt-2">
-										<label class="text-foreground font-medium">Struggles</label>
+										<label class="text-foreground font-medium">{ i18n.T(ctx, "Struggles") }</label>
 										<textarea
 											x-model="profile.struggles"
-											placeholder="e.g. Algebra, focus, time management..."
+											placeholder={ i18n.T(ctx, "e.g. Algebra, focus, time management...") }
 											class="w-full h-20 bg-card border border-border rounded-xl p-3 outline-none focus:ring-1 focus:ring-primary resize-none"
 										></textarea>
-										<p class="text-[12px] text-muted-foreground">Topics or skills you find challenging (comma separated).</p>
+										<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "Topics or skills you find challenging (comma separated).") }</p>
 									</div>
 									<div class="flex flex-col gap-2 pt-2">
-										<label class="text-foreground font-medium">Strengths</label>
+										<label class="text-foreground font-medium">{ i18n.T(ctx, "Strengths") }</label>
 										<textarea
 											x-model="profile.strengths"
-											placeholder="e.g. Critical thinking, geometry, writing..."
+											placeholder={ i18n.T(ctx, "e.g. Critical thinking, geometry, writing...") }
 											class="w-full h-20 bg-card border border-border rounded-xl p-3 outline-none focus:ring-1 focus:ring-primary resize-none"
 										></textarea>
-										<p class="text-[12px] text-muted-foreground">Areas where you excel or feel confident (comma separated).</p>
+										<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "Areas where you excel or feel confident (comma separated).") }</p>
 									</div>
 									<div class="flex flex-col gap-2 pt-2">
-										<label class="text-foreground font-medium">Academic Goals</label>
+										<label class="text-foreground font-medium">{ i18n.T(ctx, "Academic Goals") }</label>
 										<textarea
 											x-model="profile.goals"
-											placeholder="e.g. Master calculus, improve essay structure..."
+											placeholder={ i18n.T(ctx, "e.g. Master calculus, improve essay structure...") }
 											class="w-full h-24 bg-card border border-border rounded-xl p-3 outline-none focus:ring-1 focus:ring-primary resize-none"
 										></textarea>
-										<p class="text-[12px] text-muted-foreground">What you hope to achieve with your AI assistant.</p>
+										<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "What you hope to achieve with your AI assistant.") }</p>
 									</div>
-									
 									<!-- Explict Save Button -->
 									<div class="flex items-center justify-end pt-2">
 										@button.Button(button.Props{
-											Type: button.TypeButton,
+											Type:  button.TypeButton,
 											Class: "min-w-[120px]",
 											Attributes: templ.Attributes{
-												"@click": "updateProfile()",
+												"@click":    "updateProfile()",
 												":disabled": "profileLoading",
 											},
 										}) {
-											<span x-show="!profileLoading">Save Changes</span>
+											<span x-show="!profileLoading">{ i18n.T(ctx, "Save Changes") }</span>
 											<span x-show="profileLoading" class="flex items-center gap-2">
 												<span class="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground"></span>
-												Saving...
+												{ i18n.T(ctx, "Saving...") }
 											</span>
 										}
 									</div>
@@ -257,29 +259,29 @@ templ Settings() {
 							@tabs.Content(tabs.ContentProps{Value: "speech", Class: "space-y-6 animate-in fade-in duration-200"}) {
 								<div class="flex items-center justify-between gap-4">
 									<div class="space-y-0.5">
-										<div class="text-foreground font-medium">Text-to-Speech</div>
-										<p class="text-[12px] text-muted-foreground leading-tight">Enable reading assistant messages aloud.</p>
+										<div class="text-foreground font-medium">{ i18n.T(ctx, "Text-to-Speech") }</div>
+										<p class="text-[12px] text-muted-foreground leading-tight">{ i18n.T(ctx, "Enable reading assistant messages aloud.") }</p>
 									</div>
 									@switchcomp.Switch(switchcomp.Props{
 										Name: "textToSpeech",
 										Attributes: templ.Attributes{
 											"x-model":    "textToSpeechEnabled",
-											"aria-label": "Enable Text-to-Speech",
+											"aria-label": i18n.T(ctx, "Enable Text-to-Speech"),
 										},
 									})
 								</div>
 								<div class="flex flex-col gap-2 pt-4 border-t border-border">
-									<div class="text-foreground">Voice Engine</div>
+									<div class="text-foreground">{ i18n.T(ctx, "Voice Engine") }</div>
 									@selectbox.SelectBox(selectbox.Props{Class: "w-full"}) {
 										@selectbox.Trigger(selectbox.TriggerProps{}) {
-											<span>Default Browser Voice</span>
+											<span>{ i18n.T(ctx, "Default Browser Voice") }</span>
 										}
 										@selectbox.Content(selectbox.ContentProps{NoSearch: true}) {
 											@selectbox.Item(selectbox.ItemProps{Value: "default", Selected: true}) {
-												Default Browser Voice 
+												{ i18n.T(ctx, "Default Browser Voice") }
 											}
 											@selectbox.Item(selectbox.ItemProps{Value: "premium"}) {
-												Premium AI Voice (BETA) 
+												{ i18n.T(ctx, "Premium AI Voice (BETA)") }
 											}
 										}
 									}
@@ -289,18 +291,18 @@ templ Settings() {
 							@tabs.Content(tabs.ContentProps{Value: "data", Class: "space-y-4 animate-in fade-in duration-200"}) {
 								<div
 									class="flex items-center justify-between p-3 rounded-xl border border-destructive/20 bg-destructive/5 hover:bg-destructive/10 transition-colors group cursor-pointer"
-									@click="if(confirm('Are you sure you want to clear all conversations?')) { sessions = []; showSettings = false; }"
+									@click={ fmt.Sprintf("if(confirm('%s')) { sessions = []; showSettings = false; }", i18n.T(ctx, "Are you sure you want to clear all conversations?")) }
 								>
 									<div class="space-y-0.5">
-										<div class="text-destructive font-medium">Clear all conversations</div>
-										<p class="text-[12px] text-muted-foreground">Permanently delete all thread history.</p>
+										<div class="text-destructive font-medium">{ i18n.T(ctx, "Clear all conversations") }</div>
+										<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "Permanently delete all thread history.") }</p>
 									</div>
 									@icon.Trash2(icon.Props{Class: "size-4 text-destructive"})
 								</div>
 								<div class="flex items-center justify-between p-3 rounded-xl border border-border hover:bg-accent transition-colors group cursor-pointer">
 									<div class="space-y-0.5">
-										<div class="text-foreground font-medium">Export all data</div>
-										<p class="text-[12px] text-muted-foreground">Download a copy of your chat history.</p>
+										<div class="text-foreground font-medium">{ i18n.T(ctx, "Export all data") }</div>
+										<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "Download a copy of your chat history.") }</p>
 									</div>
 									@icon.Download(icon.Props{Class: "size-4 text-muted-foreground group-hover:text-foreground"})
 								</div>
@@ -312,17 +314,17 @@ templ Settings() {
 										U
 									</div>
 									<div>
-										<div class="text-foreground font-medium">User Profile</div>
-										<p class="text-xs text-muted-foreground">Manage your account details and preferences.</p>
+										<div class="text-foreground font-medium">{ i18n.T(ctx, "User Profile") }</div>
+										<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "Manage your account details and preferences.") }</p>
 									</div>
 								</div>
 								<div class="space-y-4 border-t border-border pt-4">
-									<a href="/auth/settings?flow=settings" class="w-full text-left p-3 rounded-xl border border-border hover:bg-accent transition-colors flex items-center justify-between group">
-										<span class="font-medium">Manage Account & Security</span>
+									<a href="/auth/settings?flow=settings" class="w-full text-start p-3 rounded-xl border border-border hover:bg-accent transition-colors flex items-center justify-between group">
+										<span class="font-medium">{ i18n.T(ctx, "Manage Account & Security") }</span>
 										@icon.ChevronRight(icon.Props{Class: "size-4 text-muted-foreground group-hover:text-foreground"})
 									</a>
-									<button class="w-full text-left p-3 rounded-xl border border-destructive/20 bg-destructive/5 hover:bg-destructive/10 transition-colors flex items-center justify-between group">
-										<span class="text-destructive font-medium">Delete Account</span>
+									<button class="w-full text-start p-3 rounded-xl border border-destructive/20 bg-destructive/5 hover:bg-destructive/10 transition-colors flex items-center justify-between group">
+										<span class="text-destructive font-medium">{ i18n.T(ctx, "Delete Account") }</span>
 										@icon.UserX(icon.Props{Class: "size-4 text-destructive"})
 									</button>
 								</div>

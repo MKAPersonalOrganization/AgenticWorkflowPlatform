@@ -86,12 +86,7 @@ document.addEventListener('alpine:init', () => {
                     if (response.ok) {
                         const data = await response.json();
                         if (data.agents && Array.isArray(data.agents)) {
-                            this.AVAILABLE_AGENTS = data.agents.map(id => ({
-                                id: id,
-                                name: id.split('-')
-                                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                                    .join(' ')
-                            }));
+                            this.AVAILABLE_AGENTS = data.agents;
 
                             // Set default if not set
                             if (!this.selectedAgent && this.AVAILABLE_AGENTS.length > 0) {

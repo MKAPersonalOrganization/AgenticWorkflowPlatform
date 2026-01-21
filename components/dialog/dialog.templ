@@ -212,7 +212,7 @@ templ Content(props ...ContentProps) {
 			<button
 				class={ utils.TwMerge(
 						// Positioning
-						"absolute top-4 right-4",
+						"absolute top-4 end-4",
 						// Style
 						"rounded-xs opacity-70",
 						// Interactions
@@ -272,7 +272,7 @@ templ Header(props ...HeaderProps) {
 		if p.ID != "" {
 			id={ p.ID }
 		}
-		class={ utils.TwMerge("flex flex-col gap-2 text-center sm:text-left", p.Class) }
+		class={ utils.TwMerge("flex flex-col gap-2 text-center sm:text-start", p.Class) }
 		{ p.Attributes... }
 	>
 		{ children... }

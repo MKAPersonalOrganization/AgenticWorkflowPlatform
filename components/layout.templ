@@ -2,6 +2,7 @@ package components
 
 import "school-with-ai/components/navbar"
 import "school-with-ai/domain"
+import "school-with-ai/components/i18n"
 
 type AppLayoutProps struct {
 	Title       string
@@ -12,7 +13,7 @@ type AppLayoutProps struct {
 // AppLayout provides the main application layout with navbar
 templ AppLayout(props AppLayoutProps) {
 	<!DOCTYPE html>
-	<html lang="en">
+	<html lang={ i18n.Lang(ctx) } dir={ i18n.Dir(ctx) }>
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -79,7 +80,7 @@ templ AppLayout(props AppLayoutProps) {
 			<!-- Left Navigation Bar -->
 			@navbar.Navbar(navbar.Props{User: props.User})
 			<!-- Main Content with margin for navbar -->
-			<div class="ml-16 flex-1">
+			<div class="ms-16 flex-1">
 				{ children... }
 			</div>
 		</body>

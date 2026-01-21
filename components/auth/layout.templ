@@ -3,6 +3,7 @@ package auth
 import "school-with-ai/components/card"
 import "school-with-ai/components/navbar"
 import "school-with-ai/domain"
+import "school-with-ai/components/i18n"
 
 type LayoutProps struct {
 	Title       string
@@ -14,7 +15,7 @@ type LayoutProps struct {
 // AuthLayout provides a centered card layout for authentication pages
 templ AuthLayout(props LayoutProps) {
 	<!DOCTYPE html>
-	<html lang="en">
+	<html lang={ i18n.Lang(ctx) } dir={ i18n.Dir(ctx) }>
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -26,7 +27,7 @@ templ AuthLayout(props LayoutProps) {
 			<!-- Left Navigation Bar -->
 			@navbar.Navbar(navbar.Props{User: props.User})
 			<!-- Main Content with margin for navbar -->
-			<div class="ml-16 flex-1">
+			<div class="ms-16 flex-1">
 				<main class="flex min-h-screen items-center justify-center p-4">
 					<div class="w-full max-w-md space-y-8">
 						<!-- Logo -->

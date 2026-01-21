@@ -120,11 +120,11 @@ templ DatePicker(props ...Props) {
 				}),
 			}) {
 				if p.Placeholder != "" {
-					<span data-tui-datepicker-display class={ "text-left grow text-muted-foreground" }>
+					<span data-tui-datepicker-display class={ "text-start grow text-muted-foreground" }>
 						{ p.Placeholder }
 					</span>
 				}
-				<span class="text-muted-foreground flex items-center ml-2">
+				<span class="text-muted-foreground flex items-center ms-2">
 					@icon.Calendar(icon.Props{Size: 16})
 				</span>
 			}

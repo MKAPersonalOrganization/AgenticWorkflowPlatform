@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"school-with-ai/components/button"
+	"school-with-ai/components/i18n"
 	"school-with-ai/components/icon"
 	"school-with-ai/components/popover"
 	"school-with-ai/components/searchbar"
@@ -26,7 +27,7 @@ templ ThreadHistory(props ...Props) {
 		Variant:     sidebar.VariantSidebar,
 		Collapsible: sidebar.CollapsibleOffcanvas,
 		Collapsed:   false,
-		Class:       "z-30 !left-0 !border-r-0",
+		Class:       "z-30 !start-0 !border-e-0",
 		Attributes: templ.Attributes{
 			"style": "--sidebar-width: 260px",
 		},
@@ -43,13 +44,13 @@ templ ThreadHistory(props ...Props) {
 					},
 				}) {
 					@icon.X(icon.Props{Class: "size-5 text-sidebar-foreground"})
-					<span class="sr-only">Close Sidebar</span>
+					<span class="sr-only">{ i18n.T(ctx, "Close Sidebar") }</span>
 				}
 			</div>
 			<!-- Search Bar -->
 			<div class="px-2 pb-2 pt-1">
 				@searchbar.SearchBar(searchbar.Props{
-					Placeholder: "Search chats...",
+					Placeholder: i18n.T(ctx, "Search chats..."),
 					Class:       "h-9 bg-muted/40 border-transparent focus-within:bg-background",
 					Attributes:  templ.Attributes{"x-model": "threadSearchQuery"},
 				})
@@ -69,7 +70,7 @@ templ ThreadHistory(props ...Props) {
 						<template x-for="session in group.sessions" :key="session.id">
 							@sidebar.MenuItem(sidebar.MenuItemProps{Class: "group/item relative"}) {
 								@sidebar.MenuButton(sidebar.MenuButtonProps{
-									Class: "w-full justify-start h-[42px] px-3 gap-3 text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors data-[tui-sidebar-active=true]:bg-sidebar-accent data-[tui-sidebar-active=true]:text-sidebar-accent-foreground data-[tui-sidebar-active=true]:font-medium pr-10 rounded-lg",
+									Class: "w-full justify-start h-[42px] px-3 gap-3 text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors data-[tui-sidebar-active=true]:bg-sidebar-accent data-[tui-sidebar-active=true]:text-sidebar-accent-foreground data-[tui-sidebar-active=true]:font-medium pe-10 rounded-lg",
 									Attributes: templ.Attributes{
 										"@click":                         "switchSession(session.id)",
 										"x-bind:data-tui-sidebar-active": "threadId === session.id",
@@ -78,19 +79,19 @@ templ ThreadHistory(props ...Props) {
 									<div class="flex items-center gap-2 w-full overflow-hidden">
 										<!-- Active Indicator Bar (LibreChat Style) -->
 										<div
-											class="absolute left-0 top-0 bottom-0 w-[2px] bg-foreground transition-all duration-200"
+											class="absolute start-0 top-0 bottom-0 w-[2px] bg-foreground transition-all duration-200"
 											x-show="threadId === session.id"
 											x-transition:enter="transition ease-out duration-200"
 											x-transition:enter-start="opacity-0 scale-y-50"
 											x-transition:enter-end="opacity-100 scale-y-100"
 										></div>
 										<!-- Title -->
-										<span class="truncate text-sm flex-1 text-left" x-text="session.title"></span>
+										<span class="truncate text-sm flex-1 text-start" x-text="session.title"></span>
 									</div>
 								}
 								<!-- Context Menu (Trigger) -->
 								<div
-									class="absolute right-1 top-1.5 z-10"
+									class="absolute end-1 top-1.5 z-10"
 									:class="threadId === session.id ? 'opacity-100' : 'opacity-0 group-hover/item:opacity-100'"
 									@click.stop
 								>
@@ -123,7 +124,7 @@ templ ThreadHistory(props ...Props) {
 									<div class="size-8 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden shrink-0 border border-border/50">
 										<span class="text-xs font-bold text-primary">{ strings.ToUpper(p.User.Email[:1]) }</span>
 									</div>
-									<div class="grid flex-1 text-left text-sm leading-tight">
+									<div class="grid flex-1 text-start text-sm leading-tight">
 										<span class="truncate font-medium text-sidebar-foreground">{ p.User.GetDisplayName() }</span>
 									</div>
 									@icon.ChevronsUpDown(icon.Props{Class: "size-4 text-muted-foreground/70"})
@@ -133,8 +134,8 @@ templ ThreadHistory(props ...Props) {
 									<div class="size-8 rounded-full bg-muted flex items-center justify-center overflow-hidden shrink-0 border border-border/50">
 										@icon.User(icon.Props{Class: "size-4 text-muted-foreground"})
 									</div>
-									<div class="grid flex-1 text-left text-sm leading-tight">
-										<span class="truncate font-medium text-sidebar-foreground">Guest</span>
+									<div class="grid flex-1 text-start text-sm leading-tight">
+										<span class="truncate font-medium text-sidebar-foreground">{ i18n.T(ctx, "Guest") }</span>
 									</div>
 									@icon.ChevronsUpDown(icon.Props{Class: "size-4 text-muted-foreground/70"})
 								</div>
@@ -150,23 +151,23 @@ templ ThreadHistory(props ...Props) {
 							@sidebar.Menu() {
 								@sidebar.MenuItem() {
 									@sidebar.MenuButton(sidebar.MenuButtonProps{
-										Class: "hover:bg-sidebar-accent/50 transition-colors py-2 px-3 rounded-lg flex items-center gap-3 w-full text-left",
+										Class: "hover:bg-sidebar-accent/50 transition-colors py-2 px-3 rounded-lg flex items-center gap-3 w-full text-start",
 										Attributes: templ.Attributes{
 											"@click": "showSettings = true",
 										},
 									}) {
 										@icon.Settings(icon.Props{Class: "size-4 text-muted-foreground"})
-										<span class="text-sm font-medium">Settings</span>
+										<span class="text-sm font-medium">{ i18n.T(ctx, "Settings") }</span>
 									}
 								}
 								<div class="my-1 h-px bg-border/50"></div>
 								@sidebar.MenuItem() {
 									@sidebar.MenuButton(sidebar.MenuButtonProps{
 										Href:  "/logout",
-										Class: "hover:bg-sidebar-accent/50 transition-colors py-2 px-3 rounded-lg flex items-center gap-3 w-full text-left text-destructive hover:text-destructive",
+										Class: "hover:bg-sidebar-accent/50 transition-colors py-2 px-3 rounded-lg flex items-center gap-3 w-full text-start text-destructive hover:text-destructive",
 									}) {
 										@icon.LogOut(icon.Props{Class: "size-4"})
-										<span class="text-sm font-medium">Log out</span>
+										<span class="text-sm font-medium">{ i18n.T(ctx, "Log out") }</span>
 									}
 								}
 							}
