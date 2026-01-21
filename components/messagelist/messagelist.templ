@@ -81,7 +81,7 @@ templ MessageList() {
 								</template>
 								<template x-if="message.parsedArgs?.agent_name === 'human'">
 									@badge.Badge(badge.Props{Variant: badge.VariantDefault, Class: "text-xs font-medium px-2 py-0 h-5"}) {
-										<span>HUMAN HELP</span>
+										<span>{ i18n.T(ctx, "HUMAN HELP") }</span>
 									}
 								</template>
 								<template x-if="message.parsedArgs?.agent_name !== 'human'">
@@ -90,7 +90,7 @@ templ MessageList() {
 									}
 								</template>
 								<template x-if="message.result">
-									<span class="text-primary text-xs font-medium">✓ transferred</span>
+									<span class="text-primary text-xs font-medium">✓ { i18n.T(ctx, "transferred") }</span>
 								</template>
 							</span>
 						}
@@ -98,19 +98,19 @@ templ MessageList() {
 							<div class="space-y-2">
 								<template x-if="message.parsedArgs?.question">
 									<div class="text-sm break-words">
-										<span class="font-semibold text-primary">Question:</span>
+										<span class="font-semibold text-primary">{ i18n.T(ctx, "Question:") }</span>
 										<span class="mis-2" x-text="message.parsedArgs?.question"></span>
 									</div>
 								</template>
 								<template x-if="message.parsedArgs?.context">
 									<div class="text-sm text-muted-foreground break-words">
-										<span class="font-semibold">Context:</span>
+										<span class="font-semibold">{ i18n.T(ctx, "Context:") }</span>
 										<span class="mis-2" x-text="message.parsedArgs?.context"></span>
 									</div>
 								</template>
 								<template x-if="!message.parsedArgs?.question && !message.parsedArgs?.context">
 									<div class="text-sm text-muted-foreground italic">
-										Transferring context to
+										{ i18n.T(ctx, "Transferring context to") }
 									</div>
 								</template>
 							</div>
@@ -198,7 +198,7 @@ templ MessageList() {
 									<svg class="w-4 h-4 text-primary flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
 										<path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"></path>
 									</svg>
-									<span class="text-sm font-semibold">Arguments</span>
+									<span class="text-sm font-semibold">{ i18n.T(ctx, "Arguments") }</span>
 								</div>
 								<div class="bg-muted/30 rounded-md p-3 overflow-x-auto break-words">
 									<div x-html="`<pre class='break-words whitespace-pre-wrap'><code class='language-json'>${JSON.stringify(message.parsedArgs || {}, null, 2)}</code></pre>`"></div>
@@ -210,7 +210,7 @@ templ MessageList() {
 									<svg class="w-4 h-4 text-primary flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
 										<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
 									</svg>
-									<span class="text-sm font-semibold">Result</span>
+									<span class="text-sm font-semibold">{ i18n.T(ctx, "Result") }</span>
 								</div>
 								<div class="bg-muted/30 rounded-md p-3 overflow-x-auto break-words">
 									<template x-if="isValidJSON(message.result)">
