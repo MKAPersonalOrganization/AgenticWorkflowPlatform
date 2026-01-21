@@ -252,9 +252,9 @@ document.addEventListener('alpine:init', () => {
                 this.__watchers.push(unwatchError);
 
                 const unwatchTheme = this.$watch('theme', (newTheme) => {
-                    // Only call setTheme to apply side effects (localStorage, CSS, Toast)
-                    // The state variable 'theme' is already updated by x-model
-                    this.setTheme(newTheme);
+                    // Centralized watcher for theme side effects
+                    // Triggered by x-model, toggleTheme, or direct assignment
+                    this.applyThemeEffects(newTheme);
                 });
                 this.__watchers.push(unwatchTheme);
 
