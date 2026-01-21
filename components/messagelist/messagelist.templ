@@ -7,6 +7,7 @@ import (
 	"school-with-ai/components/calculate"
 	"school-with-ai/components/elicitation"
 	"school-with-ai/components/errormessage"
+	"school-with-ai/components/i18n"
 	"school-with-ai/components/library"
 	"school-with-ai/components/lookupsection"
 	"school-with-ai/components/message"
@@ -241,7 +242,7 @@ templ MessageList() {
 		>
 			<div class="flex flex-col gap-1 min-w-0">
 				<div class="flex items-center gap-2">
-					<span class="text-sm font-semibold text-foreground">SchoolWithAI</span>
+					<span class="text-sm font-semibold text-foreground">{ i18n.T(ctx, "Safar.AI") }</span>
 				</div>
 				<div class="flex items-center gap-1.5 h-6">
 					<span class="w-1.5 h-1.5 bg-primary/70 rounded-full animate-bounce" style="animation-duration: 0.8s; animation-delay: 0ms;"></span>

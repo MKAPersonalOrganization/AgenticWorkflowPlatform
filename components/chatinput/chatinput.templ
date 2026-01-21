@@ -25,7 +25,7 @@ templ ChatInput() {
 						":disabled":         "isStreaming",
 						"@keydown":          "handleSlashKeydown($event) || handleKeydown($event)",
 						"@input":            "handleInput($event)",
-						"placeholder":       i18n.T(ctx, "Message SchoolWithAI..."),
+						"placeholder":       i18n.T(ctx, "Message Safar.AI..."),
 						"rows":              "1",
 						"style":             "max-height: 200px;",
 						"aria-label":        "Type your message",
@@ -135,6 +135,6 @@ templ ChatInput() {
 	</div>
 	<!-- Disclaimer Footer -->
 	<div class="text-center text-xs text-muted-foreground mt-2 pb-2">
-		{ i18n.T(ctx, "SchoolWithAI can make mistakes. Check important info.") }
+		{ i18n.T(ctx, "Safar.AI can make mistakes. Check important info.") }
 	</div>
 }
