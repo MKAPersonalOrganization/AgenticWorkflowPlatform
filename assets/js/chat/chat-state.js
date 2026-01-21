@@ -78,10 +78,10 @@ export function createInitialState() {
             { command: '/quiz', description: 'Generate a quiz', content: 'Generate a 5-question multiple choice quiz about the following topic, including an answer key at the end:\n\n' },
             { command: '/summary', description: 'Summarize text or notes', content: 'Please provide a concise summary of the following text, highlighting the key points and actionable takeaways:\n\n' },
             { command: '/analogy', description: 'Explain with an analogy', content: 'Please explain this concept using a real-world analogy to make it easier to understand:\n\n' },
-            { command: '/code-review', description: 'Review code for best practices', content: 'Please review the following code for best practices, security vulnerabilities, and potential performance optimizations:\n\n' },
-            { command: '/debug', description: 'Help debug an error', content: 'I am encountering the following error. Can you help me diagnose the cause and suggest a fix?\n\nError:\n\nCode context:\n' },
-            { command: '/email', description: 'Draft a professional email', content: 'Draft a professional email to [recipient] regarding [topic]. The tone should be [tone].\n\nKey points to include:\n- ' },
-            { command: '/brainstorm', description: 'Brainstorm ideas', content: 'Help me brainstorm 10 creative ideas for [topic]. Prioritize uniqueness and feasibility.\n\n' },
+            { command: '/code-review', description: 'Review code for best practices', content: 'Please review the following code for best practices, security vulnerabilities, and potential performance optimizations:\\n\\n' },
+            { command: '/debug', description: 'Help debug an error', content: 'I am encountering the following error. Can you help me diagnose the cause and suggest a fix?\\n\\nError:\\n\\nCode context:\\n' },
+            { command: '/email', description: 'Draft a professional email', content: 'Draft a professional email to [recipient] regarding [topic]. The tone should be [tone].\\n\\nKey points to include:\\n- ' },
+            { command: '/brainstorm', description: 'Brainstorm ideas', content: 'Help me brainstorm 10 creative ideas for [topic]. Prioritize uniqueness and feasibility.\\n\\n' },
         ],
         // Search
         showSearch: false,
@@ -112,9 +112,13 @@ export function createInitialState() {
         toasts: [],
         __toastIdCounter: 0,
 
+        // Global Banner
+        banner: null, // { id: string, message: string, persistable: boolean }
+        bannerDismissedIds: JSON.parse(localStorage.getItem('bannerDismissedIds') || '[]'),
+
         // Theme management
         // Theme management
-        theme: 'system',
+        theme: localStorage.getItem('theme') || 'system',
 
         // Accessibility
         prefersReducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
@@ -135,6 +139,11 @@ export function createInitialState() {
 
         // Connection resilience config
         __connectionConfig: { ...CONNECTION_CONFIG },
+
+        // Message parsing state
+        markdownEnabled: true,
+        autoScroll: true,
+        textToSpeechEnabled: false,
 
         // Message queue for offline handling
         __messageQueue: []

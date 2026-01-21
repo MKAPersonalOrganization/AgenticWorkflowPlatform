@@ -1,14 +1,13 @@
 package sampleprompts
 
-import "school-with-ai/components/icon"
+import (
+	"school-with-ai/components/icon"
+	"strings"
+)
 
 templ SamplePrompts() {
 	<!-- Welcome Screen / Sample Prompts -->
 	<div class="w-full flex flex-col items-center justify-center min-h-[60vh] space-y-10 animate-in fade-in duration-500" x-data="{ selectedCategory: null }">
-		
-
-
-
 		<!-- Category Grid -->
 		<div class="w-full max-w-4xl">
 			<div class="grid gap-4 grid-cols-2 md:grid-cols-4 lg:grid-cols-4">
@@ -30,7 +29,6 @@ templ SamplePrompts() {
 				@CategoryButton("economics", "Economics", icon.TrendingUp)
 			</div>
 		</div>
-
 		<!-- Expanded Examples (Centered & Clean) -->
 		<div class="w-full max-w-2xl transition-all duration-300 ease-in-out">
 			<!-- Math Examples -->
@@ -101,7 +99,7 @@ templ CategoryButton(id string, label string, iconFunc func(...icon.Props) templ
 
 templ PromptButton(text string) {
 	<button
-		@click={ "currentMessage = '" + text + "'; sendMessage()" }
+		@click={ "currentMessage = '" + strings.ReplaceAll(text, "'", "\\'") + "'; sendMessage()" }
 		class="w-full text-left p-4 rounded-xl border border-border/40 bg-card/50 hover:bg-accent hover:border-primary/50 transition-all duration-200 text-sm group flex items-center justify-between"
 	>
 		<span>{ text }</span>
