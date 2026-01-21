@@ -115,11 +115,14 @@ templ Navbar(props ...Props) {
 						</a>
 						<div class="border-t border-border my-1"></div>
 						<!-- Theme Toggle -->
-						<button
-							@click="toggleTheme()"
-							class="flex items-center gap-3 w-full px-2 py-2 text-sm rounded-md hover:bg-accent transition-colors"
-							type="button"
-						>
+						@button.Button(button.Props{
+							Type:    button.TypeButton,
+							Variant: button.VariantGhost,
+							Class:   "justify-start flex items-center gap-3 w-full px-2 py-2 text-sm rounded-md hover:bg-accent transition-colors font-normal h-auto",
+							Attributes: templ.Attributes{
+								"@click": "toggleTheme()",
+							},
+						}) {
 							<!-- Theme icons -->
 							<div class="flex items-center justify-center size-5">
 								<!-- Sun icon (light mode) -->
@@ -136,7 +139,7 @@ templ Navbar(props ...Props) {
 								</svg>
 							</div>
 							<span class="flex-1 text-left">Theme: <span x-text="theme.charAt(0).toUpperCase() + theme.slice(1)"></span></span>
-						</button>
+						}
 						<div class="border-t border-border my-1"></div>
 						<!-- Logout Button -->
 						<a

@@ -45,14 +45,18 @@ templ ChatInput() {
 				<!-- Left: Agents & Attachments -->
 				<div class="flex items-center gap-1">
                     <!-- Attachment Button -->
-                     <button 
-                        type="button" 
-                        class="p-2 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-muted/50 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
-                        aria-label="Attach file"
-                        @click="$refs.fileInput.click()"
-                    >
+                     @button.Button(button.Props{
+                        Type:    button.TypeButton,
+                        Variant: button.VariantGhost,
+                        Size:    button.SizeIcon,
+                        Class:   "p-2 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-muted/50 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none",
+                        Attributes: templ.Attributes{
+                             "aria-label": "Attach file",
+                             "@click":    "$refs.fileInput.click()",
+                        },
+                     }) {
                         @icon.Paperclip(icon.Props{Class: "size-5"})
-                    </button>
+                     }
                     <input 
                         type="file" 
                         x-ref="fileInput"
@@ -62,15 +66,19 @@ templ ChatInput() {
                     />
 
                     <!-- Artifacts Toggle (Wand) -->
-                     <button 
-                        type="button" 
-                        class="p-2 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-muted/50 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
-                        aria-label="Artifacts mode"
-                        data-tui-sidebar-trigger="true"
-                        data-tui-sidebar-target="artifacts-sidebar"
-                    >
+                     @button.Button(button.Props{
+                        Type:    button.TypeButton,
+                        Variant: button.VariantGhost,
+                        Size:    button.SizeIcon,
+                        Class:   "p-2 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-muted/50 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none",
+                        Attributes: templ.Attributes{
+                            "aria-label":               "Artifacts mode",
+                            "data-tui-sidebar-trigger": "true",
+                            "data-tui-sidebar-target":  "premium-sidepanel",
+                        },
+                     }) {
                         @icon.Wand(icon.Props{Class: "size-5"})
-                    </button>
+                     }
 				</div>
 
 				<!-- Right: Send Button -->
@@ -78,15 +86,19 @@ templ ChatInput() {
                     <!-- Help/Shortcuts -->
                     @tooltip.Tooltip() {
                         @tooltip.Trigger(tooltip.TriggerProps{}) {
-                            <button
-                                @click="toggleKeyboardShortcuts()"
-                                class="text-muted-foreground hover:text-foreground transition-colors p-2 rounded-xl hover:bg-muted/50"
-                                type="button"
-                                aria-label="Show keyboard shortcuts"
-                            >
+                            @button.Button(button.Props{
+                                Type:    button.TypeButton,
+                                Variant: button.VariantGhost,
+                                Size:    button.SizeIcon,
+                                Class:   "text-muted-foreground hover:text-foreground transition-colors p-2 rounded-xl hover:bg-muted/50",
+                                Attributes: templ.Attributes{
+                                    "@click":     "toggleKeyboardShortcuts()",
+                                    "aria-label": "Show keyboard shortcuts",
+                                },
+                            }) {
                                 <!-- Use a small keyboard icon or question mark -->
                                  <div class="size-5 flex items-center justify-center border border-current rounded text-[10px] font-medium opacity-70">?</div>
-                            </button>
+                            }
                         }
                         @tooltip.Content(tooltip.ContentProps{Class: "text-xs"}) {
                             Keyboard shortcuts

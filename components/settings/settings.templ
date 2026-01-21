@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"school-with-ai/components/button"
 	"school-with-ai/components/dialog"
 	"school-with-ai/components/icon"
 	"school-with-ai/components/nativeselect"
@@ -42,12 +43,17 @@ templ Settings() {
 					<!-- Header -->
 					<div class="flex items-center justify-between p-6 pb-4">
 						<h2 class="text-lg font-medium text-foreground">Settings</h2>
-						<button
-							@click="showSettings = false"
-							class="rounded-lg p-1 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-						>
+						@button.Button(button.Props{
+							Type:    button.TypeButton,
+							Variant: button.VariantGhost,
+							Size:    button.SizeIcon,
+							Class:   "rounded-lg p-1 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors",
+							Attributes: templ.Attributes{
+								"@click": "showSettings = false",
+							},
+						}) {
 							@icon.X(icon.Props{Class: "size-5"})
-						</button>
+						}
 					</div>
 					<!-- Use Tabs Component -->
 					@tabs.Tabs(tabs.Props{
