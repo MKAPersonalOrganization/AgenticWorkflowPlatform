@@ -35,29 +35,11 @@ export function createThemeMethods() {
 
     return {
         /**
-         * Toggle theme: light -> dark -> system -> light
+         * Apply theme side effects (DOM, localStorage, Toast)
+         * Should be called by watcher
+         * @param {'light'|'dark'|'system'} theme 
          */
-        toggleTheme() {
-            const currentTheme = this.theme;
-            let nextTheme;
-
-            if (currentTheme === 'light') {
-                nextTheme = 'dark';
-            } else if (currentTheme === 'dark') {
-                nextTheme = 'system';
-            } else {
-                nextTheme = 'light';
-            }
-
-            this.setTheme(nextTheme);
-        },
-
-        /**
-         * Set theme preference
-         * @param {'light'|'dark'|'system'} theme - Theme to set
-         */
-        setTheme(theme) {
-            this.theme = theme;
+        applyThemeEffects(theme) {
             localStorage.setItem('theme', theme);
             _applyThemeToDOM(theme);
 
@@ -72,7 +54,39 @@ export function createThemeMethods() {
                 dark: 'Dark mode',
                 system: 'System theme'
             };
-            this.showToast(`${themeLabels[theme]} enabled`, 'info', 2000);
+
+            // Only show toast if initialized (avoid toast on load)
+            if (this.__initialized && this.__themeInitialized) {
+                this.showToast(`${themeLabels[theme]} enabled`, 'info', 2000);
+            }
+        },
+
+        /**
+         * Toggle theme: light -> dark -> system -> light
+         * updates state only, watcher triggers effects
+         */
+        toggleTheme() {
+            const currentTheme = this.theme;
+            let nextTheme;
+
+            if (currentTheme === 'light') {
+                nextTheme = 'dark';
+            } else if (currentTheme === 'dark') {
+                nextTheme = 'system';
+            } else {
+                nextTheme = 'light';
+            }
+
+            this.theme = nextTheme;
+        },
+
+        /**
+         * Set theme preference
+         * updates state only, watcher triggers effects
+         * @param {'light'|'dark'|'system'} theme - Theme to set
+         */
+        setTheme(theme) {
+            this.theme = theme;
         },
 
         /**
@@ -82,6 +96,7 @@ export function createThemeMethods() {
             const savedTheme = localStorage.getItem('theme') || 'system';
             this.theme = savedTheme;
             _applyThemeToDOM(savedTheme);
+            this.__themeInitialized = true;
 
             // Listen for system theme changes when in system mode
             const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');

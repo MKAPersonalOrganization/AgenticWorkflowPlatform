@@ -1,0 +1,67 @@
+package nativeselect
+
+import (
+	"school-with-ai/components/icon"
+	"school-with-ai/components/utils"
+)
+
+type Props struct {
+	ID          string
+	Class       string
+	Name        string
+	Model       string // For Alpine x-model
+	Label       string // Aria label
+	Placeholder string
+	Attributes  templ.Attributes
+}
+
+type Option struct {
+	Value string
+	Label string
+}
+
+templ Select(props Props, options []Option) {
+	{{
+		if props.ID == "" {
+			props.ID = utils.RandomID()
+		}
+	}}
+	<div class={ utils.TwMerge("relative", props.Class) }>
+		<select
+			if props.Model != "" {
+				x-model={ props.Model }
+			}
+			if props.Name != "" {
+				name={ props.Name }
+			}
+			id={ props.ID }
+			class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+			aria-label={ props.Label }
+			{ props.Attributes... }
+		>
+			for _, opt := range options {
+				<option value={ opt.Value }>{ opt.Label }</option>
+			}
+		</select>
+		<div class="w-full h-9 px-3 py-1 text-base md:text-sm flex items-center justify-between rounded-md border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground">
+			if props.Model != "" {
+				<span class="capitalize" x-text={ props.Model }>
+					if props.Placeholder != "" {
+						{ props.Placeholder }
+					} else {
+						Select...
+					}
+				</span>
+			} else {
+				<span>
+					if props.Placeholder != "" {
+						{ props.Placeholder }
+					} else {
+						Select...
+					}
+				</span>
+			}
+			@icon.ChevronDown(icon.Props{Size: 16, Class: "text-muted-foreground"})
+		</div>
+	</div>
+}
