@@ -4,6 +4,7 @@ import "school-with-ai/components/button"
 import "school-with-ai/components/textarea"
 import "school-with-ai/components/icon"
 import "school-with-ai/components/tooltip"
+import "school-with-ai/components/i18n"
 
 templ ChatInput() {
 	<div
@@ -13,133 +14,127 @@ templ ChatInput() {
 		aria-label="Message input area"
 	>
 		<form @submit.prevent="sendMessage" class="mx-auto flex flex-col w-full p-1.5">
-            <!-- File Previews -->
-            @FileRow()
-
-            <!-- Textarea Area -->
+			<!-- File Previews -->
+			@FileRow()
+			<!-- Textarea Area -->
 			<div class="relative w-full">
-                @textarea.Textarea(textarea.Props{
-                    AutoResize:      true,
-                    Attributes: templ.Attributes{
-                        "x-model":           "currentMessage",
-                        ":disabled":         "isStreaming",
-                        "@keydown":          "handleSlashKeydown($event) || handleKeydown($event)",
-                        "@input":            "handleInput($event)",
-                        "placeholder":      "Message SchoolWithAI...",
-                        "rows":              "1",
-                        "style":             "max-height: 200px;",
-                        "aria-label":        "Type your message",
-                        ":aria-disabled":    "isStreaming",
-                        ":aria-describedby": "errorMessage ? 'error-message' : null",
-                        "x-ref":             "messageInput",
-                    },
-                    Class: "w-full resize-none border-none bg-transparent shadow-none text-base min-h-[44px] py-3.5 px-3 focus:ring-0 focus:outline-none placeholder:text-muted-foreground/50",
-                })
-
-                <!-- Slash Command Menu -->
-                @SlashMenu()
-            </div>
-
-            <!-- Footer Area -->
+				@textarea.Textarea(textarea.Props{
+					AutoResize: true,
+					Attributes: templ.Attributes{
+						"x-model":           "currentMessage",
+						":disabled":         "isStreaming",
+						"@keydown":          "handleSlashKeydown($event) || handleKeydown($event)",
+						"@input":            "handleInput($event)",
+						"placeholder":       i18n.T(ctx, "Message SchoolWithAI..."),
+						"rows":              "1",
+						"style":             "max-height: 200px;",
+						"aria-label":        "Type your message",
+						":aria-disabled":    "isStreaming",
+						":aria-describedby": "errorMessage ? 'error-message' : null",
+						"x-ref":             "messageInput",
+					},
+					Class: "w-full resize-none border-none bg-transparent shadow-none text-base min-h-[44px] py-3.5 px-3 focus:ring-0 focus:outline-none placeholder:text-muted-foreground/50",
+				})
+				<!-- Slash Command Menu -->
+				@SlashMenu()
+			</div>
+			<!-- Footer Area -->
 			<div class="flex items-center justify-between px-1.5 pb-1 gap-2">
 				<!-- Left: Agents & Attachments -->
 				<div class="flex items-center gap-1">
-                    <!-- Attachment Button -->
-                     @button.Button(button.Props{
-                        Type:    button.TypeButton,
-                        Variant: button.VariantGhost,
-                        Size:    button.SizeIcon,
-                        Class:   "p-2 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-muted/50 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none",
-                        Attributes: templ.Attributes{
-                             "aria-label": "Attach file",
-                             "@click":    "$refs.fileInput.click()",
-                        },
-                     }) {
-                        @icon.Paperclip(icon.Props{Class: "size-5"})
-                     }
-                    <input 
-                        type="file" 
-                        x-ref="fileInput"
-                        class="hidden" 
-                        multiple 
-                        @change="handleFileSelect($event)"
-                    />
-
-                    <!-- Artifacts Toggle (Wand) -->
-                     @button.Button(button.Props{
-                        Type:    button.TypeButton,
-                        Variant: button.VariantGhost,
-                        Size:    button.SizeIcon,
-                        Class:   "p-2 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-muted/50 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none",
-                        Attributes: templ.Attributes{
-                            "aria-label":               "Artifacts mode",
-                            "data-tui-sidebar-trigger": "true",
-                            "data-tui-sidebar-target":  "premium-sidepanel",
-                        },
-                     }) {
-                        @icon.Wand(icon.Props{Class: "size-5"})
-                     }
+					<!-- Attachment Button -->
+					@button.Button(button.Props{
+						Type:    button.TypeButton,
+						Variant: button.VariantGhost,
+						Size:    button.SizeIcon,
+						Class:   "p-2 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-muted/50 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none",
+						Attributes: templ.Attributes{
+							"aria-label": i18n.T(ctx, "Attach file"),
+							"@click":     "$refs.fileInput.click()",
+						},
+					}) {
+						@icon.Paperclip(icon.Props{Class: "size-5"})
+					}
+					<input
+						type="file"
+						x-ref="fileInput"
+						class="hidden"
+						multiple
+						@change="handleFileSelect($event)"
+					/>
+					<!-- Artifacts Toggle (Wand) -->
+					@button.Button(button.Props{
+						Type:    button.TypeButton,
+						Variant: button.VariantGhost,
+						Size:    button.SizeIcon,
+						Class:   "p-2 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-muted/50 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none",
+						Attributes: templ.Attributes{
+							"aria-label":               i18n.T(ctx, "Artifacts mode"),
+							"data-tui-sidebar-trigger": "true",
+							"data-tui-sidebar-target":  "premium-sidepanel",
+						},
+					}) {
+						@icon.Wand(icon.Props{Class: "size-5"})
+					}
 				</div>
-
 				<!-- Right: Send Button -->
-                <div class="flex items-center gap-1">
-                    <!-- Help/Shortcuts -->
-                    @tooltip.Tooltip() {
-                        @tooltip.Trigger(tooltip.TriggerProps{}) {
-                            @button.Button(button.Props{
-                                Type:    button.TypeButton,
-                                Variant: button.VariantGhost,
-                                Size:    button.SizeIcon,
-                                Class:   "text-muted-foreground hover:text-foreground transition-colors p-2 rounded-xl hover:bg-muted/50",
-                                Attributes: templ.Attributes{
-                                    "@click":     "toggleKeyboardShortcuts()",
-                                    "aria-label": "Show keyboard shortcuts",
-                                },
-                            }) {
-                                <!-- Use a small keyboard icon or question mark -->
-                                 <div class="size-5 flex items-center justify-center border border-current rounded text-[10px] font-medium opacity-70">?</div>
-                            }
-                        }
-                        @tooltip.Content(tooltip.ContentProps{Class: "text-xs"}) {
-                            Keyboard shortcuts
-                        }
-                    }
-
-                    @tooltip.Tooltip() {
-                        @tooltip.Trigger(tooltip.TriggerProps{}) {
-                            @button.Button(button.Props{
-                                Variant: button.VariantDefault,
-                                Size:    button.SizeIcon,
-                                Class:   "bg-foreground text-background transition-all shadow-none hover:opacity-90 rounded-xl",
-                                Attributes: templ.Attributes{
-                                    "@click.prevent": "isStreaming ? cancelJob() : sendMessage()",
-                                    "type":           "button",
-                                    ":disabled":      "!canSendMessage && !isStreaming",
-                                    ":class":         "(canSendMessage || isStreaming) ? '' : 'opacity-20 cursor-not-allowed'",
-                                    ":aria-busy":     "isStreaming",
-                                    ":aria-label":    "isStreaming ? 'Cancel message' : 'Send message'",
-                                },
-                            }) {
-                                <!-- Send Icon -->
-                                <div x-show="!isStreaming">
-                                   @icon.ArrowUp(icon.Props{Class: "size-5"})
-                                </div>
-                                <!-- Cancel/Stop Icon -->
-                                <div x-show="isStreaming">
-                                   <div class="size-3 bg-current rounded-[2px]"></div>
-                                </div>
-                            }
-                        }
-                        @tooltip.Content(tooltip.ContentProps{Class: "text-xs"}) {
-                            <span x-text="isStreaming ? 'Stop generating' : 'Send message'"></span>
-                        }
-                    }
-                </div>
+				<div class="flex items-center gap-1">
+					<!-- Help/Shortcuts -->
+					@tooltip.Tooltip() {
+						@tooltip.Trigger(tooltip.TriggerProps{}) {
+							@button.Button(button.Props{
+								Type:    button.TypeButton,
+								Variant: button.VariantGhost,
+								Size:    button.SizeIcon,
+								Class:   "text-muted-foreground hover:text-foreground transition-colors p-2 rounded-xl hover:bg-muted/50",
+								Attributes: templ.Attributes{
+									"@click":     "toggleKeyboardShortcuts()",
+									"aria-label": i18n.T(ctx, "Show keyboard shortcuts"),
+								},
+							}) {
+								<!-- Use a small keyboard icon or question mark -->
+								<div class="size-5 flex items-center justify-center border border-current rounded text-[10px] font-medium opacity-70">?</div>
+							}
+						}
+						@tooltip.Content(tooltip.ContentProps{Class: "text-xs"}) {
+							{ i18n.T(ctx, "Keyboard shortcuts") }
+						}
+					}
+					@tooltip.Tooltip() {
+						@tooltip.Trigger(tooltip.TriggerProps{}) {
+							@button.Button(button.Props{
+								Variant: button.VariantDefault,
+								Size:    button.SizeIcon,
+								Class:   "bg-foreground text-background transition-all shadow-none hover:opacity-90 rounded-xl",
+								Attributes: templ.Attributes{
+									"@click.prevent": "isStreaming ? cancelJob() : sendMessage()",
+									"type":           "button",
+									":disabled":      "!canSendMessage && !isStreaming",
+									":class":         "(canSendMessage || isStreaming) ? '' : 'opacity-20 cursor-not-allowed'",
+									":aria-busy":     "isStreaming",
+									":aria-label":    "isStreaming ? 'Cancel message' : '" + i18n.T(ctx, "Send message") + "'",
+								},
+							}) {
+								<!-- Send Icon -->
+								<div x-show="!isStreaming">
+									@icon.ArrowUp(icon.Props{Class: "size-5"})
+								</div>
+								<!-- Cancel/Stop Icon -->
+								<div x-show="isStreaming">
+									<div class="size-3 bg-current rounded-[2px]"></div>
+								</div>
+							}
+						}
+						@tooltip.Content(tooltip.ContentProps{Class: "text-xs"}) {
+							<span x-text={ "isStreaming ? '" + i18n.T(ctx, "Stop generating") + "' : '" + i18n.T(ctx, "Send message") + "'" }></span>
+						}
+					}
+				</div>
 			</div>
 		</form>
 	</div>
-    <!-- Disclaimer Footer -->
-    <div class="text-center text-xs text-muted-foreground mt-2 pb-2">
-        SchoolWithAI can make mistakes. Check important info.
-    </div>
+	<!-- Disclaimer Footer -->
+	<div class="text-center text-xs text-muted-foreground mt-2 pb-2">
+		{ i18n.T(ctx, "SchoolWithAI can make mistakes. Check important info.") }
+	</div>
 }

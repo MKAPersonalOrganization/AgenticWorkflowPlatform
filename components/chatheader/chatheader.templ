@@ -75,7 +75,7 @@ templ ChatHeader(user *domain.User) {
 								<span class="text-xs text-muted-foreground" x-text="'Great for general tasks'"></span>
 							</div>
 							<template x-if="selectedAgent === agent.id">
-								@icon.Check(icon.Props{Class: "size-4 text-primary absolute right-3"})
+								@icon.Check(icon.Props{Class: "size-4 text-primary absolute end-3"})
 							</template>
 						}
 					</template>

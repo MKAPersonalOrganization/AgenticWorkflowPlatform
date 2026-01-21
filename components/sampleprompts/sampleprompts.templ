@@ -1,9 +1,9 @@
 package sampleprompts
 
 import (
-	"school-with-ai/components/icon"
-	"school-with-ai/components/icon"
 	"school-with-ai/components/button"
+	"school-with-ai/components/i18n"
+	"school-with-ai/components/icon"
 	"strings"
 )
 
@@ -14,73 +14,73 @@ templ SamplePrompts() {
 		<div class="w-full max-w-4xl">
 			<div class="grid gap-4 grid-cols-2 md:grid-cols-4 lg:grid-cols-4">
 				<!-- Math -->
-				@CategoryButton("math", "Mathematics", icon.Calculator)
+				@CategoryButton("math", i18n.T(ctx, "Mathematics"), icon.Calculator)
 				<!-- Physics -->
-				@CategoryButton("physics", "Physics", icon.Atom)
+				@CategoryButton("physics", i18n.T(ctx, "Physics"), icon.Atom)
 				<!-- Chemistry -->
-				@CategoryButton("chemistry", "Chemistry", icon.FlaskConical)
+				@CategoryButton("chemistry", i18n.T(ctx, "Chemistry"), icon.FlaskConical)
 				<!-- Biology -->
-				@CategoryButton("biology", "Biology", icon.Dna)
+				@CategoryButton("biology", i18n.T(ctx, "Biology"), icon.Dna)
 				<!-- History -->
-				@CategoryButton("history", "History", icon.Landmark)
+				@CategoryButton("history", i18n.T(ctx, "History"), icon.Landmark)
 				<!-- Literature -->
-				@CategoryButton("literature", "Literature", icon.BookOpen)
+				@CategoryButton("literature", i18n.T(ctx, "Literature"), icon.BookOpen)
 				<!-- Comp Sci -->
-				@CategoryButton("cs", "Computer Science", icon.Cpu)
+				@CategoryButton("cs", i18n.T(ctx, "Computer Science"), icon.Cpu)
 				<!-- Economics -->
-				@CategoryButton("economics", "Economics", icon.TrendingUp)
+				@CategoryButton("economics", i18n.T(ctx, "Economics"), icon.TrendingUp)
 			</div>
 		</div>
 		<!-- Expanded Examples (Centered & Clean) -->
 		<div class="w-full max-w-2xl transition-all duration-300 ease-in-out">
 			<!-- Math Examples -->
 			<div x-show="selectedCategory === 'math'" x-collapse class="space-y-2">
-				@PromptButton("Solve the quadratic equation: x² + 5x + 6 = 0")
-				@PromptButton("What is the derivative of sin(x) · cos(x)?")
-				@PromptButton("Calculate the area of a circle with radius 5")
-				@PromptButton("Calculate mean and standard deviation of: 4, 8, 6, 5, 3, 7")
+				@PromptButton(i18n.T(ctx, "Solve the quadratic equation: x² + 5x + 6 = 0"))
+				@PromptButton(i18n.T(ctx, "What is the derivative of sin(x) · cos(x)?"))
+				@PromptButton(i18n.T(ctx, "Calculate the area of a circle with radius 5"))
+				@PromptButton(i18n.T(ctx, "Calculate mean and standard deviation of: 4, 8, 6, 5, 3, 7"))
 			</div>
 			<!-- Physics Examples -->
 			<div x-show="selectedCategory === 'physics'" x-collapse class="space-y-2">
-				@PromptButton("Calculate the force needed to accelerate a 50kg object at 3m/s²")
-				@PromptButton("What is the kinetic energy of a 2kg object moving at 10m/s?")
-				@PromptButton("Explain Newton's third law of motion with an example")
+				@PromptButton(i18n.T(ctx, "Calculate the force needed to accelerate a 50kg object at 3m/s²"))
+				@PromptButton(i18n.T(ctx, "What is the kinetic energy of a 2kg object moving at 10m/s?"))
+				@PromptButton(i18n.T(ctx, "Explain Newton's third law of motion with an example"))
 			</div>
 			<!-- Chemistry Examples -->
 			<div x-show="selectedCategory === 'chemistry'" x-collapse class="space-y-2">
-				@PromptButton("Balance the equation: H₂ + O₂ → H₂O")
-				@PromptButton("What is the molar mass of glucose (C₆H₁₂O₆)?")
-				@PromptButton("Explain the difference between ionic and covalent bonds")
+				@PromptButton(i18n.T(ctx, "Balance the equation: H₂ + O₂ → H₂O"))
+				@PromptButton(i18n.T(ctx, "What is the molar mass of glucose (C₆H₁₂O₆)?"))
+				@PromptButton(i18n.T(ctx, "Explain the difference between ionic and covalent bonds"))
 			</div>
 			<!-- Biology Examples -->
 			<div x-show="selectedCategory === 'biology'" x-collapse class="space-y-2">
-				@PromptButton("Explain the process of photosynthesis")
-				@PromptButton("What are the main differences between plant and animal cells?")
-				@PromptButton("Describe the structure of DNA")
+				@PromptButton(i18n.T(ctx, "Explain the process of photosynthesis"))
+				@PromptButton(i18n.T(ctx, "What are the main differences between plant and animal cells?"))
+				@PromptButton(i18n.T(ctx, "Describe the structure of DNA"))
 			</div>
 			<!-- History Examples -->
 			<div x-show="selectedCategory === 'history'" x-collapse class="space-y-2">
-				@PromptButton("Explain the causes of World War I")
-				@PromptButton("What were the key events of the French Revolution?")
-				@PromptButton("Describe the impact of the Industrial Revolution on society")
+				@PromptButton(i18n.T(ctx, "Explain the causes of World War I"))
+				@PromptButton(i18n.T(ctx, "What were the key events of the French Revolution?"))
+				@PromptButton(i18n.T(ctx, "Describe the impact of the Industrial Revolution on society"))
 			</div>
 			<!-- Literature Examples -->
 			<div x-show="selectedCategory === 'literature'" x-collapse class="space-y-2">
-				@PromptButton("Analyze the theme of revenge in Hamlet")
-				@PromptButton("What are the main literary devices in To Kill a Mockingbird?")
-				@PromptButton("Compare and contrast a sonnet and a haiku")
+				@PromptButton(i18n.T(ctx, "Analyze the theme of revenge in Hamlet"))
+				@PromptButton(i18n.T(ctx, "What are the main literary devices in To Kill a Mockingbird?"))
+				@PromptButton(i18n.T(ctx, "Compare and contrast a sonnet and a haiku"))
 			</div>
 			<!-- Computer Science Examples -->
 			<div x-show="selectedCategory === 'cs'" x-collapse class="space-y-2">
-				@PromptButton("Explain what an algorithm is with examples")
-				@PromptButton("What is the difference between a stack and a queue?")
-				@PromptButton("Write a simple Python program to find prime numbers")
+				@PromptButton(i18n.T(ctx, "Explain what an algorithm is with examples"))
+				@PromptButton(i18n.T(ctx, "What is the difference between a stack and a queue?"))
+				@PromptButton(i18n.T(ctx, "Write a simple Python program to find prime numbers"))
 			</div>
 			<!-- Economics Examples -->
 			<div x-show="selectedCategory === 'economics'" x-collapse class="space-y-2">
-				@PromptButton("Explain the law of supply and demand")
-				@PromptButton("What is the difference between GDP and GNP?")
-				@PromptButton("How does inflation affect the economy?")
+				@PromptButton(i18n.T(ctx, "Explain the law of supply and demand"))
+				@PromptButton(i18n.T(ctx, "What is the difference between GDP and GNP?"))
+				@PromptButton(i18n.T(ctx, "How does inflation affect the economy?"))
 			</div>
 		</div>
 	</div>

@@ -10,6 +10,7 @@ import (
 	"school-with-ai/components/dialog"
 	"school-with-ai/components/dropdown"
 	"school-with-ai/components/eventlog"
+	"school-with-ai/components/i18n"
 	"school-with-ai/components/icon"
 	"school-with-ai/components/input"
 	"school-with-ai/components/keyboardshortcuts"
@@ -28,7 +29,7 @@ import (
 
 templ ChatInputScreen(user *domain.User) {
 	<!DOCTYPE html>
-	<html lang="en">
+	<html lang={ i18n.Lang(ctx) } dir={ i18n.Dir(ctx) }>
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -214,7 +215,7 @@ templ ChatInputScreen(user *domain.User) {
 							<!-- Progress Bar (Simulated) -->
 							<div class="absolute top-0 left-0 right-0 h-1 overflow-hidden" x-show="toast.duration > 0">
 								<div
-									class="toast-progress h-full origin-left transition-transform ease-linear"
+									class="toast-progress h-full ltr:origin-left rtl:origin-right transition-transform ease-linear"
 									:class="{
                                         'bg-gray-500': !toast.type || toast.type === 'default',
                                         'bg-green-500': toast.type === 'success',
@@ -226,7 +227,7 @@ templ ChatInputScreen(user *domain.User) {
 								></div>
 							</div>
 							<!-- Icon -->
-							<div class="shrink-0 mr-3">
+							<div class="shrink-0 me-3">
 								<template x-if="toast.type === 'success'">
 									@icon.CircleCheck(icon.Props{Size: 22, Class: "text-green-500"})
 								</template>
@@ -249,7 +250,7 @@ templ ChatInputScreen(user *domain.User) {
 							<!-- Close Button -->
 							<button
 								@click="dismissToast(toast.id)"
-								class="shrink-0 inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 hover:bg-accent hover:text-accent-foreground h-6 w-6 ml-2 opacity-75 hover:opacity-100"
+								class="shrink-0 inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 hover:bg-accent hover:text-accent-foreground h-6 w-6 ms-2 opacity-75 hover:opacity-100"
 								type="button"
 								aria-label="Close notification"
 							>

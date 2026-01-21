@@ -1,9 +1,9 @@
 package searchbar
 
 import (
+	"school-with-ai/components/button"
 	"school-with-ai/components/icon"
 	"school-with-ai/components/utils"
-	"school-with-ai/components/button"
 )
 
 type Props struct {
@@ -54,14 +54,14 @@ templ SearchBar(props ...Props) {
 		x-modelable="query"
 		{ p.Attributes... }
 	>
-		<span class="absolute left-3 text-base-content/60 group-focus-within:text-base-content group-hover:text-base-content transition-colors pointer-events-none">
+		<span class="absolute start-3 text-base-content/60 group-focus-within:text-base-content group-hover:text-base-content transition-colors pointer-events-none">
 			@icon.Search(icon.Props{Size: 16})
 		</span>
 		<input
 			x-ref="searchInput"
 			type="text"
 			id={ p.ID }
-			class="m-0 mr-0 w-full border-none bg-transparent p-0 pl-7 text-sm leading-tight placeholder:text-base-content/60 focus:outline-none focus:ring-0"
+			class="m-0 me-0 w-full border-none bg-transparent p-0 ps-7 text-sm leading-tight placeholder:text-base-content/60 focus:outline-none focus:ring-0"
 			placeholder={ p.Placeholder }
 			x-model="query"
 			@input="handleInput"
@@ -72,11 +72,11 @@ templ SearchBar(props ...Props) {
 		@button.Button(button.Props{
 			Type:    button.TypeButton,
 			Variant: button.VariantGhost,
-			Class:   "absolute right-[7px] flex h-5 w-5 items-center justify-center rounded-full text-base-content/60 hover:text-base-content transition-opacity duration-200 p-0 min-h-0",
+			Class:   "absolute end-[7px] flex h-5 w-5 items-center justify-center rounded-full text-base-content/60 hover:text-base-content transition-opacity duration-200 p-0 min-h-0",
 			Attributes: templ.Attributes{
-				"x-show":    "showClear",
-				"@click":    "clear()",
-				"tabindex":  "-1",
+				"x-show":   "showClear",
+				"@click":   "clear()",
+				"tabindex": "-1",
 			},
 		}) {
 			@icon.X(icon.Props{Size: 14})

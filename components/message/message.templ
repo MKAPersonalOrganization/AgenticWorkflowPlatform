@@ -1,58 +1,48 @@
 package message
 
-
 templ UserMessage() {
-	<div x-show="message.role === 'user'" class="flex items-start gap-4 justify-end group/message w-full pl-10 relative">
-        <!-- Actions (Left side for User) -->
-        <div class="absolute right-full top-2 mr-2 flex flex-col items-end">
-             @Actions(ActionProps{
-                MessageID: "message.id", // Using string literal placeholder, Alpine will bind it logic is slightly complex here in templ, simpler to inline or assume ID binding
-                // Actually, since we are inside an Alpine loop, we can't easily pass 'message.id' as a string to the Go function if strictly server-side rendered.
-                // However, if we just render static HTML structure and let Alpine handle the click binding, it works.
-                // But the Go struct passing implies server-side data. 
-                // Since this is a client-side rendered list (Alpine x-for), we need to generate Alpine-compatible markup.
-                Role:      "user",
-             })
-        </div>
-
+	<div x-show="message.role === 'user'" class="flex items-start gap-4 justify-end group/message w-full ps-10 relative">
+		<!-- Actions (End side of the message) -->
+		<div class="absolute end-full top-2 me-2 flex flex-col items-end">
+			@Actions(ActionProps{
+				MessageID: "message.id", // Using string literal placeholder, Alpine will bind it logic is slightly complex here in templ, simpler to inline or assume ID binding
+				// Actually, since we are inside an Alpine loop, we can't easily pass 'message.id' as a string to the Go function if strictly server-side rendered.
+				// However, if we just render static HTML structure and let Alpine handle the click binding, it works.
+				// But the Go struct passing implies server-side data.
+				// Since this is a client-side rendered list (Alpine x-for), we need to generate Alpine-compatible markup.
+				Role: "user",
+			})
+		</div>
 		<div class="flex flex-col items-end gap-1 max-w-full">
 			<!-- User Message Bubble -->
-			<div 
-				class="bg-secondary/80 px-4 py-2.5 rounded-2xl text-left prose prose-sm max-w-none text-foreground leading-relaxed shadow-xs" 
+			<div
+				class="bg-secondary/80 px-4 py-2.5 rounded-2xl text-start prose prose-sm max-w-none text-foreground leading-relaxed shadow-xs"
 				x-html="renderMarkdown(message.content)"
 			></div>
-            
-            <!-- Actions (Bottom Right fallback or integrated? LibreChat puts them on the side or bottom) -->
-
+			<!-- Actions (Bottom Right fallback or integrated? LibreChat puts them on the side or bottom) -->
 		</div>
 	</div>
 }
 
 templ AssistantMessage() {
-	<div x-show="message.role === 'assistant'" class="flex items-start gap-4 group/message w-full pr-10">
+	<div x-show="message.role === 'assistant'" class="flex items-start gap-4 justify-start group/message w-full pe-10">
 		<div class="flex flex-col gap-1 min-w-0 flex-1 relative">
 			<!-- Assistant Name -->
-			<div class="flex items-center gap-2 select-none">
-				<span class="text-sm font-semibold text-foreground">SchoolWithAI</span>
-			</div>
-
 			<!-- Message Content -->
 			<div class="prose prose-sm max-w-none text-sm leading-relaxed text-foreground dark:[&_*]:text-white mb-1" x-html="renderMarkdown(message.content)"></div>
-			
 			<!-- Streaming Indicator -->
 			<div x-show="message.streaming" class="flex items-center gap-1 text-muted-foreground mt-2">
 				<span class="w-1.5 h-1.5 bg-primary rounded-full animate-bounce"></span>
 				<span class="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style="animation-delay: 150ms;"></span>
 				<span class="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style="animation-delay: 300ms;"></span>
 			</div>
-
 			<!-- Interaction Actions (Copy, Regenerate) -->
-            <div class="mt-1">
-                 @Actions(ActionProps{
-                    MessageID: "message.id",
-                    Role:      "assistant",
-                 })
-            </div>
+			<div class="mt-1">
+				@Actions(ActionProps{
+					MessageID: "message.id",
+					Role:      "assistant",
+				})
+			</div>
 		</div>
 	</div>
 }

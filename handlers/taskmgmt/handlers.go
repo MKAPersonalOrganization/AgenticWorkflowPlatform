@@ -12,6 +12,7 @@ import (
 	"school-with-ai/services"
 	"school-with-ai/services/taskmanagement"
 	"school-with-ai/services/threadmgmt"
+	"school-with-ai/foundation/middleware"
 	"time"
 
 	"github.com/hibiken/asynq"
@@ -403,10 +404,27 @@ func (h *TaskManagementHandler) UpdateThreadTitle(w http.ResponseWriter, r *http
 
 // ListAgents returns a list of available agents.
 func (h *TaskManagementHandler) ListAgents(w http.ResponseWriter, r *http.Request) {
-	agents := h.orchestratorService.GetAvailableAgents()
+	agentIDs := h.orchestratorService.GetAvailableAgents()
+
+	type AgentInfo struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	}
+
+	var agents []AgentInfo
+	printer := middleware.GetPrinter(r.Context())
+
+	for _, id := range agentIDs {
+		// Use the printer to get the localized name for the agent ID
+		// The keys in en.json match the agent IDs (e.g. "math-instructor")
+		agents = append(agents, AgentInfo{
+			ID:   id,
+			Name: printer.Sprintf(id),
+		})
+	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string][]string{"agents": agents}); err != nil {
+	if err := json.NewEncoder(w).Encode(map[string][]AgentInfo{"agents": agents}); err != nil {
 		h.log.Error(r.Context(), "failed to encode agents list", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}

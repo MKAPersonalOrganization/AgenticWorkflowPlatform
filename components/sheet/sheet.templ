@@ -177,7 +177,7 @@ templ Header(props ...HeaderProps) {
 	// Sheet header uses Dialog header but overrides styles
 	@dialog.Header(dialog.HeaderProps{
 		ID:         p.ID,
-		Class:      utils.TwMerge("gap-1.5 p-4 text-left", p.Class),
+		Class:      utils.TwMerge("gap-1.5 p-4 text-start", p.Class),
 		Attributes: p.Attributes,
 	}) {
 		{ children... }
@@ -256,28 +256,32 @@ func getSideClasses(side Side) string {
 	case SideRight:
 		return baseClasses +
 			// Positioning
-			"!inset-y-0 !right-0 !left-auto !top-auto " +
+			"!inset-y-0 !end-0 !start-auto !top-auto " +
 			// Size
 			"h-full w-3/4 sm:max-w-sm " +
 			// Border
-			"border-l border-t-0 border-r-0 border-b-0 " +
+			"border-s border-t-0 border-e-0 border-b-0 " +
 			// Reset Dialog transforms
 			"!translate-y-0 " +
-			// Slide animation
-			"data-[tui-dialog-open=false]:!translate-x-full " +
+			// Slide animation (End side: Right in LTR, Left in RTL)
+			// LTR (Right): Close moves Right (+) -> translate-x-full
+			// RTL (Left): Close moves Left (-) -> -translate-x-full
+			"data-[tui-dialog-open=false]:ltr:!translate-x-full data-[tui-dialog-open=false]:rtl:!-translate-x-full " +
 			"data-[tui-dialog-open=true]:!translate-x-0"
 	case SideLeft:
 		return baseClasses +
 			// Positioning
-			"!inset-y-0 !left-0 !right-auto !top-auto " +
+			"!inset-y-0 !start-0 !end-auto !top-auto " +
 			// Size
 			"h-full w-3/4 sm:max-w-sm " +
 			// Border
-			"border-r border-t-0 border-l-0 border-b-0 " +
+			"border-e border-t-0 border-s-0 border-b-0 " +
 			// Reset Dialog transforms
 			"!translate-y-0 " +
-			// Slide animation
-			"data-[tui-dialog-open=false]:!-translate-x-full " +
+			// Slide animation (Start side: Left in LTR, Right in RTL)
+			// LTR (Left): Close moves Left (-) -> -translate-x-full
+			// RTL (Right): Close moves Right (+) -> translate-x-full
+			"data-[tui-dialog-open=false]:ltr:!-translate-x-full data-[tui-dialog-open=false]:rtl:!translate-x-full " +
 			"data-[tui-dialog-open=true]:!translate-x-0"
 	case SideTop:
 		return baseClasses +
@@ -310,7 +314,7 @@ func getSideClasses(side Side) string {
 			// Default to right side
 			"!inset-y-0 !right-0 !left-auto !top-auto " +
 			"h-full w-3/4 " +
-			"border-l border-t-0 border-r-0 border-b-0 " +
+			"border-s border-t-0 border-r-0 border-b-0 " +
 			"!translate-y-0 " +
 			"data-[tui-dialog-open=false]:!translate-x-full " +
 			"data-[tui-dialog-open=true]:!translate-x-0"

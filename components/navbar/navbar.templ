@@ -4,6 +4,7 @@ import "school-with-ai/components/button"
 import "school-with-ai/components/icon"
 import "school-with-ai/components/sheet"
 import "school-with-ai/components/popover"
+import "school-with-ai/components/i18n"
 import "school-with-ai/domain"
 
 type Props struct {
@@ -22,7 +23,7 @@ templ Navbar(props ...Props) {
 	}
 	<!-- Left Navigation Bar -->
 	<nav
-		class={ "fixed left-0 top-0 h-screen w-16 bg-sidebar z-10 flex flex-col items-center py-4 gap-4 transition-opacity duration-200", p.Class }
+		class={ "fixed start-0 top-0 h-screen w-16 bg-sidebar z-10 flex flex-col items-center py-4 gap-4 transition-opacity duration-200", p.Class }
 		id="main-navbar"
 		data-navbar-for={ p.SidebarID }
 	>
@@ -67,7 +68,7 @@ templ Navbar(props ...Props) {
 					Class:   "size-9",
 				}) {
 					@icon.Settings(icon.Props{Class: "size-5"})
-					<span class="sr-only">Settings</span>
+					<span class="sr-only">{ i18n.T(ctx, "Settings") }</span>
 				}
 			}
 			@popover.Content(popover.ContentProps{
@@ -91,7 +92,7 @@ templ Navbar(props ...Props) {
 							<div class="flex items-center justify-center size-5">
 								@icon.BookOpen(icon.Props{Class: "size-4"})
 							</div>
-							<span class="flex-1 text-left">Student Profile</span>
+							<span class="flex-1 text-start">Student Profile</span>
 						</a>
 						<!-- Account Settings Link -->
 						<a
@@ -101,7 +102,7 @@ templ Navbar(props ...Props) {
 							<div class="flex items-center justify-center size-5">
 								@icon.User(icon.Props{Class: "size-4"})
 							</div>
-							<span class="flex-1 text-left">Account Settings</span>
+							<span class="flex-1 text-start">Account Settings</span>
 						</a>
 						<!-- Upgrade Plan Link -->
 						<a
@@ -111,7 +112,7 @@ templ Navbar(props ...Props) {
 							<div class="flex items-center justify-center size-5">
 								@icon.Crown(icon.Props{Class: "size-4"})
 							</div>
-							<span class="flex-1 text-left">Upgrade Plan</span>
+							<span class="flex-1 text-start">Upgrade Plan</span>
 						</a>
 						<div class="border-t border-border my-1"></div>
 						<!-- Theme Toggle -->
@@ -138,7 +139,30 @@ templ Navbar(props ...Props) {
 									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
 								</svg>
 							</div>
-							<span class="flex-1 text-left">Theme: <span x-text="theme.charAt(0).toUpperCase() + theme.slice(1)"></span></span>
+							<span class="flex-1 text-start">Theme: <span x-text="theme.charAt(0).toUpperCase() + theme.slice(1)"></span></span>
+						}
+						<div class="border-t border-border my-1"></div>
+						<!-- Language Switcher -->
+						if i18n.Lang(ctx) == "ar" {
+							<a
+								href="?lang=en"
+								class="flex items-center gap-3 w-full px-2 py-2 text-sm rounded-md hover:bg-accent transition-colors"
+							>
+								<div class="flex items-center justify-center size-5">
+									@icon.Languages(icon.Props{Class: "size-4"})
+								</div>
+								<span class="flex-1 text-start">English</span>
+							</a>
+						} else {
+							<a
+								href="?lang=ar"
+								class="flex items-center gap-3 w-full px-2 py-2 text-sm rounded-md hover:bg-accent transition-colors"
+							>
+								<div class="flex items-center justify-center size-5">
+									@icon.Languages(icon.Props{Class: "size-4"})
+								</div>
+								<span class="flex-1 text-start">العربية</span>
+							</a>
 						}
 						<div class="border-t border-border my-1"></div>
 						<!-- Logout Button -->
@@ -149,7 +173,7 @@ templ Navbar(props ...Props) {
 							<div class="flex items-center justify-center size-5">
 								@icon.LogOut(icon.Props{Class: "size-4"})
 							</div>
-							<span class="flex-1 text-left">Logout</span>
+							<span class="flex-1 text-start">Logout</span>
 						</a>
 					} else {
 						<!-- Unauthenticated User Section -->
@@ -163,7 +187,7 @@ templ Navbar(props ...Props) {
 							<div class="flex items-center justify-center size-5">
 								@icon.LogIn(icon.Props{Class: "size-4"})
 							</div>
-							<span class="flex-1 text-left">Login</span>
+							<span class="flex-1 text-start">{ i18n.T(ctx, "Login") }</span>
 						</a>
 						<!-- Register Link -->
 						<a
@@ -173,8 +197,31 @@ templ Navbar(props ...Props) {
 							<div class="flex items-center justify-center size-5">
 								@icon.UserPlus(icon.Props{Class: "size-4"})
 							</div>
-							<span class="flex-1 text-left">Register</span>
+							<span class="flex-1 text-start">{ i18n.T(ctx, "Register") }</span>
 						</a>
+						<div class="border-t border-border my-1"></div>
+						<!-- Language Switcher -->
+						if i18n.Lang(ctx) == "ar" {
+							<a
+								href="?lang=en"
+								class="flex items-center gap-3 w-full px-2 py-2 text-sm rounded-md hover:bg-accent transition-colors"
+							>
+								<div class="flex items-center justify-center size-5">
+									@icon.Languages(icon.Props{Class: "size-4"})
+								</div>
+								<span class="flex-1 text-start">English</span>
+							</a>
+						} else {
+							<a
+								href="?lang=ar"
+								class="flex items-center gap-3 w-full px-2 py-2 text-sm rounded-md hover:bg-accent transition-colors"
+							>
+								<div class="flex items-center justify-center size-5">
+									@icon.Languages(icon.Props{Class: "size-4"})
+								</div>
+								<span class="flex-1 text-start">العربية</span>
+							</a>
+						}
 						<div class="border-t border-border my-1"></div>
 						<!-- Theme Toggle -->
 						<button
@@ -197,7 +244,7 @@ templ Navbar(props ...Props) {
 									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
 								</svg>
 							</div>
-							<span class="flex-1 text-left">Theme: <span x-text="theme.charAt(0).toUpperCase() + theme.slice(1)"></span></span>
+							<span class="flex-1 text-start">Theme: <span x-text="theme.charAt(0).toUpperCase() + theme.slice(1)"></span></span>
 						</button>
 					}
 				</div>
