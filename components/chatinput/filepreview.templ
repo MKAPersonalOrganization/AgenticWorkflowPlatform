@@ -1,6 +1,7 @@
 package chatinput
 
 import "school-with-ai/components/icon"
+import "school-with-ai/components/button"
 
 // FilePreview Props
 // We assume Alpine JS is handling the data binding, so we pass indices or specialized attributes.
@@ -26,13 +27,17 @@ templ FilePreview() {
         </div>
 
         <!-- Remove Button -->
-        <button
-            type="button"
-            @click="removeFile(index)"
-            class="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
-            aria-label="Remove file"
-        >
+        @button.Button(button.Props{
+            Type:    button.TypeButton,
+            Variant: button.VariantDestructive,
+            Size:    button.SizeIcon,
+            Class:   "absolute -top-1 -right-1 rounded-full p-0.5 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity w-5 h-5 min-h-0",
+            Attributes: templ.Attributes{
+                "@click":     "removeFile(index)",
+                "aria-label": "Remove file",
+            },
+        }) {
             @icon.X(icon.Props{Class: "size-3"})
-        </button>
+        }
     </div>
 }

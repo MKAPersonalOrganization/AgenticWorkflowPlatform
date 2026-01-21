@@ -45,38 +45,54 @@ templ Header() {
     }) {
         <div class="flex flex-row items-center justify-between px-3 py-2.5">
              <div class="flex items-center gap-1 bg-muted/50 p-0.5 rounded-lg border border-border/20">
-                <button 
-                    @click="activeView = 'artifacts'"
-                    :class="activeView === 'artifacts' ? 'bg-background shadow-sm text-foreground ring-1 ring-black/5 dark:ring-white/10' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'"
-                    class="flex items-center gap-2 px-3 py-1.5 rounded-[6px] text-xs font-medium transition-all duration-200"
-                >
+                @button.Button(button.Props{
+                    Type:    button.TypeButton,
+                    Variant: button.VariantGhost,
+                    Class:   "flex items-center gap-2 px-3 py-1.5 rounded-[6px] text-xs font-medium transition-all duration-200 h-auto",
+                    Attributes: templ.Attributes{
+                        "@click": "activeView = 'artifacts'",
+                        ":class": "activeView === 'artifacts' ? 'bg-background shadow-sm text-foreground ring-1 ring-black/5 dark:ring-white/10' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'",
+                    },
+                }) {
                     @icon.LayoutDashboard(icon.Props{Class: "size-3.5"})
                     <span>Artifacts</span>
-                </button>
-                <button 
-                    @click="activeView = 'bookmarks'"
-                    :class="activeView === 'bookmarks' ? 'bg-background shadow-sm text-foreground ring-1 ring-black/5 dark:ring-white/10' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'"
-                    class="flex items-center gap-2 px-3 py-1.5 rounded-[6px] text-xs font-medium transition-all duration-200"
-                >
+                }
+                @button.Button(button.Props{
+                    Type:    button.TypeButton,
+                    Variant: button.VariantGhost,
+                    Class:   "flex items-center gap-2 px-3 py-1.5 rounded-[6px] text-xs font-medium transition-all duration-200 h-auto",
+                    Attributes: templ.Attributes{
+                        "@click": "activeView = 'bookmarks'",
+                        ":class": "activeView === 'bookmarks' ? 'bg-background shadow-sm text-foreground ring-1 ring-black/5 dark:ring-white/10' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'",
+                    },
+                }) {
                     @icon.Bookmark(icon.Props{Class: "size-3.5"})
                     <span>Bookmarks</span>
-                </button>
-                <button 
-                    @click="activeView = 'files'"
-                    :class="activeView === 'files' ? 'bg-background shadow-sm text-foreground ring-1 ring-black/5 dark:ring-white/10' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'"
-                    class="flex items-center gap-2 px-3 py-1.5 rounded-[6px] text-xs font-medium transition-all duration-200"
-                >
+                }
+                @button.Button(button.Props{
+                    Type:    button.TypeButton,
+                    Variant: button.VariantGhost,
+                    Class:   "flex items-center gap-2 px-3 py-1.5 rounded-[6px] text-xs font-medium transition-all duration-200 h-auto",
+                    Attributes: templ.Attributes{
+                        "@click": "activeView = 'files'",
+                        ":class": "activeView === 'files' ? 'bg-background shadow-sm text-foreground ring-1 ring-black/5 dark:ring-white/10' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'",
+                    },
+                }) {
                     @icon.Folder(icon.Props{Class: "size-3.5"})
                     <span>Files</span>
-                </button>
-                 <button 
-                    @click="activeView = 'prompts'"
-                    :class="activeView === 'prompts' ? 'bg-background shadow-sm text-foreground ring-1 ring-black/5 dark:ring-white/10' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'"
-                    class="flex items-center gap-2 px-3 py-1.5 rounded-[6px] text-xs font-medium transition-all duration-200"
-                >
+                }
+                @button.Button(button.Props{
+                    Type:    button.TypeButton,
+                    Variant: button.VariantGhost,
+                    Class:   "flex items-center gap-2 px-3 py-1.5 rounded-[6px] text-xs font-medium transition-all duration-200 h-auto",
+                    Attributes: templ.Attributes{
+                        "@click": "activeView = 'prompts'",
+                        ":class": "activeView === 'prompts' ? 'bg-background shadow-sm text-foreground ring-1 ring-black/5 dark:ring-white/10' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'",
+                    },
+                }) {
                     @icon.Command(icon.Props{Class: "size-3.5"})
                     <span>Prompts</span>
-                </button>
+                }
              </div>
 
             <!-- Close Button -->

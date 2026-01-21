@@ -2,6 +2,8 @@ package sampleprompts
 
 import (
 	"school-with-ai/components/icon"
+	"school-with-ai/components/icon"
+	"school-with-ai/components/button"
 	"strings"
 )
 
@@ -85,24 +87,32 @@ templ SamplePrompts() {
 }
 
 templ CategoryButton(id string, label string, iconFunc func(...icon.Props) templ.Component) {
-	<button
-		@click={ "selectedCategory = selectedCategory === '" + id + "' ? null : '" + id + "'" }
-		class="group flex flex-col items-center justify-center p-4 gap-3 rounded-xl border border-border/40 bg-card hover:bg-accent/50 hover:border-primary/50 transition-all duration-200 hover:shadow-sm"
-		:class={ "selectedCategory === '" + id + "' ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : ''" }
-	>
+	@button.Button(button.Props{
+		Type:    button.TypeButton,
+		Variant: button.VariantGhost,
+		Class:   "group flex flex-col items-center justify-center p-4 gap-3 rounded-xl border border-border/40 bg-card hover:bg-accent/50 hover:border-primary/50 transition-all duration-200 hover:shadow-sm h-auto",
+		Attributes: templ.Attributes{
+			"@click": "selectedCategory = selectedCategory === '" + id + "' ? null : '" + id + "'",
+			":class": "selectedCategory === '" + id + "' ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : ''",
+		},
+	}) {
 		<div class="p-3 rounded-lg bg-background group-hover:bg-background/80 transition-colors shadow-sm ring-1 ring-border/50">
 			@iconFunc(icon.Props{Size: 20, Class: "text-foreground/70 group-hover:text-primary transition-colors"})
 		</div>
 		<span class="text-sm font-medium text-foreground/80 group-hover:text-foreground">{ label }</span>
-	</button>
+	}
 }
 
 templ PromptButton(text string) {
-	<button
-		@click={ "currentMessage = '" + strings.ReplaceAll(text, "'", "\\'") + "'; sendMessage()" }
-		class="w-full text-left p-4 rounded-xl border border-border/40 bg-card/50 hover:bg-accent hover:border-primary/50 transition-all duration-200 text-sm group flex items-center justify-between"
-	>
+	@button.Button(button.Props{
+		Type:    button.TypeButton,
+		Variant: button.VariantGhost,
+		Class:   "w-full text-left p-4 rounded-xl border border-border/40 bg-card/50 hover:bg-accent hover:border-primary/50 transition-all duration-200 text-sm group flex items-center justify-between h-auto",
+		Attributes: templ.Attributes{
+			"@click": "currentMessage = '" + strings.ReplaceAll(text, "'", "\\'") + "'; sendMessage()",
+		},
+	}) {
 		<span>{ text }</span>
 		<span class="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground">→</span>
-	</button>
+	}
 }

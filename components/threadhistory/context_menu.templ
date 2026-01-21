@@ -1,6 +1,7 @@
 package threadhistory
 
 import "school-with-ai/components/icon"
+import "school-with-ai/components/button"
 
 type ContextMenuProps struct {
 	ThreadID string
@@ -30,14 +31,19 @@ templ ContextMenu(props ContextMenuProps) {
 		}" 
 		class="relative shrink-0"
 	>
-		<button 
-			x-ref="trigger"
-			@click.stop="toggle()" 
-			class="opacity-0 group-hover/item:opacity-100 transition-opacity size-6 flex items-center justify-center rounded-md text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-foreground outline-none focus-visible:opacity-100"
-		>
+		@button.Button(button.Props{
+			Type:    button.TypeButton,
+			Variant: button.VariantGhost,
+			Size:    button.SizeIcon,
+			Class:   "opacity-0 group-hover/item:opacity-100 transition-opacity size-6 flex items-center justify-center rounded-md text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-foreground outline-none focus-visible:opacity-100",
+			Attributes: templ.Attributes{
+				"x-ref":       "trigger",
+				"@click.stop": "toggle()",
+			},
+		}) {
 			@icon.EllipsisVertical(icon.Props{Class: "size-4"})
 			<span class="sr-only">Thread options</span>
-		</button>
+		}
 		<template x-teleport="body">
 			<div 
 				x-show="open" 
@@ -57,21 +63,29 @@ templ ContextMenu(props ContextMenuProps) {
 						Options
 					</div>
 					<hr class="my-1 border-border/50" />
-					<button 
-						class="flex items-center gap-2 px-2 py-1.5 text-sm rounded-md hover:bg-accent hover:text-accent-foreground text-left w-full cursor-not-allowed opacity-50 transition-colors"
-						title="Coming soon"
-						@click.stop="open = false"
-					>
+					@button.Button(button.Props{
+						Type:    button.TypeButton,
+						Variant: button.VariantGhost,
+						Class:   "justify-start flex items-center gap-2 px-2 py-1.5 text-sm rounded-md hover:bg-accent hover:text-accent-foreground text-left w-full cursor-not-allowed opacity-50 transition-colors",
+						Attributes: templ.Attributes{
+							"title":       "Coming soon",
+							"@click.stop": "open = false",
+						},
+					}) {
 						@icon.Pencil(icon.Props{Class: "size-4"})
 						<span>Rename</span>
-					</button>
-					<button 
-						@click.stop={ "deleteSession(" + props.ThreadID + "); open = false" }
-						class="flex items-center gap-2 px-2 py-1.5 text-sm rounded-md hover:bg-accent hover:text-accent-foreground text-left w-full transition-colors"
-					>
+					}
+					@button.Button(button.Props{
+						Type:    button.TypeButton,
+						Variant: button.VariantGhost,
+						Class:   "justify-start flex items-center gap-2 px-2 py-1.5 text-sm rounded-md hover:bg-accent hover:text-accent-foreground text-left w-full transition-colors",
+						Attributes: templ.Attributes{
+							"@click.stop": "deleteSession(" + props.ThreadID + "); open = false",
+						},
+					}) {
 						@icon.Trash2(icon.Props{Class: "size-4"})
 						<span>Delete</span>
-					</button>
+					}
 				</div>
 			</div>
 		</template>
