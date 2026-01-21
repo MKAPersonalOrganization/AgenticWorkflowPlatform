@@ -12,16 +12,22 @@ import (
 
 // Language represents a supported language.
 type Language struct {
-	Tag  language.Tag
-	Name string
-	Dir  string // "ltr" or "rtl"
+	Tag        language.Tag
+	Name       string
+	NativeName string // Name in the language itself (e.g., "العربية" for Arabic)
+	Dir        string // "ltr" or "rtl"
+}
+
+// IsRTL returns true if the language is right-to-left.
+func (l Language) IsRTL() bool {
+	return l.Dir == "rtl"
 }
 
 var (
 	// SupportedLanguages lists all available languages.
 	SupportedLanguages = []Language{
-		{Tag: language.English, Name: "English", Dir: "ltr"},
-		{Tag: language.Arabic, Name: "Arabic", Dir: "rtl"},
+		{Tag: language.English, Name: "English", NativeName: "English", Dir: "ltr"},
+		{Tag: language.Arabic, Name: "Arabic", NativeName: "العربية", Dir: "rtl"},
 	}
 
 	// Matcher is used to find the best match for a list of preferred tags.
@@ -30,6 +36,18 @@ var (
 		language.Arabic,
 	})
 )
+
+// GetLanguageByTag returns the Language for a given tag, or nil if not found.
+func GetLanguageByTag(tag language.Tag) *Language {
+	base, _ := tag.Base()
+	for i := range SupportedLanguages {
+		langBase, _ := SupportedLanguages[i].Tag.Base()
+		if langBase == base {
+			return &SupportedLanguages[i]
+		}
+	}
+	return nil
+}
 
 // LoadCatalogs loads translation files from the specified directory.
 // It expects files named like "en.json", "ar.json".
@@ -67,6 +85,7 @@ func LoadCatalogs(localesDir string) error {
 				return fmt.Errorf("failed to set message for %s key %s: %w", tag, key, err)
 			}
 		}
+		fmt.Printf("Loaded %d messages for language %s from %s\n", len(messages), tag, entry.Name())
 	}
 	return nil
 }

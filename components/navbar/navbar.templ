@@ -143,27 +143,16 @@ templ Navbar(props ...Props) {
 						}
 						<div class="border-t border-border my-1"></div>
 						<!-- Language Switcher -->
-						if i18n.Lang(ctx) == "ar" {
-							<a
-								href="?lang=en"
-								class="flex items-center gap-3 w-full px-2 py-2 text-sm rounded-md hover:bg-accent transition-colors"
-							>
-								<div class="flex items-center justify-center size-5">
-									@icon.Languages(icon.Props{Class: "size-4"})
-								</div>
-								<span class="flex-1 text-start">English</span>
-							</a>
-						} else {
-							<a
-								href="?lang=ar"
-								class="flex items-center gap-3 w-full px-2 py-2 text-sm rounded-md hover:bg-accent transition-colors"
-							>
-								<div class="flex items-center justify-center size-5">
-									@icon.Languages(icon.Props{Class: "size-4"})
-								</div>
-								<span class="flex-1 text-start">العربية</span>
-							</a>
-						}
+						<button
+							@click="window.i18n.setLanguage(window.i18n.getCurrentLanguage() === 'ar' ? 'en' : 'ar')"
+							class="flex items-center gap-3 w-full px-2 py-2 text-sm rounded-md hover:bg-accent transition-colors"
+							type="button"
+						>
+							<div class="flex items-center justify-center size-5">
+								@icon.Languages(icon.Props{Class: "size-4"})
+							</div>
+							<span class="flex-1 text-start" x-text="window.i18n.getCurrentLanguage() === 'ar' ? 'English' : 'العربية'"></span>
+						</button>
 						<div class="border-t border-border my-1"></div>
 						<!-- Logout Button -->
 						<a
@@ -201,27 +190,16 @@ templ Navbar(props ...Props) {
 						</a>
 						<div class="border-t border-border my-1"></div>
 						<!-- Language Switcher -->
-						if i18n.Lang(ctx) == "ar" {
-							<a
-								href="?lang=en"
-								class="flex items-center gap-3 w-full px-2 py-2 text-sm rounded-md hover:bg-accent transition-colors"
-							>
-								<div class="flex items-center justify-center size-5">
-									@icon.Languages(icon.Props{Class: "size-4"})
-								</div>
-								<span class="flex-1 text-start">English</span>
-							</a>
-						} else {
-							<a
-								href="?lang=ar"
-								class="flex items-center gap-3 w-full px-2 py-2 text-sm rounded-md hover:bg-accent transition-colors"
-							>
-								<div class="flex items-center justify-center size-5">
-									@icon.Languages(icon.Props{Class: "size-4"})
-								</div>
-								<span class="flex-1 text-start">العربية</span>
-							</a>
-						}
+						<button
+							@click="window.i18n.setLanguage(window.i18n.getCurrentLanguage() === 'ar' ? 'en' : 'ar')"
+							class="flex items-center gap-3 w-full px-2 py-2 text-sm rounded-md hover:bg-accent transition-colors"
+							type="button"
+						>
+							<div class="flex items-center justify-center size-5">
+								@icon.Languages(icon.Props{Class: "size-4"})
+							</div>
+							<span class="flex-1 text-start" x-text="window.i18n.getCurrentLanguage() === 'ar' ? 'English' : 'العربية'"></span>
+						</button>
 						<div class="border-t border-border my-1"></div>
 						<!-- Theme Toggle -->
 						<button

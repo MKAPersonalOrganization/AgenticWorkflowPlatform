@@ -1,9 +1,10 @@
 package artifacts
 
 import (
-	"school-with-ai/components/sidebar"
 	"school-with-ai/components/button"
+	"school-with-ai/components/i18n"
 	"school-with-ai/components/icon"
+	"school-with-ai/components/sidebar"
 )
 
 templ Artifacts() {
@@ -23,9 +24,8 @@ templ Artifacts() {
 		}) {
 			<div class="flex items-center gap-2">
 				@icon.LayoutDashboard(icon.Props{Class: "size-4 text-muted-foreground"})
-				<span class="text-sm font-medium">Artifacts</span>
+				<span class="text-sm font-medium">{ i18n.T(ctx, "Artifacts") }</span>
 			</div>
-			
 			<!-- Close Button -->
 			@button.Button(button.Props{
 				Size:    button.SizeIcon,
@@ -37,10 +37,9 @@ templ Artifacts() {
 				},
 			}) {
 				@icon.X(icon.Props{Class: "size-4 text-muted-foreground"})
-				<span class="sr-only">Close Artifacts</span>
+				<span class="sr-only">{ i18n.T(ctx, "Close Artifacts") }</span>
 			}
 		}
-
 		@sidebar.Content(sidebar.ContentProps{Class: "p-4"}) {
 			@ArtifactsContent()
 		}
@@ -53,8 +52,8 @@ templ ArtifactsContent() {
 			@icon.FileText(icon.Props{Class: "size-6"})
 		</div>
 		<div class="space-y-1">
-			<p class="font-medium text-foreground">No artifacts yet</p>
-			<p class="text-xs">Generated content like code, documents, and designs will appear here.</p>
+			<p class="font-medium text-foreground">{ i18n.T(ctx, "No artifacts yet") }</p>
+			<p class="text-xs">{ i18n.T(ctx, "Generated content like code, documents, and designs will appear here.") }</p>
 		</div>
 	</div>
 }

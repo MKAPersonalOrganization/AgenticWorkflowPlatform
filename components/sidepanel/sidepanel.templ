@@ -3,6 +3,7 @@ package sidepanel
 import (
 	"school-with-ai/components/artifacts"
 	"school-with-ai/components/button"
+	"school-with-ai/components/i18n"
 	"school-with-ai/components/icon"
 	"school-with-ai/components/sidebar"
 )
@@ -54,7 +55,7 @@ templ Header() {
 					},
 				}) {
 					@icon.LayoutDashboard(icon.Props{Class: "size-3.5"})
-					<span>Artifacts</span>
+					<span>{ i18n.T(ctx, "Artifacts") }</span>
 				}
 				@button.Button(button.Props{
 					Type:    button.TypeButton,
@@ -66,7 +67,7 @@ templ Header() {
 					},
 				}) {
 					@icon.Bookmark(icon.Props{Class: "size-3.5"})
-					<span>Bookmarks</span>
+					<span>{ i18n.T(ctx, "Bookmarks") }</span>
 				}
 				@button.Button(button.Props{
 					Type:    button.TypeButton,
@@ -78,7 +79,7 @@ templ Header() {
 					},
 				}) {
 					@icon.Folder(icon.Props{Class: "size-3.5"})
-					<span>Files</span>
+					<span>{ i18n.T(ctx, "Files") }</span>
 				}
 				@button.Button(button.Props{
 					Type:    button.TypeButton,
@@ -90,7 +91,7 @@ templ Header() {
 					},
 				}) {
 					@icon.Command(icon.Props{Class: "size-3.5"})
-					<span>Prompts</span>
+					<span>{ i18n.T(ctx, "Prompts") }</span>
 				}
 			</div>
 			<!-- Close Button -->
@@ -104,7 +105,7 @@ templ Header() {
 				},
 			}) {
 				@icon.X(icon.Props{Class: "size-4"})
-				<span class="sr-only">Close</span>
+				<span class="sr-only">{ i18n.T(ctx, "Close") }</span>
 			}
 		</div>
 	}
