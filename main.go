@@ -45,6 +45,7 @@ import (
 	sharedtools "school-with-ai/services/agentorchestrator/agents/shared/tools"
 
 	aguihandlers "school-with-ai/handlers/agui"
+	bannerhandlers "school-with-ai/handlers/banner"
 	healthhandlers "school-with-ai/handlers/health"
 
 	taskmgmthandlers "school-with-ai/handlers/taskmgmt"
@@ -443,6 +444,10 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// Profile Handler
 	profileHandler := profile.NewHandler(log, studentProfileRepo)
+
+	// Banner Handler
+	bannerHandler := bannerhandlers.NewHandler(log)
+	r.Get("/api/banner", authMiddleware.RequireAuthFunc(bannerHandler.GetBanner))
 
 	// Health check endpoints (public)
 	r.Get("/liveness", healthHandler.Liveness)

@@ -207,6 +207,29 @@ export function createUIMethods() {
             }
         },
 
+        async fetchBanner() {
+            try {
+                const response = await fetch('/api/banner');
+                console.log('[Banner] Fetching banner...', response.status);
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('[Banner] Data:', data);
+                    console.log('[Banner] Dismissed IDs:', this.bannerDismissedIds);
+                    this.banner = data;
+                }
+            } catch (error) {
+                console.error('Failed to fetch banner:', error);
+            }
+        },
+
+        dismissBanner() {
+            if (this.banner && !this.banner.persistable) {
+                this.bannerDismissedIds.push(this.banner.id);
+                localStorage.setItem('bannerDismissedIds', JSON.stringify(this.bannerDismissedIds));
+                this.banner = null; // Re-evaluation handles the hiding in UI usually, but setting to null is explicit for non-persistent
+            }
+        },
+
         toggleEventLog() {
             this.showEventLog = !this.showEventLog;
             if (this.showEventLog) {

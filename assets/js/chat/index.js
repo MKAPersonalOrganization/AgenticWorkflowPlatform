@@ -195,6 +195,7 @@ document.addEventListener('alpine:init', () => {
                 queueMicrotask(() => {
                     this.__loadSessions();
                     this.fetchProfile();
+                    this.fetchBanner();
                 });
 
                 // Set up infinite scroll for sidebar sessions
@@ -249,6 +250,13 @@ document.addEventListener('alpine:init', () => {
                     }
                 });
                 this.__watchers.push(unwatchError);
+
+                const unwatchTheme = this.$watch('theme', (newTheme) => {
+                    // Only call setTheme to apply side effects (localStorage, CSS, Toast)
+                    // The state variable 'theme' is already updated by x-model
+                    this.setTheme(newTheme);
+                });
+                this.__watchers.push(unwatchTheme);
 
                 // Register keyboard shortcuts
                 this.__registerKeyboardShortcuts();

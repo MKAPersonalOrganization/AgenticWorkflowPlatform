@@ -1,28 +1,30 @@
 package components
 
-import "school-with-ai/components/input"
-import "school-with-ai/components/chatinput"
-import "school-with-ai/components/threadhistory"
-import "school-with-ai/components/messagelist"
-import "school-with-ai/components/settings"
-import "school-with-ai/components/eventlog"
-import "school-with-ai/components/collapsible"
-import "school-with-ai/components/popover"
-import "school-with-ai/components/textarea"
-import "school-with-ai/components/sidebar"
-import "school-with-ai/components/code"
-import "school-with-ai/components/dialog"
-import "school-with-ai/components/keyboardshortcuts"
-import "school-with-ai/components/sampleprompts"
-import "school-with-ai/components/chatheader"
-import "school-with-ai/domain"
-import "school-with-ai/components/sidepanel"
-import "school-with-ai/components/tabs"
-
-import "school-with-ai/components/selectbox"
-import "school-with-ai/components/copybutton"
-import "school-with-ai/components/icon"
-import "school-with-ai/components/dropdown"
+import (
+	"school-with-ai/components/banner"
+	"school-with-ai/components/chatheader"
+	"school-with-ai/components/chatinput"
+	"school-with-ai/components/code"
+	"school-with-ai/components/collapsible"
+	"school-with-ai/components/copybutton"
+	"school-with-ai/components/dialog"
+	"school-with-ai/components/dropdown"
+	"school-with-ai/components/eventlog"
+	"school-with-ai/components/icon"
+	"school-with-ai/components/input"
+	"school-with-ai/components/keyboardshortcuts"
+	"school-with-ai/components/messagelist"
+	"school-with-ai/components/popover"
+	"school-with-ai/components/sampleprompts"
+	"school-with-ai/components/selectbox"
+	"school-with-ai/components/settings"
+	"school-with-ai/components/sidebar"
+	"school-with-ai/components/sidepanel"
+	"school-with-ai/components/tabs"
+	"school-with-ai/components/textarea"
+	"school-with-ai/components/threadhistory"
+	"school-with-ai/domain"
+)
 
 templ ChatInputScreen(user *domain.User) {
 	<!DOCTYPE html>
@@ -112,11 +114,10 @@ templ ChatInputScreen(user *domain.User) {
 			@sidebar.Script()
 			@code.Script()
 			@tabs.Script()
-
 			@selectbox.Script()
 			@copybutton.Script()
 			@dropdown.Script()
-            <style>
+			<style>
                 @keyframes shrink {
                     from { transform: scaleX(1); }
                     to { transform: scaleX(0); }
@@ -130,19 +131,17 @@ templ ChatInputScreen(user *domain.User) {
 					@sidebar.Layout() {
 						<!-- Left Sidebar - Chat History -->
 						@threadhistory.ThreadHistory(threadhistory.Props{User: user})
-						
-
 						<!-- Floating Sidebar Toggle Removed (Replaced by Header Toggle) -->
-
 						<!-- Main Content Area -->
 						<div class="flex-1 flex h-screen overflow-hidden relative">
 							<!-- Main Chat Panel -->
 							<main
 								class="flex flex-col relative overflow-hidden w-full h-full"
 							>
-                                <!-- Header -->
-                                @chatheader.ChatHeader(user)
-                                
+								<!-- Global Banner -->
+								@banner.Banner()
+								<!-- Header -->
+								@chatheader.ChatHeader(user)
 								<!-- Messages Container -->
 								<div
 									class="flex-1 overflow-y-auto scrollbar-transparent scrollbar-hover"
@@ -184,7 +183,6 @@ templ ChatInputScreen(user *domain.User) {
 								@eventlog.EventLog()
 							</main>
 						</div>
-
 						<!-- Right Sidebar - Premium Side Panel -->
 						@sidepanel.SidePanel()
 					}
@@ -213,42 +211,40 @@ templ ChatInputScreen(user *domain.User) {
 							role="alert"
 							:aria-live="toast.type === 'error' ? 'assertive' : 'polite'"
 						>
-                            <!-- Progress Bar (Simulated) -->
-                            <div class="absolute top-0 left-0 right-0 h-1 overflow-hidden" x-show="toast.duration > 0">
-                                <div
-                                    class="toast-progress h-full origin-left transition-transform ease-linear"
-                                    :class="{
+							<!-- Progress Bar (Simulated) -->
+							<div class="absolute top-0 left-0 right-0 h-1 overflow-hidden" x-show="toast.duration > 0">
+								<div
+									class="toast-progress h-full origin-left transition-transform ease-linear"
+									:class="{
                                         'bg-gray-500': !toast.type || toast.type === 'default',
                                         'bg-green-500': toast.type === 'success',
                                         'bg-red-500': toast.type === 'error',
                                         'bg-yellow-500': toast.type === 'warning',
                                         'bg-blue-500': toast.type === 'info'
                                     }"
-                                    :style="`animation: shrink ${toast.duration || 3000}ms linear forwards`"
-                                ></div>
-                            </div>
-
+									:style="`animation: shrink ${toast.duration || 3000}ms linear forwards`"
+								></div>
+							</div>
 							<!-- Icon -->
 							<div class="shrink-0 mr-3">
-                                <template x-if="toast.type === 'success'">
-                                    @icon.CircleCheck(icon.Props{Size: 22, Class: "text-green-500"})
-                                </template>
-                                <template x-if="toast.type === 'error'">
-                                    @icon.CircleX(icon.Props{Size: 22, Class: "text-red-500"})
-                                </template>
-                                <template x-if="toast.type === 'warning'">
-                                    @icon.TriangleAlert(icon.Props{Size: 22, Class: "text-yellow-500"})
-                                </template>
-                                <template x-if="toast.type === 'info'">
-                                    @icon.Info(icon.Props{Size: 22, Class: "text-blue-500"})
-                                </template>
-                            </div>
-
+								<template x-if="toast.type === 'success'">
+									@icon.CircleCheck(icon.Props{Size: 22, Class: "text-green-500"})
+								</template>
+								<template x-if="toast.type === 'error'">
+									@icon.CircleX(icon.Props{Size: 22, Class: "text-red-500"})
+								</template>
+								<template x-if="toast.type === 'warning'">
+									@icon.TriangleAlert(icon.Props{Size: 22, Class: "text-yellow-500"})
+								</template>
+								<template x-if="toast.type === 'info'">
+									@icon.Info(icon.Props{Size: 22, Class: "text-blue-500"})
+								</template>
+							</div>
 							<!-- Content -->
 							<div class="flex-1 min-w-0">
 								<p class="text-sm font-semibold truncate" x-text="toast.message"></p>
-                                <!-- Description support if we add it later -->
-                                <!-- <p class="text-sm opacity-90 mt-1" x-text="toast.description"></p> -->
+								<!-- Description support if we add it later -->
+								<!-- <p class="text-sm opacity-90 mt-1" x-text="toast.description"></p> -->
 							</div>
 							<!-- Close Button -->
 							<button
