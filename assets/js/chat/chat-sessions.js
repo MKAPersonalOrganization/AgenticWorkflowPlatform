@@ -255,7 +255,16 @@ export function createSessionMethods() {
                 'Older': []
             };
 
-            this.sessions.forEach(session => {
+            // Filter sessions first
+            let filteredSessions = this.sessions;
+            if (this.threadSearchQuery && this.threadSearchQuery.trim().length > 0) {
+                const query = this.threadSearchQuery.toLowerCase();
+                filteredSessions = this.sessions.filter(s =>
+                    (s.title && s.title.toLowerCase().includes(query))
+                );
+            }
+
+            filteredSessions.forEach(session => {
                 const date = new Date(session.lastMessage || session.created || new Date());
                 const diffTime = Math.abs(today - date);
                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));

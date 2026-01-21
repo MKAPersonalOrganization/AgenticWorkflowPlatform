@@ -86,6 +86,7 @@ export function createInitialState() {
         // Search
         showSearch: false,
         searchQuery: '',
+        threadSearchQuery: '',
 
         selectedAgent: '',
 
