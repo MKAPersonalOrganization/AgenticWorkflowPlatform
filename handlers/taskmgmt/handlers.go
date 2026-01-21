@@ -348,6 +348,59 @@ func (h *TaskManagementHandler) DeleteThread(w http.ResponseWriter, r *http.Requ
 	}
 }
 
+// UpdateThreadTitleRequest represents request body for renaming a thread.
+type UpdateThreadTitleRequest struct {
+	Title string `json:"title"`
+}
+
+// UpdateThreadTitle renames a thread.
+// PATCH /api/agui/threads/{threadId}
+func (h *TaskManagementHandler) UpdateThreadTitle(w http.ResponseWriter, r *http.Request) {
+	// Get authenticated user from context
+	user := h.authService.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	threadID := r.PathValue("threadId")
+	if threadID == "" {
+		http.Error(w, "threadId is required", http.StatusBadRequest)
+		return
+	}
+
+	var req UpdateThreadTitleRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Title == "" {
+		http.Error(w, "title is required", http.StatusBadRequest)
+		return
+	}
+
+	h.log.Info(r.Context(), "Renaming thread", "userID", user.ID, "threadID", threadID, "newTitle", req.Title)
+
+	// Update thread title using thread manager
+	_, err := h.threadMgmt.UpdateThreadTitle(r.Context(), threadID, req.Title)
+	if err != nil {
+		if errors.Is(err, domain.ErrThreadNotFound) {
+			http.Error(w, "Thread not found", http.StatusNotFound)
+			return
+		}
+		h.log.Error(r.Context(), "failed to update thread title", "error", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(map[string]string{"status": "success", "title": req.Title}); err != nil {
+		h.log.Error(r.Context(), "[API] Failed to encode rename response", "error", err)
+	}
+}
+
 // ListAgents returns a list of available agents.
 func (h *TaskManagementHandler) ListAgents(w http.ResponseWriter, r *http.Request) {
 	agents := h.orchestratorService.GetAvailableAgents()

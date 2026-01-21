@@ -8,7 +8,7 @@ type ContextMenuProps struct {
 }
 
 templ ContextMenu(props ContextMenuProps) {
-	<div 
+	<div
 		x-data="{ 
 			open: false,
 			top: 0,
@@ -28,7 +28,7 @@ templ ContextMenu(props ContextMenuProps) {
 					});
 				}
 			}
-		}" 
+		}"
 		class="relative shrink-0"
 	>
 		@button.Button(button.Props{
@@ -45,8 +45,8 @@ templ ContextMenu(props ContextMenuProps) {
 			<span class="sr-only">Thread options</span>
 		}
 		<template x-teleport="body">
-			<div 
-				x-show="open" 
+			<div
+				x-show="open"
 				x-transition:enter="transition ease-out duration-150"
 				x-transition:enter-start="opacity-0 scale-95 translate-x-[-10px]"
 				x-transition:enter-end="opacity-100 scale-100 translate-x-0"
@@ -62,14 +62,13 @@ templ ContextMenu(props ContextMenuProps) {
 					<div class="px-2 py-1.5 text-xs font-medium text-muted-foreground/70">
 						Options
 					</div>
-					<hr class="my-1 border-border/50" />
+					<hr class="my-1 border-border/50"/>
 					@button.Button(button.Props{
 						Type:    button.TypeButton,
 						Variant: button.VariantGhost,
-						Class:   "justify-start flex items-center gap-2 px-2 py-1.5 text-sm rounded-md hover:bg-accent hover:text-accent-foreground text-left w-full cursor-not-allowed opacity-50 transition-colors",
+						Class:   "justify-start flex items-center gap-2 px-2 py-1.5 text-sm rounded-md hover:bg-accent hover:text-accent-foreground text-left w-full transition-colors",
 						Attributes: templ.Attributes{
-							"title":       "Coming soon",
-							"@click.stop": "open = false",
+							"@click.stop": "renameSession(" + props.ThreadID + "); open = false",
 						},
 					}) {
 						@icon.Pencil(icon.Props{Class: "size-4"})
