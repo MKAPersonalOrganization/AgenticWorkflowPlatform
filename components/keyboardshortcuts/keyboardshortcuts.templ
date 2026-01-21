@@ -2,6 +2,7 @@ package keyboardshortcuts
 
 import "school-with-ai/components/dialog"
 import "school-with-ai/components/button"
+import "school-with-ai/components/i18n"
 
 templ KeyboardShortcuts() {
 	<!-- Keyboard Shortcuts Dialog -->
@@ -12,11 +13,11 @@ templ KeyboardShortcuts() {
 					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
 					</svg>
-					Keyboard Shortcuts
+					{ i18n.T(ctx, "Keyboard shortcuts") }
 				</div>
 			}
 			@dialog.Description(dialog.DescriptionProps{}) {
-				Navigate and control the chat interface faster with these shortcuts
+				{ i18n.T(ctx, "Navigate and control the chat interface faster with these shortcuts") }
 			}
 		}
 		<!-- Shortcuts Grid -->
@@ -27,25 +28,25 @@ templ KeyboardShortcuts() {
 					<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
 						<path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"></path>
 					</svg>
-					General
+					{ i18n.T(ctx, "General") }
 				</h3>
 				<div class="space-y-2">
 					<div class="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors">
-						<span class="text-sm">Show this help dialog</span>
+						<span class="text-sm">{ i18n.T(ctx, "Show this help dialog") }</span>
 						<div class="flex items-center gap-1">
 							<kbd class="kbd">?</kbd>
-							<span class="text-xs text-muted-foreground px-1">or</span>
+							<span class="text-xs text-muted-foreground px-1">{ i18n.T(ctx, "or") }</span>
 							<kbd class="kbd">Ctrl</kbd>
 							<span class="text-xs text-muted-foreground">+</span>
 							<kbd class="kbd">/</kbd>
 						</div>
 					</div>
 					<div class="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors">
-						<span class="text-sm">Close dialog or cancel streaming</span>
+						<span class="text-sm">{ i18n.T(ctx, "Close dialog or cancel streaming") }</span>
 						<kbd class="kbd">Esc</kbd>
 					</div>
 					<div class="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors">
-						<span class="text-sm">Focus message input</span>
+						<span class="text-sm">{ i18n.T(ctx, "Focus message input") }</span>
 						<div class="flex items-center gap-1">
 							<kbd class="kbd">Ctrl</kbd>
 							<span class="text-xs text-muted-foreground">+</span>
@@ -61,11 +62,11 @@ templ KeyboardShortcuts() {
 						<path d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5z"></path>
 						<path d="M15 7v2a4 4 0 01-4 4H9.828l-1.766 1.767c.28.149.599.233.938.233h2l3 3v-3h2a2 2 0 002-2V9a2 2 0 00-2-2h-1z"></path>
 					</svg>
-					Chat Management
+					{ i18n.T(ctx, "Chat Management") }
 				</h3>
 				<div class="space-y-2">
 					<div class="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors">
-						<span class="text-sm">New chat session</span>
+						<span class="text-sm">{ i18n.T(ctx, "New chat session") }</span>
 						<div class="flex items-center gap-1">
 							<kbd class="kbd">Ctrl</kbd>
 							<span class="text-xs text-muted-foreground">+</span>
@@ -75,7 +76,7 @@ templ KeyboardShortcuts() {
 						</div>
 					</div>
 					<div class="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors">
-						<span class="text-sm">Navigate through sessions</span>
+						<span class="text-sm">{ i18n.T(ctx, "Navigate through sessions") }</span>
 						<div class="flex items-center gap-1">
 							<kbd class="kbd">Ctrl</kbd>
 							<span class="text-xs text-muted-foreground">+</span>
@@ -93,11 +94,11 @@ templ KeyboardShortcuts() {
 						<path d="M10 12a2 2 0 100-4 2 2 0 000 4z"></path>
 						<path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"></path>
 					</svg>
-					View Controls
+					{ i18n.T(ctx, "View Controls") }
 				</h3>
 				<div class="space-y-2">
 					<div class="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors">
-						<span class="text-sm">Toggle debug panel</span>
+						<span class="text-sm">{ i18n.T(ctx, "Toggle debug panel") }</span>
 						<div class="flex items-center gap-1">
 							<kbd class="kbd">Ctrl</kbd>
 							<span class="text-xs text-muted-foreground">+</span>
@@ -107,7 +108,7 @@ templ KeyboardShortcuts() {
 						</div>
 					</div>
 					<div class="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors">
-						<span class="text-sm">Cycle theme (Light → Dark → System)</span>
+						<span class="text-sm">{ i18n.T(ctx, "Cycle theme (Light → Dark → System)") }</span>
 						<div class="flex items-center gap-1">
 							<kbd class="kbd">Ctrl</kbd>
 							<span class="text-xs text-muted-foreground">+</span>
@@ -125,8 +126,8 @@ templ KeyboardShortcuts() {
 						<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
 					</svg>
 					<div class="space-y-1">
-						<p class="text-sm font-medium">Pro Tip</p>
-						<p class="text-xs text-muted-foreground">On macOS, use <kbd class="kbd text-xs">⌘</kbd> instead of <kbd class="kbd text-xs">Ctrl</kbd></p>
+						<p class="text-sm font-medium">{ i18n.T(ctx, "Pro Tip") }</p>
+						<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "On macOS, use ⌘ instead of Ctrl") }</p>
 					</div>
 				</div>
 			</div>
@@ -134,13 +135,13 @@ templ KeyboardShortcuts() {
 		@dialog.Footer(dialog.FooterProps{}) {
 			<div class="flex justify-end">
 				@button.Button(button.Props{
-					Type: button.TypeButton,
+					Type:  button.TypeButton,
 					Class: "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2",
 					Attributes: templ.Attributes{
 						"@click": "showKeyboardShortcuts = false",
 					},
 				}) {
-					Got it!
+					{ i18n.T(ctx, "Got it!") }
 				}
 			</div>
 		}
