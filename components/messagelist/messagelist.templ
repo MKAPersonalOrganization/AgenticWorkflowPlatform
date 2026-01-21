@@ -98,13 +98,13 @@ templ MessageList() {
 								<template x-if="message.parsedArgs?.question">
 									<div class="text-sm break-words">
 										<span class="font-semibold text-primary">Question:</span>
-										<span class="ml-2" x-text="message.parsedArgs?.question"></span>
+										<span class="mis-2" x-text="message.parsedArgs?.question"></span>
 									</div>
 								</template>
 								<template x-if="message.parsedArgs?.context">
 									<div class="text-sm text-muted-foreground break-words">
 										<span class="font-semibold">Context:</span>
-										<span class="ml-2" x-text="message.parsedArgs?.context"></span>
+										<span class="mis-2" x-text="message.parsedArgs?.context"></span>
 									</div>
 								</template>
 								<template x-if="!message.parsedArgs?.question && !message.parsedArgs?.context">
@@ -148,7 +148,7 @@ templ MessageList() {
 				<div x-show="message.type === 'tool_call' && !['transfer_to_agent', 'ask_human', 'write_todos', 'browse_library', 'lookup_section', 'search_text_in_file', 'calculate', 'plot'].includes(message.name) && message.status === 'completed'" class="my-2 relative group/message">
 					<!-- Parallel indicator bar (shown only for parallel tool calls) -->
 					<template x-if="getParallelToolCallInfo(message).isParallel">
-						<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary/30 rounded-l" title="Parallel tool call"></div>
+						<div class="absolute inset-inline-start-0 top-0 bottom-0 w-1 bg-primary/30 rounded-s" title="Parallel tool call"></div>
 					</template>
 					<!-- Copy button for tool call -->
 					@button.Button(button.Props{
@@ -234,7 +234,7 @@ templ MessageList() {
 		<!-- Typing Indicator -->
 		<div
 			x-show="showTypingIndicator"
-			class="flex items-start gap-4 animate-in fade-in duration-300 w-full pr-10"
+			class="flex items-start gap-4 animate-in fade-in duration-300 w-full pie-10"
 			role="status"
 			aria-live="polite"
 			aria-label="Assistant is typing"
