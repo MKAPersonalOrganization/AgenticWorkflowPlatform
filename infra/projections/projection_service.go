@@ -1,6 +1,7 @@
 package projections
 
 import (
+	"context"
 	"errors"
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/services"
@@ -42,5 +43,5 @@ func (s *UIProjectionService) ListThreadSummaries() []services.ThreadSummary {
 
 // ListThreadsPaginated retrieves paginated threads for a user.
 func (s *UIProjectionService) ListThreadsPaginated(req agui.ThreadListRequest) (*agui.ThreadListResponse, error) {
-	return s.aguiProjection.ListThreads(req)
+	return s.aguiProjection.ListThreads(context.Background(), req)
 }

@@ -1,6 +1,7 @@
 package agui
 
 import (
+	"context"
 	"time"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
@@ -18,7 +19,7 @@ type AguiProjection interface {
 	GetMessages(threadID string) []aguievents.Message
 
 	// ListThreads returns paginated threads for a user.
-	ListThreads(req ThreadListRequest) (*ThreadListResponse, error)
+	ListThreads(ctx context.Context, req ThreadListRequest) (*ThreadListResponse, error)
 }
 
 // AguiBroadcaster is an interface for subscribing to real-time events.
@@ -81,7 +82,8 @@ type ThreadListResponse struct {
 
 // ThreadSummary is a lightweight thread representation for list views.
 type ThreadSummary struct {
-	ID        string    `json:"id"`
-	Title     string    `json:"title,omitempty"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	ID         string    `json:"id"`
+	Title      string    `json:"title,omitempty"`
+	GroupTitle string    `json:"groupTitle,omitempty"` // Localized date group title
+	UpdatedAt  time.Time `json:"updatedAt"`
 }
