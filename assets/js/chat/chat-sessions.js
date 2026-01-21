@@ -30,6 +30,7 @@ export function createSessionMethods() {
                     this.sessions = (data.threads || []).map(thread => ({
                         id: thread.id,
                         title: thread.title || 'New Chat',
+                        groupTitle: thread.groupTitle,
                         lastMessage: thread.updatedAt
                     }));
 
@@ -79,6 +80,7 @@ export function createSessionMethods() {
                     const newSessions = (data.threads || []).map(thread => ({
                         id: thread.id,
                         title: thread.title || 'New Chat',
+                        groupTitle: thread.groupTitle,
                         lastMessage: thread.updatedAt
                     }));
 
@@ -275,17 +277,8 @@ export function createSessionMethods() {
          * @returns {Array} Array of groups { title: string, sessions: Array }
          */
         getGroupedSessions() {
-            const today = new Date();
-            const yesterday = new Date(today);
-            yesterday.setDate(yesterday.getDate() - 1);
-
-            const groups = {
-                'Today': [],
-                'Yesterday': [],
-                'Previous 7 Days': [],
-                'Previous 30 Days': [],
-                'Older': []
-            };
+            const groups = {};
+            const groupOrder = [];
 
             // Filter sessions first
             let filteredSessions = this.sessions;
@@ -297,27 +290,18 @@ export function createSessionMethods() {
             }
 
             filteredSessions.forEach(session => {
-                const date = new Date(session.lastMessage || session.created || new Date());
-                const diffTime = Math.abs(today - date);
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-                if (date.toDateString() === today.toDateString()) {
-                    groups['Today'].push(session);
-                } else if (date.toDateString() === yesterday.toDateString()) {
-                    groups['Yesterday'].push(session);
-                } else if (diffDays <= 7) {
-                    groups['Previous 7 Days'].push(session);
-                } else if (diffDays <= 30) {
-                    groups['Previous 30 Days'].push(session);
-                } else {
-                    groups['Older'].push(session);
+                const title = session.groupTitle || 'Older';
+                if (!groups[title]) {
+                    groups[title] = [];
+                    groupOrder.push(title);
                 }
+                groups[title].push(session);
             });
 
-            // Return non-empty groups in order
-            return Object.entries(groups)
-                .filter(([_, items]) => items.length > 0)
-                .map(([title, sessions]) => ({ title, sessions }));
+            return groupOrder.map(title => ({
+                title,
+                sessions: groups[title]
+            }));
         },
 
         __onThreadSwitch(newThreadId, oldThreadId) {

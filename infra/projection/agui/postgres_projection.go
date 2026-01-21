@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"school-with-ai/components/i18n"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/event"
@@ -299,20 +300,18 @@ func (p *PostgresAguiProjection) GetMessages(threadID string) []aguievents.Messa
 }
 
 // ListThreads returns paginated threads for a user.
-func (p *PostgresAguiProjection) ListThreads(req ThreadListRequest) (*ThreadListResponse, error) {
-	ctx := context.Background()
-
+func (p *PostgresAguiProjection) ListThreads(ctx context.Context, req ThreadListRequest) (*ThreadListResponse, error) {
 	// Apply defaults and limits
-	limit := req.Limit
-	if limit <= 0 {
-		limit = 20
+	pageSize := req.Limit
+	if pageSize <= 0 {
+		pageSize = 20
 	}
-	if limit > 100 {
-		limit = 100
+	if pageSize > 100 {
+		pageSize = 100
 	}
 
 	// Fetch one extra to determine if there are more pages
-	fetchLimit := limit + 1
+	fetchLimit := pageSize + 1
 
 	var threads []struct {
 		ThreadID  string    `db:"thread_id"`
@@ -354,9 +353,9 @@ func (p *PostgresAguiProjection) ListThreads(req ThreadListRequest) (*ThreadList
 	}
 
 	// Determine if there are more pages
-	hasMore := len(threads) > limit
+	hasMore := len(threads) > pageSize
 	if hasMore {
-		threads = threads[:limit] // Trim the extra item
+		threads = threads[:pageSize] // Trim the extra item
 	}
 
 	// Convert to response format
@@ -365,15 +364,38 @@ func (p *PostgresAguiProjection) ListThreads(req ThreadListRequest) (*ThreadList
 		HasMore: hasMore,
 	}
 
+	now := time.Now()
+	today := now.Truncate(24 * time.Hour)
+	yesterday := today.Add(-24 * time.Hour)
+	sevenDaysAgo := today.Add(-7 * 24 * time.Hour)
+	thirtyDaysAgo := today.Add(-30 * 24 * time.Hour)
+
 	for _, t := range threads {
 		title := ""
 		if t.Title != nil {
 			title = *t.Title
 		}
+
+		// Calculate group title
+		var groupTitle string
+		switch {
+		case t.UpdatedAt.After(today):
+			groupTitle = i18n.T(ctx, "Today")
+		case t.UpdatedAt.After(yesterday):
+			groupTitle = i18n.T(ctx, "Yesterday")
+		case t.UpdatedAt.After(sevenDaysAgo):
+			groupTitle = i18n.T(ctx, "Previous 7 Days")
+		case t.UpdatedAt.After(thirtyDaysAgo):
+			groupTitle = i18n.T(ctx, "Previous 30 Days")
+		default:
+			groupTitle = i18n.T(ctx, "Older")
+		}
+
 		result.Threads = append(result.Threads, ThreadSummary{
-			ID:        t.ThreadID,
-			Title:     title,
-			UpdatedAt: t.UpdatedAt,
+			ID:         t.ThreadID,
+			Title:      title,
+			GroupTitle: groupTitle,
+			UpdatedAt:  t.UpdatedAt,
 		})
 	}
 

@@ -100,7 +100,7 @@ func (h *AguiProjectionHandler) ListThreads(w http.ResponseWriter, r *http.Reque
 		Limit:  limit,
 	}
 
-	response, err := h.projection.ListThreads(req)
+	response, err := h.projection.ListThreads(r.Context(), req)
 	if err != nil {
 		http.Error(w, "invalid cursor format", http.StatusBadRequest)
 		return
