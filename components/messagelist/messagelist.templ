@@ -13,6 +13,7 @@ import (
 	"school-with-ai/components/message"
 	"school-with-ai/components/plot"
 	"school-with-ai/components/searchtext"
+	"school-with-ai/components/statistics"
 	"school-with-ai/components/todo"
 	"school-with-ai/components/utils"
 )
@@ -145,8 +146,12 @@ templ MessageList() {
 				<div x-show="message.type === 'tool_call' && message.name === 'plot'" class="my-2 relative group/message w-full">
 					@plot.Container()
 				</div>
+				<!-- Statistics Tool Call - Special Rendering -->
+				<div x-show="['mean', 'median', 'mode', 'min', 'max', 'sum', 'variance', 'standard_deviation', 'quartile', 'percentile', 'interquartile_range', 'pearson_correlation', 'euclidean_distance', 'manhattan_distance', 'sample', 'quartile_outliers', 'normal_pdf', 'normal_cdf', 'normal_ppf', 'normal_mean', 'normal_median', 'normal_std', 'normal_var', 'normal_interval', 'binomial_ncr', 'linear_regression'].includes(message.name) && message.type === 'tool_call'" class="my-2 relative group/message w-full">
+					@statistics.Container()
+				</div>
 				<!-- Regular Tool Call Message (with result if available) -->
-				<div x-show="message.type === 'tool_call' && !['transfer_to_agent', 'ask_human', 'write_todos', 'browse_library', 'lookup_section', 'search_text_in_file', 'calculate', 'plot', 'add', 'subtract', 'multiply', 'divide', 'power', 'sqrt'].includes(message.name) && message.status === 'completed'" class="my-2 relative group/message">
+				<div x-show="message.type === 'tool_call' && !['transfer_to_agent', 'ask_human', 'write_todos', 'browse_library', 'lookup_section', 'search_text_in_file', 'calculate', 'plot', 'add', 'subtract', 'multiply', 'divide', 'power', 'sqrt', 'mean', 'median', 'mode', 'min', 'max', 'sum', 'variance', 'standard_deviation', 'quartile', 'percentile', 'interquartile_range', 'pearson_correlation', 'euclidean_distance', 'manhattan_distance', 'sample', 'quartile_outliers', 'normal_pdf', 'normal_cdf', 'normal_ppf', 'normal_mean', 'normal_median', 'normal_std', 'normal_var', 'normal_interval', 'binomial_ncr', 'linear_regression'].includes(message.name) && message.status === 'completed'" class="my-2 relative group/message">
 					<!-- Parallel indicator bar (shown only for parallel tool calls) -->
 					<template x-if="getParallelToolCallInfo(message).isParallel">
 						<div class="absolute inset-inline-start-0 top-0 bottom-0 w-1 bg-primary/30 rounded-s" title="Parallel tool call"></div>
