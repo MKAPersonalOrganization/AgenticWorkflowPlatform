@@ -8,15 +8,6 @@ import (
 	"school-with-ai/foundation/i18n"
 
 	"golang.org/x/text/language"
-	"golang.org/x/text/message"
-)
-
-type contextKey string
-
-const (
-	LanguageContextKey  contextKey = "language"
-	DirectionContextKey contextKey = "direction"
-	PrinterContextKey   contextKey = "printer"
 )
 
 // I18n Middleware detects the user's language and injects it into the context.
@@ -66,44 +57,22 @@ func I18n(next http.Handler) http.Handler {
 			tag = t
 		} else {
 			// Even if found via cookie/param, we should match it against supported to ensure validity
-			// e.g. if cookie says "fr" but we don't support it, we might want fallback?
-			// i18n.Matcher will pick the closest match.
 			t, _, _ := i18n.Matcher.Match(tag)
 			tag = t
 		}
 
-		// Initialize Printer
-		printer := message.NewPrinter(tag)
-		dir := i18n.GetDirection(tag)
-
-		ctx := context.WithValue(r.Context(), LanguageContextKey, tag.String())
-		ctx = context.WithValue(ctx, DirectionContextKey, dir)
-		ctx = context.WithValue(ctx, PrinterContextKey, printer)
-
+		// Use helper to inject into context
+		ctx := i18n.WithLanguage(r.Context(), tag)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
 // GetLanguage returns the language tag from context, or "en" if missing.
 func GetLanguage(ctx context.Context) string {
-	if val, ok := ctx.Value(LanguageContextKey).(string); ok {
-		return val
-	}
-	return "en"
+	return i18n.FromContext(ctx).String()
 }
 
 // GetDirection returns "rtl" or "ltr" from context.
 func GetDirection(ctx context.Context) string {
-	if val, ok := ctx.Value(DirectionContextKey).(string); ok {
-		return val
-	}
-	return "ltr"
-}
-
-// GetPrinter returns the message printer from context.
-func GetPrinter(ctx context.Context) *message.Printer {
-	if val, ok := ctx.Value(PrinterContextKey).(*message.Printer); ok {
-		return val
-	}
-	return message.NewPrinter(language.English)
+	return i18n.GetDirection(i18n.FromContext(ctx))
 }

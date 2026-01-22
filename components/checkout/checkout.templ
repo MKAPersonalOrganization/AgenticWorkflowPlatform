@@ -8,13 +8,14 @@ import "school-with-ai/components/label"
 import "school-with-ai/components/input"
 import "school-with-ai/components/pageheader"
 import "school-with-ai/domain"
+import "school-with-ai/components/i18n"
 
 type PlanDetails struct {
-	ID          string
-	Name        string
-	Price       string
-	Period      string
-	Features    []string
+	ID       string
+	Name     string
+	Price    string
+	Period   string
+	Features []string
 }
 
 type CheckoutPageProps struct {
@@ -25,17 +26,17 @@ type CheckoutPageProps struct {
 
 templ CheckoutPage(props CheckoutPageProps) {
 	@components.AppLayout(components.AppLayoutProps{
-		Title: "Checkout",
+		Title: i18n.T(ctx, "Checkout"),
 		User:  props.User,
 	}) {
 		<div class="min-h-screen bg-background">
 			<div class="container mx-auto max-w-5xl px-4 py-8 lg:py-12 space-y-10">
 				<!-- Header with Back Button -->
 				@pageheader.PageHeader(pageheader.Props{
-					Title:       "Complete Your Purchase",
-					Description: "Subscribe to the " + props.Plan.Name + " plan",
+					Title:       i18n.T(ctx, "Complete Your Purchase"),
+					Description: i18n.T(ctx, "Subscribe to the {plan} plan", "{plan}", props.Plan.Name),
 					BackURL:     "/pricing",
-					BackLabel:   "Back to Pricing",
+					BackLabel:   i18n.T(ctx, "Back to Pricing"),
 				})
 				if props.Error != "" {
 					<div class="rounded-xl border-2 border-destructive bg-destructive text-destructive-foreground p-5 shadow-sm">
@@ -45,7 +46,6 @@ templ CheckoutPage(props CheckoutPageProps) {
 						</div>
 					</div>
 				}
-
 				<!-- Single Card Container -->
 				<div class="max-w-4xl mx-auto">
 					<form action="/api/subscriptions/checkout" method="POST">
@@ -114,8 +114,8 @@ templ CheckoutPage(props CheckoutPageProps) {
 										<!-- Payment Section - Left Side -->
 										<div class="lg:col-span-3 p-8 lg:p-10 space-y-9">
 											<div class="space-y-2.5">
-												<h2 class="text-2xl font-bold tracking-tight">Payment Details</h2>
-												<p class="text-sm text-muted-foreground leading-relaxed">Enter your payment information below</p>
+												<h2 class="text-2xl font-bold tracking-tight">{ i18n.T(ctx, "Payment Details") }</h2>
+												<p class="text-sm text-muted-foreground leading-relaxed">{ i18n.T(ctx, "Enter your payment information below") }</p>
 											</div>
 											<!-- Payment Method Selector -->
 											<div class="flex gap-2">
@@ -127,7 +127,7 @@ templ CheckoutPage(props CheckoutPageProps) {
 												>
 													<div class="flex items-center justify-center gap-2.5">
 														@icon.CreditCard(icon.Props{Class: "size-5"})
-														<span>Card</span>
+														<span>{ i18n.T(ctx, "Card") }</span>
 													</div>
 												</button>
 												<button
@@ -137,7 +137,7 @@ templ CheckoutPage(props CheckoutPageProps) {
 													class="flex-1 py-2.5 px-5 font-medium transition-colors rounded-lg"
 												>
 													<div class="flex items-center justify-center gap-2.5">
-														<span>PayPal</span>
+														<span>{ i18n.T(ctx, "PayPal") }</span>
 													</div>
 												</button>
 											</div>
@@ -146,7 +146,7 @@ templ CheckoutPage(props CheckoutPageProps) {
 												<div>
 													<div class="flex items-center justify-between mb-3">
 														@label.Label(label.Props{For: "card_number"}) {
-															Card Number
+															{ i18n.T(ctx, "Card Number") }
 														}
 														<span x-show="cardType" x-text="cardType" class="text-xs font-bold px-3 py-1.5 rounded-lg bg-primary text-primary-foreground shadow-sm"></span>
 													</div>
@@ -168,7 +168,7 @@ templ CheckoutPage(props CheckoutPageProps) {
 												<div class="grid grid-cols-2 gap-5">
 													<div>
 														@label.Label(label.Props{For: "expiry"}) {
-															Expiry Date
+															{ i18n.T(ctx, "Expiry Date") }
 														}
 														@input.Input(input.Props{
 															ID:          "expiry",
@@ -187,7 +187,7 @@ templ CheckoutPage(props CheckoutPageProps) {
 													</div>
 													<div>
 														@label.Label(label.Props{For: "cvv"}) {
-															CVV
+															{ i18n.T(ctx, "CVV") }
 														}
 														@input.Input(input.Props{
 															ID:          "cvv",
@@ -207,7 +207,7 @@ templ CheckoutPage(props CheckoutPageProps) {
 												</div>
 												<div>
 													@label.Label(label.Props{For: "cardholder_name"}) {
-														Cardholder Name
+														{ i18n.T(ctx, "Cardholder Name") }
 													}
 													@input.Input(input.Props{
 														ID:          "cardholder_name",
@@ -226,9 +226,9 @@ templ CheckoutPage(props CheckoutPageProps) {
 											<!-- PayPal Payment (Placeholder) -->
 											<div x-show="paymentMethod === 'paypal'" x-transition class="space-y-6">
 												<div class="text-center py-12">
-													<p class="text-foreground font-medium mb-6">You will be redirected to PayPal to complete your purchase</p>
+													<p class="text-foreground font-medium mb-6">{ i18n.T(ctx, "You will be redirected to PayPal to complete your purchase") }</p>
 													<div class="bg-muted border-2 border-dashed border-border rounded-xl p-12">
-														<p class="text-sm text-muted-foreground">PayPal button will appear here</p>
+														<p class="text-sm text-muted-foreground">{ i18n.T(ctx, "PayPal button will appear here") }</p>
 													</div>
 												</div>
 											</div>
@@ -236,19 +236,19 @@ templ CheckoutPage(props CheckoutPageProps) {
 										<!-- Order Summary - Right Side -->
 										<div class="lg:col-span-2 p-8 lg:p-10 space-y-8 bg-muted/30">
 											<div class="space-y-2.5">
-												<h2 class="text-xl font-bold tracking-tight">Order Summary</h2>
-												<p class="text-sm text-muted-foreground leading-relaxed">Review your purchase details</p>
+												<h2 class="text-xl font-bold tracking-tight">{ i18n.T(ctx, "Order Summary") }</h2>
+												<p class="text-sm text-muted-foreground leading-relaxed">{ i18n.T(ctx, "Review your purchase details") }</p>
 											</div>
 											<!-- Plan Details -->
 											<div class="space-y-6">
 												<div class="flex items-center justify-between py-4 px-4 rounded-lg bg-background/50 border border-border/50">
 													<div>
-														<div class="text-sm text-muted-foreground mb-1.5">Plan</div>
+														<div class="text-sm text-muted-foreground mb-1.5">{ i18n.T(ctx, "Plan") }</div>
 														<div class="font-semibold text-lg">{ props.Plan.Name }</div>
 													</div>
 												</div>
 												<div class="flex items-center justify-between py-5 px-4 border-t border-border">
-													<span class="font-semibold text-base">Total due today</span>
+													<span class="font-semibold text-base">{ i18n.T(ctx, "Total due today") }</span>
 													<div class="text-right">
 														<div class="text-3xl font-bold tracking-tight">{ props.Plan.Price }</div>
 														<div class="text-sm text-muted-foreground mt-1">{ props.Plan.Period }</div>
@@ -257,7 +257,7 @@ templ CheckoutPage(props CheckoutPageProps) {
 											</div>
 											<!-- Features List -->
 											<div class="pt-6 border-t-2 border-border">
-												<p class="text-sm font-bold mb-5 text-foreground">What's included:</p>
+												<p class="text-sm font-bold mb-5 text-foreground">{ i18n.T(ctx, "What's included:") }</p>
 												<ul class="space-y-3.5">
 													for _, feature := range props.Plan.Features {
 														<li class="flex items-start gap-3">
@@ -269,13 +269,12 @@ templ CheckoutPage(props CheckoutPageProps) {
 													}
 												</ul>
 											</div>
-
 										</div>
 									</div>
 									<!-- Submit Buttons -->
 									<div class="flex flex-col sm:flex-row justify-between items-center gap-5 px-8 lg:px-10 py-7 bg-muted border-t-2 border-border">
 										<p class="text-xs text-muted-foreground text-center sm:text-left leading-relaxed max-w-xs">
-											By completing this purchase, you agree to our Terms of Service and Privacy Policy.
+											{ i18n.T(ctx, "By completing this purchase, you agree to our Terms of Service and Privacy Policy.") }
 										</p>
 										<div class="flex gap-4 w-full sm:w-auto">
 											<a href="/pricing" class="flex-1 sm:flex-none">
@@ -284,7 +283,7 @@ templ CheckoutPage(props CheckoutPageProps) {
 													Size:    button.SizeLg,
 													Class:   "w-full min-w-32",
 												}) {
-													Cancel
+													{ i18n.T(ctx, "Cancel") }
 												}
 											</a>
 											<div x-show="paymentMethod === 'card'" class="flex-1 sm:flex-none">
@@ -295,7 +294,7 @@ templ CheckoutPage(props CheckoutPageProps) {
 													Class:   "w-full min-w-48",
 												}) {
 													@icon.Lock(icon.Props{Class: "size-4"})
-													<span>Complete Purchase</span>
+													<span>{ i18n.T(ctx, "Complete Purchase") }</span>
 												}
 											</div>
 											<div x-show="paymentMethod === 'paypal'" class="flex-1 sm:flex-none">
@@ -305,7 +304,7 @@ templ CheckoutPage(props CheckoutPageProps) {
 													Variant: button.VariantDefault,
 													Class:   "w-full min-w-48",
 												}) {
-													<span>Continue to PayPal</span>
+													<span>{ i18n.T(ctx, "Continue to PayPal") }</span>
 												}
 											</div>
 										</div>

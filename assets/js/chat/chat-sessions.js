@@ -29,7 +29,7 @@ export function createSessionMethods() {
                     // Map threads to session format
                     this.sessions = (data.threads || []).map(thread => ({
                         id: thread.id,
-                        title: thread.title || 'New Chat',
+                        title: thread.title || window.i18n.t('New Chat'),
                         groupTitle: thread.groupTitle,
                         lastMessage: thread.updatedAt
                     }));
@@ -54,7 +54,7 @@ export function createSessionMethods() {
                     }
 
                 } else {
-                    throw new Error(`Failed to fetch threads: ${response.status}`);
+                    throw new Error(`${window.i18n.t('Failed to fetch threads')}: ${response.status}`);
                 }
             }) || this.createNewSession();
         },
@@ -79,7 +79,7 @@ export function createSessionMethods() {
                     // Append new threads to existing sessions
                     const newSessions = (data.threads || []).map(thread => ({
                         id: thread.id,
-                        title: thread.title || 'New Chat',
+                        title: thread.title || window.i18n.t('New Chat'),
                         groupTitle: thread.groupTitle,
                         lastMessage: thread.updatedAt
                     }));
@@ -90,7 +90,7 @@ export function createSessionMethods() {
                     this.sessionsNextCursor = data.nextCursor || null;
                     this.sessionsHasMore = data.hasMore || false;
                 } else {
-                    throw new Error(`Failed to fetch more threads: ${response.status}`);
+                    throw new Error(`${window.i18n.t('Failed to fetch more threads')}: ${response.status}`);
                 }
             }).finally(() => {
                 // Add a small delay to prevent rapid-fire loading and allow user to perceive the pagination
@@ -118,7 +118,7 @@ export function createSessionMethods() {
          * @param {string} sessionId - Session ID to delete
          */
         async deleteSession(sessionId) {
-            if (!confirm('Are you sure you want to delete this session?')) {
+            if (!confirm(window.i18n.t('Are you sure you want to delete this session?'))) {
                 return;
             }
 
@@ -160,7 +160,7 @@ export function createSessionMethods() {
                         }
                     }
                 } else {
-                    throw new Error(`Failed to delete session: ${response.status}`);
+                    throw new Error(`${window.i18n.t('Failed to delete session')}: ${response.status}`);
                 }
             });
         },
@@ -178,7 +178,7 @@ export function createSessionMethods() {
             localStorage.setItem('currentThreadId', newSessionId);
 
             // Announce to screen readers
-            this.__announce('New chat session created');
+            this.__announce(window.i18n.t('New chat session created'));
         },
 
         /**
@@ -213,7 +213,7 @@ export function createSessionMethods() {
                 const now = new Date().toISOString();
                 session = {
                     id: this.__currentThreadId,
-                    title: 'New Chat',
+                    title: window.i18n.t('New Chat'),
                     created: now,
                     lastMessage: now
                 };
@@ -230,7 +230,7 @@ export function createSessionMethods() {
             const session = this.sessions.find(s => s.id === sessionId);
             if (!session) return;
 
-            const newTitle = prompt('Rename chat:', session.title);
+            const newTitle = prompt(window.i18n.t('Rename chat:'), session.title);
             if (!newTitle || newTitle.trim() === '' || newTitle === session.title) return;
 
             // Optimistic update
@@ -249,7 +249,7 @@ export function createSessionMethods() {
 
                 if (!response.ok) {
                     session.title = oldTitle; // Revert on failure
-                    throw new Error(`Failed to rename thread: ${response.status}`);
+                    throw new Error(`${window.i18n.t('Failed to rename thread')}: ${response.status}`);
                 }
             });
         },
@@ -290,7 +290,7 @@ export function createSessionMethods() {
             }
 
             filteredSessions.forEach(session => {
-                const title = session.groupTitle || 'Older';
+                const title = session.groupTitle || window.i18n.t('Older');
                 if (!groups[title]) {
                     groups[title] = [];
                     groupOrder.push(title);
@@ -316,7 +316,8 @@ export function createSessionMethods() {
             // Announce thread switch to screen readers
             const session = this.sessions.find(s => s.id === newThreadId);
             if (session) {
-                this.__announce(`Switched to ${session.title}`);
+                this.__announce(window.i18n.t('Switched to {title}', { title: session.title }));
+                // Note: I added argument support to window.i18n.t in previous step
             }
 
             // Focus message input

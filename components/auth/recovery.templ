@@ -2,6 +2,7 @@ package auth
 
 import client "github.com/ory/client-go"
 import "school-with-ai/domain"
+import "school-with-ai/components/i18n"
 
 type RecoveryPageProps struct {
 	FlowAction string
@@ -14,8 +15,8 @@ type RecoveryPageProps struct {
 // RecoveryPage renders the password recovery page with a slot for form content
 templ RecoveryPage(props RecoveryPageProps) {
 	@AuthLayout(LayoutProps{
-		Title:       "Reset Your Password",
-		Description: "Enter your email to receive a recovery code",
+		Title:       i18n.T(ctx, "Reset Your Password"),
+		Description: i18n.T(ctx, "Enter your email to receive a recovery code"),
 	}) {
 		<!-- Flow-level messages -->
 		if len(props.Messages) > 0 {
@@ -33,10 +34,10 @@ templ RecoveryPage(props RecoveryPageProps) {
 			<div class="mt-4 text-center text-sm">
 				if props.LoginURL != "" {
 					<div class="text-muted-foreground">
-						Remember your password?
+						{ i18n.T(ctx, "Remember your password?") }
 						{ " " }
 						<a href={ templ.SafeURL(props.LoginURL) } class="text-primary hover:underline">
-							Sign in
+							{ i18n.T(ctx, "Sign in") }
 						</a>
 					</div>
 				}

@@ -5,6 +5,7 @@ import "school-with-ai/components/sidebar"
 import "school-with-ai/components/button"
 import "school-with-ai/components/dropdown"
 import "school-with-ai/domain"
+import "school-with-ai/components/i18n"
 
 templ ChatHeader(user *domain.User) {
 	<div class="sticky top-0 z-10 flex h-14 w-full items-center justify-between border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4">
@@ -24,7 +25,7 @@ templ ChatHeader(user *domain.User) {
 				Class:   "size-9 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors",
 				Attributes: templ.Attributes{
 					"@click": "createNewSession()",
-					"title":  "New Chat",
+					"title":  i18n.T(ctx, "New Chat"),
 				},
 			}) {
 				@icon.SquarePen(icon.Props{Class: "size-5"})
@@ -40,7 +41,7 @@ templ ChatHeader(user *domain.User) {
 						"class": "flex items-center gap-1.5 cursor-pointer hover:bg-muted/50 px-2 py-1.5 rounded-lg transition-colors group",
 					},
 				}) {
-					<span x-text="AVAILABLE_AGENTS.find(a => a.id === selectedAgent)?.name || 'Select Agent'" class="text-lg font-semibold text-foreground/80 group-hover:text-foreground"></span>
+					<span x-text={ "AVAILABLE_AGENTS.find(a => a.id === selectedAgent)?.name || '" + i18n.T(ctx, "Select Agent") + "'" } class="text-lg font-semibold text-foreground/80 group-hover:text-foreground"></span>
 				}
 				@dropdown.Content(dropdown.ContentProps{
 					Class:      "w-64",
@@ -52,7 +53,7 @@ templ ChatHeader(user *domain.User) {
 					@dropdown.Label(dropdown.LabelProps{
 						Class: "text-xs font-medium text-muted-foreground uppercase tracking-wider",
 					}) {
-						Model
+						{ i18n.T(ctx, "Model") }
 					}
 					<template x-for="agent in AVAILABLE_AGENTS" :key="agent.id">
 						@dropdown.Item(dropdown.ItemProps{
@@ -72,7 +73,7 @@ templ ChatHeader(user *domain.User) {
 							</div>
 							<div class="flex flex-col items-start gap-0.5 flex-1">
 								<span x-text="agent.name" class="font-medium text-foreground"></span>
-								<span class="text-xs text-muted-foreground" x-text="'Great for general tasks'"></span>
+								<span class="text-xs text-muted-foreground" x-text={ "'" + i18n.T(ctx, "Great for general tasks") + "'" }></span>
 							</div>
 							<template x-if="selectedAgent === agent.id">
 								@icon.Check(icon.Props{Class: "size-4 text-primary absolute end-3"})

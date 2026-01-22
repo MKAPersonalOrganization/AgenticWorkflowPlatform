@@ -1,6 +1,7 @@
 package auth
 
 import "school-with-ai/domain"
+import "school-with-ai/components/i18n"
 
 type ErrorPageProps struct {
 	ErrorID      string
@@ -14,8 +15,8 @@ type ErrorPageProps struct {
 // ErrorPage renders the authentication error page
 templ ErrorPage(props ErrorPageProps) {
 	@AuthLayout(LayoutProps{
-		Title:       "An Error Occurred",
-		Description: "We encountered a problem while processing your request",
+		Title:       i18n.T(ctx, "An Error Occurred"),
+		Description: i18n.T(ctx, "We encountered a problem while processing your request"),
 		User:        props.User,
 	}) {
 		<div class="space-y-4">
@@ -32,13 +33,13 @@ templ ErrorPage(props ErrorPageProps) {
 				if props.ErrorMessage != "" {
 					<h2 class="text-lg font-semibold text-destructive">{ props.ErrorMessage }</h2>
 				} else {
-					<h2 class="text-lg font-semibold text-destructive">Authentication Error</h2>
+					<h2 class="text-lg font-semibold text-destructive">{ i18n.T(ctx, "Authentication Error") }</h2>
 				}
 				if props.ErrorDetails != "" {
 					<p class="text-sm text-muted-foreground">{ props.ErrorDetails }</p>
 				}
 				if props.ErrorID != "" {
-					<p class="text-xs text-muted-foreground">Error ID: { props.ErrorID }</p>
+					<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "Error ID") }: { props.ErrorID }</p>
 				}
 			</div>
 			<!-- Action Buttons -->
@@ -48,7 +49,7 @@ templ ErrorPage(props ErrorPageProps) {
 						href={ templ.SafeURL(props.LoginURL) }
 						class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
 					>
-						Go to Login
+						{ i18n.T(ctx, "Go to Login") }
 					</a>
 				}
 				if props.HomeURL != "" {
@@ -56,7 +57,7 @@ templ ErrorPage(props ErrorPageProps) {
 						href={ templ.SafeURL(props.HomeURL) }
 						class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
 					>
-						Go to Home
+						{ i18n.T(ctx, "Go to Home") }
 					</a>
 				}
 			</div>

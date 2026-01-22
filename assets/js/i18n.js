@@ -19,6 +19,9 @@ const LANGUAGES = {
     }
 };
 
+// Translation dictionary
+let translations = {};
+
 /**
  * Get current language from cookie or default to English
  * @returns {string} Language code (e.g., 'en', 'ar')
@@ -89,6 +92,59 @@ function initI18n() {
 }
 
 /**
+ * Set the translation dictionary
+ * @param {object} dict - Key-value pair translations
+ */
+function setTranslations(dict) {
+    translations = dict || {};
+}
+
+/**
+ * Convert Western Arabic numerals (0-9) to Eastern Arabic numerals (٠-٩)
+ * @param {string|number} value - Value to convert
+ * @returns {string} Converted value
+ */
+function toEasternArabicDigits(value) {
+    if (value === null || value === undefined) return '';
+    const charMap = {
+        '0': '٠', '1': '١', '2': '٢', '3': '٣', '4': '٤',
+        '5': '٥', '6': '٦', '7': '٧', '8': '٨', '9': '٩'
+    };
+    return String(value).replace(/[0-9]/g, (char) => charMap[char]);
+}
+
+/**
+ * Translate a key
+ * @param {string} key - Translation key
+ * @param {object} [args] - Optional arguments to replace in string
+ * @returns {string} Translated string or key if not found
+ */
+function t(key, args = {}) {
+    let translated = translations[key] || key;
+    const currentLang = getCurrentLanguage();
+
+    // Handle string replacements if args are provided
+    // Example: t("Hello {name}", { name: "World" })
+    if (args && typeof args === 'object') {
+        Object.entries(args).forEach(([k, v]) => {
+            let val = v;
+            // Convert numbers to Eastern Arabic if in Arabic mode
+            if (currentLang === 'ar' && (typeof v === 'number' || (!isNaN(v) && !String(v).startsWith('0x')))) {
+                val = toEasternArabicDigits(v);
+            }
+            translated = translated.replace(`{${k}}`, val);
+        });
+    }
+
+    // Also handle numbers embedded in the translated string itself for Arabic
+    if (currentLang === 'ar') {
+        translated = toEasternArabicDigits(translated);
+    }
+
+    return translated;
+}
+
+/**
  * Create Alpine.js data component for language switching
  * Use this in components that need language switching functionality
  */
@@ -107,6 +163,10 @@ function createLanguageSwitcher() {
 
         isRTL() {
             return LANGUAGES[this.currentLang]?.dir === 'rtl';
+        },
+
+        t(key, args) {
+            return t(key, args);
         }
     };
 }
@@ -118,22 +178,15 @@ if (document.readyState === 'loading') {
     initI18n();
 }
 
-// Export for module usage
-export {
-    LANGUAGES,
-    getCurrentLanguage,
-    getLanguage,
-    setLanguage,
-    initI18n,
-    createLanguageSwitcher
-};
-
-// Also expose globally for non-module usage
+// Expose globally for non-module usage
 window.i18n = {
     LANGUAGES,
     getCurrentLanguage,
     getLanguage,
     setLanguage,
     initI18n,
+    setTranslations,
+    t,
     createLanguageSwitcher
 };
+

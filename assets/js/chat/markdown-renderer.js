@@ -72,13 +72,13 @@ function enhanceCodeBlocks(html) {
                         onclick="copyCodeBlock(event)"
                         class="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium text-muted-foreground hover:bg-background hover:text-foreground transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
                         type="button"
-                        aria-label="Copy code"
-                        title="Copy code"
+                        aria-label="${window.i18n.t('Copy code')}"
+                        title="${window.i18n.t('Copy code')}"
                     >
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
                         </svg>
-                        <span>Copy code</span>
+                        <span>${window.i18n.t('Copy code')}</span>
                     </button>
                 </div>
                 <div class="p-0 overflow-x-auto" dir="ltr">
@@ -162,7 +162,7 @@ window.copyCodeBlock = async function (event) {
             <svg class="w-3 h-3 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
             </svg>
-            <span class="text-primary">Copied!</span>
+            <span class="text-primary">${window.i18n.t('Copied!')}</span>
         `;
 
         setTimeout(() => {
@@ -172,7 +172,7 @@ window.copyCodeBlock = async function (event) {
         // Show toast if available
         const chatComponent = Alpine.$data(document.querySelector('[x-data*="chat"]'));
         if (chatComponent?.showToast) {
-            chatComponent.showToast('Code copied to clipboard', 'success', 2000);
+            chatComponent.showToast(window.i18n.t('Code copied to clipboard'), 'success', 2000);
         }
     } catch (error) {
         console.error('Failed to copy code:', error);
@@ -180,7 +180,7 @@ window.copyCodeBlock = async function (event) {
         // Show error toast if available
         const chatComponent = Alpine.$data(document.querySelector('[x-data*="chat"]'));
         if (chatComponent?.showToast) {
-            chatComponent.showToast('Failed to copy code', 'error');
+            chatComponent.showToast(window.i18n.t('Failed to copy code'), 'error');
         }
     }
 }

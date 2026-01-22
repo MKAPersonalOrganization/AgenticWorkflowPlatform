@@ -2,6 +2,7 @@ package auth
 
 import client "github.com/ory/client-go"
 import "school-with-ai/domain"
+import "school-with-ai/components/i18n"
 
 type LoginPageProps struct {
 	FlowAction      string
@@ -15,8 +16,8 @@ type LoginPageProps struct {
 // LoginPage renders the login page with a slot for form content
 templ LoginPage(props LoginPageProps) {
 	@AuthLayout(LayoutProps{
-		Title:       "Sign In",
-		Description: "Enter your credentials to access your account",
+		Title:       i18n.T(ctx, "Sign In"),
+		Description: i18n.T(ctx, "Enter your credentials to access your account"),
 		User:        props.User,
 	}) {
 		<!-- Flow-level messages -->
@@ -36,16 +37,16 @@ templ LoginPage(props LoginPageProps) {
 				if props.RecoveryURL != "" {
 					<div>
 						<a href={ templ.SafeURL(props.RecoveryURL) } class="text-primary hover:underline">
-							Forgot your password?
+							{ i18n.T(ctx, "Forgot your password?") }
 						</a>
 					</div>
 				}
 				if props.RegistrationURL != "" {
 					<div class="text-muted-foreground">
-						Don't have an account?
+						{ i18n.T(ctx, "Don't have an account?") }
 						{ " " }
 						<a href={ templ.SafeURL(props.RegistrationURL) } class="text-primary hover:underline">
-							Create one
+							{ i18n.T(ctx, "Create one") }
 						</a>
 					</div>
 				}

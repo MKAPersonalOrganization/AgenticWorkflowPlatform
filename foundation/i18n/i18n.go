@@ -1,6 +1,7 @@
 package i18n
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -35,6 +36,9 @@ var (
 		language.English, // The first language is the fallback
 		language.Arabic,
 	})
+
+	// messagesCache stores raw translations for frontend exposure
+	messagesCache = make(map[string]map[string]string)
 )
 
 // GetLanguageByTag returns the Language for a given tag, or nil if not found.
@@ -73,12 +77,18 @@ func LoadCatalogs(localesDir string) error {
 		if err != nil {
 			return fmt.Errorf("failed to open locale file %s: %w", path, err)
 		}
-		defer file.Close()
+		// No defer close in loop, but we close it manually
+		// defer file.Close()
 
 		var messages map[string]string
 		if err := json.NewDecoder(file).Decode(&messages); err != nil {
+			file.Close()
 			return fmt.Errorf("failed to decode locale file %s: %w", path, err)
 		}
+		file.Close()
+
+		// Store in cache for frontend
+		messagesCache[tag.String()] = messages
 
 		for key, msg := range messages {
 			if err := message.SetString(tag, key, msg); err != nil {
@@ -90,6 +100,23 @@ func LoadCatalogs(localesDir string) error {
 	return nil
 }
 
+// GetMessages returns the raw translation map for a given tag.
+func GetMessages(tag language.Tag) map[string]string {
+	// Try exact match first
+	if m, ok := messagesCache[tag.String()]; ok {
+		return m
+	}
+
+	// Try base language match
+	base, _ := tag.Base()
+	if m, ok := messagesCache[base.String()]; ok {
+		return m
+	}
+
+	// Fallback to English
+	return messagesCache["en"]
+}
+
 // GetDirection returns "rtl" for Arabic and "ltr" for others.
 func GetDirection(tag language.Tag) string {
 	base, _ := tag.Base()
@@ -97,4 +124,67 @@ func GetDirection(tag language.Tag) string {
 		return "rtl"
 	}
 	return "ltr"
+}
+
+// contextKey is a private type for context keys.
+type contextKey string
+
+const (
+	langKey contextKey = "lang"
+)
+
+// FromContext returns the language tag from the context.
+func FromContext(ctx context.Context) language.Tag {
+	if tag, ok := ctx.Value(langKey).(language.Tag); ok {
+		return tag
+	}
+	return language.English
+}
+
+// WithLanguage returns a new context with the assigned language tag.
+func WithLanguage(ctx context.Context, tag language.Tag) context.Context {
+	return context.WithValue(ctx, langKey, tag)
+}
+
+// T translates the given key using the language in the context.
+func T(ctx context.Context, key string, args ...any) string {
+	tag := FromContext(ctx)
+	p := message.NewPrinter(tag)
+
+	// Localize dynamic values in args if they are numbers and we are in Arabic mode
+	base, _ := tag.Base()
+	isArabic := base.String() == "ar"
+
+	if isArabic {
+		for i, arg := range args {
+			switch v := arg.(type) {
+			case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
+				args[i] = toEasternArabicDigits(fmt.Sprintf("%v", v))
+			}
+		}
+	}
+
+	translated := p.Sprintf(key, args...)
+
+	// Global conversion for Arabic strings to use Eastern numerals
+	if isArabic {
+		return toEasternArabicDigits(translated)
+	}
+
+	return translated
+}
+
+func toEasternArabicDigits(s string) string {
+	mapping := map[rune]rune{
+		'0': '٠', '1': '١', '2': '٢', '3': '٣', '4': '٤',
+		'5': '٥', '6': '٦', '7': '٧', '8': '٨', '9': '٩',
+	}
+
+	runes := []rune(s)
+	for i, r := range runes {
+		if mapped, ok := mapping[r]; ok {
+			runes[i] = mapped
+		}
+	}
+	return string(runes)
 }

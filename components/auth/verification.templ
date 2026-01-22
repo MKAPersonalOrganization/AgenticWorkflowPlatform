@@ -2,6 +2,7 @@ package auth
 
 import client "github.com/ory/client-go"
 import "school-with-ai/domain"
+import "school-with-ai/components/i18n"
 
 type VerificationPageProps struct {
 	FlowAction string
@@ -14,8 +15,8 @@ type VerificationPageProps struct {
 // VerificationPage renders the email verification page with a slot for form content
 templ VerificationPage(props VerificationPageProps) {
 	@AuthLayout(LayoutProps{
-		Title:       "Verify Your Email",
-		Description: "Enter the verification code sent to your email",
+		Title:       i18n.T(ctx, "Verify Your Email"),
+		Description: i18n.T(ctx, "Enter the verification code sent to your email"),
 		User:        props.User,
 	}) {
 		<!-- Flow-level messages -->
@@ -34,10 +35,10 @@ templ VerificationPage(props VerificationPageProps) {
 			<div class="mt-4 text-center text-sm">
 				if props.LoginURL != "" {
 					<div class="text-muted-foreground">
-						Already verified?
+						{ i18n.T(ctx, "Already verified?") }
 						{ " " }
 						<a href={ templ.SafeURL(props.LoginURL) } class="text-primary hover:underline">
-							Sign in
+							{ i18n.T(ctx, "Sign in") }
 						</a>
 					</div>
 				}

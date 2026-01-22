@@ -2,8 +2,9 @@ package engine
 
 // GenerateThreadTitle produces a thread title from the content of the first message.
 func GenerateThreadTitle(content string) string {
-	if len(content) > 30 {
-		return content[:27] + "..."
+	runes := []rune(content)
+	if len(runes) > 30 {
+		return string(runes[:27]) + "..."
 	}
-	return content
+	return string(runes)
 }
