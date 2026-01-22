@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/i18n"
 	"strconv"
 	"strings"
 	"time"
@@ -171,7 +172,7 @@ func (a *AnimateTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	}
 
 	// Generate the animation
-	animationPath, err := executeGnuplotAnimation(params.GnuplotScript, params.Format, params.Delay, params.Title)
+	animationPath, err := executeGnuplotAnimation(ctx, params.GnuplotScript, params.Format, params.Delay, params.Title)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate animation: %w", err)
 	}
@@ -191,7 +192,7 @@ func (a *AnimateTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 }
 
 // executeGnuplotAnimation executes a gnuplot animation script and generates the animation file.
-func executeGnuplotAnimation(userScript, format string, delay int, title string) (string, error) {
+func executeGnuplotAnimation(ctx core.ToolContext, userScript, format string, delay int, title string) (string, error) {
 	// Ensure charts directory exists with secure permissions
 	chartsDir := "assets/charts"
 	if err := os.MkdirAll(chartsDir, 0o750); err != nil {
@@ -208,12 +209,20 @@ func executeGnuplotAnimation(userScript, format string, delay int, title string)
 	var script strings.Builder
 	script.WriteString("# Auto-generated terminal and output settings\n")
 
+	// Determine best font for the current language
+	font := "Verdana,12"
+	tag := i18n.FromContext(ctx)
+	if lang := i18n.GetLanguageByTag(tag); lang != nil && lang.IsRTL() {
+		// Use a font that supports Arabic well in Gnuplot
+		font = "Arial Unicode MS,12"
+	}
+
 	// Set terminal based on format
 	switch format {
 	case "gif":
-		script.WriteString(fmt.Sprintf("set terminal gif animate delay %d size 800,600\n", delay))
+		script.WriteString(fmt.Sprintf("set terminal gif animate delay %d size 800,600 font '%s'\n", delay, font))
 	case "webp":
-		script.WriteString(fmt.Sprintf("set terminal webp animate delay %d size 800,600\n", delay))
+		script.WriteString(fmt.Sprintf("set terminal webp animate delay %d size 800,600 font '%s'\n", delay, font))
 	}
 
 	script.WriteString(fmt.Sprintf("set output '%s'\n\n", animationPath))

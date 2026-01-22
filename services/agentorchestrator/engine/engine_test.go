@@ -61,7 +61,7 @@ type MockAgentProvider struct {
 	configs map[string]core.AgentConfig
 }
 
-func (p *MockAgentProvider) GetConfig(name string) (core.AgentConfig, error) {
+func (p *MockAgentProvider) GetConfig(ctx context.Context, name string) (core.AgentConfig, error) {
 	if config, ok := p.configs[name]; ok {
 		return config, nil
 	}
