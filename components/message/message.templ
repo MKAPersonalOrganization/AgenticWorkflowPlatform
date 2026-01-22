@@ -1,9 +1,26 @@
 package message
 
+import "school-with-ai/components/i18n"
+
 templ UserMessage() {
-	<div x-show="message.role === 'user'" class="flex items-start gap-4 justify-end group/message w-full pis-10 relative">
-		<!-- Actions (End side of the message) -->
-		<div class="absolute inset-inline-end-full top-2 mie-2 flex flex-col items-end">
+	<div
+		x-show="message.role === 'user'"
+		class={
+			"flex items-start gap-4 group/message w-full relative",
+			templ.KV("justify-end", i18n.Dir(ctx) == "ltr"),
+			templ.KV("justify-start", i18n.Dir(ctx) == "rtl"),
+			templ.KV("pis-10", i18n.Dir(ctx) == "ltr"),
+			templ.KV("pie-10", i18n.Dir(ctx) == "rtl"),
+		}
+	>
+		<!-- Actions (End side of the message in LTR, Start side in RTL -> physically always Left for User sitting on Right) -->
+		<div
+			class={
+				"absolute top-2 flex flex-col items-end",
+				templ.KV("inset-inline-end-full mie-2", i18n.Dir(ctx) == "ltr"),
+				templ.KV("inset-inline-start-full mis-2", i18n.Dir(ctx) == "rtl"),
+			}
+		>
 			@Actions(ActionProps{
 				MessageID: "message.id", // Using string literal placeholder, Alpine will bind it logic is slightly complex here in templ, simpler to inline or assume ID binding
 				// Actually, since we are inside an Alpine loop, we can't easily pass 'message.id' as a string to the Go function if strictly server-side rendered.
@@ -13,11 +30,18 @@ templ UserMessage() {
 				Role: "user",
 			})
 		</div>
-		<div class="flex flex-col items-end gap-1 max-w-full">
+		<div
+			class={
+				"flex flex-col gap-1 max-w-full",
+				templ.KV("items-end", i18n.Dir(ctx) == "ltr"),
+				templ.KV("items-start", i18n.Dir(ctx) == "rtl"),
+			}
+		>
 			<!-- User Message Bubble -->
 			<div
 				class="bg-secondary/80 px-4 py-2.5 rounded-2xl text-start prose prose-sm max-w-none text-foreground leading-relaxed shadow-xs"
 				x-html="renderMarkdown(message.content)"
+				dir="auto"
 			></div>
 			<!-- Actions (Bottom Right fallback or integrated? LibreChat puts them on the side or bottom) -->
 		</div>
@@ -25,11 +49,20 @@ templ UserMessage() {
 }
 
 templ AssistantMessage() {
-	<div x-show="message.role === 'assistant'" class="flex items-start gap-4 justify-start group/message w-full pie-10">
+	<div
+		x-show="message.role === 'assistant'"
+		class={
+			"flex items-start gap-4 group/message w-full",
+			templ.KV("justify-start", i18n.Dir(ctx) == "ltr"),
+			templ.KV("justify-end", i18n.Dir(ctx) == "rtl"),
+			templ.KV("pie-10", i18n.Dir(ctx) == "ltr"),
+			templ.KV("pis-10", i18n.Dir(ctx) == "rtl"),
+		}
+	>
 		<div class="flex flex-col gap-1 min-w-0 flex-1 relative">
 			<!-- Assistant Name -->
 			<!-- Message Content -->
-			<div class="prose prose-sm max-w-none text-sm leading-relaxed text-foreground dark:[&_*]:text-white mb-1" x-html="renderMarkdown(message.content)"></div>
+			<div class="prose prose-sm max-w-none text-sm leading-relaxed text-foreground dark:[&_*]:text-white mb-1" x-html="renderMarkdown(message.content)" dir="auto"></div>
 			<!-- Streaming Indicator -->
 			<div x-show="message.streaming" class="flex items-center gap-1 text-muted-foreground mt-2">
 				<span class="w-1.5 h-1.5 bg-primary rounded-full animate-bounce"></span>

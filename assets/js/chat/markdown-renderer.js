@@ -81,7 +81,7 @@ function enhanceCodeBlocks(html) {
                         <span>Copy code</span>
                     </button>
                 </div>
-                <div class="p-0 overflow-x-auto">
+                <div class="p-0 overflow-x-auto" dir="ltr">
                     <pre class="!m-0 !p-4 !bg-transparent"><code${attrs} class="!bg-transparent !p-0 font-mono text-sm">${code}</code></pre>
                 </div>
             </div>`;
@@ -97,10 +97,23 @@ function enhanceCodeBlocks(html) {
 export function renderMarkdown(content) {
     if (!content) return '';
 
+    // Handle Arabic numbers and symbols in math if currently in Arabic mode
+    const isArabic = document.documentElement.dir === 'rtl' || document.documentElement.lang === 'ar';
+    let processedContent = content;
+
+    if (isArabic) {
+        // We only want to convert digits that are inside math blocks or are intended to be Arabic
+        // For simplicity and since this is an educational tool for schools, we'll convert all digits if in Arabic mode,
+        // or we can be more selective. Let's try converting specifically within math blocks first.
+        processedContent = processedContent.replace(/\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]|\\\(([\s\S]*?)\\\)|\$([\s\S]*?)\$/g, (match) => {
+            return convertDigits(match);
+        });
+    }
+
     // Use Mathpix renderer if available (supports LaTeX math with $$, \[\], etc.)
     if (typeof window.markdownToHTML === 'function') {
         try {
-            const rendered = window.markdownToHTML(content, {
+            const rendered = window.markdownToHTML(processedContent, {
                 htmlTags: true
             });
             return enhanceCodeBlocks(rendered);
@@ -108,17 +121,27 @@ export function renderMarkdown(content) {
             console.error('Error rendering with Mathpix:', e);
             // Fallback to regular markdown-it
             if (md) {
-                return enhanceCodeBlocks(md.render(content));
+                return enhanceCodeBlocks(md.render(processedContent));
             }
         }
     }
 
     // Fallback to regular markdown-it
     if (md) {
-        return enhanceCodeBlocks(md.render(content));
+        return enhanceCodeBlocks(md.render(processedContent));
     }
 
-    return content;
+    return processedContent;
+}
+
+/**
+ * Convert Western digits to Arabic-Indic digits
+ * @param {string} str - String to convert
+ * @returns {string} - Converted string
+ */
+function convertDigits(str) {
+    const arabicDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+    return str.replace(/[0-9]/g, (w) => arabicDigits[+w]);
 }
 
 /**
