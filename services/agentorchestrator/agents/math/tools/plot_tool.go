@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/i18n"
 	"strings"
 	"time"
 )
@@ -145,7 +146,7 @@ func (p *PlotTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	}
 
 	// Generate the plot
-	imagePath, err := executeGnuplotScript(params.GnuplotScript, params.Title)
+	imagePath, err := executeGnuplotScript(ctx, params.GnuplotScript, params.Title)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate plot: %w", err)
 	}
@@ -163,7 +164,7 @@ func (p *PlotTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 }
 
 // executeGnuplotScript executes a gnuplot script and generates the plot image.
-func executeGnuplotScript(userScript, title string) (string, error) {
+func executeGnuplotScript(ctx core.ToolContext, userScript, title string) (string, error) {
 	// Ensure charts directory exists with secure permissions
 	chartsDir := "assets/charts"
 	if err := os.MkdirAll(chartsDir, 0o750); err != nil {
@@ -191,7 +192,16 @@ func executeGnuplotScript(userScript, title string) (string, error) {
 	// Build complete gnuplot script with terminal and output settings
 	var script strings.Builder
 	script.WriteString("# Auto-generated terminal and output settings\n")
-	script.WriteString("set terminal pngcairo size 800,600 enhanced font 'Verdana,12'\n")
+
+	// Determine best font for the current language
+	font := "Verdana,12"
+	tag := i18n.FromContext(ctx)
+	if lang := i18n.GetLanguageByTag(tag); lang != nil && lang.IsRTL() {
+		// Use a font that supports Arabic well in Gnuplot (Noto Sans Arabic is a good choice if installed)
+		font = "Arial Unicode MS,12"
+	}
+
+	script.WriteString(fmt.Sprintf("set terminal pngcairo size 800,600 enhanced font '%s'\n", font))
 	script.WriteString(fmt.Sprintf("set output '%s'\n\n", imagePath))
 	script.WriteString("# User-provided gnuplot script\n")
 	script.WriteString(userScript)

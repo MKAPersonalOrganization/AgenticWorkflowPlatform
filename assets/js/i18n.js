@@ -9,13 +9,15 @@ const LANGUAGES = {
         code: 'en',
         name: 'English',
         nativeName: 'English',
-        dir: 'ltr'
+        dir: 'ltr',
+        useEasternDigits: false
     },
     ar: {
         code: 'ar',
         name: 'Arabic',
         nativeName: 'العربية',
-        dir: 'rtl'
+        dir: 'rtl',
+        useEasternDigits: true
     }
 };
 
@@ -122,22 +124,23 @@ function toEasternArabicDigits(value) {
 function t(key, args = {}) {
     let translated = translations[key] || key;
     const currentLang = getCurrentLanguage();
+    const langData = LANGUAGES[currentLang] || LANGUAGES['en'];
 
     // Handle string replacements if args are provided
     // Example: t("Hello {name}", { name: "World" })
     if (args && typeof args === 'object') {
         Object.entries(args).forEach(([k, v]) => {
             let val = v;
-            // Convert numbers to Eastern Arabic if in Arabic mode
-            if (currentLang === 'ar' && (typeof v === 'number' || (!isNaN(v) && !String(v).startsWith('0x')))) {
+            // Convert numbers to Eastern Arabic if configured
+            if (langData.useEasternDigits && (typeof v === 'number' || (!isNaN(v) && !String(v).startsWith('0x')))) {
                 val = toEasternArabicDigits(v);
             }
             translated = translated.replace(`{${k}}`, val);
         });
     }
 
-    // Also handle numbers embedded in the translated string itself for Arabic
-    if (currentLang === 'ar') {
+    // Also handle numbers embedded in the translated string itself if configured
+    if (langData.useEasternDigits) {
         translated = toEasternArabicDigits(translated);
     }
 

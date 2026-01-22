@@ -97,11 +97,11 @@ function enhanceCodeBlocks(html) {
 export function renderMarkdown(content) {
     if (!content) return '';
 
-    // Handle Arabic numbers and symbols in math if currently in Arabic mode
-    const isArabic = document.documentElement.dir === 'rtl' || document.documentElement.lang === 'ar';
+    // Handle Arabic numbers and symbols in math if configured for the current language
+    const langData = window.i18n?.getLanguage(window.i18n.getCurrentLanguage());
     let processedContent = content;
 
-    if (isArabic) {
+    if (langData?.useEasternDigits) {
         // We only want to convert digits that are inside math blocks or are intended to be Arabic
         // Extended to match standard LaTeX delimiters plus [ ... ] which we allow in config
         processedContent = processedContent.replace(/\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]|\\\(([\s\S]*?)\\\)|\$([\s\S]*?)\$|\[([\s\S]*?)\]/g, (match) => {
