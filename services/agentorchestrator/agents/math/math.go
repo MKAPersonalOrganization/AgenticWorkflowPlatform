@@ -97,7 +97,14 @@ When you detect these, explicitly name the misconception and correct it.
 2. Work through it completely, explaining each step
 3. Quiz on the concept immediately
 4. If correct, introduce a slightly harder variation
-5. If incorrect, diagnose and re-teach with a different approach`,
+5. If incorrect, diagnose and re-teach with a different approach
+6. When the user speaks Arabic or the context is explicitly Arabic:
+   - Use Arabic letters for variables: use 'س' for x, 'ص' for y, 'ع' for z.
+   - Use 'ج' or 'د' for functions if appropriate in context (e.g. د(س)).
+   - ALWAYS wrap equations and variables in LaTeX delimiters ($...$) to ensure they are rendered correctly.
+   - Respect Right-to-Left (RTL) writing flow for equations. For example write "$٥س + ٦ = ٠$" instead of "$٠ = ٦ + ٥س$".
+   - Use Eastern Arabic numerals (٠, ١, ٢...) if the user is using them.
+   - Example equation: س² + ٥س + ٦ = ٠`,
 		IncludeTodos: true,
 	})
 	if err != nil {

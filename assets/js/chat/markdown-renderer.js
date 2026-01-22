@@ -103,9 +103,8 @@ export function renderMarkdown(content) {
 
     if (isArabic) {
         // We only want to convert digits that are inside math blocks or are intended to be Arabic
-        // For simplicity and since this is an educational tool for schools, we'll convert all digits if in Arabic mode,
-        // or we can be more selective. Let's try converting specifically within math blocks first.
-        processedContent = processedContent.replace(/\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]|\\\(([\s\S]*?)\\\)|\$([\s\S]*?)\$/g, (match) => {
+        // Extended to match standard LaTeX delimiters plus [ ... ] which we allow in config
+        processedContent = processedContent.replace(/\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]|\\\(([\s\S]*?)\\\)|\$([\s\S]*?)\$|\[([\s\S]*?)\]/g, (match) => {
             return convertDigits(match);
         });
     }
