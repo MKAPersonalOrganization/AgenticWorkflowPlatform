@@ -106,16 +106,16 @@ func TestToAguiEvents(t *testing.T) {
 				ThreadID:        "thread-1",
 				ParentMessageID: "msg-1",
 				ToolCallID:      "tool-1",
-				ToolCallName:    "get_weather",
-				AgentName:       "weather-agent",
+				ToolCallName:    "add",
+				AgentName:       "math-agent",
 				Timestamp:       now,
 			},
 			expected: []any{
 				aguievents.NewCustomEvent("TOOL_CALL_AGENT", aguievents.WithValue(map[string]any{
 					"toolCallId": "tool-1",
-					"agentName":  "weather-agent",
+					"agentName":  "math-agent",
 				})),
-				aguievents.NewToolCallStartEvent("tool-1", "get_weather", aguievents.WithParentMessageID("msg-1")),
+				aguievents.NewToolCallStartEvent("tool-1", "add", aguievents.WithParentMessageID("msg-1")),
 			},
 		},
 		{

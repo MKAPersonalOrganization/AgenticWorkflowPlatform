@@ -11,7 +11,12 @@ import (
 // domainTools returns the domain-specific tools for the chemistry instructor.
 func domainTools() []core.Tool {
 	return []core.Tool{
-		sharedtools.NewCalculatorTool(),
+		&sharedtools.AddTool{},
+		&sharedtools.SubtractTool{},
+		&sharedtools.MultiplyTool{},
+		&sharedtools.DivideTool{},
+		&sharedtools.PowerTool{},
+		&sharedtools.SqrtTool{},
 		core.NewWriteTodosTool(),
 	}
 }

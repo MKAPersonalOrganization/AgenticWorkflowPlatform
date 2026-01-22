@@ -27,8 +27,8 @@ func TestMapFromCoreToLLMMessages(t *testing.T) {
 			{
 				ID: "call_123",
 				Function: core.ToolFunction{
-					Name:      "get_weather",
-					Arguments: `{"city":"London"}`,
+					Name:      "add",
+					Arguments: `{"a":2,"b":2}`,
 				},
 			},
 		},
@@ -37,7 +37,7 @@ func TestMapFromCoreToLLMMessages(t *testing.T) {
 	toolResultMsg := core.Message{
 		Role:       "tool",
 		ToolCallID: "call_123",
-		Content:    "Sunny",
+		Content:    `{"result":4}`,
 	}
 
 	input := []core.Message{userMsg, assistantMsg, toolCallMsg, toolResultMsg}
@@ -58,8 +58,8 @@ func TestMapFromCoreToLLMMessages(t *testing.T) {
 			Contents: []llm.AIContent{
 				llm.FunctionCallContent{
 					CallID:       "call_123",
-					Name:         "get_weather",
-					RawArguments: `{"city":"London"}`,
+					Name:         "add",
+					RawArguments: `{"a":2,"b":2}`,
 				},
 			},
 		},
@@ -68,7 +68,7 @@ func TestMapFromCoreToLLMMessages(t *testing.T) {
 			Contents: []llm.AIContent{
 				llm.FunctionResultContent{
 					CallID: "call_123",
-					Result: "Sunny",
+					Result: `{"result":4}`,
 				},
 			},
 		},

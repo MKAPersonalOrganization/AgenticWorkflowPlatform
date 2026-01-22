@@ -12,7 +12,12 @@ import (
 // domainTools returns the domain-specific tools for the math instructor.
 func domainTools() []core.Tool {
 	return []core.Tool{
-		sharedtools.NewCalculatorTool(),
+		&sharedtools.AddTool{},
+		&sharedtools.SubtractTool{},
+		&sharedtools.MultiplyTool{},
+		&sharedtools.DivideTool{},
+		&sharedtools.PowerTool{},
+		&sharedtools.SqrtTool{},
 		tools.NewPlotTool(),    // gnuplot-based plotting
 		tools.NewAnimateTool(), // gnuplot-based animations
 		core.NewWriteTodosTool(),
