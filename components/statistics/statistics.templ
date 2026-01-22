@@ -1,0 +1,75 @@
+package statistics
+
+templ Container() {
+	<div class="flex flex-col bg-card rounded-xl border border-border shadow-sm w-full max-w-md overflow-hidden transition-all duration-200 hover:shadow-md">
+		<!-- Header -->
+		<div class="flex items-center gap-2 px-4 py-3 bg-muted/40 border-b border-border/50">
+			<div class="p-1.5 bg-primary/10 rounded-md text-primary">
+				<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bar-chart-3"><path d="M3 3v18h18"></path><path d="M18 17V9"></path><path d="M13 17V5"></path><path d="M8 17v-3"></path></svg>
+			</div>
+			<span
+				class="text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+				x-text="message.name?.replace(/_/g, ' ') || 'Statistics'"
+			></span>
+		</div>
+		<!-- Display Area -->
+		<div class="p-5 flex flex-col gap-3">
+			<!-- Input Data Preview -->
+			<div class="text-sm text-muted-foreground/80 font-mono break-all">
+				<template x-if="message.parsedArgs?.data">
+					<div>
+						<span class="font-semibold">Data: </span>
+						<span x-text="Array.isArray(message.parsedArgs.data) ? `[${message.parsedArgs.data.slice(0, 10).join(', ')}${message.parsedArgs.data.length > 10 ? '...' : ''}]` : JSON.stringify(message.parsedArgs.data)"></span>
+					</div>
+				</template>
+				<template x-if="message.parsedArgs?.x && message.parsedArgs?.y">
+					<div class="flex flex-col gap-1">
+						<div>
+							<span class="font-semibold">X: </span>
+							<span x-text="Array.isArray(message.parsedArgs.x) ? `[${message.parsedArgs.x.slice(0, 5).join(', ')}${message.parsedArgs.x.length > 5 ? '...' : ''}]` : JSON.stringify(message.parsedArgs.x)"></span>
+						</div>
+						<div>
+							<span class="font-semibold">Y: </span>
+							<span x-text="Array.isArray(message.parsedArgs.y) ? `[${message.parsedArgs.y.slice(0, 5).join(', ')}${message.parsedArgs.y.length > 5 ? '...' : ''}]` : JSON.stringify(message.parsedArgs.y)"></span>
+						</div>
+					</div>
+				</template>
+			</div>
+			<!-- Result or Error -->
+			<template x-if="message.parsedResult?.error || (typeof message.result === 'string' && message.result.includes('error'))">
+				<div class="flex items-center gap-2 text-destructive font-medium">
+					<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-alert-circle"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="8" y2="12"></line><line x1="12" x2="12.01" y1="16" y2="16"></line></svg>
+					<span>Calculation Failed</span>
+				</div>
+			</template>
+			<template x-if="!message.parsedResult?.error && !(typeof message.result === 'string' && message.result.includes('error'))">
+				<div class="flex flex-col gap-2">
+					<div class="text-xs font-semibold text-muted-foreground uppercase">Result</div>
+					<!-- Single Value Result -->
+					<template x-if="typeof (message.parsedResult?.result) === 'number'">
+						<div class="text-3xl font-mono font-bold text-foreground tracking-tight break-all" x-text="message.parsedResult?.result"></div>
+					</template>
+					<!-- Array Result (e.g. Sample) -->
+					<template x-if="Array.isArray(message.parsedResult?.result)">
+						<div class="bg-muted/30 p-2 rounded-md font-mono text-sm break-all" x-text="`[${message.parsedResult.result.join(', ')}]`"></div>
+					</template>
+					<!-- Regression Result -->
+					<template x-if="message.parsedResult?.regression">
+						<div class="flex flex-col gap-2">
+							<div class="text-sm font-medium">Equation: <span class="font-mono" x-text="message.parsedResult.equation"></span></div>
+							<div class="bg-muted/30 p-2 rounded-md font-mono text-xs max-h-32 overflow-y-auto">
+								<template x-for="point in message.parsedResult.regression">
+									<div x-text="`(${point.x}, ${point.y})`"></div>
+								</template>
+							</div>
+						</div>
+					</template>
+					<!-- Fallback for other objects -->
+					<template x-if="typeof (message.parsedResult?.result) === 'object' && !Array.isArray(message.parsedResult?.result)">
+						<div class="bg-muted/30 p-2 rounded-md font-mono text-xs break-all" x-text="JSON.stringify(message.parsedResult.result, null, 2)"></div>
+					</template>
+				</div>
+			</template>
+		</div>
+	</div>
+}

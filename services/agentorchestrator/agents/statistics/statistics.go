@@ -18,14 +18,39 @@ func domainTools() []core.Tool {
 		&sharedtools.DivideTool{},
 		&sharedtools.PowerTool{},
 		&sharedtools.SqrtTool{},
-		tools.NewDescriptiveStatsTool(),
-		tools.NewCorrelationTool(),
-		tools.NewDistanceMetricsTool(),
-		tools.NewSamplingTool(),
-		tools.NewDataTransformTool(),
-		tools.NewNormalDistributionTool(),
-		tools.NewGeometricDistributionTool(),
-		tools.NewRegressionTool(),
+		// Descriptive Statistics
+		&tools.MeanTool{},
+		&tools.MedianTool{},
+		&tools.ModeTool{},
+		&tools.MinTool{},
+		&tools.MaxTool{},
+		&tools.SumTool{},
+		&tools.VarianceTool{},
+		&tools.StandardDeviationTool{},
+		&tools.QuartileTool{},
+		&tools.PercentileTool{},
+		&tools.IQRTool{},
+		// Correlation
+		&tools.PearsonCorrelationTool{},
+		// Distance Metrics
+		&tools.EuclideanDistanceTool{},
+		&tools.ManhattanDistanceTool{},
+		// Sampling & Outliers
+		&tools.SampleTool{},
+		&tools.QuartileOutliersTool{},
+		// Normal Distribution
+		&tools.NormalPdfTool{},
+		&tools.NormalCdfTool{},
+		&tools.NormalPpfTool{},
+		&tools.NormalMeanTool{},
+		&tools.NormalMedianTool{},
+		&tools.NormalStdTool{},
+		&tools.NormalVarTool{},
+		&tools.NormalIntervalTool{},
+		&tools.BinomialNcrTool{},
+		// Regression
+		&tools.LinearRegressionTool{},
+		// Other
 		core.NewWriteTodosTool(),
 	}
 }

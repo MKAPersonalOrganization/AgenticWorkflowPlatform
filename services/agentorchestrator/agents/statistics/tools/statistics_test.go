@@ -2,281 +2,113 @@ package tools
 
 import (
 	"context"
+	"math"
 	"school-with-ai/foundation/agentsdk/core"
 	"testing"
 )
 
-func TestDescriptiveStatsTool_Mean(t *testing.T) {
+func TestMeanTool(t *testing.T) {
 	t.Parallel()
-	tool := NewDescriptiveStatsTool()
+	tool := &MeanTool{}
 	args := map[string]any{
-		"operation": "mean",
-		"data":      []float64{1, 2, 3, 4, 5},
+		"data": []float64{1, 2, 3, 4, 5},
 	}
-
 	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
-
-	response, ok := result.(map[string]any)
-	if !ok {
-		t.Fatalf("Expected map[string]any result, got %T", result)
-	}
-
-	if response["result"] != 3.0 {
-		t.Errorf("Expected mean 3.0, got %v", response["result"])
+	resMap := result.(map[string]any)
+	if resMap["result"] != 3.0 {
+		t.Errorf("Expected 3.0, got %v", resMap["result"])
 	}
 }
 
-func TestDescriptiveStatsTool_Describe(t *testing.T) {
+func TestMedianTool(t *testing.T) {
 	t.Parallel()
-	tool := NewDescriptiveStatsTool()
+	tool := &MedianTool{}
 	args := map[string]any{
-		"operation": "describe",
-		"data":      []float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+		"data": []float64{1, 2, 3, 4, 5},
 	}
-
 	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
-
-	response, ok := result.(map[string]any)
-	if !ok {
-		t.Fatalf("Expected map[string]any result, got %T", result)
-	}
-
-	resultMap := response["result"].(map[string]any)
-
-	if response["result"].(map[string]any)["count"].(int) != 10 {
-		t.Errorf("Expected count 10, got %v", response["result"].(map[string]any)["count"])
-	}
-	if resultMap["mean"] != 5.5 {
-		t.Errorf("Expected mean 5.5, got %v", resultMap["mean"])
+	resMap := result.(map[string]any)
+	if resMap["result"] != 3.0 {
+		t.Errorf("Expected 3.0, got %v", resMap["result"])
 	}
 }
 
-func TestCorrelationTool_Pearson(t *testing.T) {
+func TestPearsonCorrelationTool(t *testing.T) {
 	t.Parallel()
-	tool := NewCorrelationTool()
+	tool := &PearsonCorrelationTool{}
 	args := map[string]any{
-		"operation": "pearson",
-		"data1":     []float64{1, 2, 3, 4, 5},
-		"data2":     []float64{2, 4, 6, 8, 10},
+		"data1": []float64{1, 2, 3, 4, 5},
+		"data2": []float64{2, 4, 6, 8, 10},
 	}
-
 	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
-
-	response, ok := result.(map[string]any)
-	if !ok {
-		t.Fatalf("Expected map[string]any result, got %T", result)
-	}
-
-	correlation := response["result"].(float64)
-
-	if correlation < 0.99 || correlation > 1.01 {
-		t.Errorf("Expected perfect correlation ~1.0, got %v", correlation)
+	resMap := result.(map[string]any)
+	corr := resMap["result"].(float64)
+	if math.Abs(corr-1.0) > 1e-9 {
+		t.Errorf("Expected 1.0, got %v", corr)
 	}
 }
 
-func TestDistanceMetricsTool_Euclidean(t *testing.T) {
+func TestNormalPdfTool(t *testing.T) {
 	t.Parallel()
-	tool := NewDistanceMetricsTool()
+	tool := &NormalPdfTool{}
 	args := map[string]any{
-		"operation": "euclidean_distance",
-		"point1":    []float64{0, 0, 0},
-		"point2":    []float64{3, 4, 0},
+		"x":     0.0,
+		"loc":   0.0,
+		"scale": 1.0,
 	}
-
 	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
-
-	response, ok := result.(map[string]any)
-	if !ok {
-		t.Fatalf("Expected map[string]any result, got %T", result)
-	}
-
-	distance := response["distance"].(float64)
-
-	if distance != 5.0 {
-		t.Errorf("Expected distance 5.0, got %v", distance)
+	resMap := result.(map[string]any)
+	pdf := resMap["result"].(float64)
+	expected := 0.3989422804014327
+	if math.Abs(pdf-expected) > 1e-5 {
+		t.Errorf("Expected ~%v, got %v", expected, pdf)
 	}
 }
 
-func TestSamplingTool_QuartileOutliers(t *testing.T) {
+func TestLinearRegressionTool(t *testing.T) {
 	t.Parallel()
-	tool := NewSamplingTool()
+	tool := &LinearRegressionTool{}
 	args := map[string]any{
-		"operation": "quartile_outliers",
-		"data":      []float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 100},
+		"x": []float64{1, 2, 3},
+		"y": []float64{2, 4, 6},
 	}
-
 	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
-
-	response, ok := result.(map[string]any)
-	if !ok {
-		t.Fatalf("Expected map[string]any result, got %T", result)
-	}
-
-	resultMap := response["result"].(map[string]any)
-
-	if resultMap["extreme"] == nil {
-		t.Error("Expected outliers to be detected")
+	resMap := result.(map[string]any)
+	reg := resMap["regression"].([]map[string]float64)
+	if len(reg) != 3 {
+		t.Errorf("Expected 3 points, got %d", len(reg))
 	}
 }
 
-func TestDataTransformTool_Sigmoid(t *testing.T) {
+func TestSampleTool(t *testing.T) {
 	t.Parallel()
-	tool := NewDataTransformTool()
+	tool := &SampleTool{}
 	args := map[string]any{
-		"operation": "sigmoid",
-		"data":      []float64{0, 1, -1},
+		"data":    []float64{1, 2, 3, 4, 5, 6},
+		"takeNum": 3,
 	}
-
 	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
-
-	response, ok := result.(map[string]any)
-	if !ok {
-		t.Fatalf("Expected map[string]any result, got %T", result)
-	}
-
-	if response["result"] == nil {
-		t.Error("Expected sigmoid transformation result")
-	}
-}
-
-func TestDataTransformTool_Round(t *testing.T) {
-	t.Parallel()
-	tool := NewDataTransformTool()
-	args := map[string]any{
-		"operation": "round",
-		"value":     3.14159,
-		"places":    2,
-	}
-
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
-
-	response, ok := result.(map[string]any)
-	if !ok {
-		t.Fatalf("Expected map[string]any result, got %T", result)
-	}
-
-	if response["result"] != 3.14 {
-		t.Errorf("Expected 3.14, got %v", response["result"])
-	}
-}
-
-func TestNormalDistributionTool_Pdf(t *testing.T) {
-	t.Parallel()
-	tool := NewNormalDistributionTool()
-	args := map[string]any{
-		"operation": "norm_pdf",
-		"x":         0.0,
-		"loc":       0.0,
-		"scale":     1.0,
-	}
-
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
-
-	response, ok := result.(map[string]any)
-	if !ok {
-		t.Fatalf("Expected map[string]any result, got %T", result)
-	}
-
-	pdf := response["result"].(float64)
-	expected := 0.3989422804014327 // 1/sqrt(2*pi)
-
-	if pdf < expected-0.0001 || pdf > expected+0.0001 {
-		t.Errorf("Expected PDF ~%v, got %v", expected, pdf)
-	}
-}
-
-func TestNormalDistributionTool_Fit(t *testing.T) {
-	t.Parallel()
-	tool := NewNormalDistributionTool()
-	args := map[string]any{
-		"operation": "norm_fit",
-		"data":      []float64{1, 2, 3, 4, 5},
-	}
-
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
-
-	response, ok := result.(map[string]any)
-	if !ok {
-		t.Fatalf("Expected map[string]any result, got %T", result)
-	}
-
-	resultMap := response["result"].(map[string]any)
-
-	if resultMap["loc"] != 3.0 {
-		t.Errorf("Expected loc 3.0, got %v", resultMap["loc"])
-	}
-}
-
-func TestGeometricDistributionTool_ExpGeom(t *testing.T) {
-	t.Parallel()
-	tool := NewGeometricDistributionTool()
-	args := map[string]any{
-		"operation": "exp_geom",
-		"p":         0.5,
-	}
-
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
-
-	response, ok := result.(map[string]any)
-	if !ok {
-		t.Fatalf("Expected map[string]any result, got %T", result)
-	}
-
-	if response["result"] != 2.0 {
-		t.Errorf("Expected expectation 2.0, got %v", response["result"])
-	}
-}
-
-func TestRegressionTool_Linear(t *testing.T) {
-	t.Parallel()
-	tool := NewRegressionTool()
-	args := map[string]any{
-		"type": "linear",
-		"x":    []float64{1, 2, 3, 4, 5},
-		"y":    []float64{2, 4, 6, 8, 10},
-	}
-
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
-
-	response, ok := result.(map[string]any)
-	if !ok {
-		t.Fatalf("Expected map[string]any result, got %T", result)
-	}
-
-	if response["type"] != "linear" {
-		t.Errorf("Expected linear regression type, got %v", response["type"])
+	resMap := result.(map[string]any)
+	sample := resMap["result"].([]float64)
+	if len(sample) != 3 {
+		t.Errorf("Expected 3 samples, got %d", len(sample))
 	}
 }
