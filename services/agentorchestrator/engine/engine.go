@@ -20,7 +20,7 @@ type ChatClient = types.ChatClient
 
 // AgentProvider provides agent configurations by name.
 type AgentProvider interface {
-	GetConfig(name string) (core.AgentConfig, error)
+	GetConfig(ctx context.Context, name string) (core.AgentConfig, error)
 }
 
 // Engine handles the core LLM iteration and streaming logic in a generic way.
@@ -105,7 +105,7 @@ func (exec *executionState) finalizeResult() {
 }
 
 func (e *Engine) newExecutionState(ctx context.Context, agentName string, runCtx core.RunContext, yield func(core.Event, error) bool) (*executionState, error) {
-	instance, err := e.newAgentInstance(agentName)
+	instance, err := e.newAgentInstance(ctx, agentName)
 	if err != nil {
 		return nil, err
 	}
@@ -391,8 +391,8 @@ type AgentInstance struct {
 	Executor core.ToolExecutor
 }
 
-func (e *Engine) newAgentInstance(name string) (*AgentInstance, error) {
-	config, err := e.provider.GetConfig(name)
+func (e *Engine) newAgentInstance(ctx context.Context, name string) (*AgentInstance, error) {
+	config, err := e.provider.GetConfig(ctx, name)
 	if err != nil {
 		return nil, err
 	}
@@ -518,7 +518,7 @@ func (s *executionState) prepareContextForLLM() (*PrepareResult, error) {
 }
 
 func (s *executionState) initAgentComponents(name string) error {
-	instance, err := s.engine.newAgentInstance(name)
+	instance, err := s.engine.newAgentInstance(s.ctx, name)
 	if err != nil {
 		return err
 	}

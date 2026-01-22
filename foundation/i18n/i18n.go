@@ -13,10 +13,11 @@ import (
 
 // Language represents a supported language.
 type Language struct {
-	Tag        language.Tag
-	Name       string
-	NativeName string // Name in the language itself (e.g., "العربية" for Arabic)
-	Dir        string // "ltr" or "rtl"
+	Tag              language.Tag
+	Name             string
+	NativeName       string // Name in the language itself (e.g., "العربية" for Arabic)
+	Dir              string // "ltr" or "rtl"
+	UseEasternDigits bool   // Whether to convert numbers to Eastern Arabic digits
 }
 
 // IsRTL returns true if the language is right-to-left.
@@ -27,8 +28,8 @@ func (l Language) IsRTL() bool {
 var (
 	// SupportedLanguages lists all available languages.
 	SupportedLanguages = []Language{
-		{Tag: language.English, Name: "English", NativeName: "English", Dir: "ltr"},
-		{Tag: language.Arabic, Name: "Arabic", NativeName: "العربية", Dir: "rtl"},
+		{Tag: language.English, Name: "English", NativeName: "English", Dir: "ltr", UseEasternDigits: false},
+		{Tag: language.Arabic, Name: "Arabic", NativeName: "العربية", Dir: "rtl", UseEasternDigits: true},
 	}
 
 	// Matcher is used to find the best match for a list of preferred tags.
@@ -117,11 +118,10 @@ func GetMessages(tag language.Tag) map[string]string {
 	return messagesCache["en"]
 }
 
-// GetDirection returns "rtl" for Arabic and "ltr" for others.
+// GetDirection returns the writing direction for the given tag.
 func GetDirection(tag language.Tag) string {
-	base, _ := tag.Base()
-	if base.String() == "ar" {
-		return "rtl"
+	if lang := GetLanguageByTag(tag); lang != nil {
+		return lang.Dir
 	}
 	return "ltr"
 }
@@ -151,11 +151,10 @@ func T(ctx context.Context, key string, args ...any) string {
 	tag := FromContext(ctx)
 	p := message.NewPrinter(tag)
 
-	// Localize dynamic values in args if they are numbers and we are in Arabic mode
-	base, _ := tag.Base()
-	isArabic := base.String() == "ar"
+	lang := GetLanguageByTag(tag)
+	useEasternDigits := lang != nil && lang.UseEasternDigits
 
-	if isArabic {
+	if useEasternDigits {
 		for i, arg := range args {
 			switch v := arg.(type) {
 			case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
@@ -166,8 +165,7 @@ func T(ctx context.Context, key string, args ...any) string {
 
 	translated := p.Sprintf(key, args...)
 
-	// Global conversion for Arabic strings to use Eastern numerals
-	if isArabic {
+	if useEasternDigits {
 		return toEasternArabicDigits(translated)
 	}
 

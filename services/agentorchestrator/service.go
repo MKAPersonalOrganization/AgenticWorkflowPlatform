@@ -142,7 +142,7 @@ type RegistryAgentProvider struct {
 	profileRepo   domain.StudentProfileRepository
 }
 
-func (p *RegistryAgentProvider) GetConfig(name string) (core.AgentConfig, error) {
+func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (core.AgentConfig, error) {
 	if name == p.initialConfig.Name {
 		return p.initialConfig, nil
 	}
@@ -155,7 +155,7 @@ func (p *RegistryAgentProvider) GetConfig(name string) (core.AgentConfig, error)
 
 	// Create new agent config using factory
 	// Note: We pass nil for notifier as events are yielded by the engine directly
-	config := factory(nil)
+	config := factory(ctx, nil)
 
 	// Inject Memory Tool and Context if available and enabled
 	if p.artifactStore != nil && p.enableMemory {

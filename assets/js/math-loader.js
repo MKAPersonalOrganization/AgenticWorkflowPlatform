@@ -11,42 +11,30 @@
  */
 window.loadMathJax = function () {
     try {
-        // Get current language from document
+        // Get current language and direction from document
         const lang = document.documentElement.lang || 'en';
         const dir = document.documentElement.dir || 'ltr';
         const isRTL = dir === 'rtl';
-        const isArabic = lang === 'ar';
-
-        // Check if Mathpix is loaded
-        if (typeof window.loadMathJax !== 'undefined' && typeof window.mathpixMarkdownItOptions !== 'undefined') {
-            console.log('Mathpix already loaded, reconfiguring for language:', lang);
-        }
 
         // Configure MathJax before it loads
-        // We avoid defining 'loader' as Mathpix's bundled MathJax might handle loading differently or have packages pre-loaded
         window.MathJax = {
             // TeX input configuration
             tex: {
                 inlineMath: [['$', '$'], ['\\(', '\\)']],
-                displayMath: [['$$', '$$'], ['\\[', '\\]'], ['[', ']']], // Support [ ] as well for non-standard input
+                displayMath: [['$$', '$$'], ['\\[', '\\]'], ['[', ']']],
                 processEscapes: true,
                 processEnvironments: true,
 
-                // Macros for better Arabic support
+                // Standard macros
                 macros: {
-                    // Standard macros
                     RR: "{\\bf R}",
                     bold: ["{\\bf #1}", 1],
-
-                    // Arabic-specific macros if needed
-                    ...(isArabic ? {
-                        // Arabic mathematical notation helpers
-                        artext: ["{\\text{#1}}", 1]
-                    } : {})
+                    // Language-specific text helper
+                    artext: ["{\\text{#1}}", 1]
                 }
             },
 
-            // Output configuration (chtml is usually default for Mathpix)
+            // Output configuration
             chtml: {
                 scale: 1,
                 minScale: 0.5,
