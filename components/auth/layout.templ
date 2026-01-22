@@ -66,14 +66,14 @@ templ AuthLayout(props LayoutProps) {
 						<!-- Footer Links -->
 						<div class="text-center text-sm text-muted-foreground">
 							<div class="space-x-4">
-								<a href="/privacy" class="hover:text-foreground">Privacy</a>
+								<a href="/privacy" class="hover:text-foreground">{ i18n.T(ctx, "Privacy") }</a>
 								<span>•</span>
-								<a href="/terms" class="hover:text-foreground">Terms</a>
+								<a href="/terms" class="hover:text-foreground">{ i18n.T(ctx, "Terms") }</a>
 								<span>•</span>
-								<a href="/support" class="hover:text-foreground">Support</a>
+								<a href="/support" class="hover:text-foreground">{ i18n.T(ctx, "Support") }</a>
 							</div>
 							<div class="mt-2 text-xs">
-								© { templ.EscapeString(getCurrentYear()) } SchoolWithAI. All rights reserved.
+								© { templ.EscapeString(getCurrentYear()) } SchoolWithAI. { i18n.T(ctx, "All rights reserved.") }
 							</div>
 						</div>
 					</div>

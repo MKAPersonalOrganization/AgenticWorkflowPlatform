@@ -104,6 +104,9 @@ templ ChatInputScreen(user *domain.User) {
 			}
 		</script>
 			<script type="module" src="/assets/js/chat.js?v=limit10"></script>
+			<!-- i18n JavaScript module -->
+			<script src="/assets/js/i18n.js"></script>
+			@i18n.I18nScript()
 			<!-- Alpine.js Intersect Plugin - MUST load before Alpine core -->
 			<script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/intersect@3.x.x/dist/cdn.min.js"></script>
 			<!-- Alpine.js Collapse Plugin - MUST load before Alpine core -->

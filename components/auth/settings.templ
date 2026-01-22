@@ -5,6 +5,7 @@ import "school-with-ai/components/button"
 import "school-with-ai/components/icon"
 import "school-with-ai/components"
 import "school-with-ai/domain"
+import "school-with-ai/components/i18n"
 
 type SettingsPageProps struct {
 	FlowAction     string
@@ -19,7 +20,7 @@ type SettingsPageProps struct {
 // SettingsPageWithNodes renders the settings page with all Kratos UI nodes
 templ SettingsPageWithNodes(nodes []client.UiNode, props SettingsPageProps) {
 	@components.AppLayout(components.AppLayoutProps{
-		Title: "Account Settings",
+		Title: i18n.T(ctx, "Account Settings"),
 		User:  props.User,
 	}) {
 		<div class="container mx-auto max-w-2xl py-8">
@@ -34,15 +35,14 @@ templ SettingsPageWithNodes(nodes []client.UiNode, props SettingsPageProps) {
 							Class:   "rounded-full hover:bg-background",
 						}) {
 							@icon.ArrowLeft(icon.Props{Class: "size-5"})
-							<span class="sr-only">Back to Chat</span>
+							<span class="sr-only">{ i18n.T(ctx, "Back to Chat") }</span>
 						}
 					</a>
 					<div class="flex-1">
-						<h1 class="text-xl font-semibold tracking-tight text-foreground">Account Settings</h1>
-						<p class="text-sm text-muted-foreground">Manage your profile and security</p>
+						<h1 class="text-xl font-semibold tracking-tight text-foreground">{ i18n.T(ctx, "Account Settings") }</h1>
+						<p class="text-sm text-muted-foreground">{ i18n.T(ctx, "Manage your profile and security") }</p>
 					</div>
 				</div>
-
 				<!-- Content -->
 				<div class="p-6">
 					<!-- Success Message -->
@@ -56,14 +56,12 @@ templ SettingsPageWithNodes(nodes []client.UiNode, props SettingsPageProps) {
 							</div>
 						</div>
 					}
-
 					<!-- Flow Messages -->
 					if len(props.Messages) > 0 {
 						<div class="mb-6">
 							@Messages(MessagesProps{Messages: props.Messages})
 						</div>
 					}
-
 					<!-- Settings Form -->
 					if props.FlowAction != "" {
 						@Form(FormProps{
@@ -77,7 +75,7 @@ templ SettingsPageWithNodes(nodes []client.UiNode, props SettingsPageProps) {
 								<div class="space-y-4">
 									<div class="flex items-center gap-2 pb-2 border-b border-border/50">
 										@icon.User(icon.Props{Class: "size-4 text-muted-foreground"})
-										<h3 class="font-medium text-sm text-foreground">Profile Information</h3>
+										<h1 class="font-medium text-sm text-foreground">{ i18n.T(ctx, "Profile Information") }</h1>
 									</div>
 									<div class="px-2">
 										@UINodes(UINodesProps{
@@ -87,14 +85,13 @@ templ SettingsPageWithNodes(nodes []client.UiNode, props SettingsPageProps) {
 									</div>
 								</div>
 							}
-
 							<!-- Password Settings -->
 							{{ passwordNodes := filterNodesByGroup(nodes, "password") }}
 							if len(passwordNodes) > 0 {
 								<div class="space-y-4">
 									<div class="flex items-center gap-2 pb-2 border-b border-border/50">
 										@icon.Lock(icon.Props{Class: "size-4 text-muted-foreground"})
-										<h3 class="font-medium text-sm text-foreground">Change Password</h3>
+										<h1 class="font-medium text-sm text-foreground">{ i18n.T(ctx, "Change Password") }</h1>
 									</div>
 									<div class="px-2">
 										@UINodes(UINodesProps{
@@ -104,13 +101,6 @@ templ SettingsPageWithNodes(nodes []client.UiNode, props SettingsPageProps) {
 									</div>
 								</div>
 							}
-
-
-
-
-
-
-
 							<!-- Default/Other Settings -->
 							{{ defaultNodes := filterNodesByGroup(nodes, "default") }}
 							if len(defaultNodes) > 0 {

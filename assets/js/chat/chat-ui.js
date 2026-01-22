@@ -183,7 +183,7 @@ export function createUIMethods() {
                 }
             } catch (error) {
                 console.error('Failed to fetch profile:', error);
-                this.showToast('Failed to load profile', 'error');
+                this.showToast(window.i18n.t('Failed to load profile'), 'error');
             } finally {
                 this.profileLoading = false;
             }
@@ -197,13 +197,13 @@ export function createUIMethods() {
                     body: JSON.stringify(this.profile)
                 });
                 if (response.ok) {
-                    this.showToast('Profile updated successfully', 'success');
+                    this.showToast(window.i18n.t('Profile updated successfully'), 'success');
                 } else {
-                    this.showToast('Failed to update profile', 'error');
+                    this.showToast(window.i18n.t('Failed to update profile'), 'error');
                 }
             } catch (error) {
                 console.error('Failed to update profile:', error);
-                this.showToast('Failed to update profile', 'error');
+                this.showToast(window.i18n.t('Failed to update profile'), 'error');
             }
         },
 
@@ -314,14 +314,14 @@ export function createUIMethods() {
          * @param {string} successMessage - Message to show on success
          * @returns {Promise<boolean>} Success status
          */
-        async copyToClipboard(text, successMessage = 'Copied to clipboard') {
+        async copyToClipboard(text, successMessage = window.i18n.t('Copied to clipboard')) {
             try {
                 await navigator.clipboard.writeText(text);
                 this.showToast(successMessage, 'success', 2000);
                 return true;
             } catch (error) {
                 console.error('Failed to copy:', error);
-                this.showToast('Failed to copy to clipboard', 'error');
+                this.showToast(window.i18n.t('Failed to copy to clipboard'), 'error');
                 return false;
             }
         },
@@ -335,7 +335,7 @@ export function createUIMethods() {
             const message = state.messages.find(m => m.id === messageId);
             if (message) {
                 const content = message.content || message.args || '';
-                await this.copyToClipboard(content, 'Message copied');
+                await this.copyToClipboard(content, window.i18n.t('Message copied'));
             }
         },
 
@@ -347,7 +347,7 @@ export function createUIMethods() {
             const button = event.currentTarget;
             const codeBlock = button.closest('pre')?.querySelector('code');
             if (codeBlock) {
-                await this.copyToClipboard(codeBlock.textContent, 'Code copied');
+                await this.copyToClipboard(codeBlock.textContent, window.i18n.t('Code copied'));
             }
         },
 
@@ -386,9 +386,9 @@ export function createUIMethods() {
                 case 'RUN_STARTED': return `Run ${event.runId?.slice(-8)}`;
                 case 'TEXT_MESSAGE_START': return `Message ${event.messageId?.slice(-8)}`;
                 case 'TEXT_MESSAGE_CONTENT': return `${event.delta?.length || 0} chars`;
-                case 'TEXT_MESSAGE_END': return `Complete`;
-                case 'RUN_FINISHED': return `Complete`;
-                case 'RUN_ERROR': return `Error: ${event.code}`;
+                case 'TEXT_MESSAGE_END': return window.i18n.t('Complete');
+                case 'RUN_FINISHED': return window.i18n.t('Complete');
+                case 'RUN_ERROR': return `${window.i18n.t('Error')}: ${event.code}`;
                 default: return '';
             }
         },
@@ -442,7 +442,7 @@ export function createUIMethods() {
                 }).join('\n---\n');
 
                 await navigator.clipboard.writeText(logText);
-                console.log('Event log copied to clipboard!');
+                console.log(window.i18n.t('Event log copied to clipboard!'));
 
                 this.eventLogCopied = true;
                 setTimeout(() => {
@@ -504,7 +504,7 @@ export function createUIMethods() {
          * @param {Object} message - Message object
          */
         __notifyNewMessage(message) {
-            this.__announce('New message received from assistant');
+            this.__announce(window.i18n.t('New message received from assistant'));
             console.log('New message received:', message.id);
         }
     };

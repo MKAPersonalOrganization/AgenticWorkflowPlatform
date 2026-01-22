@@ -569,7 +569,7 @@ func HandlePricingPage(log *logger.Logger) http.HandlerFunc {
 		user := domain.GetUserFromContext(r.Context())
 
 		// Get default pricing plans
-		plans := pricing.GetDefaultPlans()
+		plans := pricing.GetDefaultPlans(r.Context())
 
 		component := pricing.PricingPage(pricing.PricingPageProps{
 			Plans: plans,
@@ -594,7 +594,7 @@ func HandleCheckoutPage(log *logger.Logger) http.HandlerFunc {
 		}
 
 		// Find the plan details
-		plans := pricing.GetDefaultPlans()
+		plans := pricing.GetDefaultPlans(r.Context())
 		var selectedPlan *pricing.Plan
 		for _, p := range plans {
 			if p.ID == planID {

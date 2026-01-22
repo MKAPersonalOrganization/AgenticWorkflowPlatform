@@ -1,13 +1,16 @@
 package auth
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"school-with-ai/components/auth"
 	"school-with-ai/domain"
+	"school-with-ai/foundation/i18n"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/infra/kratos"
 )
+
 
 // AuthHandlers contains handlers for authentication routes.
 type AuthHandlers struct {
@@ -425,7 +428,7 @@ func (h *AuthHandlers) SettingsPage(w http.ResponseWriter, r *http.Request) {
 	// Check for success messages from query params (e.g., after upgrade)
 	var successMessage string
 	if r.URL.Query().Get("upgraded") == "true" {
-		successMessage = "Successfully upgraded! Your new plan is now active."
+		successMessage = i18n.T(r.Context(), "Successfully upgraded! Your new plan is now active.")
 	}
 
 	// Render the settings page
@@ -485,8 +488,8 @@ func (h *AuthHandlers) ErrorPage(w http.ResponseWriter, r *http.Request) {
 	if errorID != "" {
 		flowError, err := h.kratos.GetFlowError(r.Context(), errorID)
 		if err != nil {
-			errorMessage = "An unexpected error occurred"
-			errorDetails = "We couldn't retrieve the error details. Please try again."
+			errorMessage = i18n.T(r.Context(), "An unexpected error occurred")
+			errorDetails = i18n.T(r.Context(), "We couldn't retrieve the error details. Please try again.")
 		} else if flowError.Error != nil {
 			// Extract message from the error map
 			if msg, ok := flowError.Error["message"].(string); ok {
@@ -504,11 +507,11 @@ func (h *AuthHandlers) ErrorPage(w http.ResponseWriter, r *http.Request) {
 		}
 	} else if errorParam != "" {
 		// Use the error parameter to show a generic message
-		errorMessage = getErrorMessage(errorParam)
+		errorMessage = getErrorMessage(r.Context(), errorParam)
 	} else {
 		// No error info provided
-		errorMessage = "An unexpected error occurred"
-		errorDetails = "Please try again or contact support if the problem persists."
+		errorMessage = i18n.T(r.Context(), "An unexpected error occurred")
+		errorDetails = i18n.T(r.Context(), "Please try again or contact support if the problem persists.")
 	}
 
 	// Build URLs
@@ -528,26 +531,26 @@ func (h *AuthHandlers) ErrorPage(w http.ResponseWriter, r *http.Request) {
 	component := auth.ErrorPage(props)
 	err := component.Render(r.Context(), w)
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		http.Error(w, i18n.T(r.Context(), "Internal server error"), http.StatusInternalServerError)
 	}
 }
 
-// getErrorMessage returns a user-friendly error message for common error types.
-func getErrorMessage(errorType string) string {
+func getErrorMessage(ctx context.Context, errorType string) string {
 	switch errorType {
 	case "login_flow_error":
-		return "Login Error"
+		return i18n.T(ctx, "Login Error")
 	case "registration_flow_error":
-		return "Registration Error"
+		return i18n.T(ctx, "Registration Error")
 	case "recovery_flow_error":
-		return "Password Recovery Error"
+		return i18n.T(ctx, "Password Recovery Error")
 	case "verification_flow_error":
-		return "Email Verification Error"
+		return i18n.T(ctx, "Email Verification Error")
 	case "settings_flow_error":
-		return "Settings Error"
+		return i18n.T(ctx, "Settings Error")
 	case "session_error":
-		return "Session Error"
+		return i18n.T(ctx, "Session Error")
 	default:
-		return "Authentication Error"
+		return i18n.T(ctx, "Authentication Error")
 	}
 }
+

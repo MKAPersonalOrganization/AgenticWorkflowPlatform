@@ -29,6 +29,11 @@ func TestGenerateThreadTitle(t *testing.T) {
 			content:  "This is a message that is longer than thirty characters and should be truncated with an ellipsis.",
 			expected: "This is a message that is l...",
 		},
+		{
+			name:     "Arabic content is handled correctly",
+			content:  "هذا نص طويل جداً باللغة العربية ويجب قصه بشكل صحيح دون تدمير الحروف",
+			expected: "هذا نص طويل جداً باللغة الع...",
+		},
 	}
 
 	for _, tt := range tests {

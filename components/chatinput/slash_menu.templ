@@ -2,6 +2,7 @@ package chatinput
 
 import "school-with-ai/components/icon"
 import "school-with-ai/components/button"
+import "school-with-ai/components/i18n"
 
 templ SlashMenu() {
 	<div
@@ -38,7 +39,7 @@ templ SlashMenu() {
 				}
 			</template>
 			<div x-show="filteredPrompts.length === 0" class="px-4 py-3 text-sm text-muted-foreground text-center">
-				No matching commands
+				{ i18n.T(ctx, "No matching commands") }
 			</div>
 		</div>
 	</div>

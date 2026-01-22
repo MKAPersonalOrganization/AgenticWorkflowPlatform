@@ -52,7 +52,7 @@ export function createMessagingMethods() {
                 }
 
                 if (!this.__currentThreadId) {
-                    this.__showError('Please select or create a chat session');
+                    this.__showError(window.i18n.t('Please select or create a chat session'));
                     return;
                 }
 
@@ -139,7 +139,7 @@ export function createMessagingMethods() {
                         this.$nextTick(() => this.__scrollToBottom());
                     }
                 } else {
-                    throw new Error(`Failed to fetch messages: ${response.status}`);
+                    throw new Error(`${window.i18n.t('Failed to fetch messages')}: ${response.status}`);
                 }
             });
         },

@@ -1,0 +1,37 @@
+package i18n
+
+import (
+	"context"
+	"encoding/json"
+)
+
+func getMessagesJSON(ctx context.Context) string {
+	messages := Messages(ctx)
+	data, _ := json.Marshal(messages)
+	return string(data)
+}
+
+templ I18nScript() {
+	@templ.JSONScript("i18n-translations", Messages(ctx))
+	<script>
+        (function() {
+            const translationsEl = document.getElementById('i18n-translations');
+            if (translationsEl) {
+                try {
+                    const translations = JSON.parse(translationsEl.textContent);
+                    if (window.i18n && window.i18n.setTranslations) {
+                        window.i18n.setTranslations(translations);
+                    } else {
+                        window.addEventListener('DOMContentLoaded', () => {
+                            if (window.i18n && window.i18n.setTranslations) {
+                                window.i18n.setTranslations(translations);
+                            }
+                        });
+                    }
+                } catch (e) {
+                    console.error('Failed to parse i18n translations', e);
+                }
+            }
+        })();
+    </script>
+}

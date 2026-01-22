@@ -55,7 +55,7 @@ export function createStreamingMethods() {
                 });
 
                 if (!response.ok) {
-                    throw new Error(`Failed to enqueue task: ${response.statusText}`);
+                    throw new Error(`${window.i18n.t('Failed to enqueue task')}: ${response.statusText}`);
                 }
 
                 const task = await response.json();
@@ -79,7 +79,7 @@ export function createStreamingMethods() {
                 state.showTypingIndicator = false;
 
                 if (threadId === this.__currentThreadId) {
-                    this.__showError(`Failed to send message: ${error.message}`, threadId);
+                    this.__showError(`${window.i18n.t('Failed to send message')}: ${error.message}`, threadId);
                 }
             }
         },
@@ -171,7 +171,7 @@ export function createStreamingMethods() {
                     });
 
                     if (!response.ok) {
-                        throw new Error(`Failed to cancel job: ${response.statusText}`);
+                        throw new Error(`${window.i18n.t('Failed to cancel job')}: ${response.statusText}`);
                     }
 
                     if (state.eventSource) {
@@ -188,7 +188,7 @@ export function createStreamingMethods() {
                     console.log('Job cancelled successfully');
                 } catch (error) {
                     console.error('Failed to cancel job:', error);
-                    this.__showError('Failed to cancel job', this.__currentThreadId);
+                    this.__showError(window.i18n.t('Failed to cancel job'), this.__currentThreadId);
                 }
             });
         },
@@ -206,7 +206,7 @@ export function createStreamingMethods() {
                     clearInterval(state.heartbeatInterval);
                     state.heartbeatInterval = null;
                 }
-                this.__announce('Streaming cancelled');
+                this.__announce(window.i18n.t('Streaming cancelled'));
                 console.log('Streaming cancelled by user');
             }
         },
@@ -452,7 +452,7 @@ export function createStreamingMethods() {
             }
 
             if (threadId === this.__currentThreadId) {
-                this.__announce('Assistant is responding');
+                this.__announce(window.i18n.t('Assistant is responding'));
             }
 
             // Check if we already have this message (e.g. from history or snapshot)
@@ -517,7 +517,7 @@ export function createStreamingMethods() {
             }
 
             if (threadId === this.__currentThreadId) {
-                this.__announce('Response complete');
+                this.__announce(window.i18n.t('Response complete'));
             }
 
             if (state.currentStreamingId === event.messageId) {
@@ -551,7 +551,7 @@ export function createStreamingMethods() {
             state.eventSource = null;
 
             if (threadId === this.__currentThreadId) {
-                this.__showError(event.message || 'An error occurred', threadId);
+                this.__showError(event.message || window.i18n.t('An error occurred'), threadId);
             }
             eventSource.close();
         },
@@ -590,29 +590,29 @@ export function createStreamingMethods() {
          */
         __getLifecycleContent(event) {
             switch (event.type) {
-                case 'RUN_STARTED': return 'Started';
-                case 'RUN_FINISHED': return event.outcome === 'interrupt' ? 'Paused' : 'Completed';
-                case 'RUN_ERROR': return `Error: ${event.message || 'Unknown'}`;
-                case 'STEP_STARTED': return `Step: ${event.stepName || 'Unknown'}`;
-                case 'STEP_FINISHED': return `${event.stepName || 'Step'} Done`;
-                case 'TEXT_MESSAGE_START': return 'Responding';
-                case 'TEXT_MESSAGE_END': return 'Response Done';
-                case 'TOOL_CALL_START': return `Tool: ${event.toolCallName || 'Unknown'}`;
-                case 'TOOL_CALL_ARGS': return 'Args';
-                case 'TOOL_CALL_END': return 'Tool Done';
-                case 'TOOL_CALL_RESULT': return 'Result';
-                case 'STATE_SNAPSHOT': return 'State Snapshot';
-                case 'STATE_DELTA': return 'State Update';
-                case 'MESSAGES_SNAPSHOT': return 'Messages Sync';
-                case 'ACTIVITY_SNAPSHOT': return `Activity: ${event.activityType || 'Unknown'}`;
-                case 'ACTIVITY_DELTA': return 'Activity Update';
-                case 'REASONING_START': return 'Thinking';
-                case 'REASONING_MESSAGE_START': return 'Reasoning';
-                case 'REASONING_MESSAGE_END': return 'Thought Complete';
-                case 'REASONING_END': return 'Thinking Done';
-                case 'META_EVENT': return event.metaType || 'Meta';
-                case 'RAW': return `Raw: ${event.source || 'External'}`;
-                case 'CUSTOM': return event.name || 'Custom';
+                case 'RUN_STARTED': return window.i18n.t('Started');
+                case 'RUN_FINISHED': return event.outcome === 'interrupt' ? window.i18n.t('Paused') : window.i18n.t('Completed');
+                case 'RUN_ERROR': return `${window.i18n.t('Error')}: ${event.message || window.i18n.t('Unknown')}`;
+                case 'STEP_STARTED': return `${window.i18n.t('Step')}: ${event.stepName || window.i18n.t('Unknown')}`;
+                case 'STEP_FINISHED': return `${event.stepName || window.i18n.t('Step')} ${window.i18n.t('Done')}`;
+                case 'TEXT_MESSAGE_START': return window.i18n.t('Responding');
+                case 'TEXT_MESSAGE_END': return window.i18n.t('Response Done');
+                case 'TOOL_CALL_START': return `${window.i18n.t('Tool')}: ${event.toolCallName || window.i18n.t('Unknown')}`;
+                case 'TOOL_CALL_ARGS': return window.i18n.t('Args');
+                case 'TOOL_CALL_END': return window.i18n.t('Tool Done');
+                case 'TOOL_CALL_RESULT': return window.i18n.t('Result');
+                case 'STATE_SNAPSHOT': return window.i18n.t('State Snapshot');
+                case 'STATE_DELTA': return window.i18n.t('State Update');
+                case 'MESSAGES_SNAPSHOT': return window.i18n.t('Messages Sync');
+                case 'ACTIVITY_SNAPSHOT': return `${window.i18n.t('Activity')}: ${event.activityType || window.i18n.t('Unknown')}`;
+                case 'ACTIVITY_DELTA': return window.i18n.t('Activity Update');
+                case 'REASONING_START': return window.i18n.t('Thinking');
+                case 'REASONING_MESSAGE_START': return window.i18n.t('Reasoning');
+                case 'REASONING_MESSAGE_END': return window.i18n.t('Thought Complete');
+                case 'REASONING_END': return window.i18n.t('Thinking Done');
+                case 'META_EVENT': return event.metaType || window.i18n.t('Meta');
+                case 'RAW': return `${window.i18n.t('Raw')}: ${event.source || window.i18n.t('External')}`;
+                case 'CUSTOM': return event.name || window.i18n.t('Custom');
                 default: return event.type;
             }
         }

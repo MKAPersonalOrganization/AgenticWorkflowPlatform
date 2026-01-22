@@ -7,6 +7,8 @@ import "school-with-ai/components/badge"
 import "school-with-ai/components/pageheader"
 import "school-with-ai/components"
 import "school-with-ai/domain"
+import "school-with-ai/components/i18n"
+import "context"
 
 type Plan struct {
 	ID          string
@@ -27,17 +29,17 @@ type PricingPageProps struct {
 
 templ PricingPage(props PricingPageProps) {
 	@components.AppLayout(components.AppLayoutProps{
-		Title: "Pricing Plans",
+		Title: i18n.T(ctx, "Pricing Plans"),
 		User:  props.User,
 	}) {
 		<div class="min-h-screen bg-background">
 			<div class="container mx-auto max-w-7xl px-6 py-8 lg:py-12 space-y-10">
 				<!-- Header with Back Button -->
 				@pageheader.PageHeader(pageheader.Props{
-					Title:       "Choose Your Plan",
-					Description: "Unlock the full potential of AI-powered learning with our flexible pricing options",
+					Title:       i18n.T(ctx, "Choose Your Plan"),
+					Description: i18n.T(ctx, "Unlock the full potential of AI-powered learning with our flexible pricing options"),
 					BackURL:     "/",
-					BackLabel:   "Back to Home",
+					BackLabel:   i18n.T(ctx, "Back to Home"),
 				})
 				<!-- Pricing Cards -->
 				@PricingCards(props)
@@ -59,7 +61,7 @@ templ PricingCards(props PricingPageProps) {
 								Variant: badge.VariantDefault,
 								Class:   "px-4 py-2 text-xs font-bold shadow-lg",
 							}) {
-								<span>POPULAR</span>
+								<span>{ i18n.T(ctx, "POPULAR") }</span>
 							}
 						</div>
 						@planCardContent(plan)
@@ -130,77 +132,77 @@ templ planCardContent(plan Plan) {
 	}
 }
 
-func GetDefaultPlans() []Plan {
+func GetDefaultPlans(ctx context.Context) []Plan {
 	return []Plan{
 		{
 			ID:          "free",
-			Name:        "Free",
-			Price:       "$0",
+			Name:        i18n.T(ctx, "Free"),
+			Price:       i18n.T(ctx, "$0"),
 			Period:      "",
-			Description: "Perfect for getting started",
+			Description: i18n.T(ctx, "Perfect for getting started"),
 			Features: []string{
-				"10 conversations per day",
-				"Basic AI model",
-				"Community support",
-				"Standard response time",
+				i18n.T(ctx, "10 conversations per day"),
+				i18n.T(ctx, "Basic AI model"),
+				i18n.T(ctx, "Community support"),
+				i18n.T(ctx, "Standard response time"),
 			},
 			Popular:    false,
-			ButtonText: "Current Plan",
+			ButtonText: i18n.T(ctx, "Current Plan"),
 			ButtonHref: "#",
 		},
 		{
 			ID:          "go",
-			Name:        "Go",
-			Price:       "$9",
-			Period:      "/month",
-			Description: "For individuals who need more",
+			Name:        i18n.T(ctx, "Go"),
+			Price:       i18n.T(ctx, "$9"),
+			Period:      i18n.T(ctx, "/month"),
+			Description: i18n.T(ctx, "For individuals who need more"),
 			Features: []string{
-				"100 conversations per day",
-				"Advanced AI model",
-				"Priority support",
-				"Faster response time",
-				"Export conversation history",
+				i18n.T(ctx, "100 conversations per day"),
+				i18n.T(ctx, "Advanced AI model"),
+				i18n.T(ctx, "Priority support"),
+				i18n.T(ctx, "Faster response time"),
+				i18n.T(ctx, "Export conversation history"),
 			},
 			Popular:    false,
-			ButtonText: "Upgrade",
+			ButtonText: i18n.T(ctx, "Upgrade"),
 			ButtonHref: "/checkout?plan=go",
 		},
 		{
 			ID:          "plus",
-			Name:        "Plus",
-			Price:       "$19",
-			Period:      "/month",
-			Description: "Most popular for power users",
+			Name:        i18n.T(ctx, "Plus"),
+			Price:       i18n.T(ctx, "$19"),
+			Period:      i18n.T(ctx, "/month"),
+			Description: i18n.T(ctx, "Most popular for power users"),
 			Features: []string{
-				"Unlimited conversations",
-				"Premium AI models",
-				"Priority support",
-				"Fastest response time",
-				"Export conversation history",
-				"Advanced analytics",
-				"Custom instructions",
+				i18n.T(ctx, "Unlimited conversations"),
+				i18n.T(ctx, "Premium AI models"),
+				i18n.T(ctx, "Priority support"),
+				i18n.T(ctx, "Fastest response time"),
+				i18n.T(ctx, "Export conversation history"),
+				i18n.T(ctx, "Advanced analytics"),
+				i18n.T(ctx, "Custom instructions"),
 			},
 			Popular:    true,
-			ButtonText: "Upgrade",
+			ButtonText: i18n.T(ctx, "Upgrade"),
 			ButtonHref: "/checkout?plan=plus",
 		},
 		{
 			ID:          "pro",
-			Name:        "Pro",
-			Price:       "$49",
-			Period:      "/month",
-			Description: "For professionals and teams",
+			Name:        i18n.T(ctx, "Pro"),
+			Price:       i18n.T(ctx, "$49"),
+			Period:      i18n.T(ctx, "/month"),
+			Description: i18n.T(ctx, "For professionals and teams"),
 			Features: []string{
-				"Everything in Plus",
-				"Dedicated support",
-				"API access",
-				"Team collaboration",
-				"Custom integrations",
-				"SLA guarantee",
-				"Advanced security",
+				i18n.T(ctx, "Everything in Plus"),
+				i18n.T(ctx, "Dedicated support"),
+				i18n.T(ctx, "API access"),
+				i18n.T(ctx, "Team collaboration"),
+				i18n.T(ctx, "Custom integrations"),
+				i18n.T(ctx, "SLA guarantee"),
+				i18n.T(ctx, "Advanced security"),
 			},
 			Popular:    false,
-			ButtonText: "Upgrade",
+			ButtonText: i18n.T(ctx, "Upgrade"),
 			ButtonHref: "/checkout?plan=pro",
 		},
 	}

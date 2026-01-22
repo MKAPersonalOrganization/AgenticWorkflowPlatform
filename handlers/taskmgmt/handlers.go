@@ -12,7 +12,7 @@ import (
 	"school-with-ai/services"
 	"school-with-ai/services/taskmanagement"
 	"school-with-ai/services/threadmgmt"
-	"school-with-ai/foundation/middleware"
+	"school-with-ai/foundation/i18n"
 	"time"
 
 	"github.com/hibiken/asynq"
@@ -412,14 +412,12 @@ func (h *TaskManagementHandler) ListAgents(w http.ResponseWriter, r *http.Reques
 	}
 
 	var agents []AgentInfo
-	printer := middleware.GetPrinter(r.Context())
-
 	for _, id := range agentIDs {
-		// Use the printer to get the localized name for the agent ID
+		// Use i18n.T to get the localized name for the agent ID
 		// The keys in en.json match the agent IDs (e.g. "math-instructor")
 		agents = append(agents, AgentInfo{
 			ID:   id,
-			Name: printer.Sprintf(id),
+			Name: i18n.T(r.Context(), id),
 		})
 	}
 

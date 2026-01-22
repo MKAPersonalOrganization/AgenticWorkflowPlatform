@@ -5,9 +5,11 @@ import (
 	"net/http"
 	"school-with-ai/components/profile"
 	"school-with-ai/domain"
+	"school-with-ai/foundation/i18n"
 	"school-with-ai/foundation/logger"
 	"strings"
 )
+
 
 // Handler manages student profile requests.
 type Handler struct {
@@ -45,7 +47,7 @@ func (h *Handler) HandleProfilePage(w http.ResponseWriter, r *http.Request) {
 
 	if err := component.Render(r.Context(), w); err != nil {
 		h.Log.Error(r.Context(), "failed to render profile page", "error", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, i18n.T(r.Context(), "Internal Server Error"), http.StatusInternalServerError)
 	}
 }
 
@@ -53,13 +55,13 @@ func (h *Handler) HandleProfilePage(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	user := domain.GetUserFromContext(r.Context())
 	if user == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
 	}
 
 	profile, err := h.Repo.GetByUserID(r.Context(), user.ID)
 	if err != nil {
-		http.Error(w, "Failed to retrieve profile", http.StatusInternalServerError)
+		http.Error(w, i18n.T(r.Context(), "Failed to retrieve profile"), http.StatusInternalServerError)
 		return
 	}
 
@@ -78,7 +80,7 @@ func (h *Handler) GetProfile(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	user := domain.GetUserFromContext(r.Context())
 	if user == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
 	}
 
@@ -90,7 +92,7 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		http.Error(w, i18n.T(r.Context(), "Invalid request body"), http.StatusBadRequest)
 		return
 	}
 
@@ -120,7 +122,7 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.Repo.Upsert(r.Context(), profile); err != nil {
 		h.Log.Error(r.Context(), "failed to update profile", "error", err, "user_id", user.ID)
-		http.Error(w, "Failed to update profile", http.StatusInternalServerError)
+		http.Error(w, i18n.T(r.Context(), "Failed to update profile"), http.StatusInternalServerError)
 		return
 	}
 

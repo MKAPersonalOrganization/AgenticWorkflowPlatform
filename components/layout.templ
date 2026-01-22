@@ -42,6 +42,7 @@ templ AppLayout(props AppLayoutProps) {
 			<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 			<!-- i18n JavaScript module -->
 			<script src="/assets/js/i18n.js"></script>
+			@i18n.I18nScript()
 			<!-- Alpine.js global data for theme management -->
 			<script>
 				document.addEventListener('alpine:init', () => {
