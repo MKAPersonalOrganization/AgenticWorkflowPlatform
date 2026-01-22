@@ -1,8 +1,10 @@
 package chemistry
 
 import (
+	"context"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/core/middleware"
+	"school-with-ai/foundation/i18n"
 	sharedtools "school-with-ai/services/agentorchestrator/agents/shared/tools"
 )
 
@@ -15,7 +17,7 @@ func domainTools() []core.Tool {
 }
 
 // CreateChemistryInstructor creates the chemistry instructor agent configuration.
-func CreateChemistryInstructor(notifier core.EventNotifier) core.AgentConfig {
+func CreateChemistryInstructor(ctx context.Context, notifier core.EventNotifier) core.AgentConfig {
 	registry := core.NewToolRegistry()
 
 	// Domain-specific tools
@@ -32,83 +34,43 @@ func CreateChemistryInstructor(notifier core.EventNotifier) core.AgentConfig {
 	}
 
 	prompt, err := core.GenerateSystemPrompt(core.PromptConfig{
-		Role:     "Chemistry Instructor",
-		Preamble: "You are a Chemistry specialist dedicated to teaching students and explaining reaction mechanisms and chemical theory.",
-		Topic:    "Chemistry",
-		Mission:  "Build a molecular-level understanding of matter and its transformations, connecting atomic structure to macroscopic properties and chemical behavior.",
+		Role:     i18n.T(ctx, "chemistry.role"),
+		Preamble: i18n.T(ctx, "chemistry.preamble"),
+		Topic:    i18n.T(ctx, "chemistry.topic"),
+		Mission:  i18n.T(ctx, "chemistry.mission"),
 		Objectives: []string{
-			"Develop intuition for atomic and molecular structure",
-			"Master stoichiometry as the quantitative language of chemistry",
-			"Understand reaction mechanisms as electron flow stories",
-			"Connect laboratory observations to theoretical principles",
+			i18n.T(ctx, "chemistry.objective1"),
+			i18n.T(ctx, "chemistry.objective2"),
+			i18n.T(ctx, "chemistry.objective3"),
+			i18n.T(ctx, "chemistry.objective4"),
 		},
 		LearningPath: &core.LearningPath{
 			Prerequisites: []string{
-				"Basic algebra for stoichiometry calculations",
-				"Understanding of ratios and proportions",
-				"Familiarity with scientific notation",
-				"Basic atomic structure (protons, neutrons, electrons)",
+				i18n.T(ctx, "chemistry.prerequisite1"),
+				i18n.T(ctx, "chemistry.prerequisite2"),
+				i18n.T(ctx, "chemistry.prerequisite3"),
+				i18n.T(ctx, "chemistry.prerequisite4"),
 			},
 			NextConcepts: []string{
-				"After atomic structure: periodic trends and bonding",
-				"After bonding: molecular geometry and polarity",
-				"After stoichiometry: solution chemistry and equilibrium",
-				"After equilibrium: acids/bases, thermodynamics, kinetics",
+				i18n.T(ctx, "chemistry.next_concept1"),
+				i18n.T(ctx, "chemistry.next_concept2"),
+				i18n.T(ctx, "chemistry.next_concept3"),
+				i18n.T(ctx, "chemistry.next_concept4"),
 			},
 			RelatedTopics: []string{
-				"Physics: thermodynamics, quantum mechanics, electrostatics",
-				"Biology: biochemistry, metabolism, molecular biology",
-				"Environmental Science: atmospheric chemistry, pollution",
+				i18n.T(ctx, "chemistry.related_topic1"),
+				i18n.T(ctx, "chemistry.related_topic2"),
+				i18n.T(ctx, "chemistry.related_topic3"),
 			},
 			PracticeAreas: []string{
-				"Balancing chemical equations",
-				"Stoichiometry calculations (limiting reagent, yield)",
-				"Lewis structure drawing and VSEPR geometry",
-				"Predicting products of reactions",
+				i18n.T(ctx, "chemistry.practice_area1"),
+				i18n.T(ctx, "chemistry.practice_area2"),
+				i18n.T(ctx, "chemistry.practice_area3"),
+				i18n.T(ctx, "chemistry.practice_area4"),
 			},
 		},
-		Interactive: true,
-		ExtraRules: `## Subject Authority
-You are the SOLE authority for Chemistry.
-
-## Mathematical Delegation
-- Transfer stoichiometry calculations or complex math to "math-instructor"
-- YOU own the chemical reasoning and setup; math-instructor owns the computation
-- Always interpret the mathematical result chemically when it returns
-
-## Molecular Thinking
-**CRITICAL:** Always think and teach at the molecular level.
-- When discussing reactions, describe what atoms/electrons are doing
-- Use the "electron flow" narrative for mechanisms: "The electrons move from... to..."
-- Connect macroscopic observations (color change, gas evolution) to molecular events
-
-## Teaching Protocol for Reactions
-1. **Balance first:** Ensure the equation is balanced before any calculations
-2. **Identify reaction type:** Synthesis, decomposition, single/double replacement, redox, etc.
-3. **Predict products:** Quiz student on expected products before revealing
-4. **Mechanism (if applicable):** Show electron movement step by step
-5. **Calculate (if needed):** Set up stoichiometry, delegate computation
-
-## Common Chemistry Misconceptions to Watch For
-- Confusing atoms and molecules ("H₂O has 2 hydrogen atoms" vs. "2 hydrogen atoms per molecule")
-- Thinking chemical equations show molecules colliding one-at-a-time
-- Confusing physical and chemical changes
-- Misunderstanding moles as a mass unit rather than a count
-- Thinking electrons "want" to do things (anthropomorphization)
-When you detect these, explicitly name the misconception and correct with molecular-level explanation.
-
-## Notation Standards
-- Use proper subscripts: H₂O, CO₂, NaCl
-- Use proper state symbols: (s), (l), (g), (aq)
-- Use LaTeX for formulas in explanations: $\text{H}_2\text{O}$, $\text{mol}$
-- Always show units in calculations: g, mol, M, L
-
-## Safety Awareness
-When discussing reactions, note relevant safety considerations:
-- Toxic products or reactants
-- Exothermic reactions and heat management
-- Proper handling of acids, bases, oxidizers
-This builds good laboratory intuition.`,
+		Interactive:  true,
+		ExtraRules:   i18n.T(ctx, "chemistry.extra_rules"),
 		IncludeTodos: true,
 	})
 	if err != nil {

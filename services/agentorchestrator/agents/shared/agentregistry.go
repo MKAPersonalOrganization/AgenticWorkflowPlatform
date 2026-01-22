@@ -1,13 +1,14 @@
 package shared
 
 import (
+	"context"
 	"school-with-ai/foundation/agentsdk/core"
 	"sort"
 	"sync"
 )
 
-// AgentFactory creates an agent configuration with a given notifier.
-type AgentFactory func(notifier core.EventNotifier) core.AgentConfig
+// AgentFactory creates an agent configuration with a given notifier and context.
+type AgentFactory func(ctx context.Context, notifier core.EventNotifier) core.AgentConfig
 
 // GlobalAgents is the global agent registry.
 var GlobalAgents = NewAgentRegistry()

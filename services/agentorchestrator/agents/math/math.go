@@ -1,8 +1,10 @@
 package math
 
 import (
+	"context"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/core/middleware"
+	"school-with-ai/foundation/i18n"
 	"school-with-ai/services/agentorchestrator/agents/math/tools"
 	sharedtools "school-with-ai/services/agentorchestrator/agents/shared/tools"
 )
@@ -18,7 +20,7 @@ func domainTools() []core.Tool {
 }
 
 // CreateMathInstructor creates the math instructor agent configuration.
-func CreateMathInstructor(notifier core.EventNotifier) core.AgentConfig {
+func CreateMathInstructor(ctx context.Context, notifier core.EventNotifier) core.AgentConfig {
 	registry := core.NewToolRegistry()
 
 	// Domain-specific tools
@@ -35,76 +37,42 @@ func CreateMathInstructor(notifier core.EventNotifier) core.AgentConfig {
 	}
 
 	prompt, err := core.GenerateSystemPrompt(core.PromptConfig{
-		Role:     "Math Instructor",
-		Preamble: "You are a Mathematics specialist dedicated to teaching students and solving mathematical problems with precision.",
-		Topic:    "Mathematics",
-		Mission:  "Guide students to deep mathematical understanding through rigorous problem-solving, visual intuition, and active verification of comprehension.",
+		Role:     i18n.T(ctx, "math.role"),
+		Preamble: i18n.T(ctx, "math.preamble"),
+		Topic:    i18n.T(ctx, "math.topic"),
+		Mission:  i18n.T(ctx, "math.mission"),
 		Objectives: []string{
-			"Build strong foundational skills in algebra, calculus, and problem-solving strategies",
-			"Develop mathematical intuition through visualization and worked examples",
-			"Identify and address misconceptions before they compound",
-			"Connect abstract concepts to concrete applications",
+			i18n.T(ctx, "math.objective1"),
+			i18n.T(ctx, "math.objective2"),
+			i18n.T(ctx, "math.objective3"),
+			i18n.T(ctx, "math.objective4"),
 		},
 		LearningPath: &core.LearningPath{
 			Prerequisites: []string{
-				"Basic arithmetic operations and order of operations",
-				"Understanding of variables and basic equation structure",
-				"Familiarity with coordinate plane for graphing topics",
+				i18n.T(ctx, "math.prerequisite1"),
+				i18n.T(ctx, "math.prerequisite2"),
+				i18n.T(ctx, "math.prerequisite3"),
 			},
 			NextConcepts: []string{
-				"After algebra fundamentals: quadratic equations and factoring",
-				"After functions: limits and introduction to calculus",
-				"After derivatives: integration and applications",
-				"After single-variable calculus: multivariable calculus or linear algebra",
+				i18n.T(ctx, "math.next_concept1"),
+				i18n.T(ctx, "math.next_concept2"),
+				i18n.T(ctx, "math.next_concept3"),
+				i18n.T(ctx, "math.next_concept4"),
 			},
 			RelatedTopics: []string{
-				"Physics: motion equations, optimization problems",
-				"Statistics: probability distributions, regression",
-				"Computer Science: algorithms, computational complexity",
+				i18n.T(ctx, "math.related_topic1"),
+				i18n.T(ctx, "math.related_topic2"),
+				i18n.T(ctx, "math.related_topic3"),
 			},
 			PracticeAreas: []string{
-				"Equation solving with increasing complexity",
-				"Word problems requiring equation setup",
-				"Graphing exercises to build visual intuition",
-				"Proof exercises for logical reasoning",
+				i18n.T(ctx, "math.practice_area1"),
+				i18n.T(ctx, "math.practice_area2"),
+				i18n.T(ctx, "math.practice_area3"),
+				i18n.T(ctx, "math.practice_area4"),
 			},
 		},
 		Interactive: true,
-		ExtraRules: `## Subject Authority
-You are the SOLE authority for Mathematics.
-
-## Calculation Protocol
-- Use the "calculate" tool for ALL arithmetic to avoid computational errors
-- Show your work step-by-step before using the tool
-- Verify results make sense in context
-
-## Visualization Strategy
-When visualizing functions or concepts:
-1. Use the plot tool → returns {"image_url": "..."}
-2. ALWAYS include the image in your response: ![Description](/assets/charts/plot.png)
-3. Explain what the graph shows and highlight key features (intercepts, extrema, asymptotes)
-4. Ask the student to identify features in the graph via quiz
-
-## Common Math Misconceptions to Watch For
-- Distributing exponents incorrectly: $(a+b)^2 \neq a^2 + b^2$
-- Sign errors when factoring or distributing negatives
-- Confusing the chain rule with the product rule in calculus
-- Misunderstanding function notation: $f(x+h) \neq f(x) + f(h)$
-When you detect these, explicitly name the misconception and correct it.
-
-## Teaching Progression
-1. Start with the simplest non-trivial example
-2. Work through it completely, explaining each step
-3. Quiz on the concept immediately
-4. If correct, introduce a slightly harder variation
-5. If incorrect, diagnose and re-teach with a different approach
-6. When the user speaks Arabic or the context is explicitly Arabic:
-   - Use Arabic letters for variables: use 'س' for x, 'ص' for y, 'ع' for z.
-   - Use 'ج' or 'د' for functions if appropriate in context (e.g. د(س)).
-   - ALWAYS wrap equations and variables in LaTeX delimiters ($...$) to ensure they are rendered correctly.
-   - Respect Right-to-Left (RTL) writing flow for equations. For example write "$٥س + ٦ = ٠$" instead of "$٠ = ٦ + ٥س$".
-   - Use Eastern Arabic numerals (٠, ١, ٢...) if the user is using them.
-   - Example equation: س² + ٥س + ٦ = ٠`,
+		ExtraRules:  i18n.T(ctx, "math.extra_rules"),
 		IncludeTodos: true,
 	})
 	if err != nil {
