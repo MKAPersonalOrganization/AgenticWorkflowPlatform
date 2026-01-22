@@ -4,43 +4,97 @@ import (
 	"school-with-ai/foundation/agentsdk/llm"
 )
 
-// GetWeatherTool returns the tool definition for weather lookup.
-func GetWeatherTool() llm.AITool {
+// GetAddTool returns the tool definition for addition.
+func GetAddTool() llm.AITool {
 	return llm.NewAIFunctionTool(
-		"get_weather",
-		"Get the current weather for a location",
+		"add",
+		"Add two numbers (a + b)",
 		map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"location": map[string]string{
-					"type":        "string",
-					"description": "City name or location (e.g., 'San Francisco, CA')",
-				},
-				"unit": map[string]any{
-					"type":        "string",
-					"enum":        []string{"celsius", "fahrenheit"},
-					"description": "Temperature unit",
-				},
+				"a": map[string]any{"type": "number"},
+				"b": map[string]any{"type": "number"},
 			},
-			"required": []string{"location"},
+			"required": []string{"a", "b"},
 		},
 	)
 }
 
-// GetCalculatorTool returns the tool definition for calculator.
-func GetCalculatorTool() llm.AITool {
+// GetSubtractTool returns the tool definition for subtraction.
+func GetSubtractTool() llm.AITool {
 	return llm.NewAIFunctionTool(
-		"calculate",
-		"Perform mathematical calculations. Supports basic arithmetic (+, -, *, /), exponentiation (^), square root (sqrt), and parentheses.",
+		"subtract",
+		"Subtract two numbers (a - b)",
 		map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"expression": map[string]string{
-					"type":        "string",
-					"description": "Mathematical expression to evaluate (e.g., '2 + 2', '15 * 3', 'sqrt(16)', '2^8')",
-				},
+				"a": map[string]any{"type": "number"},
+				"b": map[string]any{"type": "number"},
 			},
-			"required": []string{"expression"},
+			"required": []string{"a", "b"},
+		},
+	)
+}
+
+// GetMultiplyTool returns the tool definition for multiplication.
+func GetMultiplyTool() llm.AITool {
+	return llm.NewAIFunctionTool(
+		"multiply",
+		"Multiply two numbers (a * b)",
+		map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"a": map[string]any{"type": "number"},
+				"b": map[string]any{"type": "number"},
+			},
+			"required": []string{"a", "b"},
+		},
+	)
+}
+
+// GetDivideTool returns the tool definition for division.
+func GetDivideTool() llm.AITool {
+	return llm.NewAIFunctionTool(
+		"divide",
+		"Divide two numbers (a / b)",
+		map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"a": map[string]any{"type": "number"},
+				"b": map[string]any{"type": "number"},
+			},
+			"required": []string{"a", "b"},
+		},
+	)
+}
+
+// GetPowerTool returns the tool definition for exponentiation.
+func GetPowerTool() llm.AITool {
+	return llm.NewAIFunctionTool(
+		"power",
+		"Raise a to the power of b (a^b)",
+		map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"a": map[string]any{"type": "number"},
+				"b": map[string]any{"type": "number"},
+			},
+			"required": []string{"a", "b"},
+		},
+	)
+}
+
+// GetSqrtTool returns the tool definition for square root.
+func GetSqrtTool() llm.AITool {
+	return llm.NewAIFunctionTool(
+		"sqrt",
+		"Calculate the square root of a number",
+		map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"value": map[string]any{"type": "number"},
+			},
+			"required": []string{"value"},
 		},
 	)
 }
@@ -48,7 +102,12 @@ func GetCalculatorTool() llm.AITool {
 // GetAllTools returns all available tools.
 func GetAllTools() []llm.AITool {
 	return []llm.AITool{
-		GetWeatherTool(),
-		GetCalculatorTool(),
+	
+		GetAddTool(),
+		GetSubtractTool(),
+		GetMultiplyTool(),
+		GetDivideTool(),
+		GetPowerTool(),
+		GetSqrtTool(),
 	}
 }
