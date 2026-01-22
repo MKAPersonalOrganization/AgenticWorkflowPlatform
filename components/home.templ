@@ -89,18 +89,21 @@ templ ChatInputScreen(user *domain.User) {
 				});
 			</script>
 			<script src="https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js"></script>
+			<!-- Load localized Math config -->
+			<script src="/assets/js/math-loader.js"></script>
 			<script>
+			// Initialize MathJax configuration immediately so it's ready when the library loads
+			if (window.loadMathJax) {
+				window.loadMathJax();
+			}
+
 			let script = document.createElement('script');
 			script.src = "https://cdn.jsdelivr.net/npm/mathpix-markdown-it@1.3.6/es5/bundle.js";
 			document.head.append(script);
 
 			script.onload = function() {
-				const isLoaded = window.loadMathJax();
-				if (isLoaded) {
-					console.log('Mathpix styles loaded successfully');
-				} else {
-					console.error('Failed to load Mathpix styles');
-				}
+				console.log('Mathpix loaded');
+				// We can re-trigger or check status here if needed
 			}
 		</script>
 			<script type="module" src="/assets/js/chat.js?v=limit10"></script>
