@@ -258,6 +258,13 @@ func (u *ProjectionUpdater) convertEvent(event *kurrentdb.RecordedEvent) (core.E
 		}
 		return &evt, nil
 
+	case "TokenUsageReported":
+		var evt domain.TokenUsageReported
+		if err := json.Unmarshal(event.Data, &evt); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal TokenUsageReported: %w", err)
+		}
+		return &evt, nil
+
 	default:
 		// Skip unknown event types (not domain events we care about)
 		return nil, fmt.Errorf("unknown event type: %s", event.EventType)

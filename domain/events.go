@@ -194,3 +194,32 @@ type AgentHandoffEvent struct {
 func (e AgentHandoffEvent) EventType() string         { return "AgentHandoff" }
 func (e AgentHandoffEvent) EventTimestamp() time.Time { return e.Timestamp }
 func (e AgentHandoffEvent) AggregateID() string       { return e.ThreadID }
+
+// TokenUsageReported is emitted when token usage information is available.
+type TokenUsageReported struct {
+	ThreadID  string `json:"threadId"`
+	MessageID string `json:"messageId"`
+	Provider  string `json:"provider"`
+	Model     string `json:"model"`
+
+	// Basic token counts
+	PromptTokens     int `json:"promptTokens"`
+	CompletionTokens int `json:"completionTokens"`
+	TotalTokens      int `json:"totalTokens"`
+
+	// Detailed prompt token breakdown
+	CachedTokens     int `json:"cachedTokens,omitempty"`
+	AudioInputTokens int `json:"audioInputTokens,omitempty"`
+
+	// Detailed completion token breakdown
+	ReasoningTokens          int `json:"reasoningTokens,omitempty"`
+	AudioOutputTokens        int `json:"audioOutputTokens,omitempty"`
+	AcceptedPredictionTokens int `json:"acceptedPredictionTokens,omitempty"`
+	RejectedPredictionTokens int `json:"rejectedPredictionTokens,omitempty"`
+
+	Timestamp time.Time `json:"timestamp"`
+}
+
+func (e TokenUsageReported) EventType() string         { return "TokenUsageReported" }
+func (e TokenUsageReported) EventTimestamp() time.Time { return e.Timestamp }
+func (e TokenUsageReported) AggregateID() string       { return e.ThreadID }

@@ -121,8 +121,8 @@ func (s *Service) HandleUserMessage(
 
 		// Filter out events that were already persisted by the Engine/ThreadMgmt to avoid duplication
 		switch event.EventType() {
-		case "MessageAdded", "ThreadCreated", "ThreadTitleUpdated", "ThreadDeleted":
-			// These are handled by threadMgmt internal calls
+		case "MessageAdded", "ThreadCreated", "ThreadTitleUpdated", "ThreadDeleted", "TokenUsageReported":
+			// These are handled by threadMgmt internal calls or engine directly
 			continue
 		default:
 			// Write ephemeral events (streaming tokens, run status, etc.) to EventStore

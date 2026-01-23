@@ -32,6 +32,8 @@ type StreamProcessor struct {
 type ProcessParams struct {
 	ThreadID  string
 	MessageID string
+	Provider  string
+	Model     string
 }
 
 // Process iterates over the LLM stream, accumulates content and tool calls,
@@ -92,6 +94,24 @@ func (p *StreamProcessor) Process(
 						return &StreamResult{Content: content, ToolCalls: toolCalls.GetAll()}, nil
 					}
 				}
+			}
+		}
+
+		// Process usage updates
+		if update.Usage != nil {
+			model := params.Model
+			if update.Model != "" {
+				model = update.Model
+			}
+			usageEvent := p.events.TokenUsageReported(
+				params.ThreadID,
+				params.MessageID,
+				params.Provider,
+				model,
+				update.Usage,
+			)
+			if !yield(usageEvent, nil) {
+				return &StreamResult{Content: content, ToolCalls: toolCalls.GetAll()}, nil
 			}
 		}
 	}

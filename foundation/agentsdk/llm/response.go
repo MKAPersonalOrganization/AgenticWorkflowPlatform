@@ -24,6 +24,9 @@ type ChatResponseUpdate struct {
 	// Typically ChatRoleAssistant for model responses.
 	Role ChatRole `json:"role,omitempty"`
 
+	// Model identifies the model that generated this response.
+	Model string `json:"model,omitempty"`
+
 	// AuthorName identifies who is generating this content.
 	// For agents, this is the agent name.
 	AuthorName string `json:"authorName,omitempty"`
@@ -50,6 +53,10 @@ type ChatResponseUpdate struct {
 	// ToolCallID is the ID of the tool call being updated.
 	// Set when streaming tool call content.
 	ToolCallID string `json:"toolCallId,omitempty"`
+
+	// Usage is set when token usage information is available.
+	// Typically set in the final update of a stream.
+	Usage *UsageDetails `json:"usage,omitempty"`
 }
 
 // Text returns the text content delta from this update.
@@ -91,4 +98,12 @@ type UsageDetails struct {
 	InputTokens  int `json:"inputTokens"`
 	OutputTokens int `json:"outputTokens"`
 	TotalTokens  int `json:"totalTokens"`
+
+	// Detailed breakdown
+	CachedTokens             int `json:"cachedTokens,omitempty"`
+	AudioInputTokens         int `json:"audioInputTokens,omitempty"`
+	ReasoningTokens          int `json:"reasoningTokens,omitempty"`
+	AudioOutputTokens        int `json:"audioOutputTokens,omitempty"`
+	AcceptedPredictionTokens int `json:"acceptedPredictionTokens,omitempty"`
+	RejectedPredictionTokens int `json:"rejectedPredictionTokens,omitempty"`
 }

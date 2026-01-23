@@ -22,6 +22,10 @@ type MockChatClient struct {
 	capturedMessages [][]llm.ChatMessage
 }
 
+func (m *MockChatClient) Provider() string {
+	return "mock"
+}
+
 func (m *MockChatClient) GetStreamingResponse(
 	ctx context.Context,
 	messages []llm.ChatMessage,
@@ -176,6 +180,13 @@ func TestEngine_Run(t *testing.T) {
 					},
 					FinishReason: "stop",
 				},
+				{
+					Usage: &llm.UsageDetails{
+						InputTokens:  10,
+						OutputTokens: 20,
+						TotalTokens:  30,
+					},
+				},
 			},
 		},
 	}
@@ -253,5 +264,19 @@ func TestEngine_Run(t *testing.T) {
 	}
 	if !foundCompleted {
 		t.Error("Did not find AssistantCompletedEvent")
+	}
+
+	// Verify persistence of usage event
+	foundUsageInStore := false
+	streamName := domain.StreamName("Thread", threadID)
+	eventsInStore, _ := eventStore.ReadStream(ctx, streamName, 0)
+	for _, evt := range eventsInStore {
+		switch evt.(type) {
+		case *domain.TokenUsageReported, domain.TokenUsageReported:
+			foundUsageInStore = true
+		}
+	}
+	if !foundUsageInStore {
+		t.Error("TokenUsageReported event not found in event store")
 	}
 }
