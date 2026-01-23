@@ -92,6 +92,7 @@ func (f *EventFactory) ToolCallExecuted(
 	toolName string,
 	toolArguments string,
 	toolResult string,
+	isError bool,
 	parentMessageID string,
 ) *domain.ToolCallExecutedEvent {
 	return &domain.ToolCallExecutedEvent{
@@ -101,6 +102,7 @@ func (f *EventFactory) ToolCallExecuted(
 		ToolName:        toolName,
 		ToolArguments:   toolArguments,
 		ToolResult:      toolResult,
+		IsError:         isError,
 		ParentMessageID: parentMessageID,
 		AgentName:       f.agentName,
 		Timestamp:       time.Now(),

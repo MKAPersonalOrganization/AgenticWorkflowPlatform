@@ -97,3 +97,30 @@ CREATE TABLE IF NOT EXISTS student_profiles (
 );
 
 CREATE INDEX IF NOT EXISTS idx_student_profiles_updated ON student_profiles(updated_at);
+
+-- Version: 1.10
+-- Description: Create tool statistics table
+CREATE TABLE IF NOT EXISTS tool_stats (
+    tool_name VARCHAR(255) PRIMARY KEY,
+    total_calls INTEGER DEFAULT 0,
+    successes INTEGER DEFAULT 0,
+    failures INTEGER DEFAULT 0,
+    last_failure TIMESTAMP,
+    last_success TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- Version: 1.11
+-- Description: Update tool statistics table to include agent_name in primary key
+DROP TABLE IF EXISTS tool_stats;
+CREATE TABLE tool_stats (
+    tool_name VARCHAR(255) NOT NULL,
+    agent_name VARCHAR(255) NOT NULL,
+    total_calls INTEGER DEFAULT 0,
+    successes INTEGER DEFAULT 0,
+    failures INTEGER DEFAULT 0,
+    last_failure TIMESTAMP,
+    last_success TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (tool_name, agent_name)
+);
