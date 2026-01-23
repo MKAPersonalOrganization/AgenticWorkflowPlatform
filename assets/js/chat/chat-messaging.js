@@ -73,10 +73,8 @@ export function createMessagingMethods() {
                 // Update session title with first message
                 this.__updateSessionTitle();
 
-                // Clear the correct input buffer
-                if (overrideMessage !== null) {
-                    this.elicitationAnswer = '';
-                } else {
+                // Clear the input buffer
+                if (overrideMessage === null) {
                     this.currentMessage = '';
                 }
 
