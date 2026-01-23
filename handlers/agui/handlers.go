@@ -62,10 +62,23 @@ func (h *AguiProjectionHandler) GetMessages(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	messages := h.projection.GetMessages(threadID)
+	// Get full thread state including token usage
+	state, exists := h.projection.GetThreadState(threadID)
+	if !exists {
+		http.Error(w, "thread not found", http.StatusNotFound)
+		return
+	}
+
+	// Return messages with token usage
+	response := map[string]interface{}{
+		"messages": state.Messages,
+	}
+	if state.TokenUsage != nil {
+		response["tokenUsage"] = state.TokenUsage
+	}
 
 	w.Header().Set("Content-Type", "application/json")
-	err := json.NewEncoder(w).Encode(messages)
+	err := json.NewEncoder(w).Encode(response)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 	}

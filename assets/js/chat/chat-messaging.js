@@ -129,6 +129,26 @@ export function createMessagingMethods() {
                     const messages = Array.isArray(data) ? data : (data.messages || []);
                     state.messages = this.__convertBackendMessagesToUI(messages);
 
+                    // Load token usage if available
+                    if (data.tokenUsage) {
+                        state.tokenUsage = {
+                            total: data.tokenUsage.total || 0,
+                            prompt: data.tokenUsage.prompt || 0,
+                            completion: data.tokenUsage.completion || 0,
+                            cached: data.tokenUsage.cached || 0,
+                            reasoning: data.tokenUsage.reasoning || 0,
+                            audioInput: data.tokenUsage.audioInput || 0,
+                            audioOutput: data.tokenUsage.audioOutput || 0,
+                            acceptedPredict: data.tokenUsage.acceptedPredict || 0,
+                            rejectedPredict: data.tokenUsage.rejectedPredict || 0,
+                            model: data.tokenUsage.model || 'N/A',
+                            provider: data.tokenUsage.provider || 'N/A',
+                            messageId: data.tokenUsage.messageId,
+                            threadId: data.tokenUsage.threadId
+                        };
+                        console.log('Token usage loaded from history:', state.tokenUsage);
+                    }
+
                     // Update derived state based on loaded messages
                     this.__updateDerivedState();
 
