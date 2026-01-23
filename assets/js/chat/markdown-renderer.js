@@ -104,7 +104,7 @@ export function renderMarkdown(content) {
     if (langData?.useEasternDigits) {
         // We only want to convert digits that are inside math blocks or are intended to be Arabic
         // Extended to match standard LaTeX delimiters plus [ ... ] which we allow in config
-        processedContent = processedContent.replace(/\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]|\\\(([\s\S]*?)\\\)|\$([\s\S]*?)\$|\[([\s\S]*?)\]/g, (match) => {
+        processedContent = processedContent.replace(/\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]|\\\(([\s\S]*?)\\\)|\$([\s\S]*?)\$/g, (match) => {
             return convertDigits(match);
         });
     }
