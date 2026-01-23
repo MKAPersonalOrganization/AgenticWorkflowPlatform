@@ -33,7 +33,9 @@ export function createEmptyThreadState() {
         awaitingHumanInput: false,
         humanInputQuestion: null,
         humanInputSchema: null,
-        humanInputToastId: null
+        humanInputToastId: null,
+        // Token usage tracking
+        tokenUsage: null
     };
 }
 
@@ -60,7 +62,8 @@ export function createInitialState() {
             awaitingHumanInput: false,
             humanInputQuestion: null,
             humanInputSchema: null,
-            humanInputToastId: null
+            humanInputToastId: null,
+            tokenUsage: null
         },
 
         // User input

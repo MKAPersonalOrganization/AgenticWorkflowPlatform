@@ -323,6 +323,23 @@ export function createStreamingMethods() {
             } else if (event.name === 'AGENT_CALLED') {
                 const { callerAgent, calledAgent, reason } = event.value;
                 console.log(`Agent collaboration: ${callerAgent} → ${calledAgent} (${reason})`);
+            } else if (event.name === 'TOKEN_USAGE_REPORTED') {
+                console.log('Token usage reported:', event.value);
+                state.tokenUsage = {
+                    total: event.value.total || 0,
+                    prompt: event.value.prompt || 0,
+                    completion: event.value.completion || 0,
+                    cached: event.value.cached || 0,
+                    reasoning: event.value.reasoning || 0,
+                    audioInput: event.value.audioInput || 0,
+                    audioOutput: event.value.audioOutput || 0,
+                    acceptedPredict: event.value.acceptedPredict || 0,
+                    rejectedPredict: event.value.rejectedPredict || 0,
+                    model: event.value.model || 'N/A',
+                    provider: event.value.provider || 'N/A',
+                    messageId: event.value.messageId,
+                    threadId: event.value.threadId
+                };
             }
             // Note: HUMAN_INPUT_REQUESTED is no longer emitted by the backend.
             // Elicitation state is derived from pending ask_human tool calls in __convertBackendMessagesToUI

@@ -27,7 +27,7 @@
 
 // Import all modules
 import { renderMarkdown } from './markdown-renderer.js';
-import { throttle, formatSessionTime, log, createErrorHandlers, isValidJSON } from './chat-utils.js';
+import { throttle, formatSessionTime, log, createErrorHandlers, isValidJSON, formatNumber } from './chat-utils.js';
 import { createInitialState, createStateMethods, createEmptyThreadState } from './chat-state.js';
 import { createSessionMethods } from './chat-sessions.js';
 import { createMessagingMethods } from './chat-messaging.js';
@@ -144,6 +144,10 @@ document.addEventListener('alpine:init', () => {
 
             get hasEvents() {
                 return this.__currentState.events.length > 0;
+            },
+
+            get tokenUsage() {
+                return this.__currentState.tokenUsage;
             },
 
             get canSendMessage() {
@@ -297,6 +301,10 @@ document.addEventListener('alpine:init', () => {
 
             isValidJSON(str) {
                 return isValidJSON(str);
+            },
+
+            formatNumber(num) {
+                return formatNumber(num);
             },
 
             /**

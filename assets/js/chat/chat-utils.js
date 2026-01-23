@@ -157,6 +157,16 @@ export function safeParseJSON(jsonString) {
 }
 
 /**
+ * Format number with thousand separators
+ * @param {number} num - Number to format
+ * @returns {string} Formatted number string
+ */
+export function formatNumber(num) {
+    if (num === null || num === undefined) return '0';
+    return num.toLocaleString('en-US');
+}
+
+/**
  * Enrich a tool result message or object with parsed content
  * Centralizes logic for tools that require structured result data (like browse_library)
  * @param {Object} toolResult - The tool result object/message
