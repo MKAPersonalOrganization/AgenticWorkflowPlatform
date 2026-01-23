@@ -47,6 +47,9 @@ func (p *PostgresAguiProjection) RegisterHandlers(router interface {
 	router.Register(&domain.ThreadDeleted{}, func(ctx context.Context, e core.Event) error {
 		return p.applyThreadDeleted(ctx, *e.(*domain.ThreadDeleted))
 	})
+	router.Register(&domain.TokenUsageReported{}, func(ctx context.Context, e core.Event) error {
+		return p.applyTokenUsageReported(ctx, *e.(*domain.TokenUsageReported))
+	})
 }
 
 // applyThreadCreated creates a new thread record.
@@ -167,6 +170,44 @@ func (p *PostgresAguiProjection) applyThreadDeleted(ctx context.Context, event d
 	_, err := p.db.ExecContext(ctx, query, time.Now(), event.ThreadID)
 	if err != nil {
 		return fmt.Errorf("failed to mark thread as deleted: %w", err)
+	}
+
+	return nil
+}
+
+// applyTokenUsageReported updates message metadata with usage information.
+func (p *PostgresAguiProjection) applyTokenUsageReported(ctx context.Context, event domain.TokenUsageReported) error {
+	usageJSON, err := json.Marshal(map[string]any{
+		"usage": map[string]any{
+			"provider":         event.Provider,
+			"model":            event.Model,
+			"prompt":           event.PromptTokens,
+			"completion":       event.CompletionTokens,
+			"total":            event.TotalTokens,
+			"cached":           event.CachedTokens,
+			"reasoning":        event.ReasoningTokens,
+			"audioInput":       event.AudioInputTokens,
+			"audioOutput":      event.AudioOutputTokens,
+			"acceptedPredict":  event.AcceptedPredictionTokens,
+			"rejectedPredict":  event.RejectedPredictionTokens,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal usage: %w", err)
+	}
+
+	query := `
+		UPDATE agui_messages
+		SET metadata = CASE 
+			WHEN metadata IS NULL THEN $1 
+			ELSE metadata || $1 
+		END
+		WHERE message_id = $2
+	`
+
+	_, err = p.db.ExecContext(ctx, query, usageJSON, event.MessageID)
+	if err != nil {
+		return fmt.Errorf("failed to update message usage metadata: %w", err)
 	}
 
 	return nil

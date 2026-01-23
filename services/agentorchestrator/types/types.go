@@ -13,4 +13,7 @@ type ChatClient interface {
 		messages []llm.ChatMessage,
 		options *llm.ChatOptions,
 	) iter.Seq2[llm.ChatResponseUpdate, error]
+
+	// Provider returns the name of the LLM provider (e.g., "openai", "ollama").
+	Provider() string
 }

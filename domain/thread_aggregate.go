@@ -116,6 +116,16 @@ func (t *ThreadAggregate) Delete() error {
 	return nil
 }
 
+// RecordUsage records token usage for a message in the thread.
+func (t *ThreadAggregate) RecordUsage(event TokenUsageReported) error {
+	if t.IsDeleted {
+		return errors.New("cannot record usage for deleted thread")
+	}
+
+	t.Enqueue(event, t.Apply)
+	return nil
+}
+
 // Apply applies an event to update the thread's state.
 // This is the only place where state mutations happen.
 func (t *ThreadAggregate) Apply(event Event) {

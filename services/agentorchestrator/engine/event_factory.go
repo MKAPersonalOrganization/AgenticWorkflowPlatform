@@ -2,6 +2,7 @@ package engine
 
 import (
 	"school-with-ai/domain"
+	"school-with-ai/foundation/agentsdk/llm"
 	"time"
 )
 
@@ -134,5 +135,31 @@ func (f *EventFactory) RunError(threadID, message, errorCode string) *domain.Run
 		Message:   message,
 		ErrorCode: errorCode,
 		Timestamp: time.Now(),
+	}
+}
+
+// TokenUsageReported creates a TokenUsageReported event.
+func (f *EventFactory) TokenUsageReported(
+	threadID string,
+	messageID string,
+	provider string,
+	model string,
+	usage *llm.UsageDetails,
+) *domain.TokenUsageReported {
+	return &domain.TokenUsageReported{
+		ThreadID:                 threadID,
+		MessageID:                messageID,
+		Provider:                 provider,
+		Model:                    model,
+		PromptTokens:             usage.InputTokens,
+		CompletionTokens:         usage.OutputTokens,
+		TotalTokens:              usage.TotalTokens,
+		CachedTokens:             usage.CachedTokens,
+		AudioInputTokens:         usage.AudioInputTokens,
+		ReasoningTokens:          usage.ReasoningTokens,
+		AudioOutputTokens:        usage.AudioOutputTokens,
+		AcceptedPredictionTokens: usage.AcceptedPredictionTokens,
+		RejectedPredictionTokens: usage.RejectedPredictionTokens,
+		Timestamp:                time.Now(),
 	}
 }

@@ -38,6 +38,11 @@ func NewOpenAIClientWithAPIKey(apiKey string, model string) *OpenAIClient {
 	}
 }
 
+// Provider implements the ChatClient interface.
+func (c *OpenAIClient) Provider() string {
+	return "openai"
+}
+
 // GetStreamingResponse implements the ChatClient interface.
 // It sends messages to OpenAI and streams back response updates.
 func (c *OpenAIClient) GetStreamingResponse(
@@ -62,15 +67,19 @@ func (c *OpenAIClient) GetStreamingResponse(
 		stream := c.client.Chat.Completions.NewStreaming(ctx, streamParams)
 
 		var responseID string
+		var modelUsed string
 		var finishReason FinishReason
 
 		// Iterate over stream chunks
 		for stream.Next() {
 			chunk := stream.Current()
 
-			// Capture response ID from first chunk
+			// Capture response ID and model from first chunk
 			if responseID == "" && chunk.ID != "" {
 				responseID = chunk.ID
+			}
+			if modelUsed == "" && chunk.Model != "" {
+				modelUsed = chunk.Model
 			}
 
 			if len(chunk.Choices) > 0 {
@@ -87,6 +96,7 @@ func (c *OpenAIClient) GetStreamingResponse(
 					update := ChatResponseUpdate{
 						Role:       ChatRoleAssistant,
 						ResponseID: responseID,
+						Model:      modelUsed,
 						Contents:   []AIContent{TextContent{Text: delta.Content}},
 					}
 					if !yield(update, nil) {
@@ -96,10 +106,39 @@ func (c *OpenAIClient) GetStreamingResponse(
 
 				// Handle tool calls
 				for _, tc := range delta.ToolCalls {
-					update := c.buildToolCallUpdate(tc, responseID)
+					update := c.buildToolCallUpdate(tc, responseID, modelUsed)
 					if !yield(update, nil) {
 						return
 					}
+				}
+			}
+
+			// Capture usage information
+			if chunk.Usage.TotalTokens > 0 {
+				usage := &UsageDetails{
+					InputTokens:  int(chunk.Usage.PromptTokens),
+					OutputTokens: int(chunk.Usage.CompletionTokens),
+					TotalTokens:  int(chunk.Usage.TotalTokens),
+				}
+
+				// Capture detailed prompt token breakdown
+				usage.CachedTokens = int(chunk.Usage.PromptTokensDetails.CachedTokens)
+				usage.AudioInputTokens = int(chunk.Usage.PromptTokensDetails.AudioTokens)
+
+				// Capture detailed completion token breakdown
+				usage.ReasoningTokens = int(chunk.Usage.CompletionTokensDetails.ReasoningTokens)
+				usage.AudioOutputTokens = int(chunk.Usage.CompletionTokensDetails.AudioTokens)
+				usage.AcceptedPredictionTokens = int(chunk.Usage.CompletionTokensDetails.AcceptedPredictionTokens)
+				usage.RejectedPredictionTokens = int(chunk.Usage.CompletionTokensDetails.RejectedPredictionTokens)
+
+				update := ChatResponseUpdate{
+					Role:       ChatRoleAssistant,
+					ResponseID: responseID,
+					Model:      modelUsed,
+					Usage:      usage,
+				}
+				if !yield(update, nil) {
+					return
 				}
 			}
 		}
@@ -196,10 +235,11 @@ func (c *OpenAIClient) buildAssistantMessage(msg ChatMessage) openai.ChatComplet
 }
 
 // buildToolCallUpdate creates a ChatResponseUpdate from an OpenAI tool call delta.
-func (c *OpenAIClient) buildToolCallUpdate(tc openai.ChatCompletionChunkChoiceDeltaToolCall, responseID string) ChatResponseUpdate {
+func (c *OpenAIClient) buildToolCallUpdate(tc openai.ChatCompletionChunkChoiceDeltaToolCall, responseID string, model string) ChatResponseUpdate {
 	update := ChatResponseUpdate{
 		Role:          ChatRoleAssistant,
 		ResponseID:    responseID,
+		Model:         model,
 		ToolCallIndex: int(tc.Index),
 		ToolCallID:    tc.ID,
 	}
@@ -266,6 +306,11 @@ func (c *OpenAIClient) applyOptions(params *openai.ChatCompletionNewParams, opti
 	// Override if explicitly set in options
 	if options.ParallelToolCalls != nil {
 		params.ParallelToolCalls = openai.Bool(*options.ParallelToolCalls)
+	}
+
+	// Always include usage in streams
+	params.StreamOptions = openai.ChatCompletionStreamOptionsParam{
+		IncludeUsage: openai.Bool(true),
 	}
 
 	// Apply tools

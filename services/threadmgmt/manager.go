@@ -128,6 +128,24 @@ func (m *Manager) AddAssistantMessage(ctx context.Context, threadID, messageID, 
 	return thread, nil
 }
 
+// AddTokenUsage records token usage for a message in the thread.
+func (m *Manager) AddTokenUsage(ctx context.Context, event domain.TokenUsageReported) (*domain.ThreadAggregate, error) {
+	thread, err := m.threadRepo.Load(ctx, event.ThreadID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load thread: %w", err)
+	}
+
+	if err := thread.RecordUsage(event); err != nil {
+		return nil, err
+	}
+
+	if err := m.threadRepo.Save(ctx, thread); err != nil {
+		return nil, err
+	}
+
+	return thread, nil
+}
+
 // AddToolResultMessage adds a tool result message to the thread.
 func (m *Manager) AddToolResultMessage(ctx context.Context, threadID, messageID, toolCallID, result, agentName string) (*domain.ThreadAggregate, error) {
 	thread, err := m.threadRepo.Load(ctx, threadID)

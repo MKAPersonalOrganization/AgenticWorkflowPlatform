@@ -70,6 +70,26 @@ func ToAguiEvents(event any) []any {
 			evt.ToolResult,
 		)}
 
+	case *domain.TokenUsageReported:
+		return []any{aguievents.NewCustomEvent(
+			"TOKEN_USAGE_REPORTED",
+			aguievents.WithValue(map[string]any{
+				"threadId":         evt.ThreadID,
+				"messageId":        evt.MessageID,
+				"provider":         evt.Provider,
+				"model":            evt.Model,
+				"prompt":           evt.PromptTokens,
+				"completion":       evt.CompletionTokens,
+				"total":            evt.TotalTokens,
+				"cached":           evt.CachedTokens,
+				"reasoning":        evt.ReasoningTokens,
+				"audioInput":       evt.AudioInputTokens,
+				"audioOutput":      evt.AudioOutputTokens,
+				"acceptedPredict":  evt.AcceptedPredictionTokens,
+				"rejectedPredict":  evt.RejectedPredictionTokens,
+			}),
+		)}
+
 	case *domain.MessageAdded, *domain.ThreadCreated, *domain.AgentHandoffEvent:
 		// These are handled by the frontend locally or via snapshots, no need to stream
 		return []any{}

@@ -42,6 +42,11 @@ func NewOllamaClientWithClient(client *api.Client, model string) *OllamaClient {
 	}
 }
 
+// Provider implements the ChatClient interface.
+func (c *OllamaClient) Provider() string {
+	return "ollama"
+}
+
 // GetStreamingResponse implements the ChatClient interface.
 // It sends messages to Ollama and streams back response updates.
 func (c *OllamaClient) GetStreamingResponse(
@@ -72,6 +77,7 @@ func (c *OllamaClient) GetStreamingResponse(
 			if resp.Message.Content != "" {
 				update := ChatResponseUpdate{
 					Role:     ChatRoleAssistant,
+					Model:    resp.Model,
 					Contents: []AIContent{TextContent{Text: resp.Message.Content}},
 				}
 				if !yield(update, nil) {

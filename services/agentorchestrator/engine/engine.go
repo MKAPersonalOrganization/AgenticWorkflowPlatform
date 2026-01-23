@@ -436,6 +436,13 @@ func (p *PersistenceUnit) AddToolResultMessage(
 	return p.mgmt.AddToolResultMessage(ctx, threadID, toolResultID, toolCallID, result, agentName)
 }
 
+func (p *PersistenceUnit) ReportTokenUsage(
+	ctx context.Context,
+	event domain.TokenUsageReported,
+) (*domain.ThreadAggregate, error) {
+	return p.mgmt.AddTokenUsage(ctx, event)
+}
+
 // ToolProcessor handles the execution of tools and determination of next steps.
 type ToolProcessor struct{}
 
@@ -737,10 +744,24 @@ func (s *executionState) streamAndProcessLLMResponse(llmContext *LLMContext) err
 	)
 
 	streamIter := s.engine.chatClient.GetStreamingResponse(s.ctx, llmContext.Messages, llmContext.Options)
+
+	// Wrap yield to persist usage events
+	wrappedYield := func(evt core.Event, err error) bool {
+		if usage, ok := evt.(*domain.TokenUsageReported); ok {
+			_, pErr := s.persistence.ReportTokenUsage(s.ctx, *usage)
+			if pErr != nil {
+				s.engine.log.Error(s.ctx, "failed to persist token usage", "error", pErr)
+			}
+		}
+		return s.observer.yield(evt, err)
+	}
+
 	res, err := s.agent.Stream.Process(s.ctx, streamIter, ProcessParams{
 		ThreadID:  s.threadID,
 		MessageID: s.messageID,
-	}, s.observer.yield)
+		Provider:  s.engine.chatClient.Provider(),
+		Model:     string(llmContext.Options.ModelID),
+	}, wrappedYield)
 	if err != nil {
 		return err
 	}
