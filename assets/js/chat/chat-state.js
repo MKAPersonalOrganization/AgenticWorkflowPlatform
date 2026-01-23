@@ -224,25 +224,52 @@ export function createStateMethods() {
             let schema = null;
 
             if (msgs && msgs.length > 0) {
-                const lastMsg = msgs[msgs.length - 1];
+                // Search from the end for the last relevant tool call
+                const lastToolMsgIndex = msgs.slice().reverse().findIndex(m =>
+                    m.type === 'tool_call' &&
+                    ['quiz_multiple_choice', 'quiz_numeric_scale', 'quiz_yes_no'].includes(m.name)
+                );
 
-                // Check if last message is an 'ask_human' tool call
-                // Criteria:
-                // 1. Type is tool_call
-                // 2. Name is ask_human
-                // 3. Status is completed (arguments fully received)
-                // 4. No result (not answered yet)
-                if (
-                    lastMsg.type === 'tool_call' &&
-                    lastMsg.name === 'ask_human' &&
-                    lastMsg.status === 'completed' &&
-                    !lastMsg.result
-                ) {
-                    isWaiting = true;
-                    question = lastMsg.parsedArgs?.question || null;
-                    schema = lastMsg.parsedArgs?.schema || null;
+                if (lastToolMsgIndex !== -1) {
+                    // slice().reverse() reverses copy, so index is from end. Convert to real index
+                    const realIndex = msgs.length - 1 - lastToolMsgIndex;
+                    const lastToolMsg = msgs[realIndex];
+
+                    // Check if there is a USER message after this tool call
+                    // We only care about user messages that act as replies
+                    const hasUserReply = msgs.slice(realIndex + 1).some(m => m.role === 'user');
+
+                    if (
+                        lastToolMsg &&
+                        lastToolMsg.status === 'completed' &&
+                        !hasUserReply
+                    ) {
+                        isWaiting = true;
+                        question = lastToolMsg.parsedResult?.question_text ||
+                                   lastToolMsg.parsedResult?.statement_to_verify || null;
+                        schema = lastToolMsg.parsedResult?.schema || null;
+
+                        // Fallback normalization if schema not in result
+                        if (!schema) {
+                            schema = {};
+                            const result = lastToolMsg.parsedResult || {};
+                            if (lastToolMsg.name === 'quiz_multiple_choice') {
+                                schema.type = 'choose_multiple';
+                                schema.enum = result.answer_choices;
+                            }
+                            else if (lastToolMsg.name === 'quiz_numeric_scale') {
+                                schema.type = 'numeric_range';
+                                schema.minimum = result.scale_minimum;
+                                schema.maximum = result.scale_maximum;
+                            }
+                            else if (lastToolMsg.name === 'quiz_yes_no') {
+                                schema.type = 'true_false';
+                            }
+                        }
+                    }
                 }
             }
+
 
             // Only update if changed to avoid unnecessary re-renders
             if (

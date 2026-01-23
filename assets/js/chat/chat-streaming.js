@@ -417,9 +417,9 @@ export function createStreamingMethods() {
                     });
                     toolMsg.parsedArgs = parsed || { raw: argsString };
 
-                    // Detect elicitation: if this is ask_human, allow component to react via derived state
-                    if (toolMsg.name === 'ask_human') {
-                        console.log('Elicitation tool call ended:', toolMsg.parsedArgs?.question);
+                    // Detect elicitation: if this is an elicitation tool, allow component to react via derived state
+                    if (['quiz_multiple_choice', 'quiz_numeric_scale', 'quiz_yes_no'].includes(toolMsg.name)) {
+                        console.log('Elicitation tool call ended:', toolMsg.parsedArgs?.question_text || toolMsg.parsedArgs?.statement_to_verify);
                         this.__updateDerivedState();
                     }
                 }
