@@ -6,109 +6,239 @@ import (
 	"school-with-ai/foundation/agentsdk/core"
 )
 
-const ElicitInputToolName = "ask_human"
+// CONSTANTS - Domain-Specific Educational Tool Names
+const (
+	ToolNameMultipleSelection = "quiz_multiple_choice"
+	ToolNameNumericRange      = "quiz_numeric_scale"
+	ToolNameTrueFalse         = "quiz_yes_no"
+)
 
-const ElicitInputToolDescription = `Request input from the human user.
-Use this tool for ANY interaction requiring user response, including:
-- Asking for clarification
-- Administering a quiz or test question
-- Requesting approval or confirmation
-- Collecting missing information
-Execution will pause until the user provides the answer.`
 
-// ElicitInputTool allows agents to request structured input from users.
-type ElicitInputTool struct{}
 
-func NewElicitInputTool() *ElicitInputTool {
-	return &ElicitInputTool{}
+
+
+// --- TOOL: MULTIPLE CHOICE QUIZ ---
+type AskMultipleSelectionTool struct{}
+
+func (t *AskMultipleSelectionTool) Name() string { return ToolNameMultipleSelection }
+func (t *AskMultipleSelectionTool) Description() string {
+	return "Present a multiple-choice quiz question where the student can select ONE OR MORE correct answers. Use this when checking understanding of concepts with multiple valid responses."
 }
-
-func (t *ElicitInputTool) Name() string {
-	return ElicitInputToolName
-}
-
-func (t *ElicitInputTool) Description() string {
-	return ElicitInputToolDescription
-}
-
-func (t *ElicitInputTool) Parameters() map[string]any {
+func (t *AskMultipleSelectionTool) Parameters() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
-			"question": map[string]any{
+			"question_text": map[string]any{
 				"type":        "string",
-				"description": "The question, quiz item, or prompt to display to the user.",
+				"description": "The quiz question text. Frame it as a clear academic question (e.g., 'Which of the following are prime numbers?').",
+				"minLength":   1,
 			},
-			"schema": map[string]any{
-				"type":        "object",
-				"description": "Optional JSON schema describing the expected response structure.",
-				"properties": map[string]any{
-					"enum": map[string]any{
-						"type":        "array",
-						"items":       map[string]any{"type": "string"},
-						"description": "List of valid options for multiple-choice questions.",
-					},
-					"type": map[string]any{
-						"type":        "string",
-						"description": "The type of input expected (e.g., 'string').",
-					},
-					"description": map[string]any{
-						"type": "string",
-					},
-					"items": map[string]any{
-						"type":        "object",
-						"description": "For array types, describes the items (e.g., enum options).",
-						"properties": map[string]any{
-							"enum": map[string]any{
-								"type":        "array",
-								"items":       map[string]any{"type": "string"},
-								"description": "List of valid options.",
-							},
-							"type": map[string]any{
-								"type": "string",
-							},
-						},
-					},
+			"answer_choices": map[string]any{
+				"type": "array",
+				"items": map[string]any{
+					"type":      "string",
+					"minLength": 1,
 				},
+				"description": "Array of answer choices for the student to select from. Each choice should be a distinct option. Minimum 2 choices required, maximum 6 recommended for clarity.",
+				"minItems":    2,
+				"maxItems":    6,
 			},
 		},
-		"required": []string{"question"},
+		"required":             []string{"question_text", "answer_choices"},
+		"additionalProperties": false,
 	}
 }
-
-func (t *ElicitInputTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (t *AskMultipleSelectionTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
-		Question string         `json:"question"`
-		Schema   map[string]any `json:"schema"`
+		QuestionText  string   `json:"question_text"`
+		AnswerChoices []string `json:"answer_choices"`
 	}
-
 	if err := core.UnmarshalArgs(args, &params); err != nil {
-		return nil, fmt.Errorf("failed to parse elicitation arguments: %w", err)
+		return nil, fmt.Errorf("failed to parse quiz parameters: %w", err)
 	}
 
-	// Create command to stop iteration and request input
+	// Validation
+	if params.QuestionText == "" {
+		return nil, fmt.Errorf("parameter 'question_text' is required and must not be empty. Example: {\"question_text\": \"Which are prime numbers?\", \"answer_choices\": [\"2\", \"3\", \"4\"]}")
+	}
+	if len(params.AnswerChoices) < 2 {
+		return nil, fmt.Errorf("parameter 'answer_choices' must contain at least 2 choices. Received: %d. Example: {\"question_text\": \"...\", \"answer_choices\": [\"Option A\", \"Option B\"]}", len(params.AnswerChoices))
+	}
+	if len(params.AnswerChoices) > 6 {
+		return nil, fmt.Errorf("parameter 'answer_choices' should contain at most 6 choices. Received: %d. Consider breaking into multiple questions.", len(params.AnswerChoices))
+	}
+
+	schema := map[string]any{
+		"type": "choose_multiple",
+		"enum": params.AnswerChoices,
+	}
+	return createMultipleChoiceResult(params.QuestionText, params.AnswerChoices, schema)
+}
+
+// --- TOOL: NUMERIC SCALE QUIZ ---
+type AskNumericRangeTool struct{}
+
+func (t *AskNumericRangeTool) Name() string { return ToolNameNumericRange }
+func (t *AskNumericRangeTool) Description() string {
+	return "Request a numeric rating or scale response from the student. Use for confidence ratings (1-10), Likert scales, or quantitative self-assessment."
+}
+func (t *AskNumericRangeTool) Parameters() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"question_text": map[string]any{
+				"type":        "string",
+				"description": "The question prompting the numeric response (e.g., 'On a scale of 1-5, how confident are you with quadratic equations?').",
+				"minLength":   1,
+			},
+			"scale_minimum": map[string]any{
+				"type":        "integer",
+				"description": "The lowest value on the scale (inclusive). Typically 0 or 1.",
+			},
+			"scale_maximum": map[string]any{
+				"type":        "integer",
+				"description": "The highest value on the scale (inclusive). Common ranges: 1-5, 1-10, 0-100.",
+			},
+		},
+		"required":             []string{"question_text", "scale_minimum", "scale_maximum"},
+		"additionalProperties": false,
+	}
+}
+func (t *AskNumericRangeTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+	var params struct {
+		QuestionText  string `json:"question_text"`
+		ScaleMinimum  int    `json:"scale_minimum"`
+		ScaleMaximum  int    `json:"scale_maximum"`
+	}
+	if err := core.UnmarshalArgs(args, &params); err != nil {
+		return nil, fmt.Errorf("failed to parse quiz scale parameters: %w", err)
+	}
+
+	// Validation
+	if params.QuestionText == "" {
+		return nil, fmt.Errorf("parameter 'question_text' is required. Example: {\"question_text\": \"How do you feel?\", \"scale_minimum\": 1, \"scale_maximum\": 5}")
+	}
+	if params.ScaleMinimum >= params.ScaleMaximum {
+		return nil, fmt.Errorf("invalid scale range: scale_minimum (%d) must be strictly less than scale_maximum (%d). Example: {\"scale_minimum\": 1, \"scale_maximum\": 5}", params.ScaleMinimum, params.ScaleMaximum)
+	}
+
+	schema := map[string]any{
+		"type":    "numeric_range",
+		"minimum": params.ScaleMinimum,
+		"maximum": params.ScaleMaximum,
+	}
+	return createNumericScaleResult(params.QuestionText, params.ScaleMinimum, params.ScaleMaximum, schema)
+}
+
+// --- TOOL: YES/NO QUIZ ---
+type AskTrueFalseTool struct{}
+
+func (t *AskTrueFalseTool) Name() string { return ToolNameTrueFalse }
+func (t *AskTrueFalseTool) Description() string {
+	return "Present a yes/no or true/false quiz question to verify student understanding. Use for binary confirmation of concepts or facts."
+}
+func (t *AskTrueFalseTool) Parameters() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"statement_to_verify": map[string]any{
+				"type":        "string",
+				"description": "A declarative statement for the student to confirm as true or false (e.g., 'The quadratic formula can solve all polynomial equations' or 'Photosynthesis occurs in mitochondria').",
+				"minLength":   1,
+			},
+		},
+		"required":             []string{"statement_to_verify"},
+		"additionalProperties": false,
+	}
+}
+func (t *AskTrueFalseTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+	var params struct {
+		StatementToVerify string `json:"statement_to_verify"`
+	}
+	if err := core.UnmarshalArgs(args, &params); err != nil {
+		return nil, fmt.Errorf("failed to parse quiz statement: %w", err)
+	}
+
+	// Validation
+	if params.StatementToVerify == "" {
+		return nil, fmt.Errorf("parameter 'statement_to_verify' is required and must not be empty. Example: {\"statement_to_verify\": \"The sky is blue\"}")
+	}
+
+	schema := map[string]any{
+		"type": "true_false",
+	}
+	return createTrueFalseResult(params.StatementToVerify, schema)
+}
+
+// --- HELPERS ---
+
+// createMultipleChoiceResult creates result for multiple choice quiz with domain-specific parameters
+func createMultipleChoiceResult(questionText string, answerChoices []string, schema map[string]any) (any, error) {
 	cmd := &core.Command{
 		StopIteration: true,
 		Elicitation: &core.ElicitationSpec{
-			Question: params.Question,
-			Schema:   params.Schema,
+			Question: questionText,
+			Schema:   schema,
 		},
 	}
-
-	status := fmt.Sprintf("Requesting input: %s", params.Question)
-
-	// Return a result that indicates we are waiting
+	status := fmt.Sprintf("Requesting input: %s", questionText)
 	return core.NewToolResultWithCommand(
 		map[string]any{
-			"status":   status,
-			"question": params.Question,
-			"schema":   params.Schema,
+			"status":         status,
+			"question_text":  questionText,
+			"answer_choices": answerChoices,
+			"schema":         schema,
 		},
 		cmd,
 	), nil
 }
 
-// ElicitationMiddleware adds the elicitation tool to the agent.
+// createNumericScaleResult creates result for numeric scale quiz with domain-specific parameters
+func createNumericScaleResult(questionText string, scaleMin int, scaleMax int, schema map[string]any) (any, error) {
+	cmd := &core.Command{
+		StopIteration: true,
+		Elicitation: &core.ElicitationSpec{
+			Question: questionText,
+			Schema:   schema,
+		},
+	}
+	status := fmt.Sprintf("Requesting input: %s", questionText)
+	return core.NewToolResultWithCommand(
+		map[string]any{
+			"status":         status,
+			"question_text":  questionText,
+			"scale_minimum":  scaleMin,
+			"scale_maximum":  scaleMax,
+			"schema":         schema,
+		},
+		cmd,
+	), nil
+}
+
+// createTrueFalseResult creates result for true/false quiz with domain-specific parameters
+func createTrueFalseResult(statement string, schema map[string]any) (any, error) {
+	cmd := &core.Command{
+		StopIteration: true,
+		Elicitation: &core.ElicitationSpec{
+			Question: statement,
+			Schema:   schema,
+		},
+	}
+	status := fmt.Sprintf("Requesting input: %s", statement)
+	return core.NewToolResultWithCommand(
+		map[string]any{
+			"status":              status,
+			"statement_to_verify": statement,
+			"schema":              schema,
+		},
+		cmd,
+	), nil
+}
+
+
+// --- MIDDLEWARE ---
+
+// ElicitationMiddleware adds the elicitation tools to the agent.
 type ElicitationMiddleware struct{}
 
 func NewElicitationMiddleware() *ElicitationMiddleware {
@@ -116,74 +246,30 @@ func NewElicitationMiddleware() *ElicitationMiddleware {
 }
 
 func (m *ElicitationMiddleware) Process(ctx context.Context, reqCtx *core.RequestContext, next core.NextHandler) error {
-	// Add the elicitation tool
-	reqCtx.AddTool(NewElicitInputTool())
+	// Add ALL specific elicitation tools
+	reqCtx.AddTool(&AskMultipleSelectionTool{})
+	reqCtx.AddTool(&AskNumericRangeTool{})
+	reqCtx.AddTool(&AskTrueFalseTool{})
 
-	// Add system prompt instruction
 	reqCtx.AddSystemPrompt(`
-## Human Interaction (STRICT ENFORCEMENT)
-STOP. READ THIS CAREFULLY.
-You are PROHIBITED from asking questions, giving quizzes, or requesting information in your text response.
-You MUST use the 'ask_human' tool for ALL interactions requiring a user response.
+## Student Elicitation Protocol
+You MUST use the specialized quiz tools for ALL student assessments and checks for understanding. 
 
-Violations (DO NOT DO THIS):
-- "Can you clarify what you mean?" (VIOLATION: Text question)
-- "Here is the first question: What is 2+2?" (VIOLATION: Text quiz)
-- "Do you want to proceed?" (VIOLATION: Text confirmation)
+### Instructions:
+1. **quiz_multiple_choice**: Use when checking understanding with predefined options.
+   * Format: ` + "`" + `{"question_text": "...", "answer_choices": ["A", "B"]}` + "`" + `
+2. **quiz_yes_no**: Use for binary factual verification.
+   * Format: ` + "`" + `{"statement_to_verify": "..."}` + "`" + `
+3. **quiz_numeric_scale**: Use for confidence or quantitative self-assessment.
+   * Format: ` + "`" + `{"question_text": "...", "scale_minimum": 1, "scale_maximum": 5}` + "`" + `
 
-Correct Usage (DO THIS):
-- Call 'ask_human' with question="Can you clarify what you mean?"
-- Call 'ask_human' with question="What is 2+2?"
-- Call 'ask_human' with question="Do you want to proceed?" type="true_false"
-
-**CRITICAL RULES**:
-1. **ONE Question Per Turn**: Always ask exactly ONE question at a time using the tool.
-2. **QUIZZES**: Administer quizzes one question at a time. Ask Q1 -> Wait for Answer -> Grade -> Ask Q2.
-3. **Execution Pauses**: The tool will pause execution. Do not say "I will wait for your answer". Just call the tool.
-
-To present options (quick replies or multiple choice), use 'type': 'choose_one' with 'enum':
-{
-  "question": "What is 2 + 2?",
-  "schema": {
-    "type": "choose_one",
-    "enum": ["3", "4", "5"]
-  }
-}
-
-For multiple selection (checkboxes), use 'type': 'choose_multiple':
-{
-  "question": "Select all prime numbers",
-  "schema": {
-    "type": "choose_multiple",
-    "enum": ["2", "4", "5", "9"]
-  }
-}
-
-For numeric ranges, use 'type': 'numeric_range':
-{
-  "question": "Rate your confidence (1-10)",
-  "schema": {
-    "type": "numeric_range",
-    "minimum": 1,
-    "maximum": 10
-  }
-}
-
-For True/False, use 'type': 'true_false':
-{
-  "question": "The earth is flat.",
-  "schema": {
-    "type": "true_false"
-  }
-}
-
-For short free-form answer, use 'type': 'short_answer':
-{
-  "question": "Explain the concept of inertia.",
-  "schema": {
-    "type": "short_answer"
-  }
-}`)
+### Rules:
+- Proactive interaction: Use a tool in every turn where you expect student input.
+- Structural Integrity: Ensure ALL required JSON parameters are populated correctly.
+- Single Question: Ask exactly one quiz question per interaction.
+`)
 
 	return next(ctx, reqCtx)
 }
+
+

@@ -5,6 +5,7 @@ import "school-with-ai/components/textarea"
 import "school-with-ai/components/icon"
 import "school-with-ai/components/tooltip"
 import "school-with-ai/components/i18n"
+import "school-with-ai/components/tokenusage"
 
 templ ChatInput() {
 	<div
@@ -77,6 +78,10 @@ templ ChatInput() {
 					}) {
 						@icon.Wand(icon.Props{Class: "size-5"})
 					}
+				</div>
+				<!-- Center: Token Counter -->
+				<div class="flex-1 flex justify-center">
+					@tokenusage.TokenCounter()
 				</div>
 				<!-- Right: Send Button -->
 				<div class="flex items-center gap-1">

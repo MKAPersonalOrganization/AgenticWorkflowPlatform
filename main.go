@@ -134,7 +134,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 			HealthCheckInterval time.Duration `conf:"default:15s"`
 		}
 		AI struct {
-			Model string `conf:"default:gpt-4o-mini"`
+			Model string `conf:"default:gemini-2.0-flash"`
 		}
 		Langfuse struct {
 			Enabled   bool   `conf:"default:false"`
@@ -318,9 +318,16 @@ func run(ctx context.Context, log *logger.Logger) error {
 		}
 	}()
 
-	// Initialize OpenAI chat client with model
+	// Initialize Gemini chat client with model
 	log.Info(ctx, "startup", "status", "initializing AI client", "model", cfg.AI.Model)
-	chatClient := llm.NewOpenAIClient(cfg.AI.Model)
+	apiKey := os.Getenv("GEMINI_API_KEY")
+	if apiKey == "" {
+		return fmt.Errorf("GEMINI_API_KEY environment variable is not set")
+	}
+	chatClient, err := llm.NewGeminiClient(ctx, apiKey, cfg.AI.Model)
+	if err != nil {
+		return fmt.Errorf("initializing Gemini client: %w", err)
+	}
 
 	// Initialize Langfuse tracer (optional observability)
 	var langfuseTracer *taskmanagement.LangfuseTracer

@@ -27,15 +27,15 @@ func TestEngine_ElicitationFlow(t *testing.T) {
 	// Mock Chat Client
 	mockClient := &MockChatClient{
 		streams: [][]llm.ChatResponseUpdate{
-			// Turn 1: Assistant calls elicit_user_input
+			// Turn 1: Assistant calls quiz tool with domain-specific parameters
 			{
 				{
 					Contents: []llm.AIContent{
 						llm.TextContent{Text: "I need input. "},
 						llm.FunctionCallContent{
 							CallID:       "call_1",
-							Name:         "ask_human",
-							RawArguments: `{"question": "What is your favorite color?", "schema": {"type": "string"}}`,
+							Name:         "quiz_numeric_scale",
+							RawArguments: `{"question_text": "How much do you like blue?", "scale_minimum": 1, "scale_maximum": 10}`,
 						},
 					},
 					FinishReason: "tool_calls",
@@ -110,8 +110,8 @@ func TestEngine_ElicitationFlow(t *testing.T) {
 	if asstMsg.Role != "assistant" {
 		t.Errorf("Expected assistant message, got %s", asstMsg.Role)
 	}
-	if len(asstMsg.ToolCalls) == 0 || asstMsg.ToolCalls[0].Function.Name != middleware.ElicitInputToolName {
-		t.Errorf("Expected %s tool call", middleware.ElicitInputToolName)
+	if len(asstMsg.ToolCalls) == 0 || asstMsg.ToolCalls[0].Function.Name != middleware.ToolNameNumericRange {
+		t.Errorf("Expected %s tool call", middleware.ToolNameNumericRange)
 	}
 
 	// 2. User Response (Answering the elicitation)

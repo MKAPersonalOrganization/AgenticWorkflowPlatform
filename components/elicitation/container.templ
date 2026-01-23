@@ -27,34 +27,9 @@ templ Container() {
                 </span>
             }
             @alert.Description() {
-                <div class="mt-2 prose prose-sm max-w-none text-foreground font-medium" x-html="renderMarkdown(message.parsedArgs?.question || '')"></div>
-                
-                <!-- Logic to choose between Question Types -->
-                
-                <!-- CHOOSE ONE / MULTIPLE CHOICE -->
-                <template x-if="message.parsedArgs?.schema?.type === 'choose_one' || (message.parsedArgs?.schema?.enum && !message.parsedArgs?.schema?.type)">
-                    @MultipleChoice()
-                </template>
+                <div class="mt-2 prose prose-sm max-w-none text-foreground font-medium" x-html="renderMarkdown(message.parsedResult?.question_text || message.parsedResult?.statement_to_verify || '')"></div>
 
-                <!-- CHOOSE MULTIPLE (CHECKBOXES) -->
-                <template x-if="message.parsedArgs?.schema?.type === 'choose_multiple'">
-                    @ChooseMultiple()
-                </template>
-                
-                <!-- NUMERIC RANGE (SLIDER) -->
-                <template x-if="message.parsedArgs?.schema?.type === 'numeric_range' || message.parsedArgs?.schema?.type === 'scale'">
-                    @NumericRange()
-                </template>
-
-                <!-- TRUE/FALSE (SINGLE CHECKBOX) -->
-                <template x-if="message.parsedArgs?.schema?.type === 'true_false'">
-                    @TrueFalse()
-                </template>
-
-                <!-- SHORT ANSWER (INPUT FIELD) -->
-                <template x-if="message.parsedArgs?.schema?.type === 'short_answer' || (!message.parsedArgs?.schema?.enum && !['choose_one', 'choose_multiple', 'numeric_range', 'scale', 'true_false'].includes(message.parsedArgs?.schema?.type) && !message.parsedArgs?.schema?.type?.includes('array'))">
-                    @ShortAnswer()
-                </template>
+                { children... }
             }
         }
     </div>

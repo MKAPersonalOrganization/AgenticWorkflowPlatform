@@ -681,7 +681,10 @@ func (r *HistoryReconciler) Reconcile() (state, *StreamResult, *ResumptionPlan) 
 	}
 
 	// 3. Resumption Logic: Check for Elicitation response
-	if pendingTC.Function.Name == middleware.ElicitInputToolName {
+	// The new elicitation tools all behave similarly regarding resumption
+	if pendingTC.Function.Name == middleware.ToolNameMultipleSelection ||
+		pendingTC.Function.Name == middleware.ToolNameNumericRange ||
+		pendingTC.Function.Name == middleware.ToolNameTrueFalse {
 		return r.reconcileElicitation(pendingTC)
 	}
 
