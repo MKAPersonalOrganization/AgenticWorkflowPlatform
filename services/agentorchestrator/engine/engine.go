@@ -365,8 +365,8 @@ func (o *ObserverUnit) TrackToolCall(tcID string) bool {
 	return o.yield(o.events.ToolCallCompleted(o.threadID, tcID), nil)
 }
 
-func (o *ObserverUnit) TrackToolExecuted(toolResultID, tcID, name, args, res, messageID string) bool {
-	return o.yield(o.events.ToolCallExecuted(o.threadID, toolResultID, tcID, name, args, res, messageID), nil)
+func (o *ObserverUnit) TrackToolExecuted(toolResultID, tcID, name, args, res string, isError bool, messageID string) bool {
+	return o.yield(o.events.ToolCallExecuted(o.threadID, toolResultID, tcID, name, args, res, isError, messageID), nil)
 }
 
 func (o *ObserverUnit) Fail(reason TerminationReason, err error) {
@@ -485,7 +485,7 @@ func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolve
 		latestAgg = agg
 
 		toolResultID := core.GenerateID()
-		if !tctx.Observer.TrackToolExecuted(toolResultID, tc.ID, result.ToolName, result.Arguments, result.Result, tctx.MessageID) {
+		if !tctx.Observer.TrackToolExecuted(toolResultID, tc.ID, result.ToolName, result.Arguments, result.Result, result.IsError, tctx.MessageID) {
 			return nil, nil, context.Canceled
 		}
 

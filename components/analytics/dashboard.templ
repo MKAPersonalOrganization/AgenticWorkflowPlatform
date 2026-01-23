@@ -1,0 +1,65 @@
+package analytics
+
+import (
+	"fmt"
+	"school-with-ai/components"
+	"school-with-ai/domain"
+	"school-with-ai/infra/projection/statistics"
+)
+
+type DashboardProps struct {
+	Stats []statistics.ToolStats
+	User  *domain.User
+}
+
+templ Dashboard(props DashboardProps) {
+	@components.AppLayout(components.AppLayoutProps{
+		Title: "Analytics",
+		User:  props.User,
+	}) {
+		<div class="p-8 space-y-8">
+			<div>
+				<h1 class="text-3xl font-bold tracking-tight">Analytics Dashboard</h1>
+				<p class="text-muted-foreground">Tool usage and failure rates per agent.</p>
+			</div>
+			<div class="rounded-md border">
+				<table class="w-full text-sm">
+					<thead class="border-b bg-muted/50">
+						<tr class="hover:bg-muted/50">
+							<th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Tool</th>
+							<th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Agent</th>
+							<th class="h-12 px-4 text-right align-middle font-medium text-muted-foreground">Calls</th>
+							<th class="h-12 px-4 text-right align-middle font-medium text-muted-foreground">Successes</th>
+							<th class="h-12 px-4 text-right align-middle font-medium text-muted-foreground">Failures</th>
+							<th class="h-12 px-4 text-right align-middle font-medium text-muted-foreground">Rate</th>
+						</tr>
+					</thead>
+					<tbody>
+						if len(props.Stats) == 0 {
+							<tr>
+								<td colspan="6" class="p-4 text-center text-muted-foreground">No data available</td>
+							</tr>
+						} else {
+							for _, s := range props.Stats {
+								<tr class="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
+									<td class="p-4 align-middle font-medium">{ s.ToolName }</td>
+									<td class="p-4 align-middle">{ s.AgentName }</td>
+									<td class="p-4 align-middle text-right">{ fmt.Sprintf("%d", s.TotalCalls) }</td>
+									<td class="p-4 align-middle text-right">{ fmt.Sprintf("%d", s.Successes) }</td>
+									<td class="p-4 align-middle text-right text-destructive">{ fmt.Sprintf("%d", s.Failures) }</td>
+									<td class="p-4 align-middle text-right">
+										if s.TotalCalls > 0 {
+											{ fmt.Sprintf("%.1f%%", float64(s.Failures)/float64(s.TotalCalls)*100) }
+										} else {
+											-
+										}
+									</td>
+								</tr>
+							}
+						}
+					</tbody>
+				</table>
+			</div>
+		</div>
+	}
+}

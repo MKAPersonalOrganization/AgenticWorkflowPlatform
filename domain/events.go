@@ -130,6 +130,7 @@ type ToolCallExecutedEvent struct {
 	ToolName        string
 	ToolArguments   string
 	ToolResult      string
+	IsError         bool
 	ParentMessageID string
 	AgentName       string
 	Timestamp       time.Time

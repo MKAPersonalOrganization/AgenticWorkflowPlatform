@@ -29,6 +29,8 @@ import (
 	"school-with-ai/infra/projections"
 	"school-with-ai/infra/sqldb"
 	"school-with-ai/infra/sqldb/migrate"
+	projectionStats "school-with-ai/infra/projection/statistics"
+	statisticsHandler "school-with-ai/handlers/statistics"
 	"school-with-ai/services/agentorchestrator"
 	"school-with-ai/services/agentorchestrator/agents/chemistry"
 	"school-with-ai/services/agentorchestrator/agents/diagramming"
@@ -301,6 +303,10 @@ func run(ctx context.Context, log *logger.Logger) error {
 		eventRouter,
 	)
 
+	// Initialize Statistics Projection (Postgres)
+	statsProjection := projectionStats.NewPostgresProjection(db)
+	statsProjection.RegisterHandlers(eventRouter)
+
 	// Start projection updater in background
 	go func() {
 		if err := projectionUpdater.Start(ctx); err != nil {
@@ -480,6 +486,10 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Get("/profile", authMiddleware.RequireAuthFunc(profileHandler.HandleProfilePage))
 	r.Get("/api/profile", authMiddleware.RequireAuthFunc(profileHandler.GetProfile))
 	r.Put("/api/profile", authMiddleware.RequireAuthFunc(profileHandler.UpdateProfile))
+
+	// Analytics Dashboard (protected, admin only ideally, but auth protected for now)
+	statsHandler := statisticsHandler.NewHandler(log, statsProjection)
+	r.Get("/analytics", authMiddleware.RequireAuthFunc(statsHandler.ServeDashboard))
 
 	// Pricing page
 	r.Get("/pricing", authMiddleware.RequireAuthFunc(HandlePricingPage(log)))
