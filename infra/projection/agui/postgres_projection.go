@@ -30,6 +30,30 @@ func NewPostgresAguiProjection(log *logger.Logger, db *sqlx.DB) *PostgresAguiPro
 	}
 }
 
+// Helper functions for extracting values from metadata maps
+func getStringFromMap(m map[string]interface{}, key string) string {
+	if val, ok := m[key]; ok {
+		if str, ok := val.(string); ok {
+			return str
+		}
+	}
+	return ""
+}
+
+func getIntFromMap(m map[string]interface{}, key string) int {
+	if val, ok := m[key]; ok {
+		switch v := val.(type) {
+		case int:
+			return v
+		case float64:
+			return int(v)
+		case int64:
+			return int(v)
+		}
+	}
+	return 0
+}
+
 // RegisterHandlers registers database update handlers to the provided router.
 func (p *PostgresAguiProjection) RegisterHandlers(router interface {
 	Register(eventPrototype any, handler event.HandlerFunc)
@@ -276,6 +300,8 @@ func (p *PostgresAguiProjection) GetThreadState(threadID string) (*AguiThreadSta
 
 	// Convert database messages to AGUI SDK format
 	aguiMessages := make([]aguievents.Message, 0, len(messages))
+	var tokenUsage *TokenUsageInfo
+
 	for _, msg := range messages {
 		content := msg.Content
 		aguimsit := aguievents.Message{
@@ -313,6 +339,30 @@ func (p *PostgresAguiProjection) GetThreadState(threadID string) (*AguiThreadSta
 			}
 		}
 
+		// Extract token usage from metadata if present
+		if msg.Metadata != nil {
+			var metadata map[string]interface{}
+			if err := json.Unmarshal([]byte(*msg.Metadata), &metadata); err == nil {
+				if usage, ok := metadata["usage"].(map[string]interface{}); ok {
+					tokenUsage = &TokenUsageInfo{
+						Provider: getStringFromMap(usage, "provider"),
+						Model:    getStringFromMap(usage, "model"),
+						Prompt:   getIntFromMap(usage, "prompt"),
+						Completion: getIntFromMap(usage, "completion"),
+						Total:    getIntFromMap(usage, "total"),
+						Cached:   getIntFromMap(usage, "cached"),
+						Reasoning: getIntFromMap(usage, "reasoning"),
+						AudioInput: getIntFromMap(usage, "audioInput"),
+						AudioOutput: getIntFromMap(usage, "audioOutput"),
+						AcceptedPredict: getIntFromMap(usage, "acceptedPredict"),
+						RejectedPredict: getIntFromMap(usage, "rejectedPredict"),
+						MessageID: msg.MessageID,
+						ThreadID: threadID,
+					}
+				}
+			}
+		}
+
 		aguiMessages = append(aguiMessages, aguimsit)
 	}
 
@@ -322,6 +372,7 @@ func (p *PostgresAguiProjection) GetThreadState(threadID string) (*AguiThreadSta
 		Messages:      aguiMessages,
 		ToolCalls:     []AguiToolCall{},
 		AgentActivity: make(map[string]*AguiAgentActivity),
+		TokenUsage:    tokenUsage,
 		CreatedAt:     thread.CreatedAt,
 		UpdatedAt:     thread.UpdatedAt,
 		Version:       thread.Version,

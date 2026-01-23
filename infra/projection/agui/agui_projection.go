@@ -36,10 +36,28 @@ type AguiThreadState struct {
 	Messages      []aguievents.Message          `json:"messages"` // AG-UI SDK format
 	ToolCalls     []AguiToolCall                `json:"toolCalls"`
 	AgentActivity map[string]*AguiAgentActivity `json:"agentActivity"`
+	TokenUsage    *TokenUsageInfo               `json:"tokenUsage,omitempty"`
 	CreatedAt     time.Time                     `json:"createdAt"`
 	UpdatedAt     time.Time                     `json:"updatedAt"`
 	Version       int64                         `json:"version"` // Event version
 	IsDeleted     bool                          `json:"isDeleted"`
+}
+
+// TokenUsageInfo represents token usage for a thread.
+type TokenUsageInfo struct {
+	Total            int    `json:"total"`
+	Prompt           int    `json:"prompt"`
+	Completion       int    `json:"completion"`
+	Cached           int    `json:"cached,omitempty"`
+	Reasoning        int    `json:"reasoning,omitempty"`
+	AudioInput       int    `json:"audioInput,omitempty"`
+	AudioOutput      int    `json:"audioOutput,omitempty"`
+	AcceptedPredict  int    `json:"acceptedPredict,omitempty"`
+	RejectedPredict  int    `json:"rejectedPredict,omitempty"`
+	Model            string `json:"model,omitempty"`
+	Provider         string `json:"provider,omitempty"`
+	MessageID        string `json:"messageId,omitempty"`
+	ThreadID         string `json:"threadId,omitempty"`
 }
 
 // AguiToolCall represents a complete tool call execution.
