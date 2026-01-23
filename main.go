@@ -109,6 +109,10 @@ func run(ctx context.Context, log *logger.Logger) error {
 			KratosBrowser string `conf:"default:http://localhost:4433"`
 			AdminAPIToken string
 		}
+		DashboardAdmin struct {
+			User string `conf:"default:admin"`
+			Pass string `conf:"default:admin,mask"`
+		}
 		KurrentDB struct {
 			ConnectionString string `conf:"default:esdb://localhost:2113?tls=false"`
 		}
@@ -487,9 +491,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Get("/api/profile", authMiddleware.RequireAuthFunc(profileHandler.GetProfile))
 	r.Put("/api/profile", authMiddleware.RequireAuthFunc(profileHandler.UpdateProfile))
 
-	// Analytics Dashboard (protected, admin only ideally, but auth protected for now)
-	statsHandler := statisticsHandler.NewHandler(log, statsProjection)
-	r.Get("/analytics", authMiddleware.RequireAuthFunc(statsHandler.ServeDashboard))
+	// Analytics Dashboard (dedicated Basic Auth)
+	statsHandler := statisticsHandler.NewHandler(log, statsProjection, cfg.DashboardAdmin.User, cfg.DashboardAdmin.Pass)
+	r.Get("/analytics", statsHandler.BasicAuth(statsHandler.ServeDashboard))
 
 	// Pricing page
 	r.Get("/pricing", authMiddleware.RequireAuthFunc(HandlePricingPage(log)))
