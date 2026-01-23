@@ -1,0 +1,76 @@
+package analytics
+
+import (
+	"school-with-ai/components/i18n"
+)
+
+type LayoutProps struct {
+	Title string
+}
+
+templ Layout(props LayoutProps) {
+	<!DOCTYPE html>
+	<html lang={ i18n.Lang(ctx) } dir={ i18n.Dir(ctx) }>
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>{ props.Title } - Analytics</title>
+			<link rel="icon" type="image/svg+xml" href="/assets/images/logo-black.svg"/>
+			<link rel="preconnect" href="https://fonts.googleapis.com"/>
+			<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+			<link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Noto+Sans+Arabic:wght@100..900&family=Noto+Sans:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet"/>
+			<link rel="stylesheet" href="/assets/css/output.css"/>
+			<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+			<script>
+				(function() {
+					const theme = localStorage.getItem('theme') || 'system';
+					const root = document.documentElement;
+					if (theme === 'system') {
+						const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+						if (systemPrefersDark) {
+							root.classList.add('dark');
+						}
+					} else if (theme === 'dark') {
+						root.classList.add('dark');
+					}
+				})();
+			</script>
+			<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+		</head>
+		<body class="flex flex-col min-h-screen bg-background text-foreground antialiased">
+			<!-- Dashboard Specific Navbar -->
+			<nav class="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+				<div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+					<div class="flex items-center gap-6">
+						<a href="/" class="flex items-center gap-2 group">
+							<div class="bg-primary p-1.5 rounded-lg text-primary-foreground group-hover:scale-110 transition-transform">
+								<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+							</div>
+							<span class="font-bold text-xl tracking-tight hidden sm:inline-block">SchoolWithAI</span>
+						</a>
+						<div class="h-6 w-px bg-border hidden sm:block"></div>
+						<div class="flex items-center gap-1">
+							<a href="/analytics" class="px-3 py-1.5 text-sm font-medium bg-secondary text-secondary-foreground rounded-md transition-colors hover:bg-secondary/80">
+								Dashboard
+							</a>
+						</div>
+					</div>
+					<div class="flex items-center gap-4">
+						<span class="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary uppercase">
+							Admin Access
+						</span>
+					</div>
+				</div>
+			</nav>
+			<!-- Main Content -->
+			<main class="flex-1">
+				{ children... }
+			</main>
+			<footer class="border-t py-6 bg-muted/50">
+				<div class="max-w-7xl mx-auto px-4 text-center text-sm text-muted-foreground">
+					<p>© 2026 SchoolWithAI Analytics. All rights reserved.</p>
+				</div>
+			</footer>
+		</body>
+	</html>
+}

@@ -2,27 +2,42 @@ package statistics
 
 import (
 	"net/http"
-	"school-with-ai/domain"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/infra/projection/statistics"
 	component "school-with-ai/components/analytics"
 )
 
 type Handler struct {
-	log   *logger.Logger
-	stats *statistics.PostgresProjection
+	log       *logger.Logger
+	stats     *statistics.PostgresProjection
+	adminUser string
+	adminPass string
 }
 
-func NewHandler(log *logger.Logger, stats *statistics.PostgresProjection) *Handler {
+func NewHandler(log *logger.Logger, stats *statistics.PostgresProjection, adminUser, adminPass string) *Handler {
 	return &Handler{
-		log:   log,
-		stats: stats,
+		log:       log,
+		stats:     stats,
+		adminUser: adminUser,
+		adminPass: adminPass,
+	}
+}
+
+// BasicAuth provides simple authentication for the analytics dashboard
+func (h *Handler) BasicAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user, pass, ok := r.BasicAuth()
+		if !ok || user != h.adminUser || pass != h.adminPass {
+			w.Header().Set("WWW-Authenticate", `Basic realm="Analytics Dashboard"`)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
 	}
 }
 
 func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	user := domain.GetUserFromContext(ctx)
 
 	agentFilter := r.URL.Query().Get("agent")
 
@@ -40,7 +55,6 @@ func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 
 	component.Dashboard(component.DashboardProps{
 		Stats:        stats,
-		User:         user,
 		Agents:       agents,
 		CurrentAgent: agentFilter,
 	}).Render(ctx, w)
