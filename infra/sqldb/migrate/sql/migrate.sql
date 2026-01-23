@@ -124,3 +124,20 @@ CREATE TABLE tool_stats (
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
     PRIMARY KEY (tool_name, agent_name)
 );
+
+-- Version: 1.12
+-- Description: Create unified analytics statistics table
+CREATE TABLE IF NOT EXISTS analytics_stats (
+    agent_name VARCHAR(255) NOT NULL,
+    category VARCHAR(50) NOT NULL, -- 'tool', 'message', 'error'
+    name VARCHAR(255) NOT NULL,    -- tool name or metric name (e.g. 'total')
+    total_count INTEGER DEFAULT 0,
+    successes INTEGER DEFAULT 0,
+    failures INTEGER DEFAULT 0,
+    last_failure TIMESTAMP,
+    last_success TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (agent_name, category, name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_analytics_stats_agent ON analytics_stats(agent_name);

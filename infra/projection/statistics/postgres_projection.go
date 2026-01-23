@@ -30,6 +30,12 @@ func (p *PostgresProjection) RegisterHandlers(router interface {
 	router.Register(&domain.ToolCallExecutedEvent{}, func(ctx context.Context, e core.Event) error {
 		return p.HandleEvent(ctx, e)
 	})
+	router.Register(&domain.AssistantMessageCompletedEvent{}, func(ctx context.Context, e core.Event) error {
+		return p.HandleEvent(ctx, e)
+	})
+	router.Register(&domain.RunErrorEvent{}, func(ctx context.Context, e core.Event) error {
+		return p.HandleEvent(ctx, e)
+	})
 }
 
 // HandleEvent processes domain events to update statistics in the database.
@@ -37,16 +43,17 @@ func (p *PostgresProjection) HandleEvent(ctx context.Context, event core.Event) 
 	switch e := event.(type) {
 	case *domain.ToolCallExecutedEvent:
 		return p.updateToolStats(ctx, e)
+	case *domain.AssistantMessageCompletedEvent:
+		return p.updateMessageStats(ctx, e)
+	case *domain.RunErrorEvent:
+		// We'll need to figure out which agent was active for RunErrorEvent.
+		// For now, let's just track it as a global or see if we can get agent from context.
+		return p.updateErrorStats(ctx, e)
 	}
 	return nil
 }
 
 func (p *PostgresProjection) updateToolStats(ctx context.Context, e *domain.ToolCallExecutedEvent) error {
-	// Construct upsert query
-	// We increment total_calls, and conditionally increment successes/failures and update timestamps.
-	// Since standard SQL doesn't have a clean "upsert with conditional logic driven by application logic" in one go 
-	// without passing params, we'll pass the increments as params.
-
 	var (
 		incSuccess = 0
 		incFailure = 0
@@ -63,20 +70,20 @@ func (p *PostgresProjection) updateToolStats(ctx context.Context, e *domain.Tool
 	}
 
 	query := `
-		INSERT INTO tool_stats (tool_name, agent_name, total_calls, successes, failures, last_failure, last_success, updated_at)
-		VALUES ($1, $2, 1, $3, $4, $5, $6, $7)
-		ON CONFLICT (tool_name, agent_name) DO UPDATE SET
-			total_calls = tool_stats.total_calls + 1,
-			successes = tool_stats.successes + $3,
-			failures = tool_stats.failures + $4,
-			last_failure = COALESCE($5, tool_stats.last_failure),
-			last_success = COALESCE($6, tool_stats.last_success),
+		INSERT INTO analytics_stats (agent_name, category, name, total_count, successes, failures, last_failure, last_success, updated_at)
+		VALUES ($1, 'tool', $2, 1, $3, $4, $5, $6, $7)
+		ON CONFLICT (agent_name, category, name) DO UPDATE SET
+			total_count = analytics_stats.total_count + 1,
+			successes = analytics_stats.successes + $3,
+			failures = analytics_stats.failures + $4,
+			last_failure = COALESCE($5, analytics_stats.last_failure),
+			last_success = COALESCE($6, analytics_stats.last_success),
 			updated_at = $7
 	`
 
 	_, err := p.db.ExecContext(ctx, query,
-		e.ToolName,
 		e.AgentName,
+		e.ToolName,
 		incSuccess,
 		incFailure,
 		lastFail,
@@ -91,16 +98,61 @@ func (p *PostgresProjection) updateToolStats(ctx context.Context, e *domain.Tool
 	return nil
 }
 
-// GetStats retrieves all tool statistics.
-func (p *PostgresProjection) GetStats(ctx context.Context) ([]ToolStats, error) {
-	var stats []ToolStats
+func (p *PostgresProjection) updateMessageStats(ctx context.Context, e *domain.AssistantMessageCompletedEvent) error {
 	query := `
-		SELECT tool_name, agent_name, total_calls, successes, failures, last_failure, last_success
-		FROM tool_stats
-		ORDER BY failures DESC, total_calls DESC
+		INSERT INTO analytics_stats (agent_name, category, name, total_count, successes, updated_at)
+		VALUES ($1, 'message', 'total', 1, 1, $2)
+		ON CONFLICT (agent_name, category, name) DO UPDATE SET
+			total_count = analytics_stats.total_count + 1,
+			successes = analytics_stats.successes + 1,
+			updated_at = $2
 	`
-	if err := p.db.SelectContext(ctx, &stats, query); err != nil {
-		return nil, fmt.Errorf("failed to get tool stats: %w", err)
+	_, err := p.db.ExecContext(ctx, query, e.AgentName, time.Now())
+	return err
+}
+
+func (p *PostgresProjection) updateErrorStats(ctx context.Context, e *domain.RunErrorEvent) error {
+	// Attempt to get agent name from context if available, otherwise use 'unknown'
+	agentName := "unknown"
+	query := `
+		INSERT INTO analytics_stats (agent_name, category, name, total_count, failures, last_failure, updated_at)
+		VALUES ($1, 'error', 'total', 1, 1, $2, $3)
+		ON CONFLICT (agent_name, category, name) DO UPDATE SET
+			total_count = analytics_stats.total_count + 1,
+			failures = analytics_stats.failures + 1,
+			last_failure = $2,
+			updated_at = $3
+	`
+	_, err := p.db.ExecContext(ctx, query, agentName, e.Timestamp, time.Now())
+	return err
+}
+
+// GetStats retrieves statistics, optionally filtered by agent.
+func (p *PostgresProjection) GetStats(ctx context.Context, agentName string) ([]StatRow, error) {
+	var stats []StatRow
+	query := `
+		SELECT agent_name, category, name, total_count, successes, failures, last_failure, last_success, updated_at
+		FROM analytics_stats
+	`
+	var args []any
+	if agentName != "" {
+		query += " WHERE agent_name = $1 "
+		args = append(args, agentName)
+	}
+	query += " ORDER BY category ASC, total_count DESC"
+
+	if err := p.db.SelectContext(ctx, &stats, query, args...); err != nil {
+		return nil, fmt.Errorf("failed to get stats: %w", err)
 	}
 	return stats, nil
+}
+
+// GetAgents retrieves a list of all unique agent names in the stats.
+func (p *PostgresProjection) GetAgents(ctx context.Context) ([]string, error) {
+	var agents []string
+	query := "SELECT DISTINCT agent_name FROM analytics_stats ORDER BY agent_name ASC"
+	if err := p.db.SelectContext(ctx, &agents, query); err != nil {
+		return nil, fmt.Errorf("failed to get agents: %w", err)
+	}
+	return agents, nil
 }

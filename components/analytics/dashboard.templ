@@ -1,6 +1,7 @@
 package analytics
 
 import (
+	"encoding/json"
 	"fmt"
 	"school-with-ai/components"
 	"school-with-ai/domain"
@@ -8,8 +9,10 @@ import (
 )
 
 type DashboardProps struct {
-	Stats []statistics.ToolStats
-	User  *domain.User
+	Stats        []statistics.StatRow
+	User         *domain.User
+	Agents       []string
+	CurrentAgent string
 }
 
 templ Dashboard(props DashboardProps) {
@@ -17,49 +20,204 @@ templ Dashboard(props DashboardProps) {
 		Title: "Analytics",
 		User:  props.User,
 	}) {
-		<div class="p-8 space-y-8">
-			<div>
-				<h1 class="text-3xl font-bold tracking-tight">Analytics Dashboard</h1>
-				<p class="text-muted-foreground">Tool usage and failure rates per agent.</p>
-			</div>
-			<div class="rounded-md border">
-				<table class="w-full text-sm">
-					<thead class="border-b bg-muted/50">
-						<tr class="hover:bg-muted/50">
-							<th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Tool</th>
-							<th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Agent</th>
-							<th class="h-12 px-4 text-right align-middle font-medium text-muted-foreground">Calls</th>
-							<th class="h-12 px-4 text-right align-middle font-medium text-muted-foreground">Successes</th>
-							<th class="h-12 px-4 text-right align-middle font-medium text-muted-foreground">Failures</th>
-							<th class="h-12 px-4 text-right align-middle font-medium text-muted-foreground">Rate</th>
-						</tr>
-					</thead>
-					<tbody>
-						if len(props.Stats) == 0 {
-							<tr>
-								<td colspan="6" class="p-4 text-center text-muted-foreground">No data available</td>
-							</tr>
-						} else {
-							for _, s := range props.Stats {
-								<tr class="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-									<td class="p-4 align-middle font-medium">{ s.ToolName }</td>
-									<td class="p-4 align-middle">{ s.AgentName }</td>
-									<td class="p-4 align-middle text-right">{ fmt.Sprintf("%d", s.TotalCalls) }</td>
-									<td class="p-4 align-middle text-right">{ fmt.Sprintf("%d", s.Successes) }</td>
-									<td class="p-4 align-middle text-right text-destructive">{ fmt.Sprintf("%d", s.Failures) }</td>
-									<td class="p-4 align-middle text-right">
-										if s.TotalCalls > 0 {
-											{ fmt.Sprintf("%.1f%%", float64(s.Failures)/float64(s.TotalCalls)*100) }
-										} else {
-											-
-										}
-									</td>
-								</tr>
+		<div class="p-8 space-y-8 max-w-7xl mx-auto">
+			<div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+				<div>
+					<h1 class="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">Analytics Dashboard</h1>
+					<p class="text-muted-foreground mt-1 text-lg">Production-ready insights into agent system performance.</p>
+				</div>
+				<div class="flex items-center gap-3">
+					<form action="/analytics" method="GET" class="flex items-center gap-3 bg-card p-2 rounded-xl border shadow-sm">
+						<label for="agent-filter" class="text-sm font-medium text-muted-foreground ml-2">Filter by Agent:</label>
+						<select
+							id="agent-filter"
+							name="agent"
+							class="bg-background border rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary outline-none transition-all"
+							onchange="this.form.submit()"
+						>
+							<option value="">All Agents</option>
+							for _, agent := range props.Agents {
+								<option value={ agent } selected?={ props.CurrentAgent == agent }>{ agent }</option>
 							}
+						</select>
+					</form>
+					<a
+						href={ templ.URL(fmt.Sprintf("/analytics?agent=%s", props.CurrentAgent)) }
+						class="inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors gap-2 h-[42px]"
+					>
+						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path></svg>
+						Refresh
+					</a>
+				</div>
+			</div>
+			<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+				{{
+					// Group stats by agent for visualization
+					agentTools := make(map[string][]statistics.StatRow)
+					for _, s := range props.Stats {
+						if s.Category == "tool" {
+							agentTools[s.AgentName] = append(agentTools[s.AgentName], s)
 						}
-					</tbody>
-				</table>
+					}
+				}}
+				for agent, stats := range agentTools {
+					<div class="bg-card p-6 rounded-2xl border shadow-sm flex flex-col items-center">
+						<h3 class="text-lg font-semibold mb-4 text-center">{ agent } - Tool Success Ratio</h3>
+						<div class="w-full aspect-square relative max-w-[250px]">
+							<canvas id={ fmt.Sprintf("chart-%s", agent) }></canvas>
+						</div>
+						<div class="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+							{{
+								totalAgentSuccess := 0
+								totalAgentFailures := 0
+								for _, s := range stats {
+									totalAgentSuccess += s.Successes
+									totalAgentFailures += s.Failures
+								}
+							}}
+							<div class="flex items-center gap-1.5">
+								<span class="w-3 h-3 rounded-full bg-green-500"></span>
+								<span>Success: { fmt.Sprintf("%d", totalAgentSuccess) }</span>
+							</div>
+							<div class="flex items-center gap-1.5">
+								<span class="w-3 h-3 rounded-full bg-red-500"></span>
+								<span>Failures: { fmt.Sprintf("%d", totalAgentFailures) }</span>
+							</div>
+						</div>
+						{{
+							labels := []string{}
+							data := []int{}
+							backgrounds := []string{}
+
+							for i, s := range stats {
+								if s.Successes > 0 {
+									labels = append(labels, fmt.Sprintf("%s (Success)", s.Name))
+									data = append(data, s.Successes)
+									opacity := 0.8 - (float64(i%5) * 0.1)
+									backgrounds = append(backgrounds, fmt.Sprintf("rgba(34, 197, 94, %v)", opacity))
+								}
+							}
+							for i, s := range stats {
+								if s.Failures > 0 {
+									labels = append(labels, fmt.Sprintf("%s (Failure)", s.Name))
+									data = append(data, s.Failures)
+									opacity := 0.8 - (float64(i%5) * 0.1)
+									backgrounds = append(backgrounds, fmt.Sprintf("rgba(239, 68, 68, %v)", opacity))
+								}
+							}
+
+							labelsJSON, _ := json.Marshal(labels)
+							dataJSON, _ := json.Marshal(data)
+							bgJSON, _ := json.Marshal(backgrounds)
+						}}
+						@renderChart(agent, string(labelsJSON), string(dataJSON), string(bgJSON))
+					</div>
+				}
+			</div>
+			<!-- Metrics Table -->
+			<div class="bg-card rounded-2xl border shadow-sm overflow-hidden">
+				<div id="stats-table-container">
+					<table class="w-full text-sm">
+						<thead>
+							<tr class="border-b bg-muted/30">
+								<th class="h-12 px-6 text-left align-middle font-semibold text-muted-foreground uppercase tracking-wider text-xs">Category</th>
+								<th class="h-12 px-6 text-left align-middle font-semibold text-muted-foreground uppercase tracking-wider text-xs">Name</th>
+								if props.CurrentAgent == "" {
+									<th class="h-12 px-6 text-left align-middle font-semibold text-muted-foreground uppercase tracking-wider text-xs">Agent</th>
+								}
+								<th class="h-12 px-6 text-right align-middle font-semibold text-muted-foreground uppercase tracking-wider text-xs">Total</th>
+								<th class="h-12 px-6 text-right align-middle font-semibold text-muted-foreground uppercase tracking-wider text-xs">Success</th>
+								<th class="h-12 px-6 text-right align-middle font-semibold text-muted-foreground uppercase tracking-wider text-xs">Failures</th>
+								<th class="h-12 px-6 text-right align-middle font-semibold text-muted-foreground uppercase tracking-wider text-xs">Failure Rate</th>
+							</tr>
+						</thead>
+						<tbody class="divide-y divide-border">
+							if len(props.Stats) == 0 {
+								<tr>
+									<td colspan="7" class="p-12 text-center text-muted-foreground italic">No metrics recorded yet</td>
+								</tr>
+							} else {
+								for _, s := range props.Stats {
+									<tr class="hover:bg-muted/20 transition-colors">
+										<td class="px-6 py-4 align-middle">
+											<span
+												class={
+													"inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+													templ.KV("bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300", s.Category == "tool"),
+													templ.KV("bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300", s.Category == "message"),
+													templ.KV("bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300", s.Category == "error"),
+												}
+											>
+												{ s.Category }
+											</span>
+										</td>
+										<td class="px-6 py-4 align-middle font-medium">{ s.Name }</td>
+										if props.CurrentAgent == "" {
+											<td class="px-6 py-4 align-middle text-muted-foreground">{ s.AgentName }</td>
+										}
+										<td class="px-6 py-4 align-middle text-right font-semibold">{ fmt.Sprintf("%d", s.TotalCount) }</td>
+										<td class="px-6 py-4 align-middle text-right text-green-600 dark:text-green-400">{ fmt.Sprintf("%d", s.Successes) }</td>
+										<td class="px-6 py-4 align-middle text-right text-destructive">{ fmt.Sprintf("%d", s.Failures) }</td>
+										<td class="px-6 py-4 align-middle text-right">
+											if s.TotalCount > 0 {
+												<div class="flex items-center justify-end gap-2">
+													<div class="w-16 bg-muted rounded-full h-1.5 hidden sm:block">
+														<div class="bg-destructive h-1.5 rounded-full" style={ fmt.Sprintf("width: %.1f%%", float64(s.Failures)/float64(s.TotalCount)*100) }></div>
+													</div>
+													<span class="font-mono text-xs">{ fmt.Sprintf("%.1f%%", float64(s.Failures)/float64(s.TotalCount)*100) }</span>
+												</div>
+											} else {
+												<span class="text-muted-foreground">-</span>
+											}
+										</td>
+									</tr>
+								}
+							}
+						</tbody>
+					</table>
+				</div>
 			</div>
 		</div>
 	}
+}
+
+script renderChart(agent, labelsJSON, dataJSON, backgroundsJSON string) {
+	const chartId = `chart-${agent}`;
+	const ctx = document.getElementById(chartId).getContext('2d');
+	const labels = JSON.parse(labelsJSON);
+	const data = JSON.parse(dataJSON);
+	const backgrounds = JSON.parse(backgroundsJSON);
+
+	new Chart(ctx, {
+		type: 'doughnut',
+		data: {
+			labels: labels,
+			datasets: [{
+				data: data,
+				backgroundColor: backgrounds,
+				borderWidth: 1,
+				hoverOffset: 4
+			}]
+		},
+		options: {
+			cutout: '65%',
+			plugins: {
+				legend: {
+					display: false
+				},
+				tooltip: {
+					callbacks: {
+						label: function(context) {
+							const label = context.label || '';
+							const value = context.raw || 0;
+							const total = context.dataset.data.reduce((a, b) => a + b, 0);
+							const percentage = Math.round((value / total) * 100);
+							return `${label}: ${value} (${percentage}%)`;
+						}
+					}
+				}
+			}
+		}
+	});
 }
