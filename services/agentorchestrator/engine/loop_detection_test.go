@@ -2,8 +2,9 @@ package engine
 
 import (
 	"fmt"
-	"school-with-ai/foundation/agentsdk/core"
 	"testing"
+
+	"school-with-ai/foundation/agentsdk/core"
 )
 
 func TestLoopDetector_ToolCallLoop(t *testing.T) {

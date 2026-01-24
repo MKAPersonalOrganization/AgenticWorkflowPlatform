@@ -9,6 +9,7 @@
  */
 
 import { createUserMessage, safeParseJSON, generateInteractionId, enrichToolResult } from './chat-utils.js';
+import { TOOL_EVENTS, TOOL_STATES } from './tool-state-machine.js';
 
 /**
  * Create messaging methods mixin
@@ -127,7 +128,7 @@ export function createMessagingMethods() {
                     const data = await response.json();
                     const state = this.__getThreadState(id);
                     const messages = Array.isArray(data) ? data : (data.messages || []);
-                    state.messages = this.__convertBackendMessagesToUI(messages);
+                    state.messages = this.__convertBackendMessagesToUI(messages, data.toolStates || {});
 
                     // Load token usage if available
                     if (data.tokenUsage) {
@@ -165,9 +166,10 @@ export function createMessagingMethods() {
         /**
          * Convert backend AG-UI messages to UI display format
          * @param {Array} backendMessages - Messages in AG-UI SDK format
+         * @param {Object} toolStatesMap - Map of tool states by toolCallId (optional)
          * @returns {Array} Converted messages for UI display
          */
-        __convertBackendMessagesToUI(backendMessages) {
+        __convertBackendMessagesToUI(backendMessages, toolStatesMap = {}) {
             // Guard: Validate input
             if (!Array.isArray(backendMessages)) {
                 console.warn('Invalid messages array:', backendMessages);
@@ -201,16 +203,59 @@ export function createMessagingMethods() {
                                 const toolName = toolCall.function?.name || 'unknown';
                                 const toolArgs = toolCall.function?.arguments || '{}';
 
+                                // Check metadata for tool state overrides
+                                let status = 'completed';
+                                let agent = agentName;
+                                let toolResult = null;
+                                let parsedToolArgs = safeParseJSON(toolArgs);
+
+                                // Check global tool states map first
+                                if (toolStatesMap && toolStatesMap[toolCall.id]) {
+                                    const stateObj = toolStatesMap[toolCall.id];
+                                    // With XState, we don't need to manually set status here as the machine will do it
+                                    // But we might need agent name
+                                    if (stateObj.agentName) agent = stateObj.agentName;
+                                }
+
+                                // Initialize and sync XState machine
+                                if (toolCall.id) {
+                                    // Always start the machine (IDLE -> EXECUTING)
+                                    this.transitionToolState(toolCall.id, TOOL_EVENTS.START, { toolName });
+
+                                    // Sync to specific state if needed
+                                    if (status === 'completed') {
+                                        this.transitionToolState(toolCall.id, TOOL_EVENTS.SUCCESS, { result: toolResult });
+                                    } else if (status === 'error') {
+                                        this.transitionToolState(toolCall.id, TOOL_EVENTS.ERROR, { error: toolResult || 'Unknown error' });
+                                    } else if (status === 'awaiting_input') {
+                                        // We might attempt to recover elicitation spec from metadata if available, 
+                                        // or result if it was somehow persisted.
+                                        // For now, transition to state is crucial.
+                                        this.transitionToolState(toolCall.id, TOOL_EVENTS.NEEDS_INPUT, {});
+                                    } else if (status === 'awaiting_auth') {
+                                        this.transitionToolState(toolCall.id, TOOL_EVENTS.NEEDS_AUTH, {});
+                                    } else if (status === 'input_provided') {
+                                        // Maintain history: It WAS awaiting input, then provided. 
+                                        // The current state should be EXECUTING or COMPLETED depending on subsequent events?
+                                        // Actually 'input_provided' is a transient event in backend, but might be a state in our view?
+                                        // If backend says 'input_provided', it means we are past the wait.
+                                        // So we should be in EXECUTING (after input).
+                                        this.transitionToolState(toolCall.id, TOOL_EVENTS.NEEDS_INPUT, {});
+                                        this.transitionToolState(toolCall.id, TOOL_EVENTS.INPUT_PROVIDED, {});
+                                    }
+                                }
+
                                 uiMessages.push({
                                     id: toolCall.id,
                                     type: 'tool_call',
                                     name: toolName,
                                     args: toolArgs,
-                                    status: 'completed',
+                                    status: status,
                                     timestamp: msg.timestamp || new Date().toISOString(),
-                                    parsedArgs: safeParseJSON(toolArgs),
-                                    result: null,
-                                    agentName: agentName
+                                    parsedArgs: parsedToolArgs,
+                                    result: toolResult,
+                                    agentName: agent,
+                                    metadata: msg.metadata
                                 });
                             }
                         }

@@ -3,6 +3,7 @@ package taskmanagement
 import (
 	"context"
 	"fmt"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/logger"
@@ -107,34 +108,8 @@ func (s *Service) HandleUserMessage(
 	}
 
 	// 2. Delegate to AgentOrchestrator
-	events, err := s.orchestratorService.ProcessUserMessage(ctx, params.AgentName, params.ThreadID, params.Content, params.UserID)
-	if err != nil {
-		return fmt.Errorf("failed to process user message: %w", err)
-	}
-
-	// 3. Persist ephemeral events to EventStore
-	// This ensures that streaming events (processed by ProjectionUpdater) reach the AguiProjection
-	for event, err := range events {
-		if err != nil {
-			return fmt.Errorf("agent run failed: %w", err)
-		}
-
-		// Filter out events that were already persisted by the Engine/ThreadMgmt to avoid duplication
-		switch event.EventType() {
-		case "MessageAdded", "ThreadCreated", "ThreadTitleUpdated", "ThreadDeleted", "TokenUsageReported":
-			// These are handled by threadMgmt internal calls or engine directly
-			continue
-		default:
-			// Write ephemeral events (streaming tokens, run status, etc.) to EventStore
-			// We use a specific streaming stream to avoid optimistic concurrency conflicts with the main thread stream
-			streamID := fmt.Sprintf("streaming-%s", params.ThreadID)
-			if _, err := s.eventLog.AppendWithVersion(ctx, streamID, -1, event); err != nil {
-				s.log.Error(ctx, "failed to append ephemeral event", "error", err, "type", event.EventType())
-			}
-		}
-	}
-
-	return nil
+	// The Engine now handles both persistence and real-time emission internally.
+	return s.orchestratorService.ProcessUserMessage(ctx, params.AgentName, params.ThreadID, params.Content, params.UserID)
 }
 
 // getRelease returns the application release version from config

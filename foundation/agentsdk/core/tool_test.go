@@ -3,8 +3,9 @@ package core_test
 import (
 	"context"
 	"fmt"
-	"school-with-ai/foundation/agentsdk/core"
 	"testing"
+
+	"school-with-ai/foundation/agentsdk/core"
 )
 
 func TestFunctionTool(t *testing.T) {

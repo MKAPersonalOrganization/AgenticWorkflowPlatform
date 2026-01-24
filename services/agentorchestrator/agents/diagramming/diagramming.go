@@ -2,6 +2,7 @@ package diagramming
 
 import (
 	"context"
+
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/core/middleware"
 	"school-with-ai/foundation/i18n"
@@ -36,11 +37,11 @@ func CreateDiagrammingInstructor(ctx context.Context, notifier core.EventNotifie
 	}
 
 	prompt, err := core.GenerateSystemPrompt(core.PromptConfig{
-		Role:        i18n.T(ctx, "diagramming.role"),
-		Preamble:    i18n.T(ctx, "diagramming.preamble"),
-		Topic:       i18n.T(ctx, "diagramming.topic"),
-		Interactive: true,
-		ExtraRules:  i18n.T(ctx, "diagramming.extra_rules"),
+		Role:         i18n.T(ctx, "diagramming.role"),
+		Preamble:     i18n.T(ctx, "diagramming.preamble"),
+		Topic:        i18n.T(ctx, "diagramming.topic"),
+		Interactive:  true,
+		ExtraRules:   i18n.T(ctx, "diagramming.extra_rules"),
 		IncludeTodos: true,
 	})
 	if err != nil {

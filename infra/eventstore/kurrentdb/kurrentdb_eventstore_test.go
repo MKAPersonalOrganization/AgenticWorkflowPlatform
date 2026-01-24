@@ -2,10 +2,11 @@ package kurrentdb
 
 import (
 	"context"
-	"school-with-ai/domain"
-	"school-with-ai/foundation/agentsdk/core"
 	"testing"
 	"time"
+
+	"school-with-ai/domain"
+	"school-with-ai/foundation/agentsdk/core"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

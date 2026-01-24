@@ -4,15 +4,16 @@ import (
 	"context"
 	"fmt"
 	"iter"
+	"time"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
-	"school-with-ai/foundation/agentsdk/core/middleware"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/agentorchestrator/types"
 	"school-with-ai/services/threadmgmt"
-	"time"
 
 	"github.com/qmuntal/stateless"
+	"golang.org/x/sync/errgroup"
 )
 
 // Use central types
@@ -21,6 +22,11 @@ type ChatClient = types.ChatClient
 // AgentProvider provides agent configurations by name.
 type AgentProvider interface {
 	GetConfig(ctx context.Context, name string) (core.AgentConfig, error)
+}
+
+// EventEmitter defines the interface for real-time event dispatching.
+type EventEmitter interface {
+	Dispatch(ctx context.Context, event core.Event) error
 }
 
 // Engine handles the core LLM iteration and streaming logic in a generic way.
@@ -32,6 +38,7 @@ type Engine struct {
 	reqCtxCapture **core.RequestContext // optional capture for testing
 	toolTracer    core.ToolTracer
 	toolExec      *ToolExecutionService
+	emitter       EventEmitter
 }
 
 // New creates a new generic execution engine.
@@ -42,6 +49,7 @@ func New(
 	provider AgentProvider,
 	reqCtxCapture **core.RequestContext,
 	toolTracer core.ToolTracer,
+	emitter EventEmitter,
 ) *Engine {
 	return &Engine{
 		log:           log,
@@ -51,6 +59,7 @@ func New(
 		reqCtxCapture: reqCtxCapture,
 		toolTracer:    toolTracer,
 		toolExec:      NewToolExecutionService(toolTracer),
+		emitter:       emitter,
 	}
 }
 
@@ -120,7 +129,7 @@ func (e *Engine) newExecutionState(ctx context.Context, agentName string, runCtx
 		agent:     instance,
 		history:   runCtx.InitialHistory,
 		observer: &ObserverUnit{
-			yield:     yield,
+			yield:     e.wrapYield(ctx, &PersistenceUnit{mgmt: e.threadMgmt}, yield),
 			startTime: timeNowNano(),
 			threadID:  runCtx.ThreadID,
 			events:    instance.Events,
@@ -146,6 +155,65 @@ func (e *Engine) newExecutionState(ctx context.Context, agentName string, runCtx
 	}
 
 	return exec, nil
+}
+
+// wrapYield creates a yield function that automatically handles persistence and emission.
+func (e *Engine) wrapYield(ctx context.Context, p *PersistenceUnit, yield func(core.Event, error) bool) func(core.Event, error) bool {
+	return func(evt core.Event, err error) bool {
+		if err != nil || evt == nil {
+			return yield(evt, err)
+		}
+
+		if err := e.emit(ctx, evt, p); err != nil {
+			e.log.Error(ctx, "failed to emit event", "error", err, "type", evt.EventType())
+		}
+
+		return yield(evt, err)
+	}
+}
+
+// emit handles the dual path of event delivery:
+// 1. Persistent events are saved to the EventStore (and then broadcast by the projection system).
+// 2. Transient events are dispatched directly to the EventRouter for real-time streaming.
+func (e *Engine) emit(ctx context.Context, evt core.Event, p *PersistenceUnit) error {
+	if evt == nil {
+		return nil
+	}
+
+	// 1. Handle special persistence cases (Token Usage, Tool Events)
+	// These are events produced by the Engine that must be durable.
+	persistent := false
+	switch e := evt.(type) {
+	case *domain.TokenUsageReported:
+		if p != nil {
+			if _, err := p.ReportTokenUsage(ctx, *e); err != nil {
+				return err
+			}
+		}
+		persistent = true
+	case *domain.ToolAwaitingInputEvent,
+		*domain.ToolAwaitingAuthEvent,
+		*domain.ToolInputProvidedEvent,
+		*domain.ToolAuthGrantedEvent,
+		*domain.ToolStateChangedEvent:
+		if p != nil {
+			if _, err := p.ReportToolEvent(ctx, evt); err != nil {
+				return err
+			}
+		}
+		persistent = true
+	case *domain.MessageAdded, *domain.ThreadCreated, *domain.ThreadTitleUpdatedEvent:
+		// These are already persisted by the thread management calls.
+		// We treat them as persistent so we don't dispatch them directly (avoiding duplicates).
+		persistent = true
+	}
+
+	// 2. Dispatch transient events directly to the emitter for real-time UI updates
+	if !persistent && e.emitter != nil {
+		return e.emitter.Dispatch(ctx, evt)
+	}
+
+	return nil
 }
 
 // timeNowNano returns the current time in nanoseconds (extracted for testing).
@@ -185,6 +253,9 @@ type executionState struct {
 	streamResult     *StreamResult
 	resolution       *RouteResolver
 	stateConfigCache []StateDefinition // Cached to avoid recreation in nextStep()
+
+	// Tool state machines for tracking individual tool execution states
+	toolStateMachines map[string]*domain.ToolStateMachine
 }
 
 func (s *executionState) generateAgentResponse() error {
@@ -217,17 +288,56 @@ func (s *executionState) generateAgentResponse() error {
 }
 
 func (s *executionState) executeRequiredActions() error {
+	// Create tool state machines for each tool call
+	s.toolStateMachines = make(map[string]*domain.ToolStateMachine)
+
+	// Ensure executor is initialized
+	// When resuming from history (state inference), we may skip streamAndProcessLLMResponse
+	// so we need to initialize the executor here using the base tools from the agent config
+	if s.agent.Executor == nil {
+		// Use the agent's base tools (without middleware processing)
+		// This is safe for resumption because the tool calls were already validated
+		// when they were originally created
+		tools := s.agent.Config.Tools
+		if tools == nil {
+			tools = []core.Tool{} // Empty tools if none available
+		}
+
+		s.agent.Executor = s.engine.toolExec.CreateExecutor(
+			s.ctx,
+			tools,
+			s.threadID,
+			s.messageID,
+			nil, // RequestCtx may not be available when resuming
+		)
+	}
+
+	// Create state observer to emit events
+	stateObserver := NewToolStateEventEmitter(
+		s.threadID,
+		s.messageID,
+		s.observer.yield,
+		s.agent.Events,
+	)
+
+	// Create state machines and register observers
+	for _, tc := range s.streamResult.ToolCalls {
+		tsm := domain.NewToolStateMachine(s.ctx, &tc, s.agent.Executor)
+		tsm.RegisterObserver(stateObserver)
+		s.toolStateMachines[tc.ID] = tsm
+	}
+
+	// Execute all tools using their state machines
 	tctx := ToolProcessorContext{
-		Ctx:           s.ctx,
-		ThreadID:      s.threadID,
-		MessageID:     s.messageID,
-		StreamResult:  s.streamResult,
-		Safety:        s.safety,
-		Observer:      s.observer,
-		Persistence:   s.persistence,
-		ToolExec:      s.engine.toolExec,
-		AgentExecutor: s.agent.Executor,
-		AgentName:     s.agent.Name,
+		Ctx:               s.ctx,
+		ThreadID:          s.threadID,
+		MessageID:         s.messageID,
+		StreamResult:      s.streamResult,
+		Safety:            s.safety,
+		Observer:          s.observer,
+		Persistence:       s.persistence,
+		AgentName:         s.agent.Name,
+		ToolStateMachines: s.toolStateMachines,
 	}
 	resolution, agg, err := s.tools.ProcessActions(tctx)
 	if err != nil {
@@ -238,12 +348,28 @@ func (s *executionState) executeRequiredActions() error {
 	}
 	s.resolution = resolution
 
+	// Check if any tool is awaiting interaction
+	if s.hasToolsAwaitingInteraction() {
+		s.observer.result.Reason = TerminationAwaitingInput
+		return s.sm.Fire(TrigStopIteration)
+	}
+
 	// Set termination reason when a tool requests to stop (e.g., elicitation)
 	if resolution.StopIteration {
 		s.observer.result.Reason = TerminationAwaitingInput
 	}
 
 	return s.nextStep()
+}
+
+// hasToolsAwaitingInteraction returns true if any tool is in a waiting state.
+func (s *executionState) hasToolsAwaitingInteraction() bool {
+	for _, tsm := range s.toolStateMachines {
+		if tsm.IsAwaitingInteraction() {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *executionState) refreshState(agg *domain.ThreadAggregate) {
@@ -302,6 +428,7 @@ type HistoryReconciler struct {
 // ResumptionPlan describes an action to take to pair a message during state inference.
 type ResumptionPlan struct {
 	ToolCallID string
+	MessageID  string
 	Content    string
 }
 
@@ -359,14 +486,6 @@ func (o *ObserverUnit) TrackStarted(messageID string) bool {
 
 func (o *ObserverUnit) TrackCompleted(messageID, content string, toolCalls []domain.ToolCall) bool {
 	return o.yield(o.events.AssistantCompleted(o.threadID, messageID, content, toolCalls), nil)
-}
-
-func (o *ObserverUnit) TrackToolCall(tcID string) bool {
-	return o.yield(o.events.ToolCallCompleted(o.threadID, tcID), nil)
-}
-
-func (o *ObserverUnit) TrackToolExecuted(toolResultID, tcID, name, args, res string, isError bool, messageID string) bool {
-	return o.yield(o.events.ToolCallExecuted(o.threadID, toolResultID, tcID, name, args, res, isError, messageID), nil)
 }
 
 func (o *ObserverUnit) Fail(reason TerminationReason, err error) {
@@ -443,26 +562,51 @@ func (p *PersistenceUnit) ReportTokenUsage(
 	return p.mgmt.AddTokenUsage(ctx, event)
 }
 
+func (p *PersistenceUnit) ReportToolEvent(
+	ctx context.Context,
+	event core.Event,
+) (*domain.ThreadAggregate, error) {
+	return p.mgmt.RecordToolEvent(ctx, event.AggregateID(), event)
+}
+
 // ToolProcessor handles the execution of tools and determination of next steps.
 type ToolProcessor struct{}
 
 // ToolProcessorContext provides the dependencies needed for tool processing.
 type ToolProcessorContext struct {
-	Ctx           context.Context
-	ThreadID      string
-	MessageID     string
-	StreamResult  *StreamResult
-	Safety        *SafetyUnit
-	Observer      *ObserverUnit
-	Persistence   *PersistenceUnit
-	ToolExec      *ToolExecutionService
-	AgentExecutor core.ToolExecutor
-	AgentName     string
+	Ctx               context.Context
+	ThreadID          string
+	MessageID         string
+	StreamResult      *StreamResult
+	Safety            *SafetyUnit
+	Observer          *ObserverUnit
+	Persistence       *PersistenceUnit
+	AgentName         string
+	ToolStateMachines map[string]*domain.ToolStateMachine
 }
 
 func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolver, *domain.ThreadAggregate, error) {
 	var route RouteResolver
 	var latestAgg *domain.ThreadAggregate
+
+	// 1. Parallel execution using errgroup
+	g, _ := errgroup.WithContext(tctx.Ctx)
+
+	for _, tc := range tctx.StreamResult.ToolCalls {
+		tc := tc // Shadow for closure
+		tsm := tctx.ToolStateMachines[tc.ID]
+
+		g.Go(func() error {
+			return tsm.Start()
+		})
+	}
+
+	// Wait for all tools to finish (or first error)
+	if err := g.Wait(); err != nil {
+		return nil, nil, err
+	}
+
+	// 2. Sequential processing of results to maintain order and thread-safety
 	for _, tc := range tctx.StreamResult.ToolCalls {
 		tctx.Observer.toolNames = append(tctx.Observer.toolNames, tc.Function.Name)
 
@@ -470,11 +614,16 @@ func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolve
 			return nil, nil, tctx.Observer.FailWithLoop(info)
 		}
 
-		if !tctx.Observer.TrackToolCall(tc.ID) {
-			return nil, nil, context.Canceled
+		tsm := tctx.ToolStateMachines[tc.ID]
+		result := tsm.Result()
+		if tsm.IsAwaitingInteraction() {
+			route.StopIteration = true
 		}
 
-		result := tctx.ToolExec.Execute(tc, tctx.AgentExecutor)
+		if result == nil {
+			continue
+		}
+
 		if info := tctx.Safety.RecordToolResult(result.ToolName, result.Result, result.IsError); info != nil {
 			return nil, nil, tctx.Observer.FailWithLoop(info)
 		}
@@ -491,17 +640,13 @@ func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolve
 		}
 		latestAgg = agg
 
-		toolResultID := core.GenerateID()
-		if !tctx.Observer.TrackToolExecuted(toolResultID, tc.ID, result.ToolName, result.Arguments, result.Result, result.IsError, tctx.MessageID) {
-			return nil, nil, context.Canceled
-		}
-
 		if res := result.Command; res != nil {
 			if res.StopIteration {
 				route.StopIteration = true
 			}
 		}
 	}
+
 	return &route, latestAgg, nil
 }
 
@@ -646,6 +791,14 @@ func (s *executionState) inferState() state {
 	st, res, plan := reconciler.Reconcile()
 
 	if plan != nil {
+		// Emit tool input provided event
+		s.observer.yield(s.observer.events.ToolInputProvided(
+			s.threadID,
+			plan.MessageID,
+			plan.ToolCallID,
+			plan.Content,
+		), nil)
+
 		agg, err := s.persistence.AddToolResultMessage(
 			s.ctx,
 			s.threadID,
@@ -680,19 +833,38 @@ func (r *HistoryReconciler) Reconcile() (state, *StreamResult, *ResumptionPlan) 
 		return StateAwaitingTurn, nil, nil
 	}
 
-	// 3. Resumption Logic: Check for Elicitation response
-	// The new elicitation tools all behave similarly regarding resumption
-	if pendingTC.Function.Name == middleware.ToolNameMultipleSelection ||
-		pendingTC.Function.Name == middleware.ToolNameNumericRange ||
-		pendingTC.Function.Name == middleware.ToolNameTrueFalse {
-		return r.reconcileElicitation(pendingTC)
+	// 3. Resumption Logic: Check for active tool states
+	// We check the persisted state metadata to see if any tool is waiting for input or auth
+	if states, ok := lastAssistantWithTools.Metadata["tool_states"].(map[string]domain.ToolCallState); ok {
+		if state, ok := states[pendingTC.ID]; ok {
+			if state.Status == "AwaitingInput" || state.Status == "AwaitingAuth" {
+				return r.reconcileElicitation(pendingTC, lastAssistantWithTools.ID)
+			}
+		}
 	}
 
-	// Populate streamResult for traditional tool execution
+	// Populate streamResult for traditional tool execution (only pending ones)
 	res := &StreamResult{
-		Content:   lastAssistantWithTools.Content,
-		ToolCalls: lastAssistantWithTools.ToolCalls,
+		Content: lastAssistantWithTools.Content,
 	}
+
+	completedCalls := make(map[string]bool)
+	for i := len(r.history) - 1; i >= 0; i-- {
+		if r.history[i].Role == "tool" {
+			completedCalls[r.history[i].ToolCallID] = true
+		}
+	}
+
+	for _, tc := range lastAssistantWithTools.ToolCalls {
+		if !completedCalls[tc.ID] {
+			res.ToolCalls = append(res.ToolCalls, tc)
+		}
+	}
+
+	if len(res.ToolCalls) == 0 {
+		return StateAwaitingTurn, nil, nil
+	}
+
 	return StatePerformingActions, res, nil
 }
 
@@ -721,13 +893,14 @@ func (r *HistoryReconciler) findPendingToolCall(msg *core.Message) *core.ToolCal
 	return nil
 }
 
-func (r *HistoryReconciler) reconcileElicitation(tc *core.ToolCall) (state, *StreamResult, *ResumptionPlan) {
+func (r *HistoryReconciler) reconcileElicitation(tc *core.ToolCall, parentMessageID string) (state, *StreamResult, *ResumptionPlan) {
 	lastMsg := r.history[len(r.history)-1]
 
 	if lastMsg.Role == "user" {
 		// Plan to automate Pairing: Fulfill the tool call with the user message content
 		return StateGeneratingResponse, nil, &ResumptionPlan{
 			ToolCallID: tc.ID,
+			MessageID:  parentMessageID,
 			Content:    lastMsg.Content,
 		}
 	}
@@ -748,23 +921,12 @@ func (s *executionState) streamAndProcessLLMResponse(llmContext *LLMContext) err
 
 	streamIter := s.engine.chatClient.GetStreamingResponse(s.ctx, llmContext.Messages, llmContext.Options)
 
-	// Wrap yield to persist usage events
-	wrappedYield := func(evt core.Event, err error) bool {
-		if usage, ok := evt.(*domain.TokenUsageReported); ok {
-			_, pErr := s.persistence.ReportTokenUsage(s.ctx, *usage)
-			if pErr != nil {
-				s.engine.log.Error(s.ctx, "failed to persist token usage", "error", pErr)
-			}
-		}
-		return s.observer.yield(evt, err)
-	}
-
 	res, err := s.agent.Stream.Process(s.ctx, streamIter, ProcessParams{
 		ThreadID:  s.threadID,
 		MessageID: s.messageID,
 		Provider:  s.engine.chatClient.Provider(),
 		Model:     string(llmContext.Options.ModelID),
-	}, wrappedYield)
+	}, s.observer.yield) // Use the already wrapped yield
 	if err != nil {
 		return err
 	}
@@ -860,3 +1022,78 @@ type TransitionRule struct {
 	Reentry   bool                       // If true, allows transition to same state
 	WithParam bool                       // If true, transition requires a parameter
 }
+
+// ToolStateEventEmitter emits domain events for tool state changes.
+type ToolStateEventEmitter struct {
+	threadID  string
+	messageID string
+	yield     func(core.Event, error) bool
+	events    *EventFactory
+}
+
+// NewToolStateEventEmitter creates a new event emitter for tool state changes.
+func NewToolStateEventEmitter(
+	threadID string,
+	messageID string,
+	yield func(core.Event, error) bool,
+	events *EventFactory,
+) *ToolStateEventEmitter {
+	return &ToolStateEventEmitter{
+		threadID:  threadID,
+		messageID: messageID,
+		yield:     yield,
+		events:    events,
+	}
+}
+
+// OnToolStateChanged handles tool state transitions and emits appropriate events.
+func (e *ToolStateEventEmitter) OnToolStateChanged(
+	toolCallID string,
+	toolName string,
+	oldState domain.ToolState,
+	newState domain.ToolState,
+	result *domain.ToolExecutionResult,
+	elicitation *core.ElicitationSpec,
+) {
+	// Emit generic state changed event
+	evt := e.events.ToolStateChanged(
+		e.threadID,
+		e.messageID,
+		toolCallID,
+		toolName,
+		oldState.String(),
+		newState.String(),
+		result,
+	)
+	e.yield(evt, nil)
+
+	// Emit specific events based on new state
+	switch newState {
+	case domain.ToolStateAwaitingInput:
+		if elicitation != nil {
+			awaitEvt := e.events.ToolAwaitingInput(
+				e.threadID,
+				e.messageID,
+				toolCallID,
+				toolName,
+				elicitation,
+			)
+			e.yield(awaitEvt, nil)
+		}
+
+	case domain.ToolStateAwaitingAuth:
+		// Authorization events will be added in future
+		// For now, just emit state change
+
+	case domain.ToolStateCompleted:
+		// Tool completion is already tracked via ToolCallExecuted event
+		// The state change event provides additional granularity
+
+	case domain.ToolStateError:
+		// Errors are already tracked via ToolCallExecuted event with IsError=true
+		// The state change event provides additional granularity
+	}
+}
+
+// Verify ToolStateEventEmitter implements ToolStateObserver.
+var _ domain.ToolStateObserver = (*ToolStateEventEmitter)(nil)

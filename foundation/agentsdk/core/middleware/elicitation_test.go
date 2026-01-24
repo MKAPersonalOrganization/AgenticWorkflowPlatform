@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/core/middleware"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestAskMultipleSelectionTool_Invoke(t *testing.T) {
@@ -72,7 +72,14 @@ func TestAskMultipleSelectionTool_Invoke(t *testing.T) {
 
 				data, ok := resStruct.Result.(map[string]any)
 				assert.True(t, ok)
-				assert.Equal(t, "choose_multiple", data["schema"].(map[string]any)["type"])
+				assert.Contains(t, data["status"], "Requesting input")
+				assert.NotContains(t, data, "schema")
+				assert.NotContains(t, data, "question_text")
+
+				assert.NotNil(t, resStruct.Command)
+				assert.NotNil(t, resStruct.Command.Elicitation)
+				assert.Equal(t, tt.args.(map[string]any)["question_text"], resStruct.Command.Elicitation.Question)
+				assert.Equal(t, "choose_multiple", resStruct.Command.Elicitation.Schema["type"])
 			}
 		})
 	}
@@ -91,36 +98,36 @@ func TestAskNumericRangeTool_Invoke(t *testing.T) {
 		{
 			name: "Valid scale range with domain-specific parameters",
 			args: map[string]any{
-				"question_text":  "How confident are you with algebra (1-5)?",
-				"scale_minimum":  1,
-				"scale_maximum":  5,
+				"question_text": "How confident are you with algebra (1-5)?",
+				"scale_minimum": 1,
+				"scale_maximum": 5,
 			},
 			wantError: false,
 		},
 		{
 			name: "Scale minimum greater than maximum",
 			args: map[string]any{
-				"question_text":  "Invalid scale",
-				"scale_minimum":  5,
-				"scale_maximum":  1,
+				"question_text": "Invalid scale",
+				"scale_minimum": 5,
+				"scale_maximum": 1,
 			},
 			wantError: true,
 		},
 		{
 			name: "Scale minimum equal to maximum",
 			args: map[string]any{
-				"question_text":  "Single point scale",
-				"scale_minimum":  5,
-				"scale_maximum":  5,
+				"question_text": "Single point scale",
+				"scale_minimum": 5,
+				"scale_maximum": 5,
 			},
 			wantError: true,
 		},
 		{
 			name: "Empty question_text",
 			args: map[string]any{
-				"question_text":  "",
-				"scale_minimum":  1,
-				"scale_maximum":  5,
+				"question_text": "",
+				"scale_minimum": 1,
+				"scale_maximum": 5,
 			},
 			wantError: true,
 		},

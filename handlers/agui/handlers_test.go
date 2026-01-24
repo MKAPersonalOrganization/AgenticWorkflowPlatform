@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"testing"
+	"time"
+
 	"school-with-ai/domain"
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/services"
-	"testing"
-	"time"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
@@ -32,7 +33,7 @@ func (m *mockProjection) GetMessages(threadID string) []aguievents.Message {
 	return nil
 }
 
-func (m *mockProjection) ListThreads(req agui.ThreadListRequest) (*agui.ThreadListResponse, error) {
+func (m *mockProjection) ListThreads(ctx context.Context, req agui.ThreadListRequest) (*agui.ThreadListResponse, error) {
 	m.lastRequest = req
 	m.callCount++
 

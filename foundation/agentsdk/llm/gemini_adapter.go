@@ -3,9 +3,8 @@ package llm
 import (
 	"context"
 	"encoding/json"
-	"iter"
-
 	"fmt"
+	"iter"
 	"runtime"
 	"strings"
 
@@ -23,8 +22,8 @@ type GeminiClient struct {
 // NewGeminiClient creates a new Gemini client.
 func NewGeminiClient(ctx context.Context, apiKey string, model string) (*GeminiClient, error) {
 	cfg := &genai.ClientConfig{
-		APIKey:  apiKey,
-		// Backend: genai.BackendGoogleAI, 
+		APIKey: apiKey,
+		// Backend: genai.BackendGoogleAI,
 	}
 
 	client, err := genai.NewClient(ctx, cfg)
@@ -203,7 +202,6 @@ func (c *GeminiClient) GetStreamingResponse(
 				return strings.Contains(err.Error(), "429") || strings.Contains(err.Error(), "Resource exhausted")
 			}),
 		)
-
 		if err != nil {
 			// If retry exhausted or non-retryable error
 			yield(ChatResponseUpdate{}, err)
@@ -285,14 +283,14 @@ func (c *GeminiClient) buildContents(messages []ChatMessage) []*genai.Content {
 	// If the last message is 'model', validation will fail. We must append a user message.
 	if len(contents) == 0 {
 		contents = append(contents, &genai.Content{
-			Role: "user",
+			Role:  "user",
 			Parts: []*genai.Part{{Text: "Handle the requests as specified in the System Instruction."}},
 		})
 	} else {
 		last := contents[len(contents)-1]
 		if last.Role != "user" {
 			contents = append(contents, &genai.Content{
-				Role: "user",
+				Role:  "user",
 				Parts: []*genai.Part{{Text: "Continue processing previous requests as instructed. Exit or provide a summary if no more outputs are needed."}},
 			})
 		}

@@ -125,19 +125,19 @@ templ MessageList() {
 				</div>
 
 				<!-- Elicitation: Multiple Choice Quiz -->
-				<div x-show="message.type === 'tool_call' && message.name === 'quiz_multiple_choice'" class="my-2 relative group/message w-full">
+				<div x-show="message.type === 'tool_call' && message.parsedResult?.schema?.type === 'choose_multiple'" class="my-2 relative group/message w-full">
 					@elicitation.Container() {
 						@elicitation.AskMultipleSelection()
 					}
 				</div>
 				<!-- Elicitation: Numeric Scale Quiz -->
-				<div x-show="message.type === 'tool_call' && message.name === 'quiz_numeric_scale'" class="my-2 relative group/message w-full">
+				<div x-show="message.type === 'tool_call' && message.parsedResult?.schema?.type === 'numeric_range'" class="my-2 relative group/message w-full">
 					@elicitation.Container() {
 						@elicitation.AskNumericRating()
 					}
 				</div>
 				<!-- Elicitation: Yes/No Quiz -->
-				<div x-show="message.type === 'tool_call' && message.name === 'quiz_yes_no'" class="my-2 relative group/message w-full">
+				<div x-show="message.type === 'tool_call' && message.parsedResult?.schema?.type === 'true_false'" class="my-2 relative group/message w-full">
 					@elicitation.Container() {
 						@elicitation.AskTrueFalse()
 					}
@@ -168,7 +168,7 @@ templ MessageList() {
 					@statistics.Container()
 				</div>
 				<!-- Regular Tool Call Message (with result if available) -->
-				<div x-show="message.type === 'tool_call' && !['transfer_to_agent', 'quiz_multiple_choice', 'quiz_numeric_scale', 'quiz_yes_no', 'write_todos', 'browse_library', 'lookup_section', 'search_text_in_file', 'calculate', 'plot', 'add', 'subtract', 'multiply', 'divide', 'power', 'sqrt', 'mean', 'median', 'mode', 'min', 'max', 'sum', 'variance', 'standard_deviation', 'quartile', 'percentile', 'interquartile_range', 'pearson_correlation', 'euclidean_distance', 'manhattan_distance', 'sample', 'quartile_outliers', 'normal_pdf', 'normal_cdf', 'normal_ppf', 'normal_mean', 'normal_median', 'normal_std', 'normal_var', 'normal_interval', 'binomial_ncr', 'linear_regression'].includes(message.name) && message.status === 'completed'" class="my-2 relative group/message">
+				<div x-show="message.type === 'tool_call' && !['transfer_to_agent', 'write_todos', 'browse_library', 'lookup_section', 'search_text_in_file', 'calculate', 'plot', 'add', 'subtract', 'multiply', 'divide', 'power', 'sqrt', 'mean', 'median', 'mode', 'min', 'max', 'sum', 'variance', 'standard_deviation', 'quartile', 'percentile', 'interquartile_range', 'pearson_correlation', 'euclidean_distance', 'manhattan_distance', 'sample', 'quartile_outliers', 'normal_pdf', 'normal_cdf', 'normal_ppf', 'normal_mean', 'normal_median', 'normal_std', 'normal_var', 'normal_interval', 'binomial_ncr', 'linear_regression'].includes(message.name) && !['choose_multiple', 'numeric_range', 'true_false'].includes(message.parsedResult?.schema?.type) && message.status === 'completed'" class="my-2 relative group/message">
 					<!-- Parallel indicator bar (shown only for parallel tool calls) -->
 					<template x-if="getParallelToolCallInfo(message).isParallel">
 						<div class="absolute inset-inline-start-0 top-0 bottom-0 w-1 bg-primary/30 rounded-s" title="Parallel tool call"></div>

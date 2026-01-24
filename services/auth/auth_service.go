@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+
 	"school-with-ai/domain"
 )
 

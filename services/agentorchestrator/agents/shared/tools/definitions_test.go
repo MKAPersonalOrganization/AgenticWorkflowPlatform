@@ -1,8 +1,9 @@
 package tools
 
 import (
-	"school-with-ai/foundation/agentsdk/llm"
 	"testing"
+
+	"school-with-ai/foundation/agentsdk/llm"
 )
 
 // TestMathTools verifies the new math tool definitions.

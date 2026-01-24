@@ -3,6 +3,7 @@ package subscriber
 import (
 	"encoding/json"
 	"fmt"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 )
@@ -80,34 +81,6 @@ func deserializeDomainEvent(eventType string, data []byte) (core.Event, error) {
 		}
 		return &evt, nil
 
-	case "ToolCallStarted":
-		var evt domain.ToolCallStartedEvent
-		if err := json.Unmarshal(data, &evt); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal ToolCallStarted: %w", err)
-		}
-		return &evt, nil
-
-	case "ToolCallArgumentsStreamed":
-		var evt domain.ToolCallArgumentsStreamedEvent
-		if err := json.Unmarshal(data, &evt); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal ToolCallArgumentsStreamed: %w", err)
-		}
-		return &evt, nil
-
-	case "ToolCallCompleted":
-		var evt domain.ToolCallCompletedEvent
-		if err := json.Unmarshal(data, &evt); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal ToolCallCompleted: %w", err)
-		}
-		return &evt, nil
-
-	case "ToolCallExecuted":
-		var evt domain.ToolCallExecutedEvent
-		if err := json.Unmarshal(data, &evt); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal ToolCallExecuted: %w", err)
-		}
-		return &evt, nil
-
 	case "AgentHandoff":
 		var evt domain.AgentHandoffEvent
 		if err := json.Unmarshal(data, &evt); err != nil {
@@ -119,6 +92,41 @@ func deserializeDomainEvent(eventType string, data []byte) (core.Event, error) {
 		var evt domain.TokenUsageReported
 		if err := json.Unmarshal(data, &evt); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal TokenUsageReported: %w", err)
+		}
+		return &evt, nil
+
+	case "ToolStateChanged":
+		var evt domain.ToolStateChangedEvent
+		if err := json.Unmarshal(data, &evt); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal ToolStateChanged: %w", err)
+		}
+		return &evt, nil
+
+	case "ToolAwaitingInput":
+		var evt domain.ToolAwaitingInputEvent
+		if err := json.Unmarshal(data, &evt); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal ToolAwaitingInput: %w", err)
+		}
+		return &evt, nil
+
+	case "ToolAwaitingAuth":
+		var evt domain.ToolAwaitingAuthEvent
+		if err := json.Unmarshal(data, &evt); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal ToolAwaitingAuth: %w", err)
+		}
+		return &evt, nil
+
+	case "ToolInputProvided":
+		var evt domain.ToolInputProvidedEvent
+		if err := json.Unmarshal(data, &evt); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal ToolInputProvided: %w", err)
+		}
+		return &evt, nil
+
+	case "ToolAuthGranted":
+		var evt domain.ToolAuthGrantedEvent
+		if err := json.Unmarshal(data, &evt); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal ToolAuthGranted: %w", err)
 		}
 		return &evt, nil
 

@@ -3,9 +3,10 @@ package tools
 import (
 	"bufio"
 	"fmt"
+	"strings"
+
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/services/studentbooks"
-	"strings"
 )
 
 // LookupSectionTool allows searching for specific sections within a library resource.

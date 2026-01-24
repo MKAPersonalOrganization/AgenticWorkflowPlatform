@@ -2,9 +2,10 @@ package shared
 
 import (
 	"context"
-	"school-with-ai/foundation/agentsdk/core"
 	"sort"
 	"sync"
+
+	"school-with-ai/foundation/agentsdk/core"
 )
 
 // AgentFactory creates an agent configuration with a given notifier and context.

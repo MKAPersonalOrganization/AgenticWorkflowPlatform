@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"school-with-ai/foundation/agentsdk/core"
 	"sync"
+
+	"school-with-ai/foundation/agentsdk/core"
 )
 
 // HandlerFunc is a function that handles a specific event type.

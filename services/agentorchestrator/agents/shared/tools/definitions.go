@@ -102,7 +102,6 @@ func GetSqrtTool() llm.AITool {
 // GetAllTools returns all available tools.
 func GetAllTools() []llm.AITool {
 	return []llm.AITool{
-	
 		GetAddTool(),
 		GetSubtractTool(),
 		GetMultiplyTool(),

@@ -3,9 +3,10 @@ package tools
 import (
 	"context"
 	"os"
-	"school-with-ai/foundation/agentsdk/core"
 	"strings"
 	"testing"
+
+	"school-with-ai/foundation/agentsdk/core"
 )
 
 func TestPlotTool_SimpleFunctionPlot(t *testing.T) {

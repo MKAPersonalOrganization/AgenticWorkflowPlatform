@@ -3,8 +3,9 @@ package tools
 import (
 	"context"
 	"math"
-	"school-with-ai/foundation/agentsdk/core"
 	"testing"
+
+	"school-with-ai/foundation/agentsdk/core"
 )
 
 func TestMeanTool(t *testing.T) {

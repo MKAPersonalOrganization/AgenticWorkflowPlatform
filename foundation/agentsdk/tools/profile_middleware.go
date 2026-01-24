@@ -3,9 +3,10 @@ package tools
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
-	"strings"
 )
 
 // NewStudentProfileInjectorMiddleware creates a middleware that injects the student profile.

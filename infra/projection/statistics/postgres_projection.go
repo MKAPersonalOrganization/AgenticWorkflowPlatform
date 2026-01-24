@@ -3,10 +3,11 @@ package statistics
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/event"
-	"time"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -26,8 +27,9 @@ func NewPostgresProjection(db *sqlx.DB) *PostgresProjection {
 // RegisterHandlers registers database update handlers to the provided router.
 func (p *PostgresProjection) RegisterHandlers(router interface {
 	Register(eventPrototype any, handler event.HandlerFunc)
-}) {
-	router.Register(&domain.ToolCallExecutedEvent{}, func(ctx context.Context, e core.Event) error {
+},
+) {
+	router.Register(&domain.ToolStateChangedEvent{}, func(ctx context.Context, e core.Event) error {
 		return p.HandleEvent(ctx, e)
 	})
 	router.Register(&domain.AssistantMessageCompletedEvent{}, func(ctx context.Context, e core.Event) error {
@@ -41,8 +43,11 @@ func (p *PostgresProjection) RegisterHandlers(router interface {
 // HandleEvent processes domain events to update statistics in the database.
 func (p *PostgresProjection) HandleEvent(ctx context.Context, event core.Event) error {
 	switch e := event.(type) {
-	case *domain.ToolCallExecutedEvent:
-		return p.updateToolStats(ctx, e)
+	case *domain.ToolStateChangedEvent:
+		if e.NewState == "completed" || e.NewState == "error" {
+			return p.updateToolStats(ctx, e)
+		}
+		return nil
 	case *domain.AssistantMessageCompletedEvent:
 		return p.updateMessageStats(ctx, e)
 	case *domain.RunErrorEvent:
@@ -53,7 +58,7 @@ func (p *PostgresProjection) HandleEvent(ctx context.Context, event core.Event) 
 	return nil
 }
 
-func (p *PostgresProjection) updateToolStats(ctx context.Context, e *domain.ToolCallExecutedEvent) error {
+func (p *PostgresProjection) updateToolStats(ctx context.Context, e *domain.ToolStateChangedEvent) error {
 	var (
 		incSuccess = 0
 		incFailure = 0
@@ -61,12 +66,14 @@ func (p *PostgresProjection) updateToolStats(ctx context.Context, e *domain.Tool
 		lastFail   *time.Time
 	)
 
-	if e.IsError {
+	if e.IsError || e.NewState == "error" {
 		incFailure = 1
 		lastFail = &e.Timestamp
-	} else {
+	} else if e.NewState == "completed" {
 		incSuccess = 1
 		lastSucc = &e.Timestamp
+	} else {
+		return nil
 	}
 
 	query := `
@@ -90,7 +97,6 @@ func (p *PostgresProjection) updateToolStats(ctx context.Context, e *domain.Tool
 		lastSucc,
 		time.Now(),
 	)
-
 	if err != nil {
 		return fmt.Errorf("failed to update tool stats for %s (agent: %s): %w", e.ToolName, e.AgentName, err)
 	}

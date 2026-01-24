@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"fmt"
+
 	"school-with-ai/foundation/agentsdk/core"
 )
 
@@ -13,10 +14,6 @@ const (
 	ToolNameTrueFalse         = "quiz_yes_no"
 )
 
-
-
-
-
 // --- TOOL: MULTIPLE CHOICE QUIZ ---
 type AskMultipleSelectionTool struct{}
 
@@ -24,6 +21,7 @@ func (t *AskMultipleSelectionTool) Name() string { return ToolNameMultipleSelect
 func (t *AskMultipleSelectionTool) Description() string {
 	return "Present a multiple-choice quiz question where the student can select ONE OR MORE correct answers. Use this when checking understanding of concepts with multiple valid responses."
 }
+
 func (t *AskMultipleSelectionTool) Parameters() map[string]any {
 	return map[string]any{
 		"type": "object",
@@ -48,6 +46,7 @@ func (t *AskMultipleSelectionTool) Parameters() map[string]any {
 		"additionalProperties": false,
 	}
 }
+
 func (t *AskMultipleSelectionTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
 		QuestionText  string   `json:"question_text"`
@@ -82,6 +81,7 @@ func (t *AskNumericRangeTool) Name() string { return ToolNameNumericRange }
 func (t *AskNumericRangeTool) Description() string {
 	return "Request a numeric rating or scale response from the student. Use for confidence ratings (1-10), Likert scales, or quantitative self-assessment."
 }
+
 func (t *AskNumericRangeTool) Parameters() map[string]any {
 	return map[string]any{
 		"type": "object",
@@ -104,11 +104,12 @@ func (t *AskNumericRangeTool) Parameters() map[string]any {
 		"additionalProperties": false,
 	}
 }
+
 func (t *AskNumericRangeTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
-		QuestionText  string `json:"question_text"`
-		ScaleMinimum  int    `json:"scale_minimum"`
-		ScaleMaximum  int    `json:"scale_maximum"`
+		QuestionText string `json:"question_text"`
+		ScaleMinimum int    `json:"scale_minimum"`
+		ScaleMaximum int    `json:"scale_maximum"`
 	}
 	if err := core.UnmarshalArgs(args, &params); err != nil {
 		return nil, fmt.Errorf("failed to parse quiz scale parameters: %w", err)
@@ -137,6 +138,7 @@ func (t *AskTrueFalseTool) Name() string { return ToolNameTrueFalse }
 func (t *AskTrueFalseTool) Description() string {
 	return "Present a yes/no or true/false quiz question to verify student understanding. Use for binary confirmation of concepts or facts."
 }
+
 func (t *AskTrueFalseTool) Parameters() map[string]any {
 	return map[string]any{
 		"type": "object",
@@ -151,6 +153,7 @@ func (t *AskTrueFalseTool) Parameters() map[string]any {
 		"additionalProperties": false,
 	}
 }
+
 func (t *AskTrueFalseTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
 		StatementToVerify string `json:"statement_to_verify"`
@@ -184,10 +187,7 @@ func createMultipleChoiceResult(questionText string, answerChoices []string, sch
 	status := fmt.Sprintf("Requesting input: %s", questionText)
 	return core.NewToolResultWithCommand(
 		map[string]any{
-			"status":         status,
-			"question_text":  questionText,
-			"answer_choices": answerChoices,
-			"schema":         schema,
+			"status": status,
 		},
 		cmd,
 	), nil
@@ -205,11 +205,7 @@ func createNumericScaleResult(questionText string, scaleMin int, scaleMax int, s
 	status := fmt.Sprintf("Requesting input: %s", questionText)
 	return core.NewToolResultWithCommand(
 		map[string]any{
-			"status":         status,
-			"question_text":  questionText,
-			"scale_minimum":  scaleMin,
-			"scale_maximum":  scaleMax,
-			"schema":         schema,
+			"status": status,
 		},
 		cmd,
 	), nil
@@ -227,14 +223,11 @@ func createTrueFalseResult(statement string, schema map[string]any) (any, error)
 	status := fmt.Sprintf("Requesting input: %s", statement)
 	return core.NewToolResultWithCommand(
 		map[string]any{
-			"status":              status,
-			"statement_to_verify": statement,
-			"schema":              schema,
+			"status": status,
 		},
 		cmd,
 	), nil
 }
-
 
 // --- MIDDLEWARE ---
 
@@ -271,5 +264,3 @@ You MUST use the specialized quiz tools for ALL student assessments and checks f
 
 	return next(ctx, reqCtx)
 }
-
-

@@ -1,9 +1,11 @@
 package engine
 
 import (
-	"school-with-ai/domain"
-	"school-with-ai/foundation/agentsdk/llm"
 	"time"
+
+	"school-with-ai/domain"
+	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/agentsdk/llm"
 )
 
 // EventFactory creates domain events with consistent agent name and timestamp handling.
@@ -51,62 +53,6 @@ func (f *EventFactory) AssistantContentStreamed(threadID, messageID, delta strin
 		MessageID: messageID,
 		Delta:     delta,
 		Timestamp: time.Now(),
-	}
-}
-
-// ToolCallStarted creates a ToolCallStartedEvent.
-func (f *EventFactory) ToolCallStarted(threadID, toolCallID, toolCallName, parentMessageID string) *domain.ToolCallStartedEvent {
-	return &domain.ToolCallStartedEvent{
-		ThreadID:        threadID,
-		ToolCallID:      toolCallID,
-		ToolCallName:    toolCallName,
-		ParentMessageID: parentMessageID,
-		AgentName:       f.agentName,
-		Timestamp:       time.Now(),
-	}
-}
-
-// ToolCallArgumentsStreamed creates a ToolCallArgumentsStreamedEvent.
-func (f *EventFactory) ToolCallArgumentsStreamed(threadID, toolCallID, delta string) *domain.ToolCallArgumentsStreamedEvent {
-	return &domain.ToolCallArgumentsStreamedEvent{
-		ThreadID:   threadID,
-		ToolCallID: toolCallID,
-		Delta:      delta,
-		Timestamp:  time.Now(),
-	}
-}
-
-// ToolCallCompleted creates a ToolCallCompletedEvent.
-func (f *EventFactory) ToolCallCompleted(threadID, toolCallID string) *domain.ToolCallCompletedEvent {
-	return &domain.ToolCallCompletedEvent{
-		ThreadID:   threadID,
-		ToolCallID: toolCallID,
-		Timestamp:  time.Now(),
-	}
-}
-
-// ToolCallExecuted creates a ToolCallExecutedEvent.
-func (f *EventFactory) ToolCallExecuted(
-	threadID string,
-	messageID string,
-	toolCallID string,
-	toolName string,
-	toolArguments string,
-	toolResult string,
-	isError bool,
-	parentMessageID string,
-) *domain.ToolCallExecutedEvent {
-	return &domain.ToolCallExecutedEvent{
-		ThreadID:        threadID,
-		MessageID:       messageID,
-		ToolCallID:      toolCallID,
-		ToolName:        toolName,
-		ToolArguments:   toolArguments,
-		ToolResult:      toolResult,
-		IsError:         isError,
-		ParentMessageID: parentMessageID,
-		AgentName:       f.agentName,
-		Timestamp:       time.Now(),
 	}
 }
 
@@ -161,5 +107,105 @@ func (f *EventFactory) TokenUsageReported(
 		AcceptedPredictionTokens: usage.AcceptedPredictionTokens,
 		RejectedPredictionTokens: usage.RejectedPredictionTokens,
 		Timestamp:                time.Now(),
+	}
+}
+
+// ToolStateChanged creates a ToolStateChangedEvent.
+func (f *EventFactory) ToolStateChanged(
+	threadID string,
+	messageID string,
+	toolCallID string,
+	toolName string,
+	oldState string,
+	newState string,
+	result *domain.ToolExecutionResult,
+) *domain.ToolStateChangedEvent {
+	evt := &domain.ToolStateChangedEvent{
+		ThreadID:   threadID,
+		MessageID:  messageID,
+		ToolCallID: toolCallID,
+		ToolName:   toolName,
+		OldState:   oldState,
+		NewState:   newState,
+		AgentName:  f.agentName,
+		Timestamp:  time.Now(),
+	}
+
+	if result != nil {
+		evt.Result = result.Result
+		evt.IsError = result.IsError
+		evt.ToolArguments = result.Arguments
+	}
+
+	return evt
+}
+
+// ToolAwaitingInput creates a ToolAwaitingInputEvent.
+func (f *EventFactory) ToolAwaitingInput(
+	threadID string,
+	messageID string,
+	toolCallID string,
+	toolName string,
+	elicitation *core.ElicitationSpec,
+) *domain.ToolAwaitingInputEvent {
+	return &domain.ToolAwaitingInputEvent{
+		ThreadID:    threadID,
+		MessageID:   messageID,
+		ToolCallID:  toolCallID,
+		ToolName:    toolName,
+		Elicitation: elicitation,
+		AgentName:   f.agentName,
+		Timestamp:   time.Now(),
+	}
+}
+
+// ToolAwaitingAuth creates a ToolAwaitingAuthEvent.
+func (f *EventFactory) ToolAwaitingAuth(
+	threadID string,
+	messageID string,
+	toolCallID string,
+	toolName string,
+	authSpec *core.AuthorizationSpec,
+) *domain.ToolAwaitingAuthEvent {
+	return &domain.ToolAwaitingAuthEvent{
+		ThreadID:   threadID,
+		MessageID:  messageID,
+		ToolCallID: toolCallID,
+		ToolName:   toolName,
+		AuthSpec:   authSpec,
+		AgentName:  f.agentName,
+		Timestamp:  time.Now(),
+	}
+}
+
+// ToolInputProvided creates a ToolInputProvidedEvent.
+func (f *EventFactory) ToolInputProvided(
+	threadID string,
+	messageID string,
+	toolCallID string,
+	input string,
+) *domain.ToolInputProvidedEvent {
+	return &domain.ToolInputProvidedEvent{
+		ThreadID:   threadID,
+		MessageID:  messageID,
+		ToolCallID: toolCallID,
+		Input:      input,
+		AgentName:  f.agentName,
+		Timestamp:  time.Now(),
+	}
+}
+
+// ToolAuthGranted creates a ToolAuthGrantedEvent.
+func (f *EventFactory) ToolAuthGranted(
+	threadID string,
+	messageID string,
+	toolCallID string,
+) *domain.ToolAuthGrantedEvent {
+	return &domain.ToolAuthGrantedEvent{
+		ThreadID:   threadID,
+		MessageID:  messageID,
+		ToolCallID: toolCallID,
+		AgentName:  f.agentName,
+		Timestamp:  time.Now(),
 	}
 }

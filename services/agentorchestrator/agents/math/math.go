@@ -2,6 +2,7 @@ package math
 
 import (
 	"context"
+
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/core/middleware"
 	"school-with-ai/foundation/i18n"
@@ -76,8 +77,8 @@ func CreateMathInstructor(ctx context.Context, notifier core.EventNotifier) core
 				i18n.T(ctx, "math.practice_area4"),
 			},
 		},
-		Interactive: true,
-		ExtraRules:  i18n.T(ctx, "math.extra_rules"),
+		Interactive:  true,
+		ExtraRules:   i18n.T(ctx, "math.extra_rules"),
 		IncludeTodos: true,
 	})
 	if err != nil {

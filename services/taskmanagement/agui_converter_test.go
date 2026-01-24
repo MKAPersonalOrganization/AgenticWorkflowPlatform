@@ -1,9 +1,10 @@
 package taskmanagement
 
 import (
-	"school-with-ai/domain"
 	"testing"
 	"time"
+
+	"school-with-ai/domain"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 	"github.com/stretchr/testify/assert"
@@ -101,57 +102,32 @@ func TestToAguiEvents(t *testing.T) {
 			},
 		},
 		{
-			name: "ToolCallStartedEvent",
-			event: &domain.ToolCallStartedEvent{
-				ThreadID:        "thread-1",
-				ParentMessageID: "msg-1",
-				ToolCallID:      "tool-1",
-				ToolCallName:    "add",
-				AgentName:       "math-agent",
-				Timestamp:       now,
+			name: "ToolStateChangedEvent",
+			event: &domain.ToolStateChangedEvent{
+				ThreadID:      "thread-1",
+				MessageID:     "msg-1",
+				ToolCallID:    "tool-1",
+				ToolName:      "test-tool",
+				OldState:      "executing",
+				NewState:      "completed",
+				Result:        "{\"success\": true}",
+				IsError:       false,
+				ToolArguments: "{\"arg1\": 1}",
+				Timestamp:     now,
 			},
 			expected: []any{
-				aguievents.NewCustomEvent("TOOL_CALL_AGENT", aguievents.WithValue(map[string]any{
+				aguievents.NewCustomEvent("TOOL_STATE_CHANGED", aguievents.WithValue(map[string]any{
+					"threadId":   "thread-1",
+					"messageId":  "msg-1",
 					"toolCallId": "tool-1",
-					"agentName":  "math-agent",
+					"toolName":   "test-tool",
+					"oldState":   "executing",
+					"newState":   "completed",
+					"result":     "{\"success\": true}",
+					"isError":    false,
+					"arguments":  "{\"arg1\": 1}",
+					"timestamp":  now,
 				})),
-				aguievents.NewToolCallStartEvent("tool-1", "add", aguievents.WithParentMessageID("msg-1")),
-			},
-		},
-		{
-			name: "ToolCallArgumentsStreamedEvent",
-			event: &domain.ToolCallArgumentsStreamedEvent{
-				ThreadID:   "thread-1",
-				ToolCallID: "tool-1",
-				Delta:      "{\"city\":",
-				Timestamp:  now,
-			},
-			expected: []any{
-				aguievents.NewToolCallArgsEvent("tool-1", "{\"city\":"),
-			},
-		},
-		{
-			name: "ToolCallCompletedEvent",
-			event: &domain.ToolCallCompletedEvent{
-				ThreadID:   "thread-1",
-				ToolCallID: "tool-1",
-				Timestamp:  now,
-			},
-			expected: []any{
-				aguievents.NewToolCallEndEvent("tool-1"),
-			},
-		},
-		{
-			name: "ToolCallExecutedEvent",
-			event: &domain.ToolCallExecutedEvent{
-				ThreadID:   "thread-1",
-				MessageID:  "msg-2",
-				ToolCallID: "tool-1",
-				ToolResult: "{\"temp\": 25}",
-				Timestamp:  now,
-			},
-			expected: []any{
-				aguievents.NewToolCallResultEvent("msg-2", "tool-1", "{\"temp\": 25}"),
 			},
 		},
 		{

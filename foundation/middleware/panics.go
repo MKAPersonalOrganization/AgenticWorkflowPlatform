@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"runtime/debug"
+
 	"school-with-ai/foundation/errs"
 	"school-with-ai/foundation/metrics"
 )

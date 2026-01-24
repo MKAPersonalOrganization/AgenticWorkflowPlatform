@@ -5,13 +5,14 @@ import (
 	"errors"
 	"io"
 	"iter"
+	"sync"
+	"testing"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/llm"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/threadmgmt"
-	"sync"
-	"testing"
 )
 
 // MockChatClient implements types.ChatClient for testing
@@ -209,6 +210,7 @@ func TestEngine_Run(t *testing.T) {
 		provider,
 		nil,
 		nil, // toolTracer
+		nil, // emitter
 	)
 
 	// Load the thread aggregate to create agent thread

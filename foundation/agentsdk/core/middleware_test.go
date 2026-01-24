@@ -3,8 +3,9 @@ package core
 import (
 	"context"
 	"errors"
-	"school-with-ai/foundation/agentsdk/llm"
 	"testing"
+
+	"school-with-ai/foundation/agentsdk/llm"
 )
 
 // Test error sentinels.

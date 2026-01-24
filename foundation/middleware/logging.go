@@ -4,8 +4,9 @@ package middleware
 import (
 	"fmt"
 	"net/http"
-	"school-with-ai/foundation/logger"
 	"time"
+
+	"school-with-ai/foundation/logger"
 )
 
 // Logger writes information about the request to the logs.

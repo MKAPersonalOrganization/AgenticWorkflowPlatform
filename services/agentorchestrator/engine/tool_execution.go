@@ -3,25 +3,10 @@ package engine
 import (
 	"context"
 	"fmt"
+
+	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 )
-
-// ToolExecutionResult represents the outcome of executing a single tool call.
-type ToolExecutionResult struct {
-	ToolCallID    string
-	ToolName      string
-	Arguments     string
-	Result        string
-	IsError       bool // True if the tool execution resulted in an error
-	StopIteration bool
-	Command       *core.Command
-}
-
-// ToolExecutionResults represents the outcome of executing multiple tool calls.
-type ToolExecutionResults struct {
-	Results    []ToolExecutionResult
-	ShouldStop bool // true if any tool signaled to stop iteration
-}
 
 // ToolExecutionService handles executor creation and tool call execution.
 // It centralizes all tool execution logic - no persistence, no event emission.
@@ -66,9 +51,9 @@ func (s *ToolExecutionService) CreateExecutor(
 
 // ExecuteAll executes all tool calls and returns their results.
 // It tracks whether any tool signals to stop iteration.
-func (s *ToolExecutionService) ExecuteAll(toolCalls []core.ToolCall, executor core.ToolExecutor) ToolExecutionResults {
-	results := ToolExecutionResults{
-		Results:    make([]ToolExecutionResult, 0, len(toolCalls)),
+func (s *ToolExecutionService) ExecuteAll(toolCalls []core.ToolCall, executor core.ToolExecutor) domain.ToolExecutionResults {
+	results := domain.ToolExecutionResults{
+		Results:    make([]domain.ToolExecutionResult, 0, len(toolCalls)),
 		ShouldStop: false,
 	}
 
@@ -85,7 +70,7 @@ func (s *ToolExecutionService) ExecuteAll(toolCalls []core.ToolCall, executor co
 }
 
 // Execute executes a single tool call and returns the result.
-func (s *ToolExecutionService) Execute(toolCall core.ToolCall, executor core.ToolExecutor) ToolExecutionResult {
+func (s *ToolExecutionService) Execute(toolCall core.ToolCall, executor core.ToolExecutor) domain.ToolExecutionResult {
 	execResult, err := executor.Execute(toolCall)
 
 	var resultStr string
@@ -97,7 +82,7 @@ func (s *ToolExecutionService) Execute(toolCall core.ToolCall, executor core.Too
 		resultStr = execResult.Result
 	}
 
-	return ToolExecutionResult{
+	return domain.ToolExecutionResult{
 		ToolCallID:    toolCall.ID,
 		ToolName:      toolCall.Function.Name,
 		Arguments:     toolCall.Function.Arguments,

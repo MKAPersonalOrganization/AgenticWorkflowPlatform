@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+
 	"school-with-ai/domain"
 	"school-with-ai/infra/rag/embeddingproviders"
 	"school-with-ai/infra/rag/embeddingstore"

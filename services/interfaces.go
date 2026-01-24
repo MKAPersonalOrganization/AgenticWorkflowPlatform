@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"iter"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 
@@ -30,8 +31,9 @@ type AgentOrchestrator interface {
 	// Run processes the LLM response using an AgentThread and yields events.
 	Run(ctx context.Context, agentName string, runCtx core.RunContext) iter.Seq2[core.Event, error]
 
-	// ProcessUserMessage processes a user message
-	ProcessUserMessage(ctx context.Context, agentName, threadID, content, userID string) (iter.Seq2[core.Event, error], error)
+	// ProcessUserMessage processes a user message and coordinates agent execution.
+	// It relies on internal emission/persistence and doesn't return events.
+	ProcessUserMessage(ctx context.Context, agentName, threadID, content, userID string) error
 
 	// GetAvailableAgents returns a list of available agents
 	GetAvailableAgents() []string

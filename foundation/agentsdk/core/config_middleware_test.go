@@ -2,8 +2,9 @@ package core
 
 import (
 	"context"
-	"school-with-ai/foundation/agentsdk/llm"
 	"testing"
+
+	"school-with-ai/foundation/agentsdk/llm"
 )
 
 // MockTool is a simple tool implementation for testing.
