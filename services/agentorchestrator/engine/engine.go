@@ -424,18 +424,173 @@ func (s *executionState) nextStep() error {
 	}
 }
 
-// HistoryReconciler analyzes the conversation history to determine the resumption state.
-type HistoryReconciler struct {
-	history   []core.Message
-	agentName string
-}
-
 // ResumptionPlan describes an action to take to pair a message during state inference.
 type ResumptionPlan struct {
 	ToolCallID string
 	MessageID  string
 	Content    string
 }
+
+// HistoryAnalysis holds the results of analyzing conversation history.
+type HistoryAnalysis struct {
+	LastAssistantWithTools *core.Message
+	PendingToolCall        *core.ToolCall
+	CompletedToolCalls     map[string]bool
+	PendingToolCalls       []core.ToolCall
+	LastMessage            *core.Message
+}
+
+// HistoryAnalyzer analyzes conversation history (read-only operations).
+type HistoryAnalyzer struct {
+	history []core.Message
+}
+
+// Analyze performs a complete analysis of the conversation history.
+func (h *HistoryAnalyzer) Analyze() *HistoryAnalysis {
+	analysis := &HistoryAnalysis{
+		CompletedToolCalls: make(map[string]bool),
+		PendingToolCalls:   []core.ToolCall{},
+	}
+
+	if len(h.history) == 0 {
+		return analysis
+	}
+
+	// Find the last message
+	analysis.LastMessage = &h.history[len(h.history)-1]
+
+	// Find the last assistant message with tool calls
+	analysis.LastAssistantWithTools = h.findLastAssistantWithTools()
+	if analysis.LastAssistantWithTools == nil {
+		return analysis
+	}
+
+	// Build map of completed tool calls
+	for i := len(h.history) - 1; i >= 0; i-- {
+		if h.history[i].Role == "tool" {
+			analysis.CompletedToolCalls[h.history[i].ToolCallID] = true
+		}
+	}
+
+	// Find pending tool calls
+	for _, tc := range analysis.LastAssistantWithTools.ToolCalls {
+		if !analysis.CompletedToolCalls[tc.ID] {
+			analysis.PendingToolCalls = append(analysis.PendingToolCalls, tc)
+		}
+	}
+
+	// Set the first pending tool call (if any)
+	if len(analysis.PendingToolCalls) > 0 {
+		analysis.PendingToolCall = &analysis.PendingToolCalls[0]
+	}
+
+	return analysis
+}
+
+func (h *HistoryAnalyzer) findLastAssistantWithTools() *core.Message {
+	for i := len(h.history) - 1; i >= 0; i-- {
+		if h.history[i].Role == "assistant" && len(h.history[i].ToolCalls) > 0 {
+			return &h.history[i]
+		}
+	}
+	return nil
+}
+
+// StateResolver determines the appropriate state based on history analysis.
+type StateResolver struct{}
+
+// ResolveState determines what state the engine should be in.
+func (s *StateResolver) ResolveState(analysis *HistoryAnalysis) state {
+	// No history or no assistant with tools - await user turn
+	if analysis.LastAssistantWithTools == nil {
+		return StateAwaitingTurn
+	}
+
+	// No pending tools - await user turn
+	if analysis.PendingToolCall == nil {
+		return StateAwaitingTurn
+	}
+
+	// Check for elicitation states (awaiting input or auth)
+	if s.isAwaitingElicitation(analysis) {
+		// If last message is user input, we can proceed to generate response
+		if analysis.LastMessage != nil && analysis.LastMessage.Role == "user" {
+			return StateGeneratingResponse
+		}
+
+		// If last message is tool result for our pending tool, we can proceed
+		if analysis.LastMessage != nil &&
+			analysis.LastMessage.Role == "tool" &&
+			analysis.LastMessage.ToolCallID == analysis.PendingToolCall.ID {
+			return StateGeneratingResponse
+		}
+
+		// Still waiting for user input - paused state
+		return StateDone
+	}
+
+	// Normal tool execution path
+	return StatePerformingActions
+}
+
+func (s *StateResolver) isAwaitingElicitation(analysis *HistoryAnalysis) bool {
+	if analysis.LastAssistantWithTools == nil || analysis.PendingToolCall == nil {
+		return false
+	}
+
+	// Check the persisted state metadata for tool states
+	if states, ok := analysis.LastAssistantWithTools.Metadata["tool_states"].(map[string]domain.ToolCallState); ok {
+		if state, ok := states[analysis.PendingToolCall.ID]; ok {
+			return state.Status == "AwaitingInput" || state.Status == "AwaitingAuth"
+		}
+	}
+
+	return false
+}
+
+// ResumptionPlanner creates resumption plans based on history analysis.
+type ResumptionPlanner struct{}
+
+// CreatePlan generates a resumption plan if needed.
+func (p *ResumptionPlanner) CreatePlan(analysis *HistoryAnalysis, targetState state) *ResumptionPlan {
+	// Only create plan if we're generating a response and have elicitation context
+	if targetState != StateGeneratingResponse {
+		return nil
+	}
+
+	if analysis.PendingToolCall == nil || analysis.LastAssistantWithTools == nil {
+		return nil
+	}
+
+	// Check if last message is user input that should fulfill the tool call
+	if analysis.LastMessage != nil && analysis.LastMessage.Role == "user" {
+		return &ResumptionPlan{
+			ToolCallID: analysis.PendingToolCall.ID,
+			MessageID:  analysis.LastAssistantWithTools.ID,
+			Content:    analysis.LastMessage.Content,
+		}
+	}
+
+	return nil
+}
+
+// CreateStreamResult creates a stream result for pending tools.
+func (p *ResumptionPlanner) CreateStreamResult(analysis *HistoryAnalysis, targetState state) *StreamResult {
+	// Only create stream result for performing actions state
+	if targetState != StatePerformingActions {
+		return nil
+	}
+
+	if analysis.LastAssistantWithTools == nil || len(analysis.PendingToolCalls) == 0 {
+		return nil
+	}
+
+	return &StreamResult{
+		Content:   analysis.LastAssistantWithTools.Content,
+		ToolCalls: analysis.PendingToolCalls,
+	}
+}
+
 
 // SafetyUnit enforces execution limits and detects infinite loops.
 type SafetyUnit struct {
@@ -789,11 +944,19 @@ func (s *executionState) run() error {
 }
 
 func (s *executionState) inferState() state {
-	reconciler := &HistoryReconciler{
-		history:   s.history,
-		agentName: s.agent.Name,
-	}
-	st, res, plan := reconciler.Reconcile()
+	// Use the new refactored components for state reconciliation
+	analyzer := &HistoryAnalyzer{history: s.history}
+	resolver := &StateResolver{}
+	planner := &ResumptionPlanner{}
+
+	// Step 1: Analyze history
+	analysis := analyzer.Analyze()
+
+	// Step 2: Resolve state
+	st := resolver.ResolveState(analysis)
+
+	// Step 3: Create resumption plan (if needed)
+	plan := planner.CreatePlan(analysis, st)
 
 	if plan != nil {
 		// Emit tool input provided event
@@ -817,106 +980,12 @@ func (s *executionState) inferState() state {
 		s.refreshState(agg)
 	}
 
-	s.streamResult = res
+	// Step 4: Create stream result (if needed)
+	s.streamResult = planner.CreateStreamResult(analysis, st)
+
 	return st
 }
 
-func (r *HistoryReconciler) Reconcile() (state, *StreamResult, *ResumptionPlan) {
-	if len(r.history) == 0 {
-		return StateAwaitingTurn, nil, nil
-	}
-
-	// 1. Find the last assistant message with tool calls
-	lastAssistantWithTools := r.findLastAssistantWithTools()
-	if lastAssistantWithTools == nil {
-		return StateAwaitingTurn, nil, nil
-	}
-
-	// 2. Check if all tool calls of that message have results
-	pendingTC := r.findPendingToolCall(lastAssistantWithTools)
-	if pendingTC == nil {
-		return StateAwaitingTurn, nil, nil
-	}
-
-	// 3. Resumption Logic: Check for active tool states
-	// We check the persisted state metadata to see if any tool is waiting for input or auth
-	if states, ok := lastAssistantWithTools.Metadata["tool_states"].(map[string]domain.ToolCallState); ok {
-		if state, ok := states[pendingTC.ID]; ok {
-			if state.Status == "AwaitingInput" || state.Status == "AwaitingAuth" {
-				return r.reconcileElicitation(pendingTC, lastAssistantWithTools.ID)
-			}
-		}
-	}
-
-	// Populate streamResult for traditional tool execution (only pending ones)
-	res := &StreamResult{
-		Content: lastAssistantWithTools.Content,
-	}
-
-	completedCalls := make(map[string]bool)
-	for i := len(r.history) - 1; i >= 0; i-- {
-		if r.history[i].Role == "tool" {
-			completedCalls[r.history[i].ToolCallID] = true
-		}
-	}
-
-	for _, tc := range lastAssistantWithTools.ToolCalls {
-		if !completedCalls[tc.ID] {
-			res.ToolCalls = append(res.ToolCalls, tc)
-		}
-	}
-
-	if len(res.ToolCalls) == 0 {
-		return StateAwaitingTurn, nil, nil
-	}
-
-	return StatePerformingActions, res, nil
-}
-
-func (r *HistoryReconciler) findLastAssistantWithTools() *core.Message {
-	for i := len(r.history) - 1; i >= 0; i-- {
-		if r.history[i].Role == "assistant" && len(r.history[i].ToolCalls) > 0 {
-			return &r.history[i]
-		}
-	}
-	return nil
-}
-
-func (r *HistoryReconciler) findPendingToolCall(msg *core.Message) *core.ToolCall {
-	completedCalls := make(map[string]bool)
-	for i := len(r.history) - 1; i >= 0; i-- {
-		if r.history[i].Role == "tool" {
-			completedCalls[r.history[i].ToolCallID] = true
-		}
-	}
-
-	for _, tc := range msg.ToolCalls {
-		if !completedCalls[tc.ID] {
-			return &tc
-		}
-	}
-	return nil
-}
-
-func (r *HistoryReconciler) reconcileElicitation(tc *core.ToolCall, parentMessageID string) (state, *StreamResult, *ResumptionPlan) {
-	lastMsg := r.history[len(r.history)-1]
-
-	if lastMsg.Role == "user" {
-		// Plan to automate Pairing: Fulfill the tool call with the user message content
-		return StateGeneratingResponse, nil, &ResumptionPlan{
-			ToolCallID: tc.ID,
-			MessageID:  parentMessageID,
-			Content:    lastMsg.Content,
-		}
-	}
-
-	if lastMsg.Role == "tool" && lastMsg.ToolCallID == tc.ID {
-		return StateGeneratingResponse, nil, nil
-	}
-
-	// Still waiting for user input - return Done (paused state)
-	return StateDone, nil, nil
-}
 
 func (s *executionState) streamAndProcessLLMResponse(llmContext *LLMContext) error {
 	// Update executor with middleware-processed effective tools
