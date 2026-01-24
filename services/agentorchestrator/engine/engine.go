@@ -372,7 +372,12 @@ func (s *executionState) executeRequiredActions() error {
 	s.resolution = resolution
 
 	// Check if any tool is awaiting interaction
-	isInput, isAuth := s.checkToolWaitingStates()
+	isInput, isAuth, err := s.checkToolWaitingStates()
+	if err != nil {
+		s.observer.Fail(TerminationError, err)
+		return s.sm.Fire(TrigError)
+	}
+
 	if isInput {
 		s.observer.result.Reason = TerminationAwaitingInput
 		return s.sm.Fire(TrigRequireInput)
@@ -386,17 +391,24 @@ func (s *executionState) executeRequiredActions() error {
 }
 
 // checkToolWaitingStates checks if any tools are in specific waiting states.
-// Returns (isAwaitingInput, isAwaitingAuth)
-func (s *executionState) checkToolWaitingStates() (bool, bool) {
+// Returns (isAwaitingInput, isAwaitingAuth, error)
+func (s *executionState) checkToolWaitingStates() (bool, bool, error) {
+	hasInput := false
+	hasAuth := false
 	for _, tsm := range s.toolStateMachines {
 		if tsm.IsAwaitingInput() {
-			return true, false
+			hasInput = true
 		}
 		if tsm.IsAwaitingAuth() {
-			return false, true
+			hasAuth = true
 		}
 	}
-	return false, false
+
+	if hasInput && hasAuth {
+		return false, false, fmt.Errorf("invalid state: simultaneous input and authorization requirements detected")
+	}
+
+	return hasInput, hasAuth, nil
 }
 
 func (s *executionState) refreshState(agg *domain.ThreadAggregate) {
@@ -404,44 +416,32 @@ func (s *executionState) refreshState(agg *domain.ThreadAggregate) {
 	s.history = s.engine.threadMgmt.ToCoreMessages(agg)
 }
 
-// nextStep determines the appropriate state transition based on declarative guards.
-// The actual transition logic is now encoded in the state configuration.
+// nextStep determines the appropriate state transition based on current context.
+// It simplifies the logic by explicitly checking conditions for the current state,
+// removing the need for a generic transition evaluator.
 func (s *executionState) nextStep() error {
 	currentState := s.sm.MustState()
 
-	// Find the state definition to access guards (using cached config)
-	for _, stateDef := range s.stateConfigCache {
-		if stateDef.State != currentState {
-			continue
-		}
-
-		// Evaluate transitions with guards in priority order
-		for _, trans := range stateDef.Transitions {
-			if trans.Guard == nil {
-				continue // Skip unconditional transitions for now
-			}
-
-			// Check if guard condition is met
-			if trans.Guard(s) {
-				return s.sm.Fire(trans.Trigger)
-			}
-		}
-
-		// Fall through to default transitions based on state
-		break
-	}
-
-	// Default behavior for each state
 	switch currentState {
 	case StateGeneratingResponse:
+		// Transition based on whether tools were called
+		if s.streamResult != nil && s.streamResult.HasToolCalls() {
+			return s.sm.Fire(TrigActionsDetected)
+		}
 		return s.sm.Fire(TrigTurnFinished)
+
 	case StatePerformingActions:
+		// Tool waiting states (Input/Auth) are handled in executeRequiredActions.
+		// If we reach here, we are ready for the next turn.
+		
 		// Prepare for next iteration
 		s.messageID = core.GenerateID()
 		s.streamResult = nil
 		s.resolution = nil
 		return s.sm.Fire(TrigActionsCompleted)
+
 	default:
+		// Default termination for safety
 		return s.sm.Fire(TrigTurnFinished)
 	}
 }
@@ -794,18 +794,10 @@ func (s *executionState) stateConfiguration() []StateDefinition {
 				{
 					Trigger: TrigRequireInput,
 					Target:  StateAwaitingInput,
-					Guard: func(s *executionState) bool {
-						isInput, _ := s.checkToolWaitingStates()
-						return isInput
-					},
 				},
 				{
 					Trigger: TrigRequireAuth,
 					Target:  StateAwaitingAuth,
-					Guard: func(s *executionState) bool {
-						_, isAuth := s.checkToolWaitingStates()
-						return isAuth
-					},
 				},
 				{Trigger: TrigActionsCompleted, Target: StateGeneratingResponse},
 				errorTransition,
