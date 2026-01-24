@@ -130,11 +130,6 @@ templ MessageList() {
 							@elicitation.AskMultipleSelection()
 						}
 					</template>
-					<template x-if="message.parsedResult?.schema?.type === 'numeric_range'">
-						@elicitation.Container() {
-							@elicitation.AskNumericRating()
-						}
-					</template>
 					<template x-if="message.parsedResult?.schema?.type === 'true_false'">
 						@elicitation.Container() {
 							@elicitation.AskTrueFalse()

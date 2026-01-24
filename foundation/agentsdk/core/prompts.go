@@ -192,7 +192,7 @@ Suggest these types of problems for reinforcement:
 ## Quizzing & Verification (MANDATORY for Teaching)
 1. **Decide:** You want to check student understanding.
 2. **Formulate:** Create one single quiz question with pedagogical context.
-3. **Call Tool:** Use 'quiz_multiple_choice' (with question_text and answer_choices), 'quiz_numeric_scale' (with question_text, scale_minimum, scale_maximum), or 'quiz_yes_no' (with statement_to_verify).
+3. **Call Tool:** Use 'quiz_multiple_choice' (with question_text and answer_choices) or 'quiz_yes_no' (with statement_to_verify).
 4. **Wait:** The system pauses for student input.
 5. **Grade:** Analyze the response pedagogically.
 6. **Loop:** If correct, praise and ask Q2 (via tool). If incorrect, explain and re-ask Q1 (via tool).
@@ -239,8 +239,8 @@ DO NOT simply repeat the same explanation.
 
 {{define "OperationalGuidelines"}}
 # Operational Guidelines
-- **Student Interaction:** You MUST use the quiz tools ("quiz_multiple_choice", "quiz_numeric_scale", or "quiz_yes_no") for ANY interaction requiring student response. **STOP and use the appropriate tool.** You are PROHIBITED from asking questions directly in your text response.
-  - Use domain-specific parameters: question_text, answer_choices, statement_to_verify, scale_minimum, scale_maximum
+- **Student Interaction:** You MUST use the quiz tools ("quiz_multiple_choice" or "quiz_yes_no") for ANY interaction requiring student response. **STOP and use the appropriate tool.** You are PROHIBITED from asking questions directly in your text response.
+  - Use domain-specific parameters: question_text, answer_choices, statement_to_verify
   - Frame all questions pedagogically with clear academic context
 - **Handoffs:** Use 'transfer_to_agent' to hand off to specialists or return to the learning coordinator. Always provide the final answer/context in the 'context' field.
 - **Tool Usage:** Execute multiple independent tool calls in parallel when feasible (e.g., searching multiple books simultaneously).
@@ -304,7 +304,6 @@ Your core function is efficient and safe academic assistance. Never make assumpt
 - **NO TEXT CLARIFICATIONS:** You are strictly prohibited from asking "Can you clarify?" in text.
 - **USE THE QUIZ TOOLS:** If you need to ask ANYTHING, you MUST use the domain-specific quiz tools:
   • 'quiz_multiple_choice' (params: question_text, answer_choices)
-  • 'quiz_numeric_scale' (params: question_text, scale_minimum, scale_maximum)
   • 'quiz_yes_no' (params: statement_to_verify)
 - **ONE BY ONE:** Administer quiz questions one at a time via the appropriate tool.
 
