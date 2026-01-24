@@ -46,11 +46,7 @@ func (h *AguiProjectionHandler) GetThreadState(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	err := json.NewEncoder(w).Encode(state)
-	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-	}
+	h.writeThreadResponse(w, state)
 }
 
 // GetMessages returns all UI-formatted messages for a thread.
@@ -70,12 +66,21 @@ func (h *AguiProjectionHandler) GetMessages(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Return messages with token usage
+	h.writeThreadResponse(w, state)
+}
+
+// writeThreadResponse writes the standard thread state response.
+func (h *AguiProjectionHandler) writeThreadResponse(w http.ResponseWriter, state *agui.AguiThreadState) {
 	response := map[string]interface{}{
 		"messages": state.Messages,
 	}
+
 	if state.TokenUsage != nil {
 		response["tokenUsage"] = state.TokenUsage
+	}
+
+	if state.ToolStates != nil {
+		response["toolStates"] = state.ToolStates
 	}
 
 	w.Header().Set("Content-Type", "application/json")

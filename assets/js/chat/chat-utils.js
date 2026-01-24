@@ -167,6 +167,29 @@ export function formatNumber(num) {
 }
 
 /**
+ * Normalize elicitation data (question, schema) for UI component compatibility.
+ * Maps backend protocol fields to frontend component expected properties.
+ * @param {string} question - Question text
+ * @param {Object} schema - Tool schema (type, enum, minimum, maximum, etc.)
+ * @returns {Object} Normalized elicitation result
+ */
+export function normalizeElicitation(question, schema) {
+    const normalized = {
+        question_text: question,
+        statement_to_verify: question, // Generic mapping for simplicity
+        schema: schema
+    };
+
+    if (schema) {
+        if (schema.enum) normalized.answer_choices = schema.enum;
+        if (schema.minimum !== undefined) normalized.scale_minimum = schema.minimum;
+        if (schema.maximum !== undefined) normalized.scale_maximum = schema.maximum;
+    }
+
+    return normalized;
+}
+
+/**
  * Enrich a tool result message or object with parsed content
  * Centralizes logic for tools that require structured result data (like browse_library)
  * @param {Object} toolResult - The tool result object/message
