@@ -291,24 +291,14 @@ func (s *executionState) executeRequiredActions() error {
 	// Create tool state machines for each tool call
 	s.toolStateMachines = make(map[string]*domain.ToolStateMachine)
 
-	// Ensure executor is initialized
-	// When resuming from history (state inference), we may skip streamAndProcessLLMResponse
-	// so we need to initialize the executor here using the base tools from the agent config
+	// Initialize executor if needed (e.g., when resuming from history)
 	if s.agent.Executor == nil {
-		// Use the agent's base tools (without middleware processing)
-		// This is safe for resumption because the tool calls were already validated
-		// when they were originally created
 		tools := s.agent.Config.Tools
 		if tools == nil {
-			tools = []core.Tool{} // Empty tools if none available
+			tools = []core.Tool{}
 		}
-
 		s.agent.Executor = s.engine.toolExec.CreateExecutor(
-			s.ctx,
-			tools,
-			s.threadID,
-			s.messageID,
-			nil, // RequestCtx may not be available when resuming
+			s.ctx, tools, s.threadID, s.messageID, nil,
 		)
 	}
 
