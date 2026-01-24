@@ -72,6 +72,10 @@ func (e *Engine) Run(ctx context.Context, agentName string, runCtx core.RunConte
 			return
 		}
 
+		// Initialize executor before state machine runs
+		// This ensures executor is available regardless of execution path
+		exec.prepareExecutor()
+
 		startState := exec.inferState()
 		if err := exec.setup(startState); err != nil {
 			yield(nil, err)
@@ -155,6 +159,28 @@ func (e *Engine) newExecutionState(ctx context.Context, agentName string, runCtx
 	}
 
 	return exec, nil
+}
+
+// prepareExecutor initializes the tool executor with base tools.
+// This is called before the state machine runs to ensure the executor
+// is available regardless of which execution path is taken.
+func (s *executionState) prepareExecutor() {
+	// Use the agent's base tools from configuration
+	// When the LLM is actually called, middleware will be applied
+	// and a new executor with effective tools will be created.
+	// This provides a fallback executor for state resumption scenarios.
+	tools := s.agent.Config.Tools
+	if tools == nil {
+		tools = []core.Tool{}
+	}
+
+	s.agent.Executor = s.engine.toolExec.CreateExecutor(
+		s.ctx,
+		tools,
+		s.threadID,
+		s.messageID,
+		nil, // No RequestContext yet - will be set during LLM call
+	)
 }
 
 // wrapYield creates a yield function that automatically handles persistence and emission.
@@ -290,17 +316,6 @@ func (s *executionState) generateAgentResponse() error {
 func (s *executionState) executeRequiredActions() error {
 	// Create tool state machines for each tool call
 	s.toolStateMachines = make(map[string]*domain.ToolStateMachine)
-
-	// Initialize executor if needed (e.g., when resuming from history)
-	if s.agent.Executor == nil {
-		tools := s.agent.Config.Tools
-		if tools == nil {
-			tools = []core.Tool{}
-		}
-		s.agent.Executor = s.engine.toolExec.CreateExecutor(
-			s.ctx, tools, s.threadID, s.messageID, nil,
-		)
-	}
 
 	// Create state observer to emit events
 	stateObserver := NewToolStateEventEmitter(
@@ -904,6 +919,9 @@ func (r *HistoryReconciler) reconcileElicitation(tc *core.ToolCall, parentMessag
 }
 
 func (s *executionState) streamAndProcessLLMResponse(llmContext *LLMContext) error {
+	// Update executor with middleware-processed effective tools
+	// This replaces the base executor created in prepareExecutor()
+	// with one that has the full context and middleware-applied tools
 	s.agent.Executor = s.engine.toolExec.CreateExecutor(
 		s.ctx, llmContext.GetEffectiveTools(),
 		s.threadID, s.messageID, llmContext.RequestCtx,
