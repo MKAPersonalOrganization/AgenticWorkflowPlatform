@@ -217,6 +217,13 @@ func (e *Engine) emit(ctx context.Context, evt core.Event, p *PersistenceUnit) e
 			}
 		}
 		persistent = true
+	case domain.EngineStateChanged:
+		if p != nil {
+			if _, err := p.RecordEngineState(ctx, e); err != nil {
+				return err
+			}
+		}
+		persistent = true
 	case *domain.ToolAwaitingInputEvent,
 		*domain.ToolAwaitingAuthEvent,
 		*domain.ToolInputProvidedEvent,
@@ -424,172 +431,6 @@ func (s *executionState) nextStep() error {
 	}
 }
 
-// ResumptionPlan describes an action to take to pair a message during state inference.
-type ResumptionPlan struct {
-	ToolCallID string
-	MessageID  string
-	Content    string
-}
-
-// HistoryAnalysis holds the results of analyzing conversation history.
-type HistoryAnalysis struct {
-	LastAssistantWithTools *core.Message
-	PendingToolCall        *core.ToolCall
-	CompletedToolCalls     map[string]bool
-	PendingToolCalls       []core.ToolCall
-	LastMessage            *core.Message
-}
-
-// HistoryAnalyzer analyzes conversation history (read-only operations).
-type HistoryAnalyzer struct {
-	history []core.Message
-}
-
-// Analyze performs a complete analysis of the conversation history.
-func (h *HistoryAnalyzer) Analyze() *HistoryAnalysis {
-	analysis := &HistoryAnalysis{
-		CompletedToolCalls: make(map[string]bool),
-		PendingToolCalls:   []core.ToolCall{},
-	}
-
-	if len(h.history) == 0 {
-		return analysis
-	}
-
-	// Find the last message
-	analysis.LastMessage = &h.history[len(h.history)-1]
-
-	// Find the last assistant message with tool calls
-	analysis.LastAssistantWithTools = h.findLastAssistantWithTools()
-	if analysis.LastAssistantWithTools == nil {
-		return analysis
-	}
-
-	// Build map of completed tool calls
-	for i := len(h.history) - 1; i >= 0; i-- {
-		if h.history[i].Role == "tool" {
-			analysis.CompletedToolCalls[h.history[i].ToolCallID] = true
-		}
-	}
-
-	// Find pending tool calls
-	for _, tc := range analysis.LastAssistantWithTools.ToolCalls {
-		if !analysis.CompletedToolCalls[tc.ID] {
-			analysis.PendingToolCalls = append(analysis.PendingToolCalls, tc)
-		}
-	}
-
-	// Set the first pending tool call (if any)
-	if len(analysis.PendingToolCalls) > 0 {
-		analysis.PendingToolCall = &analysis.PendingToolCalls[0]
-	}
-
-	return analysis
-}
-
-func (h *HistoryAnalyzer) findLastAssistantWithTools() *core.Message {
-	for i := len(h.history) - 1; i >= 0; i-- {
-		if h.history[i].Role == "assistant" && len(h.history[i].ToolCalls) > 0 {
-			return &h.history[i]
-		}
-	}
-	return nil
-}
-
-// StateResolver determines the appropriate state based on history analysis.
-type StateResolver struct{}
-
-// ResolveState determines what state the engine should be in.
-func (s *StateResolver) ResolveState(analysis *HistoryAnalysis) state {
-	// No history or no assistant with tools - await user turn
-	if analysis.LastAssistantWithTools == nil {
-		return StateAwaitingTurn
-	}
-
-	// No pending tools - await user turn
-	if analysis.PendingToolCall == nil {
-		return StateAwaitingTurn
-	}
-
-	// Check for elicitation states (awaiting input or auth)
-	if s.isAwaitingElicitation(analysis) {
-		// If last message is user input, we can proceed to generate response
-		if analysis.LastMessage != nil && analysis.LastMessage.Role == "user" {
-			return StateGeneratingResponse
-		}
-
-		// If last message is tool result for our pending tool, we can proceed
-		if analysis.LastMessage != nil &&
-			analysis.LastMessage.Role == "tool" &&
-			analysis.LastMessage.ToolCallID == analysis.PendingToolCall.ID {
-			return StateGeneratingResponse
-		}
-
-		// Still waiting for user input - paused state
-		return StateDone
-	}
-
-	// Normal tool execution path
-	return StatePerformingActions
-}
-
-func (s *StateResolver) isAwaitingElicitation(analysis *HistoryAnalysis) bool {
-	if analysis.LastAssistantWithTools == nil || analysis.PendingToolCall == nil {
-		return false
-	}
-
-	// Check the persisted state metadata for tool states
-	if states, ok := analysis.LastAssistantWithTools.Metadata["tool_states"].(map[string]domain.ToolCallState); ok {
-		if state, ok := states[analysis.PendingToolCall.ID]; ok {
-			return state.Status == "AwaitingInput" || state.Status == "AwaitingAuth"
-		}
-	}
-
-	return false
-}
-
-// ResumptionPlanner creates resumption plans based on history analysis.
-type ResumptionPlanner struct{}
-
-// CreatePlan generates a resumption plan if needed.
-func (p *ResumptionPlanner) CreatePlan(analysis *HistoryAnalysis, targetState state) *ResumptionPlan {
-	// Only create plan if we're generating a response and have elicitation context
-	if targetState != StateGeneratingResponse {
-		return nil
-	}
-
-	if analysis.PendingToolCall == nil || analysis.LastAssistantWithTools == nil {
-		return nil
-	}
-
-	// Check if last message is user input that should fulfill the tool call
-	if analysis.LastMessage != nil && analysis.LastMessage.Role == "user" {
-		return &ResumptionPlan{
-			ToolCallID: analysis.PendingToolCall.ID,
-			MessageID:  analysis.LastAssistantWithTools.ID,
-			Content:    analysis.LastMessage.Content,
-		}
-	}
-
-	return nil
-}
-
-// CreateStreamResult creates a stream result for pending tools.
-func (p *ResumptionPlanner) CreateStreamResult(analysis *HistoryAnalysis, targetState state) *StreamResult {
-	// Only create stream result for performing actions state
-	if targetState != StatePerformingActions {
-		return nil
-	}
-
-	if analysis.LastAssistantWithTools == nil || len(analysis.PendingToolCalls) == 0 {
-		return nil
-	}
-
-	return &StreamResult{
-		Content:   analysis.LastAssistantWithTools.Content,
-		ToolCalls: analysis.PendingToolCalls,
-	}
-}
 
 
 // SafetyUnit enforces execution limits and detects infinite loops.
@@ -729,6 +570,13 @@ func (p *PersistenceUnit) ReportToolEvent(
 	return p.mgmt.RecordToolEvent(ctx, event.AggregateID(), event)
 }
 
+func (p *PersistenceUnit) RecordEngineState(
+	ctx context.Context,
+	event domain.EngineStateChanged,
+) (*domain.ThreadAggregate, error) {
+	return p.mgmt.RecordEngineStateChange(ctx, event)
+}
+
 // ToolProcessor handles the execution of tools and determination of next steps.
 type ToolProcessor struct{}
 
@@ -843,6 +691,11 @@ func (s *executionState) initAgentComponents(name string) error {
 func (s *executionState) setup(initialState state) error {
 	s.sm = stateless.NewStateMachine(initialState)
 
+	// Persist state changes
+	s.sm.OnTransitioned(func(_ context.Context, trans stateless.Transition) {
+		s.trackStateChange(trans.Destination.(state))
+	})
+
 	// Cache state configuration for efficient lookup in nextStep()
 	s.stateConfigCache = s.stateConfiguration()
 
@@ -944,46 +797,20 @@ func (s *executionState) run() error {
 }
 
 func (s *executionState) inferState() state {
-	// Use the new refactored components for state reconciliation
-	analyzer := &HistoryAnalyzer{history: s.history}
-	resolver := &StateResolver{}
-	planner := &ResumptionPlanner{}
-
-	// Step 1: Analyze history
-	analysis := analyzer.Analyze()
-
-	// Step 2: Resolve state
-	st := resolver.ResolveState(analysis)
-
-	// Step 3: Create resumption plan (if needed)
-	plan := planner.CreatePlan(analysis, st)
-
-	if plan != nil {
-		// Emit tool input provided event
-		s.observer.yield(s.observer.events.ToolInputProvided(
-			s.threadID,
-			plan.MessageID,
-			plan.ToolCallID,
-			plan.Content,
-		), nil)
-
-		agg, err := s.persistence.AddToolResultMessage(
-			s.ctx,
-			s.threadID,
-			plan.ToolCallID,
-			plan.Content,
-			s.agent.Name,
-		)
-		if err != nil {
-			return StateError
-		}
-		s.refreshState(agg)
+	// Use persisted state only
+	persistedStateStr, err := s.engine.threadMgmt.GetEngineState(s.ctx, s.threadID)
+	if err != nil || persistedStateStr == "" {
+		return StateAwaitingTurn
 	}
 
-	// Step 4: Create stream result (if needed)
-	s.streamResult = planner.CreateStreamResult(analysis, st)
+	currentState := parseState(persistedStateStr)
 
-	return st
+	// If the state is Done, we reset to AwaitingTurn to allow a new turn to start.
+	if currentState == StateDone {
+		return StateAwaitingTurn
+	}
+
+	return currentState
 }
 
 
@@ -1035,6 +862,31 @@ func (s *executionState) saveAgentMessageAndEmitEvents() error {
 	}
 	s.refreshState(agg)
 	return nil
+}
+
+func (s *executionState) trackStateChange(newState state) {
+	s.observer.yield(domain.EngineStateChanged{
+		ThreadID:  s.threadID,
+		NewState:  newState.String(),
+		Timestamp: time.Now(),
+	}, nil)
+}
+
+func parseState(str string) state {
+	switch str {
+	case "AwaitingTurn":
+		return StateAwaitingTurn
+	case "GeneratingResponse":
+		return StateGeneratingResponse
+	case "PerformingActions":
+		return StatePerformingActions
+	case "Done":
+		return StateDone
+	case "Error":
+		return StateError
+	default:
+		return StateAwaitingTurn
+	}
 }
 
 // State machine states
