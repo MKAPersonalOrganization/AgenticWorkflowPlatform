@@ -24,19 +24,19 @@ func (e *Engine) ProcessUserMessage(ctx context.Context, agentName, threadID, co
 	// Check if this is a tool resumption
 	engineState, _ := e.threadMgmt.GetEngineState(ctx, threadID)
 	if engineState == "AwaitingInput" {
-		pendingToolID, _ := e.threadMgmt.GetPendingToolCall(ctx, threadID)
+		pendingToolID, _ := e.threadMgmt.GetPendingInputToolCall(ctx, threadID)
 		if pendingToolID != "" {
 			// This is an input for a tool
 			agg, err = e.threadMgmt.AddToolResultMessage(ctx, threadID, messageID, pendingToolID, content, agentName)
-			// Need to synthesize an event for the UI to know input was accepted? 
-			// Actually AddToolResultMessage generates MessageAdded with role=tool. 
-			// We might want to emit ToolInputProvided as well for completeness, but the engine flow will see the tool result.
-			
-			// We also need to emit a dummy "MessageAdded" for the USER's input so it shows in the chat?
-			// Typically, "Tool Output" is hidden or formatted differently. 
-			// If the user *typed* this, they expect to see their message.
-			// However, strictly speaking, it's a tool output. 
-			// Let's stick to adding it as a tool result for now to satisfy the LLM.
+		}
+	} else if engineState == "AwaitingAuth" {
+		pendingToolID, _ := e.threadMgmt.GetPendingAuthToolCall(ctx, threadID)
+		if pendingToolID != "" {
+			// This is an auth grant/denial for a tool
+			// For now, treat content as "true" (grant) unless explicitly "deny"? 
+			// Or just pass it through as a result.
+			// Let's assume standard input flow for now, but specialized UI would handle this differently.
+			agg, err = e.threadMgmt.AddToolResultMessage(ctx, threadID, messageID, pendingToolID, content, agentName)
 		}
 	}
 	

@@ -372,27 +372,31 @@ func (s *executionState) executeRequiredActions() error {
 	s.resolution = resolution
 
 	// Check if any tool is awaiting interaction
-	if s.hasToolsAwaitingInteraction() {
+	isInput, isAuth := s.checkToolWaitingStates()
+	if isInput {
 		s.observer.result.Reason = TerminationAwaitingInput
-		return s.sm.Fire(TrigStopIteration)
+		return s.sm.Fire(TrigRequireInput)
 	}
-
-	// Set termination reason when a tool requests to stop (e.g., elicitation)
-	if resolution.StopIteration {
-		s.observer.result.Reason = TerminationAwaitingInput
+	if isAuth {
+		s.observer.result.Reason = TerminationAwaitingInput // Use specific reason if available, or re-use for now
+		return s.sm.Fire(TrigRequireAuth)
 	}
 
 	return s.nextStep()
 }
 
-// hasToolsAwaitingInteraction returns true if any tool is in a waiting state.
-func (s *executionState) hasToolsAwaitingInteraction() bool {
+// checkToolWaitingStates checks if any tools are in specific waiting states.
+// Returns (isAwaitingInput, isAwaitingAuth)
+func (s *executionState) checkToolWaitingStates() (bool, bool) {
 	for _, tsm := range s.toolStateMachines {
-		if tsm.IsAwaitingInteraction() {
-			return true
+		if tsm.IsAwaitingInput() {
+			return true, false
+		}
+		if tsm.IsAwaitingAuth() {
+			return false, true
 		}
 	}
-	return false
+	return false, false
 }
 
 func (s *executionState) refreshState(agg *domain.ThreadAggregate) {
@@ -788,10 +792,19 @@ func (s *executionState) stateConfiguration() []StateDefinition {
 			Transitions: []TransitionRule{
 				{Trigger: TrigStartExecution, Target: StatePerformingActions, Reentry: true},
 				{
-					Trigger: TrigStopIteration,
-					Target:  StateAwaitingInput, // Transition to explicit awaiting input state
+					Trigger: TrigRequireInput,
+					Target:  StateAwaitingInput,
 					Guard: func(s *executionState) bool {
-						return s.resolution != nil && s.resolution.StopIteration
+						isInput, _ := s.checkToolWaitingStates()
+						return isInput
+					},
+				},
+				{
+					Trigger: TrigRequireAuth,
+					Target:  StateAwaitingAuth,
+					Guard: func(s *executionState) bool {
+						_, isAuth := s.checkToolWaitingStates()
+						return isAuth
 					},
 				},
 				{Trigger: TrigActionsCompleted, Target: StateGeneratingResponse},
@@ -800,6 +813,14 @@ func (s *executionState) stateConfiguration() []StateDefinition {
 		},
 		{
 			State: StateAwaitingInput,
+			// No logic on entry, loop terminates naturally
+			Transitions: []TransitionRule{
+				{Trigger: TrigStartExecution, Target: StateGeneratingResponse},
+				errorTransition,
+			},
+		},
+		{
+			State: StateAwaitingAuth,
 			// No logic on entry, loop terminates naturally
 			Transitions: []TransitionRule{
 				{Trigger: TrigStartExecution, Target: StateGeneratingResponse},
@@ -905,6 +926,8 @@ func parseState(str string) state {
 		return StatePerformingActions
 	case "AwaitingInput":
 		return StateAwaitingInput
+	case "AwaitingAuth":
+		return StateAwaitingAuth
 	case "Done":
 		return StateDone
 	case "Error":
@@ -921,7 +944,8 @@ const (
 	StateAwaitingTurn state = iota
 	StateGeneratingResponse
 	StatePerformingActions
-	StateAwaitingInput // New state for explicit elicitation/auth pauses
+	StateAwaitingInput // Paused for user elicitation
+	StateAwaitingAuth  // Paused for authorization
 
 	StateDone
 	StateError
@@ -938,6 +962,8 @@ func (s state) String() string {
 		return "PerformingActions"
 	case StateAwaitingInput:
 		return "AwaitingInput"
+	case StateAwaitingAuth:
+		return "AwaitingAuth"
 
 	case StateDone:
 		return "Done"
@@ -954,8 +980,9 @@ const (
 	TrigTurnFinished     = "TurnFinished"
 	TrigActionsCompleted = "ActionsCompleted"
 
-	TrigStopIteration = "StopIteration" // Tool requested to stop (e.g., elicitation)
-	TrigError         = "Error"         // System or safety error
+	TrigRequireInput = "RequireInput" // Transition to StateAwaitingInput
+	TrigRequireAuth  = "RequireAuth"  // Transition to StateAwaitingAuth
+	TrigError        = "Error"        // System or safety error
 )
 
 // Safety and iteration limits

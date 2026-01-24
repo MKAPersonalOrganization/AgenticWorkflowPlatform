@@ -354,6 +354,16 @@ func (t *ToolStateMachine) IsAwaitingInteraction() bool {
 	return state == ToolStateAwaitingInput || state == ToolStateAwaitingAuth
 }
 
+// IsAwaitingInput returns true if the tool is specifically awaiting elicitation input.
+func (t *ToolStateMachine) IsAwaitingInput() bool {
+	return t.sm.MustState().(ToolState) == ToolStateAwaitingInput
+}
+
+// IsAwaitingAuth returns true if the tool is specifically awaiting authorization.
+func (t *ToolStateMachine) IsAwaitingAuth() bool {
+	return t.sm.MustState().(ToolState) == ToolStateAwaitingAuth
+}
+
 // ToolStateChangedEvent is emitted when a tool transitions between states.
 type ToolStateChangedEvent struct {
 	ThreadID      string    `json:"threadId"`
