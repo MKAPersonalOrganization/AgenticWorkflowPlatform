@@ -13,13 +13,40 @@ import (
 // 2. Generates/Updates the thread title (if new).
 // 3. Runs the agent execution loop.
 func (e *Engine) ProcessUserMessage(ctx context.Context, agentName, threadID, content, userID string) error {
-	// 1. Add user message
+	// 1. Add user message or tool result based on Engine State
 	messageID := domain.GenerateMessageID()
 	runID := domain.GenerateMessageID() // Unique ID for this execution run
 
-	agg, event, err := e.threadMgmt.AddUserMessage(ctx, threadID, messageID, content, userID)
+	var agg *domain.ThreadAggregate
+	var event domain.Event
+	var err error
+
+	// Check if this is a tool resumption
+	engineState, _ := e.threadMgmt.GetEngineState(ctx, threadID)
+	if engineState == "AwaitingInput" {
+		pendingToolID, _ := e.threadMgmt.GetPendingToolCall(ctx, threadID)
+		if pendingToolID != "" {
+			// This is an input for a tool
+			agg, err = e.threadMgmt.AddToolResultMessage(ctx, threadID, messageID, pendingToolID, content, agentName)
+			// Need to synthesize an event for the UI to know input was accepted? 
+			// Actually AddToolResultMessage generates MessageAdded with role=tool. 
+			// We might want to emit ToolInputProvided as well for completeness, but the engine flow will see the tool result.
+			
+			// We also need to emit a dummy "MessageAdded" for the USER's input so it shows in the chat?
+			// Typically, "Tool Output" is hidden or formatted differently. 
+			// If the user *typed* this, they expect to see their message.
+			// However, strictly speaking, it's a tool output. 
+			// Let's stick to adding it as a tool result for now to satisfy the LLM.
+		}
+	}
+	
+	if agg == nil {
+		// Default: Standard User Message
+		agg, event, err = e.threadMgmt.AddUserMessage(ctx, threadID, messageID, content, userID)
+	}
+
 	if err != nil {
-		return fmt.Errorf("failed to add user message: %w", err)
+		return fmt.Errorf("failed to add message: %w", err)
 	}
 
 	// 2. State Reconciliation & Elicitation Pairing
