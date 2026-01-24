@@ -9,6 +9,9 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"syscall"
+	"time"
+
 	"school-with-ai/components"
 	"school-with-ai/components/checkout"
 	"school-with-ai/components/pricing"
@@ -21,16 +24,16 @@ import (
 	"school-with-ai/foundation/middleware"
 	"school-with-ai/handlers/auth"
 	"school-with-ai/handlers/profile"
+	statisticsHandler "school-with-ai/handlers/statistics"
 	"school-with-ai/infra/eventstore/kurrentdb"
 	"school-with-ai/infra/kratos"
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/infra/projection/llmcontext"
+	projectionStats "school-with-ai/infra/projection/statistics"
 	"school-with-ai/infra/projection/subscriber"
 	"school-with-ai/infra/projections"
 	"school-with-ai/infra/sqldb"
 	"school-with-ai/infra/sqldb/migrate"
-	projectionStats "school-with-ai/infra/projection/statistics"
-	statisticsHandler "school-with-ai/handlers/statistics"
 	"school-with-ai/services/agentorchestrator"
 	"school-with-ai/services/agentorchestrator/agents/chemistry"
 	"school-with-ai/services/agentorchestrator/agents/diagramming"
@@ -42,8 +45,6 @@ import (
 	"school-with-ai/services/studentbooks"
 	"school-with-ai/services/taskmanagement"
 	"school-with-ai/services/threadmgmt"
-	"syscall"
-	"time"
 
 	sharedtools "school-with-ai/services/agentorchestrator/agents/shared/tools"
 
@@ -373,6 +374,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		agentorchestrator.WithArtifactService(artifactService),
 		agentorchestrator.WithMemoryEnabled(cfg.AgentCapabilities.LongTermMemory),
 		agentorchestrator.WithStudentProfileRepository(studentProfileRepo),
+		agentorchestrator.WithEmitter(eventRouter),
 	)
 
 	threadRepo := domain.NewThreadRepository(threadmgmt.NewEventStoreAdapter(eventLog))

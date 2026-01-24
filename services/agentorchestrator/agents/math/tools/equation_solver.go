@@ -2,8 +2,9 @@ package tools
 
 import (
 	"fmt"
-	"school-with-ai/foundation/agentsdk/core"
 	"strings"
+
+	"school-with-ai/foundation/agentsdk/core"
 )
 
 // EquationSolverArgs represents the arguments for equation solver tool.

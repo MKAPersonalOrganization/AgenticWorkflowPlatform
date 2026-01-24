@@ -3,7 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
-	"iter"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 )
@@ -12,26 +12,24 @@ import (
 // 1. Adds the message to the thread.
 // 2. Generates/Updates the thread title (if new).
 // 3. Runs the agent execution loop.
-func (e *Engine) ProcessUserMessage(ctx context.Context, agentName, threadID, content, userID string) (iter.Seq2[core.Event, error], error) {
+func (e *Engine) ProcessUserMessage(ctx context.Context, agentName, threadID, content, userID string) error {
 	// 1. Add user message
 	messageID := domain.GenerateMessageID()
 	runID := domain.GenerateMessageID() // Unique ID for this execution run
 
 	agg, event, err := e.threadMgmt.AddUserMessage(ctx, threadID, messageID, content, userID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to add user message: %w", err)
+		return fmt.Errorf("failed to add user message: %w", err)
 	}
 
 	// 2. State Reconciliation & Elicitation Pairing
 	thread := e.threadMgmt.ToAgentThread(agg)
 	messages, err := thread.RetrieveFullConversationHistory(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve conversation history: %w", err)
+		return fmt.Errorf("failed to retrieve conversation history: %w", err)
 	}
 
 	// 3. Determine Target Agent (Sticky Session)
-	// We check the conversation history to see which agent was last active.
-	// This ensures that if the user is talking to a specialist, they stay with them.
 	targetAgent := e.determineTargetAgent(ctx, messages, agentName)
 
 	titleEvent, err := e.handleThreadTitle(ctx, threadID, content, messages)
@@ -39,8 +37,7 @@ func (e *Engine) ProcessUserMessage(ctx context.Context, agentName, threadID, co
 		e.log.Error(ctx, "failed to handle thread title", "error", err)
 	}
 
-	// Inject User into context for tools that need it (e.g. MemoryTool)
-	// We construct a partial user object with the ID we have.
+	// Inject User into context for tools that need it
 	if userID != "" {
 		ctx = context.WithValue(ctx, domain.UserContextKey, &domain.User{ID: userID})
 	}
@@ -56,51 +53,33 @@ func (e *Engine) ProcessUserMessage(ctx context.Context, agentName, threadID, co
 	// Create event factory for run events
 	events := NewEventFactory(agentName)
 
-	// Return combined iterator
-	return func(yield func(core.Event, error) bool) {
-		// Yield UserMessageAdded
-		if !yield(event, nil) {
-			return
+	// Emit Initial Events
+	_ = e.emit(ctx, event, nil)      // MessageAdded (already persisted)
+	_ = e.emit(ctx, titleEvent, nil) // TitleUpdated (already persisted)
+	_ = e.emit(ctx, events.RunStarted(threadID, runID), nil)
+
+	// Consume the run iterator and emit all events
+	var terminationReason TerminationReason
+	for evt, err := range runIter {
+		if err != nil {
+			runErr := events.RunError(threadID, err.Error(), "RUN_EXECUTION_ERROR")
+			_ = e.emit(ctx, runErr, nil)
+			return err
 		}
 
-		// Yield TitleUpdated if any
-		if titleEvent != nil {
-			if !yield(titleEvent, nil) {
-				return
-			}
+		if completed, ok := evt.(runCompletedEvent); ok {
+			terminationReason = completed.Reason
+			continue
 		}
+		// Event emission is already handled by e.Run using wrapYield
+	}
 
-		// Yield RunStarted
-		if !yield(events.RunStarted(threadID, runID), nil) {
-			return
-		}
+	// Emit Finish Event if appropriate
+	if terminationReason != TerminationAwaitingInput {
+		_ = e.emit(ctx, events.RunFinished(threadID, runID), nil)
+	}
 
-		// Yield Run events
-		// The last event will be an internal runCompletedEvent with termination reason
-		var terminationReason TerminationReason
-		for evt, err := range runIter {
-			if err != nil {
-				// Emit RunError
-				yield(events.RunError(threadID, err.Error(), "RUN_EXECUTION_ERROR"), nil)
-				return // Stop iteration on error
-			}
-
-			// Catch the internal completion event (don't forward to frontend)
-			if completed, ok := evt.(runCompletedEvent); ok {
-				terminationReason = completed.Reason
-				continue // Don't yield this internal event
-			}
-
-			if !yield(evt, nil) {
-				return
-			}
-		}
-
-		// Only emit RunFinished if the run truly completed (not paused for elicitation)
-		if terminationReason != TerminationAwaitingInput {
-			yield(events.RunFinished(threadID, runID), nil)
-		}
-	}, nil
+	return nil
 }
 
 // handleThreadTitle generates and updates a thread title if it's the first message.

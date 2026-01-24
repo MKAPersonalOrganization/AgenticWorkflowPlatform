@@ -3,17 +3,18 @@ package tools
 import (
 	"errors"
 	"fmt"
+
 	"school-with-ai/foundation/agentsdk/core"
 
 	"github.com/montanaflynn/stats"
 )
 
 var (
-	ErrCorrelationRequiresData          = errors.New("correlation requires data1 and data2")
-	ErrPearsonRequiresData              = errors.New("pearson requires data1 and data2")
-	ErrXYArrayLengthMismatch            = errors.New("x and y arrays must have the same length")
-	ErrUnknownOperation                 = errors.New("unknown operation")
-	ErrUnknownRegressionType            = errors.New("unknown regression type")
+	ErrCorrelationRequiresData = errors.New("correlation requires data1 and data2")
+	ErrPearsonRequiresData     = errors.New("pearson requires data1 and data2")
+	ErrXYArrayLengthMismatch   = errors.New("x and y arrays must have the same length")
+	ErrUnknownOperation        = errors.New("unknown operation")
+	ErrUnknownRegressionType   = errors.New("unknown regression type")
 )
 
 // =============================================================================
@@ -24,7 +25,7 @@ var (
 // MeanTool calculates the arithmetic mean.
 type MeanTool struct{}
 
-func (t *MeanTool) Name() string { return "mean" }
+func (t *MeanTool) Name() string        { return "mean" }
 func (t *MeanTool) Description() string { return "Calculate the arithmetic mean of a dataset" }
 func (t *MeanTool) Parameters() map[string]any {
 	return map[string]any{
@@ -39,6 +40,7 @@ func (t *MeanTool) Parameters() map[string]any {
 		"required": []string{"data"},
 	}
 }
+
 func (t *MeanTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
 		Data []float64 `json:"data"`
@@ -56,7 +58,7 @@ func (t *MeanTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 // MedianTool calculates the median.
 type MedianTool struct{}
 
-func (t *MedianTool) Name() string { return "median" }
+func (t *MedianTool) Name() string        { return "median" }
 func (t *MedianTool) Description() string { return "Calculate the median of a dataset" }
 func (t *MedianTool) Parameters() map[string]any {
 	return map[string]any{
@@ -71,6 +73,7 @@ func (t *MedianTool) Parameters() map[string]any {
 		"required": []string{"data"},
 	}
 }
+
 func (t *MedianTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
 		Data []float64 `json:"data"`
@@ -88,7 +91,7 @@ func (t *MedianTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 // ModeTool calculates the mode.
 type ModeTool struct{}
 
-func (t *ModeTool) Name() string { return "mode" }
+func (t *ModeTool) Name() string        { return "mode" }
 func (t *ModeTool) Description() string { return "Calculate the mode(s) of a dataset" }
 func (t *ModeTool) Parameters() map[string]any {
 	return map[string]any{
@@ -103,6 +106,7 @@ func (t *ModeTool) Parameters() map[string]any {
 		"required": []string{"data"},
 	}
 }
+
 func (t *ModeTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
 		Data []float64 `json:"data"`
@@ -120,7 +124,7 @@ func (t *ModeTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 // MinTool calculates the minimum.
 type MinTool struct{}
 
-func (t *MinTool) Name() string { return "min" }
+func (t *MinTool) Name() string        { return "min" }
 func (t *MinTool) Description() string { return "Find the minimum value in a dataset" }
 func (t *MinTool) Parameters() map[string]any {
 	return map[string]any{
@@ -135,6 +139,7 @@ func (t *MinTool) Parameters() map[string]any {
 		"required": []string{"data"},
 	}
 }
+
 func (t *MinTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
 		Data []float64 `json:"data"`
@@ -152,7 +157,7 @@ func (t *MinTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 // MaxTool calculates the maximum.
 type MaxTool struct{}
 
-func (t *MaxTool) Name() string { return "max" }
+func (t *MaxTool) Name() string        { return "max" }
 func (t *MaxTool) Description() string { return "Find the maximum value in a dataset" }
 func (t *MaxTool) Parameters() map[string]any {
 	return map[string]any{
@@ -167,6 +172,7 @@ func (t *MaxTool) Parameters() map[string]any {
 		"required": []string{"data"},
 	}
 }
+
 func (t *MaxTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
 		Data []float64 `json:"data"`
@@ -184,7 +190,7 @@ func (t *MaxTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 // SumTool calculates the sum.
 type SumTool struct{}
 
-func (t *SumTool) Name() string { return "sum" }
+func (t *SumTool) Name() string        { return "sum" }
 func (t *SumTool) Description() string { return "Calculate the sum of a dataset" }
 func (t *SumTool) Parameters() map[string]any {
 	return map[string]any{
@@ -199,6 +205,7 @@ func (t *SumTool) Parameters() map[string]any {
 		"required": []string{"data"},
 	}
 }
+
 func (t *SumTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
 		Data []float64 `json:"data"`
@@ -216,7 +223,7 @@ func (t *SumTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 // VarianceTool calculates the variance.
 type VarianceTool struct{}
 
-func (t *VarianceTool) Name() string { return "variance" }
+func (t *VarianceTool) Name() string        { return "variance" }
 func (t *VarianceTool) Description() string { return "Calculate the variance of a dataset" }
 func (t *VarianceTool) Parameters() map[string]any {
 	return map[string]any{
@@ -235,6 +242,7 @@ func (t *VarianceTool) Parameters() map[string]any {
 		"required": []string{"data"},
 	}
 }
+
 func (t *VarianceTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
 		Data   []float64 `json:"data"`
@@ -260,7 +268,10 @@ func (t *VarianceTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 type StandardDeviationTool struct{}
 
 func (t *StandardDeviationTool) Name() string { return "standard_deviation" }
-func (t *StandardDeviationTool) Description() string { return "Calculate the standard deviation of a dataset" }
+func (t *StandardDeviationTool) Description() string {
+	return "Calculate the standard deviation of a dataset"
+}
+
 func (t *StandardDeviationTool) Parameters() map[string]any {
 	return map[string]any{
 		"type": "object",
@@ -278,6 +289,7 @@ func (t *StandardDeviationTool) Parameters() map[string]any {
 		"required": []string{"data"},
 	}
 }
+
 func (t *StandardDeviationTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
 		Data   []float64 `json:"data"`
@@ -303,7 +315,10 @@ func (t *StandardDeviationTool) Invoke(ctx core.ToolContext, args any) (any, err
 type QuartileTool struct{}
 
 func (t *QuartileTool) Name() string { return "quartiles" }
-func (t *QuartileTool) Description() string { return "Calculate the quartiles (Q1, Median, Q3) of a dataset" }
+func (t *QuartileTool) Description() string {
+	return "Calculate the quartiles (Q1, Median, Q3) of a dataset"
+}
+
 func (t *QuartileTool) Parameters() map[string]any {
 	return map[string]any{
 		"type": "object",
@@ -317,6 +332,7 @@ func (t *QuartileTool) Parameters() map[string]any {
 		"required": []string{"data"},
 	}
 }
+
 func (t *QuartileTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
 		Data []float64 `json:"data"`
@@ -338,7 +354,7 @@ func (t *QuartileTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 // PercentileTool calculates a specific percentile.
 type PercentileTool struct{}
 
-func (t *PercentileTool) Name() string { return "percentile" }
+func (t *PercentileTool) Name() string        { return "percentile" }
 func (t *PercentileTool) Description() string { return "Calculate the value at a specific percentile" }
 func (t *PercentileTool) Parameters() map[string]any {
 	return map[string]any{
@@ -357,6 +373,7 @@ func (t *PercentileTool) Parameters() map[string]any {
 		"required": []string{"data", "percent"},
 	}
 }
+
 func (t *PercentileTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
 		Data    []float64 `json:"data"`
@@ -375,7 +392,7 @@ func (t *PercentileTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 // IQRTool calculates the Interquartile Range.
 type IQRTool struct{}
 
-func (t *IQRTool) Name() string { return "interquartile_range" }
+func (t *IQRTool) Name() string        { return "interquartile_range" }
 func (t *IQRTool) Description() string { return "Calculate the Interquartile Range (IQR) of a dataset" }
 func (t *IQRTool) Parameters() map[string]any {
 	return map[string]any{
@@ -390,6 +407,7 @@ func (t *IQRTool) Parameters() map[string]any {
 		"required": []string{"data"},
 	}
 }
+
 func (t *IQRTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
 		Data []float64 `json:"data"`
@@ -415,6 +433,7 @@ func (t *PearsonCorrelationTool) Name() string { return "pearson_correlation" }
 func (t *PearsonCorrelationTool) Description() string {
 	return "Calculate the Pearson correlation coefficient between two datasets"
 }
+
 func (t *PearsonCorrelationTool) Parameters() map[string]any {
 	return map[string]any{
 		"type": "object",
@@ -433,6 +452,7 @@ func (t *PearsonCorrelationTool) Parameters() map[string]any {
 		"required": []string{"data1", "data2"},
 	}
 }
+
 func (t *PearsonCorrelationTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
 		Data1 []float64 `json:"data1"`
@@ -462,6 +482,7 @@ func (t *EuclideanDistanceTool) Name() string { return "euclidean_distance" }
 func (t *EuclideanDistanceTool) Description() string {
 	return "Calculate the Euclidean distance between two points"
 }
+
 func (t *EuclideanDistanceTool) Parameters() map[string]any {
 	return map[string]any{
 		"type": "object",
@@ -480,6 +501,7 @@ func (t *EuclideanDistanceTool) Parameters() map[string]any {
 		"required": []string{"point1", "point2"},
 	}
 }
+
 func (t *EuclideanDistanceTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
 		Point1 []float64 `json:"point1"`
@@ -504,6 +526,7 @@ func (t *ManhattanDistanceTool) Name() string { return "manhattan_distance" }
 func (t *ManhattanDistanceTool) Description() string {
 	return "Calculate the Manhattan distance between two points"
 }
+
 func (t *ManhattanDistanceTool) Parameters() map[string]any {
 	return map[string]any{
 		"type": "object",
@@ -522,6 +545,7 @@ func (t *ManhattanDistanceTool) Parameters() map[string]any {
 		"required": []string{"point1", "point2"},
 	}
 }
+
 func (t *ManhattanDistanceTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
 		Point1 []float64 `json:"point1"`
@@ -550,7 +574,7 @@ func (t *ManhattanDistanceTool) Invoke(ctx core.ToolContext, args any) (any, err
 // SampleTool performs random sampling.
 type SampleTool struct{}
 
-func (t *SampleTool) Name() string { return "sample" }
+func (t *SampleTool) Name() string        { return "sample" }
 func (t *SampleTool) Description() string { return "Perform random sampling from a dataset" }
 func (t *SampleTool) Parameters() map[string]any {
 	return map[string]any{
@@ -573,6 +597,7 @@ func (t *SampleTool) Parameters() map[string]any {
 		"required": []string{"data"},
 	}
 }
+
 func (t *SampleTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
 		Data        []float64 `json:"data"`
@@ -599,6 +624,7 @@ func (t *QuartileOutliersTool) Name() string { return "quartile_outliers" }
 func (t *QuartileOutliersTool) Description() string {
 	return "Detect mild and extreme outliers using the Interquartile Range (IQR) method"
 }
+
 func (t *QuartileOutliersTool) Parameters() map[string]any {
 	return map[string]any{
 		"type": "object",
@@ -612,6 +638,7 @@ func (t *QuartileOutliersTool) Parameters() map[string]any {
 		"required": []string{"data"},
 	}
 }
+
 func (t *QuartileOutliersTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
 		Data []float64 `json:"data"`
@@ -629,9 +656,6 @@ func (t *QuartileOutliersTool) Invoke(ctx core.ToolContext, args any) (any, erro
 	}, nil
 }
 
-
-
-
 // =============================================================================
 // NORMAL DISTRIBUTION TOOL
 // =============================================================================
@@ -643,7 +667,7 @@ func (t *QuartileOutliersTool) Invoke(ctx core.ToolContext, args any) (any, erro
 // NormalPdfTool calculates the Normal Probability Density Function.
 type NormalPdfTool struct{}
 
-func (t *NormalPdfTool) Name() string { return "norm_pdf" }
+func (t *NormalPdfTool) Name() string        { return "norm_pdf" }
 func (t *NormalPdfTool) Description() string { return "Calculate the Normal PDF at x" }
 func (t *NormalPdfTool) Parameters() map[string]any {
 	return map[string]any{
@@ -665,6 +689,7 @@ func (t *NormalPdfTool) Parameters() map[string]any {
 		"required": []string{"x"},
 	}
 }
+
 func (t *NormalPdfTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
 		X     float64 `json:"x"`
@@ -674,9 +699,9 @@ func (t *NormalPdfTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	if err := core.UnmarshalArgs(args, &params); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
-	// Defaults usually handled by caller or zero value issues? 
+	// Defaults usually handled by caller or zero value issues?
 	// stats package handles 0 scale as error usually, but here 0 scale means Dirac delta strict.
-	// But let's assume default strictness. 
+	// But let's assume default strictness.
 	// Actually, if Loc/Scale are omitted, they are 0.
 	// For standard normal, Scale=1. If user passes 0, it might be an issue if they meant standard.
 	// I'll ensure Scale defaults to 1 if not provided? No, 0 is a valid number, but Scale=0 is singular.
@@ -691,7 +716,7 @@ func (t *NormalPdfTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 // NormalCdfTool calculates the Normal Cumulative Distribution Function.
 type NormalCdfTool struct{}
 
-func (t *NormalCdfTool) Name() string { return "norm_cdf" }
+func (t *NormalCdfTool) Name() string        { return "norm_cdf" }
 func (t *NormalCdfTool) Description() string { return "Calculate the Normal CDF at x" }
 func (t *NormalCdfTool) Parameters() map[string]any {
 	return map[string]any{
@@ -713,6 +738,7 @@ func (t *NormalCdfTool) Parameters() map[string]any {
 		"required": []string{"x"},
 	}
 }
+
 func (t *NormalCdfTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
 		X     float64 `json:"x"`
@@ -730,7 +756,10 @@ func (t *NormalCdfTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 type NormalPpfTool struct{}
 
 func (t *NormalPpfTool) Name() string { return "norm_ppf" }
-func (t *NormalPpfTool) Description() string { return "Calculate the Normal PPF (Inverse CDF) for probability p" }
+func (t *NormalPpfTool) Description() string {
+	return "Calculate the Normal PPF (Inverse CDF) for probability p"
+}
+
 func (t *NormalPpfTool) Parameters() map[string]any {
 	return map[string]any{
 		"type": "object",
@@ -751,6 +780,7 @@ func (t *NormalPpfTool) Parameters() map[string]any {
 		"required": []string{"p"},
 	}
 }
+
 func (t *NormalPpfTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
 		P     float64 `json:"p"`
@@ -767,7 +797,7 @@ func (t *NormalPpfTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 // NormalMeanTool calculates the Mean of the distribution.
 type NormalMeanTool struct{}
 
-func (t *NormalMeanTool) Name() string { return "norm_mean" }
+func (t *NormalMeanTool) Name() string        { return "norm_mean" }
 func (t *NormalMeanTool) Description() string { return "Calculate the Mean of a Normal distribution" }
 func (t *NormalMeanTool) Parameters() map[string]any {
 	return map[string]any{
@@ -785,6 +815,7 @@ func (t *NormalMeanTool) Parameters() map[string]any {
 		"required": []string{},
 	}
 }
+
 func (t *NormalMeanTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
 		Loc   float64 `json:"loc"`
@@ -801,7 +832,10 @@ func (t *NormalMeanTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 type NormalMedianTool struct{}
 
 func (t *NormalMedianTool) Name() string { return "norm_median" }
-func (t *NormalMedianTool) Description() string { return "Calculate the Median of a Normal distribution" }
+func (t *NormalMedianTool) Description() string {
+	return "Calculate the Median of a Normal distribution"
+}
+
 func (t *NormalMedianTool) Parameters() map[string]any {
 	return map[string]any{
 		"type": "object",
@@ -818,6 +852,7 @@ func (t *NormalMedianTool) Parameters() map[string]any {
 		"required": []string{},
 	}
 }
+
 func (t *NormalMedianTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
 		Loc   float64 `json:"loc"`
@@ -834,7 +869,10 @@ func (t *NormalMedianTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 type NormalStdTool struct{}
 
 func (t *NormalStdTool) Name() string { return "norm_std" }
-func (t *NormalStdTool) Description() string { return "Calculate the Standard Deviation of a Normal distribution" }
+func (t *NormalStdTool) Description() string {
+	return "Calculate the Standard Deviation of a Normal distribution"
+}
+
 func (t *NormalStdTool) Parameters() map[string]any {
 	return map[string]any{
 		"type": "object",
@@ -851,6 +889,7 @@ func (t *NormalStdTool) Parameters() map[string]any {
 		"required": []string{},
 	}
 }
+
 func (t *NormalStdTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
 		Loc   float64 `json:"loc"`
@@ -867,7 +906,10 @@ func (t *NormalStdTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 type NormalVarTool struct{}
 
 func (t *NormalVarTool) Name() string { return "norm_var" }
-func (t *NormalVarTool) Description() string { return "Calculate the Variance of a Normal distribution" }
+func (t *NormalVarTool) Description() string {
+	return "Calculate the Variance of a Normal distribution"
+}
+
 func (t *NormalVarTool) Parameters() map[string]any {
 	return map[string]any{
 		"type": "object",
@@ -884,6 +926,7 @@ func (t *NormalVarTool) Parameters() map[string]any {
 		"required": []string{},
 	}
 }
+
 func (t *NormalVarTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
 		Loc   float64 `json:"loc"`
@@ -900,7 +943,10 @@ func (t *NormalVarTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 type NormalIntervalTool struct{}
 
 func (t *NormalIntervalTool) Name() string { return "norm_interval" }
-func (t *NormalIntervalTool) Description() string { return "Calculate the confidence interval for a Normal distribution" }
+func (t *NormalIntervalTool) Description() string {
+	return "Calculate the confidence interval for a Normal distribution"
+}
+
 func (t *NormalIntervalTool) Parameters() map[string]any {
 	return map[string]any{
 		"type": "object",
@@ -921,6 +967,7 @@ func (t *NormalIntervalTool) Parameters() map[string]any {
 		"required": []string{"alpha"},
 	}
 }
+
 func (t *NormalIntervalTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
 		Alpha float64 `json:"alpha"`
@@ -941,7 +988,10 @@ func (t *NormalIntervalTool) Invoke(ctx core.ToolContext, args any) (any, error)
 type BinomialNcrTool struct{}
 
 func (t *BinomialNcrTool) Name() string { return "ncr" }
-func (t *BinomialNcrTool) Description() string { return "Calculate the number of combinations (N choose R)" }
+func (t *BinomialNcrTool) Description() string {
+	return "Calculate the number of combinations (N choose R)"
+}
+
 func (t *BinomialNcrTool) Parameters() map[string]any {
 	return map[string]any{
 		"type": "object",
@@ -958,6 +1008,7 @@ func (t *BinomialNcrTool) Parameters() map[string]any {
 		"required": []string{"n", "r"},
 	}
 }
+
 func (t *BinomialNcrTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
 		N int `json:"n"`
@@ -977,7 +1028,7 @@ func (t *BinomialNcrTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 // LinearRegressionTool performs linear regression.
 type LinearRegressionTool struct{}
 
-func (t *LinearRegressionTool) Name() string { return "linear_regression" }
+func (t *LinearRegressionTool) Name() string        { return "linear_regression" }
 func (t *LinearRegressionTool) Description() string { return "Perform linear regression analysis" }
 func (t *LinearRegressionTool) Parameters() map[string]any {
 	return map[string]any{
@@ -997,6 +1048,7 @@ func (t *LinearRegressionTool) Parameters() map[string]any {
 		"required": []string{"x", "y"},
 	}
 }
+
 func (t *LinearRegressionTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
 		X []float64 `json:"x"`

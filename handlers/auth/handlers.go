@@ -4,13 +4,13 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+
 	"school-with-ai/components/auth"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/i18n"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/infra/kratos"
 )
-
 
 // AuthHandlers contains handlers for authentication routes.
 type AuthHandlers struct {
@@ -553,4 +553,3 @@ func getErrorMessage(ctx context.Context, errorType string) string {
 		return i18n.T(ctx, "Authentication Error")
 	}
 }
-

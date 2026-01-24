@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+
 	"school-with-ai/domain"
 	"school-with-ai/infra/rag/embeddingstore"
 )

@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"strings"
+	"testing"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/services/artifact"
-	"strings"
-	"testing"
 )
 
 // MockArtifactService for testing

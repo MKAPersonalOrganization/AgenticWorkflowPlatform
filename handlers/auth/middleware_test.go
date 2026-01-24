@@ -5,10 +5,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"school-with-ai/domain"
-	"school-with-ai/infra/kratos"
 	"testing"
 	"time"
+
+	"school-with-ai/domain"
+	"school-with-ai/infra/kratos"
 
 	client "github.com/ory/client-go"
 )

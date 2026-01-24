@@ -3,9 +3,10 @@ package embeddingstore
 import (
 	"context"
 	"fmt"
-	"school-with-ai/domain"
 	"strings"
 	"time"
+
+	"school-with-ai/domain"
 
 	"github.com/avast/retry-go/v4"
 	"github.com/rs/zerolog/log"

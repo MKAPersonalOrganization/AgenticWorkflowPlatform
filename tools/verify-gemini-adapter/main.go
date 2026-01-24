@@ -50,8 +50,8 @@ func main() {
 	temp := 0.7
 	opts := llm.ChatOptions{
 		Temperature: &temp,
-		Tools: []llm.AITool{tool},
-		ToolMode: llm.ToolModeAuto,
+		Tools:       []llm.AITool{tool},
+		ToolMode:    llm.ToolModeAuto,
 	}
 
 	fmt.Println("Streaming response:")

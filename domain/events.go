@@ -85,61 +85,6 @@ func (e AssistantMessageCompletedEvent) EventType() string         { return "Ass
 func (e AssistantMessageCompletedEvent) EventTimestamp() time.Time { return e.Timestamp }
 func (e AssistantMessageCompletedEvent) AggregateID() string       { return e.ThreadID }
 
-// ToolCallStartedEvent is emitted when a tool call begins.
-type ToolCallStartedEvent struct {
-	ThreadID        string
-	ToolCallID      string
-	ToolCallName    string
-	ParentMessageID string
-	AgentName       string
-	Timestamp       time.Time
-}
-
-func (e ToolCallStartedEvent) EventType() string         { return "ToolCallStarted" }
-func (e ToolCallStartedEvent) EventTimestamp() time.Time { return e.Timestamp }
-func (e ToolCallStartedEvent) AggregateID() string       { return e.ThreadID }
-
-// ToolCallArgumentsStreamedEvent is emitted for each argument delta during streaming.
-type ToolCallArgumentsStreamedEvent struct {
-	ThreadID   string
-	ToolCallID string
-	Delta      string
-	Timestamp  time.Time
-}
-
-func (e ToolCallArgumentsStreamedEvent) EventType() string         { return "ToolCallArgumentsStreamed" }
-func (e ToolCallArgumentsStreamedEvent) EventTimestamp() time.Time { return e.Timestamp }
-func (e ToolCallArgumentsStreamedEvent) AggregateID() string       { return e.ThreadID }
-
-// ToolCallCompletedEvent is emitted when a tool call's arguments are complete.
-type ToolCallCompletedEvent struct {
-	ThreadID   string
-	ToolCallID string
-	Timestamp  time.Time
-}
-
-func (e ToolCallCompletedEvent) EventType() string         { return "ToolCallCompleted" }
-func (e ToolCallCompletedEvent) EventTimestamp() time.Time { return e.Timestamp }
-func (e ToolCallCompletedEvent) AggregateID() string       { return e.ThreadID }
-
-// ToolCallExecutedEvent is emitted when a tool call is executed.
-type ToolCallExecutedEvent struct {
-	ThreadID        string
-	MessageID       string
-	ToolCallID      string
-	ToolName        string
-	ToolArguments   string
-	ToolResult      string
-	IsError         bool
-	ParentMessageID string
-	AgentName       string
-	Timestamp       time.Time
-}
-
-func (e ToolCallExecutedEvent) EventType() string         { return "ToolCallExecuted" }
-func (e ToolCallExecutedEvent) EventTimestamp() time.Time { return e.Timestamp }
-func (e ToolCallExecutedEvent) AggregateID() string       { return e.ThreadID }
-
 // RunStartedEvent indicates that message processing has begun.
 type RunStartedEvent struct {
 	ThreadID  string

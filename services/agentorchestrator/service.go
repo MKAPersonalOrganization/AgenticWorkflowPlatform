@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"iter"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/tools"
@@ -34,6 +35,7 @@ type Service struct {
 	artifactStore artifact.Service
 	enableMemory  bool
 	profileRepo   domain.StudentProfileRepository
+	emitter       engine.EventEmitter
 
 	// Internal components
 	threadMgmt *threadmgmt.Manager
@@ -79,6 +81,7 @@ func New(
 		provider,
 		s.reqCtxCapture,
 		s.toolTracer,
+		s.emitter,
 	)
 
 	return s
@@ -130,6 +133,13 @@ func WithMemoryEnabled(enabled bool) Option {
 func WithStudentProfileRepository(repo domain.StudentProfileRepository) Option {
 	return func(s *Service) {
 		s.profileRepo = repo
+	}
+}
+
+// WithEmitter configures the agent with an event emitter for real-time updates.
+func WithEmitter(emitter engine.EventEmitter) Option {
+	return func(s *Service) {
+		s.emitter = emitter
 	}
 }
 
@@ -194,11 +204,8 @@ func (s *Service) Run(ctx context.Context, agentName string, runCtx core.RunCont
 	}
 }
 
-// ProcessUserMessage handles the full flow of processing a user message:
-// 1. Adds the message to the thread.
-// 2. Generates/Updates the thread title (if new).
-// 3. Runs the agent execution loop.
-func (s *Service) ProcessUserMessage(ctx context.Context, agentName, threadID, content, userID string) (iter.Seq2[core.Event, error], error) {
+// ProcessUserMessage handles the full flow of processing a user message.
+func (s *Service) ProcessUserMessage(ctx context.Context, agentName, threadID, content, userID string) error {
 	// Delegate to Engine
 	return s.engine.ProcessUserMessage(ctx, agentName, threadID, content, userID)
 }

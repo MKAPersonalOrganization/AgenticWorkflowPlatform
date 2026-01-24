@@ -40,53 +40,80 @@ func ToAguiEvents(event any) []any {
 	case *domain.AssistantMessageCompletedEvent:
 		return []any{aguievents.NewTextMessageEndEvent(evt.MessageID)}
 
-	case *domain.ToolCallStartedEvent:
-		// First emit TOOL_CALL_AGENT to establish agent-tool call association
-		agentEvent := aguievents.NewCustomEvent(
-			"TOOL_CALL_AGENT",
-			aguievents.WithValue(map[string]any{
-				"toolCallId": evt.ToolCallID,
-				"agentName":  evt.AgentName,
-			}),
-		)
-		// Then emit standard TOOL_CALL_START event
-		startEvent := aguievents.NewToolCallStartEvent(
-			evt.ToolCallID,
-			evt.ToolCallName,
-			aguievents.WithParentMessageID(evt.ParentMessageID),
-		)
-		return []any{agentEvent, startEvent}
-
-	case *domain.ToolCallArgumentsStreamedEvent:
-		return []any{aguievents.NewToolCallArgsEvent(evt.ToolCallID, evt.Delta)}
-
-	case *domain.ToolCallCompletedEvent:
-		return []any{aguievents.NewToolCallEndEvent(evt.ToolCallID)}
-
-	case *domain.ToolCallExecutedEvent:
-		return []any{aguievents.NewToolCallResultEvent(
-			evt.MessageID,
-			evt.ToolCallID,
-			evt.ToolResult,
-		)}
-
 	case *domain.TokenUsageReported:
 		return []any{aguievents.NewCustomEvent(
 			"TOKEN_USAGE_REPORTED",
 			aguievents.WithValue(map[string]any{
-				"threadId":         evt.ThreadID,
-				"messageId":        evt.MessageID,
-				"provider":         evt.Provider,
-				"model":            evt.Model,
-				"prompt":           evt.PromptTokens,
-				"completion":       evt.CompletionTokens,
-				"total":            evt.TotalTokens,
-				"cached":           evt.CachedTokens,
-				"reasoning":        evt.ReasoningTokens,
-				"audioInput":       evt.AudioInputTokens,
-				"audioOutput":      evt.AudioOutputTokens,
-				"acceptedPredict":  evt.AcceptedPredictionTokens,
-				"rejectedPredict":  evt.RejectedPredictionTokens,
+				"threadId":        evt.ThreadID,
+				"messageId":       evt.MessageID,
+				"provider":        evt.Provider,
+				"model":           evt.Model,
+				"prompt":          evt.PromptTokens,
+				"completion":      evt.CompletionTokens,
+				"total":           evt.TotalTokens,
+				"cached":          evt.CachedTokens,
+				"reasoning":       evt.ReasoningTokens,
+				"audioInput":      evt.AudioInputTokens,
+				"audioOutput":     evt.AudioOutputTokens,
+				"acceptedPredict": evt.AcceptedPredictionTokens,
+				"rejectedPredict": evt.RejectedPredictionTokens,
+			}),
+		)}
+
+	case *domain.ToolStateChangedEvent:
+		return []any{aguievents.NewCustomEvent(
+			"TOOL_STATE_CHANGED",
+			aguievents.WithValue(map[string]any{
+				"toolCallId": evt.ToolCallID,
+				"toolName":   evt.ToolName,
+				"oldState":   evt.OldState,
+				"newState":   evt.NewState,
+				"result":     evt.Result,
+				"isError":    evt.IsError,
+				"arguments":  evt.ToolArguments,
+				"agentName":  evt.AgentName,
+				"timestamp":  evt.Timestamp,
+			}),
+		)}
+
+	case *domain.ToolAwaitingInputEvent:
+		return []any{aguievents.NewCustomEvent(
+			"TOOL_AWAITING_INPUT",
+			aguievents.WithValue(map[string]any{
+				"toolCallId": evt.ToolCallID,
+				"toolName":   evt.ToolName,
+				"question":   evt.Elicitation.Question,
+				"schema":     evt.Elicitation.Schema,
+				"agentName":  evt.AgentName,
+			}),
+		)}
+
+	case *domain.ToolAwaitingAuthEvent:
+		return []any{aguievents.NewCustomEvent(
+			"TOOL_AWAITING_AUTH",
+			aguievents.WithValue(map[string]any{
+				"toolCallId": evt.ToolCallID,
+				"toolName":   evt.ToolName,
+				"authSpec":   evt.AuthSpec,
+				"agentName":  evt.AgentName,
+			}),
+		)}
+
+	case *domain.ToolInputProvidedEvent:
+		return []any{aguievents.NewCustomEvent(
+			"TOOL_INPUT_PROVIDED",
+			aguievents.WithValue(map[string]any{
+				"toolCallId": evt.ToolCallID,
+				"messageId":  evt.MessageID,
+				"input":      evt.Input,
+			}),
+		)}
+
+	case *domain.ToolAuthGrantedEvent:
+		return []any{aguievents.NewCustomEvent(
+			"TOOL_AUTH_GRANTED",
+			aguievents.WithValue(map[string]any{
+				"toolCallId": evt.ToolCallID,
 			}),
 		)}
 

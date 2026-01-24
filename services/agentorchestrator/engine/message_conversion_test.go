@@ -2,9 +2,10 @@ package engine
 
 import (
 	"reflect"
+	"testing"
+
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/llm"
-	"testing"
 )
 
 func TestMapFromCoreToLLMMessages(t *testing.T) {

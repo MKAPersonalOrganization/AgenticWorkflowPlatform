@@ -3,13 +3,14 @@ package engine
 import (
 	"context"
 	"io"
+	"testing"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/core/middleware"
 	"school-with-ai/foundation/agentsdk/llm"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/threadmgmt"
-	"testing"
 )
 
 func TestEngine_ElicitationFlow(t *testing.T) {
@@ -75,19 +76,15 @@ func TestEngine_ElicitationFlow(t *testing.T) {
 		provider,
 		nil,
 		nil,
+		nil,
 	)
 
 	userID := "user1"
 
 	// 1. Initial User Message
-	seq, err := eng.ProcessUserMessage(ctx, "test-elicitor", threadID, "Hello", userID)
+	err := eng.ProcessUserMessage(ctx, "test-elicitor", threadID, "Hello", userID)
 	if err != nil {
 		t.Fatalf("ProcessUserMessage 1 failed: %v", err)
-	}
-	for _, err := range seq {
-		if err != nil {
-			t.Fatalf("Run 1 iteration failed: %v", err)
-		}
 	}
 
 	// Verify events: Should see elicitation tool call
@@ -116,18 +113,13 @@ func TestEngine_ElicitationFlow(t *testing.T) {
 
 	// 2. User Response (Answering the elicitation)
 	// ProcessUserMessage should detect the pending elicitation and pair it
-	seq, err = eng.ProcessUserMessage(ctx, "test-elicitor", threadID, "Blue", userID)
+	err = eng.ProcessUserMessage(ctx, "test-elicitor", threadID, "Blue", userID)
 	if err != nil {
 		t.Fatalf("ProcessUserMessage 2 failed: %v", err)
 	}
 
 	t.Log("--- Starting Run 2 ---")
-	for event, err := range seq {
-		if err != nil {
-			t.Fatalf("Run 2 iteration failed: %v", err)
-		}
-		t.Logf("Event: %T", event)
-	}
+	// Events are now handled internally by Eng.ProcessUserMessage calling Eng.Run
 	t.Log("--- Finished Run 2 ---")
 
 	// Reload thread to get latest state

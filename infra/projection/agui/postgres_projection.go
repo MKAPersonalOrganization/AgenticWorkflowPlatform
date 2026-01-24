@@ -5,12 +5,13 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"school-with-ai/components/i18n"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/event"
 	"school-with-ai/foundation/logger"
-	"time"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 	"github.com/jmoiron/sqlx"
@@ -73,6 +74,21 @@ func (p *PostgresAguiProjection) RegisterHandlers(router interface {
 	})
 	router.Register(&domain.TokenUsageReported{}, func(ctx context.Context, e core.Event) error {
 		return p.applyTokenUsageReported(ctx, *e.(*domain.TokenUsageReported))
+	})
+	router.Register(&domain.ToolStateChangedEvent{}, func(ctx context.Context, e core.Event) error {
+		return p.applyToolStateChanged(ctx, *e.(*domain.ToolStateChangedEvent))
+	})
+	router.Register(&domain.ToolAwaitingInputEvent{}, func(ctx context.Context, e core.Event) error {
+		return p.applyToolAwaitingInput(ctx, *e.(*domain.ToolAwaitingInputEvent))
+	})
+	router.Register(&domain.ToolAwaitingAuthEvent{}, func(ctx context.Context, e core.Event) error {
+		return p.applyToolAwaitingAuth(ctx, *e.(*domain.ToolAwaitingAuthEvent))
+	})
+	router.Register(&domain.ToolInputProvidedEvent{}, func(ctx context.Context, e core.Event) error {
+		return p.applyToolInputProvided(ctx, *e.(*domain.ToolInputProvidedEvent))
+	})
+	router.Register(&domain.ToolAuthGrantedEvent{}, func(ctx context.Context, e core.Event) error {
+		return p.applyToolAuthGranted(ctx, *e.(*domain.ToolAuthGrantedEvent))
 	})
 }
 
@@ -203,17 +219,17 @@ func (p *PostgresAguiProjection) applyThreadDeleted(ctx context.Context, event d
 func (p *PostgresAguiProjection) applyTokenUsageReported(ctx context.Context, event domain.TokenUsageReported) error {
 	usageJSON, err := json.Marshal(map[string]any{
 		"usage": map[string]any{
-			"provider":         event.Provider,
-			"model":            event.Model,
-			"prompt":           event.PromptTokens,
-			"completion":       event.CompletionTokens,
-			"total":            event.TotalTokens,
-			"cached":           event.CachedTokens,
-			"reasoning":        event.ReasoningTokens,
-			"audioInput":       event.AudioInputTokens,
-			"audioOutput":      event.AudioOutputTokens,
-			"acceptedPredict":  event.AcceptedPredictionTokens,
-			"rejectedPredict":  event.RejectedPredictionTokens,
+			"provider":        event.Provider,
+			"model":           event.Model,
+			"prompt":          event.PromptTokens,
+			"completion":      event.CompletionTokens,
+			"total":           event.TotalTokens,
+			"cached":          event.CachedTokens,
+			"reasoning":       event.ReasoningTokens,
+			"audioInput":      event.AudioInputTokens,
+			"audioOutput":     event.AudioOutputTokens,
+			"acceptedPredict": event.AcceptedPredictionTokens,
+			"rejectedPredict": event.RejectedPredictionTokens,
 		},
 	})
 	if err != nil {
@@ -234,6 +250,182 @@ func (p *PostgresAguiProjection) applyTokenUsageReported(ctx context.Context, ev
 		return fmt.Errorf("failed to update message usage metadata: %w", err)
 	}
 
+	return nil
+}
+
+// applyToolStateChanged updates the tool state in message metadata.
+func (p *PostgresAguiProjection) applyToolStateChanged(ctx context.Context, event domain.ToolStateChangedEvent) error {
+	// Update or insert tool state in the tool_states JSONB array
+	// The structure is an array of tool state objects keyed by toolCallId
+	query := `
+		UPDATE agui_messages
+		SET metadata = COALESCE(metadata, '{}'::jsonb) ||
+			jsonb_build_object(
+				'toolStates',
+				COALESCE(metadata->'toolStates', '[]'::jsonb) ||
+				jsonb_build_array(
+					jsonb_build_object(
+						'toolCallId', $1::text,
+						'state', $2::text,
+						'oldState', $3::text,
+						'result', $4::text,
+						'isError', $5::boolean,
+						'arguments', $6::text,
+						'timestamp', $7::timestamp
+					)
+				)
+			)
+		WHERE message_id = $8
+	`
+	_, err := p.db.ExecContext(ctx, query,
+		event.ToolCallID,
+		event.NewState,
+		event.OldState,
+		event.Result,
+		event.IsError,
+		event.ToolArguments,
+		event.Timestamp,
+		event.MessageID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update tool state: %w", err)
+	}
+	return nil
+}
+
+// applyToolAwaitingInput updates the tool state with elicitation info.
+func (p *PostgresAguiProjection) applyToolAwaitingInput(ctx context.Context, event domain.ToolAwaitingInputEvent) error {
+	elicitationJSON, err := json.Marshal(event.Elicitation)
+	if err != nil {
+		return fmt.Errorf("failed to marshal elicitation: %w", err)
+	}
+
+	query := `
+		UPDATE agui_messages
+		SET metadata = COALESCE(metadata, '{}'::jsonb) ||
+			jsonb_build_object(
+				'toolStates',
+				COALESCE(metadata->'toolStates', '[]'::jsonb) ||
+				jsonb_build_array(
+					jsonb_build_object(
+						'toolCallId', $1::text,
+						'state', 'awaiting_input',
+						'elicitation', $2::jsonb,
+						'timestamp', $3::timestamp
+					)
+				)
+			)
+		WHERE message_id = $4
+	`
+	_, err = p.db.ExecContext(ctx, query,
+		event.ToolCallID,
+		elicitationJSON,
+		event.Timestamp,
+		event.MessageID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update tool awaiting input: %w", err)
+	}
+	return nil
+}
+
+// applyToolAwaitingAuth updates the tool state with authorization info.
+func (p *PostgresAguiProjection) applyToolAwaitingAuth(ctx context.Context, event domain.ToolAwaitingAuthEvent) error {
+	authSpecJSON, err := json.Marshal(event.AuthSpec)
+	if err != nil {
+		return fmt.Errorf("failed to marshal auth spec: %w", err)
+	}
+
+	query := `
+		UPDATE agui_messages
+		SET metadata = COALESCE(metadata, '{}'::jsonb) ||
+			jsonb_build_object(
+				'toolStates',
+				COALESCE(metadata->'toolStates', '[]'::jsonb) ||
+				jsonb_build_array(
+					jsonb_build_object(
+						'toolCallId', $1::text,
+						'state', 'awaiting_auth',
+						'authSpec', $2::jsonb,
+						'timestamp', $3::timestamp
+					)
+				)
+			)
+		WHERE message_id = $4
+	`
+	_, err = p.db.ExecContext(ctx, query,
+		event.ToolCallID,
+		authSpecJSON,
+		event.Timestamp,
+		event.MessageID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update tool awaiting auth: %w", err)
+	}
+	return nil
+}
+
+// applyToolInputProvided updates the tool state with provided input.
+func (p *PostgresAguiProjection) applyToolInputProvided(ctx context.Context, event domain.ToolInputProvidedEvent) error {
+	query := `
+		UPDATE agui_messages
+		SET metadata = COALESCE(metadata, '{}'::jsonb) ||
+			jsonb_build_object(
+				'toolStates',
+				COALESCE(metadata->'toolStates', '[]'::jsonb) ||
+				jsonb_build_array(
+					jsonb_build_object(
+						'toolCallId', $1::text,
+						'state', 'input_provided',
+						'input', $2::text,
+						'agentName', $3::text,
+						'timestamp', $4::timestamp
+					)
+				)
+			)
+		WHERE message_id = $5
+	`
+	_, err := p.db.ExecContext(ctx, query,
+		event.ToolCallID,
+		event.Input,
+		event.AgentName,
+		event.Timestamp,
+		event.MessageID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update tool input provided: %w", err)
+	}
+	return nil
+}
+
+// applyToolAuthGranted updates the tool state with auth granted.
+func (p *PostgresAguiProjection) applyToolAuthGranted(ctx context.Context, event domain.ToolAuthGrantedEvent) error {
+	query := `
+		UPDATE agui_messages
+		SET metadata = COALESCE(metadata, '{}'::jsonb) ||
+			jsonb_build_object(
+				'toolStates',
+				COALESCE(metadata->'toolStates', '[]'::jsonb) ||
+				jsonb_build_array(
+					jsonb_build_object(
+						'toolCallId', $1::text,
+						'state', 'auth_granted',
+						'agentName', $2::text,
+						'timestamp', $3::timestamp
+					)
+				)
+			)
+		WHERE message_id = $4
+	`
+	_, err := p.db.ExecContext(ctx, query,
+		event.ToolCallID,
+		event.AgentName,
+		event.Timestamp,
+		event.MessageID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update tool auth granted: %w", err)
+	}
 	return nil
 }
 
@@ -300,6 +492,7 @@ func (p *PostgresAguiProjection) GetThreadState(threadID string) (*AguiThreadSta
 
 	// Convert database messages to AGUI SDK format
 	aguiMessages := make([]aguievents.Message, 0, len(messages))
+	toolStatesMap := make(map[string]interface{})
 	var tokenUsage *TokenUsageInfo
 
 	for _, msg := range messages {
@@ -345,19 +538,55 @@ func (p *PostgresAguiProjection) GetThreadState(threadID string) (*AguiThreadSta
 			if err := json.Unmarshal([]byte(*msg.Metadata), &metadata); err == nil {
 				if usage, ok := metadata["usage"].(map[string]interface{}); ok {
 					tokenUsage = &TokenUsageInfo{
-						Provider: getStringFromMap(usage, "provider"),
-						Model:    getStringFromMap(usage, "model"),
-						Prompt:   getIntFromMap(usage, "prompt"),
-						Completion: getIntFromMap(usage, "completion"),
-						Total:    getIntFromMap(usage, "total"),
-						Cached:   getIntFromMap(usage, "cached"),
-						Reasoning: getIntFromMap(usage, "reasoning"),
-						AudioInput: getIntFromMap(usage, "audioInput"),
-						AudioOutput: getIntFromMap(usage, "audioOutput"),
+						Provider:        getStringFromMap(usage, "provider"),
+						Model:           getStringFromMap(usage, "model"),
+						Prompt:          getIntFromMap(usage, "prompt"),
+						Completion:      getIntFromMap(usage, "completion"),
+						Total:           getIntFromMap(usage, "total"),
+						Cached:          getIntFromMap(usage, "cached"),
+						Reasoning:       getIntFromMap(usage, "reasoning"),
+						AudioInput:      getIntFromMap(usage, "audioInput"),
+						AudioOutput:     getIntFromMap(usage, "audioOutput"),
 						AcceptedPredict: getIntFromMap(usage, "acceptedPredict"),
 						RejectedPredict: getIntFromMap(usage, "rejectedPredict"),
-						MessageID: msg.MessageID,
-						ThreadID: threadID,
+						MessageID:       msg.MessageID,
+						ThreadID:        threadID,
+					}
+				}
+			}
+		}
+
+		// Extract metadata
+		if msg.Metadata != nil {
+			var metadata map[string]interface{}
+			if err := json.Unmarshal([]byte(*msg.Metadata), &metadata); err == nil {
+				// Aggregate tool states
+				if states, ok := metadata["toolStates"].([]interface{}); ok {
+					for _, s := range states {
+						if stateMap, ok := s.(map[string]interface{}); ok {
+							if tid, ok := stateMap["toolCallId"].(string); ok {
+								toolStatesMap[tid] = stateMap
+							}
+						}
+					}
+				}
+
+				// Extract token usage
+				if usage, ok := metadata["usage"].(map[string]interface{}); ok {
+					tokenUsage = &TokenUsageInfo{
+						Provider:        getStringFromMap(usage, "provider"),
+						Model:           getStringFromMap(usage, "model"),
+						Prompt:          getIntFromMap(usage, "prompt"),
+						Completion:      getIntFromMap(usage, "completion"),
+						Total:           getIntFromMap(usage, "total"),
+						Cached:          getIntFromMap(usage, "cached"),
+						Reasoning:       getIntFromMap(usage, "reasoning"),
+						AudioInput:      getIntFromMap(usage, "audioInput"),
+						AudioOutput:     getIntFromMap(usage, "audioOutput"),
+						AcceptedPredict: getIntFromMap(usage, "acceptedPredict"),
+						RejectedPredict: getIntFromMap(usage, "rejectedPredict"),
+						MessageID:       msg.MessageID,
+						ThreadID:        threadID,
 					}
 				}
 			}
@@ -372,6 +601,7 @@ func (p *PostgresAguiProjection) GetThreadState(threadID string) (*AguiThreadSta
 		Messages:      aguiMessages,
 		ToolCalls:     []AguiToolCall{},
 		AgentActivity: make(map[string]*AguiAgentActivity),
+		ToolStates:    toolStatesMap,
 		TokenUsage:    tokenUsage,
 		CreatedAt:     thread.CreatedAt,
 		UpdatedAt:     thread.UpdatedAt,

@@ -3,9 +3,10 @@ package engine
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"school-with-ai/foundation/agentsdk/core"
 	"strings"
 	"unicode"
+
+	"school-with-ai/foundation/agentsdk/core"
 )
 
 // LoopDetector detects various types of loops in agent execution.

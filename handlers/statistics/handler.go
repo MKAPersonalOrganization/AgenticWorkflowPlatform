@@ -2,9 +2,10 @@ package statistics
 
 import (
 	"net/http"
+
+	component "school-with-ai/components/analytics"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/infra/projection/statistics"
-	component "school-with-ai/components/analytics"
 )
 
 type Handler struct {

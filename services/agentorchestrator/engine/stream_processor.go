@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/llm"
 )
@@ -78,23 +79,10 @@ func (p *StreamProcessor) Process(
 		}
 
 		// Process tool calls
-		tcUpdates, hasTool := toolCalls.ProcessUpdate(update)
+		_, hasTool := toolCalls.ProcessUpdate(update)
 		if hasTool {
-			for _, tcUpdate := range tcUpdates {
-				if tcUpdate.IsNew {
-					toolStartEvent := p.events.ToolCallStarted(params.ThreadID, tcUpdate.ID, tcUpdate.Name, params.MessageID)
-					if !yield(toolStartEvent, nil) {
-						return &StreamResult{Content: content, ToolCalls: toolCalls.GetAll()}, nil
-					}
-				}
-
-				if tcUpdate.ArgsDelta != "" {
-					argsEvent := p.events.ToolCallArgumentsStreamed(params.ThreadID, tcUpdate.ID, tcUpdate.ArgsDelta)
-					if !yield(argsEvent, nil) {
-						return &StreamResult{Content: content, ToolCalls: toolCalls.GetAll()}, nil
-					}
-				}
-			}
+			// We no longer emit ToolCallStarted or ToolCallArgumentsStreamed.
+			// Tool calls are accumulated and their execution is tracked via the state machine.
 		}
 
 		// Process usage updates

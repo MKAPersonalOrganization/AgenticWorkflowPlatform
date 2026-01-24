@@ -17,7 +17,7 @@ func main() {
 	}
 
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey:  apiKey,
+		APIKey: apiKey,
 		// Backend: genai.BackendGoogleAI,
 	})
 	if err != nil {

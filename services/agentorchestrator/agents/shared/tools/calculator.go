@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+
 	"school-with-ai/foundation/agentsdk/core"
 )
 
@@ -14,8 +15,6 @@ var (
 	// ErrSqrtNegative is returned when taking square root of negative number.
 	ErrSqrtNegative = errors.New("square root of negative number")
 )
-
-
 
 // BinaryOperationArgs represents arguments for binary operations (two numbers).
 type BinaryOperationArgs struct {
@@ -35,6 +34,7 @@ func (t *AddTool) Name() string { return "add" }
 func (t *AddTool) Description() string {
 	return "Add two numbers (a + b)"
 }
+
 func (t *AddTool) Parameters() map[string]any {
 	return map[string]any{
 		"type": "object",
@@ -45,6 +45,7 @@ func (t *AddTool) Parameters() map[string]any {
 		"required": []string{"a", "b"},
 	}
 }
+
 func (t *AddTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params BinaryOperationArgs
 	if err := core.UnmarshalArgs(args, &params); err != nil {
@@ -60,6 +61,7 @@ func (t *SubtractTool) Name() string { return "subtract" }
 func (t *SubtractTool) Description() string {
 	return "Subtract two numbers (a - b)"
 }
+
 func (t *SubtractTool) Parameters() map[string]any {
 	return map[string]any{
 		"type": "object",
@@ -70,6 +72,7 @@ func (t *SubtractTool) Parameters() map[string]any {
 		"required": []string{"a", "b"},
 	}
 }
+
 func (t *SubtractTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params BinaryOperationArgs
 	if err := core.UnmarshalArgs(args, &params); err != nil {
@@ -85,6 +88,7 @@ func (t *MultiplyTool) Name() string { return "multiply" }
 func (t *MultiplyTool) Description() string {
 	return "Multiply two numbers (a * b)"
 }
+
 func (t *MultiplyTool) Parameters() map[string]any {
 	return map[string]any{
 		"type": "object",
@@ -95,6 +99,7 @@ func (t *MultiplyTool) Parameters() map[string]any {
 		"required": []string{"a", "b"},
 	}
 }
+
 func (t *MultiplyTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params BinaryOperationArgs
 	if err := core.UnmarshalArgs(args, &params); err != nil {
@@ -110,6 +115,7 @@ func (t *DivideTool) Name() string { return "divide" }
 func (t *DivideTool) Description() string {
 	return "Divide two numbers (a / b)"
 }
+
 func (t *DivideTool) Parameters() map[string]any {
 	return map[string]any{
 		"type": "object",
@@ -120,6 +126,7 @@ func (t *DivideTool) Parameters() map[string]any {
 		"required": []string{"a", "b"},
 	}
 }
+
 func (t *DivideTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params BinaryOperationArgs
 	if err := core.UnmarshalArgs(args, &params); err != nil {
@@ -138,6 +145,7 @@ func (t *PowerTool) Name() string { return "power" }
 func (t *PowerTool) Description() string {
 	return "Raise a to the power of b (a^b)"
 }
+
 func (t *PowerTool) Parameters() map[string]any {
 	return map[string]any{
 		"type": "object",
@@ -148,6 +156,7 @@ func (t *PowerTool) Parameters() map[string]any {
 		"required": []string{"a", "b"},
 	}
 }
+
 func (t *PowerTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params BinaryOperationArgs
 	if err := core.UnmarshalArgs(args, &params); err != nil {
@@ -163,6 +172,7 @@ func (t *SqrtTool) Name() string { return "sqrt" }
 func (t *SqrtTool) Description() string {
 	return "Calculate the square root of a number"
 }
+
 func (t *SqrtTool) Parameters() map[string]any {
 	return map[string]any{
 		"type": "object",
@@ -172,6 +182,7 @@ func (t *SqrtTool) Parameters() map[string]any {
 		"required": []string{"value"},
 	}
 }
+
 func (t *SqrtTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params UnaryOperationArgs
 	if err := core.UnmarshalArgs(args, &params); err != nil {
@@ -182,5 +193,3 @@ func (t *SqrtTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	}
 	return map[string]any{"result": math.Sqrt(params.Value)}, nil
 }
-
-

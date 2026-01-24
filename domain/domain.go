@@ -65,3 +65,11 @@ func GenerateMessageID() string {
 
 	return hex.EncodeToString(b)
 }
+
+// ToolCallState represents the current state of a tool call in the thread.
+type ToolCallState struct {
+	ToolCallID  string         `json:"toolCallId"`
+	Status      string         `json:"status"` // "AwaitingInput", "AwaitingAuth", "Completed", etc.
+	Elicitation map[string]any `json:"elicitation,omitempty"`
+	AuthSpec    map[string]any `json:"authSpec,omitempty"`
+}

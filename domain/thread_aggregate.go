@@ -8,14 +8,18 @@ import (
 // ThreadAggregate is an event-sourced aggregate representing a conversation thread.
 // Following the pattern from EventSourcing.NetCore, business logic is implemented
 // as methods on the aggregate that validate rules and enqueue events.
+// ThreadAggregate is an event-sourced aggregate representing a conversation thread.
+// Following the pattern from EventSourcing.NetCore, business logic is implemented
+// as methods on the aggregate that validate rules and enqueue events.
 type ThreadAggregate struct {
 	BaseAggregate
-	UserID    string
-	Title     string
-	Messages  []Message
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	IsDeleted bool
+	UserID           string
+	Title            string
+	Messages         []Message
+	ActiveToolStates map[string]ToolCallState
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	IsDeleted        bool
 }
 
 // NewThreadAggregate creates a new thread aggregate.
@@ -26,7 +30,8 @@ func NewThreadAggregate(id string) *ThreadAggregate {
 			Version:           0,
 			uncommittedEvents: make([]Event, 0),
 		},
-		Messages: make([]Message, 0),
+		Messages:         make([]Message, 0),
+		ActiveToolStates: make(map[string]ToolCallState),
 	}
 }
 
@@ -126,6 +131,16 @@ func (t *ThreadAggregate) RecordUsage(event TokenUsageReported) error {
 	return nil
 }
 
+// RecordToolEvent records a tool lifecycle event in the thread.
+func (t *ThreadAggregate) RecordToolEvent(event Event) error {
+	if t.IsDeleted {
+		return errors.New("cannot record tool event for deleted thread")
+	}
+
+	t.Enqueue(event, t.Apply)
+	return nil
+}
+
 // Apply applies an event to update the thread's state.
 // This is the only place where state mutations happen.
 func (t *ThreadAggregate) Apply(event Event) {
@@ -152,6 +167,11 @@ func (t *ThreadAggregate) Apply(event Event) {
 		t.Messages = append(t.Messages, msg)
 		t.UpdatedAt = e.Timestamp
 
+		// If a tool result is added, remove the tool from active states
+		if e.Role == "tool" && e.ToolCallID != "" {
+			delete(t.ActiveToolStates, e.ToolCallID)
+		}
+
 	case ThreadTitleUpdatedEvent:
 		t.Title = e.Title
 		t.UpdatedAt = e.Timestamp
@@ -159,6 +179,42 @@ func (t *ThreadAggregate) Apply(event Event) {
 	case ThreadDeleted:
 		t.IsDeleted = true
 		t.UpdatedAt = e.Timestamp
+
+	case *ToolAwaitingInputEvent:
+		state := ToolCallState{
+			ToolCallID: e.ToolCallID,
+			Status:     "AwaitingInput",
+			Elicitation: map[string]any{
+				"question": e.Elicitation.Question,
+				"schema":   e.Elicitation.Schema,
+			},
+		}
+		t.ActiveToolStates[e.ToolCallID] = state
+
+	case *ToolAwaitingAuthEvent:
+		state := ToolCallState{
+			ToolCallID: e.ToolCallID,
+			Status:     "AwaitingAuth",
+			AuthSpec: map[string]any{
+				"resource": e.AuthSpec.Resource,
+				"action":   e.AuthSpec.Action,
+				"reason":   e.AuthSpec.Reason,
+				"scopes":   e.AuthSpec.Scopes,
+			},
+		}
+		t.ActiveToolStates[e.ToolCallID] = state
+
+	case *ToolInputProvidedEvent:
+		if state, ok := t.ActiveToolStates[e.ToolCallID]; ok {
+			state.Status = "InputProvided"
+			t.ActiveToolStates[e.ToolCallID] = state
+		}
+
+	case *ToolAuthGrantedEvent:
+		if state, ok := t.ActiveToolStates[e.ToolCallID]; ok {
+			state.Status = "AuthGranted"
+			t.ActiveToolStates[e.ToolCallID] = state
+		}
 	}
 }
 

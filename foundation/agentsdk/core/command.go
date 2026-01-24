@@ -16,12 +16,23 @@ type Command struct {
 
 	// Elicitation specifies a request for structured user input
 	Elicitation *ElicitationSpec
+
+	// Authorization specifies a request for user authorization
+	Authorization *AuthorizationSpec
 }
 
 // ElicitationSpec defines the structure for user input requests
 type ElicitationSpec struct {
 	Question string         `json:"question"`
 	Schema   map[string]any `json:"schema,omitempty"`
+}
+
+// AuthorizationSpec defines a request for user authorization.
+type AuthorizationSpec struct {
+	Resource string   `json:"resource"` // What's being accessed
+	Action   string   `json:"action"`   // What action is requested
+	Reason   string   `json:"reason"`   // Why this is needed
+	Scopes   []string `json:"scopes"`   // Required permission scopes
 }
 
 // ToolResult represents the result of a tool invocation.

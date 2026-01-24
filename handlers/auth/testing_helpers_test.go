@@ -2,6 +2,7 @@ package auth
 
 import (
 	"os"
+
 	"school-with-ai/infra/kratos"
 )
 

@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/services/artifact"
-	"strings"
 )
 
 const (

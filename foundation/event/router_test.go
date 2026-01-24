@@ -3,8 +3,9 @@ package event
 import (
 	"context"
 	"errors"
-	"school-with-ai/foundation/agentsdk/core"
 	"testing"
+
+	"school-with-ai/foundation/agentsdk/core"
 )
 
 type mockEvent struct {

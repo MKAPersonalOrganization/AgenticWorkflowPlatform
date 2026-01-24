@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"strings"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
-	"strings"
 
 	"github.com/kurrent-io/KurrentDB-Client-Go/kurrentdb"
 )
@@ -229,6 +230,46 @@ func (s *KurrentDBEventStore) convertFromRecordedEvent(recordedEvent *kurrentdb.
 			return nil, fmt.Errorf("failed to unmarshal TokenUsageReported: %w", err)
 		}
 		event = e
+
+	case "ToolStateChanged":
+		var e domain.ToolStateChangedEvent
+		err := json.Unmarshal(recordedEvent.Data, &e)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal ToolStateChangedEvent: %w", err)
+		}
+		event = &e
+
+	case "ToolAwaitingInput":
+		var e domain.ToolAwaitingInputEvent
+		err := json.Unmarshal(recordedEvent.Data, &e)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal ToolAwaitingInputEvent: %w", err)
+		}
+		event = &e
+
+	case "ToolAwaitingAuth":
+		var e domain.ToolAwaitingAuthEvent
+		err := json.Unmarshal(recordedEvent.Data, &e)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal ToolAwaitingAuthEvent: %w", err)
+		}
+		event = &e
+
+	case "ToolInputProvided":
+		var e domain.ToolInputProvidedEvent
+		err := json.Unmarshal(recordedEvent.Data, &e)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal ToolInputProvidedEvent: %w", err)
+		}
+		event = &e
+
+	case "ToolAuthGranted":
+		var e domain.ToolAuthGrantedEvent
+		err := json.Unmarshal(recordedEvent.Data, &e)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal ToolAuthGrantedEvent: %w", err)
+		}
+		event = &e
 
 	default:
 		return nil, fmt.Errorf("%w: %s", ErrUnknownEventType, recordedEvent.EventType)

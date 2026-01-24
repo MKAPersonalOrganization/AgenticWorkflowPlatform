@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"school-with-ai/foundation/agentsdk/core"
 	"testing"
+
+	"school-with-ai/foundation/agentsdk/core"
 )
 
 var errTestToolNotFound = errors.New("tool not found")

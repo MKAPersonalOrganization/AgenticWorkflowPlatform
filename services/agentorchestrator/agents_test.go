@@ -2,13 +2,14 @@ package agentorchestrator_test
 
 import (
 	"context"
+	"testing"
+
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/services/agentorchestrator/agents/chemistry"
 	"school-with-ai/services/agentorchestrator/agents/diagramming"
 	"school-with-ai/services/agentorchestrator/agents/math"
 	"school-with-ai/services/agentorchestrator/agents/physics"
 	"school-with-ai/services/agentorchestrator/agents/statistics"
-	"testing"
 )
 
 func TestInstructorConfigurations(t *testing.T) {

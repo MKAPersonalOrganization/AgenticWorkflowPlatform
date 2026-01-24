@@ -10,6 +10,7 @@
 
 import { LIFECYCLE_EVENT_TYPES } from './constants.js';
 import { enrichToolResult } from './chat-utils.js';
+import { TOOL_EVENTS } from './tool-state-machine.js';
 
 /**
  * Create streaming methods mixin
@@ -262,21 +263,6 @@ export function createStreamingMethods() {
                     this.__handleCustomEvent(event, state, threadId);
                     break;
 
-                case 'TOOL_CALL_START':
-                    this.__handleToolCallStart(event, state, threadId);
-                    break;
-
-                case 'TOOL_CALL_ARGS':
-                    this.__handleToolCallArgs(event, state);
-                    break;
-
-                case 'TOOL_CALL_END':
-                    this.__handleToolCallEnd(event, state);
-                    break;
-
-                case 'TOOL_CALL_RESULT':
-                    this.__handleToolCallResult(event, state, threadId);
-                    break;
 
                 case 'TEXT_MESSAGE_START':
                     this.__handleTextMessageStart(event, state, threadId);
@@ -340,114 +326,100 @@ export function createStreamingMethods() {
                     messageId: event.value.messageId,
                     threadId: event.value.threadId
                 };
+            } else if (event.name === 'TOOL_STATE_CHANGED') {
+                const { toolCallId, toolName, oldState, newState, result, isError, arguments: toolArgs, agentName } = event.value;
+                console.log(`[Tool] ${toolName} (${toolCallId}) state changed: ${oldState} → ${newState}`);
+
+                this.__ensureToolCallMessage(state, toolCallId, toolName, agentName);
+
+                // Map state changes to XState events
+                let eventType = null;
+                const payload = { toolName, result, error: isError ? result : null };
+
+                switch (newState) {
+                    case 'executing':
+                        if (oldState === 'idle') eventType = TOOL_EVENTS.START;
+                        // Resumptions
+                        if (oldState === 'awaiting_input') eventType = TOOL_EVENTS.INPUT_PROVIDED;
+                        if (oldState === 'awaiting_auth') eventType = TOOL_EVENTS.AUTH_GRANTED;
+                        break;
+                    case 'completed':
+                        eventType = TOOL_EVENTS.SUCCESS;
+                        break;
+                    case 'error':
+                        eventType = TOOL_EVENTS.ERROR;
+                        break;
+                    case 'awaiting_input':
+                        eventType = TOOL_EVENTS.NEEDS_INPUT;
+                        break;
+                    case 'awaiting_auth':
+                        eventType = TOOL_EVENTS.NEEDS_AUTH;
+                        break;
+                }
+
+                if (eventType) {
+                    this.transitionToolState(toolCallId, eventType, payload);
+                }
+
+                // Note: state.toolCalls and state.messages are updated via the XState machine transition callback in chat-state.js
+
+                this.__updateDerivedState();
+            } else if (event.name === 'TOOL_AWAITING_INPUT') {
+                const { toolCallId, toolName, question, schema, agentName } = event.value;
+                console.log(`[Tool] ${toolName} awaiting input: ${question}`);
+
+                this.__ensureToolCallMessage(state, toolCallId, toolName, agentName);
+
+                // Transition machine
+                this.transitionToolState(toolCallId, TOOL_EVENTS.NEEDS_INPUT, {
+                    elicitation: { question, schema }
+                });
+
+                // Update the message in the list to trigger elicitation UI rendering (via parsed data)
+                const msg = state.messages.find(m => m.id === toolCallId);
+                if (msg) {
+                    msg.status = 'awaiting_input';
+
+                    // Normalize data for UI component compatibility (AskMultipleSelection, AskNumericRating)
+                    const normalizedResult = {
+                        question_text: question,
+                        statement_to_verify: question, // Generic mapping
+                        schema: schema
+                    };
+
+                    if (schema) {
+                        if (schema.enum) normalizedResult.answer_choices = schema.enum;
+                        if (schema.minimum !== undefined) normalizedResult.scale_minimum = schema.minimum;
+                        if (schema.maximum !== undefined) normalizedResult.scale_maximum = schema.maximum;
+                    }
+
+                    msg.parsedResult = normalizedResult;
+                }
+
+                if (threadId === this.__currentThreadId) {
+                    this.showToast(window.i18n.t('Input required'), 'info');
+                }
+                this.__updateDerivedState();
+            } else if (event.name === 'TOOL_AWAITING_AUTH') {
+                const { toolCallId, toolName, authSpec, agentName } = event.value;
+                console.log(`[Tool] ${toolName} awaiting authorization: ${authSpec.reason}`);
+
+                this.__ensureToolCallMessage(state, toolCallId, toolName, agentName);
+
+                this.transitionToolState(toolCallId, TOOL_EVENTS.NEEDS_AUTH, { authSpec });
+
+                this.__updateDerivedState();
+                // Authorization UI could be triggered here
+            } else if (event.name === 'TOOL_INPUT_PROVIDED') {
+                const { toolCallId, input } = event.value;
+                this.transitionToolState(toolCallId, TOOL_EVENTS.INPUT_PROVIDED, { input });
+                this.__updateDerivedState();
             }
             // Note: HUMAN_INPUT_REQUESTED is no longer emitted by the backend.
-            // Elicitation state is derived from pending ask_human tool calls in __convertBackendMessagesToUI
+            // Elicitation state is ALSO derived from pending tool calls in chat-state.js
         },
 
-        /**
-         * Handle TOOL_CALL_START event
-         */
-        __handleToolCallStart(event, state, threadId) {
-            const agentName = state.pendingToolCallAgents?.[event.toolCallId] || null;
-            const parentMessageId = event.parentMessageId || null;
 
-            state.toolCalls[event.toolCallId] = {
-                id: event.toolCallId,
-                name: event.toolCallName,
-                args: '',
-                status: 'streaming',
-                timestamp: new Date(event.timestamp).toISOString(),
-                agentName: agentName,
-                parentMessageId: parentMessageId
-            };
-
-            state.messages.push({
-                id: event.toolCallId,
-                type: 'tool_call',
-                name: event.toolCallName,
-                args: '',
-                parsedArgs: {},
-                status: 'streaming',
-                timestamp: new Date(event.timestamp).toISOString(),
-                agentName: agentName,
-                parentMessageId: parentMessageId
-            });
-
-            if (agentName) {
-                delete state.pendingToolCallAgents[event.toolCallId];
-            }
-
-            if (threadId === this.__currentThreadId) {
-                this.$nextTick(() => this.__scrollToBottom());
-            }
-        },
-
-        /**
-         * Handle TOOL_CALL_ARGS event
-         */
-        __handleToolCallArgs(event, state) {
-            if (state.toolCalls[event.toolCallId]) {
-                state.toolCalls[event.toolCallId].args += event.delta;
-
-                const msgIndex = state.messages.findIndex(m => m.id === event.toolCallId);
-                if (msgIndex !== -1) {
-                    const msg = state.messages[msgIndex];
-                    msg.args = state.toolCalls[event.toolCallId].args;
-                    msg.parsedArgs = this.safeParseJSON(msg.args);
-                }
-            }
-        },
-
-        /**
-         * Handle TOOL_CALL_END event
-         */
-        __handleToolCallEnd(event, state) {
-            if (state.toolCalls[event.toolCallId]) {
-                state.toolCalls[event.toolCallId].status = 'completed';
-
-                const toolMsgIndex = state.messages.findIndex(m => m.id === event.toolCallId);
-                if (toolMsgIndex !== -1) {
-                    const toolMsg = state.messages[toolMsgIndex];
-                    toolMsg.status = 'completed';
-
-                    const argsString = toolMsg.args || '{}';
-                    const parsed = this.__tryCatch('parse tool args', { toolCallId: event.toolCallId }, () => {
-                        return JSON.parse(argsString);
-                    });
-                    toolMsg.parsedArgs = parsed || { raw: argsString };
-
-                    // Detect elicitation: if this is an elicitation tool, allow component to react via derived state
-                    if (['quiz_multiple_choice', 'quiz_numeric_scale', 'quiz_yes_no'].includes(toolMsg.name)) {
-                        console.log('Elicitation tool call ended:', toolMsg.parsedArgs?.question_text || toolMsg.parsedArgs?.statement_to_verify);
-                        this.__updateDerivedState();
-                    }
-                }
-            }
-        },
-
-        /**
-         * Handle TOOL_CALL_RESULT event
-         */
-        __handleToolCallResult(event, state, threadId) {
-            const resultToolCallIndex = state.messages.findIndex(m => m.id === event.toolCallId);
-
-            if (resultToolCallIndex !== -1) {
-                state.messages[resultToolCallIndex].result = event.content;
-                state.messages[resultToolCallIndex].resultTimestamp = new Date(event.timestamp).toISOString();
-
-                // Use shared enrichment logic
-                enrichToolResult(state.messages[resultToolCallIndex], event.content);
-            }
-
-            if (state.toolCalls[event.toolCallId]) {
-                state.toolCalls[event.toolCallId].result = event.content;
-            }
-
-            if (threadId === this.__currentThreadId) {
-                this.$nextTick(() => this.__scrollToBottom());
-            }
-        },
 
         /**
          * Handle TEXT_MESSAGE_START event
@@ -632,6 +604,36 @@ export function createStreamingMethods() {
                 case 'CUSTOM': return event.name || window.i18n.t('Custom');
                 default: return event.type;
             }
+        },
+
+        /**
+         * Ensure a tool call message exists in state
+         */
+        __ensureToolCallMessage(state, toolCallId, toolName, agentName) {
+            if (state.toolCalls[toolCallId]) return;
+
+            console.log(`[STREAM] Lazily creating tool call message for ${toolName} (${toolCallId})`);
+
+            state.toolCalls[toolCallId] = {
+                id: toolCallId,
+                name: toolName,
+                args: '',
+                status: 'executing',
+                timestamp: new Date().toISOString(),
+                agentName: agentName
+            };
+
+            state.messages.push({
+                id: toolCallId,
+                type: 'tool_call',
+                name: toolName,
+                args: '',
+                parsedArgs: {},
+                parsedResult: null,
+                status: 'executing',
+                timestamp: new Date().toISOString(),
+                agentName: agentName
+            });
         }
     };
 }

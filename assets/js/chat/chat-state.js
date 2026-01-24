@@ -6,6 +6,8 @@
  */
 
 import { CONNECTION_CONFIG, DEFAULT_PERF_METRICS } from './constants.js';
+import { createToolStateMachine, TOOL_EVENTS, TOOL_STATES } from './tool-state-machine.js';
+import { createActor } from 'xstate';
 
 /**
  * Create an empty thread state object
@@ -65,6 +67,7 @@ export function createInitialState() {
             humanInputToastId: null,
             tokenUsage: null
         },
+        __toolStateServices: {}, // Map of toolCallId -> XState Service
 
         // User input
         currentMessage: '',
@@ -214,7 +217,49 @@ export function createStateMethods() {
          * Update derived state based on current messages.
          * This ensures a Single Source of Truth for UI state.
          */
-        __updateDerivedState() {
+        /**
+         * Transition a tool's state machine
+         * @param {string} toolCallId
+         * @param {string} event
+         * @param {Object} payload
+         */
+        transitionToolState(toolCallId, event, payload = {}) {
+            // Lazy init service
+            if (!this.__toolStateServices[toolCallId]) {
+                const machine = createToolStateMachine(toolCallId, { toolName: payload.toolName });
+                const actor = createActor(machine);
+
+                actor.subscribe(snapshot => {
+                    // Update Alpine state on transition
+                    this.__batchUpdate(() => {
+                        const threadState = this.__getThreadState();
+                        if (!threadState.toolCalls) threadState.toolCalls = {};
+
+                        threadState.toolCalls[toolCallId] = {
+                            state: snapshot.value,
+                            context: snapshot.context
+                        };
+
+                        // Sync to message object for UI binding
+                        const msg = threadState.messages.find(m => m.id === toolCallId);
+                        if (msg) {
+                            msg.status = snapshot.value;
+                        }
+
+                        // Force derived state update
+                        this.__updateDerivedState();
+                    });
+                });
+
+                actor.start();
+                this.__toolStateServices[toolCallId] = actor;
+            }
+
+            const actor = this.__toolStateServices[toolCallId];
+            actor.send({ type: event, ...payload });
+        },
+
+        async __updateDerivedState() {
             const state = this.__getThreadState();
             const msgs = state.messages;
 
@@ -224,47 +269,23 @@ export function createStateMethods() {
             let schema = null;
 
             if (msgs && msgs.length > 0) {
-                // Search from the end for the last relevant tool call
-                const lastToolMsgIndex = msgs.slice().reverse().findIndex(m =>
-                    m.type === 'tool_call' &&
-                    ['quiz_multiple_choice', 'quiz_numeric_scale', 'quiz_yes_no'].includes(m.name)
-                );
+                // Iterate backwards to find the most recent tool call that is awaiting input
+                for (let i = msgs.length - 1; i >= 0; i--) {
+                    const m = msgs[i];
+                    if (m.type === 'tool_call') {
+                        // Check XState machine state if available
+                        let machineState = null;
+                        if (state.toolCalls && state.toolCalls[m.id]) {
+                            machineState = state.toolCalls[m.id].state;
+                        }
 
-                if (lastToolMsgIndex !== -1) {
-                    // slice().reverse() reverses copy, so index is from end. Convert to real index
-                    const realIndex = msgs.length - 1 - lastToolMsgIndex;
-                    const lastToolMsg = msgs[realIndex];
-
-                    // Check if there is a USER message after this tool call
-                    // We only care about user messages that act as replies
-                    const hasUserReply = msgs.slice(realIndex + 1).some(m => m.role === 'user');
-
-                    if (
-                        lastToolMsg &&
-                        lastToolMsg.status === 'completed' &&
-                        !hasUserReply
-                    ) {
-                        isWaiting = true;
-                        question = lastToolMsg.parsedResult?.question_text ||
-                                   lastToolMsg.parsedResult?.statement_to_verify || null;
-                        schema = lastToolMsg.parsedResult?.schema || null;
-
-                        // Fallback normalization if schema not in result
-                        if (!schema) {
-                            schema = {};
-                            const result = lastToolMsg.parsedResult || {};
-                            if (lastToolMsg.name === 'quiz_multiple_choice') {
-                                schema.type = 'choose_multiple';
-                                schema.enum = result.answer_choices;
-                            }
-                            else if (lastToolMsg.name === 'quiz_numeric_scale') {
-                                schema.type = 'numeric_range';
-                                schema.minimum = result.scale_minimum;
-                                schema.maximum = result.scale_maximum;
-                            }
-                            else if (lastToolMsg.name === 'quiz_yes_no') {
-                                schema.type = 'true_false';
-                            }
+                        // Strict XState check: only show input if machine is in 'awaiting_input'
+                        if (machineState === TOOL_STATES.AWAITING_INPUT) {
+                            isWaiting = true;
+                            question = m.parsedResult?.question_text ||
+                                m.parsedResult?.statement_to_verify || null;
+                            schema = m.parsedResult?.schema || null;
+                            break; // Stop after finding the first one (most recent)
                         }
                     }
                 }

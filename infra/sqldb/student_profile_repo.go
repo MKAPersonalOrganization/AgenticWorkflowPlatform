@@ -5,8 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"school-with-ai/domain"
 	"time"
+
+	"school-with-ai/domain"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"

@@ -7,11 +7,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"school-with-ai/foundation/agentsdk/core"
-	"school-with-ai/foundation/i18n"
 	"strconv"
 	"strings"
 	"time"
+
+	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/i18n"
 )
 
 var (

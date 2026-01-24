@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/logger"
-	"time"
 )
 
 // Manager handles thread lifecycle and persistence using event sourcing.
@@ -130,39 +131,23 @@ func (m *Manager) AddAssistantMessage(ctx context.Context, threadID, messageID, 
 
 // AddTokenUsage records token usage for a message in the thread.
 func (m *Manager) AddTokenUsage(ctx context.Context, event domain.TokenUsageReported) (*domain.ThreadAggregate, error) {
-	thread, err := m.threadRepo.Load(ctx, event.ThreadID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load thread: %w", err)
-	}
+	return m.retryUpdate(ctx, event.ThreadID, func(t *domain.ThreadAggregate) error {
+		return t.RecordUsage(event)
+	})
+}
 
-	if err := thread.RecordUsage(event); err != nil {
-		return nil, err
-	}
-
-	if err := m.threadRepo.Save(ctx, thread); err != nil {
-		return nil, err
-	}
-
-	return thread, nil
+// RecordToolEvent records a tool lifecycle event in the thread.
+func (m *Manager) RecordToolEvent(ctx context.Context, threadID string, event domain.Event) (*domain.ThreadAggregate, error) {
+	return m.retryUpdate(ctx, threadID, func(t *domain.ThreadAggregate) error {
+		return t.RecordToolEvent(event)
+	})
 }
 
 // AddToolResultMessage adds a tool result message to the thread.
 func (m *Manager) AddToolResultMessage(ctx context.Context, threadID, messageID, toolCallID, result, agentName string) (*domain.ThreadAggregate, error) {
-	thread, err := m.threadRepo.Load(ctx, threadID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load thread: %w", err)
-	}
-
-	err = thread.AddMessage(messageID, "tool", result, nil, toolCallID, agentName, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to add tool result: %w", err)
-	}
-
-	if err := m.threadRepo.Save(ctx, thread); err != nil {
-		return nil, err
-	}
-
-	return thread, nil
+	return m.retryUpdate(ctx, threadID, func(t *domain.ThreadAggregate) error {
+		return t.AddMessage(messageID, "tool", result, nil, toolCallID, agentName, nil)
+	})
 }
 
 // UpdateThreadTitle updates the title of a thread.
@@ -227,8 +212,59 @@ func (m *Manager) ToCoreMessages(aggregate *domain.ThreadAggregate) []core.Messa
 			AgentName:  dm.AgentName,
 			Metadata:   dm.Metadata,
 		}
+
+		// Inject active tool states if present
+		if len(dm.ToolCalls) > 0 && len(aggregate.ActiveToolStates) > 0 {
+			toolStates := make(map[string]domain.ToolCallState)
+			hasActive := false
+			for _, tc := range dm.ToolCalls {
+				if state, ok := aggregate.ActiveToolStates[tc.ID]; ok {
+					toolStates[tc.ID] = state
+					hasActive = true
+				}
+			}
+
+			if hasActive {
+				if messages[i].Metadata == nil {
+					messages[i].Metadata = make(map[string]any)
+				}
+				messages[i].Metadata["tool_states"] = toolStates
+			}
+		}
 	}
 	return messages
+}
+
+func (m *Manager) retryUpdate(ctx context.Context, threadID string, update func(*domain.ThreadAggregate) error) (*domain.ThreadAggregate, error) {
+	const maxRetries = 5
+	var lastErr error
+
+	for i := 0; i < maxRetries; i++ {
+		thread, err := m.threadRepo.Load(ctx, threadID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load thread: %w", err)
+		}
+
+		if err := update(thread); err != nil {
+			return nil, err
+		}
+
+		err = m.threadRepo.Save(ctx, thread)
+		if err == nil {
+			return thread, nil
+		}
+
+		if !errors.Is(err, core.ErrConcurrencyConflict) {
+			return nil, fmt.Errorf("failed to save thread: %w", err)
+		}
+
+		lastErr = err
+		// Wait a tiny bit to avoid tight loops? Or just continue
+		m.log.Debug(ctx, "Concurrency conflict during update, retrying", "threadID", threadID, "attempt", i+1)
+		time.Sleep(time.Duration(i*10) * time.Millisecond)
+	}
+
+	return nil, fmt.Errorf("exceeded max retries (%d) after concurrency conflict: %w", maxRetries, lastErr)
 }
 
 func toCoreToolCalls(dtcs []domain.ToolCall) []core.ToolCall {

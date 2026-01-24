@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+
 	"school-with-ai/foundation/agentsdk/core"
 )
 

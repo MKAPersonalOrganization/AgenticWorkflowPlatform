@@ -3,6 +3,7 @@ package types
 import (
 	"context"
 	"iter"
+
 	"school-with-ai/foundation/agentsdk/llm"
 )
 

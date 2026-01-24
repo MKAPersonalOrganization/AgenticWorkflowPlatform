@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
+
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/llm"
 	"school-with-ai/services/threadmgmt"
