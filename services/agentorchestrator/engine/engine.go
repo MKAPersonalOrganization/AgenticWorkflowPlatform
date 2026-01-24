@@ -76,7 +76,16 @@ func (e *Engine) Run(ctx context.Context, agentName string, runCtx core.RunConte
 		// This ensures executor is available regardless of execution path
 		exec.prepareExecutor()
 
-		startState := exec.inferState()
+
+		// Load persisted state or default to AwaitingTurn
+		startState := StateAwaitingTurn
+		if persistedStateStr, err := e.threadMgmt.GetEngineState(ctx, runCtx.ThreadID); err == nil && persistedStateStr != "" {
+			startState = parseState(persistedStateStr)
+			if startState == StateDone {
+				startState = StateAwaitingTurn
+			}
+		}
+
 		if err := exec.setup(startState); err != nil {
 			yield(nil, err)
 			return
@@ -826,22 +835,6 @@ func (s *executionState) run() error {
 	return s.sm.Fire(TrigStartExecution)
 }
 
-func (s *executionState) inferState() state {
-	// Use persisted state only
-	persistedStateStr, err := s.engine.threadMgmt.GetEngineState(s.ctx, s.threadID)
-	if err != nil || persistedStateStr == "" {
-		return StateAwaitingTurn
-	}
-
-	currentState := parseState(persistedStateStr)
-
-	// If the state is Done, we reset to AwaitingTurn to allow a new turn to start.
-	if currentState == StateDone {
-		return StateAwaitingTurn
-	}
-
-	return currentState
-}
 
 
 func (s *executionState) streamAndProcessLLMResponse(llmContext *LLMContext) error {
