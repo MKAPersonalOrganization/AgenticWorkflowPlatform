@@ -59,26 +59,18 @@ func (e *Engine) ProcessUserMessage(ctx context.Context, agentName, threadID, co
 	_ = e.emit(ctx, events.RunStarted(threadID, runID), nil)
 
 	// Consume the run iterator and emit all events
-	var terminationReason TerminationReason
 	for evt, err := range runIter {
 		if err != nil {
-			runErr := events.RunError(threadID, err.Error(), "RUN_EXECUTION_ERROR")
-			_ = e.emit(ctx, runErr, nil)
+			// Engine has already emitted RunError via StateError transition
 			return err
 		}
 
-		if completed, ok := evt.(runCompletedEvent); ok {
-			terminationReason = completed.Reason
+		if _, ok := evt.(runCompletedEvent); ok {
 			continue
 		}
 		// Event emission is already handled by e.Run using wrapYield
 	}
-
-	// Emit Finish Event if appropriate
-	if terminationReason != TerminationAwaitingInput {
-		_ = e.emit(ctx, events.RunFinished(threadID, runID), nil)
-	}
-
+	
 	return nil
 }
 
