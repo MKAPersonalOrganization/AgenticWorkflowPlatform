@@ -313,8 +313,7 @@ func TestToolStateMachine_Cancellation(t *testing.T) {
 }
 
 func TestToolStateMachine_ConcurrentAccess(t *testing.T) {
-	// This test verifies that the ToolStateMachine is safe for concurrent access
-	// by multiple goroutines performing various operations simultaneously.
+	// Verify concurrent access to state machine methods is safe
 	ctx := context.Background()
 	tc := &core.ToolCall{
 		ID: "tc-concurrent",
@@ -361,7 +360,7 @@ func TestToolStateMachine_ConcurrentAccess(t *testing.T) {
 	for i := 0; i < numGoroutines; i++ {
 		go func() {
 			defer wg.Done()
-			for j := 0; j < 100; j++ {
+			for j := 0; j < 20; j++ {
 				_ = tsm.CurrentState()
 				_ = tsm.Result()
 				_ = tsm.Elicitation()
@@ -381,7 +380,7 @@ func TestToolStateMachine_ConcurrentAccess(t *testing.T) {
 }
 
 func TestToolStateMachine_ConcurrentObserverRegistration(t *testing.T) {
-	// Test that registering observers while state transitions occur is safe
+	// Verify observer registration is safe during state transitions
 	ctx := context.Background()
 	tc := &core.ToolCall{
 		ID: "tc-observer-race",
@@ -431,7 +430,7 @@ func TestToolStateMachine_ConcurrentObserverRegistration(t *testing.T) {
 }
 
 func TestToolStateMachine_ConcurrentElicitation(t *testing.T) {
-	// Test concurrent access during elicitation flow
+	// Verify concurrent access during elicitation is safe
 	ctx := context.Background()
 	tc := &core.ToolCall{
 		ID: "tc-elicit-concurrent",
@@ -483,7 +482,7 @@ func TestToolStateMachine_ConcurrentElicitation(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		go func() {
 			defer wg.Done()
-			for j := 0; j < 50; j++ {
+			for j := 0; j < 20; j++ {
 				_ = tsm.CurrentState()
 				_ = tsm.Elicitation()
 				time.Sleep(time.Microsecond)

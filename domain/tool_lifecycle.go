@@ -176,14 +176,6 @@ func (t *ToolStateMachine) setup() {
 
 // executeToolLogic executes the actual tool and determines the next trigger.
 func (t *ToolStateMachine) executeToolLogic(_ context.Context, _ ...any) error {
-	// Safety check: ensure executor and toolCall are not nil
-	if t.executor == nil {
-		panic("BUG: executor is nil in executeToolLogic - this should never happen")
-	}
-	if t.toolCall == nil {
-		panic("BUG: toolCall is nil in executeToolLogic - this should never happen")
-	}
-
 	// Execute the tool via ToolExecutor
 	execResult, err := t.executor.Execute(*t.toolCall)
 
@@ -299,7 +291,6 @@ func (t *ToolStateMachine) Cancel() error {
 }
 
 // CurrentState returns the current state of the tool.
-// The stateless library is internally thread-safe.
 func (t *ToolStateMachine) CurrentState() ToolState {
 	return t.sm.MustState().(ToolState)
 }
@@ -319,7 +310,6 @@ func (t *ToolStateMachine) Elicitation() *core.ElicitationSpec {
 }
 
 // RegisterObserver registers a state change observer.
-// Safe to call concurrently.
 func (t *ToolStateMachine) RegisterObserver(observer ToolStateObserver) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -327,8 +317,7 @@ func (t *ToolStateMachine) RegisterObserver(observer ToolStateObserver) {
 }
 
 // notifyStateChange notifies all observers of a state transition.
-// This method is called from within state machine callbacks.
-// It locks to read observers and result/elicitation, then calls observers without holding the lock.
+// Calls observers without holding the lock to prevent deadlocks.
 func (t *ToolStateMachine) notifyStateChange(oldState, newState ToolState) {
 	t.mu.Lock()
 
@@ -354,14 +343,12 @@ func (t *ToolStateMachine) notifyStateChange(oldState, newState ToolState) {
 }
 
 // IsTerminal returns true if the tool is in a terminal state.
-// The stateless library is internally thread-safe.
 func (t *ToolStateMachine) IsTerminal() bool {
 	state := t.sm.MustState().(ToolState)
 	return state == ToolStateCompleted || state == ToolStateError
 }
 
 // IsAwaitingInteraction returns true if the tool is awaiting user interaction.
-// The stateless library is internally thread-safe.
 func (t *ToolStateMachine) IsAwaitingInteraction() bool {
 	state := t.sm.MustState().(ToolState)
 	return state == ToolStateAwaitingInput || state == ToolStateAwaitingAuth
