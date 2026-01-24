@@ -56,7 +56,7 @@ func NewTaskManagementHandler(
 	}
 }
 
-// SendMessageRequest represents the async chat request (A2A compatible).
+// SendMessageRequest represents the async chat request.
 type SendMessageRequest struct {
 	ContextID string `json:"contextId,omitempty"` // Optional: existing context (threadID)
 	Message   string `json:"message"`             // The message/input for the task
@@ -104,11 +104,11 @@ func (h *TaskManagementHandler) SendMessage(w http.ResponseWriter, r *http.Reque
 		"taskID", result.TaskInfo.ID,
 		"queue", result.TaskInfo.Queue)
 
-	// Return A2A-compliant task response
+	// Return task response
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted) // 202 Accepted for async operations
 
-	// Create A2A Task
+	// Create Task
 	task := NewTask(result.JobID, result.ContextID, TaskStateSubmitted)
 	task.Metadata["streamUrl"] = fmt.Sprintf("/v1/tasks/%s:subscribe", result.JobID)
 
@@ -214,7 +214,7 @@ func (h *TaskManagementHandler) StreamJobEvents(w http.ResponseWriter, r *http.R
 	}
 }
 
-// GetJobStatus retrieves the status of a task (A2A compliant).
+// GetJobStatus retrieves the status of a task.
 func (h *TaskManagementHandler) GetJobStatus(w http.ResponseWriter, r *http.Request) {
 	taskID := r.PathValue("id")
 	if taskID == "" {
@@ -226,22 +226,20 @@ func (h *TaskManagementHandler) GetJobStatus(w http.ResponseWriter, r *http.Requ
 	// Try to get task info from Asynq
 	taskInfo, err := h.taskManager.GetTaskInfo("default", taskID)
 
-	// Create A2A Task response
+	// Create Task response
 	task := Task{
 		ID:        taskID,
 		ContextID: "", // Would need to be stored/retrieved separately
-		Artifacts: []Artifact{},
-		History:   []*Message{},
 		Metadata:  make(map[string]any),
 	}
 
-	// Add stream URL to metadata (not part of core A2A spec)
+	// Add stream URL to metadata
 	task.Metadata["streamUrl"] = fmt.Sprintf("/v1/tasks/%s:subscribe", taskID)
 
 	if err != nil {
-		task.Status = NewTaskStatus(TaskStateUnknown, nil)
+		task.Status = NewTaskStatus(TaskStateUnknown)
 	} else {
-		// Map Asynq state to A2A TaskState
+		// Map Asynq state to TaskState
 		var state TaskState
 		switch taskInfo.State {
 		case asynq.TaskStatePending:
@@ -260,9 +258,9 @@ func (h *TaskManagementHandler) GetJobStatus(w http.ResponseWriter, r *http.Requ
 			state = TaskStateUnknown
 		}
 
-		task.Status = NewTaskStatus(state, nil)
+		task.Status = NewTaskStatus(state)
 
-		// Add retry information to metadata (implementation detail, not A2A core)
+		// Add retry information to metadata
 		if taskInfo.Retried > 0 {
 			task.Metadata["retried"] = taskInfo.Retried
 			task.Metadata["maxRetry"] = taskInfo.MaxRetry
