@@ -296,7 +296,6 @@ type executionState struct {
 	sm               *stateless.StateMachine
 	streamResult     *StreamResult
 	resolution       *RouteResolver
-	stateConfigCache []StateDefinition // Cached to avoid recreation in nextStep()
 
 	// Tool state machines for tracking individual tool execution states
 	toolStateMachines map[string]*domain.ToolStateMachine
@@ -711,137 +710,70 @@ func (s *executionState) setup(initialState state) error {
 		s.trackStateChange(trans.Destination.(state))
 	})
 
-	// Cache state configuration for efficient lookup in nextStep()
-	s.stateConfigCache = s.stateConfiguration()
+	// Configure StateAwaitingTurn
+	s.sm.Configure(StateAwaitingTurn).
+		Permit(TrigStartExecution, StateGeneratingResponse).
+		Permit(TrigError, StateError)
 
-	// Build state machine from declarative configuration
-	for _, stateDef := range s.stateConfigCache {
-		config := s.sm.Configure(stateDef.State)
-
-		// Attach lifecycle hooks
-		if stateDef.OnEntry != nil {
-			config.OnEntry(func(_ context.Context, args ...any) error {
-				return stateDef.OnEntry(s)
-			})
-		}
-		if stateDef.OnExit != nil {
-			config.OnExit(func(_ context.Context, _ ...any) error {
-				return stateDef.OnExit(s)
-			})
-		}
-
-		// Configure transitions
-		for _, trans := range stateDef.Transitions {
-			if trans.Reentry {
-				config.PermitReentry(trans.Trigger)
-			} else {
-				// Note: Guards are evaluated in nextStep() using CanFire
-				// The stateless library will check them via CanFire before Fire
-				config.Permit(trans.Trigger, trans.Target)
+	// Configure StateGeneratingResponse
+	s.sm.Configure(StateGeneratingResponse).
+		OnEntry(func(_ context.Context, _ ...any) error {
+			s.observer.TrackStarted(s.messageID)
+			return s.generateAgentResponse()
+		}).
+		OnExit(func(_ context.Context, _ ...any) error {
+			if s.streamResult != nil {
+				s.observer.TrackCompleted(s.messageID, s.streamResult.Content, toDomainToolCalls(s.streamResult.ToolCalls))
 			}
-		}
-	}
+			return nil
+		}).
+		PermitReentry(TrigStartExecution).
+		Permit(TrigActionsDetected, StatePerformingActions).
+		Permit(TrigTurnFinished, StateDone).
+		Permit(TrigError, StateError)
+
+	// Configure StatePerformingActions
+	s.sm.Configure(StatePerformingActions).
+		OnEntry(func(_ context.Context, _ ...any) error {
+			return s.executeRequiredActions()
+		}).
+		PermitReentry(TrigStartExecution).
+		Permit(TrigRequireInput, StateAwaitingInput).
+		Permit(TrigRequireAuth, StateAwaitingAuth).
+		Permit(TrigActionsCompleted, StateGeneratingResponse).
+		Permit(TrigError, StateError)
+
+	// Configure StateAwaitingInput
+	s.sm.Configure(StateAwaitingInput).
+		Permit(TrigStartExecution, StateGeneratingResponse).
+		Permit(TrigError, StateError)
+
+	// Configure StateAwaitingAuth
+	s.sm.Configure(StateAwaitingAuth).
+		Permit(TrigStartExecution, StateGeneratingResponse).
+		Permit(TrigError, StateError)
+
+	// Configure StateDone
+	s.sm.Configure(StateDone).
+		OnEntry(func(_ context.Context, _ ...any) error {
+			// Emit RunFinished event when entering StateDone cleanly
+			s.observer.yield(s.observer.events.RunFinished(s.threadID, s.messageID), nil)
+			return nil
+		})
+
+	// Configure StateError
+	s.sm.Configure(StateError).
+		OnEntry(func(_ context.Context, _ ...any) error {
+			// Emit RunError event when entering StateError
+			msg := "Unknown error"
+			if s.observer.result.Error != nil {
+				msg = s.observer.result.Error.Error()
+			}
+			s.observer.yield(s.observer.events.RunError(s.threadID, msg, "RUN_ERROR"), nil)
+			return nil
+		})
 
 	return nil
-}
-
-// stateConfiguration provides the complete declarative state machine specification.
-func (s *executionState) stateConfiguration() []StateDefinition {
-	// Common error transition for all active states
-	errorTransition := TransitionRule{Trigger: TrigError, Target: StateError}
-
-	return []StateDefinition{
-		{
-			State: StateAwaitingTurn,
-			Transitions: []TransitionRule{
-				{Trigger: TrigStartExecution, Target: StateGeneratingResponse},
-				errorTransition,
-			},
-		},
-		{
-			State: StateGeneratingResponse,
-			OnEntry: func(s *executionState) error {
-				s.observer.TrackStarted(s.messageID)
-				return s.generateAgentResponse()
-			},
-			OnExit: func(s *executionState) error {
-				if s.streamResult != nil {
-					s.observer.TrackCompleted(s.messageID, s.streamResult.Content, toDomainToolCalls(s.streamResult.ToolCalls))
-				}
-				return nil
-			},
-			Transitions: []TransitionRule{
-				{Trigger: TrigStartExecution, Target: StateGeneratingResponse, Reentry: true},
-				// Conditional transitions based on response content
-				{
-					Trigger: TrigActionsDetected,
-					Target:  StatePerformingActions,
-					Guard: func(s *executionState) bool {
-						return s.streamResult != nil && s.streamResult.HasToolCalls()
-					},
-				},
-				{Trigger: TrigTurnFinished, Target: StateDone},
-				errorTransition,
-			},
-		},
-		{
-			State: StatePerformingActions,
-			OnEntry: func(s *executionState) error {
-				return s.executeRequiredActions()
-			},
-			Transitions: []TransitionRule{
-				{Trigger: TrigStartExecution, Target: StatePerformingActions, Reentry: true},
-				{
-					Trigger: TrigRequireInput,
-					Target:  StateAwaitingInput,
-				},
-				{
-					Trigger: TrigRequireAuth,
-					Target:  StateAwaitingAuth,
-				},
-				{Trigger: TrigActionsCompleted, Target: StateGeneratingResponse},
-				errorTransition,
-			},
-		},
-		{
-			State: StateAwaitingInput,
-			// No logic on entry, loop terminates naturally
-			Transitions: []TransitionRule{
-				{Trigger: TrigStartExecution, Target: StateGeneratingResponse},
-				errorTransition,
-			},
-		},
-		{
-			State: StateAwaitingAuth,
-			// No logic on entry, loop terminates naturally
-			Transitions: []TransitionRule{
-				{Trigger: TrigStartExecution, Target: StateGeneratingResponse},
-				errorTransition,
-			},
-		},
-		{
-			State: StateDone,
-			OnEntry: func(s *executionState) error {
-				// Emit RunFinished event when entering StateDone cleanly
-				s.observer.yield(s.observer.events.RunFinished(s.threadID, s.messageID), nil)
-				return nil
-			},
-			Transitions: []TransitionRule{},
-		},
-		{
-			State: StateError,
-			OnEntry: func(s *executionState) error {
-				// Emit RunError event when entering StateError
-				msg := "Unknown error"
-				if s.observer.result.Error != nil {
-					msg = s.observer.result.Error.Error()
-				}
-				s.observer.yield(s.observer.events.RunError(s.threadID, msg, "RUN_ERROR"), nil)
-				return nil
-			},
-			Transitions: []TransitionRule{},
-		},
-	}
 }
 
 func (s *executionState) run() error {
@@ -982,23 +914,6 @@ const (
 	DefaultMaxTotalIterations = 20
 	DefaultMaxAgentIterations = 5
 )
-
-// StateDefinition declaratively defines a state's behavior and transitions.
-type StateDefinition struct {
-	State       state
-	OnEntry     func(*executionState) error
-	OnExit      func(*executionState) error
-	Transitions []TransitionRule
-}
-
-// TransitionRule declaratively defines when and how a state transition occurs.
-type TransitionRule struct {
-	Trigger   string
-	Target    state
-	Guard     func(*executionState) bool // Optional condition for transition
-	Reentry   bool                       // If true, allows transition to same state
-	WithParam bool                       // If true, transition requires a parameter
-}
 
 // ToolStateEventEmitter emits domain events for tool state changes.
 type ToolStateEventEmitter struct {
