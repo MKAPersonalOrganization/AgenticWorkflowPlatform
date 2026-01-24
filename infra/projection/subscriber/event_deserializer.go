@@ -130,6 +130,13 @@ func deserializeDomainEvent(eventType string, data []byte) (core.Event, error) {
 		}
 		return &evt, nil
 
+	case "EngineStateChanged":
+		var evt domain.EngineStateChanged
+		if err := json.Unmarshal(data, &evt); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal EngineStateChanged: %w", err)
+		}
+		return &evt, nil
+
 	default:
 		return nil, fmt.Errorf("unknown event type: %s", eventType)
 	}

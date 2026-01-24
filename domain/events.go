@@ -168,3 +168,14 @@ type TokenUsageReported struct {
 func (e TokenUsageReported) EventType() string         { return "TokenUsageReported" }
 func (e TokenUsageReported) EventTimestamp() time.Time { return e.Timestamp }
 func (e TokenUsageReported) AggregateID() string       { return e.ThreadID }
+
+// EngineStateChanged is emitted when the engine's high-level state changes.
+type EngineStateChanged struct {
+	ThreadID  string    `json:"threadId"`
+	NewState  string    `json:"newState"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+func (e EngineStateChanged) EventType() string         { return "EngineStateChanged" }
+func (e EngineStateChanged) EventTimestamp() time.Time { return e.Timestamp }
+func (e EngineStateChanged) AggregateID() string       { return e.ThreadID }
