@@ -9,16 +9,11 @@ import "time"
 type TaskState string
 
 const (
-	TaskStateUnspecified   TaskState = ""               // Missing TaskState value
-	TaskStateSubmitted     TaskState = "submitted"      // Task has been submitted and is awaiting execution
-	TaskStateWorking       TaskState = "working"        // Agent is actively working on the task
-	TaskStateCompleted     TaskState = "completed"      // Task has been successfully completed (terminal)
-	TaskStateFailed        TaskState = "failed"         // Task failed due to an error (terminal)
-	TaskStateCanceled      TaskState = "canceled"       // Task was canceled by the user (terminal)
-	TaskStateInputRequired TaskState = "input-required" // Task is paused and waiting for input (interrupted)
-	TaskStateRejected      TaskState = "rejected"       // Task was rejected by agent and not started (terminal)
-	TaskStateAuthRequired  TaskState = "auth-required"  // Authentication needed
-	TaskStateUnknown       TaskState = "unknown"        // Unknown or indeterminate state
+	TaskStateSubmitted TaskState = "submitted" // Task has been submitted and is awaiting execution
+	TaskStateWorking   TaskState = "working"   // Agent is actively working on the task
+	TaskStateCompleted TaskState = "completed" // Task has been successfully completed (terminal)
+	TaskStateFailed    TaskState = "failed"    // Task failed due to an error (terminal)
+	TaskStateUnknown   TaskState = "unknown"   // Unknown or indeterminate state
 )
 
 // TaskStatus represents the status of a task at a specific point in time.
