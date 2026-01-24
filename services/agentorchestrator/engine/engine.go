@@ -378,7 +378,7 @@ func (s *executionState) executeRequiredActions() error {
 		return s.sm.Fire(TrigRequireInput)
 	}
 	if isAuth {
-		s.observer.result.Reason = TerminationAwaitingInput // Use specific reason if available, or re-use for now
+		s.observer.result.Reason = TerminationAwaitingAuth
 		return s.sm.Fire(TrigRequireAuth)
 	}
 

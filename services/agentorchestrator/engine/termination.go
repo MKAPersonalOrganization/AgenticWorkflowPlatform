@@ -27,6 +27,9 @@ const (
 	// TerminationAwaitingInput indicates the agent is waiting for user input.
 	TerminationAwaitingInput TerminationReason = "awaiting_input"
 
+	// TerminationAwaitingAuth indicates the agent is waiting for authorization.
+	TerminationAwaitingAuth TerminationReason = "awaiting_auth"
+
 	// TerminationError indicates an error occurred during execution.
 	TerminationError TerminationReason = "error"
 )
@@ -107,7 +110,7 @@ func (r *ExecutionResult) String() string {
 // IsRecoverable returns true if the termination reason allows resumption.
 func (r *ExecutionResult) IsRecoverable() bool {
 	switch r.Reason {
-	case TerminationAwaitingInput:
+	case TerminationAwaitingInput, TerminationAwaitingAuth:
 		return true
 	default:
 		return false
