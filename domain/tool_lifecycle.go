@@ -439,3 +439,10 @@ type ToolAuthGrantedEvent struct {
 func (e ToolAuthGrantedEvent) EventType() string         { return "ToolAuthGranted" }
 func (e ToolAuthGrantedEvent) EventTimestamp() time.Time { return e.Timestamp }
 func (e ToolAuthGrantedEvent) AggregateID() string       { return e.ThreadID }
+
+// GetToolStateMachineGraph returns the DOT graph representation of the tool state machine.
+func GetToolStateMachineGraph() string {
+	tsm := &ToolStateMachine{}
+	tsm.setup()
+	return tsm.sm.ToGraph()
+}

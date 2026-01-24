@@ -63,6 +63,24 @@ func New(
 	}
 }
 
+// GetGraph returns the DOT graph representation of the engine state machine.
+func (e *Engine) GetGraph() string {
+	// Create a dummy execution state to configure the state machine
+	exec := &executionState{
+		engine: e,
+		// We don't need real dependencies for graph generation
+		safety:      &SafetyUnit{},
+		observer:    &ObserverUnit{},
+		persistence: &PersistenceUnit{},
+		tools:       &ToolProcessor{},
+	}
+
+	// We can use any start state, setup will configure all of them
+	_ = exec.setup(StateAwaitingTurn)
+
+	return exec.sm.ToGraph()
+}
+
 // Run processes the LLM response using an AgentThread and yields events.
 func (e *Engine) Run(ctx context.Context, agentName string, runCtx core.RunContext) iter.Seq2[core.Event, error] {
 	return func(yield func(core.Event, error) bool) {
