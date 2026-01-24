@@ -85,65 +85,6 @@ func TestAskMultipleSelectionTool_Invoke(t *testing.T) {
 	}
 }
 
-func TestAskNumericRangeTool_Invoke(t *testing.T) {
-	tool := &middleware.AskNumericRangeTool{}
-	ctx := context.Background()
-	tCtx := core.ToolContext{Context: ctx}
-
-	tests := []struct {
-		name      string
-		args      any
-		wantError bool
-	}{
-		{
-			name: "Valid scale range with domain-specific parameters",
-			args: map[string]any{
-				"question_text": "How confident are you with algebra (1-5)?",
-				"scale_minimum": 1,
-				"scale_maximum": 5,
-			},
-			wantError: false,
-		},
-		{
-			name: "Scale minimum greater than maximum",
-			args: map[string]any{
-				"question_text": "Invalid scale",
-				"scale_minimum": 5,
-				"scale_maximum": 1,
-			},
-			wantError: true,
-		},
-		{
-			name: "Scale minimum equal to maximum",
-			args: map[string]any{
-				"question_text": "Single point scale",
-				"scale_minimum": 5,
-				"scale_maximum": 5,
-			},
-			wantError: true,
-		},
-		{
-			name: "Empty question_text",
-			args: map[string]any{
-				"question_text": "",
-				"scale_minimum": 1,
-				"scale_maximum": 5,
-			},
-			wantError: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := tool.Invoke(tCtx, tt.args)
-			if tt.wantError {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
-}
 
 func TestAskTrueFalseTool_Invoke(t *testing.T) {
 	tool := &middleware.AskTrueFalseTool{}

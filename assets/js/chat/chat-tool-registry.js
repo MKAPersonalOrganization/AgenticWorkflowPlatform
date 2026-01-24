@@ -79,7 +79,6 @@ export const TOOL_REGISTRY = {
  */
 export const ELICITATION_REGISTRY = {
     'choose_multiple': { type: 'elicitation' },
-    'numeric_range': { type: 'elicitation' },
     'true_false': { type: 'elicitation' }
 };
 

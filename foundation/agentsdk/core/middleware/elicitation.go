@@ -10,7 +10,6 @@ import (
 // CONSTANTS - Domain-Specific Educational Tool Names
 const (
 	ToolNameMultipleSelection = "quiz_multiple_choice"
-	ToolNameNumericRange      = "quiz_numeric_scale"
 	ToolNameTrueFalse         = "quiz_yes_no"
 )
 
@@ -74,62 +73,6 @@ func (t *AskMultipleSelectionTool) Invoke(ctx core.ToolContext, args any) (any, 
 	return createMultipleChoiceResult(params.QuestionText, params.AnswerChoices, schema)
 }
 
-// --- TOOL: NUMERIC SCALE QUIZ ---
-type AskNumericRangeTool struct{}
-
-func (t *AskNumericRangeTool) Name() string { return ToolNameNumericRange }
-func (t *AskNumericRangeTool) Description() string {
-	return "Request a numeric rating or scale response from the student. Use for confidence ratings (1-10), Likert scales, or quantitative self-assessment."
-}
-
-func (t *AskNumericRangeTool) Parameters() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"question_text": map[string]any{
-				"type":        "string",
-				"description": "The question prompting the numeric response (e.g., 'On a scale of 1-5, how confident are you with quadratic equations?').",
-				"minLength":   1,
-			},
-			"scale_minimum": map[string]any{
-				"type":        "integer",
-				"description": "The lowest value on the scale (inclusive). Typically 0 or 1.",
-			},
-			"scale_maximum": map[string]any{
-				"type":        "integer",
-				"description": "The highest value on the scale (inclusive). Common ranges: 1-5, 1-10, 0-100.",
-			},
-		},
-		"required":             []string{"question_text", "scale_minimum", "scale_maximum"},
-		"additionalProperties": false,
-	}
-}
-
-func (t *AskNumericRangeTool) Invoke(ctx core.ToolContext, args any) (any, error) {
-	var params struct {
-		QuestionText string `json:"question_text"`
-		ScaleMinimum int    `json:"scale_minimum"`
-		ScaleMaximum int    `json:"scale_maximum"`
-	}
-	if err := core.UnmarshalArgs(args, &params); err != nil {
-		return nil, fmt.Errorf("failed to parse quiz scale parameters: %w", err)
-	}
-
-	// Validation
-	if params.QuestionText == "" {
-		return nil, fmt.Errorf("parameter 'question_text' is required. Example: {\"question_text\": \"How do you feel?\", \"scale_minimum\": 1, \"scale_maximum\": 5}")
-	}
-	if params.ScaleMinimum >= params.ScaleMaximum {
-		return nil, fmt.Errorf("invalid scale range: scale_minimum (%d) must be strictly less than scale_maximum (%d). Example: {\"scale_minimum\": 1, \"scale_maximum\": 5}", params.ScaleMinimum, params.ScaleMaximum)
-	}
-
-	schema := map[string]any{
-		"type":    "numeric_range",
-		"minimum": params.ScaleMinimum,
-		"maximum": params.ScaleMaximum,
-	}
-	return createNumericScaleResult(params.QuestionText, params.ScaleMinimum, params.ScaleMaximum, schema)
-}
 
 // --- TOOL: YES/NO QUIZ ---
 type AskTrueFalseTool struct{}
@@ -193,23 +136,6 @@ func createMultipleChoiceResult(questionText string, answerChoices []string, sch
 	), nil
 }
 
-// createNumericScaleResult creates result for numeric scale quiz with domain-specific parameters
-func createNumericScaleResult(questionText string, scaleMin int, scaleMax int, schema map[string]any) (any, error) {
-	cmd := &core.Command{
-		StopIteration: true,
-		Elicitation: &core.ElicitationSpec{
-			Question: questionText,
-			Schema:   schema,
-		},
-	}
-	status := fmt.Sprintf("Requesting input: %s", questionText)
-	return core.NewToolResultWithCommand(
-		map[string]any{
-			"status": status,
-		},
-		cmd,
-	), nil
-}
 
 // createTrueFalseResult creates result for true/false quiz with domain-specific parameters
 func createTrueFalseResult(statement string, schema map[string]any) (any, error) {
@@ -241,7 +167,6 @@ func NewElicitationMiddleware() *ElicitationMiddleware {
 func (m *ElicitationMiddleware) Process(ctx context.Context, reqCtx *core.RequestContext, next core.NextHandler) error {
 	// Add ALL specific elicitation tools
 	reqCtx.AddTool(&AskMultipleSelectionTool{})
-	reqCtx.AddTool(&AskNumericRangeTool{})
 	reqCtx.AddTool(&AskTrueFalseTool{})
 
 	reqCtx.AddSystemPrompt(`
@@ -253,8 +178,6 @@ You MUST use the specialized quiz tools for ALL student assessments and checks f
    * Format: ` + "`" + `{"question_text": "...", "answer_choices": ["A", "B"]}` + "`" + `
 2. **quiz_yes_no**: Use for binary factual verification.
    * Format: ` + "`" + `{"statement_to_verify": "..."}` + "`" + `
-3. **quiz_numeric_scale**: Use for confidence or quantitative self-assessment.
-   * Format: ` + "`" + `{"question_text": "...", "scale_minimum": 1, "scale_maximum": 5}` + "`" + `
 
 ### Rules:
 - Proactive interaction: Use a tool in every turn where you expect student input.
