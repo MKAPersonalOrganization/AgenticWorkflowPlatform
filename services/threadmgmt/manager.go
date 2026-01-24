@@ -201,8 +201,8 @@ func (m *Manager) GetEngineState(ctx context.Context, threadID string) (string, 
 	return thread.EngineState, nil
 }
 
-// GetPendingToolCall returns the ID of a tool call awaiting input, if any.
-func (m *Manager) GetPendingToolCall(ctx context.Context, threadID string) (string, error) {
+// GetPendingInputToolCall returns the ID of a tool call awaiting user input.
+func (m *Manager) GetPendingInputToolCall(ctx context.Context, threadID string) (string, error) {
 	thread, err := m.threadRepo.Load(ctx, threadID)
 	if err != nil {
 		return "", err
@@ -210,6 +210,21 @@ func (m *Manager) GetPendingToolCall(ctx context.Context, threadID string) (stri
 	
 	for id, info := range thread.ActiveToolStates {
 		if info.Status == "AwaitingInput" {
+			return id, nil
+		}
+	}
+	return "", nil
+}
+
+// GetPendingAuthToolCall returns the ID of a tool call awaiting authorization.
+func (m *Manager) GetPendingAuthToolCall(ctx context.Context, threadID string) (string, error) {
+	thread, err := m.threadRepo.Load(ctx, threadID)
+	if err != nil {
+		return "", err
+	}
+	
+	for id, info := range thread.ActiveToolStates {
+		if info.Status == "AwaitingAuth" {
 			return id, nil
 		}
 	}
