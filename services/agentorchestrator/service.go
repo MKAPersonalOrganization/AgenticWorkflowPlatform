@@ -214,3 +214,13 @@ func (s *Service) ProcessUserMessage(ctx context.Context, agentName, threadID, c
 func (s *Service) GetAvailableAgents() []string {
 	return shared.GlobalAgents.List()
 }
+
+// GetEngineGraph returns the DOT graph for the engine state machine.
+func (s *Service) GetEngineGraph() string {
+	return s.engine.GetGraph()
+}
+
+// GetToolGraph returns the DOT graph for the tool state machine.
+func (s *Service) GetToolGraph() string {
+	return domain.GetToolStateMachineGraph()
+}

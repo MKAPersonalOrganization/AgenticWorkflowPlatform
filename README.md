@@ -166,3 +166,16 @@ graph TB
 - **Components**: templui (shadcn/ui equivalent for Go/Templ)
 - **Protocol**: AG-UI for server-sent events
 - **Linear Algebra**: gosl library (LAPACK/OpenBLAS integration)
+
+## Debugging
+
+The application exposes endpoints to visualize the internal state machines of the Agent Orchestrator. These diagrams are generated in real-time from the running code.
+
+| Endpoint | Description |
+| :--- | :--- |
+| `GET /api/debug/state-machines/engine` | Visualizes the high-level Engine state machine. |
+| `GET /api/debug/state-machines/tool` | Visualizes the Tool lifecycle state machine. |
+
+**Query Parameters:**
+-   `format=svg` (default): Returns the graph as an SVG image.
+-   `format=dot` (or `text`): Returns the raw DOT graph text description.

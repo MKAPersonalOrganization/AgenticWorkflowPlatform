@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 
@@ -522,6 +524,15 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Delete("/api/agui/threads/{threadId}", authMiddleware.RequireAuthFunc(handler.DeleteThread))
 	r.Patch("/api/agui/threads/{threadId}", authMiddleware.RequireAuthFunc(handler.UpdateThreadTitle))
 
+	// Debug State Machine Routes
+	r.Get("/api/debug/state-machines/engine", func(w http.ResponseWriter, r *http.Request) {
+		renderGraph(w, log, r, agentOrchestrator.GetEngineGraph())
+	})
+
+	r.Get("/api/debug/state-machines/tool", func(w http.ResponseWriter, r *http.Request) {
+		renderGraph(w, log, r, agentOrchestrator.GetToolGraph())
+	})
+
 	// Home route
 	r.Get("/", authMiddleware.RequireAuthFunc(HandleViewChatInputScreen(log)))
 
@@ -648,4 +659,25 @@ func HandleCheckoutPage(log *logger.Logger) http.HandlerFunc {
 			log.Error(r.Context(), "failed to render checkout page", "error", err)
 		}
 	}
+}
+
+func renderGraph(w http.ResponseWriter, log *logger.Logger, r *http.Request, graph string) {
+	format := r.URL.Query().Get("format")
+	if format == "dot" || format == "text" {
+		w.Header().Set("Content-Type", "text/plain")
+		w.Write([]byte(graph))
+		return
+	}
+
+	cmd := exec.Command("dot", "-Tsvg")
+	cmd.Stdin = strings.NewReader(graph)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Error(r.Context(), "failed to render graph", "error", err, "output", string(output))
+		http.Error(w, "Failed to render graph", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "image/svg+xml")
+	w.Write(output)
 }
