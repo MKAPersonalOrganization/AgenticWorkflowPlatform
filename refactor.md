@@ -266,12 +266,12 @@ if executor == nil {
 
 ## Design Issues
 
-### 6. Overly Complex State Reconciliation
+### 6. Overly Complex State Reconciliation ✅ FIXED
 
-**Location:** `services/agentorchestrator/engine/engine.go:803-897`
+**Location:** `services/agentorchestrator/engine/engine.go:427-580`
 
 **Problem:**
-The `HistoryReconciler` is responsible for:
+The `HistoryReconciler` was responsible for:
 - Finding the last assistant message with tools
 - Determining if tools were executed
 - Detecting partial executions
@@ -293,46 +293,67 @@ func (r *HistoryReconciler) Reconcile() (state, *StreamResult, *ResumptionPlan) 
 - Hard to debug (which scenario am I in?)
 - Fragile (easy to introduce bugs)
 
-**Recommended Refactor:**
+**Fix Applied - Option 3: Separate Concerns**
 
-**Option 1: State Pattern**
-```go
-type HistoryState interface {
-    Reconcile() (state, *StreamResult, *ResumptionPlan)
-}
+Refactored the monolithic HistoryReconciler into three focused components:
 
-type EmptyHistory struct{}
-type PendingToolsHistory struct{}
-type PartialToolsHistory struct{}
-type CompletedToolsHistory struct{}
-```
+1. **HistoryAnalyzer** - Read-only analysis of conversation history
+   ```go
+   type HistoryAnalysis struct {
+       LastAssistantWithTools *core.Message
+       PendingToolCall        *core.ToolCall
+       CompletedToolCalls     map[string]bool
+       PendingToolCalls       []core.ToolCall
+       LastMessage            *core.Message
+   }
 
-**Option 2: Builder Pattern**
-```go
-type ReconciliationBuilder struct {
-    history []Message
-}
+   func (h *HistoryAnalyzer) Analyze() *HistoryAnalysis
+   ```
 
-func (b *ReconciliationBuilder) FindLastAssistant() *ReconciliationBuilder
-func (b *ReconciliationBuilder) CheckToolCompletion() *ReconciliationBuilder
-func (b *ReconciliationBuilder) DetermineState() *ReconciliationBuilder
-func (b *ReconciliationBuilder) Build() (state, *StreamResult, *ResumptionPlan)
-```
+2. **StateResolver** - Determines the appropriate state based on analysis
+   ```go
+   func (s *StateResolver) ResolveState(analysis *HistoryAnalysis) state
+   func (s *StateResolver) isAwaitingElicitation(analysis *HistoryAnalysis) bool
+   ```
 
-**Option 3: Separate Concerns**
-```go
-type HistoryAnalyzer struct{}  // Read-only analysis
-func (h *HistoryAnalyzer) FindLastAssistant() *Message
-func (h *HistoryAnalyzer) GetPendingTools() []ToolCall
+3. **ResumptionPlanner** - Creates resumption plans and stream results
+   ```go
+   func (p *ResumptionPlanner) CreatePlan(analysis *HistoryAnalysis, targetState state) *ResumptionPlan
+   func (p *ResumptionPlanner) CreateStreamResult(analysis *HistoryAnalysis, targetState state) *StreamResult
+   ```
 
-type StateResolver struct{}  // State determination
-func (s *StateResolver) ResolveState(analysis HistoryAnalysis) state
+**Benefits:**
+- **Single Responsibility**: Each component has one clear purpose
+- **Testability**: Each component can be tested independently with simple unit tests
+- **Clarity**: Logic flow is explicit: Analyze → Resolve → Plan
+- **Maintainability**: Changes to one concern don't affect others
+- **Clean Migration**: Old `HistoryReconciler` completely removed, all code uses new components
 
-type ResumptionPlanner struct{}  // Planning
-func (r *ResumptionPlanner) Plan(analysis HistoryAnalysis) *ResumptionPlan
-```
+**Testing:**
+- Created comprehensive test suite with 17 test cases covering:
+  - Empty history scenarios
+  - Normal tool execution
+  - Partial tool execution
+  - Elicitation flows (AwaitingInput, AwaitingAuth)
+  - Resumption planning
+  - Integration tests (full flow using all components)
+- All tests pass ✅
+- Test file: `services/agentorchestrator/engine/history_reconciliation_test.go`
 
-**Priority:** Medium (not broken, but hard to maintain)
+**Code Quality Improvements:**
+- Reduced complexity from 150+ lines in one method to ~150 lines across 3 focused components
+- Clear separation between data analysis, decision making, and planning
+- Each method is <30 lines and has a single, well-defined purpose
+- Easy to extend (e.g., adding new state types or resumption strategies)
+
+**Migration:**
+- ✅ **Complete**: Old `HistoryReconciler` fully removed from codebase
+- All code now uses the new components directly (`HistoryAnalyzer`, `StateResolver`, `ResumptionPlanner`)
+- `inferState()` method refactored to use the new 4-step process:
+  1. Analyze history
+  2. Resolve state
+  3. Create resumption plan (if needed)
+  4. Create stream result (if needed)
 
 ---
 
@@ -672,7 +693,7 @@ Reduced to 20 iterations (still catches race conditions with `-race` detector).
 
 ### Medium Priority (Technical Debt)
 7. 📝 **Interface drift** - Use mockgen or compile-time verification
-8. 📝 **State reconciliation complexity** - Refactor to simpler pattern
+8. ✅ **State reconciliation complexity** - Fixed with Separate Concerns pattern
 9. 📝 **God object (executionState)** - Extract collaborators
 10. 📝 **Tight coupling** - Use interfaces for dependencies
 
@@ -687,8 +708,13 @@ Reduced to 20 iterations (still catches race conditions with `-race` detector).
 **Issues Found:** 13
 **Critical Issues Fixed:** 3
 **High Priority Remaining:** 3
-**Medium Priority Remaining:** 4
+**Medium Priority Remaining:** 3 (1 fixed)
 **Low Priority Remaining:** 3
+
+**Latest Improvements:**
+- State reconciliation refactored into 3 focused components (HistoryAnalyzer, StateResolver, ResumptionPlanner)
+- 17 new comprehensive unit tests covering all reconciliation scenarios
+- Improved testability and maintainability while preserving backward compatibility
 
 **Code Quality Improvements:**
 - 5% reduction in lines of code (cleanup)
