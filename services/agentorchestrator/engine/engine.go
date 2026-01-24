@@ -106,6 +106,8 @@ func (exec *executionState) handleExecutionError(ctx context.Context, err error)
 		}
 		exec.observer.result.Success = false
 	}
+	// Fire transition to error state to trigger event emission
+	_ = exec.sm.Fire(TrigError)
 }
 
 // finalizeResult completes the execution result with final metrics.
@@ -732,11 +734,15 @@ func (s *executionState) setup(initialState state) error {
 
 // stateConfiguration provides the complete declarative state machine specification.
 func (s *executionState) stateConfiguration() []StateDefinition {
+	// Common error transition for all active states
+	errorTransition := TransitionRule{Trigger: TrigError, Target: StateError}
+
 	return []StateDefinition{
 		{
 			State: StateAwaitingTurn,
 			Transitions: []TransitionRule{
 				{Trigger: TrigStartExecution, Target: StateGeneratingResponse},
+				errorTransition,
 			},
 		},
 		{
@@ -762,6 +768,7 @@ func (s *executionState) stateConfiguration() []StateDefinition {
 					},
 				},
 				{Trigger: TrigTurnFinished, Target: StateDone},
+				errorTransition,
 			},
 		},
 		{
@@ -771,23 +778,46 @@ func (s *executionState) stateConfiguration() []StateDefinition {
 			},
 			Transitions: []TransitionRule{
 				{Trigger: TrigStartExecution, Target: StatePerformingActions, Reentry: true},
-				// Conditional transitions based on tool results
-
 				{
 					Trigger: TrigStopIteration,
-					Target:  StateDone,
+					Target:  StateAwaitingInput, // Transition to explicit awaiting input state
 					Guard: func(s *executionState) bool {
-						// Only stop for StopIteration if NOT a handoff
 						return s.resolution != nil && s.resolution.StopIteration
 					},
 				},
 				{Trigger: TrigActionsCompleted, Target: StateGeneratingResponse},
+				errorTransition,
 			},
 		},
-
 		{
-			State:       StateDone,
-			Transitions: []TransitionRule{}, // Terminal state
+			State: StateAwaitingInput,
+			// No logic on entry, loop terminates naturally
+			Transitions: []TransitionRule{
+				{Trigger: TrigStartExecution, Target: StateGeneratingResponse},
+				errorTransition,
+			},
+		},
+		{
+			State: StateDone,
+			OnEntry: func(s *executionState) error {
+				// Emit RunFinished event when entering StateDone cleanly
+				s.observer.yield(s.observer.events.RunFinished(s.threadID, s.messageID), nil)
+				return nil
+			},
+			Transitions: []TransitionRule{},
+		},
+		{
+			State: StateError,
+			OnEntry: func(s *executionState) error {
+				// Emit RunError event when entering StateError
+				msg := "Unknown error"
+				if s.observer.result.Error != nil {
+					msg = s.observer.result.Error.Error()
+				}
+				s.observer.yield(s.observer.events.RunError(s.threadID, msg, "RUN_ERROR"), nil)
+				return nil
+			},
+			Transitions: []TransitionRule{},
 		},
 	}
 }
@@ -880,6 +910,8 @@ func parseState(str string) state {
 		return StateGeneratingResponse
 	case "PerformingActions":
 		return StatePerformingActions
+	case "AwaitingInput":
+		return StateAwaitingInput
 	case "Done":
 		return StateDone
 	case "Error":
@@ -896,6 +928,7 @@ const (
 	StateAwaitingTurn state = iota
 	StateGeneratingResponse
 	StatePerformingActions
+	StateAwaitingInput // New state for explicit elicitation/auth pauses
 
 	StateDone
 	StateError
@@ -910,6 +943,8 @@ func (s state) String() string {
 		return "GeneratingResponse"
 	case StatePerformingActions:
 		return "PerformingActions"
+	case StateAwaitingInput:
+		return "AwaitingInput"
 
 	case StateDone:
 		return "Done"
@@ -927,6 +962,7 @@ const (
 	TrigActionsCompleted = "ActionsCompleted"
 
 	TrigStopIteration = "StopIteration" // Tool requested to stop (e.g., elicitation)
+	TrigError         = "Error"         // System or safety error
 )
 
 // Safety and iteration limits
