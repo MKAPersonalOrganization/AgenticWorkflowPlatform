@@ -9,8 +9,9 @@
  */
 
 import { LIFECYCLE_EVENT_TYPES } from './constants.js';
-import { enrichToolResult } from './chat-utils.js';
+import { enrichToolResult, normalizeElicitation, safeParseJSON } from './chat-utils.js';
 import { TOOL_EVENTS } from './tool-state-machine.js';
+import { isElicitationTool } from './chat-tool-registry.js';
 
 /**
  * Create streaming methods mixin
@@ -287,136 +288,164 @@ export function createStreamingMethods() {
         },
 
         /**
-         * Handle CUSTOM event
+         * Handle CUSTOM event by dispatching to specific handlers
          */
         __handleCustomEvent(event, state, threadId) {
-            if (event.name === 'THREAD_TITLE_UPDATED') {
-                const session = this.sessions.find(s => s.id === event.value.threadId);
-                if (session) {
-                    session.title = event.value.title;
-                }
-            } else if (event.name === 'TOOL_CALL_AGENT') {
-                const { toolCallId, agentName } = event.value;
-                state.pendingToolCallAgents = state.pendingToolCallAgents || {};
-                state.pendingToolCallAgents[toolCallId] = agentName;
-
-                if (state.toolCalls[toolCallId]) state.toolCalls[toolCallId].agentName = agentName;
-                const msg = state.messages.find(m => m.id === toolCallId);
-                if (msg) {
-                    msg.agentName = agentName;
-                    delete state.pendingToolCallAgents[toolCallId];
-                }
-            } else if (event.name === 'AGENT_CALLED') {
-                const { callerAgent, calledAgent, reason } = event.value;
-                console.log(`Agent collaboration: ${callerAgent} → ${calledAgent} (${reason})`);
-            } else if (event.name === 'TOKEN_USAGE_REPORTED') {
-                console.log('Token usage reported:', event.value);
-                state.tokenUsage = {
-                    total: event.value.total || 0,
-                    prompt: event.value.prompt || 0,
-                    completion: event.value.completion || 0,
-                    cached: event.value.cached || 0,
-                    reasoning: event.value.reasoning || 0,
-                    audioInput: event.value.audioInput || 0,
-                    audioOutput: event.value.audioOutput || 0,
-                    acceptedPredict: event.value.acceptedPredict || 0,
-                    rejectedPredict: event.value.rejectedPredict || 0,
-                    model: event.value.model || 'N/A',
-                    provider: event.value.provider || 'N/A',
-                    messageId: event.value.messageId,
-                    threadId: event.value.threadId
-                };
-            } else if (event.name === 'TOOL_STATE_CHANGED') {
-                const { toolCallId, toolName, oldState, newState, result, isError, arguments: toolArgs, agentName } = event.value;
-                console.log(`[Tool] ${toolName} (${toolCallId}) state changed: ${oldState} → ${newState}`);
-
-                this.__ensureToolCallMessage(state, toolCallId, toolName, agentName);
-
-                // Map state changes to XState events
-                let eventType = null;
-                const payload = { toolName, result, error: isError ? result : null };
-
-                switch (newState) {
-                    case 'executing':
-                        if (oldState === 'idle') eventType = TOOL_EVENTS.START;
-                        // Resumptions
-                        if (oldState === 'awaiting_input') eventType = TOOL_EVENTS.INPUT_PROVIDED;
-                        if (oldState === 'awaiting_auth') eventType = TOOL_EVENTS.AUTH_GRANTED;
-                        break;
-                    case 'completed':
-                        eventType = TOOL_EVENTS.SUCCESS;
-                        break;
-                    case 'error':
-                        eventType = TOOL_EVENTS.ERROR;
-                        break;
-                    case 'awaiting_input':
-                        eventType = TOOL_EVENTS.NEEDS_INPUT;
-                        break;
-                    case 'awaiting_auth':
-                        eventType = TOOL_EVENTS.NEEDS_AUTH;
-                        break;
-                }
-
-                if (eventType) {
-                    this.transitionToolState(toolCallId, eventType, payload);
-                }
-
-                // Note: state.toolCalls and state.messages are updated via the XState machine transition callback in chat-state.js
-
-                this.__updateDerivedState();
-            } else if (event.name === 'TOOL_AWAITING_INPUT') {
-                const { toolCallId, toolName, question, schema, agentName } = event.value;
-                console.log(`[Tool] ${toolName} awaiting input: ${question}`);
-
-                this.__ensureToolCallMessage(state, toolCallId, toolName, agentName);
-
-                // Transition machine
-                this.transitionToolState(toolCallId, TOOL_EVENTS.NEEDS_INPUT, {
-                    elicitation: { question, schema }
-                });
-
-                // Update the message in the list to trigger elicitation UI rendering (via parsed data)
-                const msg = state.messages.find(m => m.id === toolCallId);
-                if (msg) {
-                    msg.status = 'awaiting_input';
-
-                    // Normalize data for UI component compatibility (AskMultipleSelection, AskNumericRating)
-                    const normalizedResult = {
-                        question_text: question,
-                        statement_to_verify: question, // Generic mapping
-                        schema: schema
-                    };
-
-                    if (schema) {
-                        if (schema.enum) normalizedResult.answer_choices = schema.enum;
-                        if (schema.minimum !== undefined) normalizedResult.scale_minimum = schema.minimum;
-                        if (schema.maximum !== undefined) normalizedResult.scale_maximum = schema.maximum;
-                    }
-
-                    msg.parsedResult = normalizedResult;
-                }
-
-                if (threadId === this.__currentThreadId) {
-                    this.showToast(window.i18n.t('Input required'), 'info');
-                }
-                this.__updateDerivedState();
-            } else if (event.name === 'TOOL_AWAITING_AUTH') {
-                const { toolCallId, toolName, authSpec, agentName } = event.value;
-                console.log(`[Tool] ${toolName} awaiting authorization: ${authSpec.reason}`);
-
-                this.__ensureToolCallMessage(state, toolCallId, toolName, agentName);
-
-                this.transitionToolState(toolCallId, TOOL_EVENTS.NEEDS_AUTH, { authSpec });
-
-                this.__updateDerivedState();
-                // Authorization UI could be triggered here
-            } else if (event.name === 'TOOL_INPUT_PROVIDED') {
-                const { toolCallId, input } = event.value;
-                this.transitionToolState(toolCallId, TOOL_EVENTS.INPUT_PROVIDED, { input });
-                this.__updateDerivedState();
+            switch (event.name) {
+                case 'THREAD_TITLE_UPDATED':
+                    this.__handleThreadTitleUpdated(event.value);
+                    break;
+                case 'TOOL_CALL_AGENT':
+                    this.__handleToolCallAgent(event.value, state);
+                    break;
+                case 'AGENT_CALLED':
+                    this.__handleAgentCalled(event.value);
+                    break;
+                case 'TOKEN_USAGE_REPORTED':
+                    this.__handleTokenUsageReported(event.value, state);
+                    break;
+                case 'TOOL_STATE_CHANGED':
+                    this.__handleToolStateChanged(event.value, state);
+                    break;
+                case 'TOOL_AWAITING_INPUT':
+                    this.__handleToolAwaitingInput(event.value, state, threadId);
+                    break;
+                case 'TOOL_AWAITING_AUTH':
+                    this.__handleToolAwaitingAuth(event.value, state);
+                    break;
+                case 'TOOL_INPUT_PROVIDED':
+                    this.__handleToolInputProvided(event.value);
+                    break;
+                default:
+                    console.warn('[Streaming] Unknown custom event:', event.name);
             }
-            // Note: HUMAN_INPUT_REQUESTED is no longer emitted by the backend.
-            // Elicitation state is ALSO derived from pending tool calls in chat-state.js
+        },
+
+        __handleThreadTitleUpdated(value) {
+            const session = this.sessions.find(s => s.id === value.threadId);
+            if (session) {
+                session.title = value.title;
+            }
+        },
+
+        __handleToolCallAgent(value, state) {
+            const { toolCallId, agentName } = value;
+            state.pendingToolCallAgents = state.pendingToolCallAgents || {};
+            state.pendingToolCallAgents[toolCallId] = agentName;
+
+            if (state.toolCalls[toolCallId]) state.toolCalls[toolCallId].agentName = agentName;
+            const msg = state.messages.find(m => m.id === toolCallId);
+            if (msg) {
+                msg.agentName = agentName;
+                delete state.pendingToolCallAgents[toolCallId];
+            }
+        },
+
+        __handleAgentCalled(value) {
+            const { callerAgent, calledAgent, reason } = value;
+            console.log(`Agent collaboration: ${callerAgent} → ${calledAgent} (${reason})`);
+        },
+
+        __handleTokenUsageReported(value, state) {
+            console.log('Token usage reported:', value);
+            state.tokenUsage = {
+                total: value.total || 0,
+                prompt: value.prompt || 0,
+                completion: value.completion || 0,
+                cached: value.cached || 0,
+                reasoning: value.reasoning || 0,
+                audioInput: value.audioInput || 0,
+                audioOutput: value.audioOutput || 0,
+                acceptedPredict: value.acceptedPredict || 0,
+                rejectedPredict: value.rejectedPredict || 0,
+                model: value.model || 'N/A',
+                provider: value.provider || 'N/A',
+                messageId: value.messageId,
+                threadId: value.threadId
+            };
+        },
+
+        __handleToolStateChanged(value, state) {
+            const { toolCallId, toolName, oldState, newState, result, isError, arguments: toolArgs, agentName } = value;
+            console.log(`[Tool] ${toolName} (${toolCallId}) state changed: ${oldState} → ${newState}`);
+
+            this.__ensureToolCallMessage(state, toolCallId, toolName, agentName);
+
+            // Sync arguments if provided in the event (crucial for streaming UI)
+            const msg = state.messages.find(m => m.id === toolCallId);
+            if (msg && toolArgs) {
+                msg.args = toolArgs;
+                msg.parsedArgs = safeParseJSON(toolArgs);
+            }
+
+            // Map state changes to XState events
+            let eventType = null;
+            const payload = { toolName, result, error: isError ? result : null };
+
+            switch (newState) {
+                case 'executing':
+                    if (oldState === 'idle') eventType = TOOL_EVENTS.START;
+                    if (oldState === 'awaiting_input') eventType = TOOL_EVENTS.INPUT_PROVIDED;
+                    if (oldState === 'awaiting_auth') eventType = TOOL_EVENTS.AUTH_GRANTED;
+                    break;
+                case 'completed':
+                    eventType = TOOL_EVENTS.SUCCESS;
+                    break;
+                case 'error':
+                    eventType = TOOL_EVENTS.ERROR;
+                    break;
+                case 'awaiting_input':
+                    eventType = TOOL_EVENTS.NEEDS_INPUT;
+                    break;
+                case 'awaiting_auth':
+                    eventType = TOOL_EVENTS.NEEDS_AUTH;
+                    break;
+            }
+
+            if (eventType) {
+                this.transitionToolState(toolCallId, eventType, payload);
+            }
+
+            this.__updateDerivedState();
+        },
+
+        __handleToolAwaitingInput(value, state, threadId) {
+            const { toolCallId, toolName, question, schema, agentName } = value;
+            console.log(`[Tool] ${toolName} awaiting input: ${question}`);
+
+            this.__ensureToolCallMessage(state, toolCallId, toolName, agentName);
+
+            // Transition machine
+            this.transitionToolState(toolCallId, TOOL_EVENTS.NEEDS_INPUT, {
+                elicitation: { question, schema }
+            });
+
+            // Update the message in the list to trigger elicitation UI rendering
+            const msg = state.messages.find(m => m.id === toolCallId);
+            if (msg) {
+                msg.status = 'awaiting_input';
+                msg.parsedResult = normalizeElicitation(question, schema);
+            }
+
+            if (threadId === this.__currentThreadId) {
+                this.showToast(window.i18n.t('Input required'), 'info');
+            }
+            this.__updateDerivedState();
+        },
+
+        __handleToolAwaitingAuth(value, state) {
+            const { toolCallId, toolName, authSpec, agentName } = value;
+            console.log(`[Tool] ${toolName} awaiting authorization: ${authSpec.reason}`);
+
+            this.__ensureToolCallMessage(state, toolCallId, toolName, agentName);
+            this.transitionToolState(toolCallId, TOOL_EVENTS.NEEDS_AUTH, { authSpec });
+            this.__updateDerivedState();
+        },
+
+        __handleToolInputProvided(value) {
+            const { toolCallId, input } = value;
+            this.transitionToolState(toolCallId, TOOL_EVENTS.INPUT_PROVIDED, { input });
+            this.__updateDerivedState();
         },
 
 

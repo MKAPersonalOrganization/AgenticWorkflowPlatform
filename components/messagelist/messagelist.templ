@@ -123,52 +123,50 @@ templ MessageList() {
 				<div x-show="message.type === 'tool_call' && message.name === 'write_todos'" class="my-2 relative group/message w-full">
 					@todo.Todo()
 				</div>
-
-				<!-- Elicitation: Multiple Choice Quiz -->
-				<div x-show="message.type === 'tool_call' && message.parsedResult?.schema?.type === 'choose_multiple'" class="my-2 relative group/message w-full">
-					@elicitation.Container() {
-						@elicitation.AskMultipleSelection()
-					}
+				<!-- Elicitation: Quiz Components -->
+				<div x-show="message.type === 'tool_call' && isElicitationTool(message.parsedResult?.schema?.type)" class="my-2 relative group/message w-full">
+					<template x-if="message.parsedResult?.schema?.type === 'choose_multiple'">
+						@elicitation.Container() {
+							@elicitation.AskMultipleSelection()
+						}
+					</template>
+					<template x-if="message.parsedResult?.schema?.type === 'numeric_range'">
+						@elicitation.Container() {
+							@elicitation.AskNumericRating()
+						}
+					</template>
+					<template x-if="message.parsedResult?.schema?.type === 'true_false'">
+						@elicitation.Container() {
+							@elicitation.AskTrueFalse()
+						}
+					</template>
 				</div>
-				<!-- Elicitation: Numeric Scale Quiz -->
-				<div x-show="message.type === 'tool_call' && message.parsedResult?.schema?.type === 'numeric_range'" class="my-2 relative group/message w-full">
-					@elicitation.Container() {
-						@elicitation.AskNumericRating()
-					}
+				<!-- Special Tool Components -->
+				<div x-show="message.type === 'tool_call' && isSpecialTool(message.name)" class="my-2 relative group/message w-full">
+					<template x-if="message.name === 'write_todos'">
+						@todo.Todo()
+					</template>
+					<template x-if="message.name === 'browse_library'">
+						@library.Library()
+					</template>
+					<template x-if="message.name === 'lookup_section'">
+						@lookupsection.Container()
+					</template>
+					<template x-if="message.name === 'search_text_in_file'">
+						@searchtext.Container()
+					</template>
+					<template x-if="['calculate', 'add', 'subtract', 'multiply', 'divide', 'power', 'sqrt'].includes(message.name)">
+						@calculate.Container()
+					</template>
+					<template x-if="message.name === 'plot'">
+						@plot.Container()
+					</template>
+					<template x-if="['mean', 'median', 'mode', 'min', 'max', 'sum', 'variance', 'standard_deviation', 'quartile', 'percentile', 'interquartile_range', 'pearson_correlation', 'euclidean_distance', 'manhattan_distance', 'sample', 'quartile_outliers', 'normal_pdf', 'normal_cdf', 'normal_ppf', 'normal_mean', 'normal_median', 'normal_std', 'normal_var', 'normal_interval', 'binomial_ncr', 'linear_regression'].includes(message.name)">
+						@statistics.Container()
+					</template>
 				</div>
-				<!-- Elicitation: Yes/No Quiz -->
-				<div x-show="message.type === 'tool_call' && message.parsedResult?.schema?.type === 'true_false'" class="my-2 relative group/message w-full">
-					@elicitation.Container() {
-						@elicitation.AskTrueFalse()
-					}
-				</div>
-
-				<!-- Library Browser Tool Call - Special Rendering -->
-				<div x-show="message.type === 'tool_call' && message.name === 'browse_library'" class="my-2 relative group/message w-full">
-					@library.Library()
-				</div>
-				<!-- Lookup Section Tool Call - Special Rendering -->
-				<div x-show="message.type === 'tool_call' && message.name === 'lookup_section'" class="my-2 relative group/message w-full">
-					@lookupsection.Container()
-				</div>
-				<!-- Search Text Tool Call - Special Rendering -->
-				<div x-show="message.type === 'tool_call' && message.name === 'search_text_in_file'" class="my-2 relative group/message w-full">
-					@searchtext.Container()
-				</div>
-				<!-- Calculate Tool Call - Special Rendering -->
-				<div x-show="['calculate', 'add', 'subtract', 'multiply', 'divide', 'power', 'sqrt'].includes(message.name) && message.type === 'tool_call'" class="my-2 relative group/message w-full">
-					@calculate.Container()
-				</div>
-				<!-- Plot Tool Call - Special Rendering -->
-				<div x-show="message.type === 'tool_call' && message.name === 'plot'" class="my-2 relative group/message w-full">
-					@plot.Container()
-				</div>
-				<!-- Statistics Tool Call - Special Rendering -->
-				<div x-show="['mean', 'median', 'mode', 'min', 'max', 'sum', 'variance', 'standard_deviation', 'quartile', 'percentile', 'interquartile_range', 'pearson_correlation', 'euclidean_distance', 'manhattan_distance', 'sample', 'quartile_outliers', 'normal_pdf', 'normal_cdf', 'normal_ppf', 'normal_mean', 'normal_median', 'normal_std', 'normal_var', 'normal_interval', 'binomial_ncr', 'linear_regression'].includes(message.name) && message.type === 'tool_call'" class="my-2 relative group/message w-full">
-					@statistics.Container()
-				</div>
-				<!-- Regular Tool Call Message (with result if available) -->
-				<div x-show="message.type === 'tool_call' && !['transfer_to_agent', 'write_todos', 'browse_library', 'lookup_section', 'search_text_in_file', 'calculate', 'plot', 'add', 'subtract', 'multiply', 'divide', 'power', 'sqrt', 'mean', 'median', 'mode', 'min', 'max', 'sum', 'variance', 'standard_deviation', 'quartile', 'percentile', 'interquartile_range', 'pearson_correlation', 'euclidean_distance', 'manhattan_distance', 'sample', 'quartile_outliers', 'normal_pdf', 'normal_cdf', 'normal_ppf', 'normal_mean', 'normal_median', 'normal_std', 'normal_var', 'normal_interval', 'binomial_ncr', 'linear_regression'].includes(message.name) && !['choose_multiple', 'numeric_range', 'true_false'].includes(message.parsedResult?.schema?.type) && message.status === 'completed'" class="my-2 relative group/message">
+				<!-- Regular Tool Call Message -->
+				<div x-show="message.type === 'tool_call' && !isSpecialTool(message.name) && !isElicitationTool(message.parsedResult?.schema?.type) && message.status === 'completed'" class="my-2 relative group/message">
 					<!-- Parallel indicator bar (shown only for parallel tool calls) -->
 					<template x-if="getParallelToolCallInfo(message).isParallel">
 						<div class="absolute inset-inline-start-0 top-0 bottom-0 w-1 bg-primary/30 rounded-s" title="Parallel tool call"></div>

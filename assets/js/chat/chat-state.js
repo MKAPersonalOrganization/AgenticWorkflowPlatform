@@ -6,7 +6,9 @@
  */
 
 import { CONNECTION_CONFIG, DEFAULT_PERF_METRICS } from './constants.js';
+import { normalizeElicitation, safeParseJSON } from './chat-utils.js';
 import { createToolStateMachine, TOOL_EVENTS, TOOL_STATES } from './tool-state-machine.js';
+import { isElicitationTool, isSpecialTool } from './chat-tool-registry.js';
 import { createActor } from 'xstate';
 
 /**
@@ -218,33 +220,71 @@ export function createStateMethods() {
          * This ensures a Single Source of Truth for UI state.
          */
         /**
+         * Synchronize tool machine state and context to the corresponding UI message.
+         * Centralizes mapping of status, result, and elicitation data.
+         * @param {Object} threadState - Target thread state
+         * @param {string} toolCallId - ID of the tool call
+         * @param {string} stateValue - Current machine state value
+         * @param {Object} context - Machine context
+         */
+        __syncToolStateToMessage(threadState, toolCallId, stateValue, context) {
+            if (!threadState.messages) return;
+
+            const msg = threadState.messages.find(m => m.id === toolCallId);
+            if (!msg) return;
+
+            // Update status
+            msg.status = stateValue;
+
+            // Sync result/args
+            if (context.result !== undefined && context.result !== null) {
+                msg.result = context.result;
+                msg.parsedResult = safeParseJSON(msg.result);
+            }
+
+            // Sync elicitation (for UI component configuration)
+            if (context.elicitation) {
+                const { question, schema } = context.elicitation;
+                msg.parsedResult = normalizeElicitation(question, schema);
+            }
+        },
+
+        /**
          * Transition a tool's state machine
+         * @param {string|null} threadId - (Optional) Thread ID for state lookup
          * @param {string} toolCallId
          * @param {string} event
          * @param {Object} payload
          */
-        transitionToolState(toolCallId, event, payload = {}) {
+        transitionToolState(toolCallId, event, payload = {}, threadId = null) {
+            const threadState = this.__getThreadState(threadId);
+
             // Lazy init service
             if (!this.__toolStateServices[toolCallId]) {
                 const machine = createToolStateMachine(toolCallId, { toolName: payload.toolName });
                 const actor = createActor(machine);
 
+                // Initialize state synchronously to prevent race conditions during hydration/streaming
+                // This ensures __updateDerivedState finds the state immediately even before the listener fires
+                if (!threadState.toolCalls) threadState.toolCalls = {};
+                threadState.toolCalls[toolCallId] = {
+                    state: actor.getSnapshot().value,
+                    context: actor.getSnapshot().context
+                };
+
                 actor.subscribe(snapshot => {
                     // Update Alpine state on transition
                     this.__batchUpdate(() => {
-                        const threadState = this.__getThreadState();
-                        if (!threadState.toolCalls) threadState.toolCalls = {};
+                        const targetState = this.__getThreadState(threadId);
+                        if (!targetState.toolCalls) targetState.toolCalls = {};
 
-                        threadState.toolCalls[toolCallId] = {
+                        targetState.toolCalls[toolCallId] = {
                             state: snapshot.value,
                             context: snapshot.context
                         };
 
                         // Sync to message object for UI binding
-                        const msg = threadState.messages.find(m => m.id === toolCallId);
-                        if (msg) {
-                            msg.status = snapshot.value;
-                        }
+                        this.__syncToolStateToMessage(targetState, toolCallId, snapshot.value, snapshot.context);
 
                         // Force derived state update
                         this.__updateDerivedState();
@@ -259,7 +299,14 @@ export function createStateMethods() {
             actor.send({ type: event, ...payload });
         },
 
-        async __updateDerivedState() {
+        // Registry Helpers (exposed for UI templates)
+        isSpecialTool,
+        isElicitationTool,
+
+        /**
+         * Update derived state (awaiting input, questions, etc.)
+         */
+        __updateDerivedState() {
             const state = this.__getThreadState();
             const msgs = state.messages;
 
@@ -291,18 +338,12 @@ export function createStateMethods() {
                 }
             }
 
-
-            // Only update if changed to avoid unnecessary re-renders
-            if (
-                state.awaitingHumanInput !== isWaiting ||
-                state.humanInputQuestion !== question ||
-                state.humanInputSchema !== schema
-            ) {
+            // Batch update derived properties
+            this.__batchUpdate(() => {
                 state.awaitingHumanInput = isWaiting;
                 state.humanInputQuestion = question;
                 state.humanInputSchema = schema;
-                console.log(`[State] Derived elicitation state: ${isWaiting ? 'Active' : 'Inactive'}`);
-            }
+            });
         }
     };
 }
