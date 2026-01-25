@@ -32,10 +32,9 @@ func TestEventStore_AppendAndRead(t *testing.T) {
 			Title:     "Test Thread",
 			Timestamp: time.Now(),
 		},
-		domain.MessageAdded{
+		domain.UserMessageAdded{
 			ThreadID:  streamID,
 			MessageID: "msg-1",
-			Role:      "user",
 			Content:   "Hello, world!",
 			Timestamp: time.Now(),
 		},
@@ -57,7 +56,7 @@ func TestEventStore_AppendAndRead(t *testing.T) {
 	assert.Equal(t, "Test Thread", threadCreated.Title)
 
 	// Verify second event
-	userMessage, ok := readEvents[1].(domain.MessageAdded)
+	userMessage, ok := readEvents[1].(domain.UserMessageAdded)
 	assert.True(t, ok)
 	assert.Equal(t, "msg-1", userMessage.MessageID)
 	assert.Equal(t, "Hello, world!", userMessage.Content)
@@ -73,24 +72,21 @@ func TestEventStore_ReadFromVersion(t *testing.T) {
 
 	// Append 3 events
 	events := []core.Event{
-		domain.MessageAdded{
+		domain.UserMessageAdded{
 			ThreadID:  streamID,
 			MessageID: "msg-1",
-			Role:      "user",
 			Content:   "First message",
 			Timestamp: time.Now(),
 		},
-		domain.MessageAdded{
+		domain.UserMessageAdded{
 			ThreadID:  streamID,
 			MessageID: "msg-2",
-			Role:      "user",
 			Content:   "Second message",
 			Timestamp: time.Now(),
 		},
-		domain.MessageAdded{
+		domain.UserMessageAdded{
 			ThreadID:  streamID,
 			MessageID: "msg-3",
-			Role:      "user",
 			Content:   "Third message",
 			Timestamp: time.Now(),
 		},
@@ -104,7 +100,7 @@ func TestEventStore_ReadFromVersion(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, readEvents, 2)
 
-	userMessage, ok := readEvents[0].(domain.MessageAdded)
+	userMessage, ok := readEvents[0].(domain.UserMessageAdded)
 	assert.True(t, ok)
 	assert.Equal(t, "msg-2", userMessage.MessageID)
 }
@@ -133,10 +129,9 @@ func TestEventStore_DeleteStream(t *testing.T) {
 
 	// Append some events
 	events := []core.Event{
-		domain.MessageAdded{
+		domain.UserMessageAdded{
 			ThreadID:  streamID,
 			MessageID: "msg-1",
-			Role:      "user",
 			Content:   "Test message",
 			Timestamp: time.Now(),
 		},

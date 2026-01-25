@@ -20,22 +20,45 @@ func (e ThreadCreated) EventType() string         { return "ThreadCreated" }
 func (e ThreadCreated) EventTimestamp() time.Time { return e.Timestamp }
 func (e ThreadCreated) AggregateID() string       { return e.ThreadID }
 
-// MessageAdded is emitted when a message is added to the thread.
-type MessageAdded struct {
-	ThreadID   string         `json:"threadId"`
-	MessageID  string         `json:"messageId"`
-	Role       string         `json:"role"`
-	Content    string         `json:"content"`
-	ToolCalls  []ToolCall     `json:"toolCalls,omitempty"`
-	ToolCallID string         `json:"toolCallId,omitempty"`
-	AgentName  string         `json:"agentName,omitempty"`
-	Metadata   map[string]any `json:"metadata,omitempty"`
-	Timestamp  time.Time      `json:"timestamp"`
+// UserMessageAdded is emitted when a user message is added to the thread.
+type UserMessageAdded struct {
+	ThreadID  string    `json:"threadId"`
+	MessageID string    `json:"messageId"`
+	Content   string    `json:"content"`
+	Timestamp time.Time `json:"timestamp"`
 }
 
-func (e MessageAdded) EventType() string         { return "MessageAdded" }
-func (e MessageAdded) EventTimestamp() time.Time { return e.Timestamp }
-func (e MessageAdded) AggregateID() string       { return e.ThreadID }
+func (e UserMessageAdded) EventType() string         { return "UserMessageAdded" }
+func (e UserMessageAdded) EventTimestamp() time.Time { return e.Timestamp }
+func (e UserMessageAdded) AggregateID() string       { return e.ThreadID }
+
+// AssistantMessageAdded is emitted when an assistant message is added to the thread.
+type AssistantMessageAdded struct {
+	ThreadID  string     `json:"threadId"`
+	MessageID string     `json:"messageId"`
+	Content   string     `json:"content"`
+	ToolCalls []ToolCall `json:"toolCalls,omitempty"`
+	AgentName string     `json:"agentName,omitempty"`
+	Timestamp time.Time  `json:"timestamp"`
+}
+
+func (e AssistantMessageAdded) EventType() string         { return "AssistantMessageAdded" }
+func (e AssistantMessageAdded) EventTimestamp() time.Time { return e.Timestamp }
+func (e AssistantMessageAdded) AggregateID() string       { return e.ThreadID }
+
+// ToolResultAdded is emitted when a tool execution result is added to the thread.
+type ToolResultAdded struct {
+	ThreadID   string    `json:"threadId"`
+	MessageID  string    `json:"messageId"`
+	ToolCallID string    `json:"toolCallId"`
+	Result     string    `json:"result"`
+	AgentName  string    `json:"agentName,omitempty"`
+	Timestamp  time.Time `json:"timestamp"`
+}
+
+func (e ToolResultAdded) EventType() string         { return "ToolResultAdded" }
+func (e ToolResultAdded) EventTimestamp() time.Time { return e.Timestamp }
+func (e ToolResultAdded) AggregateID() string       { return e.ThreadID }
 
 // ThreadTitleUpdated indicates that a thread's title has been changed.
 type ThreadTitleUpdated struct {
@@ -181,6 +204,8 @@ func (e EngineStateChanged) EventTimestamp() time.Time { return e.Timestamp }
 func (e EngineStateChanged) AggregateID() string       { return e.ThreadID }
 
 // ActionsDetected is emitted when the engine identifies tool calls that need execution.
+// NOTE: This is a transient informational event - NOT persisted to event store.
+// It's used for real-time UI updates only and does not modify aggregate state.
 type ActionsDetected struct {
 	ThreadID  string     `json:"threadId"`
 	MessageID string     `json:"messageId"`
@@ -193,6 +218,8 @@ func (e ActionsDetected) EventTimestamp() time.Time { return e.Timestamp }
 func (e ActionsDetected) AggregateID() string       { return e.ThreadID }
 
 // TurnFinished is emitted when a turn completes and no further actions are required from the engine.
+// NOTE: This is a transient informational event - NOT persisted to event store.
+// It's used for real-time UI updates only and does not modify aggregate state.
 type TurnFinished struct {
 	ThreadID  string    `json:"threadId"`
 	MessageID string    `json:"messageId"`

@@ -63,8 +63,14 @@ func (p *PostgresAguiProjection) RegisterHandlers(router interface {
 	router.Register(&domain.ThreadCreated{}, func(ctx context.Context, e core.Event) error {
 		return p.applyThreadCreated(ctx, *e.(*domain.ThreadCreated))
 	})
-	router.Register(&domain.MessageAdded{}, func(ctx context.Context, e core.Event) error {
-		return p.applyMessageAdded(ctx, *e.(*domain.MessageAdded))
+	router.Register(&domain.UserMessageAdded{}, func(ctx context.Context, e core.Event) error {
+		return p.applyUserMessageAdded(ctx, *e.(*domain.UserMessageAdded))
+	})
+	router.Register(&domain.AssistantMessageAdded{}, func(ctx context.Context, e core.Event) error {
+		return p.applyAssistantMessageAdded(ctx, *e.(*domain.AssistantMessageAdded))
+	})
+	router.Register(&domain.ToolResultAdded{}, func(ctx context.Context, e core.Event) error {
+		return p.applyToolResultAdded(ctx, *e.(*domain.ToolResultAdded))
 	})
 	router.Register(&domain.ThreadTitleUpdated{}, func(ctx context.Context, e core.Event) error {
 		return p.applyThreadTitleChanged(ctx, *e.(*domain.ThreadTitleUpdated))
@@ -123,8 +129,8 @@ func (p *PostgresAguiProjection) applyThreadCreated(ctx context.Context, event d
 	return nil
 }
 
-// applyMessageAdded adds a message to the thread.
-func (p *PostgresAguiProjection) applyMessageAdded(ctx context.Context, event domain.MessageAdded) error {
+// applyUserMessageAdded adds a user message to the thread.
+func (p *PostgresAguiProjection) applyUserMessageAdded(ctx context.Context, event domain.UserMessageAdded) error {
 	// First, get current message count for sequence number
 	var messageCount int
 	countQuery := `SELECT COUNT(*) FROM agui_messages WHERE thread_id = $1`
@@ -132,14 +138,47 @@ func (p *PostgresAguiProjection) applyMessageAdded(ctx context.Context, event do
 		return fmt.Errorf("failed to get message count: %w", err)
 	}
 
-	// Marshal metadata to JSONB
-	var metadataJSON []byte
-	if event.Metadata != nil {
-		var err error
-		metadataJSON, err = json.Marshal(event.Metadata)
-		if err != nil {
-			return fmt.Errorf("failed to marshal metadata: %w", err)
-		}
+	// Insert message
+	insertQuery := `
+		INSERT INTO agui_messages (message_id, thread_id, role, content, created_at, sequence_num)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		ON CONFLICT (message_id) DO NOTHING
+	`
+
+	_, err := p.db.ExecContext(ctx, insertQuery,
+		event.MessageID,
+		event.ThreadID,
+		"user",
+		event.Content,
+		event.Timestamp,
+		messageCount, // 0-indexed sequence
+	)
+	if err != nil {
+		return fmt.Errorf("failed to insert user message: %w", err)
+	}
+
+	// Update thread's updated_at timestamp
+	updateQuery := `
+		UPDATE agui_threads 
+		SET updated_at = $1, version = version + 1
+		WHERE thread_id = $2
+	`
+
+	_, err = p.db.ExecContext(ctx, updateQuery, event.Timestamp, event.ThreadID)
+	if err != nil {
+		return fmt.Errorf("failed to update thread timestamp: %w", err)
+	}
+
+	return nil
+}
+
+// applyAssistantMessageAdded adds an assistant message to the thread.
+func (p *PostgresAguiProjection) applyAssistantMessageAdded(ctx context.Context, event domain.AssistantMessageAdded) error {
+	// First, get current message count for sequence number
+	var messageCount int
+	countQuery := `SELECT COUNT(*) FROM agui_messages WHERE thread_id = $1`
+	if err := p.db.GetContext(ctx, &messageCount, countQuery, event.ThreadID); err != nil {
+		return fmt.Errorf("failed to get message count: %w", err)
 	}
 
 	// Marshal tool calls to JSONB
@@ -154,25 +193,68 @@ func (p *PostgresAguiProjection) applyMessageAdded(ctx context.Context, event do
 
 	// Insert message
 	insertQuery := `
-		INSERT INTO agui_messages (message_id, thread_id, role, content, tool_calls, tool_call_id, agent_name, metadata, created_at, sequence_num)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		INSERT INTO agui_messages (message_id, thread_id, role, content, tool_calls, agent_name, created_at, sequence_num)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		ON CONFLICT (message_id) DO NOTHING
 	`
 
 	_, err := p.db.ExecContext(ctx, insertQuery,
 		event.MessageID,
 		event.ThreadID,
-		event.Role,
+		"assistant",
 		event.Content,
 		toolCallsJSON,
-		event.ToolCallID,
 		event.AgentName,
-		metadataJSON,
 		event.Timestamp,
 		messageCount, // 0-indexed sequence
 	)
 	if err != nil {
-		return fmt.Errorf("failed to insert message: %w", err)
+		return fmt.Errorf("failed to insert assistant message: %w", err)
+	}
+
+	// Update thread's updated_at timestamp
+	updateQuery := `
+		UPDATE agui_threads 
+		SET updated_at = $1, version = version + 1
+		WHERE thread_id = $2
+	`
+
+	_, err = p.db.ExecContext(ctx, updateQuery, event.Timestamp, event.ThreadID)
+	if err != nil {
+		return fmt.Errorf("failed to update thread timestamp: %w", err)
+	}
+
+	return nil
+}
+
+// applyToolResultAdded adds a tool result message to the thread.
+func (p *PostgresAguiProjection) applyToolResultAdded(ctx context.Context, event domain.ToolResultAdded) error {
+	// First, get current message count for sequence number
+	var messageCount int
+	countQuery := `SELECT COUNT(*) FROM agui_messages WHERE thread_id = $1`
+	if err := p.db.GetContext(ctx, &messageCount, countQuery, event.ThreadID); err != nil {
+		return fmt.Errorf("failed to get message count: %w", err)
+	}
+
+	// Insert message
+	insertQuery := `
+		INSERT INTO agui_messages (message_id, thread_id, role, content, tool_call_id, agent_name, created_at, sequence_num)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		ON CONFLICT (message_id) DO NOTHING
+	`
+
+	_, err := p.db.ExecContext(ctx, insertQuery,
+		event.MessageID,
+		event.ThreadID,
+		"tool",
+		event.Result,
+		event.ToolCallID,
+		event.AgentName,
+		event.Timestamp,
+		messageCount, // 0-indexed sequence
+	)
+	if err != nil {
+		return fmt.Errorf("failed to insert tool result message: %w", err)
 	}
 
 	// Update thread's updated_at timestamp

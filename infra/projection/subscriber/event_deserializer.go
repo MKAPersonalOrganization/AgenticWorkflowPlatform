@@ -18,10 +18,24 @@ func deserializeDomainEvent(eventType string, data []byte) (core.Event, error) {
 		}
 		return &evt, nil
 
-	case "MessageAdded":
-		var evt domain.MessageAdded
+	case "UserMessageAdded":
+		var evt domain.UserMessageAdded
 		if err := json.Unmarshal(data, &evt); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal MessageAdded: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal UserMessageAdded: %w", err)
+		}
+		return &evt, nil
+
+	case "AssistantMessageAdded":
+		var evt domain.AssistantMessageAdded
+		if err := json.Unmarshal(data, &evt); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal AssistantMessageAdded: %w", err)
+		}
+		return &evt, nil
+
+	case "ToolResultAdded":
+		var evt domain.ToolResultAdded
+		if err := json.Unmarshal(data, &evt); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal ToolResultAdded: %w", err)
 		}
 		return &evt, nil
 
@@ -155,20 +169,6 @@ func deserializeDomainEvent(eventType string, data []byte) (core.Event, error) {
 		var evt domain.ToolCancelled
 		if err := json.Unmarshal(data, &evt); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal ToolCancelled: %w", err)
-		}
-		return &evt, nil
-
-	case "ActionsDetected":
-		var evt domain.ActionsDetected
-		if err := json.Unmarshal(data, &evt); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal ActionsDetected: %w", err)
-		}
-		return &evt, nil
-
-	case "TurnFinished":
-		var evt domain.TurnFinished
-		if err := json.Unmarshal(data, &evt); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal TurnFinished: %w", err)
 		}
 		return &evt, nil
 

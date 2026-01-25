@@ -70,16 +70,36 @@ func (t *ThreadAggregate) AddMessage(messageID, role, content string, toolCalls 
 		return errors.New("message role is required")
 	}
 
-	event := MessageAdded{
-		ThreadID:   t.ID,
-		MessageID:  messageID,
-		Role:       role,
-		Content:    content,
-		ToolCalls:  toolCalls,
-		ToolCallID: toolCallID,
-		AgentName:  agentName,
-		Metadata:   metadata,
-		Timestamp:  time.Now(),
+	// Emit specific event based on role
+	var event Event
+	switch role {
+	case "user":
+		event = UserMessageAdded{
+			ThreadID:  t.ID,
+			MessageID: messageID,
+			Content:   content,
+			Timestamp: time.Now(),
+		}
+	case "assistant":
+		event = AssistantMessageAdded{
+			ThreadID:  t.ID,
+			MessageID: messageID,
+			Content:   content,
+			ToolCalls: toolCalls,
+			AgentName: agentName,
+			Timestamp: time.Now(),
+		}
+	case "tool":
+		event = ToolResultAdded{
+			ThreadID:   t.ID,
+			MessageID:  messageID,
+			ToolCallID: toolCallID,
+			Result:     content,
+			AgentName:  agentName,
+			Timestamp:  time.Now(),
+		}
+	default:
+		return errors.New("unsupported message role: " + role)
 	}
 
 	t.Enqueue(event, t.Apply)
@@ -164,24 +184,42 @@ func (t *ThreadAggregate) Apply(event Event) {
 		t.UpdatedAt = e.Timestamp
 		t.IsDeleted = false
 
-	case MessageAdded:
+	case UserMessageAdded:
 		msg := Message{
-			ID:         e.MessageID,
-			Role:       e.Role,
-			Content:    e.Content,
-			Timestamp:  e.Timestamp,
-			ToolCalls:  e.ToolCalls,
-			ToolCallID: e.ToolCallID,
-			AgentName:  e.AgentName,
-			Metadata:   e.Metadata,
+			ID:        e.MessageID,
+			Role:      "user",
+			Content:   e.Content,
+			Timestamp: e.Timestamp,
 		}
 		t.Messages = append(t.Messages, msg)
 		t.UpdatedAt = e.Timestamp
 
-		// If a tool result is added, remove the tool from active states
-		if e.Role == "tool" && e.ToolCallID != "" {
-			delete(t.ActiveToolStates, e.ToolCallID)
+	case AssistantMessageAdded:
+		msg := Message{
+			ID:        e.MessageID,
+			Role:      "assistant",
+			Content:   e.Content,
+			ToolCalls: e.ToolCalls,
+			AgentName: e.AgentName,
+			Timestamp: e.Timestamp,
 		}
+		t.Messages = append(t.Messages, msg)
+		t.UpdatedAt = e.Timestamp
+
+	case ToolResultAdded:
+		msg := Message{
+			ID:         e.MessageID,
+			Role:       "tool",
+			Content:    e.Result,
+			ToolCallID: e.ToolCallID,
+			AgentName:  e.AgentName,
+			Timestamp:  e.Timestamp,
+		}
+		t.Messages = append(t.Messages, msg)
+		t.UpdatedAt = e.Timestamp
+
+		// Remove the tool from active states when result is added
+		delete(t.ActiveToolStates, e.ToolCallID)
 
 	case ThreadTitleUpdated:
 		t.Title = e.Title
