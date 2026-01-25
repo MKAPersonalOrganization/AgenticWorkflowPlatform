@@ -100,9 +100,9 @@ func TestThreadDeciderAddMessage(t *testing.T) {
 		t.Fatalf("expected 1 event, got %d", len(events))
 	}
 
-	added, ok := events[0].(MessageAdded)
+	added, ok := events[0].(UserMessageAdded)
 	if !ok {
-		t.Fatalf("expected MessageAdded event, got %T", events[0])
+		t.Fatalf("expected UserMessageAdded event, got %T", events[0])
 	}
 
 	if added.MessageID != "msg-1" {
@@ -140,11 +140,10 @@ func TestThreadAggregateEvolve(t *testing.T) {
 		t.Errorf("expected Title 'Test Thread', got '%s'", thread.Title)
 	}
 
-	// Apply MessageAdded event
-	msgAdded := MessageAdded{
+	// Apply UserMessageAdded event
+	msgAdded := UserMessageAdded{
 		ThreadID:  "thread-1",
 		MessageID: "msg-1",
-		Role:      "user",
 		Content:   "Hello!",
 		Timestamp: time.Now(),
 	}

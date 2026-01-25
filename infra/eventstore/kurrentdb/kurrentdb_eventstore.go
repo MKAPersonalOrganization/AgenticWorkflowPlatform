@@ -199,11 +199,27 @@ func (s *KurrentDBEventStore) convertFromRecordedEvent(recordedEvent *kurrentdb.
 		}
 		event = e
 
-	case "MessageAdded":
-		var e domain.MessageAdded
+	case "UserMessageAdded":
+		var e domain.UserMessageAdded
 		err := json.Unmarshal(recordedEvent.Data, &e)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal MessageAdded: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal UserMessageAdded: %w", err)
+		}
+		event = e
+
+	case "AssistantMessageAdded":
+		var e domain.AssistantMessageAdded
+		err := json.Unmarshal(recordedEvent.Data, &e)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal AssistantMessageAdded: %w", err)
+		}
+		event = e
+
+	case "ToolResultAdded":
+		var e domain.ToolResultAdded
+		err := json.Unmarshal(recordedEvent.Data, &e)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal ToolResultAdded: %w", err)
 		}
 		event = e
 
@@ -300,22 +316,6 @@ func (s *KurrentDBEventStore) convertFromRecordedEvent(recordedEvent *kurrentdb.
 		err := json.Unmarshal(recordedEvent.Data, &e)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal ToolCancelled: %w", err)
-		}
-		event = &e
-
-	case "ActionsDetected":
-		var e domain.ActionsDetected
-		err := json.Unmarshal(recordedEvent.Data, &e)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal ActionsDetected: %w", err)
-		}
-		event = &e
-
-	case "TurnFinished":
-		var e domain.TurnFinished
-		err := json.Unmarshal(recordedEvent.Data, &e)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal TurnFinished: %w", err)
 		}
 		event = &e
 

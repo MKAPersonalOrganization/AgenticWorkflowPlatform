@@ -45,14 +45,13 @@ func TestThreadAggregate_ActiveToolStates(t *testing.T) {
 	assert.Contains(t, thread.ActiveToolStates, "call-1")
 	assert.Equal(t, "InputProvided", thread.ActiveToolStates["call-1"].Status)
 
-	// 3. Tool Result (MessageAdded with role="tool")
+	// 3. Tool Result (ToolResultAdded)
 	// This usually comes from execution after input
-	toolResult := domain.MessageAdded{
+	toolResult := domain.ToolResultAdded{
 		ThreadID:   "thread-1",
 		MessageID:  "msg-3",
-		Role:       "tool",
-		Content:    "Result",
 		ToolCallID: "call-1",
+		Result:     "Result",
 		AgentName:  "agent",
 		Timestamp:  time.Now(),
 	}
@@ -96,12 +95,11 @@ func TestThreadAggregate_ActiveToolStates_Auth(t *testing.T) {
 	assert.Equal(t, "AuthGranted", thread.ActiveToolStates["call-2"].Status)
 
 	// 3. Tool Result
-	toolResult := domain.MessageAdded{
+	toolResult := domain.ToolResultAdded{
 		ThreadID:   "thread-1",
 		MessageID:  "msg-3",
-		Role:       "tool",
-		Content:    "Done",
 		ToolCallID: "call-2",
+		Result:     "Done",
 		AgentName:  "agent",
 		Timestamp:  time.Now(),
 	}

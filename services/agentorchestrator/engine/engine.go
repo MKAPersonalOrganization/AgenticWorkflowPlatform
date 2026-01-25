@@ -243,7 +243,7 @@ func (e *Engine) emit(ctx context.Context, evt core.Event, p *PersistenceUnit) e
 		return nil
 	}
 
-	// 1. Handle special persistence cases (Token Usage, Tool Events)
+	// 1. Handle special persistence cases (Token Usage, Tool Events, Engine State)
 	// These are events produced by the Engine that must be durable.
 	persistent := false
 	switch e := evt.(type) {
@@ -269,16 +269,14 @@ func (e *Engine) emit(ctx context.Context, evt core.Event, p *PersistenceUnit) e
 		*domain.InputProvided,
 		*domain.AuthGranted,
 		*domain.AuthDenied,
-		*domain.ToolCancelled,
-		*domain.ActionsDetected,
-		*domain.TurnFinished:
+		*domain.ToolCancelled:
 		if p != nil {
 			if _, err := p.ReportToolEvent(ctx, evt); err != nil {
 				return err
 			}
 		}
 		persistent = true
-	case *domain.MessageAdded, *domain.ThreadCreated, *domain.ThreadTitleUpdated:
+	case *domain.UserMessageAdded, *domain.AssistantMessageAdded, *domain.ToolResultAdded, *domain.ThreadCreated, *domain.ThreadTitleUpdated:
 		// These are already persisted by the thread management calls.
 		// We treat them as persistent so we don't dispatch them directly (avoiding duplicates).
 		persistent = true
@@ -589,7 +587,7 @@ func (p *PersistenceUnit) AddAssistantMessage(
 	content string,
 	toolCalls []domain.ToolCall,
 	agentName string,
-) (*domain.ThreadAggregate, error) {
+) (*domain.ThreadAggregate, *domain.AssistantMessageAdded, error) {
 	return p.mgmt.AddAssistantMessage(ctx, threadID, messageID, content, toolCalls, agentName)
 }
 
@@ -599,7 +597,7 @@ func (p *PersistenceUnit) AddToolResultMessage(
 	toolCallID string,
 	result string,
 	agentName string,
-) (*domain.ThreadAggregate, error) {
+) (*domain.ThreadAggregate, *domain.ToolResultAdded, error) {
 	toolResultID := core.GenerateID()
 	return p.mgmt.AddToolResultMessage(ctx, threadID, toolResultID, toolCallID, result, agentName)
 }
@@ -684,7 +682,7 @@ func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolve
 			return nil, nil, tctx.Observer.FailWithLoop(info)
 		}
 
-		agg, err := tctx.Persistence.AddToolResultMessage(
+		agg, _, err := tctx.Persistence.AddToolResultMessage(
 			tctx.Ctx,
 			tctx.ThreadID,
 			tc.ID,
@@ -895,7 +893,7 @@ func (s *executionState) validateAgentOutput() error {
 
 func (s *executionState) saveAgentMessageAndEmitEvents() error {
 	toolCalls := toDomainToolCalls(s.streamResult.ToolCalls)
-	agg, err := s.persistence.AddAssistantMessage(
+	agg, _, err := s.persistence.AddAssistantMessage(
 		s.ctx,
 		s.threadID,
 		s.messageID,

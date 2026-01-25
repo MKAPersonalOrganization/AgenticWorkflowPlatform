@@ -156,7 +156,7 @@ func ToAguiEvents(event any) []any {
 			}),
 		)}
 
-	case *domain.MessageAdded, *domain.ThreadCreated, *domain.AgentHandoff:
+	case *domain.UserMessageAdded, *domain.AssistantMessageAdded, *domain.ToolResultAdded, *domain.ThreadCreated, *domain.AgentHandoff:
 		// These are handled by the frontend locally or via snapshots, no need to stream
 		return []any{}
 

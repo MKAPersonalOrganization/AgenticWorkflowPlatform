@@ -64,7 +64,7 @@ func (m *Manager) CreateThread(ctx context.Context, threadID, title string) (*do
 }
 
 // AddUserMessage adds a user message to a thread.
-func (m *Manager) AddUserMessage(ctx context.Context, threadID, messageID, content, userID string) (*domain.ThreadAggregate, *domain.MessageAdded, error) {
+func (m *Manager) AddUserMessage(ctx context.Context, threadID, messageID, content, userID string) (*domain.ThreadAggregate, *domain.UserMessageAdded, error) {
 	thread, err := m.threadRepo.Load(ctx, threadID)
 	if errors.Is(err, domain.ErrThreadNotFound) {
 		thread, err = domain.OpenThread(threadID, userID, "New Chat")
@@ -99,10 +99,9 @@ func (m *Manager) AddUserMessage(ctx context.Context, threadID, messageID, conte
 		}
 	}
 
-	event := &domain.MessageAdded{
+	event := &domain.UserMessageAdded{
 		ThreadID:  threadID,
 		MessageID: messageID,
-		Role:      "user",
 		Content:   content,
 		Timestamp: time.Now(),
 	}
@@ -111,22 +110,31 @@ func (m *Manager) AddUserMessage(ctx context.Context, threadID, messageID, conte
 }
 
 // AddAssistantMessage adds an assistant message to the thread.
-func (m *Manager) AddAssistantMessage(ctx context.Context, threadID, messageID, content string, toolCalls []domain.ToolCall, agentName string) (*domain.ThreadAggregate, error) {
+func (m *Manager) AddAssistantMessage(ctx context.Context, threadID, messageID, content string, toolCalls []domain.ToolCall, agentName string) (*domain.ThreadAggregate, *domain.AssistantMessageAdded, error) {
 	thread, err := m.threadRepo.Load(ctx, threadID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load thread: %w", err)
+		return nil, nil, fmt.Errorf("failed to load thread: %w", err)
 	}
 
 	err = thread.AddMessage(messageID, "assistant", content, toolCalls, "", agentName, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to add assistant message: %w", err)
+		return nil, nil, fmt.Errorf("failed to add assistant message: %w", err)
 	}
 
 	if err := m.threadRepo.Save(ctx, thread); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return thread, nil
+	event := &domain.AssistantMessageAdded{
+		ThreadID:  threadID,
+		MessageID: messageID,
+		Content:   content,
+		ToolCalls: toolCalls,
+		AgentName: agentName,
+		Timestamp: time.Now(),
+	}
+
+	return thread, event, nil
 }
 
 // AddTokenUsage records token usage for a message in the thread.
@@ -151,10 +159,24 @@ func (m *Manager) RecordEngineStateChange(ctx context.Context, event domain.Engi
 }
 
 // AddToolResultMessage adds a tool result message to the thread.
-func (m *Manager) AddToolResultMessage(ctx context.Context, threadID, messageID, toolCallID, result, agentName string) (*domain.ThreadAggregate, error) {
-	return m.retryUpdate(ctx, threadID, func(t *domain.ThreadAggregate) error {
+func (m *Manager) AddToolResultMessage(ctx context.Context, threadID, messageID, toolCallID, result, agentName string) (*domain.ThreadAggregate, *domain.ToolResultAdded, error) {
+	thread, err := m.retryUpdate(ctx, threadID, func(t *domain.ThreadAggregate) error {
 		return t.AddMessage(messageID, "tool", result, nil, toolCallID, agentName, nil)
 	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	event := &domain.ToolResultAdded{
+		ThreadID:   threadID,
+		MessageID:  messageID,
+		ToolCallID: toolCallID,
+		Result:     result,
+		AgentName:  agentName,
+		Timestamp:  time.Now(),
+	}
+
+	return thread, event, nil
 }
 
 // UpdateThreadTitle updates the title of a thread.
