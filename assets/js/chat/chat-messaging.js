@@ -197,6 +197,15 @@ export function createMessagingMethods() {
                         break;
 
                     case 'assistant':
+                        if (msg.content) {
+                            uiMessages.push({
+                                id: msg.id,
+                                role: 'assistant',
+                                content: msg.content,
+                                timestamp: msg.timestamp || new Date().toISOString(),
+                                streaming: false
+                            });
+                        }
                         if (msg.toolCalls && msg.toolCalls.length > 0) {
                             const agentName = msg.name || 'agent';
 
@@ -210,10 +219,6 @@ export function createMessagingMethods() {
                                 let toolResult = null;
                                 let elicitation = null;
                                 let parsedToolArgs = safeParseJSON(toolArgs);
-                                // Determine if this is a special tool call or an elicitation tool call
-                                const isSpecial = isSpecialTool(toolName);
-                                const isElicitation = isElicitationTool(elicitation?.schema?.type);
-
                                 // Check global tool states map first
                                 if (toolStatesMap && toolStatesMap[toolCall.id]) {
                                     const stateObj = toolStatesMap[toolCall.id];
@@ -224,6 +229,10 @@ export function createMessagingMethods() {
                                     if (stateObj.state) status = stateObj.state;
                                     if (stateObj.elicitation) elicitation = stateObj.elicitation;
                                 }
+
+                                // Determine if this is a special tool call or an elicitation tool call
+                                const isSpecial = isSpecialTool(toolName);
+                                const isElicitation = isElicitationTool(elicitation?.schema?.type);
 
                                 // Initialize and sync XState machine
                                 if (toolCall.id) {
@@ -264,8 +273,8 @@ export function createMessagingMethods() {
                                     id: toolCall.id,
                                     type: 'tool_call',
                                     name: toolName,
-                                    args: toolCall.arguments,
-                                    parsedArgs: safeParseJSON(toolCall.arguments),
+                                    args: toolArgs,
+                                    parsedArgs: safeParseJSON(toolArgs),
                                     result: toolResult,
                                     parsedResult: parsedResult,
                                     status: status,
@@ -273,15 +282,6 @@ export function createMessagingMethods() {
                                     timestamp: toolCall.timestamp || new Date().toISOString()
                                 });
                             }
-                        }
-                        if (msg.content) {
-                            uiMessages.push({
-                                id: msg.id,
-                                role: 'assistant',
-                                content: msg.content,
-                                timestamp: msg.timestamp || new Date().toISOString(),
-                                streaming: false
-                            });
                         }
                         break;
 
