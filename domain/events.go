@@ -37,42 +37,42 @@ func (e MessageAdded) EventType() string         { return "MessageAdded" }
 func (e MessageAdded) EventTimestamp() time.Time { return e.Timestamp }
 func (e MessageAdded) AggregateID() string       { return e.ThreadID }
 
-// ThreadTitleUpdatedEvent indicates that a thread's title has been changed.
-type ThreadTitleUpdatedEvent struct {
+// ThreadTitleUpdated indicates that a thread's title has been changed.
+type ThreadTitleUpdated struct {
 	ThreadID  string    `json:"threadId"`
 	Title     string    `json:"title"`
 	Timestamp time.Time `json:"timestamp"`
 }
 
-func (e ThreadTitleUpdatedEvent) EventType() string         { return "ThreadTitleUpdated" }
-func (e ThreadTitleUpdatedEvent) EventTimestamp() time.Time { return e.Timestamp }
-func (e ThreadTitleUpdatedEvent) AggregateID() string       { return e.ThreadID }
+func (e ThreadTitleUpdated) EventType() string         { return "ThreadTitleUpdated" }
+func (e ThreadTitleUpdated) EventTimestamp() time.Time { return e.Timestamp }
+func (e ThreadTitleUpdated) AggregateID() string       { return e.ThreadID }
 
-// AssistantMessageStartedEvent is emitted when the assistant begins responding.
-type AssistantMessageStartedEvent struct {
+// AssistantMessageStarted is emitted when the assistant begins responding.
+type AssistantMessageStarted struct {
 	ThreadID  string
 	MessageID string
 	Timestamp time.Time
 }
 
-func (e AssistantMessageStartedEvent) EventType() string         { return "AssistantMessageStarted" }
-func (e AssistantMessageStartedEvent) EventTimestamp() time.Time { return e.Timestamp }
-func (e AssistantMessageStartedEvent) AggregateID() string       { return e.ThreadID }
+func (e AssistantMessageStarted) EventType() string         { return "AssistantMessageStarted" }
+func (e AssistantMessageStarted) EventTimestamp() time.Time { return e.Timestamp }
+func (e AssistantMessageStarted) AggregateID() string       { return e.ThreadID }
 
-// AssistantContentStreamedEvent is emitted for each content delta during streaming.
-type AssistantContentStreamedEvent struct {
+// AssistantContentStreamed is emitted for each content delta during streaming.
+type AssistantContentStreamed struct {
 	ThreadID  string
 	MessageID string
 	Delta     string
 	Timestamp time.Time
 }
 
-func (e AssistantContentStreamedEvent) EventType() string         { return "AssistantContentStreamed" }
-func (e AssistantContentStreamedEvent) EventTimestamp() time.Time { return e.Timestamp }
-func (e AssistantContentStreamedEvent) AggregateID() string       { return e.ThreadID }
+func (e AssistantContentStreamed) EventType() string         { return "AssistantContentStreamed" }
+func (e AssistantContentStreamed) EventTimestamp() time.Time { return e.Timestamp }
+func (e AssistantContentStreamed) AggregateID() string       { return e.ThreadID }
 
-// AssistantMessageCompletedEvent is emitted when the assistant completes a message.
-type AssistantMessageCompletedEvent struct {
+// AssistantMessageCompleted is emitted when the assistant completes a message.
+type AssistantMessageCompleted struct {
 	ThreadID  string
 	MessageID string
 	Content   string
@@ -81,43 +81,43 @@ type AssistantMessageCompletedEvent struct {
 	Timestamp time.Time
 }
 
-func (e AssistantMessageCompletedEvent) EventType() string         { return "AssistantMessageCompleted" }
-func (e AssistantMessageCompletedEvent) EventTimestamp() time.Time { return e.Timestamp }
-func (e AssistantMessageCompletedEvent) AggregateID() string       { return e.ThreadID }
+func (e AssistantMessageCompleted) EventType() string         { return "AssistantMessageCompleted" }
+func (e AssistantMessageCompleted) EventTimestamp() time.Time { return e.Timestamp }
+func (e AssistantMessageCompleted) AggregateID() string       { return e.ThreadID }
 
-// RunStartedEvent indicates that message processing has begun.
-type RunStartedEvent struct {
+// RunStarted indicates that message processing has begun.
+type RunStarted struct {
 	ThreadID  string
 	RunID     string
 	Timestamp time.Time
 }
 
-func (e RunStartedEvent) EventType() string         { return "RunStarted" }
-func (e RunStartedEvent) EventTimestamp() time.Time { return e.Timestamp }
-func (e RunStartedEvent) AggregateID() string       { return e.ThreadID }
+func (e RunStarted) EventType() string         { return "RunStarted" }
+func (e RunStarted) EventTimestamp() time.Time { return e.Timestamp }
+func (e RunStarted) AggregateID() string       { return e.ThreadID }
 
-// RunFinishedEvent indicates that message processing has completed.
-type RunFinishedEvent struct {
+// RunFinished indicates that message processing has completed.
+type RunFinished struct {
 	ThreadID  string
 	RunID     string
 	Timestamp time.Time
 }
 
-func (e RunFinishedEvent) EventType() string         { return "RunFinished" }
-func (e RunFinishedEvent) EventTimestamp() time.Time { return e.Timestamp }
-func (e RunFinishedEvent) AggregateID() string       { return e.ThreadID }
+func (e RunFinished) EventType() string         { return "RunFinished" }
+func (e RunFinished) EventTimestamp() time.Time { return e.Timestamp }
+func (e RunFinished) AggregateID() string       { return e.ThreadID }
 
-// RunErrorEvent indicates that an error occurred during processing.
-type RunErrorEvent struct {
+// RunError indicates that an error occurred during processing.
+type RunError struct {
 	ThreadID  string
 	Message   string
 	ErrorCode string
 	Timestamp time.Time
 }
 
-func (e RunErrorEvent) EventType() string         { return "RunError" }
-func (e RunErrorEvent) EventTimestamp() time.Time { return e.Timestamp }
-func (e RunErrorEvent) AggregateID() string       { return e.ThreadID }
+func (e RunError) EventType() string         { return "RunError" }
+func (e RunError) EventTimestamp() time.Time { return e.Timestamp }
+func (e RunError) AggregateID() string       { return e.ThreadID }
 
 // ThreadDeleted is emitted when a thread is deleted.
 type ThreadDeleted struct {
@@ -129,16 +129,16 @@ func (e ThreadDeleted) EventType() string         { return "ThreadDeleted" }
 func (e ThreadDeleted) EventTimestamp() time.Time { return e.Timestamp }
 func (e ThreadDeleted) AggregateID() string       { return e.ThreadID }
 
-// AgentHandoffEvent is emitted when control is transferred to another agent.
-type AgentHandoffEvent struct {
+// AgentHandoff is emitted when control is transferred to another agent.
+type AgentHandoff struct {
 	ThreadID    string
 	TargetAgent string
 	Timestamp   time.Time
 }
 
-func (e AgentHandoffEvent) EventType() string         { return "AgentHandoff" }
-func (e AgentHandoffEvent) EventTimestamp() time.Time { return e.Timestamp }
-func (e AgentHandoffEvent) AggregateID() string       { return e.ThreadID }
+func (e AgentHandoff) EventType() string         { return "AgentHandoff" }
+func (e AgentHandoff) EventTimestamp() time.Time { return e.Timestamp }
+func (e AgentHandoff) AggregateID() string       { return e.ThreadID }
 
 // TokenUsageReported is emitted when token usage information is available.
 type TokenUsageReported struct {
@@ -179,3 +179,26 @@ type EngineStateChanged struct {
 func (e EngineStateChanged) EventType() string         { return "EngineStateChanged" }
 func (e EngineStateChanged) EventTimestamp() time.Time { return e.Timestamp }
 func (e EngineStateChanged) AggregateID() string       { return e.ThreadID }
+
+// ActionsDetected is emitted when the engine identifies tool calls that need execution.
+type ActionsDetected struct {
+	ThreadID  string     `json:"threadId"`
+	MessageID string     `json:"messageId"`
+	ToolCalls []ToolCall `json:"toolCalls"`
+	Timestamp time.Time  `json:"timestamp"`
+}
+
+func (e ActionsDetected) EventType() string         { return "ActionsDetected" }
+func (e ActionsDetected) EventTimestamp() time.Time { return e.Timestamp }
+func (e ActionsDetected) AggregateID() string       { return e.ThreadID }
+
+// TurnFinished is emitted when a turn completes and no further actions are required from the engine.
+type TurnFinished struct {
+	ThreadID  string    `json:"threadId"`
+	MessageID string    `json:"messageId"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+func (e TurnFinished) EventType() string         { return "TurnFinished" }
+func (e TurnFinished) EventTimestamp() time.Time { return e.Timestamp }
+func (e TurnFinished) AggregateID() string       { return e.ThreadID }

@@ -10,19 +10,19 @@ import (
 // It returns a slice of events because some domain events map to multiple AGUI events.
 func ToAguiEvents(event any) []any {
 	switch evt := event.(type) {
-	case *domain.RunStartedEvent:
+	case *domain.RunStarted:
 		return []any{aguievents.NewRunStartedEvent(evt.ThreadID, evt.RunID)}
 
-	case *domain.RunFinishedEvent:
+	case *domain.RunFinished:
 		return []any{aguievents.NewRunFinishedEvent(evt.ThreadID, evt.RunID)}
 
-	case *domain.RunErrorEvent:
+	case *domain.RunError:
 		return []any{aguievents.NewRunErrorEvent(
 			evt.Message,
 			aguievents.WithErrorCode(evt.ErrorCode),
 		)}
 
-	case *domain.ThreadTitleUpdatedEvent:
+	case *domain.ThreadTitleUpdated:
 		return []any{aguievents.NewCustomEvent(
 			"THREAD_TITLE_UPDATED",
 			aguievents.WithValue(map[string]any{
@@ -31,13 +31,13 @@ func ToAguiEvents(event any) []any {
 			}),
 		)}
 
-	case *domain.AssistantMessageStartedEvent:
+	case *domain.AssistantMessageStarted:
 		return []any{aguievents.NewTextMessageStartEvent(evt.MessageID, aguievents.WithRole("assistant"))}
 
-	case *domain.AssistantContentStreamedEvent:
+	case *domain.AssistantContentStreamed:
 		return []any{aguievents.NewTextMessageContentEvent(evt.MessageID, evt.Delta)}
 
-	case *domain.AssistantMessageCompletedEvent:
+	case *domain.AssistantMessageCompleted:
 		return []any{aguievents.NewTextMessageEndEvent(evt.MessageID)}
 
 	case *domain.TokenUsageReported:
@@ -60,25 +60,47 @@ func ToAguiEvents(event any) []any {
 			}),
 		)}
 
-	case *domain.ToolStateChangedEvent:
+	case *domain.ToolStart:
 		return []any{aguievents.NewCustomEvent(
-			"TOOL_STATE_CHANGED",
+			"TOOL_START",
 			aguievents.WithValue(map[string]any{
 				"toolCallId": evt.ToolCallID,
 				"toolName":   evt.ToolName,
-				"oldState":   evt.OldState,
-				"newState":   evt.NewState,
-				"result":     evt.Result,
-				"isError":    evt.IsError,
 				"arguments":  evt.ToolArguments,
 				"agentName":  evt.AgentName,
 				"timestamp":  evt.Timestamp,
 			}),
 		)}
 
-	case *domain.ToolAwaitingInputEvent:
+	case *domain.ToolSuccess:
 		return []any{aguievents.NewCustomEvent(
-			"TOOL_AWAITING_INPUT",
+			"TOOL_SUCCESS",
+			aguievents.WithValue(map[string]any{
+				"toolCallId": evt.ToolCallID,
+				"toolName":   evt.ToolName,
+				"result":     evt.Result,
+				"arguments":  evt.ToolArguments,
+				"agentName":  evt.AgentName,
+				"timestamp":  evt.Timestamp,
+			}),
+		)}
+
+	case *domain.ToolError:
+		return []any{aguievents.NewCustomEvent(
+			"TOOL_ERROR",
+			aguievents.WithValue(map[string]any{
+				"toolCallId": evt.ToolCallID,
+				"toolName":   evt.ToolName,
+				"error":      evt.Error,
+				"arguments":  evt.ToolArguments,
+				"agentName":  evt.AgentName,
+				"timestamp":  evt.Timestamp,
+			}),
+		)}
+
+	case *domain.ToolNeedsInput:
+		return []any{aguievents.NewCustomEvent(
+			"TOOL_NEEDS_INPUT",
 			aguievents.WithValue(map[string]any{
 				"toolCallId": evt.ToolCallID,
 				"toolName":   evt.ToolName,
@@ -88,9 +110,9 @@ func ToAguiEvents(event any) []any {
 			}),
 		)}
 
-	case *domain.ToolAwaitingAuthEvent:
+	case *domain.ToolNeedsAuth:
 		return []any{aguievents.NewCustomEvent(
-			"TOOL_AWAITING_AUTH",
+			"TOOL_NEEDS_AUTH",
 			aguievents.WithValue(map[string]any{
 				"toolCallId": evt.ToolCallID,
 				"toolName":   evt.ToolName,
@@ -99,9 +121,9 @@ func ToAguiEvents(event any) []any {
 			}),
 		)}
 
-	case *domain.ToolInputProvidedEvent:
+	case *domain.InputProvided:
 		return []any{aguievents.NewCustomEvent(
-			"TOOL_INPUT_PROVIDED",
+			"INPUT_PROVIDED",
 			aguievents.WithValue(map[string]any{
 				"toolCallId": evt.ToolCallID,
 				"messageId":  evt.MessageID,
@@ -109,15 +131,32 @@ func ToAguiEvents(event any) []any {
 			}),
 		)}
 
-	case *domain.ToolAuthGrantedEvent:
+	case *domain.AuthGranted:
 		return []any{aguievents.NewCustomEvent(
-			"TOOL_AUTH_GRANTED",
+			"AUTH_GRANTED",
 			aguievents.WithValue(map[string]any{
 				"toolCallId": evt.ToolCallID,
 			}),
 		)}
 
-	case *domain.MessageAdded, *domain.ThreadCreated, *domain.AgentHandoffEvent:
+	case *domain.AuthDenied:
+		return []any{aguievents.NewCustomEvent(
+			"AUTH_DENIED",
+			aguievents.WithValue(map[string]any{
+				"toolCallId": evt.ToolCallID,
+			}),
+		)}
+
+	case *domain.ToolCancelled:
+		return []any{aguievents.NewCustomEvent(
+			"TOOL_CANCELLED",
+			aguievents.WithValue(map[string]any{
+				"toolCallId": evt.ToolCallID,
+				"toolName":   evt.ToolName,
+			}),
+		)}
+
+	case *domain.MessageAdded, *domain.ThreadCreated, *domain.AgentHandoff:
 		// These are handled by the frontend locally or via snapshots, no need to stream
 		return []any{}
 

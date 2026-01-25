@@ -94,7 +94,6 @@ func (e *Engine) Run(ctx context.Context, agentName string, runCtx core.RunConte
 		// This ensures executor is available regardless of execution path
 		exec.prepareExecutor()
 
-
 		// Load persisted state or default to AwaitingTurn
 		startState := StateAwaitingTurn
 		if persistedStateStr, err := e.threadMgmt.GetEngineState(ctx, runCtx.ThreadID); err == nil && persistedStateStr != "" {
@@ -262,18 +261,24 @@ func (e *Engine) emit(ctx context.Context, evt core.Event, p *PersistenceUnit) e
 			}
 		}
 		persistent = true
-	case *domain.ToolAwaitingInputEvent,
-		*domain.ToolAwaitingAuthEvent,
-		*domain.ToolInputProvidedEvent,
-		*domain.ToolAuthGrantedEvent,
-		*domain.ToolStateChangedEvent:
+	case *domain.ToolStart,
+		*domain.ToolSuccess,
+		*domain.ToolError,
+		*domain.ToolNeedsInput,
+		*domain.ToolNeedsAuth,
+		*domain.InputProvided,
+		*domain.AuthGranted,
+		*domain.AuthDenied,
+		*domain.ToolCancelled,
+		*domain.ActionsDetected,
+		*domain.TurnFinished:
 		if p != nil {
 			if _, err := p.ReportToolEvent(ctx, evt); err != nil {
 				return err
 			}
 		}
 		persistent = true
-	case *domain.MessageAdded, *domain.ThreadCreated, *domain.ThreadTitleUpdatedEvent:
+	case *domain.MessageAdded, *domain.ThreadCreated, *domain.ThreadTitleUpdated:
 		// These are already persisted by the thread management calls.
 		// We treat them as persistent so we don't dispatch them directly (avoiding duplicates).
 		persistent = true
@@ -324,9 +329,9 @@ type executionState struct {
 	tools       *ToolProcessor
 
 	// Current Turn State
-	sm               *stateless.StateMachine
-	streamResult     *StreamResult
-	resolution       *RouteResolver
+	sm           *stateless.StateMachine
+	streamResult *StreamResult
+	resolution   *RouteResolver
 
 	// Tool state machines for tracking individual tool execution states
 	toolStateMachines map[string]*domain.ToolStateMachine
@@ -463,7 +468,7 @@ func (s *executionState) nextStep() error {
 	case StatePerformingActions:
 		// Tool waiting states (Input/Auth) are handled in executeRequiredActions.
 		// If we reach here, we are ready for the next turn.
-		
+
 		// Prepare for next iteration
 		s.messageID = core.GenerateID()
 		s.streamResult = nil
@@ -475,8 +480,6 @@ func (s *executionState) nextStep() error {
 		return s.sm.Fire(TrigTurnFinished)
 	}
 }
-
-
 
 // SafetyUnit enforces execution limits and detects infinite loops.
 type SafetyUnit struct {
@@ -804,6 +807,11 @@ func (s *executionState) setup(initialState state) error {
 	// Configure StatePerformingActions
 	s.sm.Configure(StatePerformingActions).
 		OnEntry(func(_ context.Context, _ ...any) error {
+			// Emit ActionsDetected event when entering this state
+			if s.streamResult != nil && s.streamResult.HasToolCalls() {
+				toolCalls := toDomainToolCalls(s.streamResult.ToolCalls)
+				s.observer.yield(s.agent.Events.ActionsDetected(s.threadID, s.messageID, toolCalls), nil)
+			}
 			return s.executeRequiredActions()
 		}).
 		PermitReentry(TrigStartExecution).
@@ -825,6 +833,9 @@ func (s *executionState) setup(initialState state) error {
 	// Configure StateDone
 	s.sm.Configure(StateDone).
 		OnEntry(func(_ context.Context, _ ...any) error {
+			// Emit explicit domain event for turn completion
+			s.observer.yield(s.agent.Events.TurnFinished(s.threadID, s.messageID), nil)
+
 			// Emit RunFinished event when entering StateDone cleanly
 			s.observer.yield(s.observer.events.RunFinished(s.threadID, s.messageID), nil)
 			return nil
@@ -848,8 +859,6 @@ func (s *executionState) setup(initialState state) error {
 func (s *executionState) run() error {
 	return s.sm.Fire(TrigStartExecution)
 }
-
-
 
 func (s *executionState) streamAndProcessLLMResponse(llmContext *LLMContext) error {
 	// Update executor with middleware-processed effective tools
@@ -1016,23 +1025,27 @@ func (e *ToolStateEventEmitter) OnToolStateChanged(
 	result *domain.ToolExecutionResult,
 	elicitation *core.ElicitationSpec,
 ) {
-	// Emit generic state changed event
-	evt := e.events.ToolStateChanged(
-		e.threadID,
-		e.messageID,
-		toolCallID,
-		toolName,
-		oldState.String(),
-		newState.String(),
-		result,
-	)
-	e.yield(evt, nil)
-
-	// Emit specific events based on new state
+	// Emit specific events based on state transitions
 	switch newState {
+	case domain.ToolStateExecuting:
+		// Emit ToolStart when entering executing state from idle
+		if oldState == domain.ToolStateIdle {
+			evt := e.events.ToolStart(
+				e.threadID,
+				e.messageID,
+				toolCallID,
+				toolName,
+				"", // Arguments will be added if available
+			)
+			if result != nil {
+				evt.ToolArguments = result.Arguments
+			}
+			e.yield(evt, nil)
+		}
+
 	case domain.ToolStateAwaitingInput:
 		if elicitation != nil {
-			awaitEvt := e.events.ToolAwaitingInput(
+			awaitEvt := e.events.ToolNeedsInput(
 				e.threadID,
 				e.messageID,
 				toolCallID,
@@ -1043,16 +1056,37 @@ func (e *ToolStateEventEmitter) OnToolStateChanged(
 		}
 
 	case domain.ToolStateAwaitingAuth:
-		// Authorization events will be added in future
-		// For now, just emit state change
+		// ToolNeedsAuth will be emitted when authorization spec is available
+		// For now handled by the tool state machine observer pattern
 
 	case domain.ToolStateCompleted:
-		// Tool completion is already tracked via ToolCallExecuted event
-		// The state change event provides additional granularity
+		if result != nil {
+			evt := e.events.ToolSuccess(
+				e.threadID,
+				e.messageID,
+				toolCallID,
+				toolName,
+				result.Result,
+				result.Arguments,
+			)
+			e.yield(evt, nil)
+		}
 
 	case domain.ToolStateError:
-		// Errors are already tracked via ToolCallExecuted event with IsError=true
-		// The state change event provides additional granularity
+		if result != nil {
+			errorMsg := result.Result
+			if result.IsError {
+				evt := e.events.ToolError(
+					e.threadID,
+					e.messageID,
+					toolCallID,
+					toolName,
+					errorMsg,
+					result.Arguments,
+				)
+				e.yield(evt, nil)
+			}
+		}
 	}
 }
 

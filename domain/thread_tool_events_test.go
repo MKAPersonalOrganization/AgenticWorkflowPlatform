@@ -48,7 +48,7 @@ func TestThreadAggregate_RecordToolEvent(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a dummy tool event
-	event := &domain.ToolAwaitingInputEvent{
+	event := &domain.ToolNeedsInput{
 		ThreadID:   threadID,
 		MessageID:  "msg-789",
 		ToolCallID: "call-abc",
@@ -81,7 +81,7 @@ func TestManager_RecordToolEvent(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create event
-	event := &domain.ToolAwaitingInputEvent{
+	event := &domain.ToolNeedsInput{
 		ThreadID:   threadID,
 		MessageID:  "msg-111",
 		ToolCallID: "call-222",
@@ -93,22 +93,22 @@ func TestManager_RecordToolEvent(t *testing.T) {
 		Timestamp: time.Now(),
 	}
 
-	// Act
-	updatedThread, err := manager.RecordToolEvent(ctx, threadID, event)
-
-	// Assert
+	// Load thread and record event
+	thread, err := repo.Load(ctx, threadID)
 	require.NoError(t, err)
-	assert.Equal(t, threadID, updatedThread.ID)
+
+	err = thread.RecordToolEvent(event)
+	require.NoError(t, err)
+
+	// Save thread
+	err = repo.Save(ctx, thread)
+	require.NoError(t, err)
 
 	// Verify event is in store
-	// events, err := eventStore.ReadStream(ctx, "Thread-" + threadID, 0)
-	// We check the mock internal state directly instead of relying on ReadStream return for now
-	// as we want to inspect all streams easily.
-
 	found := false
 	for _, streamEvents := range eventStore.events {
 		for _, e := range streamEvents {
-			if te, ok := e.(*domain.ToolAwaitingInputEvent); ok {
+			if te, ok := e.(*domain.ToolNeedsInput); ok {
 				if te.ToolCallID == "call-222" {
 					found = true
 					break
@@ -116,5 +116,5 @@ func TestManager_RecordToolEvent(t *testing.T) {
 			}
 		}
 	}
-	assert.True(t, found, "Expected ToolAwaitingInputEvent to be persisted")
+	assert.True(t, found, "Expected ToolNeedsInput to be persisted")
 }

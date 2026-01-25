@@ -158,7 +158,7 @@ func (m *Manager) AddToolResultMessage(ctx context.Context, threadID, messageID,
 }
 
 // UpdateThreadTitle updates the title of a thread.
-func (m *Manager) UpdateThreadTitle(ctx context.Context, threadID, newTitle string) (*domain.ThreadTitleUpdatedEvent, error) {
+func (m *Manager) UpdateThreadTitle(ctx context.Context, threadID, newTitle string) (*domain.ThreadTitleUpdated, error) {
 	thread, err := m.threadRepo.Load(ctx, threadID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load thread: %w", err)
@@ -174,7 +174,7 @@ func (m *Manager) UpdateThreadTitle(ctx context.Context, threadID, newTitle stri
 		return nil, fmt.Errorf("failed to save thread: %w", err)
 	}
 
-	event := &domain.ThreadTitleUpdatedEvent{
+	event := &domain.ThreadTitleUpdated{
 		ThreadID:  threadID,
 		Title:     newTitle,
 		Timestamp: time.Now(),
@@ -207,7 +207,7 @@ func (m *Manager) GetPendingInputToolCall(ctx context.Context, threadID string) 
 	if err != nil {
 		return "", err
 	}
-	
+
 	for id, info := range thread.ActiveToolStates {
 		if info.Status == "AwaitingInput" {
 			return id, nil
@@ -222,7 +222,7 @@ func (m *Manager) GetPendingAuthToolCall(ctx context.Context, threadID string) (
 	if err != nil {
 		return "", err
 	}
-	
+
 	for id, info := range thread.ActiveToolStates {
 		if info.Status == "AwaitingAuth" {
 			return id, nil

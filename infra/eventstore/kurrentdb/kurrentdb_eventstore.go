@@ -208,10 +208,10 @@ func (s *KurrentDBEventStore) convertFromRecordedEvent(recordedEvent *kurrentdb.
 		event = e
 
 	case "ThreadTitleChanged", "ThreadTitleUpdated":
-		var e domain.ThreadTitleUpdatedEvent
+		var e domain.ThreadTitleUpdated
 		err := json.Unmarshal(recordedEvent.Data, &e)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal ThreadTitleUpdatedEvent: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal ThreadTitleUpdated: %w", err)
 		}
 		event = e
 
@@ -231,43 +231,91 @@ func (s *KurrentDBEventStore) convertFromRecordedEvent(recordedEvent *kurrentdb.
 		}
 		event = e
 
-	case "ToolStateChanged":
-		var e domain.ToolStateChangedEvent
+	case "ToolStart":
+		var e domain.ToolStart
 		err := json.Unmarshal(recordedEvent.Data, &e)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal ToolStateChangedEvent: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal ToolStart: %w", err)
 		}
 		event = &e
 
-	case "ToolAwaitingInput":
-		var e domain.ToolAwaitingInputEvent
+	case "ToolSuccess":
+		var e domain.ToolSuccess
 		err := json.Unmarshal(recordedEvent.Data, &e)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal ToolAwaitingInputEvent: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal ToolSuccess: %w", err)
 		}
 		event = &e
 
-	case "ToolAwaitingAuth":
-		var e domain.ToolAwaitingAuthEvent
+	case "ToolError":
+		var e domain.ToolError
 		err := json.Unmarshal(recordedEvent.Data, &e)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal ToolAwaitingAuthEvent: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal ToolError: %w", err)
 		}
 		event = &e
 
-	case "ToolInputProvided":
-		var e domain.ToolInputProvidedEvent
+	case "ToolNeedsInput":
+		var e domain.ToolNeedsInput
 		err := json.Unmarshal(recordedEvent.Data, &e)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal ToolInputProvidedEvent: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal ToolNeedsInput: %w", err)
 		}
 		event = &e
 
-	case "ToolAuthGranted":
-		var e domain.ToolAuthGrantedEvent
+	case "ToolNeedsAuth":
+		var e domain.ToolNeedsAuth
 		err := json.Unmarshal(recordedEvent.Data, &e)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal ToolAuthGrantedEvent: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal ToolNeedsAuth: %w", err)
+		}
+		event = &e
+
+	case "InputProvided":
+		var e domain.InputProvided
+		err := json.Unmarshal(recordedEvent.Data, &e)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal InputProvided: %w", err)
+		}
+		event = &e
+
+	case "AuthGranted":
+		var e domain.AuthGranted
+		err := json.Unmarshal(recordedEvent.Data, &e)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal AuthGranted: %w", err)
+		}
+		event = &e
+
+	case "AuthDenied":
+		var e domain.AuthDenied
+		err := json.Unmarshal(recordedEvent.Data, &e)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal AuthDenied: %w", err)
+		}
+		event = &e
+
+	case "ToolCancelled":
+		var e domain.ToolCancelled
+		err := json.Unmarshal(recordedEvent.Data, &e)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal ToolCancelled: %w", err)
+		}
+		event = &e
+
+	case "ActionsDetected":
+		var e domain.ActionsDetected
+		err := json.Unmarshal(recordedEvent.Data, &e)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal ActionsDetected: %w", err)
+		}
+		event = &e
+
+	case "TurnFinished":
+		var e domain.TurnFinished
+		err := json.Unmarshal(recordedEvent.Data, &e)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal TurnFinished: %w", err)
 		}
 		event = &e
 

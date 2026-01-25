@@ -364,27 +364,55 @@ func (t *ToolStateMachine) IsAwaitingAuth() bool {
 	return t.sm.MustState().(ToolState) == ToolStateAwaitingAuth
 }
 
-// ToolStateChangedEvent is emitted when a tool transitions between states.
-type ToolStateChangedEvent struct {
+// ToolStart is emitted when a tool begins execution.
+type ToolStart struct {
 	ThreadID      string    `json:"threadId"`
 	MessageID     string    `json:"messageId"`
 	ToolCallID    string    `json:"toolCallId"`
 	ToolName      string    `json:"toolName"`
-	OldState      string    `json:"oldState"`
-	NewState      string    `json:"newState"`
-	Result        string    `json:"result,omitempty"`
-	IsError       bool      `json:"isError,omitempty"`
 	ToolArguments string    `json:"arguments,omitempty"`
 	AgentName     string    `json:"agentName"`
 	Timestamp     time.Time `json:"timestamp"`
 }
 
-func (e ToolStateChangedEvent) EventType() string         { return "ToolStateChanged" }
-func (e ToolStateChangedEvent) EventTimestamp() time.Time { return e.Timestamp }
-func (e ToolStateChangedEvent) AggregateID() string       { return e.ThreadID }
+func (e ToolStart) EventType() string         { return "ToolStart" }
+func (e ToolStart) EventTimestamp() time.Time { return e.Timestamp }
+func (e ToolStart) AggregateID() string       { return e.ThreadID }
 
-// ToolAwaitingInputEvent is emitted when a tool requests user input (elicitation).
-type ToolAwaitingInputEvent struct {
+// ToolSuccess is emitted when a tool completes successfully.
+type ToolSuccess struct {
+	ThreadID      string    `json:"threadId"`
+	MessageID     string    `json:"messageId"`
+	ToolCallID    string    `json:"toolCallId"`
+	ToolName      string    `json:"toolName"`
+	Result        string    `json:"result"`
+	ToolArguments string    `json:"arguments,omitempty"`
+	AgentName     string    `json:"agentName"`
+	Timestamp     time.Time `json:"timestamp"`
+}
+
+func (e ToolSuccess) EventType() string         { return "ToolSuccess" }
+func (e ToolSuccess) EventTimestamp() time.Time { return e.Timestamp }
+func (e ToolSuccess) AggregateID() string       { return e.ThreadID }
+
+// ToolError is emitted when a tool execution fails.
+type ToolError struct {
+	ThreadID      string    `json:"threadId"`
+	MessageID     string    `json:"messageId"`
+	ToolCallID    string    `json:"toolCallId"`
+	ToolName      string    `json:"toolName"`
+	Error         string    `json:"error"`
+	ToolArguments string    `json:"arguments,omitempty"`
+	AgentName     string    `json:"agentName"`
+	Timestamp     time.Time `json:"timestamp"`
+}
+
+func (e ToolError) EventType() string         { return "ToolError" }
+func (e ToolError) EventTimestamp() time.Time { return e.Timestamp }
+func (e ToolError) AggregateID() string       { return e.ThreadID }
+
+// ToolNeedsInput is emitted when a tool requests user input (elicitation).
+type ToolNeedsInput struct {
 	ThreadID    string                `json:"threadId"`
 	MessageID   string                `json:"messageId"`
 	ToolCallID  string                `json:"toolCallId"`
@@ -394,12 +422,12 @@ type ToolAwaitingInputEvent struct {
 	Timestamp   time.Time             `json:"timestamp"`
 }
 
-func (e ToolAwaitingInputEvent) EventType() string         { return "ToolAwaitingInput" }
-func (e ToolAwaitingInputEvent) EventTimestamp() time.Time { return e.Timestamp }
-func (e ToolAwaitingInputEvent) AggregateID() string       { return e.ThreadID }
+func (e ToolNeedsInput) EventType() string         { return "ToolNeedsInput" }
+func (e ToolNeedsInput) EventTimestamp() time.Time { return e.Timestamp }
+func (e ToolNeedsInput) AggregateID() string       { return e.ThreadID }
 
-// ToolAwaitingAuthEvent is emitted when a tool requests user authorization.
-type ToolAwaitingAuthEvent struct {
+// ToolNeedsAuth is emitted when a tool requests user authorization.
+type ToolNeedsAuth struct {
 	ThreadID   string                  `json:"threadId"`
 	MessageID  string                  `json:"messageId"`
 	ToolCallID string                  `json:"toolCallId"`
@@ -409,12 +437,12 @@ type ToolAwaitingAuthEvent struct {
 	Timestamp  time.Time               `json:"timestamp"`
 }
 
-func (e ToolAwaitingAuthEvent) EventType() string         { return "ToolAwaitingAuth" }
-func (e ToolAwaitingAuthEvent) EventTimestamp() time.Time { return e.Timestamp }
-func (e ToolAwaitingAuthEvent) AggregateID() string       { return e.ThreadID }
+func (e ToolNeedsAuth) EventType() string         { return "ToolNeedsAuth" }
+func (e ToolNeedsAuth) EventTimestamp() time.Time { return e.Timestamp }
+func (e ToolNeedsAuth) AggregateID() string       { return e.ThreadID }
 
-// ToolInputProvidedEvent is emitted when user provides input to a waiting tool.
-type ToolInputProvidedEvent struct {
+// InputProvided is emitted when user provides input to a waiting tool.
+type InputProvided struct {
 	ThreadID   string    `json:"threadId"`
 	MessageID  string    `json:"messageId"`
 	ToolCallID string    `json:"toolCallId"`
@@ -423,12 +451,12 @@ type ToolInputProvidedEvent struct {
 	Timestamp  time.Time `json:"timestamp"`
 }
 
-func (e ToolInputProvidedEvent) EventType() string         { return "ToolInputProvided" }
-func (e ToolInputProvidedEvent) EventTimestamp() time.Time { return e.Timestamp }
-func (e ToolInputProvidedEvent) AggregateID() string       { return e.ThreadID }
+func (e InputProvided) EventType() string         { return "InputProvided" }
+func (e InputProvided) EventTimestamp() time.Time { return e.Timestamp }
+func (e InputProvided) AggregateID() string       { return e.ThreadID }
 
-// ToolAuthGrantedEvent is emitted when user grants authorization to a waiting tool.
-type ToolAuthGrantedEvent struct {
+// AuthGranted is emitted when user grants authorization to a waiting tool.
+type AuthGranted struct {
 	ThreadID   string    `json:"threadId"`
 	MessageID  string    `json:"messageId"`
 	ToolCallID string    `json:"toolCallId"`
@@ -436,9 +464,36 @@ type ToolAuthGrantedEvent struct {
 	Timestamp  time.Time `json:"timestamp"`
 }
 
-func (e ToolAuthGrantedEvent) EventType() string         { return "ToolAuthGranted" }
-func (e ToolAuthGrantedEvent) EventTimestamp() time.Time { return e.Timestamp }
-func (e ToolAuthGrantedEvent) AggregateID() string       { return e.ThreadID }
+func (e AuthGranted) EventType() string         { return "AuthGranted" }
+func (e AuthGranted) EventTimestamp() time.Time { return e.Timestamp }
+func (e AuthGranted) AggregateID() string       { return e.ThreadID }
+
+// AuthDenied is emitted when user denies authorization to a waiting tool.
+type AuthDenied struct {
+	ThreadID   string    `json:"threadId"`
+	MessageID  string    `json:"messageId"`
+	ToolCallID string    `json:"toolCallId"`
+	AgentName  string    `json:"agentName"`
+	Timestamp  time.Time `json:"timestamp"`
+}
+
+func (e AuthDenied) EventType() string         { return "AuthDenied" }
+func (e AuthDenied) EventTimestamp() time.Time { return e.Timestamp }
+func (e AuthDenied) AggregateID() string       { return e.ThreadID }
+
+// ToolCancelled is emitted when a tool execution is cancelled.
+type ToolCancelled struct {
+	ThreadID   string    `json:"threadId"`
+	MessageID  string    `json:"messageId"`
+	ToolCallID string    `json:"toolCallId"`
+	ToolName   string    `json:"toolName"`
+	AgentName  string    `json:"agentName"`
+	Timestamp  time.Time `json:"timestamp"`
+}
+
+func (e ToolCancelled) EventType() string         { return "ToolCancelled" }
+func (e ToolCancelled) EventTimestamp() time.Time { return e.Timestamp }
+func (e ToolCancelled) AggregateID() string       { return e.ThreadID }
 
 // GetToolStateMachineGraph returns the DOT graph representation of the tool state machine.
 func GetToolStateMachineGraph() string {
