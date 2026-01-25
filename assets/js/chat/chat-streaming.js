@@ -304,17 +304,33 @@ export function createStreamingMethods() {
                 case 'TOKEN_USAGE_REPORTED':
                     this.__handleTokenUsageReported(event.value, state);
                     break;
-                case 'TOOL_STATE_CHANGED':
-                    this.__handleToolStateChanged(event.value, state);
+                // New specific tool lifecycle events
+                case 'TOOL_START':
+                    this.__handleToolStart(event.value, state);
                     break;
-                case 'TOOL_AWAITING_INPUT':
-                    this.__handleToolAwaitingInput(event.value, state, threadId);
+                case 'TOOL_SUCCESS':
+                    this.__handleToolSuccess(event.value, state);
                     break;
-                case 'TOOL_AWAITING_AUTH':
-                    this.__handleToolAwaitingAuth(event.value, state);
+                case 'TOOL_ERROR':
+                    this.__handleToolError(event.value, state);
                     break;
-                case 'TOOL_INPUT_PROVIDED':
-                    this.__handleToolInputProvided(event.value);
+                case 'TOOL_NEEDS_INPUT':
+                    this.__handleToolNeedsInput(event.value, state, threadId);
+                    break;
+                case 'TOOL_NEEDS_AUTH':
+                    this.__handleToolNeedsAuth(event.value, state);
+                    break;
+                case 'INPUT_PROVIDED':
+                    this.__handleInputProvided(event.value);
+                    break;
+                case 'AUTH_GRANTED':
+                    this.__handleAuthGranted(event.value);
+                    break;
+                case 'AUTH_DENIED':
+                    this.__handleAuthDenied(event.value);
+                    break;
+                case 'TOOL_CANCELLED':
+                    this.__handleToolCancelled(event.value, state);
                     break;
                 default:
                     console.warn('[Streaming] Unknown custom event:', event.name);
@@ -365,53 +381,60 @@ export function createStreamingMethods() {
             };
         },
 
-        __handleToolStateChanged(value, state) {
-            const { toolCallId, toolName, oldState, newState, result, isError, arguments: toolArgs, agentName } = value;
-            console.log(`[Tool] ${toolName} (${toolCallId}) state changed: ${oldState} → ${newState}`);
+        __handleToolStart(value, state) {
+            const { toolCallId, toolName, arguments: toolArgs, agentName } = value;
+            console.log(`[Tool] ${toolName} (${toolCallId}) started`);
 
             this.__ensureToolCallMessage(state, toolCallId, toolName, agentName);
 
-            // Sync arguments if provided in the event (crucial for streaming UI)
+            // Sync arguments
             const msg = state.messages.find(m => m.id === toolCallId);
             if (msg && toolArgs) {
                 msg.args = toolArgs;
                 msg.parsedArgs = safeParseJSON(toolArgs);
             }
 
-            // Map state changes to XState events
-            let eventType = null;
-            const payload = { toolName, result, error: isError ? result : null };
-
-            switch (newState) {
-                case 'executing':
-                    if (oldState === 'idle') eventType = TOOL_EVENTS.START;
-                    if (oldState === 'awaiting_input') eventType = TOOL_EVENTS.INPUT_PROVIDED;
-                    if (oldState === 'awaiting_auth') eventType = TOOL_EVENTS.AUTH_GRANTED;
-                    break;
-                case 'completed':
-                    eventType = TOOL_EVENTS.SUCCESS;
-                    break;
-                case 'error':
-                    eventType = TOOL_EVENTS.ERROR;
-                    break;
-                case 'awaiting_input':
-                    eventType = TOOL_EVENTS.NEEDS_INPUT;
-                    break;
-                case 'awaiting_auth':
-                    eventType = TOOL_EVENTS.NEEDS_AUTH;
-                    break;
-            }
-
-            if (eventType) {
-                this.transitionToolState(toolCallId, eventType, payload);
-            }
-
+            this.transitionToolState(toolCallId, TOOL_EVENTS.START, { toolName });
             this.__updateDerivedState();
         },
 
-        __handleToolAwaitingInput(value, state, threadId) {
+        __handleToolSuccess(value, state) {
+            const { toolCallId, toolName, result, arguments: toolArgs, agentName } = value;
+            console.log(`[Tool] ${toolName} (${toolCallId}) completed successfully`);
+
+            this.__ensureToolCallMessage(state, toolCallId, toolName, agentName);
+
+            // Sync arguments if provided
+            const msg = state.messages.find(m => m.id === toolCallId);
+            if (msg && toolArgs) {
+                msg.args = toolArgs;
+                msg.parsedArgs = safeParseJSON(toolArgs);
+            }
+
+            this.transitionToolState(toolCallId, TOOL_EVENTS.SUCCESS, { toolName, result });
+            this.__updateDerivedState();
+        },
+
+        __handleToolError(value, state) {
+            const { toolCallId, toolName, error, arguments: toolArgs, agentName } = value;
+            console.log(`[Tool] ${toolName} (${toolCallId}) error:`, error);
+
+            this.__ensureToolCallMessage(state, toolCallId, toolName, agentName);
+
+            // Sync arguments if provided
+            const msg = state.messages.find(m => m.id === toolCallId);
+            if (msg && toolArgs) {
+                msg.args = toolArgs;
+                msg.parsedArgs = safeParseJSON(toolArgs);
+            }
+
+            this.transitionToolState(toolCallId, TOOL_EVENTS.ERROR, { toolName, error });
+            this.__updateDerivedState();
+        },
+
+        __handleToolNeedsInput(value, state, threadId) {
             const { toolCallId, toolName, question, schema, agentName } = value;
-            console.log(`[Tool] ${toolName} awaiting input: ${question}`);
+            console.log(`[Tool] ${toolName} needs input: ${question}`);
 
             this.__ensureToolCallMessage(state, toolCallId, toolName, agentName);
 
@@ -433,18 +456,41 @@ export function createStreamingMethods() {
             this.__updateDerivedState();
         },
 
-        __handleToolAwaitingAuth(value, state) {
+        __handleToolNeedsAuth(value, state) {
             const { toolCallId, toolName, authSpec, agentName } = value;
-            console.log(`[Tool] ${toolName} awaiting authorization: ${authSpec.reason}`);
+            console.log(`[Tool] ${toolName} needs authorization: ${authSpec.reason}`);
 
             this.__ensureToolCallMessage(state, toolCallId, toolName, agentName);
             this.transitionToolState(toolCallId, TOOL_EVENTS.NEEDS_AUTH, { authSpec });
             this.__updateDerivedState();
         },
 
-        __handleToolInputProvided(value) {
+        __handleInputProvided(value) {
             const { toolCallId, input } = value;
+            console.log(`[Tool] Input provided for ${toolCallId}`);
             this.transitionToolState(toolCallId, TOOL_EVENTS.INPUT_PROVIDED, { input });
+            this.__updateDerivedState();
+        },
+
+        __handleAuthGranted(value) {
+            const { toolCallId } = value;
+            console.log(`[Tool] Authorization granted for ${toolCallId}`);
+            this.transitionToolState(toolCallId, TOOL_EVENTS.AUTH_GRANTED, {});
+            this.__updateDerivedState();
+        },
+
+        __handleAuthDenied(value) {
+            const { toolCallId } = value;
+            console.log(`[Tool] Authorization denied for ${toolCallId}`);
+            this.transitionToolState(toolCallId, TOOL_EVENTS.AUTH_DENIED, {});
+            this.__updateDerivedState();
+        },
+
+        __handleToolCancelled(value, state) {
+            const { toolCallId, toolName } = value;
+            console.log(`[Tool] ${toolName} (${toolCallId}) cancelled`);
+
+            this.transitionToolState(toolCallId, TOOL_EVENTS.CANCELLED, { toolName });
             this.__updateDerivedState();
         },
 

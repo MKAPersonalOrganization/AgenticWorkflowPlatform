@@ -66,8 +66,8 @@ func (p *PostgresAguiProjection) RegisterHandlers(router interface {
 	router.Register(&domain.MessageAdded{}, func(ctx context.Context, e core.Event) error {
 		return p.applyMessageAdded(ctx, *e.(*domain.MessageAdded))
 	})
-	router.Register(&domain.ThreadTitleUpdatedEvent{}, func(ctx context.Context, e core.Event) error {
-		return p.applyThreadTitleChanged(ctx, *e.(*domain.ThreadTitleUpdatedEvent))
+	router.Register(&domain.ThreadTitleUpdated{}, func(ctx context.Context, e core.Event) error {
+		return p.applyThreadTitleChanged(ctx, *e.(*domain.ThreadTitleUpdated))
 	})
 	router.Register(&domain.ThreadDeleted{}, func(ctx context.Context, e core.Event) error {
 		return p.applyThreadDeleted(ctx, *e.(*domain.ThreadDeleted))
@@ -75,20 +75,27 @@ func (p *PostgresAguiProjection) RegisterHandlers(router interface {
 	router.Register(&domain.TokenUsageReported{}, func(ctx context.Context, e core.Event) error {
 		return p.applyTokenUsageReported(ctx, *e.(*domain.TokenUsageReported))
 	})
-	router.Register(&domain.ToolStateChangedEvent{}, func(ctx context.Context, e core.Event) error {
-		return p.applyToolStateChanged(ctx, *e.(*domain.ToolStateChangedEvent))
+	// Tool lifecycle events
+	router.Register(&domain.ToolStart{}, func(ctx context.Context, e core.Event) error {
+		return p.applyToolStart(ctx, *e.(*domain.ToolStart))
 	})
-	router.Register(&domain.ToolAwaitingInputEvent{}, func(ctx context.Context, e core.Event) error {
-		return p.applyToolAwaitingInput(ctx, *e.(*domain.ToolAwaitingInputEvent))
+	router.Register(&domain.ToolSuccess{}, func(ctx context.Context, e core.Event) error {
+		return p.applyToolSuccess(ctx, *e.(*domain.ToolSuccess))
 	})
-	router.Register(&domain.ToolAwaitingAuthEvent{}, func(ctx context.Context, e core.Event) error {
-		return p.applyToolAwaitingAuth(ctx, *e.(*domain.ToolAwaitingAuthEvent))
+	router.Register(&domain.ToolError{}, func(ctx context.Context, e core.Event) error {
+		return p.applyToolError(ctx, *e.(*domain.ToolError))
 	})
-	router.Register(&domain.ToolInputProvidedEvent{}, func(ctx context.Context, e core.Event) error {
-		return p.applyToolInputProvided(ctx, *e.(*domain.ToolInputProvidedEvent))
+	router.Register(&domain.ToolNeedsInput{}, func(ctx context.Context, e core.Event) error {
+		return p.applyToolNeedsInput(ctx, *e.(*domain.ToolNeedsInput))
 	})
-	router.Register(&domain.ToolAuthGrantedEvent{}, func(ctx context.Context, e core.Event) error {
-		return p.applyToolAuthGranted(ctx, *e.(*domain.ToolAuthGrantedEvent))
+	router.Register(&domain.ToolNeedsAuth{}, func(ctx context.Context, e core.Event) error {
+		return p.applyToolNeedsAuth(ctx, *e.(*domain.ToolNeedsAuth))
+	})
+	router.Register(&domain.InputProvided{}, func(ctx context.Context, e core.Event) error {
+		return p.applyInputProvided(ctx, *e.(*domain.InputProvided))
+	})
+	router.Register(&domain.AuthGranted{}, func(ctx context.Context, e core.Event) error {
+		return p.applyAuthGranted(ctx, *e.(*domain.AuthGranted))
 	})
 }
 
@@ -184,7 +191,7 @@ func (p *PostgresAguiProjection) applyMessageAdded(ctx context.Context, event do
 }
 
 // applyThreadTitleChanged updates the thread title.
-func (p *PostgresAguiProjection) applyThreadTitleChanged(ctx context.Context, event domain.ThreadTitleUpdatedEvent) error {
+func (p *PostgresAguiProjection) applyThreadTitleChanged(ctx context.Context, event domain.ThreadTitleUpdated) error {
 	query := `
 		UPDATE agui_threads
 		SET title = $1, updated_at = $2, version = version + 1
@@ -253,10 +260,8 @@ func (p *PostgresAguiProjection) applyTokenUsageReported(ctx context.Context, ev
 	return nil
 }
 
-// applyToolStateChanged updates the tool state in message metadata.
-func (p *PostgresAguiProjection) applyToolStateChanged(ctx context.Context, event domain.ToolStateChangedEvent) error {
-	// Update or insert tool state in the tool_states JSONB array
-	// The structure is an array of tool state objects keyed by toolCallId
+// applyToolStart updates the tool state when execution starts.
+func (p *PostgresAguiProjection) applyToolStart(ctx context.Context, event domain.ToolStart) error {
 	query := `
 		UPDATE agui_messages
 		SET metadata = COALESCE(metadata, '{}'::jsonb) ||
@@ -266,35 +271,94 @@ func (p *PostgresAguiProjection) applyToolStateChanged(ctx context.Context, even
 				jsonb_build_array(
 					jsonb_build_object(
 						'toolCallId', $1::text,
-						'state', $2::text,
-						'oldState', $3::text,
-						'result', $4::text,
-						'isError', $5::boolean,
-						'arguments', $6::text,
-						'timestamp', $7::timestamp
+						'state', 'executing',
+						'arguments', $2::text,
+						'timestamp', $3::timestamp
 					)
 				)
 			)
-		WHERE message_id = $8
+		WHERE message_id = $4
 	`
 	_, err := p.db.ExecContext(ctx, query,
 		event.ToolCallID,
-		event.NewState,
-		event.OldState,
-		event.Result,
-		event.IsError,
 		event.ToolArguments,
 		event.Timestamp,
 		event.MessageID,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to update tool state: %w", err)
+		return fmt.Errorf("failed to update tool start: %w", err)
 	}
 	return nil
 }
 
-// applyToolAwaitingInput updates the tool state with elicitation info.
-func (p *PostgresAguiProjection) applyToolAwaitingInput(ctx context.Context, event domain.ToolAwaitingInputEvent) error {
+// applyToolSuccess updates the tool state when execution completes successfully.
+func (p *PostgresAguiProjection) applyToolSuccess(ctx context.Context, event domain.ToolSuccess) error {
+	query := `
+		UPDATE agui_messages
+		SET metadata = COALESCE(metadata, '{}'::jsonb) ||
+			jsonb_build_object(
+				'toolStates',
+				COALESCE(metadata->'toolStates', '[]'::jsonb) ||
+				jsonb_build_array(
+					jsonb_build_object(
+						'toolCallId', $1::text,
+						'state', 'completed',
+						'result', $2::text,
+						'arguments', $3::text,
+						'timestamp', $4::timestamp
+					)
+				)
+			)
+		WHERE message_id = $5
+	`
+	_, err := p.db.ExecContext(ctx, query,
+		event.ToolCallID,
+		event.Result,
+		event.ToolArguments,
+		event.Timestamp,
+		event.MessageID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update tool success: %w", err)
+	}
+	return nil
+}
+
+// applyToolError updates the tool state when execution fails.
+func (p *PostgresAguiProjection) applyToolError(ctx context.Context, event domain.ToolError) error {
+	query := `
+		UPDATE agui_messages
+		SET metadata = COALESCE(metadata, '{}'::jsonb) ||
+			jsonb_build_object(
+				'toolStates',
+				COALESCE(metadata->'toolStates', '[]'::jsonb) ||
+				jsonb_build_array(
+					jsonb_build_object(
+						'toolCallId', $1::text,
+						'state', 'error',
+						'error', $2::text,
+						'arguments', $3::text,
+						'timestamp', $4::timestamp
+					)
+				)
+			)
+		WHERE message_id = $5
+	`
+	_, err := p.db.ExecContext(ctx, query,
+		event.ToolCallID,
+		event.Error,
+		event.ToolArguments,
+		event.Timestamp,
+		event.MessageID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update tool error: %w", err)
+	}
+	return nil
+}
+
+// applyToolNeedsInput updates the tool state with elicitation info.
+func (p *PostgresAguiProjection) applyToolNeedsInput(ctx context.Context, event domain.ToolNeedsInput) error {
 	elicitationJSON, err := json.Marshal(event.Elicitation)
 	if err != nil {
 		return fmt.Errorf("failed to marshal elicitation: %w", err)
@@ -329,8 +393,8 @@ func (p *PostgresAguiProjection) applyToolAwaitingInput(ctx context.Context, eve
 	return nil
 }
 
-// applyToolAwaitingAuth updates the tool state with authorization info.
-func (p *PostgresAguiProjection) applyToolAwaitingAuth(ctx context.Context, event domain.ToolAwaitingAuthEvent) error {
+// applyToolNeedsAuth updates the tool state with authorization info.
+func (p *PostgresAguiProjection) applyToolNeedsAuth(ctx context.Context, event domain.ToolNeedsAuth) error {
 	authSpecJSON, err := json.Marshal(event.AuthSpec)
 	if err != nil {
 		return fmt.Errorf("failed to marshal auth spec: %w", err)
@@ -365,8 +429,8 @@ func (p *PostgresAguiProjection) applyToolAwaitingAuth(ctx context.Context, even
 	return nil
 }
 
-// applyToolInputProvided updates the tool state with provided input.
-func (p *PostgresAguiProjection) applyToolInputProvided(ctx context.Context, event domain.ToolInputProvidedEvent) error {
+// applyInputProvided updates the tool state with provided input.
+func (p *PostgresAguiProjection) applyInputProvided(ctx context.Context, event domain.InputProvided) error {
 	query := `
 		UPDATE agui_messages
 		SET metadata = COALESCE(metadata, '{}'::jsonb) ||
@@ -398,8 +462,8 @@ func (p *PostgresAguiProjection) applyToolInputProvided(ctx context.Context, eve
 	return nil
 }
 
-// applyToolAuthGranted updates the tool state with auth granted.
-func (p *PostgresAguiProjection) applyToolAuthGranted(ctx context.Context, event domain.ToolAuthGrantedEvent) error {
+// applyAuthGranted updates the tool state with auth granted.
+func (p *PostgresAguiProjection) applyAuthGranted(ctx context.Context, event domain.AuthGranted) error {
 	query := `
 		UPDATE agui_messages
 		SET metadata = COALESCE(metadata, '{}'::jsonb) ||

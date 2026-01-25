@@ -14,7 +14,7 @@ func TestThreadAggregate_ActiveToolStates(t *testing.T) {
 	thread := domain.NewThreadAggregate("thread-1")
 
 	// 1. Tool enters AwaitingInput
-	awaitInput := &domain.ToolAwaitingInputEvent{
+	awaitInput := domain.ToolNeedsInput{
 		ThreadID:   "thread-1",
 		MessageID:  "msg-1",
 		ToolCallID: "call-1",
@@ -32,7 +32,7 @@ func TestThreadAggregate_ActiveToolStates(t *testing.T) {
 	assert.Equal(t, "Input?", thread.ActiveToolStates["call-1"].Elicitation["question"])
 
 	// 2. Input Provided
-	inputProvided := &domain.ToolInputProvidedEvent{
+	inputProvided := domain.InputProvided{
 		ThreadID:   "thread-1",
 		MessageID:  "msg-2",
 		ToolCallID: "call-1",
@@ -65,7 +65,7 @@ func TestThreadAggregate_ActiveToolStates_Auth(t *testing.T) {
 	thread := domain.NewThreadAggregate("thread-1")
 
 	// 1. Awaiting Auth
-	awaitAuth := &domain.ToolAwaitingAuthEvent{
+	awaitAuth := domain.ToolNeedsAuth{
 		ThreadID:   "thread-1",
 		MessageID:  "msg-1",
 		ToolCallID: "call-2",
@@ -84,7 +84,7 @@ func TestThreadAggregate_ActiveToolStates_Auth(t *testing.T) {
 	assert.Equal(t, "read", thread.ActiveToolStates["call-2"].AuthSpec["action"])
 
 	// 2. Auth Granted
-	granted := &domain.ToolAuthGrantedEvent{
+	granted := domain.AuthGranted{
 		ThreadID:   "thread-1",
 		MessageID:  "msg-2",
 		ToolCallID: "call-2",

@@ -246,11 +246,11 @@ func TestEngine_Run(t *testing.T) {
 
 	for _, evt := range events {
 		switch e := evt.(type) {
-		case *domain.AssistantMessageStartedEvent:
+		case *domain.AssistantMessageStarted:
 			foundStarted = true
-		case *domain.AssistantContentStreamedEvent:
+		case *domain.AssistantContentStreamed:
 			foundStreamed = true
-		case *domain.AssistantMessageCompletedEvent:
+		case *domain.AssistantMessageCompleted:
 			foundCompleted = true
 			if e.Content != "Hello World" {
 				t.Errorf("Expected content 'Hello World', got '%s'", e.Content)

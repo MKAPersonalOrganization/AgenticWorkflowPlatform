@@ -20,8 +20,8 @@ func TestToAguiEvents(t *testing.T) {
 		expected []any
 	}{
 		{
-			name: "RunStartedEvent",
-			event: &domain.RunStartedEvent{
+			name: "RunStarted",
+			event: &domain.RunStarted{
 				ThreadID:  "thread-1",
 				RunID:     "run-1",
 				Timestamp: now,
@@ -31,8 +31,8 @@ func TestToAguiEvents(t *testing.T) {
 			},
 		},
 		{
-			name: "RunFinishedEvent",
-			event: &domain.RunFinishedEvent{
+			name: "RunFinished",
+			event: &domain.RunFinished{
 				ThreadID:  "thread-1",
 				RunID:     "run-1",
 				Timestamp: now,
@@ -42,8 +42,8 @@ func TestToAguiEvents(t *testing.T) {
 			},
 		},
 		{
-			name: "RunErrorEvent",
-			event: &domain.RunErrorEvent{
+			name: "RunError",
+			event: &domain.RunError{
 				ThreadID:  "thread-1",
 				Message:   "error message",
 				ErrorCode: "ERR-001",
@@ -54,8 +54,8 @@ func TestToAguiEvents(t *testing.T) {
 			},
 		},
 		{
-			name: "ThreadTitleUpdatedEvent",
-			event: &domain.ThreadTitleUpdatedEvent{
+			name: "ThreadTitleUpdated",
+			event: &domain.ThreadTitleUpdated{
 				ThreadID:  "thread-1",
 				Title:     "New Title",
 				Timestamp: now,
@@ -68,8 +68,8 @@ func TestToAguiEvents(t *testing.T) {
 			},
 		},
 		{
-			name: "AssistantMessageStartedEvent",
-			event: &domain.AssistantMessageStartedEvent{
+			name: "AssistantMessageStarted",
+			event: &domain.AssistantMessageStarted{
 				ThreadID:  "thread-1",
 				MessageID: "msg-1",
 				Timestamp: now,
@@ -79,8 +79,8 @@ func TestToAguiEvents(t *testing.T) {
 			},
 		},
 		{
-			name: "AssistantContentStreamedEvent",
-			event: &domain.AssistantContentStreamedEvent{
+			name: "AssistantContentStreamed",
+			event: &domain.AssistantContentStreamed{
 				ThreadID:  "thread-1",
 				MessageID: "msg-1",
 				Delta:     "hello",
@@ -91,8 +91,8 @@ func TestToAguiEvents(t *testing.T) {
 			},
 		},
 		{
-			name: "AssistantMessageCompletedEvent",
-			event: &domain.AssistantMessageCompletedEvent{
+			name: "AssistantMessageCompleted",
+			event: &domain.AssistantMessageCompleted{
 				ThreadID:  "thread-1",
 				MessageID: "msg-1",
 				Timestamp: now,
@@ -102,30 +102,23 @@ func TestToAguiEvents(t *testing.T) {
 			},
 		},
 		{
-			name: "ToolStateChangedEvent",
-			event: &domain.ToolStateChangedEvent{
+			name: "ToolSuccess",
+			event: &domain.ToolSuccess{
 				ThreadID:      "thread-1",
 				MessageID:     "msg-1",
 				ToolCallID:    "tool-1",
 				ToolName:      "test-tool",
-				OldState:      "executing",
-				NewState:      "completed",
 				Result:        "{\"success\": true}",
-				IsError:       false,
 				ToolArguments: "{\"arg1\": 1}",
 				Timestamp:     now,
 			},
 			expected: []any{
-				aguievents.NewCustomEvent("TOOL_STATE_CHANGED", aguievents.WithValue(map[string]any{
-					"threadId":   "thread-1",
-					"messageId":  "msg-1",
+				aguievents.NewCustomEvent("TOOL_SUCCESS", aguievents.WithValue(map[string]any{
 					"toolCallId": "tool-1",
 					"toolName":   "test-tool",
-					"oldState":   "executing",
-					"newState":   "completed",
 					"result":     "{\"success\": true}",
-					"isError":    false,
 					"arguments":  "{\"arg1\": 1}",
+					"agentName":  "",
 					"timestamp":  now,
 				})),
 			},

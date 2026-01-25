@@ -29,13 +29,16 @@ func (p *PostgresProjection) RegisterHandlers(router interface {
 	Register(eventPrototype any, handler event.HandlerFunc)
 },
 ) {
-	router.Register(&domain.ToolStateChangedEvent{}, func(ctx context.Context, e core.Event) error {
+	router.Register(&domain.ToolSuccess{}, func(ctx context.Context, e core.Event) error {
 		return p.HandleEvent(ctx, e)
 	})
-	router.Register(&domain.AssistantMessageCompletedEvent{}, func(ctx context.Context, e core.Event) error {
+	router.Register(&domain.ToolError{}, func(ctx context.Context, e core.Event) error {
 		return p.HandleEvent(ctx, e)
 	})
-	router.Register(&domain.RunErrorEvent{}, func(ctx context.Context, e core.Event) error {
+	router.Register(&domain.AssistantMessageCompleted{}, func(ctx context.Context, e core.Event) error {
+		return p.HandleEvent(ctx, e)
+	})
+	router.Register(&domain.RunError{}, func(ctx context.Context, e core.Event) error {
 		return p.HandleEvent(ctx, e)
 	})
 }
@@ -43,68 +46,69 @@ func (p *PostgresProjection) RegisterHandlers(router interface {
 // HandleEvent processes domain events to update statistics in the database.
 func (p *PostgresProjection) HandleEvent(ctx context.Context, event core.Event) error {
 	switch e := event.(type) {
-	case *domain.ToolStateChangedEvent:
-		if e.NewState == "completed" || e.NewState == "error" {
-			return p.updateToolStats(ctx, e)
-		}
-		return nil
-	case *domain.AssistantMessageCompletedEvent:
+	case *domain.ToolSuccess:
+		return p.updateToolSuccessStats(ctx, e)
+	case *domain.ToolError:
+		return p.updateToolErrorStats(ctx, e)
+	case *domain.AssistantMessageCompleted:
 		return p.updateMessageStats(ctx, e)
-	case *domain.RunErrorEvent:
-		// We'll need to figure out which agent was active for RunErrorEvent.
+	case *domain.RunError:
+		// We'll need to figure out which agent was active for RunError.
 		// For now, let's just track it as a global or see if we can get agent from context.
 		return p.updateErrorStats(ctx, e)
 	}
 	return nil
 }
 
-func (p *PostgresProjection) updateToolStats(ctx context.Context, e *domain.ToolStateChangedEvent) error {
-	var (
-		incSuccess = 0
-		incFailure = 0
-		lastSucc   *time.Time
-		lastFail   *time.Time
-	)
-
-	if e.IsError || e.NewState == "error" {
-		incFailure = 1
-		lastFail = &e.Timestamp
-	} else if e.NewState == "completed" {
-		incSuccess = 1
-		lastSucc = &e.Timestamp
-	} else {
-		return nil
-	}
-
+func (p *PostgresProjection) updateToolSuccessStats(ctx context.Context, e *domain.ToolSuccess) error {
 	query := `
-		INSERT INTO analytics_stats (agent_name, category, name, total_count, successes, failures, last_failure, last_success, updated_at)
-		VALUES ($1, 'tool', $2, 1, $3, $4, $5, $6, $7)
+		INSERT INTO analytics_stats (agent_name, category, name, total_count, successes, failures, last_success, updated_at)
+		VALUES ($1, 'tool', $2, 1, 1, 0, $3, $4)
 		ON CONFLICT (agent_name, category, name) DO UPDATE SET
 			total_count = analytics_stats.total_count + 1,
-			successes = analytics_stats.successes + $3,
-			failures = analytics_stats.failures + $4,
-			last_failure = COALESCE($5, analytics_stats.last_failure),
-			last_success = COALESCE($6, analytics_stats.last_success),
-			updated_at = $7
+			successes = analytics_stats.successes + 1,
+			last_success = $3,
+			updated_at = $4
 	`
 
 	_, err := p.db.ExecContext(ctx, query,
 		e.AgentName,
 		e.ToolName,
-		incSuccess,
-		incFailure,
-		lastFail,
-		lastSucc,
+		e.Timestamp,
 		time.Now(),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to update tool stats for %s (agent: %s): %w", e.ToolName, e.AgentName, err)
+		return fmt.Errorf("failed to update tool success stats for %s (agent: %s): %w", e.ToolName, e.AgentName, err)
 	}
 
 	return nil
 }
 
-func (p *PostgresProjection) updateMessageStats(ctx context.Context, e *domain.AssistantMessageCompletedEvent) error {
+func (p *PostgresProjection) updateToolErrorStats(ctx context.Context, e *domain.ToolError) error {
+	query := `
+		INSERT INTO analytics_stats (agent_name, category, name, total_count, successes, failures, last_failure, updated_at)
+		VALUES ($1, 'tool', $2, 1, 0, 1, $3, $4)
+		ON CONFLICT (agent_name, category, name) DO UPDATE SET
+			total_count = analytics_stats.total_count + 1,
+			failures = analytics_stats.failures + 1,
+			last_failure = $3,
+			updated_at = $4
+	`
+
+	_, err := p.db.ExecContext(ctx, query,
+		e.AgentName,
+		e.ToolName,
+		e.Timestamp,
+		time.Now(),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update tool error stats for %s (agent: %s): %w", e.ToolName, e.AgentName, err)
+	}
+
+	return nil
+}
+
+func (p *PostgresProjection) updateMessageStats(ctx context.Context, e *domain.AssistantMessageCompleted) error {
 	query := `
 		INSERT INTO analytics_stats (agent_name, category, name, total_count, successes, updated_at)
 		VALUES ($1, 'message', 'total', 1, 1, $2)
@@ -117,7 +121,7 @@ func (p *PostgresProjection) updateMessageStats(ctx context.Context, e *domain.A
 	return err
 }
 
-func (p *PostgresProjection) updateErrorStats(ctx context.Context, e *domain.RunErrorEvent) error {
+func (p *PostgresProjection) updateErrorStats(ctx context.Context, e *domain.RunError) error {
 	// Attempt to get agent name from context if available, otherwise use 'unknown'
 	agentName := "unknown"
 	query := `

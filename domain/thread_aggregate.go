@@ -97,7 +97,7 @@ func (t *ThreadAggregate) ChangeTitle(newTitle string) error {
 		return nil
 	}
 
-	event := ThreadTitleUpdatedEvent{
+	event := ThreadTitleUpdated{
 		ThreadID:  t.ID,
 		Title:     newTitle,
 		Timestamp: time.Now(),
@@ -183,7 +183,7 @@ func (t *ThreadAggregate) Apply(event Event) {
 			delete(t.ActiveToolStates, e.ToolCallID)
 		}
 
-	case ThreadTitleUpdatedEvent:
+	case ThreadTitleUpdated:
 		t.Title = e.Title
 		t.UpdatedAt = e.Timestamp
 
@@ -191,7 +191,7 @@ func (t *ThreadAggregate) Apply(event Event) {
 		t.IsDeleted = true
 		t.UpdatedAt = e.Timestamp
 
-	case *ToolAwaitingInputEvent:
+	case ToolNeedsInput:
 		state := ToolCallState{
 			ToolCallID: e.ToolCallID,
 			Status:     "AwaitingInput",
@@ -202,7 +202,7 @@ func (t *ThreadAggregate) Apply(event Event) {
 		}
 		t.ActiveToolStates[e.ToolCallID] = state
 
-	case *ToolAwaitingAuthEvent:
+	case ToolNeedsAuth:
 		state := ToolCallState{
 			ToolCallID: e.ToolCallID,
 			Status:     "AwaitingAuth",
@@ -215,17 +215,18 @@ func (t *ThreadAggregate) Apply(event Event) {
 		}
 		t.ActiveToolStates[e.ToolCallID] = state
 
-	case *ToolInputProvidedEvent:
+	case InputProvided:
 		if state, ok := t.ActiveToolStates[e.ToolCallID]; ok {
 			state.Status = "InputProvided"
 			t.ActiveToolStates[e.ToolCallID] = state
 		}
 
+	case AuthGranted:
 		if state, ok := t.ActiveToolStates[e.ToolCallID]; ok {
 			state.Status = "AuthGranted"
 			t.ActiveToolStates[e.ToolCallID] = state
 		}
-	
+
 	case EngineStateChanged:
 		t.EngineState = e.NewState
 		t.UpdatedAt = e.Timestamp

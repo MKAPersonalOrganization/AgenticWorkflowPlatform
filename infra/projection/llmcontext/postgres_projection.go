@@ -42,8 +42,8 @@ func (p *PostgresLLMContextProjection) RegisterHandlers(router interface {
 	router.Register(&domain.MessageAdded{}, func(ctx context.Context, e core.Event) error {
 		return p.applyMessageAdded(ctx, *e.(*domain.MessageAdded))
 	})
-	router.Register(&domain.ThreadTitleUpdatedEvent{}, func(ctx context.Context, e core.Event) error {
-		return p.applyThreadTitleChanged(ctx, *e.(*domain.ThreadTitleUpdatedEvent))
+	router.Register(&domain.ThreadTitleUpdated{}, func(ctx context.Context, e core.Event) error {
+		return p.applyThreadTitleChanged(ctx, *e.(*domain.ThreadTitleUpdated))
 	})
 	router.Register(&domain.ThreadDeleted{}, func(ctx context.Context, e core.Event) error {
 		return p.applyThreadDeleted(ctx, *e.(*domain.ThreadDeleted))
@@ -141,7 +141,7 @@ func (p *PostgresLLMContextProjection) applyMessageAdded(ctx context.Context, ev
 }
 
 // applyThreadTitleChanged updates the thread title.
-func (p *PostgresLLMContextProjection) applyThreadTitleChanged(ctx context.Context, event domain.ThreadTitleUpdatedEvent) error {
+func (p *PostgresLLMContextProjection) applyThreadTitleChanged(ctx context.Context, event domain.ThreadTitleUpdated) error {
 	query := `
 		UPDATE llm_threads
 		SET title = $1, updated_at = $2
