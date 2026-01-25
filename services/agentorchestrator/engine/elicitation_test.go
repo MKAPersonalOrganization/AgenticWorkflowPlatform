@@ -36,7 +36,7 @@ func TestEngine_ElicitationFlow(t *testing.T) {
 						llm.FunctionCallContent{
 							CallID:       "call_1",
 							Name:         "quiz_yes_no",
-							RawArguments: `{"statement_to_verify": "Is the sky blue?"}`,
+							RawArguments: `{"question": "Is the sky blue?"}`,
 						},
 					},
 					FinishReason: "tool_calls",
