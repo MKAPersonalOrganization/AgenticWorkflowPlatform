@@ -18,59 +18,49 @@ type AskMultipleSelectionTool struct{}
 
 func (t *AskMultipleSelectionTool) Name() string { return ToolNameMultipleSelection }
 func (t *AskMultipleSelectionTool) Description() string {
-	return "Present a multiple-choice quiz question where the student can select ONE OR MORE correct answers. Use this when checking understanding of concepts with multiple valid responses."
+	return "Ask a multiple-choice question."
 }
 
 func (t *AskMultipleSelectionTool) Parameters() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
-			"question_text": map[string]any{
+			"question": map[string]any{
 				"type":        "string",
-				"description": "The quiz question text. Frame it as a clear academic question (e.g., 'Which of the following are prime numbers?').",
-				"minLength":   1,
+				"description": "The question to ask.",
 			},
-			"answer_choices": map[string]any{
-				"type": "array",
-				"items": map[string]any{
-					"type":      "string",
-					"minLength": 1,
-				},
-				"description": "Array of answer choices for the student to select from. Each choice should be a distinct option. Minimum 2 choices required, maximum 6 recommended for clarity.",
+			"options": map[string]any{
+				"type":        "array",
+				"items":       map[string]any{"type": "string"},
+				"description": "List of answer options.",
 				"minItems":    2,
-				"maxItems":    6,
 			},
 		},
-		"required":             []string{"question_text", "answer_choices"},
-		"additionalProperties": false,
+		"required": []string{"question", "options"},
 	}
 }
 
 func (t *AskMultipleSelectionTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
-		QuestionText  string   `json:"question_text"`
-		AnswerChoices []string `json:"answer_choices"`
+		Question string   `json:"question"`
+		Options  []string `json:"options"`
 	}
 	if err := core.UnmarshalArgs(args, &params); err != nil {
-		return nil, fmt.Errorf("failed to parse quiz parameters: %w", err)
+		return nil, fmt.Errorf("invalid args: %w", err)
 	}
 
-	// Validation
-	if params.QuestionText == "" {
-		return nil, fmt.Errorf("parameter 'question_text' is required and must not be empty. Example: {\"question_text\": \"Which are prime numbers?\", \"answer_choices\": [\"2\", \"3\", \"4\"]}")
+	if params.Question == "" {
+		return nil, fmt.Errorf("question is required")
 	}
-	if len(params.AnswerChoices) < 2 {
-		return nil, fmt.Errorf("parameter 'answer_choices' must contain at least 2 choices. Received: %d. Example: {\"question_text\": \"...\", \"answer_choices\": [\"Option A\", \"Option B\"]}", len(params.AnswerChoices))
-	}
-	if len(params.AnswerChoices) > 6 {
-		return nil, fmt.Errorf("parameter 'answer_choices' should contain at most 6 choices. Received: %d. Consider breaking into multiple questions.", len(params.AnswerChoices))
+	if len(params.Options) < 2 {
+		return nil, fmt.Errorf("at least 2 options required")
 	}
 
 	schema := map[string]any{
 		"type": "choose_multiple",
-		"enum": params.AnswerChoices,
+		"enum": params.Options,
 	}
-	return createMultipleChoiceResult(params.QuestionText, params.AnswerChoices, schema)
+	return createMultipleChoiceResult(params.Question, params.Options, schema)
 }
 
 
@@ -79,55 +69,52 @@ type AskTrueFalseTool struct{}
 
 func (t *AskTrueFalseTool) Name() string { return ToolNameTrueFalse }
 func (t *AskTrueFalseTool) Description() string {
-	return "Present a yes/no or true/false quiz question to verify student understanding. Use for binary confirmation of concepts or facts."
+	return "Ask a yes/no question."
 }
 
 func (t *AskTrueFalseTool) Parameters() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
-			"statement_to_verify": map[string]any{
+			"question": map[string]any{
 				"type":        "string",
-				"description": "A declarative statement for the student to confirm as true or false (e.g., 'The quadratic formula can solve all polynomial equations' or 'Photosynthesis occurs in mitochondria').",
-				"minLength":   1,
+				"description": "The question to verify (true/false).",
 			},
 		},
-		"required":             []string{"statement_to_verify"},
-		"additionalProperties": false,
+		"required": []string{"question"},
 	}
 }
 
 func (t *AskTrueFalseTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
-		StatementToVerify string `json:"statement_to_verify"`
+		Question string `json:"question"`
 	}
 	if err := core.UnmarshalArgs(args, &params); err != nil {
-		return nil, fmt.Errorf("failed to parse quiz statement: %w", err)
+		return nil, fmt.Errorf("invalid args: %w", err)
 	}
 
-	// Validation
-	if params.StatementToVerify == "" {
-		return nil, fmt.Errorf("parameter 'statement_to_verify' is required and must not be empty. Example: {\"statement_to_verify\": \"The sky is blue\"}")
+	if params.Question == "" {
+		return nil, fmt.Errorf("question is required")
 	}
 
 	schema := map[string]any{
 		"type": "true_false",
 	}
-	return createTrueFalseResult(params.StatementToVerify, schema)
+	return createTrueFalseResult(params.Question, schema)
 }
 
 // --- HELPERS ---
 
-// createMultipleChoiceResult creates result for multiple choice quiz with domain-specific parameters
-func createMultipleChoiceResult(questionText string, answerChoices []string, schema map[string]any) (any, error) {
+// createMultipleChoiceResult creates result for multiple choice quiz
+func createMultipleChoiceResult(question string, options []string, schema map[string]any) (any, error) {
 	cmd := &core.Command{
 		StopIteration: true,
 		Elicitation: &core.ElicitationSpec{
-			Question: questionText,
+			Question: question,
 			Schema:   schema,
 		},
 	}
-	status := fmt.Sprintf("Requesting input: %s", questionText)
+	status := fmt.Sprintf("Requesting input: %s", question)
 	return core.NewToolResultWithCommand(
 		map[string]any{
 			"status": status,
@@ -170,19 +157,12 @@ func (m *ElicitationMiddleware) Process(ctx context.Context, reqCtx *core.Reques
 	reqCtx.AddTool(&AskTrueFalseTool{})
 
 	reqCtx.AddSystemPrompt(`
-## Student Elicitation Protocol
-You MUST use the specialized quiz tools for ALL student assessments and checks for understanding. 
-
-### Instructions:
-1. **quiz_multiple_choice**: Use when checking understanding with predefined options.
-   * Format: ` + "`" + `{"question_text": "...", "answer_choices": ["A", "B"]}` + "`" + `
-2. **quiz_yes_no**: Use for binary factual verification.
-   * Format: ` + "`" + `{"statement_to_verify": "..."}` + "`" + `
-
-### Rules:
-- Proactive interaction: Use a tool in every turn where you expect student input.
-- Structural Integrity: Ensure ALL required JSON parameters are populated correctly.
-- Single Question: Ask exactly one quiz question per interaction.
+## Quiz Tools
+You MUST use these tools to quiz the student. Arguments are MANDATORY.
+1. **quiz_multiple_choice**:
+   - arguments: {"question": "...", "options": ["A", "B"]}
+2. **quiz_yes_no**:
+   - arguments: {"question": "..."}
 `)
 
 	return next(ctx, reqCtx)
