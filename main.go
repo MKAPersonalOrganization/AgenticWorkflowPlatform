@@ -73,7 +73,7 @@ func main() {
 		},
 	}
 
-	log = logger.NewWithEvents(os.Stdout, logger.LevelError, "SCHOOL", nil, events)
+	log = logger.NewWithEvents(os.Stdout, logger.LevelInfo, "SCHOOL", nil, events)
 
 	// -------------------------------------------------------------------------
 

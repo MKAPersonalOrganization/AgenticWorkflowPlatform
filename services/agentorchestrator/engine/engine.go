@@ -813,24 +813,59 @@ func (s *executionState) handleUserMessageSubmission() error {
 func (s *executionState) setup(initialState state) error {
 	s.sm = stateless.NewStateMachine(initialState)
 
-	// Persist state changes
-	s.sm.OnTransitioned(func(_ context.Context, trans stateless.Transition) {
-		s.trackStateChange(trans.Destination.(state))
+	// Log and persist state changes
+	s.sm.OnTransitioned(func(ctx context.Context, trans stateless.Transition) {
+		srcState := trans.Source.(state)
+		dstState := trans.Destination.(state)
+		trigger := trans.Trigger
+
+		s.engine.log.Info(ctx, "state transition",
+			"thread_id", s.threadID,
+			"message_id", s.messageID,
+			"agent", s.agent.Name,
+			"from_state", srcState.String(),
+			"to_state", dstState.String(),
+			"trigger", trigger,
+			"pause_reason", s.pauseReason.String(),
+			"completion_reason", s.completionReason.String(),
+		)
+
+		s.trackStateChange(dstState)
 	})
 
 	// Configure StateAwaitingExecution (replaces StateAwaitingTurn)
 	s.sm.Configure(StateAwaitingExecution).
+		OnEntry(func(ctx context.Context, _ ...any) error {
+			s.engine.log.Info(ctx, "entering StateAwaitingExecution",
+				"thread_id", s.threadID,
+				"message_id", s.messageID,
+				"agent", s.agent.Name,
+			)
+			return nil
+		}).
 		Permit(TrigBeginExecution, StateInvokingLLM).
 		Permit(TrigExecutionFailed, StateCompleted)
 
 	// Configure StateInvokingLLM (replaces StateInvokingLLMResponse)
 	s.sm.Configure(StateInvokingLLM).
-		OnEntry(func(_ context.Context, _ ...any) error {
+		OnEntry(func(ctx context.Context, _ ...any) error {
+			s.engine.log.Info(ctx, "entering StateInvokingLLM - calling LLM",
+				"thread_id", s.threadID,
+				"message_id", s.messageID,
+				"agent", s.agent.Name,
+			)
 			s.observer.TrackStarted(s.messageID)
 			return s.generateAgentResponse()
 		}).
-		OnExit(func(_ context.Context, _ ...any) error {
+		OnExit(func(ctx context.Context, _ ...any) error {
 			if s.streamResult != nil {
+				s.engine.log.Info(ctx, "exiting StateInvokingLLM - LLM response received",
+					"thread_id", s.threadID,
+					"message_id", s.messageID,
+					"agent", s.agent.Name,
+					"has_tool_calls", s.streamResult.HasToolCalls(),
+					"tool_count", len(s.streamResult.ToolCalls),
+				)
 				s.observer.TrackCompleted(s.messageID, s.streamResult.Content, toDomainToolCalls(s.streamResult.ToolCalls))
 			}
 			return nil
@@ -842,7 +877,21 @@ func (s *executionState) setup(initialState state) error {
 
 	// Configure StateExecutingTools (replaces StatePerformingActions)
 	s.sm.Configure(StateExecutingTools).
-		OnEntry(func(_ context.Context, _ ...any) error {
+		OnEntry(func(ctx context.Context, _ ...any) error {
+			toolNames := []string{}
+			if s.streamResult != nil {
+				for _, tc := range s.streamResult.ToolCalls {
+					toolNames = append(toolNames, tc.Function.Name)
+				}
+			}
+			s.engine.log.Info(ctx, "entering StateExecutingTools - executing tools",
+				"thread_id", s.threadID,
+				"message_id", s.messageID,
+				"agent", s.agent.Name,
+				"tool_count", len(toolNames),
+				"tools", toolNames,
+			)
+
 			// Emit ActionsDetected event when entering this state
 			if s.streamResult != nil && s.streamResult.HasToolCalls() {
 				toolCalls := toDomainToolCalls(s.streamResult.ToolCalls)
@@ -857,12 +906,31 @@ func (s *executionState) setup(initialState state) error {
 
 	// Configure StateAwaitingUserInput (unifies StateAwaitingInput + StateAwaitingAuth)
 	s.sm.Configure(StateAwaitingUserInput).
+		OnEntry(func(ctx context.Context, _ ...any) error {
+			s.engine.log.Info(ctx, "entering StateAwaitingUserInput - paused for user interaction",
+				"thread_id", s.threadID,
+				"message_id", s.messageID,
+				"agent", s.agent.Name,
+				"pause_reason", s.pauseReason.String(),
+			)
+			return nil
+		}).
 		Permit(TrigBeginExecution, StateInvokingLLM).
 		Permit(TrigExecutionFailed, StateCompleted)
 
 	// Configure StateCompleted (terminal state for both success and failure)
 	s.sm.Configure(StateCompleted).
-		OnEntry(func(_ context.Context, _ ...any) error {
+		OnEntry(func(ctx context.Context, _ ...any) error {
+			s.engine.log.Info(ctx, "entering StateCompleted - execution finished",
+				"thread_id", s.threadID,
+				"message_id", s.messageID,
+				"agent", s.agent.Name,
+				"completion_reason", s.completionReason.String(),
+				"is_success", s.completionReason.IsSuccess(),
+				"termination_reason", s.observer.result.Reason,
+				"iterations", s.safety.total,
+			)
+
 			// Emit events based on completion reason (metadata)
 			if s.completionReason.IsSuccess() {
 				// Successful completion: emit turn finished and run finished
@@ -874,6 +942,13 @@ func (s *executionState) setup(initialState state) error {
 				if s.observer.result.Error != nil {
 					msg = s.observer.result.Error.Error()
 				}
+				s.engine.log.Error(ctx, "execution failed",
+					"thread_id", s.threadID,
+					"message_id", s.messageID,
+					"agent", s.agent.Name,
+					"completion_reason", s.completionReason.String(),
+					"error", msg,
+				)
 				s.observer.yield(s.observer.events.RunError(s.threadID, msg, "RUN_ERROR"), nil)
 			}
 			return nil

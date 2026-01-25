@@ -79,69 +79,6 @@ case StatePerformingActions:
 
 ## Proposed Refactoring Plan
 
-### Phase 1: Simplify Engine State Machine (High Impact, Low Risk)
-
-#### Goals
-- Reduce engine states from 7 to 5
-- Unify pause states with metadata
-- Improve readability and debuggability
-
-#### Changes
-
-**Before** (7 states):
-```
-AwaitingTurn → GeneratingResponse → PerformingActions → AwaitingInput/AwaitingAuth → Done/Error
-```
-
-**After** (5 states):
-```
-Idle → Generating → Executing → Paused → Terminal
-```
-
-**New State Definitions**:
-```go
-type EngineState int
-const (
-    StateIdle        = iota  // Waiting to start (replaces AwaitingTurn)
-    StateGenerating          // LLM responding (replaces GeneratingResponse)
-    StateExecuting           // Tools running (replaces PerformingActions)
-    StatePaused              // Waiting for user interaction (unifies AwaitingInput + AwaitingAuth)
-    StateTerminal            // Final state (unifies Done + Error)
-)
-
-// Pause reasons (metadata)
-type PauseReason int
-const (
-    PauseReasonNone = iota
-    PauseReasonInput       // Tool elicitation
-    PauseReasonAuth        // Authorization required
-)
-
-// Terminal reasons (metadata)
-type TerminalReason int
-const (
-    TerminalReasonSuccess         // Goal reached
-    TerminalReasonError           // Error occurred
-    TerminalReasonMaxIterations   // Safety limit
-    TerminalReasonLoopDetected
-    TerminalReasonUserAborted
-    TerminalReasonTimeout
-)
-```
-
-**Benefits**:
-- **Simpler mental model**: 5 states instead of 7
-- **Metadata separation**: Reason stored separately from state (more flexible)
-- **Easier testing**: Fewer state permutations
-- **Better extensibility**: Add new pause/terminal reasons without new states
-
-#### File Changes
-- `services/agentorchestrator/engine/engine.go` (lines 941-987, 775-856)
-- `services/agentorchestrator/engine/termination.go`
-- Update tests in `services/agentorchestrator/state_machine_graph_test.go`
-
----
-
 ### Phase 2: Extract Tool Orchestration Layer (High Impact, Medium Risk)
 
 #### Goals
