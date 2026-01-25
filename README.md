@@ -169,12 +169,14 @@ graph TB
 
 ## Debugging
 
-The application exposes endpoints to visualize the internal state machines of the Agent Orchestrator. These diagrams are generated in real-time from the running code.
+The application exposes endpoints to visualize the internal state machines of the Agent Orchestrator. These diagrams are generated in real-time from the running code. 
 
-| Endpoint | Description |
-| :--- | :--- |
-| `GET /api/debug/state-machines/engine` | Visualizes the high-level Engine state machine. |
-| `GET /api/debug/state-machines/tool` | Visualizes the Tool lifecycle state machine. |
+By default, these are served on the debug server (port `4015` as per `.env`).
+
+| Endpoint | Link | Description |
+| :--- | :--- | :--- |
+| **Engine State Machine** | [View Graph (SVG)](http://localhost:4015/api/debug/state-machines/engine) \| [View DOT](http://localhost:4015/api/debug/state-machines/engine?format=dot) | Visualizes the high-level Engine state machine. |
+| **Tool Lifecycle State Machine** | [View Graph (SVG)](http://localhost:4015/api/debug/state-machines/tool) \| [View DOT](http://localhost:4015/api/debug/state-machines/tool?format=dot) | Visualizes the Tool lifecycle state machine. |
 
 **Query Parameters:**
 -   `format=svg` (default): Returns the graph as an SVG image.

@@ -202,24 +202,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 	expvar.NewString("build").Set(cfg.Build)
 
 	// -------------------------------------------------------------------------
-	// Start Debug Service
+	// Initialize Debug Mux
 
-	go func() {
-		log.Info(ctx, "startup", "status", "debug server started", "host", cfg.Web.DebugHost)
-
-		debugServer := &http.Server{
-			Addr:              cfg.Web.DebugHost,
-			Handler:           debug.Mux(),
-			ReadTimeout:       10 * time.Second,
-			WriteTimeout:      10 * time.Second,
-			IdleTimeout:       120 * time.Second,
-			ReadHeaderTimeout: 5 * time.Second,
-		}
-
-		if err := debugServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Error(ctx, "shutdown", "status", "debug server closed", "host", cfg.Web.DebugHost, "msg", err)
-		}
-	}()
+	debugMux := debug.Mux()
 
 	// -------------------------------------------------------------------------
 	// Initialize KurrentDB EventStore
@@ -379,6 +364,34 @@ func run(ctx context.Context, log *logger.Logger) error {
 		agentorchestrator.WithEmitter(eventRouter),
 	)
 
+	// -------------------------------------------------------------------------
+	// Start Debug Service
+
+	go func() {
+		log.Info(ctx, "startup", "status", "debug server started", "host", cfg.Web.DebugHost)
+
+		debugMux.HandleFunc("/api/debug/state-machines/engine", func(w http.ResponseWriter, r *http.Request) {
+			renderGraph(w, log, r, agentOrchestrator.GetEngineGraph())
+		})
+
+		debugMux.HandleFunc("/api/debug/state-machines/tool", func(w http.ResponseWriter, r *http.Request) {
+			renderGraph(w, log, r, agentOrchestrator.GetToolGraph())
+		})
+
+		debugServer := &http.Server{
+			Addr:              cfg.Web.DebugHost,
+			Handler:           debugMux,
+			ReadTimeout:       10 * time.Second,
+			WriteTimeout:      10 * time.Second,
+			IdleTimeout:       120 * time.Second,
+			ReadHeaderTimeout: 5 * time.Second,
+		}
+
+		if err := debugServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Error(ctx, "shutdown", "status", "debug server closed", "host", cfg.Web.DebugHost, "msg", err)
+		}
+	}()
+
 	threadRepo := domain.NewThreadRepository(threadmgmt.NewEventStoreAdapter(eventLog))
 	threadMgmt := threadmgmt.New(log, threadRepo)
 
@@ -524,14 +537,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Delete("/api/agui/threads/{threadId}", authMiddleware.RequireAuthFunc(handler.DeleteThread))
 	r.Patch("/api/agui/threads/{threadId}", authMiddleware.RequireAuthFunc(handler.UpdateThreadTitle))
 
-	// Debug State Machine Routes
-	r.Get("/api/debug/state-machines/engine", func(w http.ResponseWriter, r *http.Request) {
-		renderGraph(w, log, r, agentOrchestrator.GetEngineGraph())
-	})
-
-	r.Get("/api/debug/state-machines/tool", func(w http.ResponseWriter, r *http.Request) {
-		renderGraph(w, log, r, agentOrchestrator.GetToolGraph())
-	})
 
 	// Home route
 	r.Get("/", authMiddleware.RequireAuthFunc(HandleViewChatInputScreen(log)))
