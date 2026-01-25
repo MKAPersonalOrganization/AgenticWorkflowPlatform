@@ -52,7 +52,6 @@ func domainTools() []core.Tool {
 		// Regression
 		&tools.LinearRegressionTool{},
 		// Other
-		core.NewWriteTodosTool(),
 	}
 }
 
@@ -113,7 +112,6 @@ func CreateStatisticsInstructor(ctx context.Context, notifier core.EventNotifier
 		},
 		Interactive:  true,
 		ExtraRules:   i18n.T(ctx, "statistics.extra_rules"),
-		IncludeTodos: true,
 	})
 	if err != nil {
 		panic(err)

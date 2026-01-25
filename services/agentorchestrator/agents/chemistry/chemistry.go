@@ -17,8 +17,6 @@ func domainTools() []core.Tool {
 		&sharedtools.MultiplyTool{},
 		&sharedtools.DivideTool{},
 		&sharedtools.PowerTool{},
-		&sharedtools.SqrtTool{},
-		core.NewWriteTodosTool(),
 	}
 }
 
@@ -77,7 +75,6 @@ func CreateChemistryInstructor(ctx context.Context, notifier core.EventNotifier)
 		},
 		Interactive:  true,
 		ExtraRules:   i18n.T(ctx, "chemistry.extra_rules"),
-		IncludeTodos: true,
 	})
 	if err != nil {
 		panic(err)

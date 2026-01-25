@@ -48,7 +48,6 @@ type PromptConfig struct {
 	StudentProfile *StudentProfile
 	LearningPath   *LearningPath // Guidance for progressive learning
 	ExtraRules     string
-	IncludeTodos   bool
 	Interactive    bool
 }
 
@@ -290,10 +289,6 @@ You have access to the following specialized skills.
 {{if .ExtraRules}}
 # Additional Instructions
 {{.ExtraRules}}
-{{end}}
-
-{{if .IncludeTodos}}
-` + WriteTodosSystemPrompt + `
 {{end}}
 
 # Final Reminder

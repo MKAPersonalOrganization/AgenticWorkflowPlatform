@@ -12,13 +12,7 @@ import (
 // domainTools returns the domain-specific tools for the physics instructor.
 func domainTools() []core.Tool {
 	return []core.Tool{
-		&sharedtools.AddTool{},
-		&sharedtools.SubtractTool{},
-		&sharedtools.MultiplyTool{},
-		&sharedtools.DivideTool{},
-		&sharedtools.PowerTool{},
 		&sharedtools.SqrtTool{},
-		core.NewWriteTodosTool(),
 	}
 }
 
@@ -77,7 +71,6 @@ func CreatePhysicsInstructor(ctx context.Context, notifier core.EventNotifier) c
 		},
 		Interactive:  true,
 		ExtraRules:   i18n.T(ctx, "physics.extra_rules"),
-		IncludeTodos: true,
 	})
 	if err != nil {
 		panic(err)
