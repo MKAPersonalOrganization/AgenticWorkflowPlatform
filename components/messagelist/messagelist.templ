@@ -14,7 +14,6 @@ import (
 	"school-with-ai/components/plot"
 	"school-with-ai/components/searchtext"
 	"school-with-ai/components/statistics"
-	"school-with-ai/components/todo"
 	"school-with-ai/components/tokenusage"
 	"school-with-ai/components/utils"
 )
@@ -119,10 +118,6 @@ templ MessageList() {
 						}
 					}
 				</div>
-				<!-- ToDo List Tool Call - Special Rendering -->
-				<div x-show="message.type === 'tool_call' && message.name === 'write_todos'" class="my-2 relative group/message w-full">
-					@todo.Todo()
-				</div>
 				<!-- Elicitation: Quiz Components -->
 				<div x-show="message.type === 'tool_call' && isElicitationTool(message.parsedResult?.schema?.type)" class="my-2 relative group/message w-full">
 					<template x-if="message.parsedResult?.schema?.type === 'choose_multiple'">
@@ -138,9 +133,6 @@ templ MessageList() {
 				</div>
 				<!-- Special Tool Components -->
 				<div x-show="message.type === 'tool_call' && isSpecialTool(message.name)" class="my-2 relative group/message w-full">
-					<template x-if="message.name === 'write_todos'">
-						@todo.Todo()
-					</template>
 					<template x-if="message.name === 'browse_library'">
 						@library.Library()
 					</template>

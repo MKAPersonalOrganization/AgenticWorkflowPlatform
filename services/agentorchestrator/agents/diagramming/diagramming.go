@@ -14,7 +14,6 @@ import (
 func domainTools() []core.Tool {
 	return []core.Tool{
 		tools.NewMermaidDiagramTool(),
-		core.NewWriteTodosTool(),
 	}
 }
 
@@ -42,7 +41,6 @@ func CreateDiagrammingInstructor(ctx context.Context, notifier core.EventNotifie
 		Topic:        i18n.T(ctx, "diagramming.topic"),
 		Interactive:  true,
 		ExtraRules:   i18n.T(ctx, "diagramming.extra_rules"),
-		IncludeTodos: true,
 	})
 	if err != nil {
 		panic(err)

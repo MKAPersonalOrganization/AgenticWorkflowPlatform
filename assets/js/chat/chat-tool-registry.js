@@ -65,8 +65,6 @@ export const TOOL_REGISTRY = {
     'transfer_to_agent': { type: 'special', category: 'collaboration' },
 
     // Utilities
-    'write_todos': { type: 'special', category: 'productivity' },
-
     // Content & Search
     'browse_library': { type: 'special', category: 'knowledge' },
     'lookup_section': { type: 'special', category: 'knowledge' },

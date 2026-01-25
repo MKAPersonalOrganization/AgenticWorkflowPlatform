@@ -21,7 +21,6 @@ func domainTools() []core.Tool {
 		&sharedtools.SqrtTool{},
 		tools.NewPlotTool(),    // gnuplot-based plotting
 		tools.NewAnimateTool(), // gnuplot-based animations
-		core.NewWriteTodosTool(),
 	}
 }
 
@@ -79,7 +78,6 @@ func CreateMathInstructor(ctx context.Context, notifier core.EventNotifier) core
 		},
 		Interactive:  true,
 		ExtraRules:   i18n.T(ctx, "math.extra_rules"),
-		IncludeTodos: true,
 	})
 	if err != nil {
 		panic(err)
