@@ -10,7 +10,7 @@ import "school-with-ai/components/tokenusage"
 templ ChatInput() {
 	<div
 		class="relative z-10 mx-auto w-full max-w-3xl rounded-2xl border border-border bg-background shadow-[0_9px_25px_0_rgba(0,0,0,0.03)] transition-all duration-300 focus-within:shadow-[0_9px_25px_0_rgba(0,0,0,0.08)] focus-within:border-border/80"
-		:class="awaitingHumanInput ? 'opacity-50 pointer-events-none grayscale' : ''"
+		:class="awaitingHumanInput ? '' : ''"
 		role="region"
 		aria-label="Message input area"
 	>
@@ -22,15 +22,15 @@ templ ChatInput() {
 				@textarea.Textarea(textarea.Props{
 					AutoResize: true,
 					Attributes: templ.Attributes{
-						"x-model":           "currentMessage",
-						":disabled":         "isStreaming",
-						"@keydown":          "handleSlashKeydown($event) || handleKeydown($event)",
-						"@input":            "handleInput($event)",
-						"placeholder":       i18n.T(ctx, "Message Safar.AI..."),
-						"rows":              "1",
-						"style":             "max-height: 200px;",
-						"aria-label":        "Type your message",
-						":aria-disabled":    "isStreaming",
+						"x-model": "currentMessage",
+				
+						"@keydown":    "handleSlashKeydown($event) || handleKeydown($event)",
+						"@input":      "handleInput($event)",
+						"placeholder": i18n.T(ctx, "Message Safar.AI..."),
+						"rows":        "1",
+						"style":       "max-height: 200px;",
+						"aria-label":  "Type your message",
+				
 						":aria-describedby": "errorMessage ? 'error-message' : null",
 						"x-ref":             "messageInput",
 						"dir":               "auto",
