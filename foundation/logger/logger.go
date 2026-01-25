@@ -23,14 +23,42 @@ type Logger struct {
 	traceIDFn TraceIDFn
 }
 
-// New constructs a new log for application use.
+type logMode int
+
+const (
+	modeJSON logMode = iota
+	modeText
+	modeMinimal
+)
+
+// New constructs a new log for application use using JSON.
 func New(w io.Writer, minLevel Level, serviceName string, traceIDFn TraceIDFn) *Logger {
-	return new(w, minLevel, serviceName, traceIDFn, Events{})
+	return new(w, minLevel, serviceName, traceIDFn, Events{}, modeJSON)
 }
 
-// NewWithEvents constructs a new log for application use with events.
+// NewWithEvents constructs a new log for application use with events using JSON.
 func NewWithEvents(w io.Writer, minLevel Level, serviceName string, traceIDFn TraceIDFn, events Events) *Logger {
-	return new(w, minLevel, serviceName, traceIDFn, events)
+	return new(w, minLevel, serviceName, traceIDFn, events, modeJSON)
+}
+
+// NewText constructs a new log for application use using Text.
+func NewText(w io.Writer, minLevel Level, serviceName string, traceIDFn TraceIDFn) *Logger {
+	return new(w, minLevel, serviceName, traceIDFn, Events{}, modeText)
+}
+
+// NewTextWithEvents constructs a new log for application use with events using Text.
+func NewTextWithEvents(w io.Writer, minLevel Level, serviceName string, traceIDFn TraceIDFn, events Events) *Logger {
+	return new(w, minLevel, serviceName, traceIDFn, events, modeText)
+}
+
+// NewMinimal constructs a new log for application use using a minimal format (values only).
+func NewMinimal(w io.Writer, minLevel Level, serviceName string, traceIDFn TraceIDFn) *Logger {
+	return new(w, minLevel, serviceName, traceIDFn, Events{}, modeMinimal)
+}
+
+// NewMinimalWithEvents constructs a new log for application use with events using a minimal format.
+func NewMinimalWithEvents(w io.Writer, minLevel Level, serviceName string, traceIDFn TraceIDFn, events Events) *Logger {
+	return new(w, minLevel, serviceName, traceIDFn, events, modeMinimal)
 }
 
 // NewWithHandler returns a new log for application use with the underlying
@@ -136,10 +164,14 @@ func (log *Logger) write(ctx context.Context, level Level, caller int, msg strin
 	_ = log.handler.Handle(ctx, r)
 }
 
-func new(w io.Writer, minLevel Level, serviceName string, traceIDFn TraceIDFn, events Events) *Logger {
+func new(w io.Writer, minLevel Level, serviceName string, traceIDFn TraceIDFn, events Events, mode logMode) *Logger {
 	// Convert the file name to just the name.ext when this key/value will
 	// be logged.
 	f := func(groups []string, a slog.Attr) slog.Attr {
+		if a.Key == slog.TimeKey || a.Key == "service" {
+			return slog.Attr{}
+		}
+
 		if a.Key == slog.SourceKey {
 			if source, ok := a.Value.Any().(*slog.Source); ok {
 				v := fmt.Sprintf("%s:%d", filepath.Base(source.File), source.Line)
@@ -150,8 +182,17 @@ func new(w io.Writer, minLevel Level, serviceName string, traceIDFn TraceIDFn, e
 		return a
 	}
 
-	// Construct the slog JSON handler for use.
-	handler := slog.Handler(slog.NewJSONHandler(w, &slog.HandlerOptions{AddSource: true, Level: slog.Level(minLevel), ReplaceAttr: f}))
+	// Construct the slog handler for use.
+	var handler slog.Handler
+	options := &slog.HandlerOptions{AddSource: true, Level: slog.Level(minLevel), ReplaceAttr: f}
+	switch mode {
+	case modeJSON:
+		handler = slog.NewJSONHandler(w, options)
+	case modeText:
+		handler = slog.NewTextHandler(w, options)
+	case modeMinimal:
+		handler = &minimalHandler{w: w, options: options}
+	}
 
 	// If events are to be processed, wrap the JSON handler around the custom
 	// log handler.
@@ -172,4 +213,71 @@ func new(w io.Writer, minLevel Level, serviceName string, traceIDFn TraceIDFn, e
 		handler:   handler,
 		traceIDFn: traceIDFn,
 	}
+}
+
+type minimalHandler struct {
+	w       io.Writer
+	options *slog.HandlerOptions
+	attrs   []slog.Attr
+}
+
+func (h *minimalHandler) Enabled(_ context.Context, level slog.Level) bool {
+	return level >= h.options.Level.Level()
+}
+
+func (h *minimalHandler) Handle(ctx context.Context, r slog.Record) error {
+	var out string
+
+	// Handle level
+	level := r.Level.String()
+	if h.options.ReplaceAttr != nil {
+		attr := h.options.ReplaceAttr(nil, slog.Any(slog.LevelKey, r.Level))
+		if attr.Key != "" {
+			level = attr.Value.String()
+		} else if attr.Equal(slog.Attr{}) {
+			level = ""
+		}
+	}
+	if level != "" {
+		out += level + " "
+	}
+
+	// Handle message
+	out += r.Message
+
+	// Handle attributes from WithAttrs
+	for _, attr := range h.attrs {
+		if h.options.ReplaceAttr != nil {
+			attr = h.options.ReplaceAttr(nil, attr)
+		}
+		if attr.Equal(slog.Attr{}) {
+			continue
+		}
+		out += " " + attr.Value.String()
+	}
+
+	// Handle record attributes
+	r.Attrs(func(attr slog.Attr) bool {
+		if h.options.ReplaceAttr != nil {
+			attr = h.options.ReplaceAttr(nil, attr)
+		}
+		if attr.Equal(slog.Attr{}) {
+			return true
+		}
+		out += " " + attr.Value.String()
+		return true
+	})
+
+	_, err := fmt.Fprintln(h.w, out)
+	return err
+}
+
+func (h *minimalHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	newAttrs := append([]slog.Attr(nil), h.attrs...)
+	newAttrs = append(newAttrs, attrs...)
+	return &minimalHandler{w: h.w, options: h.options, attrs: newAttrs}
+}
+
+func (h *minimalHandler) WithGroup(name string) slog.Handler {
+	return h // Groups not supported in minimal mode
 }

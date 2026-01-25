@@ -9,8 +9,28 @@ import (
 // mapFromCoreToLLMMessages converts a slice of core.Message to llm.ChatMessage.
 func mapFromCoreToLLMMessages(msgs []core.Message) []llm.ChatMessage {
 	result := make([]llm.ChatMessage, 0, len(msgs))
+
+	var currentToolMsg *llm.ChatMessage
+
 	for _, m := range msgs {
-		result = append(result, mapFromCoreToLLMMessage(m))
+		cm := mapFromCoreToLLMMessage(m)
+
+		if cm.Role == llm.ChatRoleTool {
+			// If we are currently building a tool message, add to it
+			if currentToolMsg != nil {
+				currentToolMsg.Contents = append(currentToolMsg.Contents, cm.Contents...)
+				continue
+			}
+			// Start a new tool message
+			currentToolMsg = &cm
+			result = append(result, *currentToolMsg)
+			// Get reference to the one in the slice so we append to it
+			currentToolMsg = &result[len(result)-1]
+		} else {
+			// Non-tool message, reset current tool message builder
+			currentToolMsg = nil
+			result = append(result, cm)
+		}
 	}
 
 	return result
