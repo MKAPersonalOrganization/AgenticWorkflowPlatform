@@ -73,7 +73,7 @@ func main() {
 		},
 	}
 
-	log = logger.NewWithEvents(os.Stdout, logger.LevelInfo, "SCHOOL", nil, events)
+	log = logger.NewMinimalWithEvents(os.Stdout, logger.LevelInfo, "SCHOOL", nil, events)
 
 	// -------------------------------------------------------------------------
 

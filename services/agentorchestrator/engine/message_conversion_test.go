@@ -106,3 +106,56 @@ func TestMapFromCoreToLLMMessages(t *testing.T) {
 		}
 	}
 }
+func TestMapFromCoreToLLMMessages_Grouping(t *testing.T) {
+	t.Parallel()
+	// Setup test data with multiple tool results
+	toolCallMsg := core.Message{
+		Role: "assistant",
+		ToolCalls: []core.ToolCall{
+			{ID: "call_1", Function: core.ToolFunction{Name: "add", Arguments: `{"a":1,"b":1}`}},
+			{ID: "call_2", Function: core.ToolFunction{Name: "add", Arguments: `{"a":2,"b":2}`}},
+		},
+	}
+
+	toolResult1 := core.Message{
+		Role:       "tool",
+		ToolCallID: "call_1",
+		Content:    `2`,
+	}
+	toolResult2 := core.Message{
+		Role:       "tool",
+		ToolCallID: "call_2",
+		Content:    `4`,
+	}
+
+	input := []core.Message{toolCallMsg, toolResult1, toolResult2}
+
+	// Execute
+	result := mapFromCoreToLLMMessages(input)
+
+	// Verify - should have 2 messages: 1 assistant with 2 calls, 1 tool with 2 results
+	if len(result) != 2 {
+		t.Fatalf("Expected 2 messages, got %d", len(result))
+	}
+
+	if result[0].Role != llm.ChatRoleAssistant {
+		t.Errorf("Expected first message role %s, got %s", llm.ChatRoleAssistant, result[0].Role)
+	}
+	if len(result[0].Contents) != 2 {
+		t.Errorf("Expected 2 contents in first message, got %d", len(result[0].Contents))
+	}
+
+	if result[1].Role != llm.ChatRoleTool {
+		t.Errorf("Expected second message role %s, got %s", llm.ChatRoleTool, result[1].Role)
+	}
+	if len(result[1].Contents) != 2 {
+		t.Errorf("Expected 2 contents in second message (grouped results), got %d", len(result[1].Contents))
+	}
+
+	// Verify content types
+	for i, content := range result[1].Contents {
+		if _, ok := content.(llm.FunctionResultContent); !ok {
+			t.Errorf("Content %d in second message is not FunctionResultContent, got %T", i, content)
+		}
+	}
+}

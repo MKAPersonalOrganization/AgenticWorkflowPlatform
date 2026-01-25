@@ -504,7 +504,8 @@ func (s *executionState) nextStep() error {
 		// Tool waiting states (Input/Auth) are handled in executeRequiredActions.
 		// If we reach here, we are ready for the next turn.
 
-		// Prepare for next iteration
+		// Prepare for next iteration: Generate new message ID for the NEXT turn
+		// This happens AFTER the current turn (ExecutingTools) is finished
 		s.messageID = core.GenerateID()
 		s.streamResult = nil
 		s.resolution = nil
@@ -855,7 +856,7 @@ func (s *executionState) setup(initialState state) error {
 				"agent", s.agent.Name,
 			)
 			s.observer.TrackStarted(s.messageID)
-			return s.generateAgentResponse()
+			return nil
 		}).
 		OnExit(func(ctx context.Context, _ ...any) error {
 			if s.streamResult != nil {
@@ -897,7 +898,7 @@ func (s *executionState) setup(initialState state) error {
 				toolCalls := toDomainToolCalls(s.streamResult.ToolCalls)
 				s.observer.yield(s.agent.Events.ActionsDetected(s.threadID, s.messageID, toolCalls), nil)
 			}
-			return s.executeRequiredActions()
+			return nil
 		}).
 		PermitReentry(TrigBeginExecution).
 		Permit(TrigAwaitUserInput, StateAwaitingUserInput).
@@ -959,7 +960,38 @@ func (s *executionState) setup(initialState state) error {
 }
 
 func (s *executionState) run() error {
-	return s.sm.Fire(TrigBeginExecution)
+	// Start the state machine
+	if err := s.sm.Fire(TrigBeginExecution); err != nil {
+		return err
+	}
+
+	// Execution loop: continue until we hit a terminal or paused state
+	for {
+		currentState := s.sm.MustState().(state)
+
+		switch currentState {
+		case StateInvokingLLM:
+			if err := s.generateAgentResponse(); err != nil {
+				return err
+			}
+			// nextStep() within generateAgentResponse will trigger transition to ExecutingTools or Completed
+		case StateExecutingTools:
+			if err := s.executeRequiredActions(); err != nil {
+				return err
+			}
+			// nextStep() within executeRequiredActions will trigger transition to InvokingLLM or AwaitingUserInput
+		case StateAwaitingUserInput, StateCompleted:
+			// Terminal or paused states for this run
+			return nil
+		default:
+			return fmt.Errorf("unexpected engine state: %s", currentState.String())
+		}
+
+		// Safety break to prevent infinite loops if fire fails to change state
+		if s.sm.MustState().(state) == currentState && currentState != StateAwaitingUserInput && currentState != StateCompleted {
+			return fmt.Errorf("state machine stuck in state %s", currentState.String())
+		}
+	}
 }
 
 func (s *executionState) streamAndProcessLLMResponse(llmContext *LLMContext) error {

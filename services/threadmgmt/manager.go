@@ -310,7 +310,7 @@ func (m *Manager) ToCoreMessages(aggregate *domain.ThreadAggregate) []core.Messa
 }
 
 func (m *Manager) retryUpdate(ctx context.Context, threadID string, update func(*domain.ThreadAggregate) error) (*domain.ThreadAggregate, error) {
-	const maxRetries = 5
+	const maxRetries = 10
 	var lastErr error
 
 	for i := 0; i < maxRetries; i++ {
@@ -333,9 +333,16 @@ func (m *Manager) retryUpdate(ctx context.Context, threadID string, update func(
 		}
 
 		lastErr = err
-		// Wait a tiny bit to avoid tight loops? Or just continue
-		m.log.Debug(ctx, "Concurrency conflict during update, retrying", "threadID", threadID, "attempt", i+1)
-		time.Sleep(time.Duration(i*10) * time.Millisecond)
+		// Exponential backoff with a bit of jitter to avoid synchronized retries
+		backoff := time.Duration(10*(i+1)) * time.Millisecond
+		// Simple jitter
+		jitter := time.Duration(i*5) * time.Millisecond
+		m.log.Debug(ctx, "Concurrency conflict during update, retrying",
+			"threadID", threadID,
+			"attempt", i+1,
+			"wait", backoff+jitter,
+		)
+		time.Sleep(backoff + jitter)
 	}
 
 	return nil, fmt.Errorf("exceeded max retries (%d) after concurrency conflict: %w", maxRetries, lastErr)
