@@ -35,11 +35,8 @@ export function createMessagingMethods() {
                 let userMessage;
                 if (overrideMessage !== null) {
                     userMessage = overrideMessage.trim();
-                } else if (!this.awaitingHumanInput) {
-                    userMessage = this.currentMessage.trim();
                 } else {
-                    console.warn('Cannot send message: awaiting human input through specific controls');
-                    return;
+                    userMessage = this.currentMessage.trim();
                 }
 
                 // Validation
@@ -202,6 +199,10 @@ export function createMessagingMethods() {
                         uiMessages.push(...this.__handleAssistantMessage(msg, toolStatesMap, targetThreadId));
                         break;
 
+                    case 'tool':
+                        uiMessages.push(this.__handleToolMessage(msg));
+                        break;
+
                     case 'system':
                     case 'developer':
                         uiMessages.push(this.__handleSystemMessage(msg));
@@ -330,6 +331,22 @@ export function createMessagingMethods() {
                     TOOL_EVENTS
                 }, (id, ev, pay, tid) => this.transitionToolState(id, ev, pay, tid));
             }
+        },
+
+        /**
+         * Handle tool result messages
+         * @private
+         */
+        __handleToolMessage(msg) {
+            return {
+                id: msg.id,
+                type: 'tool_result',
+                role: 'tool',
+                toolCallId: msg.toolCallId,
+                content: msg.content || '',
+                timestamp: msg.timestamp || new Date().toISOString(),
+                streaming: false
+            };
         },
 
         /**

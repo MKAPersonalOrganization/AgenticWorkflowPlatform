@@ -171,7 +171,8 @@ func (t *ToolStateMachine) setup() {
 		OnEntry(t.onEnterCompleted)
 
 	t.sm.Configure(ToolStateError).
-		OnEntry(t.onEnterError)
+		OnEntry(t.onEnterError).
+		Permit(TrigToolStart, ToolStateExecuting)
 }
 
 // executeToolLogic executes the actual tool and determines the next trigger.

@@ -849,7 +849,8 @@ func (s *executionState) setup(initialState state) error {
 			}
 			s.observer.yield(s.observer.events.RunError(s.threadID, msg, "RUN_ERROR"), nil)
 			return nil
-		})
+		}).
+		Permit(TrigStartExecution, StateGeneratingResponse)
 
 	return nil
 }
