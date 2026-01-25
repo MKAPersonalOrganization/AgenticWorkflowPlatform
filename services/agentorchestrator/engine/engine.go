@@ -109,6 +109,13 @@ func (e *Engine) Run(ctx context.Context, agentName string, runCtx core.RunConte
 			return
 		}
 
+		// Handle user message submission before state machine runs
+		// This persists the message and emits RunStarted event
+		if err := exec.handleUserMessageSubmission(); err != nil {
+			yield(nil, fmt.Errorf("failed to handle user message: %w", err))
+			return
+		}
+
 		if err := exec.run(); err != nil {
 			exec.handleExecutionError(ctx, err)
 			yield(nil, err)
@@ -153,14 +160,16 @@ func (e *Engine) newExecutionState(ctx context.Context, agentName string, runCtx
 	}
 
 	exec := &executionState{
-		engine:    e,
-		ctx:       ctx,
-		threadID:  runCtx.ThreadID,
-		messageID: runCtx.MessageID,
-		thread:    runCtx.Thread,
-		options:   runCtx.Options,
-		agent:     instance,
-		history:   runCtx.InitialHistory,
+		engine:      e,
+		ctx:         ctx,
+		threadID:    runCtx.ThreadID,
+		messageID:   runCtx.MessageID,
+		thread:      runCtx.Thread,
+		options:     runCtx.Options,
+		agent:       instance,
+		history:     runCtx.InitialHistory,
+		userContent: runCtx.UserContent,
+		userID:      runCtx.UserID,
 		observer: &ObserverUnit{
 			yield:     e.wrapYield(ctx, &PersistenceUnit{mgmt: e.threadMgmt}, yield),
 			startTime: timeNowNano(),
@@ -300,6 +309,10 @@ type executionState struct {
 	thread    core.AgentThread
 	options   core.RunOptions
 	history   []core.Message
+
+	// User message submission (if this is a new user message)
+	userContent string
+	userID      string
 
 	// agent-specific state (swappable during handoff)
 	agent *AgentInstance
@@ -717,6 +730,44 @@ func (s *executionState) initAgentComponents(name string) error {
 	s.agent = instance
 	s.observer.events = instance.Events
 	s.safety.ResetAgentLimits()
+	return nil
+}
+
+// handleUserMessageSubmission persists the user message when starting a new run.
+// This ensures all domain events (MessageAdded, RunStarted) flow through the engine state machine.
+func (s *executionState) handleUserMessageSubmission() error {
+	// Only process if this is a new user message submission
+	if s.userContent == "" {
+		return nil
+	}
+
+	// Generate unique message ID for the user message
+	userMessageID := domain.GenerateMessageID()
+
+	// Persist the user message to the event store
+	// This emits MessageAdded event which will be broadcast via projection system
+	agg, _, err := s.engine.threadMgmt.AddUserMessage(s.ctx, s.threadID, userMessageID, s.userContent, s.userID)
+	if err != nil {
+		return fmt.Errorf("failed to persist user message: %w", err)
+	}
+
+	// Update internal thread and history state with the new aggregate
+	// This ensures the LLM sees the user message in the conversation history
+	s.refreshState(agg)
+
+	// Emit RunStarted event (transient, real-time notification)
+	s.observer.yield(s.observer.events.RunStarted(s.threadID, s.messageID), nil)
+
+	// Handle thread title generation for first message
+	// Check aggregate message count (now includes the just-added user message)
+	if len(agg.Messages) == 1 {
+		title := GenerateThreadTitle(s.userContent)
+		_, err = s.engine.threadMgmt.UpdateThreadTitle(s.ctx, s.threadID, title)
+		if err != nil {
+			s.engine.log.Error(s.ctx, "failed to update thread title", "error", err)
+		}
+	}
+
 	return nil
 }
 

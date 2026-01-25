@@ -205,8 +205,8 @@ func (s *Service) Run(ctx context.Context, agentName string, runCtx core.RunCont
 }
 
 // ProcessUserMessage handles the full flow of processing a user message.
+// The engine intelligently routes between new messages and tool resumptions.
 func (s *Service) ProcessUserMessage(ctx context.Context, agentName, threadID, content, userID string) error {
-	// Delegate to Engine
 	return s.engine.ProcessUserMessage(ctx, agentName, threadID, content, userID)
 }
 
