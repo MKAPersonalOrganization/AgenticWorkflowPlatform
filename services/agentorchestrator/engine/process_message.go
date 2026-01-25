@@ -2,90 +2,68 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 )
 
-// ProcessUserMessage handles the full flow of processing a user message:
-// 1. Adds the message to the thread.
-// 2. Generates/Updates the thread title (if new).
-// 3. Runs the agent execution loop.
+// ProcessUserMessage handles a new user message submission.
+// The engine state machine handles message persistence and event emission.
 func (e *Engine) ProcessUserMessage(ctx context.Context, agentName, threadID, content, userID string) error {
-	// 1. Add user message or tool result based on Engine State
-	messageID := domain.GenerateMessageID()
-	runID := domain.GenerateMessageID() // Unique ID for this execution run
+	runID := domain.GenerateMessageID()
 
-	var agg *domain.ThreadAggregate
-	var event domain.Event
-	var err error
+	// Load thread for history (may not exist yet for new threads)
+	agg, err := e.threadMgmt.Load(ctx, threadID)
+	if err != nil && !errors.Is(err, domain.ErrThreadNotFound) {
+		return fmt.Errorf("failed to load thread: %w", err)
+	}
 
-	// Check if this is a tool resumption
-	engineState, _ := e.threadMgmt.GetEngineState(ctx, threadID)
-	if engineState == "AwaitingInput" {
-		pendingToolID, _ := e.threadMgmt.GetPendingInputToolCall(ctx, threadID)
-		if pendingToolID != "" {
-			// This is an input for a tool
-			agg, err = e.threadMgmt.AddToolResultMessage(ctx, threadID, messageID, pendingToolID, content, agentName)
+	// Get conversation history (empty for new threads)
+	var thread core.AgentThread
+	var messages []core.Message
+
+	if agg != nil {
+		thread = e.threadMgmt.ToAgentThread(agg)
+		messages, err = thread.RetrieveFullConversationHistory(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve conversation history: %w", err)
 		}
-	} else if engineState == "AwaitingAuth" {
-		pendingToolID, _ := e.threadMgmt.GetPendingAuthToolCall(ctx, threadID)
-		if pendingToolID != "" {
-			// This is an auth grant/denial for a tool
-			// For now, treat content as "true" (grant) unless explicitly "deny"? 
-			// Or just pass it through as a result.
-			// Let's assume standard input flow for now, but specialized UI would handle this differently.
-			agg, err = e.threadMgmt.AddToolResultMessage(ctx, threadID, messageID, pendingToolID, content, agentName)
-		}
-	}
-	
-	if agg == nil {
-		// Default: Standard User Message
-		agg, event, err = e.threadMgmt.AddUserMessage(ctx, threadID, messageID, content, userID)
+	} else {
+		// New thread - empty history
+		thread = core.NewInMemoryThreadWithID(threadID)
+		messages = []core.Message{}
 	}
 
-	if err != nil {
-		return fmt.Errorf("failed to add message: %w", err)
-	}
-
-	// 2. State Reconciliation & Elicitation Pairing
-	thread := e.threadMgmt.ToAgentThread(agg)
-	messages, err := thread.RetrieveFullConversationHistory(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to retrieve conversation history: %w", err)
-	}
-
-	// 3. Determine Target Agent (Sticky Session)
+	// Determine target agent (sticky session)
 	targetAgent := e.determineTargetAgent(ctx, messages, agentName)
-
-	titleEvent, err := e.handleThreadTitle(ctx, threadID, content, messages)
-	if err != nil {
-		e.log.Error(ctx, "failed to handle thread title", "error", err)
-	}
 
 	// Inject User into context for tools that need it
 	if userID != "" {
 		ctx = context.WithValue(ctx, domain.UserContextKey, &domain.User{ID: userID})
 	}
 
-	runIter := e.Run(ctx, targetAgent, core.RunContext{
+	// Prepare RunContext with user message
+	// The engine state machine will persist the message
+	runCtx := core.RunContext{
 		ThreadID:       threadID,
 		MessageID:      runID,
 		Thread:         thread,
 		InitialHistory: messages,
 		Options:        core.DefaultRunOptions(),
-	})
+		UserContent:    content,
+		UserID:         userID,
+	}
 
-	// Create event factory for run events
-	events := NewEventFactory(agentName)
+	return e.executeRun(ctx, targetAgent, runCtx)
+}
 
-	// Emit Initial Events
-	_ = e.emit(ctx, event, nil)      // MessageAdded (already persisted)
-	_ = e.emit(ctx, titleEvent, nil) // TitleUpdated (already persisted)
-	_ = e.emit(ctx, events.RunStarted(threadID, runID), nil)
+// executeRun runs the engine and consumes the event iterator.
+func (e *Engine) executeRun(ctx context.Context, agentName string, runCtx core.RunContext) error {
+	runIter := e.Run(ctx, agentName, runCtx)
 
-	// Consume the run iterator and emit all events
+	// Consume the run iterator
 	for evt, err := range runIter {
 		if err != nil {
 			// Engine has already emitted RunError via StateError transition
@@ -97,26 +75,8 @@ func (e *Engine) ProcessUserMessage(ctx context.Context, agentName, threadID, co
 		}
 		// Event emission is already handled by e.Run using wrapYield
 	}
-	
+
 	return nil
-}
-
-// handleThreadTitle generates and updates a thread title if it's the first message.
-func (e *Engine) handleThreadTitle(ctx context.Context, threadID, content string, messages []core.Message) (core.Event, error) {
-	// Only generate title on the first message
-	if len(messages) != 1 {
-		return nil, nil
-	}
-
-	title := GenerateThreadTitle(content)
-
-	// Update thread title via thread command service (internal threadMgmt)
-	event, err := e.threadMgmt.UpdateThreadTitle(ctx, threadID, title)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update thread title: %w", err)
-	}
-
-	return event, nil
 }
 
 // determineTargetAgent inspects the history to find the last active agent.

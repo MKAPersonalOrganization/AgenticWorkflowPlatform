@@ -232,6 +232,12 @@ func (m *Manager) GetPendingAuthToolCall(ctx context.Context, threadID string) (
 }
 
 // ToAgentThread converts a ThreadAggregate to a core.AgentThread.
+// Load loads an existing thread aggregate from the repository.
+// Returns domain.ErrThreadNotFound if the thread doesn't exist.
+func (m *Manager) Load(ctx context.Context, threadID string) (*domain.ThreadAggregate, error) {
+	return m.threadRepo.Load(ctx, threadID)
+}
+
 func (m *Manager) ToAgentThread(aggregate *domain.ThreadAggregate) core.AgentThread {
 	agentThread := core.NewInMemoryThreadWithID(aggregate.ID)
 	messages := m.ToCoreMessages(aggregate)
