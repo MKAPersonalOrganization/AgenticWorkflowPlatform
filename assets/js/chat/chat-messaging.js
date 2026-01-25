@@ -8,9 +8,9 @@
  * - Message snapshot handling
  */
 
-import { createUserMessage, safeParseJSON, generateInteractionId, enrichToolResult, normalizeElicitation } from './chat-utils.js';
+import { createUserMessage, safeParseJSON, generateInteractionId, enrichToolResult } from './chat-utils.js';
 import { TOOL_EVENTS, TOOL_STATES } from './tool-state-machine.js';
-import { isElicitationTool, isSpecialTool } from './chat-tool-registry.js';
+import { getToolConfig } from './chat-tool-registry.js';
 /**
  * Create messaging methods mixin
  * @returns {Object} Methods for message handling
@@ -128,7 +128,11 @@ export function createMessagingMethods() {
                     const data = await response.json();
                     const state = this.__getThreadState(id);
                     const messages = Array.isArray(data) ? data : (data.messages || []);
-                    state.messages = this.__convertBackendMessagesToUI(messages, data.toolStates || {}, id);
+                    const uiMessages = this.__convertBackendMessagesToUI(messages, data.toolStates || {}, id);
+                    state.messages = uiMessages;
+
+                    // Side Effect Phase: Sync stateful components (XState)
+                    this.__syncThreadToolStates(uiMessages, data.toolStates || {}, id);
 
                     // Load token usage if available
                     if (data.tokenUsage) {
@@ -170,157 +174,183 @@ export function createMessagingMethods() {
          * @param {string|null} targetThreadId - Thread ID for state syncing (optional)
          * @returns {Array} Converted messages for UI display
          */
+        /**
+         * Convert backend AG-UI messages to UI display format
+         * @param {Array} backendMessages - Messages in AG-UI SDK format
+         * @param {Object} toolStatesMap - Map of tool states by toolCallId (optional)
+         * @param {string|null} targetThreadId - Thread ID for state syncing (optional)
+         * @returns {Array} Converted messages for UI display
+         */
         __convertBackendMessagesToUI(backendMessages, toolStatesMap = {}, targetThreadId = null) {
-            // Guard: Validate input
             if (!Array.isArray(backendMessages)) {
-                console.warn('Invalid messages array:', backendMessages);
+                console.warn('[Messaging] Invalid messages array:', backendMessages);
                 return [];
             }
 
             const uiMessages = [];
 
+            // Phase 1: Convert individual backend messages to flat UI message segments
             for (const msg of backendMessages) {
-                if (!msg || !msg.role) {
-                    console.warn('Skipping invalid message:', msg);
-                    continue;
-                }
+                if (!msg?.role) continue;
 
                 switch (msg.role) {
                     case 'user':
-                        uiMessages.push({
-                            id: msg.id,
-                            role: 'user',
-                            content: msg.content || '',
-                            timestamp: msg.timestamp || new Date().toISOString(),
-                            streaming: false
-                        });
+                        uiMessages.push(this.__handleUserMessage(msg));
                         break;
 
                     case 'assistant':
-                        if (msg.content) {
-                            uiMessages.push({
-                                id: msg.id,
-                                role: 'assistant',
-                                content: msg.content,
-                                timestamp: msg.timestamp || new Date().toISOString(),
-                                streaming: false
-                            });
-                        }
-                        if (msg.toolCalls && msg.toolCalls.length > 0) {
-                            const agentName = msg.name || 'agent';
-
-                            for (const toolCall of msg.toolCalls) {
-                                const toolName = toolCall.function?.name || 'unknown';
-                                const toolArgs = toolCall.function?.arguments || '{}';
-
-                                // Check metadata for tool state overrides
-                                let status = 'completed';
-                                let agent = agentName;
-                                let toolResult = null;
-                                let elicitation = null;
-                                let parsedToolArgs = safeParseJSON(toolArgs);
-                                // Check global tool states map first
-                                if (toolStatesMap && toolStatesMap[toolCall.id]) {
-                                    const stateObj = toolStatesMap[toolCall.id];
-                                    // With XState, we don't need to manually set status here as the machine will do it
-                                    // But we might need agent name
-                                    if (stateObj.agentName) agent = stateObj.agentName;
-                                    if (stateObj.result) toolResult = stateObj.result;
-                                    if (stateObj.state) status = stateObj.state;
-                                    if (stateObj.elicitation) elicitation = stateObj.elicitation;
-                                }
-
-                                // Determine if this is a special tool call or an elicitation tool call
-                                const isSpecial = isSpecialTool(toolName);
-                                const isElicitation = isElicitationTool(elicitation?.schema?.type);
-
-                                // Initialize and sync XState machine
-                                if (toolCall.id) {
-                                    // Always start the machine (IDLE -> EXECUTING)
-                                    // The machine will synchronously initialize its state in the thread state,
-                                    // preventing race conditions during hydration.
-                                    this.transitionToolState(toolCall.id, TOOL_EVENTS.START, { toolName }, targetThreadId);
-
-                                    // Sync to specific state if needed
-                                    if (status === 'completed') {
-                                        this.transitionToolState(toolCall.id, TOOL_EVENTS.SUCCESS, { result: toolResult }, targetThreadId);
-                                    } else if (status === 'error') {
-                                        this.transitionToolState(toolCall.id, TOOL_EVENTS.ERROR, { error: toolResult || 'Unknown error' }, targetThreadId);
-                                    } else if (status === 'awaiting_input') {
-                                        this.transitionToolState(toolCall.id, TOOL_EVENTS.NEEDS_INPUT, { elicitation }, targetThreadId);
-                                    } else if (status === 'awaiting_auth') {
-                                        this.transitionToolState(toolCall.id, TOOL_EVENTS.NEEDS_AUTH, {}, targetThreadId);
-                                    } else if (status === 'input_provided') {
-                                        // Maintain history: It WAS awaiting input, then provided. 
-                                        // The current state should be EXECUTING or COMPLETED depending on subsequent events?
-                                        // Actually 'input_provided' is a transient event in backend, but might be a state in our view?
-                                        // If backend says 'input_provided', it means we are past the wait.
-                                        // So we should be in EXECUTING (after input).
-                                        this.transitionToolState(toolCall.id, TOOL_EVENTS.NEEDS_INPUT, { elicitation }, targetThreadId);
-                                        this.transitionToolState(toolCall.id, TOOL_EVENTS.INPUT_PROVIDED, {}, targetThreadId);
-                                    }
-                                }
-
-                                // Normalize result/elicitation
-                                let parsedResult = toolResult;
-                                if (isElicitation && elicitation) {
-                                    parsedResult = normalizeElicitation(elicitation.question, elicitation.schema);
-                                } else if (toolResult) {
-                                    parsedResult = safeParseJSON(toolResult);
-                                }
-
-                                uiMessages.push({
-                                    id: toolCall.id,
-                                    type: 'tool_call',
-                                    name: toolName,
-                                    args: toolArgs,
-                                    parsedArgs: safeParseJSON(toolArgs),
-                                    result: toolResult,
-                                    parsedResult: parsedResult,
-                                    status: status,
-                                    agentName: agent,
-                                    timestamp: toolCall.timestamp || new Date().toISOString()
-                                });
-                            }
-                        }
-                        break;
-
-                    case 'tool':
-                        console.log('[DEBUG] Raw Tool Message Keys:', Object.keys(msg));
-                        const toolCallId = msg.toolCallId || msg.toolCallID || msg.tool_call_id || null;
-                        uiMessages.push({
-                            id: msg.id,
-                            type: 'tool_result',
-                            toolCallId: toolCallId,
-                            content: msg.content || '',
-                            timestamp: msg.timestamp || new Date().toISOString()
-                        });
+                        uiMessages.push(...this.__handleAssistantMessage(msg, toolStatesMap, targetThreadId));
                         break;
 
                     case 'system':
                     case 'developer':
-                        uiMessages.push({
-                            id: msg.id,
-                            role: msg.role,
-                            content: msg.content || '',
-                            timestamp: msg.timestamp || new Date().toISOString(),
-                            streaming: false
-                        });
+                        uiMessages.push(this.__handleSystemMessage(msg));
                         break;
 
                     default:
-                        console.warn('Unknown message role:', msg.role);
-                        uiMessages.push({
-                            id: msg.id,
-                            role: msg.role,
-                            content: msg.content || '',
-                            timestamp: msg.timestamp || new Date().toISOString(),
-                            streaming: false
-                        });
+                        console.warn('[Messaging] Unknown message role:', msg.role);
+                        uiMessages.push(this.__handleSystemMessage(msg)); // Fallback to system styling
                 }
             }
 
-            // Pair tool calls with their results
+            // Phase 2: Pair tool calls with their results for unified display
+            return this.__pairToolCallsWithResults(uiMessages);
+        },
+
+        /**
+         * Handle conversion of a user message
+         * @private
+         */
+        __handleUserMessage(msg) {
+            return {
+                id: msg.id,
+                role: 'user',
+                content: msg.content || '',
+                timestamp: msg.timestamp || new Date().toISOString(),
+                streaming: false
+            };
+        },
+
+        /**
+         * Handle conversion of an assistant message (text + tool calls)
+         * EXPLICIT ORDER: CONTENT -> TOOL CALLS
+         * @private
+         */
+        __handleAssistantMessage(msg, toolStatesMap, targetThreadId) {
+            const segments = [];
+
+            // 1. Text Content ALWAYS first (ensures consistent UI order after refresh)
+            if (msg.content) {
+                segments.push({
+                    id: msg.id,
+                    role: 'assistant',
+                    content: msg.content,
+                    timestamp: msg.timestamp || new Date().toISOString(),
+                    streaming: false
+                });
+            }
+
+            // 2. Tool Calls second
+            if (msg.toolCalls?.length > 0) {
+                const agentName = msg.name || 'agent';
+                for (const toolCall of msg.toolCalls) {
+                    segments.push(this.__processToolCall(toolCall, agentName, toolStatesMap, targetThreadId));
+                }
+            }
+
+            return segments;
+        },
+
+        /**
+         * Process a single tool call from an assistant message
+         * @private
+         */
+        __processToolCall(toolCall, agentName, toolStatesMap, targetThreadId) {
+            const toolName = toolCall.function?.name || 'unknown';
+            const toolArgs = toolCall.function?.arguments || '{}';
+
+            // Default state
+            let status = 'completed';
+            let agent = agentName;
+            let toolResult = null;
+            let elicitation = null;
+
+            // Sync with persistent tool states from projection
+            if (toolStatesMap?.[toolCall.id]) {
+                const stateObj = toolStatesMap[toolCall.id];
+                if (stateObj.agentName) agent = stateObj.agentName;
+                if (stateObj.result) toolResult = stateObj.result;
+                if (stateObj.state) status = stateObj.state;
+                if (stateObj.elicitation) elicitation = stateObj.elicitation;
+            }
+
+            // Component-owned mapping (React-like)
+            const config = getToolConfig(toolName, elicitation?.schema?.type);
+            const mappedData = config.onMap(toolCall, toolResult, elicitation);
+
+            return {
+                id: toolCall.id,
+                type: 'tool_call',
+                name: toolName,
+                args: toolArgs,
+                parsedArgs: safeParseJSON(toolArgs),
+                result: toolResult,
+                status: status,
+                agentName: agent,
+                timestamp: toolCall.timestamp || new Date().toISOString(),
+                ...mappedData
+            };
+        },
+
+        /**
+         * State Synchronization Phase (React-like design)
+         * Decouples side effects (XState transitions) from data mapping.
+         * @param {Array} uiMessages - Converted UI messages
+         * @param {Object} toolStatesMap - Map of tool states by toolCallId
+         * @param {string} threadId - Thread ID
+         * @private
+         */
+        __syncThreadToolStates(uiMessages, toolStatesMap, threadId) {
+            for (const msg of uiMessages) {
+                if (msg.type !== 'tool_call') continue;
+
+                const toolId = msg.id;
+                const toolName = msg.name;
+                const status = msg.status;
+                const toolResult = msg.result;
+                const elicitation = toolStatesMap[toolId]?.elicitation;
+
+                // Component-owned synchronization (React-like)
+                const config = getToolConfig(toolName, elicitation?.schema?.type);
+                config.onSync(toolId, threadId, {
+                    toolName,
+                    status,
+                    toolResult,
+                    elicitation,
+                    TOOL_EVENTS
+                }, (id, ev, pay, tid) => this.transitionToolState(id, ev, pay, tid));
+            }
+        },
+
+        /**
+         * Handle system/developer messages
+         * @private
+         */
+        __handleSystemMessage(msg) {
+            return {
+                id: msg.id,
+                role: msg.role,
+                content: msg.content || '',
+                timestamp: msg.timestamp || new Date().toISOString(),
+                streaming: false
+            };
+        },
+
+        /**
+         * Pair tool calls with their results for unified display
+         * @private
+         */
+        __pairToolCallsWithResults(uiMessages) {
             const toolCallMap = new Map();
             const pairedMessages = [];
 
@@ -331,17 +361,14 @@ export function createMessagingMethods() {
                 } else if (msg.type === 'tool_result') {
                     const toolCall = toolCallMap.get(msg.toolCallId);
                     if (toolCall) {
-                        // Use shared enrichment logic
                         enrichToolResult(toolCall, msg.content);
                     } else {
-                        pairedMessages.push(msg);
+                        pairedMessages.push(msg); // Keep orphaned results visible
                     }
                 } else {
                     pairedMessages.push(msg);
                 }
             }
-
-            // Note: awaitingHumanInput is derived centrally via __updateDerivedState() set in chat-state.js
 
             return pairedMessages;
         },
@@ -372,7 +399,11 @@ export function createMessagingMethods() {
             }
 
             // Convert and set messages
-            state.messages = this.__convertBackendMessagesToUI(event.messages, {}, threadId);
+            const uiMessages = this.__convertBackendMessagesToUI(event.messages, {}, threadId);
+            state.messages = uiMessages;
+
+            // Sync stateful components (XState)
+            this.__syncThreadToolStates(uiMessages, {}, threadId);
 
             // Update derived state
             this.__updateDerivedState();
@@ -385,13 +416,5 @@ export function createMessagingMethods() {
             }
         },
 
-        /**
-         * Safely parse JSON string
-         * @param {string} jsonString - JSON string to parse
-         * @returns {Object} Parsed object or empty object
-         */
-        safeParseJSON(jsonString) {
-            return safeParseJSON(jsonString);
-        }
     };
 }

@@ -1,48 +1,86 @@
+import { safeParseJSON, normalizeElicitation } from './chat-utils.js';
+
 /**
- * Chat Tool Registry
- * 
- * Central registry for tool definitions, rendering types, and normalization logic.
- * This decouples the message processing from specific tool implementations.
+ * Default tool configuration (Base component logic)
  */
+const DEFAULT_TOOL_CONFIG = {
+    type: 'standard',
+    category: 'general',
+
+    /**
+     * Data Mapping Hook (Pure)
+     * Transforms raw tool data into UI message properties.
+     */
+    onMap: (toolCall, toolResult, elicitation) => {
+        return {
+            parsedResult: toolResult ? safeParseJSON(toolResult) : null
+        };
+    },
+
+    /**
+     * State Synchronization Hook (Side-effect)
+     * Handles tool-specific stateful updates (e.g. XState transitions).
+     */
+    onSync: (toolId, threadId, context, transitionFn) => {
+        const { toolName, status, toolResult, elicitation, TOOL_EVENTS } = context;
+
+        // Base XState lifecycle: START -> (SUCCESS | ERROR | NEEDS_INPUT | NEEDS_AUTH)
+        transitionFn(toolId, TOOL_EVENTS.START, { toolName }, threadId);
+
+        const statusEventMap = {
+            'completed': { event: TOOL_EVENTS.SUCCESS, payload: { result: toolResult } },
+            'error': { event: TOOL_EVENTS.ERROR, payload: { error: toolResult || 'Unknown error' } },
+            'awaiting_input': { event: TOOL_EVENTS.NEEDS_INPUT, payload: { elicitation } },
+            'awaiting_auth': { event: TOOL_EVENTS.NEEDS_AUTH, payload: {} }
+        };
+
+        if (statusEventMap[status]) {
+            const { event, payload } = statusEventMap[status];
+            transitionFn(toolId, event, payload, threadId);
+        } else if (status === 'input_provided') {
+            transitionFn(toolId, TOOL_EVENTS.NEEDS_INPUT, { elicitation }, threadId);
+            transitionFn(toolId, TOOL_EVENTS.INPUT_PROVIDED, {}, threadId);
+        }
+    }
+};
+
+/**
+ * Specialized Elicitation logic
+ */
+const ELICITATION_BASE_CONFIG = {
+    ...DEFAULT_TOOL_CONFIG,
+    type: 'elicitation',
+    onMap: (toolCall, toolResult, elicitation) => {
+        return {
+            parsedResult: elicitation ? normalizeElicitation(elicitation.question, elicitation.schema) : null
+        };
+    }
+};
 
 /**
  * Registry of known tools and their metadata
  */
 export const TOOL_REGISTRY = {
     // Collaboration
-    'transfer_to_agent': {
-        type: 'special',
-        category: 'collaboration'
-    },
+    'transfer_to_agent': { type: 'special', category: 'collaboration' },
 
     // Utilities
-    'write_todos': {
-        type: 'special',
-        category: 'productivity'
-    },
+    'write_todos': { type: 'special', category: 'productivity' },
 
     // Content & Search
-    'browse_library': {
-        type: 'special',
-        category: 'knowledge'
-    },
-    'lookup_section': {
-        type: 'special',
-        category: 'knowledge'
-    },
-    'search_text_in_file': {
-        type: 'special',
-        category: 'knowledge'
-    },
+    'browse_library': { type: 'special', category: 'knowledge' },
+    'lookup_section': { type: 'special', category: 'knowledge' },
+    'search_text_in_file': { type: 'special', category: 'knowledge' },
 
-    // Mathematics & Analysis
-    'calculate': { type: 'special', category: 'math' },
+    // Mathematics & Analysis (Component-owned mapping for display consistency)
     'add': { type: 'special', category: 'math' },
     'subtract': { type: 'special', category: 'math' },
     'multiply': { type: 'special', category: 'math' },
     'divide': { type: 'special', category: 'math' },
     'power': { type: 'special', category: 'math' },
     'sqrt': { type: 'special', category: 'math' },
+    'calculate': { type: 'special', category: 'math' },
+
     'plot': { type: 'special', category: 'visualization' },
 
     // Statistics
@@ -78,14 +116,29 @@ export const TOOL_REGISTRY = {
  * Registry of elicitation schema types
  */
 export const ELICITATION_REGISTRY = {
-    'choose_multiple': { type: 'elicitation' },
-    'true_false': { type: 'elicitation' }
+    'choose_multiple': { ...ELICITATION_BASE_CONFIG },
+    'true_false': { ...ELICITATION_BASE_CONFIG }
 };
 
 /**
- * Check if a tool has special rendering
+ * Get the full configuration for a tool
  * @param {string} toolName - Name of the tool
- * @returns {boolean} True if tool has special rendering
+ * @param {string|null} schemaType - Optional elicitation schema type
+ * @returns {Object} Merged tool configuration
+ */
+export function getToolConfig(toolName, schemaType = null) {
+    const elicitationConfig = schemaType ? ELICITATION_REGISTRY[schemaType] : null;
+    const toolConfig = TOOL_REGISTRY[toolName] || null;
+
+    return {
+        ...DEFAULT_TOOL_CONFIG,
+        ...(toolConfig || {}),
+        ...(elicitationConfig || {})
+    };
+}
+
+/**
+ * Check if a tool has special rendering
  */
 export function isSpecialTool(toolName) {
     return !!TOOL_REGISTRY[toolName];
@@ -93,18 +146,7 @@ export function isSpecialTool(toolName) {
 
 /**
  * Check if a schema type is for elicitation
- * @param {string} schemaType - Type of schema
- * @returns {boolean} True if schema is for elicitation
  */
 export function isElicitationTool(schemaType) {
     return !!ELICITATION_REGISTRY[schemaType];
-}
-
-/**
- * Get tool metadata
- * @param {string} toolName - Name of the tool
- * @returns {Object|null} Tool metadata or null
- */
-export function getToolMetadata(toolName) {
-    return TOOL_REGISTRY[toolName] || null;
 }
