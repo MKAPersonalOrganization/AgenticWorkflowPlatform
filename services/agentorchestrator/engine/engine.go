@@ -76,7 +76,7 @@ func (e *Engine) GetGraph() string {
 	}
 
 	// We can use any start state, setup will configure all of them
-	_ = exec.setup(StateAwaitingTurn)
+	_ = exec.setup(StateAwaitingExecution)
 
 	return exec.sm.ToGraph()
 }
@@ -94,12 +94,13 @@ func (e *Engine) Run(ctx context.Context, agentName string, runCtx core.RunConte
 		// This ensures executor is available regardless of execution path
 		exec.prepareExecutor()
 
-		// Load persisted state or default to AwaitingTurn
-		startState := StateAwaitingTurn
+		// Load persisted state or default to Idle
+		startState := StateAwaitingExecution
 		if persistedStateStr, err := e.threadMgmt.GetEngineState(ctx, runCtx.ThreadID); err == nil && persistedStateStr != "" {
 			startState = parseState(persistedStateStr)
-			if startState == StateDone {
-				startState = StateAwaitingTurn
+			// Reset terminal state to idle for new execution
+			if startState == StateCompleted {
+				startState = StateAwaitingExecution
 			}
 		}
 
@@ -127,20 +128,46 @@ func (e *Engine) Run(ctx context.Context, agentName string, runCtx core.RunConte
 	}
 }
 
-// handleExecutionError updates the result based on error type.
+// handleExecutionError updates the result and completion metadata based on error type.
 func (exec *executionState) handleExecutionError(ctx context.Context, err error) {
 	// Update result based on error type, but only if not already set to a specific reason
 	if exec.observer.result.Reason == TerminationGoalReached {
 		if ctx.Err() != nil {
 			exec.observer.result.Reason = TerminationUserAborted
+			exec.completionReason = CompletionReasonUserAborted
 		} else {
 			exec.observer.result.Reason = TerminationError
 			exec.observer.result.Error = err
+			exec.completionReason = CompletionReasonError
 		}
 		exec.observer.result.Success = false
+	} else {
+		// Completion reason already set (e.g., MaxIterations, LoopDetected)
+		// Map the existing termination reason to completion reason
+		exec.completionReason = terminationReasonToCompletionReason(exec.observer.result.Reason)
 	}
-	// Fire transition to error state to trigger event emission
-	_ = exec.sm.Fire(TrigError)
+	// Fire transition to completed state to trigger event emission
+	_ = exec.sm.Fire(TrigExecutionFailed)
+}
+
+// terminationReasonToCompletionReason converts TerminationReason to CompletionReason.
+func terminationReasonToCompletionReason(tr TerminationReason) CompletionReason {
+	switch tr {
+	case TerminationGoalReached:
+		return CompletionReasonSuccess
+	case TerminationMaxIterations:
+		return CompletionReasonMaxIterations
+	case TerminationLoopDetected:
+		return CompletionReasonLoopDetected
+	case TerminationTimeout:
+		return CompletionReasonTimeout
+	case TerminationUserAborted:
+		return CompletionReasonUserAborted
+	case TerminationError:
+		return CompletionReasonError
+	default:
+		return CompletionReasonError
+	}
 }
 
 // finalizeResult completes the execution result with final metrics.
@@ -331,6 +358,10 @@ type executionState struct {
 	streamResult *StreamResult
 	resolution   *RouteResolver
 
+	// State metadata - tracks WHY we're in a particular state
+	pauseReason      PauseReason      // Why paused (input/auth)
+	completionReason CompletionReason // Why completed (success/error type)
+
 	// Tool state machines for tracking individual tool execution states
 	toolStateMachines map[string]*domain.ToolStateMachine
 }
@@ -408,16 +439,19 @@ func (s *executionState) executeRequiredActions() error {
 	isInput, isAuth, err := s.checkToolWaitingStates()
 	if err != nil {
 		s.observer.Fail(TerminationError, err)
-		return s.sm.Fire(TrigError)
+		s.completionReason = CompletionReasonError
+		return s.sm.Fire(TrigExecutionFailed)
 	}
 
 	if isInput {
 		s.observer.result.Reason = TerminationAwaitingInput
-		return s.sm.Fire(TrigRequireInput)
+		s.pauseReason = PauseReasonInput
+		return s.sm.Fire(TrigAwaitUserInput)
 	}
 	if isAuth {
 		s.observer.result.Reason = TerminationAwaitingAuth
-		return s.sm.Fire(TrigRequireAuth)
+		s.pauseReason = PauseReasonAuth
+		return s.sm.Fire(TrigAwaitUserInput)
 	}
 
 	return s.nextStep()
@@ -456,14 +490,17 @@ func (s *executionState) nextStep() error {
 	currentState := s.sm.MustState()
 
 	switch currentState {
-	case StateGeneratingResponse:
+	case StateInvokingLLM:
 		// Transition based on whether tools were called
 		if s.streamResult != nil && s.streamResult.HasToolCalls() {
-			return s.sm.Fire(TrigActionsDetected)
+			return s.sm.Fire(TrigToolsDetected)
 		}
-		return s.sm.Fire(TrigTurnFinished)
+		// No tools called, execution complete successfully
+		s.completionReason = CompletionReasonSuccess
+		s.observer.result.Reason = TerminationGoalReached
+		return s.sm.Fire(TrigExecutionComplete)
 
-	case StatePerformingActions:
+	case StateExecutingTools:
 		// Tool waiting states (Input/Auth) are handled in executeRequiredActions.
 		// If we reach here, we are ready for the next turn.
 
@@ -471,11 +508,13 @@ func (s *executionState) nextStep() error {
 		s.messageID = core.GenerateID()
 		s.streamResult = nil
 		s.resolution = nil
-		return s.sm.Fire(TrigActionsCompleted)
+		return s.sm.Fire(TrigToolsCompleted)
 
 	default:
 		// Default termination for safety
-		return s.sm.Fire(TrigTurnFinished)
+		s.completionReason = CompletionReasonSuccess
+		s.observer.result.Reason = TerminationGoalReached
+		return s.sm.Fire(TrigExecutionComplete)
 	}
 }
 
@@ -647,7 +686,6 @@ func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolve
 	g, _ := errgroup.WithContext(tctx.Ctx)
 
 	for _, tc := range tctx.StreamResult.ToolCalls {
-		tc := tc // Shadow for closure
 		tsm := tctx.ToolStateMachines[tc.ID]
 
 		g.Go(func() error {
@@ -780,13 +818,13 @@ func (s *executionState) setup(initialState state) error {
 		s.trackStateChange(trans.Destination.(state))
 	})
 
-	// Configure StateAwaitingTurn
-	s.sm.Configure(StateAwaitingTurn).
-		Permit(TrigStartExecution, StateGeneratingResponse).
-		Permit(TrigError, StateError)
+	// Configure StateAwaitingExecution (replaces StateAwaitingTurn)
+	s.sm.Configure(StateAwaitingExecution).
+		Permit(TrigBeginExecution, StateInvokingLLM).
+		Permit(TrigExecutionFailed, StateCompleted)
 
-	// Configure StateGeneratingResponse
-	s.sm.Configure(StateGeneratingResponse).
+	// Configure StateInvokingLLM (replaces StateInvokingLLMResponse)
+	s.sm.Configure(StateInvokingLLM).
 		OnEntry(func(_ context.Context, _ ...any) error {
 			s.observer.TrackStarted(s.messageID)
 			return s.generateAgentResponse()
@@ -797,13 +835,13 @@ func (s *executionState) setup(initialState state) error {
 			}
 			return nil
 		}).
-		PermitReentry(TrigStartExecution).
-		Permit(TrigActionsDetected, StatePerformingActions).
-		Permit(TrigTurnFinished, StateDone).
-		Permit(TrigError, StateError)
+		PermitReentry(TrigBeginExecution).
+		Permit(TrigToolsDetected, StateExecutingTools).
+		Permit(TrigExecutionComplete, StateCompleted).
+		Permit(TrigExecutionFailed, StateCompleted)
 
-	// Configure StatePerformingActions
-	s.sm.Configure(StatePerformingActions).
+	// Configure StateExecutingTools (replaces StatePerformingActions)
+	s.sm.Configure(StateExecutingTools).
 		OnEntry(func(_ context.Context, _ ...any) error {
 			// Emit ActionsDetected event when entering this state
 			if s.streamResult != nil && s.streamResult.HasToolCalls() {
@@ -812,51 +850,41 @@ func (s *executionState) setup(initialState state) error {
 			}
 			return s.executeRequiredActions()
 		}).
-		PermitReentry(TrigStartExecution).
-		Permit(TrigRequireInput, StateAwaitingInput).
-		Permit(TrigRequireAuth, StateAwaitingAuth).
-		Permit(TrigActionsCompleted, StateGeneratingResponse).
-		Permit(TrigError, StateError)
+		PermitReentry(TrigBeginExecution).
+		Permit(TrigAwaitUserInput, StateAwaitingUserInput).
+		Permit(TrigToolsCompleted, StateInvokingLLM).
+		Permit(TrigExecutionFailed, StateCompleted)
 
-	// Configure StateAwaitingInput
-	s.sm.Configure(StateAwaitingInput).
-		Permit(TrigStartExecution, StateGeneratingResponse).
-		Permit(TrigError, StateError)
+	// Configure StateAwaitingUserInput (unifies StateAwaitingInput + StateAwaitingAuth)
+	s.sm.Configure(StateAwaitingUserInput).
+		Permit(TrigBeginExecution, StateInvokingLLM).
+		Permit(TrigExecutionFailed, StateCompleted)
 
-	// Configure StateAwaitingAuth
-	s.sm.Configure(StateAwaitingAuth).
-		Permit(TrigStartExecution, StateGeneratingResponse).
-		Permit(TrigError, StateError)
-
-	// Configure StateDone
-	s.sm.Configure(StateDone).
+	// Configure StateCompleted (terminal state for both success and failure)
+	s.sm.Configure(StateCompleted).
 		OnEntry(func(_ context.Context, _ ...any) error {
-			// Emit explicit domain event for turn completion
-			s.observer.yield(s.agent.Events.TurnFinished(s.threadID, s.messageID), nil)
-
-			// Emit RunFinished event when entering StateDone cleanly
-			s.observer.yield(s.observer.events.RunFinished(s.threadID, s.messageID), nil)
-			return nil
-		})
-
-	// Configure StateError
-	s.sm.Configure(StateError).
-		OnEntry(func(_ context.Context, _ ...any) error {
-			// Emit RunError event when entering StateError
-			msg := "Unknown error"
-			if s.observer.result.Error != nil {
-				msg = s.observer.result.Error.Error()
+			// Emit events based on completion reason (metadata)
+			if s.completionReason.IsSuccess() {
+				// Successful completion: emit turn finished and run finished
+				s.observer.yield(s.agent.Events.TurnFinished(s.threadID, s.messageID), nil)
+				s.observer.yield(s.observer.events.RunFinished(s.threadID, s.messageID), nil)
+			} else {
+				// Error termination: emit run error with context
+				msg := "Unknown error"
+				if s.observer.result.Error != nil {
+					msg = s.observer.result.Error.Error()
+				}
+				s.observer.yield(s.observer.events.RunError(s.threadID, msg, "RUN_ERROR"), nil)
 			}
-			s.observer.yield(s.observer.events.RunError(s.threadID, msg, "RUN_ERROR"), nil)
 			return nil
 		}).
-		Permit(TrigStartExecution, StateGeneratingResponse)
+		Permit(TrigBeginExecution, StateInvokingLLM) // Allow restart from completed state
 
 	return nil
 }
 
 func (s *executionState) run() error {
-	return s.sm.Fire(TrigStartExecution)
+	return s.sm.Fire(TrigBeginExecution)
 }
 
 func (s *executionState) streamAndProcessLLMResponse(llmContext *LLMContext) error {
@@ -919,72 +947,21 @@ func (s *executionState) trackStateChange(newState state) {
 
 func parseState(str string) state {
 	switch str {
-	case "AwaitingTurn":
-		return StateAwaitingTurn
-	case "GeneratingResponse":
-		return StateGeneratingResponse
-	case "PerformingActions":
-		return StatePerformingActions
-	case "AwaitingInput":
-		return StateAwaitingInput
-	case "AwaitingAuth":
-		return StateAwaitingAuth
-	case "Done":
-		return StateDone
-	case "Error":
-		return StateError
+	case "AwaitingExecution":
+		return StateAwaitingExecution
+	case "InvokingLLM":
+		return StateInvokingLLM
+	case "ExecutingTools":
+		return StateExecutingTools
+	case "AwaitingUserInput":
+		return StateAwaitingUserInput
+	case "Completed":
+		return StateCompleted
 	default:
-		return StateAwaitingTurn
+		// Default to initial state if unknown
+		return StateAwaitingExecution
 	}
 }
-
-// State machine states
-type state int
-
-const (
-	StateAwaitingTurn state = iota
-	StateGeneratingResponse
-	StatePerformingActions
-	StateAwaitingInput // Paused for user elicitation
-	StateAwaitingAuth  // Paused for authorization
-
-	StateDone
-	StateError
-)
-
-// String provides human-readable state names for debugging.
-func (s state) String() string {
-	switch s {
-	case StateAwaitingTurn:
-		return "AwaitingTurn"
-	case StateGeneratingResponse:
-		return "GeneratingResponse"
-	case StatePerformingActions:
-		return "PerformingActions"
-	case StateAwaitingInput:
-		return "AwaitingInput"
-	case StateAwaitingAuth:
-		return "AwaitingAuth"
-
-	case StateDone:
-		return "Done"
-	case StateError:
-		return "Error"
-	default:
-		return fmt.Sprintf("Unknown(%d)", s)
-	}
-}
-
-const (
-	TrigStartExecution   = "StartExecution"
-	TrigActionsDetected  = "ActionsDetected"
-	TrigTurnFinished     = "TurnFinished"
-	TrigActionsCompleted = "ActionsCompleted"
-
-	TrigRequireInput = "RequireInput" // Transition to StateAwaitingInput
-	TrigRequireAuth  = "RequireAuth"  // Transition to StateAwaitingAuth
-	TrigError        = "Error"        // System or safety error
-)
 
 // Safety and iteration limits
 const (
