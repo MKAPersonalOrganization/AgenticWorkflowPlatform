@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"school-with-ai/foundation/agentsdk/core"
 )
@@ -41,26 +42,65 @@ func (t *AskMultipleSelectionTool) Parameters() map[string]any {
 }
 
 func (t *AskMultipleSelectionTool) Invoke(ctx core.ToolContext, args any) (any, error) {
-	var params struct {
-		Question string   `json:"question"`
-		Options  []string `json:"options"`
-	}
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	// First unmarshal into a flexible map to handle various types
+	var raw map[string]any
+	if err := core.UnmarshalArgs(args, &raw); err != nil {
 		return nil, fmt.Errorf("invalid args: %w", err)
 	}
 
-	if params.Question == "" {
-		return nil, fmt.Errorf("question is required")
+	// Extract question/statement/text
+	var question string
+	if v, ok := raw["question"].(string); ok {
+		question = v
+	} else if v, ok := raw["statement"].(string); ok {
+		question = v
+	} else if v, ok := raw["text"].(string); ok {
+		question = v
 	}
-	if len(params.Options) < 2 {
-		return nil, fmt.Errorf("at least 2 options required")
+
+	if question == "" {
+		return nil, fmt.Errorf("question is required (use 'question' parameter)")
+	}
+
+	// Extract options - supporting both []any/[]string and string
+	var options []string
+	if v, ok := raw["options"]; ok {
+		switch opt := v.(type) {
+		case []any:
+			for _, item := range opt {
+				if s, ok := item.(string); ok {
+					options = append(options, s)
+				}
+			}
+		case []string:
+			options = opt
+		case string:
+			// Split by common delimiters if LLM sent a string
+			parts := []string{}
+			if strings.Contains(opt, ";") {
+				parts = strings.Split(opt, ";")
+			} else if strings.Contains(opt, ",") {
+				parts = strings.Split(opt, ",")
+			} else {
+				parts = []string{opt}
+			}
+			for _, p := range parts {
+				if trimmed := strings.TrimSpace(p); trimmed != "" {
+					options = append(options, trimmed)
+				}
+			}
+		}
+	}
+
+	if len(options) < 2 {
+		return nil, fmt.Errorf("at least 2 options required in 'options' (array or comma-separated string)")
 	}
 
 	schema := map[string]any{
 		"type": "choose_multiple",
-		"enum": params.Options,
+		"enum": options,
 	}
-	return createMultipleChoiceResult(params.Question, params.Options, schema)
+	return createMultipleChoiceResult(question, options, schema)
 }
 
 
@@ -87,20 +127,31 @@ func (t *AskTrueFalseTool) Parameters() map[string]any {
 
 func (t *AskTrueFalseTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	var params struct {
-		Question string `json:"question"`
+		Question  string `json:"question"`
+		Statement string `json:"statement"`
+		Text      string `json:"text"`
 	}
 	if err := core.UnmarshalArgs(args, &params); err != nil {
-		return nil, fmt.Errorf("invalid args: %w", err)
+		return nil, fmt.Errorf("invalid args (expected schema with question): %w", err)
 	}
 
-	if params.Question == "" {
-		return nil, fmt.Errorf("question is required")
+	question := params.Question
+	if question == "" {
+		if params.Statement != "" {
+			question = params.Statement
+		} else if params.Text != "" {
+			question = params.Text
+		}
+	}
+
+	if question == "" {
+		return nil, fmt.Errorf("question is required (use 'question' parameter)")
 	}
 
 	schema := map[string]any{
 		"type": "true_false",
 	}
-	return createTrueFalseResult(params.Question, schema)
+	return createTrueFalseResult(question, schema)
 }
 
 // --- HELPERS ---
@@ -160,9 +211,11 @@ func (m *ElicitationMiddleware) Process(ctx context.Context, reqCtx *core.Reques
 ## Quiz Tools
 You MUST use these tools to quiz the student. Arguments are MANDATORY.
 1. **quiz_multiple_choice**:
-   - arguments: {"question": "...", "options": ["A", "B"]}
+   - Schema: {"question": "...", "options": ["A", "B"]}
+   - Use this for multiple choice questions.
 2. **quiz_yes_no**:
-   - arguments: {"question": "..."}
+   - Schema: {"question": "..."}
+   - Use this for true/false or yes/no questions.
 `)
 
 	return next(ctx, reqCtx)

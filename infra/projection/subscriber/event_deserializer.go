@@ -179,6 +179,20 @@ func deserializeDomainEvent(eventType string, data []byte) (core.Event, error) {
 		}
 		return &evt, nil
 
+	case "ActionsDetected":
+		var evt domain.ActionsDetected
+		if err := json.Unmarshal(data, &evt); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal ActionsDetected: %w", err)
+		}
+		return &evt, nil
+
+	case "TurnFinished":
+		var evt domain.TurnFinished
+		if err := json.Unmarshal(data, &evt); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal TurnFinished: %w", err)
+		}
+		return &evt, nil
+
 	default:
 		return nil, fmt.Errorf("unknown event type: %s", eventType)
 	}

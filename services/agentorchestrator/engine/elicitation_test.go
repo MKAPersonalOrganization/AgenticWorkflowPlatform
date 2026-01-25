@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"testing"
 
@@ -149,5 +150,150 @@ func TestEngine_ElicitationFlow(t *testing.T) {
 	finalMsg := msgs[len(msgs)-1]
 	if finalMsg.Role != "assistant" || finalMsg.Content != "Thanks! I see you like blue." {
 		t.Errorf("Unexpected final message: %+v", finalMsg)
+	}
+}
+func TestEngine_ElicitationRobustness(t *testing.T) {
+	t.Parallel()
+	// Setup
+	log := logger.New(io.Discard, logger.LevelInfo, "test", nil)
+	eventStore := NewMockEventStore()
+	repo := domain.NewThreadRepository(eventStore)
+	tm := threadmgmt.New(log, repo)
+
+	ctx := context.Background()
+	threadID := "thread-robustness"
+	_, _, _ = tm.CreateThread(ctx, threadID, "Robustness Thread")
+
+	// Mock Chat Client simulating an LLM using "statement" instead of "question"
+	mockClient := &MockChatClient{
+		streams: [][]llm.ChatResponseUpdate{
+			{
+				{
+					Contents: []llm.AIContent{
+						llm.FunctionCallContent{
+							CallID:       "call_1",
+							Name:         "quiz_yes_no",
+							RawArguments: `{"statement": "Is 2+2=4?"}`, // Using "statement" alias
+						},
+					},
+					FinishReason: "tool_calls",
+				},
+			},
+		},
+	}
+
+	agentConfig := core.AgentConfig{
+		Name:          "test-robust",
+		MaxIterations: 5,
+		Middleware: []core.Middleware{
+			middleware.NewElicitationMiddleware(),
+		},
+	}
+
+	provider := &MockAgentProvider{
+		configs: map[string]core.AgentConfig{
+			"test-robust": agentConfig,
+		},
+	}
+
+	eng := New(log, mockClient, tm, provider, nil, nil, nil)
+	userID := "user1"
+
+	err := eng.ProcessUserMessage(ctx, "test-robust", threadID, "Start", userID)
+	if err != nil {
+		t.Fatalf("ProcessUserMessage failed: %v", err)
+	}
+
+	// Verify that the tool was successful despite using "statement"
+	threadAgg, _ := repo.Load(ctx, threadID)
+	foundSuccess := false
+	for _, msg := range threadAgg.Messages {
+		if msg.Role == "tool" {
+			var result struct {
+				Status string `json:"status"`
+			}
+			json.Unmarshal([]byte(msg.Content), &result)
+			if result.Status == "Requesting input: Is 2+2=4?" {
+				foundSuccess = true
+				break
+			}
+		}
+	}
+
+	if !foundSuccess {
+		t.Error("Expected successful tool execution with 'statement' alias, but didn't find the expected status in tool message")
+	}
+}
+
+func TestEngine_ElicitationOptionsRobustness(t *testing.T) {
+	t.Parallel()
+	// Setup
+	log := logger.New(io.Discard, logger.LevelInfo, "test", nil)
+	eventStore := NewMockEventStore()
+	repo := domain.NewThreadRepository(eventStore)
+	tm := threadmgmt.New(log, repo)
+
+	ctx := context.Background()
+	threadID := "thread-options-robustness"
+	_, _, _ = tm.CreateThread(ctx, threadID, "Options Robustness Thread")
+
+	// Mock Chat Client simulating an LLM using "options" as a comma-separated string
+	mockClient := &MockChatClient{
+		streams: [][]llm.ChatResponseUpdate{
+			{
+				{
+					Contents: []llm.AIContent{
+						llm.FunctionCallContent{
+							CallID:       "call_1",
+							Name:         "quiz_multiple_choice",
+							RawArguments: `{"question": "What is 2+3?", "options": "4, 5, 6"}`, // String options
+						},
+					},
+					FinishReason: "tool_calls",
+				},
+			},
+		},
+	}
+
+	agentConfig := core.AgentConfig{
+		Name:          "test-robust-opts",
+		MaxIterations: 5,
+		Middleware: []core.Middleware{
+			middleware.NewElicitationMiddleware(),
+		},
+	}
+
+	provider := &MockAgentProvider{
+		configs: map[string]core.AgentConfig{
+			"test-robust-opts": agentConfig,
+		},
+	}
+
+	eng := New(log, mockClient, tm, provider, nil, nil, nil)
+	userID := "user1"
+
+	err := eng.ProcessUserMessage(ctx, "test-robust-opts", threadID, "Start", userID)
+	if err != nil {
+		t.Fatalf("ProcessUserMessage failed: %v", err)
+	}
+
+	// Verify that the tool was successful and options were parsed
+	threadAgg, _ := repo.Load(ctx, threadID)
+	foundSuccess := false
+	for _, msg := range threadAgg.Messages {
+		if msg.Role == "tool" {
+			var result struct {
+				Status string `json:"status"`
+			}
+			json.Unmarshal([]byte(msg.Content), &result)
+			if result.Status == "Requesting input: What is 2+3?" {
+				foundSuccess = true
+				break
+			}
+		}
+	}
+
+	if !foundSuccess {
+		t.Error("Expected successful tool execution with string 'options', but didn't find the expected status in tool message")
 	}
 }
