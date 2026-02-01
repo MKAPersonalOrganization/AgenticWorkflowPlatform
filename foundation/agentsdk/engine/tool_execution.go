@@ -86,6 +86,9 @@ func (s *ToolExecutionService) ExecuteAll(toolCalls []core.ToolCall, executor co
 // Execute executes a single tool call and returns the result.
 func (s *ToolExecutionService) Execute(toolCall core.ToolCall, executor core.ToolExecutor) ToolExecutionResult {
 	execResult, err := executor.Execute(toolCall)
+	if err != nil && execResult.Result == "" {
+		execResult.Result = err.Error()
+	}
 
 	return ToolExecutionResult{
 		ToolCallID:    toolCall.ID,

@@ -45,33 +45,6 @@ func (s state) String() string {
 	}
 }
 
-// Trigger constants define events that cause state transitions.
-const (
-	// TrigBeginExecution initiates execution from AwaitingExecution state.
-	// Replaces: TrigStartExecution
-	TrigBeginExecution = "BeginExecution"
-
-	// TrigToolsDetected transitions from InvokingLLM to ExecutingTools when tool calls are detected.
-	// Replaces: TrigActionsDetected
-	TrigToolsDetected = "ToolsDetected"
-
-	// TrigExecutionComplete transitions to Completed state when execution finishes successfully.
-	// Replaces: TrigTurnFinished
-	TrigExecutionComplete = "ExecutionComplete"
-
-	// TrigToolsCompleted transitions from ExecutingTools back to InvokingLLM for next iteration.
-	// Replaces: TrigActionsCompleted
-	TrigToolsCompleted = "ToolsCompleted"
-
-	// TrigAwaitUserInput transitions to AwaitingUserInput state when user interaction is needed.
-	// Replaces: TrigRequireInput + TrigRequireAuth
-	TrigAwaitUserInput = "AwaitUserInput"
-
-	// TrigExecutionFailed transitions to Completed state with error.
-	// Replaces: TrigError
-	TrigExecutionFailed = "ExecutionFailed"
-)
-
 // PauseReason describes why execution is paused.
 type PauseReason int
 
@@ -176,5 +149,3 @@ func (c CompletionReason) ToTerminationReason() TerminationReason {
 func (c CompletionReason) IsSuccess() bool {
 	return c == CompletionReasonSuccess
 }
-
-

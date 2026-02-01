@@ -20,6 +20,7 @@ type ThreadCreated struct {
 func (e ThreadCreated) EventType() string         { return "ThreadCreated" }
 func (e ThreadCreated) EventTimestamp() time.Time { return e.Timestamp }
 func (e ThreadCreated) AggregateID() string       { return e.ThreadID }
+func (e ThreadCreated) sealed()                   {}
 
 // UserMessageAdded is emitted when a user message is added to the thread.
 type UserMessageAdded struct {
@@ -33,6 +34,7 @@ type UserMessageAdded struct {
 func (e UserMessageAdded) EventType() string         { return "UserMessageAdded" }
 func (e UserMessageAdded) EventTimestamp() time.Time { return e.Timestamp }
 func (e UserMessageAdded) AggregateID() string       { return e.ThreadID }
+func (e UserMessageAdded) sealed()                   {}
 
 // AssistantMessageAdded is emitted when an assistant message is added to the thread.
 type AssistantMessageAdded struct {
@@ -47,6 +49,7 @@ type AssistantMessageAdded struct {
 func (e AssistantMessageAdded) EventType() string         { return "AssistantMessageAdded" }
 func (e AssistantMessageAdded) EventTimestamp() time.Time { return e.Timestamp }
 func (e AssistantMessageAdded) AggregateID() string       { return e.ThreadID }
+func (e AssistantMessageAdded) sealed()                   {}
 
 // ToolResultAdded is emitted when a tool execution result is added to the thread.
 type ToolResultAdded struct {
@@ -63,6 +66,7 @@ type ToolResultAdded struct {
 func (e ToolResultAdded) EventType() string         { return "ToolResultAdded" }
 func (e ToolResultAdded) EventTimestamp() time.Time { return e.Timestamp }
 func (e ToolResultAdded) AggregateID() string       { return e.ThreadID }
+func (e ToolResultAdded) sealed()                   {}
 
 // ThreadTitleUpdated indicates that a thread's title has been changed.
 type ThreadTitleUpdated struct {
@@ -74,6 +78,7 @@ type ThreadTitleUpdated struct {
 func (e ThreadTitleUpdated) EventType() string         { return "ThreadTitleUpdated" }
 func (e ThreadTitleUpdated) EventTimestamp() time.Time { return e.Timestamp }
 func (e ThreadTitleUpdated) AggregateID() string       { return e.ThreadID }
+func (e ThreadTitleUpdated) sealed()                   {}
 
 // AssistantMessageStarted is emitted when the assistant begins responding.
 type AssistantMessageStarted struct {
@@ -85,6 +90,7 @@ type AssistantMessageStarted struct {
 func (e AssistantMessageStarted) EventType() string         { return "AssistantMessageStarted" }
 func (e AssistantMessageStarted) EventTimestamp() time.Time { return e.Timestamp }
 func (e AssistantMessageStarted) AggregateID() string       { return e.ThreadID }
+func (e AssistantMessageStarted) sealed()                   {}
 
 // AssistantContentStreamed is emitted for each content delta during streaming.
 type AssistantContentStreamed struct {
@@ -97,6 +103,7 @@ type AssistantContentStreamed struct {
 func (e AssistantContentStreamed) EventType() string         { return "AssistantContentStreamed" }
 func (e AssistantContentStreamed) EventTimestamp() time.Time { return e.Timestamp }
 func (e AssistantContentStreamed) AggregateID() string       { return e.ThreadID }
+func (e AssistantContentStreamed) sealed()                   {}
 
 // AssistantMessageCompleted is emitted when the assistant completes a message.
 type AssistantMessageCompleted struct {
@@ -111,6 +118,7 @@ type AssistantMessageCompleted struct {
 func (e AssistantMessageCompleted) EventType() string         { return "AssistantMessageCompleted" }
 func (e AssistantMessageCompleted) EventTimestamp() time.Time { return e.Timestamp }
 func (e AssistantMessageCompleted) AggregateID() string       { return e.ThreadID }
+func (e AssistantMessageCompleted) sealed()                   {}
 
 // RunStarted indicates that message processing has begun.
 type RunStarted struct {
@@ -122,6 +130,7 @@ type RunStarted struct {
 func (e RunStarted) EventType() string         { return "RunStarted" }
 func (e RunStarted) EventTimestamp() time.Time { return e.Timestamp }
 func (e RunStarted) AggregateID() string       { return e.ThreadID }
+func (e RunStarted) sealed()                   {}
 
 // RunFinished indicates that message processing has completed.
 type RunFinished struct {
@@ -133,6 +142,7 @@ type RunFinished struct {
 func (e RunFinished) EventType() string         { return "RunFinished" }
 func (e RunFinished) EventTimestamp() time.Time { return e.Timestamp }
 func (e RunFinished) AggregateID() string       { return e.ThreadID }
+func (e RunFinished) sealed()                   {}
 
 // RunError indicates that an error occurred during processing.
 type RunError struct {
@@ -145,6 +155,7 @@ type RunError struct {
 func (e RunError) EventType() string         { return "RunError" }
 func (e RunError) EventTimestamp() time.Time { return e.Timestamp }
 func (e RunError) AggregateID() string       { return e.ThreadID }
+func (e RunError) sealed()                   {}
 
 // ThreadDeleted is emitted when a thread is deleted.
 type ThreadDeleted struct {
@@ -155,6 +166,7 @@ type ThreadDeleted struct {
 func (e ThreadDeleted) EventType() string         { return "ThreadDeleted" }
 func (e ThreadDeleted) EventTimestamp() time.Time { return e.Timestamp }
 func (e ThreadDeleted) AggregateID() string       { return e.ThreadID }
+func (e ThreadDeleted) sealed()                   {}
 
 // TokenUsageReported is emitted when token usage information is available.
 type TokenUsageReported struct {
@@ -184,6 +196,7 @@ type TokenUsageReported struct {
 func (e TokenUsageReported) EventType() string         { return "TokenUsageReported" }
 func (e TokenUsageReported) EventTimestamp() time.Time { return e.Timestamp }
 func (e TokenUsageReported) AggregateID() string       { return e.ThreadID }
+func (e TokenUsageReported) sealed()                   {}
 
 // EngineStateChanged is emitted when the engine's high-level state changes.
 type EngineStateChanged struct {
@@ -195,6 +208,7 @@ type EngineStateChanged struct {
 func (e EngineStateChanged) EventType() string         { return "EngineStateChanged" }
 func (e EngineStateChanged) EventTimestamp() time.Time { return e.Timestamp }
 func (e EngineStateChanged) AggregateID() string       { return e.ThreadID }
+func (e EngineStateChanged) sealed()                   {}
 
 // ActionsDetected is emitted when the engine identifies tool calls that need execution.
 // NOTE: This is a transient informational event - NOT persisted to event store.
@@ -209,6 +223,7 @@ type ActionsDetected struct {
 func (e ActionsDetected) EventType() string         { return "ActionsDetected" }
 func (e ActionsDetected) EventTimestamp() time.Time { return e.Timestamp }
 func (e ActionsDetected) AggregateID() string       { return e.ThreadID }
+func (e ActionsDetected) sealed()                   {}
 
 // TurnFinished is emitted when a turn completes and no further actions are required from the engine.
 // NOTE: This is a transient informational event - NOT persisted to event store.
@@ -222,6 +237,7 @@ type TurnFinished struct {
 func (e TurnFinished) EventType() string         { return "TurnFinished" }
 func (e TurnFinished) EventTimestamp() time.Time { return e.Timestamp }
 func (e TurnFinished) AggregateID() string       { return e.ThreadID }
+func (e TurnFinished) sealed()                   {}
 
 // ExecutionStateReported is emitted to persist the engine's internal safety and loop detection state.
 type ExecutionStateReported struct {
@@ -235,3 +251,4 @@ type ExecutionStateReported struct {
 func (e ExecutionStateReported) EventType() string         { return "ExecutionStateReported" }
 func (e ExecutionStateReported) EventTimestamp() time.Time { return e.Timestamp }
 func (e ExecutionStateReported) AggregateID() string       { return e.ThreadID }
+func (e ExecutionStateReported) sealed()                   {}

@@ -290,7 +290,11 @@ func (m *Manager) GetPendingAuthToolCall(ctx context.Context, threadID string) (
 // Load loads an existing thread aggregate from the repository.
 // Returns domain.ErrThreadNotFound if the thread doesn't exist.
 func (m *Manager) Load(ctx context.Context, threadID string) (*domain.ThreadAggregate, error) {
-	return m.threadRepo.Load(ctx, threadID)
+	agg, err := m.threadRepo.Load(ctx, threadID)
+	if err != nil {
+		return nil, err
+	}
+	return agg, nil
 }
 
 func (m *Manager) retryUpdate(ctx context.Context, threadID string, update func(*domain.ThreadAggregate) error) (*domain.ThreadAggregate, error) {

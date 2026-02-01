@@ -5,33 +5,9 @@ import (
 	"testing"
 
 	"school-with-ai/domain"
-	"school-with-ai/foundation/agentsdk/engine"
 )
 
 func TestGraphGeneration(t *testing.T) {
-	t.Run("Engine Graph", func(t *testing.T) {
-		// Setup minimal dependencies for Engine
-		// Setup minimal dependencies for Engine
-		// We need a provider that doesn't crash on nil registry if we are just testing GetGraph
-		// But GetGraph doesn't use the provider.
-
-		e := engine.New(
-			nil, // chatClient
-			nil, // provider
-			nil, // reqCtxCapture
-			nil, // toolTracer
-		)
-
-		graph := e.GetGraph()
-		if graph == "" {
-			t.Error("expected engine graph to be non-empty")
-		}
-		if !strings.HasPrefix(graph, "digraph") {
-			t.Errorf("expected graph to start with 'digraph', got %s", graph)
-		}
-		t.Logf("Engine Graph:\n%s", graph)
-	})
-
 	t.Run("Tool Graph", func(t *testing.T) {
 		graph := domain.GetToolStateMachineGraph()
 		if graph == "" {

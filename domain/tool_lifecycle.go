@@ -348,6 +348,7 @@ type ToolStart struct {
 func (e ToolStart) EventType() string         { return "ToolStart" }
 func (e ToolStart) EventTimestamp() time.Time { return e.Timestamp }
 func (e ToolStart) AggregateID() string       { return e.ThreadID }
+func (e ToolStart) sealed()                   {}
 
 // ToolSuccess is emitted when a tool completes successfully.
 type ToolSuccess struct {
@@ -364,6 +365,7 @@ type ToolSuccess struct {
 func (e ToolSuccess) EventType() string         { return "ToolSuccess" }
 func (e ToolSuccess) EventTimestamp() time.Time { return e.Timestamp }
 func (e ToolSuccess) AggregateID() string       { return e.ThreadID }
+func (e ToolSuccess) sealed()                   {}
 
 // ToolError is emitted when a tool execution fails.
 type ToolError struct {
@@ -380,6 +382,7 @@ type ToolError struct {
 func (e ToolError) EventType() string         { return "ToolError" }
 func (e ToolError) EventTimestamp() time.Time { return e.Timestamp }
 func (e ToolError) AggregateID() string       { return e.ThreadID }
+func (e ToolError) sealed()                   {}
 
 // ToolNeedsInput is emitted when a tool requests user input (elicitation).
 type ToolNeedsInput struct {
@@ -395,6 +398,7 @@ type ToolNeedsInput struct {
 func (e ToolNeedsInput) EventType() string         { return "ToolNeedsInput" }
 func (e ToolNeedsInput) EventTimestamp() time.Time { return e.Timestamp }
 func (e ToolNeedsInput) AggregateID() string       { return e.ThreadID }
+func (e ToolNeedsInput) sealed()                   {}
 
 // ToolNeedsAuth struct
 type ToolNeedsAuth struct {
@@ -410,6 +414,7 @@ type ToolNeedsAuth struct {
 func (e ToolNeedsAuth) EventType() string         { return "ToolNeedsAuth" }
 func (e ToolNeedsAuth) EventTimestamp() time.Time { return e.Timestamp }
 func (e ToolNeedsAuth) AggregateID() string       { return e.ThreadID }
+func (e ToolNeedsAuth) sealed()                   {}
 
 // InputProvided is emitted when user provides input to a waiting tool.
 type InputProvided struct {
@@ -424,6 +429,7 @@ type InputProvided struct {
 func (e InputProvided) EventType() string         { return "InputProvided" }
 func (e InputProvided) EventTimestamp() time.Time { return e.Timestamp }
 func (e InputProvided) AggregateID() string       { return e.ThreadID }
+func (e InputProvided) sealed()                   {}
 
 // AuthGranted is emitted when user grants authorization to a waiting tool.
 type AuthGranted struct {
@@ -437,6 +443,7 @@ type AuthGranted struct {
 func (e AuthGranted) EventType() string         { return "AuthGranted" }
 func (e AuthGranted) EventTimestamp() time.Time { return e.Timestamp }
 func (e AuthGranted) AggregateID() string       { return e.ThreadID }
+func (e AuthGranted) sealed()                   {}
 
 // AuthDenied is emitted when user denies authorization to a waiting tool.
 type AuthDenied struct {
@@ -450,6 +457,7 @@ type AuthDenied struct {
 func (e AuthDenied) EventType() string         { return "AuthDenied" }
 func (e AuthDenied) EventTimestamp() time.Time { return e.Timestamp }
 func (e AuthDenied) AggregateID() string       { return e.ThreadID }
+func (e AuthDenied) sealed()                   {}
 
 // ToolCancelled is emitted when a tool execution is cancelled.
 type ToolCancelled struct {
@@ -464,6 +472,7 @@ type ToolCancelled struct {
 func (e ToolCancelled) EventType() string         { return "ToolCancelled" }
 func (e ToolCancelled) EventTimestamp() time.Time { return e.Timestamp }
 func (e ToolCancelled) AggregateID() string       { return e.ThreadID }
+func (e ToolCancelled) sealed()                   {}
 
 // GetToolStateMachineGraph returns the DOT graph representation of the tool state machine.
 func GetToolStateMachineGraph() string {

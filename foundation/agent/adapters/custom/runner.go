@@ -26,6 +26,7 @@ type RunnerAdapter struct {
 	artifactStore artifact.Service
 	profileRepo   domain.StudentProfileRepository
 	enableMemory  bool
+	pipeline      *EventPipeline // Add event pipeline for observability
 }
 
 // NewRunnerAdapter creates a new runner adapter.
@@ -43,6 +44,7 @@ func NewRunnerAdapter(
 		artifactStore: artifactStore,
 		profileRepo:   profileRepo,
 		enableMemory:  enableMemory,
+		pipeline:      NewEventPipeline(log), // Initialize event pipeline
 	}
 
 	provider := &RegistryAgentProvider{
@@ -115,21 +117,8 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 		// 4. Run Engine and Pipe through Orchestrator
 		coreEvents := r.engine.Run(ctx, req.AgentName, runCtx)
 
-		// Translate core events to domain events stream
-		domainEvents := func(yield func(domain.Event, error) bool) {
-			for ce, err := range coreEvents {
-				if err != nil {
-					yield(nil, err)
-					return
-				}
-				de := ToDomainEvent(ce)
-				if de != nil {
-					if !yield(de, nil) {
-						return
-					}
-				}
-			}
-		}
+		// Use observable event pipeline instead of manual conversion
+		domainEvents := r.pipeline.ProcessEventStream(ctx, coreEvents)
 
 		// Pass to Orchestration Service for persistence and broadcasting
 		orchestratedEvents := r.service.ProcessEvents(ctx, domainEvents)

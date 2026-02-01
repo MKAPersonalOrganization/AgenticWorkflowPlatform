@@ -9,7 +9,6 @@ import (
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/llm"
 
-	"github.com/qmuntal/stateless"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -46,21 +45,9 @@ func New(
 	}
 }
 
-// GetGraph returns the DOT graph representation of the engine state machine.
+// GetGraph returns an empty string as the state machine has been replaced by a loop.
 func (e *Engine) GetGraph() string {
-	// Create a dummy execution state to configure the state machine
-	exec := &executionState{
-		engine: e,
-		// We don't need real dependencies for graph generation
-		safety:   &SafetyUnit{},
-		observer: &ObserverUnit{},
-		tools:    &ToolProcessor{},
-	}
-
-	// We can use any start state, setup will configure all of them
-	_ = exec.setup(StateAwaitingExecution)
-
-	return exec.sm.ToGraph()
+	return ""
 }
 
 // Run processes the LLM response using an AgentThread and yields events.
@@ -95,11 +82,8 @@ func (e *Engine) Run(ctx context.Context, agentName string, runCtx core.RunConte
 			// Initialize executor before state machine runs
 			exec.prepareExecutor()
 
-			// Start with AwaitingExecution
-			if err := exec.setup(StateAwaitingExecution); err != nil {
-				wrappedYield(nil, err)
-				return
-			}
+			// Start turn
+			exec.trackStateChange(StateInvokingLLM)
 
 			// Handle user message submission before state machine runs
 			if err := exec.handleUserMessageSubmission(); err != nil {
@@ -142,13 +126,12 @@ func (exec *executionState) handleExecutionError(ctx context.Context, err error)
 			exec.completionReason = CompletionReasonError
 		}
 		exec.observer.result.Success = false
-	} else {
-		// Completion reason already set (e.g., MaxIterations, LoopDetected)
 		// Map the existing termination reason to completion reason
 		exec.completionReason = terminationReasonToCompletionReason(exec.observer.result.Reason)
 	}
-	// Fire transition to completed state to trigger event emission
-	_ = exec.sm.Fire(TrigExecutionFailed)
+	// Transition to completed state to trigger event emission
+	exec.trackStateChange(StateCompleted)
+	exec.emitCompletionEvents()
 }
 
 // terminationReasonToCompletionReason converts TerminationReason to CompletionReason.
@@ -290,7 +273,6 @@ type executionState struct {
 	tools    *ToolProcessor
 
 	// Current Turn State
-	sm           *stateless.StateMachine
 	streamResult *StreamResult
 	resolution   *RouteResolver
 
@@ -300,39 +282,6 @@ type executionState struct {
 
 	// Tool state machines for tracking individual tool execution states
 	toolStateMachines map[string]*core.ToolStateMachine
-}
-
-func (s *executionState) generateAgentResponse() error {
-	if err := s.safety.Guard(); err != nil {
-		s.observer.Fail(TerminationMaxIterations, err)
-		return err
-	}
-	// Yield state update
-	if !s.observer.yield(s.safety.Report(s.threadID), nil) {
-		return errStopIteration
-	}
-
-	prepped, err := s.prepareContextForLLM()
-	if err != nil {
-		return err
-	}
-	if prepped.Terminated {
-		return s.nextStep()
-	}
-
-	if err := s.streamAndProcessLLMResponse(prepped.Context); err != nil {
-		return err
-	}
-
-	if err := s.validateAgentOutput(); err != nil {
-		return err
-	}
-
-	if err := s.saveAgentMessageAndEmitEvents(); err != nil {
-		return err
-	}
-
-	return s.nextStep()
 }
 
 func (s *executionState) executeRequiredActions() error {
@@ -380,21 +329,28 @@ func (s *executionState) executeRequiredActions() error {
 	if err != nil {
 		s.observer.Fail(TerminationError, err)
 		s.completionReason = CompletionReasonError
-		return s.sm.Fire(TrigExecutionFailed)
+		return err
 	}
 
 	if isInput {
 		s.observer.result.Reason = TerminationAwaitingInput
 		s.pauseReason = PauseReasonInput
-		return s.sm.Fire(TrigAwaitUserInput)
+		s.trackStateChange(StateAwaitingUserInput)
+		return nil
 	}
 	if isAuth {
 		s.observer.result.Reason = TerminationAwaitingAuth
 		s.pauseReason = PauseReasonAuth
-		return s.sm.Fire(TrigAwaitUserInput)
+		s.trackStateChange(StateAwaitingUserInput)
+		return nil
 	}
 
-	return s.nextStep()
+	// Prepare for next iteration: Generate new message ID for the NEXT turn
+	s.messageID = core.GenerateID()
+	s.streamResult = nil
+	s.resolution = nil
+
+	return nil
 }
 
 // checkToolWaitingStates checks if any tools are in specific waiting states.
@@ -422,39 +378,25 @@ func (s *executionState) refreshState(history []core.Message) {
 	s.history = history
 }
 
-// nextStep determines the appropriate state transition based on current context.
-// It simplifies the logic by explicitly checking conditions for the current state,
-// removing the need for a generic transition evaluator.
-func (s *executionState) nextStep() error {
-	currentState := s.sm.MustState()
-
-	switch currentState {
-	case StateInvokingLLM:
-		// Transition based on whether tools were called
-		if s.streamResult != nil && s.streamResult.HasToolCalls() {
-			return s.sm.Fire(TrigToolsDetected)
+// emitCompletionEvents handles the emission of final events based on completion reason.
+func (s *executionState) emitCompletionEvents() {
+	if s.completionReason.IsSuccess() {
+		// Successful completion: emit turn finished and run finished
+		if !s.observer.yield(s.agent.Events.TurnFinished(s.threadID, s.messageID), nil) {
+			return
 		}
-		// No tools called, execution complete successfully
-		s.completionReason = CompletionReasonSuccess
-		s.observer.result.Reason = TerminationGoalReached
-		return s.sm.Fire(TrigExecutionComplete)
-
-	case StateExecutingTools:
-		// Tool waiting states (Input/Auth) are handled in executeRequiredActions.
-		// If we reach here, we are ready for the next turn.
-
-		// Prepare for next iteration: Generate new message ID for the NEXT turn
-		// This happens AFTER the current turn (ExecutingTools) is finished
-		s.messageID = core.GenerateID()
-		s.streamResult = nil
-		s.resolution = nil
-		return s.sm.Fire(TrigToolsCompleted)
-
-	default:
-		// Default termination for safety
-		s.completionReason = CompletionReasonSuccess
-		s.observer.result.Reason = TerminationGoalReached
-		return s.sm.Fire(TrigExecutionComplete)
+		if !s.observer.yield(s.observer.events.RunFinished(s.threadID, s.messageID), nil) {
+			return
+		}
+	} else {
+		// Error termination: emit run error with context
+		msg := "Unknown error"
+		if s.observer.result.Error != nil {
+			msg = s.observer.result.Error.Error()
+		}
+		if !s.observer.yield(s.observer.events.RunError(s.threadID, msg, "RUN_ERROR"), nil) {
+			return
+		}
 	}
 }
 
@@ -773,120 +715,86 @@ func (s *executionState) handleUserMessageSubmission() error {
 	return nil
 }
 
-func (s *executionState) setup(initialState state) error {
-	s.sm = stateless.NewStateMachine(initialState)
-
-	// Track state changes
-	s.sm.OnTransitioned(func(ctx context.Context, trans stateless.Transition) {
-		dstState := trans.Destination.(state)
-		s.trackStateChange(dstState)
-	})
-
-	// Configure StateAwaitingExecution (replaces StateAwaitingTurn)
-	s.sm.Configure(StateAwaitingExecution).
-		Permit(TrigBeginExecution, StateInvokingLLM).
-		Permit(TrigExecutionFailed, StateCompleted)
-
-	// Configure StateInvokingLLM (replaces StateInvokingLLMResponse)
-	s.sm.Configure(StateInvokingLLM).
-		OnEntry(func(ctx context.Context, _ ...any) error {
-			s.observer.TrackStarted(s.messageID)
-			return nil
-		}).
-		OnExit(func(ctx context.Context, _ ...any) error {
-			if s.streamResult != nil {
-				s.observer.TrackCompleted(s.messageID, s.streamResult.Content, s.streamResult.ToolCalls)
-			}
-			return nil
-		}).
-		PermitReentry(TrigBeginExecution).
-		Permit(TrigToolsDetected, StateExecutingTools).
-		Permit(TrigExecutionComplete, StateCompleted).
-		Permit(TrigExecutionFailed, StateCompleted)
-
-	// Configure StateExecutingTools (replaces StatePerformingActions)
-	s.sm.Configure(StateExecutingTools).
-		OnEntry(func(ctx context.Context, _ ...any) error {
-			// Emit ActionsDetected event when entering this state
-			if s.streamResult != nil && s.streamResult.HasToolCalls() {
-				if !s.observer.yield(s.agent.Events.ActionsDetected(s.threadID, s.messageID, s.streamResult.ToolCalls), nil) {
-					return errStopIteration
-				}
-			}
-			return nil
-		}).
-		PermitReentry(TrigBeginExecution).
-		Permit(TrigAwaitUserInput, StateAwaitingUserInput).
-		Permit(TrigToolsCompleted, StateInvokingLLM).
-		Permit(TrigExecutionFailed, StateCompleted)
-
-	// Configure StateAwaitingUserInput (unifies StateAwaitingInput + StateAwaitingAuth)
-	s.sm.Configure(StateAwaitingUserInput).
-		Permit(TrigBeginExecution, StateInvokingLLM).
-		Permit(TrigExecutionFailed, StateCompleted)
-
-	// Configure StateCompleted (terminal state for both success and failure)
-	s.sm.Configure(StateCompleted).
-		OnEntry(func(ctx context.Context, _ ...any) error {
-			// Emit events based on completion reason (metadata)
-			if s.completionReason.IsSuccess() {
-				// Successful completion: emit turn finished and run finished
-				if !s.observer.yield(s.agent.Events.TurnFinished(s.threadID, s.messageID), nil) {
-					return errStopIteration
-				}
-				if !s.observer.yield(s.observer.events.RunFinished(s.threadID, s.messageID), nil) {
-					return errStopIteration
-				}
-			} else {
-				// Error termination: emit run error with context
-				msg := "Unknown error"
-				if s.observer.result.Error != nil {
-					msg = s.observer.result.Error.Error()
-				}
-				if !s.observer.yield(s.observer.events.RunError(s.threadID, msg, "RUN_ERROR"), nil) {
-					return errStopIteration
-				}
-			}
-			return nil
-		}).
-		Permit(TrigBeginExecution, StateInvokingLLM) // Allow restart from completed state
-
-	return nil
-}
-
 func (s *executionState) run() error {
-	// Start the state machine
-	if err := s.sm.Fire(TrigBeginExecution); err != nil {
-		return err
-	}
+	// 1. Initial State
+	s.trackStateChange(StateInvokingLLM)
 
-	// Execution loop: continue until we hit a terminal or paused state
-	for {
-		currentState := s.sm.MustState().(state)
+	for i := 0; i < s.safety.maxAgent; i++ {
+		// 3. Report Status
+		if !s.observer.yield(s.safety.Report(s.threadID), nil) {
+			return errStopIteration
+		}
 
-		switch currentState {
-		case StateInvokingLLM:
-			if err := s.generateAgentResponse(); err != nil {
-				return err
+		// 4. Invoke LLM
+		s.observer.TrackStarted(s.messageID)
+		prepped, err := s.prepareContextForLLM()
+		if err != nil {
+			s.handleExecutionError(s.ctx, err)
+			return err
+		}
+
+		if prepped.Terminated {
+			break
+		}
+
+		if err := s.streamAndProcessLLMResponse(prepped.Context); err != nil {
+			s.handleExecutionError(s.ctx, err)
+			return err
+		}
+
+		if err := s.validateAgentOutput(); err != nil {
+			s.handleExecutionError(s.ctx, err)
+			return err
+		}
+
+		if err := s.saveAgentMessageAndEmitEvents(); err != nil {
+			s.handleExecutionError(s.ctx, err)
+			return err
+		}
+
+		if s.streamResult != nil {
+			s.observer.TrackCompleted(s.messageID, s.streamResult.Content, s.streamResult.ToolCalls)
+		}
+
+		// 5. Handle Tools (equivalent to RoleTool in blades)
+		if s.streamResult != nil && s.streamResult.HasToolCalls() {
+			// Transition to ExecutingTools
+			s.trackStateChange(StateExecutingTools)
+
+			// Emit ActionsDetected event
+			if !s.observer.yield(s.agent.Events.ActionsDetected(s.threadID, s.messageID, s.streamResult.ToolCalls), nil) {
+				return errStopIteration
 			}
-			// nextStep() within generateAgentResponse will trigger transition to ExecutingTools or Completed
-		case StateExecutingTools:
+
+			// Execute tools
 			if err := s.executeRequiredActions(); err != nil {
+				s.handleExecutionError(s.ctx, err)
 				return err
 			}
-			// nextStep() within executeRequiredActions will trigger transition to InvokingLLM or AwaitingUserInput
-		case StateAwaitingUserInput, StateCompleted:
-			// Terminal or paused states for this run
-			return nil
-		default:
-			return fmt.Errorf("unexpected engine state: %s", currentState.String())
+
+			// If executeRequiredActions set a pause state, return
+			if s.pauseReason != PauseReasonNone {
+				return nil
+			}
+
+			// Continue to next iteration (back to StateInvokingLLM)
+			s.trackStateChange(StateInvokingLLM)
+			continue
 		}
 
-		// Safety break to prevent infinite loops if fire fails to change state
-		if s.sm.MustState().(state) == currentState && currentState != StateAwaitingUserInput && currentState != StateCompleted {
-			return fmt.Errorf("state machine stuck in state %s", currentState.String())
-		}
+		// No tools or terminated - Success
+		s.completionReason = CompletionReasonSuccess
+		s.observer.result.Reason = TerminationGoalReached
+		s.trackStateChange(StateCompleted)
+		s.emitCompletionEvents()
+		return nil
 	}
+
+	// Exceeded maximum iterations
+	err := fmt.Errorf("agent exceeded maximum iterations (%d)", s.safety.maxAgent)
+	s.observer.Fail(TerminationMaxIterations, err)
+	s.handleExecutionError(s.ctx, err)
+	return err
 }
 
 func (s *executionState) streamAndProcessLLMResponse(llmContext *LLMContext) error {
@@ -1075,8 +983,8 @@ func (e *ToolStateEventEmitter) OnToolStateChanged(
 
 	case core.ToolStateError:
 		if result != nil {
-			errorMsg := result.Result
-			if result != nil && result.IsError {
+			if result.IsError {
+				errorMsg := result.Result
 				evt := e.events.ToolError(
 					e.threadID,
 					e.messageID,

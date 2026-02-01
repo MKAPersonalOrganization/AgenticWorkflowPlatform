@@ -76,19 +76,35 @@ func WithStudentProfileRepository(repo domain.StudentProfileRepository) Option {
 // ProcessEvents orchestrates a stream of domain events, providing persistence and broadcasting.
 func (s *Service) ProcessEvents(ctx context.Context, events iter.Seq2[domain.Event, error]) iter.Seq2[domain.Event, error] {
 	return func(yield func(domain.Event, error) bool) {
+		eventCount := 0
+		durableCount := 0
+		transientCount := 0
+		
 		for event, err := range events {
+			eventCount++
+			
 			if err != nil {
+				s.log.Error(ctx, "Orchestrator: Event stream error", "eventNumber", eventCount, "error", err)
 				yield(nil, err)
 				return
 			}
 
 			// Handle persistence
 			durable := s.isDurable(event)
+			s.log.Debug(ctx, "Orchestrator: Processing event", "eventNumber", eventCount, "eventType", event.EventType(), "isDurable", durable)
+			
 			if durable {
+				durableCount++
+				s.log.Debug(ctx, "Orchestrator: Persisting durable event", "eventType", event.EventType())
 				if pErr := s.persistDurableEvent(ctx, event); pErr != nil {
+					s.log.Error(ctx, "Orchestrator: Failed to persist durable event", "eventType", event.EventType(), "error", pErr)
 					yield(event, fmt.Errorf("persisting event: %w", pErr))
 					return
 				}
+				s.log.Debug(ctx, "Orchestrator: Successfully persisted durable event", "eventType", event.EventType())
+			} else {
+				transientCount++
+				s.log.Debug(ctx, "Orchestrator: Processing transient event", "eventType", event.EventType())
 			}
 
 			// Handle broadcasting
@@ -98,15 +114,20 @@ func (s *Service) ProcessEvents(ctx context.Context, events iter.Seq2[domain.Eve
 				// and prevent double-broadcasting to the UI.
 				if !durable {
 					if bErr := s.emitter.Dispatch(ctx, event); bErr != nil {
-						s.log.Error(ctx, "failed to dispatch event", "error", bErr)
+						s.log.Error(ctx, "Orchestrator: Failed to dispatch transient event", "eventType", event.EventType(), "error", bErr)
+					} else {
+						s.log.Debug(ctx, "Orchestrator: Successfully dispatched transient event", "eventType", event.EventType())
 					}
 				}
 			}
 
 			if !yield(event, nil) {
+				s.log.Info(ctx, "Orchestrator: Event stream terminated early", "totalEvents", eventCount, "durable", durableCount, "transient", transientCount)
 				return
 			}
 		}
+		
+		s.log.Info(ctx, "Orchestrator: Event stream completed", "totalEvents", eventCount, "durable", durableCount, "transient", transientCount)
 	}
 }
 
@@ -120,7 +141,6 @@ func (s *Service) isDurable(event domain.Event) bool {
 		*domain.ToolResultAdded,
 		*domain.ThreadTitleUpdated,
 		*domain.TokenUsageReported,
-		*domain.EngineStateChanged,
 		*domain.ExecutionStateReported,
 		*domain.ToolStart,
 		*domain.ToolSuccess,
