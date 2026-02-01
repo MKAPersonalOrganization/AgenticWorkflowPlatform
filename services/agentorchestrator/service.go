@@ -200,16 +200,24 @@ func (s *Service) Run(ctx context.Context, agentName string, runCtx core.RunCont
 			}
 
 			// Handle persistence
-			if pErr := s.persistDurableEvent(ctx, event); pErr != nil {
-				yield(event, fmt.Errorf("persisting event: %w", pErr))
-				return
+			durable := s.isDurable(event)
+			if durable {
+				if pErr := s.persistDurableEvent(ctx, event); pErr != nil {
+					yield(event, fmt.Errorf("persisting event: %w", pErr))
+					return
+				}
 			}
 
 			// Handle broadcasting
 			if s.emitter != nil {
-				if de, ok := event.(domain.Event); ok {
-					if bErr := s.emitter.Dispatch(ctx, de); bErr != nil {
-						s.log.Error(ctx, "failed to dispatch event", "error", bErr)
+				// We only broadcast TRANSIENT events from here.
+				// DURABLE events are broadcast by the projection updater to ensure consistency
+				// and prevent double-broadcasting to the UI.
+				if !durable {
+					if de, ok := event.(domain.Event); ok {
+						if bErr := s.emitter.Dispatch(ctx, de); bErr != nil {
+							s.log.Error(ctx, "failed to dispatch event", "error", bErr)
+						}
 					}
 				}
 			}
@@ -218,6 +226,25 @@ func (s *Service) Run(ctx context.Context, agentName string, runCtx core.RunCont
 				return
 			}
 		}
+	}
+}
+
+// isDurable returns true if the event should be persisted to the durable store.
+func (s *Service) isDurable(event core.Event) bool {
+	if event == nil {
+		return false
+	}
+
+	switch event.(type) {
+	case *domain.UserMessageAdded,
+		*domain.AssistantMessageAdded,
+		*domain.ToolResultAdded,
+		*domain.TokenUsageReported,
+		domain.EngineStateChanged,
+		*domain.ExecutionStateReported:
+		return true
+	default:
+		return false
 	}
 }
 
@@ -250,6 +277,9 @@ func (s *Service) persistDurableEvent(ctx context.Context, event core.Event) err
 		return err
 	case domain.EngineStateChanged:
 		_, err := s.threadMgmt.RecordEngineStateChange(ctx, e)
+		return err
+	case *domain.ExecutionStateReported:
+		_, err := s.threadMgmt.RecordExecutionState(ctx, *e)
 		return err
 	}
 
@@ -290,6 +320,13 @@ func (s *Service) ProcessUserMessage(ctx context.Context, agentName, threadID, c
 		Options:        core.DefaultRunOptions(),
 		UserContent:    content,
 		UserID:         userID,
+	}
+
+	// Restore execution state if resuming
+	if agg != nil && agg.ExecutionState != nil {
+		runCtx.Iteration = agg.ExecutionState.Iteration
+		runCtx.Total = agg.ExecutionState.Total
+		runCtx.LoopState = agg.ExecutionState.LoopStateHex
 	}
 
 	// 3. Delegation to Engine

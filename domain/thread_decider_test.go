@@ -90,7 +90,7 @@ func TestThreadDeciderAddMessage(t *testing.T) {
 	thread.DequeueUncommittedEvents() // Clear creation event
 
 	// Now add a message
-	err := thread.AddMessage("msg-1", "user", "Hello!", nil, "", "", nil)
+	err := thread.AddMessage("msg-1", "user", "Hello!", nil, "", "", "", nil)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -174,7 +174,7 @@ func TestThreadAggregateValidation(t *testing.T) {
 	thread.DequeueUncommittedEvents()
 
 	// Try to add message to deleted thread - should fail
-	err := thread.AddMessage("msg-1", "user", "Hello!", nil, "", "", nil)
+	err := thread.AddMessage("msg-1", "user", "Hello!", nil, "", "", "", nil)
 	if err == nil {
 		t.Error("expected error when adding message to deleted thread")
 	}
@@ -262,7 +262,7 @@ func TestAggregateVersionTracking(t *testing.T) {
 	}
 
 	// Add another message
-	thread.AddMessage("msg-1", "user", "Test", nil, "", "", nil)
+	thread.AddMessage("msg-1", "user", "Test", nil, "", "", "", nil)
 
 	// Version still 1 (new event not persisted yet)
 	if thread.Version != 1 {

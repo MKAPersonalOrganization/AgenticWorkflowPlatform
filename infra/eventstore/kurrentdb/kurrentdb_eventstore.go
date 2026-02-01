@@ -327,6 +327,14 @@ func (s *KurrentDBEventStore) convertFromRecordedEvent(recordedEvent *kurrentdb.
 		}
 		event = e
 
+	case "ExecutionStateReported":
+		var e domain.ExecutionStateReported
+		err := json.Unmarshal(recordedEvent.Data, &e)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal ExecutionStateReported: %w", err)
+		}
+		event = &e
+
 	default:
 		return nil, fmt.Errorf("%w: %s", ErrUnknownEventType, recordedEvent.EventType)
 	}

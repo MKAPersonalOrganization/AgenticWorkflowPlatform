@@ -77,7 +77,16 @@ func (m *Manager) AddUserMessage(ctx context.Context, threadID, messageID, conte
 
 	isNewThread := thread.GetVersion() == 0
 
-	err = thread.AddMessage(messageID, "user", content, nil, "", "", "", nil)
+	err = thread.AddMessage(
+		messageID,
+		"user",
+		content,
+		nil,
+		"",
+		"",
+		"",
+		nil,
+	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to add message: %w", err)
 	}
@@ -116,7 +125,16 @@ func (m *Manager) AddAssistantMessage(ctx context.Context, threadID, messageID, 
 		return nil, nil, fmt.Errorf("failed to load thread: %w", err)
 	}
 
-	err = thread.AddMessage(messageID, "assistant", content, toolCalls, "", "", agentName, nil)
+	err = thread.AddMessage(
+		messageID,
+		"assistant",
+		content,
+		toolCalls,
+		"",
+		"",
+		agentName,
+		nil,
+	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to add assistant message: %w", err)
 	}
@@ -158,10 +176,26 @@ func (m *Manager) RecordEngineStateChange(ctx context.Context, event domain.Engi
 	})
 }
 
+// RecordExecutionState records the engine's internal execution state (safety limits, loops).
+func (m *Manager) RecordExecutionState(ctx context.Context, event domain.ExecutionStateReported) (*domain.ThreadAggregate, error) {
+	return m.retryUpdate(ctx, event.ThreadID, func(t *domain.ThreadAggregate) error {
+		return t.RecordExecutionState(event)
+	})
+}
+
 // AddToolResultMessage adds a tool result message to the thread.
 func (m *Manager) AddToolResultMessage(ctx context.Context, threadID, messageID, toolCallID, toolName, result, agentName string) (*domain.ThreadAggregate, *domain.ToolResultAdded, error) {
 	thread, err := m.retryUpdate(ctx, threadID, func(t *domain.ThreadAggregate) error {
-		return t.AddMessage(messageID, "tool", result, nil, toolCallID, toolName, agentName, nil)
+		return t.AddMessage(
+			messageID,
+			"tool",
+			result,
+			nil,
+			toolCallID,
+			toolName,
+			agentName,
+			nil,
+		)
 	})
 	if err != nil {
 		return nil, nil, err

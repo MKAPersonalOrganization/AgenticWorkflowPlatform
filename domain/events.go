@@ -232,3 +232,16 @@ type TurnFinished struct {
 func (e TurnFinished) EventType() string         { return "TurnFinished" }
 func (e TurnFinished) EventTimestamp() time.Time { return e.Timestamp }
 func (e TurnFinished) AggregateID() string       { return e.ThreadID }
+
+// ExecutionStateReported is emitted to persist the engine's internal safety and loop detection state.
+type ExecutionStateReported struct {
+	ThreadID     string    `json:"threadId"`
+	Iteration    int       `json:"iteration"`
+	Total        int       `json:"total"`
+	LoopStateHex string    `json:"loopStateHex,omitempty"`
+	Timestamp    time.Time `json:"timestamp"`
+}
+
+func (e ExecutionStateReported) EventType() string         { return "ExecutionStateReported" }
+func (e ExecutionStateReported) EventTimestamp() time.Time { return e.Timestamp }
+func (e ExecutionStateReported) AggregateID() string       { return e.ThreadID }
