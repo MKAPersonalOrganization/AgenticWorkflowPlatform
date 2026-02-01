@@ -105,7 +105,7 @@ func (c *OllamaClient) GetStreamingResponse(
 					ToolCallIndex: toolCallIndex,
 					ToolCallID:    callID,
 					Contents: []AIContent{FunctionCallContent{
-						CallID:       callID,
+						ToolCallID:   callID,
 						Name:         tc.Function.Name,
 						RawArguments: argsJSON,
 					}},

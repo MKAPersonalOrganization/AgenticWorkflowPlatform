@@ -15,12 +15,10 @@ func TestLoopDetector_ToolCallLoop(t *testing.T) {
 
 	// Create a tool call
 	tc := core.ToolCall{
-		ID:   "test-1",
-		Type: "function",
-		Function: core.ToolFunction{
-			Name:      "calculate",
-			Arguments: `{"expression": "2+2"}`,
-		},
+		ID:        "test-1",
+		Type:      "function",
+		Name:      "calculate",
+		Arguments: `{"expression": "2+2"}`,
 	}
 
 	// First two calls should not trigger loop detection
@@ -57,12 +55,10 @@ func TestLoopDetector_DifferentArgsNoLoop(t *testing.T) {
 	// Different arguments should not trigger loop
 	for i := 0; i < 5; i++ {
 		tc := core.ToolCall{
-			ID:   "test",
-			Type: "function",
-			Function: core.ToolFunction{
-				Name:      "calculate",
-				Arguments: fmt.Sprintf(`{"expression": %d}`, i), // Different each time
-			},
+			ID:        "test",
+			Type:      "function",
+			Name:      "calculate",
+			Arguments: fmt.Sprintf(`{"expression": %d}`, i), // Different each time
 		}
 		if loopInfo := detector.RecordToolCall(tc); loopInfo != nil {
 			t.Errorf("Expected no loop with different arguments, got %v", loopInfo)
@@ -178,12 +174,10 @@ func TestLoopDetector_Reset(t *testing.T) {
 	detector := NewLoopDetector(config)
 
 	tc := core.ToolCall{
-		ID:   "test",
-		Type: "function",
-		Function: core.ToolFunction{
-			Name:      "calculate",
-			Arguments: `{"x": 1}`,
-		},
+		ID:        "test",
+		Type:      "function",
+		Name:      "calculate",
+		Arguments: `{"x": 1}`,
 	}
 
 	// Record some calls

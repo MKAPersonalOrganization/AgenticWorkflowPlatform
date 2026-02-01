@@ -22,9 +22,10 @@ type Event interface {
 
 // ToolCall represents a tool/function call made by the assistant.
 type ToolCall struct {
-	ID       string       `json:"id"`
-	Type     string       `json:"type"` // "function"
-	Function ToolFunction `json:"function"`
+	ID        string `json:"id"`
+	Type      string `json:"type"` // "function"
+	Name      string `json:"name"`
+	Arguments string `json:"arguments"` // JSON string
 }
 
 // ToolFunction represents the function details of a tool call.
@@ -41,6 +42,8 @@ type Message struct {
 	Timestamp  time.Time      `json:"timestamp"`
 	ToolCalls  []ToolCall     `json:"toolCalls,omitempty"`  // For assistant messages with tool calls
 	ToolCallID string         `json:"toolCallId,omitempty"` // For tool result messages
+	IsError    bool           `json:"isError,omitempty"`    // For tool result messages
+	Error      string         `json:"error,omitempty"`      // For tool result messages
 	AgentName  string         `json:"agentName,omitempty"`  // Name of the agent that created this message
 	Metadata   map[string]any `json:"metadata,omitempty"`   // Additional metadata for custom message types
 }

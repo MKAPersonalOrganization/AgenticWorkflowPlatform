@@ -16,8 +16,8 @@ func TestToolCallAccumulator_NewToolCall(t *testing.T) {
 		ToolCallIndex: 0,
 		ToolCallID:    "call_123",
 		Contents: []llm.AIContent{llm.FunctionCallContent{
-			CallID: "call_123",
-			Name:   "get_weather",
+			ToolCallID: "call_123",
+			Name:       "get_weather",
 		}},
 	}
 
@@ -54,8 +54,8 @@ func TestToolCallAccumulator_ArgumentStreaming(t *testing.T) {
 		ToolCallIndex: 0,
 		ToolCallID:    "call_123",
 		Contents: []llm.AIContent{llm.FunctionCallContent{
-			CallID: "call_123",
-			Name:   "get_weather",
+			ToolCallID: "call_1",
+			Name:       "get_weather",
 		}},
 	})
 
@@ -101,8 +101,8 @@ func TestToolCallAccumulator_ArgumentStreaming(t *testing.T) {
 	if len(calls) != 1 {
 		t.Fatalf("expected 1 call, got %d", len(calls))
 	}
-	if calls[0].Function.Arguments != `{"city":"London"}` {
-		t.Errorf("unexpected accumulated arguments: %s", calls[0].Function.Arguments)
+	if calls[0].Arguments != `{"city":"London"}` {
+		t.Errorf("unexpected accumulated arguments: %s", calls[0].Arguments)
 	}
 }
 
@@ -115,8 +115,8 @@ func TestToolCallAccumulator_MultipleToolCalls(t *testing.T) {
 		ToolCallIndex: 0,
 		ToolCallID:    "call_1",
 		Contents: []llm.AIContent{llm.FunctionCallContent{
-			CallID: "call_1",
-			Name:   "get_weather",
+			ToolCallID: "call_1",
+			Name:       "get_weather",
 		}},
 	})
 	acc.ProcessUpdate(llm.ChatResponseUpdate{
@@ -131,8 +131,8 @@ func TestToolCallAccumulator_MultipleToolCalls(t *testing.T) {
 		ToolCallIndex: 1,
 		ToolCallID:    "call_2",
 		Contents: []llm.AIContent{llm.FunctionCallContent{
-			CallID: "call_2",
-			Name:   "calculate",
+			ToolCallID: "call_2",
+			Name:       "calculate",
 		}},
 	})
 	acc.ProcessUpdate(llm.ChatResponseUpdate{
@@ -164,8 +164,8 @@ func TestToolCallAccumulator_HasToolCalls(t *testing.T) {
 		ToolCallIndex: 0,
 		ToolCallID:    "call_1",
 		Contents: []llm.AIContent{llm.FunctionCallContent{
-			CallID: "call_1",
-			Name:   "get_weather",
+			ToolCallID: "call_1",
+			Name:       "get_weather",
 		}},
 	})
 

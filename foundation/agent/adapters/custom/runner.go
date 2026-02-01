@@ -205,8 +205,8 @@ func convertCoreEventData(coreEvent core.Event) any {
 			return &agent.ToolCallEvent{
 				ToolCall: &agent.ToolCall{
 					ID:        tc.ID,
-					Name:      tc.Function.Name,
-					Arguments: tc.Function.Arguments,
+					Name:      tc.Name,
+					Arguments: tc.Arguments,
 				},
 			}
 		}
@@ -318,8 +318,8 @@ func convertCoreMessageToAgent(msg core.Message) *agent.Message {
 			Type: agent.ContentTypeToolCall,
 			ToolCall: &agent.ToolCall{
 				ID:        tc.ID,
-				Name:      tc.Function.Name,
-				Arguments: tc.Function.Arguments,
+				Name:      tc.Name,
+				Arguments: tc.Arguments,
 			},
 		})
 	}

@@ -84,8 +84,8 @@ func (s *ToolExecutionService) Execute(toolCall core.ToolCall, executor core.Too
 
 	return domain.ToolExecutionResult{
 		ToolCallID:    toolCall.ID,
-		ToolName:      toolCall.Function.Name,
-		Arguments:     toolCall.Function.Arguments,
+		ToolName:      toolCall.Name,
+		Arguments:     toolCall.Arguments,
 		Result:        resultStr,
 		IsError:       isError,
 		StopIteration: execResult.StopIteration,

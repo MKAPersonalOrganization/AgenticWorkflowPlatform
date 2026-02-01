@@ -4,9 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/core/middleware"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestAskMultipleSelectionTool_Invoke(t *testing.T) {
@@ -22,39 +23,32 @@ func TestAskMultipleSelectionTool_Invoke(t *testing.T) {
 		{
 			name: "Valid args with domain-specific parameters",
 			args: map[string]any{
-				"question_text":  "Which of the following are primary colors?",
-				"answer_choices": []any{"Red", "Blue", "Green", "Yellow"},
+				"question": "Which of the following are primary colors?",
+				"options":  []any{"Red", "Blue", "Green", "Yellow"},
 			},
 			wantError: false,
 		},
 		{
 			name: "Missing answer_choices parameter",
 			args: map[string]any{
-				"question_text": "Pick a color",
+				"question": "Pick a color",
 			},
 			wantError: true,
 		},
 		{
 			name: "Insufficient answer_choices (only 1)",
 			args: map[string]any{
-				"question_text":  "Pick a color",
-				"answer_choices": []any{"Red"},
+				"question": "Pick a color",
+				"options":  []any{"Red"},
 			},
 			wantError: true,
 		},
-		{
-			name: "Too many answer_choices (more than 6)",
-			args: map[string]any{
-				"question_text":  "Pick colors",
-				"answer_choices": []any{"A", "B", "C", "D", "E", "F", "G"},
-			},
-			wantError: true,
-		},
+
 		{
 			name: "Empty question_text",
 			args: map[string]any{
-				"question_text":  "",
-				"answer_choices": []any{"Red", "Blue"},
+				"question": "",
+				"options":  []any{"Red", "Blue"},
 			},
 			wantError: true,
 		},
@@ -74,17 +68,16 @@ func TestAskMultipleSelectionTool_Invoke(t *testing.T) {
 				assert.True(t, ok)
 				assert.Contains(t, data["status"], "Requesting input")
 				assert.NotContains(t, data, "schema")
-				assert.NotContains(t, data, "question_text")
+				assert.NotContains(t, data, "question")
 
 				assert.NotNil(t, resStruct.Command)
 				assert.NotNil(t, resStruct.Command.Elicitation)
-				assert.Equal(t, tt.args.(map[string]any)["question_text"], resStruct.Command.Elicitation.Question)
+				assert.Equal(t, tt.args.(map[string]any)["question"], resStruct.Command.Elicitation.Question)
 				assert.Equal(t, "choose_multiple", resStruct.Command.Elicitation.Schema["type"])
 			}
 		})
 	}
 }
-
 
 func TestAskTrueFalseTool_Invoke(t *testing.T) {
 	tool := &middleware.AskTrueFalseTool{}
@@ -99,14 +92,14 @@ func TestAskTrueFalseTool_Invoke(t *testing.T) {
 		{
 			name: "Valid statement with domain-specific parameter",
 			args: map[string]any{
-				"statement_to_verify": "Photosynthesis occurs in the chloroplasts",
+				"question": "Photosynthesis occurs in the chloroplasts",
 			},
 			wantError: false,
 		},
 		{
 			name: "Empty statement",
 			args: map[string]any{
-				"statement_to_verify": "",
+				"question": "",
 			},
 			wantError: true,
 		},

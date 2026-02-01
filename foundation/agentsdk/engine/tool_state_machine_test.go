@@ -64,11 +64,10 @@ func TestToolStateMachine_NormalExecution(t *testing.T) {
 
 	ctx := context.Background()
 	toolCall := &core.ToolCall{
-		ID: "tc_123",
-		Function: core.ToolFunction{
-			Name:      "calculator",
-			Arguments: `{"operation": "add", "a": 1, "b": 2}`,
-		},
+		ID:        "tc_123",
+		Type:      "function",
+		Name:      "calculator",
+		Arguments: `{"operation": "add", "a": 1, "b": 2}`,
 	}
 
 	executor := &MockToolExecutor{
@@ -122,11 +121,10 @@ func TestToolStateMachine_AwaitingInput(t *testing.T) {
 
 	ctx := context.Background()
 	toolCall := &core.ToolCall{
-		ID: "tc_456",
-		Function: core.ToolFunction{
-			Name:      "elicitation_tool",
-			Arguments: `{}`,
-		},
+		ID:        "tc_456",
+		Type:      "function",
+		Name:      "elicitation_tool",
+		Arguments: `{}`,
 	}
 
 	elicitation := &core.ElicitationSpec{
@@ -197,11 +195,10 @@ func TestToolStateMachine_AwaitingAuth(t *testing.T) {
 
 	ctx := context.Background()
 	toolCall := &core.ToolCall{
-		ID: "tc_789",
-		Function: core.ToolFunction{
-			Name:      "file_access",
-			Arguments: `{"path": "/etc/passwd"}`,
-		},
+		ID:        "tc_789",
+		Type:      "function",
+		Name:      "file_access",
+		Arguments: `{"path": "/etc/passwd"}`,
 	}
 
 	authSpec := &core.AuthorizationSpec{
@@ -263,11 +260,10 @@ func TestToolStateMachine_ErrorDuringExecution(t *testing.T) {
 
 	ctx := context.Background()
 	toolCall := &core.ToolCall{
-		ID: "tc_error",
-		Function: core.ToolFunction{
-			Name:      "failing_tool",
-			Arguments: `{}`,
-		},
+		ID:        "tc_error",
+		Type:      "function",
+		Name:      "failing_tool",
+		Arguments: `{}`,
 	}
 
 	executor := &MockToolExecutor{
@@ -315,11 +311,10 @@ func TestToolStateMachine_ErrorDuringExecution(t *testing.T) {
 func TestToolStateMachine_IsTerminal(t *testing.T) {
 	ctx := context.Background()
 	toolCall := &core.ToolCall{
-		ID: "tc_term",
-		Function: core.ToolFunction{
-			Name:      "test_tool",
-			Arguments: `{}`,
-		},
+		ID:        "tc_term",
+		Type:      "function",
+		Name:      "test_tool",
+		Arguments: `{}`,
 	}
 
 	// Test completed state is terminal

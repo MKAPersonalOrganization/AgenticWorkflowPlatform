@@ -54,17 +54,17 @@ func mapFromCoreToLLMMessage(msg core.Message) llm.ChatMessage {
 	// Add function calls from tool calls
 	for _, tc := range msg.ToolCalls {
 		cm.Contents = append(cm.Contents, llm.FunctionCallContent{
-			CallID:       tc.ID,
-			Name:         tc.Function.Name,
-			RawArguments: tc.Function.Arguments,
+			ToolCallID:   tc.ID,
+			Name:         tc.Name,
+			RawArguments: tc.Arguments,
 		})
 	}
 
 	// Add function result for tool messages
 	if msg.Role == "tool" && msg.ToolCallID != "" {
 		cm.Contents = append(cm.Contents, llm.FunctionResultContent{
-			CallID: msg.ToolCallID,
-			Result: msg.Content,
+			ToolCallID: msg.ToolCallID,
+			Result:     msg.Content,
 		})
 	}
 
@@ -78,12 +78,10 @@ func toDomainToolCalls(ctcs []core.ToolCall) []domain.ToolCall {
 	result := make([]domain.ToolCall, len(ctcs))
 	for i, ctc := range ctcs {
 		result[i] = domain.ToolCall{
-			ID:   ctc.ID,
-			Type: ctc.Type,
-			Function: domain.ToolFunction{
-				Name:      ctc.Function.Name,
-				Arguments: ctc.Function.Arguments,
-			},
+			ID:        ctc.ID,
+			Type:      ctc.Type,
+			Name:      ctc.Name,
+			Arguments: ctc.Arguments,
 		}
 	}
 	return result

@@ -187,7 +187,7 @@ func (c *OpenAIClient) buildMessages(messages []ChatMessage, options *ChatOption
 				if fr.IsError() {
 					content = fr.Error
 				}
-				params = append(params, openai.ToolMessage(content, fr.CallID))
+				params = append(params, openai.ToolMessage(content, fr.ToolCallID))
 			}
 
 		case ChatRoleSystem:
@@ -208,7 +208,7 @@ func (c *OpenAIClient) buildAssistantMessage(msg ChatMessage) openai.ChatComplet
 		for _, fc := range functionCalls {
 			toolCalls = append(toolCalls, openai.ChatCompletionMessageToolCallUnionParam{
 				OfFunction: &openai.ChatCompletionMessageFunctionToolCallParam{
-					ID: fc.CallID,
+					ID: fc.ToolCallID,
 					Function: openai.ChatCompletionMessageFunctionToolCallFunctionParam{
 						Arguments: fc.ArgumentsJSON(),
 						Name:      fc.Name,
@@ -247,7 +247,7 @@ func (c *OpenAIClient) buildToolCallUpdate(tc openai.ChatCompletionChunkChoiceDe
 	// Add function call content if we have name or arguments
 	if tc.ID != "" || tc.Function.Name != "" || tc.Function.Arguments != "" {
 		fc := FunctionCallContent{
-			CallID:       tc.ID,
+			ToolCallID:   tc.ID,
 			Name:         tc.Function.Name,
 			RawArguments: tc.Function.Arguments,
 		}

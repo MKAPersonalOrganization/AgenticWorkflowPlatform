@@ -183,8 +183,8 @@ func (t *ToolStateMachine) executeToolLogic(_ context.Context, _ ...any) error {
 	// Build result
 	result := &ToolExecutionResult{
 		ToolCallID:    t.toolCall.ID,
-		ToolName:      t.toolCall.Function.Name,
-		Arguments:     t.toolCall.Function.Arguments,
+		ToolName:      t.toolCall.Name,
+		Arguments:     t.toolCall.Arguments,
 		StopIteration: execResult.StopIteration,
 		Command:       execResult.Command,
 	}
@@ -337,7 +337,7 @@ func (t *ToolStateMachine) notifyStateChange(oldState, newState ToolState) {
 
 	// Call observers without holding lock to prevent deadlocks
 	toolCallID := t.toolCall.ID
-	toolName := t.toolCall.Function.Name
+	toolName := t.toolCall.Name
 	for _, observer := range observersCopy {
 		observer.OnToolStateChanged(toolCallID, toolName, oldState, newState, result, elicitation)
 	}

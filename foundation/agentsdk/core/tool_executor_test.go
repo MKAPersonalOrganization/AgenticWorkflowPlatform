@@ -29,12 +29,12 @@ func NewMockToolExecutor() *MockToolExecutor {
 func (m *MockToolExecutor) Execute(toolCall core.ToolCall) (core.ToolExecutionResult, error) {
 	m.calls = append(m.calls, toolCall)
 
-	if err, ok := m.errors[toolCall.Function.Name]; ok {
+	if err, ok := m.errors[toolCall.Name]; ok {
 		return core.ToolExecutionResult{}, err
 	}
 
 	var result string
-	if res, ok := m.results[toolCall.Function.Name]; ok {
+	if res, ok := m.results[toolCall.Name]; ok {
 		result = res
 	} else {
 		result = `{"status": "ok"}`
@@ -72,12 +72,10 @@ func TestMockToolExecutor_Execute(t *testing.T) {
 	executor.SetResult("get_weather", `{"temperature": 72}`)
 
 	toolCall := core.ToolCall{
-		ID:   "call_123",
-		Type: "function",
-		Function: core.ToolFunction{
-			Name:      "get_weather",
-			Arguments: `{"city": "London"}`,
-		},
+		ID:        "call_123",
+		Type:      "function",
+		Name:      "get_weather",
+		Arguments: `{"city": "London"}`,
 	}
 
 	result, err := executor.Execute(toolCall)
@@ -101,12 +99,10 @@ func TestMockToolExecutor_ExecuteWithError(t *testing.T) {
 	executor.SetError("unknown_tool", expectedErr)
 
 	toolCall := core.ToolCall{
-		ID:   "call_456",
-		Type: "function",
-		Function: core.ToolFunction{
-			Name:      "unknown_tool",
-			Arguments: `{}`,
-		},
+		ID:        "call_456",
+		Type:      "function",
+		Name:      "unknown_tool",
+		Arguments: `{}`,
 	}
 
 	_, err := executor.Execute(toolCall)
@@ -124,12 +120,10 @@ func TestMockToolExecutor_DefaultResult(t *testing.T) {
 	executor := NewMockToolExecutor()
 
 	toolCall := core.ToolCall{
-		ID:   "call_789",
-		Type: "function",
-		Function: core.ToolFunction{
-			Name:      "any_tool",
-			Arguments: `{}`,
-		},
+		ID:        "call_789",
+		Type:      "function",
+		Name:      "any_tool",
+		Arguments: `{}`,
 	}
 
 	result, err := executor.Execute(toolCall)
@@ -158,12 +152,10 @@ func TestBasicToolExecutor_Calculate(t *testing.T) {
 	executor := core.NewRegistryToolExecutor(context.Background(), toolRegistry, "", "", nil)
 
 	toolCall := core.ToolCall{
-		ID:   "call_calc",
-		Type: "function",
-		Function: core.ToolFunction{
-			Name:      "calculate",
-			Arguments: `{"expression": "2 + 2"}`,
-		},
+		ID:        "call_calc",
+		Type:      "function",
+		Name:      "calculate",
+		Arguments: `{"expression": "2 + 2"}`,
 	}
 
 	result, err := executor.Execute(toolCall)
@@ -195,12 +187,10 @@ func TestBasicToolExecutor_CustomTool(t *testing.T) {
 	executor := core.NewRegistryToolExecutor(context.Background(), toolRegistry, "", "", nil)
 
 	toolCall := core.ToolCall{
-		ID:   "call_note",
-		Type: "function",
-		Function: core.ToolFunction{
-			Name:      "save_note",
-			Arguments: `{"content": "test content", "action": "write"}`,
-		},
+		ID:        "call_note",
+		Type:      "function",
+		Name:      "save_note",
+		Arguments: `{"content": "test content", "action": "write"}`,
 	}
 
 	result, err := executor.Execute(toolCall)
@@ -243,12 +233,10 @@ func TestRegistryToolExecutor(t *testing.T) {
 
 	// Test successful execution
 	result, err := executor.Execute(core.ToolCall{
-		ID:   "call_1",
-		Type: "function",
-		Function: core.ToolFunction{
-			Name:      "greet",
-			Arguments: `{"name": "World"}`,
-		},
+		ID:        "call_1",
+		Type:      "function",
+		Name:      "greet",
+		Arguments: `{"name": "World"}`,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -266,12 +254,10 @@ func TestRegistryToolExecutor_ToolNotFound(t *testing.T) {
 	executor := core.NewRegistryToolExecutor(ctx, registry, "", "", nil)
 
 	_, err := executor.Execute(core.ToolCall{
-		ID:   "call_1",
-		Type: "function",
-		Function: core.ToolFunction{
-			Name:      "nonexistent",
-			Arguments: `{}`,
-		},
+		ID:        "call_1",
+		Type:      "function",
+		Name:      "nonexistent",
+		Arguments: `{}`,
 	})
 
 	if err == nil {

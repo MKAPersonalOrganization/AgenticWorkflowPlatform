@@ -31,7 +31,7 @@ func TestToolProcessor_ProcessActions_MultipleTools(t *testing.T) {
 
 	mockExecutor := &MockToolExecutor{
 		executeFunc: func(tc core.ToolCall) (core.ToolExecutionResult, error) {
-			switch tc.Function.Name {
+			switch tc.Name {
 			case "tool1":
 				return core.ToolExecutionResult{Result: "result1"}, nil
 			case "tool2":
@@ -56,8 +56,8 @@ func TestToolProcessor_ProcessActions_MultipleTools(t *testing.T) {
 		_, persistence, threadID := setup(t)
 
 		toolCalls := []core.ToolCall{
-			{ID: "call1", Function: core.ToolFunction{Name: "tool1"}},
-			{ID: "call2", Function: core.ToolFunction{Name: "tool2"}},
+			{ID: "call1", Name: "tool1"},
+			{ID: "call2", Name: "tool2"},
 		}
 
 		tsms := make(map[string]*domain.ToolStateMachine)
@@ -100,9 +100,9 @@ func TestToolProcessor_ProcessActions_MultipleTools(t *testing.T) {
 		_, persistence, threadID := setup(t)
 
 		toolCalls := []core.ToolCall{
-			{ID: "call1", Function: core.ToolFunction{Name: "tool1"}},
-			{ID: "call_elicit", Function: core.ToolFunction{Name: "tool_elicitation"}},
-			{ID: "call2", Function: core.ToolFunction{Name: "tool2"}},
+			{ID: "call1", Name: "tool1"},
+			{ID: "call_elicit", Name: "tool_elicitation"},
+			{ID: "call2", Name: "tool2"},
 		}
 
 		tsms := make(map[string]*domain.ToolStateMachine)
@@ -149,14 +149,14 @@ func TestToolProcessor_ProcessActions_MultipleTools(t *testing.T) {
 		_, persistence, threadID := setup(t)
 
 		toolCalls := []core.ToolCall{
-			{ID: "slow", Function: core.ToolFunction{Name: "slow_tool"}},
-			{ID: "fast", Function: core.ToolFunction{Name: "fast_tool"}},
+			{ID: "slow", Name: "slow_tool"},
+			{ID: "fast", Name: "fast_tool"},
 		}
 
 		// Mock executor where "slow" takes more time but results are collected in order
 		parallelExecutor := &MockToolExecutor{
 			executeFunc: func(tc core.ToolCall) (core.ToolExecutionResult, error) {
-				if tc.Function.Name == "slow_tool" {
+				if tc.Name == "slow_tool" {
 					return core.ToolExecutionResult{Result: "slow_result"}, nil
 				}
 				return core.ToolExecutionResult{Result: "fast_result"}, nil
@@ -210,13 +210,13 @@ func TestToolProcessor_ProcessActions_MultipleTools(t *testing.T) {
 		_, persistence, threadID := setup(t)
 
 		toolCalls := []core.ToolCall{
-			{ID: "ok", Function: core.ToolFunction{Name: "tool1"}},
-			{ID: "fail", Function: core.ToolFunction{Name: "fail_tool"}},
+			{ID: "ok", Name: "tool1"},
+			{ID: "fail", Name: "fail_tool"},
 		}
 
 		errorExecutor := &MockToolExecutor{
 			executeFunc: func(tc core.ToolCall) (core.ToolExecutionResult, error) {
-				if tc.Function.Name == "fail_tool" {
+				if tc.Name == "fail_tool" {
 					return core.ToolExecutionResult{}, errors.New("something went wrong")
 				}
 				return core.ToolExecutionResult{Result: "ok_result"}, nil
@@ -271,8 +271,8 @@ func TestToolProcessor_ProcessActions_MultipleTools(t *testing.T) {
 		_, persistence, threadID := setup(t)
 
 		toolCalls := []core.ToolCall{
-			{ID: "ok", Function: core.ToolFunction{Name: "tool1"}},
-			{ID: "elicit", Function: core.ToolFunction{Name: "tool_elicitation"}},
+			{ID: "ok", Name: "tool1"},
+			{ID: "elicit", Name: "tool_elicitation"},
 		}
 
 		tsms := make(map[string]*domain.ToolStateMachine)
