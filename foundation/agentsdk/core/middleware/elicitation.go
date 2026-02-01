@@ -103,7 +103,6 @@ func (t *AskMultipleSelectionTool) Invoke(ctx core.ToolContext, args any) (any, 
 	return createMultipleChoiceResult(question, options, schema)
 }
 
-
 // --- TOOL: YES/NO QUIZ ---
 type AskTrueFalseTool struct{}
 
@@ -174,7 +173,6 @@ func createMultipleChoiceResult(question string, options []string, schema map[st
 	), nil
 }
 
-
 // createTrueFalseResult creates result for true/false quiz with domain-specific parameters
 func createTrueFalseResult(statement string, schema map[string]any) (any, error) {
 	cmd := &core.Command{
@@ -208,14 +206,14 @@ func (m *ElicitationMiddleware) Process(ctx context.Context, reqCtx *core.Reques
 	reqCtx.AddTool(&AskTrueFalseTool{})
 
 	reqCtx.AddSystemPrompt(`
-## Quiz Tools
-You MUST use these tools to quiz the student. Arguments are MANDATORY.
+## Verification Tools
+You MUST use these tools to verify understanding when appropriate. Arguments are MANDATORY.
 1. **quiz_multiple_choice**:
    - Schema: {"question": "...", "options": ["A", "B"]}
-   - Use this for multiple choice questions.
+   - Use this for multiple choice verification.
 2. **quiz_yes_no**:
    - Schema: {"question": "..."}
-   - Use this for true/false or yes/no questions.
+   - Use this for true/false or yes/no verification.
 `)
 
 	return next(ctx, reqCtx)

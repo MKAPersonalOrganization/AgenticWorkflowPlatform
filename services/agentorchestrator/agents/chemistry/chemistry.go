@@ -7,6 +7,7 @@ import (
 	"school-with-ai/foundation/agentsdk/core/middleware"
 	"school-with-ai/foundation/i18n"
 	sharedtools "school-with-ai/services/agentorchestrator/agents/tools"
+	"school-with-ai/services/agentorchestrator/prompts"
 )
 
 // domainTools returns the domain-specific tools for the chemistry instructor.
@@ -37,7 +38,7 @@ func CreateChemistryInstructor(ctx context.Context, notifier core.EventNotifier)
 		registry.Register(tool)
 	}
 
-	prompt, err := core.GenerateSystemPrompt(core.PromptConfig{
+	prompt, err := prompts.GenerateTeacherSystemPrompt(prompts.TeacherPromptConfig{
 		Role:     i18n.T(ctx, "chemistry.role"),
 		Preamble: i18n.T(ctx, "chemistry.preamble"),
 		Topic:    i18n.T(ctx, "chemistry.topic"),
@@ -48,7 +49,7 @@ func CreateChemistryInstructor(ctx context.Context, notifier core.EventNotifier)
 			i18n.T(ctx, "chemistry.objective3"),
 			i18n.T(ctx, "chemistry.objective4"),
 		},
-		LearningPath: &core.LearningPath{
+		LearningPath: &prompts.LearningPath{
 			Prerequisites: []string{
 				i18n.T(ctx, "chemistry.prerequisite1"),
 				i18n.T(ctx, "chemistry.prerequisite2"),

@@ -125,8 +125,8 @@ func TestLoopDetector_PedagogicalLoop(t *testing.T) {
 	detector.RecordConceptExplanation(concept)
 
 	// Record quiz failures
-	detector.RecordQuizFailure(concept)
-	detector.RecordQuizFailure(concept)
+	detector.RecordTaskFailure(concept)
+	detector.RecordTaskFailure(concept)
 
 	// Should now detect pedagogical loop
 	loopInfo := detector.CheckPedagogicalLoop(concept)
@@ -154,11 +154,11 @@ func TestLoopDetector_QuizSuccessResetsPedagogicalLoop(t *testing.T) {
 	detector.RecordConceptExplanation(concept)
 	detector.RecordConceptExplanation(concept)
 	detector.RecordConceptExplanation(concept)
-	detector.RecordQuizFailure(concept)
-	detector.RecordQuizFailure(concept)
+	detector.RecordTaskFailure(concept)
+	detector.RecordTaskFailure(concept)
 
 	// Quiz success should reset failure count
-	detector.RecordQuizSuccess(concept)
+	detector.RecordTaskSuccess(concept)
 
 	// Should not detect loop anymore
 	loopInfo := detector.CheckPedagogicalLoop(concept)

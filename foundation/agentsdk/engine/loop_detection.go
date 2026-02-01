@@ -300,14 +300,14 @@ func (d *LoopDetector) RecordConceptExplanation(concept string) {
 	d.conceptExplanations[concept]++
 }
 
-// RecordQuizFailure records that a student failed a quiz on a concept.
-func (d *LoopDetector) RecordQuizFailure(concept string) {
+// RecordTaskFailure records that a user failed a task on a concept.
+func (d *LoopDetector) RecordTaskFailure(concept string) {
 	d.conceptQuizFailures[concept]++
 }
 
-// RecordQuizSuccess records that a student passed a quiz on a concept.
+// RecordTaskSuccess records that a user passed a task on a concept.
 // This resets the failure count for that concept.
-func (d *LoopDetector) RecordQuizSuccess(concept string) {
+func (d *LoopDetector) RecordTaskSuccess(concept string) {
 	d.conceptQuizFailures[concept] = 0
 }
 
@@ -317,13 +317,13 @@ func (d *LoopDetector) CheckPedagogicalLoop(concept string) *LoopInfo {
 	explanations := d.conceptExplanations[concept]
 	failures := d.conceptQuizFailures[concept]
 
-	// If we've explained multiple times and student keeps failing,
+	// If we've explained multiple times and user keeps failing,
 	// we might need a different approach
 	if explanations >= d.pedagogicalThreshold && failures >= 2 {
 		return &LoopInfo{
 			Type: LoopTypePedagogical,
-			Description: "Student continues to struggle with concept after multiple explanations. " +
-				"Consider: different approach, prerequisite review, or human tutor escalation.",
+			Description: "User continues to struggle with concept after multiple explanations. " +
+				"Consider: different approach, prerequisite review, or human escalation.",
 			Occurrences: explanations,
 			Pattern:     concept,
 		}
