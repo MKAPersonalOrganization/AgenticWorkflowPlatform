@@ -178,6 +178,13 @@ func deserializeDomainEvent(eventType string, data []byte) (domain.Event, error)
 		}
 		return &evt, nil
 
+	case "ExecutionStateReported":
+		var evt domain.ExecutionStateReported
+		if err := json.Unmarshal(data, &evt); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal ExecutionStateReported: %w", err)
+		}
+		return &evt, nil
+
 	case "TurnFinished":
 		var evt domain.TurnFinished
 		if err := json.Unmarshal(data, &evt); err != nil {
