@@ -69,6 +69,9 @@ type RunConfig struct {
 
 	// ModelID optionally overrides the default model.
 	ModelID string
+
+	// StopSequences are strings that stop generation when encountered.
+	StopSequences []string
 }
 
 // DefaultRunConfig returns sensible defaults for agent execution.

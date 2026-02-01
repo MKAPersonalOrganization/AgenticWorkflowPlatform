@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"school-with-ai/domain"
+	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services"
@@ -45,8 +46,8 @@ func NewAsynqTaskManager(
 	config AsynqConfig,
 	eventLog core.EventStore,
 	state domain.ThreadStore,
-	chatClient ChatClient,
-	orchestratorService services.AgentOrchestrator, // decouple from concrete implementation
+	model agent.Model,
+	runner agent.Runner, // decouple from concrete implementation
 	agentFactory services.AgentFactory,
 	langfuseTracer *LangfuseTracer,
 	observabilityConfig ObservabilityConfig,
@@ -79,11 +80,11 @@ func NewAsynqTaskManager(
 	// Create orchestration service
 	orchestrationService := NewService(
 		log,
-		orchestratorService,
+		runner,
 		agentFactory,
 		state,
 		eventLog,
-		chatClient,
+		model,
 		langfuseTracer,
 		observabilityConfig,
 	)

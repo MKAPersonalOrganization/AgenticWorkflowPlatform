@@ -215,6 +215,11 @@ func (s *Service) GetAvailableAgents() []string {
 	return registry.GlobalAgents.List()
 }
 
+// GetThreadManager returns the underlying thread manager.
+func (s *Service) GetThreadManager() *threadmgmt.Manager {
+	return s.threadMgmt
+}
+
 // GetEngineGraph returns the DOT graph for the engine state machine.
 func (s *Service) GetEngineGraph() string {
 	return s.engine.GetGraph()

@@ -8,7 +8,8 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	"school-with-ai/foundation/agentsdk/llm"
+	"school-with-ai/foundation/agent"
+	"school-with-ai/foundation/agentsdk/registry"
 	"school-with-ai/foundation/i18n"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/infra/projection/agui"
@@ -21,23 +22,23 @@ import (
 
 // TaskManagementHandler encapsulates dependencies for HTTP handlers for task management.
 type TaskManagementHandler struct {
-	log                 *logger.Logger
-	chatClient          llm.ChatClient
-	taskManager         *taskmanagement.AsynqTaskManager
-	orchestratorService services.AgentOrchestrator
-	threadMgmt          *threadmgmt.Manager
-	authService         services.AuthService
-	threadQueryService  services.ThreadQueryService
-	aguiProjection      agui.AguiProjection
-	broadcaster         agui.AguiBroadcaster
+	log                *logger.Logger
+	model              agent.Model
+	taskManager        *taskmanagement.AsynqTaskManager
+	runner             agent.Runner
+	threadMgmt         *threadmgmt.Manager
+	authService        services.AuthService
+	threadQueryService services.ThreadQueryService
+	aguiProjection     agui.AguiProjection
+	broadcaster        agui.AguiBroadcaster
 }
 
 // NewTaskManagementHandler creates a new HTTP handler for task management.
 func NewTaskManagementHandler(
 	log *logger.Logger,
-	chatClient llm.ChatClient,
+	model agent.Model,
 	taskManager *taskmanagement.AsynqTaskManager,
-	orchestratorService services.AgentOrchestrator,
+	runner agent.Runner,
 	threadMgmt *threadmgmt.Manager,
 	authService services.AuthService,
 	threadQueryService services.ThreadQueryService,
@@ -45,15 +46,15 @@ func NewTaskManagementHandler(
 	broadcaster agui.AguiBroadcaster,
 ) *TaskManagementHandler {
 	return &TaskManagementHandler{
-		log:                 log,
-		chatClient:          chatClient,
-		taskManager:         taskManager,
-		orchestratorService: orchestratorService,
-		threadMgmt:          threadMgmt,
-		authService:         authService,
-		threadQueryService:  threadQueryService,
-		aguiProjection:      aguiProjection,
-		broadcaster:         broadcaster,
+		log:                log,
+		model:              model,
+		taskManager:        taskManager,
+		runner:             runner,
+		threadMgmt:         threadMgmt,
+		authService:        authService,
+		threadQueryService: threadQueryService,
+		aguiProjection:     aguiProjection,
+		broadcaster:        broadcaster,
 	}
 }
 
@@ -403,7 +404,7 @@ func (h *TaskManagementHandler) UpdateThreadTitle(w http.ResponseWriter, r *http
 
 // ListAgents returns a list of available agents.
 func (h *TaskManagementHandler) ListAgents(w http.ResponseWriter, r *http.Request) {
-	agentIDs := h.orchestratorService.GetAvailableAgents()
+	agentIDs := registry.GlobalAgents.List()
 
 	type AgentInfo struct {
 		ID   string `json:"id"`
