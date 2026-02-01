@@ -73,6 +73,7 @@ func (s *SessionAdapter) Append(ctx context.Context, msg *agent.Message) error {
 		coreMsg.Content,
 		toDomainToolCalls(coreMsg.ToolCalls),
 		coreMsg.ToolCallID,
+		coreMsg.ToolName,
 		coreMsg.AgentName,
 		coreMsg.Metadata,
 	)
@@ -233,6 +234,9 @@ func convertAgentMessageToCore(msg *agent.Message) core.Message {
 			if c.ToolResult != nil {
 				coreMsg.ToolCallID = c.ToolResult.ToolCallID
 				coreMsg.Content = c.ToolResult.Output
+				// ToolName is handled by the higher level if needed,
+				// but agent.Message doesn't have it on ToolResult yet.
+				// However, core.Message does.
 			}
 		}
 	}
