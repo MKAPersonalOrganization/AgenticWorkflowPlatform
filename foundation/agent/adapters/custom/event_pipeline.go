@@ -37,7 +37,7 @@ func (ep *EventPipeline) ConvertWithObservability(ctx context.Context, coreEvent
 
 	// Attempt conversion
 	domainEvent := ep.convertCoreEvent(coreEvent)
-	
+
 	if domainEvent == nil {
 		ep.log.Info(ctx, "Event Pipeline: Skipping unsupported core event", "coreType", coreEventType)
 		return ConversionResult{Skipped: true, Reason: fmt.Sprintf("unsupported core event type: %s", coreEventType)}
@@ -104,7 +104,7 @@ func (ep *EventPipeline) convertCoreEvent(e core.Event) domain.Event {
 		return (*domain.RunFinished)(evt)
 	case *core.TurnFinished:
 		return (*domain.TurnFinished)(evt)
-	
+
 	// Tool lifecycle events
 	case *core.ToolStart:
 		return (*domain.ToolStart)(evt)
@@ -120,7 +120,7 @@ func (ep *EventPipeline) convertCoreEvent(e core.Event) domain.Event {
 		return (*domain.AuthDenied)(evt)
 	case *core.ToolCancelled:
 		return (*domain.ToolCancelled)(evt)
-	
+
 	// Events that need manual conversion
 	case *core.ActionsDetected:
 		return &domain.ActionsDetected{
@@ -139,7 +139,7 @@ func (ep *EventPipeline) convertCoreEvent(e core.Event) domain.Event {
 			AgentName:   evt.AgentName,
 			Timestamp:   evt.Timestamp,
 		}
-	
+
 	// Handle value types (not pointers)
 	case core.EngineStateChanged:
 		return &domain.EngineStateChanged{
@@ -147,15 +147,14 @@ func (ep *EventPipeline) convertCoreEvent(e core.Event) domain.Event {
 			NewState:  evt.State,
 			Timestamp: evt.Timestamp,
 		}
-	
-	
+
 	default:
 		// Handle internal engine events by event type (not exported structs)
 		if e.EventType() == "RunCompleted" {
 			// This is an internal engine event, not meant to be persisted
 			return nil
 		}
-		
+
 		// Check if it's already a domain event
 		if de, ok := e.(domain.Event); ok {
 			return de
@@ -169,19 +168,19 @@ func (ep *EventPipeline) validateDomainEvent(event domain.Event) error {
 	if event == nil {
 		return fmt.Errorf("domain event is nil")
 	}
-	
+
 	if event.EventType() == "" {
 		return fmt.Errorf("domain event missing EventType")
 	}
-	
+
 	if event.AggregateID() == "" {
 		return fmt.Errorf("domain event missing AggregateID")
 	}
-	
+
 	if event.EventTimestamp().IsZero() {
 		return fmt.Errorf("domain event missing Timestamp")
 	}
-	
+
 	return nil
 }
 
@@ -191,10 +190,10 @@ func (ep *EventPipeline) ProcessEventStream(ctx context.Context, coreEvents func
 		eventCount := 0
 		convertedCount := 0
 		skippedCount := 0
-		
+
 		for ce, err := range coreEvents {
 			eventCount++
-			
+
 			if err != nil {
 				ep.log.Error(ctx, "Event Pipeline: Core event stream error", "eventNumber", eventCount, "error", err)
 				yield(nil, err)
@@ -202,7 +201,7 @@ func (ep *EventPipeline) ProcessEventStream(ctx context.Context, coreEvents func
 			}
 
 			result := ep.ConvertWithObservability(ctx, ce)
-			
+
 			if result.Skipped {
 				skippedCount++
 				ep.log.Debug(ctx, "Event Pipeline: Skipped event", "eventNumber", eventCount, "reason", result.Reason)
@@ -215,7 +214,7 @@ func (ep *EventPipeline) ProcessEventStream(ctx context.Context, coreEvents func
 				return
 			}
 		}
-		
+
 		ep.log.Info(ctx, "Event Pipeline: Stream completed", "totalEvents", eventCount, "converted", convertedCount, "skipped", skippedCount)
 	}
 }

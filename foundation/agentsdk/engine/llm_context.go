@@ -74,7 +74,7 @@ func (m *LLMContextManager) Prepare(ctx context.Context, runCtx core.RunContext,
 
 	// 1. Convert core messages to LLM format
 	chatMessages := m.convertMessages(messages)
-	
+
 	// DEBUG: Log the converted messages
 	fmt.Printf("DEBUG: LLMContextManager.Prepare - Converted message count: %d\n", len(chatMessages))
 	for i, msg := range chatMessages {

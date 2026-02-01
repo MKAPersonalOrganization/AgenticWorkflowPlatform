@@ -79,10 +79,10 @@ func (s *Service) ProcessEvents(ctx context.Context, events iter.Seq2[domain.Eve
 		eventCount := 0
 		durableCount := 0
 		transientCount := 0
-		
+
 		for event, err := range events {
 			eventCount++
-			
+
 			if err != nil {
 				s.log.Error(ctx, "Orchestrator: Event stream error", "eventNumber", eventCount, "error", err)
 				yield(nil, err)
@@ -92,7 +92,7 @@ func (s *Service) ProcessEvents(ctx context.Context, events iter.Seq2[domain.Eve
 			// Handle persistence
 			durable := s.isDurable(event)
 			s.log.Debug(ctx, "Orchestrator: Processing event", "eventNumber", eventCount, "eventType", event.EventType(), "isDurable", durable)
-			
+
 			if durable {
 				durableCount++
 				s.log.Debug(ctx, "Orchestrator: Persisting durable event", "eventType", event.EventType())
@@ -126,7 +126,7 @@ func (s *Service) ProcessEvents(ctx context.Context, events iter.Seq2[domain.Eve
 				return
 			}
 		}
-		
+
 		s.log.Info(ctx, "Orchestrator: Event stream completed", "totalEvents", eventCount, "durable", durableCount, "transient", transientCount)
 	}
 }

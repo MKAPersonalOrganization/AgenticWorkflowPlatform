@@ -71,11 +71,11 @@ func ToDomainEvent(e core.Event) domain.Event {
 		if evt, ok := e.(core.EngineStateChanged); ok {
 			return &domain.EngineStateChanged{
 				ThreadID:  evt.ThreadID,
-				NewState:  evt.State,  // core.State -> domain.NewState
+				NewState:  evt.State, // core.State -> domain.NewState
 				Timestamp: evt.Timestamp,
 			}
 		}
-		
+
 		// If it's already a domain event, return as-is
 		if de, ok := e.(domain.Event); ok {
 			return de
