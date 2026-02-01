@@ -29,6 +29,11 @@ type Agent interface {
 	SubAgents() []Agent
 }
 
+// AgentRegistry provides a list of available agents.
+type AgentRegistry interface {
+	List() []string
+}
+
 // Invocation contains all the information needed to execute an agent.
 type Invocation struct {
 	// ID is a unique identifier for this invocation (for resumability).

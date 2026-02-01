@@ -8,7 +8,6 @@ import (
 
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
-	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services"
 
@@ -44,7 +43,7 @@ type AsynqConfig struct {
 func NewAsynqTaskManager(
 	log *logger.Logger,
 	config AsynqConfig,
-	eventLog core.EventStore,
+	eventLog domain.EventStore,
 	state domain.ThreadStore,
 	model agent.Model,
 	runner agent.Runner, // decouple from concrete implementation
@@ -195,8 +194,8 @@ func (s *AsynqTaskManager) SubmitChatTask(ctx context.Context, userID, message, 
 	}
 
 	// Generate IDs for async task
-	jobID := core.GenerateID()
-	messageID := core.GenerateID()
+	jobID := agent.GenerateID()
+	messageID := agent.GenerateID()
 
 	// Create payload for async processing
 	payload := ProcessChatPayload{

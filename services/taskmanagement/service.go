@@ -7,7 +7,6 @@ import (
 
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
-	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/observability/langfuse"
 	"school-with-ai/services"
@@ -30,7 +29,7 @@ type Service struct {
 	runner              agent.Runner
 	agentFactory        services.AgentFactory
 	threadStore         domain.ThreadStore
-	eventLog            core.EventStore
+	eventLog            domain.EventStore
 	model               agent.Model
 	langfuseTracer      *LangfuseTracer
 	observabilityConfig ObservabilityConfig
@@ -42,7 +41,7 @@ func NewService(
 	runner agent.Runner,
 	agentFactory services.AgentFactory,
 	threadStore domain.ThreadStore,
-	eventLog core.EventStore,
+	eventLog domain.EventStore,
 	model agent.Model,
 	langfuseTracer *LangfuseTracer,
 	observabilityConfig ObservabilityConfig,
@@ -106,7 +105,7 @@ func (s *Service) HandleUserMessage(
 	}
 
 	if traceCtx != nil {
-		ctx = core.WithTraceContext(ctx, traceCtx.TraceID, traceCtx.ParentObservationID)
+		ctx = agent.WithTraceContext(ctx, traceCtx.TraceID, traceCtx.ParentObservationID)
 	}
 
 	// 2. Delegate to Runner

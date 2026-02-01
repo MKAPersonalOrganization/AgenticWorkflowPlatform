@@ -9,7 +9,6 @@ import (
 
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
-	"school-with-ai/foundation/agentsdk/registry"
 	"school-with-ai/foundation/i18n"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/infra/projection/agui"
@@ -26,6 +25,7 @@ type TaskManagementHandler struct {
 	model              agent.Model
 	taskManager        *taskmanagement.AsynqTaskManager
 	runner             agent.Runner
+	agentRegistry      agent.AgentRegistry
 	threadMgmt         *threadmgmt.Manager
 	authService        services.AuthService
 	threadQueryService services.ThreadQueryService
@@ -39,6 +39,7 @@ func NewTaskManagementHandler(
 	model agent.Model,
 	taskManager *taskmanagement.AsynqTaskManager,
 	runner agent.Runner,
+	agentRegistry agent.AgentRegistry,
 	threadMgmt *threadmgmt.Manager,
 	authService services.AuthService,
 	threadQueryService services.ThreadQueryService,
@@ -50,6 +51,7 @@ func NewTaskManagementHandler(
 		model:              model,
 		taskManager:        taskManager,
 		runner:             runner,
+		agentRegistry:      agentRegistry,
 		threadMgmt:         threadMgmt,
 		authService:        authService,
 		threadQueryService: threadQueryService,
@@ -404,7 +406,7 @@ func (h *TaskManagementHandler) UpdateThreadTitle(w http.ResponseWriter, r *http
 
 // ListAgents returns a list of available agents.
 func (h *TaskManagementHandler) ListAgents(w http.ResponseWriter, r *http.Request) {
-	agentIDs := registry.GlobalAgents.List()
+	agentIDs := h.agentRegistry.List()
 
 	type AgentInfo struct {
 		ID   string `json:"id"`
