@@ -18,6 +18,7 @@ import (
 	"school-with-ai/components/checkout"
 	"school-with-ai/components/pricing"
 	"school-with-ai/domain"
+	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/llm"
 	"school-with-ai/foundation/debug"
 	"school-with-ai/foundation/event"
@@ -47,6 +48,7 @@ import (
 	"school-with-ai/services/taskmanagement"
 	"school-with-ai/services/threadmgmt"
 
+	"school-with-ai/foundation/agent/adapters/custom"
 	"school-with-ai/foundation/agentsdk/registry"
 	sharedtools "school-with-ai/services/agentorchestrator/agents/tools"
 
@@ -132,6 +134,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 			Addr string `conf:"default:localhost:6379"`
 		}
 		Orchestration struct {
+			Framework           string        `conf:"default:custom"`
 			Concurrency         int           `conf:"default:5"`
 			ShutdownTimeout     time.Duration `conf:"default:10s"`
 			HealthCheckInterval time.Duration `conf:"default:15s"`
@@ -317,6 +320,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 		return fmt.Errorf("initializing Gemini client: %w", err)
 	}
 
+	// Wrap chatClient with the new abstraction adapter
+	model := custom.NewModelAdapter(chatClient)
+
 	// Initialize Langfuse tracer (optional observability)
 	var langfuseTracer *taskmanagement.LangfuseTracer
 	if cfg.Langfuse.Enabled {
@@ -357,12 +363,20 @@ func run(ctx context.Context, log *logger.Logger) error {
 	}
 
 	// Initialize orchestrator and thread services
-	agentOrchestrator := agentorchestrator.New(log, chatClient, eventLog,
-		agentorchestrator.WithArtifactService(artifactService),
-		agentorchestrator.WithMemoryEnabled(cfg.AgentCapabilities.LongTermMemory),
-		agentorchestrator.WithStudentProfileRepository(studentProfileRepo),
-		agentorchestrator.WithEmitter(eventRouter),
-	)
+	// Initialize the selected agent framework
+	var runner agent.Runner
+	switch cfg.Orchestration.Framework {
+	case "custom":
+		agentOrchestrator := agentorchestrator.New(log, chatClient, eventLog,
+			agentorchestrator.WithArtifactService(artifactService),
+			agentorchestrator.WithMemoryEnabled(cfg.AgentCapabilities.LongTermMemory),
+			agentorchestrator.WithStudentProfileRepository(studentProfileRepo),
+			agentorchestrator.WithEmitter(eventRouter),
+		)
+		runner = custom.NewRunnerAdapter(log, agentOrchestrator)
+	default:
+		return fmt.Errorf("unsupported agent framework: %s", cfg.Orchestration.Framework)
+	}
 
 	// -------------------------------------------------------------------------
 	// Start Debug Service
@@ -371,11 +385,20 @@ func run(ctx context.Context, log *logger.Logger) error {
 		log.Info(ctx, "startup", "status", "debug server started", "host", cfg.Web.DebugHost)
 
 		debugMux.HandleFunc("/api/debug/state-machines/engine", func(w http.ResponseWriter, r *http.Request) {
-			renderGraph(w, log, r, agentOrchestrator.GetEngineGraph())
+			// This currently only works for the custom framework
+			if ao, ok := runner.(*custom.RunnerAdapter); ok {
+				renderGraph(w, log, r, ao.GetService().GetEngineGraph())
+			} else {
+				http.Error(w, "Debug graph not supported for this framework", http.StatusNotFound)
+			}
 		})
 
 		debugMux.HandleFunc("/api/debug/state-machines/tool", func(w http.ResponseWriter, r *http.Request) {
-			renderGraph(w, log, r, agentOrchestrator.GetToolGraph())
+			if ao, ok := runner.(*custom.RunnerAdapter); ok {
+				renderGraph(w, log, r, ao.GetService().GetToolGraph())
+			} else {
+				http.Error(w, "Debug graph not supported for this framework", http.StatusNotFound)
+			}
 		})
 
 		debugServer := &http.Server{
@@ -428,8 +451,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 		},
 		eventLog,
 		llmContextProjection,
-		chatClient,
-		agentOrchestrator,
+		model,
+		runner,
 		agentFactory,
 		langfuseTracer,
 		observabilityConfig,
@@ -442,7 +465,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		"healthCheckInterval", cfg.Orchestration.HealthCheckInterval)
 
 	// Create HTTP handler
-	handler := taskmgmthandlers.NewTaskManagementHandler(log, chatClient, taskManager, agentOrchestrator, threadMgmt, authSvc, threadQueryService, aguiProjection, redisBroadcaster)
+	handler := taskmgmthandlers.NewTaskManagementHandler(log, model, taskManager, runner, threadMgmt, authSvc, threadQueryService, aguiProjection, redisBroadcaster)
 
 	// Create health handler
 	healthHandler := healthhandlers.NewHealthHandler(log)

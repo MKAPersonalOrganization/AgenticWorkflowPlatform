@@ -3,8 +3,10 @@ package taskmanagement
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"school-with-ai/domain"
+	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/observability/langfuse"
@@ -25,11 +27,11 @@ type ObservabilityConfig struct {
 // It is designed to be reusable across different transports (HTTP/SSE, A2A, etc.).
 type Service struct {
 	log                 *logger.Logger
-	orchestratorService services.AgentOrchestrator
+	runner              agent.Runner
 	agentFactory        services.AgentFactory
 	threadStore         domain.ThreadStore
 	eventLog            core.EventStore
-	chatClient          ChatClient
+	model               agent.Model
 	langfuseTracer      *LangfuseTracer
 	observabilityConfig ObservabilityConfig
 }
@@ -37,21 +39,21 @@ type Service struct {
 // NewService creates a new orchestration service.
 func NewService(
 	log *logger.Logger,
-	orchestratorService services.AgentOrchestrator,
+	runner agent.Runner,
 	agentFactory services.AgentFactory,
 	threadStore domain.ThreadStore,
 	eventLog core.EventStore,
-	chatClient ChatClient,
+	model agent.Model,
 	langfuseTracer *LangfuseTracer,
 	observabilityConfig ObservabilityConfig,
 ) *Service {
 	return &Service{
 		log:                 log,
-		orchestratorService: orchestratorService,
+		runner:              runner,
 		agentFactory:        agentFactory,
 		threadStore:         threadStore,
 		eventLog:            eventLog,
-		chatClient:          chatClient,
+		model:               model,
 		langfuseTracer:      langfuseTracer,
 		observabilityConfig: observabilityConfig,
 	}
@@ -107,9 +109,29 @@ func (s *Service) HandleUserMessage(
 		ctx = core.WithTraceContext(ctx, traceCtx.TraceID, traceCtx.ParentObservationID)
 	}
 
-	// 2. Delegate to AgentOrchestrator
-	// The Engine now handles both persistence and real-time emission internally.
-	return s.orchestratorService.ProcessUserMessage(ctx, params.AgentName, params.ThreadID, params.Content, params.UserID)
+	// 2. Delegate to Runner
+	req := &agent.RunRequest{
+		AgentName: params.AgentName,
+		SessionID: params.ThreadID,
+		UserID:    params.UserID,
+		Message: &agent.Message{
+			ID:   params.MessageID,
+			Role: agent.RoleUser,
+			Content: []agent.Content{
+				{Type: agent.ContentTypeText, Text: params.Content},
+			},
+			Timestamp: time.Now(),
+		},
+	}
+
+	// Iterate over the runner and return when complete
+	for _, err := range s.runner.Run(ctx, req) {
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // getRelease returns the application release version from config
