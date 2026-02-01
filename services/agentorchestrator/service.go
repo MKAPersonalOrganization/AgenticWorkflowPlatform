@@ -2,6 +2,7 @@ package agentorchestrator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"iter"
 
@@ -19,6 +20,11 @@ import (
 // ChatClient is the LLM client interface.
 type ChatClient = llm.ChatClient
 
+// EventEmitter is the interface for broadcasting events.
+type EventEmitter interface {
+	Dispatch(ctx context.Context, event domain.Event) error
+}
+
 // Service handles processing of user messages using pure event sourcing.
 // It acts as an orchestrator, delegating specific responsibilities to internal components.
 type Service struct {
@@ -31,11 +37,11 @@ type Service struct {
 	reqCtxCapture **core.RequestContext
 	ragService    domain.RAG
 	toolTracer    core.ToolTracer
+	emitter       EventEmitter
 
 	artifactStore artifact.Service
 	enableMemory  bool
 	profileRepo   domain.StudentProfileRepository
-	emitter       engine.EventEmitter
 
 	// Internal components
 	threadMgmt *threadmgmt.Manager
@@ -70,18 +76,15 @@ func New(
 		initialConfig: s.config,
 		registry:      registry.GlobalAgents,
 		artifactStore: s.artifactStore,
-		enableMemory:  s.enableMemory,
 		profileRepo:   s.profileRepo,
 	}
 
 	s.engine = engine.New(
 		log,
 		s.chatClient,
-		s.threadMgmt,
 		provider,
 		s.reqCtxCapture,
 		s.toolTracer,
-		s.emitter,
 	)
 
 	return s
@@ -115,6 +118,13 @@ func WithToolTracer(tracer core.ToolTracer) Option {
 	}
 }
 
+// WithEmitter configures the agent with an event emitter for broadcasting.
+func WithEmitter(emitter EventEmitter) Option {
+	return func(s *Service) {
+		s.emitter = emitter
+	}
+}
+
 // WithArtifactService configures the agent with an artifact service.
 func WithArtifactService(store artifact.Service) Option {
 	return func(s *Service) {
@@ -133,13 +143,6 @@ func WithMemoryEnabled(enabled bool) Option {
 func WithStudentProfileRepository(repo domain.StudentProfileRepository) Option {
 	return func(s *Service) {
 		s.profileRepo = repo
-	}
-}
-
-// WithEmitter configures the agent with an event emitter for real-time updates.
-func WithEmitter(emitter engine.EventEmitter) Option {
-	return func(s *Service) {
-		s.emitter = emitter
 	}
 }
 
@@ -191,28 +194,127 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 func (s *Service) Run(ctx context.Context, agentName string, runCtx core.RunContext) iter.Seq2[core.Event, error] {
 	return func(yield func(core.Event, error) bool) {
 		for event, err := range s.engine.Run(ctx, agentName, runCtx) {
-			if s.config.Notifier != nil && event != nil {
-				// We ignore the error here to keep the stream moving, but log it
-				if nErr := s.config.Notifier.HandleDomainEvent(event); nErr != nil {
-					s.log.Error(ctx, "failed to notify event", "error", nErr, "eventType", event.EventType())
+			if err != nil {
+				yield(nil, err)
+				return
+			}
+
+			// Handle persistence
+			if pErr := s.persistDurableEvent(ctx, event); pErr != nil {
+				yield(event, fmt.Errorf("persisting event: %w", pErr))
+				return
+			}
+
+			// Handle broadcasting
+			if s.emitter != nil {
+				if de, ok := event.(domain.Event); ok {
+					if bErr := s.emitter.Dispatch(ctx, de); bErr != nil {
+						s.log.Error(ctx, "failed to dispatch event", "error", bErr)
+					}
 				}
 			}
-			if !yield(event, err) {
+
+			if !yield(event, nil) {
 				return
 			}
 		}
 	}
 }
 
-// ProcessUserMessage handles the full flow of processing a user message.
-// The engine intelligently routes between new messages and tool resumptions.
+// persistDurableEvent handles persistence for events that must be durable.
+func (s *Service) persistDurableEvent(ctx context.Context, event core.Event) error {
+	if event == nil {
+		return nil
+	}
+
+	switch e := event.(type) {
+	case *domain.UserMessageAdded:
+		_, _, err := s.threadMgmt.AddUserMessage(ctx, e.ThreadID, e.MessageID, e.Content, e.UserID)
+		if err != nil {
+			return err
+		}
+		// Handle title generation for first message
+		agg, err := s.threadMgmt.Load(ctx, e.ThreadID)
+		if err == nil && len(agg.Messages) == 1 {
+			title := engine.GenerateThreadTitle(e.Content)
+			_, _ = s.threadMgmt.UpdateThreadTitle(ctx, e.ThreadID, title)
+		}
+	case *domain.AssistantMessageAdded:
+		_, _, err := s.threadMgmt.AddAssistantMessage(ctx, e.ThreadID, e.MessageID, e.Content, e.ToolCalls, e.AgentName)
+		return err
+	case *domain.ToolResultAdded:
+		toolResultID := core.GenerateID()
+		_, _, err := s.threadMgmt.AddToolResultMessage(ctx, e.ThreadID, toolResultID, e.ToolCallID, e.Result, e.AgentName)
+		return err
+	case *domain.TokenUsageReported:
+		_, err := s.threadMgmt.AddTokenUsage(ctx, *e)
+		return err
+	case domain.EngineStateChanged:
+		_, err := s.threadMgmt.RecordEngineStateChange(ctx, e)
+		return err
+	}
+
+	return nil
+}
+
+// ProcessUserMessage handles a new user message submission.
 func (s *Service) ProcessUserMessage(ctx context.Context, agentName, threadID, content, userID string) error {
-	return s.engine.ProcessUserMessage(ctx, agentName, threadID, content, userID)
+	runID := domain.GenerateMessageID()
+
+	// 1. Thread Management (History Loading)
+	agg, err := s.threadMgmt.Load(ctx, threadID)
+	if err != nil && !errors.Is(err, domain.ErrThreadNotFound) {
+		return fmt.Errorf("failed to load thread: %w", err)
+	}
+
+	var thread core.AgentThread
+	var messages []core.Message
+
+	if agg != nil {
+		thread = s.threadMgmt.ToAgentThread(agg)
+		messages, err = thread.RetrieveFullConversationHistory(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve conversation history: %w", err)
+		}
+	} else {
+		// New thread - empty history
+		thread = core.NewInMemoryThreadWithID(threadID)
+		messages = []core.Message{}
+	}
+
+	// 2. Prepare Run Context
+	runCtx := core.RunContext{
+		ThreadID:       threadID,
+		MessageID:      runID,
+		Thread:         thread,
+		InitialHistory: messages,
+		Options:        core.DefaultRunOptions(),
+		UserContent:    content,
+		UserID:         userID,
+	}
+
+	// 3. Delegation to Engine
+	runIter := s.Run(ctx, agentName, runCtx)
+
+	// 4. Consumption and Error Handling
+	for _, err := range runIter {
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // GetAvailableAgents returns a list of available agents
 func (s *Service) GetAvailableAgents() []string {
-	return registry.GlobalAgents.List()
+	return []string{
+		"math-instructor",
+		"physics-instructor",
+		"chemistry-instructor",
+		"statistics-instructor",
+		"diagramming-instructor",
+	}
 }
 
 // GetThreadManager returns the underlying thread manager.
@@ -220,12 +322,12 @@ func (s *Service) GetThreadManager() *threadmgmt.Manager {
 	return s.threadMgmt
 }
 
-// GetEngineGraph returns the DOT graph for the engine state machine.
+// GetEngineGraph returns the engine state machine graph in DOT format.
 func (s *Service) GetEngineGraph() string {
 	return s.engine.GetGraph()
 }
 
-// GetToolGraph returns the DOT graph for the tool state machine.
+// GetToolGraph returns the tool state machine graph in DOT format.
 func (s *Service) GetToolGraph() string {
 	return domain.GetToolStateMachineGraph()
 }

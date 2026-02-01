@@ -241,9 +241,10 @@ func (c *GeminiClient) buildContents(messages []ChatMessage) []*genai.Content {
 					resultData = map[string]interface{}{"result": v.Result}
 				}
 
-				name := callIDToName[v.ToolCallID]
-				// If name is missing, we can try to proceed with empty name or handle error,
-				// but Gemini usually requires it.
+				name := v.Name
+				if name == "" {
+					name = callIDToName[v.ToolCallID]
+				}
 
 				parts = append(parts, &genai.Part{
 					FunctionResponse: &genai.FunctionResponse{

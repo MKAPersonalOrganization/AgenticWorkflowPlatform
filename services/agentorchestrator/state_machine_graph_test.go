@@ -8,27 +8,21 @@ import (
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/engine"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/services/threadmgmt"
 )
 
 func TestGraphGeneration(t *testing.T) {
 	t.Run("Engine Graph", func(t *testing.T) {
 		// Setup minimal dependencies for Engine
 		log := logger.New(os.Stdout, logger.LevelInfo, "TEST", nil)
-		threadRepo := domain.NewThreadRepository(threadmgmt.NewEventStoreAdapter(nil)) // Mock event store adapter if possible or nil if unused in setup
-		mgmt := threadmgmt.New(log, threadRepo)
-
 		// We need a provider that doesn't crash on nil registry if we are just testing GetGraph
 		// But GetGraph doesn't use the provider.
 
 		e := engine.New(
 			log,
 			nil, // chatClient
-			mgmt,
 			nil, // provider
 			nil, // reqCtxCapture
 			nil, // toolTracer
-			nil, // emitter
 		)
 
 		graph := e.GetGraph()
