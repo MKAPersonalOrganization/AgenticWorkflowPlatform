@@ -243,8 +243,7 @@ func (s *Service) persistDurableEvent(ctx context.Context, event core.Event) err
 		_, _, err := s.threadMgmt.AddAssistantMessage(ctx, e.ThreadID, e.MessageID, e.Content, e.ToolCalls, e.AgentName)
 		return err
 	case *domain.ToolResultAdded:
-		toolResultID := core.GenerateID()
-		_, _, err := s.threadMgmt.AddToolResultMessage(ctx, e.ThreadID, toolResultID, e.ToolCallID, e.Result, e.AgentName)
+		_, _, err := s.threadMgmt.AddToolResultMessage(ctx, e.ThreadID, e.MessageID, e.ToolCallID, e.ToolName, e.Result, e.AgentName)
 		return err
 	case *domain.TokenUsageReported:
 		_, err := s.threadMgmt.AddTokenUsage(ctx, *e)

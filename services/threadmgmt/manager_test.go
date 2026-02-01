@@ -88,7 +88,7 @@ func TestManager_RetryUpdate(t *testing.T) {
 		store.maxConflicts = 2
 		store.mu.Unlock()
 
-		_, _, err = mgr.AddToolResultMessage(ctx, threadID, "msg-123", "call-1", "result", "agent-1")
+		_, _, err = mgr.AddToolResultMessage(ctx, threadID, "msg-123", "call-1", "tool-1", "result", "agent-1")
 		if err != nil {
 			t.Fatalf("Expected success after retries, got error: %v", err)
 		}
@@ -112,10 +112,10 @@ func TestManager_RetryUpdate(t *testing.T) {
 
 		store.mu.Lock()
 		store.conflictCount = 0
-		store.maxConflicts = 6 // maxRetries is 5
+		store.maxConflicts = 11 // maxRetries is 10
 		store.mu.Unlock()
 
-		_, _, err = mgr.AddToolResultMessage(ctx, threadID, "msg-123", "call-1", "result", "agent-1")
+		_, _, err = mgr.AddToolResultMessage(ctx, threadID, "msg-123", "call-1", "tool-1", "result", "agent-1")
 		if err == nil {
 			t.Fatal("Expected failure after max retries, got success")
 		}

@@ -59,7 +59,7 @@ func OpenThread(threadID, userID, title string) (*ThreadAggregate, error) {
 
 // AddMessage adds a message to the thread.
 // This implements business logic like ShoppingCart.AddProduct.
-func (t *ThreadAggregate) AddMessage(messageID, role, content string, toolCalls []ToolCall, toolCallID, agentName string, metadata map[string]interface{}) error {
+func (t *ThreadAggregate) AddMessage(messageID, role, content string, toolCalls []ToolCall, toolCallID, toolName, agentName string, metadata map[string]interface{}) error {
 	if t.IsDeleted {
 		return errors.New("cannot add message to deleted thread")
 	}
@@ -94,6 +94,7 @@ func (t *ThreadAggregate) AddMessage(messageID, role, content string, toolCalls 
 			ThreadID:   t.ID,
 			MessageID:  messageID,
 			ToolCallID: toolCallID,
+			ToolName:   toolName,
 			Result:     content,
 			AgentName:  agentName,
 			Timestamp:  time.Now(),
@@ -212,6 +213,7 @@ func (t *ThreadAggregate) Apply(event Event) {
 			Role:       "tool",
 			Content:    e.Result,
 			ToolCallID: e.ToolCallID,
+			ToolName:   e.ToolName,
 			AgentName:  e.AgentName,
 			Timestamp:  e.Timestamp,
 		}
