@@ -11,9 +11,10 @@ import (
 	"school-with-ai/foundation/agentsdk/engine"
 	"school-with-ai/foundation/agentsdk/llm"
 	"school-with-ai/foundation/agentsdk/registry"
-	"school-with-ai/foundation/agentsdk/tools"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/artifact"
+	memorytools "school-with-ai/services/memory/tools"
+	"school-with-ai/services/studentprofile/middleware"
 	"school-with-ai/services/threadmgmt"
 )
 
@@ -172,18 +173,18 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 
 	// Inject Memory Tool and Context if available and enabled
 	if p.artifactStore != nil && p.enableMemory {
-		memoryTool := tools.NewMemoryTool(p.artifactStore)
+		memoryTool := memorytools.NewMemoryTool(p.artifactStore)
 		config.Tools = append(config.Tools, memoryTool.Definition()...)
 
 		// Load long-term memory for context injection
 		// We use a middleware to inject memory dynamically based on the user context
-		memoryMiddleware := tools.NewMemoryInjectorMiddleware(memoryTool)
+		memoryMiddleware := memorytools.NewMemoryInjectorMiddleware(memoryTool)
 		config.Middleware = append(config.Middleware, memoryMiddleware)
 	}
 
 	// Inject Student Profile Middleware
 	if p.profileRepo != nil {
-		profileMiddleware := tools.NewStudentProfileInjectorMiddleware(p.profileRepo)
+		profileMiddleware := middleware.NewStudentProfileInjectorMiddleware(p.profileRepo)
 		config.Middleware = append(config.Middleware, profileMiddleware)
 	}
 

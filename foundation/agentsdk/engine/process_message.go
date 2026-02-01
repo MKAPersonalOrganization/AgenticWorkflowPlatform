@@ -10,7 +10,10 @@ import (
 // ProcessUserMessage handles a new user message submission.
 func (e *Engine) ProcessUserMessage(ctx context.Context, agentName string, runCtx core.RunContext) error {
 	// Determine target agent (sticky session)
-	targetAgent := e.determineTargetAgent(ctx, runCtx.InitialHistory, agentName)
+	targetAgent, err := e.determineTargetAgent(ctx, runCtx.InitialHistory, agentName)
+	if err != nil {
+		return err
+	}
 
 	// Inject User into context for tools that need it
 	if runCtx.UserID != "" {
@@ -44,20 +47,20 @@ func (e *Engine) executeRun(ctx context.Context, agentName string, runCtx core.R
 // If an explicit agent is requested, it takes precedence.
 // Otherwise, it checks sticky session (last active agent).
 // If neither, it defaults to "math-instructor".
-func (e *Engine) determineTargetAgent(ctx context.Context, history []core.Message, requestedAgent string) string {
+func (e *Engine) determineTargetAgent(ctx context.Context, history []core.Message, requestedAgent string) (string, error) {
 	// 1. Explicit request takes precedence
 	if requestedAgent != "" {
-		return requestedAgent
+		return requestedAgent, nil
 	}
 
 	// 2. Sticky Session: Iterate backwards to find the last assistant message
 	for i := len(history) - 1; i >= 0; i-- {
 		msg := history[i]
 		if msg.Role == "assistant" && msg.AgentName != "" {
-			return msg.AgentName
+			return msg.AgentName, nil
 		}
 	}
 
-	// 3. Default fallback
-	return "math-instructor"
+	// 3. No agent determined
+	return "", ErrNoAgentSelected
 }

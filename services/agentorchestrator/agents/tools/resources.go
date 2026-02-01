@@ -2,8 +2,8 @@ package tools
 
 import (
 	"school-with-ai/foundation/agentsdk/core"
-	sdktools "school-with-ai/foundation/agentsdk/tools"
 	"school-with-ai/services/studentbooks"
+	bookstools "school-with-ai/services/studentbooks/tools"
 )
 
 var globalStudentBooks studentbooks.Service
@@ -16,7 +16,7 @@ func InitStudentBooks(svc studentbooks.Service) {
 // NewLibraryTools returns the generalized library discovery tools.
 func NewLibraryTools() []core.Tool {
 	return []core.Tool{
-		sdktools.NewBrowseLibraryTool(globalStudentBooks),
-		sdktools.NewLookupSectionTool(globalStudentBooks),
+		bookstools.NewBrowseLibraryTool(globalStudentBooks),
+		bookstools.NewLookupSectionTool(globalStudentBooks),
 	}
 }
