@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/logger"
 )
 
@@ -288,60 +287,10 @@ func (m *Manager) GetPendingAuthToolCall(ctx context.Context, threadID string) (
 	return "", nil
 }
 
-// ToAgentThread converts a ThreadAggregate to a core.AgentThread.
 // Load loads an existing thread aggregate from the repository.
 // Returns domain.ErrThreadNotFound if the thread doesn't exist.
 func (m *Manager) Load(ctx context.Context, threadID string) (*domain.ThreadAggregate, error) {
 	return m.threadRepo.Load(ctx, threadID)
-}
-
-func (m *Manager) ToAgentThread(aggregate *domain.ThreadAggregate) core.AgentThread {
-	agentThread := core.NewInMemoryThreadWithID(aggregate.ID)
-	messages := m.ToCoreMessages(aggregate)
-	if len(messages) > 0 {
-		_ = agentThread.AddMessages(messages)
-	}
-	return agentThread
-}
-
-// ToCoreMessages converts domain messages in an aggregate to core messages.
-func (m *Manager) ToCoreMessages(aggregate *domain.ThreadAggregate) []core.Message {
-	if len(aggregate.Messages) == 0 {
-		return nil
-	}
-	messages := make([]core.Message, len(aggregate.Messages))
-	for i, dm := range aggregate.Messages {
-		messages[i] = core.Message{
-			ID:         dm.ID,
-			Role:       dm.Role,
-			Content:    dm.Content,
-			Timestamp:  dm.Timestamp,
-			ToolCalls:  toCoreToolCalls(dm.ToolCalls),
-			ToolCallID: dm.ToolCallID,
-			AgentName:  dm.AgentName,
-			Metadata:   dm.Metadata,
-		}
-
-		// Inject active tool states if present
-		if len(dm.ToolCalls) > 0 && len(aggregate.ActiveToolStates) > 0 {
-			toolStates := make(map[string]domain.ToolCallState)
-			hasActive := false
-			for _, tc := range dm.ToolCalls {
-				if state, ok := aggregate.ActiveToolStates[tc.ID]; ok {
-					toolStates[tc.ID] = state
-					hasActive = true
-				}
-			}
-
-			if hasActive {
-				if messages[i].Metadata == nil {
-					messages[i].Metadata = make(map[string]any)
-				}
-				messages[i].Metadata["tool_states"] = toolStates
-			}
-		}
-	}
-	return messages
 }
 
 func (m *Manager) retryUpdate(ctx context.Context, threadID string, update func(*domain.ThreadAggregate) error) (*domain.ThreadAggregate, error) {
@@ -381,20 +330,4 @@ func (m *Manager) retryUpdate(ctx context.Context, threadID string, update func(
 	}
 
 	return nil, fmt.Errorf("exceeded max retries (%d) after concurrency conflict: %w", maxRetries, lastErr)
-}
-
-func toCoreToolCalls(dtcs []domain.ToolCall) []core.ToolCall {
-	if dtcs == nil {
-		return nil
-	}
-	result := make([]core.ToolCall, len(dtcs))
-	for i, dtc := range dtcs {
-		result[i] = core.ToolCall{
-			ID:        dtc.ID,
-			Type:      dtc.Type,
-			Name:      dtc.Name,
-			Arguments: dtc.Arguments,
-		}
-	}
-	return result
 }

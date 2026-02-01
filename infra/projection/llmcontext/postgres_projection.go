@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/event"
 	"school-with-ai/foundation/logger"
 
@@ -19,9 +18,6 @@ import (
 // It maintains materialized thread and message state in PostgreSQL tables that are
 // incrementally updated via the Apply() method when events are received.
 //
-// NOTE: This projection includes methods (GetAgentThread, GetOrCreateAgentThread) that return
-// core.AgentThread types from foundation/agentsdk/core. These methods are infrastructure-level
-// utilities for the custom agent framework and are not used by the web/handler layer.
 // The web layer only uses domain-agnostic methods (Get, Messages, All).
 type PostgresLLMContextProjection struct {
 	log *logger.Logger
@@ -364,105 +360,6 @@ func (p *PostgresLLMContextProjection) getMessages(ctx context.Context, threadID
 	}
 
 	return messages, nil
-}
-
-// GetAgentThread retrieves thread as AgentThread for LLM processing.
-func (p *PostgresLLMContextProjection) GetAgentThread(threadID string) (core.AgentThread, bool) {
-	ctx := context.Background()
-
-	// Get thread
-	var thread struct {
-		ThreadID  string `db:"thread_id"`
-		IsDeleted bool   `db:"is_deleted"`
-	}
-
-	threadQuery := `SELECT thread_id, is_deleted FROM llm_threads WHERE thread_id = $1`
-	err := p.db.GetContext(ctx, &thread, threadQuery, threadID)
-	if err == sql.ErrNoRows || thread.IsDeleted {
-		return nil, false
-	}
-	if err != nil {
-		p.log.Error(ctx, "failed to get thread", "threadID", threadID, "ERROR", err)
-		return nil, false
-	}
-
-	// Get messages
-	var dbMessages []struct {
-		MessageID  string           `db:"message_id"`
-		Role       string           `db:"role"`
-		Content    string           `db:"content"`
-		ToolCalls  *json.RawMessage `db:"tool_calls"`
-		ToolCallID string           `db:"tool_call_id"`
-		AgentName  string           `db:"agent_name"`
-		Metadata   *json.RawMessage `db:"metadata"`
-		CreatedAt  time.Time        `db:"created_at"`
-	}
-
-	messagesQuery := `
-		SELECT message_id, role, content, tool_calls, tool_call_id, agent_name, metadata, created_at
-		FROM llm_messages
-		WHERE thread_id = $1
-		ORDER BY sequence_num ASC
-	`
-
-	err = p.db.SelectContext(ctx, &dbMessages, messagesQuery, threadID)
-	if err != nil && err != sql.ErrNoRows {
-		p.log.Error(ctx, "failed to get messages for agent thread", "threadID", threadID, "ERROR", err)
-		return nil, false
-	}
-
-	// Create in-memory thread from database data
-	agentThread := core.NewInMemoryThreadWithID(threadID)
-
-	// Build messages slice - InMemoryThread already has Messages field we can access
-	messages := make([]core.Message, 0, len(dbMessages))
-	for _, msg := range dbMessages {
-		// Unmarshal tool calls
-		var toolCalls []core.ToolCall
-		if msg.ToolCalls != nil {
-			if err := json.Unmarshal(*msg.ToolCalls, &toolCalls); err != nil {
-				p.log.Error(ctx, "failed to unmarshal tool calls", "messageID", msg.MessageID, "ERROR", err)
-			}
-		}
-
-		// Unmarshal metadata
-		var metadata map[string]any
-		if msg.Metadata != nil {
-			if err := json.Unmarshal(*msg.Metadata, &metadata); err != nil {
-				p.log.Error(ctx, "failed to unmarshal metadata", "messageID", msg.MessageID, "ERROR", err)
-			}
-		}
-
-		messages = append(messages, core.Message{
-			ID:         msg.MessageID,
-			Role:       msg.Role,
-			Content:    msg.Content,
-			ToolCalls:  toolCalls,
-			ToolCallID: msg.ToolCallID,
-			AgentName:  msg.AgentName,
-			Timestamp:  msg.CreatedAt,
-			Metadata:   metadata,
-		})
-	}
-
-	// Add messages to thread using the AddMessages method
-	if len(messages) > 0 {
-		if err := agentThread.AddMessages(messages); err != nil {
-			p.log.Error(ctx, "failed to add messages to thread", "threadID", threadID, "ERROR", err)
-			return nil, false
-		}
-	}
-
-	return agentThread, true
-}
-
-// GetOrCreateAgentThread ensures a thread exists, creating an empty one if needed.
-func (p *PostgresLLMContextProjection) GetOrCreateAgentThread(ctx context.Context, threadID string) (core.AgentThread, error) {
-	if agentThread, exists := p.GetAgentThread(threadID); exists {
-		return agentThread, nil
-	}
-
-	return core.NewInMemoryThreadWithID(threadID), nil
 }
 
 // Messages retrieves all messages from a thread.
