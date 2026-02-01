@@ -8,6 +8,7 @@ import (
 	"school-with-ai/foundation/i18n"
 	"school-with-ai/services/agentorchestrator/agents/diagramming/tools"
 	sharedtools "school-with-ai/services/agentorchestrator/agents/tools"
+	"school-with-ai/services/agentorchestrator/prompts"
 )
 
 // domainTools returns the domain-specific tools for the diagramming instructor.
@@ -35,7 +36,7 @@ func CreateDiagrammingInstructor(ctx context.Context, notifier core.EventNotifie
 		registry.Register(tool)
 	}
 
-	prompt, err := core.GenerateSystemPrompt(core.PromptConfig{
+	prompt, err := prompts.GenerateTeacherSystemPrompt(prompts.TeacherPromptConfig{
 		Role:        i18n.T(ctx, "diagramming.role"),
 		Preamble:    i18n.T(ctx, "diagramming.preamble"),
 		Topic:       i18n.T(ctx, "diagramming.topic"),

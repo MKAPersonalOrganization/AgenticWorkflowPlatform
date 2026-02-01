@@ -8,6 +8,7 @@ import (
 	"school-with-ai/foundation/i18n"
 	mathtools "school-with-ai/services/agentorchestrator/agents/math/tools"
 	sharedtools "school-with-ai/services/agentorchestrator/agents/tools"
+	"school-with-ai/services/agentorchestrator/prompts"
 )
 
 // domainTools returns the domain-specific tools for the math instructor.
@@ -41,7 +42,7 @@ func CreateMathInstructor(ctx context.Context, notifier core.EventNotifier) core
 		registry.Register(tool)
 	}
 
-	prompt, err := core.GenerateSystemPrompt(core.PromptConfig{
+	prompt, err := prompts.GenerateTeacherSystemPrompt(prompts.TeacherPromptConfig{
 		Role:     i18n.T(ctx, "math.role"),
 		Preamble: i18n.T(ctx, "math.preamble"),
 		Topic:    i18n.T(ctx, "math.topic"),
@@ -52,7 +53,7 @@ func CreateMathInstructor(ctx context.Context, notifier core.EventNotifier) core
 			i18n.T(ctx, "math.objective3"),
 			i18n.T(ctx, "math.objective4"),
 		},
-		LearningPath: &core.LearningPath{
+		LearningPath: &prompts.LearningPath{
 			Prerequisites: []string{
 				i18n.T(ctx, "math.prerequisite1"),
 				i18n.T(ctx, "math.prerequisite2"),

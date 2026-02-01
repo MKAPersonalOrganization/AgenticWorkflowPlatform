@@ -8,6 +8,7 @@ import (
 	"school-with-ai/foundation/i18n"
 	"school-with-ai/services/agentorchestrator/agents/statistics/tools"
 	sharedtools "school-with-ai/services/agentorchestrator/agents/tools"
+	"school-with-ai/services/agentorchestrator/prompts"
 )
 
 // domainTools returns the domain-specific tools for the statistics instructor.
@@ -73,7 +74,7 @@ func CreateStatisticsInstructor(ctx context.Context, notifier core.EventNotifier
 		registry.Register(tool)
 	}
 
-	prompt, err := core.GenerateSystemPrompt(core.PromptConfig{
+	prompt, err := prompts.GenerateTeacherSystemPrompt(prompts.TeacherPromptConfig{
 		Role:     i18n.T(ctx, "statistics.role"),
 		Preamble: i18n.T(ctx, "statistics.preamble"),
 		Topic:    i18n.T(ctx, "statistics.topic"),
@@ -84,7 +85,7 @@ func CreateStatisticsInstructor(ctx context.Context, notifier core.EventNotifier
 			i18n.T(ctx, "statistics.objective3"),
 			i18n.T(ctx, "statistics.objective4"),
 		},
-		LearningPath: &core.LearningPath{
+		LearningPath: &prompts.LearningPath{
 			Prerequisites: []string{
 				i18n.T(ctx, "statistics.prerequisite1"),
 				i18n.T(ctx, "statistics.prerequisite2"),
