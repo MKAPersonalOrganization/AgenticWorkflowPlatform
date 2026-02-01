@@ -3,7 +3,6 @@ package engine
 import (
 	"context"
 	"errors"
-	"io"
 	"iter"
 	"sync"
 	"testing"
@@ -12,7 +11,6 @@ import (
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/llm"
-	"school-with-ai/foundation/logger"
 )
 
 // MockChatClient implements types.ChatClient for testing
@@ -73,21 +71,21 @@ func (p *MockAgentProvider) GetConfig(ctx context.Context, name string) (core.Ag
 	return core.AgentConfig{}, errors.New("config not found") // Just a placeholder error
 }
 
-// MockEventStore implements domain.EventStore
+// MockEventStore implements core.EventStore
 type MockEventStore struct {
 	mu      sync.Mutex
-	events  map[string][]domain.Event
+	events  map[string][]core.Event
 	streams map[string]int64
 }
 
 func NewMockEventStore() *MockEventStore {
 	return &MockEventStore{
-		events:  make(map[string][]domain.Event),
+		events:  make(map[string][]core.Event),
 		streams: make(map[string]int64),
 	}
 }
 
-func (m *MockEventStore) AppendWithVersion(ctx context.Context, streamID string, expectedVersion int64, events ...domain.Event) (int64, error) {
+func (m *MockEventStore) AppendWithVersion(ctx context.Context, streamID string, expectedVersion int64, events ...core.Event) (int64, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -112,7 +110,7 @@ func (m *MockEventStore) AppendWithVersion(ctx context.Context, streamID string,
 
 	if !exists {
 		m.streams[streamID] = 0
-		m.events[streamID] = []domain.Event{}
+		m.events[streamID] = []core.Event{}
 	}
 
 	for range events {
@@ -125,13 +123,13 @@ func (m *MockEventStore) AppendWithVersion(ctx context.Context, streamID string,
 	return currentVersion, nil
 }
 
-func (m *MockEventStore) ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]domain.Event, error) {
+func (m *MockEventStore) ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]core.Event, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	events, exists := m.events[streamID]
 	if !exists {
-		return []domain.Event{}, nil
+		return []core.Event{}, nil
 	}
 
 	return events, nil
@@ -148,14 +146,13 @@ func (m *MockEventStore) DeleteStream(ctx context.Context, streamID string) erro
 func TestEngine_Run(t *testing.T) {
 	t.Parallel()
 	// Setup
-	log := logger.New(io.Discard, logger.LevelInfo, "test", nil)
 	eventStore := NewMockEventStore()
-	repo := domain.NewThreadRepository(eventStore)
+	repo := core.NewThreadRepository(eventStore)
 	// Create a thread
 	ctx := context.Background()
 	threadID := "thread-1"
 	// Create thread directly in store
-	event := &domain.ThreadCreated{
+	event := &core.ThreadCreated{
 		ThreadID:  threadID,
 		UserID:    "system",
 		Title:     "Test Thread",
@@ -215,25 +212,25 @@ func TestEngine_Run(t *testing.T) {
 	}
 
 	eng := New(
-		log,
 		chatClient,
 		provider,
 		nil,
 		nil,
 	)
 
-	// Load the thread aggregate to create agent thread
-	threadAgg, err := repo.Load(ctx, threadID)
+	// Get thread events instead of loading aggregate
+	threadEvents, err := repo.GetThreadEvents(ctx, threadID)
 	if err != nil {
-		t.Fatalf("Failed to load thread: %v", err)
+		t.Fatalf("Failed to get thread events: %v", err)
 	}
-	agentThread := core.NewInMemoryThreadWithID(threadAgg.ID)
+	agentThread := core.NewInMemoryThreadWithID(threadID)
 	var messages []core.Message
-	for _, dm := range threadAgg.Messages {
+	// Convert events to messages - simplified for test, just add a basic user message
+	if len(threadEvents) > 0 {
 		messages = append(messages, core.Message{
-			ID:      dm.ID,
-			Role:    dm.Role,
-			Content: dm.Content,
+			ID:      "msg-1",
+			Role:    "user",
+			Content: "Hello!",
 		})
 	}
 	_ = agentThread.AddMessages(messages)

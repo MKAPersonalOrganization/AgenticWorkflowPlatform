@@ -26,11 +26,11 @@ func NewMockToolExecutor() *MockToolExecutor {
 	}
 }
 
-func (m *MockToolExecutor) Execute(toolCall core.ToolCall) (core.ToolExecutionResult, error) {
+func (m *MockToolExecutor) Execute(toolCall core.ToolCall) (core.ToolExecResult, error) {
 	m.calls = append(m.calls, toolCall)
 
 	if err, ok := m.errors[toolCall.Name]; ok {
-		return core.ToolExecutionResult{}, err
+		return core.ToolExecResult{}, err
 	}
 
 	var result string
@@ -40,7 +40,7 @@ func (m *MockToolExecutor) Execute(toolCall core.ToolCall) (core.ToolExecutionRe
 		result = `{"status": "ok"}`
 	}
 
-	return core.ToolExecutionResult{Result: result}, nil
+	return core.ToolExecResult{Result: result}, nil
 }
 
 func (m *MockToolExecutor) SetResult(toolName, result string) {

@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/llm"
 )
@@ -70,20 +69,4 @@ func mapFromCoreToLLMMessage(msg core.Message) llm.ChatMessage {
 	}
 
 	return cm
-}
-
-func toDomainToolCalls(ctcs []core.ToolCall) []domain.ToolCall {
-	if ctcs == nil {
-		return nil
-	}
-	result := make([]domain.ToolCall, len(ctcs))
-	for i, ctc := range ctcs {
-		result[i] = domain.ToolCall{
-			ID:        ctc.ID,
-			Type:      ctc.Type,
-			Name:      ctc.Name,
-			Arguments: ctc.Arguments,
-		}
-	}
-	return result
 }

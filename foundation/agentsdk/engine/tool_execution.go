@@ -2,11 +2,25 @@ package engine
 
 import (
 	"context"
-	"fmt"
 
-	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 )
+
+// ToolExecutionResult represents the result of executing a single tool
+type ToolExecutionResult struct {
+	ToolCallID    string               `json:"tool_call_id"`
+	Result        *core.ToolExecResult `json:"result,omitempty"`
+	Error         error                `json:"error,omitempty"`
+	StopIteration bool                 `json:"stop_iteration"`
+}
+
+// ToolExecutionResults represents the results of executing multiple tools
+type ToolExecutionResults struct {
+	Results    []ToolExecutionResult `json:"results"`
+	HasErrors  bool                  `json:"has_errors"`
+	ErrorCount int                   `json:"error_count"`
+	ShouldStop bool                  `json:"should_stop"`
+}
 
 // ToolExecutionService handles executor creation and tool call execution.
 // It centralizes all tool execution logic - no persistence, no event emission.
@@ -51,9 +65,9 @@ func (s *ToolExecutionService) CreateExecutor(
 
 // ExecuteAll executes all tool calls and returns their results.
 // It tracks whether any tool signals to stop iteration.
-func (s *ToolExecutionService) ExecuteAll(toolCalls []core.ToolCall, executor core.ToolExecutor) domain.ToolExecutionResults {
-	results := domain.ToolExecutionResults{
-		Results:    make([]domain.ToolExecutionResult, 0, len(toolCalls)),
+func (s *ToolExecutionService) ExecuteAll(toolCalls []core.ToolCall, executor core.ToolExecutor) ToolExecutionResults {
+	results := ToolExecutionResults{
+		Results:    make([]ToolExecutionResult, 0, len(toolCalls)),
 		ShouldStop: false,
 	}
 
@@ -70,25 +84,13 @@ func (s *ToolExecutionService) ExecuteAll(toolCalls []core.ToolCall, executor co
 }
 
 // Execute executes a single tool call and returns the result.
-func (s *ToolExecutionService) Execute(toolCall core.ToolCall, executor core.ToolExecutor) domain.ToolExecutionResult {
+func (s *ToolExecutionService) Execute(toolCall core.ToolCall, executor core.ToolExecutor) ToolExecutionResult {
 	execResult, err := executor.Execute(toolCall)
 
-	var resultStr string
-	isError := false
-	if err != nil {
-		resultStr = fmt.Sprintf(`{"error": "%s"}`, err)
-		isError = true
-	} else {
-		resultStr = execResult.Result
-	}
-
-	return domain.ToolExecutionResult{
+	return ToolExecutionResult{
 		ToolCallID:    toolCall.ID,
-		ToolName:      toolCall.Name,
-		Arguments:     toolCall.Arguments,
-		Result:        resultStr,
-		IsError:       isError,
+		Result:        &execResult,
+		Error:         err,
 		StopIteration: execResult.StopIteration,
-		Command:       execResult.Command,
 	}
 }

@@ -2,7 +2,6 @@ package engine
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 
 	"school-with-ai/foundation/agentsdk/core"
@@ -12,14 +11,14 @@ func TestToolExecutionService_ExecuteAll(t *testing.T) {
 	service := NewToolExecutionService(nil)
 
 	mockExecutor := &MockToolExecutor{
-		executeFunc: func(tc core.ToolCall) (core.ToolExecutionResult, error) {
+		executeFunc: func(tc core.ToolCall) (core.ToolExecResult, error) {
 			switch tc.Name {
 			case "tool1":
-				return core.ToolExecutionResult{Result: "result1"}, nil
+				return core.ToolExecResult{Result: "result1"}, nil
 			case "tool2":
-				return core.ToolExecutionResult{Result: "result2"}, nil
+				return core.ToolExecResult{Result: "result2"}, nil
 			case "tool_elicitation":
-				return core.ToolExecutionResult{
+				return core.ToolExecResult{
 					Command: &core.Command{
 						Elicitation:   &core.ElicitationSpec{Question: "more info?"},
 						StopIteration: true,
@@ -27,9 +26,9 @@ func TestToolExecutionService_ExecuteAll(t *testing.T) {
 					StopIteration: true,
 				}, nil
 			case "fail_tool":
-				return core.ToolExecutionResult{}, errors.New("something went wrong")
+				return core.ToolExecResult{}, errors.New("something went wrong")
 			default:
-				return core.ToolExecutionResult{Result: "default"}, nil
+				return core.ToolExecResult{Result: "default"}, nil
 			}
 		},
 	}
@@ -50,7 +49,7 @@ func TestToolExecutionService_ExecuteAll(t *testing.T) {
 			t.Fatalf("Expected 2 results, got %d", len(results.Results))
 		}
 
-		if results.Results[0].Result != "result1" || results.Results[1].Result != "result2" {
+		if results.Results[0].Result.Result != "result1" || results.Results[1].Result.Result != "result2" {
 			t.Errorf("Unexpected results: %v", results.Results)
 		}
 	})
@@ -89,13 +88,12 @@ func TestToolExecutionService_ExecuteAll(t *testing.T) {
 			t.Fatalf("Expected 2 results, got %d", len(results.Results))
 		}
 
-		if !results.Results[1].IsError {
-			t.Error("Expected fail_tool to have IsError true")
+		if results.Results[1].Error == nil {
+			t.Error("Expected fail_tool to have an Error")
 		}
 
-		expectedError := fmt.Sprintf(`{"error": "%s"}`, "something went wrong")
-		if results.Results[1].Result != expectedError {
-			t.Errorf("Expected error JSON, got %s", results.Results[1].Result)
+		if results.Results[1].Result.Result == "" {
+			t.Error("Expected fail_tool to have a Result even with error")
 		}
 	})
 }

@@ -11,10 +11,10 @@ import (
 // ErrToolNotFound is returned when a tool is not registered.
 var ErrToolNotFound = errors.New("tool not found")
 
-// ToolExecutionResult contains the result of tool execution.
+// ToolExecResult contains the result of tool execution.
 // This struct exposes Command metadata to allow the engine to detect
 // routing commands without checking tool names.
-type ToolExecutionResult struct {
+type ToolExecResult struct {
 	// Result is the string representation for adding to thread
 	Result string
 
@@ -29,7 +29,7 @@ type ToolExecutionResult struct {
 // ToolExecutor executes tool calls and returns results.
 type ToolExecutor interface {
 	// Execute runs a tool call and returns the result with Command metadata
-	Execute(toolCall ToolCall) (ToolExecutionResult, error)
+	Execute(toolCall ToolCall) (ToolExecResult, error)
 }
 
 // ToolTracer defines the interface for tracking tool executions (e.g., Langfuse).
@@ -86,12 +86,12 @@ func NewRegistryToolExecutor(
 }
 
 // Execute runs a tool call using the registry.
-func (e *RegistryToolExecutor) Execute(toolCall ToolCall) (ToolExecutionResult, error) {
+func (e *RegistryToolExecutor) Execute(toolCall ToolCall) (ToolExecResult, error) {
 	startTime := time.Now()
 
 	tool, ok := e.registry.Get(toolCall.Name)
 	if !ok {
-		return ToolExecutionResult{}, fmt.Errorf("%w: %s", ErrToolNotFound, toolCall.Name)
+		return ToolExecResult{}, fmt.Errorf("%w: %s", ErrToolNotFound, toolCall.Name)
 	}
 
 	// Create ToolContext with additional data for tools to access
@@ -107,7 +107,7 @@ func (e *RegistryToolExecutor) Execute(toolCall ToolCall) (ToolExecutionResult, 
 	var args map[string]any
 	if toolCall.Arguments != "" {
 		if err := json.Unmarshal([]byte(toolCall.Arguments), &args); err != nil {
-			return ToolExecutionResult{}, fmt.Errorf("failed to unmarshal tool arguments: %w", err)
+			return ToolExecResult{}, fmt.Errorf("failed to unmarshal tool arguments: %w", err)
 		}
 	}
 
@@ -116,7 +116,7 @@ func (e *RegistryToolExecutor) Execute(toolCall ToolCall) (ToolExecutionResult, 
 	endTime := time.Now()
 
 	// Build execution result
-	execResult := ToolExecutionResult{
+	execResult := ToolExecResult{
 		StopIteration: false,
 	}
 
@@ -146,7 +146,7 @@ func (e *RegistryToolExecutor) Execute(toolCall ToolCall) (ToolExecutionResult, 
 		// Marshal the result back to JSON string for LLM
 		resultBytes, marshalErr := json.Marshal(finalResult)
 		if marshalErr != nil {
-			return ToolExecutionResult{}, fmt.Errorf("failed to marshal tool result: %w", marshalErr)
+			return ToolExecResult{}, fmt.Errorf("failed to marshal tool result: %w", marshalErr)
 		}
 		execResult.Result = string(resultBytes)
 	}
