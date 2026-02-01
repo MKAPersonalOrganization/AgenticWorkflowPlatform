@@ -3,12 +3,12 @@ package engine
 import (
 	"context"
 	"errors"
+	"fmt"
 	"iter"
 	"sync"
 	"testing"
 	"time"
 
-	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/llm"
 )
@@ -158,19 +158,20 @@ func TestEngine_Run(t *testing.T) {
 		Title:     "Test Thread",
 		Timestamp: time.Now(),
 	}
-	_, err := eventStore.AppendWithVersion(ctx, domain.StreamName("Thread", threadID), -2, event)
+	_, err := eventStore.AppendWithVersion(ctx, fmt.Sprintf("Thread-%s", threadID), -2, event)
 	if err != nil {
 		t.Fatalf("Failed to create thread: %v", err)
 	}
 
 	// Add user message via manager so event store is populated
-	userMsg := &domain.UserMessageAdded{
+	userMsg := &core.UserMessageAdded{
 		ThreadID:  threadID,
 		MessageID: "msg-1",
 		Content:   "Calculate 2+2",
+		UserID:    "system",
 		Timestamp: time.Now(),
 	}
-	_, err = eventStore.AppendWithVersion(ctx, domain.StreamName("Thread", threadID), 1, userMsg)
+	_, err = eventStore.AppendWithVersion(ctx, fmt.Sprintf("Thread-%s", threadID), 1, userMsg)
 	if err != nil {
 		t.Fatalf("Failed to add user message: %v", err)
 	}
@@ -261,11 +262,11 @@ func TestEngine_Run(t *testing.T) {
 
 	for _, evt := range events {
 		switch e := evt.(type) {
-		case *domain.AssistantMessageStarted:
+		case *core.AssistantMessageStarted:
 			foundStarted = true
-		case *domain.AssistantContentStreamed:
+		case *core.AssistantContentStreamed:
 			foundStreamed = true
-		case *domain.AssistantMessageCompleted:
+		case *core.AssistantMessageCompleted:
 			foundCompleted = true
 			if e.Content != "Hello World" {
 				t.Errorf("Expected content 'Hello World', got '%s'", e.Content)
@@ -287,7 +288,7 @@ func TestEngine_Run(t *testing.T) {
 	foundUsage := false
 	for _, evt := range events {
 		switch evt.(type) {
-		case *domain.TokenUsageReported, domain.TokenUsageReported:
+		case *core.TokenUsageReported, core.TokenUsageReported:
 			foundUsage = true
 		}
 	}
