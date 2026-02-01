@@ -73,10 +73,27 @@ func TestToolStateMachine_NormalExecution(t *testing.T) {
 	tsm := core.NewToolStateMachine(toolCall)
 	tsm.AddObserver(observer)
 
-	// Start execution
+	// Start execution (transitions to Executing)
 	err := tsm.Start(ctx)
 	if err != nil {
 		t.Fatalf("Start() failed: %v", err)
+	}
+
+	// Verify executing state
+	if state := tsm.CurrentState(ctx); state != core.ToolStateExecuting {
+		t.Errorf("Expected state Executing after Start, got %v", state)
+	}
+
+	// Signal success (transitions to Completed)
+	result := &core.ToolExecutionResult{
+		ToolCallID: "tc_123",
+		ToolName:   "calculator",
+		Result:     "3",
+		IsError:    false,
+	}
+	err = tsm.Success(result)
+	if err != nil {
+		t.Fatalf("Success() failed: %v", err)
 	}
 
 	// Verify final state
@@ -85,12 +102,12 @@ func TestToolStateMachine_NormalExecution(t *testing.T) {
 	}
 
 	// Verify result
-	result := tsm.Result()
-	if result == nil {
+	storedResult := tsm.Result()
+	if storedResult == nil {
 		t.Fatal("Expected result, got nil")
 	}
-	if result.Result != "3" {
-		t.Errorf("Expected result '3', got '%s'", result.Result)
+	if storedResult.Result != "3" {
+		t.Errorf("Expected result '3', got '%s'", storedResult.Result)
 	}
 
 	// Verify state transitions: Idle -> Executing -> Completed
@@ -127,10 +144,22 @@ func TestToolStateMachine_AwaitingInput(t *testing.T) {
 	tsm := core.NewToolStateMachine(toolCall)
 	tsm.AddObserver(observer)
 
-	// Start execution
+	// Start execution (transitions to Executing)
 	err := tsm.Start(ctx)
 	if err != nil {
 		t.Fatalf("Start() failed: %v", err)
+	}
+
+	// Signal needs input (transitions to AwaitingInput)
+	result := &core.ToolExecutionResult{
+		ToolCallID: "tc_456",
+		ToolName:   "elicitation_tool",
+		Result:     `{"status": "awaiting input"}`,
+		IsError:    false,
+	}
+	err = tsm.NeedsInput(elicitation, result)
+	if err != nil {
+		t.Fatalf("NeedsInput() failed: %v", err)
 	}
 
 	// Verify state
@@ -178,15 +207,33 @@ func TestToolStateMachine_AwaitingAuth(t *testing.T) {
 		Arguments: `{"path": "/etc/passwd"}`,
 	}
 
+	authSpec := &core.AuthorizationSpec{
+		Resource: "/etc/passwd",
+		Action:   "read",
+		Reason:   "Tool requires access to system file",
+	}
+
 	observer := &MockToolStateObserver{}
 
 	tsm := core.NewToolStateMachine(toolCall)
 	tsm.AddObserver(observer)
 
-	// Start execution
+	// Start execution (transitions to Executing)
 	err := tsm.Start(ctx)
 	if err != nil {
 		t.Fatalf("Start() failed: %v", err)
+	}
+
+	// Signal needs auth (transitions to AwaitingAuth)
+	result := &core.ToolExecutionResult{
+		ToolCallID: "tc_789",
+		ToolName:   "file_access",
+		Result:     `{"status": "awaiting authorization"}`,
+		IsError:    false,
+	}
+	err = tsm.NeedsAuth(authSpec, result)
+	if err != nil {
+		t.Fatalf("NeedsAuth() failed: %v", err)
 	}
 
 	// Verify state
@@ -228,10 +275,22 @@ func TestToolStateMachine_ErrorDuringExecution(t *testing.T) {
 	tsm := core.NewToolStateMachine(toolCall)
 	tsm.AddObserver(observer)
 
-	// Start execution
+	// Start execution (transitions to Executing)
 	err := tsm.Start(ctx)
 	if err != nil {
 		t.Fatalf("Start() failed: %v", err)
+	}
+
+	// Signal error (transitions to Error)
+	errorResult := &core.ToolExecutionResult{
+		ToolCallID: "tc_error",
+		ToolName:   "failing_tool",
+		Result:     "Tool execution failed",
+		IsError:    true,
+	}
+	err = tsm.Error(errorResult)
+	if err != nil {
+		t.Fatalf("Error() failed: %v", err)
 	}
 
 	// Verify state
@@ -269,7 +328,25 @@ func TestToolStateMachine_IsTerminal(t *testing.T) {
 	}
 
 	tsm := core.NewToolStateMachine(toolCall)
+
+	// Initially in Idle - not terminal
+	if tsm.IsTerminal(ctx) {
+		t.Error("Expected Idle state to not be terminal")
+	}
+
+	// Start execution - now in Executing, not terminal
 	tsm.Start(ctx)
+	if tsm.IsTerminal(ctx) {
+		t.Error("Expected Executing state to not be terminal")
+	}
+
+	// Complete execution - now in Completed, which is terminal
+	result := &core.ToolExecutionResult{
+		ToolCallID: "tc_term",
+		ToolName:   "test_tool",
+		Result:     "success",
+	}
+	tsm.Success(result)
 
 	if !tsm.IsTerminal(ctx) {
 		t.Error("Expected Completed state to be terminal")
