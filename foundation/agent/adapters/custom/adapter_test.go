@@ -46,12 +46,10 @@ func TestConvertDomainMessageToAgent(t *testing.T) {
 		Content: "Hello",
 		ToolCalls: []domain.ToolCall{
 			{
-				ID:   "tc1",
-				Type: "function",
-				Function: domain.ToolFunction{
-					Name:      "test_tool",
-					Arguments: "{}",
-				},
+				ID:        "tc1",
+				Type:      "function",
+				Name:      "test_tool",
+				Arguments: "{}",
 			},
 		},
 		Timestamp: time.Now(),

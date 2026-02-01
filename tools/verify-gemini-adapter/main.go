@@ -60,17 +60,13 @@ func main() {
 			fmt.Printf("Error stream: %v\n", err)
 			break
 		}
-		if err != nil {
-			fmt.Printf("Error stream: %v\n", err)
-			break
-		}
 		if update.Contents != nil {
 			for _, content := range update.Contents {
 				switch c := content.(type) {
 				case llm.TextContent:
 					fmt.Print(c.Text)
 				case llm.FunctionCallContent:
-					fmt.Printf("\n[ToolCall] Name: %s, ID: %s, Args: %s\n", c.Name, c.CallID, c.ArgumentsJSON())
+					fmt.Printf("\n[ToolCall] Name: %s, ID: %s, Args: %s\n", c.Name, c.ToolCallID, c.ArgumentsJSON())
 				case llm.UsageContent:
 					fmt.Printf("\n[Usage] Input: %d, Output: %d\n", c.InputTokens, c.OutputTokens)
 				}

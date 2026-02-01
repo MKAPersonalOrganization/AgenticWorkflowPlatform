@@ -89,9 +89,9 @@ func NewRegistryToolExecutor(
 func (e *RegistryToolExecutor) Execute(toolCall ToolCall) (ToolExecutionResult, error) {
 	startTime := time.Now()
 
-	tool, ok := e.registry.Get(toolCall.Function.Name)
+	tool, ok := e.registry.Get(toolCall.Name)
 	if !ok {
-		return ToolExecutionResult{}, fmt.Errorf("%w: %s", ErrToolNotFound, toolCall.Function.Name)
+		return ToolExecutionResult{}, fmt.Errorf("%w: %s", ErrToolNotFound, toolCall.Name)
 	}
 
 	// Create ToolContext with additional data for tools to access
@@ -105,8 +105,8 @@ func (e *RegistryToolExecutor) Execute(toolCall ToolCall) (ToolExecutionResult, 
 
 	// Unmarshal JSON arguments to map[string]any
 	var args map[string]any
-	if toolCall.Function.Arguments != "" {
-		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
+	if toolCall.Arguments != "" {
+		if err := json.Unmarshal([]byte(toolCall.Arguments), &args); err != nil {
 			return ToolExecutionResult{}, fmt.Errorf("failed to unmarshal tool arguments: %w", err)
 		}
 	}
@@ -156,7 +156,7 @@ func (e *RegistryToolExecutor) Execute(toolCall ToolCall) (ToolExecutionResult, 
 		// Extract trace context from ctx if available
 		traceID, parentObservationID := extractTraceContext(e.ctx)
 		if traceID != "" {
-			trackErr := e.tracer.TrackToolCall(e.ctx, traceID, parentObservationID, toolCall.Function.Name, toolCall.Function.Arguments, execResult.Result, startTime, endTime, err)
+			trackErr := e.tracer.TrackToolCall(e.ctx, traceID, parentObservationID, toolCall.Name, toolCall.Arguments, execResult.Result, startTime, endTime, err)
 			if trackErr != nil {
 				// Log tracking error but don't fail the tool execution
 				// Note: In production, you'd want proper logging here
@@ -166,7 +166,7 @@ func (e *RegistryToolExecutor) Execute(toolCall ToolCall) (ToolExecutionResult, 
 	}
 
 	if err != nil {
-		return execResult, fmt.Errorf("failed to execute tool call %s: %w", toolCall.Function.Name, err)
+		return execResult, fmt.Errorf("failed to execute tool call %s: %w", toolCall.Name, err)
 	}
 
 	return execResult, nil

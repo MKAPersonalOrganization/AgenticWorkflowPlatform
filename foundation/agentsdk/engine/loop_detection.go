@@ -126,9 +126,9 @@ func NewLoopDetector(config LoopDetectorConfig) *LoopDetector {
 func (d *LoopDetector) RecordToolCall(tc core.ToolCall) *LoopInfo {
 	// Create signature from tool name and arguments hash
 	// Arguments is already a JSON string in core.ToolCall
-	hash := sha256.Sum256([]byte(tc.Function.Arguments))
+	hash := sha256.Sum256([]byte(tc.Arguments))
 	sig := toolCallSignature{
-		toolName: tc.Function.Name,
+		toolName: tc.Name,
 		argsHash: hex.EncodeToString(hash[:8]), // First 8 bytes is enough
 	}
 
@@ -149,7 +149,7 @@ func (d *LoopDetector) RecordToolCall(tc core.ToolCall) *LoopInfo {
 			Type:        LoopTypeToolCall,
 			Description: "Agent is repeatedly calling the same tool with identical arguments",
 			Occurrences: consecutive,
-			Pattern:     tc.Function.Name,
+			Pattern:     tc.Name,
 		}
 	}
 

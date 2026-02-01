@@ -701,7 +701,7 @@ func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolve
 
 	// 2. Sequential processing of results to maintain order and thread-safety
 	for _, tc := range tctx.StreamResult.ToolCalls {
-		tctx.Observer.toolNames = append(tctx.Observer.toolNames, tc.Function.Name)
+		tctx.Observer.toolNames = append(tctx.Observer.toolNames, tc.Name)
 
 		if info := tctx.Safety.RecordToolCall(tc); info != nil {
 			return nil, nil, tctx.Observer.FailWithLoop(info)
@@ -882,7 +882,7 @@ func (s *executionState) setup(initialState state) error {
 			toolNames := []string{}
 			if s.streamResult != nil {
 				for _, tc := range s.streamResult.ToolCalls {
-					toolNames = append(toolNames, tc.Function.Name)
+					toolNames = append(toolNames, tc.Name)
 				}
 			}
 			s.engine.log.Info(ctx, "entering StateExecutingTools - executing tools",

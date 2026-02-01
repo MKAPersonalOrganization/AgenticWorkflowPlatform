@@ -355,12 +355,10 @@ func toCoreToolCalls(dtcs []domain.ToolCall) []core.ToolCall {
 	result := make([]core.ToolCall, len(dtcs))
 	for i, dtc := range dtcs {
 		result[i] = core.ToolCall{
-			ID:   dtc.ID,
-			Type: dtc.Type,
-			Function: core.ToolFunction{
-				Name:      dtc.Function.Name,
-				Arguments: dtc.Function.Arguments,
-			},
+			ID:        dtc.ID,
+			Type:      dtc.Type,
+			Name:      dtc.Name,
+			Arguments: dtc.Arguments,
 		}
 	}
 	return result

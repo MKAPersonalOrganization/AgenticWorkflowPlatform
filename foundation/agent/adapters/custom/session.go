@@ -85,12 +85,10 @@ func toDomainToolCalls(ctcs []core.ToolCall) []domain.ToolCall {
 	result := make([]domain.ToolCall, len(ctcs))
 	for i, ctc := range ctcs {
 		result[i] = domain.ToolCall{
-			ID:   ctc.ID,
-			Type: ctc.Type,
-			Function: domain.ToolFunction{
-				Name:      ctc.Function.Name,
-				Arguments: ctc.Function.Arguments,
-			},
+			ID:        ctc.ID,
+			Type:      ctc.Type,
+			Name:      ctc.Name,
+			Arguments: ctc.Arguments,
 		}
 	}
 	return result
@@ -184,8 +182,8 @@ func convertDomainMessageToAgent(msg domain.Message) *agent.Message {
 			Type: agent.ContentTypeToolCall,
 			ToolCall: &agent.ToolCall{
 				ID:        tc.ID,
-				Name:      tc.Function.Name,
-				Arguments: tc.Function.Arguments,
+				Name:      tc.Name,
+				Arguments: tc.Arguments,
 			},
 		})
 	}
@@ -225,12 +223,10 @@ func convertAgentMessageToCore(msg *agent.Message) core.Message {
 		case agent.ContentTypeToolCall:
 			if c.ToolCall != nil {
 				coreMsg.ToolCalls = append(coreMsg.ToolCalls, core.ToolCall{
-					ID:   c.ToolCall.ID,
-					Type: "function",
-					Function: core.ToolFunction{
-						Name:      c.ToolCall.Name,
-						Arguments: c.ToolCall.Arguments,
-					},
+					ID:        c.ToolCall.ID,
+					Type:      "function",
+					Name:      c.ToolCall.Name,
+					Arguments: c.ToolCall.Arguments,
 				})
 			}
 		case agent.ContentTypeToolResult:

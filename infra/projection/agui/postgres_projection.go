@@ -669,8 +669,8 @@ func (p *PostgresAguiProjection) GetThreadState(threadID string) (*AguiThreadSta
 							Name      string `json:"name"`
 							Arguments string `json:"arguments"`
 						}{
-							Name:      tc.Function.Name,
-							Arguments: tc.Function.Arguments,
+							Name:      tc.Name,
+							Arguments: tc.Arguments,
 						},
 					})
 				}

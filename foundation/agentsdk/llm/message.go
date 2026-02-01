@@ -97,8 +97,8 @@ func NewToolResultMessage(callID, result string) ChatMessage {
 	return ChatMessage{
 		Role: ChatRoleTool,
 		Contents: []AIContent{FunctionResultContent{
-			CallID: callID,
-			Result: result,
+			ToolCallID: callID,
+			Result:     result,
 		}},
 	}
 }
@@ -108,8 +108,8 @@ func NewToolErrorMessage(callID, errorMsg string) ChatMessage {
 	return ChatMessage{
 		Role: ChatRoleTool,
 		Contents: []AIContent{FunctionResultContent{
-			CallID: callID,
-			Error:  errorMsg,
+			ToolCallID: callID,
+			Error:      errorMsg,
 		}},
 	}
 }

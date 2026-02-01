@@ -41,10 +41,8 @@ func (m *MockObserver) OnToolStateChanged(
 func TestToolStateMachine_DirectSuccess(t *testing.T) {
 	ctx := context.Background()
 	tc := &core.ToolCall{
-		ID: "tc-1",
-		Function: core.ToolFunction{
-			Name: "test_tool",
-		},
+		ID:   "tc-1",
+		Name: "test_tool",
 	}
 
 	executor := &MockToolExecutor{
@@ -90,10 +88,8 @@ func TestToolStateMachine_DirectSuccess(t *testing.T) {
 func TestToolStateMachine_ElicitationFlow(t *testing.T) {
 	ctx := context.Background()
 	tc := &core.ToolCall{
-		ID: "tc-2",
-		Function: core.ToolFunction{
-			Name: "elicitation_tool",
-		},
+		ID:   "tc-2",
+		Name: "elicitation_tool",
 	}
 
 	var callCount int
@@ -162,10 +158,8 @@ func TestToolStateMachine_ElicitationFlow(t *testing.T) {
 func TestToolStateMachine_AuthorizationFlow(t *testing.T) {
 	ctx := context.Background()
 	tc := &core.ToolCall{
-		ID: "tc-3",
-		Function: core.ToolFunction{
-			Name: "auth_tool",
-		},
+		ID:   "tc-3",
+		Name: "auth_tool",
 	}
 
 	var callCount int
@@ -227,10 +221,8 @@ func TestToolStateMachine_AuthorizationFlow(t *testing.T) {
 func TestToolStateMachine_ErrorPath(t *testing.T) {
 	ctx := context.Background()
 	tc := &core.ToolCall{
-		ID: "tc-4",
-		Function: core.ToolFunction{
-			Name: "error_tool",
-		},
+		ID:   "tc-4",
+		Name: "error_tool",
 	}
 
 	executor := &MockToolExecutor{
@@ -267,10 +259,8 @@ func TestToolStateMachine_ErrorPath(t *testing.T) {
 func TestToolStateMachine_Cancellation(t *testing.T) {
 	ctx := context.Background()
 	tc := &core.ToolCall{
-		ID: "tc-5",
-		Function: core.ToolFunction{
-			Name: "cancel_tool",
-		},
+		ID:   "tc-5",
+		Name: "cancel_tool",
 	}
 
 	executor := &MockToolExecutor{
@@ -316,10 +306,8 @@ func TestToolStateMachine_ConcurrentAccess(t *testing.T) {
 	// Verify concurrent access to state machine methods is safe
 	ctx := context.Background()
 	tc := &core.ToolCall{
-		ID: "tc-concurrent",
-		Function: core.ToolFunction{
-			Name: "concurrent_tool",
-		},
+		ID:   "tc-concurrent",
+		Name: "concurrent_tool",
 	}
 
 	// Use a slow executor to increase chance of race conditions
@@ -383,10 +371,8 @@ func TestToolStateMachine_ConcurrentObserverRegistration(t *testing.T) {
 	// Verify observer registration is safe during state transitions
 	ctx := context.Background()
 	tc := &core.ToolCall{
-		ID: "tc-observer-race",
-		Function: core.ToolFunction{
-			Name: "observer_race_tool",
-		},
+		ID:   "tc-observer-race",
+		Name: "observer_race_tool",
 	}
 
 	executor := &MockToolExecutor{
@@ -433,10 +419,8 @@ func TestToolStateMachine_ConcurrentElicitation(t *testing.T) {
 	// Verify concurrent access during elicitation is safe
 	ctx := context.Background()
 	tc := &core.ToolCall{
-		ID: "tc-elicit-concurrent",
-		Function: core.ToolFunction{
-			Name: "elicit_concurrent_tool",
-		},
+		ID:   "tc-elicit-concurrent",
+		Name: "elicit_concurrent_tool",
 	}
 
 	var callCount int

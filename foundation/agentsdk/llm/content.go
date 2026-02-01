@@ -19,8 +19,8 @@ func (t TextContent) ContentType() string { return "text" }
 
 // FunctionCallContent represents a function/tool call request from the model.
 type FunctionCallContent struct {
-	// CallID is the unique identifier for this function call.
-	CallID string `json:"callId"`
+	// ToolCallID is the unique identifier for this function call.
+	ToolCallID string `json:"toolCallId"`
 
 	// Name is the name of the function to call.
 	Name string `json:"name"`
@@ -53,8 +53,8 @@ func (f FunctionCallContent) ArgumentsJSON() string {
 
 // FunctionResultContent represents the result of a function call execution.
 type FunctionResultContent struct {
-	// CallID references the FunctionCallContent.CallID that this is a result for.
-	CallID string `json:"callId"`
+	// ToolCallID references the FunctionCallContent.ToolCallID that this is a result for.
+	ToolCallID string `json:"toolCallId"`
 
 	// Result contains the function result, typically as a JSON string.
 	Result string `json:"result"`

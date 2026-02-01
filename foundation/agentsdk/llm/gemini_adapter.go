@@ -128,7 +128,7 @@ func (c *GeminiClient) GetStreamingResponse(
 									}
 
 									fc := FunctionCallContent{
-										CallID:       callID,
+										ToolCallID:   callID,
 										Name:         part.FunctionCall.Name,
 										Arguments:    part.FunctionCall.Args,
 										RawArguments: string(argsJSON),
@@ -221,12 +221,12 @@ func (c *GeminiClient) buildContents(messages []ChatMessage) []*genai.Content {
 			case TextContent:
 				parts = append(parts, &genai.Part{Text: v.Text})
 			case FunctionCallContent:
-				if v.CallID != "" {
-					callIDToName[v.CallID] = v.Name
+				if v.ToolCallID != "" {
+					callIDToName[v.ToolCallID] = v.Name
 				}
 				parts = append(parts, &genai.Part{
 					FunctionCall: &genai.FunctionCall{
-						ID:   v.CallID,
+						ID:   v.ToolCallID,
 						Name: v.Name,
 						Args: v.Arguments,
 					},
@@ -241,14 +241,14 @@ func (c *GeminiClient) buildContents(messages []ChatMessage) []*genai.Content {
 					resultData = map[string]interface{}{"result": v.Result}
 				}
 
-				name := callIDToName[v.CallID]
+				name := callIDToName[v.ToolCallID]
 				// If name is missing, we can try to proceed with empty name or handle error,
 				// but Gemini usually requires it.
 
 				parts = append(parts, &genai.Part{
 					FunctionResponse: &genai.FunctionResponse{
 						Name:     name,
-						ID:       v.CallID,
+						ID:       v.ToolCallID,
 						Response: resultData,
 					},
 				})

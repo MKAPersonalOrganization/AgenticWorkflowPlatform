@@ -35,7 +35,7 @@ func TestEngine_ElicitationFlow(t *testing.T) {
 					Contents: []llm.AIContent{
 						llm.TextContent{Text: "I need input. "},
 						llm.FunctionCallContent{
-							CallID:       "call_1",
+							ToolCallID:   "call_1",
 							Name:         "quiz_yes_no",
 							RawArguments: `{"question": "Is the sky blue?"}`,
 						},
@@ -108,7 +108,7 @@ func TestEngine_ElicitationFlow(t *testing.T) {
 	if asstMsg.Role != "assistant" {
 		t.Errorf("Expected assistant message, got %s", asstMsg.Role)
 	}
-	if len(asstMsg.ToolCalls) == 0 || asstMsg.ToolCalls[0].Function.Name != middleware.ToolNameTrueFalse {
+	if len(asstMsg.ToolCalls) == 0 || asstMsg.ToolCalls[0].Name != middleware.ToolNameTrueFalse {
 		t.Errorf("Expected %s tool call", middleware.ToolNameTrueFalse)
 	}
 
@@ -152,6 +152,7 @@ func TestEngine_ElicitationFlow(t *testing.T) {
 		t.Errorf("Unexpected final message: %+v", finalMsg)
 	}
 }
+
 func TestEngine_ElicitationRobustness(t *testing.T) {
 	t.Parallel()
 	// Setup
@@ -171,7 +172,7 @@ func TestEngine_ElicitationRobustness(t *testing.T) {
 				{
 					Contents: []llm.AIContent{
 						llm.FunctionCallContent{
-							CallID:       "call_1",
+							ToolCallID:   "call_1",
 							Name:         "quiz_yes_no",
 							RawArguments: `{"statement": "Is 2+2=4?"}`, // Using "statement" alias
 						},
@@ -244,7 +245,7 @@ func TestEngine_ElicitationOptionsRobustness(t *testing.T) {
 				{
 					Contents: []llm.AIContent{
 						llm.FunctionCallContent{
-							CallID:       "call_1",
+							ToolCallID:   "call_1",
 							Name:         "quiz_multiple_choice",
 							RawArguments: `{"question": "What is 2+3?", "options": "4, 5, 6"}`, // String options
 						},

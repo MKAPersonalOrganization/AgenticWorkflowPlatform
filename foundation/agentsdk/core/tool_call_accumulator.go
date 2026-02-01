@@ -52,19 +52,19 @@ func (a *ToolCallAccumulator) ProcessUpdate(update llm.ChatResponseUpdate) ([]To
 		// and increment for subsequent ones if they are part of the same chunk.
 		currentIndex := index + i
 
-		// Check if this is a new tool call (has CallID and Name)
-		if fc.CallID != "" && fc.Name != "" {
+		// Check if this is a new tool call (has ToolCallID and Name)
+		if fc.ToolCallID != "" && fc.Name != "" {
 			state := &toolCallState{
-				ID:        fc.CallID,
+				ID:        fc.ToolCallID,
 				Index:     currentIndex,
 				Name:      fc.Name,
 				Arguments: fc.RawArguments,
 			}
-			a.byID[fc.CallID] = state
+			a.byID[fc.ToolCallID] = state
 			a.byIndex[currentIndex] = state
 
 			updates = append(updates, ToolCallUpdate{
-				ID:        fc.CallID,
+				ID:        fc.ToolCallID,
 				Name:      fc.Name,
 				IsNew:     true,
 				ArgsDelta: fc.RawArguments,
@@ -101,12 +101,10 @@ func (a *ToolCallAccumulator) GetAll() []ToolCall {
 	result := make([]ToolCall, 0, len(a.byID))
 	for _, state := range a.byID {
 		result = append(result, ToolCall{
-			ID:   state.ID,
-			Type: "function",
-			Function: ToolFunction{
-				Name:      state.Name,
-				Arguments: state.Arguments,
-			},
+			ID:        state.ID,
+			Type:      "function",
+			Name:      state.Name,
+			Arguments: state.Arguments,
 		})
 	}
 

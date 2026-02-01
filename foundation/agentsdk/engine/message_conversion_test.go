@@ -26,11 +26,9 @@ func TestMapFromCoreToLLMMessages(t *testing.T) {
 		Role: "assistant",
 		ToolCalls: []core.ToolCall{
 			{
-				ID: "call_123",
-				Function: core.ToolFunction{
-					Name:      "add",
-					Arguments: `{"a":2,"b":2}`,
-				},
+				ID:        "call_123",
+				Name:      "add",
+				Arguments: `{"a":2,"b":2}`,
 			},
 		},
 	}
@@ -58,7 +56,7 @@ func TestMapFromCoreToLLMMessages(t *testing.T) {
 			Role: llm.ChatRoleAssistant,
 			Contents: []llm.AIContent{
 				llm.FunctionCallContent{
-					CallID:       "call_123",
+					ToolCallID:   "call_123",
 					Name:         "add",
 					RawArguments: `{"a":2,"b":2}`,
 				},
@@ -68,8 +66,8 @@ func TestMapFromCoreToLLMMessages(t *testing.T) {
 			Role: llm.ChatRoleTool,
 			Contents: []llm.AIContent{
 				llm.FunctionResultContent{
-					CallID: "call_123",
-					Result: `{"result":4}`,
+					ToolCallID: "call_123",
+					Result:     `{"result":4}`,
 				},
 			},
 		},
@@ -106,14 +104,15 @@ func TestMapFromCoreToLLMMessages(t *testing.T) {
 		}
 	}
 }
+
 func TestMapFromCoreToLLMMessages_Grouping(t *testing.T) {
 	t.Parallel()
 	// Setup test data with multiple tool results
 	toolCallMsg := core.Message{
 		Role: "assistant",
 		ToolCalls: []core.ToolCall{
-			{ID: "call_1", Function: core.ToolFunction{Name: "add", Arguments: `{"a":1,"b":1}`}},
-			{ID: "call_2", Function: core.ToolFunction{Name: "add", Arguments: `{"a":2,"b":2}`}},
+			{ID: "call_1", Name: "add", Arguments: `{"a":1,"b":1}`},
+			{ID: "call_2", Name: "add", Arguments: `{"a":2,"b":2}`},
 		},
 	}
 

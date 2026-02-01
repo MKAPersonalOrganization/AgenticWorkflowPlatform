@@ -92,7 +92,7 @@ func convertToLLMMessage(msg *agent.Message) llm.ChatMessage {
 		case agent.ContentTypeToolCall:
 			if c.ToolCall != nil {
 				contents = append(contents, llm.FunctionCallContent{
-					CallID:       c.ToolCall.ID,
+					ToolCallID:   c.ToolCall.ID,
 					Name:         c.ToolCall.Name,
 					RawArguments: c.ToolCall.Arguments,
 				})
@@ -100,9 +100,9 @@ func convertToLLMMessage(msg *agent.Message) llm.ChatMessage {
 		case agent.ContentTypeToolResult:
 			if c.ToolResult != nil {
 				contents = append(contents, llm.FunctionResultContent{
-					CallID: c.ToolResult.ToolCallID,
-					Result: c.ToolResult.Output,
-					Error:  c.ToolResult.Error,
+					ToolCallID: c.ToolResult.ToolCallID,
+					Result:     c.ToolResult.Output,
+					Error:      c.ToolResult.Error,
 				})
 			}
 		}
@@ -135,7 +135,7 @@ func convertToGenerateResponse(update llm.ChatResponseUpdate) *agent.GenerateRes
 				resp.Content = append(resp.Content, agent.Content{
 					Type: agent.ContentTypeToolCall,
 					ToolCall: &agent.ToolCall{
-						ID:        fnCall.CallID,
+						ID:        fnCall.ToolCallID,
 						Name:      fnCall.Name,
 						Arguments: fnCall.ArgumentsJSON(),
 					},
