@@ -24,6 +24,7 @@ func (e ThreadCreated) AggregateID() string       { return e.ThreadID }
 // UserMessageAdded is emitted when a user message is added to the thread.
 type UserMessageAdded struct {
 	ThreadID  string    `json:"threadId"`
+	UserID    string    `json:"userId,omitempty"`
 	MessageID string    `json:"messageId"`
 	Content   string    `json:"content"`
 	Timestamp time.Time `json:"timestamp"`
@@ -52,6 +53,7 @@ type ToolResultAdded struct {
 	ThreadID   string    `json:"threadId"`
 	MessageID  string    `json:"messageId"`
 	ToolCallID string    `json:"toolCallId"`
+	ToolName   string    `json:"toolName,omitempty"`
 	Result     string    `json:"result"`
 	AgentName  string    `json:"agentName,omitempty"`
 	Timestamp  time.Time `json:"timestamp"`

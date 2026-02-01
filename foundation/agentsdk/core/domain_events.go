@@ -27,6 +27,7 @@ type Message struct {
 	Timestamp  time.Time      `json:"timestamp"`
 	ToolCalls  []ToolCall     `json:"toolCalls,omitempty"`  // For assistant messages with tool calls
 	ToolCallID string         `json:"toolCallId,omitempty"` // For tool result messages
+	ToolName   string         `json:"toolName,omitempty"`   // Name of the tool for result messages
 	IsError    bool           `json:"isError,omitempty"`    // For tool result messages
 	Error      string         `json:"error,omitempty"`      // For tool result messages
 	AgentName  string         `json:"agentName,omitempty"`  // Name of the agent that created this message

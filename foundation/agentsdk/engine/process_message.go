@@ -2,58 +2,19 @@ package engine
 
 import (
 	"context"
-	"errors"
-	"fmt"
 
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 )
 
 // ProcessUserMessage handles a new user message submission.
-// The engine state machine handles message persistence and event emission.
-func (e *Engine) ProcessUserMessage(ctx context.Context, agentName, threadID, content, userID string) error {
-	runID := domain.GenerateMessageID()
-
-	// Load thread for history (may not exist yet for new threads)
-	agg, err := e.threadMgmt.Load(ctx, threadID)
-	if err != nil && !errors.Is(err, domain.ErrThreadNotFound) {
-		return fmt.Errorf("failed to load thread: %w", err)
-	}
-
-	// Get conversation history (empty for new threads)
-	var thread core.AgentThread
-	var messages []core.Message
-
-	if agg != nil {
-		thread = e.threadMgmt.ToAgentThread(agg)
-		messages, err = thread.RetrieveFullConversationHistory(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to retrieve conversation history: %w", err)
-		}
-	} else {
-		// New thread - empty history
-		thread = core.NewInMemoryThreadWithID(threadID)
-		messages = []core.Message{}
-	}
-
+func (e *Engine) ProcessUserMessage(ctx context.Context, agentName string, runCtx core.RunContext) error {
 	// Determine target agent (sticky session)
-	targetAgent := e.determineTargetAgent(ctx, messages, agentName)
+	targetAgent := e.determineTargetAgent(ctx, runCtx.InitialHistory, agentName)
 
 	// Inject User into context for tools that need it
-	if userID != "" {
-		ctx = context.WithValue(ctx, domain.UserContextKey, &domain.User{ID: userID})
-	}
-
-	// Prepare RunContext with user message
-	// The engine state machine will persist the message
-	runCtx := core.RunContext{
-		ThreadID:       threadID,
-		MessageID:      runID,
-		Thread:         thread,
-		InitialHistory: messages,
-		Options:        core.DefaultRunOptions(),
-		UserContent:    content,
-		UserID:         userID,
+	if runCtx.UserID != "" {
+		ctx = context.WithValue(ctx, domain.UserContextKey, &domain.User{ID: runCtx.UserID})
 	}
 
 	return e.executeRun(ctx, targetAgent, runCtx)

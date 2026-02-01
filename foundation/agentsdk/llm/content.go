@@ -56,6 +56,9 @@ type FunctionResultContent struct {
 	// ToolCallID references the FunctionCallContent.ToolCallID that this is a result for.
 	ToolCallID string `json:"toolCallId"`
 
+	// Name is the name of the function to call.
+	Name string `json:"name,omitempty"`
+
 	// Result contains the function result, typically as a JSON string.
 	Result string `json:"result"`
 

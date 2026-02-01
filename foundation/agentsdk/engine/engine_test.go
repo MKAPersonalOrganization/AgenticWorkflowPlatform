@@ -7,12 +7,12 @@ import (
 	"iter"
 	"sync"
 	"testing"
+	"time"
 
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/llm"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/services/threadmgmt"
 )
 
 // MockChatClient implements types.ChatClient for testing
@@ -151,23 +151,34 @@ func TestEngine_Run(t *testing.T) {
 	log := logger.New(io.Discard, logger.LevelInfo, "test", nil)
 	eventStore := NewMockEventStore()
 	repo := domain.NewThreadRepository(eventStore)
-	tm := threadmgmt.New(log, repo) // No name
-
 	// Create a thread
 	ctx := context.Background()
 	threadID := "thread-1"
-	_, _, err := tm.CreateThread(ctx, threadID, "Test Thread")
+	// Create thread directly in store
+	event := &domain.ThreadCreated{
+		ThreadID:  threadID,
+		UserID:    "system",
+		Title:     "Test Thread",
+		Timestamp: time.Now(),
+	}
+	_, err := eventStore.AppendWithVersion(ctx, domain.StreamName("Thread", threadID), -2, event)
 	if err != nil {
 		t.Fatalf("Failed to create thread: %v", err)
 	}
 
 	// Add user message via manager so event store is populated
-	_, _, err = tm.AddUserMessage(ctx, threadID, "msg-1", "Hello", "test-user")
+	userMsg := &domain.UserMessageAdded{
+		ThreadID:  threadID,
+		MessageID: "msg-1",
+		Content:   "Calculate 2+2",
+		Timestamp: time.Now(),
+	}
+	_, err = eventStore.AppendWithVersion(ctx, domain.StreamName("Thread", threadID), 1, userMsg)
 	if err != nil {
 		t.Fatalf("Failed to add user message: %v", err)
 	}
 
-	mockChatClient := &MockChatClient{
+	chatClient := &MockChatClient{
 		streams: [][]llm.ChatResponseUpdate{
 			{
 				{
@@ -205,12 +216,10 @@ func TestEngine_Run(t *testing.T) {
 
 	eng := New(
 		log,
-		mockChatClient,
-		tm,
+		chatClient,
 		provider,
 		nil,
-		nil, // toolTracer
-		nil, // emitter
+		nil,
 	)
 
 	// Load the thread aggregate to create agent thread
@@ -218,7 +227,16 @@ func TestEngine_Run(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to load thread: %v", err)
 	}
-	agentThread := tm.ToAgentThread(threadAgg)
+	agentThread := core.NewInMemoryThreadWithID(threadAgg.ID)
+	var messages []core.Message
+	for _, dm := range threadAgg.Messages {
+		messages = append(messages, core.Message{
+			ID:      dm.ID,
+			Role:    dm.Role,
+			Content: dm.Content,
+		})
+	}
+	_ = agentThread.AddMessages(messages)
 
 	runCtx := core.RunContext{
 		ThreadID:  threadID,
@@ -268,17 +286,15 @@ func TestEngine_Run(t *testing.T) {
 		t.Error("Did not find AssistantCompletedEvent")
 	}
 
-	// Verify persistence of usage event
-	foundUsageInStore := false
-	streamName := domain.StreamName("Thread", threadID)
-	eventsInStore, _ := eventStore.ReadStream(ctx, streamName, 0)
-	for _, evt := range eventsInStore {
+	// Verify yielded events
+	foundUsage := false
+	for _, evt := range events {
 		switch evt.(type) {
 		case *domain.TokenUsageReported, domain.TokenUsageReported:
-			foundUsageInStore = true
+			foundUsage = true
 		}
 	}
-	if !foundUsageInStore {
-		t.Error("TokenUsageReported event not found in event store")
+	if !foundUsage {
+		t.Error("TokenUsageReported event not found in yielded events")
 	}
 }

@@ -10,7 +10,6 @@ import (
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/llm"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/services/threadmgmt"
 
 	"github.com/qmuntal/stateless"
 	"golang.org/x/sync/errgroup"
@@ -24,43 +23,31 @@ type AgentProvider interface {
 	GetConfig(ctx context.Context, name string) (core.AgentConfig, error)
 }
 
-// EventEmitter defines the interface for real-time event dispatching.
-// Events are domain events that implement the domain.Event interface.
-type EventEmitter interface {
-	Dispatch(ctx context.Context, event domain.Event) error
-}
-
 // Engine handles the core LLM iteration and streaming logic in a generic way.
 type Engine struct {
 	log           *logger.Logger
 	chatClient    ChatClient
 	provider      AgentProvider
-	threadMgmt    *threadmgmt.Manager
 	reqCtxCapture **core.RequestContext // optional capture for testing
 	toolTracer    core.ToolTracer
 	toolExec      *ToolExecutionService
-	emitter       EventEmitter
 }
 
 // New creates a new generic execution engine.
 func New(
 	log *logger.Logger,
 	chatClient ChatClient,
-	threadMgmt *threadmgmt.Manager,
 	provider AgentProvider,
 	reqCtxCapture **core.RequestContext,
 	toolTracer core.ToolTracer,
-	emitter EventEmitter,
 ) *Engine {
 	return &Engine{
 		log:           log,
 		chatClient:    chatClient,
 		provider:      provider,
-		threadMgmt:    threadMgmt,
 		reqCtxCapture: reqCtxCapture,
 		toolTracer:    toolTracer,
 		toolExec:      NewToolExecutionService(toolTracer),
-		emitter:       emitter,
 	}
 }
 
@@ -70,10 +57,9 @@ func (e *Engine) GetGraph() string {
 	exec := &executionState{
 		engine: e,
 		// We don't need real dependencies for graph generation
-		safety:      &SafetyUnit{},
-		observer:    &ObserverUnit{},
-		persistence: &PersistenceUnit{},
-		tools:       &ToolProcessor{},
+		safety:   &SafetyUnit{},
+		observer: &ObserverUnit{},
+		tools:    &ToolProcessor{},
 	}
 
 	// We can use any start state, setup will configure all of them
@@ -85,47 +71,70 @@ func (e *Engine) GetGraph() string {
 // Run processes the LLM response using an AgentThread and yields events.
 func (e *Engine) Run(ctx context.Context, agentName string, runCtx core.RunContext) iter.Seq2[core.Event, error] {
 	return func(yield func(core.Event, error) bool) {
-		exec, err := e.newExecutionState(ctx, agentName, runCtx, yield)
-		if err != nil {
-			yield(nil, err)
-			return
+		e.log.Info(ctx, "engine run started", "agent", agentName, "thread_id", runCtx.ThreadID)
+		type result struct {
+			evt core.Event
+			err error
 		}
+		ch := make(chan result, 100)
+		ctx, cancel := context.WithCancel(ctx)
 
-		// Initialize executor before state machine runs
-		// This ensures executor is available regardless of execution path
-		exec.prepareExecutor()
-
-		// Load persisted state or default to Idle
-		startState := StateAwaitingExecution
-		if persistedStateStr, err := e.threadMgmt.GetEngineState(ctx, runCtx.ThreadID); err == nil && persistedStateStr != "" {
-			startState = parseState(persistedStateStr)
-			// Reset terminal state to idle for new execution
-			if startState == StateCompleted {
-				startState = StateAwaitingExecution
+		wrappedYield := func(evt core.Event, err error) bool {
+			select {
+			case ch <- result{evt: evt, err: err}:
+				return true
+			case <-ctx.Done():
+				return false
 			}
 		}
 
-		if err := exec.setup(startState); err != nil {
-			yield(nil, err)
-			return
-		}
+		go func() {
+			defer close(ch)
+			defer cancel()
+			defer e.log.Info(ctx, "engine background goroutine finished")
 
-		// Handle user message submission before state machine runs
-		// This persists the message and emits RunStarted event
-		if err := exec.handleUserMessageSubmission(); err != nil {
-			yield(nil, fmt.Errorf("failed to handle user message: %w", err))
-			return
-		}
+			exec, err := e.newExecutionState(ctx, agentName, runCtx, wrappedYield)
+			if err != nil {
+				wrappedYield(nil, err)
+				return
+			}
 
-		if err := exec.run(); err != nil {
-			exec.handleExecutionError(ctx, err)
-			yield(nil, err)
-			return
-		}
+			// Initialize executor before state machine runs
+			exec.prepareExecutor()
 
-		// Finalize and yield internal completion event with termination reason
-		exec.finalizeResult()
-		yield(runCompletedEvent{Reason: exec.observer.result.Reason}, nil)
+			// Start with AwaitingExecution
+			if err := exec.setup(StateAwaitingExecution); err != nil {
+				wrappedYield(nil, err)
+				return
+			}
+
+			// Handle user message submission before state machine runs
+			if err := exec.handleUserMessageSubmission(); err != nil {
+				wrappedYield(nil, fmt.Errorf("failed to handle user message: %w", err))
+				return
+			}
+
+			if err := exec.run(); err != nil {
+				if err != errStopIteration {
+					exec.handleExecutionError(ctx, err)
+					wrappedYield(nil, err)
+				}
+				return
+			}
+
+			// Finalize and yield internal completion event with termination reason
+			exec.finalizeResult()
+			wrappedYield(runCompletedEvent{Reason: exec.observer.result.Reason}, nil)
+		}()
+
+		for res := range ch {
+			if !yield(res.evt, res.err) {
+				e.log.Info(ctx, "engine run stop requested by consumer")
+				cancel()
+				return
+			}
+		}
+		e.log.Info(ctx, "engine run completed normal exit", "thread_id", runCtx.ThreadID)
 	}
 }
 
@@ -198,7 +207,7 @@ func (e *Engine) newExecutionState(ctx context.Context, agentName string, runCtx
 		userContent: runCtx.UserContent,
 		userID:      runCtx.UserID,
 		observer: &ObserverUnit{
-			yield:     e.wrapYield(ctx, &PersistenceUnit{mgmt: e.threadMgmt}, yield),
+			yield:     yield,
 			startTime: timeNowNano(),
 			threadID:  runCtx.ThreadID,
 			events:    instance.Events,
@@ -212,9 +221,6 @@ func (e *Engine) newExecutionState(ctx context.Context, agentName string, runCtx
 			maxTotal:     DefaultMaxTotalIterations,
 			loopDetector: NewLoopDetector(DefaultLoopDetectorConfig()),
 			maxAgent:     instance.Config.MaxIterations,
-		},
-		persistence: &PersistenceUnit{
-			mgmt: e.threadMgmt,
 		},
 		tools: &ToolProcessor{},
 	}
@@ -248,73 +254,10 @@ func (s *executionState) prepareExecutor() {
 	)
 }
 
-// wrapYield creates a yield function that automatically handles persistence and emission.
-func (e *Engine) wrapYield(ctx context.Context, p *PersistenceUnit, yield func(core.Event, error) bool) func(core.Event, error) bool {
-	return func(evt core.Event, err error) bool {
-		if err != nil || evt == nil {
-			return yield(evt, err)
-		}
+var errStopIteration = fmt.Errorf("stop iteration")
 
-		if err := e.emit(ctx, evt, p); err != nil {
-			e.log.Error(ctx, "failed to emit event", "error", err, "type", evt.EventType())
-		}
-
-		return yield(evt, err)
-	}
-}
-
-// emit handles the dual path of event delivery:
-// 1. Persistent events are saved to the EventStore (and then broadcast by the projection system).
-// 2. Transient events are dispatched directly to the EventRouter for real-time streaming.
-func (e *Engine) emit(ctx context.Context, evt core.Event, p *PersistenceUnit) error {
-	if evt == nil {
-		return nil
-	}
-
-	// 1. Handle special persistence cases (Token Usage, Tool Events, Engine State)
-	// These are events produced by the Engine that must be durable.
-	persistent := false
-	switch e := evt.(type) {
-	case *domain.TokenUsageReported:
-		if p != nil {
-			if _, err := p.ReportTokenUsage(ctx, *e); err != nil {
-				return err
-			}
-		}
-		persistent = true
-	case domain.EngineStateChanged:
-		if p != nil {
-			if _, err := p.RecordEngineState(ctx, e); err != nil {
-				return err
-			}
-		}
-		persistent = true
-	case *domain.ToolStart,
-		*domain.ToolSuccess,
-		*domain.ToolError,
-		*domain.ToolNeedsInput,
-		*domain.ToolNeedsAuth,
-		*domain.InputProvided,
-		*domain.AuthGranted,
-		*domain.AuthDenied,
-		*domain.ToolCancelled:
-		if p != nil {
-			if _, err := p.ReportToolEvent(ctx, evt); err != nil {
-				return err
-			}
-		}
-		persistent = true
-	case *domain.UserMessageAdded, *domain.AssistantMessageAdded, *domain.ToolResultAdded, *domain.ThreadCreated, *domain.ThreadTitleUpdated:
-		// These are already persisted by the thread management calls.
-		// We treat them as persistent so we don't dispatch them directly (avoiding duplicates).
-		persistent = true
-	}
-
-	// 2. Dispatch transient events directly to the emitter for real-time UI updates
-	if !persistent && e.emitter != nil {
-		return e.emitter.Dispatch(ctx, evt)
-	}
-
+// emit is deprecated, logic moved to wrapYield or handled by caller.
+func (e *Engine) emit(ctx context.Context, evt core.Event) error {
 	return nil
 }
 
@@ -349,10 +292,9 @@ type executionState struct {
 	agent *AgentInstance
 
 	// Cohesive Units
-	safety      *SafetyUnit
-	observer    *ObserverUnit
-	persistence *PersistenceUnit
-	tools       *ToolProcessor
+	safety   *SafetyUnit
+	observer *ObserverUnit
+	tools    *ToolProcessor
 
 	// Current Turn State
 	sm           *stateless.StateMachine
@@ -422,10 +364,9 @@ func (s *executionState) executeRequiredActions() error {
 		MessageID:         s.messageID,
 		StreamResult:      s.streamResult,
 		Safety:            s.safety,
-		Observer:          s.observer,
-		Persistence:       s.persistence,
 		AgentName:         s.agent.Name,
 		ToolStateMachines: s.toolStateMachines,
+		Yield:             s.observer.yield,
 	}
 	resolution, agg, err := s.tools.ProcessActions(tctx)
 	if err != nil {
@@ -479,9 +420,8 @@ func (s *executionState) checkToolWaitingStates() (bool, bool, error) {
 	return hasInput, hasAuth, nil
 }
 
-func (s *executionState) refreshState(agg *domain.ThreadAggregate) {
-	s.thread = s.engine.threadMgmt.ToAgentThread(agg)
-	s.history = s.engine.threadMgmt.ToCoreMessages(agg)
+func (s *executionState) refreshState(history []core.Message) {
+	s.history = history
 }
 
 // nextStep determines the appropriate state transition based on current context.
@@ -611,58 +551,13 @@ func (e *Engine) newAgentInstance(ctx context.Context, name string) (*AgentInsta
 	return &AgentInstance{
 		Name:   config.Name,
 		Config: config,
-		LLM:    NewLLMContextManager(config, e.threadMgmt, e.reqCtxCapture),
+		LLM:    NewLLMContextManager(config, e.reqCtxCapture),
 		Events: events,
 		Stream: NewStreamProcessor(events),
 	}, nil
 }
 
-// PersistenceUnit ensures atomic updates between the database and in-memory state.
-type PersistenceUnit struct {
-	mgmt *threadmgmt.Manager
-}
-
-func (p *PersistenceUnit) AddAssistantMessage(
-	ctx context.Context,
-	threadID, messageID string,
-	content string,
-	toolCalls []domain.ToolCall,
-	agentName string,
-) (*domain.ThreadAggregate, *domain.AssistantMessageAdded, error) {
-	return p.mgmt.AddAssistantMessage(ctx, threadID, messageID, content, toolCalls, agentName)
-}
-
-func (p *PersistenceUnit) AddToolResultMessage(
-	ctx context.Context,
-	threadID string,
-	toolCallID string,
-	result string,
-	agentName string,
-) (*domain.ThreadAggregate, *domain.ToolResultAdded, error) {
-	toolResultID := core.GenerateID()
-	return p.mgmt.AddToolResultMessage(ctx, threadID, toolResultID, toolCallID, result, agentName)
-}
-
-func (p *PersistenceUnit) ReportTokenUsage(
-	ctx context.Context,
-	event domain.TokenUsageReported,
-) (*domain.ThreadAggregate, error) {
-	return p.mgmt.AddTokenUsage(ctx, event)
-}
-
-func (p *PersistenceUnit) ReportToolEvent(
-	ctx context.Context,
-	event core.Event,
-) (*domain.ThreadAggregate, error) {
-	return p.mgmt.RecordToolEvent(ctx, event.AggregateID(), event)
-}
-
-func (p *PersistenceUnit) RecordEngineState(
-	ctx context.Context,
-	event domain.EngineStateChanged,
-) (*domain.ThreadAggregate, error) {
-	return p.mgmt.RecordEngineStateChange(ctx, event)
-}
+// PersistenceUnit is deprecated.
 
 // ToolProcessor handles the execution of tools and determination of next steps.
 type ToolProcessor struct{}
@@ -674,15 +569,14 @@ type ToolProcessorContext struct {
 	MessageID         string
 	StreamResult      *StreamResult
 	Safety            *SafetyUnit
-	Observer          *ObserverUnit
-	Persistence       *PersistenceUnit
 	AgentName         string
 	ToolStateMachines map[string]*domain.ToolStateMachine
+	Yield             func(core.Event, error) bool
 }
 
-func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolver, *domain.ThreadAggregate, error) {
+func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolver, []core.Message, error) {
 	var route RouteResolver
-	var latestAgg *domain.ThreadAggregate
+	var newMessages []core.Message
 
 	// 1. Parallel execution using errgroup
 	g, _ := errgroup.WithContext(tctx.Ctx)
@@ -702,12 +596,6 @@ func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolve
 
 	// 2. Sequential processing of results to maintain order and thread-safety
 	for _, tc := range tctx.StreamResult.ToolCalls {
-		tctx.Observer.toolNames = append(tctx.Observer.toolNames, tc.Name)
-
-		if info := tctx.Safety.RecordToolCall(tc); info != nil {
-			return nil, nil, tctx.Observer.FailWithLoop(info)
-		}
-
 		tsm := tctx.ToolStateMachines[tc.ID]
 		result := tsm.Result()
 		if tsm.IsAwaitingInteraction() {
@@ -719,20 +607,35 @@ func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolve
 		}
 
 		if info := tctx.Safety.RecordToolResult(result.ToolName, result.Result, result.IsError); info != nil {
-			return nil, nil, tctx.Observer.FailWithLoop(info)
+			// FailWithLoop requires ObserverUnit, but we can return error directly
+			return nil, nil, fmt.Errorf("loop detected: %s", info.Description)
 		}
 
-		agg, _, err := tctx.Persistence.AddToolResultMessage(
-			tctx.Ctx,
-			tctx.ThreadID,
-			tc.ID,
-			result.Result,
-			tctx.AgentName,
-		)
-		if err != nil {
-			return nil, nil, err
+		// Yield ToolResultAdded event (durable)
+		toolResultEvent := &domain.ToolResultAdded{
+			ThreadID:   tctx.ThreadID,
+			MessageID:  core.GenerateID(),
+			ToolCallID: tc.ID,
+			ToolName:   tc.Name,
+			Result:     result.Result,
+			AgentName:  tctx.AgentName,
+			Timestamp:  time.Now(),
 		}
-		latestAgg = agg
+		if !tctx.Yield(toolResultEvent, nil) {
+			return nil, nil, errStopIteration
+		}
+
+		// Create message for internal history
+		newMessages = append(newMessages, core.Message{
+			ID:         toolResultEvent.MessageID,
+			Role:       "tool",
+			Content:    result.Result,
+			ToolCallID: tc.ID,
+			ToolName:   tc.Name,
+			IsError:    result.IsError,
+			AgentName:  tctx.AgentName,
+			Timestamp:  toolResultEvent.Timestamp,
+		})
 
 		if res := result.Command; res != nil {
 			if res.StopIteration {
@@ -741,7 +644,7 @@ func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolve
 		}
 	}
 
-	return &route, latestAgg, nil
+	return &route, newMessages, nil
 }
 
 // RouteResolver determines the next state based on tool results.
@@ -755,11 +658,19 @@ func (r *RouteResolver) HasAction() bool {
 
 func (s *executionState) prepareContextForLLM() (*PrepareResult, error) {
 	runCtx := core.RunContext{
-		ThreadID:  s.threadID,
-		MessageID: s.messageID,
-		Thread:    s.thread,
-		Options:   s.options,
+		ThreadID:       s.threadID,
+		UserID:         s.userID,
+		MessageID:      s.messageID,
+		Thread:         s.thread,
+		InitialHistory: s.history,
+		Options:        s.options,
 	}
+
+	s.engine.log.Debug(s.ctx, "preparing LLM context", "historyCount", len(s.history))
+	for i, msg := range s.history {
+		s.engine.log.Debug(s.ctx, "history message", "index", i, "role", msg.Role, "contentLength", len(msg.Content), "toolCallsCount", len(msg.ToolCalls), "toolCallID", msg.ToolCallID, "toolName", msg.ToolName)
+	}
+
 	return s.agent.LLM.Prepare(s.ctx, runCtx, s.history)
 }
 
@@ -774,8 +685,7 @@ func (s *executionState) initAgentComponents(name string) error {
 	return nil
 }
 
-// handleUserMessageSubmission persists the user message when starting a new run.
-// This ensures all domain events (MessageAdded, RunStarted) flow through the engine state machine.
+// handleUserMessageSubmission yields a UserMessageAdded event.
 func (s *executionState) handleUserMessageSubmission() error {
 	// Only process if this is a new user message submission
 	if s.userContent == "" {
@@ -783,30 +693,31 @@ func (s *executionState) handleUserMessageSubmission() error {
 	}
 
 	// Generate unique message ID for the user message
-	userMessageID := domain.GenerateMessageID()
+	userMessageID := core.GenerateID()
 
-	// Persist the user message to the event store
-	// This emits MessageAdded event which will be broadcast via projection system
-	agg, _, err := s.engine.threadMgmt.AddUserMessage(s.ctx, s.threadID, userMessageID, s.userContent, s.userID)
-	if err != nil {
-		return fmt.Errorf("failed to persist user message: %w", err)
+	// Yield UserMessageAdded event (durable)
+	userMsgEvent := &domain.UserMessageAdded{
+		ThreadID:  s.threadID,
+		UserID:    s.userID,
+		MessageID: userMessageID,
+		Content:   s.userContent,
+		Timestamp: time.Now(),
+	}
+	if !s.observer.yield(userMsgEvent, nil) {
+		return errStopIteration
 	}
 
-	// Update internal thread and history state with the new aggregate
-	// This ensures the LLM sees the user message in the conversation history
-	s.refreshState(agg)
+	// Update internal history
+	s.history = append(s.history, core.Message{
+		ID:        userMessageID,
+		Role:      "user",
+		Content:   s.userContent,
+		Timestamp: userMsgEvent.Timestamp,
+	})
 
-	// Emit RunStarted event (transient, real-time notification)
-	s.observer.yield(s.observer.events.RunStarted(s.threadID, s.messageID), nil)
-
-	// Handle thread title generation for first message
-	// Check aggregate message count (now includes the just-added user message)
-	if len(agg.Messages) == 1 {
-		title := GenerateThreadTitle(s.userContent)
-		_, err = s.engine.threadMgmt.UpdateThreadTitle(s.ctx, s.threadID, title)
-		if err != nil {
-			s.engine.log.Error(s.ctx, "failed to update thread title", "error", err)
-		}
+	// Emit RunStarted event (transient)
+	if !s.observer.yield(s.observer.events.RunStarted(s.threadID, s.messageID), nil) {
+		return errStopIteration
 	}
 
 	return nil
@@ -897,7 +808,9 @@ func (s *executionState) setup(initialState state) error {
 			// Emit ActionsDetected event when entering this state
 			if s.streamResult != nil && s.streamResult.HasToolCalls() {
 				toolCalls := toDomainToolCalls(s.streamResult.ToolCalls)
-				s.observer.yield(s.agent.Events.ActionsDetected(s.threadID, s.messageID, toolCalls), nil)
+				if !s.observer.yield(s.agent.Events.ActionsDetected(s.threadID, s.messageID, toolCalls), nil) {
+					return errStopIteration
+				}
 			}
 			return nil
 		}).
@@ -936,8 +849,12 @@ func (s *executionState) setup(initialState state) error {
 			// Emit events based on completion reason (metadata)
 			if s.completionReason.IsSuccess() {
 				// Successful completion: emit turn finished and run finished
-				s.observer.yield(s.agent.Events.TurnFinished(s.threadID, s.messageID), nil)
-				s.observer.yield(s.observer.events.RunFinished(s.threadID, s.messageID), nil)
+				if !s.observer.yield(s.agent.Events.TurnFinished(s.threadID, s.messageID), nil) {
+					return errStopIteration
+				}
+				if !s.observer.yield(s.observer.events.RunFinished(s.threadID, s.messageID), nil) {
+					return errStopIteration
+				}
 			} else {
 				// Error termination: emit run error with context
 				msg := "Unknown error"
@@ -951,7 +868,9 @@ func (s *executionState) setup(initialState state) error {
 					"completion_reason", s.completionReason.String(),
 					"error", msg,
 				)
-				s.observer.yield(s.observer.events.RunError(s.threadID, msg, "RUN_ERROR"), nil)
+				if !s.observer.yield(s.observer.events.RunError(s.threadID, msg, "RUN_ERROR"), nil) {
+					return errStopIteration
+				}
 			}
 			return nil
 		}).
@@ -1030,27 +949,42 @@ func (s *executionState) validateAgentOutput() error {
 
 func (s *executionState) saveAgentMessageAndEmitEvents() error {
 	toolCalls := toDomainToolCalls(s.streamResult.ToolCalls)
-	agg, _, err := s.persistence.AddAssistantMessage(
-		s.ctx,
-		s.threadID,
-		s.messageID,
-		s.streamResult.Content,
-		toolCalls,
-		s.agent.Name,
-	)
-	if err != nil {
-		return err
+
+	// Yield AssistantMessageAdded event (durable)
+	assistantMsgEvent := &domain.AssistantMessageAdded{
+		ThreadID:  s.threadID,
+		MessageID: s.messageID,
+		Content:   s.streamResult.Content,
+		ToolCalls: toolCalls,
+		AgentName: s.agent.Name,
+		Timestamp: time.Now(),
 	}
-	s.refreshState(agg)
+	if !s.observer.yield(assistantMsgEvent, nil) {
+		return errStopIteration
+	}
+
+	// Update internal history
+	s.history = append(s.history, core.Message{
+		ID:        s.messageID,
+		Role:      "assistant",
+		Content:   s.streamResult.Content,
+		ToolCalls: s.streamResult.ToolCalls,
+		AgentName: s.agent.Name,
+		Timestamp: assistantMsgEvent.Timestamp,
+	})
+
 	return nil
 }
 
 func (s *executionState) trackStateChange(newState state) {
-	s.observer.yield(domain.EngineStateChanged{
+	if !s.observer.yield(domain.EngineStateChanged{
 		ThreadID:  s.threadID,
 		NewState:  newState.String(),
 		Timestamp: time.Now(),
-	}, nil)
+	}, nil) {
+		// We can't return error from here easily if it's a callback,
+		// but trackStateChange is called from SM callback.
+	}
 }
 
 func parseState(str string) state {
@@ -1124,7 +1058,9 @@ func (e *ToolStateEventEmitter) OnToolStateChanged(
 			if result != nil {
 				evt.ToolArguments = result.Arguments
 			}
-			e.yield(evt, nil)
+			if !e.yield(evt, nil) {
+				return
+			}
 		}
 
 	case domain.ToolStateAwaitingInput:
@@ -1136,7 +1072,9 @@ func (e *ToolStateEventEmitter) OnToolStateChanged(
 				toolName,
 				elicitation,
 			)
-			e.yield(awaitEvt, nil)
+			if !e.yield(awaitEvt, nil) {
+				return
+			}
 		}
 
 	case domain.ToolStateAwaitingAuth:
@@ -1153,7 +1091,9 @@ func (e *ToolStateEventEmitter) OnToolStateChanged(
 				result.Result,
 				result.Arguments,
 			)
-			e.yield(evt, nil)
+			if !e.yield(evt, nil) {
+				return
+			}
 		}
 
 	case domain.ToolStateError:
@@ -1168,7 +1108,9 @@ func (e *ToolStateEventEmitter) OnToolStateChanged(
 					errorMsg,
 					result.Arguments,
 				)
-				e.yield(evt, nil)
+				if !e.yield(evt, nil) {
+					return
+				}
 			}
 		}
 	}

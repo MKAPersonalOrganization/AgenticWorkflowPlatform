@@ -11,25 +11,19 @@ import (
 	"school-with-ai/foundation/agentsdk/core/middleware"
 	"school-with-ai/foundation/agentsdk/llm"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/services/threadmgmt"
 )
 
 func TestEngine_ElicitationFlow(t *testing.T) {
 	t.Parallel()
 	// Setup
 	log := logger.New(io.Discard, logger.LevelInfo, "test", nil)
-	eventStore := NewMockEventStore()
-	repo := domain.NewThreadRepository(eventStore)
-	tm := threadmgmt.New(log, repo)
-
 	ctx := context.Background()
 	threadID := "thread-elicitation"
-	_, _, _ = tm.CreateThread(ctx, threadID, "Elicitation Thread")
 
 	// Mock Chat Client
 	mockClient := &MockChatClient{
 		streams: [][]llm.ChatResponseUpdate{
-			// Turn 1: Assistant calls quiz tool with domain-specific parameters
+			// Turn 1: Assistant calls quiz tool
 			{
 				{
 					Contents: []llm.AIContent{
@@ -58,7 +52,6 @@ func TestEngine_ElicitationFlow(t *testing.T) {
 	agentConfig := core.AgentConfig{
 		Name:          "test-elicitor",
 		MaxIterations: 5,
-		Handoffs:      []core.Handoff{},
 		Middleware: []core.Middleware{
 			middleware.NewElicitationMiddleware(),
 		},
@@ -70,102 +63,90 @@ func TestEngine_ElicitationFlow(t *testing.T) {
 		},
 	}
 
-	eng := New(
-		log,
-		mockClient,
-		tm,
-		provider,
-		nil,
-		nil,
-		nil,
-	)
-
+	eng := New(log, mockClient, provider, nil, nil)
 	userID := "user1"
 
 	// 1. Initial User Message
-	err := eng.ProcessUserMessage(ctx, "test-elicitor", threadID, "Hello", userID)
-	if err != nil {
-		t.Fatalf("ProcessUserMessage 1 failed: %v", err)
+	runCtx1 := core.RunContext{
+		ThreadID:       threadID,
+		MessageID:      core.GenerateID(),
+		Thread:         core.NewInMemoryThreadWithID(threadID),
+		InitialHistory: []core.Message{},
+		Options:        core.DefaultRunOptions(),
+		UserContent:    "Hello",
+		UserID:         userID,
 	}
 
-	// Verify events: Should see elicitation tool call
-	threadAgg, err := repo.Load(ctx, threadID)
-	if err != nil {
-		t.Fatalf("Failed to load thread: %v", err)
-	}
-	thread := tm.ToAgentThread(threadAgg)
-
-	// Verify conversation flow
-	msgs, _ := thread.RetrieveFullConversationHistory(ctx)
-
-	// Expect assistant message with tool call (second to last, as tool result is last)
-	// msgs[0]=User, msgs[1]=Assistant, msgs[2]=Tool
-	if len(msgs) < 3 {
-		t.Fatalf("Expected at least 3 messages, got %d", len(msgs))
+	var events1 []core.Event
+	for evt, err := range eng.Run(ctx, "test-elicitor", runCtx1) {
+		if err != nil {
+			t.Fatalf("Run 1 failed: %v", err)
+		}
+		events1 = append(events1, evt)
 	}
 
-	asstMsg := msgs[len(msgs)-2]
-	if asstMsg.Role != "assistant" {
-		t.Errorf("Expected assistant message, got %s", asstMsg.Role)
-	}
-	if len(asstMsg.ToolCalls) == 0 || asstMsg.ToolCalls[0].Name != middleware.ToolNameTrueFalse {
-		t.Errorf("Expected %s tool call", middleware.ToolNameTrueFalse)
-	}
-
-	// 2. User Response (Answering the elicitation)
-	// ProcessUserMessage should detect the pending elicitation and pair it
-	err = eng.ProcessUserMessage(ctx, "test-elicitor", threadID, "Blue", userID)
-	if err != nil {
-		t.Fatalf("ProcessUserMessage 2 failed: %v", err)
-	}
-
-	t.Log("--- Starting Run 2 ---")
-	// Events are now handled internally by Eng.ProcessUserMessage calling Eng.Run
-	t.Log("--- Finished Run 2 ---")
-
-	// Reload thread to get latest state
-	threadAgg, err = repo.Load(ctx, threadID)
-	if err != nil {
-		t.Fatalf("Failed to reload thread: %v", err)
-	}
-	thread = tm.ToAgentThread(threadAgg)
-
-	// Verify conversation flow
-	msgs, _ = thread.RetrieveFullConversationHistory(ctx)
-
-	// We expect:
-	// 1. User: Hello
-	// 2. Assistant: (elicit_user_input)
-	// 3. Tool: (Status update from elicit tool)
-	// 4. User: Blue (This acts as the tool result/answer)
-	// 5. Assistant: Thanks! I see you like blue.
-
-	if len(msgs) != 5 {
-		t.Errorf("Expected 5 messages, got %d", len(msgs))
-		for i, m := range msgs {
-			t.Logf("Msg %d: %s (%s)", i, m.Role, m.Content)
+	// Build history from events for next step
+	var history []core.Message
+	for _, evt := range events1 {
+		switch e := evt.(type) {
+		case *domain.UserMessageAdded:
+			history = append(history, core.Message{ID: e.MessageID, Role: "user", Content: e.Content})
+		case *domain.AssistantMessageAdded:
+			history = append(history, core.Message{ID: e.MessageID, Role: "assistant", Content: e.Content, ToolCalls: toCoreToolCalls(e.ToolCalls)})
+		case *domain.ToolResultAdded:
+			history = append(history, core.Message{ID: e.MessageID, Role: "tool", Content: e.Result, ToolCallID: e.ToolCallID})
 		}
 	}
 
-	finalMsg := msgs[len(msgs)-1]
-	if finalMsg.Role != "assistant" || finalMsg.Content != "Thanks! I see you like blue." {
-		t.Errorf("Unexpected final message: %+v", finalMsg)
+	// Verify turn 1
+	if len(history) < 3 {
+		t.Fatalf("Expected at least 3 messages (User, Assistant, Tool Result), got %d", len(history))
+	}
+	asstMsg := history[1]
+	if len(asstMsg.ToolCalls) == 0 || asstMsg.ToolCalls[0].Name != middleware.ToolNameTrueFalse {
+		t.Errorf("Expected %s tool call, got %+v", middleware.ToolNameTrueFalse, asstMsg)
+	}
+
+	// 2. User Response (Answering the elicitation)
+	runCtx2 := core.RunContext{
+		ThreadID:       threadID,
+		MessageID:      core.GenerateID(),
+		Thread:         core.NewInMemoryThreadWithID(threadID),
+		InitialHistory: history,
+		Options:        core.DefaultRunOptions(),
+		UserContent:    "Blue",
+		UserID:         userID,
+	}
+
+	var events2 []core.Event
+	for evt, err := range eng.Run(ctx, "test-elicitor", runCtx2) {
+		if err != nil {
+			t.Fatalf("Run 2 failed: %v", err)
+		}
+		events2 = append(events2, evt)
+	}
+
+	// Verify turn 2
+	foundFinalAssistant := false
+	for _, evt := range events2 {
+		if e, ok := evt.(*domain.AssistantMessageAdded); ok {
+			if e.Content == "Thanks! I see you like blue." {
+				foundFinalAssistant = true
+			}
+		}
+	}
+
+	if !foundFinalAssistant {
+		t.Error("Did not find the final assistant response answering the elicitation")
 	}
 }
 
 func TestEngine_ElicitationRobustness(t *testing.T) {
 	t.Parallel()
-	// Setup
 	log := logger.New(io.Discard, logger.LevelInfo, "test", nil)
-	eventStore := NewMockEventStore()
-	repo := domain.NewThreadRepository(eventStore)
-	tm := threadmgmt.New(log, repo)
-
 	ctx := context.Background()
 	threadID := "thread-robustness"
-	_, _, _ = tm.CreateThread(ctx, threadID, "Robustness Thread")
 
-	// Mock Chat Client simulating an LLM using "statement" instead of "question"
 	mockClient := &MockChatClient{
 		streams: [][]llm.ChatResponseUpdate{
 			{
@@ -183,37 +164,41 @@ func TestEngine_ElicitationRobustness(t *testing.T) {
 		},
 	}
 
-	agentConfig := core.AgentConfig{
-		Name:          "test-robust",
-		MaxIterations: 5,
-		Middleware: []core.Middleware{
-			middleware.NewElicitationMiddleware(),
-		},
-	}
-
-	provider := &MockAgentProvider{
+	eng := New(log, mockClient, &MockAgentProvider{
 		configs: map[string]core.AgentConfig{
-			"test-robust": agentConfig,
+			"test-robust": {
+				Name:          "test-robust",
+				MaxIterations: 5,
+				Middleware:    []core.Middleware{middleware.NewElicitationMiddleware()},
+			},
 		},
+	}, nil, nil)
+
+	runCtx := core.RunContext{
+		ThreadID:       threadID,
+		MessageID:      core.GenerateID(),
+		Thread:         core.NewInMemoryThreadWithID(threadID),
+		InitialHistory: []core.Message{},
+		Options:        core.DefaultRunOptions(),
+		UserContent:    "Start",
+		UserID:         "user1",
 	}
 
-	eng := New(log, mockClient, tm, provider, nil, nil, nil)
-	userID := "user1"
-
-	err := eng.ProcessUserMessage(ctx, "test-robust", threadID, "Start", userID)
-	if err != nil {
-		t.Fatalf("ProcessUserMessage failed: %v", err)
+	var events []core.Event
+	for evt, err := range eng.Run(ctx, "test-robust", runCtx) {
+		if err != nil {
+			t.Fatalf("Run failed: %v", err)
+		}
+		events = append(events, evt)
 	}
 
-	// Verify that the tool was successful despite using "statement"
-	threadAgg, _ := repo.Load(ctx, threadID)
 	foundSuccess := false
-	for _, msg := range threadAgg.Messages {
-		if msg.Role == "tool" {
+	for _, evt := range events {
+		if e, ok := evt.(*domain.ToolResultAdded); ok {
 			var result struct {
 				Status string `json:"status"`
 			}
-			json.Unmarshal([]byte(msg.Content), &result)
+			json.Unmarshal([]byte(e.Result), &result)
 			if result.Status == "Requesting input: Is 2+2=4?" {
 				foundSuccess = true
 				break
@@ -222,23 +207,16 @@ func TestEngine_ElicitationRobustness(t *testing.T) {
 	}
 
 	if !foundSuccess {
-		t.Error("Expected successful tool execution with 'statement' alias, but didn't find the expected status in tool message")
+		t.Error("Expected successful tool execution with 'statement' alias")
 	}
 }
 
 func TestEngine_ElicitationOptionsRobustness(t *testing.T) {
 	t.Parallel()
-	// Setup
 	log := logger.New(io.Discard, logger.LevelInfo, "test", nil)
-	eventStore := NewMockEventStore()
-	repo := domain.NewThreadRepository(eventStore)
-	tm := threadmgmt.New(log, repo)
-
 	ctx := context.Background()
 	threadID := "thread-options-robustness"
-	_, _, _ = tm.CreateThread(ctx, threadID, "Options Robustness Thread")
 
-	// Mock Chat Client simulating an LLM using "options" as a comma-separated string
 	mockClient := &MockChatClient{
 		streams: [][]llm.ChatResponseUpdate{
 			{
@@ -256,37 +234,41 @@ func TestEngine_ElicitationOptionsRobustness(t *testing.T) {
 		},
 	}
 
-	agentConfig := core.AgentConfig{
-		Name:          "test-robust-opts",
-		MaxIterations: 5,
-		Middleware: []core.Middleware{
-			middleware.NewElicitationMiddleware(),
-		},
-	}
-
-	provider := &MockAgentProvider{
+	eng := New(log, mockClient, &MockAgentProvider{
 		configs: map[string]core.AgentConfig{
-			"test-robust-opts": agentConfig,
+			"test-robust-opts": {
+				Name:          "test-robust-opts",
+				MaxIterations: 5,
+				Middleware:    []core.Middleware{middleware.NewElicitationMiddleware()},
+			},
 		},
+	}, nil, nil)
+
+	runCtx := core.RunContext{
+		ThreadID:       threadID,
+		MessageID:      core.GenerateID(),
+		Thread:         core.NewInMemoryThreadWithID(threadID),
+		InitialHistory: []core.Message{},
+		Options:        core.DefaultRunOptions(),
+		UserContent:    "Start",
+		UserID:         "user1",
 	}
 
-	eng := New(log, mockClient, tm, provider, nil, nil, nil)
-	userID := "user1"
-
-	err := eng.ProcessUserMessage(ctx, "test-robust-opts", threadID, "Start", userID)
-	if err != nil {
-		t.Fatalf("ProcessUserMessage failed: %v", err)
+	var events []core.Event
+	for evt, err := range eng.Run(ctx, "test-robust-opts", runCtx) {
+		if err != nil {
+			t.Fatalf("Run failed: %v", err)
+		}
+		events = append(events, evt)
 	}
 
-	// Verify that the tool was successful and options were parsed
-	threadAgg, _ := repo.Load(ctx, threadID)
 	foundSuccess := false
-	for _, msg := range threadAgg.Messages {
-		if msg.Role == "tool" {
+	for _, evt := range events {
+		if e, ok := evt.(*domain.ToolResultAdded); ok {
 			var result struct {
 				Status string `json:"status"`
 			}
-			json.Unmarshal([]byte(msg.Content), &result)
+			json.Unmarshal([]byte(e.Result), &result)
 			if result.Status == "Requesting input: What is 2+3?" {
 				foundSuccess = true
 				break
@@ -295,6 +277,22 @@ func TestEngine_ElicitationOptionsRobustness(t *testing.T) {
 	}
 
 	if !foundSuccess {
-		t.Error("Expected successful tool execution with string 'options', but didn't find the expected status in tool message")
+		t.Error("Expected successful tool execution with string 'options'")
 	}
+}
+
+func toCoreToolCalls(dtcs []domain.ToolCall) []core.ToolCall {
+	if dtcs == nil {
+		return nil
+	}
+	result := make([]core.ToolCall, len(dtcs))
+	for i, dtc := range dtcs {
+		result[i] = core.ToolCall{
+			ID:        dtc.ID,
+			Type:      dtc.Type,
+			Name:      dtc.Name,
+			Arguments: dtc.Arguments,
+		}
+	}
+	return result
 }

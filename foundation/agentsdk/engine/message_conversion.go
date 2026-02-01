@@ -64,6 +64,7 @@ func mapFromCoreToLLMMessage(msg core.Message) llm.ChatMessage {
 	if msg.Role == "tool" && msg.ToolCallID != "" {
 		cm.Contents = append(cm.Contents, llm.FunctionResultContent{
 			ToolCallID: msg.ToolCallID,
+			Name:       msg.ToolName,
 			Result:     msg.Content,
 		})
 	}

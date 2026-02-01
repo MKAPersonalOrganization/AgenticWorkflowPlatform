@@ -6,7 +6,6 @@ import (
 
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/llm"
-	"school-with-ai/services/threadmgmt"
 )
 
 // LLMContext holds all data needed for an LLM call.
@@ -26,22 +25,18 @@ func (c *LLMContext) GetEffectiveTools() []core.Tool {
 // It handles:
 // - Conversation history retrieval and message conversion
 // - Middleware application and chat options building
-// - Thread persistence (adding assistant messages and tool results)
 type LLMContextManager struct {
 	config        core.AgentConfig
-	threadMgmt    *threadmgmt.Manager
 	reqCtxCapture **core.RequestContext // optional capture for testing
 }
 
 // NewLLMContextManager creates a new LLMContextManager.
 func NewLLMContextManager(
 	config core.AgentConfig,
-	threadMgmt *threadmgmt.Manager,
 	reqCtxCapture **core.RequestContext,
 ) *LLMContextManager {
 	return &LLMContextManager{
 		config:        config,
-		threadMgmt:    threadMgmt,
 		reqCtxCapture: reqCtxCapture,
 	}
 }
