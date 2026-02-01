@@ -4,15 +4,20 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
-	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/domain"
 )
 
 type mockEvent struct {
-	core.BaseEvent
+	eventType string
+	timestamp time.Time
+	aggID     string
 }
 
-func (m *mockEvent) EventType() string { return "MockEvent" }
+func (m *mockEvent) EventType() string         { return m.eventType }
+func (m *mockEvent) EventTimestamp() time.Time { return m.timestamp }
+func (m *mockEvent) AggregateID() string       { return m.aggID }
 
 func TestRouter(t *testing.T) {
 	t.Parallel()
@@ -20,18 +25,18 @@ func TestRouter(t *testing.T) {
 	ctx := context.Background()
 
 	var handled bool
-	router.Register(&mockEvent{}, func(ctx context.Context, e core.Event) error {
+	router.Register(&mockEvent{}, func(ctx context.Context, e domain.Event) error {
 		handled = true
 		return nil
 	})
 
 	var anyHandled bool
-	router.RegisterAny(func(ctx context.Context, e core.Event) error {
+	router.RegisterAny(func(ctx context.Context, e domain.Event) error {
 		anyHandled = true
 		return nil
 	})
 
-	evt := &mockEvent{}
+	evt := &mockEvent{eventType: "MockEvent", timestamp: time.Now(), aggID: "test-123"}
 	if err := router.Dispatch(ctx, evt); err != nil {
 		t.Fatalf("Dispatch failed: %v", err)
 	}
@@ -50,11 +55,11 @@ func TestRouter_Error(t *testing.T) {
 	ctx := context.Background()
 
 	expectedErr := errors.New("test error")
-	router.Register(&mockEvent{}, func(ctx context.Context, e core.Event) error {
+	router.Register(&mockEvent{}, func(ctx context.Context, e domain.Event) error {
 		return expectedErr
 	})
 
-	evt := &mockEvent{}
+	evt := &mockEvent{eventType: "MockEvent", timestamp: time.Now(), aggID: "test-123"}
 	err := router.Dispatch(ctx, evt)
 	if !errors.Is(err, expectedErr) {
 		t.Errorf("Expected error %v, got %v", expectedErr, err)

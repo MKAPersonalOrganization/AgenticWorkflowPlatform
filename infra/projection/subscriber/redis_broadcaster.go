@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"sync"
 
+	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agent/adapters/custom"
-	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/logger"
 
 	"github.com/redis/go-redis/v9"
@@ -128,7 +128,7 @@ func (b *RedisBroadcaster) Subscribe(threadID string) (<-chan agent.Event, func(
 }
 
 // Broadcast publishes an event to Redis, which delivers it to all pods' subscribers.
-func (b *RedisBroadcaster) Broadcast(ctx context.Context, event core.Event) error {
+func (b *RedisBroadcaster) Broadcast(ctx context.Context, event domain.Event) error {
 	threadID := event.AggregateID()
 	if threadID == "" {
 		return nil
@@ -160,7 +160,7 @@ type eventEnvelope struct {
 }
 
 // serializeEvent serializes an event to JSON with type information.
-func (b *RedisBroadcaster) serializeEvent(event core.Event) (string, error) {
+func (b *RedisBroadcaster) serializeEvent(event domain.Event) (string, error) {
 	data, err := json.Marshal(event)
 	if err != nil {
 		return "", err
@@ -180,7 +180,7 @@ func (b *RedisBroadcaster) serializeEvent(event core.Event) (string, error) {
 }
 
 // deserializeEvent deserializes an event from JSON.
-func (b *RedisBroadcaster) deserializeEvent(payload string) (core.Event, error) {
+func (b *RedisBroadcaster) deserializeEvent(payload string) (domain.Event, error) {
 	var envelope eventEnvelope
 	if err := json.Unmarshal([]byte(payload), &envelope); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal envelope: %w", err)

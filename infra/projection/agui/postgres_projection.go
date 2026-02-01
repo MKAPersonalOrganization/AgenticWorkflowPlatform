@@ -10,7 +10,6 @@ import (
 	"school-with-ai/components/i18n"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
-	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/event"
 	"school-with-ai/foundation/logger"
 
@@ -61,47 +60,47 @@ func (p *PostgresAguiProjection) RegisterHandlers(router interface {
 	Register(eventPrototype any, handler event.HandlerFunc)
 },
 ) {
-	router.Register(&domain.ThreadCreated{}, func(ctx context.Context, e core.Event) error {
+	router.Register(&domain.ThreadCreated{}, func(ctx context.Context, e domain.Event) error {
 		return p.applyThreadCreated(ctx, *e.(*domain.ThreadCreated))
 	})
-	router.Register(&domain.UserMessageAdded{}, func(ctx context.Context, e core.Event) error {
+	router.Register(&domain.UserMessageAdded{}, func(ctx context.Context, e domain.Event) error {
 		return p.applyUserMessageAdded(ctx, *e.(*domain.UserMessageAdded))
 	})
-	router.Register(&domain.AssistantMessageAdded{}, func(ctx context.Context, e core.Event) error {
+	router.Register(&domain.AssistantMessageAdded{}, func(ctx context.Context, e domain.Event) error {
 		return p.applyAssistantMessageAdded(ctx, *e.(*domain.AssistantMessageAdded))
 	})
-	router.Register(&domain.ToolResultAdded{}, func(ctx context.Context, e core.Event) error {
+	router.Register(&domain.ToolResultAdded{}, func(ctx context.Context, e domain.Event) error {
 		return p.applyToolResultAdded(ctx, *e.(*domain.ToolResultAdded))
 	})
-	router.Register(&domain.ThreadTitleUpdated{}, func(ctx context.Context, e core.Event) error {
+	router.Register(&domain.ThreadTitleUpdated{}, func(ctx context.Context, e domain.Event) error {
 		return p.applyThreadTitleChanged(ctx, *e.(*domain.ThreadTitleUpdated))
 	})
-	router.Register(&domain.ThreadDeleted{}, func(ctx context.Context, e core.Event) error {
+	router.Register(&domain.ThreadDeleted{}, func(ctx context.Context, e domain.Event) error {
 		return p.applyThreadDeleted(ctx, *e.(*domain.ThreadDeleted))
 	})
-	router.Register(&domain.TokenUsageReported{}, func(ctx context.Context, e core.Event) error {
+	router.Register(&domain.TokenUsageReported{}, func(ctx context.Context, e domain.Event) error {
 		return p.applyTokenUsageReported(ctx, *e.(*domain.TokenUsageReported))
 	})
 	// Tool lifecycle events
-	router.Register(&domain.ToolStart{}, func(ctx context.Context, e core.Event) error {
+	router.Register(&domain.ToolStart{}, func(ctx context.Context, e domain.Event) error {
 		return p.applyToolStart(ctx, *e.(*domain.ToolStart))
 	})
-	router.Register(&domain.ToolSuccess{}, func(ctx context.Context, e core.Event) error {
+	router.Register(&domain.ToolSuccess{}, func(ctx context.Context, e domain.Event) error {
 		return p.applyToolSuccess(ctx, *e.(*domain.ToolSuccess))
 	})
-	router.Register(&domain.ToolError{}, func(ctx context.Context, e core.Event) error {
+	router.Register(&domain.ToolError{}, func(ctx context.Context, e domain.Event) error {
 		return p.applyToolError(ctx, *e.(*domain.ToolError))
 	})
-	router.Register(&domain.ToolNeedsInput{}, func(ctx context.Context, e core.Event) error {
+	router.Register(&domain.ToolNeedsInput{}, func(ctx context.Context, e domain.Event) error {
 		return p.applyToolNeedsInput(ctx, *e.(*domain.ToolNeedsInput))
 	})
-	router.Register(&domain.ToolNeedsAuth{}, func(ctx context.Context, e core.Event) error {
+	router.Register(&domain.ToolNeedsAuth{}, func(ctx context.Context, e domain.Event) error {
 		return p.applyToolNeedsAuth(ctx, *e.(*domain.ToolNeedsAuth))
 	})
-	router.Register(&domain.InputProvided{}, func(ctx context.Context, e core.Event) error {
+	router.Register(&domain.InputProvided{}, func(ctx context.Context, e domain.Event) error {
 		return p.applyInputProvided(ctx, *e.(*domain.InputProvided))
 	})
-	router.Register(&domain.AuthGranted{}, func(ctx context.Context, e core.Event) error {
+	router.Register(&domain.AuthGranted{}, func(ctx context.Context, e domain.Event) error {
 		return p.applyAuthGranted(ctx, *e.(*domain.AuthGranted))
 	})
 }

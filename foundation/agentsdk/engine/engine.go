@@ -25,8 +25,9 @@ type AgentProvider interface {
 }
 
 // EventEmitter defines the interface for real-time event dispatching.
+// Events are domain events that implement the domain.Event interface.
 type EventEmitter interface {
-	Dispatch(ctx context.Context, event core.Event) error
+	Dispatch(ctx context.Context, event domain.Event) error
 }
 
 // Engine handles the core LLM iteration and streaming logic in a generic way.

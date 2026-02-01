@@ -18,6 +18,11 @@ import (
 // PostgresLLMContextProjection is a PostgreSQL-backed implementation for LLM context.
 // It maintains materialized thread and message state in PostgreSQL tables that are
 // incrementally updated via the Apply() method when events are received.
+//
+// NOTE: This projection includes methods (GetAgentThread, GetOrCreateAgentThread) that return
+// core.AgentThread types from foundation/agentsdk/core. These methods are infrastructure-level
+// utilities for the custom agent framework and are not used by the web/handler layer.
+// The web layer only uses domain-agnostic methods (Get, Messages, All).
 type PostgresLLMContextProjection struct {
 	log *logger.Logger
 	db  *sqlx.DB
@@ -36,22 +41,22 @@ func (p *PostgresLLMContextProjection) RegisterHandlers(router interface {
 	Register(eventPrototype any, handler event.HandlerFunc)
 },
 ) {
-	router.Register(&domain.ThreadCreated{}, func(ctx context.Context, e core.Event) error {
+	router.Register(&domain.ThreadCreated{}, func(ctx context.Context, e domain.Event) error {
 		return p.applyThreadCreated(ctx, *e.(*domain.ThreadCreated))
 	})
-	router.Register(&domain.UserMessageAdded{}, func(ctx context.Context, e core.Event) error {
+	router.Register(&domain.UserMessageAdded{}, func(ctx context.Context, e domain.Event) error {
 		return p.applyUserMessageAdded(ctx, *e.(*domain.UserMessageAdded))
 	})
-	router.Register(&domain.AssistantMessageAdded{}, func(ctx context.Context, e core.Event) error {
+	router.Register(&domain.AssistantMessageAdded{}, func(ctx context.Context, e domain.Event) error {
 		return p.applyAssistantMessageAdded(ctx, *e.(*domain.AssistantMessageAdded))
 	})
-	router.Register(&domain.ToolResultAdded{}, func(ctx context.Context, e core.Event) error {
+	router.Register(&domain.ToolResultAdded{}, func(ctx context.Context, e domain.Event) error {
 		return p.applyToolResultAdded(ctx, *e.(*domain.ToolResultAdded))
 	})
-	router.Register(&domain.ThreadTitleUpdated{}, func(ctx context.Context, e core.Event) error {
+	router.Register(&domain.ThreadTitleUpdated{}, func(ctx context.Context, e domain.Event) error {
 		return p.applyThreadTitleChanged(ctx, *e.(*domain.ThreadTitleUpdated))
 	})
-	router.Register(&domain.ThreadDeleted{}, func(ctx context.Context, e core.Event) error {
+	router.Register(&domain.ThreadDeleted{}, func(ctx context.Context, e domain.Event) error {
 		return p.applyThreadDeleted(ctx, *e.(*domain.ThreadDeleted))
 	})
 }

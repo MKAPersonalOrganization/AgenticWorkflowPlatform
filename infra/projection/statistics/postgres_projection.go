@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/event"
 
 	"github.com/jmoiron/sqlx"
@@ -29,22 +28,22 @@ func (p *PostgresProjection) RegisterHandlers(router interface {
 	Register(eventPrototype any, handler event.HandlerFunc)
 },
 ) {
-	router.Register(&domain.ToolSuccess{}, func(ctx context.Context, e core.Event) error {
+	router.Register(&domain.ToolSuccess{}, func(ctx context.Context, e domain.Event) error {
 		return p.HandleEvent(ctx, e)
 	})
-	router.Register(&domain.ToolError{}, func(ctx context.Context, e core.Event) error {
+	router.Register(&domain.ToolError{}, func(ctx context.Context, e domain.Event) error {
 		return p.HandleEvent(ctx, e)
 	})
-	router.Register(&domain.AssistantMessageCompleted{}, func(ctx context.Context, e core.Event) error {
+	router.Register(&domain.AssistantMessageCompleted{}, func(ctx context.Context, e domain.Event) error {
 		return p.HandleEvent(ctx, e)
 	})
-	router.Register(&domain.RunError{}, func(ctx context.Context, e core.Event) error {
+	router.Register(&domain.RunError{}, func(ctx context.Context, e domain.Event) error {
 		return p.HandleEvent(ctx, e)
 	})
 }
 
 // HandleEvent processes domain events to update statistics in the database.
-func (p *PostgresProjection) HandleEvent(ctx context.Context, event core.Event) error {
+func (p *PostgresProjection) HandleEvent(ctx context.Context, event domain.Event) error {
 	switch e := event.(type) {
 	case *domain.ToolSuccess:
 		return p.updateToolSuccessStats(ctx, e)

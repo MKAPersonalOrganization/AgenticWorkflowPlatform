@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 
-	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/domain"
 	"school-with-ai/foundation/logger"
 
 	"github.com/jmoiron/sqlx"
@@ -16,7 +16,7 @@ import (
 
 // EventRouter defines the interface for dispatching events.
 type EventRouter interface {
-	Dispatch(ctx context.Context, event core.Event) error
+	Dispatch(ctx context.Context, event domain.Event) error
 }
 
 // ProjectionUpdater subscribes to all events and updates registered projections via a router.
@@ -149,6 +149,6 @@ func (u *ProjectionUpdater) Shutdown() {
 }
 
 // convertEvent converts a KurrentDB RecordedEvent to a domain event.
-func (u *ProjectionUpdater) convertEvent(event *kurrentdb.RecordedEvent) (core.Event, error) {
+func (u *ProjectionUpdater) convertEvent(event *kurrentdb.RecordedEvent) (domain.Event, error) {
 	return deserializeDomainEvent(event.EventType, event.Data)
 }
