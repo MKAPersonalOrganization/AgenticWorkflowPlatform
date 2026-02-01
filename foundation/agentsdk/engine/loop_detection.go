@@ -3,6 +3,7 @@ package engine
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"strings"
 	"unicode"
 
@@ -34,15 +35,15 @@ type LoopDetector struct {
 
 // toolErrorRecord tracks a tool error for error-based loop detection.
 type toolErrorRecord struct {
-	toolName  string
-	wasError  bool
-	errorType string // extracted error pattern
+	ToolName  string `json:"name"`
+	WasError  bool   `json:"err"`
+	ErrorType string `json:"type"`
 }
 
 // toolCallSignature represents a unique tool call for loop detection.
 type toolCallSignature struct {
-	toolName string
-	argsHash string
+	ToolName string `json:"name"`
+	ArgsHash string `json:"hash"`
 }
 
 // LoopDetectorConfig contains configuration for loop detection.
@@ -128,8 +129,8 @@ func (d *LoopDetector) RecordToolCall(tc core.ToolCall) *LoopInfo {
 	// Arguments is already a JSON string in core.ToolCall
 	hash := sha256.Sum256([]byte(tc.Arguments))
 	sig := toolCallSignature{
-		toolName: tc.Name,
-		argsHash: hex.EncodeToString(hash[:8]), // First 8 bytes is enough
+		ToolName: tc.Name,
+		ArgsHash: hex.EncodeToString(hash[:8]), // First 8 bytes is enough
 	}
 
 	d.toolCallHistory = append(d.toolCallHistory, sig)
@@ -149,7 +150,7 @@ func (d *LoopDetector) RecordToolCall(tc core.ToolCall) *LoopInfo {
 			Type:        LoopTypeToolCall,
 			Description: "Agent is repeatedly calling the same tool with identical arguments",
 			Occurrences: consecutive,
-			Pattern:     tc.Name,
+			Pattern:     sig.ToolName,
 		}
 	}
 
@@ -167,9 +168,9 @@ func (d *LoopDetector) RecordToolResult(toolName string, result string, isError 
 	}
 
 	record := toolErrorRecord{
-		toolName:  toolName,
-		wasError:  isError,
-		errorType: errorType,
+		ToolName:  toolName,
+		WasError:  isError,
+		ErrorType: errorType,
 	}
 
 	d.toolErrorHistory = append(d.toolErrorHistory, record)
@@ -183,7 +184,7 @@ func (d *LoopDetector) RecordToolResult(toolName string, result string, isError 
 	consecutiveErrors := 0
 	for i := len(d.toolErrorHistory) - 1; i >= 0; i-- {
 		rec := d.toolErrorHistory[i]
-		if rec.toolName == toolName && rec.wasError {
+		if rec.ToolName == toolName && rec.WasError {
 			consecutiveErrors++
 		} else {
 			break
@@ -349,6 +350,48 @@ func (d *LoopDetector) GetStats() map[string]any {
 		"concepts_explained":       len(d.conceptExplanations),
 		"concepts_with_failures":   len(d.conceptQuizFailures),
 	}
+}
+
+// Serialize returns a hex-encoded JSON representation of the detector state.
+func (d *LoopDetector) Serialize() string {
+	state := loopDetectorState{
+		ToolCallHistory:     d.toolCallHistory,
+		ToolErrorHistory:    d.toolErrorHistory,
+		ContentChunks:       d.contentChunks,
+		ConceptExplanations: d.conceptExplanations,
+		ConceptQuizFailures: d.conceptQuizFailures,
+	}
+	b, _ := json.Marshal(state)
+	return hex.EncodeToString(b)
+}
+
+// Load restores the detector state from a hex-encoded JSON string.
+func (d *LoopDetector) Load(stateHex string) error {
+	if stateHex == "" {
+		return nil
+	}
+	b, err := hex.DecodeString(stateHex)
+	if err != nil {
+		return err
+	}
+	var state loopDetectorState
+	if err := json.Unmarshal(b, &state); err != nil {
+		return err
+	}
+	d.toolCallHistory = state.ToolCallHistory
+	d.toolErrorHistory = state.ToolErrorHistory
+	d.contentChunks = state.ContentChunks
+	d.conceptExplanations = state.ConceptExplanations
+	d.conceptQuizFailures = state.ConceptQuizFailures
+	return nil
+}
+
+type loopDetectorState struct {
+	ToolCallHistory     []toolCallSignature `json:"toolCallHistory"`
+	ToolErrorHistory    []toolErrorRecord   `json:"toolErrorHistory"`
+	ContentChunks       []string            `json:"contentChunks"`
+	ConceptExplanations map[string]int      `json:"conceptExplanations"`
+	ConceptQuizFailures map[string]int      `json:"conceptQuizFailures"`
 }
 
 // Helper functions

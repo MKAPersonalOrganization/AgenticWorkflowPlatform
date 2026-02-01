@@ -217,16 +217,25 @@ func (e *Engine) newExecutionState(ctx context.Context, agentName string, runCtx
 				FinalAgent: agentName,
 			},
 		},
-		safety: &SafetyUnit{
-			maxTotal:     DefaultMaxTotalIterations,
-			loopDetector: NewLoopDetector(DefaultLoopDetectorConfig()),
-			maxAgent:     instance.Config.MaxIterations,
-		},
 		tools: &ToolProcessor{},
+	}
+
+	exec.safety = &SafetyUnit{
+		iteration:    runCtx.Iteration,
+		total:        runCtx.Total,
+		maxTotal:     DefaultMaxTotalIterations,
+		loopDetector: NewLoopDetector(DefaultLoopDetectorConfig()),
+		maxAgent:     instance.Config.MaxIterations,
 	}
 
 	if exec.safety.maxAgent <= 0 {
 		exec.safety.maxAgent = DefaultMaxAgentIterations
+	}
+
+	if runCtx.LoopState != "" {
+		if err := exec.safety.loopDetector.Load(runCtx.LoopState); err != nil {
+			e.log.Error(ctx, "failed to load loop detector state", "error", err)
+		}
 	}
 
 	return exec, nil
@@ -313,6 +322,10 @@ func (s *executionState) generateAgentResponse() error {
 	if err := s.safety.Guard(); err != nil {
 		s.observer.Fail(TerminationMaxIterations, err)
 		return err
+	}
+	// Yield state update
+	if !s.observer.yield(s.safety.Report(s.threadID), nil) {
+		return errStopIteration
 	}
 
 	prepped, err := s.prepareContextForLLM()
@@ -481,6 +494,16 @@ func (s *SafetyUnit) Guard() error {
 	return nil
 }
 
+func (s *SafetyUnit) Report(threadID string) *domain.ExecutionStateReported {
+	return &domain.ExecutionStateReported{
+		ThreadID:     threadID,
+		Iteration:    s.iteration,
+		Total:        s.total,
+		LoopStateHex: s.loopDetector.Serialize(),
+		Timestamp:    time.Now(),
+	}
+}
+
 func (s *SafetyUnit) RecordContent(content string) *LoopInfo {
 	return s.loopDetector.RecordContent(content)
 }
@@ -584,6 +607,14 @@ func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolve
 	for _, tc := range tctx.StreamResult.ToolCalls {
 		tsm := tctx.ToolStateMachines[tc.ID]
 
+		if info := tctx.Safety.RecordToolCall(tc); info != nil {
+			return nil, nil, fmt.Errorf("loop detected: %s", info.Description)
+		}
+		// Yield state update
+		if !tctx.Yield(tctx.Safety.Report(tctx.ThreadID), nil) {
+			return nil, nil, fmt.Errorf("yield interrupted")
+		}
+
 		g.Go(func() error {
 			return tsm.Start()
 		})
@@ -609,6 +640,10 @@ func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolve
 		if info := tctx.Safety.RecordToolResult(result.ToolName, result.Result, result.IsError); info != nil {
 			// FailWithLoop requires ObserverUnit, but we can return error directly
 			return nil, nil, fmt.Errorf("loop detected: %s", info.Description)
+		}
+		// Yield state update
+		if !tctx.Yield(tctx.Safety.Report(tctx.ThreadID), nil) {
+			return nil, nil, fmt.Errorf("yield interrupted")
 		}
 
 		// Yield ToolResultAdded event (durable)
@@ -942,6 +977,10 @@ func (s *executionState) validateAgentOutput() error {
 	if s.streamResult.Content != "" {
 		if info := s.safety.RecordContent(s.streamResult.Content); info != nil {
 			return s.observer.FailWithLoop(info)
+		}
+		// Yield state update
+		if !s.observer.yield(s.safety.Report(s.threadID), nil) {
+			return errStopIteration
 		}
 	}
 	return nil

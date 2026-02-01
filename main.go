@@ -259,27 +259,33 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// -------------------------------------------------------------------------
 	// Initialize Projections
+	// persistenceRouter is used by the ProjectionUpdater to update Postgres AND broadcast to Redis
+	persistenceRouter := event.NewRouter()
 
-	// Initialize Event Router for decoupled dispatching
-	eventRouter := event.NewRouter()
+	// transientRouter is used by the orchestrator for non-persistent events (streaming deltas, etc.)
+	transientRouter := event.NewRouter()
 
 	// Initialize Redis broadcaster for cross-pod event delivery
-	// This enables horizontal scaling by using Redis pub/sub instead of in-memory channels
 	redisBroadcaster := subscriber.NewRedisBroadcaster(log, cfg.Redis.Addr)
 	defer func() {
 		if closeErr := redisBroadcaster.Close(); closeErr != nil {
 			log.Error(ctx, "shutdown", "status", "failed to close Redis broadcaster", "ERROR", closeErr)
 		}
 	}()
-	eventRouter.RegisterAny(redisBroadcaster.Broadcast)
 
-	// Initialize PostgreSQL AGUI projection (materialized views for fast reads and writes)
+	// Register Redis broadcaster to BOTH routers
+	// persistenceRouter will broadcast durable events once they hit ESDB
+	// transientRouter will broadcast transient events immediately
+	persistenceRouter.RegisterAny(redisBroadcaster.Broadcast)
+	transientRouter.RegisterAny(redisBroadcaster.Broadcast)
+
+	// Initialize PostgreSQL AGUI projection
 	aguiProjection := agui.NewPostgresAguiProjection(log, db)
-	aguiProjection.RegisterHandlers(eventRouter)
+	aguiProjection.RegisterHandlers(persistenceRouter)
 
-	// Initialize PostgreSQL LLM context projection (materialized views for fast reads)
+	// Initialize PostgreSQL LLM context projection
 	llmContextProjection := llmcontext.NewPostgresLLMContextProjection(log, db)
-	llmContextProjection.RegisterHandlers(eventRouter)
+	llmContextProjection.RegisterHandlers(persistenceRouter)
 
 	// All projections are now query-time, so we use the base event store directly
 	// No need for ProjectionEventStore wrapper anymore
@@ -290,17 +296,17 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	log.Info(ctx, "startup", "status", "starting projection updater")
 
-	// Create projection updater with the router
+	// Create projection updater with the persistence router
 	projectionUpdater := subscriber.NewProjectionUpdater(
 		log,
-		baseEventStore.Client(), // baseEventStore is already *KurrentDBEventStore
+		baseEventStore.Client(),
 		db,
-		eventRouter,
+		persistenceRouter,
 	)
 
 	// Initialize Statistics Projection (Postgres)
 	statsProjection := projectionStats.NewPostgresProjection(db)
-	statsProjection.RegisterHandlers(eventRouter)
+	statsProjection.RegisterHandlers(persistenceRouter)
 
 	// Start projection updater in background
 	go func() {
@@ -371,7 +377,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 			agentorchestrator.WithArtifactService(artifactService),
 			agentorchestrator.WithMemoryEnabled(cfg.AgentCapabilities.LongTermMemory),
 			agentorchestrator.WithStudentProfileRepository(studentProfileRepo),
-			agentorchestrator.WithEmitter(eventRouter),
+			agentorchestrator.WithEmitter(transientRouter),
 		)
 		runner = custom.NewRunnerAdapter(log, agentOrchestrator)
 	default:

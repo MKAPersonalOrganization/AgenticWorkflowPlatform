@@ -21,6 +21,7 @@ type ThreadAggregate struct {
 	UpdatedAt        time.Time
 	IsDeleted        bool
 	EngineState      string
+	ExecutionState   *ExecutionStateReported
 }
 
 // NewThreadAggregate creates a new thread aggregate.
@@ -270,7 +271,20 @@ func (t *ThreadAggregate) Apply(event Event) {
 	case EngineStateChanged:
 		t.EngineState = e.NewState
 		t.UpdatedAt = e.Timestamp
+
+	case ExecutionStateReported:
+		t.ExecutionState = &e
+		t.UpdatedAt = e.Timestamp
 	}
+}
+
+// RecordExecutionState records the engine's internal execution state.
+func (t *ThreadAggregate) RecordExecutionState(event ExecutionStateReported) error {
+	if t.IsDeleted {
+		return errors.New("cannot record execution state on deleted thread")
+	}
+	t.Enqueue(event, t.Apply)
+	return nil
 }
 
 // StreamName returns the event stream name for this aggregate.

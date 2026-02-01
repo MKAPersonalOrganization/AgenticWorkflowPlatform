@@ -8,9 +8,12 @@ type RunContext struct {
 	Thread         AgentThread
 	Options        RunOptions
 	InitialHistory []Message // Pre-fetched history to avoid redundant I/O
-
 	// User message to process (if this is a new user message submission)
-	// If non-empty, the engine will persist this as a user message before execution
 	UserContent string
 	UserID      string
+
+	// Execution state for resumption
+	Iteration int
+	Total     int
+	LoopState string // Hex serialized LoopDetector state (optional)
 }
