@@ -7,6 +7,7 @@ import (
 // Domain events - transport-agnostic events that represent business domain occurrences.
 // These events are emitted by the orchestration service and can be converted to
 // transport-specific events (AGUI, A2A, etc.) by the presentation layer.
+// All domain events implement the Event interface defined in domain/domain.go.
 
 // ThreadCreated is emitted when a new thread is created.
 type ThreadCreated struct {

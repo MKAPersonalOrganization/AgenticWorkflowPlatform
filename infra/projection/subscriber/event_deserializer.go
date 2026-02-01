@@ -5,11 +5,10 @@ import (
 	"fmt"
 
 	"school-with-ai/domain"
-	"school-with-ai/foundation/agentsdk/core"
 )
 
 // deserializeDomainEvent deserializes a domain event from JSON based on its type.
-func deserializeDomainEvent(eventType string, data []byte) (core.Event, error) {
+func deserializeDomainEvent(eventType string, data []byte) (domain.Event, error) {
 	switch eventType {
 	case "ThreadCreated":
 		var evt domain.ThreadCreated

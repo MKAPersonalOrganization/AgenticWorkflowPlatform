@@ -6,11 +6,11 @@ import (
 	"reflect"
 	"sync"
 
-	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/domain"
 )
 
 // HandlerFunc is a function that handles a specific event type.
-type HandlerFunc func(ctx context.Context, event core.Event) error
+type HandlerFunc func(ctx context.Context, event domain.Event) error
 
 // Router dispatches events to registered handlers based on their type.
 type Router struct {
@@ -45,7 +45,7 @@ func (r *Router) RegisterAny(handler HandlerFunc) {
 }
 
 // Dispatch sends the event to all registered handlers for its type.
-func (r *Router) Dispatch(ctx context.Context, event core.Event) error {
+func (r *Router) Dispatch(ctx context.Context, event domain.Event) error {
 	r.mu.RLock()
 	t := reflect.TypeOf(event)
 	handlers := r.handlers[t]
