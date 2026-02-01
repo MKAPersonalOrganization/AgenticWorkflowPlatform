@@ -449,7 +449,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 			ShutdownTimeout:     cfg.Orchestration.ShutdownTimeout,
 			HealthCheckInterval: cfg.Orchestration.HealthCheckInterval,
 		},
-		eventLog,
+		threadmgmt.NewEventStoreAdapter(eventLog),
 		llmContextProjection,
 		model,
 		runner,
@@ -465,7 +465,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		"healthCheckInterval", cfg.Orchestration.HealthCheckInterval)
 
 	// Create HTTP handler
-	handler := taskmgmthandlers.NewTaskManagementHandler(log, model, taskManager, runner, threadMgmt, authSvc, threadQueryService, aguiProjection, redisBroadcaster)
+	handler := taskmgmthandlers.NewTaskManagementHandler(log, model, taskManager, runner, registry.GlobalAgents, threadMgmt, authSvc, threadQueryService, aguiProjection, redisBroadcaster)
 
 	// Create health handler
 	healthHandler := healthhandlers.NewHealthHandler(log)
