@@ -8,16 +8,16 @@ import (
 
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/agentsdk/llm"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/services/agentorchestrator/types"
 	"school-with-ai/services/threadmgmt"
 
 	"github.com/qmuntal/stateless"
 	"golang.org/x/sync/errgroup"
 )
 
-// Use central types
-type ChatClient = types.ChatClient
+// ChatClient is the LLM client interface.
+type ChatClient = llm.ChatClient
 
 // AgentProvider provides agent configurations by name.
 type AgentProvider interface {

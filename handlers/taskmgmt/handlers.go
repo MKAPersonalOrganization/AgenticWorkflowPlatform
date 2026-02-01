@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"school-with-ai/domain"
+	"school-with-ai/foundation/agentsdk/llm"
 	"school-with-ai/foundation/i18n"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/services"
-	orchestratortypes "school-with-ai/services/agentorchestrator/types"
 	"school-with-ai/services/taskmanagement"
 	"school-with-ai/services/threadmgmt"
 
@@ -22,7 +22,7 @@ import (
 // TaskManagementHandler encapsulates dependencies for HTTP handlers for task management.
 type TaskManagementHandler struct {
 	log                 *logger.Logger
-	chatClient          orchestratortypes.ChatClient
+	chatClient          llm.ChatClient
 	taskManager         *taskmanagement.AsynqTaskManager
 	orchestratorService services.AgentOrchestrator
 	threadMgmt          *threadmgmt.Manager
@@ -35,7 +35,7 @@ type TaskManagementHandler struct {
 // NewTaskManagementHandler creates a new HTTP handler for task management.
 func NewTaskManagementHandler(
 	log *logger.Logger,
-	chatClient orchestratortypes.ChatClient,
+	chatClient llm.ChatClient,
 	taskManager *taskmanagement.AsynqTaskManager,
 	orchestratorService services.AgentOrchestrator,
 	threadMgmt *threadmgmt.Manager,

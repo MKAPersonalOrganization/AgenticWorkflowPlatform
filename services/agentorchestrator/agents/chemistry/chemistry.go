@@ -6,7 +6,7 @@ import (
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/core/middleware"
 	"school-with-ai/foundation/i18n"
-	sharedtools "school-with-ai/services/agentorchestrator/agents/shared/tools"
+	sharedtools "school-with-ai/services/agentorchestrator/agents/tools"
 )
 
 // domainTools returns the domain-specific tools for the chemistry instructor.
@@ -73,8 +73,8 @@ func CreateChemistryInstructor(ctx context.Context, notifier core.EventNotifier)
 				i18n.T(ctx, "chemistry.practice_area4"),
 			},
 		},
-		Interactive:  true,
-		ExtraRules:   i18n.T(ctx, "chemistry.extra_rules"),
+		Interactive: true,
+		ExtraRules:  i18n.T(ctx, "chemistry.extra_rules"),
 	})
 	if err != nil {
 		panic(err)

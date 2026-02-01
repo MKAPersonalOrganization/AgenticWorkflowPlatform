@@ -7,17 +7,17 @@ import (
 
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/agentsdk/engine"
+	"school-with-ai/foundation/agentsdk/llm"
+	"school-with-ai/foundation/agentsdk/registry"
 	"school-with-ai/foundation/agentsdk/tools"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/services/agentorchestrator/agents/shared"
-	"school-with-ai/services/agentorchestrator/engine"
-	"school-with-ai/services/agentorchestrator/types"
 	"school-with-ai/services/artifact"
 	"school-with-ai/services/threadmgmt"
 )
 
-// Use central types
-type ChatClient = types.ChatClient
+// ChatClient is the LLM client interface.
+type ChatClient = llm.ChatClient
 
 // Service handles processing of user messages using pure event sourcing.
 // It acts as an orchestrator, delegating specific responsibilities to internal components.
@@ -68,7 +68,7 @@ func New(
 	// Initialize Provider and Engine
 	provider := &RegistryAgentProvider{
 		initialConfig: s.config,
-		registry:      shared.GlobalAgents,
+		registry:      registry.GlobalAgents,
 		artifactStore: s.artifactStore,
 		enableMemory:  s.enableMemory,
 		profileRepo:   s.profileRepo,
@@ -146,7 +146,7 @@ func WithEmitter(emitter engine.EventEmitter) Option {
 // RegistryAgentProvider implements engine.AgentProvider using GlobalAgents.
 type RegistryAgentProvider struct {
 	initialConfig core.AgentConfig
-	registry      *shared.AgentRegistry
+	registry      *registry.AgentRegistry
 	artifactStore artifact.Service
 	enableMemory  bool
 	profileRepo   domain.StudentProfileRepository
@@ -212,7 +212,7 @@ func (s *Service) ProcessUserMessage(ctx context.Context, agentName, threadID, c
 
 // GetAvailableAgents returns a list of available agents
 func (s *Service) GetAvailableAgents() []string {
-	return shared.GlobalAgents.List()
+	return registry.GlobalAgents.List()
 }
 
 // GetEngineGraph returns the DOT graph for the engine state machine.
