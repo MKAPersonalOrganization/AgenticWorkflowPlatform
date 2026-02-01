@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services"
@@ -43,8 +42,6 @@ type AsynqConfig struct {
 func NewAsynqTaskManager(
 	log *logger.Logger,
 	config AsynqConfig,
-	eventLog domain.EventStore,
-	state domain.ThreadStore,
 	model agent.Model,
 	runner agent.Runner, // decouple from concrete implementation
 	agentFactory services.AgentFactory,
@@ -81,8 +78,6 @@ func NewAsynqTaskManager(
 		log,
 		runner,
 		agentFactory,
-		state,
-		eventLog,
 		model,
 		langfuseTracer,
 		observabilityConfig,

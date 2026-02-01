@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"school-with-ai/domain"
+	"school-with-ai/foundation/agent"
+	"school-with-ai/foundation/agent/adapters/custom"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 	"github.com/stretchr/testify/assert"
@@ -133,7 +135,22 @@ func TestToAguiEvents(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := ToAguiEvents(tt.event)
+
+			var input agent.Event
+			if evt, ok := tt.event.(agent.Event); ok {
+				input = evt
+			} else if coreEvt, ok := tt.event.(interface {
+				EventType() string
+				EventTimestamp() time.Time
+				AggregateID() string
+			}); ok {
+				// Wrap it so it matches domain.Event interface if needed,
+				// but domain events already have these.
+				// For now let's just use ConvertCoreEventToAgent if it's a domain event.
+				input = custom.ConvertCoreEventToAgent(coreEvt)
+			}
+
+			got := ToAguiEvents(input)
 
 			// Check if both are nil
 			if tt.expected == nil {

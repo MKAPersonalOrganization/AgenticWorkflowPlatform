@@ -416,7 +416,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	}()
 
 	threadRepo := domain.NewThreadRepository(threadmgmt.NewEventStoreAdapter(eventLog))
-	threadMgmt := threadmgmt.New(log, threadRepo)
+	sessionStore := custom.NewSessionStoreAdapter(threadRepo)
 
 	// Initialize service layer
 	authSvc := authService.NewAuthService()
@@ -449,8 +449,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 			ShutdownTimeout:     cfg.Orchestration.ShutdownTimeout,
 			HealthCheckInterval: cfg.Orchestration.HealthCheckInterval,
 		},
-		threadmgmt.NewEventStoreAdapter(eventLog),
-		llmContextProjection,
 		model,
 		runner,
 		agentFactory,
@@ -465,7 +463,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		"healthCheckInterval", cfg.Orchestration.HealthCheckInterval)
 
 	// Create HTTP handler
-	handler := taskmgmthandlers.NewTaskManagementHandler(log, model, taskManager, runner, registry.GlobalAgents, threadMgmt, authSvc, threadQueryService, aguiProjection, redisBroadcaster)
+	handler := taskmgmthandlers.NewTaskManagementHandler(log, model, taskManager, runner, registry.GlobalAgents, sessionStore, authSvc, threadQueryService, aguiProjection, redisBroadcaster)
 
 	// Create health handler
 	healthHandler := healthhandlers.NewHealthHandler(log)

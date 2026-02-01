@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/observability/langfuse"
@@ -27,9 +26,8 @@ type ObservabilityConfig struct {
 type Service struct {
 	log                 *logger.Logger
 	runner              agent.Runner
+	agentRegistry       agent.AgentRegistry // Added this earlier? No, let's see.
 	agentFactory        services.AgentFactory
-	threadStore         domain.ThreadStore
-	eventLog            domain.EventStore
 	model               agent.Model
 	langfuseTracer      *LangfuseTracer
 	observabilityConfig ObservabilityConfig
@@ -40,8 +38,6 @@ func NewService(
 	log *logger.Logger,
 	runner agent.Runner,
 	agentFactory services.AgentFactory,
-	threadStore domain.ThreadStore,
-	eventLog domain.EventStore,
 	model agent.Model,
 	langfuseTracer *LangfuseTracer,
 	observabilityConfig ObservabilityConfig,
@@ -50,8 +46,6 @@ func NewService(
 		log:                 log,
 		runner:              runner,
 		agentFactory:        agentFactory,
-		threadStore:         threadStore,
-		eventLog:            eventLog,
 		model:               model,
 		langfuseTracer:      langfuseTracer,
 		observabilityConfig: observabilityConfig,

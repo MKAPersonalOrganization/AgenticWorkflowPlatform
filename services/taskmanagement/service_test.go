@@ -11,11 +11,9 @@ func TestServiceCreation(t *testing.T) {
 	// This test ensures the Service struct can be instantiated
 	service := NewService(
 		nil, // log
-		nil, // orchestratorService
+		nil, // runner
 		nil, // agentFactory
-		nil, // threadStore
-		nil, // eventLog
-		nil, // chatClient
+		nil, // model
 		nil, // langfuseTracer
 		ObservabilityConfig{ // observabilityConfig
 			Release: "test-build-v1.0.0",
@@ -27,8 +25,8 @@ func TestServiceCreation(t *testing.T) {
 		t.Fatal("NewService() returned nil")
 	}
 
-	if service.orchestratorService != nil {
-		t.Error("Expected nil orchestratorService")
+	if service.runner != nil {
+		t.Error("Expected nil runner")
 	}
 }
 
@@ -54,7 +52,7 @@ func TestUserMessageParamsValidation(t *testing.T) {
 // TestHandleUserMessageCancellation verifies that HandleUserMessage respects context cancellation.
 func TestHandleUserMessageCancellation(t *testing.T) {
 	t.Parallel()
-	service := NewService(nil, nil, nil, nil, nil, nil, nil, ObservabilityConfig{Release: "test-build-v1.0.0"})
+	service := NewService(nil, nil, nil, nil, nil, ObservabilityConfig{Release: "test-build-v1.0.0"})
 
 	// Create cancelled context
 	ctx, cancel := context.WithCancel(context.Background())

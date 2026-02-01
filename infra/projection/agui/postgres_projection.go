@@ -9,6 +9,7 @@ import (
 
 	"school-with-ai/components/i18n"
 	"school-with-ai/domain"
+	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/event"
 	"school-with-ai/foundation/logger"
@@ -658,10 +659,10 @@ func (p *PostgresAguiProjection) GetThreadState(threadID string) (*AguiThreadSta
 		}
 
 		if msg.ToolCalls != nil {
-			var coreToolCalls []core.ToolCall
-			if err := json.Unmarshal([]byte(*msg.ToolCalls), &coreToolCalls); err == nil {
-				aguiToolCalls := make([]aguievents.ToolCall, 0, len(coreToolCalls))
-				for _, tc := range coreToolCalls {
+			var agentToolCalls []agent.ToolCall
+			if err := json.Unmarshal([]byte(*msg.ToolCalls), &agentToolCalls); err == nil {
+				aguiToolCalls := make([]aguievents.ToolCall, 0, len(agentToolCalls))
+				for _, tc := range agentToolCalls {
 					aguiToolCalls = append(aguiToolCalls, aguievents.ToolCall{
 						ID:   tc.ID,
 						Type: "function",
