@@ -61,26 +61,26 @@ const (
 // ToolCall represents a request to execute a tool.
 type ToolCall struct {
 	// ID uniquely identifies this tool call.
-	ID string
+	ID string `json:"id"`
 
 	// Name is the tool function name.
-	Name string
+	Name string `json:"name"`
 
 	// Arguments is the JSON-encoded tool input.
-	Arguments string
+	Arguments string `json:"arguments"`
 }
 
 // ToolResult represents the output of a tool execution.
 type ToolResult struct {
 	// ToolCallID links this result to the originating call.
-	ToolCallID string
+	ToolCallID string `json:"tool_call_id,omitempty"`
 
 	// Output is the JSON-encoded tool output.
-	Output string
+	Output string `json:"output,omitempty"`
 
 	// Error contains error information if the tool failed.
-	Error string
+	Error string `json:"error,omitempty"`
 
 	// IsError indicates whether the execution failed.
-	IsError bool
+	IsError bool `json:"is_error,omitempty"`
 }

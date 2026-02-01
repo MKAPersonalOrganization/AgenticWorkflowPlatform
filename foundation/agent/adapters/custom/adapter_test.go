@@ -81,7 +81,7 @@ func TestConvertCoreEventToAgent(t *testing.T) {
 		Timestamp:     time.Now(),
 	}
 
-	agentEvent := convertCoreEventToAgent(ts)
+	agentEvent := ConvertCoreEventToAgent(ts)
 
 	if agentEvent.Type() != agent.EventTypeToolCall {
 		t.Errorf("expected event type %s, got %s", agent.EventTypeToolCall, agentEvent.Type())
@@ -100,7 +100,7 @@ func TestConvertCoreEventToAgent(t *testing.T) {
 		Timestamp:  time.Now(),
 	}
 
-	agentEventResult := convertCoreEventToAgent(tr)
+	agentEventResult := ConvertCoreEventToAgent(tr)
 	if agentEventResult.Type() != agent.EventTypeToolResult {
 		t.Errorf("expected event type %s, got %s", agent.EventTypeToolResult, agentEventResult.Type())
 	}

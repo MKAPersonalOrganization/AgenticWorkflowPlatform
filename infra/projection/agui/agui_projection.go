@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"school-with-ai/foundation/agent"
+
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
 
@@ -25,8 +27,8 @@ type AguiProjection interface {
 // AguiBroadcaster is an interface for subscribing to real-time events.
 type AguiBroadcaster interface {
 	// Subscribe subscribes to real-time events for a thread.
-	// Returns a channel of events (type core.Event) and a cancel function.
-	Subscribe(threadID string) (<-chan any, func())
+	// Returns a channel of events (type agent.Event) and a cancel function.
+	Subscribe(threadID string) (<-chan agent.Event, func())
 }
 
 // AguiThreadState represents the complete UI state for a thread.

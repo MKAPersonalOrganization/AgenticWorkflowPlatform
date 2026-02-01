@@ -43,6 +43,9 @@ const (
 	// EventTypeTitleGenerated indicates a conversation title was created.
 	EventTypeTitleGenerated EventType = "title_generated"
 
+	// EventTypeToolInteraction indicates a tool requires user input or auth.
+	EventTypeToolInteraction EventType = "tool_interaction"
+
 	// EventTypeComplete indicates the agent finished successfully.
 	EventTypeComplete EventType = "complete"
 )
@@ -111,4 +114,14 @@ type HandoffEvent struct {
 // TitleEvent is the payload for EventTypeTitleGenerated.
 type TitleEvent struct {
 	Title string
+}
+
+// ToolInteractionEvent is the payload for EventTypeToolInteraction.
+type ToolInteractionEvent struct {
+	ToolCallID string
+	ToolName   string
+	Type       string // "input", "auth"
+	Prompt     string
+	Schema     any
+	AuthSpec   any
 }

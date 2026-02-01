@@ -14,7 +14,6 @@ import (
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/services"
 	"school-with-ai/services/taskmanagement"
-	"school-with-ai/services/threadmgmt"
 
 	"github.com/hibiken/asynq"
 )
@@ -26,7 +25,7 @@ type TaskManagementHandler struct {
 	taskManager        *taskmanagement.AsynqTaskManager
 	runner             agent.Runner
 	agentRegistry      agent.AgentRegistry
-	threadMgmt         *threadmgmt.Manager
+	sessionStore       agent.SessionStore
 	authService        services.AuthService
 	threadQueryService services.ThreadQueryService
 	aguiProjection     agui.AguiProjection
@@ -40,7 +39,7 @@ func NewTaskManagementHandler(
 	taskManager *taskmanagement.AsynqTaskManager,
 	runner agent.Runner,
 	agentRegistry agent.AgentRegistry,
-	threadMgmt *threadmgmt.Manager,
+	sessionStore agent.SessionStore,
 	authService services.AuthService,
 	threadQueryService services.ThreadQueryService,
 	aguiProjection agui.AguiProjection,
@@ -52,7 +51,7 @@ func NewTaskManagementHandler(
 		taskManager:        taskManager,
 		runner:             runner,
 		agentRegistry:      agentRegistry,
-		threadMgmt:         threadMgmt,
+		sessionStore:       sessionStore,
 		authService:        authService,
 		threadQueryService: threadQueryService,
 		aguiProjection:     aguiProjection,
@@ -330,8 +329,8 @@ func (h *TaskManagementHandler) DeleteThread(w http.ResponseWriter, r *http.Requ
 
 	h.log.Info(r.Context(), "Deleting thread", "userID", user.ID, "threadID", threadID)
 
-	// Delete thread using thread manager
-	err := h.threadMgmt.DeleteThread(r.Context(), threadID)
+	// Delete thread using session store
+	err := h.sessionStore.Delete(r.Context(), threadID)
 	if err != nil {
 		if errors.Is(err, domain.ErrThreadNotFound) {
 			http.Error(w, "Thread not found", http.StatusNotFound)
@@ -385,14 +384,28 @@ func (h *TaskManagementHandler) UpdateThreadTitle(w http.ResponseWriter, r *http
 
 	h.log.Info(r.Context(), "Renaming thread", "userID", user.ID, "threadID", threadID, "newTitle", req.Title)
 
-	// Update thread title using thread manager
-	_, err := h.threadMgmt.UpdateThreadTitle(r.Context(), threadID, req.Title)
+	// Update thread title using session store
+	session, err := h.sessionStore.Get(r.Context(), threadID)
 	if err != nil {
 		if errors.Is(err, domain.ErrThreadNotFound) {
 			http.Error(w, "Thread not found", http.StatusNotFound)
 			return
 		}
-		h.log.Error(r.Context(), "failed to update thread title", "error", err)
+		h.log.Error(r.Context(), "failed to get session", "error", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	err = session.SetTitle(r.Context(), req.Title)
+	if err != nil {
+		h.log.Error(r.Context(), "failed to update session title", "error", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	err = h.sessionStore.Save(r.Context(), session)
+	if err != nil {
+		h.log.Error(r.Context(), "failed to save session", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
