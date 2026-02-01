@@ -155,17 +155,6 @@ func (e ThreadDeleted) EventType() string         { return "ThreadDeleted" }
 func (e ThreadDeleted) EventTimestamp() time.Time { return e.Timestamp }
 func (e ThreadDeleted) AggregateID() string       { return e.ThreadID }
 
-// AgentHandoff is emitted when control is transferred to another agent.
-type AgentHandoff struct {
-	ThreadID    string
-	TargetAgent string
-	Timestamp   time.Time
-}
-
-func (e AgentHandoff) EventType() string         { return "AgentHandoff" }
-func (e AgentHandoff) EventTimestamp() time.Time { return e.Timestamp }
-func (e AgentHandoff) AggregateID() string       { return e.ThreadID }
-
 // TokenUsageReported is emitted when token usage information is available.
 type TokenUsageReported struct {
 	ThreadID  string `json:"threadId"`

@@ -94,13 +94,6 @@ func deserializeDomainEvent(eventType string, data []byte) (domain.Event, error)
 		}
 		return &evt, nil
 
-	case "AgentHandoff":
-		var evt domain.AgentHandoff
-		if err := json.Unmarshal(data, &evt); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal AgentHandoff: %w", err)
-		}
-		return &evt, nil
-
 	case "TokenUsageReported":
 		var evt domain.TokenUsageReported
 		if err := json.Unmarshal(data, &evt); err != nil {
