@@ -3,20 +3,16 @@ package engine
 import (
 	"context"
 	"encoding/json"
-	"io"
 	"testing"
 
-	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/core/middleware"
 	"school-with-ai/foundation/agentsdk/llm"
-	"school-with-ai/foundation/logger"
 )
 
 func TestEngine_ElicitationFlow(t *testing.T) {
 	t.Parallel()
 	// Setup
-	log := logger.New(io.Discard, logger.LevelInfo, "test", nil)
 	ctx := context.Background()
 	threadID := "thread-elicitation"
 
@@ -63,7 +59,7 @@ func TestEngine_ElicitationFlow(t *testing.T) {
 		},
 	}
 
-	eng := New(log, mockClient, provider, nil, nil)
+	eng := New(mockClient, provider, nil, nil)
 	userID := "user1"
 
 	// 1. Initial User Message
@@ -89,11 +85,11 @@ func TestEngine_ElicitationFlow(t *testing.T) {
 	var history []core.Message
 	for _, evt := range events1 {
 		switch e := evt.(type) {
-		case *domain.UserMessageAdded:
+		case *core.UserMessageAdded:
 			history = append(history, core.Message{ID: e.MessageID, Role: "user", Content: e.Content})
-		case *domain.AssistantMessageAdded:
-			history = append(history, core.Message{ID: e.MessageID, Role: "assistant", Content: e.Content, ToolCalls: toCoreToolCalls(e.ToolCalls)})
-		case *domain.ToolResultAdded:
+		case *core.AssistantMessageAdded:
+			history = append(history, core.Message{ID: e.MessageID, Role: "assistant", Content: e.Content, ToolCalls: e.ToolCalls})
+		case *core.ToolResultAdded:
 			history = append(history, core.Message{ID: e.MessageID, Role: "tool", Content: e.Result, ToolCallID: e.ToolCallID})
 		}
 	}
@@ -129,7 +125,7 @@ func TestEngine_ElicitationFlow(t *testing.T) {
 	// Verify turn 2
 	foundFinalAssistant := false
 	for _, evt := range events2 {
-		if e, ok := evt.(*domain.AssistantMessageAdded); ok {
+		if e, ok := evt.(*core.AssistantMessageAdded); ok {
 			if e.Content == "Thanks! I see you like blue." {
 				foundFinalAssistant = true
 			}
@@ -143,7 +139,6 @@ func TestEngine_ElicitationFlow(t *testing.T) {
 
 func TestEngine_ElicitationRobustness(t *testing.T) {
 	t.Parallel()
-	log := logger.New(io.Discard, logger.LevelInfo, "test", nil)
 	ctx := context.Background()
 	threadID := "thread-robustness"
 
@@ -164,7 +159,7 @@ func TestEngine_ElicitationRobustness(t *testing.T) {
 		},
 	}
 
-	eng := New(log, mockClient, &MockAgentProvider{
+	eng := New(mockClient, &MockAgentProvider{
 		configs: map[string]core.AgentConfig{
 			"test-robust": {
 				Name:          "test-robust",
@@ -194,7 +189,7 @@ func TestEngine_ElicitationRobustness(t *testing.T) {
 
 	foundSuccess := false
 	for _, evt := range events {
-		if e, ok := evt.(*domain.ToolResultAdded); ok {
+		if e, ok := evt.(*core.ToolResultAdded); ok {
 			var result struct {
 				Status string `json:"status"`
 			}
@@ -213,7 +208,6 @@ func TestEngine_ElicitationRobustness(t *testing.T) {
 
 func TestEngine_ElicitationOptionsRobustness(t *testing.T) {
 	t.Parallel()
-	log := logger.New(io.Discard, logger.LevelInfo, "test", nil)
 	ctx := context.Background()
 	threadID := "thread-options-robustness"
 
@@ -234,7 +228,7 @@ func TestEngine_ElicitationOptionsRobustness(t *testing.T) {
 		},
 	}
 
-	eng := New(log, mockClient, &MockAgentProvider{
+	eng := New(mockClient, &MockAgentProvider{
 		configs: map[string]core.AgentConfig{
 			"test-robust-opts": {
 				Name:          "test-robust-opts",
@@ -264,7 +258,7 @@ func TestEngine_ElicitationOptionsRobustness(t *testing.T) {
 
 	foundSuccess := false
 	for _, evt := range events {
-		if e, ok := evt.(*domain.ToolResultAdded); ok {
+		if e, ok := evt.(*core.ToolResultAdded); ok {
 			var result struct {
 				Status string `json:"status"`
 			}
@@ -279,20 +273,4 @@ func TestEngine_ElicitationOptionsRobustness(t *testing.T) {
 	if !foundSuccess {
 		t.Error("Expected successful tool execution with string 'options'")
 	}
-}
-
-func toCoreToolCalls(dtcs []domain.ToolCall) []core.ToolCall {
-	if dtcs == nil {
-		return nil
-	}
-	result := make([]core.ToolCall, len(dtcs))
-	for i, dtc := range dtcs {
-		result[i] = core.ToolCall{
-			ID:        dtc.ID,
-			Type:      dtc.Type,
-			Name:      dtc.Name,
-			Arguments: dtc.Arguments,
-		}
-	}
-	return result
 }

@@ -2,23 +2,21 @@ package engine
 
 import (
 	"context"
-	"errors"
 	"testing"
 
-	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 )
 
 // MockToolExecutor is a mock implementation of ToolExecutor for testing.
 type MockToolExecutor struct {
-	executeFunc func(toolCall core.ToolCall) (core.ToolExecutionResult, error)
+	executeFunc func(toolCall core.ToolCall) (core.ToolExecResult, error)
 }
 
-func (m *MockToolExecutor) Execute(toolCall core.ToolCall) (core.ToolExecutionResult, error) {
+func (m *MockToolExecutor) Execute(toolCall core.ToolCall) (core.ToolExecResult, error) {
 	if m.executeFunc != nil {
 		return m.executeFunc(toolCall)
 	}
-	return core.ToolExecutionResult{Result: "success"}, nil
+	return core.ToolExecResult{Result: "success"}, nil
 }
 
 // MockToolStateObserver records state transitions for testing.
@@ -26,9 +24,9 @@ type MockToolStateObserver struct {
 	transitions []struct {
 		toolCallID  string
 		toolName    string
-		oldState    domain.ToolState
-		newState    domain.ToolState
-		result      *domain.ToolExecutionResult
+		oldState    core.ToolState
+		newState    core.ToolState
+		result      *core.ToolExecutionResult
 		elicitation *core.ElicitationSpec
 	}
 }
@@ -36,17 +34,17 @@ type MockToolStateObserver struct {
 func (m *MockToolStateObserver) OnToolStateChanged(
 	toolCallID string,
 	toolName string,
-	oldState domain.ToolState,
-	newState domain.ToolState,
-	result *domain.ToolExecutionResult,
+	oldState core.ToolState,
+	newState core.ToolState,
+	result *core.ToolExecutionResult,
 	elicitation *core.ElicitationSpec,
 ) {
 	m.transitions = append(m.transitions, struct {
 		toolCallID  string
 		toolName    string
-		oldState    domain.ToolState
-		newState    domain.ToolState
-		result      *domain.ToolExecutionResult
+		oldState    core.ToolState
+		newState    core.ToolState
+		result      *core.ToolExecutionResult
 		elicitation *core.ElicitationSpec
 	}{
 		toolCallID:  toolCallID,
@@ -70,27 +68,19 @@ func TestToolStateMachine_NormalExecution(t *testing.T) {
 		Arguments: `{"operation": "add", "a": 1, "b": 2}`,
 	}
 
-	executor := &MockToolExecutor{
-		executeFunc: func(tc core.ToolCall) (core.ToolExecutionResult, error) {
-			return core.ToolExecutionResult{
-				Result: "3",
-			}, nil
-		},
-	}
-
 	observer := &MockToolStateObserver{}
 
-	tsm := domain.NewToolStateMachine(ctx, toolCall, executor)
-	tsm.RegisterObserver(observer)
+	tsm := core.NewToolStateMachine(toolCall)
+	tsm.AddObserver(observer)
 
 	// Start execution
-	err := tsm.Start()
+	err := tsm.Start(ctx)
 	if err != nil {
 		t.Fatalf("Start() failed: %v", err)
 	}
 
 	// Verify final state
-	if state := tsm.CurrentState(); state != domain.ToolStateCompleted {
+	if state := tsm.CurrentState(ctx); state != core.ToolStateCompleted {
 		t.Errorf("Expected state Completed, got %v", state)
 	}
 
@@ -109,7 +99,7 @@ func TestToolStateMachine_NormalExecution(t *testing.T) {
 	}
 	if len(observer.transitions) >= 2 {
 		trans := observer.transitions[1]
-		if trans.newState != domain.ToolStateCompleted {
+		if trans.newState != core.ToolStateCompleted {
 			t.Errorf("Expected transition to Completed, got %v", trans.newState)
 		}
 	}
@@ -132,32 +122,19 @@ func TestToolStateMachine_AwaitingInput(t *testing.T) {
 		Schema:   map[string]any{"type": "string"},
 	}
 
-	executor := &MockToolExecutor{
-		executeFunc: func(tc core.ToolCall) (core.ToolExecutionResult, error) {
-			return core.ToolExecutionResult{
-				Result: "awaiting input",
-				Command: &core.Command{
-					StopIteration: true,
-					Elicitation:   elicitation,
-				},
-				StopIteration: true,
-			}, nil
-		},
-	}
-
 	observer := &MockToolStateObserver{}
 
-	tsm := domain.NewToolStateMachine(ctx, toolCall, executor)
-	tsm.RegisterObserver(observer)
+	tsm := core.NewToolStateMachine(toolCall)
+	tsm.AddObserver(observer)
 
 	// Start execution
-	err := tsm.Start()
+	err := tsm.Start(ctx)
 	if err != nil {
 		t.Fatalf("Start() failed: %v", err)
 	}
 
 	// Verify state
-	if state := tsm.CurrentState(); state != domain.ToolStateAwaitingInput {
+	if state := tsm.CurrentState(ctx); state != core.ToolStateAwaitingInput {
 		t.Errorf("Expected state AwaitingInput, got %v", state)
 	}
 
@@ -170,7 +147,7 @@ func TestToolStateMachine_AwaitingInput(t *testing.T) {
 	}
 
 	// Verify it's awaiting interaction
-	if !tsm.IsAwaitingInteraction() {
+	if !tsm.IsAwaitingInteraction(ctx) {
 		t.Error("Expected tool to be awaiting interaction")
 	}
 
@@ -180,7 +157,7 @@ func TestToolStateMachine_AwaitingInput(t *testing.T) {
 	}
 	if len(observer.transitions) >= 2 {
 		trans := observer.transitions[1]
-		if trans.newState != domain.ToolStateAwaitingInput {
+		if trans.newState != core.ToolStateAwaitingInput {
 			t.Errorf("Expected transition to AwaitingInput, got %v", trans.newState)
 		}
 		if trans.elicitation == nil {
@@ -201,44 +178,24 @@ func TestToolStateMachine_AwaitingAuth(t *testing.T) {
 		Arguments: `{"path": "/etc/passwd"}`,
 	}
 
-	authSpec := &core.AuthorizationSpec{
-		Resource: "/etc/passwd",
-		Action:   "read",
-		Reason:   "Need to check user configuration",
-		Scopes:   []string{"file:read"},
-	}
-
-	executor := &MockToolExecutor{
-		executeFunc: func(tc core.ToolCall) (core.ToolExecutionResult, error) {
-			return core.ToolExecutionResult{
-				Result: "awaiting authorization",
-				Command: &core.Command{
-					StopIteration: true,
-					Authorization: authSpec,
-				},
-				StopIteration: true,
-			}, nil
-		},
-	}
-
 	observer := &MockToolStateObserver{}
 
-	tsm := domain.NewToolStateMachine(ctx, toolCall, executor)
-	tsm.RegisterObserver(observer)
+	tsm := core.NewToolStateMachine(toolCall)
+	tsm.AddObserver(observer)
 
 	// Start execution
-	err := tsm.Start()
+	err := tsm.Start(ctx)
 	if err != nil {
 		t.Fatalf("Start() failed: %v", err)
 	}
 
 	// Verify state
-	if state := tsm.CurrentState(); state != domain.ToolStateAwaitingAuth {
+	if state := tsm.CurrentState(ctx); state != core.ToolStateAwaitingAuth {
 		t.Errorf("Expected state AwaitingAuth, got %v", state)
 	}
 
 	// Verify it's awaiting interaction
-	if !tsm.IsAwaitingInteraction() {
+	if !tsm.IsAwaitingInteraction(ctx) {
 		t.Error("Expected tool to be awaiting interaction")
 	}
 
@@ -248,7 +205,7 @@ func TestToolStateMachine_AwaitingAuth(t *testing.T) {
 	}
 	if len(observer.transitions) >= 2 {
 		trans := observer.transitions[1]
-		if trans.newState != domain.ToolStateAwaitingAuth {
+		if trans.newState != core.ToolStateAwaitingAuth {
 			t.Errorf("Expected transition to AwaitingAuth, got %v", trans.newState)
 		}
 	}
@@ -266,25 +223,19 @@ func TestToolStateMachine_ErrorDuringExecution(t *testing.T) {
 		Arguments: `{}`,
 	}
 
-	executor := &MockToolExecutor{
-		executeFunc: func(tc core.ToolCall) (core.ToolExecutionResult, error) {
-			return core.ToolExecutionResult{}, errors.New("tool execution failed")
-		},
-	}
-
 	observer := &MockToolStateObserver{}
 
-	tsm := domain.NewToolStateMachine(ctx, toolCall, executor)
-	tsm.RegisterObserver(observer)
+	tsm := core.NewToolStateMachine(toolCall)
+	tsm.AddObserver(observer)
 
 	// Start execution
-	err := tsm.Start()
+	err := tsm.Start(ctx)
 	if err != nil {
 		t.Fatalf("Start() failed: %v", err)
 	}
 
 	// Verify state
-	if state := tsm.CurrentState(); state != domain.ToolStateError {
+	if state := tsm.CurrentState(ctx); state != core.ToolStateError {
 		t.Errorf("Expected state Error, got %v", state)
 	}
 
@@ -298,7 +249,7 @@ func TestToolStateMachine_ErrorDuringExecution(t *testing.T) {
 	}
 
 	// Verify it's terminal
-	if !tsm.IsTerminal() {
+	if !tsm.IsTerminal(ctx) {
 		t.Error("Expected tool to be in terminal state")
 	}
 
@@ -317,37 +268,18 @@ func TestToolStateMachine_IsTerminal(t *testing.T) {
 		Arguments: `{}`,
 	}
 
-	// Test completed state is terminal
-	executor := &MockToolExecutor{
-		executeFunc: func(tc core.ToolCall) (core.ToolExecutionResult, error) {
-			return core.ToolExecutionResult{Result: "done"}, nil
-		},
-	}
+	tsm := core.NewToolStateMachine(toolCall)
+	tsm.Start(ctx)
 
-	tsm := domain.NewToolStateMachine(ctx, toolCall, executor)
-	tsm.Start()
-
-	if !tsm.IsTerminal() {
+	if !tsm.IsTerminal(ctx) {
 		t.Error("Expected Completed state to be terminal")
 	}
 
 	// Test awaiting state is not terminal
-	tsm2 := domain.NewToolStateMachine(ctx, toolCall, &MockToolExecutor{
-		executeFunc: func(tc core.ToolCall) (core.ToolExecutionResult, error) {
-			return core.ToolExecutionResult{
-				Command: &core.Command{
-					Elicitation: &core.ElicitationSpec{
-						Question: "test?",
-					},
-					StopIteration: true,
-				},
-				StopIteration: true,
-			}, nil
-		},
-	})
-	tsm2.Start()
+	tsm2 := core.NewToolStateMachine(toolCall)
+	tsm2.Start(ctx)
 
-	if tsm2.IsTerminal() {
+	if tsm2.IsTerminal(ctx) {
 		t.Error("Expected AwaitingInput state to not be terminal")
 	}
 }

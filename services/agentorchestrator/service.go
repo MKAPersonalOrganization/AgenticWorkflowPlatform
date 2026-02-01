@@ -81,7 +81,6 @@ func New(
 	}
 
 	s.engine = engine.New(
-		log,
 		s.chatClient,
 		provider,
 		s.reqCtxCapture,

@@ -3,7 +3,6 @@ package engine
 import (
 	"time"
 
-	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/llm"
 )
@@ -21,8 +20,8 @@ func NewEventFactory(agentName string) *EventFactory {
 }
 
 // AssistantStarted creates an AssistantMessageStarted.
-func (f *EventFactory) AssistantStarted(threadID, messageID string) *domain.AssistantMessageStarted {
-	return &domain.AssistantMessageStarted{
+func (f *EventFactory) AssistantStarted(threadID, messageID string) *core.AssistantMessageStarted {
+	return &core.AssistantMessageStarted{
 		ThreadID:  threadID,
 		MessageID: messageID,
 		Timestamp: time.Now(),
@@ -34,9 +33,9 @@ func (f *EventFactory) AssistantCompleted(
 	threadID string,
 	messageID string,
 	content string,
-	toolCalls []domain.ToolCall,
-) *domain.AssistantMessageCompleted {
-	return &domain.AssistantMessageCompleted{
+	toolCalls []core.ToolCall,
+) *core.AssistantMessageCompleted {
+	return &core.AssistantMessageCompleted{
 		ThreadID:  threadID,
 		MessageID: messageID,
 		Content:   content,
@@ -47,8 +46,8 @@ func (f *EventFactory) AssistantCompleted(
 }
 
 // AssistantContentStreamed creates an AssistantContentStreamed.
-func (f *EventFactory) AssistantContentStreamed(threadID, messageID, delta string) *domain.AssistantContentStreamed {
-	return &domain.AssistantContentStreamed{
+func (f *EventFactory) AssistantContentStreamed(threadID, messageID, delta string) *core.AssistantContentStreamed {
+	return &core.AssistantContentStreamed{
 		ThreadID:  threadID,
 		MessageID: messageID,
 		Delta:     delta,
@@ -57,8 +56,8 @@ func (f *EventFactory) AssistantContentStreamed(threadID, messageID, delta strin
 }
 
 // RunStarted creates a RunStarted.
-func (f *EventFactory) RunStarted(threadID, runID string) *domain.RunStarted {
-	return &domain.RunStarted{
+func (f *EventFactory) RunStarted(threadID, runID string) *core.RunStarted {
+	return &core.RunStarted{
 		ThreadID:  threadID,
 		RunID:     runID,
 		Timestamp: time.Now(),
@@ -66,8 +65,8 @@ func (f *EventFactory) RunStarted(threadID, runID string) *domain.RunStarted {
 }
 
 // RunFinished creates a RunFinished.
-func (f *EventFactory) RunFinished(threadID, runID string) *domain.RunFinished {
-	return &domain.RunFinished{
+func (f *EventFactory) RunFinished(threadID, runID string) *core.RunFinished {
+	return &core.RunFinished{
 		ThreadID:  threadID,
 		RunID:     runID,
 		Timestamp: time.Now(),
@@ -75,8 +74,8 @@ func (f *EventFactory) RunFinished(threadID, runID string) *domain.RunFinished {
 }
 
 // RunError creates a RunError.
-func (f *EventFactory) RunError(threadID, message, errorCode string) *domain.RunError {
-	return &domain.RunError{
+func (f *EventFactory) RunError(threadID, message, errorCode string) *core.RunError {
+	return &core.RunError{
 		ThreadID:  threadID,
 		Message:   message,
 		ErrorCode: errorCode,
@@ -91,8 +90,8 @@ func (f *EventFactory) TokenUsageReported(
 	provider string,
 	model string,
 	usage *llm.UsageDetails,
-) *domain.TokenUsageReported {
-	return &domain.TokenUsageReported{
+) *core.TokenUsageReported {
+	return &core.TokenUsageReported{
 		ThreadID:                 threadID,
 		MessageID:                messageID,
 		Provider:                 provider,
@@ -117,8 +116,8 @@ func (f *EventFactory) ToolStart(
 	toolCallID string,
 	toolName string,
 	arguments string,
-) *domain.ToolStart {
-	return &domain.ToolStart{
+) *core.ToolStart {
+	return &core.ToolStart{
 		ThreadID:      threadID,
 		MessageID:     messageID,
 		ToolCallID:    toolCallID,
@@ -137,8 +136,8 @@ func (f *EventFactory) ToolSuccess(
 	toolName string,
 	result string,
 	arguments string,
-) *domain.ToolSuccess {
-	return &domain.ToolSuccess{
+) *core.ToolSuccess {
+	return &core.ToolSuccess{
 		ThreadID:      threadID,
 		MessageID:     messageID,
 		ToolCallID:    toolCallID,
@@ -158,8 +157,8 @@ func (f *EventFactory) ToolError(
 	toolName string,
 	errorMsg string,
 	arguments string,
-) *domain.ToolError {
-	return &domain.ToolError{
+) *core.ToolError {
+	return &core.ToolError{
 		ThreadID:      threadID,
 		MessageID:     messageID,
 		ToolCallID:    toolCallID,
@@ -178,8 +177,8 @@ func (f *EventFactory) ToolNeedsInput(
 	toolCallID string,
 	toolName string,
 	elicitation *core.ElicitationSpec,
-) *domain.ToolNeedsInput {
-	return &domain.ToolNeedsInput{
+) *core.ToolNeedsInput {
+	return &core.ToolNeedsInput{
 		ThreadID:    threadID,
 		MessageID:   messageID,
 		ToolCallID:  toolCallID,
@@ -197,8 +196,8 @@ func (f *EventFactory) ToolNeedsAuth(
 	toolCallID string,
 	toolName string,
 	authSpec *core.AuthorizationSpec,
-) *domain.ToolNeedsAuth {
-	return &domain.ToolNeedsAuth{
+) *core.ToolNeedsAuth {
+	return &core.ToolNeedsAuth{
 		ThreadID:   threadID,
 		MessageID:  messageID,
 		ToolCallID: toolCallID,
@@ -215,8 +214,8 @@ func (f *EventFactory) InputProvided(
 	messageID string,
 	toolCallID string,
 	input string,
-) *domain.InputProvided {
-	return &domain.InputProvided{
+) *core.InputProvided {
+	return &core.InputProvided{
 		ThreadID:   threadID,
 		MessageID:  messageID,
 		ToolCallID: toolCallID,
@@ -231,8 +230,8 @@ func (f *EventFactory) AuthGranted(
 	threadID string,
 	messageID string,
 	toolCallID string,
-) *domain.AuthGranted {
-	return &domain.AuthGranted{
+) *core.AuthGranted {
+	return &core.AuthGranted{
 		ThreadID:   threadID,
 		MessageID:  messageID,
 		ToolCallID: toolCallID,
@@ -246,8 +245,8 @@ func (f *EventFactory) AuthDenied(
 	threadID string,
 	messageID string,
 	toolCallID string,
-) *domain.AuthDenied {
-	return &domain.AuthDenied{
+) *core.AuthDenied {
+	return &core.AuthDenied{
 		ThreadID:   threadID,
 		MessageID:  messageID,
 		ToolCallID: toolCallID,
@@ -262,8 +261,8 @@ func (f *EventFactory) ToolCancelled(
 	messageID string,
 	toolCallID string,
 	toolName string,
-) *domain.ToolCancelled {
-	return &domain.ToolCancelled{
+) *core.ToolCancelled {
+	return &core.ToolCancelled{
 		ThreadID:   threadID,
 		MessageID:  messageID,
 		ToolCallID: toolCallID,
@@ -277,9 +276,9 @@ func (f *EventFactory) ToolCancelled(
 func (f *EventFactory) ActionsDetected(
 	threadID string,
 	messageID string,
-	toolCalls []domain.ToolCall,
-) *domain.ActionsDetected {
-	return &domain.ActionsDetected{
+	toolCalls []core.ToolCall,
+) *core.ActionsDetected {
+	return &core.ActionsDetected{
 		ThreadID:  threadID,
 		MessageID: messageID,
 		ToolCalls: toolCalls,
@@ -291,10 +290,26 @@ func (f *EventFactory) ActionsDetected(
 func (f *EventFactory) TurnFinished(
 	threadID string,
 	messageID string,
-) *domain.TurnFinished {
-	return &domain.TurnFinished{
+) *core.TurnFinished {
+	return &core.TurnFinished{
 		ThreadID:  threadID,
 		MessageID: messageID,
 		Timestamp: time.Now(),
+	}
+}
+
+// ExecutionStateReported creates an ExecutionStateReported event.
+func (f *EventFactory) ExecutionStateReported(
+	threadID string,
+	iteration int,
+	total int,
+	loopStateHex string,
+) *core.ExecutionStateReported {
+	return &core.ExecutionStateReported{
+		ThreadID:     threadID,
+		Iteration:    iteration,
+		Total:        total,
+		LoopStateHex: loopStateHex,
+		Timestamp:    time.Now(),
 	}
 }
