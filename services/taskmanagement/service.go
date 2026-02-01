@@ -8,7 +8,6 @@ import (
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/observability/langfuse"
-	"school-with-ai/services"
 )
 
 // ObservabilityConfig contains configuration for observability and tracing attributes
@@ -26,8 +25,6 @@ type ObservabilityConfig struct {
 type Service struct {
 	log                 *logger.Logger
 	runner              agent.Runner
-	agentRegistry       agent.AgentRegistry // Added this earlier? No, let's see.
-	agentFactory        services.AgentFactory
 	model               agent.Model
 	langfuseTracer      *LangfuseTracer
 	observabilityConfig ObservabilityConfig
@@ -37,7 +34,6 @@ type Service struct {
 func NewService(
 	log *logger.Logger,
 	runner agent.Runner,
-	agentFactory services.AgentFactory,
 	model agent.Model,
 	langfuseTracer *LangfuseTracer,
 	observabilityConfig ObservabilityConfig,
@@ -45,7 +41,6 @@ func NewService(
 	return &Service{
 		log:                 log,
 		runner:              runner,
-		agentFactory:        agentFactory,
 		model:               model,
 		langfuseTracer:      langfuseTracer,
 		observabilityConfig: observabilityConfig,

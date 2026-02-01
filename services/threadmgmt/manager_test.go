@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"school-with-ai/domain"
-	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/logger"
 )
 
@@ -38,13 +37,11 @@ func (m *ConcurrentMockEventStore) AppendWithVersion(ctx context.Context, stream
 	// Simulate conflict
 	if m.conflictCount < m.maxConflicts {
 		m.conflictCount++
-		// If we are at the first append or a specific one, we can simulate that someone else updated the stream
-		// by just returning a conflict error.
-		return 0, core.ErrConcurrencyConflict
+		return 0, domain.ErrConcurrencyConflict
 	}
 
 	if expectedVersion != -2 && expectedVersion != currentVersion {
-		return 0, core.ErrConcurrencyConflict
+		return 0, domain.ErrConcurrencyConflict
 	}
 
 	m.events[streamID] = append(m.events[streamID], events...)
@@ -55,8 +52,8 @@ func (m *ConcurrentMockEventStore) AppendWithVersion(ctx context.Context, stream
 func (m *ConcurrentMockEventStore) ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]domain.Event, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	events := m.events[streamID]
-	if len(events) == 0 {
+	events, ok := m.events[streamID]
+	if !ok {
 		return nil, domain.ErrThreadNotFound
 	}
 	return events, nil
@@ -120,7 +117,7 @@ func TestManager_RetryUpdate(t *testing.T) {
 			t.Fatal("Expected failure after max retries, got success")
 		}
 
-		if !errors.Is(err, core.ErrConcurrencyConflict) {
+		if !errors.Is(err, domain.ErrConcurrencyConflict) {
 			t.Errorf("Expected concurrency conflict error, got: %v", err)
 		}
 	})

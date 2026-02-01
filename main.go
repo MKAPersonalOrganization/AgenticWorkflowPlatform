@@ -368,18 +368,22 @@ func run(ctx context.Context, log *logger.Logger) error {
 		return fmt.Errorf("initializing s3 artifact service: %w", err)
 	}
 
-	// Initialize orchestrator and thread services
-	// Initialize the selected agent framework
 	var runner agent.Runner
 	switch cfg.Orchestration.Framework {
 	case "custom":
-		agentOrchestrator := agentorchestrator.New(log, chatClient, eventLog,
+		agentOrchestrator := agentorchestrator.New(log, eventLog,
 			agentorchestrator.WithArtifactService(artifactService),
-			agentorchestrator.WithMemoryEnabled(cfg.AgentCapabilities.LongTermMemory),
 			agentorchestrator.WithStudentProfileRepository(studentProfileRepo),
 			agentorchestrator.WithEmitter(transientRouter),
 		)
-		runner = custom.NewRunnerAdapter(log, agentOrchestrator)
+		runner = custom.NewRunnerAdapter(
+			log,
+			agentOrchestrator,
+			chatClient,
+			artifactService,
+			studentProfileRepo,
+			cfg.AgentCapabilities.LongTermMemory,
+		)
 	default:
 		return fmt.Errorf("unsupported agent framework: %s", cfg.Orchestration.Framework)
 	}
@@ -391,20 +395,10 @@ func run(ctx context.Context, log *logger.Logger) error {
 		log.Info(ctx, "startup", "status", "debug server started", "host", cfg.Web.DebugHost)
 
 		debugMux.HandleFunc("/api/debug/state-machines/engine", func(w http.ResponseWriter, r *http.Request) {
-			// This currently only works for the custom framework
-			if ao, ok := runner.(*custom.RunnerAdapter); ok {
-				renderGraph(w, log, r, ao.GetService().GetEngineGraph())
-			} else {
-				http.Error(w, "Debug graph not supported for this framework", http.StatusNotFound)
-			}
-		})
-
-		debugMux.HandleFunc("/api/debug/state-machines/tool", func(w http.ResponseWriter, r *http.Request) {
-			if ao, ok := runner.(*custom.RunnerAdapter); ok {
-				renderGraph(w, log, r, ao.GetService().GetToolGraph())
-			} else {
-				http.Error(w, "Debug graph not supported for this framework", http.StatusNotFound)
-			}
+			// Engine and tool graphs are now handled by the custom adapter
+			// but we need to expose them if needed.
+			// (Note: Currently removed from Service to keep it agnostic)
+			http.Error(w, "Debug graphs temporarily unavailable during refactor", http.StatusNotFound)
 		})
 
 		debugServer := &http.Server{
@@ -444,8 +438,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		observabilityConfig.Release = build
 	}
 
-	// Initialize agent factory
-	agentFactory := agentorchestrator.NewFactory(log, chatClient, eventLog)
+	// (agentFactory removed)
 
 	taskManager := taskmanagement.NewAsynqTaskManager(
 		log,
@@ -457,7 +450,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 		},
 		model,
 		runner,
-		agentFactory,
 		langfuseTracer,
 		observabilityConfig,
 	)

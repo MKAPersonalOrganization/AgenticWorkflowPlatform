@@ -45,7 +45,7 @@ func (m *Manager) CreateThread(ctx context.Context, threadID, title string) (*do
 
 	err = m.threadRepo.SaveNew(ctx, thread)
 	if err != nil {
-		if errors.Is(err, core.ErrConcurrencyConflict) {
+		if errors.Is(err, domain.ErrConcurrencyConflict) {
 			// Reload the thread if it was already created by another request
 			t, err := m.threadRepo.Load(ctx, threadID)
 			return t, nil, err
@@ -94,7 +94,7 @@ func (m *Manager) AddUserMessage(ctx context.Context, threadID, messageID, conte
 	if isNewThread {
 		err = m.threadRepo.SaveNew(ctx, thread)
 		if err != nil {
-			if errors.Is(err, core.ErrConcurrencyConflict) {
+			if errors.Is(err, domain.ErrConcurrencyConflict) {
 				// Reload if already exists
 				t, err := m.threadRepo.Load(ctx, threadID)
 				return t, nil, err
@@ -363,7 +363,7 @@ func (m *Manager) retryUpdate(ctx context.Context, threadID string, update func(
 			return thread, nil
 		}
 
-		if !errors.Is(err, core.ErrConcurrencyConflict) {
+		if !errors.Is(err, domain.ErrConcurrencyConflict) {
 			return nil, fmt.Errorf("failed to save thread: %w", err)
 		}
 

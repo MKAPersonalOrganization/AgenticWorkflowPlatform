@@ -5,7 +5,6 @@ import (
 	"iter"
 
 	"school-with-ai/domain"
-	"school-with-ai/foundation/agentsdk/core"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
@@ -28,22 +27,14 @@ type ThreadQueryService interface {
 
 // AgentOrchestrator defines the interface for running agent-based workflows.
 type AgentOrchestrator interface {
-	// Run processes the LLM response using an AgentThread and yields events.
-	Run(ctx context.Context, agentName string, runCtx core.RunContext) iter.Seq2[core.Event, error]
-
-	// ProcessUserMessage processes a user message and coordinates agent execution.
-	// It relies on internal emission/persistence and doesn't return events.
-	ProcessUserMessage(ctx context.Context, agentName, threadID, content, userID string) error
+	// ProcessEvents orchestrates a stream of domain events, providing persistence and broadcasting.
+	ProcessEvents(ctx context.Context, events iter.Seq2[domain.Event, error]) iter.Seq2[domain.Event, error]
 
 	// GetAvailableAgents returns a list of available agents
 	GetAvailableAgents() []string
 }
 
-// AgentFactory creates instances of AgentOrchestrator for specific agents.
-type AgentFactory interface {
-	// Create creates a new AgentOrchestrator with the given configuration and options.
-	Create(config core.AgentConfig, reqCtxCapture **core.RequestContext, toolTracer core.ToolTracer) AgentOrchestrator
-}
+// (AgentFactory removed - no longer needed with new RunnerAdapter design)
 
 // ThreadSummary represents a summary of a thread for list views.
 type ThreadSummary struct {
