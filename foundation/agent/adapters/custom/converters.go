@@ -15,12 +15,7 @@ func ToDomainEvent(e core.Event) domain.Event {
 		return nil
 	}
 
-	// If it already implements domain.Event, we can try to cast it.
-	if de, ok := e.(domain.Event); ok {
-		return de
-	}
-
-	// For specific translations where types differ or need wrapping
+	// Convert core events to proper domain events
 	switch evt := e.(type) {
 	case *core.UserMessageAdded:
 		return &domain.UserMessageAdded{
@@ -54,9 +49,40 @@ func ToDomainEvent(e core.Event) domain.Event {
 		return (*domain.TokenUsageReported)(evt)
 	case *core.ExecutionStateReported:
 		return (*domain.ExecutionStateReported)(evt)
+	case *core.AssistantMessageStarted:
+		return (*domain.AssistantMessageStarted)(evt)
+	case *core.AssistantContentStreamed:
+		return (*domain.AssistantContentStreamed)(evt)
+	case *core.RunStarted:
+		return (*domain.RunStarted)(evt)
+	case *core.RunFinished:
+		return (*domain.RunFinished)(evt)
+	case *core.TurnFinished:
+		return (*domain.TurnFinished)(evt)
+	case *core.AssistantMessageCompleted:
+		// Manual conversion for AssistantMessageCompleted
+		return &domain.AssistantMessageCompleted{
+			ThreadID:  evt.ThreadID,
+			MessageID: evt.MessageID,
+			Timestamp: evt.Timestamp,
+		}
+	default:
+		// Handle value types that need special conversion
+		if evt, ok := e.(core.EngineStateChanged); ok {
+			return &domain.EngineStateChanged{
+				ThreadID:  evt.ThreadID,
+				NewState:  evt.State,  // core.State -> domain.NewState
+				Timestamp: evt.Timestamp,
+			}
+		}
+		
+		// If it's already a domain event, return as-is
+		if de, ok := e.(domain.Event); ok {
+			return de
+		}
+		// Unknown event type, skip it (this might include transient events like streaming)
+		return nil
 	}
-
-	return nil
 }
 
 // MapCoreToolCallsToDomain maps core.ToolCall to domain.ToolCall

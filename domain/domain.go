@@ -15,10 +15,12 @@ var (
 )
 
 // Event is the base interface for all domain events.
+// The sealed() method ensures only domain types can implement this interface.
 type Event interface {
 	EventType() string
 	EventTimestamp() time.Time
 	AggregateID() string // ThreadID
+	sealed()             // Prevents external packages from implementing this interface
 }
 
 // ToolCall represents a tool/function call made by the assistant.
