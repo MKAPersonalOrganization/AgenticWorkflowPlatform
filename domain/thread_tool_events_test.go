@@ -10,28 +10,27 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"school-with-ai/domain"
-	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/threadmgmt"
 )
 
-// MockEventStore implements core.EventStore for testing
+// MockEventStore implements domain.EventStore for testing
 type MockEventStore struct {
-	events map[string][]core.Event
+	events map[string][]domain.Event
 }
 
 func NewMockEventStore() *MockEventStore {
 	return &MockEventStore{
-		events: make(map[string][]core.Event),
+		events: make(map[string][]domain.Event),
 	}
 }
 
-func (m *MockEventStore) AppendWithVersion(ctx context.Context, streamID string, expectedVersion int64, events ...core.Event) (int64, error) {
+func (m *MockEventStore) AppendWithVersion(ctx context.Context, streamID string, expectedVersion int64, events ...domain.Event) (int64, error) {
 	m.events[streamID] = append(m.events[streamID], events...)
 	return int64(len(m.events[streamID])), nil
 }
 
-func (m *MockEventStore) ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]core.Event, error) {
+func (m *MockEventStore) ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]domain.Event, error) {
 	return m.events[streamID], nil
 }
 
@@ -53,7 +52,7 @@ func TestThreadAggregate_RecordToolEvent(t *testing.T) {
 		MessageID:  "msg-789",
 		ToolCallID: "call-abc",
 		ToolName:   "test-tool",
-		Elicitation: &core.ElicitationSpec{
+		Elicitation: &domain.ElicitationSpec{
 			Question: "Please provide input",
 		},
 		AgentName: "test-agent",
@@ -86,7 +85,7 @@ func TestManager_RecordToolEvent(t *testing.T) {
 		MessageID:  "msg-111",
 		ToolCallID: "call-222",
 		ToolName:   "my-tool",
-		Elicitation: &core.ElicitationSpec{
+		Elicitation: &domain.ElicitationSpec{
 			Question: "Need input",
 		},
 		AgentName: "agent-x",

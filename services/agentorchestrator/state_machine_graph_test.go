@@ -1,24 +1,21 @@
 package agentorchestrator_test
 
 import (
-	"os"
 	"strings"
 	"testing"
 
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agentsdk/engine"
-	"school-with-ai/foundation/logger"
 )
 
 func TestGraphGeneration(t *testing.T) {
 	t.Run("Engine Graph", func(t *testing.T) {
 		// Setup minimal dependencies for Engine
-		log := logger.New(os.Stdout, logger.LevelInfo, "TEST", nil)
+		// Setup minimal dependencies for Engine
 		// We need a provider that doesn't crash on nil registry if we are just testing GetGraph
 		// But GetGraph doesn't use the provider.
 
 		e := engine.New(
-			log,
 			nil, // chatClient
 			nil, // provider
 			nil, // reqCtxCapture

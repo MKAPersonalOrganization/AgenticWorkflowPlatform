@@ -55,6 +55,7 @@ type ToolResultAdded struct {
 	ToolCallID string    `json:"toolCallId"`
 	ToolName   string    `json:"toolName,omitempty"`
 	Result     string    `json:"result"`
+	IsError    bool      `json:"isError"`
 	AgentName  string    `json:"agentName,omitempty"`
 	Timestamp  time.Time `json:"timestamp"`
 }

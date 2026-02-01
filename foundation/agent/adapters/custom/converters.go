@@ -9,8 +9,75 @@ import (
 	"school-with-ai/foundation/agentsdk/core"
 )
 
-// ConvertCoreEventToAgent converts core.Event to agent.Event.
-func ConvertCoreEventToAgent(coreEvent core.Event) agent.Event {
+// ToDomainEvent translates a core.Event to a domain.Event.
+func ToDomainEvent(e core.Event) domain.Event {
+	if e == nil {
+		return nil
+	}
+
+	// If it already implements domain.Event, we can try to cast it.
+	if de, ok := e.(domain.Event); ok {
+		return de
+	}
+
+	// For specific translations where types differ or need wrapping
+	switch evt := e.(type) {
+	case *core.UserMessageAdded:
+		return &domain.UserMessageAdded{
+			ThreadID:  evt.ThreadID,
+			MessageID: evt.MessageID,
+			Content:   evt.Content,
+			UserID:    evt.UserID,
+			Timestamp: evt.Timestamp,
+		}
+	case *core.AssistantMessageAdded:
+		return &domain.AssistantMessageAdded{
+			ThreadID:  evt.ThreadID,
+			MessageID: evt.MessageID,
+			Content:   evt.Content,
+			ToolCalls: MapCoreToolCallsToDomain(evt.ToolCalls),
+			AgentName: evt.AgentName,
+			Timestamp: evt.Timestamp,
+		}
+	case *core.ToolResultAdded:
+		return &domain.ToolResultAdded{
+			ThreadID:   evt.ThreadID,
+			MessageID:  evt.MessageID,
+			ToolCallID: evt.ToolCallID,
+			ToolName:   evt.ToolName,
+			Result:     evt.Result,
+			IsError:    evt.IsError,
+			AgentName:  evt.AgentName,
+			Timestamp:  evt.Timestamp,
+		}
+	case *core.TokenUsageReported:
+		return (*domain.TokenUsageReported)(evt)
+	case *core.ExecutionStateReported:
+		return (*domain.ExecutionStateReported)(evt)
+	}
+
+	return nil
+}
+
+// MapCoreToolCallsToDomain maps core.ToolCall to domain.ToolCall
+func MapCoreToolCallsToDomain(calls []core.ToolCall) []domain.ToolCall {
+	if calls == nil {
+		return nil
+	}
+	res := make([]domain.ToolCall, len(calls))
+	for i, c := range calls {
+		res[i] = domain.ToolCall{
+			ID:        c.ID,
+			Type:      c.Type,
+			Name:      c.Name,
+			Arguments: c.Arguments,
+		}
+	}
+	return res
+}
+
+// ConvertCoreEventToAgent converts domain.Event to agent.Event.
+func ConvertCoreEventToAgent(coreEvent domain.Event) agent.Event {
 	if coreEvent == nil {
 		return nil
 	}
@@ -49,8 +116,8 @@ func MapCoreEventType(coreType string) agent.EventType {
 	}
 }
 
-// ConvertCoreEventData converts core event data to agent event data.
-func ConvertCoreEventData(coreEvent core.Event) any {
+// ConvertCoreEventData converts domain event data to agent event data.
+func ConvertCoreEventData(coreEvent domain.Event) any {
 	eventType := coreEvent.EventType()
 
 	switch eventType {

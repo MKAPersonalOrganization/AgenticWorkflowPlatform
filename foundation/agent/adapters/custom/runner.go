@@ -9,46 +9,76 @@ import (
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/agentsdk/engine"
 	"school-with-ai/foundation/agentsdk/registry"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/agentorchestrator"
+	"school-with-ai/services/artifact"
+	memorytools "school-with-ai/services/memory/tools"
+	"school-with-ai/services/studentprofile/middleware"
 )
 
-// RunnerAdapter adapts agentorchestrator.Service to the agent.Runner interface.
+// RunnerAdapter adapts the custom engine and orchestration service to the agent.Runner interface.
 type RunnerAdapter struct {
-	log     *logger.Logger
-	service *agentorchestrator.Service
+	log           *logger.Logger
+	service       *agentorchestrator.Service
+	engine        *engine.Engine
+	artifactStore artifact.Service
+	profileRepo   domain.StudentProfileRepository
+	enableMemory  bool
 }
 
-// NewRunnerAdapter creates a runner adapter from an orchestrator service.
-func NewRunnerAdapter(log *logger.Logger, service *agentorchestrator.Service) agent.Runner {
-	return &RunnerAdapter{
-		log:     log,
-		service: service,
+// NewRunnerAdapter creates a new runner adapter.
+func NewRunnerAdapter(
+	log *logger.Logger,
+	service *agentorchestrator.Service,
+	chatClient engine.ChatClient,
+	artifactStore artifact.Service,
+	profileRepo domain.StudentProfileRepository,
+	enableMemory bool,
+) *RunnerAdapter {
+	r := &RunnerAdapter{
+		log:           log,
+		service:       service,
+		artifactStore: artifactStore,
+		profileRepo:   profileRepo,
+		enableMemory:  enableMemory,
 	}
-}
 
-// GetService returns the underlying orchestrator service.
-func (r *RunnerAdapter) GetService() *agentorchestrator.Service {
-	return r.service
+	provider := &RegistryAgentProvider{
+		registry:      registry.GlobalAgents,
+		artifactStore: r.artifactStore,
+		profileRepo:   r.profileRepo,
+		enableMemory:  r.enableMemory,
+	}
+
+	r.engine = engine.New(
+		chatClient,
+		provider,
+		nil, // reqCtxCapture
+		nil, // toolTracer
+	)
+
+	return r
 }
 
 // Run executes an agent with the given request.
 func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq2[agent.Event, error] {
 	return func(yield func(agent.Event, error) bool) {
-		// Load thread and history
-		threadMgmt := r.service.GetThreadManager()
+		// 1. Thread Loading
+		threadMgmt := r.service.GetThreadManagement()
 		agg, err := threadMgmt.Load(ctx, req.SessionID)
 		if err != nil && !errors.Is(err, domain.ErrThreadNotFound) {
 			yield(nil, fmt.Errorf("failed to load thread: %w", err))
 			return
 		}
 
+		// 2. Map Domain Aggregate to SDK Thread
 		var thread core.AgentThread
 		var messages []core.Message
 
 		if agg != nil {
-			thread = threadMgmt.ToAgentThread(agg)
+			thread = r.toAgentThread(agg)
 			var hErr error
 			messages, hErr = thread.RetrieveFullConversationHistory(ctx)
 			if hErr != nil {
@@ -60,7 +90,7 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 			messages = []core.Message{}
 		}
 
-		// Create RunContext
+		// 3. Prepare Run Context
 		runCtx := core.RunContext{
 			ThreadID:       req.SessionID,
 			UserID:         req.UserID,
@@ -72,34 +102,150 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 		if req.Message != nil && req.Message.ID != "" {
 			runCtx.MessageID = req.Message.ID
 		} else {
-			runCtx.MessageID = core.GenerateID()
+			runCtx.MessageID = domain.GenerateMessageID()
 		}
 
-		// Apply configuration if provided
-		if req.Config != nil {
-			runCtx.Options = core.RunOptions{
-				Temperature:   &req.Config.Temperature,
-				MaxTokens:     &req.Config.MaxTokens,
-				ModelID:       req.Config.ModelID,
-				StopSequences: req.Config.StopSequences,
+		// Restore execution state if resuming
+		if agg != nil && agg.ExecutionState != nil {
+			runCtx.Iteration = agg.ExecutionState.Iteration
+			runCtx.Total = agg.ExecutionState.Total
+			runCtx.LoopState = agg.ExecutionState.LoopStateHex
+		}
+
+		// 4. Run Engine and Pipe through Orchestrator
+		coreEvents := r.engine.Run(ctx, req.AgentName, runCtx)
+
+		// Translate core events to domain events stream
+		domainEvents := func(yield func(domain.Event, error) bool) {
+			for ce, err := range coreEvents {
+				if err != nil {
+					yield(nil, err)
+					return
+				}
+				de := ToDomainEvent(ce)
+				if de != nil {
+					if !yield(de, nil) {
+						return
+					}
+				}
 			}
 		}
 
-		// Run the agent and convert events
-		for event, err := range r.service.Run(ctx, req.AgentName, runCtx) {
+		// Pass to Orchestration Service for persistence and broadcasting
+		orchestratedEvents := r.service.ProcessEvents(ctx, domainEvents)
+
+		// 5. Convert back to agent.Event for the consumer
+		for de, err := range orchestratedEvents {
 			if err != nil {
 				yield(nil, err)
-				continue
+				return
 			}
-			// Convert core.Event to agent.Event
-			agentEvent := ConvertCoreEventToAgent(event)
-			if agentEvent != nil {
-				if !yield(agentEvent, nil) {
+			ae := ConvertCoreEventToAgent(de)
+			if ae != nil {
+				if !yield(ae, nil) {
 					return
 				}
 			}
 		}
 	}
+}
+
+func (r *RunnerAdapter) toAgentThread(aggregate *domain.ThreadAggregate) core.AgentThread {
+	agentThread := core.NewInMemoryThreadWithID(aggregate.ID)
+	messages := r.toCoreMessages(aggregate)
+	if len(messages) > 0 {
+		_ = agentThread.AddMessages(messages)
+	}
+	return agentThread
+}
+
+func (r *RunnerAdapter) toCoreMessages(aggregate *domain.ThreadAggregate) []core.Message {
+	if len(aggregate.Messages) == 0 {
+		return nil
+	}
+	messages := make([]core.Message, len(aggregate.Messages))
+	for i, dm := range aggregate.Messages {
+		messages[i] = core.Message{
+			ID:         dm.ID,
+			Role:       dm.Role,
+			Content:    dm.Content,
+			Timestamp:  dm.Timestamp,
+			ToolCalls:  r.toCoreToolCalls(dm.ToolCalls),
+			ToolCallID: dm.ToolCallID,
+			AgentName:  dm.AgentName,
+			Metadata:   dm.Metadata,
+		}
+
+		// Inject active tool states if present
+		if len(dm.ToolCalls) > 0 && len(aggregate.ActiveToolStates) > 0 {
+			toolStates := make(map[string]domain.ToolCallState)
+			for _, tc := range dm.ToolCalls {
+				if state, ok := aggregate.ActiveToolStates[tc.ID]; ok {
+					toolStates[tc.ID] = state
+				}
+			}
+
+			if len(toolStates) > 0 {
+				if messages[i].Metadata == nil {
+					messages[i].Metadata = make(map[string]any)
+				}
+				messages[i].Metadata["tool_states"] = toolStates
+			}
+		}
+	}
+	return messages
+}
+
+func (r *RunnerAdapter) toCoreToolCalls(dtcs []domain.ToolCall) []core.ToolCall {
+	if dtcs == nil {
+		return nil
+	}
+	result := make([]core.ToolCall, len(dtcs))
+	for i, dtc := range dtcs {
+		result[i] = core.ToolCall{
+			ID:        dtc.ID,
+			Type:      dtc.Type,
+			Name:      dtc.Name,
+			Arguments: dtc.Arguments,
+		}
+	}
+	return result
+}
+
+// RegistryAgentProvider implements engine.AgentProvider using GlobalAgents.
+type RegistryAgentProvider struct {
+	registry      *registry.AgentRegistry
+	artifactStore artifact.Service
+	enableMemory  bool
+	profileRepo   domain.StudentProfileRepository
+}
+
+func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (core.AgentConfig, error) {
+	// Use provided registry
+	factory, ok := p.registry.Get(name)
+	if !ok {
+		return core.AgentConfig{}, fmt.Errorf("agent %s not found", name)
+	}
+
+	// Create new agent config using factory
+	config := factory(ctx, nil)
+
+	// Inject Memory Tool and Context if available and enabled
+	if p.artifactStore != nil && p.enableMemory {
+		memoryTool := memorytools.NewMemoryTool(p.artifactStore)
+		config.Tools = append(config.Tools, memoryTool.Definition()...)
+
+		memoryMiddleware := memorytools.NewMemoryInjectorMiddleware(memoryTool)
+		config.Middleware = append(config.Middleware, memoryMiddleware)
+	}
+
+	// Inject Student Profile Middleware
+	if p.profileRepo != nil {
+		profileMiddleware := middleware.NewStudentProfileInjectorMiddleware(p.profileRepo)
+		config.Middleware = append(config.Middleware, profileMiddleware)
+	}
+
+	return config, nil
 }
 
 // GetAgent returns an agent by name.
@@ -109,9 +255,7 @@ func (r *RunnerAdapter) GetAgent(name string) (agent.Agent, error) {
 		return nil, fmt.Errorf("agent not found: %s", name)
 	}
 
-	// Create the agent config using the factory
 	config := factory(context.Background(), nil)
-
 	return NewAgentAdapter(config), nil
 }
 

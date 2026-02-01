@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"school-with-ai/domain"
-	"school-with-ai/foundation/agentsdk/core"
 
 	"github.com/kurrent-io/KurrentDB-Client-Go/kurrentdb"
 )
@@ -68,7 +67,7 @@ func (s *KurrentDBEventStore) enableSystemProjections() {
 }
 
 // AppendWithVersion adds events to a stream with optimistic concurrency control.
-func (s *KurrentDBEventStore) AppendWithVersion(ctx context.Context, streamID string, expectedVersion int64, events ...core.Event) (int64, error) {
+func (s *KurrentDBEventStore) AppendWithVersion(ctx context.Context, streamID string, expectedVersion int64, events ...domain.Event) (int64, error) {
 	if len(events) == 0 {
 		return 0, nil
 	}
@@ -114,7 +113,7 @@ func (s *KurrentDBEventStore) AppendWithVersion(ctx context.Context, streamID st
 	if err != nil {
 		// Check if it's a concurrency conflict
 		if strings.Contains(err.Error(), "WrongExpectedVersion") {
-			return 0, core.ErrConcurrencyConflict
+			return 0, domain.ErrConcurrencyConflict
 		}
 		return 0, fmt.Errorf("failed to append to stream: %w", err)
 	}
@@ -127,7 +126,7 @@ func (s *KurrentDBEventStore) AppendWithVersion(ctx context.Context, streamID st
 }
 
 // ReadStream reads all events for a stream from a specific version.
-func (s *KurrentDBEventStore) ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]core.Event, error) {
+func (s *KurrentDBEventStore) ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]domain.Event, error) {
 	// Check for negative version before converting int64 to uint64
 	if fromVersion < 0 {
 		return nil, fmt.Errorf("%w: %d", ErrInvalidFromVersion, fromVersion)
@@ -141,11 +140,11 @@ func (s *KurrentDBEventStore) ReadStream(ctx context.Context, streamID string, f
 	stream, err := s.client.ReadStream(ctx, streamID, readOpts, 4096)
 	if err != nil {
 		// Return empty slice on stream not found (matches in-memory behavior)
-		return []core.Event{}, nil
+		return []domain.Event{}, nil
 	}
 	defer stream.Close()
 
-	var events []core.Event
+	var events []domain.Event
 	for {
 		resolvedEvent, err := stream.Recv()
 		if errors.Is(err, io.EOF) {
@@ -156,7 +155,7 @@ func (s *KurrentDBEventStore) ReadStream(ctx context.Context, streamID string, f
 			errMsg := err.Error()
 			if errMsg != "" && (errMsg == "stream is not found" ||
 				(len(errMsg) > 30 && errMsg[:30] == "[ErrorCodeResourceNotFound] a ")) {
-				return []core.Event{}, nil
+				return []domain.Event{}, nil
 			}
 
 			return nil, fmt.Errorf("failed to receive event: %w", err)
@@ -186,8 +185,8 @@ func (s *KurrentDBEventStore) Close() error {
 }
 
 // convertFromRecordedEvent converts a KurrentDB RecordedEvent to a domain event.
-func (s *KurrentDBEventStore) convertFromRecordedEvent(recordedEvent *kurrentdb.RecordedEvent) (core.Event, error) {
-	var event core.Event
+func (s *KurrentDBEventStore) convertFromRecordedEvent(recordedEvent *kurrentdb.RecordedEvent) (domain.Event, error) {
+	var event domain.Event
 
 	switch recordedEvent.EventType {
 	// Domain events (persisted)
@@ -460,5 +459,5 @@ func (s *KurrentDBEventStore) readFromAllStream(ctx context.Context) ([]string, 
 	return result, nil
 }
 
-// Verify KurrentDBEventStore implements core.EventStore.
-var _ core.EventStore = (*KurrentDBEventStore)(nil)
+// Verify KurrentDBEventStore implements domain.EventStore.
+var _ domain.EventStore = (*KurrentDBEventStore)(nil)

@@ -8,7 +8,6 @@ import (
 
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/services"
 
 	"github.com/hibiken/asynq"
 )
@@ -44,7 +43,6 @@ func NewAsynqTaskManager(
 	config AsynqConfig,
 	model agent.Model,
 	runner agent.Runner, // decouple from concrete implementation
-	agentFactory services.AgentFactory,
 	langfuseTracer *LangfuseTracer,
 	observabilityConfig ObservabilityConfig,
 ) *AsynqTaskManager {
@@ -77,7 +75,6 @@ func NewAsynqTaskManager(
 	orchestrationService := NewService(
 		log,
 		runner,
-		agentFactory,
 		model,
 		langfuseTracer,
 		observabilityConfig,

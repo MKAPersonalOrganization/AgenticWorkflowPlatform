@@ -5,8 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"school-with-ai/foundation/agentsdk/core"
-
 	"github.com/qmuntal/stateless"
 )
 
@@ -20,7 +18,7 @@ type ToolExecutionResult struct {
 	Result        string
 	IsError       bool // True if the tool execution resulted in an error
 	StopIteration bool
-	Command       *core.Command
+	Command       any
 }
 
 // ToolExecutionResults represents the outcome of executing multiple tool calls.
@@ -84,7 +82,7 @@ type ToolStateObserver interface {
 		oldState ToolState,
 		newState ToolState,
 		result *ToolExecutionResult,
-		elicitation *core.ElicitationSpec,
+		elicitation *ElicitationSpec,
 	)
 }
 
@@ -92,26 +90,21 @@ type ToolStateObserver interface {
 
 // ToolStateMachine manages the lifecycle of a single tool execution.
 // It is safe for concurrent use by multiple goroutines.
-// The stateless.StateMachine library is internally thread-safe, so we only
-// need to protect access to our own fields (result, elicitation, observers).
 type ToolStateMachine struct {
 	mu          sync.Mutex // Protects result, elicitation, and observers fields only
 	sm          *stateless.StateMachine
-	toolCall    *core.ToolCall
+	toolCall    *ToolCall
 	result      *ToolExecutionResult
-	elicitation *core.ElicitationSpec
-	executor    core.ToolExecutor
+	elicitation *ElicitationSpec
+	authSpec    *AuthorizationSpec
 	observers   []ToolStateObserver
 	ctx         context.Context
 }
 
 // NewToolStateMachine creates a new tool state machine for a given tool call.
-func NewToolStateMachine(ctx context.Context, tc *core.ToolCall, executor core.ToolExecutor) *ToolStateMachine {
+func NewToolStateMachine(ctx context.Context, tc *ToolCall) *ToolStateMachine {
 	if tc == nil {
 		panic("toolCall cannot be nil")
-	}
-	if executor == nil {
-		panic("executor cannot be nil")
 	}
 	if ctx == nil {
 		ctx = context.Background()
@@ -119,7 +112,6 @@ func NewToolStateMachine(ctx context.Context, tc *core.ToolCall, executor core.T
 
 	tsm := &ToolStateMachine{
 		toolCall: tc,
-		executor: executor,
 		ctx:      ctx,
 	}
 	tsm.setup()
@@ -137,15 +129,15 @@ func (t *ToolStateMachine) setup() {
 	// Configure ToolStateExecuting
 	t.sm.Configure(ToolStateExecuting).
 		OnEntryFrom(TrigToolStart, func(_ context.Context, _ ...any) error {
-			t.notifyStateChange(ToolStateIdle, ToolStateExecuting)
+			t.notifyObservers(ToolStateIdle, ToolStateExecuting)
 			return t.executeToolLogic(context.Background())
 		}).
 		OnEntryFrom(TrigInputProvided, func(_ context.Context, _ ...any) error {
-			t.notifyStateChange(ToolStateAwaitingInput, ToolStateExecuting)
+			t.notifyObservers(ToolStateAwaitingInput, ToolStateExecuting)
 			return t.executeToolLogic(context.Background())
 		}).
 		OnEntryFrom(TrigAuthGranted, func(_ context.Context, _ ...any) error {
-			t.notifyStateChange(ToolStateAwaitingAuth, ToolStateExecuting)
+			t.notifyObservers(ToolStateAwaitingAuth, ToolStateExecuting)
 			return t.executeToolLogic(context.Background())
 		}).
 		Permit(TrigToolSuccess, ToolStateCompleted).
@@ -177,65 +169,19 @@ func (t *ToolStateMachine) setup() {
 
 // executeToolLogic executes the actual tool and determines the next trigger.
 func (t *ToolStateMachine) executeToolLogic(_ context.Context, _ ...any) error {
-	// Execute the tool via ToolExecutor
-	execResult, err := t.executor.Execute(*t.toolCall)
-
-	// Build result
-	result := &ToolExecutionResult{
-		ToolCallID:    t.toolCall.ID,
-		ToolName:      t.toolCall.Name,
-		Arguments:     t.toolCall.Arguments,
-		StopIteration: execResult.StopIteration,
-		Command:       execResult.Command,
-	}
-
-	if err != nil {
-		result.Result = err.Error()
-		result.IsError = true
-		t.mu.Lock()
-		t.result = result
-		t.mu.Unlock()
-		return t.sm.Fire(TrigToolError)
-	}
-
-	result.Result = execResult.Result
-
-	// Check if tool returned a Command with special instructions
-	if execResult.Command != nil {
-		// Check for elicitation request
-		if execResult.Command.Elicitation != nil {
-			t.mu.Lock()
-			t.elicitation = execResult.Command.Elicitation
-			t.result = result
-			t.mu.Unlock()
-			return t.sm.Fire(TrigToolNeedsInput)
-		}
-
-		// Check for authorization request
-		if execResult.Command.Authorization != nil {
-			t.mu.Lock()
-			t.result = result
-			t.mu.Unlock()
-			return t.sm.Fire(TrigToolNeedsAuth)
-		}
-	}
-
-	// Normal successful completion
-	t.mu.Lock()
-	t.result = result
-	t.mu.Unlock()
-	return t.sm.Fire(TrigToolSuccess)
+	// Execute the tool - logic moved to adapter to protect domain
+	return nil
 }
 
 // onEnterAwaitingInput is called when entering the AwaitingInput state.
 func (t *ToolStateMachine) onEnterAwaitingInput(_ context.Context, _ ...any) error {
-	t.notifyStateChange(ToolStateExecuting, ToolStateAwaitingInput)
+	t.notifyObservers(ToolStateExecuting, ToolStateAwaitingInput)
 	return nil
 }
 
 // onEnterAwaitingAuth is called when entering the AwaitingAuth state.
 func (t *ToolStateMachine) onEnterAwaitingAuth(_ context.Context, _ ...any) error {
-	t.notifyStateChange(ToolStateExecuting, ToolStateAwaitingAuth)
+	t.notifyObservers(ToolStateExecuting, ToolStateAwaitingAuth)
 	return nil
 }
 
@@ -245,7 +191,7 @@ func (t *ToolStateMachine) onEnterCompleted(_ context.Context, _ ...any) error {
 	if t.elicitation != nil {
 		oldState = ToolStateAwaitingInput
 	}
-	t.notifyStateChange(oldState, ToolStateCompleted)
+	t.notifyObservers(oldState, ToolStateCompleted)
 	return nil
 }
 
@@ -260,35 +206,8 @@ func (t *ToolStateMachine) onEnterError(_ context.Context, _ ...any) error {
 	case ToolStateAwaitingAuth:
 		oldState = ToolStateAwaitingAuth
 	}
-	t.notifyStateChange(oldState, ToolStateError)
+	t.notifyObservers(oldState, ToolStateError)
 	return nil
-}
-
-// Start begins the tool execution by firing the start trigger.
-func (t *ToolStateMachine) Start() error {
-	return t.sm.Fire(TrigToolStart)
-}
-
-// ProvideInput provides user input to resume execution from AwaitingInput state.
-func (t *ToolStateMachine) ProvideInput(input string) error {
-	// Store input for resumption
-	// This would be handled by the tool executor on next execution
-	return t.sm.Fire(TrigInputProvided)
-}
-
-// GrantAuth grants authorization to resume execution from AwaitingAuth state.
-func (t *ToolStateMachine) GrantAuth() error {
-	return t.sm.Fire(TrigAuthGranted)
-}
-
-// DenyAuth denials authorization, causing the tool to error.
-func (t *ToolStateMachine) DenyAuth() error {
-	return t.sm.Fire(TrigAuthDenied)
-}
-
-// Cancel cancels the tool execution.
-func (t *ToolStateMachine) Cancel() error {
-	return t.sm.Fire(TrigToolCancelled)
 }
 
 // CurrentState returns the current state of the tool.
@@ -304,10 +223,35 @@ func (t *ToolStateMachine) Result() *ToolExecutionResult {
 }
 
 // Elicitation returns the elicitation spec if the tool is awaiting input.
-func (t *ToolStateMachine) Elicitation() *core.ElicitationSpec {
+func (t *ToolStateMachine) Elicitation() *ElicitationSpec {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return t.elicitation
+}
+
+// Start begins the tool execution.
+func (t *ToolStateMachine) Start() error {
+	return t.sm.Fire(TrigToolStart)
+}
+
+// ProvideInput provides user input to resume execution.
+func (t *ToolStateMachine) ProvideInput(input string) error {
+	return t.sm.Fire(TrigInputProvided)
+}
+
+// GrantAuth grants authorization to resume execution.
+func (t *ToolStateMachine) GrantAuth() error {
+	return t.sm.Fire(TrigAuthGranted)
+}
+
+// DenyAuth denials authorization, causing the tool to error.
+func (t *ToolStateMachine) DenyAuth() error {
+	return t.sm.Fire(TrigAuthDenied)
+}
+
+// Cancel cancels the tool execution.
+func (t *ToolStateMachine) Cancel() error {
+	return t.sm.Fire(TrigToolCancelled)
 }
 
 // RegisterObserver registers a state change observer.
@@ -317,9 +261,54 @@ func (t *ToolStateMachine) RegisterObserver(observer ToolStateObserver) {
 	t.observers = append(t.observers, observer)
 }
 
-// notifyStateChange notifies all observers of a state transition.
-// Calls observers without holding the lock to prevent deadlocks.
-func (t *ToolStateMachine) notifyStateChange(oldState, newState ToolState) {
+// IsTerminal returns true if the tool is in a terminal state.
+func (t *ToolStateMachine) IsTerminal() bool {
+	state := t.sm.MustState().(ToolState)
+	return state == ToolStateCompleted || state == ToolStateError
+}
+
+// IsAwaitingInteraction returns true if the tool is awaiting user interaction.
+func (t *ToolStateMachine) IsAwaitingInteraction() bool {
+	state := t.sm.MustState().(ToolState)
+	return state == ToolStateAwaitingInput || state == ToolStateAwaitingAuth
+}
+
+// FireSuccess transitions to the completed state with the given result.
+func (t *ToolStateMachine) FireSuccess(result *ToolExecutionResult) error {
+	t.mu.Lock()
+	t.result = result
+	t.mu.Unlock()
+	return t.sm.Fire(TrigToolSuccess)
+}
+
+// FireError transitions to the error state with the given result.
+func (t *ToolStateMachine) FireError(result *ToolExecutionResult) error {
+	t.mu.Lock()
+	t.result = result
+	t.mu.Unlock()
+	return t.sm.Fire(TrigToolError)
+}
+
+// FireNeedsInput transitions to the awaiting input state.
+func (t *ToolStateMachine) FireNeedsInput(elicitation *ElicitationSpec, result *ToolExecutionResult) error {
+	t.mu.Lock()
+	t.elicitation = elicitation
+	t.result = result
+	t.mu.Unlock()
+	return t.sm.Fire(TrigToolNeedsInput)
+}
+
+// FireNeedsAuth transitions to the awaiting auth state.
+func (t *ToolStateMachine) FireNeedsAuth(authSpec *AuthorizationSpec, result *ToolExecutionResult) error {
+	t.mu.Lock()
+	t.authSpec = authSpec
+	t.result = result
+	t.mu.Unlock()
+	return t.sm.Fire(TrigToolNeedsAuth)
+}
+
+// notifyObservers notifies all observers of a state transition.
+func (t *ToolStateMachine) notifyObservers(oldState, newState ToolState) {
 	t.mu.Lock()
 
 	// Copy result if needed
@@ -343,27 +332,7 @@ func (t *ToolStateMachine) notifyStateChange(oldState, newState ToolState) {
 	}
 }
 
-// IsTerminal returns true if the tool is in a terminal state.
-func (t *ToolStateMachine) IsTerminal() bool {
-	state := t.sm.MustState().(ToolState)
-	return state == ToolStateCompleted || state == ToolStateError
-}
-
-// IsAwaitingInteraction returns true if the tool is awaiting user interaction.
-func (t *ToolStateMachine) IsAwaitingInteraction() bool {
-	state := t.sm.MustState().(ToolState)
-	return state == ToolStateAwaitingInput || state == ToolStateAwaitingAuth
-}
-
-// IsAwaitingInput returns true if the tool is specifically awaiting elicitation input.
-func (t *ToolStateMachine) IsAwaitingInput() bool {
-	return t.sm.MustState().(ToolState) == ToolStateAwaitingInput
-}
-
-// IsAwaitingAuth returns true if the tool is specifically awaiting authorization.
-func (t *ToolStateMachine) IsAwaitingAuth() bool {
-	return t.sm.MustState().(ToolState) == ToolStateAwaitingAuth
-}
+// -- Events --
 
 // ToolStart is emitted when a tool begins execution.
 type ToolStart struct {
@@ -414,28 +383,28 @@ func (e ToolError) AggregateID() string       { return e.ThreadID }
 
 // ToolNeedsInput is emitted when a tool requests user input (elicitation).
 type ToolNeedsInput struct {
-	ThreadID    string                `json:"threadId"`
-	MessageID   string                `json:"messageId"`
-	ToolCallID  string                `json:"toolCallId"`
-	ToolName    string                `json:"toolName"`
-	Elicitation *core.ElicitationSpec `json:"elicitation"`
-	AgentName   string                `json:"agentName"`
-	Timestamp   time.Time             `json:"timestamp"`
+	ThreadID    string           `json:"threadId"`
+	MessageID   string           `json:"messageId"`
+	ToolCallID  string           `json:"toolCallId"`
+	ToolName    string           `json:"toolName"`
+	Elicitation *ElicitationSpec `json:"elicitation"`
+	AgentName   string           `json:"agentName"`
+	Timestamp   time.Time        `json:"timestamp"`
 }
 
 func (e ToolNeedsInput) EventType() string         { return "ToolNeedsInput" }
 func (e ToolNeedsInput) EventTimestamp() time.Time { return e.Timestamp }
 func (e ToolNeedsInput) AggregateID() string       { return e.ThreadID }
 
-// ToolNeedsAuth is emitted when a tool requests user authorization.
+// ToolNeedsAuth struct
 type ToolNeedsAuth struct {
-	ThreadID   string                  `json:"threadId"`
-	MessageID  string                  `json:"messageId"`
-	ToolCallID string                  `json:"toolCallId"`
-	ToolName   string                  `json:"toolName"`
-	AuthSpec   *core.AuthorizationSpec `json:"authSpec"`
-	AgentName  string                  `json:"agentName"`
-	Timestamp  time.Time               `json:"timestamp"`
+	ThreadID   string             `json:"threadId"`
+	MessageID  string             `json:"messageId"`
+	ToolCallID string             `json:"toolCallId"`
+	ToolName   string             `json:"toolName"`
+	AuthSpec   *AuthorizationSpec `json:"authSpec"`
+	AgentName  string             `json:"agentName"`
+	Timestamp  time.Time          `json:"timestamp"`
 }
 
 func (e ToolNeedsAuth) EventType() string         { return "ToolNeedsAuth" }

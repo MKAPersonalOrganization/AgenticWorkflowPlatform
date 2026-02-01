@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"school-with-ai/domain"
-	"school-with-ai/foundation/agentsdk/core"
 )
 
 func TestThreadAggregate_ActiveToolStates(t *testing.T) {
@@ -19,7 +18,7 @@ func TestThreadAggregate_ActiveToolStates(t *testing.T) {
 		MessageID:  "msg-1",
 		ToolCallID: "call-1",
 		ToolName:   "my-tool",
-		Elicitation: &core.ElicitationSpec{
+		Elicitation: &domain.ElicitationSpec{
 			Question: "Input?",
 		},
 		AgentName: "agent",
@@ -69,7 +68,7 @@ func TestThreadAggregate_ActiveToolStates_Auth(t *testing.T) {
 		MessageID:  "msg-1",
 		ToolCallID: "call-2",
 		ToolName:   "auth-tool",
-		AuthSpec: &core.AuthorizationSpec{
+		AuthSpec: &domain.AuthorizationSpec{
 			Resource: "res",
 			Action:   "read",
 		},
