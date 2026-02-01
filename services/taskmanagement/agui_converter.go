@@ -119,20 +119,6 @@ func ToAguiEvents(event agent.Event) []any {
 			}),
 		)}
 
-	case agent.EventTypeHandoff:
-		data, ok := event.Data().(*agent.HandoffEvent)
-		if !ok {
-			return nil
-		}
-		return []any{aguievents.NewCustomEvent(
-			"AGENT_HANDOFF",
-			aguievents.WithValue(map[string]any{
-				"from":   data.FromAgent,
-				"to":     data.ToAgent,
-				"reason": data.Reason,
-			}),
-		)}
-
 	case agent.EventTypeError:
 		data, ok := event.Data().(*agent.ErrorEvent)
 		if !ok {
@@ -301,7 +287,7 @@ func toAguiEventsLegacy(event any) []any {
 			}),
 		)}
 
-	case *domain.UserMessageAdded, *domain.AssistantMessageAdded, *domain.ToolResultAdded, *domain.ThreadCreated, *domain.AgentHandoff:
+	case *domain.UserMessageAdded, *domain.AssistantMessageAdded, *domain.ToolResultAdded, *domain.ThreadCreated:
 		// These are handled by the frontend locally or via snapshots, no need to stream
 		return []any{}
 
