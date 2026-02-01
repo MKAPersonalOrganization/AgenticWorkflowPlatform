@@ -6,8 +6,8 @@ import (
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/core/middleware"
 	"school-with-ai/foundation/i18n"
-	"school-with-ai/services/agentorchestrator/agents/math/tools"
-	sharedtools "school-with-ai/services/agentorchestrator/agents/shared/tools"
+	mathtools "school-with-ai/services/agentorchestrator/agents/math/tools"
+	sharedtools "school-with-ai/services/agentorchestrator/agents/tools"
 )
 
 // domainTools returns the domain-specific tools for the math instructor.
@@ -19,8 +19,8 @@ func domainTools() []core.Tool {
 		&sharedtools.DivideTool{},
 		&sharedtools.PowerTool{},
 		&sharedtools.SqrtTool{},
-		tools.NewPlotTool(),    // gnuplot-based plotting
-		tools.NewAnimateTool(), // gnuplot-based animations
+		mathtools.NewPlotTool(),    // gnuplot-based plotting
+		mathtools.NewAnimateTool(), // gnuplot-based animations
 	}
 }
 
@@ -76,8 +76,8 @@ func CreateMathInstructor(ctx context.Context, notifier core.EventNotifier) core
 				i18n.T(ctx, "math.practice_area4"),
 			},
 		},
-		Interactive:  true,
-		ExtraRules:   i18n.T(ctx, "math.extra_rules"),
+		Interactive: true,
+		ExtraRules:  i18n.T(ctx, "math.extra_rules"),
 	})
 	if err != nil {
 		panic(err)

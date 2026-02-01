@@ -6,8 +6,8 @@ import (
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/core/middleware"
 	"school-with-ai/foundation/i18n"
-	sharedtools "school-with-ai/services/agentorchestrator/agents/shared/tools"
 	"school-with-ai/services/agentorchestrator/agents/statistics/tools"
+	sharedtools "school-with-ai/services/agentorchestrator/agents/tools"
 )
 
 // domainTools returns the domain-specific tools for the statistics instructor.
@@ -110,8 +110,8 @@ func CreateStatisticsInstructor(ctx context.Context, notifier core.EventNotifier
 				i18n.T(ctx, "statistics.practice_area4"),
 			},
 		},
-		Interactive:  true,
-		ExtraRules:   i18n.T(ctx, "statistics.extra_rules"),
+		Interactive: true,
+		ExtraRules:  i18n.T(ctx, "statistics.extra_rules"),
 	})
 	if err != nil {
 		panic(err)

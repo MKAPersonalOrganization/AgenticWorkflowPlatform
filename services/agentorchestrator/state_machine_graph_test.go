@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"school-with-ai/domain"
+	"school-with-ai/foundation/agentsdk/engine"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/services/agentorchestrator/engine"
 	"school-with-ai/services/threadmgmt"
 )
 
@@ -38,7 +38,7 @@ func TestGraphGeneration(t *testing.T) {
 		if !strings.HasPrefix(graph, "digraph") {
 			t.Errorf("expected graph to start with 'digraph', got %s", graph)
 		}
-        t.Logf("Engine Graph:\n%s", graph)
+		t.Logf("Engine Graph:\n%s", graph)
 	})
 
 	t.Run("Tool Graph", func(t *testing.T) {
@@ -49,6 +49,6 @@ func TestGraphGeneration(t *testing.T) {
 		if !strings.HasPrefix(graph, "digraph") {
 			t.Errorf("expected graph to start with 'digraph', got %s", graph)
 		}
-         t.Logf("Tool Graph:\n%s", graph)
+		t.Logf("Tool Graph:\n%s", graph)
 	})
 }

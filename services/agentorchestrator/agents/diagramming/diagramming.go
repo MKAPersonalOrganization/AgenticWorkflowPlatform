@@ -7,7 +7,7 @@ import (
 	"school-with-ai/foundation/agentsdk/core/middleware"
 	"school-with-ai/foundation/i18n"
 	"school-with-ai/services/agentorchestrator/agents/diagramming/tools"
-	sharedtools "school-with-ai/services/agentorchestrator/agents/shared/tools"
+	sharedtools "school-with-ai/services/agentorchestrator/agents/tools"
 )
 
 // domainTools returns the domain-specific tools for the diagramming instructor.
@@ -36,11 +36,11 @@ func CreateDiagrammingInstructor(ctx context.Context, notifier core.EventNotifie
 	}
 
 	prompt, err := core.GenerateSystemPrompt(core.PromptConfig{
-		Role:         i18n.T(ctx, "diagramming.role"),
-		Preamble:     i18n.T(ctx, "diagramming.preamble"),
-		Topic:        i18n.T(ctx, "diagramming.topic"),
-		Interactive:  true,
-		ExtraRules:   i18n.T(ctx, "diagramming.extra_rules"),
+		Role:        i18n.T(ctx, "diagramming.role"),
+		Preamble:    i18n.T(ctx, "diagramming.preamble"),
+		Topic:       i18n.T(ctx, "diagramming.topic"),
+		Interactive: true,
+		ExtraRules:  i18n.T(ctx, "diagramming.extra_rules"),
 	})
 	if err != nil {
 		panic(err)

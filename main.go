@@ -41,14 +41,14 @@ import (
 	"school-with-ai/services/agentorchestrator/agents/diagramming"
 	"school-with-ai/services/agentorchestrator/agents/math"
 	"school-with-ai/services/agentorchestrator/agents/physics"
-	"school-with-ai/services/agentorchestrator/agents/shared"
 	"school-with-ai/services/agentorchestrator/agents/statistics"
 	"school-with-ai/services/artifact"
 	"school-with-ai/services/studentbooks"
 	"school-with-ai/services/taskmanagement"
 	"school-with-ai/services/threadmgmt"
 
-	sharedtools "school-with-ai/services/agentorchestrator/agents/shared/tools"
+	"school-with-ai/foundation/agentsdk/registry"
+	sharedtools "school-with-ai/services/agentorchestrator/agents/tools"
 
 	aguihandlers "school-with-ai/handlers/agui"
 	bannerhandlers "school-with-ai/handlers/banner"
@@ -332,11 +332,11 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// Register all agent factories for routing
 
-	shared.GlobalAgents.Register("math-instructor", math.CreateMathInstructor)
-	shared.GlobalAgents.Register("physics-instructor", physics.CreatePhysicsInstructor)
-	shared.GlobalAgents.Register("chemistry-instructor", chemistry.CreateChemistryInstructor)
-	shared.GlobalAgents.Register("statistics-instructor", statistics.CreateStatisticsInstructor)
-	shared.GlobalAgents.Register("diagramming-instructor", diagramming.CreateDiagrammingInstructor)
+	registry.GlobalAgents.Register("math-instructor", math.CreateMathInstructor)
+	registry.GlobalAgents.Register("physics-instructor", physics.CreatePhysicsInstructor)
+	registry.GlobalAgents.Register("chemistry-instructor", chemistry.CreateChemistryInstructor)
+	registry.GlobalAgents.Register("statistics-instructor", statistics.CreateStatisticsInstructor)
+	registry.GlobalAgents.Register("diagramming-instructor", diagramming.CreateDiagrammingInstructor)
 
 	// Initialize Student Books Service
 	booksSvc := studentbooks.NewFileSystemService("books")
@@ -536,7 +536,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Get("/api/agui/threads/{threadId}/messages", authMiddleware.RequireAuthFunc(aguiHandler.GetMessages))
 	r.Delete("/api/agui/threads/{threadId}", authMiddleware.RequireAuthFunc(handler.DeleteThread))
 	r.Patch("/api/agui/threads/{threadId}", authMiddleware.RequireAuthFunc(handler.UpdateThreadTitle))
-
 
 	// Home route
 	r.Get("/", authMiddleware.RequireAuthFunc(HandleViewChatInputScreen(log)))
