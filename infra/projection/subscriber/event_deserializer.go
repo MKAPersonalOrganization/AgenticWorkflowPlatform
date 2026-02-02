@@ -31,13 +31,6 @@ func deserializeDomainEvent(eventType string, data []byte) (domain.Event, error)
 		}
 		return &evt, nil
 
-	case "ToolResultAdded":
-		var evt domain.ToolResultAdded
-		if err := json.Unmarshal(data, &evt); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal ToolResultAdded: %w", err)
-		}
-		return &evt, nil
-
 	case "ThreadTitleChanged", "ThreadTitleUpdated":
 		var evt domain.ThreadTitleUpdated
 		if err := json.Unmarshal(data, &evt); err != nil {
@@ -63,13 +56,6 @@ func deserializeDomainEvent(eventType string, data []byte) (domain.Event, error)
 		var evt domain.RunFinished
 		if err := json.Unmarshal(data, &evt); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal RunFinished: %w", err)
-		}
-		return &evt, nil
-
-	case "RunError":
-		var evt domain.RunError
-		if err := json.Unmarshal(data, &evt); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal RunError: %w", err)
 		}
 		return &evt, nil
 
@@ -108,17 +94,14 @@ func deserializeDomainEvent(eventType string, data []byte) (domain.Event, error)
 		}
 		return &evt, nil
 
-	case "ToolSuccess":
-		var evt domain.ToolSuccess
+	case "ToolSuccess", "ToolError", "ToolResultAdded":
+		var evt domain.ToolResultAdded
 		if err := json.Unmarshal(data, &evt); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal ToolSuccess: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal ToolResultAdded: %w", err)
 		}
-		return &evt, nil
-
-	case "ToolError":
-		var evt domain.ToolError
-		if err := json.Unmarshal(data, &evt); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal ToolError: %w", err)
+		// For legacy events, set IsError based on event type
+		if eventType == "ToolError" {
+			evt.IsError = true
 		}
 		return &evt, nil
 
@@ -164,33 +147,8 @@ func deserializeDomainEvent(eventType string, data []byte) (domain.Event, error)
 		}
 		return &evt, nil
 
-	case "EngineStateChanged":
-		var evt domain.EngineStateChanged
-		if err := json.Unmarshal(data, &evt); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal EngineStateChanged: %w", err)
-		}
-		return &evt, nil
-
-	case "ActionsDetected":
-		var evt domain.ActionsDetected
-		if err := json.Unmarshal(data, &evt); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal ActionsDetected: %w", err)
-		}
-		return &evt, nil
-
-	case "ExecutionStateReported":
-		var evt domain.ExecutionStateReported
-		if err := json.Unmarshal(data, &evt); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal ExecutionStateReported: %w", err)
-		}
-		return &evt, nil
-
-	case "TurnFinished":
-		var evt domain.TurnFinished
-		if err := json.Unmarshal(data, &evt); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal TurnFinished: %w", err)
-		}
-		return &evt, nil
+	// Prohibited framework events removed per EVENT_CONTRACTS.md:
+	// EngineStateChanged, ActionsDetected, ExecutionStateReported, TurnFinished
 
 	default:
 		return nil, fmt.Errorf("unknown event type: %s", eventType)

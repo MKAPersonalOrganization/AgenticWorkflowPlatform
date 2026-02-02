@@ -214,14 +214,6 @@ func (s *KurrentDBEventStore) convertFromRecordedEvent(recordedEvent *kurrentdb.
 		}
 		event = e
 
-	case "ToolResultAdded":
-		var e domain.ToolResultAdded
-		err := json.Unmarshal(recordedEvent.Data, &e)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal ToolResultAdded: %w", err)
-		}
-		event = e
-
 	case "ThreadTitleChanged", "ThreadTitleUpdated":
 		var e domain.ThreadTitleUpdated
 		err := json.Unmarshal(recordedEvent.Data, &e)
@@ -254,19 +246,16 @@ func (s *KurrentDBEventStore) convertFromRecordedEvent(recordedEvent *kurrentdb.
 		}
 		event = &e
 
-	case "ToolSuccess":
-		var e domain.ToolSuccess
+	case "ToolSuccess", "ToolError", "ToolResultAdded":
+		// Handle both legacy event names and new unified event
+		var e domain.ToolResultAdded
 		err := json.Unmarshal(recordedEvent.Data, &e)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal ToolSuccess: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal ToolResultAdded: %w", err)
 		}
-		event = &e
-
-	case "ToolError":
-		var e domain.ToolError
-		err := json.Unmarshal(recordedEvent.Data, &e)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal ToolError: %w", err)
+		// For legacy events, set IsError based on event type
+		if recordedEvent.EventType == "ToolError" {
+			e.IsError = true
 		}
 		event = &e
 
@@ -318,19 +307,19 @@ func (s *KurrentDBEventStore) convertFromRecordedEvent(recordedEvent *kurrentdb.
 		}
 		event = &e
 
-	case "EngineStateChanged":
-		var e domain.EngineStateChanged
+	case "RunStarted":
+		var e domain.RunStarted
 		err := json.Unmarshal(recordedEvent.Data, &e)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal EngineStateChanged: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal RunStarted: %w", err)
 		}
-		event = e
+		event = &e
 
-	case "ExecutionStateReported":
-		var e domain.ExecutionStateReported
+	case "RunFinished":
+		var e domain.RunFinished
 		err := json.Unmarshal(recordedEvent.Data, &e)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal ExecutionStateReported: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal RunFinished: %w", err)
 		}
 		event = &e
 

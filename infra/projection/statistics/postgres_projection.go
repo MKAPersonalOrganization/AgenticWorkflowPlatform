@@ -28,38 +28,31 @@ func (p *PostgresProjection) RegisterHandlers(router interface {
 	Register(eventPrototype any, handler event.HandlerFunc)
 },
 ) {
-	router.Register(&domain.ToolSuccess{}, func(ctx context.Context, e domain.Event) error {
-		return p.HandleEvent(ctx, e)
-	})
-	router.Register(&domain.ToolError{}, func(ctx context.Context, e domain.Event) error {
+	router.Register(&domain.ToolResultAdded{}, func(ctx context.Context, e domain.Event) error {
 		return p.HandleEvent(ctx, e)
 	})
 	router.Register(&domain.AssistantMessageCompleted{}, func(ctx context.Context, e domain.Event) error {
 		return p.HandleEvent(ctx, e)
 	})
-	router.Register(&domain.RunError{}, func(ctx context.Context, e domain.Event) error {
-		return p.HandleEvent(ctx, e)
-	})
+	// Note: RunError removed per EVENT_CONTRACTS.md - was framework lifecycle event
 }
 
 // HandleEvent processes domain events to update statistics in the database.
 func (p *PostgresProjection) HandleEvent(ctx context.Context, event domain.Event) error {
 	switch e := event.(type) {
-	case *domain.ToolSuccess:
-		return p.updateToolSuccessStats(ctx, e)
-	case *domain.ToolError:
-		return p.updateToolErrorStats(ctx, e)
+	case *domain.ToolResultAdded:
+		if e.IsError {
+			return p.updateToolErrorStats(ctx, e)
+		} else {
+			return p.updateToolSuccessStats(ctx, e)
+		}
 	case *domain.AssistantMessageCompleted:
 		return p.updateMessageStats(ctx, e)
-	case *domain.RunError:
-		// We'll need to figure out which agent was active for RunError.
-		// For now, let's just track it as a global or see if we can get agent from context.
-		return p.updateErrorStats(ctx, e)
 	}
 	return nil
 }
 
-func (p *PostgresProjection) updateToolSuccessStats(ctx context.Context, e *domain.ToolSuccess) error {
+func (p *PostgresProjection) updateToolSuccessStats(ctx context.Context, e *domain.ToolResultAdded) error {
 	query := `
 		INSERT INTO analytics_stats (agent_name, category, name, total_count, successes, failures, last_success, updated_at)
 		VALUES ($1, 'tool', $2, 1, 1, 0, $3, $4)
@@ -83,7 +76,7 @@ func (p *PostgresProjection) updateToolSuccessStats(ctx context.Context, e *doma
 	return nil
 }
 
-func (p *PostgresProjection) updateToolErrorStats(ctx context.Context, e *domain.ToolError) error {
+func (p *PostgresProjection) updateToolErrorStats(ctx context.Context, e *domain.ToolResultAdded) error {
 	query := `
 		INSERT INTO analytics_stats (agent_name, category, name, total_count, successes, failures, last_failure, updated_at)
 		VALUES ($1, 'tool', $2, 1, 0, 1, $3, $4)
@@ -117,22 +110,6 @@ func (p *PostgresProjection) updateMessageStats(ctx context.Context, e *domain.A
 			updated_at = $2
 	`
 	_, err := p.db.ExecContext(ctx, query, e.AgentName, time.Now())
-	return err
-}
-
-func (p *PostgresProjection) updateErrorStats(ctx context.Context, e *domain.RunError) error {
-	// Attempt to get agent name from context if available, otherwise use 'unknown'
-	agentName := "unknown"
-	query := `
-		INSERT INTO analytics_stats (agent_name, category, name, total_count, failures, last_failure, updated_at)
-		VALUES ($1, 'error', 'total', 1, 1, $2, $3)
-		ON CONFLICT (agent_name, category, name) DO UPDATE SET
-			total_count = analytics_stats.total_count + 1,
-			failures = analytics_stats.failures + 1,
-			last_failure = $2,
-			updated_at = $3
-	`
-	_, err := p.db.ExecContext(ctx, query, agentName, e.Timestamp, time.Now())
 	return err
 }
 

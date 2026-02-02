@@ -142,16 +142,10 @@ func ToAguiEvents(event agent.Event) []any {
 func toAguiEventsLegacy(event any) []any {
 	switch evt := event.(type) {
 	case *domain.RunStarted:
-		return []any{aguievents.NewRunStartedEvent(evt.ThreadID, evt.RunID)}
+		return []any{aguievents.NewRunStartedEvent(evt.ThreadID, evt.MessageID)}
 
 	case *domain.RunFinished:
-		return []any{aguievents.NewRunFinishedEvent(evt.ThreadID, evt.RunID)}
-
-	case *domain.RunError:
-		return []any{aguievents.NewRunErrorEvent(
-			evt.Message,
-			aguievents.WithErrorCode(evt.ErrorCode),
-		)}
+		return []any{aguievents.NewRunFinishedEvent(evt.ThreadID, evt.MessageID)}
 
 	case *domain.ThreadTitleUpdated:
 		return []any{aguievents.NewCustomEvent(
@@ -203,27 +197,22 @@ func toAguiEventsLegacy(event any) []any {
 			}),
 		)}
 
-	case *domain.ToolSuccess:
+	case *domain.ToolResultAdded:
+		eventName := "TOOL_RESULT_ADDED"
+		// Backward compatibility: emit legacy event names based on IsError flag
+		if evt.IsError {
+			eventName = "TOOL_ERROR"
+		} else {
+			eventName = "TOOL_SUCCESS"
+		}
+
 		return []any{aguievents.NewCustomEvent(
-			"TOOL_SUCCESS",
+			eventName,
 			aguievents.WithValue(map[string]any{
 				"toolCallId": evt.ToolCallID,
 				"toolName":   evt.ToolName,
 				"result":     evt.Result,
-				"arguments":  evt.ToolArguments,
-				"agentName":  evt.AgentName,
-				"timestamp":  evt.Timestamp,
-			}),
-		)}
-
-	case *domain.ToolError:
-		return []any{aguievents.NewCustomEvent(
-			"TOOL_ERROR",
-			aguievents.WithValue(map[string]any{
-				"toolCallId": evt.ToolCallID,
-				"toolName":   evt.ToolName,
-				"error":      evt.Error,
-				"arguments":  evt.ToolArguments,
+				"isError":    evt.IsError,
 				"agentName":  evt.AgentName,
 				"timestamp":  evt.Timestamp,
 			}),
@@ -287,7 +276,7 @@ func toAguiEventsLegacy(event any) []any {
 			}),
 		)}
 
-	case *domain.UserMessageAdded, *domain.AssistantMessageAdded, *domain.ToolResultAdded, *domain.ThreadCreated:
+	case *domain.UserMessageAdded, *domain.AssistantMessageAdded, *domain.ThreadCreated:
 		// These are handled by the frontend locally or via snapshots, no need to stream
 		return []any{}
 

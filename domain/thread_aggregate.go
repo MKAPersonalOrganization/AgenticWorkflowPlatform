@@ -20,8 +20,6 @@ type ThreadAggregate struct {
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 	IsDeleted        bool
-	EngineState      string
-	ExecutionState   *ExecutionStateReported
 }
 
 // NewThreadAggregate creates a new thread aggregate.
@@ -164,16 +162,6 @@ func (t *ThreadAggregate) RecordToolEvent(event Event) error {
 	return nil
 }
 
-// RecordEngineStateChange records a change in the engine's high-level state.
-func (t *ThreadAggregate) RecordEngineStateChange(event EngineStateChanged) error {
-	if t.IsDeleted {
-		return errors.New("cannot record state change for deleted thread")
-	}
-
-	t.Enqueue(event, t.Apply)
-	return nil
-}
-
 // Apply applies an event to update the thread's state.
 // This is the only place where state mutations happen.
 func (t *ThreadAggregate) Apply(event Event) {
@@ -268,23 +256,26 @@ func (t *ThreadAggregate) Apply(event Event) {
 			t.ActiveToolStates[e.ToolCallID] = state
 		}
 
-	case EngineStateChanged:
-		t.EngineState = e.NewState
+	case AuthDenied:
+		if state, ok := t.ActiveToolStates[e.ToolCallID]; ok {
+			state.Status = "AuthDenied"
+			t.ActiveToolStates[e.ToolCallID] = state
+		}
+
+	case ToolCancelled:
+		// Remove the tool from active states when cancelled
+		delete(t.ActiveToolStates, e.ToolCallID)
 		t.UpdatedAt = e.Timestamp
 
-	case ExecutionStateReported:
-		t.ExecutionState = &e
+	case RunStarted:
+		// Update the thread's last activity timestamp when a run starts
 		t.UpdatedAt = e.Timestamp
-	}
-}
 
-// RecordExecutionState records the engine's internal execution state.
-func (t *ThreadAggregate) RecordExecutionState(event ExecutionStateReported) error {
-	if t.IsDeleted {
-		return errors.New("cannot record execution state on deleted thread")
+	case RunFinished:
+		// Update the thread's last activity timestamp when a run finishes
+		t.UpdatedAt = e.Timestamp
+
 	}
-	t.Enqueue(event, t.Apply)
-	return nil
 }
 
 // StreamName returns the event stream name for this aggregate.

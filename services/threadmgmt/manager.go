@@ -176,20 +176,6 @@ func (m *Manager) RecordToolEvent(ctx context.Context, threadID string, event do
 	})
 }
 
-// RecordEngineStateChange records a change in the engine's high-level state.
-func (m *Manager) RecordEngineStateChange(ctx context.Context, event domain.EngineStateChanged) (*domain.ThreadAggregate, error) {
-	return m.retryUpdate(ctx, event.ThreadID, func(t *domain.ThreadAggregate) error {
-		return t.RecordEngineStateChange(event)
-	})
-}
-
-// RecordExecutionState records the engine's internal execution state (safety limits, loops).
-func (m *Manager) RecordExecutionState(ctx context.Context, event domain.ExecutionStateReported) (*domain.ThreadAggregate, error) {
-	return m.retryUpdate(ctx, event.ThreadID, func(t *domain.ThreadAggregate) error {
-		return t.RecordExecutionState(event)
-	})
-}
-
 // AddToolResultMessage adds a tool result message to the thread.
 func (m *Manager) AddToolResultMessage(ctx context.Context, threadID, messageID, toolCallID, toolName, result, agentName string) (*domain.ThreadAggregate, *domain.ToolResultAdded, error) {
 	thread, err := m.retryUpdate(ctx, threadID, func(t *domain.ThreadAggregate) error {
@@ -268,15 +254,6 @@ func (m *Manager) DeleteThread(ctx context.Context, threadID string) (*domain.Th
 	}
 
 	return event, nil
-}
-
-// GetEngineState retrieves the current engine state for a thread.
-func (m *Manager) GetEngineState(ctx context.Context, threadID string) (string, error) {
-	thread, err := m.threadRepo.Load(ctx, threadID)
-	if err != nil {
-		return "", err
-	}
-	return thread.EngineState, nil
 }
 
 // GetPendingInputToolCall returns the ID of a tool call awaiting user input.

@@ -120,42 +120,22 @@ func (e AssistantMessageCompleted) EventTimestamp() time.Time { return e.Timesta
 func (e AssistantMessageCompleted) AggregateID() string       { return e.ThreadID }
 func (e AssistantMessageCompleted) sealed()                   {}
 
-// RunStarted indicates that message processing has begun.
-type RunStarted struct {
-	ThreadID  string
-	RunID     string
-	Timestamp time.Time
+// ToolStart is emitted when a tool execution began (UI feedback only).
+// This is a transient event - NOT persisted to event store.
+type ToolStart struct {
+	ThreadID      string    `json:"threadId"`
+	MessageID     string    `json:"messageId"`
+	ToolCallID    string    `json:"toolCallId"`
+	ToolName      string    `json:"toolName"`
+	ToolArguments string    `json:"arguments,omitempty"`
+	AgentName     string    `json:"agentName"`
+	Timestamp     time.Time `json:"timestamp"`
 }
 
-func (e RunStarted) EventType() string         { return "RunStarted" }
-func (e RunStarted) EventTimestamp() time.Time { return e.Timestamp }
-func (e RunStarted) AggregateID() string       { return e.ThreadID }
-func (e RunStarted) sealed()                   {}
-
-// RunFinished indicates that message processing has completed.
-type RunFinished struct {
-	ThreadID  string
-	RunID     string
-	Timestamp time.Time
-}
-
-func (e RunFinished) EventType() string         { return "RunFinished" }
-func (e RunFinished) EventTimestamp() time.Time { return e.Timestamp }
-func (e RunFinished) AggregateID() string       { return e.ThreadID }
-func (e RunFinished) sealed()                   {}
-
-// RunError indicates that an error occurred during processing.
-type RunError struct {
-	ThreadID  string
-	Message   string
-	ErrorCode string
-	Timestamp time.Time
-}
-
-func (e RunError) EventType() string         { return "RunError" }
-func (e RunError) EventTimestamp() time.Time { return e.Timestamp }
-func (e RunError) AggregateID() string       { return e.ThreadID }
-func (e RunError) sealed()                   {}
+func (e ToolStart) EventType() string         { return "ToolStart" }
+func (e ToolStart) EventTimestamp() time.Time { return e.Timestamp }
+func (e ToolStart) AggregateID() string       { return e.ThreadID }
+func (e ToolStart) sealed()                   {}
 
 // ThreadDeleted is emitted when a thread is deleted.
 type ThreadDeleted struct {
@@ -198,57 +178,123 @@ func (e TokenUsageReported) EventTimestamp() time.Time { return e.Timestamp }
 func (e TokenUsageReported) AggregateID() string       { return e.ThreadID }
 func (e TokenUsageReported) sealed()                   {}
 
-// EngineStateChanged is emitted when the engine's high-level state changes.
-type EngineStateChanged struct {
-	ThreadID  string    `json:"threadId"`
-	NewState  string    `json:"newState"`
-	Timestamp time.Time `json:"timestamp"`
+// ToolNeedsInput is emitted when a tool requires user input to continue (elicitation).
+type ToolNeedsInput struct {
+	ThreadID    string           `json:"threadId"`
+	MessageID   string           `json:"messageId"`
+	ToolCallID  string           `json:"toolCallId"`
+	ToolName    string           `json:"toolName"`
+	Elicitation *ElicitationSpec `json:"elicitation"`
+	AgentName   string           `json:"agentName"`
+	Timestamp   time.Time        `json:"timestamp"`
 }
 
-func (e EngineStateChanged) EventType() string         { return "EngineStateChanged" }
-func (e EngineStateChanged) EventTimestamp() time.Time { return e.Timestamp }
-func (e EngineStateChanged) AggregateID() string       { return e.ThreadID }
-func (e EngineStateChanged) sealed()                   {}
+func (e ToolNeedsInput) EventType() string         { return "ToolNeedsInput" }
+func (e ToolNeedsInput) EventTimestamp() time.Time { return e.Timestamp }
+func (e ToolNeedsInput) AggregateID() string       { return e.ThreadID }
+func (e ToolNeedsInput) sealed()                   {}
 
-// ActionsDetected is emitted when the engine identifies tool calls that need execution.
-// NOTE: This is a transient informational event - NOT persisted to event store.
-// It's used for real-time UI updates only and does not modify aggregate state.
-type ActionsDetected struct {
-	ThreadID  string     `json:"threadId"`
-	MessageID string     `json:"messageId"`
-	ToolCalls []ToolCall `json:"toolCalls"`
-	Timestamp time.Time  `json:"timestamp"`
+// ToolNeedsAuth is emitted when a tool requires user authorization to continue.
+type ToolNeedsAuth struct {
+	ThreadID   string             `json:"threadId"`
+	MessageID  string             `json:"messageId"`
+	ToolCallID string             `json:"toolCallId"`
+	ToolName   string             `json:"toolName"`
+	AuthSpec   *AuthorizationSpec `json:"authSpec"`
+	AgentName  string             `json:"agentName"`
+	Timestamp  time.Time          `json:"timestamp"`
 }
 
-func (e ActionsDetected) EventType() string         { return "ActionsDetected" }
-func (e ActionsDetected) EventTimestamp() time.Time { return e.Timestamp }
-func (e ActionsDetected) AggregateID() string       { return e.ThreadID }
-func (e ActionsDetected) sealed()                   {}
+func (e ToolNeedsAuth) EventType() string         { return "ToolNeedsAuth" }
+func (e ToolNeedsAuth) EventTimestamp() time.Time { return e.Timestamp }
+func (e ToolNeedsAuth) AggregateID() string       { return e.ThreadID }
+func (e ToolNeedsAuth) sealed()                   {}
 
-// TurnFinished is emitted when a turn completes and no further actions are required from the engine.
-// NOTE: This is a transient informational event - NOT persisted to event store.
-// It's used for real-time UI updates only and does not modify aggregate state.
-type TurnFinished struct {
+// InputProvided is emitted when user provided input to a waiting tool.
+type InputProvided struct {
+	ThreadID   string    `json:"threadId"`
+	MessageID  string    `json:"messageId"`
+	ToolCallID string    `json:"toolCallId"`
+	Input      string    `json:"input"`
+	AgentName  string    `json:"agentName"`
+	Timestamp  time.Time `json:"timestamp"`
+}
+
+func (e InputProvided) EventType() string         { return "InputProvided" }
+func (e InputProvided) EventTimestamp() time.Time { return e.Timestamp }
+func (e InputProvided) AggregateID() string       { return e.ThreadID }
+func (e InputProvided) sealed()                   {}
+
+// AuthGranted is emitted when user granted authorization to a waiting tool.
+type AuthGranted struct {
+	ThreadID   string    `json:"threadId"`
+	MessageID  string    `json:"messageId"`
+	ToolCallID string    `json:"toolCallId"`
+	AgentName  string    `json:"agentName"`
+	Timestamp  time.Time `json:"timestamp"`
+}
+
+func (e AuthGranted) EventType() string         { return "AuthGranted" }
+func (e AuthGranted) EventTimestamp() time.Time { return e.Timestamp }
+func (e AuthGranted) AggregateID() string       { return e.ThreadID }
+func (e AuthGranted) sealed()                   {}
+
+// AuthDenied is emitted when user denied authorization to a waiting tool.
+type AuthDenied struct {
+	ThreadID   string    `json:"threadId"`
+	MessageID  string    `json:"messageId"`
+	ToolCallID string    `json:"toolCallId"`
+	AgentName  string    `json:"agentName"`
+	Timestamp  time.Time `json:"timestamp"`
+}
+
+func (e AuthDenied) EventType() string         { return "AuthDenied" }
+func (e AuthDenied) EventTimestamp() time.Time { return e.Timestamp }
+func (e AuthDenied) AggregateID() string       { return e.ThreadID }
+func (e AuthDenied) sealed()                   {}
+
+// ToolCancelled is emitted when tool execution was cancelled.
+type ToolCancelled struct {
+	ThreadID   string    `json:"threadId"`
+	MessageID  string    `json:"messageId"`
+	ToolCallID string    `json:"toolCallId"`
+	ToolName   string    `json:"toolName"`
+	AgentName  string    `json:"agentName"`
+	Timestamp  time.Time `json:"timestamp"`
+}
+
+func (e ToolCancelled) EventType() string         { return "ToolCancelled" }
+func (e ToolCancelled) EventTimestamp() time.Time { return e.Timestamp }
+func (e ToolCancelled) AggregateID() string       { return e.ThreadID }
+func (e ToolCancelled) sealed()                   {}
+
+// RunStarted is emitted when an agent run begins.
+// This marks the start of a complete execution cycle and helps the frontend
+// understand run boundaries for UI state management.
+type RunStarted struct {
 	ThreadID  string    `json:"threadId"`
 	MessageID string    `json:"messageId"`
+	AgentName string    `json:"agentName"`
 	Timestamp time.Time `json:"timestamp"`
 }
 
-func (e TurnFinished) EventType() string         { return "TurnFinished" }
-func (e TurnFinished) EventTimestamp() time.Time { return e.Timestamp }
-func (e TurnFinished) AggregateID() string       { return e.ThreadID }
-func (e TurnFinished) sealed()                   {}
+func (e RunStarted) EventType() string         { return "RunStarted" }
+func (e RunStarted) EventTimestamp() time.Time { return e.Timestamp }
+func (e RunStarted) AggregateID() string       { return e.ThreadID }
+func (e RunStarted) sealed()                   {}
 
-// ExecutionStateReported is emitted to persist the engine's internal safety and loop detection state.
-type ExecutionStateReported struct {
-	ThreadID     string    `json:"threadId"`
-	Iteration    int       `json:"iteration"`
-	Total        int       `json:"total"`
-	LoopStateHex string    `json:"loopStateHex,omitempty"`
-	Timestamp    time.Time `json:"timestamp"`
+// RunFinished is emitted when an agent run completes.
+// This marks the end of a complete execution cycle and helps the frontend
+// understand run boundaries for UI state management.
+type RunFinished struct {
+	ThreadID  string    `json:"threadId"`
+	MessageID string    `json:"messageId"`
+	AgentName string    `json:"agentName"`
+	Success   bool      `json:"success"`
+	Timestamp time.Time `json:"timestamp"`
 }
 
-func (e ExecutionStateReported) EventType() string         { return "ExecutionStateReported" }
-func (e ExecutionStateReported) EventTimestamp() time.Time { return e.Timestamp }
-func (e ExecutionStateReported) AggregateID() string       { return e.ThreadID }
-func (e ExecutionStateReported) sealed()                   {}
+func (e RunFinished) EventType() string         { return "RunFinished" }
+func (e RunFinished) EventTimestamp() time.Time { return e.Timestamp }
+func (e RunFinished) AggregateID() string       { return e.ThreadID }
+func (e RunFinished) sealed()                   {}

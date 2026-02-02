@@ -69,9 +69,6 @@ func (p *PostgresAguiProjection) RegisterHandlers(router interface {
 	router.Register(&domain.AssistantMessageAdded{}, func(ctx context.Context, e domain.Event) error {
 		return p.applyAssistantMessageAdded(ctx, *e.(*domain.AssistantMessageAdded))
 	})
-	router.Register(&domain.ToolResultAdded{}, func(ctx context.Context, e domain.Event) error {
-		return p.applyToolResultAdded(ctx, *e.(*domain.ToolResultAdded))
-	})
 	router.Register(&domain.ThreadTitleUpdated{}, func(ctx context.Context, e domain.Event) error {
 		return p.applyThreadTitleChanged(ctx, *e.(*domain.ThreadTitleUpdated))
 	})
@@ -85,11 +82,8 @@ func (p *PostgresAguiProjection) RegisterHandlers(router interface {
 	router.Register(&domain.ToolStart{}, func(ctx context.Context, e domain.Event) error {
 		return p.applyToolStart(ctx, *e.(*domain.ToolStart))
 	})
-	router.Register(&domain.ToolSuccess{}, func(ctx context.Context, e domain.Event) error {
-		return p.applyToolSuccess(ctx, *e.(*domain.ToolSuccess))
-	})
-	router.Register(&domain.ToolError{}, func(ctx context.Context, e domain.Event) error {
-		return p.applyToolError(ctx, *e.(*domain.ToolError))
+	router.Register(&domain.ToolResultAdded{}, func(ctx context.Context, e domain.Event) error {
+		return p.applyToolResultAdded(ctx, *e.(*domain.ToolResultAdded))
 	})
 	router.Register(&domain.ToolNeedsInput{}, func(ctx context.Context, e domain.Event) error {
 		return p.applyToolNeedsInput(ctx, *e.(*domain.ToolNeedsInput))
@@ -102,6 +96,12 @@ func (p *PostgresAguiProjection) RegisterHandlers(router interface {
 	})
 	router.Register(&domain.AuthGranted{}, func(ctx context.Context, e domain.Event) error {
 		return p.applyAuthGranted(ctx, *e.(*domain.AuthGranted))
+	})
+	router.Register(&domain.RunStarted{}, func(ctx context.Context, e domain.Event) error {
+		return p.applyRunStarted(ctx, *e.(*domain.RunStarted))
+	})
+	router.Register(&domain.RunFinished{}, func(ctx context.Context, e domain.Event) error {
+		return p.applyRunFinished(ctx, *e.(*domain.RunFinished))
 	})
 }
 
@@ -373,68 +373,64 @@ func (p *PostgresAguiProjection) applyToolStart(ctx context.Context, event domai
 	return nil
 }
 
-// applyToolSuccess updates the tool state when execution completes successfully.
-func (p *PostgresAguiProjection) applyToolSuccess(ctx context.Context, event domain.ToolSuccess) error {
-	query := `
-		UPDATE agui_messages
-		SET metadata = COALESCE(metadata, '{}'::jsonb) ||
-			jsonb_build_object(
-				'toolStates',
-				COALESCE(metadata->'toolStates', '[]'::jsonb) ||
-				jsonb_build_array(
-					jsonb_build_object(
-						'toolCallId', $1::text,
-						'state', 'completed',
-						'result', $2::text,
-						'arguments', $3::text,
-						'timestamp', $4::timestamp
-					)
-				)
-			)
-		WHERE message_id = $5
-	`
-	_, err := p.db.ExecContext(ctx, query,
-		event.ToolCallID,
-		event.Result,
-		event.ToolArguments,
-		event.Timestamp,
-		event.MessageID,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update tool success: %w", err)
-	}
-	return nil
-}
+// applyToolResultState updates the tool state when execution completes (successfully or with error).
+func (p *PostgresAguiProjection) applyToolResultState(ctx context.Context, event domain.ToolResultAdded) error {
+	var query string
+	var args []interface{}
 
-// applyToolError updates the tool state when execution fails.
-func (p *PostgresAguiProjection) applyToolError(ctx context.Context, event domain.ToolError) error {
-	query := `
-		UPDATE agui_messages
-		SET metadata = COALESCE(metadata, '{}'::jsonb) ||
-			jsonb_build_object(
-				'toolStates',
-				COALESCE(metadata->'toolStates', '[]'::jsonb) ||
-				jsonb_build_array(
-					jsonb_build_object(
-						'toolCallId', $1::text,
-						'state', 'error',
-						'error', $2::text,
-						'arguments', $3::text,
-						'timestamp', $4::timestamp
+	if event.IsError {
+		query = `
+			UPDATE agui_messages
+			SET metadata = COALESCE(metadata, '{}'::jsonb) ||
+				jsonb_build_object(
+					'toolStates',
+					COALESCE(metadata->'toolStates', '[]'::jsonb) ||
+					jsonb_build_array(
+						jsonb_build_object(
+							'toolCallId', $1::text,
+							'state', 'error',
+							'error', $2::text,
+							'timestamp', $3::timestamp
+						)
 					)
 				)
-			)
-		WHERE message_id = $5
-	`
-	_, err := p.db.ExecContext(ctx, query,
-		event.ToolCallID,
-		event.Error,
-		event.ToolArguments,
-		event.Timestamp,
-		event.MessageID,
-	)
+			WHERE message_id = $4
+		`
+		args = []interface{}{
+			event.ToolCallID,
+			event.Result, // Error message is stored in Result field
+			event.Timestamp,
+			event.MessageID,
+		}
+	} else {
+		query = `
+			UPDATE agui_messages
+			SET metadata = COALESCE(metadata, '{}'::jsonb) ||
+				jsonb_build_object(
+					'toolStates',
+					COALESCE(metadata->'toolStates', '[]'::jsonb) ||
+					jsonb_build_array(
+						jsonb_build_object(
+							'toolCallId', $1::text,
+							'state', 'completed',
+							'result', $2::text,
+							'timestamp', $3::timestamp
+						)
+					)
+				)
+			WHERE message_id = $4
+		`
+		args = []interface{}{
+			event.ToolCallID,
+			event.Result,
+			event.Timestamp,
+			event.MessageID,
+		}
+	}
+
+	_, err := p.db.ExecContext(ctx, query, args...)
 	if err != nil {
-		return fmt.Errorf("failed to update tool error: %w", err)
+		return fmt.Errorf("failed to update tool result: %w", err)
 	}
 	return nil
 }
@@ -874,6 +870,22 @@ func (p *PostgresAguiProjection) ListThreads(ctx context.Context, req ThreadList
 	}
 
 	return result, nil
+}
+
+// applyRunStarted handles run start events by updating the thread metadata.
+func (p *PostgresAguiProjection) applyRunStarted(ctx context.Context, event domain.RunStarted) error {
+	// For now, we don't need to store run start/end separately in the database
+	// The frontend just needs these events for UI state management
+	// We could add run tracking to the metadata if needed later
+	return nil
+}
+
+// applyRunFinished handles run completion events by updating the thread metadata.
+func (p *PostgresAguiProjection) applyRunFinished(ctx context.Context, event domain.RunFinished) error {
+	// For now, we don't need to store run start/end separately in the database
+	// The frontend just needs these events for UI state management
+	// We could add run tracking to the metadata if needed later
+	return nil
 }
 
 // Verify PostgresAguiProjection implements AguiProjection.
