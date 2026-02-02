@@ -924,12 +924,13 @@ func (e *ToolStateEventEmitter) OnToolStateChanged(
 
 	case core.ToolStateCompleted:
 		if result != nil {
-			evt := e.events.ToolSuccess(
+			evt := e.events.ToolResultAdded(
 				e.threadID,
 				e.messageID,
 				toolCallID,
 				toolName,
 				result.Result,
+				false, // isError = false for success
 				result.Arguments,
 			)
 			if !e.yield(evt, nil) {
@@ -941,12 +942,13 @@ func (e *ToolStateEventEmitter) OnToolStateChanged(
 		if result != nil {
 			if result.IsError {
 				errorMsg := result.Result
-				evt := e.events.ToolError(
+				evt := e.events.ToolResultAdded(
 					e.threadID,
 					e.messageID,
 					toolCallID,
 					toolName,
 					errorMsg,
+					true, // isError = true for error
 					result.Arguments,
 				)
 				if !e.yield(evt, nil) {

@@ -132,26 +132,37 @@ func (s *Service) ProcessEvents(ctx context.Context, events iter.Seq2[domain.Eve
 }
 
 // isDurable returns true if the event should be persisted to the event store.
+// Per EVENT_CONTRACTS.md: only business facts are persisted, not framework lifecycle events.
 func (s *Service) isDurable(event domain.Event) bool {
 	switch event.(type) {
+	// Application Service Events (Persisted)
 	case *domain.ThreadCreated,
-		*domain.UserMessageAdded,
-		*domain.AssistantMessageAdded,
-		*domain.AssistantMessageCompleted,
-		*domain.ToolResultAdded,
+		*domain.ThreadDeleted,
 		*domain.ThreadTitleUpdated,
+		*domain.UserMessageAdded:
+		return true
+
+	// Agent Framework Events - Persisted
+	case *domain.AssistantMessageAdded,
+		*domain.ToolResultAdded,
 		*domain.TokenUsageReported,
-		*domain.ExecutionStateReported,
-		*domain.ToolStart,
-		*domain.ToolSuccess,
-		*domain.ToolError,
 		*domain.ToolNeedsInput,
 		*domain.ToolNeedsAuth,
 		*domain.InputProvided,
 		*domain.AuthGranted,
 		*domain.AuthDenied,
-		*domain.ToolCancelled:
+		*domain.ToolCancelled,
+		*domain.RunStarted,
+		*domain.RunFinished:
 		return true
+
+	// Agent Framework Events - Transient (NOT persisted)
+	case *domain.AssistantMessageStarted,
+		*domain.AssistantContentStreamed,
+		*domain.AssistantMessageCompleted,
+		*domain.ToolStart:
+		return false
+
 	default:
 		return false
 	}
@@ -181,21 +192,14 @@ func (s *Service) persistDurableEvent(ctx context.Context, event domain.Event) e
 	case *domain.TokenUsageReported:
 		_, err := s.threadMgmt.AddTokenUsage(ctx, *e)
 		return err
-	case *domain.EngineStateChanged:
-		_, err := s.threadMgmt.RecordEngineStateChange(ctx, *e)
-		return err
-	case *domain.ExecutionStateReported:
-		_, err := s.threadMgmt.RecordExecutionState(ctx, *e)
-		return err
-	case *domain.ToolStart,
-		*domain.ToolSuccess,
-		*domain.ToolError,
-		*domain.ToolNeedsInput,
+	case *domain.ToolNeedsInput,
 		*domain.ToolNeedsAuth,
 		*domain.InputProvided,
 		*domain.AuthGranted,
 		*domain.AuthDenied,
-		*domain.ToolCancelled:
+		*domain.ToolCancelled,
+		*domain.RunStarted,
+		*domain.RunFinished:
 		_, err := s.threadMgmt.RecordToolEvent(ctx, event.AggregateID(), event)
 		return err
 	default:

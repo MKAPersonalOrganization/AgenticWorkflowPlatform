@@ -183,38 +183,6 @@ func (e ToolStart) EventType() string         { return "ToolStart" }
 func (e ToolStart) EventTimestamp() time.Time { return e.Timestamp }
 func (e ToolStart) AggregateID() string       { return e.ThreadID }
 
-// ToolSuccess is emitted when a tool completes successfully.
-type ToolSuccess struct {
-	ThreadID      string    `json:"threadId"`
-	MessageID     string    `json:"messageId"`
-	ToolCallID    string    `json:"toolCallId"`
-	ToolName      string    `json:"toolName"`
-	Result        string    `json:"result"`
-	ToolArguments string    `json:"arguments,omitempty"`
-	AgentName     string    `json:"agentName"`
-	Timestamp     time.Time `json:"timestamp"`
-}
-
-func (e ToolSuccess) EventType() string         { return "ToolSuccess" }
-func (e ToolSuccess) EventTimestamp() time.Time { return e.Timestamp }
-func (e ToolSuccess) AggregateID() string       { return e.ThreadID }
-
-// ToolError is emitted when a tool execution fails.
-type ToolError struct {
-	ThreadID      string    `json:"threadId"`
-	MessageID     string    `json:"messageId"`
-	ToolCallID    string    `json:"toolCallId"`
-	ToolName      string    `json:"toolName"`
-	Error         string    `json:"error"`
-	ToolArguments string    `json:"arguments,omitempty"`
-	AgentName     string    `json:"agentName"`
-	Timestamp     time.Time `json:"timestamp"`
-}
-
-func (e ToolError) EventType() string         { return "ToolError" }
-func (e ToolError) EventTimestamp() time.Time { return e.Timestamp }
-func (e ToolError) AggregateID() string       { return e.ThreadID }
-
 // ToolNeedsInput is emitted when a tool requests user input (elicitation).
 type ToolNeedsInput struct {
 	ThreadID    string           `json:"threadId"`

@@ -78,8 +78,6 @@ func (ep *EventPipeline) convertCoreEvent(e core.Event) domain.Event {
 		}
 	case *core.TokenUsageReported:
 		return (*domain.TokenUsageReported)(evt)
-	case *core.ExecutionStateReported:
-		return (*domain.ExecutionStateReported)(evt)
 	case *core.AssistantMessageStarted:
 		return (*domain.AssistantMessageStarted)(evt)
 	case *core.AssistantContentStreamed:
@@ -90,20 +88,10 @@ func (ep *EventPipeline) convertCoreEvent(e core.Event) domain.Event {
 			MessageID: evt.MessageID,
 			Timestamp: evt.Timestamp,
 		}
-	case *core.RunStarted:
-		return (*domain.RunStarted)(evt)
-	case *core.RunFinished:
-		return (*domain.RunFinished)(evt)
-	case *core.TurnFinished:
-		return (*domain.TurnFinished)(evt)
 
 	// Tool lifecycle events
 	case *core.ToolStart:
 		return (*domain.ToolStart)(evt)
-	case *core.ToolSuccess:
-		return (*domain.ToolSuccess)(evt)
-	case *core.ToolError:
-		return (*domain.ToolError)(evt)
 	case *core.InputProvided:
 		return (*domain.InputProvided)(evt)
 	case *core.AuthGranted:
@@ -114,30 +102,15 @@ func (ep *EventPipeline) convertCoreEvent(e core.Event) domain.Event {
 		return (*domain.ToolCancelled)(evt)
 
 	// Events that need manual conversion
-	case *core.ActionsDetected:
-		return &domain.ActionsDetected{
-			ThreadID:  evt.ThreadID,
-			MessageID: evt.MessageID,
-			ToolCalls: MapCoreToolCallsToDomain(evt.ToolCalls),
-			Timestamp: evt.Timestamp,
-		}
 	case *core.ToolNeedsInput:
 		return &domain.ToolNeedsInput{
 			ThreadID:    evt.ThreadID,
 			MessageID:   evt.MessageID,
 			ToolCallID:  evt.ToolCallID,
 			ToolName:    evt.ToolName,
-			Elicitation: (*domain.ElicitationSpec)(evt.Elicitation),
+			Elicitation: convertElicitationSpec(evt.Elicitation),
 			AgentName:   evt.AgentName,
 			Timestamp:   evt.Timestamp,
-		}
-
-	// Handle value types (not pointers)
-	case core.EngineStateChanged:
-		return &domain.EngineStateChanged{
-			ThreadID:  evt.ThreadID,
-			NewState:  evt.State,
-			Timestamp: evt.Timestamp,
 		}
 
 	default:

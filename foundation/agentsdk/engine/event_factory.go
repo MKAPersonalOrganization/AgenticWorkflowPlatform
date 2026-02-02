@@ -128,45 +128,25 @@ func (f *EventFactory) ToolStart(
 	}
 }
 
-// ToolSuccess creates a ToolSuccess event.
-func (f *EventFactory) ToolSuccess(
+// ToolResultAdded creates a ToolResultAdded event (unified for success/error).
+func (f *EventFactory) ToolResultAdded(
 	threadID string,
 	messageID string,
 	toolCallID string,
 	toolName string,
 	result string,
+	isError bool,
 	arguments string,
-) *core.ToolSuccess {
-	return &core.ToolSuccess{
-		ThreadID:      threadID,
-		MessageID:     messageID,
-		ToolCallID:    toolCallID,
-		ToolName:      toolName,
-		Result:        result,
-		ToolArguments: arguments,
-		AgentName:     f.agentName,
-		Timestamp:     time.Now(),
-	}
-}
-
-// ToolError creates a ToolError event.
-func (f *EventFactory) ToolError(
-	threadID string,
-	messageID string,
-	toolCallID string,
-	toolName string,
-	errorMsg string,
-	arguments string,
-) *core.ToolError {
-	return &core.ToolError{
-		ThreadID:      threadID,
-		MessageID:     messageID,
-		ToolCallID:    toolCallID,
-		ToolName:      toolName,
-		Error:         errorMsg,
-		ToolArguments: arguments,
-		AgentName:     f.agentName,
-		Timestamp:     time.Now(),
+) *core.ToolResultAdded {
+	return &core.ToolResultAdded{
+		ThreadID:   threadID,
+		MessageID:  messageID,
+		ToolCallID: toolCallID,
+		ToolName:   toolName,
+		Result:     result,
+		IsError:    isError,
+		AgentName:  f.agentName,
+		Timestamp:  time.Now(),
 	}
 }
 

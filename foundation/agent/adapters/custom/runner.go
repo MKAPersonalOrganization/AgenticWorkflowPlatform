@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"time"
 
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
@@ -132,14 +133,34 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 			runCtx.MessageID = domain.GenerateMessageID()
 		}
 
-		// Restore execution state if resuming
-		if agg != nil && agg.ExecutionState != nil {
-			runCtx.Iteration = agg.ExecutionState.Iteration
-			runCtx.Total = agg.ExecutionState.Total
-			runCtx.LoopState = agg.ExecutionState.LoopStateHex
+		// 4. Emit RunStarted event
+		now := time.Now()
+		runStartedEvent := &domain.RunStarted{
+			ThreadID:  req.SessionID,
+			MessageID: runCtx.MessageID,
+			AgentName: req.AgentName,
+			Timestamp: now,
 		}
 
-		// 4. Run Engine (No need for initialEvents in the domain stream as they are already persisted)
+		// Process RunStarted event through orchestrator for immediate emission
+		runStartedEventIter := func(yield func(domain.Event, error) bool) {
+			yield(runStartedEvent, nil)
+		}
+		runStartedProcessed := r.service.ProcessEvents(ctx, runStartedEventIter)
+		for re, err := range runStartedProcessed {
+			if err != nil {
+				yield(nil, fmt.Errorf("failed to emit RunStarted: %w", err))
+				return
+			}
+			ae := ConvertCoreEventToAgent(re)
+			if ae != nil {
+				if !yield(ae, nil) {
+					return
+				}
+			}
+		}
+
+		// 5. Run Engine (No need for initialEvents in the domain stream as they are already persisted)
 		coreEvents := r.engine.Run(ctx, req.AgentName, runCtx)
 
 		// Use observable event pipeline instead of manual conversion
@@ -148,7 +169,15 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 		// Pass to Orchestration Service for persistence and broadcasting (only for new events)
 		orchestratedEvents := r.service.ProcessEvents(ctx, engineDomainEvents)
 
-		// 5. Yield events back to caller
+		// 6. Emit RunFinished event after successful execution
+		runFinishedEvent := &domain.RunFinished{
+			ThreadID:  req.SessionID,
+			MessageID: runCtx.MessageID,
+			AgentName: req.AgentName,
+			Timestamp: time.Now(),
+		}
+
+		// 7. Yield events back to caller
 		// First yield the initial events that we persisted synchronously
 		for _, ie := range initialEvents {
 			ae := ConvertCoreEventToAgent(ie)
@@ -166,6 +195,24 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 				return
 			}
 			ae := ConvertCoreEventToAgent(de)
+			if ae != nil {
+				if !yield(ae, nil) {
+					return
+				}
+			}
+		}
+
+		// Finally, emit RunFinished event
+		runFinishedEventIter := func(yield func(domain.Event, error) bool) {
+			yield(runFinishedEvent, nil)
+		}
+		runFinishedProcessed := r.service.ProcessEvents(ctx, runFinishedEventIter)
+		for re, err := range runFinishedProcessed {
+			if err != nil {
+				yield(nil, fmt.Errorf("failed to emit RunFinished: %w", err))
+				return
+			}
+			ae := ConvertCoreEventToAgent(re)
 			if ae != nil {
 				if !yield(ae, nil) {
 					return
