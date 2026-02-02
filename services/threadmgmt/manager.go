@@ -86,8 +86,16 @@ func (m *Manager) AddUserMessage(ctx context.Context, threadID, messageID, conte
 		"",
 		nil,
 	)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to add message: %w", err)
+	// Auto-titling: if the thread is new or has the default "New Chat" title, update it
+	// using the first 50 characters of the user message.
+	if isNewThread || thread.Title == "New Chat" {
+		newTitle := content
+		if len(newTitle) > 50 {
+			newTitle = newTitle[:50] + "..."
+		}
+		if err := thread.ChangeTitle(newTitle); err != nil {
+			m.log.Warn(ctx, "failed to auto-generate thread title", "error", err)
+		}
 	}
 
 	if isNewThread {

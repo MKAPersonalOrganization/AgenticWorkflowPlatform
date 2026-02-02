@@ -19,9 +19,6 @@ type Session interface {
 
 	// Append adds a new message to the conversation.
 	Append(context.Context, *Message) error
-
-	// SetTitle updates the conversation title.
-	SetTitle(context.Context, string) error
 }
 
 // State provides key-value storage for session data.

@@ -95,15 +95,6 @@ func toDomainToolCalls(ctcs []core.ToolCall) []domain.ToolCall {
 	return result
 }
 
-// SetTitle updates the conversation title.
-func (s *SessionAdapter) SetTitle(ctx context.Context, title string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.aggregate.ChangeTitle(title)
-	return nil
-}
-
 // GetAggregate returns the underlying ThreadAggregate (for internal use).
 func (s *SessionAdapter) GetAggregate() *domain.ThreadAggregate {
 	return s.aggregate
