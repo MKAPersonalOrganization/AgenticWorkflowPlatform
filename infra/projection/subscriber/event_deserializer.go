@@ -59,6 +59,13 @@ func deserializeDomainEvent(eventType string, data []byte) (domain.Event, error)
 		}
 		return &evt, nil
 
+	case "RunError":
+		var evt domain.RunError
+		if err := json.Unmarshal(data, &evt); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal RunError: %w", err)
+		}
+		return &evt, nil
+
 	case "AssistantMessageStarted":
 		var evt domain.AssistantMessageStarted
 		if err := json.Unmarshal(data, &evt); err != nil {

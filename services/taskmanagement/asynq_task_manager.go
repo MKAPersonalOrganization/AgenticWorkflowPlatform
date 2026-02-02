@@ -42,7 +42,7 @@ func NewAsynqTaskManager(
 	log *logger.Logger,
 	config AsynqConfig,
 	model agent.Model,
-	runner agent.Runner, // decouple from concrete implementation
+	orchestrator Orchestrator, // Orchestrator that emits run lifecycle events
 	langfuseTracer *LangfuseTracer,
 	observabilityConfig ObservabilityConfig,
 ) *AsynqTaskManager {
@@ -74,7 +74,7 @@ func NewAsynqTaskManager(
 	// Create orchestration service
 	orchestrationService := NewService(
 		log,
-		runner,
+		orchestrator,
 		model,
 		langfuseTracer,
 		observabilityConfig,

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"iter"
-	"time"
 
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
@@ -13,39 +12,41 @@ import (
 	"school-with-ai/foundation/agentsdk/engine"
 	"school-with-ai/foundation/agentsdk/registry"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/services/agentorchestrator"
 	"school-with-ai/services/artifact"
 	memorytools "school-with-ai/services/memory/tools"
 	"school-with-ai/services/studentprofile/middleware"
 )
 
-// RunnerAdapter adapts the custom engine and orchestration service to the agent.Runner interface.
+// RunnerAdapter adapts the custom engine to the agent.Runner interface.
 type RunnerAdapter struct {
-	log           *logger.Logger
-	service       *agentorchestrator.Service
-	engine        *engine.Engine
-	artifactStore artifact.Service
-	profileRepo   domain.StudentProfileRepository
-	enableMemory  bool
-	pipeline      *EventPipeline // Add event pipeline for observability
+	log            *logger.Logger
+	threadMgr      ThreadManager      // Interface for thread management
+	eventProcessor EventProcessor     // Interface for event processing
+	engine         *engine.Engine
+	artifactStore  artifact.Service
+	profileRepo    domain.StudentProfileRepository
+	enableMemory   bool
+	pipeline       *EventPipeline // Add event pipeline for observability
 }
 
 // NewRunnerAdapter creates a new runner adapter.
 func NewRunnerAdapter(
 	log *logger.Logger,
-	service *agentorchestrator.Service,
+	threadMgr ThreadManager,
+	eventProcessor EventProcessor,
 	chatClient engine.ChatClient,
 	artifactStore artifact.Service,
 	profileRepo domain.StudentProfileRepository,
 	enableMemory bool,
 ) *RunnerAdapter {
 	r := &RunnerAdapter{
-		log:           log,
-		service:       service,
-		artifactStore: artifactStore,
-		profileRepo:   profileRepo,
-		enableMemory:  enableMemory,
-		pipeline:      NewEventPipeline(log), // Initialize event pipeline
+		log:            log,
+		threadMgr:      threadMgr,
+		eventProcessor: eventProcessor,
+		artifactStore:  artifactStore,
+		profileRepo:    profileRepo,
+		enableMemory:   enableMemory,
+		pipeline:       NewEventPipeline(log), // Initialize event pipeline
 	}
 
 	provider := &RegistryAgentProvider{
@@ -69,7 +70,7 @@ func NewRunnerAdapter(
 func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq2[agent.Event, error] {
 	return func(yield func(agent.Event, error) bool) {
 		// 1. Facts First: Initialize Thread and Message
-		threadMgmt := r.service.GetThreadManagement()
+		threadMgmt := r.threadMgr.GetThreadManagement()
 		var agg *domain.ThreadAggregate
 		var initialEvents []domain.Event
 
@@ -133,52 +134,7 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 			runCtx.MessageID = domain.GenerateMessageID()
 		}
 
-		// 4. Emit RunStarted event
-		now := time.Now()
-		runStartedEvent := &domain.RunStarted{
-			ThreadID:  req.SessionID,
-			MessageID: runCtx.MessageID,
-			AgentName: req.AgentName,
-			Timestamp: now,
-		}
-
-		// Process RunStarted event through orchestrator for immediate emission
-		runStartedEventIter := func(yield func(domain.Event, error) bool) {
-			yield(runStartedEvent, nil)
-		}
-		runStartedProcessed := r.service.ProcessEvents(ctx, runStartedEventIter)
-		for re, err := range runStartedProcessed {
-			if err != nil {
-				yield(nil, fmt.Errorf("failed to emit RunStarted: %w", err))
-				return
-			}
-			ae := ConvertCoreEventToAgent(re)
-			if ae != nil {
-				if !yield(ae, nil) {
-					return
-				}
-			}
-		}
-
-		// 5. Run Engine (No need for initialEvents in the domain stream as they are already persisted)
-		coreEvents := r.engine.Run(ctx, req.AgentName, runCtx)
-
-		// Use observable event pipeline instead of manual conversion
-		engineDomainEvents := r.pipeline.ProcessEventStream(ctx, coreEvents)
-
-		// Pass to Orchestration Service for persistence and broadcasting (only for new events)
-		orchestratedEvents := r.service.ProcessEvents(ctx, engineDomainEvents)
-
-		// 6. Emit RunFinished event after successful execution
-		runFinishedEvent := &domain.RunFinished{
-			ThreadID:  req.SessionID,
-			MessageID: runCtx.MessageID,
-			AgentName: req.AgentName,
-			Timestamp: time.Now(),
-		}
-
-		// 7. Yield events back to caller
-		// First yield the initial events that we persisted synchronously
+		// 4. Yield initial events that we persisted synchronously
 		for _, ie := range initialEvents {
 			ae := ConvertCoreEventToAgent(ie)
 			if ae != nil {
@@ -188,35 +144,25 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 			}
 		}
 
-		// Then yield orchestrated engine events
+		// 5. Run engine and process events
+		coreEvents := r.engine.Run(ctx, req.AgentName, runCtx)
+
+		// Convert core events to domain events
+		engineDomainEvents := r.pipeline.ProcessEventStream(ctx, coreEvents)
+
+		// Process through event processor for persistence and broadcasting
+		orchestratedEvents := r.eventProcessor.ProcessEvents(ctx, engineDomainEvents)
+
+		// 6. Yield all orchestrated events to caller
 		for de, err := range orchestratedEvents {
-			if err != nil {
-				yield(nil, err)
-				return
-			}
 			ae := ConvertCoreEventToAgent(de)
 			if ae != nil {
-				if !yield(ae, nil) {
+				if !yield(ae, err) {
 					return
 				}
-			}
-		}
-
-		// Finally, emit RunFinished event
-		runFinishedEventIter := func(yield func(domain.Event, error) bool) {
-			yield(runFinishedEvent, nil)
-		}
-		runFinishedProcessed := r.service.ProcessEvents(ctx, runFinishedEventIter)
-		for re, err := range runFinishedProcessed {
-			if err != nil {
-				yield(nil, fmt.Errorf("failed to emit RunFinished: %w", err))
+			} else if err != nil {
+				yield(nil, err)
 				return
-			}
-			ae := ConvertCoreEventToAgent(re)
-			if ae != nil {
-				if !yield(ae, nil) {
-					return
-				}
 			}
 		}
 	}

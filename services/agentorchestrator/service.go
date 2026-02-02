@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"iter"
+	"time"
 
 	"school-with-ai/domain"
+	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/artifact"
 	"school-with-ai/services/threadmgmt"
@@ -24,6 +26,7 @@ type Service struct {
 	emitter       EventEmitter
 	artifactStore artifact.Service
 	profileRepo   domain.StudentProfileRepository
+	runner        agent.Runner // Framework runner interface (foundation layer)
 
 	// Internal components
 	threadMgmt *threadmgmt.Manager
@@ -71,6 +74,30 @@ func WithStudentProfileRepository(repo domain.StudentProfileRepository) Option {
 	return func(s *Service) {
 		s.profileRepo = repo
 	}
+}
+
+// WithRunner configures the service with an agent runner.
+func WithRunner(runner agent.Runner) Option {
+	return func(s *Service) {
+		s.runner = runner
+	}
+}
+
+// SetRunner sets the agent runner after construction.
+// This allows breaking circular dependencies during initialization.
+func (s *Service) SetRunner(runner agent.Runner) {
+	s.runner = runner
+}
+
+// convertAgentEventToDomain converts foundation agent events to domain events.
+// Returns nil for events that should not be converted (e.g., framework-specific events).
+func convertAgentEventToDomain(ae agent.Event) domain.Event {
+	// The agent events are already domain events wrapped in the agent.Event interface
+	// We just need to extract the underlying domain event
+	if domainEvt, ok := ae.(domain.Event); ok {
+		return domainEvt
+	}
+	return nil
 }
 
 // ProcessEvents orchestrates a stream of domain events, providing persistence and broadcasting.
@@ -151,13 +178,15 @@ func (s *Service) isDurable(event domain.Event) bool {
 		*domain.InputProvided,
 		*domain.AuthGranted,
 		*domain.AuthDenied,
-		*domain.ToolCancelled,
-		*domain.RunStarted,
-		*domain.RunFinished:
+		*domain.ToolCancelled:
 		return true
 
 	// Agent Framework Events - Transient (NOT persisted)
-	case *domain.AssistantMessageStarted,
+	// Run lifecycle events are for frontend UI only, not thread state
+	case *domain.RunStarted,
+		*domain.RunFinished,
+		*domain.RunError,
+		*domain.AssistantMessageStarted,
 		*domain.AssistantContentStreamed,
 		*domain.AssistantMessageCompleted,
 		*domain.ToolStart:
@@ -197,9 +226,7 @@ func (s *Service) persistDurableEvent(ctx context.Context, event domain.Event) e
 		*domain.InputProvided,
 		*domain.AuthGranted,
 		*domain.AuthDenied,
-		*domain.ToolCancelled,
-		*domain.RunStarted,
-		*domain.RunFinished:
+		*domain.ToolCancelled:
 		_, err := s.threadMgmt.RecordToolEvent(ctx, event.AggregateID(), event)
 		return err
 	default:
@@ -217,4 +244,129 @@ func (s *Service) GetAvailableAgents() []string {
 // GetThreadManagement returns the thread management component.
 func (s *Service) GetThreadManagement() *threadmgmt.Manager {
 	return s.threadMgmt
+}
+
+// RunExecutionRequest contains parameters for executing a run.
+type RunExecutionRequest struct {
+	SessionID   string // ID of the conversation thread
+	UserID      string // User making the request
+	AgentName   string // Agent to execute
+	Message     string // User message content
+	MessageID   string // Message ID (used as RunID)
+	ParentRunID string // (Optional) Lineage pointer for branching/time travel
+}
+
+// ExecuteRun orchestrates a framework-agnostic run execution with lifecycle events.
+// This method emits RunStarted, calls the runner, and emits RunFinished or RunError.
+// It provides a consistent run lifecycle regardless of which framework adapter is used.
+func (s *Service) ExecuteRun(
+	ctx context.Context,
+	req RunExecutionRequest,
+) iter.Seq2[domain.Event, error] {
+	return func(yield func(domain.Event, error) bool) {
+		// 1. Emit RunStarted
+		runStartedEvent := &domain.RunStarted{
+			ThreadID:    req.SessionID,
+			RunID:       req.MessageID,
+			ParentRunID: req.ParentRunID,
+			Input:       req.Message,
+			Timestamp:   time.Now(),
+		}
+
+		runStartedIter := func(y func(domain.Event, error) bool) {
+			y(runStartedEvent, nil)
+		}
+		processedStart := s.ProcessEvents(ctx, runStartedIter)
+		for evt, err := range processedStart {
+			if err != nil {
+				yield(nil, fmt.Errorf("failed to emit RunStarted: %w", err))
+				return
+			}
+			if !yield(evt, nil) {
+				return
+			}
+		}
+
+		// 2. Call the framework runner to get events
+		runnerReq := &agent.RunRequest{
+			SessionID: req.SessionID,
+			UserID:    req.UserID,
+			AgentName: req.AgentName,
+			Message: &agent.Message{
+				ID: req.MessageID,
+				Content: []agent.Content{
+					{Type: agent.ContentTypeText, Text: req.Message},
+				},
+			},
+		}
+		agentEvents := s.runner.Run(ctx, runnerReq)
+
+		// 3. Process agent events, convert to domain events, and check for errors
+		var executionError error
+		for ae, err := range agentEvents {
+			if err != nil {
+				executionError = err
+				break
+			}
+
+			// Convert agent.Event to domain.Event
+			de := convertAgentEventToDomain(ae)
+			if de != nil {
+				if !yield(de, nil) {
+					return
+				}
+			}
+		}
+
+		// 4. Emit RunError if execution failed, otherwise emit RunFinished
+		if executionError != nil {
+			runErrorEvent := &domain.RunError{
+				ThreadID:  req.SessionID,
+				RunID:     req.MessageID,
+				Message:   executionError.Error(),
+				Code:      "RUN_ERROR",
+				Timestamp: time.Now(),
+			}
+
+			runErrorIter := func(y func(domain.Event, error) bool) {
+				y(runErrorEvent, nil)
+			}
+			processedError := s.ProcessEvents(ctx, runErrorIter)
+			for evt, err := range processedError {
+				if err != nil {
+					yield(nil, fmt.Errorf("failed to emit RunError: %w", err))
+					return
+				}
+				if !yield(evt, nil) {
+					return
+				}
+			}
+
+			// Yield the original execution error
+			yield(nil, executionError)
+			return
+		}
+
+		// 5. Emit RunFinished on success
+		runFinishedEvent := &domain.RunFinished{
+			ThreadID:  req.SessionID,
+			RunID:     req.MessageID,
+			Result:    nil, // TODO: Capture result from framework events if available
+			Timestamp: time.Now(),
+		}
+
+		runFinishedIter := func(y func(domain.Event, error) bool) {
+			y(runFinishedEvent, nil)
+		}
+		processedFinish := s.ProcessEvents(ctx, runFinishedIter)
+		for evt, err := range processedFinish {
+			if err != nil {
+				yield(nil, fmt.Errorf("failed to emit RunFinished: %w", err))
+				return
+			}
+			if !yield(evt, nil) {
+				return
+			}
+		}
+	}
 }

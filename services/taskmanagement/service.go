@@ -3,11 +3,13 @@ package taskmanagement
 import (
 	"context"
 	"fmt"
-	"time"
+	"iter"
 
+	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/observability/langfuse"
+	"school-with-ai/services/agentorchestrator"
 )
 
 // ObservabilityConfig contains configuration for observability and tracing attributes
@@ -18,13 +20,18 @@ type ObservabilityConfig struct {
 	Tags       []string // Additional custom tags
 }
 
+// Orchestrator is the interface for orchestrating agent runs with lifecycle events.
+type Orchestrator interface {
+	ExecuteRun(ctx context.Context, req agentorchestrator.RunExecutionRequest) iter.Seq2[domain.Event, error]
+}
+
 // Service provides transport-agnostic message taskmanagement.
 // This service handles the core business logic of processing messages,
 // managing threads, routing to agents, and coordinating execution.
 // It is designed to be reusable across different transports (HTTP/SSE, A2A, etc.).
 type Service struct {
 	log                 *logger.Logger
-	runner              agent.Runner
+	orchestrator        Orchestrator
 	model               agent.Model
 	langfuseTracer      *LangfuseTracer
 	observabilityConfig ObservabilityConfig
@@ -33,14 +40,14 @@ type Service struct {
 // NewService creates a new orchestration service.
 func NewService(
 	log *logger.Logger,
-	runner agent.Runner,
+	orchestrator Orchestrator,
 	model agent.Model,
 	langfuseTracer *LangfuseTracer,
 	observabilityConfig ObservabilityConfig,
 ) *Service {
 	return &Service{
 		log:                 log,
-		runner:              runner,
+		orchestrator:        orchestrator,
 		model:               model,
 		langfuseTracer:      langfuseTracer,
 		observabilityConfig: observabilityConfig,
@@ -97,23 +104,18 @@ func (s *Service) HandleUserMessage(
 		ctx = agent.WithTraceContext(ctx, traceCtx.TraceID, traceCtx.ParentObservationID)
 	}
 
-	// 2. Delegate to Runner
-	req := &agent.RunRequest{
-		AgentName: params.AgentName,
-		SessionID: params.ThreadID,
-		UserID:    params.UserID,
-		Message: &agent.Message{
-			ID:   params.MessageID,
-			Role: agent.RoleUser,
-			Content: []agent.Content{
-				{Type: agent.ContentTypeText, Text: params.Content},
-			},
-			Timestamp: time.Now(),
-		},
+	// 2. Delegate to Orchestrator (which emits RunStarted/RunFinished/RunError)
+	req := agentorchestrator.RunExecutionRequest{
+		SessionID:   params.ThreadID,
+		UserID:      params.UserID,
+		AgentName:   params.AgentName,
+		Message:     params.Content,
+		MessageID:   params.MessageID,
+		ParentRunID: "", // TODO: Support branching/time travel
 	}
 
-	// Iterate over the runner and return when complete
-	for _, err := range s.runner.Run(ctx, req) {
+	// Iterate over orchestrated events (includes RunStarted, framework events, RunFinished/RunError)
+	for _, err := range s.orchestrator.ExecuteRun(ctx, req) {
 		if err != nil {
 			return err
 		}

@@ -55,34 +55,6 @@ func (f *EventFactory) AssistantContentStreamed(threadID, messageID, delta strin
 	}
 }
 
-// RunStarted creates a RunStarted.
-func (f *EventFactory) RunStarted(threadID, runID string) *core.RunStarted {
-	return &core.RunStarted{
-		ThreadID:  threadID,
-		RunID:     runID,
-		Timestamp: time.Now(),
-	}
-}
-
-// RunFinished creates a RunFinished.
-func (f *EventFactory) RunFinished(threadID, runID string) *core.RunFinished {
-	return &core.RunFinished{
-		ThreadID:  threadID,
-		RunID:     runID,
-		Timestamp: time.Now(),
-	}
-}
-
-// RunError creates a RunError.
-func (f *EventFactory) RunError(threadID, message, errorCode string) *core.RunError {
-	return &core.RunError{
-		ThreadID:  threadID,
-		Message:   message,
-		ErrorCode: errorCode,
-		Timestamp: time.Now(),
-	}
-}
-
 // TokenUsageReported creates a TokenUsageReported event.
 func (f *EventFactory) TokenUsageReported(
 	threadID string,

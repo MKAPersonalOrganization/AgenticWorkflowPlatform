@@ -373,25 +373,18 @@ func (s *executionState) refreshState(history []core.Message) {
 }
 
 // emitCompletionEvents handles the emission of final events based on completion reason.
+// Note: Run lifecycle events (RunFinished, RunError) are emitted at the service layer,
+// not here. The engine only emits TurnFinished for successful completions.
 func (s *executionState) emitCompletionEvents() {
 	if s.completionReason.IsSuccess() {
-		// Successful completion: emit turn finished and run finished
+		// Successful completion: emit turn finished only
+		// RunFinished will be emitted by the service layer (RunnerAdapter)
 		if !s.observer.yield(s.agent.Events.TurnFinished(s.threadID, s.messageID), nil) {
 			return
 		}
-		if !s.observer.yield(s.observer.events.RunFinished(s.threadID, s.messageID), nil) {
-			return
-		}
-	} else {
-		// Error termination: emit run error with context
-		msg := "Unknown error"
-		if s.observer.result.Error != nil {
-			msg = s.observer.result.Error.Error()
-		}
-		if !s.observer.yield(s.observer.events.RunError(s.threadID, msg, "RUN_ERROR"), nil) {
-			return
-		}
 	}
+	// On error: do nothing here
+	// RunError will be emitted by the service layer (RunnerAdapter)
 }
 
 // SafetyUnit enforces execution limits and detects infinite loops.
