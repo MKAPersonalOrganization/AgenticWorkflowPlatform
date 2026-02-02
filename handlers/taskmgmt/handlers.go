@@ -14,6 +14,7 @@ import (
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/services"
 	"school-with-ai/services/taskmanagement"
+	"school-with-ai/services/threadmgmt"
 
 	"github.com/hibiken/asynq"
 )
@@ -30,6 +31,7 @@ type TaskManagementHandler struct {
 	threadQueryService services.ThreadQueryService
 	aguiProjection     agui.AguiProjection
 	broadcaster        agui.AguiBroadcaster
+	threadMgmt         *threadmgmt.Manager
 }
 
 // NewTaskManagementHandler creates a new HTTP handler for task management.
@@ -44,6 +46,7 @@ func NewTaskManagementHandler(
 	threadQueryService services.ThreadQueryService,
 	aguiProjection agui.AguiProjection,
 	broadcaster agui.AguiBroadcaster,
+	threadMgmt *threadmgmt.Manager,
 ) *TaskManagementHandler {
 	return &TaskManagementHandler{
 		log:                log,
@@ -56,6 +59,7 @@ func NewTaskManagementHandler(
 		threadQueryService: threadQueryService,
 		aguiProjection:     aguiProjection,
 		broadcaster:        broadcaster,
+		threadMgmt:         threadMgmt,
 	}
 }
 
@@ -384,31 +388,26 @@ func (h *TaskManagementHandler) UpdateThreadTitle(w http.ResponseWriter, r *http
 
 	h.log.Info(r.Context(), "Renaming thread", "userID", user.ID, "threadID", threadID, "newTitle", req.Title)
 
-	// Update thread title using session store
-	session, err := h.sessionStore.Get(r.Context(), threadID)
+	event, err := h.threadMgmt.UpdateThreadTitle(r.Context(), threadID, req.Title)
 	if err != nil {
 		if errors.Is(err, domain.ErrThreadNotFound) {
 			http.Error(w, "Thread not found", http.StatusNotFound)
 			return
 		}
-		h.log.Error(r.Context(), "failed to get session", "error", err)
+		h.log.Error(r.Context(), "failed to update thread title", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	err = session.SetTitle(r.Context(), req.Title)
-	if err != nil {
-		h.log.Error(r.Context(), "failed to update session title", "error", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
+	// Dispatch the event manually if the broadcaster isn't already handling it via ESDB subscription
+	// In this architecture, durable events are usually broadcasted by the projection updater,
+	// but for immediate UI feedback on application-level events, we might want to dispatch here too.
+	// However, looking at ProcessEvents in agentorchestrator/service.go, it seems durable events
+	// are NOT broadcasted by the emitter if they are durable, to avoid double-broadcasting.
+	// But ThreadTitleUpdated is an application event, not an agent event.
+	// The ProjectionUpdater will eventually broadcast it once it's in ESDB.
 
-	err = h.sessionStore.Save(r.Context(), session)
-	if err != nil {
-		h.log.Error(r.Context(), "failed to save session", "error", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
+	_ = event // Event can be used for logging or specific logic
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

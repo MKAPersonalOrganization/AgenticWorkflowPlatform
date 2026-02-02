@@ -122,3 +122,65 @@ func TestManager_RetryUpdate(t *testing.T) {
 		}
 	})
 }
+
+func TestManager_AutoTitling(t *testing.T) {
+	ctx := context.Background()
+	log := logger.New(io.Discard, logger.LevelInfo, "test", nil)
+	store := NewConcurrentMockEventStore(0)
+	repo := domain.NewThreadRepository(store)
+	mgr := New(log, repo)
+
+	t.Run("Auto-titles on first user message", func(t *testing.T) {
+		threadID := "auto-title-thread"
+
+		// 1. Create thread with default title
+		_, _, err := mgr.CreateThread(ctx, threadID, "New Chat")
+		if err != nil {
+			t.Fatalf("Failed to create thread: %v", err)
+		}
+
+		// 2. Add first user message
+		messageContent := "This is a long message that should be truncated for the title"
+		_, _, err = mgr.AddUserMessage(ctx, threadID, "msg-1", messageContent, "user-1")
+		if err != nil {
+			t.Fatalf("Failed to add user message: %v", err)
+		}
+
+		// 3. Verify title was updated
+		thread, _ := repo.Load(ctx, threadID)
+		expectedTitle := messageContent[:50] + "..."
+		if thread.Title != expectedTitle {
+			t.Errorf("Expected title %q, got %q", expectedTitle, thread.Title)
+		}
+
+		// 4. Verify events
+		streamName := domain.StreamName("Thread", threadID)
+		events, _ := store.ReadStream(ctx, streamName, 0)
+		hasTitleUpdated := false
+		for _, e := range events {
+			if _, ok := e.(domain.ThreadTitleUpdated); ok {
+				hasTitleUpdated = true
+				break
+			}
+		}
+		if !hasTitleUpdated {
+			t.Error("Expected ThreadTitleUpdated event to be emitted")
+		}
+	})
+
+	t.Run("Does not overwrite non-default title", func(t *testing.T) {
+		threadID := "no-overwrite-thread"
+
+		// 1. Create thread with custom title
+		mgr.CreateThread(ctx, threadID, "Custom Title")
+
+		// 2. Add user message
+		mgr.AddUserMessage(ctx, threadID, "msg-1", "Some content", "user-1")
+
+		// 3. Verify title remains the same
+		thread, _ := repo.Load(ctx, threadID)
+		if thread.Title != "Custom Title" {
+			t.Errorf("Expected title 'Custom Title', got %q", thread.Title)
+		}
+	})
+}
