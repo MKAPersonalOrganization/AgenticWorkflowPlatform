@@ -107,40 +107,6 @@ func (e AssistantMessageCompleted) EventType() string         { return "Assistan
 func (e AssistantMessageCompleted) EventTimestamp() time.Time { return e.Timestamp }
 func (e AssistantMessageCompleted) AggregateID() string       { return e.ThreadID }
 
-// RunStarted indicates that message processing has begun.
-type RunStarted struct {
-	ThreadID  string
-	RunID     string
-	Timestamp time.Time
-}
-
-func (e RunStarted) EventType() string         { return "RunStarted" }
-func (e RunStarted) EventTimestamp() time.Time { return e.Timestamp }
-func (e RunStarted) AggregateID() string       { return e.ThreadID }
-
-// RunFinished indicates that message processing has completed.
-type RunFinished struct {
-	ThreadID  string
-	RunID     string
-	Timestamp time.Time
-}
-
-func (e RunFinished) EventType() string         { return "RunFinished" }
-func (e RunFinished) EventTimestamp() time.Time { return e.Timestamp }
-func (e RunFinished) AggregateID() string       { return e.ThreadID }
-
-// RunError indicates that an error occurred during processing.
-type RunError struct {
-	ThreadID  string
-	Message   string
-	ErrorCode string
-	Timestamp time.Time
-}
-
-func (e RunError) EventType() string         { return "RunError" }
-func (e RunError) EventTimestamp() time.Time { return e.Timestamp }
-func (e RunError) AggregateID() string       { return e.ThreadID }
-
 // TokenUsageReported is emitted when token usage information is available.
 type TokenUsageReported struct {
 	ThreadID  string `json:"threadId"`

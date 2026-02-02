@@ -369,21 +369,25 @@ func run(ctx context.Context, log *logger.Logger) error {
 	}
 
 	var runner agent.Runner
+	var agentOrchestrator *agentorchestrator.Service
 	switch cfg.Orchestration.Framework {
 	case "custom":
-		agentOrchestrator := agentorchestrator.New(log, eventLog,
+		agentOrchestrator = agentorchestrator.New(log, eventLog,
 			agentorchestrator.WithArtifactService(artifactService),
 			agentorchestrator.WithStudentProfileRepository(studentProfileRepo),
 			agentorchestrator.WithEmitter(transientRouter),
 		)
 		runner = custom.NewRunnerAdapter(
 			log,
-			agentOrchestrator,
+			agentOrchestrator, // ThreadManager interface
+			agentOrchestrator, // EventProcessor interface
 			chatClient,
 			artifactService,
 			studentProfileRepo,
 			cfg.AgentCapabilities.LongTermMemory,
 		)
+		// Wire the runner back to the service to complete the dependency cycle
+		agentOrchestrator.SetRunner(runner)
 	default:
 		return fmt.Errorf("unsupported agent framework: %s", cfg.Orchestration.Framework)
 	}
@@ -450,7 +454,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 			HealthCheckInterval: cfg.Orchestration.HealthCheckInterval,
 		},
 		model,
-		runner,
+		agentOrchestrator, // Pass orchestrator instead of runner
 		langfuseTracer,
 		observabilityConfig,
 	)

@@ -268,14 +268,17 @@ func (e ToolCancelled) EventTimestamp() time.Time { return e.Timestamp }
 func (e ToolCancelled) AggregateID() string       { return e.ThreadID }
 func (e ToolCancelled) sealed()                   {}
 
-// RunStarted is emitted when an agent run begins.
-// This marks the start of a complete execution cycle and helps the frontend
-// understand run boundaries for UI state management.
+// RunStarted signals the start of an agent run.
+// The RunStarted event is the first event emitted when an agent begins processing a request.
+// It establishes a new execution context identified by a unique runId. This event serves as
+// a marker for frontends to initialize UI elements such as progress indicators or loading states.
+// It also provides crucial identifiers that can be used to associate subsequent events with this specific run.
 type RunStarted struct {
-	ThreadID  string    `json:"threadId"`
-	MessageID string    `json:"messageId"`
-	AgentName string    `json:"agentName"`
-	Timestamp time.Time `json:"timestamp"`
+	ThreadID    string    `json:"threadId"`              // ID of the conversation thread
+	RunID       string    `json:"runId"`                 // ID of the agent run
+	ParentRunID string    `json:"parentRunId,omitempty"` // (Optional) Lineage pointer for branching/time travel
+	Input       any       `json:"input,omitempty"`       // (Optional) The exact agent input payload sent to the agent
+	Timestamp   time.Time `json:"timestamp"`
 }
 
 func (e RunStarted) EventType() string         { return "RunStarted" }
@@ -283,14 +286,15 @@ func (e RunStarted) EventTimestamp() time.Time { return e.Timestamp }
 func (e RunStarted) AggregateID() string       { return e.ThreadID }
 func (e RunStarted) sealed()                   {}
 
-// RunFinished is emitted when an agent run completes.
-// This marks the end of a complete execution cycle and helps the frontend
-// understand run boundaries for UI state management.
+// RunFinished signals the successful completion of an agent run.
+// The RunFinished event indicates that an agent has successfully completed all its work for the current run.
+// Upon receiving this event, frontends should finalize any UI states that were waiting on the agent's completion.
+// This event marks a clean termination point and indicates that no further processing will occur in this run
+// unless explicitly requested. The optional result field can contain any output data produced by the agent run.
 type RunFinished struct {
-	ThreadID  string    `json:"threadId"`
-	MessageID string    `json:"messageId"`
-	AgentName string    `json:"agentName"`
-	Success   bool      `json:"success"`
+	ThreadID  string    `json:"threadId"`        // ID of the conversation thread
+	RunID     string    `json:"runId"`           // ID of the agent run
+	Result    any       `json:"result,omitempty"` // (Optional) Result data from run
 	Timestamp time.Time `json:"timestamp"`
 }
 
@@ -298,3 +302,21 @@ func (e RunFinished) EventType() string         { return "RunFinished" }
 func (e RunFinished) EventTimestamp() time.Time { return e.Timestamp }
 func (e RunFinished) AggregateID() string       { return e.ThreadID }
 func (e RunFinished) sealed()                   {}
+
+// RunError signals an error during an agent run.
+// The RunError event indicates that the agent encountered an error it could not recover from,
+// causing the run to terminate prematurely. This event provides information about what went wrong,
+// allowing frontends to display appropriate error messages and potentially offer recovery options.
+// After a RunError event, no further processing will occur in this run.
+type RunError struct {
+	ThreadID  string    `json:"threadId"`      // ID of the conversation thread
+	RunID     string    `json:"runId"`         // ID of the agent run
+	Message   string    `json:"message"`       // Error message
+	Code      string    `json:"code,omitempty"` // (Optional) Error code
+	Timestamp time.Time `json:"timestamp"`
+}
+
+func (e RunError) EventType() string         { return "RunError" }
+func (e RunError) EventTimestamp() time.Time { return e.Timestamp }
+func (e RunError) AggregateID() string       { return e.ThreadID }
+func (e RunError) sealed()                   {}

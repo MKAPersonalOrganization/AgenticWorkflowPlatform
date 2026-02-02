@@ -142,10 +142,10 @@ func ToAguiEvents(event agent.Event) []any {
 func toAguiEventsLegacy(event any) []any {
 	switch evt := event.(type) {
 	case *domain.RunStarted:
-		return []any{aguievents.NewRunStartedEvent(evt.ThreadID, evt.MessageID)}
+		return []any{aguievents.NewRunStartedEvent(evt.ThreadID, evt.RunID)}
 
 	case *domain.RunFinished:
-		return []any{aguievents.NewRunFinishedEvent(evt.ThreadID, evt.MessageID)}
+		return []any{aguievents.NewRunFinishedEvent(evt.ThreadID, evt.RunID)}
 
 	case *domain.ThreadTitleUpdated:
 		return []any{aguievents.NewCustomEvent(

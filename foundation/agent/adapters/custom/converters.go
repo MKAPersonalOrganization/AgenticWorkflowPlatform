@@ -161,17 +161,7 @@ func ToDomainEvent(e core.Event) domain.Event {
 		}
 
 	// ❌ PROHIBITED EVENTS (Framework Lifecycle - DISCARD per ADR 001)
-	case *core.RunStarted:
-		// Discard: Framework lifecycle event, not business fact
-		return nil
-
-	case *core.RunFinished:
-		// Discard: Framework lifecycle event, not business fact
-		return nil
-
-	case *core.RunError:
-		// Discard: Framework lifecycle event, not business fact
-		return nil
+	// Note: RunStarted, RunFinished, RunError are now domain events emitted at service layer
 
 	case *core.EngineStateChanged:
 		// Discard: Framework internal state, not business fact
