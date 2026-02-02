@@ -76,7 +76,7 @@ func TestManager_RecordToolEvent(t *testing.T) {
 
 	// Create thread
 	threadID := "thread-manager-test"
-	_, _, err := manager.CreateThread(ctx, threadID, "Test Thread")
+	_, _, err := manager.CreateThread(ctx, threadID, "user-setup", "Test Thread")
 	require.NoError(t, err)
 
 	// Create event

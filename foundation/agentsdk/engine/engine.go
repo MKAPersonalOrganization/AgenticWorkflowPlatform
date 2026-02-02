@@ -85,12 +85,6 @@ func (e *Engine) Run(ctx context.Context, agentName string, runCtx core.RunConte
 			// Start turn
 			exec.trackStateChange(StateInvokingLLM)
 
-			// Handle user message submission before state machine runs
-			if err := exec.handleUserMessageSubmission(); err != nil {
-				wrappedYield(nil, fmt.Errorf("failed to handle user message: %w", err))
-				return
-			}
-
 			if err := exec.run(); err != nil {
 				if err != errStopIteration {
 					exec.handleExecutionError(ctx, err)
@@ -674,44 +668,6 @@ func (s *executionState) initAgentComponents(name string) error {
 	s.agent = instance
 	s.observer.events = instance.Events
 	s.safety.ResetAgentLimits()
-	return nil
-}
-
-// handleUserMessageSubmission yields a UserMessageAdded event.
-func (s *executionState) handleUserMessageSubmission() error {
-	// Only process if this is a new user message submission
-	if s.userContent == "" {
-		return nil
-	}
-
-	// Generate unique message ID for the user message
-	userMessageID := core.GenerateID()
-
-	// Yield UserMessageAdded event (durable)
-	userMsgEvent := &core.UserMessageAdded{
-		ThreadID:  s.threadID,
-		UserID:    s.userID,
-		MessageID: userMessageID,
-		Content:   s.userContent,
-		Timestamp: time.Now(),
-	}
-	if !s.observer.yield(userMsgEvent, nil) {
-		return errStopIteration
-	}
-
-	// Update internal history
-	s.history = append(s.history, core.Message{
-		ID:        userMessageID,
-		Role:      "user",
-		Content:   s.userContent,
-		Timestamp: userMsgEvent.Timestamp,
-	})
-
-	// Emit RunStarted event (transient)
-	if !s.observer.yield(s.observer.events.RunStarted(s.threadID, s.messageID), nil) {
-		return errStopIteration
-	}
-
 	return nil
 }
 

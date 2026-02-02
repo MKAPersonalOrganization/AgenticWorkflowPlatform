@@ -3,7 +3,6 @@ package core
 import (
 	"context"
 	"fmt"
-	"time"
 )
 
 // ThreadRepository manages thread state and events.
@@ -16,23 +15,6 @@ func NewThreadRepository(eventStore EventStore) *ThreadRepository {
 	return &ThreadRepository{
 		eventStore: eventStore,
 	}
-}
-
-// CreateThread creates a new thread.
-func (r *ThreadRepository) CreateThread(ctx context.Context, threadID, userID, title string) error {
-	event := &ThreadCreated{
-		ThreadID:  threadID,
-		UserID:    userID,
-		Title:     title,
-		Timestamp: time.Now(),
-	}
-
-	_, err := r.eventStore.AppendWithVersion(ctx, threadID, 0, event)
-	if err != nil {
-		return fmt.Errorf("failed to create thread: %w", err)
-	}
-
-	return nil
 }
 
 // GetThreadEvents retrieves all events for a thread.

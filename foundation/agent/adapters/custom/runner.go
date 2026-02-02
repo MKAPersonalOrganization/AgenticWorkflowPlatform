@@ -67,15 +67,40 @@ func NewRunnerAdapter(
 // Run executes an agent with the given request.
 func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq2[agent.Event, error] {
 	return func(yield func(agent.Event, error) bool) {
-		// 1. Thread Loading
+		// 1. Facts First: Initialize Thread and Message
 		threadMgmt := r.service.GetThreadManagement()
-		agg, err := threadMgmt.Load(ctx, req.SessionID)
-		if err != nil && !errors.Is(err, domain.ErrThreadNotFound) {
-			yield(nil, fmt.Errorf("failed to load thread: %w", err))
-			return
+		var agg *domain.ThreadAggregate
+		var initialEvents []domain.Event
+
+		userContent := extractUserPrompt(req.Message)
+		if req.Message != nil {
+			messageID := req.Message.ID
+			if messageID == "" {
+				messageID = domain.GenerateMessageID()
+			}
+
+			// AddUserMessage handles both thread creation and message persistence
+			var uEvent *domain.UserMessageAdded
+			var pErr error
+			agg, uEvent, pErr = threadMgmt.AddUserMessage(ctx, req.SessionID, messageID, userContent, req.UserID)
+			if pErr != nil {
+				yield(nil, fmt.Errorf("failed to persist user message: %w", pErr))
+				return
+			}
+			if uEvent != nil {
+				initialEvents = append(initialEvents, uEvent)
+			}
+		} else {
+			// Resuming without a new message
+			var lErr error
+			agg, lErr = threadMgmt.Load(ctx, req.SessionID)
+			if lErr != nil && !errors.Is(lErr, domain.ErrThreadNotFound) {
+				yield(nil, fmt.Errorf("failed to load thread: %w", lErr))
+				return
+			}
 		}
 
-		// 2. Map Domain Aggregate to SDK Thread
+		// 2. Map Domain Aggregate to SDK Thread (Naturally includes the new message)
 		var thread core.AgentThread
 		var messages []core.Message
 
@@ -96,7 +121,7 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 		runCtx := core.RunContext{
 			ThreadID:       req.SessionID,
 			UserID:         req.UserID,
-			UserContent:    extractUserPrompt(req.Message),
+			UserContent:    userContent,
 			Thread:         thread,
 			InitialHistory: messages,
 		}
@@ -114,16 +139,27 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 			runCtx.LoopState = agg.ExecutionState.LoopStateHex
 		}
 
-		// 4. Run Engine and Pipe through Orchestrator
+		// 4. Run Engine (No need for initialEvents in the domain stream as they are already persisted)
 		coreEvents := r.engine.Run(ctx, req.AgentName, runCtx)
 
 		// Use observable event pipeline instead of manual conversion
-		domainEvents := r.pipeline.ProcessEventStream(ctx, coreEvents)
+		engineDomainEvents := r.pipeline.ProcessEventStream(ctx, coreEvents)
 
-		// Pass to Orchestration Service for persistence and broadcasting
-		orchestratedEvents := r.service.ProcessEvents(ctx, domainEvents)
+		// Pass to Orchestration Service for persistence and broadcasting (only for new events)
+		orchestratedEvents := r.service.ProcessEvents(ctx, engineDomainEvents)
 
-		// 5. Convert back to agent.Event for the consumer
+		// 5. Yield events back to caller
+		// First yield the initial events that we persisted synchronously
+		for _, ie := range initialEvents {
+			ae := ConvertCoreEventToAgent(ie)
+			if ae != nil {
+				if !yield(ae, nil) {
+					return
+				}
+			}
+		}
+
+		// Then yield orchestrated engine events
 		for de, err := range orchestratedEvents {
 			if err != nil {
 				yield(nil, err)

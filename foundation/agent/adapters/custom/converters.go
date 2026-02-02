@@ -17,14 +17,6 @@ func ToDomainEvent(e core.Event) domain.Event {
 
 	// Convert core events to proper domain events
 	switch evt := e.(type) {
-	case *core.UserMessageAdded:
-		return &domain.UserMessageAdded{
-			ThreadID:  evt.ThreadID,
-			MessageID: evt.MessageID,
-			Content:   evt.Content,
-			UserID:    evt.UserID,
-			Timestamp: evt.Timestamp,
-		}
 	case *core.AssistantMessageAdded:
 		return &domain.AssistantMessageAdded{
 			ThreadID:  evt.ThreadID,

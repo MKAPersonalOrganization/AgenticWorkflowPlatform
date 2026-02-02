@@ -333,8 +333,8 @@ func (h *TaskManagementHandler) DeleteThread(w http.ResponseWriter, r *http.Requ
 
 	h.log.Info(r.Context(), "Deleting thread", "userID", user.ID, "threadID", threadID)
 
-	// Delete thread using session store
-	err := h.sessionStore.Delete(r.Context(), threadID)
+	// Delete thread using thread management manager
+	_, err := h.threadMgmt.DeleteThread(r.Context(), threadID)
 	if err != nil {
 		if errors.Is(err, domain.ErrThreadNotFound) {
 			http.Error(w, "Thread not found", http.StatusNotFound)

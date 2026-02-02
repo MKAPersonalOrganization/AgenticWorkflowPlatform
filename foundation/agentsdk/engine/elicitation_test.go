@@ -83,10 +83,9 @@ func TestEngine_ElicitationFlow(t *testing.T) {
 
 	// Build history from events for next step
 	var history []core.Message
+	history = append(history, core.Message{ID: runCtx1.MessageID, Role: "user", Content: runCtx1.UserContent})
 	for _, evt := range events1 {
 		switch e := evt.(type) {
-		case *core.UserMessageAdded:
-			history = append(history, core.Message{ID: e.MessageID, Role: "user", Content: e.Content})
 		case *core.AssistantMessageAdded:
 			history = append(history, core.Message{ID: e.MessageID, Role: "assistant", Content: e.Content, ToolCalls: e.ToolCalls})
 		case *core.ToolResultAdded:

@@ -68,30 +68,7 @@ func (e BaseEvent) AggregateID() string       { return e.ThreadID }
 
 // -- SDK Events --
 
-// ThreadCreated is emitted when a new thread is created.
-type ThreadCreated struct {
-	ThreadID  string    `json:"threadId"`
-	UserID    string    `json:"userId"`
-	Title     string    `json:"title,omitempty"`
-	Timestamp time.Time `json:"timestamp"`
-}
-
-func (e ThreadCreated) EventType() string         { return "ThreadCreated" }
-func (e ThreadCreated) EventTimestamp() time.Time { return e.Timestamp }
-func (e ThreadCreated) AggregateID() string       { return e.ThreadID }
-
-// UserMessageAdded is emitted when a user message is added to the thread.
-type UserMessageAdded struct {
-	ThreadID  string    `json:"threadId"`
-	UserID    string    `json:"userId,omitempty"`
-	MessageID string    `json:"messageId"`
-	Content   string    `json:"content"`
-	Timestamp time.Time `json:"timestamp"`
-}
-
-func (e UserMessageAdded) EventType() string         { return "UserMessageAdded" }
-func (e UserMessageAdded) EventTimestamp() time.Time { return e.Timestamp }
-func (e UserMessageAdded) AggregateID() string       { return e.ThreadID }
+// -- SDK Events --
 
 // AssistantMessageStarted is emitted when the assistant begins responding.
 type AssistantMessageStarted struct {
