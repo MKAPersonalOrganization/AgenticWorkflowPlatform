@@ -25,7 +25,7 @@ func New(log *logger.Logger, threadRepo *domain.ThreadRepository) *Manager {
 }
 
 // CreateThread creates a new chat thread.
-func (m *Manager) CreateThread(ctx context.Context, threadID, title string) (*domain.ThreadAggregate, *domain.ThreadCreated, error) {
+func (m *Manager) CreateThread(ctx context.Context, threadID, userID, title string) (*domain.ThreadAggregate, *domain.ThreadCreated, error) {
 	m.log.Debug(ctx, "CreateThread called", "threadID", threadID, "title", title)
 
 	existingThread, err := m.threadRepo.Load(ctx, threadID)
@@ -37,7 +37,7 @@ func (m *Manager) CreateThread(ctx context.Context, threadID, title string) (*do
 		return nil, nil, fmt.Errorf("failed to check existing thread: %w", err)
 	}
 
-	thread, err := domain.OpenThread(threadID, "system", title)
+	thread, err := domain.OpenThread(threadID, userID, title)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create thread: %w", err)
 	}
@@ -54,7 +54,7 @@ func (m *Manager) CreateThread(ctx context.Context, threadID, title string) (*do
 
 	event := &domain.ThreadCreated{
 		ThreadID:  threadID,
-		UserID:    "system", // Assuming system for now
+		UserID:    userID,
 		Title:     title,
 		Timestamp: time.Now(),
 	}
@@ -247,13 +247,27 @@ func (m *Manager) UpdateThreadTitle(ctx context.Context, threadID, newTitle stri
 	return event, nil
 }
 
-// DeleteThread deletes a thread.
-func (m *Manager) DeleteThread(ctx context.Context, threadID string) error {
-	err := m.threadRepo.Delete(ctx, threadID)
+// DeleteThread deletes a thread and returns the deletion event.
+func (m *Manager) DeleteThread(ctx context.Context, threadID string) (*domain.ThreadDeleted, error) {
+	thread, err := m.threadRepo.Load(ctx, threadID)
 	if err != nil {
-		return fmt.Errorf("failed to delete thread: %w", err)
+		return nil, fmt.Errorf("failed to load thread: %w", err)
 	}
-	return nil
+
+	if err := thread.Delete(); err != nil {
+		return nil, fmt.Errorf("failed to delete aggregate: %w", err)
+	}
+
+	if err := m.threadRepo.Save(ctx, thread); err != nil {
+		return nil, fmt.Errorf("failed to save thread: %w", err)
+	}
+
+	event := &domain.ThreadDeleted{
+		ThreadID:  threadID,
+		Timestamp: time.Now(),
+	}
+
+	return event, nil
 }
 
 // GetEngineState retrieves the current engine state for a thread.

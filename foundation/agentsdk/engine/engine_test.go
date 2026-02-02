@@ -3,11 +3,9 @@ package engine
 import (
 	"context"
 	"errors"
-	"fmt"
 	"iter"
 	"sync"
 	"testing"
-	"time"
 
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/llm"
@@ -145,35 +143,22 @@ func (m *MockEventStore) DeleteStream(ctx context.Context, streamID string) erro
 
 func TestEngine_Run(t *testing.T) {
 	t.Parallel()
-	// Setup
-	eventStore := NewMockEventStore()
-	repo := core.NewThreadRepository(eventStore)
-	// Create a thread
 	ctx := context.Background()
 	threadID := "thread-1"
-	// Create thread directly in store
-	event := &core.ThreadCreated{
-		ThreadID:  threadID,
-		UserID:    "system",
-		Title:     "Test Thread",
-		Timestamp: time.Now(),
-	}
-	_, err := eventStore.AppendWithVersion(ctx, fmt.Sprintf("Thread-%s", threadID), -2, event)
-	if err != nil {
-		t.Fatalf("Failed to create thread: %v", err)
-	}
+	agentThread := core.NewInMemoryThreadWithID(threadID)
+	_ = agentThread.AddMessages([]core.Message{
+		{
+			ID:      "msg-1",
+			Role:    "user",
+			Content: "Hello!",
+		},
+	})
 
-	// Add user message via manager so event store is populated
-	userMsg := &core.UserMessageAdded{
+	runCtx := core.RunContext{
 		ThreadID:  threadID,
-		MessageID: "msg-1",
-		Content:   "Calculate 2+2",
-		UserID:    "system",
-		Timestamp: time.Now(),
-	}
-	_, err = eventStore.AppendWithVersion(ctx, fmt.Sprintf("Thread-%s", threadID), 1, userMsg)
-	if err != nil {
-		t.Fatalf("Failed to add user message: %v", err)
+		MessageID: "msg-2", // Expected response ID
+		Thread:    agentThread,
+		Options:   core.RunOptions{},
 	}
 
 	chatClient := &MockChatClient{
@@ -218,30 +203,6 @@ func TestEngine_Run(t *testing.T) {
 		nil,
 		nil,
 	)
-
-	// Get thread events instead of loading aggregate
-	threadEvents, err := repo.GetThreadEvents(ctx, threadID)
-	if err != nil {
-		t.Fatalf("Failed to get thread events: %v", err)
-	}
-	agentThread := core.NewInMemoryThreadWithID(threadID)
-	var messages []core.Message
-	// Convert events to messages - simplified for test, just add a basic user message
-	if len(threadEvents) > 0 {
-		messages = append(messages, core.Message{
-			ID:      "msg-1",
-			Role:    "user",
-			Content: "Hello!",
-		})
-	}
-	_ = agentThread.AddMessages(messages)
-
-	runCtx := core.RunContext{
-		ThreadID:  threadID,
-		MessageID: "msg-2", // Expected response ID
-		Thread:    agentThread,
-		Options:   core.RunOptions{},
-	}
 
 	// Execute with explicit initial agent
 	var events []core.Event

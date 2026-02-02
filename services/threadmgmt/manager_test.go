@@ -74,7 +74,7 @@ func TestManager_RetryUpdate(t *testing.T) {
 		mgr := New(log, repo)
 
 		threadID := "test-thread-success"
-		_, _, err := mgr.CreateThread(ctx, threadID, "Title")
+		_, _, err := mgr.CreateThread(ctx, threadID, "user-1", "Title")
 		if err != nil {
 			t.Fatalf("Failed to create thread: %v", err)
 		}
@@ -102,7 +102,7 @@ func TestManager_RetryUpdate(t *testing.T) {
 		mgr := New(log, repo)
 
 		threadID := "test-thread-fail"
-		_, _, err := mgr.CreateThread(ctx, threadID, "Title")
+		_, _, err := mgr.CreateThread(ctx, threadID, "user-1", "Title")
 		if err != nil {
 			t.Fatalf("Failed to create thread: %v", err)
 		}
@@ -134,7 +134,7 @@ func TestManager_AutoTitling(t *testing.T) {
 		threadID := "auto-title-thread"
 
 		// 1. Create thread with default title
-		_, _, err := mgr.CreateThread(ctx, threadID, "New Chat")
+		_, _, err := mgr.CreateThread(ctx, threadID, "user-1", "New Chat")
 		if err != nil {
 			t.Fatalf("Failed to create thread: %v", err)
 		}
@@ -172,7 +172,7 @@ func TestManager_AutoTitling(t *testing.T) {
 		threadID := "no-overwrite-thread"
 
 		// 1. Create thread with custom title
-		mgr.CreateThread(ctx, threadID, "Custom Title")
+		mgr.CreateThread(ctx, threadID, "user-1", "Custom Title")
 
 		// 2. Add user message
 		mgr.AddUserMessage(ctx, threadID, "msg-1", "Some content", "user-1")

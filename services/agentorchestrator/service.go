@@ -161,7 +161,10 @@ func (s *Service) isDurable(event domain.Event) bool {
 func (s *Service) persistDurableEvent(ctx context.Context, event domain.Event) error {
 	switch e := event.(type) {
 	case *domain.ThreadCreated:
-		_, _, err := s.threadMgmt.CreateThread(ctx, e.ThreadID, e.Title)
+		_, _, err := s.threadMgmt.CreateThread(ctx, e.ThreadID, e.UserID, e.Title)
+		return err
+	case *domain.ThreadDeleted:
+		_, err := s.threadMgmt.DeleteThread(ctx, e.ThreadID)
 		return err
 	case *domain.UserMessageAdded:
 		_, _, err := s.threadMgmt.AddUserMessage(ctx, e.ThreadID, e.MessageID, e.Content, e.UserID)
