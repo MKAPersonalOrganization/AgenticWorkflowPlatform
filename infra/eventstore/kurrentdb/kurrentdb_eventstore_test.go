@@ -26,13 +26,13 @@ func TestEventStore_AppendAndRead(t *testing.T) {
 
 	// Create test events
 	events := []core.Event{
-		domain.ThreadCreated{
+		&domain.ThreadCreated{
 			ThreadID:  streamID,
 			UserID:    "user-1",
 			Title:     "Test Thread",
 			Timestamp: time.Now(),
 		},
-		domain.UserMessageAdded{
+		&domain.UserMessageAdded{
 			ThreadID:  streamID,
 			MessageID: "msg-1",
 			Content:   "Hello, world!",
@@ -51,12 +51,12 @@ func TestEventStore_AppendAndRead(t *testing.T) {
 	assert.Len(t, readEvents, 2)
 
 	// Verify first event
-	threadCreated, ok := readEvents[0].(domain.ThreadCreated)
+	threadCreated, ok := readEvents[0].(*domain.ThreadCreated)
 	assert.True(t, ok)
 	assert.Equal(t, "Test Thread", threadCreated.Title)
 
 	// Verify second event
-	userMessage, ok := readEvents[1].(domain.UserMessageAdded)
+	userMessage, ok := readEvents[1].(*domain.UserMessageAdded)
 	assert.True(t, ok)
 	assert.Equal(t, "msg-1", userMessage.MessageID)
 	assert.Equal(t, "Hello, world!", userMessage.Content)
@@ -72,19 +72,19 @@ func TestEventStore_ReadFromVersion(t *testing.T) {
 
 	// Append 3 events
 	events := []core.Event{
-		domain.UserMessageAdded{
+		&domain.UserMessageAdded{
 			ThreadID:  streamID,
 			MessageID: "msg-1",
 			Content:   "First message",
 			Timestamp: time.Now(),
 		},
-		domain.UserMessageAdded{
+		&domain.UserMessageAdded{
 			ThreadID:  streamID,
 			MessageID: "msg-2",
 			Content:   "Second message",
 			Timestamp: time.Now(),
 		},
-		domain.UserMessageAdded{
+		&domain.UserMessageAdded{
 			ThreadID:  streamID,
 			MessageID: "msg-3",
 			Content:   "Third message",
@@ -100,7 +100,7 @@ func TestEventStore_ReadFromVersion(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, readEvents, 2)
 
-	userMessage, ok := readEvents[0].(domain.UserMessageAdded)
+	userMessage, ok := readEvents[0].(*domain.UserMessageAdded)
 	assert.True(t, ok)
 	assert.Equal(t, "msg-2", userMessage.MessageID)
 }
@@ -129,7 +129,7 @@ func TestEventStore_DeleteStream(t *testing.T) {
 
 	// Append some events
 	events := []core.Event{
-		domain.UserMessageAdded{
+		&domain.UserMessageAdded{
 			ThreadID:  streamID,
 			MessageID: "msg-1",
 			Content:   "Test message",

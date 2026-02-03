@@ -196,7 +196,7 @@ func (s *KurrentDBEventStore) convertFromRecordedEvent(recordedEvent *kurrentdb.
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal ThreadCreated: %w", err)
 		}
-		event = e
+		event = &e
 
 	case "UserMessageAdded":
 		var e domain.UserMessageAdded
@@ -204,7 +204,7 @@ func (s *KurrentDBEventStore) convertFromRecordedEvent(recordedEvent *kurrentdb.
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal UserMessageAdded: %w", err)
 		}
-		event = e
+		event = &e
 
 	case "AssistantMessageAdded":
 		var e domain.AssistantMessageAdded
@@ -212,7 +212,7 @@ func (s *KurrentDBEventStore) convertFromRecordedEvent(recordedEvent *kurrentdb.
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal AssistantMessageAdded: %w", err)
 		}
-		event = e
+		event = &e
 
 	case "ThreadTitleChanged", "ThreadTitleUpdated":
 		var e domain.ThreadTitleUpdated
@@ -220,7 +220,7 @@ func (s *KurrentDBEventStore) convertFromRecordedEvent(recordedEvent *kurrentdb.
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal ThreadTitleUpdated: %w", err)
 		}
-		event = e
+		event = &e
 
 	case "ThreadDeleted":
 		var e domain.ThreadDeleted
@@ -228,7 +228,7 @@ func (s *KurrentDBEventStore) convertFromRecordedEvent(recordedEvent *kurrentdb.
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal ThreadDeleted: %w", err)
 		}
-		event = e
+		event = &e
 
 	case "TokenUsageReported":
 		var e domain.TokenUsageReported
@@ -236,7 +236,7 @@ func (s *KurrentDBEventStore) convertFromRecordedEvent(recordedEvent *kurrentdb.
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal TokenUsageReported: %w", err)
 		}
-		event = e
+		event = &e
 
 	case "ToolStart":
 		var e domain.ToolStart

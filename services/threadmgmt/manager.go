@@ -163,7 +163,7 @@ func (m *Manager) AddAssistantMessage(ctx context.Context, threadID, messageID, 
 }
 
 // AddTokenUsage records token usage for a message in the thread.
-func (m *Manager) AddTokenUsage(ctx context.Context, event domain.TokenUsageReported) (*domain.ThreadAggregate, error) {
+func (m *Manager) AddTokenUsage(ctx context.Context, event *domain.TokenUsageReported) (*domain.ThreadAggregate, error) {
 	return m.retryUpdate(ctx, event.ThreadID, func(t *domain.ThreadAggregate) error {
 		return t.RecordUsage(event)
 	})

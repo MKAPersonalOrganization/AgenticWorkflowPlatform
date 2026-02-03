@@ -38,27 +38,27 @@ func (p *PostgresLLMContextProjection) RegisterHandlers(router interface {
 },
 ) {
 	router.Register(&domain.ThreadCreated{}, func(ctx context.Context, e domain.Event) error {
-		return p.applyThreadCreated(ctx, *e.(*domain.ThreadCreated))
+		return p.applyThreadCreated(ctx, e.(*domain.ThreadCreated))
 	})
 	router.Register(&domain.UserMessageAdded{}, func(ctx context.Context, e domain.Event) error {
-		return p.applyUserMessageAdded(ctx, *e.(*domain.UserMessageAdded))
+		return p.applyUserMessageAdded(ctx, e.(*domain.UserMessageAdded))
 	})
 	router.Register(&domain.AssistantMessageAdded{}, func(ctx context.Context, e domain.Event) error {
-		return p.applyAssistantMessageAdded(ctx, *e.(*domain.AssistantMessageAdded))
+		return p.applyAssistantMessageAdded(ctx, e.(*domain.AssistantMessageAdded))
 	})
 	router.Register(&domain.ToolResultAdded{}, func(ctx context.Context, e domain.Event) error {
-		return p.applyToolResultAdded(ctx, *e.(*domain.ToolResultAdded))
+		return p.applyToolResultAdded(ctx, e.(*domain.ToolResultAdded))
 	})
 	router.Register(&domain.ThreadTitleUpdated{}, func(ctx context.Context, e domain.Event) error {
-		return p.applyThreadTitleChanged(ctx, *e.(*domain.ThreadTitleUpdated))
+		return p.applyThreadTitleChanged(ctx, e.(*domain.ThreadTitleUpdated))
 	})
 	router.Register(&domain.ThreadDeleted{}, func(ctx context.Context, e domain.Event) error {
-		return p.applyThreadDeleted(ctx, *e.(*domain.ThreadDeleted))
+		return p.applyThreadDeleted(ctx, e.(*domain.ThreadDeleted))
 	})
 }
 
 // applyThreadCreated creates a new thread record.
-func (p *PostgresLLMContextProjection) applyThreadCreated(ctx context.Context, event domain.ThreadCreated) error {
+func (p *PostgresLLMContextProjection) applyThreadCreated(ctx context.Context, event *domain.ThreadCreated) error {
 	query := `
 		INSERT INTO llm_threads (thread_id, user_id, title, created_at, updated_at, is_deleted)
 		VALUES ($1, $2, $3, $4, $5, $6)
@@ -81,7 +81,7 @@ func (p *PostgresLLMContextProjection) applyThreadCreated(ctx context.Context, e
 }
 
 // applyUserMessageAdded adds a user message to the thread.
-func (p *PostgresLLMContextProjection) applyUserMessageAdded(ctx context.Context, event domain.UserMessageAdded) error {
+func (p *PostgresLLMContextProjection) applyUserMessageAdded(ctx context.Context, event *domain.UserMessageAdded) error {
 	// First, get current message count for sequence number
 	var messageCount int
 	countQuery := `SELECT COUNT(*) FROM llm_messages WHERE thread_id = $1`
@@ -124,7 +124,7 @@ func (p *PostgresLLMContextProjection) applyUserMessageAdded(ctx context.Context
 }
 
 // applyAssistantMessageAdded adds an assistant message to the thread.
-func (p *PostgresLLMContextProjection) applyAssistantMessageAdded(ctx context.Context, event domain.AssistantMessageAdded) error {
+func (p *PostgresLLMContextProjection) applyAssistantMessageAdded(ctx context.Context, event *domain.AssistantMessageAdded) error {
 	// First, get current message count for sequence number
 	var messageCount int
 	countQuery := `SELECT COUNT(*) FROM llm_messages WHERE thread_id = $1`
@@ -179,7 +179,7 @@ func (p *PostgresLLMContextProjection) applyAssistantMessageAdded(ctx context.Co
 }
 
 // applyToolResultAdded adds a tool result message to the thread.
-func (p *PostgresLLMContextProjection) applyToolResultAdded(ctx context.Context, event domain.ToolResultAdded) error {
+func (p *PostgresLLMContextProjection) applyToolResultAdded(ctx context.Context, event *domain.ToolResultAdded) error {
 	// First, get current message count for sequence number
 	var messageCount int
 	countQuery := `SELECT COUNT(*) FROM llm_messages WHERE thread_id = $1`
@@ -224,7 +224,7 @@ func (p *PostgresLLMContextProjection) applyToolResultAdded(ctx context.Context,
 }
 
 // applyThreadTitleChanged updates the thread title.
-func (p *PostgresLLMContextProjection) applyThreadTitleChanged(ctx context.Context, event domain.ThreadTitleUpdated) error {
+func (p *PostgresLLMContextProjection) applyThreadTitleChanged(ctx context.Context, event *domain.ThreadTitleUpdated) error {
 	query := `
 		UPDATE llm_threads
 		SET title = $1, updated_at = $2
@@ -240,7 +240,7 @@ func (p *PostgresLLMContextProjection) applyThreadTitleChanged(ctx context.Conte
 }
 
 // applyThreadDeleted marks a thread as deleted (messages cascade delete via FK).
-func (p *PostgresLLMContextProjection) applyThreadDeleted(ctx context.Context, event domain.ThreadDeleted) error {
+func (p *PostgresLLMContextProjection) applyThreadDeleted(ctx context.Context, event *domain.ThreadDeleted) error {
 	query := `
 		UPDATE llm_threads
 		SET is_deleted = true, updated_at = $1

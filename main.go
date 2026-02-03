@@ -18,7 +18,6 @@ import (
 	"school-with-ai/components/checkout"
 	"school-with-ai/components/pricing"
 	"school-with-ai/domain"
-	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/llm"
 	"school-with-ai/foundation/debug"
 	"school-with-ai/foundation/event"
@@ -140,7 +139,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 			HealthCheckInterval time.Duration `conf:"default:15s"`
 		}
 		AI struct {
-			Model string `conf:"default:gemini-2.0-flash"`
+			Provider string `conf:"default:openai"`
+			Model    string `conf:"default:gpt-4o"`
 		}
 		Langfuse struct {
 			Enabled   bool   `conf:"default:false"`
@@ -315,15 +315,31 @@ func run(ctx context.Context, log *logger.Logger) error {
 		}
 	}()
 
-	// Initialize Gemini chat client with model
-	log.Info(ctx, "startup", "status", "initializing AI client", "model", cfg.AI.Model)
-	apiKey := os.Getenv("GEMINI_API_KEY")
-	if apiKey == "" {
-		return fmt.Errorf("GEMINI_API_KEY environment variable is not set")
-	}
-	chatClient, err := llm.NewGeminiClient(ctx, apiKey, cfg.AI.Model)
-	if err != nil {
-		return fmt.Errorf("initializing Gemini client: %w", err)
+	// Initialize AI chat client
+	var chatClient llm.ChatClient
+	log.Info(ctx, "startup", "status", "initializing AI client", "provider", cfg.AI.Provider, "model", cfg.AI.Model)
+
+	switch cfg.AI.Provider {
+	case "openai":
+		apiKey := os.Getenv("OPENAI_API_KEY")
+		if apiKey == "" {
+			return fmt.Errorf("OPENAI_API_KEY environment variable is not set")
+		}
+		chatClient = llm.NewOpenAIClientWithAPIKey(apiKey, cfg.AI.Model)
+
+	case "gemini":
+		apiKey := os.Getenv("GEMINI_API_KEY")
+		if apiKey == "" {
+			return fmt.Errorf("GEMINI_API_KEY environment variable is not set")
+		}
+		var err error
+		chatClient, err = llm.NewGeminiClient(ctx, apiKey, cfg.AI.Model)
+		if err != nil {
+			return fmt.Errorf("initializing Gemini client: %w", err)
+		}
+
+	default:
+		return fmt.Errorf("unsupported AI provider: %s", cfg.AI.Provider)
 	}
 
 	// Wrap chatClient with the new abstraction adapter
@@ -368,7 +384,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		return fmt.Errorf("initializing s3 artifact service: %w", err)
 	}
 
-	var runner agent.Runner
+	var runner agentorchestrator.Runner
 	var agentOrchestrator *agentorchestrator.Service
 	switch cfg.Orchestration.Framework {
 	case "custom":
@@ -380,7 +396,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 		runner = custom.NewRunnerAdapter(
 			log,
 			agentOrchestrator, // ThreadManager interface
-			agentOrchestrator, // EventProcessor interface
 			chatClient,
 			artifactService,
 			studentProfileRepo,
@@ -466,7 +481,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		"healthCheckInterval", cfg.Orchestration.HealthCheckInterval)
 
 	// Create HTTP handler
-	handler := taskmgmthandlers.NewTaskManagementHandler(log, model, taskManager, runner, registry.GlobalAgents, sessionStore, authSvc, threadQueryService, aguiProjection, redisBroadcaster, threadMgmt)
+	handler := taskmgmthandlers.NewTaskManagementHandler(log, model, taskManager, registry.GlobalAgents, sessionStore, authSvc, threadQueryService, aguiProjection, redisBroadcaster, threadMgmt)
 
 	// Create health handler
 	healthHandler := healthhandlers.NewHealthHandler(log)

@@ -368,8 +368,8 @@ func (s *executionState) checkToolWaitingStates() (bool, bool, error) {
 	return hasInput, hasAuth, nil
 }
 
-func (s *executionState) refreshState(history []core.Message) {
-	s.history = history
+func (s *executionState) refreshState(newMessages []core.Message) {
+	s.history = append(s.history, newMessages...)
 }
 
 // emitCompletionEvents handles the emission of final events based on completion reason.
@@ -916,39 +916,10 @@ func (e *ToolStateEventEmitter) OnToolStateChanged(
 		// For now handled by the tool state machine observer pattern
 
 	case core.ToolStateCompleted:
-		if result != nil {
-			evt := e.events.ToolResultAdded(
-				e.threadID,
-				e.messageID,
-				toolCallID,
-				toolName,
-				result.Result,
-				false, // isError = false for success
-				result.Arguments,
-			)
-			if !e.yield(evt, nil) {
-				return
-			}
-		}
+		// ToolResultAdded is already emitted by ToolProcessor.ProcessActions
 
 	case core.ToolStateError:
-		if result != nil {
-			if result.IsError {
-				errorMsg := result.Result
-				evt := e.events.ToolResultAdded(
-					e.threadID,
-					e.messageID,
-					toolCallID,
-					toolName,
-					errorMsg,
-					true, // isError = true for error
-					result.Arguments,
-				)
-				if !e.yield(evt, nil) {
-					return
-				}
-			}
-		}
+		// ToolResultAdded (with isError=true) is already emitted by ToolProcessor.ProcessActions
 	}
 }
 

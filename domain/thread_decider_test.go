@@ -20,7 +20,7 @@ func TestThreadDeciderCreateThread(t *testing.T) {
 		t.Fatalf("expected 1 event, got %d", len(events))
 	}
 
-	created, ok := events[0].(ThreadCreated)
+	created, ok := events[0].(*ThreadCreated)
 	if !ok {
 		t.Fatalf("expected ThreadCreated event, got %T", events[0])
 	}
@@ -100,7 +100,7 @@ func TestThreadDeciderAddMessage(t *testing.T) {
 		t.Fatalf("expected 1 event, got %d", len(events))
 	}
 
-	added, ok := events[0].(UserMessageAdded)
+	added, ok := events[0].(*UserMessageAdded)
 	if !ok {
 		t.Fatalf("expected UserMessageAdded event, got %T", events[0])
 	}
@@ -120,7 +120,7 @@ func TestThreadAggregateEvolve(t *testing.T) {
 	thread := NewThreadAggregate("thread-1")
 
 	// Apply ThreadCreated event
-	created := ThreadCreated{
+	created := &ThreadCreated{
 		ThreadID:  "thread-1",
 		UserID:    "user-1",
 		Title:     "Test Thread",
@@ -141,7 +141,7 @@ func TestThreadAggregateEvolve(t *testing.T) {
 	}
 
 	// Apply UserMessageAdded event
-	msgAdded := UserMessageAdded{
+	msgAdded := &UserMessageAdded{
 		ThreadID:  "thread-1",
 		MessageID: "msg-1",
 		Content:   "Hello!",
@@ -199,7 +199,7 @@ func TestThreadTitleChange(t *testing.T) {
 		t.Fatalf("expected 1 event, got %d", len(events))
 	}
 
-	changed, ok := events[0].(ThreadTitleUpdated)
+	changed, ok := events[0].(*ThreadTitleUpdated)
 	if !ok {
 		t.Fatalf("expected ThreadTitleUpdated event, got %T", events[0])
 	}

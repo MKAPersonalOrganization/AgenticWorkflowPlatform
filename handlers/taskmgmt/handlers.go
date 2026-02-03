@@ -24,7 +24,6 @@ type TaskManagementHandler struct {
 	log                *logger.Logger
 	model              agent.Model
 	taskManager        *taskmanagement.AsynqTaskManager
-	runner             agent.Runner
 	agentRegistry      agent.AgentRegistry
 	sessionStore       agent.SessionStore
 	authService        services.AuthService
@@ -39,7 +38,6 @@ func NewTaskManagementHandler(
 	log *logger.Logger,
 	model agent.Model,
 	taskManager *taskmanagement.AsynqTaskManager,
-	runner agent.Runner,
 	agentRegistry agent.AgentRegistry,
 	sessionStore agent.SessionStore,
 	authService services.AuthService,
@@ -52,7 +50,6 @@ func NewTaskManagementHandler(
 		log:                log,
 		model:              model,
 		taskManager:        taskManager,
-		runner:             runner,
 		agentRegistry:      agentRegistry,
 		sessionStore:       sessionStore,
 		authService:        authService,

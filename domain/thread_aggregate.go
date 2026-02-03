@@ -45,7 +45,7 @@ func OpenThread(threadID, userID, title string) (*ThreadAggregate, error) {
 	}
 
 	thread := NewThreadAggregate(threadID)
-	event := ThreadCreated{
+	event := &ThreadCreated{
 		ThreadID:  threadID,
 		UserID:    userID,
 		Title:     title,
@@ -73,14 +73,14 @@ func (t *ThreadAggregate) AddMessage(messageID, role, content string, toolCalls 
 	var event Event
 	switch role {
 	case "user":
-		event = UserMessageAdded{
+		event = &UserMessageAdded{
 			ThreadID:  t.ID,
 			MessageID: messageID,
 			Content:   content,
 			Timestamp: time.Now(),
 		}
 	case "assistant":
-		event = AssistantMessageAdded{
+		event = &AssistantMessageAdded{
 			ThreadID:  t.ID,
 			MessageID: messageID,
 			Content:   content,
@@ -89,7 +89,7 @@ func (t *ThreadAggregate) AddMessage(messageID, role, content string, toolCalls 
 			Timestamp: time.Now(),
 		}
 	case "tool":
-		event = ToolResultAdded{
+		event = &ToolResultAdded{
 			ThreadID:   t.ID,
 			MessageID:  messageID,
 			ToolCallID: toolCallID,
@@ -117,7 +117,7 @@ func (t *ThreadAggregate) ChangeTitle(newTitle string) error {
 		return nil
 	}
 
-	event := ThreadTitleUpdated{
+	event := &ThreadTitleUpdated{
 		ThreadID:  t.ID,
 		Title:     newTitle,
 		Timestamp: time.Now(),
@@ -133,7 +133,7 @@ func (t *ThreadAggregate) Delete() error {
 		return errors.New("thread already deleted")
 	}
 
-	event := ThreadDeleted{
+	event := &ThreadDeleted{
 		ThreadID:  t.ID,
 		Timestamp: time.Now(),
 	}
@@ -143,7 +143,7 @@ func (t *ThreadAggregate) Delete() error {
 }
 
 // RecordUsage records token usage for a message in the thread.
-func (t *ThreadAggregate) RecordUsage(event TokenUsageReported) error {
+func (t *ThreadAggregate) RecordUsage(event *TokenUsageReported) error {
 	if t.IsDeleted {
 		return errors.New("cannot record usage for deleted thread")
 	}
@@ -166,7 +166,7 @@ func (t *ThreadAggregate) RecordToolEvent(event Event) error {
 // This is the only place where state mutations happen.
 func (t *ThreadAggregate) Apply(event Event) {
 	switch e := event.(type) {
-	case ThreadCreated:
+	case *ThreadCreated:
 		t.ID = e.ThreadID
 		t.UserID = e.UserID
 		t.Title = e.Title
@@ -174,7 +174,7 @@ func (t *ThreadAggregate) Apply(event Event) {
 		t.UpdatedAt = e.Timestamp
 		t.IsDeleted = false
 
-	case UserMessageAdded:
+	case *UserMessageAdded:
 		msg := Message{
 			ID:        e.MessageID,
 			Role:      "user",
@@ -184,7 +184,7 @@ func (t *ThreadAggregate) Apply(event Event) {
 		t.Messages = append(t.Messages, msg)
 		t.UpdatedAt = e.Timestamp
 
-	case AssistantMessageAdded:
+	case *AssistantMessageAdded:
 		msg := Message{
 			ID:        e.MessageID,
 			Role:      "assistant",
@@ -196,7 +196,7 @@ func (t *ThreadAggregate) Apply(event Event) {
 		t.Messages = append(t.Messages, msg)
 		t.UpdatedAt = e.Timestamp
 
-	case ToolResultAdded:
+	case *ToolResultAdded:
 		msg := Message{
 			ID:         e.MessageID,
 			Role:       "tool",
@@ -212,15 +212,15 @@ func (t *ThreadAggregate) Apply(event Event) {
 		// Remove the tool from active states when result is added
 		delete(t.ActiveToolStates, e.ToolCallID)
 
-	case ThreadTitleUpdated:
+	case *ThreadTitleUpdated:
 		t.Title = e.Title
 		t.UpdatedAt = e.Timestamp
 
-	case ThreadDeleted:
+	case *ThreadDeleted:
 		t.IsDeleted = true
 		t.UpdatedAt = e.Timestamp
 
-	case ToolNeedsInput:
+	case *ToolNeedsInput:
 		state := ToolCallState{
 			ToolCallID: e.ToolCallID,
 			Status:     "AwaitingInput",
@@ -231,7 +231,7 @@ func (t *ThreadAggregate) Apply(event Event) {
 		}
 		t.ActiveToolStates[e.ToolCallID] = state
 
-	case ToolNeedsAuth:
+	case *ToolNeedsAuth:
 		state := ToolCallState{
 			ToolCallID: e.ToolCallID,
 			Status:     "AwaitingAuth",
@@ -244,37 +244,40 @@ func (t *ThreadAggregate) Apply(event Event) {
 		}
 		t.ActiveToolStates[e.ToolCallID] = state
 
-	case InputProvided:
+	case *InputProvided:
 		if state, ok := t.ActiveToolStates[e.ToolCallID]; ok {
 			state.Status = "InputProvided"
 			t.ActiveToolStates[e.ToolCallID] = state
 		}
 
-	case AuthGranted:
+	case *AuthGranted:
 		if state, ok := t.ActiveToolStates[e.ToolCallID]; ok {
 			state.Status = "AuthGranted"
 			t.ActiveToolStates[e.ToolCallID] = state
 		}
 
-	case AuthDenied:
+	case *AuthDenied:
 		if state, ok := t.ActiveToolStates[e.ToolCallID]; ok {
 			state.Status = "AuthDenied"
 			t.ActiveToolStates[e.ToolCallID] = state
 		}
 
-	case ToolCancelled:
+	case *ToolCancelled:
 		// Remove the tool from active states when cancelled
 		delete(t.ActiveToolStates, e.ToolCallID)
 		t.UpdatedAt = e.Timestamp
 
-	case RunStarted:
+	case *RunStarted:
 		// Update the thread's last activity timestamp when a run starts
 		t.UpdatedAt = e.Timestamp
 
-	case RunFinished:
+	case *RunFinished:
 		// Update the thread's last activity timestamp when a run finishes
 		t.UpdatedAt = e.Timestamp
 
+	case *TokenUsageReported:
+		// Track token usage if needed
+		t.UpdatedAt = e.Timestamp
 	}
 }
 

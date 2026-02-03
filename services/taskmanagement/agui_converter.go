@@ -2,150 +2,30 @@ package taskmanagement
 
 import (
 	"school-with-ai/domain"
-	"school-with-ai/foundation/agent"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
 
-// ToAguiEvents converts agent events to AGUI events.
-// It returns a slice of events because some agent events map to multiple AGUI events.
-func ToAguiEvents(event agent.Event) []any {
+// ToAguiEvents converts domain events to AGUI events.
+// It returns a slice of events because some domain events map to multiple AGUI events.
+func ToAguiEvents(event domain.Event) []any {
 	if event == nil {
 		return nil
 	}
 
-	switch event.Type() {
-	case agent.EventTypeMessage:
-		data, ok := event.Data().(*agent.MessageEvent)
-		if !ok || data.Message == nil {
-			return nil
-		}
-		msg := data.Message
-		events := []any{}
-		switch msg.Role {
-		case agent.RoleAssistant:
-			events = append(events, aguievents.NewTextMessageStartEvent(msg.ID, aguievents.WithRole("assistant")))
-			// Extract text content
-			for _, c := range msg.Content {
-				if c.Type == agent.ContentTypeText {
-					events = append(events, aguievents.NewTextMessageContentEvent(msg.ID, c.Text))
-				}
-			}
-			events = append(events, aguievents.NewTextMessageEndEvent(msg.ID))
-		case agent.RoleUser:
-			// Usually handled locally, but can be added if needed
-		}
-		return events
-
-	case agent.EventTypeToolCall:
-		data, ok := event.Data().(*agent.ToolCallEvent)
-		if !ok || data.ToolCall == nil {
-			return nil
-		}
-		tc := data.ToolCall
-		return []any{aguievents.NewCustomEvent(
-			"TOOL_START",
-			aguievents.WithValue(map[string]any{
-				"toolCallId": tc.ID,
-				"toolName":   tc.Name,
-				"arguments":  tc.Arguments,
-				"timestamp":  event.Timestamp(),
-			}),
-		)}
-
-	case agent.EventTypeToolResult:
-		data, ok := event.Data().(*agent.ToolResultEvent)
-		if !ok || data.Result == nil {
-			return nil
-		}
-		tr := data.Result
-		if tr.IsError {
-			return []any{aguievents.NewCustomEvent(
-				"TOOL_ERROR",
-				aguievents.WithValue(map[string]any{
-					"toolCallId": tr.ToolCallID,
-					"error":      tr.Output,
-					"timestamp":  event.Timestamp(),
-				}),
-			)}
-		}
-		return []any{aguievents.NewCustomEvent(
-			"TOOL_SUCCESS",
-			aguievents.WithValue(map[string]any{
-				"toolCallId": tr.ToolCallID,
-				"result":     tr.Output,
-				"timestamp":  event.Timestamp(),
-			}),
-		)}
-
-	case agent.EventTypeToolInteraction:
-		data, ok := event.Data().(*agent.ToolInteractionEvent)
-		if !ok {
-			return nil
-		}
-		if data.Type == "input" {
-			return []any{aguievents.NewCustomEvent(
-				"TOOL_NEEDS_INPUT",
-				aguievents.WithValue(map[string]any{
-					"toolCallId": data.ToolCallID,
-					"toolName":   data.ToolName,
-					"question":   data.Prompt,
-					"schema":     data.Schema,
-				}),
-			)}
-		} else if data.Type == "auth" {
-			return []any{aguievents.NewCustomEvent(
-				"TOOL_NEEDS_AUTH",
-				aguievents.WithValue(map[string]any{
-					"toolCallId": data.ToolCallID,
-					"toolName":   data.ToolName,
-					"authSpec":   data.AuthSpec,
-				}),
-			)}
-		}
-
-	case agent.EventTypeUsage:
-		data, ok := event.Data().(*agent.UsageEvent)
-		if !ok || data.Usage == nil {
-			return nil
-		}
-		u := data.Usage
-		return []any{aguievents.NewCustomEvent(
-			"TOKEN_USAGE_REPORTED",
-			aguievents.WithValue(map[string]any{
-				"prompt":     u.PromptTokens,
-				"completion": u.CompletionTokens,
-				"total":      u.TotalTokens,
-			}),
-		)}
-
-	case agent.EventTypeError:
-		data, ok := event.Data().(*agent.ErrorEvent)
-		if !ok {
-			return nil
-		}
-		return []any{aguievents.NewRunErrorEvent(
-			data.Error,
-			aguievents.WithErrorCode(data.Code),
-		)}
-
-	default:
-		// Fallback for domain events: unwrap the data payload
-		if event.Data() != nil {
-			return toAguiEventsLegacy(event.Data())
-		}
-		return toAguiEventsLegacy(event)
-	}
-	return nil
+	return toAguiEventsInternal(event)
 }
 
-func toAguiEventsLegacy(event any) []any {
+func toAguiEventsInternal(event any) []any {
 	switch evt := event.(type) {
 	case *domain.RunStarted:
 		return []any{aguievents.NewRunStartedEvent(evt.ThreadID, evt.RunID)}
 
 	case *domain.RunFinished:
 		return []any{aguievents.NewRunFinishedEvent(evt.ThreadID, evt.RunID)}
+
+	case *domain.RunError:
+		return []any{aguievents.NewRunErrorEvent(evt.Message, aguievents.WithErrorCode(evt.Code))}
 
 	case *domain.ThreadTitleUpdated:
 		return []any{aguievents.NewCustomEvent(
