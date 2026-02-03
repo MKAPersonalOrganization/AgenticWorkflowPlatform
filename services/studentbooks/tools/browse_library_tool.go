@@ -1,9 +1,11 @@
 package tools
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 
-	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/agent"
 	"school-with-ai/services/studentbooks"
 )
 
@@ -36,8 +38,8 @@ func (t *BrowseLibraryTool) Description() string {
 	return "Browses the academic library tree. Use it to discover grade levels, then books, then chapters. Provide a path or leave empty to start at the root."
 }
 
-// Parameters returns the JSON schema for the tool's parameters.
-func (t *BrowseLibraryTool) Parameters() map[string]any {
+// InputSchema returns the JSON schema for the tool's parameters.
+func (t *BrowseLibraryTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -49,22 +51,30 @@ func (t *BrowseLibraryTool) Parameters() map[string]any {
 	}
 }
 
-// Invoke executes the tool with the given ToolContext and typed arguments.
-func (t *BrowseLibraryTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+// Execute executes the tool with the given ToolContext and typed arguments.
+func (t *BrowseLibraryTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params BrowseLibraryArgs
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("failed to parse browse_library args: %w", err)
 	}
 
 	nodes, err := t.books.ListNodes(params.Path)
 	if err != nil {
-		return map[string]any{
+		return jsonResult(map[string]any{
 			"status":  "error",
 			"message": fmt.Sprintf("Failed to browse path '%s': %v", params.Path, err),
-		}, nil
+		})
 	}
 
-	return map[string]any{
+	return jsonResult(map[string]any{
 		"nodes": nodes,
-	}, nil
+	})
+}
+
+func jsonResult(v any) (*agent.ToolResult, error) {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+	return &agent.ToolResult{Output: string(b)}, nil
 }

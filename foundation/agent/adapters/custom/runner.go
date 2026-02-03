@@ -9,12 +9,13 @@ import (
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/agentsdk/core/middleware"
 	"school-with-ai/foundation/agentsdk/engine"
 	"school-with-ai/foundation/agentsdk/registry"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/artifact"
 	memorytools "school-with-ai/services/memory/tools"
-	"school-with-ai/services/studentprofile/middleware"
+	smiddleware "school-with-ai/services/studentprofile/middleware"
 )
 
 // RunnerAdapter adapts the custom engine to the agent.Runner interface.
@@ -219,11 +220,42 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 	}
 
 	// Create new agent config using factory
-	config := factory(ctx)
+	agentConfig := factory(ctx)
+
+	// Map agent.Config to core.AgentConfig
+	config := core.AgentConfig{
+		Name:          agentConfig.Name,
+		SystemPrompt:  agentConfig.SystemPrompt,
+		MaxIterations: agentConfig.MaxIterations,
+		ModelID:       agentConfig.ModelID,
+	}
+
+	// Map Tools
+	for _, t := range agentConfig.Tools {
+		config.Tools = append(config.Tools, WrapTool(t))
+	}
+
+	// Map Handoffs
+	for _, h := range agentConfig.Handoffs {
+		config.Handoffs = append(config.Handoffs, core.Handoff{
+			AgentName:   h.AgentName,
+			Description: h.Description,
+		})
+	}
+
+	// Add Capabilities (Middleware)
+	if agentConfig.Capabilities.InputElicitation {
+		config.Middleware = append(config.Middleware, middleware.NewElicitationMiddleware())
+	}
 
 	// Inject Memory Tool and Context if available and enabled
 	if p.artifactStore != nil && p.enableMemory {
 		memoryTool := memorytools.NewMemoryTool(p.artifactStore)
+		// We need to wrap these core tools if they are agent.Tools?
+		// memorytools.NewMemoryTool returns core.Tool or agent.Tool?
+		// Currently services/memory/tools/memory_tool.go imports core.
+		// So it returns core.Tool.
+		// We can append directly to config.Tools (which is []core.Tool).
 		config.Tools = append(config.Tools, memoryTool.Definition()...)
 
 		memoryMiddleware := memorytools.NewMemoryInjectorMiddleware(memoryTool)
@@ -232,7 +264,7 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 
 	// Inject Student Profile Middleware
 	if p.profileRepo != nil {
-		profileMiddleware := middleware.NewStudentProfileInjectorMiddleware(p.profileRepo)
+		profileMiddleware := smiddleware.NewStudentProfileInjectorMiddleware(p.profileRepo)
 		config.Middleware = append(config.Middleware, profileMiddleware)
 	}
 

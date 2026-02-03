@@ -1,6 +1,8 @@
 package tools
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -9,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/i18n"
 )
 
@@ -44,7 +46,7 @@ func (p *PlotTool) Description() string {
 	return "The ONLY plotting/graphing tool available. Generates plots by executing gnuplot scripts via CLI. You write a complete gnuplot script, the tool executes it through the gnuplot command-line interface, and returns a PNG image. This is a script-based tool - you provide the gnuplot commands, and the CLI tool processes them. Supports all gnuplot features: function plots, data plots, 3D visualizations, multiple plots, custom styling, etc."
 }
 
-func (p *PlotTool) Parameters() map[string]any {
+func (p *PlotTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -118,9 +120,9 @@ Remember: The script will be executed as-is, so ensure it's complete and valid g
 	}
 }
 
-func (p *PlotTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (p *PlotTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params PlotArgs
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("failed to parse plot args: %w", err)
 	}
 
@@ -161,11 +163,15 @@ func (p *PlotTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 		"title":      params.Title,
 	}
 
-	return result, nil
+	b, err := json.Marshal(result)
+	if err != nil {
+		return nil, err
+	}
+	return &agent.ToolResult{Output: string(b)}, nil
 }
 
 // executeGnuplotScript executes a gnuplot script and generates the plot image.
-func executeGnuplotScript(ctx core.ToolContext, userScript, title string) (string, error) {
+func executeGnuplotScript(ctx context.Context, userScript, title string) (string, error) {
 	// Ensure charts directory exists with secure permissions
 	chartsDir := "assets/charts"
 	if err := os.MkdirAll(chartsDir, 0o750); err != nil {

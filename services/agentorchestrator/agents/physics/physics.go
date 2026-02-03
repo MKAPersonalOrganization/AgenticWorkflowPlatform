@@ -3,23 +3,22 @@ package physics
 import (
 	"context"
 
-	"school-with-ai/foundation/agentsdk/core"
-	"school-with-ai/foundation/agentsdk/core/middleware"
+	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/i18n"
 	sharedtools "school-with-ai/services/agentorchestrator/agents/tools"
 	"school-with-ai/services/agentorchestrator/prompts"
 )
 
 // domainTools returns the domain-specific tools for the physics instructor.
-func domainTools() []core.Tool {
-	return []core.Tool{
+func domainTools() []agent.Tool {
+	return []agent.Tool{
 		&sharedtools.SqrtTool{},
 	}
 }
 
 // CreatePhysicsInstructor creates the physics instructor agent configuration.
-func CreatePhysicsInstructor(ctx context.Context) core.AgentConfig {
-	registry := core.NewToolRegistry()
+func CreatePhysicsInstructor(ctx context.Context) agent.Config {
+	registry := agent.NewToolSet()
 
 	// Domain-specific tools
 	for _, tool := range domainTools() {
@@ -77,13 +76,13 @@ func CreatePhysicsInstructor(ctx context.Context) core.AgentConfig {
 		panic(err)
 	}
 
-	return core.AgentConfig{
+	return agent.Config{
 		Name:          "physics-instructor",
 		MaxIterations: 20,
 		SystemPrompt:  prompt,
 		Tools:         registry.All(),
-		Middleware: []core.Middleware{
-			middleware.NewElicitationMiddleware(),
+		Capabilities: agent.Capabilities{
+			InputElicitation: true,
 		},
 	}
 }

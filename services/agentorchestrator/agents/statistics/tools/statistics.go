@@ -1,13 +1,23 @@
 package tools
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
-	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/agent"
 
 	"github.com/montanaflynn/stats"
 )
+
+func jsonResult(v any) (*agent.ToolResult, error) {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+	return &agent.ToolResult{Output: string(b)}, nil
+}
 
 var (
 	ErrCorrelationRequiresData = errors.New("correlation requires data1 and data2")
@@ -27,7 +37,7 @@ type MeanTool struct{}
 
 func (t *MeanTool) Name() string        { return "mean" }
 func (t *MeanTool) Description() string { return "Calculate the arithmetic mean of a dataset" }
-func (t *MeanTool) Parameters() map[string]any {
+func (t *MeanTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -41,18 +51,18 @@ func (t *MeanTool) Parameters() map[string]any {
 	}
 }
 
-func (t *MeanTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (t *MeanTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params struct {
 		Data []float64 `json:"data"`
 	}
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	result, err := stats.Mean(stats.Float64Data(params.Data))
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate mean: %w", err)
 	}
-	return map[string]any{"result": result}, nil
+	return jsonResult(map[string]any{"result": result})
 }
 
 // MedianTool calculates the median.
@@ -60,7 +70,7 @@ type MedianTool struct{}
 
 func (t *MedianTool) Name() string        { return "median" }
 func (t *MedianTool) Description() string { return "Calculate the median of a dataset" }
-func (t *MedianTool) Parameters() map[string]any {
+func (t *MedianTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -74,18 +84,18 @@ func (t *MedianTool) Parameters() map[string]any {
 	}
 }
 
-func (t *MedianTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (t *MedianTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params struct {
 		Data []float64 `json:"data"`
 	}
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	result, err := stats.Median(stats.Float64Data(params.Data))
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate median: %w", err)
 	}
-	return map[string]any{"result": result}, nil
+	return jsonResult(map[string]any{"result": result})
 }
 
 // ModeTool calculates the mode.
@@ -93,7 +103,7 @@ type ModeTool struct{}
 
 func (t *ModeTool) Name() string        { return "mode" }
 func (t *ModeTool) Description() string { return "Calculate the mode(s) of a dataset" }
-func (t *ModeTool) Parameters() map[string]any {
+func (t *ModeTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -107,18 +117,18 @@ func (t *ModeTool) Parameters() map[string]any {
 	}
 }
 
-func (t *ModeTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (t *ModeTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params struct {
 		Data []float64 `json:"data"`
 	}
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	result, err := stats.Mode(stats.Float64Data(params.Data))
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate mode: %w", err)
 	}
-	return map[string]any{"result": result}, nil
+	return jsonResult(map[string]any{"result": result})
 }
 
 // MinTool calculates the minimum.
@@ -126,7 +136,7 @@ type MinTool struct{}
 
 func (t *MinTool) Name() string        { return "min" }
 func (t *MinTool) Description() string { return "Find the minimum value in a dataset" }
-func (t *MinTool) Parameters() map[string]any {
+func (t *MinTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -140,18 +150,18 @@ func (t *MinTool) Parameters() map[string]any {
 	}
 }
 
-func (t *MinTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (t *MinTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params struct {
 		Data []float64 `json:"data"`
 	}
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	result, err := stats.Min(stats.Float64Data(params.Data))
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate min: %w", err)
 	}
-	return map[string]any{"result": result}, nil
+	return jsonResult(map[string]any{"result": result})
 }
 
 // MaxTool calculates the maximum.
@@ -159,7 +169,7 @@ type MaxTool struct{}
 
 func (t *MaxTool) Name() string        { return "max" }
 func (t *MaxTool) Description() string { return "Find the maximum value in a dataset" }
-func (t *MaxTool) Parameters() map[string]any {
+func (t *MaxTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -173,18 +183,18 @@ func (t *MaxTool) Parameters() map[string]any {
 	}
 }
 
-func (t *MaxTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (t *MaxTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params struct {
 		Data []float64 `json:"data"`
 	}
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	result, err := stats.Max(stats.Float64Data(params.Data))
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate max: %w", err)
 	}
-	return map[string]any{"result": result}, nil
+	return jsonResult(map[string]any{"result": result})
 }
 
 // SumTool calculates the sum.
@@ -192,7 +202,7 @@ type SumTool struct{}
 
 func (t *SumTool) Name() string        { return "sum" }
 func (t *SumTool) Description() string { return "Calculate the sum of a dataset" }
-func (t *SumTool) Parameters() map[string]any {
+func (t *SumTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -206,18 +216,18 @@ func (t *SumTool) Parameters() map[string]any {
 	}
 }
 
-func (t *SumTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (t *SumTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params struct {
 		Data []float64 `json:"data"`
 	}
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	result, err := stats.Sum(stats.Float64Data(params.Data))
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate sum: %w", err)
 	}
-	return map[string]any{"result": result}, nil
+	return jsonResult(map[string]any{"result": result})
 }
 
 // VarianceTool calculates the variance.
@@ -225,7 +235,7 @@ type VarianceTool struct{}
 
 func (t *VarianceTool) Name() string        { return "variance" }
 func (t *VarianceTool) Description() string { return "Calculate the variance of a dataset" }
-func (t *VarianceTool) Parameters() map[string]any {
+func (t *VarianceTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -243,12 +253,12 @@ func (t *VarianceTool) Parameters() map[string]any {
 	}
 }
 
-func (t *VarianceTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (t *VarianceTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params struct {
 		Data   []float64 `json:"data"`
 		Sample bool      `json:"sample"`
 	}
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	var result float64
@@ -261,7 +271,7 @@ func (t *VarianceTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate variance: %w", err)
 	}
-	return map[string]any{"result": result}, nil
+	return jsonResult(map[string]any{"result": result})
 }
 
 // StandardDeviationTool calculates the standard deviation.
@@ -272,7 +282,7 @@ func (t *StandardDeviationTool) Description() string {
 	return "Calculate the standard deviation of a dataset"
 }
 
-func (t *StandardDeviationTool) Parameters() map[string]any {
+func (t *StandardDeviationTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -290,12 +300,12 @@ func (t *StandardDeviationTool) Parameters() map[string]any {
 	}
 }
 
-func (t *StandardDeviationTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (t *StandardDeviationTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params struct {
 		Data   []float64 `json:"data"`
 		Sample bool      `json:"sample"`
 	}
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	var result float64
@@ -308,7 +318,7 @@ func (t *StandardDeviationTool) Invoke(ctx core.ToolContext, args any) (any, err
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate standard deviation: %w", err)
 	}
-	return map[string]any{"result": result}, nil
+	return jsonResult(map[string]any{"result": result})
 }
 
 // QuartileTool calculates the quartiles (Q1, Q2/Median, Q3).
@@ -319,7 +329,7 @@ func (t *QuartileTool) Description() string {
 	return "Calculate the quartiles (Q1, Median, Q3) of a dataset"
 }
 
-func (t *QuartileTool) Parameters() map[string]any {
+func (t *QuartileTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -333,22 +343,22 @@ func (t *QuartileTool) Parameters() map[string]any {
 	}
 }
 
-func (t *QuartileTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (t *QuartileTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params struct {
 		Data []float64 `json:"data"`
 	}
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	result, err := stats.Quartile(stats.Float64Data(params.Data))
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate quartiles: %w", err)
 	}
-	return map[string]any{
+	return jsonResult(map[string]any{
 		"q1":     result.Q1,
 		"median": result.Q2,
 		"q3":     result.Q3,
-	}, nil
+	})
 }
 
 // PercentileTool calculates a specific percentile.
@@ -356,7 +366,7 @@ type PercentileTool struct{}
 
 func (t *PercentileTool) Name() string        { return "percentile" }
 func (t *PercentileTool) Description() string { return "Calculate the value at a specific percentile" }
-func (t *PercentileTool) Parameters() map[string]any {
+func (t *PercentileTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -374,19 +384,19 @@ func (t *PercentileTool) Parameters() map[string]any {
 	}
 }
 
-func (t *PercentileTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (t *PercentileTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params struct {
 		Data    []float64 `json:"data"`
 		Percent float64   `json:"percent"`
 	}
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	result, err := stats.Percentile(stats.Float64Data(params.Data), params.Percent)
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate percentile: %w", err)
 	}
-	return map[string]any{"result": result}, nil
+	return jsonResult(map[string]any{"result": result})
 }
 
 // IQRTool calculates the Interquartile Range.
@@ -394,7 +404,7 @@ type IQRTool struct{}
 
 func (t *IQRTool) Name() string        { return "interquartile_range" }
 func (t *IQRTool) Description() string { return "Calculate the Interquartile Range (IQR) of a dataset" }
-func (t *IQRTool) Parameters() map[string]any {
+func (t *IQRTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -408,18 +418,18 @@ func (t *IQRTool) Parameters() map[string]any {
 	}
 }
 
-func (t *IQRTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (t *IQRTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params struct {
 		Data []float64 `json:"data"`
 	}
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	result, err := stats.InterQuartileRange(stats.Float64Data(params.Data))
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate IQR: %w", err)
 	}
-	return map[string]any{"result": result}, nil
+	return jsonResult(map[string]any{"result": result})
 }
 
 // =============================================================================
@@ -434,7 +444,7 @@ func (t *PearsonCorrelationTool) Description() string {
 	return "Calculate the Pearson correlation coefficient between two datasets"
 }
 
-func (t *PearsonCorrelationTool) Parameters() map[string]any {
+func (t *PearsonCorrelationTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -453,12 +463,12 @@ func (t *PearsonCorrelationTool) Parameters() map[string]any {
 	}
 }
 
-func (t *PearsonCorrelationTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (t *PearsonCorrelationTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params struct {
 		Data1 []float64 `json:"data1"`
 		Data2 []float64 `json:"data2"`
 	}
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	if len(params.Data1) == 0 || len(params.Data2) == 0 {
@@ -468,7 +478,7 @@ func (t *PearsonCorrelationTool) Invoke(ctx core.ToolContext, args any) (any, er
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate Pearson correlation: %w", err)
 	}
-	return map[string]any{"result": result}, nil
+	return jsonResult(map[string]any{"result": result})
 }
 
 // =============================================================================
@@ -483,7 +493,7 @@ func (t *EuclideanDistanceTool) Description() string {
 	return "Calculate the Euclidean distance between two points"
 }
 
-func (t *EuclideanDistanceTool) Parameters() map[string]any {
+func (t *EuclideanDistanceTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -502,12 +512,12 @@ func (t *EuclideanDistanceTool) Parameters() map[string]any {
 	}
 }
 
-func (t *EuclideanDistanceTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (t *EuclideanDistanceTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params struct {
 		Point1 []float64 `json:"point1"`
 		Point2 []float64 `json:"point2"`
 	}
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	p1 := stats.Float64Data(params.Point1)
@@ -516,7 +526,7 @@ func (t *EuclideanDistanceTool) Invoke(ctx core.ToolContext, args any) (any, err
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate Euclidean distance: %w", err)
 	}
-	return map[string]any{"distance": result}, nil
+	return jsonResult(map[string]any{"distance": result})
 }
 
 // ManhattanDistanceTool calculates the Manhattan distance.
@@ -527,7 +537,7 @@ func (t *ManhattanDistanceTool) Description() string {
 	return "Calculate the Manhattan distance between two points"
 }
 
-func (t *ManhattanDistanceTool) Parameters() map[string]any {
+func (t *ManhattanDistanceTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -546,12 +556,12 @@ func (t *ManhattanDistanceTool) Parameters() map[string]any {
 	}
 }
 
-func (t *ManhattanDistanceTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (t *ManhattanDistanceTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params struct {
 		Point1 []float64 `json:"point1"`
 		Point2 []float64 `json:"point2"`
 	}
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	p1 := stats.Float64Data(params.Point1)
@@ -560,7 +570,7 @@ func (t *ManhattanDistanceTool) Invoke(ctx core.ToolContext, args any) (any, err
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate Manhattan distance: %w", err)
 	}
-	return map[string]any{"distance": result}, nil
+	return jsonResult(map[string]any{"distance": result})
 }
 
 // =============================================================================
@@ -576,7 +586,7 @@ type SampleTool struct{}
 
 func (t *SampleTool) Name() string        { return "sample" }
 func (t *SampleTool) Description() string { return "Perform random sampling from a dataset" }
-func (t *SampleTool) Parameters() map[string]any {
+func (t *SampleTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -598,13 +608,13 @@ func (t *SampleTool) Parameters() map[string]any {
 	}
 }
 
-func (t *SampleTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (t *SampleTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params struct {
 		Data        []float64 `json:"data"`
 		TakeNum     int       `json:"takeNum,omitempty"`
 		Replacement bool      `json:"replacement,omitempty"`
 	}
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	if params.TakeNum == 0 {
@@ -614,7 +624,7 @@ func (t *SampleTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to sample data: %w", err)
 	}
-	return map[string]any{"result": result}, nil
+	return jsonResult(map[string]any{"result": result})
 }
 
 // QuartileOutliersTool detects outliers using quartiles.
@@ -625,7 +635,7 @@ func (t *QuartileOutliersTool) Description() string {
 	return "Detect mild and extreme outliers using the Interquartile Range (IQR) method"
 }
 
-func (t *QuartileOutliersTool) Parameters() map[string]any {
+func (t *QuartileOutliersTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -639,21 +649,21 @@ func (t *QuartileOutliersTool) Parameters() map[string]any {
 	}
 }
 
-func (t *QuartileOutliersTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (t *QuartileOutliersTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params struct {
 		Data []float64 `json:"data"`
 	}
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	outliers, err := stats.QuartileOutliers(stats.Float64Data(params.Data))
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect outliers: %w", err)
 	}
-	return map[string]any{
+	return jsonResult(map[string]any{
 		"mild":    outliers.Mild,
 		"extreme": outliers.Extreme,
-	}, nil
+	})
 }
 
 // =============================================================================
@@ -669,7 +679,7 @@ type NormalPdfTool struct{}
 
 func (t *NormalPdfTool) Name() string        { return "norm_pdf" }
 func (t *NormalPdfTool) Description() string { return "Calculate the Normal PDF at x" }
-func (t *NormalPdfTool) Parameters() map[string]any {
+func (t *NormalPdfTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -690,27 +700,17 @@ func (t *NormalPdfTool) Parameters() map[string]any {
 	}
 }
 
-func (t *NormalPdfTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (t *NormalPdfTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params struct {
 		X     float64 `json:"x"`
 		Loc   float64 `json:"loc,omitempty"`
 		Scale float64 `json:"scale,omitempty"`
 	}
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
-	// Defaults usually handled by caller or zero value issues?
-	// stats package handles 0 scale as error usually, but here 0 scale means Dirac delta strict.
-	// But let's assume default strictness.
-	// Actually, if Loc/Scale are omitted, they are 0.
-	// For standard normal, Scale=1. If user passes 0, it might be an issue if they meant standard.
-	// I'll ensure Scale defaults to 1 if not provided? No, 0 is a valid number, but Scale=0 is singular.
-	// Unmarshal doesn't distinguish missing vs 0.
-	// However, standard stats libraries treat loc=0, scale=1 as defaults if not specified.
-	// Given the struct, I can't know if they passed 0 or omitted it easily without *float64.
-	// But for this refactor I'll stick to passing them as is. `stats.NormPdf` likely expects valid scale.
 	result := stats.NormPdf(params.X, params.Loc, params.Scale)
-	return map[string]any{"result": result}, nil
+	return jsonResult(map[string]any{"result": result})
 }
 
 // NormalCdfTool calculates the Normal Cumulative Distribution Function.
@@ -718,7 +718,7 @@ type NormalCdfTool struct{}
 
 func (t *NormalCdfTool) Name() string        { return "norm_cdf" }
 func (t *NormalCdfTool) Description() string { return "Calculate the Normal CDF at x" }
-func (t *NormalCdfTool) Parameters() map[string]any {
+func (t *NormalCdfTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -739,17 +739,17 @@ func (t *NormalCdfTool) Parameters() map[string]any {
 	}
 }
 
-func (t *NormalCdfTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (t *NormalCdfTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params struct {
 		X     float64 `json:"x"`
 		Loc   float64 `json:"loc"`
 		Scale float64 `json:"scale"`
 	}
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	result := stats.NormCdf(params.X, params.Loc, params.Scale)
-	return map[string]any{"result": result}, nil
+	return jsonResult(map[string]any{"result": result})
 }
 
 // NormalPpfTool calculates the Normal Percent Point Function (Inverse CDF).
@@ -760,7 +760,7 @@ func (t *NormalPpfTool) Description() string {
 	return "Calculate the Normal PPF (Inverse CDF) for probability p"
 }
 
-func (t *NormalPpfTool) Parameters() map[string]any {
+func (t *NormalPpfTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -781,17 +781,17 @@ func (t *NormalPpfTool) Parameters() map[string]any {
 	}
 }
 
-func (t *NormalPpfTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (t *NormalPpfTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params struct {
 		P     float64 `json:"p"`
 		Loc   float64 `json:"loc"`
 		Scale float64 `json:"scale"`
 	}
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	result := stats.NormPpf(params.P, params.Loc, params.Scale)
-	return map[string]any{"result": result}, nil
+	return jsonResult(map[string]any{"result": result})
 }
 
 // NormalMeanTool calculates the Mean of the distribution.
@@ -799,7 +799,7 @@ type NormalMeanTool struct{}
 
 func (t *NormalMeanTool) Name() string        { return "norm_mean" }
 func (t *NormalMeanTool) Description() string { return "Calculate the Mean of a Normal distribution" }
-func (t *NormalMeanTool) Parameters() map[string]any {
+func (t *NormalMeanTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -816,16 +816,16 @@ func (t *NormalMeanTool) Parameters() map[string]any {
 	}
 }
 
-func (t *NormalMeanTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (t *NormalMeanTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params struct {
 		Loc   float64 `json:"loc"`
 		Scale float64 `json:"scale"`
 	}
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	result := stats.NormMean(params.Loc, params.Scale)
-	return map[string]any{"result": result}, nil
+	return jsonResult(map[string]any{"result": result})
 }
 
 // NormalMedianTool calculates the Median of the distribution.
@@ -836,7 +836,7 @@ func (t *NormalMedianTool) Description() string {
 	return "Calculate the Median of a Normal distribution"
 }
 
-func (t *NormalMedianTool) Parameters() map[string]any {
+func (t *NormalMedianTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -853,16 +853,16 @@ func (t *NormalMedianTool) Parameters() map[string]any {
 	}
 }
 
-func (t *NormalMedianTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (t *NormalMedianTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params struct {
 		Loc   float64 `json:"loc"`
 		Scale float64 `json:"scale"`
 	}
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	result := stats.NormMedian(params.Loc, params.Scale)
-	return map[string]any{"result": result}, nil
+	return jsonResult(map[string]any{"result": result})
 }
 
 // NormalStdTool calculates the Standard Deviation of the distribution.
@@ -873,7 +873,7 @@ func (t *NormalStdTool) Description() string {
 	return "Calculate the Standard Deviation of a Normal distribution"
 }
 
-func (t *NormalStdTool) Parameters() map[string]any {
+func (t *NormalStdTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -890,16 +890,16 @@ func (t *NormalStdTool) Parameters() map[string]any {
 	}
 }
 
-func (t *NormalStdTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (t *NormalStdTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params struct {
 		Loc   float64 `json:"loc"`
 		Scale float64 `json:"scale"`
 	}
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	result := stats.NormStd(params.Loc, params.Scale)
-	return map[string]any{"result": result}, nil
+	return jsonResult(map[string]any{"result": result})
 }
 
 // NormalVarTool calculates the Variance of the distribution.
@@ -910,7 +910,7 @@ func (t *NormalVarTool) Description() string {
 	return "Calculate the Variance of a Normal distribution"
 }
 
-func (t *NormalVarTool) Parameters() map[string]any {
+func (t *NormalVarTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -927,16 +927,16 @@ func (t *NormalVarTool) Parameters() map[string]any {
 	}
 }
 
-func (t *NormalVarTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (t *NormalVarTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params struct {
 		Loc   float64 `json:"loc"`
 		Scale float64 `json:"scale"`
 	}
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	result := stats.NormVar(params.Loc, params.Scale)
-	return map[string]any{"result": result}, nil
+	return jsonResult(map[string]any{"result": result})
 }
 
 // NormalIntervalTool calculates the confidence interval.
@@ -947,7 +947,7 @@ func (t *NormalIntervalTool) Description() string {
 	return "Calculate the confidence interval for a Normal distribution"
 }
 
-func (t *NormalIntervalTool) Parameters() map[string]any {
+func (t *NormalIntervalTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -968,20 +968,20 @@ func (t *NormalIntervalTool) Parameters() map[string]any {
 	}
 }
 
-func (t *NormalIntervalTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (t *NormalIntervalTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params struct {
 		Alpha float64 `json:"alpha"`
 		Loc   float64 `json:"loc"`
 		Scale float64 `json:"scale"`
 	}
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	interval := stats.NormInterval(params.Alpha, params.Loc, params.Scale)
-	return map[string]any{
+	return jsonResult(map[string]any{
 		"lower": interval[0],
 		"upper": interval[1],
-	}, nil
+	})
 }
 
 // BinomialNcrTool calculates combinations (N choose R).
@@ -992,7 +992,7 @@ func (t *BinomialNcrTool) Description() string {
 	return "Calculate the number of combinations (N choose R)"
 }
 
-func (t *BinomialNcrTool) Parameters() map[string]any {
+func (t *BinomialNcrTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -1009,16 +1009,16 @@ func (t *BinomialNcrTool) Parameters() map[string]any {
 	}
 }
 
-func (t *BinomialNcrTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (t *BinomialNcrTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params struct {
 		N int `json:"n"`
 		R int `json:"r"`
 	}
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	result := stats.Ncr(params.N, params.R)
-	return map[string]any{"result": result}, nil
+	return jsonResult(map[string]any{"result": result})
 }
 
 // =============================================================================
@@ -1030,7 +1030,7 @@ type LinearRegressionTool struct{}
 
 func (t *LinearRegressionTool) Name() string        { return "linear_regression" }
 func (t *LinearRegressionTool) Description() string { return "Perform linear regression analysis" }
-func (t *LinearRegressionTool) Parameters() map[string]any {
+func (t *LinearRegressionTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -1049,12 +1049,12 @@ func (t *LinearRegressionTool) Parameters() map[string]any {
 	}
 }
 
-func (t *LinearRegressionTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (t *LinearRegressionTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params struct {
 		X []float64 `json:"x"`
 		Y []float64 `json:"y"`
 	}
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 	if len(params.X) != len(params.Y) {
@@ -1072,5 +1072,5 @@ func (t *LinearRegressionTool) Invoke(ctx core.ToolContext, args any) (any, erro
 	for i, coord := range result {
 		resultCoords[i] = map[string]float64{"x": coord.X, "y": coord.Y}
 	}
-	return map[string]any{"regression": resultCoords}, nil
+	return jsonResult(map[string]any{"regression": resultCoords})
 }

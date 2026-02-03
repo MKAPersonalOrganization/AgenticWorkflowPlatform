@@ -2,11 +2,12 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"strings"
 	"testing"
 
-	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/agent"
 )
 
 func TestPlotTool_SimpleFunctionPlot(t *testing.T) {
@@ -20,19 +21,28 @@ set grid
 set xrange [-6.28:6.28]
 plot sin(x) with lines linewidth 2 title 'y = sin(x)'`
 
-	args := PlotArgs{
-		GnuplotScript: script,
-		Title:         "Sine wave test",
+	args := map[string]any{
+		"gnuplot_script": script,
+		"title":          "Sine wave test",
 	}
 
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
+	argBytes, err := json.Marshal(args)
+	if err != nil {
+		t.Fatalf("failed to marshal args: %v", err)
+	}
+
+	tCtx := &agent.ToolContext{
+		Arguments: string(argBytes),
+	}
+
+	result, err := tool.Execute(context.Background(), tCtx)
 	if err != nil {
 		t.Fatalf("failed to invoke plot tool: %v", err)
 	}
 
-	response, ok := result.(map[string]any)
-	if !ok {
-		t.Fatalf("expected map[string]any result, got %T", result)
+	var response map[string]any
+	if err := json.Unmarshal([]byte(result.Output), &response); err != nil {
+		t.Fatalf("failed to unmarshal output: %v", err)
 	}
 
 	if !response["success"].(bool) {
@@ -57,19 +67,28 @@ set grid
 set xrange [-6.28:6.28]
 plot sin(x) title 'sin(x)', cos(x) title 'cos(x)', tan(x) title 'tan(x)'`
 
-	args := PlotArgs{
-		GnuplotScript: script,
-		Title:         "Multiple trig functions",
+	args := map[string]any{
+		"gnuplot_script": script,
+		"title":          "Multiple trig functions",
 	}
 
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
+	argBytes, err := json.Marshal(args)
+	if err != nil {
+		t.Fatalf("failed to marshal args: %v", err)
+	}
+
+	tCtx := &agent.ToolContext{
+		Arguments: string(argBytes),
+	}
+
+	result, err := tool.Execute(context.Background(), tCtx)
 	if err != nil {
 		t.Fatalf("failed to create plot: %v", err)
 	}
 
-	response, ok := result.(map[string]any)
-	if !ok {
-		t.Fatalf("expected map[string]any result, got %T", result)
+	var response map[string]any
+	if err := json.Unmarshal([]byte(result.Output), &response); err != nil {
+		t.Fatalf("failed to unmarshal output: %v", err)
 	}
 
 	imagePath := response["image_path"].(string)
@@ -91,19 +110,28 @@ set xrange [-2:6]
 set yrange [-5:10]
 plot x**2 - 4*x + 3 with lines title 'y = x² - 4x + 3', 0 with lines dashtype 2 notitle`
 
-	args := PlotArgs{
-		GnuplotScript: script,
-		Title:         "Quadratic function",
+	args := map[string]any{
+		"gnuplot_script": script,
+		"title":          "Quadratic function",
 	}
 
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
+	argBytes, err := json.Marshal(args)
+	if err != nil {
+		t.Fatalf("failed to marshal args: %v", err)
+	}
+
+	tCtx := &agent.ToolContext{
+		Arguments: string(argBytes),
+	}
+
+	result, err := tool.Execute(context.Background(), tCtx)
 	if err != nil {
 		t.Fatalf("failed to create plot: %v", err)
 	}
 
-	response, ok := result.(map[string]any)
-	if !ok {
-		t.Fatalf("expected map[string]any result, got %T", result)
+	var response map[string]any
+	if err := json.Unmarshal([]byte(result.Output), &response); err != nil {
+		t.Fatalf("failed to unmarshal output: %v", err)
 	}
 
 	imagePath := response["image_path"].(string)
@@ -125,19 +153,28 @@ plot '-' with points pointtype 7 pointsize 1.5 title 'Data Points'
 5 9.1
 e`
 
-	args := PlotArgs{
-		GnuplotScript: script,
-		Title:         "Scatter data",
+	args := map[string]any{
+		"gnuplot_script": script,
+		"title":          "Scatter data",
 	}
 
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
+	argBytes, err := json.Marshal(args)
+	if err != nil {
+		t.Fatalf("failed to marshal args: %v", err)
+	}
+
+	tCtx := &agent.ToolContext{
+		Arguments: string(argBytes),
+	}
+
+	result, err := tool.Execute(context.Background(), tCtx)
 	if err != nil {
 		t.Fatalf("failed to create plot: %v", err)
 	}
 
-	response, ok := result.(map[string]any)
-	if !ok {
-		t.Fatalf("expected map[string]any result, got %T", result)
+	var response map[string]any
+	if err := json.Unmarshal([]byte(result.Output), &response); err != nil {
+		t.Fatalf("failed to unmarshal output: %v", err)
 	}
 
 	imagePath := response["image_path"].(string)
@@ -153,19 +190,28 @@ func TestPlotTool_3DSurface(t *testing.T) {
 set grid
 splot x**2 + y**2 with lines`
 
-	args := PlotArgs{
-		GnuplotScript: script,
-		Title:         "3D surface",
+	args := map[string]any{
+		"gnuplot_script": script,
+		"title":          "3D surface",
 	}
 
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
+	argBytes, err := json.Marshal(args)
+	if err != nil {
+		t.Fatalf("failed to marshal args: %v", err)
+	}
+
+	tCtx := &agent.ToolContext{
+		Arguments: string(argBytes),
+	}
+
+	result, err := tool.Execute(context.Background(), tCtx)
 	if err != nil {
 		t.Fatalf("failed to create plot: %v", err)
 	}
 
-	response, ok := result.(map[string]any)
-	if !ok {
-		t.Fatalf("expected map[string]any result, got %T", result)
+	var response map[string]any
+	if err := json.Unmarshal([]byte(result.Output), &response); err != nil {
+		t.Fatalf("failed to unmarshal output: %v", err)
 	}
 
 	imagePath := response["image_path"].(string)
@@ -181,12 +227,21 @@ splot x**2 + y**2 with lines`
 func TestPlotTool_ValidationMissingScript(t *testing.T) {
 	t.Parallel()
 	tool := NewPlotTool()
-	args := PlotArgs{
+	args := map[string]any{
 		// Missing gnuplot_script
-		Title: "Test",
+		"title": "Test",
 	}
 
-	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
+	argBytes, err := json.Marshal(args)
+	if err != nil {
+		t.Fatalf("failed to marshal args: %v", err)
+	}
+
+	tCtx := &agent.ToolContext{
+		Arguments: string(argBytes),
+	}
+
+	_, err = tool.Execute(context.Background(), tCtx)
 
 	if err == nil {
 		t.Error("expected error for missing gnuplot_script parameter")
@@ -199,12 +254,21 @@ func TestPlotTool_ValidationMissingScript(t *testing.T) {
 func TestPlotTool_ValidationSetTerminal(t *testing.T) {
 	t.Parallel()
 	tool := NewPlotTool()
-	args := PlotArgs{
-		GnuplotScript: "set terminal png\nplot sin(x)",
-		Title:         "Test",
+	args := map[string]any{
+		"gnuplot_script": "set terminal png\nplot sin(x)",
+		"title":          "Test",
 	}
 
-	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
+	argBytes, err := json.Marshal(args)
+	if err != nil {
+		t.Fatalf("failed to marshal args: %v", err)
+	}
+
+	tCtx := &agent.ToolContext{
+		Arguments: string(argBytes),
+	}
+
+	_, err = tool.Execute(context.Background(), tCtx)
 
 	if err == nil {
 		t.Error("expected error for script containing 'set terminal'")
@@ -217,12 +281,21 @@ func TestPlotTool_ValidationSetTerminal(t *testing.T) {
 func TestPlotTool_ValidationSetOutput(t *testing.T) {
 	t.Parallel()
 	tool := NewPlotTool()
-	args := PlotArgs{
-		GnuplotScript: "set output 'test.png'\nplot sin(x)",
-		Title:         "Test",
+	args := map[string]any{
+		"gnuplot_script": "set output 'test.png'\nplot sin(x)",
+		"title":          "Test",
 	}
 
-	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
+	argBytes, err := json.Marshal(args)
+	if err != nil {
+		t.Fatalf("failed to marshal args: %v", err)
+	}
+
+	tCtx := &agent.ToolContext{
+		Arguments: string(argBytes),
+	}
+
+	_, err = tool.Execute(context.Background(), tCtx)
 
 	if err == nil {
 		t.Error("expected error for script containing 'set output'")
@@ -236,12 +309,21 @@ func TestPlotTool_ValidationTitleTooLong(t *testing.T) {
 	t.Parallel()
 	tool := NewPlotTool()
 	longTitle := strings.Repeat("a", 101) // 101 characters (exceeds 100 limit)
-	args := PlotArgs{
-		GnuplotScript: "plot sin(x)",
-		Title:         longTitle,
+	args := map[string]any{
+		"gnuplot_script": "plot sin(x)",
+		"title":          longTitle,
 	}
 
-	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
+	argBytes, err := json.Marshal(args)
+	if err != nil {
+		t.Fatalf("failed to marshal args: %v", err)
+	}
+
+	tCtx := &agent.ToolContext{
+		Arguments: string(argBytes),
+	}
+
+	_, err = tool.Execute(context.Background(), tCtx)
 
 	if err == nil {
 		t.Error("expected error for title too long")
@@ -254,7 +336,7 @@ func TestPlotTool_ValidationTitleTooLong(t *testing.T) {
 func TestPlotTool_ParametersSchema(t *testing.T) {
 	t.Parallel()
 	tool := NewPlotTool()
-	params := tool.Parameters()
+	params := tool.InputSchema()
 
 	// Verify schema structure
 	if params["type"] != "object" {

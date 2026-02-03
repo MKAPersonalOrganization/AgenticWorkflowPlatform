@@ -2,11 +2,12 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"strings"
 	"testing"
 
-	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/agent"
 )
 
 func TestAnimateTool_WavePropagation(t *testing.T) {
@@ -22,21 +23,30 @@ do for [i=0:40] {
   plot sin(x - t) with lines linewidth 2 title sprintf('t = %.1f', t)
 }`
 
-	args := AnimateArgs{
-		GnuplotScript: script,
-		Format:        "gif",
-		Delay:         10,
-		Title:         "Wave propagation animation",
+	args := map[string]any{
+		"gnuplot_script": script,
+		"format":         "gif",
+		"delay":          10,
+		"title":          "Wave propagation animation",
 	}
 
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
+	argBytes, err := json.Marshal(args)
+	if err != nil {
+		t.Fatalf("failed to marshal args: %v", err)
+	}
+
+	tCtx := &agent.ToolContext{
+		Arguments: string(argBytes),
+	}
+
+	result, err := tool.Execute(context.Background(), tCtx)
 	if err != nil {
 		t.Fatalf("failed to invoke animate tool: %v", err)
 	}
 
-	response, ok := result.(map[string]any)
-	if !ok {
-		t.Fatalf("expected map[string]any result, got %T", result)
+	var response map[string]any
+	if err := json.Unmarshal([]byte(result.Output), &response); err != nil {
+		t.Fatalf("failed to unmarshal output: %v", err)
 	}
 
 	if !response["success"].(bool) {
@@ -66,21 +76,30 @@ do for [ang=0:360:10] {
   splot x**2 + y**2 with pm3d
 }`
 
-	args := AnimateArgs{
-		GnuplotScript: script,
-		Format:        "gif",
-		Delay:         50,
-		Title:         "Rotating 3D surface",
+	args := map[string]any{
+		"gnuplot_script": script,
+		"format":         "gif",
+		"delay":          50,
+		"title":          "Rotating 3D surface",
 	}
 
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
+	argBytes, err := json.Marshal(args)
+	if err != nil {
+		t.Fatalf("failed to marshal args: %v", err)
+	}
+
+	tCtx := &agent.ToolContext{
+		Arguments: string(argBytes),
+	}
+
+	result, err := tool.Execute(context.Background(), tCtx)
 	if err != nil {
 		t.Fatalf("failed to create animation: %v", err)
 	}
 
-	response, ok := result.(map[string]any)
-	if !ok {
-		t.Fatalf("expected map[string]any result, got %T", result)
+	var response map[string]any
+	if err := json.Unmarshal([]byte(result.Output), &response); err != nil {
+		t.Fatalf("failed to unmarshal output: %v", err)
 	}
 
 	animationPath := response["animation_path"].(string)
@@ -100,21 +119,30 @@ do for [i=1:30] {
   plot a*sin(x) with lines title sprintf('y = %.1f sin(x)', a)
 }`
 
-	args := AnimateArgs{
-		GnuplotScript: script,
-		Format:        "webp",
-		Delay:         30,
-		Title:         "Amplitude variation",
+	args := map[string]any{
+		"gnuplot_script": script,
+		"format":         "webp",
+		"delay":          30,
+		"title":          "Amplitude variation",
 	}
 
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
+	argBytes, err := json.Marshal(args)
+	if err != nil {
+		t.Fatalf("failed to marshal args: %v", err)
+	}
+
+	tCtx := &agent.ToolContext{
+		Arguments: string(argBytes),
+	}
+
+	result, err := tool.Execute(context.Background(), tCtx)
 	if err != nil {
 		t.Fatalf("failed to create webp animation: %v", err)
 	}
 
-	response, ok := result.(map[string]any)
-	if !ok {
-		t.Fatalf("expected map[string]any result, got %T", result)
+	var response map[string]any
+	if err := json.Unmarshal([]byte(result.Output), &response); err != nil {
+		t.Fatalf("failed to unmarshal output: %v", err)
 	}
 
 	animationPath := response["animation_path"].(string)
@@ -128,12 +156,21 @@ do for [i=1:30] {
 func TestAnimateTool_ValidationMissingScript(t *testing.T) {
 	t.Parallel()
 	tool := NewAnimateTool()
-	args := AnimateArgs{
-		Format: "gif",
-		Title:  "Test",
+	args := map[string]any{
+		"format": "gif",
+		"title":  "Test",
 	}
 
-	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
+	argBytes, err := json.Marshal(args)
+	if err != nil {
+		t.Fatalf("failed to marshal args: %v", err)
+	}
+
+	tCtx := &agent.ToolContext{
+		Arguments: string(argBytes),
+	}
+
+	_, err = tool.Execute(context.Background(), tCtx)
 
 	if err == nil {
 		t.Error("expected error for missing gnuplot_script parameter")
@@ -146,12 +183,21 @@ func TestAnimateTool_ValidationMissingScript(t *testing.T) {
 func TestAnimateTool_ValidationInvalidFormat(t *testing.T) {
 	t.Parallel()
 	tool := NewAnimateTool()
-	args := AnimateArgs{
-		GnuplotScript: "plot sin(x)",
-		Format:        "mp4", // Invalid format
+	args := map[string]any{
+		"gnuplot_script": "plot sin(x)",
+		"format":         "mp4", // Invalid format
 	}
 
-	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
+	argBytes, err := json.Marshal(args)
+	if err != nil {
+		t.Fatalf("failed to marshal args: %v", err)
+	}
+
+	tCtx := &agent.ToolContext{
+		Arguments: string(argBytes),
+	}
+
+	_, err = tool.Execute(context.Background(), tCtx)
 
 	if err == nil {
 		t.Error("expected error for invalid format")
@@ -164,12 +210,21 @@ func TestAnimateTool_ValidationInvalidFormat(t *testing.T) {
 func TestAnimateTool_ValidationSetTerminal(t *testing.T) {
 	t.Parallel()
 	tool := NewAnimateTool()
-	args := AnimateArgs{
-		GnuplotScript: "set terminal gif\ndo for [i=1:10] { plot sin(x + i) }",
-		Format:        "gif",
+	args := map[string]any{
+		"gnuplot_script": "set terminal gif\ndo for [i=1:10] { plot sin(x + i) }",
+		"format":         "gif",
 	}
 
-	_, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
+	argBytes, err := json.Marshal(args)
+	if err != nil {
+		t.Fatalf("failed to marshal args: %v", err)
+	}
+
+	tCtx := &agent.ToolContext{
+		Arguments: string(argBytes),
+	}
+
+	_, err = tool.Execute(context.Background(), tCtx)
 
 	if err == nil {
 		t.Error("expected error for script containing 'set terminal'")
@@ -185,27 +240,47 @@ func TestAnimateTool_DefaultValues(t *testing.T) {
 
 	script := `do for [i=1:5] { plot sin(x + i) }`
 
-	args := AnimateArgs{
-		GnuplotScript: script,
+	args := map[string]any{
+		"gnuplot_script": script,
 		// Format and Delay not specified - should use defaults
 	}
 
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), args)
+	argBytes, err := json.Marshal(args)
+	if err != nil {
+		t.Fatalf("failed to marshal args: %v", err)
+	}
+
+	tCtx := &agent.ToolContext{
+		Arguments: string(argBytes),
+	}
+
+	result, err := tool.Execute(context.Background(), tCtx)
 	if err != nil {
 		t.Fatalf("failed with defaults: %v", err)
 	}
 
-	response, ok := result.(map[string]any)
-	if !ok {
-		t.Fatalf("expected map[string]any result, got %T", result)
+	var response map[string]any
+	if err := json.Unmarshal([]byte(result.Output), &response); err != nil {
+		t.Fatalf("failed to unmarshal output: %v", err)
 	}
 
 	if response["format"].(string) != "gif" {
 		t.Errorf("expected default format 'gif', got: %s", response["format"])
 	}
 
-	if response["delay"].(int) != 50 {
-		t.Errorf("expected default delay 50, got: %v", response["delay"])
+	// JSON unmarshaling numbers into interface{} results in float64
+	delay := response["delay"]
+	var delayInt int
+	if f, ok := delay.(float64); ok {
+		delayInt = int(f)
+	} else if i, ok := delay.(int); ok {
+		delayInt = i
+	} else {
+		t.Errorf("unexpected type for delay: %T", delay)
+	}
+
+	if delayInt != 50 {
+		t.Errorf("expected default delay 50, got: %v", delayInt)
 	}
 
 	animationPath := response["animation_path"].(string)
