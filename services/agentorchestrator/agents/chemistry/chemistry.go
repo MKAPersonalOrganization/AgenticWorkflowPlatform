@@ -22,7 +22,7 @@ func domainTools() []core.Tool {
 }
 
 // CreateChemistryInstructor creates the chemistry instructor agent configuration.
-func CreateChemistryInstructor(ctx context.Context, notifier core.EventNotifier) core.AgentConfig {
+func CreateChemistryInstructor(ctx context.Context) core.AgentConfig {
 	registry := core.NewToolRegistry()
 
 	// Domain-specific tools
@@ -86,7 +86,6 @@ func CreateChemistryInstructor(ctx context.Context, notifier core.EventNotifier)
 		MaxIterations: 20,
 		SystemPrompt:  prompt,
 		Tools:         registry.All(),
-		Notifier:      notifier,
 		Middleware: []core.Middleware{
 			middleware.NewElicitationMiddleware(),
 		},

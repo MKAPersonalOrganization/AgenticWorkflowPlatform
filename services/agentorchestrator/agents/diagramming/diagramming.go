@@ -19,8 +19,7 @@ func domainTools() []core.Tool {
 }
 
 // CreateDiagrammingInstructor creates the diagramming specialist agent configuration.
-// Event contract is defined in contract.go.
-func CreateDiagrammingInstructor(ctx context.Context, notifier core.EventNotifier) core.AgentConfig {
+func CreateDiagrammingInstructor(ctx context.Context) core.AgentConfig {
 	registry := core.NewToolRegistry()
 
 	// Domain-specific tools
@@ -52,7 +51,6 @@ func CreateDiagrammingInstructor(ctx context.Context, notifier core.EventNotifie
 		MaxIterations: 20,
 		SystemPrompt:  prompt,
 		Tools:         registry.All(),
-		Notifier:      notifier,
 		Middleware: []core.Middleware{
 			middleware.NewElicitationMiddleware(),
 		},

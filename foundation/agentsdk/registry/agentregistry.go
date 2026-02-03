@@ -8,8 +8,8 @@ import (
 	"school-with-ai/foundation/agentsdk/core"
 )
 
-// AgentFactory creates an agent configuration with a given notifier and context.
-type AgentFactory func(ctx context.Context, notifier core.EventNotifier) core.AgentConfig
+// AgentFactory creates an agent configuration with a given context.
+type AgentFactory func(ctx context.Context) core.AgentConfig
 
 // GlobalAgents is the global agent registry.
 var GlobalAgents = NewAgentRegistry()

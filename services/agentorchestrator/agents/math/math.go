@@ -26,7 +26,7 @@ func domainTools() []core.Tool {
 }
 
 // CreateMathInstructor creates the math instructor agent configuration.
-func CreateMathInstructor(ctx context.Context, notifier core.EventNotifier) core.AgentConfig {
+func CreateMathInstructor(ctx context.Context) core.AgentConfig {
 	registry := core.NewToolRegistry()
 
 	// Domain-specific tools
@@ -89,7 +89,6 @@ func CreateMathInstructor(ctx context.Context, notifier core.EventNotifier) core
 		MaxIterations: 20,
 		SystemPrompt:  prompt,
 		Tools:         registry.All(),
-		Notifier:      notifier,
 		Middleware: []core.Middleware{
 			middleware.NewElicitationMiddleware(),
 		},
