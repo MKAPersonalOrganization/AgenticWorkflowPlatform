@@ -19,34 +19,31 @@ import (
 
 // RunnerAdapter adapts the custom engine to the agent.Runner interface.
 type RunnerAdapter struct {
-	log            *logger.Logger
-	threadMgr      ThreadManager      // Interface for thread management
-	eventProcessor EventProcessor     // Interface for event processing
-	engine         *engine.Engine
-	artifactStore  artifact.Service
-	profileRepo    domain.StudentProfileRepository
-	enableMemory   bool
-	pipeline       *EventPipeline // Add event pipeline for observability
+	log           *logger.Logger
+	threadMgr     ThreadManager // Interface for thread management
+	engine        *engine.Engine
+	artifactStore artifact.Service
+	profileRepo   domain.StudentProfileRepository
+	enableMemory  bool
+	pipeline      *EventPipeline // Add event pipeline for observability
 }
 
 // NewRunnerAdapter creates a new runner adapter.
 func NewRunnerAdapter(
 	log *logger.Logger,
 	threadMgr ThreadManager,
-	eventProcessor EventProcessor,
 	chatClient engine.ChatClient,
 	artifactStore artifact.Service,
 	profileRepo domain.StudentProfileRepository,
 	enableMemory bool,
 ) *RunnerAdapter {
 	r := &RunnerAdapter{
-		log:            log,
-		threadMgr:      threadMgr,
-		eventProcessor: eventProcessor,
-		artifactStore:  artifactStore,
-		profileRepo:    profileRepo,
-		enableMemory:   enableMemory,
-		pipeline:       NewEventPipeline(log), // Initialize event pipeline
+		log:           log,
+		threadMgr:     threadMgr,
+		artifactStore: artifactStore,
+		profileRepo:   profileRepo,
+		enableMemory:  enableMemory,
+		pipeline:      NewEventPipeline(log), // Initialize event pipeline
 	}
 
 	provider := &RegistryAgentProvider{
@@ -67,8 +64,8 @@ func NewRunnerAdapter(
 }
 
 // Run executes an agent with the given request.
-func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq2[agent.Event, error] {
-	return func(yield func(agent.Event, error) bool) {
+func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq2[domain.Event, error] {
+	return func(yield func(domain.Event, error) bool) {
 		// 1. Facts First: Initialize Thread and Message
 		threadMgmt := r.threadMgr.GetThreadManagement()
 		var agg *domain.ThreadAggregate
@@ -126,22 +123,7 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 			UserContent:    userContent,
 			Thread:         thread,
 			InitialHistory: messages,
-		}
-
-		if req.Message != nil && req.Message.ID != "" {
-			runCtx.MessageID = req.Message.ID
-		} else {
-			runCtx.MessageID = domain.GenerateMessageID()
-		}
-
-		// 4. Yield initial events that we persisted synchronously
-		for _, ie := range initialEvents {
-			ae := ConvertCoreEventToAgent(ie)
-			if ae != nil {
-				if !yield(ae, nil) {
-					return
-				}
-			}
+			MessageID:      domain.GenerateMessageID(), // Always generate a fresh ID for the agent's first response
 		}
 
 		// 5. Run engine and process events
@@ -150,18 +132,9 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 		// Convert core events to domain events
 		engineDomainEvents := r.pipeline.ProcessEventStream(ctx, coreEvents)
 
-		// Process through event processor for persistence and broadcasting
-		orchestratedEvents := r.eventProcessor.ProcessEvents(ctx, engineDomainEvents)
-
-		// 6. Yield all orchestrated events to caller
-		for de, err := range orchestratedEvents {
-			ae := ConvertCoreEventToAgent(de)
-			if ae != nil {
-				if !yield(ae, err) {
-					return
-				}
-			} else if err != nil {
-				yield(nil, err)
+		// 6. Yield all raw domain events to caller
+		for de, err := range engineDomainEvents {
+			if !yield(de, err) {
 				return
 			}
 		}

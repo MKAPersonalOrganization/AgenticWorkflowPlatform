@@ -158,7 +158,7 @@ func TestManager_AutoTitling(t *testing.T) {
 		events, _ := store.ReadStream(ctx, streamName, 0)
 		hasTitleUpdated := false
 		for _, e := range events {
-			if _, ok := e.(domain.ThreadTitleUpdated); ok {
+			if _, ok := e.(*domain.ThreadTitleUpdated); ok {
 				hasTitleUpdated = true
 				break
 			}

@@ -5,8 +5,6 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	"school-with-ai/foundation/agent"
-	"school-with-ai/foundation/agent/adapters/custom"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 	"github.com/stretchr/testify/assert"
@@ -48,7 +46,7 @@ func TestToAguiEvents(t *testing.T) {
 			event: &domain.RunError{
 				ThreadID:  "thread-1",
 				Message:   "error message",
-				ErrorCode: "ERR-001",
+				Code:      "ERR-001",
 				Timestamp: now,
 			},
 			expected: []any{
@@ -104,22 +102,22 @@ func TestToAguiEvents(t *testing.T) {
 			},
 		},
 		{
-			name: "ToolSuccess",
-			event: &domain.ToolSuccess{
-				ThreadID:      "thread-1",
-				MessageID:     "msg-1",
-				ToolCallID:    "tool-1",
-				ToolName:      "test-tool",
-				Result:        "{\"success\": true}",
-				ToolArguments: "{\"arg1\": 1}",
-				Timestamp:     now,
+			name: "ToolResultAdded",
+			event: &domain.ToolResultAdded{
+				ThreadID:   "thread-1",
+				MessageID:  "msg-1",
+				ToolCallID: "tool-1",
+				ToolName:   "test-tool",
+				Result:     "{\"success\": true}",
+				AgentName:  "",
+				Timestamp:  now,
 			},
 			expected: []any{
 				aguievents.NewCustomEvent("TOOL_SUCCESS", aguievents.WithValue(map[string]any{
 					"toolCallId": "tool-1",
 					"toolName":   "test-tool",
 					"result":     "{\"success\": true}",
-					"arguments":  "{\"arg1\": 1}",
+					"isError":    false,
 					"agentName":  "",
 					"timestamp":  now,
 				})),
@@ -136,18 +134,9 @@ func TestToAguiEvents(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			var input agent.Event
-			if evt, ok := tt.event.(agent.Event); ok {
-				input = evt
-			} else if coreEvt, ok := tt.event.(interface {
-				EventType() string
-				EventTimestamp() time.Time
-				AggregateID() string
-			}); ok {
-				// Wrap it so it matches domain.Event interface if needed,
-				// but domain events already have these.
-				// For now let's just use ConvertCoreEventToAgent if it's a domain event.
-				input = custom.ConvertCoreEventToAgent(coreEvt)
+			var input domain.Event
+			if de, ok := tt.event.(domain.Event); ok {
+				input = de
 			}
 
 			got := ToAguiEvents(input)

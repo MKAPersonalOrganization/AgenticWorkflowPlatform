@@ -24,7 +24,7 @@ func TestThreadAggregate_ActiveToolStates(t *testing.T) {
 		AgentName: "agent",
 		Timestamp: time.Now(),
 	}
-	thread.Apply(awaitInput)
+	thread.Apply(&awaitInput)
 
 	assert.Contains(t, thread.ActiveToolStates, "call-1")
 	assert.Equal(t, "AwaitingInput", thread.ActiveToolStates["call-1"].Status)
@@ -39,7 +39,7 @@ func TestThreadAggregate_ActiveToolStates(t *testing.T) {
 		AgentName:  "agent",
 		Timestamp:  time.Now(),
 	}
-	thread.Apply(inputProvided)
+	thread.Apply(&inputProvided)
 
 	assert.Contains(t, thread.ActiveToolStates, "call-1")
 	assert.Equal(t, "InputProvided", thread.ActiveToolStates["call-1"].Status)
@@ -54,7 +54,7 @@ func TestThreadAggregate_ActiveToolStates(t *testing.T) {
 		AgentName:  "agent",
 		Timestamp:  time.Now(),
 	}
-	thread.Apply(toolResult)
+	thread.Apply(&toolResult)
 
 	assert.NotContains(t, thread.ActiveToolStates, "call-1", "Tool state should be removed after result")
 }
@@ -75,7 +75,7 @@ func TestThreadAggregate_ActiveToolStates_Auth(t *testing.T) {
 		AgentName: "agent",
 		Timestamp: time.Now(),
 	}
-	thread.Apply(awaitAuth)
+	thread.Apply(&awaitAuth)
 
 	assert.Contains(t, thread.ActiveToolStates, "call-2")
 	assert.Equal(t, "AwaitingAuth", thread.ActiveToolStates["call-2"].Status)
@@ -89,7 +89,7 @@ func TestThreadAggregate_ActiveToolStates_Auth(t *testing.T) {
 		AgentName:  "agent",
 		Timestamp:  time.Now(),
 	}
-	thread.Apply(granted)
+	thread.Apply(&granted)
 
 	assert.Equal(t, "AuthGranted", thread.ActiveToolStates["call-2"].Status)
 
@@ -102,7 +102,7 @@ func TestThreadAggregate_ActiveToolStates_Auth(t *testing.T) {
 		AgentName:  "agent",
 		Timestamp:  time.Now(),
 	}
-	thread.Apply(toolResult)
+	thread.Apply(&toolResult)
 
 	assert.NotContains(t, thread.ActiveToolStates, "call-2")
 }

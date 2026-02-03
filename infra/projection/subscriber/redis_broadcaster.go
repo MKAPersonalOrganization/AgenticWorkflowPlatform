@@ -7,8 +7,6 @@ import (
 	"sync"
 
 	"school-with-ai/domain"
-	"school-with-ai/foundation/agent"
-	"school-with-ai/foundation/agent/adapters/custom"
 	"school-with-ai/foundation/logger"
 
 	"github.com/redis/go-redis/v9"
@@ -26,7 +24,7 @@ type RedisBroadcaster struct {
 
 // redisSubscription tracks a local subscriber and its Redis pubsub connection.
 type redisSubscription struct {
-	ch     chan agent.Event
+	ch     chan domain.Event
 	pubsub *redis.PubSub
 	cancel context.CancelFunc
 }
@@ -51,8 +49,8 @@ func channelName(threadID string) string {
 
 // Subscribe subscribes to real-time events for a thread.
 // Events are received via Redis pub/sub, enabling cross-pod delivery.
-func (b *RedisBroadcaster) Subscribe(threadID string) (<-chan agent.Event, func()) {
-	ch := make(chan agent.Event, 100)
+func (b *RedisBroadcaster) Subscribe(threadID string) (<-chan domain.Event, func()) {
+	ch := make(chan domain.Event, 100)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -96,11 +94,10 @@ func (b *RedisBroadcaster) Subscribe(threadID string) (<-chan agent.Event, func(
 					continue
 				}
 
-				// Forward to local channel
-				agentEvent := custom.ConvertCoreEventToAgent(event)
-				if agentEvent != nil {
+				// Forward to local channel directly
+				if event != nil {
 					select {
-					case ch <- agentEvent:
+					case ch <- event:
 					default:
 						b.log.Warn(ctx, "Redis broadcaster channel full, dropping event",
 							"threadID", threadID)

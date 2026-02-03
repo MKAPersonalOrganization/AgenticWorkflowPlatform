@@ -18,6 +18,11 @@ type EventEmitter interface {
 	Dispatch(ctx context.Context, event domain.Event) error
 }
 
+// Runner is the interface for executing agents specifically within this service's domain.
+type Runner interface {
+	Run(ctx context.Context, req *agent.RunRequest) iter.Seq2[domain.Event, error]
+}
+
 // Service handles orchestration of agent events, providing persistence and broadcasting.
 type Service struct {
 	log           *logger.Logger
@@ -26,7 +31,7 @@ type Service struct {
 	emitter       EventEmitter
 	artifactStore artifact.Service
 	profileRepo   domain.StudentProfileRepository
-	runner        agent.Runner // Framework runner interface (foundation layer)
+	runner        Runner // Domain-aware runner interface
 
 	// Internal components
 	threadMgmt *threadmgmt.Manager
@@ -76,28 +81,16 @@ func WithStudentProfileRepository(repo domain.StudentProfileRepository) Option {
 	}
 }
 
-// WithRunner configures the service with an agent runner.
-func WithRunner(runner agent.Runner) Option {
+// WithRunner configures the agent with a runner.
+func WithRunner(runner Runner) Option {
 	return func(s *Service) {
 		s.runner = runner
 	}
 }
 
-// SetRunner sets the agent runner after construction.
-// This allows breaking circular dependencies during initialization.
-func (s *Service) SetRunner(runner agent.Runner) {
+// SetRunner sets the runner for the agent orchestrator.
+func (s *Service) SetRunner(runner Runner) {
 	s.runner = runner
-}
-
-// convertAgentEventToDomain converts foundation agent events to domain events.
-// Returns nil for events that should not be converted (e.g., framework-specific events).
-func convertAgentEventToDomain(ae agent.Event) domain.Event {
-	// The agent events are already domain events wrapped in the agent.Event interface
-	// We just need to extract the underlying domain event
-	if domainEvt, ok := ae.(domain.Event); ok {
-		return domainEvt
-	}
-	return nil
 }
 
 // ProcessEvents orchestrates a stream of domain events, providing persistence and broadcasting.
@@ -219,7 +212,7 @@ func (s *Service) persistDurableEvent(ctx context.Context, event domain.Event) e
 		_, err := s.threadMgmt.UpdateThreadTitle(ctx, e.ThreadID, e.Title)
 		return err
 	case *domain.TokenUsageReported:
-		_, err := s.threadMgmt.AddTokenUsage(ctx, *e)
+		_, err := s.threadMgmt.AddTokenUsage(ctx, e)
 		return err
 	case *domain.ToolNeedsInput,
 		*domain.ToolNeedsAuth,
@@ -299,22 +292,20 @@ func (s *Service) ExecuteRun(
 				},
 			},
 		}
-		agentEvents := s.runner.Run(ctx, runnerReq)
+		rawDomainEvents := s.runner.Run(ctx, runnerReq)
 
-		// 3. Process agent events, convert to domain events, and check for errors
+		// 3. Process events for persistence and broadcasting
+		processedEvents := s.ProcessEvents(ctx, rawDomainEvents)
+
+		// 4. Yield orchestrated events to caller and check for errors
 		var executionError error
-		for ae, err := range agentEvents {
+		for de, err := range processedEvents {
 			if err != nil {
 				executionError = err
 				break
 			}
-
-			// Convert agent.Event to domain.Event
-			de := convertAgentEventToDomain(ae)
-			if de != nil {
-				if !yield(de, nil) {
-					return
-				}
+			if !yield(de, nil) {
+				return
 			}
 		}
 

@@ -24,8 +24,8 @@ func TestServiceCreation(t *testing.T) {
 		t.Fatal("NewService() returned nil")
 	}
 
-	if service.runner != nil {
-		t.Error("Expected nil runner")
+	if service.orchestrator != nil {
+		t.Error("Expected nil orchestrator")
 	}
 }
 

@@ -23,7 +23,7 @@ tasks:
         FILE=$(echo "$FILE" | sed "s/^'//;s/'$//;s/^\"//;s/\"$//")
         if [ -z "$FILE" ]; then echo "Usage: task add-book -- path/to/file.epub"; exit 1; fi
         NAME=$(basename "$FILE" .epub)
-        
+          
         # Copy to temp dir to control output location and avoid path joining issues
         cp "$FILE" ".conversion_tmp/$NAME.epub"
         

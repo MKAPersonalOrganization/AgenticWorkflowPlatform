@@ -17,10 +17,10 @@ type ThreadCreated struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
-func (e ThreadCreated) EventType() string         { return "ThreadCreated" }
-func (e ThreadCreated) EventTimestamp() time.Time { return e.Timestamp }
-func (e ThreadCreated) AggregateID() string       { return e.ThreadID }
-func (e ThreadCreated) sealed()                   {}
+func (e *ThreadCreated) EventType() string         { return "ThreadCreated" }
+func (e *ThreadCreated) EventTimestamp() time.Time { return e.Timestamp }
+func (e *ThreadCreated) AggregateID() string       { return e.ThreadID }
+func (e *ThreadCreated) sealed()                   {}
 
 // UserMessageAdded is emitted when a user message is added to the thread.
 type UserMessageAdded struct {
@@ -31,10 +31,10 @@ type UserMessageAdded struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
-func (e UserMessageAdded) EventType() string         { return "UserMessageAdded" }
-func (e UserMessageAdded) EventTimestamp() time.Time { return e.Timestamp }
-func (e UserMessageAdded) AggregateID() string       { return e.ThreadID }
-func (e UserMessageAdded) sealed()                   {}
+func (e *UserMessageAdded) EventType() string         { return "UserMessageAdded" }
+func (e *UserMessageAdded) EventTimestamp() time.Time { return e.Timestamp }
+func (e *UserMessageAdded) AggregateID() string       { return e.ThreadID }
+func (e *UserMessageAdded) sealed()                   {}
 
 // AssistantMessageAdded is emitted when an assistant message is added to the thread.
 type AssistantMessageAdded struct {
@@ -46,10 +46,10 @@ type AssistantMessageAdded struct {
 	Timestamp time.Time  `json:"timestamp"`
 }
 
-func (e AssistantMessageAdded) EventType() string         { return "AssistantMessageAdded" }
-func (e AssistantMessageAdded) EventTimestamp() time.Time { return e.Timestamp }
-func (e AssistantMessageAdded) AggregateID() string       { return e.ThreadID }
-func (e AssistantMessageAdded) sealed()                   {}
+func (e *AssistantMessageAdded) EventType() string         { return "AssistantMessageAdded" }
+func (e *AssistantMessageAdded) EventTimestamp() time.Time { return e.Timestamp }
+func (e *AssistantMessageAdded) AggregateID() string       { return e.ThreadID }
+func (e *AssistantMessageAdded) sealed()                   {}
 
 // ToolResultAdded is emitted when a tool execution result is added to the thread.
 type ToolResultAdded struct {
@@ -63,10 +63,10 @@ type ToolResultAdded struct {
 	Timestamp  time.Time `json:"timestamp"`
 }
 
-func (e ToolResultAdded) EventType() string         { return "ToolResultAdded" }
-func (e ToolResultAdded) EventTimestamp() time.Time { return e.Timestamp }
-func (e ToolResultAdded) AggregateID() string       { return e.ThreadID }
-func (e ToolResultAdded) sealed()                   {}
+func (e *ToolResultAdded) EventType() string         { return "ToolResultAdded" }
+func (e *ToolResultAdded) EventTimestamp() time.Time { return e.Timestamp }
+func (e *ToolResultAdded) AggregateID() string       { return e.ThreadID }
+func (e *ToolResultAdded) sealed()                   {}
 
 // ThreadTitleUpdated indicates that a thread's title has been changed.
 type ThreadTitleUpdated struct {
@@ -75,10 +75,10 @@ type ThreadTitleUpdated struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
-func (e ThreadTitleUpdated) EventType() string         { return "ThreadTitleUpdated" }
-func (e ThreadTitleUpdated) EventTimestamp() time.Time { return e.Timestamp }
-func (e ThreadTitleUpdated) AggregateID() string       { return e.ThreadID }
-func (e ThreadTitleUpdated) sealed()                   {}
+func (e *ThreadTitleUpdated) EventType() string         { return "ThreadTitleUpdated" }
+func (e *ThreadTitleUpdated) EventTimestamp() time.Time { return e.Timestamp }
+func (e *ThreadTitleUpdated) AggregateID() string       { return e.ThreadID }
+func (e *ThreadTitleUpdated) sealed()                   {}
 
 // AssistantMessageStarted is emitted when the assistant begins responding.
 type AssistantMessageStarted struct {
@@ -87,10 +87,10 @@ type AssistantMessageStarted struct {
 	Timestamp time.Time
 }
 
-func (e AssistantMessageStarted) EventType() string         { return "AssistantMessageStarted" }
-func (e AssistantMessageStarted) EventTimestamp() time.Time { return e.Timestamp }
-func (e AssistantMessageStarted) AggregateID() string       { return e.ThreadID }
-func (e AssistantMessageStarted) sealed()                   {}
+func (e *AssistantMessageStarted) EventType() string         { return "AssistantMessageStarted" }
+func (e *AssistantMessageStarted) EventTimestamp() time.Time { return e.Timestamp }
+func (e *AssistantMessageStarted) AggregateID() string       { return e.ThreadID }
+func (e *AssistantMessageStarted) sealed()                   {}
 
 // AssistantContentStreamed is emitted for each content delta during streaming.
 type AssistantContentStreamed struct {
@@ -100,10 +100,10 @@ type AssistantContentStreamed struct {
 	Timestamp time.Time
 }
 
-func (e AssistantContentStreamed) EventType() string         { return "AssistantContentStreamed" }
-func (e AssistantContentStreamed) EventTimestamp() time.Time { return e.Timestamp }
-func (e AssistantContentStreamed) AggregateID() string       { return e.ThreadID }
-func (e AssistantContentStreamed) sealed()                   {}
+func (e *AssistantContentStreamed) EventType() string         { return "AssistantContentStreamed" }
+func (e *AssistantContentStreamed) EventTimestamp() time.Time { return e.Timestamp }
+func (e *AssistantContentStreamed) AggregateID() string       { return e.ThreadID }
+func (e *AssistantContentStreamed) sealed()                   {}
 
 // AssistantMessageCompleted is emitted when the assistant completes a message.
 type AssistantMessageCompleted struct {
@@ -115,10 +115,10 @@ type AssistantMessageCompleted struct {
 	Timestamp time.Time
 }
 
-func (e AssistantMessageCompleted) EventType() string         { return "AssistantMessageCompleted" }
-func (e AssistantMessageCompleted) EventTimestamp() time.Time { return e.Timestamp }
-func (e AssistantMessageCompleted) AggregateID() string       { return e.ThreadID }
-func (e AssistantMessageCompleted) sealed()                   {}
+func (e *AssistantMessageCompleted) EventType() string         { return "AssistantMessageCompleted" }
+func (e *AssistantMessageCompleted) EventTimestamp() time.Time { return e.Timestamp }
+func (e *AssistantMessageCompleted) AggregateID() string       { return e.ThreadID }
+func (e *AssistantMessageCompleted) sealed()                   {}
 
 // ToolStart is emitted when a tool execution began (UI feedback only).
 // This is a transient event - NOT persisted to event store.
@@ -132,10 +132,10 @@ type ToolStart struct {
 	Timestamp     time.Time `json:"timestamp"`
 }
 
-func (e ToolStart) EventType() string         { return "ToolStart" }
-func (e ToolStart) EventTimestamp() time.Time { return e.Timestamp }
-func (e ToolStart) AggregateID() string       { return e.ThreadID }
-func (e ToolStart) sealed()                   {}
+func (e *ToolStart) EventType() string         { return "ToolStart" }
+func (e *ToolStart) EventTimestamp() time.Time { return e.Timestamp }
+func (e *ToolStart) AggregateID() string       { return e.ThreadID }
+func (e *ToolStart) sealed()                   {}
 
 // ThreadDeleted is emitted when a thread is deleted.
 type ThreadDeleted struct {
@@ -143,10 +143,10 @@ type ThreadDeleted struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
-func (e ThreadDeleted) EventType() string         { return "ThreadDeleted" }
-func (e ThreadDeleted) EventTimestamp() time.Time { return e.Timestamp }
-func (e ThreadDeleted) AggregateID() string       { return e.ThreadID }
-func (e ThreadDeleted) sealed()                   {}
+func (e *ThreadDeleted) EventType() string         { return "ThreadDeleted" }
+func (e *ThreadDeleted) EventTimestamp() time.Time { return e.Timestamp }
+func (e *ThreadDeleted) AggregateID() string       { return e.ThreadID }
+func (e *ThreadDeleted) sealed()                   {}
 
 // TokenUsageReported is emitted when token usage information is available.
 type TokenUsageReported struct {
@@ -173,10 +173,10 @@ type TokenUsageReported struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
-func (e TokenUsageReported) EventType() string         { return "TokenUsageReported" }
-func (e TokenUsageReported) EventTimestamp() time.Time { return e.Timestamp }
-func (e TokenUsageReported) AggregateID() string       { return e.ThreadID }
-func (e TokenUsageReported) sealed()                   {}
+func (e *TokenUsageReported) EventType() string         { return "TokenUsageReported" }
+func (e *TokenUsageReported) EventTimestamp() time.Time { return e.Timestamp }
+func (e *TokenUsageReported) AggregateID() string       { return e.ThreadID }
+func (e *TokenUsageReported) sealed()                   {}
 
 // ToolNeedsInput is emitted when a tool requires user input to continue (elicitation).
 type ToolNeedsInput struct {
@@ -189,10 +189,10 @@ type ToolNeedsInput struct {
 	Timestamp   time.Time        `json:"timestamp"`
 }
 
-func (e ToolNeedsInput) EventType() string         { return "ToolNeedsInput" }
-func (e ToolNeedsInput) EventTimestamp() time.Time { return e.Timestamp }
-func (e ToolNeedsInput) AggregateID() string       { return e.ThreadID }
-func (e ToolNeedsInput) sealed()                   {}
+func (e *ToolNeedsInput) EventType() string         { return "ToolNeedsInput" }
+func (e *ToolNeedsInput) EventTimestamp() time.Time { return e.Timestamp }
+func (e *ToolNeedsInput) AggregateID() string       { return e.ThreadID }
+func (e *ToolNeedsInput) sealed()                   {}
 
 // ToolNeedsAuth is emitted when a tool requires user authorization to continue.
 type ToolNeedsAuth struct {
@@ -205,10 +205,10 @@ type ToolNeedsAuth struct {
 	Timestamp  time.Time          `json:"timestamp"`
 }
 
-func (e ToolNeedsAuth) EventType() string         { return "ToolNeedsAuth" }
-func (e ToolNeedsAuth) EventTimestamp() time.Time { return e.Timestamp }
-func (e ToolNeedsAuth) AggregateID() string       { return e.ThreadID }
-func (e ToolNeedsAuth) sealed()                   {}
+func (e *ToolNeedsAuth) EventType() string         { return "ToolNeedsAuth" }
+func (e *ToolNeedsAuth) EventTimestamp() time.Time { return e.Timestamp }
+func (e *ToolNeedsAuth) AggregateID() string       { return e.ThreadID }
+func (e *ToolNeedsAuth) sealed()                   {}
 
 // InputProvided is emitted when user provided input to a waiting tool.
 type InputProvided struct {
@@ -220,10 +220,10 @@ type InputProvided struct {
 	Timestamp  time.Time `json:"timestamp"`
 }
 
-func (e InputProvided) EventType() string         { return "InputProvided" }
-func (e InputProvided) EventTimestamp() time.Time { return e.Timestamp }
-func (e InputProvided) AggregateID() string       { return e.ThreadID }
-func (e InputProvided) sealed()                   {}
+func (e *InputProvided) EventType() string         { return "InputProvided" }
+func (e *InputProvided) EventTimestamp() time.Time { return e.Timestamp }
+func (e *InputProvided) AggregateID() string       { return e.ThreadID }
+func (e *InputProvided) sealed()                   {}
 
 // AuthGranted is emitted when user granted authorization to a waiting tool.
 type AuthGranted struct {
@@ -234,10 +234,10 @@ type AuthGranted struct {
 	Timestamp  time.Time `json:"timestamp"`
 }
 
-func (e AuthGranted) EventType() string         { return "AuthGranted" }
-func (e AuthGranted) EventTimestamp() time.Time { return e.Timestamp }
-func (e AuthGranted) AggregateID() string       { return e.ThreadID }
-func (e AuthGranted) sealed()                   {}
+func (e *AuthGranted) EventType() string         { return "AuthGranted" }
+func (e *AuthGranted) EventTimestamp() time.Time { return e.Timestamp }
+func (e *AuthGranted) AggregateID() string       { return e.ThreadID }
+func (e *AuthGranted) sealed()                   {}
 
 // AuthDenied is emitted when user denied authorization to a waiting tool.
 type AuthDenied struct {
@@ -248,10 +248,10 @@ type AuthDenied struct {
 	Timestamp  time.Time `json:"timestamp"`
 }
 
-func (e AuthDenied) EventType() string         { return "AuthDenied" }
-func (e AuthDenied) EventTimestamp() time.Time { return e.Timestamp }
-func (e AuthDenied) AggregateID() string       { return e.ThreadID }
-func (e AuthDenied) sealed()                   {}
+func (e *AuthDenied) EventType() string         { return "AuthDenied" }
+func (e *AuthDenied) EventTimestamp() time.Time { return e.Timestamp }
+func (e *AuthDenied) AggregateID() string       { return e.ThreadID }
+func (e *AuthDenied) sealed()                   {}
 
 // ToolCancelled is emitted when tool execution was cancelled.
 type ToolCancelled struct {
@@ -263,10 +263,10 @@ type ToolCancelled struct {
 	Timestamp  time.Time `json:"timestamp"`
 }
 
-func (e ToolCancelled) EventType() string         { return "ToolCancelled" }
-func (e ToolCancelled) EventTimestamp() time.Time { return e.Timestamp }
-func (e ToolCancelled) AggregateID() string       { return e.ThreadID }
-func (e ToolCancelled) sealed()                   {}
+func (e *ToolCancelled) EventType() string         { return "ToolCancelled" }
+func (e *ToolCancelled) EventTimestamp() time.Time { return e.Timestamp }
+func (e *ToolCancelled) AggregateID() string       { return e.ThreadID }
+func (e *ToolCancelled) sealed()                   {}
 
 // RunStarted signals the start of an agent run.
 // The RunStarted event is the first event emitted when an agent begins processing a request.
@@ -281,10 +281,10 @@ type RunStarted struct {
 	Timestamp   time.Time `json:"timestamp"`
 }
 
-func (e RunStarted) EventType() string         { return "RunStarted" }
-func (e RunStarted) EventTimestamp() time.Time { return e.Timestamp }
-func (e RunStarted) AggregateID() string       { return e.ThreadID }
-func (e RunStarted) sealed()                   {}
+func (e *RunStarted) EventType() string         { return "RunStarted" }
+func (e *RunStarted) EventTimestamp() time.Time { return e.Timestamp }
+func (e *RunStarted) AggregateID() string       { return e.ThreadID }
+func (e *RunStarted) sealed()                   {}
 
 // RunFinished signals the successful completion of an agent run.
 // The RunFinished event indicates that an agent has successfully completed all its work for the current run.
@@ -292,16 +292,16 @@ func (e RunStarted) sealed()                   {}
 // This event marks a clean termination point and indicates that no further processing will occur in this run
 // unless explicitly requested. The optional result field can contain any output data produced by the agent run.
 type RunFinished struct {
-	ThreadID  string    `json:"threadId"`        // ID of the conversation thread
-	RunID     string    `json:"runId"`           // ID of the agent run
+	ThreadID  string    `json:"threadId"`         // ID of the conversation thread
+	RunID     string    `json:"runId"`            // ID of the agent run
 	Result    any       `json:"result,omitempty"` // (Optional) Result data from run
 	Timestamp time.Time `json:"timestamp"`
 }
 
-func (e RunFinished) EventType() string         { return "RunFinished" }
-func (e RunFinished) EventTimestamp() time.Time { return e.Timestamp }
-func (e RunFinished) AggregateID() string       { return e.ThreadID }
-func (e RunFinished) sealed()                   {}
+func (e *RunFinished) EventType() string         { return "RunFinished" }
+func (e *RunFinished) EventTimestamp() time.Time { return e.Timestamp }
+func (e *RunFinished) AggregateID() string       { return e.ThreadID }
+func (e *RunFinished) sealed()                   {}
 
 // RunError signals an error during an agent run.
 // The RunError event indicates that the agent encountered an error it could not recover from,
@@ -309,14 +309,14 @@ func (e RunFinished) sealed()                   {}
 // allowing frontends to display appropriate error messages and potentially offer recovery options.
 // After a RunError event, no further processing will occur in this run.
 type RunError struct {
-	ThreadID  string    `json:"threadId"`      // ID of the conversation thread
-	RunID     string    `json:"runId"`         // ID of the agent run
-	Message   string    `json:"message"`       // Error message
+	ThreadID  string    `json:"threadId"`       // ID of the conversation thread
+	RunID     string    `json:"runId"`          // ID of the agent run
+	Message   string    `json:"message"`        // Error message
 	Code      string    `json:"code,omitempty"` // (Optional) Error code
 	Timestamp time.Time `json:"timestamp"`
 }
 
-func (e RunError) EventType() string         { return "RunError" }
-func (e RunError) EventTimestamp() time.Time { return e.Timestamp }
-func (e RunError) AggregateID() string       { return e.ThreadID }
-func (e RunError) sealed()                   {}
+func (e *RunError) EventType() string         { return "RunError" }
+func (e *RunError) EventTimestamp() time.Time { return e.Timestamp }
+func (e *RunError) AggregateID() string       { return e.ThreadID }
+func (e *RunError) sealed()                   {}
