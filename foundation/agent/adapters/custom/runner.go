@@ -219,7 +219,7 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 	}
 
 	// Create new agent config using factory
-	config := factory(ctx, nil)
+	config := factory(ctx)
 
 	// Inject Memory Tool and Context if available and enabled
 	if p.artifactStore != nil && p.enableMemory {
@@ -246,7 +246,7 @@ func (r *RunnerAdapter) GetAgent(name string) (agent.Agent, error) {
 		return nil, fmt.Errorf("agent not found: %s", name)
 	}
 
-	config := factory(context.Background(), nil)
+	config := factory(context.Background())
 	return NewAgentAdapter(config), nil
 }
 

@@ -18,7 +18,7 @@ func domainTools() []core.Tool {
 }
 
 // CreatePhysicsInstructor creates the physics instructor agent configuration.
-func CreatePhysicsInstructor(ctx context.Context, notifier core.EventNotifier) core.AgentConfig {
+func CreatePhysicsInstructor(ctx context.Context) core.AgentConfig {
 	registry := core.NewToolRegistry()
 
 	// Domain-specific tools
@@ -82,7 +82,6 @@ func CreatePhysicsInstructor(ctx context.Context, notifier core.EventNotifier) c
 		MaxIterations: 20,
 		SystemPrompt:  prompt,
 		Tools:         registry.All(),
-		Notifier:      notifier,
 		Middleware: []core.Middleware{
 			middleware.NewElicitationMiddleware(),
 		},

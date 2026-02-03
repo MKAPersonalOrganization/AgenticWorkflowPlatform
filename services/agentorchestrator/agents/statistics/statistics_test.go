@@ -3,21 +3,11 @@ package statistics
 import (
 	"context"
 	"testing"
-
-	"school-with-ai/foundation/agentsdk/core"
 )
-
-type mockNotifier struct{}
-
-func (m *mockNotifier) HandleDomainEvent(event core.Event) error {
-	return nil
-}
 
 func TestCreateStatisticsInstructor(t *testing.T) {
 	ctx := context.Background()
-	notifier := &mockNotifier{}
-
-	config := CreateStatisticsInstructor(ctx, notifier)
+	config := CreateStatisticsInstructor(ctx)
 
 	if config.Name != "statistics-instructor" {
 		t.Errorf("Expected agent name 'statistics-instructor', got '%s'", config.Name)

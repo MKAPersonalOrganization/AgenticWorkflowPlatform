@@ -57,8 +57,7 @@ func domainTools() []core.Tool {
 }
 
 // CreateStatisticsInstructor creates the statistics instructor agent.
-// Event contract is defined in contract.go.
-func CreateStatisticsInstructor(ctx context.Context, notifier core.EventNotifier) core.AgentConfig {
+func CreateStatisticsInstructor(ctx context.Context) core.AgentConfig {
 	registry := core.NewToolRegistry()
 
 	// Domain-specific tools
@@ -123,7 +122,6 @@ func CreateStatisticsInstructor(ctx context.Context, notifier core.EventNotifier
 		MaxIterations: 20,
 		SystemPrompt:  prompt,
 		Tools:         registry.All(),
-		Notifier:      notifier,
 		Middleware: []core.Middleware{
 			middleware.NewElicitationMiddleware(),
 		},
