@@ -1,7 +1,9 @@
 package tools
 
 import (
+	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -10,7 +12,7 @@ import (
 	"strconv"
 	"time"
 
-	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/agent"
 )
 
 var (
@@ -44,7 +46,7 @@ func (m *MermaidDiagramTool) Description() string {
 	return "Generate diagrams using Mermaid syntax via Docker. Create flowcharts, sequence diagrams, class diagrams, state diagrams, ER diagrams, and more. You provide mermaid diagram code, and the tool executes it via Docker to create an image file. Perfect for visualizing processes, workflows, algorithms, and relationships."
 }
 
-func (m *MermaidDiagramTool) Parameters() map[string]any {
+func (m *MermaidDiagramTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -67,9 +69,9 @@ func (m *MermaidDiagramTool) Parameters() map[string]any {
 	}
 }
 
-func (m *MermaidDiagramTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (m *MermaidDiagramTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params MermaidDiagramArgs
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("failed to parse mermaid diagram args: %w", err)
 	}
 
@@ -109,7 +111,11 @@ func (m *MermaidDiagramTool) Invoke(ctx core.ToolContext, args any) (any, error)
 		"title":       params.Title,
 	}
 
-	return result, nil
+	b, err := json.Marshal(result)
+	if err != nil {
+		return nil, err
+	}
+	return &agent.ToolResult{Output: string(b)}, nil
 }
 
 // executeMermaidDiagram executes mermaid-cli via Docker to generate the diagram.

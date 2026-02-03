@@ -1,7 +1,9 @@
 package tools
 
 import (
+	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -11,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/i18n"
 )
 
@@ -49,7 +51,7 @@ func (a *AnimateTool) Description() string {
 	return "Generate animated mathematical visualizations using gnuplot. Creates animated GIF or WebP files by rendering multiple frames. Perfect for showing function transformations, rotating 3D plots, parameter variations, wave propagation, and dynamic mathematical concepts."
 }
 
-func (a *AnimateTool) Parameters() map[string]any {
+func (a *AnimateTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -131,9 +133,9 @@ do for [n=1:10] {
 	}
 }
 
-func (a *AnimateTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (a *AnimateTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params AnimateArgs
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("failed to parse animate args: %w", err)
 	}
 
@@ -189,11 +191,15 @@ func (a *AnimateTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 		"title":          params.Title,
 	}
 
-	return result, nil
+	b, err := json.Marshal(result)
+	if err != nil {
+		return nil, err
+	}
+	return &agent.ToolResult{Output: string(b)}, nil
 }
 
 // executeGnuplotAnimation executes a gnuplot animation script and generates the animation file.
-func executeGnuplotAnimation(ctx core.ToolContext, userScript, format string, delay int, title string) (string, error) {
+func executeGnuplotAnimation(ctx context.Context, userScript, format string, delay int, title string) (string, error) {
 	// Ensure charts directory exists with secure permissions
 	chartsDir := "assets/charts"
 	if err := os.MkdirAll(chartsDir, 0o750); err != nil {

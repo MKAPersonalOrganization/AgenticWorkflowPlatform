@@ -3,6 +3,7 @@ package tools
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -12,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/agent"
 )
 
 const (
@@ -31,9 +32,9 @@ func NewGrepTool(rootDir string) *GrepTool {
 }
 
 // Definition returns the tool definition.
-func (t *GrepTool) Definition() []core.Tool {
-	return []core.Tool{
-		core.NewFunctionTool(
+func (t *GrepTool) Definition() []agent.Tool {
+	return []agent.Tool{
+		agent.NewFunctionTool(
 			"search_text_in_file",
 			"FAST, optimized search within a SINGLE markdown file powered by `ripgrep`. MUST be used after identifying a specific file via 'browse_library'.",
 			map[string]any{
@@ -144,9 +145,9 @@ type rgMatchText struct {
 	Text string `json:"text"`
 }
 
-func (t *GrepTool) execute(ctx core.ToolContext, args any) (any, error) {
+func (t *GrepTool) execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var input grepArgs
-	if err := core.UnmarshalArgs(args, &input); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &input); err != nil {
 		return nil, err
 	}
 
@@ -253,7 +254,7 @@ func (t *GrepTool) execute(ctx core.ToolContext, args any) (any, error) {
 
 	totalMatches := len(allMatches)
 	if offset >= totalMatches {
-		return fmt.Sprintf("No more matches found (Offset %d exceeds total matches %d).", offset, totalMatches), nil
+		return &agent.ToolResult{Output: fmt.Sprintf("No more matches found (Offset %d exceeds total matches %d).", offset, totalMatches)}, nil
 	}
 
 	end := offset + limit
@@ -272,7 +273,7 @@ func (t *GrepTool) execute(ctx core.ToolContext, args any) (any, error) {
 	// Format Output
 	searchLocationDescription := fmt.Sprintf("in file \"%s\"", searchPath)
 	if len(pagedMatches) == 0 {
-		return fmt.Sprintf("No matches found for pattern \"%s\" %s.", input.Pattern, searchLocationDescription), nil
+		return &agent.ToolResult{Output: fmt.Sprintf("No matches found for pattern \"%s\" %s.", input.Pattern, searchLocationDescription)}, nil
 	}
 
 	matchCount := len(pagedMatches)
@@ -317,7 +318,7 @@ func (t *GrepTool) execute(ctx core.ToolContext, args any) (any, error) {
 		sb.WriteString("---\n")
 	}
 
-	return sb.String(), nil
+	return &agent.ToolResult{Output: sb.String()}, nil
 }
 
 // findParentHeading scans the file backwards from lineNumber to find the nearest heading.

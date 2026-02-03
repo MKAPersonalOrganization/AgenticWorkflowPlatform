@@ -2,10 +2,12 @@ package tools
 
 import (
 	"bufio"
+	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
-	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/agent"
 	"school-with-ai/services/studentbooks"
 )
 
@@ -31,8 +33,8 @@ func (t *LookupSectionTool) Description() string {
 	return "Reads a specific section of a library book or chapter. Useful for reading context around a search result."
 }
 
-// Parameters returns the schema for the tool's arguments.
-func (t *LookupSectionTool) Parameters() map[string]any {
+// InputSchema returns the schema for the tool's arguments.
+func (t *LookupSectionTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -65,10 +67,10 @@ type LookupSectionArgs struct {
 	EndLine        int    `json:"end_line,omitempty"`
 }
 
-// Invoke executes the tool logic.
-func (t *LookupSectionTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+// Execute executes the tool logic.
+func (t *LookupSectionTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params LookupSectionArgs
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("failed to parse args: %w", err)
 	}
 
@@ -77,17 +79,26 @@ func (t *LookupSectionTool) Invoke(ctx core.ToolContext, args any) (any, error) 
 		return nil, fmt.Errorf("failed to read file '%s': %w", params.Path, err)
 	}
 
+	var result string
 	// Mode 1: Line number range
 	if params.StartLine > 0 {
-		return t.extractByLines(content, params.StartLine, params.EndLine)
+		result, err = t.extractByLines(content, params.StartLine, params.EndLine)
+	} else if params.SectionHeading != "" {
+		// Mode 2: Section Heading
+		result, err = t.extractByHeading(content, params.SectionHeading)
+	} else {
+		err = fmt.Errorf("must provide either 'section_heading' or 'start_line'")
 	}
 
-	// Mode 2: Section Heading
-	if params.SectionHeading != "" {
-		return t.extractByHeading(content, params.SectionHeading)
+	if err != nil {
+		return nil, err
 	}
 
-	return nil, fmt.Errorf("must provide either 'section_heading' or 'start_line'")
+	b, err := json.Marshal(result)
+	if err != nil {
+		return nil, err
+	}
+	return &agent.ToolResult{Output: string(b)}, nil
 }
 
 func (t *LookupSectionTool) extractByLines(content string, start, end int) (string, error) {

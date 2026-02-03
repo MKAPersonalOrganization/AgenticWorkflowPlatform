@@ -5,11 +5,11 @@ import (
 	"sort"
 	"sync"
 
-	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/agent"
 )
 
 // AgentFactory creates an agent configuration with a given context.
-type AgentFactory func(ctx context.Context) core.AgentConfig
+type AgentFactory func(ctx context.Context) agent.Config
 
 // GlobalAgents is the global agent registry.
 var GlobalAgents = NewAgentRegistry()
