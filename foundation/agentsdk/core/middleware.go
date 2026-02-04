@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"school-with-ai/foundation/agentsdk/llm"
+	"school-with-ai/foundation/agentsdk/internal/llm"
 )
 
 var (

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"school-with-ai/foundation/agentsdk/llm"
+	"school-with-ai/foundation/agentsdk/internal/llm"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

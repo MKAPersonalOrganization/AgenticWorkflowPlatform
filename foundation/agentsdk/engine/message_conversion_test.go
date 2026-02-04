@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"school-with-ai/foundation/agentsdk/core"
-	"school-with-ai/foundation/agentsdk/llm"
+	"school-with-ai/foundation/agentsdk/internal/llm"
 )
 
 func TestMapFromCoreToLLMMessages(t *testing.T) {

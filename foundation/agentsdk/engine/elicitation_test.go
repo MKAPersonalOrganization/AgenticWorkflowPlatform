@@ -7,7 +7,7 @@ import (
 
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/core/middleware"
-	"school-with-ai/foundation/agentsdk/llm"
+	"school-with-ai/foundation/agentsdk/internal/llm"
 )
 
 func TestEngine_ElicitationFlow(t *testing.T) {

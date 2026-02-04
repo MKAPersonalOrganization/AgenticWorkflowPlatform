@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"school-with-ai/foundation/agentsdk/core"
-	"school-with-ai/foundation/agentsdk/llm"
+	"school-with-ai/foundation/agentsdk/internal/llm"
 )
 
 // EventFactory creates domain events with consistent agent name and timestamp handling.

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"school-with-ai/foundation/agentsdk/llm"
+	"school-with-ai/foundation/agentsdk/internal/llm"
 )
 
 func runSemanticsTest() {
