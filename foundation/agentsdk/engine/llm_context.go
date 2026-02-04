@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"school-with-ai/foundation/agentsdk/core"
-	"school-with-ai/foundation/agentsdk/llm"
+	"school-with-ai/foundation/agentsdk/internal/llm"
 )
 
 // Helper function to get minimum of two integers

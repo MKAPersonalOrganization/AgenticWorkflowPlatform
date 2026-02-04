@@ -7,7 +7,7 @@ import (
 
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/core"
-	"school-with-ai/foundation/agentsdk/llm"
+	"school-with-ai/foundation/agentsdk/internal/llm"
 )
 
 // ToolExecutionError represents an error from tool execution.

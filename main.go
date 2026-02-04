@@ -19,7 +19,7 @@ import (
 	"school-with-ai/components/pricing"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
-	"school-with-ai/foundation/agent/adapters/custom"
+	"school-with-ai/foundation/agentsdk/adapters/custom"
 	"school-with-ai/foundation/debug"
 	"school-with-ai/foundation/event"
 	"school-with-ai/foundation/i18n"

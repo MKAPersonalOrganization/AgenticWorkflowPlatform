@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 
 	"school-with-ai/foundation/agentsdk/core"
-	"school-with-ai/foundation/agentsdk/llm"
+	"school-with-ai/foundation/agentsdk/internal/llm"
 )
 
 // mapFromCoreToLLMMessages converts a slice of core.Message to llm.Message.

@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"school-with-ai/foundation/agentsdk/core"
-	"school-with-ai/foundation/agentsdk/llm"
+	"school-with-ai/foundation/agentsdk/internal/llm"
 )
 
 // MockChatClient implements llm.LLM for testing

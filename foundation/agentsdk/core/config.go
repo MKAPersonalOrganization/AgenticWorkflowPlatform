@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"maps"
 
-	"school-with-ai/foundation/agentsdk/llm"
+	"school-with-ai/foundation/agentsdk/internal/llm"
 )
 
 // EventNotifier is the interface for handling domain events from agents.

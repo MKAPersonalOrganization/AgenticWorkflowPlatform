@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"school-with-ai/foundation/agentsdk/llm"
+	"school-with-ai/foundation/agentsdk/internal/llm"
 )
 
 // Test error sentinels.
