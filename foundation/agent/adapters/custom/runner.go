@@ -251,21 +251,19 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 	// Inject Memory Tool and Context if available and enabled
 	if p.artifactStore != nil && p.enableMemory {
 		memoryTool := memorytools.NewMemoryTool(p.artifactStore)
-		// We need to wrap these core tools if they are agent.Tools?
-		// memorytools.NewMemoryTool returns core.Tool or agent.Tool?
-		// Currently services/memory/tools/memory_tool.go imports core.
-		// So it returns core.Tool.
-		// We can append directly to config.Tools (which is []core.Tool).
-		config.Tools = append(config.Tools, memoryTool.Definition()...)
+		// Convert agent.Tool to core.Tool
+		for _, t := range memoryTool.Definition() {
+			config.Tools = append(config.Tools, WrapAgentTool(t))
+		}
 
 		memoryMiddleware := memorytools.NewMemoryInjectorMiddleware(memoryTool)
-		config.Middleware = append(config.Middleware, memoryMiddleware)
+		config.Middleware = append(config.Middleware, WrapRequestMiddleware(memoryMiddleware))
 	}
 
 	// Inject Student Profile Middleware
 	if p.profileRepo != nil {
 		profileMiddleware := smiddleware.NewStudentProfileInjectorMiddleware(p.profileRepo)
-		config.Middleware = append(config.Middleware, profileMiddleware)
+		config.Middleware = append(config.Middleware, WrapRequestMiddleware(profileMiddleware))
 	}
 
 	return config, nil

@@ -6,12 +6,12 @@ import (
 	"strings"
 
 	"school-with-ai/domain"
-	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/agent"
 )
 
 // NewStudentProfileInjectorMiddleware creates a middleware that injects the student profile.
-func NewStudentProfileInjectorMiddleware(repo domain.StudentProfileRepository) core.Middleware {
-	return core.MiddlewareFunc(func(ctx context.Context, reqCtx *core.RequestContext, next core.NextHandler) error {
+func NewStudentProfileInjectorMiddleware(repo domain.StudentProfileRepository) agent.RequestMiddleware {
+	return agent.RequestMiddlewareFunc(func(ctx context.Context, reqCtx *agent.RequestContext, next agent.RequestNextHandler) error {
 		user := domain.GetUserFromContext(ctx)
 		if user == nil {
 			return next(ctx, reqCtx)

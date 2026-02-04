@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"school-with-ai/domain"
-	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/agent"
 	"school-with-ai/services/artifact"
 )
 
@@ -28,9 +28,9 @@ func NewMemoryTool(store artifact.Service) *MemoryTool {
 }
 
 // Definition returns the tool definition.
-func (t *MemoryTool) Definition() []core.Tool {
-	return []core.Tool{
-		core.NewFunctionTool(
+func (t *MemoryTool) Definition() []agent.Tool {
+	return []agent.Tool{
+		agent.SimpleFunctionTool(
 			"save_memory",
 			"Saves a specific piece of information or fact to your long-term memory. Use this when the user explicitly asks you to remember something, or when they state a clear, concise fact that seems important to retain for future interactions.",
 			map[string]any{
@@ -48,11 +48,11 @@ func (t *MemoryTool) Definition() []core.Tool {
 	}
 }
 
-func (t *MemoryTool) saveMemory(ctx core.ToolContext, args any) (any, error) {
+func (t *MemoryTool) saveMemory(ctx context.Context, args map[string]any) (any, error) {
 	var input struct {
 		Fact string `json:"fact"`
 	}
-	if err := core.UnmarshalArgs(args, &input); err != nil {
+	if err := agent.UnmarshalToolArgs(args, &input); err != nil {
 		return nil, err
 	}
 
@@ -62,7 +62,7 @@ func (t *MemoryTool) saveMemory(ctx core.ToolContext, args any) (any, error) {
 
 	// Extract userID from context
 	userID := "default_user"
-	if user := domain.GetUserFromContext(ctx.Context); user != nil {
+	if user := domain.GetUserFromContext(ctx); user != nil {
 		userID = user.ID
 	}
 	sessionID := "user_shared"
@@ -133,8 +133,8 @@ func (t *MemoryTool) computeNewContent(currentContent, fact string) string {
 
 // NewMemoryInjectorMiddleware creates a middleware that injects the user's long-term memory
 // into the system prompt.
-func NewMemoryInjectorMiddleware(tool *MemoryTool) core.Middleware {
-	return core.MiddlewareFunc(func(ctx context.Context, reqCtx *core.RequestContext, next core.NextHandler) error {
+func NewMemoryInjectorMiddleware(tool *MemoryTool) agent.RequestMiddleware {
+	return agent.RequestMiddlewareFunc(func(ctx context.Context, reqCtx *agent.RequestContext, next agent.RequestNextHandler) error {
 		memories, err := tool.LoadMemory(ctx)
 		if err == nil && memories != "" {
 			reqCtx.AddSystemPrompt(memories)

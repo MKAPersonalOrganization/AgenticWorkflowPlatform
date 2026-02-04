@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"school-with-ai/domain"
-	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/agent"
 	"school-with-ai/services/artifact"
 )
 
@@ -56,9 +56,23 @@ func TestMemoryTool_SaveMemory(t *testing.T) {
 
 	// 1. Save new memory
 	args := map[string]any{"fact": "My favorite color is blue."}
-	_, err := tool.Definition()[0].Invoke(core.ToolContext{Context: ctx}, args)
+
+	// Execute the tool directly (it's a FunctionTool wrapper)
+	// We can call the underlying function by getting the tool and executing it
+	tools := tool.Definition()
+	if len(tools) == 0 {
+		t.Fatal("No tools defined")
+	}
+
+	tctx := &agent.ToolContext{
+		Context:    ctx,
+		ToolCallID: "test-call-1",
+		Arguments:  `{"fact":"My favorite color is blue."}`,
+	}
+
+	_, err := tools[0].Execute(ctx, tctx)
 	if err != nil {
-		t.Fatalf("Invoke failed: %v", err)
+		t.Fatalf("Execute failed: %v", err)
 	}
 
 	// Verify content - should be saved under user ID
@@ -80,10 +94,15 @@ func TestMemoryTool_SaveMemory(t *testing.T) {
 	}
 
 	// 2. Append memory
-	args2 := map[string]any{"fact": "I like pizza."}
-	_, err = tool.Definition()[0].Invoke(core.ToolContext{Context: ctx}, args2)
+	tctx2 := &agent.ToolContext{
+		Context:    ctx,
+		ToolCallID: "test-call-2",
+		Arguments:  `{"fact":"I like pizza."}`,
+	}
+
+	_, err = tools[0].Execute(ctx, tctx2)
 	if err != nil {
-		t.Fatalf("Invoke failed: %v", err)
+		t.Fatalf("Execute failed: %v", err)
 	}
 
 	// Verify content again

@@ -17,11 +17,59 @@ type Message struct {
 	// Timestamp when the message was created.
 	Timestamp time.Time
 
+	// Status indicates the message generation state (for streaming).
+	Status MessageStatus
+
+	// FinishReason indicates why generation stopped.
+	FinishReason FinishReason
+
 	// ToolCallID links tool results to their originating call.
 	ToolCallID string
 
-	// Metadata for extensibility (e.g., token usage, model info).
+	// Author identifies who created this message (agent name or "user").
+	Author string
+
+	// InvocationID links the message to its originating invocation.
+	InvocationID string
+
+	// Usage contains token consumption metrics.
+	Usage *Usage
+
+	// Actions contains state changes requested by the agent.
+	Actions map[string]any
+
+	// Metadata for extensibility (e.g., model info).
 	Metadata map[string]any
+}
+
+// IsComplete returns true if the message is fully generated.
+func (m *Message) IsComplete() bool {
+	return m.Status == StatusCompleted
+}
+
+// IsPartial returns true if the message is still being generated.
+func (m *Message) IsPartial() bool {
+	return m.Status == StatusInProgress
+}
+
+// Text returns the concatenated text content of the message.
+func (m *Message) Text() string {
+	var text string
+	for _, c := range m.Content {
+		if c.Type == ContentTypeText {
+			text += c.Text
+		}
+	}
+	return text
+}
+
+// Clone creates a shallow copy of the message.
+func (m *Message) Clone() *Message {
+	if m == nil {
+		return nil
+	}
+	copy := *m
+	return &copy
 }
 
 // MessageRole identifies the sender of a message.
@@ -75,6 +123,9 @@ type ToolResult struct {
 	// ToolCallID links this result to the originating call.
 	ToolCallID string `json:"tool_call_id,omitempty"`
 
+	// ToolName is the name of the tool that was executed.
+	ToolName string `json:"tool_name,omitempty"`
+
 	// Output is the JSON-encoded tool output.
 	Output string `json:"output,omitempty"`
 
@@ -83,4 +134,57 @@ type ToolResult struct {
 
 	// IsError indicates whether the execution failed.
 	IsError bool `json:"is_error,omitempty"`
+
+	// RequiresConfirmation indicates this result is a confirmation request.
+	RequiresConfirmation bool `json:"requires_confirmation,omitempty"`
+
+	// ConfirmationHint explains what needs confirmation.
+	ConfirmationHint string `json:"confirmation_hint,omitempty"`
+
+	// ConfirmationPayload contains action details for confirmation.
+	ConfirmationPayload any `json:"confirmation_payload,omitempty"`
+}
+
+// NewUserMessage creates a new user message with text content.
+func NewUserMessage(id string, text string) *Message {
+	return &Message{
+		ID:      id,
+		Role:    RoleUser,
+		Author:  "user",
+		Status:  StatusCompleted,
+		Content: []Content{{Type: ContentTypeText, Text: text}},
+	}
+}
+
+// NewAssistantMessage creates a new assistant message.
+func NewAssistantMessage(id string, status MessageStatus) *Message {
+	return &Message{
+		ID:       id,
+		Role:     RoleAssistant,
+		Status:   status,
+		Content:  []Content{},
+		Actions:  make(map[string]any),
+		Metadata: make(map[string]any),
+	}
+}
+
+// NewSystemMessage creates a new system message.
+func NewSystemMessage(text string) *Message {
+	return &Message{
+		ID:      GenerateID(),
+		Role:    RoleSystem,
+		Status:  StatusCompleted,
+		Content: []Content{{Type: ContentTypeText, Text: text}},
+	}
+}
+
+// NewToolResultMessage creates a new tool result message.
+func NewToolResultMessage(id string, result *ToolResult) *Message {
+	return &Message{
+		ID:         id,
+		Role:       RoleTool,
+		Status:     StatusCompleted,
+		ToolCallID: result.ToolCallID,
+		Content:    []Content{{Type: ContentTypeToolResult, ToolResult: result}},
+	}
 }

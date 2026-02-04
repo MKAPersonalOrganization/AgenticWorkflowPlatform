@@ -10,15 +10,24 @@ import (
 // - Custom agentsdk implementation
 // - Google ADK-Go
 // - Go-Kratos Blades
+//
+// Per ADR 001: This interface is the sole access point for agent interactions.
+// All framework-specific details are hidden behind adapter implementations.
 type Agent interface {
 	// Name returns the agent's identifier (e.g., "math-instructor").
+	// Must be unique within an agent tree.
 	Name() string
 
 	// Description returns a human-readable description of the agent's capabilities.
+	// Used by LLMs to determine whether to delegate to this agent.
 	Description() string
 
 	// Run executes the agent with the given invocation context.
 	// Returns an iterator that yields events as the agent processes the request.
+	//
+	// The context can be either:
+	// - A simple context.Context with an *Invocation (Blades style)
+	// - An InvocationContext with rich context (ADK-Go style)
 	Run(context.Context, *Invocation) iter.Seq2[Event, error]
 
 	// Tools returns the list of tools available to this agent.
@@ -26,15 +35,47 @@ type Agent interface {
 
 	// SubAgents returns child agents for hierarchical delegation (optional).
 	// Returns empty slice if the agent doesn't support sub-agents.
+	//
+	// Note: Blades uses agent-as-tool pattern instead of explicit sub-agents.
+	// Adapters should bridge this difference transparently.
 	SubAgents() []Agent
 }
 
-// AgentRegistry provides a list of available agents.
+// AgentWithCallbacks extends Agent with lifecycle callbacks.
+// This is optional - agents can implement just Agent if callbacks aren't needed.
+type AgentWithCallbacks interface {
+	Agent
+
+	// BeforeAgentCallbacks returns callbacks to run before agent execution.
+	BeforeAgentCallbacks() []BeforeAgentCallback
+
+	// AfterAgentCallbacks returns callbacks to run after agent execution.
+	AfterAgentCallbacks() []AfterAgentCallback
+}
+
+// AgentWithMiddleware extends Agent with middleware support.
+// This is optional - compatible with Blades' middleware pattern.
+type AgentWithMiddleware interface {
+	Agent
+
+	// Middlewares returns the middleware chain for this agent.
+	Middlewares() []Middleware
+}
+
+// AgentRegistry provides discovery and lookup for available agents.
 type AgentRegistry interface {
+	// Get retrieves an agent by name.
+	Get(name string) (Agent, error)
+
+	// List returns all available agent names.
 	List() []string
+
+	// Register adds an agent to the registry.
+	Register(agent Agent) error
 }
 
 // Invocation contains all the information needed to execute an agent.
+// This struct bridges ADK-Go's InvocationContext and Blades' Invocation.
 type Invocation struct {
 	// ID is a unique identifier for this invocation (for resumability).
 	ID string
@@ -51,11 +92,58 @@ type Invocation struct {
 	// History contains previous messages in the conversation.
 	History []*Message
 
+	// Instruction is an optional system instruction override.
+	Instruction *Message
+
+	// Tools are additional tools available for this invocation.
+	// These are merged with the agent's default tools.
+	Tools []Tool
+
 	// Context is custom context data (e.g., student profile, memory).
 	Context map[string]any
 
-	// Config contains agent execution configuration (temperature, max tokens, etc.).
+	// Config contains agent execution configuration.
 	Config *RunConfig
+
+	// Session provides access to session state and history.
+	Session Session
+
+	// Resumable indicates if the invocation can be resumed after interruption.
+	Resumable bool
+
+	// Streamable indicates if the response should be streamed.
+	Streamable bool
+}
+
+// Clone creates a deep copy of the Invocation.
+func (inv *Invocation) Clone() *Invocation {
+	if inv == nil {
+		return nil
+	}
+	clone := *inv
+	if inv.Message != nil {
+		clone.Message = inv.Message.Clone()
+	}
+	if inv.Instruction != nil {
+		clone.Instruction = inv.Instruction.Clone()
+	}
+	if inv.History != nil {
+		clone.History = make([]*Message, len(inv.History))
+		for i, m := range inv.History {
+			clone.History[i] = m.Clone()
+		}
+	}
+	if inv.Tools != nil {
+		clone.Tools = make([]Tool, len(inv.Tools))
+		copy(clone.Tools, inv.Tools)
+	}
+	if inv.Context != nil {
+		clone.Context = make(map[string]any, len(inv.Context))
+		for k, v := range inv.Context {
+			clone.Context[k] = v
+		}
+	}
+	return &clone
 }
 
 // RunConfig controls agent execution behavior.
@@ -69,14 +157,17 @@ type RunConfig struct {
 	// MaxIterations limits tool calling loops.
 	MaxIterations int
 
-	// Streaming enables/disables event streaming.
-	Streaming bool
+	// StreamingMode controls how events are streamed.
+	StreamingMode StreamingMode
 
 	// ModelID optionally overrides the default model.
 	ModelID string
 
 	// StopSequences are strings that stop generation when encountered.
 	StopSequences []string
+
+	// SaveInputBlobsAsArtifacts saves user input files as artifacts.
+	SaveInputBlobsAsArtifacts bool
 }
 
 // DefaultRunConfig returns sensible defaults for agent execution.
@@ -85,6 +176,6 @@ func DefaultRunConfig() *RunConfig {
 		Temperature:   0.7,
 		MaxTokens:     4096,
 		MaxIterations: 10,
-		Streaming:     true,
+		StreamingMode: StreamingModeSSE,
 	}
 }
