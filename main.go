@@ -18,7 +18,7 @@ import (
 	"school-with-ai/components/checkout"
 	"school-with-ai/components/pricing"
 	"school-with-ai/domain"
-	"school-with-ai/foundation/agentsdk/llm"
+	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/debug"
 	"school-with-ai/foundation/event"
 	"school-with-ai/foundation/i18n"
@@ -315,35 +315,34 @@ func run(ctx context.Context, log *logger.Logger) error {
 		}
 	}()
 
-	// Initialize AI chat client
-	var chatClient llm.ChatClient
-	log.Info(ctx, "startup", "status", "initializing AI client", "provider", cfg.AI.Provider, "model", cfg.AI.Model)
+	// Get AI provider configuration
+	// LLM client creation is now handled internally by each framework adapter
+	log.Info(ctx, "startup", "status", "preparing AI configuration", "provider", cfg.AI.Provider, "model", cfg.AI.Model)
 
+	var apiKey string
 	switch cfg.AI.Provider {
 	case "openai":
-		apiKey := os.Getenv("OPENAI_API_KEY")
+		apiKey = os.Getenv("OPENAI_API_KEY")
 		if apiKey == "" {
 			return fmt.Errorf("OPENAI_API_KEY environment variable is not set")
 		}
-		chatClient = llm.NewOpenAIClientWithAPIKey(apiKey, cfg.AI.Model)
 
 	case "gemini":
-		apiKey := os.Getenv("GEMINI_API_KEY")
+		apiKey = os.Getenv("GEMINI_API_KEY")
 		if apiKey == "" {
 			return fmt.Errorf("GEMINI_API_KEY environment variable is not set")
-		}
-		var err error
-		chatClient, err = llm.NewGeminiClient(ctx, apiKey, cfg.AI.Model)
-		if err != nil {
-			return fmt.Errorf("initializing Gemini client: %w", err)
 		}
 
 	default:
 		return fmt.Errorf("unsupported AI provider: %s", cfg.AI.Provider)
 	}
 
-	// Wrap chatClient with the new abstraction adapter
-	model := custom.NewModelAdapter(chatClient)
+	// Create model configuration - framework adapters will create their own clients
+	modelConfig := &agent.ModelConfig{
+		Provider: cfg.AI.Provider,
+		Model:    cfg.AI.Model,
+		APIKey:   apiKey,
+	}
 
 	// Initialize Langfuse tracer (optional observability)
 	var langfuseTracer *taskmanagement.LangfuseTracer
@@ -393,14 +392,22 @@ func run(ctx context.Context, log *logger.Logger) error {
 			agentorchestrator.WithStudentProfileRepository(studentProfileRepo),
 			agentorchestrator.WithEmitter(transientRouter),
 		)
-		runner = custom.NewRunnerAdapter(
+
+		// Custom adapter creates its own LLM client internally
+		var err error
+		runner, err = custom.NewRunnerAdapter(
+			ctx,
 			log,
 			agentOrchestrator, // ThreadManager interface
-			chatClient,
+			modelConfig,       // Model configuration (provider, model, API key)
 			artifactService,
 			studentProfileRepo,
 			cfg.AgentCapabilities.LongTermMemory,
 		)
+		if err != nil {
+			return fmt.Errorf("creating custom runner: %w", err)
+		}
+
 		// Wire the runner back to the service to complete the dependency cycle
 		agentOrchestrator.SetRunner(runner)
 	default:
@@ -468,7 +475,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 			ShutdownTimeout:     cfg.Orchestration.ShutdownTimeout,
 			HealthCheckInterval: cfg.Orchestration.HealthCheckInterval,
 		},
-		model,
 		agentOrchestrator, // Pass orchestrator instead of runner
 		langfuseTracer,
 		observabilityConfig,
@@ -482,7 +488,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// Create HTTP handler
 	agentRegistry := custom.NewListOnlyRegistryAdapter(registry.GlobalAgents)
-	handler := taskmgmthandlers.NewTaskManagementHandler(log, model, taskManager, agentRegistry, sessionStore, authSvc, threadQueryService, aguiProjection, redisBroadcaster, threadMgmt)
+	handler := taskmgmthandlers.NewTaskManagementHandler(log, taskManager, agentRegistry, sessionStore, authSvc, threadQueryService, aguiProjection, redisBroadcaster, threadMgmt)
 
 	// Create health handler
 	healthHandler := healthhandlers.NewHealthHandler(log)

@@ -41,7 +41,6 @@ type AsynqConfig struct {
 func NewAsynqTaskManager(
 	log *logger.Logger,
 	config AsynqConfig,
-	model agent.Model,
 	orchestrator Orchestrator, // Orchestrator that emits run lifecycle events
 	langfuseTracer *LangfuseTracer,
 	observabilityConfig ObservabilityConfig,
@@ -75,7 +74,6 @@ func NewAsynqTaskManager(
 	orchestrationService := NewService(
 		log,
 		orchestrator,
-		model,
 		langfuseTracer,
 		observabilityConfig,
 	)

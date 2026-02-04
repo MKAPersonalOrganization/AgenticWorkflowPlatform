@@ -32,7 +32,6 @@ type Orchestrator interface {
 type Service struct {
 	log                 *logger.Logger
 	orchestrator        Orchestrator
-	model               agent.Model
 	langfuseTracer      *LangfuseTracer
 	observabilityConfig ObservabilityConfig
 }
@@ -41,14 +40,12 @@ type Service struct {
 func NewService(
 	log *logger.Logger,
 	orchestrator Orchestrator,
-	model agent.Model,
 	langfuseTracer *LangfuseTracer,
 	observabilityConfig ObservabilityConfig,
 ) *Service {
 	return &Service{
 		log:                 log,
 		orchestrator:        orchestrator,
-		model:               model,
 		langfuseTracer:      langfuseTracer,
 		observabilityConfig: observabilityConfig,
 	}
