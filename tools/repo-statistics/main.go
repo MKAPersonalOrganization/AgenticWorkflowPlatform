@@ -252,35 +252,39 @@ set output '%s'
 set multiplot layout 2,1 title "Git Repository Statistics" font ",18"
 
 # Top plot - Cumulative lines
-set xlabel "Commit Number" font ",13"
-set ylabel "Lines of Code" font ",13"
-set title "Cumulative Lines Added and Removed Over Time" font ",15"
-set grid
-set key left top
+set xlabel "Commit Number" font ",14"
+set ylabel "Lines of Code" font ",14"
+set title "Cumulative Lines Added and Removed" font ",15"
+set grid ytics xtics linetype 0 linewidth 0.5 linecolor rgb "#E0E0E0"
+set border linewidth 1.5
+set key left top box linewidth 1.5
 
 set style fill transparent solid 0.3
-set style line 1 lc rgb '#00AA00' lt 1 lw 2 pt 7 ps 0.5
-set style line 2 lc rgb '#DD0000' lt 1 lw 2 pt 7 ps 0.5
+set style line 1 lc rgb '#00AA00' lt 1 lw 3 pt 7 ps 0.8
+set style line 2 lc rgb '#DD0000' lt 1 lw 3 pt 7 ps 0.8
 
 plot '%s' using 1:5 with filledcurves x1 lc rgb '#00AA00' notitle, \
      '' using 1:5 with linespoints ls 1 title 'Lines Added (Cumulative)', \
      '' using 1:6 with filledcurves x1 lc rgb '#DD0000' notitle, \
      '' using 1:6 with linespoints ls 2 title 'Lines Removed (Cumulative)'
 
-# Bottom plot - Per-commit changes
-set xlabel "Commit Number" font ",13"
-set ylabel "Lines Changed" font ",13"
-set title "Lines Added/Removed Per Commit" font ",15"
-set grid ytics
-set key left top
+# Bottom plot - Commit count over time
+set xlabel "Date" font ",14"
+set ylabel "Cumulative Commits" font ",14"
+set title "Project Activity Timeline" font ",15"
+set xdata time
+set timefmt "%%Y-%%m-%%d"
+set format x "%%b %%Y"
+set xtics rotate by -45
+set grid ytics xtics linetype 0 linewidth 0.5 linecolor rgb "#E0E0E0"
+set border linewidth 1.5
+set key off
 
-set style fill solid 0.7
-set boxwidth 0.8
-set style line 3 lc rgb '#00AA00'
-set style line 4 lc rgb '#DD0000'
+set style line 5 lc rgb '#0066CC' lt 1 lw 3 pt 7 ps 0.8
+set style fill transparent solid 0.15
 
-plot '%s' using 1:3 with boxes ls 3 title 'Lines Added', \
-     '' using 1:(-$4) with boxes ls 4 title 'Lines Removed'
+plot '%s' using 2:1 with filledcurves x1 lc rgb '#0066CC' notitle, \
+     '' using 2:1 with linespoints ls 5 title 'Commits'
 
 unset multiplot
 
