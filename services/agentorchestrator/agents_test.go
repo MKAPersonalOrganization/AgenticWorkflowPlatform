@@ -16,32 +16,47 @@ func TestInstructorConfigurations(t *testing.T) {
 	ctx := context.Background()
 
 	// Math
-	mathAgent := math.CreateMathInstructor(ctx)
-	if mathAgent.Name != "math-instructor" {
-		t.Errorf("Expected math name 'math-instructor', got '%s'", mathAgent.Name)
+	mathConfig, err := math.NewMathInstructorConfig(ctx)
+	if err != nil {
+		t.Fatalf("Failed to create math instructor config: %v", err)
+	}
+	if mathConfig.Name != "math-instructor" {
+		t.Errorf("Expected math name 'math-instructor', got '%s'", mathConfig.Name)
 	}
 
 	// Physics
-	physicsAgent := physics.CreatePhysicsInstructor(ctx)
-	if physicsAgent.Name != "physics-instructor" {
-		t.Errorf("Expected physics name 'physics-instructor', got '%s'", physicsAgent.Name)
+	physicsConfig, err := physics.NewPhysicsInstructorConfig(ctx)
+	if err != nil {
+		t.Fatalf("Failed to create physics instructor config: %v", err)
+	}
+	if physicsConfig.Name != "physics-instructor" {
+		t.Errorf("Expected physics name 'physics-instructor', got '%s'", physicsConfig.Name)
 	}
 
 	// Chemistry
-	chemistryAgent := chemistry.CreateChemistryInstructor(ctx)
-	if chemistryAgent.Name != "chemistry-instructor" {
-		t.Errorf("Expected chemistry name 'chemistry-instructor', got '%s'", chemistryAgent.Name)
+	chemistryConfig, err := chemistry.NewChemistryInstructorConfig(ctx)
+	if err != nil {
+		t.Fatalf("Failed to create chemistry instructor config: %v", err)
+	}
+	if chemistryConfig.Name != "chemistry-instructor" {
+		t.Errorf("Expected chemistry name 'chemistry-instructor', got '%s'", chemistryConfig.Name)
 	}
 
 	// Statistics
-	statisticsAgent := statistics.CreateStatisticsInstructor(ctx)
-	if statisticsAgent.Name != "statistics-instructor" {
-		t.Errorf("Expected statistics name 'statistics-instructor', got '%s'", statisticsAgent.Name)
+	statisticsConfig, err := statistics.NewStatisticsInstructorConfig(ctx)
+	if err != nil {
+		t.Fatalf("Failed to create statistics instructor config: %v", err)
+	}
+	if statisticsConfig.Name != "statistics-instructor" {
+		t.Errorf("Expected statistics name 'statistics-instructor', got '%s'", statisticsConfig.Name)
 	}
 
 	// Diagramming
-	diagrammingAgent := diagramming.CreateDiagrammingInstructor(ctx)
-	if diagrammingAgent.Name != "diagramming-instructor" {
-		t.Errorf("Expected diagramming name 'diagramming-instructor', got '%s'", diagrammingAgent.Name)
+	diagrammingConfig, err := diagramming.NewDiagrammingInstructorConfig(ctx)
+	if err != nil {
+		t.Fatalf("Failed to create diagramming instructor config: %v", err)
+	}
+	if diagrammingConfig.Name != "diagramming-instructor" {
+		t.Errorf("Expected diagramming name 'diagramming-instructor', got '%s'", diagrammingConfig.Name)
 	}
 }

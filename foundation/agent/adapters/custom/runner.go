@@ -12,7 +12,6 @@ import (
 	"school-with-ai/foundation/agentsdk/core/middleware"
 	"school-with-ai/foundation/agentsdk/engine"
 	"school-with-ai/foundation/agentsdk/llm"
-	"school-with-ai/foundation/agentsdk/registry"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/artifact"
 	memorytools "school-with-ai/services/memory/tools"
@@ -24,6 +23,7 @@ type RunnerAdapter struct {
 	log           *logger.Logger
 	threadMgr     ThreadManager // Interface for thread management
 	engine        *engine.Engine
+	agentProvider agent.AgentProvider
 	artifactStore artifact.Service
 	profileRepo   domain.StudentProfileRepository
 	enableMemory  bool
@@ -32,10 +32,13 @@ type RunnerAdapter struct {
 
 // NewRunnerAdapter creates a new runner adapter.
 // It creates its own LLM client based on the ModelConfig.
+// NewRunnerAdapter creates a new runner adapter.
+// It creates its own LLM client based on the ModelConfig.
 func NewRunnerAdapter(
 	ctx context.Context,
 	log *logger.Logger,
 	threadMgr ThreadManager,
+	agentProvider agent.AgentProvider, // Injected provider
 	modelCfg *agent.ModelConfig,
 	artifactStore artifact.Service,
 	profileRepo domain.StudentProfileRepository,
@@ -54,6 +57,7 @@ func NewRunnerAdapter(
 	r := &RunnerAdapter{
 		log:           log,
 		threadMgr:     threadMgr,
+		agentProvider: agentProvider,
 		artifactStore: artifactStore,
 		profileRepo:   profileRepo,
 		enableMemory:  enableMemory,
@@ -61,7 +65,7 @@ func NewRunnerAdapter(
 	}
 
 	provider := &RegistryAgentProvider{
-		registry:      registry.GlobalAgents,
+		provider:      agentProvider,
 		artifactStore: r.artifactStore,
 		profileRepo:   r.profileRepo,
 		enableMemory:  r.enableMemory,
@@ -165,8 +169,26 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 			MessageID:      domain.GenerateMessageID(), // Always generate a fresh ID for the agent's first response
 		}
 
+		// 4. Resolve Agent Name
+		agentName := req.AgentName
+		if agentName == "" {
+			// Try to infer from history
+			if agg != nil {
+				for i := len(agg.Messages) - 1; i >= 0; i-- {
+					if agg.Messages[i].AgentName != "" {
+						agentName = agg.Messages[i].AgentName
+						break
+					}
+				}
+			}
+		}
+		// Fallback to default if still empty
+		if agentName == "" {
+			agentName = "math-instructor"
+		}
+
 		// 5. Run engine and process events
-		coreEvents := r.engine.Run(ctx, req.AgentName, runCtx)
+		coreEvents := r.engine.Run(ctx, agentName, runCtx)
 
 		// Convert core events to domain events
 		engineDomainEvents := r.pipeline.ProcessEventStream(ctx, coreEvents)
@@ -242,23 +264,30 @@ func (r *RunnerAdapter) toCoreToolCalls(dtcs []domain.ToolCall) []core.ToolCall 
 	return result
 }
 
-// RegistryAgentProvider implements engine.AgentProvider using GlobalAgents.
+// RegistryAgentProvider implements engine.AgentProvider using agent.AgentProvider.
 type RegistryAgentProvider struct {
-	registry      *registry.AgentRegistry
+	provider      agent.AgentProvider
 	artifactStore artifact.Service
 	enableMemory  bool
 	profileRepo   domain.StudentProfileRepository
 }
 
 func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (core.AgentConfig, error) {
-	// Use provided registry
-	factory, ok := p.registry.Get(name)
-	if !ok {
-		return core.AgentConfig{}, fmt.Errorf("agent %s not found", name)
+	// Use provided provider
+	a, err := p.provider.Get(name)
+	if err != nil {
+		return core.AgentConfig{}, fmt.Errorf("agent %s not found: %w", name, err)
 	}
 
-	// Create new agent config using factory
-	agentConfig := factory(ctx)
+	// Assert that it is a CustomAgent to access the config
+	// This is required because the generic agent.Agent interface hides implementation details
+	// like SystemPrompt which the engine needs.
+	customAgent, ok := a.(*CustomAgent)
+	if !ok {
+		return core.AgentConfig{}, fmt.Errorf("agent %s is not a custom agent", name)
+	}
+
+	agentConfig := customAgent.Config()
 
 	// Map agent.Config to core.AgentConfig
 	config := core.AgentConfig{
@@ -309,18 +338,12 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 
 // GetAgent returns an agent by name.
 func (r *RunnerAdapter) GetAgent(name string) (agent.Agent, error) {
-	factory, ok := registry.GlobalAgents.Get(name)
-	if !ok {
-		return nil, fmt.Errorf("agent not found: %s", name)
-	}
-
-	config := factory(context.Background())
-	return NewAgentAdapter(config), nil
+	return r.agentProvider.Get(name)
 }
 
 // ListAgents returns all available agent names.
 func (r *RunnerAdapter) ListAgents() []string {
-	return registry.GlobalAgents.List()
+	return r.agentProvider.List()
 }
 
 // extractUserPrompt extracts the text from a message.

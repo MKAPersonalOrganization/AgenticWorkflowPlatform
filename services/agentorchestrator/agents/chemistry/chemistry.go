@@ -20,8 +20,8 @@ func domainTools() []agent.Tool {
 	}
 }
 
-// CreateChemistryInstructor creates the chemistry instructor agent configuration.
-func CreateChemistryInstructor(ctx context.Context) agent.Config {
+// NewChemistryInstructorConfig creates the chemistry instructor configuration.
+func NewChemistryInstructorConfig(ctx context.Context) (agent.Config, error) {
 	registry := agent.NewToolSet()
 
 	// Domain-specific tools
@@ -77,7 +77,7 @@ func CreateChemistryInstructor(ctx context.Context) agent.Config {
 		ExtraRules:  i18n.T(ctx, "chemistry.extra_rules"),
 	})
 	if err != nil {
-		panic(err)
+		return agent.Config{}, err
 	}
 
 	return agent.Config{
@@ -88,5 +88,5 @@ func CreateChemistryInstructor(ctx context.Context) agent.Config {
 		Capabilities: agent.Capabilities{
 			InputElicitation: true,
 		},
-	}
+	}, nil
 }

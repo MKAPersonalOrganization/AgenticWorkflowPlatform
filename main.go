@@ -19,6 +19,7 @@ import (
 	"school-with-ai/components/pricing"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
+	"school-with-ai/foundation/agent/adapters/custom"
 	"school-with-ai/foundation/debug"
 	"school-with-ai/foundation/event"
 	"school-with-ai/foundation/i18n"
@@ -37,24 +38,21 @@ import (
 	"school-with-ai/infra/sqldb"
 	"school-with-ai/infra/sqldb/migrate"
 	"school-with-ai/services/agentorchestrator"
-	"school-with-ai/services/agentorchestrator/agents/chemistry"
-	"school-with-ai/services/agentorchestrator/agents/diagramming"
-	"school-with-ai/services/agentorchestrator/agents/math"
-	"school-with-ai/services/agentorchestrator/agents/physics"
-	"school-with-ai/services/agentorchestrator/agents/statistics"
 	"school-with-ai/services/artifact"
 	"school-with-ai/services/studentbooks"
 	"school-with-ai/services/taskmanagement"
 	"school-with-ai/services/threadmgmt"
 
-	"school-with-ai/foundation/agent/adapters/custom"
-	"school-with-ai/foundation/agentsdk/registry"
+	"school-with-ai/services/agentorchestrator/agents/chemistry"
+	"school-with-ai/services/agentorchestrator/agents/diagramming"
+	"school-with-ai/services/agentorchestrator/agents/math"
+	"school-with-ai/services/agentorchestrator/agents/physics"
+	"school-with-ai/services/agentorchestrator/agents/statistics"
 	sharedtools "school-with-ai/services/agentorchestrator/agents/tools"
 
 	aguihandlers "school-with-ai/handlers/agui"
 	bannerhandlers "school-with-ai/handlers/banner"
 	healthhandlers "school-with-ai/handlers/health"
-
 	taskmgmthandlers "school-with-ai/handlers/taskmgmt"
 
 	authService "school-with-ai/services/auth"
@@ -357,13 +355,62 @@ func run(ctx context.Context, log *logger.Logger) error {
 		log.Info(ctx, "startup", "status", "Langfuse tracing disabled")
 	}
 
-	// Register all agent factories for routing
+	// Initialize Agents directly (Step 2 of Registry Removal)
+	// Initialize Agents directly (Step 2 of Registry Removal) - Updated for Service Decoupling
+	mathConfig, err := math.NewMathInstructorConfig(ctx)
+	if err != nil {
+		return fmt.Errorf("creating math instructor config: %w", err)
+	}
+	mathInstructor, err := custom.NewAgent(mathConfig)
+	if err != nil {
+		return fmt.Errorf("creating math instructor agent: %w", err)
+	}
 
-	registry.GlobalAgents.Register("math-instructor", math.CreateMathInstructor)
-	registry.GlobalAgents.Register("physics-instructor", physics.CreatePhysicsInstructor)
-	registry.GlobalAgents.Register("chemistry-instructor", chemistry.CreateChemistryInstructor)
-	registry.GlobalAgents.Register("statistics-instructor", statistics.CreateStatisticsInstructor)
-	registry.GlobalAgents.Register("diagramming-instructor", diagramming.CreateDiagrammingInstructor)
+	physicsConfig, err := physics.NewPhysicsInstructorConfig(ctx)
+	if err != nil {
+		return fmt.Errorf("creating physics instructor config: %w", err)
+	}
+	physicsInstructor, err := custom.NewAgent(physicsConfig)
+	if err != nil {
+		return fmt.Errorf("creating physics instructor agent: %w", err)
+	}
+
+	chemistryConfig, err := chemistry.NewChemistryInstructorConfig(ctx)
+	if err != nil {
+		return fmt.Errorf("creating chemistry instructor config: %w", err)
+	}
+	chemistryInstructor, err := custom.NewAgent(chemistryConfig)
+	if err != nil {
+		return fmt.Errorf("creating chemistry instructor agent: %w", err)
+	}
+
+	statsConfig, err := statistics.NewStatisticsInstructorConfig(ctx)
+	if err != nil {
+		return fmt.Errorf("creating statistics instructor config: %w", err)
+	}
+	statsInstructor, err := custom.NewAgent(statsConfig)
+	if err != nil {
+		return fmt.Errorf("creating statistics instructor agent: %w", err)
+	}
+
+	diagrammingConfig, err := diagramming.NewDiagrammingInstructorConfig(ctx)
+	if err != nil {
+		return fmt.Errorf("creating diagramming instructor config: %w", err)
+	}
+	diagrammingInstructor, err := custom.NewAgent(diagrammingConfig)
+	if err != nil {
+		return fmt.Errorf("creating diagramming instructor agent: %w", err)
+	}
+
+	// Create a simple map of available agents
+	availableAgents := map[string]agent.Agent{
+		"math-instructor":        mathInstructor,
+		"physics-instructor":     physicsInstructor,
+		"chemistry-instructor":   chemistryInstructor,
+		"statistics-instructor":  statsInstructor,
+		"diagramming-instructor": diagrammingInstructor,
+	}
+	agentProvider := custom.NewMapAgentProvider(availableAgents)
 
 	// Initialize Student Books Service
 	booksSvc := studentbooks.NewFileSystemService("books")
@@ -399,6 +446,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 			ctx,
 			log,
 			agentOrchestrator, // ThreadManager interface
+			agentProvider,     // AgentProvider
 			modelConfig,       // Model configuration (provider, model, API key)
 			artifactService,
 			studentProfileRepo,
@@ -487,8 +535,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		"healthCheckInterval", cfg.Orchestration.HealthCheckInterval)
 
 	// Create HTTP handler
-	agentRegistry := custom.NewListOnlyRegistryAdapter(registry.GlobalAgents)
-	handler := taskmgmthandlers.NewTaskManagementHandler(log, taskManager, agentRegistry, sessionStore, authSvc, threadQueryService, aguiProjection, redisBroadcaster, threadMgmt)
+	handler := taskmgmthandlers.NewTaskManagementHandler(log, taskManager, agentProvider, sessionStore, authSvc, threadQueryService, aguiProjection, redisBroadcaster, threadMgmt)
 
 	// Create health handler
 	healthHandler := healthhandlers.NewHealthHandler(log)

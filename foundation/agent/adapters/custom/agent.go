@@ -2,66 +2,54 @@ package custom
 
 import (
 	"context"
+	"fmt"
 	"iter"
 
 	"school-with-ai/foundation/agent"
 )
 
-// AgentAdapter adapts agent.Config to the agent.Agent interface.
-type AgentAdapter struct {
+// CustomAgent is a concrete implementation of agent.Agent that holds the configuration.
+// It is used by the custom adapter to manage agents without a global registry.
+type CustomAgent struct {
 	config agent.Config
 }
 
-// NewAgentAdapter creates an adapter from an AgentConfig.
-func NewAgentAdapter(config agent.Config) agent.Agent {
-	return &AgentAdapter{config: config}
+// NewAgent creates a new CustomAgent from the given configuration.
+func NewAgent(cfg agent.Config) (agent.Agent, error) {
+	return &CustomAgent{config: cfg}, nil
 }
 
-// Name returns the agent's identifier.
-func (a *AgentAdapter) Name() string {
+// Name returns the agent's name.
+func (a *CustomAgent) Name() string {
 	return a.config.Name
 }
 
 // Description returns the agent's description.
-func (a *AgentAdapter) Description() string {
-	if a.config.Description != "" {
-		return a.config.Description
-	}
-	return a.config.SystemPrompt
+func (a *CustomAgent) Description() string {
+	return a.config.Description
 }
 
-// Run executes the agent (not directly supported - use RunnerAdapter instead).
-// This method is a placeholder since Config doesn't have a standalone Run method.
-func (a *AgentAdapter) Run(ctx context.Context, inv *agent.Invocation) iter.Seq2[agent.Event, error] {
+// Run executes the agent.
+// Note: This implementation currently returns an error because execution logic
+// is handled by the RunnerAdapter/Engine. In the future, we might inject the runner here.
+func (a *CustomAgent) Run(ctx context.Context, inv *agent.Invocation) iter.Seq2[agent.Event, error] {
 	return func(yield func(agent.Event, error) bool) {
-		// AgentConfig doesn't support standalone execution
-		// Use RunnerAdapter.Run() instead which uses the engine
-		yield(nil, &NotImplementedError{"AgentAdapter.Run - use RunnerAdapter instead"})
+		yield(nil, fmt.Errorf("Run not directly supported on CustomAgent; use RunnerAdapter"))
 	}
 }
 
-// Tools returns the agent's available tools.
-func (a *AgentAdapter) Tools() []agent.Tool {
+// Tools returns the agent's tools.
+func (a *CustomAgent) Tools() []agent.Tool {
 	return a.config.Tools
 }
 
-// SubAgents returns child agents from handoffs.
-func (a *AgentAdapter) SubAgents() []agent.Agent {
-	// AgentConfig doesn't directly support sub-agents, but has handoffs
-	// This could be enhanced to return agents that can be handed off to
-	return []agent.Agent{}
+// SubAgents returns the agent's sub-agents.
+func (a *CustomAgent) SubAgents() []agent.Agent {
+	return a.config.SubAgents
 }
 
-// GetConfig returns the underlying AgentConfig (for internal use).
-func (a *AgentAdapter) GetConfig() agent.Config {
+// Config returns the underlying configuration.
+// This is used by the adapter to extract config for the engine.
+func (a *CustomAgent) Config() agent.Config {
 	return a.config
-}
-
-// NotImplementedError represents a feature that is not implemented.
-type NotImplementedError struct {
-	Feature string
-}
-
-func (e *NotImplementedError) Error() string {
-	return "not implemented: " + e.Feature
 }

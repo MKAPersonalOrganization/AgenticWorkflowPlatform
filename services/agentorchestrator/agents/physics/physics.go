@@ -16,8 +16,8 @@ func domainTools() []agent.Tool {
 	}
 }
 
-// CreatePhysicsInstructor creates the physics instructor agent configuration.
-func CreatePhysicsInstructor(ctx context.Context) agent.Config {
+// NewPhysicsInstructorConfig creates the physics instructor configuration.
+func NewPhysicsInstructorConfig(ctx context.Context) (agent.Config, error) {
 	registry := agent.NewToolSet()
 
 	// Domain-specific tools
@@ -73,7 +73,7 @@ func CreatePhysicsInstructor(ctx context.Context) agent.Config {
 		ExtraRules:  i18n.T(ctx, "physics.extra_rules"),
 	})
 	if err != nil {
-		panic(err)
+		return agent.Config{}, err
 	}
 
 	return agent.Config{
@@ -84,5 +84,5 @@ func CreatePhysicsInstructor(ctx context.Context) agent.Config {
 		Capabilities: agent.Capabilities{
 			InputElicitation: true,
 		},
-	}
+	}, nil
 }

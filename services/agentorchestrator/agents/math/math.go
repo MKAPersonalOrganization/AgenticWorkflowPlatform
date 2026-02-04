@@ -25,8 +25,8 @@ func domainTools() []agent.Tool {
 	}
 }
 
-// CreateMathInstructor creates the math instructor agent configuration.
-func CreateMathInstructor(ctx context.Context) agent.Config {
+// NewMathInstructorConfig creates the math instructor configuration.
+func NewMathInstructorConfig(ctx context.Context) (agent.Config, error) {
 	registry := agent.NewToolSet()
 
 	// Domain-specific tools
@@ -73,7 +73,7 @@ func CreateMathInstructor(ctx context.Context) agent.Config {
 		ExtraRules:  i18n.T(ctx, "math.extra_rules"),
 	})
 	if err != nil {
-		panic(err)
+		return agent.Config{}, err
 	}
 
 	return agent.Config{
@@ -84,5 +84,5 @@ func CreateMathInstructor(ctx context.Context) agent.Config {
 		Capabilities: agent.Capabilities{
 			InputElicitation: true,
 		},
-	}
+	}, nil
 }

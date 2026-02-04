@@ -62,16 +62,15 @@ type AgentWithMiddleware interface {
 	Middlewares() []Middleware
 }
 
-// AgentRegistry provides discovery and lookup for available agents.
-type AgentRegistry interface {
+// AgentProvider provides discovery and lookup for available agents.
+// It replaces the previous AgentRegistry interface with a read-only contract,
+// promoting direct instantiation and dependency injection over global state.
+type AgentProvider interface {
 	// Get retrieves an agent by name.
 	Get(name string) (Agent, error)
 
 	// List returns all available agent names.
 	List() []string
-
-	// Register adds an agent to the registry.
-	Register(agent Agent) error
 }
 
 // Invocation contains all the information needed to execute an agent.
