@@ -93,6 +93,26 @@ type RunnerConfig struct {
 
 	// Middlewares are applied to all agent invocations.
 	Middlewares []Middleware
+
+	// ModelConfig specifies which LLM to use.
+	// Each framework adapter is responsible for creating its own LLM client.
+	ModelConfig *ModelConfig
+}
+
+// ModelConfig specifies LLM provider and credentials.
+// Framework adapters use this to create their internal LLM clients.
+type ModelConfig struct {
+	// Provider identifies the LLM provider ("openai", "gemini", "anthropic", etc.).
+	Provider string
+
+	// Model specifies the model name ("gpt-4", "gemini-pro", etc.).
+	Model string
+
+	// APIKey is the authentication key for the provider.
+	APIKey string
+
+	// AdditionalConfig for provider-specific settings.
+	AdditionalConfig map[string]any
 }
 
 // ArtifactStore persists artifacts.

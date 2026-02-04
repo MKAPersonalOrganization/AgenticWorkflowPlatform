@@ -11,6 +11,7 @@ import (
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/core/middleware"
 	"school-with-ai/foundation/agentsdk/engine"
+	"school-with-ai/foundation/agentsdk/llm"
 	"school-with-ai/foundation/agentsdk/registry"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/artifact"
@@ -30,14 +31,26 @@ type RunnerAdapter struct {
 }
 
 // NewRunnerAdapter creates a new runner adapter.
+// It creates its own LLM client based on the ModelConfig.
 func NewRunnerAdapter(
+	ctx context.Context,
 	log *logger.Logger,
 	threadMgr ThreadManager,
-	chatClient engine.ChatClient,
+	modelCfg *agent.ModelConfig,
 	artifactStore artifact.Service,
 	profileRepo domain.StudentProfileRepository,
 	enableMemory bool,
-) *RunnerAdapter {
+) (*RunnerAdapter, error) {
+	if modelCfg == nil {
+		return nil, fmt.Errorf("model config is required")
+	}
+
+	// Create LLM client based on provider - this is now internal to the adapter
+	chatClient, err := createLLMClient(ctx, modelCfg)
+	if err != nil {
+		return nil, fmt.Errorf("creating LLM client: %w", err)
+	}
+
 	r := &RunnerAdapter{
 		log:           log,
 		threadMgr:     threadMgr,
@@ -61,7 +74,32 @@ func NewRunnerAdapter(
 		nil, // toolTracer
 	)
 
-	return r
+	return r, nil
+}
+
+// createLLMClient creates an LLM client based on the model configuration.
+// This is an internal implementation detail of the custom adapter.
+func createLLMClient(ctx context.Context, cfg *agent.ModelConfig) (llm.ChatClient, error) {
+	switch cfg.Provider {
+	case "openai":
+		if cfg.APIKey == "" {
+			return nil, fmt.Errorf("OpenAI API key is required")
+		}
+		return llm.NewOpenAIClientWithAPIKey(cfg.APIKey, cfg.Model), nil
+
+	case "gemini":
+		if cfg.APIKey == "" {
+			return nil, fmt.Errorf("Gemini API key is required")
+		}
+		client, err := llm.NewGeminiClient(ctx, cfg.APIKey, cfg.Model)
+		if err != nil {
+			return nil, fmt.Errorf("initializing Gemini client: %w", err)
+		}
+		return client, nil
+
+	default:
+		return nil, fmt.Errorf("unsupported AI provider: %s", cfg.Provider)
+	}
 }
 
 // Run executes an agent with the given request.

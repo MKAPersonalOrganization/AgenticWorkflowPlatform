@@ -22,7 +22,6 @@ import (
 // TaskManagementHandler encapsulates dependencies for HTTP handlers for task management.
 type TaskManagementHandler struct {
 	log                *logger.Logger
-	model              agent.Model
 	taskManager        *taskmanagement.AsynqTaskManager
 	agentRegistry      agent.AgentRegistry
 	sessionStore       agent.SessionStore
@@ -36,7 +35,6 @@ type TaskManagementHandler struct {
 // NewTaskManagementHandler creates a new HTTP handler for task management.
 func NewTaskManagementHandler(
 	log *logger.Logger,
-	model agent.Model,
 	taskManager *taskmanagement.AsynqTaskManager,
 	agentRegistry agent.AgentRegistry,
 	sessionStore agent.SessionStore,
@@ -48,7 +46,6 @@ func NewTaskManagementHandler(
 ) *TaskManagementHandler {
 	return &TaskManagementHandler{
 		log:                log,
-		model:              model,
 		taskManager:        taskManager,
 		agentRegistry:      agentRegistry,
 		sessionStore:       sessionStore,
