@@ -19,8 +19,7 @@ func min(a, b int) int {
 // LLMContext holds all data needed for an LLM call.
 // This is the output of context preparation - ready to be passed to the chat client.
 type LLMContext struct {
-	Messages   []llm.ChatMessage
-	Options    *llm.ChatOptions
+	Request    *llm.Request
 	RequestCtx *core.RequestContext
 }
 
@@ -84,8 +83,8 @@ func (m *LLMContextManager) Prepare(ctx context.Context, runCtx core.RunContext,
 		fmt.Printf("DEBUG: Converted message[%d]: role=%s, text=%s\n", i, msg.Role, msg.Text()[:min(50, len(msg.Text()))])
 	}
 
-	// 3. Apply middleware and build chat options
-	chatOptions, reqCtx, err := core.ToChatOptionsWithMiddleware(ctx, m.config, chatMessages, runCtx.ThreadID, runCtx.Options)
+	// 3. Apply middleware and build LLM request
+	llmReq, reqCtx, err := core.ToLLMRequestWithMiddleware(ctx, m.config, chatMessages, runCtx.ThreadID, runCtx.Options)
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply middleware: %w", err)
 	}
@@ -102,8 +101,7 @@ func (m *LLMContextManager) Prepare(ctx context.Context, runCtx core.RunContext,
 
 	return &PrepareResult{
 		Context: &LLMContext{
-			Messages:   chatMessages,
-			Options:    chatOptions,
+			Request:    llmReq,
 			RequestCtx: reqCtx,
 		},
 		Terminated: false,
@@ -111,6 +109,6 @@ func (m *LLMContextManager) Prepare(ctx context.Context, runCtx core.RunContext,
 }
 
 // convertMessages converts core messages to LLM chat messages.
-func (m *LLMContextManager) convertMessages(msgs []core.Message) []llm.ChatMessage {
+func (m *LLMContextManager) convertMessages(msgs []core.Message) []llm.Message {
 	return mapFromCoreToLLMMessages(msgs)
 }

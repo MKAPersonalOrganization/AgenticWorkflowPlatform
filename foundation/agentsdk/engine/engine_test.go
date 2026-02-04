@@ -11,33 +11,28 @@ import (
 	"school-with-ai/foundation/agentsdk/llm"
 )
 
-// MockChatClient implements types.ChatClient for testing
+// MockChatClient implements llm.LLM for testing
 type MockChatClient struct {
-	streams          [][]llm.ChatResponseUpdate
+	streams          [][]*llm.Response
 	mu               sync.Mutex
 	err              error
-	capturedMessages [][]llm.ChatMessage
+	capturedMessages [][]llm.Message
 }
 
-func (m *MockChatClient) Provider() string {
-	return "mock"
-}
-
-func (m *MockChatClient) GetStreamingResponse(
+func (m *MockChatClient) Generate(
 	ctx context.Context,
-	messages []llm.ChatMessage,
-	options *llm.ChatOptions,
-) iter.Seq2[llm.ChatResponseUpdate, error] {
+	req *llm.Request,
+) iter.Seq2[*llm.Response, error] {
 	m.mu.Lock()
-	m.capturedMessages = append(m.capturedMessages, messages)
+	m.capturedMessages = append(m.capturedMessages, req.Messages)
 	m.mu.Unlock()
 
-	return func(yield func(llm.ChatResponseUpdate, error) bool) {
+	return func(yield func(*llm.Response, error) bool) {
 		m.mu.Lock()
 		defer m.mu.Unlock()
 
 		if m.err != nil {
-			yield(llm.ChatResponseUpdate{}, m.err)
+			yield(nil, m.err)
 			return
 		}
 
@@ -162,21 +157,23 @@ func TestEngine_Run(t *testing.T) {
 	}
 
 	chatClient := &MockChatClient{
-		streams: [][]llm.ChatResponseUpdate{
+		streams: [][]*llm.Response{
 			{
 				{
-					Contents: []llm.AIContent{
+					Content: []llm.Content{
 						llm.TextContent{Text: "Hello "},
 					},
+					Partial: true,
 				},
 				{
-					Contents: []llm.AIContent{
+					Content: []llm.Content{
 						llm.TextContent{Text: "World"},
 					},
-					FinishReason: "stop",
+					FinishReason: llm.FinishReasonStop,
+					Partial:      true,
 				},
 				{
-					Usage: &llm.UsageDetails{
+					Usage: &llm.Usage{
 						InputTokens:  10,
 						OutputTokens: 20,
 						TotalTokens:  30,

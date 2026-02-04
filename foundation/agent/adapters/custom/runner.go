@@ -83,7 +83,7 @@ func NewRunnerAdapter(
 
 // createLLMClient creates an LLM client based on the model configuration.
 // This is an internal implementation detail of the custom adapter.
-func createLLMClient(ctx context.Context, cfg *agent.ModelConfig) (llm.ChatClient, error) {
+func createLLMClient(ctx context.Context, cfg *agent.ModelConfig) (llm.LLM, error) {
 	switch cfg.Provider {
 	case "openai":
 		if cfg.APIKey == "" {

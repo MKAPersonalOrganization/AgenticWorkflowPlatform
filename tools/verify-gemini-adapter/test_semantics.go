@@ -23,33 +23,24 @@ func runSemanticsTest() {
 	}
 
 	// Scenario: History ends with Model message. Adapter should append User continuation.
-	msgs := []llm.ChatMessage{
-		{
-			Role: llm.ChatRoleUser,
-			Contents: []llm.AIContent{
-				llm.TextContent{Text: "Hi"},
+	req := &llm.Request{
+		Messages: []llm.Message{
+			llm.NewUserMessage("Hi"),
+			{
+				Role:    llm.RoleAssistant,
+				Content: []llm.Content{llm.TextContent{Text: "Hello! How can I help?"}},
 			},
 		},
-		{
-			Role: llm.ChatRoleAssistant,
-			Contents: []llm.AIContent{
-				llm.TextContent{Text: "Hello! How can I help?"},
-			},
-		},
-	}
-
-	opts := llm.ChatOptions{
-		Temperature: nil,
 	}
 
 	fmt.Println("Streaming response (History ends in Model):")
-	for update, err := range client.GetStreamingResponse(ctx, msgs, &opts) {
+	for resp, err := range client.Generate(ctx, req) {
 		if err != nil {
 			fmt.Printf("Error stream: %v\n", err)
 			break
 		}
-		if update.Contents != nil {
-			for _, content := range update.Contents {
+		if resp.Content != nil {
+			for _, content := range resp.Content {
 				switch c := content.(type) {
 				case llm.TextContent:
 					fmt.Print(c.Text)

@@ -51,7 +51,7 @@ type RequestContext struct {
 	ThreadID string
 
 	// Messages are the conversation messages being sent to the LLM
-	Messages []llm.ChatMessage
+	Messages []llm.Message
 
 	// SystemPrompt is the system-level instruction for the agent
 	SystemPrompt string
@@ -84,7 +84,7 @@ type RequestContext struct {
 }
 
 // NewRequestContext creates a new RequestContext with the given parameters.
-func NewRequestContext(threadID string, messages []llm.ChatMessage, systemPrompt string, tools []Tool, config *AgentConfig) *RequestContext {
+func NewRequestContext(threadID string, messages []llm.Message, systemPrompt string, tools []Tool, config *AgentConfig) *RequestContext {
 	return &RequestContext{
 		ThreadID:              threadID,
 		Messages:              messages,
@@ -187,7 +187,7 @@ func (rc *RequestContext) GetEffectiveTools() []Tool {
 type ContextOption func(*RequestContext)
 
 // WithMessages sets the messages in the context.
-func WithMessages(messages []llm.ChatMessage) ContextOption {
+func WithMessages(messages []llm.Message) ContextOption {
 	return func(rc *RequestContext) {
 		rc.Messages = messages
 	}

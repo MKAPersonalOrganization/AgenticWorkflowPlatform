@@ -13,7 +13,7 @@ import (
 	"google.golang.org/genai"
 )
 
-// GeminiClient implements the ChatClient interface for Gemini.
+// GeminiClient implements the LLM interface for Gemini.
 type GeminiClient struct {
 	client *genai.Client
 	model  string
@@ -23,12 +23,15 @@ type GeminiClient struct {
 func NewGeminiClient(ctx context.Context, apiKey string, model string) (*GeminiClient, error) {
 	cfg := &genai.ClientConfig{
 		APIKey: apiKey,
-		// Backend: genai.BackendGoogleAI,
 	}
 
 	client, err := genai.NewClient(ctx, cfg)
 	if err != nil {
-		return nil, err
+		return nil, &Error{
+			Op:   "gemini.NewClient",
+			Kind: KindInternal,
+			Err:  err,
+		}
 	}
 
 	return &GeminiClient{
@@ -37,23 +40,17 @@ func NewGeminiClient(ctx context.Context, apiKey string, model string) (*GeminiC
 	}, nil
 }
 
-// Provider implements the ChatClient interface.
-func (c *GeminiClient) Provider() string {
-	return "gemini"
-}
-
-// GetStreamingResponse implements the ChatClient interface.
-func (c *GeminiClient) GetStreamingResponse(
+// Generate implements the LLM interface.
+func (c *GeminiClient) Generate(
 	ctx context.Context,
-	messages []ChatMessage,
-	options *ChatOptions,
-) iter.Seq2[ChatResponseUpdate, error] {
-	return func(yield func(ChatResponseUpdate, error) bool) {
+	req *Request,
+) iter.Seq2[*Response, error] {
+	return func(yield func(*Response, error) bool) {
 		// Convert messages to genai.Content
-		contents := c.buildContents(messages)
+		contents := c.buildContents(req.Messages)
 
 		// Build config
-		config := c.buildConfig(options)
+		config := c.buildConfig(req)
 
 		// Set headers to match reference implementation
 		if config.HTTPOptions == nil {
@@ -62,17 +59,16 @@ func (c *GeminiClient) GetStreamingResponse(
 		if config.HTTPOptions.Headers == nil {
 			config.HTTPOptions.Headers = make(map[string][]string)
 		}
-		// Mimic reference version heder: google-adk/<version> gl-go/<go-version>
-		// Since we don't have ADK version, we use a placeholder or similar.
-		// Reference: "google-adk/%s gl-go/%s"
 		versionHeader := fmt.Sprintf("google-adk/0.0.1 gl-go/%s", strings.TrimPrefix(runtime.Version(), "go"))
 		config.HTTPOptions.Headers["x-goog-api-client"] = []string{versionHeader}
 		config.HTTPOptions.Headers["user-agent"] = []string{versionHeader}
 
 		// Select model
 		modelName := c.model
-		if options != nil && options.ModelID != "" {
-			modelName = options.ModelID
+		if req.Extensions != nil {
+			if m, ok := req.Extensions["model"].(string); ok {
+				modelName = m
+			}
 		}
 
 		// Call the API with retry logic
@@ -89,16 +85,10 @@ func (c *GeminiClient) GetStreamingResponse(
 						if firstChunk {
 							return err
 						}
-						// If error happens mid-stream, we can't easily retry transparently
-						yield(ChatResponseUpdate{}, err)
-						return nil // return nil to stop retry.Do, as we handled error via yield
+						yield(nil, c.mapError("gemini.GenerateStream", err))
+						return nil
 					}
 					firstChunk = false
-
-					// We don't get a strict response ID from standard Gemini stream easily in the first chunk like OpenAI
-					// But we can generate or leave empty.
-					// Currently genai.GenerateContentResponse doesn't seem to have a top-level ID field in the stream struct easily accessible?
-					// Checking struct definition would be good, but assuming standard flow.
 
 					// Iterate over candidates
 					for _, candidate := range chunk.Candidates {
@@ -106,41 +96,42 @@ func (c *GeminiClient) GetStreamingResponse(
 						if candidate.Content != nil {
 							for _, part := range candidate.Content.Parts {
 								if part.Text != "" {
-									update := ChatResponseUpdate{
-										Role:       ChatRoleAssistant,
-										ResponseID: responseID,
-										Model:      modelName,
-										Contents:   []AIContent{TextContent{Text: part.Text}},
+									resp := &Response{
+										Content: []Content{TextContent{Text: part.Text}},
+										Partial: true,
+										Extensions: Metadata{
+											"response_id": responseID,
+											"model":       modelName,
+										},
 									}
-									if !yield(update, nil) {
-										return nil // Stop iteration
+									if !yield(resp, nil) {
+										return nil
 									}
 								}
 
 								if part.FunctionCall != nil {
-									// Function call
-									argsJSON, _ := json.Marshal(part.FunctionCall.Args) // Args is map[string]interface{}
+									argsJSON, _ := json.Marshal(part.FunctionCall.Args)
 
 									callID := part.FunctionCall.ID
 									if callID == "" {
-										// Generate a local ID if Gemini didn't provide one
 										callID = "call_" + uuid.New().String()
 									}
 
-									fc := FunctionCallContent{
-										ToolCallID:   callID,
-										Name:         part.FunctionCall.Name,
-										Arguments:    part.FunctionCall.Args,
-										RawArguments: string(argsJSON),
+									fc := FunctionCall{
+										ID:        callID,
+										Name:      part.FunctionCall.Name,
+										Arguments: json.RawMessage(argsJSON),
 									}
 
-									update := ChatResponseUpdate{
-										Role:       ChatRoleAssistant,
-										ResponseID: responseID,
-										Model:      modelName,
-										Contents:   []AIContent{fc},
+									resp := &Response{
+										Content: []Content{fc},
+										Partial: true,
+										Extensions: Metadata{
+											"response_id": responseID,
+											"model":       modelName,
+										},
 									}
-									if !yield(update, nil) {
+									if !yield(resp, nil) {
 										return nil
 									}
 								}
@@ -149,7 +140,6 @@ func (c *GeminiClient) GetStreamingResponse(
 
 						// Finish Reason
 						if candidate.FinishReason != "" {
-							// Check for potential tool calls if standard reason is stop/other
 							hasToolCalls := false
 							if candidate.Content != nil {
 								for _, p := range candidate.Content.Parts {
@@ -162,16 +152,21 @@ func (c *GeminiClient) GetStreamingResponse(
 
 							var reason FinishReason
 							if hasToolCalls {
-								reason = FinishReasonToolCalls
+								reason = FinishReasonToolUse
 							} else {
 								reason = c.mapFinishReason(candidate.FinishReason)
 							}
 
-							update := ChatResponseUpdate{
-								Role:         ChatRoleAssistant,
+							resp := &Response{
 								FinishReason: reason,
+								Partial:      false,
+								Extensions: Metadata{
+									"response_id": responseID,
+									"model":       modelName,
+									"provider":    "gemini",
+								},
 							}
-							if !yield(update, nil) {
+							if !yield(resp, nil) {
 								return nil
 							}
 						}
@@ -179,16 +174,20 @@ func (c *GeminiClient) GetStreamingResponse(
 
 					// Handle Usage
 					if chunk.UsageMetadata != nil {
-						usage := &UsageDetails{
+						usage := &Usage{
 							InputTokens:  int(chunk.UsageMetadata.PromptTokenCount),
 							OutputTokens: int(chunk.UsageMetadata.CandidatesTokenCount),
 							TotalTokens:  int(chunk.UsageMetadata.TotalTokenCount),
 						}
-						update := ChatResponseUpdate{
-							Role:  ChatRoleAssistant,
-							Usage: usage,
+						resp := &Response{
+							Usage:   usage,
+							Partial: true,
+							Extensions: Metadata{
+								"response_id": responseID,
+								"model":       modelName,
+							},
 						}
-						if !yield(update, nil) {
+						if !yield(resp, nil) {
 							return nil
 						}
 					}
@@ -198,58 +197,81 @@ func (c *GeminiClient) GetStreamingResponse(
 			retry.Attempts(3),
 			retry.DelayType(retry.BackOffDelay),
 			retry.RetryIf(func(err error) bool {
-				// Retry on Resource Exhausted (429) errors
 				return strings.Contains(err.Error(), "429") || strings.Contains(err.Error(), "Resource exhausted")
 			}),
 		)
 		if err != nil {
-			// If retry exhausted or non-retryable error
-			yield(ChatResponseUpdate{}, err)
+			yield(nil, c.mapError("gemini.Generate", err))
 		}
 	}
 }
 
-func (c *GeminiClient) buildContents(messages []ChatMessage) []*genai.Content {
+func (c *GeminiClient) mapError(op string, err error) error {
+	if err == nil {
+		return nil
+	}
+
+	kind := KindInternal
+	errStr := err.Error()
+
+	switch {
+	case strings.Contains(errStr, "429") || strings.Contains(errStr, "Resource exhausted"):
+		kind = KindRateLimit
+	case strings.Contains(errStr, "400") || strings.Contains(errStr, "invalid"):
+		kind = KindInvalidInput
+	case strings.Contains(errStr, "404") || strings.Contains(errStr, "not found"):
+		kind = KindNotFound
+	}
+
+	return &Error{
+		Op:   op,
+		Kind: kind,
+		Err:  err,
+		Context: map[string]any{
+			"model": c.model,
+		},
+	}
+}
+
+func (c *GeminiClient) buildContents(messages []Message) []*genai.Content {
 	var contents []*genai.Content
 	callIDToName := make(map[string]string)
 
 	for _, msg := range messages {
 		var parts []*genai.Part
 
-		for _, content := range msg.Contents {
+		for _, content := range msg.Content {
 			switch v := content.(type) {
 			case TextContent:
 				parts = append(parts, &genai.Part{Text: v.Text})
-			case FunctionCallContent:
-				if v.ToolCallID != "" {
-					callIDToName[v.ToolCallID] = v.Name
+			case FunctionCall:
+				if v.ID != "" {
+					callIDToName[v.ID] = v.Name
 				}
+				var args map[string]any
+				_ = json.Unmarshal(v.Arguments, &args)
 				parts = append(parts, &genai.Part{
 					FunctionCall: &genai.FunctionCall{
-						ID:   v.ToolCallID,
+						ID:   v.ID,
 						Name: v.Name,
-						Args: v.Arguments,
+						Args: args,
 					},
 				})
-			case FunctionResultContent:
-				// FunctionResponse needs to be wrapped properly
-				// Gemini expects FunctionResponse to be a part
-				// We need to parse valid JSON result or wrap it
+			case FunctionResult:
 				var resultData map[string]interface{}
-				// Try parsing result as JSON, otherwise wrap string
-				if err := json.Unmarshal([]byte(v.Result), &resultData); err != nil {
-					resultData = map[string]interface{}{"result": v.Result}
+				if err := json.Unmarshal(v.Result, &resultData); err != nil {
+					resultData = map[string]interface{}{"result": string(v.Result)}
 				}
 
 				name := v.Name
 				if name == "" {
-					name = callIDToName[v.ToolCallID]
+					name = callIDToName[v.CallID]
 				}
 
 				parts = append(parts, &genai.Part{
 					FunctionResponse: &genai.FunctionResponse{
 						Name:     name,
-						ID:       v.ToolCallID,
+						ID:       v.CallID,
 						Response: resultData,
 					},
 				})
@@ -258,18 +280,11 @@ func (c *GeminiClient) buildContents(messages []ChatMessage) []*genai.Content {
 
 		if len(parts) > 0 {
 			role := "user"
-			if msg.Role == ChatRoleAssistant {
+			if msg.Role == RoleAssistant {
 				role = "model"
-			} else if msg.Role == ChatRoleTool {
-				role = "function" // technically part of 'user' or separate? "function" role is deprecated or used differently?
-				// GenAI usually uses 'function' or puts it in history associated with user?
-				// In new API, it is usually role="function" or role="tool" depending on version.
-				// Google GenAI SDK `Content` struct: Role field.
-				// Valid roles: "user", "model", "tool"? or just "user"/"model".
-				// "function" is often a separate role.
-				role = "function" // Verify strict role names
-			} else if msg.Role == ChatRoleSystem {
-				// System instructions are usually config, not content history in Gemini
+			} else if msg.Role == RoleTool {
+				role = "function"
+			} else if msg.Role == RoleSystem {
 				continue
 			}
 
@@ -280,8 +295,6 @@ func (c *GeminiClient) buildContents(messages []ChatMessage) []*genai.Content {
 		}
 	}
 
-	// Semantic Check: Gemini requires the last message to be from 'user' or 'function' (which drives model output).
-	// If the last message is 'model', validation will fail. We must append a user message.
 	if len(contents) == 0 {
 		contents = append(contents, &genai.Content{
 			Role:  "user",
@@ -289,7 +302,7 @@ func (c *GeminiClient) buildContents(messages []ChatMessage) []*genai.Content {
 		})
 	} else {
 		last := contents[len(contents)-1]
-		if last.Role != "user" {
+		if last.Role != "user" && last.Role != "function" {
 			contents = append(contents, &genai.Content{
 				Role:  "user",
 				Parts: []*genai.Part{{Text: "Continue processing previous requests as instructed. Exit or provide a summary if no more outputs are needed."}},
@@ -300,59 +313,69 @@ func (c *GeminiClient) buildContents(messages []ChatMessage) []*genai.Content {
 	return contents
 }
 
-func (c *GeminiClient) buildConfig(options *ChatOptions) *genai.GenerateContentConfig {
-	if options == nil {
-		return nil
-	}
-
+func (c *GeminiClient) buildConfig(req *Request) *genai.GenerateContentConfig {
 	cfg := &genai.GenerateContentConfig{}
 
-	if options.Temperature != nil {
-		t := float32(*options.Temperature)
-		cfg.Temperature = &t
+	if req.Parameters != nil {
+		opts := req.Parameters
+		if opts.Temperature != nil {
+			t := float32(*opts.Temperature)
+			cfg.Temperature = &t
+		}
+		if opts.TopP != nil {
+			p := float32(*opts.TopP)
+			cfg.TopP = &p
+		}
+		if opts.MaxTokens > 0 {
+			cfg.MaxOutputTokens = int32(opts.MaxTokens)
+		}
+		if len(opts.StopSequences) > 0 {
+			cfg.StopSequences = opts.StopSequences
+		}
 	}
-	if options.TopP != nil {
-		p := float32(*options.TopP)
-		cfg.TopP = &p
-	}
-	if options.MaxOutputTokens != nil {
-		cfg.MaxOutputTokens = int32(*options.MaxOutputTokens)
-	}
-	if len(options.StopSequences) > 0 {
-		cfg.StopSequences = options.StopSequences
-	}
-	if options.Instructions != "" {
+
+	if req.System != "" {
 		cfg.SystemInstruction = &genai.Content{
-			Parts: []*genai.Part{{Text: options.Instructions}},
+			Parts: []*genai.Part{{Text: req.System}},
 		}
 	}
 
 	// Tools mapping
-	if len(options.Tools) > 0 {
+	if len(req.Tools) > 0 {
 		var funcs []*genai.FunctionDeclaration
-		for _, tool := range options.Tools {
+		for _, tool := range req.Tools {
+			var paramsMap map[string]any
+			if tool.Parameters != nil {
+				data, _ := json.Marshal(tool.Parameters)
+				_ = json.Unmarshal(data, &paramsMap)
+			}
+
 			funcs = append(funcs, &genai.FunctionDeclaration{
-				Name:                 tool.Name(),
-				Description:          tool.Description(),
-				ParametersJsonSchema: tool.Parameters(),
+				Name:                 tool.Name,
+				Description:          tool.Description,
+				ParametersJsonSchema: paramsMap,
 			})
 		}
 		cfg.Tools = []*genai.Tool{{
 			FunctionDeclarations: funcs,
 		}}
 
-		// Tool Mode
-		if options.ToolMode == ToolModeRequired {
-			cfg.ToolConfig = &genai.ToolConfig{
-				FunctionCallingConfig: &genai.FunctionCallingConfig{
-					Mode: genai.FunctionCallingConfigModeAny,
-				},
-			}
-		} else if options.ToolMode == ToolModeNone {
-			cfg.ToolConfig = &genai.ToolConfig{
-				FunctionCallingConfig: &genai.FunctionCallingConfig{
-					Mode: genai.FunctionCallingConfigModeNone,
-				},
+		if req.Extensions != nil {
+			if toolMode, ok := req.Extensions["tool_mode"].(string); ok {
+				switch toolMode {
+				case "required":
+					cfg.ToolConfig = &genai.ToolConfig{
+						FunctionCallingConfig: &genai.FunctionCallingConfig{
+							Mode: genai.FunctionCallingConfigModeAny,
+						},
+					}
+				case "none":
+					cfg.ToolConfig = &genai.ToolConfig{
+						FunctionCallingConfig: &genai.FunctionCallingConfig{
+							Mode: genai.FunctionCallingConfigModeNone,
+						},
+					}
+				}
 			}
 		}
 	}
@@ -366,8 +389,7 @@ func (c *GeminiClient) mapFinishReason(reason genai.FinishReason) FinishReason {
 		return FinishReasonStop
 	case genai.FinishReasonMaxTokens:
 		return FinishReasonLength
-	// Add other mappings
 	default:
-		return FinishReason(string(reason))
+		return FinishReason(reason)
 	}
 }

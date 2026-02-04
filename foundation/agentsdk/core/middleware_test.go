@@ -48,8 +48,8 @@ func (m *mockMiddleware) Process(ctx context.Context, reqCtx *RequestContext, ne
 
 func TestNewRequestContext(t *testing.T) {
 	t.Parallel()
-	messages := []llm.ChatMessage{
-		{Role: llm.ChatRoleUser, Contents: []llm.AIContent{llm.TextContent{Text: "Hello"}}},
+	messages := []llm.Message{
+		{Role: llm.RoleUser, Content: []llm.Content{llm.TextContent{Text: "Hello"}}},
 	}
 	systemPrompt := "You are a helpful assistant"
 	tools := []Tool{}
@@ -195,7 +195,7 @@ func TestRequestContext_Override(t *testing.T) {
 	t.Parallel()
 	original := NewRequestContext(
 		"thread-123",
-		[]llm.ChatMessage{{Role: llm.ChatRoleUser, Contents: []llm.AIContent{llm.TextContent{Text: "Original"}}}},
+		[]llm.Message{llm.NewUserMessage("Original")},
 		"Original prompt",
 		nil,
 		&AgentConfig{Name: "original"},
@@ -203,12 +203,10 @@ func TestRequestContext_Override(t *testing.T) {
 	original.WithMetadata("key", "value")
 
 	// Override messages
-	newMessages := []llm.ChatMessage{
-		{Role: llm.ChatRoleUser, Contents: []llm.AIContent{llm.TextContent{Text: "New"}}},
+	newMessages := []llm.Message{
+		llm.NewUserMessage("New"),
 	}
 	overridden := original.Override(WithMessages(newMessages))
-
-	// Original should be unchanged
 	if len(original.Messages) != 1 || original.Messages[0].Text() != "Original" {
 		t.Error("Original context was modified")
 	}
