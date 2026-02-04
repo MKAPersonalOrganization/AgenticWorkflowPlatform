@@ -17,8 +17,8 @@ func domainTools() []agent.Tool {
 	}
 }
 
-// CreateDiagrammingInstructor creates the diagramming specialist agent configuration.
-func CreateDiagrammingInstructor(ctx context.Context) agent.Config {
+// NewDiagrammingInstructorConfig creates the diagramming specialist agent.
+func NewDiagrammingInstructorConfig(ctx context.Context) (agent.Config, error) {
 	registry := agent.NewToolSet()
 
 	// Domain-specific tools
@@ -36,7 +36,7 @@ func CreateDiagrammingInstructor(ctx context.Context) agent.Config {
 		ExtraRules:  i18n.T(ctx, "diagramming.extra_rules"),
 	})
 	if err != nil {
-		panic(err)
+		return agent.Config{}, err
 	}
 
 	return agent.Config{
@@ -47,5 +47,5 @@ func CreateDiagrammingInstructor(ctx context.Context) agent.Config {
 		Capabilities: agent.Capabilities{
 			InputElicitation: true,
 		},
-	}
+	}, nil
 }

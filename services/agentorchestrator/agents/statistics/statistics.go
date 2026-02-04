@@ -55,8 +55,8 @@ func domainTools() []agent.Tool {
 	}
 }
 
-// CreateStatisticsInstructor creates the statistics instructor agent.
-func CreateStatisticsInstructor(ctx context.Context) agent.Config {
+// NewStatisticsInstructorConfig creates the statistics instructor configuration.
+func NewStatisticsInstructorConfig(ctx context.Context) (agent.Config, error) {
 	registry := agent.NewToolSet()
 
 	// Domain-specific tools
@@ -107,7 +107,7 @@ func CreateStatisticsInstructor(ctx context.Context) agent.Config {
 		ExtraRules:  i18n.T(ctx, "statistics.extra_rules"),
 	})
 	if err != nil {
-		panic(err)
+		return agent.Config{}, err
 	}
 
 	return agent.Config{
@@ -118,5 +118,5 @@ func CreateStatisticsInstructor(ctx context.Context) agent.Config {
 		Capabilities: agent.Capabilities{
 			InputElicitation: true,
 		},
-	}
+	}, nil
 }

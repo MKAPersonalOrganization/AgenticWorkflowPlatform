@@ -9,7 +9,6 @@ import (
 
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
-	"school-with-ai/foundation/i18n"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/services"
@@ -23,7 +22,7 @@ import (
 type TaskManagementHandler struct {
 	log                *logger.Logger
 	taskManager        *taskmanagement.AsynqTaskManager
-	agentRegistry      agent.AgentRegistry
+	agentProvider      agent.AgentProvider
 	sessionStore       agent.SessionStore
 	authService        services.AuthService
 	threadQueryService services.ThreadQueryService
@@ -35,19 +34,19 @@ type TaskManagementHandler struct {
 // NewTaskManagementHandler creates a new HTTP handler for task management.
 func NewTaskManagementHandler(
 	log *logger.Logger,
-	taskManager *taskmanagement.AsynqTaskManager,
-	agentRegistry agent.AgentRegistry,
+	taskManager *taskmanagement.AsynqTaskManager, // Type remains *taskmanagement.AsynqTaskManager as per struct
+	agentProvider agent.AgentProvider,
 	sessionStore agent.SessionStore,
-	authService services.AuthService,
-	threadQueryService services.ThreadQueryService,
-	aguiProjection agui.AguiProjection,
-	broadcaster agui.AguiBroadcaster,
+	authService services.AuthService, // Name remains authService as per struct
+	threadQueryService services.ThreadQueryService, // Name remains threadQueryService as per struct
+	aguiProjection agui.AguiProjection, // Type remains agui.AguiProjection as per struct
+	broadcaster agui.AguiBroadcaster, // Type remains agui.AguiBroadcaster as per struct
 	threadMgmt *threadmgmt.Manager,
 ) *TaskManagementHandler {
 	return &TaskManagementHandler{
 		log:                log,
 		taskManager:        taskManager,
-		agentRegistry:      agentRegistry,
+		agentProvider:      agentProvider,
 		sessionStore:       sessionStore,
 		authService:        authService,
 		threadQueryService: threadQueryService,
@@ -412,26 +411,11 @@ func (h *TaskManagementHandler) UpdateThreadTitle(w http.ResponseWriter, r *http
 
 // ListAgents returns a list of available agents.
 func (h *TaskManagementHandler) ListAgents(w http.ResponseWriter, r *http.Request) {
-	agentIDs := h.agentRegistry.List()
-
-	type AgentInfo struct {
-		ID   string `json:"id"`
-		Name string `json:"name"`
-	}
-
-	var agents []AgentInfo
-	for _, id := range agentIDs {
-		// Use i18n.T to get the localized name for the agent ID
-		// The keys in en.json match the agent IDs (e.g. "math-instructor")
-		agents = append(agents, AgentInfo{
-			ID:   id,
-			Name: i18n.T(r.Context(), id),
-		})
-	}
+	agents := h.agentProvider.List()
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string][]AgentInfo{"agents": agents}); err != nil {
+	if err := json.NewEncoder(w).Encode(agents); err != nil {
 		h.log.Error(r.Context(), "failed to encode agents list", "error", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, "Failed to encode agents list", http.StatusInternalServerError)
 	}
 }

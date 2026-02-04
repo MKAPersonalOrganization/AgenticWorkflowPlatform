@@ -5,9 +5,12 @@ import (
 	"testing"
 )
 
-func TestCreateStatisticsInstructor(t *testing.T) {
+func TestNewStatisticsInstructor(t *testing.T) {
 	ctx := context.Background()
-	config := CreateStatisticsInstructor(ctx)
+	config, err := NewStatisticsInstructorConfig(ctx)
+	if err != nil {
+		t.Fatalf("Failed to create statistics instructor config: %v", err)
+	}
 
 	if config.Name != "statistics-instructor" {
 		t.Errorf("Expected agent name 'statistics-instructor', got '%s'", config.Name)
