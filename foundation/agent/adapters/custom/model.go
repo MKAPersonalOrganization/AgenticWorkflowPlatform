@@ -2,142 +2,158 @@ package custom
 
 import (
 	"context"
+	"encoding/json"
 	"iter"
 
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/llm"
 )
 
-// ModelAdapter adapts llm.ChatClient to the agent.Model interface.
+// ModelAdapter adapts llm.LLM to the agent.Model interface.
 type ModelAdapter struct {
-	client llm.ChatClient
+	client   llm.LLM
+	provider string
 }
 
-// NewModelAdapter creates an adapter from an llm.ChatClient.
-func NewModelAdapter(client llm.ChatClient) agent.Model {
-	return &ModelAdapter{client: client}
+// NewModelAdapter creates an adapter from an llm.LLM.
+func NewModelAdapter(client llm.LLM, provider string) agent.Model {
+	return &ModelAdapter{client: client, provider: provider}
 }
 
 // Provider returns the model provider name.
 func (m *ModelAdapter) Provider() string {
-	return m.client.Provider()
+	return m.provider
 }
 
 // Generate produces a response to the given messages.
 func (m *ModelAdapter) Generate(ctx context.Context, req *agent.GenerateRequest) iter.Seq2[*agent.GenerateResponse, error] {
-	// Convert agent.Message to llm.ChatMessage
-	messages := make([]llm.ChatMessage, 0, len(req.Messages))
+	// Convert agent.Message to llm.Message
+	messages := make([]llm.Message, 0, len(req.Messages))
 	for _, msg := range req.Messages {
 		chatMsg := convertToLLMMessage(msg)
 		messages = append(messages, chatMsg)
 	}
 
-	// Build ChatOptions
-	options := &llm.ChatOptions{
-		Temperature:     &req.Temperature,
-		MaxOutputTokens: &req.MaxTokens,
-		TopP:            &req.TopP,
-		StopSequences:   req.StopSequences,
-		Instructions:    req.SystemPrompt,
+	// Build Parameters
+	parameters := llm.Parameters{
+		Temperature:   &req.Temperature,
+		MaxTokens:     req.MaxTokens,
+		TopP:          &req.TopP,
+		StopSequences: req.StopSequences,
 	}
 
-	if req.ModelID != "" {
-		options.ModelID = req.ModelID
-	}
-
-	// Convert tools to llm.AITool
+	// Convert tools to llm.ToolDeclaration
+	var llmTools []llm.ToolDeclaration
 	if len(req.Tools) > 0 {
-		tools := make([]llm.AITool, 0, len(req.Tools))
+		llmTools = make([]llm.ToolDeclaration, 0, len(req.Tools))
 		for _, t := range req.Tools {
-			tools = append(tools, llm.NewAIFunctionTool(
-				t.Name,
-				t.Description,
-				t.Parameters,
-			))
+			var schema *llm.Schema
+			if t.Parameters != nil {
+				data, _ := json.Marshal(t.Parameters)
+				_ = json.Unmarshal(data, &schema)
+			}
+			llmTools = append(llmTools, llm.ToolDeclaration{
+				Name:        t.Name,
+				Description: t.Description,
+				Parameters:  schema,
+			})
 		}
-		options.Tools = tools
 	}
 
-	// Call the underlying client
+	llmReq := &llm.Request{
+		Messages:   messages,
+		System:     req.SystemPrompt,
+		Parameters: &parameters,
+		Tools:      llmTools,
+		Extensions: make(llm.Metadata),
+	}
+
+	llmReq.Extensions["provider"] = m.provider
+	if req.ModelID != "" {
+		llmReq.Extensions["model"] = req.ModelID
+	}
+
+	// Call the underlying model
 	return func(yield func(*agent.GenerateResponse, error) bool) {
-		for update, err := range m.client.GetStreamingResponse(ctx, messages, options) {
+		for resp, err := range m.client.Generate(ctx, llmReq) {
 			if err != nil {
 				yield(nil, err)
 				return
 			}
 
-			// Convert llm.ChatResponseUpdate to agent.GenerateResponse
-			resp := convertToGenerateResponse(update)
-			if !yield(resp, nil) {
+			// Convert llm.Response to agent.GenerateResponse
+			respConverted := convertToGenerateResponse(resp)
+			if !yield(respConverted, nil) {
 				return
 			}
 		}
 	}
 }
 
-// convertToLLMMessage converts agent.Message to llm.ChatMessage.
-func convertToLLMMessage(msg *agent.Message) llm.ChatMessage {
+// convertToLLMMessage converts agent.Message to llm.Message.
+func convertToLLMMessage(msg *agent.Message) llm.Message {
 	if msg == nil {
-		return llm.ChatMessage{}
+		return llm.Message{}
 	}
 
-	role := llm.ChatRole(msg.Role)
+	role := llm.Role(msg.Role)
 
 	// Convert content
-	contents := make([]llm.AIContent, 0, len(msg.Content))
+	contents := make([]llm.Content, 0, len(msg.Content))
 	for _, c := range msg.Content {
 		switch c.Type {
 		case agent.ContentTypeText:
 			contents = append(contents, llm.TextContent{Text: c.Text})
 		case agent.ContentTypeToolCall:
 			if c.ToolCall != nil {
-				contents = append(contents, llm.FunctionCallContent{
-					ToolCallID:   c.ToolCall.ID,
-					Name:         c.ToolCall.Name,
-					RawArguments: c.ToolCall.Arguments,
+				contents = append(contents, llm.FunctionCall{
+					ID:        c.ToolCall.ID,
+					Name:      c.ToolCall.Name,
+					Arguments: json.RawMessage(c.ToolCall.Arguments),
 				})
 			}
 		case agent.ContentTypeToolResult:
 			if c.ToolResult != nil {
-				contents = append(contents, llm.FunctionResultContent{
-					ToolCallID: c.ToolResult.ToolCallID,
-					Result:     c.ToolResult.Output,
-					Error:      c.ToolResult.Error,
+				contents = append(contents, llm.FunctionResult{
+					CallID:  c.ToolResult.ToolCallID,
+					Name:    c.ToolResult.ToolName,
+					Result:  json.RawMessage(c.ToolResult.Output),
+					IsError: c.ToolResult.IsError || c.ToolResult.Error != "",
 				})
 			}
 		}
 	}
 
-	return llm.ChatMessage{
-		Role:     role,
-		Contents: contents,
+	return llm.Message{
+		Role:    role,
+		Content: contents,
 	}
 }
 
-// convertToGenerateResponse converts llm.ChatResponseUpdate to agent.GenerateResponse.
-func convertToGenerateResponse(update llm.ChatResponseUpdate) *agent.GenerateResponse {
-	resp := &agent.GenerateResponse{
+// convertToGenerateResponse converts llm.Response to agent.GenerateResponse.
+func convertToGenerateResponse(resp *llm.Response) *agent.GenerateResponse {
+	agentResp := &agent.GenerateResponse{
 		Content: make([]agent.Content, 0),
 	}
 
 	// Convert content
-	for _, c := range update.Contents {
+	for _, c := range resp.Content {
 		switch c.ContentType() {
 		case "text":
 			if textContent, ok := c.(llm.TextContent); ok {
-				resp.Content = append(resp.Content, agent.Content{
+				agentResp.Content = append(agentResp.Content, agent.Content{
 					Type: agent.ContentTypeText,
 					Text: textContent.Text,
 				})
 			}
-		case "functionCall":
-			if fnCall, ok := c.(llm.FunctionCallContent); ok {
-				resp.Content = append(resp.Content, agent.Content{
+		case "function_call": // Match the new ContentType identifier
+			if fnCall, ok := c.(llm.FunctionCall); ok {
+				agentResp.Content = append(agentResp.Content, agent.Content{
 					Type: agent.ContentTypeToolCall,
 					ToolCall: &agent.ToolCall{
-						ID:        fnCall.ToolCallID,
+						ID:        fnCall.ID,
 						Name:      fnCall.Name,
-						Arguments: fnCall.ArgumentsJSON(),
+						Arguments: string(fnCall.Arguments),
 					},
 				})
 			}
@@ -145,20 +161,20 @@ func convertToGenerateResponse(update llm.ChatResponseUpdate) *agent.GenerateRes
 	}
 
 	// Convert finish reason
-	if update.FinishReason != "" {
-		resp.FinishReason = agent.FinishReason(update.FinishReason)
+	if resp.FinishReason != "" {
+		agentResp.FinishReason = agent.FinishReason(resp.FinishReason)
 	}
 
 	// Convert usage
-	if update.Usage != nil {
-		resp.Usage = &agent.Usage{
-			PromptTokens:     update.Usage.InputTokens,
-			CompletionTokens: update.Usage.OutputTokens,
-			TotalTokens:      update.Usage.TotalTokens,
+	if resp.Usage != nil {
+		agentResp.Usage = &agent.Usage{
+			PromptTokens:     resp.Usage.InputTokens,
+			CompletionTokens: resp.Usage.OutputTokens,
+			TotalTokens:      resp.Usage.TotalTokens,
 		}
 	}
 
-	resp.ModelID = update.Model
+	agentResp.ModelID = resp.Extensions.GetString("model")
 
-	return resp
+	return agentResp
 }

@@ -61,7 +61,7 @@ func (f *EventFactory) TokenUsageReported(
 	messageID string,
 	provider string,
 	model string,
-	usage *llm.UsageDetails,
+	usage *llm.Usage,
 ) *core.TokenUsageReported {
 	return &core.TokenUsageReported{
 		ThreadID:                 threadID,

@@ -18,28 +18,28 @@ func TestEngine_ElicitationFlow(t *testing.T) {
 
 	// Mock Chat Client
 	mockClient := &MockChatClient{
-		streams: [][]llm.ChatResponseUpdate{
+		streams: [][]*llm.Response{
 			// Turn 1: Assistant calls quiz tool
 			{
 				{
-					Contents: []llm.AIContent{
+					Content: []llm.Content{
 						llm.TextContent{Text: "I need input. "},
-						llm.FunctionCallContent{
-							ToolCallID:   "call_1",
-							Name:         "quiz_yes_no",
-							RawArguments: `{"question": "Is the sky blue?"}`,
+						llm.FunctionCall{
+							ID:        "call_1",
+							Name:      "quiz_yes_no",
+							Arguments: json.RawMessage(`{"question": "Is the sky blue?"}`),
 						},
 					},
-					FinishReason: "tool_calls",
+					FinishReason: llm.FinishReasonToolUse,
 				},
 			},
 			// Turn 2: Assistant responds to the input
 			{
 				{
-					Contents: []llm.AIContent{
+					Content: []llm.Content{
 						llm.TextContent{Text: "Thanks! I see you like blue."},
 					},
-					FinishReason: "stop",
+					FinishReason: llm.FinishReasonStop,
 				},
 			},
 		},
@@ -142,17 +142,17 @@ func TestEngine_ElicitationRobustness(t *testing.T) {
 	threadID := "thread-robustness"
 
 	mockClient := &MockChatClient{
-		streams: [][]llm.ChatResponseUpdate{
+		streams: [][]*llm.Response{
 			{
 				{
-					Contents: []llm.AIContent{
-						llm.FunctionCallContent{
-							ToolCallID:   "call_1",
-							Name:         "quiz_yes_no",
-							RawArguments: `{"statement": "Is 2+2=4?"}`, // Using "statement" alias
+					Content: []llm.Content{
+						llm.FunctionCall{
+							ID:        "call_1",
+							Name:      "quiz_yes_no",
+							Arguments: json.RawMessage(`{"statement": "Is 2+2=4?"}`), // Using "statement" alias
 						},
 					},
-					FinishReason: "tool_calls",
+					FinishReason: llm.FinishReasonToolUse,
 				},
 			},
 		},
@@ -211,17 +211,17 @@ func TestEngine_ElicitationOptionsRobustness(t *testing.T) {
 	threadID := "thread-options-robustness"
 
 	mockClient := &MockChatClient{
-		streams: [][]llm.ChatResponseUpdate{
+		streams: [][]*llm.Response{
 			{
 				{
-					Contents: []llm.AIContent{
-						llm.FunctionCallContent{
-							ToolCallID:   "call_1",
-							Name:         "quiz_multiple_choice",
-							RawArguments: `{"question": "What is 2+3?", "options": "4, 5, 6"}`, // String options
+					Content: []llm.Content{
+						llm.FunctionCall{
+							ID:        "call_1",
+							Name:      "quiz_multiple_choice",
+							Arguments: json.RawMessage(`{"question": "What is 2+3?", "options": "4, 5, 6"}`), // String options
 						},
 					},
-					FinishReason: "tool_calls",
+					FinishReason: llm.FinishReasonToolUse,
 				},
 			},
 		},

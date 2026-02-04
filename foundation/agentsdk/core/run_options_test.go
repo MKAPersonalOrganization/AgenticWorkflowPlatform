@@ -74,7 +74,7 @@ func TestDefaultRunOptions(t *testing.T) {
 	assert.Nil(t, opts.AdditionalProperties)
 }
 
-func TestToChatOptionsWithDefaultRunOptions(t *testing.T) {
+func TestToLLMRequestWithDefaultRunOptions(t *testing.T) {
 	t.Parallel()
 	temp := 0.5
 	config := AgentConfig{
@@ -83,17 +83,17 @@ func TestToChatOptionsWithDefaultRunOptions(t *testing.T) {
 		Temperature:  &temp,
 	}
 
-	chatOpts, _, err := ToChatOptionsWithMiddleware(context.Background(), config, []llm.ChatMessage{}, "", DefaultRunOptions())
+	req, _, err := ToLLMRequestWithMiddleware(context.Background(), config, []llm.Message{}, "", DefaultRunOptions())
 	require.NoError(t, err)
 
-	require.NotNil(t, chatOpts)
-	assert.Equal(t, "Test prompt", chatOpts.Instructions)
+	require.NotNil(t, req)
+	assert.Equal(t, "Test prompt", req.System)
 	// DefaultRunOptions has Temperature=1.0, which overrides config's 0.5
-	require.NotNil(t, chatOpts.Temperature)
-	assert.Equal(t, 1.0, *chatOpts.Temperature)
+	require.NotNil(t, req.Parameters.Temperature)
+	assert.Equal(t, 1.0, *req.Parameters.Temperature)
 }
 
-func TestToChatOptionsRunOptionsOverridesConfig(t *testing.T) {
+func TestToLLMRequestRunOptionsOverridesConfig(t *testing.T) {
 	t.Parallel()
 	configTemp := 0.5
 	configMaxTokens := 100
@@ -116,26 +116,25 @@ func TestToChatOptionsRunOptionsOverridesConfig(t *testing.T) {
 		ModelID:     "gpt-4",
 	}
 
-	chatOpts, _, err := ToChatOptionsWithMiddleware(context.Background(), config, []llm.ChatMessage{}, "", runOpts)
+	req, _, err := ToLLMRequestWithMiddleware(context.Background(), config, []llm.Message{}, "", runOpts)
 	require.NoError(t, err)
 
-	require.NotNil(t, chatOpts)
+	require.NotNil(t, req)
 
 	// RunOptions should override config
-	require.NotNil(t, chatOpts.Temperature)
-	assert.Equal(t, 0.9, *chatOpts.Temperature, "Temperature should be overridden by RunOptions")
+	require.NotNil(t, req.Parameters.Temperature)
+	assert.Equal(t, 0.9, *req.Parameters.Temperature, "Temperature should be overridden by RunOptions")
 
-	require.NotNil(t, chatOpts.MaxOutputTokens)
-	assert.Equal(t, 200, *chatOpts.MaxOutputTokens, "MaxTokens should be overridden by RunOptions")
+	assert.Equal(t, 200, req.Parameters.MaxTokens, "MaxTokens should be overridden by RunOptions")
 
-	assert.Equal(t, "gpt-4", chatOpts.ModelID, "ModelID should be overridden by RunOptions")
+	assert.Equal(t, "gpt-4", req.Extensions.GetString("model"), "ModelID should be overridden by RunOptions")
 
 	// TopP should come from config (not in RunOptions)
-	require.NotNil(t, chatOpts.TopP)
-	assert.Equal(t, 0.8, *chatOpts.TopP, "TopP should come from config")
+	require.NotNil(t, req.Parameters.TopP)
+	assert.Equal(t, 0.8, *req.Parameters.TopP, "TopP should come from config")
 }
 
-func TestToChatOptionsPartialOverride(t *testing.T) {
+func TestToLLMRequestPartialOverride(t *testing.T) {
 	t.Parallel()
 	configTemp := 0.5
 	configMaxTokens := 100
@@ -161,29 +160,27 @@ func TestToChatOptionsPartialOverride(t *testing.T) {
 		StopSequences: []string{"run-stop-1", "run-stop-2"},
 	}
 
-	chatOpts, _, err := ToChatOptionsWithMiddleware(context.Background(), config, []llm.ChatMessage{}, "", runOpts)
+	req, _, err := ToLLMRequestWithMiddleware(context.Background(), config, []llm.Message{}, "", runOpts)
 	require.NoError(t, err)
 
-	require.NotNil(t, chatOpts)
+	require.NotNil(t, req)
 
 	// Overridden values
-	require.NotNil(t, chatOpts.Temperature)
-	assert.Equal(t, 0.9, *chatOpts.Temperature)
-	assert.Equal(t, []string{"run-stop-1", "run-stop-2"}, chatOpts.StopSequences)
+	require.NotNil(t, req.Parameters.Temperature)
+	assert.Equal(t, 0.9, *req.Parameters.Temperature)
+	assert.Equal(t, []string{"run-stop-1", "run-stop-2"}, req.Parameters.StopSequences)
 
 	// Config values preserved
-	require.NotNil(t, chatOpts.MaxOutputTokens)
-	assert.Equal(t, 100, *chatOpts.MaxOutputTokens)
-	require.NotNil(t, chatOpts.TopP)
-	assert.Equal(t, 0.8, *chatOpts.TopP)
-	require.NotNil(t, chatOpts.FrequencyPenalty)
-	assert.Equal(t, 0.2, *chatOpts.FrequencyPenalty)
-	assert.Equal(t, "gpt-3.5", chatOpts.ModelID)
-	require.NotNil(t, chatOpts.Seed)
-	assert.Equal(t, int64(123), *chatOpts.Seed)
+	assert.Equal(t, 100, req.Parameters.MaxTokens)
+	require.NotNil(t, req.Parameters.TopP)
+	assert.Equal(t, 0.8, *req.Parameters.TopP)
+	require.NotNil(t, req.Parameters.FrequencyPenalty)
+	assert.Equal(t, 0.2, *req.Parameters.FrequencyPenalty)
+	assert.Equal(t, "gpt-3.5", req.Extensions.GetString("model"))
+	assert.Equal(t, int64(123), req.Extensions["seed"])
 }
 
-func TestToChatOptionsAdditionalProperties(t *testing.T) {
+func TestToLLMRequestAdditionalProperties(t *testing.T) {
 	t.Parallel()
 	config := AgentConfig{
 		Name:         "test-agent",
@@ -198,17 +195,17 @@ func TestToChatOptionsAdditionalProperties(t *testing.T) {
 		},
 	}
 
-	chatOpts, _, err := ToChatOptionsWithMiddleware(context.Background(), config, []llm.ChatMessage{}, "", runOpts)
+	req, _, err := ToLLMRequestWithMiddleware(context.Background(), config, []llm.Message{}, "", runOpts)
 	require.NoError(t, err)
 
-	require.NotNil(t, chatOpts)
-	require.NotNil(t, chatOpts.AdditionalProperties)
-	assert.Equal(t, "value1", chatOpts.AdditionalProperties["customKey1"])
-	assert.Equal(t, 42, chatOpts.AdditionalProperties["customKey2"])
-	assert.Equal(t, true, chatOpts.AdditionalProperties["customKey3"])
+	require.NotNil(t, req)
+	require.NotNil(t, req.Extensions)
+	assert.Equal(t, "value1", req.Extensions["customKey1"])
+	assert.Equal(t, 42, req.Extensions["customKey2"])
+	assert.Equal(t, true, req.Extensions["customKey3"])
 }
 
-func TestToChatOptionsAllParameters(t *testing.T) {
+func TestToLLMRequestAllParameters(t *testing.T) {
 	t.Parallel()
 	configTemp := 0.5
 	configMaxTokens := 100
@@ -251,26 +248,23 @@ func TestToChatOptionsAllParameters(t *testing.T) {
 		},
 	}
 
-	chatOpts, _, err := ToChatOptionsWithMiddleware(context.Background(), config, []llm.ChatMessage{}, "", runOpts)
+	req, _, err := ToLLMRequestWithMiddleware(context.Background(), config, []llm.Message{}, "", runOpts)
 	require.NoError(t, err)
 
-	require.NotNil(t, chatOpts)
+	require.NotNil(t, req)
 
 	// All values should come from runOpts
-	require.NotNil(t, chatOpts.Temperature)
-	assert.Equal(t, 0.9, *chatOpts.Temperature)
-	require.NotNil(t, chatOpts.MaxOutputTokens)
-	assert.Equal(t, 200, *chatOpts.MaxOutputTokens)
-	require.NotNil(t, chatOpts.TopP)
-	assert.Equal(t, 0.95, *chatOpts.TopP)
-	require.NotNil(t, chatOpts.FrequencyPenalty)
-	assert.Equal(t, 0.5, *chatOpts.FrequencyPenalty)
-	require.NotNil(t, chatOpts.PresencePenalty)
-	assert.Equal(t, 0.3, *chatOpts.PresencePenalty)
-	assert.Equal(t, []string{"run-stop-1", "run-stop-2"}, chatOpts.StopSequences)
-	assert.Equal(t, "gpt-4", chatOpts.ModelID)
-	require.NotNil(t, chatOpts.Seed)
-	assert.Equal(t, int64(456), *chatOpts.Seed)
-	require.NotNil(t, chatOpts.AdditionalProperties)
-	assert.Equal(t, "value", chatOpts.AdditionalProperties["custom"])
+	require.NotNil(t, req.Parameters.Temperature)
+	assert.Equal(t, 0.9, *req.Parameters.Temperature)
+	assert.Equal(t, 200, req.Parameters.MaxTokens)
+	require.NotNil(t, req.Parameters.TopP)
+	assert.Equal(t, 0.95, *req.Parameters.TopP)
+	require.NotNil(t, req.Parameters.FrequencyPenalty)
+	assert.Equal(t, 0.5, *req.Parameters.FrequencyPenalty)
+	require.NotNil(t, req.Parameters.PresencePenalty)
+	assert.Equal(t, 0.3, *req.Parameters.PresencePenalty)
+	assert.Equal(t, []string{"run-stop-1", "run-stop-2"}, req.Parameters.StopSequences)
+	assert.Equal(t, "gpt-4", req.Extensions.GetString("model"))
+	assert.Equal(t, int64(456), req.Extensions["seed"])
+	assert.Equal(t, "value", req.Extensions["custom"])
 }

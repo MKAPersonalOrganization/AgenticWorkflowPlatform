@@ -1,6 +1,7 @@
 package core_test
 
 import (
+	"encoding/json"
 	"testing"
 
 	"school-with-ai/foundation/agentsdk/core"
@@ -12,13 +13,12 @@ func TestToolCallAccumulator_NewToolCall(t *testing.T) {
 	acc := core.NewToolCallAccumulator()
 
 	// First update starts a new tool call
-	update := llm.ChatResponseUpdate{
-		ToolCallIndex: 0,
-		ToolCallID:    "call_123",
-		Contents: []llm.AIContent{llm.FunctionCallContent{
-			ToolCallID: "call_123",
-			Name:       "get_weather",
+	update := &llm.Response{
+		Content: []llm.Content{llm.FunctionCall{
+			ID:   "call_123",
+			Name: "get_weather",
 		}},
+		Extensions: llm.Metadata{"index": 0},
 	}
 
 	updates, ok := acc.ProcessUpdate(update)
@@ -50,21 +50,20 @@ func TestToolCallAccumulator_ArgumentStreaming(t *testing.T) {
 	acc := core.NewToolCallAccumulator()
 
 	// Start tool call
-	acc.ProcessUpdate(llm.ChatResponseUpdate{
-		ToolCallIndex: 0,
-		ToolCallID:    "call_123",
-		Contents: []llm.AIContent{llm.FunctionCallContent{
-			ToolCallID: "call_1",
-			Name:       "get_weather",
+	acc.ProcessUpdate(&llm.Response{
+		Content: []llm.Content{llm.FunctionCall{
+			ID:   "call_1",
+			Name: "get_weather",
 		}},
+		Extensions: llm.Metadata{"index": 0},
 	})
 
 	// Stream arguments in chunks
-	updates1, ok := acc.ProcessUpdate(llm.ChatResponseUpdate{
-		ToolCallIndex: 0,
-		Contents: []llm.AIContent{llm.FunctionCallContent{
-			RawArguments: `{"city":`,
+	updates1, ok := acc.ProcessUpdate(&llm.Response{
+		Content: []llm.Content{llm.FunctionCall{
+			Arguments: json.RawMessage(`{"city":`),
 		}},
+		Extensions: llm.Metadata{"index": 0},
 	})
 	if !ok {
 		t.Fatal("expected update to be processed")
@@ -81,11 +80,11 @@ func TestToolCallAccumulator_ArgumentStreaming(t *testing.T) {
 		t.Errorf("unexpected args delta: %s", update1.ArgsDelta)
 	}
 
-	updates2, _ := acc.ProcessUpdate(llm.ChatResponseUpdate{
-		ToolCallIndex: 0,
-		Contents: []llm.AIContent{llm.FunctionCallContent{
-			RawArguments: `"London"}`,
+	updates2, _ := acc.ProcessUpdate(&llm.Response{
+		Content: []llm.Content{llm.FunctionCall{
+			Arguments: json.RawMessage(`"London"}`),
 		}},
+		Extensions: llm.Metadata{"index": 0},
 	})
 	if len(updates2) != 1 {
 		t.Fatalf("expected 1 update, got %d", len(updates2))
@@ -111,35 +110,33 @@ func TestToolCallAccumulator_MultipleToolCalls(t *testing.T) {
 	acc := core.NewToolCallAccumulator()
 
 	// First tool call
-	acc.ProcessUpdate(llm.ChatResponseUpdate{
-		ToolCallIndex: 0,
-		ToolCallID:    "call_1",
-		Contents: []llm.AIContent{llm.FunctionCallContent{
-			ToolCallID: "call_1",
-			Name:       "get_weather",
+	acc.ProcessUpdate(&llm.Response{
+		Content: []llm.Content{llm.FunctionCall{
+			ID:   "call_1",
+			Name: "get_weather",
 		}},
+		Extensions: llm.Metadata{"index": 0},
 	})
-	acc.ProcessUpdate(llm.ChatResponseUpdate{
-		ToolCallIndex: 0,
-		Contents: []llm.AIContent{llm.FunctionCallContent{
-			RawArguments: `{"city":"London"}`,
+	acc.ProcessUpdate(&llm.Response{
+		Content: []llm.Content{llm.FunctionCall{
+			Arguments: json.RawMessage(`{"city":"London"}`),
 		}},
+		Extensions: llm.Metadata{"index": 0},
 	})
 
 	// Second tool call
-	acc.ProcessUpdate(llm.ChatResponseUpdate{
-		ToolCallIndex: 1,
-		ToolCallID:    "call_2",
-		Contents: []llm.AIContent{llm.FunctionCallContent{
-			ToolCallID: "call_2",
-			Name:       "calculate",
+	acc.ProcessUpdate(&llm.Response{
+		Content: []llm.Content{llm.FunctionCall{
+			ID:   "call_2",
+			Name: "calculate",
 		}},
+		Extensions: llm.Metadata{"index": 1},
 	})
-	acc.ProcessUpdate(llm.ChatResponseUpdate{
-		ToolCallIndex: 1,
-		Contents: []llm.AIContent{llm.FunctionCallContent{
-			RawArguments: `{"expr":"2+2"}`,
+	acc.ProcessUpdate(&llm.Response{
+		Content: []llm.Content{llm.FunctionCall{
+			Arguments: json.RawMessage(`{"expr":"2+2"}`),
 		}},
+		Extensions: llm.Metadata{"index": 1},
 	})
 
 	if acc.Count() != 2 {
@@ -160,13 +157,12 @@ func TestToolCallAccumulator_HasToolCalls(t *testing.T) {
 		t.Error("expected HasToolCalls to be false initially")
 	}
 
-	acc.ProcessUpdate(llm.ChatResponseUpdate{
-		ToolCallIndex: 0,
-		ToolCallID:    "call_1",
-		Contents: []llm.AIContent{llm.FunctionCallContent{
-			ToolCallID: "call_1",
-			Name:       "get_weather",
+	acc.ProcessUpdate(&llm.Response{
+		Content: []llm.Content{llm.FunctionCall{
+			ID:   "call_1",
+			Name: "get_weather",
 		}},
+		Extensions: llm.Metadata{"index": 0},
 	})
 
 	if !acc.HasToolCalls() {
@@ -179,11 +175,11 @@ func TestToolCallAccumulator_UnknownIndex(t *testing.T) {
 	acc := core.NewToolCallAccumulator()
 
 	// Update for unknown index should not be processed
-	_, ok := acc.ProcessUpdate(llm.ChatResponseUpdate{
-		ToolCallIndex: 5, // No tool call at this index
-		Contents: []llm.AIContent{llm.FunctionCallContent{
-			RawArguments: `{"foo":"bar"}`,
+	_, ok := acc.ProcessUpdate(&llm.Response{
+		Content: []llm.Content{llm.FunctionCall{
+			Arguments: json.RawMessage(`{"foo":"bar"}`),
 		}},
+		Extensions: llm.Metadata{"index": 5}, // No tool call at this index
 	})
 
 	if ok {

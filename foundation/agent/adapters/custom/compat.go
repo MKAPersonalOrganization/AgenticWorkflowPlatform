@@ -95,8 +95,8 @@ func argsToJSON(args any) string {
 	return string(data)
 }
 
-// convertCoreMsgsToAgent converts llm.ChatMessage to agent.Message.
-func convertCoreMsgsToAgent(msgs []llm.ChatMessage) []*agent.Message {
+// convertCoreMsgsToAgent converts llm.Message to agent.Message.
+func convertCoreMsgsToAgent(msgs []llm.Message) []*agent.Message {
 	result := make([]*agent.Message, len(msgs))
 	for i, msg := range msgs {
 		result[i] = &agent.Message{

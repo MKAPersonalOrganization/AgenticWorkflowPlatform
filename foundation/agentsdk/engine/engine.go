@@ -12,8 +12,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// ChatClient is the LLM client interface.
-type ChatClient = llm.ChatClient
+// ChatClient is the LLM client interface (aliased for convenience).
+type ChatClient = llm.LLM
 
 // AgentProvider provides agent configurations by name.
 type AgentProvider interface {
@@ -755,13 +755,15 @@ func (s *executionState) streamAndProcessLLMResponse(llmContext *LLMContext) err
 		s.threadID, s.messageID, llmContext.RequestCtx,
 	)
 
-	streamIter := s.engine.chatClient.GetStreamingResponse(s.ctx, llmContext.Messages, llmContext.Options)
+	req := llmContext.Request
+
+	streamIter := s.engine.chatClient.Generate(s.ctx, req)
 
 	res, err := s.agent.Stream.Process(s.ctx, streamIter, ProcessParams{
 		ThreadID:  s.threadID,
 		MessageID: s.messageID,
-		Provider:  s.engine.chatClient.Provider(),
-		Model:     string(llmContext.Options.ModelID),
+		Provider:  req.Extensions.GetString("provider"),
+		Model:     req.Extensions.GetString("model"),
 	}, s.observer.yield) // Use the already wrapped yield
 	if err != nil {
 		return err

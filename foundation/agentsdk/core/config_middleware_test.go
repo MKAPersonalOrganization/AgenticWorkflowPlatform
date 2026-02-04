@@ -44,8 +44,8 @@ func (m *MockTool) Invoke(ctx ToolContext, args any) (any, error) {
 	return map[string]any{"result": "mock result"}, nil
 }
 
-// TestToChatOptionsWithMiddleware_WithoutMiddleware ensures backward compatibility.
-func TestToChatOptionsWithMiddleware_WithoutMiddleware(t *testing.T) {
+// TestToLLMRequestWithMiddleware_WithoutMiddleware ensures backward compatibility.
+func TestToLLMRequestWithMiddleware_WithoutMiddleware(t *testing.T) {
 	t.Parallel()
 	config := AgentConfig{
 		Name:         "test-agent",
@@ -56,17 +56,17 @@ func TestToChatOptionsWithMiddleware_WithoutMiddleware(t *testing.T) {
 
 	runOpts := RunOptions{}
 
-	opts, _, err := ToChatOptionsWithMiddleware(context.Background(), config, []llm.ChatMessage{}, "", runOpts)
+	req, _, err := ToLLMRequestWithMiddleware(context.Background(), config, []llm.Message{}, "", runOpts)
 	if err != nil {
-		t.Fatalf("ToChatOptionsWithMiddleware failed: %v", err)
+		t.Fatalf("ToLLMRequestWithMiddleware failed: %v", err)
 	}
 
-	if opts.Instructions != "You are a test assistant" {
-		t.Errorf("Expected system prompt, got %s", opts.Instructions)
+	if req.System != "You are a test assistant" {
+		t.Errorf("Expected system prompt, got %s", req.System)
 	}
 
-	if len(opts.Tools) != 1 {
-		t.Errorf("Expected 1 tool, got %d", len(opts.Tools))
+	if len(req.Tools) != 1 {
+		t.Errorf("Expected 1 tool, got %d", len(req.Tools))
 	}
 }
 
@@ -80,7 +80,7 @@ func TestApplyMiddleware_NoMiddleware(t *testing.T) {
 		Middleware:   []Middleware{}, // No middleware
 	}
 
-	messages := []llm.ChatMessage{
+	messages := []llm.Message{
 		llm.NewUserMessage("Hello"),
 	}
 
@@ -119,7 +119,7 @@ func TestApplyMiddleware_WithToolInjection(t *testing.T) {
 		Middleware:   []Middleware{toolAdderMiddleware},
 	}
 
-	messages := []llm.ChatMessage{
+	messages := []llm.Message{
 		llm.NewUserMessage("Hello"),
 	}
 
@@ -165,7 +165,7 @@ func TestApplyMiddleware_WithSystemPromptAddition(t *testing.T) {
 		Middleware:   []Middleware{promptAdderMiddleware},
 	}
 
-	messages := []llm.ChatMessage{
+	messages := []llm.Message{
 		llm.NewUserMessage("Hello"),
 	}
 
@@ -198,7 +198,7 @@ func TestApplyMiddleware_Termination(t *testing.T) {
 		Middleware: []Middleware{terminatorMiddleware},
 	}
 
-	messages := []llm.ChatMessage{
+	messages := []llm.Message{
 		llm.NewUserMessage("Hello"),
 	}
 
@@ -216,13 +216,13 @@ func TestApplyMiddleware_Termination(t *testing.T) {
 	}
 }
 
-// TestToChatOptionsWithMiddleware tests the integrated middleware flow.
-func TestToChatOptionsWithMiddleware(t *testing.T) {
+// TestToLLMRequestWithMiddleware tests the integrated middleware flow.
+func TestToLLMRequestWithMiddleware(t *testing.T) {
 	t.Parallel()
 	// Create middleware that adds tool and system prompt
 	enrichmentMiddleware := MiddlewareFunc(func(ctx context.Context, reqCtx *RequestContext, next NextHandler) error {
 		reqCtx.AddTool(NewMockTool("middleware_tool", "Added by middleware"))
-		reqCtx.AddSystemPrompt("\n\nNote: Middleware is active.")
+		reqCtx.AddSystemPrompt("Note: Middleware is active.")
 
 		return next(ctx, reqCtx)
 	})
@@ -234,25 +234,25 @@ func TestToChatOptionsWithMiddleware(t *testing.T) {
 		Middleware:   []Middleware{enrichmentMiddleware},
 	}
 
-	messages := []llm.ChatMessage{
+	messages := []llm.Message{
 		llm.NewUserMessage("Test message"),
 	}
 
-	opts, reqCtx, err := ToChatOptionsWithMiddleware(context.Background(), config, messages, "", RunOptions{})
+	req, reqCtx, err := ToLLMRequestWithMiddleware(context.Background(), config, messages, "", RunOptions{})
 	if err != nil {
-		t.Fatalf("ToChatOptionsWithMiddleware failed: %v", err)
+		t.Fatalf("ToLLMRequestWithMiddleware failed: %v", err)
 	}
 
 	// Check system prompt was augmented
-	// Note: Current implementation adds \n\n\n\n between base and additions
-	expectedPrompt := "Base prompt\n\n\n\nNote: Middleware is active."
-	if opts.Instructions != expectedPrompt {
-		t.Errorf("Expected augmented prompt, got %s", opts.Instructions)
+	// Note: Current implementation adds \n\n between base and additions
+	expectedPrompt := "Base prompt\n\nNote: Middleware is active."
+	if req.System != expectedPrompt {
+		t.Errorf("Expected augmented prompt, got %q", req.System)
 	}
 
 	// Check tools were augmented
-	if len(opts.Tools) != 2 {
-		t.Errorf("Expected 2 tools, got %d", len(opts.Tools))
+	if len(req.Tools) != 2 {
+		t.Errorf("Expected 2 tools, got %d", len(req.Tools))
 	}
 
 	// Verify reqCtx is returned correctly
@@ -265,8 +265,8 @@ func TestToChatOptionsWithMiddleware(t *testing.T) {
 	}
 }
 
-// TestToChatOptionsWithMiddleware_Termination tests early termination.
-func TestToChatOptionsWithMiddleware_Termination(t *testing.T) {
+// TestToLLMRequestWithMiddleware_Termination tests early termination.
+func TestToLLMRequestWithMiddleware_Termination(t *testing.T) {
 	t.Parallel()
 	terminatorMiddleware := MiddlewareFunc(func(ctx context.Context, reqCtx *RequestContext, next NextHandler) error {
 		reqCtx.SetTerminate()
@@ -279,17 +279,17 @@ func TestToChatOptionsWithMiddleware_Termination(t *testing.T) {
 		Middleware: []Middleware{terminatorMiddleware},
 	}
 
-	messages := []llm.ChatMessage{
+	messages := []llm.Message{
 		llm.NewUserMessage("Test"),
 	}
 
-	opts, reqCtx, err := ToChatOptionsWithMiddleware(context.Background(), config, messages, "", RunOptions{})
+	req, reqCtx, err := ToLLMRequestWithMiddleware(context.Background(), config, messages, "", RunOptions{})
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	if opts == nil {
-		t.Fatal("Expected opts to be returned even with termination")
+	if req == nil {
+		t.Fatal("Expected req to be returned even with termination")
 	}
 
 	if !reqCtx.Terminate {
@@ -315,7 +315,7 @@ func TestApplyMiddleware_ConfigParameters(t *testing.T) {
 		Middleware:  []Middleware{},
 	}
 
-	messages := []llm.ChatMessage{
+	messages := []llm.Message{
 		llm.NewUserMessage("Test"),
 	}
 
@@ -362,7 +362,7 @@ func TestApplyMiddleware_RunOptionsOverride(t *testing.T) {
 		ModelID:     runModel,
 	}
 
-	messages := []llm.ChatMessage{
+	messages := []llm.Message{
 		llm.NewUserMessage("Test"),
 	}
 
@@ -408,7 +408,7 @@ func TestApplyMiddleware_MultipleMiddleware(t *testing.T) {
 		Middleware: []Middleware{middleware1, middleware2},
 	}
 
-	messages := []llm.ChatMessage{
+	messages := []llm.Message{
 		llm.NewUserMessage("Test"),
 	}
 

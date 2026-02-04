@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"maps"
 
@@ -76,81 +77,94 @@ func DefaultConfig(name string) AgentConfig {
 	}
 }
 
-// ToAITools converts agent.Tool slice to llm.AITool slice for ChatClient.
-func ToAITools(tools []Tool) []llm.AITool {
-	result := make([]llm.AITool, len(tools))
+// ToToolDeclarations converts agent.Tool slice to llm.ToolDeclaration slice for ChatClient.
+func ToToolDeclarations(tools []Tool) []llm.ToolDeclaration {
+	result := make([]llm.ToolDeclaration, len(tools))
 	for i, t := range tools {
-		result[i] = llm.NewAIFunctionTool(
-			t.Name(),
-			t.Description(),
-			t.Parameters(),
-		)
+		parameters := t.Parameters()
+		var schema *llm.Schema
+		if parameters != nil {
+			// Convert map[string]any to *llm.Schema
+			data, _ := json.Marshal(parameters)
+			_ = json.Unmarshal(data, &schema)
+		}
+
+		result[i] = llm.ToolDeclaration{
+			Name:        t.Name(),
+			Description: t.Description(),
+			Parameters:  schema,
+		}
 	}
 
 	return result
 }
 
-// ToChatOptionsWithMiddleware builds ChatOptions from agent configuration and run options,
-// applying middleware transformations. This is the middleware-aware version of ToChatOptions.
+// ToLLMRequestWithMiddleware builds llm.Request from agent configuration and run options,
+// applying middleware transformations. This is the middleware-aware version of building a request.
 // It executes the middleware chain to collect additional tools and system prompt modifications.
-// Returns the ChatOptions and the RequestContext (which may have Terminate=true if middleware
+// Returns the llm.Request and the RequestContext (which may have Terminate=true if middleware
 // short-circuited).
-func ToChatOptionsWithMiddleware(ctx context.Context, config AgentConfig, messages []llm.ChatMessage, threadID string, runOpts RunOptions) (*llm.ChatOptions, *RequestContext, error) {
+func ToLLMRequestWithMiddleware(ctx context.Context, config AgentConfig, messages []llm.Message, threadID string, runOpts RunOptions) (*llm.Request, *RequestContext, error) {
 	// Apply middleware to get the request context
 	reqCtx, err := ApplyMiddleware(ctx, config, messages, threadID, runOpts)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// Build ChatOptions from the middleware-modified request context
-	opts := &llm.ChatOptions{
-		Instructions: reqCtx.GetEffectiveSystemPrompt(),
-		Tools:        ToAITools(reqCtx.GetEffectiveTools()),
-		ToolMode:     llm.ToolModeAuto,
-	}
+	// Build Parameters
+	params := &llm.Parameters{}
 
 	// Apply config parameters from request context
 	if reqCtx.Config.Temperature != nil {
-		opts.Temperature = reqCtx.Config.Temperature
+		params.Temperature = reqCtx.Config.Temperature
 	}
 	if reqCtx.Config.MaxTokens != nil {
-		opts.MaxOutputTokens = reqCtx.Config.MaxTokens
+		params.MaxTokens = *reqCtx.Config.MaxTokens
 	}
 	if reqCtx.Config.TopP != nil {
-		opts.TopP = reqCtx.Config.TopP
+		params.TopP = reqCtx.Config.TopP
 	}
 	if reqCtx.Config.FrequencyPenalty != nil {
-		opts.FrequencyPenalty = reqCtx.Config.FrequencyPenalty
+		params.FrequencyPenalty = reqCtx.Config.FrequencyPenalty
 	}
 	if reqCtx.Config.PresencePenalty != nil {
-		opts.PresencePenalty = reqCtx.Config.PresencePenalty
+		params.PresencePenalty = reqCtx.Config.PresencePenalty
 	}
 	if reqCtx.Config.StopSequences != nil {
-		opts.StopSequences = make([]string, len(reqCtx.Config.StopSequences))
-		copy(opts.StopSequences, reqCtx.Config.StopSequences)
+		params.StopSequences = make([]string, len(reqCtx.Config.StopSequences))
+		copy(params.StopSequences, reqCtx.Config.StopSequences)
 	}
+
+	// Extensions
+	extensions := llm.Metadata{}
 	if reqCtx.Config.ModelID != "" {
-		opts.ModelID = reqCtx.Config.ModelID
+		extensions["model"] = reqCtx.Config.ModelID
 	}
 	if reqCtx.Config.Seed != nil {
-		opts.Seed = reqCtx.Config.Seed
+		extensions["seed"] = *reqCtx.Config.Seed
 	}
 
 	// Merge additional properties from run options
 	if len(runOpts.AdditionalProperties) > 0 {
-		if opts.AdditionalProperties == nil {
-			opts.AdditionalProperties = make(map[string]any)
-		}
-		maps.Copy(opts.AdditionalProperties, runOpts.AdditionalProperties)
+		maps.Copy(extensions, runOpts.AdditionalProperties)
 	}
 
-	return opts, reqCtx, nil
+	// Build llm.Request
+	req := &llm.Request{
+		Messages:   messages,
+		System:     reqCtx.GetEffectiveSystemPrompt(),
+		Tools:      ToToolDeclarations(reqCtx.GetEffectiveTools()),
+		Parameters: params,
+		Extensions: extensions,
+	}
+
+	return req, reqCtx, nil
 }
 
 // ApplyMiddleware executes the middleware chain on initial request context
 // to collect additional tools and system prompt modifications. This is called
 // before the LLM request to gather middleware contributions.
-func ApplyMiddleware(ctx context.Context, config AgentConfig, messages []llm.ChatMessage, threadID string, runOpts RunOptions) (*RequestContext, error) {
+func ApplyMiddleware(ctx context.Context, config AgentConfig, messages []llm.Message, threadID string, runOpts RunOptions) (*RequestContext, error) {
 	// Build initial request context with minimal config
 	initialConfig := &AgentConfig{}
 	reqCtx := NewRequestContext(threadID, messages, config.SystemPrompt, config.Tools, initialConfig)

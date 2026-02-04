@@ -2,92 +2,71 @@ package llm
 
 import "encoding/json"
 
-// AIContent is the base interface for all content types in a chat message.
+// Content is the base interface for all content types in a chat message.
 // Messages can contain multiple content items of different types.
-type AIContent interface {
+type Content interface {
 	// ContentType returns a discriminator string identifying the content type.
 	ContentType() string
+	isContent() // Marker method to restrict implementations
 }
 
 // TextContent represents plain text content in a message.
 type TextContent struct {
-	Text string `json:"text"`
+	Text string
 }
 
-// ContentType implements AIContent.
-func (t TextContent) ContentType() string { return "text" }
+// ContentType implements Content.
+func (TextContent) ContentType() string { return "text" }
+func (TextContent) isContent()          {}
 
-// FunctionCallContent represents a function/tool call request from the model.
-type FunctionCallContent struct {
-	// ToolCallID is the unique identifier for this function call.
-	ToolCallID string `json:"toolCallId"`
-
-	// Name is the name of the function to call.
-	Name string `json:"name"`
-
-	// Arguments contains the parsed function arguments.
-	Arguments map[string]any `json:"arguments,omitempty"`
-
-	// RawArguments contains the raw JSON string of arguments.
-	RawArguments string `json:"argumentsJson,omitempty"`
+// BinaryContent is binary data with MIME type.
+type BinaryContent struct {
+	Data     []byte
+	MimeType string
+	Name     string // Optional filename
 }
 
-// ContentType implements AIContent.
-func (f FunctionCallContent) ContentType() string { return "functionCall" }
+// ContentType implements Content.
+func (BinaryContent) ContentType() string { return "binary" }
+func (BinaryContent) isContent()          {}
 
-// ArgumentsJSON returns the arguments as a JSON string.
-func (f FunctionCallContent) ArgumentsJSON() string {
-	if f.RawArguments != "" {
-		return f.RawArguments
-	}
-	if f.Arguments == nil {
-		return "{}"
-	}
-	data, err := json.Marshal(f.Arguments)
-	if err != nil {
-		return "{}"
-	}
-
-	return string(data)
+// JSONContent is structured JSON data.
+type JSONContent struct {
+	Data json.RawMessage
 }
 
-// FunctionResultContent represents the result of a function call execution.
-type FunctionResultContent struct {
-	// ToolCallID references the FunctionCallContent.ToolCallID that this is a result for.
-	ToolCallID string `json:"toolCallId"`
+// ContentType implements Content.
+func (JSONContent) ContentType() string { return "json" }
+func (JSONContent) isContent()          {}
 
-	// Name is the name of the function to call.
-	Name string `json:"name,omitempty"`
-
-	// Result contains the function result, typically as a JSON string.
-	Result string `json:"result"`
-
-	// Error contains an error message if the function call failed.
-	Error string `json:"error,omitempty"`
+// FunctionCall represents a request to invoke a function.
+type FunctionCall struct {
+	ID        string
+	Name      string
+	Arguments json.RawMessage
 }
 
-// ContentType implements AIContent.
-func (f FunctionResultContent) ContentType() string { return "functionResult" }
+// ContentType implements Content.
+func (FunctionCall) ContentType() string { return "function_call" }
+func (FunctionCall) isContent()          {}
 
-// IsError returns true if the function result represents an error.
-func (f FunctionResultContent) IsError() bool {
-	return f.Error != ""
+// FunctionResult is the result of a function invocation.
+type FunctionResult struct {
+	CallID  string
+	Name    string
+	Result  json.RawMessage
+	IsError bool
 }
 
-// UsageContent represents token usage information.
-type UsageContent struct {
-	InputTokens  int `json:"inputTokens"`
-	OutputTokens int `json:"outputTokens"`
-	TotalTokens  int `json:"totalTokens"`
-}
+// ContentType implements Content.
+func (FunctionResult) ContentType() string { return "function_result" }
+func (FunctionResult) isContent()          {}
 
-// ContentType implements AIContent.
-func (u UsageContent) ContentType() string { return "usage" }
-
-// Ensure all content types implement AIContent at compile time.
+// Ensure all content types implement Content at compile time.
 var (
-	_ AIContent = TextContent{}
-	_ AIContent = FunctionCallContent{}
-	_ AIContent = FunctionResultContent{}
-	_ AIContent = UsageContent{}
+	_ Content = TextContent{}
+	_ Content = BinaryContent{}
+	_ Content = JSONContent{}
+	_ Content = FunctionCall{}
+	_ Content = FunctionResult{}
 )
