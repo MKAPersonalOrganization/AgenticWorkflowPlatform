@@ -67,6 +67,7 @@ const (
 	FinishReasonToolCalls FinishReason = "tool_calls" // Tool calling required
 	FinishReasonError     FinishReason = "error"      // Generation error
 	FinishReasonCancelled FinishReason = "cancelled"  // User cancelled
+	FinishReasonHandoff   FinishReason = "handoff"    // Agent transfer
 )
 
 // Usage tracks token consumption.

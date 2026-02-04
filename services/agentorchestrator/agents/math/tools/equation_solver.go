@@ -1,10 +1,12 @@
 package tools
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
-	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/agent"
 )
 
 // EquationSolverArgs represents the arguments for equation solver tool.
@@ -29,7 +31,7 @@ func (e *EquationSolverTool) Description() string {
 	return "Solve algebraic equations for a given variable. Supports linear, quadratic, and simple polynomial equations."
 }
 
-func (e *EquationSolverTool) Parameters() map[string]any {
+func (e *EquationSolverTool) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -46,9 +48,9 @@ func (e *EquationSolverTool) Parameters() map[string]any {
 	}
 }
 
-func (e *EquationSolverTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (e *EquationSolverTool) Execute(ctx context.Context, tctx *agent.ToolContext) (*agent.ToolResult, error) {
 	var params EquationSolverArgs
-	if err := core.UnmarshalArgs(args, &params); err != nil {
+	if err := agent.UnmarshalToolArgs(tctx.Arguments, &params); err != nil {
 		return nil, fmt.Errorf("failed to parse equation solver args: %w", err)
 	}
 
@@ -58,7 +60,22 @@ func (e *EquationSolverTool) Invoke(ctx core.ToolContext, args any) (any, error)
 
 	// Solve equation and return result as map
 	solution := solveEquation(params.Equation, params.Variable)
-	return solution, nil
+
+	// Convert solution to JSON string for ToolResult
+	output, err := json.Marshal(solution)
+	if err != nil {
+		return &agent.ToolResult{
+			ToolCallID: tctx.ToolCallID,
+			Output:     fmt.Sprintf("error marshaling solution: %v", err),
+			IsError:    true,
+		}, nil
+	}
+
+	return &agent.ToolResult{
+		ToolCallID: tctx.ToolCallID,
+		Output:     string(output),
+		IsError:    false,
+	}, nil
 }
 
 func solveEquation(equation, variable string) map[string]any {

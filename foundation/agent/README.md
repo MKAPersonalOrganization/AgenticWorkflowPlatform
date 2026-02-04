@@ -2,19 +2,64 @@
 
 This package provides framework-agnostic interfaces for building AI agents in the SchoolWithAI application.
 
-## Purpose
+## Architecture
 
-The agent abstraction layer decouples the application from specific agent framework implementations, enabling:
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Application Layer                        │
+│  (Handlers, Services, Orchestration)                        │
+│                         │                                   │
+│                         ▼                                   │
+│              ┌─────────────────────┐                        │
+│              │   agent.Runner      │  ← Main Entry Point    │
+│              │   agent.Agent       │                        │
+│              │   agent.Event       │                        │
+│              └─────────────────────┘                        │
+└─────────────────────────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     Adapter Layer                            │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
+│  │   custom/   │  │   adkgo/    │  │   blades/   │          │
+│  │  (agentsdk) │  │  (ADK-Go)   │  │  (Blades)   │          │
+│  └─────────────┘  └─────────────┘  └─────────────┘          │
+└─────────────────────────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   Framework Layer                            │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
+│  │  agentsdk   │  │  Google     │  │  Go-Kratos  │          │
+│  │   (custom)  │  │  ADK-Go     │  │  Blades     │          │
+│  └─────────────┘  └─────────────┘  └─────────────┘          │
+└─────────────────────────────────────────────────────────────┘
+```
 
-1. **Framework Flexibility**: Switch between custom agentsdk, ADK-Go, or Blades without changing application code
-2. **Clean Architecture**: Handlers and services depend only on interfaces, not implementations
-3. **Testability**: Mock agent behavior without running full LLM workflows
-4. **Future-Proofing**: Add new agent frameworks by implementing adapters
+## Design Principles
+
+Following ADRs 001-004:
+
+1. **Agent Interface as Sole Access Point** (ADR 001)
+   - Application code depends only on `foundation/agent` interfaces
+   - No direct imports from framework packages
+
+2. **Service Layer Orchestration** (ADR 002)
+   - Run lifecycle events (RunStarted, RunFinished) are emitted by services, not adapters
+   - Adapters remain stateless event translators
+
+3. **Event Classification** (ADR 003)
+   - Ephemeral events: Streaming deltas, progress, lifecycle signals
+   - Persistent events: Messages, tool results, state changes
+
+4. **Pointer-based Events** (ADR 004)
+   - All event types use pointer receivers
+   - Consistent type handling throughout the system
 
 ## Core Interfaces
 
-### `Agent`
-Represents an AI agent that processes user requests.
+### Agent
+
 ```go
 type Agent interface {
     Name() string
@@ -25,18 +70,33 @@ type Agent interface {
 }
 ```
 
-### `Runner`
-Orchestrates agent execution across sessions (main entry point for application code).
+### Runner
+
 ```go
 type Runner interface {
     Run(context.Context, *RunRequest) iter.Seq2[Event, error]
+    RunSync(context.Context, *RunRequest) (*RunResult, error)
     GetAgent(name string) (Agent, error)
     ListAgents() []string
 }
 ```
 
-### `Tool`
-A function that agents can invoke to perform actions.
+### Event
+
+```go
+type Event interface {
+    Type() EventType
+    Timestamp() time.Time
+    Data() any
+}
+
+// Marker interfaces for event classification
+type EphemeralEvent interface { Event; ephemeral() }
+type PersistentEvent interface { Event; persistent() }
+```
+
+### Tool
+
 ```go
 type Tool interface {
     Name() string
@@ -46,44 +106,23 @@ type Tool interface {
 }
 ```
 
-### `Model`
-An LLM client abstraction (OpenAI, Gemini, Ollama, etc.).
-```go
-type Model interface {
-    Generate(context.Context, *GenerateRequest) iter.Seq2[*GenerateResponse, error]
-    Provider() string
-}
-```
+### Session
 
-### `Session`
-Manages conversation state and history.
 ```go
 type Session interface {
     ID() string
     UserID() string
+    AppName() string
     State() State
     History() []*Message
     Append(context.Context, *Message) error
+    LastUpdateTime() int64
 }
 ```
 
-## Design Principles
-
-1. **Streaming-First**: All agent execution returns `iter.Seq2` for real-time event streaming
-2. **Context-Rich**: Provide enough context for tools to make intelligent decisions
-3. **Error Transparency**: Events can represent errors without breaking the stream
-4. **Metadata-Friendly**: All types include metadata fields for extensibility
-
-## Compatibility
-
-The interfaces are designed to align with:
-- **Custom Implementation**: `foundation/agentsdk/*`
-- **ADK-Go**: Google's Agent Development Kit (`github.com/google/adk-go`)
-- **Blades**: Go-Kratos agent framework (`github.com/go-kratos/blades`)
-
 ## Usage
 
-Application code should depend only on the `foundation/agent` interfaces:
+### Application Code
 
 ```go
 import "school-with-ai/foundation/agent"
@@ -91,28 +130,74 @@ import "school-with-ai/foundation/agent"
 func HandleChatRequest(runner agent.Runner, req *agent.RunRequest) {
     for event, err := range runner.Run(ctx, req) {
         if err != nil {
-            // Handle error
+            log.Error(err)
             continue
         }
         
-        switch event.Type() {
-        case agent.EventTypeMessage:
-            // Send message to client
-        case agent.EventTypeToolCall:
-            // Show tool execution status
+        switch e := event.(type) {
+        case *agent.MessageEvent:
+            sendToClient(e.Message)
+        case *agent.MessageDeltaEvent:
+            streamToClient(e.Delta)
+        case *agent.ToolCallEvent:
+            showToolStatus(e.ToolCall)
+        case *agent.UsageEvent:
+            trackUsage(e.Usage)
         }
     }
 }
 ```
 
-Concrete implementations are in `foundation/agent/adapters/`:
-- `custom/` - Wraps `foundation/agentsdk`
-- `adkgo/` - Wraps Google ADK-Go
-- `blades/` - Wraps Go-Kratos Blades
+### Creating an Agent
 
-## Next Steps
+```go
+import "school-with-ai/foundation/agent"
 
-1. Implement `foundation/agent/adapters/custom/` (Phase 1)
-2. Refactor services to use `agent.Runner` instead of `agentorchestrator.Service` (Phase 2)
-3. Update handlers to consume `agent.Event` streams (Phase 2)
-4. Implement ADK-Go and Blades adapters (Phase 4)
+config := agent.Config{
+    Name:        "math-tutor",
+    Description: "A helpful math tutor",
+    SystemPrompt: "You are a patient math tutor...",
+    Tools:       []agent.Tool{calculator, grapher},
+    Capabilities: agent.Capabilities{
+        InputElicitation: true,
+        LongTermMemory:   true,
+    },
+}
+
+// Use an adapter to create the agent
+adapter := custom.NewAgentAdapter(config)
+```
+
+## Adapters
+
+### custom/ (agentsdk)
+Wraps the legacy `foundation/agentsdk` implementation.
+
+### adkgo/ (ADK-Go)
+Wraps Google's Agent Development Kit for Go.
+
+### blades/ (Go-Kratos)
+Wraps Go-Kratos Blades framework.
+
+## Event Types
+
+| Event Type | Classification | Description |
+|------------|----------------|-------------|
+| MessageEvent | Persistent | Complete message |
+| MessageDeltaEvent | Ephemeral | Streaming content |
+| ToolCallEvent | Ephemeral | Tool execution started |
+| ToolResultEvent | Persistent | Tool execution completed |
+| UsageEvent | Persistent | Token consumption |
+| TitleEvent | Persistent | Thread title generated |
+| ToolInteractionEvent | Persistent | Tool needs user input |
+| ErrorEvent | Ephemeral | Execution error |
+| HandoffEvent | Ephemeral | Agent transfer |
+| CompleteEvent | Ephemeral | Invocation finished |
+| StateChangeEvent | Persistent | Session state modified |
+
+## See Also
+
+- [ADR 001: Agent Framework Architectural Boundary](../../arch/adr/001-agent-sdk-architectural-boundary.md)
+- [ADR 002: Run Lifecycle Events](../../arch/adr/002-run-lifecycle-events-service-orchestration.md)
+- [ADR 003: Event Classification](../../arch/adr/003-event-classification-ephemeral-vs-persistent.md)
+- [ADR 004: Pointer-based Domain Events](../../arch/adr/004-standardization-of-pointer-based-domain-events.md)

@@ -3,7 +3,7 @@ package tools
 import (
 	"testing"
 
-	"school-with-ai/foundation/agentsdk/llm"
+	"school-with-ai/foundation/agent"
 )
 
 // TestMathTools verifies the new math tool definitions.
@@ -11,7 +11,7 @@ func TestMathTools(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
 		name     string
-		toolFunc func() llm.AITool
+		toolFunc func() agent.Tool
 	}{
 		{"add", GetAddTool},
 		{"subtract", GetSubtractTool},
@@ -32,8 +32,8 @@ func TestMathTools(t *testing.T) {
 			if tool.Description() == "" {
 				t.Errorf("Tool %q missing description", tc.name)
 			}
-			if tool.Parameters() == nil {
-				t.Errorf("Tool %q missing parameters", tc.name)
+			if tool.InputSchema() == nil {
+				t.Errorf("Tool %q missing input schema", tc.name)
 			}
 		})
 	}

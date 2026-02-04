@@ -95,6 +95,18 @@ func toDomainToolCalls(ctcs []core.ToolCall) []domain.ToolCall {
 	return result
 }
 
+// AppName returns the application name.
+func (s *SessionAdapter) AppName() string {
+	return "schoolai"
+}
+
+// LastUpdateTime returns when the session was last modified.
+func (s *SessionAdapter) LastUpdateTime() int64 {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.aggregate.UpdatedAt.Unix()
+}
+
 // GetAggregate returns the underlying ThreadAggregate (for internal use).
 func (s *SessionAdapter) GetAggregate() *domain.ThreadAggregate {
 	return s.aggregate
@@ -114,25 +126,30 @@ func NewMapState() *MapState {
 }
 
 // Get retrieves a value by key.
-func (s *MapState) Get(key string) (any, bool) {
+func (s *MapState) Get(key string) (any, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	val, ok := s.data[key]
-	return val, ok
+	if !ok {
+		return nil, agent.ErrStateKeyNotFound
+	}
+	return val, nil
 }
 
 // Set stores a value by key.
-func (s *MapState) Set(key string, value any) {
+func (s *MapState) Set(key string, value any) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.data[key] = value
+	return nil
 }
 
 // Delete removes a value by key.
-func (s *MapState) Delete(key string) {
+func (s *MapState) Delete(key string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.data, key)
+	return nil
 }
 
 // Keys returns all stored keys.
@@ -145,6 +162,19 @@ func (s *MapState) Keys() []string {
 		keys = append(keys, k)
 	}
 	return keys
+}
+
+// All returns an iterator over all key-value pairs.
+func (s *MapState) All() func(yield func(key string, value any) bool) {
+	return func(yield func(key string, value any) bool) {
+		s.mu.RLock()
+		defer s.mu.RUnlock()
+		for k, v := range s.data {
+			if !yield(k, v) {
+				return
+			}
+		}
+	}
 }
 
 // convertDomainMessageToAgent converts domain message to agent message.
@@ -246,7 +276,7 @@ func NewSessionStoreAdapter(repo *domain.ThreadRepository) agent.SessionStore {
 }
 
 // Get retrieves a session by ID.
-func (s *SessionStoreAdapter) Get(ctx context.Context, sessionID string) (agent.Session, error) {
+func (s *SessionStoreAdapter) Get(ctx context.Context, appName, userID, sessionID string) (agent.Session, error) {
 	aggregate, err := s.repo.Load(ctx, sessionID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load session: %w", err)
@@ -256,7 +286,7 @@ func (s *SessionStoreAdapter) Get(ctx context.Context, sessionID string) (agent.
 }
 
 // Create initializes a new session.
-func (s *SessionStoreAdapter) Create(ctx context.Context, userID string) (agent.Session, error) {
+func (s *SessionStoreAdapter) Create(ctx context.Context, appName, userID string) (agent.Session, error) {
 	aggregate := domain.NewThreadAggregate(core.GenerateID())
 	aggregate.UserID = userID // NewThreadAggregate doesn't take userID now
 	return NewSessionAdapter(aggregate), nil
@@ -271,6 +301,13 @@ func (s *SessionStoreAdapter) Save(ctx context.Context, session agent.Session) e
 }
 
 // Delete removes a session.
-func (s *SessionStoreAdapter) Delete(ctx context.Context, sessionID string) error {
+func (s *SessionStoreAdapter) Delete(ctx context.Context, appName, userID, sessionID string) error {
 	return s.repo.Delete(ctx, sessionID)
+}
+
+// List returns all sessions for a user.
+func (s *SessionStoreAdapter) List(ctx context.Context, appName, userID string) ([]agent.Session, error) {
+	// ThreadRepository doesn't have a List method, so return empty for now
+	// TODO: Implement when ThreadRepository supports listing
+	return nil, nil
 }
