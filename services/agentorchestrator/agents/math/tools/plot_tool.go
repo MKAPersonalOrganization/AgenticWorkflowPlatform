@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -46,13 +45,13 @@ func (p *PlotTool) Description() string {
 	return "The ONLY plotting/graphing tool available. Generates plots by executing gnuplot scripts via CLI. You write a complete gnuplot script, the tool executes it through the gnuplot command-line interface, and returns a PNG image. This is a script-based tool - you provide the gnuplot commands, and the CLI tool processes them. Supports all gnuplot features: function plots, data plots, 3D visualizations, multiple plots, custom styling, etc."
 }
 
-func (p *PlotTool) InputSchema() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"gnuplot_script": map[string]any{
-				"type": "string",
-				"description": `Complete gnuplot script to execute. REQUIRED. The script should be a valid gnuplot program that generates a plot.
+func (p *PlotTool) Schema() *agent.Schema {
+	return &agent.Schema{
+		Type: agent.TypeObject,
+		Properties: map[string]*agent.Schema{
+			"gnuplot_script": {
+				Type: agent.TypeString,
+				Description: `Complete gnuplot script to execute. REQUIRED. The script should be a valid gnuplot program that generates a plot.
 
 CRITICAL REQUIREMENTS:
 1. DO NOT include 'set terminal' or 'set output' commands - these are added automatically
@@ -111,47 +110,47 @@ splot x**2 + y**2 with lines
 
 Remember: The script will be executed as-is, so ensure it's complete and valid gnuplot syntax.`,
 			},
-			"title": map[string]any{
-				"type":        "string",
-				"description": "REQUIRED. A descriptive name for the plot that will be used as the image filename. Use lowercase with hyphens, e.g., 'sine-wave', 'quadratic-function', 'velocity-vs-time'. This will be the actual filename.",
+			"title": {
+				Type:        agent.TypeString,
+				Description: "REQUIRED. A descriptive name for the plot that will be used as the image filename. Use lowercase with hyphens, e.g., 'sine-wave', 'quadratic-function', 'velocity-vs-time'. This will be the actual filename.",
 			},
 		},
-		"required": []string{"gnuplot_script", "title"},
+		Required: []string{"gnuplot_script", "title"},
 	}
 }
 
-func (p *PlotTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
+func (p *PlotTool) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
 	var params PlotArgs
-	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
-		return nil, fmt.Errorf("failed to parse plot args: %w", err)
+	if err := args.Decode(&params); err != nil {
+		return agent.ErrorResult(fmt.Errorf("failed to parse plot args: %w", err)), nil
 	}
 
 	// Validate required parameters
 	if params.GnuplotScript == "" {
-		return nil, ErrPlotScriptRequired
+		return agent.ErrorResult(ErrPlotScriptRequired), nil
 	}
 	if params.Title == "" {
-		return nil, ErrPlotTitleRequired
+		return agent.ErrorResult(ErrPlotTitleRequired), nil
 	}
 
 	// Validate script doesn't contain terminal/output commands (we manage these)
 	scriptLower := strings.ToLower(params.GnuplotScript)
 	if strings.Contains(scriptLower, "set terminal") {
-		return nil, ErrPlotTerminalCommandNotAllowed
+		return agent.ErrorResult(ErrPlotTerminalCommandNotAllowed), nil
 	}
 	if strings.Contains(scriptLower, "set output") {
-		return nil, ErrPlotOutputCommandNotAllowed
+		return agent.ErrorResult(ErrPlotOutputCommandNotAllowed), nil
 	}
 
 	// Validate title length
 	if len(params.Title) > 100 {
-		return nil, ErrPlotTitleTooLong
+		return agent.ErrorResult(ErrPlotTitleTooLong), nil
 	}
 
 	// Generate the plot
 	imagePath, err := executeGnuplotScript(ctx, params.GnuplotScript, params.Title)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate plot: %w", err)
+		return agent.ErrorResult(fmt.Errorf("failed to generate plot: %w", err)), nil
 	}
 
 	// Return result as map
@@ -163,11 +162,7 @@ func (p *PlotTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent
 		"title":      params.Title,
 	}
 
-	b, err := json.Marshal(result)
-	if err != nil {
-		return nil, err
-	}
-	return &agent.ToolResult{Output: string(b)}, nil
+	return agent.JSONResult(result), nil
 }
 
 // executeGnuplotScript executes a gnuplot script and generates the plot image.

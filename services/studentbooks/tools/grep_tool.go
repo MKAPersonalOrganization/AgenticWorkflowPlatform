@@ -31,65 +31,73 @@ func NewGrepTool(rootDir string) *GrepTool {
 	return &GrepTool{RootDir: rootDir}
 }
 
-// Definition returns the tool definition.
-func (t *GrepTool) Definition() []agent.Tool {
-	return []agent.Tool{
-		agent.NewFunctionTool(
-			"search_text_in_file",
-			"FAST, optimized search within a SINGLE markdown file powered by `ripgrep`. MUST be used after identifying a specific file via 'browse_library'.",
-			map[string]any{
-				"type": "object",
-				"properties": map[string]any{
-					"pattern": map[string]any{
-						"type":        "string",
-						"description": "The pattern to search for. By default, treated as a Rust-flavored regular expression. Use '\\b' for precise symbol matching (e.g., '\\bMatchMe\\b').",
-					},
-					"file_path": map[string]any{
-						"type":        "string",
-						"description": "The specific file path to search within (e.g., 'university/Think-Stats/chapter1.md'). MUST be a file, not a directory. Use 'browse_library' to identify relevant files first.",
-					},
-					"include": map[string]any{
-						"type":        "string",
-						"description": "Glob pattern to filter files (e.g., '*.ts', 'src/**'). Recommended for large repositories to reduce noise. Defaults to all files if omitted.",
-					},
-					"case_sensitive": map[string]any{
-						"type":        "boolean",
-						"description": "If true, search is case-sensitive. Defaults to false (ignore case) if omitted.",
-					},
-					"fixed_strings": map[string]any{
-						"type":        "boolean",
-						"description": "If true, treats the `pattern` as a literal string instead of a regular expression. Defaults to false (basic regex) if omitted.",
-					},
-					"context": map[string]any{
-						"type":        "integer",
-						"description": "Show this many lines of context around each match (equivalent to grep -C). Defaults to 0 if omitted.",
-					},
-					"after": map[string]any{
-						"type":        "integer",
-						"description": "Show this many lines after each match (equivalent to grep -A). Defaults to 0 if omitted.",
-					},
-					"before": map[string]any{
-						"type":        "integer",
-						"description": "Show this many lines before each match (equivalent to grep -B). Defaults to 0 if omitted.",
-					},
-					"no_ignore": map[string]any{
-						"type":        "boolean",
-						"description": "If true, searches all files including those usually ignored (like in .gitignore, build/, dist/, etc). Defaults to false if omitted.",
-					},
-					"limit": map[string]any{
-						"type":        "integer",
-						"description": "Maximum number of matches to return (for pagination). Defaults to 5 for efficiency.",
-					},
-					"offset": map[string]any{
-						"type":        "integer",
-						"description": "Number of matches to skip (for pagination). Defaults to 0.",
-					},
-				},
-				"required": []string{"pattern"},
+// Name returns the tool name.
+func (t *GrepTool) Name() string {
+	return "search_text_in_file"
+}
+
+// Description returns the tool description.
+func (t *GrepTool) Description() string {
+	return "FAST, optimized search within a SINGLE markdown file powered by `ripgrep`. MUST be used after identifying a specific file via 'browse_library'."
+}
+
+// Schema returns the tool schema.
+func (t *GrepTool) Schema() *agent.Schema {
+	return &agent.Schema{
+		Type: agent.TypeObject,
+		Properties: map[string]*agent.Schema{
+			"pattern": {
+				Type:        agent.TypeString,
+				Description: "The pattern to search for. By default, treated as a Rust-flavored regular expression. Use '\\b' for precise symbol matching (e.g., '\\bMatchMe\\b').",
 			},
-			t.execute,
-		),
+			"file_path": {
+				Type:        agent.TypeString,
+				Description: "The specific file path to search within (e.g., 'university/Think-Stats/chapter1.md'). MUST be a file, not a directory. Use 'browse_library' to identify relevant files first.",
+			},
+			"include": {
+				Type:        agent.TypeString,
+				Description: "Glob pattern to filter files (e.g., '*.ts', 'src/**'). Recommended for large repositories to reduce noise. Defaults to all files if omitted.",
+			},
+			"case_sensitive": {
+				Type:        agent.TypeBoolean,
+				Description: "If true, search is case-sensitive. Defaults to false (ignore case) if omitted.",
+			},
+			"fixed_strings": {
+				Type:        agent.TypeBoolean,
+				Description: "If true, treats the `pattern` as a literal string instead of a regular expression. Defaults to false (basic regex) if omitted.",
+			},
+			"context": {
+				Type:        agent.TypeInteger,
+				Description: "Show this many lines of context around each match (equivalent to grep -C). Defaults to 0 if omitted.",
+			},
+			"after": {
+				Type:        agent.TypeInteger,
+				Description: "Show this many lines after each match (equivalent to grep -A). Defaults to 0 if omitted.",
+			},
+			"before": {
+				Type:        agent.TypeInteger,
+				Description: "Show this many lines before each match (equivalent to grep -B). Defaults to 0 if omitted.",
+			},
+			"no_ignore": {
+				Type:        agent.TypeBoolean,
+				Description: "If true, searches all files including those usually ignored (like in .gitignore, build/, dist/, etc). Defaults to false if omitted.",
+			},
+			"limit": {
+				Type:        agent.TypeInteger,
+				Description: "Maximum number of matches to return (for pagination). Defaults to 5 for efficiency.",
+			},
+			"offset": {
+				Type:        agent.TypeInteger,
+				Description: "Number of matches to skip (for pagination). Defaults to 0.",
+			},
+		},
+		Required: []string{"pattern"},
 	}
+}
+
+// Execute executes the grep search.
+func (t *GrepTool) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
+	return t.execute(ctx, args)
 }
 
 type grepArgs struct {
@@ -145,34 +153,34 @@ type rgMatchText struct {
 	Text string `json:"text"`
 }
 
-func (t *GrepTool) execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
+func (t *GrepTool) execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
 	var input grepArgs
-	if err := agent.UnmarshalArgs(tCtx.Arguments, &input); err != nil {
-		return nil, err
+	if err := args.Decode(&input); err != nil {
+		return agent.ErrorResult(err), nil
 	}
 
 	searchPath := input.FilePath
 	if searchPath == "" {
-		return nil, fmt.Errorf("file_path is required for search_text")
+		return agent.ErrorResult(fmt.Errorf("file_path is required for search_text")), nil
 	}
 
 	// Resolve absolute path
 	absSearchPath, err := filepath.Abs(filepath.Join(t.RootDir, searchPath))
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve search path: %w", err)
+		return agent.ErrorResult(fmt.Errorf("failed to resolve search path: %w", err)), nil
 	}
 
 	// Verify path exists and is a file
 	info, err := os.Stat(absSearchPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("path does not exist: %s", searchPath)
+			return agent.ErrorResult(fmt.Errorf("path does not exist: %s", searchPath)), nil
 		}
-		return nil, fmt.Errorf("failed to access path stats for %s: %w", searchPath, err)
+		return agent.ErrorResult(fmt.Errorf("failed to access path stats for %s: %w", searchPath, err)), nil
 	}
 
 	if info.IsDir() {
-		return nil, fmt.Errorf("path '%s' is a directory; 'search_text' is strictly for single-file search; use 'browse_library' to find the specific file first", searchPath)
+		return agent.ErrorResult(fmt.Errorf("path '%s' is a directory; 'search_text' is strictly for single-file search; use 'browse_library' to find the specific file first", searchPath)), nil
 	}
 	// Allow file search too, but if it is a directory check if it is within root logic here if strict security needed.
 	// For now assuming the tool is trusted or sandboxed.
@@ -222,7 +230,7 @@ func (t *GrepTool) execute(ctx context.Context, tCtx *agent.ToolContext) (*agent
 
 	// Check if rg is available
 	if _, err := exec.LookPath("rg"); err != nil {
-		return nil, fmt.Errorf("ripgrep (rg) is not installed or not in PATH")
+		return agent.ErrorResult(fmt.Errorf("ripgrep (rg) is not installed or not in PATH")), nil
 	}
 
 	cmd := exec.Command("rg", cmdArgs...)
@@ -233,10 +241,10 @@ func (t *GrepTool) execute(ctx context.Context, tCtx *agent.ToolContext) (*agent
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			if exitErr.ExitCode() > 1 {
-				return nil, fmt.Errorf("ripgrep failed with code %d", exitErr.ExitCode())
+				return agent.ErrorResult(fmt.Errorf("ripgrep failed with code %d", exitErr.ExitCode())), nil
 			}
 		} else {
-			return nil, fmt.Errorf("failed to execute ripgrep: %w", err)
+			return agent.ErrorResult(fmt.Errorf("failed to execute ripgrep: %w", err)), nil
 		}
 	}
 
@@ -254,7 +262,7 @@ func (t *GrepTool) execute(ctx context.Context, tCtx *agent.ToolContext) (*agent
 
 	totalMatches := len(allMatches)
 	if offset >= totalMatches {
-		return &agent.ToolResult{Output: fmt.Sprintf("No more matches found (Offset %d exceeds total matches %d).", offset, totalMatches)}, nil
+		return agent.TextResult(fmt.Sprintf("No more matches found (Offset %d exceeds total matches %d).", offset, totalMatches)), nil
 	}
 
 	end := offset + limit
@@ -273,7 +281,7 @@ func (t *GrepTool) execute(ctx context.Context, tCtx *agent.ToolContext) (*agent
 	// Format Output
 	searchLocationDescription := fmt.Sprintf("in file \"%s\"", searchPath)
 	if len(pagedMatches) == 0 {
-		return &agent.ToolResult{Output: fmt.Sprintf("No matches found for pattern \"%s\" %s.", input.Pattern, searchLocationDescription)}, nil
+		return agent.TextResult(fmt.Sprintf("No matches found for pattern \"%s\" %s.", input.Pattern, searchLocationDescription)), nil
 	}
 
 	matchCount := len(pagedMatches)
@@ -318,7 +326,7 @@ func (t *GrepTool) execute(ctx context.Context, tCtx *agent.ToolContext) (*agent
 		sb.WriteString("---\n")
 	}
 
-	return &agent.ToolResult{Output: sb.String()}, nil
+	return agent.TextResult(sb.String()), nil
 }
 
 // findParentHeading scans the file backwards from lineNumber to find the nearest heading.

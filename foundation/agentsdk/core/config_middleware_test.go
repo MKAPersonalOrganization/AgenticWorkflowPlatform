@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/internal/llm"
 )
 
@@ -13,7 +14,7 @@ type MockTool struct {
 	description string
 }
 
-func NewMockTool(name, description string) *MockTool {
+func NewMockTool(name, description string) agent.ExecutableTool {
 	return &MockTool{
 		name:        name,
 		description: description,
@@ -28,20 +29,20 @@ func (m *MockTool) Description() string {
 	return m.description
 }
 
-func (m *MockTool) Parameters() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"input": map[string]any{
-				"type":        "string",
-				"description": "Input parameter",
+func (m *MockTool) Schema() *agent.Schema {
+	return &agent.Schema{
+		Type: "object",
+		Properties: map[string]*agent.Schema{
+			"input": {
+				Type:        "string",
+				Description: "Input parameter",
 			},
 		},
 	}
 }
 
-func (m *MockTool) Invoke(ctx ToolContext, args any) (any, error) {
-	return map[string]any{"result": "mock result"}, nil
+func (m *MockTool) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
+	return agent.NewResult(map[string]any{"result": "mock result"}), nil
 }
 
 // TestToLLMRequestWithMiddleware_WithoutMiddleware ensures backward compatibility.

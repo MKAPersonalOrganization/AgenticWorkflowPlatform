@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 
+	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/internal/llm"
 )
 
@@ -28,8 +29,8 @@ type AgentConfig struct {
 	Name string // Unique identifier for the agent
 
 	// Behavior
-	SystemPrompt string // Instructions for how the agent should behave
-	Tools        []Tool // Available tools for this agent (implements Tool interface)
+	SystemPrompt string                 // Instructions for how the agent should behave
+	Tools        []agent.ExecutableTool // Available tools for this agent (implements ExecutableTool interface)
 
 	// Handoffs declares which agents this agent can transfer control to.
 	// This is used by HandoffMiddleware to automatically create transfer tools.
@@ -71,28 +72,29 @@ func DefaultConfig(name string) AgentConfig {
 	return AgentConfig{
 		Name:          name,
 		SystemPrompt:  "You are a helpful assistant.",
-		Tools:         []Tool{},
+		Tools:         []agent.ExecutableTool{},
 		Middleware:    []Middleware{},
 		MaxIterations: 5,
 	}
 }
 
-// ToToolDeclarations converts agent.Tool slice to llm.ToolDeclaration slice for ChatClient.
-func ToToolDeclarations(tools []Tool) []llm.ToolDeclaration {
+// ToToolDeclarations converts agent.ExecutableTool slice to llm.ToolDeclaration slice for ChatClient.
+func ToToolDeclarations(tools []agent.ExecutableTool) []llm.ToolDeclaration {
 	result := make([]llm.ToolDeclaration, len(tools))
 	for i, t := range tools {
-		parameters := t.Parameters()
-		var schema *llm.Schema
-		if parameters != nil {
-			// Convert map[string]any to *llm.Schema
-			data, _ := json.Marshal(parameters)
-			_ = json.Unmarshal(data, &schema)
+		// Convert agent.Schema to llm.Schema
+		schema := t.Schema()
+		var llmSchema *llm.Schema
+		if schema != nil {
+			// Convert agent.Schema to llm.Schema via JSON
+			data, _ := json.Marshal(schema)
+			_ = json.Unmarshal(data, &llmSchema)
 		}
 
 		result[i] = llm.ToolDeclaration{
 			Name:        t.Name(),
 			Description: t.Description(),
-			Parameters:  schema,
+			Parameters:  llmSchema,
 		}
 	}
 

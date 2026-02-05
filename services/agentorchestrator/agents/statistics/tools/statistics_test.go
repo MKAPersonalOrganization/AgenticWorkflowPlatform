@@ -16,20 +16,19 @@ func TestMeanTool(t *testing.T) {
 		"data": []float64{1, 2, 3, 4, 5},
 	}
 	argsBytes, _ := json.Marshal(args)
-	tCtx := &agent.ToolContext{
-		Context:   context.Background(),
-		Arguments: string(argsBytes),
+	toolArgs := agent.Arguments{
+		Raw: json.RawMessage(argsBytes),
 	}
 
-	result, err := tool.Execute(context.Background(), tCtx)
+	result, err := tool.Execute(context.Background(), toolArgs)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	var resMap map[string]any
-	if err := json.Unmarshal([]byte(result.Output), &resMap); err != nil {
-		t.Fatalf("Failed to unmarshal output: %v", err)
+	if len(result.Content) == 0 {
+		t.Fatal("expected content in result")
 	}
+	resMap := result.Content[0].(map[string]any)
 
 	if resMap["result"] != 3.0 {
 		t.Errorf("Expected 3.0, got %v", resMap["result"])
@@ -43,20 +42,19 @@ func TestMedianTool(t *testing.T) {
 		"data": []float64{1, 2, 3, 4, 5},
 	}
 	argsBytes, _ := json.Marshal(args)
-	tCtx := &agent.ToolContext{
-		Context:   context.Background(),
-		Arguments: string(argsBytes),
+	toolArgs := agent.Arguments{
+		Raw: json.RawMessage(argsBytes),
 	}
 
-	result, err := tool.Execute(context.Background(), tCtx)
+	result, err := tool.Execute(context.Background(), toolArgs)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	var resMap map[string]any
-	if err := json.Unmarshal([]byte(result.Output), &resMap); err != nil {
-		t.Fatalf("Failed to unmarshal output: %v", err)
+	if len(result.Content) == 0 {
+		t.Fatal("expected content in result")
 	}
+	resMap := result.Content[0].(map[string]any)
 
 	if resMap["result"] != 3.0 {
 		t.Errorf("Expected 3.0, got %v", resMap["result"])
@@ -71,20 +69,19 @@ func TestPearsonCorrelationTool(t *testing.T) {
 		"data2": []float64{2, 4, 6, 8, 10},
 	}
 	argsBytes, _ := json.Marshal(args)
-	tCtx := &agent.ToolContext{
-		Context:   context.Background(),
-		Arguments: string(argsBytes),
+	toolArgs := agent.Arguments{
+		Raw: json.RawMessage(argsBytes),
 	}
 
-	result, err := tool.Execute(context.Background(), tCtx)
+	result, err := tool.Execute(context.Background(), toolArgs)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	var resMap map[string]any
-	if err := json.Unmarshal([]byte(result.Output), &resMap); err != nil {
-		t.Fatalf("Failed to unmarshal output: %v", err)
+	if len(result.Content) == 0 {
+		t.Fatal("expected content in result")
 	}
+	resMap := result.Content[0].(map[string]any)
 
 	corr := resMap["result"].(float64)
 	if math.Abs(corr-1.0) > 1e-9 {
@@ -101,20 +98,19 @@ func TestNormalPdfTool(t *testing.T) {
 		"scale": 1.0,
 	}
 	argsBytes, _ := json.Marshal(args)
-	tCtx := &agent.ToolContext{
-		Context:   context.Background(),
-		Arguments: string(argsBytes),
+	toolArgs := agent.Arguments{
+		Raw: json.RawMessage(argsBytes),
 	}
 
-	result, err := tool.Execute(context.Background(), tCtx)
+	result, err := tool.Execute(context.Background(), toolArgs)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	var resMap map[string]any
-	if err := json.Unmarshal([]byte(result.Output), &resMap); err != nil {
-		t.Fatalf("Failed to unmarshal output: %v", err)
+	if len(result.Content) == 0 {
+		t.Fatal("expected content in result")
 	}
+	resMap := result.Content[0].(map[string]any)
 
 	pdf := resMap["result"].(float64)
 	expected := 0.3989422804014327
@@ -131,20 +127,19 @@ func TestLinearRegressionTool(t *testing.T) {
 		"y": []float64{2, 4, 6},
 	}
 	argsBytes, _ := json.Marshal(args)
-	tCtx := &agent.ToolContext{
-		Context:   context.Background(),
-		Arguments: string(argsBytes),
+	toolArgs := agent.Arguments{
+		Raw: json.RawMessage(argsBytes),
 	}
 
-	result, err := tool.Execute(context.Background(), tCtx)
+	result, err := tool.Execute(context.Background(), toolArgs)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	var resMap map[string]any
-	if err := json.Unmarshal([]byte(result.Output), &resMap); err != nil {
-		t.Fatalf("Failed to unmarshal output: %v", err)
+	if len(result.Content) == 0 {
+		t.Fatal("expected content in result")
 	}
+	resMap := result.Content[0].(map[string]any)
 
 	regRaw := resMap["regression"].([]any)
 	if len(regRaw) != 3 {
@@ -160,20 +155,19 @@ func TestSampleTool(t *testing.T) {
 		"takeNum": 3,
 	}
 	argsBytes, _ := json.Marshal(args)
-	tCtx := &agent.ToolContext{
-		Context:   context.Background(),
-		Arguments: string(argsBytes),
+	toolArgs := agent.Arguments{
+		Raw: json.RawMessage(argsBytes),
 	}
 
-	result, err := tool.Execute(context.Background(), tCtx)
+	result, err := tool.Execute(context.Background(), toolArgs)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	var resMap map[string]any
-	if err := json.Unmarshal([]byte(result.Output), &resMap); err != nil {
-		t.Fatalf("Failed to unmarshal output: %v", err)
+	if len(result.Content) == 0 {
+		t.Fatal("expected content in result")
 	}
+	resMap := result.Content[0].(map[string]any)
 
 	sampleRaw := resMap["result"].([]any)
 	if len(sampleRaw) != 3 {

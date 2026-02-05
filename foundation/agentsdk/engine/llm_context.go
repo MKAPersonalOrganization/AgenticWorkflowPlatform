@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/internal/llm"
 )
@@ -24,7 +25,7 @@ type LLMContext struct {
 }
 
 // GetEffectiveTools returns the tools available after middleware processing.
-func (c *LLMContext) GetEffectiveTools() []core.Tool {
+func (c *LLMContext) GetEffectiveTools() []agent.ExecutableTool {
 	return c.RequestCtx.GetEffectiveTools()
 }
 

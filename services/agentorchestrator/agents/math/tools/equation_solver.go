@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -48,10 +47,10 @@ func (e *EquationSolverTool) InputSchema() map[string]any {
 	}
 }
 
-func (e *EquationSolverTool) Execute(ctx context.Context, tctx *agent.ToolContext) (*agent.ToolResult, error) {
+func (e *EquationSolverTool) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
 	var params EquationSolverArgs
-	if err := agent.UnmarshalToolArgs(tctx.Arguments, &params); err != nil {
-		return nil, fmt.Errorf("failed to parse equation solver args: %w", err)
+	if err := args.Decode(&params); err != nil {
+		return agent.ErrorResult(fmt.Errorf("failed to parse equation solver args: %w", err)), nil
 	}
 
 	if params.Variable == "" {
@@ -61,21 +60,7 @@ func (e *EquationSolverTool) Execute(ctx context.Context, tctx *agent.ToolContex
 	// Solve equation and return result as map
 	solution := solveEquation(params.Equation, params.Variable)
 
-	// Convert solution to JSON string for ToolResult
-	output, err := json.Marshal(solution)
-	if err != nil {
-		return &agent.ToolResult{
-			ToolCallID: tctx.ToolCallID,
-			Output:     fmt.Sprintf("error marshaling solution: %v", err),
-			IsError:    true,
-		}, nil
-	}
-
-	return &agent.ToolResult{
-		ToolCallID: tctx.ToolCallID,
-		Output:     string(output),
-		IsError:    false,
-	}, nil
+	return agent.JSONResult(solution), nil
 }
 
 func solveEquation(equation, variable string) map[string]any {

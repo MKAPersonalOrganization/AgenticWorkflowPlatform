@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"school-with-ai/foundation/agent"
 )
 
 // ErrToolNotFound is returned when a tool is not registered.
@@ -94,25 +96,21 @@ func (e *RegistryToolExecutor) Execute(toolCall ToolCall) (ToolExecResult, error
 		return ToolExecResult{}, fmt.Errorf("%w: %s", ErrToolNotFound, toolCall.Name)
 	}
 
-	// Create ToolContext with additional data for tools to access
-	toolCtx := NewToolContext(
-		e.ctx,
-		e.threadID,
-		e.messageID,
-		toolCall.ID,
-		e.requestCtx,
-	)
-
-	// Unmarshal JSON arguments to map[string]any
-	var args map[string]any
-	if toolCall.Arguments != "" {
-		if err := json.Unmarshal([]byte(toolCall.Arguments), &args); err != nil {
-			return ToolExecResult{}, fmt.Errorf("failed to unmarshal tool arguments: %w", err)
-		}
+	// Create agent.Arguments from ToolCall
+	args := agent.Arguments{
+		Raw:    json.RawMessage(toolCall.Arguments),
+		CallID: toolCall.ID,
 	}
 
-	// Invoke tool with typed arguments
-	result, err := tool.Invoke(toolCtx, args)
+	// Populate legacy fields if requestCtx is available
+	if e.requestCtx != nil {
+		args.SessionID = e.threadID
+		// UserID would need to be extracted from context or passed separately
+		args.Metadata = e.requestCtx.State
+	}
+
+	// Execute tool with new spec-compliant interface
+	result, err := tool.Execute(e.ctx, args)
 	endTime := time.Now()
 
 	// Build execution result
@@ -120,35 +118,55 @@ func (e *RegistryToolExecutor) Execute(toolCall ToolCall) (ToolExecResult, error
 		StopIteration: false,
 	}
 
-	// Handle result based on its type
-	if result != nil {
-		finalResult := result
+	// Handle error from result (Execute returns error separately)
+	if err == nil && result.Error != nil {
+		err = result.Error
+	}
 
-		// If the tool returned an explicit ToolResult (possibly for routing), extract metadata
-		if tr, ok := result.(ToolResult); ok {
-			finalResult = tr.Result
-			execResult.Command = tr.Command
-			if tr.Command != nil {
-				execResult.StopIteration = tr.Command.StopIteration
+	// Handle result content
+	if len(result.Content) > 0 {
+		// Check if the first content item is a ToolResult (for routing commands)
+		if len(result.Content) == 1 {
+			if tr, ok := result.Content[0].(ToolResult); ok {
+				// Extract routing command metadata
+				execResult.Command = tr.Command
+				if tr.Command != nil {
+					execResult.StopIteration = tr.Command.StopIteration
 
-				// Apply state updates if RequestCtx is available
-				if e.requestCtx != nil && tr.Command.Update != nil {
-					if e.requestCtx.State == nil {
-						e.requestCtx.State = make(map[string]any)
-					}
-					for k, v := range tr.Command.Update {
-						e.requestCtx.State[k] = v
+					// Apply state updates if RequestCtx is available
+					if e.requestCtx != nil && tr.Command.Update != nil {
+						if e.requestCtx.State == nil {
+							e.requestCtx.State = make(map[string]any)
+						}
+						for k, v := range tr.Command.Update {
+							e.requestCtx.State[k] = v
+						}
 					}
 				}
+				// Use the wrapped result
+				if tr.Result != nil {
+					resultBytes, marshalErr := json.Marshal(tr.Result)
+					if marshalErr != nil {
+						return ToolExecResult{}, fmt.Errorf("failed to marshal tool result: %w", marshalErr)
+					}
+					execResult.Result = string(resultBytes)
+				}
+			} else {
+				// Regular content - marshal it
+				resultBytes, marshalErr := json.Marshal(result.Content)
+				if marshalErr != nil {
+					return ToolExecResult{}, fmt.Errorf("failed to marshal tool result: %w", marshalErr)
+				}
+				execResult.Result = string(resultBytes)
 			}
+		} else {
+			// Multiple content items - marshal the array
+			resultBytes, marshalErr := json.Marshal(result.Content)
+			if marshalErr != nil {
+				return ToolExecResult{}, fmt.Errorf("failed to marshal tool result: %w", marshalErr)
+			}
+			execResult.Result = string(resultBytes)
 		}
-
-		// Marshal the result back to JSON string for LLM
-		resultBytes, marshalErr := json.Marshal(finalResult)
-		if marshalErr != nil {
-			return ToolExecResult{}, fmt.Errorf("failed to marshal tool result: %w", marshalErr)
-		}
-		execResult.Result = string(resultBytes)
 	}
 
 	// Track tool execution if tracer is available

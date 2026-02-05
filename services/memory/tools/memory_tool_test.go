@@ -55,24 +55,17 @@ func TestMemoryTool_SaveMemory(t *testing.T) {
 	ctx := context.WithValue(context.Background(), domain.UserContextKey, user)
 
 	// 1. Save new memory
-	args := map[string]any{"fact": "My favorite color is blue."}
-
-	// Execute the tool directly (it's a FunctionTool wrapper)
-	// We can call the underlying function by getting the tool and executing it
-	tools := tool.Definition()
-	if len(tools) == 0 {
-		t.Fatal("No tools defined")
+	args := agent.Arguments{
+		Raw:    []byte(`{"fact":"My favorite color is blue."}`),
+		CallID: "test-call-1",
 	}
 
-	tctx := &agent.ToolContext{
-		Context:    ctx,
-		ToolCallID: "test-call-1",
-		Arguments:  `{"fact":"My favorite color is blue."}`,
-	}
-
-	_, err := tools[0].Execute(ctx, tctx)
+	result, err := tool.Execute(ctx, args)
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
+	}
+	if result.Error != nil {
+		t.Fatalf("Result has error: %v", result.Error)
 	}
 
 	// Verify content - should be saved under user ID
@@ -94,15 +87,17 @@ func TestMemoryTool_SaveMemory(t *testing.T) {
 	}
 
 	// 2. Append memory
-	tctx2 := &agent.ToolContext{
-		Context:    ctx,
-		ToolCallID: "test-call-2",
-		Arguments:  `{"fact":"I like pizza."}`,
+	args2 := agent.Arguments{
+		Raw:    []byte(`{"fact":"I like pizza."}`),
+		CallID: "test-call-2",
 	}
 
-	_, err = tools[0].Execute(ctx, tctx2)
+	result, err = tool.Execute(ctx, args2)
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
+	}
+	if result.Error != nil {
+		t.Fatalf("Result has error: %v", result.Error)
 	}
 
 	// Verify content again

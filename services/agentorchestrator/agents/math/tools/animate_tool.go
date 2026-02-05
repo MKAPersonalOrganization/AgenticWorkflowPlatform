@@ -3,7 +3,6 @@ package tools
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -51,13 +50,13 @@ func (a *AnimateTool) Description() string {
 	return "Generate animated mathematical visualizations using gnuplot. Creates animated GIF or WebP files by rendering multiple frames. Perfect for showing function transformations, rotating 3D plots, parameter variations, wave propagation, and dynamic mathematical concepts."
 }
 
-func (a *AnimateTool) InputSchema() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"gnuplot_script": map[string]any{
-				"type": "string",
-				"description": `Complete gnuplot animation script. REQUIRED. The script must use a loop (do for) to generate multiple frames.
+func (a *AnimateTool) Schema() *agent.Schema {
+	return &agent.Schema{
+		Type: agent.TypeObject,
+		Properties: map[string]*agent.Schema{
+			"gnuplot_script": {
+				Type: agent.TypeString,
+				Description: `Complete gnuplot animation script. REQUIRED. The script must use a loop (do for) to generate multiple frames.
 
 CRITICAL REQUIREMENTS:
 1. DO NOT include 'set terminal' - it will be added automatically based on format
@@ -110,47 +109,44 @@ do for [n=1:10] {
   plot cos(n*t), sin(n*t) with lines title sprintf('n = %d', n)
 }`,
 			},
-			"format": map[string]any{
-				"type":        "string",
-				"description": "Animation format. 'gif' for animated GIF (widely supported), 'webp' for animated WebP (smaller file size, modern browsers). Defaults to 'gif'.",
-				"enum":        []string{"gif", "webp"},
-				"default":     "gif",
+			"format": {
+				Type:        agent.TypeString,
+				Description: "Animation format. 'gif' for animated GIF (widely supported), 'webp' for animated WebP (smaller file size, modern browsers). Defaults to 'gif'.",
+				Enum:        []string{"gif", "webp"},
+				Default:     "gif",
 			},
-			"delay": map[string]any{
-				"type":        "integer",
-				"description": "Delay between frames in hundredths of a second. Default is 50 (0.5 seconds, 20fps). Lower values = faster animation. Examples: 10 (100fps), 50 (20fps), 100 (10fps)",
-				"default":     50,
-				"minimum":     1,
-				"maximum":     500,
+			"delay": {
+				Type:        agent.TypeInteger,
+				Description: "Delay between frames in hundredths of a second. Default is 50 (0.5 seconds, 20fps). Lower values = faster animation. Examples: 10 (100fps), 50 (20fps), 100 (10fps). Min: 1, Max: 500.",
+				Default:     50,
 			},
-			"title": map[string]any{
-				"type":        "string",
-				"description": "Brief description of the animation for logging/reference purposes. Example: 'Rotating 3D surface', 'Wave propagation'",
-				"maxLength":   100,
+			"title": {
+				Type:        agent.TypeString,
+				Description: "Brief description of the animation for logging/reference purposes (max 100 characters). Example: 'Rotating 3D surface', 'Wave propagation'",
 			},
 		},
-		"required": []string{"gnuplot_script"},
+		Required: []string{"gnuplot_script"},
 	}
 }
 
-func (a *AnimateTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
+func (a *AnimateTool) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
 	var params AnimateArgs
-	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
-		return nil, fmt.Errorf("failed to parse animate args: %w", err)
+	if err := args.Decode(&params); err != nil {
+		return agent.ErrorResult(fmt.Errorf("failed to parse animate args: %w", err)), nil
 	}
 
 	// Validate required gnuplot_script parameter
 	if params.GnuplotScript == "" {
-		return nil, ErrGnuplotScriptRequired
+		return agent.ErrorResult(ErrGnuplotScriptRequired), nil
 	}
 
 	// Validate script doesn't contain terminal/output commands
 	scriptLower := strings.ToLower(params.GnuplotScript)
 	if strings.Contains(scriptLower, "set terminal") || strings.Contains(scriptLower, "set term") {
-		return nil, ErrTerminalCommandNotAllowed
+		return agent.ErrorResult(ErrTerminalCommandNotAllowed), nil
 	}
 	if strings.Contains(scriptLower, "set output") {
-		return nil, ErrOutputCommandNotAllowed
+		return agent.ErrorResult(ErrOutputCommandNotAllowed), nil
 	}
 
 	// Validate format
@@ -158,7 +154,7 @@ func (a *AnimateTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*ag
 		params.Format = "gif"
 	}
 	if params.Format != "gif" && params.Format != "webp" {
-		return nil, fmt.Errorf("%w, got: %s", ErrInvalidAnimationFormat, params.Format)
+		return agent.ErrorResult(fmt.Errorf("%w, got: %s", ErrInvalidAnimationFormat, params.Format)), nil
 	}
 
 	// Validate delay
@@ -166,18 +162,18 @@ func (a *AnimateTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*ag
 		params.Delay = 50 // Default to 20fps
 	}
 	if params.Delay > 500 {
-		return nil, fmt.Errorf("%w (got: %d)", ErrDelayTooLarge, params.Delay)
+		return agent.ErrorResult(fmt.Errorf("%w (got: %d)", ErrDelayTooLarge, params.Delay)), nil
 	}
 
 	// Validate title length
 	if len(params.Title) > 100 {
-		return nil, ErrAnimateTitleTooLong
+		return agent.ErrorResult(ErrAnimateTitleTooLong), nil
 	}
 
 	// Generate the animation
 	animationPath, err := executeGnuplotAnimation(ctx, params.GnuplotScript, params.Format, params.Delay, params.Title)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate animation: %w", err)
+		return agent.ErrorResult(fmt.Errorf("failed to generate animation: %w", err)), nil
 	}
 
 	// Return result as map
@@ -191,11 +187,7 @@ func (a *AnimateTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*ag
 		"title":          params.Title,
 	}
 
-	b, err := json.Marshal(result)
-	if err != nil {
-		return nil, err
-	}
-	return &agent.ToolResult{Output: string(b)}, nil
+	return agent.JSONResult(result), nil
 }
 
 // executeGnuplotAnimation executes a gnuplot animation script and generates the animation file.

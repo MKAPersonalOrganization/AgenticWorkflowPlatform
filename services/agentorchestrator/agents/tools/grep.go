@@ -9,5 +9,5 @@ import (
 // NewGrepTool creates a new GrepTool instance for use in academic agents.
 // It strictly constrains searches to the 'books/' directory (the Academic Library).
 func NewGrepTool() []agent.Tool {
-	return bookstools.NewGrepTool("books").Definition()
+	return []agent.Tool{bookstools.NewGrepTool("books")}
 }

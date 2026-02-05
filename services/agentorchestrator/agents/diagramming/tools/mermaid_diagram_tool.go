@@ -3,7 +3,6 @@ package tools
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -46,38 +45,37 @@ func (m *MermaidDiagramTool) Description() string {
 	return "Generate diagrams using Mermaid syntax via Docker. Create flowcharts, sequence diagrams, class diagrams, state diagrams, ER diagrams, and more. You provide mermaid diagram code, and the tool executes it via Docker to create an image file. Perfect for visualizing processes, workflows, algorithms, and relationships."
 }
 
-func (m *MermaidDiagramTool) InputSchema() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"mermaid_code": map[string]any{
-				"type":        "string",
-				"description": "Complete mermaid diagram definition. REQUIRED. The code should be valid mermaid syntax.\n\nSUPPORTED DIAGRAM TYPES:\n1. Flowchart - Process flows and decision trees\n2. Sequence Diagram - Interaction between entities over time\n3. Class Diagram - Object-oriented class relationships\n4. State Diagram - State transitions and lifecycle\n5. ER Diagram - Entity relationships in databases\n6. Gantt Chart - Project timelines\n7. Pie Chart - Proportional data\n8. Git Graph - Version control branching\n\nMERMAID SYNTAX EXAMPLES:\n\nFlowchart:\ngraph TD\n    A[Start] --> B{Is it working?}\n    B -->|Yes| C[Great!]\n    B -->|No| D[Debug]\n    D --> B\n\nSequence Diagram:\nsequenceDiagram\n    participant A as Alice\n    participant B as Bob\n    A->>B: Hello Bob!\n    B->>A: Hi Alice!\n    A->>B: How are you?\n    B->>A: I'm good, thanks!\n\nClass Diagram:\nclassDiagram\n    class Animal {\n        +String name\n        +int age\n        +makeSound()\n    }\n    class Dog {\n        +String breed\n        +bark()\n    }\n    Animal <|-- Dog\n\nState Diagram:\nstateDiagram-v2\n    [*] --> Idle\n    --> Processing: Start\n    Processing --> Success: Complete\n    Processing --> Error: Fail\n    Success --> [*]\n    Error --> Idle: Retry\n\nER Diagram:\nerDiagram\n    CUSTOMER ||--o{ ORDER : places\n    ORDER ||--|{ LINE-ITEM : contains\n    CUSTOMER }|..|{ DELIVERY-ADDRESS : uses\n\nPie Chart:\npie title Pets Distribution\n    \"Dogs\" : 386\n    \"Cats\" : 85\n    \"Rabbits\" : 15\n\nGit Graph:\ngitGraph\n    commit\n    branch develop\n    checkout develop\n    commit\n    checkout main\n    merge develop\n    commit\n\nRemember: Ensure your mermaid syntax is valid. The diagram will be rendered exactly as specified.",
+func (m *MermaidDiagramTool) Schema() *agent.Schema {
+	return &agent.Schema{
+		Type: agent.TypeObject,
+		Properties: map[string]*agent.Schema{
+			"mermaid_code": {
+				Type:        agent.TypeString,
+				Description: "Complete mermaid diagram definition. REQUIRED. The code should be valid mermaid syntax.\n\nSUPPORTED DIAGRAM TYPES:\n1. Flowchart - Process flows and decision trees\n2. Sequence Diagram - Interaction between entities over time\n3. Class Diagram - Object-oriented class relationships\n4. State Diagram - State transitions and lifecycle\n5. ER Diagram - Entity relationships in databases\n6. Gantt Chart - Project timelines\n7. Pie Chart - Proportional data\n8. Git Graph - Version control branching\n\nMERMAID SYNTAX EXAMPLES:\n\nFlowchart:\ngraph TD\n    A[Start] --> B{Is it working?}\n    B -->|Yes| C[Great!]\n    B -->|No| D[Debug]\n    D --> B\n\nSequence Diagram:\nsequenceDiagram\n    participant A as Alice\n    participant B as Bob\n    A->>B: Hello Bob!\n    B->>A: Hi Alice!\n    A->>B: How are you?\n    B->>A: I'm good, thanks!\n\nClass Diagram:\nclassDiagram\n    class Animal {\n        +String name\n        +int age\n        +makeSound()\n    }\n    class Dog {\n        +String breed\n        +bark()\n    }\n    Animal <|-- Dog\n\nState Diagram:\nstateDiagram-v2\n    [*] --> Idle\n    --> Processing: Start\n    Processing --> Success: Complete\n    Processing --> Error: Fail\n    Success --> [*]\n    Error --> Idle: Retry\n\nER Diagram:\nerDiagram\n    CUSTOMER ||--o{ ORDER : places\n    ORDER ||--|{ LINE-ITEM : contains\n    CUSTOMER }|..|{ DELIVERY-ADDRESS : uses\n\nPie Chart:\npie title Pets Distribution\n    \"Dogs\" : 386\n    \"Cats\" : 85\n    \"Rabbits\" : 15\n\nGit Graph:\ngitGraph\n    commit\n    branch develop\n    checkout develop\n    commit\n    checkout main\n    merge develop\n    commit\n\nRemember: Ensure your mermaid syntax is valid. The diagram will be rendered exactly as specified.",
 			},
-			"title": map[string]any{
-				"type":        "string",
-				"description": "Brief description of the diagram for logging/reference purposes. Example: 'Algorithm flowchart', 'System architecture'",
-				"maxLength":   100,
+			"title": {
+				Type:        agent.TypeString,
+				Description: "Brief description of the diagram for logging/reference purposes (max 100 characters). Example: 'Algorithm flowchart', 'System architecture'",
 			},
-			"output_type": map[string]any{
-				"type":        "string",
-				"description": "Output format: 'svg' for scalable vector graphics or 'png' for raster image. Default is 'png'.",
-				"enum":        []string{"svg", "png"},
+			"output_type": {
+				Type:        agent.TypeString,
+				Description: "Output format: 'svg' for scalable vector graphics or 'png' for raster image. Default is 'png'.",
+				Enum:        []string{"svg", "png"},
 			},
 		},
-		"required": []string{"mermaid_code"},
+		Required: []string{"mermaid_code"},
 	}
 }
 
-func (m *MermaidDiagramTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
+func (m *MermaidDiagramTool) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
 	var params MermaidDiagramArgs
-	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
-		return nil, fmt.Errorf("failed to parse mermaid diagram args: %w", err)
+	if err := args.Decode(&params); err != nil {
+		return agent.ErrorResult(fmt.Errorf("failed to parse mermaid diagram args: %w", err)), nil
 	}
 
 	// Validate required mermaid_code parameter
 	if params.MermaidCode == "" {
-		return nil, ErrMermaidCodeRequired
+		return agent.ErrorResult(ErrMermaidCodeRequired), nil
 	}
 
 	// Set default output type
@@ -87,18 +85,18 @@ func (m *MermaidDiagramTool) Execute(ctx context.Context, tCtx *agent.ToolContex
 
 	// Validate output type
 	if params.OutputType != "svg" && params.OutputType != "png" {
-		return nil, fmt.Errorf("%w, got: %s", ErrInvalidOutputType, params.OutputType)
+		return agent.ErrorResult(fmt.Errorf("%w, got: %s", ErrInvalidOutputType, params.OutputType)), nil
 	}
 
 	// Validate title length
 	if len(params.Title) > 100 {
-		return nil, ErrTitleTooLong
+		return agent.ErrorResult(ErrTitleTooLong), nil
 	}
 
 	// Generate the diagram
 	imagePath, err := executeMermaidDiagram(params.MermaidCode, params.Title, params.OutputType)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate diagram: %w", err)
+		return agent.ErrorResult(fmt.Errorf("failed to generate diagram: %w", err)), nil
 	}
 
 	// Return result as map
@@ -111,11 +109,7 @@ func (m *MermaidDiagramTool) Execute(ctx context.Context, tCtx *agent.ToolContex
 		"title":       params.Title,
 	}
 
-	b, err := json.Marshal(result)
-	if err != nil {
-		return nil, err
-	}
-	return &agent.ToolResult{Output: string(b)}, nil
+	return agent.JSONResult(result), nil
 }
 
 // executeMermaidDiagram executes mermaid-cli via Docker to generate the diagram.

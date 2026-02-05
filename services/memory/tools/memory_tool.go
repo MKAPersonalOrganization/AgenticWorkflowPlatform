@@ -27,37 +27,41 @@ func NewMemoryTool(store artifact.Service) *MemoryTool {
 	return &MemoryTool{store: store}
 }
 
-// Definition returns the tool definition.
-func (t *MemoryTool) Definition() []agent.Tool {
-	return []agent.Tool{
-		agent.SimpleFunctionTool(
-			"save_memory",
-			"Saves a specific piece of information or fact to your long-term memory. Use this when the user explicitly asks you to remember something, or when they state a clear, concise fact that seems important to retain for future interactions.",
-			map[string]any{
-				"type": "object",
-				"properties": map[string]any{
-					"fact": map[string]any{
-						"type":        "string",
-						"description": "The specific fact or piece of information to remember. Should be a clear, self-contained statement.",
-					},
-				},
-				"required": []string{"fact"},
+// Name returns the tool name.
+func (t *MemoryTool) Name() string {
+	return "save_memory"
+}
+
+// Description returns the tool description.
+func (t *MemoryTool) Description() string {
+	return "Saves a specific piece of information or fact to your long-term memory. Use this when the user explicitly asks you to remember something, or when they state a clear, concise fact that seems important to retain for future interactions."
+}
+
+// Schema returns the tool schema.
+func (t *MemoryTool) Schema() *agent.Schema {
+	return &agent.Schema{
+		Type: agent.TypeObject,
+		Properties: map[string]*agent.Schema{
+			"fact": {
+				Type:        agent.TypeString,
+				Description: "The specific fact or piece of information to remember. Should be a clear, self-contained statement.",
 			},
-			t.saveMemory,
-		),
+		},
+		Required: []string{"fact"},
 	}
 }
 
-func (t *MemoryTool) saveMemory(ctx context.Context, args map[string]any) (any, error) {
+// Execute executes the save memory operation.
+func (t *MemoryTool) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
 	var input struct {
 		Fact string `json:"fact"`
 	}
-	if err := agent.UnmarshalToolArgs(args, &input); err != nil {
-		return nil, err
+	if err := args.Decode(&input); err != nil {
+		return agent.ErrorResult(err), nil
 	}
 
 	if input.Fact == "" {
-		return nil, fmt.Errorf("fact cannot be empty")
+		return agent.ErrorResult(fmt.Errorf("fact cannot be empty")), nil
 	}
 
 	// Extract userID from context
@@ -74,11 +78,11 @@ func (t *MemoryTool) saveMemory(ctx context.Context, args map[string]any) (any, 
 		defer func() { _ = rc.Close() }()
 		data, err := io.ReadAll(rc)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read memory file: %w", err)
+			return agent.ErrorResult(fmt.Errorf("failed to read memory file: %w", err)), nil
 		}
 		currentContent = string(data)
 	} else if err != artifact.ErrNotFound {
-		return nil, fmt.Errorf("failed to load memory file: %w", err)
+		return agent.ErrorResult(fmt.Errorf("failed to load memory file: %w", err)), nil
 	}
 
 	// 2. Compute new content
@@ -87,10 +91,10 @@ func (t *MemoryTool) saveMemory(ctx context.Context, args map[string]any) (any, 
 	// 3. Save content
 	_, err = t.store.Save(ctx, userID, sessionID, MemoryFileName, strings.NewReader(newContent))
 	if err != nil {
-		return nil, fmt.Errorf("failed to save memory file: %w", err)
+		return agent.ErrorResult(fmt.Errorf("failed to save memory file: %w", err)), nil
 	}
 
-	return fmt.Sprintf("Okay, I've remembered that: %q", input.Fact), nil
+	return agent.TextResult(fmt.Sprintf("Okay, I've remembered that: %q", input.Fact)), nil
 }
 
 func (t *MemoryTool) computeNewContent(currentContent, fact string) string {

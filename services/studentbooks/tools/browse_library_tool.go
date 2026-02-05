@@ -38,43 +38,40 @@ func (t *BrowseLibraryTool) Description() string {
 	return "Browses the academic library tree. Use it to discover grade levels, then books, then chapters. Provide a path or leave empty to start at the root."
 }
 
-// InputSchema returns the JSON schema for the tool's parameters.
-func (t *BrowseLibraryTool) InputSchema() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"path": map[string]any{
-				"type":        "string",
-				"description": "Path to a directory (e.g., 'university' or 'university/Think-Stats'). Leave empty for root.",
+// Schema returns the JSON schema for the tool's parameters.
+func (t *BrowseLibraryTool) Schema() *agent.Schema {
+	return &agent.Schema{
+		Type: agent.TypeObject,
+		Properties: map[string]*agent.Schema{
+			"path": {
+				Type:        agent.TypeString,
+				Description: "Path to a directory (e.g., 'university' or 'university/Think-Stats'). Leave empty for root.",
 			},
 		},
 	}
 }
 
-// Execute executes the tool with the given ToolContext and typed arguments.
-func (t *BrowseLibraryTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
+// Execute executes the tool with the given arguments.
+func (t *BrowseLibraryTool) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
 	var params BrowseLibraryArgs
-	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
-		return nil, fmt.Errorf("failed to parse browse_library args: %w", err)
+	if err := args.Decode(&params); err != nil {
+		return agent.ErrorResult(fmt.Errorf("failed to parse browse_library args: %w", err)), nil
 	}
 
 	nodes, err := t.books.ListNodes(params.Path)
 	if err != nil {
-		return jsonResult(map[string]any{
+		return agent.JSONResult(map[string]any{
 			"status":  "error",
 			"message": fmt.Sprintf("Failed to browse path '%s': %v", params.Path, err),
-		})
+		}), nil
 	}
 
-	return jsonResult(map[string]any{
+	return agent.JSONResult(map[string]any{
 		"nodes": nodes,
-	})
+	}), nil
 }
 
-func jsonResult(v any) (*agent.ToolResult, error) {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return nil, err
-	}
-	return &agent.ToolResult{Output: string(b)}, nil
+func jsonResult(v any) agent.Result {
+	b, _ := json.Marshal(v)
+	return agent.TextResult(string(b))
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/internal/llm"
 )
 
@@ -57,7 +58,7 @@ type RequestContext struct {
 	SystemPrompt string
 
 	// Tools are the available tools/functions for this request
-	Tools []Tool
+	Tools []agent.ExecutableTool
 
 	// Config is the agent configuration
 	Config *AgentConfig
@@ -76,7 +77,7 @@ type RequestContext struct {
 
 	// AdditionalTools are tools added by middleware
 	// These will be merged with the base Tools
-	AdditionalTools []Tool
+	AdditionalTools []agent.ExecutableTool
 
 	// SystemPromptAdditions are system prompt fragments added by middleware
 	// These will be appended to the base SystemPrompt
@@ -84,7 +85,7 @@ type RequestContext struct {
 }
 
 // NewRequestContext creates a new RequestContext with the given parameters.
-func NewRequestContext(threadID string, messages []llm.Message, systemPrompt string, tools []Tool, config *AgentConfig) *RequestContext {
+func NewRequestContext(threadID string, messages []llm.Message, systemPrompt string, tools []agent.ExecutableTool, config *AgentConfig) *RequestContext {
 	return &RequestContext{
 		ThreadID:              threadID,
 		Messages:              messages,
@@ -92,7 +93,7 @@ func NewRequestContext(threadID string, messages []llm.Message, systemPrompt str
 		Tools:                 tools,
 		Config:                config,
 		State:                 make(map[string]any),
-		AdditionalTools:       []Tool{},
+		AdditionalTools:       []agent.ExecutableTool{},
 		SystemPromptAdditions: []string{},
 		Terminate:             false,
 	}
@@ -122,7 +123,7 @@ func (rc *RequestContext) SetTerminate() {
 
 // AddTool adds a tool that will be available for this request.
 // This allows middleware to dynamically inject tools.
-func (rc *RequestContext) AddTool(tool Tool) {
+func (rc *RequestContext) AddTool(tool agent.ExecutableTool) {
 	rc.AdditionalTools = append(rc.AdditionalTools, tool)
 }
 
@@ -170,12 +171,12 @@ func (rc *RequestContext) GetEffectiveSystemPrompt() string {
 }
 
 // GetEffectiveTools returns all tools including those added by middleware.
-func (rc *RequestContext) GetEffectiveTools() []Tool {
+func (rc *RequestContext) GetEffectiveTools() []agent.ExecutableTool {
 	if len(rc.AdditionalTools) == 0 {
 		return rc.Tools
 	}
 
-	allTools := make([]Tool, 0, len(rc.Tools)+len(rc.AdditionalTools))
+	allTools := make([]agent.ExecutableTool, 0, len(rc.Tools)+len(rc.AdditionalTools))
 	allTools = append(allTools, rc.Tools...)
 	allTools = append(allTools, rc.AdditionalTools...)
 
@@ -201,7 +202,7 @@ func WithSystemPrompt(prompt string) ContextOption {
 }
 
 // WithTools sets the tools in the context.
-func WithTools(tools []Tool) ContextOption {
+func WithTools(tools []agent.ExecutableTool) ContextOption {
 	return func(rc *RequestContext) {
 		rc.Tools = tools
 	}
