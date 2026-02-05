@@ -61,18 +61,6 @@ type Hierarchical interface {
 	Parent() Agent
 }
 
-// AgentWithCallbacks extends Agent with lifecycle callbacks.
-// This is optional - agents can implement just Agent if callbacks aren't needed.
-type AgentWithCallbacks interface {
-	Agent
-
-	// BeforeAgentCallbacks returns callbacks to run before agent execution.
-	BeforeAgentCallbacks() []BeforeAgentCallback
-
-	// AfterAgentCallbacks returns callbacks to run after agent execution.
-	AfterAgentCallbacks() []AfterAgentCallback
-}
-
 // AgentWithMiddleware extends Agent with middleware support.
 // This is optional - compatible with Blades' middleware pattern.
 type AgentWithMiddleware interface {

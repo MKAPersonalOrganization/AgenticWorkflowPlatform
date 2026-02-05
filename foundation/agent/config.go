@@ -60,18 +60,6 @@ type Config struct {
 	// Middlewares are applied to this agent's handler.
 	Middlewares []Middleware
 
-	// BeforeAgentCallbacks run before agent execution.
-	BeforeAgentCallbacks []BeforeAgentCallback
-
-	// AfterAgentCallbacks run after agent execution.
-	AfterAgentCallbacks []AfterAgentCallback
-
-	// BeforeToolCallbacks run before tool execution.
-	BeforeToolCallbacks []BeforeToolCallback
-
-	// AfterToolCallbacks run after tool execution.
-	AfterToolCallbacks []AfterToolCallback
-
 	// OutputKey stores the agent's output in session state.
 	// Useful for connecting agents to coordinate with each other.
 	OutputKey string

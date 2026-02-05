@@ -76,18 +76,6 @@ type ReadonlyContext interface {
 	State() ReadonlyState
 }
 
-// CallbackContext is passed to callbacks during agent execution.
-// It extends ReadonlyContext with write access to state and artifacts.
-type CallbackContext interface {
-	ReadonlyContext
-
-	// MutableState provides read-write access to session state.
-	MutableState() State
-
-	// Artifacts provides access to artifact storage.
-	Artifacts() Artifacts
-}
-
 // ReadonlyState provides read-only access to session state.
 type ReadonlyState interface {
 	// Get retrieves a value by key.
