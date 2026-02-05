@@ -18,8 +18,8 @@ type TraceIDFn func(ctx context.Context) string
 
 // Logger represents a logger for logging information.
 type Logger struct {
+	slog.Handler
 	discard   bool
-	handler   slog.Handler
 	traceIDFn TraceIDFn
 }
 
@@ -64,12 +64,12 @@ func NewMinimalWithEvents(w io.Writer, minLevel Level, serviceName string, trace
 // NewWithHandler returns a new log for application use with the underlying
 // handler.
 func NewWithHandler(h slog.Handler) *Logger {
-	return &Logger{handler: h}
+	return &Logger{Handler: h}
 }
 
 // NewStdLogger returns a standard library Logger that wraps the slog Logger.
 func NewStdLogger(logger *Logger, level Level) *log.Logger {
-	return slog.NewLogLogger(logger.handler, slog.Level(level))
+	return slog.NewLogLogger(logger.Handler, slog.Level(level))
 }
 
 // Debug logs at LevelDebug with the given context.
@@ -147,7 +147,7 @@ func (log *Logger) Errorc(ctx context.Context, caller int, msg string, args ...a
 func (log *Logger) write(ctx context.Context, level Level, caller int, msg string, args ...any) {
 	slogLevel := slog.Level(level)
 
-	if !log.handler.Enabled(ctx, slogLevel) {
+	if !log.Handler.Enabled(ctx, slogLevel) {
 		return
 	}
 
@@ -161,7 +161,7 @@ func (log *Logger) write(ctx context.Context, level Level, caller int, msg strin
 	}
 	r.Add(args...)
 
-	_ = log.handler.Handle(ctx, r)
+	_ = log.Handler.Handle(ctx, r)
 }
 
 func new(w io.Writer, minLevel Level, serviceName string, traceIDFn TraceIDFn, events Events, mode logMode) *Logger {
@@ -209,8 +209,8 @@ func new(w io.Writer, minLevel Level, serviceName string, traceIDFn TraceIDFn, e
 	handler = handler.WithAttrs(attrs)
 
 	return &Logger{
+		Handler:   handler,
 		discard:   w == io.Discard,
-		handler:   handler,
 		traceIDFn: traceIDFn,
 	}
 }

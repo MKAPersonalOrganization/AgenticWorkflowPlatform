@@ -413,8 +413,20 @@ func (h *TaskManagementHandler) UpdateThreadTitle(w http.ResponseWriter, r *http
 func (h *TaskManagementHandler) ListAgents(w http.ResponseWriter, r *http.Request) {
 	agents := h.agentProvider.List()
 
+	response := agent.AgentListResponse{
+		Agents: make([]agent.AgentMetadata, 0, len(agents)),
+	}
+
+	for _, a := range agents {
+		response.Agents = append(response.Agents, agent.AgentMetadata{
+			ID:          a.ID(),
+			Name:        a.Name(),
+			Description: a.Description(),
+		})
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(agents); err != nil {
+	if err := json.NewEncoder(w).Encode(response); err != nil {
 		h.log.Error(r.Context(), "failed to encode agents list", "error", err)
 		http.Error(w, "Failed to encode agents list", http.StatusInternalServerError)
 	}

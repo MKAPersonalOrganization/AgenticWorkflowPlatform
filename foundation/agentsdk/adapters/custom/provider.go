@@ -28,12 +28,17 @@ func (p *MapAgentProvider) Get(name string) (agent.Agent, error) {
 	return a, nil
 }
 
-// List returns all available agent names.
-func (p *MapAgentProvider) List() []string {
-	names := make([]string, 0, len(p.agents))
-	for name := range p.agents {
-		names = append(names, name)
+// List returns all available agents.
+func (p *MapAgentProvider) List() []agent.Agent {
+	agents := make([]agent.Agent, 0, len(p.agents))
+	for _, a := range p.agents {
+		agents = append(agents, a)
 	}
-	sort.Strings(names)
-	return names
+
+	// Sort by name for consistency
+	sort.Slice(agents, func(i, j int) bool {
+		return agents[i].Name() < agents[j].Name()
+	})
+
+	return agents
 }

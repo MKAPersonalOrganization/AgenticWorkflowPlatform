@@ -152,7 +152,7 @@ func terminationReasonToCompletionReason(tr TerminationReason) CompletionReason 
 // finalizeResult completes the execution result with final metrics.
 func (exec *executionState) finalizeResult() {
 	res := exec.observer.result
-	res.FinalAgent = exec.agent.Name
+	res.FinalAgent = exec.agent.Name()
 	res.Iterations = exec.safety.iteration
 	res.ToolsCalled = exec.observer.toolNames
 	res.Duration = timeSince(exec.observer.startTime)
@@ -305,7 +305,7 @@ func (s *executionState) executeRequiredActions() error {
 		MessageID:         s.messageID,
 		StreamResult:      s.streamResult,
 		Safety:            s.safety,
-		AgentName:         s.agent.Name,
+		AgentName:         s.agent.Name(),
 		ToolStateMachines: s.toolStateMachines,
 		Yield:             s.observer.yield,
 		Executor:          s.agent.Executor,
@@ -468,12 +468,24 @@ func (o *ObserverUnit) FailWithLoop(info *LoopInfo) error {
 
 // AgentInstance holds everything specific to the agent currently in control.
 type AgentInstance struct {
-	Name     string
-	Config   core.AgentConfig
-	LLM      *LLMContextManager
-	Stream   *StreamProcessor
-	Events   *EventFactory
-	Executor core.ToolExecutor
+	instanceName string
+	Config       core.AgentConfig
+	LLM          *LLMContextManager
+	Stream       *StreamProcessor
+	Events       *EventFactory
+	Executor     core.ToolExecutor
+}
+
+func (ai *AgentInstance) ID() agent.ID { return agent.ID(ai.instanceName) }
+
+func (ai *AgentInstance) Name() string { return ai.instanceName }
+
+func (ai *AgentInstance) Description() string { return "" }
+
+func (ai *AgentInstance) Run(ctx context.Context, inv *agent.Invocation) iter.Seq2[agent.Event, error] {
+	return func(yield func(agent.Event, error) bool) {
+		yield(nil, fmt.Errorf("Run not directly supported on AgentInstance; use Engine"))
+	}
 }
 
 func (e *Engine) newAgentInstance(ctx context.Context, name string) (*AgentInstance, error) {
@@ -487,11 +499,11 @@ func (e *Engine) newAgentInstance(ctx context.Context, name string) (*AgentInsta
 
 	events := NewEventFactory(config.Name)
 	return &AgentInstance{
-		Name:   config.Name,
-		Config: config,
-		LLM:    NewLLMContextManager(config, e.reqCtxCapture),
-		Events: events,
-		Stream: NewStreamProcessor(events),
+		instanceName: config.Name,
+		Config:       config,
+		LLM:          NewLLMContextManager(config, e.reqCtxCapture),
+		Events:       events,
+		Stream:       NewStreamProcessor(events),
 	}, nil
 }
 
@@ -666,6 +678,22 @@ func (s *executionState) initAgentComponents(name string) error {
 }
 
 func (s *executionState) run() error {
+	// Wrap entire agent run with AgentMiddleware
+	if len(s.agent.Config.AgentMiddleware) > 0 {
+		return ExecuteAgentMiddleware(
+			s.ctx,
+			s.agent.Config.AgentMiddleware,
+			s.agent, // agent.Agent
+			nil,     // []agent.Message
+			nil,     // agent.Session
+			true,    // Streaming
+			s.runCore,
+		)
+	}
+	return s.runCore()
+}
+
+func (s *executionState) runCore() error {
 	// 1. Initial State
 	s.trackStateChange(StateInvokingLLM)
 
@@ -748,6 +776,23 @@ func (s *executionState) run() error {
 }
 
 func (s *executionState) streamAndProcessLLMResponse(llmContext *LLMContext) error {
+	// Wrap LLM call with ChatMiddleware
+	if len(s.agent.Config.ChatMiddleware) > 0 {
+		return ExecuteChatMiddleware(
+			s.ctx,
+			s.agent.Config.ChatMiddleware,
+			nil, // agent.Model
+			nil, // []agent.Message
+			nil, // *agent.ChatOptions
+			func() error {
+				return s.streamAndProcessLLMResponseCore(llmContext)
+			},
+		)
+	}
+	return s.streamAndProcessLLMResponseCore(llmContext)
+}
+
+func (s *executionState) streamAndProcessLLMResponseCore(llmContext *LLMContext) error {
 	// Update executor with middleware-processed effective tools
 	// This replaces the base executor created in prepareExecutor()
 	// with one that has the full context and middleware-applied tools
@@ -793,7 +838,7 @@ func (s *executionState) saveAgentMessageAndEmitEvents() error {
 		MessageID: s.messageID,
 		Content:   s.streamResult.Content,
 		ToolCalls: s.streamResult.ToolCalls,
-		AgentName: s.agent.Name,
+		AgentName: s.agent.Name(),
 		Timestamp: time.Now(),
 	}
 	if !s.observer.yield(assistantMsgEvent, nil) {
@@ -806,7 +851,7 @@ func (s *executionState) saveAgentMessageAndEmitEvents() error {
 		Role:      "assistant",
 		Content:   s.streamResult.Content,
 		ToolCalls: s.streamResult.ToolCalls,
-		AgentName: s.agent.Name,
+		AgentName: s.agent.Name(),
 		Timestamp: assistantMsgEvent.Timestamp,
 	})
 

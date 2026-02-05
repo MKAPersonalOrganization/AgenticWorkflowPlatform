@@ -49,6 +49,18 @@ type Toolable interface {
 	Tools() []Tool
 }
 
+// AgentMetadata represents metadata for an agent exposed via the API.
+type AgentMetadata struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// AgentListResponse represents the response containing a list of agents.
+type AgentListResponse struct {
+	Agents []AgentMetadata `json:"agents"`
+}
+
 // Hierarchical extends Agent with sub-agent capabilities for hierarchical delegation.
 type Hierarchical interface {
 	Agent
@@ -66,8 +78,14 @@ type Hierarchical interface {
 type AgentWithMiddleware interface {
 	Agent
 
-	// Middlewares returns the middleware chain for this agent.
-	Middlewares() []Middleware
+	// AgentMiddlewares returns the middleware chain for the agent run.
+	AgentMiddlewares() []Middleware
+
+	// ChatMiddlewares returns the middleware chain for LLM calls.
+	ChatMiddlewares() []Middleware
+
+	// FunctionMiddlewares returns the middleware chain for tool execution.
+	FunctionMiddlewares() []Middleware
 }
 
 // AgentProvider provides discovery and lookup for available agents.
@@ -77,8 +95,8 @@ type AgentProvider interface {
 	// Get retrieves an agent by name.
 	Get(name string) (Agent, error)
 
-	// List returns all available agent names.
-	List() []string
+	// List returns all available agents.
+	List() []Agent
 }
 
 // Invocation contains all the information needed to execute an agent.

@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"school-with-ai/foundation/agent"
-	"school-with-ai/foundation/agentsdk/core"
 )
 
 // ExecutableToolAdapter adapts agent.Tool to agent.ExecutableTool.
@@ -56,29 +55,24 @@ func (a *ExecutableToolAdapter) Execute(ctx context.Context, args agent.Argument
 	return agent.Result{}, fmt.Errorf("tool %s does not implement Execute method", a.tool.Name())
 }
 
-// MiddlewareAdapter adapts agent.RequestMiddleware to core.Middleware.
-type MiddlewareAdapter struct {
-	middleware agent.RequestMiddleware
-}
+// =============================================================================
+// Unified Middleware Adapters
+// =============================================================================
 
-// NewMiddlewareAdapter creates an adapter from agent.RequestMiddleware.
-func NewMiddlewareAdapter(middleware agent.RequestMiddleware) core.Middleware {
-	return &MiddlewareAdapter{
-		middleware: middleware,
+// AdaptRequestMiddlewareToUnified converts agent.RequestMiddleware to unified agent.Middleware.
+// This bridges the old request-based middleware pattern to the new unified middleware system.
+func AdaptRequestMiddlewareToUnified(mw agent.RequestMiddleware) agent.Middleware {
+	return func(next agent.Handler) agent.Handler {
+		return agent.HandlerFunc(func(c *agent.Context) error {
+			agentReqCtx := &agent.RequestContext{}
+
+			// Create next handler adapter
+			agentNext := func(ctx context.Context, rc *agent.RequestContext) error {
+				return next.Handle(c)
+			}
+
+			// Execute the request middleware
+			return mw.Process(c.Context, agentReqCtx, agentNext)
+		})
 	}
-}
-
-func (a *MiddlewareAdapter) Process(ctx context.Context, reqCtx *core.RequestContext, next core.NextHandler) error {
-	// Convert core.RequestContext to agent.RequestContext
-	// Note: agent.RequestContext has different structure, we'll pass through what we can
-	agentReqCtx := &agent.RequestContext{}
-
-	// Create adapter for next handler
-	agentNext := func(ctx context.Context, agentCtx *agent.RequestContext) error {
-		// Call the core next handler
-		return next(ctx, reqCtx)
-	}
-
-	// Call the agent middleware
-	return a.middleware.Process(ctx, agentReqCtx, agentNext)
 }

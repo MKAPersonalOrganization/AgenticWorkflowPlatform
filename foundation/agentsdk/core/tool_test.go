@@ -2,41 +2,44 @@ package core_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 
+	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/core"
 )
 
 func TestFunctionTool(t *testing.T) {
 	t.Parallel()
-	tool := core.NewFunctionTool(
+	tool := agent.NewFunctionTool(
 		"get_weather",
 		"Get the current weather for a location",
-		core.ObjectSchema(
-			map[string]any{
-				"location": core.StringProperty("The city name"),
-				"unit":     core.EnumProperty("Temperature unit", []string{"celsius", "fahrenheit"}),
+		&agent.Schema{
+			Type: agent.TypeObject,
+			Properties: map[string]*agent.Schema{
+				"location": {Type: agent.TypeString, Description: "The city name"},
+				"unit":     {Type: agent.TypeString, Enum: []string{"celsius", "fahrenheit"}},
 			},
-			[]string{"location"},
-		),
-		func(ctx core.ToolContext, args any) (any, error) {
+			Required: []string{"location"},
+		},
+		func(ctx context.Context, args agent.Arguments) (agent.Result, error) {
 			var params struct {
 				Location string `json:"location"`
 				Unit     string `json:"unit"`
 			}
-			if err := core.UnmarshalArgs(args, &params); err != nil {
-				return nil, fmt.Errorf("failed to parse arguments: %w", err)
+			if err := args.Decode(&params); err != nil {
+				return agent.NewResultError(fmt.Errorf("failed to parse arguments: %w", err)), nil
 			}
 			if params.Unit == "" {
 				params.Unit = "celsius"
 			}
 
-			return map[string]any{
+			return agent.JSONResult(map[string]any{
 				"temperature": 22,
 				"unit":        params.Unit,
 				"location":    params.Location,
-			}, nil
+			}), nil
 		},
 	)
 
@@ -48,26 +51,27 @@ func TestFunctionTool(t *testing.T) {
 		t.Errorf("unexpected description: %s", tool.Description())
 	}
 
-	params := tool.Parameters()
-	if params["type"] != "object" {
-		t.Errorf("expected type 'object', got '%v'", params["type"])
-	}
-
-	// Test invocation
-	result, err := tool.Invoke(core.NewToolContext(context.Background(), "", "", "", nil), map[string]any{"location": "London", "unit": "celsius"})
+	// Test execution
+	rawArgs := []byte(`{"location": "London", "unit": "celsius"}`)
+	result, err := tool.Execute(context.Background(), agent.Arguments{Raw: rawArgs})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	resMap, ok := result.(map[string]any)
-	if !ok {
-		t.Fatalf("expected map[string]any result, got %T", result)
+	if result.Error != nil {
+		t.Fatalf("unexpected result error: %v", result.Error)
+	}
+
+	resMap := make(map[string]any)
+	err = json.Unmarshal([]byte(result.Content[0].(string)), &resMap)
+	if err != nil {
+		t.Fatalf("failed to unmarshal content: %v", err)
 	}
 
 	if resMap["location"] != "London" {
 		t.Errorf("expected location 'London', got '%v'", resMap["location"])
 	}
-	if resMap["temperature"] != 22 {
+	if resMap["temperature"].(float64) != 22 {
 		t.Errorf("expected temperature 22, got %v", resMap["temperature"])
 	}
 }
@@ -77,21 +81,21 @@ func TestToolRegistry(t *testing.T) {
 	registry := core.NewToolRegistry()
 
 	// Register some tools
-	weatherTool := core.NewFunctionTool(
+	weatherTool := agent.NewFunctionTool(
 		"get_weather",
 		"Get weather",
-		core.ObjectSchema(map[string]any{"location": core.StringProperty("City")}, []string{"location"}),
-		func(ctx core.ToolContext, args any) (any, error) {
-			return map[string]any{"temp": 20}, nil
+		nil,
+		func(ctx context.Context, args agent.Arguments) (agent.Result, error) {
+			return agent.JSONResult(map[string]any{"temp": 20}), nil
 		},
 	)
 
-	calcTool := core.NewFunctionTool(
+	calcTool := agent.NewFunctionTool(
 		"calculate",
 		"Calculate expression",
-		core.ObjectSchema(map[string]any{"expression": core.StringProperty("Math expression")}, []string{"expression"}),
-		func(ctx core.ToolContext, args any) (any, error) {
-			return map[string]any{"result": 42}, nil
+		nil,
+		func(ctx context.Context, args agent.Arguments) (agent.Result, error) {
+			return agent.JSONResult(map[string]any{"result": 42}), nil
 		},
 	)
 
@@ -117,55 +121,6 @@ func TestToolRegistry(t *testing.T) {
 	all := registry.All()
 	if len(all) != 2 {
 		t.Errorf("expected 2 tools, got %d", len(all))
-	}
-
-	// Test ToToolSpecs
-	specs := registry.ToToolSpecs()
-	if len(specs) != 2 {
-		t.Errorf("expected 2 specs, got %d", len(specs))
-	}
-	for _, spec := range specs {
-		if spec.Type != "function" {
-			t.Errorf("expected type 'function', got '%s'", spec.Type)
-		}
-	}
-}
-
-func TestToToolSpec(t *testing.T) {
-	t.Parallel()
-	tool := core.NewFunctionTool(
-		"test_tool",
-		"A test tool",
-		core.ObjectSchema(
-			map[string]any{
-				"param1": core.StringProperty("First parameter"),
-				"param2": core.IntegerProperty("Second parameter"),
-			},
-			[]string{"param1"},
-		),
-		func(ctx core.ToolContext, args any) (any, error) { return map[string]any{}, nil },
-	)
-
-	spec := core.ToToolSpec(tool)
-
-	if spec.Type != "function" {
-		t.Errorf("expected type 'function', got '%s'", spec.Type)
-	}
-	if spec.Function.Name != "test_tool" {
-		t.Errorf("expected name 'test_tool', got '%s'", spec.Function.Name)
-	}
-	if spec.Function.Description != "A test tool" {
-		t.Errorf("unexpected description: %s", spec.Function.Description)
-	}
-
-	// Verify parameters are properly structured
-	params := spec.Function.Parameters
-	if params["type"] != "object" {
-		t.Errorf("expected parameters type 'object', got '%v'", params["type"])
-	}
-	required, ok := params["required"].([]string)
-	if !ok || len(required) != 1 || required[0] != "param1" {
-		t.Errorf("unexpected required fields: %v", params["required"])
 	}
 }
 

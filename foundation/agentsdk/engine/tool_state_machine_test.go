@@ -19,6 +19,10 @@ func (m *MockToolExecutor) Execute(toolCall core.ToolCall) (core.ToolExecResult,
 	return core.ToolExecResult{Result: "success"}, nil
 }
 
+func (m *MockToolExecutor) Context() context.Context {
+	return context.Background()
+}
+
 // MockToolStateObserver records state transitions for testing.
 type MockToolStateObserver struct {
 	transitions []struct {

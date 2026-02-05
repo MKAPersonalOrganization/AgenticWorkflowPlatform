@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"encoding/json"
 
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/core"
@@ -67,13 +68,23 @@ func (s *ToolExecutionService) CreateExecutor(
 // ExecuteAll executes all tool calls and returns their results.
 // It tracks whether any tool signals to stop iteration.
 func (s *ToolExecutionService) ExecuteAll(toolCalls []core.ToolCall, executor core.ToolExecutor) ToolExecutionResults {
+	return s.ExecuteAllWithMiddleware(executor.Context(), toolCalls, executor, nil)
+}
+
+// ExecuteAllWithMiddleware executes all tool calls with middleware and returns their results.
+func (s *ToolExecutionService) ExecuteAllWithMiddleware(
+	ctx context.Context,
+	toolCalls []core.ToolCall,
+	executor core.ToolExecutor,
+	middleware []agent.Middleware,
+) ToolExecutionResults {
 	results := ToolExecutionResults{
 		Results:    make([]ToolExecutionResult, 0, len(toolCalls)),
 		ShouldStop: false,
 	}
 
 	for _, tc := range toolCalls {
-		result := s.Execute(tc, executor)
+		result := s.ExecuteWithMiddleware(ctx, tc, executor, middleware)
 		results.Results = append(results.Results, result)
 
 		if result.StopIteration {
@@ -86,15 +97,52 @@ func (s *ToolExecutionService) ExecuteAll(toolCalls []core.ToolCall, executor co
 
 // Execute executes a single tool call and returns the result.
 func (s *ToolExecutionService) Execute(toolCall core.ToolCall, executor core.ToolExecutor) ToolExecutionResult {
-	execResult, err := executor.Execute(toolCall)
-	if err != nil && execResult.Result == "" {
-		execResult.Result = err.Error()
+	return s.ExecuteWithMiddleware(executor.Context(), toolCall, executor, nil)
+}
+
+// ExecuteWithMiddleware executes a single tool call with middleware and returns the result.
+func (s *ToolExecutionService) ExecuteWithMiddleware(
+	ctx context.Context,
+	toolCall core.ToolCall,
+	executor core.ToolExecutor,
+	middleware []agent.Middleware,
+) ToolExecutionResult {
+	var execResult core.ToolExecResult
+	var execErr error
+
+	// Core execution logic
+	doExecute := func() error {
+		execResult, execErr = executor.Execute(toolCall)
+		if execErr != nil && execResult.Result == "" {
+			execResult.Result = execErr.Error()
+		}
+		return nil // Always return nil - we capture errors in execErr
+	}
+
+	// Wrap with FunctionMiddleware if present
+	if len(middleware) > 0 {
+		// Parse arguments JSON string to map for middleware context
+		var argsMap map[string]any
+		if toolCall.Arguments != "" {
+			_ = json.Unmarshal([]byte(toolCall.Arguments), &argsMap)
+		}
+		// We don't have access to the actual Tool interface here,
+		// so we pass nil for the tool argument
+		_ = ExecuteFunctionMiddleware(
+			ctx,
+			middleware,
+			nil, // Tool (not easily available here)
+			argsMap,
+			doExecute,
+		)
+	} else {
+		doExecute()
 	}
 
 	return ToolExecutionResult{
 		ToolCallID:    toolCall.ID,
 		Result:        &execResult,
-		Error:         err,
+		Error:         execErr,
 		StopIteration: execResult.StopIteration,
 	}
 }
