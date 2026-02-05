@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"iter"
 	"time"
@@ -309,6 +310,8 @@ func (s *executionState) executeRequiredActions() error {
 		ToolStateMachines: s.toolStateMachines,
 		Yield:             s.observer.yield,
 		Executor:          s.agent.Executor,
+		Middlewares:       s.agent.Config.FunctionMiddleware,
+		Tools:             s.agent.Config.Tools,
 	}
 	resolution, agg, err := s.tools.ProcessActions(tctx)
 	if err != nil {
@@ -523,11 +526,15 @@ type ToolProcessorContext struct {
 	ToolStateMachines map[string]*core.ToolStateMachine
 	Yield             func(core.Event, error) bool
 	Executor          core.ToolExecutor
+	Middlewares       []agent.Middleware
+	Tools             []agent.ExecutableTool // Added for tool lookup
 }
 
 func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolver, []core.Message, error) {
 	var route RouteResolver
 	var newMessages []core.Message
+
+	// Map tool names to actual agent.Tool if needed, though we only have tc.Name
 
 	// 1. Parallel execution using errgroup
 	g, _ := errgroup.WithContext(tctx.Ctx)
@@ -550,8 +557,47 @@ func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolve
 				return err
 			}
 
-			// Actually execute the tool
-			execResult, err := tctx.Executor.Execute(tc)
+			var execResult core.ToolExecResult
+			var execErr error
+
+			// Parse arguments for middleware
+			var argsMap map[string]any
+			if tc.Arguments != "" {
+				_ = json.Unmarshal([]byte(tc.Arguments), &argsMap)
+			}
+
+			// Resolve the actual tool if possible
+			var tool agent.Tool
+			for _, t := range tctx.Tools {
+				if t.Name() == tc.Name {
+					tool = t
+					break
+				}
+			}
+
+			// Actually execute the tool wrapped in middleware
+			err := ExecuteFunctionMiddleware(
+				tctx.Ctx,
+				tctx.Middlewares,
+				tool,
+				argsMap,
+				map[string]any{
+					"agent_name": tctx.AgentName,
+					"thread_id":  tctx.ThreadID,
+					"message_id": tctx.MessageID,
+					"tool_name":  tc.Name,
+				},
+				func(c *agent.Context) error {
+					execResult, execErr = tctx.Executor.Execute(tc)
+					c.Result = execResult
+					return execErr
+				},
+			)
+
+			// Handle potential error from ExecuteFunctionMiddleware itself (though unlikely)
+			if err != nil && execErr == nil {
+				execErr = err
+			}
 
 			// Prepare result for state machine (always, even for elicitation/auth)
 			toolResult := &core.ToolExecutionResult{
@@ -559,7 +605,7 @@ func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolve
 				ToolName:      tc.Name,
 				Arguments:     tc.Arguments,
 				Result:        execResult.Result,
-				IsError:       err != nil,
+				IsError:       execErr != nil,
 				StopIteration: execResult.StopIteration,
 				Command:       execResult.Command,
 			}
@@ -575,7 +621,7 @@ func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolve
 			}
 
 			// Update state machine based on execution result
-			if err != nil {
+			if execErr != nil {
 				return tsm.Error(toolResult)
 			}
 			return tsm.Success(toolResult)
@@ -683,11 +729,18 @@ func (s *executionState) run() error {
 		return ExecuteAgentMiddleware(
 			s.ctx,
 			s.agent.Config.AgentMiddleware,
-			s.agent, // agent.Agent
-			nil,     // []agent.Message
-			nil,     // agent.Session
-			true,    // Streaming
-			s.runCore,
+			s.agent,
+			nil,   // []agent.Message
+			nil,   // agent.Session
+			false, // Streaming
+			map[string]any{
+				"agent_name": s.agent.Name(),
+				"thread_id":  s.threadID,
+				"message_id": s.messageID,
+			},
+			func() error {
+				return s.runCore()
+			},
 		)
 	}
 	return s.runCore()
@@ -784,6 +837,11 @@ func (s *executionState) streamAndProcessLLMResponse(llmContext *LLMContext) err
 			nil, // agent.Model
 			nil, // []agent.Message
 			nil, // *agent.ChatOptions
+			map[string]any{
+				"agent_name": s.agent.Name(),
+				"thread_id":  s.threadID,
+				"message_id": s.messageID,
+			},
 			func() error {
 				return s.streamAndProcessLLMResponseCore(llmContext)
 			},

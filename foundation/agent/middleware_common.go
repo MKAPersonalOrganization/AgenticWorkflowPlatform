@@ -3,6 +3,7 @@ package agent
 import (
 	"fmt"
 	"log/slog"
+	"reflect"
 	"time"
 )
 
@@ -75,6 +76,9 @@ func Recovery() Middleware {
 func Logging(logger *slog.Logger) Middleware {
 	return func(next Handler) Handler {
 		return HandlerFunc(func(c *Context) error {
+			if c.DryRun {
+				return next.Handle(c)
+			}
 			start := time.Now()
 
 			// Log operation start
@@ -118,6 +122,87 @@ func Logging(logger *slog.Logger) Middleware {
 			} else {
 				logger.Info("operation completed",
 					"duration", duration)
+			}
+
+			return err
+		})
+	}
+}
+
+// ToolLogging logs detailed tool calls including arguments and results.
+func ToolLogging(logger *slog.Logger) Middleware {
+	return func(next Handler) Handler {
+		return HandlerFunc(func(c *Context) error {
+			if c.DryRun || !c.IsFunction() {
+				return next.Handle(c)
+			}
+
+			start := time.Now()
+			toolName, _ := c.Metadata["tool_name"].(string)
+			if toolName == "" && c.Function != nil && c.Function.Tool != nil {
+				toolName = c.Function.Tool.Name()
+			}
+			if toolName == "" {
+				toolName = "<unknown>"
+			}
+
+			if c.Function == nil || c.Function.Tool == nil {
+				logger.Warn("tool call without resolved tool object",
+					"tool", toolName)
+			}
+
+			// Extract metadata for enriched logging
+			agentName, _ := c.Metadata["agent_name"].(string)
+			if agentName == "" {
+				agentName = "<unknown>"
+			}
+			threadID, _ := c.Metadata["thread_id"].(string)
+			messageID, _ := c.Metadata["message_id"].(string)
+
+			// Log tool call started
+			logger.Info("tool call started",
+				"agent", agentName,
+				"thread_id", threadID,
+				"message_id", messageID,
+				"tool", toolName,
+				"arguments", c.Function.Arguments)
+
+			err := next.Handle(c)
+
+			duration := time.Since(start)
+			if err != nil {
+				logger.Error("tool call failed",
+					"agent", agentName,
+					"thread_id", threadID,
+					"message_id", messageID,
+					"tool", toolName,
+					"duration", duration,
+					"error", err)
+			} else {
+				// Format the result for better readability in logs.
+				// If it's a struct (like core.ToolExecResult), we try to extract its Result field.
+				logResult := c.Result
+				if logResult != nil {
+					v := reflect.ValueOf(logResult)
+					// Handle pointer to struct
+					if v.Kind() == reflect.Ptr {
+						v = v.Elem()
+					}
+					if v.Kind() == reflect.Struct {
+						// Look for a field named 'Result' (common in tool result structures)
+						if f := v.FieldByName("Result"); f.IsValid() && f.Kind() == reflect.String {
+							logResult = f.String()
+						}
+					}
+				}
+
+				logger.Info("tool call completed",
+					"agent", agentName,
+					"thread_id", threadID,
+					"message_id", messageID,
+					"tool", toolName,
+					"duration", duration,
+					"result", logResult)
 			}
 
 			return err

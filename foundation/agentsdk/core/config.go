@@ -239,6 +239,7 @@ func ApplyMiddleware(ctx context.Context, config AgentConfig, messages []llm.Mes
 		// Create a chat context for the middleware chain
 		// (This middleware runs before the LLM call)
 		chatCtx := agent.NewChatContext(ctx, nil, nil, nil)
+		chatCtx.DryRun = true
 
 		// Store request context in metadata for middleware access
 		chatCtx.Metadata["request_context"] = reqCtx

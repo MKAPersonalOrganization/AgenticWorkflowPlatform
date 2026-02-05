@@ -73,7 +73,7 @@ func main() {
 		},
 	}
 
-	log = logger.NewMinimalWithEvents(os.Stdout, logger.LevelInfo, "SCHOOL", nil, events)
+	log = logger.NewTextWithEvents(os.Stdout, logger.LevelInfo, "SCHOOL", nil, events)
 
 	// -------------------------------------------------------------------------
 
@@ -360,6 +360,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Initialize Agents directly (Step 2 of Registry Removal) - Updated for Service Decoupling
 	slogLogger := slog.New(log)
 	loggingMw := agent.Logging(slogLogger)
+	toolLoggingMw := agent.ToolLogging(slogLogger)
 
 	mathConfig, err := math.NewMathInstructorConfig(ctx)
 	if err != nil {
@@ -367,7 +368,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	}
 	mathConfig.AgentMiddlewares = []agent.Middleware{loggingMw}
 	mathConfig.ChatMiddlewares = []agent.Middleware{loggingMw}
-	mathConfig.FunctionMiddlewares = []agent.Middleware{loggingMw}
+	mathConfig.FunctionMiddlewares = []agent.Middleware{toolLoggingMw}
 	mathInstructor, err := custom.NewAgent(mathConfig)
 	if err != nil {
 		return fmt.Errorf("creating math instructor agent: %w", err)
@@ -379,7 +380,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	}
 	physicsConfig.AgentMiddlewares = []agent.Middleware{loggingMw}
 	physicsConfig.ChatMiddlewares = []agent.Middleware{loggingMw}
-	physicsConfig.FunctionMiddlewares = []agent.Middleware{loggingMw}
+	physicsConfig.FunctionMiddlewares = []agent.Middleware{toolLoggingMw}
 	physicsInstructor, err := custom.NewAgent(physicsConfig)
 	if err != nil {
 		return fmt.Errorf("creating physics instructor agent: %w", err)
@@ -391,7 +392,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	}
 	chemistryConfig.AgentMiddlewares = []agent.Middleware{loggingMw}
 	chemistryConfig.ChatMiddlewares = []agent.Middleware{loggingMw}
-	chemistryConfig.FunctionMiddlewares = []agent.Middleware{loggingMw}
+	chemistryConfig.FunctionMiddlewares = []agent.Middleware{toolLoggingMw}
 	chemistryInstructor, err := custom.NewAgent(chemistryConfig)
 	if err != nil {
 		return fmt.Errorf("creating chemistry instructor agent: %w", err)
@@ -403,7 +404,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	}
 	statsConfig.AgentMiddlewares = []agent.Middleware{loggingMw}
 	statsConfig.ChatMiddlewares = []agent.Middleware{loggingMw}
-	statsConfig.FunctionMiddlewares = []agent.Middleware{loggingMw}
+	statsConfig.FunctionMiddlewares = []agent.Middleware{toolLoggingMw}
 	statsInstructor, err := custom.NewAgent(statsConfig)
 	if err != nil {
 		return fmt.Errorf("creating statistics instructor agent: %w", err)
@@ -415,7 +416,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	}
 	diagrammingConfig.AgentMiddlewares = []agent.Middleware{loggingMw}
 	diagrammingConfig.ChatMiddlewares = []agent.Middleware{loggingMw}
-	diagrammingConfig.FunctionMiddlewares = []agent.Middleware{loggingMw}
+	diagrammingConfig.FunctionMiddlewares = []agent.Middleware{toolLoggingMw}
 	diagrammingInstructor, err := custom.NewAgent(diagrammingConfig)
 	if err != nil {
 		return fmt.Errorf("creating diagramming instructor agent: %w", err)

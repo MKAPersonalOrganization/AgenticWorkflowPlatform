@@ -39,7 +39,7 @@ func (ep *EventPipeline) ConvertWithObservability(ctx context.Context, coreEvent
 	domainEvent := ep.convertCoreEvent(coreEvent)
 
 	if domainEvent == nil {
-		ep.log.Info(ctx, "Event Pipeline: Skipping unsupported core event", "coreType", coreEventType)
+		ep.log.Debug(ctx, "Event Pipeline: Skipping unsupported core event", "coreType", coreEventType)
 		return ConversionResult{Skipped: true, Reason: fmt.Sprintf("unsupported core event type: %s", coreEventType)}
 	}
 

@@ -60,7 +60,6 @@ type PrepareResult struct {
 // Returns PrepareResult with Terminated=true if middleware signals early termination.
 func (m *LLMContextManager) Prepare(ctx context.Context, runCtx core.RunContext, messages []core.Message) (*PrepareResult, error) {
 	// DEBUG: Log the initial messages
-	fmt.Printf("DEBUG: LLMContextManager.Prepare - Initial message count: %d\n", len(messages))
 	for i, msg := range messages {
 		if i >= 3 { // Only log first 3 messages to avoid spam
 			break
@@ -69,20 +68,10 @@ func (m *LLMContextManager) Prepare(ctx context.Context, runCtx core.RunContext,
 		if len(contentPreview) > 50 {
 			contentPreview = contentPreview[:50]
 		}
-		fmt.Printf("DEBUG: Initial message[%d]: id=%s, role=%s, content=%s\n", i, msg.ID, msg.Role, contentPreview)
 	}
 
 	// 1. Convert core messages to LLM format
 	chatMessages := m.convertMessages(messages)
-
-	// DEBUG: Log the converted messages
-	fmt.Printf("DEBUG: LLMContextManager.Prepare - Converted message count: %d\n", len(chatMessages))
-	for i, msg := range chatMessages {
-		if i >= 3 { // Only log first 3 messages to avoid spam
-			break
-		}
-		fmt.Printf("DEBUG: Converted message[%d]: role=%s, text=%s\n", i, msg.Role, msg.Text()[:min(50, len(msg.Text()))])
-	}
 
 	// 3. Apply middleware and build LLM request
 	llmReq, reqCtx, err := core.ToLLMRequestWithMiddleware(ctx, m.config, chatMessages, runCtx.ThreadID, runCtx.Options)

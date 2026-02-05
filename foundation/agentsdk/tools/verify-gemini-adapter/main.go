@@ -18,7 +18,6 @@ func main() {
 
 	client, err := llm.NewGeminiClient(ctx, apiKey, "gemini-2.0-flash")
 	if err != nil {
-		fmt.Printf("Error creating client: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -48,7 +47,6 @@ func main() {
 	fmt.Println("Streaming response:")
 	for resp, err := range client.Generate(ctx, req) {
 		if err != nil {
-			fmt.Printf("Error stream: %v\n", err)
 			break
 		}
 		if resp.Content != nil {
@@ -57,15 +55,12 @@ func main() {
 				case llm.TextContent:
 					fmt.Print(c.Text)
 				case llm.FunctionCall:
-					fmt.Printf("\n[ToolCall] Name: %s, ID: %s, Args: %s\n", c.Name, c.ID, string(c.Arguments))
 				}
 			}
 		}
 		if resp.FinishReason != "" {
-			fmt.Printf("\n[FinishReason] %s\n", resp.FinishReason)
 		}
 		if resp.Usage != nil {
-			fmt.Printf("\n[Usage] Input: %d, Output: %d\n", resp.Usage.InputTokens, resp.Usage.OutputTokens)
 		}
 	}
 	fmt.Println("\nDone.")
