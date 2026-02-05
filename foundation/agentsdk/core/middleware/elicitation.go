@@ -61,7 +61,7 @@ func (t *AskMultipleSelectionTool) Execute(ctx context.Context, args agent.Argum
 	}
 
 	if question == "" {
-		return agent.ErrorResult(fmt.Errorf("question is required (use 'question' parameter)")), nil
+		return agent.Result{}, fmt.Errorf("question is required (use 'question' parameter)")
 	}
 
 	// Extract options - supporting both []any/[]string and string
@@ -95,7 +95,7 @@ func (t *AskMultipleSelectionTool) Execute(ctx context.Context, args agent.Argum
 	}
 
 	if len(options) < 2 {
-		return agent.ErrorResult(fmt.Errorf("at least 2 options required in 'options' (array or comma-separated string)")), nil
+		return agent.Result{}, fmt.Errorf("at least 2 options required in 'options' (array or comma-separated string)")
 	}
 
 	schema := map[string]any{
@@ -150,7 +150,7 @@ func (t *AskTrueFalseTool) Execute(ctx context.Context, args agent.Arguments) (a
 	}
 
 	if question == "" {
-		return agent.ErrorResult(fmt.Errorf("question is required (use 'question' parameter)")), nil
+		return agent.Result{}, fmt.Errorf("question is required (use 'question' parameter)")
 	}
 
 	schema := map[string]any{
@@ -204,18 +204,24 @@ func createTrueFalseResult(statement string, schema map[string]any) (any, error)
 // --- MIDDLEWARE ---
 
 // ElicitationMiddleware adds the elicitation tools to the agent.
+// It now returns an agent.Middleware that can be used in the unified middleware chain.
 type ElicitationMiddleware struct{}
 
 func NewElicitationMiddleware() *ElicitationMiddleware {
 	return &ElicitationMiddleware{}
 }
 
-func (m *ElicitationMiddleware) Process(ctx context.Context, reqCtx *core.RequestContext, next core.NextHandler) error {
-	// Add ALL specific elicitation tools
-	reqCtx.AddTool(&AskMultipleSelectionTool{})
-	reqCtx.AddTool(&AskTrueFalseTool{})
+// Middleware returns an agent.Middleware that injects elicitation tools.
+func (m *ElicitationMiddleware) Middleware() agent.Middleware {
+	return func(next agent.Handler) agent.Handler {
+		return agent.HandlerFunc(func(c *agent.Context) error {
+			// Get request context from metadata (set by ApplyMiddleware)
+			if reqCtx, ok := c.Metadata["request_context"].(*core.RequestContext); ok {
+				// Add ALL specific elicitation tools
+				reqCtx.AddTool(&AskMultipleSelectionTool{})
+				reqCtx.AddTool(&AskTrueFalseTool{})
 
-	reqCtx.AddSystemPrompt(`
+				reqCtx.AddSystemPrompt(`
 ## Verification Tools
 You MUST use these tools to verify understanding when appropriate. Arguments are MANDATORY.
 1. **quiz_multiple_choice**:
@@ -225,6 +231,9 @@ You MUST use these tools to verify understanding when appropriate. Arguments are
    - Schema: {"question": "..."}
    - Use this for true/false or yes/no verification.
 `)
+			}
 
-	return next(ctx, reqCtx)
+			return next.Handle(c)
+		})
+	}
 }

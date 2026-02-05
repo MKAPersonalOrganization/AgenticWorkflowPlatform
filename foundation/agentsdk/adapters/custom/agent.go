@@ -43,6 +43,21 @@ func (a *CustomAgent) Run(ctx context.Context, inv *agent.Invocation) iter.Seq2[
 	}
 }
 
+// AgentMiddlewares returns the agent's run middlewares.
+func (a *CustomAgent) AgentMiddlewares() []agent.Middleware {
+	return a.config.AgentMiddlewares
+}
+
+// ChatMiddlewares returns the agent's chat middlewares.
+func (a *CustomAgent) ChatMiddlewares() []agent.Middleware {
+	return a.config.ChatMiddlewares
+}
+
+// FunctionMiddlewares returns the agent's function middlewares.
+func (a *CustomAgent) FunctionMiddlewares() []agent.Middleware {
+	return a.config.FunctionMiddlewares
+}
+
 // Tools returns the agent's tools.
 func (a *CustomAgent) Tools() []agent.Tool {
 	return a.config.Tools

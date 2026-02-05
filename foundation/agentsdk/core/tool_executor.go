@@ -32,6 +32,9 @@ type ToolExecResult struct {
 type ToolExecutor interface {
 	// Execute runs a tool call and returns the result with Command metadata
 	Execute(toolCall ToolCall) (ToolExecResult, error)
+
+	// Context returns the execution context.
+	Context() context.Context
 }
 
 // ToolTracer defines the interface for tracking tool executions (e.g., Langfuse).
@@ -85,6 +88,11 @@ func NewRegistryToolExecutor(
 	}
 
 	return executor
+}
+
+// Context returns the execution context.
+func (e *RegistryToolExecutor) Context() context.Context {
+	return e.ctx
 }
 
 // Execute runs a tool call using the registry.
@@ -152,8 +160,8 @@ func (e *RegistryToolExecutor) Execute(toolCall ToolCall) (ToolExecResult, error
 					execResult.Result = string(resultBytes)
 				}
 			} else {
-				// Regular content - marshal it
-				resultBytes, marshalErr := json.Marshal(result.Content)
+				// Regular content - marshal the item itself if it's the only one
+				resultBytes, marshalErr := json.Marshal(result.Content[0])
 				if marshalErr != nil {
 					return ToolExecResult{}, fmt.Errorf("failed to marshal tool result: %w", marshalErr)
 				}

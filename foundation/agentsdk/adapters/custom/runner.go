@@ -310,9 +310,15 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 		})
 	}
 
+	// Map Middlewares to their respective phases
+	config.AgentMiddleware = append(config.AgentMiddleware, agentConfig.AgentMiddlewares...)
+	config.ChatMiddleware = append(config.ChatMiddleware, agentConfig.ChatMiddlewares...)
+	config.FunctionMiddleware = append(config.FunctionMiddleware, agentConfig.FunctionMiddlewares...)
+
 	// Add Capabilities (Middleware)
 	if agentConfig.Capabilities.InputElicitation {
-		config.Middleware = append(config.Middleware, middleware.NewElicitationMiddleware())
+		elicitMw := middleware.NewElicitationMiddleware()
+		config.AgentMiddleware = append(config.AgentMiddleware, elicitMw.Middleware())
 	}
 
 	// Inject Memory Tool and Context if available and enabled
@@ -321,13 +327,13 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 		config.Tools = append(config.Tools, memoryTool)
 
 		memoryMiddleware := memorytools.NewMemoryInjectorMiddleware(memoryTool)
-		config.Middleware = append(config.Middleware, NewMiddlewareAdapter(memoryMiddleware))
+		config.AgentMiddleware = append(config.AgentMiddleware, AdaptRequestMiddlewareToUnified(memoryMiddleware))
 	}
 
 	// Inject Student Profile Middleware
 	if p.profileRepo != nil {
 		profileMiddleware := smiddleware.NewStudentProfileInjectorMiddleware(p.profileRepo)
-		config.Middleware = append(config.Middleware, NewMiddlewareAdapter(profileMiddleware))
+		config.AgentMiddleware = append(config.AgentMiddleware, AdaptRequestMiddlewareToUnified(profileMiddleware))
 	}
 
 	return config, nil
@@ -340,7 +346,12 @@ func (r *RunnerAdapter) GetAgent(name string) (agent.Agent, error) {
 
 // ListAgents returns all available agent names.
 func (r *RunnerAdapter) ListAgents() []string {
-	return r.agentProvider.List()
+	agents := r.agentProvider.List()
+	names := make([]string, len(agents))
+	for i, a := range agents {
+		names[i] = a.Name()
+	}
+	return names
 }
 
 // extractUserPrompt extracts the text from a message.

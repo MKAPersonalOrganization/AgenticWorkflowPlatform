@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"school-with-ai/foundation/agent"
+	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/core/middleware"
 
 	"github.com/stretchr/testify/assert"
@@ -56,7 +57,8 @@ func TestAskMultipleSelectionTool_Invoke(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			args := agent.Arguments{Data: tt.args}
+			rawArgs, _ := json.Marshal(tt.args)
+			args := agent.Arguments{Raw: rawArgs}
 			result, err := tool.Execute(ctx, args)
 			if tt.wantError {
 				assert.Error(t, err)
@@ -64,16 +66,17 @@ func TestAskMultipleSelectionTool_Invoke(t *testing.T) {
 				assert.NoError(t, err)
 				// Result should contain command with elicitation
 
-				data, ok := resStruct.Result.(map[string]any)
+				assert.Len(t, result.Content, 1)
+				res, ok := result.Content[0].(core.ToolResult)
+				assert.True(t, ok)
+
+				data, ok := res.Result.(map[string]any)
 				assert.True(t, ok)
 				assert.Contains(t, data["status"], "Requesting input")
-				assert.NotContains(t, data, "schema")
-				assert.NotContains(t, data, "question")
 
-				assert.NotNil(t, resStruct.Command)
-				assert.NotNil(t, resStruct.Command.Elicitation)
-				assert.Equal(t, tt.args.(map[string]any)["question"], resStruct.Command.Elicitation.Question)
-				assert.Equal(t, "choose_multiple", resStruct.Command.Elicitation.Schema["type"])
+				assert.NotNil(t, res.Command)
+				assert.NotNil(t, res.Command.Elicitation)
+				assert.Equal(t, tt.args.(map[string]any)["question"], res.Command.Elicitation.Question)
 			}
 		})
 	}

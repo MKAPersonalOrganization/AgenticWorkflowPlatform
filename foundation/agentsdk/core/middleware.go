@@ -1,7 +1,6 @@
 package core
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -14,36 +13,6 @@ var (
 	ErrNoEventNotifier     = errors.New("no event notifier configured")
 	ErrEventEmissionFailed = errors.New("failed to handle domain event")
 )
-
-// Middleware provides a way to intercept and modify agent execution.
-// Middleware can inspect and modify the request context before and after
-// the next handler executes, enabling cross-cutting concerns like logging,
-// retry logic, task management, and request/response transformation.
-//
-// Example:
-//
-//	type LoggingMiddleware struct{}
-//
-//	func (m *LoggingMiddleware) Process(ctx context.Context, reqCtx *RequestContext, next NextHandler) error {
-//	    log.Printf("Before: %d messages", len(reqCtx.Messages))
-//	    err := next(ctx, reqCtx)
-//	    log.Printf("After: result=%v", reqCtx.Result)
-//	    return err
-//	}
-type Middleware interface {
-	// Process executes the middleware logic.
-	// It receives the request context and a next handler to continue the chain.
-	// The middleware can:
-	// - Inspect and modify reqCtx before calling next()
-	// - Call next() to continue execution (or skip it to short-circuit)
-	// - Inspect and modify reqCtx after next() returns
-	// - Return an error to halt execution
-	Process(ctx context.Context, reqCtx *RequestContext, next NextHandler) error
-}
-
-// NextHandler is a function that continues middleware chain execution.
-// It processes the request context and may modify it.
-type NextHandler func(ctx context.Context, reqCtx *RequestContext) error
 
 // RequestContext carries all state through the middleware chain.
 // It contains the request data, agent configuration, and execution state.
@@ -239,102 +208,3 @@ func (rc *RequestContext) Override(opts ...ContextOption) *RequestContext {
 
 	return newCtx
 }
-
-// MiddlewareFunc is an adapter that allows ordinary functions to act as Middleware.
-// This enables a functional programming style for simple middleware.
-//
-// Example:
-//
-//	loggingFunc := func(ctx context.Context, reqCtx *RequestContext, next NextHandler) error {
-//	    log.Println("Processing request")
-//	    return next(ctx, reqCtx)
-//	}
-//	middleware := MiddlewareFunc(loggingFunc)
-type MiddlewareFunc func(ctx context.Context, reqCtx *RequestContext, next NextHandler) error
-
-// Process implements the Middleware interface for MiddlewareFunc.
-func (f MiddlewareFunc) Process(ctx context.Context, reqCtx *RequestContext, next NextHandler) error {
-	return f(ctx, reqCtx, next)
-}
-
-// ChainMiddleware composes multiple middleware into a single handler chain.
-// Middleware are executed in order: the first middleware in the slice is the
-// outermost layer that wraps all others.
-//
-// The composition pattern is:
-//   - First middleware wraps second middleware
-//   - Second middleware wraps third middleware
-//   - ...and so on until the base handler
-//
-// This allows middleware to run code before AND after the inner layers execute.
-//
-// Example:
-//
-//	handler := ChainMiddleware(
-//	    []Middleware{authMiddleware, retryMiddleware, loggingMiddleware},
-//	    baseHandler,
-//	)
-//	// Execution flow:
-//	// authMiddleware (before) ->
-//	//   retryMiddleware (before) ->
-//	//     loggingMiddleware (before) ->
-//	//       baseHandler ->
-//	//     loggingMiddleware (after) ->
-//	//   retryMiddleware (after) ->
-//	// authMiddleware (after)
-func ChainMiddleware(middlewares []Middleware, baseHandler NextHandler) NextHandler {
-	if len(middlewares) == 0 {
-		return baseHandler
-	}
-
-	// Build the chain from right to left (innermost to outermost)
-	// This ensures the first middleware in the slice is the outermost wrapper
-	handler := baseHandler
-	// Iterate backwards through the slice safely
-	length := len(middlewares)
-	for idx := 0; idx < length; idx++ {
-		i := length - 1 - idx
-		handler = wrapWithMiddleware(middlewares[i], handler)
-	}
-
-	return handler
-}
-
-// wrapWithMiddleware wraps a handler with a middleware, properly capturing variables to avoid closure issues.
-func wrapWithMiddleware(middleware Middleware, next NextHandler) NextHandler {
-	return func(ctx context.Context, reqCtx *RequestContext) error {
-		// Check if we should terminate before executing this middleware
-		if reqCtx.Terminate {
-			return nil
-		}
-
-		return middleware.Process(ctx, reqCtx, next)
-	}
-}
-
-// NoOpHandler is a NextHandler that does nothing.
-// Useful for testing middleware in isolation.
-func NoOpHandler(ctx context.Context, reqCtx *RequestContext) error {
-	return nil
-}
-
-// ErrorHandler creates a NextHandler that always returns the given error.
-// Useful for testing error handling in middleware.
-func ErrorHandler(err error) NextHandler {
-	return func(ctx context.Context, reqCtx *RequestContext) error {
-		return err
-	}
-}
-
-// ResultHandler creates a NextHandler that sets a result in the context.
-// Useful for testing middleware that inspects results.
-func ResultHandler(result any) NextHandler {
-	return func(ctx context.Context, reqCtx *RequestContext) error {
-		reqCtx.Result = result
-
-		return nil
-	}
-}
-
-// Verify MiddlewareFunc implements Middleware.
-var _ Middleware = (*MiddlewareFunc)(nil)

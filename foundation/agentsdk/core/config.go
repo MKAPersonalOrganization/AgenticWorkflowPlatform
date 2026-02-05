@@ -36,8 +36,10 @@ type AgentConfig struct {
 	// This is used by HandoffMiddleware to automatically create transfer tools.
 	Handoffs []Handoff // Declarative handoff configuration
 
-	// Middleware
-	Middleware []Middleware // Middleware chain for request/response processing
+	// Middleware - Separate chains for each operation type
+	AgentMiddleware    []agent.Middleware // Runs around entire agent run
+	ChatMiddleware     []agent.Middleware // Runs around each LLM call
+	FunctionMiddleware []agent.Middleware // Runs around each tool execution
 
 	// Execution Limits
 	MaxIterations int // Maximum LLM iterations per run cycle (prevents infinite loops)
@@ -70,11 +72,13 @@ func (c *AgentConfig) Validate() error {
 // DefaultConfig returns a basic agent configuration.
 func DefaultConfig(name string) AgentConfig {
 	return AgentConfig{
-		Name:          name,
-		SystemPrompt:  "You are a helpful assistant.",
-		Tools:         []agent.ExecutableTool{},
-		Middleware:    []Middleware{},
-		MaxIterations: 5,
+		Name:               name,
+		SystemPrompt:       "You are a helpful assistant.",
+		Tools:              []agent.ExecutableTool{},
+		AgentMiddleware:    []agent.Middleware{},
+		ChatMiddleware:     []agent.Middleware{},
+		FunctionMiddleware: []agent.Middleware{},
+		MaxIterations:      5,
 	}
 }
 
@@ -230,23 +234,29 @@ func ApplyMiddleware(ctx context.Context, config AgentConfig, messages []llm.Mes
 	}
 	// Note: AdditionalProperties are handled separately in ChatOptions
 
-	// Execute middleware chain if any middleware is configured
-	if len(config.Middleware) > 0 {
-		// Use a no-op handler - we're only running the "before" phase here
-		// The actual LLM call happens in the service layer
-		noOpHandler := func(ctx context.Context, reqCtx *RequestContext) error {
-			return nil // No-op
-		}
+	// Execute agent middleware chain if any middleware is configured
+	if len(config.AgentMiddleware) > 0 {
+		// Create a chat context for the middleware chain
+		// (This middleware runs before the LLM call)
+		chatCtx := agent.NewChatContext(ctx, nil, nil, nil)
 
-		chain := ChainMiddleware(config.Middleware, noOpHandler)
+		// Store request context in metadata for middleware access
+		chatCtx.Metadata["request_context"] = reqCtx
 
-		err := chain(ctx, reqCtx)
+		// Build the handler chain
+		finalHandler := agent.HandlerFunc(func(c *agent.Context) error {
+			return nil // No-op - we're only running the "before" phase here
+		})
+
+		chain := agent.Chain(config.AgentMiddleware...)
+		err := chain(finalHandler).Handle(chatCtx)
 		if err != nil {
 			return nil, err
 		}
 
-		// Check if middleware terminated early
-		if reqCtx.Terminate {
+		// Check for termination signal in metadata
+		if terminate, ok := chatCtx.Metadata["terminate"].(bool); ok && terminate {
+			reqCtx.Terminate = true
 			return reqCtx, nil
 		}
 	}

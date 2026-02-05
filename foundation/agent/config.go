@@ -57,8 +57,10 @@ type Config struct {
 	// If not set, the default model from the runner is used.
 	Model Model
 
-	// Middlewares are applied to this agent's handler.
-	Middlewares []Middleware
+	// Middlewares are applied to this agent's operation stages.
+	AgentMiddlewares    []Middleware // Runs around the entire agent run
+	ChatMiddlewares     []Middleware // Runs around each LLM call
+	FunctionMiddlewares []Middleware // Runs around each tool execution
 
 	// OutputKey stores the agent's output in session state.
 	// Useful for connecting agents to coordinate with each other.

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"testing"
 
+	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/core"
 )
 
@@ -41,6 +42,10 @@ func (m *MockToolExecutor) Execute(toolCall core.ToolCall) (core.ToolExecResult,
 	}
 
 	return core.ToolExecResult{Result: result}, nil
+}
+
+func (m *MockToolExecutor) Context() context.Context {
+	return context.Background()
 }
 
 func (m *MockToolExecutor) SetResult(toolName, result string) {
@@ -140,12 +145,18 @@ func TestBasicToolExecutor_Calculate(t *testing.T) {
 	t.Parallel()
 	// Create tool registry and register a mock calculator tool
 	toolRegistry := core.NewToolRegistry()
-	toolRegistry.Register(core.NewFunctionTool(
+	toolRegistry.Register(agent.NewFunctionTool(
 		"calculate",
 		"Calculate an expression",
-		core.ObjectSchema(map[string]any{"expression": core.StringProperty("Expression")}, []string{"expression"}),
-		func(ctx core.ToolContext, args any) (any, error) {
-			return core.NewToolResult(`{"result": "4"}`), nil
+		&agent.Schema{
+			Type: agent.TypeObject,
+			Properties: map[string]*agent.Schema{
+				"expression": {Type: agent.TypeString, Description: "Expression"},
+			},
+			Required: []string{"expression"},
+		},
+		func(ctx context.Context, args agent.Arguments) (agent.Result, error) {
+			return agent.NewResult(`{"result": "4"}`), nil
 		},
 	))
 
@@ -172,15 +183,19 @@ func TestBasicToolExecutor_CustomTool(t *testing.T) {
 	t.Parallel()
 	// Create tool registry and register a mock custom tool
 	toolRegistry := core.NewToolRegistry()
-	toolRegistry.Register(core.NewFunctionTool(
+	toolRegistry.Register(agent.NewFunctionTool(
 		"save_note",
 		"Save a note",
-		core.ObjectSchema(map[string]any{
-			"content": core.StringProperty("Content"),
-			"action":  core.StringProperty("Action"),
-		}, []string{"content", "action"}),
-		func(ctx core.ToolContext, args any) (any, error) {
-			return core.NewToolResult(`{"status": "success"}`), nil
+		&agent.Schema{
+			Type: agent.TypeObject,
+			Properties: map[string]*agent.Schema{
+				"content": {Type: agent.TypeString, Description: "Content"},
+				"action":  {Type: agent.TypeString, Description: "Action"},
+			},
+			Required: []string{"content", "action"},
+		},
+		func(ctx context.Context, args agent.Arguments) (agent.Result, error) {
+			return agent.NewResult(`{"status": "success"}`), nil
 		},
 	))
 
@@ -209,23 +224,26 @@ func TestRegistryToolExecutor(t *testing.T) {
 	registry := core.NewToolRegistry()
 
 	// Register a test tool
-	registry.Register(core.NewFunctionTool(
+	registry.Register(agent.NewFunctionTool(
 		"greet",
 		"Greet someone",
-		core.ObjectSchema(
-			map[string]any{"name": core.StringProperty("The name")},
-			[]string{"name"},
-		),
-		func(ctx core.ToolContext, args any) (any, error) {
+		&agent.Schema{
+			Type: agent.TypeObject,
+			Properties: map[string]*agent.Schema{
+				"name": {Type: agent.TypeString, Description: "The name"},
+			},
+			Required: []string{"name"},
+		},
+		func(ctx context.Context, args agent.Arguments) (agent.Result, error) {
 			var params struct {
 				Name string `json:"name"`
 			}
-			err := core.UnmarshalArgs(args, &params)
+			err := args.Decode(&params)
 			if err != nil {
-				return nil, fmt.Errorf("failed to unmarshal arguments: %w", err)
+				return agent.Result{}, fmt.Errorf("failed to unmarshal arguments: %w", err)
 			}
 
-			return map[string]any{"message": "Hello, " + params.Name + "!"}, nil
+			return agent.NewResult(map[string]any{"message": "Hello, " + params.Name + "!"}), nil
 		},
 	))
 
