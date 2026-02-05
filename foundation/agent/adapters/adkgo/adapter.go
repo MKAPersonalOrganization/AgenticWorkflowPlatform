@@ -19,6 +19,11 @@ type AgentAdapter struct {
 	adkAgent any
 }
 
+// ID returns the agent's unique identifier.
+func (a *AgentAdapter) ID() agent.ID {
+	return "" // Placeholder
+}
+
 // Name returns the agent's identifier.
 func (a *AgentAdapter) Name() string {
 	return ""
@@ -36,15 +41,6 @@ func (a *AgentAdapter) Run(ctx context.Context, inv *agent.Invocation) agent.Str
 	}
 }
 
-// Tools returns the agent's tools.
-func (a *AgentAdapter) Tools() []agent.Tool {
-	return nil
-}
-
-// SubAgents returns child agents.
-func (a *AgentAdapter) SubAgents() []agent.Agent {
-	return nil
-}
 
 // WrapTool wraps an ADK-Go tool to implement agent.Tool.
 func WrapTool(adkTool any) agent.Tool {

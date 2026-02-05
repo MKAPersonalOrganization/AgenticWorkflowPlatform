@@ -35,6 +35,11 @@ func NewAgent(cfg agent.Config) (agent.Agent, error) {
 	}, nil
 }
 
+// ID returns the agent's unique identifier.
+func (a *Adapter) ID() agent.ID {
+	return a.config.Name
+}
+
 func (a *Adapter) Name() string {
 	return a.config.Name
 }
@@ -51,10 +56,3 @@ func (a *Adapter) Run(ctx context.Context, input *agent.Invocation) iter.Seq2[ag
 	}
 }
 
-func (a *Adapter) Tools() []agent.Tool {
-	return a.config.Tools
-}
-
-func (a *Adapter) SubAgents() []agent.Agent {
-	return nil // ADK might handle sub-agents differently
-}

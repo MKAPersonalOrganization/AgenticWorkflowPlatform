@@ -19,6 +19,11 @@ func NewAgent(cfg agent.Config) (agent.Agent, error) {
 	return &CustomAgent{config: cfg}, nil
 }
 
+// ID returns the agent's unique identifier.
+func (a *CustomAgent) ID() agent.ID {
+	return a.config.Name // Use name as ID for now
+}
+
 // Name returns the agent's name.
 func (a *CustomAgent) Name() string {
 	return a.config.Name

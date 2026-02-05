@@ -29,6 +29,11 @@ func NewAgent(name string, opts ...any) (agent.Agent, error) {
 	}, nil
 }
 
+// ID returns the agent's unique identifier.
+func (a *Adapter) ID() agent.ID {
+	return a.name
+}
+
 func (a *Adapter) Name() string {
 	return a.name
 }
@@ -43,10 +48,3 @@ func (a *Adapter) Run(ctx context.Context, input *agent.Invocation) iter.Seq2[ag
 	}
 }
 
-func (a *Adapter) Tools() []agent.Tool {
-	return nil
-}
-
-func (a *Adapter) SubAgents() []agent.Agent {
-	return nil
-}
