@@ -730,13 +730,15 @@ func (s *executionState) run() error {
 			s.ctx,
 			s.agent.Config.AgentMiddleware,
 			s.agent,
-			nil,   // []agent.Message
-			nil,   // agent.Session
-			false, // Streaming
+			nil, // messages (core.Message, not agent.Message)
+			nil, // session  (not available in engine)
+			false,
 			map[string]any{
-				"agent_name": s.agent.Name(),
-				"thread_id":  s.threadID,
-				"message_id": s.messageID,
+				"agent_name":    s.agent.Name(),
+				"thread_id":     s.threadID,
+				"message_id":    s.messageID,
+				"user_id":       s.userID,
+				"message_count": len(s.history),
 			},
 			func() error {
 				return s.runCore()
@@ -831,17 +833,29 @@ func (s *executionState) runCore() error {
 func (s *executionState) streamAndProcessLLMResponse(llmContext *LLMContext) error {
 	// Wrap LLM call with ChatMiddleware
 	if len(s.agent.Config.ChatMiddleware) > 0 {
+		// Extract provider/model and parameters from the LLM request for middleware logging
+		chatMeta := map[string]any{
+			"agent_name":    s.agent.Name(),
+			"thread_id":     s.threadID,
+			"message_id":    s.messageID,
+			"message_count": len(llmContext.Request.Messages),
+			"provider":      llmContext.Request.Extensions.GetString("provider"),
+			"model":         llmContext.Request.Extensions.GetString("model"),
+		}
+		if llmContext.Request.Parameters != nil {
+			chatMeta["max_tokens"] = llmContext.Request.Parameters.MaxTokens
+			if llmContext.Request.Parameters.Temperature != nil {
+				chatMeta["temperature"] = *llmContext.Request.Parameters.Temperature
+			}
+		}
+
 		return ExecuteChatMiddleware(
 			s.ctx,
 			s.agent.Config.ChatMiddleware,
-			nil, // agent.Model
-			nil, // []agent.Message
-			nil, // *agent.ChatOptions
-			map[string]any{
-				"agent_name": s.agent.Name(),
-				"thread_id":  s.threadID,
-				"message_id": s.messageID,
-			},
+			nil, // agent.Model (engine uses llm.Client, not agent.Model)
+			nil, // []agent.Message (engine uses llm.Message)
+			nil, // *agent.ChatOptions (parameters passed via metadata)
+			chatMeta,
 			func() error {
 				return s.streamAndProcessLLMResponseCore(llmContext)
 			},
