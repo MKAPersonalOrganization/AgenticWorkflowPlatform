@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"errors"
+	"iter"
 	"log/slog"
 	"testing"
 	"time"
@@ -254,8 +255,214 @@ func TestLogging_LogsOperations(t *testing.T) {
 }
 
 // =============================================================================
+// Agent Logging Middleware Tests
+// =============================================================================
+
+// mockAgent implements Agent for testing.
+type mockAgent struct {
+	id   ID
+	name string
+}
+
+func (m *mockAgent) ID() ID            { return m.id }
+func (m *mockAgent) Name() string       { return m.name }
+func (m *mockAgent) Description() string { return "" }
+func (m *mockAgent) Run(_ context.Context, _ *Invocation) iter.Seq2[Event, error] {
+	return nil
+}
+
+// mockSession implements Session for testing.
+type mockSession struct {
+	id     string
+	userID string
+}
+
+func (m *mockSession) ID() string                                    { return m.id }
+func (m *mockSession) UserID() string                                { return m.userID }
+func (m *mockSession) AppName() string                               { return "" }
+func (m *mockSession) State() State                                  { return nil }
+func (m *mockSession) History() []*Message                           { return nil }
+func (m *mockSession) Append(_ context.Context, _ *Message) error    { return nil }
+func (m *mockSession) LastUpdateTime() int64                         { return 0 }
+
+func TestAgentLogging_PassesThroughNonAgentOps(t *testing.T) {
+	logger := slog.Default()
+	mw := AgentLogging(logger)
+	called := false
+	handler := mw(HandlerFunc(func(c *Context) error {
+		called = true
+		return nil
+	}))
+
+	// Chat context - should pass through
+	c := NewChatContext(context.Background(), nil, nil, nil)
+	if err := handler.Handle(c); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !called {
+		t.Error("handler should be called for passthrough")
+	}
+
+	// Function context - should pass through
+	called = false
+	c2 := NewFunctionContext(context.Background(), nil, nil)
+	if err := handler.Handle(c2); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !called {
+		t.Error("handler should be called for passthrough")
+	}
+}
+
+func TestAgentLogging_SkipsDryRun(t *testing.T) {
+	logger := slog.Default()
+	mw := AgentLogging(logger)
+	called := false
+	handler := mw(HandlerFunc(func(c *Context) error {
+		called = true
+		return nil
+	}))
+
+	c := NewAgentContext(context.Background(), nil, nil, nil, false)
+	c.DryRun = true
+	if err := handler.Handle(c); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !called {
+		t.Error("handler should still be called on dry run passthrough")
+	}
+}
+
+func TestAgentLogging_LogsAgentOps(t *testing.T) {
+	logger := slog.Default()
+	mw := AgentLogging(logger)
+	handler := mw(NoOpHandler)
+
+	c := NewAgentContext(context.Background(), nil, nil, nil, false)
+	if err := handler.Handle(c); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestAgentLogging_LogsAgentOpsWithMetadata(t *testing.T) {
+	logger := slog.Default()
+	mw := AgentLogging(logger)
+	handler := mw(NoOpHandler)
+
+	mockAgt := &mockAgent{id: "math-001", name: "math-instructor"}
+	mockSess := &mockSession{id: "sess-123", userID: "user-456"}
+
+	c := NewAgentContext(context.Background(), mockAgt, []Message{{Role: "user"}}, mockSess, true)
+	if err := handler.Handle(c); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestAgentLogging_LogsErrorOnFailure(t *testing.T) {
+	logger := slog.Default()
+	mw := AgentLogging(logger)
+	handler := mw(ErrorHandler(errors.New("agent failure")))
+
+	c := NewAgentContext(context.Background(), nil, nil, nil, false)
+	err := handler.Handle(c)
+
+	if err == nil {
+		t.Error("expected error")
+	}
+}
+
+// =============================================================================
 // Chat Middleware Tests
 // =============================================================================
+
+func TestChatLogging_PassesThroughNonChatOps(t *testing.T) {
+	logger := slog.Default()
+	mw := ChatLogging(logger)
+	called := false
+	handler := mw(HandlerFunc(func(c *Context) error {
+		called = true
+		return nil
+	}))
+
+	// Agent context - should pass through
+	c := NewAgentContext(context.Background(), nil, nil, nil, false)
+	if err := handler.Handle(c); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !called {
+		t.Error("handler should be called for passthrough")
+	}
+
+	// Function context - should pass through
+	called = false
+	c2 := NewFunctionContext(context.Background(), nil, nil)
+	if err := handler.Handle(c2); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !called {
+		t.Error("handler should be called for passthrough")
+	}
+}
+
+func TestChatLogging_SkipsDryRun(t *testing.T) {
+	logger := slog.Default()
+	mw := ChatLogging(logger)
+	called := false
+	handler := mw(HandlerFunc(func(c *Context) error {
+		called = true
+		return nil
+	}))
+
+	c := NewChatContext(context.Background(), nil, nil, nil)
+	c.DryRun = true
+	if err := handler.Handle(c); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !called {
+		t.Error("handler should still be called on dry run passthrough")
+	}
+}
+
+func TestChatLogging_LogsChatOps(t *testing.T) {
+	logger := slog.Default()
+	mw := ChatLogging(logger)
+	handler := mw(NoOpHandler)
+
+	c := NewChatContext(context.Background(), nil, nil, nil)
+	if err := handler.Handle(c); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestChatLogging_LogsChatOpsWithMetadata(t *testing.T) {
+	logger := slog.Default()
+	mw := ChatLogging(logger)
+	handler := mw(NoOpHandler)
+
+	c := NewChatContext(context.Background(), nil, []Message{{Role: "user"}}, &ChatOptions{
+		Temperature: 0.7,
+		MaxTokens:   1024,
+	})
+	c.Metadata["agent_name"] = "test-agent"
+	c.Metadata["thread_id"] = "thread-123"
+
+	if err := handler.Handle(c); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestChatLogging_LogsErrorOnFailure(t *testing.T) {
+	logger := slog.Default()
+	mw := ChatLogging(logger)
+	handler := mw(ErrorHandler(errors.New("llm failure")))
+
+	c := NewChatContext(context.Background(), nil, nil, nil)
+	err := handler.Handle(c)
+
+	if err == nil {
+		t.Error("expected error")
+	}
+}
 
 type mockTokenCounter struct {
 	inputCalled  bool

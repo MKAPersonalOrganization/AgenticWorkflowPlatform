@@ -52,6 +52,7 @@ type AgentConfig struct {
 	PresencePenalty  *float64 // Default presence penalty (-2.0 to 2.0)
 	StopSequences    []string // Default stop sequences
 	ModelID          string   // Default model ID
+	Provider         string   // LLM provider name (e.g., "openai", "gemini")
 	Seed             *int64   // Default seed for reproducibility
 
 	// Event handling
@@ -143,6 +144,9 @@ func ToLLMRequestWithMiddleware(ctx context.Context, config AgentConfig, message
 
 	// Extensions
 	extensions := llm.Metadata{}
+	if reqCtx.Config.Provider != "" {
+		extensions["provider"] = reqCtx.Config.Provider
+	}
 	if reqCtx.Config.ModelID != "" {
 		extensions["model"] = reqCtx.Config.ModelID
 	}
@@ -201,6 +205,9 @@ func ApplyMiddleware(ctx context.Context, config AgentConfig, messages []llm.Mes
 	}
 	if config.ModelID != "" {
 		reqCtx.Config.ModelID = config.ModelID
+	}
+	if config.Provider != "" {
+		reqCtx.Config.Provider = config.Provider
 	}
 	if config.Seed != nil {
 		reqCtx.Config.Seed = config.Seed

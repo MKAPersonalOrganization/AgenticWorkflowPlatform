@@ -69,6 +69,8 @@ func NewRunnerAdapter(
 		artifactStore: r.artifactStore,
 		profileRepo:   r.profileRepo,
 		enableMemory:  r.enableMemory,
+		modelProvider: modelCfg.Provider,
+		modelID:       modelCfg.Model,
 	}
 
 	r.engine = engine.New(
@@ -270,6 +272,8 @@ type RegistryAgentProvider struct {
 	artifactStore artifact.Service
 	enableMemory  bool
 	profileRepo   domain.StudentProfileRepository
+	modelProvider string // LLM provider name (e.g., "openai", "gemini")
+	modelID       string // LLM model name (e.g., "gpt-4o", "gemini-2.0-flash")
 }
 
 func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (core.AgentConfig, error) {
@@ -290,11 +294,16 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 	agentConfig := customAgent.Config()
 
 	// Map agent.Config to core.AgentConfig
+	modelID := agentConfig.ModelID
+	if modelID == "" {
+		modelID = p.modelID // Fall back to runner-level model
+	}
 	config := core.AgentConfig{
 		Name:          agentConfig.Name,
 		SystemPrompt:  agentConfig.SystemPrompt,
 		MaxIterations: agentConfig.MaxIterations,
-		ModelID:       agentConfig.ModelID,
+		ModelID:       modelID,
+		Provider:      p.modelProvider,
 	}
 
 	// Map Tools

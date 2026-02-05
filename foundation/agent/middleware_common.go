@@ -11,6 +11,101 @@ import (
 // Agent-Level Middleware
 // =============================================================================
 
+// AgentLogging logs detailed agent operations including agent identity, session, and message context.
+func AgentLogging(logger *slog.Logger) Middleware {
+	return func(next Handler) Handler {
+		return HandlerFunc(func(c *Context) error {
+			if c.DryRun || !c.IsAgent() {
+				return next.Handle(c)
+			}
+
+			start := time.Now()
+
+			// Extract agent details from typed fields, fall back to metadata
+			agentName := "<unknown>"
+			agentID := "<unknown>"
+			if c.Agent != nil && c.Agent.Agent != nil {
+				agentName = c.Agent.Agent.Name()
+				agentID = string(c.Agent.Agent.ID())
+			}
+			if agentName == "<unknown>" {
+				if v, ok := c.Metadata["agent_name"].(string); ok && v != "" {
+					agentName = v
+				}
+			}
+
+			// Extract session details from typed fields, fall back to metadata
+			sessionID := ""
+			userID := ""
+			if c.Agent != nil && c.Agent.Session != nil {
+				sessionID = c.Agent.Session.ID()
+				userID = c.Agent.Session.UserID()
+			}
+			if sessionID == "" {
+				if v, ok := c.Metadata["session_id"].(string); ok {
+					sessionID = v
+				}
+			}
+			if userID == "" {
+				if v, ok := c.Metadata["user_id"].(string); ok {
+					userID = v
+				}
+			}
+
+			// Extract thread ID from metadata
+			threadID, _ := c.Metadata["thread_id"].(string)
+
+			// Extract message count and streaming from typed fields, fall back to metadata
+			msgCount := 0
+			streaming := false
+			if c.Agent != nil {
+				msgCount = len(c.Agent.Messages)
+				streaming = c.Agent.Streaming
+			}
+			if msgCount == 0 {
+				if v, ok := c.Metadata["message_count"].(int); ok {
+					msgCount = v
+				}
+			}
+
+			// Log agent run started
+			logger.Info("agent run started",
+				"agent", agentName,
+				"agent_id", agentID,
+				"thread_id", threadID,
+				"user_id", userID,
+				"message_count", msgCount,
+				"streaming", streaming)
+
+			err := next.Handle(c)
+
+			duration := time.Since(start)
+			if err != nil {
+				logger.Error("agent run failed",
+					"agent", agentName,
+					"agent_id", agentID,
+					"thread_id", threadID,
+					"user_id", userID,
+					"message_count", msgCount,
+					"streaming", streaming,
+					"duration", duration,
+					"error", err)
+			} else {
+				logger.Info("agent run completed",
+					"agent", agentName,
+					"agent_id", agentID,
+					"thread_id", threadID,
+					"user_id", userID,
+					"message_count", msgCount,
+					"streaming", streaming,
+					"duration", duration)
+			}
+
+			return err
+		})
+	}
+}
+
 // Retry retries agent operations on transient failures.
 func Retry(attempts int) Middleware {
 	return func(next Handler) Handler {
@@ -213,6 +308,104 @@ func ToolLogging(logger *slog.Logger) Middleware {
 // =============================================================================
 // Chat-Level Middleware
 // =============================================================================
+
+// ChatLogging logs detailed LLM/chat calls including model, messages, and options.
+func ChatLogging(logger *slog.Logger) Middleware {
+	return func(next Handler) Handler {
+		return HandlerFunc(func(c *Context) error {
+			if c.DryRun || !c.IsChat() {
+				return next.Handle(c)
+			}
+
+			start := time.Now()
+
+			// Extract metadata for enriched logging
+			agentName, _ := c.Metadata["agent_name"].(string)
+			if agentName == "" {
+				agentName = "<unknown>"
+			}
+			threadID, _ := c.Metadata["thread_id"].(string)
+
+			// Extract chat operation details from typed fields, fall back to metadata
+			provider := "<unknown>"
+			if c.Chat != nil && c.Chat.Model != nil {
+				provider = c.Chat.Model.Provider()
+			}
+			if provider == "<unknown>" {
+				if v, ok := c.Metadata["provider"].(string); ok && v != "" {
+					provider = v
+				}
+			}
+
+			model := ""
+			if v, ok := c.Metadata["model"].(string); ok {
+				model = v
+			}
+
+			msgCount := 0
+			if c.Chat != nil {
+				msgCount = len(c.Chat.Messages)
+			}
+			if msgCount == 0 {
+				if v, ok := c.Metadata["message_count"].(int); ok {
+					msgCount = v
+				}
+			}
+
+			// Extract options from typed fields, fall back to metadata
+			var temperature float64
+			var maxTokens int
+			if c.Chat != nil && c.Chat.Options != nil {
+				temperature = c.Chat.Options.Temperature
+				maxTokens = c.Chat.Options.MaxTokens
+			}
+			if temperature == 0 {
+				if v, ok := c.Metadata["temperature"].(float64); ok {
+					temperature = v
+				}
+			}
+			if maxTokens == 0 {
+				if v, ok := c.Metadata["max_tokens"].(int); ok {
+					maxTokens = v
+				}
+			}
+
+			// Log chat call started
+			logger.Info("chat call started",
+				"agent", agentName,
+				"thread_id", threadID,
+				"provider", provider,
+				"model", model,
+				"message_count", msgCount,
+				"temperature", temperature,
+				"max_tokens", maxTokens)
+
+			err := next.Handle(c)
+
+			duration := time.Since(start)
+			if err != nil {
+				logger.Error("chat call failed",
+					"agent", agentName,
+					"thread_id", threadID,
+					"provider", provider,
+					"model", model,
+					"message_count", msgCount,
+					"duration", duration,
+					"error", err)
+			} else {
+				logger.Info("chat call completed",
+					"agent", agentName,
+					"thread_id", threadID,
+					"provider", provider,
+					"model", model,
+					"message_count", msgCount,
+					"duration", duration)
+			}
+
+			return err
+		})
+	}
+}
 
 // TokenCounter is the interface for counting tokens.
 type TokenCounter interface {
