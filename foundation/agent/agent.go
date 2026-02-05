@@ -5,6 +5,29 @@ import (
 	"iter"
 )
 
+// ID is a unique identifier for an agent.
+type ID = string
+
+// Identifiable represents an entity that can be identified by ID, name, and description.
+type Identifiable interface {
+	// ID returns the unique identifier for this agent.
+	ID() ID
+
+	// Name returns the agent's human-readable name (e.g., "math-instructor").
+	Name() string
+
+	// Description returns a human-readable description of the agent's capabilities.
+	// Used by LLMs to determine whether to delegate to this agent.
+	Description() string
+}
+
+// Runnable represents an entity that can execute with input and produce events.
+type Runnable interface {
+	// Run executes the agent with the given invocation.
+	// Returns an iterator that yields events as the agent processes the request.
+	Run(ctx context.Context, inv *Invocation) iter.Seq2[Event, error]
+}
+
 // Agent represents an AI agent that can process user requests and produce responses.
 // This interface is designed to be compatible with multiple agent frameworks:
 // - Custom agentsdk implementation
@@ -14,31 +37,28 @@ import (
 // Per ADR 001: This interface is the sole access point for agent interactions.
 // All framework-specific details are hidden behind adapter implementations.
 type Agent interface {
-	// Name returns the agent's identifier (e.g., "math-instructor").
-	// Must be unique within an agent tree.
-	Name() string
+	Identifiable
+	Runnable
+}
 
-	// Description returns a human-readable description of the agent's capabilities.
-	// Used by LLMs to determine whether to delegate to this agent.
-	Description() string
-
-	// Run executes the agent with the given invocation context.
-	// Returns an iterator that yields events as the agent processes the request.
-	//
-	// The context can be either:
-	// - A simple context.Context with an *Invocation (Blades style)
-	// - An InvocationContext with rich context (ADK-Go style)
-	Run(context.Context, *Invocation) iter.Seq2[Event, error]
+// Toolable extends Agent with tool capabilities.
+type Toolable interface {
+	Agent
 
 	// Tools returns the list of tools available to this agent.
 	Tools() []Tool
+}
 
-	// SubAgents returns child agents for hierarchical delegation (optional).
+// Hierarchical extends Agent with sub-agent capabilities for hierarchical delegation.
+type Hierarchical interface {
+	Agent
+
+	// SubAgents returns child agents for hierarchical delegation.
 	// Returns empty slice if the agent doesn't support sub-agents.
-	//
-	// Note: Blades uses agent-as-tool pattern instead of explicit sub-agents.
-	// Adapters should bridge this difference transparently.
 	SubAgents() []Agent
+
+	// Parent returns the parent agent, or nil if this is a root agent.
+	Parent() Agent
 }
 
 // AgentWithCallbacks extends Agent with lifecycle callbacks.
