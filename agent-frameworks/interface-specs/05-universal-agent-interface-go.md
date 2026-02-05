@@ -25,12 +25,11 @@ This document defines a **universal, vendor-agnostic Go interface specification*
 6. [Message Types](#6-message-types)
 7. [Session Management](#7-session-management)
 8. [Event System](#8-event-system)
-9. [Hook System](#9-hook-system)
-10. [Middleware](#10-middleware)
-11. [Multi-Agent Orchestration](#11-multi-agent-orchestration)
-12. [Services](#12-services)
-13. [Error Handling](#13-error-handling)
-14. [Package Structure](#14-package-structure)
+9. [Middleware](#9-middleware)
+10. [Multi-Agent Orchestration](#10-multi-agent-orchestration)
+11. [Services](#11-services)
+12. [Error Handling](#12-error-handling)
+13. [Package Structure](#13-package-structure)
 
 ---
 
@@ -360,7 +359,6 @@ type Config struct {
     
     // Behavior
     MaxIterations int
-    Hooks         []HookProvider
     Middleware    []Middleware
     
     // Extensions (provider-specific)
@@ -1078,213 +1076,184 @@ func Multiplex(handlers ...Handler) Handler
 
 ---
 
-## 9. Hook System
+## 9. Middleware
 
-### 9.1 Hook Registry (Type-Safe Event System)
+The middleware system follows Echo's pattern: single `Handler`, single `Context`, single `Middleware` type.
 
-```go
-package hook
-
-import "context"
-
-// Registry manages typed event callbacks.
-type Registry interface {
-    // Register adds a callback for an event type.
-    Register(eventType EventType, callback Callback) Registration
-    
-    // RegisterProvider adds all hooks from a provider.
-    RegisterProvider(provider Provider) []Registration
-    
-    // Invoke calls all callbacks for an event.
-    Invoke(ctx context.Context, event HookEvent) error
-}
-
-// Registration allows unregistering a callback.
-type Registration interface {
-    Unregister()
-}
-
-// Callback handles a hook event.
-type Callback func(ctx context.Context, event HookEvent) error
-
-// Provider registers multiple hooks.
-type Provider interface {
-    RegisterHooks(registry Registry)
-}
-
-// HookEvent is the base interface for hook events.
-type HookEvent interface {
-    HookEventType() EventType
-}
-
-// NewRegistry creates a new hook registry.
-func NewRegistry() Registry
-```
-
-### 9.2 Lifecycle Hook Events
-
-```go
-package hook
-
-// BeforeInvoke fires before agent processing begins.
-type BeforeInvoke struct {
-    Agent    Agent
-    Input    *Input
-    Session  Session
-    Messages []Message // Mutable - modify to inject context
-}
-
-func (BeforeInvoke) HookEventType() EventType { return "before_invoke" }
-
-// AfterInvoke fires after agent processing completes.
-type AfterInvoke struct {
-    Agent    Agent
-    Input    *Input
-    Session  Session
-    Result   any
-    Error    error
-    Duration time.Duration
-}
-
-func (AfterInvoke) HookEventType() EventType { return "after_invoke" }
-
-// BeforeModelCall fires before each model request.
-type BeforeModelCall struct {
-    Agent   Agent
-    Request *model.Request // Mutable
-}
-
-func (BeforeModelCall) HookEventType() EventType { return "before_model" }
-
-// AfterModelCall fires after each model response.
-type AfterModelCall struct {
-    Agent    Agent
-    Request  *model.Request
-    Response *model.Response
-    Error    error
-}
-
-func (AfterModelCall) HookEventType() EventType { return "after_model" }
-
-// BeforeToolCall fires before tool execution.
-type BeforeToolCall struct {
-    Agent     Agent
-    Tool      Tool
-    Arguments Arguments // Mutable
-}
-
-func (BeforeToolCall) HookEventType() EventType { return "before_tool" }
-
-// AfterToolCall fires after tool execution.
-type AfterToolCall struct {
-    Agent     Agent
-    Tool      Tool
-    Arguments Arguments
-    Result    Result
-    Error     error
-    Duration  time.Duration
-}
-
-func (AfterToolCall) HookEventType() EventType { return "after_tool" }
-
-// MessageAdded fires when a message is added to history.
-type MessageAdded struct {
-    Agent   Agent
-    Session Session
-    Message Message
-}
-
-func (MessageAdded) HookEventType() EventType { return "message_added" }
-```
-
----
-
-## 10. Middleware
-
-### 10.1 Middleware Interface
+### 9.1 Core Types
 
 ```go
 package middleware
 
 import "context"
 
-// Middleware wraps agent execution with additional behavior.
-type Middleware interface {
-    // Wrap returns a wrapped runner.
-    Wrap(next Runner) Runner
+// Handler processes operations.
+type Handler interface {
+    Handle(*Context) error
 }
 
-// Runner executes agent logic.
-type Runner interface {
-    Run(ctx context.Context, input *Input) iter.Seq2[Event, error]
+// HandlerFunc adapts a function to Handler.
+type HandlerFunc func(*Context) error
+
+func (f HandlerFunc) Handle(c *Context) error { return f(c) }
+
+// Middleware wraps a Handler.
+type Middleware func(Handler) Handler
+
+// Chain combines middleware (first is outermost).
+func Chain(mws ...Middleware) Middleware {
+    return func(final Handler) Handler {
+        for i := len(mws) - 1; i >= 0; i-- {
+            final = mws[i](final)
+        }
+        return final
+    }
 }
-
-// Func adapts a function to Middleware.
-type Func func(next Runner) Runner
-
-func (f Func) Wrap(next Runner) Runner { return f(next) }
-
-// Chain combines multiple middleware in order.
-// First middleware is outermost (executed first on request, last on response).
-func Chain(middleware ...Middleware) Middleware
 ```
 
-### 10.2 Common Middleware
+### 9.2 Context
 
 ```go
-package middleware
+// Context carries all operation data.
+// Embeds context.Context for cancellation/timeout.
+type Context struct {
+    context.Context
+    
+    // Operation type
+    Kind OperationKind
+    
+    // Exactly one is non-nil (like http.Request body vs form)
+    Agent    *AgentOp
+    Chat     *ChatOp
+    Function *FunctionOp
+    
+    // Shared across middleware
+    Metadata map[string]any
+    
+    // Result (set by handler)
+    Result any
+}
 
-import (
-    "context"
-    "time"
+// OperationKind identifies the operation type.
+type OperationKind int
+
+const (
+    OperationAgent OperationKind = iota
+    OperationChat
+    OperationFunction
 )
 
-// Logging logs requests and responses.
-func Logging(logger Logger) Middleware
+// Helpers
+func (c *Context) IsAgent() bool    { return c.Kind == OperationAgent }
+func (c *Context) IsChat() bool     { return c.Kind == OperationChat }
+func (c *Context) IsFunction() bool { return c.Kind == OperationFunction }
+```
 
-// Metrics collects execution metrics.
-func Metrics(collector MetricsCollector) Middleware
+### 9.3 Operation Structs
 
-// Timeout enforces a maximum execution time.
-func Timeout(d time.Duration) Middleware
-
-// Retry automatically retries on transient errors.
-func Retry(strategy RetryStrategy) Middleware
-
-// Recovery catches panics and converts to errors.
-func Recovery() Middleware
-
-// RateLimit enforces request rate limits.
-func RateLimit(limiter RateLimiter) Middleware
-
-// Tracing adds distributed tracing spans.
-func Tracing(tracer Tracer) Middleware
-
-// Caching caches responses based on input.
-func Caching(cache Cache) Middleware
-
-// Validation validates input before execution.
-func Validation(validator Validator) Middleware
-
-// ContextProvider injects additional context.
-func ContextProvider(provider ContextProvider) Middleware
-
-// Logger interface for logging middleware.
-type Logger interface {
-    Log(ctx context.Context, level Level, msg string, fields ...Field)
+```go
+// AgentOp groups agent-level data.
+type AgentOp struct {
+    Agent     Agent
+    Messages  []Message
+    Session   Session
+    Streaming bool
 }
 
-// MetricsCollector interface for metrics middleware.
-type MetricsCollector interface {
-    Record(ctx context.Context, name string, value float64, tags ...Tag)
+// ChatOp groups LLM call data.
+type ChatOp struct {
+    Model    Model
+    Messages []Message
+    Options  *ChatOptions
 }
 
-// RetryStrategy determines retry behavior.
-type RetryStrategy interface {
-    ShouldRetry(err error, attempt int) bool
-    Delay(attempt int) time.Duration
+// FunctionOp groups tool call data.
+type FunctionOp struct {
+    Tool      Tool
+    Arguments map[string]any
 }
 ```
+
+### 9.4 Common Middleware
+
+```go
+package middleware
+
+import "time"
+
+// Retry retries agent operations on failure.
+func Retry(attempts int) Middleware {
+    return func(next Handler) Handler {
+        return HandlerFunc(func(c *Context) error {
+            if c.Agent == nil {
+                return next.Handle(c)
+            }
+            var err error
+            for i := 0; i < attempts; i++ {
+                if err = next.Handle(c); err == nil {
+                    return nil
+                }
+            }
+            return err
+        })
+    }
+}
+
+// Timeout adds timeout to operations.
+func Timeout(d time.Duration) Middleware
+
+// Logging logs operations.
+func Logging(logger Logger) Middleware
+
+// TokenCounter counts tokens for chat operations.
+func TokenCounter(counter TokenCounter) Middleware
+
+// RateLimit rate-limits chat operations.
+func RateLimit(limiter RateLimiter) Middleware
+
+// Caching caches function results.
+func Caching(cache Cache) Middleware
+
+// Validation validates function arguments.
+func Validation(validator Validator) Middleware
+```
+
+### 9.5 Execution Flow
+
+```
+User Request
+    │
+    ▼
+┌─────────────────────────────────────┐
+│           Middleware Chain           │
+│  ┌─────────────────────────────────┐│
+│  │ Retry (checks c.Agent != nil)   ││
+│  └─────────────┬───────────────────┘│
+│                ▼                     │
+│  ┌─────────────────────────────────┐│
+│  │ Logging (all operations)        ││
+│  └─────────────┬───────────────────┘│
+│                ▼                     │
+│  ┌─────────────────────────────────┐│
+│  │ TokenCounter (c.Chat != nil)    ││
+│  └─────────────┬───────────────────┘│
+│                ▼                     │
+│  ┌─────────────────────────────────┐│
+│  │ Caching (c.Function != nil)     ││
+│  └─────────────┬───────────────────┘│
+└────────────────┼────────────────────┘
+                 ▼
+           Final Handler
+```
+
+### 9.6 Comparison with Web Frameworks
+
+| Framework | Handler | Context | Middleware |
+|-----------|---------|---------|------------|
+| net/http | `ServeHTTP(w, r)` | `*http.Request` | `func(http.Handler) http.Handler` |
+| Chi | `ServeHTTP(w, r)` | `*http.Request` | `func(http.Handler) http.Handler` |
+| Echo | `func(c) error` | `echo.Context` | `func(next) handler` |
+| **Ours** | `Handle(*Context) error` | `*Context` | `func(Handler) Handler` |
 
 ---
 
@@ -1693,11 +1662,6 @@ github.com/your-org/agentkit/
 │   ├── types.go             # Concrete event types
 │   └── handler.go           # Handler interface
 │
-├── hook/                     # Hook system
-│   ├── registry.go          # Registry interface
-│   ├── events.go            # Hook event types
-│   └── provider.go          # Provider interface
-│
 ├── middleware/               # Middleware
 │   ├── middleware.go        # Middleware interface
 │   ├── chain.go             # Chain helper
@@ -1791,11 +1755,10 @@ github.com/your-org/agentkit/
 3. **Future-Proof**: New providers don't require interface changes
 4. **Clean Dependencies**: Core has no external dependencies
 
-### Why Events + Hooks + Middleware?
+### Why Events + Middleware?
 
 - **Events**: Read-only notification stream (consumers)
-- **Hooks**: Typed interception points (modifiers)
-- **Middleware**: Request/response wrapping (cross-cutting)
+- **Middleware**: Request/response wrapping (cross-cutting, interception)
 
 Each serves a distinct purpose with minimal overlap.
 
@@ -1809,7 +1772,7 @@ Each serves a distinct purpose with minimal overlap.
 | ADK `InvocationContext` | `context.Context` + `*Input` |
 | ADK `BaseTool` | `tool.Tool` + `tool.Executor` |
 | Strands `Agent` | `agent.Agent` interface |
-| Strands `HookProvider` | `hook.Provider` interface |
+| Strands `HookProvider` | `middleware.Middleware` |
 | Strands `ConversationManager` | `middleware.Middleware` |
 | Microsoft `AIAgent` | `agent.Agent` interface |
 | Microsoft `AIContextProvider` | `middleware.ContextProvider` |
