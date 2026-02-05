@@ -28,6 +28,10 @@ type Context struct {
 	// Shared across middleware
 	Metadata map[string]any
 
+	// DryRun indicates this is a configuration/preparation call, not actual execution.
+	// Middlewares that have side effects (logging, etc.) should avoid processing dry runs.
+	DryRun bool
+
 	// Result (set by handler)
 	Result any
 }

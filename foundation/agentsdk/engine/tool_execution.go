@@ -133,7 +133,12 @@ func (s *ToolExecutionService) ExecuteWithMiddleware(
 			middleware,
 			nil, // Tool (not easily available here)
 			argsMap,
-			doExecute,
+			nil, // Metadata (not available in this legacy path)
+			func(c *agent.Context) error {
+				err := doExecute()
+				c.Result = execResult
+				return err
+			},
 		)
 	} else {
 		doExecute()
