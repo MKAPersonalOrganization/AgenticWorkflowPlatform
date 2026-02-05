@@ -6,6 +6,7 @@ import (
 	"iter"
 	"time"
 
+	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/internal/llm"
 
@@ -217,7 +218,7 @@ func (s *executionState) prepareExecutor() {
 	// This provides a fallback executor for state resumption scenarios.
 	tools := s.agent.Config.Tools
 	if tools == nil {
-		tools = []core.Tool{}
+		tools = []agent.ExecutableTool{}
 	}
 
 	s.agent.Executor = s.engine.toolExec.CreateExecutor(

@@ -35,19 +35,19 @@ do for [i=0:40] {
 		t.Fatalf("failed to marshal args: %v", err)
 	}
 
-	tCtx := &agent.ToolContext{
-		Arguments: string(argBytes),
+	toolArgs := agent.Arguments{
+		Raw: json.RawMessage(argBytes),
 	}
 
-	result, err := tool.Execute(context.Background(), tCtx)
+	result, err := tool.Execute(context.Background(), toolArgs)
 	if err != nil {
 		t.Fatalf("failed to invoke animate tool: %v", err)
 	}
 
-	var response map[string]any
-	if err := json.Unmarshal([]byte(result.Output), &response); err != nil {
-		t.Fatalf("failed to unmarshal output: %v", err)
+	if len(result.Content) == 0 {
+		t.Fatal("expected content in result")
 	}
+	response := result.Content[0].(map[string]any)
 
 	if !response["success"].(bool) {
 		t.Error("expected success to be true")
@@ -88,19 +88,19 @@ do for [ang=0:360:10] {
 		t.Fatalf("failed to marshal args: %v", err)
 	}
 
-	tCtx := &agent.ToolContext{
-		Arguments: string(argBytes),
+	toolArgs := agent.Arguments{
+		Raw: json.RawMessage(argBytes),
 	}
 
-	result, err := tool.Execute(context.Background(), tCtx)
+	result, err := tool.Execute(context.Background(), toolArgs)
 	if err != nil {
 		t.Fatalf("failed to create animation: %v", err)
 	}
 
-	var response map[string]any
-	if err := json.Unmarshal([]byte(result.Output), &response); err != nil {
-		t.Fatalf("failed to unmarshal output: %v", err)
+	if len(result.Content) == 0 {
+		t.Fatal("expected content in result")
 	}
+	response := result.Content[0].(map[string]any)
 
 	animationPath := response["animation_path"].(string)
 	defer func() { _ = os.Remove(animationPath) }()
@@ -131,19 +131,19 @@ do for [i=1:30] {
 		t.Fatalf("failed to marshal args: %v", err)
 	}
 
-	tCtx := &agent.ToolContext{
-		Arguments: string(argBytes),
+	toolArgs := agent.Arguments{
+		Raw: json.RawMessage(argBytes),
 	}
 
-	result, err := tool.Execute(context.Background(), tCtx)
+	result, err := tool.Execute(context.Background(), toolArgs)
 	if err != nil {
 		t.Fatalf("failed to create webp animation: %v", err)
 	}
 
-	var response map[string]any
-	if err := json.Unmarshal([]byte(result.Output), &response); err != nil {
-		t.Fatalf("failed to unmarshal output: %v", err)
+	if len(result.Content) == 0 {
+		t.Fatal("expected content in result")
 	}
+	response := result.Content[0].(map[string]any)
 
 	animationPath := response["animation_path"].(string)
 	if !strings.HasSuffix(animationPath, ".webp") {
@@ -166,11 +166,11 @@ func TestAnimateTool_ValidationMissingScript(t *testing.T) {
 		t.Fatalf("failed to marshal args: %v", err)
 	}
 
-	tCtx := &agent.ToolContext{
-		Arguments: string(argBytes),
+	toolArgs := agent.Arguments{
+		Raw: json.RawMessage(argBytes),
 	}
 
-	_, err = tool.Execute(context.Background(), tCtx)
+	_, err = tool.Execute(context.Background(), toolArgs)
 
 	if err == nil {
 		t.Error("expected error for missing gnuplot_script parameter")
@@ -193,11 +193,11 @@ func TestAnimateTool_ValidationInvalidFormat(t *testing.T) {
 		t.Fatalf("failed to marshal args: %v", err)
 	}
 
-	tCtx := &agent.ToolContext{
-		Arguments: string(argBytes),
+	toolArgs := agent.Arguments{
+		Raw: json.RawMessage(argBytes),
 	}
 
-	_, err = tool.Execute(context.Background(), tCtx)
+	_, err = tool.Execute(context.Background(), toolArgs)
 
 	if err == nil {
 		t.Error("expected error for invalid format")
@@ -220,11 +220,11 @@ func TestAnimateTool_ValidationSetTerminal(t *testing.T) {
 		t.Fatalf("failed to marshal args: %v", err)
 	}
 
-	tCtx := &agent.ToolContext{
-		Arguments: string(argBytes),
+	toolArgs := agent.Arguments{
+		Raw: json.RawMessage(argBytes),
 	}
 
-	_, err = tool.Execute(context.Background(), tCtx)
+	_, err = tool.Execute(context.Background(), toolArgs)
 
 	if err == nil {
 		t.Error("expected error for script containing 'set terminal'")
@@ -250,19 +250,19 @@ func TestAnimateTool_DefaultValues(t *testing.T) {
 		t.Fatalf("failed to marshal args: %v", err)
 	}
 
-	tCtx := &agent.ToolContext{
-		Arguments: string(argBytes),
+	toolArgs := agent.Arguments{
+		Raw: json.RawMessage(argBytes),
 	}
 
-	result, err := tool.Execute(context.Background(), tCtx)
+	result, err := tool.Execute(context.Background(), toolArgs)
 	if err != nil {
 		t.Fatalf("failed with defaults: %v", err)
 	}
 
-	var response map[string]any
-	if err := json.Unmarshal([]byte(result.Output), &response); err != nil {
-		t.Fatalf("failed to unmarshal output: %v", err)
+	if len(result.Content) == 0 {
+		t.Fatal("expected content in result")
 	}
+	response := result.Content[0].(map[string]any)
 
 	if response["format"].(string) != "gif" {
 		t.Errorf("expected default format 'gif', got: %s", response["format"])

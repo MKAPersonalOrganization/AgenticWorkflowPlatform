@@ -1,26 +1,28 @@
 package agent
 
-import "context"
+import (
+	"context"
+)
 
-// FunctionTool is a Tool implementation that wraps a function.
+// FunctionTool is an ExecutableTool implementation that wraps a function.
 type FunctionTool struct {
 	name        string
 	description string
-	parameters  map[string]any
-	handler     func(ctx context.Context, tCtx *ToolContext) (*ToolResult, error)
+	schema      *Schema
+	handler     func(ctx context.Context, args Arguments) (Result, error)
 }
 
-// NewFunctionTool creates a new function tool.
+// NewFunctionTool creates a new function tool with a Schema.
 func NewFunctionTool(
 	name string,
 	description string,
-	parameters map[string]any,
-	handler func(ctx context.Context, tCtx *ToolContext) (*ToolResult, error),
+	schema *Schema,
+	handler func(ctx context.Context, args Arguments) (Result, error),
 ) *FunctionTool {
 	return &FunctionTool{
 		name:        name,
 		description: description,
-		parameters:  parameters,
+		schema:      schema,
 		handler:     handler,
 	}
 }
@@ -33,10 +35,11 @@ func (f *FunctionTool) Description() string {
 	return f.description
 }
 
-func (f *FunctionTool) InputSchema() map[string]any {
-	return f.parameters
+func (f *FunctionTool) Schema() *Schema {
+	return f.schema
 }
 
-func (f *FunctionTool) Execute(ctx context.Context, tCtx *ToolContext) (*ToolResult, error) {
-	return f.handler(ctx, tCtx)
+// Execute implements the Executor interface.
+func (f *FunctionTool) Execute(ctx context.Context, args Arguments) (Result, error) {
+	return f.handler(ctx, args)
 }

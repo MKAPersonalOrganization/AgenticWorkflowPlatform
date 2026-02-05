@@ -299,7 +299,7 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 
 	// Map Tools
 	for _, t := range agentConfig.Tools {
-		config.Tools = append(config.Tools, WrapTool(t))
+		config.Tools = append(config.Tools, NewExecutableToolAdapter(t))
 	}
 
 	// Map Handoffs
@@ -318,19 +318,16 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 	// Inject Memory Tool and Context if available and enabled
 	if p.artifactStore != nil && p.enableMemory {
 		memoryTool := memorytools.NewMemoryTool(p.artifactStore)
-		// Convert agent.Tool to core.Tool
-		for _, t := range memoryTool.Definition() {
-			config.Tools = append(config.Tools, WrapAgentTool(t))
-		}
+		config.Tools = append(config.Tools, memoryTool)
 
 		memoryMiddleware := memorytools.NewMemoryInjectorMiddleware(memoryTool)
-		config.Middleware = append(config.Middleware, WrapRequestMiddleware(memoryMiddleware))
+		config.Middleware = append(config.Middleware, NewMiddlewareAdapter(memoryMiddleware))
 	}
 
 	// Inject Student Profile Middleware
 	if p.profileRepo != nil {
 		profileMiddleware := smiddleware.NewStudentProfileInjectorMiddleware(p.profileRepo)
-		config.Middleware = append(config.Middleware, WrapRequestMiddleware(profileMiddleware))
+		config.Middleware = append(config.Middleware, NewMiddlewareAdapter(profileMiddleware))
 	}
 
 	return config, nil

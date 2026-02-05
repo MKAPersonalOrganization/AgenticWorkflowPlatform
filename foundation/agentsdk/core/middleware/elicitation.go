@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/core"
 )
 
@@ -22,30 +23,31 @@ func (t *AskMultipleSelectionTool) Description() string {
 	return "Ask a multiple-choice question."
 }
 
-func (t *AskMultipleSelectionTool) Parameters() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"question": map[string]any{
-				"type":        "string",
-				"description": "The question to ask.",
+func (t *AskMultipleSelectionTool) Schema() *agent.Schema {
+	return &agent.Schema{
+		Type: agent.TypeObject,
+		Properties: map[string]*agent.Schema{
+			"question": {
+				Type:        agent.TypeString,
+				Description: "The question to ask.",
 			},
-			"options": map[string]any{
-				"type":        "array",
-				"items":       map[string]any{"type": "string"},
-				"description": "List of answer options.",
-				"minItems":    2,
+			"options": {
+				Type:        agent.TypeArray,
+				Description: "List of answer options.",
+				Items: &agent.Schema{
+					Type: agent.TypeString,
+				},
 			},
 		},
-		"required": []string{"question", "options"},
+		Required: []string{"question", "options"},
 	}
 }
 
-func (t *AskMultipleSelectionTool) Invoke(ctx core.ToolContext, args any) (any, error) {
-	// First unmarshal into a flexible map to handle various types
+func (t *AskMultipleSelectionTool) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
+	// Unmarshal into a flexible map to handle various types
 	var raw map[string]any
-	if err := core.UnmarshalArgs(args, &raw); err != nil {
-		return nil, fmt.Errorf("invalid args: %w", err)
+	if err := args.Decode(&raw); err != nil {
+		return agent.ErrorResult(fmt.Errorf("invalid args: %w", err)), nil
 	}
 
 	// Extract question/statement/text
@@ -59,7 +61,7 @@ func (t *AskMultipleSelectionTool) Invoke(ctx core.ToolContext, args any) (any, 
 	}
 
 	if question == "" {
-		return nil, fmt.Errorf("question is required (use 'question' parameter)")
+		return agent.ErrorResult(fmt.Errorf("question is required (use 'question' parameter)")), nil
 	}
 
 	// Extract options - supporting both []any/[]string and string
@@ -93,14 +95,18 @@ func (t *AskMultipleSelectionTool) Invoke(ctx core.ToolContext, args any) (any, 
 	}
 
 	if len(options) < 2 {
-		return nil, fmt.Errorf("at least 2 options required in 'options' (array or comma-separated string)")
+		return agent.ErrorResult(fmt.Errorf("at least 2 options required in 'options' (array or comma-separated string)")), nil
 	}
 
 	schema := map[string]any{
 		"type": "choose_multiple",
 		"enum": options,
 	}
-	return createMultipleChoiceResult(question, options, schema)
+	result, err := createMultipleChoiceResult(question, options, schema)
+	if err != nil {
+		return agent.ErrorResult(err), nil
+	}
+	return agent.NewResult(result), nil
 }
 
 // --- TOOL: YES/NO QUIZ ---
@@ -111,27 +117,27 @@ func (t *AskTrueFalseTool) Description() string {
 	return "Ask a yes/no question."
 }
 
-func (t *AskTrueFalseTool) Parameters() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"question": map[string]any{
-				"type":        "string",
-				"description": "The question to verify (true/false).",
+func (t *AskTrueFalseTool) Schema() *agent.Schema {
+	return &agent.Schema{
+		Type: agent.TypeObject,
+		Properties: map[string]*agent.Schema{
+			"question": {
+				Type:        agent.TypeString,
+				Description: "The question to verify (true/false).",
 			},
 		},
-		"required": []string{"question"},
+		Required: []string{"question"},
 	}
 }
 
-func (t *AskTrueFalseTool) Invoke(ctx core.ToolContext, args any) (any, error) {
+func (t *AskTrueFalseTool) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
 	var params struct {
 		Question  string `json:"question"`
 		Statement string `json:"statement"`
 		Text      string `json:"text"`
 	}
-	if err := core.UnmarshalArgs(args, &params); err != nil {
-		return nil, fmt.Errorf("invalid args (expected schema with question): %w", err)
+	if err := args.Decode(&params); err != nil {
+		return agent.ErrorResult(fmt.Errorf("invalid args (expected schema with question): %w", err)), nil
 	}
 
 	question := params.Question
@@ -144,13 +150,17 @@ func (t *AskTrueFalseTool) Invoke(ctx core.ToolContext, args any) (any, error) {
 	}
 
 	if question == "" {
-		return nil, fmt.Errorf("question is required (use 'question' parameter)")
+		return agent.ErrorResult(fmt.Errorf("question is required (use 'question' parameter)")), nil
 	}
 
 	schema := map[string]any{
 		"type": "true_false",
 	}
-	return createTrueFalseResult(question, schema)
+	result, err := createTrueFalseResult(question, schema)
+	if err != nil {
+		return agent.ErrorResult(err), nil
+	}
+	return agent.NewResult(result), nil
 }
 
 // --- HELPERS ---

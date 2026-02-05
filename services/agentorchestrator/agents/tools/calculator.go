@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -29,177 +28,117 @@ type UnaryOperationArgs struct {
 	Value float64 `json:"value"`
 }
 
-func jsonResult(v any) (*agent.ToolResult, error) {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return nil, err
-	}
-	return &agent.ToolResult{Output: string(b)}, nil
+
+// Common schemas for calculator tools
+var binaryOpSchema = &agent.Schema{
+	Type: agent.TypeObject,
+	Properties: map[string]*agent.Schema{
+		"a": {Type: agent.TypeNumber},
+		"b": {Type: agent.TypeNumber},
+	},
+	Required: []string{"a", "b"},
+}
+
+var unaryOpSchema = &agent.Schema{
+	Type: agent.TypeObject,
+	Properties: map[string]*agent.Schema{
+		"value": {Type: agent.TypeNumber},
+	},
+	Required: []string{"value"},
 }
 
 // AddTool performs addition.
 type AddTool struct{}
 
-func (t *AddTool) Name() string { return "add" }
-func (t *AddTool) Description() string {
-	return "Add two numbers (a + b)"
-}
+func (t *AddTool) Name() string        { return "add" }
+func (t *AddTool) Description() string { return "Add two numbers (a + b)" }
+func (t *AddTool) Schema() *agent.Schema { return binaryOpSchema }
 
-func (t *AddTool) InputSchema() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"a": map[string]any{"type": "number"},
-			"b": map[string]any{"type": "number"},
-		},
-		"required": []string{"a", "b"},
-	}
-}
-
-func (t *AddTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
+func (t *AddTool) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
 	var params BinaryOperationArgs
-	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
-		return nil, fmt.Errorf("failed to parse add args: %w", err)
+	if err := args.Decode(&params); err != nil {
+		return agent.ErrorResult(fmt.Errorf("failed to parse add args: %w", err)), nil
 	}
-	return jsonResult(map[string]any{"result": params.A + params.B})
+	return agent.JSONResult(map[string]any{"result": params.A + params.B}), nil
 }
 
 // SubtractTool performs subtraction.
 type SubtractTool struct{}
 
-func (t *SubtractTool) Name() string { return "subtract" }
-func (t *SubtractTool) Description() string {
-	return "Subtract two numbers (a - b)"
-}
+func (t *SubtractTool) Name() string        { return "subtract" }
+func (t *SubtractTool) Description() string { return "Subtract two numbers (a - b)" }
+func (t *SubtractTool) Schema() *agent.Schema { return binaryOpSchema }
 
-func (t *SubtractTool) InputSchema() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"a": map[string]any{"type": "number"},
-			"b": map[string]any{"type": "number"},
-		},
-		"required": []string{"a", "b"},
-	}
-}
-
-func (t *SubtractTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
+func (t *SubtractTool) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
 	var params BinaryOperationArgs
-	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
-		return nil, fmt.Errorf("failed to parse subtract args: %w", err)
+	if err := args.Decode(&params); err != nil {
+		return agent.ErrorResult(fmt.Errorf("failed to parse subtract args: %w", err)), nil
 	}
-	return jsonResult(map[string]any{"result": params.A - params.B})
+	return agent.JSONResult(map[string]any{"result": params.A - params.B}), nil
 }
 
 // MultiplyTool performs multiplication.
 type MultiplyTool struct{}
 
-func (t *MultiplyTool) Name() string { return "multiply" }
-func (t *MultiplyTool) Description() string {
-	return "Multiply two numbers (a * b)"
-}
+func (t *MultiplyTool) Name() string        { return "multiply" }
+func (t *MultiplyTool) Description() string { return "Multiply two numbers (a * b)" }
+func (t *MultiplyTool) Schema() *agent.Schema { return binaryOpSchema }
 
-func (t *MultiplyTool) InputSchema() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"a": map[string]any{"type": "number"},
-			"b": map[string]any{"type": "number"},
-		},
-		"required": []string{"a", "b"},
-	}
-}
-
-func (t *MultiplyTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
+func (t *MultiplyTool) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
 	var params BinaryOperationArgs
-	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
-		return nil, fmt.Errorf("failed to parse multiply args: %w", err)
+	if err := args.Decode(&params); err != nil {
+		return agent.ErrorResult(fmt.Errorf("failed to parse multiply args: %w", err)), nil
 	}
-	return jsonResult(map[string]any{"result": params.A * params.B})
+	return agent.JSONResult(map[string]any{"result": params.A * params.B}), nil
 }
 
 // DivideTool performs division.
 type DivideTool struct{}
 
-func (t *DivideTool) Name() string { return "divide" }
-func (t *DivideTool) Description() string {
-	return "Divide two numbers (a / b)"
-}
+func (t *DivideTool) Name() string        { return "divide" }
+func (t *DivideTool) Description() string { return "Divide two numbers (a / b)" }
+func (t *DivideTool) Schema() *agent.Schema { return binaryOpSchema }
 
-func (t *DivideTool) InputSchema() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"a": map[string]any{"type": "number"},
-			"b": map[string]any{"type": "number"},
-		},
-		"required": []string{"a", "b"},
-	}
-}
-
-func (t *DivideTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
+func (t *DivideTool) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
 	var params BinaryOperationArgs
-	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
-		return nil, fmt.Errorf("failed to parse divide args: %w", err)
+	if err := args.Decode(&params); err != nil {
+		return agent.ErrorResult(fmt.Errorf("failed to parse divide args: %w", err)), nil
 	}
 	if params.B == 0 {
-		return nil, fmt.Errorf("failed to divide %v by %v: %w", params.A, params.B, ErrDivisionByZero)
+		return agent.ErrorResult(fmt.Errorf("failed to divide %v by %v: %w", params.A, params.B, ErrDivisionByZero)), nil
 	}
-	return jsonResult(map[string]any{"result": params.A / params.B})
+	return agent.JSONResult(map[string]any{"result": params.A / params.B}), nil
 }
 
 // PowerTool performs exponentiation.
 type PowerTool struct{}
 
-func (t *PowerTool) Name() string { return "power" }
-func (t *PowerTool) Description() string {
-	return "Raise a to the power of b (a^b)"
-}
+func (t *PowerTool) Name() string        { return "power" }
+func (t *PowerTool) Description() string { return "Raise a to the power of b (a^b)" }
+func (t *PowerTool) Schema() *agent.Schema { return binaryOpSchema }
 
-func (t *PowerTool) InputSchema() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"a": map[string]any{"type": "number"},
-			"b": map[string]any{"type": "number"},
-		},
-		"required": []string{"a", "b"},
-	}
-}
-
-func (t *PowerTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
+func (t *PowerTool) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
 	var params BinaryOperationArgs
-	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
-		return nil, fmt.Errorf("failed to parse power args: %w", err)
+	if err := args.Decode(&params); err != nil {
+		return agent.ErrorResult(fmt.Errorf("failed to parse power args: %w", err)), nil
 	}
-	return jsonResult(map[string]any{"result": math.Pow(params.A, params.B)})
+	return agent.JSONResult(map[string]any{"result": math.Pow(params.A, params.B)}), nil
 }
 
 // SqrtTool performs square root.
 type SqrtTool struct{}
 
-func (t *SqrtTool) Name() string { return "sqrt" }
-func (t *SqrtTool) Description() string {
-	return "Calculate the square root of a number"
-}
+func (t *SqrtTool) Name() string        { return "sqrt" }
+func (t *SqrtTool) Description() string { return "Calculate the square root of a number" }
+func (t *SqrtTool) Schema() *agent.Schema { return unaryOpSchema }
 
-func (t *SqrtTool) InputSchema() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"value": map[string]any{"type": "number"},
-		},
-		"required": []string{"value"},
-	}
-}
-
-func (t *SqrtTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
+func (t *SqrtTool) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
 	var params UnaryOperationArgs
-	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
-		return nil, fmt.Errorf("failed to parse sqrt args: %w", err)
+	if err := args.Decode(&params); err != nil {
+		return agent.ErrorResult(fmt.Errorf("failed to parse sqrt args: %w", err)), nil
 	}
 	if params.Value < 0 {
-		return nil, fmt.Errorf("failed to calculate sqrt of %v: %w", params.Value, ErrSqrtNegative)
+		return agent.ErrorResult(fmt.Errorf("failed to calculate sqrt of %v: %w", params.Value, ErrSqrtNegative)), nil
 	}
-	return jsonResult(map[string]any{"result": math.Sqrt(params.Value)})
+	return agent.JSONResult(map[string]any{"result": math.Sqrt(params.Value)}), nil
 }

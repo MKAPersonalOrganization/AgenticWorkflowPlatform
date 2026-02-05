@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 
+	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/core"
 )
 
@@ -38,7 +39,7 @@ func NewToolExecutionService(tracer core.ToolTracer) *ToolExecutionService {
 // CreateExecutor creates a tool executor initialized with the given tools.
 func (s *ToolExecutionService) CreateExecutor(
 	ctx context.Context,
-	tools []core.Tool,
+	tools []agent.ExecutableTool,
 	threadID string,
 	messageID string,
 	reqCtx *core.RequestContext,

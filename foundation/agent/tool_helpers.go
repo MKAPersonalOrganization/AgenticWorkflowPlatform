@@ -35,49 +35,134 @@ func UnmarshalToolArgs(args any, target any) error {
 	return nil
 }
 
+// SchemaToMap converts a Schema to a map[string]any representation.
+// This is useful for adapters that need the legacy format.
+func SchemaToMap(s *Schema) map[string]any {
+	if s == nil {
+		return nil
+	}
+
+	m := make(map[string]any)
+	if s.Type != "" {
+		m["type"] = string(s.Type)
+	}
+	if s.Description != "" {
+		m["description"] = s.Description
+	}
+	if len(s.Required) > 0 {
+		m["required"] = s.Required
+	}
+	if len(s.Properties) > 0 {
+		props := make(map[string]any)
+		for k, v := range s.Properties {
+			props[k] = SchemaToMap(v)
+		}
+		m["properties"] = props
+	}
+	if s.Items != nil {
+		m["items"] = SchemaToMap(s.Items)
+	}
+	if len(s.Enum) > 0 {
+		m["enum"] = s.Enum
+	}
+	if s.Format != "" {
+		m["format"] = s.Format
+	}
+	if s.Default != nil {
+		m["default"] = s.Default
+	}
+	if s.Nullable {
+		m["nullable"] = s.Nullable
+	}
+
+	return m
+}
+
+// SchemaFromMap creates a Schema from a map[string]any representation.
+// This is useful for converting legacy tool definitions to the new format.
+func SchemaFromMap(m map[string]any) *Schema {
+	if m == nil {
+		return nil
+	}
+
+	schema := &Schema{}
+
+	if t, ok := m["type"].(string); ok {
+		schema.Type = SchemaType(t)
+	}
+	if d, ok := m["description"].(string); ok {
+		schema.Description = d
+	}
+	if req, ok := m["required"].([]string); ok {
+		schema.Required = req
+	}
+	if req, ok := m["required"].([]any); ok {
+		for _, r := range req {
+			if s, ok := r.(string); ok {
+				schema.Required = append(schema.Required, s)
+			}
+		}
+	}
+	if props, ok := m["properties"].(map[string]any); ok {
+		schema.Properties = make(map[string]*Schema)
+		for k, v := range props {
+			if propMap, ok := v.(map[string]any); ok {
+				schema.Properties[k] = SchemaFromMap(propMap)
+			}
+		}
+	}
+	if items, ok := m["items"].(map[string]any); ok {
+		schema.Items = SchemaFromMap(items)
+	}
+	if enum, ok := m["enum"].([]string); ok {
+		schema.Enum = enum
+	}
+	if enum, ok := m["enum"].([]any); ok {
+		for _, e := range enum {
+			if s, ok := e.(string); ok {
+				schema.Enum = append(schema.Enum, s)
+			}
+		}
+	}
+	if f, ok := m["format"].(string); ok {
+		schema.Format = f
+	}
+	schema.Default = m["default"]
+	if n, ok := m["nullable"].(bool); ok {
+		schema.Nullable = n
+	}
+
+	return schema
+}
+
 // SimpleFunctionTool creates a simple function-based tool.
-// This is a convenience constructor similar to core.NewFunctionTool.
-// It wraps the simpler function signature into the Tool interface.
-func SimpleFunctionTool(name, description string, inputSchema map[string]any, fn func(context.Context, map[string]any) (any, error)) Tool {
-	return NewFunctionTool(name, description, inputSchema, func(ctx context.Context, tctx *ToolContext) (*ToolResult, error) {
-		// Parse arguments from JSON string
-		var args map[string]any
-		if tctx.Arguments != "" {
-			if err := json.Unmarshal([]byte(tctx.Arguments), &args); err != nil {
-				return nil, fmt.Errorf("failed to parse tool arguments: %w", err)
+// This is a convenience constructor for creating tools with simpler function signatures.
+func SimpleFunctionTool(name, description string, inputSchema map[string]any, fn func(context.Context, map[string]any) (any, error)) ExecutableTool {
+	schema := SchemaFromMap(inputSchema)
+	return NewFunctionTool(name, description, schema, func(ctx context.Context, args Arguments) (Result, error) {
+		// Parse arguments from JSON
+		var argsMap map[string]any
+		if args.Raw != nil {
+			if err := json.Unmarshal(args.Raw, &argsMap); err != nil {
+				return ErrorResult(fmt.Errorf("failed to parse tool arguments: %w", err)), nil
 			}
 		}
 
 		// Execute function
-		result, err := fn(ctx, args)
+		result, err := fn(ctx, argsMap)
 		if err != nil {
-			return &ToolResult{
-				ToolCallID: tctx.ToolCallID,
-				Output:     err.Error(),
-				IsError:    true,
-			}, nil
+			return ErrorResult(err), nil
 		}
 
 		// Convert result to string
-		var output string
 		switch v := result.(type) {
 		case string:
-			output = v
+			return TextResult(v), nil
 		case fmt.Stringer:
-			output = v.String()
+			return TextResult(v.String()), nil
 		default:
-			data, err := json.Marshal(result)
-			if err != nil {
-				return nil, fmt.Errorf("failed to marshal tool result: %w", err)
-			}
-			output = string(data)
+			return JSONResult(result), nil
 		}
-
-		return &ToolResult{
-			ToolCallID: tctx.ToolCallID,
-			Output:     output,
-			IsError:    false,
-		}, nil
 	})
 }
 

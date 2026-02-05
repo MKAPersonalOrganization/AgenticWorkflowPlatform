@@ -31,19 +31,19 @@ plot sin(x) with lines linewidth 2 title 'y = sin(x)'`
 		t.Fatalf("failed to marshal args: %v", err)
 	}
 
-	tCtx := &agent.ToolContext{
-		Arguments: string(argBytes),
+	toolArgs := agent.Arguments{
+		Raw: json.RawMessage(argBytes),
 	}
 
-	result, err := tool.Execute(context.Background(), tCtx)
+	result, err := tool.Execute(context.Background(), toolArgs)
 	if err != nil {
 		t.Fatalf("failed to invoke plot tool: %v", err)
 	}
 
-	var response map[string]any
-	if err := json.Unmarshal([]byte(result.Output), &response); err != nil {
-		t.Fatalf("failed to unmarshal output: %v", err)
+	if len(result.Content) == 0 {
+		t.Fatal("expected content in result")
 	}
+	response := result.Content[0].(map[string]any)
 
 	if !response["success"].(bool) {
 		t.Error("expected success to be true")
@@ -77,19 +77,19 @@ plot sin(x) title 'sin(x)', cos(x) title 'cos(x)', tan(x) title 'tan(x)'`
 		t.Fatalf("failed to marshal args: %v", err)
 	}
 
-	tCtx := &agent.ToolContext{
-		Arguments: string(argBytes),
+	toolArgs := agent.Arguments{
+		Raw: json.RawMessage(argBytes),
 	}
 
-	result, err := tool.Execute(context.Background(), tCtx)
+	result, err := tool.Execute(context.Background(), toolArgs)
 	if err != nil {
 		t.Fatalf("failed to create plot: %v", err)
 	}
 
-	var response map[string]any
-	if err := json.Unmarshal([]byte(result.Output), &response); err != nil {
-		t.Fatalf("failed to unmarshal output: %v", err)
+	if len(result.Content) == 0 {
+		t.Fatal("expected content in result")
 	}
+	response := result.Content[0].(map[string]any)
 
 	imagePath := response["image_path"].(string)
 	if _, err := os.Stat(imagePath); os.IsNotExist(err) {
@@ -120,19 +120,19 @@ plot x**2 - 4*x + 3 with lines title 'y = x² - 4x + 3', 0 with lines dashtype 2
 		t.Fatalf("failed to marshal args: %v", err)
 	}
 
-	tCtx := &agent.ToolContext{
-		Arguments: string(argBytes),
+	toolArgs := agent.Arguments{
+		Raw: json.RawMessage(argBytes),
 	}
 
-	result, err := tool.Execute(context.Background(), tCtx)
+	result, err := tool.Execute(context.Background(), toolArgs)
 	if err != nil {
 		t.Fatalf("failed to create plot: %v", err)
 	}
 
-	var response map[string]any
-	if err := json.Unmarshal([]byte(result.Output), &response); err != nil {
-		t.Fatalf("failed to unmarshal output: %v", err)
+	if len(result.Content) == 0 {
+		t.Fatal("expected content in result")
 	}
+	response := result.Content[0].(map[string]any)
 
 	imagePath := response["image_path"].(string)
 	defer func() { _ = os.Remove(imagePath) }()
@@ -163,19 +163,19 @@ e`
 		t.Fatalf("failed to marshal args: %v", err)
 	}
 
-	tCtx := &agent.ToolContext{
-		Arguments: string(argBytes),
+	toolArgs := agent.Arguments{
+		Raw: json.RawMessage(argBytes),
 	}
 
-	result, err := tool.Execute(context.Background(), tCtx)
+	result, err := tool.Execute(context.Background(), toolArgs)
 	if err != nil {
 		t.Fatalf("failed to create plot: %v", err)
 	}
 
-	var response map[string]any
-	if err := json.Unmarshal([]byte(result.Output), &response); err != nil {
-		t.Fatalf("failed to unmarshal output: %v", err)
+	if len(result.Content) == 0 {
+		t.Fatal("expected content in result")
 	}
+	response := result.Content[0].(map[string]any)
 
 	imagePath := response["image_path"].(string)
 	defer func() { _ = os.Remove(imagePath) }()
@@ -200,19 +200,19 @@ splot x**2 + y**2 with lines`
 		t.Fatalf("failed to marshal args: %v", err)
 	}
 
-	tCtx := &agent.ToolContext{
-		Arguments: string(argBytes),
+	toolArgs := agent.Arguments{
+		Raw: json.RawMessage(argBytes),
 	}
 
-	result, err := tool.Execute(context.Background(), tCtx)
+	result, err := tool.Execute(context.Background(), toolArgs)
 	if err != nil {
 		t.Fatalf("failed to create plot: %v", err)
 	}
 
-	var response map[string]any
-	if err := json.Unmarshal([]byte(result.Output), &response); err != nil {
-		t.Fatalf("failed to unmarshal output: %v", err)
+	if len(result.Content) == 0 {
+		t.Fatal("expected content in result")
 	}
+	response := result.Content[0].(map[string]any)
 
 	imagePath := response["image_path"].(string)
 	defer func() {
@@ -237,11 +237,11 @@ func TestPlotTool_ValidationMissingScript(t *testing.T) {
 		t.Fatalf("failed to marshal args: %v", err)
 	}
 
-	tCtx := &agent.ToolContext{
-		Arguments: string(argBytes),
+	toolArgs := agent.Arguments{
+		Raw: json.RawMessage(argBytes),
 	}
 
-	_, err = tool.Execute(context.Background(), tCtx)
+	_, err = tool.Execute(context.Background(), toolArgs)
 
 	if err == nil {
 		t.Error("expected error for missing gnuplot_script parameter")
@@ -264,11 +264,11 @@ func TestPlotTool_ValidationSetTerminal(t *testing.T) {
 		t.Fatalf("failed to marshal args: %v", err)
 	}
 
-	tCtx := &agent.ToolContext{
-		Arguments: string(argBytes),
+	toolArgs := agent.Arguments{
+		Raw: json.RawMessage(argBytes),
 	}
 
-	_, err = tool.Execute(context.Background(), tCtx)
+	_, err = tool.Execute(context.Background(), toolArgs)
 
 	if err == nil {
 		t.Error("expected error for script containing 'set terminal'")
@@ -291,11 +291,11 @@ func TestPlotTool_ValidationSetOutput(t *testing.T) {
 		t.Fatalf("failed to marshal args: %v", err)
 	}
 
-	tCtx := &agent.ToolContext{
-		Arguments: string(argBytes),
+	toolArgs := agent.Arguments{
+		Raw: json.RawMessage(argBytes),
 	}
 
-	_, err = tool.Execute(context.Background(), tCtx)
+	_, err = tool.Execute(context.Background(), toolArgs)
 
 	if err == nil {
 		t.Error("expected error for script containing 'set output'")
@@ -319,11 +319,11 @@ func TestPlotTool_ValidationTitleTooLong(t *testing.T) {
 		t.Fatalf("failed to marshal args: %v", err)
 	}
 
-	tCtx := &agent.ToolContext{
-		Arguments: string(argBytes),
+	toolArgs := agent.Arguments{
+		Raw: json.RawMessage(argBytes),
 	}
 
-	_, err = tool.Execute(context.Background(), tCtx)
+	_, err = tool.Execute(context.Background(), toolArgs)
 
 	if err == nil {
 		t.Error("expected error for title too long")
@@ -333,36 +333,31 @@ func TestPlotTool_ValidationTitleTooLong(t *testing.T) {
 	}
 }
 
+
 func TestPlotTool_ParametersSchema(t *testing.T) {
-	t.Parallel()
-	tool := NewPlotTool()
-	params := tool.InputSchema()
+t.Parallel()
+tool := NewPlotTool()
+schema := tool.Schema()
 
-	// Verify schema structure
-	if params["type"] != "object" {
-		t.Error("expected type to be 'object'")
-	}
+// Verify schema structure
+if schema.Type != "object" {
+t.Error("expected type to be 'object'")
+}
 
-	properties, ok := params["properties"].(map[string]any)
-	if !ok {
-		t.Fatal("expected properties to be a map")
-	}
+if schema.Properties == nil {
+t.Fatal("expected properties to be defined")
+}
 
-	// Check gnuplot_script property exists
-	if _, ok := properties["gnuplot_script"]; !ok {
-		t.Error("expected gnuplot_script property")
-	}
+// Check gnuplot_script property exists
+if _, ok := schema.Properties["gnuplot_script"]; !ok {
+t.Error("expected gnuplot_script property")
+}
 
-	// Check required fields
-	required, ok := params["required"].([]string)
-	if !ok {
-		t.Fatal("expected required to be a string array")
-	}
-
-	if len(required) != 2 {
-		t.Errorf("expected required to contain 2 fields, got: %v", required)
-	}
-	if required[0] != "gnuplot_script" || required[1] != "title" {
-		t.Errorf("expected required to contain 'gnuplot_script' and 'title', got: %v", required)
-	}
+// Check required fields
+if len(schema.Required) != 2 {
+t.Errorf("expected required to contain 2 fields, got: %v", schema.Required)
+}
+if schema.Required[0] != "gnuplot_script" || schema.Required[1] != "title" {
+t.Errorf("expected required to contain 'gnuplot_script' and 'title', got: %v", schema.Required)
+}
 }

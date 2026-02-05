@@ -2,9 +2,10 @@ package middleware_test
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
-	"school-with-ai/foundation/agentsdk/core"
+	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/core/middleware"
 
 	"github.com/stretchr/testify/assert"
@@ -13,7 +14,6 @@ import (
 func TestAskMultipleSelectionTool_Invoke(t *testing.T) {
 	tool := &middleware.AskMultipleSelectionTool{}
 	ctx := context.Background()
-	tCtx := core.ToolContext{Context: ctx}
 
 	tests := []struct {
 		name      string
@@ -56,13 +56,13 @@ func TestAskMultipleSelectionTool_Invoke(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := tool.Invoke(tCtx, tt.args)
+			args := agent.Arguments{Data: tt.args}
+			result, err := tool.Execute(ctx, args)
 			if tt.wantError {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
-				resStruct, ok := result.(core.ToolResult)
-				assert.True(t, ok)
+				// Result should contain command with elicitation
 
 				data, ok := resStruct.Result.(map[string]any)
 				assert.True(t, ok)
@@ -82,7 +82,6 @@ func TestAskMultipleSelectionTool_Invoke(t *testing.T) {
 func TestAskTrueFalseTool_Invoke(t *testing.T) {
 	tool := &middleware.AskTrueFalseTool{}
 	ctx := context.Background()
-	tCtx := core.ToolContext{Context: ctx}
 
 	tests := []struct {
 		name      string
@@ -114,7 +113,10 @@ func TestAskTrueFalseTool_Invoke(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := tool.Invoke(tCtx, tt.args)
+			// Marshal args to JSON for agent.Arguments
+			argsJSON, _ := json.Marshal(tt.args)
+			args := agent.Arguments{Raw: argsJSON}
+			_, err := tool.Execute(ctx, args)
 			if tt.wantError {
 				assert.Error(t, err)
 			} else {

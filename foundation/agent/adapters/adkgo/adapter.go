@@ -42,23 +42,25 @@ func (a *AgentAdapter) Run(ctx context.Context, inv *agent.Invocation) agent.Str
 }
 
 
-// WrapTool wraps an ADK-Go tool to implement agent.Tool.
-func WrapTool(adkTool any) agent.Tool {
+// WrapTool wraps an ADK-Go tool to implement agent.ExecutableTool.
+func WrapTool(adkTool any) agent.ExecutableTool {
 	return &ToolAdapter{
 		adkTool: adkTool,
 	}
 }
 
-// ToolAdapter adapts an ADK-Go tool to the agent.Tool interface.
+// ToolAdapter adapts an ADK-Go tool to the agent.ExecutableTool interface.
 type ToolAdapter struct {
 	adkTool any
 }
 
-func (t *ToolAdapter) Name() string                { return "" }
-func (t *ToolAdapter) Description() string         { return "" }
-func (t *ToolAdapter) InputSchema() map[string]any { return nil }
-func (t *ToolAdapter) Execute(ctx context.Context, tctx *agent.ToolContext) (*agent.ToolResult, error) {
-	return nil, &NotImplementedError{"ADK-Go tool adapter not yet implemented"}
+func (t *ToolAdapter) Name() string        { return "" }
+func (t *ToolAdapter) Description() string { return "" }
+func (t *ToolAdapter) Schema() *agent.Schema { return nil }
+
+// Execute implements the Executor interface.
+func (t *ToolAdapter) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
+	return agent.ErrorResult(&NotImplementedError{"ADK-Go tool adapter not yet implemented"}), nil
 }
 
 // NotImplementedError indicates a feature is not yet implemented.

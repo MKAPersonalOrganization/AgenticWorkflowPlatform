@@ -33,29 +33,29 @@ func (t *LookupSectionTool) Description() string {
 	return "Reads a specific section of a library book or chapter. Useful for reading context around a search result."
 }
 
-// InputSchema returns the schema for the tool's arguments.
-func (t *LookupSectionTool) InputSchema() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"path": map[string]any{
-				"type":        "string",
-				"description": "The path to the file (e.g., 'grade-10/math/algebra.md').",
+// Schema returns the schema for the tool's arguments.
+func (t *LookupSectionTool) Schema() *agent.Schema {
+	return &agent.Schema{
+		Type: agent.TypeObject,
+		Properties: map[string]*agent.Schema{
+			"path": {
+				Type:        agent.TypeString,
+				Description: "The path to the file (e.g., 'grade-10/math/algebra.md').",
 			},
-			"section_heading": map[string]any{
-				"type":        "string",
-				"description": "The exact heading text of the section to read (e.g., 'Quadratic Equations').",
+			"section_heading": {
+				Type:        agent.TypeString,
+				Description: "The exact heading text of the section to read (e.g., 'Quadratic Equations').",
 			},
-			"start_line": map[string]any{
-				"type":        "integer",
-				"description": "Optional: Start reading from this line number (1-based). Overrides section_heading if provided.",
+			"start_line": {
+				Type:        agent.TypeInteger,
+				Description: "Optional: Start reading from this line number (1-based). Overrides section_heading if provided.",
 			},
-			"end_line": map[string]any{
-				"type":        "integer",
-				"description": "Optional: Stop reading at this line number (1-based).",
+			"end_line": {
+				Type:        agent.TypeInteger,
+				Description: "Optional: Stop reading at this line number (1-based).",
 			},
 		},
-		"required": []string{"path"},
+		Required: []string{"path"},
 	}
 }
 
@@ -68,15 +68,15 @@ type LookupSectionArgs struct {
 }
 
 // Execute executes the tool logic.
-func (t *LookupSectionTool) Execute(ctx context.Context, tCtx *agent.ToolContext) (*agent.ToolResult, error) {
+func (t *LookupSectionTool) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
 	var params LookupSectionArgs
-	if err := agent.UnmarshalArgs(tCtx.Arguments, &params); err != nil {
-		return nil, fmt.Errorf("failed to parse args: %w", err)
+	if err := args.Decode(&params); err != nil {
+		return agent.ErrorResult(fmt.Errorf("failed to parse args: %w", err)), nil
 	}
 
 	content, err := t.books.GetChapterContent(params.Path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read file '%s': %w", params.Path, err)
+		return agent.ErrorResult(fmt.Errorf("failed to read file '%s': %w", params.Path, err)), nil
 	}
 
 	var result string
@@ -91,14 +91,14 @@ func (t *LookupSectionTool) Execute(ctx context.Context, tCtx *agent.ToolContext
 	}
 
 	if err != nil {
-		return nil, err
+		return agent.ErrorResult(err), nil
 	}
 
 	b, err := json.Marshal(result)
 	if err != nil {
-		return nil, err
+		return agent.ErrorResult(err), nil
 	}
-	return &agent.ToolResult{Output: string(b)}, nil
+	return agent.TextResult(string(b)), nil
 }
 
 func (t *LookupSectionTool) extractByLines(content string, start, end int) (string, error) {
