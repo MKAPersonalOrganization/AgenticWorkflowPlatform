@@ -74,6 +74,7 @@ type ToolStateObserver interface {
 	OnToolStateChanged(
 		toolCallID string,
 		toolName string,
+		arguments string,
 		oldState ToolState,
 		newState ToolState,
 		result *ToolExecutionResult,
@@ -270,6 +271,7 @@ func (tsm *ToolStateMachine) notifyObservers(oldState, newState ToolState) {
 		observer.OnToolStateChanged(
 			tsm.toolCall.ID,
 			tsm.toolCall.Name,
+			tsm.toolCall.Arguments,
 			oldState,
 			newState,
 			result,
