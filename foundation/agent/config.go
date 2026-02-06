@@ -37,9 +37,6 @@ type Config struct {
 	// ToolResolvers provide dynamic tool discovery.
 	ToolResolvers []ToolResolver
 
-	// Handoffs declares which agents this agent can transfer control to.
-	Handoffs []Handoff
-
 	// SubAgents are child agents for hierarchical delegation.
 	SubAgents []Agent
 
@@ -101,18 +98,6 @@ type Capabilities struct {
 
 	// Artifacts enables the agent to save and load artifacts.
 	Artifacts bool
-}
-
-// Handoff represents a transfer of control to another agent.
-type Handoff struct {
-	// AgentName is the target agent's name.
-	AgentName string
-
-	// Description explains when to use this handoff.
-	Description string
-
-	// InputSchema defines expected input for the handoff (optional).
-	InputSchema map[string]any
 }
 
 // DefaultConfig returns a Config with sensible defaults.

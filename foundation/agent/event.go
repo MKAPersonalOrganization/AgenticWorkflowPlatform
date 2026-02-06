@@ -60,9 +60,6 @@ const (
 	// EventTypeUsage indicates token usage.
 	EventTypeUsage EventType = "usage"
 
-	// EventTypeHandoff indicates agent transfer.
-	EventTypeHandoff EventType = "handoff"
-
 	// EventTypeTitleGenerated indicates a conversation title was created.
 	EventTypeTitleGenerated EventType = "title_generated"
 
@@ -181,20 +178,6 @@ func (e *UsageEvent) Timestamp() time.Time { return e.EventTime }
 func (e *UsageEvent) Data() any            { return e.Usage }
 func (e *UsageEvent) persistent()          {}
 
-// HandoffEvent is emitted when control transfers between agents.
-// This is an EPHEMERAL event - handoffs are execution flow, not domain state.
-type HandoffEvent struct {
-	FromAgent string
-	ToAgent   string
-	Reason    string
-	EventTime time.Time
-}
-
-func (e *HandoffEvent) Type() EventType      { return EventTypeHandoff }
-func (e *HandoffEvent) Timestamp() time.Time { return e.EventTime }
-func (e *HandoffEvent) Data() any            { return e }
-func (e *HandoffEvent) ephemeral()           {}
-
 // TitleEvent is emitted when a conversation title is generated.
 // This is a PERSISTENT event - title is part of thread state.
 type TitleEvent struct {
@@ -261,6 +244,5 @@ var (
 	_ EphemeralEvent = (*MessageDeltaEvent)(nil)
 	_ EphemeralEvent = (*ToolCallEvent)(nil)
 	_ EphemeralEvent = (*ErrorEvent)(nil)
-	_ EphemeralEvent = (*HandoffEvent)(nil)
 	_ EphemeralEvent = (*CompleteEvent)(nil)
 )
