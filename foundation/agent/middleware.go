@@ -45,7 +45,6 @@ func (c *Context) IsFunction() bool { return c.Kind == OperationFunction }
 type AgentOp struct {
 	Agent     Agent
 	Messages  []Message
-	Session   Session
 	Streaming bool
 }
 
@@ -101,14 +100,13 @@ func Chain(mws ...Middleware) Middleware {
 }
 
 // NewAgentContext creates a Context for an agent operation.
-func NewAgentContext(ctx context.Context, agent Agent, messages []Message, session Session, streaming bool) *Context {
+func NewAgentContext(ctx context.Context, agent Agent, messages []Message, streaming bool) *Context {
 	return &Context{
 		Context: ctx,
 		Kind:    OperationAgent,
 		Agent: &AgentOp{
 			Agent:     agent,
 			Messages:  messages,
-			Session:   session,
 			Streaming: streaming,
 		},
 		Metadata: make(map[string]any),

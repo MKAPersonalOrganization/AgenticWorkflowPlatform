@@ -82,9 +82,6 @@ type RunnerConfig struct {
 	// RootAgent is the primary agent for handling requests.
 	RootAgent Agent
 
-	// SessionStore manages session persistence.
-	SessionStore SessionStore
-
 	// ArtifactStore manages artifact storage (optional).
 	ArtifactStore ArtifactStore
 

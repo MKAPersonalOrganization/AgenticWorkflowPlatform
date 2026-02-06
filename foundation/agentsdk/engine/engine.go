@@ -731,7 +731,6 @@ func (s *executionState) run() error {
 			s.agent.Config.AgentMiddleware,
 			s.agent,
 			nil, // messages (core.Message, not agent.Message)
-			nil, // session  (not available in engine)
 			false,
 			map[string]any{
 				"agent_name":    s.agent.Name(),

@@ -26,12 +26,11 @@ func ExecuteAgentMiddleware(
 	middlewares []agent.Middleware,
 	agentInstance agent.Agent,
 	messages []agent.Message,
-	session agent.Session,
 	streaming bool,
 	metadata map[string]any,
 	handler func() error,
 ) error {
-	c := agent.NewAgentContext(ctx, agentInstance, messages, session, streaming)
+	c := agent.NewAgentContext(ctx, agentInstance, messages, streaming)
 	for k, v := range metadata {
 		c.Metadata[k] = v
 	}

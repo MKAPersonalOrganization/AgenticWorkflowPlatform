@@ -77,7 +77,6 @@ type Arguments struct {
 	// Legacy fields for backward compatibility with ToolContext
 	SessionID string
 	UserID    string
-	Session   Session
 	Artifacts Artifacts
 	Memory    Memory
 	Metadata  map[string]any
@@ -151,9 +150,6 @@ type ToolContext struct {
 
 	// Arguments is the JSON-encoded tool input.
 	Arguments string
-
-	// Session provides access to conversation state.
-	Session Session
 
 	// Artifacts provides access to artifact storage (optional).
 	Artifacts Artifacts
