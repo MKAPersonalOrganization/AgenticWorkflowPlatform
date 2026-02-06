@@ -28,6 +28,7 @@ type MockToolStateObserver struct {
 	transitions []struct {
 		toolCallID  string
 		toolName    string
+		arguments   string
 		oldState    core.ToolState
 		newState    core.ToolState
 		result      *core.ToolExecutionResult
@@ -38,6 +39,7 @@ type MockToolStateObserver struct {
 func (m *MockToolStateObserver) OnToolStateChanged(
 	toolCallID string,
 	toolName string,
+	arguments string,
 	oldState core.ToolState,
 	newState core.ToolState,
 	result *core.ToolExecutionResult,
@@ -46,6 +48,7 @@ func (m *MockToolStateObserver) OnToolStateChanged(
 	m.transitions = append(m.transitions, struct {
 		toolCallID  string
 		toolName    string
+		arguments   string
 		oldState    core.ToolState
 		newState    core.ToolState
 		result      *core.ToolExecutionResult
@@ -53,6 +56,7 @@ func (m *MockToolStateObserver) OnToolStateChanged(
 	}{
 		toolCallID:  toolCallID,
 		toolName:    toolName,
+		arguments:   arguments,
 		oldState:    oldState,
 		newState:    newState,
 		result:      result,

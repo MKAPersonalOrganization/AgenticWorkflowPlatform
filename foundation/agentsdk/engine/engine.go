@@ -991,6 +991,7 @@ func NewToolStateEventEmitter(
 func (e *ToolStateEventEmitter) OnToolStateChanged(
 	toolCallID string,
 	toolName string,
+	arguments string,
 	oldState core.ToolState,
 	newState core.ToolState,
 	result *core.ToolExecutionResult,
@@ -1006,7 +1007,7 @@ func (e *ToolStateEventEmitter) OnToolStateChanged(
 				e.messageID,
 				toolCallID,
 				toolName,
-				"", // Arguments will be added if available
+				arguments,
 			)
 			if result != nil {
 				evt.ToolArguments = result.Arguments

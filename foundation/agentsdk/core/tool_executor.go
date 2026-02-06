@@ -153,19 +153,28 @@ func (e *RegistryToolExecutor) Execute(toolCall ToolCall) (ToolExecResult, error
 				}
 				// Use the wrapped result
 				if tr.Result != nil {
-					resultBytes, marshalErr := json.Marshal(tr.Result)
+					if str, ok := tr.Result.(string); ok {
+						execResult.Result = str
+					} else {
+						resultBytes, marshalErr := json.Marshal(tr.Result)
+						if marshalErr != nil {
+							return ToolExecResult{}, fmt.Errorf("failed to marshal tool result: %w", marshalErr)
+						}
+						execResult.Result = string(resultBytes)
+					}
+				}
+			} else {
+				// Regular content - use directly if it's already a string,
+				// otherwise marshal the item itself if it's the only one
+				if str, ok := result.Content[0].(string); ok {
+					execResult.Result = str
+				} else {
+					resultBytes, marshalErr := json.Marshal(result.Content[0])
 					if marshalErr != nil {
 						return ToolExecResult{}, fmt.Errorf("failed to marshal tool result: %w", marshalErr)
 					}
 					execResult.Result = string(resultBytes)
 				}
-			} else {
-				// Regular content - marshal the item itself if it's the only one
-				resultBytes, marshalErr := json.Marshal(result.Content[0])
-				if marshalErr != nil {
-					return ToolExecResult{}, fmt.Errorf("failed to marshal tool result: %w", marshalErr)
-				}
-				execResult.Result = string(resultBytes)
 			}
 		} else {
 			// Multiple content items - marshal the array
