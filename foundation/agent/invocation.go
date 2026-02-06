@@ -19,9 +19,6 @@ type InvocationContext interface {
 	// Agent returns the currently executing agent.
 	Agent() Agent
 
-	// Session provides access to conversation state and history.
-	Session() Session
-
 	// Artifacts provides access to artifact storage (optional).
 	// Returns nil if artifacts are not supported.
 	Artifacts() Artifacts

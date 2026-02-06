@@ -15,7 +15,7 @@ import (
 
 func TestNewAgentContext(t *testing.T) {
 	ctx := context.Background()
-	c := NewAgentContext(ctx, nil, nil, nil, true)
+	c := NewAgentContext(ctx, nil, nil, true)
 
 	if c.Kind != OperationAgent {
 		t.Errorf("expected OperationAgent, got %v", c.Kind)
@@ -112,7 +112,7 @@ func TestChain_ExecutesInOrder(t *testing.T) {
 	chain := Chain(mw1, mw2)
 	handler := chain(final)
 
-	c := NewAgentContext(context.Background(), nil, nil, nil, false)
+	c := NewAgentContext(context.Background(), nil, nil, false)
 	if err := handler.Handle(c); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -146,7 +146,7 @@ func TestChain_EmptyMiddleware(t *testing.T) {
 	chain := Chain()
 	handler := chain(final)
 
-	c := NewAgentContext(context.Background(), nil, nil, nil, false)
+	c := NewAgentContext(context.Background(), nil, nil, false)
 	if err := handler.Handle(c); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -191,7 +191,7 @@ func TestRetry_RetriesAgentOps(t *testing.T) {
 		return nil // Succeed on third attempt
 	}))
 
-	c := NewAgentContext(context.Background(), nil, nil, nil, false)
+	c := NewAgentContext(context.Background(), nil, nil, false)
 	err := handler.Handle(c)
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
@@ -208,7 +208,7 @@ func TestTimeout_TimesOut(t *testing.T) {
 		return nil
 	}))
 
-	c := NewAgentContext(context.Background(), nil, nil, nil, false)
+	c := NewAgentContext(context.Background(), nil, nil, false)
 	err := handler.Handle(c)
 
 	if err == nil {
@@ -222,7 +222,7 @@ func TestRecovery_RecoversPanic(t *testing.T) {
 		panic("test panic")
 	}))
 
-	c := NewAgentContext(context.Background(), nil, nil, nil, false)
+	c := NewAgentContext(context.Background(), nil, nil, false)
 	err := handler.Handle(c)
 
 	if err == nil {
@@ -236,7 +236,7 @@ func TestLogging_LogsOperations(t *testing.T) {
 	handler := mw(NoOpHandler)
 
 	// Test agent op
-	c := NewAgentContext(context.Background(), nil, nil, nil, false)
+	c := NewAgentContext(context.Background(), nil, nil, false)
 	if err := handler.Handle(c); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -264,26 +264,12 @@ type mockAgent struct {
 	name string
 }
 
-func (m *mockAgent) ID() ID            { return m.id }
-func (m *mockAgent) Name() string       { return m.name }
+func (m *mockAgent) ID() ID              { return m.id }
+func (m *mockAgent) Name() string        { return m.name }
 func (m *mockAgent) Description() string { return "" }
 func (m *mockAgent) Run(_ context.Context, _ *Invocation) iter.Seq2[Event, error] {
 	return nil
 }
-
-// mockSession implements Session for testing.
-type mockSession struct {
-	id     string
-	userID string
-}
-
-func (m *mockSession) ID() string                                    { return m.id }
-func (m *mockSession) UserID() string                                { return m.userID }
-func (m *mockSession) AppName() string                               { return "" }
-func (m *mockSession) State() State                                  { return nil }
-func (m *mockSession) History() []*Message                           { return nil }
-func (m *mockSession) Append(_ context.Context, _ *Message) error    { return nil }
-func (m *mockSession) LastUpdateTime() int64                         { return 0 }
 
 func TestAgentLogging_PassesThroughNonAgentOps(t *testing.T) {
 	logger := slog.Default()
@@ -323,7 +309,7 @@ func TestAgentLogging_SkipsDryRun(t *testing.T) {
 		return nil
 	}))
 
-	c := NewAgentContext(context.Background(), nil, nil, nil, false)
+	c := NewAgentContext(context.Background(), nil, nil, false)
 	c.DryRun = true
 	if err := handler.Handle(c); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -338,7 +324,7 @@ func TestAgentLogging_LogsAgentOps(t *testing.T) {
 	mw := AgentLogging(logger)
 	handler := mw(NoOpHandler)
 
-	c := NewAgentContext(context.Background(), nil, nil, nil, false)
+	c := NewAgentContext(context.Background(), nil, nil, false)
 	if err := handler.Handle(c); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -350,9 +336,10 @@ func TestAgentLogging_LogsAgentOpsWithMetadata(t *testing.T) {
 	handler := mw(NoOpHandler)
 
 	mockAgt := &mockAgent{id: "math-001", name: "math-instructor"}
-	mockSess := &mockSession{id: "sess-123", userID: "user-456"}
 
-	c := NewAgentContext(context.Background(), mockAgt, []Message{{Role: "user"}}, mockSess, true)
+	c := NewAgentContext(context.Background(), mockAgt, []Message{{Role: "user"}}, true)
+	// Set user_id via metadata since Session was removed
+	c.Metadata["user_id"] = "user-456"
 	if err := handler.Handle(c); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -363,7 +350,7 @@ func TestAgentLogging_LogsErrorOnFailure(t *testing.T) {
 	mw := AgentLogging(logger)
 	handler := mw(ErrorHandler(errors.New("agent failure")))
 
-	c := NewAgentContext(context.Background(), nil, nil, nil, false)
+	c := NewAgentContext(context.Background(), nil, nil, false)
 	err := handler.Handle(c)
 
 	if err == nil {
@@ -385,7 +372,7 @@ func TestChatLogging_PassesThroughNonChatOps(t *testing.T) {
 	}))
 
 	// Agent context - should pass through
-	c := NewAgentContext(context.Background(), nil, nil, nil, false)
+	c := NewAgentContext(context.Background(), nil, nil, false)
 	if err := handler.Handle(c); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -477,7 +464,7 @@ func TestTokenCounting_PassesThroughNonChatOps(t *testing.T) {
 	mw := TokenCounting(counter)
 	handler := mw(NoOpHandler)
 
-	c := NewAgentContext(context.Background(), nil, nil, nil, false)
+	c := NewAgentContext(context.Background(), nil, nil, false)
 	if err := handler.Handle(c); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -528,7 +515,7 @@ func TestFunctionCaching_PassesThroughNonFunctionOps(t *testing.T) {
 	mw := FunctionCaching(cache, keyFunc)
 	handler := mw(NoOpHandler)
 
-	c := NewAgentContext(context.Background(), nil, nil, nil, false)
+	c := NewAgentContext(context.Background(), nil, nil, false)
 	if err := handler.Handle(c); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

@@ -12,7 +12,7 @@
 //
 // # Adapter Responsibilities (per ADR 001)
 //
-//  1. Implement agent.Agent, agent.Tool, agent.Session interfaces
+//  1. Implement agent.Agent and agent.Tool interfaces
 //  2. Translate framework-specific events to agent.Event types
 //  3. Translate agent.Event types to domain.Event for the service layer
 //  4. Handle framework-specific configuration and initialization

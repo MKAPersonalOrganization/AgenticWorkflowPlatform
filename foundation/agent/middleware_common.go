@@ -34,22 +34,10 @@ func AgentLogging(logger *slog.Logger) Middleware {
 				}
 			}
 
-			// Extract session details from typed fields, fall back to metadata
-			sessionID := ""
+			// Extract user details from metadata
 			userID := ""
-			if c.Agent != nil && c.Agent.Session != nil {
-				sessionID = c.Agent.Session.ID()
-				userID = c.Agent.Session.UserID()
-			}
-			if sessionID == "" {
-				if v, ok := c.Metadata["session_id"].(string); ok {
-					sessionID = v
-				}
-			}
-			if userID == "" {
-				if v, ok := c.Metadata["user_id"].(string); ok {
-					userID = v
-				}
+			if v, ok := c.Metadata["user_id"].(string); ok {
+				userID = v
 			}
 
 			// Extract thread ID from metadata

@@ -23,7 +23,6 @@ type TaskManagementHandler struct {
 	log                *logger.Logger
 	taskManager        *taskmanagement.AsynqTaskManager
 	agentProvider      agent.AgentProvider
-	sessionStore       agent.SessionStore
 	authService        services.AuthService
 	threadQueryService services.ThreadQueryService
 	aguiProjection     agui.AguiProjection
@@ -34,20 +33,18 @@ type TaskManagementHandler struct {
 // NewTaskManagementHandler creates a new HTTP handler for task management.
 func NewTaskManagementHandler(
 	log *logger.Logger,
-	taskManager *taskmanagement.AsynqTaskManager, // Type remains *taskmanagement.AsynqTaskManager as per struct
+	taskManager *taskmanagement.AsynqTaskManager,
 	agentProvider agent.AgentProvider,
-	sessionStore agent.SessionStore,
-	authService services.AuthService, // Name remains authService as per struct
-	threadQueryService services.ThreadQueryService, // Name remains threadQueryService as per struct
-	aguiProjection agui.AguiProjection, // Type remains agui.AguiProjection as per struct
-	broadcaster agui.AguiBroadcaster, // Type remains agui.AguiBroadcaster as per struct
+	authService services.AuthService,
+	threadQueryService services.ThreadQueryService,
+	aguiProjection agui.AguiProjection,
+	broadcaster agui.AguiBroadcaster,
 	threadMgmt *threadmgmt.Manager,
 ) *TaskManagementHandler {
 	return &TaskManagementHandler{
 		log:                log,
 		taskManager:        taskManager,
 		agentProvider:      agentProvider,
-		sessionStore:       sessionStore,
 		authService:        authService,
 		threadQueryService: threadQueryService,
 		aguiProjection:     aguiProjection,

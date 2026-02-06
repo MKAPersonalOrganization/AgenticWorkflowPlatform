@@ -130,9 +130,6 @@ type Invocation struct {
 	// Config contains agent execution configuration.
 	Config *RunConfig
 
-	// Session provides access to session state and history.
-	Session Session
-
 	// Resumable indicates if the invocation can be resumed after interruption.
 	Resumable bool
 
