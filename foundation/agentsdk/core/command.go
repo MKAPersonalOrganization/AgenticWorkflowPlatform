@@ -7,11 +7,10 @@ type Command struct {
 	// Goto specifies the target agent/node to route to
 	Goto string
 
-	// Update contains state updates to apply (e.g., handoff information)
+	// Update contains state updates to apply
 	Update map[string]any
 
 	// StopIteration indicates the engine should stop iterating
-	// This is set to true for handoff tools to prevent infinite loops
 	StopIteration bool
 
 	// Elicitation specifies a request for structured user input

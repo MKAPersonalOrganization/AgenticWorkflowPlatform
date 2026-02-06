@@ -311,14 +311,6 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 		config.Tools = append(config.Tools, NewExecutableToolAdapter(t))
 	}
 
-	// Map Handoffs
-	for _, h := range agentConfig.Handoffs {
-		config.Handoffs = append(config.Handoffs, core.Handoff{
-			AgentName:   h.AgentName,
-			Description: h.Description,
-		})
-	}
-
 	// Map Middlewares to their respective phases
 	config.AgentMiddleware = append(config.AgentMiddleware, agentConfig.AgentMiddlewares...)
 	config.ChatMiddleware = append(config.ChatMiddleware, agentConfig.ChatMiddlewares...)

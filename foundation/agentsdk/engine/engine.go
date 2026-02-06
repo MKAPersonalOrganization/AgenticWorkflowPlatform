@@ -260,7 +260,7 @@ type executionState struct {
 	userContent string
 	userID      string
 
-	// agent-specific state (swappable during handoff)
+	// agent-specific state
 	agent *AgentInstance
 
 	// Cohesive Units
