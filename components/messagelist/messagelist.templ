@@ -148,7 +148,7 @@ templ MessageList() {
 					<template x-if="message.name === 'browse_library'">
 						@library.Library()
 					</template>
-					<template x-if="message.name === 'save_memory' || message.name === 'forget_memory'">
+				<template x-if="message.name === 'save_memory' || message.name === 'forget_memory' || message.name === 'list_memories' || message.name === 'clear_memories'">
 						@memory.Container()
 					</template>
 					<template x-if="message.name === 'lookup_section'">

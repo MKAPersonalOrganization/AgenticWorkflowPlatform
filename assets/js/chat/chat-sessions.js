@@ -84,7 +84,10 @@ export function createSessionMethods() {
                         lastMessage: thread.updatedAt
                     }));
 
-                    this.sessions = [...this.sessions, ...newSessions];
+                    const existingIds = new Set(this.sessions.map(s => s.id));
+                    const uniqueNewSessions = newSessions.filter(s => !existingIds.has(s.id));
+
+                    this.sessions = [...this.sessions, ...uniqueNewSessions];
 
                     // Update pagination state
                     this.sessionsNextCursor = data.nextCursor || null;

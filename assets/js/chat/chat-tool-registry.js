@@ -65,6 +65,8 @@ export const TOOL_REGISTRY = {
     'transfer_to_agent': { type: 'special', category: 'collaboration' },
     'save_memory': { type: 'special', category: 'memory' },
     'forget_memory': { type: 'special', category: 'memory' },
+    'list_memories': { type: 'special', category: 'memory' },
+    'clear_memories': { type: 'special', category: 'memory' },
 
     // Utilities
     // Content & Search
