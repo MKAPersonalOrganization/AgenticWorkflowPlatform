@@ -327,7 +327,10 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 		memoryTool := memorytools.NewMemoryTool(p.artifactStore)
 		config.Tools = append(config.Tools, memoryTool)
 
-		memoryMiddleware := memorytools.NewMemoryInjectorMiddleware(memoryTool)
+		forgetTool := memorytools.NewForgetMemoryTool(p.artifactStore)
+		config.Tools = append(config.Tools, forgetTool)
+
+		memoryMiddleware := memorytools.NewMemoryInjectorMiddleware(p.artifactStore)
 		config.AgentMiddleware = append(config.AgentMiddleware, AdaptRequestMiddlewareToUnified(memoryMiddleware))
 	}
 

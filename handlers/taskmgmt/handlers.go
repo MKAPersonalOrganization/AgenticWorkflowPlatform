@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"school-with-ai/foundation/logger"
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/services"
+	"school-with-ai/services/artifact"
 	"school-with-ai/services/taskmanagement"
 	"school-with-ai/services/threadmgmt"
 
@@ -28,6 +30,7 @@ type TaskManagementHandler struct {
 	aguiProjection     agui.AguiProjection
 	broadcaster        agui.AguiBroadcaster
 	threadMgmt         *threadmgmt.Manager
+	artifactStore      artifact.Service
 }
 
 // NewTaskManagementHandler creates a new HTTP handler for task management.
@@ -40,6 +43,7 @@ func NewTaskManagementHandler(
 	aguiProjection agui.AguiProjection,
 	broadcaster agui.AguiBroadcaster,
 	threadMgmt *threadmgmt.Manager,
+	artifactStore artifact.Service,
 ) *TaskManagementHandler {
 	return &TaskManagementHandler{
 		log:                log,
@@ -50,6 +54,7 @@ func NewTaskManagementHandler(
 		aguiProjection:     aguiProjection,
 		broadcaster:        broadcaster,
 		threadMgmt:         threadMgmt,
+		artifactStore:      artifactStore,
 	}
 }
 
@@ -427,4 +432,68 @@ func (h *TaskManagementHandler) ListAgents(w http.ResponseWriter, r *http.Reques
 		h.log.Error(r.Context(), "failed to encode agents list", "error", err)
 		http.Error(w, "Failed to encode agents list", http.StatusInternalServerError)
 	}
+}
+
+// ListArtifacts returns a list of artifacts for a thread.
+// GET /v1/threads/{threadId}/artifacts
+func (h *TaskManagementHandler) ListArtifacts(w http.ResponseWriter, r *http.Request) {
+	user := h.authService.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	threadID := r.PathValue("threadId")
+	if threadID == "" {
+		http.Error(w, "threadId is required", http.StatusBadRequest)
+		return
+	}
+
+	artifacts, err := h.artifactStore.List(r.Context(), user.ID, threadID)
+	if err != nil {
+		h.log.Error(r.Context(), "failed to list artifacts", "error", err, "userID", user.ID, "threadID", threadID)
+		http.Error(w, "Failed to list artifacts", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]any{"artifacts": artifacts}); err != nil {
+		h.log.Error(r.Context(), "failed to encode artifacts list", "error", err)
+	}
+}
+
+// DownloadArtifact downloads a specific artifact.
+// GET /v1/threads/{threadId}/artifacts/{fileName}
+func (h *TaskManagementHandler) DownloadArtifact(w http.ResponseWriter, r *http.Request) {
+	user := h.authService.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	threadID := r.PathValue("threadId")
+	fileName := r.PathValue("fileName")
+	if threadID == "" || fileName == "" {
+		http.Error(w, "threadId and fileName are required", http.StatusBadRequest)
+		return
+	}
+
+	content, err := h.artifactStore.Load(r.Context(), user.ID, threadID, fileName)
+	if err != nil {
+		if errors.Is(err, artifact.ErrNotFound) {
+			http.Error(w, "Artifact not found", http.StatusNotFound)
+			return
+		}
+		h.log.Error(r.Context(), "failed to load artifact", "error", err, "userID", user.ID, "threadID", threadID, "fileName", fileName)
+		http.Error(w, "Failed to load artifact", http.StatusInternalServerError)
+		return
+	}
+	defer content.Close()
+
+	// Set content type and disposition
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", fileName))
+	// In a real app we might want to detect mime type, but S3/MinIO often returns generic if not set.
+	// For now, let the browser handle it.
+
+	io.Copy(w, content)
 }

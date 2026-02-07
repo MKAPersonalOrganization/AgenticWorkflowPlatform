@@ -16,7 +16,7 @@ func TestInstructorConfigurations(t *testing.T) {
 	ctx := context.Background()
 
 	// Math
-	mathConfig, err := math.NewMathInstructorConfig(ctx)
+	mathConfig, err := math.NewMathInstructorConfig(ctx, nil)
 	if err != nil {
 		t.Fatalf("Failed to create math instructor config: %v", err)
 	}

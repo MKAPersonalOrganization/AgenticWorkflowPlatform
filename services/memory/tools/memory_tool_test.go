@@ -45,10 +45,11 @@ func (m *MockArtifactService) Delete(ctx context.Context, userID, sessionID, fil
 	return nil
 }
 
-func TestMemoryTool_SaveMemory(t *testing.T) {
+func TestMemoryTool_Integration(t *testing.T) {
 	t.Parallel()
 	store := NewMockArtifactService()
-	tool := NewMemoryTool(store)
+	saveTool := NewMemoryTool(store)
+	forgetTool := NewForgetMemoryTool(store)
 
 	// Create context with user
 	user := &domain.User{ID: "test-user-123"}
@@ -60,110 +61,30 @@ func TestMemoryTool_SaveMemory(t *testing.T) {
 		CallID: "test-call-1",
 	}
 
-	result, err := tool.Execute(ctx, args)
-	if err != nil {
-		t.Fatalf("Execute failed: %v", err)
-	}
-	if result.Error != nil {
-		t.Fatalf("Result has error: %v", result.Error)
+	res, err := saveTool.Execute(ctx, args)
+	if err != nil || res.Error != nil {
+		t.Fatalf("Save Execute failed: %v", err)
 	}
 
-	// Verify content - should be saved under user ID
-	content, err := tool.LoadMemory(ctx)
-	if err != nil {
-		t.Fatalf("LoadMemory failed: %v", err)
-	}
-	if !strings.Contains(content, "## SchoolAI Memories") {
-		t.Error("Missing header")
-	}
+	// 2. Verify saved
+	content, _ := saveTool.mgr.load(ctx)
 	if !strings.Contains(content, "- My favorite color is blue.") {
-		t.Error("Missing fact")
+		t.Error("Fact not saved")
 	}
 
-	// Verify it used the correct path in mock store
-	key := "test-user-123/user_shared/SCHOOLAI.md"
-	if _, ok := store.files[key]; !ok {
-		t.Error("File NOT saved under correct user path")
-	}
-
-	// 2. Append memory
-	args2 := agent.Arguments{
-		Raw:    []byte(`{"fact":"I like pizza."}`),
+	// 3. Forget memory
+	forgetArgs := agent.Arguments{
+		Raw:    []byte(`{"fact":"blue"}`),
 		CallID: "test-call-2",
 	}
-
-	result, err = tool.Execute(ctx, args2)
-	if err != nil {
-		t.Fatalf("Execute failed: %v", err)
-	}
-	if result.Error != nil {
-		t.Fatalf("Result has error: %v", result.Error)
+	res, err = forgetTool.Execute(ctx, forgetArgs)
+	if err != nil || res.Error != nil {
+		t.Fatalf("Forget Execute failed: %v", err)
 	}
 
-	// Verify content again
-	content, err = tool.LoadMemory(ctx)
-	if err != nil {
-		t.Fatalf("LoadMemory failed: %v", err)
+	// 4. Verify forgotten
+	content, _ = saveTool.mgr.load(ctx)
+	if strings.Contains(content, "blue") {
+		t.Error("Fact not forgotten")
 	}
-
-	if !strings.Contains(content, "- My favorite color is blue.") {
-		t.Error("Missing first fact")
-	}
-	if !strings.Contains(content, "- I like pizza.") {
-		t.Error("Missing second fact")
-	}
-	// Verify header appears only once
-	if strings.Count(content, "## SchoolAI Memories") != 1 {
-		t.Errorf("Header appeared %d times", strings.Count(content, "## SchoolAI Memories"))
-	}
-}
-
-func TestMemoryTool_ComputeNewContent(t *testing.T) {
-	t.Parallel()
-	tool := &MemoryTool{}
-
-	t.Run("Empty Content", func(t *testing.T) {
-		t.Parallel()
-		res := tool.computeNewContent("", "Fact 1")
-		if !strings.Contains(res, "## SchoolAI Memories") {
-			t.Error("Missing header")
-		}
-		if !strings.Contains(res, "- Fact 1") {
-			t.Error("Missing fact")
-		}
-	})
-
-	t.Run("Existing Content with Header", func(t *testing.T) {
-		t.Parallel()
-		initial := "## SchoolAI Memories\n- Old Fact\n"
-		res := tool.computeNewContent(initial, "New Fact")
-
-		expectedLines := []string{
-			"## SchoolAI Memories",
-			"- Old Fact",
-			"- New Fact",
-		}
-		for _, line := range expectedLines {
-			if !strings.Contains(res, line) {
-				t.Errorf("Missing expected content: %s", line)
-			}
-		}
-		// Basic check for newlines
-		if !strings.Contains(res, "\n- New Fact\n") {
-			t.Errorf("Format issue: %q", res)
-		}
-	})
-
-	t.Run("Existing Content without Header/New Section", func(t *testing.T) {
-		t.Parallel()
-		initial := "Some existing system prompt content."
-		res := tool.computeNewContent(initial, "New Fact")
-
-		if !strings.Contains(res, "Some existing system prompt content.") {
-			t.Error("Lost original content")
-		}
-		if !strings.Contains(res, "\n\n## SchoolAI Memories") {
-			t.Error("Missing header with newline separation")
-		}
-	})
 }

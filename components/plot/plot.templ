@@ -1,37 +1,41 @@
 package plot
 
-templ Container() {
-	<div class="flex flex-col p-0 bg-base-100 rounded-lg border border-base-200 shadow-sm overflow-hidden w-full max-w-lg mx-auto">
-		<!-- Header -->
-		<div class="px-4 py-3 bg-base-200/50 border-b border-base-200 flex items-center gap-2">
-			<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-activity text-primary"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-			<span class="text-xs font-bold uppercase tracking-wider text-base-content/70 truncate" x-text="message.parsedResult?.title || message.parsedArgs?.title || 'Generated Plot'"></span>
-		</div>
+import "school-with-ai/components/annotation"
 
-		<!-- Image Display -->
-		<div class="relative bg-white flex items-center justify-center p-4 min-h-[200px]">
-             <!-- Loading State -->
-            <div x-show="!message.parsedResult?.image_url" class="absolute inset-0 flex items-center justify-center bg-base-100/50 z-10">
-                <span class="loading loading-spinner loading-md text-primary"></span>
-            </div>
-
-            <!-- Image -->
-			<template x-if="message.parsedResult?.image_url">
-				<img 
-                    :src="message.parsedResult?.image_url" 
-                    :alt="message.parsedResult?.title || 'Plot'"
-                    class="max-w-full h-auto rounded shadow-sm border border-base-200"
-                />
-			</template>
-            <!-- Fallback if no URL yet (e.g. streaming) -->
-            <template x-if="!message.parsedResult?.image_url">
-                 <div class="text-sm text-base-content/40 italic">Generating plot...</div>
-            </template>
-		</div>
-        
-        <!-- Footer / Metadata -->
-         <div class="px-4 py-2 bg-base-200/30 border-t border-base-200 text-[10px] text-base-content/50 flex justify-end">
-            Generated via gnuplot
-        </div>
-	</div>
+templ icon() {
+	<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-activity"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
 }
+
+templ Container() {
+	@annotation.Container(icon(), annotation.Props{
+		Label:   "Visual Synthesized",
+		Subtext: "Visualization generated via SchoolAI plotting engine",
+	}) {
+		<div class="flex flex-col gap-4">
+			<!-- Title: Academic Typography -->
+			<div class="flex items-center gap-2 text-[12px] text-muted-foreground/60 italic font-serif">
+				<span class="font-semibold" x-text="message.parsedResult?.title || message.parsedArgs?.title || 'Metric Visualization'"></span>
+			</div>
+			<!-- Image Display: Integrated Surface -->
+			<div class="relative w-full bg-muted/[0.03] border border-border/10 rounded-xl p-6 flex items-center justify-center min-h-[240px] shadow-[inset_0_1px_4px_rgba(0,0,0,0.02)] transition-colors hover:bg-muted/[0.05]">
+				<!-- Loading State -->
+				<div x-show="!message.parsedResult?.image_url" class="absolute inset-0 flex items-center justify-center bg-background/40 backdrop-blur-sm z-10 rounded-xl">
+					<span class="loading loading-spinner loading-md text-primary/40"></span>
+				</div>
+				<!-- Image -->
+				<template x-if="message.parsedResult?.image_url">
+					<img
+						:src="message.parsedResult?.image_url"
+						:alt="message.parsedResult?.title || 'Plot'"
+						class="max-w-full h-auto rounded-lg shadow-md border border-border/20 transition-transform duration-500 hover:scale-[1.01]"
+					/>
+				</template>
+				<!-- Fallback -->
+				<template x-if="!message.parsedResult?.image_url">
+					<div class="text-[11px] text-muted-foreground/40 uppercase tracking-[0.2em] font-bold">Rendering Visual Dataset...</div>
+				</template>
+			</div>
+		</div>
+	}
+}
+

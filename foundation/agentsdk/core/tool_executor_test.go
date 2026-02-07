@@ -160,7 +160,7 @@ func TestBasicToolExecutor_Calculate(t *testing.T) {
 		},
 	))
 
-	executor := core.NewRegistryToolExecutor(context.Background(), toolRegistry, "", "", nil)
+	executor := core.NewRegistryToolExecutor(context.Background(), toolRegistry, "", "test-user", "", nil)
 
 	toolCall := core.ToolCall{
 		ID:        "call_calc",
@@ -199,7 +199,7 @@ func TestBasicToolExecutor_CustomTool(t *testing.T) {
 		},
 	))
 
-	executor := core.NewRegistryToolExecutor(context.Background(), toolRegistry, "", "", nil)
+	executor := core.NewRegistryToolExecutor(context.Background(), toolRegistry, "", "test-user", "", nil)
 
 	toolCall := core.ToolCall{
 		ID:        "call_note",
@@ -247,7 +247,7 @@ func TestRegistryToolExecutor(t *testing.T) {
 		},
 	))
 
-	executor := core.NewRegistryToolExecutor(ctx, registry, "", "", nil)
+	executor := core.NewRegistryToolExecutor(ctx, registry, "", "test-user", "", nil)
 
 	// Test successful execution
 	result, err := executor.Execute(core.ToolCall{
@@ -269,7 +269,7 @@ func TestRegistryToolExecutor_ToolNotFound(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	registry := core.NewToolRegistry()
-	executor := core.NewRegistryToolExecutor(ctx, registry, "", "", nil)
+	executor := core.NewRegistryToolExecutor(ctx, registry, "", "test-user", "", nil)
 
 	_, err := executor.Execute(core.ToolCall{
 		ID:        "call_1",

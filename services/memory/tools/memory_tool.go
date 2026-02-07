@@ -14,44 +14,70 @@ import (
 const (
 	MemoryFileName    = "SCHOOLAI.md"
 	MemoryHeader      = "## SchoolAI Memories"
-	MemoryHeaderCheck = "## SchoolAI Memories" // Simplified check
+	MemoryHeaderCheck = "## SchoolAI Memories"
 )
 
-// MemoryTool provides the save_memory tool.
-type MemoryTool struct {
+// memoryManager handles the persistence and manipulation of the memory file.
+type memoryManager struct {
 	store artifact.Service
 }
 
-// NewMemoryTool creates a new MemoryTool instance.
+func (m *memoryManager) load(ctx context.Context) (string, error) {
+	userID, sessionID := m.getIDs(ctx)
+	rc, err := m.store.Load(ctx, userID, sessionID, MemoryFileName)
+	if err != nil {
+		if err == artifact.ErrNotFound {
+			return "", nil
+		}
+		return "", fmt.Errorf("failed to load memory file: %w", err)
+	}
+	defer func() { _ = rc.Close() }()
+
+	data, err := io.ReadAll(rc)
+	if err != nil {
+		return "", fmt.Errorf("failed to read memory file: %w", err)
+	}
+	return string(data), nil
+}
+
+func (m *memoryManager) save(ctx context.Context, content string) error {
+	userID, sessionID := m.getIDs(ctx)
+	_, err := m.store.Save(ctx, userID, sessionID, MemoryFileName, strings.NewReader(content))
+	if err != nil {
+		return fmt.Errorf("failed to save memory file: %w", err)
+	}
+	return nil
+}
+
+func (m *memoryManager) getIDs(ctx context.Context) (string, string) {
+	userID := "default_user"
+	if user := domain.GetUserFromContext(ctx); user != nil {
+		userID = user.ID
+	}
+	return userID, "user_shared"
+}
+
+// MemoryTool saves facts to long-term memory.
+type MemoryTool struct {
+	mgr *memoryManager
+}
+
 func NewMemoryTool(store artifact.Service) *MemoryTool {
-	return &MemoryTool{store: store}
+	return &MemoryTool{mgr: &memoryManager{store: store}}
 }
 
-// Name returns the tool name.
-func (t *MemoryTool) Name() string {
-	return "save_memory"
-}
-
-// Description returns the tool description.
-func (t *MemoryTool) Description() string {
-	return "Saves a specific piece of information or fact to your long-term memory. Use this when the user explicitly asks you to remember something, or when they state a clear, concise fact that seems important to retain for future interactions."
-}
-
-// Schema returns the tool schema.
+func (t *MemoryTool) Name() string        { return "save_memory" }
+func (t *MemoryTool) Description() string { return "Saves a specific fact to your long-term memory." }
 func (t *MemoryTool) Schema() *agent.Schema {
 	return &agent.Schema{
 		Type: agent.TypeObject,
 		Properties: map[string]*agent.Schema{
-			"fact": {
-				Type:        agent.TypeString,
-				Description: "The specific fact or piece of information to remember. Should be a clear, self-contained statement.",
-			},
+			"fact": {Type: agent.TypeString, Description: "The specific fact to remember."},
 		},
 		Required: []string{"fact"},
 	}
 }
 
-// Execute executes the save memory operation.
 func (t *MemoryTool) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
 	var input struct {
 		Fact string `json:"fact"`
@@ -60,113 +86,109 @@ func (t *MemoryTool) Execute(ctx context.Context, args agent.Arguments) (agent.R
 		return agent.ErrorResult(err), nil
 	}
 
-	if input.Fact == "" {
-		return agent.ErrorResult(fmt.Errorf("fact cannot be empty")), nil
-	}
-
-	// Extract userID from context
-	userID := "default_user"
-	if user := domain.GetUserFromContext(ctx); user != nil {
-		userID = user.ID
-	}
-	sessionID := "user_shared"
-
-	// 1. Load existing content
-	var currentContent string
-	rc, err := t.store.Load(ctx, userID, sessionID, MemoryFileName)
-	if err == nil {
-		defer func() { _ = rc.Close() }()
-		data, err := io.ReadAll(rc)
-		if err != nil {
-			return agent.ErrorResult(fmt.Errorf("failed to read memory file: %w", err)), nil
-		}
-		currentContent = string(data)
-	} else if err != artifact.ErrNotFound {
-		return agent.ErrorResult(fmt.Errorf("failed to load memory file: %w", err)), nil
-	}
-
-	// 2. Compute new content
-	newContent := t.computeNewContent(currentContent, input.Fact)
-
-	// 3. Save content
-	_, err = t.store.Save(ctx, userID, sessionID, MemoryFileName, strings.NewReader(newContent))
+	content, err := t.mgr.load(ctx)
 	if err != nil {
-		return agent.ErrorResult(fmt.Errorf("failed to save memory file: %w", err)), nil
+		return agent.ErrorResult(err), nil
 	}
 
-	return agent.TextResult(fmt.Sprintf("Okay, I've remembered that: %q", input.Fact)), nil
-}
+	normalized := strings.TrimSpace(strings.TrimLeft(input.Fact, "- "))
+	newEntry := fmt.Sprintf("- %s", normalized)
 
-func (t *MemoryTool) computeNewContent(currentContent, fact string) string {
-	processedFact := strings.TrimSpace(fact)
-	// Remove leading dashes/bullets/regex-like start if present to normalize
-	// Gemini uses: processedText = processedText.replace(/^(-+\s*)+/, '').trim();
-	// Go approximate equivalent:
-	processedFact = strings.TrimLeft(processedFact, "- ")
-	processedFact = strings.TrimSpace(processedFact)
-
-	newEntry := fmt.Sprintf("- %s", processedFact)
-
-	if strings.Contains(currentContent, MemoryHeaderCheck) {
-		// Append to existing section
-		parts := strings.SplitN(currentContent, MemoryHeaderCheck, 2)
-		if len(parts) == 2 {
-			// Ensure proper newline separation for the new item
-			sectionContent := parts[1]
-			if !strings.HasSuffix(sectionContent, "\n") {
-				sectionContent += "\n"
+	if !strings.Contains(content, MemoryHeaderCheck) {
+		prefix := ""
+		if content != "" {
+			if !strings.HasSuffix(content, "\n\n") {
+				prefix = "\n\n"
 			}
-			return parts[0] + MemoryHeader + sectionContent + newEntry + "\n"
 		}
-		return currentContent + "\n" + newEntry + "\n"
+		content += prefix + MemoryHeader + "\n"
 	}
 
-	// Create new section
-	prefix := ""
-	if currentContent != "" {
-		if strings.HasSuffix(currentContent, "\n\n") {
-			prefix = ""
-		} else if strings.HasSuffix(currentContent, "\n") {
-			prefix = "\n"
-		} else {
-			prefix = "\n\n"
-		}
+	if !strings.HasSuffix(content, "\n") {
+		content += "\n"
 	}
-	return currentContent + prefix + MemoryHeader + "\n" + newEntry + "\n"
+	content += newEntry + "\n"
+
+	if err := t.mgr.save(ctx, content); err != nil {
+		return agent.ErrorResult(err), nil
+	}
+
+	return agent.TextResult(fmt.Sprintf("Saved memory: %q", input.Fact)), nil
 }
 
-// NewMemoryInjectorMiddleware creates a middleware that injects the user's long-term memory
-// into the system prompt.
-func NewMemoryInjectorMiddleware(tool *MemoryTool) agent.RequestMiddleware {
+// ForgetMemoryTool removes facts from long-term memory.
+type ForgetMemoryTool struct {
+	mgr *memoryManager
+}
+
+func NewForgetMemoryTool(store artifact.Service) *ForgetMemoryTool {
+	return &ForgetMemoryTool{mgr: &memoryManager{store: store}}
+}
+
+func (t *ForgetMemoryTool) Name() string { return "forget_memory" }
+func (t *ForgetMemoryTool) Description() string {
+	return "Removes a specific fact from your long-term memory."
+}
+
+func (t *ForgetMemoryTool) Schema() *agent.Schema {
+	return &agent.Schema{
+		Type: agent.TypeObject,
+		Properties: map[string]*agent.Schema{
+			"fact": {Type: agent.TypeString, Description: "The specific fact to forget."},
+		},
+		Required: []string{"fact"},
+	}
+}
+
+func (t *ForgetMemoryTool) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
+	var input struct {
+		Fact string `json:"fact"`
+	}
+	if err := args.Decode(&input); err != nil {
+		return agent.ErrorResult(err), nil
+	}
+
+	content, err := t.mgr.load(ctx)
+	if err != nil || content == "" {
+		return agent.TextResult("No memories found."), nil
+	}
+
+	normalizedFact := strings.ToLower(strings.TrimSpace(strings.TrimLeft(input.Fact, "- ")))
+	lines := strings.Split(content, "\n")
+	var newLines []string
+	found := false
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "- ") {
+			normalizedLine := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(trimmed, "- ")))
+			if strings.Contains(normalizedLine, normalizedFact) || strings.Contains(normalizedFact, normalizedLine) {
+				found = true
+				continue
+			}
+		}
+		newLines = append(newLines, line)
+	}
+
+	if !found {
+		return agent.TextResult(fmt.Sprintf("Could not find memory: %q", input.Fact)), nil
+	}
+
+	if err := t.mgr.save(ctx, strings.Join(newLines, "\n")); err != nil {
+		return agent.ErrorResult(err), nil
+	}
+
+	return agent.TextResult(fmt.Sprintf("Forgotten memory: %q", input.Fact)), nil
+}
+
+// NewMemoryInjectorMiddleware injects the user's memories into the system prompt.
+func NewMemoryInjectorMiddleware(store artifact.Service) agent.RequestMiddleware {
+	mgr := &memoryManager{store: store}
 	return agent.RequestMiddlewareFunc(func(ctx context.Context, reqCtx *agent.RequestContext, next agent.RequestNextHandler) error {
-		memories, err := tool.LoadMemory(ctx)
-		if err == nil && memories != "" {
-			reqCtx.AddSystemPrompt(memories)
+		content, err := mgr.load(ctx)
+		if err == nil && content != "" {
+			reqCtx.AddSystemPrompt(content)
 		}
 		return next(ctx, reqCtx)
 	})
-}
-
-// LoadMemory returns the full content of the memory file for context injection.
-func (t *MemoryTool) LoadMemory(ctx context.Context) (string, error) {
-	userID := "default_user"
-	if user := domain.GetUserFromContext(ctx); user != nil {
-		userID = user.ID
-	}
-	sessionID := "user_shared"
-
-	rc, err := t.store.Load(ctx, userID, sessionID, MemoryFileName)
-	if err != nil {
-		if err == artifact.ErrNotFound {
-			return "", nil
-		}
-		return "", err
-	}
-	defer func() { _ = rc.Close() }()
-
-	data, err := io.ReadAll(rc)
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
 }
