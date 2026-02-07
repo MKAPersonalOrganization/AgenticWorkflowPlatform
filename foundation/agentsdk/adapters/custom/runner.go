@@ -14,6 +14,7 @@ import (
 	"school-with-ai/foundation/agentsdk/internal/llm"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/artifact"
+	"school-with-ai/services/memory"
 	memorytools "school-with-ai/services/memory/tools"
 	smiddleware "school-with-ai/services/studentprofile/middleware"
 )
@@ -189,7 +190,11 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 			agentName = "math-instructor"
 		}
 
-		// 5. Run engine and process events
+		// 5. Inject user into context for tools that need it (using domain.User)
+		if runCtx.UserID != "" {
+			ctx = context.WithValue(ctx, domain.UserContextKey, &domain.User{ID: runCtx.UserID})
+		}
+
 		coreEvents := r.engine.Run(ctx, agentName, runCtx)
 
 		// Convert core events to domain events
@@ -324,13 +329,21 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 
 	// Inject Memory Tool and Context if available and enabled
 	if p.artifactStore != nil && p.enableMemory {
-		memoryTool := memorytools.NewMemoryTool(p.artifactStore)
+		memoryService := memory.NewArtifactMemoryService(p.artifactStore)
+
+		memoryTool := memorytools.NewMemoryTool(memoryService)
 		config.Tools = append(config.Tools, memoryTool)
 
-		forgetTool := memorytools.NewForgetMemoryTool(p.artifactStore)
+		forgetTool := memorytools.NewForgetMemoryTool(memoryService)
 		config.Tools = append(config.Tools, forgetTool)
 
-		memoryMiddleware := memorytools.NewMemoryInjectorMiddleware(p.artifactStore)
+		listTool := memorytools.NewListMemoriesTool(memoryService)
+		config.Tools = append(config.Tools, listTool)
+
+		clearTool := memorytools.NewClearMemoriesTool(memoryService)
+		config.Tools = append(config.Tools, clearTool)
+
+		memoryMiddleware := memorytools.NewMemoryInjectorMiddleware(memoryService)
 		config.AgentMiddleware = append(config.AgentMiddleware, AdaptRequestMiddlewareToUnified(memoryMiddleware))
 	}
 

@@ -9,6 +9,8 @@ import (
 	sharedtools "school-with-ai/services/agentorchestrator/agents/tools"
 	"school-with-ai/services/agentorchestrator/prompts"
 	"school-with-ai/services/artifact"
+	"school-with-ai/services/memory"
+	memorytools "school-with-ai/services/memory/tools"
 )
 
 // domainTools returns the domain-specific tools for the math instructor.
@@ -36,6 +38,15 @@ func NewMathInstructorConfig(ctx context.Context, artifactStore artifact.Service
 	// Domain-specific tools
 	for _, tool := range domainTools(artifactStore) {
 		registry.Register(tool)
+	}
+
+	// Memory tools
+	if artifactStore != nil {
+		memoryService := memory.NewArtifactMemoryService(artifactStore)
+		registry.Register(memorytools.NewMemoryTool(memoryService))
+		registry.Register(memorytools.NewForgetMemoryTool(memoryService))
+		registry.Register(memorytools.NewListMemoriesTool(memoryService))
+		registry.Register(memorytools.NewClearMemoriesTool(memoryService))
 	}
 
 	prompt, err := prompts.GenerateTeacherSystemPrompt(prompts.TeacherPromptConfig{

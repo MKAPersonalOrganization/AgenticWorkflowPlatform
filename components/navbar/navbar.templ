@@ -6,6 +6,7 @@ import "school-with-ai/components/sheet"
 import "school-with-ai/components/popover"
 import "school-with-ai/components/i18n"
 import "school-with-ai/domain"
+import "school-with-ai/components/memory"
 
 type Props struct {
 	SidebarID string
@@ -84,6 +85,8 @@ templ Navbar(props ...Props) {
 							<div class="text-xs text-muted-foreground">{ p.User.ID }</div>
 						</div>
 						<div class="border-t border-border my-1"></div>
+						<!-- Memory Viewer -->
+						@memory.ViewButton()
 						<!-- Student Profile Link -->
 						<a
 							href="/profile"

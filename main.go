@@ -40,6 +40,7 @@ import (
 	"school-with-ai/infra/sqldb/migrate"
 	"school-with-ai/services/agentorchestrator"
 	"school-with-ai/services/artifact"
+	"school-with-ai/services/memory"
 	"school-with-ai/services/studentbooks"
 	"school-with-ai/services/taskmanagement"
 	"school-with-ai/services/threadmgmt"
@@ -370,6 +371,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 		return fmt.Errorf("initializing s3 artifact service: %w", err)
 	}
 
+	// Initialize memory service
+	memoryService := memory.NewArtifactMemoryService(artifactService)
+
 	// Initialize Agents directly (Step 2 of Registry Removal)
 	// Initialize Agents directly (Step 2 of Registry Removal) - Updated for Service Decoupling
 	slogLogger := slog.New(log)
@@ -555,8 +559,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		"healthCheckInterval", cfg.Orchestration.HealthCheckInterval)
 
 	// Create HTTP handler
-	// Create HTTP handler
-	handler := taskmgmthandlers.NewTaskManagementHandler(log, taskManager, agentProvider, authSvc, threadQueryService, aguiProjection, redisBroadcaster, threadMgmt, artifactService)
+	handler := taskmgmthandlers.NewTaskManagementHandler(log, taskManager, agentProvider, authSvc, threadQueryService, aguiProjection, redisBroadcaster, threadMgmt, artifactService, memoryService)
 
 	// Create health handler
 	healthHandler := healthhandlers.NewHealthHandler(log)
@@ -645,6 +648,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Get("/v1/agents", authMiddleware.RequireAuthFunc(handler.ListAgents))
 	r.Get("/v1/threads/{threadId}/artifacts", authMiddleware.RequireAuthFunc(handler.ListArtifacts))
 	r.Get("/v1/threads/{threadId}/artifacts/{fileName}", authMiddleware.RequireAuthFunc(handler.DownloadArtifact))
+	r.Get("/v1/memory", authMiddleware.RequireAuthFunc(handler.GetMemory))
 
 	// AGUI projection query endpoints (protected)
 	r.Get("/api/agui/threads", authMiddleware.RequireAuthFunc(aguiHandler.ListThreads))

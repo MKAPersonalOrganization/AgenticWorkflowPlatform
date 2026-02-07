@@ -23,13 +23,17 @@ type User struct {
 	UpdatedAt time.Time `json:"updated_at"` // When identity was last updated
 }
 
-// GetUserFromContext retrieves the user from the context.
-func GetUserFromContext(ctx context.Context) (*User, bool) {
+// getUserFromContext retrieves the user from the context.
+// Deprecated: Use domain.GetUserFromContext instead for application-wide user context.
+// This is kept private to prevent accidental misuse.
+func getUserFromContext(ctx context.Context) (*User, bool) {
 	user, ok := ctx.Value(UserContextKey).(*User)
 	return user, ok
 }
 
-// WithUser adds a user to the context.
-func WithUser(ctx context.Context, user *User) context.Context {
+// withUser adds a user to the context.
+// Deprecated: Use domain user context functions instead for application-wide user context.
+// This is kept private to prevent accidental misuse.
+func withUser(ctx context.Context, user *User) context.Context {
 	return context.WithValue(ctx, UserContextKey, user)
 }

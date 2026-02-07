@@ -1,0 +1,146 @@
+package memory
+
+import (
+	"school-with-ai/components/dialog"
+	icons "school-with-ai/components/icon"
+	"school-with-ai/components/i18n"
+)
+
+// MemoryDialog renders the dialog content. Should be placed outside of restricted containers.
+templ MemoryDialog() {
+	<div x-data="{ 
+		open: false,
+		content: '', 
+		loading: false, 
+		loaded: false,
+		load() {
+			this.open = true;
+			if (this.loaded) return;
+			this.loading = true;
+			fetch('/v1/memory')
+				.then(r => {
+					if (!r.ok) throw new Error('Failed to load');
+					return r.json();
+				})
+				.then(d => {
+					this.content = d.content || 'No memories recorded yet.'; 
+					this.loading = false;
+					this.loaded = true;
+				})
+				.catch(e => {
+					this.content = 'Error loading memory.';
+					this.loading = false;
+				});
+		},
+		close() {
+			this.open = false;
+		}
+	}"
+	@open-memory-dialog.window="load()"
+	>
+		@dialog.Dialog(dialog.Props{
+			ID: "memory-viewer-dialog",
+			Open: true,
+		}) {
+			<!-- Backdrop -->
+			<div 
+				class="fixed inset-0 z-[60] bg-black/50 transition-opacity"
+				x-show="open"
+				x-transition:enter="ease-out duration-300"
+				x-transition:enter-start="opacity-0"
+				x-transition:enter-end="opacity-100"
+				x-transition:leave="ease-in duration-200"
+				x-transition:leave-start="opacity-100"
+				x-transition:leave-end="opacity-0"
+				style="display: none;"
+				aria-hidden="true"
+			></div>
+
+			<!-- Modal Container -->
+			<div 
+				class="fixed inset-0 z-[60] flex items-center justify-center p-4"
+				x-show="open"
+				style="display: none;"
+				@click.self="close()"
+			>
+				<div 
+					class="relative w-full max-w-2xl max-h-[80vh] bg-background rounded-lg shadow-lg flex flex-col overflow-hidden border border-border"
+					x-show="open"
+					x-transition:enter="ease-out duration-300"
+					x-transition:enter-start="opacity-0 scale-95"
+					x-transition:enter-end="opacity-100 scale-100"
+					x-transition:leave="ease-in duration-200"
+					x-transition:leave-start="opacity-100 scale-100"
+					x-transition:leave-end="opacity-0 scale-95"
+					@keydown.escape.window="close()"
+				>
+					<!-- Header -->
+					<div class="flex items-center justify-between p-6 pb-4 border-b border-border">
+						<div class="space-y-1">
+							<h2 class="text-lg font-semibold leading-none tracking-tight">{ i18n.T(ctx, "Long-Term Memory") }</h2>
+							<p class="text-sm text-muted-foreground">{ i18n.T(ctx, "This is what the AI remembers about you across all conversations.") }</p>
+						</div>
+						<button 
+							type="button" 
+							class="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
+							@click="close()"
+						>
+							@icons.X(icons.Props{Class: "size-4"})
+							<span class="sr-only">Close</span>
+						</button>
+					</div>
+
+					<!-- Body -->
+					<div class="flex-1 overflow-auto p-4 bg-muted/30">
+						<template x-if="loading">
+							<div class="flex items-center justify-center h-40 text-muted-foreground">
+								<span class="animate-pulse flex items-center gap-2">
+									<span class="size-4 rounded-full border-2 border-primary border-t-transparent animate-spin"></span>
+									Loading memory...
+								</span>
+							</div>
+						</template>
+						<template x-if="!loading">
+							<div class="prose dark:prose-invert max-w-none bg-card p-4 rounded-md border border-border/50 shadow-sm">
+								<pre class="whitespace-pre-wrap font-mono text-xs sm:text-sm bg-transparent p-0 m-0 border-0 text-foreground" x-text="content"></pre>
+							</div>
+						</template>
+					</div>
+
+					<!-- Footer -->
+					<div class="p-4 border-t border-border flex justify-end gap-2 bg-background">
+						<button 
+							type="button" 
+							class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
+							@click="close()"
+						>
+							{ i18n.T(ctx, "Close") }
+						</button>
+					</div>
+				</div>
+			</div>
+		}
+	</div>
+}
+
+// ViewButtonTrigger renders the button that opens the dialog.
+templ ViewButtonTrigger() {
+	@dialog.Trigger(dialog.TriggerProps{
+		For: "memory-viewer-dialog",
+	}) {
+		<button
+			class="hover:bg-sidebar-accent/50 transition-colors py-2 px-3 rounded-lg flex items-center gap-3 w-full text-start"
+			type="button"
+			@click="$dispatch('open-memory-dialog')"
+		>
+			@icons.Brain(icons.Props{Class: "size-4 text-muted-foreground"})
+			<span class="text-sm font-medium">{ i18n.T(ctx, "Long-Term Memory") }</span>
+		</button>
+	}
+}
+
+// ViewButton is deprecated, use separate components.
+templ ViewButton() {
+	@MemoryDialog()
+	@ViewButtonTrigger()
+}
