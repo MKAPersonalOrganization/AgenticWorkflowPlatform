@@ -8,25 +8,23 @@ type MultipleChoiceProps struct {}
 templ MultipleChoice() {
     <!-- Active State: Clickable Buttons -->
     <template x-if="awaitingHumanInput && index === messages.length - 1">
-        <div class="mt-4 pt-4 border-t border-primary/10 animate-in fade-in slide-in-from-top-2 w-full">
-            <div class="flex flex-col w-full gap-2">
-                <template x-for="option in message.parsedArgs.schema.enum">
-                    <button
-                        @click="sendMessage(option)"
-                        class="inline-flex items-center justify-start w-full whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2 hover:border-primary/50 hover:shadow-sm"
-                        x-text="option"
-                    >
-                    </button>
-                </template>
-            </div>
+        <div class="mt-6 flex flex-col w-full gap-3 animate-in fade-in slide-in-from-top-4 duration-500">
+            <template x-for="option in message.parsedArgs.schema.enum">
+                <button
+                    @click="sendMessage(option)"
+                    class="group/opt flex items-center justify-start w-full p-4 rounded-xl border border-border/40 bg-card/5 text-[14px] font-medium text-foreground/70 transition-all duration-300 hover:border-primary/40 hover:bg-primary/[0.03] hover:text-foreground active:scale-[0.99] hover:shadow-sm"
+                    x-text="option"
+                >
+                </button>
+            </template>
         </div>
     </template>
 
     <!-- History State: Static Badges -->
     <template x-if="!awaitingHumanInput || index !== messages.length - 1">
-        <div class="mt-3 flex flex-wrap gap-2">
+        <div class="mt-4 flex flex-wrap gap-2 opacity-50">
             <template x-for="option in message.parsedArgs.schema.enum">
-                @badge.Badge(badge.Props{Variant: badge.VariantOutline, Class: "text-xs pointer-events-none opacity-60"}) {
+                @badge.Badge(badge.Props{Variant: badge.VariantOutline, Class: "text-[10px] uppercase tracking-wider font-bold border-border/40"}) {
                     <span x-text="option"></span>
                 }
             </template>

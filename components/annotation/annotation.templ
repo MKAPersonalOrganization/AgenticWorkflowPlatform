@@ -1,0 +1,71 @@
+package annotation
+
+type Props struct {
+	ContainerAttrs templ.Attributes
+	IconAttrs      templ.Attributes
+	Label          string
+	LabelAttrs     templ.Attributes
+	Subtext        string
+	SubtextAttrs   templ.Attributes
+	FooterDotAttrs templ.Attributes
+}
+
+templ Container(icon templ.Component, props Props) {
+	<div 
+		class="group block w-full my-12 relative overflow-hidden rounded-2xl border border-border/40 bg-card/10 backdrop-blur-[2px] shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] transition-all duration-500 hover:shadow-[0_8px_30px_-4px_rgba(0,0,0,0.08)] hover:border-border/60"
+		{ props.ContainerAttrs... }
+	>
+		<!-- Top Accent Glow -->
+		<div class="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-primary/20 to-transparent"></div>
+		
+		<!-- Widget Header -->
+		<div class="flex items-center justify-between px-5 pt-4 pb-2">
+			<div class="flex items-center gap-3">
+				<div
+					class="flex items-center justify-center p-1.5 rounded-lg bg-primary/5 text-primary/70 transition-all duration-300 group-hover:bg-primary/10 group-hover:text-primary"
+					{ props.IconAttrs... }
+				>
+					@icon
+				</div>
+				<span
+					class="text-[11px] font-bold tracking-[0.15em] uppercase text-muted-foreground/40 transition-colors duration-300 group-hover:text-muted-foreground/60"
+					{ props.LabelAttrs... }
+				>
+					{ props.Label }
+				</span>
+			</div>
+
+			<!-- Subtle Status Indicator (Optional) -->
+			<div class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-muted/5 border border-border/10">
+				<div 
+					class="size-1 rounded-full bg-primary/30 animate-pulse"
+					{ props.FooterDotAttrs... }
+				></div>
+				<span class="text-[9px] font-medium text-muted-foreground/30 uppercase tracking-widest">Active</span>
+			</div>
+		</div>
+
+		<!-- Widget Body -->
+		<div class="px-5 pb-5">
+			<div class="relative w-full">
+				{ children... }
+			</div>
+		</div>
+
+		<!-- Widget Footer -->
+		<div class="flex items-center h-8 px-5 border-t border-border/10 bg-muted/[0.02]">
+			<span
+				class="text-[9px] font-medium text-muted-foreground/20 italic tracking-wide"
+				{ props.SubtextAttrs... }
+			>
+				{ props.Subtext }
+			</span>
+			<div class="ml-auto flex items-center gap-1 opacity-20 group-hover:opacity-40 transition-opacity">
+				<div class="w-8 h-[1px] bg-muted-foreground/30"></div>
+				<div class="size-0.5 rounded-full bg-muted-foreground/50"></div>
+			</div>
+		</div>
+	</div>
+}
+
+

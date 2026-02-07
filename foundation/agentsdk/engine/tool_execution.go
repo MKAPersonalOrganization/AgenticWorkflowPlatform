@@ -42,6 +42,7 @@ func (s *ToolExecutionService) CreateExecutor(
 	ctx context.Context,
 	tools []agent.ExecutableTool,
 	threadID string,
+	userID string,
 	messageID string,
 	reqCtx *core.RequestContext,
 ) core.ToolExecutor {
@@ -59,6 +60,7 @@ func (s *ToolExecutionService) CreateExecutor(
 		ctx,
 		registry,
 		threadID,
+		userID,
 		messageID,
 		reqCtx,
 		opts...,

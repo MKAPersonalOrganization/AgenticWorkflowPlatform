@@ -63,12 +63,19 @@ const ELICITATION_BASE_CONFIG = {
 export const TOOL_REGISTRY = {
     // Collaboration
     'transfer_to_agent': { type: 'special', category: 'collaboration' },
+    'save_memory': { type: 'special', category: 'memory' },
+    'forget_memory': { type: 'special', category: 'memory' },
 
     // Utilities
     // Content & Search
     'browse_library': { type: 'special', category: 'knowledge' },
     'lookup_section': { type: 'special', category: 'knowledge' },
     'search_text_in_file': { type: 'special', category: 'knowledge' },
+
+    // Content Creation
+    'create_markdown': { type: 'special', category: 'content' },
+    'update_markdown': { type: 'special', category: 'content' },
+    'delete_markdown': { type: 'special', category: 'content' },
 
     // Mathematics & Analysis (Component-owned mapping for display consistency)
     'add': { type: 'special', category: 'math' },
@@ -115,7 +122,9 @@ export const TOOL_REGISTRY = {
  */
 export const ELICITATION_REGISTRY = {
     'choose_multiple': { ...ELICITATION_BASE_CONFIG },
-    'true_false': { ...ELICITATION_BASE_CONFIG }
+    'true_false': { ...ELICITATION_BASE_CONFIG },
+    'multiple_choice': { ...ELICITATION_BASE_CONFIG },
+    'short_answer': { ...ELICITATION_BASE_CONFIG }
 };
 
 /**

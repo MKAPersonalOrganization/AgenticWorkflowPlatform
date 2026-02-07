@@ -3,38 +3,46 @@ package elicitation
 templ AskTrueFalse() {
     <template x-if="awaitingHumanInput">
         <div 
-            class="mt-4 pt-4 border-t border-primary/10 animate-in fade-in slide-in-from-top-2"
+            class="mt-6 flex flex-col w-full gap-4 animate-in fade-in slide-in-from-top-4 duration-500"
             x-data="{ selection: null }"
         >
-            <div class="grid grid-cols-2 gap-3 w-full">
+            <div class="grid grid-cols-2 gap-4 w-full">
                 <!-- True Option -->
                 <button 
                     @click="selection = 'True'"
-                    class="flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all cursor-pointer hover:bg-accent hover:text-accent-foreground"
-                    :class="selection === 'True' ? 'border-primary bg-primary/5 text-primary' : 'border-muted bg-background'"
+                    class="group/opt flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-300 cursor-pointer active:scale-[0.98]"
+                    :class="selection === 'True' ? 'border-primary bg-primary/[0.07] shadow-lg shadow-primary/10' : 'border-border/40 bg-card/5 hover:border-primary/20 hover:bg-primary/[0.02]'"
                 >
-                    <span class="text-lg font-bold">True</span>
-                    <span class="text-xs text-muted-foreground mt-1">Yes / Correct</span>
+                    <span class="text-xl font-bold tracking-tight" :class="selection === 'True' ? 'text-primary' : 'text-foreground/80'">True</span>
+                    <div class="h-[1px] w-8 bg-muted/20 my-2 transition-colors group-hover/opt:bg-primary/20" :class="selection === 'True' ? 'bg-primary/40' : ''"></div>
+                    <span class="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground/40">Affirmative</span>
                 </button>
 
                 <!-- False Option -->
                 <button 
                     @click="selection = 'False'"
-                    class="flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all cursor-pointer hover:bg-accent hover:text-accent-foreground"
-                    :class="selection === 'False' ? 'border-primary bg-primary/5 text-primary' : 'border-muted bg-background'"
+                    class="group/opt flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-300 cursor-pointer active:scale-[0.98]"
+                    :class="selection === 'False' ? 'border-destructive bg-destructive/[0.07] shadow-lg shadow-destructive/10' : 'border-border/40 bg-card/5 hover:border-destructive/20 hover:bg-destructive/[0.02]'"
                 >
-                    <span class="text-lg font-bold">False</span>
-                    <span class="text-xs text-muted-foreground mt-1">No / Incorrect</span>
+                    <span class="text-xl font-bold tracking-tight" :class="selection === 'False' ? 'text-destructive' : 'text-foreground/80'">False</span>
+                    <div class="h-[1px] w-8 bg-muted/20 my-2 transition-colors group-hover/opt:bg-destructive/20" :class="selection === 'False' ? 'bg-destructive/40' : ''"></div>
+                    <span class="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground/40">Negative</span>
                 </button>
             </div>
             
-            <div class="mt-4 flex justify-end w-full">
+            <div class="mt-2 flex justify-end w-full">
                 <button 
                     @click="sendMessage(selection)"
-                    class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 shadow-sm gap-2"
+                    class="group/btn relative overflow-hidden inline-flex items-center justify-center whitespace-nowrap rounded-xl text-[13px] font-bold tracking-widest uppercase transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40 bg-primary text-primary-foreground hover:bg-primary/90 h-11 px-8 shadow-lg shadow-primary/20 active:scale-[0.98]"
                     :disabled="!selection"
                 >
-                    <span>Submit Answer</span>
+                    <span class="relative z-10 flex items-center gap-2">
+                        Submit Answer
+                        <svg class="w-4 h-4 transition-transform group-hover/btn:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                        </svg>
+                    </span>
+                    <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover/btn:animate-[shimmer_1.5s_infinite]"></div>
                 </button>
             </div>
         </div>
@@ -42,8 +50,8 @@ templ AskTrueFalse() {
 
      <!-- History State -->
     <template x-if="!awaitingHumanInput">
-         <div class="mt-2 text-sm text-muted-foreground italic">
-            (True/False)
+         <div class="mt-4 text-[10px] text-muted-foreground/30 uppercase tracking-[0.2em] font-bold italic text-center w-full">
+            Technical Verification Completed
          </div>
     </template>
 }

@@ -226,6 +226,7 @@ func (s *executionState) prepareExecutor() {
 		s.ctx,
 		tools,
 		s.threadID,
+		s.userID,
 		s.messageID,
 		nil, // No RequestContext yet - will be set during LLM call
 	)
@@ -869,7 +870,7 @@ func (s *executionState) streamAndProcessLLMResponseCore(llmContext *LLMContext)
 	// with one that has the full context and middleware-applied tools
 	s.agent.Executor = s.engine.toolExec.CreateExecutor(
 		s.ctx, llmContext.GetEffectiveTools(),
-		s.threadID, s.messageID, llmContext.RequestCtx,
+		s.threadID, s.userID, s.messageID, llmContext.RequestCtx,
 	)
 
 	req := llmContext.Request

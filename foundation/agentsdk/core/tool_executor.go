@@ -48,6 +48,7 @@ type RegistryToolExecutor struct {
 	registry   *ToolRegistry
 	ctx        context.Context
 	threadID   string
+	userID     string
 	messageID  string
 	requestCtx *RequestContext
 	tracer     ToolTracer // Optional tracer for observability
@@ -70,6 +71,7 @@ func NewRegistryToolExecutor(
 	ctx context.Context,
 	registry *ToolRegistry,
 	threadID string,
+	userID string,
 	messageID string,
 	requestCtx *RequestContext,
 	opts ...ToolExecutorOption,
@@ -78,6 +80,7 @@ func NewRegistryToolExecutor(
 		registry:   registry,
 		ctx:        ctx,
 		threadID:   threadID,
+		userID:     userID,
 		messageID:  messageID,
 		requestCtx: requestCtx,
 	}
@@ -110,10 +113,12 @@ func (e *RegistryToolExecutor) Execute(toolCall ToolCall) (ToolExecResult, error
 		CallID: toolCall.ID,
 	}
 
+	// Populate standard fields
+	args.SessionID = e.threadID
+	args.UserID = e.userID
+
 	// Populate legacy fields if requestCtx is available
 	if e.requestCtx != nil {
-		args.SessionID = e.threadID
-		// UserID would need to be extracted from context or passed separately
 		args.Metadata = e.requestCtx.State
 	}
 

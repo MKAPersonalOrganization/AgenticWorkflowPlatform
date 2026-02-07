@@ -356,6 +356,20 @@ func run(ctx context.Context, log *logger.Logger) error {
 		log.Info(ctx, "startup", "status", "Langfuse tracing disabled")
 	}
 
+	// Initialize artifact service
+	log.Info(ctx, "startup", "status", "initializing s3 artifact service", "endpoint", cfg.Artifacts.S3Endpoint, "bucket", cfg.Artifacts.S3Bucket)
+	artifactService, err := artifact.NewS3Service(ctx, artifact.S3Config{
+		Endpoint:        cfg.Artifacts.S3Endpoint,
+		AccessKeyID:     cfg.Artifacts.S3AccessKey,
+		SecretAccessKey: cfg.Artifacts.S3SecretKey,
+		UseSSL:          cfg.Artifacts.S3UseSSL,
+		BucketName:      cfg.Artifacts.S3Bucket,
+		Region:          cfg.Artifacts.S3Region,
+	})
+	if err != nil {
+		return fmt.Errorf("initializing s3 artifact service: %w", err)
+	}
+
 	// Initialize Agents directly (Step 2 of Registry Removal)
 	// Initialize Agents directly (Step 2 of Registry Removal) - Updated for Service Decoupling
 	slogLogger := slog.New(log)
@@ -363,7 +377,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	chatLoggingMw := agent.ChatLogging(slogLogger)
 	toolLoggingMw := agent.ToolLogging(slogLogger)
 
-	mathConfig, err := math.NewMathInstructorConfig(ctx)
+	mathConfig, err := math.NewMathInstructorConfig(ctx, artifactService)
 	if err != nil {
 		return fmt.Errorf("creating math instructor config: %w", err)
 	}
@@ -436,20 +450,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Initialize Student Books Service
 	booksSvc := studentbooks.NewFileSystemService("books")
 	sharedtools.InitStudentBooks(booksSvc)
-
-	// Initialize artifact service
-	log.Info(ctx, "startup", "status", "initializing s3 artifact service", "endpoint", cfg.Artifacts.S3Endpoint, "bucket", cfg.Artifacts.S3Bucket)
-	artifactService, err := artifact.NewS3Service(ctx, artifact.S3Config{
-		Endpoint:        cfg.Artifacts.S3Endpoint,
-		AccessKeyID:     cfg.Artifacts.S3AccessKey,
-		SecretAccessKey: cfg.Artifacts.S3SecretKey,
-		UseSSL:          cfg.Artifacts.S3UseSSL,
-		BucketName:      cfg.Artifacts.S3Bucket,
-		Region:          cfg.Artifacts.S3Region,
-	})
-	if err != nil {
-		return fmt.Errorf("initializing s3 artifact service: %w", err)
-	}
 
 	var runner agentorchestrator.Runner
 	var agentOrchestrator *agentorchestrator.Service
@@ -555,7 +555,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 		"healthCheckInterval", cfg.Orchestration.HealthCheckInterval)
 
 	// Create HTTP handler
-	handler := taskmgmthandlers.NewTaskManagementHandler(log, taskManager, agentProvider, authSvc, threadQueryService, aguiProjection, redisBroadcaster, threadMgmt)
+	// Create HTTP handler
+	handler := taskmgmthandlers.NewTaskManagementHandler(log, taskManager, agentProvider, authSvc, threadQueryService, aguiProjection, redisBroadcaster, threadMgmt, artifactService)
 
 	// Create health handler
 	healthHandler := healthhandlers.NewHealthHandler(log)
@@ -642,6 +643,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Get("/v1/tasks/{id}:subscribe", authMiddleware.RequireAuthFunc(handler.StreamJobEvents))
 	r.Post("/v1/tasks/{id}:cancel", authMiddleware.RequireAuthFunc(handler.CancelJob))
 	r.Get("/v1/agents", authMiddleware.RequireAuthFunc(handler.ListAgents))
+	r.Get("/v1/threads/{threadId}/artifacts", authMiddleware.RequireAuthFunc(handler.ListArtifacts))
+	r.Get("/v1/threads/{threadId}/artifacts/{fileName}", authMiddleware.RequireAuthFunc(handler.DownloadArtifact))
 
 	// AGUI projection query endpoints (protected)
 	r.Get("/api/agui/threads", authMiddleware.RequireAuthFunc(aguiHandler.ListThreads))

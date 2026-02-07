@@ -8,10 +8,11 @@ import (
 	mathtools "school-with-ai/services/agentorchestrator/agents/math/tools"
 	sharedtools "school-with-ai/services/agentorchestrator/agents/tools"
 	"school-with-ai/services/agentorchestrator/prompts"
+	"school-with-ai/services/artifact"
 )
 
 // domainTools returns the domain-specific tools for the math instructor.
-func domainTools() []agent.Tool {
+func domainTools(artifactStore artifact.Service) []agent.Tool {
 	return []agent.Tool{
 		&sharedtools.AddTool{},
 		&sharedtools.SubtractTool{},
@@ -21,16 +22,19 @@ func domainTools() []agent.Tool {
 		&sharedtools.SqrtTool{},
 		&mathtools.PlotTool{},
 		&mathtools.AnimateTool{},
+		&sharedtools.CreateMarkdownTool{ArtifactStore: artifactStore},
+		&sharedtools.UpdateMarkdownTool{ArtifactStore: artifactStore},
+		&sharedtools.DeleteMarkdownTool{ArtifactStore: artifactStore},
 		// &mathtools.EquationSolverTool{},
 	}
 }
 
 // NewMathInstructorConfig creates the math instructor configuration.
-func NewMathInstructorConfig(ctx context.Context) (agent.Config, error) {
+func NewMathInstructorConfig(ctx context.Context, artifactStore artifact.Service) (agent.Config, error) {
 	registry := agent.NewToolSet()
 
 	// Domain-specific tools
-	for _, tool := range domainTools() {
+	for _, tool := range domainTools(artifactStore) {
 		registry.Register(tool)
 	}
 

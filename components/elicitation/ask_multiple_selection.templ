@@ -5,7 +5,7 @@ import "school-with-ai/components/badge"
 templ AskMultipleSelection() {
     <template x-if="awaitingHumanInput">
         <div
-            class="mt-4 pt-4 border-t border-primary/10 animate-in fade-in slide-in-from-top-2 w-full"
+            class="mt-6 flex flex-col w-full gap-4 animate-in fade-in slide-in-from-top-4 duration-500"
             x-data="{
                 selected: [],
                 get choices() {
@@ -14,27 +14,45 @@ templ AskMultipleSelection() {
                 }
             }"
         >
-            <div class="flex flex-col w-full gap-2">
+            <div class="grid grid-cols-1 gap-3 w-full">
                 <template x-for="option in choices">
-                    <label class="flex items-center space-x-3 p-3 rounded-md border border-input hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors">
-                        <input
-                            type="checkbox"
-                            :value="option"
-                            x-model="selected"
-                            class="h-4 w-4 rounded border-primary text-primary shadow focus:ring-primary"
-                        />
-                        <span class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" x-text="option"></span>
+                    <label 
+                        class="group/option flex items-center space-x-4 p-4 rounded-xl border border-border/40 bg-card/5 cursor-pointer transition-all duration-300 hover:border-primary/40 hover:bg-primary/[0.03] hover:shadow-sm"
+                        :class="selected.includes(option) ? 'border-primary/40 bg-primary/10 shadow-[0_2px_10px_-3px_rgba(var(--primary),0.1)]' : ''"
+                    >
+                        <div class="relative flex items-center justify-center">
+                            <input
+                                type="checkbox"
+                                :value="option"
+                                x-model="selected"
+                                class="peer h-5 w-5 rounded-md border-2 border-primary/20 bg-transparent text-primary transition-all focus:ring-offset-0 focus:ring-0 checked:border-primary checked:bg-primary"
+                            />
+                            <svg class="absolute w-3.5 h-3.5 text-primary-foreground opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                        </div>
+                        <span 
+                            class="text-[14px] font-medium leading-none text-foreground/70 transition-colors group-hover/option:text-foreground"
+                            :class="selected.includes(option) ? 'text-foreground' : ''"
+                            x-text="option"
+                        ></span>
                     </label>
                 </template>
             </div>
 
-            <div class="mt-4 flex justify-end w-full">
+            <div class="mt-2 flex justify-end w-full">
                 <button
                     @click="sendMessage(selected.join(', '))"
-                    class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 shadow-sm"
+                    class="group/btn relative overflow-hidden inline-flex items-center justify-center whitespace-nowrap rounded-xl text-[13px] font-bold tracking-widest uppercase transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40 bg-primary text-primary-foreground hover:bg-primary/90 h-11 px-8 shadow-lg shadow-primary/20 active:scale-[0.98]"
                     :disabled="selected.length === 0"
                 >
-                   <span>Submit Selection</span>
+                    <span class="relative z-10 flex items-center gap-2">
+                        Submit Selection
+                        <svg class="w-4 h-4 transition-transform group-hover/btn:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                        </svg>
+                    </span>
+                    <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover/btn:animate-[shimmer_1.5s_infinite]"></div>
                 </button>
             </div>
         </div>
@@ -43,7 +61,7 @@ templ AskMultipleSelection() {
     <!-- History State -->
     <template x-if="!awaitingHumanInput">
         <div
-            class="mt-3 flex flex-wrap gap-2"
+            class="mt-4 flex flex-wrap gap-2 opacity-50"
             x-data="{
                 get choices() {
                     const choices = message.parsedResult?.answer_choices;
@@ -52,10 +70,11 @@ templ AskMultipleSelection() {
             }"
         >
              <template x-for="option in choices">
-                @badge.Badge(badge.Props{Variant: badge.VariantOutline, Class: "text-xs pointer-events-none opacity-60"}) {
+                @badge.Badge(badge.Props{Variant: badge.VariantOutline, Class: "text-[10px] uppercase tracking-wider font-bold border-border/40"}) {
                     <span x-text="option"></span>
                 }
             </template>
         </div>
     </template>
 }
+
