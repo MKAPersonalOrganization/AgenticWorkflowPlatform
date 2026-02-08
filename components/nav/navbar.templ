@@ -3,6 +3,7 @@ package nav
 import (
 	"school-with-ai/components/agents"
 	"school-with-ai/components/button"
+	"school-with-ai/components/convsearch"
 	"school-with-ai/components/i18n"
 	"school-with-ai/components/icon"
 	"school-with-ai/components/resources"
@@ -72,6 +73,10 @@ templ Navbar(props ...NavbarProps) {
 		<!-- Tools Button -->
 		<div class="hidden md:block">
 			@tools.ToolsButtonTrigger()
+		</div>
+		<!-- Search Conversations Button -->
+		<div class="hidden md:block">
+			@convsearch.SearchButtonTrigger()
 		</div>
 		<!-- User Profile / Settings Menu (at bottom) -->
 		@AccountSettings(AccountSettingsProps{
