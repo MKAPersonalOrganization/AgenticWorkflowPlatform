@@ -20,18 +20,72 @@ import (
 	"school-with-ai/components/utils"
 )
 
+// ScrollToBottom - LibreChat style floating scroll button
+templ ScrollToBottom() {
+	<button
+		x-show="scrolledUp"
+		x-transition:enter="transition ease-out duration-200"
+		x-transition:enter-start="opacity-0 translate-y-2"
+		x-transition:enter-end="opacity-100 translate-y-0"
+		x-transition:leave="transition ease-in duration-150"
+		x-transition:leave-start="opacity-100 translate-y-0"
+		x-transition:leave-end="opacity-0 translate-y-2"
+		@click="scrollToBottom()"
+		class="absolute bottom-5 left-1/2 -translate-x-1/2 cursor-pointer rounded-full border border-border bg-background p-2 shadow-md hover:shadow-lg hover:bg-accent/50 transition-all z-10"
+		aria-label={ i18n.T(ctx, "Scroll to bottom") }
+	>
+		<svg width="18" height="18" viewBox="0 0 24 24" fill="none" class="text-muted-foreground">
+			<path
+				d="M17 13L12 18L7 13M12 6L12 17"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			></path>
+		</svg>
+	</button>
+}
+
+// DateSeparator - LibreChat style date separator
+templ DateSeparator() {
+	<div
+		x-show="index > 0 && getMessageDate(message) !== getMessageDate(messages[index - 1])"
+		class="flex items-center justify-center my-4"
+	>
+		<div class="text-xs text-muted-foreground bg-muted/50 px-3 py-1 rounded-full">
+			<span x-text="formatRelativeDate(getMessageDate(message))"></span>
+		</div>
+	</div>
+}
+
 templ MessageList() {
-	<div class="space-y-4">
+	<div
+		class="space-y-4 relative"
+		x-data="{ scrolledUp: false }"
+		x-init="
+		$watch('messages', () => {
+			$nextTick(() => {
+				const container = $refs.messageList;
+				if (container) {
+					const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+					if (isNearBottom) scrollToBottom();
+				}
+			});
+		});
+	"
+	>
 		<template x-for="(message, index) in messages" :key="message.id">
 			<div
-				class="group"
+				class="group transform-gpu"
 				role="article"
 				:aria-label="`Message from ${message.role || 'system'}`"
 				x-show="!showSearch || !searchQuery || (message.content && message.content.toLowerCase().includes(searchQuery.toLowerCase())) || (message.parsedArgs && JSON.stringify(message.parsedArgs).toLowerCase().includes(searchQuery.toLowerCase()))"
-				x-transition:enter="transition ease-out duration-300"
-				x-transition:enter-start="opacity-0 transform scale-95"
-				x-transition:enter-end="opacity-100 transform scale-100"
+				x-transition:enter="transition ease-out duration-200"
+				x-transition:enter-start="opacity-0 translate-y-2"
+				x-transition:enter-end="opacity-100 translate-y-0"
 			>
+				<!-- Date Separator -->
+				@DateSeparator()
 				<!-- User Message -->
 				@message.UserMessage()
 				<!-- Agent Transfer Tool Call - Special Rendering -->

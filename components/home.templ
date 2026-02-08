@@ -10,6 +10,8 @@ import (
 	"school-with-ai/components/dialog"
 	"school-with-ai/components/dropdown"
 	"school-with-ai/components/eventlog"
+	"school-with-ai/components/footer"
+	"school-with-ai/components/i18n"
 	"school-with-ai/components/icon"
 	"school-with-ai/components/input"
 	"school-with-ai/components/keyboardshortcuts"
@@ -51,6 +53,7 @@ templ HomeExtraHead() {
 	@selectbox.Script()
 	@copybutton.Script()
 	@dropdown.Script()
+	@dialog.Script()
 	<style>
 		@keyframes shrink {
 			from { transform: scaleX(1); }
@@ -118,18 +121,31 @@ templ ChatInputScreen(user *domain.User) {
 									: 'flex-1 items-center justify-end sm:justify-center'"
 							>
 								<!-- Landing state -->
-								<div x-show="!hasMessages && !isStreaming"
-									class="flex h-full transform-gpu flex-col items-center justify-center pb-16 transition-all duration-200">
-									<div class="flex flex-col items-center gap-0 p-2">
+								<div
+									x-show="!hasMessages && !isStreaming"
+									class="flex h-full transform-gpu flex-col items-center justify-center pb-16 transition-all duration-200"
+								>
+									<div class="flex flex-col items-center gap-3 p-2">
+										<!-- LibreChat-style Time-based Greeting -->
+										<div class="mb-2 flex flex-col items-center gap-0">
+											<h1 class="text-3xl font-medium text-foreground/90" x-text="getTimeBasedGreeting()"></h1>
+											<h2 class="text-xl text-muted-foreground">{ i18n.T(ctx, "How can I help you today?") }</h2>
+										</div>
 										@sampleprompts.SamplePrompts()
 									</div>
 								</div>
 								<!-- Messages state -->
-								<div x-show="hasMessages || isStreaming"
-									class="relative flex-1 overflow-hidden overflow-y-auto">
-									<div x-ref="messageList"
-										style="height: 100%; overflow-y: auto; width: 100%;"
-										role="log" aria-live="polite">
+								<div
+									x-show="hasMessages || isStreaming"
+									class="relative flex-1 overflow-hidden overflow-y-auto"
+								>
+									<div
+										x-ref="messageList"
+										@scroll="scrolledUp = ($refs.messageList.scrollHeight - $refs.messageList.scrollTop - $refs.messageList.clientHeight) > 100"
+										style="height: 100%; overflow-y: auto; width: 100%; scrollbar-gutter: stable;"
+										role="log"
+										aria-live="polite"
+									>
 										<div class="flex flex-col pb-9 pt-14">
 											<div class="w-full max-w-3xl xl:max-w-4xl mx-auto px-4">
 												@messagelist.MessageList()
@@ -137,6 +153,21 @@ templ ChatInputScreen(user *domain.User) {
 											<div id="messages-end" class="h-0 w-full flex-shrink-0"></div>
 										</div>
 									</div>
+									<!-- Scroll to Bottom Button -->
+									<button
+										x-show="scrolledUp"
+										x-transition:enter="transition ease-out duration-200"
+										x-transition:enter-start="opacity-0 translate-y-2"
+										x-transition:enter-end="opacity-100 translate-y-0"
+										x-transition:leave="transition ease-in duration-150"
+										x-transition:leave-start="opacity-100 translate-y-0"
+										x-transition:leave-end="opacity-0 translate-y-2"
+										@click="scrollToBottom()"
+										class="absolute bottom-5 left-1/2 -translate-x-1/2 cursor-pointer rounded-full border border-border bg-background p-2 shadow-md hover:shadow-lg hover:bg-accent/50 transition-all z-10"
+										aria-label="Scroll to bottom"
+									>
+										@icon.ChevronDown(icon.Props{Class: "size-5 text-muted-foreground"})
+									</button>
 								</div>
 								<!-- ChatForm - SINGLE instance -->
 								<div
@@ -145,11 +176,22 @@ templ ChatInputScreen(user *domain.User) {
 								>
 									<div
 										class="mx-auto flex w-full flex-row gap-3 transition-[max-width] duration-300 sm:px-2"
-										:class="(hasMessages || isStreaming) ? 'max-w-3xl xl:max-w-4xl sm:mb-4' : 'sm:mb-8'"
+										:class="(hasMessages || isStreaming) ? 'max-w-3xl xl:max-w-4xl sm:mb-4' : 'sm:mb-10'"
 									>
 										@chatinput.ChatInput()
 									</div>
+									<!-- Conversation Starters (Landing) / Footer (Conversation) -->
+									<div x-show="!hasMessages && !isStreaming">
+										@sampleprompts.ConversationStarters()
+									</div>
+									<div x-show="hasMessages || isStreaming">
+										@footer.CompactFooter()
+									</div>
 								</div>
+							</div>
+							<!-- Footer (Landing Page) -->
+							<div x-show="!hasMessages && !isStreaming">
+								@footer.Footer()
 							</div>
 							@eventlog.EventLog()
 						</main>

@@ -10,7 +10,9 @@ import "school-with-ai/components/tokenusage"
 templ ChatInput() {
 	<div
 		class="relative flex w-full flex-grow flex-col overflow-hidden rounded-t-3xl border border-border bg-background shadow-md transition-all duration-200 focus-within:shadow-lg sm:rounded-3xl"
-		:class="awaitingHumanInput ? '' : ''"
+		:class="isTextAreaFocused ? 'shadow-lg border-border' : 'shadow-md'"
+		x-data="{ isTextAreaFocused: false }"
+		@click="$refs.messageInput.focus()"
 		role="region"
 		aria-label="Message input area"
 	>
@@ -26,16 +28,18 @@ templ ChatInput() {
 				
 						"@keydown":    "handleSlashKeydown($event) || handleKeydown($event)",
 						"@input":      "handleInput($event)",
+						"@focus":      "isTextAreaFocused = true",
+						"@blur":       "isTextAreaFocused = false",
 						"placeholder": i18n.T(ctx, "Message Safar.AI..."),
 						"rows":        "1",
-						"style":       "max-height: 200px;",
+						"style":       "max-height: 45vh;",
 						"aria-label":  "Type your message",
 				
 						":aria-describedby": "errorMessage ? 'error-message' : null",
 						"x-ref":             "messageInput",
 						"dir":               "auto",
 					},
-					Class: "w-full resize-none border-none bg-transparent shadow-none text-base min-h-[44px] py-3.5 px-3 focus:ring-0 focus:outline-none placeholder:text-muted-foreground/50",
+					Class: "md:py-3.5 m-0 w-full resize-none py-[13px] placeholder-muted-foreground/50 bg-transparent border-none shadow-none text-base min-h-[44px] px-5 focus:ring-0 focus:outline-none",
 				})
 				<!-- Slash Command Menu -->
 				@SlashMenu()
@@ -49,7 +53,7 @@ templ ChatInput() {
 						Type:    button.TypeButton,
 						Variant: button.VariantGhost,
 						Size:    button.SizeIcon,
-						Class:   "p-2 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-muted/50 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none",
+						Class:   "p-2 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
 						Attributes: templ.Attributes{
 							"aria-label": i18n.T(ctx, "Attach file"),
 							"@click":     "$refs.fileInput.click()",
@@ -69,7 +73,7 @@ templ ChatInput() {
 						Type:    button.TypeButton,
 						Variant: button.VariantGhost,
 						Size:    button.SizeIcon,
-						Class:   "p-2 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-muted/50 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none",
+						Class:   "p-2 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
 						Attributes: templ.Attributes{
 							"aria-label":               i18n.T(ctx, "Artifacts mode"),
 							"data-tui-sidebar-trigger": "true",
@@ -92,7 +96,7 @@ templ ChatInput() {
 								Type:    button.TypeButton,
 								Variant: button.VariantGhost,
 								Size:    button.SizeIcon,
-								Class:   "text-muted-foreground hover:text-foreground transition-colors p-2 rounded-xl hover:bg-muted/50",
+								Class:   "text-muted-foreground hover:text-foreground transition-colors p-2 rounded-xl hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
 								Attributes: templ.Attributes{
 									"@click":     "toggleKeyboardShortcuts()",
 									"aria-label": i18n.T(ctx, "Show keyboard shortcuts"),
@@ -111,7 +115,7 @@ templ ChatInput() {
 							@button.Button(button.Props{
 								Variant: button.VariantDefault,
 								Size:    button.SizeIcon,
-								Class:   "rounded-full bg-foreground p-1.5 text-background transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-10",
+								Class:   "rounded-full bg-foreground p-1.5 text-background transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-10 hover:bg-foreground/90",
 								Attributes: templ.Attributes{
 									"@click.prevent": "isStreaming ? cancelJob() : sendMessage()",
 									"type":           "button",

@@ -69,29 +69,29 @@ templ ThreadHistory(props ...Props) {
 					@sidebar.Menu(sidebar.MenuProps{Class: "gap-0.5"}) {
 						<template x-for="session in group.sessions" :key="session.id">
 							@sidebar.MenuItem(sidebar.MenuItemProps{Class: "group/item relative"}) {
-								@sidebar.MenuButton(sidebar.MenuButtonProps{
-									Class: "w-full justify-start h-[42px] px-3 gap-3 text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors data-[tui-sidebar-active=true]:bg-sidebar-accent data-[tui-sidebar-active=true]:text-sidebar-accent-foreground data-[tui-sidebar-active=true]:font-medium pe-10 rounded-lg",
-									Attributes: templ.Attributes{
-										"@click":                         "switchSession(session.id)",
-										"x-bind:data-tui-sidebar-active": "threadId === session.id",
-									},
-								}) {
-									<div class="flex items-center gap-2 w-full overflow-hidden">
-										<!-- Active Indicator Bar (LibreChat Style) -->
-										<div
-											class="absolute start-0 top-0 bottom-0 w-[2px] bg-foreground transition-all duration-200"
-											x-show="threadId === session.id"
-											x-transition:enter="transition ease-out duration-200"
-											x-transition:enter-start="opacity-0 scale-y-50"
-											x-transition:enter-end="opacity-100 scale-y-100"
-										></div>
-										<!-- Title -->
-										<span class="truncate text-sm flex-1 text-start" x-text="session.title" dir="auto"></span>
-									</div>
-								}
+								<div
+									class="group relative flex h-12 w-full items-center rounded-lg outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring md:h-9 transition-colors cursor-pointer"
+									:class="threadId === session.id ? 'bg-sidebar-accent before:absolute before:bottom-1 before:start-0 before:top-1 before:w-0.5 before:rounded-full before:bg-foreground' : 'hover:bg-sidebar-accent/50'"
+									@click="switchSession(session.id)"
+									role="button"
+									tabindex="0"
+									:aria-label="`Conversation: ${session.title || 'Untitled'}`"
+								>
+									@sidebar.MenuButton(sidebar.MenuButtonProps{
+										Class: "w-full justify-start h-full px-3 gap-3 text-sidebar-foreground pe-10",
+										Attributes: templ.Attributes{
+											"x-bind:data-tui-sidebar-active": "threadId === session.id",
+										},
+									}) {
+										<div class="flex items-center gap-2 w-full overflow-hidden">
+											<!-- Title -->
+											<span class="truncate text-sm flex-1 text-start" x-text="session.title" dir="auto"></span>
+										</div>
+									}
+								</div>
 								<!-- Context Menu (Trigger) -->
 								<div
-									class="absolute end-1 top-1.5 z-10"
+									class="absolute end-1 top-1/2 -translate-y-1/2 z-10"
 									:class="threadId === session.id ? 'opacity-100' : 'opacity-0 group-hover/item:opacity-100'"
 									@click.stop
 								>
