@@ -534,6 +534,15 @@ export function createUIMethods() {
             } else {
                 return window.i18n.t('Good night');
             }
+        },
+
+        /**
+         * Get current session title for mobile header
+         * @returns {string} Current session title or 'New Chat'
+         */
+        getCurrentSessionTitle() {
+            const currentThread = this.chatComponent.currentThread;
+            return currentThread ? currentThread.title : 'New Chat';
         }
     };
 }

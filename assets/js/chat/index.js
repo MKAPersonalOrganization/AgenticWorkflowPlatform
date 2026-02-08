@@ -27,7 +27,7 @@
 
 // Import all modules
 import { renderMarkdown } from './markdown-renderer.js';
-import { throttle, formatSessionTime, log, createErrorHandlers, isValidJSON, formatNumber } from './chat-utils.js';
+import { throttle, formatSessionTime, formatTime, log, createErrorHandlers, isValidJSON, formatNumber } from './chat-utils.js';
 import { createInitialState, createStateMethods, createEmptyThreadState } from './chat-state.js';
 import { createSessionMethods } from './chat-sessions.js';
 import { createMessagingMethods } from './chat-messaging.js';
@@ -156,6 +156,72 @@ document.addEventListener('alpine:init', () => {
 
             get currentThread() {
                 return this.sessions.find(s => s.id === this.__currentThreadId) || null;
+            },
+
+            getCurrentSessionTitle() {
+                const currentThread = this.currentThread;
+                return currentThread ? currentThread.title : 'New Chat';
+            },
+
+            getTimeBasedGreeting() {
+                const hour = new Date().getHours();
+                if (hour < 12) {
+                    return 'Good morning!';
+                } else if (hour < 18) {
+                    return 'Good afternoon!';
+                } else {
+                    return 'Good evening!';
+                }
+            },
+
+            /**
+             * Extract message date for grouping
+             * @param {Object} message - Message object
+             * @returns {string} Date string in YYYY-MM-DD format
+             */
+            getMessageDate(message) {
+                if (!message || !message.timestamp) return '';
+                return new Date(message.timestamp).toDateString();
+            },
+
+            /**
+             * Format relative date for message grouping
+             * @param {string} dateString - Date string
+             * @returns {string} Formatted relative date
+             */
+            formatRelativeDate(dateString) {
+                if (!dateString) return '';
+
+                const date = new Date(dateString);
+                const today = new Date();
+                const yesterday = new Date(today);
+                yesterday.setDate(yesterday.getDate() - 1);
+
+                const isToday = date.toDateString() === today.toDateString();
+                const isYesterday = date.toDateString() === yesterday.toDateString();
+
+                if (isToday) {
+                    return 'Today';
+                } else if (isYesterday) {
+                    return 'Yesterday';
+                } else {
+                    // For older dates, show the actual date
+                    return date.toLocaleDateString('en-US', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    });
+                }
+            },
+
+            /**
+             * Format time for display
+             * @param {string|number} timestamp - Timestamp to format
+             * @returns {string} Formatted time string
+             */
+            formatTime(timestamp) {
+                return formatTime(timestamp);
             },
 
             // ============================================
