@@ -523,3 +523,79 @@ func (h *TaskManagementHandler) GetMemory(w http.ResponseWriter, r *http.Request
 		h.log.Error(r.Context(), "failed to encode memory response", "error", err)
 	}
 }
+
+// AgentTool represents a tool available to an agent.
+type AgentTool struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Category    string `json:"category"`
+	Enabled     bool   `json:"enabled"`
+}
+
+// mockTools returns a hardcoded list of agent tools.
+func mockTools() []AgentTool {
+	return []AgentTool{
+		{ID: "calc-add", Name: "Add", Description: "Add two numbers together", Category: "Calculator", Enabled: true},
+		{ID: "calc-subtract", Name: "Subtract", Description: "Subtract one number from another", Category: "Calculator", Enabled: true},
+		{ID: "calc-multiply", Name: "Multiply", Description: "Multiply two numbers", Category: "Calculator", Enabled: true},
+		{ID: "calc-divide", Name: "Divide", Description: "Divide one number by another", Category: "Calculator", Enabled: true},
+		{ID: "calc-power", Name: "Power", Description: "Raise a number to a power", Category: "Calculator", Enabled: false},
+		{ID: "calc-sqrt", Name: "Square Root", Description: "Calculate the square root of a number", Category: "Calculator", Enabled: false},
+		{ID: "viz-plot", Name: "Plot", Description: "Generate a chart or plot from data", Category: "Visualization", Enabled: true},
+		{ID: "viz-animate", Name: "Animate", Description: "Create animated visualizations", Category: "Visualization", Enabled: false},
+		{ID: "doc-create", Name: "Create Document", Description: "Create a new markdown document", Category: "Documents", Enabled: true},
+		{ID: "doc-update", Name: "Update Document", Description: "Update an existing document", Category: "Documents", Enabled: true},
+		{ID: "doc-delete", Name: "Delete Document", Description: "Delete a document", Category: "Documents", Enabled: false},
+		{ID: "mem-remember", Name: "Remember", Description: "Store information in long-term memory", Category: "Memory", Enabled: true},
+		{ID: "mem-forget", Name: "Forget", Description: "Remove information from memory", Category: "Memory", Enabled: false},
+		{ID: "mem-list", Name: "List Memories", Description: "List all stored memories", Category: "Memory", Enabled: true},
+		{ID: "mem-clear", Name: "Clear Memory", Description: "Clear all stored memories", Category: "Memory", Enabled: false},
+	}
+}
+
+// ListAgentTools returns a list of tools available to an agent.
+// GET /v1/agents/{agentId}/tools
+func (h *TaskManagementHandler) ListAgentTools(w http.ResponseWriter, r *http.Request) {
+	agentID := r.PathValue("agentId")
+	if agentID == "" {
+		http.Error(w, "agentId is required", http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]any{"tools": mockTools()}); err != nil {
+		h.log.Error(r.Context(), "failed to encode tools list", "error", err)
+	}
+}
+
+// ToggleAgentToolRequest represents the request body for toggling a tool.
+type ToggleAgentToolRequest struct {
+	Enabled bool `json:"enabled"`
+}
+
+// ToggleAgentTool enables or disables a tool for an agent.
+// PUT /v1/agents/{agentId}/tools/{toolId}
+func (h *TaskManagementHandler) ToggleAgentTool(w http.ResponseWriter, r *http.Request) {
+	agentID := r.PathValue("agentId")
+	toolID := r.PathValue("toolId")
+	if agentID == "" || toolID == "" {
+		http.Error(w, "agentId and toolId are required", http.StatusBadRequest)
+		return
+	}
+
+	var req ToggleAgentToolRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]any{
+		"status":  "success",
+		"toolId":  toolID,
+		"enabled": req.Enabled,
+	}); err != nil {
+		h.log.Error(r.Context(), "failed to encode toggle tool response", "error", err)
+	}
+}

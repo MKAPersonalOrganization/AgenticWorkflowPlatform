@@ -1,0 +1,202 @@
+package tools
+
+import (
+	"school-with-ai/components/button"
+	"school-with-ai/components/dialog"
+	"school-with-ai/components/i18n"
+	"school-with-ai/components/icon"
+)
+
+templ ToolsDialog() {
+	<script>
+		document.addEventListener('alpine:init', () => {
+			Alpine.data('toolsDialog', () => ({
+				tools: [],
+				loading: false,
+				search: '',
+				selectedAgent: '',
+				async init() {
+					const chatEl = document.querySelector('[x-data="chat"]');
+					if (chatEl) {
+						try {
+							const chatData = Alpine.$data(chatEl);
+							if (chatData) {
+								this.selectedAgent = chatData.selectedAgent || '';
+							}
+						} catch (e) { /* ignore */ }
+					}
+					await this.fetchTools();
+				},
+				async fetchTools() {
+					if (!this.selectedAgent) return;
+					this.loading = true;
+					try {
+						const response = await fetch(`/v1/agents/${this.selectedAgent}/tools`);
+						if (response.ok) {
+							const data = await response.json();
+							if (data.tools && Array.isArray(data.tools)) {
+								this.tools = data.tools;
+							}
+						}
+					} catch (err) {
+						console.error('Failed to fetch tools:', err);
+					} finally {
+						this.loading = false;
+					}
+				},
+				get filteredTools() {
+					if (!this.search) return this.tools;
+					const q = this.search.toLowerCase();
+					return this.tools.filter(t =>
+						t.name.toLowerCase().includes(q) ||
+						t.description.toLowerCase().includes(q) ||
+						t.category.toLowerCase().includes(q)
+					);
+				},
+				get categories() {
+					const cats = [...new Set(this.filteredTools.map(t => t.category))];
+					cats.sort();
+					return cats;
+				},
+				toolsByCategory(category) {
+					return this.filteredTools.filter(t => t.category === category);
+				},
+				async toggleTool(tool) {
+					const newState = !tool.enabled;
+					try {
+						const response = await fetch(`/v1/agents/${this.selectedAgent}/tools/${tool.id}`, {
+							method: 'PUT',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({ enabled: newState })
+						});
+						if (response.ok) {
+							tool.enabled = newState;
+						}
+					} catch (err) {
+						console.error('Failed to toggle tool:', err);
+					}
+				},
+				categoryColor(category) {
+					const colors = {
+						'Calculator': 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+						'Visualization': 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+						'Documents': 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+						'Memory': 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+					};
+					return colors[category] || 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400';
+				}
+			}));
+		});
+	</script>
+	<div
+		x-data="toolsDialog"
+		@open-tools-dialog.window="init()"
+	>
+		@dialog.Dialog(dialog.Props{
+			ID: "tools-manager-dialog",
+		}) {
+			@dialog.Content(dialog.ContentProps{
+				Class: "sm:max-w-lg max-h-[90vh] flex flex-col p-0 overflow-hidden",
+			}) {
+				@dialog.Header(dialog.HeaderProps{Class: "p-6 pb-2"}) {
+					@dialog.Title() {
+						{ i18n.T(ctx, "Tools") }
+					}
+					@dialog.Description() {
+						{ i18n.T(ctx, "Manage tools available for this agent.") }
+					}
+				}
+				<!-- Search -->
+				<div class="px-6 pb-2">
+					<input
+						type="text"
+						x-model="search"
+						placeholder={ i18n.T(ctx, "Search tools...") }
+						class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+					/>
+				</div>
+				<!-- Tools List -->
+				<div class="flex-1 overflow-auto px-6 pb-2">
+					<template x-if="loading && tools.length === 0">
+						<div class="flex justify-center p-8">
+							<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+						</div>
+					</template>
+					<template x-if="!loading && tools.length === 0">
+						<div class="text-center p-8 text-muted-foreground italic">
+							{ i18n.T(ctx, "No tools available.") }
+						</div>
+					</template>
+					<template x-if="!loading && filteredTools.length === 0 && tools.length > 0">
+						<div class="text-center p-8 text-muted-foreground italic">
+							{ i18n.T(ctx, "No tools match your search.") }
+						</div>
+					</template>
+					<template x-if="filteredTools.length > 0">
+						<div class="flex flex-col gap-4">
+							<template x-for="category in categories" :key="category">
+								<div>
+									<div class="flex items-center gap-2 mb-2">
+										<span
+											class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+											:class="categoryColor(category)"
+											x-text="category"
+										></span>
+									</div>
+									<div class="flex flex-col gap-1">
+										<template x-for="tool in toolsByCategory(category)" :key="tool.id">
+											<div class="flex items-center justify-between gap-3 rounded-lg py-2.5 px-3 hover:bg-accent/50 transition-colors">
+												<div class="flex flex-col gap-0.5 flex-1 min-w-0">
+													<span x-text="tool.name" class="text-sm font-medium text-foreground"></span>
+													<span x-text="tool.description" class="text-xs text-muted-foreground truncate"></span>
+												</div>
+												<button
+													@click="toggleTool(tool)"
+													class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+													:class="tool.enabled ? 'bg-primary' : 'bg-input'"
+													role="switch"
+													:aria-checked="tool.enabled"
+												>
+													<span
+														class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200 ease-in-out"
+														:class="tool.enabled ? 'translate-x-4' : 'translate-x-0'"
+													></span>
+												</button>
+											</div>
+										</template>
+									</div>
+								</div>
+							</template>
+						</div>
+					</template>
+				</div>
+				@dialog.Footer(dialog.FooterProps{Class: "p-6 pt-2 border-t mt-auto"}) {
+					@dialog.Close() {
+						@button.Button(button.Props{Variant: button.VariantGhost}) {
+							{ i18n.T(ctx, "Close") }
+						}
+					}
+				}
+			}
+		}
+	</div>
+}
+
+templ ToolsButtonTrigger() {
+	@dialog.Trigger(dialog.TriggerProps{
+		For: "tools-manager-dialog",
+	}) {
+		@button.Button(button.Props{
+			Size:    button.SizeIcon,
+			Variant: button.VariantGhost,
+			Class:   "size-9",
+			Attributes: templ.Attributes{
+				"@click": "$dispatch('open-tools-dialog')",
+				"title":  i18n.T(ctx, "Tools"),
+			},
+		}) {
+			@icon.Wrench(icon.Props{Class: "size-5"})
+			<span class="sr-only">{ i18n.T(ctx, "Tools") }</span>
+		}
+	}
+}
