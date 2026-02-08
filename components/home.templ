@@ -100,7 +100,7 @@ templ ChatInputScreen(user *domain.User) {
 					@sidebar.Sidebar(sidebar.Props{
 						ID: "thread-history-sidebar",
 					}) {
-						@threadhistory.ThreadHistory(threadhistory.Props{User: user})
+						@threadhistory.ThreadHistory()
 					}
 					<!-- Main Content Area -->
 					<div class="flex-1 flex h-full overflow-hidden relative">

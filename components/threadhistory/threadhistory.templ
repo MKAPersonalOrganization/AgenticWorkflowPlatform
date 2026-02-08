@@ -1,26 +1,14 @@
 package threadhistory
 
 import (
-	"strings"
-
 	"school-with-ai/components/button"
 	"school-with-ai/components/i18n"
 	"school-with-ai/components/icon"
-	"school-with-ai/components/popover"
 	"school-with-ai/components/searchbar"
 	"school-with-ai/components/sidebar"
-	"school-with-ai/domain"
 )
 
-type Props struct {
-	User *domain.User
-}
-
-templ ThreadHistory(props ...Props) {
-	{{ var p Props }}
-	if len(props) > 0 {
-		{{ p = props[0] }}
-	}
+templ ThreadHistory() {
 	@sidebar.Sidebar(sidebar.Props{
 		ID:          "thread-history-sidebar",
 		Side:        sidebar.SideLeft,
@@ -108,73 +96,6 @@ templ ThreadHistory(props ...Props) {
 			<div x-show="sessionsHasMore" x-intersect.margin.200px="__loadMoreSessions()" class="flex justify-center py-4 h-12 w-full">
 				<span x-show="sessionsLoading" class="animate-spin size-4 border-2 border-primary border-t-transparent rounded-full"></span>
 			</div>
-		}
-		@sidebar.Footer() {
-			@sidebar.Menu() {
-				@sidebar.MenuItem() {
-					@popover.Trigger(popover.TriggerProps{
-						For: "sidebar-profile-popover",
-					}) {
-						@sidebar.MenuButton(sidebar.MenuButtonProps{
-							Size:  "lg",
-							Class: "hover:bg-sidebar-accent/50 transition-colors py-2 px-2 rounded-xl",
-						}) {
-							if p.User != nil {
-								<div class="flex items-center gap-2 w-full">
-									<div class="size-8 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden shrink-0 border border-border/50">
-										<span class="text-xs font-bold text-primary">{ strings.ToUpper(p.User.Email[:1]) }</span>
-									</div>
-									<div class="grid flex-1 text-start text-sm leading-tight">
-										<span class="truncate font-medium text-sidebar-foreground">{ p.User.GetDisplayName() }</span>
-									</div>
-									@icon.ChevronsUpDown(icon.Props{Class: "size-4 text-muted-foreground/70"})
-								</div>
-							} else {
-								<div class="flex items-center gap-2 w-full">
-									<div class="size-8 rounded-full bg-muted flex items-center justify-center overflow-hidden shrink-0 border border-border/50">
-										@icon.User(icon.Props{Class: "size-4 text-muted-foreground"})
-									</div>
-									<div class="grid flex-1 text-start text-sm leading-tight">
-										<span class="truncate font-medium text-sidebar-foreground">{ i18n.T(ctx, "Guest") }</span>
-									</div>
-									@icon.ChevronsUpDown(icon.Props{Class: "size-4 text-muted-foreground/70"})
-								</div>
-							}
-						}
-					}
-					@popover.Content(popover.ContentProps{
-						ID:        "sidebar-profile-popover",
-						Placement: popover.PlacementTopStart,
-						Class:     "w-64 overflow-hidden p-1 border border-border bg-popover text-popover-foreground shadow-lg rounded-xl mb-2",
-					}) {
-						<div class="flex flex-col">
-							@sidebar.Menu() {
-								@sidebar.MenuItem() {
-									@sidebar.MenuButton(sidebar.MenuButtonProps{
-										Class: "hover:bg-sidebar-accent/50 transition-colors py-2 px-3 rounded-lg flex items-center gap-3 w-full text-start",
-										Attributes: templ.Attributes{
-											"@click": "showSettings = true",
-										},
-									}) {
-										@icon.Settings(icon.Props{Class: "size-4 text-muted-foreground"})
-										<span class="text-sm font-medium">{ i18n.T(ctx, "Settings") }</span>
-									}
-								}
-								<div class="my-1 h-px bg-border/50"></div>
-								@sidebar.MenuItem() {
-									@sidebar.MenuButton(sidebar.MenuButtonProps{
-										Href:  "/logout",
-										Class: "hover:bg-sidebar-accent/50 transition-colors py-2 px-3 rounded-lg flex items-center gap-3 w-full text-start text-destructive hover:text-destructive",
-									}) {
-										@icon.LogOut(icon.Props{Class: "size-4"})
-										<span class="text-sm font-medium">{ i18n.T(ctx, "Log out") }</span>
-									}
-								}
-							}
-						</div>
-					}
-				}
-			}
 		}
 	}
 }
