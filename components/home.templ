@@ -11,7 +11,6 @@ import (
 	"school-with-ai/components/dropdown"
 	"school-with-ai/components/eventlog"
 	"school-with-ai/components/footer"
-	"school-with-ai/components/i18n"
 	"school-with-ai/components/icon"
 	"school-with-ai/components/input"
 	"school-with-ai/components/keyboardshortcuts"
@@ -127,10 +126,10 @@ templ ChatInputScreen(user *domain.User) {
 								>
 									<div class="flex flex-col items-center gap-3 p-2">
 										<!-- LibreChat-style Time-based Greeting -->
-										<div class="mb-2 flex flex-col items-center gap-0">
-											<h1 class="text-3xl font-medium text-foreground/90" x-text="getTimeBasedGreeting()"></h1>
-											<h2 class="text-xl text-muted-foreground">{ i18n.T(ctx, "How can I help you today?") }</h2>
-										</div>
+										// <div class="mb-2 flex flex-col items-center gap-0">
+										// 	<h1 class="text-3xl font-medium text-foreground/90" x-text="getTimeBasedGreeting()"></h1>
+										// 	<h2 class="text-xl text-muted-foreground">{ i18n.T(ctx, "How can I help you today?") }</h2>
+										// </div>
 										@sampleprompts.SamplePrompts()
 									</div>
 								</div>
@@ -180,10 +179,7 @@ templ ChatInputScreen(user *domain.User) {
 									>
 										@chatinput.ChatInput()
 									</div>
-									<!-- Conversation Starters (Landing) / Footer (Conversation) -->
-									<div x-show="!hasMessages && !isStreaming">
-										@sampleprompts.ConversationStarters()
-									</div>
+						
 									<div x-show="hasMessages || isStreaming">
 										@footer.CompactFooter()
 									</div>

@@ -8,14 +8,6 @@ import (
 )
 
 // ConversationStarters - LibreChat style quick prompt cards
-templ ConversationStarters() {
-	<div class="mt-8 flex flex-wrap justify-center gap-3 px-4">
-		@StarterCard(i18n.T(ctx, "Help me solve a math problem step by step"))
-		@StarterCard(i18n.T(ctx, "Explain a concept in simple terms"))
-		@StarterCard(i18n.T(ctx, "Quiz me on a topic I'm studying"))
-		@StarterCard(i18n.T(ctx, "Help me understand this homework"))
-	</div>
-}
 
 templ StarterCard(text string) {
 	<button
