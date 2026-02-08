@@ -5,23 +5,15 @@ import (
 
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/i18n"
-	"school-with-ai/services/agentorchestrator/agents/diagramming/tools"
 	"school-with-ai/services/agentorchestrator/prompts"
 )
 
-// domainTools returns the domain-specific tools for the diagramming instructor.
-func domainTools() []agent.Tool {
-	return []agent.Tool{
-		tools.NewMermaidDiagramTool(),
-	}
-}
+// NOTE: Tools are now managed via permissions service instead of hardcoded domain tools
+// The permissions service will determine which tools this agent can access
 
 // NewDiagrammingInstructorConfig creates the diagramming specialist agent.
 func NewDiagrammingInstructorConfig(ctx context.Context) (agent.Config, error) {
-	registry := agent.NewToolSet()
-
-	// Domain-specific tools
-	registry.AddAll(domainTools())
+	// NOTE: Tools are now managed via permissions service - no hardcoded tool registration
 
 	prompt, err := prompts.GenerateTeacherSystemPrompt(prompts.TeacherPromptConfig{
 		Role:        i18n.T(ctx, "diagramming.role"),
@@ -38,7 +30,7 @@ func NewDiagrammingInstructorConfig(ctx context.Context) (agent.Config, error) {
 		Name:          "diagramming-instructor",
 		MaxIterations: 20,
 		SystemPrompt:  prompt,
-		Tools:         registry.All(),
+		Tools:         []agent.Tool{}, // Tools managed via permissions service
 		Capabilities: agent.Capabilities{
 			InputElicitation: true,
 		},

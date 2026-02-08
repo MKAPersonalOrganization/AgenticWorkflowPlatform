@@ -15,8 +15,10 @@ import (
 	"school-with-ai/services"
 	"school-with-ai/services/artifact"
 	"school-with-ai/services/memory"
+	"school-with-ai/services/permissions"
 	"school-with-ai/services/taskmanagement"
 	"school-with-ai/services/threadmgmt"
+	"school-with-ai/services/toolregistry"
 
 	"github.com/hibiken/asynq"
 )
@@ -33,6 +35,8 @@ type TaskManagementHandler struct {
 	threadMgmt         *threadmgmt.Manager
 	artifactStore      artifact.Service
 	memoryStore        memory.Service
+	toolRegistry       *toolregistry.Registry
+	permissionsService *permissions.Service
 }
 
 // NewTaskManagementHandler creates a new HTTP handler for task management.
@@ -47,6 +51,8 @@ func NewTaskManagementHandler(
 	threadMgmt *threadmgmt.Manager,
 	artifactStore artifact.Service,
 	memoryStore memory.Service,
+	toolRegistry *toolregistry.Registry,
+	permissionsService *permissions.Service,
 ) *TaskManagementHandler {
 	return &TaskManagementHandler{
 		log:                log,
@@ -59,6 +65,8 @@ func NewTaskManagementHandler(
 		threadMgmt:         threadMgmt,
 		artifactStore:      artifactStore,
 		memoryStore:        memoryStore,
+		toolRegistry:       toolRegistry,
+		permissionsService: permissionsService,
 	}
 }
 
@@ -524,34 +532,13 @@ func (h *TaskManagementHandler) GetMemory(w http.ResponseWriter, r *http.Request
 	}
 }
 
-// AgentTool represents a tool available to an agent.
-type AgentTool struct {
+// AgentToolResponse represents the API response format for agent tools.
+type AgentToolResponse struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Category    string `json:"category"`
 	Enabled     bool   `json:"enabled"`
-}
-
-// mockTools returns a hardcoded list of agent tools.
-func mockTools() []AgentTool {
-	return []AgentTool{
-		{ID: "calc-add", Name: "Add", Description: "Add two numbers together", Category: "Calculator", Enabled: true},
-		{ID: "calc-subtract", Name: "Subtract", Description: "Subtract one number from another", Category: "Calculator", Enabled: true},
-		{ID: "calc-multiply", Name: "Multiply", Description: "Multiply two numbers", Category: "Calculator", Enabled: true},
-		{ID: "calc-divide", Name: "Divide", Description: "Divide one number by another", Category: "Calculator", Enabled: true},
-		{ID: "calc-power", Name: "Power", Description: "Raise a number to a power", Category: "Calculator", Enabled: false},
-		{ID: "calc-sqrt", Name: "Square Root", Description: "Calculate the square root of a number", Category: "Calculator", Enabled: false},
-		{ID: "viz-plot", Name: "Plot", Description: "Generate a chart or plot from data", Category: "Visualization", Enabled: true},
-		{ID: "viz-animate", Name: "Animate", Description: "Create animated visualizations", Category: "Visualization", Enabled: false},
-		{ID: "doc-create", Name: "Create Document", Description: "Create a new markdown document", Category: "Documents", Enabled: true},
-		{ID: "doc-update", Name: "Update Document", Description: "Update an existing document", Category: "Documents", Enabled: true},
-		{ID: "doc-delete", Name: "Delete Document", Description: "Delete a document", Category: "Documents", Enabled: false},
-		{ID: "mem-remember", Name: "Remember", Description: "Store information in long-term memory", Category: "Memory", Enabled: true},
-		{ID: "mem-forget", Name: "Forget", Description: "Remove information from memory", Category: "Memory", Enabled: false},
-		{ID: "mem-list", Name: "List Memories", Description: "List all stored memories", Category: "Memory", Enabled: true},
-		{ID: "mem-clear", Name: "Clear Memory", Description: "Clear all stored memories", Category: "Memory", Enabled: false},
-	}
 }
 
 // ListAgentTools returns a list of tools available to an agent.
@@ -563,8 +550,47 @@ func (h *TaskManagementHandler) ListAgentTools(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// Get all tools from registry
+	allTools, err := h.toolRegistry.ListTools(r.Context())
+	if err != nil {
+		h.log.Error(r.Context(), "Failed to list tools", "error", err)
+		http.Error(w, "Failed to retrieve tools", http.StatusInternalServerError)
+		return
+	}
+
+	// Initialize default permissions for agent if none exist
+	if err := h.permissionsService.InitializeDefaultPermissions(r.Context(), agentID); err != nil {
+		h.log.Error(r.Context(), "Failed to initialize default permissions", "agent_id", agentID, "error", err)
+	}
+
+	// Get enabled tool IDs for the agent
+	enabledToolIDs, err := h.permissionsService.GetEnabledTools(r.Context(), agentID)
+	if err != nil {
+		h.log.Error(r.Context(), "Failed to get enabled tools", "agent_id", agentID, "error", err)
+		http.Error(w, "Failed to retrieve agent permissions", http.StatusInternalServerError)
+		return
+	}
+
+	// Create a map of enabled tools for quick lookup
+	enabledTools := make(map[string]bool)
+	for _, toolID := range enabledToolIDs {
+		enabledTools[toolID] = true
+	}
+
+	// Convert to response format
+	responseTools := make([]AgentToolResponse, 0, len(allTools))
+	for _, tool := range allTools {
+		responseTools = append(responseTools, AgentToolResponse{
+			ID:          tool.ID,
+			Name:        tool.Name,
+			Description: tool.Description,
+			Category:    tool.Category,
+			Enabled:     enabledTools[tool.ID],
+		})
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]any{"tools": mockTools()}); err != nil {
+	if err := json.NewEncoder(w).Encode(map[string]any{"tools": responseTools}); err != nil {
 		h.log.Error(r.Context(), "failed to encode tools list", "error", err)
 	}
 }
@@ -587,6 +613,22 @@ func (h *TaskManagementHandler) ToggleAgentTool(w http.ResponseWriter, r *http.R
 	var req ToggleAgentToolRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Verify tool exists in registry
+	if _, err := h.toolRegistry.GetTool(r.Context(), toolID); err != nil {
+		h.log.Error(r.Context(), "Tool not found in registry",
+			"tool_id", toolID, "error", err)
+		http.Error(w, "Tool not found", http.StatusNotFound)
+		return
+	}
+
+	// Update permission in permissions service
+	if err := h.permissionsService.SetPermission(r.Context(), agentID, toolID, req.Enabled); err != nil {
+		h.log.Error(r.Context(), "Failed to update agent tool permission",
+			"agent_id", agentID, "tool_id", toolID, "enabled", req.Enabled, "error", err)
+		http.Error(w, "Failed to update tool permission", http.StatusInternalServerError)
 		return
 	}
 

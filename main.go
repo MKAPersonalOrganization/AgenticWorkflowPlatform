@@ -41,9 +41,11 @@ import (
 	"school-with-ai/services/agentorchestrator"
 	"school-with-ai/services/artifact"
 	"school-with-ai/services/memory"
+	"school-with-ai/services/permissions"
 	"school-with-ai/services/resources"
 	"school-with-ai/services/taskmanagement"
 	"school-with-ai/services/threadmgmt"
+	"school-with-ai/services/toolregistry"
 
 	"school-with-ai/services/agentorchestrator/agents/chemistry"
 	"school-with-ai/services/agentorchestrator/agents/diagramming"
@@ -378,6 +380,17 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Initialize resources service
 	resourcesService := resources.NewService(resourcesRepo, artifactService)
 
+	// Create and initialize tool registry
+	toolRegistry := toolregistry.NewRegistry(log, toolregistry.NewInMemoryRepository())
+	if err := toolRegistry.Initialize(ctx); err != nil {
+		return fmt.Errorf("failed to initialize tool registry: %w", err)
+	}
+	log.Info(ctx, "startup", "status", "tool registry initialized")
+
+	// Create and initialize permissions service
+	permissionsService := permissions.NewService(log, permissions.NewInMemoryRepository())
+	log.Info(ctx, "startup", "status", "permissions service initialized")
+
 	// Initialize Agents directly (Step 2 of Registry Removal)
 	// Initialize Agents directly (Step 2 of Registry Removal) - Updated for Service Decoupling
 	slogLogger := slog.New(log)
@@ -476,6 +489,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 			artifactService,
 			studentProfileRepo,
 			cfg.AgentCapabilities.LongTermMemory,
+			toolRegistry,       // Tool registry service
+			permissionsService, // Permissions service
 		)
 		if err != nil {
 			return fmt.Errorf("creating custom runner: %w", err)
@@ -559,7 +574,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		"healthCheckInterval", cfg.Orchestration.HealthCheckInterval)
 
 	// Create HTTP handler
-	handler := taskmgmthandlers.NewTaskManagementHandler(log, taskManager, agentProvider, authSvc, threadQueryService, aguiProjection, redisBroadcaster, threadMgmt, artifactService, memoryService)
+	handler := taskmgmthandlers.NewTaskManagementHandler(log, taskManager, agentProvider, authSvc, threadQueryService, aguiProjection, redisBroadcaster, threadMgmt, artifactService, memoryService, toolRegistry, permissionsService)
 
 	// Create health handler
 	healthHandler := healthhandlers.NewHealthHandler(log)
