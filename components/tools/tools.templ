@@ -18,7 +18,7 @@ templ ToolsDialog() {
 				search: '',
 				selectedAgent: '',
 				selectedCategory: 'all',
-				viewMode: 'grid', // 'grid' or 'list'
+				viewMode: 'grid',
 				async init() {
 					const chatEl = document.querySelector('[x-data="chat"]');
 					if (chatEl) {
@@ -40,7 +40,6 @@ templ ToolsDialog() {
 							const data = await response.json();
 							if (data.agents && Array.isArray(data.agents)) {
 								this.agents = data.agents;
-								// Set first agent as default if no agent is selected
 								if (!this.selectedAgent && this.agents.length > 0) {
 									this.selectedAgent = this.agents[0].id;
 								}
@@ -66,7 +65,6 @@ templ ToolsDialog() {
 								this.tools = data.toolsets;
 							}
 						} else {
-							// Handle case where agent doesn't exist or has no tools
 							this.tools = [];
 						}
 					} catch (err) {
@@ -77,48 +75,42 @@ templ ToolsDialog() {
 					}
 				},
 				async onAgentChange() {
-					// Clear current tools and fetch new ones
 					this.tools = [];
 					await this.fetchTools();
 				},
 				get filteredTools() {
 					let filtered = this.tools;
-					
-					// Apply category filter
 					if (this.selectedCategory !== 'all') {
 						filtered = filtered.filter(toolSet => toolSet.category === this.selectedCategory);
 					}
-					
-					// Apply search filter
 					if (this.search) {
 						const q = this.search.toLowerCase();
 						filtered = filtered.filter(toolSet =>
 							toolSet.name.toLowerCase().includes(q) ||
 							toolSet.description.toLowerCase().includes(q) ||
 							toolSet.category.toLowerCase().includes(q) ||
-							toolSet.tools.some(tool => 
+							toolSet.tools.some(tool =>
 								tool.name.toLowerCase().includes(q) ||
 								tool.description.toLowerCase().includes(q)
 							)
 						);
 					}
-					
 					return filtered;
-				},
-				get categories() {
-					const cats = [...new Set(this.tools.map(t => t.category))];
-					cats.sort();
-					return cats;
 				},
 				get categoriesWithCounts() {
 					const counts = {};
 					this.tools.forEach(toolSet => {
 						counts[toolSet.category] = (counts[toolSet.category] || 0) + 1;
 					});
-					return Object.entries(counts).map(([category, count]) => ({ category, count }));
+					return Object.entries(counts).map(([category, count]) => ({ category, count })).sort((a, b) => a.category.localeCompare(b.category));
 				},
-				toolSetsByCategory(category) {
-					return this.filteredTools.filter(t => t.category === category);
+				get enabledSummary() {
+					const enabledSets = this.tools.filter(ts => ts.enabled).length;
+					let enabledTools = 0;
+					this.tools.forEach(ts => {
+						if (ts.enabled) enabledTools += (ts.tools || []).filter(t => t.enabled).length;
+					});
+					return { sets: enabledSets, tools: enabledTools, total: this.tools.length };
 				},
 				async toggleToolSet(toolSet) {
 					const newState = !toolSet.enabled;
@@ -130,11 +122,9 @@ templ ToolsDialog() {
 						});
 						if (response.ok) {
 							toolSet.enabled = newState;
-							// If disabling the tool set, disable all individual tools
 							if (!newState) {
 								toolSet.tools.forEach(tool => tool.enabled = false);
 							} else {
-								// If enabling the tool set, enable all individual tools (default behavior)
 								toolSet.tools.forEach(tool => tool.enabled = true);
 							}
 						}
@@ -152,11 +142,7 @@ templ ToolsDialog() {
 						});
 						if (response.ok) {
 							tool.enabled = newState;
-							// Update tool set status based on individual tool states
-							const enabledTools = toolSet.tools.filter(t => t.enabled).length;
-							const totalTools = toolSet.tools.length;
-							// Tool set is considered enabled if at least one tool is enabled
-							toolSet.enabled = enabledTools > 0;
+							toolSet.enabled = toolSet.tools.some(t => t.enabled);
 						}
 					} catch (err) {
 						console.error('Failed to toggle individual tool:', err);
@@ -170,6 +156,15 @@ templ ToolsDialog() {
 						'Memory': 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
 					};
 					return colors[category] || 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400';
+				},
+				categoryBorderColor(category) {
+					const colors = {
+						'Calculator': 'border-l-blue-400 dark:border-l-blue-500',
+						'Visualization': 'border-l-purple-400 dark:border-l-purple-500',
+						'Documents': 'border-l-green-400 dark:border-l-green-500',
+						'Memory': 'border-l-amber-400 dark:border-l-amber-500',
+					};
+					return colors[category] || 'border-l-gray-400 dark:border-l-gray-500';
 				}
 			}));
 		});
@@ -194,96 +189,104 @@ templ ToolsDialog() {
 								{ i18n.T(ctx, "Select an agent and manage its available tools.") }
 							}
 						</div>
-						<div class="flex items-center gap-3">
-							<!-- View Mode Toggle -->
-							<div class="flex items-center border border-border rounded-md">
-								<button
-									@click="viewMode = 'grid'"
-									class="px-3 py-1.5 text-xs font-medium rounded-l-md transition-colors"
-									:class="viewMode === 'grid' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'"
-								>
-									Grid
-								</button>
-								<button
-									@click="viewMode = 'list'"
-									class="px-3 py-1.5 text-xs font-medium rounded-r-md transition-colors"
-									:class="viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'"
-								>
-									List
-								</button>
-							</div>
+						<div class="flex items-center gap-1 bg-muted rounded-lg p-1">
+							<button
+								@click="viewMode = 'grid'"
+								class="p-1.5 rounded-md transition-all duration-200"
+								:class="viewMode === 'grid' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+								:aria-label="'Grid view'"
+							>
+								@icon.LayoutGrid(icon.Props{Class: "size-4"})
+							</button>
+							<button
+								@click="viewMode = 'list'"
+								class="p-1.5 rounded-md transition-all duration-200"
+								:class="viewMode === 'list' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+								:aria-label="'List view'"
+							>
+								@icon.List(icon.Props{Class: "size-4"})
+							</button>
 						</div>
 					</div>
 				}
 				<!-- Top Controls -->
-				<div class="p-4 border-b border-border bg-muted/30">
+				<div class="p-4 border-b border-border bg-muted/50">
 					<div class="flex gap-4">
-						<!-- Agent Selection -->
 						<div class="flex-1">
-							<label class="block text-sm font-medium text-foreground mb-2">{ i18n.T(ctx, "Select Agent") }</label>
+							<label class="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wide">{ i18n.T(ctx, "Agent") }</label>
 							<div class="relative">
 								<select
 									x-model="selectedAgent"
 									@change="onAgentChange()"
-									class="w-full rounded-md border border-input bg-background px-3 py-2 pr-8 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring appearance-none"
+									class="w-full rounded-lg border border-input bg-background px-3 py-2 pr-8 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring appearance-none transition-colors"
 									:disabled="loadingAgents"
 								>
 									<template x-for="agent in agents" :key="agent.id">
 										<option :value="agent.id" x-text="agent.name"></option>
 									</template>
 								</select>
-								<div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+								<div class="absolute inset-y-0 right-0 flex items-center pr-2.5 pointer-events-none">
 									<template x-if="loadingAgents">
-										<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+										<div class="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent"></div>
 									</template>
 									<template x-if="!loadingAgents">
-										<svg class="h-4 w-4 text-muted-foreground" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-											<path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path>
-										</svg>
+										@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
 									</template>
 								</div>
 							</div>
 						</div>
-						<!-- Search -->
 						<div class="flex-1">
-							<label class="block text-sm font-medium text-foreground mb-2">{ i18n.T(ctx, "Search Tools") }</label>
-							<input
-								type="text"
-								x-model="search"
-								placeholder={ i18n.T(ctx, "Search tools and tool sets...") }
-								class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
+							<label class="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wide">{ i18n.T(ctx, "Search") }</label>
+							<div class="relative">
+								<div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+									@icon.Search(icon.Props{Class: "size-4 text-muted-foreground"})
+								</div>
+								<input
+									type="text"
+									x-model="search"
+									placeholder={ i18n.T(ctx, "Search tools and tool sets...") }
+									class="w-full rounded-lg border border-input bg-background pl-9 pr-9 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
+								/>
+								<button
+									x-show="search.length > 0"
+									x-transition:enter="transition-opacity duration-100"
+									x-transition:enter-start="opacity-0"
+									x-transition:enter-end="opacity-100"
+									@click="search = ''"
+									class="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground transition-colors"
+								>
+									@icon.X(icon.Props{Class: "size-3.5"})
+								</button>
+							</div>
 						</div>
 					</div>
 				</div>
 				<!-- Main Content with Sidebar -->
 				<div class="flex-1 flex overflow-hidden">
 					<!-- Category Sidebar -->
-					<div class="w-64 border-r border-border bg-muted/20 overflow-y-auto">
-						<div class="p-4">
-							<h3 class="text-sm font-semibold text-foreground mb-3">Categories</h3>
-							<div class="space-y-1">
-								<!-- All Tools Option -->
+					<div class="w-52 border-r border-border bg-muted/50 overflow-y-auto shrink-0 scrollbar-thin">
+						<div class="p-3">
+							<h3 class="text-[11px] font-semibold text-muted-foreground mb-2 uppercase tracking-wider px-2">{ i18n.T(ctx, "Categories") }</h3>
+							<div class="space-y-0.5">
 								<button
 									@click="selectedCategory = 'all'"
-									class="w-full text-left px-3 py-2 text-sm rounded-md transition-colors"
-									:class="selectedCategory === 'all' ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-accent'"
+									class="w-full text-left px-3 py-2 text-sm rounded-lg transition-all duration-150"
+									:class="selectedCategory === 'all' ? 'bg-accent text-accent-foreground font-medium border-l-2 border-primary pl-2.5' : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'"
 								>
 									<div class="flex items-center justify-between">
-										<span>All Tools</span>
-										<span class="text-xs" x-text="tools.length"></span>
+										<span>{ i18n.T(ctx, "All Tools") }</span>
+										<span class="text-xs tabular-nums opacity-60" x-text="tools.length"></span>
 									</div>
 								</button>
-								<!-- Category List -->
 								<template x-for="{ category, count } in categoriesWithCounts" :key="category">
 									<button
 										@click="selectedCategory = category"
-										class="w-full text-left px-3 py-2 text-sm rounded-md transition-colors"
-										:class="selectedCategory === category ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-accent'"
+										class="w-full text-left px-3 py-2 text-sm rounded-lg transition-all duration-150"
+										:class="selectedCategory === category ? 'bg-accent text-accent-foreground font-medium border-l-2 border-primary pl-2.5' : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'"
 									>
 										<div class="flex items-center justify-between">
 											<span x-text="category"></span>
-											<span class="text-xs" x-text="count"></span>
+											<span class="text-xs tabular-nums opacity-60" x-text="count"></span>
 										</div>
 									</button>
 								</template>
@@ -291,85 +294,115 @@ templ ToolsDialog() {
 						</div>
 					</div>
 					<!-- Tools Content -->
-					<div class="flex-1 overflow-auto">
+					<div class="flex-1 overflow-auto scrollbar-thin">
 						<div class="p-4">
-							<!-- Loading States -->
+							<!-- Skeleton Loading -->
 							<template x-if="loading && tools.length === 0">
-								<div class="flex justify-center p-8">
-									<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+								<div>
+									<div class="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+										<template x-for="i in 6" :key="i">
+											<div class="border border-border rounded-lg overflow-hidden animate-pulse">
+												<div class="p-4 bg-accent/20">
+													<div class="flex items-center justify-between">
+														<div class="space-y-2 flex-1">
+															<div class="h-4 bg-muted rounded-md w-2/3"></div>
+															<div class="h-3 bg-muted rounded-md w-full"></div>
+														</div>
+														<div class="h-5 w-9 bg-muted rounded-full"></div>
+													</div>
+												</div>
+												<div class="p-4 space-y-3">
+													<div class="h-3 bg-muted rounded-md w-3/4"></div>
+													<div class="h-3 bg-muted rounded-md w-1/2"></div>
+												</div>
+											</div>
+										</template>
+									</div>
 								</div>
 							</template>
 							<template x-if="!loading && !selectedAgent">
-								<div class="text-center p-8 text-muted-foreground italic">
-									{ i18n.T(ctx, "Please select an agent to view its tools.") }
+								<div class="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">
+									@icon.Wrench(icon.Props{Class: "size-12 opacity-20"})
+									<span class="text-sm font-medium">{ i18n.T(ctx, "Select an agent to manage tools") }</span>
+									<span class="text-xs">{ i18n.T(ctx, "Choose an agent from the dropdown above to get started.") }</span>
 								</div>
 							</template>
 							<template x-if="!loading && selectedAgent && tools.length === 0">
-								<div class="text-center p-8 text-muted-foreground italic">
-									{ i18n.T(ctx, "No tools available for this agent.") }
+								<div class="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">
+									@icon.PackageOpen(icon.Props{Class: "size-12 opacity-20"})
+									<span class="text-sm font-medium">{ i18n.T(ctx, "No tools available") }</span>
+									<span class="text-xs">{ i18n.T(ctx, "This agent has no tool sets configured yet.") }</span>
 								</div>
 							</template>
 							<template x-if="!loading && filteredTools.length === 0 && tools.length > 0">
-								<div class="text-center p-8 text-muted-foreground italic">
-									{ i18n.T(ctx, "No tools match your search or category filter.") }
+								<div class="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">
+									@icon.SearchX(icon.Props{Class: "size-12 opacity-20"})
+									<span class="text-sm font-medium">{ i18n.T(ctx, "No results found") }</span>
+									<span class="text-xs">{ i18n.T(ctx, "Try adjusting your search or category filter.") }</span>
 								</div>
 							</template>
 							<!-- Tools Grid/List -->
 							<template x-if="filteredTools.length > 0">
 								<div>
-									<!-- Stats Header -->
 									<div class="flex items-center justify-between mb-4">
-										<div class="text-sm text-muted-foreground">
-											<span x-text="filteredTools.length"></span> tool sets
+										<p class="text-sm text-muted-foreground">
+											<span class="font-medium text-foreground" x-text="filteredTools.length"></span> { i18n.T(ctx, "tool sets") }
 											<template x-if="selectedCategory !== 'all'">
-												in "<span x-text="selectedCategory"></span>"
+												<span> { i18n.T(ctx, "in") } <span class="font-medium text-foreground" x-text="selectedCategory"></span></span>
 											</template>
 											<template x-if="search">
-												matching "<span x-text="search"></span>"
+												<span> &middot; { i18n.T(ctx, "matching") } &ldquo;<span class="font-medium text-foreground" x-text="search"></span>&rdquo;</span>
 											</template>
-										</div>
+										</p>
 									</div>
 									<!-- Grid Layout -->
 									<div
 										x-show="viewMode === 'grid'"
+										x-transition:enter="transition-opacity duration-200"
+										x-transition:enter-start="opacity-0"
+										x-transition:enter-end="opacity-100"
 										class="grid gap-4"
 										:class="filteredTools.length > 6 ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : filteredTools.length > 2 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'"
 									>
 										<template x-for="toolSet in filteredTools" :key="toolSet.id">
-											<div class="border border-border rounded-lg overflow-hidden hover:shadow-md transition-shadow">
-												<!-- Tool Set Header -->
-												<div class="flex items-start justify-between gap-3 p-4 bg-accent/20">
+											<div
+												class="group border rounded-lg overflow-hidden transition-all duration-200 border-l-[3px] hover:-translate-y-0.5 hover:shadow-lg"
+												:class="[toolSet.enabled ? 'border-border bg-card' : 'border-border opacity-60', categoryBorderColor(toolSet.category)]"
+											>
+												<div class="flex items-start justify-between gap-3 p-4 bg-accent/10 group-hover:bg-accent/20 transition-colors">
 													<div class="flex flex-col gap-1 flex-1 min-w-0">
 														<div class="flex items-center gap-2">
-															<span x-text="toolSet.name" class="text-sm font-medium text-foreground"></span>
 															<span
-																class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+																class="size-1.5 rounded-full shrink-0"
+																:class="toolSet.enabled ? 'bg-primary' : 'bg-input'"
+															></span>
+															<span x-text="toolSet.name" class="text-sm font-semibold text-foreground"></span>
+															<span
+																class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium"
 																:class="categoryColor(toolSet.category)"
 																x-text="toolSet.category"
 															></span>
 														</div>
-														<span x-text="toolSet.description" class="text-xs text-muted-foreground line-clamp-2"></span>
-														<span class="text-xs text-muted-foreground mt-1" x-text="`${toolSet.tools.length} tools`"></span>
+														<span x-text="toolSet.description" class="text-xs text-muted-foreground line-clamp-2 pl-3.5"></span>
+														<span class="text-[11px] text-muted-foreground pl-3.5 tabular-nums">
+															<span x-text="toolSet.tools.filter(t => t.enabled).length"></span>/<span x-text="toolSet.tools.length"></span> { i18n.T(ctx, "tools enabled") }
+														</span>
 													</div>
-													<div class="flex flex-col items-end gap-2">
-														<!-- Tool Set Toggle -->
-														<button
-															@click="toggleToolSet(toolSet)"
-															class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-															:class="toolSet.enabled ? 'bg-primary' : 'bg-input'"
-															role="switch"
-															:aria-checked="toolSet.enabled"
-															:title="toolSet.enabled ? 'Disable tool set' : 'Enable tool set'"
-														>
-															<span
-																class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200 ease-in-out"
-																:class="toolSet.enabled ? 'translate-x-4' : 'translate-x-0'"
-															></span>
-														</button>
-													</div>
+													<button
+														@click="toggleToolSet(toolSet)"
+														class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+														:class="toolSet.enabled ? 'bg-primary' : 'bg-input'"
+														role="switch"
+														:aria-checked="toolSet.enabled"
+														:aria-label="toolSet.name"
+													>
+														<span
+															class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200 ease-in-out"
+															:class="toolSet.enabled ? 'translate-x-4' : 'translate-x-0'"
+														></span>
+													</button>
 												</div>
-												<!-- Individual Tools -->
-												<div class="border-t border-border divide-y divide-border">
+												<div class="border-t border-border divide-y divide-border/50">
 													<template x-for="tool in toolSet.tools" :key="tool.id">
 														<div class="flex items-center justify-between gap-3 py-2.5 px-4 hover:bg-accent/30 transition-colors">
 															<div class="flex flex-col gap-0.5 flex-1 min-w-0">
@@ -378,11 +411,11 @@ templ ToolsDialog() {
 															</div>
 															<button
 																@click="toggleTool(toolSet, tool)"
-																class="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+																class="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
 																:class="tool.enabled ? 'bg-primary/80' : 'bg-input'"
 																role="switch"
 																:aria-checked="tool.enabled"
-																:title="tool.enabled ? `Disable ${tool.name}` : `Enable ${tool.name}`"
+																:aria-label="tool.name"
 																:disabled="!toolSet.enabled"
 															>
 																<span
@@ -399,56 +432,61 @@ templ ToolsDialog() {
 									<!-- List Layout -->
 									<div
 										x-show="viewMode === 'list'"
+										x-transition:enter="transition-opacity duration-200"
+										x-transition:enter-start="opacity-0"
+										x-transition:enter-end="opacity-100"
 										class="space-y-2"
 									>
 										<template x-for="toolSet in filteredTools" :key="toolSet.id">
-											<div class="border border-border rounded-lg overflow-hidden">
-												<!-- Tool Set Header -->
-												<div class="flex items-center justify-between gap-3 p-3 bg-accent/20">
+											<div
+												class="group border rounded-lg overflow-hidden transition-all duration-200 border-l-[3px]"
+												:class="[toolSet.enabled ? 'border-border bg-card' : 'border-border opacity-60', categoryBorderColor(toolSet.category)]"
+											>
+												<div class="flex items-center justify-between gap-3 p-3 bg-accent/10 group-hover:bg-accent/20 transition-colors">
 													<div class="flex flex-col gap-0.5 flex-1 min-w-0">
 														<div class="flex items-center gap-2">
-															<span x-text="toolSet.name" class="text-sm font-medium text-foreground"></span>
 															<span
-																class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+																class="size-1.5 rounded-full shrink-0"
+																:class="toolSet.enabled ? 'bg-primary' : 'bg-input'"
+															></span>
+															<span x-text="toolSet.name" class="text-sm font-semibold text-foreground"></span>
+															<span
+																class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium"
 																:class="categoryColor(toolSet.category)"
 																x-text="toolSet.category"
 															></span>
-															<span class="text-xs text-muted-foreground" x-text="`(${toolSet.tools.length} tools)`"></span>
+															<span class="text-[11px] text-muted-foreground tabular-nums" x-text="`(${toolSet.tools.filter(t => t.enabled).length}/${toolSet.tools.length})`"></span>
 														</div>
-														<span x-text="toolSet.description" class="text-xs text-muted-foreground"></span>
+														<span x-text="toolSet.description" class="text-xs text-muted-foreground pl-3.5"></span>
 													</div>
-													<div class="flex items-center gap-2">
-														<!-- Tool Set Toggle -->
-														<button
-															@click="toggleToolSet(toolSet)"
-															class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-															:class="toolSet.enabled ? 'bg-primary' : 'bg-input'"
-															role="switch"
-															:aria-checked="toolSet.enabled"
-															:title="toolSet.enabled ? 'Disable tool set' : 'Enable tool set'"
-														>
-															<span
-																class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200 ease-in-out"
-																:class="toolSet.enabled ? 'translate-x-4' : 'translate-x-0'"
-															></span>
-														</button>
-													</div>
+													<button
+														@click="toggleToolSet(toolSet)"
+														class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+														:class="toolSet.enabled ? 'bg-primary' : 'bg-input'"
+														role="switch"
+														:aria-checked="toolSet.enabled"
+														:aria-label="toolSet.name"
+													>
+														<span
+															class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200 ease-in-out"
+															:class="toolSet.enabled ? 'translate-x-4' : 'translate-x-0'"
+														></span>
+													</button>
 												</div>
-												<!-- Individual Tools -->
 												<div class="border-t border-border">
 													<template x-for="tool in toolSet.tools" :key="tool.id">
 														<div class="flex items-center justify-between gap-3 py-2.5 px-3 hover:bg-accent/30 transition-colors">
-															<div class="flex flex-col gap-0.5 flex-1 min-w-0 pl-2">
+															<div class="flex flex-col gap-0.5 flex-1 min-w-0 pl-3.5">
 																<span x-text="tool.name" class="text-sm text-foreground"></span>
 																<span x-text="tool.description" class="text-xs text-muted-foreground truncate"></span>
 															</div>
 															<button
 																@click="toggleTool(toolSet, tool)"
-																class="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+																class="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
 																:class="tool.enabled ? 'bg-primary/80' : 'bg-input'"
 																role="switch"
 																:aria-checked="tool.enabled"
-																:title="tool.enabled ? `Disable ${tool.name}` : `Enable ${tool.name}`"
+																:aria-label="tool.name"
 																:disabled="!toolSet.enabled"
 															>
 																<span
@@ -467,12 +505,23 @@ templ ToolsDialog() {
 						</div>
 					</div>
 				</div>
-				@dialog.Footer(dialog.FooterProps{Class: "p-6 pt-2 border-t mt-auto"}) {
-					@dialog.Close() {
-						@button.Button(button.Props{Variant: button.VariantGhost}) {
-							{ i18n.T(ctx, "Close") }
+				@dialog.Footer(dialog.FooterProps{Class: "px-4 py-3 border-t mt-auto bg-muted/50"}) {
+					<div class="flex items-center justify-between w-full">
+						<div class="flex items-center gap-3 text-xs text-muted-foreground" x-show="tools.length > 0">
+							<span class="flex items-center gap-1.5">
+								<span class="size-1.5 rounded-full bg-primary"></span>
+								<span x-text="enabledSummary.sets"></span>/<span x-text="enabledSummary.total"></span> { i18n.T(ctx, "tool sets") }
+							</span>
+							<span class="text-border">|</span>
+							<span x-text="enabledSummary.tools"></span> { i18n.T(ctx, "individual tools") }
+						</div>
+						<div x-show="tools.length === 0"></div>
+						@dialog.Close() {
+							@button.Button(button.Props{Variant: button.VariantGhost, Class: "h-8 px-3 text-xs"}) {
+								{ i18n.T(ctx, "Close") }
+							}
 						}
-					}
+					</div>
 				}
 			}
 		}

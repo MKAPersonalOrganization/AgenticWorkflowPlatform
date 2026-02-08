@@ -80,13 +80,9 @@ templ ResourcesDialog() {
 				},
 				get filteredResources() {
 					let filtered = this.resources;
-
-					// Apply domain category filter
 					if (this.selectedCategory !== 'all') {
 						filtered = filtered.filter(r => r.category === this.selectedCategory);
 					}
-
-					// Apply search filter
 					if (this.search) {
 						const q = this.search.toLowerCase();
 						filtered = filtered.filter(r =>
@@ -95,7 +91,6 @@ templ ResourcesDialog() {
 							r.source.toLowerCase().includes(q)
 						);
 					}
-
 					return filtered;
 				},
 				normalizeFileType(ft) {
@@ -114,6 +109,10 @@ templ ResourcesDialog() {
 						counts[cat] = (counts[cat] || 0) + 1;
 					});
 					return Object.entries(counts).map(([category, count]) => ({ category, count })).sort((a, b) => a.category.localeCompare(b.category));
+				},
+				get enabledSummary() {
+					const enabled = this.resources.filter(r => r.enabled).length;
+					return { enabled, total: this.resources.length };
 				},
 				async toggleResource(resource) {
 					const newState = !resource.enabled;
@@ -157,6 +156,20 @@ templ ResourcesDialog() {
 						'Arts': 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400',
 					};
 					return colors[cat] || 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400';
+				},
+				categoryBorderColor(cat) {
+					const colors = {
+						'Mathematics': 'border-l-blue-400 dark:border-l-blue-500',
+						'Physics': 'border-l-indigo-400 dark:border-l-indigo-500',
+						'Chemistry': 'border-l-emerald-400 dark:border-l-emerald-500',
+						'Computer Science': 'border-l-violet-400 dark:border-l-violet-500',
+						'Biology': 'border-l-green-400 dark:border-l-green-500',
+						'Economics': 'border-l-amber-400 dark:border-l-amber-500',
+						'Languages': 'border-l-pink-400 dark:border-l-pink-500',
+						'History': 'border-l-orange-400 dark:border-l-orange-500',
+						'Arts': 'border-l-rose-400 dark:border-l-rose-500',
+					};
+					return colors[cat] || 'border-l-gray-400 dark:border-l-gray-500';
 				}
 			}));
 		});
@@ -181,96 +194,106 @@ templ ResourcesDialog() {
 								{ i18n.T(ctx, "Select an agent and manage which resources it can access.") }
 							}
 						</div>
-						<div class="flex items-center gap-3">
-							<!-- View Mode Toggle -->
-							<div class="flex items-center border border-border rounded-md">
-								<button
-									@click="viewMode = 'grid'"
-									class="px-3 py-1.5 text-xs font-medium rounded-l-md transition-colors"
-									:class="viewMode === 'grid' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'"
-								>
-									Grid
-								</button>
-								<button
-									@click="viewMode = 'list'"
-									class="px-3 py-1.5 text-xs font-medium rounded-r-md transition-colors"
-									:class="viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'"
-								>
-									List
-								</button>
-							</div>
+						<div class="flex items-center gap-1 bg-muted rounded-lg p-1">
+							<button
+								@click="viewMode = 'grid'"
+								class="p-1.5 rounded-md transition-all duration-200"
+								:class="viewMode === 'grid' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+								:aria-label="'Grid view'"
+							>
+								@icon.LayoutGrid(icon.Props{Class: "size-4"})
+							</button>
+							<button
+								@click="viewMode = 'list'"
+								class="p-1.5 rounded-md transition-all duration-200"
+								:class="viewMode === 'list' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+								:aria-label="'List view'"
+							>
+								@icon.List(icon.Props{Class: "size-4"})
+							</button>
 						</div>
 					</div>
 				}
 				<!-- Top Controls -->
-				<div class="p-4 border-b border-border bg-muted/30">
+				<div class="p-4 border-b border-border bg-muted/50">
 					<div class="flex gap-4">
 						<!-- Agent Selection -->
 						<div class="flex-1">
-							<label class="block text-sm font-medium text-foreground mb-2">{ i18n.T(ctx, "Select Agent") }</label>
+							<label class="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wide">{ i18n.T(ctx, "Agent") }</label>
 							<div class="relative">
 								<select
 									x-model="selectedAgent"
 									@change="onAgentChange()"
-									class="w-full rounded-md border border-input bg-background px-3 py-2 pr-8 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring appearance-none"
+									class="w-full rounded-lg border border-input bg-background px-3 py-2 pr-8 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring appearance-none transition-colors"
 									:disabled="loadingAgents"
 								>
 									<template x-for="agent in agents" :key="agent.id">
 										<option :value="agent.id" x-text="agent.name"></option>
 									</template>
 								</select>
-								<div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+								<div class="absolute inset-y-0 right-0 flex items-center pr-2.5 pointer-events-none">
 									<template x-if="loadingAgents">
-										<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+										<div class="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent"></div>
 									</template>
 									<template x-if="!loadingAgents">
-										<svg class="h-4 w-4 text-muted-foreground" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-											<path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path>
-										</svg>
+										@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
 									</template>
 								</div>
 							</div>
 						</div>
 						<!-- Search -->
 						<div class="flex-1">
-							<label class="block text-sm font-medium text-foreground mb-2">{ i18n.T(ctx, "Search Resources") }</label>
-							<input
-								type="text"
-								x-model="search"
-								placeholder={ i18n.T(ctx, "Search resources...") }
-								class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
+							<label class="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wide">{ i18n.T(ctx, "Search") }</label>
+							<div class="relative">
+								<div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+									@icon.Search(icon.Props{Class: "size-4 text-muted-foreground"})
+								</div>
+								<input
+									type="text"
+									x-model="search"
+									placeholder={ i18n.T(ctx, "Search resources...") }
+									class="w-full rounded-lg border border-input bg-background pl-9 pr-9 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
+								/>
+								<button
+									x-show="search.length > 0"
+									x-transition:enter="transition-opacity duration-100"
+									x-transition:enter-start="opacity-0"
+									x-transition:enter-end="opacity-100"
+									@click="search = ''"
+									class="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground transition-colors"
+								>
+									@icon.X(icon.Props{Class: "size-3.5"})
+								</button>
+							</div>
 						</div>
 					</div>
 				</div>
 				<!-- Main Content with Sidebar -->
 				<div class="flex-1 flex overflow-hidden">
 					<!-- Domain Sidebar -->
-					<div class="w-64 border-r border-border bg-muted/20 overflow-y-auto">
-						<div class="p-4">
-							<h3 class="text-sm font-semibold text-foreground mb-3">{ i18n.T(ctx, "Domains") }</h3>
-							<div class="space-y-1">
-								<!-- All Resources Option -->
+					<div class="w-52 border-r border-border bg-muted/50 overflow-y-auto shrink-0 scrollbar-thin">
+						<div class="p-3">
+							<h3 class="text-[11px] font-semibold text-muted-foreground mb-2 uppercase tracking-wider px-2">{ i18n.T(ctx, "Domains") }</h3>
+							<div class="space-y-0.5">
 								<button
 									@click="selectedCategory = 'all'"
-									class="w-full text-left px-3 py-2 text-sm rounded-md transition-colors"
-									:class="selectedCategory === 'all' ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-accent'"
+									class="w-full text-left px-3 py-2 text-sm rounded-lg transition-all duration-150"
+									:class="selectedCategory === 'all' ? 'bg-accent text-accent-foreground font-medium border-l-2 border-primary pl-2.5' : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'"
 								>
 									<div class="flex items-center justify-between">
 										<span>{ i18n.T(ctx, "All Domains") }</span>
-										<span class="text-xs" x-text="resources.length"></span>
+										<span class="text-xs tabular-nums opacity-60" x-text="resources.length"></span>
 									</div>
 								</button>
-								<!-- Category List -->
 								<template x-for="{ category, count } in categoriesWithCounts" :key="category">
 									<button
 										@click="selectedCategory = category"
-										class="w-full text-left px-3 py-2 text-sm rounded-md transition-colors"
-										:class="selectedCategory === category ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-accent'"
+										class="w-full text-left px-3 py-2 text-sm rounded-lg transition-all duration-150"
+										:class="selectedCategory === category ? 'bg-accent text-accent-foreground font-medium border-l-2 border-primary pl-2.5' : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'"
 									>
 										<div class="flex items-center justify-between">
 											<span x-text="category"></span>
-											<span class="text-xs" x-text="count"></span>
+											<span class="text-xs tabular-nums opacity-60" x-text="count"></span>
 										</div>
 									</button>
 								</template>
@@ -278,27 +301,57 @@ templ ResourcesDialog() {
 						</div>
 					</div>
 					<!-- Resources Content -->
-					<div class="flex-1 overflow-auto">
+					<div class="flex-1 overflow-auto scrollbar-thin">
 						<div class="p-4">
-							<!-- Loading States -->
+							<!-- Skeleton Loading -->
 							<template x-if="loading && resources.length === 0">
-								<div class="flex justify-center p-8">
-									<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+								<div>
+									<div class="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+										<template x-for="i in 9" :key="i">
+											<div class="border border-border rounded-lg overflow-hidden animate-pulse">
+												<div class="p-4">
+													<div class="flex items-start justify-between">
+														<div class="space-y-2.5 flex-1">
+															<div class="flex items-center gap-2">
+																<div class="size-4 bg-muted rounded"></div>
+																<div class="h-4 bg-muted rounded-md w-3/4"></div>
+															</div>
+															<div class="flex gap-1.5">
+																<div class="h-5 bg-muted rounded-full w-16"></div>
+																<div class="h-5 bg-muted rounded-full w-10"></div>
+																<div class="h-5 bg-muted rounded-full w-14"></div>
+															</div>
+														</div>
+														<div class="h-5 w-9 bg-muted rounded-full"></div>
+													</div>
+												</div>
+											</div>
+										</template>
+									</div>
 								</div>
 							</template>
+							<!-- No Agent Selected -->
 							<template x-if="!loading && !selectedAgent">
-								<div class="text-center p-8 text-muted-foreground italic">
-									{ i18n.T(ctx, "Please select an agent to view its resources.") }
+								<div class="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">
+									@icon.Library(icon.Props{Class: "size-12 opacity-20"})
+									<span class="text-sm font-medium">{ i18n.T(ctx, "Select an agent to manage resources") }</span>
+									<span class="text-xs">{ i18n.T(ctx, "Choose an agent from the dropdown above to get started.") }</span>
 								</div>
 							</template>
+							<!-- No Resources Available -->
 							<template x-if="!loading && selectedAgent && resources.length === 0">
-								<div class="text-center p-8 text-muted-foreground italic">
-									{ i18n.T(ctx, "No resources available.") }
+								<div class="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">
+									@icon.PackageOpen(icon.Props{Class: "size-12 opacity-20"})
+									<span class="text-sm font-medium">{ i18n.T(ctx, "No resources available") }</span>
+									<span class="text-xs">{ i18n.T(ctx, "This agent has no resources configured yet.") }</span>
 								</div>
 							</template>
+							<!-- No Search/Filter Results -->
 							<template x-if="!loading && filteredResources.length === 0 && resources.length > 0">
-								<div class="text-center p-8 text-muted-foreground italic">
-									{ i18n.T(ctx, "No resources match your search or filter.") }
+								<div class="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">
+									@icon.SearchX(icon.Props{Class: "size-12 opacity-20"})
+									<span class="text-sm font-medium">{ i18n.T(ctx, "No results found") }</span>
+									<span class="text-xs">{ i18n.T(ctx, "Try adjusting your search or domain filter.") }</span>
 								</div>
 							</template>
 							<!-- Resources Grid/List -->
@@ -306,61 +359,74 @@ templ ResourcesDialog() {
 								<div>
 									<!-- Stats Header -->
 									<div class="flex items-center justify-between mb-4">
-										<div class="text-sm text-muted-foreground">
-											<span x-text="filteredResources.length"></span> resources
+										<p class="text-sm text-muted-foreground">
+											<span class="font-medium text-foreground" x-text="filteredResources.length"></span> { i18n.T(ctx, "resources") }
 											<template x-if="selectedCategory !== 'all'">
-												<span> in "<span x-text="selectedCategory"></span>"</span>
+												<span> { i18n.T(ctx, "in") } <span class="font-medium text-foreground" x-text="selectedCategory"></span></span>
 											</template>
 											<template x-if="search">
-												<span> matching "<span x-text="search"></span>"</span>
+												<span> &middot; { i18n.T(ctx, "matching") } &ldquo;<span class="font-medium text-foreground" x-text="search"></span>&rdquo;</span>
 											</template>
-										</div>
+										</p>
 									</div>
 									<!-- Grid Layout -->
 									<div
 										x-show="viewMode === 'grid'"
+										x-transition:enter="transition-opacity duration-200"
+										x-transition:enter-start="opacity-0"
+										x-transition:enter-end="opacity-100"
 										class="grid gap-4"
 										:class="filteredResources.length > 6 ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : filteredResources.length > 2 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'"
 									>
 										<template x-for="resource in filteredResources" :key="resource.id">
-											<div class="border border-border rounded-lg overflow-hidden hover:shadow-md transition-shadow">
+											<div
+												class="group border rounded-lg overflow-hidden transition-all duration-200 border-l-[3px] hover:-translate-y-0.5 hover:shadow-lg"
+												:class="[resource.enabled ? 'border-border bg-card' : 'border-border opacity-60', categoryBorderColor(resource.category)]"
+											>
 												<div class="flex items-start justify-between gap-3 p-4">
 													<div class="flex flex-col gap-1.5 flex-1 min-w-0">
 														<div class="flex items-center gap-2">
-															@icon.File(icon.Props{Class: "size-4 text-muted-foreground shrink-0"})
-															<span x-text="resource.title" class="text-sm font-medium text-foreground truncate"></span>
-														</div>
-														<div class="flex items-center gap-2 flex-wrap">
 															<span
-																class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+																class="size-1.5 rounded-full shrink-0"
+																:class="resource.enabled ? 'bg-primary' : 'bg-input'"
+															></span>
+															@icon.FileText(icon.Props{Class: "size-4 text-muted-foreground shrink-0"})
+															<span x-text="resource.title" class="text-sm font-semibold text-foreground truncate"></span>
+														</div>
+														<div class="flex items-center gap-1.5 flex-wrap pl-3.5">
+															<span
+																class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium"
 																:class="categoryColor(resource.category)"
 																x-text="resource.category"
 															></span>
 															<span
-																class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+																class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium"
 																:class="fileTypeColor(resource.file_type)"
 																x-text="normalizeFileType(resource.file_type)"
 															></span>
 															<span
-																class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+																class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium"
 																:class="sourceColor(resource.source)"
 																x-text="resource.source"
 															></span>
 														</div>
 													</div>
-													<div class="flex items-center gap-2 shrink-0">
-														<!-- Download Button -->
-														<a :href="`/api/resources/${resource.id}/content`" target="_blank" class="inline-flex items-center justify-center rounded-md text-sm font-medium h-8 w-8 hover:bg-accent hover:text-accent-foreground transition-colors">
-															@icon.Download(icon.Props{Class: "size-4"})
+													<div class="flex items-center gap-1.5 shrink-0">
+														<a
+															:href="`/api/resources/${resource.id}/content`"
+															target="_blank"
+															class="inline-flex items-center justify-center rounded-md h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+															:aria-label="resource.title + ' download'"
+														>
+															@icon.Download(icon.Props{Class: "size-3.5"})
 														</a>
-														<!-- Toggle Switch -->
 														<button
 															@click="toggleResource(resource)"
 															class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 															:class="resource.enabled ? 'bg-primary' : 'bg-input'"
 															role="switch"
 															:aria-checked="resource.enabled"
-															:title="resource.enabled ? 'Disable resource' : 'Enable resource'"
+															:aria-label="resource.title"
 														>
 															<span
 																class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200 ease-in-out"
@@ -375,43 +441,56 @@ templ ResourcesDialog() {
 									<!-- List Layout -->
 									<div
 										x-show="viewMode === 'list'"
-										class="space-y-2"
+										x-transition:enter="transition-opacity duration-200"
+										x-transition:enter-start="opacity-0"
+										x-transition:enter-end="opacity-100"
+										class="space-y-1.5"
 									>
 										<template x-for="resource in filteredResources" :key="resource.id">
-											<div class="border border-border rounded-lg overflow-hidden">
-												<div class="flex items-center justify-between gap-3 p-3 hover:bg-accent/30 transition-colors">
-													<div class="flex items-center gap-3 flex-1 min-w-0">
-														@icon.File(icon.Props{Class: "size-4 text-muted-foreground shrink-0"})
+											<div
+												class="group border rounded-lg overflow-hidden transition-all duration-200 border-l-[3px]"
+												:class="[resource.enabled ? 'border-border bg-card' : 'border-border opacity-60', categoryBorderColor(resource.category)]"
+											>
+												<div class="flex items-center justify-between gap-3 p-3 hover:bg-accent/20 transition-colors">
+													<div class="flex items-center gap-2.5 flex-1 min-w-0">
+														<span
+															class="size-1.5 rounded-full shrink-0"
+															:class="resource.enabled ? 'bg-primary' : 'bg-input'"
+														></span>
+														@icon.FileText(icon.Props{Class: "size-4 text-muted-foreground shrink-0"})
 														<span x-text="resource.title" class="text-sm font-medium text-foreground truncate"></span>
 														<span
-															class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium shrink-0"
+															class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium shrink-0"
 															:class="categoryColor(resource.category)"
 															x-text="resource.category"
 														></span>
 														<span
-															class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium shrink-0"
+															class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium shrink-0"
 															:class="fileTypeColor(resource.file_type)"
 															x-text="normalizeFileType(resource.file_type)"
 														></span>
 														<span
-															class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium shrink-0"
+															class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium shrink-0"
 															:class="sourceColor(resource.source)"
 															x-text="resource.source"
 														></span>
 													</div>
-													<div class="flex items-center gap-2 shrink-0">
-														<!-- Download Button -->
-														<a :href="`/api/resources/${resource.id}/content`" target="_blank" class="inline-flex items-center justify-center rounded-md text-sm font-medium h-8 w-8 hover:bg-accent hover:text-accent-foreground transition-colors">
-															@icon.Download(icon.Props{Class: "size-4"})
+													<div class="flex items-center gap-1.5 shrink-0">
+														<a
+															:href="`/api/resources/${resource.id}/content`"
+															target="_blank"
+															class="inline-flex items-center justify-center rounded-md h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+															:aria-label="resource.title + ' download'"
+														>
+															@icon.Download(icon.Props{Class: "size-3.5"})
 														</a>
-														<!-- Toggle Switch -->
 														<button
 															@click="toggleResource(resource)"
 															class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 															:class="resource.enabled ? 'bg-primary' : 'bg-input'"
 															role="switch"
 															:aria-checked="resource.enabled"
-															:title="resource.enabled ? 'Disable resource' : 'Enable resource'"
+															:aria-label="resource.title"
 														>
 															<span
 																class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200 ease-in-out"
@@ -428,12 +507,21 @@ templ ResourcesDialog() {
 						</div>
 					</div>
 				</div>
-				@dialog.Footer(dialog.FooterProps{Class: "p-6 pt-2 border-t mt-auto"}) {
-					@dialog.Close() {
-						@button.Button(button.Props{Variant: button.VariantGhost}) {
-							{ i18n.T(ctx, "Close") }
+				@dialog.Footer(dialog.FooterProps{Class: "px-4 py-3 border-t mt-auto bg-muted/50"}) {
+					<div class="flex items-center justify-between w-full">
+						<div class="flex items-center gap-3 text-xs text-muted-foreground" x-show="resources.length > 0">
+							<span class="flex items-center gap-1.5">
+								<span class="size-1.5 rounded-full bg-primary"></span>
+								<span x-text="enabledSummary.enabled"></span>/<span x-text="enabledSummary.total"></span> { i18n.T(ctx, "resources enabled") }
+							</span>
+						</div>
+						<div x-show="resources.length === 0"></div>
+						@dialog.Close() {
+							@button.Button(button.Props{Variant: button.VariantGhost, Class: "h-8 px-3 text-xs"}) {
+								{ i18n.T(ctx, "Close") }
+							}
 						}
-					}
+					</div>
 				}
 			}
 		}
