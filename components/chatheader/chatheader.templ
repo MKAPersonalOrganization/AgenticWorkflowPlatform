@@ -8,7 +8,7 @@ import "school-with-ai/domain"
 import "school-with-ai/components/i18n"
 
 templ ChatHeader(user *domain.User) {
-	<div class="sticky top-0 z-10 flex h-14 w-full items-center justify-between border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4">
+	<div class="absolute top-0 z-10 flex h-14 w-full items-center justify-between bg-gradient-to-b from-background via-background/70 to-transparent p-2 font-semibold md:from-background/80 md:via-background/50">
 		<div class="flex items-center gap-2">
 			<!-- Sidebar Trigger (Desktop) -->
 			@sidebar.Trigger(sidebar.TriggerProps{

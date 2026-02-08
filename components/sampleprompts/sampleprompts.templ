@@ -11,7 +11,7 @@ templ SamplePrompts() {
 	<!-- Welcome Screen / Sample Prompts -->
 	<div class="w-full flex flex-col items-center justify-center min-h-[60vh] space-y-10 animate-in fade-in duration-500" x-data="{ selectedCategory: null }">
 		<!-- Category Grid -->
-		<div class="w-full max-w-4xl">
+		<div class="w-full max-w-full">
 			<div class="grid gap-4 grid-cols-2 md:grid-cols-4 lg:grid-cols-4">
 				<!-- Math -->
 				@CategoryButton("math", i18n.T(ctx, "Mathematics"), icon.Calculator)
@@ -32,7 +32,7 @@ templ SamplePrompts() {
 			</div>
 		</div>
 		<!-- Expanded Examples (Centered & Clean) -->
-		<div class="w-full max-w-2xl transition-all duration-300 ease-in-out">
+		<div class="w-full max-w-full transition-all duration-300 ease-in-out">
 			<!-- Math Examples -->
 			<div x-show="selectedCategory === 'math'" x-collapse class="space-y-2">
 				@PromptButton(i18n.T(ctx, "Solve the quadratic equation: x² + 5x + 6 = 0"))

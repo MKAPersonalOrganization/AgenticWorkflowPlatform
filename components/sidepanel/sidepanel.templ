@@ -2,9 +2,6 @@ package sidepanel
 
 import (
 	"school-with-ai/components/artifacts"
-	"school-with-ai/components/button"
-	"school-with-ai/components/i18n"
-	"school-with-ai/components/icon"
 	"school-with-ai/components/sidebar"
 )
 
@@ -15,98 +12,26 @@ templ SidePanel() {
 		Variant:     sidebar.VariantSidebar,
 		Collapsible: sidebar.CollapsibleOffcanvas,
 		Collapsed:   true,
-		Class:       "z-30 !ltr:border-l-0 !rtl:border-r-0 ltr:border-l rtl:border-r border-border bg-background shadow-2xl",
+		Class:       "!absolute !right-0 !top-0 !h-full [&>div.relative]:!hidden z-30 !ltr:border-l-0 !rtl:border-r-0 ltr:border-l rtl:border-r border-border",
 		Attributes: templ.Attributes{
-			"style":  "--sidebar-width: 400px",
-			"x-data": "{ activeView: 'artifacts' }",
+			"style":            "--sidebar-width: 400px",
+			"x-data":           "{ activeView: 'artifacts' }",
+			"@open-right-sidebar.window": "$dispatch('sidebar:open', { id: 'premium-sidepanel' })",
 		},
 	}) {
-		@Header()
 		@sidebar.Content(sidebar.ContentProps{Class: "flex-1 overflow-hidden bg-background"}) {
 			<div class="h-full overflow-y-auto custom-scrollbar" x-show="activeView === 'artifacts'">
 				@artifacts.ArtifactsContent()
 			</div>
-			<div class="h-full overflow-y-auto custom-scrollbar" x-show="activeView === 'bookmarks'" style="display: none;">
+			<div class="h-full overflow-y-auto custom-scrollbar" x-show="activeView === 'bookmarks'">
 				@Bookmarks()
 			</div>
-			<div class="h-full overflow-y-auto custom-scrollbar" x-show="activeView === 'files'" style="display: none;">
+			<div class="h-full overflow-y-auto custom-scrollbar" x-show="activeView === 'files'">
 				@Files()
 			</div>
-			<div class="h-full overflow-y-auto custom-scrollbar" x-show="activeView === 'prompts'" style="display: none;">
+			<div class="h-full overflow-y-auto custom-scrollbar" x-show="activeView === 'prompts'">
 				@Prompts()
 			</div>
 		}
-	}
-}
-
-templ Header() {
-	@sidebar.Header(sidebar.HeaderProps{
-		Class: "flex flex-col border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60",
-	}) {
-		<div class="flex flex-row items-center justify-between px-3 py-2.5 gap-2">
-			<div class="flex items-center gap-0.5 bg-muted/50 p-0.5 rounded-lg border border-border/20 flex-wrap flex-1 min-w-0">
-				@button.Button(button.Props{
-					Type:    button.TypeButton,
-					Variant: button.VariantGhost,
-					Class:   "flex items-center gap-1.5 px-2 py-1.5 rounded-[6px] text-xs font-medium transition-all duration-200 h-auto whitespace-nowrap",
-					Attributes: templ.Attributes{
-						"@click": "activeView = 'artifacts'",
-						":class": "activeView === 'artifacts' ? 'bg-background shadow-sm text-foreground ring-1 ring-black/5 dark:ring-white/10' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'",
-					},
-				}) {
-					@icon.LayoutDashboard(icon.Props{Class: "size-3.5"})
-					<span>{ i18n.T(ctx, "Artifacts") }</span>
-				}
-				@button.Button(button.Props{
-					Type:    button.TypeButton,
-					Variant: button.VariantGhost,
-					Class:   "flex items-center gap-1.5 px-2 py-1.5 rounded-[6px] text-xs font-medium transition-all duration-200 h-auto whitespace-nowrap",
-					Attributes: templ.Attributes{
-						"@click": "activeView = 'bookmarks'",
-						":class": "activeView === 'bookmarks' ? 'bg-background shadow-sm text-foreground ring-1 ring-black/5 dark:ring-white/10' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'",
-					},
-				}) {
-					@icon.Bookmark(icon.Props{Class: "size-3.5"})
-					<span>{ i18n.T(ctx, "Bookmarks") }</span>
-				}
-				@button.Button(button.Props{
-					Type:    button.TypeButton,
-					Variant: button.VariantGhost,
-					Class:   "flex items-center gap-1.5 px-2 py-1.5 rounded-[6px] text-xs font-medium transition-all duration-200 h-auto whitespace-nowrap",
-					Attributes: templ.Attributes{
-						"@click": "activeView = 'files'",
-						":class": "activeView === 'files' ? 'bg-background shadow-sm text-foreground ring-1 ring-black/5 dark:ring-white/10' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'",
-					},
-				}) {
-					@icon.Folder(icon.Props{Class: "size-3.5"})
-					<span>{ i18n.T(ctx, "Files") }</span>
-				}
-				@button.Button(button.Props{
-					Type:    button.TypeButton,
-					Variant: button.VariantGhost,
-					Class:   "flex items-center gap-1.5 px-2 py-1.5 rounded-[6px] text-xs font-medium transition-all duration-200 h-auto whitespace-nowrap",
-					Attributes: templ.Attributes{
-						"@click": "activeView = 'prompts'",
-						":class": "activeView === 'prompts' ? 'bg-background shadow-sm text-foreground ring-1 ring-black/5 dark:ring-white/10' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'",
-					},
-				}) {
-					@icon.Command(icon.Props{Class: "size-3.5"})
-					<span>{ i18n.T(ctx, "Prompts") }</span>
-				}
-			</div>
-			<!-- Close Button -->
-			@button.Button(button.Props{
-				Size:    button.SizeIcon,
-				Variant: button.VariantGhost,
-				Class:   "size-7 hover:bg-muted text-muted-foreground rounded-md",
-				Attributes: templ.Attributes{
-					"data-tui-sidebar-trigger": "true",
-					"data-tui-sidebar-target":  "premium-sidepanel",
-				},
-			}) {
-				@icon.X(icon.Props{Class: "size-4"})
-				<span class="sr-only">{ i18n.T(ctx, "Close") }</span>
-			}
-		</div>
 	}
 }

@@ -141,3 +141,17 @@ CREATE TABLE IF NOT EXISTS analytics_stats (
 );
 
 CREATE INDEX IF NOT EXISTS idx_analytics_stats_agent ON analytics_stats(agent_name);
+-- Version: 1.13
+-- Description: Create resources table for document management
+CREATE TABLE IF NOT EXISTS resources (
+    resource_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id VARCHAR(255), -- NULL for public resources
+    title TEXT NOT NULL,
+    file_type VARCHAR(50) NOT NULL,
+    file_path TEXT NOT NULL,
+    source VARCHAR(20) NOT NULL, -- 'public' or 'private'
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_resources_user ON resources(user_id);
+CREATE INDEX IF NOT EXISTS idx_resources_source ON resources(source);

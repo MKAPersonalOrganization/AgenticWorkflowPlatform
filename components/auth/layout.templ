@@ -1,7 +1,7 @@
 package auth
 
+import "school-with-ai/components"
 import "school-with-ai/components/card"
-import "school-with-ai/components/navbar"
 import "school-with-ai/domain"
 import "school-with-ai/components/i18n"
 
@@ -14,73 +14,59 @@ type LayoutProps struct {
 
 // AuthLayout provides a centered card layout for authentication pages
 templ AuthLayout(props LayoutProps) {
-	<!DOCTYPE html>
-	<html lang={ i18n.Lang(ctx) } dir={ i18n.Dir(ctx) }>
-		<head>
-			<meta charset="UTF-8"/>
-			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-			<title>{ props.Title } - SchoolWithAI</title>
-			<link rel="preconnect" href="https://fonts.googleapis.com"/>
-			<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-			<link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Noto+Sans+Arabic:wght@100..900&family=Noto+Sans:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet"/>
-			<link rel="stylesheet" href="/assets/css/output.css"/>
-		</head>
-		<body class="flex min-h-screen bg-background">
-			<!-- Left Navigation Bar -->
-			@navbar.Navbar(navbar.Props{User: props.User})
-			<!-- Main Content with margin for navbar -->
-			<div class="ms-16 flex-1">
-				<main class="flex min-h-screen items-center justify-center p-4">
-					<div class="w-full max-w-md space-y-8">
-						<!-- Logo -->
-						<div class="flex justify-center">
-							if props.LogoURL != "" {
-								<img src={ props.LogoURL } alt="SchoolWithAI Logo" class="h-12 w-auto"/>
-							} else {
-								<img src="/assets/images/logo-black.svg" alt="SchoolWithAI Logo" class="h-12 w-auto dark:hidden"/>
-								<img src="/assets/images/logo-white.svg" alt="SchoolWithAI Logo" class="h-12 w-auto hidden dark:block"/>
-							}
-						</div>
-						<!-- Main Content Card -->
-						@card.Card(card.Props{
-							Class: "w-full",
+	@components.BaseLayout(components.LayoutProps{
+		Title: props.Title,
+		User:  props.User,
+	}) {
+		<main class="flex min-h-screen items-center justify-center p-4">
+			<div class="w-full max-w-md space-y-8">
+				<!-- Logo -->
+				<div class="flex justify-center">
+					if props.LogoURL != "" {
+						<img src={ props.LogoURL } alt="SchoolWithAI Logo" class="h-12 w-auto"/>
+					} else {
+						<img src="/assets/images/logo-black.svg" alt="SchoolWithAI Logo" class="h-12 w-auto dark:hidden"/>
+						<img src="/assets/images/logo-white.svg" alt="SchoolWithAI Logo" class="h-12 w-auto hidden dark:block"/>
+					}
+				</div>
+				<!-- Main Content Card -->
+				@card.Card(card.Props{
+					Class: "w-full",
+				}) {
+					@card.Header(card.HeaderProps{}) {
+						@card.Title(card.TitleProps{
+							Class: "text-center text-2xl font-bold",
 						}) {
-							@card.Header(card.HeaderProps{}) {
-								@card.Title(card.TitleProps{
-									Class: "text-center text-2xl font-bold",
-								}) {
-									{ props.Title }
-								}
-								if props.Description != "" {
-									@card.Description(card.DescriptionProps{
-										Class: "text-center",
-									}) {
-										{ props.Description }
-									}
-								}
-							}
-							@card.Content(card.ContentProps{}) {
-								{ children... }
+							{ props.Title }
+						}
+						if props.Description != "" {
+							@card.Description(card.DescriptionProps{
+								Class: "text-center",
+							}) {
+								{ props.Description }
 							}
 						}
-						<!-- Footer Links -->
-						<div class="text-center text-sm text-muted-foreground">
-							<div class="space-x-4">
-								<a href="/privacy" class="hover:text-foreground">{ i18n.T(ctx, "Privacy") }</a>
-								<span>•</span>
-								<a href="/terms" class="hover:text-foreground">{ i18n.T(ctx, "Terms") }</a>
-								<span>•</span>
-								<a href="/support" class="hover:text-foreground">{ i18n.T(ctx, "Support") }</a>
-							</div>
-							<div class="mt-2 text-xs">
-								© { templ.EscapeString(getCurrentYear()) } SchoolWithAI. { i18n.T(ctx, "All rights reserved.") }
-							</div>
-						</div>
+					}
+					@card.Content(card.ContentProps{}) {
+						{ children... }
+					}
+				}
+				<!-- Footer Links -->
+				<div class="text-center text-sm text-muted-foreground">
+					<div class="space-x-4">
+						<a href="/privacy" class="hover:text-foreground">{ i18n.T(ctx, "Privacy") }</a>
+						<span>•</span>
+						<a href="/terms" class="hover:text-foreground">{ i18n.T(ctx, "Terms") }</a>
+						<span>•</span>
+						<a href="/support" class="hover:text-foreground">{ i18n.T(ctx, "Support") }</a>
 					</div>
-				</main>
+					<div class="mt-2 text-xs">
+						© { templ.EscapeString(getCurrentYear()) } SchoolWithAI. { i18n.T(ctx, "All rights reserved.") }
+					</div>
+				</div>
 			</div>
-		</body>
-	</html>
+		</main>
+	}
 }
 
 func getCurrentYear() string {

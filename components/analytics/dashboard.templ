@@ -3,6 +3,7 @@ package analytics
 import (
 	"encoding/json"
 	"fmt"
+	"school-with-ai/domain"
 	"school-with-ai/infra/projection/statistics"
 )
 
@@ -10,11 +11,13 @@ type DashboardProps struct {
 	Stats        []statistics.StatRow
 	Agents       []string
 	CurrentAgent string
+	User         *domain.User
 }
 
 templ Dashboard(props DashboardProps) {
 	@Layout(LayoutProps{
 		Title: "Analytics",
+		User:  props.User,
 	}) {
 		<div class="p-8 space-y-8 max-w-7xl mx-auto">
 			<div class="flex flex-col md:flex-row md:items-center justify-between gap-4">

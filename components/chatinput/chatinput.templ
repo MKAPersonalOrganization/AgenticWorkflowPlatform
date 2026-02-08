@@ -9,7 +9,7 @@ import "school-with-ai/components/tokenusage"
 
 templ ChatInput() {
 	<div
-		class="relative z-10 mx-auto w-full max-w-3xl rounded-2xl border border-border bg-background shadow-[0_9px_25px_0_rgba(0,0,0,0.03)] transition-all duration-300 focus-within:shadow-[0_9px_25px_0_rgba(0,0,0,0.08)] focus-within:border-border/80"
+		class="relative flex w-full flex-grow flex-col overflow-hidden rounded-t-3xl border border-border bg-background shadow-md transition-all duration-200 focus-within:shadow-lg sm:rounded-3xl"
 		:class="awaitingHumanInput ? '' : ''"
 		role="region"
 		aria-label="Message input area"
@@ -41,9 +41,9 @@ templ ChatInput() {
 				@SlashMenu()
 			</div>
 			<!-- Footer Area -->
-			<div class="flex items-center justify-between px-1.5 pb-1 gap-2">
+			<div class="flex items-center gap-2 pb-2">
 				<!-- Left: Agents & Attachments -->
-				<div class="flex items-center gap-1">
+				<div class="ml-2 flex items-center gap-1">
 					<!-- Attachment Button -->
 					@button.Button(button.Props{
 						Type:    button.TypeButton,
@@ -84,7 +84,7 @@ templ ChatInput() {
 					@tokenusage.TokenCounter()
 				</div>
 				<!-- Right: Send Button -->
-				<div class="flex items-center gap-1">
+				<div class="mr-2 flex items-center gap-1">
 					<!-- Help/Shortcuts -->
 					@tooltip.Tooltip() {
 						@tooltip.Trigger(tooltip.TriggerProps{}) {
@@ -111,7 +111,7 @@ templ ChatInput() {
 							@button.Button(button.Props{
 								Variant: button.VariantDefault,
 								Size:    button.SizeIcon,
-								Class:   "bg-foreground text-background transition-all shadow-none hover:opacity-90 rounded-xl",
+								Class:   "rounded-full bg-foreground p-1.5 text-background transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-10",
 								Attributes: templ.Attributes{
 									"@click.prevent": "isStreaming ? cancelJob() : sendMessage()",
 									"type":           "button",
@@ -138,9 +138,5 @@ templ ChatInput() {
 				</div>
 			</div>
 		</form>
-	</div>
-	<!-- Disclaimer Footer -->
-	<div class="text-center text-xs text-muted-foreground mt-2 pb-2">
-		{ i18n.T(ctx, "Safar.AI can make mistakes. Check important info.") }
 	</div>
 }

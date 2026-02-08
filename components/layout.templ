@@ -1,23 +1,34 @@
 package components
 
-import "school-with-ai/components/navbar"
-import "school-with-ai/domain"
-import "school-with-ai/components/i18n"
+import (
+	"school-with-ai/components/i18n"
+	"school-with-ai/components/navbar"
+	"school-with-ai/components/resources"
+	"school-with-ai/domain"
+)
 
-type AppLayoutProps struct {
-	Title       string
-	User        *domain.User
-	IncludeChat bool // If true, includes chat-specific scripts
+type LayoutProps struct {
+	Title     string
+	User      *domain.User
+	ExtraHead templ.Component
 }
 
-// AppLayout provides the main application layout with navbar
-templ AppLayout(props AppLayoutProps) {
+// BaseLayout provides the single governing application layout with navbar
+templ BaseLayout(props LayoutProps) {
 	<!DOCTYPE html>
 	<html lang={ i18n.Lang(ctx) } dir={ i18n.Dir(ctx) }>
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 			<title>{ props.Title } - SchoolWithAI</title>
+			<!-- Import Map MUST be at the top of head -->
+			<script type="importmap">
+			{
+				"imports": {
+					"xstate": "https://cdn.jsdelivr.net/npm/xstate@5.25.1/+esm"
+				}
+			}
+			</script>
 			<link rel="icon" type="image/svg+xml" href="/assets/images/logo-black.svg"/>
 			<link rel="preconnect" href="https://fonts.googleapis.com"/>
 			<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -34,18 +45,8 @@ templ AppLayout(props AppLayoutProps) {
 						if (systemPrefersDark) {
 							root.classList.add('dark');
 						}
-					} else if (theme === 'dark') {
-						root.classList.add('dark');
 					}
 				})();
-			</script>
-			<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-			<script type="importmap">
-			{
-				"imports": {
-					"xstate": "https://cdn.jsdelivr.net/npm/xstate@5.25.1/+esm"
-				}
-			}
 			</script>
 			<!-- i18n JavaScript module -->
 			<script src="/assets/js/i18n.js"></script>
@@ -88,14 +89,42 @@ templ AppLayout(props AppLayoutProps) {
 					}));
 				});
 			</script>
+			if props.ExtraHead != nil {
+				@props.ExtraHead
+			}
+			<!-- Alpine.js Core - MUST load after plugins -->
+			<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 		</head>
-		<body class="flex min-h-screen bg-background text-foreground antialiased" x-data="themeManager">
-			<!-- Left Navigation Bar -->
-			@navbar.Navbar(navbar.Props{User: props.User})
-			<!-- Main Content with margin for navbar -->
-			<div class="ms-16 flex-1">
-				{ children... }
+		<body class="flex h-screen bg-background text-foreground antialiased overflow-hidden" x-data="themeManager">
+			<div class="flex h-screen w-full overflow-hidden">
+				<!-- Root Navbar - always available as the first child -->
+				@navbar.Navbar(navbar.Props{
+					User: props.User,
+				})
+				<!-- Main Content Area -->
+				<div class="flex-1 min-w-0 overflow-y-auto relative" id="main-content">
+					{ children... }
+				</div>
 			</div>
+			<!-- Global Modals -->
+			@resources.ResourcesDialog()
 		</body>
 	</html>
+}
+
+type AppLayoutProps struct {
+	Title       string
+	User        *domain.User
+	IncludeChat bool // If true, includes chat-specific scripts
+}
+
+// AppLayout provides the main application layout with navbar
+// (Kept for compatibility, now wraps BaseLayout)
+templ AppLayout(props AppLayoutProps) {
+	@BaseLayout(LayoutProps{
+		Title: props.Title,
+		User:  props.User,
+	}) {
+		{ children... }
+	}
 }
