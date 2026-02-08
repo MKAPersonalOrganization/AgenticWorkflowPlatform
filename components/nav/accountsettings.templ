@@ -145,39 +145,17 @@ templ authenticatedMenu(user *domain.User) {
 		<div class="text-xs text-muted-foreground truncate">{ user.Email }</div>
 	</div>
 	@accountMenuSeparator()
-	<!-- Memory -->
-	@accountMenuItem(
-		icon.Brain(icon.Props{Class: "size-4"}),
-		i18n.T(ctx, "Memory"),
-		templ.Attributes{"@click": "$dispatch('open-memory-dialog')"},
-	)
-	<!-- Student Profile -->
-	@accountMenuLink(
-		icon.BookOpen(icon.Props{Class: "size-4"}),
-		i18n.T(ctx, "Student Profile"),
-		"/profile",
-		"",
-	)
 	<!-- Settings -->
 	@accountMenuItem(
 		icon.Settings(icon.Props{Class: "size-4"}),
 		i18n.T(ctx, "Settings"),
-		templ.Attributes{"@click": "showSettings = true"},
-	)
-	@accountMenuSeparator()
-	<!-- Account Settings -->
-	@accountMenuLink(
-		icon.User(icon.Props{Class: "size-4"}),
-		i18n.T(ctx, "Account Settings"),
-		"/auth/settings",
-		"",
+		templ.Attributes{"@click": "$dispatch('open-settings-dialog', {})"},
 	)
 	<!-- Upgrade Plan -->
-	@accountMenuLink(
+	@accountMenuItem(
 		icon.Crown(icon.Props{Class: "size-4"}),
 		i18n.T(ctx, "Upgrade Plan"),
-		"/pricing",
-		"",
+		templ.Attributes{"@click": "$dispatch('open-pricing-dialog')"},
 	)
 	@accountMenuSeparator()
 	<!-- Theme Toggle -->
