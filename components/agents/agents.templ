@@ -14,6 +14,9 @@ templ AgentsDialog() {
 				agents: [],
 				loading: false,
 				selectedAgent: '',
+				toolsets: [],
+				resources: [],
+				loadingDetails: false,
 				async init() {
 					// Read current selection from the chat component
 					const chatEl = document.querySelector('[x-data="chat"]');
@@ -26,6 +29,9 @@ templ AgentsDialog() {
 						} catch (e) { /* ignore */ }
 					}
 					await this.fetchAgents();
+					if (this.selectedAgent) {
+						await this.fetchAgentDetails();
+					}
 				},
 				async fetchAgents() {
 					this.loading = true;
@@ -43,12 +49,85 @@ templ AgentsDialog() {
 						this.loading = false;
 					}
 				},
+				async fetchAgentDetails() {
+					if (!this.selectedAgent) {
+						this.toolsets = [];
+						this.resources = [];
+						return;
+					}
+					this.loadingDetails = true;
+					try {
+						const [toolsRes, resourcesRes] = await Promise.all([
+							fetch(`/v1/agents/${this.selectedAgent}/toolsets`),
+							fetch(`/v1/agents/${this.selectedAgent}/resources`)
+						]);
+						if (toolsRes.ok) {
+							const data = await toolsRes.json();
+							this.toolsets = (data.toolsets || []).filter(ts => ts.enabled);
+						} else {
+							this.toolsets = [];
+						}
+						if (resourcesRes.ok) {
+							const data = await resourcesRes.json();
+							this.resources = (data.resources || []).filter(r => r.enabled);
+						} else {
+							this.resources = [];
+						}
+					} catch (err) {
+						console.error('Failed to fetch agent details:', err);
+						this.toolsets = [];
+						this.resources = [];
+					} finally {
+						this.loadingDetails = false;
+					}
+				},
 				selectAgent(id) {
 					this.selectedAgent = id;
 					window.dispatchEvent(new CustomEvent('agent-selected', { detail: { id: id } }));
-					// Close the dialog
-					const closeBtn = document.querySelector('[data-tui-dialog-close="agents-manager-dialog"]');
-					if (closeBtn) closeBtn.click();
+					this.fetchAgentDetails();
+				},
+				get selectedAgentName() {
+					const a = this.agents.find(a => a.id === this.selectedAgent);
+					return a ? a.name : '';
+				},
+				get enabledToolCount() {
+					let count = 0;
+					this.toolsets.forEach(ts => {
+						count += (ts.tools || []).filter(t => t.enabled).length;
+					});
+					return count;
+				},
+				normalizeFileType(ft) {
+					if (!ft) return 'Other';
+					const lower = ft.toLowerCase();
+					if (lower.includes('pdf')) return 'PDF';
+					if (lower.includes('doc') || lower.includes('docx') || lower.includes('word')) return 'DOCX';
+					if (lower.includes('txt') || lower.includes('text/plain')) return 'TXT';
+					if (lower.includes('md') || lower.includes('markdown')) return 'MD';
+					return 'Other';
+				},
+				categoryColor(cat) {
+					const colors = {
+						'Mathematics': 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+						'Physics': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400',
+						'Chemistry': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
+						'Computer Science': 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400',
+						'Biology': 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+						'Economics': 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+						'Languages': 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400',
+						'History': 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
+						'Arts': 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400',
+					};
+					return colors[cat] || 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400';
+				},
+				toolSetCategoryColor(category) {
+					const colors = {
+						'Calculator': 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+						'Visualization': 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+						'Documents': 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+						'Memory': 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+					};
+					return colors[category] || 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400';
 				}
 			}));
 		});
@@ -61,7 +140,7 @@ templ AgentsDialog() {
 			ID: "agents-manager-dialog",
 		}) {
 			@dialog.Content(dialog.ContentProps{
-				Class: "sm:max-w-md max-h-[90vh] flex flex-col p-0 overflow-hidden",
+				Class: "sm:max-w-3xl max-h-[90vh] flex flex-col p-0 overflow-hidden",
 			}) {
 				@dialog.Header(dialog.HeaderProps{Class: "p-6 pb-2"}) {
 					@dialog.Title() {
@@ -71,39 +150,128 @@ templ AgentsDialog() {
 						{ i18n.T(ctx, "Select an agent for your conversation.") }
 					}
 				}
-				<div class="flex-1 overflow-auto p-6 pt-2">
-					<template x-if="loading && agents.length === 0">
-						<div class="flex justify-center p-8">
-							<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-						</div>
-					</template>
-					<template x-if="!loading && agents.length === 0">
-						<div class="text-center p-8 text-muted-foreground italic">
-							{ i18n.T(ctx, "No agents available.") }
-						</div>
-					</template>
-					<template x-if="agents.length > 0">
-						<div class="flex flex-col gap-2">
-							<template x-for="agent in agents" :key="agent.id">
-								<button
-									@click="selectAgent(agent.id)"
-									class="relative flex w-full cursor-pointer select-none items-center gap-3 rounded-lg py-3 px-3 text-sm outline-none hover:bg-accent/50 hover:text-accent-foreground transition-colors focus-visible:ring-2 focus-visible:ring-ring text-start"
-									:class="selectedAgent === agent.id ? 'bg-accent/50 text-accent-foreground ring-1 ring-primary/20' : ''"
-								>
-									<div class="size-8 rounded-md bg-primary/10 flex items-center justify-center text-primary shrink-0">
-										@icon.Bot(icon.Props{Class: "size-4"})
+				<div class="flex-1 flex overflow-hidden min-h-0">
+					<!-- Agent List (Left Panel) -->
+					<div class="w-56 border-r border-border overflow-y-auto p-3 shrink-0">
+						<template x-if="loading && agents.length === 0">
+							<div class="flex justify-center p-8">
+								<div class="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+							</div>
+						</template>
+						<template x-if="agents.length > 0">
+							<div class="flex flex-col gap-1">
+								<template x-for="agent in agents" :key="agent.id">
+									<button
+										@click="selectAgent(agent.id)"
+										class="relative flex w-full cursor-pointer select-none items-center gap-2.5 rounded-lg py-2.5 px-2.5 text-sm outline-none hover:bg-accent/50 hover:text-accent-foreground transition-colors focus-visible:ring-2 focus-visible:ring-ring text-start"
+										:class="selectedAgent === agent.id ? 'bg-accent/50 text-accent-foreground ring-1 ring-primary/20' : ''"
+									>
+										<div class="size-7 rounded-md bg-primary/10 flex items-center justify-center text-primary shrink-0">
+											@icon.Bot(icon.Props{Class: "size-3.5"})
+										</div>
+										<div class="flex flex-col items-start gap-0.5 flex-1 min-w-0">
+											<span x-text="agent.name" class="font-medium text-foreground text-xs"></span>
+										</div>
+										<template x-if="selectedAgent === agent.id">
+											@icon.Check(icon.Props{Class: "size-3.5 text-primary shrink-0"})
+										</template>
+									</button>
+								</template>
+							</div>
+						</template>
+					</div>
+					<!-- Agent Details (Right Panel) -->
+					<div class="flex-1 overflow-y-auto p-4">
+						<template x-if="!selectedAgent">
+							<div class="flex items-center justify-center h-full text-muted-foreground italic text-sm">
+								{ i18n.T(ctx, "Select an agent to view its configuration.") }
+							</div>
+						</template>
+						<template x-if="selectedAgent && loadingDetails">
+							<div class="flex justify-center p-8">
+								<div class="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+							</div>
+						</template>
+						<template x-if="selectedAgent && !loadingDetails">
+							<div class="space-y-5">
+								<!-- Agent Info -->
+								<div class="flex items-center gap-3">
+									<div class="size-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+										@icon.Bot(icon.Props{Class: "size-5"})
 									</div>
-									<div class="flex flex-col items-start gap-0.5 flex-1 min-w-0">
-										<span x-text="agent.name" class="font-medium text-foreground"></span>
-										<span x-text="agent.description || ''" class="text-xs text-muted-foreground truncate w-full"></span>
+									<div>
+										<h3 x-text="selectedAgentName" class="font-semibold text-foreground"></h3>
+										<p x-text="agents.find(a => a.id === selectedAgent)?.description || ''" class="text-xs text-muted-foreground"></p>
 									</div>
-									<template x-if="selectedAgent === agent.id">
-										@icon.Check(icon.Props{Class: "size-4 text-primary shrink-0"})
+								</div>
+								<!-- Enabled Tool Sets -->
+								<div>
+									<div class="flex items-center gap-2 mb-2.5">
+										@icon.Wrench(icon.Props{Class: "size-4 text-muted-foreground"})
+										<h4 class="text-sm font-semibold text-foreground">{ i18n.T(ctx, "Tools") }</h4>
+										<span class="text-xs text-muted-foreground" x-text="`${toolsets.length} tool sets, ${enabledToolCount} tools`"></span>
+									</div>
+									<template x-if="toolsets.length === 0">
+										<p class="text-xs text-muted-foreground italic pl-6">{ i18n.T(ctx, "No tools enabled for this agent.") }</p>
 									</template>
-								</button>
-							</template>
-						</div>
-					</template>
+									<template x-if="toolsets.length > 0">
+										<div class="space-y-2 pl-6">
+											<template x-for="ts in toolsets" :key="ts.id">
+												<div class="border border-border rounded-md p-2.5">
+													<div class="flex items-center gap-2 mb-1.5">
+														<span x-text="ts.name" class="text-xs font-medium text-foreground"></span>
+														<span
+															class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+															:class="toolSetCategoryColor(ts.category)"
+															x-text="ts.category"
+														></span>
+													</div>
+													<div class="flex flex-wrap gap-1.5">
+														<template x-for="tool in (ts.tools || []).filter(t => t.enabled)" :key="tool.id">
+															<span class="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground" x-text="tool.name"></span>
+														</template>
+													</div>
+												</div>
+											</template>
+										</div>
+									</template>
+								</div>
+								<!-- Enabled Resources -->
+								<div>
+									<div class="flex items-center gap-2 mb-2.5">
+										@icon.Library(icon.Props{Class: "size-4 text-muted-foreground"})
+										<h4 class="text-sm font-semibold text-foreground">{ i18n.T(ctx, "Resources") }</h4>
+										<span class="text-xs text-muted-foreground" x-text="`${resources.length} enabled`"></span>
+									</div>
+									<template x-if="resources.length === 0">
+										<p class="text-xs text-muted-foreground italic pl-6">{ i18n.T(ctx, "No resources enabled for this agent.") }</p>
+									</template>
+									<template x-if="resources.length > 0">
+										<div class="space-y-1 pl-6 max-h-48 overflow-y-auto">
+											<template x-for="res in resources" :key="res.id">
+												<div class="flex items-center gap-2 py-1 px-2 rounded-md hover:bg-muted/50">
+													@icon.File(icon.Props{Class: "size-3.5 text-muted-foreground shrink-0"})
+													<span x-text="res.title" class="text-xs text-foreground truncate flex-1"></span>
+													<span
+														class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium shrink-0"
+														:class="categoryColor(res.category)"
+														x-text="res.category"
+													></span>
+													<span class="text-[10px] text-muted-foreground uppercase shrink-0" x-text="normalizeFileType(res.file_type)"></span>
+												</div>
+											</template>
+										</div>
+									</template>
+								</div>
+								<!-- Hint to edit -->
+								<div class="border-t border-border pt-3">
+									<p class="text-[11px] text-muted-foreground italic">
+										{ i18n.T(ctx, "To change tool or resource permissions, use the Tools and Resource Library dialogs.") }
+									</p>
+								</div>
+							</div>
+						</template>
+					</div>
 				</div>
 				@dialog.Footer(dialog.FooterProps{Class: "p-6 pt-2 border-t mt-auto"}) {
 					@dialog.Close() {

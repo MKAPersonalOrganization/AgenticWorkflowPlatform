@@ -42,6 +42,7 @@ import (
 	"school-with-ai/services/artifact"
 	"school-with-ai/services/memory"
 	"school-with-ai/services/permissions"
+	"school-with-ai/services/resourcepermissions"
 	"school-with-ai/services/resources"
 	"school-with-ai/services/taskmanagement"
 	"school-with-ai/services/threadmgmt"
@@ -56,6 +57,7 @@ import (
 	aguihandlers "school-with-ai/handlers/agui"
 	bannerhandlers "school-with-ai/handlers/banner"
 	healthhandlers "school-with-ai/handlers/health"
+	resourcepermhandlers "school-with-ai/handlers/resourcepermissions"
 	resourceshandlers "school-with-ai/handlers/resources"
 	taskmgmthandlers "school-with-ai/handlers/taskmgmt"
 
@@ -391,6 +393,10 @@ func run(ctx context.Context, log *logger.Logger) error {
 	permissionsService := permissions.NewService(log, permissions.NewInMemoryRepository())
 	log.Info(ctx, "startup", "status", "permissions service initialized")
 
+	// Create resource permissions service
+	resourcePermissionsService := resourcepermissions.NewService(log, resourcepermissions.NewInMemoryRepository())
+	log.Info(ctx, "startup", "status", "resource permissions service initialized")
+
 	// Initialize Agents directly (Step 2 of Registry Removal)
 	// Initialize Agents directly (Step 2 of Registry Removal) - Updated for Service Decoupling
 	slogLogger := slog.New(log)
@@ -626,6 +632,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Resources Handler
 	resourcesHandler := resourceshandlers.NewHandler(resourcesService)
 
+	// Resource Permissions Handler
+	resourcePermHandler := resourcepermhandlers.NewHandler(log, resourcePermissionsService, resourcesService, agentProvider)
+
 	// Banner Handler
 	bannerHandler := bannerhandlers.NewHandler(log)
 	r.Get("/api/banner", authMiddleware.RequireAuthFunc(bannerHandler.GetBanner))
@@ -670,6 +679,10 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Get("/v1/agents/{agentId}/toolsets", authMiddleware.RequireAuthFunc(handler.ListAgentToolSets))
 	r.Put("/v1/agents/{agentId}/toolsets/{toolSetId}", authMiddleware.RequireAuthFunc(handler.ToggleAgentToolSet))
 	r.Put("/v1/agents/{agentId}/toolsets/{toolSetId}/tools/{toolId}", authMiddleware.RequireAuthFunc(handler.ToggleIndividualTool))
+
+	// Resource permission routes
+	r.Get("/v1/agents/{agentId}/resources", authMiddleware.RequireAuthFunc(resourcePermHandler.ListAgentResources))
+	r.Put("/v1/agents/{agentId}/resources/{resourceId}", authMiddleware.RequireAuthFunc(resourcePermHandler.ToggleAgentResource))
 
 	// AGUI projection query endpoints (protected)
 	r.Get("/api/agui/threads", authMiddleware.RequireAuthFunc(aguiHandler.ListThreads))
