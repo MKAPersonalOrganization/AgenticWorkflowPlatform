@@ -1,6 +1,7 @@
 package nav
 
 import (
+	"school-with-ai/components/agents"
 	"school-with-ai/components/button"
 	"school-with-ai/components/i18n"
 	"school-with-ai/components/icon"
@@ -62,6 +63,10 @@ templ Navbar(props ...NavbarProps) {
 		<!-- Resources Button -->
 		<div class="hidden md:block">
 			@resources.ResourcesButtonTrigger()
+		</div>
+		<!-- Agents Button -->
+		<div class="hidden md:block">
+			@agents.AgentsButtonTrigger()
 		</div>
 		<!-- User Profile / Settings Menu (at bottom) -->
 		@AccountSettings(AccountSettingsProps{

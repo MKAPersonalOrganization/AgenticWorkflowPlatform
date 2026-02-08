@@ -92,7 +92,7 @@ templ ChatInputScreen(user *domain.User) {
 		User:      user,
 		ExtraHead: HomeExtraHead(),
 	}) {
-		<div class="w-full h-full flex flex-col" x-data="chat">
+		<div class="w-full h-full flex flex-col" x-data="chat" @agent-selected.window="selectedAgent = $event.detail.id">
 			<!-- Sidebar Layout -->
 			<div class="flex-1">
 				@sidebar.Layout() {
@@ -111,7 +111,7 @@ templ ChatInputScreen(user *domain.User) {
 							@banner.Banner()
 							<!-- Header -->
 							@nav.MobileNav()
-							@chat.Header(user)
+							@chat.Header()
 							<!-- Content wrapper - class switches based on state -->
 							<div
 								class="flex flex-col"
