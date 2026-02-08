@@ -1,4 +1,4 @@
-package threadhistory
+package nav
 
 import "school-with-ai/components/icon"
 import "school-with-ai/components/button"
@@ -10,7 +10,7 @@ type ContextMenuProps struct {
 
 templ ContextMenu(props ContextMenuProps) {
 	<div
-		x-data="{ 
+		x-data="{
 			open: false,
 			top: 0,
 			left: 0,
@@ -22,7 +22,7 @@ templ ContextMenu(props ContextMenuProps) {
 						const rect = this.$refs.trigger.getBoundingClientRect();
 						this.top = rect.top;
 						this.left = rect.right + 8;
-						
+
 						if (window.innerHeight - rect.bottom < 200) {
 							this.top = rect.bottom - 180;
 						}
