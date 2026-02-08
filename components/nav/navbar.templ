@@ -7,6 +7,7 @@ import (
 	"school-with-ai/components/icon"
 	"school-with-ai/components/resources"
 	"school-with-ai/components/sheet"
+	"school-with-ai/components/tools"
 	"school-with-ai/domain"
 )
 
@@ -67,6 +68,10 @@ templ Navbar(props ...NavbarProps) {
 		<!-- Agents Button -->
 		<div class="hidden md:block">
 			@agents.AgentsButtonTrigger()
+		</div>
+		<!-- Tools Button -->
+		<div class="hidden md:block">
+			@tools.ToolsButtonTrigger()
 		</div>
 		<!-- User Profile / Settings Menu (at bottom) -->
 		@AccountSettings(AccountSettingsProps{

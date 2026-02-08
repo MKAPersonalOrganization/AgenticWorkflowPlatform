@@ -652,6 +652,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Get("/v1/threads/{threadId}/artifacts", authMiddleware.RequireAuthFunc(handler.ListArtifacts))
 	r.Get("/v1/threads/{threadId}/artifacts/{fileName}", authMiddleware.RequireAuthFunc(handler.DownloadArtifact))
 	r.Get("/v1/memory", authMiddleware.RequireAuthFunc(handler.GetMemory))
+	r.Get("/v1/agents/{agentId}/tools", authMiddleware.RequireAuthFunc(handler.ListAgentTools))
+	r.Put("/v1/agents/{agentId}/tools/{toolId}", authMiddleware.RequireAuthFunc(handler.ToggleAgentTool))
 
 	// AGUI projection query endpoints (protected)
 	r.Get("/api/agui/threads", authMiddleware.RequireAuthFunc(aguiHandler.ListThreads))
