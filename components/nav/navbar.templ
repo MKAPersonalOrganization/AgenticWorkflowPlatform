@@ -1,7 +1,6 @@
 package nav
 
 import (
-	"school-with-ai/components/agents"
 	"school-with-ai/components/button"
 	"school-with-ai/components/convsearch"
 	"school-with-ai/components/i18n"
@@ -66,11 +65,7 @@ templ Navbar(props ...NavbarProps) {
 		<div class="hidden md:block">
 			@resources.ResourcesButtonTrigger()
 		</div>
-		<!-- Agents Button -->
-		<div class="hidden md:block">
-			@agents.AgentsButtonTrigger()
-		</div>
-		<!-- Tools Button -->
+			<!-- Tools Button -->
 		<div class="hidden md:block">
 			@tools.ToolsButtonTrigger()
 		</div>
