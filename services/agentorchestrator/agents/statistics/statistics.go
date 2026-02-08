@@ -5,62 +5,15 @@ import (
 
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/i18n"
-	"school-with-ai/services/agentorchestrator/agents/statistics/tools"
-	sharedtools "school-with-ai/services/agentorchestrator/agents/tools"
 	"school-with-ai/services/agentorchestrator/prompts"
 )
 
-// domainTools returns the domain-specific tools for the statistics instructor.
-func domainTools() []agent.Tool {
-	return []agent.Tool{
-		&sharedtools.AddTool{},
-		&sharedtools.SubtractTool{},
-		&sharedtools.MultiplyTool{},
-		&sharedtools.DivideTool{},
-		&sharedtools.PowerTool{},
-		&sharedtools.SqrtTool{},
-		// Descriptive Statistics
-		&tools.MeanTool{},
-		&tools.MedianTool{},
-		&tools.ModeTool{},
-		&tools.MinTool{},
-		&tools.MaxTool{},
-		&tools.SumTool{},
-		&tools.VarianceTool{},
-		&tools.StandardDeviationTool{},
-		&tools.QuartileTool{},
-		&tools.PercentileTool{},
-		&tools.IQRTool{},
-		// Correlation
-		&tools.PearsonCorrelationTool{},
-		// Distance Metrics
-		&tools.EuclideanDistanceTool{},
-		&tools.ManhattanDistanceTool{},
-		// Sampling & Outliers
-		&tools.SampleTool{},
-		&tools.QuartileOutliersTool{},
-		// Normal Distribution
-		&tools.NormalPdfTool{},
-		&tools.NormalCdfTool{},
-		&tools.NormalPpfTool{},
-		&tools.NormalMeanTool{},
-		&tools.NormalMedianTool{},
-		&tools.NormalStdTool{},
-		&tools.NormalVarTool{},
-		&tools.NormalIntervalTool{},
-		&tools.BinomialNcrTool{},
-		// Regression
-		&tools.LinearRegressionTool{},
-		// Other
-	}
-}
+// NOTE: Tools are now managed via permissions service instead of hardcoded domain tools
+// The permissions service will determine which tools this agent can access
 
 // NewStatisticsInstructorConfig creates the statistics instructor configuration.
 func NewStatisticsInstructorConfig(ctx context.Context) (agent.Config, error) {
-	registry := agent.NewToolSet()
-
-	// Domain-specific tools
-	registry.AddAll(domainTools())
+	// NOTE: Tools are now managed via permissions service - no hardcoded tool registration
 
 	prompt, err := prompts.GenerateTeacherSystemPrompt(prompts.TeacherPromptConfig{
 		Role:     i18n.T(ctx, "statistics.role"),
@@ -110,7 +63,7 @@ func NewStatisticsInstructorConfig(ctx context.Context) (agent.Config, error) {
 		Name:          "statistics-instructor",
 		MaxIterations: 20,
 		SystemPrompt:  prompt,
-		Tools:         registry.All(),
+		Tools:         []agent.Tool{}, // Tools managed via permissions service
 		Capabilities: agent.Capabilities{
 			InputElicitation: true,
 		},

@@ -12,7 +12,9 @@ templ ToolsDialog() {
 		document.addEventListener('alpine:init', () => {
 			Alpine.data('toolsDialog', () => ({
 				tools: [],
+				agents: [],
 				loading: false,
+				loadingAgents: false,
 				search: '',
 				selectedAgent: '',
 				async init() {
@@ -25,10 +27,34 @@ templ ToolsDialog() {
 							}
 						} catch (e) { /* ignore */ }
 					}
+					await this.fetchAgents();
 					await this.fetchTools();
 				},
+				async fetchAgents() {
+					this.loadingAgents = true;
+					try {
+						const response = await fetch('/v1/agents');
+						if (response.ok) {
+							const data = await response.json();
+							if (data.agents && Array.isArray(data.agents)) {
+								this.agents = data.agents;
+								// Set first agent as default if no agent is selected
+								if (!this.selectedAgent && this.agents.length > 0) {
+									this.selectedAgent = this.agents[0].id;
+								}
+							}
+						}
+					} catch (err) {
+						console.error('Failed to fetch agents:', err);
+					} finally {
+						this.loadingAgents = false;
+					}
+				},
 				async fetchTools() {
-					if (!this.selectedAgent) return;
+					if (!this.selectedAgent) {
+						this.tools = [];
+						return;
+					}
 					this.loading = true;
 					try {
 						const response = await fetch(`/v1/agents/${this.selectedAgent}/tools`);
@@ -37,12 +63,21 @@ templ ToolsDialog() {
 							if (data.tools && Array.isArray(data.tools)) {
 								this.tools = data.tools;
 							}
+						} else {
+							// Handle case where agent doesn't exist or has no tools
+							this.tools = [];
 						}
 					} catch (err) {
 						console.error('Failed to fetch tools:', err);
+						this.tools = [];
 					} finally {
 						this.loading = false;
 					}
+				},
+				async onAgentChange() {
+					// Clear current tools and fetch new ones
+					this.tools = [];
+					await this.fetchTools();
 				},
 				get filteredTools() {
 					if (!this.search) return this.tools;
@@ -100,12 +135,38 @@ templ ToolsDialog() {
 			}) {
 				@dialog.Header(dialog.HeaderProps{Class: "p-6 pb-2"}) {
 					@dialog.Title() {
-						{ i18n.T(ctx, "Tools") }
+						{ i18n.T(ctx, "Tools Management") }
 					}
 					@dialog.Description() {
-						{ i18n.T(ctx, "Manage tools available for this agent.") }
+						{ i18n.T(ctx, "Select an agent and manage its available tools.") }
 					}
 				}
+				<!-- Agent Selection -->
+				<div class="px-6 pb-2">
+					<label class="block text-sm font-medium text-foreground mb-2">{ i18n.T(ctx, "Select Agent") }</label>
+					<div class="relative">
+						<select
+							x-model="selectedAgent"
+							@change="onAgentChange()"
+							class="w-full rounded-md border border-input bg-background px-3 py-2 pr-8 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring appearance-none"
+							:disabled="loadingAgents"
+						>
+							<template x-for="agent in agents" :key="agent.id">
+								<option :value="agent.id" x-text="agent.name"></option>
+							</template>
+						</select>
+						<div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+							<template x-if="loadingAgents">
+								<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+							</template>
+							<template x-if="!loadingAgents">
+								<svg class="h-4 w-4 text-muted-foreground" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+									<path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+								</svg>
+							</template>
+						</div>
+					</div>
+				</div>
 				<!-- Search -->
 				<div class="px-6 pb-2">
 					<input
@@ -122,9 +183,14 @@ templ ToolsDialog() {
 							<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
 						</div>
 					</template>
-					<template x-if="!loading && tools.length === 0">
+					<template x-if="!loading && !selectedAgent">
 						<div class="text-center p-8 text-muted-foreground italic">
-							{ i18n.T(ctx, "No tools available.") }
+							{ i18n.T(ctx, "Please select an agent to view its tools.") }
+						</div>
+					</template>
+					<template x-if="!loading && selectedAgent && tools.length === 0">
+						<div class="text-center p-8 text-muted-foreground italic">
+							{ i18n.T(ctx, "No tools available for this agent.") }
 						</div>
 					</template>
 					<template x-if="!loading && filteredTools.length === 0 && tools.length > 0">

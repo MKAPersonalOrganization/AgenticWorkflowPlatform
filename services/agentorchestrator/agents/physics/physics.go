@@ -5,25 +5,15 @@ import (
 
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/i18n"
-	sharedtools "school-with-ai/services/agentorchestrator/agents/tools"
 	"school-with-ai/services/agentorchestrator/prompts"
 )
 
-// domainTools returns the domain-specific tools for the physics instructor.
-func domainTools() []agent.Tool {
-	return []agent.Tool{
-		&sharedtools.SqrtTool{},
-	}
-}
+// NOTE: Tools are now managed via permissions service instead of hardcoded domain tools
+// The permissions service will determine which tools this agent can access
 
 // NewPhysicsInstructorConfig creates the physics instructor configuration.
 func NewPhysicsInstructorConfig(ctx context.Context) (agent.Config, error) {
-	registry := agent.NewToolSet()
-
-	// Domain-specific tools
-	for _, tool := range domainTools() {
-		registry.Register(tool)
-	}
+	// NOTE: Tools are now managed via permissions service - no hardcoded tool registration
 
 	prompt, err := prompts.GenerateTeacherSystemPrompt(prompts.TeacherPromptConfig{
 		Role:     i18n.T(ctx, "physics.role"),
@@ -72,7 +62,7 @@ func NewPhysicsInstructorConfig(ctx context.Context) (agent.Config, error) {
 		Name:          "physics-instructor",
 		MaxIterations: 20,
 		SystemPrompt:  prompt,
-		Tools:         registry.All(),
+		Tools:         []agent.Tool{}, // Tools managed via permissions service
 		Capabilities: agent.Capabilities{
 			InputElicitation: true,
 		},

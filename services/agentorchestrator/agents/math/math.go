@@ -5,49 +5,16 @@ import (
 
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/i18n"
-	mathtools "school-with-ai/services/agentorchestrator/agents/math/tools"
-	sharedtools "school-with-ai/services/agentorchestrator/agents/tools"
 	"school-with-ai/services/agentorchestrator/prompts"
 	"school-with-ai/services/artifact"
-	"school-with-ai/services/memory"
-	memorytools "school-with-ai/services/memory/tools"
 )
 
-// domainTools returns the domain-specific tools for the math instructor.
-func domainTools(artifactStore artifact.Service) []agent.Tool {
-	return []agent.Tool{
-		&sharedtools.AddTool{},
-		&sharedtools.SubtractTool{},
-		&sharedtools.MultiplyTool{},
-		&sharedtools.DivideTool{},
-		&sharedtools.PowerTool{},
-		&sharedtools.SqrtTool{},
-		&mathtools.PlotTool{},
-		&mathtools.AnimateTool{},
-		&sharedtools.CreateMarkdownTool{ArtifactStore: artifactStore},
-		&sharedtools.UpdateMarkdownTool{ArtifactStore: artifactStore},
-		&sharedtools.DeleteMarkdownTool{ArtifactStore: artifactStore},
-		// &mathtools.EquationSolverTool{},
-	}
-}
+// NOTE: Tools are now managed via permissions service instead of hardcoded domain tools
+// The permissions service will determine which tools this agent can access
 
 // NewMathInstructorConfig creates the math instructor configuration.
 func NewMathInstructorConfig(ctx context.Context, artifactStore artifact.Service) (agent.Config, error) {
-	registry := agent.NewToolSet()
-
-	// Domain-specific tools
-	for _, tool := range domainTools(artifactStore) {
-		registry.Register(tool)
-	}
-
-	// Memory tools
-	if artifactStore != nil {
-		memoryService := memory.NewArtifactMemoryService(artifactStore)
-		registry.Register(memorytools.NewMemoryTool(memoryService))
-		registry.Register(memorytools.NewForgetMemoryTool(memoryService))
-		registry.Register(memorytools.NewListMemoriesTool(memoryService))
-		registry.Register(memorytools.NewClearMemoriesTool(memoryService))
-	}
+	// NOTE: Tools are now managed via permissions service - no hardcoded tool registration
 
 	prompt, err := prompts.GenerateTeacherSystemPrompt(prompts.TeacherPromptConfig{
 		Role:     i18n.T(ctx, "math.role"),
@@ -95,7 +62,7 @@ func NewMathInstructorConfig(ctx context.Context, artifactStore artifact.Service
 		Name:          "math-instructor",
 		MaxIterations: 20,
 		SystemPrompt:  prompt,
-		Tools:         registry.All(),
+		Tools:         []agent.Tool{}, // Tools managed via permissions service
 		Capabilities: agent.Capabilities{
 			InputElicitation: true,
 		},

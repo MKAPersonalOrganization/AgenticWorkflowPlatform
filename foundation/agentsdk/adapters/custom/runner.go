@@ -16,19 +16,23 @@ import (
 	"school-with-ai/services/artifact"
 	"school-with-ai/services/memory"
 	memorytools "school-with-ai/services/memory/tools"
+	"school-with-ai/services/permissions"
 	smiddleware "school-with-ai/services/studentprofile/middleware"
+	"school-with-ai/services/toolregistry"
 )
 
 // RunnerAdapter adapts the custom engine to the agent.Runner interface.
 type RunnerAdapter struct {
-	log           *logger.Logger
-	threadMgr     ThreadManager // Interface for thread management
-	engine        *engine.Engine
-	agentProvider agent.AgentProvider
-	artifactStore artifact.Service
-	profileRepo   domain.StudentProfileRepository
-	enableMemory  bool
-	pipeline      *EventPipeline // Add event pipeline for observability
+	log                *logger.Logger
+	threadMgr          ThreadManager // Interface for thread management
+	engine             *engine.Engine
+	agentProvider      agent.AgentProvider
+	artifactStore      artifact.Service
+	profileRepo        domain.StudentProfileRepository
+	enableMemory       bool
+	pipeline           *EventPipeline // Add event pipeline for observability
+	toolRegistry       *toolregistry.Registry
+	permissionsService *permissions.Service
 }
 
 // NewRunnerAdapter creates a new runner adapter.
@@ -44,6 +48,8 @@ func NewRunnerAdapter(
 	artifactStore artifact.Service,
 	profileRepo domain.StudentProfileRepository,
 	enableMemory bool,
+	toolRegistry *toolregistry.Registry,
+	permissionsService *permissions.Service,
 ) (*RunnerAdapter, error) {
 	if modelCfg == nil {
 		return nil, fmt.Errorf("model config is required")
@@ -56,22 +62,26 @@ func NewRunnerAdapter(
 	}
 
 	r := &RunnerAdapter{
-		log:           log,
-		threadMgr:     threadMgr,
-		agentProvider: agentProvider,
-		artifactStore: artifactStore,
-		profileRepo:   profileRepo,
-		enableMemory:  enableMemory,
-		pipeline:      NewEventPipeline(log), // Initialize event pipeline
+		log:                log,
+		threadMgr:          threadMgr,
+		agentProvider:      agentProvider,
+		artifactStore:      artifactStore,
+		profileRepo:        profileRepo,
+		enableMemory:       enableMemory,
+		pipeline:           NewEventPipeline(log), // Initialize event pipeline
+		toolRegistry:       toolRegistry,
+		permissionsService: permissionsService,
 	}
 
 	provider := &RegistryAgentProvider{
-		provider:      agentProvider,
-		artifactStore: r.artifactStore,
-		profileRepo:   r.profileRepo,
-		enableMemory:  r.enableMemory,
-		modelProvider: modelCfg.Provider,
-		modelID:       modelCfg.Model,
+		provider:           agentProvider,
+		artifactStore:      r.artifactStore,
+		profileRepo:        r.profileRepo,
+		enableMemory:       r.enableMemory,
+		modelProvider:      modelCfg.Provider,
+		modelID:            modelCfg.Model,
+		toolRegistry:       toolRegistry,
+		permissionsService: permissionsService,
 	}
 
 	r.engine = engine.New(
@@ -273,12 +283,14 @@ func (r *RunnerAdapter) toCoreToolCalls(dtcs []domain.ToolCall) []core.ToolCall 
 
 // RegistryAgentProvider implements engine.AgentProvider using agent.AgentProvider.
 type RegistryAgentProvider struct {
-	provider      agent.AgentProvider
-	artifactStore artifact.Service
-	enableMemory  bool
-	profileRepo   domain.StudentProfileRepository
-	modelProvider string // LLM provider name (e.g., "openai", "gemini")
-	modelID       string // LLM model name (e.g., "gpt-4o", "gemini-2.0-flash")
+	provider           agent.AgentProvider
+	artifactStore      artifact.Service
+	enableMemory       bool
+	profileRepo        domain.StudentProfileRepository
+	modelProvider      string // LLM provider name (e.g., "openai", "gemini")
+	modelID            string // LLM model name (e.g., "gpt-4o", "gemini-2.0-flash")
+	toolRegistry       *toolregistry.Registry
+	permissionsService *permissions.Service
 }
 
 func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (core.AgentConfig, error) {
@@ -311,9 +323,40 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 		Provider:      p.modelProvider,
 	}
 
-	// Map Tools
-	for _, t := range agentConfig.Tools {
-		config.Tools = append(config.Tools, NewExecutableToolAdapter(t))
+	// Get allowed tools for this agent from permissions service
+	if p.permissionsService != nil && p.toolRegistry != nil {
+		// Initialize default permissions for this agent if none exist
+		if err := p.permissionsService.InitializeDefaultPermissions(ctx, name); err != nil {
+			// Log error but continue - don't fail agent config
+			// The agent will just have no tools available
+		}
+
+		// Get enabled tool IDs for this agent
+		enabledToolIDs, err := p.permissionsService.GetEnabledTools(ctx, name)
+		if err != nil {
+			// Log error but continue with no tools
+			enabledToolIDs = []string{}
+		}
+
+		// Convert tool IDs to actual executable tools
+		factory := toolregistry.NewExecutableToolFactory(p.artifactStore)
+		for _, toolID := range enabledToolIDs {
+			tool, err := p.toolRegistry.GetTool(ctx, toolID)
+			if err != nil {
+				// Skip tools that don't exist in registry
+				continue
+			}
+
+			// Create executable tool from registry metadata
+			executableTool, err := factory.CreateExecutableTool(ctx, tool)
+			if err != nil {
+				// Skip tools that can't be created
+				continue
+			}
+
+			// Add the executable tool to the agent configuration
+			config.Tools = append(config.Tools, executableTool)
+		}
 	}
 
 	// Map Middlewares to their respective phases
