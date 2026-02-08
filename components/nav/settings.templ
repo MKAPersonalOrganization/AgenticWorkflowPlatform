@@ -16,7 +16,11 @@ import (
 // Settings renders the settings dialog
 // (matches LibreChat's Settings.tsx).
 templ Settings() {
-	<div x-show="showSettings" x-cloak>
+	<div
+		x-show="showSettings"
+		x-cloak
+		@open-settings-dialog.window="let _tab = ($event.detail || {}).tab; showSettings = true; if (_tab) $nextTick(function() { if (window.tui && window.tui.tabs) window.tui.tabs.setActive('settings-tabs', _tab); })"
+	>
 		@dialog.Dialog(dialog.Props{Open: true, Class: "relative z-50"}) {
 			<!-- Backdrop -->
 			<div
@@ -62,6 +66,7 @@ templ Settings() {
 					</div>
 					<!-- Use Tabs Component -->
 					@tabs.Tabs(tabs.Props{
+						ID:    "settings-tabs",
 						Class: "flex flex-col md:flex-row h-full overflow-hidden px-6 pb-6 gap-6",
 						Attributes: templ.Attributes{
 							"data-orientation": "vertical",
@@ -343,4 +348,7 @@ templ Settings() {
 		}
 	</div>
 	@memory.MemoryDialog()
+	@profileDialog()
+	@pricingDialog()
+	@checkoutDialog()
 }

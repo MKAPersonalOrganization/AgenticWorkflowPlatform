@@ -1,0 +1,119 @@
+package nav
+
+import (
+	"school-with-ai/components/button"
+	"school-with-ai/components/icon"
+	"school-with-ai/components/i18n"
+)
+
+templ pricingDialog() {
+	<div x-data={ pricingAlpineData(ctx) }
+		@open-pricing-dialog.window="open = true"
+	>
+		<!-- Backdrop -->
+		<div
+			class="fixed inset-0 z-[60] bg-black/50 transition-opacity"
+			x-show="open"
+			x-transition:enter="ease-out duration-300"
+			x-transition:enter-start="opacity-0"
+			x-transition:enter-end="opacity-100"
+			x-transition:leave="ease-in duration-200"
+			x-transition:leave-start="opacity-100"
+			x-transition:leave-end="opacity-0"
+			style="display: none;"
+			aria-hidden="true"
+		></div>
+		<!-- Modal Container -->
+		<div
+			class="fixed inset-0 z-[60] flex items-center justify-center p-4"
+			x-show="open"
+			style="display: none;"
+			@click.self="open = false"
+		>
+			<div
+				class="relative w-full max-w-5xl max-h-[90vh] bg-background rounded-lg shadow-lg flex flex-col overflow-hidden border border-border"
+				x-show="open"
+				x-transition:enter="ease-out duration-300"
+				x-transition:enter-start="opacity-0 scale-95"
+				x-transition:enter-end="opacity-100 scale-100"
+				x-transition:leave="ease-in duration-200"
+				x-transition:leave-start="opacity-100 scale-100"
+				x-transition:leave-end="opacity-0 scale-95"
+				@keydown.escape.window="open = false"
+			>
+				<!-- Header -->
+				<div class="flex items-center justify-between p-6 pb-4 border-b border-border">
+					<div class="space-y-1">
+						<h2 class="text-lg font-semibold leading-none tracking-tight">{ i18n.T(ctx, "Choose Your Plan") }</h2>
+						<p class="text-sm text-muted-foreground">{ i18n.T(ctx, "Unlock the full potential of AI-powered learning") }</p>
+					</div>
+					<button
+						type="button"
+						class="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+						@click="open = false"
+					>
+						@icon.X(icon.Props{Class: "size-4"})
+						<span class="sr-only">Close</span>
+					</button>
+				</div>
+				<!-- Body -->
+				<div class="flex-1 overflow-auto p-6">
+					<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+						<template x-for="plan in plans" :key="plan.id">
+							<div
+								:class="plan.popular
+									? 'relative rounded-lg border-2 border-primary shadow-md p-5 flex flex-col'
+									: 'relative rounded-lg border border-border hover:border-ring transition-colors p-5 flex flex-col'"
+							>
+								<!-- Popular Badge -->
+								<template x-if="plan.popular">
+									<div class="absolute -top-3 left-1/2 -translate-x-1/2">
+										<span class="inline-flex items-center rounded-full bg-primary px-3 py-1 text-[10px] font-bold text-primary-foreground shadow-sm">
+											{ i18n.T(ctx, "POPULAR") }
+										</span>
+									</div>
+								</template>
+								<h3 class="text-lg font-bold text-foreground" x-text="plan.name"></h3>
+								<p class="text-xs text-muted-foreground mt-1" x-text="plan.description"></p>
+								<div class="mt-4 mb-4">
+									<span class="text-3xl font-bold tracking-tight" x-text="plan.price"></span>
+									<span x-show="plan.period" class="text-sm text-muted-foreground" x-text="plan.period"></span>
+								</div>
+								<ul class="space-y-2 flex-1 mb-4">
+									<template x-for="feature in plan.features" :key="feature">
+										<li class="flex items-start gap-2 text-sm">
+											<svg class="size-4 text-primary shrink-0 mt-0.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
+											<span x-text="feature"></span>
+										</li>
+									</template>
+								</ul>
+								<!-- Upgrade Button -->
+								<button
+									type="button"
+									@click="selectPlan(plan)"
+									:disabled="plan.id === 'free'"
+									:class="plan.popular
+										? 'w-full inline-flex items-center justify-center rounded-md text-sm font-medium h-10 px-4 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+										: 'w-full inline-flex items-center justify-center rounded-md text-sm font-medium h-10 px-4 border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed'"
+									x-text="plan.buttonText"
+								></button>
+							</div>
+						</template>
+					</div>
+				</div>
+				<!-- Footer -->
+				<div class="p-4 border-t border-border flex justify-end bg-background">
+					@button.Button(button.Props{
+						Type:    button.TypeButton,
+						Variant: button.VariantOutline,
+						Attributes: templ.Attributes{
+							"@click": "open = false",
+						},
+					}) {
+						{ i18n.T(ctx, "Close") }
+					}
+				</div>
+			</div>
+		</div>
+	</div>
+}
