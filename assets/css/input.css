@@ -418,4 +418,43 @@
     font-size: 0.75rem;
     color: var(--muted-foreground);
   }
+  
+  /* Line clamp utilities for text truncation */
+  .line-clamp-1 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+  }
+  
+  .line-clamp-2 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  
+  .line-clamp-3 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+  
+  /* Full-width dialog overrides */
+  #tools-manager-dialog [data-dialog-content],
+  #tools-manager-dialog > div,
+  #tools-manager-dialog .dialog-content {
+    width: 98vw !important;
+    height: 95vh !important;
+    max-width: none !important;
+    max-height: none !important;
+  }
+  
+  /* Override any container constraints */
+  [data-dialog-overlay] {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
 }

@@ -9,118 +9,226 @@ import (
 	"school-with-ai/foundation/logger"
 )
 
-// Permission represents an agent's access permission to a specific tool.
+// Permission represents permission for an agent to use a specific tool within a tool set.
 type Permission struct {
 	AgentID   string    `json:"agent_id"`
+	ToolSetID string    `json:"tool_set_id"`
 	ToolID    string    `json:"tool_id"`
 	Enabled   bool      `json:"enabled"`
-	Config    string    `json:"config,omitempty"` // JSON string for tool-specific config
+	Config    string    `json:"config,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// Repository defines the storage interface for permission data.
+// ToolSetPermission represents an agent's access permission to a tool set.
+type ToolSetPermission struct {
+	AgentID   string    `json:"agent_id"`
+	ToolSetID string    `json:"tool_set_id"`
+	Enabled   bool      `json:"enabled"`
+	Config    string    `json:"config,omitempty"` // JSON string for tool set-specific config
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// Repository defines the storage interface for tool set and individual tool permission data.
 type Repository interface {
+	// Individual Tool Permissions within Tool Sets
 	// GetPermission retrieves a specific agent-tool permission.
-	GetPermission(ctx context.Context, agentID, toolID string) (*Permission, error)
+	GetPermission(ctx context.Context, agentID, toolSetID, toolID string) (*Permission, error)
 
-	// ListPermissions returns all permissions for an agent.
-	ListPermissions(ctx context.Context, agentID string) ([]Permission, error)
+	// ListPermissions returns all individual tool permissions for an agent within a tool set.
+	ListPermissions(ctx context.Context, agentID, toolSetID string) ([]Permission, error)
 
-	// SavePermission saves or updates a permission.
+	// SavePermission saves or updates an individual tool permission.
 	SavePermission(ctx context.Context, permission *Permission) error
 
 	// DeletePermission removes a specific agent-tool permission.
-	DeletePermission(ctx context.Context, agentID, toolID string) error
+	DeletePermission(ctx context.Context, agentID, toolSetID, toolID string) error
 
-	// ListAllPermissions returns all permissions in the system.
-	ListAllPermissions(ctx context.Context) ([]Permission, error)
+	// Tool Set Permissions
+	// GetToolSetPermission retrieves a specific agent-toolset permission.
+	GetToolSetPermission(ctx context.Context, agentID, toolSetID string) (*ToolSetPermission, error)
+
+	// ListToolSetPermissions returns all tool set permissions for an agent.
+	ListToolSetPermissions(ctx context.Context, agentID string) ([]ToolSetPermission, error)
+
+	// SaveToolSetPermission saves or updates a tool set permission.
+	SaveToolSetPermission(ctx context.Context, permission *ToolSetPermission) error
+
+	// DeleteToolSetPermission removes a specific agent-toolset permission.
+	DeleteToolSetPermission(ctx context.Context, agentID, toolSetID string) error
 }
 
-// Service manages agent-tool permissions.
+// Service manages tool set permissions and individual tool permissions within tool sets for agents.
 type Service struct {
-	log   *logger.Logger
-	repo  Repository
-	mutex sync.RWMutex
-	cache map[string]map[string]*Permission // agentID -> toolID -> Permission
+	log          *logger.Logger
+	repo         Repository
+	mutex        sync.RWMutex
+	toolSetCache map[string]map[string]*ToolSetPermission     // agentID -> toolSetID -> ToolSetPermission
+	toolCache    map[string]map[string]map[string]*Permission // agentID -> toolSetID -> toolID -> Permission
 }
 
 // NewService creates a new permissions service.
 func NewService(log *logger.Logger, repo Repository) *Service {
 	return &Service{
-		log:   log,
-		repo:  repo,
-		cache: make(map[string]map[string]*Permission),
+		log:          log,
+		repo:         repo,
+		toolSetCache: make(map[string]map[string]*ToolSetPermission),
+		toolCache:    make(map[string]map[string]map[string]*Permission),
 	}
 }
 
-// Initialize loads existing permissions and sets up defaults.
+// Initialize loads existing tool set permissions.
 func (s *Service) Initialize(ctx context.Context) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	// Load all existing permissions into cache
-	permissions, err := s.repo.ListAllPermissions(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to load permissions: %w", err)
-	}
-
-	for _, perm := range permissions {
-		if s.cache[perm.AgentID] == nil {
-			s.cache[perm.AgentID] = make(map[string]*Permission)
-		}
-		permCopy := perm
-		s.cache[perm.AgentID][perm.ToolID] = &permCopy
-	}
-
-	s.log.Info(ctx, "Permissions service initialized", "permission_count", len(permissions))
+	s.log.Info(ctx, "Permissions service initialized for tool sets")
 	return nil
 }
 
-// SetPermission grants or revokes permission for an agent to use a tool.
-func (s *Service) SetPermission(ctx context.Context, agentID, toolID string, enabled bool) error {
-	now := time.Now()
+// =============================================================================
+// Individual Tool Permission Management (within Tool Sets)
+// =============================================================================
 
-	// Check if permission already exists
-	existing, _ := s.GetPermission(ctx, agentID, toolID)
+// SetPermission enables or disables a specific tool within a tool set for an agent.
+func (s *Service) SetPermission(ctx context.Context, agentID, toolSetID, toolID string, enabled bool) error {
+	now := time.Now()
 
 	permission := &Permission{
 		AgentID:   agentID,
+		ToolSetID: toolSetID,
 		ToolID:    toolID,
 		Enabled:   enabled,
+		CreatedAt: now,
 		UpdatedAt: now,
 	}
 
-	if existing != nil {
-		permission.CreatedAt = existing.CreatedAt
-		permission.Config = existing.Config
-	} else {
-		permission.CreatedAt = now
-	}
-
 	if err := s.repo.SavePermission(ctx, permission); err != nil {
-		return fmt.Errorf("failed to save permission: %w", err)
+		return fmt.Errorf("failed to save individual tool permission: %w", err)
 	}
 
 	// Update cache
 	s.mutex.Lock()
-	if s.cache[agentID] == nil {
-		s.cache[agentID] = make(map[string]*Permission)
+	if _, exists := s.toolCache[agentID]; !exists {
+		s.toolCache[agentID] = make(map[string]map[string]*Permission)
 	}
-	s.cache[agentID][toolID] = permission
+	if _, exists := s.toolCache[agentID][toolSetID]; !exists {
+		s.toolCache[agentID][toolSetID] = make(map[string]*Permission)
+	}
+	s.toolCache[agentID][toolSetID][toolID] = permission
 	s.mutex.Unlock()
 
-	s.log.Info(ctx, "Permission updated",
-		"agent_id", agentID, "tool_id", toolID, "enabled", enabled)
-
+	s.log.Info(ctx, "Individual tool permission updated", "agent_id", agentID, "tool_set_id", toolSetID, "tool_id", toolID, "enabled", enabled)
 	return nil
 }
 
-// GetPermission retrieves a specific agent-tool permission.
-func (s *Service) GetPermission(ctx context.Context, agentID, toolID string) (*Permission, error) {
+// HasPermission checks if an agent has permission to use a specific tool within a tool set.
+func (s *Service) HasPermission(ctx context.Context, agentID, toolSetID, toolID string) bool {
+	permission, err := s.GetPermission(ctx, agentID, toolSetID, toolID)
+	if err != nil {
+		// If no explicit permission exists, check if the tool set is enabled (inherit from tool set)
+		return s.HasToolSetPermission(ctx, agentID, toolSetID)
+	}
+	return permission.Enabled
+}
+
+// GetPermission retrieves a specific agent's tool permission within a tool set.
+func (s *Service) GetPermission(ctx context.Context, agentID, toolSetID, toolID string) (*Permission, error) {
 	s.mutex.RLock()
-	if agentPerms, exists := s.cache[agentID]; exists {
-		if perm, exists := agentPerms[toolID]; exists {
+	if agentPerms, exists := s.toolCache[agentID]; exists {
+		if toolSetPerms, exists := agentPerms[toolSetID]; exists {
+			if perm, exists := toolSetPerms[toolID]; exists {
+				s.mutex.RUnlock()
+				permCopy := *perm
+				return &permCopy, nil
+			}
+		}
+	}
+	s.mutex.RUnlock()
+
+	// Not in cache, load from repository
+	permission, err := s.repo.GetPermission(ctx, agentID, toolSetID, toolID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Cache it
+	s.mutex.Lock()
+	if _, exists := s.toolCache[agentID]; !exists {
+		s.toolCache[agentID] = make(map[string]map[string]*Permission)
+	}
+	if _, exists := s.toolCache[agentID][toolSetID]; !exists {
+		s.toolCache[agentID][toolSetID] = make(map[string]*Permission)
+	}
+	s.toolCache[agentID][toolSetID][toolID] = permission
+	s.mutex.Unlock()
+
+	return permission, nil
+}
+
+// GetEnabledToolsInSet returns all enabled tools within a specific tool set for an agent.
+func (s *Service) GetEnabledToolsInSet(ctx context.Context, agentID, toolSetID string) ([]string, error) {
+	// First check if the tool set is enabled
+	if !s.HasToolSetPermission(ctx, agentID, toolSetID) {
+		return []string{}, nil
+	}
+
+	// Load individual tool permissions for this tool set
+	permissions, err := s.repo.ListPermissions(ctx, agentID, toolSetID)
+	if err != nil {
+		s.log.Warn(ctx, "Failed to load individual tool permissions", "agent_id", agentID, "tool_set_id", toolSetID, "error", err)
+		// If we can't load individual permissions, return empty (tool set enabled but no individual overrides)
+		return []string{}, nil
+	}
+
+	var enabledTools []string
+	for _, perm := range permissions {
+		if perm.Enabled {
+			enabledTools = append(enabledTools, perm.ToolID)
+		}
+	}
+
+	return enabledTools, nil
+}
+
+// =============================================================================
+// Tool Set Permission Management
+// =============================================================================
+
+// SetToolSetPermission enables or disables a tool set for an agent.
+func (s *Service) SetToolSetPermission(ctx context.Context, agentID, toolSetID string, enabled bool) error {
+	now := time.Now()
+
+	permission := &ToolSetPermission{
+		AgentID:   agentID,
+		ToolSetID: toolSetID,
+		Enabled:   enabled,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	if err := s.repo.SaveToolSetPermission(ctx, permission); err != nil {
+		return fmt.Errorf("failed to save tool set permission: %w", err)
+	}
+
+	// Update cache
+	s.mutex.Lock()
+	if _, exists := s.toolSetCache[agentID]; !exists {
+		s.toolSetCache[agentID] = make(map[string]*ToolSetPermission)
+	}
+	s.toolSetCache[agentID][toolSetID] = permission
+	s.mutex.Unlock()
+
+	s.log.Info(ctx, "Tool set permission updated", "agent_id", agentID, "tool_set_id", toolSetID, "enabled", enabled)
+	return nil
+}
+
+// GetToolSetPermission retrieves a specific agent's tool set permission.
+func (s *Service) GetToolSetPermission(ctx context.Context, agentID, toolSetID string) (*ToolSetPermission, error) {
+	s.mutex.RLock()
+	if agentPerms, exists := s.toolSetCache[agentID]; exists {
+		if perm, exists := agentPerms[toolSetID]; exists {
 			s.mutex.RUnlock()
 			permCopy := *perm
 			return &permCopy, nil
@@ -128,238 +236,116 @@ func (s *Service) GetPermission(ctx context.Context, agentID, toolID string) (*P
 	}
 	s.mutex.RUnlock()
 
-	// Not in cache, try repository
-	perm, err := s.repo.GetPermission(ctx, agentID, toolID)
+	// Not in cache, load from repository
+	permission, err := s.repo.GetToolSetPermission(ctx, agentID, toolSetID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Cache the result
+	// Cache it
 	s.mutex.Lock()
-	if s.cache[agentID] == nil {
-		s.cache[agentID] = make(map[string]*Permission)
+	if _, exists := s.toolSetCache[agentID]; !exists {
+		s.toolSetCache[agentID] = make(map[string]*ToolSetPermission)
 	}
-	s.cache[agentID][toolID] = perm
+	s.toolSetCache[agentID][toolSetID] = permission
 	s.mutex.Unlock()
 
-	return perm, nil
+	return permission, nil
 }
 
-// HasPermission checks if an agent has permission to use a specific tool.
-func (s *Service) HasPermission(ctx context.Context, agentID, toolID string) bool {
-	perm, err := s.GetPermission(ctx, agentID, toolID)
+// HasToolSetPermission checks if an agent has permission to use a tool set.
+func (s *Service) HasToolSetPermission(ctx context.Context, agentID, toolSetID string) bool {
+	permission, err := s.GetToolSetPermission(ctx, agentID, toolSetID)
 	if err != nil {
-		// No explicit permission found, check default permissions
-		return s.hasDefaultPermission(agentID, toolID)
+		// If no explicit permission exists, check if this is a default tool set for the agent
+		return s.hasDefaultToolSetPermission(agentID, toolSetID)
 	}
-	return perm.Enabled
+	return permission.Enabled
 }
 
-// ListAgentPermissions returns all permissions for a specific agent.
-func (s *Service) ListAgentPermissions(ctx context.Context, agentID string) ([]Permission, error) {
-	s.mutex.RLock()
-	if agentPerms, exists := s.cache[agentID]; exists {
-		permissions := make([]Permission, 0, len(agentPerms))
-		for _, perm := range agentPerms {
-			permissions = append(permissions, *perm)
-		}
-		s.mutex.RUnlock()
-		return permissions, nil
-	}
-	s.mutex.RUnlock()
+// GetEnabledToolSets returns all enabled tool sets for an agent.
+func (s *Service) GetEnabledToolSets(ctx context.Context, agentID string) ([]string, error) {
+	// Get default tool sets for this agent type
+	defaultToolSets := s.getDefaultToolSetsForAgent(agentID)
 
-	// Load from repository
-	permissions, err := s.repo.ListPermissions(ctx, agentID)
+	// Create a map to track final permissions (default + explicit overrides)
+	finalPermissions := make(map[string]bool)
+
+	// Start with defaults
+	for _, toolSetID := range defaultToolSets {
+		finalPermissions[toolSetID] = true
+	}
+
+	// Load explicit permissions from database to override defaults
+	permissions, err := s.repo.ListToolSetPermissions(ctx, agentID)
 	if err != nil {
-		return nil, err
+		s.log.Warn(ctx, "Failed to load tool set permissions", "agent_id", agentID, "error", err)
+		// Return just defaults if database fails
+		return defaultToolSets, nil
 	}
 
-	// Cache the results
-	s.mutex.Lock()
-	if s.cache[agentID] == nil {
-		s.cache[agentID] = make(map[string]*Permission)
-	}
+	// Apply explicit permissions as overrides
 	for _, perm := range permissions {
-		permCopy := perm
-		s.cache[agentID][perm.ToolID] = &permCopy
-	}
-	s.mutex.Unlock()
-
-	return permissions, nil
-}
-
-// GetEnabledTools returns a list of tool IDs that the agent has permission to use.
-func (s *Service) GetEnabledTools(ctx context.Context, agentID string) ([]string, error) {
-	// Start with default tools for this agent
-	defaultTools := s.getDefaultToolsForAgent(agentID)
-	enabledTools := make(map[string]bool)
-
-	// Initialize with defaults
-	for _, toolID := range defaultTools {
-		enabledTools[toolID] = true
+		finalPermissions[perm.ToolSetID] = perm.Enabled
 	}
 
-	// Get explicit permissions and override defaults
-	permissions, err := s.ListAgentPermissions(ctx, agentID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Apply explicit permissions (both enabled and disabled)
-	for _, perm := range permissions {
-		enabledTools[perm.ToolID] = perm.Enabled
-	}
-
-	// Convert back to slice of enabled tool IDs
-	var result []string
-	for toolID, enabled := range enabledTools {
+	// Build final list of enabled tools
+	var enabledToolSets []string
+	for toolSetID, enabled := range finalPermissions {
 		if enabled {
-			result = append(result, toolID)
+			enabledToolSets = append(enabledToolSets, toolSetID)
 		}
 	}
 
-	return result, nil
+	return enabledToolSets, nil
 }
 
-// InitializeDefaultPermissions sets up default permissions for an agent if none exist.
-func (s *Service) InitializeDefaultPermissions(ctx context.Context, agentID string) error {
-	// Check if agent already has any permissions
-	existing, err := s.ListAgentPermissions(ctx, agentID)
-	if err != nil {
-		return err
-	}
-
-	// Agent already has permissions configured
-	if len(existing) > 0 {
-		return nil
-	}
-
-	// Set default permissions
-	now := time.Now()
-	defaultTools := s.getDefaultToolsForAgent(agentID)
-
-	for _, toolID := range defaultTools {
-		permission := &Permission{
-			AgentID:   agentID,
-			ToolID:    toolID,
-			Enabled:   true,
-			CreatedAt: now,
-			UpdatedAt: now,
-		}
-
-		if err := s.repo.SavePermission(ctx, permission); err != nil {
-			s.log.Error(ctx, "Failed to save default permission",
-				"agent_id", agentID, "tool_id", toolID, "error", err)
-			continue
-		}
-
-		// Update cache
-		s.mutex.Lock()
-		if s.cache[agentID] == nil {
-			s.cache[agentID] = make(map[string]*Permission)
-		}
-		s.cache[agentID][toolID] = permission
-		s.mutex.Unlock()
-	}
-
-	s.log.Info(ctx, "Default permissions initialized",
-		"agent_id", agentID, "tool_count", len(defaultTools))
-
-	return nil
-}
-
-// hasDefaultPermission checks if an agent has default permission to a tool.
-func (s *Service) hasDefaultPermission(agentID, toolID string) bool {
-	defaultTools := s.getDefaultToolsForAgent(agentID)
-	for _, defaultTool := range defaultTools {
-		if defaultTool == toolID {
+// hasDefaultToolSetPermission checks if a tool set is enabled by default for an agent.
+func (s *Service) hasDefaultToolSetPermission(agentID, toolSetID string) bool {
+	defaultToolSets := s.getDefaultToolSetsForAgent(agentID)
+	for _, defaultToolSet := range defaultToolSets {
+		if defaultToolSet == toolSetID {
 			return true
 		}
 	}
 	return false
 }
 
-// getDefaultToolsForAgent returns default tool IDs based on agent type.
-func (s *Service) getDefaultToolsForAgent(agentID string) []string {
-	// Define default tool sets per agent type
+// getDefaultToolSetsForAgent returns the default tool sets for each agent type.
+func (s *Service) getDefaultToolSetsForAgent(agentID string) []string {
 	defaultSets := map[string][]string{
 		"math-instructor": {
-			// Calculator tools
-			"calc-add", "calc-subtract", "calc-multiply", "calc-divide", "calc-power", "calc-sqrt",
-			// Visualization tools
-			"viz-plot", "viz-animate",
-			// Document tools
-			"doc-create", "doc-update",
-			// Memory tools
-			"mem-remember", "mem-list",
+			"calculator-set",
+			"visualization-set",
+			"memory-set",
 		},
 		"physics-instructor": {
-			// Calculator tools
-			"calc-add", "calc-subtract", "calc-multiply", "calc-divide", "calc-power", "calc-sqrt",
-			// Physics tools
-			"physics-kinematics", "physics-dynamics",
-			// Visualization tools
-			"viz-plot",
-			// Document tools
-			"doc-create", "doc-update",
-			// Memory tools
-			"mem-remember", "mem-list",
+			"calculator-set",
+			"physics-set",
+			"visualization-set",
+			"memory-set",
 		},
 		"chemistry-instructor": {
-			// Calculator tools
-			"calc-add", "calc-subtract", "calc-multiply", "calc-divide", "calc-power",
-			// Chemistry tools
-			"chem-balance", "chem-molarity",
-			// Document tools
-			"doc-create", "doc-update",
-			// Memory tools
-			"mem-remember", "mem-list",
+			"calculator-set",
+			"chemistry-set",
+			"memory-set",
 		},
 		"statistics-instructor": {
-			// Calculator tools
-			"calc-add", "calc-subtract", "calc-multiply", "calc-divide", "calc-power", "calc-sqrt",
-			// Statistics tools
-			"stats-mean", "stats-median", "stats-mode", "stats-variance", "stats-stddev",
-			"stats-correlation", "stats-regression",
-			// Visualization tools
-			"viz-plot", "viz-animate",
-			// Document tools
-			"doc-create", "doc-update",
-			// Memory tools
-			"mem-remember", "mem-list",
+			"calculator-set",
+			"statistics-set",
+			"visualization-set",
+			"memory-set",
 		},
 		"diagramming-instructor": {
-			// Diagramming tools
-			"diagram-mermaid",
-			// Document tools
-			"doc-create", "doc-update",
-			// Memory tools
-			"mem-remember", "mem-list",
-		},
-		"general-assistant": {
-			// Basic calculator
-			"calc-add", "calc-subtract", "calc-multiply", "calc-divide",
-			// Document tools
-			"doc-create", "doc-update",
-			// Memory tools
-			"mem-remember", "mem-list",
-		},
-		"data-analyst": {
-			// Calculator tools
-			"calc-add", "calc-subtract", "calc-multiply", "calc-divide", "calc-power",
-			// Statistics tools
-			"stats-mean", "stats-median", "stats-variance", "stats-correlation", "stats-regression",
-			// Visualization tools
-			"viz-plot", "viz-animate",
-			// Document tools
-			"doc-create", "doc-update",
+			"diagramming-set",
+			"memory-set",
 		},
 	}
 
-	if tools, exists := defaultSets[agentID]; exists {
-		return tools
+	if toolSets, exists := defaultSets[agentID]; exists {
+		return toolSets
 	}
 
 	// Default fallback for unknown agents
-	return []string{"calc-add", "calc-subtract", "mem-remember"}
+	return []string{"calculator-set", "memory-set"}
 }

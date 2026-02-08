@@ -323,39 +323,27 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 		Provider:      p.modelProvider,
 	}
 
-	// Get allowed tools for this agent from permissions service
+	// Get allowed tool sets for this agent from permissions service
 	if p.permissionsService != nil && p.toolRegistry != nil {
-		// Initialize default permissions for this agent if none exist
-		if err := p.permissionsService.InitializeDefaultPermissions(ctx, name); err != nil {
-			// Log error but continue - don't fail agent config
-			// The agent will just have no tools available
-		}
-
-		// Get enabled tool IDs for this agent
-		enabledToolIDs, err := p.permissionsService.GetEnabledTools(ctx, name)
-		if err != nil {
-			// Log error but continue with no tools
-			enabledToolIDs = []string{}
-		}
-
-		// Convert tool IDs to actual executable tools
+		// Create tool factory
 		factory := toolregistry.NewExecutableToolFactory(p.artifactStore)
-		for _, toolID := range enabledToolIDs {
-			tool, err := p.toolRegistry.GetTool(ctx, toolID)
+		factory.SetToolRegistry(p.toolRegistry)
+
+		// Get enabled tool sets for this agent
+		enabledToolSetIDs, err := p.permissionsService.GetEnabledToolSets(ctx, name)
+		if err != nil {
+			// Log error but continue with no tool sets
+			enabledToolSetIDs = []string{}
+		}
+
+		// Add tools from enabled tool sets
+		for _, toolSetID := range enabledToolSetIDs {
+			toolsFromSet, err := factory.CreateExecutableToolsFromSet(ctx, toolSetID)
 			if err != nil {
-				// Skip tools that don't exist in registry
+				// Skip tool sets that can't be processed
 				continue
 			}
-
-			// Create executable tool from registry metadata
-			executableTool, err := factory.CreateExecutableTool(ctx, tool)
-			if err != nil {
-				// Skip tools that can't be created
-				continue
-			}
-
-			// Add the executable tool to the agent configuration
-			config.Tools = append(config.Tools, executableTool)
+			config.Tools = append(config.Tools, toolsFromSet...)
 		}
 	}
 
