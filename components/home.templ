@@ -2,7 +2,7 @@ package components
 
 import (
 	"school-with-ai/components/banner"
-	"school-with-ai/components/chatheader"
+	"school-with-ai/components/chat"
 	"school-with-ai/components/chatinput"
 	"school-with-ai/components/code"
 	"school-with-ai/components/collapsible"
@@ -18,11 +18,10 @@ import (
 	"school-with-ai/components/popover"
 	"school-with-ai/components/sampleprompts"
 	"school-with-ai/components/selectbox"
-	"school-with-ai/components/settings"
+	"school-with-ai/components/nav"
 	"school-with-ai/components/sidebar"
 	"school-with-ai/components/tabs"
 	"school-with-ai/components/textarea"
-	"school-with-ai/components/threadhistory"
 	"school-with-ai/domain"
 )
 
@@ -100,7 +99,7 @@ templ ChatInputScreen(user *domain.User) {
 					@sidebar.Sidebar(sidebar.Props{
 						ID: "thread-history-sidebar",
 					}) {
-						@threadhistory.ThreadHistory()
+						@nav.Nav()
 					}
 					<!-- Main Content Area -->
 					<div class="flex-1 flex h-full overflow-hidden relative">
@@ -111,7 +110,8 @@ templ ChatInputScreen(user *domain.User) {
 							<!-- Global Banner -->
 							@banner.Banner()
 							<!-- Header -->
-							@chatheader.ChatHeader(user)
+							@nav.MobileNav()
+							@chat.Header(user)
 							<!-- Content wrapper - class switches based on state -->
 							<div
 								class="flex flex-col"
@@ -203,7 +203,7 @@ templ ChatInputScreen(user *domain.User) {
 				}
 			</div>
 			<!-- Settings Dialog -->
-			@settings.Settings()
+			@nav.Settings()
 			<!-- Toast Notifications -->
 			<div
 				class="toast-container"

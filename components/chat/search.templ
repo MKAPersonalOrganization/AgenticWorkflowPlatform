@@ -1,4 +1,4 @@
-package chatheader
+package chat
 
 import (
 	"school-with-ai/components/button"
@@ -6,7 +6,7 @@ import (
 	"school-with-ai/components/searchbar"
 )
 
-// Search component renders the search input/toggle for the chat header
+// Search renders the search input/toggle for the chat header.
 templ Search() {
 	<div class="relative flex items-center" x-data="{ focused: false }">
 		<div
@@ -25,7 +25,7 @@ templ Search() {
 				Class:       "h-9 w-full bg-background/50 border-input",
 				Attributes: templ.Attributes{
 					"x-model":         "searchQuery",
-					"x-ref":           "searchInput", // To allow focus manipulation
+					"x-ref":           "searchInput",
 					"@keydown.escape": "showSearch = false; searchQuery = ''",
 				},
 			})

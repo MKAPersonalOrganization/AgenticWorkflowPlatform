@@ -1,4 +1,4 @@
-package threadhistory
+package nav
 
 import (
 	"school-with-ai/components/button"
@@ -8,7 +8,8 @@ import (
 	"school-with-ai/components/sidebar"
 )
 
-templ ThreadHistory() {
+// Nav renders the main thread history sidebar (matches LibreChat's Nav.tsx).
+templ Nav() {
 	@sidebar.Sidebar(sidebar.Props{
 		ID:          "thread-history-sidebar",
 		Side:        sidebar.SideLeft,
@@ -45,8 +46,6 @@ templ ThreadHistory() {
 			</div>
 		}
 		@sidebar.Content(sidebar.ContentProps{Class: "gap-0 scrollbar-transparent scrollbar-hover overflow-y-auto"}) {
-			<!-- Infinite Scroll Sentinel & Loading Indicator (Top for reverse scroll? No, traditionally bottom for chat history loading older) -->
-			<!-- Actually for thread list, usually we load more as we scroll down. -->
 			<template x-for="group in getGroupedSessions()" :key="group.title">
 				@sidebar.Group(sidebar.GroupProps{Class: "px-2 py-0"}) {
 					@sidebar.GroupLabel(sidebar.GroupLabelProps{

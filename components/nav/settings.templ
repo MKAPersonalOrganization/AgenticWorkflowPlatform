@@ -1,4 +1,4 @@
-package settings
+package nav
 
 import (
 	"fmt"
@@ -13,6 +13,8 @@ import (
 	"school-with-ai/components/memory"
 )
 
+// Settings renders the settings dialog
+// (matches LibreChat's Settings.tsx).
 templ Settings() {
 	<div x-show="showSettings" x-cloak>
 		@dialog.Dialog(dialog.Props{Open: true, Class: "relative z-50"}) {
@@ -151,13 +153,8 @@ templ Settings() {
 										<div class="text-foreground">{ i18n.T(ctx, "Enable Markdown for user messages") }</div>
 										@switchcomp.Switch(switchcomp.Props{
 											Name:    "markdownEnabled",
-											Checked: true, // Default or bind to state
+											Checked: true,
 											Attributes: templ.Attributes{
-												// Assuming x-model handles the checking state boolean
-												// But since templui switch uses a hidden checkbox, we can bind x-model to it?
-												// Actually switch.Switch wraps input. The Attributes go to input.
-												// However, templui switch might not support x-model directly changing its visual state if it relies on CSS peer-checked.
-												// x-model usually toggles the 'checked' property, which peer-checked relies on. So it SHOULD work.
 												"x-model":    "markdownEnabled",
 												"aria-label": i18n.T(ctx, "Enable Markdown"),
 											},
@@ -254,7 +251,6 @@ templ Settings() {
 										}
 									</div>
 								</div>
-								<!-- Loading indicator removed from below as it is now inside the button -->
 							}
 							<!-- Speech Tab -->
 							@tabs.Content(tabs.ContentProps{Value: "speech", Class: "space-y-6 animate-in fade-in duration-200"}) {

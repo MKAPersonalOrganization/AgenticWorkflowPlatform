@@ -1,4 +1,4 @@
-package accountsettings
+package nav
 
 import (
 	"strings"
@@ -11,18 +11,16 @@ import (
 	"school-with-ai/domain"
 )
 
-type Props struct {
+type AccountSettingsProps struct {
 	User    *domain.User
 	ID      string // Unique popover ID (required when multiple instances exist)
 	Compact bool   // True: icon-only trigger (navbar). False: avatar+name trigger (sidebar footer).
 }
 
-// AccountSettings renders a unified user profile/settings menu.
-// In Compact mode (navbar): shows a user avatar icon that opens the menu.
-// In Full mode (sidebar footer): shows avatar + display name + chevron.
-// Both modes open the same comprehensive popover menu.
-templ AccountSettings(props ...Props) {
-	{{ var p Props }}
+// AccountSettings renders a unified user profile/settings menu
+// (matches LibreChat's AccountSettings.tsx).
+templ AccountSettings(props ...AccountSettingsProps) {
+	{{ var p AccountSettingsProps }}
 	if len(props) > 0 {
 		{{ p = props[0] }}
 	}
@@ -48,7 +46,7 @@ templ AccountSettings(props ...Props) {
 					}
 				}
 			}
-			@menuPopover(p)
+			@accountMenuPopover(p)
 		</div>
 	} else {
 		@sidebar.Menu() {
@@ -83,13 +81,13 @@ templ AccountSettings(props ...Props) {
 						}
 					}
 				}
-				@menuPopover(p)
+				@accountMenuPopover(p)
 			}
 		}
 	}
 }
 
-templ menuPopover(p Props) {
+templ accountMenuPopover(p AccountSettingsProps) {
 	{{ placement := popover.PlacementTopStart }}
 	{{ popoverClass := "w-64 overflow-hidden p-1 border border-border bg-popover text-popover-foreground shadow-lg rounded-xl mb-2" }}
 	if p.Compact {
@@ -111,7 +109,7 @@ templ menuPopover(p Props) {
 	}
 }
 
-templ menuItem(iconComp templ.Component, label string, attrs templ.Attributes) {
+templ accountMenuItem(iconComp templ.Component, label string, attrs templ.Attributes) {
 	<button
 		type="button"
 		class="flex items-center gap-3 w-full px-3 py-2 text-sm rounded-lg hover:bg-accent transition-colors text-start"
@@ -124,7 +122,7 @@ templ menuItem(iconComp templ.Component, label string, attrs templ.Attributes) {
 	</button>
 }
 
-templ menuLink(iconComp templ.Component, label string, href string, extraClass string) {
+templ accountMenuLink(iconComp templ.Component, label string, href string, extraClass string) {
 	<a
 		href={ templ.SafeURL(href) }
 		class={ "flex items-center gap-3 w-full px-3 py-2 text-sm rounded-lg hover:bg-accent transition-colors", extraClass }
@@ -136,7 +134,7 @@ templ menuLink(iconComp templ.Component, label string, href string, extraClass s
 	</a>
 }
 
-templ menuSeparator() {
+templ accountMenuSeparator() {
 	<div class="my-1 h-px bg-border/50"></div>
 }
 
@@ -146,42 +144,42 @@ templ authenticatedMenu(user *domain.User) {
 		<div class="text-sm font-semibold truncate">{ user.GetDisplayName() }</div>
 		<div class="text-xs text-muted-foreground truncate">{ user.Email }</div>
 	</div>
-	@menuSeparator()
+	@accountMenuSeparator()
 	<!-- Memory -->
-	@menuItem(
+	@accountMenuItem(
 		icon.Brain(icon.Props{Class: "size-4"}),
 		i18n.T(ctx, "Memory"),
 		templ.Attributes{"@click": "$dispatch('open-memory-dialog')"},
 	)
 	<!-- Student Profile -->
-	@menuLink(
+	@accountMenuLink(
 		icon.BookOpen(icon.Props{Class: "size-4"}),
 		i18n.T(ctx, "Student Profile"),
 		"/profile",
 		"",
 	)
 	<!-- Settings -->
-	@menuItem(
+	@accountMenuItem(
 		icon.Settings(icon.Props{Class: "size-4"}),
 		i18n.T(ctx, "Settings"),
 		templ.Attributes{"@click": "showSettings = true"},
 	)
-	@menuSeparator()
+	@accountMenuSeparator()
 	<!-- Account Settings -->
-	@menuLink(
+	@accountMenuLink(
 		icon.User(icon.Props{Class: "size-4"}),
 		i18n.T(ctx, "Account Settings"),
 		"/auth/settings",
 		"",
 	)
 	<!-- Upgrade Plan -->
-	@menuLink(
+	@accountMenuLink(
 		icon.Crown(icon.Props{Class: "size-4"}),
 		i18n.T(ctx, "Upgrade Plan"),
 		"/pricing",
 		"",
 	)
-	@menuSeparator()
+	@accountMenuSeparator()
 	<!-- Theme Toggle -->
 	@button.Button(button.Props{
 		Type:    button.TypeButton,
@@ -218,9 +216,9 @@ templ authenticatedMenu(user *domain.User) {
 		</div>
 		<span class="flex-1 text-start" x-text="window.i18n.getCurrentLanguage() === 'ar' ? 'English' : 'العربية'"></span>
 	</button>
-	@menuSeparator()
+	@accountMenuSeparator()
 	<!-- Logout -->
-	@menuLink(
+	@accountMenuLink(
 		icon.LogOut(icon.Props{Class: "size-4"}),
 		i18n.T(ctx, "Log out"),
 		"/auth/logout",
@@ -230,22 +228,22 @@ templ authenticatedMenu(user *domain.User) {
 
 templ unauthenticatedMenu() {
 	<div class="px-3 py-2 text-sm font-semibold">{ i18n.T(ctx, "Welcome") }</div>
-	@menuSeparator()
+	@accountMenuSeparator()
 	<!-- Login -->
-	@menuLink(
+	@accountMenuLink(
 		icon.LogIn(icon.Props{Class: "size-4"}),
 		i18n.T(ctx, "Login"),
 		"/auth/login",
 		"",
 	)
 	<!-- Register -->
-	@menuLink(
+	@accountMenuLink(
 		icon.UserPlus(icon.Props{Class: "size-4"}),
 		i18n.T(ctx, "Register"),
 		"/auth/registration",
 		"",
 	)
-	@menuSeparator()
+	@accountMenuSeparator()
 	<!-- Language Switcher -->
 	<button
 		@click="window.i18n.setLanguage(window.i18n.getCurrentLanguage() === 'ar' ? 'en' : 'ar')"

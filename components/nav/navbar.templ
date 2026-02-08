@@ -1,7 +1,6 @@
-package navbar
+package nav
 
 import (
-	"school-with-ai/components/accountsettings"
 	"school-with-ai/components/button"
 	"school-with-ai/components/i18n"
 	"school-with-ai/components/icon"
@@ -10,14 +9,14 @@ import (
 	"school-with-ai/domain"
 )
 
-type Props struct {
+type NavbarProps struct {
 	SidebarID string
 	Class     string
 	User      *domain.User // Authenticated user (nil if not authenticated)
 }
 
-templ Navbar(props ...Props) {
-	{{ var p Props }}
+templ Navbar(props ...NavbarProps) {
+	{{ var p NavbarProps }}
 	if len(props) > 0 {
 		{{ p = props[0] }}
 	}
@@ -65,7 +64,7 @@ templ Navbar(props ...Props) {
 			@resources.ResourcesButtonTrigger()
 		</div>
 		<!-- User Profile / Settings Menu (at bottom) -->
-		@accountsettings.AccountSettings(accountsettings.Props{
+		@AccountSettings(AccountSettingsProps{
 			User:    p.User,
 			ID:      "navbar-account-settings",
 			Compact: true,
