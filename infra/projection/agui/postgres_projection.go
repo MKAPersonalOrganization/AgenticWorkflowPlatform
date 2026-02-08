@@ -784,7 +784,33 @@ func (p *PostgresAguiProjection) ListThreads(ctx context.Context, req ThreadList
 	}
 
 	var err error
-	if req.Cursor == "" {
+	if req.Query != "" {
+		// Search mode - filter by title
+		searchPattern := "%" + req.Query + "%"
+		if req.Cursor == "" {
+			query := `
+				SELECT thread_id, title, updated_at
+				FROM agui_threads
+				WHERE user_id = $1 AND is_deleted = false AND title ILIKE $2
+				ORDER BY updated_at DESC
+				LIMIT $3
+			`
+			err = p.db.SelectContext(ctx, &threads, query, req.UserID, searchPattern, fetchLimit)
+		} else {
+			cursorTime, parseErr := time.Parse(time.RFC3339Nano, req.Cursor)
+			if parseErr != nil {
+				return nil, fmt.Errorf("invalid cursor format: %w", parseErr)
+			}
+			query := `
+				SELECT thread_id, title, updated_at
+				FROM agui_threads
+				WHERE user_id = $1 AND is_deleted = false AND title ILIKE $2 AND updated_at < $3
+				ORDER BY updated_at DESC
+				LIMIT $4
+			`
+			err = p.db.SelectContext(ctx, &threads, query, req.UserID, searchPattern, cursorTime, fetchLimit)
+		}
+	} else if req.Cursor == "" {
 		// First page - no cursor
 		query := `
 			SELECT thread_id, title, updated_at

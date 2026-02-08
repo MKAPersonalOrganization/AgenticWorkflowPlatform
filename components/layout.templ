@@ -2,6 +2,7 @@ package components
 
 import (
 	"school-with-ai/components/agents"
+	"school-with-ai/components/convsearch"
 	"school-with-ai/components/i18n"
 	"school-with-ai/components/nav"
 	"school-with-ai/components/resources"
@@ -112,6 +113,7 @@ templ BaseLayout(props LayoutProps) {
 			@resources.ResourcesDialog()
 			@agents.AgentsDialog()
 			@tools.ToolsDialog()
+			@convsearch.SearchDialog()
 		</body>
 	</html>
 }

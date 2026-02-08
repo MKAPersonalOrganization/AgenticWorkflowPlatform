@@ -112,11 +112,15 @@ func (h *AguiProjectionHandler) ListThreads(w http.ResponseWriter, r *http.Reque
 		limit = parsedLimit
 	}
 
+	// Parse optional search query
+	query := r.URL.Query().Get("q")
+
 	// Build request and fetch paginated threads
 	req := agui.ThreadListRequest{
 		UserID: user.ID,
 		Cursor: cursor,
 		Limit:  limit,
+		Query:  query,
 	}
 
 	response, err := h.projection.ListThreads(r.Context(), req)

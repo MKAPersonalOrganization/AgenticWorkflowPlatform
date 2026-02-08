@@ -1,0 +1,176 @@
+package convsearch
+
+import (
+	"school-with-ai/components/button"
+	"school-with-ai/components/dialog"
+	"school-with-ai/components/i18n"
+	"school-with-ai/components/icon"
+)
+
+templ SearchDialog() {
+	<script>
+		document.addEventListener('alpine:init', () => {
+			Alpine.data('convSearchDialog', () => ({
+				results: [],
+				loading: false,
+				query: '',
+				debounceTimer: null,
+				async init() {
+					this.results = [];
+					this.query = '';
+					this.$watch('query', (val) => {
+						clearTimeout(this.debounceTimer);
+						if (!val.trim()) {
+							this.results = [];
+							return;
+						}
+						this.debounceTimer = setTimeout(() => this.search(), 300);
+					});
+				},
+				async search() {
+					const q = this.query.trim();
+					if (!q) {
+						this.results = [];
+						return;
+					}
+					this.loading = true;
+					try {
+						const response = await fetch(`/api/agui/threads?q=${encodeURIComponent(q)}&limit=20`);
+						if (response.ok) {
+							const data = await response.json();
+							this.results = data.threads || [];
+						}
+					} catch (err) {
+						console.error('Failed to search conversations:', err);
+					} finally {
+						this.loading = false;
+					}
+				},
+				selectThread(threadId) {
+					const chatEl = document.querySelector('[x-data="chat"]');
+					if (chatEl) {
+						try {
+							const chatData = Alpine.$data(chatEl);
+							if (chatData && typeof chatData.switchSession === 'function') {
+								chatData.switchSession(threadId);
+							}
+						} catch (e) {
+							console.error('Failed to switch session:', e);
+						}
+					}
+					// Close the dialog
+					const closeBtn = document.querySelector('[data-tui-dialog-close="conv-search-dialog"]');
+					if (closeBtn) closeBtn.click();
+				},
+				formatDate(dateStr) {
+					const date = new Date(dateStr);
+					const now = new Date();
+					const diff = now - date;
+					const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+					if (days === 0) return 'Today';
+					if (days === 1) return 'Yesterday';
+					if (days < 7) return days + 'd ago';
+					return date.toLocaleDateString();
+				}
+			}));
+		});
+	</script>
+	<div
+		x-data="convSearchDialog"
+		@open-conv-search-dialog.window="init(); $nextTick(() => $refs.convSearchInput?.focus())"
+	>
+		@dialog.Dialog(dialog.Props{
+			ID: "conv-search-dialog",
+		}) {
+			@dialog.Content(dialog.ContentProps{
+				Class: "sm:max-w-lg max-h-[90vh] flex flex-col p-0 overflow-hidden",
+			}) {
+				@dialog.Header(dialog.HeaderProps{Class: "p-6 pb-2"}) {
+					@dialog.Title() {
+						{ i18n.T(ctx, "Search Conversations") }
+					}
+					@dialog.Description() {
+						{ i18n.T(ctx, "Find conversations by title.") }
+					}
+				}
+				<!-- Search Input -->
+				<div class="px-6 pb-2">
+					<div class="relative">
+						<div class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3">
+							@icon.Search(icon.Props{Class: "size-4 text-muted-foreground"})
+						</div>
+						<input
+							type="text"
+							x-ref="convSearchInput"
+							x-model="query"
+							placeholder={ i18n.T(ctx, "Type to search...") }
+							class="w-full rounded-md border border-input bg-background ps-9 pe-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+						/>
+					</div>
+				</div>
+				<!-- Results -->
+				<div class="flex-1 overflow-auto px-6 pb-2" style="min-height: 200px; max-height: 400px;">
+					<template x-if="loading">
+						<div class="flex justify-center p-8">
+							<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+						</div>
+					</template>
+					<template x-if="!loading && query.trim() === ''">
+						<div class="text-center p-8 text-muted-foreground italic">
+							{ i18n.T(ctx, "Start typing to search your conversations.") }
+						</div>
+					</template>
+					<template x-if="!loading && query.trim() !== '' && results.length === 0">
+						<div class="text-center p-8 text-muted-foreground italic">
+							{ i18n.T(ctx, "No conversations found.") }
+						</div>
+					</template>
+					<template x-if="!loading && results.length > 0">
+						<div class="flex flex-col gap-1">
+							<template x-for="thread in results" :key="thread.id">
+								<button
+									@click="selectThread(thread.id)"
+									class="flex w-full cursor-pointer select-none items-center gap-3 rounded-lg py-3 px-3 text-sm outline-none hover:bg-accent/50 hover:text-accent-foreground transition-colors focus-visible:ring-2 focus-visible:ring-ring text-start"
+								>
+									<div class="size-8 rounded-md bg-muted/50 flex items-center justify-center text-muted-foreground shrink-0">
+										@icon.MessageCircle(icon.Props{Class: "size-4"})
+									</div>
+									<div class="flex flex-col items-start gap-0.5 flex-1 min-w-0">
+										<span x-text="thread.title || 'New Chat'" class="font-medium text-foreground truncate w-full"></span>
+										<span x-text="formatDate(thread.updatedAt)" class="text-xs text-muted-foreground"></span>
+									</div>
+								</button>
+							</template>
+						</div>
+					</template>
+				</div>
+				@dialog.Footer(dialog.FooterProps{Class: "p-6 pt-2 border-t mt-auto"}) {
+					@dialog.Close() {
+						@button.Button(button.Props{Variant: button.VariantGhost}) {
+							{ i18n.T(ctx, "Close") }
+						}
+					}
+				}
+			}
+		}
+	</div>
+}
+
+templ SearchButtonTrigger() {
+	@dialog.Trigger(dialog.TriggerProps{
+		For: "conv-search-dialog",
+	}) {
+		@button.Button(button.Props{
+			Size:    button.SizeIcon,
+			Variant: button.VariantGhost,
+			Class:   "size-9",
+			Attributes: templ.Attributes{
+				"@click": "$dispatch('open-conv-search-dialog')",
+				"title":  i18n.T(ctx, "Search Conversations"),
+			},
+		}) {
+			@icon.Search(icon.Props{Class: "size-5"})
+			<span class="sr-only">{ i18n.T(ctx, "Search Conversations") }</span>
+		}
+	}
+}

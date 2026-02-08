@@ -92,6 +92,7 @@ type ThreadListRequest struct {
 	UserID string // Required: filter by user
 	Cursor string // Optional: RFC3339 timestamp of last item's updated_at
 	Limit  int    // Optional: max items to return (default 20, max 100)
+	Query  string // Optional: search threads by title (case-insensitive)
 }
 
 // ThreadListResponse contains paginated thread results.
