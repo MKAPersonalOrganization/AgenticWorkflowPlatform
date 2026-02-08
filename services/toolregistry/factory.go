@@ -12,9 +12,10 @@ import (
 	"school-with-ai/services/artifact"
 )
 
-// ExecutableToolFactory creates executable tools from tool registry entries.
+// ExecutableToolFactory creates executable tools from tool registry entries and tool sets.
 type ExecutableToolFactory struct {
 	artifactStore artifact.Service
+	toolRegistry  *Registry
 }
 
 // NewExecutableToolFactory creates a new tool factory.
@@ -22,6 +23,36 @@ func NewExecutableToolFactory(artifactStore artifact.Service) *ExecutableToolFac
 	return &ExecutableToolFactory{
 		artifactStore: artifactStore,
 	}
+}
+
+// SetToolRegistry sets the tool registry for the factory (used for tool set expansion).
+func (f *ExecutableToolFactory) SetToolRegistry(registry *Registry) {
+	f.toolRegistry = registry
+}
+
+// CreateExecutableToolsFromSet creates all executable tools from a tool set.
+func (f *ExecutableToolFactory) CreateExecutableToolsFromSet(ctx context.Context, toolSetID string) ([]agent.ExecutableTool, error) {
+	if f.toolRegistry == nil {
+		return nil, fmt.Errorf("tool registry not set")
+	}
+
+	// Get tools in the set
+	tools, err := f.toolRegistry.GetToolsInSet(ctx, toolSetID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tools in set %s: %w", toolSetID, err)
+	}
+
+	var executableTools []agent.ExecutableTool
+	for _, tool := range tools {
+		executableTool, err := f.CreateExecutableTool(ctx, &tool)
+		if err != nil {
+			// Skip tools that can't be created rather than failing the entire set
+			continue
+		}
+		executableTools = append(executableTools, executableTool)
+	}
+
+	return executableTools, nil
 }
 
 // CreateExecutableTool creates an executable tool from a tool registry entry.

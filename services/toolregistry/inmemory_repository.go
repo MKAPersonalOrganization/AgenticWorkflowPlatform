@@ -9,14 +9,16 @@ import (
 // InMemoryRepository implements Repository interface with in-memory storage.
 // This is suitable for development and testing. For production, use a persistent storage.
 type InMemoryRepository struct {
-	mutex sync.RWMutex
-	tools map[string]*Tool // toolID -> Tool
+	mutex    sync.RWMutex
+	tools    map[string]*Tool    // toolID -> Tool
+	toolSets map[string]*ToolSet // toolSetID -> ToolSet
 }
 
 // NewInMemoryRepository creates a new in-memory repository.
 func NewInMemoryRepository() Repository {
 	return &InMemoryRepository{
-		tools: make(map[string]*Tool),
+		tools:    make(map[string]*Tool),
+		toolSets: make(map[string]*ToolSet),
 	}
 }
 
@@ -56,7 +58,7 @@ func (r *InMemoryRepository) SaveTool(ctx context.Context, tool *Tool) error {
 	// Create a copy to store
 	toolCopy := *tool
 	r.tools[tool.ID] = &toolCopy
-	
+
 	return nil
 }
 
@@ -70,5 +72,68 @@ func (r *InMemoryRepository) DeleteTool(ctx context.Context, id string) error {
 	}
 
 	delete(r.tools, id)
+	return nil
+}
+
+// GetToolSet retrieves a tool set by ID.
+func (r *InMemoryRepository) GetToolSet(ctx context.Context, id string) (*ToolSet, error) {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+
+	toolSet, exists := r.toolSets[id]
+	if !exists {
+		return nil, fmt.Errorf("tool set with id %s not found", id)
+	}
+
+	// Return a copy to prevent external modifications
+	toolSetCopy := *toolSet
+	// Deep copy the slice to prevent external modifications
+	toolSetCopy.ToolIDs = make([]string, len(toolSet.ToolIDs))
+	copy(toolSetCopy.ToolIDs, toolSet.ToolIDs)
+
+	return &toolSetCopy, nil
+}
+
+// ListToolSets returns all tool sets.
+func (r *InMemoryRepository) ListToolSets(ctx context.Context) ([]ToolSet, error) {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+
+	toolSets := make([]ToolSet, 0, len(r.toolSets))
+	for _, toolSet := range r.toolSets {
+		// Create a copy with deep copy of slice
+		toolSetCopy := *toolSet
+		toolSetCopy.ToolIDs = make([]string, len(toolSet.ToolIDs))
+		copy(toolSetCopy.ToolIDs, toolSet.ToolIDs)
+		toolSets = append(toolSets, toolSetCopy)
+	}
+
+	return toolSets, nil
+}
+
+// SaveToolSet saves or updates a tool set.
+func (r *InMemoryRepository) SaveToolSet(ctx context.Context, toolSet *ToolSet) error {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	// Create a copy to store with deep copy of slice
+	toolSetCopy := *toolSet
+	toolSetCopy.ToolIDs = make([]string, len(toolSet.ToolIDs))
+	copy(toolSetCopy.ToolIDs, toolSet.ToolIDs)
+
+	r.toolSets[toolSet.ID] = &toolSetCopy
+	return nil
+}
+
+// DeleteToolSet removes a tool set by ID.
+func (r *InMemoryRepository) DeleteToolSet(ctx context.Context, id string) error {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	if _, exists := r.toolSets[id]; !exists {
+		return fmt.Errorf("tool set with id %s not found", id)
+	}
+
+	delete(r.toolSets, id)
 	return nil
 }

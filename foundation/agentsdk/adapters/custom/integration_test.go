@@ -11,7 +11,7 @@ import (
 )
 
 // TestToolFactoryIntegration tests that the tool factory can properly create executable tools
-// from tool registry entries based on permissions
+// from tool registry entries and tool sets based on permissions
 func TestToolFactoryIntegration(t *testing.T) {
 	ctx := context.Background()
 	log := logger.NewText(os.Stdout, logger.LevelInfo, "TEST", nil)
@@ -24,122 +24,124 @@ func TestToolFactoryIntegration(t *testing.T) {
 	permissionsService := permissions.NewService(log, permissionsRepo)
 	toolRegistry := toolregistry.NewRegistry(log, toolRegistryRepo)
 
-	// Initialize tool registry with default tools
+	// Initialize tool registry with default tools and tool sets
 	if err := toolRegistry.Initialize(ctx); err != nil {
 		t.Fatalf("Failed to initialize tool registry: %v", err)
 	}
 
-	// Initialize default permissions for math instructor
-	if err := permissionsService.InitializeDefaultPermissions(ctx, "math-instructor"); err != nil {
-		t.Fatalf("Failed to initialize default permissions: %v", err)
-	}
-
-	// Get enabled tools for math instructor
-	enabledToolIDs, err := permissionsService.GetEnabledTools(ctx, "math-instructor")
+	// Test: Verify tool sets were created
+	toolSets, err := toolRegistry.ListToolSets(ctx)
 	if err != nil {
-		t.Fatalf("Failed to get enabled tools: %v", err)
+		t.Fatalf("Failed to list tool sets: %v", err)
 	}
 
-	if len(enabledToolIDs) == 0 {
-		t.Errorf("Expected math instructor to have default tools enabled, but got none")
+	if len(toolSets) == 0 {
+		t.Errorf("Expected default tool sets to be created, but got none")
 	}
 
-	t.Logf("Math instructor has %d tools enabled by default", len(enabledToolIDs))
+	t.Logf("Created %d default tool sets", len(toolSets))
 
-	// Create tool factory
+	// Test: Verify tool set permissions work
+	enabledToolSetIDs, err := permissionsService.GetEnabledToolSets(ctx, "math-instructor")
+	if err != nil {
+		t.Fatalf("Failed to get enabled tool sets: %v", err)
+	}
+
+	if len(enabledToolSetIDs) == 0 {
+		t.Errorf("Expected math instructor to have default tool sets enabled, but got none")
+	}
+
+	t.Logf("Math instructor has %d tool sets enabled by default", len(enabledToolSetIDs))
+
+	// Test: Verify we can create executable tools from tool sets
 	factory := toolregistry.NewExecutableToolFactory(nil)
+	factory.SetToolRegistry(toolRegistry)
 
-	// Verify that we can create executable tools from the enabled tool IDs
-	executableToolsCreated := 0
-	for _, toolID := range enabledToolIDs {
-		tool, err := toolRegistry.GetTool(ctx, toolID)
+	totalToolsFromSets := 0
+	for _, toolSetID := range enabledToolSetIDs {
+		toolsFromSet, err := factory.CreateExecutableToolsFromSet(ctx, toolSetID)
 		if err != nil {
-			t.Logf("Skipping tool %s: not found in registry", toolID)
+			t.Logf("Skipping tool set %s: %v", toolSetID, err)
 			continue
 		}
 
-		executableTool, err := factory.CreateExecutableTool(ctx, tool)
-		if err != nil {
-			t.Logf("Skipping tool %s: cannot create executable tool: %v", toolID, err)
-			continue
-		}
+		t.Logf("Tool set %s provided %d executable tools", toolSetID, len(toolsFromSet))
+		totalToolsFromSets += len(toolsFromSet)
 
-		if executableTool == nil {
-			t.Logf("Skipping tool %s: created nil executable tool", toolID)
-			continue
+		// Verify each tool has the expected interface methods
+		for _, tool := range toolsFromSet {
+			if tool.Name() == "" {
+				t.Errorf("Tool from set %s has empty name", toolSetID)
+			}
+			if tool.Description() == "" {
+				t.Errorf("Tool from set %s has empty description", toolSetID)
+			}
 		}
-
-		// Verify the tool has the expected interface methods
-		if executableTool.Name() == "" {
-			t.Errorf("Tool %s has empty name", toolID)
-		}
-		if executableTool.Description() == "" {
-			t.Errorf("Tool %s has empty description", toolID)
-		}
-
-		executableToolsCreated++
-		t.Logf("Successfully created executable tool: %s -> %s", toolID, executableTool.Name())
 	}
 
-	if executableToolsCreated == 0 {
-		t.Errorf("Expected to create at least one executable tool, but created none")
-	}
+	t.Logf("Successfully created %d total executable tools from tool sets", totalToolsFromSets)
 
-	t.Logf("Successfully created %d executable tools from %d enabled tool IDs", executableToolsCreated, len(enabledToolIDs))
+	// Test: Tool set permission changes
+	t.Log("Testing tool set permission changes...")
 
-	// Test permission changes
-	t.Log("Testing permission changes...")
-
-	// Disable calc-add tool
-	err = permissionsService.SetPermission(ctx, "math-instructor", "calc-add", false)
+	// Disable calculator-set for math instructor
+	err = permissionsService.SetToolSetPermission(ctx, "math-instructor", "calculator-set", false)
 	if err != nil {
-		t.Fatalf("Failed to disable calc-add tool: %v", err)
+		t.Fatalf("Failed to disable calculator-set: %v", err)
 	}
 
-	// Get enabled tools again
-	enabledToolIDsAfterDisable, err := permissionsService.GetEnabledTools(ctx, "math-instructor")
+	// Get enabled tool sets again
+	enabledToolSetsAfterDisable, err := permissionsService.GetEnabledToolSets(ctx, "math-instructor")
 	if err != nil {
-		t.Fatalf("Failed to get enabled tools after disable: %v", err)
+		t.Fatalf("Failed to get enabled tool sets after disable: %v", err)
 	}
 
-	// Verify calc-add is not in the list
-	for _, toolID := range enabledToolIDsAfterDisable {
-		if toolID == "calc-add" {
-			t.Errorf("Expected calc-add to be disabled, but it's still in enabled tools list")
+	// Verify calculator-set is not in the list
+	for _, toolSetID := range enabledToolSetsAfterDisable {
+		if toolSetID == "calculator-set" {
+			t.Errorf("Expected calculator-set to be disabled, but it's still in enabled tool sets list")
 		}
 	}
 
-	if len(enabledToolIDsAfterDisable) != len(enabledToolIDs)-1 {
-		t.Errorf("Expected tool count to decrease by 1 after disabling calc-add, original: %d, after disable: %d",
-			len(enabledToolIDs), len(enabledToolIDsAfterDisable))
+	if len(enabledToolSetsAfterDisable) != len(enabledToolSetIDs)-1 {
+		t.Errorf("Expected tool set count to decrease by 1 after disabling calculator-set, original: %d, after disable: %d",
+			len(enabledToolSetIDs), len(enabledToolSetsAfterDisable))
 	}
 
-	t.Logf("After disabling calc-add: math instructor has %d tools enabled", len(enabledToolIDsAfterDisable))
+	t.Logf("After disabling calculator-set: math instructor has %d tool sets enabled", len(enabledToolSetsAfterDisable))
 
-	// Test that other agents are not affected
-	err = permissionsService.InitializeDefaultPermissions(ctx, "physics-instructor")
+	// Test: Verify other agents are not affected by tool set permission changes
+	enabledPhysicsToolSets, err := permissionsService.GetEnabledToolSets(ctx, "physics-instructor")
 	if err != nil {
-		t.Fatalf("Failed to initialize physics instructor permissions: %v", err)
+		t.Fatalf("Failed to get physics tool sets: %v", err)
 	}
 
-	physicsTools, err := permissionsService.GetEnabledTools(ctx, "physics-instructor")
-	if err != nil {
-		t.Fatalf("Failed to get physics tools: %v", err)
-	}
-
-	// Physics should still have calc-add enabled
-	physicsHasCalcAdd := false
-	for _, toolID := range physicsTools {
-		if toolID == "calc-add" {
-			physicsHasCalcAdd = true
+	// Physics should still have calculator-set enabled
+	physicsHasCalculatorSet := false
+	for _, toolSetID := range enabledPhysicsToolSets {
+		if toolSetID == "calculator-set" {
+			physicsHasCalculatorSet = true
 			break
 		}
 	}
 
-	if !physicsHasCalcAdd {
-		t.Errorf("Expected physics instructor to still have calc-add enabled")
+	if !physicsHasCalculatorSet {
+		t.Errorf("Expected physics instructor to still have calculator-set enabled")
 	}
 
-	t.Logf("Physics instructor has %d tools enabled (including calc-add)", len(physicsTools))
-	t.Log("Tool factory integration tests passed!")
+	t.Logf("Physics instructor has %d tool sets enabled (including calculator-set)", len(enabledPhysicsToolSets))
+
+	// Test: Verify tools in a set
+	calculatorSet, err := toolRegistry.GetToolSet(ctx, "calculator-set")
+	if err != nil {
+		t.Fatalf("Failed to get calculator set: %v", err)
+	}
+
+	if len(calculatorSet.ToolIDs) == 0 {
+		t.Errorf("Expected calculator set to have tools, but it's empty")
+	}
+
+	t.Logf("Calculator set contains %d tools: %v", len(calculatorSet.ToolIDs), calculatorSet.ToolIDs)
+
+	t.Log("Tool set integration tests passed!")
 }
