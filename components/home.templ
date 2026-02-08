@@ -16,7 +16,6 @@ import (
 	"school-with-ai/components/keyboardshortcuts"
 	"school-with-ai/components/messagelist"
 	"school-with-ai/components/popover"
-	"school-with-ai/components/sampleprompts"
 	"school-with-ai/components/selectbox"
 	"school-with-ai/components/nav"
 	"school-with-ai/components/sidebar"
@@ -119,20 +118,6 @@ templ ChatInputScreen(user *domain.User) {
 									? 'h-full overflow-y-auto'
 									: 'flex-1 items-center justify-end sm:justify-center'"
 							>
-								<!-- Landing state -->
-								<div
-									x-show="!hasMessages && !isStreaming"
-									class="flex h-full transform-gpu flex-col items-center justify-center pb-16 transition-all duration-200"
-								>
-									<div class="flex flex-col items-center gap-3 p-2">
-										<!-- LibreChat-style Time-based Greeting -->
-										// <div class="mb-2 flex flex-col items-center gap-0">
-										// 	<h1 class="text-3xl font-medium text-foreground/90" x-text="getTimeBasedGreeting()"></h1>
-										// 	<h2 class="text-xl text-muted-foreground">{ i18n.T(ctx, "How can I help you today?") }</h2>
-										// </div>
-										@sampleprompts.SamplePrompts()
-									</div>
-								</div>
 								<!-- Messages state -->
 								<div
 									x-show="hasMessages || isStreaming"
@@ -175,7 +160,7 @@ templ ChatInputScreen(user *domain.User) {
 								>
 									<div
 										class="mx-auto flex w-full flex-row gap-3 transition-[max-width] duration-300 sm:px-2"
-										:class="(hasMessages || isStreaming) ? 'max-w-3xl xl:max-w-4xl sm:mb-4' : 'sm:mb-10'"
+										:class="(hasMessages || isStreaming) ? 'max-w-3xl xl:max-w-4xl sm:mb-4' : 'sm:mb-28'"
 									>
 										@chatinput.ChatInput()
 									</div>
