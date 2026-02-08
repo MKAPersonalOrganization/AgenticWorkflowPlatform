@@ -1,0 +1,260 @@
+package resources
+
+import (
+	"school-with-ai/components/button"
+	"school-with-ai/components/dialog"
+	"school-with-ai/components/i18n"
+	"school-with-ai/components/icon"
+	"school-with-ai/components/table"
+	"school-with-ai/components/tabs"
+)
+
+templ ResourcesDialog() {
+	<div
+		x-data="{ 
+		tab: 'public',
+		publicResources: [],
+		privateResources: [],
+		loading: false,
+		error: '',
+		async init() {
+			this.fetchResources('public');
+			this.fetchResources('private');
+		},
+		async fetchResources(source) {
+			this.loading = true;
+			try {
+				const response = await fetch(`/api/resources?source=${source}`);
+				if (!response.ok) throw new Error('Failed to fetch resources');
+				const data = await response.json();
+				if (source === 'public') {
+					this.publicResources = data || [];
+				} else {
+					this.privateResources = data || [];
+				}
+			} catch (err) {
+				this.error = err.message;
+			} finally {
+				this.loading = false;
+			}
+		},
+		async uploadResource(event) {
+			const file = event.target.files[0];
+			if (!file) return;
+
+			const formData = new FormData();
+			formData.append('file', file);
+			formData.append('title', file.name);
+
+			this.loading = true;
+			try {
+				const response = await fetch('/api/resources/upload', {
+					method: 'POST',
+					body: formData
+				});
+				if (!response.ok) throw new Error('Upload failed');
+				await this.fetchResources('private');
+				event.target.value = ''; // Reset input
+			} catch (err) {
+				alert('Upload failed: ' + err.message);
+			} finally {
+				this.loading = false;
+			}
+		},
+		async deleteResource(id) {
+			if (!confirm('Are you sure you want to delete this resource?')) return;
+			
+			try {
+				const response = await fetch(`/api/resources/${id}`, { method: 'DELETE' });
+				if (!response.ok) throw new Error('Delete failed');
+				await this.fetchResources('private');
+			} catch (err) {
+				alert('Delete failed: ' + err.message);
+			}
+		},
+		formatDate(dateStr) {
+			return new Date(dateStr).toLocaleDateString();
+		}
+	}"
+		@open-resources-dialog.window="init()"
+	>
+		@dialog.Dialog(dialog.Props{
+			ID: "resources-manager-dialog",
+		}) {
+			@dialog.Content(dialog.ContentProps{
+				Class: "sm:max-w-2xl max-h-[90vh] flex flex-col p-0 overflow-hidden",
+			}) {
+				@dialog.Header(dialog.HeaderProps{Class: "p-6 pb-2"}) {
+					@dialog.Title() {
+						{ i18n.T(ctx, "Resource Library") }
+					}
+					@dialog.Description() {
+						{ i18n.T(ctx, "Access shared materials and manage your own study documents.") }
+					}
+				}
+				<div class="flex-1 overflow-auto p-6 pt-2">
+					@tabs.Tabs(tabs.Props{ID: "resource-tabs", Class: "w-full"}) {
+						@tabs.List() {
+							@tabs.Trigger(tabs.TriggerProps{Value: "public", IsActive: true}) {
+								{ i18n.T(ctx, "Public Library") }
+							}
+							@tabs.Trigger(tabs.TriggerProps{Value: "private"}) {
+								{ i18n.T(ctx, "My Documents") }
+							}
+						}
+						<!-- Public Resources -->
+						@tabs.Content(tabs.ContentProps{Value: "public", IsActive: true, Class: "pt-4"}) {
+							<template x-if="loading && publicResources.length === 0">
+								<div class="flex justify-center p-8">
+									<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+								</div>
+							</template>
+							<template x-if="!loading && publicResources.length === 0">
+								<div class="text-center p-8 text-muted-foreground italic">
+									{ i18n.T(ctx, "No public resources available.") }
+								</div>
+							</template>
+							<template x-if="publicResources.length > 0">
+								@table.Table() {
+									@table.Header() {
+										@table.Row() {
+											@table.Head() {
+												{ i18n.T(ctx, "Title") }
+											}
+											@table.Head() {
+												{ i18n.T(ctx, "Type") }
+											}
+											@table.Head() {
+												{ i18n.T(ctx, "Actions") }
+											}
+										}
+									}
+									@table.Body() {
+										<template x-for="res in publicResources" :key="res.id">
+											@table.Row() {
+												@table.Cell() {
+													<div class="flex items-center gap-2">
+														@icon.File(icon.Props{Class: "size-4 text-muted-foreground"})
+														<span x-text="res.title" class="font-medium"></span>
+													</div>
+												}
+												@table.Cell() {
+													<span x-text="res.file_type" class="text-xs text-muted-foreground uppercase"></span>
+												}
+												@table.Cell() {
+													<a :href="`/api/resources/${res.id}/content`" target="_blank">
+														@button.Button(button.Props{Variant: button.VariantGhost, Size: button.SizeIcon}) {
+															@icon.Download(icon.Props{Class: "size-4"})
+														}
+													</a>
+												}
+											}
+										</template>
+									}
+								}
+							</template>
+						}
+						<!-- Private Resources -->
+						@tabs.Content(tabs.ContentProps{Value: "private", Class: "pt-4"}) {
+							<div class="flex justify-between items-center mb-4">
+								<h3 class="text-sm font-medium">{ i18n.T(ctx, "Your Uploads") }</h3>
+								<label class="cursor-pointer">
+									<input type="file" class="hidden" @change="uploadResource($event)" accept=".pdf,.doc,.docx,.txt,.md"/>
+									@button.Button(button.Props{Variant: button.VariantOutline, Size: button.SizeSm, Class: "gap-2"}) {
+										@icon.Plus(icon.Props{Class: "size-4"})
+										{ i18n.T(ctx, "Upload") }
+									}
+								</label>
+							</div>
+							<template x-if="loading && privateResources.length === 0">
+								<div class="flex justify-center p-8">
+									<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+								</div>
+							</template>
+							<template x-if="!loading && privateResources.length === 0">
+								<div class="text-center p-8 text-muted-foreground italic">
+									{ i18n.T(ctx, "You haven't uploaded any documents yet.") }
+								</div>
+							</template>
+							<template x-if="privateResources.length > 0">
+								@table.Table() {
+									@table.Header() {
+										@table.Row() {
+											@table.Head() {
+												{ i18n.T(ctx, "Title") }
+											}
+											@table.Head() {
+												{ i18n.T(ctx, "Date") }
+											}
+											@table.Head() {
+												{ i18n.T(ctx, "Actions") }
+											}
+										}
+									}
+									@table.Body() {
+										<template x-for="res in privateResources" :key="res.id">
+											@table.Row() {
+												@table.Cell() {
+													<div class="flex items-center gap-2">
+														@icon.File(icon.Props{Class: "size-4 text-muted-foreground"})
+														<span x-text="res.title" class="font-medium"></span>
+													</div>
+												}
+												@table.Cell() {
+													<span x-text="formatDate(res.created_at)" class="text-xs text-muted-foreground"></span>
+												}
+												@table.Cell() {
+													<div class="flex items-center gap-1">
+														<a :href="`/api/resources/${res.id}/content`" target="_blank">
+															@button.Button(button.Props{Variant: button.VariantGhost, Size: button.SizeIcon}) {
+																@icon.Download(icon.Props{Class: "size-4"})
+															}
+														</a>
+														@button.Button(button.Props{
+															Variant:    button.VariantGhost,
+															Size:       button.SizeIcon,
+															Class:      "text-destructive hover:text-destructive",
+															Attributes: templ.Attributes{"@click": "deleteResource(res.id)"},
+														}) {
+															@icon.Trash2(icon.Props{Class: "size-4"})
+														}
+													</div>
+												}
+											}
+										</template>
+									}
+								}
+							</template>
+						}
+					}
+				</div>
+				@dialog.Footer(dialog.FooterProps{Class: "p-6 pt-2 border-t mt-auto"}) {
+					@dialog.Close() {
+						@button.Button(button.Props{Variant: button.VariantGhost}) {
+							{ i18n.T(ctx, "Close") }
+						}
+					}
+				}
+			}
+		}
+	</div>
+}
+
+templ ResourcesButtonTrigger() {
+	@dialog.Trigger(dialog.TriggerProps{
+		For: "resources-manager-dialog",
+	}) {
+		@button.Button(button.Props{
+			Size:    button.SizeIcon,
+			Variant: button.VariantGhost,
+			Class:   "size-9",
+			Attributes: templ.Attributes{
+				"@click": "$dispatch('open-resources-dialog')",
+				"title":  i18n.T(ctx, "Resource Library"),
+			},
+		}) {
+			@icon.Library(icon.Props{Class: "size-5"})
+			<span class="sr-only">{ i18n.T(ctx, "Resource Library") }</span>
+		}
+	}
+}

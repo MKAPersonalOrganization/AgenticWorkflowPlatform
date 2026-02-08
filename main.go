@@ -41,7 +41,7 @@ import (
 	"school-with-ai/services/agentorchestrator"
 	"school-with-ai/services/artifact"
 	"school-with-ai/services/memory"
-	"school-with-ai/services/studentbooks"
+	"school-with-ai/services/resources"
 	"school-with-ai/services/taskmanagement"
 	"school-with-ai/services/threadmgmt"
 
@@ -50,11 +50,11 @@ import (
 	"school-with-ai/services/agentorchestrator/agents/math"
 	"school-with-ai/services/agentorchestrator/agents/physics"
 	"school-with-ai/services/agentorchestrator/agents/statistics"
-	sharedtools "school-with-ai/services/agentorchestrator/agents/tools"
 
 	aguihandlers "school-with-ai/handlers/agui"
 	bannerhandlers "school-with-ai/handlers/banner"
 	healthhandlers "school-with-ai/handlers/health"
+	resourceshandlers "school-with-ai/handlers/resources"
 	taskmgmthandlers "school-with-ai/handlers/taskmgmt"
 
 	authService "school-with-ai/services/auth"
@@ -250,6 +250,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// Initialize Student Profile Repository
 	studentProfileRepo := sqldb.NewPostgresStudentProfileRepository(db)
+	resourcesRepo := sqldb.NewPostgresResourcesRepository(db)
 
 	// Run migrations
 	log.Info(ctx, "startup", "status", "running database migrations")
@@ -374,6 +375,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Initialize memory service
 	memoryService := memory.NewArtifactMemoryService(artifactService)
 
+	// Initialize resources service
+	resourcesService := resources.NewService(resourcesRepo, artifactService)
+
 	// Initialize Agents directly (Step 2 of Registry Removal)
 	// Initialize Agents directly (Step 2 of Registry Removal) - Updated for Service Decoupling
 	slogLogger := slog.New(log)
@@ -450,10 +454,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 		"diagramming-instructor": diagrammingInstructor,
 	}
 	agentProvider := custom.NewMapAgentProvider(availableAgents)
-
-	// Initialize Student Books Service
-	booksSvc := studentbooks.NewFileSystemService("books")
-	sharedtools.InitStudentBooks(booksSvc)
 
 	var runner agentorchestrator.Runner
 	var agentOrchestrator *agentorchestrator.Service
@@ -608,6 +608,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Profile Handler
 	profileHandler := profile.NewHandler(log, studentProfileRepo)
 
+	// Resources Handler
+	resourcesHandler := resourceshandlers.NewHandler(resourcesService)
+
 	// Banner Handler
 	bannerHandler := bannerhandlers.NewHandler(log)
 	r.Get("/api/banner", authMiddleware.RequireAuthFunc(bannerHandler.GetBanner))
@@ -656,6 +659,12 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Get("/api/agui/threads/{threadId}/messages", authMiddleware.RequireAuthFunc(aguiHandler.GetMessages))
 	r.Delete("/api/agui/threads/{threadId}", authMiddleware.RequireAuthFunc(handler.DeleteThread))
 	r.Patch("/api/agui/threads/{threadId}", authMiddleware.RequireAuthFunc(handler.UpdateThreadTitle))
+
+	// Resources routes
+	r.Get("/api/resources", authMiddleware.RequireAuthFunc(resourcesHandler.List))
+	r.Post("/api/resources/upload", authMiddleware.RequireAuthFunc(resourcesHandler.Upload))
+	r.Get("/api/resources/{id}/content", authMiddleware.RequireAuthFunc(resourcesHandler.GetContent))
+	r.Delete("/api/resources/{id}", authMiddleware.RequireAuthFunc(resourcesHandler.Delete))
 
 	// Home route
 	r.Get("/", authMiddleware.RequireAuthFunc(HandleViewChatInputScreen(log)))

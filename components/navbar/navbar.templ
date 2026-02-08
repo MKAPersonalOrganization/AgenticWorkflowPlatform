@@ -1,12 +1,15 @@
 package navbar
 
-import "school-with-ai/components/button"
-import "school-with-ai/components/icon"
-import "school-with-ai/components/sheet"
-import "school-with-ai/components/popover"
-import "school-with-ai/components/i18n"
-import "school-with-ai/domain"
-import "school-with-ai/components/memory"
+import (
+	"school-with-ai/components/button"
+	"school-with-ai/components/i18n"
+	"school-with-ai/components/icon"
+	"school-with-ai/components/memory"
+	"school-with-ai/components/popover"
+	"school-with-ai/components/resources"
+	"school-with-ai/components/sheet"
+	"school-with-ai/domain"
+)
 
 type Props struct {
 	SidebarID string
@@ -24,7 +27,7 @@ templ Navbar(props ...Props) {
 	}
 	<!-- Left Navigation Bar -->
 	<nav
-		class={ "fixed start-0 top-0 h-screen w-16 bg-sidebar z-10 flex flex-col items-center py-4 gap-4 transition-opacity duration-200", p.Class }
+		class={ "h-full w-16 bg-sidebar flex flex-col items-center py-4 gap-4 transition-opacity duration-200 border-e border-sidebar-border shrink-0", p.Class }
 		id="main-navbar"
 		data-navbar-for={ p.SidebarID }
 	>
@@ -57,6 +60,10 @@ templ Navbar(props ...Props) {
 				@icon.PanelLeft(icon.Props{Class: "size-5"})
 				<span class="sr-only">{ i18n.T(ctx, "Open Thread History") }</span>
 			}
+		</div>
+		<!-- Resources Button -->
+		<div class="hidden md:block">
+			@resources.ResourcesButtonTrigger()
 		</div>
 		<!-- Settings Menu (at bottom) -->
 		<div class="mt-auto">

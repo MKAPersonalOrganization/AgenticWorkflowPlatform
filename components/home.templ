@@ -10,7 +10,6 @@ import (
 	"school-with-ai/components/dialog"
 	"school-with-ai/components/dropdown"
 	"school-with-ai/components/eventlog"
-	"school-with-ai/components/i18n"
 	"school-with-ai/components/icon"
 	"school-with-ai/components/input"
 	"school-with-ai/components/keyboardshortcuts"
@@ -20,279 +19,214 @@ import (
 	"school-with-ai/components/selectbox"
 	"school-with-ai/components/settings"
 	"school-with-ai/components/sidebar"
-	"school-with-ai/components/sidepanel"
 	"school-with-ai/components/tabs"
 	"school-with-ai/components/textarea"
 	"school-with-ai/components/threadhistory"
 	"school-with-ai/domain"
 )
 
+templ HomeExtraHead() {
+	<script src="https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js"></script>
+	<script>
+	let script = document.createElement('script');
+	script.src = "https://cdn.jsdelivr.net/npm/mathpix-markdown-it@1.3.6/es5/bundle.js";
+	document.head.append(script);
+
+	script.onload = function() {
+		console.log('Mathpix loaded');
+	}
+</script>
+	<script type="module" src="/assets/js/chat.js?v=limit10"></script>
+	<!-- Alpine.js Intersect Plugin - MUST load before Alpine core -->
+	<script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/intersect@3.x.x/dist/cdn.min.js"></script>
+	<!-- Alpine.js Collapse Plugin - MUST load before Alpine core -->
+	<script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
+	@input.Script()
+	@collapsible.Script()
+	@popover.Script()
+	@textarea.Script()
+	@sidebar.Script()
+	@code.Script()
+	@tabs.Script()
+	@selectbox.Script()
+	@copybutton.Script()
+	@dropdown.Script()
+	<style>
+		@keyframes shrink {
+			from { transform: scaleX(1); }
+			to { transform: scaleX(0); }
+		}
+
+		/* Ensure inline math stays inline and doesn't force new lines */
+		mjx-container:not([display="true"]) {
+			display: inline-block !important;
+			vertical-align: middle;
+			margin: 0 0.1em !important;
+			width: auto !important;
+		}
+		
+		/* Ensure it stays inline within prose containers */
+		.prose mjx-container:not([display="true"]) {
+			display: inline-block !important;
+		}
+
+		/* Remove excessive margins from display math */
+		mjx-container[display="true"] {
+			display: block !important;
+			margin-top: 1em !important;
+			margin-bottom: 1em !important;
+			width: 100% !important;
+		}
+		
+		/* RTL alignment for display math */
+		[dir="rtl"] mjx-container[display="true"] {
+			text-align: right !important;
+		}
+	</style>
+}
+
 templ ChatInputScreen(user *domain.User) {
-	<!DOCTYPE html>
-	<html lang={ i18n.Lang(ctx) } dir={ i18n.Dir(ctx) }>
-		<head>
-			<meta charset="UTF-8"/>
-			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-			<title>Chat</title>
-			<link rel="preconnect" href="https://fonts.googleapis.com"/>
-			<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-			<link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Noto+Sans+Arabic:wght@100..900&family=Noto+Sans:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet"/>
-			<link rel="stylesheet" href="/assets/css/output.css"/>
-			<script type="importmap">
-			{
-				"imports": {
-					"xstate": "https://cdn.jsdelivr.net/npm/xstate@5.25.1/+esm"
-				}
-			}
-			</script>
-			<script>
-				// Hide navbar when sidebar is open
-				document.addEventListener('DOMContentLoaded', () => {
-					const navbar = document.getElementById('main-navbar');
-					if (!navbar) return;
-
-					// Watch for sidebar state changes (desktop)
-					const observer = new MutationObserver(() => {
-						const sidebar = document.querySelector('[data-tui-sidebar-wrapper][data-tui-sidebar-id="thread-history-sidebar"]');
-						if (sidebar) {
-							const state = sidebar.getAttribute('data-tui-sidebar-state');
-							if (state === 'expanded') {
-								navbar.style.opacity = '0';
-								navbar.style.pointerEvents = 'none';
-							} else {
-								navbar.style.opacity = '1';
-								navbar.style.pointerEvents = 'auto';
-							}
-						}
-					});
-
-					// Start observing
-					observer.observe(document.body, {
-						attributes: true,
-						attributeFilter: ['data-tui-sidebar-state'],
-						subtree: true
-					});
-
-					// Watch for sheet state changes (mobile)
-					const sheetObserver = new MutationObserver(() => {
-						const sheet = document.querySelector('[data-tui-sheet][data-tui-sheet-side="left"]');
-						if (sheet) {
-							const isOpen = sheet.getAttribute('data-tui-dialog-open') === 'true';
-							if (isOpen) {
-								navbar.style.opacity = '0';
-								navbar.style.pointerEvents = 'none';
-							} else {
-								navbar.style.opacity = '1';
-								navbar.style.pointerEvents = 'auto';
-							}
-						}
-					});
-
-					sheetObserver.observe(document.body, {
-						attributes: true,
-						attributeFilter: ['data-tui-dialog-open'],
-						subtree: true
-					});
-				});
-			</script>
-			<script src="https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js"></script>
-			<script>
-			let script = document.createElement('script');
-			script.src = "https://cdn.jsdelivr.net/npm/mathpix-markdown-it@1.3.6/es5/bundle.js";
-			document.head.append(script);
-
-			script.onload = function() {
-				console.log('Mathpix loaded');
-			}
-		</script>
-			<script type="module" src="/assets/js/chat.js?v=limit10"></script>
-			<!-- i18n JavaScript module -->
-			<script src="/assets/js/i18n.js"></script>
-			@i18n.I18nScript()
-			<!-- Alpine.js Intersect Plugin - MUST load before Alpine core -->
-			<script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/intersect@3.x.x/dist/cdn.min.js"></script>
-			<!-- Alpine.js Collapse Plugin - MUST load before Alpine core -->
-			<script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
-			<!-- Alpine.js Core - MUST load after plugins -->
-			<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-			@input.Script()
-			@collapsible.Script()
-			@popover.Script()
-			@textarea.Script()
-			@sidebar.Script()
-			@code.Script()
-			@tabs.Script()
-			@selectbox.Script()
-			@copybutton.Script()
-			@dropdown.Script()
-			<style>
-                @keyframes shrink {
-                    from { transform: scaleX(1); }
-                    to { transform: scaleX(0); }
-                }
-
-                /* Ensure inline math stays inline and doesn't force new lines */
-                mjx-container:not([display="true"]) {
-                    display: inline-block !important;
-                    vertical-align: middle;
-                    margin: 0 0.1em !important;
-                    width: auto !important;
-                }
-                
-                /* Ensure it stays inline within prose containers */
-                .prose mjx-container:not([display="true"]) {
-                    display: inline-block !important;
-                }
-
-                /* Remove excessive margins from display math */
-                mjx-container[display="true"] {
-                    display: block !important;
-                    margin-top: 1em !important;
-                    margin-bottom: 1em !important;
-                    width: 100% !important;
-                }
-                
-                /* RTL alignment for display math */
-                [dir="rtl"] mjx-container[display="true"] {
-                    text-align: right !important;
-                }
-            </style>
-		</head>
-		<body class="flex min-h-screen bg-background text-foreground antialiased">
-			<div class="w-full h-screen" x-data="chat">
-				<!-- Sidebar Layout -->
-				<div class="flex-1">
-					@sidebar.Layout() {
-						<!-- Left Sidebar - Chat History -->
+	@BaseLayout(LayoutProps{
+		Title:     "Chat",
+		User:      user,
+		ExtraHead: HomeExtraHead(),
+	}) {
+		<div class="w-full h-full flex flex-col" x-data="chat">
+			<!-- Sidebar Layout -->
+			<div class="flex-1">
+				@sidebar.Layout() {
+					@sidebar.Sidebar(sidebar.Props{
+						ID: "thread-history-sidebar",
+					}) {
 						@threadhistory.ThreadHistory(threadhistory.Props{User: user})
-						<!-- Floating Sidebar Toggle Removed (Replaced by Header Toggle) -->
-						<!-- Main Content Area -->
-						<div class="flex-1 flex h-screen overflow-hidden relative">
-							<!-- Main Chat Panel -->
-							<main
-								class="flex flex-col relative overflow-hidden w-full h-full"
+					}
+					<!-- Main Content Area -->
+					<div class="flex-1 flex h-full overflow-hidden relative">
+						<!-- Main Chat Panel -->
+						<main
+							class="flex flex-col relative overflow-hidden w-full h-full"
+						>
+							<!-- Global Banner -->
+							@banner.Banner()
+							<!-- Header -->
+							@chatheader.ChatHeader(user)
+							<!-- Content wrapper - class switches based on state -->
+							<div
+								class="flex flex-col"
+								:class="(hasMessages || isStreaming)
+									? 'h-full overflow-y-auto'
+									: 'flex-1 items-center justify-end sm:justify-center'"
 							>
-								<!-- Global Banner -->
-								@banner.Banner()
-								<!-- Header -->
-								@chatheader.ChatHeader(user)
-								<!-- Messages Container -->
-								<div
-									class="flex-1 overflow-y-auto scrollbar-transparent scrollbar-hover"
-									style="overflow-anchor: none;"
-									x-ref="messageList"
-									role="log"
-									aria-live="polite"
-									aria-relevant="additions"
-									aria-label="Chat conversation"
-								>
-									<div x-show="!hasMessages && !isStreaming" class="h-full flex flex-col items-center justify-center">
-										<div class="flex flex-col items-center gap-8 w-full max-w-3xl mx-auto px-4 py-12">
-											<!-- Sample Prompts -->
-											@sampleprompts.SamplePrompts()
-											<!-- Keyboard shortcut hint -->
-											<div class="flex items-center gap-2 text-xs text-muted-foreground mt-4">
-												<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-													<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
-												</svg>
-												<span>{ i18n.T(ctx, "Press ? to see all keyboard shortcuts") }</span>
-											</div> <!-- Centered Input Area -->
-											<div class="w-full">
-												@chatinput.ChatInput()
-											</div>
-										</div>
-									</div>
-									<!-- When messages exist: regular message list -->
-									<div x-show="hasMessages || isStreaming" class="max-w-3xl mx-auto px-4 py-6">
-										<!-- Messages -->
-										@messagelist.MessageList()
+								<!-- Landing state -->
+								<div x-show="!hasMessages && !isStreaming"
+									class="flex h-full transform-gpu flex-col items-center justify-center pb-16 transition-all duration-200">
+									<div class="flex flex-col items-center gap-0 p-2">
+										@sampleprompts.SamplePrompts()
 									</div>
 								</div>
-								<!-- Input Area - Agent Chat UI Style (only show when messages exist) -->
-								<div x-show="hasMessages || isStreaming" class="sticky bottom-0 flex flex-col items-center gap-8 bg-background">
-									<div class="mb-2 w-full">
+								<!-- Messages state -->
+								<div x-show="hasMessages || isStreaming"
+									class="relative flex-1 overflow-hidden overflow-y-auto">
+									<div x-ref="messageList"
+										style="height: 100%; overflow-y: auto; width: 100%;"
+										role="log" aria-live="polite">
+										<div class="flex flex-col pb-9 pt-14">
+											<div class="w-full max-w-3xl xl:max-w-4xl mx-auto px-4">
+												@messagelist.MessageList()
+											</div>
+											<div id="messages-end" class="h-0 w-full flex-shrink-0"></div>
+										</div>
+									</div>
+								</div>
+								<!-- ChatForm - SINGLE instance -->
+								<div
+									class="w-full"
+									:class="(!hasMessages && !isStreaming) ? 'max-w-3xl xl:max-w-4xl mx-auto transition-all duration-200' : ''"
+								>
+									<div
+										class="mx-auto flex w-full flex-row gap-3 transition-[max-width] duration-300 sm:px-2"
+										:class="(hasMessages || isStreaming) ? 'max-w-3xl xl:max-w-4xl sm:mb-4' : 'sm:mb-8'"
+									>
 										@chatinput.ChatInput()
 									</div>
 								</div>
-								@eventlog.EventLog()
-							</main>
-						</div>
-						<!-- Right Sidebar - Premium Side Panel -->
-						@sidepanel.SidePanel()
-					}
-				</div>
-				<!-- Keyboard Shortcuts Dialog -->
-				<div x-show="showKeyboardShortcuts" x-cloak>
-					@dialog.Dialog(dialog.Props{Open: true}) {
-						<div x-show="showKeyboardShortcuts" @click.away="showKeyboardShortcuts = false">
-							@keyboardshortcuts.KeyboardShortcuts()
-						</div>
-					}
-				</div>
-				<!-- Settings Dialog -->
-				@settings.Settings()
-				<!-- Toast Notifications -->
-				<div
-					class="toast-container"
-					role="region"
-					aria-live="polite"
-					aria-label="Notifications"
-				>
-					<template x-for="toast in toasts" :key="toast.id">
-						<div
-							:class="toast.leaving ? 'toast-leave' : 'toast-enter'"
-							class="w-full bg-popover text-popover-foreground rounded-lg shadow-xs border pt-5 pb-4 px-4 flex items-center justify-center relative overflow-hidden group max-w-md min-w-[320px] mb-2"
-							role="alert"
-							:aria-live="toast.type === 'error' ? 'assertive' : 'polite'"
-						>
-							<!-- Progress Bar (Simulated) -->
-							<div class="absolute top-0 left-0 right-0 h-1 overflow-hidden" x-show="toast.duration > 0">
-								<div
-									class="toast-progress h-full ltr:origin-left rtl:origin-right transition-transform ease-linear"
-									:class="{
-                                        'bg-gray-500': !toast.type || toast.type === 'default',
-                                        'bg-green-500': toast.type === 'success',
-                                        'bg-red-500': toast.type === 'error',
-                                        'bg-yellow-500': toast.type === 'warning',
-                                        'bg-blue-500': toast.type === 'info'
-                                    }"
-									:style="`animation: shrink ${toast.duration || 3000}ms linear forwards`"
-								></div>
 							</div>
-							<!-- Icon -->
-							<div class="shrink-0 me-3">
-								<template x-if="toast.type === 'success'">
-									@icon.CircleCheck(icon.Props{Size: 22, Class: "text-green-500"})
-								</template>
-								<template x-if="toast.type === 'error'">
-									@icon.CircleX(icon.Props{Size: 22, Class: "text-red-500"})
-								</template>
-								<template x-if="toast.type === 'warning'">
-									@icon.TriangleAlert(icon.Props{Size: 22, Class: "text-yellow-500"})
-								</template>
-								<template x-if="toast.type === 'info'">
-									@icon.Info(icon.Props{Size: 22, Class: "text-blue-500"})
-								</template>
-							</div>
-							<!-- Content -->
-							<div class="flex-1 min-w-0">
-								<p class="text-sm font-semibold truncate" x-text="toast.message"></p>
-								<!-- Description support if we add it later -->
-								<!-- <p class="text-sm opacity-90 mt-1" x-text="toast.description"></p> -->
-							</div>
-							<!-- Close Button -->
-							<button
-								@click="dismissToast(toast.id)"
-								class="shrink-0 inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 hover:bg-accent hover:text-accent-foreground h-6 w-6 ms-2 opacity-75 hover:opacity-100"
-								type="button"
-								aria-label="Close notification"
-							>
-								@icon.X(icon.Props{Size: 18})
-							</button>
-						</div>
-					</template>
-				</div>
+							@eventlog.EventLog()
+						</main>
+					</div>
+				}
 			</div>
-		</body>
-	</html>
+			<!-- Keyboard Shortcuts Dialog -->
+			<div x-show="showKeyboardShortcuts" x-cloak>
+				@dialog.Dialog(dialog.Props{Open: true}) {
+					<div x-show="showKeyboardShortcuts" @click.away="showKeyboardShortcuts = false">
+						@keyboardshortcuts.KeyboardShortcuts()
+					</div>
+				}
+			</div>
+			<!-- Settings Dialog -->
+			@settings.Settings()
+			<!-- Toast Notifications -->
+			<div
+				class="toast-container"
+				role="region"
+				aria-live="polite"
+				aria-label="Notifications"
+			>
+				<template x-for="toast in toasts" :key="toast.id">
+					<div
+						:class="toast.leaving ? 'toast-leave' : 'toast-enter'"
+						class="w-full bg-popover text-popover-foreground rounded-lg shadow-xs border pt-5 pb-4 px-4 flex items-center justify-center relative overflow-hidden group max-w-md min-w-[320px] mb-2"
+						role="alert"
+						:aria-live="toast.type === 'error' ? 'assertive' : 'polite'"
+					>
+						<!-- Progress Bar (Simulated) -->
+						<div class="absolute top-0 left-0 right-0 h-1 overflow-hidden" x-show="toast.duration > 0">
+							<div
+								class="toast-progress h-full ltr:origin-left rtl:origin-right transition-transform ease-linear"
+								:class="{
+									'bg-gray-500': !toast.type || toast.type === 'default',
+									'bg-green-500': toast.type === 'success',
+									'bg-red-500': toast.type === 'error',
+									'bg-yellow-500': toast.type === 'warning',
+									'bg-blue-500': toast.type === 'info'
+								}"
+								:style="`animation: shrink ${toast.duration || 3000}ms linear forwards`"
+							></div>
+						</div>
+						<!-- Icon -->
+						<div class="shrink-0 me-3">
+							<template x-if="toast.type === 'success'">
+								@icon.CircleCheck(icon.Props{Size: 22, Class: "text-green-500"})
+							</template>
+							<template x-if="toast.type === 'error'">
+								@icon.CircleX(icon.Props{Size: 22, Class: "text-red-500"})
+							</template>
+							<template x-if="toast.type === 'warning'">
+								@icon.TriangleAlert(icon.Props{Size: 22, Class: "text-yellow-500"})
+							</template>
+							<template x-if="toast.type === 'info'">
+								@icon.Info(icon.Props{Size: 22, Class: "text-blue-500"})
+							</template>
+						</div>
+						<!-- Content -->
+						<div class="flex-1 min-w-0">
+							<p class="text-sm font-semibold truncate" x-text="toast.message"></p>
+							<!-- Description support if we add it later -->
+							<!-- <p class="text-sm opacity-90 mt-1" x-text="toast.description"></p> -->
+						</div>
+						<!-- Close Button -->
+						<button
+							@click="dismissToast(toast.id)"
+							class="shrink-0 inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 hover:bg-accent hover:text-accent-foreground h-6 w-6 ms-2 opacity-75 hover:opacity-100"
+							type="button"
+							aria-label="Close notification"
+						>
+							@icon.X(icon.Props{Size: 18})
+						</button>
+					</div>
+				</template>
+			</div>
+		</div>
+	}
 }

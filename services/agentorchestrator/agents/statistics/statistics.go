@@ -62,10 +62,6 @@ func NewStatisticsInstructorConfig(ctx context.Context) (agent.Config, error) {
 	// Domain-specific tools
 	registry.AddAll(domainTools())
 
-	// Shared tools
-	registry.AddAll(sharedtools.NewGrepTool())
-	registry.AddAll(sharedtools.NewLibraryTools())
-
 	prompt, err := prompts.GenerateTeacherSystemPrompt(prompts.TeacherPromptConfig{
 		Role:     i18n.T(ctx, "statistics.role"),
 		Preamble: i18n.T(ctx, "statistics.preamble"),

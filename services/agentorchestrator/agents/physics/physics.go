@@ -25,14 +25,6 @@ func NewPhysicsInstructorConfig(ctx context.Context) (agent.Config, error) {
 		registry.Register(tool)
 	}
 
-	// Shared tools
-	for _, tool := range sharedtools.NewGrepTool() {
-		registry.Register(tool)
-	}
-	for _, tool := range sharedtools.NewLibraryTools() {
-		registry.Register(tool)
-	}
-
 	prompt, err := prompts.GenerateTeacherSystemPrompt(prompts.TeacherPromptConfig{
 		Role:     i18n.T(ctx, "physics.role"),
 		Preamble: i18n.T(ctx, "physics.preamble"),

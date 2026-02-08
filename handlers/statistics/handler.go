@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	component "school-with-ai/components/analytics"
+	"school-with-ai/domain"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/infra/projection/statistics"
 )
@@ -54,9 +55,13 @@ func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 		h.log.Error(ctx, "failed to get agents", "error", err)
 	}
 
+	// Get user from context
+	user := domain.GetUserFromContext(ctx)
+
 	component.Dashboard(component.DashboardProps{
 		Stats:        stats,
 		Agents:       agents,
 		CurrentAgent: agentFilter,
+		User:         user,
 	}).Render(ctx, w)
 }
