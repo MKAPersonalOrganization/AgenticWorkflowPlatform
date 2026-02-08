@@ -6,6 +6,7 @@ import "school-with-ai/components/icon"
 import "school-with-ai/components/tooltip"
 import "school-with-ai/components/i18n"
 import "school-with-ai/components/tokenusage"
+import "school-with-ai/components/agents"
 
 templ ChatInput() {
 	<div
@@ -31,6 +32,7 @@ templ ChatInput() {
 						"@focus":      "isTextAreaFocused = true",
 						"@blur":       "isTextAreaFocused = false",
 						"placeholder": i18n.T(ctx, "Message Safar.AI..."),
+					":placeholder": "AVAILABLE_AGENTS.find(a => a.id === selectedAgent)?.name ? '" + i18n.T(ctx, "Message") + " ' + AVAILABLE_AGENTS.find(a => a.id === selectedAgent).name + '...' : '" + i18n.T(ctx, "Message Safar.AI...") + "'",
 						"rows":        "1",
 						"style":       "max-height: 45vh;",
 						"aria-label":  "Type your message",
@@ -48,6 +50,8 @@ templ ChatInput() {
 			<div class="flex items-center gap-2 pb-2">
 				<!-- Left: Agents & Attachments -->
 				<div class="ml-2 flex items-center gap-1">
+					<!-- Agents Selector -->
+					@agents.AgentsButtonTrigger()
 					<!-- Attachment Button -->
 					@button.Button(button.Props{
 						Type:    button.TypeButton,
