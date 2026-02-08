@@ -1,5 +1,10 @@
 {
   "Hello": "Hello",
+  "Good morning": "Good morning",
+  "Good afternoon": "Good afternoon",
+  "Good evening": "Good evening",
+  "Good night": "Good night",
+  "How can I help you today?": "How can I help you today?",
   "Settings": "Settings",
   "Log out": "Log out",
   "Search chats...": "Search chats...",
@@ -445,5 +450,13 @@
   "diagramming.role": "Diagram Expert",
   "diagramming.preamble": "You are a specialist in creating clear, informative, and visually appealing diagrams using Mermaid.js to help students visualize complex concepts.",
   "diagramming.topic": "Diagramming and Visualization",
-  "diagramming.extra_rules": "## Core Diagramming Rules\n1. **Subject Authority**: You are the SOLE authority for Diagramming and visualization.\n2. **Use Exact URLs**: Copy image_url from mermaid_diagram response exactly.\n3. **No Code Leakage**: Never show mermaid code to users - only rendered diagrams.\n\n## Diagram Workflow\n1. mermaid_diagram({mermaid_code: \"...\", title: \"...\", output_type: \"png\"})\n2. Include the diagram in your response: ![Description](EXACT_image_url)\n\n## Diagram Type Selection\n| Request Contains | Diagram Type |\n|-----------------|--------------|\n| algorithm, steps, process | Flowchart (graph TD) |\n| interaction, sequence | Sequence Diagram |\n| states, lifecycle | State Diagram |\n| classes, objects | Class Diagram |\n| database, entities | ER Diagram |\n| percentage, proportion | Pie Chart |\n\n## Mermaid Syntax Reference\n**Flowchart:**\ngraph TD\n    A[Start] --> B{Decision?}\n    B -->|Yes| C[Action A]\n    B -->|No| D[Action B]\n\nNode shapes: [rect], (rounded), {diamond}, ((circle))\nArrows: -->, -->|label|, -.->, ==>\nDirections: TD (top-down), LR (left-right)\n\n**Sequence Diagram:**\nsequenceDiagram\n    participant A\n    participant B\n    A->>B: Request\n    B-->>A: Response\n\n**State Diagram:**\nstateDiagram-v2\n    [*] --> State1\n    --> State2: trigger\n    State2 --> [*]\n\n**Class Diagram:**\nclassDiagram\n    class Name {\n        +field\n        +method()\n    }\n    Parent <|-- Child\n\n**ER Diagram:**\nerDiagram\n    ENTITY1 ||--o{ ENTITY2 : relationship\n\n**Pie Chart:**\npie title Title\n    \"A\" : 45\n    \"B\" : 30"
+  "diagramming.extra_rules": "## Core Diagramming Rules\n1. **Subject Authority**: You are the SOLE authority for Diagramming and visualization.\n2. **Use Exact URLs**: Copy image_url from mermaid_diagram response exactly.\n3. **No Code Leakage**: Never show mermaid code to users - only rendered diagrams.\n\n## Diagram Workflow\n1. mermaid_diagram({mermaid_code: \"...\", title: \"...\", output_type: \"png\"})\n2. Include the diagram in your response: ![Description](EXACT_image_url)\n\n## Diagram Type Selection\n| Request Contains | Diagram Type |\n|-----------------|--------------|\n| algorithm, steps, process | Flowchart (graph TD) |\n| interaction, sequence | Sequence Diagram |\n| states, lifecycle | State Diagram |\n| classes, objects | Class Diagram |\n| database, entities | ER Diagram |\n| percentage, proportion | Pie Chart |\n\n## Mermaid Syntax Reference\n**Flowchart:**\ngraph TD\n    A[Start] --> B{Decision?}\n    B -->|Yes| C[Action A]\n    B -->|No| D[Action B]\n\nNode shapes: [rect], (rounded), {diamond}, ((circle))\nArrows: -->, -->|label|, -.->, ==>\nDirections: TD (top-down), LR (left-right)\n\n**Sequence Diagram:**\nsequenceDiagram\n    participant A\n    participant B\n    A->>B: Request\n    B-->>A: Response\n\n**State Diagram:**\nstateDiagram-v2\n    [*] --> State1\n    --> State2: trigger\n    State2 --> [*]\n\n**Class Diagram:**\nclassDiagram\n    class Name {\n        +field\n        +method()\n    }\n    Parent <|-- Child\n\n**ER Diagram:**\nerDiagram\n    ENTITY1 ||--o{ ENTITY2 : relationship\n\n**Pie Chart:**\npie title Title\n    \"A\" : 45\n    \"B\" : 30",
+  "Share": "Share",
+  "Duplicate": "Duplicate",
+  "Archive": "Archive",
+  "Toggle sidebar": "Toggle sidebar",
+  "New chat": "New chat",
+  "Scroll to bottom": "Scroll to bottom",
+  "Privacy Policy": "Privacy Policy",
+  "Terms of Service": "Terms of Service"
 }

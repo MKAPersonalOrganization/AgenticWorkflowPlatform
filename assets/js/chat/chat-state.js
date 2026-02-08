@@ -151,6 +151,7 @@ export function createInitialState() {
         // Message parsing state
         markdownEnabled: true,
         autoScroll: true,
+        scrolledUp: false, // Track if user has scrolled up from bottom
         textToSpeechEnabled: false,
 
         // Message queue for offline handling

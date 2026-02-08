@@ -7,6 +7,27 @@ import (
 	"strings"
 )
 
+// ConversationStarters - LibreChat style quick prompt cards
+templ ConversationStarters() {
+	<div class="mt-8 flex flex-wrap justify-center gap-3 px-4">
+		@StarterCard(i18n.T(ctx, "Help me solve a math problem step by step"))
+		@StarterCard(i18n.T(ctx, "Explain a concept in simple terms"))
+		@StarterCard(i18n.T(ctx, "Quiz me on a topic I'm studying"))
+		@StarterCard(i18n.T(ctx, "Help me understand this homework"))
+	</div>
+}
+
+templ StarterCard(text string) {
+	<button
+		@click={ "currentMessage = '" + strings.ReplaceAll(text, "'", "\\'") + "'; sendMessage()" }
+		class="relative flex w-40 cursor-pointer flex-col gap-2 rounded-2xl border border-border/50 px-3 pb-4 pt-3 text-start align-top text-[15px] shadow-[0_0_2px_0_rgba(0,0,0,0.05),0_4px_6px_0_rgba(0,0,0,0.02)] transition-colors duration-300 ease-in-out hover:bg-accent/50 fade-in"
+	>
+		<p class="break-words line-clamp-3 overflow-hidden text-balance break-all text-muted-foreground text-sm">
+			{ text }
+		</p>
+	</button>
+}
+
 templ SamplePrompts() {
 	<!-- Welcome Screen / Sample Prompts -->
 	<div class="w-full flex flex-col items-center justify-center min-h-[60vh] space-y-10 animate-in fade-in duration-500" x-data="{ selectedCategory: null }">
@@ -90,7 +111,7 @@ templ CategoryButton(id string, label string, iconFunc func(...icon.Props) templ
 	@button.Button(button.Props{
 		Type:    button.TypeButton,
 		Variant: button.VariantGhost,
-		Class:   "group flex flex-col items-center justify-center p-4 gap-3 rounded-xl border border-border/40 bg-card hover:bg-accent/50 hover:border-primary/50 transition-all duration-200 hover:shadow-sm h-auto",
+		Class:   "group flex flex-col items-center justify-center p-4 gap-3 rounded-xl border border-border/40 bg-card hover:bg-accent/50 hover:border-primary/50 transition-all duration-200 hover:shadow-sm h-auto focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
 		Attributes: templ.Attributes{
 			"@click": "selectedCategory = selectedCategory === '" + id + "' ? null : '" + id + "'",
 			":class": "selectedCategory === '" + id + "' ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : ''",
@@ -107,7 +128,7 @@ templ PromptButton(text string) {
 	@button.Button(button.Props{
 		Type:    button.TypeButton,
 		Variant: button.VariantGhost,
-		Class:   "w-full text-left p-4 rounded-xl border border-border/40 bg-card/50 hover:bg-accent hover:border-primary/50 transition-all duration-200 text-sm group flex items-center justify-between h-auto",
+		Class:   "w-full text-left p-4 rounded-xl border border-border/40 bg-card/50 hover:bg-accent hover:border-primary/50 transition-all duration-200 text-sm group flex items-center justify-between h-auto focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
 		Attributes: templ.Attributes{
 			"@click": "currentMessage = '" + strings.ReplaceAll(text, "'", "\\'") + "'; sendMessage()",
 		},

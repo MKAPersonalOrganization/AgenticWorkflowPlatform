@@ -1,0 +1,48 @@
+package footer
+
+import "school-with-ai/components/i18n"
+
+// Footer - LibreChat style footer with disclaimer and links
+templ Footer() {
+	<div class="relative w-full">
+		<div
+			class="hidden items-center justify-center gap-2 px-2 py-2 text-center text-xs text-muted-foreground sm:flex md:px-[60px]"
+			role="contentinfo"
+		>
+			<span>
+				<a
+					class="text-muted-foreground hover:text-foreground underline transition-colors"
+					href="https://safar.ai"
+					target="_blank"
+					rel="noreferrer"
+				>
+					Safar.AI
+				</a>
+				{ " " + i18n.T(ctx, "may produce inaccurate information.") }
+			</span>
+			<div class="h-2 border-r border-border"></div>
+			<a
+				class="text-muted-foreground hover:text-foreground underline transition-colors"
+				href="/privacy"
+				rel="noreferrer"
+			>
+				{ i18n.T(ctx, "Privacy Policy") }
+			</a>
+			<div class="h-2 border-r border-border"></div>
+			<a
+				class="text-muted-foreground hover:text-foreground underline transition-colors"
+				href="/terms"
+				rel="noreferrer"
+			>
+				{ i18n.T(ctx, "Terms of Service") }
+			</a>
+		</div>
+	</div>
+}
+
+// CompactFooter - Smaller footer for conversation state
+templ CompactFooter() {
+	<div class="text-center text-[11px] text-muted-foreground py-1.5">
+		{ i18n.T(ctx, "AI responses may be inaccurate. Verify important information.") }
+	</div>
+}
