@@ -2,61 +2,14 @@ package chat
 
 import "school-with-ai/components/icon"
 import "school-with-ai/components/button"
-import "school-with-ai/components/dropdown"
-import "school-with-ai/domain"
 import "school-with-ai/components/i18n"
 
-// Header renders the desktop chat header with agent selector and action buttons
-// (matches LibreChat's Chat/Header.tsx).
-templ Header(user *domain.User) {
+// Header renders the desktop chat header with agent name and action buttons.
+templ Header() {
 	<div class="absolute top-0 z-10 hidden md:flex h-14 w-full items-center justify-between bg-gradient-to-b from-background via-background/70 to-transparent p-2 font-semibold">
 		<div class="flex items-center gap-2">
-			<!-- Agent Selector -->
-			@dropdown.Dropdown(dropdown.Props{
-				ID: "agent-selector",
-			}) {
-				@dropdown.Trigger(dropdown.TriggerProps{
-					Attributes: templ.Attributes{
-						"class": "flex items-center gap-1.5 cursor-pointer hover:bg-accent/50 px-2 py-1.5 rounded-lg transition-colors group focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-					},
-				}) {
-					<span x-text={ "AVAILABLE_AGENTS.find(a => a.id === selectedAgent)?.name || '" + i18n.T(ctx, "Select Agent") + "'" } class="text-lg font-semibold text-foreground/80 group-hover:text-foreground"></span>
-				}
-				@dropdown.Content(dropdown.ContentProps{
-					Class: "w-64",
-				}) {
-					@dropdown.Label(dropdown.LabelProps{
-						Class: "text-xs font-medium text-muted-foreground uppercase tracking-wider",
-					}) {
-						{ i18n.T(ctx, "Model") }
-					}
-					<template x-for="agent in AVAILABLE_AGENTS" :key="agent.id">
-						@dropdown.Item(dropdown.ItemProps{
-							Attributes: templ.Attributes{
-								"@click": "selectedAgent = agent.id",
-								":class": "selectedAgent === agent.id ? 'bg-accent/50 text-accent-foreground' : ''",
-								"class":  "relative flex w-full cursor-pointer select-none items-center gap-3 rounded-lg py-2.5 px-3 text-sm outline-none hover:bg-accent/50 hover:text-accent-foreground transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-							},
-						}) {
-							<!-- Icon placeholder -->
-							<div class="size-5 rounded-sm bg-primary/10 flex items-center justify-center text-primary">
-								<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-									<path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"></path>
-									<path d="M12 12v6"></path>
-									<path d="M12 6h.01"></path>
-								</svg>
-							</div>
-							<div class="flex flex-col items-start gap-0.5 flex-1">
-								<span x-text="agent.name" class="font-medium text-foreground"></span>
-								<span class="text-xs text-muted-foreground" x-text={ "'" + i18n.T(ctx, "Great for general tasks") + "'" }></span>
-							</div>
-							<template x-if="selectedAgent === agent.id">
-								@icon.Check(icon.Props{Class: "size-4 text-primary absolute end-3"})
-							</template>
-						}
-					</template>
-				}
-			}
+			<!-- Agent Name (read-only) -->
+			<span x-text={ "AVAILABLE_AGENTS.find(a => a.id === selectedAgent)?.name || '" + i18n.T(ctx, "Select Agent") + "'" } class="text-lg font-semibold text-foreground/80 px-2 py-1.5"></span>
 		</div>
 		<div class="flex items-center gap-2">
 			<!-- Right Side Actions -->
