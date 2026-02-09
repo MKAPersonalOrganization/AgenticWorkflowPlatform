@@ -63,7 +63,7 @@ templ Actions(props ActionProps) {
 				@button.Button(button.Props{
 					Size:    button.SizeIcon,
 					Variant: button.VariantGhost,
-					Class:   "hover-button rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent/50 md:opacity-0 md:group-hover/message:opacity-100 md:group-focus-within/message:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none transition-all",
+					Class:   "hover-button rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none transition-all",
 					Attributes: templ.Attributes{
 						"@click":     "copyMessage(" + props.MessageID + "); isCopied = true; setTimeout(() => isCopied = false, 2000)",
 						"aria-label": i18n.T(ctx, "Copy to clipboard"),
@@ -88,7 +88,7 @@ templ Actions(props ActionProps) {
 					@button.Button(button.Props{
 						Size:    button.SizeIcon,
 						Variant: button.VariantGhost,
-						Class:   "hover-button rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent/50 md:opacity-0 md:group-hover/message:opacity-100 md:group-focus-within/message:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none transition-all",
+						Class:   "hover-button rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none transition-all",
 						Attributes: templ.Attributes{
 							"aria-label": i18n.T(ctx, "Edit message"),
 							"@click":     "editMessage(" + props.MessageID + ")",
@@ -109,7 +109,7 @@ templ Actions(props ActionProps) {
 					@button.Button(button.Props{
 						Size:    button.SizeIcon,
 						Variant: button.VariantGhost,
-						Class:   "hover-button rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent/50 md:opacity-0 md:group-hover/message:opacity-100 md:group-focus-within/message:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none transition-all",
+						Class:   "hover-button rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none transition-all",
 						Attributes: templ.Attributes{
 							"aria-label": i18n.T(ctx, "Bookmark"),
 							"@click":     "$dispatch('toggle-bookmark', { id: " + props.MessageID + " })",
