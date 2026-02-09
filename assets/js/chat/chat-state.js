@@ -96,6 +96,9 @@ export function createInitialState() {
         searchQuery: '',
         threadSearchQuery: '',
 
+        renamingSessionId: null,
+        renameTitle: '',
+
         selectedAgent: '',
 
         // UI state

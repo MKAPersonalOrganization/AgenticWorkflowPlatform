@@ -1,4 +1,4 @@
-// templui component sidebar - version: v1.2.0 installed by templui v1.2.0
+// templui component sidebar - version: v1.5.0 installed by templui v1.5.0
 // 📚 Documentation: https://templui.io/docs/components/sidebar
 package sidebar
 
@@ -173,7 +173,7 @@ templ Layout(props ...LayoutProps) {
 	<!-- Layout Container - No ID needed here -->
 	<div
 		class={ utils.TwMerge(
-			"flex h-full relative",
+			"flex min-h-svh relative",
 			"has-[[data-tui-sidebar-variant=inset]]:bg-sidebar",
 			p.Class,
 		) }
@@ -250,14 +250,14 @@ templ Sidebar(props ...Props) {
 		data-tui-sidebar-id={ p.ID }
 		data-tui-sidebar-keyboard-shortcut={ p.KeyboardShortcut }
 		{ utils.MergeAttributes(
-			templ.Attributes{"style": "--sidebar-width:16rem;"},
+			templ.Attributes{"style": "--sidebar-width:16rem"},
 			p.Attributes,
 		)... }
 	>
 		<!-- Gap element for document flow -->
 		<div
 			class={ utils.TwMerge(
-					"relative bg-transparent transition-all duration-200 ease-in-out",
+					"relative bg-transparent transition-[width] duration-200 ease-linear",
 					"w-[var(--sidebar-width,16rem)]",
 					"group-data-[tui-sidebar-state=collapsed]:group-data-[tui-sidebar-collapsible=offcanvas]:w-0",
 					"group-data-[tui-sidebar-side=right]:rotate-180",
@@ -271,16 +271,16 @@ templ Sidebar(props ...Props) {
 		<aside
 			id={ p.ID }
 			class={ utils.TwMerge(
-					"absolute inset-y-0 z-10 hidden h-full bg-sidebar transition-all duration-200 ease-in-out md:flex",
+					"fixed inset-y-0 z-10 hidden h-svh bg-sidebar transition-transform duration-200 ease-linear md:flex",
 					"w-[var(--sidebar-width,16rem)]",
 					// Side positioning with data attributes
-					"group-data-[tui-sidebar-side=right]:end-0 group-data-[tui-sidebar-side=right]:group-data-[tui-sidebar-state=collapsed]:group-data-[tui-sidebar-collapsible=offcanvas]:ltr:translate-x-full group-data-[tui-sidebar-side=right]:group-data-[tui-sidebar-state=collapsed]:group-data-[tui-sidebar-collapsible=offcanvas]:rtl:-translate-x-full",
-					"group-data-[tui-sidebar-side=left]:start-0 group-data-[tui-sidebar-side=left]:group-data-[tui-sidebar-state=collapsed]:group-data-[tui-sidebar-collapsible=offcanvas]:ltr:-translate-x-full group-data-[tui-sidebar-side=left]:group-data-[tui-sidebar-state=collapsed]:group-data-[tui-sidebar-collapsible=offcanvas]:rtl:translate-x-full",
+					"group-data-[tui-sidebar-side=right]:right-0 group-data-[tui-sidebar-side=right]:group-data-[tui-sidebar-state=collapsed]:group-data-[tui-sidebar-collapsible=offcanvas]:translate-x-full",
+					"group-data-[tui-sidebar-side=left]:left-0 group-data-[tui-sidebar-side=left]:group-data-[tui-sidebar-state=collapsed]:group-data-[tui-sidebar-collapsible=offcanvas]:-translate-x-full",
 					// Adjust padding and width for variants
 					"group-data-[tui-sidebar-variant=floating]:p-2 group-data-[tui-sidebar-variant=floating]:group-data-[tui-sidebar-state=collapsed]:group-data-[tui-sidebar-collapsible=icon]:w-[calc(3rem+(theme(spacing.4))+2px)]",
 					"group-data-[tui-sidebar-variant=inset]:p-2 group-data-[tui-sidebar-variant=inset]:group-data-[tui-sidebar-state=collapsed]:group-data-[tui-sidebar-collapsible=icon]:w-[calc(3rem+(theme(spacing.4))+2px)]",
 					"group-data-[tui-sidebar-variant=sidebar]:group-data-[tui-sidebar-state=collapsed]:group-data-[tui-sidebar-collapsible=icon]:w-12",
-					"group-data-[tui-sidebar-variant=sidebar]:group-data-[tui-sidebar-side=left]:border-e group-data-[tui-sidebar-variant=sidebar]:group-data-[tui-sidebar-side=right]:border-s",
+					"group-data-[tui-sidebar-variant=sidebar]:group-data-[tui-sidebar-side=left]:border-r group-data-[tui-sidebar-variant=sidebar]:group-data-[tui-sidebar-side=right]:border-l",
 					p.Class,
 				) }
 			data-sidebar="sidebar"

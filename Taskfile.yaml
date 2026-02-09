@@ -51,6 +51,16 @@ tasks:
         # Cleanup
         rm -rf .conversion_tmp
 
+  update-templui:
+    desc: "Update templui CLI and all installed components. Usage: task update-templui -- v1.5.0"
+    cmds:
+      - |
+        REF="{{.CLI_ARGS}}"
+        if [ -z "$REF" ]; then echo "Usage: task update-templui -- <version>"; exit 1; fi
+        go install "github.com/templui/templui/cmd/templui@${REF}"
+        yes | templui --installed "add@${REF}"
+        templ generate
+
   setup-ubuntu:
     cmds:
       - go install github.com/a-h/templ/cmd/templ@latest

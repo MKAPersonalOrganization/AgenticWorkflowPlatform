@@ -1,4 +1,4 @@
-// templui component dropdown - version: v1.2.0 installed by templui v1.2.0
+// templui component dropdown - version: v1.5.0 installed by templui v1.5.0
 // 📚 Documentation: https://templui.io/docs/components/dropdown
 package dropdown
 
@@ -227,7 +227,7 @@ templ Item(props ...ItemProps) {
 			}
 			class={
 				utils.TwMerge(
-					"flex text-start items-center justify-between px-2 py-1.5 text-sm rounded-sm",
+					"flex text-left items-center justify-between px-2 py-1.5 text-sm rounded-sm",
 					utils.If(!p.Disabled, "focus:bg-accent focus:text-accent-foreground hover:bg-accent hover:text-accent-foreground cursor-default"),
 					utils.If(p.Disabled, "opacity-50 pointer-events-none"),
 					p.Class,
@@ -247,7 +247,7 @@ templ Item(props ...ItemProps) {
 			id={ p.ID }
 			class={
 				utils.TwMerge(
-					"w-full text-start flex items-center justify-between px-2 py-1.5 text-sm rounded-sm",
+					"w-full text-left flex items-center justify-between px-2 py-1.5 text-sm rounded-sm",
 					utils.If(!p.Disabled, "focus:bg-accent focus:text-accent-foreground hover:bg-accent hover:text-accent-foreground cursor-default"),
 					utils.If(p.Disabled, "opacity-50 pointer-events-none"),
 					p.Class,
@@ -290,7 +290,7 @@ templ Shortcut(props ...ShortcutProps) {
 		if p.ID != "" {
 			id={ p.ID }
 		}
-		class={ utils.TwMerge("ms-auto text-xs tracking-widest opacity-60", p.Class) }
+		class={ utils.TwMerge("ml-auto text-xs tracking-widest opacity-60", p.Class) }
 		{ p.Attributes... }
 	>
 		{ children... }
@@ -342,7 +342,7 @@ templ SubTrigger(props ...SubTriggerProps) {
 			data-tui-dropdown-submenu-trigger
 			class={
 				utils.TwMerge(
-					"w-full text-start flex items-center justify-between px-2 py-1.5 text-sm rounded-sm",
+					"w-full text-left flex items-center justify-between px-2 py-1.5 text-sm rounded-sm",
 					"focus:bg-accent focus:text-accent-foreground hover:bg-accent hover:text-accent-foreground cursor-default",
 					p.Class,
 				),
@@ -352,7 +352,7 @@ templ SubTrigger(props ...SubTriggerProps) {
 			<span>
 				{ children... }
 			</span>
-			<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ms-auto">
+			<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-auto">
 				<path d="M6.5 3L11.5 8L6.5 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
 			</svg>
 		</button>

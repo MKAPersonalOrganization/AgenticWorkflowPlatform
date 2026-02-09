@@ -16,24 +16,49 @@ templ Nav() {
 		Variant:     sidebar.VariantSidebar,
 		Collapsible: sidebar.CollapsibleOffcanvas,
 		Collapsed:   false,
-		Class:       "z-30 !start-0 !border-e-0",
+		Class:       "z-30 !left-16 !border-r-0",
 		Attributes: templ.Attributes{
 			"style": "--sidebar-width: 260px",
 		},
 	}) {
-		@sidebar.Header() {
-			<div class="flex items-center justify-between w-full px-1">
-				<!-- Mobile Toggle -->
+		@sidebar.Header(sidebar.HeaderProps{Class: "p-0 gap-0"}) {
+			<div class="flex items-center justify-between px-0.5 py-[2px] md:py-2">
+				<!-- Mobile Close -->
 				@button.Button(button.Props{
 					Size:    button.SizeIcon,
 					Variant: button.VariantGhost,
-					Class:   "size-8 md:hidden hover:bg-sidebar-accent/50 rounded-lg",
+					Class:   "size-10 rounded-xl md:hidden hover:bg-sidebar-accent/50",
 					Attributes: templ.Attributes{
 						"data-tui-sheet-close": "thread-history-sidebar-mobile",
 					},
 				}) {
 					@icon.X(icon.Props{Class: "size-5 text-sidebar-foreground"})
 					<span class="sr-only">{ i18n.T(ctx, "Close Sidebar") }</span>
+				}
+				<!-- Desktop Toggle -->
+				@button.Button(button.Props{
+					Size:    button.SizeIcon,
+					Variant: button.VariantGhost,
+					Class:   "size-10 rounded-xl bg-transparent hover:bg-sidebar-accent hidden md:flex",
+					Attributes: templ.Attributes{
+						"data-tui-sidebar-trigger": true,
+						"data-tui-sidebar-target":  "thread-history-sidebar",
+					},
+				}) {
+					@icon.PanelLeftClose(icon.Props{Class: "size-5 text-sidebar-foreground"})
+					<span class="sr-only">{ i18n.T(ctx, "Toggle Sidebar") }</span>
+				}
+				<!-- Desktop New Chat -->
+				@button.Button(button.Props{
+					Size:    button.SizeIcon,
+					Variant: button.VariantGhost,
+					Class:   "size-10 rounded-xl bg-transparent hover:bg-sidebar-accent hidden md:flex",
+					Attributes: templ.Attributes{
+						"@click": "createNewSession()",
+					},
+				}) {
+					@icon.SquarePen(icon.Props{Class: "size-5 text-sidebar-foreground"})
+					<span class="sr-only">{ i18n.T(ctx, "New Chat") }</span>
 				}
 			</div>
 			<!-- Search Bar -->
@@ -46,16 +71,42 @@ templ Nav() {
 			</div>
 		}
 		@sidebar.Content(sidebar.ContentProps{Class: "gap-0 scrollbar-transparent scrollbar-hover overflow-y-auto"}) {
-			<template x-for="group in getGroupedSessions()" :key="group.title">
+			<template x-for="(group, groupIndex) in getGroupedSessions()" :key="group.title">
 				@sidebar.Group(sidebar.GroupProps{Class: "px-2 py-0"}) {
-					@sidebar.GroupLabel(sidebar.GroupLabelProps{
-						Class: "text-muted-foreground/50 px-3 py-3 h-auto text-[11px] font-semibold sticky top-0 bg-sidebar z-10 uppercase tracking-wider",
-					}) {
-						<span x-text="group.title"></span>
-					}
+					<h2
+						class="pl-1 pt-1 text-muted-foreground text-[0.7rem]"
+						:class="groupIndex === 0 ? 'mt-0' : 'mt-2'"
+						x-text="group.title"
+					></h2>
 					@sidebar.Menu(sidebar.MenuProps{Class: "gap-0.5"}) {
 						<template x-for="session in group.sessions" :key="session.id">
 							@sidebar.MenuItem(sidebar.MenuItemProps{Class: "group/item relative"}) {
+								<!-- Inline Rename Overlay -->
+								<div
+									x-show="renamingSessionId === session.id"
+									x-cloak
+									class="absolute inset-0 z-20 flex w-full items-center rounded-lg bg-sidebar-accent p-1.5"
+								>
+									<input
+										type="text"
+										x-model="renameTitle"
+										x-effect="if (renamingSessionId === session.id) { $nextTick(() => { $el.focus(); $el.select(); }) }"
+										@keydown.enter.prevent="submitRename()"
+										@keydown.escape.prevent="cancelRename()"
+										@click.stop
+										maxlength="100"
+										class="flex-1 rounded bg-transparent p-0.5 text-sm leading-tight text-sidebar-foreground outline-none"
+									/>
+									<div class="flex gap-1">
+										<button @click.stop="cancelRename()" class="rounded-md p-1 hover:opacity-70">
+											@icon.X(icon.Props{Class: "size-4 text-sidebar-foreground"})
+										</button>
+										<button @click.stop="submitRename()" class="rounded-md p-1 hover:opacity-70">
+											@icon.Check(icon.Props{Class: "size-4 text-sidebar-foreground"})
+										</button>
+									</div>
+								</div>
+								<!-- Conversation Link -->
 								<div
 									class="group relative flex h-12 w-full items-center rounded-lg outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring md:h-9 transition-colors cursor-pointer"
 									:class="threadId === session.id ? 'bg-sidebar-accent before:absolute before:bottom-1 before:start-0 before:top-1 before:w-0.5 before:rounded-full before:bg-foreground' : 'hover:bg-sidebar-accent/50'"
@@ -65,26 +116,36 @@ templ Nav() {
 									:aria-label="`Conversation: ${session.title || 'Untitled'}`"
 								>
 									@sidebar.MenuButton(sidebar.MenuButtonProps{
-										Class: "w-full justify-start h-full px-3 gap-3 text-sidebar-foreground pe-10",
+										Class: "w-full justify-start h-full px-3 gap-3 text-sidebar-foreground",
 										Attributes: templ.Attributes{
 											"x-bind:data-tui-sidebar-active": "threadId === session.id",
 										},
 									}) {
-										<div class="flex items-center gap-2 w-full overflow-hidden">
-											<!-- Title -->
-											<span class="truncate text-sm flex-1 text-start" x-text="session.title" dir="auto"></span>
+										<div class="relative flex items-center gap-2 w-full overflow-hidden">
+											<span
+												class="whitespace-nowrap text-sm flex-1 text-start"
+												style="text-overflow: clip;"
+												x-text="session.title"
+												dir="auto"
+											></span>
+											<div
+												class="pointer-events-none absolute bottom-0.5 right-0.5 top-0.5 w-20 rounded-r-md bg-gradient-to-l"
+												:class="threadId === session.id
+													? 'from-sidebar-accent'
+													: 'from-sidebar group-hover/item:from-sidebar-accent'"
+											></div>
 										</div>
 									}
-								</div>
-								<!-- Context Menu (Trigger) -->
-								<div
-									class="absolute end-1 top-1/2 -translate-y-1/2 z-10"
-									:class="threadId === session.id ? 'opacity-100' : 'opacity-0 group-hover/item:opacity-100'"
-									@click.stop
-								>
-									@ContextMenu(ContextMenuProps{
-										ThreadID: "session.id",
-									})
+									<!-- Options Button (Scale Animation) -->
+									<div
+										class="flex origin-left items-center mr-1 max-w-0 scale-x-0 overflow-hidden transition-all duration-150 group-hover/item:max-w-[28px] group-hover/item:scale-x-100"
+										:class="threadId === session.id ? '!max-w-[28px] !scale-x-100' : ''"
+										@click.stop
+									>
+										@ContextMenu(ContextMenuProps{
+											ThreadID: "session.id",
+										})
+									</div>
 								</div>
 							}
 						</template>
