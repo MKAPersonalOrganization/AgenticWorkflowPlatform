@@ -32,6 +32,7 @@ const (
 type Client struct {
 	baseURL    string
 	apiKey     string
+	workspace  string
 	httpClient *http.Client
 	tracer     trace.Tracer
 }
@@ -53,6 +54,11 @@ func NewClient(baseURL, apiKey string, httpClient *http.Client) *Client {
 		httpClient: httpClient,
 		tracer:     otel.Tracer("foundation/lightrag"),
 	}
+}
+
+// SetWorkspace sets the workspace for the client.
+func (c *Client) SetWorkspace(workspace string) {
+	c.workspace = workspace
 }
 
 // QueryRequest represents a request to the query endpoint.
@@ -250,6 +256,12 @@ func (c *Client) Query(ctx context.Context, req QueryRequest) (*QueryResponse, e
 	if c.apiKey != "" {
 		httpReq.Header.Set("X-API-Key", c.apiKey)
 	}
+	if c.workspace != "" {
+		httpReq.Header.Set("LIGHTRAG-WORKSPACE", c.workspace)
+	}
+
+	// Debug headers
+	// fmt.Printf("Debug - Request Headers: %v\n", httpReq.Header)
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -300,6 +312,12 @@ func (c *Client) QueryStream(ctx context.Context, req QueryRequest) (<-chan Stre
 	if c.apiKey != "" {
 		httpReq.Header.Set("X-API-Key", c.apiKey)
 	}
+	if c.workspace != "" {
+		httpReq.Header.Set("LIGHTRAG-WORKSPACE", c.workspace)
+	}
+
+	// Debug headers
+	// fmt.Printf("Debug - Request Headers: %v\n", httpReq.Header)
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -409,6 +427,12 @@ func (c *Client) GetDocumentsPaginated(ctx context.Context, req DocumentsRequest
 	if c.apiKey != "" {
 		httpReq.Header.Set("X-API-Key", c.apiKey)
 	}
+	if c.workspace != "" {
+		httpReq.Header.Set("LIGHTRAG-WORKSPACE", c.workspace)
+	}
+
+	// Debug headers
+	// fmt.Printf("Debug - Request Headers: %v\n", httpReq.Header)
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -600,6 +624,15 @@ func (c *Client) UploadFile(ctx context.Context, filename string, content io.Rea
 	if c.apiKey != "" {
 		httpReq.Header.Set("X-API-Key", c.apiKey)
 	}
+	if c.workspace != "" {
+		httpReq.Header.Set("LIGHTRAG-WORKSPACE", c.workspace)
+	}
+
+	// Debug headers
+	fmt.Printf("Debug - Request Headers: %v\n", httpReq.Header)
+
+	// Debug headers
+	// fmt.Printf("Debug - Request Headers: %v\n", httpReq.Header)
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -742,6 +775,12 @@ func (c *Client) ClearCache(ctx context.Context) (*ClearCacheResponse, error) {
 	if c.apiKey != "" {
 		httpReq.Header.Set("X-API-Key", c.apiKey)
 	}
+	if c.workspace != "" {
+		httpReq.Header.Set("LIGHTRAG-WORKSPACE", c.workspace)
+	}
+
+	// Debug headers
+	// fmt.Printf("Debug - Request Headers: %v\n", httpReq.Header)
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -783,6 +822,12 @@ func (c *Client) DeleteDocument(ctx context.Context, req DeleteDocRequest) (*Del
 	if c.apiKey != "" {
 		httpReq.Header.Set("X-API-Key", c.apiKey)
 	}
+	if c.workspace != "" {
+		httpReq.Header.Set("LIGHTRAG-WORKSPACE", c.workspace)
+	}
+
+	// Debug headers
+	// fmt.Printf("Debug - Request Headers: %v\n", httpReq.Header)
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {

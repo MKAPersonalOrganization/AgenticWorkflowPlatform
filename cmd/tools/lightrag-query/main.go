@@ -18,10 +18,11 @@ import (
 func main() {
 	var (
 		baseURL        = flag.String("url", "", "LightRAG API base URL")
-		apiKey         = flag.String("api-key", "", "LightRAG API key")
+		apiKey         = flag.String("api-key", "", "API key for authentication")
 		mode           = flag.String("mode", lightrag.ModeHybrid, "Query mode (local, global, hybrid, naive, mix, bypass)")
+		workspace      = flag.String("workspace", "", "Workspace name for data isolation")
 		stream         = flag.Bool("stream", false, "Enable streaming response")
-		verbose        = flag.Bool("v", false, "Enable verbose logging")
+		verbose        = flag.Bool("verbose", false, "Enable verbose output")
 		list           = flag.Bool("list", false, "List documents")
 		clear          = flag.Bool("clear", false, "Clear all documents")
 		scan           = flag.Bool("scan", false, "Scan for new documents")
@@ -85,6 +86,9 @@ func main() {
 	}
 
 	client := lightrag.NewClient(*baseURL, *apiKey, nil)
+	if *workspace != "" {
+		client.SetWorkspace(*workspace)
+	}
 
 	if *list {
 		handleList(ctx, client, *status, *page, *pageSize)
