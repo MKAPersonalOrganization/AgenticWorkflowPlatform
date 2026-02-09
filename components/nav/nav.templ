@@ -18,7 +18,7 @@ templ Nav() {
 		Collapsed:   false,
 		Class:       "z-30 !left-16 !border-r-0",
 		Attributes: templ.Attributes{
-			"style": "--sidebar-width: 260px",
+			"style": "--sidebar-width: 320px",
 		},
 	}) {
 		@sidebar.Header(sidebar.HeaderProps{Class: "p-0 gap-0"}) {
@@ -70,7 +70,12 @@ templ Nav() {
 				})
 			</div>
 		}
-		@sidebar.Content(sidebar.ContentProps{Class: "gap-0 scrollbar-transparent scrollbar-hover overflow-y-auto"}) {
+		@sidebar.Content(sidebar.ContentProps{Class: "gap-0 scrollbar-thin overflow-y-auto"}) {
+			<div class="px-3 pt-4 pb-2">
+				<h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+					{ i18n.T(ctx, "Chats") }
+				</h2>
+			</div>
 			<template x-for="(group, groupIndex) in getGroupedSessions()" :key="group.title">
 				@sidebar.Group(sidebar.GroupProps{Class: "px-2 py-0"}) {
 					<h2
@@ -78,7 +83,7 @@ templ Nav() {
 						:class="groupIndex === 0 ? 'mt-0' : 'mt-2'"
 						x-text="group.title"
 					></h2>
-					@sidebar.Menu(sidebar.MenuProps{Class: "gap-0.5"}) {
+					@sidebar.Menu(sidebar.MenuProps{Class: "gap-1"}) {
 						<template x-for="session in group.sessions" :key="session.id">
 							@sidebar.MenuItem(sidebar.MenuItemProps{Class: "group/item relative"}) {
 								<!-- Inline Rename Overlay -->
@@ -108,38 +113,38 @@ templ Nav() {
 								</div>
 								<!-- Conversation Link -->
 								<div
-									class="group relative flex h-12 w-full items-center rounded-lg outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring md:h-9 transition-colors cursor-pointer"
-									:class="threadId === session.id ? 'bg-sidebar-accent before:absolute before:bottom-1 before:start-0 before:top-1 before:w-0.5 before:rounded-full before:bg-foreground' : 'hover:bg-sidebar-accent/50'"
+									class="group relative flex h-12 w-full items-center rounded-lg outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring transition-all cursor-pointer"
+									:class="threadId === session.id ? 'bg-sidebar-accent before:absolute before:bottom-1 before:start-0 before:top-1 before:w-[2px] before:rounded-full before:bg-foreground' : 'hover:bg-sidebar-accent/50'"
 									@click="switchSession(session.id)"
 									role="button"
 									tabindex="0"
 									:aria-label="`Conversation: ${session.title || 'Untitled'}`"
 								>
 									@sidebar.MenuButton(sidebar.MenuButtonProps{
-										Class: "w-full justify-start h-full px-3 gap-3 text-sidebar-foreground",
+										Class: "w-full justify-start h-full px-3 gap-3 text-sidebar-foreground hover:bg-transparent active:bg-transparent",
 										Attributes: templ.Attributes{
 											"x-bind:data-tui-sidebar-active": "threadId === session.id",
 										},
 									}) {
-										<div class="relative flex items-center gap-2 w-full overflow-hidden">
+										<div class="relative flex items-center gap-2.5 w-full overflow-hidden">
 											<span
-												class="whitespace-nowrap text-sm flex-1 text-start"
+												class="whitespace-nowrap text-sm font-medium flex-1 text-start tracking-tight"
 												style="text-overflow: clip;"
 												x-text="session.title"
 												dir="auto"
 											></span>
 											<div
-												class="pointer-events-none absolute bottom-0.5 right-0.5 top-0.5 w-20 rounded-r-md bg-gradient-to-l"
+												class="pointer-events-none absolute bottom-0 right-0 top-0 w-20 rounded-r-lg bg-gradient-to-l"
 												:class="threadId === session.id
 													? 'from-sidebar-accent'
-													: 'from-sidebar group-hover/item:from-sidebar-accent'"
+													: 'from-sidebar group-hover/item:from-sidebar-accent/50'"
 											></div>
 										</div>
 									}
-									<!-- Options Button (Scale Animation) -->
+									<!-- Options Button -->
 									<div
-										class="flex origin-left items-center mr-1 max-w-0 scale-x-0 overflow-hidden transition-all duration-150 group-hover/item:max-w-[28px] group-hover/item:scale-x-100"
-										:class="threadId === session.id ? '!max-w-[28px] !scale-x-100' : ''"
+										class="flex origin-left items-center mr-2 max-w-0 scale-x-0 overflow-hidden transition-all duration-200 group-hover/item:max-w-[32px] group-hover/item:scale-x-100"
+										:class="threadId === session.id ? '!max-w-[32px] !scale-x-100' : ''"
 										@click.stop
 									>
 										@ContextMenu(ContextMenuProps{
@@ -153,7 +158,7 @@ templ Nav() {
 				}
 			</template>
 			<!-- Loading Indicator -->
-			<div x-show="sessionsHasMore" x-intersect.margin.200px="__loadMoreSessions()" class="flex justify-center py-4 h-12 w-full">
+			<div x-show="sessionsHasMore" x-intersect="__loadMoreSessions()" class="flex justify-center py-4 h-12 w-full">
 				<span x-show="sessionsLoading" class="animate-spin size-4 border-2 border-primary border-t-transparent rounded-full"></span>
 			</div>
 		}

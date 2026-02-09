@@ -254,13 +254,15 @@ document.addEventListener('alpine:init', () => {
                     this.fetchBanner();
                 });
 
-                // Set up infinite scroll for sidebar sessions
+                // Set up infinite scroll for sidebar sessions (handled by x-intersect in nav.templ)
+                /* 
                 this.$nextTick(() => {
                     const sidebarContent = document.querySelector('[data-tui-sidebar="content"]');
                     if (sidebarContent) {
                         sidebarContent.addEventListener('scroll', (e) => this.__onSidebarScroll(e));
                     }
                 });
+                */
 
                 // Initialize accessibility
                 this.__initScreenReaderAnnouncer();
