@@ -22,7 +22,7 @@ export function createSessionMethods() {
          */
         async __loadSessions() {
             return await this.__tryCatchAsync('load sessions', {}, async () => {
-                const response = await fetch('/api/agui/threads?limit=10');
+                const response = await fetch('/api/agui/threads?limit=20');
                 if (response.ok) {
                     const data = await response.json();
 
@@ -70,7 +70,7 @@ export function createSessionMethods() {
             this.sessionsLoading = true;
 
             return await this.__tryCatchAsync('load more sessions', {}, async () => {
-                const url = `/api/agui/threads?limit=10&cursor=${encodeURIComponent(this.sessionsNextCursor)}`;
+                const url = `/api/agui/threads?limit=20&cursor=${encodeURIComponent(this.sessionsNextCursor)}`;
                 const response = await fetch(url);
 
                 if (response.ok) {

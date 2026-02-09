@@ -25,17 +25,11 @@ import (
 )
 
 templ HomeExtraHead() {
-	<script src="https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/mathpix-markdown-it@1.3.16/es5/bundle.js"></script>
 	<script>
-	let script = document.createElement('script');
-	script.src = "https://cdn.jsdelivr.net/npm/mathpix-markdown-it@1.3.6/es5/bundle.js";
-	document.head.append(script);
-
-	script.onload = function() {
-		console.log('Mathpix loaded');
-	}
-</script>
-	<script type="module" src="/assets/js/chat.js?v=limit10"></script>
+		console.log('Mathpix scripts loaded');
+	</script>
+	<script type="module" src="/assets/js/chat.js?v=fix_bundle"></script>
 	<!-- Alpine.js Intersect Plugin - MUST load before Alpine core -->
 	<script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/intersect@3.x.x/dist/cdn.min.js"></script>
 	<!-- Alpine.js Collapse Plugin - MUST load before Alpine core -->
@@ -187,7 +181,7 @@ templ ChatInputScreen(user *domain.User) {
 								>
 									<!-- Landing Page Logo (appears above chat input when no messages) -->
 									<div x-show="!hasMessages && !isStreaming" class="flex flex-col items-center justify-center mb-12">
-										<div class="h-16 w-16 flex items-center justify-center bg-primary text-primary-foreground rounded-full mb-4 shadow-lg compass-pulse">
+										<div class="h-16 w-16 flex items-center justify-center bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-full mb-4 shadow-sm compass-pulse">
 											<div class="compass-float">
 												<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
 													<!-- Outer ring -->
