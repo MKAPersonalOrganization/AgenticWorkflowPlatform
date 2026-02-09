@@ -25,11 +25,11 @@ import (
 )
 
 templ HomeExtraHead() {
-	<script src="https://cdn.jsdelivr.net/npm/mathpix-markdown-it@1.3.16/es5/bundle.js"></script>
-	<script>
-		console.log('Mathpix scripts loaded');
-	</script>
-	<script type="module" src="/assets/js/chat.js?v=fix_bundle"></script>
+	<!-- Markdown rendering: markdown-it + KaTeX for math -->
+	<script src="https://cdn.jsdelivr.net/npm/markdown-it@14.1.0/dist/markdown-it.min.js"></script>
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+	<script src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"></script>
+	<script type="module" src="/assets/js/chat.js?v=fix_katex"></script>
 	<!-- Alpine.js Intersect Plugin - MUST load before Alpine core -->
 	<script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/intersect@3.x.x/dist/cdn.min.js"></script>
 	<!-- Alpine.js Collapse Plugin - MUST load before Alpine core -->
@@ -82,29 +82,19 @@ templ HomeExtraHead() {
 			to { transform: scale(1.05); }
 		}
 
-		/* Ensure inline math stays inline and doesn't force new lines */
-		mjx-container:not([display="true"]) {
-			display: inline-block !important;
-			vertical-align: middle;
-			margin: 0 0.1em !important;
-			width: auto !important;
-		}
-		
-		/* Ensure it stays inline within prose containers */
-		.prose mjx-container:not([display="true"]) {
-			display: inline-block !important;
+		/* KaTeX inline math */
+		.katex-display {
+			display: block !important;
+			margin: 1em 0 !important;
+			text-align: center;
 		}
 
-		/* Remove excessive margins from display math */
-		mjx-container[display="true"] {
-			display: block !important;
-			margin-top: 1em !important;
-			margin-bottom: 1em !important;
-			width: 100% !important;
+		.katex {
+			font-size: 1.1em;
 		}
-		
+
 		/* RTL alignment for display math */
-		[dir="rtl"] mjx-container[display="true"] {
+		[dir="rtl"] .katex-display {
 			text-align: right !important;
 		}
 	</style>
