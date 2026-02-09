@@ -223,7 +223,8 @@ function renderKatex(tex, displayMode) {
         return window.katex.renderToString(tex.trim(), {
             displayMode,
             throwOnError: false,
-            strict: false
+            strict: false,
+            output: 'html'
         });
     } catch (e) {
         const escaped = tex.replace(/</g, '&lt;').replace(/>/g, '&gt;');
