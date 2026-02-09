@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"strings"
 
@@ -135,6 +136,44 @@ type PaginatedDocsResponse struct {
 type ClearDocumentsResponse struct {
 	Status  string `json:"status"` // success, partial_success, busy, fail
 	Message string `json:"message"`
+}
+
+// ScanResponse represents the response from the POST /documents/scan endpoint.
+type ScanResponse struct {
+	Status  string `json:"status"` // scanning_started
+	Message string `json:"message"`
+	TrackID string `json:"track_id"`
+}
+
+// UploadResponse represents the response from the POST /documents/upload endpoint.
+type UploadResponse struct {
+	Status  string `json:"status"` // success, duplicated, partial_success, failure
+	Message string `json:"message"`
+	TrackID string `json:"track_id"`
+}
+
+// PipelineStatusResponse represents the response from the GET /documents/pipeline_status endpoint.
+type PipelineStatusResponse struct {
+	Autoscanned     bool              `json:"autoscanned"`
+	Busy            bool              `json:"busy"`
+	JobName         string            `json:"job_name"`
+	JobStart        string            `json:"job_start,omitempty"`
+	Docs            int               `json:"docs"`
+	Batchs          int               `json:"batchs"`
+	CurBatch        int               `json:"cur_batch"`
+	RequestPending  bool              `json:"request_pending"`
+	LatestMessage   string            `json:"latest_message"`
+	HistoryMessages []string          `json:"history_messages,omitempty"`
+	UpdateStatus    map[string][]bool `json:"update_status"`
+	Canceled        bool              `json:"cancellation_requested,omitempty"`
+}
+
+// TrackStatusResponse represents the response from the GET /documents/track_status/{track_id} endpoint.
+type TrackStatusResponse struct {
+	TrackID       string              `json:"track_id"`
+	Documents     []DocStatusResponse `json:"documents"`
+	TotalCount    int                 `json:"total_count"`
+	StatusSummary map[string]int      `json:"status_summary"`
 }
 
 // QueryResponse represents the response from the query endpoint.
@@ -386,4 +425,160 @@ func (c *Client) ClearDocuments(ctx context.Context) (*ClearDocumentsResponse, e
 	}
 
 	return &clearResp, nil
+}
+
+// ScanDocuments triggers a scan for new documents in the input directory.
+func (c *Client) ScanDocuments(ctx context.Context) (*ScanResponse, error) {
+	ctx, span := c.tracer.Start(ctx, "ScanDocuments")
+	defer span.End()
+
+	url := fmt.Sprintf("%s/documents/scan", c.baseURL)
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	if c.apiKey != "" {
+		httpReq.Header.Set("X-API-Key", c.apiKey)
+	}
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("do request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, string(body))
+	}
+
+	var scanResp ScanResponse
+	if err := json.NewDecoder(resp.Body).Decode(&scanResp); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+
+	return &scanResp, nil
+}
+
+// GetPipelineStatus retrieves the current status of the document indexing pipeline.
+func (c *Client) GetPipelineStatus(ctx context.Context) (*PipelineStatusResponse, error) {
+	ctx, span := c.tracer.Start(ctx, "GetPipelineStatus")
+	defer span.End()
+
+	url := fmt.Sprintf("%s/documents/pipeline_status", c.baseURL)
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	if c.apiKey != "" {
+		httpReq.Header.Set("X-API-Key", c.apiKey)
+	}
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("do request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, string(body))
+	}
+
+	var pipeResp PipelineStatusResponse
+	if err := json.NewDecoder(resp.Body).Decode(&pipeResp); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+
+	return &pipeResp, nil
+}
+
+// GetTrackStatus retrieves the processing status of documents by tracking ID.
+func (c *Client) GetTrackStatus(ctx context.Context, trackID string) (*TrackStatusResponse, error) {
+	ctx, span := c.tracer.Start(ctx, "GetTrackStatus", trace.WithAttributes(
+		attribute.String("track_id", trackID),
+	))
+	defer span.End()
+
+	url := fmt.Sprintf("%s/documents/track_status/%s", c.baseURL, trackID)
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	if c.apiKey != "" {
+		httpReq.Header.Set("X-API-Key", c.apiKey)
+	}
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("do request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, string(body))
+	}
+
+	var trackResp TrackStatusResponse
+	if err := json.NewDecoder(resp.Body).Decode(&trackResp); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+
+	return &trackResp, nil
+}
+
+// UploadFile uploads a document to the LightRAG API.
+func (c *Client) UploadFile(ctx context.Context, filename string, content io.Reader) (*UploadResponse, error) {
+	ctx, span := c.tracer.Start(ctx, "UploadFile", trace.WithAttributes(
+		attribute.String("filename", filename),
+	))
+	defer span.End()
+
+	url := fmt.Sprintf("%s/documents/upload", c.baseURL)
+
+	var b bytes.Buffer
+	w := multipart.NewWriter(&b)
+	fw, err := w.CreateFormFile("file", filename)
+	if err != nil {
+		return nil, fmt.Errorf("create form file: %w", err)
+	}
+	if _, err := io.Copy(fw, content); err != nil {
+		return nil, fmt.Errorf("copy content: %w", err)
+	}
+	w.Close()
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, &b)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", w.FormDataContentType())
+	if c.apiKey != "" {
+		httpReq.Header.Set("X-API-Key", c.apiKey)
+	}
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("do request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, string(body))
+	}
+
+	var uploadResp UploadResponse
+	if err := json.NewDecoder(resp.Body).Decode(&uploadResp); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+
+	return &uploadResp, nil
 }

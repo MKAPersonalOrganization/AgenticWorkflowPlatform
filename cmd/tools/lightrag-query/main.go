@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -23,6 +24,9 @@ func main() {
 		verbose  = flag.Bool("v", false, "Enable verbose logging")
 		list     = flag.Bool("list", false, "List documents")
 		clear    = flag.Bool("clear", false, "Clear all documents")
+		scan     = flag.Bool("scan", false, "Scan for new documents")
+		upload   = flag.String("upload", "", "Upload a document file")
+		track    = flag.String("track", "", "Track status of a specific ID (or 'pipeline' for overall status)")
 		status   = flag.String("status", "", "Filter by status (PENDING, PROCESSING, PREPROCESSED, PROCESSED, FAILED)")
 		page     = flag.Int("page", 1, "Page number for listing")
 		pageSize = flag.Int("page-size", 50, "Page size for listing")
@@ -30,7 +34,7 @@ func main() {
 
 	flag.Parse()
 
-	if !*list && !*clear && flag.NArg() < 1 {
+	if !*list && !*clear && !*scan && *track == "" && *upload == "" && flag.NArg() < 1 {
 		fmt.Println("Usage: lightrag-query [flags] <query>")
 		fmt.Println("\nFlags:")
 		flag.PrintDefaults()
@@ -38,6 +42,10 @@ func main() {
 		fmt.Println("  lightrag-query -stream \"What is biology?\"")
 		fmt.Println("  lightrag-query -list -status PROCESSED")
 		fmt.Println("  lightrag-query -clear")
+		fmt.Println("  lightrag-query -scan")
+		fmt.Println("  lightrag-query -upload document.pdf")
+		fmt.Println("  lightrag-query -track pipeline")
+		fmt.Println("  lightrag-query -track scan_20240101_000000_xxxx")
 		os.Exit(1)
 	}
 
@@ -73,6 +81,21 @@ func main() {
 
 	if *clear {
 		handleClear(ctx, client)
+		return
+	}
+
+	if *scan {
+		handleScan(ctx, client)
+		return
+	}
+
+	if *track != "" {
+		handleTrack(ctx, client, *track)
+		return
+	}
+
+	if *upload != "" {
+		handleUpload(ctx, client, *upload)
 		return
 	}
 
@@ -166,6 +189,93 @@ func handleClear(ctx context.Context, client *lightrag.Client) {
 
 	fmt.Printf("Status: %s\n", resp.Status)
 	fmt.Printf("Message: %s\n", resp.Message)
+}
+
+func handleScan(ctx context.Context, client *lightrag.Client) {
+	fmt.Println("\nScanning for new documents...")
+	resp, err := client.ScanDocuments(ctx)
+	if err != nil {
+		fmt.Printf("Error scanning documents: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Status: %s\n", resp.Status)
+	fmt.Printf("Message: %s\n", resp.Message)
+	fmt.Printf("Track ID: %s\n", resp.TrackID)
+}
+
+func handleUpload(ctx context.Context, client *lightrag.Client, filePath string) {
+	fmt.Printf("\nUploading document: %s...\n", filePath)
+	f, err := os.Open(filePath)
+	if err != nil {
+		fmt.Printf("Error opening file: %v\n", err)
+		os.Exit(1)
+	}
+	defer f.Close()
+
+	resp, err := client.UploadFile(ctx, filepath.Base(filePath), f)
+	if err != nil {
+		fmt.Printf("Error uploading document: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Status: %s\n", resp.Status)
+	fmt.Printf("Message: %s\n", resp.Message)
+	fmt.Printf("Track ID: %s\n", resp.TrackID)
+}
+
+func handleTrack(ctx context.Context, client *lightrag.Client, trackID string) {
+	if trackID == "pipeline" {
+		fmt.Println("\nRetrieving pipeline status...")
+		resp, err := client.GetPipelineStatus(ctx)
+		if err != nil {
+			fmt.Printf("Error retrieving pipeline status: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Printf("Busy: %v\n", resp.Busy)
+		if resp.JobName != "" {
+			fmt.Printf("Job Name: %s\n", resp.JobName)
+			fmt.Printf("Job Start: %s\n", resp.JobStart)
+			fmt.Printf("Progress: %d/%d (Batch %d)\n", resp.Docs, resp.Batchs, resp.CurBatch)
+		}
+		fmt.Printf("Latest Message: %s\n", resp.LatestMessage)
+		if len(resp.HistoryMessages) > 0 {
+			fmt.Println("\nRecent History:")
+			// Print latest 5 messages
+			start := len(resp.HistoryMessages) - 5
+			if start < 0 {
+				start = 0
+			}
+			for i := start; i < len(resp.HistoryMessages); i++ {
+				fmt.Printf("  - %s\n", resp.HistoryMessages[i])
+			}
+		}
+		return
+	}
+
+	fmt.Printf("\nTracking status for ID: %s...\n", trackID)
+	resp, err := client.GetTrackStatus(ctx, trackID)
+	if err != nil {
+		fmt.Printf("Error tracking status: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Total Documents: %d\n", resp.TotalCount)
+	fmt.Println("\nStatus Summary:")
+	for s, count := range resp.StatusSummary {
+		fmt.Printf("  %s: %d\n", s, count)
+	}
+
+	if len(resp.Documents) > 0 {
+		fmt.Println("\nDocuments:")
+		for _, doc := range resp.Documents {
+			fmt.Printf("  - [%s] %s (%s)\n", doc.Status, doc.ID, doc.FilePath)
+			if doc.ErrorMsg != nil && *doc.ErrorMsg != "" {
+				fmt.Printf("    Error: %s\n", *doc.ErrorMsg)
+			}
+		}
+	}
 }
 
 func zeroIfNil(i *int) int {
