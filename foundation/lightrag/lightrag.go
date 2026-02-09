@@ -175,6 +175,20 @@ type ClearCacheResponse struct {
 	Message string `json:"message"`
 }
 
+// DeleteDocRequest represents the request body for deleting documents.
+type DeleteDocRequest struct {
+	DocIDs         []string `json:"doc_ids"`
+	DeleteFile     bool     `json:"delete_file"`
+	DeleteLLMCache bool     `json:"delete_llm_cache"`
+}
+
+// DeleteDocResponse represents the response from the DELETE /documents/delete_document endpoint.
+type DeleteDocResponse struct {
+	Status  string `json:"status"` // deletion_started, busy, not_allowed
+	Message string `json:"message"`
+	DocID   string `json:"doc_id"`
+}
+
 // PipelineStatusResponse represents the response from the GET /documents/pipeline_status endpoint.
 type PipelineStatusResponse struct {
 	Autoscanned     bool              `json:"autoscanned"`
@@ -746,4 +760,45 @@ func (c *Client) ClearCache(ctx context.Context) (*ClearCacheResponse, error) {
 	}
 
 	return &clearResp, nil
+}
+
+// DeleteDocument deletes documents by their IDs.
+func (c *Client) DeleteDocument(ctx context.Context, req DeleteDocRequest) (*DeleteDocResponse, error) {
+	ctx, span := c.tracer.Start(ctx, "DeleteDocument")
+	defer span.End()
+
+	url := fmt.Sprintf("%s/documents/delete_document", c.baseURL)
+
+	jsonData, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	if c.apiKey != "" {
+		httpReq.Header.Set("X-API-Key", c.apiKey)
+	}
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("do request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, string(body))
+	}
+
+	var delResp DeleteDocResponse
+	if err := json.NewDecoder(resp.Body).Decode(&delResp); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+
+	return &delResp, nil
 }
