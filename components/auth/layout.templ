@@ -18,15 +18,39 @@ templ AuthLayout(props LayoutProps) {
 		Title: props.Title,
 		User:  props.User,
 	}) {
+		<style>
+			/* Compass spinning animation for auth pages */
+			@keyframes compassSpin {
+				from { transform: rotate(0deg); }
+				to { transform: rotate(360deg); }
+			}
+			.compass-spin-slow {
+				animation: compassSpin 12s linear infinite;
+			}
+		</style>
 		<main class="flex min-h-screen items-center justify-center p-4">
 			<div class="w-full max-w-md space-y-8">
 				<!-- Logo -->
 				<div class="flex justify-center">
 					if props.LogoURL != "" {
-						<img src={ props.LogoURL } alt="SchoolWithAI Logo" class="h-12 w-auto"/>
+						<img src={ props.LogoURL } alt="Compass Logo" class="h-12 w-auto"/>
 					} else {
-						<img src="/assets/images/logo-black.svg" alt="SchoolWithAI Logo" class="h-12 w-auto dark:hidden"/>
-						<img src="/assets/images/logo-white.svg" alt="SchoolWithAI Logo" class="h-12 w-auto hidden dark:block"/>
+						<div class="h-12 w-12 mx-auto flex items-center justify-center bg-primary text-primary-foreground rounded-full">
+						<svg width="24" height="24" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" class="compass-spin-slow">
+							<!-- Outer ring -->
+							<circle cx="16" cy="16" r="15" stroke="currentColor" stroke-width="1.5" fill="none"/>
+							<!-- Cardinal points -->
+							<line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+							<line x1="30" y1="16" x2="26" y2="16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+							<line x1="16" y1="30" x2="16" y2="26" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+							<line x1="2" y1="16" x2="6" y2="16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+							<!-- Needle -->
+							<path d="M16 8 L18.5 14 L16 13 L13.5 14 Z" fill="currentColor"/>
+							<path d="M16 24 L13.5 18 L16 19 L18.5 18 Z" fill="currentColor" opacity="0.6"/>
+							<!-- Center dot -->
+							<circle cx="16" cy="16" r="1.5" fill="currentColor"/>
+						</svg>
+						</div>
 					}
 				</div>
 				<!-- Main Content Card -->
@@ -61,7 +85,7 @@ templ AuthLayout(props LayoutProps) {
 						<a href="/support" class="hover:text-foreground">{ i18n.T(ctx, "Support") }</a>
 					</div>
 					<div class="mt-2 text-xs">
-						© { templ.EscapeString(getCurrentYear()) } SchoolWithAI. { i18n.T(ctx, "All rights reserved.") }
+						© { templ.EscapeString(getCurrentYear()) } Compass. { i18n.T(ctx, "All rights reserved.") }
 					</div>
 				</div>
 			</div>

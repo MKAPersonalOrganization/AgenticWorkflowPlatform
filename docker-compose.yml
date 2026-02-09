@@ -222,8 +222,8 @@ services:
       - MINIO_ROOT_USER=minio
       - MINIO_ROOT_PASSWORD=miniosecret
     ports:
-      - "9092:9000"  # API
-      - "9093:9001"  # Console
+      - "9092:9000" # API
+      - "9093:9001" # Console
     volumes:
       - langfuse-minio-data:/data
     networks:
@@ -289,8 +289,6 @@ services:
       echo 'Bucket created';
       exit 0;
       "
-
-
 
   # Langfuse Worker
   langfuse-worker:
@@ -391,9 +389,9 @@ services:
       - LANGFUSE_INIT_USER_NAME=Admin
       - LANGFUSE_INIT_USER_PASSWORD=admin123
       - LANGFUSE_INIT_ORG_ID=school-with-ai-org
-      - LANGFUSE_INIT_ORG_NAME=SchoolWithAI
-      - LANGFUSE_INIT_PROJECT_ID=school-with-ai-project
-      - LANGFUSE_INIT_PROJECT_NAME=SchoolWithAI
+      - LANGFUSE_INIT_ORG_NAME=Compass
+      - LANGFUSE_INIT_PROJECT_ID=compass-project
+      - LANGFUSE_INIT_PROJECT_NAME=Compass
       - LANGFUSE_INIT_PROJECT_PUBLIC_KEY=pk-lf-local-dev-public-key
       - LANGFUSE_INIT_PROJECT_SECRET_KEY=sk-lf-local-dev-secret-key
     networks:
