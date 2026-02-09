@@ -22,6 +22,7 @@ func main() {
 		stream   = flag.Bool("stream", false, "Enable streaming response")
 		verbose  = flag.Bool("v", false, "Enable verbose logging")
 		list     = flag.Bool("list", false, "List documents")
+		clear    = flag.Bool("clear", false, "Clear all documents")
 		status   = flag.String("status", "", "Filter by status (PENDING, PROCESSING, PREPROCESSED, PROCESSED, FAILED)")
 		page     = flag.Int("page", 1, "Page number for listing")
 		pageSize = flag.Int("page-size", 50, "Page size for listing")
@@ -29,13 +30,14 @@ func main() {
 
 	flag.Parse()
 
-	if !*list && flag.NArg() < 1 {
+	if !*list && !*clear && flag.NArg() < 1 {
 		fmt.Println("Usage: lightrag-query [flags] <query>")
 		fmt.Println("\nFlags:")
 		flag.PrintDefaults()
 		fmt.Println("\nExample:")
 		fmt.Println("  lightrag-query -stream \"What is biology?\"")
 		fmt.Println("  lightrag-query -list -status PROCESSED")
+		fmt.Println("  lightrag-query -clear")
 		os.Exit(1)
 	}
 
@@ -66,6 +68,11 @@ func main() {
 
 	if *list {
 		handleList(ctx, client, *status, *page, *pageSize)
+		return
+	}
+
+	if *clear {
+		handleClear(ctx, client)
 		return
 	}
 
@@ -147,6 +154,18 @@ func handleList(ctx context.Context, client *lightrag.Client, statusFilter strin
 		fmt.Printf("  %s: %d\n", s, count)
 	}
 	fmt.Println("------------------------------------------")
+}
+
+func handleClear(ctx context.Context, client *lightrag.Client) {
+	fmt.Println("\nClearing all documents...")
+	resp, err := client.ClearDocuments(ctx)
+	if err != nil {
+		fmt.Printf("Error clearing documents: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Status: %s\n", resp.Status)
+	fmt.Printf("Message: %s\n", resp.Message)
 }
 
 func zeroIfNil(i *int) int {
