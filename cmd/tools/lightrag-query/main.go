@@ -17,28 +17,31 @@ import (
 
 func main() {
 	var (
-		baseURL    = flag.String("url", "", "LightRAG API base URL")
-		apiKey     = flag.String("api-key", "", "LightRAG API key")
-		mode       = flag.String("mode", lightrag.ModeHybrid, "Query mode (local, global, hybrid, naive, mix, bypass)")
-		stream     = flag.Bool("stream", false, "Enable streaming response")
-		verbose    = flag.Bool("v", false, "Enable verbose logging")
-		list       = flag.Bool("list", false, "List documents")
-		clear      = flag.Bool("clear", false, "Clear all documents")
-		scan       = flag.Bool("scan", false, "Scan for new documents")
-		upload     = flag.String("upload", "", "Upload a document file")
-		reprocess  = flag.Bool("reprocess", false, "Reprocess failed documents")
-		cancel     = flag.Bool("cancel", false, "Cancel currently running pipeline")
-		stats      = flag.Bool("stats", false, "Show document status counts")
-		clearCache = flag.Bool("clear-cache", false, "Clear LLM response cache")
-		track      = flag.String("track", "", "Track status of a specific ID (or 'pipeline' for overall status)")
-		status     = flag.String("status", "", "Filter by status (PENDING, PROCESSING, PREPROCESSED, PROCESSED, FAILED)")
-		page       = flag.Int("page", 1, "Page number for listing")
-		pageSize   = flag.Int("page-size", 50, "Page size for listing")
+		baseURL        = flag.String("url", "", "LightRAG API base URL")
+		apiKey         = flag.String("api-key", "", "LightRAG API key")
+		mode           = flag.String("mode", lightrag.ModeHybrid, "Query mode (local, global, hybrid, naive, mix, bypass)")
+		stream         = flag.Bool("stream", false, "Enable streaming response")
+		verbose        = flag.Bool("v", false, "Enable verbose logging")
+		list           = flag.Bool("list", false, "List documents")
+		clear          = flag.Bool("clear", false, "Clear all documents")
+		scan           = flag.Bool("scan", false, "Scan for new documents")
+		upload         = flag.String("upload", "", "Upload a document file")
+		reprocess      = flag.Bool("reprocess", false, "Reprocess failed documents")
+		cancel         = flag.Bool("cancel", false, "Cancel currently running pipeline")
+		stats          = flag.Bool("stats", false, "Show document status counts")
+		clearCache     = flag.Bool("clear-cache", false, "Clear LLM response cache")
+		track          = flag.String("track", "", "Track status of a specific ID (or 'pipeline' for overall status)")
+		status         = flag.String("status", "", "Filter by status (PENDING, PROCESSING, PREPROCESSED, PROCESSED, FAILED)")
+		page           = flag.Int("page", 1, "Page number for listing")
+		pageSize       = flag.Int("page-size", 50, "Page size for listing")
+		deleteDoc      = flag.String("delete-doc", "", "Delete document(s) by ID (comma-separated)")
+		deleteFile     = flag.Bool("delete-file", false, "Delete original file when deleting document")
+		deleteLLMCache = flag.Bool("delete-llm-cache", false, "Delete LLM cache when deleting document")
 	)
 
 	flag.Parse()
 
-	if !*list && !*clear && !*scan && *track == "" && *upload == "" && !*reprocess && !*cancel && !*stats && !*clearCache && flag.NArg() < 1 {
+	if !*list && !*clear && !*scan && *track == "" && *upload == "" && !*reprocess && !*cancel && !*stats && !*clearCache && *deleteDoc == "" && flag.NArg() < 1 {
 		fmt.Println("Usage: lightrag-query [flags] <query>")
 		fmt.Println("\nFlags:")
 		flag.PrintDefaults()
@@ -51,6 +54,7 @@ func main() {
 		fmt.Println("  lightrag-query -cancel")
 		fmt.Println("  lightrag-query -stats")
 		fmt.Println("  lightrag-query -clear-cache")
+		fmt.Println("  lightrag-query -delete-doc doc_id1,doc_id2 [-delete-file] [-delete-llm-cache]")
 		fmt.Println("  lightrag-query -upload document.pdf")
 		fmt.Println("  lightrag-query -track pipeline")
 		fmt.Println("  lightrag-query -track scan_20240101_000000_xxxx")
@@ -124,6 +128,11 @@ func main() {
 
 	if *clearCache {
 		handleClearCache(ctx, client)
+		return
+	}
+
+	if *deleteDoc != "" {
+		handleDeleteDoc(ctx, client, *deleteDoc, *deleteFile, *deleteLLMCache)
 		return
 	}
 
@@ -242,6 +251,30 @@ func handleClearCache(ctx context.Context, client *lightrag.Client) {
 
 	fmt.Printf("Status: %s\n", resp.Status)
 	fmt.Printf("Message: %s\n", resp.Message)
+}
+
+func handleDeleteDoc(ctx context.Context, client *lightrag.Client, docIDsStr string, deleteFile, deleteLLMCache bool) {
+	docIDs := strings.Split(docIDsStr, ",")
+	for i := range docIDs {
+		docIDs[i] = strings.TrimSpace(docIDs[i])
+	}
+
+	fmt.Printf("\nDeleting %d document(s)...\n", len(docIDs))
+	req := lightrag.DeleteDocRequest{
+		DocIDs:         docIDs,
+		DeleteFile:     deleteFile,
+		DeleteLLMCache: deleteLLMCache,
+	}
+
+	resp, err := client.DeleteDocument(ctx, req)
+	if err != nil {
+		fmt.Printf("Error deleting document(s): %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Status: %s\n", resp.Status)
+	fmt.Printf("Message: %s\n", resp.Message)
+	fmt.Printf("Doc IDs: %s\n", resp.DocID)
 }
 
 func handleStats(ctx context.Context, client *lightrag.Client) {
