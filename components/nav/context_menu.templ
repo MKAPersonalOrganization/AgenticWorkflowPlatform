@@ -36,7 +36,7 @@ templ ContextMenu(props ContextMenuProps) {
 			Type:    button.TypeButton,
 			Variant: button.VariantGhost,
 			Size:    button.SizeIcon,
-			Class:   "opacity-0 group-hover/item:opacity-100 transition-opacity size-7 flex items-center justify-center rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-foreground outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring",
+			Class:   "size-7 flex items-center justify-center rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring",
 			Attributes: templ.Attributes{
 				"x-ref":       "trigger",
 				"@click.stop": "toggle()",
@@ -103,7 +103,7 @@ templ ContextMenu(props ContextMenuProps) {
 						Variant: button.VariantGhost,
 						Class:   "justify-start flex items-center gap-3 px-3 py-2 text-sm rounded-lg hover:bg-accent hover:text-accent-foreground text-start w-full transition-colors",
 						Attributes: templ.Attributes{
-							"@click.stop": "renameSession(" + props.ThreadID + "); open = false",
+							"@click.stop": "startRename(" + props.ThreadID + "); open = false",
 						},
 					}) {
 						@icon.Pencil(icon.Props{Class: "size-4 text-muted-foreground"})
@@ -114,7 +114,7 @@ templ ContextMenu(props ContextMenuProps) {
 					@button.Button(button.Props{
 						Type:    button.TypeButton,
 						Variant: button.VariantGhost,
-						Class:   "justify-start flex items-center gap-3 px-3 py-2 text-sm rounded-lg hover:bg-destructive/10 text-destructive hover:text-destructive text-start w-full transition-colors",
+						Class:   "justify-start flex items-center gap-3 px-3 py-2 text-sm rounded-lg hover:bg-accent hover:text-accent-foreground text-start w-full transition-colors",
 						Attributes: templ.Attributes{
 							"@click.stop": "deleteSession(" + props.ThreadID + "); open = false",
 						},

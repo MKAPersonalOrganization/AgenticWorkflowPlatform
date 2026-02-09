@@ -94,12 +94,8 @@ templ ChatInputScreen(user *domain.User) {
 		<div class="w-full h-full flex flex-col" x-data="chat" @agent-selected.window="selectedAgent = $event.detail.id">
 			<!-- Sidebar Layout -->
 			<div class="flex-1">
-				@sidebar.Layout() {
-					@sidebar.Sidebar(sidebar.Props{
-						ID: "thread-history-sidebar",
-					}) {
-						@nav.Nav()
-					}
+				@sidebar.Layout(sidebar.LayoutProps{Class: "h-full min-h-0"}) {
+					@nav.Nav()
 					<!-- Main Content Area -->
 					<div class="flex-1 flex h-full overflow-hidden relative">
 						<!-- Main Chat Panel -->

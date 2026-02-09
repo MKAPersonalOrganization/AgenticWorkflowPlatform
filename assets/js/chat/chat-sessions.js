@@ -226,19 +226,46 @@ export function createSessionMethods() {
         },
 
         /**
-         * Rename a session
+         * Start inline rename for a session
          * @param {string} sessionId - Session ID to rename
          */
-        async renameSession(sessionId) {
+        startRename(sessionId) {
             const session = this.sessions.find(s => s.id === sessionId);
             if (!session) return;
+            this.renamingSessionId = sessionId;
+            this.renameTitle = session.title;
+        },
 
-            const newTitle = prompt(window.i18n.t('Rename chat:'), session.title);
-            if (!newTitle || newTitle.trim() === '' || newTitle === session.title) return;
+        /**
+         * Cancel inline rename
+         */
+        cancelRename() {
+            this.renamingSessionId = null;
+            this.renameTitle = '';
+        },
+
+        /**
+         * Submit inline rename
+         */
+        async submitRename() {
+            const sessionId = this.renamingSessionId;
+            const newTitle = this.renameTitle?.trim();
+            if (!sessionId || !newTitle) {
+                this.cancelRename();
+                return;
+            }
+
+            const session = this.sessions.find(s => s.id === sessionId);
+            if (!session || newTitle === session.title) {
+                this.cancelRename();
+                return;
+            }
 
             // Optimistic update
             const oldTitle = session.title;
             session.title = newTitle;
+            this.renamingSessionId = null;
+            this.renameTitle = '';
 
             // Send to backend
             await this.__tryCatchAsync('rename session', { sessionId, newTitle }, async () => {
