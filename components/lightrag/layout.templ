@@ -1,0 +1,22 @@
+package lightrag
+
+import (
+	"school-with-ai/components"
+	"school-with-ai/domain"
+)
+
+type LayoutProps struct {
+	Title string
+	User  *domain.User
+}
+
+templ Layout(props LayoutProps) {
+	@components.BaseLayout(components.LayoutProps{
+		Title: props.Title,
+		User:  props.User,
+	}) {
+		<main class="flex-1">
+			{ children... }
+		</main>
+	}
+}
