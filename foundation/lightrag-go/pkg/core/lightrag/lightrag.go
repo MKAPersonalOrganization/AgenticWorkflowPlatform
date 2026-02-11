@@ -690,6 +690,9 @@ func (r *LightRAG) Delete(ctx context.Context, docID string) error {
 	r.mu.RUnlock()
 
 	// Get document data to find associated chunks
+	if r.fullDocs == nil {
+		return fmt.Errorf("fullDocs storage not initialized")
+	}
 	docData, err := r.fullDocs.GetByID(ctx, docID)
 	if err != nil {
 		return fmt.Errorf("failed to get document %s: %w", docID, err)

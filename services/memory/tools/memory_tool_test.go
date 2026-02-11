@@ -37,7 +37,11 @@ func (m *MockArtifactService) Load(ctx context.Context, userID, sessionID, fileN
 	return io.NopCloser(bytes.NewReader(data)), nil
 }
 
-func (m *MockArtifactService) List(ctx context.Context, userID, sessionID string) ([]string, error) {
+func (m *MockArtifactService) CreateDirectory(ctx context.Context, userID, sessionID, path string) error {
+	return nil
+}
+
+func (m *MockArtifactService) List(ctx context.Context, userID, sessionID, prefix string) ([]artifact.ArtifactInfo, error) {
 	return nil, nil
 }
 

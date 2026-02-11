@@ -28,31 +28,33 @@ import (
 	"school-with-ai/foundation/middleware"
 	"school-with-ai/handlers/auth"
 	"school-with-ai/handlers/profile"
-	statisticsHandler "school-with-ai/handlers/statistics"
 	"school-with-ai/infra/eventstore/kurrentdb"
 	"school-with-ai/infra/kratos"
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/infra/projection/llmcontext"
-	projectionStats "school-with-ai/infra/projection/statistics"
 	"school-with-ai/infra/projection/subscriber"
 	"school-with-ai/infra/projections"
 	"school-with-ai/infra/sqldb"
 	"school-with-ai/infra/sqldb/migrate"
 	"school-with-ai/services/agentorchestrator"
+	"school-with-ai/services/agentorchestrator/agents/chemistry"
+	"school-with-ai/services/agentorchestrator/agents/diagramming"
+	"school-with-ai/services/agentorchestrator/agents/math"
+	"school-with-ai/services/agentorchestrator/agents/physics"
+	"school-with-ai/services/agentorchestrator/agents/statistics"
 	"school-with-ai/services/artifact"
 	"school-with-ai/services/memory"
 	"school-with-ai/services/permissions"
+	"school-with-ai/services/rag"
 	"school-with-ai/services/resourcepermissions"
 	"school-with-ai/services/resources"
 	"school-with-ai/services/taskmanagement"
 	"school-with-ai/services/threadmgmt"
 	"school-with-ai/services/toolregistry"
 
-	"school-with-ai/services/agentorchestrator/agents/chemistry"
-	"school-with-ai/services/agentorchestrator/agents/diagramming"
-	"school-with-ai/services/agentorchestrator/agents/math"
-	"school-with-ai/services/agentorchestrator/agents/physics"
-	"school-with-ai/services/agentorchestrator/agents/statistics"
+	statisticsHandler "school-with-ai/handlers/statistics"
+
+	projectionStats "school-with-ai/infra/projection/statistics"
 
 	aguihandlers "school-with-ai/handlers/agui"
 	bannerhandlers "school-with-ai/handlers/banner"
@@ -176,6 +178,12 @@ func run(ctx context.Context, log *logger.Logger) error {
 		}
 		LightRAG struct {
 			WorkingDir string `conf:"default:./rag_storage"`
+		}
+		LightRAGPostgres struct {
+			User     string `conf:"default:lightrag"`
+			Password string `conf:"default:password"`
+			Host     string `conf:"default:localhost:5433"`
+			Name     string `conf:"default:lightrag"`
 		}
 	}{
 		Version: conf.Version{
@@ -688,34 +696,78 @@ func run(ctx context.Context, log *logger.Logger) error {
 	if err != nil {
 		log.Error(ctx, "lightrag: failed to create instance", "error", err)
 	} else {
-		// Set up JSON KV storages
-		workDir := ragCfg.WorkingDir
-		fullDocs := ragstorage.NewJsonKVStorage(ragstorage.NewStorageConfig("full_docs", workDir), nil)
-		docStatus := ragstorage.NewJsonKVStorage(ragstorage.NewStorageConfig("doc_status", workDir), nil)
-		textChunks := ragstorage.NewJsonKVStorage(ragstorage.NewStorageConfig("text_chunks", workDir), nil)
-		llmCache := ragstorage.NewJsonKVStorage(ragstorage.NewStorageConfig("llm_response_cache", workDir), nil)
+		// Initialize Postgres Storage
+		connString := fmt.Sprintf("postgres://%s:%s@%s/%s", cfg.LightRAGPostgres.User, cfg.LightRAGPostgres.Password, cfg.LightRAGPostgres.Host, cfg.LightRAGPostgres.Name)
+		pgDB, err := ragstorage.NewPostgresDB(ctx, connString)
+		if err != nil {
+			log.Error(ctx, "lightrag: failed to connect to postgres", "error", err)
+		} else {
+			defer pgDB.Close()
 
-		ragInstance.SetStorages(
-			fullDocs, textChunks,
-			nil, nil, // fullEntities, fullRelations
-			nil, nil, // entityChunks, relationChunks
-			nil, nil, nil, // VDBs
-			nil,       // graph
-			llmCache, docStatus,
-		)
+			workDir := ragCfg.WorkingDir
 
-		if err := ragInstance.InitializeStorages(ctx); err != nil {
-			log.Error(ctx, "lightrag: failed to initialize storages", "error", err)
+			// KV Storages
+			fullDocs := ragstorage.NewPostgresKVStorage(pgDB, ragstorage.NewStorageConfig("full_docs", workDir))
+			docStatus := ragstorage.NewPostgresKVStorage(pgDB, ragstorage.NewStorageConfig("doc_status", workDir))
+			textChunks := ragstorage.NewPostgresKVStorage(pgDB, ragstorage.NewStorageConfig("text_chunks", workDir))
+			llmCache := ragstorage.NewPostgresKVStorage(pgDB, ragstorage.NewStorageConfig("llm_response_cache", workDir))
+
+			// Additional KV storages needed by LightRAG
+			fullEntities := ragstorage.NewPostgresKVStorage(pgDB, ragstorage.NewStorageConfig("full_entities", workDir))
+			fullRelations := ragstorage.NewPostgresKVStorage(pgDB, ragstorage.NewStorageConfig("full_relations", workDir))
+			entityChunks := ragstorage.NewPostgresKVStorage(pgDB, ragstorage.NewStorageConfig("entity_chunks", workDir))
+			relationChunks := ragstorage.NewPostgresKVStorage(pgDB, ragstorage.NewStorageConfig("relation_chunks", workDir))
+
+			// Vector Storages
+			// Note: We need EmbeddingFunc to be set in config for dimension, but StorageConfig usually carries dimension?
+			// StorageConfig in interfaces.go: EmbeddingDim int
+			// ragstorage.NewStorageConfig default is 0?
+			// We should set dimension explicitly.
+
+			chunksVDBConfig := ragstorage.NewStorageConfig("chunks_vdb", workDir)
+			chunksVDBConfig.EmbeddingDim = 1536 // Default OpenAI dim, should match cfg.AI.Model or similar
+			chunksVDB := ragstorage.NewPostgresVectorStorage(pgDB, chunksVDBConfig)
+
+			entitiesVDBConfig := ragstorage.NewStorageConfig("entities_vdb", workDir)
+			entitiesVDBConfig.EmbeddingDim = 1536
+			entitiesVDB := ragstorage.NewPostgresVectorStorage(pgDB, entitiesVDBConfig)
+
+			relationsVDBConfig := ragstorage.NewStorageConfig("relations_vdb", workDir)
+			relationsVDBConfig.EmbeddingDim = 1536
+			relationsVDB := ragstorage.NewPostgresVectorStorage(pgDB, relationsVDBConfig)
+
+			// Graph Storage
+			graphStorage := ragstorage.NewPostgresGraphStorage(pgDB, ragstorage.NewStorageConfig("graph", workDir))
+
+			ragInstance.SetStorages(
+				fullDocs, textChunks,
+				fullEntities, fullRelations,
+				entityChunks, relationChunks,
+				entitiesVDB, relationsVDB, chunksVDB,
+				graphStorage,
+				llmCache, docStatus,
+			)
+
+			if err := ragInstance.InitializeStorages(ctx); err != nil {
+				log.Error(ctx, "lightrag: failed to initialize storages", "error", err)
+			}
 		}
 
-		lightragHandler := lightraghandlers.NewHandler(log, ragInstance, cfg.DashboardAdmin.User, cfg.DashboardAdmin.Pass)
+		// Initialize RAG Service (MinIO backed + Postgres DB)
+		ragStore := rag.NewS3Store(artifactService)
+		docRepo := sqldb.NewPostgresDocumentRepository(db)
+		ragService := rag.NewService(ragStore, docRepo)
+
+		lightragHandler := lightraghandlers.NewHandler(log, ragService, ragInstance, cfg.DashboardAdmin.User, cfg.DashboardAdmin.Pass)
 		r.Get("/lightrag", lightragHandler.BasicAuth(lightragHandler.ServeDashboard))
 		r.Route("/api/lightrag", func(r chi.Router) {
 			r.Use(lightragHandler.BasicAuthMiddleware)
 			r.Get("/documents", lightragHandler.ListDocuments)
 			r.Post("/documents/upload", lightragHandler.UploadDocument)
+			r.Post("/documents/folder", lightragHandler.CreateFolder)
 			r.Delete("/documents/{id}", lightragHandler.DeleteDocument)
 			r.Delete("/documents", lightragHandler.ClearDocuments)
+			r.Post("/documents/sync", lightragHandler.SyncDocuments)
 			r.Get("/documents/status-counts", lightragHandler.GetStatusCounts)
 			r.Get("/health", lightragHandler.GetHealth)
 			r.Post("/pipeline/index", lightragHandler.IndexDocuments)
