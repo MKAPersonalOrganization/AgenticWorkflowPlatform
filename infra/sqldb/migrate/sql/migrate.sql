@@ -155,3 +155,21 @@ CREATE TABLE IF NOT EXISTS resources (
 );
 CREATE INDEX IF NOT EXISTS idx_resources_user ON resources(user_id);
 CREATE INDEX IF NOT EXISTS idx_resources_source ON resources(source);
+
+-- Version: 1.14
+-- Description: Create documents table for LightRAG file management
+CREATE TABLE IF NOT EXISTS documents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_id VARCHAR(255),  -- NULL for public? or 'system'
+    name VARCHAR(255) NOT NULL,
+    s3_key TEXT NOT NULL,
+    content_type VARCHAR(255),
+    size BIGINT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    status VARCHAR(50) DEFAULT 'uploaded', -- uploaded, pipelined, indexed, failed
+    is_dir BOOLEAN DEFAULT FALSE
+);
+
+CREATE INDEX IF NOT EXISTS idx_documents_owner ON documents(owner_id);
+CREATE INDEX IF NOT EXISTS idx_documents_key ON documents(s3_key);

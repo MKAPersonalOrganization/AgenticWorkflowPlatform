@@ -12,8 +12,9 @@ type LayoutProps struct {
 
 templ Layout(props LayoutProps) {
 	@components.BaseLayout(components.LayoutProps{
-		Title: props.Title,
-		User:  props.User,
+		Title:      props.Title,
+		User:       props.User,
+		HideNavbar: true,
 	}) {
 		<main class="flex-1">
 			{ children... }

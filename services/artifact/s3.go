@@ -70,7 +70,8 @@ func (s *S3Service) Save(ctx context.Context, userID, sessionID, fileName string
 	}
 
 	// Check for naming validity (S3 is generous but let's be safe against traversal attempts in logic)
-	if strings.Contains(fileName, "..") || strings.Contains(fileName, "/") || strings.Contains(fileName, "\\") {
+	// Allow forward slashes for subdirectories, but block traversal and backslashes
+	if strings.Contains(fileName, "..") || strings.Contains(fileName, "\\") {
 		return 0, ErrInvalidPath
 	}
 
@@ -115,36 +116,91 @@ func (s *S3Service) Load(ctx context.Context, userID, sessionID, fileName string
 	return obj, nil
 }
 
-func (s *S3Service) List(ctx context.Context, userID, sessionID string) ([]string, error) {
+// CreateDirectory creates a directory (or placeholder) in the artifact store.
+func (s *S3Service) CreateDirectory(ctx context.Context, userID, sessionID, pathStr string) error {
+	if userID == "" || sessionID == "" || pathStr == "" {
+		return fmt.Errorf("userID, sessionID, and path are required")
+	}
+
+	// Ensure path ends with /
+	if !strings.HasSuffix(pathStr, "/") {
+		pathStr += "/"
+	}
+
+	// Use generic getObjectKey but manually append / because path.Join strips it
+	objectKey := s.getObjectKey(userID, sessionID, pathStr)
+	if !strings.HasSuffix(objectKey, "/") {
+		objectKey += "/"
+	}
+
+	// Create 0-byte object
+	_, err := s.client.PutObject(ctx, s.bucketName, objectKey, strings.NewReader(""), 0, minio.PutObjectOptions{
+		ContentType: "application/x-directory",
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create directory object: %w", err)
+	}
+
+	return nil
+}
+
+func (s *S3Service) List(ctx context.Context, userID, sessionID, dirPrefix string) ([]ArtifactInfo, error) {
 	if userID == "" || sessionID == "" {
 		return nil, fmt.Errorf("userID and sessionID are required")
 	}
 
-	prefix := path.Join(userID, sessionID) + "/"
+	// Base prefix: userID/sessionID/
+	basePrefix := path.Join(userID, sessionID) + "/"
 
-	var files []string
+	// Full prefix to list: userID/sessionID/dirPrefix
+	// Ensure dirPrefix ends with / if it's a directory we are listing,
+	// unless it's empty (root).
+	fullPrefix := basePrefix
+	if dirPrefix != "" {
+		// Clean the prefix path
+		cleanPrefix := strings.Trim(dirPrefix, "/")
+		if cleanPrefix != "" {
+			fullPrefix += cleanPrefix + "/"
+		}
+	}
+
+	var artifacts []ArtifactInfo
 
 	// ListObjects returns a channel
 	opts := minio.ListObjectsOptions{
-		Prefix:    prefix,
-		Recursive: false, // We only want files at this level
+		Prefix:    fullPrefix,
+		Recursive: false, // We want to emulate directory listing, so not recursive
 	}
 
 	for object := range s.client.ListObjects(ctx, s.bucketName, opts) {
 		if object.Err != nil {
 			return nil, fmt.Errorf("error listing objects: %w", object.Err)
 		}
-		// Key is full path "userID/sessionID/fileName"
-		// We want just "fileName"
-		_, fileName := path.Split(object.Key)
-		// If recursive is false, it might return "userID/sessionID/" as a directory, ignore it
-		if fileName == "" {
+
+		// Key is full path "userID/sessionID/folder/file"
+		// We want just the name relative to fullPrefix
+		relativePath := strings.TrimPrefix(object.Key, fullPrefix)
+
+		if relativePath == "" {
+			// This is the directory object itself, skip
 			continue
 		}
-		files = append(files, fileName)
+
+		// In MinIO, "Virtual" folders might be returned if they exist in other keys?
+		// Since Recursive=false, MinIO returns "common prefixes" as objects ending in /
+
+		isDir := strings.HasSuffix(object.Key, "/")
+		name := strings.TrimSuffix(relativePath, "/")
+
+		artifacts = append(artifacts, ArtifactInfo{
+			Name:    name,
+			Size:    object.Size,
+			ModTime: object.LastModified,
+			IsDir:   isDir,
+		})
 	}
 
-	return files, nil
+	return artifacts, nil
 }
 
 func (s *S3Service) Delete(ctx context.Context, userID, sessionID, fileName string) error {
