@@ -762,10 +762,23 @@ func run(ctx context.Context, log *logger.Logger) error {
 		r.Get("/lightrag", lightragHandler.BasicAuth(lightragHandler.ServeDashboard))
 		r.Route("/api/lightrag", func(r chi.Router) {
 			r.Use(lightragHandler.BasicAuthMiddleware)
+
+			// Document browsing & management
 			r.Get("/documents", lightragHandler.ListDocuments)
+			r.Get("/documents/children", lightragHandler.ListChildren)
+			r.Get("/documents/search", lightragHandler.SearchDocuments)
+			r.Get("/documents/trash", lightragHandler.ListTrash)
 			r.Post("/documents/upload", lightragHandler.UploadDocument)
 			r.Post("/documents/folder", lightragHandler.CreateFolder)
 			r.Delete("/documents/{id}", lightragHandler.DeleteDocument)
+			r.Post("/documents/{id}/rename", lightragHandler.RenameDocument)
+			r.Post("/documents/{id}/move", lightragHandler.MoveDocument)
+			r.Post("/documents/{id}/trash", lightragHandler.TrashDocument)
+			r.Post("/documents/{id}/restore", lightragHandler.RestoreDocument)
+			r.Get("/documents/{id}/download", lightragHandler.DownloadDocument)
+			r.Delete("/documents/trash", lightragHandler.EmptyTrash)
+
+			// RAG admin operations
 			r.Delete("/documents", lightragHandler.ClearDocuments)
 			r.Post("/documents/sync", lightragHandler.SyncDocuments)
 			r.Get("/documents/status-counts", lightragHandler.GetStatusCounts)
