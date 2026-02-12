@@ -131,12 +131,6 @@ type PaginatedDocsResponse struct {
 	StatusCounts map[string]int      `json:"status_counts"`
 }
 
-// ClearDocumentsResponse represents the response from the DELETE /documents endpoint.
-type ClearDocumentsResponse struct {
-	Status  string `json:"status"` // success, partial_success, busy, fail
-	Message string `json:"message"`
-}
-
 // QueryResponse represents the response from the query endpoint.
 type QueryResponse struct {
 	Response   string      `json:"response"`
@@ -351,39 +345,4 @@ func (c *Client) GetDocumentsPaginated(ctx context.Context, req DocumentsRequest
 	}
 
 	return &docsResp, nil
-}
-
-// ClearDocuments deletes all documents from the system.
-func (c *Client) ClearDocuments(ctx context.Context) (*ClearDocumentsResponse, error) {
-	ctx, span := c.tracer.Start(ctx, "ClearDocuments")
-	defer span.End()
-
-	url := fmt.Sprintf("%s/documents", c.baseURL)
-
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
-	}
-
-	if c.apiKey != "" {
-		httpReq.Header.Set("X-API-Key", c.apiKey)
-	}
-
-	resp, err := c.httpClient.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("do request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, string(body))
-	}
-
-	var clearResp ClearDocumentsResponse
-	if err := json.NewDecoder(resp.Body).Decode(&clearResp); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
-	}
-
-	return &clearResp, nil
 }
