@@ -24,7 +24,6 @@ require (
 	github.com/kcmvp/archunit v0.2.0-alpha1
 	github.com/kurrent-io/KurrentDB-Client-Go v1.1.1
 	github.com/lib/pq v1.10.9
-	github.com/lightrag/lightrag-go v0.0.0-00010101000000-000000000000
 	github.com/minio/minio-go/v7 v7.0.98
 	github.com/montanaflynn/stats v0.7.1
 	github.com/ollama/ollama v0.13.5
@@ -78,6 +77,7 @@ require (
 	github.com/klauspost/compress v1.18.2 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.11 // indirect
 	github.com/klauspost/crc32 v1.3.0 // indirect
+	github.com/lightrag/lightrag-go v0.0.0-00010101000000-000000000000 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/minio/crc64nvme v1.1.1 // indirect
@@ -97,7 +97,6 @@ require (
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/tinylib/msgp v1.6.1 // indirect
-	github.com/x448/float16 v0.8.4 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel/metric v1.39.0 // indirect
