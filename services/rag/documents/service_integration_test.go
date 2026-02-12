@@ -1,0 +1,181 @@
+//go:build integration
+
+package documents
+
+import (
+	"bytes"
+	"context"
+	"fmt"
+	"os"
+	"school-with-ai/domain"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/google/uuid"
+)
+
+// To run these tests:
+// EDGEQUAKE_BASE_URL=http://localhost:8081 go test -v -tags=integration ./services/rag/documents/...
+
+func TestService_Integration_UploadAndList(t *testing.T) {
+	baseURL := os.Getenv("EDGEQUAKE_BASE_URL")
+	if baseURL == "" {
+		t.Skip("Skipping integration test: EDGEQUAKE_BASE_URL not set")
+	}
+
+	service := NewService(baseURL, nil)
+	ctx := context.Background()
+
+	tCtx := getIntegrationContext()
+
+	fmt.Printf("Running integration test against %s\n", baseURL)
+
+	// 1. List current documents
+	initialResp, err := service.List(ctx, tCtx, 1, 10)
+	if err != nil {
+		t.Fatalf("Failed to list documents: %v", err)
+	}
+	initialCount := len(initialResp.Documents)
+	fmt.Printf("Initial document count: %d\n", initialCount)
+
+	// 2. Upload a new document
+	fileName := fmt.Sprintf("integration-test-%d.txt", time.Now().Unix())
+	content := strings.NewReader(fmt.Sprintf("Integration test content for the new documents package. Unique ID: %s", uuid.New().String()))
+
+	uploadResp, err := service.Upload(ctx, tCtx, fileName, "text/plain", content)
+	if err != nil {
+		t.Fatalf("Failed to upload document: %v", err)
+	}
+	fmt.Printf("Uploaded document ID: %s\n", uploadResp.DocumentID)
+
+	// 3. List documents again and verify the new one is there (with retries)
+	found := false
+	for i := 0; i < 5; i++ {
+		finalResp, err := service.List(ctx, tCtx, 1, 100)
+		if err != nil {
+			t.Fatalf("Failed to list documents after upload: %v", err)
+		}
+
+		for _, doc := range finalResp.Documents {
+			if doc.ID == uploadResp.DocumentID {
+				found = true
+				break
+			}
+		}
+		if found {
+			break
+		}
+		fmt.Printf("Document not found yet, retrying in 1s... (attempt %d/5)\n", i+1)
+		time.Sleep(1 * time.Second)
+	}
+
+	if !found {
+		t.Errorf("Uploaded document %s not found in list after retries", uploadResp.DocumentID)
+	}
+}
+
+func TestService_Integration_ListPDFs(t *testing.T) {
+	baseURL := os.Getenv("EDGEQUAKE_BASE_URL")
+	if baseURL == "" {
+		t.Skip("Skipping integration test: EDGEQUAKE_BASE_URL not set")
+	}
+
+	service := NewService(baseURL, nil)
+	ctx := context.Background()
+	tCtx := getIntegrationContext()
+
+	resp, err := service.ListPDFs(ctx, tCtx, 1, 10, "")
+	if err != nil {
+		t.Fatalf("Failed to list PDFs: %v", err)
+	}
+
+	fmt.Printf("Found %d PDFs in workspace\n", resp.Pagination.TotalCount)
+}
+
+func TestService_Integration_PDF_Lifecycle(t *testing.T) {
+	baseURL := os.Getenv("EDGEQUAKE_BASE_URL")
+	if baseURL == "" {
+		t.Skip("Skipping integration test: EDGEQUAKE_BASE_URL not set")
+	}
+
+	service := NewService(baseURL, nil)
+	ctx := context.Background()
+	tCtx := getIntegrationContext()
+
+	// 1. Upload
+	pdfContent := createDummyPDF()
+	fileName := fmt.Sprintf("integration-test-lifecycle-%d.pdf", time.Now().Unix())
+	uploadResp, err := service.UploadPDF(ctx, tCtx, fileName, bytes.NewReader(pdfContent))
+	if err != nil {
+		t.Fatalf("Failed to upload PDF: %v", err)
+	}
+	trackID := ""
+	if uploadResp.TrackID != nil {
+		trackID = *uploadResp.TrackID
+	}
+	fmt.Printf("Uploaded PDF ID: %s, TrackID: %s\n", uploadResp.PdfID, trackID)
+
+	// 2. Poll Progress
+	if uploadResp.TrackID != nil {
+		completed := false
+		for i := 0; i < 30; i++ {
+			progress, err := service.GetPDFProgress(ctx, tCtx, *uploadResp.TrackID)
+			if err != nil {
+				t.Fatalf("Failed to get progress: %v", err)
+			}
+			if progress.IsComplete {
+				completed = true
+				break
+			}
+			time.Sleep(1 * time.Second)
+		}
+		if !completed {
+			t.Log("PDF processing timed out in progress check")
+		}
+	}
+
+	// 3. Check Status
+	status, err := service.GetPDFStatus(ctx, tCtx, uploadResp.PdfID)
+	if err != nil {
+		t.Fatalf("Failed to get status: %v", err)
+	}
+	fmt.Printf("PDF Status: %s\n", status.Status)
+
+	// 4. Get Content
+	content, err := service.GetPDFContent(ctx, tCtx, uploadResp.PdfID)
+	if err != nil {
+		t.Fatalf("Failed to get content: %v", err)
+	}
+	if content.MarkdownContent != nil {
+		fmt.Printf("Extracted Content Length: %d\n", len(*content.MarkdownContent))
+	}
+
+	// 5. Delete
+	err = service.DeletePDF(ctx, tCtx, uploadResp.PdfID)
+	if err != nil {
+		t.Fatalf("Failed to delete PDF: %v", err)
+	}
+	fmt.Printf("PDF deleted successfully\n")
+}
+
+func getIntegrationContext() *domain.TenantContext {
+	tenantIDStr := "00000000-0000-0000-0000-000000000002"
+	workspaceIDStr := "00000000-0000-0000-0000-000000000003"
+	userID := "00000000-0000-0000-0000-000000000001"
+	role := "admin"
+
+	id1, _ := uuid.Parse(tenantIDStr)
+	id2, _ := uuid.Parse(workspaceIDStr)
+
+	return &domain.TenantContext{
+		TenantID:    &id1,
+		WorkspaceID: &id2,
+		UserID:      userID,
+		Role:        role,
+	}
+}
+
+func createDummyPDF() []byte {
+	return []byte("%PDF-1.4\n1 0 obj\n<< /Type /Page /Contents 2 0 R /Resources << /Font << /F1 3 0 R >> >> >>\nendobj\n2 0 obj\n<< /Length 50 >>\nstream\nBT /F1 12 Tf 100 700 Td (Hello World) Tj ET\nendstream\nendobj\n3 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF")
+}
