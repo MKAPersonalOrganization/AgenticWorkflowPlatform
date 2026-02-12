@@ -9,6 +9,7 @@ import (
 
 	"school-with-ai/domain"
 	"school-with-ai/services/rag/documents"
+	"school-with-ai/services/rag/folders"
 	"school-with-ai/services/rag/query"
 	"school-with-ai/services/rag/tenants"
 	"school-with-ai/services/rag/workspaces"
@@ -29,6 +30,7 @@ type Service struct {
 	Query      *query.Service
 	Workspaces *workspaces.Service
 	Tenants    *tenants.Service
+	Folders    *folders.Service
 }
 
 // NewService creates a new Edgequake service.
@@ -43,6 +45,7 @@ func NewService(baseURL string) *Service {
 		Query:      query.NewService(baseURL, httpClient),
 		Workspaces: workspaces.NewService(baseURL, httpClient),
 		Tenants:    tenants.NewService(baseURL, httpClient),
+		Folders:    folders.NewService(baseURL, httpClient),
 	}
 }
 
@@ -149,4 +152,24 @@ func (s *Service) UpdateTenant(ctx context.Context, tenantID uuid.UUID, req *ten
 // DeleteTenant deletes a tenant.
 func (s *Service) DeleteTenant(ctx context.Context, tenantID uuid.UUID) error {
 	return s.Tenants.Delete(ctx, tenantID)
+}
+
+// ListFolders lists all folders.
+func (s *Service) ListFolders(ctx context.Context, tCtx *domain.TenantContext, page, pageSize int) (*folders.FolderListResponse, error) {
+	return s.Folders.List(ctx, tCtx, page, pageSize)
+}
+
+// CreateFolder creates a new folder.
+func (s *Service) CreateFolder(ctx context.Context, tCtx *domain.TenantContext, req *folders.CreateFolderRequest) (*folders.FolderResponse, error) {
+	return s.Folders.Create(ctx, tCtx, req)
+}
+
+// DeleteFolder deletes a folder.
+func (s *Service) DeleteFolder(ctx context.Context, tCtx *domain.TenantContext, folderID uuid.UUID) error {
+	return s.Folders.Delete(ctx, tCtx, folderID)
+}
+
+// UpdateFolder updates an existing folder.
+func (s *Service) UpdateFolder(ctx context.Context, tCtx *domain.TenantContext, folderID uuid.UUID, req *folders.UpdateFolderRequest) (*folders.FolderResponse, error) {
+	return s.Folders.Update(ctx, tCtx, folderID, req)
 }
