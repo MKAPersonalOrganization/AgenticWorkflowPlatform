@@ -461,9 +461,7 @@ func (h *TaskManagementHandler) ListArtifacts(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	prefix := r.URL.Query().Get("prefix")
-
-	artifacts, err := h.artifactStore.List(r.Context(), user.ID, threadID, prefix)
+	artifacts, err := h.artifactStore.List(r.Context(), user.ID, threadID)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to list artifacts", "error", err, "userID", user.ID, "threadID", threadID)
 		http.Error(w, "Failed to list artifacts", http.StatusInternalServerError)

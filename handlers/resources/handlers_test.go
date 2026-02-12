@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"school-with-ai/domain"
-	"school-with-ai/services/artifact"
 	"school-with-ai/services/resources"
 
 	"github.com/google/uuid"
@@ -63,11 +62,7 @@ func (m *MockArtifactService) Load(ctx context.Context, userID, sessionID, fileN
 	return io.NopCloser(bytes.NewReader([]byte("test content"))), nil
 }
 
-func (m *MockArtifactService) CreateDirectory(ctx context.Context, userID, sessionID, path string) error {
-	return nil
-}
-
-func (m *MockArtifactService) List(ctx context.Context, userID, sessionID, prefix string) ([]artifact.ArtifactInfo, error) {
+func (m *MockArtifactService) List(ctx context.Context, userID, sessionID string) ([]string, error) {
 	return nil, nil
 }
 
