@@ -17,28 +17,24 @@ import (
 
 func main() {
 	var (
-		baseURL    = flag.String("url", "", "LightRAG API base URL")
-		apiKey     = flag.String("api-key", "", "LightRAG API key")
-		mode       = flag.String("mode", lightrag.ModeHybrid, "Query mode (local, global, hybrid, naive, mix, bypass)")
-		stream     = flag.Bool("stream", false, "Enable streaming response")
-		verbose    = flag.Bool("v", false, "Enable verbose logging")
-		list       = flag.Bool("list", false, "List documents")
-		clear      = flag.Bool("clear", false, "Clear all documents")
-		scan       = flag.Bool("scan", false, "Scan for new documents")
-		upload     = flag.String("upload", "", "Upload a document file")
-		reprocess  = flag.Bool("reprocess", false, "Reprocess failed documents")
-		cancel     = flag.Bool("cancel", false, "Cancel currently running pipeline")
-		stats      = flag.Bool("stats", false, "Show document status counts")
-		clearCache = flag.Bool("clear-cache", false, "Clear LLM response cache")
-		track      = flag.String("track", "", "Track status of a specific ID (or 'pipeline' for overall status)")
-		status     = flag.String("status", "", "Filter by status (PENDING, PROCESSING, PREPROCESSED, PROCESSED, FAILED)")
-		page       = flag.Int("page", 1, "Page number for listing")
-		pageSize   = flag.Int("page-size", 50, "Page size for listing")
+		baseURL  = flag.String("url", "", "LightRAG API base URL")
+		apiKey   = flag.String("api-key", "", "LightRAG API key")
+		mode     = flag.String("mode", lightrag.ModeHybrid, "Query mode (local, global, hybrid, naive, mix, bypass)")
+		stream   = flag.Bool("stream", false, "Enable streaming response")
+		verbose  = flag.Bool("v", false, "Enable verbose logging")
+		list     = flag.Bool("list", false, "List documents")
+		clear    = flag.Bool("clear", false, "Clear all documents")
+		scan     = flag.Bool("scan", false, "Scan for new documents")
+		upload   = flag.String("upload", "", "Upload a document file")
+		track    = flag.String("track", "", "Track status of a specific ID (or 'pipeline' for overall status)")
+		status   = flag.String("status", "", "Filter by status (PENDING, PROCESSING, PREPROCESSED, PROCESSED, FAILED)")
+		page     = flag.Int("page", 1, "Page number for listing")
+		pageSize = flag.Int("page-size", 50, "Page size for listing")
 	)
 
 	flag.Parse()
 
-	if !*list && !*clear && !*scan && *track == "" && *upload == "" && !*reprocess && !*cancel && !*stats && !*clearCache && flag.NArg() < 1 {
+	if !*list && !*clear && !*scan && *track == "" && *upload == "" && flag.NArg() < 1 {
 		fmt.Println("Usage: lightrag-query [flags] <query>")
 		fmt.Println("\nFlags:")
 		flag.PrintDefaults()
@@ -47,10 +43,6 @@ func main() {
 		fmt.Println("  lightrag-query -list -status PROCESSED")
 		fmt.Println("  lightrag-query -clear")
 		fmt.Println("  lightrag-query -scan")
-		fmt.Println("  lightrag-query -reprocess")
-		fmt.Println("  lightrag-query -cancel")
-		fmt.Println("  lightrag-query -stats")
-		fmt.Println("  lightrag-query -clear-cache")
 		fmt.Println("  lightrag-query -upload document.pdf")
 		fmt.Println("  lightrag-query -track pipeline")
 		fmt.Println("  lightrag-query -track scan_20240101_000000_xxxx")
@@ -104,26 +96,6 @@ func main() {
 
 	if *upload != "" {
 		handleUpload(ctx, client, *upload)
-		return
-	}
-
-	if *reprocess {
-		handleReprocess(ctx, client)
-		return
-	}
-
-	if *cancel {
-		handleCancel(ctx, client)
-		return
-	}
-
-	if *stats {
-		handleStats(ctx, client)
-		return
-	}
-
-	if *clearCache {
-		handleClearCache(ctx, client)
 		return
 	}
 
@@ -230,56 +202,6 @@ func handleScan(ctx context.Context, client *lightrag.Client) {
 	fmt.Printf("Status: %s\n", resp.Status)
 	fmt.Printf("Message: %s\n", resp.Message)
 	fmt.Printf("Track ID: %s\n", resp.TrackID)
-}
-
-func handleClearCache(ctx context.Context, client *lightrag.Client) {
-	fmt.Println("\nClearing LLM response cache...")
-	resp, err := client.ClearCache(ctx)
-	if err != nil {
-		fmt.Printf("Error clearing cache: %v\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Printf("Status: %s\n", resp.Status)
-	fmt.Printf("Message: %s\n", resp.Message)
-}
-
-func handleStats(ctx context.Context, client *lightrag.Client) {
-	fmt.Println("\nRetrieving document status counts...")
-	resp, err := client.GetStatusCounts(ctx)
-	if err != nil {
-		fmt.Printf("Error retrieving status counts: %v\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Println("Counts by status:")
-	for s, count := range resp.StatusCounts {
-		fmt.Printf("  %s: %d\n", s, count)
-	}
-}
-
-func handleReprocess(ctx context.Context, client *lightrag.Client) {
-	fmt.Println("\nInitiating reprocessing of failed documents...")
-	resp, err := client.ReprocessFailedDocuments(ctx)
-	if err != nil {
-		fmt.Printf("Error reprocessing documents: %v\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Printf("Status: %s\n", resp.Status)
-	fmt.Printf("Message: %s\n", resp.Message)
-}
-
-func handleCancel(ctx context.Context, client *lightrag.Client) {
-	fmt.Println("\nRequesting pipeline cancellation...")
-	resp, err := client.CancelPipeline(ctx)
-	if err != nil {
-		fmt.Printf("Error cancelling pipeline: %v\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Printf("Status: %s\n", resp.Status)
-	fmt.Printf("Message: %s\n", resp.Message)
 }
 
 func handleUpload(ctx context.Context, client *lightrag.Client, filePath string) {
