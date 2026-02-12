@@ -40,6 +40,8 @@ import (
 	"school-with-ai/infra/sqldb/migrate"
 	"school-with-ai/services/agentorchestrator"
 	"school-with-ai/services/artifact"
+	"school-with-ai/services/edgequake"
+	eqperms "school-with-ai/services/edgequakepermissions"
 	"school-with-ai/services/memory"
 	"school-with-ai/services/permissions"
 	"school-with-ai/services/resourcepermissions"
@@ -168,6 +170,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 		}
 		AgentCapabilities struct {
 			LongTermMemory bool `conf:"default:true"`
+		}
+		Edgequake struct {
+			BaseURL string `conf:"default:http://localhost:8081"`
 		}
 	}{
 		Version: conf.Version{
@@ -397,6 +402,25 @@ func run(ctx context.Context, log *logger.Logger) error {
 	resourcePermissionsService := resourcepermissions.NewService(log, resourcepermissions.NewInMemoryRepository())
 	log.Info(ctx, "startup", "status", "resource permissions service initialized")
 
+	// Create and initialize edgequake permissions service (multitenancy)
+	eqPermissionsRepo := eqperms.NewInMemoryRepository()
+	eqPermissionsService := eqperms.NewService(log, eqPermissionsRepo)
+	log.Info(ctx, "startup", "status", "edgequake permissions service initialized")
+
+	// SEED: Create a default tenant and workspace for development
+	// In a real system, this would come from a database or account sign-up flow.
+	devTenant, _ := eqPermissionsService.CreateTenant(ctx, "Default School", "default-school")
+	devWorkspace, _ := eqPermissionsService.CreateWorkspace(ctx, devTenant.ID, "General Knowledge", "general")
+
+	// Default development user from Kratos (example ID)
+	// We'll add a membership so the system works out of the box in dev
+	_ = eqPermissionsService.AddMember(ctx, "00000000-0000-0000-0000-000000000001", devTenant.ID, &devWorkspace.ID, domain.RoleAdmin)
+
+	// Initialize Edgequake service
+	edgequakeService := edgequake.NewService(cfg.Edgequake.BaseURL)
+	_ = edgequakeService // Reserved for future use in handlers
+	log.Info(ctx, "startup", "status", "edgequake service initialized", "baseURL", cfg.Edgequake.BaseURL)
+
 	// Initialize Agents directly (Step 2 of Registry Removal)
 	// Initialize Agents directly (Step 2 of Registry Removal) - Updated for Service Decoupling
 	slogLogger := slog.New(log)
@@ -580,7 +604,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		"healthCheckInterval", cfg.Orchestration.HealthCheckInterval)
 
 	// Create HTTP handler
-	handler := taskmgmthandlers.NewTaskManagementHandler(log, taskManager, agentProvider, authSvc, threadQueryService, aguiProjection, redisBroadcaster, threadMgmt, artifactService, memoryService, toolRegistry, permissionsService)
+	handler := taskmgmthandlers.NewTaskManagementHandler(log, taskManager, agentProvider, authSvc, threadQueryService, aguiProjection, redisBroadcaster, threadMgmt, artifactService, memoryService, toolRegistry, permissionsService, eqPermissionsService, edgequakeService)
 
 	// Create health handler
 	healthHandler := healthhandlers.NewHealthHandler(log)
@@ -679,6 +703,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Get("/v1/agents/{agentId}/toolsets", authMiddleware.RequireAuthFunc(handler.ListAgentToolSets))
 	r.Put("/v1/agents/{agentId}/toolsets/{toolSetId}", authMiddleware.RequireAuthFunc(handler.ToggleAgentToolSet))
 	r.Put("/v1/agents/{agentId}/toolsets/{toolSetId}/tools/{toolId}", authMiddleware.RequireAuthFunc(handler.ToggleIndividualTool))
+	r.Get("/v1/documents", authMiddleware.RequireAuthFunc(handler.ListDocuments))
+	r.Post("/v1/documents", authMiddleware.RequireAuthFunc(handler.UploadDocument))
 
 	// Resource permission routes
 	r.Get("/v1/agents/{agentId}/resources", authMiddleware.RequireAuthFunc(resourcePermHandler.ListAgentResources))

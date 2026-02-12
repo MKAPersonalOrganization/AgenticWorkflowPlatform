@@ -14,6 +14,8 @@ import (
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/services"
 	"school-with-ai/services/artifact"
+	"school-with-ai/services/edgequake"
+	"school-with-ai/services/edgequakepermissions"
 	"school-with-ai/services/memory"
 	"school-with-ai/services/permissions"
 	"school-with-ai/services/taskmanagement"
@@ -37,6 +39,8 @@ type TaskManagementHandler struct {
 	memoryStore        memory.Service
 	toolRegistry       *toolregistry.Registry
 	permissionsService *permissions.Service
+	eqPermissions      *edgequakepermissions.Service
+	edgequakeService   *edgequake.Service
 }
 
 // NewTaskManagementHandler creates a new HTTP handler for task management.
@@ -53,6 +57,8 @@ func NewTaskManagementHandler(
 	memoryStore memory.Service,
 	toolRegistry *toolregistry.Registry,
 	permissionsService *permissions.Service,
+	eqPermissions *edgequakepermissions.Service,
+	edgequakeService *edgequake.Service,
 ) *TaskManagementHandler {
 	return &TaskManagementHandler{
 		log:                log,
@@ -67,6 +73,8 @@ func NewTaskManagementHandler(
 		memoryStore:        memoryStore,
 		toolRegistry:       toolRegistry,
 		permissionsService: permissionsService,
+		eqPermissions:      eqPermissions,
+		edgequakeService:   edgequakeService,
 	}
 }
 
@@ -738,5 +746,101 @@ func (h *TaskManagementHandler) ToggleIndividualTool(w http.ResponseWriter, r *h
 		"enabled":   req.Enabled,
 	}); err != nil {
 		h.log.Error(r.Context(), "failed to encode toggle individual tool response", "error", err)
+	}
+}
+
+// ListDocuments handles GET /v1/documents - retrieves documents from Edgequake using passive context resolution.
+func (h *TaskManagementHandler) ListDocuments(w http.ResponseWriter, r *http.Request) {
+	// 1. Authenticate user via Kratos
+	user := h.authService.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// 2. Resolve Multitenancy Context (Go as Context Resolver)
+	tCtx, err := h.eqPermissions.GetTenantContext(r.Context(), user.ID)
+	if err != nil {
+		h.log.Error(r.Context(), "Failed to resolve multitenancy context", "userID", user.ID, "error", err)
+		// We'll return 401 if we can't find a tenant membership for the user
+		http.Error(w, "User has no active tenant workspace", http.StatusUnauthorized)
+		return
+	}
+
+	// 3. Delegate to Edgequake (Passive Enforcement)
+	// Go does NOT check if the user is allowed to list docs. It just passes the headers.
+	resp, err := h.edgequakeService.ListDocuments(r.Context(), tCtx, 1, 20)
+	if err != nil {
+		if err == edgequake.ErrEdgequakeUnauthorized {
+			http.Error(w, "Unauthorized by Edgequake", http.StatusUnauthorized)
+			return
+		}
+		if err == edgequake.ErrEdgequakeForbidden {
+			http.Error(w, "Access forbidden by Edgequake", http.StatusForbidden)
+			return
+		}
+		h.log.Error(r.Context(), "Edgequake API failure", "error", err)
+		http.Error(w, "Failed to retrieve documents from Edgequake", http.StatusInternalServerError)
+		return
+	}
+
+	// 4. Return results
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		h.log.Error(r.Context(), "Failed to encode documents response", "error", err)
+	}
+}
+
+// UploadDocument handles POST /v1/documents - uploads a document to Edgequake using passive context resolution.
+func (h *TaskManagementHandler) UploadDocument(w http.ResponseWriter, r *http.Request) {
+	// 1. Authenticate user via Kratos
+	user := h.authService.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// 2. Resolve Multitenancy Context (Go as Context Resolver)
+	tCtx, err := h.eqPermissions.GetTenantContext(r.Context(), user.ID)
+	if err != nil {
+		h.log.Error(r.Context(), "Failed to resolve multitenancy context", "userID", user.ID, "error", err)
+		http.Error(w, "User has no active tenant workspace", http.StatusUnauthorized)
+		return
+	}
+
+	// 3. Parse Multipart Form
+	if err := r.ParseMultipartForm(32 << 20); err != nil { // 32MB max
+		http.Error(w, "Failed to parse multipart form", http.StatusBadRequest)
+		return
+	}
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "file is required", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	// 4. Delegate to Edgequake (Passive Enforcement)
+	resp, err := h.edgequakeService.UploadDocument(r.Context(), tCtx, header.Filename, header.Header.Get("Content-Type"), file)
+	if err != nil {
+		if err == edgequake.ErrEdgequakeUnauthorized {
+			http.Error(w, "Unauthorized by Edgequake", http.StatusUnauthorized)
+			return
+		}
+		if err == edgequake.ErrEdgequakeForbidden {
+			http.Error(w, "Access forbidden by Edgequake", http.StatusForbidden)
+			return
+		}
+		h.log.Error(r.Context(), "Edgequake API failure during upload", "error", err)
+		http.Error(w, "Failed to upload document to Edgequake", http.StatusInternalServerError)
+		return
+	}
+
+	// 5. Return result
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		h.log.Error(r.Context(), "Failed to encode upload response", "error", err)
 	}
 }
