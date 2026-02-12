@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -79,72 +78,26 @@ func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 	}).Render(ctx, w)
 }
 
-// ---------- Scope Helper ----------
-
-func (h *Handler) resolveScope(r *http.Request) (rag.Scope, string) {
-	scopeStr := r.URL.Query().Get("scope")
-	if scopeStr == "" {
-		scopeStr = r.FormValue("scope")
-	}
-	if scopeStr == "private" {
-		return rag.ScopePrivate, h.adminUser
-	}
-	return rag.ScopePublic, ""
-}
-
 // ---------- JSON API Handlers ----------
 
 // docEntry is a flat representation of a document for the API response.
 type docEntry struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	DisplayName string  `json:"display_name"`
-	ParentPath  string  `json:"parent_path"`
-	Status      string  `json:"status"`
-	Summary     string  `json:"content_summary,omitempty"`
-	Size        int64   `json:"size"`
-	ContentType string  `json:"content_type"`
-	CreatedAt   string  `json:"created_at"`
-	UpdatedAt   string  `json:"updated_at"`
-	DeletedAt   *string `json:"deleted_at,omitempty"`
-	IsDir       bool    `json:"is_dir"`
-}
-
-func docToEntry(d domain.Document) docEntry {
-	// Extract display name (basename) from full path
-	displayName := d.Name
-	if d.ParentPath != "" {
-		displayName = strings.TrimPrefix(d.Name, d.ParentPath)
-	}
-	displayName = strings.TrimSuffix(displayName, "/")
-	if displayName == "" {
-		displayName = d.Name
-	}
-
-	entry := docEntry{
-		ID:          d.ID.String(),
-		Name:        d.Name,
-		DisplayName: displayName,
-		ParentPath:  d.ParentPath,
-		Status:      string(d.Status),
-		Size:        d.Size,
-		ContentType: d.ContentType,
-		CreatedAt:   d.CreatedAt.Format(time.RFC3339),
-		UpdatedAt:   d.UpdatedAt.Format(time.RFC3339),
-		IsDir:       d.IsDir,
-	}
-	if d.DeletedAt != nil {
-		ts := d.DeletedAt.Format(time.RFC3339)
-		entry.DeletedAt = &ts
-	}
-	return entry
+	ID        string `json:"id"`
+	FilePath  string `json:"file_path"`
+	Status    string `json:"status"`
+	Summary   string `json:"content_summary"`
+	Length    int    `json:"content_length"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+	// IsDir     bool   `json:"is_dir"` // Deprecated in favor of flat list? Or keep for folders?
+	// For now, let's keep folders if we support them, but DB is flat for files.
+	IsDir bool `json:"is_dir"`
 }
 
 // CreateFolderRequest is the request body for creating a folder.
 type CreateFolderRequest struct {
-	Name       string `json:"name"`
-	ParentPath string `json:"parent_path"`
-	Scope      string `json:"scope"`
+	Path  string `json:"path"`
+	Scope string `json:"scope"`
 }
 
 // CreateFolder creates a new folder.
@@ -156,45 +109,37 @@ func (h *Handler) CreateFolder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Name == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "name is required"})
+	if req.Path == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "path is required"})
 		return
 	}
-
-	// Validate folder name
-	if strings.Contains(req.Name, "/") || strings.Contains(req.Name, "\\") {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "folder name cannot contain slashes"})
-		return
-	}
-
-	// Build full path
-	parentPath := req.ParentPath
-	if parentPath != "" && !strings.HasSuffix(parentPath, "/") {
-		parentPath += "/"
-	}
-	fullPath := parentPath + req.Name + "/"
 
 	// Determine scope/owner
 	var scope rag.Scope
 	ownerID := ""
 	if req.Scope == "private" {
 		scope = rag.ScopePrivate
-		ownerID = h.adminUser
+		ownerID = h.adminUser // or from context if multi-user
 	} else {
 		scope = rag.ScopePublic
 	}
 
-	if err := h.ragService.CreateDirectory(ctx, scope, ownerID, fullPath); err != nil {
+	if err := h.ragService.CreateDirectory(ctx, scope, ownerID, req.Path); err != nil {
 		h.log.Error(ctx, "lightrag: create folder", "error", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
 
+	// Save to DB
+	// Normalize path
+	if !strings.HasSuffix(req.Path, "/") {
+		req.Path += "/"
+	}
+
 	doc := &domain.Document{
 		OwnerID:     ownerID,
-		Name:        fullPath,
-		ParentPath:  parentPath,
-		S3Key:       fullPath,
+		Name:        req.Path,
+		S3Key:       req.Path,
 		ContentType: "application/x-directory",
 		Size:        0,
 		Status:      domain.DocumentStatusUploaded,
@@ -203,17 +148,20 @@ func (h *Handler) CreateFolder(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.ragService.SaveDocument(ctx, doc); err != nil {
 		h.log.Error(ctx, "lightrag: save folder metadata", "error", err)
+		// We could rollback S3, but folder objects are lightweight.
+		// For now just log usage.
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "Folder created"})
 }
 
-// ListDocuments returns a paginated list of documents for the current folder.
+// ListDocuments returns a paginated list of documents.
 func (h *Handler) ListDocuments(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	parentPath := r.URL.Query().Get("parent_path")
-	_, ownerID := h.resolveScope(r)
+	// Parameters
+	prefix := r.URL.Query().Get("prefix")
+	scopeStr := r.URL.Query().Get("scope")
 
 	// Pagination
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
@@ -222,34 +170,104 @@ func (h *Handler) ListDocuments(w http.ResponseWriter, r *http.Request) {
 	}
 	pageSize, _ := strconv.Atoi(r.URL.Query().Get("page_size"))
 	if pageSize < 1 || pageSize > 100 {
-		pageSize = 50
+		pageSize = 20
 	}
 
-	docs, total, err := h.ragService.ListByParentPath(ctx, ownerID, parentPath, pageSize, (page-1)*pageSize)
+	var ownerID string
+	if scopeStr == "private" {
+		ownerID = h.adminUser
+	}
+
+	// 1. Get documents from DB (Source of Truth for Metadata & ID)
+	// Pagination is now done in DB
+	docs, total, err := h.ragService.ListDocumentsDB(ctx, ownerID, prefix, pageSize, (page-1)*pageSize)
 	if err != nil {
-		h.log.Error(ctx, "lightrag: list documents", "error", err)
+		h.log.Error(ctx, "lightrag: list documents db", "error", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to list documents"})
 		return
 	}
 
-	entries := make([]docEntry, 0, len(docs))
+	// 2. Get statuses from LightRAG (Source of Truth for processing status)
+	// We might want to optimize this by only querying for the specific IDs?
+	// But LightRAG status is keyed by filename/path usually.
+	// But LightRAG status is keyed by filename/path usually.
+	ragStatuses, err := h.rag.GetDocStatuses(ctx)
+	if err != nil {
+		h.log.Error(ctx, "lightrag: get doc statuses", "error", err)
+		ragStatuses = make(map[string]map[string]interface{})
+	}
+
+	// 3. Merge State and Filter
+	var responseDocs []docEntry
+
+	// Normalize prefix for filtering
+	searchPrefix := prefix
+	if searchPrefix != "" && !strings.HasSuffix(searchPrefix, "/") {
+		searchPrefix += "/"
+	}
+
 	for _, d := range docs {
-		entries = append(entries, docToEntry(d))
+		// Filter out files in subdirectories (naive implementation: list all prefixed, filter in application)
+		// NOTE: This breaks pagination if many files are in subdirectories.
+		// Ideally the DB query should exclude them.
+		// For now, let's filter what we got.
+
+		relPath := strings.TrimPrefix(d.Name, searchPrefix)
+		if relPath == "" {
+			continue // Skip the directory itself if returned
+		}
+
+		// If remaining path contains separator, it's a sub-item, skip it
+		// (unless we are listing recursive? No, standard UI is folder view)
+		// But wait, if d.IsDir is true, it might have trailing slash?
+		// e.g. foo/bar/ -> relPath = bar/
+		// e.g. foo/bar.txt -> relPath = bar.txt
+
+		// Check for nested slashes.
+		// If relPath has slash, and it's NOT just the trailing slash:
+		// e.g. bar/baz.txt -> has slash, skip.
+		// e.g. bar/ -> has slash at end. OK.
+
+		trimmedRel := strings.TrimSuffix(relPath, "/")
+		if strings.Contains(trimmedRel, "/") {
+			continue
+		}
+
+		// Status inference:
+		ragStatusData, inRag := ragStatuses[d.S3Key]
+		finalStatus := string(d.Status)
+
+		if inRag {
+			rawRagStatus := strVal(ragStatusData, "status")
+			if rawRagStatus == "processed" {
+				finalStatus = "indexed"
+			} else if rawRagStatus == "failed" {
+				finalStatus = "failed"
+			}
+		}
+
+		entry := docEntry{
+			ID:        d.ID.String(),
+			FilePath:  relPath, // Display relative path
+			Status:    finalStatus,
+			Length:    int(d.Size),
+			CreatedAt: d.CreatedAt.Format(time.RFC3339),
+			UpdatedAt: d.UpdatedAt.Format(time.RFC3339),
+			IsDir:     d.IsDir,
+		}
+		if inRag {
+			entry.Summary = strVal(ragStatusData, "content_summary")
+		}
+		responseDocs = append(responseDocs, entry)
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"documents":   entries,
-		"total":       total,
+		"documents":   responseDocs,
+		"total":       total, // Note: Total is still DB total, not filtered total :(
 		"page":        page,
 		"page_size":   pageSize,
 		"total_pages": (total + pageSize - 1) / pageSize,
-		"parent_path": parentPath,
 	})
-}
-
-// ListChildren is an alias for ListDocuments using parent_path-based listing.
-func (h *Handler) ListChildren(w http.ResponseWriter, r *http.Request) {
-	h.ListDocuments(w, r)
 }
 
 // UploadDocument saves an uploaded file to the RAG working directory.
@@ -267,17 +285,18 @@ func (h *Handler) UploadDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Parse scope, ownerID, path
 	scopeStr := r.FormValue("scope")
 	ownerID := r.FormValue("owner_id")
-	parentPath := r.FormValue("parent_path")
+	targetPath := r.FormValue("path") // target folder
 
-	// Normalize parent path
-	if parentPath != "" {
-		if parentPath[len(parentPath)-1] != '/' {
-			parentPath += "/"
+	// Ensure path ends with / and doesn't start with / if not empty
+	if targetPath != "" {
+		if targetPath[len(targetPath)-1] != '/' {
+			targetPath += "/"
 		}
-		if parentPath[0] == '/' {
-			parentPath = parentPath[1:]
+		if targetPath[0] == '/' {
+			targetPath = targetPath[1:]
 		}
 	}
 
@@ -307,7 +326,7 @@ func (h *Handler) UploadDocument(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		fullFileName := parentPath + header.Filename
+		fullFileName := targetPath + header.Filename
 
 		// Upload to MinIO
 		size, err := h.ragService.Upload(ctx, scope, ownerID, fullFileName, bytes.NewReader(data))
@@ -320,8 +339,7 @@ func (h *Handler) UploadDocument(w http.ResponseWriter, r *http.Request) {
 		// Save to DB
 		doc := &domain.Document{
 			OwnerID:     ownerID,
-			Name:        fullFileName,
-			ParentPath:  parentPath,
+			Name:        fullFileName, // Use full path for valid hierarchy
 			S3Key:       fullFileName,
 			ContentType: header.Header.Get("Content-Type"),
 			Size:        size,
@@ -330,6 +348,7 @@ func (h *Handler) UploadDocument(w http.ResponseWriter, r *http.Request) {
 
 		if err := h.ragService.SaveDocument(ctx, doc); err != nil {
 			h.log.Error(ctx, "lightrag: save doc metadata", "error", err)
+			// TODO: Rollback S3?
 			errors = append(errors, fmt.Sprintf("failed to save metadata for %s: %v", header.Filename, err))
 			continue
 		}
@@ -353,7 +372,7 @@ func (h *Handler) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, response)
 }
 
-// DeleteDocument permanently deletes a single document by ID.
+// DeleteDocument deletes a single document by ID.
 func (h *Handler) DeleteDocument(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	docID := chi.URLParam(r, "id")
@@ -363,7 +382,26 @@ func (h *Handler) DeleteDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	scope, ownerID := h.resolveScope(r)
+	// Parse scope/owner from Query (files are effectively scoped in S3)
+	// If not provided, we might default to Public or try both?
+	// Better to require it or try to deduce.
+	scopeStr := r.URL.Query().Get("scope")
+	var scope rag.Scope
+	ownerID := ""
+
+	if scopeStr == "private" {
+		scope = rag.ScopePrivate
+		ownerID = h.adminUser
+	} else {
+		scope = rag.ScopePublic
+	}
+
+	// 1. Get Doc from DB to find S3 Key
+	// The docID is now a UUID from the URL wildcard which matched the UUID pattern?
+	// But our route is /documents/*, and standard UUID is just /documents/{id}.
+	// We fixed nested files by making it wildcard to capture paths.
+	// But now we are moving to opaque IDs (UUIDs).
+	// So we should expect a UUID.
 
 	uid, err := uuid.Parse(docID)
 	if err != nil {
@@ -377,39 +415,45 @@ func (h *Handler) DeleteDocument(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "document not found"})
 		return
 	}
-	if doc == nil {
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": "document not found"})
-		return
-	}
 
-	// Recursive delete if directory
+	// 2. Recursive Delete if Directory
 	if doc.IsDir {
 		prefix := doc.S3Key
 		if !strings.HasSuffix(prefix, "/") {
 			prefix += "/"
 		}
-		// Delete children from S3 and DB
+
+		// Delete children
 		pageSize := 100
 		for {
+			// Always fetch page 0 because deletion shifts the results
 			children, _, err := h.ragService.ListDocumentsDB(ctx, ownerID, prefix, pageSize, 0)
 			if err != nil {
 				h.log.Error(ctx, "lightrag: recursive list failed", "error", err)
 				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to list children for deletion"})
 				return
 			}
+
+			// Filter out self if returned
 			var toDelete []domain.Document
 			for _, child := range children {
 				if child.ID != doc.ID {
 					toDelete = append(toDelete, child)
 				}
 			}
+
 			if len(toDelete) == 0 {
 				break
 			}
+
 			for _, child := range toDelete {
+				// Delete from S3
 				if err := h.ragService.Delete(ctx, scope, ownerID, child.S3Key); err != nil {
 					h.log.Error(ctx, "lightrag: recursive s3 delete failed", "child", child.S3Key, "error", err)
+					// Continue trying to delete others
 				}
+
+				// Delete from DB
 				if err := h.ragService.DeleteDocumentDB(ctx, child.ID); err != nil {
 					h.log.Error(ctx, "lightrag: recursive db delete failed", "child", child.ID, "error", err)
 				}
@@ -417,14 +461,14 @@ func (h *Handler) DeleteDocument(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Delete the document itself from S3
+	// 3. Delete the document itself (or directory placeholder) from S3
 	if err := h.ragService.Delete(ctx, scope, ownerID, doc.S3Key); err != nil {
 		h.log.Error(ctx, "lightrag: s3 delete failed", "error", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to delete file from storage: " + err.Error()})
 		return
 	}
 
-	// Delete from DB
+	// 4. Delete from DB
 	if err := h.ragService.DeleteDocumentDB(ctx, uid); err != nil {
 		h.log.Error(ctx, "lightrag: db delete failed", "error", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to delete metadata"})
@@ -436,244 +480,6 @@ func (h *Handler) DeleteDocument(w http.ResponseWriter, r *http.Request) {
 		"message": "Document deleted",
 	})
 }
-
-// ---------- New Drive Endpoints ----------
-
-// RenameRequest is the request body for renaming a document.
-type RenameRequest struct {
-	NewName string `json:"new_name"`
-}
-
-// RenameDocument renames a document.
-func (h *Handler) RenameDocument(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	docID := chi.URLParam(r, "id")
-	uid, err := uuid.Parse(docID)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid document ID"})
-		return
-	}
-
-	var req RenameRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
-		return
-	}
-
-	if req.NewName == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "new_name is required"})
-		return
-	}
-
-	if strings.Contains(req.NewName, "/") || strings.Contains(req.NewName, "\\") {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "name cannot contain slashes"})
-		return
-	}
-
-	scope, ownerID := h.resolveScope(r)
-
-	if err := h.ragService.RenameDocument(ctx, scope, ownerID, uid, req.NewName); err != nil {
-		h.log.Error(ctx, "lightrag: rename document", "error", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-		return
-	}
-
-	writeJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "Document renamed"})
-}
-
-// MoveRequest is the request body for moving a document.
-type MoveRequest struct {
-	TargetFolder string `json:"target_folder"`
-}
-
-// MoveDocument moves a document to a different folder.
-func (h *Handler) MoveDocument(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	docID := chi.URLParam(r, "id")
-	uid, err := uuid.Parse(docID)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid document ID"})
-		return
-	}
-
-	var req MoveRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
-		return
-	}
-
-	scope, ownerID := h.resolveScope(r)
-
-	if err := h.ragService.MoveDocument(ctx, scope, ownerID, uid, req.TargetFolder); err != nil {
-		h.log.Error(ctx, "lightrag: move document", "error", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-		return
-	}
-
-	writeJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "Document moved"})
-}
-
-// TrashDocument moves a document to trash (soft delete).
-func (h *Handler) TrashDocument(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	docID := chi.URLParam(r, "id")
-	uid, err := uuid.Parse(docID)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid document ID"})
-		return
-	}
-
-	if err := h.ragService.TrashDocument(ctx, uid); err != nil {
-		h.log.Error(ctx, "lightrag: trash document", "error", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-		return
-	}
-
-	writeJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "Document moved to trash"})
-}
-
-// RestoreDocument restores a document from trash.
-func (h *Handler) RestoreDocument(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	docID := chi.URLParam(r, "id")
-	uid, err := uuid.Parse(docID)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid document ID"})
-		return
-	}
-
-	if err := h.ragService.RestoreDocument(ctx, uid); err != nil {
-		h.log.Error(ctx, "lightrag: restore document", "error", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-		return
-	}
-
-	writeJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "Document restored"})
-}
-
-// ListTrash returns trashed documents.
-func (h *Handler) ListTrash(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	_, ownerID := h.resolveScope(r)
-
-	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	if page < 1 {
-		page = 1
-	}
-	pageSize, _ := strconv.Atoi(r.URL.Query().Get("page_size"))
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 50
-	}
-
-	docs, total, err := h.ragService.ListTrashed(ctx, ownerID, pageSize, (page-1)*pageSize)
-	if err != nil {
-		h.log.Error(ctx, "lightrag: list trash", "error", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to list trash"})
-		return
-	}
-
-	entries := make([]docEntry, 0, len(docs))
-	for _, d := range docs {
-		entries = append(entries, docToEntry(d))
-	}
-
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"documents":   entries,
-		"total":       total,
-		"page":        page,
-		"page_size":   pageSize,
-		"total_pages": (total + pageSize - 1) / pageSize,
-	})
-}
-
-// EmptyTrash permanently deletes all trashed documents.
-func (h *Handler) EmptyTrash(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	scope, ownerID := h.resolveScope(r)
-
-	if err := h.ragService.EmptyTrash(ctx, scope, ownerID); err != nil {
-		h.log.Error(ctx, "lightrag: empty trash", "error", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-		return
-	}
-
-	writeJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "Trash emptied"})
-}
-
-// DownloadDocument downloads a document.
-func (h *Handler) DownloadDocument(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	docID := chi.URLParam(r, "id")
-	uid, err := uuid.Parse(docID)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid document ID"})
-		return
-	}
-
-	scope, ownerID := h.resolveScope(r)
-
-	reader, doc, err := h.ragService.DownloadDocument(ctx, scope, ownerID, uid)
-	if err != nil {
-		h.log.Error(ctx, "lightrag: download document", "error", err)
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
-		return
-	}
-	defer reader.Close()
-
-	// Extract filename for Content-Disposition
-	filename := filepath.Base(doc.Name)
-
-	w.Header().Set("Content-Type", doc.ContentType)
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
-	if doc.Size > 0 {
-		w.Header().Set("Content-Length", strconv.FormatInt(doc.Size, 10))
-	}
-
-	io.Copy(w, reader)
-}
-
-// SearchDocuments searches documents by name.
-func (h *Handler) SearchDocuments(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	_, ownerID := h.resolveScope(r)
-	query := r.URL.Query().Get("q")
-	if query == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "query parameter 'q' is required"})
-		return
-	}
-
-	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	if page < 1 {
-		page = 1
-	}
-	pageSize, _ := strconv.Atoi(r.URL.Query().Get("page_size"))
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 50
-	}
-
-	docs, total, err := h.ragService.SearchDocuments(ctx, ownerID, query, pageSize, (page-1)*pageSize)
-	if err != nil {
-		h.log.Error(ctx, "lightrag: search documents", "error", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "search failed"})
-		return
-	}
-
-	entries := make([]docEntry, 0, len(docs))
-	for _, d := range docs {
-		entries = append(entries, docToEntry(d))
-	}
-
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"documents":   entries,
-		"total":       total,
-		"page":        page,
-		"page_size":   pageSize,
-		"total_pages": (total + pageSize - 1) / pageSize,
-		"query":       query,
-	})
-}
-
-// ---------- Existing RAG Endpoints (kept for admin) ----------
 
 // ClearDocuments deletes all documents.
 func (h *Handler) ClearDocuments(w http.ResponseWriter, r *http.Request) {
@@ -744,6 +550,96 @@ func (h *Handler) IndexDocuments(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, result)
 }
 
+// IngestRequest is the request body for ingesting documents.
+type IngestRequest struct {
+	Files []string `json:"files"`
+	Scope string   `json:"scope"`
+}
+
+// IngestDocuments triggers ingestion of specific documents from storage into the RAG pipeline.
+func (h *Handler) IngestDocuments(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	var req IngestRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+
+	if len(req.Files) == 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "files list is required"})
+		return
+	}
+
+	// Parse scope/owner
+	var scope rag.Scope
+	ownerID := ""
+	if req.Scope == "private" {
+		scope = rag.ScopePrivate
+		ownerID = h.adminUser
+	} else {
+		scope = rag.ScopePublic
+	}
+
+	successCount := 0
+	var errors []string
+
+	for _, idStr := range req.Files {
+		// idStr is now UUID
+		uid, err := uuid.Parse(idStr)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("invalid ID %s: %v", idStr, err))
+			continue
+		}
+
+		doc, err := h.ragService.GetDocument(ctx, uid)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("failed to find doc %s: %v", idStr, err))
+			continue
+		}
+
+		// 1. Load from Storage (S3) using Doc's S3Key
+		reader, err := h.ragService.Load(ctx, scope, ownerID, doc.S3Key)
+		if err != nil {
+			h.log.Error(ctx, "lightrag: load from storage", "file", doc.S3Key, "error", err)
+			errors = append(errors, fmt.Sprintf("failed to load %s: %v", doc.Name, err))
+			continue
+		}
+
+		data, err := io.ReadAll(reader)
+		reader.Close()
+		if err != nil {
+			h.log.Error(ctx, "lightrag: read from storage", "file", doc.S3Key, "error", err)
+			errors = append(errors, fmt.Sprintf("failed to read %s: %v", doc.Name, err))
+			continue
+		}
+
+		// 2. Register file in LightRAG for indexing
+		// We use the S3Key as the ID/Subject in RAG
+		if err := h.rag.RegisterFile(ctx, doc.S3Key, data); err != nil {
+			h.log.Error(ctx, "lightrag: register file failed", "file", doc.S3Key, "error", err)
+			errors = append(errors, fmt.Sprintf("failed to register %s: %v", doc.Name, err))
+			continue
+		}
+
+		successCount++
+	}
+
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": fmt.Sprintf("Queued %d files for ingestion", successCount),
+	}
+	if len(errors) > 0 {
+		response["status"] = "partial_success"
+		response["errors"] = errors
+	}
+	if successCount == 0 && len(errors) > 0 {
+		response["status"] = "failure"
+		response["message"] = "Failed to queue any files"
+	}
+
+	writeJSON(w, http.StatusOK, response)
+}
+
 // QueryRequest is the request body for the query endpoint.
 type QueryRequest struct {
 	Query string `json:"query"`
@@ -806,10 +702,16 @@ func (h *Handler) ClearCache(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) SyncDocuments(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	// 1. List all files from S3 (Public and Private)
+	// For simplicity, let's sync public first, or iterate all users if needed.
+	// Admin user context?
+	// Let's iterate both scopes for the admin user.
+
 	scopes := []rag.Scope{rag.ScopePublic, rag.ScopePrivate}
 	ownerID := h.adminUser
 
-	ragStatuses, _ := h.rag.GetDocStatuses(ctx)
+	// 2. Get RAG Statuses for status inference
+	ragStatuses, _ := h.rag.GetDocStatuses(ctx) // changes map[string]interface{}
 
 	syncedCount := 0
 
@@ -821,6 +723,8 @@ func (h *Handler) SyncDocuments(w http.ResponseWriter, r *http.Request) {
 		}
 
 		for _, f := range files {
+			// Check if exists in DB by S3Key
+			// S3 Key in our system is currently the full path (f.Name)
 			existing, err := h.ragService.GetDocumentByS3Key(ctx, f.Name)
 			if err != nil {
 				h.log.Error(ctx, "lightrag: sync check db", "file", f.Name, "error", err)
@@ -828,11 +732,13 @@ func (h *Handler) SyncDocuments(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if existing != nil {
-				continue
+				continue // Already exists
 			}
 
+			// Determine status
 			status := domain.DocumentStatusUploaded
 			if val, ok := ragStatuses[f.Name]; ok {
+				// val is map[string]interface{}
 				rawStatus := strVal(val, "status")
 				if rawStatus == "processed" {
 					status = domain.DocumentStatusIndexed
@@ -843,18 +749,12 @@ func (h *Handler) SyncDocuments(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
-			// Derive parent path
-			parentPath := ""
-			if idx := strings.LastIndex(strings.TrimSuffix(f.Name, "/"), "/"); idx >= 0 {
-				parentPath = f.Name[:idx+1]
-			}
-
+			// Create new document
 			doc := &domain.Document{
 				OwnerID:     ownerID,
-				Name:        f.Name,
-				ParentPath:  parentPath,
+				Name:        f.Name, // Using f.Name as Name AND S3Key
 				S3Key:       f.Name,
-				ContentType: "application/octet-stream",
+				ContentType: "application/octet-stream", // Unknown/Default
 				Size:        f.Size,
 				Status:      status,
 				IsDir:       f.IsDir,
@@ -895,4 +795,18 @@ func strVal(m map[string]interface{}, key string) string {
 		}
 	}
 	return ""
+}
+
+func intVal(m map[string]interface{}, key string) int {
+	if v, ok := m[key]; ok {
+		switch n := v.(type) {
+		case float64:
+			return int(n)
+		case int:
+			return n
+		case int64:
+			return int(n)
+		}
+	}
+	return 0
 }

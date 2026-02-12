@@ -173,21 +173,3 @@ CREATE TABLE IF NOT EXISTS documents (
 
 CREATE INDEX IF NOT EXISTS idx_documents_owner ON documents(owner_id);
 CREATE INDEX IF NOT EXISTS idx_documents_key ON documents(s3_key);
-
--- Version: 1.15
--- Description: Add trash and parent_path support to documents
-ALTER TABLE documents ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
-ALTER TABLE documents ADD COLUMN IF NOT EXISTS parent_path TEXT DEFAULT '';
-
--- Data migration: derive parent_path from existing name for any rows
-UPDATE documents SET parent_path = 
-    CASE 
-        WHEN position('/' in name) > 0 
-            THEN left(name, length(name) - length(split_part(reverse(name), '/', 1)) )
-        ELSE ''
-    END
-WHERE parent_path = '' OR parent_path IS NULL;
-
-CREATE INDEX IF NOT EXISTS idx_documents_parent_path ON documents(parent_path);
-CREATE INDEX IF NOT EXISTS idx_documents_deleted ON documents(deleted_at) WHERE deleted_at IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_documents_not_deleted ON documents(parent_path, owner_id) WHERE deleted_at IS NULL;
