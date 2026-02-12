@@ -24,10 +24,11 @@ func TestService_Integration_Lifecycle(t *testing.T) {
 	ctx := context.Background()
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
+	userID := uuid.MustParse("00000000-0000-0000-0000-000000000004")
 	tCtx := &domain.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
-		UserID:      "test-user",
+		UserID:      userID.String(),
 		Role:        "user",
 	}
 
@@ -91,10 +92,11 @@ func TestService_Integration_NestedFolders(t *testing.T) {
 	ctx := context.Background()
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
+	userID := uuid.MustParse("00000000-0000-0000-0000-000000000004")
 	tCtx := &domain.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
-		UserID:      "test-user",
+		UserID:      userID.String(),
 		Role:        "user",
 	}
 
@@ -173,10 +175,11 @@ func TestService_Integration_MoveFolderBetweenParents(t *testing.T) {
 	ctx := context.Background()
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
+	userID := uuid.MustParse("00000000-0000-0000-0000-000000000004")
 	tCtx := &domain.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
-		UserID:      "test-user",
+		UserID:      userID.String(),
 		Role:        "user",
 	}
 
@@ -223,10 +226,11 @@ func TestService_Integration_UpdateFolderPosition(t *testing.T) {
 	ctx := context.Background()
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
+	userID := uuid.MustParse("00000000-0000-0000-0000-000000000004")
 	tCtx := &domain.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
-		UserID:      "test-user",
+		UserID:      userID.String(),
 		Role:        "user",
 	}
 
@@ -261,10 +265,11 @@ func TestService_Integration_UpdateMultipleFields(t *testing.T) {
 	ctx := context.Background()
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
+	userID := uuid.MustParse("00000000-0000-0000-0000-000000000004")
 	tCtx := &domain.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
-		UserID:      "test-user",
+		UserID:      userID.String(),
 		Role:        "user",
 	}
 
@@ -308,10 +313,11 @@ func TestService_Integration_CreateMultipleFoldersAndList(t *testing.T) {
 	ctx := context.Background()
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
+	userID := uuid.MustParse("00000000-0000-0000-0000-000000000004")
 	tCtx := &domain.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
-		UserID:      "test-user",
+		UserID:      userID.String(),
 		Role:        "user",
 	}
 
@@ -360,10 +366,11 @@ func TestService_Integration_DeleteNonExistentFolder(t *testing.T) {
 	ctx := context.Background()
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
+	userID := uuid.MustParse("00000000-0000-0000-0000-000000000004")
 	tCtx := &domain.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
-		UserID:      "test-user",
+		UserID:      userID.String(),
 		Role:        "user",
 	}
 
@@ -385,10 +392,11 @@ func TestService_Integration_UpdateNonExistentFolder(t *testing.T) {
 	ctx := context.Background()
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
+	userID := uuid.MustParse("00000000-0000-0000-0000-000000000004")
 	tCtx := &domain.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
-		UserID:      "test-user",
+		UserID:      userID.String(),
 		Role:        "user",
 	}
 
@@ -444,10 +452,11 @@ func TestService_Integration_FolderTimestamps(t *testing.T) {
 	ctx := context.Background()
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
+	userID := uuid.MustParse("00000000-0000-0000-0000-000000000004")
 	tCtx := &domain.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
-		UserID:      "test-user",
+		UserID:      userID.String(),
 		Role:        "user",
 	}
 
