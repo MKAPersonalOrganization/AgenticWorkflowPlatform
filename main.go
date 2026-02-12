@@ -57,7 +57,6 @@ import (
 	aguihandlers "school-with-ai/handlers/agui"
 	bannerhandlers "school-with-ai/handlers/banner"
 	healthhandlers "school-with-ai/handlers/health"
-	lightraghandlers "school-with-ai/handlers/lightrag"
 	resourcepermhandlers "school-with-ai/handlers/resourcepermissions"
 	resourceshandlers "school-with-ai/handlers/resources"
 	taskmgmthandlers "school-with-ai/handlers/taskmgmt"
@@ -66,10 +65,6 @@ import (
 
 	"github.com/ardanlabs/conf/v3"
 	"github.com/go-chi/chi/v5"
-	"github.com/lightrag/lightrag-go/pkg/core/base"
-	ragcore "github.com/lightrag/lightrag-go/pkg/core/lightrag"
-	"github.com/lightrag/lightrag-go/pkg/core/operate"
-	ragstorage "github.com/lightrag/lightrag-go/pkg/storage"
 )
 
 var build = "develop"
@@ -173,9 +168,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 		}
 		AgentCapabilities struct {
 			LongTermMemory bool `conf:"default:true"`
-		}
-		LightRAG struct {
-			WorkingDir string `conf:"default:./rag_storage"`
 		}
 	}{
 		Version: conf.Version{
@@ -670,59 +662,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Analytics Dashboard (dedicated Basic Auth)
 	statsHandler := statisticsHandler.NewHandler(log, statsProjection, cfg.DashboardAdmin.User, cfg.DashboardAdmin.Pass)
 	r.Get("/analytics", statsHandler.BasicAuth(statsHandler.ServeDashboard))
-
-	// LightRAG Dashboard (in-process knowledge base)
-	ragCfg := ragcore.DefaultConfig()
-	ragCfg.WorkingDir = cfg.LightRAG.WorkingDir
-	ragCfg.LLMModelFunc = func(ctx context.Context, prompt string, opts ...operate.LLMOption) (string, error) {
-		return "", nil
-	}
-	ragCfg.EmbeddingFunc = &base.EmbeddingFunc{
-		Func: func(ctx context.Context, texts []string) ([][]float64, error) {
-			return nil, nil // no-op: embeddings skipped, document storage still works
-		},
-		EmbeddingDim: 1536,
-	}
-
-	ragInstance, err := ragcore.New(ragCfg)
-	if err != nil {
-		log.Error(ctx, "lightrag: failed to create instance", "error", err)
-	} else {
-		// Set up JSON KV storages
-		workDir := ragCfg.WorkingDir
-		fullDocs := ragstorage.NewJsonKVStorage(ragstorage.NewStorageConfig("full_docs", workDir), nil)
-		docStatus := ragstorage.NewJsonKVStorage(ragstorage.NewStorageConfig("doc_status", workDir), nil)
-		textChunks := ragstorage.NewJsonKVStorage(ragstorage.NewStorageConfig("text_chunks", workDir), nil)
-		llmCache := ragstorage.NewJsonKVStorage(ragstorage.NewStorageConfig("llm_response_cache", workDir), nil)
-
-		ragInstance.SetStorages(
-			fullDocs, textChunks,
-			nil, nil, // fullEntities, fullRelations
-			nil, nil, // entityChunks, relationChunks
-			nil, nil, nil, // VDBs
-			nil,       // graph
-			llmCache, docStatus,
-		)
-
-		if err := ragInstance.InitializeStorages(ctx); err != nil {
-			log.Error(ctx, "lightrag: failed to initialize storages", "error", err)
-		}
-
-		lightragHandler := lightraghandlers.NewHandler(log, ragInstance, cfg.DashboardAdmin.User, cfg.DashboardAdmin.Pass)
-		r.Get("/lightrag", lightragHandler.BasicAuth(lightragHandler.ServeDashboard))
-		r.Route("/api/lightrag", func(r chi.Router) {
-			r.Use(lightragHandler.BasicAuthMiddleware)
-			r.Get("/documents", lightragHandler.ListDocuments)
-			r.Post("/documents/upload", lightragHandler.UploadDocument)
-			r.Delete("/documents/{id}", lightragHandler.DeleteDocument)
-			r.Delete("/documents", lightragHandler.ClearDocuments)
-			r.Get("/documents/status-counts", lightragHandler.GetStatusCounts)
-			r.Get("/health", lightragHandler.GetHealth)
-			r.Post("/pipeline/index", lightragHandler.IndexDocuments)
-			r.Post("/query", lightragHandler.QueryKnowledgeBase)
-			r.Post("/documents/clear-cache", lightragHandler.ClearCache)
-		})
-	}
 
 	// Pricing page
 	r.Get("/pricing", authMiddleware.RequireAuthFunc(HandlePricingPage(log)))
