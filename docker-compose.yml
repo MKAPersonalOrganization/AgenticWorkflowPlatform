@@ -397,6 +397,58 @@ services:
     networks:
       - intranet
 
+  # EdgeQuake dedicated database with Apache AGE and pgvector
+  edgequake-db:
+    build:
+      context: ./edgequake/edgequake/docker
+      dockerfile: Dockerfile.postgres
+    container_name: edgequake-db
+    restart: unless-stopped
+    ports:
+      - "5436:5432"
+    environment:
+      - POSTGRES_USER=edgequake
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-edgequake_secret}
+      - POSTGRES_DB=edgequake
+    volumes:
+      - edgequake-db-data:/var/lib/postgresql/data
+      - ./edgequake/edgequake/docker/init-extensions.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - intranet
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U edgequake -d edgequake"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # EdgeQuake API Server
+  edgequake-api:
+    build:
+      context: ./edgequake/edgequake
+      dockerfile: docker/Dockerfile
+    container_name: edgequake-api
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    environment:
+      - EDGEQUAKE_HOST=0.0.0.0
+      - EDGEQUAKE_PORT=8080
+      - DATABASE_URL=postgres://edgequake:${POSTGRES_PASSWORD:-edgequake_secret}@edgequake-db:5432/edgequake
+      - OPENAI_API_KEY
+      - RUST_LOG=info,edgequake=debug
+    depends_on:
+      edgequake-db:
+        condition: service_healthy
+    networks:
+      - intranet
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
 networks:
   intranet:
 
@@ -414,3 +466,4 @@ volumes:
   langfuse-minio-data:
   minio-data:
   app-postgres-data:
+  edgequake-db-data:
