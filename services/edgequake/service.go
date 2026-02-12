@@ -10,6 +10,7 @@ import (
 	"school-with-ai/domain"
 	"school-with-ai/services/rag/documents"
 	"school-with-ai/services/rag/query"
+	"school-with-ai/services/rag/tenants"
 	"school-with-ai/services/rag/workspaces"
 
 	"github.com/google/uuid"
@@ -27,6 +28,7 @@ type Service struct {
 	Documents  *documents.Service
 	Query      *query.Service
 	Workspaces *workspaces.Service
+	Tenants    *tenants.Service
 }
 
 // NewService creates a new Edgequake service.
@@ -40,6 +42,7 @@ func NewService(baseURL string) *Service {
 		Documents:  documents.NewService(baseURL, httpClient),
 		Query:      query.NewService(baseURL, httpClient),
 		Workspaces: workspaces.NewService(baseURL, httpClient),
+		Tenants:    tenants.NewService(baseURL, httpClient),
 	}
 }
 
@@ -121,4 +124,29 @@ func (s *Service) GetWorkspaceStats(ctx context.Context, tCtx *domain.TenantCont
 // UpdateWorkspace modifies an existing workspace's fields.
 func (s *Service) UpdateWorkspace(ctx context.Context, tCtx *domain.TenantContext, workspaceID uuid.UUID, req *workspaces.UpdateWorkspaceRequest) (*workspaces.WorkspaceResponse, error) {
 	return s.Workspaces.Update(ctx, tCtx, workspaceID, req)
+}
+
+// ListTenants retrieves all tenants from Edgequake.
+func (s *Service) ListTenants(ctx context.Context, page, pageSize int) (*tenants.TenantListResponse, error) {
+	return s.Tenants.List(ctx, page, pageSize)
+}
+
+// CreateTenant creates a new tenant.
+func (s *Service) CreateTenant(ctx context.Context, req *tenants.CreateTenantRequest) (*tenants.TenantResponse, error) {
+	return s.Tenants.Create(ctx, req)
+}
+
+// GetTenant retrieves a specific tenant by ID.
+func (s *Service) GetTenant(ctx context.Context, tenantID uuid.UUID) (*tenants.TenantResponse, error) {
+	return s.Tenants.Get(ctx, tenantID)
+}
+
+// UpdateTenant updates an existing tenant.
+func (s *Service) UpdateTenant(ctx context.Context, tenantID uuid.UUID, req *tenants.UpdateTenantRequest) (*tenants.TenantResponse, error) {
+	return s.Tenants.Update(ctx, tenantID, req)
+}
+
+// DeleteTenant deletes a tenant.
+func (s *Service) DeleteTenant(ctx context.Context, tenantID uuid.UUID) error {
+	return s.Tenants.Delete(ctx, tenantID)
 }
