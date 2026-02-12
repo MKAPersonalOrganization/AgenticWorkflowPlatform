@@ -1,1 +1,0 @@
-SCRIPT TEST: This is confidential data for Script Workspace A. Code: SECRET-SCRIPT-A.
