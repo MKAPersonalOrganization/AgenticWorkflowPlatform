@@ -1,0 +1,118 @@
+package knowledge
+
+import (
+	"school-with-ai/components/button"
+	"school-with-ai/components/dialog"
+	"school-with-ai/components/i18n"
+	"school-with-ai/components/icon"
+	"school-with-ai/components/input"
+	"school-with-ai/components/nav"
+	"school-with-ai/components/progress"
+	"school-with-ai/components/tabs"
+	"school-with-ai/domain"
+)
+
+type knowledgeLayoutProps struct {
+	Title string
+	User  *domain.User
+}
+
+templ knowledgeLayout(props knowledgeLayoutProps) {
+	<!DOCTYPE html>
+	<html lang={ i18n.Lang(ctx) } dir={ i18n.Dir(ctx) }>
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>{ props.Title } - Compass</title>
+			<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z'/><circle cx='12' cy='12' r='10'/></svg>"/>
+			<link rel="preconnect" href="https://fonts.googleapis.com"/>
+			<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+			<link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Noto+Sans+Arabic:wght@100..900&family=Noto+Sans:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet"/>
+			<link rel="stylesheet" href="/assets/css/output.css"/>
+			<!-- Theme initialization -->
+			<script>
+				(function() {
+					const theme = localStorage.getItem('theme') || 'system';
+					const root = document.documentElement;
+					if (theme === 'system') {
+						const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+						if (systemPrefersDark) root.classList.add('dark');
+					} else if (theme === 'dark') {
+						root.classList.add('dark');
+					}
+				})();
+			</script>
+			<script src="/assets/js/i18n.js"></script>
+			@i18n.I18nScript()
+			<!-- Theme manager -->
+			<script>
+				document.addEventListener('alpine:init', () => {
+					Alpine.data('themeManager', () => ({
+						theme: localStorage.getItem('theme') || 'system',
+						toggleTheme() {
+							const themes = ['light', 'dark', 'system'];
+							const currentIndex = themes.indexOf(this.theme);
+							const nextTheme = themes[(currentIndex + 1) % themes.length];
+							this.setTheme(nextTheme);
+						},
+						setTheme(theme) {
+							this.theme = theme;
+							localStorage.setItem('theme', theme);
+							this.applyTheme(theme);
+						},
+						applyTheme(theme) {
+							const root = document.documentElement;
+							if (theme === 'system') {
+								const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+								if (systemPrefersDark) root.classList.add('dark');
+								else root.classList.remove('dark');
+							} else if (theme === 'dark') {
+								root.classList.add('dark');
+							} else {
+								root.classList.remove('dark');
+							}
+						}
+					}));
+				});
+			</script>
+			@input.Script()
+			@dialog.Script()
+			@tabs.Script()
+			@progress.Script()
+			<!-- Alpine.js Core -->
+			<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+		</head>
+		<body class="flex h-screen bg-background text-foreground antialiased overflow-hidden" x-data="themeManager">
+			<div class="flex h-screen w-full overflow-hidden">
+				<!-- Root Navbar -->
+				@nav.Navbar(nav.NavbarProps{
+					User: props.User,
+				})
+				<!-- Main Content Area -->
+				<div class="flex-1 min-w-0 overflow-y-auto relative" id="main-content">
+					<!-- Back to Chat Link -->
+					<div class="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+						<div class="flex items-center justify-between px-6 py-3">
+							<div class="flex items-center gap-3">
+								@button.Button(button.Props{
+									Variant: button.VariantGhost,
+									Size:    button.SizeSm,
+									Href:    "/",
+								}) {
+									@icon.ArrowLeft(icon.Props{Class: "size-4 me-2"})
+									{ i18n.T(ctx, "Back to Chat") }
+								}
+								<div class="h-4 w-px bg-border"></div>
+								<div class="flex items-center gap-2">
+									@icon.Brain(icon.Props{Class: "size-5 text-primary"})
+									<span class="font-semibold text-sm">{ i18n.T(ctx, "Knowledge Base") }</span>
+								</div>
+							</div>
+						</div>
+					</div>
+					{ children... }
+				</div>
+			</div>
+		</body>
+	</html>
+}
