@@ -155,8 +155,8 @@ func (s *Service) DeleteTenant(ctx context.Context, tenantID uuid.UUID) error {
 }
 
 // ListFolders lists all folders.
-func (s *Service) ListFolders(ctx context.Context, tCtx *domain.TenantContext, page, pageSize int) (*folders.FolderListResponse, error) {
-	return s.Folders.List(ctx, tCtx, page, pageSize)
+func (s *Service) ListFolders(ctx context.Context, tCtx *domain.TenantContext) ([]folders.FolderResponse, error) {
+	return s.Folders.List(ctx, tCtx)
 }
 
 // CreateFolder creates a new folder.
