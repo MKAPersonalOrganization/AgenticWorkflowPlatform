@@ -65,7 +65,7 @@ templ Navbar(props ...NavbarProps) {
 		<div class="hidden md:block">
 			@resources.ResourcesButtonTrigger()
 		</div>
-			<!-- Tools Button -->
+		<!-- Tools Button -->
 		<div class="hidden md:block">
 			@tools.ToolsButtonTrigger()
 		</div>
@@ -73,6 +73,39 @@ templ Navbar(props ...NavbarProps) {
 		<div class="hidden md:block">
 			@convsearch.SearchButtonTrigger()
 		</div>
+		<!-- Knowledge Base Button -->
+		<div class="hidden md:block">
+			@button.Button(button.Props{
+				Size:    button.SizeIcon,
+				Variant: button.VariantGhost,
+				Class:   "size-9",
+				Href:    "/knowledge",
+				Attributes: templ.Attributes{
+					"title": i18n.T(ctx, "Knowledge Base"),
+				},
+			}) {
+				@icon.Brain(icon.Props{Class: "size-5"})
+				<span class="sr-only">{ i18n.T(ctx, "Knowledge Base") }</span>
+			}
+		</div>
+		<!-- Admin Indicator -->
+		if p.User != nil && p.User.Role == "admin" {
+			<div class="hidden md:block">
+				@button.Button(button.Props{
+					Size:    button.SizeIcon,
+					Variant: button.VariantGhost,
+					Class:   "size-9 text-yellow-500",
+					Attributes: templ.Attributes{
+						"title": i18n.T(ctx, "Administrator"),
+					},
+				}) {
+					@icon.Shield(icon.Props{Class: "size-5"})
+					<span class="sr-only">{ i18n.T(ctx, "Administrator") }</span>
+				}
+			</div>
+		}
+		<!-- Spacer to push account settings to bottom -->
+		<div class="flex-1"></div>
 		<!-- User Profile / Settings Menu (at bottom) -->
 		@AccountSettings(AccountSettingsProps{
 			User:    p.User,

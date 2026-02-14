@@ -10,6 +10,8 @@ import (
 	"school-with-ai/foundation/i18n"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/infra/kratos"
+
+	client "github.com/ory/client-go"
 )
 
 // AuthHandlers contains handlers for authentication routes.
@@ -210,7 +212,13 @@ func (h *AuthHandlers) RegistrationPage(w http.ResponseWriter, r *http.Request) 
 		User:       domain.GetUserFromContext(r.Context()), // nil if not authenticated
 	}
 
-	component := auth.RegistrationPageWithNodes(flow.Ui.Nodes, props)
+	// Hide internal fields like role by setting them to hidden input with default value
+	// This ensures the value "user" is submitted to Kratos so it persists in the traits
+	nodes := hideNodes(flow.Ui.Nodes, map[string]string{
+		"traits.role": "user",
+	})
+
+	component := auth.RegistrationPageWithNodes(nodes, props)
 	if err := component.Render(r.Context(), w); err != nil {
 		h.log.Error(r.Context(), "failed to render registration page", "error", err, "flowID", flowID)
 	}
@@ -552,4 +560,23 @@ func getErrorMessage(ctx context.Context, errorType string) string {
 	default:
 		return i18n.T(ctx, "Authentication Error")
 	}
+}
+
+// hideNodes sets specific nodes to hidden type and forces a value.
+func hideNodes(nodes []client.UiNode, nodesToHide map[string]string) []client.UiNode {
+	for i := range nodes {
+		node := &nodes[i]
+		if node.Attributes.UiNodeInputAttributes != nil {
+			name := node.Attributes.UiNodeInputAttributes.Name
+			if defaultValue, ok := nodesToHide[name]; ok {
+				// Set type to hidden
+				node.Attributes.UiNodeInputAttributes.Type = "hidden"
+				// Force the default value
+				node.Attributes.UiNodeInputAttributes.Value = defaultValue
+				// Clear label (meta) so it doesn't render weirdly if template checks
+				node.Meta = client.UiNodeMeta{}
+			}
+		}
+	}
+	return nodes
 }

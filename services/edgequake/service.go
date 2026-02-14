@@ -12,6 +12,7 @@ import (
 	"school-with-ai/services/rag/folders"
 	"school-with-ai/services/rag/query"
 	"school-with-ai/services/rag/tenants"
+	"school-with-ai/services/rag/users"
 	"school-with-ai/services/rag/workspaces"
 
 	"github.com/google/uuid"
@@ -31,6 +32,7 @@ type Service struct {
 	Workspaces *workspaces.Service
 	Tenants    *tenants.Service
 	Folders    *folders.Service
+	Users      *users.Service
 }
 
 // NewService creates a new Edgequake service.
@@ -46,6 +48,7 @@ func NewService(baseURL string) *Service {
 		Workspaces: workspaces.NewService(baseURL, httpClient),
 		Tenants:    tenants.NewService(baseURL, httpClient),
 		Folders:    folders.NewService(baseURL, httpClient),
+		Users:      users.NewService(baseURL, httpClient),
 	}
 }
 

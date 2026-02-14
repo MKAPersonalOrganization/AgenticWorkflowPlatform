@@ -43,6 +43,15 @@
                             "maxLength": 100
                         }
                     }
+                },
+                "role": {
+                    "type": "string",
+                    "enum": [
+                        "user",
+                        "admin"
+                    ],
+                    "default": "user",
+                    "title": "Role"
                 }
             },
             "required": [

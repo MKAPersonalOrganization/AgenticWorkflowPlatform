@@ -29,6 +29,7 @@ const (
 type IdentityTraits struct {
 	Email string     `json:"email"`
 	Name  NameTraits `json:"name"`
+	Role  string     `json:"role"`
 }
 
 // NameTraits represents the user's name information.
@@ -43,6 +44,7 @@ type User struct {
 	Email     string         `json:"email"`      // Primary email (from traits)
 	FirstName string         `json:"first_name"` // First name (from traits)
 	LastName  string         `json:"last_name"`  // Last name (from traits)
+	Role      string         `json:"role"`       // Role (from traits)
 	CreatedAt time.Time      `json:"created_at"` // When identity was created
 	UpdatedAt time.Time      `json:"updated_at"` // When identity was last updated
 	Traits    IdentityTraits `json:"traits"`     // Full traits object
@@ -84,6 +86,16 @@ func NewUserFromIdentity(identity *client.Identity) (*User, error) {
 				user.LastName = last
 				user.Traits.Name.Last = last
 			}
+		}
+
+		// Extract role
+		if role, ok := traits["role"].(string); ok {
+			user.Role = role
+			user.Traits.Role = role
+		} else {
+			// Default to user if not present
+			user.Role = "user"
+			user.Traits.Role = "user"
 		}
 	}
 

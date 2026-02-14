@@ -44,6 +44,7 @@ import (
 	eqperms "school-with-ai/services/edgequakepermissions"
 	"school-with-ai/services/memory"
 	"school-with-ai/services/permissions"
+	"school-with-ai/services/rag/users"
 	"school-with-ai/services/resourcepermissions"
 	"school-with-ai/services/resources"
 	"school-with-ai/services/taskmanagement"
@@ -59,6 +60,7 @@ import (
 	aguihandlers "school-with-ai/handlers/agui"
 	bannerhandlers "school-with-ai/handlers/banner"
 	healthhandlers "school-with-ai/handlers/health"
+	knowledgehandlers "school-with-ai/handlers/knowledge"
 	resourcepermhandlers "school-with-ai/handlers/resourcepermissions"
 	resourceshandlers "school-with-ai/handlers/resources"
 	taskmgmthandlers "school-with-ai/handlers/taskmgmt"
@@ -67,6 +69,7 @@ import (
 
 	"github.com/ardanlabs/conf/v3"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 )
 
 var build = "develop"
@@ -723,8 +726,26 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Get("/api/resources/{id}/content", authMiddleware.RequireAuthFunc(resourcesHandler.GetContent))
 	r.Delete("/api/resources/{id}", authMiddleware.RequireAuthFunc(resourcesHandler.Delete))
 
+	// Knowledge Base / RAG dashboard routes
+	knowledgeHandler := knowledgehandlers.NewHandler(log, edgequakeService, eqPermissionsService)
+	r.Get("/knowledge", authMiddleware.RequireAuthFunc(knowledgeHandler.DashboardPage))
+	r.Get("/api/knowledge/dashboard", authMiddleware.RequireAuthFunc(knowledgeHandler.GetDashboardData))
+	r.Get("/api/knowledge/documents", authMiddleware.RequireAuthFunc(knowledgeHandler.ListDocuments))
+	r.Post("/api/knowledge/documents/upload", authMiddleware.RequireAuthFunc(knowledgeHandler.UploadDocument))
+	r.Get("/api/knowledge/pdfs", authMiddleware.RequireAuthFunc(knowledgeHandler.ListPDFs))
+	r.Post("/api/knowledge/pdfs/upload", authMiddleware.RequireAuthFunc(knowledgeHandler.UploadPDF))
+	r.Delete("/api/knowledge/pdfs/{pdfId}", authMiddleware.RequireAuthFunc(knowledgeHandler.DeletePDF))
+	r.Get("/api/knowledge/pdfs/{trackId}/progress", authMiddleware.RequireAuthFunc(knowledgeHandler.GetPDFProgress))
+	r.Get("/api/knowledge/workspaces", authMiddleware.RequireAuthFunc(knowledgeHandler.ListWorkspaces))
+	r.Post("/api/knowledge/workspaces", authMiddleware.RequireAuthFunc(knowledgeHandler.CreateWorkspace))
+	r.Get("/api/knowledge/workspaces/{workspaceId}/stats", authMiddleware.RequireAuthFunc(knowledgeHandler.GetWorkspaceStats))
+	r.Delete("/api/knowledge/workspaces/{workspaceId}", authMiddleware.RequireAuthFunc(knowledgeHandler.DeleteWorkspace))
+	r.Get("/api/knowledge/folders", authMiddleware.RequireAuthFunc(knowledgeHandler.ListFolders))
+	r.Post("/api/knowledge/folders", authMiddleware.RequireAuthFunc(knowledgeHandler.CreateFolder))
+	r.Delete("/api/knowledge/folders/{folderId}", authMiddleware.RequireAuthFunc(knowledgeHandler.DeleteFolder))
+
 	// Home route
-	r.Get("/", authMiddleware.RequireAuthFunc(HandleViewChatInputScreen(log)))
+	r.Get("/", authMiddleware.RequireAuthFunc(HandleViewChatInputScreen(log, edgequakeService)))
 
 	// Create server with proper timeouts to prevent slowloris and similar attacks
 	server := &http.Server{
@@ -775,10 +796,36 @@ func run(ctx context.Context, log *logger.Logger) error {
 	return nil
 }
 
-func HandleViewChatInputScreen(log *logger.Logger) http.HandlerFunc {
+func HandleViewChatInputScreen(log *logger.Logger, edgequakeService *edgequake.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get authenticated user from context
 		user := domain.GetUserFromContext(r.Context())
+
+		// Sync user to RAG (Idempotent)
+		if user != nil {
+			go func(u *domain.User) {
+				// Generate a random password since RAG requires one, but we don't use it for auth
+				randomPass := uuid.New().String()
+
+				// Create user request
+				req := &users.CreateUserRequest{
+					Username: u.GetDisplayName(),
+					Email:    u.Email,
+					Password: randomPass,
+					Role:     &u.Role,
+				}
+
+				// We use a background context as the request context might cancel
+				_, err := edgequakeService.Users.Create(context.Background(), req)
+				if err != nil {
+					// Log error but don't fail the request (best effort sync)
+					// In production, we might want to check if error is "already exists" and ignore
+					log.Error(context.Background(), "failed to sync user to RAG", "error", err, "email", u.Email)
+				} else {
+					log.Info(context.Background(), "synced user to RAG", "email", u.Email, "role", u.Role)
+				}
+			}(user)
+		}
 
 		component := components.ChatInputScreen(user)
 		if err := component.Render(r.Context(), w); err != nil {
