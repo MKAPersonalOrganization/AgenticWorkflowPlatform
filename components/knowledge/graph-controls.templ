@@ -1,9 +1,10 @@
 package knowledge
 
 /**
- * GraphControls - Graph display setting toggles (labels, edge labels).
+ * GraphControls - Graph display setting toggles.
  * Matches EdgeQuake edgequake_webui/src/components/graph/graph-controls.tsx
  *
+ * Includes: labels, edge labels, node size, drag, neighbor highlight, hide edges toggles.
  * Positioned absolute top-left of the graph container.
  */
 
@@ -30,6 +31,52 @@ templ GraphControls() {
 				class="rounded border-input text-primary focus:ring-primary size-3.5"
 			/>
 			<label for="show-edge-labels" class="text-xs text-muted-foreground cursor-pointer select-none">Edge Labels</label>
+		</div>
+		<!-- Node size selector -->
+		<div class="bg-background/90 backdrop-blur-sm border rounded-lg shadow-sm p-2">
+			<label class="text-xs text-muted-foreground block mb-1 select-none">Node Size</label>
+			<select
+				x-model="graphNodeSize"
+				@change="applyNodeSize()"
+				class="w-full text-xs rounded border border-input bg-transparent px-1.5 py-0.5"
+			>
+				<option value="small">Small</option>
+				<option value="medium">Medium</option>
+				<option value="large">Large</option>
+			</select>
+		</div>
+		<!-- Toggle node drag -->
+		<div class="bg-background/90 backdrop-blur-sm border rounded-lg shadow-sm p-2 flex items-center gap-2">
+			<input
+				type="checkbox"
+				id="enable-drag"
+				x-model="graphEnableDrag"
+				@change="saveGraphSettings()"
+				class="rounded border-input text-primary focus:ring-primary size-3.5"
+			/>
+			<label for="enable-drag" class="text-xs text-muted-foreground cursor-pointer select-none">Drag</label>
+		</div>
+		<!-- Toggle neighbor highlighting -->
+		<div class="bg-background/90 backdrop-blur-sm border rounded-lg shadow-sm p-2 flex items-center gap-2">
+			<input
+				type="checkbox"
+				id="highlight-neighbors"
+				x-model="graphHighlightNeighbors"
+				@change="saveGraphSettings()"
+				class="rounded border-input text-primary focus:ring-primary size-3.5"
+			/>
+			<label for="highlight-neighbors" class="text-xs text-muted-foreground cursor-pointer select-none">Highlight</label>
+		</div>
+		<!-- Toggle hide unselected edges -->
+		<div class="bg-background/90 backdrop-blur-sm border rounded-lg shadow-sm p-2 flex items-center gap-2">
+			<input
+				type="checkbox"
+				id="hide-unsel-edges"
+				x-model="graphHideUnselectedEdges"
+				@change="saveGraphSettings()"
+				class="rounded border-input text-primary focus:ring-primary size-3.5"
+			/>
+			<label for="hide-unsel-edges" class="text-xs text-muted-foreground cursor-pointer select-none">Dim Edges</label>
 		</div>
 	</div>
 }

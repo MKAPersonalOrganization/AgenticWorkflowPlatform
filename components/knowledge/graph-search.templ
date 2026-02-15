@@ -2,9 +2,7 @@ package knowledge
 
 /**
  * GraphSearch - Entity search input for the graph.
- * Matches EdgeQuake edgequake_webui/src/components/graph/graph-search.tsx
- *
- * Search input with leading Search icon, debounced search.
+ * Matches EdgeQuake graph-search.tsx — debounced, with ⌘K / Ctrl+K shortcut.
  */
 
 import (
@@ -17,10 +15,14 @@ templ GraphSearch() {
 		@icon.Search(icon.Props{Class: "absolute left-2.5 top-2.5 size-4 text-muted-foreground"})
 		<input
 			type="search"
+			id="graph-search-input"
 			placeholder={ i18n.T(ctx, "Search entities...") }
-			class="flex h-9 w-full rounded-md border border-input bg-transparent pl-9 pr-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-			x-model.debounce.500ms="graphSearch"
+			class="flex h-9 w-full rounded-md border border-input bg-transparent pl-9 pr-12 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+			x-model.debounce.300ms="graphSearch"
 			@input="searchGraph()"
 		/>
+		<kbd class="pointer-events-none absolute right-2 top-2 hidden h-5 select-none items-center gap-0.5 rounded border bg-muted px-1 font-mono text-[10px] font-medium opacity-100 sm:flex">
+			<span class="text-xs">⌘</span>K
+		</kbd>
 	</div>
 }
