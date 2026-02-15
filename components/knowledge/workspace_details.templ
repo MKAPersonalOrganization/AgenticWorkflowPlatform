@@ -899,6 +899,40 @@ templ workspaceDetailsScript() {
 					return `<span class="text-base">${icons[ext] || '📄'}</span>`;
 				},
 
+				fileTypeIconSvg(fileName) {
+					const svgBase = 'xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+					const fileText = `<svg ${svgBase}><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 13H8"/><path d="M16 17H8"/><path d="M16 13h-2"/></svg>`;
+					const fileCode = `<svg ${svgBase}><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="m10 13-2 2 2 2"/><path d="m14 17 2-2-2-2"/></svg>`;
+					const fileSheet = `<svg ${svgBase}><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 13h2"/><path d="M14 13h2"/><path d="M8 17h2"/><path d="M14 17h2"/></svg>`;
+					const fileImg = `<svg ${svgBase}><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><circle cx="10" cy="12" r="2"/><path d="m20 17-1.296-1.296a2.41 2.41 0 0 0-3.408 0L9 22"/></svg>`;
+					const fileGeneric = `<svg ${svgBase}><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>`;
+
+					if (!fileName) return `<span class="text-muted-foreground">${fileGeneric}</span>`;
+					const ext = fileName.split('.').pop()?.toLowerCase() || '';
+					const config = {
+						'pdf': { svg: fileText, color: 'text-red-500' },
+						'doc': { svg: fileText, color: 'text-blue-500' },
+						'docx': { svg: fileText, color: 'text-blue-500' },
+						'xls': { svg: fileSheet, color: 'text-green-500' },
+						'xlsx': { svg: fileSheet, color: 'text-green-500' },
+						'csv': { svg: fileSheet, color: 'text-green-500' },
+						'md': { svg: fileCode, color: 'text-purple-500' },
+						'markdown': { svg: fileCode, color: 'text-purple-500' },
+						'txt': { svg: fileText, color: 'text-gray-500' },
+						'html': { svg: fileCode, color: 'text-orange-500' },
+						'htm': { svg: fileCode, color: 'text-orange-500' },
+						'json': { svg: fileCode, color: 'text-orange-500' },
+						'xml': { svg: fileCode, color: 'text-orange-500' },
+						'jpg': { svg: fileImg, color: 'text-pink-500' },
+						'jpeg': { svg: fileImg, color: 'text-pink-500' },
+						'png': { svg: fileImg, color: 'text-pink-500' },
+						'gif': { svg: fileImg, color: 'text-pink-500' },
+						'webp': { svg: fileImg, color: 'text-pink-500' },
+					};
+					const c = config[ext] || { svg: fileGeneric, color: 'text-muted-foreground' };
+					return `<span class="${c.color}">${c.svg}</span>`;
+				},
+
 				isNewDocument(doc) {
 					if (!doc?.created_at) return false;
 					const created = new Date(doc.created_at);
@@ -1221,9 +1255,13 @@ templ workspaceDetailsScript() {
 						e => e.source === node.id || e.target === node.id
 					);
 					this._highlightSelectedNode(nodeId);
-					// Animate camera to focus on node
-					const nodePosition = { x: graph.getNodeAttribute(nodeId, 'x'), y: graph.getNodeAttribute(nodeId, 'y') };
-					sigma.getCamera().animate(nodePosition, { duration: 400 });
+					// Animate camera to focus on node with zoom (matching EdgeQuake behavior)
+					const nodePosition = { 
+						x: graph.getNodeAttribute(nodeId, 'x'), 
+						y: graph.getNodeAttribute(nodeId, 'y'),
+						ratio: 0.5  // Zoom level: smaller = more zoomed in
+					};
+					sigma.getCamera().animate(nodePosition, { duration: 500 });
 				},
 
 				// === Sigma.js Graph initialization ===
@@ -1374,15 +1412,11 @@ templ workspaceDetailsScript() {
 					// === Event handlers ===
 					const self = this;
 
-					// Node click → select
+					// Node click → select and focus camera
 					sigma.on('clickNode', ({ node }) => {
 						const nodeData = self._graphNodeMap[node];
 						if (nodeData) {
-							self.selectedNode = nodeData;
-							self.selectedNodeEdges = self._graphEdges.filter(
-								e => e.source === node || e.target === node
-							);
-							self._highlightSelectedNode(node);
+							self.focusNode(node);
 						}
 					});
 

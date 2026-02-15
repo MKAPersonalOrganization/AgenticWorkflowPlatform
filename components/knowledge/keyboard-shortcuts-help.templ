@@ -7,6 +7,22 @@ import (
 )
 
 templ KeyboardShortcutsHelp() {
+	@dialog.Trigger(dialog.TriggerProps{
+		For: "graph-shortcuts-help",
+	}) {
+		<button
+			class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted h-8 w-8"
+			aria-label="Keyboard shortcuts"
+		>
+			@icon.Keyboard(icon.Props{Class: "size-4"})
+		</button>
+	}
+}
+
+// KeyboardShortcutsDialog renders the dialog overlay + content.
+// Must be placed OUTSIDE any stacking context (e.g., outside the toolbar header)
+// so that its fixed-position backdrop and content float above the entire page.
+templ KeyboardShortcutsDialog() {
 	@dialog.Dialog(dialog.Props{
 		ID:    "graph-shortcuts-help",
 		Class: "max-w-md",
@@ -14,54 +30,60 @@ templ KeyboardShortcutsHelp() {
 		@dialog.Content(dialog.ContentProps{}) {
 			@dialog.Header(dialog.HeaderProps{}) {
 				@dialog.Title(dialog.TitleProps{}) {
-					{ i18n.T(ctx, "Graph Shortcuts") }
+					<span class="flex items-center gap-2">
+						@icon.Keyboard(icon.Props{Class: "size-5"})
+						{ i18n.T(ctx, "Keyboard Shortcuts") }
+					</span>
 				}
 				@dialog.Description(dialog.DescriptionProps{}) {
-					{ i18n.T(ctx, "Navigate and control the graph interface faster with these shortcuts") }
+					{ i18n.T(ctx, "Use these shortcuts to navigate the graph efficiently.") }
 				}
 			}
 			<div class="space-y-6 pt-4">
 				<!-- Navigation -->
-				<div class="space-y-3">
-					<h4 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70 px-1">
+				<div>
+					<h4 class="text-sm font-medium text-muted-foreground mb-3">
 						{ i18n.T(ctx, "Navigation") }
 					</h4>
 					<div class="space-y-2">
-						@ShortcutRow(i18n.T(ctx, "Pan Graph"), "Left Click + Drag")
-						@ShortcutRow(i18n.T(ctx, "Zoom In/Out"), "Scroll Wheel")
-						@ShortcutRow(i18n.T(ctx, "Fit to Screen"), "F")
-						@ShortcutRow(i18n.T(ctx, "Reset Zoom"), "Esc")
-					</div>
-				</div>
-				<!-- Selection -->
-				<div class="space-y-3">
-					<h4 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70 px-1">
-						{ i18n.T(ctx, "Selection") }
-					</h4>
-					<div class="space-y-2">
-						@ShortcutRow(i18n.T(ctx, "Select Node"), "Click Node")
-						@ShortcutRow(i18n.T(ctx, "Clear Selection"), "Click Empty Space")
-						@ShortcutRow(i18n.T(ctx, "Multiple Selection"), "Shift + Drag")
+						@ShortcutRow(i18n.T(ctx, "Next node"), "Tab")
+						@ShortcutRow(i18n.T(ctx, "Previous node"), "Shift+Tab")
+						@ShortcutRow(i18n.T(ctx, "Navigate nodes"), "↑+↓+←+→")
+						@ShortcutRow(i18n.T(ctx, "Focus on selected node"), "Enter")
+						@ShortcutRow(i18n.T(ctx, "Deselect node"), "Escape")
 					</div>
 				</div>
 				<!-- View Controls -->
-				<div class="space-y-3">
-					<h4 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70 px-1">
+				<div>
+					<h4 class="text-sm font-medium text-muted-foreground mb-3">
 						{ i18n.T(ctx, "View Controls") }
 					</h4>
 					<div class="space-y-2">
-						@ShortcutRow(i18n.T(ctx, "Toggle Minimap"), "M")
-						@ShortcutRow(i18n.T(ctx, "Toggle Legend"), "L")
-						@ShortcutRow(i18n.T(ctx, "Toggle Sidebar"), "B")
-						@ShortcutRow(i18n.T(ctx, "Show help dialog"), "?")
+						@ShortcutRow(i18n.T(ctx, "Zoom in"), "+")
+						@ShortcutRow(i18n.T(ctx, "Zoom out"), "-")
+						@ShortcutRow(i18n.T(ctx, "Reset view"), "0")
+						@ShortcutRow(i18n.T(ctx, "Toggle fullscreen"), "F")
+					</div>
+				</div>
+				<!-- Search -->
+				<div>
+					<h4 class="text-sm font-medium text-muted-foreground mb-3">
+						{ i18n.T(ctx, "Search") }
+					</h4>
+					<div class="space-y-2">
+						@ShortcutRow(i18n.T(ctx, "Open search"), "⌘+K")
+						@ShortcutRow(i18n.T(ctx, "Quick search"), "/")
 					</div>
 				</div>
 			</div>
+			<div class="pt-4 border-t mt-4">
+				<p class="text-xs text-muted-foreground text-center">
+					{ i18n.T(ctx, "Press") }
+					<kbd class="px-1.5 py-0.5 text-[10px] font-mono bg-muted rounded border">?</kbd>
+					{ i18n.T(ctx, "to show this dialog anytime") }
+				</p>
+			</div>
 			@dialog.Footer(dialog.FooterProps{}) {
-				<div class="flex items-center gap-2 p-3 bg-muted/30 rounded-lg border border-dashed text-[11px] text-muted-foreground">
-					@icon.Info(icon.Props{Class: "size-3.5"})
-					<p>{ i18n.T(ctx, "On macOS, use ⌘ instead of Ctrl") }</p>
-				</div>
 				@dialog.Close(dialog.CloseProps{}) {
 					{ i18n.T(ctx, "Got it!") }
 				}
@@ -71,11 +93,14 @@ templ KeyboardShortcutsHelp() {
 }
 
 templ ShortcutRow(label string, shortcut string) {
-	<div class="flex items-center justify-between group">
-		<span class="text-xs font-medium text-foreground/80">{ label }</span>
+	<div class="flex items-center justify-between text-sm">
+		<span class="text-foreground">{ label }</span>
 		<div class="flex items-center gap-1">
-			for _, key := range splitKeys(shortcut) {
-				<kbd class="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100 shadow-sm border-b-2 active:border-b-0 transition-all">
+			for i, key := range splitKeys(shortcut) {
+				if i > 0 {
+					<span class="text-muted-foreground">+</span>
+				}
+				<kbd class="px-2 py-1 text-xs font-mono bg-muted rounded border border-border">
 					{ key }
 				</kbd>
 			}
@@ -84,16 +109,14 @@ templ ShortcutRow(label string, shortcut string) {
 }
 
 func splitKeys(s string) []string {
-	// Simple split by '+' for now, can be sophisticated later
 	var keys []string
 	current := ""
 	for i := 0; i < len(s); i++ {
 		if s[i] == '+' {
-			keys = append(keys, current)
+			if current != "" {
+				keys = append(keys, current)
+			}
 			current = ""
-			continue
-		}
-		if s[i] == ' ' {
 			continue
 		}
 		current += string(s[i])
@@ -101,6 +124,5 @@ func splitKeys(s string) []string {
 	if current != "" {
 		keys = append(keys, current)
 	}
-	// Special case: "Left Click" -> "LeftClick" but let's just return what we have
 	return keys
 }

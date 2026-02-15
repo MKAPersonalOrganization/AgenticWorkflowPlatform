@@ -1,10 +1,12 @@
 package knowledge
 
+import "school-with-ai/components/i18n"
+
 /**
  * DocumentTableRow - Single document row in the documents table.
  * Matches EdgeQuake edgequake_webui/src/components/documents/document-table-row.tsx
  *
- * Displays file-type icon with color, title with search highlighting, status badge,
+ * Displays Lucide file-type icon with color, title with search highlighting, status badge,
  * entity count, cost, relative date (with "NEW" indicator), error popover for failures,
  * and action buttons.
  */
@@ -20,6 +22,7 @@ templ DocumentTableRow() {
 			'bg-orange-50/50 dark:bg-orange-950/20 border-l-4 border-l-orange-500': doc.status === 'partial_failure',
 		}"
 		@click="openDocumentPreview(doc)"
+		@dblclick="detailDoc = doc; window.tui.dialog.open('document-detail-dialog')"
 	>
 		<!-- Checkbox -->
 		<td class="p-3 align-middle" @click.stop>
@@ -29,13 +32,14 @@ templ DocumentTableRow() {
 				:value="doc.id"
 				x-model="selectedDocs"
 				:disabled="!isTerminalStatus(doc.status)"
+				aria-label="Select"
 			/>
 		</td>
 		<!-- Title with file type icon -->
 		<td class="p-3 align-middle font-medium">
 			<div class="flex flex-col gap-0.5">
 				<div class="flex items-center gap-2">
-					<span x-text="fileTypeIcon(doc.file_name)" class="text-base"></span>
+					<span x-html="fileTypeIconSvg(doc.file_name)" class="flex-shrink-0"></span>
 					<span class="truncate max-w-xs" x-html="highlightSearch(doc.title || doc.file_name || ('Document ' + doc.id.slice(0, 8)), docSearch)"></span>
 					<!-- NEW indicator -->
 					<span
@@ -46,7 +50,31 @@ templ DocumentTableRow() {
 				</div>
 				<!-- Error message popover -->
 				<template x-if="(doc.status === 'failed' || doc.status === 'partial_failure') && doc.error_message">
-					<p class="text-xs text-red-500 truncate max-w-xs cursor-help" :title="doc.error_message" x-text="doc.error_message"></p>
+					<div class="relative" x-data="{ showError: false }">
+						<button
+							@click.stop="showError = !showError"
+							class="text-xs text-red-500 truncate max-w-xs cursor-pointer hover:underline flex items-center gap-1"
+						>
+							<svg xmlns="http://www.w3.org/2000/svg" class="size-3 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="8" y2="12"></line><line x1="12" x2="12.01" y1="16" y2="16"></line></svg>
+							<span x-text="doc.error_message" class="truncate"></span>
+						</button>
+						<div
+							x-show="showError"
+							x-cloak
+							@click.outside="showError = false"
+							x-transition
+							class="absolute left-0 top-full z-50 mt-1 w-72 rounded-lg border bg-popover p-3 shadow-md"
+						>
+							<p class="text-xs text-popover-foreground mb-2 break-words" x-text="doc.error_message"></p>
+							<button
+								@click.stop="reprocessDocument(doc.id); showError = false"
+								class="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium hover:bg-accent transition-colors"
+							>
+								<svg xmlns="http://www.w3.org/2000/svg" class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path><path d="M8 16H3v5"></path></svg>
+								{ i18n.T(ctx, "Retry") }
+							</button>
+						</div>
+					</div>
 				</template>
 			</div>
 		</td>
@@ -64,6 +92,8 @@ templ DocumentTableRow() {
 				<div x-show="doc.stage_progress > 0 && doc.stage_progress < 100" class="h-1 w-24 bg-secondary rounded-full overflow-hidden">
 					<div class="h-full bg-primary transition-all duration-300" :style="`width: ${doc.stage_progress}%`"></div>
 				</div>
+				<!-- Stage message for conversion progress -->
+				<span x-show="doc.stage_message && doc.current_stage === 'converting'" class="text-[10px] text-muted-foreground truncate" x-text="doc.stage_message"></span>
 				<!-- Processing duration -->
 				<span x-show="doc.processing_duration_seconds > 0 && isTerminalStatus(doc.status)" class="text-[10px] text-muted-foreground" x-text="formatDuration(doc.processing_duration_seconds)"></span>
 			</div>

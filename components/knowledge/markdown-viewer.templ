@@ -1,8 +1,6 @@
 package knowledge
 
-import (
-	"school-with-ai/components/icon"
-)
+import "school-with-ai/components/icon"
 
 type MarkdownViewerProps struct {
 	Content     string // x-text binding string, e.g. "previewContent"
@@ -52,14 +50,22 @@ templ MarkdownViewer(props MarkdownViewerProps) {
 				</button>
 			</div>
 		}
-
 		<!-- Content -->
 		<div
 			class="flex-1 overflow-y-auto p-4 md:p-6 bg-background custom-scrollbar"
 			style={ "min-height: " + props.Height + ";" }
 		>
+			<!-- Empty state -->
 			<div
-				class="prose prose-sm dark:prose-invert max-w-none"
+				x-show={ "!" + props.Content }
+				class="flex flex-col items-center justify-center py-12 text-center"
+			>
+				@icon.FileText(icon.Props{Class: "size-8 text-muted-foreground/50 mb-3"})
+				<p class="text-sm text-muted-foreground">No content available</p>
+			</div>
+			<div
+				x-show={ props.Content }
+				class="prose prose-sm dark:prose-invert max-w-none prose-headings:scroll-mt-4 prose-pre:bg-muted/50 prose-code:before:content-none prose-code:after:content-none prose-table:text-sm"
 				x-html={ "marked.parse(" + props.Content + " || '')" }
 			></div>
 		</div>

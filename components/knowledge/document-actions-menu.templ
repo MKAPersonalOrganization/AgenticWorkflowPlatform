@@ -52,6 +52,7 @@ templ DocumentActionsMenu() {
 			<button
 				@click.stop="menuOpen = !menuOpen"
 				class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted h-8 w-8"
+				aria-label="More actions"
 			>
 				@icon.EllipsisVertical(icon.Props{Class: "size-4"})
 			</button>
@@ -69,12 +70,32 @@ templ DocumentActionsMenu() {
 			>
 				<!-- Copy ID -->
 				<button
-					@click="navigator.clipboard.writeText(doc.id); menuOpen = false"
+					@click="navigator.clipboard.writeText(doc.id); showToast && showToast('Document ID copied'); menuOpen = false"
 					class="w-full flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted transition-colors text-left cursor-pointer"
 				>
 					@icon.Copy(icon.Props{Class: "size-4 text-muted-foreground"})
 					Copy ID
 				</button>
+				<!-- View PDF (PDF documents only) -->
+				<template x-if="doc.source_type === 'pdf' || doc.pdf_id">
+					<button
+						@click="openPdfViewer && openPdfViewer(doc); menuOpen = false"
+						class="w-full flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted transition-colors text-left cursor-pointer"
+					>
+						@icon.Eye(icon.Props{Class: "size-4 text-muted-foreground"})
+						View PDF
+					</button>
+				</template>
+				<!-- Retry Failed -->
+				<template x-if="doc.status === 'failed' || doc.status === 'partial_failure'">
+					<button
+						@click="doc.track_id ? retryTask(doc.track_id) : reprocessDocument(doc.id); menuOpen = false"
+						class="w-full flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted transition-colors text-left cursor-pointer text-amber-600"
+					>
+						@icon.RotateCcw(icon.Props{Class: "size-4"})
+						Retry Failed
+					</button>
+				</template>
 				<!-- Cancel (processing only) -->
 				<template x-if="!isTerminalStatus(doc.status)">
 					<button

@@ -1,29 +1,46 @@
 package knowledge
- 
-import "school-with-ai/components/icon"
+
+import (
+	"school-with-ai/components/icon"
+	"school-with-ai/components/separator"
+	"school-with-ai/components/tooltip"
+)
 
 /**
  * LayoutControl - Graph layout selector dropdown.
- * Matches all 7 EdgeQuake layout algorithms.
+ * Matches EdgeQuake edgequake_webui/src/components/graph/layout-control.tsx
+ *
+ * Tooltip-wrapped trigger button with DropdownMenu containing 7 layout algorithms.
+ * Active layout highlighted with bg-accent. Separator between main and advanced layouts.
  */
 
 templ LayoutControl() {
 	<div x-data="{ open: false }" class="relative">
-		<button
-			@click="open = !open"
-			class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted h-9 w-9"
-			:class="{ 'bg-muted': open }"
-			aria-label="Change layout"
-			id="layout-menu-button"
-			:disabled="graphLoading"
-		>
-			<template x-if="graphLoading">
-				@icon.Loader(icon.Props{Class: "size-4 animate-spin text-muted-foreground"})
-			</template>
-			<template x-if="!graphLoading">
-				@icon.LayoutGrid(icon.Props{Class: "size-4"})
-			</template>
-		</button>
+		@tooltip.Tooltip() {
+			@tooltip.Trigger(tooltip.TriggerProps{}) {
+				<button
+					@click="open = !open"
+					class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted h-9 w-9"
+					:class="{ 'bg-muted': open }"
+					aria-label="Change layout"
+					id="layout-menu-button"
+					:disabled="graphLoading"
+				>
+					<template x-if="graphLoading">
+						@icon.Loader(icon.Props{Class: "size-4 animate-spin text-muted-foreground"})
+					</template>
+					<template x-if="!graphLoading">
+						@icon.LayoutGrid(icon.Props{Class: "size-4"})
+					</template>
+				</button>
+			}
+			@tooltip.Content(tooltip.ContentProps{Position: tooltip.PositionBottom}) {
+				<div class="space-y-1">
+					<div class="font-medium text-xs">Graph Layout</div>
+					<p class="text-[10px] opacity-80">Rearrange nodes with different algorithms</p>
+				</div>
+			}
+		}
 		<!-- Dropdown Menu -->
 		<div
 			x-show="open"
@@ -34,7 +51,7 @@ templ LayoutControl() {
 			x-transition:leave="transition ease-in duration-75"
 			x-transition:leave-start="transform opacity-100 scale-100"
 			x-transition:leave-end="transform opacity-0 scale-95"
-			class="absolute right-0 top-full mt-2 w-48 z-50 overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95"
+			class="absolute right-0 top-full mt-2 w-48 z-[9999] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95"
 			x-cloak
 		>
 			<button
@@ -65,7 +82,7 @@ templ LayoutControl() {
 			>
 				🎲 Random
 			</button>
-			<div class="h-px bg-muted my-1 -mx-1"></div>
+			@separator.Separator(separator.Props{Class: "-mx-1 my-1"})
 			<button
 				@click="graphLayout = 'noverlap'; applyLayout(); open = false"
 				class="relative flex w-full cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"

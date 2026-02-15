@@ -20,27 +20,13 @@ templ DocumentFilters() {
 			x-model="docStatusFilter"
 			@change="filterByStatus(docStatusFilter)"
 		>
-			<option value="">
-				{ i18n.T(ctx, "All") }
-			</option>
-			<option value="pending">
-				{ i18n.T(ctx, "Pending") }
-			</option>
-			<option value="processing">
-				{ i18n.T(ctx, "Processing") }
-			</option>
-			<option value="completed">
-				{ i18n.T(ctx, "Completed") }
-			</option>
-			<option value="failed">
-				{ i18n.T(ctx, "Failed") }
-			</option>
-			<option value="partial_failure">
-				{ i18n.T(ctx, "Partial Failure") }
-			</option>
-			<option value="cancelled">
-				{ i18n.T(ctx, "Cancelled") }
-			</option>
+			<option value="" x-text="'All' + (docStatusCounts ? ' (' + (docStatusCounts.all || allDocuments.length) + ')' : '')"></option>
+			<option value="pending" x-text="'Pending' + (docStatusCounts?.pending ? ' (' + docStatusCounts.pending + ')' : '')"></option>
+			<option value="processing" x-text="'Processing' + (docStatusCounts?.processing ? ' (' + docStatusCounts.processing + ')' : '')"></option>
+			<option value="completed" x-text="'Completed' + (docStatusCounts?.completed ? ' (' + docStatusCounts.completed + ')' : '')"></option>
+			<option value="failed" x-text="'Failed' + (docStatusCounts?.failed ? ' (' + docStatusCounts.failed + ')' : '')"></option>
+			<option value="partial_failure" x-text="'Partial Failure' + (docStatusCounts?.partial_failure ? ' (' + docStatusCounts.partial_failure + ')' : '')"></option>
+			<option value="cancelled" x-text="'Cancelled' + (docStatusCounts?.cancelled ? ' (' + docStatusCounts.cancelled + ')' : '')"></option>
 		</select>
 		<!-- Separator -->
 		<div class="h-6 w-px bg-border hidden sm:block"></div>

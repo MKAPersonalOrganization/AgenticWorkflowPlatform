@@ -1,12 +1,17 @@
 package knowledge
 
-import "school-with-ai/components/icon"
+import (
+	"school-with-ai/components/icon"
+	"school-with-ai/components/separator"
+	"school-with-ai/components/tooltip"
+)
 
 /**
  * ZoomControls - Zoom in/out/rotate/fit/fullscreen buttons for the graph.
  * Matches EdgeQuake edgequake_webui/src/components/graph/zoom-controls.tsx
  *
  * Positioned absolute top-right of the graph container.
+ * Each button wrapped in tooltip with keyboard hint.
  */
 
 templ ZoomControls() {
@@ -17,76 +22,133 @@ templ ZoomControls() {
 		data-tour="zoom-controls"
 	>
 		<!-- Zoom In -->
-		<button
-			@click="graphZoomIn()"
-			class="h-8 w-8 inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
-			title="Zoom In (+)"
-			aria-label="Zoom In"
-		>
-			@icon.ZoomIn(icon.Props{Class: "size-4"})
-		</button>
+		@tooltip.Tooltip() {
+			@tooltip.Trigger(tooltip.TriggerProps{}) {
+				<button
+					@click="graphZoomIn()"
+					class="h-8 w-8 inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
+					aria-label="Zoom In"
+				>
+					@icon.ZoomIn(icon.Props{Class: "size-4"})
+				</button>
+			}
+			@tooltip.Content(tooltip.ContentProps{Position: tooltip.PositionLeft}) {
+				<div class="flex items-center gap-2">
+					<span>Zoom In</span>
+					<kbd class="px-1.5 py-0.5 text-[10px] font-mono bg-background/20 rounded border border-background/10">+</kbd>
+				</div>
+			}
+		}
 		<!-- Zoom Out -->
-		<button
-			@click="graphZoomOut()"
-			class="h-8 w-8 inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
-			title="Zoom Out (-)"
-			aria-label="Zoom Out"
-		>
-			@icon.ZoomOut(icon.Props{Class: "size-4"})
-		</button>
-		<div class="border-t my-1"></div>
+		@tooltip.Tooltip() {
+			@tooltip.Trigger(tooltip.TriggerProps{}) {
+				<button
+					@click="graphZoomOut()"
+					class="h-8 w-8 inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
+					aria-label="Zoom Out"
+				>
+					@icon.ZoomOut(icon.Props{Class: "size-4"})
+				</button>
+			}
+			@tooltip.Content(tooltip.ContentProps{Position: tooltip.PositionLeft}) {
+				<div class="flex items-center gap-2">
+					<span>Zoom Out</span>
+					<kbd class="px-1.5 py-0.5 text-[10px] font-mono bg-background/20 rounded border border-background/10">-</kbd>
+				</div>
+			}
+		}
+		@separator.Separator(separator.Props{Class: "my-1"})
 		<!-- Rotate CW -->
-		<button
-			@click="graphRotateCW()"
-			class="h-8 w-8 inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
-			title="Rotate Clockwise"
-			aria-label="Rotate Clockwise"
-		>
-			@icon.RotateCw(icon.Props{Class: "size-4"})
-		</button>
+		@tooltip.Tooltip() {
+			@tooltip.Trigger(tooltip.TriggerProps{}) {
+				<button
+					@click="graphRotateCW()"
+					class="h-8 w-8 inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
+					aria-label="Rotate Clockwise"
+				>
+					@icon.RotateCw(icon.Props{Class: "size-4"})
+				</button>
+			}
+			@tooltip.Content(tooltip.ContentProps{Position: tooltip.PositionLeft}) {
+				Rotate Clockwise
+			}
+		}
 		<!-- Rotate CCW -->
-		<button
-			@click="graphRotateCCW()"
-			class="h-8 w-8 inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
-			title="Rotate Counter-Clockwise"
-			aria-label="Rotate Counter-Clockwise"
-		>
-			@icon.RotateCcw(icon.Props{Class: "size-4"})
-		</button>
-		<div class="border-t my-1"></div>
+		@tooltip.Tooltip() {
+			@tooltip.Trigger(tooltip.TriggerProps{}) {
+				<button
+					@click="graphRotateCCW()"
+					class="h-8 w-8 inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
+					aria-label="Rotate Counter-Clockwise"
+				>
+					@icon.RotateCcw(icon.Props{Class: "size-4"})
+				</button>
+			}
+			@tooltip.Content(tooltip.ContentProps{Position: tooltip.PositionLeft}) {
+				Rotate Counter-Clockwise
+			}
+		}
+		@separator.Separator(separator.Props{Class: "my-1"})
 		<!-- Focus on Node (Only if selected) -->
 		<template x-if="selectedNodeId">
-			<button
-				@click="graphFocusOnNode()"
-				class="h-8 w-8 inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
-				title="Focus on Selected (Enter)"
-				aria-label="Focus on Selected Node"
-			>
-				@icon.Focus(icon.Props{Class: "size-4"})
-			</button>
+			@tooltip.Tooltip() {
+				@tooltip.Trigger(tooltip.TriggerProps{}) {
+					<button
+						@click="graphFocusOnNode()"
+						class="h-8 w-8 inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
+						aria-label="Focus on Selected Node"
+					>
+						@icon.Focus(icon.Props{Class: "size-4"})
+					</button>
+				}
+				@tooltip.Content(tooltip.ContentProps{Position: tooltip.PositionLeft}) {
+					<div class="flex items-center gap-2">
+						<span>Focus on Selected</span>
+						<kbd class="px-1.5 py-0.5 text-[10px] font-mono bg-background/20 rounded border border-background/10">Enter</kbd>
+					</div>
+				}
+			}
 		</template>
 		<!-- Reset View -->
-		<button
-			@click="graphResetCamera()"
-			class="h-8 w-8 inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
-			title="Reset View (0)"
-			aria-label="Reset View"
-		>
-			@icon.Maximize(icon.Props{Class: "size-4"})
-		</button>
+		@tooltip.Tooltip() {
+			@tooltip.Trigger(tooltip.TriggerProps{}) {
+				<button
+					@click="graphResetCamera()"
+					class="h-8 w-8 inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
+					aria-label="Reset View"
+				>
+					@icon.Maximize(icon.Props{Class: "size-4"})
+				</button>
+			}
+			@tooltip.Content(tooltip.ContentProps{Position: tooltip.PositionLeft}) {
+				<div class="flex items-center gap-2">
+					<span>Reset View</span>
+					<kbd class="px-1.5 py-0.5 text-[10px] font-mono bg-background/20 rounded border border-background/10">0</kbd>
+				</div>
+			}
+		}
 		<!-- Fullscreen Toggle -->
-		<button
-			@click="graphToggleFullscreen()"
-			class="h-8 w-8 inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
-			title="Fullscreen (F)"
-			aria-label="Fullscreen"
-		>
-			<template x-if="!isFullscreen">
-				@icon.Expand(icon.Props{Class: "size-4"})
-			</template>
-			<template x-if="isFullscreen">
-				@icon.Shrink(icon.Props{Class: "size-4"})
-			</template>
-		</button>
+		@tooltip.Tooltip() {
+			@tooltip.Trigger(tooltip.TriggerProps{}) {
+				<button
+					@click="graphToggleFullscreen()"
+					class="h-8 w-8 inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
+					:aria-label="isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'"
+				>
+					<template x-if="!isFullscreen">
+						@icon.Expand(icon.Props{Class: "size-4"})
+					</template>
+					<template x-if="isFullscreen">
+						@icon.Shrink(icon.Props{Class: "size-4"})
+					</template>
+				</button>
+			}
+			@tooltip.Content(tooltip.ContentProps{Position: tooltip.PositionLeft}) {
+				<div class="flex items-center gap-2">
+					<span x-text="isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'"></span>
+					<kbd class="px-1.5 py-0.5 text-[10px] font-mono bg-background/20 rounded border border-background/10">F</kbd>
+				</div>
+			}
+		}
 	</div>
 }

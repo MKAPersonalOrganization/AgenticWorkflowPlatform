@@ -2,6 +2,7 @@ package knowledge
 
 import (
 	"fmt"
+	"school-with-ai/components/button"
 	"school-with-ai/components/i18n"
 	"school-with-ai/components/icon"
 )
@@ -20,15 +21,18 @@ templ PDFViewer(props PDFViewerProps) {
 		<div class="flex items-center justify-between gap-2 p-2 border-b bg-muted/30 shrink-0">
 			<!-- Page Navigation -->
 			<div class="flex items-center gap-1">
-				<button
-					@click="prevPage()"
-					:disabled="pageNum <= 1 || isLoading"
-					class="p-1 hover:bg-muted rounded-md disabled:opacity-30 transition-colors"
-					title={ i18n.T(ctx, "Previous Page") }
-				>
+				@button.Button(button.Props{
+					Variant: button.VariantGhost,
+					Size:    button.SizeIcon,
+					Class:   "h-8 w-8",
+					Attributes: templ.Attributes{
+						"@click":    "prevPage()",
+						":disabled": "pageNum <= 1 || isLoading",
+					},
+				}) {
 					@icon.ChevronLeft(icon.Props{Class: "size-4"})
-				</button>
-				<span class="text-xs text-muted-foreground min-w-[60px] text-center font-medium tabular-nums">
+				}
+				<span class="text-sm text-muted-foreground min-w-[80px] text-center font-medium tabular-nums">
 					<template x-if="isLoading">
 						<span>...</span>
 					</template>
@@ -36,50 +40,60 @@ templ PDFViewer(props PDFViewerProps) {
 						<span x-text="`${pageNum} / ${numPages}`"></span>
 					</template>
 				</span>
-				<button
-					@click="nextPage()"
-					:disabled="pageNum >= numPages || isLoading"
-					class="p-1 hover:bg-muted rounded-md disabled:opacity-30 transition-colors"
-					title={ i18n.T(ctx, "Next Page") }
-				>
+				@button.Button(button.Props{
+					Variant: button.VariantGhost,
+					Size:    button.SizeIcon,
+					Class:   "h-8 w-8",
+					Attributes: templ.Attributes{
+						"@click":    "nextPage()",
+						":disabled": "pageNum >= numPages || isLoading",
+					},
+				}) {
 					@icon.ChevronRight(icon.Props{Class: "size-4"})
-				</button>
+				}
 			</div>
-
 			<!-- Zoom Controls -->
 			<div class="flex items-center gap-1">
-				<button
-					@click="zoomOut()"
-					:disabled="scale <= 0.5 || isLoading"
-					class="p-1 hover:bg-muted rounded-md disabled:opacity-30 transition-colors"
-					title={ i18n.T(ctx, "Zoom Out") }
-				>
+				@button.Button(button.Props{
+					Variant: button.VariantGhost,
+					Size:    button.SizeIcon,
+					Class:   "h-8 w-8",
+					Attributes: templ.Attributes{
+						"@click":    "zoomOut()",
+						":disabled": "scale <= 0.5 || isLoading",
+					},
+				}) {
 					@icon.ZoomOut(icon.Props{Class: "size-4"})
-				</button>
-				<span class="text-xs text-muted-foreground min-w-[40px] text-center font-medium tabular-nums" x-text="`${Math.round(scale * 100)}%`"></span>
-				<button
-					@click="zoomIn()"
-					:disabled="scale >= 3.0 || isLoading"
-					class="p-1 hover:bg-muted rounded-md disabled:opacity-30 transition-colors"
-					title={ i18n.T(ctx, "Zoom In") }
-				>
+				}
+				<span class="text-sm text-muted-foreground min-w-[50px] text-center font-medium tabular-nums" x-text="`${Math.round(scale * 100)}%`"></span>
+				@button.Button(button.Props{
+					Variant: button.VariantGhost,
+					Size:    button.SizeIcon,
+					Class:   "h-8 w-8",
+					Attributes: templ.Attributes{
+						"@click":    "zoomIn()",
+						":disabled": "scale >= 3.0 || isLoading",
+					},
+				}) {
 					@icon.ZoomIn(icon.Props{Class: "size-4"})
-				</button>
+				}
 				<div class="w-px h-4 bg-border mx-1"></div>
-				<button
-					@click="resetZoom()"
-					class="p-1 hover:bg-muted rounded-md transition-colors"
-					title={ i18n.T(ctx, "Reset Zoom") }
-				>
+				@button.Button(button.Props{
+					Variant: button.VariantGhost,
+					Size:    button.SizeIcon,
+					Class:   "h-8 w-8",
+					Attributes: templ.Attributes{
+						"@click": "resetZoom()",
+					},
+				}) {
 					@icon.Maximize(icon.Props{Class: "size-4"})
-				</button>
+				}
 			</div>
 		</div>
-
 		<!-- Scroll Area -->
 		<div
-			class="flex-1 overflow-auto bg-muted/20 flex flex-col items-center py-8 relative custom-scrollbar"
-			style={ fmt.Sprintf("height: %dpx;", props.Height) }
+			class="flex-1 overflow-auto bg-muted/10 flex flex-col items-center py-4 relative custom-scrollbar scroll-smooth"
+			style={ fmt.Sprintf("height: %dpx; -webkit-overflow-scrolling: touch;", props.Height) }
 		>
 			<!-- Loading state -->
 			<template x-if="isLoading">
@@ -88,7 +102,6 @@ templ PDFViewer(props PDFViewerProps) {
 					<p class="text-sm text-muted-foreground tracking-wide font-medium">{ i18n.T(ctx, "Loading PDF...") }</p>
 				</div>
 			</template>
-
 			<!-- Error state -->
 			<template x-if="error">
 				<div class="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-background/80 z-20">
@@ -97,16 +110,18 @@ templ PDFViewer(props PDFViewerProps) {
 					</div>
 					<h3 class="font-semibold text-red-900 border-none mb-1">{ i18n.T(ctx, "Failed to load PDF") }</h3>
 					<p class="text-xs text-red-600 mb-6 max-w-xs" x-text="error"></p>
-					<button
-						@click="init()"
-						class="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-xs font-semibold rounded-md hover:bg-red-700 transition-colors"
-					>
-						@icon.RefreshCw(icon.Props{Class: "size-3"})
+					@button.Button(button.Props{
+						Variant: button.VariantOutline,
+						Size:    button.SizeSm,
+						Attributes: templ.Attributes{
+							"@click": "init()",
+						},
+					}) {
+						@icon.RefreshCw(icon.Props{Class: "size-3 me-1.5"})
 						{ i18n.T(ctx, "Retry") }
-					</button>
+					}
 				</div>
 			</template>
-
 			<!-- Canvas Container -->
 			<div
 				class="bg-white shadow-2xl ring-1 ring-black/5 relative"
@@ -115,7 +130,6 @@ templ PDFViewer(props PDFViewerProps) {
 				<canvas x-ref="pdfCanvas" class="max-w-full h-auto block"></canvas>
 			</div>
 		</div>
-
 		@pdfViewerScript()
 	</div>
 }
@@ -127,7 +141,7 @@ templ pdfViewerScript() {
 				pdfDoc: null,
 				pageNum: 1,
 				numPages: 0,
-				scale: 1.25,
+				scale: 1.0,
 				isLoading: true,
 				error: null,
 				renderTask: null,
@@ -220,7 +234,7 @@ templ pdfViewerScript() {
 				},
 
 				resetZoom() {
-					this.scale = 1.25;
+					this.scale = 1.0;
 					this.renderPage();
 				}
 			}));
