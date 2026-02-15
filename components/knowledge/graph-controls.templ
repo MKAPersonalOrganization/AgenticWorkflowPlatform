@@ -52,7 +52,19 @@ templ GraphControls() {
 						@icon.GitBranch(icon.Props{Class: "size-3.5 text-muted-foreground"})
 						<label class="text-xs font-medium">Layout</label>
 					</div>
-					@LayoutControl()
+					<select
+						x-model="graphLayout"
+						@change="applyLayout()"
+						class="w-full h-8 text-xs rounded border border-input bg-transparent px-2 py-0.5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+					>
+						<option value="force-atlas">Force Atlas (FA2)</option>
+						<option value="force-directed">Force-Directed</option>
+						<option value="circular">Circular</option>
+						<option value="circlepack">Circle Pack</option>
+						<option value="random">Random</option>
+						<option value="noverlap">No Overlap</option>
+						<option value="hierarchical">Hierarchical</option>
+					</select>
 				</div>
 				<div class="h-px bg-border my-1"></div>
 				<!-- Appearance Section -->
