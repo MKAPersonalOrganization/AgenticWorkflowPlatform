@@ -34,7 +34,12 @@ templ DocumentDetailDialog() {
 				}
 			}
 			@tabs.Tabs(tabs.Props{ID: "doc-detail-tabs", Class: "mt-4"}) {
-				@tabs.List(tabs.ListProps{Class: "grid w-full grid-cols-3"}) {
+				@tabs.List(tabs.ListProps{
+					Class: "grid w-full",
+					Attributes: templ.Attributes{
+						":class": "detailDoc?.file_name?.toLowerCase().endsWith('.pdf') ? 'grid-cols-4' : 'grid-cols-3'",
+					},
+				}) {
 					@tabs.Trigger(tabs.TriggerProps{Value: "overview", IsActive: true}) {
 						{ i18n.T(ctx, "Overview") }
 					}
@@ -44,6 +49,11 @@ templ DocumentDetailDialog() {
 					@tabs.Trigger(tabs.TriggerProps{Value: "entities"}) {
 						{ i18n.T(ctx, "Entities") }
 					}
+					<template x-if="detailDoc?.file_name?.toLowerCase().endsWith('.pdf')">
+						@tabs.Trigger(tabs.TriggerProps{Value: "source"}) {
+							{ i18n.T(ctx, "Source") }
+						}
+					</template>
 				}
 				@tabs.Content(tabs.ContentProps{Value: "overview"}) {
 					<div class="mt-4 space-y-4">
@@ -133,17 +143,24 @@ templ DocumentDetailDialog() {
 					</div>
 				}
 				@tabs.Content(tabs.ContentProps{Value: "content"}) {
-					<div class="mt-4 h-[300px] rounded-lg border p-4 overflow-y-auto">
+					<div class="mt-4">
 						<template x-if="detailDoc?.content || previewContent">
-							<pre class="text-sm whitespace-pre-wrap font-mono" x-text="detailDoc?.content || previewContent"></pre>
+							@MarkdownViewer(MarkdownViewerProps{
+								Content:     "detailDoc?.content || previewContent",
+								Height:      "300px",
+								ShowToolbar: true,
+								Title:       "Extracted Markdown",
+							})
 						</template>
 						<template x-if="!detailDoc?.content && !previewContent">
-							<p class="text-muted-foreground text-sm">{ i18n.T(ctx, "No content available") }</p>
+							<div class="h-[300px] rounded-lg border p-4 flex items-center justify-center text-muted-foreground italic">
+								<p class="text-sm">{ i18n.T(ctx, "No content available") }</p>
+							</div>
 						</template>
 					</div>
 				}
 				@tabs.Content(tabs.ContentProps{Value: "entities"}) {
-					<div class="mt-4 h-[300px] rounded-lg border p-4 overflow-y-auto">
+					<div class="mt-4 h-[300px] rounded-lg border p-4 overflow-y-auto custom-scrollbar">
 						<template x-if="detailDoc?.entity_count && detailDoc.entity_count > 0">
 							<div class="text-center py-8">
 								<p class="text-sm text-muted-foreground mb-2">
@@ -168,6 +185,17 @@ templ DocumentDetailDialog() {
 							<p class="text-muted-foreground text-sm text-center py-8">
 								{ i18n.T(ctx, "No entities extracted yet") }
 							</p>
+						</template>
+					</div>
+				}
+				@tabs.Content(tabs.ContentProps{Value: "source"}) {
+					<div class="mt-4">
+						<template x-if="detailDoc?.file_name?.toLowerCase().endsWith('.pdf')">
+							@PDFMarkdownSplitView(PDFMarkdownSplitViewProps{
+								PDFURL:    "'/api/knowledge/pdfs/' + detailDoc.pdf_id + '/download?workspace_id=' + workspaceId",
+								Markdown: "detailDoc?.content || previewContent",
+								Height:   450,
+							})
 						</template>
 					</div>
 				}

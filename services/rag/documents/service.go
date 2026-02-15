@@ -340,6 +340,30 @@ func (s *Service) GetPDFContent(ctx context.Context, tCtx *domain.TenantContext,
 	return &result, nil
 }
 
+// DownloadPDF retrieves the raw PDF binary from Edgequake.
+func (s *Service) DownloadPDF(ctx context.Context, tCtx *domain.TenantContext, pdfID string) (io.ReadCloser, string, int64, error) {
+	url := fmt.Sprintf("%s/api/v1/documents/pdf/%s/download", s.baseURL, pdfID)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, "", 0, fmt.Errorf("creating request: %w", err)
+	}
+
+	s.injectHeaders(req, tCtx)
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, "", 0, fmt.Errorf("executing request: %w", err)
+	}
+
+	if err := s.handleError(resp); err != nil {
+		resp.Body.Close()
+		return nil, "", 0, err
+	}
+
+	return resp.Body, resp.Header.Get("Content-Type"), resp.ContentLength, nil
+}
+
 // GetPipelineTasks retrieves the current tasks in the pipeline.
 func (s *Service) GetPipelineTasks(ctx context.Context, tCtx *domain.TenantContext, page, pageSize int) (*TaskListResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/tasks?page=%d&page_size=%d", s.baseURL, page, pageSize)

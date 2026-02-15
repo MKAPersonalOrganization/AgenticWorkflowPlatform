@@ -17,14 +17,12 @@ templ GraphViewer() {
 	<div class="flex flex-col h-full overflow-hidden">
 		<!-- Graph Toolbar -->
 		@GraphToolbar()
-		
 		<!-- Main Content Area -->
 		<div class="flex-1 relative overflow-hidden bg-background text-foreground" data-graph-container>
 			<!-- Loading state overlays -->
 			<div x-show="graphLoading" class="absolute inset-0 z-50 flex items-center justify-center bg-background/50 backdrop-blur-sm">
 				@GraphLoadingOverlay()
 			</div>
-
 			<!-- Empty state -->
 			<div x-show="!graphLoading && (!graphData || !graphData.nodes || graphData.nodes.length === 0)" x-cloak class="absolute inset-0 flex items-center justify-center">
 				<div class="text-center max-w-md px-4">
@@ -44,13 +42,12 @@ templ GraphViewer() {
 					</button>
 				</div>
 			</div>
-
 			<!-- Graph Area (Nodes > 0) -->
 			<div x-show="!graphLoading && graphData && graphData.nodes && graphData.nodes.length > 0" x-cloak class="flex h-full overflow-hidden">
+				@EntityBrowserPanel()
 				<!-- Sigma.js WebGL Graph Container -->
 				<div class="flex-1 relative overflow-hidden" id="graph-container">
 					<div id="sigma-container" class="w-full h-full" style="display: block; position: relative; min-height: 400px;"></div>
-					
 					<!-- Overlays -->
 					<div class="absolute inset-0 pointer-events-none z-20">
 						<div class="pointer-events-auto">
@@ -60,13 +57,11 @@ templ GraphViewer() {
 							@GraphMinimap()
 						</div>
 					</div>
-
 					<!-- Truncation banner -->
 					<div class="absolute top-4 left-1/2 -translate-x-1/2 z-30">
 						@TruncationBanner()
 					</div>
 				</div>
-
 				<!-- Right Side Panel - Node Details -->
 				@NodeDetails()
 			</div>
@@ -78,10 +73,8 @@ templ GraphToolbar() {
 	<header class="flex items-center justify-between border-b px-4 py-2 shrink-0 bg-card/50 backdrop-blur-sm">
 		<div class="flex items-center gap-2.5">
 			<h2 class="text-base font-semibold tracking-tight">{ i18n.T(ctx, "Knowledge Graph") }</h2>
-			
 			<!-- Loading pulse -->
 			<div x-show="graphLoading" class="size-2 rounded-full bg-primary animate-pulse"></div>
-
 			<!-- Node/Edge counts -->
 			<div x-show="graphData" x-cloak class="flex items-center gap-1.5 text-[11px] text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-md border border-border/30">
 				<span x-text="(graphData?.nodes?.length || 0).toLocaleString() + ' nodes'"></span>
@@ -89,13 +82,10 @@ templ GraphToolbar() {
 				<span x-text="(graphData?.edges?.length || 0).toLocaleString() + ' edges'"></span>
 			</div>
 		</div>
-
 		<div class="flex items-center gap-1.5">
 			@GraphSearch()
 			@TruncationIndicator()
-			
 			<div class="w-px h-5 bg-border mx-1"></div>
-
 			<!-- Layout Selector -->
 			<div class="relative group">
 				<div class="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground group-hover:text-primary transition-colors">
@@ -118,26 +108,20 @@ templ GraphToolbar() {
 					@icon.ChevronDown(icon.Props{Class: "size-3"})
 				</div>
 			</div>
-			
 			<div class="w-px h-5 bg-border mx-1"></div>
-
-			<!-- Max nodes selector -->
-			<div class="relative">
-				<select
-					class="h-8 rounded-md border border-input bg-background pl-2 pr-8 text-[11px] font-medium shadow-sm transition-colors hover:bg-accent focus:outline-none focus:ring-1 focus:ring-ring appearance-none"
-					x-model="graphMaxNodes"
-					@change="loadGraph()"
-				>
-					<option value="50">50 nodes</option>
-					<option value="100">100 nodes</option>
-					<option value="200">200 nodes</option>
-					<option value="500">500 nodes</option>
-				</select>
-				<div class="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
-					@icon.ChevronDown(icon.Props{Class: "size-3"})
-				</div>
-			</div>
-
+			<!-- New Advanced Settings Panel -->
+			@GraphSettingsPanel()
+			<div class="w-px h-5 bg-border mx-1"></div>
+			<!-- Help Button -->
+			<button
+				@click="$dispatch('open-dialog', 'graph-shortcuts-help')"
+				class="flex items-center justify-center h-8 w-8 rounded-md border bg-background hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+				title={ i18n.T(ctx, "Show keyboard shortcuts") }
+			>
+				@icon.Info(icon.Props{Class: "size-4"})
+			</button>
+			<!-- Keyboard Shortcuts Dialog -->
+			@KeyboardShortcutsHelp()
 			<!-- Toolbar Buttons -->
 			<div class="flex items-center bg-muted/30 rounded-md p-0.5 border">
 				<button
@@ -174,4 +158,3 @@ templ GraphLoadingOverlay() {
 		<p class="text-sm text-muted-foreground">{ i18n.T(ctx, "Loading knowledge graph...") }</p>
 	</div>
 }
-
