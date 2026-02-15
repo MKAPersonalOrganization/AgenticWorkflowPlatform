@@ -1,0 +1,26 @@
+package knowledge
+
+/**
+ * GraphSearch - Entity search input for the graph.
+ * Matches EdgeQuake edgequake_webui/src/components/graph/graph-search.tsx
+ *
+ * Search input with leading Search icon, debounced search.
+ */
+
+import (
+	"school-with-ai/components/i18n"
+	"school-with-ai/components/icon"
+)
+
+templ GraphSearch() {
+	<div class="relative w-56">
+		@icon.Search(icon.Props{Class: "absolute left-2.5 top-2.5 size-4 text-muted-foreground"})
+		<input
+			type="search"
+			placeholder={ i18n.T(ctx, "Search entities...") }
+			class="flex h-9 w-full rounded-md border border-input bg-transparent pl-9 pr-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+			x-model.debounce.500ms="graphSearch"
+			@input="searchGraph()"
+		/>
+	</div>
+}

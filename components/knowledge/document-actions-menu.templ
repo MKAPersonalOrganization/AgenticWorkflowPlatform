@@ -1,0 +1,109 @@
+package knowledge
+
+import "school-with-ai/components/icon"
+
+/**
+ * DocumentActionsMenu - Overflow dropdown menu (⋮) with document actions.
+ * Matches EdgeQuake edgequake_webui/src/components/documents/document-actions-menu.tsx
+ *
+ * Context-aware menu items: View Details, Copy ID, Cancel, Reprocess, Delete.
+ */
+
+templ DocumentActionsMenu() {
+	<div class="flex items-center gap-1 justify-end">
+		<!-- Quick Action: View Details -->
+		<button
+			@click="openDocumentDetail(doc)"
+			class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted h-8 w-8"
+			title="View Details"
+		>
+			@icon.ExternalLink(icon.Props{Class: "size-4"})
+		</button>
+		<!-- Quick Action: Preview -->
+		<button
+			@click="openDocumentPreview(doc)"
+			class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted h-8 w-8"
+			title="Preview"
+		>
+			@icon.Eye(icon.Props{Class: "size-4"})
+		</button>
+		<!-- Quick Action: View in Graph (completed/indexed only) -->
+		<template x-if="doc.status === 'completed' || doc.status === 'indexed'">
+			<button
+				@click="viewInGraph(doc)"
+				class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted h-8 w-8"
+				title="View in Graph"
+			>
+				@icon.Sparkles(icon.Props{Class: "size-4"})
+			</button>
+		</template>
+		<!-- Quick Action: Retry (failed only) -->
+		<template x-if="doc.status === 'failed' || doc.status === 'partial_failure'">
+			<button
+				@click="doc.track_id ? retryTask(doc.track_id) : reprocessDocument(doc.id)"
+				class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-amber-500/10 hover:text-amber-600 h-8 w-8"
+				title="Retry"
+			>
+				@icon.RotateCcw(icon.Props{Class: "size-4"})
+			</button>
+		</template>
+		<!-- Overflow Menu -->
+		<div class="relative" x-data="{ menuOpen: false }">
+			<button
+				@click.stop="menuOpen = !menuOpen"
+				class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted h-8 w-8"
+			>
+				@icon.EllipsisVertical(icon.Props{Class: "size-4"})
+			</button>
+			<div
+				x-show="menuOpen"
+				x-cloak
+				@click.outside="menuOpen = false"
+				x-transition:enter="transition ease-out duration-100"
+				x-transition:enter-start="opacity-0 scale-95"
+				x-transition:enter-end="opacity-100 scale-100"
+				x-transition:leave="transition ease-in duration-75"
+				x-transition:leave-start="opacity-100 scale-100"
+				x-transition:leave-end="opacity-0 scale-95"
+				class="absolute right-0 top-8 z-50 min-w-[180px] rounded-lg border bg-popover p-1 shadow-lg"
+			>
+				<!-- Copy ID -->
+				<button
+					@click="navigator.clipboard.writeText(doc.id); menuOpen = false"
+					class="w-full flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted transition-colors text-left cursor-pointer"
+				>
+					@icon.Copy(icon.Props{Class: "size-4 text-muted-foreground"})
+					Copy ID
+				</button>
+				<!-- Cancel (processing only) -->
+				<template x-if="!isTerminalStatus(doc.status)">
+					<button
+						@click="cancelDocumentTask(doc.id, doc.track_id); menuOpen = false"
+						class="w-full flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted transition-colors text-left cursor-pointer text-orange-600"
+					>
+						@icon.Square(icon.Props{Class: "size-4 fill-current"})
+						Cancel Extraction
+					</button>
+				</template>
+				<!-- Reprocess -->
+				<button
+					@click="reprocessDocument(doc.id); menuOpen = false"
+					class="w-full flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted transition-colors text-left cursor-pointer"
+				>
+					@icon.RefreshCw(icon.Props{Class: "size-4 text-muted-foreground"})
+					Reprocess
+				</button>
+				<!-- Separator -->
+				<div class="border-t my-1"></div>
+				<!-- Delete -->
+				<button
+					@click="deleteDocument(doc.id, doc.title || doc.file_name); menuOpen = false"
+					class="w-full flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-destructive/10 transition-colors text-left cursor-pointer text-destructive"
+				>
+					@icon.Trash2(icon.Props{Class: "size-4"})
+					Delete
+				</button>
+			</div>
+		</div>
+	</div>
+}

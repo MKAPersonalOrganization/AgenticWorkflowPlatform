@@ -1,0 +1,40 @@
+package knowledge
+
+/**
+ * DocumentManager - Ingested documents tab, orchestrates all document sub-components.
+ * Matches EdgeQuake edgequake_webui/src/components/documents/document-manager.tsx
+ *
+ * Composes: DocumentHeader, DocumentToolbarSection, DocumentTableSection,
+ * PaginationControls, DocumentDetailDialog, DocumentPreviewPanel.
+ */
+
+import (
+	"school-with-ai/components/i18n"
+	"school-with-ai/components/icon"
+)
+
+templ DocumentManager() {
+	<div class="space-y-4 mt-4">
+		<!-- Document Header: title, count, pipeline status, refresh, retry, clear -->
+		@DocumentHeader()
+		<!-- Toolbar: search + filters row, pipeline summary, dropzone, batch bar, upload progress -->
+		@DocumentToolbarSection()
+		<!-- Main table + pagination -->
+		@DocumentTableSection()
+		@PaginationControls()
+		<!-- Empty state -->
+		<div x-show="!docsLoading && filteredDocuments.length === 0" x-cloak class="flex flex-col items-center justify-center py-20 text-center">
+			@icon.FileText(icon.Props{Class: "size-10 text-muted-foreground mb-4"})
+			<h3 class="text-lg font-semibold">
+				<span x-show="docStatusFilter" x-text="'No ' + docStatusFilter + ' documents'"></span>
+				<span x-show="!docStatusFilter">{ i18n.T(ctx, "No ingested content yet") }</span>
+			</h3>
+			<p class="text-sm text-muted-foreground">
+				<span x-show="docStatusFilter">
+					<button @click="filterByStatus('')" class="text-primary hover:underline">{ i18n.T(ctx, "View all documents") }</button>
+				</span>
+				<span x-show="!docStatusFilter">{ i18n.T(ctx, "Content will appear here once your files are processed.") }</span>
+			</p>
+		</div>
+	</div>
+}

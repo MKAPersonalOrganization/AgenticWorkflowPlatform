@@ -1,0 +1,31 @@
+package knowledge
+
+import "school-with-ai/components/icon"
+
+/**
+ * DocumentSearchBar - Search input with clear button for document filtering.
+ * Matches EdgeQuake edgequake_webui/src/components/documents/document-search-bar.tsx
+ */
+
+templ DocumentSearchBar() {
+	<div class="relative flex-1 max-w-md">
+		@icon.Search(icon.Props{Class: "absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground"})
+		<input
+			type="search"
+			placeholder="Search documents..."
+			class="flex h-9 w-full rounded-md border border-input bg-transparent pl-9 pr-8 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+			x-model.debounce.300ms="docSearch"
+			@input="handleSearch()"
+		/>
+		<button
+			type="button"
+			x-show="docSearch"
+			x-cloak
+			@click="docSearch = ''; handleSearch()"
+			class="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-muted transition-colors"
+			aria-label="Clear search"
+		>
+			@icon.X(icon.Props{Class: "size-3.5 text-muted-foreground"})
+		</button>
+	</div>
+}

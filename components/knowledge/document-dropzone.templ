@@ -1,0 +1,61 @@
+package knowledge
+
+import "school-with-ai/components/icon"
+
+/**
+ * DocumentDropzone - File upload dropzone with drag-and-drop support.
+ * Matches EdgeQuake edgequake_webui/src/components/documents/document-dropzone.tsx
+ *
+ * Dashed border container, Upload icon, drag-active pulse animation, file type hints.
+ * Uses Alpine.js for drag-and-drop state management.
+ */
+
+templ DocumentDropzone() {
+	<div
+		x-data="{ isDragOver: false }"
+		@dragenter.prevent="isDragOver = true"
+		@dragleave.prevent="isDragOver = false"
+		@dragover.prevent="isDragOver = true"
+		@drop.prevent="isDragOver = false; handleFileDrop($event)"
+		@click="$refs.fileInput.click()"
+		class="border-2 border-dashed rounded-lg cursor-pointer transition-all duration-200 flex items-center gap-4 px-4 py-3"
+		:class="isDragOver
+			? 'border-primary bg-primary/5 ring-2 ring-primary/20 animate-pulse'
+			: 'border-muted-foreground/20 hover:border-primary/50 hover:bg-muted/30'"
+		role="button"
+		aria-label="Upload files by clicking or dragging"
+		tabindex="0"
+	>
+		<input
+			type="file"
+			x-ref="fileInput"
+			class="hidden"
+			accept=".txt,.md,.json,.pdf,.csv,.html,.htm,.xml,.docx"
+			multiple
+			@change="handleFileInput($event)"
+		/>
+		<div
+			class="p-2 rounded-lg transition-all"
+			:class="isDragOver ? 'bg-primary/10' : 'bg-muted/50'"
+		>
+			<span :class="isDragOver ? 'text-primary scale-110' : 'text-muted-foreground'">
+				@icon.Upload(icon.Props{Class: "size-5 transition-all duration-200"})
+			</span>
+		</div>
+		<div class="flex-1 min-w-0">
+			<p
+				x-show="isDragOver"
+				x-cloak
+				class="text-sm font-medium text-primary"
+			>
+				Drop files here
+			</p>
+			<p
+				x-show="!isDragOver"
+				class="text-sm text-muted-foreground"
+			>
+				Drag &amp; drop or <span class="text-primary font-medium">click to upload</span> • TXT, MD, JSON, PDF (max 64MB)
+			</p>
+		</div>
+	</div>
+}

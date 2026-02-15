@@ -1,0 +1,24 @@
+package knowledge
+
+/**
+ * GraphLegend - Entity type legend with visibility toggles.
+ * Matches EdgeQuake edgequake_webui/src/components/graph/graph-legend.tsx
+ *
+ * Positioned absolute bottom-center of the graph canvas.
+ * Shows color-coded entity type pills that can be clicked to toggle visibility.
+ */
+
+templ GraphLegend() {
+	<div class="absolute bottom-3 left-3 right-3 flex flex-wrap gap-1.5 justify-center">
+		<template x-for="[type, color] in Object.entries(entityColors).filter(([t]) => graphData?.nodes?.some(n => (n.node_type || 'UNKNOWN') === t))" :key="type">
+			<button
+				@click="toggleEntityType(type)"
+				class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border transition-all cursor-pointer select-none"
+				:class="graphVisibleTypes.includes(type) ? 'bg-background shadow-sm' : 'bg-muted/50 opacity-50 line-through'"
+			>
+				<span class="size-2.5 rounded-full flex-shrink-0" :style="`background-color: ${color}`"></span>
+				<span class="text-muted-foreground capitalize" x-text="type.toLowerCase().replace('_', ' ')"></span>
+			</button>
+		</template>
+	</div>
+}

@@ -1,0 +1,35 @@
+package knowledge
+
+/**
+ * GraphControls - Graph display setting toggles (labels, edge labels).
+ * Matches EdgeQuake edgequake_webui/src/components/graph/graph-controls.tsx
+ *
+ * Positioned absolute top-left of the graph canvas.
+ */
+
+templ GraphControls() {
+	<div class="absolute top-3 left-3 flex flex-col gap-1.5">
+		<!-- Toggle labels -->
+		<div class="bg-background/90 backdrop-blur-sm border rounded-lg shadow-sm p-2 flex items-center gap-2">
+			<input
+				type="checkbox"
+				id="show-labels"
+				x-model="graphShowLabels"
+				@change="graphDraw()"
+				class="rounded border-input text-primary focus:ring-primary size-3.5"
+			/>
+			<label for="show-labels" class="text-xs text-muted-foreground cursor-pointer select-none">Labels</label>
+		</div>
+		<!-- Toggle edge labels -->
+		<div class="bg-background/90 backdrop-blur-sm border rounded-lg shadow-sm p-2 flex items-center gap-2">
+			<input
+				type="checkbox"
+				id="show-edge-labels"
+				x-model="graphShowEdgeLabels"
+				@change="graphDraw()"
+				class="rounded border-input text-primary focus:ring-primary size-3.5"
+			/>
+			<label for="show-edge-labels" class="text-xs text-muted-foreground cursor-pointer select-none">Edge Labels</label>
+		</div>
+	</div>
+}

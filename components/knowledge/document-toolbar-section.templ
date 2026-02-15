@@ -1,0 +1,25 @@
+package knowledge
+
+/**
+ * DocumentToolbarSection - Composes the full toolbar area.
+ * Matches EdgeQuake edgequake_webui/src/components/documents/document-toolbar-section.tsx
+ *
+ * Search bar + filters row, processing status summary, upload dropzone,
+ * batch action bar, and upload progress list.
+ */
+
+templ DocumentToolbarSection() {
+	<!-- Search + Filters Row -->
+	<div class="flex flex-col sm:flex-row sm:items-center gap-3 pb-3 border-b">
+		@DocumentSearchBar()
+		@DocumentFilters()
+	</div>
+	<!-- Processing Status Summary -->
+	@PipelineStatusSummary()
+	<!-- Upload Dropzone -->
+	@DocumentDropzone()
+	<!-- Batch Actions Bar -->
+	@BatchActionsBar()
+	<!-- Upload Progress List -->
+	@UploadProgressList()
+}

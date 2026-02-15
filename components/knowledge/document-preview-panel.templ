@@ -1,0 +1,154 @@
+package knowledge
+
+/**
+ * DocumentPreviewPanel - Slide-over panel for document preview.
+ * Matches EdgeQuake's document preview / detail panel pattern.
+ *
+ * Shows: Document metadata, content preview, and actions in a right-side panel.
+ * Uses Alpine.js transition for slide-in/slide-out.
+ */
+
+import (
+	"school-with-ai/components/button"
+	"school-with-ai/components/i18n"
+	"school-with-ai/components/icon"
+)
+
+templ DocumentPreviewPanel() {
+	<!-- Overlay backdrop -->
+	<div
+		x-show="previewDoc"
+		x-cloak
+		@click="closePreview()"
+		class="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm"
+		x-transition:enter="transition ease-out duration-200"
+		x-transition:enter-start="opacity-0"
+		x-transition:enter-end="opacity-100"
+		x-transition:leave="transition ease-in duration-150"
+		x-transition:leave-start="opacity-100"
+		x-transition:leave-end="opacity-0"
+	></div>
+	<!-- Panel -->
+	<div
+		x-show="previewDoc"
+		x-cloak
+		x-transition:enter="transition ease-out duration-300 transform"
+		x-transition:enter-start="translate-x-full"
+		x-transition:enter-end="translate-x-0"
+		x-transition:leave="transition ease-in duration-200 transform"
+		x-transition:leave-start="translate-x-0"
+		x-transition:leave-end="translate-x-full"
+		class="fixed inset-y-0 right-0 z-50 w-full max-w-lg border-l bg-background shadow-xl flex flex-col"
+	>
+		<!-- Header -->
+		<div class="flex items-center justify-between border-b px-4 py-3">
+			<div class="flex items-center gap-2 min-w-0 flex-1">
+				@icon.FileText(icon.Props{Class: "size-4 text-muted-foreground flex-shrink-0"})
+				<h3 class="text-sm font-semibold truncate" x-text="previewDoc?.title || previewDoc?.file_name || 'Document Preview'"></h3>
+			</div>
+			<div class="flex items-center gap-1 flex-shrink-0">
+				<!-- Open detail dialog -->
+				@button.Button(button.Props{
+					Variant: button.VariantGhost,
+					Size:    button.SizeIcon,
+					Class:   "h-8 w-8",
+					Attributes: templ.Attributes{
+						"@click": "detailDoc = previewDoc; document.getElementById('document-detail-dialog')?.showPopover()",
+					},
+				}) {
+					@icon.Maximize2(icon.Props{Class: "size-4"})
+				}
+				<!-- Close -->
+				@button.Button(button.Props{
+					Variant: button.VariantGhost,
+					Size:    button.SizeIcon,
+					Class:   "h-8 w-8",
+					Attributes: templ.Attributes{
+						"@click": "closePreview()",
+					},
+				}) {
+					@icon.X(icon.Props{Class: "size-4"})
+				}
+			</div>
+		</div>
+		<!-- Metadata section -->
+		<div class="border-b px-4 py-3 space-y-2">
+			<div class="grid grid-cols-2 gap-3 text-xs">
+				<div>
+					<p class="text-muted-foreground">{ i18n.T(ctx, "Status") }</p>
+					<span
+						class="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium mt-0.5"
+						:class="statusBadgeClass(previewDoc?.current_stage || previewDoc?.status)"
+						x-text="statusLabel(previewDoc?.current_stage || previewDoc?.status)"
+					></span>
+				</div>
+				<div>
+					<p class="text-muted-foreground">{ i18n.T(ctx, "Entities") }</p>
+					<p class="font-medium" x-text="previewDoc?.entity_count ?? 0"></p>
+				</div>
+				<div>
+					<p class="text-muted-foreground">{ i18n.T(ctx, "Created") }</p>
+					<p class="font-medium" x-text="timeAgo(previewDoc?.created_at)"></p>
+				</div>
+				<div>
+					<p class="text-muted-foreground">{ i18n.T(ctx, "Updated") }</p>
+					<p class="font-medium" x-text="timeAgo(previewDoc?.updated_at)"></p>
+				</div>
+			</div>
+		</div>
+		<!-- Content preview -->
+		<div class="flex-1 overflow-y-auto p-4">
+			<template x-if="previewLoading">
+				<div class="flex flex-col items-center justify-center h-32 gap-2 text-muted-foreground">
+					@icon.LoaderCircle(icon.Props{Class: "size-5 animate-spin"})
+					<span class="text-sm">{ i18n.T(ctx, "Loading content...") }</span>
+				</div>
+			</template>
+			<template x-if="!previewLoading && previewContent">
+				<pre class="text-sm whitespace-pre-wrap font-mono leading-relaxed text-foreground/90" x-text="previewContent"></pre>
+			</template>
+			<template x-if="!previewLoading && !previewContent">
+				<div class="flex flex-col items-center justify-center h-32 gap-2 text-muted-foreground">
+					@icon.FileWarning(icon.Props{Class: "size-8"})
+					<p class="text-sm">{ i18n.T(ctx, "No content available for preview") }</p>
+				</div>
+			</template>
+		</div>
+		<!-- Footer actions -->
+		<div class="border-t px-4 py-3 flex items-center gap-2">
+			@button.Button(button.Props{
+				Variant: button.VariantOutline,
+				Size:    button.SizeSm,
+				Attributes: templ.Attributes{
+					"@click": "detailDoc = previewDoc; document.getElementById('document-detail-dialog')?.showPopover()",
+				},
+			}) {
+				@icon.Info(icon.Props{Class: "size-3.5 me-1.5"})
+				{ i18n.T(ctx, "Details") }
+			}
+			<template x-if="previewDoc?.entity_count > 0">
+				@button.Button(button.Props{
+					Variant: button.VariantOutline,
+					Size:    button.SizeSm,
+					Attributes: templ.Attributes{
+						"@click": "viewInGraph(previewDoc)",
+					},
+				}) {
+					@icon.Network(icon.Props{Class: "size-3.5 me-1.5"})
+					{ i18n.T(ctx, "View in Graph") }
+				}
+			</template>
+			<div class="flex-1"></div>
+			@button.Button(button.Props{
+				Variant: button.VariantDestructive,
+				Size:    button.SizeSm,
+				Attributes: templ.Attributes{
+					"@click": "deleteDocument(previewDoc?.id); closePreview()",
+				},
+			}) {
+				@icon.Trash2(icon.Props{Class: "size-3.5 me-1.5"})
+				{ i18n.T(ctx, "Delete") }
+			}
+		</div>
+	</div>
+}

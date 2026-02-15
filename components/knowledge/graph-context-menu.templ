@@ -1,0 +1,49 @@
+package knowledge
+
+import "school-with-ai/components/icon"
+
+/**
+ * GraphContextMenu - Right-click context menu for graph nodes.
+ * Matches EdgeQuake edgequake_webui/src/components/graph/graph-context-menu.tsx
+ *
+ * Shows: View Details, Focus Node, Highlight Neighbors, Copy ID, Copy Label.
+ * Positioned at the click location using Alpine.js reactive coords.
+ */
+
+templ GraphContextMenu() {
+	<div
+		x-show="_graphContextMenu?.visible"
+		x-cloak
+		x-transition:enter="transition ease-out duration-100"
+		x-transition:enter-start="opacity-0 scale-95"
+		x-transition:enter-end="opacity-100 scale-100"
+		x-transition:leave="transition ease-in duration-75"
+		x-transition:leave-start="opacity-100 scale-100"
+		x-transition:leave-end="opacity-0 scale-95"
+		class="absolute z-50 min-w-[180px] rounded-lg border bg-background/95 backdrop-blur-sm shadow-lg py-1"
+		:style="`left: ${_graphContextMenu?.x || 0}px; top: ${_graphContextMenu?.y || 0}px`"
+		@click.outside="_graphContextMenu = {visible: false}"
+	>
+		<button @click="contextMenuAction('details')" class="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted transition-colors text-left">
+			@icon.Info(icon.Props{Class: "size-3.5 text-muted-foreground"})
+			<span>View Details</span>
+		</button>
+		<button @click="contextMenuAction('focus')" class="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted transition-colors text-left">
+			@icon.Focus(icon.Props{Class: "size-3.5 text-muted-foreground"})
+			<span>Focus Node</span>
+		</button>
+		<button @click="contextMenuAction('neighbors')" class="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted transition-colors text-left">
+			@icon.Network(icon.Props{Class: "size-3.5 text-muted-foreground"})
+			<span>Highlight Neighbors</span>
+		</button>
+		<div class="border-t my-1"></div>
+		<button @click="contextMenuAction('copyId')" class="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted transition-colors text-left">
+			@icon.Copy(icon.Props{Class: "size-3.5 text-muted-foreground"})
+			<span>Copy Entity ID</span>
+		</button>
+		<button @click="contextMenuAction('copyLabel')" class="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted transition-colors text-left">
+			@icon.Clipboard(icon.Props{Class: "size-3.5 text-muted-foreground"})
+			<span>Copy Label</span>
+		</button>
+	</div>
+}
