@@ -138,7 +138,7 @@ func TestService_List_Headers(t *testing.T) {
 	defer server.Close()
 
 	service := NewService(server.URL, nil)
-	_, err := service.List(context.Background(), tCtx, 1, 10)
+	_, err := service.List(context.Background(), tCtx, 1, 10, "")
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -176,7 +176,7 @@ func TestService_UploadAndListFlow(t *testing.T) {
 	}
 
 	// List
-	listResp, err := service.List(context.Background(), tCtx, 1, 10)
+	listResp, err := service.List(context.Background(), tCtx, 1, 10, "")
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -214,7 +214,7 @@ func TestService_ListPDFs(t *testing.T) {
 	defer server.Close()
 
 	service := NewService(server.URL, nil)
-	resp, err := service.ListPDFs(context.Background(), tCtx, 1, 10, "completed")
+	resp, err := service.ListPDFs(context.Background(), tCtx, 1, 10, "completed", "")
 	if err != nil {
 		t.Fatalf("ListPDFs failed: %v", err)
 	}

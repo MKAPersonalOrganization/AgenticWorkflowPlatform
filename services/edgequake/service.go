@@ -10,6 +10,9 @@ import (
 	"school-with-ai/domain"
 	"school-with-ai/services/rag/documents"
 	"school-with-ai/services/rag/folders"
+	"school-with-ai/services/rag/graph"
+	"school-with-ai/services/rag/models"
+	"school-with-ai/services/rag/pipeline"
 	"school-with-ai/services/rag/query"
 	"school-with-ai/services/rag/tenants"
 	"school-with-ai/services/rag/users"
@@ -33,6 +36,9 @@ type Service struct {
 	Tenants    *tenants.Service
 	Folders    *folders.Service
 	Users      *users.Service
+	Models     *models.Service
+	Pipeline   *pipeline.Service
+	Graph      *graph.Service
 }
 
 // NewService creates a new Edgequake service.
@@ -49,12 +55,20 @@ func NewService(baseURL string) *Service {
 		Tenants:    tenants.NewService(baseURL, httpClient),
 		Folders:    folders.NewService(baseURL, httpClient),
 		Users:      users.NewService(baseURL, httpClient),
+		Models:     models.NewService(baseURL, httpClient),
+		Pipeline:   pipeline.NewService(baseURL, httpClient),
+		Graph:      graph.NewService(baseURL, httpClient),
 	}
 }
 
 // ListDocuments retrieves a paginated list of documents from Edgequake.
-func (s *Service) ListDocuments(ctx context.Context, tCtx *domain.TenantContext, page, pageSize int) (*documents.ListDocumentsResponse, error) {
-	return s.Documents.List(ctx, tCtx, page, pageSize)
+func (s *Service) ListDocuments(ctx context.Context, tCtx *domain.TenantContext, page, pageSize int, status string) (*documents.ListDocumentsResponse, error) {
+	return s.Documents.List(ctx, tCtx, page, pageSize, status)
+}
+
+// GetDocument retrieves a single document by ID.
+func (s *Service) GetDocument(ctx context.Context, tCtx *domain.TenantContext, documentID string) (*documents.DocumentDetail, error) {
+	return s.Documents.Get(ctx, tCtx, documentID)
 }
 
 // UploadDocument uploads a document to Edgequake.
@@ -63,8 +77,8 @@ func (s *Service) UploadDocument(ctx context.Context, tCtx *domain.TenantContext
 }
 
 // ListPDFs retrieves a paginated list of PDFs from Edgequake.
-func (s *Service) ListPDFs(ctx context.Context, tCtx *domain.TenantContext, page, pageSize int, status string) (*documents.ListPdfsResponse, error) {
-	return s.Documents.ListPDFs(ctx, tCtx, page, pageSize, status)
+func (s *Service) ListPDFs(ctx context.Context, tCtx *domain.TenantContext, page, pageSize int, status string, search string) (*documents.ListPdfsResponse, error) {
+	return s.Documents.ListPDFs(ctx, tCtx, page, pageSize, status, search)
 }
 
 // UploadPDF uploads a PDF document to Edgequake.
@@ -90,6 +104,61 @@ func (s *Service) GetPDFStatus(ctx context.Context, tCtx *domain.TenantContext, 
 // GetPDFContent retrieves the content of a specific PDF.
 func (s *Service) GetPDFContent(ctx context.Context, tCtx *domain.TenantContext, pdfID string) (*documents.PdfContentResponse, error) {
 	return s.Documents.GetPDFContent(ctx, tCtx, pdfID)
+}
+
+// ReprocessDocument triggers reprocessing for a single document.
+func (s *Service) ReprocessDocument(ctx context.Context, tCtx *domain.TenantContext, documentID string) (*documents.ReprocessResponse, error) {
+	return s.Documents.Reprocess(ctx, tCtx, documentID)
+}
+
+// DeleteDocument deletes an ingested document.
+func (s *Service) DeleteDocument(ctx context.Context, tCtx *domain.TenantContext, documentID string) error {
+	return s.Documents.Delete(ctx, tCtx, documentID)
+}
+
+// ReprocessFailedDocuments triggers reprocessing for all failed documents.
+func (s *Service) ReprocessFailedDocuments(ctx context.Context, tCtx *domain.TenantContext) (*documents.ReprocessFailedResponse, error) {
+	return s.Documents.ReprocessFailed(ctx, tCtx)
+}
+
+// ScanDocuments triggers scanning of the input directory for new documents.
+func (s *Service) ScanDocuments(ctx context.Context, tCtx *domain.TenantContext, path string) (*documents.ScanDocumentsResponse, error) {
+	return s.Documents.ScanDocuments(ctx, tCtx, path)
+}
+
+// DeleteAllDocuments deletes all documents from the workspace.
+func (s *Service) DeleteAllDocuments(ctx context.Context, tCtx *domain.TenantContext) (*documents.DeleteAllDocumentsResponse, error) {
+	return s.Documents.DeleteAll(ctx, tCtx)
+}
+
+// RetryTask retries a failed pipeline task.
+func (s *Service) RetryTask(ctx context.Context, tCtx *domain.TenantContext, taskID string) (*documents.TaskRetryResponse, error) {
+	return s.Documents.RetryTask(ctx, tCtx, taskID)
+}
+
+// RetryPdfProcessing retries a failed PDF processing.
+func (s *Service) RetryPdfProcessing(ctx context.Context, tCtx *domain.TenantContext, pdfID string) (*documents.PdfRetryResponse, error) {
+	return s.Documents.RetryPdfProcessing(ctx, tCtx, pdfID)
+}
+
+// GetEnhancedPipelineStatus retrieves the enhanced pipeline status.
+func (s *Service) GetEnhancedPipelineStatus(ctx context.Context, tCtx *domain.TenantContext) (*pipeline.EnhancedPipelineStatusResponse, error) {
+	return s.Pipeline.Status(ctx, tCtx)
+}
+
+// GetQueueMetrics retrieves queue metrics.
+func (s *Service) GetQueueMetrics(ctx context.Context, tCtx *domain.TenantContext) (*pipeline.QueueMetricsResponse, error) {
+	return s.Pipeline.Metrics(ctx, tCtx)
+}
+
+// CancelPipeline requests cancellation of the entire pipeline.
+func (s *Service) CancelPipeline(ctx context.Context, tCtx *domain.TenantContext) (*pipeline.CancelPipelineResponse, error) {
+	return s.Pipeline.Cancel(ctx, tCtx)
+}
+
+// GetPipelineTasks retrieves the current tasks in the pipeline.
+func (s *Service) GetPipelineTasks(ctx context.Context, tCtx *domain.TenantContext, page, pageSize int) (*documents.TaskListResponse, error) {
+	return s.Documents.GetPipelineTasks(ctx, tCtx, page, pageSize)
 }
 
 // ExecuteQuery performs a standard RAG query.
@@ -132,6 +201,21 @@ func (s *Service) UpdateWorkspace(ctx context.Context, tCtx *domain.TenantContex
 	return s.Workspaces.Update(ctx, tCtx, workspaceID, req)
 }
 
+// RebuildKnowledgeGraph clears the knowledge graph and triggers a rebuild.
+func (s *Service) RebuildKnowledgeGraph(ctx context.Context, tCtx *domain.TenantContext, workspaceID uuid.UUID, req *workspaces.RebuildKnowledgeGraphRequest) (*workspaces.RebuildKnowledgeGraphResponse, error) {
+	return s.Workspaces.RebuildGraph(ctx, tCtx, workspaceID, req)
+}
+
+// RebuildEmbeddings clears all embeddings and triggers a re-indexing.
+func (s *Service) RebuildEmbeddings(ctx context.Context, tCtx *domain.TenantContext, workspaceID uuid.UUID, req *workspaces.RebuildEmbeddingsRequest) (*workspaces.RebuildEmbeddingsResponse, error) {
+	return s.Workspaces.RebuildEmbeddings(ctx, tCtx, workspaceID, req)
+}
+
+// ReprocessAllDocuments triggers reprocessing for all documents in the workspace.
+func (s *Service) ReprocessAllDocuments(ctx context.Context, tCtx *domain.TenantContext, workspaceID uuid.UUID) error {
+	return s.Workspaces.ReprocessAllDocuments(ctx, tCtx, workspaceID)
+}
+
 // ListTenants retrieves all tenants from Edgequake.
 func (s *Service) ListTenants(ctx context.Context, page, pageSize int) (*tenants.TenantListResponse, error) {
 	return s.Tenants.List(ctx, page, pageSize)
@@ -157,6 +241,11 @@ func (s *Service) DeleteTenant(ctx context.Context, tenantID uuid.UUID) error {
 	return s.Tenants.Delete(ctx, tenantID)
 }
 
+// CancelPipelineTask cancels a document processing task.
+func (s *Service) CancelPipelineTask(ctx context.Context, tCtx *domain.TenantContext, taskID string) error {
+	return s.Documents.CancelTask(ctx, tCtx, taskID)
+}
+
 // ListFolders lists all folders.
 func (s *Service) ListFolders(ctx context.Context, tCtx *domain.TenantContext) ([]folders.FolderResponse, error) {
 	return s.Folders.List(ctx, tCtx)
@@ -175,4 +264,44 @@ func (s *Service) DeleteFolder(ctx context.Context, tCtx *domain.TenantContext, 
 // UpdateFolder updates an existing folder.
 func (s *Service) UpdateFolder(ctx context.Context, tCtx *domain.TenantContext, folderID uuid.UUID, req *folders.UpdateFolderRequest) (*folders.FolderResponse, error) {
 	return s.Folders.Update(ctx, tCtx, folderID, req)
+}
+
+// ListLLMModels retrieving available LLM models
+func (s *Service) ListLLMModels(ctx context.Context) (*models.LlmModelsResponse, error) {
+	return s.Models.ListLLM(ctx)
+}
+
+// ListEmbeddingModels retrieving available embedding models
+func (s *Service) ListEmbeddingModels(ctx context.Context) (*models.EmbeddingModelsResponse, error) {
+	return s.Models.ListEmbedding(ctx)
+}
+
+// GetGraph retrieves the knowledge graph.
+func (s *Service) GetGraph(ctx context.Context, tCtx *domain.TenantContext, params *graph.GraphQueryParams) (*graph.KnowledgeGraphResponse, error) {
+	tc := *tCtx
+	return s.Graph.GetGraph(ctx, tc, params)
+}
+
+// GetGraphNode retrieves a specific graph node by ID.
+func (s *Service) GetGraphNode(ctx context.Context, tCtx *domain.TenantContext, nodeID string) (*graph.GraphNodeResponse, error) {
+	tc := *tCtx
+	return s.Graph.GetNode(ctx, tc, nodeID)
+}
+
+// SearchGraphNodes searches for nodes matching a query.
+func (s *Service) SearchGraphNodes(ctx context.Context, tCtx *domain.TenantContext, q string, limit int) (*graph.SearchNodesResponse, error) {
+	tc := *tCtx
+	return s.Graph.SearchNodes(ctx, tc, q, limit)
+}
+
+// GetPopularLabels retrieves popular graph labels.
+func (s *Service) GetPopularLabels(ctx context.Context, tCtx *domain.TenantContext, limit int) (*graph.PopularLabelsResponse, error) {
+	tc := *tCtx
+	return s.Graph.GetPopularLabels(ctx, tc, limit)
+}
+
+// SearchGraphLabels searches for graph labels matching a query.
+func (s *Service) SearchGraphLabels(ctx context.Context, tCtx *domain.TenantContext, q string, limit int) (*graph.SearchLabelsResponse, error) {
+	tc := *tCtx
+	return s.Graph.SearchLabels(ctx, tc, q, limit)
 }
