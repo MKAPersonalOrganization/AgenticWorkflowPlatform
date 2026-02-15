@@ -1102,6 +1102,30 @@ func (h *Handler) SearchGraphLabels(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, result)
 }
 
+// ListLLMModels returns available LLM models for workspace creation.
+func (h *Handler) ListLLMModels(w http.ResponseWriter, r *http.Request) {
+	models, err := h.edgequakeService.ListLLMModels(r.Context())
+	if err != nil {
+		h.log.Error(r.Context(), "failed to list LLM models", "error", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to load LLM models"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, models)
+}
+
+// ListEmbeddingModels returns available embedding models for workspace creation.
+func (h *Handler) ListEmbeddingModels(w http.ResponseWriter, r *http.Request) {
+	models, err := h.edgequakeService.ListEmbeddingModels(r.Context())
+	if err != nil {
+		h.log.Error(r.Context(), "failed to list embedding models", "error", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to load embedding models"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, models)
+}
+
 func writeJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
