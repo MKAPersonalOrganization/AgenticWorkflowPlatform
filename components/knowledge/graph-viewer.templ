@@ -11,14 +11,24 @@ package knowledge
 import (
 	"school-with-ai/components/i18n"
 	"school-with-ai/components/icon"
+	"school-with-ai/components/separator"
+	"school-with-ai/components/tooltip"
 )
 
 templ GraphViewer() {
 	<div class="flex flex-col h-full overflow-hidden">
 		<!-- Graph Toolbar -->
 		@GraphToolbar()
+		<!-- Keyboard Shortcuts Dialog (rendered outside toolbar to avoid stacking context issues) -->
+		@KeyboardShortcutsDialog()
 		<!-- Main Content Area -->
-		<div class="flex-1 relative overflow-hidden bg-background text-foreground" data-graph-container>
+		<div
+			class="flex-1 relative overflow-hidden bg-background text-foreground"
+			data-graph-container
+			data-tour="graph-canvas"
+			role="application"
+			aria-label="Knowledge Graph Visualization - use Tab to navigate nodes, Enter to focus, Escape to deselect"
+		>
 			<!-- Loading state overlays -->
 			<div x-show="graphLoading" class="absolute inset-0 z-50 flex items-center justify-center bg-background/50 backdrop-blur-sm">
 				@GraphLoadingOverlay()
@@ -49,16 +59,20 @@ templ GraphViewer() {
 				<div class="flex-1 relative overflow-hidden" id="graph-container">
 					<div id="sigma-container" class="w-full h-full" style="display: block; position: relative; min-height: 400px;"></div>
 					<!-- Overlays -->
-					<div class="absolute inset-0 pointer-events-none z-20">
-						<div class="pointer-events-auto">
-							@ZoomControls()
-							@GraphControls()
-							@GraphLegend()
-							@GraphMinimap()
-						</div>
+					<div class="absolute top-4 left-4 flex flex-col gap-2 z-20">
+						@GraphControls()
+					</div>
+					<div class="absolute top-4 right-4 flex flex-col gap-2">
+						@ZoomControls()
+					</div>
+					<div class="absolute bottom-4 right-4">
+						@GraphLegend()
+					</div>
+					<div class="absolute top-20 left-4 z-10">
+						@GraphMinimap()
 					</div>
 					<!-- Truncation banner -->
-					<div class="absolute top-4 left-1/2 -translate-x-1/2 z-30">
+					<div class="absolute bottom-4 left-1/2 -translate-x-1/2 z-30">
 						@TruncationBanner()
 					</div>
 				</div>
@@ -70,84 +84,95 @@ templ GraphViewer() {
 }
 
 templ GraphToolbar() {
-	<header class="flex items-center justify-between border-b px-4 py-2 shrink-0 bg-card/50 backdrop-blur-sm">
+	<header class="flex items-center justify-between border-b px-4 py-2 shrink-0 bg-card/50 backdrop-blur-sm" data-tour="graph-header">
 		<div class="flex items-center gap-2.5">
 			<h2 class="text-base font-semibold tracking-tight">{ i18n.T(ctx, "Knowledge Graph") }</h2>
 			<!-- Loading pulse -->
-			<div x-show="graphLoading" class="size-2 rounded-full bg-primary animate-pulse"></div>
+			<div x-show="graphLoading" class="size-3.5">
+				@icon.Loader(icon.Props{Class: "size-3.5 animate-spin text-muted-foreground"})
+			</div>
 			<!-- Node/Edge counts -->
-			<div x-show="graphData" x-cloak class="flex items-center gap-1.5 text-[11px] text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-md border border-border/30">
+			<div x-show="graphData" x-cloak class="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-md">
 				<span x-text="(graphData?.nodes?.length || 0).toLocaleString() + ' nodes'"></span>
-				<span class="opacity-30">•</span>
+				<span class="opacity-50">· </span>
 				<span x-text="(graphData?.edges?.length || 0).toLocaleString() + ' edges'"></span>
 			</div>
 		</div>
-		<div class="flex items-center gap-1.5">
-			@GraphSearch()
+		<div class="flex items-center gap-1" data-tour="graph-toolbar-actions">
+			<div data-tour="graph-search">
+				@GraphSearch()
+			</div>
 			@TruncationIndicator()
-			<div class="w-px h-5 bg-border mx-1"></div>
-			<!-- Layout Selector -->
-			<div class="relative group">
-				<div class="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground group-hover:text-primary transition-colors">
-					@icon.GitBranch(icon.Props{Class: "size-3"})
-				</div>
-				<select
-					class="h-8 rounded-md border border-input bg-background pl-8 pr-8 text-[11px] font-medium shadow-sm transition-all hover:bg-accent hover:border-primary/30 focus:outline-none focus:ring-1 focus:ring-ring appearance-none min-w-[120px]"
-					x-model="graphLayout"
-					@change="applyLayout()"
-				>
-					<option value="force-atlas">Force Atlas (FA2)</option>
-					<option value="force-directed">Force-Directed</option>
-					<option value="circular">Circular</option>
-					<option value="circlepack">Circle Pack</option>
-					<option value="random">Random</option>
-					<option value="noverlap">No Overlap</option>
-					<option value="hierarchical">Hierarchical</option>
-				</select>
-				<div class="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground opacity-50">
-					@icon.ChevronDown(icon.Props{Class: "size-3"})
-				</div>
+			<div data-tour="keyboard-help">
+				@KeyboardShortcutsHelp()
 			</div>
-			<div class="w-px h-5 bg-border mx-1"></div>
-			<!-- New Advanced Settings Panel -->
-			@GraphSettingsPanel()
-			<div class="w-px h-5 bg-border mx-1"></div>
-			<!-- Help Button -->
-			<button
-				@click="$dispatch('open-dialog', 'graph-shortcuts-help')"
-				class="flex items-center justify-center h-8 w-8 rounded-md border bg-background hover:bg-accent hover:text-accent-foreground transition-all duration-200"
-				title={ i18n.T(ctx, "Show keyboard shortcuts") }
-			>
-				@icon.Info(icon.Props{Class: "size-4"})
-			</button>
-			<!-- Keyboard Shortcuts Dialog -->
-			@KeyboardShortcutsHelp()
-			<!-- Toolbar Buttons -->
-			<div class="flex items-center bg-muted/30 rounded-md p-0.5 border">
-				<button
-					@click="graphExportPNG()"
-					class="inline-flex items-center justify-center rounded-sm text-sm font-medium transition-colors hover:bg-background hover:shadow-sm h-7 w-7"
-					title="Export PNG"
-				>
-					@icon.Image(icon.Props{Class: "size-3.5"})
-				</button>
-				<button
-					@click="graphExportJSON()"
-					class="inline-flex items-center justify-center rounded-sm text-sm font-medium transition-colors hover:bg-background hover:shadow-sm h-7 w-7"
-					title="Export JSON"
-				>
-					@icon.Download(icon.Props{Class: "size-3.5"})
-				</button>
-				<div class="w-px h-4 bg-border mx-0.5"></div>
-				<button
-					@click="loadGraph()"
-					class="inline-flex items-center justify-center rounded-sm text-sm font-medium transition-colors hover:bg-background hover:shadow-sm h-7 w-7"
-					:class="{ 'animate-spin': graphLoading }"
-					title="Reload Graph"
-				>
-					@icon.RefreshCw(icon.Props{Class: "size-3.5"})
-				</button>
-			</div>
+			@separator.Separator(separator.Props{Orientation: separator.OrientationVertical, Class: "h-5 mx-1"})
+			@tooltip.Tooltip() {
+				@tooltip.Trigger(tooltip.TriggerProps{}) {
+					<button
+						@click="loadGraph()"
+						class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted h-7 w-7"
+						:class="{ 'animate-spin': graphLoading }"
+					>
+						@icon.RefreshCw(icon.Props{Class: "size-3.5"})
+					</button>
+				}
+				@tooltip.Content(tooltip.ContentProps{}) {
+					Refresh
+				}
+			}
+			@tooltip.Tooltip() {
+				@tooltip.Trigger(tooltip.TriggerProps{}) {
+					<button
+						@click="graphZoomIn()"
+						class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted h-7 w-7"
+					>
+						@icon.ZoomIn(icon.Props{Class: "size-3.5"})
+					</button>
+				}
+				@tooltip.Content(tooltip.ContentProps{}) {
+					Zoom In
+				}
+			}
+			@tooltip.Tooltip() {
+				@tooltip.Trigger(tooltip.TriggerProps{}) {
+					<button
+						@click="graphZoomOut()"
+						class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted h-7 w-7"
+					>
+						@icon.ZoomOut(icon.Props{Class: "size-3.5"})
+					</button>
+				}
+				@tooltip.Content(tooltip.ContentProps{}) {
+					Zoom Out
+				}
+			}
+			@tooltip.Tooltip() {
+				@tooltip.Trigger(tooltip.TriggerProps{}) {
+					<button
+						@click="graphExportPNG()"
+						class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted h-7 w-7"
+					>
+						@icon.Image(icon.Props{Class: "size-3.5"})
+					</button>
+				}
+				@tooltip.Content(tooltip.ContentProps{}) {
+					Export PNG
+				}
+			}
+			@tooltip.Tooltip() {
+				@tooltip.Trigger(tooltip.TriggerProps{}) {
+					<button
+						@click="graphExportJSON()"
+						class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted h-7 w-7"
+					>
+						@icon.Download(icon.Props{Class: "size-3.5"})
+					</button>
+				}
+				@tooltip.Content(tooltip.ContentProps{}) {
+					Export JSON
+				}
+			}
 		</div>
 	</header>
 }

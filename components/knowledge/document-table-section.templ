@@ -64,6 +64,7 @@ templ DocumentTableSection() {
 									class="rounded border-input text-primary focus:ring-primary size-3.5"
 									@change="toggleSelectAllDocs($event.target.checked)"
 									:checked="selectedDocs.length > 0 && selectedDocs.length === filteredDocuments.filter(d => isTerminalStatus(d.status)).length"
+									aria-label="Select all documents"
 								/>
 							</th>
 							<th class="h-10 px-3 align-middle font-medium text-muted-foreground">{ i18n.T(ctx, "Title") }</th>
@@ -71,7 +72,7 @@ templ DocumentTableSection() {
 							<th class="h-10 px-3 align-middle font-medium text-muted-foreground text-center">{ i18n.T(ctx, "Entities") }</th>
 							<th class="h-10 px-3 align-middle font-medium text-muted-foreground text-center">{ i18n.T(ctx, "Cost") }</th>
 							<th class="h-10 px-3 align-middle font-medium text-muted-foreground">{ i18n.T(ctx, "Created") }</th>
-							<th class="h-10 px-3 align-middle font-medium text-muted-foreground w-25"></th>
+							<th class="h-10 px-3 align-middle font-medium text-muted-foreground w-25"><span class="sr-only">Actions</span></th>
 						</tr>
 					</thead>
 					<tbody class="[&_tr:last-child]:border-0">

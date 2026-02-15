@@ -7,6 +7,7 @@ import (
 	"school-with-ai/components/icon"
 	"school-with-ai/components/input"
 	"school-with-ai/components/nav"
+	"school-with-ai/components/popover"
 	"school-with-ai/components/progress"
 	"school-with-ai/components/tabs"
 	"school-with-ai/domain"
@@ -77,6 +78,7 @@ templ knowledgeLayout(props knowledgeLayoutProps) {
 			</script>
 			@input.Script()
 			@dialog.Script()
+			@popover.Script()
 			@tabs.Script()
 			@progress.Script()
 			<!-- Graphology + Sigma.js for Knowledge Graph (WebGL) -->

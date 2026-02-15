@@ -17,7 +17,12 @@ import (
 
 templ DocumentDetailDialog() {
 	@dialog.Dialog(dialog.Props{ID: "document-detail-dialog"}) {
-		@dialog.Content(dialog.ContentProps{Class: "sm:max-w-2xl max-h-[85vh] overflow-y-auto"}) {
+		@dialog.Content(dialog.ContentProps{
+			Class: "max-h-[90vh] overflow-y-auto",
+			Attributes: templ.Attributes{
+				":class": "(detailDoc?.pdf_id || detailDoc?.file_name?.toLowerCase().endsWith('.pdf')) ? 'sm:max-w-4xl' : 'sm:max-w-2xl'",
+			},
+		}) {
 			@dialog.Header(dialog.HeaderProps{}) {
 				@dialog.Title(dialog.TitleProps{Class: "flex items-center gap-2"}) {
 					@icon.FileText(icon.Props{Class: "size-5"})
@@ -37,23 +42,23 @@ templ DocumentDetailDialog() {
 				@tabs.List(tabs.ListProps{
 					Class: "grid w-full",
 					Attributes: templ.Attributes{
-						":class": "detailDoc?.file_name?.toLowerCase().endsWith('.pdf') ? 'grid-cols-4' : 'grid-cols-3'",
+						":class": "(detailDoc?.pdf_id || detailDoc?.file_name?.toLowerCase().endsWith('.pdf')) ? 'grid-cols-4' : 'grid-cols-3'",
 					},
 				}) {
 					@tabs.Trigger(tabs.TriggerProps{Value: "overview", IsActive: true}) {
 						{ i18n.T(ctx, "Overview") }
 					}
+					<template x-if="detailDoc?.pdf_id || detailDoc?.file_name?.toLowerCase().endsWith('.pdf')">
+						@tabs.Trigger(tabs.TriggerProps{Value: "source"}) {
+							{ i18n.T(ctx, "Source") }
+						}
+					</template>
 					@tabs.Trigger(tabs.TriggerProps{Value: "content"}) {
 						{ i18n.T(ctx, "Content") }
 					}
 					@tabs.Trigger(tabs.TriggerProps{Value: "entities"}) {
 						{ i18n.T(ctx, "Entities") }
 					}
-					<template x-if="detailDoc?.file_name?.toLowerCase().endsWith('.pdf')">
-						@tabs.Trigger(tabs.TriggerProps{Value: "source"}) {
-							{ i18n.T(ctx, "Source") }
-						}
-					</template>
 				}
 				@tabs.Content(tabs.ContentProps{Value: "overview"}) {
 					<div class="mt-4 space-y-4">
@@ -66,12 +71,16 @@ templ DocumentDetailDialog() {
 									<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "Document ID") }</p>
 									<div class="flex items-center gap-1">
 										<code class="text-xs" x-text="(detailDoc?.id || '').slice(0, 12) + '...'"></code>
-										<button
-											@click="navigator.clipboard.writeText(detailDoc?.id || '')"
-											class="inline-flex items-center justify-center rounded-md h-6 w-6 hover:bg-muted transition-colors"
-										>
+										@button.Button(button.Props{
+											Variant: button.VariantGhost,
+											Size:    button.SizeIcon,
+											Class:   "h-6 w-6",
+											Attributes: templ.Attributes{
+												"@click": "navigator.clipboard.writeText(detailDoc?.id || ''); showToast && showToast('Copied!')",
+											},
+										}) {
 											@icon.Copy(icon.Props{Class: "size-3"})
-										</button>
+										}
 									</div>
 								</div>
 							</div>
@@ -142,6 +151,17 @@ templ DocumentDetailDialog() {
 						</div>
 					</div>
 				}
+				@tabs.Content(tabs.ContentProps{Value: "source"}) {
+					<div class="mt-4">
+						<template x-if="detailDoc?.pdf_id || detailDoc?.file_name?.toLowerCase().endsWith('.pdf')">
+							@PDFMarkdownSplitView(PDFMarkdownSplitViewProps{
+								PDFURL:   "'/api/knowledge/pdfs/' + detailDoc.pdf_id + '/download?workspace_id=' + workspaceId",
+								Markdown: "detailDoc?.content || previewContent",
+								Height:   450,
+							})
+						</template>
+					</div>
+				}
 				@tabs.Content(tabs.ContentProps{Value: "content"}) {
 					<div class="mt-4">
 						<template x-if="detailDoc?.content || previewContent">
@@ -185,17 +205,6 @@ templ DocumentDetailDialog() {
 							<p class="text-muted-foreground text-sm text-center py-8">
 								{ i18n.T(ctx, "No entities extracted yet") }
 							</p>
-						</template>
-					</div>
-				}
-				@tabs.Content(tabs.ContentProps{Value: "source"}) {
-					<div class="mt-4">
-						<template x-if="detailDoc?.file_name?.toLowerCase().endsWith('.pdf')">
-							@PDFMarkdownSplitView(PDFMarkdownSplitViewProps{
-								PDFURL:    "'/api/knowledge/pdfs/' + detailDoc.pdf_id + '/download?workspace_id=' + workspaceId",
-								Markdown: "detailDoc?.content || previewContent",
-								Height:   450,
-							})
 						</template>
 					</div>
 				}

@@ -11,8 +11,11 @@ package knowledge
 import (
 	"school-with-ai/components/badge"
 	"school-with-ai/components/button"
+	"school-with-ai/components/dialog"
 	"school-with-ai/components/i18n"
 	"school-with-ai/components/icon"
+	"school-with-ai/components/input"
+	"school-with-ai/components/label"
 )
 
 templ DocumentHeader() {
@@ -89,20 +92,72 @@ templ DocumentHeader() {
 				</span>
 				{ i18n.T(ctx, "Refresh") }
 			}
-			<!-- Clear All Documents -->
-			@button.Button(button.Props{
-				Variant: button.VariantOutline,
-				Size:    button.SizeSm,
-				Class:   "text-destructive border-destructive/50 hover:bg-destructive/10",
-				Attributes: templ.Attributes{
-					"@click":    "deleteAllDocuments()",
-					":disabled": "deletingAllDocs",
-					"x-show":    "totalCount > 0",
-				},
-			}) {
-				@icon.Trash2(icon.Props{Class: "size-4 me-1"})
-				{ i18n.T(ctx, "Clear All") }
-			}
+			<!-- Clear All Documents (with confirmation dialog) -->
+			<span x-show="totalCount > 0" x-cloak>
+				@button.Button(button.Props{
+					Variant: button.VariantDestructive,
+					Size:    button.SizeSm,
+					Attributes: templ.Attributes{
+						"@click":    "window.tui.dialog.open('clear-all-dialog')",
+						":disabled": "deletingAllDocs",
+					},
+				}) {
+					@icon.Trash2(icon.Props{Class: "size-4 me-1"})
+					{ i18n.T(ctx, "Clear All") }
+				}
+			</span>
 		</div>
 	</header>
+	<!-- Clear All Confirmation Dialog -->
+	@dialog.Dialog(dialog.Props{ID: "clear-all-dialog"}) {
+		@dialog.Content(dialog.ContentProps{Class: "sm:max-w-md"}) {
+			@dialog.Header(dialog.HeaderProps{}) {
+				@dialog.Title(dialog.TitleProps{Class: "flex items-center gap-2 text-destructive"}) {
+					@icon.TriangleAlert(icon.Props{Class: "size-5"})
+					{ i18n.T(ctx, "Delete All Documents") }
+				}
+				@dialog.Description(dialog.DescriptionProps{Class: "space-y-3"}) {
+					<p>{ i18n.T(ctx, "This action cannot be undone. This will permanently delete:") }</p>
+					<ul class="list-disc list-inside space-y-1 text-sm">
+						<li><span x-text="totalCount"></span> { i18n.T(ctx, "document(s)") }</li>
+						<li>{ i18n.T(ctx, "All extracted entities and relationships") }</li>
+						<li>{ i18n.T(ctx, "All document chunks and embeddings") }</li>
+					</ul>
+					<div class="pt-2" x-data="{ clearConfirmation: '' }">
+						@label.Label(label.Props{For: "clear-confirmation", Class: "text-sm font-medium"}) {
+							{ i18n.T(ctx, "Type DELETE ALL to confirm:") }
+						}
+						@input.Input(input.Props{
+							ID:          "clear-confirmation",
+							Placeholder: "DELETE ALL",
+							Class:       "mt-2",
+							Attributes: templ.Attributes{
+								"x-model":      "clearConfirmation",
+								"autocomplete": "off",
+							},
+						})
+						<div class="flex justify-end gap-2 pt-4">
+							@dialog.Close(dialog.CloseProps{}) {
+								@button.Button(button.Props{Variant: button.VariantOutline}) {
+									{ i18n.T(ctx, "Cancel") }
+								}
+							}
+							@button.Button(button.Props{
+								Class: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+								Attributes: templ.Attributes{
+									"@click":    "if (clearConfirmation === 'DELETE ALL') { deleteAllDocuments(); window.tui.dialog.close('clear-all-dialog'); clearConfirmation = ''; }",
+									":disabled": "clearConfirmation !== 'DELETE ALL' || deletingAllDocs",
+								},
+							}) {
+								<template x-if="deletingAllDocs">
+									@icon.LoaderCircle(icon.Props{Class: "size-4 me-2 animate-spin"})
+								</template>
+								<span x-text="deletingAllDocs ? 'Deleting...' : 'Delete All Documents'"></span>
+							}
+						</div>
+					</div>
+				}
+			}
+		}
+	}
 }
