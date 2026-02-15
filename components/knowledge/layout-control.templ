@@ -1,0 +1,21 @@
+package knowledge
+
+/**
+ * LayoutControl - Graph layout selector dropdown.
+ * Matches EdgeQuake edgequake_webui/src/components/graph/layout-control.tsx
+ *
+ * Provides: Force Atlas, Force Directed, Circular, Hierarchical layout options.
+ */
+
+templ LayoutControl() {
+	<select
+		class="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+		x-model="graphLayout"
+		@change="applyLayout()"
+	>
+		<option value="force-atlas">Force Atlas</option>
+		<option value="force-directed">Force Directed</option>
+		<option value="circular">Circular</option>
+		<option value="hierarchical">Hierarchical</option>
+	</select>
+}

@@ -1,0 +1,44 @@
+package knowledge
+
+import "school-with-ai/components/icon"
+
+/**
+ * ZoomControls - Zoom in/out/fit/fullscreen buttons for the graph.
+ * Matches EdgeQuake edgequake_webui/src/components/graph/zoom-controls.tsx
+ *
+ * Positioned absolute top-right of the graph canvas.
+ */
+
+templ ZoomControls() {
+	<div class="absolute top-3 right-3 flex flex-col gap-1 bg-background/90 backdrop-blur-sm border rounded-lg shadow-sm p-1">
+		<button
+			@click="graphZoomIn()"
+			class="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors"
+			title="Zoom In (+)"
+		>
+			@icon.ZoomIn(icon.Props{Class: "size-4"})
+		</button>
+		<button
+			@click="graphZoomOut()"
+			class="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors"
+			title="Zoom Out (-)"
+		>
+			@icon.ZoomOut(icon.Props{Class: "size-4"})
+		</button>
+		<div class="border-t my-0.5"></div>
+		<button
+			@click="graphResetCamera()"
+			class="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors"
+			title="Fit to View (0)"
+		>
+			@icon.Maximize2(icon.Props{Class: "size-4"})
+		</button>
+		<button
+			@click="graphToggleFullscreen()"
+			class="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors"
+			title="Fullscreen (F)"
+		>
+			@icon.Expand(icon.Props{Class: "size-4"})
+		</button>
+	</div>
+}

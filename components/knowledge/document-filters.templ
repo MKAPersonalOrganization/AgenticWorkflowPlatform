@@ -1,0 +1,80 @@
+package knowledge
+
+/**
+ * DocumentFilters - Filter/sort controls for document listing.
+ * Matches EdgeQuake edgequake_webui/src/components/documents/document-filters.tsx
+ *
+ * Status dropdown (with counts) and sort toggle buttons with direction arrows.
+ */
+
+import (
+	"school-with-ai/components/i18n"
+	"school-with-ai/components/icon"
+)
+
+templ DocumentFilters() {
+	<div class="flex flex-wrap items-center gap-3">
+		<!-- Status Filter Select -->
+		<select
+			class="h-10 w-40 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+			x-model="docStatusFilter"
+			@change="filterByStatus(docStatusFilter)"
+		>
+			<option value="">
+				{ i18n.T(ctx, "All") }
+			</option>
+			<option value="pending">
+				{ i18n.T(ctx, "Pending") }
+			</option>
+			<option value="processing">
+				{ i18n.T(ctx, "Processing") }
+			</option>
+			<option value="completed">
+				{ i18n.T(ctx, "Completed") }
+			</option>
+			<option value="failed">
+				{ i18n.T(ctx, "Failed") }
+			</option>
+			<option value="partial_failure">
+				{ i18n.T(ctx, "Partial Failure") }
+			</option>
+			<option value="cancelled">
+				{ i18n.T(ctx, "Cancelled") }
+			</option>
+		</select>
+		<!-- Separator -->
+		<div class="h-6 w-px bg-border hidden sm:block"></div>
+		<!-- Sort Controls -->
+		<div class="flex items-center gap-1.5">
+			<span class="text-sm text-muted-foreground whitespace-nowrap">
+				{ i18n.T(ctx, "Sort by") }
+			</span>
+			<button
+				@click="toggleSort('created_at')"
+				class="inline-flex items-center gap-1 rounded-md px-3 h-9 text-sm font-medium transition-colors"
+				:class="sortField === 'created_at' ? 'bg-secondary text-secondary-foreground' : 'hover:bg-muted text-muted-foreground'"
+			>
+				{ i18n.T(ctx, "Created") }
+				<template x-if="sortField === 'created_at' && sortDirection === 'asc'">
+					@icon.ArrowUp(icon.Props{Class: "size-3"})
+				</template>
+				<template x-if="sortField === 'created_at' && sortDirection === 'desc'">
+					@icon.ArrowDown(icon.Props{Class: "size-3"})
+				</template>
+			</button>
+			<button
+				@click="toggleSort('updated_at')"
+				class="inline-flex items-center gap-1 rounded-md px-3 h-9 text-sm font-medium transition-colors"
+				:class="sortField === 'updated_at' ? 'bg-secondary text-secondary-foreground' : 'hover:bg-muted text-muted-foreground'"
+			>
+				{ i18n.T(ctx, "Updated") }
+				<template x-if="sortField === 'updated_at' && sortDirection === 'asc'">
+					@icon.ArrowUp(icon.Props{Class: "size-3"})
+				</template>
+				<template x-if="sortField === 'updated_at' && sortDirection === 'desc'">
+					@icon.ArrowDown(icon.Props{Class: "size-3"})
+				</template>
+			</button>
+		</div>
+	</div>
+}

@@ -1,0 +1,72 @@
+package knowledge
+
+/**
+ * StatusBadge - Status badge component for documents with icons and colors.
+ * Matches EdgeQuake edgequake_webui/src/components/documents/status-badge.tsx
+ *
+ * Maps 18+ statuses (unified pipeline stages + legacy) to distinct icon/color configs.
+ * For processing statuses, shows stage-specific styling with pulse animation.
+ */
+
+templ StatusBadge() {
+	<!-- Rendered via Alpine.js x-html binding from statusBadgeHtml(doc) -->
+	<span
+		class="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium cursor-default"
+		:class="statusBadgeClass(doc.current_stage || doc.status)"
+		x-text="statusLabel(doc.current_stage || doc.status)"
+	></span>
+}
+
+// statusBadgeScript provides the JavaScript functions for status badge rendering.
+// This matches the EdgeQuake StatusBadge component's statusConfig mapping.
+templ StatusBadgeScript() {
+	<script>
+		// Status configuration matching EdgeQuake's statusConfig
+		window._statusConfig = {
+			// Unified stages (SPEC-002)
+			uploading:    { color: 'text-blue-500 dark:text-blue-300 border-blue-300 dark:border-blue-700', label: 'Uploading', animate: true },
+			converting:   { color: 'text-indigo-600 dark:text-indigo-400 border-indigo-300 dark:border-indigo-700', label: 'Converting', animate: true },
+			preprocessing:{ color: 'text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-700', label: 'Preprocessing', animate: true },
+			chunking:     { color: 'text-blue-500 dark:text-blue-300 border-blue-300 dark:border-blue-700', label: 'Chunking', animate: true },
+			extracting:   { color: 'text-purple-600 dark:text-purple-400 border-purple-300 dark:border-purple-700', label: 'Extracting', animate: true },
+			gleaning:     { color: 'text-purple-500 dark:text-purple-300 border-purple-300 dark:border-purple-700', label: 'Gleaning', animate: true },
+			merging:      { color: 'text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700', label: 'Merging', animate: true },
+			summarizing:  { color: 'text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-700', label: 'Summarizing', animate: true },
+			embedding:    { color: 'text-cyan-600 dark:text-cyan-400 border-cyan-300 dark:border-cyan-700', label: 'Embedding', animate: true },
+			storing:      { color: 'text-teal-600 dark:text-teal-400 border-teal-300 dark:border-teal-700', label: 'Storing', animate: true },
+			// Terminal states
+			completed:      { color: 'text-green-600 dark:text-green-400 border-green-300 dark:border-green-700', label: 'Completed', animate: false },
+			failed:         { color: 'text-red-600 dark:text-red-400 border-red-300 dark:border-red-700', label: 'Failed', animate: false },
+			partial_failure:{ color: 'text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-700', label: 'Partial Failure', animate: false },
+			partial_success:{ color: 'text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700', label: 'Partial', animate: false },
+			// Legacy
+			pending:   { color: 'text-yellow-600 dark:text-yellow-400 border-yellow-300 dark:border-yellow-700', label: 'Pending', animate: false },
+			processing:{ color: 'text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-700', label: 'Processing', animate: true },
+			indexing:  { color: 'text-teal-600 dark:text-teal-400 border-teal-300 dark:border-teal-700', label: 'Indexing', animate: true },
+			indexed:   { color: 'text-green-600 dark:text-green-400 border-green-300 dark:border-green-700', label: 'Indexed', animate: false },
+			cancelled: { color: 'text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-700', label: 'Cancelled', animate: false },
+		};
+
+		function statusBadgeClass(status) {
+			const config = window._statusConfig[status] || window._statusConfig.pending;
+			return config.color + (config.animate ? ' animate-pulse' : '');
+		}
+
+		function statusLabel(status) {
+			const config = window._statusConfig[status] || window._statusConfig.pending;
+			return config.label;
+		}
+
+		function stageIcon(stage) {
+			const icons = {
+				'uploading': '📤', 'converting': '🔄', 'preprocessing': '⚙️',
+				'chunking': '✂️', 'extracting': '🔍', 'gleaning': '🔬',
+				'merging': '🔗', 'summarizing': '📝', 'embedding': '📊',
+				'storing': '💾', 'completed': '✅', 'failed': '❌',
+				'pending': '⏳', 'indexing': '📁', 'cancelled': '🚫',
+				'indexed': '✅', 'partial_failure': '⚠️', 'partial_success': '⚠️',
+			};
+			return icons[stage] || '⏳';
+		}
+	</script>
+}

@@ -1,0 +1,106 @@
+package knowledge
+
+/**
+ * NodeDetails - Right sidebar panel showing selected node details.
+ * Matches EdgeQuake edgequake_webui/src/components/graph/node-details.tsx
+ *
+ * Shows: Node label, type (color-coded), description, degree/connections,
+ * properties table, and relationships list with clickable navigation.
+ */
+
+import (
+	"school-with-ai/components/i18n"
+	"school-with-ai/components/icon"
+	"school-with-ai/components/separator"
+)
+
+templ NodeDetails() {
+	<div
+		x-show="selectedNode"
+		x-transition:enter="transition ease-out duration-200"
+		x-transition:enter-start="opacity-0 w-0"
+		x-transition:enter-end="opacity-100"
+		x-transition:leave="transition ease-in duration-150"
+		x-transition:leave-start="opacity-100"
+		x-transition:leave-end="opacity-0 w-0"
+		class="w-80 border-l bg-background overflow-y-auto flex-shrink-0"
+	>
+		<!-- Sticky header -->
+		<div class="sticky top-0 z-10 bg-background border-b px-4 py-3">
+			<div class="flex items-center justify-between">
+				<h3 class="font-bold text-sm truncate flex-1" x-text="selectedNode?.label"></h3>
+				<button
+					@click="selectedNode = null; selectedNodeEdges = []; graphDraw()"
+					class="p-1 hover:bg-muted rounded-md flex-shrink-0 ml-2"
+				>
+					@icon.X(icon.Props{Class: "size-4"})
+				</button>
+			</div>
+		</div>
+		<!-- Content -->
+		<div class="p-4 space-y-4 text-sm">
+			<!-- Node Type -->
+			<div>
+				<span class="text-xs text-muted-foreground uppercase tracking-wide block mb-1">{ i18n.T(ctx, "Type") }</span>
+				<div class="flex items-center gap-1.5">
+					<span class="size-3 rounded-full" :style="`background-color: ${entityColors[selectedNode?.node_type] || '#6b7280'}`"></span>
+					<span class="font-medium capitalize" x-text="(selectedNode?.node_type || '').toLowerCase().replace('_', ' ')"></span>
+				</div>
+			</div>
+			<!-- Description -->
+			<div x-show="selectedNode?.description">
+				<span class="text-xs text-muted-foreground uppercase tracking-wide block mb-1">{ i18n.T(ctx, "Description") }</span>
+				<p class="text-sm leading-relaxed" x-text="selectedNode?.description"></p>
+			</div>
+			<!-- Degree -->
+			<div>
+				<span class="text-xs text-muted-foreground uppercase tracking-wide block mb-1">{ i18n.T(ctx, "Connections") }</span>
+				<p class="font-mono text-lg font-bold" x-text="selectedNode?.degree || 0"></p>
+			</div>
+			<!-- Properties -->
+			<div x-show="getNodeProperties() && Object.keys(getNodeProperties()).length > 0">
+				<span class="text-xs text-muted-foreground uppercase tracking-wide block mb-1">{ i18n.T(ctx, "Properties") }</span>
+				<div class="space-y-1">
+					<template x-for="[key, val] in Object.entries(getNodeProperties())" :key="key">
+						<div class="flex justify-between items-start text-xs py-1 border-b border-dashed last:border-0">
+							<span class="text-muted-foreground font-mono" x-text="key"></span>
+							<span class="font-medium text-right ml-2 max-w-[150px] truncate" x-text="String(val)"></span>
+						</div>
+					</template>
+				</div>
+			</div>
+			@separator.Separator(separator.Props{})
+			<!-- Relationships -->
+			<div x-show="selectedNodeEdges.length > 0">
+				<span class="text-xs text-muted-foreground uppercase tracking-wide block mb-2">
+					{ i18n.T(ctx, "Relationships") }
+					<span class="text-foreground font-mono" x-text="selectedNodeEdges.length"></span>
+				</span>
+				<div class="space-y-1.5 max-h-80 overflow-y-auto">
+					<template x-for="edge in selectedNodeEdges" :key="(edge.source || '') + '-' + (edge.target || '') + '-' + (edge.edge_type || '')">
+						<button
+							@click="focusNode(edge.source === selectedNode?.id ? edge.target : edge.source)"
+							class="w-full text-left text-xs p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer group"
+						>
+							<div class="flex items-center gap-1 font-mono leading-relaxed">
+								<span
+									class="truncate max-w-[90px]"
+									:class="edge.source === selectedNode?.id ? 'font-bold text-foreground' : 'text-muted-foreground'"
+									x-text="getNodeLabel(edge.source)"
+								></span>
+								<span class="text-primary flex-shrink-0 group-hover:text-primary/80">→</span>
+								<span class="text-primary/70 flex-shrink-0 text-[10px]" x-text="edge.edge_type"></span>
+								<span class="text-primary flex-shrink-0 group-hover:text-primary/80">→</span>
+								<span
+									class="truncate max-w-[90px]"
+									:class="edge.target === selectedNode?.id ? 'font-bold text-foreground' : 'text-muted-foreground'"
+									x-text="getNodeLabel(edge.target)"
+								></span>
+							</div>
+						</button>
+					</template>
+				</div>
+			</div>
+		</div>
+	</div>
+}
