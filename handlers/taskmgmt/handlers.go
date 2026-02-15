@@ -15,13 +15,13 @@ import (
 	"school-with-ai/services"
 	"school-with-ai/services/artifact"
 	"school-with-ai/services/edgequake"
-	"school-with-ai/services/edgequakepermissions"
 	"school-with-ai/services/memory"
 	"school-with-ai/services/permissions"
 	"school-with-ai/services/taskmanagement"
 	"school-with-ai/services/threadmgmt"
 	"school-with-ai/services/toolregistry"
 
+	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 )
 
@@ -39,8 +39,8 @@ type TaskManagementHandler struct {
 	memoryStore        memory.Service
 	toolRegistry       *toolregistry.Registry
 	permissionsService *permissions.Service
-	eqPermissions      *edgequakepermissions.Service
 	edgequakeService   *edgequake.Service
+	tenantID           string
 }
 
 // NewTaskManagementHandler creates a new HTTP handler for task management.
@@ -57,8 +57,8 @@ func NewTaskManagementHandler(
 	memoryStore memory.Service,
 	toolRegistry *toolregistry.Registry,
 	permissionsService *permissions.Service,
-	eqPermissions *edgequakepermissions.Service,
 	edgequakeService *edgequake.Service,
+	tenantID string,
 ) *TaskManagementHandler {
 	return &TaskManagementHandler{
 		log:                log,
@@ -73,8 +73,8 @@ func NewTaskManagementHandler(
 		memoryStore:        memoryStore,
 		toolRegistry:       toolRegistry,
 		permissionsService: permissionsService,
-		eqPermissions:      eqPermissions,
 		edgequakeService:   edgequakeService,
+		tenantID:           tenantID,
 	}
 }
 
@@ -758,18 +758,30 @@ func (h *TaskManagementHandler) ListDocuments(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// 2. Resolve Multitenancy Context (Go as Context Resolver)
-	tCtx, err := h.eqPermissions.GetTenantContext(r.Context(), user.ID)
-	if err != nil {
-		h.log.Error(r.Context(), "Failed to resolve multitenancy context", "userID", user.ID, "error", err)
-		// We'll return 401 if we can't find a tenant membership for the user
-		http.Error(w, "User has no active tenant workspace", http.StatusUnauthorized)
+	// 2. Resolve Multitenancy Context
+	var tCtx *domain.TenantContext
+	if h.tenantID == "" {
+		h.log.Error(r.Context(), "Tenant ID not configured")
+		http.Error(w, "Server configuration error", http.StatusInternalServerError)
 		return
+	}
+
+	// Static Configuration
+	tID, err := uuid.Parse(h.tenantID)
+	if err != nil {
+		h.log.Error(r.Context(), "Invalid configured tenant ID", "error", err)
+		http.Error(w, "Invalid server configuration", http.StatusInternalServerError)
+		return
+	}
+	tCtx = &domain.TenantContext{
+		TenantID: &tID,
+		UserID:   user.ID,
+		Role:     string(domain.RoleAdmin),
 	}
 
 	// 3. Delegate to Edgequake (Passive Enforcement)
 	// Go does NOT check if the user is allowed to list docs. It just passes the headers.
-	resp, err := h.edgequakeService.ListDocuments(r.Context(), tCtx, 1, 20)
+	resp, err := h.edgequakeService.ListDocuments(r.Context(), tCtx, 1, 20, "")
 	if err != nil {
 		if err == edgequake.ErrEdgequakeUnauthorized {
 			http.Error(w, "Unauthorized by Edgequake", http.StatusUnauthorized)
@@ -800,12 +812,25 @@ func (h *TaskManagementHandler) UploadDocument(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// 2. Resolve Multitenancy Context (Go as Context Resolver)
-	tCtx, err := h.eqPermissions.GetTenantContext(r.Context(), user.ID)
-	if err != nil {
-		h.log.Error(r.Context(), "Failed to resolve multitenancy context", "userID", user.ID, "error", err)
-		http.Error(w, "User has no active tenant workspace", http.StatusUnauthorized)
+	// 2. Resolve Multitenancy Context
+	var tCtx *domain.TenantContext
+	if h.tenantID == "" {
+		h.log.Error(r.Context(), "Tenant ID not configured")
+		http.Error(w, "Server configuration error", http.StatusInternalServerError)
 		return
+	}
+
+	// Static Configuration
+	tID, err := uuid.Parse(h.tenantID)
+	if err != nil {
+		h.log.Error(r.Context(), "Invalid configured tenant ID", "error", err)
+		http.Error(w, "Invalid server configuration", http.StatusInternalServerError)
+		return
+	}
+	tCtx = &domain.TenantContext{
+		TenantID: &tID,
+		UserID:   user.ID,
+		Role:     string(domain.RoleAdmin),
 	}
 
 	// 3. Parse Multipart Form

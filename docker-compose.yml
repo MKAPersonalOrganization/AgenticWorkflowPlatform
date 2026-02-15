@@ -437,6 +437,11 @@ services:
       - DATABASE_URL=postgres://edgequake:${POSTGRES_PASSWORD:-edgequake_secret}@edgequake-db:5432/edgequake
       - OPENAI_API_KEY
       - RUST_LOG=info,edgequake=debug
+      - OLLAMA_HOST=http://host.docker.internal:11435
+      - OLLAMA_MODEL=gemma3:12b
+      - OLLAMA_EMBEDDING_MODEL=embeddinggemma:latest
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       edgequake-db:
         condition: service_healthy
@@ -448,6 +453,27 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+
+  # Proxy for local Ollama (since it binds to 127.0.0.1)
+  ollama-socat:
+    image: alpine/socat
+    command: tcp-listen:11435,fork,bind=0.0.0.0 tcp:127.0.0.1:11434
+    network_mode: host
+    restart: always
+
+  # EdgeQuake Web UI
+  edgequake-web:
+    build:
+      context: ./edgequake
+      dockerfile: edgequake_webui/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8081
+    container_name: edgequake-web
+    restart: unless-stopped
+    ports:
+      - "3002:3000"
+    networks:
+      - intranet
 
 networks:
   intranet:

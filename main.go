@@ -41,7 +41,6 @@ import (
 	"school-with-ai/services/agentorchestrator"
 	"school-with-ai/services/artifact"
 	"school-with-ai/services/edgequake"
-	eqperms "school-with-ai/services/edgequakepermissions"
 	"school-with-ai/services/memory"
 	"school-with-ai/services/permissions"
 	"school-with-ai/services/rag/users"
@@ -175,7 +174,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 			LongTermMemory bool `conf:"default:true"`
 		}
 		Edgequake struct {
-			BaseURL string `conf:"default:http://localhost:8081"`
+			BaseURL  string `conf:"default:http://localhost:8081"`
+			TenantID string
 		}
 	}{
 		Version: conf.Version{
@@ -193,6 +193,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 		}
 		return fmt.Errorf("parsing config: %w", err)
 	}
+
+	log.Info(ctx, "startup", "config_tenant_id", cfg.Edgequake.TenantID)
 
 	// -------------------------------------------------------------------------
 	// Initialize I18n
@@ -405,23 +407,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 	resourcePermissionsService := resourcepermissions.NewService(log, resourcepermissions.NewInMemoryRepository())
 	log.Info(ctx, "startup", "status", "resource permissions service initialized")
 
-	// Create and initialize edgequake permissions service (multitenancy)
-	eqPermissionsRepo := eqperms.NewInMemoryRepository()
-	eqPermissionsService := eqperms.NewService(log, eqPermissionsRepo)
-	log.Info(ctx, "startup", "status", "edgequake permissions service initialized")
-
-	// SEED: Create a default tenant and workspace for development
-	// In a real system, this would come from a database or account sign-up flow.
-	devTenant, _ := eqPermissionsService.CreateTenant(ctx, "Default School", "default-school")
-	devWorkspace, _ := eqPermissionsService.CreateWorkspace(ctx, devTenant.ID, "General Knowledge", "general")
-
-	// Default development user from Kratos (example ID)
-	// We'll add a membership so the system works out of the box in dev
-	_ = eqPermissionsService.AddMember(ctx, "00000000-0000-0000-0000-000000000001", devTenant.ID, &devWorkspace.ID, domain.RoleAdmin)
-
 	// Initialize Edgequake service
 	edgequakeService := edgequake.NewService(cfg.Edgequake.BaseURL)
-	_ = edgequakeService // Reserved for future use in handlers
 	log.Info(ctx, "startup", "status", "edgequake service initialized", "baseURL", cfg.Edgequake.BaseURL)
 
 	// Initialize Agents directly (Step 2 of Registry Removal)
@@ -607,7 +594,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		"healthCheckInterval", cfg.Orchestration.HealthCheckInterval)
 
 	// Create HTTP handler
-	handler := taskmgmthandlers.NewTaskManagementHandler(log, taskManager, agentProvider, authSvc, threadQueryService, aguiProjection, redisBroadcaster, threadMgmt, artifactService, memoryService, toolRegistry, permissionsService, eqPermissionsService, edgequakeService)
+	handler := taskmgmthandlers.NewTaskManagementHandler(log, taskManager, agentProvider, authSvc, threadQueryService, aguiProjection, redisBroadcaster, threadMgmt, artifactService, memoryService, toolRegistry, permissionsService, edgequakeService, cfg.Edgequake.TenantID)
 
 	// Create health handler
 	healthHandler := healthhandlers.NewHealthHandler(log)
@@ -726,23 +713,52 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Get("/api/resources/{id}/content", authMiddleware.RequireAuthFunc(resourcesHandler.GetContent))
 	r.Delete("/api/resources/{id}", authMiddleware.RequireAuthFunc(resourcesHandler.Delete))
 
-	// Knowledge Base / RAG dashboard routes
-	knowledgeHandler := knowledgehandlers.NewHandler(log, edgequakeService, eqPermissionsService)
-	r.Get("/knowledge", authMiddleware.RequireAuthFunc(knowledgeHandler.DashboardPage))
-	r.Get("/api/knowledge/dashboard", authMiddleware.RequireAuthFunc(knowledgeHandler.GetDashboardData))
+	// Knowledge Base / RAG routes
+	knowledgeHandler := knowledgehandlers.NewHandler(log, edgequakeService, cfg.Edgequake.TenantID)
+
+	// Pages
+	r.Get("/knowledge", authMiddleware.RequireAuthFunc(knowledgeHandler.WorkspacesPage))
+	r.Get("/knowledge/workspaces/{workspaceId}", authMiddleware.RequireAuthFunc(knowledgeHandler.WorkspaceDetailsPage))
+
+	// Documents API (maps to Edgequake /api/v1/documents)
 	r.Get("/api/knowledge/documents", authMiddleware.RequireAuthFunc(knowledgeHandler.ListDocuments))
+	r.Get("/api/knowledge/documents/{documentId}", authMiddleware.RequireAuthFunc(knowledgeHandler.GetDocument))
 	r.Post("/api/knowledge/documents/upload", authMiddleware.RequireAuthFunc(knowledgeHandler.UploadDocument))
+	r.Delete("/api/knowledge/documents/{documentId}", authMiddleware.RequireAuthFunc(knowledgeHandler.DeleteDocument))
+	r.Delete("/api/knowledge/documents", authMiddleware.RequireAuthFunc(knowledgeHandler.DeleteAllDocuments))
+	r.Post("/api/knowledge/documents/reprocess", authMiddleware.RequireAuthFunc(knowledgeHandler.ReprocessDocument))
+	r.Post("/api/knowledge/documents/reprocess-failed", authMiddleware.RequireAuthFunc(knowledgeHandler.ReprocessFailed))
+	r.Post("/api/knowledge/documents/scan", authMiddleware.RequireAuthFunc(knowledgeHandler.ScanDocuments))
+
+	// PDFs API (maps to Edgequake /api/v1/documents/pdf)
 	r.Get("/api/knowledge/pdfs", authMiddleware.RequireAuthFunc(knowledgeHandler.ListPDFs))
 	r.Post("/api/knowledge/pdfs/upload", authMiddleware.RequireAuthFunc(knowledgeHandler.UploadPDF))
 	r.Delete("/api/knowledge/pdfs/{pdfId}", authMiddleware.RequireAuthFunc(knowledgeHandler.DeletePDF))
+	r.Get("/api/knowledge/pdfs/{pdfId}/content", authMiddleware.RequireAuthFunc(knowledgeHandler.GetPDFContent))
 	r.Get("/api/knowledge/pdfs/{trackId}/progress", authMiddleware.RequireAuthFunc(knowledgeHandler.GetPDFProgress))
+	r.Post("/api/knowledge/pdfs/{pdfId}/retry", authMiddleware.RequireAuthFunc(knowledgeHandler.RetryPdfProcessing))
+
+	// Workspaces API (maps to Edgequake /api/v1/workspaces)
 	r.Get("/api/knowledge/workspaces", authMiddleware.RequireAuthFunc(knowledgeHandler.ListWorkspaces))
 	r.Post("/api/knowledge/workspaces", authMiddleware.RequireAuthFunc(knowledgeHandler.CreateWorkspace))
 	r.Get("/api/knowledge/workspaces/{workspaceId}/stats", authMiddleware.RequireAuthFunc(knowledgeHandler.GetWorkspaceStats))
 	r.Delete("/api/knowledge/workspaces/{workspaceId}", authMiddleware.RequireAuthFunc(knowledgeHandler.DeleteWorkspace))
-	r.Get("/api/knowledge/folders", authMiddleware.RequireAuthFunc(knowledgeHandler.ListFolders))
-	r.Post("/api/knowledge/folders", authMiddleware.RequireAuthFunc(knowledgeHandler.CreateFolder))
-	r.Delete("/api/knowledge/folders/{folderId}", authMiddleware.RequireAuthFunc(knowledgeHandler.DeleteFolder))
+	r.Post("/api/knowledge/workspaces/{workspaceId}/rebuild", authMiddleware.RequireAuthFunc(knowledgeHandler.RebuildWorkspace))
+	r.Post("/api/knowledge/workspaces/reprocess", authMiddleware.RequireAuthFunc(knowledgeHandler.ReprocessAll))
+
+	// Pipeline API (maps to Edgequake /api/v1/pipeline + /api/v1/tasks)
+	r.Get("/api/knowledge/pipeline/enhanced-status", authMiddleware.RequireAuthFunc(knowledgeHandler.GetEnhancedPipelineStatus))
+	r.Get("/api/knowledge/pipeline/queue-metrics", authMiddleware.RequireAuthFunc(knowledgeHandler.GetQueueMetrics))
+	r.Post("/api/knowledge/pipeline/cancel", authMiddleware.RequireAuthFunc(knowledgeHandler.CancelPipelineTask))
+	r.Post("/api/knowledge/pipeline/cancel-all", authMiddleware.RequireAuthFunc(knowledgeHandler.CancelPipeline))
+	r.Post("/api/knowledge/pipeline/retry", authMiddleware.RequireAuthFunc(knowledgeHandler.RetryTask))
+
+	// Graph API (maps to Edgequake /api/v1/graph)
+	r.Get("/api/knowledge/graph", authMiddleware.RequireAuthFunc(knowledgeHandler.GetGraph))
+	r.Get("/api/knowledge/graph/nodes/search", authMiddleware.RequireAuthFunc(knowledgeHandler.SearchGraphNodes))
+	r.Get("/api/knowledge/graph/nodes/{nodeId}", authMiddleware.RequireAuthFunc(knowledgeHandler.GetGraphNode))
+	r.Get("/api/knowledge/graph/labels/popular", authMiddleware.RequireAuthFunc(knowledgeHandler.GetPopularLabels))
+	r.Get("/api/knowledge/graph/labels/search", authMiddleware.RequireAuthFunc(knowledgeHandler.SearchGraphLabels))
 
 	// Home route
 	r.Get("/", authMiddleware.RequireAuthFunc(HandleViewChatInputScreen(log, edgequakeService)))

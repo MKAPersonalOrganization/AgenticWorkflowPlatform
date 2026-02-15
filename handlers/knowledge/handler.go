@@ -2,17 +2,19 @@ package knowledge
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"school-with-ai/components/knowledge"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/edgequake"
-	eqperms "school-with-ai/services/edgequakepermissions"
-	"school-with-ai/services/rag/folders"
+	"school-with-ai/services/rag/documents"
+	"school-with-ai/services/rag/graph"
 	"school-with-ai/services/rag/workspaces"
 
 	"github.com/go-chi/chi/v5"
@@ -23,15 +25,15 @@ import (
 type Handler struct {
 	log              *logger.Logger
 	edgequakeService *edgequake.Service
-	eqPermsService   *eqperms.Service
+	tenantID         string
 }
 
 // NewHandler creates a new Knowledge Base handler.
-func NewHandler(log *logger.Logger, edgequakeService *edgequake.Service, eqPermsService *eqperms.Service) *Handler {
+func NewHandler(log *logger.Logger, edgequakeService *edgequake.Service, tenantID string) *Handler {
 	return &Handler{
 		log:              log,
 		edgequakeService: edgequakeService,
-		eqPermsService:   eqPermsService,
+		tenantID:         tenantID,
 	}
 }
 
@@ -41,18 +43,67 @@ func (h *Handler) resolveTenantContext(r *http.Request) (*domain.TenantContext, 
 	if user == nil {
 		return nil, fmt.Errorf("no authenticated user")
 	}
-	return h.eqPermsService.GetTenantContext(r.Context(), user.ID)
+
+	// 1. Static Configuration (Required)
+	if h.tenantID == "" {
+		return nil, fmt.Errorf("tenant ID not configured")
+	}
+
+	// Use configured tenant ID
+	tID, err := uuid.Parse(h.tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid configured tenant ID: %w", err)
+	}
+	return &domain.TenantContext{
+		TenantID: &tID,
+		UserID:   user.ID,
+		Role:     string(domain.RoleAdmin), // Assume admin for static tenant
+	}, nil
 }
 
-// DashboardPage renders the main Knowledge Base dashboard page.
-func (h *Handler) DashboardPage(w http.ResponseWriter, r *http.Request) {
+// WorkspacesPage renders the workspaces listing page.
+func (h *Handler) WorkspacesPage(w http.ResponseWriter, r *http.Request) {
 	user := domain.GetUserFromContext(r.Context())
 
-	component := knowledge.DashboardPage(knowledge.DashboardPageProps{
+	component := knowledge.WorkspacesPage(knowledge.WorkspacesPageProps{
 		User: user,
 	})
 	if err := component.Render(r.Context(), w); err != nil {
-		h.log.Error(r.Context(), "failed to render knowledge dashboard", "error", err)
+		h.log.Error(r.Context(), "failed to render workspaces page", "error", err)
+	}
+}
+
+// WorkspaceDetailsPage renders the workspace details and document list.
+func (h *Handler) WorkspaceDetailsPage(w http.ResponseWriter, r *http.Request) {
+	user := domain.GetUserFromContext(r.Context())
+	tCtx, err := h.resolveTenantContext(r)
+	if err != nil {
+		h.log.Error(r.Context(), "failed to resolve tenant context", "error", err)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	wsID := chi.URLParam(r, "workspaceId")
+	workspaceID, err := uuid.Parse(wsID)
+	if err != nil {
+		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		return
+	}
+
+	// Fetch workspace details
+	workspace, err := h.edgequakeService.GetWorkspace(r.Context(), tCtx, workspaceID)
+	if err != nil {
+		h.log.Error(r.Context(), "failed to get workspace details", "error", err, "workspaceId", workspaceID)
+		http.Error(w, "Failed to load workspace", http.StatusInternalServerError)
+		return
+	}
+
+	component := knowledge.WorkspaceDetailsPage(knowledge.WorkspaceDetailsPageProps{
+		User:      user,
+		Workspace: workspace,
+	})
+	if err := component.Render(r.Context(), w); err != nil {
+		h.log.Error(r.Context(), "failed to render workspace details page", "error", err)
 	}
 }
 
@@ -65,6 +116,14 @@ func (h *Handler) ListDocuments(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Handle workspace_id param
+	wsID := r.URL.Query().Get("workspace_id")
+	if wsID != "" {
+		if uid, err := uuid.Parse(wsID); err == nil {
+			tCtx.WorkspaceID = &uid
+		}
+	}
+
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	if page < 1 {
 		page = 1
@@ -73,8 +132,9 @@ func (h *Handler) ListDocuments(w http.ResponseWriter, r *http.Request) {
 	if pageSize < 1 {
 		pageSize = 20
 	}
+	status := r.URL.Query().Get("status")
 
-	docs, err := h.edgequakeService.ListDocuments(r.Context(), tCtx, page, pageSize)
+	docs, err := h.edgequakeService.ListDocuments(r.Context(), tCtx, page, pageSize, status)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to list documents", "error", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to load documents"})
@@ -84,6 +144,38 @@ func (h *Handler) ListDocuments(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, docs)
 }
 
+// GetDocument retrieves a single document by ID.
+func (h *Handler) GetDocument(w http.ResponseWriter, r *http.Request) {
+	tCtx, err := h.resolveTenantContext(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Handle workspace_id param
+	wsID := r.URL.Query().Get("workspace_id")
+	if wsID != "" {
+		if uid, err := uuid.Parse(wsID); err == nil {
+			tCtx.WorkspaceID = &uid
+		}
+	}
+
+	docID := chi.URLParam(r, "documentId")
+	if docID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Missing document ID"})
+		return
+	}
+
+	doc, err := h.edgequakeService.GetDocument(r.Context(), tCtx, docID)
+	if err != nil {
+		h.log.Error(r.Context(), "failed to get document", "error", err, "documentId", docID)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to load document"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, doc)
+}
+
 // UploadDocument handles document upload.
 func (h *Handler) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
@@ -91,6 +183,14 @@ func (h *Handler) UploadDocument(w http.ResponseWriter, r *http.Request) {
 		h.log.Error(r.Context(), "failed to resolve tenant context", "error", err)
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
+	}
+
+	// Handle workspace_id param
+	wsID := r.URL.Query().Get("workspace_id")
+	if wsID != "" {
+		if uid, err := uuid.Parse(wsID); err == nil {
+			tCtx.WorkspaceID = &uid
+		}
 	}
 
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
@@ -110,10 +210,18 @@ func (h *Handler) UploadDocument(w http.ResponseWriter, r *http.Request) {
 		contentType = "application/octet-stream"
 	}
 
-	result, err := h.edgequakeService.UploadDocument(r.Context(), tCtx, header.Filename, contentType, file)
-	if err != nil {
-		h.log.Error(r.Context(), "failed to upload document", "error", err, "filename", header.Filename)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to upload document"})
+	var result interface{}
+	var uploadErr error
+
+	if strings.HasSuffix(strings.ToLower(header.Filename), ".pdf") {
+		result, uploadErr = h.edgequakeService.UploadPDF(r.Context(), tCtx, header.Filename, file)
+	} else {
+		result, uploadErr = h.edgequakeService.UploadDocument(r.Context(), tCtx, header.Filename, contentType, file)
+	}
+
+	if uploadErr != nil {
+		h.log.Error(r.Context(), "failed to upload document", "error", uploadErr, "filename", header.Filename)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("Failed to upload document: %v", uploadErr)})
 		return
 	}
 
@@ -126,6 +234,14 @@ func (h *Handler) UploadPDF(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
+	}
+
+	// Handle workspace_id param
+	wsID := r.URL.Query().Get("workspace_id")
+	if wsID != "" {
+		if uid, err := uuid.Parse(wsID); err == nil {
+			tCtx.WorkspaceID = &uid
+		}
 	}
 
 	if err := r.ParseMultipartForm(64 << 20); err != nil {
@@ -158,6 +274,14 @@ func (h *Handler) DeletePDF(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Handle workspace_id param
+	wsID := r.URL.Query().Get("workspace_id")
+	if wsID != "" {
+		if uid, err := uuid.Parse(wsID); err == nil {
+			tCtx.WorkspaceID = &uid
+		}
+	}
+
 	pdfID := chi.URLParam(r, "pdfId")
 	if pdfID == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Missing PDF ID"})
@@ -181,6 +305,14 @@ func (h *Handler) ListPDFs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Handle workspace_id param
+	wsID := r.URL.Query().Get("workspace_id")
+	if wsID != "" {
+		if uid, err := uuid.Parse(wsID); err == nil {
+			tCtx.WorkspaceID = &uid
+		}
+	}
+
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	if page < 1 {
 		page = 1
@@ -190,8 +322,9 @@ func (h *Handler) ListPDFs(w http.ResponseWriter, r *http.Request) {
 		pageSize = 20
 	}
 	status := r.URL.Query().Get("status")
+	search := r.URL.Query().Get("search")
 
-	pdfs, err := h.edgequakeService.ListPDFs(r.Context(), tCtx, page, pageSize, status)
+	pdfs, err := h.edgequakeService.ListPDFs(r.Context(), tCtx, page, pageSize, status, search)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to list PDFs", "error", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to load PDFs"})
@@ -223,6 +356,30 @@ func (h *Handler) GetPDFProgress(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, progress)
+}
+
+// GetPDFContent retrieves the content of a specific PDF.
+func (h *Handler) GetPDFContent(w http.ResponseWriter, r *http.Request) {
+	tCtx, err := h.resolveTenantContext(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	pdfID := chi.URLParam(r, "pdfId")
+	if pdfID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Missing PDF ID"})
+		return
+	}
+
+	content, err := h.edgequakeService.GetPDFContent(r.Context(), tCtx, pdfID)
+	if err != nil {
+		h.log.Error(r.Context(), "failed to get PDF content", "error", err, "pdfId", pdfID)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to load PDF content"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, content)
 }
 
 // ListWorkspaces returns workspaces for the user's tenant.
@@ -286,8 +443,14 @@ func (h *Handler) CreateWorkspace(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Name        string `json:"name"`
-		Description string `json:"description"`
+		Name               string `json:"name"`
+		Description        string `json:"description"`
+		Slug               string `json:"slug"`
+		LlmModel           string `json:"llm_model"`
+		LlmProvider        string `json:"llm_provider"`
+		EmbeddingModel     string `json:"embedding_model"`
+		EmbeddingProvider  string `json:"embedding_provider"`
+		EmbeddingDimension int    `json:"embedding_dimension"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
@@ -304,13 +467,49 @@ func (h *Handler) CreateWorkspace(w http.ResponseWriter, r *http.Request) {
 		desc = &req.Description
 	}
 
+	var slug *string
+	if req.Slug != "" {
+		slug = &req.Slug
+	}
+
+	var llmModel *string
+	if req.LlmModel != "" {
+		llmModel = &req.LlmModel
+	}
+
+	var llmProvider *string
+	if req.LlmProvider != "" {
+		llmProvider = &req.LlmProvider
+	}
+
+	var embeddingModel *string
+	if req.EmbeddingModel != "" {
+		embeddingModel = &req.EmbeddingModel
+	}
+
+	var embeddingProvider *string
+	if req.EmbeddingProvider != "" {
+		embeddingProvider = &req.EmbeddingProvider
+	}
+
+	var embeddingDimension *int
+	if req.EmbeddingDimension > 0 {
+		embeddingDimension = &req.EmbeddingDimension
+	}
+
 	ws, err := h.edgequakeService.CreateWorkspace(r.Context(), tCtx, &workspaces.CreateWorkspaceRequest{
-		Name:        req.Name,
-		Description: desc,
+		Name:               req.Name,
+		Description:        desc,
+		Slug:               slug,
+		LlmModel:           llmModel,
+		LlmProvider:        llmProvider,
+		EmbeddingModel:     embeddingModel,
+		EmbeddingProvider:  embeddingProvider,
+		EmbeddingDimension: embeddingDimension,
 	})
 	if err != nil {
 		h.log.Error(r.Context(), "failed to create workspace", "error", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create workspace"})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create workspace: " + err.Error()})
 		return
 	}
 
@@ -341,26 +540,39 @@ func (h *Handler) DeleteWorkspace(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
-// ListFolders returns folders for the current workspace.
-func (h *Handler) ListFolders(w http.ResponseWriter, r *http.Request) {
+// DeleteDocument deletes an ingested document.
+func (h *Handler) DeleteDocument(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	foldersList, err := h.edgequakeService.ListFolders(r.Context(), tCtx)
-	if err != nil {
-		h.log.Error(r.Context(), "failed to list folders", "error", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to load folders"})
+	// Handle workspace_id param
+	wsID := r.URL.Query().Get("workspace_id")
+	if wsID != "" {
+		if uid, err := uuid.Parse(wsID); err == nil {
+			tCtx.WorkspaceID = &uid
+		}
+	}
+
+	docID := chi.URLParam(r, "documentId")
+	if docID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Missing document ID"})
 		return
 	}
 
-	writeJSON(w, http.StatusOK, foldersList)
+	if err := h.edgequakeService.DeleteDocument(r.Context(), tCtx, docID); err != nil {
+		h.log.Error(r.Context(), "failed to delete document", "error", err, "documentId", docID)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete document"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
-// CreateFolder creates a new folder.
-func (h *Handler) CreateFolder(w http.ResponseWriter, r *http.Request) {
+// ReprocessDocument triggers reprocessing for a single document.
+func (h *Handler) ReprocessDocument(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -368,99 +580,526 @@ func (h *Handler) CreateFolder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Name string `json:"name"`
+		DocumentID string `json:"document_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
 		return
 	}
 
-	if req.Name == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Name is required"})
-		return
+	// Handle workspace_id param
+	wsID := r.URL.Query().Get("workspace_id")
+	if wsID != "" {
+		if uid, err := uuid.Parse(wsID); err == nil {
+			tCtx.WorkspaceID = &uid
+		}
 	}
 
-	folder, err := h.edgequakeService.CreateFolder(r.Context(), tCtx, &folders.CreateFolderRequest{Name: req.Name})
+	result, err := h.edgequakeService.ReprocessDocument(r.Context(), tCtx, req.DocumentID)
 	if err != nil {
-		h.log.Error(r.Context(), "failed to create folder", "error", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create folder"})
+		h.log.Error(r.Context(), "failed to reprocess document", "error", err, "documentId", req.DocumentID)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to reprocess document"})
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, folder)
+	writeJSON(w, http.StatusOK, result)
 }
 
-// DeleteFolder deletes a folder.
-func (h *Handler) DeleteFolder(w http.ResponseWriter, r *http.Request) {
+// ReprocessFailed triggers reprocessing for all failed documents.
+func (h *Handler) ReprocessFailed(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	fID := chi.URLParam(r, "folderId")
-	folderID, err := uuid.Parse(fID)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid folder ID"})
-		return
-	}
-
-	if err := h.edgequakeService.DeleteFolder(r.Context(), tCtx, folderID); err != nil {
-		h.log.Error(r.Context(), "failed to delete folder", "error", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete folder"})
-		return
-	}
-
-	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
-}
-
-// GetDashboardData returns aggregated dashboard data.
-func (h *Handler) GetDashboardData(w http.ResponseWriter, r *http.Request) {
-	tCtx, err := h.resolveTenantContext(r)
-	if err != nil {
-		h.log.Warn(r.Context(), "failed to resolve tenant context for dashboard", "error", err)
-		writeJSON(w, http.StatusOK, map[string]interface{}{
-			"documents": map[string]interface{}{"documents": []interface{}{}, "total": 0, "page": 1, "page_size": 10, "total_pages": 0},
-			"pdfs":      map[string]interface{}{"items": []interface{}{}, "pagination": map[string]interface{}{"total_count": 0}},
-			"stats":     nil,
-		})
-		return
-	}
-
-	type dashboardData struct {
-		Documents interface{} `json:"documents"`
-		PDFs      interface{} `json:"pdfs"`
-		Stats     interface{} `json:"stats"`
-	}
-
-	data := dashboardData{}
-
-	docs, err := h.edgequakeService.ListDocuments(r.Context(), tCtx, 1, 10)
-	if err != nil {
-		h.log.Warn(r.Context(), "failed to list documents for dashboard", "error", err)
-		data.Documents = map[string]interface{}{"documents": []interface{}{}, "total": 0}
-	} else {
-		data.Documents = docs
-	}
-
-	pdfs, err := h.edgequakeService.ListPDFs(r.Context(), tCtx, 1, 10, "")
-	if err != nil {
-		h.log.Warn(r.Context(), "failed to list PDFs for dashboard", "error", err)
-		data.PDFs = map[string]interface{}{"items": []interface{}{}, "pagination": map[string]interface{}{"total_count": 0}}
-	} else {
-		data.PDFs = pdfs
-	}
-
-	if tCtx.WorkspaceID != nil {
-		stats, err := h.edgequakeService.GetWorkspaceStats(r.Context(), tCtx, *tCtx.WorkspaceID)
-		if err != nil {
-			h.log.Warn(r.Context(), "failed to get workspace stats for dashboard", "error", err)
-		} else {
-			data.Stats = stats
+	// Handle workspace_id param
+	wsID := r.URL.Query().Get("workspace_id")
+	if wsID != "" {
+		if uid, err := uuid.Parse(wsID); err == nil {
+			tCtx.WorkspaceID = &uid
 		}
 	}
 
-	writeJSON(w, http.StatusOK, data)
+	result, err := h.edgequakeService.ReprocessFailedDocuments(r.Context(), tCtx)
+	if err != nil {
+		h.log.Error(r.Context(), "failed to reprocess failed documents", "error", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to reprocess failed documents"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}
+
+// ScanDocuments triggers scanning of an input directory for new documents.
+func (h *Handler) ScanDocuments(w http.ResponseWriter, r *http.Request) {
+	tCtx, err := h.resolveTenantContext(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Handle workspace_id param
+	wsID := r.URL.Query().Get("workspace_id")
+	if wsID != "" {
+		if uid, err := uuid.Parse(wsID); err == nil {
+			tCtx.WorkspaceID = &uid
+		}
+	}
+
+	var req struct {
+		Path string `json:"path"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		return
+	}
+
+	if req.Path == "" {
+		req.Path = "./inputs"
+	}
+
+	result, err := h.edgequakeService.ScanDocuments(r.Context(), tCtx, req.Path)
+	if err != nil {
+		h.log.Error(r.Context(), "failed to scan documents", "error", err, "path", req.Path)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to scan documents: " + err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}
+
+// DeleteAllDocuments deletes all documents in the workspace.
+func (h *Handler) DeleteAllDocuments(w http.ResponseWriter, r *http.Request) {
+	tCtx, err := h.resolveTenantContext(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Handle workspace_id param
+	wsID := r.URL.Query().Get("workspace_id")
+	if wsID != "" {
+		if uid, err := uuid.Parse(wsID); err == nil {
+			tCtx.WorkspaceID = &uid
+		}
+	}
+
+	result, err := h.edgequakeService.DeleteAllDocuments(r.Context(), tCtx)
+	if err != nil {
+		h.log.Error(r.Context(), "failed to delete all documents", "error", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete all documents"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}
+
+// RetryTask retries a failed pipeline task.
+func (h *Handler) RetryTask(w http.ResponseWriter, r *http.Request) {
+	tCtx, err := h.resolveTenantContext(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req struct {
+		TaskID string `json:"task_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		return
+	}
+
+	result, err := h.edgequakeService.RetryTask(r.Context(), tCtx, req.TaskID)
+	if err != nil {
+		h.log.Error(r.Context(), "failed to retry task", "error", err, "taskId", req.TaskID)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to retry task: " + err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}
+
+// RetryPdfProcessing retries a failed PDF processing.
+func (h *Handler) RetryPdfProcessing(w http.ResponseWriter, r *http.Request) {
+	tCtx, err := h.resolveTenantContext(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	pdfID := chi.URLParam(r, "pdfId")
+	if pdfID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Missing PDF ID"})
+		return
+	}
+
+	result, err := h.edgequakeService.RetryPdfProcessing(r.Context(), tCtx, pdfID)
+	if err != nil {
+		h.log.Error(r.Context(), "failed to retry PDF processing", "error", err, "pdfId", pdfID)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to retry PDF processing"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}
+
+// GetEnhancedPipelineStatus returns the enhanced pipeline status.
+func (h *Handler) GetEnhancedPipelineStatus(w http.ResponseWriter, r *http.Request) {
+	tCtx, err := h.resolveTenantContext(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Handle workspace_id param
+	wsID := r.URL.Query().Get("workspace_id")
+	if wsID != "" {
+		if uid, err := uuid.Parse(wsID); err == nil {
+			tCtx.WorkspaceID = &uid
+		}
+	}
+
+	status, err := h.edgequakeService.GetEnhancedPipelineStatus(r.Context(), tCtx)
+	if err != nil {
+		h.log.Error(r.Context(), "failed to get enhanced pipeline status", "error", err)
+		// Fallback to task list
+		tasks, taskErr := h.edgequakeService.GetPipelineTasks(r.Context(), tCtx, 1, 50)
+		if taskErr != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to load pipeline status"})
+			return
+		}
+		writeJSON(w, http.StatusOK, tasks)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, status)
+}
+
+// GetQueueMetrics returns queue metrics.
+func (h *Handler) GetQueueMetrics(w http.ResponseWriter, r *http.Request) {
+	tCtx, err := h.resolveTenantContext(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Handle workspace_id param
+	wsID := r.URL.Query().Get("workspace_id")
+	if wsID != "" {
+		if uid, err := uuid.Parse(wsID); err == nil {
+			tCtx.WorkspaceID = &uid
+		}
+	}
+
+	metrics, err := h.edgequakeService.GetQueueMetrics(r.Context(), tCtx)
+	if err != nil {
+		h.log.Error(r.Context(), "failed to get queue metrics", "error", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to load queue metrics"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, metrics)
+}
+
+// CancelPipeline cancels the entire pipeline.
+func (h *Handler) CancelPipeline(w http.ResponseWriter, r *http.Request) {
+	tCtx, err := h.resolveTenantContext(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	result, err := h.edgequakeService.CancelPipeline(r.Context(), tCtx)
+	if err != nil {
+		h.log.Error(r.Context(), "failed to cancel pipeline", "error", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to cancel pipeline"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}
+
+// ReprocessAll triggers reprocessing for all documents.
+func (h *Handler) ReprocessAll(w http.ResponseWriter, r *http.Request) {
+	tCtx, err := h.resolveTenantContext(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	wsID := r.URL.Query().Get("workspace_id")
+	workspaceID, err := uuid.Parse(wsID)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid workspace ID"})
+		return
+	}
+
+	if err := h.edgequakeService.ReprocessAllDocuments(r.Context(), tCtx, workspaceID); err != nil {
+		h.log.Error(r.Context(), "failed to reprocess workspace", "error", err, "workspaceId", wsID)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to reprocess workspace"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "queued"})
+}
+
+// RebuildWorkspace triggers knowledge graph or embeddings rebuild.
+func (h *Handler) RebuildWorkspace(w http.ResponseWriter, r *http.Request) {
+	tCtx, err := h.resolveTenantContext(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	wsID := chi.URLParam(r, "workspaceId")
+	workspaceID, err := uuid.Parse(wsID)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid workspace ID"})
+		return
+	}
+
+	var req struct {
+		Type              string `json:"type"` // "graph" or "embeddings"
+		LlmModel          string `json:"llm_model,omitempty"`
+		LlmProvider       string `json:"llm_provider,omitempty"`
+		EmbeddingModel    string `json:"embedding_model,omitempty"`
+		EmbeddingProvider string `json:"embedding_provider,omitempty"`
+		Force             bool   `json:"force"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		return
+	}
+
+	if req.Type == "graph" {
+		result, err := h.edgequakeService.RebuildKnowledgeGraph(r.Context(), tCtx, workspaceID, &workspaces.RebuildKnowledgeGraphRequest{
+			LlmModel:    &req.LlmModel,
+			LlmProvider: &req.LlmProvider,
+			Force:       req.Force,
+		})
+		if err != nil {
+			h.log.Error(r.Context(), "failed to rebuild graph", "error", err, "workspaceId", wsID)
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to rebuild knowledge graph: " + err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, result)
+	} else if req.Type == "embeddings" {
+		result, err := h.edgequakeService.RebuildEmbeddings(r.Context(), tCtx, workspaceID, &workspaces.RebuildEmbeddingsRequest{
+			EmbeddingModel:    &req.EmbeddingModel,
+			EmbeddingProvider: &req.EmbeddingProvider,
+			Force:             req.Force,
+		})
+		if err != nil {
+			h.log.Error(r.Context(), "failed to rebuild embeddings", "error", err, "workspaceId", wsID)
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to rebuild embeddings: " + err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, result)
+	} else {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid rebuild type"})
+	}
+}
+
+// CancelPipelineTask cancels a specific task in the pipeline.
+func (h *Handler) CancelPipelineTask(w http.ResponseWriter, r *http.Request) {
+	tCtx, err := h.resolveTenantContext(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req struct {
+		TaskID string `json:"task_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		return
+	}
+
+	if err := h.edgequakeService.CancelPipelineTask(r.Context(), tCtx, req.TaskID); err != nil {
+		if errors.Is(err, documents.ErrConflict) {
+			h.log.Info(r.Context(), "pipeline task already in target state", "taskId", req.TaskID)
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "Task is already cancelled or in a state where cancellation is not possible"})
+			return
+		}
+		h.log.Error(r.Context(), "failed to cancel pipeline task", "error", err, "taskId", req.TaskID)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to cancel task: " + err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "cancelled"})
+}
+
+// GetGraph retrieves the knowledge graph.
+func (h *Handler) GetGraph(w http.ResponseWriter, r *http.Request) {
+	tCtx, err := h.resolveTenantContext(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Handle workspace_id param
+	wsID := r.URL.Query().Get("workspace_id")
+	if wsID != "" {
+		if uid, err := uuid.Parse(wsID); err == nil {
+			tCtx.WorkspaceID = &uid
+		}
+	}
+
+	params := &graph.GraphQueryParams{}
+	if startNode := r.URL.Query().Get("start_node"); startNode != "" {
+		params.StartNode = &startNode
+	}
+	if depth, err := strconv.Atoi(r.URL.Query().Get("depth")); err == nil && depth > 0 {
+		params.Depth = depth
+	}
+	if maxNodes, err := strconv.Atoi(r.URL.Query().Get("max_nodes")); err == nil && maxNodes > 0 {
+		params.MaxNodes = maxNodes
+	}
+
+	graphData, err := h.edgequakeService.GetGraph(r.Context(), tCtx, params)
+	if err != nil {
+		h.log.Error(r.Context(), "failed to get graph", "error", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to load knowledge graph"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, graphData)
+}
+
+// GetGraphNode retrieves a specific graph node.
+func (h *Handler) GetGraphNode(w http.ResponseWriter, r *http.Request) {
+	tCtx, err := h.resolveTenantContext(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	wsID := r.URL.Query().Get("workspace_id")
+	if wsID != "" {
+		if uid, err := uuid.Parse(wsID); err == nil {
+			tCtx.WorkspaceID = &uid
+		}
+	}
+
+	nodeID := chi.URLParam(r, "nodeId")
+	if nodeID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Missing node ID"})
+		return
+	}
+
+	node, err := h.edgequakeService.GetGraphNode(r.Context(), tCtx, nodeID)
+	if err != nil {
+		h.log.Error(r.Context(), "failed to get graph node", "error", err, "nodeId", nodeID)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to load node"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, node)
+}
+
+// SearchGraphNodes searches for nodes by query.
+func (h *Handler) SearchGraphNodes(w http.ResponseWriter, r *http.Request) {
+	tCtx, err := h.resolveTenantContext(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	wsID := r.URL.Query().Get("workspace_id")
+	if wsID != "" {
+		if uid, err := uuid.Parse(wsID); err == nil {
+			tCtx.WorkspaceID = &uid
+		}
+	}
+
+	q := r.URL.Query().Get("q")
+	if q == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Missing search query"})
+		return
+	}
+
+	limit := 20
+	if l, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && l > 0 {
+		limit = l
+	}
+
+	result, err := h.edgequakeService.SearchGraphNodes(r.Context(), tCtx, q, limit)
+	if err != nil {
+		h.log.Error(r.Context(), "failed to search graph nodes", "error", err, "query", q)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to search nodes"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}
+
+// GetPopularLabels retrieves popular graph labels.
+func (h *Handler) GetPopularLabels(w http.ResponseWriter, r *http.Request) {
+	tCtx, err := h.resolveTenantContext(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	wsID := r.URL.Query().Get("workspace_id")
+	if wsID != "" {
+		if uid, err := uuid.Parse(wsID); err == nil {
+			tCtx.WorkspaceID = &uid
+		}
+	}
+
+	limit := 20
+	if l, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && l > 0 {
+		limit = l
+	}
+
+	result, err := h.edgequakeService.GetPopularLabels(r.Context(), tCtx, limit)
+	if err != nil {
+		h.log.Error(r.Context(), "failed to get popular labels", "error", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to load popular labels"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}
+
+// SearchGraphLabels searches for graph labels.
+func (h *Handler) SearchGraphLabels(w http.ResponseWriter, r *http.Request) {
+	tCtx, err := h.resolveTenantContext(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	wsID := r.URL.Query().Get("workspace_id")
+	if wsID != "" {
+		if uid, err := uuid.Parse(wsID); err == nil {
+			tCtx.WorkspaceID = &uid
+		}
+	}
+
+	q := r.URL.Query().Get("q")
+	if q == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Missing search query"})
+		return
+	}
+
+	limit := 20
+	if l, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && l > 0 {
+		limit = l
+	}
+
+	result, err := h.edgequakeService.SearchGraphLabels(r.Context(), tCtx, q, limit)
+	if err != nil {
+		h.log.Error(r.Context(), "failed to search graph labels", "error", err, "query", q)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to search labels"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, result)
 }
 
 func writeJSON(w http.ResponseWriter, status int, data interface{}) {

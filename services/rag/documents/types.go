@@ -38,6 +38,36 @@ type DocumentSummary struct {
 	PDFID          *string  `json:"pdf_id,omitempty"`
 }
 
+// DocumentDetail represents the full detail of a single document.
+type DocumentDetail struct {
+	ID                   string   `json:"id"`
+	Title                *string  `json:"title,omitempty"`
+	FileName             *string  `json:"file_name,omitempty"`
+	Content              *string  `json:"content,omitempty"`
+	ContentSummary       *string  `json:"content_summary,omitempty"`
+	ContentLength        *int     `json:"content_length,omitempty"`
+	ChunkCount           int      `json:"chunk_count"`
+	EntityCount          *int     `json:"entity_count,omitempty"`
+	RelationshipCount    *int     `json:"relationship_count,omitempty"`
+	Status               *string  `json:"status,omitempty"`
+	ErrorMessage         *string  `json:"error_message,omitempty"`
+	TrackID              *string  `json:"track_id,omitempty"`
+	CreatedAt            *string  `json:"created_at,omitempty"`
+	UpdatedAt            *string  `json:"updated_at,omitempty"`
+	CostUSD              *float64 `json:"cost_usd,omitempty"`
+	InputTokens          *int     `json:"input_tokens,omitempty"`
+	OutputTokens         *int     `json:"output_tokens,omitempty"`
+	TotalTokens          *int     `json:"total_tokens,omitempty"`
+	LLMModel             *string  `json:"llm_model,omitempty"`
+	EmbeddingModel       *string  `json:"embedding_model,omitempty"`
+	SourceType           *string  `json:"source_type,omitempty"`
+	CurrentStage         *string  `json:"current_stage,omitempty"`
+	StageProgress        *float32 `json:"stage_progress,omitempty"`
+	StageMessage         *string  `json:"stage_message,omitempty"`
+	PDFID                *string  `json:"pdf_id,omitempty"`
+	ProcessingDurationMs *int64   `json:"processing_duration_ms,omitempty"`
+}
+
 // StatusCounts represents document status counts.
 type StatusCounts struct {
 	Pending        int `json:"pending"`
@@ -175,4 +205,85 @@ type PdfContentResponse struct {
 	ContentType     string  `json:"content_type"`
 	MarkdownContent *string `json:"markdown_content,omitempty"`
 	IsProcessed     bool    `json:"is_processed"`
+}
+
+// TaskListResponse represents a list of tasks in the ingestion pipeline.
+type TaskListResponse struct {
+	Tasks      []TaskItem     `json:"tasks"`
+	Total      int            `json:"total"`
+	Page       int            `json:"page"`
+	PageSize   int            `json:"page_size"`
+	TotalPages int            `json:"total_pages"`
+	Statistics TaskStatistics `json:"statistics"`
+}
+
+// TaskItem represents a single task in the pipeline.
+type TaskItem struct {
+	ID           string  `json:"id"`
+	TrackID      string  `json:"track_id"`
+	DocumentID   string  `json:"document_id"`
+	TenantID     string  `json:"tenant_id"`
+	WorkspaceID  string  `json:"workspace_id"`
+	TaskType     string  `json:"task_type"`
+	Status       string  `json:"status"`
+	CurrentStage *string `json:"current_stage,omitempty"`
+	ErrorMessage *string `json:"error_message,omitempty"`
+	CreatedAt    string  `json:"created_at"`
+	UpdatedAt    string  `json:"updated_at"`
+}
+
+// TaskStatistics represents aggregated statistics for pipeline tasks.
+type TaskStatistics struct {
+	Total      int `json:"total"`
+	Pending    int `json:"pending"`
+	Processing int `json:"processing"`
+	Indexed    int `json:"indexed"`
+	Failed     int `json:"failed"`
+	Cancelled  int `json:"cancelled"`
+}
+
+// ReprocessResponse represents the response from reprocessing documents.
+type ReprocessResponse struct {
+	TrackID string `json:"track_id"`
+	Message string `json:"message"`
+	Count   int    `json:"count,omitempty"`
+}
+
+// ReprocessFailedResponse represents the response from reprocessing failed documents.
+type ReprocessFailedResponse struct {
+	TrackID     string   `json:"track_id"`
+	FailedFound int      `json:"failed_found"`
+	Requeued    int      `json:"requeued"`
+	DocumentIDs []string `json:"document_ids"`
+}
+
+// ScanDocumentsRequest represents the request to scan for documents.
+type ScanDocumentsRequest struct {
+	Path string `json:"path"`
+}
+
+// ScanDocumentsResponse represents the response from scanning documents.
+type ScanDocumentsResponse struct {
+	TrackID string `json:"track_id"`
+	Message string `json:"message"`
+}
+
+// DeleteAllDocumentsResponse represents the response from deleting all documents.
+type DeleteAllDocumentsResponse struct {
+	DeletedCount int `json:"deleted_count"`
+}
+
+// TaskRetryResponse represents the response from retrying a task.
+type TaskRetryResponse struct {
+	TrackID string `json:"track_id"`
+	Status  string `json:"status"`
+	Message string `json:"message,omitempty"`
+}
+
+// PdfRetryResponse represents the response from retrying PDF processing.
+type PdfRetryResponse struct {
+	Success bool   `json:"success"`
+	PdfID   string `json:"pdf_id"`
+	Message string `json:"message"`
+	TaskID  string `json:"task_id,omitempty"`
 }

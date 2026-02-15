@@ -73,4 +73,7 @@ type EdgequakePermissionRepository interface {
 	// Membership operations
 	SaveMembership(membership *EdgequakeMembership) error
 	ListMembershipsByUser(userID string) ([]*EdgequakeMembership, error)
+
+	// Admin/General operations
+	ListTenants() ([]*EdgequakeTenant, error)
 }

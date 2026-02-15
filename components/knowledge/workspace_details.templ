@@ -1,0 +1,3015 @@
+package knowledge
+
+import (
+	"school-with-ai/components/button"
+	"school-with-ai/components/dialog"
+	"school-with-ai/components/i18n"
+	"school-with-ai/components/icon"
+	"school-with-ai/components/separator"
+	"school-with-ai/components/tabs"
+	"school-with-ai/domain"
+	"school-with-ai/services/rag/workspaces"
+)
+
+type WorkspaceDetailsPageProps struct {
+	User      *domain.User
+	Workspace *workspaces.WorkspaceResponse
+}
+
+templ WorkspaceDetailsPage(props WorkspaceDetailsPageProps) {
+	@knowledgeLayout(knowledgeLayoutProps{
+		Title: props.Workspace.Name + " - Documents",
+		User:  props.User,
+	}) {
+		@workspaceDetailsScript()
+		<div
+			class="flex-1 overflow-y-auto p-6 md:p-8 space-y-8 max-w-7xl mx-auto"
+			x-data={ "workspaceDetails('" + props.Workspace.ID.String() + "')" }
+		>
+			<!-- Header -->
+			<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+				<div>
+					<div class="flex items-center gap-2 mb-1">
+						<a href="/knowledge" class="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+							@icon.ArrowLeft(icon.Props{Class: "size-4"})
+							{ i18n.T(ctx, "Workspaces") }
+						</a>
+					</div>
+					<h1 class="text-3xl font-bold tracking-tight">{ props.Workspace.Name }</h1>
+					if props.Workspace.Description != nil {
+						<p class="text-muted-foreground mt-2 text-lg">{ *props.Workspace.Description }</p>
+					}
+				</div>
+				<div class="flex items-center gap-3">
+					<button
+						@click="refreshAll()"
+						class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted h-10 w-10 border shadow-sm"
+						:class="{ 'animate-spin': isRefreshing }"
+						title="Refresh All"
+					>
+						@icon.RefreshCw(icon.Props{Class: "size-5"})
+					</button>
+					@dialog.Trigger(dialog.TriggerProps{For: "upload-document-dialog"}) {
+						@button.Button(button.Props{
+							Size:  button.SizeLg,
+							Class: "shadow-sm",
+						}) {
+							@icon.Upload(icon.Props{Class: "size-5 me-2"})
+							{ i18n.T(ctx, "Upload Document") }
+						}
+					}
+				</div>
+			</div>
+			@separator.Separator(separator.Props{})
+			<!-- Content -->
+			<div class="space-y-4">
+				@tabs.Tabs(tabs.Props{ID: "workspace-content-tabs"}) {
+					@tabs.List(tabs.ListProps{}) {
+						@tabs.Trigger(tabs.TriggerProps{Value: "files", IsActive: true}) {
+							@icon.File(icon.Props{Class: "size-4 me-2"})
+							{ i18n.T(ctx, "Files") }
+						}
+						@tabs.Trigger(tabs.TriggerProps{Value: "ingested"}) {
+							@icon.FileText(icon.Props{Class: "size-4 me-2"})
+							{ i18n.T(ctx, "Ingested") }
+						}
+						@tabs.Trigger(tabs.TriggerProps{Value: "graph"}) {
+							@icon.Network(icon.Props{Class: "size-4 me-2"})
+							{ i18n.T(ctx, "Graph") }
+						}
+						@tabs.Trigger(tabs.TriggerProps{Value: "settings"}) {
+							@icon.Settings(icon.Props{Class: "size-4 me-2"})
+							{ i18n.T(ctx, "Settings") }
+						}
+					}
+					@tabs.Content(tabs.ContentProps{Value: "files"}) {
+						<div class="space-y-4 mt-4">
+							<div class="flex items-center justify-between">
+								<h2 class="text-xl font-semibold tracking-tight">{ i18n.T(ctx, "Uploaded Files") }</h2>
+								<div class="relative w-full max-w-sm">
+									@icon.Search(icon.Props{Class: "absolute left-2.5 top-2.5 size-4 text-muted-foreground"})
+									<input
+										type="search"
+										placeholder={ i18n.T(ctx, "Search files...") }
+										class="flex h-9 w-full rounded-md border border-input bg-transparent pl-9 pr-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+										x-model.debounce.300ms="fileSearch"
+										@input="filePage = 1; loadFiles()"
+									/>
+								</div>
+							</div>
+							<!-- Loading State -->
+							<div x-show="filesLoading" class="flex items-center justify-center py-20">
+								<span class="animate-spin size-8 border-2 border-primary border-t-transparent rounded-full"></span>
+							</div>
+							<!-- Empty State -->
+							<div x-show="!filesLoading && files.length === 0" x-cloak class="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed rounded-xl bg-muted/20">
+								<div class="bg-background p-4 rounded-full shadow-sm mb-4">
+									@icon.File(icon.Props{Class: "size-10 text-muted-foreground"})
+								</div>
+								<h3 class="text-xl font-semibold">{ i18n.T(ctx, "No files yet") }</h3>
+								<p class="text-muted-foreground mt-2 max-w-md mx-auto">{ i18n.T(ctx, "Upload PDF files to this workspace to start building your knowledge base.") }</p>
+							</div>
+							<!-- Files Table -->
+							<div x-show="!filesLoading && files.length > 0" x-cloak class="rounded-md border bg-card">
+								<div class="relative w-full overflow-auto">
+									<table class="w-full caption-bottom text-sm text-left">
+										<thead class="[&_tr]:border-b">
+											<tr class="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
+												<th class="h-12 px-4 align-middle w-[40px]">
+													<input
+														type="checkbox"
+														class="rounded border-input text-primary focus:ring-primary"
+														@change="toggleSelectAllFiles($event.target.checked)"
+														:checked="selectedFiles.length === files.length && files.length > 0"
+													/>
+												</th>
+												<th class="h-12 px-4 align-middle font-medium text-muted-foreground w-[50%]">{ i18n.T(ctx, "Name") }</th>
+												<th class="h-12 px-4 align-middle font-medium text-muted-foreground">{ i18n.T(ctx, "Status") }</th>
+												<th class="h-12 px-4 align-middle font-medium text-muted-foreground">{ i18n.T(ctx, "Size") }</th>
+												<th class="h-12 px-4 align-middle font-medium text-muted-foreground">{ i18n.T(ctx, "Created") }</th>
+												<th class="h-12 px-4 align-middle font-medium text-muted-foreground text-right">{ i18n.T(ctx, "Actions") }</th>
+											</tr>
+										</thead>
+										<tbody class="[&_tr:last-child]:border-0">
+											<template x-for="file in files" :key="file.pdf_id">
+												<tr class="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted" :class="selectedFiles.includes(file.pdf_id) && 'bg-primary/5'">
+													<td class="p-4 align-middle">
+														<input
+															type="checkbox"
+															class="rounded border-input text-primary focus:ring-primary"
+															:value="file.pdf_id"
+															x-model="selectedFiles"
+														/>
+													</td>
+													<td class="p-4 align-middle font-medium">
+														<div class="flex items-center gap-2">
+															@icon.File(icon.Props{Class: "size-4 text-red-500"})
+															<span x-text="file.filename"></span>
+														</div>
+													</td>
+													<td class="p-4 align-middle">
+														<span
+															class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium"
+															:class="{
+																'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400': file.status === 'completed',
+																'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400': file.status === 'processing' || file.status === 'pending',
+																'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400': file.status === 'failed',
+																'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400': file.status === 'uploading' || file.status === 'converting',
+															}"
+															x-text="file.status"
+														></span>
+													</td>
+													<td class="p-4 align-middle text-muted-foreground" x-text="formatBytes(file.file_size_bytes)"></td>
+													<td class="p-4 align-middle text-muted-foreground" x-text="formatDate(file.created_at)"></td>
+													<td class="p-4 align-middle text-right flex items-center justify-end gap-1">
+														<button
+															x-show="file.status === 'failed'"
+															@click="retryPdf(file.pdf_id)"
+															class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-amber-500/10 hover:text-amber-600 h-8 w-8"
+															title="Retry Processing"
+														>
+															@icon.RotateCcw(icon.Props{Class: "size-4"})
+														</button>
+														<button
+															x-show="file.status === 'completed' || file.status === 'failed'"
+															@click="reprocessFile(file.pdf_id)"
+															class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-primary/10 hover:text-primary h-8 w-8"
+															title="Reprocess"
+														>
+															@icon.RefreshCw(icon.Props{Class: "size-4"})
+														</button>
+														<button
+															@click="deleteFile(file.pdf_id, file.filename)"
+															class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:bg-destructive/10 hover:text-destructive h-8 w-8"
+														>
+															@icon.Trash2(icon.Props{Class: "size-4"})
+														</button>
+													</td>
+												</tr>
+											</template>
+										</tbody>
+									</table>
+								</div>
+								<!-- Pagination -->
+								<div class="flex items-center justify-end space-x-2 py-4 px-4 border-t" x-show="fileTotalPages > 1">
+									<button
+										class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring h-8 px-3 border border-input bg-background"
+										:disabled="filePage <= 1"
+										@click="filePage--; loadFiles()"
+									>
+										{ i18n.T(ctx, "Previous") }
+									</button>
+									<span class="text-sm font-medium" x-text="`Page ${filePage} of ${fileTotalPages}`"></span>
+									<button
+										class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring h-8 px-3 border border-input bg-background"
+										:disabled="filePage >= fileTotalPages"
+										@click="filePage++; loadFiles()"
+									>
+										{ i18n.T(ctx, "Next") }
+									</button>
+								</div>
+							</div>
+						</div>
+					}
+					@tabs.Content(tabs.ContentProps{Value: "ingested"}) {
+						<div class="space-y-4 mt-4">
+							<!-- Pipeline Status Banner -->
+							<div x-show="pipelineStatus && pipelineStatus.is_busy" x-cloak class="rounded-lg border bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 p-4">
+								<div class="flex items-center justify-between">
+									<div class="flex items-center gap-3">
+										<span class="animate-spin size-5 border-2 border-blue-500 border-t-transparent rounded-full"></span>
+										<div>
+											<p class="text-sm font-medium text-blue-800 dark:text-blue-200" x-text="pipelineStatus?.latest_message || 'Pipeline is processing...'"></p>
+											<p class="text-xs text-blue-600 dark:text-blue-400 mt-0.5" x-show="pipelineStatus?.processing_tasks">
+												<span x-text="pipelineStatus?.processing_tasks"></span> tasks processing
+											</p>
+										</div>
+									</div>
+									<div class="flex items-center gap-2" x-show="pipelineStatus?.total_documents > 0">
+										<div class="h-2 w-32 bg-blue-200 dark:bg-blue-800 rounded-full overflow-hidden">
+											<div class="h-full bg-blue-500 transition-all duration-500" :style="`width: ${(pipelineStatus?.total_documents || 0) > 0 ? Math.round(((pipelineStatus?.processed_documents || 0) / pipelineStatus.total_documents) * 100) : 0}%`"></div>
+										</div>
+										<span class="text-xs font-medium text-blue-700 dark:text-blue-300" x-text="(pipelineStatus?.processed_documents || 0) + '/' + (pipelineStatus?.total_documents || 0)"></span>
+									</div>
+								</div>
+								<!-- History Messages -->
+								<div x-show="pipelineStatus?.history_messages && pipelineStatus.history_messages.length > 0" class="mt-3 space-y-1 max-h-24 overflow-y-auto">
+									<template x-for="msg in (pipelineStatus?.history_messages || []).slice(-5)" :key="msg.timestamp">
+										<p class="text-xs font-mono" :class="msg.level === 'error' ? 'text-red-500 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'" x-text="msg.message"></p>
+									</template>
+								</div>
+							</div>
+							<!-- Queue Metrics Banner -->
+							<div x-show="queueMetrics" x-cloak class="grid grid-cols-2 md:grid-cols-4 gap-3">
+								<div class="rounded-lg border bg-card p-3 text-center">
+									<p class="text-xs text-muted-foreground uppercase tracking-wide">{ i18n.T(ctx, "Queue") }</p>
+									<p class="text-2xl font-bold mt-1" x-text="(queueMetrics?.pending_count || 0) + (queueMetrics?.processing_count || 0)"></p>
+								</div>
+								<div class="rounded-lg border bg-card p-3 text-center">
+									<p class="text-xs text-muted-foreground uppercase tracking-wide">{ i18n.T(ctx, "Workers") }</p>
+									<p class="text-2xl font-bold mt-1" x-text="(queueMetrics?.active_workers || 0) + '/' + (queueMetrics?.max_workers || 0)"></p>
+								</div>
+								<div class="rounded-lg border bg-card p-3 text-center">
+									<p class="text-xs text-muted-foreground uppercase tracking-wide">{ i18n.T(ctx, "Throughput") }</p>
+									<p class="text-2xl font-bold mt-1" x-text="(queueMetrics?.throughput_per_minute || 0).toFixed(1) + '/m'"></p>
+								</div>
+								<div class="rounded-lg border bg-card p-3 text-center">
+									<p class="text-xs text-muted-foreground uppercase tracking-wide">{ i18n.T(ctx, "ETA") }</p>
+									<p class="text-2xl font-bold mt-1" x-text="formatDuration(queueMetrics?.estimated_queue_time_seconds)"></p>
+								</div>
+							</div>
+							<div class="flex items-center justify-between flex-wrap gap-3">
+								<h2 class="text-xl font-semibold tracking-tight">{ i18n.T(ctx, "Ingested Content") }</h2>
+								<div class="flex items-center gap-2">
+									<button
+										@click="reprocessFailed()"
+										:disabled="reprocessingFailed"
+										class="inline-flex items-center gap-1.5 rounded-md text-xs font-medium transition-colors border border-input bg-background hover:bg-accent px-3 h-8"
+										title="Reprocess all failed documents"
+									>
+										<template x-if="reprocessingFailed">
+											<span class="animate-spin size-3 border-2 border-primary border-t-transparent rounded-full"></span>
+										</template>
+										@icon.RefreshCw(icon.Props{Class: "size-3.5"})
+										{ i18n.T(ctx, "Retry Failed") }
+									</button>
+									<button
+										@click="scanDocuments()"
+										:disabled="scanningDocuments"
+										class="inline-flex items-center gap-1.5 rounded-md text-xs font-medium transition-colors border border-input bg-background hover:bg-accent px-3 h-8"
+										title="Scan for new documents on disk"
+									>
+										<template x-if="scanningDocuments">
+											<span class="animate-spin size-3 border-2 border-primary border-t-transparent rounded-full"></span>
+										</template>
+										@icon.Search(icon.Props{Class: "size-3.5"})
+										{ i18n.T(ctx, "Scan") }
+									</button>
+									<button
+										@click="deleteAllDocuments()"
+										:disabled="deletingAllDocs"
+										class="inline-flex items-center gap-1.5 rounded-md text-xs font-medium transition-colors border border-destructive/50 text-destructive bg-background hover:bg-destructive/10 px-3 h-8"
+										title="Delete all documents"
+									>
+										@icon.Trash2(icon.Props{Class: "size-3.5"})
+										{ i18n.T(ctx, "Delete All") }
+									</button>
+								</div>
+							</div>
+							<!-- Status Filter Tabs -->
+							<div class="flex items-center gap-1 flex-wrap border-b pb-2">
+								<button
+									@click="filterByStatus('')"
+									class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors"
+									:class="docStatusFilter === '' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'"
+								>
+									{ i18n.T(ctx, "All") }
+									<span class="ml-1 rounded-full bg-background/20 px-1.5 text-[10px]" x-text="documents.length || 0"></span>
+								</button>
+								<button
+									@click="filterByStatus('pending')"
+									class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors"
+									:class="docStatusFilter === 'pending' ? 'bg-yellow-500 text-white' : 'text-muted-foreground hover:bg-yellow-50 dark:hover:bg-yellow-950'"
+								>
+									⏳ { i18n.T(ctx, "Pending") }
+									<span class="ml-1 rounded-full bg-background/20 px-1.5 text-[10px]" x-text="statusCounts.pending || 0"></span>
+								</button>
+								<button
+									@click="filterByStatus('processing')"
+									class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors"
+									:class="docStatusFilter === 'processing' ? 'bg-blue-500 text-white' : 'text-muted-foreground hover:bg-blue-50 dark:hover:bg-blue-950'"
+								>
+									⚙️ { i18n.T(ctx, "Processing") }
+									<span class="ml-1 rounded-full bg-background/20 px-1.5 text-[10px]" x-text="statusCounts.processing || 0"></span>
+								</button>
+								<button
+									@click="filterByStatus('completed')"
+									class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors"
+									:class="docStatusFilter === 'completed' ? 'bg-green-500 text-white' : 'text-muted-foreground hover:bg-green-50 dark:hover:bg-green-950'"
+								>
+									✅ { i18n.T(ctx, "Completed") }
+									<span class="ml-1 rounded-full bg-background/20 px-1.5 text-[10px]" x-text="statusCounts.completed || 0"></span>
+								</button>
+								<button
+									@click="filterByStatus('failed')"
+									class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors"
+									:class="docStatusFilter === 'failed' ? 'bg-red-500 text-white' : 'text-muted-foreground hover:bg-red-50 dark:hover:bg-red-950'"
+								>
+									❌ { i18n.T(ctx, "Failed") }
+									<span class="ml-1 rounded-full bg-background/20 px-1.5 text-[10px]" x-text="(statusCounts.failed || 0) + (statusCounts.partial_failure || 0)"></span>
+								</button>
+								<button
+									@click="filterByStatus('cancelled')"
+									class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors"
+									:class="docStatusFilter === 'cancelled' ? 'bg-orange-500 text-white' : 'text-muted-foreground hover:bg-orange-50 dark:hover:bg-orange-950'"
+								>
+									🚫 { i18n.T(ctx, "Cancelled") }
+									<span class="ml-1 rounded-full bg-background/20 px-1.5 text-[10px]" x-text="statusCounts.cancelled || 0"></span>
+								</button>
+							</div>
+							<!-- Loading State -->
+							<div x-show="docsLoading" class="flex items-center justify-center py-20">
+								<span class="animate-spin size-8 border-2 border-primary border-t-transparent rounded-full"></span>
+							</div>
+							<!-- Documents Table -->
+							<div x-show="!docsLoading && filteredDocuments.length > 0" x-cloak class="rounded-md border bg-card">
+								<div class="relative w-full overflow-auto">
+									<table class="w-full caption-bottom text-sm text-left">
+										<thead class="[&_tr]:border-b">
+											<tr class="border-b transition-colors">
+												<th class="h-12 px-4 align-middle w-[40px]">
+													<input
+														type="checkbox"
+														class="rounded border-input text-primary focus:ring-primary"
+														@change="toggleSelectAllDocs($event.target.checked)"
+														:checked="selectedDocs.length > 0 && selectedDocs.length === filteredDocuments.filter(d => isTerminalStatus(d.status)).length"
+													/>
+												</th>
+												<th class="h-12 px-4 align-middle font-medium text-muted-foreground w-[35%]">{ i18n.T(ctx, "Title") }</th>
+												<th class="h-12 px-4 align-middle font-medium text-muted-foreground">{ i18n.T(ctx, "Status") }</th>
+												<th class="h-12 px-4 align-middle font-medium text-muted-foreground">{ i18n.T(ctx, "Chunks") }</th>
+												<th class="h-12 px-4 align-middle font-medium text-muted-foreground">{ i18n.T(ctx, "Cost") }</th>
+												<th class="h-12 px-4 align-middle font-medium text-muted-foreground">{ i18n.T(ctx, "Created") }</th>
+												<th class="h-12 px-4 align-middle font-medium text-muted-foreground text-right">{ i18n.T(ctx, "Actions") }</th>
+											</tr>
+										</thead>
+										<tbody class="[&_tr:last-child]:border-0">
+											<template x-for="doc in filteredDocuments" :key="doc.id">
+												<tr class="border-b transition-colors hover:bg-muted/50 cursor-pointer" :class="selectedDocs.includes(doc.id) && 'bg-primary/5'" @click="openDocumentPreview(doc)">
+													<td class="p-4 align-middle" @click.stop>
+														<input
+															type="checkbox"
+															class="rounded border-input text-primary focus:ring-primary"
+															:value="doc.id"
+															x-model="selectedDocs"
+															:disabled="!isTerminalStatus(doc.status)"
+														/>
+													</td>
+													<td class="p-4 align-middle font-medium">
+														<div class="flex items-center gap-2">
+															<span x-text="stageIcon(doc.current_stage || doc.status)"></span>
+															<div class="min-w-0">
+																<span class="truncate block max-w-xs" x-text="doc.title || doc.file_name"></span>
+																<span x-show="doc.error_message" class="text-xs text-red-500 truncate block max-w-xs" x-text="doc.error_message" :title="doc.error_message"></span>
+															</div>
+														</div>
+													</td>
+													<td class="p-4 align-middle">
+														<div class="space-y-1">
+															<span
+																class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium"
+																:class="{
+																	'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400': doc.status === 'completed' || doc.status === 'indexed' || doc.status === 'partial_success',
+																	'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400': isProcessingStatus(doc.status),
+																	'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400': doc.status === 'pending',
+																	'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400': doc.status === 'failed',
+																	'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400': doc.status === 'cancelled' || doc.status === 'partial_failure',
+																}"
+																x-text="doc.current_stage || doc.status"
+															></span>
+															<div x-show="doc.stage_progress > 0 && doc.stage_progress < 100" class="h-1 w-24 bg-secondary rounded-full overflow-hidden">
+																<div class="h-full bg-primary transition-all duration-300" :style="`width: ${doc.stage_progress}%`"></div>
+															</div>
+															<div x-show="doc.processing_duration_seconds > 0 && isTerminalStatus(doc.status)" class="text-[10px] text-muted-foreground" x-text="formatDuration(doc.processing_duration_seconds)"></div>
+														</div>
+													</td>
+													<td class="p-4 align-middle text-muted-foreground" x-text="doc.chunk_count || '-'"></td>
+													<td class="p-4 align-middle text-muted-foreground font-mono text-xs" x-text="doc.cost_usd ? ('$' + doc.cost_usd.toFixed(4)) : '-'"></td>
+													<td class="p-4 align-middle text-muted-foreground" x-text="formatDate(doc.created_at)"></td>
+													<td class="p-4 align-middle text-right" @click.stop>
+														<div class="flex items-center justify-end gap-1">
+															<!-- Show Stop if NOT a terminal state -->
+															<template x-if="!isTerminalStatus(doc.status)">
+																<button
+																	@click="cancelDocumentTask(doc.id, doc.track_id)"
+																	class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-destructive/10 hover:text-destructive h-8 w-8"
+																	title="Stop Processing"
+																>
+																	@icon.Square(icon.Props{Class: "size-3.5 fill-current"})
+																</button>
+															</template>
+															<!-- Show Retry if failed -->
+															<template x-if="doc.status === 'failed' || doc.status === 'partial_failure'">
+																<button
+																	@click="doc.track_id ? retryTask(doc.track_id) : reprocessDocument(doc.id)"
+																	class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-amber-500/10 hover:text-amber-600 h-8 w-8"
+																	title="Retry Failed"
+																>
+																	@icon.RotateCcw(icon.Props{Class: "size-4"})
+																</button>
+															</template>
+															<!-- Show Reprocess if completed/cancelled -->
+															<template x-if="doc.status === 'completed' || doc.status === 'indexed' || doc.status === 'cancelled'">
+																<button
+																	@click="reprocessDocument(doc.id)"
+																	class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-primary/10 hover:text-primary h-8 w-8"
+																	title="Reprocess"
+																>
+																	@icon.RefreshCw(icon.Props{Class: "size-4"})
+																</button>
+															</template>
+															<!-- Show Delete if it IS a terminal state -->
+															<template x-if="isTerminalStatus(doc.status)">
+																<button
+																	@click="deleteDocument(doc.id, doc.title || doc.file_name)"
+																	class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-destructive/10 hover:text-destructive h-8 w-8"
+																	title="Delete Document"
+																>
+																	@icon.Trash2(icon.Props{Class: "size-4"})
+																</button>
+															</template>
+														</div>
+													</td>
+												</tr>
+											</template>
+										</tbody>
+									</table>
+								</div>
+								<!-- Pagination -->
+								<div class="flex items-center justify-between py-4 px-4 border-t">
+									<span class="text-sm text-muted-foreground" x-text="`${filteredDocuments.length} documents`"></span>
+								</div>
+							</div>
+							<div x-show="!docsLoading && filteredDocuments.length === 0" x-cloak class="flex flex-col items-center justify-center py-20 text-center">
+								@icon.FileText(icon.Props{Class: "size-10 text-muted-foreground mb-4"})
+								<h3 class="text-lg font-semibold">
+									<span x-show="docStatusFilter" x-text="'No ' + docStatusFilter + ' documents'"></span>
+									<span x-show="!docStatusFilter">{ i18n.T(ctx, "No ingested content yet") }</span>
+								</h3>
+								<p class="text-sm text-muted-foreground">
+									<span x-show="docStatusFilter">
+										<button @click="filterByStatus('')" class="text-primary hover:underline">{ i18n.T(ctx, "View all documents") }</button>
+									</span>
+									<span x-show="!docStatusFilter">{ i18n.T(ctx, "Content will appear here once your files are processed.") }</span>
+								</p>
+							</div>
+						</div>
+					}
+					@tabs.Content(tabs.ContentProps{Value: "graph"}) {
+						<div class="space-y-4 mt-4">
+							<!-- Graph Toolbar -->
+							<div class="flex items-center justify-between flex-wrap gap-3">
+								<div class="flex items-center gap-3">
+									<h2 class="text-xl font-semibold tracking-tight">{ i18n.T(ctx, "Knowledge Graph") }</h2>
+									<!-- Node/Edge counts -->
+									<div x-show="graphData" x-cloak class="flex items-center gap-2 text-xs text-muted-foreground">
+										<span class="inline-flex items-center gap-1 bg-muted px-2 py-0.5 rounded-full">
+											<span class="size-1.5 rounded-full bg-blue-500"></span>
+											<span x-text="(graphData?.nodes?.length || 0) + ' nodes'"></span>
+										</span>
+										<span class="inline-flex items-center gap-1 bg-muted px-2 py-0.5 rounded-full">
+											<span class="size-1.5 rounded-full bg-gray-400"></span>
+											<span x-text="(graphData?.edges?.length || 0) + ' edges'"></span>
+										</span>
+										<span x-show="graphData?.is_truncated" class="inline-flex items-center gap-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full">
+											⚠️ Truncated
+										</span>
+									</div>
+								</div>
+								<div class="flex items-center gap-2">
+									<!-- Search -->
+									<div class="relative w-56">
+										@icon.Search(icon.Props{Class: "absolute left-2.5 top-2.5 size-4 text-muted-foreground"})
+										<input
+											type="search"
+											placeholder={ i18n.T(ctx, "Search entities...") }
+											class="flex h-9 w-full rounded-md border border-input bg-transparent pl-9 pr-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+											x-model.debounce.500ms="graphSearch"
+											@input="searchGraph()"
+										/>
+									</div>
+									<!-- Layout selector -->
+									<select
+										class="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+										x-model="graphLayout"
+										@change="applyLayout()"
+									>
+										<option value="force-atlas">Force Atlas</option>
+										<option value="force-directed">Force Directed</option>
+										<option value="circular">Circular</option>
+										<option value="hierarchical">Hierarchical</option>
+									</select>
+									<!-- Max nodes -->
+									<select
+										class="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+										x-model="graphMaxNodes"
+										@change="loadGraph()"
+									>
+										<option value="50">50 nodes</option>
+										<option value="100">100 nodes</option>
+										<option value="200">200 nodes</option>
+										<option value="500">500 nodes</option>
+									</select>
+									<!-- Reload -->
+									<button
+										@click="loadGraph()"
+										class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted h-9 w-9 border shadow-sm"
+										:class="{ 'animate-spin': graphLoading }"
+										title="Reload Graph"
+									>
+										@icon.RefreshCw(icon.Props{Class: "size-4"})
+									</button>
+								</div>
+							</div>
+							<!-- Graph Loading -->
+							<div x-show="graphLoading" class="flex items-center justify-center py-20">
+								<div class="flex flex-col items-center gap-3">
+									<span class="animate-spin size-8 border-2 border-primary border-t-transparent rounded-full"></span>
+									<p class="text-sm text-muted-foreground">Loading knowledge graph...</p>
+								</div>
+							</div>
+							<!-- Graph Empty -->
+							<div x-show="!graphLoading && (!graphData || !graphData.nodes || graphData.nodes.length === 0)" x-cloak class="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed rounded-xl bg-muted/20">
+								<div class="bg-background p-4 rounded-full shadow-sm mb-4">
+									@icon.Network(icon.Props{Class: "size-10 text-muted-foreground"})
+								</div>
+								<h3 class="text-xl font-semibold">{ i18n.T(ctx, "No knowledge graph yet") }</h3>
+								<p class="text-muted-foreground mt-2 max-w-md mx-auto">{ i18n.T(ctx, "Build a knowledge graph from your documents in the Settings tab.") }</p>
+							</div>
+							<!-- Graph Canvas Container -->
+							<div x-show="!graphLoading && graphData && graphData.nodes && graphData.nodes.length > 0" x-cloak class="relative">
+								<!-- Main Graph Area with side panel -->
+								<div class="flex rounded-xl border bg-card shadow-sm overflow-hidden" style="height: 700px;">
+									<!-- Graph Canvas -->
+									<div class="flex-1 relative" id="graph-container">
+										<canvas id="graph-canvas" class="w-full h-full" style="display: block;"></canvas>
+										<!-- Zoom Controls (top-right) -->
+										<div class="absolute top-3 right-3 flex flex-col gap-1 bg-background/90 backdrop-blur-sm border rounded-lg shadow-sm p-1">
+											<button @click="graphZoomIn()" class="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors" title="Zoom In (+)">
+												@icon.ZoomIn(icon.Props{Class: "size-4"})
+											</button>
+											<button @click="graphZoomOut()" class="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors" title="Zoom Out (-)">
+												@icon.ZoomOut(icon.Props{Class: "size-4"})
+											</button>
+											<div class="border-t my-0.5"></div>
+											<button @click="graphResetCamera()" class="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors" title="Fit to View (0)">
+												@icon.Maximize2(icon.Props{Class: "size-4"})
+											</button>
+											<button @click="graphToggleFullscreen()" class="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors" title="Fullscreen (F)">
+												@icon.Expand(icon.Props{Class: "size-4"})
+											</button>
+										</div>
+										<!-- Graph Controls (top-left) -->
+										<div class="absolute top-3 left-3 flex flex-col gap-1.5">
+											<!-- Toggle labels -->
+											<div class="bg-background/90 backdrop-blur-sm border rounded-lg shadow-sm p-2 flex items-center gap-2">
+												<input type="checkbox" id="show-labels" x-model="graphShowLabels" @change="graphDraw()" class="rounded border-input text-primary focus:ring-primary size-3.5"/>
+												<label for="show-labels" class="text-xs text-muted-foreground cursor-pointer select-none">Labels</label>
+											</div>
+											<!-- Toggle edge labels -->
+											<div class="bg-background/90 backdrop-blur-sm border rounded-lg shadow-sm p-2 flex items-center gap-2">
+												<input type="checkbox" id="show-edge-labels" x-model="graphShowEdgeLabels" @change="graphDraw()" class="rounded border-input text-primary focus:ring-primary size-3.5"/>
+												<label for="show-edge-labels" class="text-xs text-muted-foreground cursor-pointer select-none">Edge Labels</label>
+											</div>
+										</div>
+										<!-- Entity Type Legend (bottom) -->
+										<div class="absolute bottom-3 left-3 right-3 flex flex-wrap gap-1.5 justify-center">
+											<template x-for="[type, color] in Object.entries(entityColors).filter(([t]) => graphData?.nodes?.some(n => (n.node_type || 'UNKNOWN') === t))" :key="type">
+												<button
+													@click="toggleEntityType(type)"
+													class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border transition-all cursor-pointer select-none"
+													:class="graphVisibleTypes.includes(type) ? 'bg-background shadow-sm' : 'bg-muted/50 opacity-50 line-through'"
+												>
+													<span class="size-2.5 rounded-full flex-shrink-0" :style="`background-color: ${color}`"></span>
+													<span class="text-muted-foreground capitalize" x-text="type.toLowerCase().replace('_', ' ')"></span>
+												</button>
+											</template>
+										</div>
+										<!-- Minimap (bottom-right) -->
+										<div class="absolute bottom-14 right-3 bg-background/90 backdrop-blur-sm border rounded-lg shadow-sm overflow-hidden cursor-pointer" style="width: 150px; height: 100px;" title="Click to navigate">
+											<canvas id="graph-minimap" class="w-full h-full" style="display: block;"></canvas>
+										</div>
+										<!-- Right-click Context Menu -->
+										<div
+											x-show="_graphContextMenu?.visible"
+											x-cloak
+											x-transition:enter="transition ease-out duration-100"
+											x-transition:enter-start="opacity-0 scale-95"
+											x-transition:enter-end="opacity-100 scale-100"
+											x-transition:leave="transition ease-in duration-75"
+											x-transition:leave-start="opacity-100 scale-100"
+											x-transition:leave-end="opacity-0 scale-95"
+											class="absolute z-50 min-w-[180px] rounded-lg border bg-background/95 backdrop-blur-sm shadow-lg py-1"
+											:style="`left: ${_graphContextMenu?.x || 0}px; top: ${_graphContextMenu?.y || 0}px`"
+											@click.outside="_graphContextMenu = {visible: false}"
+										>
+											<button @click="contextMenuAction('details')" class="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted transition-colors text-left">
+												@icon.Info(icon.Props{Class: "size-3.5 text-muted-foreground"})
+												<span>View Details</span>
+											</button>
+											<button @click="contextMenuAction('focus')" class="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted transition-colors text-left">
+												@icon.Focus(icon.Props{Class: "size-3.5 text-muted-foreground"})
+												<span>Focus Node</span>
+											</button>
+											<button @click="contextMenuAction('neighbors')" class="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted transition-colors text-left">
+												@icon.Network(icon.Props{Class: "size-3.5 text-muted-foreground"})
+												<span>Highlight Neighbors</span>
+											</button>
+											<div class="border-t my-1"></div>
+											<button @click="contextMenuAction('copyId')" class="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted transition-colors text-left">
+												@icon.Copy(icon.Props{Class: "size-3.5 text-muted-foreground"})
+												<span>Copy Entity ID</span>
+											</button>
+											<button @click="contextMenuAction('copyLabel')" class="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted transition-colors text-left">
+												@icon.Clipboard(icon.Props{Class: "size-3.5 text-muted-foreground"})
+												<span>Copy Label</span>
+											</button>
+										</div>
+									</div>
+									<!-- Right Side Panel - Node Details -->
+									<div
+										x-show="selectedNode"
+										x-transition:enter="transition ease-out duration-200"
+										x-transition:enter-start="opacity-0 w-0"
+										x-transition:enter-end="opacity-100"
+										x-transition:leave="transition ease-in duration-150"
+										x-transition:leave-start="opacity-100"
+										x-transition:leave-end="opacity-0 w-0"
+										class="w-80 border-l bg-background overflow-y-auto flex-shrink-0"
+									>
+										<div class="sticky top-0 z-10 bg-background border-b px-4 py-3">
+											<div class="flex items-center justify-between">
+												<h3 class="font-bold text-sm truncate flex-1" x-text="selectedNode?.label"></h3>
+												<button @click="selectedNode = null; selectedNodeEdges = []; graphDraw()" class="p-1 hover:bg-muted rounded-md flex-shrink-0 ml-2">
+													@icon.X(icon.Props{Class: "size-4"})
+												</button>
+											</div>
+										</div>
+										<div class="p-4 space-y-4 text-sm">
+											<!-- Node Type -->
+											<div>
+												<span class="text-xs text-muted-foreground uppercase tracking-wide block mb-1">{ i18n.T(ctx, "Type") }</span>
+												<div class="flex items-center gap-1.5">
+													<span class="size-3 rounded-full" :style="`background-color: ${entityColors[selectedNode?.node_type] || '#6b7280'}`"></span>
+													<span class="font-medium capitalize" x-text="(selectedNode?.node_type || '').toLowerCase().replace('_', ' ')"></span>
+												</div>
+											</div>
+											<!-- Description -->
+											<div x-show="selectedNode?.description">
+												<span class="text-xs text-muted-foreground uppercase tracking-wide block mb-1">{ i18n.T(ctx, "Description") }</span>
+												<p class="text-sm leading-relaxed" x-text="selectedNode?.description"></p>
+											</div>
+											<!-- Degree -->
+											<div>
+												<span class="text-xs text-muted-foreground uppercase tracking-wide block mb-1">{ i18n.T(ctx, "Connections") }</span>
+												<p class="font-mono text-lg font-bold" x-text="selectedNode?.degree || 0"></p>
+											</div>
+											<!-- Properties -->
+											<div x-show="getNodeProperties() && Object.keys(getNodeProperties()).length > 0">
+												<span class="text-xs text-muted-foreground uppercase tracking-wide block mb-1">{ i18n.T(ctx, "Properties") }</span>
+												<div class="space-y-1">
+													<template x-for="[key, val] in Object.entries(getNodeProperties())" :key="key">
+														<div class="flex justify-between items-start text-xs py-1 border-b border-dashed last:border-0">
+															<span class="text-muted-foreground font-mono" x-text="key"></span>
+															<span class="font-medium text-right ml-2 max-w-[150px] truncate" x-text="String(val)"></span>
+														</div>
+													</template>
+												</div>
+											</div>
+											@separator.Separator(separator.Props{})
+											<!-- Relationships -->
+											<div x-show="selectedNodeEdges.length > 0">
+												<span class="text-xs text-muted-foreground uppercase tracking-wide block mb-2">{ i18n.T(ctx, "Relationships") } <span class="text-foreground font-mono" x-text="selectedNodeEdges.length"></span></span>
+												<div class="space-y-1.5 max-h-80 overflow-y-auto">
+													<template x-for="edge in selectedNodeEdges" :key="(edge.source || '') + '-' + (edge.target || '') + '-' + (edge.edge_type || '')">
+														<button
+															@click="focusNode(edge.source === selectedNode?.id ? edge.target : edge.source)"
+															class="w-full text-left text-xs p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer group"
+														>
+															<div class="flex items-center gap-1 font-mono leading-relaxed">
+																<span class="truncate max-w-[90px]" :class="edge.source === selectedNode?.id ? 'font-bold text-foreground' : 'text-muted-foreground'" x-text="getNodeLabel(edge.source)"></span>
+																<span class="text-primary flex-shrink-0 group-hover:text-primary/80">→</span>
+																<span class="text-primary/70 flex-shrink-0 text-[10px]" x-text="edge.edge_type"></span>
+																<span class="text-primary flex-shrink-0 group-hover:text-primary/80">→</span>
+																<span class="truncate max-w-[90px]" :class="edge.target === selectedNode?.id ? 'font-bold text-foreground' : 'text-muted-foreground'" x-text="getNodeLabel(edge.target)"></span>
+															</div>
+														</button>
+													</template>
+												</div>
+											</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+					}
+					@tabs.Content(tabs.ContentProps{Value: "settings"}) {
+						<div class="space-y-6 mt-6 max-w-4xl">
+							<div class="grid gap-6 md:grid-cols-2">
+								<!-- Knowledge Graph Card -->
+								<div class="rounded-xl border bg-card shadow-sm overflow-hidden">
+									<div class="p-6">
+										<div class="flex items-center gap-3 mb-4">
+											<div class="p-2 bg-primary/10 rounded-lg text-primary">
+												@icon.Network(icon.Props{Class: "size-6"})
+											</div>
+											<h3 class="font-bold text-lg">{ i18n.T(ctx, "Knowledge Graph") }</h3>
+										</div>
+										<p class="text-sm text-muted-foreground mb-6">
+											{ i18n.T(ctx, "Rebuild the semantic relations between your documents. This can improve search quality but uses significant LLM resources.") }
+										</p>
+										<div class="space-y-4">
+											<div class="flex items-center gap-2">
+												<input type="checkbox" id="force-graph" x-model="rebuildGraphForce" class="rounded border-input text-primary focus:ring-primary"/>
+												<label for="force-graph" class="text-sm font-medium">{ i18n.T(ctx, "Force rebuild everything") }</label>
+											</div>
+											@button.Button(button.Props{
+												Attributes: templ.Attributes{
+													"@click":    "rebuildGraph()",
+													":disabled": "rebuildingGraph",
+												},
+												Class: "w-full",
+											}) {
+												<span x-show="!rebuildingGraph">{ i18n.T(ctx, "Rebuild Graph") }</span>
+												<span x-show="rebuildingGraph" class="flex items-center gap-2">
+													<span class="animate-spin size-4 border-2 border-white border-t-transparent rounded-full"></span>
+													{ i18n.T(ctx, "Queued...") }
+												</span>
+											}
+										</div>
+									</div>
+								</div>
+								<!-- Embeddings Card -->
+								<div class="rounded-xl border bg-card shadow-sm overflow-hidden">
+									<div class="p-6">
+										<div class="flex items-center gap-3 mb-4">
+											<div class="p-2 bg-primary/10 rounded-lg text-primary">
+												@icon.Layers(icon.Props{Class: "size-6"})
+											</div>
+											<h3 class="font-bold text-lg">{ i18n.T(ctx, "Embeddings") }</h3>
+										</div>
+										<p class="text-sm text-muted-foreground mb-6">
+											{ i18n.T(ctx, "Regenerate all document embeddings. Useful if you change the embedding model or want to ensure consistency.") }
+										</p>
+										<div class="space-y-4">
+											<div class="flex items-center gap-2">
+												<input type="checkbox" id="force-emb" x-model="rebuildEmbeddingsForce" class="rounded border-input text-primary focus:ring-primary"/>
+												<label for="force-emb" class="text-sm font-medium">{ i18n.T(ctx, "Force rebuild everything") }</label>
+											</div>
+											@button.Button(button.Props{
+												Attributes: templ.Attributes{
+													"@click":    "rebuildEmbeddings()",
+													":disabled": "rebuildingEmbeddings",
+												},
+												Class: "w-full",
+											}) {
+												<span x-show="!rebuildingEmbeddings">{ i18n.T(ctx, "Rebuild Embeddings") }</span>
+												<span x-show="rebuildingEmbeddings" class="flex items-center gap-2">
+													<span class="animate-spin size-4 border-2 border-white border-t-transparent rounded-full"></span>
+													{ i18n.T(ctx, "Queued...") }
+												</span>
+											}
+										</div>
+									</div>
+								</div>
+							</div>
+							<!-- Dangerous Zone -->
+							<div class="rounded-xl border border-destructive/20 bg-destructive/5 overflow-hidden">
+								<div class="p-6">
+									<h3 class="font-bold text-lg text-destructive mb-2">{ i18n.T(ctx, "Advanced Recovery") }</h3>
+									<p class="text-sm text-muted-foreground mb-6">
+										{ i18n.T(ctx, "If you encounter persistent issues with document ingestion, you can trigger recovery operations.") }
+									</p>
+									<div class="flex flex-wrap gap-3">
+										@button.Button(button.Props{
+											Variant: button.VariantOutline,
+											Class:   "text-destructive border-destructive hover:bg-destructive/10",
+											Attributes: templ.Attributes{
+												"@click":    "reprocessAll()",
+												":disabled": "reprocessingAll",
+											},
+										}) {
+											<span x-show="!reprocessingAll">{ i18n.T(ctx, "Reprocess All Documents") }</span>
+											<span x-show="reprocessingAll" class="flex items-center gap-2">
+												<span class="animate-spin size-4 border-2 border-destructive border-t-transparent rounded-full"></span>
+												{ i18n.T(ctx, "Queued...") }
+											</span>
+										}
+										@button.Button(button.Props{
+											Variant: button.VariantOutline,
+											Class:   "text-amber-600 border-amber-500 hover:bg-amber-500/10",
+											Attributes: templ.Attributes{
+												"@click":    "reprocessFailed()",
+												":disabled": "reprocessingFailed",
+											},
+										}) {
+											<span x-show="!reprocessingFailed">{ i18n.T(ctx, "Retry Failed Only") }</span>
+											<span x-show="reprocessingFailed" class="flex items-center gap-2">
+												<span class="animate-spin size-4 border-2 border-amber-500 border-t-transparent rounded-full"></span>
+												{ i18n.T(ctx, "Queued...") }
+											</span>
+										}
+										@button.Button(button.Props{
+											Variant: button.VariantOutline,
+											Class:   "text-blue-600 border-blue-500 hover:bg-blue-500/10",
+											Attributes: templ.Attributes{
+												"@click":    "scanDocuments()",
+												":disabled": "scanningDocuments",
+											},
+										}) {
+											<span x-show="!scanningDocuments">{ i18n.T(ctx, "Scan for Documents") }</span>
+											<span x-show="scanningDocuments" class="flex items-center gap-2">
+												<span class="animate-spin size-4 border-2 border-blue-500 border-t-transparent rounded-full"></span>
+												{ i18n.T(ctx, "Scanning...") }
+											</span>
+										}
+									</div>
+								</div>
+							</div>
+						</div>
+					}
+				}
+			</div>
+			<!-- Bulk Actions Floating Bar - Files -->
+			<div
+				x-show="selectedFiles.length > 0"
+				x-transition:enter="transition ease-out duration-300 transform"
+				x-transition:enter-start="translate-y-full"
+				x-transition:enter-end="translate-y-0"
+				x-transition:leave="transition ease-in duration-200 transform"
+				x-transition:leave-start="translate-y-0"
+				x-transition:leave-end="translate-y-full"
+				class="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-foreground text-background rounded-full px-6 py-3 shadow-2xl flex items-center gap-6"
+			>
+				<span class="text-sm font-medium" x-text="`${selectedFiles.length} files selected`"></span>
+				<div class="h-4 w-px bg-background/20"></div>
+				<div class="flex items-center gap-2">
+					<button @click="bulkDelete()" class="inline-flex items-center gap-1.5 hover:text-red-400 transition-colors text-sm font-medium">
+						@icon.Trash2(icon.Props{Class: "size-4"})
+						{ i18n.T(ctx, "Delete") }
+					</button>
+					<button @click="bulkReprocess()" class="inline-flex items-center gap-1.5 hover:text-primary-foreground/80 transition-colors text-sm font-medium px-4">
+						@icon.RefreshCw(icon.Props{Class: "size-4"})
+						{ i18n.T(ctx, "Reprocess") }
+					</button>
+				</div>
+				<button @click="selectedFiles = []" class="p-1 hover:bg-background/10 rounded-full transition-colors">
+					@icon.X(icon.Props{Class: "size-4"})
+				</button>
+			</div>
+			<!-- Bulk Actions Floating Bar - Documents -->
+			<div
+				x-show="selectedDocs.length > 0 && selectedFiles.length === 0"
+				x-transition:enter="transition ease-out duration-300 transform"
+				x-transition:enter-start="translate-y-full"
+				x-transition:enter-end="translate-y-0"
+				x-transition:leave="transition ease-in duration-200 transform"
+				x-transition:leave-start="translate-y-0"
+				x-transition:leave-end="translate-y-full"
+				class="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-foreground text-background rounded-full px-6 py-3 shadow-2xl flex items-center gap-6"
+			>
+				<span class="text-sm font-medium" x-text="`${selectedDocs.length} documents selected`"></span>
+				<div class="h-4 w-px bg-background/20"></div>
+				<div class="flex items-center gap-2">
+					<button @click="bulkDeleteDocs()" class="inline-flex items-center gap-1.5 hover:text-red-400 transition-colors text-sm font-medium">
+						@icon.Trash2(icon.Props{Class: "size-4"})
+						{ i18n.T(ctx, "Delete") }
+					</button>
+					<button @click="bulkReprocessDocs()" class="inline-flex items-center gap-1.5 hover:text-primary-foreground/80 transition-colors text-sm font-medium px-4">
+						@icon.RefreshCw(icon.Props{Class: "size-4"})
+						{ i18n.T(ctx, "Reprocess") }
+					</button>
+				</div>
+				<button @click="selectedDocs = []" class="p-1 hover:bg-background/10 rounded-full transition-colors">
+					@icon.X(icon.Props{Class: "size-4"})
+				</button>
+			</div>
+			<!-- Document Preview Panel -->
+			<div
+				x-show="previewDoc"
+				x-transition:enter="transition ease-out duration-300"
+				x-transition:enter-start="opacity-0"
+				x-transition:enter-end="opacity-100"
+				x-transition:leave="transition ease-in duration-200"
+				x-transition:leave-start="opacity-100"
+				x-transition:leave-end="opacity-0"
+				class="fixed inset-0 z-50 bg-black/50"
+				@click.self="closePreview()"
+			>
+				<div
+					x-transition:enter="transition ease-out duration-300 transform"
+					x-transition:enter-start="translate-x-full"
+					x-transition:enter-end="translate-x-0"
+					x-transition:leave="transition ease-in duration-200 transform"
+					x-transition:leave-start="translate-x-0"
+					x-transition:leave-end="translate-x-full"
+					class="absolute right-0 top-0 h-full w-full max-w-2xl bg-background border-l shadow-2xl overflow-y-auto"
+				>
+					<div class="sticky top-0 z-10 bg-background border-b px-6 py-4">
+						<div class="flex items-center justify-between">
+							<div class="min-w-0 flex-1">
+								<h2 class="text-lg font-bold truncate" x-text="previewDoc?.title || previewDoc?.file_name || 'Document'"></h2>
+								<div class="flex items-center gap-2 mt-1">
+									<span
+										class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium"
+										:class="{
+											'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400': (previewDoc?.status || previewDoc?.current_stage) === 'completed',
+											'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400': previewDoc?.status === 'failed',
+											'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400': isProcessingStatus(previewDoc?.status),
+											'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400': previewDoc?.status === 'pending',
+										}"
+										x-text="previewDoc?.current_stage || previewDoc?.status"
+									></span>
+									<span class="text-xs text-muted-foreground" x-text="previewDoc?.source_type"></span>
+								</div>
+							</div>
+							<button @click="closePreview()" class="p-2 hover:bg-muted rounded-md">
+								@icon.X(icon.Props{Class: "size-5"})
+							</button>
+						</div>
+					</div>
+					<div class="p-6 space-y-6">
+						<!-- Metadata Grid -->
+						<div class="grid grid-cols-2 gap-4 text-sm">
+							<div>
+								<span class="text-xs text-muted-foreground uppercase tracking-wide">{ i18n.T(ctx, "Chunks") }</span>
+								<p class="font-medium mt-0.5" x-text="previewDoc?.chunk_count || 0"></p>
+							</div>
+							<div>
+								<span class="text-xs text-muted-foreground uppercase tracking-wide">{ i18n.T(ctx, "Entities") }</span>
+								<p class="font-medium mt-0.5" x-text="previewDoc?.entity_count || 0"></p>
+							</div>
+							<div>
+								<span class="text-xs text-muted-foreground uppercase tracking-wide">{ i18n.T(ctx, "Cost") }</span>
+								<p class="font-medium mt-0.5 font-mono" x-text="previewDoc?.cost_usd ? ('$' + previewDoc.cost_usd.toFixed(4)) : '-'"></p>
+							</div>
+							<div>
+								<span class="text-xs text-muted-foreground uppercase tracking-wide">{ i18n.T(ctx, "Tokens") }</span>
+								<p class="font-medium mt-0.5 font-mono" x-text="(previewDoc?.total_tokens || 0).toLocaleString()"></p>
+							</div>
+							<div>
+								<span class="text-xs text-muted-foreground uppercase tracking-wide">{ i18n.T(ctx, "LLM Model") }</span>
+								<p class="font-medium mt-0.5" x-text="previewDoc?.llm_model || '-'"></p>
+							</div>
+							<div>
+								<span class="text-xs text-muted-foreground uppercase tracking-wide">{ i18n.T(ctx, "Embedding") }</span>
+								<p class="font-medium mt-0.5" x-text="previewDoc?.embedding_model || '-'"></p>
+							</div>
+							<div>
+								<span class="text-xs text-muted-foreground uppercase tracking-wide">{ i18n.T(ctx, "Created") }</span>
+								<p class="font-medium mt-0.5" x-text="formatDate(previewDoc?.created_at)"></p>
+							</div>
+							<div>
+								<span class="text-xs text-muted-foreground uppercase tracking-wide">{ i18n.T(ctx, "Updated") }</span>
+								<p class="font-medium mt-0.5" x-text="formatDate(previewDoc?.updated_at)"></p>
+							</div>
+						</div>
+						@separator.Separator(separator.Props{})
+						<!-- Error Message -->
+						<div x-show="previewDoc?.error_message" x-cloak class="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+							<h3 class="font-medium text-destructive text-sm mb-1">{ i18n.T(ctx, "Error") }</h3>
+							<p class="text-sm text-destructive/80 font-mono whitespace-pre-wrap" x-text="previewDoc?.error_message"></p>
+						</div>
+						<!-- Content Summary -->
+						<div x-show="previewDoc?.content_summary" x-cloak>
+							<h3 class="font-medium text-sm mb-2">{ i18n.T(ctx, "Summary") }</h3>
+							<p class="text-sm text-muted-foreground bg-muted/50 rounded-lg p-4" x-text="previewDoc?.content_summary"></p>
+						</div>
+						<!-- Content Preview -->
+						<div x-show="previewContent" x-cloak>
+							<h3 class="font-medium text-sm mb-2">{ i18n.T(ctx, "Content") }</h3>
+							<div class="bg-muted/50 rounded-lg p-4 max-h-96 overflow-y-auto">
+								<pre class="text-sm whitespace-pre-wrap font-mono break-words" x-text="previewContent"></pre>
+							</div>
+						</div>
+						<!-- Actions -->
+						<div class="flex items-center gap-2 pt-2">
+							<button
+								x-show="previewDoc?.status === 'failed' || previewDoc?.status === 'partial_failure'"
+								@click="previewDoc?.track_id ? retryTask(previewDoc.track_id) : reprocessDocument(previewDoc.id); closePreview()"
+								class="inline-flex items-center gap-1.5 rounded-md text-sm font-medium transition-colors border border-input bg-background hover:bg-accent px-4 h-9"
+							>
+								@icon.RotateCcw(icon.Props{Class: "size-4"})
+								{ i18n.T(ctx, "Retry") }
+							</button>
+							<button
+								x-show="previewDoc?.status === 'completed' || previewDoc?.status === 'indexed'"
+								@click="reprocessDocument(previewDoc.id); closePreview()"
+								class="inline-flex items-center gap-1.5 rounded-md text-sm font-medium transition-colors border border-input bg-background hover:bg-accent px-4 h-9"
+							>
+								@icon.RefreshCw(icon.Props{Class: "size-4"})
+								{ i18n.T(ctx, "Reprocess") }
+							</button>
+							<button
+								x-show="isTerminalStatus(previewDoc?.status)"
+								@click="deleteDocument(previewDoc.id, previewDoc.title || previewDoc.file_name); closePreview()"
+								class="inline-flex items-center gap-1.5 rounded-md text-sm font-medium transition-colors border border-destructive/50 text-destructive bg-background hover:bg-destructive/10 px-4 h-9"
+							>
+								@icon.Trash2(icon.Props{Class: "size-4"})
+								{ i18n.T(ctx, "Delete") }
+							</button>
+						</div>
+					</div>
+				</div>
+			</div>
+			<!-- Upload Dialog -->
+			@workspaceUploadDocumentDialog()
+		</div>
+	}
+}
+
+templ workspaceUploadDocumentDialog() {
+	@dialog.Dialog(dialog.Props{ID: "upload-document-dialog"}) {
+		@dialog.Content(dialog.ContentProps{Class: "sm:max-w-md"}) {
+			<div x-data="uploadDocumentForm()">
+				@dialog.Header(dialog.HeaderProps{}) {
+					@dialog.Title(dialog.TitleProps{}) {
+						{ i18n.T(ctx, "Upload Document") }
+					}
+					@dialog.Description(dialog.DescriptionProps{}) {
+						{ i18n.T(ctx, "Upload a file to this workspace. Supported formats: PDF, TXT, MD.") }
+					}
+				}
+				<div class="space-y-4 py-4">
+					<div class="grid w-full max-w-sm items-center gap-1.5">
+						<label class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" for="document-file">{ i18n.T(ctx, "File") }</label>
+						<input id="document-file" type="file" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" @change="fileSelected($event)"/>
+					</div>
+					<div x-show="uploading" class="space-y-2">
+						<div class="flex items-center justify-between text-xs">
+							<span>{ i18n.T(ctx, "Uploading...") }</span>
+							<span x-text="Math.round(progress) + '%'"></span>
+						</div>
+						<div class="h-2 w-full overflow-hidden rounded-full bg-secondary">
+							<div class="h-full bg-primary transition-all duration-300 ease-in-out" :style="`width: ${progress}%`"></div>
+						</div>
+					</div>
+					<div x-show="error" x-cloak class="rounded-lg border border-destructive/50 bg-destructive/10 p-3">
+						<p class="text-sm text-destructive" x-text="error"></p>
+					</div>
+				</div>
+				@dialog.Footer(dialog.FooterProps{}) {
+					@dialog.Close(dialog.CloseProps{}) {
+						@button.Button(button.Props{Variant: button.VariantOutline}) {
+							{ i18n.T(ctx, "Cancel") }
+						}
+					}
+					@button.Button(button.Props{
+						Attributes: templ.Attributes{
+							"@click":    "upload()",
+							":disabled": "!file || uploading",
+						},
+					}) {
+						<span x-show="!uploading">{ i18n.T(ctx, "Upload") }</span>
+						<span x-show="uploading" class="flex items-center gap-2">
+							<span class="animate-spin size-4 border-2 border-white border-t-transparent rounded-full"></span>
+							{ i18n.T(ctx, "Processing...") }
+						</span>
+					}
+				}
+			</div>
+		}
+	}
+}
+
+templ workspaceDetailsScript() {
+	<script>
+		document.addEventListener('alpine:init', () => {
+			Alpine.data('workspaceDetails', (workspaceId) => ({
+				workspaceId: workspaceId,
+				
+				// Files (PDFs)
+				filesLoading: true,
+				files: [],
+				fileSearch: '',
+				filePage: 1,
+				filePageSize: 10,
+				fileTotal: 0,
+				fileTotalPages: 0,
+				
+				// Ingested Documents
+				docsLoading: true,
+				documents: [],       // All documents from API (unfiltered)
+				docSearch: '',
+				docPage: 1,
+				docPageSize: 100,    // Fetch all for client-side filtering
+				docTotal: 0,
+				docTotalPages: 0,
+				docStatusFilter: '', // '', 'pending', 'processing', 'completed', 'failed', 'cancelled'
+				statusCounts: { pending: 0, processing: 0, completed: 0, partial_failure: 0, failed: 0, cancelled: 0 },
+
+				// Pipeline Status
+				pipelineStatus: null,
+				pipelineLoading: false,
+				pipelineTasks: [],
+				queueMetrics: null,
+				pipelinePollingInterval: null,
+				isRefreshing: false,
+
+				// Selection
+				selectedFiles: [],
+				selectedDocs: [],
+
+				// Document Preview
+				previewDoc: null,
+				previewContent: null,
+				previewLoading: false,
+
+				// Knowledge Graph
+				graphData: null,
+				graphLoading: false,
+				graphSearch: '',
+				graphMaxNodes: '100',
+				graphLayout: 'force-atlas',
+				selectedNode: null,
+				selectedNodeEdges: [],
+				graphShowLabels: true,
+				graphShowEdgeLabels: false,
+				graphVisibleTypes: [],
+				_graphNodes: [],
+				_graphEdges: [],
+				_graphNodeMap: {},
+				_graphTransform: { x: 0, y: 0, k: 1 },
+				_graphDragging: null,
+				_graphPanning: false,
+				_graphPanStart: { x: 0, y: 0 },
+				_graphHoveredNode: null,
+				_graphAnimFrame: null,
+				_graphCanvas: null,
+				_graphCtx: null,
+				_graphW: 0,
+				_graphH: 0,
+				_graphDpr: 1,
+				_graphResizeObs: null,
+				_graphContextMenu: { visible: false, x: 0, y: 0, node: null },
+				_graphSelectionPulse: 0,
+				_graphSelectionAnimFrame: null,
+				_graphSearchMatches: new Set(),
+				entityColors: {
+					'PERSON': '#3b82f6',
+					'ORGANIZATION': '#10b981',
+					'LOCATION': '#f59e0b',
+					'EVENT': '#ef4444',
+					'CONCEPT': '#8b5cf6',
+					'DOCUMENT': '#6366f1',
+					'TECHNOLOGY': '#06b6d4',
+					'CATEGORY': '#d946ef',
+					'GEO': '#f59e0b',
+					'DATE': '#f97316',
+					'PRODUCT': '#14b8a6',
+					'METRIC': '#ec4899',
+					'PROCESS': '#a855f7',
+					'REGULATION': '#64748b',
+					'UNKNOWN': '#6b7280',
+				},
+
+				// Rebuild/Reprocess states
+				rebuildingGraph: false,
+				rebuildGraphForce: false,
+				rebuildingEmbeddings: false,
+				rebuildEmbeddingsForce: false,
+				reprocessingAll: false,
+				reprocessingFailed: false,
+				scanningDocuments: false,
+				deletingAllDocs: false,
+
+				// Client-side filtered documents
+				get filteredDocuments() {
+					if (!this.docStatusFilter) return this.documents;
+					return this.documents.filter(doc => {
+						const status = doc.status || doc.current_stage || 'completed';
+						if (this.docStatusFilter === 'failed') {
+							return status === 'failed' || status === 'partial_failure';
+						}
+						return status === this.docStatusFilter;
+					});
+				},
+
+				init() {
+					this.loadFiles();
+					this.loadDocuments();
+					this.loadPipelineStatus();
+					this.loadQueueMetrics();
+					
+					// Start polling for pipeline status
+					this.pipelinePollingInterval = setInterval(() => {
+						this.loadPipelineStatus();
+						this.loadQueueMetrics();
+						// Auto-refresh docs if pipeline is busy
+						if (this.pipelineStatus && this.pipelineStatus.is_busy) {
+							this.loadDocuments();
+						}
+					}, 5000);
+					
+					window.addEventListener('document-uploaded', () => {
+						this.filePage = 1;
+						this.refreshAll();
+					});
+				},
+
+				destroy() {
+					if (this.pipelinePollingInterval) {
+						clearInterval(this.pipelinePollingInterval);
+					}
+					if (this._graphAnimFrame) {
+						cancelAnimationFrame(this._graphAnimFrame);
+					}
+					if (this._graphSelectionAnimFrame) {
+						cancelAnimationFrame(this._graphSelectionAnimFrame);
+					}
+					if (this._graphResizeObs) {
+						this._graphResizeObs.disconnect();
+					}
+				},
+
+				async refreshAll() {
+					if (this.isRefreshing) return;
+					this.isRefreshing = true;
+					try {
+						await Promise.all([
+							this.loadFiles(),
+							this.loadDocuments(),
+							this.loadPipelineStatus(),
+							this.loadQueueMetrics()
+						]);
+					} finally {
+						setTimeout(() => { this.isRefreshing = false; }, 600);
+					}
+				},
+
+				// === Pipeline Status ===
+				async loadPipelineStatus() {
+					try {
+						const resp = await fetch(`/api/knowledge/pipeline/enhanced-status?workspace_id=${this.workspaceId}`);
+						if (resp.ok) {
+							this.pipelineStatus = await resp.json();
+						}
+					} catch (e) {
+						console.error('Failed to load pipeline status:', e);
+					}
+				},
+
+				async loadQueueMetrics() {
+					try {
+						const resp = await fetch(`/api/knowledge/pipeline/queue-metrics?workspace_id=${this.workspaceId}`);
+						if (resp.ok) {
+							this.queueMetrics = await resp.json();
+						}
+					} catch (e) {
+						console.error('Failed to load queue metrics:', e);
+					}
+				},
+
+				// === Selection ===
+				toggleSelectAllFiles(checked) {
+					if (checked) {
+						this.selectedFiles = this.files.map(f => f.pdf_id);
+					} else {
+						this.selectedFiles = [];
+					}
+				},
+
+				toggleSelectAllDocs(checked) {
+					if (checked) {
+						this.selectedDocs = this.filteredDocuments.filter(d => this.isTerminalStatus(d.status)).map(d => d.id);
+					} else {
+						this.selectedDocs = [];
+					}
+				},
+
+				// === Bulk Operations ===
+				async bulkDelete() {
+					if (!confirm(`Are you sure you want to delete ${this.selectedFiles.length} files?`)) return;
+					
+					for (const id of this.selectedFiles) {
+						await fetch(`/api/knowledge/pdfs/${id}?workspace_id=${this.workspaceId}`, { method: 'DELETE' });
+					}
+					this.selectedFiles = [];
+					this.loadFiles();
+					this.loadDocuments();
+				},
+
+				async bulkReprocess() {
+					for (const pdfId of this.selectedFiles) {
+						await this.reprocessFile(pdfId);
+					}
+					this.selectedFiles = [];
+					this.refreshAll();
+				},
+
+				async bulkDeleteDocs() {
+					if (!confirm(`Are you sure you want to delete ${this.selectedDocs.length} documents?`)) return;
+					
+					for (const id of this.selectedDocs) {
+						await fetch(`/api/knowledge/documents/${id}?workspace_id=${this.workspaceId}`, { method: 'DELETE' });
+					}
+					this.selectedDocs = [];
+					this.loadDocuments();
+				},
+
+				async bulkReprocessDocs() {
+					for (const docId of this.selectedDocs) {
+						await this.reprocessDocument(docId);
+					}
+					this.selectedDocs = [];
+					this.refreshAll();
+				},
+
+				// === Rebuild/Reprocess ===
+				async rebuildGraph() {
+					this.rebuildingGraph = true;
+					try {
+						const resp = await fetch(`/api/knowledge/workspaces/${this.workspaceId}/rebuild`, {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({ type: 'graph', force: this.rebuildGraphForce })
+						});
+						if (resp.ok) {
+							this.refreshAll();
+						}
+					} finally {
+						setTimeout(() => { this.rebuildingGraph = false; }, 2000);
+					}
+				},
+
+				async rebuildEmbeddings() {
+					this.rebuildingEmbeddings = true;
+					try {
+						const resp = await fetch(`/api/knowledge/workspaces/${this.workspaceId}/rebuild`, {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({ type: 'embeddings', force: this.rebuildEmbeddingsForce })
+						});
+						if (resp.ok) {
+							this.refreshAll();
+						}
+					} finally {
+						setTimeout(() => { this.rebuildingEmbeddings = false; }, 2000);
+					}
+				},
+
+				async reprocessAll() {
+					if (!confirm('This will trigger reprocessing for ALL documents in this workspace. Continue?')) return;
+					this.reprocessingAll = true;
+					try {
+						const resp = await fetch(`/api/knowledge/workspaces/reprocess?workspace_id=${this.workspaceId}`, {
+							method: 'POST'
+						});
+						if (resp.ok) {
+							this.refreshAll();
+						}
+					} finally {
+						setTimeout(() => { this.reprocessingAll = false; }, 2000);
+					}
+				},
+
+				async reprocessFailed() {
+					this.reprocessingFailed = true;
+					try {
+						const resp = await fetch(`/api/knowledge/documents/reprocess-failed?workspace_id=${this.workspaceId}`, {
+							method: 'POST'
+						});
+						if (resp.ok) {
+							const data = await resp.json();
+							if (data.requeued === 0) {
+								alert('No failed documents found to reprocess.');
+							}
+							this.refreshAll();
+						}
+					} catch (e) {
+						console.error('Failed to reprocess failed documents:', e);
+					} finally {
+						setTimeout(() => { this.reprocessingFailed = false; }, 2000);
+					}
+				},
+
+				async scanDocuments() {
+					this.scanningDocuments = true;
+					try {
+						const resp = await fetch(`/api/knowledge/documents/scan?workspace_id=${this.workspaceId}`, {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({ path: './inputs' })
+						});
+						if (resp.ok) {
+							this.refreshAll();
+						} else {
+							const data = await resp.json();
+							alert(data.error || 'Failed to scan documents');
+						}
+					} catch (e) {
+						console.error('Failed to scan documents:', e);
+					} finally {
+						setTimeout(() => { this.scanningDocuments = false; }, 2000);
+					}
+				},
+
+				async deleteAllDocuments() {
+					if (!confirm('Are you sure you want to DELETE ALL documents in this workspace? This action cannot be undone.')) return;
+					if (!confirm('This is a destructive operation. Type "delete" to confirm.')) return;
+					
+					this.deletingAllDocs = true;
+					try {
+						const resp = await fetch(`/api/knowledge/documents?workspace_id=${this.workspaceId}`, {
+							method: 'DELETE'
+						});
+						if (resp.ok) {
+							const data = await resp.json();
+							alert(`Deleted ${data.deleted_count} documents.`);
+							this.refreshAll();
+						}
+					} catch (e) {
+						console.error('Failed to delete all documents:', e);
+					} finally {
+						setTimeout(() => { this.deletingAllDocs = false; }, 2000);
+					}
+				},
+
+				// === File Operations ===
+				async loadFiles() {
+					this.filesLoading = true;
+					try {
+						let url = `/api/knowledge/pdfs?workspace_id=${this.workspaceId}&page=${this.filePage}&page_size=${this.filePageSize}`;
+						if (this.fileSearch) {
+							url += `&search=${encodeURIComponent(this.fileSearch)}`;
+						}
+						
+						const resp = await fetch(url);
+						if (resp.ok) {
+							const data = await resp.json();
+							this.files = data.items || [];
+							this.fileTotal = data.pagination?.total_count || 0;
+							this.fileTotalPages = data.pagination?.total_pages || 0;
+						}
+					} catch (e) {
+						console.error('Failed to load files:', e);
+					} finally {
+						setTimeout(() => { this.filesLoading = false; }, 300);
+					}
+				},
+
+				// === Document Operations ===
+				async loadDocuments() {
+					this.docsLoading = true;
+					try {
+						let url = `/api/knowledge/documents?workspace_id=${this.workspaceId}&page=1&page_size=500`;
+						
+						const resp = await fetch(url);
+						if (resp.ok) {
+							const data = await resp.json();
+							this.documents = data.documents || [];
+							this.docTotal = data.total || this.documents.length;
+							this.docTotalPages = 1;
+							// Use server status_counts if available, otherwise compute client-side
+							if (data.status_counts && Object.values(data.status_counts).some(v => v > 0)) {
+								this.statusCounts = data.status_counts;
+							} else {
+								this.computeStatusCounts();
+							}
+						}
+					} catch (e) {
+						console.error('Failed to load documents:', e);
+					} finally {
+						setTimeout(() => { this.docsLoading = false; }, 300);
+					}
+				},
+
+				computeStatusCounts() {
+					const counts = { pending: 0, processing: 0, completed: 0, partial_failure: 0, failed: 0, cancelled: 0 };
+					for (const doc of this.documents) {
+						const status = doc.status || doc.current_stage || 'completed';
+						if (status in counts) {
+							counts[status]++;
+						} else if (['uploading', 'converting', 'preprocessing', 'chunking', 'extracting', 'gleaning', 'merging', 'summarizing', 'embedding', 'storing', 'indexing'].includes(status)) {
+							counts.processing++;
+						} else if (status === 'indexed' || status === 'partial_success') {
+							counts.completed++;
+						} else {
+							counts.completed++;
+						}
+					}
+					this.statusCounts = counts;
+				},
+
+				filterByStatus(status) {
+					this.docStatusFilter = status;
+					this.selectedDocs = [];
+				},
+
+				async deleteFile(id, name) {
+					if (!confirm(`Are you sure you want to delete file "${name}"? This action cannot be undone.`)) {
+						return;
+					}
+					
+					try {
+						const resp = await fetch(`/api/knowledge/pdfs/${id}?workspace_id=${this.workspaceId}`, {
+							method: 'DELETE',
+						});
+						
+						if (resp.ok) {
+							this.loadFiles();
+							this.loadDocuments();
+						} else {
+							alert('Failed to delete file');
+						}
+					} catch (e) {
+						console.error('Failed to delete file:', e);
+						alert('An error occurred while deleting the file');
+					}
+				},
+
+				async retryPdf(pdfId) {
+					try {
+						const resp = await fetch(`/api/knowledge/pdfs/${pdfId}/retry`, {
+							method: 'POST'
+						});
+						if (resp.ok) {
+							this.refreshAll();
+						} else {
+							const data = await resp.json();
+							alert(data.error || 'Failed to retry PDF processing');
+						}
+					} catch (e) {
+						console.error('Failed to retry PDF:', e);
+					}
+				},
+
+				async reprocessDocument(id) {
+					try {
+						const resp = await fetch(`/api/knowledge/documents/reprocess?workspace_id=${this.workspaceId}`, {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({ document_id: id })
+						});
+						if (resp.ok) {
+							this.refreshAll();
+						}
+					} catch (e) {
+						console.error('Failed to reprocess document:', e);
+					}
+				},
+
+				async cancelTask(taskId) {
+					try {
+						const resp = await fetch(`/api/knowledge/pipeline/cancel`, {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({ task_id: taskId })
+						});
+						if (resp.ok || resp.status === 409) {
+							this.loadDocuments();
+							this.loadPipelineStatus();
+						}
+					} catch (e) {
+						console.error('Failed to cancel task:', e);
+					}
+				},
+
+				async retryTask(trackId) {
+					try {
+						const resp = await fetch(`/api/knowledge/pipeline/retry`, {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({ task_id: trackId })
+						});
+						if (resp.ok) {
+							this.refreshAll();
+						} else {
+							const data = await resp.json();
+							alert(data.error || 'Failed to retry task');
+						}
+					} catch (e) {
+						console.error('Failed to retry task:', e);
+					}
+				},
+
+				async deleteDocument(id, title) {
+					if (!confirm(`Are you sure you want to delete "${title}"?`)) return;
+					try {
+						const resp = await fetch(`/api/knowledge/documents/${id}?workspace_id=${this.workspaceId}`, {
+							method: 'DELETE'
+						});
+						if (resp.ok) {
+							this.loadDocuments();
+						} else {
+							alert('Failed to delete document');
+						}
+					} catch (e) {
+						console.error('Failed to delete document:', e);
+					}
+				},
+
+				async cancelDocumentTask(docId, trackId) {
+					const finalTrackId = trackId || 
+						this.pipelineTasks.find(t => t.document_id === docId)?.track_id ||
+						this.documents.find(d => d.id === docId)?.track_id;
+
+					if (finalTrackId) {
+						await this.cancelTask(finalTrackId);
+					} else {
+						console.warn('Could not find track_id for document cancellation:', docId);
+					}
+				},
+
+				async reprocessFile(pdfId) {
+					const doc = this.documents.find(d => d.pdf_id === pdfId);
+					if (doc) {
+						await this.reprocessDocument(doc.id);
+					} else {
+						// Try retrying PDF processing directly
+						await this.retryPdf(pdfId);
+					}
+				},
+
+				// === Utilities ===
+				formatBytes(bytes, decimals = 2) {
+					if (!+bytes) return '0 Bytes';
+					const k = 1024;
+					const dm = decimals < 0 ? 0 : decimals;
+					const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+					const i = Math.floor(Math.log(bytes) / Math.log(k));
+					return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+				},
+
+				formatDate(dateString) {
+					if (!dateString) return '';
+					return new Date(dateString).toLocaleDateString(undefined, {
+						year: 'numeric',
+						month: 'short',
+						day: 'numeric',
+						hour: '2-digit',
+						minute: '2-digit'
+					});
+				},
+
+				formatDuration(seconds) {
+					if (!seconds || seconds <= 0) return '-';
+					if (seconds < 60) return `${Math.round(seconds)}s`;
+					if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+					return `${Math.round(seconds / 3600)}h ${Math.round((seconds % 3600) / 60)}m`;
+				},
+
+				isProcessingStatus(status) {
+					if (!status) return false;
+					return [
+						'processing', 'pending', 'uploading', 'converting', 
+						'preprocessing', 'chunking', 'extracting', 'gleaning', 
+						'merging', 'summarizing', 'embedding', 'storing', 'indexing'
+					].includes(status.toLowerCase());
+				},
+
+				isTerminalStatus(status) {
+					if (!status) return false;
+					return [
+						'completed', 'indexed', 'failed', 'partial_failure', 'partial_success', 'cancelled'
+					].includes(status.toLowerCase());
+				},
+
+				stageIcon(stage) {
+					const icons = {
+						'uploading': '📤', 'converting': '🔄', 'preprocessing': '⚙️',
+						'chunking': '✂️', 'extracting': '🔍', 'gleaning': '🔬',
+						'merging': '🔗', 'summarizing': '📝', 'embedding': '📊',
+						'storing': '💾', 'completed': '✅', 'failed': '❌',
+						'pending': '⏳', 'indexing': '📁', 'cancelled': '🚫'
+					};
+					return icons[stage] || '⏳';
+				},
+
+				// === Document Preview ===
+				async openDocumentPreview(doc) {
+					this.previewDoc = doc;
+					this.previewContent = null;
+					
+					// Try to load full document detail
+					try {
+						const resp = await fetch(`/api/knowledge/documents/${doc.id}?workspace_id=${this.workspaceId}`);
+						if (resp.ok) {
+							const detail = await resp.json();
+							this.previewDoc = { ...doc, ...detail };
+							if (detail.content) {
+								this.previewContent = detail.content;
+							}
+						}
+					} catch (e) {
+						console.error('Failed to load document detail:', e);
+					}
+
+					// If document has a PDF, try to load PDF content
+					if (doc.pdf_id && !this.previewContent) {
+						try {
+							const resp = await fetch(`/api/knowledge/pdfs/${doc.pdf_id}/content?workspace_id=${this.workspaceId}`);
+							if (resp.ok) {
+								const pdfContent = await resp.json();
+								if (pdfContent.markdown_content) {
+									this.previewContent = pdfContent.markdown_content;
+								}
+							}
+						} catch (e) {
+							console.error('Failed to load PDF content:', e);
+						}
+					}
+				},
+
+				closePreview() {
+					this.previewDoc = null;
+					this.previewContent = null;
+				},
+
+				// === Knowledge Graph ===
+				async loadGraph() {
+					this.graphLoading = true;
+					this.selectedNode = null;
+					this.selectedNodeEdges = [];
+					try {
+						const resp = await fetch(`/api/knowledge/graph?workspace_id=${this.workspaceId}&max_nodes=${this.graphMaxNodes}`);
+						if (resp.ok) {
+							this.graphData = await resp.json();
+							// Initialize visible types from data
+							const types = new Set();
+							(this.graphData.nodes || []).forEach(n => types.add(n.node_type || 'UNKNOWN'));
+							this.graphVisibleTypes = [...types];
+							this.$nextTick(() => this.initGraph());
+						} else {
+							this.graphData = null;
+						}
+					} catch (e) {
+						console.error('Failed to load graph:', e);
+						this.graphData = null;
+					} finally {
+						this.graphLoading = false;
+					}
+				},
+
+				async searchGraph() {
+					if (!this.graphSearch.trim()) {
+						this._graphSearchMatches = new Set();
+						this.loadGraph();
+						return;
+					}
+					this.graphLoading = true;
+					try {
+						const resp = await fetch(`/api/knowledge/graph/nodes/search?workspace_id=${this.workspaceId}&q=${encodeURIComponent(this.graphSearch)}&limit=50`);
+						if (resp.ok) {
+							const data = await resp.json();
+							this.graphData = {
+								nodes: data.nodes || [],
+								edges: data.edges || [],
+								total_nodes: data.total_matches || 0,
+								total_edges: (data.edges || []).length,
+								is_truncated: data.is_truncated || false,
+							};
+							const types = new Set();
+							(this.graphData.nodes || []).forEach(n => types.add(n.node_type || 'UNKNOWN'));
+							this.graphVisibleTypes = [...types];
+							// Mark search matches for highlighting
+							this._graphSearchMatches = new Set((data.nodes || []).map(n => n.id));
+							this.$nextTick(() => this.initGraph());
+						}
+					} catch (e) {
+						console.error('Failed to search graph:', e);
+					} finally {
+						this.graphLoading = false;
+					}
+				},
+
+				getNodeLabel(nodeId) {
+					if (!nodeId) return '';
+					const node = this._graphNodeMap[nodeId];
+					return node ? node.label : nodeId.substring(0, 8);
+				},
+
+				// Safe properties accessor: handles json.RawMessage (already object) or JSON string
+				getNodeProperties() {
+					const props = this.selectedNode?.properties;
+					if (!props) return {};
+					if (typeof props === 'object') return props;
+					try { return JSON.parse(props); } catch { return {}; }
+				},
+
+				// Context menu actions
+				contextMenuAction(action) {
+					const node = this._graphContextMenu?.node;
+					this._graphContextMenu = { visible: false };
+					if (!node) return;
+					switch (action) {
+						case 'details':
+							this.selectedNode = node;
+							this.selectedNodeEdges = this._graphEdges.filter(
+								e => e.source === node.id || e.target === node.id
+							);
+							this.graphDraw();
+							break;
+						case 'focus':
+							this.focusNode(node.id);
+							break;
+						case 'neighbors':
+							this.selectedNode = node;
+							this.selectedNodeEdges = this._graphEdges.filter(
+								e => e.source === node.id || e.target === node.id
+							);
+							this.graphDraw();
+							break;
+						case 'copyId':
+							navigator.clipboard.writeText(node.id).catch(() => {});
+							break;
+						case 'copyLabel':
+							navigator.clipboard.writeText(node.label).catch(() => {});
+							break;
+					}
+				},
+
+				// Selection pulsing animation (like Edgequake: border oscillates 3.5-4.5px at 20fps)
+				_startSelectionPulse() {
+					if (this._graphSelectionAnimFrame) return;
+					const animate = () => {
+						this._graphSelectionPulse = (this._graphSelectionPulse + 0.1) % (Math.PI * 2);
+						this.graphDraw();
+						if (this.selectedNode) {
+							this._graphSelectionAnimFrame = setTimeout(() => {
+								requestAnimationFrame(animate);
+							}, 50); // ~20fps
+						} else {
+							this._graphSelectionAnimFrame = null;
+						}
+					};
+					requestAnimationFrame(animate);
+				},
+
+				_stopSelectionPulse() {
+					if (this._graphSelectionAnimFrame) {
+						clearTimeout(this._graphSelectionAnimFrame);
+						this._graphSelectionAnimFrame = null;
+					}
+					this._graphSelectionPulse = 0;
+				},
+
+				toggleEntityType(type) {
+					const idx = this.graphVisibleTypes.indexOf(type);
+					if (idx >= 0) {
+						this.graphVisibleTypes.splice(idx, 1);
+					} else {
+						this.graphVisibleTypes.push(type);
+					}
+					this.graphDraw();
+				},
+
+				focusNode(nodeId) {
+					const node = this._graphNodeMap[nodeId];
+					if (!node) return;
+					// Select the node
+					this.selectedNode = node;
+					this.selectedNodeEdges = this._graphEdges.filter(
+						e => e.source === node.id || e.target === node.id
+					);
+					this._startSelectionPulse();
+					// Animate camera to center on node
+					const t = this._graphTransform;
+					const targetX = this._graphW / 2 - node.x * t.k;
+					const targetY = this._graphH / 2 - node.y * t.k;
+					const startX = t.x, startY = t.y;
+					const duration = 400;
+					const start = performance.now();
+					const animate = (now) => {
+						const elapsed = Math.min(1, (now - start) / duration);
+						// Ease out cubic for smoother deceleration
+						const ease = 1 - Math.pow(1 - elapsed, 3);
+						t.x = startX + (targetX - startX) * ease;
+						t.y = startY + (targetY - startY) * ease;
+						this.graphDraw();
+						if (elapsed < 1) requestAnimationFrame(animate);
+					};
+					requestAnimationFrame(animate);
+				},
+
+				// Graph initialization
+				initGraph() {
+					const canvas = document.getElementById('graph-canvas');
+					if (!canvas || !this.graphData || !this.graphData.nodes?.length) return;
+
+					// Cleanup previous
+					if (this._graphAnimFrame) cancelAnimationFrame(this._graphAnimFrame);
+					if (this._graphResizeObs) this._graphResizeObs.disconnect();
+
+					const ctx = canvas.getContext('2d');
+					this._graphCanvas = canvas;
+					this._graphCtx = ctx;
+
+					const setupSize = () => {
+						const container = canvas.parentElement;
+						const rect = container.getBoundingClientRect();
+						this._graphDpr = window.devicePixelRatio || 1;
+						canvas.width = rect.width * this._graphDpr;
+						canvas.height = rect.height * this._graphDpr;
+						canvas.style.width = rect.width + 'px';
+						canvas.style.height = rect.height + 'px';
+						this._graphW = rect.width;
+						this._graphH = rect.height;
+					};
+					setupSize();
+
+					// ResizeObserver for responsive canvas
+					this._graphResizeObs = new ResizeObserver(() => {
+						setupSize();
+						this.graphDraw();
+					});
+					this._graphResizeObs.observe(canvas.parentElement);
+
+					// Compute max degree for node sizing
+					const maxDegree = Math.max(1, ...this.graphData.nodes.map(n => n.degree || 1));
+
+					// Build positioned nodes
+					const W = this._graphW;
+					const H = this._graphH;
+					const nodes = this.graphData.nodes.map((n) => ({
+						...n,
+						x: W / 2 + (Math.random() - 0.5) * W * 0.6,
+						y: H / 2 + (Math.random() - 0.5) * H * 0.6,
+						vx: 0, vy: 0,
+						// Logarithmic sizing like Sigma.js: base + log scale
+						radius: Math.max(4, Math.min(24, 6 + Math.log2(1 + (n.degree || 1)) * (14 / Math.log2(1 + maxDegree)))),
+					}));
+
+					const nodeMap = {};
+					nodes.forEach(n => { nodeMap[n.id] = n; });
+
+					const edges = (this.graphData.edges || []).filter(e => nodeMap[e.source] && nodeMap[e.target]);
+
+					this._graphNodes = nodes;
+					this._graphEdges = edges;
+					this._graphNodeMap = nodeMap;
+					this._graphTransform = { x: 0, y: 0, k: 1 };
+					this._graphHoveredNode = null;
+					this._graphDragging = null;
+
+					// Apply layout
+					this.applyLayout();
+
+					// Setup mouse events
+					this._setupGraphInteraction(canvas);
+				},
+
+				applyLayout() {
+					const nodes = this._graphNodes;
+					const edges = this._graphEdges;
+					const nodeMap = this._graphNodeMap;
+					const W = this._graphW;
+					const H = this._graphH;
+					if (!nodes.length) return;
+
+					if (this._graphAnimFrame) cancelAnimationFrame(this._graphAnimFrame);
+
+					const layout = this.graphLayout;
+
+					if (layout === 'circular') {
+						// Circular layout
+						const cx = W / 2, cy = H / 2;
+						const radius = Math.min(W, H) * 0.35;
+						nodes.forEach((n, i) => {
+							const angle = (2 * Math.PI * i) / nodes.length;
+							n.x = cx + Math.cos(angle) * radius;
+							n.y = cy + Math.sin(angle) * radius;
+							n.vx = 0; n.vy = 0;
+						});
+						this._graphTransform = { x: 0, y: 0, k: 1 };
+						this.graphDraw();
+						return;
+					}
+
+					if (layout === 'hierarchical') {
+						// Group by type, arrange in rows
+						const groups = {};
+						nodes.forEach(n => {
+							const t = n.node_type || 'UNKNOWN';
+							if (!groups[t]) groups[t] = [];
+							groups[t].push(n);
+						});
+						const typeKeys = Object.keys(groups);
+						const rowHeight = H / (typeKeys.length + 1);
+						typeKeys.forEach((type, rowIdx) => {
+							const row = groups[type];
+							const colWidth = W / (row.length + 1);
+							row.forEach((n, colIdx) => {
+								n.x = colWidth * (colIdx + 1);
+								n.y = rowHeight * (rowIdx + 1);
+								n.vx = 0; n.vy = 0;
+							});
+						});
+						this._graphTransform = { x: 0, y: 0, k: 1 };
+						this.graphDraw();
+						return;
+					}
+
+					// Force-based layouts (ForceAtlas2 / Force Directed)
+					const isFA2 = layout === 'force-atlas';
+					const gravity = isFA2 ? 1.0 : 0.5;
+					const scalingRatio = isFA2 ? 2.0 : 5.0;
+					const useBarnesHut = nodes.length > 100;
+					const maxIterations = isFA2 ? 100 : 150;
+					let iterations = 0;
+
+					// Build adjacency for degree computation
+					const adjacency = {};
+					nodes.forEach(n => { adjacency[n.id] = []; });
+					edges.forEach(e => {
+						if (adjacency[e.source]) adjacency[e.source].push(e.target);
+						if (adjacency[e.target]) adjacency[e.target].push(e.source);
+					});
+
+					const simulate = () => {
+						iterations++;
+						const alpha = Math.max(0.001, 1 - iterations / maxIterations);
+						const repulsionK = scalingRatio * 100;
+
+						if (useBarnesHut) {
+							// Barnes-Hut approximation using quadtree
+							const qt = this._buildQuadTree(nodes, W, H);
+							for (const n of nodes) {
+								if (n === this._graphDragging) continue;
+								const force = this._queryQuadTree(qt, n, repulsionK, 0.5);
+								n.vx += force.fx * alpha;
+								n.vy += force.fy * alpha;
+							}
+						} else {
+							// Direct N-body repulsion
+							for (let i = 0; i < nodes.length; i++) {
+								if (nodes[i] === this._graphDragging) continue;
+								for (let j = i + 1; j < nodes.length; j++) {
+									const ni = nodes[i], nj = nodes[j];
+									let dx = nj.x - ni.x;
+									let dy = nj.y - ni.y;
+									let dist = Math.sqrt(dx * dx + dy * dy) || 1;
+									// ForceAtlas2 repulsion: k * (deg+1) * (deg+1) / dist
+									const degI = (adjacency[ni.id]?.length || 0) + 1;
+									const degJ = (adjacency[nj.id]?.length || 0) + 1;
+									let force;
+									if (isFA2) {
+										force = -repulsionK * degI * degJ / (dist * dist);
+									} else {
+										force = -repulsionK / (dist * dist);
+									}
+									const fx = (dx / dist) * force * alpha;
+									const fy = (dy / dist) * force * alpha;
+									ni.vx -= fx;
+									ni.vy -= fy;
+									nj.vx += fx;
+									nj.vy += fy;
+								}
+							}
+						}
+
+						// Edge attraction
+						for (const e of edges) {
+							const s = nodeMap[e.source];
+							const t = nodeMap[e.target];
+							if (!s || !t) continue;
+							let dx = t.x - s.x;
+							let dy = t.y - s.y;
+							let dist = Math.sqrt(dx * dx + dy * dy) || 1;
+							let force;
+							if (isFA2) {
+								// ForceAtlas2: linear attraction
+								force = dist * 0.01 * alpha;
+							} else {
+								// Spring force
+								force = (dist - 100) * 0.02 * alpha;
+							}
+							const weight = e.weight || 1;
+							const fx = (dx / dist) * force * weight;
+							const fy = (dy / dist) * force * weight;
+							if (s !== this._graphDragging) { s.vx += fx; s.vy += fy; }
+							if (t !== this._graphDragging) { t.vx -= fx; t.vy -= fy; }
+						}
+
+						// Center gravity (strong gravity mode for FA2)
+						for (const n of nodes) {
+							if (n === this._graphDragging) continue;
+							const dx = W / 2 - n.x;
+							const dy = H / 2 - n.y;
+							const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+							if (isFA2) {
+								// Strong gravity
+								const deg = (adjacency[n.id]?.length || 0) + 1;
+								n.vx += (dx / dist) * gravity * deg * alpha;
+								n.vy += (dy / dist) * gravity * deg * alpha;
+							} else {
+								n.vx += dx * 0.01 * gravity * alpha;
+								n.vy += dy * 0.01 * gravity * alpha;
+							}
+						}
+
+						// Apply velocities with damping
+						const damping = isFA2 ? 0.5 : 0.6;
+						const speed = isFA2 ? 1.0 : 0.8;
+						for (const n of nodes) {
+							if (n === this._graphDragging) continue;
+							n.vx *= damping;
+							n.vy *= damping;
+							// Speed limit
+							const vmag = Math.sqrt(n.vx * n.vx + n.vy * n.vy);
+							const maxSpeed = 10 * speed;
+							if (vmag > maxSpeed) {
+								n.vx = (n.vx / vmag) * maxSpeed;
+								n.vy = (n.vy / vmag) * maxSpeed;
+							}
+							n.x += n.vx;
+							n.y += n.vy;
+						}
+
+						this.graphDraw();
+						if (iterations < maxIterations) {
+							this._graphAnimFrame = requestAnimationFrame(simulate);
+						}
+					};
+
+					simulate();
+				},
+
+				// Simple quadtree for Barnes-Hut
+				_buildQuadTree(nodes, W, H) {
+					const root = { x: 0, y: 0, w: W, h: H, mass: 0, cx: 0, cy: 0, children: null, node: null };
+					for (const n of nodes) {
+						this._insertQuadTree(root, n, 0);
+					}
+					return root;
+				},
+
+				_insertQuadTree(cell, node, depth) {
+					if (depth > 20) return;
+					if (cell.mass === 0 && !cell.node) {
+						cell.node = node;
+						cell.mass = 1;
+						cell.cx = node.x;
+						cell.cy = node.y;
+						return;
+					}
+					if (!cell.children) {
+						cell.children = [];
+						const hw = cell.w / 2, hh = cell.h / 2;
+						cell.children.push({ x: cell.x, y: cell.y, w: hw, h: hh, mass: 0, cx: 0, cy: 0, children: null, node: null });
+						cell.children.push({ x: cell.x + hw, y: cell.y, w: hw, h: hh, mass: 0, cx: 0, cy: 0, children: null, node: null });
+						cell.children.push({ x: cell.x, y: cell.y + hh, w: hw, h: hh, mass: 0, cx: 0, cy: 0, children: null, node: null });
+						cell.children.push({ x: cell.x + hw, y: cell.y + hh, w: hw, h: hh, mass: 0, cx: 0, cy: 0, children: null, node: null });
+						if (cell.node) {
+							this._insertQuadTree(this._getQuadrant(cell, cell.node), cell.node, depth + 1);
+							cell.node = null;
+						}
+					}
+					cell.cx = (cell.cx * cell.mass + node.x) / (cell.mass + 1);
+					cell.cy = (cell.cy * cell.mass + node.y) / (cell.mass + 1);
+					cell.mass++;
+					this._insertQuadTree(this._getQuadrant(cell, node), node, depth + 1);
+				},
+
+				_getQuadrant(cell, node) {
+					const mx = cell.x + cell.w / 2;
+					const my = cell.y + cell.h / 2;
+					const idx = (node.x >= mx ? 1 : 0) + (node.y >= my ? 2 : 0);
+					return cell.children[idx];
+				},
+
+				_queryQuadTree(cell, node, k, theta) {
+					let fx = 0, fy = 0;
+					if (cell.mass === 0) return { fx, fy };
+					const dx = cell.cx - node.x;
+					const dy = cell.cy - node.y;
+					const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+					
+					if (cell.children === null || (cell.w / dist) < theta) {
+						if (cell.node === node) return { fx: 0, fy: 0 };
+						const force = -k * cell.mass / (dist * dist);
+						return { fx: (dx / dist) * force, fy: (dy / dist) * force };
+					}
+					
+					for (const child of cell.children) {
+						const f = this._queryQuadTree(child, node, k, theta);
+						fx += f.fx;
+						fy += f.fy;
+					}
+					return { fx, fy };
+				},
+
+				// Graph rendering - Professional quality matching Edgequake UI
+				graphDraw() {
+					const ctx = this._graphCtx;
+					const canvas = this._graphCanvas;
+					if (!ctx || !canvas) return;
+
+					const dpr = this._graphDpr;
+					const W = this._graphW;
+					const H = this._graphH;
+					const t = this._graphTransform;
+					const nodes = this._graphNodes;
+					const edges = this._graphEdges;
+					const nodeMap = this._graphNodeMap;
+					const isDark = document.documentElement.classList.contains('dark');
+
+					ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+					ctx.clearRect(0, 0, W, H);
+
+					// Background with subtle grid pattern
+					ctx.fillStyle = isDark ? '#0f1117' : '#fafbfc';
+					ctx.fillRect(0, 0, W, H);
+					if (t.k > 0.3) {
+						const gridSize = 40 * t.k;
+						ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.03)';
+						ctx.lineWidth = 1;
+						const offsetX = t.x % gridSize;
+						const offsetY = t.y % gridSize;
+						for (let x = offsetX; x < W; x += gridSize) {
+							ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+						}
+						for (let y = offsetY; y < H; y += gridSize) {
+							ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+						}
+					}
+
+					ctx.save();
+					ctx.translate(t.x, t.y);
+					ctx.scale(t.k, t.k);
+
+					// Determine visible nodes
+					const visibleTypes = new Set(this.graphVisibleTypes);
+					const visibleNodes = new Set();
+					nodes.forEach(n => {
+						if (visibleTypes.has(n.node_type || 'UNKNOWN')) visibleNodes.add(n.id);
+					});
+
+					// Neighbor highlighting
+					const highlightedNodes = new Set();
+					const highlightedEdges = new Set();
+					const selectedId = this.selectedNode?.id;
+					const hoveredId = this._graphHoveredNode?.id;
+					const focusId = selectedId || hoveredId;
+					
+					if (focusId) {
+						highlightedNodes.add(focusId);
+						edges.forEach((e, i) => {
+							if (e.source === focusId || e.target === focusId) {
+								highlightedEdges.add(i);
+								highlightedNodes.add(e.source);
+								highlightedNodes.add(e.target);
+							}
+						});
+					}
+
+					// Search match highlighting
+					const searchMatches = this._graphSearchMatches;
+					const hasSearchMatches = searchMatches && searchMatches.size > 0;
+
+					// Build parallel edge map for offset curves
+					const edgePairCount = {};
+					const edgePairIndex = {};
+					edges.forEach((e, idx) => {
+						const key = [e.source, e.target].sort().join('|');
+						edgePairCount[key] = (edgePairCount[key] || 0) + 1;
+						edgePairIndex[idx] = edgePairCount[key] - 1;
+					});
+
+					// Draw edges
+					edges.forEach((e, idx) => {
+						const s = nodeMap[e.source];
+						const tgt = nodeMap[e.target];
+						if (!s || !tgt) return;
+						if (!visibleNodes.has(e.source) || !visibleNodes.has(e.target)) return;
+
+						const isHighlighted = highlightedEdges.has(idx);
+						const dimmed = focusId && !isHighlighted;
+
+						// Skip completely hidden edges (Edgequake-style: hide non-connected on hover)
+						if (dimmed && hoveredId) return;
+
+						// Curved edge with Edgequake curvature=0.25 and parallel edge offset
+						const dx = tgt.x - s.x;
+						const dy = tgt.y - s.y;
+						const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+						const pairKey = [e.source, e.target].sort().join('|');
+						const pairTotal = edgePairCount[pairKey] || 1;
+						const pairIdx = edgePairIndex[idx] || 0;
+						// Base curvature + offset for parallel edges
+						const curvature = 0.25 + (pairTotal > 1 ? (pairIdx - (pairTotal - 1) / 2) * 0.15 : 0);
+						const cx = (s.x + tgt.x) / 2 + dy * curvature;
+						const cy = (s.y + tgt.y) / 2 - dx * curvature;
+
+						ctx.beginPath();
+						ctx.moveTo(s.x, s.y);
+						ctx.quadraticCurveTo(cx, cy, tgt.x, tgt.y);
+						
+						const weight = Math.max(0.5, Math.min(4, (e.weight || 1)));
+						ctx.lineWidth = isHighlighted ? weight * 2.5 : weight * 0.8;
+						
+						if (isHighlighted) {
+							ctx.strokeStyle = isDark ? '#60a5fa' : '#3b82f6';
+							ctx.globalAlpha = 0.9;
+						} else if (dimmed) {
+							ctx.strokeStyle = isDark ? '#1f2937' : '#e5e7eb';
+							ctx.globalAlpha = 0.08;
+						} else {
+							ctx.strokeStyle = isDark ? '#374151' : '#94a3b8';
+							ctx.globalAlpha = 0.35;
+						}
+						ctx.stroke();
+						ctx.globalAlpha = 1;
+
+						// Arrow head (refined)
+						if (t.k > 0.25) {
+							const arrowSize = isHighlighted ? 9 : 6;
+							const targetR = tgt.radius || 6;
+							// Point on curve near target
+							const at = 0.88;
+							const ax = (1-at)*(1-at)*s.x + 2*(1-at)*at*cx + at*at*tgt.x;
+							const ay = (1-at)*(1-at)*s.y + 2*(1-at)*at*cy + at*at*tgt.y;
+							const angle = Math.atan2(tgt.y - ay, tgt.x - ax);
+							
+							const tipX = tgt.x - Math.cos(angle) * (targetR + 1);
+							const tipY = tgt.y - Math.sin(angle) * (targetR + 1);
+							
+							ctx.beginPath();
+							ctx.moveTo(tipX, tipY);
+							ctx.lineTo(
+								tipX - Math.cos(angle) * arrowSize + Math.sin(angle) * arrowSize * 0.4,
+								tipY - Math.sin(angle) * arrowSize - Math.cos(angle) * arrowSize * 0.4
+							);
+							ctx.lineTo(
+								tipX - Math.cos(angle) * arrowSize - Math.sin(angle) * arrowSize * 0.4,
+								tipY - Math.sin(angle) * arrowSize + Math.cos(angle) * arrowSize * 0.4
+							);
+							ctx.closePath();
+							if (isHighlighted) {
+								ctx.fillStyle = isDark ? '#60a5fa' : '#3b82f6';
+								ctx.globalAlpha = 0.9;
+							} else if (dimmed) {
+								ctx.fillStyle = isDark ? '#1f2937' : '#e5e7eb';
+								ctx.globalAlpha = 0.08;
+							} else {
+								ctx.fillStyle = isDark ? '#374151' : '#94a3b8';
+								ctx.globalAlpha = 0.35;
+							}
+							ctx.fill();
+							ctx.globalAlpha = 1;
+						}
+
+						// Edge labels
+						if (this.graphShowEdgeLabels && t.k > 0.5 && (isHighlighted || (!focusId && t.k > 0.8))) {
+							const labelX = cx;
+							const labelY = cy;
+							const fontSize = Math.max(8, 10 / t.k);
+							ctx.font = `500 ${Math.min(fontSize, 11)}px Inter, system-ui, sans-serif`;
+							const label = e.edge_type || '';
+							// Background pill
+							const metrics = ctx.measureText(label);
+							const pw = metrics.width + 8;
+							const ph = fontSize + 6;
+							ctx.fillStyle = isDark ? 'rgba(15,17,23,0.85)' : 'rgba(255,255,255,0.9)';
+							ctx.beginPath();
+							ctx.roundRect(labelX - pw/2, labelY - ph/2, pw, ph, 4);
+							ctx.fill();
+							if (isHighlighted) {
+								ctx.strokeStyle = isDark ? '#60a5fa44' : '#3b82f644';
+								ctx.lineWidth = 1;
+								ctx.stroke();
+							}
+							ctx.fillStyle = isHighlighted ? (isDark ? '#93c5fd' : '#2563eb') : (isDark ? '#6b7280' : '#9ca3af');
+							ctx.textAlign = 'center';
+							ctx.textBaseline = 'middle';
+							ctx.fillText(label, labelX, labelY);
+						}
+					});
+
+					// Draw nodes (sorted: dimmed first, then normal, then highlighted/selected on top)
+					const sortedNodes = [...nodes].sort((a, b) => {
+						const aScore = (a.id === selectedId ? 100 : 0) + (a.id === hoveredId ? 50 : 0) + (highlightedNodes.has(a.id) ? 10 : 0);
+						const bScore = (b.id === selectedId ? 100 : 0) + (b.id === hoveredId ? 50 : 0) + (highlightedNodes.has(b.id) ? 10 : 0);
+						return aScore - bScore;
+					});
+
+					for (const n of sortedNodes) {
+						if (!visibleNodes.has(n.id)) continue;
+
+						const color = this.entityColors[n.node_type] || this.entityColors['UNKNOWN'];
+						const isSelected = selectedId === n.id;
+						const isHovered = hoveredId === n.id;
+						const isNeighbor = highlightedNodes.has(n.id);
+						const dimmed = focusId && !isNeighbor;
+						const isSearchMatch = hasSearchMatches && searchMatches.has(n.id);
+
+						// Edgequake-style: completely hide non-connected nodes on hover
+						if (dimmed && hoveredId) continue;
+
+						// Edgequake sizing: selected=2x, hovered=1.3x
+						const r = n.radius * (isSelected ? 2.0 : isHovered ? 1.3 : 1);
+
+						// Outer glow for selected node (pulsing)
+						if (isSelected) {
+							const pulseSize = 3.5 + Math.sin(this._graphSelectionPulse) * 1.0;
+							ctx.beginPath();
+							ctx.arc(n.x, n.y, r + pulseSize + 4, 0, 2 * Math.PI);
+							const glowGrad = ctx.createRadialGradient(n.x, n.y, r, n.x, n.y, r + pulseSize + 4);
+							glowGrad.addColorStop(0, isDark ? 'rgba(96,165,250,0.3)' : 'rgba(37,99,235,0.25)');
+							glowGrad.addColorStop(1, 'rgba(96,165,250,0)');
+							ctx.fillStyle = glowGrad;
+							ctx.fill();
+						}
+
+						// Search match glow ring
+						if (isSearchMatch && !isSelected) {
+							ctx.beginPath();
+							ctx.arc(n.x, n.y, r + 6, 0, 2 * Math.PI);
+							const searchGrad = ctx.createRadialGradient(n.x, n.y, r, n.x, n.y, r + 6);
+							searchGrad.addColorStop(0, 'rgba(234,179,8,0.4)');
+							searchGrad.addColorStop(1, 'rgba(234,179,8,0)');
+							ctx.fillStyle = searchGrad;
+							ctx.fill();
+						}
+
+						// Hover glow
+						if (isHovered && !isSelected) {
+							ctx.beginPath();
+							ctx.arc(n.x, n.y, r + 5, 0, 2 * Math.PI);
+							const hoverGrad = ctx.createRadialGradient(n.x, n.y, r, n.x, n.y, r + 5);
+							hoverGrad.addColorStop(0, isDark ? 'rgba(96,165,250,0.2)' : 'rgba(37,99,235,0.15)');
+							hoverGrad.addColorStop(1, 'rgba(96,165,250,0)');
+							ctx.fillStyle = hoverGrad;
+							ctx.fill();
+						}
+
+						// Border ring (Edgequake NodeBorderProgram style)
+						if (isSelected || isHovered) {
+							const borderWidth = isSelected ? (3.5 + Math.sin(this._graphSelectionPulse) * 1.0) : 2.5;
+							ctx.beginPath();
+							ctx.arc(n.x, n.y, r + borderWidth, 0, 2 * Math.PI);
+							ctx.fillStyle = isSelected ? (isDark ? '#60a5fa' : '#2563eb') : (isDark ? '#60a5fa99' : '#3b82f699');
+							ctx.fill();
+						}
+
+						// Node fill with subtle gradient for depth
+						ctx.beginPath();
+						ctx.arc(n.x, n.y, r, 0, 2 * Math.PI);
+						const grad = ctx.createRadialGradient(n.x - r * 0.3, n.y - r * 0.3, r * 0.1, n.x, n.y, r);
+						const baseColor = color;
+						grad.addColorStop(0, this._lightenColor(baseColor, 30));
+						grad.addColorStop(0.7, baseColor);
+						grad.addColorStop(1, this._darkenColor(baseColor, 15));
+						ctx.fillStyle = grad;
+						ctx.globalAlpha = dimmed ? 0.12 : (isSelected || isHovered ? 1 : 0.9);
+						ctx.fill();
+
+						// Inner white highlight for 3D effect
+						if (!dimmed && r * t.k > 4) {
+							ctx.beginPath();
+							ctx.arc(n.x - r * 0.25, n.y - r * 0.25, r * 0.35, 0, 2 * Math.PI);
+							ctx.fillStyle = 'rgba(255,255,255,0.15)';
+							ctx.fill();
+						}
+						
+						// Crisp border ring
+						ctx.beginPath();
+						ctx.arc(n.x, n.y, r, 0, 2 * Math.PI);
+						ctx.lineWidth = isSelected ? 2.5 : 1.5;
+						ctx.strokeStyle = isDark ? 'rgba(17,24,39,0.6)' : 'rgba(255,255,255,0.7)';
+						ctx.globalAlpha = dimmed ? 0.08 : 0.9;
+						ctx.stroke();
+						ctx.globalAlpha = 1;
+
+						// Labels
+						if (this.graphShowLabels && !dimmed) {
+							const showLabel = r * t.k > 4 || isHovered || isSelected || n.radius > 8;
+							if (showLabel) {
+								const fontSize = Math.max(9, Math.min(13, n.radius * 0.9));
+								ctx.font = `${isSelected ? '600' : '500'} ${fontSize}px Inter, system-ui, sans-serif`;
+								ctx.textAlign = 'center';
+								ctx.textBaseline = 'top';
+								const label = n.label.length > 25 ? n.label.substring(0, 23) + '…' : n.label;
+								const textY = n.y + r + 5;
+								
+								// Text shadow/background for readability
+								const metrics = ctx.measureText(label);
+								const bgW = metrics.width + 8;
+								const bgH = fontSize + 5;
+								ctx.fillStyle = isDark ? 'rgba(15,17,23,0.8)' : 'rgba(255,255,255,0.85)';
+								ctx.beginPath();
+								ctx.roundRect(n.x - bgW/2, textY - 2, bgW, bgH, 3);
+								ctx.fill();
+								
+								// Subtle border on label background
+								if (isSelected || isHovered) {
+									ctx.strokeStyle = isDark ? 'rgba(96,165,250,0.3)' : 'rgba(37,99,235,0.2)';
+									ctx.lineWidth = 0.5;
+									ctx.stroke();
+								}
+								
+								ctx.fillStyle = isSelected ? (isDark ? '#93c5fd' : '#1e40af') : 
+									isHovered ? (isDark ? '#bfdbfe' : '#1e3a8a') :
+									(isDark ? '#d1d5db' : '#374151');
+								ctx.globalAlpha = isHovered || isSelected ? 1 : 0.85;
+								ctx.fillText(label, n.x, textY);
+								ctx.globalAlpha = 1;
+							}
+						}
+					}
+
+					ctx.restore();
+
+					// Draw minimap
+					this._drawMinimap();
+				},
+
+				// Color utility helpers
+				_lightenColor(hex, percent) {
+					const num = parseInt(hex.replace('#', ''), 16);
+					const r = Math.min(255, (num >> 16) + Math.round(2.55 * percent));
+					const g = Math.min(255, ((num >> 8) & 0x00FF) + Math.round(2.55 * percent));
+					const b = Math.min(255, (num & 0x0000FF) + Math.round(2.55 * percent));
+					return `rgb(${r},${g},${b})`;
+				},
+
+				_darkenColor(hex, percent) {
+					const num = parseInt(hex.replace('#', ''), 16);
+					const r = Math.max(0, (num >> 16) - Math.round(2.55 * percent));
+					const g = Math.max(0, ((num >> 8) & 0x00FF) - Math.round(2.55 * percent));
+					const b = Math.max(0, (num & 0x0000FF) - Math.round(2.55 * percent));
+					return `rgb(${r},${g},${b})`;
+				},
+
+				_drawMinimap() {
+					const minimapCanvas = document.getElementById('graph-minimap');
+					if (!minimapCanvas) return;
+					const mctx = minimapCanvas.getContext('2d');
+					const mr = minimapCanvas.parentElement.getBoundingClientRect();
+					const dpr = this._graphDpr;
+					minimapCanvas.width = mr.width * dpr;
+					minimapCanvas.height = mr.height * dpr;
+					mctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+					const mw = mr.width, mh = mr.height;
+					const isDark = document.documentElement.classList.contains('dark');
+
+					mctx.clearRect(0, 0, mw, mh);
+					mctx.fillStyle = isDark ? '#111827' : '#f8fafc';
+					mctx.fillRect(0, 0, mw, mh);
+
+					const nodes = this._graphNodes;
+					if (!nodes.length) return;
+
+					// Compute bounds
+					let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+					nodes.forEach(n => {
+						minX = Math.min(minX, n.x);
+						minY = Math.min(minY, n.y);
+						maxX = Math.max(maxX, n.x);
+						maxY = Math.max(maxY, n.y);
+					});
+					const padding = 20;
+					minX -= padding; minY -= padding; maxX += padding; maxY += padding;
+					const gw = maxX - minX || 1;
+					const gh = maxY - minY || 1;
+					const scale = Math.min(mw / gw, mh / gh);
+					const ox = (mw - gw * scale) / 2;
+					const oy = (mh - gh * scale) / 2;
+
+					// Draw edges
+					mctx.strokeStyle = isDark ? '#374151' : '#d1d5db';
+					mctx.lineWidth = 0.5;
+					mctx.globalAlpha = 0.3;
+					this._graphEdges.forEach(e => {
+						const s = this._graphNodeMap[e.source];
+						const t = this._graphNodeMap[e.target];
+						if (!s || !t) return;
+						mctx.beginPath();
+						mctx.moveTo(ox + (s.x - minX) * scale, oy + (s.y - minY) * scale);
+						mctx.lineTo(ox + (t.x - minX) * scale, oy + (t.y - minY) * scale);
+						mctx.stroke();
+					});
+					mctx.globalAlpha = 1;
+
+					// Draw nodes
+					nodes.forEach(n => {
+						const color = this.entityColors[n.node_type] || '#6b7280';
+						mctx.beginPath();
+						mctx.arc(ox + (n.x - minX) * scale, oy + (n.y - minY) * scale, Math.max(1.5, n.radius * scale * 0.3), 0, 2 * Math.PI);
+						mctx.fillStyle = color;
+						mctx.fill();
+					});
+
+					// Draw viewport rectangle
+					const t = this._graphTransform;
+					const vx1 = (-t.x / t.k);
+					const vy1 = (-t.y / t.k);
+					const vx2 = vx1 + this._graphW / t.k;
+					const vy2 = vy1 + this._graphH / t.k;
+					mctx.strokeStyle = isDark ? '#60a5fa' : '#2563eb';
+					mctx.lineWidth = 1.5;
+					mctx.strokeRect(
+						ox + (vx1 - minX) * scale,
+						oy + (vy1 - minY) * scale,
+						(vx2 - vx1) * scale,
+						(vy2 - vy1) * scale
+					);
+				},
+
+				// Mouse/touch interaction setup
+				_setupGraphInteraction(canvas) {
+					const self = this;
+					let isPanning = false;
+					let panStart = { x: 0, y: 0 };
+					let dragStartPos = null;
+
+					const getMousePos = (e) => {
+						const r = canvas.getBoundingClientRect();
+						const t = self._graphTransform;
+						return {
+							x: (e.clientX - r.left - t.x) / t.k,
+							y: (e.clientY - r.top - t.y) / t.k,
+							screenX: e.clientX - r.left,
+							screenY: e.clientY - r.top,
+						};
+					};
+
+					const findNode = (mx, my) => {
+						const visibleTypes = new Set(self.graphVisibleTypes);
+						for (let i = self._graphNodes.length - 1; i >= 0; i--) {
+							const n = self._graphNodes[i];
+							if (!visibleTypes.has(n.node_type || 'UNKNOWN')) continue;
+							const dx = n.x - mx;
+							const dy = n.y - my;
+							const hitRadius = n.radius + 5;
+							if (dx * dx + dy * dy < hitRadius * hitRadius) return n;
+						}
+						return null;
+					};
+
+					canvas.onmousedown = (e) => {
+						e.preventDefault();
+						// Close context menu on any click
+						self._graphContextMenu = { visible: false };
+						
+						if (e.button === 2) return; // Right click handled in contextmenu event
+						
+						const pos = getMousePos(e);
+						const node = findNode(pos.x, pos.y);
+						if (node) {
+							self._graphDragging = node;
+							dragStartPos = { x: node.x, y: node.y };
+							canvas.style.cursor = 'grabbing';
+						} else {
+							isPanning = true;
+							panStart = { x: e.clientX, y: e.clientY };
+							canvas.style.cursor = 'grabbing';
+						}
+					};
+
+					canvas.onmousemove = (e) => {
+						const pos = getMousePos(e);
+						if (self._graphDragging) {
+							self._graphDragging.x = pos.x;
+							self._graphDragging.y = pos.y;
+							self._graphDragging.vx = 0;
+							self._graphDragging.vy = 0;
+							self.graphDraw();
+						} else if (isPanning) {
+							const dx = e.clientX - panStart.x;
+							const dy = e.clientY - panStart.y;
+							self._graphTransform.x += dx;
+							self._graphTransform.y += dy;
+							panStart = { x: e.clientX, y: e.clientY };
+							self.graphDraw();
+						} else {
+							const node = findNode(pos.x, pos.y);
+							if (node !== self._graphHoveredNode) {
+								self._graphHoveredNode = node;
+								canvas.style.cursor = node ? 'pointer' : 'default';
+								self.graphDraw();
+							}
+						}
+					};
+
+					canvas.onmouseup = (e) => {
+						if (self._graphDragging) {
+							// Check if it was a click (minimal drag)
+							const moved = dragStartPos ? 
+								Math.abs(self._graphDragging.x - dragStartPos.x) + Math.abs(self._graphDragging.y - dragStartPos.y) : 999;
+							if (moved < 5) {
+								// Click - select node
+								self.selectedNode = self._graphDragging;
+								self.selectedNodeEdges = self._graphEdges.filter(
+									e => e.source === self._graphDragging.id || e.target === self._graphDragging.id
+								);
+								self._startSelectionPulse();
+							}
+							self._graphDragging = null;
+							dragStartPos = null;
+							self.graphDraw();
+						}
+						if (isPanning) {
+							isPanning = false;
+						}
+						canvas.style.cursor = 'default';
+					};
+
+					canvas.onmouseleave = () => {
+						if (self._graphHoveredNode) {
+							self._graphHoveredNode = null;
+							self.graphDraw();
+						}
+						isPanning = false;
+						if (self._graphDragging) {
+							self._graphDragging = null;
+							dragStartPos = null;
+						}
+						canvas.style.cursor = 'default';
+					};
+
+					// Right-click context menu
+					canvas.oncontextmenu = (e) => {
+						e.preventDefault();
+						const pos = getMousePos(e);
+						const node = findNode(pos.x, pos.y);
+						if (node) {
+							const r = canvas.getBoundingClientRect();
+							self._graphContextMenu = {
+								visible: true,
+								x: e.clientX - r.left,
+								y: e.clientY - r.top,
+								node: node,
+							};
+						} else {
+							self._graphContextMenu = { visible: false };
+						}
+					};
+
+					canvas.onwheel = (e) => {
+						e.preventDefault();
+						const r = canvas.getBoundingClientRect();
+						const mx = e.clientX - r.left;
+						const my = e.clientY - r.top;
+						const factor = e.deltaY < 0 ? 1.12 : 0.89;
+						const t = self._graphTransform;
+						const newK = Math.max(0.1, Math.min(10, t.k * factor));
+						t.x = mx - (mx - t.x) * (newK / t.k);
+						t.y = my - (my - t.y) * (newK / t.k);
+						t.k = newK;
+						self.graphDraw();
+					};
+
+					// Double-click to focus
+					canvas.ondblclick = (e) => {
+						const pos = getMousePos(e);
+						const node = findNode(pos.x, pos.y);
+						if (node) {
+							self.focusNode(node.id);
+						} else {
+							// Double-click empty space to deselect
+							self.selectedNode = null;
+							self.selectedNodeEdges = [];
+							self._stopSelectionPulse();
+							self.graphDraw();
+						}
+					};
+
+					// Minimap click-to-navigate
+					const minimap = document.getElementById('graph-minimap');
+					if (minimap) {
+						this._setupMinimapInteraction(minimap);
+					}
+
+					// Keyboard shortcuts
+					canvas.tabIndex = 0;
+					canvas.style.outline = 'none';
+					canvas.onkeydown = (e) => {
+						if (e.key === 'Escape') {
+							self.selectedNode = null;
+							self.selectedNodeEdges = [];
+							self._graphContextMenu = { visible: false };
+							self._stopSelectionPulse();
+							self.graphDraw();
+						} else if (e.key === '+' || e.key === '=') {
+							self.graphZoomIn();
+						} else if (e.key === '-') {
+							self.graphZoomOut();
+						} else if (e.key === '0') {
+							self.graphResetCamera();
+						} else if (e.key === 'f' || e.key === 'F') {
+							self.graphToggleFullscreen();
+						}
+					};
+				},
+
+				// Minimap click/drag to navigate viewport
+				_setupMinimapInteraction(minimap) {
+					const self = this;
+					let isDragging = false;
+
+					const navigateToMinimapPos = (e) => {
+						const nodes = self._graphNodes;
+						if (!nodes.length) return;
+
+						const rect = minimap.getBoundingClientRect();
+						const mx = e.clientX - rect.left;
+						const my = e.clientY - rect.top;
+						const mw = rect.width;
+						const mh = rect.height;
+
+						// Calculate graph bounds (same as minimap drawing)
+						let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+						nodes.forEach(n => {
+							minX = Math.min(minX, n.x);
+							minY = Math.min(minY, n.y);
+							maxX = Math.max(maxX, n.x);
+							maxY = Math.max(maxY, n.y);
+						});
+						const padding = 20;
+						minX -= padding; minY -= padding; maxX += padding; maxY += padding;
+						const gw = maxX - minX || 1;
+						const gh = maxY - minY || 1;
+						const scale = Math.min(mw / gw, mh / gh);
+						const ox = (mw - gw * scale) / 2;
+						const oy = (mh - gh * scale) / 2;
+
+						// Convert minimap coords to graph coords
+						const graphX = (mx - ox) / scale + minX;
+						const graphY = (my - oy) / scale + minY;
+
+						// Center viewport on this point
+						const t = self._graphTransform;
+						t.x = self._graphW / 2 - graphX * t.k;
+						t.y = self._graphH / 2 - graphY * t.k;
+						self.graphDraw();
+					};
+
+					minimap.onmousedown = (e) => {
+						e.preventDefault();
+						e.stopPropagation();
+						isDragging = true;
+						navigateToMinimapPos(e);
+					};
+
+					minimap.onmousemove = (e) => {
+						if (isDragging) {
+							navigateToMinimapPos(e);
+						}
+					};
+
+					minimap.onmouseup = () => { isDragging = false; };
+					minimap.onmouseleave = () => { isDragging = false; };
+				},
+
+				graphZoomIn() {
+					const t = this._graphTransform;
+					const cx = this._graphW / 2;
+					const cy = this._graphH / 2;
+					const factor = 1.5;
+					const newK = Math.min(10, t.k * factor);
+					t.x = cx - (cx - t.x) * (newK / t.k);
+					t.y = cy - (cy - t.y) * (newK / t.k);
+					t.k = newK;
+					this.graphDraw();
+				},
+
+				graphZoomOut() {
+					const t = this._graphTransform;
+					const cx = this._graphW / 2;
+					const cy = this._graphH / 2;
+					const factor = 1 / 1.5;
+					const newK = Math.max(0.1, t.k * factor);
+					t.x = cx - (cx - t.x) * (newK / t.k);
+					t.y = cy - (cy - t.y) * (newK / t.k);
+					t.k = newK;
+					this.graphDraw();
+				},
+
+				graphResetCamera() {
+					// Fit all nodes in view
+					const nodes = this._graphNodes;
+					if (!nodes.length) return;
+					let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+					nodes.forEach(n => {
+						minX = Math.min(minX, n.x - n.radius);
+						minY = Math.min(minY, n.y - n.radius);
+						maxX = Math.max(maxX, n.x + n.radius);
+						maxY = Math.max(maxY, n.y + n.radius);
+					});
+					const gw = maxX - minX || 1;
+					const gh = maxY - minY || 1;
+					const pad = 60;
+					const k = Math.min((this._graphW - pad * 2) / gw, (this._graphH - pad * 2) / gh);
+					this._graphTransform = {
+						x: (this._graphW - gw * k) / 2 - minX * k,
+						y: (this._graphH - gh * k) / 2 - minY * k,
+						k: Math.max(0.1, Math.min(10, k)),
+					};
+					this.graphDraw();
+				},
+
+				graphToggleFullscreen() {
+					const container = document.getElementById('graph-container');
+					if (!container) return;
+					if (document.fullscreenElement) {
+						document.exitFullscreen();
+					} else {
+						container.requestFullscreen().catch(() => {});
+					}
+				},
+			}));
+
+			Alpine.data('uploadDocumentForm', () => ({
+				file: null,
+				uploading: false,
+				progress: 0,
+				error: '',
+
+				fileSelected(event) {
+					this.file = event.target.files[0];
+					this.error = '';
+				},
+
+				async upload() {
+					if (!this.file) return;
+					
+					this.uploading = true;
+					this.progress = 0;
+					this.error = '';
+					
+					const formData = new FormData();
+					formData.append('file', this.file);
+					
+					const workspaceId = this.$data.workspaceId || document.querySelector('[x-data^="workspaceDetails"]').__x.$data.workspaceId;
+					
+					try {
+						const xhr = new XMLHttpRequest();
+						
+						xhr.upload.addEventListener('progress', (e) => {
+							if (e.lengthComputable) {
+								this.progress = (e.loaded / e.total) * 100;
+							}
+						});
+						
+						const promise = new Promise((resolve, reject) => {
+							xhr.onreadystatechange = () => {
+								if (xhr.readyState === 4) {
+									if (xhr.status >= 200 && xhr.status < 300) {
+										resolve(JSON.parse(xhr.responseText));
+									} else {
+										try {
+											const resp = JSON.parse(xhr.responseText);
+											reject(new Error(resp.error || 'Upload failed'));
+										} catch (e) {
+											reject(new Error('Upload failed'));
+										}
+									}
+								}
+							};
+							
+							xhr.onerror = () => reject(new Error('Network error'));
+						});
+						
+						xhr.open('POST', `/api/knowledge/documents/upload?workspace_id=${workspaceId}`);
+						xhr.send(formData);
+						
+						await promise;
+						
+						this.file = null;
+						document.getElementById('document-file').value = '';
+						
+						window.dispatchEvent(new CustomEvent('document-uploaded'));
+						this.$el.closest('[role="dialog"]')?.querySelector('[data-dialog-close]')?.click();
+						
+					} catch (e) {
+						this.error = e.message;
+						console.error(e);
+					} finally {
+						this.uploading = false;
+					}
+				}
+			}));
+		});
+	</script>
+}

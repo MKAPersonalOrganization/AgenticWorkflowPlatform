@@ -301,3 +301,111 @@ func (s *Service) Update(ctx context.Context, tCtx *domain.TenantContext, worksp
 
 	return &response, nil
 }
+
+// RebuildGraph clears the knowledge graph and triggers a rebuild.
+func (s *Service) RebuildGraph(ctx context.Context, tCtx *domain.TenantContext, workspaceID uuid.UUID, req *RebuildKnowledgeGraphRequest) (*RebuildKnowledgeGraphResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/workspaces/%s/rebuild-knowledge-graph", s.baseURL, workspaceID.String())
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	s.injectHeaders(httpReq, tCtx)
+
+	resp, err := s.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var response RebuildKnowledgeGraphResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &response, nil
+}
+
+// RebuildEmbeddings clears all embeddings and triggers a re-indexing.
+func (s *Service) RebuildEmbeddings(ctx context.Context, tCtx *domain.TenantContext, workspaceID uuid.UUID, req *RebuildEmbeddingsRequest) (*RebuildEmbeddingsResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/workspaces/%s/rebuild-embeddings", s.baseURL, workspaceID.String())
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	s.injectHeaders(httpReq, tCtx)
+
+	resp, err := s.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var response RebuildEmbeddingsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &response, nil
+}
+
+// ReprocessAllDocuments triggers reprocessing for all documents in the workspace.
+func (s *Service) ReprocessAllDocuments(ctx context.Context, tCtx *domain.TenantContext, workspaceID uuid.UUID) error {
+	url := fmt.Sprintf("%s/api/v1/workspaces/%s/reprocess-documents", s.baseURL, workspaceID.String())
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	s.injectHeaders(httpReq, tCtx)
+
+	resp, err := s.httpClient.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
+func (s *Service) injectHeaders(req *http.Request, tCtx *domain.TenantContext) {
+	if tCtx != nil {
+		if tCtx.TenantID != nil {
+			req.Header.Set("X-Tenant-ID", tCtx.TenantID.String())
+		}
+		if tCtx.UserID != "" {
+			req.Header.Set("X-User-ID", tCtx.UserID)
+		}
+		if tCtx.Role != "" {
+			req.Header.Set("X-Role", tCtx.Role)
+		}
+	}
+}
