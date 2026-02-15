@@ -10,51 +10,83 @@ import "school-with-ai/components/icon"
  */
 
 templ ZoomControls() {
-	<div class="absolute top-3 right-3 flex flex-col gap-1 bg-background/90 backdrop-blur-sm border rounded-lg shadow-sm p-1">
+	<div
+		class="flex flex-col gap-1 bg-background/95 backdrop-blur-sm rounded-lg border border-border/50 shadow-lg p-1 hover:shadow-xl transition-shadow duration-200"
+		role="toolbar"
+		aria-label="Graph controls"
+		data-tour="zoom-controls"
+	>
+		<!-- Zoom In -->
 		<button
 			@click="graphZoomIn()"
-			class="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors"
+			class="h-8 w-8 inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
 			title="Zoom In (+)"
+			aria-label="Zoom In"
 		>
 			@icon.ZoomIn(icon.Props{Class: "size-4"})
 		</button>
+		<!-- Zoom Out -->
 		<button
 			@click="graphZoomOut()"
-			class="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors"
+			class="h-8 w-8 inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
 			title="Zoom Out (-)"
+			aria-label="Zoom Out"
 		>
 			@icon.ZoomOut(icon.Props{Class: "size-4"})
 		</button>
-		<div class="border-t my-0.5"></div>
-		<!-- Rotate CW/CCW -->
+		<div class="border-t my-1"></div>
+		<!-- Rotate CW -->
 		<button
 			@click="graphRotateCW()"
-			class="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors"
+			class="h-8 w-8 inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
 			title="Rotate Clockwise"
+			aria-label="Rotate Clockwise"
 		>
 			@icon.RotateCw(icon.Props{Class: "size-4"})
 		</button>
+		<!-- Rotate CCW -->
 		<button
 			@click="graphRotateCCW()"
-			class="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors"
+			class="h-8 w-8 inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
 			title="Rotate Counter-Clockwise"
+			aria-label="Rotate Counter-Clockwise"
 		>
 			@icon.RotateCcw(icon.Props{Class: "size-4"})
 		</button>
-		<div class="border-t my-0.5"></div>
+		<div class="border-t my-1"></div>
+		<!-- Focus on Node (Only if selected) -->
+		<template x-if="selectedNodeId">
+			<button
+				@click="graphFocusOnNode()"
+				class="h-8 w-8 inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
+				title="Focus on Selected (Enter)"
+				aria-label="Focus on Selected Node"
+			>
+				@icon.Focus(icon.Props{Class: "size-4"})
+			</button>
+		</template>
+		<!-- Reset View -->
 		<button
 			@click="graphResetCamera()"
-			class="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors"
-			title="Fit to View (0)"
+			class="h-8 w-8 inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
+			title="Reset View (0)"
+			aria-label="Reset View"
 		>
 			@icon.Maximize2(icon.Props{Class: "size-4"})
 		</button>
+		<!-- Fullscreen Toggle -->
 		<button
 			@click="graphToggleFullscreen()"
-			class="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors"
+			class="h-8 w-8 inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
 			title="Fullscreen (F)"
+			aria-label="Fullscreen"
 		>
-			@icon.Expand(icon.Props{Class: "size-4"})
+			<template x-if="!isFullscreen">
+				@icon.Maximize2(icon.Props{Class: "size-4"})
+			</template>
+			<template x-if="isFullscreen">
+				@icon.Minimize2(icon.Props{Class: "size-4"})
+			</template>
 		</button>
 	</div>
 }
