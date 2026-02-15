@@ -32,7 +32,7 @@ templ WorkspaceDetailsPage(props WorkspaceDetailsPageProps) {
 			@separator.Separator(separator.Props{})
 			<!-- Content Tabs -->
 			<div class="space-y-4">
-				@tabs.Tabs(tabs.Props{ID: "workspace-content-tabs"}) {
+				@tabs.Tabs(tabs.Props{ID: "workspace-content-tabs", Attributes: templ.Attributes{"x-model": "activeTab"}}) {
 					@tabs.List(tabs.ListProps{}) {
 						@tabs.Trigger(tabs.TriggerProps{Value: "files", IsActive: true}) {
 							@icon.File(icon.Props{Class: "size-4 me-2"})
@@ -42,7 +42,7 @@ templ WorkspaceDetailsPage(props WorkspaceDetailsPageProps) {
 							@icon.FileText(icon.Props{Class: "size-4 me-2"})
 							{ i18n.T(ctx, "Ingested") }
 						}
-						@tabs.Trigger(tabs.TriggerProps{Value: "graph"}) {
+						@tabs.Trigger(tabs.TriggerProps{Value: "graph", Attributes: templ.Attributes{"@click": "activeTab = 'graph'; $nextTick(() => initGraph())"}}) {
 							@icon.Network(icon.Props{Class: "size-4 me-2"})
 							{ i18n.T(ctx, "Graph") }
 						}
@@ -57,7 +57,7 @@ templ WorkspaceDetailsPage(props WorkspaceDetailsPageProps) {
 					@tabs.Content(tabs.ContentProps{Value: "ingested"}) {
 						@DocumentManager()
 					}
-					@tabs.Content(tabs.ContentProps{Value: "graph"}) {
+					@tabs.Content(tabs.ContentProps{Value: "graph", Class: "h-[calc(100vh-300px)] min-h-[500px] flex flex-col border rounded-lg overflow-hidden bg-card"}) {
 						@GraphViewer()
 					}
 					@tabs.Content(tabs.ContentProps{Value: "settings"}) {
@@ -161,6 +161,12 @@ templ workspaceDetailsScript() {
 		document.addEventListener('alpine:init', () => {
 			Alpine.data('workspaceDetails', (workspaceId) => ({
 				workspaceId: workspaceId,
+				activeTab: 'files',
+				isFullscreen: false,
+				graphColorBy: 'type',
+				selectedNodeId: null,
+				graphLoading: false,
+				graphData: null,
 				
 				// Files (PDFs)
 				filesLoading: true,
@@ -210,9 +216,7 @@ templ workspaceDetailsScript() {
 				// Upload progress
 				uploadingFiles: [],
 
-				// Knowledge Graph (Sigma.js + Graphology — matching EdgeQuake 100%)
-				graphData: null,
-				graphLoading: false,
+				// Knowledge Graph state
 				graphSearch: '',
 				graphMaxNodes: '100',
 				graphLayout: 'force-atlas',
@@ -232,7 +236,6 @@ templ workspaceDetailsScript() {
 				_graphRelTypes: [],
 				_sigmaInstance: null,
 				_graphologyInstance: null,
-				_graphContextMenu: { visible: false, x: 0, y: 0, node: null },
 				_graphSearchMatches: new Set(),
 				_previousSelectedNodeId: null,
 				_draggedNode: null,
@@ -290,6 +293,9 @@ templ workspaceDetailsScript() {
 					this.loadQueueMetrics();
 					this.restoreGraphSettings();
 					
+					// Initial graph load
+					this.loadGraph();
+					
 					// Start polling for pipeline status
 					this.pipelinePollingInterval = setInterval(() => {
 						this.loadPipelineStatus();
@@ -314,6 +320,18 @@ templ workspaceDetailsScript() {
 						}
 					};
 					window.addEventListener('keydown', this._keydownHandler);
+
+					// Watch for tab changes to init graph
+					this.$watch('activeTab', (value) => {
+						if (value === 'graph') {
+							setTimeout(() => this.initGraph(), 100);
+						}
+					});
+
+					// Update selectedNodeId property when selectedNode changes
+					this.$watch('selectedNode', (node) => {
+						this.selectedNodeId = node ? node.id : null;
+					});
 				},
 
 				destroy() {
@@ -919,9 +937,26 @@ templ workspaceDetailsScript() {
 					return Math.min(base + scale, base * 3);
 				},
 
-				_getNodeColor(nodeType) {
-					if (!nodeType) return this.entityColors['UNKNOWN'];
-					return this.entityColors[nodeType.toUpperCase()] || this.entityColors['UNKNOWN'];
+				_getNodeColor(typeOrNode) {
+					const colorBy = this.graphColorBy || 'type';
+					let type = typeof typeOrNode === 'string' ? typeOrNode : typeOrNode?.node_type;
+					
+					if (typeof typeOrNode === 'object' && typeOrNode !== null) {
+						if (colorBy === 'community' && typeOrNode.community !== undefined) {
+							const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#d946ef', '#f97316'];
+							return colors[typeOrNode.community % colors.length];
+						} else if (colorBy === 'degree') {
+							const degree = typeOrNode.degree || 0;
+							if (degree > 20) return '#ef4444';
+							if (degree > 10) return '#f97316';
+							if (degree > 5) return '#f59e0b';
+							if (degree > 2) return '#3b82f6';
+							return '#94a3b8';
+						}
+					}
+
+					if (!type) return this.entityColors['UNKNOWN'];
+					return this.entityColors[type.toUpperCase()] || this.entityColors['UNKNOWN'];
 				},
 
 				async loadGraph() {
@@ -1011,38 +1046,6 @@ templ workspaceDetailsScript() {
 					try { return JSON.parse(props); } catch { return {}; }
 				},
 
-				contextMenuAction(action) {
-					const node = this._graphContextMenu?.node;
-					this._graphContextMenu = { visible: false };
-					if (!node) return;
-					switch (action) {
-						case 'details':
-							this.selectedNode = node;
-							this.selectedNodeEdges = this._graphEdges.filter(
-								e => e.source === node.id || e.target === node.id
-							);
-							this._highlightSelectedNode(node.id);
-							break;
-						case 'focus':
-							this.focusNode(node.id);
-							break;
-						case 'expand':
-							this.expandNeighborhood(node.id);
-							break;
-						case 'prune':
-							this.pruneNode(node.id);
-							break;
-						case 'copyId':
-							navigator.clipboard.writeText(node.id).catch(() => {});
-							break;
-						case 'copyLabel':
-							navigator.clipboard.writeText(node.label).catch(() => {});
-							break;
-						case 'delete':
-							this.deleteGraphEntity(node.id, node.label);
-							break;
-					}
-				},
 
 				// _highlightSelectedNode is defined below with pulsing animation support
 
@@ -1053,6 +1056,31 @@ templ workspaceDetailsScript() {
 					} else {
 						this.graphVisibleTypes.push(type);
 					}
+					this._applyVisibilityFilter();
+				},
+
+				graphGetTypeStats() {
+					if (!this.graphData || !this.graphData.nodes) return [];
+					const stats = {};
+					this.graphData.nodes.forEach(node => {
+						const t = node.node_type || 'UNKNOWN';
+						stats[t] = (stats[t] || 0) + 1;
+					});
+					return Object.entries(stats)
+						.sort((a, b) => b[1] - a[1])
+						.map(([type, count]) => ({
+							type,
+							count,
+							color: this._getNodeColor(type),
+							label: type.charAt(0).toUpperCase() + type.slice(1).toLowerCase().replace('_', ' ')
+						}));
+				},
+
+				showAllEntityTypes() {
+					if (!this.graphData || !this.graphData.nodes) return;
+					const types = new Set();
+					this.graphData.nodes.forEach(n => types.add(n.node_type || 'UNKNOWN'));
+					this.graphVisibleTypes = [...types];
 					this._applyVisibilityFilter();
 				},
 
@@ -1098,19 +1126,32 @@ templ workspaceDetailsScript() {
 				// === Sigma.js Graph initialization ===
 				initGraph() {
 					const container = document.getElementById('sigma-container');
-					if (!container || !this.graphData || !this.graphData.nodes?.length) return;
-
-					// Ensure the container has actual dimensions (not hidden via x-show).
-					const rect = container.getBoundingClientRect();
-					if (rect.width === 0 || rect.height === 0) {
-						if (!this._initGraphRetries) this._initGraphRetries = 0;
-						if (this._initGraphRetries < 10) {
-							this._initGraphRetries++;
-							setTimeout(() => this.initGraph(), 50);
-							return;
+					if (!container) return;
+					
+					// Force dimensions check if tab is graph
+					if (this.activeTab === 'graph') {
+						const rect = container.getBoundingClientRect();
+						console.log('initGraph check:', { 
+							width: rect.width, 
+							height: rect.height, 
+							activeTab: this.activeTab,
+							hasData: !!this.graphData?.nodes?.length 
+						});
+						
+						if (rect.width === 0 || rect.height === 0) {
+							if (!this._initGraphRetries) this._initGraphRetries = 0;
+							if (this._initGraphRetries < 20) {
+								this._initGraphRetries++;
+								setTimeout(() => this.initGraph(), 100);
+								return;
+							}
+							console.warn('sigma-container still has 0 dimensions after 20 retries');
 						}
-						console.warn('sigma-container still has 0 dimensions after retries');
+					} else {
+						return; // Not on graph tab
 					}
+					
+					if (!this.graphData || !this.graphData.nodes?.length) return;
 					this._initGraphRetries = 0;
 
 					// Kill previous Sigma instance + pulse animation
@@ -1224,6 +1265,9 @@ templ workspaceDetailsScript() {
 
 					this._sigmaInstance = sigma;
 
+					// Block browser's native context menu everywhere in the container
+					container.addEventListener('contextmenu', (e) => e.preventDefault());
+
 					// === Event handlers ===
 					const self = this;
 
@@ -1244,26 +1288,8 @@ templ workspaceDetailsScript() {
 						self.selectedNode = null;
 						self.selectedNodeEdges = [];
 						self._highlightSelectedNode(null);
-						self._graphContextMenu = { visible: false };
 					});
 
-					// Right-click → context menu
-					sigma.on('rightClickNode', ({ node, event }) => {
-						const originalEvent = event.original || event;
-						if (container) {
-							container.addEventListener('contextmenu', (e) => e.preventDefault(), { once: true });
-						}
-						const nodeData = self._graphNodeMap[node];
-						if (nodeData) {
-							const rect = container.getBoundingClientRect();
-							self._graphContextMenu = {
-								visible: true,
-								x: (originalEvent.clientX || originalEvent.x || 0) - rect.left,
-								y: (originalEvent.clientY || originalEvent.y || 0) - rect.top,
-								node: nodeData,
-							};
-						}
-					});
 
 					// Node drag — only if enabled
 					if (this.graphEnableDrag) {
@@ -1364,7 +1390,6 @@ templ workspaceDetailsScript() {
 						if (e.key === 'Escape') {
 							self.selectedNode = null;
 							self.selectedNodeEdges = [];
-							self._graphContextMenu = { visible: false };
 							self._highlightSelectedNode(null);
 						} else if (e.key === '+' || e.key === '=') {
 							self.graphZoomIn();
@@ -1821,9 +1846,15 @@ templ workspaceDetailsScript() {
 					const container = document.getElementById('graph-container');
 					if (!container) return;
 					if (document.fullscreenElement) {
-						document.exitFullscreen();
+						document.exitFullscreen().then(() => { this.isFullscreen = false; });
 					} else {
-						container.requestFullscreen().catch(() => {});
+						container.requestFullscreen().then(() => { this.isFullscreen = true; }).catch(() => {});
+					}
+				},
+
+				graphFocusOnNode() {
+					if (this.selectedNode) {
+						this.focusNode(this.selectedNode.id);
 					}
 				},
 

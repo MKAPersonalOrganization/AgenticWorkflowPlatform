@@ -11,7 +11,7 @@ import "school-with-ai/components/icon"
 
 templ ZoomControls() {
 	<div
-		class="flex flex-col gap-1 bg-background/95 backdrop-blur-sm rounded-lg border border-border/50 shadow-lg p-1 hover:shadow-xl transition-shadow duration-200"
+		class="absolute top-4 right-4 z-20 flex flex-col gap-1 bg-background/95 backdrop-blur-sm rounded-lg border border-border/50 shadow-lg p-1 hover:shadow-xl transition-shadow duration-200"
 		role="toolbar"
 		aria-label="Graph controls"
 		data-tour="zoom-controls"
@@ -72,7 +72,7 @@ templ ZoomControls() {
 			title="Reset View (0)"
 			aria-label="Reset View"
 		>
-			@icon.Maximize2(icon.Props{Class: "size-4"})
+			@icon.Maximize(icon.Props{Class: "size-4"})
 		</button>
 		<!-- Fullscreen Toggle -->
 		<button
@@ -82,10 +82,10 @@ templ ZoomControls() {
 			aria-label="Fullscreen"
 		>
 			<template x-if="!isFullscreen">
-				@icon.Maximize2(icon.Props{Class: "size-4"})
+				@icon.Expand(icon.Props{Class: "size-4"})
 			</template>
 			<template x-if="isFullscreen">
-				@icon.Minimize2(icon.Props{Class: "size-4"})
+				@icon.Shrink(icon.Props{Class: "size-4"})
 			</template>
 		</button>
 	</div>

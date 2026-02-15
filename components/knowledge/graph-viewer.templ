@@ -14,37 +14,59 @@ import (
 )
 
 templ GraphViewer() {
-	<div class="space-y-4 mt-4">
+	<div class="flex flex-col h-full overflow-hidden">
 		<!-- Graph Toolbar -->
 		@GraphToolbar()
-		<!-- Graph Loading -->
-		<div x-show="graphLoading" class="flex items-center justify-center py-20">
-			@GraphLoadingOverlay()
-		</div>
-		<!-- Graph Empty -->
-		<div x-show="!graphLoading && (!graphData || !graphData.nodes || graphData.nodes.length === 0)" x-cloak class="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed rounded-xl bg-muted/20">
-			<div class="bg-background p-4 rounded-full shadow-sm mb-4">
-				@icon.Network(icon.Props{Class: "size-10 text-muted-foreground"})
+		
+		<!-- Main Content Area -->
+		<div class="flex-1 relative overflow-hidden bg-background text-foreground" data-graph-container>
+			<!-- Loading state overlays -->
+			<div x-show="graphLoading" class="absolute inset-0 z-50 flex items-center justify-center bg-background/50 backdrop-blur-sm">
+				@GraphLoadingOverlay()
 			</div>
-			<h3 class="text-xl font-semibold">{ i18n.T(ctx, "No knowledge graph yet") }</h3>
-			<p class="text-muted-foreground mt-2 max-w-md mx-auto">{ i18n.T(ctx, "Build a knowledge graph from your documents in the Settings tab.") }</p>
-		</div>
-		<!-- Graph Container -->
-		<div x-show="!graphLoading && graphData && graphData.nodes && graphData.nodes.length > 0" x-cloak class="relative">
-			<!-- Truncation banner -->
-			@TruncationBanner()
-			<!-- Main Graph Area with side panel -->
-			<div class="flex rounded-xl border bg-card shadow-sm overflow-hidden" style="height: 700px;">
-				<!-- Sigma.js WebGL Graph Container -->
-				<div class="flex-1 relative" id="graph-container">
-					<div id="sigma-container" class="w-full h-full" style="display: block; position: relative;"></div>
-					<!-- Overlays -->
-					@ZoomControls()
-					@GraphControls()
-					@GraphLegend()
-					@GraphMinimap()
-					@GraphContextMenu()
+
+			<!-- Empty state -->
+			<div x-show="!graphLoading && (!graphData || !graphData.nodes || graphData.nodes.length === 0)" x-cloak class="absolute inset-0 flex items-center justify-center">
+				<div class="text-center max-w-md px-4">
+					<div class="bg-background p-6 rounded-full shadow-lg border mb-6 inline-block">
+						@icon.Network(icon.Props{Class: "size-12 text-muted-foreground opacity-50"})
+					</div>
+					<h3 class="text-xl font-semibold tracking-tight">{ i18n.T(ctx, "No knowledge graph yet") }</h3>
+					<p class="text-sm text-muted-foreground mt-2 mb-6">
+						{ i18n.T(ctx, "Your knowledge graph is empty. Upload documents to automatically extract entities and relationships.") }
+					</p>
+					<button
+						@click="window.location.href = '/documents'"
+						class="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+					>
+						@icon.Upload(icon.Props{Class: "size-4 mr-2"})
+						{ i18n.T(ctx, "Upload Documents") }
+					</button>
 				</div>
+			</div>
+
+			<!-- Graph Area (Nodes > 0) -->
+			<div x-show="!graphLoading && graphData && graphData.nodes && graphData.nodes.length > 0" x-cloak class="flex h-full overflow-hidden">
+				<!-- Sigma.js WebGL Graph Container -->
+				<div class="flex-1 relative overflow-hidden" id="graph-container">
+					<div id="sigma-container" class="w-full h-full" style="display: block; position: relative; min-height: 400px;"></div>
+					
+					<!-- Overlays -->
+					<div class="absolute inset-0 pointer-events-none z-20">
+						<div class="pointer-events-auto">
+							@ZoomControls()
+							@GraphControls()
+							@GraphLegend()
+							@GraphMinimap()
+						</div>
+					</div>
+
+					<!-- Truncation banner -->
+					<div class="absolute top-4 left-1/2 -translate-x-1/2 z-30">
+						@TruncationBanner()
+					</div>
+				</div>
+
 				<!-- Right Side Panel - Node Details -->
 				@NodeDetails()
 			</div>
@@ -53,62 +75,97 @@ templ GraphViewer() {
 }
 
 templ GraphToolbar() {
-	<div class="flex items-center justify-between flex-wrap gap-3">
-		<div class="flex items-center gap-3">
-			<h2 class="text-xl font-semibold tracking-tight">{ i18n.T(ctx, "Knowledge Graph") }</h2>
+	<header class="flex items-center justify-between border-b px-4 py-2 shrink-0 bg-card/50 backdrop-blur-sm">
+		<div class="flex items-center gap-2.5">
+			<h2 class="text-base font-semibold tracking-tight">{ i18n.T(ctx, "Knowledge Graph") }</h2>
+			
+			<!-- Loading pulse -->
+			<div x-show="graphLoading" class="size-2 rounded-full bg-primary animate-pulse"></div>
+
 			<!-- Node/Edge counts -->
-			<div x-show="graphData" x-cloak class="flex items-center gap-2 text-xs text-muted-foreground">
-				<span class="inline-flex items-center gap-1 bg-muted px-2 py-0.5 rounded-full">
-					<span class="size-1.5 rounded-full bg-blue-500"></span>
-					<span x-text="(graphData?.nodes?.length || 0) + ' nodes'"></span>
-				</span>
-				<span class="inline-flex items-center gap-1 bg-muted px-2 py-0.5 rounded-full">
-					<span class="size-1.5 rounded-full bg-gray-400"></span>
-					<span x-text="(graphData?.edges?.length || 0) + ' edges'"></span>
-				</span>
+			<div x-show="graphData" x-cloak class="flex items-center gap-1.5 text-[11px] text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-md border border-border/30">
+				<span x-text="(graphData?.nodes?.length || 0).toLocaleString() + ' nodes'"></span>
+				<span class="opacity-30">•</span>
+				<span x-text="(graphData?.edges?.length || 0).toLocaleString() + ' edges'"></span>
 			</div>
 		</div>
-		<div class="flex items-center gap-2">
+
+		<div class="flex items-center gap-1.5">
 			@GraphSearch()
-			@LayoutControl()
-			<!-- Max nodes -->
-			<select
-				class="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-				x-model="graphMaxNodes"
-				@change="loadGraph()"
-			>
-				<option value="50">50 nodes</option>
-				<option value="100">100 nodes</option>
-				<option value="200">200 nodes</option>
-				<option value="500">500 nodes</option>
-			</select>
-			<!-- Export PNG -->
-			<button
-				@click="graphExportPNG()"
-				class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted h-9 w-9 border shadow-sm"
-				title="Export as PNG"
-			>
-				@icon.Image(icon.Props{Class: "size-4"})
-			</button>
-			<!-- Export JSON -->
-			<button
-				@click="graphExportJSON()"
-				class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted h-9 w-9 border shadow-sm"
-				title="Export as JSON"
-			>
-				@icon.Download(icon.Props{Class: "size-4"})
-			</button>
-			<!-- Reload -->
-			<button
-				@click="loadGraph()"
-				class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted h-9 w-9 border shadow-sm"
-				:class="{ 'animate-spin': graphLoading }"
-				title="Reload Graph"
-			>
-				@icon.RefreshCw(icon.Props{Class: "size-4"})
-			</button>
+			@TruncationIndicator()
+			
+			<div class="w-px h-5 bg-border mx-1"></div>
+
+			<!-- Layout Selector -->
+			<div class="relative group">
+				<div class="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground group-hover:text-primary transition-colors">
+					@icon.GitBranch(icon.Props{Class: "size-3"})
+				</div>
+				<select
+					class="h-8 rounded-md border border-input bg-background pl-8 pr-8 text-[11px] font-medium shadow-sm transition-all hover:bg-accent hover:border-primary/30 focus:outline-none focus:ring-1 focus:ring-ring appearance-none min-w-[120px]"
+					x-model="graphLayout"
+					@change="applyLayout()"
+				>
+					<option value="force-atlas">Force Atlas (FA2)</option>
+					<option value="force-directed">Force-Directed</option>
+					<option value="circular">Circular</option>
+					<option value="circlepack">Circle Pack</option>
+					<option value="random">Random</option>
+					<option value="noverlap">No Overlap</option>
+					<option value="hierarchical">Hierarchical</option>
+				</select>
+				<div class="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground opacity-50">
+					@icon.ChevronDown(icon.Props{Class: "size-3"})
+				</div>
+			</div>
+			
+			<div class="w-px h-5 bg-border mx-1"></div>
+
+			<!-- Max nodes selector -->
+			<div class="relative">
+				<select
+					class="h-8 rounded-md border border-input bg-background pl-2 pr-8 text-[11px] font-medium shadow-sm transition-colors hover:bg-accent focus:outline-none focus:ring-1 focus:ring-ring appearance-none"
+					x-model="graphMaxNodes"
+					@change="loadGraph()"
+				>
+					<option value="50">50 nodes</option>
+					<option value="100">100 nodes</option>
+					<option value="200">200 nodes</option>
+					<option value="500">500 nodes</option>
+				</select>
+				<div class="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
+					@icon.ChevronDown(icon.Props{Class: "size-3"})
+				</div>
+			</div>
+
+			<!-- Toolbar Buttons -->
+			<div class="flex items-center bg-muted/30 rounded-md p-0.5 border">
+				<button
+					@click="graphExportPNG()"
+					class="inline-flex items-center justify-center rounded-sm text-sm font-medium transition-colors hover:bg-background hover:shadow-sm h-7 w-7"
+					title="Export PNG"
+				>
+					@icon.Image(icon.Props{Class: "size-3.5"})
+				</button>
+				<button
+					@click="graphExportJSON()"
+					class="inline-flex items-center justify-center rounded-sm text-sm font-medium transition-colors hover:bg-background hover:shadow-sm h-7 w-7"
+					title="Export JSON"
+				>
+					@icon.Download(icon.Props{Class: "size-3.5"})
+				</button>
+				<div class="w-px h-4 bg-border mx-0.5"></div>
+				<button
+					@click="loadGraph()"
+					class="inline-flex items-center justify-center rounded-sm text-sm font-medium transition-colors hover:bg-background hover:shadow-sm h-7 w-7"
+					:class="{ 'animate-spin': graphLoading }"
+					title="Reload Graph"
+				>
+					@icon.RefreshCw(icon.Props{Class: "size-3.5"})
+				</button>
+			</div>
 		</div>
-	</div>
+	</header>
 }
 
 templ GraphLoadingOverlay() {
@@ -118,25 +175,3 @@ templ GraphLoadingOverlay() {
 	</div>
 }
 
-templ TruncationBanner() {
-	<div
-		x-show="graphData?.is_truncated"
-		x-cloak
-		class="mb-2 flex items-center justify-between gap-2 rounded-lg border border-amber-500/20 bg-amber-50 dark:bg-amber-900/10 px-4 py-2 text-sm text-amber-700 dark:text-amber-400"
-	>
-		<div class="flex items-center gap-2">
-			@icon.TriangleAlert(icon.Props{Class: "size-4 flex-shrink-0"})
-			<span>
-				{ i18n.T(ctx, "Graph is truncated.") }
-				<span x-text="'Showing ' + (graphData?.nodes?.length || 0) + ' of ' + (graphData?.total_nodes || 0) + ' nodes.'"></span>
-			</span>
-		</div>
-		<button
-			@click="graphLoadMore()"
-			class="flex-shrink-0 inline-flex items-center gap-1 text-xs font-medium px-3 py-1 rounded-md bg-amber-100 dark:bg-amber-900/30 hover:bg-amber-200 dark:hover:bg-amber-800/40 transition-colors"
-		>
-			@icon.ChevronDown(icon.Props{Class: "size-3"})
-			<span>Load More</span>
-		</button>
-	</div>
-}
