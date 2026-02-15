@@ -746,6 +746,10 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Post("/api/knowledge/workspaces/{workspaceId}/rebuild", authMiddleware.RequireAuthFunc(knowledgeHandler.RebuildWorkspace))
 	r.Post("/api/knowledge/workspaces/reprocess", authMiddleware.RequireAuthFunc(knowledgeHandler.ReprocessAll))
 
+	// Models API (maps to Edgequake /api/v1/models)
+	r.Get("/api/knowledge/models/llm", authMiddleware.RequireAuthFunc(knowledgeHandler.ListLLMModels))
+	r.Get("/api/knowledge/models/embedding", authMiddleware.RequireAuthFunc(knowledgeHandler.ListEmbeddingModels))
+
 	// Pipeline API (maps to Edgequake /api/v1/pipeline + /api/v1/tasks)
 	r.Get("/api/knowledge/pipeline/enhanced-status", authMiddleware.RequireAuthFunc(knowledgeHandler.GetEnhancedPipelineStatus))
 	r.Get("/api/knowledge/pipeline/queue-metrics", authMiddleware.RequireAuthFunc(knowledgeHandler.GetQueueMetrics))
