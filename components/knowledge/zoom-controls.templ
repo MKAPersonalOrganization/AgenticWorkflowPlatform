@@ -3,7 +3,7 @@ package knowledge
 import "school-with-ai/components/icon"
 
 /**
- * ZoomControls - Zoom in/out/fit/fullscreen buttons for the graph.
+ * ZoomControls - Zoom in/out/rotate/fit/fullscreen buttons for the graph.
  * Matches EdgeQuake edgequake_webui/src/components/graph/zoom-controls.tsx
  *
  * Positioned absolute top-right of the graph container.
@@ -24,6 +24,22 @@ templ ZoomControls() {
 			title="Zoom Out (-)"
 		>
 			@icon.ZoomOut(icon.Props{Class: "size-4"})
+		</button>
+		<div class="border-t my-0.5"></div>
+		<!-- Rotate CW/CCW -->
+		<button
+			@click="graphRotateCW()"
+			class="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors"
+			title="Rotate Clockwise"
+		>
+			@icon.RotateCw(icon.Props{Class: "size-4"})
+		</button>
+		<button
+			@click="graphRotateCCW()"
+			class="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors"
+			title="Rotate Counter-Clockwise"
+		>
+			@icon.RotateCcw(icon.Props{Class: "size-4"})
 		</button>
 		<div class="border-t my-0.5"></div>
 		<button

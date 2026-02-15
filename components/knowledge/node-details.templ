@@ -4,8 +4,9 @@ package knowledge
  * NodeDetails - Right sidebar panel showing selected node details.
  * Matches EdgeQuake edgequake_webui/src/components/graph/node-details.tsx
  *
- * Shows: Node label, type (color-coded), description, degree/connections,
- * properties table, and relationships list with clickable navigation.
+ * Shows: Color dot + label (with copy), type badge, description, metadata (ID, degree, created_at),
+ * expandable properties with copy, relationships list with direction arrows + clickable.
+ * Panel is resizable via drag handle.
  */
 
 import (
@@ -23,15 +24,34 @@ templ NodeDetails() {
 		x-transition:leave="transition ease-in duration-150"
 		x-transition:leave-start="opacity-100"
 		x-transition:leave-end="opacity-0 w-0"
-		class="w-80 border-l bg-background overflow-y-auto flex-shrink-0"
+		class="border-l bg-background overflow-y-auto flex-shrink-0 relative"
+		:style="`width: ${_nodeDetailsPanelWidth || 320}px`"
 	>
+		<!-- Resize handle -->
+		<div
+			class="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/30 transition-colors z-20"
+			@mousedown.prevent="_startPanelResize($event)"
+		></div>
 		<!-- Sticky header -->
 		<div class="sticky top-0 z-10 bg-background border-b px-4 py-3">
-			<div class="flex items-center justify-between">
-				<h3 class="font-bold text-sm truncate flex-1" x-text="selectedNode?.label"></h3>
+			<div class="flex items-center justify-between gap-2">
+				<!-- Color dot + label -->
+				<div class="flex items-center gap-2 min-w-0 flex-1">
+					<span class="size-3 rounded-full flex-shrink-0" :style="`background-color: ${entityColors[selectedNode?.node_type] || '#6b7280'}`"></span>
+					<h3 class="font-bold text-sm truncate" x-text="selectedNode?.label"></h3>
+				</div>
+				<!-- Copy label -->
+				<button
+					@click="navigator.clipboard.writeText(selectedNode?.label || '')"
+					class="p-1 hover:bg-muted rounded-md flex-shrink-0"
+					title="Copy Label"
+				>
+					@icon.Copy(icon.Props{Class: "size-3.5 text-muted-foreground"})
+				</button>
+				<!-- Close -->
 				<button
 					@click="selectedNode = null; selectedNodeEdges = []; _highlightSelectedNode(null)"
-					class="p-1 hover:bg-muted rounded-md flex-shrink-0 ml-2"
+					class="p-1 hover:bg-muted rounded-md flex-shrink-0"
 				>
 					@icon.X(icon.Props{Class: "size-4"})
 				</button>
@@ -39,32 +59,82 @@ templ NodeDetails() {
 		</div>
 		<!-- Content -->
 		<div class="p-4 space-y-4 text-sm">
-			<!-- Node Type -->
+			<!-- Node Type Badge -->
 			<div>
 				<span class="text-xs text-muted-foreground uppercase tracking-wide block mb-1">{ i18n.T(ctx, "Type") }</span>
-				<div class="flex items-center gap-1.5">
-					<span class="size-3 rounded-full" :style="`background-color: ${entityColors[selectedNode?.node_type] || '#6b7280'}`"></span>
-					<span class="font-medium capitalize" x-text="(selectedNode?.node_type || '').toLowerCase().replace('_', ' ')"></span>
-				</div>
+				<span
+					class="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border"
+					:style="`background-color: ${(entityColors[selectedNode?.node_type] || '#6b7280')}15; border-color: ${(entityColors[selectedNode?.node_type] || '#6b7280')}40; color: ${entityColors[selectedNode?.node_type] || '#6b7280'}`"
+				>
+					<span class="size-2 rounded-full" :style="`background-color: ${entityColors[selectedNode?.node_type] || '#6b7280'}`"></span>
+					<span class="capitalize" x-text="(selectedNode?.node_type || '').toLowerCase().replace('_', ' ')"></span>
+				</span>
 			</div>
 			<!-- Description -->
 			<div x-show="selectedNode?.description">
 				<span class="text-xs text-muted-foreground uppercase tracking-wide block mb-1">{ i18n.T(ctx, "Description") }</span>
 				<p class="text-sm leading-relaxed" x-text="selectedNode?.description"></p>
 			</div>
-			<!-- Degree -->
+			@separator.Separator(separator.Props{})
+			<!-- Metadata -->
 			<div>
-				<span class="text-xs text-muted-foreground uppercase tracking-wide block mb-1">{ i18n.T(ctx, "Connections") }</span>
-				<p class="font-mono text-lg font-bold" x-text="selectedNode?.degree || 0"></p>
+				<span class="text-xs text-muted-foreground uppercase tracking-wide block mb-2">{ i18n.T(ctx, "Metadata") }</span>
+				<div class="space-y-1.5">
+					<!-- Entity ID -->
+					<div class="flex items-center justify-between text-xs">
+						<span class="text-muted-foreground font-mono">ID</span>
+						<div class="flex items-center gap-1">
+							<span class="font-mono text-right truncate max-w-[140px]" x-text="selectedNode?.id?.substring(0, 12) + '...'"></span>
+							<button @click="navigator.clipboard.writeText(selectedNode?.id || '')" class="p-0.5 hover:bg-muted rounded" title="Copy ID">
+								@icon.Copy(icon.Props{Class: "size-3 text-muted-foreground"})
+							</button>
+						</div>
+					</div>
+					<!-- Degree -->
+					<div class="flex items-center justify-between text-xs">
+						<span class="text-muted-foreground font-mono">Degree</span>
+						<span class="font-bold" x-text="selectedNode?.degree || 0"></span>
+					</div>
+					<!-- Created At (if available) -->
+					<div x-show="selectedNode?.created_at" class="flex items-center justify-between text-xs">
+						<span class="text-muted-foreground font-mono">Created</span>
+						<span x-text="selectedNode?.created_at ? new Date(selectedNode.created_at).toLocaleDateString() : ''"></span>
+					</div>
+				</div>
 			</div>
 			<!-- Properties -->
 			<div x-show="getNodeProperties() && Object.keys(getNodeProperties()).length > 0">
-				<span class="text-xs text-muted-foreground uppercase tracking-wide block mb-1">{ i18n.T(ctx, "Properties") }</span>
+				@separator.Separator(separator.Props{})
+				<div class="flex items-center justify-between mb-2">
+					<span class="text-xs text-muted-foreground uppercase tracking-wide">{ i18n.T(ctx, "Properties") }</span>
+					<button
+						@click="navigator.clipboard.writeText(JSON.stringify(getNodeProperties(), null, 2))"
+						class="p-0.5 hover:bg-muted rounded"
+						title="Copy All Properties"
+					>
+						@icon.Copy(icon.Props{Class: "size-3 text-muted-foreground"})
+					</button>
+				</div>
 				<div class="space-y-1">
 					<template x-for="[key, val] in Object.entries(getNodeProperties())" :key="key">
-						<div class="flex justify-between items-start text-xs py-1 border-b border-dashed last:border-0">
-							<span class="text-muted-foreground font-mono" x-text="key"></span>
-							<span class="font-medium text-right ml-2 max-w-[150px] truncate" x-text="String(val)"></span>
+						<div class="group text-xs py-1.5 border-b border-dashed last:border-0">
+							<div class="flex justify-between items-start gap-2">
+								<span class="text-muted-foreground font-mono flex-shrink-0" x-text="key"></span>
+								<div class="flex items-center gap-1 min-w-0">
+									<span
+										class="font-medium text-right truncate max-w-[160px] cursor-pointer"
+										x-text="String(val)"
+										@click="$el.classList.toggle('truncate'); $el.classList.toggle('whitespace-pre-wrap')"
+										title="Click to expand"
+									></span>
+									<button
+										@click="navigator.clipboard.writeText(String(val))"
+										class="p-0.5 hover:bg-muted rounded opacity-0 group-hover:opacity-100 flex-shrink-0"
+									>
+										@icon.Copy(icon.Props{Class: "size-2.5 text-muted-foreground"})
+									</button>
+								</div>
+							</div>
 						</div>
 					</template>
 				</div>
@@ -82,17 +152,32 @@ templ NodeDetails() {
 							@click="focusNode(edge.source === selectedNode?.id ? edge.target : edge.source)"
 							class="w-full text-left text-xs p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer group"
 						>
-							<div class="flex items-center gap-1 font-mono leading-relaxed">
+							<div class="flex items-center gap-1.5 font-mono leading-relaxed">
+								<!-- Source node -->
 								<span
-									class="truncate max-w-[90px]"
+									class="truncate max-w-[80px]"
 									:class="edge.source === selectedNode?.id ? 'font-bold text-foreground' : 'text-muted-foreground'"
 									x-text="getNodeLabel(edge.source)"
 								></span>
-								<span class="text-primary flex-shrink-0 group-hover:text-primary/80">→</span>
-								<span class="text-primary/70 flex-shrink-0 text-[10px]" x-text="edge.edge_type"></span>
-								<span class="text-primary flex-shrink-0 group-hover:text-primary/80">→</span>
+								<!-- Direction arrow (outgoing = →, incoming = ←) -->
+								<template x-if="edge.source === selectedNode?.id">
+									<span class="text-primary flex-shrink-0 font-bold">→</span>
+								</template>
+								<template x-if="edge.source !== selectedNode?.id">
+									<span class="text-orange-500 flex-shrink-0 font-bold">←</span>
+								</template>
+								<!-- Relationship type -->
+								<span class="text-primary/70 flex-shrink-0 text-[10px] bg-primary/5 px-1 rounded" x-text="edge.edge_type"></span>
+								<!-- Direction arrow -->
+								<template x-if="edge.source === selectedNode?.id">
+									<span class="text-primary flex-shrink-0 font-bold">→</span>
+								</template>
+								<template x-if="edge.source !== selectedNode?.id">
+									<span class="text-orange-500 flex-shrink-0 font-bold">←</span>
+								</template>
+								<!-- Target node -->
 								<span
-									class="truncate max-w-[90px]"
+									class="truncate max-w-[80px]"
 									:class="edge.target === selectedNode?.id ? 'font-bold text-foreground' : 'text-muted-foreground'"
 									x-text="getNodeLabel(edge.target)"
 								></span>

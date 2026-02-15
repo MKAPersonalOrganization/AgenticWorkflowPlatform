@@ -1,24 +1,41 @@
 package knowledge
 
 /**
- * GraphLegend - Entity type legend with visibility toggles.
- * Matches EdgeQuake edgequake_webui/src/components/graph/graph-legend.tsx
+ * GraphLegend - Entity type + relationship type legend with visibility toggles.
+ * Matches EdgeQuake entity and relationship type filters.
  *
- * Positioned absolute bottom-center of the graph container.
- * Shows color-coded entity type pills that can be clicked to toggle visibility.
+ * Positioned absolute bottom of graph container.
+ * Shows color-coded entity type pills and relationship type pills.
  */
 
 templ GraphLegend() {
-	<div class="absolute bottom-3 left-3 right-3 flex flex-wrap gap-1.5 justify-center">
-		<template x-for="[type, color] in Object.entries(entityColors).filter(([t]) => graphData?.nodes?.some(n => (n.node_type || 'UNKNOWN') === t))" :key="type">
-			<button
-				@click="toggleEntityType(type)"
-				class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border transition-all cursor-pointer select-none"
-				:class="graphVisibleTypes.includes(type) ? 'bg-background shadow-sm' : 'bg-muted/50 opacity-50 line-through'"
-			>
-				<span class="size-2.5 rounded-full flex-shrink-0" :style="`background-color: ${color}`"></span>
-				<span class="text-muted-foreground capitalize" x-text="type.toLowerCase().replace('_', ' ')"></span>
-			</button>
-		</template>
+	<div class="absolute bottom-3 left-3 right-3 flex flex-col gap-1.5 items-center">
+		<!-- Entity types -->
+		<div class="flex flex-wrap gap-1.5 justify-center">
+			<template x-for="[type, color] in Object.entries(entityColors).filter(([t]) => graphData?.nodes?.some(n => (n.node_type || 'UNKNOWN') === t))" :key="type">
+				<button
+					@click="toggleEntityType(type)"
+					class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border transition-all cursor-pointer select-none"
+					:class="graphVisibleTypes.includes(type) ? 'bg-background shadow-sm' : 'bg-muted/50 opacity-50 line-through'"
+				>
+					<span class="size-2.5 rounded-full flex-shrink-0" :style="`background-color: ${color}`"></span>
+					<span class="text-muted-foreground capitalize" x-text="type.toLowerCase().replace('_', ' ')"></span>
+					<span class="text-[10px] text-muted-foreground/70" x-text="'(' + (graphData?.nodes?.filter(n => (n.node_type || 'UNKNOWN') === type).length || 0) + ')'"></span>
+				</button>
+			</template>
+		</div>
+		<!-- Relationship types -->
+		<div x-show="_graphRelTypes.length > 0" class="flex flex-wrap gap-1 justify-center">
+			<template x-for="rt in _graphRelTypes" :key="rt">
+				<button
+					@click="toggleRelType(rt)"
+					class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border transition-all cursor-pointer select-none"
+					:class="graphVisibleRelTypes.includes(rt) ? 'bg-background shadow-sm' : 'bg-muted/50 opacity-50 line-through'"
+				>
+					<span class="size-1.5 rounded-full bg-muted-foreground/50 flex-shrink-0"></span>
+					<span class="text-muted-foreground" x-text="rt"></span>
+				</button>
+			</template>
+		</div>
 	</div>
 }

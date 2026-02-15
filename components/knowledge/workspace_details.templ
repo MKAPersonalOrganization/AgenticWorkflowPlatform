@@ -210,7 +210,7 @@ templ workspaceDetailsScript() {
 				// Upload progress
 				uploadingFiles: [],
 
-				// Knowledge Graph (Sigma.js + Graphology - matching EdgeQuake)
+				// Knowledge Graph (Sigma.js + Graphology — matching EdgeQuake 100%)
 				graphData: null,
 				graphLoading: false,
 				graphSearch: '',
@@ -221,15 +221,24 @@ templ workspaceDetailsScript() {
 				graphShowLabels: true,
 				graphShowEdgeLabels: false,
 				graphVisibleTypes: [],
+				graphVisibleRelTypes: [],
+				graphNodeSize: 'medium',
+				graphEnableDrag: true,
+				graphHighlightNeighbors: true,
+				graphHideUnselectedEdges: false,
 				_graphNodes: [],
 				_graphEdges: [],
 				_graphNodeMap: {},
+				_graphRelTypes: [],
 				_sigmaInstance: null,
 				_graphologyInstance: null,
 				_graphContextMenu: { visible: false, x: 0, y: 0, node: null },
 				_graphSearchMatches: new Set(),
 				_previousSelectedNodeId: null,
 				_draggedNode: null,
+				_nodeDetailsPanelWidth: 320,
+				_selectionPulseInterval: null,
+				_graphNodeCycleIndex: -1,
 				entityColors: {
 					'PERSON': '#3b82f6',
 					'ORGANIZATION': '#10b981',
@@ -279,6 +288,7 @@ templ workspaceDetailsScript() {
 					this.loadDocuments();
 					this.loadPipelineStatus();
 					this.loadQueueMetrics();
+					this.restoreGraphSettings();
 					
 					// Start polling for pipeline status
 					this.pipelinePollingInterval = setInterval(() => {
@@ -294,17 +304,34 @@ templ workspaceDetailsScript() {
 						this.filePage = 1;
 						this.refreshAll();
 					});
+
+					// Global Ctrl+K / Cmd+K shortcut for graph search
+					this._keydownHandler = (e) => {
+						if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+							e.preventDefault();
+							const searchInput = document.getElementById('graph-search-input');
+							if (searchInput) searchInput.focus();
+						}
+					};
+					window.addEventListener('keydown', this._keydownHandler);
 				},
 
 				destroy() {
 					if (this.pipelinePollingInterval) {
 						clearInterval(this.pipelinePollingInterval);
 					}
+					if (this._selectionPulseInterval) {
+						clearInterval(this._selectionPulseInterval);
+						this._selectionPulseInterval = null;
+					}
 					if (this._sigmaInstance) {
 						this._sigmaInstance.kill();
 						this._sigmaInstance = null;
 					}
 					this._graphologyInstance = null;
+					if (this._keydownHandler) {
+						window.removeEventListener('keydown', this._keydownHandler);
+					}
 				},
 
 				async refreshAll() {
@@ -908,6 +935,11 @@ templ workspaceDetailsScript() {
 							const types = new Set();
 							(this.graphData.nodes || []).forEach(n => types.add(n.node_type || 'UNKNOWN'));
 							this.graphVisibleTypes = [...types];
+							// Extract relationship types
+							const relTypes = new Set();
+							(this.graphData.edges || []).forEach(e => { if (e.edge_type) relTypes.add(e.edge_type); });
+							this._graphRelTypes = [...relTypes].sort();
+							this.graphVisibleRelTypes = [...this._graphRelTypes];
 							// Set loading false BEFORE scheduling initGraph so the
 							// x-show container becomes visible when $nextTick fires.
 							this.graphLoading = false;
@@ -948,6 +980,10 @@ templ workspaceDetailsScript() {
 							const types = new Set();
 							(this.graphData.nodes || []).forEach(n => types.add(n.node_type || 'UNKNOWN'));
 							this.graphVisibleTypes = [...types];
+							const relTypes = new Set();
+							(this.graphData.edges || []).forEach(e => { if (e.edge_type) relTypes.add(e.edge_type); });
+							this._graphRelTypes = [...relTypes].sort();
+							this.graphVisibleRelTypes = [...this._graphRelTypes];
 							this._graphSearchMatches = new Set((data.nodes || []).map(n => n.id));
 							this.graphLoading = false;
 							this.$nextTick(() => {
@@ -990,12 +1026,11 @@ templ workspaceDetailsScript() {
 						case 'focus':
 							this.focusNode(node.id);
 							break;
-						case 'neighbors':
-							this.selectedNode = node;
-							this.selectedNodeEdges = this._graphEdges.filter(
-								e => e.source === node.id || e.target === node.id
-							);
-							this._highlightSelectedNode(node.id);
+						case 'expand':
+							this.expandNeighborhood(node.id);
+							break;
+						case 'prune':
+							this.pruneNode(node.id);
 							break;
 						case 'copyId':
 							navigator.clipboard.writeText(node.id).catch(() => {});
@@ -1003,37 +1038,13 @@ templ workspaceDetailsScript() {
 						case 'copyLabel':
 							navigator.clipboard.writeText(node.label).catch(() => {});
 							break;
+						case 'delete':
+							this.deleteGraphEntity(node.id, node.label);
+							break;
 					}
 				},
 
-				// Highlight the selected node by enlarging it and raising its z-index.
-				// Sigma v2.4 default circle renderer supports: size, color, zIndex, highlighted, hidden.
-				_highlightSelectedNode(nodeId) {
-					const graph = this._graphologyInstance;
-					const sigma = this._sigmaInstance;
-					if (!graph || !sigma) return;
-
-					// Restore previous selected node
-					if (this._previousSelectedNodeId && graph.hasNode(this._previousSelectedNodeId)) {
-						const prevId = this._previousSelectedNodeId;
-						const prevDegree = graph.getNodeAttribute(prevId, 'degree') || 0;
-						const origSize = this._calcNodeSize(prevDegree, 8);
-						graph.setNodeAttribute(prevId, 'size', origSize);
-						graph.setNodeAttribute(prevId, 'highlighted', false);
-						graph.setNodeAttribute(prevId, 'zIndex', 0);
-					}
-
-					if (nodeId && graph.hasNode(nodeId)) {
-						const currentSize = graph.getNodeAttribute(nodeId, 'size') || 8;
-						graph.setNodeAttribute(nodeId, 'size', currentSize * 2);
-						graph.setNodeAttribute(nodeId, 'highlighted', true);
-						graph.setNodeAttribute(nodeId, 'zIndex', 999);
-						this._previousSelectedNodeId = nodeId;
-					} else {
-						this._previousSelectedNodeId = null;
-					}
-					sigma.refresh();
-				},
+				// _highlightSelectedNode is defined below with pulsing animation support
 
 				toggleEntityType(type) {
 					const idx = this.graphVisibleTypes.indexOf(type);
@@ -1045,12 +1056,13 @@ templ workspaceDetailsScript() {
 					this._applyVisibilityFilter();
 				},
 
-				// Apply entity type visibility filter to Sigma graph
+				// Apply entity type + relationship type visibility filter to Sigma graph
 				_applyVisibilityFilter() {
 					const graph = this._graphologyInstance;
 					const sigma = this._sigmaInstance;
 					if (!graph || !sigma) return;
 					const visibleTypes = new Set(this.graphVisibleTypes);
+					const visibleRelTypes = new Set(this.graphVisibleRelTypes);
 					const visibleNodeIds = new Set();
 					graph.forEachNode((nodeId, attrs) => {
 						const nodeType = attrs.entityType || 'UNKNOWN';
@@ -1059,7 +1071,10 @@ templ workspaceDetailsScript() {
 						if (visible) visibleNodeIds.add(nodeId);
 					});
 					graph.forEachEdge((edgeId, attrs, source, target) => {
-						graph.setEdgeAttribute(edgeId, 'hidden', !visibleNodeIds.has(source) || !visibleNodeIds.has(target));
+						const relType = attrs.label || '';
+						const nodesVisible = visibleNodeIds.has(source) && visibleNodeIds.has(target);
+						const relVisible = !relType || visibleRelTypes.has(relType);
+						graph.setEdgeAttribute(edgeId, 'hidden', !nodesVisible || !relVisible);
 					});
 					sigma.refresh();
 				},
@@ -1086,7 +1101,6 @@ templ workspaceDetailsScript() {
 					if (!container || !this.graphData || !this.graphData.nodes?.length) return;
 
 					// Ensure the container has actual dimensions (not hidden via x-show).
-					// If it has 0 dimensions, retry after a short delay.
 					const rect = container.getBoundingClientRect();
 					if (rect.width === 0 || rect.height === 0) {
 						if (!this._initGraphRetries) this._initGraphRetries = 0;
@@ -1099,23 +1113,31 @@ templ workspaceDetailsScript() {
 					}
 					this._initGraphRetries = 0;
 
-					// Kill previous Sigma instance
+					// Kill previous Sigma instance + pulse animation
+					if (this._selectionPulseInterval) {
+						clearInterval(this._selectionPulseInterval);
+						this._selectionPulseInterval = null;
+					}
 					if (this._sigmaInstance) {
 						this._sigmaInstance.kill();
 						this._sigmaInstance = null;
 					}
 					this._previousSelectedNodeId = null;
+					this._graphNodeCycleIndex = -1;
+
+					// Node size map matching EdgeQuake
+					const NODE_SIZES = { small: 6, medium: 10, large: 14 };
+					const baseNodeSize = NODE_SIZES[this.graphNodeSize] || 10;
 
 					// Create Graphology graph (directed, multi-edge)
 					const graph = new graphology.Graph({ multi: true, type: 'directed' });
 					this._graphologyInstance = graph;
 
 					const isDark = document.documentElement.classList.contains('dark');
-					const baseNodeSize = 8;
 					const nodes = this.graphData.nodes || [];
 					const edges = this.graphData.edges || [];
 
-					// Add nodes with initial circular positions (will be repositioned by layout)
+					// Add nodes with initial circular positions
 					nodes.forEach((node, index) => {
 						if (!node.id || graph.hasNode(node.id)) return;
 						const angle = (2 * Math.PI * index) / nodes.length;
@@ -1162,7 +1184,7 @@ templ workspaceDetailsScript() {
 					// Apply layout before creating Sigma
 					this._applyLayoutToGraph(graph);
 
-					// Adaptive LOD settings (matching EdgeQuake graph-renderer.tsx)
+					// Adaptive LOD settings
 					const nodeCount = graph.order;
 					const edgeCount = graph.size;
 					const isLargeGraph = nodeCount > 200 || edgeCount > 400;
@@ -1171,8 +1193,7 @@ templ workspaceDetailsScript() {
 					const adaptiveLabelDensity = isVeryLargeGraph ? 0.6 : (isLargeGraph ? 0.7 : 0.8);
 					const adaptiveLabelThreshold = isVeryLargeGraph ? 4 : (isLargeGraph ? 3 : 2);
 
-					// Create Sigma instance (WebGL renderer)
-					// UMD global is `Sigma` which is the module — actual class is Sigma.Sigma (or Sigma.default)
+					// Create Sigma instance
 					const SigmaClass = (typeof Sigma !== 'undefined') ? (Sigma.Sigma || Sigma.default || Sigma) : null;
 					if (!SigmaClass) {
 						console.error('Sigma.js not loaded');
@@ -1203,7 +1224,7 @@ templ workspaceDetailsScript() {
 
 					this._sigmaInstance = sigma;
 
-					// === Event handlers (matching EdgeQuake) ===
+					// === Event handlers ===
 					const self = this;
 
 					// Node click → select
@@ -1223,6 +1244,7 @@ templ workspaceDetailsScript() {
 						self.selectedNode = null;
 						self.selectedNodeEdges = [];
 						self._highlightSelectedNode(null);
+						self._graphContextMenu = { visible: false };
 					});
 
 					// Right-click → context menu
@@ -1243,31 +1265,34 @@ templ workspaceDetailsScript() {
 						}
 					});
 
-					// Node drag (matching EdgeQuake enableNodeDrag)
-					sigma.on('downNode', (e) => {
-						self._draggedNode = e.node;
-						graph.setNodeAttribute(e.node, 'highlighted', true);
-					});
+					// Node drag — only if enabled
+					if (this.graphEnableDrag) {
+						sigma.on('downNode', (e) => {
+							self._draggedNode = e.node;
+							graph.setNodeAttribute(e.node, 'highlighted', true);
+						});
 
-					sigma.getMouseCaptor().on('mousemovebody', (e) => {
-						if (!self._draggedNode) return;
-						const pos = sigma.viewportToGraph(e);
-						graph.setNodeAttribute(self._draggedNode, 'x', pos.x);
-						graph.setNodeAttribute(self._draggedNode, 'y', pos.y);
-						e.preventSigmaDefault();
-						e.original.preventDefault();
-						e.original.stopPropagation();
-					});
+						sigma.getMouseCaptor().on('mousemovebody', (e) => {
+							if (!self._draggedNode) return;
+							const pos = sigma.viewportToGraph(e);
+							graph.setNodeAttribute(self._draggedNode, 'x', pos.x);
+							graph.setNodeAttribute(self._draggedNode, 'y', pos.y);
+							e.preventSigmaDefault();
+							e.original.preventDefault();
+							e.original.stopPropagation();
+						});
 
-					sigma.getMouseCaptor().on('mouseup', () => {
-						if (self._draggedNode) {
-							graph.removeNodeAttribute(self._draggedNode, 'highlighted');
-							self._draggedNode = null;
-						}
-					});
+						sigma.getMouseCaptor().on('mouseup', () => {
+							if (self._draggedNode) {
+								graph.removeNodeAttribute(self._draggedNode, 'highlighted');
+								self._draggedNode = null;
+							}
+						});
+					}
 
-					// Node hover → neighbor highlighting (EdgeQuake style: dim non-neighbors)
+					// Node hover → neighbor highlighting (if enabled)
 					sigma.on('enterNode', ({ node }) => {
+						if (!self.graphHighlightNeighbors) return;
 						const connectedNodes = new Set();
 						graph.forEachNeighbor(node, (neighbor) => connectedNodes.add(neighbor));
 						graph.forEachNode((n) => {
@@ -1279,15 +1304,20 @@ templ workspaceDetailsScript() {
 								graph.setNodeAttribute(n, 'hidden', true);
 							}
 						});
+						// Hide unselected edges if setting is on, otherwise just hide non-connected edges
 						graph.forEachEdge((edge, attrs, source, target) => {
-							if (source !== node && target !== node) {
+							const isConnected = source === node || target === node;
+							if (!isConnected) {
 								graph.setEdgeAttribute(edge, 'hidden', true);
+							} else if (self.graphHideUnselectedEdges) {
+								// keep connected visible
 							}
 						});
 						sigma.refresh();
 					});
 
 					sigma.on('leaveNode', () => {
+						if (!self.graphHighlightNeighbors) return;
 						graph.forEachNode((n) => {
 							graph.removeNodeAttribute(n, 'hidden');
 							graph.removeNodeAttribute(n, 'highlighted');
@@ -1295,11 +1325,11 @@ templ workspaceDetailsScript() {
 						graph.forEachEdge((edge) => {
 							graph.removeEdgeAttribute(edge, 'hidden');
 						});
-						// Re-apply entity type filter
+						// Re-apply entity type + relationship type filter
 						self._applyVisibilityFilter();
 					});
 
-					// Edge hover → highlight (EdgeQuake style)
+					// Edge hover → highlight
 					if (!isVeryLargeGraph) {
 						sigma.on('enterEdge', ({ edge }) => {
 							const source = graph.source(edge);
@@ -1343,7 +1373,18 @@ templ workspaceDetailsScript() {
 						} else if (e.key === '0') {
 							self.graphResetCamera();
 						} else if (e.key === 'f' || e.key === 'F') {
-							self.graphToggleFullscreen();
+							if (!e.ctrlKey && !e.metaKey) self.graphToggleFullscreen();
+						} else if (e.key === 'Tab') {
+							e.preventDefault();
+							self._cycleNodes(e.shiftKey ? -1 : 1);
+						} else if (e.key === 'Enter') {
+							if (self.selectedNode) self.focusNode(self.selectedNode.id);
+						} else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+							e.preventDefault();
+							self._cycleNodes(1);
+						} else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+							e.preventDefault();
+							self._cycleNodes(-1);
 						}
 					});
 
@@ -1361,7 +1402,7 @@ templ workspaceDetailsScript() {
 					this._setupMinimap();
 				},
 
-				// Apply layout algorithm to Graphology graph (matching EdgeQuake layouts)
+				// Apply layout algorithm to Graphology graph (all 7 EdgeQuake layouts)
 				_applyLayoutToGraph(graph) {
 					if (!graph || graph.order === 0) return;
 					const layout = this.graphLayout;
@@ -1376,6 +1417,94 @@ templ workspaceDetailsScript() {
 							graph.setNodeAttribute(nodeId, 'y', Math.sin(angle) * radius);
 							i++;
 						});
+						return;
+					}
+
+					if (layout === 'circlepack') {
+						// Circle-pack layout: group by entity type, concentric rings
+						const groups = {};
+						graph.forEachNode((nodeId, attrs) => {
+							const t = attrs.entityType || 'UNKNOWN';
+							if (!groups[t]) groups[t] = [];
+							groups[t].push(nodeId);
+						});
+						const typeKeys = Object.keys(groups);
+						let globalIdx = 0;
+						typeKeys.forEach((type, ringIdx) => {
+							const ring = groups[type];
+							const ringRadius = (ringIdx + 1) * Math.max(50, nodeCount * 2);
+							ring.forEach((nodeId, i) => {
+								const angle = (2 * Math.PI * i) / ring.length;
+								graph.setNodeAttribute(nodeId, 'x', Math.cos(angle) * ringRadius);
+								graph.setNodeAttribute(nodeId, 'y', Math.sin(angle) * ringRadius);
+								globalIdx++;
+							});
+						});
+						return;
+					}
+
+					if (layout === 'random') {
+						// Random positions + ForceAtlas2 settle (like EdgeQuake random+FA2)
+						graph.forEachNode((nodeId) => {
+							graph.setNodeAttribute(nodeId, 'x', (Math.random() - 0.5) * 300);
+							graph.setNodeAttribute(nodeId, 'y', (Math.random() - 0.5) * 300);
+						});
+						// Settle with FA2 if available
+						if (typeof graphologyLayoutForceAtlas2 !== 'undefined' && graphologyLayoutForceAtlas2) {
+							try {
+								graphologyLayoutForceAtlas2.assign(graph, {
+									iterations: Math.min(30, nodeCount > 200 ? 15 : 30),
+									settings: {
+										gravity: 1,
+										scalingRatio: 2,
+										strongGravityMode: true,
+										barnesHutOptimize: nodeCount > 50,
+									},
+								});
+							} catch (e) { /* FA2 failed */ }
+						}
+						return;
+					}
+
+					if (layout === 'noverlap') {
+						// First apply circular, then resolve overlaps manually
+						let i = 0;
+						graph.forEachNode((nodeId) => {
+							const angle = (2 * Math.PI * i) / nodeCount;
+							const radius = Math.max(100, nodeCount * 3);
+							graph.setNodeAttribute(nodeId, 'x', Math.cos(angle) * radius);
+							graph.setNodeAttribute(nodeId, 'y', Math.sin(angle) * radius);
+							i++;
+						});
+						// Simple overlap resolution: push overlapping nodes apart
+						for (let iter = 0; iter < 50; iter++) {
+							const positions = [];
+							graph.forEachNode((nodeId, attrs) => {
+								positions.push({ id: nodeId, x: attrs.x, y: attrs.y, size: attrs.size || 8 });
+							});
+							let moved = false;
+							for (let a = 0; a < positions.length; a++) {
+								for (let b = a + 1; b < positions.length; b++) {
+									const dx = positions[b].x - positions[a].x;
+									const dy = positions[b].y - positions[a].y;
+									const dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
+									const minDist = (positions[a].size + positions[b].size) * 2.5;
+									if (dist < minDist) {
+										const push = (minDist - dist) / 2;
+										const nx = (dx / dist) * push;
+										const ny = (dy / dist) * push;
+										positions[a].x -= nx; positions[a].y -= ny;
+										positions[b].x += nx; positions[b].y += ny;
+										moved = true;
+									}
+								}
+							}
+							if (!moved) break;
+							positions.forEach(p => {
+								graph.setNodeAttribute(p.id, 'x', p.x);
+								graph.setNodeAttribute(p.id, 'y', p.y);
+							});
+						}
 						return;
 					}
 
@@ -1485,15 +1614,60 @@ templ workspaceDetailsScript() {
 					}
 				},
 
-				// Apply layout change (called from LayoutControl dropdown)
+				// Apply layout change with animated transition (matching EdgeQuake 500ms animateNodes)
 				applyLayout() {
 					const graph = this._graphologyInstance;
 					const sigma = this._sigmaInstance;
 					if (!graph || !sigma || graph.order === 0) return;
-					this._applyLayoutToGraph(graph);
-					sigma.refresh();
-					// Fit camera after layout change
-					this.graphResetCamera();
+
+					// Capture old positions for animation
+					const oldPositions = {};
+					graph.forEachNode((nodeId, attrs) => {
+						oldPositions[nodeId] = { x: attrs.x, y: attrs.y };
+					});
+
+					// Calculate new layout positions on a temp copy
+					const tempGraph = graph.copy();
+					const savedLayout = this.graphLayout;
+					this._applyLayoutToGraph(tempGraph);
+
+					// Extract new positions
+					const newPositions = {};
+					tempGraph.forEachNode((nodeId) => {
+						newPositions[nodeId] = {
+							x: tempGraph.getNodeAttribute(nodeId, 'x'),
+							y: tempGraph.getNodeAttribute(nodeId, 'y'),
+						};
+					});
+
+					// Animate from old to new positions (500ms, ease-in-out)
+					const duration = 500;
+					const startTime = performance.now();
+					const easeInOut = (t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+
+					const animate = () => {
+						const elapsed = performance.now() - startTime;
+						const progress = Math.min(elapsed / duration, 1);
+						const eased = easeInOut(progress);
+
+						graph.forEachNode((nodeId) => {
+							const oldPos = oldPositions[nodeId];
+							const newPos = newPositions[nodeId];
+							if (oldPos && newPos) {
+								graph.setNodeAttribute(nodeId, 'x', oldPos.x + (newPos.x - oldPos.x) * eased);
+								graph.setNodeAttribute(nodeId, 'y', oldPos.y + (newPos.y - oldPos.y) * eased);
+							}
+						});
+						sigma.refresh();
+
+						if (progress < 1) {
+							requestAnimationFrame(animate);
+						} else {
+							this.graphResetCamera();
+						}
+					};
+					requestAnimationFrame(animate);
+					this.saveGraphSettings();
 				},
 
 				// Minimap: draw a scaled overview of the graph on the minimap canvas
@@ -1640,6 +1814,7 @@ templ workspaceDetailsScript() {
 					sigma.setSetting('renderLabels', this.graphShowLabels);
 					sigma.setSetting('renderEdgeLabels', this.graphShowEdgeLabels);
 					sigma.refresh();
+					this.saveGraphSettings();
 				},
 
 				graphToggleFullscreen() {
@@ -1650,6 +1825,378 @@ templ workspaceDetailsScript() {
 					} else {
 						container.requestFullscreen().catch(() => {});
 					}
+				},
+
+				// === Camera rotation (matching EdgeQuake zoom-controls.tsx) ===
+				graphRotateCW() {
+					if (!this._sigmaInstance) return;
+					const camera = this._sigmaInstance.getCamera();
+					const state = camera.getState();
+					camera.animate({ angle: (state.angle || 0) + Math.PI / 12 }, { duration: 200 });
+				},
+
+				graphRotateCCW() {
+					if (!this._sigmaInstance) return;
+					const camera = this._sigmaInstance.getCamera();
+					const state = camera.getState();
+					camera.animate({ angle: (state.angle || 0) - Math.PI / 12 }, { duration: 200 });
+				},
+
+				// === Export (matching EdgeQuake graph-export.tsx) ===
+				graphExportPNG() {
+					const sigma = this._sigmaInstance;
+					if (!sigma) return;
+					// Capture the sigma canvas
+					const container = document.getElementById('sigma-container');
+					if (!container) return;
+					const canvases = container.querySelectorAll('canvas');
+					if (canvases.length === 0) return;
+					
+					// Create a combined canvas
+					const mainCanvas = canvases[0];
+					const exportCanvas = document.createElement('canvas');
+					exportCanvas.width = mainCanvas.width;
+					exportCanvas.height = mainCanvas.height;
+					const ctx = exportCanvas.getContext('2d');
+					
+					// Draw all sigma canvases (nodes, edges, labels layers)
+					canvases.forEach(c => {
+						ctx.drawImage(c, 0, 0);
+					});
+					
+					// Download
+					exportCanvas.toBlob((blob) => {
+						if (!blob) return;
+						const url = URL.createObjectURL(blob);
+						const a = document.createElement('a');
+						a.href = url;
+						a.download = `knowledge-graph-${new Date().toISOString().slice(0,10)}.png`;
+						a.click();
+						URL.revokeObjectURL(url);
+					}, 'image/png');
+				},
+
+				graphExportJSON() {
+					if (!this.graphData) return;
+					const exportData = {
+						metadata: {
+							exportedAt: new Date().toISOString(),
+							nodeCount: (this.graphData.nodes || []).length,
+							edgeCount: (this.graphData.edges || []).length,
+							totalNodes: this.graphData.total_nodes || 0,
+							isTruncated: this.graphData.is_truncated || false,
+						},
+						nodes: this.graphData.nodes || [],
+						edges: this.graphData.edges || [],
+					};
+					const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+					const url = URL.createObjectURL(blob);
+					const a = document.createElement('a');
+					a.href = url;
+					a.download = `knowledge-graph-${new Date().toISOString().slice(0,10)}.json`;
+					a.click();
+					URL.revokeObjectURL(url);
+				},
+
+				// === Node cycling (Tab/Shift+Tab, arrows — matching EdgeQuake) ===
+				_cycleNodes(direction) {
+					if (!this._graphNodes || this._graphNodes.length === 0) return;
+					const visibleNodes = this._graphNodes.filter(n => 
+						this.graphVisibleTypes.includes(n.node_type || 'UNKNOWN')
+					);
+					if (visibleNodes.length === 0) return;
+					
+					this._graphNodeCycleIndex += direction;
+					if (this._graphNodeCycleIndex >= visibleNodes.length) this._graphNodeCycleIndex = 0;
+					if (this._graphNodeCycleIndex < 0) this._graphNodeCycleIndex = visibleNodes.length - 1;
+					
+					const node = visibleNodes[this._graphNodeCycleIndex];
+					this.selectedNode = node;
+					this.selectedNodeEdges = this._graphEdges.filter(
+						e => e.source === node.id || e.target === node.id
+					);
+					this._highlightSelectedNode(node.id);
+					
+					// Animate camera to the node
+					const graph = this._graphologyInstance;
+					const sigma = this._sigmaInstance;
+					if (graph && sigma && graph.hasNode(node.id)) {
+						const pos = {
+							x: graph.getNodeAttribute(node.id, 'x'),
+							y: graph.getNodeAttribute(node.id, 'y'),
+						};
+						sigma.getCamera().animate(pos, { duration: 200 });
+					}
+				},
+
+				// === Expand neighborhood (fetch 1-hop neighbors via API + add to graph) ===
+				async expandNeighborhood(nodeId) {
+					try {
+						const resp = await fetch(`/api/knowledge/graph/nodes/${encodeURIComponent(nodeId)}/neighbors?workspace_id=${this.workspaceId}&depth=1`);
+						if (!resp.ok) return;
+						const data = await resp.json();
+						const graph = this._graphologyInstance;
+						const sigma = this._sigmaInstance;
+						if (!graph || !sigma) return;
+
+						const isDark = document.documentElement.classList.contains('dark');
+						const NODE_SIZES = { small: 6, medium: 10, large: 14 };
+						const baseNodeSize = NODE_SIZES[this.graphNodeSize] || 10;
+						let addedNodes = 0;
+						let addedEdges = 0;
+
+						// Add new nodes
+						(data.nodes || []).forEach((node) => {
+							if (!node.id || graph.hasNode(node.id)) return;
+							// Position near the expanded node
+							const parentX = graph.getNodeAttribute(nodeId, 'x') || 0;
+							const parentY = graph.getNodeAttribute(nodeId, 'y') || 0;
+							const angle = Math.random() * 2 * Math.PI;
+							const dist = 30 + Math.random() * 40;
+							const degree = node.degree || 0;
+							graph.addNode(node.id, {
+								label: node.label,
+								x: parentX + Math.cos(angle) * dist,
+								y: parentY + Math.sin(angle) * dist,
+								size: this._calcNodeSize(degree, baseNodeSize),
+								color: this._getNodeColor(node.node_type),
+								entityType: node.node_type,
+								description: node.description,
+								degree: degree,
+								zIndex: 0,
+							});
+							this._graphNodeMap[node.id] = node;
+							this._graphNodes.push(node);
+							addedNodes++;
+						});
+
+						// Add new edges
+						(data.edges || []).forEach((edge) => {
+							if (!edge.source || !edge.target) return;
+							if (!graph.hasNode(edge.source) || !graph.hasNode(edge.target)) return;
+							const edgeId = `${edge.source}-${edge.target}-${edge.edge_type || ''}`;
+							if (graph.hasEdge(edgeId)) return;
+							try {
+								graph.addEdgeWithKey(edgeId, edge.source, edge.target, {
+									label: edge.edge_type || '',
+									size: Math.max(1, Math.min((edge.weight || 1) * 2, 5)),
+									color: isDark ? '#4b5563' : '#94a3b8',
+									type: 'arrow',
+									forceLabel: false,
+								});
+								this._graphEdges.push(edge);
+								addedEdges++;
+							} catch (e) { /* duplicate */ }
+						});
+
+						// Quick FA2 settle for the new nodes
+						if (addedNodes > 0 && typeof graphologyLayoutForceAtlas2 !== 'undefined') {
+							try {
+								graphologyLayoutForceAtlas2.assign(graph, {
+									iterations: 20,
+									settings: {
+										gravity: 1,
+										scalingRatio: 2,
+										strongGravityMode: true,
+										barnesHutOptimize: true,
+									},
+								});
+							} catch (e) { /* settle failed */ }
+						}
+
+						sigma.refresh();
+						this._setupMinimap();
+					} catch (e) {
+						console.error('Failed to expand neighborhood:', e);
+					}
+				},
+
+				// === Prune node (remove + orphaned neighbors) ===
+				pruneNode(nodeId) {
+					const graph = this._graphologyInstance;
+					const sigma = this._sigmaInstance;
+					if (!graph || !sigma || !graph.hasNode(nodeId)) return;
+
+					// Find neighbors that would become orphaned
+					const neighbors = [];
+					graph.forEachNeighbor(nodeId, (neighbor) => neighbors.push(neighbor));
+
+					// Remove the node
+					graph.dropNode(nodeId);
+					delete this._graphNodeMap[nodeId];
+					this._graphNodes = this._graphNodes.filter(n => n.id !== nodeId);
+					this._graphEdges = this._graphEdges.filter(e => e.source !== nodeId && e.target !== nodeId);
+
+					// Remove orphaned neighbors (degree 0 after removal)
+					neighbors.forEach((nId) => {
+						if (graph.hasNode(nId) && graph.degree(nId) === 0) {
+							graph.dropNode(nId);
+							delete this._graphNodeMap[nId];
+							this._graphNodes = this._graphNodes.filter(n => n.id !== nId);
+						}
+					});
+
+					// Deselect if pruned node was selected
+					if (this.selectedNode?.id === nodeId) {
+						this.selectedNode = null;
+						this.selectedNodeEdges = [];
+						this._highlightSelectedNode(null);
+					}
+
+					sigma.refresh();
+					this._setupMinimap();
+				},
+
+				// === Delete graph entity via API ===
+				async deleteGraphEntity(nodeId, label) {
+					if (!confirm(`Delete entity "${label}"? This cannot be undone.`)) return;
+					try {
+						const resp = await fetch(`/api/knowledge/graph/nodes/${encodeURIComponent(nodeId)}?workspace_id=${this.workspaceId}`, {
+							method: 'DELETE',
+						});
+						if (resp.ok) {
+							this.pruneNode(nodeId);
+						}
+					} catch (e) {
+						console.error('Failed to delete entity:', e);
+					}
+				},
+
+				// === Relationship type toggle ===
+				toggleRelType(rt) {
+					const idx = this.graphVisibleRelTypes.indexOf(rt);
+					if (idx >= 0) {
+						this.graphVisibleRelTypes.splice(idx, 1);
+					} else {
+						this.graphVisibleRelTypes.push(rt);
+					}
+					this._applyVisibilityFilter();
+				},
+
+				// === Node size change ===
+				applyNodeSize() {
+					const graph = this._graphologyInstance;
+					const sigma = this._sigmaInstance;
+					if (!graph || !sigma) return;
+					const NODE_SIZES = { small: 6, medium: 10, large: 14 };
+					const baseNodeSize = NODE_SIZES[this.graphNodeSize] || 10;
+					graph.forEachNode((nodeId, attrs) => {
+						const degree = attrs.degree || 0;
+						graph.setNodeAttribute(nodeId, 'size', this._calcNodeSize(degree, baseNodeSize));
+					});
+					sigma.refresh();
+					this.saveGraphSettings();
+				},
+
+				// === Resizable node details panel ===
+				_startPanelResize(e) {
+					const startX = e.clientX;
+					const startWidth = this._nodeDetailsPanelWidth || 320;
+					const onMove = (e) => {
+						const diff = startX - e.clientX;
+						this._nodeDetailsPanelWidth = Math.max(280, Math.min(480, startWidth + diff));
+					};
+					const onUp = () => {
+						document.removeEventListener('mousemove', onMove);
+						document.removeEventListener('mouseup', onUp);
+						this.saveGraphSettings();
+					};
+					document.addEventListener('mousemove', onMove);
+					document.addEventListener('mouseup', onUp);
+				},
+
+				// === Load More (truncation) ===
+				graphLoadMore() {
+					const current = parseInt(this.graphMaxNodes) || 100;
+					const next = Math.min(Math.round(current * 1.5), 500);
+					this.graphMaxNodes = String(next);
+					this.loadGraph();
+				},
+
+				// === Selected node pulsing animation (matching EdgeQuake) ===
+				_highlightSelectedNode(nodeId) {
+					const graph = this._graphologyInstance;
+					const sigma = this._sigmaInstance;
+					if (!graph || !sigma) return;
+
+					// Stop previous pulse
+					if (this._selectionPulseInterval) {
+						clearInterval(this._selectionPulseInterval);
+						this._selectionPulseInterval = null;
+					}
+
+					// Restore previous selected node
+					if (this._previousSelectedNodeId && graph.hasNode(this._previousSelectedNodeId)) {
+						const prevId = this._previousSelectedNodeId;
+						const NODE_SIZES = { small: 6, medium: 10, large: 14 };
+						const baseNodeSize = NODE_SIZES[this.graphNodeSize] || 10;
+						const prevDegree = graph.getNodeAttribute(prevId, 'degree') || 0;
+						const origSize = this._calcNodeSize(prevDegree, baseNodeSize);
+						graph.setNodeAttribute(prevId, 'size', origSize);
+						graph.setNodeAttribute(prevId, 'highlighted', false);
+						graph.setNodeAttribute(prevId, 'zIndex', 0);
+					}
+
+					if (nodeId && graph.hasNode(nodeId)) {
+						const currentSize = graph.getNodeAttribute(nodeId, 'size') || 10;
+						graph.setNodeAttribute(nodeId, 'size', currentSize * 2);
+						graph.setNodeAttribute(nodeId, 'highlighted', true);
+						graph.setNodeAttribute(nodeId, 'zIndex', 999);
+						this._previousSelectedNodeId = nodeId;
+
+						// Pulsing animation at 20fps (matching EdgeQuake 3.5↔4.5 border concept via size)
+						let phase = 0;
+						this._selectionPulseInterval = setInterval(() => {
+							if (!graph.hasNode(nodeId)) {
+								clearInterval(this._selectionPulseInterval);
+								this._selectionPulseInterval = null;
+								return;
+							}
+							phase = (phase + 0.15) % (Math.PI * 2);
+							const basePulseSize = currentSize * 2;
+							const pulseSize = basePulseSize + Math.sin(phase) * (currentSize * 0.2);
+							graph.setNodeAttribute(nodeId, 'size', pulseSize);
+							sigma.refresh();
+						}, 50);
+					} else {
+						this._previousSelectedNodeId = null;
+					}
+					sigma.refresh();
+				},
+
+				// === Settings persistence (localStorage) ===
+				saveGraphSettings() {
+					try {
+						const settings = {
+							graphLayout: this.graphLayout,
+							graphMaxNodes: this.graphMaxNodes,
+							graphShowLabels: this.graphShowLabels,
+							graphShowEdgeLabels: this.graphShowEdgeLabels,
+							graphNodeSize: this.graphNodeSize,
+							graphEnableDrag: this.graphEnableDrag,
+							graphHighlightNeighbors: this.graphHighlightNeighbors,
+							graphHideUnselectedEdges: this.graphHideUnselectedEdges,
+							_nodeDetailsPanelWidth: this._nodeDetailsPanelWidth,
+						};
+						localStorage.setItem('graph-settings', JSON.stringify(settings));
+					} catch (e) { /* localStorage unavailable */ }
+				},
+
+				restoreGraphSettings() {
+					try {
+						const saved = localStorage.getItem('graph-settings');
+						if (!saved) return;
+						const settings = JSON.parse(saved);
+						if (settings.graphLayout) this.graphLayout = settings.graphLayout;
+						if (settings.graphMaxNodes) this.graphMaxNodes = settings.graphMaxNodes;
+						if (settings.graphShowLabels !== undefined) this.graphShowLabels = settings.graphShowLabels;
+						if (settings.graphShowEdgeLabels !== undefined) this.graphShowEdgeLabels = settings.graphShowEdgeLabels;
+						if (settings.graphNodeSize) this.graphNodeSize = settings.graphNodeSize;
+						if (settings.graphEnableDrag !== undefined) this.graphEnableDrag = settings.graphEnableDrag;
+						if (settings.graphHighlightNeighbors !== undefined) this.graphHighlightNeighbors = settings.graphHighlightNeighbors;
+						if (settings.graphHideUnselectedEdges !== undefined) this.graphHideUnselectedEdges = settings.graphHideUnselectedEdges;
+						if (settings._nodeDetailsPanelWidth) this._nodeDetailsPanelWidth = settings._nodeDetailsPanelWidth;
+					} catch (e) { /* parse error or localStorage unavailable */ }
 				},
 			}));
 

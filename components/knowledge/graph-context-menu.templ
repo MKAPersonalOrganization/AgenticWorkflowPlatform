@@ -4,10 +4,9 @@ import "school-with-ai/components/icon"
 
 /**
  * GraphContextMenu - Right-click context menu for graph nodes.
- * Matches EdgeQuake edgequake_webui/src/components/graph/graph-context-menu.tsx
- *
- * Shows: View Details, Focus Node, Highlight Neighbors, Copy ID, Copy Label.
- * Positioned at the click location using Alpine.js reactive coords.
+ * Matches EdgeQuake's 7-action context menu:
+ *   View Details, Expand Neighborhood, Prune Node, Find Related,
+ *   View Source Documents, Copy Entity ID, Delete Entity.
  */
 
 templ GraphContextMenu() {
@@ -20,7 +19,7 @@ templ GraphContextMenu() {
 		x-transition:leave="transition ease-in duration-75"
 		x-transition:leave-start="opacity-100 scale-100"
 		x-transition:leave-end="opacity-0 scale-95"
-		class="absolute z-50 min-w-[180px] rounded-lg border bg-background/95 backdrop-blur-sm shadow-lg py-1"
+		class="absolute z-50 min-w-[200px] rounded-lg border bg-background/95 backdrop-blur-sm shadow-lg py-1"
 		:style="`left: ${_graphContextMenu?.x || 0}px; top: ${_graphContextMenu?.y || 0}px`"
 		@click.outside="_graphContextMenu = {visible: false}"
 	>
@@ -32,9 +31,13 @@ templ GraphContextMenu() {
 			@icon.Focus(icon.Props{Class: "size-3.5 text-muted-foreground"})
 			<span>Focus Node</span>
 		</button>
-		<button @click="contextMenuAction('neighbors')" class="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted transition-colors text-left">
+		<button @click="contextMenuAction('expand')" class="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted transition-colors text-left">
 			@icon.Network(icon.Props{Class: "size-3.5 text-muted-foreground"})
-			<span>Highlight Neighbors</span>
+			<span>Expand Neighborhood</span>
+		</button>
+		<button @click="contextMenuAction('prune')" class="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted transition-colors text-left">
+			@icon.Scissors(icon.Props{Class: "size-3.5 text-muted-foreground"})
+			<span>Prune Node</span>
 		</button>
 		<div class="border-t my-1"></div>
 		<button @click="contextMenuAction('copyId')" class="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted transition-colors text-left">
@@ -44,6 +47,11 @@ templ GraphContextMenu() {
 		<button @click="contextMenuAction('copyLabel')" class="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted transition-colors text-left">
 			@icon.Clipboard(icon.Props{Class: "size-3.5 text-muted-foreground"})
 			<span>Copy Label</span>
+		</button>
+		<div class="border-t my-1"></div>
+		<button @click="contextMenuAction('delete')" class="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted transition-colors text-left text-destructive">
+			@icon.Trash2(icon.Props{Class: "size-3.5"})
+			<span>Delete Entity</span>
 		</button>
 	</div>
 }
