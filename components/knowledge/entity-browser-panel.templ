@@ -1,0 +1,203 @@
+package knowledge
+
+import (
+	"school-with-ai/components/i18n"
+	"school-with-ai/components/icon"
+)
+
+templ EntityBrowserPanel() {
+	<!-- Persistent drawer container -->
+	<aside
+		class="flex flex-col border-r bg-card/95 backdrop-blur-sm shrink-0 overflow-hidden transition-all duration-300 relative group"
+		:class="entityBrowserCollapsed ? 'w-10' : 'w-72'"
+		aria-label="Entity browser"
+	>
+		<!-- Collapsed state content -->
+		<div
+			x-show="entityBrowserCollapsed"
+			class="flex flex-col items-center py-4 gap-4"
+		>
+			<button
+				@click="entityBrowserCollapsed = false"
+				class="p-1 hover:bg-muted rounded-md transition-colors"
+				title="Expand Panel"
+			>
+				@icon.ChevronRight(icon.Props{Class: "size-4"})
+			</button>
+			<div class="flex flex-col items-center gap-1.5 opacity-50">
+				@icon.Network(icon.Props{Class: "size-4 text-muted-foreground"})
+				<span
+					class="text-[10px] text-muted-foreground font-medium whitespace-nowrap"
+					style="writing-mode: vertical-rl; text-orientation: mixed"
+				>
+					{ i18n.T(ctx, "Entities") }
+				</span>
+			</div>
+		</div>
+
+		<!-- Expanded state content -->
+		<div
+			x-show="!entityBrowserCollapsed"
+			class="flex flex-col h-full w-72"
+			x-cloak
+		>
+			<!-- Header -->
+			<div class="flex items-center justify-between px-3 py-2.5 border-b bg-muted/20">
+				<div class="flex items-center gap-2">
+					@icon.Network(icon.Props{Class: "size-4 text-muted-foreground"})
+					<h2 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+						{ i18n.T(ctx, "Entities") }
+					</h2>
+					<template x-if="_graphNodes.length > 0">
+						<span class="inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium" x-text="sortedNodes.length"></span>
+					</template>
+				</div>
+				<button
+					@click="entityBrowserCollapsed = true"
+					class="p-1 hover:bg-muted rounded-md transition-colors text-muted-foreground"
+					title="Collapse Panel"
+				>
+					@icon.ChevronLeft(icon.Props{Class: "size-4"})
+				</button>
+			</div>
+
+			<!-- Search -->
+			<div class="p-2.5 border-b space-y-2">
+				<div class="relative">
+					@icon.Search(icon.Props{Class: "absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground"})
+					<input
+						type="text"
+						x-model="entityBrowserSearchQuery"
+						placeholder={ i18n.T(ctx, "Search entities...") }
+						class="w-full h-8 pl-8 pr-3 text-xs bg-muted/50 border-none rounded-md focus:ring-1 focus:ring-ring transition-all"
+					/>
+				</div>
+				
+				<!-- Sort Controls -->
+				<div class="flex items-center justify-between">
+					<div class="flex items-center gap-1">
+						<span class="text-[10px] text-muted-foreground mr-1">{ i18n.T(ctx, "Sort:") }</span>
+						<button
+							@click="entityBrowserSortBy = 'name'"
+							class="px-1.5 py-0.5 text-[10px] rounded transition-colors"
+							:class="entityBrowserSortBy === 'name' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground'"
+						>
+							{ i18n.T(ctx, "Name") }
+						</button>
+						<button
+							@click="entityBrowserSortBy = 'degree'"
+							class="px-1.5 py-0.5 text-[10px] rounded transition-colors"
+							:class="entityBrowserSortBy === 'degree' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground'"
+						>
+							{ i18n.T(ctx, "Degree") }
+						</button>
+					</div>
+					<button
+						@click="entityBrowserSortAsc = !entityBrowserSortAsc"
+						class="p-1 hover:bg-muted rounded text-muted-foreground transition-colors"
+						title="Toggle Sort Direction"
+					>
+						<template x-if="entityBrowserSortAsc">
+							@icon.ArrowUpNarrowWide(icon.Props{Class: "size-3.5"})
+						</template>
+						<template x-if="!entityBrowserSortAsc">
+							@icon.ArrowDownWideNarrow(icon.Props{Class: "size-3.5"})
+						</template>
+					</button>
+				</div>
+			</div>
+
+			<!-- View Toggles -->
+			<div class="flex p-1 bg-muted/30 border-b">
+				<button
+					@click="entityBrowserViewMode = 'grouped'"
+					class="flex-1 py-1 text-[10px] font-medium rounded transition-all"
+					:class="entityBrowserViewMode === 'grouped' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+				>
+					{ i18n.T(ctx, "Grouped") }
+				</button>
+				<button
+					@click="entityBrowserViewMode = 'list'"
+					class="flex-1 py-1 text-[10px] font-medium rounded transition-all"
+					:class="entityBrowserViewMode === 'list' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+				>
+					{ i18n.T(ctx, "List") }
+				</button>
+			</div>
+
+			<!-- List Content -->
+			<div class="flex-1 overflow-y-auto px-1 py-2 custom-scrollbar">
+				<!-- Grouped View -->
+				<template x-if="entityBrowserViewMode === 'grouped'">
+					<div class="space-y-4">
+						<template x-for="[type, nodes] in groupedNodes" :key="type">
+							<div class="space-y-1">
+								<div class="flex items-center justify-between px-2 py-1 sticky top-0 bg-card z-10">
+									<div class="flex items-center gap-2">
+										<div class="size-2 rounded-full" :style="`background-color: ${entityColors[type] || '#94a3b8'}`"></div>
+										<span class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground" x-text="type"></span>
+									</div>
+									<span class="text-[10px] text-muted-foreground font-medium tabular-nums" x-text="nodes.length"></span>
+								</div>
+								<div class="space-y-0.5">
+									<template x-for="node in nodes" :key="node.id">
+										@EntityItem()
+									</template>
+								</div>
+							</div>
+						</template>
+					</div>
+				</template>
+
+				<!-- List View -->
+				<template x-if="entityBrowserViewMode === 'list'">
+					<div class="space-y-0.5">
+						<template x-for="node in sortedNodes" :key="node.id">
+							@EntityItem()
+						</template>
+					</div>
+				</template>
+
+				<!-- Empty State -->
+				<template x-if="sortedNodes.length === 0">
+					<div class="flex flex-col items-center justify-center py-12 px-4 text-center">
+						@icon.Network(icon.Props{Class: "size-8 text-muted-foreground/30 mb-3"})
+						<p class="text-xs text-muted-foreground">
+							<span x-show="entityBrowserSearchQuery">{ i18n.T(ctx, "No entities match your search") }</span>
+							<span x-show="!entityBrowserSearchQuery">{ i18n.T(ctx, "No entities in graph") }</span>
+						</p>
+					</div>
+				</template>
+			</div>
+		</div>
+	</aside>
+}
+
+templ EntityItem() {
+	<button
+		@click="focusNode(node.id)"
+		class="w-full text-left px-2 py-1.5 rounded-md transition-all group flex items-center gap-2.5 outline-none"
+		:class="selectedNodeId === node.id ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-muted/80'"
+	>
+		<div
+			class="size-2 rounded-full shrink-0 ring-1 ring-offset-1 ring-offset-card transition-transform group-hover:scale-110"
+			:class="selectedNodeId === node.id ? 'ring-primary-foreground/50' : 'ring-border'"
+			:style="`background-color: ${entityColors[node.node_type] || '#94a3b8'}`"
+		></div>
+		<div class="flex-1 min-w-0">
+			<div class="flex items-center justify-between gap-2">
+				<span class="text-xs font-medium truncate leading-tight" x-text="node.label || node.id"></span>
+				<span
+					x-show="node.degree > 0"
+					class="text-[9px] tabular-nums font-medium opacity-60 flex-shrink-0"
+					x-text="node.degree"
+				></span>
+			</div>
+			<div
+				class="text-[9px] uppercase tracking-wider opacity-60 mt-0.5 font-medium"
+				x-text="node.node_type"
+				x-show="entityBrowserViewMode === 'list'"
+			></div>
+		</div>
+	</button>
+}

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -380,6 +381,50 @@ func (h *Handler) GetPDFContent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, content)
+}
+
+// DownloadPDF proxies the PDF binary download from Edgequake.
+func (h *Handler) DownloadPDF(w http.ResponseWriter, r *http.Request) {
+	tCtx, err := h.resolveTenantContext(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Handle workspace_id param
+	wsID := r.URL.Query().Get("workspace_id")
+	if wsID != "" {
+		if uid, err := uuid.Parse(wsID); err == nil {
+			tCtx.WorkspaceID = &uid
+		}
+	}
+
+	pdfID := chi.URLParam(r, "pdfId")
+	if pdfID == "" {
+		http.Error(w, "Missing PDF ID", http.StatusBadRequest)
+		return
+	}
+
+	body, contentType, contentLength, err := h.edgequakeService.DownloadPDF(r.Context(), tCtx, pdfID)
+	if err != nil {
+		h.log.Error(r.Context(), "failed to download PDF", "error", err, "pdfId", pdfID)
+		http.Error(w, "Failed to download PDF", http.StatusInternalServerError)
+		return
+	}
+	defer body.Close()
+
+	if contentType != "" {
+		w.Header().Set("Content-Type", contentType)
+	} else {
+		w.Header().Set("Content-Type", "application/pdf")
+	}
+
+	if contentLength > 0 {
+		w.Header().Set("Content-Length", strconv.FormatInt(contentLength, 10))
+	}
+
+	w.Header().Set("Content-Disposition", "inline; filename=\"document.pdf\"")
+	io.Copy(w, body)
 }
 
 // ListWorkspaces returns workspaces for the user's tenant.

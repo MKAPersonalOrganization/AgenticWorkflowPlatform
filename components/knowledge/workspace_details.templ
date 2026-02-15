@@ -210,6 +210,13 @@ templ workspaceDetailsScript() {
 				previewContent: null,
 				previewLoading: false,
 
+				// Entity Browser state (persisted)
+				entityBrowserCollapsed: false,
+				entityBrowserViewMode: 'grouped', // 'grouped' or 'list'
+				entityBrowserSortBy: 'name',     // 'name', 'degree', 'type'
+				entityBrowserSortAsc: true,
+				entityBrowserSearchQuery: '',
+
 				// Document Detail Dialog
 				detailDoc: null,
 
@@ -218,7 +225,12 @@ templ workspaceDetailsScript() {
 
 				// Knowledge Graph state
 				graphSearch: '',
-				graphMaxNodes: '100',
+				graphMaxNodes: '200',
+				graphDepth: 2,
+				graphStartNode: null,
+				graphStartNodeInput: '',
+				graphIncludeOrphans: false,
+				graphLabelMatches: [],
 				graphLayout: 'force-atlas',
 				selectedNode: null,
 				selectedNodeEdges: [],
@@ -286,12 +298,55 @@ templ workspaceDetailsScript() {
 					return this.docTotal || this.documents.length;
 				},
 
+				get sortedNodes() {
+					if (!this._graphNodes || this._graphNodes.length === 0) return [];
+					
+					const query = this.entityBrowserSearchQuery.toLowerCase().trim();
+					let filtered = [...this._graphNodes];
+					
+					if (query) {
+						filtered = filtered.filter(node => 
+							(node.label || '').toLowerCase().includes(query) ||
+							(node.node_type || '').toLowerCase().includes(query)
+						);
+					}
+
+					return filtered.sort((a, b) => {
+						let comparison = 0;
+						switch (this.entityBrowserSortBy) {
+							case 'name':
+								comparison = (a.label || '').localeCompare(b.label || '');
+								break;
+							case 'degree':
+								comparison = (b.degree || 0) - (a.degree || 0);
+								break;
+							case 'type':
+								comparison = (a.node_type || '').localeCompare(b.node_type || '');
+								break;
+						}
+						return this.entityBrowserSortAsc ? comparison : -comparison;
+					});
+				},
+
+				get groupedNodes() {
+					const sorted = this.sortedNodes;
+					const groups = {};
+					for (const node of sorted) {
+						const type = node.node_type || 'UNKNOWN';
+						if (!groups[type]) groups[type] = [];
+						groups[type].push(node);
+					}
+					// Sort groups by type name
+					return Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0]));
+				},
+
 				init() {
 					this.loadFiles();
 					this.loadDocuments();
 					this.loadPipelineStatus();
 					this.loadQueueMetrics();
 					this.restoreGraphSettings();
+					this.restoreEntityBrowserSettings();
 					
 					// Initial graph load
 					this.loadGraph();
@@ -332,6 +387,11 @@ templ workspaceDetailsScript() {
 					this.$watch('selectedNode', (node) => {
 						this.selectedNodeId = node ? node.id : null;
 					});
+
+					this.$watch('entityBrowserCollapsed', () => this.saveEntityBrowserSettings());
+					this.$watch('entityBrowserViewMode', () => this.saveEntityBrowserSettings());
+					this.$watch('entityBrowserSortBy', () => this.saveEntityBrowserSettings());
+					this.$watch('entityBrowserSortAsc', () => this.saveEntityBrowserSettings());
 				},
 
 				destroy() {
@@ -964,7 +1024,15 @@ templ workspaceDetailsScript() {
 					this.selectedNode = null;
 					this.selectedNodeEdges = [];
 					try {
-						const resp = await fetch(`/api/knowledge/graph?workspace_id=${this.workspaceId}&max_nodes=${this.graphMaxNodes}`);
+						let url = `/api/knowledge/graph?workspace_id=${this.workspaceId}&max_nodes=${this.graphMaxNodes}&depth=${this.graphDepth}`;
+						if (this.graphStartNode) {
+							url += `&start_node=${encodeURIComponent(this.graphStartNode)}`;
+						}
+						if (this.graphIncludeOrphans) {
+							url += `&include_orphans=true`;
+						}
+						
+						const resp = await fetch(url);
 						if (resp.ok) {
 							this.graphData = await resp.json();
 							const types = new Set();
@@ -987,11 +1055,46 @@ templ workspaceDetailsScript() {
 							this.graphData = null;
 							this.graphLoading = false;
 						}
-					} catch (e) {
-						console.error('Failed to load graph:', e);
-						this.graphData = null;
+					} finally {
 						this.graphLoading = false;
 					}
+				},
+
+				// === Graph Settings Methods ===
+				async searchGraphLabels() {
+					if (this.graphStartNodeInput.length < 2) {
+						this.graphLabelMatches = [];
+						return;
+					}
+					try {
+						const resp = await fetch(`/api/knowledge/graph/labels/search?q=${encodeURIComponent(this.graphStartNodeInput)}&limit=5&workspace_id=${this.workspaceId}`);
+						if (resp.ok) {
+							const data = await resp.json();
+							this.graphLabelMatches = data.labels || [];
+						}
+					} catch (e) {
+						console.error('Failed to search labels:', e);
+					}
+				},
+
+				selectGraphFocus(label) {
+					this.graphStartNode = label;
+					this.graphStartNodeInput = label;
+					this.graphLabelMatches = [];
+					this.loadGraph();
+				},
+
+				clearGraphFocus() {
+					this.graphStartNode = null;
+					this.graphStartNodeInput = '';
+					this.graphLabelMatches = [];
+					this.loadGraph();
+				},
+
+				applyGraphPreset(maxNodes, depth) {
+					this.graphMaxNodes = String(maxNodes);
+					this.graphDepth = depth;
+					this.loadGraph();
 				},
 
 				async searchGraph() {
@@ -2227,6 +2330,30 @@ templ workspaceDetailsScript() {
 						if (settings.graphHighlightNeighbors !== undefined) this.graphHighlightNeighbors = settings.graphHighlightNeighbors;
 						if (settings.graphHideUnselectedEdges !== undefined) this.graphHideUnselectedEdges = settings.graphHideUnselectedEdges;
 						if (settings._nodeDetailsPanelWidth) this._nodeDetailsPanelWidth = settings._nodeDetailsPanelWidth;
+					} catch (e) { /* parse error or localStorage unavailable */ }
+				},
+
+				saveEntityBrowserSettings() {
+					try {
+						const settings = {
+							entityBrowserCollapsed: this.entityBrowserCollapsed,
+							entityBrowserViewMode: this.entityBrowserViewMode,
+							entityBrowserSortBy: this.entityBrowserSortBy,
+							entityBrowserSortAsc: this.entityBrowserSortAsc,
+						};
+						localStorage.setItem('entity-browser-settings', JSON.stringify(settings));
+					} catch (e) { /* localStorage unavailable */ }
+				},
+
+				restoreEntityBrowserSettings() {
+					try {
+						const saved = localStorage.getItem('entity-browser-settings');
+						if (!saved) return;
+						const settings = JSON.parse(saved);
+						if (settings.entityBrowserCollapsed !== undefined) this.entityBrowserCollapsed = settings.entityBrowserCollapsed;
+						if (settings.entityBrowserViewMode) this.entityBrowserViewMode = settings.entityBrowserViewMode;
+						if (settings.entityBrowserSortBy) this.entityBrowserSortBy = settings.entityBrowserSortBy;
+						if (settings.entityBrowserSortAsc !== undefined) this.entityBrowserSortAsc = settings.entityBrowserSortAsc;
 					} catch (e) { /* parse error or localStorage unavailable */ }
 				},
 			}));

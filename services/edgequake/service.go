@@ -106,6 +106,11 @@ func (s *Service) GetPDFContent(ctx context.Context, tCtx *domain.TenantContext,
 	return s.Documents.GetPDFContent(ctx, tCtx, pdfID)
 }
 
+// DownloadPDF retrieves the raw PDF binary from Edgequake.
+func (s *Service) DownloadPDF(ctx context.Context, tCtx *domain.TenantContext, pdfID string) (io.ReadCloser, string, int64, error) {
+	return s.Documents.DownloadPDF(ctx, tCtx, pdfID)
+}
+
 // ReprocessDocument triggers reprocessing for a single document.
 func (s *Service) ReprocessDocument(ctx context.Context, tCtx *domain.TenantContext, documentID string) (*documents.ReprocessResponse, error) {
 	return s.Documents.Reprocess(ctx, tCtx, documentID)
