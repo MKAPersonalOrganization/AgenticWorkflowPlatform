@@ -1,10 +1,10 @@
 package knowledge
 
 /**
- * GraphViewer - Main graph canvas container with all overlays.
+ * GraphViewer - Main graph container with all overlays.
  * Matches EdgeQuake edgequake_webui/src/components/graph/graph-viewer.tsx
  *
- * Contains: Canvas element, overlays (zoom, controls, legend, minimap, context menu),
+ * Contains: Sigma.js WebGL container, overlays (zoom, controls, legend, minimap, context menu),
  * loading state, empty state, and the node details side panel.
  */
 
@@ -29,15 +29,15 @@ templ GraphViewer() {
 			<h3 class="text-xl font-semibold">{ i18n.T(ctx, "No knowledge graph yet") }</h3>
 			<p class="text-muted-foreground mt-2 max-w-md mx-auto">{ i18n.T(ctx, "Build a knowledge graph from your documents in the Settings tab.") }</p>
 		</div>
-		<!-- Graph Canvas Container -->
+		<!-- Graph Container -->
 		<div x-show="!graphLoading && graphData && graphData.nodes && graphData.nodes.length > 0" x-cloak class="relative">
 			<!-- Truncation banner -->
 			@TruncationBanner()
 			<!-- Main Graph Area with side panel -->
 			<div class="flex rounded-xl border bg-card shadow-sm overflow-hidden" style="height: 700px;">
-				<!-- Graph Canvas -->
+				<!-- Sigma.js WebGL Graph Container -->
 				<div class="flex-1 relative" id="graph-container">
-					<canvas id="graph-canvas" class="w-full h-full" style="display: block;"></canvas>
+					<div id="sigma-container" class="w-full h-full" style="display: block; position: relative;"></div>
 					<!-- Overlays -->
 					@ZoomControls()
 					@GraphControls()

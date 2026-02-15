@@ -4,7 +4,7 @@ package knowledge
  * GraphControls - Graph display setting toggles (labels, edge labels).
  * Matches EdgeQuake edgequake_webui/src/components/graph/graph-controls.tsx
  *
- * Positioned absolute top-left of the graph canvas.
+ * Positioned absolute top-left of the graph container.
  */
 
 templ GraphControls() {
@@ -15,7 +15,7 @@ templ GraphControls() {
 				type="checkbox"
 				id="show-labels"
 				x-model="graphShowLabels"
-				@change="graphDraw()"
+				@change="graphRefresh()"
 				class="rounded border-input text-primary focus:ring-primary size-3.5"
 			/>
 			<label for="show-labels" class="text-xs text-muted-foreground cursor-pointer select-none">Labels</label>
@@ -26,7 +26,7 @@ templ GraphControls() {
 				type="checkbox"
 				id="show-edge-labels"
 				x-model="graphShowEdgeLabels"
-				@change="graphDraw()"
+				@change="graphRefresh()"
 				class="rounded border-input text-primary focus:ring-primary size-3.5"
 			/>
 			<label for="show-edge-labels" class="text-xs text-muted-foreground cursor-pointer select-none">Edge Labels</label>

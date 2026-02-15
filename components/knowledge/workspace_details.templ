@@ -210,7 +210,7 @@ templ workspaceDetailsScript() {
 				// Upload progress
 				uploadingFiles: [],
 
-				// Knowledge Graph
+				// Knowledge Graph (Sigma.js + Graphology - matching EdgeQuake)
 				graphData: null,
 				graphLoading: false,
 				graphSearch: '',
@@ -224,22 +224,12 @@ templ workspaceDetailsScript() {
 				_graphNodes: [],
 				_graphEdges: [],
 				_graphNodeMap: {},
-				_graphTransform: { x: 0, y: 0, k: 1 },
-				_graphDragging: null,
-				_graphPanning: false,
-				_graphPanStart: { x: 0, y: 0 },
-				_graphHoveredNode: null,
-				_graphAnimFrame: null,
-				_graphCanvas: null,
-				_graphCtx: null,
-				_graphW: 0,
-				_graphH: 0,
-				_graphDpr: 1,
-				_graphResizeObs: null,
+				_sigmaInstance: null,
+				_graphologyInstance: null,
 				_graphContextMenu: { visible: false, x: 0, y: 0, node: null },
-				_graphSelectionPulse: 0,
-				_graphSelectionAnimFrame: null,
 				_graphSearchMatches: new Set(),
+				_previousSelectedNodeId: null,
+				_draggedNode: null,
 				entityColors: {
 					'PERSON': '#3b82f6',
 					'ORGANIZATION': '#10b981',
@@ -310,15 +300,11 @@ templ workspaceDetailsScript() {
 					if (this.pipelinePollingInterval) {
 						clearInterval(this.pipelinePollingInterval);
 					}
-					if (this._graphAnimFrame) {
-						cancelAnimationFrame(this._graphAnimFrame);
+					if (this._sigmaInstance) {
+						this._sigmaInstance.kill();
+						this._sigmaInstance = null;
 					}
-					if (this._graphSelectionAnimFrame) {
-						cancelAnimationFrame(this._graphSelectionAnimFrame);
-					}
-					if (this._graphResizeObs) {
-						this._graphResizeObs.disconnect();
-					}
+					this._graphologyInstance = null;
 				},
 
 				async refreshAll() {
@@ -896,7 +882,21 @@ templ workspaceDetailsScript() {
 					this.previewContent = null;
 				},
 
-				// === Knowledge Graph ===
+				// === Knowledge Graph (Sigma.js + Graphology — matching EdgeQuake graph-renderer.tsx) ===
+
+				// Dynamic node sizing: base + log2(degree+1) * 2, capped at base*3
+				// Matches EdgeQuake calculateNodeSize()
+				_calcNodeSize(degree, base) {
+					if (!degree) return base;
+					const scale = Math.log2(degree + 1) * 2;
+					return Math.min(base + scale, base * 3);
+				},
+
+				_getNodeColor(nodeType) {
+					if (!nodeType) return this.entityColors['UNKNOWN'];
+					return this.entityColors[nodeType.toUpperCase()] || this.entityColors['UNKNOWN'];
+				},
+
 				async loadGraph() {
 					this.graphLoading = true;
 					this.selectedNode = null;
@@ -905,18 +905,24 @@ templ workspaceDetailsScript() {
 						const resp = await fetch(`/api/knowledge/graph?workspace_id=${this.workspaceId}&max_nodes=${this.graphMaxNodes}`);
 						if (resp.ok) {
 							this.graphData = await resp.json();
-							// Initialize visible types from data
 							const types = new Set();
 							(this.graphData.nodes || []).forEach(n => types.add(n.node_type || 'UNKNOWN'));
 							this.graphVisibleTypes = [...types];
-							this.$nextTick(() => this.initGraph());
+							// Set loading false BEFORE scheduling initGraph so the
+							// x-show container becomes visible when $nextTick fires.
+							this.graphLoading = false;
+							this.$nextTick(() => {
+								// Extra rAF ensures the browser has painted the visible container
+								// so sigma-container has real dimensions for WebGL.
+								requestAnimationFrame(() => this.initGraph());
+							});
 						} else {
 							this.graphData = null;
+							this.graphLoading = false;
 						}
 					} catch (e) {
 						console.error('Failed to load graph:', e);
 						this.graphData = null;
-					} finally {
 						this.graphLoading = false;
 					}
 				},
@@ -942,13 +948,16 @@ templ workspaceDetailsScript() {
 							const types = new Set();
 							(this.graphData.nodes || []).forEach(n => types.add(n.node_type || 'UNKNOWN'));
 							this.graphVisibleTypes = [...types];
-							// Mark search matches for highlighting
 							this._graphSearchMatches = new Set((data.nodes || []).map(n => n.id));
-							this.$nextTick(() => this.initGraph());
+							this.graphLoading = false;
+							this.$nextTick(() => {
+								requestAnimationFrame(() => this.initGraph());
+							});
+						} else {
+							this.graphLoading = false;
 						}
 					} catch (e) {
 						console.error('Failed to search graph:', e);
-					} finally {
 						this.graphLoading = false;
 					}
 				},
@@ -959,7 +968,6 @@ templ workspaceDetailsScript() {
 					return node ? node.label : nodeId.substring(0, 8);
 				},
 
-				// Safe properties accessor: handles json.RawMessage (already object) or JSON string
 				getNodeProperties() {
 					const props = this.selectedNode?.properties;
 					if (!props) return {};
@@ -967,7 +975,6 @@ templ workspaceDetailsScript() {
 					try { return JSON.parse(props); } catch { return {}; }
 				},
 
-				// Context menu actions
 				contextMenuAction(action) {
 					const node = this._graphContextMenu?.node;
 					this._graphContextMenu = { visible: false };
@@ -978,7 +985,7 @@ templ workspaceDetailsScript() {
 							this.selectedNodeEdges = this._graphEdges.filter(
 								e => e.source === node.id || e.target === node.id
 							);
-							this.graphDraw();
+							this._highlightSelectedNode(node.id);
 							break;
 						case 'focus':
 							this.focusNode(node.id);
@@ -988,7 +995,7 @@ templ workspaceDetailsScript() {
 							this.selectedNodeEdges = this._graphEdges.filter(
 								e => e.source === node.id || e.target === node.id
 							);
-							this.graphDraw();
+							this._highlightSelectedNode(node.id);
 							break;
 						case 'copyId':
 							navigator.clipboard.writeText(node.id).catch(() => {});
@@ -999,29 +1006,33 @@ templ workspaceDetailsScript() {
 					}
 				},
 
-				// Selection pulsing animation (like Edgequake: border oscillates 3.5-4.5px at 20fps)
-				_startSelectionPulse() {
-					if (this._graphSelectionAnimFrame) return;
-					const animate = () => {
-						this._graphSelectionPulse = (this._graphSelectionPulse + 0.1) % (Math.PI * 2);
-						this.graphDraw();
-						if (this.selectedNode) {
-							this._graphSelectionAnimFrame = setTimeout(() => {
-								requestAnimationFrame(animate);
-							}, 50); // ~20fps
-						} else {
-							this._graphSelectionAnimFrame = null;
-						}
-					};
-					requestAnimationFrame(animate);
-				},
+				// Highlight the selected node by enlarging it and raising its z-index.
+				// Sigma v2.4 default circle renderer supports: size, color, zIndex, highlighted, hidden.
+				_highlightSelectedNode(nodeId) {
+					const graph = this._graphologyInstance;
+					const sigma = this._sigmaInstance;
+					if (!graph || !sigma) return;
 
-				_stopSelectionPulse() {
-					if (this._graphSelectionAnimFrame) {
-						clearTimeout(this._graphSelectionAnimFrame);
-						this._graphSelectionAnimFrame = null;
+					// Restore previous selected node
+					if (this._previousSelectedNodeId && graph.hasNode(this._previousSelectedNodeId)) {
+						const prevId = this._previousSelectedNodeId;
+						const prevDegree = graph.getNodeAttribute(prevId, 'degree') || 0;
+						const origSize = this._calcNodeSize(prevDegree, 8);
+						graph.setNodeAttribute(prevId, 'size', origSize);
+						graph.setNodeAttribute(prevId, 'highlighted', false);
+						graph.setNodeAttribute(prevId, 'zIndex', 0);
 					}
-					this._graphSelectionPulse = 0;
+
+					if (nodeId && graph.hasNode(nodeId)) {
+						const currentSize = graph.getNodeAttribute(nodeId, 'size') || 8;
+						graph.setNodeAttribute(nodeId, 'size', currentSize * 2);
+						graph.setNodeAttribute(nodeId, 'highlighted', true);
+						graph.setNodeAttribute(nodeId, 'zIndex', 999);
+						this._previousSelectedNodeId = nodeId;
+					} else {
+						this._previousSelectedNodeId = null;
+					}
+					sigma.refresh();
 				},
 
 				toggleEntityType(type) {
@@ -1031,936 +1042,300 @@ templ workspaceDetailsScript() {
 					} else {
 						this.graphVisibleTypes.push(type);
 					}
-					this.graphDraw();
+					this._applyVisibilityFilter();
+				},
+
+				// Apply entity type visibility filter to Sigma graph
+				_applyVisibilityFilter() {
+					const graph = this._graphologyInstance;
+					const sigma = this._sigmaInstance;
+					if (!graph || !sigma) return;
+					const visibleTypes = new Set(this.graphVisibleTypes);
+					const visibleNodeIds = new Set();
+					graph.forEachNode((nodeId, attrs) => {
+						const nodeType = attrs.entityType || 'UNKNOWN';
+						const visible = visibleTypes.has(nodeType);
+						graph.setNodeAttribute(nodeId, 'hidden', !visible);
+						if (visible) visibleNodeIds.add(nodeId);
+					});
+					graph.forEachEdge((edgeId, attrs, source, target) => {
+						graph.setEdgeAttribute(edgeId, 'hidden', !visibleNodeIds.has(source) || !visibleNodeIds.has(target));
+					});
+					sigma.refresh();
 				},
 
 				focusNode(nodeId) {
+					const graph = this._graphologyInstance;
+					const sigma = this._sigmaInstance;
+					if (!graph || !sigma || !graph.hasNode(nodeId)) return;
 					const node = this._graphNodeMap[nodeId];
 					if (!node) return;
-					// Select the node
 					this.selectedNode = node;
 					this.selectedNodeEdges = this._graphEdges.filter(
 						e => e.source === node.id || e.target === node.id
 					);
-					this._startSelectionPulse();
-					// Animate camera to center on node
-					const t = this._graphTransform;
-					const targetX = this._graphW / 2 - node.x * t.k;
-					const targetY = this._graphH / 2 - node.y * t.k;
-					const startX = t.x, startY = t.y;
-					const duration = 400;
-					const start = performance.now();
-					const animate = (now) => {
-						const elapsed = Math.min(1, (now - start) / duration);
-						// Ease out cubic for smoother deceleration
-						const ease = 1 - Math.pow(1 - elapsed, 3);
-						t.x = startX + (targetX - startX) * ease;
-						t.y = startY + (targetY - startY) * ease;
-						this.graphDraw();
-						if (elapsed < 1) requestAnimationFrame(animate);
-					};
-					requestAnimationFrame(animate);
+					this._highlightSelectedNode(nodeId);
+					// Animate camera to focus on node
+					const nodePosition = { x: graph.getNodeAttribute(nodeId, 'x'), y: graph.getNodeAttribute(nodeId, 'y') };
+					sigma.getCamera().animate(nodePosition, { duration: 400 });
 				},
 
-				// Graph initialization
+				// === Sigma.js Graph initialization ===
 				initGraph() {
-					const canvas = document.getElementById('graph-canvas');
-					if (!canvas || !this.graphData || !this.graphData.nodes?.length) return;
+					const container = document.getElementById('sigma-container');
+					if (!container || !this.graphData || !this.graphData.nodes?.length) return;
 
-					// Cleanup previous
-					if (this._graphAnimFrame) cancelAnimationFrame(this._graphAnimFrame);
-					if (this._graphResizeObs) this._graphResizeObs.disconnect();
+					// Ensure the container has actual dimensions (not hidden via x-show).
+					// If it has 0 dimensions, retry after a short delay.
+					const rect = container.getBoundingClientRect();
+					if (rect.width === 0 || rect.height === 0) {
+						if (!this._initGraphRetries) this._initGraphRetries = 0;
+						if (this._initGraphRetries < 10) {
+							this._initGraphRetries++;
+							setTimeout(() => this.initGraph(), 50);
+							return;
+						}
+						console.warn('sigma-container still has 0 dimensions after retries');
+					}
+					this._initGraphRetries = 0;
 
-					const ctx = canvas.getContext('2d');
-					this._graphCanvas = canvas;
-					this._graphCtx = ctx;
+					// Kill previous Sigma instance
+					if (this._sigmaInstance) {
+						this._sigmaInstance.kill();
+						this._sigmaInstance = null;
+					}
+					this._previousSelectedNodeId = null;
 
-					const setupSize = () => {
-						const container = canvas.parentElement;
-						const rect = container.getBoundingClientRect();
-						this._graphDpr = window.devicePixelRatio || 1;
-						canvas.width = rect.width * this._graphDpr;
-						canvas.height = rect.height * this._graphDpr;
-						canvas.style.width = rect.width + 'px';
-						canvas.style.height = rect.height + 'px';
-						this._graphW = rect.width;
-						this._graphH = rect.height;
-					};
-					setupSize();
+					// Create Graphology graph (directed, multi-edge)
+					const graph = new graphology.Graph({ multi: true, type: 'directed' });
+					this._graphologyInstance = graph;
 
-					// ResizeObserver for responsive canvas
-					this._graphResizeObs = new ResizeObserver(() => {
-						setupSize();
-						this.graphDraw();
+					const isDark = document.documentElement.classList.contains('dark');
+					const baseNodeSize = 8;
+					const nodes = this.graphData.nodes || [];
+					const edges = this.graphData.edges || [];
+
+					// Add nodes with initial circular positions (will be repositioned by layout)
+					nodes.forEach((node, index) => {
+						if (!node.id || graph.hasNode(node.id)) return;
+						const angle = (2 * Math.PI * index) / nodes.length;
+						const radius = 100;
+						const nodeDegree = node.degree || 0;
+						const dynamicSize = this._calcNodeSize(nodeDegree, baseNodeSize);
+						graph.addNode(node.id, {
+							label: node.label,
+							x: Math.cos(angle) * radius,
+							y: Math.sin(angle) * radius,
+							size: dynamicSize,
+							color: this._getNodeColor(node.node_type),
+							entityType: node.node_type,
+							description: node.description,
+							degree: nodeDegree,
+							zIndex: 0,
+						});
 					});
-					this._graphResizeObs.observe(canvas.parentElement);
 
-					// Compute max degree for node sizing
-					const maxDegree = Math.max(1, ...this.graphData.nodes.map(n => n.degree || 1));
+					// Add edges
+					edges.forEach((edge) => {
+						if (!edge.source || !edge.target) return;
+						if (!graph.hasNode(edge.source) || !graph.hasNode(edge.target)) return;
+						const edgeId = `${edge.source}-${edge.target}-${edge.edge_type || ''}`;
+						if (graph.hasEdge(edgeId)) return;
+						try {
+							graph.addEdgeWithKey(edgeId, edge.source, edge.target, {
+								label: edge.edge_type || '',
+								size: Math.max(1, Math.min((edge.weight || 1) * 2, 5)),
+								color: isDark ? '#4b5563' : '#94a3b8',
+								type: 'arrow',
+								forceLabel: false,
+							});
+						} catch (e) { /* duplicate edge or invalid */ }
+					});
 
-					// Build positioned nodes
-					const W = this._graphW;
-					const H = this._graphH;
-					const nodes = this.graphData.nodes.map((n) => ({
-						...n,
-						x: W / 2 + (Math.random() - 0.5) * W * 0.6,
-						y: H / 2 + (Math.random() - 0.5) * H * 0.6,
-						vx: 0, vy: 0,
-						// Logarithmic sizing like Sigma.js: base + log scale
-						radius: Math.max(4, Math.min(24, 6 + Math.log2(1 + (n.degree || 1)) * (14 / Math.log2(1 + maxDegree)))),
-					}));
-
+					// Build internal lookups
 					const nodeMap = {};
 					nodes.forEach(n => { nodeMap[n.id] = n; });
-
-					const edges = (this.graphData.edges || []).filter(e => nodeMap[e.source] && nodeMap[e.target]);
-
 					this._graphNodes = nodes;
 					this._graphEdges = edges;
 					this._graphNodeMap = nodeMap;
-					this._graphTransform = { x: 0, y: 0, k: 1 };
-					this._graphHoveredNode = null;
-					this._graphDragging = null;
 
-					// Apply layout
-					this.applyLayout();
+					// Apply layout before creating Sigma
+					this._applyLayoutToGraph(graph);
 
-					// Setup mouse events
-					this._setupGraphInteraction(canvas);
-				},
+					// Adaptive LOD settings (matching EdgeQuake graph-renderer.tsx)
+					const nodeCount = graph.order;
+					const edgeCount = graph.size;
+					const isLargeGraph = nodeCount > 200 || edgeCount > 400;
+					const isVeryLargeGraph = nodeCount > 500 || edgeCount > 1000;
+					const adaptiveLabelGridCellSize = isVeryLargeGraph ? 150 : (isLargeGraph ? 100 : 80);
+					const adaptiveLabelDensity = isVeryLargeGraph ? 0.6 : (isLargeGraph ? 0.7 : 0.8);
+					const adaptiveLabelThreshold = isVeryLargeGraph ? 4 : (isLargeGraph ? 3 : 2);
 
-				applyLayout() {
-					const nodes = this._graphNodes;
-					const edges = this._graphEdges;
-					const nodeMap = this._graphNodeMap;
-					const W = this._graphW;
-					const H = this._graphH;
-					if (!nodes.length) return;
-
-					if (this._graphAnimFrame) cancelAnimationFrame(this._graphAnimFrame);
-
-					const layout = this.graphLayout;
-
-					if (layout === 'circular') {
-						// Circular layout
-						const cx = W / 2, cy = H / 2;
-						const radius = Math.min(W, H) * 0.35;
-						nodes.forEach((n, i) => {
-							const angle = (2 * Math.PI * i) / nodes.length;
-							n.x = cx + Math.cos(angle) * radius;
-							n.y = cy + Math.sin(angle) * radius;
-							n.vx = 0; n.vy = 0;
-						});
-						this._graphTransform = { x: 0, y: 0, k: 1 };
-						this.graphDraw();
+					// Create Sigma instance (WebGL renderer)
+					// UMD global is `Sigma` which is the module — actual class is Sigma.Sigma (or Sigma.default)
+					const SigmaClass = (typeof Sigma !== 'undefined') ? (Sigma.Sigma || Sigma.default || Sigma) : null;
+					if (!SigmaClass) {
+						console.error('Sigma.js not loaded');
 						return;
 					}
-
-					if (layout === 'hierarchical') {
-						// Group by type, arrange in rows
-						const groups = {};
-						nodes.forEach(n => {
-							const t = n.node_type || 'UNKNOWN';
-							if (!groups[t]) groups[t] = [];
-							groups[t].push(n);
-						});
-						const typeKeys = Object.keys(groups);
-						const rowHeight = H / (typeKeys.length + 1);
-						typeKeys.forEach((type, rowIdx) => {
-							const row = groups[type];
-							const colWidth = W / (row.length + 1);
-							row.forEach((n, colIdx) => {
-								n.x = colWidth * (colIdx + 1);
-								n.y = rowHeight * (rowIdx + 1);
-								n.vx = 0; n.vy = 0;
-							});
-						});
-						this._graphTransform = { x: 0, y: 0, k: 1 };
-						this.graphDraw();
-						return;
-					}
-
-					// Force-based layouts (ForceAtlas2 / Force Directed)
-					const isFA2 = layout === 'force-atlas';
-					const gravity = isFA2 ? 1.0 : 0.5;
-					const scalingRatio = isFA2 ? 2.0 : 5.0;
-					const useBarnesHut = nodes.length > 100;
-					const maxIterations = isFA2 ? 100 : 150;
-					let iterations = 0;
-
-					// Build adjacency for degree computation
-					const adjacency = {};
-					nodes.forEach(n => { adjacency[n.id] = []; });
-					edges.forEach(e => {
-						if (adjacency[e.source]) adjacency[e.source].push(e.target);
-						if (adjacency[e.target]) adjacency[e.target].push(e.source);
+					const sigma = new SigmaClass(graph, container, {
+						renderLabels: this.graphShowLabels,
+						renderEdgeLabels: this.graphShowEdgeLabels && !isVeryLargeGraph,
+						labelSize: 13,
+						labelWeight: '500',
+						labelColor: { color: isDark ? '#e2e8f0' : '#374151' },
+						labelFont: 'Inter, ui-sans-serif, system-ui, sans-serif',
+						labelGridCellSize: adaptiveLabelGridCellSize,
+						labelRenderedSizeThreshold: adaptiveLabelThreshold,
+						labelDensity: adaptiveLabelDensity,
+						defaultNodeColor: '#64748b',
+						defaultEdgeColor: isDark ? '#4b5563' : '#94a3b8',
+						defaultEdgeType: 'arrow',
+						minCameraRatio: 0.1,
+						maxCameraRatio: 10,
+						enableEdgeClickEvents: !isVeryLargeGraph,
+						enableEdgeHoverEvents: !isVeryLargeGraph,
+						enableEdgeWheelEvents: false,
+						stagePadding: 50,
+						zIndex: true,
+						allowInvalidContainer: true,
 					});
 
-					const simulate = () => {
-						iterations++;
-						const alpha = Math.max(0.001, 1 - iterations / maxIterations);
-						const repulsionK = scalingRatio * 100;
+					this._sigmaInstance = sigma;
 
-						if (useBarnesHut) {
-							// Barnes-Hut approximation using quadtree
-							const qt = this._buildQuadTree(nodes, W, H);
-							for (const n of nodes) {
-								if (n === this._graphDragging) continue;
-								const force = this._queryQuadTree(qt, n, repulsionK, 0.5);
-								n.vx += force.fx * alpha;
-								n.vy += force.fy * alpha;
-							}
-						} else {
-							// Direct N-body repulsion
-							for (let i = 0; i < nodes.length; i++) {
-								if (nodes[i] === this._graphDragging) continue;
-								for (let j = i + 1; j < nodes.length; j++) {
-									const ni = nodes[i], nj = nodes[j];
-									let dx = nj.x - ni.x;
-									let dy = nj.y - ni.y;
-									let dist = Math.sqrt(dx * dx + dy * dy) || 1;
-									// ForceAtlas2 repulsion: k * (deg+1) * (deg+1) / dist
-									const degI = (adjacency[ni.id]?.length || 0) + 1;
-									const degJ = (adjacency[nj.id]?.length || 0) + 1;
-									let force;
-									if (isFA2) {
-										force = -repulsionK * degI * degJ / (dist * dist);
-									} else {
-										force = -repulsionK / (dist * dist);
-									}
-									const fx = (dx / dist) * force * alpha;
-									const fy = (dy / dist) * force * alpha;
-									ni.vx -= fx;
-									ni.vy -= fy;
-									nj.vx += fx;
-									nj.vy += fy;
-								}
-							}
-						}
-
-						// Edge attraction
-						for (const e of edges) {
-							const s = nodeMap[e.source];
-							const t = nodeMap[e.target];
-							if (!s || !t) continue;
-							let dx = t.x - s.x;
-							let dy = t.y - s.y;
-							let dist = Math.sqrt(dx * dx + dy * dy) || 1;
-							let force;
-							if (isFA2) {
-								// ForceAtlas2: linear attraction
-								force = dist * 0.01 * alpha;
-							} else {
-								// Spring force
-								force = (dist - 100) * 0.02 * alpha;
-							}
-							const weight = e.weight || 1;
-							const fx = (dx / dist) * force * weight;
-							const fy = (dy / dist) * force * weight;
-							if (s !== this._graphDragging) { s.vx += fx; s.vy += fy; }
-							if (t !== this._graphDragging) { t.vx -= fx; t.vy -= fy; }
-						}
-
-						// Center gravity (strong gravity mode for FA2)
-						for (const n of nodes) {
-							if (n === this._graphDragging) continue;
-							const dx = W / 2 - n.x;
-							const dy = H / 2 - n.y;
-							const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-							if (isFA2) {
-								// Strong gravity
-								const deg = (adjacency[n.id]?.length || 0) + 1;
-								n.vx += (dx / dist) * gravity * deg * alpha;
-								n.vy += (dy / dist) * gravity * deg * alpha;
-							} else {
-								n.vx += dx * 0.01 * gravity * alpha;
-								n.vy += dy * 0.01 * gravity * alpha;
-							}
-						}
-
-						// Apply velocities with damping
-						const damping = isFA2 ? 0.5 : 0.6;
-						const speed = isFA2 ? 1.0 : 0.8;
-						for (const n of nodes) {
-							if (n === this._graphDragging) continue;
-							n.vx *= damping;
-							n.vy *= damping;
-							// Speed limit
-							const vmag = Math.sqrt(n.vx * n.vx + n.vy * n.vy);
-							const maxSpeed = 10 * speed;
-							if (vmag > maxSpeed) {
-								n.vx = (n.vx / vmag) * maxSpeed;
-								n.vy = (n.vy / vmag) * maxSpeed;
-							}
-							n.x += n.vx;
-							n.y += n.vy;
-						}
-
-						this.graphDraw();
-						if (iterations < maxIterations) {
-							this._graphAnimFrame = requestAnimationFrame(simulate);
-						}
-					};
-
-					simulate();
-				},
-
-				// Simple quadtree for Barnes-Hut
-				_buildQuadTree(nodes, W, H) {
-					const root = { x: 0, y: 0, w: W, h: H, mass: 0, cx: 0, cy: 0, children: null, node: null };
-					for (const n of nodes) {
-						this._insertQuadTree(root, n, 0);
-					}
-					return root;
-				},
-
-				_insertQuadTree(cell, node, depth) {
-					if (depth > 20) return;
-					if (cell.mass === 0 && !cell.node) {
-						cell.node = node;
-						cell.mass = 1;
-						cell.cx = node.x;
-						cell.cy = node.y;
-						return;
-					}
-					if (!cell.children) {
-						cell.children = [];
-						const hw = cell.w / 2, hh = cell.h / 2;
-						cell.children.push({ x: cell.x, y: cell.y, w: hw, h: hh, mass: 0, cx: 0, cy: 0, children: null, node: null });
-						cell.children.push({ x: cell.x + hw, y: cell.y, w: hw, h: hh, mass: 0, cx: 0, cy: 0, children: null, node: null });
-						cell.children.push({ x: cell.x, y: cell.y + hh, w: hw, h: hh, mass: 0, cx: 0, cy: 0, children: null, node: null });
-						cell.children.push({ x: cell.x + hw, y: cell.y + hh, w: hw, h: hh, mass: 0, cx: 0, cy: 0, children: null, node: null });
-						if (cell.node) {
-							this._insertQuadTree(this._getQuadrant(cell, cell.node), cell.node, depth + 1);
-							cell.node = null;
-						}
-					}
-					cell.cx = (cell.cx * cell.mass + node.x) / (cell.mass + 1);
-					cell.cy = (cell.cy * cell.mass + node.y) / (cell.mass + 1);
-					cell.mass++;
-					this._insertQuadTree(this._getQuadrant(cell, node), node, depth + 1);
-				},
-
-				_getQuadrant(cell, node) {
-					const mx = cell.x + cell.w / 2;
-					const my = cell.y + cell.h / 2;
-					const idx = (node.x >= mx ? 1 : 0) + (node.y >= my ? 2 : 0);
-					return cell.children[idx];
-				},
-
-				_queryQuadTree(cell, node, k, theta) {
-					let fx = 0, fy = 0;
-					if (cell.mass === 0) return { fx, fy };
-					const dx = cell.cx - node.x;
-					const dy = cell.cy - node.y;
-					const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-					
-					if (cell.children === null || (cell.w / dist) < theta) {
-						if (cell.node === node) return { fx: 0, fy: 0 };
-						const force = -k * cell.mass / (dist * dist);
-						return { fx: (dx / dist) * force, fy: (dy / dist) * force };
-					}
-					
-					for (const child of cell.children) {
-						const f = this._queryQuadTree(child, node, k, theta);
-						fx += f.fx;
-						fy += f.fy;
-					}
-					return { fx, fy };
-				},
-
-				// Graph rendering - Professional quality matching Edgequake UI
-				graphDraw() {
-					const ctx = this._graphCtx;
-					const canvas = this._graphCanvas;
-					if (!ctx || !canvas) return;
-
-					const dpr = this._graphDpr;
-					const W = this._graphW;
-					const H = this._graphH;
-					const t = this._graphTransform;
-					const nodes = this._graphNodes;
-					const edges = this._graphEdges;
-					const nodeMap = this._graphNodeMap;
-					const isDark = document.documentElement.classList.contains('dark');
-
-					ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-					ctx.clearRect(0, 0, W, H);
-
-					// Background with subtle grid pattern
-					ctx.fillStyle = isDark ? '#0f1117' : '#fafbfc';
-					ctx.fillRect(0, 0, W, H);
-					if (t.k > 0.3) {
-						const gridSize = 40 * t.k;
-						ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.03)';
-						ctx.lineWidth = 1;
-						const offsetX = t.x % gridSize;
-						const offsetY = t.y % gridSize;
-						for (let x = offsetX; x < W; x += gridSize) {
-							ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
-						}
-						for (let y = offsetY; y < H; y += gridSize) {
-							ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-						}
-					}
-
-					ctx.save();
-					ctx.translate(t.x, t.y);
-					ctx.scale(t.k, t.k);
-
-					// Determine visible nodes
-					const visibleTypes = new Set(this.graphVisibleTypes);
-					const visibleNodes = new Set();
-					nodes.forEach(n => {
-						if (visibleTypes.has(n.node_type || 'UNKNOWN')) visibleNodes.add(n.id);
-					});
-
-					// Neighbor highlighting
-					const highlightedNodes = new Set();
-					const highlightedEdges = new Set();
-					const selectedId = this.selectedNode?.id;
-					const hoveredId = this._graphHoveredNode?.id;
-					const focusId = selectedId || hoveredId;
-					
-					if (focusId) {
-						highlightedNodes.add(focusId);
-						edges.forEach((e, i) => {
-							if (e.source === focusId || e.target === focusId) {
-								highlightedEdges.add(i);
-								highlightedNodes.add(e.source);
-								highlightedNodes.add(e.target);
-							}
-						});
-					}
-
-					// Search match highlighting
-					const searchMatches = this._graphSearchMatches;
-					const hasSearchMatches = searchMatches && searchMatches.size > 0;
-
-					// Build parallel edge map for offset curves
-					const edgePairCount = {};
-					const edgePairIndex = {};
-					edges.forEach((e, idx) => {
-						const key = [e.source, e.target].sort().join('|');
-						edgePairCount[key] = (edgePairCount[key] || 0) + 1;
-						edgePairIndex[idx] = edgePairCount[key] - 1;
-					});
-
-					// Draw edges
-					edges.forEach((e, idx) => {
-						const s = nodeMap[e.source];
-						const tgt = nodeMap[e.target];
-						if (!s || !tgt) return;
-						if (!visibleNodes.has(e.source) || !visibleNodes.has(e.target)) return;
-
-						const isHighlighted = highlightedEdges.has(idx);
-						const dimmed = focusId && !isHighlighted;
-
-						// Skip completely hidden edges (Edgequake-style: hide non-connected on hover)
-						if (dimmed && hoveredId) return;
-
-						// Curved edge with Edgequake curvature=0.25 and parallel edge offset
-						const dx = tgt.x - s.x;
-						const dy = tgt.y - s.y;
-						const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-						const pairKey = [e.source, e.target].sort().join('|');
-						const pairTotal = edgePairCount[pairKey] || 1;
-						const pairIdx = edgePairIndex[idx] || 0;
-						// Base curvature + offset for parallel edges
-						const curvature = 0.25 + (pairTotal > 1 ? (pairIdx - (pairTotal - 1) / 2) * 0.15 : 0);
-						const cx = (s.x + tgt.x) / 2 + dy * curvature;
-						const cy = (s.y + tgt.y) / 2 - dx * curvature;
-
-						ctx.beginPath();
-						ctx.moveTo(s.x, s.y);
-						ctx.quadraticCurveTo(cx, cy, tgt.x, tgt.y);
-						
-						const weight = Math.max(0.5, Math.min(4, (e.weight || 1)));
-						ctx.lineWidth = isHighlighted ? weight * 2.5 : weight * 0.8;
-						
-						if (isHighlighted) {
-							ctx.strokeStyle = isDark ? '#60a5fa' : '#3b82f6';
-							ctx.globalAlpha = 0.9;
-						} else if (dimmed) {
-							ctx.strokeStyle = isDark ? '#1f2937' : '#e5e7eb';
-							ctx.globalAlpha = 0.08;
-						} else {
-							ctx.strokeStyle = isDark ? '#374151' : '#94a3b8';
-							ctx.globalAlpha = 0.35;
-						}
-						ctx.stroke();
-						ctx.globalAlpha = 1;
-
-						// Arrow head (refined)
-						if (t.k > 0.25) {
-							const arrowSize = isHighlighted ? 9 : 6;
-							const targetR = tgt.radius || 6;
-							// Point on curve near target
-							const at = 0.88;
-							const ax = (1-at)*(1-at)*s.x + 2*(1-at)*at*cx + at*at*tgt.x;
-							const ay = (1-at)*(1-at)*s.y + 2*(1-at)*at*cy + at*at*tgt.y;
-							const angle = Math.atan2(tgt.y - ay, tgt.x - ax);
-							
-							const tipX = tgt.x - Math.cos(angle) * (targetR + 1);
-							const tipY = tgt.y - Math.sin(angle) * (targetR + 1);
-							
-							ctx.beginPath();
-							ctx.moveTo(tipX, tipY);
-							ctx.lineTo(
-								tipX - Math.cos(angle) * arrowSize + Math.sin(angle) * arrowSize * 0.4,
-								tipY - Math.sin(angle) * arrowSize - Math.cos(angle) * arrowSize * 0.4
-							);
-							ctx.lineTo(
-								tipX - Math.cos(angle) * arrowSize - Math.sin(angle) * arrowSize * 0.4,
-								tipY - Math.sin(angle) * arrowSize + Math.cos(angle) * arrowSize * 0.4
-							);
-							ctx.closePath();
-							if (isHighlighted) {
-								ctx.fillStyle = isDark ? '#60a5fa' : '#3b82f6';
-								ctx.globalAlpha = 0.9;
-							} else if (dimmed) {
-								ctx.fillStyle = isDark ? '#1f2937' : '#e5e7eb';
-								ctx.globalAlpha = 0.08;
-							} else {
-								ctx.fillStyle = isDark ? '#374151' : '#94a3b8';
-								ctx.globalAlpha = 0.35;
-							}
-							ctx.fill();
-							ctx.globalAlpha = 1;
-						}
-
-						// Edge labels
-						if (this.graphShowEdgeLabels && t.k > 0.5 && (isHighlighted || (!focusId && t.k > 0.8))) {
-							const labelX = cx;
-							const labelY = cy;
-							const fontSize = Math.max(8, 10 / t.k);
-							ctx.font = `500 ${Math.min(fontSize, 11)}px Inter, system-ui, sans-serif`;
-							const label = e.edge_type || '';
-							// Background pill
-							const metrics = ctx.measureText(label);
-							const pw = metrics.width + 8;
-							const ph = fontSize + 6;
-							ctx.fillStyle = isDark ? 'rgba(15,17,23,0.85)' : 'rgba(255,255,255,0.9)';
-							ctx.beginPath();
-							ctx.roundRect(labelX - pw/2, labelY - ph/2, pw, ph, 4);
-							ctx.fill();
-							if (isHighlighted) {
-								ctx.strokeStyle = isDark ? '#60a5fa44' : '#3b82f644';
-								ctx.lineWidth = 1;
-								ctx.stroke();
-							}
-							ctx.fillStyle = isHighlighted ? (isDark ? '#93c5fd' : '#2563eb') : (isDark ? '#6b7280' : '#9ca3af');
-							ctx.textAlign = 'center';
-							ctx.textBaseline = 'middle';
-							ctx.fillText(label, labelX, labelY);
-						}
-					});
-
-					// Draw nodes (sorted: dimmed first, then normal, then highlighted/selected on top)
-					const sortedNodes = [...nodes].sort((a, b) => {
-						const aScore = (a.id === selectedId ? 100 : 0) + (a.id === hoveredId ? 50 : 0) + (highlightedNodes.has(a.id) ? 10 : 0);
-						const bScore = (b.id === selectedId ? 100 : 0) + (b.id === hoveredId ? 50 : 0) + (highlightedNodes.has(b.id) ? 10 : 0);
-						return aScore - bScore;
-					});
-
-					for (const n of sortedNodes) {
-						if (!visibleNodes.has(n.id)) continue;
-
-						const color = this.entityColors[n.node_type] || this.entityColors['UNKNOWN'];
-						const isSelected = selectedId === n.id;
-						const isHovered = hoveredId === n.id;
-						const isNeighbor = highlightedNodes.has(n.id);
-						const dimmed = focusId && !isNeighbor;
-						const isSearchMatch = hasSearchMatches && searchMatches.has(n.id);
-
-						// Edgequake-style: completely hide non-connected nodes on hover
-						if (dimmed && hoveredId) continue;
-
-						// Edgequake sizing: selected=2x, hovered=1.3x
-						const r = n.radius * (isSelected ? 2.0 : isHovered ? 1.3 : 1);
-
-						// Outer glow for selected node (pulsing)
-						if (isSelected) {
-							const pulseSize = 3.5 + Math.sin(this._graphSelectionPulse) * 1.0;
-							ctx.beginPath();
-							ctx.arc(n.x, n.y, r + pulseSize + 4, 0, 2 * Math.PI);
-							const glowGrad = ctx.createRadialGradient(n.x, n.y, r, n.x, n.y, r + pulseSize + 4);
-							glowGrad.addColorStop(0, isDark ? 'rgba(96,165,250,0.3)' : 'rgba(37,99,235,0.25)');
-							glowGrad.addColorStop(1, 'rgba(96,165,250,0)');
-							ctx.fillStyle = glowGrad;
-							ctx.fill();
-						}
-
-						// Search match glow ring
-						if (isSearchMatch && !isSelected) {
-							ctx.beginPath();
-							ctx.arc(n.x, n.y, r + 6, 0, 2 * Math.PI);
-							const searchGrad = ctx.createRadialGradient(n.x, n.y, r, n.x, n.y, r + 6);
-							searchGrad.addColorStop(0, 'rgba(234,179,8,0.4)');
-							searchGrad.addColorStop(1, 'rgba(234,179,8,0)');
-							ctx.fillStyle = searchGrad;
-							ctx.fill();
-						}
-
-						// Hover glow
-						if (isHovered && !isSelected) {
-							ctx.beginPath();
-							ctx.arc(n.x, n.y, r + 5, 0, 2 * Math.PI);
-							const hoverGrad = ctx.createRadialGradient(n.x, n.y, r, n.x, n.y, r + 5);
-							hoverGrad.addColorStop(0, isDark ? 'rgba(96,165,250,0.2)' : 'rgba(37,99,235,0.15)');
-							hoverGrad.addColorStop(1, 'rgba(96,165,250,0)');
-							ctx.fillStyle = hoverGrad;
-							ctx.fill();
-						}
-
-						// Border ring (Edgequake NodeBorderProgram style)
-						if (isSelected || isHovered) {
-							const borderWidth = isSelected ? (3.5 + Math.sin(this._graphSelectionPulse) * 1.0) : 2.5;
-							ctx.beginPath();
-							ctx.arc(n.x, n.y, r + borderWidth, 0, 2 * Math.PI);
-							ctx.fillStyle = isSelected ? (isDark ? '#60a5fa' : '#2563eb') : (isDark ? '#60a5fa99' : '#3b82f699');
-							ctx.fill();
-						}
-
-						// Node fill with subtle gradient for depth
-						ctx.beginPath();
-						ctx.arc(n.x, n.y, r, 0, 2 * Math.PI);
-						const grad = ctx.createRadialGradient(n.x - r * 0.3, n.y - r * 0.3, r * 0.1, n.x, n.y, r);
-						const baseColor = color;
-						grad.addColorStop(0, this._lightenColor(baseColor, 30));
-						grad.addColorStop(0.7, baseColor);
-						grad.addColorStop(1, this._darkenColor(baseColor, 15));
-						ctx.fillStyle = grad;
-						ctx.globalAlpha = dimmed ? 0.12 : (isSelected || isHovered ? 1 : 0.9);
-						ctx.fill();
-
-						// Inner white highlight for 3D effect
-						if (!dimmed && r * t.k > 4) {
-							ctx.beginPath();
-							ctx.arc(n.x - r * 0.25, n.y - r * 0.25, r * 0.35, 0, 2 * Math.PI);
-							ctx.fillStyle = 'rgba(255,255,255,0.15)';
-							ctx.fill();
-						}
-						
-						// Crisp border ring
-						ctx.beginPath();
-						ctx.arc(n.x, n.y, r, 0, 2 * Math.PI);
-						ctx.lineWidth = isSelected ? 2.5 : 1.5;
-						ctx.strokeStyle = isDark ? 'rgba(17,24,39,0.6)' : 'rgba(255,255,255,0.7)';
-						ctx.globalAlpha = dimmed ? 0.08 : 0.9;
-						ctx.stroke();
-						ctx.globalAlpha = 1;
-
-						// Labels
-						if (this.graphShowLabels && !dimmed) {
-							const showLabel = r * t.k > 4 || isHovered || isSelected || n.radius > 8;
-							if (showLabel) {
-								const fontSize = Math.max(9, Math.min(13, n.radius * 0.9));
-								ctx.font = `${isSelected ? '600' : '500'} ${fontSize}px Inter, system-ui, sans-serif`;
-								ctx.textAlign = 'center';
-								ctx.textBaseline = 'top';
-								const label = n.label.length > 25 ? n.label.substring(0, 23) + '…' : n.label;
-								const textY = n.y + r + 5;
-								
-								// Text shadow/background for readability
-								const metrics = ctx.measureText(label);
-								const bgW = metrics.width + 8;
-								const bgH = fontSize + 5;
-								ctx.fillStyle = isDark ? 'rgba(15,17,23,0.8)' : 'rgba(255,255,255,0.85)';
-								ctx.beginPath();
-								ctx.roundRect(n.x - bgW/2, textY - 2, bgW, bgH, 3);
-								ctx.fill();
-								
-								// Subtle border on label background
-								if (isSelected || isHovered) {
-									ctx.strokeStyle = isDark ? 'rgba(96,165,250,0.3)' : 'rgba(37,99,235,0.2)';
-									ctx.lineWidth = 0.5;
-									ctx.stroke();
-								}
-								
-								ctx.fillStyle = isSelected ? (isDark ? '#93c5fd' : '#1e40af') : 
-									isHovered ? (isDark ? '#bfdbfe' : '#1e3a8a') :
-									(isDark ? '#d1d5db' : '#374151');
-								ctx.globalAlpha = isHovered || isSelected ? 1 : 0.85;
-								ctx.fillText(label, n.x, textY);
-								ctx.globalAlpha = 1;
-							}
-						}
-					}
-
-					ctx.restore();
-
-					// Draw minimap
-					this._drawMinimap();
-				},
-
-				// Color utility helpers
-				_lightenColor(hex, percent) {
-					const num = parseInt(hex.replace('#', ''), 16);
-					const r = Math.min(255, (num >> 16) + Math.round(2.55 * percent));
-					const g = Math.min(255, ((num >> 8) & 0x00FF) + Math.round(2.55 * percent));
-					const b = Math.min(255, (num & 0x0000FF) + Math.round(2.55 * percent));
-					return `rgb(${r},${g},${b})`;
-				},
-
-				_darkenColor(hex, percent) {
-					const num = parseInt(hex.replace('#', ''), 16);
-					const r = Math.max(0, (num >> 16) - Math.round(2.55 * percent));
-					const g = Math.max(0, ((num >> 8) & 0x00FF) - Math.round(2.55 * percent));
-					const b = Math.max(0, (num & 0x0000FF) - Math.round(2.55 * percent));
-					return `rgb(${r},${g},${b})`;
-				},
-
-				_drawMinimap() {
-					const minimapCanvas = document.getElementById('graph-minimap');
-					if (!minimapCanvas) return;
-					const mctx = minimapCanvas.getContext('2d');
-					const mr = minimapCanvas.parentElement.getBoundingClientRect();
-					const dpr = this._graphDpr;
-					minimapCanvas.width = mr.width * dpr;
-					minimapCanvas.height = mr.height * dpr;
-					mctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-					const mw = mr.width, mh = mr.height;
-					const isDark = document.documentElement.classList.contains('dark');
-
-					mctx.clearRect(0, 0, mw, mh);
-					mctx.fillStyle = isDark ? '#111827' : '#f8fafc';
-					mctx.fillRect(0, 0, mw, mh);
-
-					const nodes = this._graphNodes;
-					if (!nodes.length) return;
-
-					// Compute bounds
-					let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-					nodes.forEach(n => {
-						minX = Math.min(minX, n.x);
-						minY = Math.min(minY, n.y);
-						maxX = Math.max(maxX, n.x);
-						maxY = Math.max(maxY, n.y);
-					});
-					const padding = 20;
-					minX -= padding; minY -= padding; maxX += padding; maxY += padding;
-					const gw = maxX - minX || 1;
-					const gh = maxY - minY || 1;
-					const scale = Math.min(mw / gw, mh / gh);
-					const ox = (mw - gw * scale) / 2;
-					const oy = (mh - gh * scale) / 2;
-
-					// Draw edges
-					mctx.strokeStyle = isDark ? '#374151' : '#d1d5db';
-					mctx.lineWidth = 0.5;
-					mctx.globalAlpha = 0.3;
-					this._graphEdges.forEach(e => {
-						const s = this._graphNodeMap[e.source];
-						const t = this._graphNodeMap[e.target];
-						if (!s || !t) return;
-						mctx.beginPath();
-						mctx.moveTo(ox + (s.x - minX) * scale, oy + (s.y - minY) * scale);
-						mctx.lineTo(ox + (t.x - minX) * scale, oy + (t.y - minY) * scale);
-						mctx.stroke();
-					});
-					mctx.globalAlpha = 1;
-
-					// Draw nodes
-					nodes.forEach(n => {
-						const color = this.entityColors[n.node_type] || '#6b7280';
-						mctx.beginPath();
-						mctx.arc(ox + (n.x - minX) * scale, oy + (n.y - minY) * scale, Math.max(1.5, n.radius * scale * 0.3), 0, 2 * Math.PI);
-						mctx.fillStyle = color;
-						mctx.fill();
-					});
-
-					// Draw viewport rectangle
-					const t = this._graphTransform;
-					const vx1 = (-t.x / t.k);
-					const vy1 = (-t.y / t.k);
-					const vx2 = vx1 + this._graphW / t.k;
-					const vy2 = vy1 + this._graphH / t.k;
-					mctx.strokeStyle = isDark ? '#60a5fa' : '#2563eb';
-					mctx.lineWidth = 1.5;
-					mctx.strokeRect(
-						ox + (vx1 - minX) * scale,
-						oy + (vy1 - minY) * scale,
-						(vx2 - vx1) * scale,
-						(vy2 - vy1) * scale
-					);
-				},
-
-				// Mouse/touch interaction setup
-				_setupGraphInteraction(canvas) {
+					// === Event handlers (matching EdgeQuake) ===
 					const self = this;
-					let isPanning = false;
-					let panStart = { x: 0, y: 0 };
-					let dragStartPos = null;
 
-					const getMousePos = (e) => {
-						const r = canvas.getBoundingClientRect();
-						const t = self._graphTransform;
-						return {
-							x: (e.clientX - r.left - t.x) / t.k,
-							y: (e.clientY - r.top - t.y) / t.k,
-							screenX: e.clientX - r.left,
-							screenY: e.clientY - r.top,
-						};
-					};
+					// Node click → select
+					sigma.on('clickNode', ({ node }) => {
+						const nodeData = self._graphNodeMap[node];
+						if (nodeData) {
+							self.selectedNode = nodeData;
+							self.selectedNodeEdges = self._graphEdges.filter(
+								e => e.source === node || e.target === node
+							);
+							self._highlightSelectedNode(node);
+						}
+					});
 
-					const findNode = (mx, my) => {
-						const visibleTypes = new Set(self.graphVisibleTypes);
-						for (let i = self._graphNodes.length - 1; i >= 0; i--) {
-							const n = self._graphNodes[i];
-							if (!visibleTypes.has(n.node_type || 'UNKNOWN')) continue;
-							const dx = n.x - mx;
-							const dy = n.y - my;
-							const hitRadius = n.radius + 5;
-							if (dx * dx + dy * dy < hitRadius * hitRadius) return n;
-						}
-						return null;
-					};
+					// Click on stage → deselect
+					sigma.on('clickStage', () => {
+						self.selectedNode = null;
+						self.selectedNodeEdges = [];
+						self._highlightSelectedNode(null);
+					});
 
-					canvas.onmousedown = (e) => {
-						e.preventDefault();
-						// Close context menu on any click
-						self._graphContextMenu = { visible: false };
-						
-						if (e.button === 2) return; // Right click handled in contextmenu event
-						
-						const pos = getMousePos(e);
-						const node = findNode(pos.x, pos.y);
-						if (node) {
-							self._graphDragging = node;
-							dragStartPos = { x: node.x, y: node.y };
-							canvas.style.cursor = 'grabbing';
-						} else {
-							isPanning = true;
-							panStart = { x: e.clientX, y: e.clientY };
-							canvas.style.cursor = 'grabbing';
+					// Right-click → context menu
+					sigma.on('rightClickNode', ({ node, event }) => {
+						const originalEvent = event.original || event;
+						if (container) {
+							container.addEventListener('contextmenu', (e) => e.preventDefault(), { once: true });
 						}
-					};
-
-					canvas.onmousemove = (e) => {
-						const pos = getMousePos(e);
-						if (self._graphDragging) {
-							self._graphDragging.x = pos.x;
-							self._graphDragging.y = pos.y;
-							self._graphDragging.vx = 0;
-							self._graphDragging.vy = 0;
-							self.graphDraw();
-						} else if (isPanning) {
-							const dx = e.clientX - panStart.x;
-							const dy = e.clientY - panStart.y;
-							self._graphTransform.x += dx;
-							self._graphTransform.y += dy;
-							panStart = { x: e.clientX, y: e.clientY };
-							self.graphDraw();
-						} else {
-							const node = findNode(pos.x, pos.y);
-							if (node !== self._graphHoveredNode) {
-								self._graphHoveredNode = node;
-								canvas.style.cursor = node ? 'pointer' : 'default';
-								self.graphDraw();
-							}
-						}
-					};
-
-					canvas.onmouseup = (e) => {
-						if (self._graphDragging) {
-							// Check if it was a click (minimal drag)
-							const moved = dragStartPos ? 
-								Math.abs(self._graphDragging.x - dragStartPos.x) + Math.abs(self._graphDragging.y - dragStartPos.y) : 999;
-							if (moved < 5) {
-								// Click - select node
-								self.selectedNode = self._graphDragging;
-								self.selectedNodeEdges = self._graphEdges.filter(
-									e => e.source === self._graphDragging.id || e.target === self._graphDragging.id
-								);
-								self._startSelectionPulse();
-							}
-							self._graphDragging = null;
-							dragStartPos = null;
-							self.graphDraw();
-						}
-						if (isPanning) {
-							isPanning = false;
-						}
-						canvas.style.cursor = 'default';
-					};
-
-					canvas.onmouseleave = () => {
-						if (self._graphHoveredNode) {
-							self._graphHoveredNode = null;
-							self.graphDraw();
-						}
-						isPanning = false;
-						if (self._graphDragging) {
-							self._graphDragging = null;
-							dragStartPos = null;
-						}
-						canvas.style.cursor = 'default';
-					};
-
-					// Right-click context menu
-					canvas.oncontextmenu = (e) => {
-						e.preventDefault();
-						const pos = getMousePos(e);
-						const node = findNode(pos.x, pos.y);
-						if (node) {
-							const r = canvas.getBoundingClientRect();
+						const nodeData = self._graphNodeMap[node];
+						if (nodeData) {
+							const rect = container.getBoundingClientRect();
 							self._graphContextMenu = {
 								visible: true,
-								x: e.clientX - r.left,
-								y: e.clientY - r.top,
-								node: node,
+								x: (originalEvent.clientX || originalEvent.x || 0) - rect.left,
+								y: (originalEvent.clientY || originalEvent.y || 0) - rect.top,
+								node: nodeData,
 							};
-						} else {
-							self._graphContextMenu = { visible: false };
 						}
-					};
+					});
 
-					canvas.onwheel = (e) => {
-						e.preventDefault();
-						const r = canvas.getBoundingClientRect();
-						const mx = e.clientX - r.left;
-						const my = e.clientY - r.top;
-						const factor = e.deltaY < 0 ? 1.12 : 0.89;
-						const t = self._graphTransform;
-						const newK = Math.max(0.1, Math.min(10, t.k * factor));
-						t.x = mx - (mx - t.x) * (newK / t.k);
-						t.y = my - (my - t.y) * (newK / t.k);
-						t.k = newK;
-						self.graphDraw();
-					};
+					// Node drag (matching EdgeQuake enableNodeDrag)
+					sigma.on('downNode', (e) => {
+						self._draggedNode = e.node;
+						graph.setNodeAttribute(e.node, 'highlighted', true);
+					});
 
-					// Double-click to focus
-					canvas.ondblclick = (e) => {
-						const pos = getMousePos(e);
-						const node = findNode(pos.x, pos.y);
-						if (node) {
-							self.focusNode(node.id);
-						} else {
-							// Double-click empty space to deselect
-							self.selectedNode = null;
-							self.selectedNodeEdges = [];
-							self._stopSelectionPulse();
-							self.graphDraw();
+					sigma.getMouseCaptor().on('mousemovebody', (e) => {
+						if (!self._draggedNode) return;
+						const pos = sigma.viewportToGraph(e);
+						graph.setNodeAttribute(self._draggedNode, 'x', pos.x);
+						graph.setNodeAttribute(self._draggedNode, 'y', pos.y);
+						e.preventSigmaDefault();
+						e.original.preventDefault();
+						e.original.stopPropagation();
+					});
+
+					sigma.getMouseCaptor().on('mouseup', () => {
+						if (self._draggedNode) {
+							graph.removeNodeAttribute(self._draggedNode, 'highlighted');
+							self._draggedNode = null;
 						}
-					};
+					});
 
-					// Minimap click-to-navigate
-					const minimap = document.getElementById('graph-minimap');
-					if (minimap) {
-						this._setupMinimapInteraction(minimap);
+					// Node hover → neighbor highlighting (EdgeQuake style: dim non-neighbors)
+					sigma.on('enterNode', ({ node }) => {
+						const connectedNodes = new Set();
+						graph.forEachNeighbor(node, (neighbor) => connectedNodes.add(neighbor));
+						graph.forEachNode((n) => {
+							if (n === node) {
+								graph.setNodeAttribute(n, 'highlighted', true);
+							} else if (connectedNodes.has(n)) {
+								graph.setNodeAttribute(n, 'highlighted', true);
+							} else {
+								graph.setNodeAttribute(n, 'hidden', true);
+							}
+						});
+						graph.forEachEdge((edge, attrs, source, target) => {
+							if (source !== node && target !== node) {
+								graph.setEdgeAttribute(edge, 'hidden', true);
+							}
+						});
+						sigma.refresh();
+					});
+
+					sigma.on('leaveNode', () => {
+						graph.forEachNode((n) => {
+							graph.removeNodeAttribute(n, 'hidden');
+							graph.removeNodeAttribute(n, 'highlighted');
+						});
+						graph.forEachEdge((edge) => {
+							graph.removeEdgeAttribute(edge, 'hidden');
+						});
+						// Re-apply entity type filter
+						self._applyVisibilityFilter();
+					});
+
+					// Edge hover → highlight (EdgeQuake style)
+					if (!isVeryLargeGraph) {
+						sigma.on('enterEdge', ({ edge }) => {
+							const source = graph.source(edge);
+							const target = graph.target(edge);
+							const origSize = graph.getEdgeAttribute(edge, 'size') || 2;
+							const origColor = graph.getEdgeAttribute(edge, 'color');
+							graph.setEdgeAttribute(edge, 'size', origSize * 2);
+							graph.setEdgeAttribute(edge, 'color', isDark ? '#60a5fa' : '#3b82f6');
+							graph.setEdgeAttribute(edge, '_origSize', origSize);
+							graph.setEdgeAttribute(edge, '_origColor', origColor);
+							graph.setNodeAttribute(source, 'highlighted', true);
+							graph.setNodeAttribute(target, 'highlighted', true);
+							sigma.refresh();
+						});
+						sigma.on('leaveEdge', ({ edge }) => {
+							const origSize = graph.getEdgeAttribute(edge, '_origSize');
+							const origColor = graph.getEdgeAttribute(edge, '_origColor');
+							if (origSize !== undefined) graph.setEdgeAttribute(edge, 'size', origSize);
+							if (origColor !== undefined) graph.setEdgeAttribute(edge, 'color', origColor);
+							const source = graph.source(edge);
+							const target = graph.target(edge);
+							graph.removeNodeAttribute(source, 'highlighted');
+							graph.removeNodeAttribute(target, 'highlighted');
+							sigma.refresh();
+						});
 					}
 
-					// Keyboard shortcuts
-					canvas.tabIndex = 0;
-					canvas.style.outline = 'none';
-					canvas.onkeydown = (e) => {
+					// Keyboard shortcuts on the sigma container
+					container.tabIndex = 0;
+					container.style.outline = 'none';
+					container.addEventListener('keydown', (e) => {
 						if (e.key === 'Escape') {
 							self.selectedNode = null;
 							self.selectedNodeEdges = [];
 							self._graphContextMenu = { visible: false };
-							self._stopSelectionPulse();
-							self.graphDraw();
+							self._highlightSelectedNode(null);
 						} else if (e.key === '+' || e.key === '=') {
 							self.graphZoomIn();
 						} else if (e.key === '-') {
@@ -1970,113 +1345,301 @@ templ workspaceDetailsScript() {
 						} else if (e.key === 'f' || e.key === 'F') {
 							self.graphToggleFullscreen();
 						}
-					};
+					});
+
+					// Double-click to focus
+					sigma.on('doubleClickNode', ({ node }) => {
+						self.focusNode(node);
+					});
+					sigma.on('doubleClickStage', () => {
+						self.selectedNode = null;
+						self.selectedNodeEdges = [];
+						self._highlightSelectedNode(null);
+					});
+
+					// Setup minimap
+					this._setupMinimap();
 				},
 
-				// Minimap click/drag to navigate viewport
-				_setupMinimapInteraction(minimap) {
-					const self = this;
-					let isDragging = false;
+				// Apply layout algorithm to Graphology graph (matching EdgeQuake layouts)
+				_applyLayoutToGraph(graph) {
+					if (!graph || graph.order === 0) return;
+					const layout = this.graphLayout;
+					const nodeCount = graph.order;
 
-					const navigateToMinimapPos = (e) => {
-						const nodes = self._graphNodes;
-						if (!nodes.length) return;
-
-						const rect = minimap.getBoundingClientRect();
-						const mx = e.clientX - rect.left;
-						const my = e.clientY - rect.top;
-						const mw = rect.width;
-						const mh = rect.height;
-
-						// Calculate graph bounds (same as minimap drawing)
-						let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-						nodes.forEach(n => {
-							minX = Math.min(minX, n.x);
-							minY = Math.min(minY, n.y);
-							maxX = Math.max(maxX, n.x);
-							maxY = Math.max(maxY, n.y);
+					if (layout === 'circular') {
+						let i = 0;
+						graph.forEachNode((nodeId) => {
+							const angle = (2 * Math.PI * i) / nodeCount;
+							const radius = Math.max(100, nodeCount * 3);
+							graph.setNodeAttribute(nodeId, 'x', Math.cos(angle) * radius);
+							graph.setNodeAttribute(nodeId, 'y', Math.sin(angle) * radius);
+							i++;
 						});
-						const padding = 20;
-						minX -= padding; minY -= padding; maxX += padding; maxY += padding;
+						return;
+					}
+
+					if (layout === 'hierarchical') {
+						const groups = {};
+						graph.forEachNode((nodeId, attrs) => {
+							const t = attrs.entityType || 'UNKNOWN';
+							if (!groups[t]) groups[t] = [];
+							groups[t].push(nodeId);
+						});
+						const typeKeys = Object.keys(groups);
+						typeKeys.forEach((type, rowIdx) => {
+							const row = groups[type];
+							row.forEach((nodeId, colIdx) => {
+								graph.setNodeAttribute(nodeId, 'x', (colIdx - row.length / 2) * 30);
+								graph.setNodeAttribute(nodeId, 'y', rowIdx * 60);
+							});
+						});
+						return;
+					}
+
+					// Force-based layouts: ForceAtlas2 (default) or Force Directed
+					// graphologyLayoutForceAtlas2 is loaded via ESM import in layout.templ
+					if (typeof graphologyLayoutForceAtlas2 !== 'undefined' && graphologyLayoutForceAtlas2) {
+						try {
+							const isFA2 = layout === 'force-atlas';
+							const iterations = nodeCount > 500 ? 15 : (nodeCount > 100 ? 30 : 50);
+							graphologyLayoutForceAtlas2.assign(graph, {
+								iterations: iterations,
+								settings: {
+									gravity: isFA2 ? 1 : 0.5,
+									scalingRatio: isFA2 ? 2 : 5,
+									strongGravityMode: isFA2,
+									barnesHutOptimize: nodeCount > 50,
+									barnesHutTheta: 0.6,
+									slowDown: 2,
+									edgeWeightInfluence: 0.5,
+								},
+							});
+							return;
+						} catch (e) {
+							console.warn('ForceAtlas2 layout failed, falling back to manual:', e);
+						}
+					}
+
+					// Fallback: Simple force-directed layout in JS
+					this._manualForceLayout(graph);
+				},
+
+				// Fallback force-directed layout
+				_manualForceLayout(graph) {
+					const nodeCount = graph.order;
+					const maxIterations = 80;
+					const nodes = [];
+					const posMap = {};
+					graph.forEachNode((nodeId, attrs) => {
+						posMap[nodeId] = { x: attrs.x || (Math.random() - 0.5) * 200, y: attrs.y || (Math.random() - 0.5) * 200, vx: 0, vy: 0 };
+						nodes.push(nodeId);
+					});
+					for (let iter = 0; iter < maxIterations; iter++) {
+						const alpha = Math.max(0.001, 1 - iter / maxIterations);
+						const repK = 200;
+						// Repulsion
+						for (let i = 0; i < nodes.length; i++) {
+							for (let j = i + 1; j < nodes.length; j++) {
+								const a = posMap[nodes[i]], b = posMap[nodes[j]];
+								let dx = b.x - a.x, dy = b.y - a.y;
+								let dist = Math.sqrt(dx * dx + dy * dy) || 1;
+								let force = -repK / (dist * dist);
+								let fx = (dx / dist) * force * alpha;
+								let fy = (dy / dist) * force * alpha;
+								a.vx -= fx; a.vy -= fy;
+								b.vx += fx; b.vy += fy;
+							}
+						}
+						// Attraction
+						graph.forEachEdge((edgeId, attrs, source, target) => {
+							const s = posMap[source], t = posMap[target];
+							if (!s || !t) return;
+							let dx = t.x - s.x, dy = t.y - s.y;
+							let dist = Math.sqrt(dx * dx + dy * dy) || 1;
+							let force = (dist - 100) * 0.02 * alpha;
+							let fx = (dx / dist) * force, fy = (dy / dist) * force;
+							s.vx += fx; s.vy += fy;
+							t.vx -= fx; t.vy -= fy;
+						});
+						// Gravity
+						for (const id of nodes) {
+							const p = posMap[id];
+							const dist = Math.sqrt(p.x * p.x + p.y * p.y) || 1;
+							p.vx -= (p.x / dist) * 0.5 * alpha;
+							p.vy -= (p.y / dist) * 0.5 * alpha;
+						}
+						// Apply with damping
+						for (const id of nodes) {
+							const p = posMap[id];
+							p.vx *= 0.6; p.vy *= 0.6;
+							const vmag = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+							if (vmag > 10) { p.vx = (p.vx / vmag) * 10; p.vy = (p.vy / vmag) * 10; }
+							p.x += p.vx; p.y += p.vy;
+						}
+					}
+					// Apply positions back to graph
+					for (const id of nodes) {
+						graph.setNodeAttribute(id, 'x', posMap[id].x);
+						graph.setNodeAttribute(id, 'y', posMap[id].y);
+					}
+				},
+
+				// Apply layout change (called from LayoutControl dropdown)
+				applyLayout() {
+					const graph = this._graphologyInstance;
+					const sigma = this._sigmaInstance;
+					if (!graph || !sigma || graph.order === 0) return;
+					this._applyLayoutToGraph(graph);
+					sigma.refresh();
+					// Fit camera after layout change
+					this.graphResetCamera();
+				},
+
+				// Minimap: draw a scaled overview of the graph on the minimap canvas
+				_setupMinimap() {
+					const minimap = document.getElementById('graph-minimap');
+					if (!minimap || !this._sigmaInstance || !this._graphologyInstance) return;
+					const self = this;
+					const graph = this._graphologyInstance;
+					const sigma = this._sigmaInstance;
+					const mctx = minimap.getContext('2d');
+
+					const drawMinimap = () => {
+						const mr = minimap.parentElement.getBoundingClientRect();
+						const dpr = window.devicePixelRatio || 1;
+						minimap.width = mr.width * dpr;
+						minimap.height = mr.height * dpr;
+						mctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+						const mw = mr.width, mh = mr.height;
+						const isDark = document.documentElement.classList.contains('dark');
+						mctx.clearRect(0, 0, mw, mh);
+						mctx.fillStyle = isDark ? '#111827' : '#f8fafc';
+						mctx.fillRect(0, 0, mw, mh);
+
+						// Compute bounds from graph attributes
+						let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+						graph.forEachNode((nodeId, attrs) => {
+							if (attrs.hidden) return;
+							minX = Math.min(minX, attrs.x);
+							minY = Math.min(minY, attrs.y);
+							maxX = Math.max(maxX, attrs.x);
+							maxY = Math.max(maxY, attrs.y);
+						});
+						if (!isFinite(minX)) return;
+						const pad = 20;
+						minX -= pad; minY -= pad; maxX += pad; maxY += pad;
 						const gw = maxX - minX || 1;
 						const gh = maxY - minY || 1;
 						const scale = Math.min(mw / gw, mh / gh);
 						const ox = (mw - gw * scale) / 2;
 						const oy = (mh - gh * scale) / 2;
 
-						// Convert minimap coords to graph coords
-						const graphX = (mx - ox) / scale + minX;
-						const graphY = (my - oy) / scale + minY;
+						// Draw edges
+						mctx.strokeStyle = isDark ? '#374151' : '#d1d5db';
+						mctx.lineWidth = 0.5;
+						mctx.globalAlpha = 0.3;
+						graph.forEachEdge((edgeId, attrs, source, target) => {
+							if (attrs.hidden) return;
+							const sAttrs = graph.getNodeAttributes(source);
+							const tAttrs = graph.getNodeAttributes(target);
+							if (sAttrs.hidden || tAttrs.hidden) return;
+							mctx.beginPath();
+							mctx.moveTo(ox + (sAttrs.x - minX) * scale, oy + (sAttrs.y - minY) * scale);
+							mctx.lineTo(ox + (tAttrs.x - minX) * scale, oy + (tAttrs.y - minY) * scale);
+							mctx.stroke();
+						});
+						mctx.globalAlpha = 1;
 
-						// Center viewport on this point
-						const t = self._graphTransform;
-						t.x = self._graphW / 2 - graphX * t.k;
-						t.y = self._graphH / 2 - graphY * t.k;
-						self.graphDraw();
+						// Draw nodes
+						graph.forEachNode((nodeId, attrs) => {
+							if (attrs.hidden) return;
+							mctx.beginPath();
+							mctx.arc(
+								ox + (attrs.x - minX) * scale,
+								oy + (attrs.y - minY) * scale,
+								Math.max(1.5, (attrs.size || 4) * scale * 0.15),
+								0, 2 * Math.PI
+							);
+							mctx.fillStyle = attrs.color || '#6b7280';
+							mctx.fill();
+						});
+
+						// Draw viewport rectangle from Sigma camera
+						const camera = sigma.getCamera();
+						const state = camera.getState();
+						const vw = mw / (state.ratio || 1);
+						const vh = mh / (state.ratio || 1);
+						const camX = ox + (gw * scale / 2) + (state.x || 0) * scale - vw / 2;
+						const camY = oy + (gh * scale / 2) + (state.y || 0) * scale - vh / 2;
+						mctx.strokeStyle = isDark ? '#60a5fa' : '#2563eb';
+						mctx.lineWidth = 1.5;
+						mctx.strokeRect(camX, camY, vw, vh);
 					};
 
-					minimap.onmousedown = (e) => {
-						e.preventDefault();
-						e.stopPropagation();
-						isDragging = true;
-						navigateToMinimapPos(e);
-					};
+					// Redraw minimap on sigma afterRender
+					sigma.on('afterRender', drawMinimap);
+					drawMinimap();
 
-					minimap.onmousemove = (e) => {
-						if (isDragging) {
-							navigateToMinimapPos(e);
-						}
+					// Minimap click-to-navigate
+					let isDragging = false;
+					const navigateToMinimapPos = (e) => {
+						let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+						graph.forEachNode((nodeId, attrs) => {
+							if (attrs.hidden) return;
+							minX = Math.min(minX, attrs.x);
+							minY = Math.min(minY, attrs.y);
+							maxX = Math.max(maxX, attrs.x);
+							maxY = Math.max(maxY, attrs.y);
+						});
+						if (!isFinite(minX)) return;
+						const pad = 20;
+						minX -= pad; minY -= pad; maxX += pad; maxY += pad;
+						const rect = minimap.getBoundingClientRect();
+						const mx = e.clientX - rect.left;
+						const my = e.clientY - rect.top;
+						const mw = rect.width, mh = rect.height;
+						const gw = maxX - minX || 1;
+						const gh = maxY - minY || 1;
+						const sc = Math.min(mw / gw, mh / gh);
+						const oox = (mw - gw * sc) / 2;
+						const ooy = (mh - gh * sc) / 2;
+						const graphX = (mx - oox) / sc + minX;
+						const graphY = (my - ooy) / sc + minY;
+						sigma.getCamera().animate({ x: graphX - (maxX + minX) / 2, y: graphY - (maxY + minY) / 2 }, { duration: 150 });
 					};
-
+					minimap.onmousedown = (e) => { e.preventDefault(); e.stopPropagation(); isDragging = true; navigateToMinimapPos(e); };
+					minimap.onmousemove = (e) => { if (isDragging) navigateToMinimapPos(e); };
 					minimap.onmouseup = () => { isDragging = false; };
 					minimap.onmouseleave = () => { isDragging = false; };
 				},
 
+				// Zoom controls (using Sigma camera API)
 				graphZoomIn() {
-					const t = this._graphTransform;
-					const cx = this._graphW / 2;
-					const cy = this._graphH / 2;
-					const factor = 1.5;
-					const newK = Math.min(10, t.k * factor);
-					t.x = cx - (cx - t.x) * (newK / t.k);
-					t.y = cy - (cy - t.y) * (newK / t.k);
-					t.k = newK;
-					this.graphDraw();
+					if (this._sigmaInstance) {
+						this._sigmaInstance.getCamera().animatedZoom({ factor: 1.5 });
+					}
 				},
 
 				graphZoomOut() {
-					const t = this._graphTransform;
-					const cx = this._graphW / 2;
-					const cy = this._graphH / 2;
-					const factor = 1 / 1.5;
-					const newK = Math.max(0.1, t.k * factor);
-					t.x = cx - (cx - t.x) * (newK / t.k);
-					t.y = cy - (cy - t.y) * (newK / t.k);
-					t.k = newK;
-					this.graphDraw();
+					if (this._sigmaInstance) {
+						this._sigmaInstance.getCamera().animatedUnzoom({ factor: 1.5 });
+					}
 				},
 
 				graphResetCamera() {
-					// Fit all nodes in view
-					const nodes = this._graphNodes;
-					if (!nodes.length) return;
-					let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-					nodes.forEach(n => {
-						minX = Math.min(minX, n.x - n.radius);
-						minY = Math.min(minY, n.y - n.radius);
-						maxX = Math.max(maxX, n.x + n.radius);
-						maxY = Math.max(maxY, n.y + n.radius);
-					});
-					const gw = maxX - minX || 1;
-					const gh = maxY - minY || 1;
-					const pad = 60;
-					const k = Math.min((this._graphW - pad * 2) / gw, (this._graphH - pad * 2) / gh);
-					this._graphTransform = {
-						x: (this._graphW - gw * k) / 2 - minX * k,
-						y: (this._graphH - gh * k) / 2 - minY * k,
-						k: Math.max(0.1, Math.min(10, k)),
-					};
-					this.graphDraw();
+					if (this._sigmaInstance) {
+						this._sigmaInstance.getCamera().animatedReset();
+					}
+				},
+
+				// Refresh Sigma renderer settings (called by controls toggles)
+				graphRefresh() {
+					const sigma = this._sigmaInstance;
+					if (!sigma) return;
+					sigma.setSetting('renderLabels', this.graphShowLabels);
+					sigma.setSetting('renderEdgeLabels', this.graphShowEdgeLabels);
+					sigma.refresh();
 				},
 
 				graphToggleFullscreen() {

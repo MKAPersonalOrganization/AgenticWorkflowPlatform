@@ -30,7 +30,7 @@ templ NodeDetails() {
 			<div class="flex items-center justify-between">
 				<h3 class="font-bold text-sm truncate flex-1" x-text="selectedNode?.label"></h3>
 				<button
-					@click="selectedNode = null; selectedNodeEdges = []; graphDraw()"
+					@click="selectedNode = null; selectedNodeEdges = []; _highlightSelectedNode(null)"
 					class="p-1 hover:bg-muted rounded-md flex-shrink-0 ml-2"
 				>
 					@icon.X(icon.Props{Class: "size-4"})

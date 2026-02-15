@@ -79,6 +79,14 @@ templ knowledgeLayout(props knowledgeLayoutProps) {
 			@dialog.Script()
 			@tabs.Script()
 			@progress.Script()
+			<!-- Graphology + Sigma.js for Knowledge Graph (WebGL) -->
+			<script src="https://cdnjs.cloudflare.com/ajax/libs/graphology/0.25.4/graphology.umd.min.js"></script>
+			<script src="https://cdnjs.cloudflare.com/ajax/libs/sigma.js/2.4.0/sigma.min.js"></script>
+			<!-- ForceAtlas2 layout for Graphology (ESM → global) -->
+			<script type="module">
+				import forceAtlas2 from 'https://cdn.jsdelivr.net/npm/graphology-layout-forceatlas2@0.10.1/+esm';
+				window.graphologyLayoutForceAtlas2 = forceAtlas2;
+			</script>
 			<!-- Alpine.js Core -->
 			<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 		</head>
