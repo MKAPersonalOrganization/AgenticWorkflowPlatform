@@ -130,6 +130,15 @@ Class: "sm:max-w-3xl max-h-[90vh] flex flex-col p-0 overflow-hidden",
 { i18n.T(ctx, "Attach knowledge base workspaces to an agent. Attached workspaces are available via the Query Knowledge Base tool.") }
 }
 </div>
+@button.Button(button.Props{
+Variant: button.VariantOutline,
+Size:    button.SizeSm,
+Href:    "/knowledge",
+Class:   "gap-2 shrink-0",
+}) {
+@icon.Settings(icon.Props{Class: "size-4"})
+{ i18n.T(ctx, "Management") }
+}
 </div>
 }
 <!-- Top Controls -->

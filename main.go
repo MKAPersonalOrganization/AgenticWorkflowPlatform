@@ -722,6 +722,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// Pages
 	r.Get("/knowledge", authMiddleware.RequireAuthFunc(knowledgeHandler.WorkspacesPage))
+	r.Get("/knowledge/dashboard", authMiddleware.RequireAuthFunc(knowledgeHandler.DashboardPage))
 	r.Get("/knowledge/workspaces/{workspaceId}", authMiddleware.RequireAuthFunc(knowledgeHandler.WorkspaceDetailsPage))
 
 	// Documents API (maps to Edgequake /api/v1/documents)

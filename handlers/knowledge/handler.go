@@ -108,6 +108,18 @@ func (h *Handler) WorkspaceDetailsPage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// DashboardPage renders the knowledge dashboard page.
+func (h *Handler) DashboardPage(w http.ResponseWriter, r *http.Request) {
+	user := domain.GetUserFromContext(r.Context())
+
+	component := knowledge.DashboardPage(knowledge.DashboardPageProps{
+		User: user,
+	})
+	if err := component.Render(r.Context(), w); err != nil {
+		h.log.Error(r.Context(), "failed to render dashboard page", "error", err)
+	}
+}
+
 // ListDocuments returns documents for the current workspace as JSON.
 func (h *Handler) ListDocuments(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
