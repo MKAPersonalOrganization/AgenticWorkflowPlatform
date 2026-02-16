@@ -35,7 +35,7 @@ type ContentProps struct {
 	ID               string
 	Class            string
 	Attributes       templ.Attributes
-	HideCloseButton  bool
+	ShowCloseButton  bool
 	Open             bool // Initial open state for standalone usage (when no context)
 	DisableAutoFocus bool
 }
@@ -208,7 +208,7 @@ templ Content(props ...ContentProps) {
 		{ p.Attributes... }
 	>
 		{ children... }
-		if !p.HideCloseButton {
+		if p.ShowCloseButton {
 			<button
 				class={ utils.TwMerge(
 						// Positioning

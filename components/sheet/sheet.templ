@@ -44,7 +44,7 @@ type ContentProps struct {
 	ID              string
 	Class           string
 	Attributes      templ.Attributes
-	HideCloseButton bool
+	ShowCloseButton bool
 	Side            Side //
 	Open            bool // Initial open state for standalone usage
 }
@@ -142,7 +142,7 @@ templ Content(props ...ContentProps) {
 	@dialog.Content(dialog.ContentProps{
 		ID:              p.ID,
 		Open:            p.Open,
-		HideCloseButton: p.HideCloseButton,
+		ShowCloseButton: p.ShowCloseButton,
 		Class: utils.TwMerge(
 			// First apply side-specific positioning and animations
 			getSideClasses(p.Side),
