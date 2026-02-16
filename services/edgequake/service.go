@@ -44,7 +44,7 @@ type Service struct {
 // NewService creates a new Edgequake service.
 func NewService(baseURL string) *Service {
 	httpClient := &http.Client{
-		Timeout: 30 * time.Second, // Increased timeout for large uploads
+		Timeout: 120 * time.Second, // Extended timeout to handle LLM cold starts (e.g. Ollama model loading)
 	}
 	return &Service{
 		baseURL:    baseURL,

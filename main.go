@@ -44,11 +44,11 @@ import (
 	"school-with-ai/services/memory"
 	"school-with-ai/services/permissions"
 	"school-with-ai/services/rag/users"
-	"school-with-ai/services/resourcepermissions"
 	"school-with-ai/services/resources"
 	"school-with-ai/services/taskmanagement"
 	"school-with-ai/services/threadmgmt"
 	"school-with-ai/services/toolregistry"
+	"school-with-ai/services/workspacepermissions"
 
 	"school-with-ai/services/agentorchestrator/agents/chemistry"
 	"school-with-ai/services/agentorchestrator/agents/diagramming"
@@ -60,9 +60,9 @@ import (
 	bannerhandlers "school-with-ai/handlers/banner"
 	healthhandlers "school-with-ai/handlers/health"
 	knowledgehandlers "school-with-ai/handlers/knowledge"
-	resourcepermhandlers "school-with-ai/handlers/resourcepermissions"
 	resourceshandlers "school-with-ai/handlers/resources"
 	taskmgmthandlers "school-with-ai/handlers/taskmgmt"
+	wkspermhandlers "school-with-ai/handlers/workspacepermissions"
 
 	authService "school-with-ai/services/auth"
 
@@ -403,9 +403,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 	permissionsService := permissions.NewService(log, permissions.NewInMemoryRepository())
 	log.Info(ctx, "startup", "status", "permissions service initialized")
 
-	// Create resource permissions service
-	resourcePermissionsService := resourcepermissions.NewService(log, resourcepermissions.NewInMemoryRepository())
-	log.Info(ctx, "startup", "status", "resource permissions service initialized")
+	// Create workspace permissions service
+	workspacePermissionsService := workspacepermissions.NewService(log, workspacepermissions.NewInMemoryRepository())
+	log.Info(ctx, "startup", "status", "workspace permissions service initialized")
 
 	// Initialize Edgequake service
 	edgequakeService := edgequake.NewService(cfg.Edgequake.BaseURL)
@@ -509,8 +509,12 @@ func run(ctx context.Context, log *logger.Logger) error {
 			artifactService,
 			studentProfileRepo,
 			cfg.AgentCapabilities.LongTermMemory,
-			toolRegistry,       // Tool registry service
-			permissionsService, // Permissions service
+			toolRegistry,                // Tool registry service
+			permissionsService,          // Permissions service
+			workspacePermissionsService, // Workspace permissions
+			edgequakeService,            // Edgequake service for KB tools
+			cfg.Edgequake.BaseURL,       // Edgequake base URL for raw KB queries
+			cfg.Edgequake.TenantID,      // Tenant ID for edgequake
 		)
 		if err != nil {
 			return fmt.Errorf("creating custom runner: %w", err)
@@ -646,8 +650,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Resources Handler
 	resourcesHandler := resourceshandlers.NewHandler(resourcesService)
 
-	// Resource Permissions Handler
-	resourcePermHandler := resourcepermhandlers.NewHandler(log, resourcePermissionsService, resourcesService, agentProvider)
+	// Workspace Permissions Handler
+	workspacePermHandler := wkspermhandlers.NewHandler(log, workspacePermissionsService, edgequakeService, agentProvider, cfg.Edgequake.TenantID)
 
 	// Banner Handler
 	bannerHandler := bannerhandlers.NewHandler(log)
@@ -696,9 +700,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Get("/v1/documents", authMiddleware.RequireAuthFunc(handler.ListDocuments))
 	r.Post("/v1/documents", authMiddleware.RequireAuthFunc(handler.UploadDocument))
 
-	// Resource permission routes
-	r.Get("/v1/agents/{agentId}/resources", authMiddleware.RequireAuthFunc(resourcePermHandler.ListAgentResources))
-	r.Put("/v1/agents/{agentId}/resources/{resourceId}", authMiddleware.RequireAuthFunc(resourcePermHandler.ToggleAgentResource))
+	// Workspace permission routes
+	r.Get("/v1/agents/{agentId}/workspaces", authMiddleware.RequireAuthFunc(workspacePermHandler.ListAgentWorkspaces))
+	r.Put("/v1/agents/{agentId}/workspaces/{workspaceId}", authMiddleware.RequireAuthFunc(workspacePermHandler.ToggleAgentWorkspace))
 
 	// AGUI projection query endpoints (protected)
 	r.Get("/api/agui/threads", authMiddleware.RequireAuthFunc(aguiHandler.ListThreads))
@@ -734,7 +738,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Get("/api/knowledge/pdfs", authMiddleware.RequireAuthFunc(knowledgeHandler.ListPDFs))
 	r.Post("/api/knowledge/pdfs/upload", authMiddleware.RequireAuthFunc(knowledgeHandler.UploadPDF))
 	r.Delete("/api/knowledge/pdfs/{pdfId}", authMiddleware.RequireAuthFunc(knowledgeHandler.DeletePDF))
-		r.Get("/api/knowledge/pdfs/{pdfId}/content", authMiddleware.RequireAuthFunc(knowledgeHandler.GetPDFContent))
+	r.Get("/api/knowledge/pdfs/{pdfId}/content", authMiddleware.RequireAuthFunc(knowledgeHandler.GetPDFContent))
 	r.Get("/api/knowledge/pdfs/{pdfId}/download", authMiddleware.RequireAuthFunc(knowledgeHandler.DownloadPDF))
 	r.Get("/api/knowledge/pdfs/{trackId}/progress", authMiddleware.RequireAuthFunc(knowledgeHandler.GetPDFProgress))
 	r.Post("/api/knowledge/pdfs/{pdfId}/retry", authMiddleware.RequireAuthFunc(knowledgeHandler.RetryPdfProcessing))

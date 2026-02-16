@@ -313,6 +313,15 @@ func (r *Registry) initializeDefaultTools(ctx context.Context) error {
 			CreatedAt:   now,
 			UpdatedAt:   now,
 		},
+		{
+			ID:          "knowledge-base-set",
+			Name:        "Knowledge Base",
+			Description: "Tools for querying attached knowledge base workspaces",
+			Category:    "Knowledge",
+			ToolIDs:     []string{"kb-query"},
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		},
 	}
 
 	// Define default tools with their tool set associations
@@ -359,6 +368,9 @@ func (r *Registry) initializeDefaultTools(ctx context.Context) error {
 		// Chemistry tools
 		{ID: "chem-balance", Name: "Chemical Balance", Description: "Balance chemical equations", Category: "Chemistry", ToolSetID: "chemistry-set"},
 		{ID: "chem-molarity", Name: "Molarity", Description: "Calculate molarity and concentration", Category: "Chemistry", ToolSetID: "chemistry-set"},
+
+		// Knowledge base tools
+		{ID: "kb-query", Name: "Query Knowledge Base", Description: "Search and retrieve information from attached knowledge base workspaces", Category: "Knowledge", ToolSetID: "knowledge-base-set"},
 	}
 
 	// Save tool sets first

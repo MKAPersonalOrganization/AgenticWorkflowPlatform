@@ -8,6 +8,7 @@ import (
 	"school-with-ai/components/elicitation"
 	"school-with-ai/components/errormessage"
 	"school-with-ai/components/i18n"
+	"school-with-ai/components/knowledgebase"
 	"school-with-ai/components/library"
 	"school-with-ai/components/lookupsection"
 	"school-with-ai/components/markdown"
@@ -210,6 +211,9 @@ templ MessageList() {
 					</template>
 					<template x-if="message.name === 'search_text_in_file'">
 						@searchtext.Container()
+					</template>
+					<template x-if="message.name === 'query_knowledge_base'">
+						@knowledgebase.Container()
 					</template>
 					<template x-if="['create_markdown', 'update_markdown', 'delete_markdown'].includes(message.name)">
 						@markdown.Container()
