@@ -76,6 +76,64 @@ type queryResponse struct {
 	Sources []sourceReference `json:"sources"`
 }
 
+// --- Structured KB Result (returned to frontend as JSON) ---
+
+// KBSourceChunk represents a document chunk source for the UI.
+type KBSourceChunk struct {
+	DocumentID string  `json:"document_id"`
+	FilePath   string  `json:"file_path,omitempty"`
+	Content    string  `json:"content"`
+	Score      float32 `json:"score"`
+	StartLine  *int    `json:"start_line,omitempty"`
+	EndLine    *int    `json:"end_line,omitempty"`
+	ChunkIndex *int    `json:"chunk_index,omitempty"`
+}
+
+// KBSourceEntity represents a knowledge graph entity for the UI.
+type KBSourceEntity struct {
+	ID               string  `json:"id"`
+	Label            string  `json:"label"`
+	Relevance        float32 `json:"relevance"`
+	SourceDocumentID string  `json:"source_document_id,omitempty"`
+	SourceFilePath   string  `json:"source_file_path,omitempty"`
+}
+
+// KBSourceRelationship represents a knowledge graph relationship for the UI.
+type KBSourceRelationship struct {
+	Source           string  `json:"source"`
+	Target           string  `json:"target"`
+	Type             string  `json:"type"`
+	Relevance        float32 `json:"relevance"`
+	SourceDocumentID string  `json:"source_document_id,omitempty"`
+	SourceFilePath   string  `json:"source_file_path,omitempty"`
+}
+
+// KBSources groups all source types for the UI.
+type KBSources struct {
+	Chunks        []KBSourceChunk        `json:"chunks"`
+	Entities      []KBSourceEntity       `json:"entities"`
+	Relationships []KBSourceRelationship `json:"relationships"`
+}
+
+// KBMetrics holds generation performance metrics.
+type KBMetrics struct {
+	RetrievalDurationMs  int64  `json:"retrieval_duration_ms"`
+	GenerationDurationMs int64  `json:"generation_duration_ms"`
+	TotalDurationMs      int64  `json:"total_duration_ms"`
+	Model                string `json:"model"`
+	Mode                 string `json:"mode"`
+	PromptTokens         int    `json:"prompt_tokens,omitempty"`
+	CompletionTokens     int    `json:"completion_tokens,omitempty"`
+	TotalTokens          int    `json:"total_tokens,omitempty"`
+}
+
+// KBResult is the structured result returned to the frontend.
+type KBResult struct {
+	Answer  string    `json:"answer"`
+	Sources KBSources `json:"sources"`
+	Metrics KBMetrics `json:"metrics"`
+}
+
 // --- OpenAI LLM types ---
 
 type llmMessage struct {
@@ -88,10 +146,17 @@ type llmRequest struct {
 	Messages []llmMessage `json:"messages"`
 }
 
+type llmUsage struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+	TotalTokens      int `json:"total_tokens"`
+}
+
 type llmResponse struct {
 	Choices []struct {
 		Message llmMessage `json:"message"`
 	} `json:"choices"`
+	Usage llmUsage `json:"usage"`
 }
 
 // QueryKnowledgeBaseTool implements the agent-as-tool pattern:
@@ -150,7 +215,10 @@ type queryArgs struct {
 // 1. Retrieve context from Edgequake via raw HTTP (context_only=true, no LLM on the RAG side)
 // 2. Build a system prompt with the retrieved context injected
 // 3. Call OpenAI to synthesize an answer grounded in the context
+// Returns a structured JSON result with answer, sources, and generation metrics.
 func (t *QueryKnowledgeBaseTool) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
+	totalStart := time.Now()
+
 	var a queryArgs
 	if err := args.Decode(&a); err != nil {
 		return agent.ErrorResult(fmt.Errorf("failed to parse arguments: %w", err)), nil
@@ -165,16 +233,32 @@ func (t *QueryKnowledgeBaseTool) Execute(ctx context.Context, args agent.Argumen
 
 	// --- Step 1: Retrieve context from Edgequake via raw HTTP ---
 
+	retrievalStart := time.Now()
 	resp, err := t.retrieveContext(ctx, a.Query, a.Namespace)
+	retrievalDuration := time.Since(retrievalStart)
 	if err != nil {
 		return agent.ErrorResult(fmt.Errorf("knowledge base query failed: %w", err)), nil
 	}
+
+	// --- Build structured sources for the UI ---
+
+	sources := buildStructuredSources(resp.Sources)
 
 	// --- Step 2: Build augmented system prompt with context ---
 
 	contextText := buildContextString(resp.Sources)
 	if contextText == "" {
-		return agent.TextResult("No relevant information found in the knowledge base for this query."), nil
+		emptyResult := KBResult{
+			Answer:  "No relevant information found in the knowledge base for this query.",
+			Sources: sources,
+			Metrics: KBMetrics{
+				RetrievalDurationMs: retrievalDuration.Milliseconds(),
+				TotalDurationMs:     time.Since(totalStart).Milliseconds(),
+				Model:               t.modelID,
+				Mode:                resp.Mode,
+			},
+		}
+		return agent.JSONResult(emptyResult), nil
 	}
 
 	tmpl, err := template.New("kb-prompt").Parse(DefaultKBSystemPrompt)
@@ -189,12 +273,34 @@ func (t *QueryKnowledgeBaseTool) Execute(ctx context.Context, args agent.Argumen
 
 	// --- Step 3: Call OpenAI to synthesize the answer ---
 
-	answer, err := t.callLLM(ctx, promptBuf.String(), a.Query)
+	genStart := time.Now()
+	llmResp, err := t.callLLMFull(ctx, promptBuf.String(), a.Query)
+	genDuration := time.Since(genStart)
 	if err != nil {
 		return agent.ErrorResult(fmt.Errorf("LLM synthesis failed: %w", err)), nil
 	}
 
-	return agent.TextResult(answer), nil
+	answer := ""
+	if len(llmResp.Choices) > 0 {
+		answer = llmResp.Choices[0].Message.Content
+	}
+
+	result := KBResult{
+		Answer:  answer,
+		Sources: sources,
+		Metrics: KBMetrics{
+			RetrievalDurationMs:  retrievalDuration.Milliseconds(),
+			GenerationDurationMs: genDuration.Milliseconds(),
+			TotalDurationMs:      time.Since(totalStart).Milliseconds(),
+			Model:                t.modelID,
+			Mode:                 resp.Mode,
+			PromptTokens:         llmResp.Usage.PromptTokens,
+			CompletionTokens:     llmResp.Usage.CompletionTokens,
+			TotalTokens:          llmResp.Usage.TotalTokens,
+		},
+	}
+
+	return agent.JSONResult(result), nil
 }
 
 // retrieveContext makes a raw HTTP POST to the Edgequake /api/v1/query endpoint.
@@ -240,8 +346,8 @@ func (t *QueryKnowledgeBaseTool) retrieveContext(ctx context.Context, query, wor
 	return &queryResp, nil
 }
 
-// callLLM sends the augmented prompt and user query to OpenAI for synthesis.
-func (t *QueryKnowledgeBaseTool) callLLM(ctx context.Context, systemPrompt, userQuery string) (string, error) {
+// callLLMFull sends the augmented prompt and user query to OpenAI and returns the full response.
+func (t *QueryKnowledgeBaseTool) callLLMFull(ctx context.Context, systemPrompt, userQuery string) (*llmResponse, error) {
 	reqBody, err := json.Marshal(llmRequest{
 		Model: t.modelID,
 		Messages: []llmMessage{
@@ -250,14 +356,14 @@ func (t *QueryKnowledgeBaseTool) callLLM(ctx context.Context, systemPrompt, user
 		},
 	})
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal LLM request: %w", err)
+		return nil, fmt.Errorf("failed to marshal LLM request: %w", err)
 	}
 
 	httpClient := &http.Client{Timeout: 60 * time.Second}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.openai.com/v1/chat/completions", bytes.NewReader(reqBody))
 	if err != nil {
-		return "", fmt.Errorf("failed to create LLM request: %w", err)
+		return nil, fmt.Errorf("failed to create LLM request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+t.openAIAPIKey)
@@ -265,25 +371,100 @@ func (t *QueryKnowledgeBaseTool) callLLM(ctx context.Context, systemPrompt, user
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("OpenAI API request failed: %w", err)
+		return nil, fmt.Errorf("OpenAI API request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("OpenAI API returned error %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("OpenAI API returned error %d: %s", resp.StatusCode, string(body))
 	}
 
 	var llmResp llmResponse
 	if err := json.NewDecoder(resp.Body).Decode(&llmResp); err != nil {
-		return "", fmt.Errorf("failed to decode LLM response: %w", err)
+		return nil, fmt.Errorf("failed to decode LLM response: %w", err)
 	}
 
 	if len(llmResp.Choices) == 0 {
-		return "", fmt.Errorf("no response from OpenAI")
+		return nil, fmt.Errorf("no response from OpenAI")
 	}
 
-	return llmResp.Choices[0].Message.Content, nil
+	return &llmResp, nil
+}
+
+// buildStructuredSources converts raw source references into structured UI-ready sources.
+func buildStructuredSources(sources []sourceReference) KBSources {
+	result := KBSources{
+		Chunks:        []KBSourceChunk{},
+		Entities:      []KBSourceEntity{},
+		Relationships: []KBSourceRelationship{},
+	}
+
+	for _, s := range sources {
+		snippet := ""
+		if s.Snippet != nil {
+			snippet = *s.Snippet
+		}
+
+		switch s.SourceType {
+		case "chunk":
+			chunk := KBSourceChunk{
+				Content:    snippet,
+				Score:      s.Score,
+				StartLine:  s.StartLine,
+				EndLine:    s.EndLine,
+				ChunkIndex: s.ChunkIndex,
+			}
+			if s.DocumentID != nil {
+				chunk.DocumentID = *s.DocumentID
+			}
+			if s.FilePath != nil {
+				chunk.FilePath = *s.FilePath
+			}
+			result.Chunks = append(result.Chunks, chunk)
+
+		case "entity":
+			entity := KBSourceEntity{
+				ID:        s.ID,
+				Label:     s.ID,
+				Relevance: s.Score,
+			}
+			if s.SourceDocumentID != nil {
+				entity.SourceDocumentID = *s.SourceDocumentID
+			}
+			if s.SourceFilePath != nil {
+				entity.SourceFilePath = *s.SourceFilePath
+			}
+			result.Entities = append(result.Entities, entity)
+
+		case "relationship":
+			rel := KBSourceRelationship{
+				Relevance: s.Score,
+			}
+			// Parse relationship snippet: typically "source -> TYPE -> target"
+			if snippet != "" {
+				parts := strings.SplitN(snippet, " -> ", 3)
+				if len(parts) == 3 {
+					rel.Source = strings.TrimSpace(parts[0])
+					rel.Type = strings.TrimSpace(parts[1])
+					rel.Target = strings.TrimSpace(parts[2])
+				} else {
+					rel.Source = snippet
+					rel.Type = "related_to"
+					rel.Target = ""
+				}
+			}
+			if s.SourceDocumentID != nil {
+				rel.SourceDocumentID = *s.SourceDocumentID
+			}
+			if s.SourceFilePath != nil {
+				rel.SourceFilePath = *s.SourceFilePath
+			}
+			result.Relationships = append(result.Relationships, rel)
+		}
+	}
+
+	return result
 }
 
 // buildContextString formats retrieved sources into a context string for the prompt.
