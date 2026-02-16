@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"text/template"
 	"time"
@@ -115,10 +116,38 @@ type KBSources struct {
 	Relationships []KBSourceRelationship `json:"relationships"`
 }
 
+// KBGraphNode represents a node in the knowledge graph visualization.
+type KBGraphNode struct {
+	ID          string          `json:"id"`
+	Label       string          `json:"label"`
+	NodeType    string          `json:"node_type"`
+	Description string          `json:"description,omitempty"`
+	Degree      int             `json:"degree"`
+	Properties  json.RawMessage `json:"properties,omitempty"`
+}
+
+// KBGraphEdge represents an edge in the knowledge graph visualization.
+type KBGraphEdge struct {
+	Source   string  `json:"source"`
+	Target   string  `json:"target"`
+	EdgeType string  `json:"edge_type"`
+	Weight   float32 `json:"weight"`
+}
+
+// KBGraph holds the knowledge graph data for inline visualization.
+type KBGraph struct {
+	Nodes       []KBGraphNode `json:"nodes"`
+	Edges       []KBGraphEdge `json:"edges"`
+	TotalNodes  int           `json:"total_nodes"`
+	TotalEdges  int           `json:"total_edges"`
+	IsTruncated bool          `json:"is_truncated"`
+}
+
 // KBMetrics holds generation performance metrics.
 type KBMetrics struct {
 	RetrievalDurationMs  int64  `json:"retrieval_duration_ms"`
 	GenerationDurationMs int64  `json:"generation_duration_ms"`
+	GraphDurationMs      int64  `json:"graph_duration_ms"`
 	TotalDurationMs      int64  `json:"total_duration_ms"`
 	Model                string `json:"model"`
 	Mode                 string `json:"mode"`
@@ -131,6 +160,7 @@ type KBMetrics struct {
 type KBResult struct {
 	Answer  string    `json:"answer"`
 	Sources KBSources `json:"sources"`
+	Graph   *KBGraph  `json:"graph,omitempty"`
 	Metrics KBMetrics `json:"metrics"`
 }
 
@@ -251,6 +281,7 @@ func (t *QueryKnowledgeBaseTool) Execute(ctx context.Context, args agent.Argumen
 		emptyResult := KBResult{
 			Answer:  "No relevant information found in the knowledge base for this query.",
 			Sources: sources,
+			Graph:   nil,
 			Metrics: KBMetrics{
 				RetrievalDurationMs: retrievalDuration.Milliseconds(),
 				TotalDurationMs:     time.Since(totalStart).Milliseconds(),
@@ -285,12 +316,24 @@ func (t *QueryKnowledgeBaseTool) Execute(ctx context.Context, args agent.Argumen
 		answer = llmResp.Choices[0].Message.Content
 	}
 
+	// --- Step 4: Fetch knowledge graph subgraph for visualization ---
+
+	var kbGraph *KBGraph
+	var graphDuration time.Duration
+	if len(sources.Entities) > 0 {
+		graphStart := time.Now()
+		kbGraph = t.fetchGraphForEntities(ctx, a.Namespace, sources.Entities)
+		graphDuration = time.Since(graphStart)
+	}
+
 	result := KBResult{
 		Answer:  answer,
 		Sources: sources,
+		Graph:   kbGraph,
 		Metrics: KBMetrics{
 			RetrievalDurationMs:  retrievalDuration.Milliseconds(),
 			GenerationDurationMs: genDuration.Milliseconds(),
+			GraphDurationMs:      graphDuration.Milliseconds(),
 			TotalDurationMs:      time.Since(totalStart).Milliseconds(),
 			Model:                t.modelID,
 			Mode:                 resp.Mode,
@@ -519,6 +562,201 @@ func buildContextString(sources []sourceReference) string {
 		sb.WriteString("\n")
 	}
 	return sb.String()
+}
+
+// --- Graph API types ---
+
+type graphNodeAPIResponse struct {
+	ID          string          `json:"id"`
+	Label       string          `json:"label"`
+	NodeType    string          `json:"node_type"`
+	Description string          `json:"description"`
+	Degree      int             `json:"degree"`
+	Properties  json.RawMessage `json:"properties"`
+}
+
+type graphEdgeAPIResponse struct {
+	Source   string  `json:"source"`
+	Target   string  `json:"target"`
+	EdgeType string  `json:"edge_type"`
+	Weight   float32 `json:"weight"`
+}
+
+type knowledgeGraphAPIResponse struct {
+	Nodes       []graphNodeAPIResponse `json:"nodes"`
+	Edges       []graphEdgeAPIResponse `json:"edges"`
+	IsTruncated bool                   `json:"is_truncated"`
+	TotalNodes  int                    `json:"total_nodes"`
+	TotalEdges  int                    `json:"total_edges"`
+}
+
+type searchNodesAPIResponse struct {
+	Nodes        []graphNodeAPIResponse `json:"nodes"`
+	Edges        []graphEdgeAPIResponse `json:"edges"`
+	TotalMatches int                    `json:"total_matches"`
+	IsTruncated  bool                   `json:"is_truncated"`
+}
+
+// fetchGraphForEntities retrieves a knowledge graph subgraph centered on the entities found during retrieval.
+// It tries multiple strategies to get the best possible graph:
+// 1. Search for each entity to find matching nodes
+// 2. Fetch the subgraph centered on the highest-degree entity with depth=2
+// 3. Fall back to combining search results into a merged graph
+func (t *QueryKnowledgeBaseTool) fetchGraphForEntities(ctx context.Context, workspaceID string, entities []KBSourceEntity) *KBGraph {
+	if len(entities) == 0 {
+		return nil
+	}
+
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+
+	// Strategy: Search for entity nodes and collect matching node IDs,
+	// then fetch a subgraph centered on the top entity.
+	var bestStartNode string
+	var bestDegree int
+	allNodes := make(map[string]graphNodeAPIResponse)
+	allEdges := make(map[string]graphEdgeAPIResponse)
+
+	// Search for each entity (limit to top 5 to avoid too many requests)
+	searchLimit := 5
+	if len(entities) < searchLimit {
+		searchLimit = len(entities)
+	}
+
+	for i := 0; i < searchLimit; i++ {
+		entity := entities[i]
+		searchResp, err := t.searchGraphNodes(ctx, httpClient, workspaceID, entity.ID, 10)
+		if err != nil {
+			continue
+		}
+
+		for _, node := range searchResp.Nodes {
+			allNodes[node.ID] = node
+			if node.Degree > bestDegree {
+				bestDegree = node.Degree
+				bestStartNode = node.ID
+			}
+		}
+		for _, edge := range searchResp.Edges {
+			key := edge.Source + "-" + edge.Target + "-" + edge.EdgeType
+			allEdges[key] = edge
+		}
+	}
+
+	// If we found a high-degree entity, fetch a richer subgraph centered on it
+	if bestStartNode != "" {
+		graphResp, err := t.fetchSubgraph(ctx, httpClient, workspaceID, bestStartNode, 2, 75)
+		if err == nil && len(graphResp.Nodes) > 0 {
+			// Merge: keep subgraph nodes + any additional nodes from search
+			for _, node := range graphResp.Nodes {
+				allNodes[node.ID] = node
+			}
+			for _, edge := range graphResp.Edges {
+				key := edge.Source + "-" + edge.Target + "-" + edge.EdgeType
+				allEdges[key] = edge
+			}
+		}
+	}
+
+	// Build the final KBGraph
+	if len(allNodes) == 0 {
+		return nil
+	}
+
+	nodes := make([]KBGraphNode, 0, len(allNodes))
+	for _, n := range allNodes {
+		nodes = append(nodes, KBGraphNode{
+			ID:          n.ID,
+			Label:       n.Label,
+			NodeType:    n.NodeType,
+			Description: n.Description,
+			Degree:      n.Degree,
+			Properties:  n.Properties,
+		})
+	}
+
+	// Only include edges where both source and target are in our node set
+	nodeSet := make(map[string]struct{}, len(allNodes))
+	for id := range allNodes {
+		nodeSet[id] = struct{}{}
+	}
+
+	edges := make([]KBGraphEdge, 0, len(allEdges))
+	for _, e := range allEdges {
+		if _, srcOk := nodeSet[e.Source]; !srcOk {
+			continue
+		}
+		if _, tgtOk := nodeSet[e.Target]; !tgtOk {
+			continue
+		}
+		edges = append(edges, KBGraphEdge{
+			Source:   e.Source,
+			Target:   e.Target,
+			EdgeType: e.EdgeType,
+			Weight:   e.Weight,
+		})
+	}
+
+	return &KBGraph{
+		Nodes:       nodes,
+		Edges:       edges,
+		TotalNodes:  len(nodes),
+		TotalEdges:  len(edges),
+		IsTruncated: len(nodes) >= 75,
+	}
+}
+
+// searchGraphNodes searches for nodes matching a query via GET /api/v1/graph/nodes/search.
+func (t *QueryKnowledgeBaseTool) searchGraphNodes(ctx context.Context, httpClient *http.Client, workspaceID, query string, limit int) (*searchNodesAPIResponse, error) {
+	u := fmt.Sprintf("%s/api/v1/graph/nodes/search?q=%s&limit=%d", t.edgequakeBaseURL, url.QueryEscape(query), limit)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("X-Workspace-ID", workspaceID)
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("search nodes returned %d", resp.StatusCode)
+	}
+
+	var result searchNodesAPIResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// fetchSubgraph retrieves a subgraph centered on a start node via GET /api/v1/graph.
+func (t *QueryKnowledgeBaseTool) fetchSubgraph(ctx context.Context, httpClient *http.Client, workspaceID, startNode string, depth, maxNodes int) (*knowledgeGraphAPIResponse, error) {
+	u := fmt.Sprintf("%s/api/v1/graph?start_node=%s&depth=%d&max_nodes=%d", t.edgequakeBaseURL, url.QueryEscape(startNode), depth, maxNodes)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("X-Workspace-ID", workspaceID)
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("graph API returned %d", resp.StatusCode)
+	}
+
+	var result knowledgeGraphAPIResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return &result, nil
 }
 
 // MarshalJSON is a helper for JSON serialization of query results.
