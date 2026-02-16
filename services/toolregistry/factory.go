@@ -9,13 +9,17 @@ import (
 	mathtools "school-with-ai/services/agentorchestrator/agents/math/tools"
 	statisticstools "school-with-ai/services/agentorchestrator/agents/statistics/tools"
 	"school-with-ai/services/agentorchestrator/agents/tools"
+	kbtools "school-with-ai/services/agentorchestrator/agents/tools/knowledgebase"
 	"school-with-ai/services/artifact"
 )
 
 // ExecutableToolFactory creates executable tools from tool registry entries and tool sets.
 type ExecutableToolFactory struct {
-	artifactStore artifact.Service
-	toolRegistry  *Registry
+	artifactStore    artifact.Service
+	toolRegistry     *Registry
+	edgequakeBaseURL string
+	openAIAPIKey     string
+	modelID          string
 }
 
 // NewExecutableToolFactory creates a new tool factory.
@@ -23,6 +27,14 @@ func NewExecutableToolFactory(artifactStore artifact.Service) *ExecutableToolFac
 	return &ExecutableToolFactory{
 		artifactStore: artifactStore,
 	}
+}
+
+// SetEdgequakeConfig sets the edgequake base URL and LLM config for knowledge base tools.
+// The openAIAPIKey and modelID are used by the KB sub-agent to synthesize answers.
+func (f *ExecutableToolFactory) SetEdgequakeConfig(edgequakeBaseURL, openAIAPIKey, modelID string) {
+	f.edgequakeBaseURL = edgequakeBaseURL
+	f.openAIAPIKey = openAIAPIKey
+	f.modelID = modelID
 }
 
 // SetToolRegistry sets the tool registry for the factory (used for tool set expansion).
@@ -97,6 +109,16 @@ func (f *ExecutableToolFactory) CreateExecutableTool(ctx context.Context, tool *
 	// Document tools
 	case "docs-create":
 		return &tools.CreateMarkdownTool{ArtifactStore: f.artifactStore}, nil
+
+	// Knowledge base tools
+	case "kb-query":
+		if f.edgequakeBaseURL == "" {
+			return nil, fmt.Errorf("edgequake base URL not configured for knowledge base tool")
+		}
+		if f.openAIAPIKey == "" {
+			return nil, fmt.Errorf("OpenAI API key not configured for knowledge base tool")
+		}
+		return kbtools.NewQueryKnowledgeBaseTool(f.edgequakeBaseURL, f.openAIAPIKey, f.modelID), nil
 
 	default:
 		return nil, fmt.Errorf("unknown tool ID: %s", tool.ID)

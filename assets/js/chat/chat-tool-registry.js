@@ -73,6 +73,7 @@ export const TOOL_REGISTRY = {
     'browse_library': { type: 'special', category: 'knowledge' },
     'lookup_section': { type: 'special', category: 'knowledge' },
     'search_text_in_file': { type: 'special', category: 'knowledge' },
+    'query_knowledge_base': { type: 'special', category: 'knowledge' },
 
     // Content Creation
     'create_markdown': { type: 'special', category: 'content' },

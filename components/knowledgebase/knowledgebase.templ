@@ -1,0 +1,74 @@
+package knowledgebase
+
+import "school-with-ai/components/annotation"
+
+templ icon() {
+	<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-database">
+		<ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+		<path d="M3 5V19A9 3 0 0 0 21 19V5"></path>
+		<path d="M3 12A9 3 0 0 0 21 12"></path>
+	</svg>
+}
+
+templ Container() {
+	@annotation.Container(icon(), annotation.Props{
+		Label:   "Knowledge Base",
+		Subtext: "Context retrieved and synthesized from workspace documents",
+		FooterDotAttrs: templ.Attributes{
+			":class": `(() => {
+				if (message.status === 'completed') return 'bg-green-500/40';
+				if (message.status === 'error') return 'bg-destructive/40';
+				return 'bg-primary/30';
+			})()`,
+		},
+	}) {
+		<div class="flex flex-col gap-4 py-2">
+			<!-- Query & Namespace Info -->
+			<div class="flex flex-col gap-2">
+				<div class="flex items-center gap-2 text-[12px] text-muted-foreground/50 italic font-serif">
+					<span class="font-semibold text-muted-foreground/40">Query:</span>
+					<span
+						class="text-primary/70 not-italic font-mono text-[11px] bg-primary/[0.05] px-2 py-0.5 rounded-md border border-primary/10 shadow-sm"
+						x-text="message.parsedArgs?.query || 'knowledge base query'"
+					></span>
+				</div>
+				<div class="flex items-center gap-2 text-[12px] text-muted-foreground/50 italic font-serif">
+					<span class="font-semibold text-muted-foreground/40">Workspace:</span>
+					<span
+						class="text-muted-foreground/60 not-italic font-mono text-[10px] bg-muted/10 px-2 py-0.5 rounded-md border border-border/10"
+						x-text="message.parsedArgs?.namespace || 'default'"
+					></span>
+				</div>
+			</div>
+			<!-- Result Area -->
+			<div class="relative w-full">
+				<!-- Loading State -->
+				<template x-if="!message.result && message.status !== 'error'">
+					<div class="bg-muted/[0.03] border border-border/10 rounded-xl p-6 flex items-center justify-center gap-3">
+						<span class="w-1.5 h-1.5 bg-primary rounded-full animate-bounce"></span>
+						<span class="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style="animation-delay: 150ms;"></span>
+						<span class="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style="animation-delay: 300ms;"></span>
+						<span class="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground/30 ms-2">Searching knowledge base...</span>
+					</div>
+				</template>
+				<!-- Error State -->
+				<template x-if="message.status === 'error' || (message.result && message.result.includes && message.result.includes('error'))">
+					<div class="flex items-center gap-3 text-destructive/80 font-medium py-3 px-4 bg-destructive/5 border border-destructive/10 rounded-xl">
+						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-alert-circle flex-shrink-0"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="8" y2="12"></line><line x1="12" x2="12.01" y1="16" y2="16"></line></svg>
+						<span class="text-xs" x-text="message.result || 'Knowledge base query failed'"></span>
+					</div>
+				</template>
+				<!-- Success State: Rendered markdown result -->
+				<template x-if="message.result && message.status !== 'error' && !(message.result.includes && message.result.includes('error'))">
+					<div class="bg-muted/[0.03] border border-border/10 rounded-xl p-5 shadow-[inset_0_1px_4px_rgba(0,0,0,0.01)] transition-colors hover:bg-muted/[0.05]">
+						<div
+							class="prose prose-sm max-w-none text-sm leading-relaxed text-foreground dark:[&_*]:text-white"
+							x-html="renderMarkdown(message.result)"
+							dir="auto"
+						></div>
+					</div>
+				</template>
+			</div>
+		</div>
+	}
+}

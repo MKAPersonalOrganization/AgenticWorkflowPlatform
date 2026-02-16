@@ -14,11 +14,13 @@ import (
 	"school-with-ai/foundation/agentsdk/internal/llm"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/artifact"
+	"school-with-ai/services/edgequake"
 	"school-with-ai/services/memory"
 	memorytools "school-with-ai/services/memory/tools"
 	"school-with-ai/services/permissions"
 	smiddleware "school-with-ai/services/studentprofile/middleware"
 	"school-with-ai/services/toolregistry"
+	"school-with-ai/services/workspacepermissions"
 )
 
 // RunnerAdapter adapts the custom engine to the agent.Runner interface.
@@ -33,6 +35,10 @@ type RunnerAdapter struct {
 	pipeline           *EventPipeline // Add event pipeline for observability
 	toolRegistry       *toolregistry.Registry
 	permissionsService *permissions.Service
+	workspacePermSvc   *workspacepermissions.Service
+	edgequakeService   *edgequake.Service
+	edgequakeBaseURL   string
+	edgequakeTenantID  string
 }
 
 // NewRunnerAdapter creates a new runner adapter.
@@ -50,6 +56,10 @@ func NewRunnerAdapter(
 	enableMemory bool,
 	toolRegistry *toolregistry.Registry,
 	permissionsService *permissions.Service,
+	workspacePermSvc *workspacepermissions.Service,
+	edgequakeService *edgequake.Service,
+	edgequakeBaseURL string,
+	edgequakeTenantID string,
 ) (*RunnerAdapter, error) {
 	if modelCfg == nil {
 		return nil, fmt.Errorf("model config is required")
@@ -71,6 +81,10 @@ func NewRunnerAdapter(
 		pipeline:           NewEventPipeline(log), // Initialize event pipeline
 		toolRegistry:       toolRegistry,
 		permissionsService: permissionsService,
+		workspacePermSvc:   workspacePermSvc,
+		edgequakeService:   edgequakeService,
+		edgequakeBaseURL:   edgequakeBaseURL,
+		edgequakeTenantID:  edgequakeTenantID,
 	}
 
 	provider := &RegistryAgentProvider{
@@ -80,8 +94,13 @@ func NewRunnerAdapter(
 		enableMemory:       r.enableMemory,
 		modelProvider:      modelCfg.Provider,
 		modelID:            modelCfg.Model,
+		modelAPIKey:        modelCfg.APIKey,
 		toolRegistry:       toolRegistry,
 		permissionsService: permissionsService,
+		workspacePermSvc:   workspacePermSvc,
+		edgequakeService:   edgequakeService,
+		edgequakeBaseURL:   edgequakeBaseURL,
+		edgequakeTenantID:  edgequakeTenantID,
 	}
 
 	r.engine = engine.New(
@@ -289,8 +308,13 @@ type RegistryAgentProvider struct {
 	profileRepo        domain.StudentProfileRepository
 	modelProvider      string // LLM provider name (e.g., "openai", "gemini")
 	modelID            string // LLM model name (e.g., "gpt-4o", "gemini-2.0-flash")
+	modelAPIKey        string // LLM API key for sub-agent tool calls
 	toolRegistry       *toolregistry.Registry
 	permissionsService *permissions.Service
+	workspacePermSvc   *workspacepermissions.Service
+	edgequakeService   *edgequake.Service
+	edgequakeBaseURL   string
+	edgequakeTenantID  string
 }
 
 func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (core.AgentConfig, error) {
@@ -329,6 +353,11 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 		factory := toolregistry.NewExecutableToolFactory(p.artifactStore)
 		factory.SetToolRegistry(p.toolRegistry)
 
+		// Wire edgequake config for KB tools
+		if p.edgequakeBaseURL != "" {
+			factory.SetEdgequakeConfig(p.edgequakeBaseURL, p.modelAPIKey, p.modelID)
+		}
+
 		// Get enabled tool sets for this agent
 		enabledToolSetIDs, err := p.permissionsService.GetEnabledToolSets(ctx, name)
 		if err != nil {
@@ -344,6 +373,19 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 				continue
 			}
 			config.Tools = append(config.Tools, toolsFromSet...)
+		}
+	}
+
+	// Inject attached workspace info into system prompt as Knowledge Bases section
+	if p.workspacePermSvc != nil && p.edgequakeService != nil {
+		enabledWorkspaceIDs, err := p.workspacePermSvc.GetEnabledWorkspaces(ctx, name)
+		if err == nil && len(enabledWorkspaceIDs) > 0 {
+			kbSection := "\n\n## Knowledge Bases\n\nYou have access to the following knowledge base workspaces. Use the query_knowledge_base tool to search them:\n"
+			for _, wsID := range enabledWorkspaceIDs {
+				kbSection += fmt.Sprintf("- Workspace ID: %s\n", wsID)
+			}
+			kbSection += "\nWhen the user asks about topics that may be covered by these knowledge bases, use the query_knowledge_base tool with the appropriate namespace (workspace ID) and a relevant query to retrieve information."
+			config.SystemPrompt += kbSection
 		}
 	}
 

@@ -15,7 +15,7 @@ templ AgentsDialog() {
 				loading: false,
 				selectedAgent: '',
 				toolsets: [],
-				resources: [],
+				workspaces: [],
 				loadingDetails: false,
 				async init() {
 					const chatEl = document.querySelector('[x-data="chat"]');
@@ -51,14 +51,14 @@ templ AgentsDialog() {
 				async fetchAgentDetails() {
 					if (!this.selectedAgent) {
 						this.toolsets = [];
-						this.resources = [];
+						this.workspaces = [];
 						return;
 					}
 					this.loadingDetails = true;
 					try {
-						const [toolsRes, resourcesRes] = await Promise.all([
+						const [toolsRes, workspacesRes] = await Promise.all([
 							fetch(`/v1/agents/${this.selectedAgent}/toolsets`),
-							fetch(`/v1/agents/${this.selectedAgent}/resources`)
+							fetch(`/v1/agents/${this.selectedAgent}/workspaces`)
 						]);
 						if (toolsRes.ok) {
 							const data = await toolsRes.json();
@@ -66,16 +66,16 @@ templ AgentsDialog() {
 						} else {
 							this.toolsets = [];
 						}
-						if (resourcesRes.ok) {
-							const data = await resourcesRes.json();
-							this.resources = (data.resources || []).filter(r => r.enabled);
+						if (workspacesRes.ok) {
+							const data = await workspacesRes.json();
+							this.workspaces = (data.workspaces || []).filter(w => w.enabled);
 						} else {
-							this.resources = [];
+							this.workspaces = [];
 						}
 					} catch (err) {
 						console.error('Failed to fetch agent details:', err);
 						this.toolsets = [];
-						this.resources = [];
+						this.workspaces = [];
 					} finally {
 						this.loadingDetails = false;
 					}
@@ -95,29 +95,6 @@ templ AgentsDialog() {
 						count += (ts.tools || []).filter(t => t.enabled).length;
 					});
 					return count;
-				},
-				normalizeFileType(ft) {
-					if (!ft) return 'Other';
-					const lower = ft.toLowerCase();
-					if (lower.includes('pdf')) return 'PDF';
-					if (lower.includes('doc') || lower.includes('docx') || lower.includes('word')) return 'DOCX';
-					if (lower.includes('txt') || lower.includes('text/plain')) return 'TXT';
-					if (lower.includes('md') || lower.includes('markdown')) return 'MD';
-					return 'Other';
-				},
-				categoryColor(cat) {
-					const colors = {
-						'Mathematics': 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-						'Physics': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400',
-						'Chemistry': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
-						'Computer Science': 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400',
-						'Biology': 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-						'Economics': 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
-						'Languages': 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400',
-						'History': 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
-						'Arts': 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400',
-					};
-					return colors[cat] || 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400';
 				},
 				toolSetCategoryColor(category) {
 					const colors = {
@@ -278,31 +255,26 @@ templ AgentsDialog() {
 										</div>
 									</template>
 								</div>
-								<!-- Enabled Resources -->
+								<!-- Attached Workspaces -->
 								<div>
 									<div class="flex items-center gap-2 mb-2.5">
-										@icon.Library(icon.Props{Class: "size-4 text-muted-foreground"})
-										<h4 class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{ i18n.T(ctx, "Resources") }</h4>
-										<span class="text-[11px] text-muted-foreground tabular-nums" x-text="`${resources.length} enabled`"></span>
+										@icon.Database(icon.Props{Class: "size-4 text-muted-foreground"})
+										<h4 class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{ i18n.T(ctx, "Workspaces") }</h4>
+										<span class="text-[11px] text-muted-foreground tabular-nums" x-text="`${workspaces.length} attached`"></span>
 									</div>
-									<template x-if="resources.length === 0">
+									<template x-if="workspaces.length === 0">
 										<div class="flex flex-col items-center gap-2 py-4">
-											@icon.FileText(icon.Props{Class: "size-6 opacity-20 text-muted-foreground"})
-											<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "No resources enabled for this agent.") }</p>
+											@icon.Database(icon.Props{Class: "size-6 opacity-20 text-muted-foreground"})
+											<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "No workspaces attached to this agent.") }</p>
 										</div>
 									</template>
-									<template x-if="resources.length > 0">
+									<template x-if="workspaces.length > 0">
 										<div class="space-y-0.5 pl-6 max-h-48 overflow-y-auto scrollbar-thin">
-											<template x-for="res in resources" :key="res.id">
+											<template x-for="ws in workspaces" :key="ws.id">
 												<div class="flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-muted transition-colors">
-													@icon.FileText(icon.Props{Class: "size-3.5 text-muted-foreground shrink-0"})
-													<span x-text="res.title" class="text-xs text-foreground truncate flex-1"></span>
-													<span
-														class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium shrink-0"
-														:class="categoryColor(res.category)"
-														x-text="res.category"
-													></span>
-													<span class="text-[10px] text-muted-foreground uppercase tabular-nums shrink-0" x-text="normalizeFileType(res.file_type)"></span>
+													@icon.Database(icon.Props{Class: "size-3.5 text-muted-foreground shrink-0"})
+													<span x-text="ws.name" class="text-xs text-foreground truncate flex-1"></span>
+													<span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 shrink-0" x-text="ws.slug"></span>
 												</div>
 											</template>
 										</div>
@@ -312,7 +284,7 @@ templ AgentsDialog() {
 								<div class="border-t border-border pt-3 flex items-start gap-2">
 									@icon.Info(icon.Props{Class: "size-3.5 text-muted-foreground shrink-0 mt-0.5"})
 									<p class="text-[11px] text-muted-foreground">
-										{ i18n.T(ctx, "To change tool or resource permissions, use the Tools and Resource Library dialogs.") }
+										{ i18n.T(ctx, "To change tool or workspace permissions, use the Tools and Knowledge Workspaces dialogs.") }
 									</p>
 								</div>
 							</div>
@@ -328,8 +300,8 @@ templ AgentsDialog() {
 							</span>
 							<span class="text-border">|</span>
 							<span class="flex items-center gap-1.5">
-								@icon.FileText(icon.Props{Class: "size-3 opacity-60"})
-								<span x-text="resources.length"></span> { i18n.T(ctx, "resources") }
+								@icon.Database(icon.Props{Class: "size-3 opacity-60"})
+								<span x-text="workspaces.length"></span> { i18n.T(ctx, "workspaces") }
 							</span>
 						</div>
 						<div x-show="!selectedAgent || loadingDetails"></div>
