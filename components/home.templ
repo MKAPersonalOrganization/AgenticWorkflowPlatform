@@ -19,6 +19,7 @@ import (
 	"school-with-ai/components/popover"
 	"school-with-ai/components/selectbox"
 	"school-with-ai/components/sidebar"
+	"school-with-ai/components/sidepanel"
 	"school-with-ai/components/tabs"
 	"school-with-ai/components/textarea"
 	"school-with-ai/domain"
@@ -223,6 +224,8 @@ templ ChatInputScreen(user *domain.User) {
 			</div>
 			<!-- Settings Dialog -->
 			@nav.Settings()
+			<!-- Side Panel -->
+			@sidepanel.SidePanel()
 			<!-- Toast Notifications -->
 			<div
 				class="toast-container"

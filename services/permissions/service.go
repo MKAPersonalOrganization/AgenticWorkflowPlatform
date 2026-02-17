@@ -318,27 +318,29 @@ func (s *Service) getDefaultToolSetsForAgent(agentID string) []string {
 			"calculator-set",
 			"visualization-set",
 			"memory-set",
+			"document-set",
+			"knowledge-base-set",
 		},
 		"physics-instructor": {
 			"calculator-set",
-			"physics-set",
 			"visualization-set",
 			"memory-set",
+			"document-set",
+			"knowledge-base-set",
 		},
 		"chemistry-instructor": {
 			"calculator-set",
-			"chemistry-set",
 			"memory-set",
+			"document-set",
+			"knowledge-base-set",
 		},
 		"statistics-instructor": {
 			"calculator-set",
 			"statistics-set",
 			"visualization-set",
 			"memory-set",
-		},
-		"diagramming-instructor": {
-			"diagramming-set",
-			"memory-set",
+			"document-set",
+			"knowledge-base-set",
 		},
 	}
 
@@ -347,5 +349,5 @@ func (s *Service) getDefaultToolSetsForAgent(agentID string) []string {
 	}
 
 	// Default fallback for unknown agents
-	return []string{"calculator-set", "memory-set"}
+	return []string{"calculator-set", "memory-set", "document-set", "knowledge-base-set"}
 }

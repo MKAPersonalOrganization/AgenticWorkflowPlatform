@@ -43,7 +43,10 @@ plot sin(x) with lines linewidth 2 title 'y = sin(x)'`
 	if len(result.Content) == 0 {
 		t.Fatal("expected content in result")
 	}
-	response := result.Content[0].(map[string]any)
+	var response map[string]any
+	if err := json.Unmarshal([]byte(result.Content[0].(string)), &response); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
 
 	if !response["success"].(bool) {
 		t.Error("expected success to be true")
@@ -89,7 +92,10 @@ plot sin(x) title 'sin(x)', cos(x) title 'cos(x)', tan(x) title 'tan(x)'`
 	if len(result.Content) == 0 {
 		t.Fatal("expected content in result")
 	}
-	response := result.Content[0].(map[string]any)
+	var response map[string]any
+	if err := json.Unmarshal([]byte(result.Content[0].(string)), &response); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
 
 	imagePath := response["image_path"].(string)
 	if _, err := os.Stat(imagePath); os.IsNotExist(err) {
@@ -132,7 +138,10 @@ plot x**2 - 4*x + 3 with lines title 'y = x² - 4x + 3', 0 with lines dashtype 2
 	if len(result.Content) == 0 {
 		t.Fatal("expected content in result")
 	}
-	response := result.Content[0].(map[string]any)
+	var response map[string]any
+	if err := json.Unmarshal([]byte(result.Content[0].(string)), &response); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
 
 	imagePath := response["image_path"].(string)
 	defer func() { _ = os.Remove(imagePath) }()
@@ -175,7 +184,10 @@ e`
 	if len(result.Content) == 0 {
 		t.Fatal("expected content in result")
 	}
-	response := result.Content[0].(map[string]any)
+	var response map[string]any
+	if err := json.Unmarshal([]byte(result.Content[0].(string)), &response); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
 
 	imagePath := response["image_path"].(string)
 	defer func() { _ = os.Remove(imagePath) }()
@@ -212,7 +224,10 @@ splot x**2 + y**2 with lines`
 	if len(result.Content) == 0 {
 		t.Fatal("expected content in result")
 	}
-	response := result.Content[0].(map[string]any)
+	var response map[string]any
+	if err := json.Unmarshal([]byte(result.Content[0].(string)), &response); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
 
 	imagePath := response["image_path"].(string)
 	defer func() {
@@ -241,13 +256,12 @@ func TestPlotTool_ValidationMissingScript(t *testing.T) {
 		Raw: json.RawMessage(argBytes),
 	}
 
-	_, err = tool.Execute(context.Background(), toolArgs)
+	result, _ := tool.Execute(context.Background(), toolArgs)
 
-	if err == nil {
+	if result.Error == nil {
 		t.Error("expected error for missing gnuplot_script parameter")
-	}
-	if !strings.Contains(err.Error(), "gnuplot_script parameter is required") {
-		t.Errorf("expected error about missing script, got: %v", err)
+	} else if !strings.Contains(result.Error.Error(), "gnuplot_script parameter is required") {
+		t.Errorf("expected error about missing script, got: %v", result.Error)
 	}
 }
 
@@ -268,13 +282,12 @@ func TestPlotTool_ValidationSetTerminal(t *testing.T) {
 		Raw: json.RawMessage(argBytes),
 	}
 
-	_, err = tool.Execute(context.Background(), toolArgs)
+	result, _ := tool.Execute(context.Background(), toolArgs)
 
-	if err == nil {
+	if result.Error == nil {
 		t.Error("expected error for script containing 'set terminal'")
-	}
-	if !strings.Contains(err.Error(), "should not contain 'set terminal'") {
-		t.Errorf("expected error about set terminal, got: %v", err)
+	} else if !strings.Contains(result.Error.Error(), "should not contain 'set terminal'") {
+		t.Errorf("expected error about set terminal, got: %v", result.Error)
 	}
 }
 
@@ -295,13 +308,12 @@ func TestPlotTool_ValidationSetOutput(t *testing.T) {
 		Raw: json.RawMessage(argBytes),
 	}
 
-	_, err = tool.Execute(context.Background(), toolArgs)
+	result, _ := tool.Execute(context.Background(), toolArgs)
 
-	if err == nil {
+	if result.Error == nil {
 		t.Error("expected error for script containing 'set output'")
-	}
-	if !strings.Contains(err.Error(), "should not contain 'set output'") {
-		t.Errorf("expected error about set output, got: %v", err)
+	} else if !strings.Contains(result.Error.Error(), "should not contain 'set output'") {
+		t.Errorf("expected error about set output, got: %v", result.Error)
 	}
 }
 
@@ -323,13 +335,12 @@ func TestPlotTool_ValidationTitleTooLong(t *testing.T) {
 		Raw: json.RawMessage(argBytes),
 	}
 
-	_, err = tool.Execute(context.Background(), toolArgs)
+	result, _ := tool.Execute(context.Background(), toolArgs)
 
-	if err == nil {
+	if result.Error == nil {
 		t.Error("expected error for title too long")
-	}
-	if !strings.Contains(err.Error(), "title exceeds maximum length") {
-		t.Errorf("expected error about title length, got: %v", err)
+	} else if !strings.Contains(result.Error.Error(), "title exceeds maximum length") {
+		t.Errorf("expected error about title length, got: %v", result.Error)
 	}
 }
 

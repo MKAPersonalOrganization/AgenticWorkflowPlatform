@@ -50,10 +50,7 @@ import (
 	"school-with-ai/services/toolregistry"
 	"school-with-ai/services/workspacepermissions"
 
-	"school-with-ai/services/agentorchestrator/agents/chemistry"
-	"school-with-ai/services/agentorchestrator/agents/diagramming"
 	"school-with-ai/services/agentorchestrator/agents/math"
-	"school-with-ai/services/agentorchestrator/agents/physics"
 	"school-with-ai/services/agentorchestrator/agents/statistics"
 
 	aguihandlers "school-with-ai/handlers/agui"
@@ -430,30 +427,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 		return fmt.Errorf("creating math instructor agent: %w", err)
 	}
 
-	physicsConfig, err := physics.NewPhysicsInstructorConfig(ctx)
-	if err != nil {
-		return fmt.Errorf("creating physics instructor config: %w", err)
-	}
-	physicsConfig.AgentMiddlewares = []agent.Middleware{agentLoggingMw}
-	physicsConfig.ChatMiddlewares = []agent.Middleware{chatLoggingMw}
-	physicsConfig.FunctionMiddlewares = []agent.Middleware{toolLoggingMw}
-	physicsInstructor, err := custom.NewAgent(physicsConfig)
-	if err != nil {
-		return fmt.Errorf("creating physics instructor agent: %w", err)
-	}
-
-	chemistryConfig, err := chemistry.NewChemistryInstructorConfig(ctx)
-	if err != nil {
-		return fmt.Errorf("creating chemistry instructor config: %w", err)
-	}
-	chemistryConfig.AgentMiddlewares = []agent.Middleware{agentLoggingMw}
-	chemistryConfig.ChatMiddlewares = []agent.Middleware{chatLoggingMw}
-	chemistryConfig.FunctionMiddlewares = []agent.Middleware{toolLoggingMw}
-	chemistryInstructor, err := custom.NewAgent(chemistryConfig)
-	if err != nil {
-		return fmt.Errorf("creating chemistry instructor agent: %w", err)
-	}
-
 	statsConfig, err := statistics.NewStatisticsInstructorConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("creating statistics instructor config: %w", err)
@@ -466,25 +439,10 @@ func run(ctx context.Context, log *logger.Logger) error {
 		return fmt.Errorf("creating statistics instructor agent: %w", err)
 	}
 
-	diagrammingConfig, err := diagramming.NewDiagrammingInstructorConfig(ctx)
-	if err != nil {
-		return fmt.Errorf("creating diagramming instructor config: %w", err)
-	}
-	diagrammingConfig.AgentMiddlewares = []agent.Middleware{agentLoggingMw}
-	diagrammingConfig.ChatMiddlewares = []agent.Middleware{chatLoggingMw}
-	diagrammingConfig.FunctionMiddlewares = []agent.Middleware{toolLoggingMw}
-	diagrammingInstructor, err := custom.NewAgent(diagrammingConfig)
-	if err != nil {
-		return fmt.Errorf("creating diagramming instructor agent: %w", err)
-	}
-
 	// Create a simple map of available agents
 	availableAgents := map[string]agent.Agent{
-		"math-instructor":        mathInstructor,
-		"physics-instructor":     physicsInstructor,
-		"chemistry-instructor":   chemistryInstructor,
-		"statistics-instructor":  statsInstructor,
-		"diagramming-instructor": diagrammingInstructor,
+		"math-instructor":      mathInstructor,
+		"statistics-instructor": statsInstructor,
 	}
 	agentProvider := custom.NewMapAgentProvider(availableAgents)
 

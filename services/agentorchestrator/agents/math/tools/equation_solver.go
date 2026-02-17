@@ -30,20 +30,20 @@ func (e *EquationSolverTool) Description() string {
 	return "Solve algebraic equations for a given variable. Supports linear, quadratic, and simple polynomial equations."
 }
 
-func (e *EquationSolverTool) InputSchema() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"equation": map[string]any{
-				"type":        "string",
-				"description": "The equation to solve (e.g., '2x + 5 = 13', 'x^2 - 4 = 0')",
+func (e *EquationSolverTool) Schema() *agent.Schema {
+	return &agent.Schema{
+		Type: agent.TypeObject,
+		Properties: map[string]*agent.Schema{
+			"equation": {
+				Type:        agent.TypeString,
+				Description: "The equation to solve (e.g., '2x + 5 = 13', 'x^2 - 4 = 0')",
 			},
-			"variable": map[string]any{
-				"type":        "string",
-				"description": "Variable to solve for (default: 'x')",
+			"variable": {
+				Type:        agent.TypeString,
+				Description: "Variable to solve for (default: 'x')",
 			},
 		},
-		"required": []string{"equation"},
+		Required: []string{"equation"},
 	}
 }
 

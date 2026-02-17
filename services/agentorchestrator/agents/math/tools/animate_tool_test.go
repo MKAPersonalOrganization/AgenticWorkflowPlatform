@@ -47,7 +47,10 @@ do for [i=0:40] {
 	if len(result.Content) == 0 {
 		t.Fatal("expected content in result")
 	}
-	response := result.Content[0].(map[string]any)
+	var response map[string]any
+	if err := json.Unmarshal([]byte(result.Content[0].(string)), &response); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
 
 	if !response["success"].(bool) {
 		t.Error("expected success to be true")
@@ -100,7 +103,10 @@ do for [ang=0:360:10] {
 	if len(result.Content) == 0 {
 		t.Fatal("expected content in result")
 	}
-	response := result.Content[0].(map[string]any)
+	var response map[string]any
+	if err := json.Unmarshal([]byte(result.Content[0].(string)), &response); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
 
 	animationPath := response["animation_path"].(string)
 	defer func() { _ = os.Remove(animationPath) }()
@@ -143,7 +149,10 @@ do for [i=1:30] {
 	if len(result.Content) == 0 {
 		t.Fatal("expected content in result")
 	}
-	response := result.Content[0].(map[string]any)
+	var response map[string]any
+	if err := json.Unmarshal([]byte(result.Content[0].(string)), &response); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
 
 	animationPath := response["animation_path"].(string)
 	if !strings.HasSuffix(animationPath, ".webp") {
@@ -170,13 +179,12 @@ func TestAnimateTool_ValidationMissingScript(t *testing.T) {
 		Raw: json.RawMessage(argBytes),
 	}
 
-	_, err = tool.Execute(context.Background(), toolArgs)
+	result, _ := tool.Execute(context.Background(), toolArgs)
 
-	if err == nil {
+	if result.Error == nil {
 		t.Error("expected error for missing gnuplot_script parameter")
-	}
-	if !strings.Contains(err.Error(), "gnuplot_script parameter is required") {
-		t.Errorf("expected error about missing script, got: %v", err)
+	} else if !strings.Contains(result.Error.Error(), "gnuplot_script parameter is required") {
+		t.Errorf("expected error about missing script, got: %v", result.Error)
 	}
 }
 
@@ -197,13 +205,12 @@ func TestAnimateTool_ValidationInvalidFormat(t *testing.T) {
 		Raw: json.RawMessage(argBytes),
 	}
 
-	_, err = tool.Execute(context.Background(), toolArgs)
+	result, _ := tool.Execute(context.Background(), toolArgs)
 
-	if err == nil {
+	if result.Error == nil {
 		t.Error("expected error for invalid format")
-	}
-	if !strings.Contains(err.Error(), "format must be 'gif' or 'webp'") {
-		t.Errorf("expected error about invalid format, got: %v", err)
+	} else if !strings.Contains(result.Error.Error(), "format must be 'gif' or 'webp'") {
+		t.Errorf("expected error about invalid format, got: %v", result.Error)
 	}
 }
 
@@ -224,13 +231,12 @@ func TestAnimateTool_ValidationSetTerminal(t *testing.T) {
 		Raw: json.RawMessage(argBytes),
 	}
 
-	_, err = tool.Execute(context.Background(), toolArgs)
+	result, _ := tool.Execute(context.Background(), toolArgs)
 
-	if err == nil {
+	if result.Error == nil {
 		t.Error("expected error for script containing 'set terminal'")
-	}
-	if !strings.Contains(err.Error(), "should not contain 'set terminal'") {
-		t.Errorf("expected error about set terminal, got: %v", err)
+	} else if !strings.Contains(result.Error.Error(), "should not contain 'set terminal'") {
+		t.Errorf("expected error about set terminal, got: %v", result.Error)
 	}
 }
 
@@ -262,7 +268,10 @@ func TestAnimateTool_DefaultValues(t *testing.T) {
 	if len(result.Content) == 0 {
 		t.Fatal("expected content in result")
 	}
-	response := result.Content[0].(map[string]any)
+	var response map[string]any
+	if err := json.Unmarshal([]byte(result.Content[0].(string)), &response); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
 
 	if response["format"].(string) != "gif" {
 		t.Errorf("expected default format 'gif', got: %s", response["format"])

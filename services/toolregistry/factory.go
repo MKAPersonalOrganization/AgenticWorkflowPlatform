@@ -5,12 +5,13 @@ import (
 	"fmt"
 
 	"school-with-ai/foundation/agent"
-	diagrammingtools "school-with-ai/services/agentorchestrator/agents/diagramming/tools"
 	mathtools "school-with-ai/services/agentorchestrator/agents/math/tools"
 	statisticstools "school-with-ai/services/agentorchestrator/agents/statistics/tools"
 	"school-with-ai/services/agentorchestrator/agents/tools"
 	kbtools "school-with-ai/services/agentorchestrator/agents/tools/knowledgebase"
 	"school-with-ai/services/artifact"
+	"school-with-ai/services/memory"
+	memorytools "school-with-ai/services/memory/tools"
 )
 
 // ExecutableToolFactory creates executable tools from tool registry entries and tool sets.
@@ -83,6 +84,8 @@ func (f *ExecutableToolFactory) CreateExecutableTool(ctx context.Context, tool *
 		return &tools.SqrtTool{}, nil
 	case "calc-power":
 		return &tools.PowerTool{}, nil
+	case "math-solve":
+		return mathtools.NewEquationSolverTool(), nil
 
 	// Math visualization tools
 	case "viz-plot":
@@ -90,25 +93,39 @@ func (f *ExecutableToolFactory) CreateExecutableTool(ctx context.Context, tool *
 	case "viz-animate":
 		return mathtools.NewAnimateTool(), nil
 
-	// Math solving tools - temporarily removed until interface is fixed
-	// case "solve-equation":
-	//	return mathtools.NewEquationSolverTool(), nil
-
 	// Statistics tools
-	case "stats-descriptive":
+	case "stats-mean":
 		return &statisticstools.MeanTool{}, nil
+	case "stats-median":
+		return &statisticstools.MedianTool{}, nil
+	case "stats-mode":
+		return &statisticstools.ModeTool{}, nil
+	case "stats-variance":
+		return &statisticstools.VarianceTool{}, nil
+	case "stats-stddev":
+		return &statisticstools.StandardDeviationTool{}, nil
+	case "stats-correlation":
+		return &statisticstools.PearsonCorrelationTool{}, nil
 	case "stats-regression":
 		return &statisticstools.LinearRegressionTool{}, nil
-	case "stats-hypothesis":
-		return &statisticstools.PearsonCorrelationTool{}, nil
-
-	// Diagramming tools
-	case "diagram-mermaid":
-		return diagrammingtools.NewMermaidDiagramTool(), nil
 
 	// Document tools
-	case "docs-create":
+	case "doc-create":
 		return &tools.CreateMarkdownTool{ArtifactStore: f.artifactStore}, nil
+	case "doc-update":
+		return &tools.UpdateMarkdownTool{ArtifactStore: f.artifactStore}, nil
+	case "doc-delete":
+		return &tools.DeleteMarkdownTool{ArtifactStore: f.artifactStore}, nil
+
+	// Memory tools
+	case "mem-remember":
+		return memorytools.NewMemoryTool(memory.NewArtifactMemoryService(f.artifactStore)), nil
+	case "mem-forget":
+		return memorytools.NewForgetMemoryTool(memory.NewArtifactMemoryService(f.artifactStore)), nil
+	case "mem-list":
+		return memorytools.NewListMemoriesTool(memory.NewArtifactMemoryService(f.artifactStore)), nil
+	case "mem-clear":
+		return memorytools.NewClearMemoriesTool(memory.NewArtifactMemoryService(f.artifactStore)), nil
 
 	// Knowledge base tools
 	case "kb-query":
