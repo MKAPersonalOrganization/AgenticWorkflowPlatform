@@ -77,7 +77,7 @@ templ MessageList() {
 	>
 		<template x-for="(message, index) in messages" :key="message.id">
 			<div
-				class="group transform-gpu"
+				class="group"
 				role="article"
 				:aria-label="`Message from ${message.role || 'system'}`"
 				x-show="!showSearch || !searchQuery || (message.content && message.content.toLowerCase().includes(searchQuery.toLowerCase())) || (message.parsedArgs && JSON.stringify(message.parsedArgs).toLowerCase().includes(searchQuery.toLowerCase()))"
