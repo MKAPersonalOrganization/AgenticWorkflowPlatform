@@ -52,40 +52,6 @@ templ ChatInput() {
 				<div class="ml-2 flex items-center gap-1">
 					<!-- Agents Selector -->
 					@agents.AgentsButtonTrigger()
-					<!-- Attachment Button -->
-					@button.Button(button.Props{
-						Type:    button.TypeButton,
-						Variant: button.VariantGhost,
-						Size:    button.SizeIcon,
-						Class:   "p-2 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-						Attributes: templ.Attributes{
-							"aria-label": i18n.T(ctx, "Attach file"),
-							"@click":     "$refs.fileInput.click()",
-						},
-					}) {
-						@icon.Paperclip(icon.Props{Class: "size-5"})
-					}
-					<input
-						type="file"
-						x-ref="fileInput"
-						class="hidden"
-						multiple
-						@change="handleFileSelect($event)"
-					/>
-					<!-- Artifacts Toggle (Wand) -->
-					@button.Button(button.Props{
-						Type:    button.TypeButton,
-						Variant: button.VariantGhost,
-						Size:    button.SizeIcon,
-						Class:   "p-2 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-						Attributes: templ.Attributes{
-							"aria-label":               i18n.T(ctx, "Artifacts mode"),
-							"data-tui-sidebar-trigger": "true",
-							"data-tui-sidebar-target":  "premium-sidepanel",
-						},
-					}) {
-						@icon.Wand(icon.Props{Class: "size-5"})
-					}
 				</div>
 				<!-- Center: Token Counter -->
 				<div class="flex-1 flex justify-center">
