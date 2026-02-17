@@ -16,7 +16,7 @@ templ Nav() {
 		Variant:     sidebar.VariantSidebar,
 		Collapsible: sidebar.CollapsibleOffcanvas,
 		Collapsed:   false,
-		Class:       "z-30 !absolute !left-0 !border-r-0",
+		Class:       "z-30 !fixed !left-12 !border-r-0",
 		Attributes: templ.Attributes{
 			"style": "--sidebar-width: 320px",
 		},
@@ -34,20 +34,6 @@ templ Nav() {
 				}) {
 					@icon.X(icon.Props{Class: "size-5 text-sidebar-foreground"})
 					<span class="sr-only">{ i18n.T(ctx, "Close Sidebar") }</span>
-				}
-				<!-- Desktop New Chat -->
-				@button.Button(button.Props{
-					Size:    button.SizeIcon,
-					Variant: button.VariantGhost,
-					Class:   "size-10 rounded-xl bg-transparent hover:bg-sidebar-accent hidden md:flex",
-					Attributes: templ.Attributes{
-						"@click": "createNewSession()",
-						"x-show": "hasMessages",
-						"x-cloak": true,
-					},
-				}) {
-					@icon.SquarePen(icon.Props{Class: "size-5 text-sidebar-foreground"})
-					<span class="sr-only">{ i18n.T(ctx, "New Chat") }</span>
 				}
 			</div>
 			<!-- Search Bar -->
