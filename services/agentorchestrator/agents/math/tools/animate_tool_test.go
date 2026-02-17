@@ -12,7 +12,8 @@ import (
 
 func TestAnimateTool_WavePropagation(t *testing.T) {
 	t.Parallel()
-	tool := NewAnimateTool()
+	mockStore := &MockArtifactStore{}
+	tool := NewAnimateTool(mockStore)
 
 	script := `set xrange [0:10]
 set yrange [-2:2]
@@ -36,7 +37,9 @@ do for [i=0:40] {
 	}
 
 	toolArgs := agent.Arguments{
-		Raw: json.RawMessage(argBytes),
+		Raw:       json.RawMessage(argBytes),
+		UserID:    "test-user",
+		SessionID: "test-session",
 	}
 
 	result, err := tool.Execute(context.Background(), toolArgs)
@@ -56,18 +59,25 @@ do for [i=0:40] {
 		t.Error("expected success to be true")
 	}
 
+	if !mockStore.SaveCalled {
+		t.Error("expected ArtifactStore.Save to be called")
+	}
+
+	if !strings.Contains(response["animation_url"].(string), "/artifacts/") {
+		t.Errorf("expected artifact URL, got: %s", response["animation_url"])
+	}
+
+	// Local file should be cleaned up
 	animationPath := response["animation_path"].(string)
-	if _, err := os.Stat(animationPath); os.IsNotExist(err) {
-		t.Errorf("expected animation file to exist at %s", animationPath)
-	} else {
-		defer func() { _ = os.Remove(animationPath) }()
-		t.Logf("Wave animation created successfully: %s", response["animation_url"])
+	if _, err := os.Stat(animationPath); !os.IsNotExist(err) {
+		t.Errorf("expected local animation file to be cleaned up from %s", animationPath)
 	}
 }
 
 func TestAnimateTool_Rotating3D(t *testing.T) {
 	t.Parallel()
-	tool := NewAnimateTool()
+	mockStore := &MockArtifactStore{}
+	tool := NewAnimateTool(mockStore)
 
 	script := `unset border
 unset tics
@@ -92,7 +102,9 @@ do for [ang=0:360:10] {
 	}
 
 	toolArgs := agent.Arguments{
-		Raw: json.RawMessage(argBytes),
+		Raw:       json.RawMessage(argBytes),
+		UserID:    "test-user",
+		SessionID: "test-session",
 	}
 
 	result, err := tool.Execute(context.Background(), toolArgs)
@@ -108,14 +120,15 @@ do for [ang=0:360:10] {
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}
 
-	animationPath := response["animation_path"].(string)
-	defer func() { _ = os.Remove(animationPath) }()
-	t.Logf("3D rotation animation created: %s", response["animation_url"])
+	if !mockStore.SaveCalled {
+		t.Error("expected ArtifactStore.Save to be called")
+	}
 }
 
 func TestAnimateTool_WebPFormat(t *testing.T) {
 	t.Parallel()
-	tool := NewAnimateTool()
+	mockStore := &MockArtifactStore{}
+	tool := NewAnimateTool(mockStore)
 
 	script := `set xrange [-10:10]
 set yrange [-5:5]
@@ -138,7 +151,9 @@ do for [i=1:30] {
 	}
 
 	toolArgs := agent.Arguments{
-		Raw: json.RawMessage(argBytes),
+		Raw:       json.RawMessage(argBytes),
+		UserID:    "test-user",
+		SessionID: "test-session",
 	}
 
 	result, err := tool.Execute(context.Background(), toolArgs)
@@ -154,17 +169,15 @@ do for [i=1:30] {
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}
 
-	animationPath := response["animation_path"].(string)
-	if !strings.HasSuffix(animationPath, ".webp") {
-		t.Errorf("expected .webp extension, got: %s", animationPath)
+	if !mockStore.SaveCalled {
+		t.Error("expected ArtifactStore.Save to be called")
 	}
-	defer func() { _ = os.Remove(animationPath) }()
-	t.Logf("WebP animation created: %s", response["animation_url"])
 }
 
 func TestAnimateTool_ValidationMissingScript(t *testing.T) {
 	t.Parallel()
-	tool := NewAnimateTool()
+	mockStore := &MockArtifactStore{}
+	tool := NewAnimateTool(mockStore)
 	args := map[string]any{
 		"format": "gif",
 		"title":  "Test",
@@ -190,7 +203,8 @@ func TestAnimateTool_ValidationMissingScript(t *testing.T) {
 
 func TestAnimateTool_ValidationInvalidFormat(t *testing.T) {
 	t.Parallel()
-	tool := NewAnimateTool()
+	mockStore := &MockArtifactStore{}
+	tool := NewAnimateTool(mockStore)
 	args := map[string]any{
 		"gnuplot_script": "plot sin(x)",
 		"format":         "mp4", // Invalid format
@@ -216,7 +230,8 @@ func TestAnimateTool_ValidationInvalidFormat(t *testing.T) {
 
 func TestAnimateTool_ValidationSetTerminal(t *testing.T) {
 	t.Parallel()
-	tool := NewAnimateTool()
+	mockStore := &MockArtifactStore{}
+	tool := NewAnimateTool(mockStore)
 	args := map[string]any{
 		"gnuplot_script": "set terminal gif\ndo for [i=1:10] { plot sin(x + i) }",
 		"format":         "gif",
@@ -242,7 +257,8 @@ func TestAnimateTool_ValidationSetTerminal(t *testing.T) {
 
 func TestAnimateTool_DefaultValues(t *testing.T) {
 	t.Parallel()
-	tool := NewAnimateTool()
+	mockStore := &MockArtifactStore{}
+	tool := NewAnimateTool(mockStore)
 
 	script := `do for [i=1:5] { plot sin(x + i) }`
 
@@ -291,7 +307,4 @@ func TestAnimateTool_DefaultValues(t *testing.T) {
 	if delayInt != 50 {
 		t.Errorf("expected default delay 50, got: %v", delayInt)
 	}
-
-	animationPath := response["animation_path"].(string)
-	defer func() { _ = os.Remove(animationPath) }()
 }
