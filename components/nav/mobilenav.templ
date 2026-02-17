@@ -24,8 +24,6 @@ templ MobileNav() {
 		<button
 			type="button"
 			@click="createNewSession()"
-			x-show="hasMessages"
-			x-cloak
 			aria-label={ i18n.T(ctx, "New chat") }
 			class="m-1 inline-flex size-10 items-center justify-center rounded-full hover:bg-accent/50 transition-colors"
 		>
