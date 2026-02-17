@@ -52,33 +52,22 @@ templ ArtifactsContent() {
 		x-data="{
 			artifacts: [],
 			loading: false,
-			activeThreadId: null,
-			async loadArtifacts() {
-				if (!this.activeThreadId) return;
+			async loadArtifacts(id) {
+				const idToLoad = id || threadId;
+				if (!idToLoad) return;
 				this.loading = true;
 				try {
-					const res = await fetch('/v1/threads/' + this.activeThreadId + '/artifacts');
+					const res = await fetch('/v1/threads/' + idToLoad + '/artifacts');
 					if (res.ok) {
 						const data = await res.json();
 						this.artifacts = data.artifacts || [];
 					}
 				} catch(e) { console.error(e); }
 				finally { this.loading = false; }
-			},
-			init() {
-				// Sync with parent threadId watcher
-				this.$watch('threadId', (val) => {
-					this.activeThreadId = val;
-					this.loadArtifacts();
-				});
-				// Initial load if threadId is already available
-				// We access the parent scope variable safely
-				if (typeof threadId !== 'undefined') {
-					this.activeThreadId = threadId;
-					this.loadArtifacts();
-				}
 			}
 		}"
+		x-effect="loadArtifacts(threadId)"
+		@artifacts-updated.window="loadArtifacts()"
 	>
 		<!-- Header / Title -->
 		<div class="flex items-center justify-between p-4 border-b border-border/40">
@@ -114,7 +103,7 @@ templ ArtifactsContent() {
 
 			<template x-for="artifact in artifacts" :key="artifact">
 				<a 
-					:href="`/v1/threads/${activeThreadId}/artifacts/${artifact}`"
+					:href="`/v1/threads/${threadId}/artifacts/${artifact}`"
 					class="flex items-center gap-3 p-3 rounded-lg border border-border/40 bg-card hover:bg-accent/50 transition-colors group"
 					download
 				>

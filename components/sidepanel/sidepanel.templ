@@ -15,7 +15,6 @@ templ SidePanel() {
 		Class:       "!absolute !right-0 !top-0 !h-full [&>div.relative]:!hidden z-30 !ltr:border-l-0 !rtl:border-r-0 ltr:border-l rtl:border-r border-border",
 		Attributes: templ.Attributes{
 			"style":            "--sidebar-width: 400px",
-			"x-data":           "{ activeView: 'artifacts' }",
 			"@open-right-sidebar.window": "$dispatch('sidebar:open', { id: 'premium-sidepanel' })",
 		},
 	}) {

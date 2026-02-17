@@ -28,7 +28,11 @@ func TestMeanTool(t *testing.T) {
 	if len(result.Content) == 0 {
 		t.Fatal("expected content in result")
 	}
-	resMap := result.Content[0].(map[string]any)
+	
+	var resMap map[string]any
+	if err := json.Unmarshal([]byte(result.Content[0].(string)), &resMap); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
 
 	if resMap["result"] != 3.0 {
 		t.Errorf("Expected 3.0, got %v", resMap["result"])
@@ -54,7 +58,11 @@ func TestMedianTool(t *testing.T) {
 	if len(result.Content) == 0 {
 		t.Fatal("expected content in result")
 	}
-	resMap := result.Content[0].(map[string]any)
+	
+	var resMap map[string]any
+	if err := json.Unmarshal([]byte(result.Content[0].(string)), &resMap); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
 
 	if resMap["result"] != 3.0 {
 		t.Errorf("Expected 3.0, got %v", resMap["result"])
@@ -81,7 +89,11 @@ func TestPearsonCorrelationTool(t *testing.T) {
 	if len(result.Content) == 0 {
 		t.Fatal("expected content in result")
 	}
-	resMap := result.Content[0].(map[string]any)
+	
+	var resMap map[string]any
+	if err := json.Unmarshal([]byte(result.Content[0].(string)), &resMap); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
 
 	corr := resMap["result"].(float64)
 	if math.Abs(corr-1.0) > 1e-9 {
@@ -110,7 +122,11 @@ func TestNormalPdfTool(t *testing.T) {
 	if len(result.Content) == 0 {
 		t.Fatal("expected content in result")
 	}
-	resMap := result.Content[0].(map[string]any)
+	
+	var resMap map[string]any
+	if err := json.Unmarshal([]byte(result.Content[0].(string)), &resMap); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
 
 	pdf := resMap["result"].(float64)
 	expected := 0.3989422804014327
@@ -139,7 +155,11 @@ func TestLinearRegressionTool(t *testing.T) {
 	if len(result.Content) == 0 {
 		t.Fatal("expected content in result")
 	}
-	resMap := result.Content[0].(map[string]any)
+	
+	var resMap map[string]any
+	if err := json.Unmarshal([]byte(result.Content[0].(string)), &resMap); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
 
 	regRaw := resMap["regression"].([]any)
 	if len(regRaw) != 3 {
@@ -167,7 +187,11 @@ func TestSampleTool(t *testing.T) {
 	if len(result.Content) == 0 {
 		t.Fatal("expected content in result")
 	}
-	resMap := result.Content[0].(map[string]any)
+	
+	var resMap map[string]any
+	if err := json.Unmarshal([]byte(result.Content[0].(string)), &resMap); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
 
 	sampleRaw := resMap["result"].([]any)
 	if len(sampleRaw) != 3 {

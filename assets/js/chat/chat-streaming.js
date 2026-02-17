@@ -413,6 +413,9 @@ export function createStreamingMethods() {
 
             this.transitionToolState(toolCallId, TOOL_EVENTS.SUCCESS, { toolName, result });
             this.__updateDerivedState();
+
+            // Notify artifacts panel to refresh
+            window.dispatchEvent(new CustomEvent('artifacts-updated'));
         },
 
         __handleToolError(value, state) {

@@ -287,33 +287,6 @@ func (r *Registry) initializeDefaultTools(ctx context.Context) error {
 			UpdatedAt:   now,
 		},
 		{
-			ID:          "diagramming-set",
-			Name:        "Diagramming",
-			Description: "Tools for creating diagrams and visual representations",
-			Category:    "Visualization",
-			ToolIDs:     []string{"diagram-mermaid"},
-			CreatedAt:   now,
-			UpdatedAt:   now,
-		},
-		{
-			ID:          "physics-set",
-			Name:        "Physics Tools",
-			Description: "Physics problem solving tools",
-			Category:    "Science",
-			ToolIDs:     []string{"physics-kinematics", "physics-dynamics"},
-			CreatedAt:   now,
-			UpdatedAt:   now,
-		},
-		{
-			ID:          "chemistry-set",
-			Name:        "Chemistry Tools",
-			Description: "Chemistry problem solving tools",
-			Category:    "Science",
-			ToolIDs:     []string{"chem-balance", "chem-molarity"},
-			CreatedAt:   now,
-			UpdatedAt:   now,
-		},
-		{
 			ID:          "knowledge-base-set",
 			Name:        "Knowledge Base",
 			Description: "Tools for querying attached knowledge base workspaces",
@@ -333,6 +306,7 @@ func (r *Registry) initializeDefaultTools(ctx context.Context) error {
 		{ID: "calc-divide", Name: "Divide", Description: "Divide one number by another", Category: "Calculator", ToolSetID: "calculator-set"},
 		{ID: "calc-power", Name: "Power", Description: "Raise a number to a power", Category: "Calculator", ToolSetID: "calculator-set"},
 		{ID: "calc-sqrt", Name: "Square Root", Description: "Calculate the square root of a number", Category: "Calculator", ToolSetID: "calculator-set"},
+		{ID: "math-solve", Name: "Solve Equation", Description: "Solve algebraic equations", Category: "Math", ToolSetID: "calculator-set"},
 
 		// Visualization tools
 		{ID: "viz-plot", Name: "Plot", Description: "Generate a chart or plot from data", Category: "Visualization", ToolSetID: "visualization-set"},
@@ -358,16 +332,6 @@ func (r *Registry) initializeDefaultTools(ctx context.Context) error {
 		{ID: "stats-correlation", Name: "Correlation", Description: "Calculate correlation between two variables", Category: "Statistics", ToolSetID: "statistics-set"},
 		{ID: "stats-regression", Name: "Linear Regression", Description: "Perform linear regression analysis", Category: "Statistics", ToolSetID: "statistics-set"},
 
-		// Diagramming tools
-		{ID: "diagram-mermaid", Name: "Mermaid Diagram", Description: "Create diagrams using Mermaid syntax", Category: "Diagramming", ToolSetID: "diagramming-set"},
-
-		// Physics tools
-		{ID: "physics-kinematics", Name: "Kinematics", Description: "Solve kinematics problems", Category: "Physics", ToolSetID: "physics-set"},
-		{ID: "physics-dynamics", Name: "Dynamics", Description: "Solve dynamics problems", Category: "Physics", ToolSetID: "physics-set"},
-
-		// Chemistry tools
-		{ID: "chem-balance", Name: "Chemical Balance", Description: "Balance chemical equations", Category: "Chemistry", ToolSetID: "chemistry-set"},
-		{ID: "chem-molarity", Name: "Molarity", Description: "Calculate molarity and concentration", Category: "Chemistry", ToolSetID: "chemistry-set"},
 
 		// Knowledge base tools
 		{ID: "kb-query", Name: "Query Knowledge Base", Description: "Search and retrieve information from attached knowledge base workspaces", Category: "Knowledge", ToolSetID: "knowledge-base-set"},

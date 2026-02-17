@@ -400,22 +400,9 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 		config.AgentMiddleware = append(config.AgentMiddleware, elicitMw.Middleware())
 	}
 
-	// Inject Memory Tool and Context if available and enabled
+	// Inject Memory Context if available and enabled (Tools are now handled via factory/registry)
 	if p.artifactStore != nil && p.enableMemory {
 		memoryService := memory.NewArtifactMemoryService(p.artifactStore)
-
-		memoryTool := memorytools.NewMemoryTool(memoryService)
-		config.Tools = append(config.Tools, memoryTool)
-
-		forgetTool := memorytools.NewForgetMemoryTool(memoryService)
-		config.Tools = append(config.Tools, forgetTool)
-
-		listTool := memorytools.NewListMemoriesTool(memoryService)
-		config.Tools = append(config.Tools, listTool)
-
-		clearTool := memorytools.NewClearMemoriesTool(memoryService)
-		config.Tools = append(config.Tools, clearTool)
-
 		memoryMiddleware := memorytools.NewMemoryInjectorMiddleware(memoryService)
 		config.AgentMiddleware = append(config.AgentMiddleware, AdaptRequestMiddlewareToUnified(memoryMiddleware))
 	}

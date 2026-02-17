@@ -97,12 +97,9 @@ func TestDefaultToolSets(t *testing.T) {
 		agentID  string
 		expected []string
 	}{
-		{"math-instructor", []string{"calculator-set", "visualization-set", "memory-set"}},
-		{"physics-instructor", []string{"calculator-set", "physics-set", "visualization-set", "memory-set"}},
-		{"chemistry-instructor", []string{"calculator-set", "chemistry-set", "memory-set"}},
-		{"statistics-instructor", []string{"calculator-set", "statistics-set", "visualization-set", "memory-set"}},
-		{"diagramming-instructor", []string{"diagramming-set", "memory-set"}},
-		{"unknown-agent", []string{"calculator-set", "memory-set"}}, // fallback
+		{"math-instructor", []string{"calculator-set", "visualization-set", "memory-set", "document-set", "knowledge-base-set"}},
+		{"statistics-instructor", []string{"calculator-set", "statistics-set", "visualization-set", "memory-set", "document-set", "knowledge-base-set"}},
+		{"unknown-agent", []string{"calculator-set", "memory-set", "document-set", "knowledge-base-set"}}, // fallback
 	}
 
 	for _, tc := range testCases {

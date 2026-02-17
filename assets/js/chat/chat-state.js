@@ -158,7 +158,10 @@ export function createInitialState() {
         textToSpeechEnabled: false,
 
         // Message queue for offline handling
-        __messageQueue: []
+        __messageQueue: [],
+
+        // Sidepanel view state
+        activeView: 'artifacts'
     };
 }
 

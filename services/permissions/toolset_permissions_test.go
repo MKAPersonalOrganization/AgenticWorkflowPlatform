@@ -27,7 +27,7 @@ func TestToolSetPermissions(t *testing.T) {
 	}
 
 	// Test: Get default tool sets for different agents
-	agentTypes := []string{"math-instructor", "physics-instructor", "chemistry-instructor", "statistics-instructor", "diagramming-instructor"}
+	agentTypes := []string{"math-instructor", "statistics-instructor"}
 
 	for _, agentType := range agentTypes {
 		t.Logf("Testing default tool sets for %s", agentType)
