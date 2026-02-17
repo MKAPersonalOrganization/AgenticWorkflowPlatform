@@ -53,20 +53,31 @@ templ ArtifactsContent() {
 			artifacts: [],
 			loading: false,
 			async loadArtifacts(id) {
-				const idToLoad = id || threadId;
-				if (!idToLoad) return;
+				const idToLoad = id || (this.$data && this.$data.threadId) || threadId;
+				console.log('[Artifacts] Loading for thread:', idToLoad);
+				if (!idToLoad) {
+					this.artifacts = [];
+					return;
+				}
+				if (this.loading) return;
 				this.loading = true;
 				try {
 					const res = await fetch('/v1/threads/' + idToLoad + '/artifacts');
 					if (res.ok) {
 						const data = await res.json();
 						this.artifacts = data.artifacts || [];
+						console.log('[Artifacts] Loaded:', this.artifacts.length, 'items');
+					} else {
+						console.error('[Artifacts] Failed to fetch:', res.status);
 					}
-				} catch(e) { console.error(e); }
-				finally { this.loading = false; }
+				} catch(e) { 
+					console.error('[Artifacts] Error:', e); 
+				} finally { 
+					this.loading = false; 
+				}
 			}
 		}"
-		x-effect="loadArtifacts(threadId)"
+		x-init="loadArtifacts(threadId); $watch('threadId', val => loadArtifacts(val))"
 		@artifacts-updated.window="loadArtifacts()"
 	>
 		<!-- Header / Title -->

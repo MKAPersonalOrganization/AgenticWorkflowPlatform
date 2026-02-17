@@ -89,9 +89,9 @@ func (f *ExecutableToolFactory) CreateExecutableTool(ctx context.Context, tool *
 
 	// Math visualization tools
 	case "viz-plot":
-		return mathtools.NewPlotTool(), nil
+		return mathtools.NewPlotTool(f.artifactStore), nil
 	case "viz-animate":
-		return mathtools.NewAnimateTool(), nil
+		return mathtools.NewAnimateTool(f.artifactStore), nil
 
 	// Statistics tools
 	case "stats-mean":

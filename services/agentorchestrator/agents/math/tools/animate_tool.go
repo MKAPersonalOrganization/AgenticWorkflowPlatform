@@ -14,6 +14,7 @@ import (
 
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/i18n"
+	"school-with-ai/services/artifact"
 )
 
 var (
@@ -35,11 +36,15 @@ type AnimateArgs struct {
 }
 
 // AnimateTool implements the Tool interface for generating animations with gnuplot.
-type AnimateTool struct{}
+type AnimateTool struct {
+	ArtifactStore artifact.Service
+}
 
 // NewAnimateTool creates a new animate tool.
-func NewAnimateTool() *AnimateTool {
-	return &AnimateTool{}
+func NewAnimateTool(store artifact.Service) *AnimateTool {
+	return &AnimateTool{
+		ArtifactStore: store,
+	}
 }
 
 func (a *AnimateTool) Name() string {
@@ -175,16 +180,43 @@ func (a *AnimateTool) Execute(ctx context.Context, args agent.Arguments) (agent.
 	if err != nil {
 		return agent.ErrorResult(fmt.Errorf("failed to generate animation: %w", err)), nil
 	}
+	defer func() { _ = os.Remove(animationPath) }() // Clean up local file after uploading
+
+	// Save to ArtifactStore
+	if args.UserID == "" || args.SessionID == "" {
+		return agent.JSONResult(map[string]any{
+			"success":        true,
+			"animation_path": animationPath,
+			"animation_url":  "/assets/charts/" + filepath.Base(animationPath),
+			"format":         params.Format,
+			"delay":          params.Delay,
+			"message":        "Animation generated successfully (but not saved to artifact store due to missing context)",
+			"title":          params.Title,
+		}), nil
+	}
+
+	file, err := os.Open(animationPath)
+	if err != nil {
+		return agent.ErrorResult(fmt.Errorf("failed to open generated animation: %w", err)), nil
+	}
+	defer file.Close()
+
+	filename := filepath.Base(animationPath)
+	_, err = a.ArtifactStore.Save(ctx, args.UserID, args.SessionID, filename, file)
+	if err != nil {
+		return agent.ErrorResult(fmt.Errorf("failed to save animation to artifact store: %w", err)), nil
+	}
 
 	// Return result as map
 	result := map[string]any{
 		"success":        true,
 		"animation_path": animationPath,
-		"animation_url":  "/assets/charts/" + filepath.Base(animationPath),
+		"animation_url":  "/v1/threads/" + args.SessionID + "/artifacts/" + filename,
 		"format":         params.Format,
 		"delay":          params.Delay,
-		"message":        "Animation generated successfully",
+		"message":        "Animation generated successfully and saved as artifact",
 		"title":          params.Title,
+		"filename":       filename,
 	}
 
 	return agent.JSONResult(result), nil

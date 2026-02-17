@@ -12,6 +12,7 @@ import (
 
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/i18n"
+	"school-with-ai/services/artifact"
 )
 
 var (
@@ -30,11 +31,15 @@ type PlotArgs struct {
 }
 
 // PlotTool implements the Tool interface for generating plots with gnuplot.
-type PlotTool struct{}
+type PlotTool struct {
+	ArtifactStore artifact.Service
+}
 
 // NewPlotTool creates a new plot tool.
-func NewPlotTool() *PlotTool {
-	return &PlotTool{}
+func NewPlotTool(store artifact.Service) *PlotTool {
+	return &PlotTool{
+		ArtifactStore: store,
+	}
 }
 
 func (p *PlotTool) Name() string {
@@ -152,14 +157,42 @@ func (p *PlotTool) Execute(ctx context.Context, args agent.Arguments) (agent.Res
 	if err != nil {
 		return agent.ErrorResult(fmt.Errorf("failed to generate plot: %w", err)), nil
 	}
+	defer func() { _ = os.Remove(imagePath) }() // Clean up local file after uploading
+
+	// Save to ArtifactStore
+	// DEBUG: Print context
+	fmt.Printf("[PlotTool] Context - UserID: %s, SessionID: %s\n", args.UserID, args.SessionID)
+
+	if args.UserID == "" || args.SessionID == "" {
+		return agent.JSONResult(map[string]any{
+			"success":    true,
+			"image_path": imagePath,
+			"image_url":  "/assets/charts/" + filepath.Base(imagePath),
+			"message":    "Plot generated successfully (but not saved to artifact store due to missing context)",
+			"title":      params.Title,
+		}), nil
+	}
+
+	file, err := os.Open(imagePath)
+	if err != nil {
+		return agent.ErrorResult(fmt.Errorf("failed to open generated plot: %w", err)), nil
+	}
+	defer file.Close()
+
+	filename := filepath.Base(imagePath)
+	_, err = p.ArtifactStore.Save(ctx, args.UserID, args.SessionID, filename, file)
+	if err != nil {
+		return agent.ErrorResult(fmt.Errorf("failed to save plot to artifact store: %w", err)), nil
+	}
 
 	// Return result as map
 	result := map[string]any{
 		"success":    true,
 		"image_path": imagePath,
-		"image_url":  "/assets/charts/" + filepath.Base(imagePath),
-		"message":    "Plot generated successfully",
+		"image_url":  "/v1/threads/" + args.SessionID + "/artifacts/" + filename,
+		"message":    "Plot generated successfully and saved as artifact",
 		"title":      params.Title,
+		"filename":   filename,
 	}
 
 	return agent.JSONResult(result), nil

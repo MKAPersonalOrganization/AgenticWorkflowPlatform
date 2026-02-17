@@ -12,7 +12,8 @@ import (
 
 func TestPlotTool_SimpleFunctionPlot(t *testing.T) {
 	t.Parallel()
-	tool := NewPlotTool()
+	mockStore := &MockArtifactStore{}
+	tool := NewPlotTool(mockStore)
 
 	script := `set title 'Sine Wave'
 set xlabel 'x'
@@ -32,7 +33,9 @@ plot sin(x) with lines linewidth 2 title 'y = sin(x)'`
 	}
 
 	toolArgs := agent.Arguments{
-		Raw: json.RawMessage(argBytes),
+		Raw:       json.RawMessage(argBytes),
+		UserID:    "test-user",
+		SessionID: "test-session",
 	}
 
 	result, err := tool.Execute(context.Background(), toolArgs)
@@ -52,18 +55,25 @@ plot sin(x) with lines linewidth 2 title 'y = sin(x)'`
 		t.Error("expected success to be true")
 	}
 
+	if !mockStore.SaveCalled {
+		t.Error("expected ArtifactStore.Save to be called")
+	}
+
+	if !strings.Contains(response["image_url"].(string), "/artifacts/") {
+		t.Errorf("expected artifact URL, got: %s", response["image_url"])
+	}
+
+	// Local file should be cleaned up
 	imagePath := response["image_path"].(string)
-	if _, err := os.Stat(imagePath); os.IsNotExist(err) {
-		t.Errorf("expected image file to exist at %s", imagePath)
-	} else {
-		defer func() { _ = os.Remove(imagePath) }()
-		t.Logf("Sine plot created successfully: %s", response["image_url"])
+	if _, err := os.Stat(imagePath); !os.IsNotExist(err) {
+		t.Errorf("expected local image file to be cleaned up from %s", imagePath)
 	}
 }
 
 func TestPlotTool_MultipleFunctions(t *testing.T) {
 	t.Parallel()
-	tool := NewPlotTool()
+	mockStore := &MockArtifactStore{}
+	tool := NewPlotTool(mockStore)
 
 	script := `set title 'Trigonometric Functions'
 set grid
@@ -81,7 +91,9 @@ plot sin(x) title 'sin(x)', cos(x) title 'cos(x)', tan(x) title 'tan(x)'`
 	}
 
 	toolArgs := agent.Arguments{
-		Raw: json.RawMessage(argBytes),
+		Raw:       json.RawMessage(argBytes),
+		UserID:    "test-user",
+		SessionID: "test-session",
 	}
 
 	result, err := tool.Execute(context.Background(), toolArgs)
@@ -97,18 +109,15 @@ plot sin(x) title 'sin(x)', cos(x) title 'cos(x)', tan(x) title 'tan(x)'`
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}
 
-	imagePath := response["image_path"].(string)
-	if _, err := os.Stat(imagePath); os.IsNotExist(err) {
-		t.Errorf("expected image file to exist at %s", imagePath)
-	} else {
-		defer func() { _ = os.Remove(imagePath) }()
-		t.Logf("Multiple functions plot created: %s", response["image_url"])
+	if !mockStore.SaveCalled {
+		t.Error("expected ArtifactStore.Save to be called")
 	}
 }
 
 func TestPlotTool_QuadraticWithRoots(t *testing.T) {
 	t.Parallel()
-	tool := NewPlotTool()
+	mockStore := &MockArtifactStore{}
+	tool := NewPlotTool(mockStore)
 
 	script := `set title 'Quadratic Function with Roots'
 set grid
@@ -127,7 +136,9 @@ plot x**2 - 4*x + 3 with lines title 'y = x² - 4x + 3', 0 with lines dashtype 2
 	}
 
 	toolArgs := agent.Arguments{
-		Raw: json.RawMessage(argBytes),
+		Raw:       json.RawMessage(argBytes),
+		UserID:    "test-user",
+		SessionID: "test-session",
 	}
 
 	result, err := tool.Execute(context.Background(), toolArgs)
@@ -143,14 +154,15 @@ plot x**2 - 4*x + 3 with lines title 'y = x² - 4x + 3', 0 with lines dashtype 2
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}
 
-	imagePath := response["image_path"].(string)
-	defer func() { _ = os.Remove(imagePath) }()
-	t.Logf("Quadratic plot created: %s", response["image_url"])
+	if !mockStore.SaveCalled {
+		t.Error("expected ArtifactStore.Save to be called")
+	}
 }
 
 func TestPlotTool_InlineDataPlot(t *testing.T) {
 	t.Parallel()
-	tool := NewPlotTool()
+	mockStore := &MockArtifactStore{}
+	tool := NewPlotTool(mockStore)
 
 	script := `set title 'Scatter Plot with Data'
 set grid
@@ -173,7 +185,9 @@ e`
 	}
 
 	toolArgs := agent.Arguments{
-		Raw: json.RawMessage(argBytes),
+		Raw:       json.RawMessage(argBytes),
+		UserID:    "test-user",
+		SessionID: "test-session",
 	}
 
 	result, err := tool.Execute(context.Background(), toolArgs)
@@ -189,14 +203,15 @@ e`
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}
 
-	imagePath := response["image_path"].(string)
-	defer func() { _ = os.Remove(imagePath) }()
-	t.Logf("Scatter plot created: %s", response["image_url"])
+	if !mockStore.SaveCalled {
+		t.Error("expected ArtifactStore.Save to be called")
+	}
 }
 
 func TestPlotTool_3DSurface(t *testing.T) {
 	t.Parallel()
-	tool := NewPlotTool()
+	mockStore := &MockArtifactStore{}
+	tool := NewPlotTool(mockStore)
 
 	script := `set title '3D Surface Plot'
 set grid
@@ -213,7 +228,9 @@ splot x**2 + y**2 with lines`
 	}
 
 	toolArgs := agent.Arguments{
-		Raw: json.RawMessage(argBytes),
+		Raw:       json.RawMessage(argBytes),
+		UserID:    "test-user",
+		SessionID: "test-session",
 	}
 
 	result, err := tool.Execute(context.Background(), toolArgs)
@@ -229,19 +246,15 @@ splot x**2 + y**2 with lines`
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}
 
-	imagePath := response["image_path"].(string)
-	defer func() {
-		err := os.Remove(imagePath)
-		if err != nil {
-			t.Logf("Failed to remove test image: %v", err)
-		}
-	}()
-	t.Logf("3D surface plot created: %s", response["image_url"])
+	if !mockStore.SaveCalled {
+		t.Error("expected ArtifactStore.Save to be called")
+	}
 }
 
 func TestPlotTool_ValidationMissingScript(t *testing.T) {
 	t.Parallel()
-	tool := NewPlotTool()
+	mockStore := &MockArtifactStore{}
+	tool := NewPlotTool(mockStore)
 	args := map[string]any{
 		// Missing gnuplot_script
 		"title": "Test",
@@ -267,7 +280,8 @@ func TestPlotTool_ValidationMissingScript(t *testing.T) {
 
 func TestPlotTool_ValidationSetTerminal(t *testing.T) {
 	t.Parallel()
-	tool := NewPlotTool()
+	mockStore := &MockArtifactStore{}
+	tool := NewPlotTool(mockStore)
 	args := map[string]any{
 		"gnuplot_script": "set terminal png\nplot sin(x)",
 		"title":          "Test",
@@ -293,7 +307,8 @@ func TestPlotTool_ValidationSetTerminal(t *testing.T) {
 
 func TestPlotTool_ValidationSetOutput(t *testing.T) {
 	t.Parallel()
-	tool := NewPlotTool()
+	mockStore := &MockArtifactStore{}
+	tool := NewPlotTool(mockStore)
 	args := map[string]any{
 		"gnuplot_script": "set output 'test.png'\nplot sin(x)",
 		"title":          "Test",
@@ -319,7 +334,8 @@ func TestPlotTool_ValidationSetOutput(t *testing.T) {
 
 func TestPlotTool_ValidationTitleTooLong(t *testing.T) {
 	t.Parallel()
-	tool := NewPlotTool()
+	mockStore := &MockArtifactStore{}
+	tool := NewPlotTool(mockStore)
 	longTitle := strings.Repeat("a", 101) // 101 characters (exceeds 100 limit)
 	args := map[string]any{
 		"gnuplot_script": "plot sin(x)",
@@ -344,31 +360,31 @@ func TestPlotTool_ValidationTitleTooLong(t *testing.T) {
 	}
 }
 
-
 func TestPlotTool_ParametersSchema(t *testing.T) {
-t.Parallel()
-tool := NewPlotTool()
-schema := tool.Schema()
+	t.Parallel()
+	mockStore := &MockArtifactStore{}
+	tool := NewPlotTool(mockStore)
+	schema := tool.Schema()
 
-// Verify schema structure
-if schema.Type != "object" {
-t.Error("expected type to be 'object'")
-}
+	// Verify schema structure
+	if schema.Type != "object" {
+		t.Error("expected type to be 'object'")
+	}
 
-if schema.Properties == nil {
-t.Fatal("expected properties to be defined")
-}
+	if schema.Properties == nil {
+		t.Fatal("expected properties to be defined")
+	}
 
-// Check gnuplot_script property exists
-if _, ok := schema.Properties["gnuplot_script"]; !ok {
-t.Error("expected gnuplot_script property")
-}
+	// Check gnuplot_script property exists
+	if _, ok := schema.Properties["gnuplot_script"]; !ok {
+		t.Error("expected gnuplot_script property")
+	}
 
-// Check required fields
-if len(schema.Required) != 2 {
-t.Errorf("expected required to contain 2 fields, got: %v", schema.Required)
-}
-if schema.Required[0] != "gnuplot_script" || schema.Required[1] != "title" {
-t.Errorf("expected required to contain 'gnuplot_script' and 'title', got: %v", schema.Required)
-}
+	// Check required fields
+	if len(schema.Required) != 2 {
+		t.Errorf("expected required to contain 2 fields, got: %v", schema.Required)
+	}
+	if schema.Required[0] != "gnuplot_script" || schema.Required[1] != "title" {
+		t.Errorf("expected required to contain 'gnuplot_script' and 'title', got: %v", schema.Required)
+	}
 }

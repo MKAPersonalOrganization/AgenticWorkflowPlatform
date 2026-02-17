@@ -117,6 +117,10 @@ func (e *RegistryToolExecutor) Execute(toolCall ToolCall) (ToolExecResult, error
 	args.SessionID = e.threadID
 	args.UserID = e.userID
 
+	// DEBUG: Print context in Executor
+	fmt.Printf("[RegistryToolExecutor] Executing %s - UserID: %s, SessionID: %s\n", toolCall.Name, args.UserID, args.SessionID)
+
+
 	// Populate legacy fields if requestCtx is available
 	if e.requestCtx != nil {
 		args.Metadata = e.requestCtx.State

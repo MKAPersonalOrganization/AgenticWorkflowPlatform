@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"iter"
+	"os"
 	"time"
+
 
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/core"
@@ -230,6 +232,12 @@ func (s *executionState) prepareExecutor() {
 		s.messageID,
 		nil, // No RequestContext yet - will be set during LLM call
 	)
+	f, _ := os.OpenFile("/tmp/debug_log.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if f != nil {
+		fmt.Fprintf(f, "[Engine] prepareExecutor - UserID: %s, ThreadID: %s\n", s.userID, s.threadID)
+		f.Close()
+	}
+
 }
 
 var errStopIteration = fmt.Errorf("stop iteration")
