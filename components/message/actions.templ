@@ -103,44 +103,6 @@ templ Actions(props ActionProps) {
 			}
 		}
 		if props.Role == "assistant" {
-			<!-- Bookmark Button -->
-			@tooltip.Tooltip() {
-				@tooltip.Trigger(tooltip.TriggerProps{}) {
-					@button.Button(button.Props{
-						Size:    button.SizeIcon,
-						Variant: button.VariantGhost,
-						Class:   "hover-button rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none transition-all",
-						Attributes: templ.Attributes{
-							"aria-label": i18n.T(ctx, "Bookmark"),
-							"@click":     "$dispatch('toggle-bookmark', { id: " + props.MessageID + " })",
-						},
-					}) {
-						@icon.Bookmark(icon.Props{Class: "size-[18px]"})
-					}
-				}
-				@tooltip.Content(tooltip.ContentProps{Class: "text-xs"}) {
-					{ i18n.T(ctx, "Bookmark") }
-				}
-			}
-			<!-- Regenerate Button -->
-			@tooltip.Tooltip() {
-				@tooltip.Trigger(tooltip.TriggerProps{}) {
-					@button.Button(button.Props{
-						Size:    button.SizeIcon,
-						Variant: button.VariantGhost,
-						Class:   "hover-button rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none transition-all",
-						Attributes: templ.Attributes{
-							"@click":     "regenerateResponse(" + props.MessageID + ")",
-							"aria-label": i18n.T(ctx, "Regenerate"),
-						},
-					}) {
-						@icon.RotateCw(icon.Props{Class: "size-[18px]"})
-					}
-				}
-				@tooltip.Content(tooltip.ContentProps{Class: "text-xs"}) {
-					{ i18n.T(ctx, "Regenerate") }
-				}
-			}
 		}
 	</div>
 }
