@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+
+
 	"school-with-ai/foundation/agent"
 )
 
@@ -116,9 +118,6 @@ func (e *RegistryToolExecutor) Execute(toolCall ToolCall) (ToolExecResult, error
 	// Populate standard fields
 	args.SessionID = e.threadID
 	args.UserID = e.userID
-
-	// DEBUG: Print context in Executor
-	fmt.Printf("[RegistryToolExecutor] Executing %s - UserID: %s, SessionID: %s\n", toolCall.Name, args.UserID, args.SessionID)
 
 
 	// Populate legacy fields if requestCtx is available

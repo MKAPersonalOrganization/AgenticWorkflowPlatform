@@ -160,8 +160,6 @@ func (p *PlotTool) Execute(ctx context.Context, args agent.Arguments) (agent.Res
 	defer func() { _ = os.Remove(imagePath) }() // Clean up local file after uploading
 
 	// Save to ArtifactStore
-	// DEBUG: Print context
-	fmt.Printf("[PlotTool] Context - UserID: %s, SessionID: %s\n", args.UserID, args.SessionID)
 
 	if args.UserID == "" || args.SessionID == "" {
 		return agent.JSONResult(map[string]any{

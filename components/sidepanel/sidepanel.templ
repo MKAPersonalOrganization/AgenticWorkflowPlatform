@@ -2,6 +2,8 @@ package sidepanel
 
 import (
 	"school-with-ai/components/artifacts"
+	"school-with-ai/components/button"
+	"school-with-ai/components/icon"
 	"school-with-ai/components/sidebar"
 )
 
@@ -19,16 +21,32 @@ templ SidePanel() {
 		},
 	}) {
 		@sidebar.Content(sidebar.ContentProps{Class: "flex-1 overflow-hidden bg-background"}) {
-			<div class="h-full overflow-y-auto custom-scrollbar" x-show="activeView === 'artifacts'">
+			<div class="flex items-center justify-between p-4 border-b" x-show="activeView">
+				<h3 class="font-semibold" x-text="activeView ? activeView.charAt(0).toUpperCase() + activeView.slice(1) : ''"></h3>
+				@button.Button(button.Props{
+					Size:    button.SizeIcon,
+					Variant: button.VariantGhost,
+					Class:   "size-8",
+					Attributes: templ.Attributes{
+						"@click":                   "activeView = ''",
+						"data-tui-sidebar-trigger": "true",
+						"data-tui-sidebar-target":  "premium-sidepanel",
+					},
+				}) {
+					@icon.X(icon.Props{Class: "size-4"})
+					<span class="sr-only">Close</span>
+				}
+			</div>
+			<div class="flex-1 overflow-y-auto custom-scrollbar" x-show="activeView === 'artifacts'">
 				@artifacts.ArtifactsContent()
 			</div>
-			<div class="h-full overflow-y-auto custom-scrollbar" x-show="activeView === 'bookmarks'">
+			<div class="flex-1 overflow-y-auto custom-scrollbar" x-show="activeView === 'bookmarks'">
 				@Bookmarks()
 			</div>
-			<div class="h-full overflow-y-auto custom-scrollbar" x-show="activeView === 'files'">
+			<div class="flex-1 overflow-y-auto custom-scrollbar" x-show="activeView === 'files'">
 				@Files()
 			</div>
-			<div class="h-full overflow-y-auto custom-scrollbar" x-show="activeView === 'prompts'">
+			<div class="flex-1 overflow-y-auto custom-scrollbar" x-show="activeView === 'prompts'">
 				@Prompts()
 			</div>
 		}
