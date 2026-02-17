@@ -55,6 +55,8 @@ templ Nav() {
 					Class:   "size-10 rounded-xl bg-transparent hover:bg-sidebar-accent hidden md:flex",
 					Attributes: templ.Attributes{
 						"@click": "createNewSession()",
+						"x-show": "hasMessages",
+						"x-cloak": true,
 					},
 				}) {
 					@icon.SquarePen(icon.Props{Class: "size-5 text-sidebar-foreground"})
