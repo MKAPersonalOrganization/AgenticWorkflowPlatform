@@ -26,11 +26,11 @@ tasks:
           
         # Copy to temp dir to control output location and avoid path joining issues
         cp "$FILE" ".conversion_tmp/$NAME.epub"
-        
+
         # Run conversion in temp dir
         # Output will be a directory at .conversion_tmp/NAME/ because we are not merging
         epub2md ".conversion_tmp/$NAME.epub"
-        
+
         # Move to final destination
         if [ -d ".conversion_tmp/$NAME" ]; then
           # Remove existing directory if it exists to ensure clean state
@@ -47,7 +47,7 @@ tasks:
           ls -R .conversion_tmp
           exit 1
         fi
-        
+
         # Cleanup
         rm -rf .conversion_tmp
 
@@ -100,7 +100,7 @@ tasks:
   run: "wgo -file=.go -file=.templ -xfile=_templ.go  go tool templ generate :: go run main.go"
 
   up:
-    desc: Start all docker compose services (Redis, Asynqmon, Kratos, Postgres, MailSlurper, KurrentDB, Typesense, Langfuse, App-Postgres)
+    desc: Start all docker compose services (Redis, Asynqmon, Kratos, Postgres, MailSlurper, Typesense, Langfuse, App-Postgres)
     cmds:
       - docker compose up -d
 

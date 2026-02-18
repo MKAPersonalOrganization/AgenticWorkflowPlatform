@@ -414,13 +414,13 @@ func (h *TaskManagementHandler) UpdateThreadTitle(w http.ResponseWriter, r *http
 		return
 	}
 
-	// Dispatch the event manually if the broadcaster isn't already handling it via ESDB subscription
+	// Dispatch the event manually if the broadcaster isn't already handling it via the projection updater.
 	// In this architecture, durable events are usually broadcasted by the projection updater,
 	// but for immediate UI feedback on application-level events, we might want to dispatch here too.
 	// However, looking at ProcessEvents in agentorchestrator/service.go, it seems durable events
 	// are NOT broadcasted by the emitter if they are durable, to avoid double-broadcasting.
 	// But ThreadTitleUpdated is an application event, not an agent event.
-	// The ProjectionUpdater will eventually broadcast it once it's in ESDB.
+	// The ProjectionUpdater will eventually broadcast it once it's in Postgres.
 
 	_ = event // Event can be used for logging or specific logic
 

@@ -51,7 +51,7 @@ func (h *HealthHandler) Readiness(w http.ResponseWriter, r *http.Request) {
 	// For now, we'll just return ready status
 	// In a production system, you would check:
 	// - Database connectivity
-	// - KurrentDB connectivity
+	// - Database connectivity
 	// - Redis connectivity
 	// - Any other critical dependencies
 	response := map[string]any{

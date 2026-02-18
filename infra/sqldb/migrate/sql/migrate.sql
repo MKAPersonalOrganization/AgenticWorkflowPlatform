@@ -155,3 +155,37 @@ CREATE TABLE IF NOT EXISTS resources (
 );
 CREATE INDEX IF NOT EXISTS idx_resources_user ON resources(user_id);
 CREATE INDEX IF NOT EXISTS idx_resources_source ON resources(source);
+
+-- Version: 1.14
+-- Description: Create event store tables (replacing KurrentDB)
+CREATE TABLE IF NOT EXISTS event_streams (
+    stream_id VARCHAR(512) PRIMARY KEY,
+    stream_version BIGINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS events (
+    global_position BIGSERIAL PRIMARY KEY,
+    stream_id VARCHAR(512) NOT NULL REFERENCES event_streams(stream_id) ON DELETE CASCADE,
+    stream_version BIGINT NOT NULL,
+    event_type VARCHAR(255) NOT NULL,
+    data JSONB NOT NULL,
+    metadata JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (stream_id, stream_version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_events_stream_version ON events(stream_id, stream_version);
+CREATE INDEX IF NOT EXISTS idx_events_event_type ON events(event_type);
+CREATE INDEX IF NOT EXISTS idx_events_created_at ON events(created_at);
+CREATE INDEX IF NOT EXISTS idx_events_global_position ON events(global_position);
+
+-- Version: 1.15
+-- Description: Update projection_checkpoints to use single global_position
+ALTER TABLE projection_checkpoints ADD COLUMN IF NOT EXISTS global_position BIGINT NOT NULL DEFAULT 0;
+
+-- Version: 1.16
+-- Description: Drop legacy commit_position and prepare_position columns from projection_checkpoints
+ALTER TABLE projection_checkpoints DROP COLUMN IF EXISTS commit_position;
+ALTER TABLE projection_checkpoints DROP COLUMN IF EXISTS prepare_position;

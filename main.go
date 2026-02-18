@@ -29,7 +29,7 @@ import (
 	"school-with-ai/handlers/auth"
 	"school-with-ai/handlers/profile"
 	statisticsHandler "school-with-ai/handlers/statistics"
-	"school-with-ai/infra/eventstore/kurrentdb"
+	pgstore "school-with-ai/infra/eventstore/postgres"
 	"school-with-ai/infra/kratos"
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/infra/projection/llmcontext"
@@ -121,9 +121,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 		DashboardAdmin struct {
 			User string `conf:"default:admin"`
 			Pass string `conf:"default:admin,mask"`
-		}
-		KurrentDB struct {
-			ConnectionString string `conf:"default:esdb://localhost:2113?tls=false"`
 		}
 		DB struct {
 			User         string `conf:"default:schoolai"`
@@ -221,25 +218,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 	debugMux := debug.Mux()
 
 	// -------------------------------------------------------------------------
-	// Initialize KurrentDB EventStore
+	// Database Support (Postgres — single database for events + projections)
 
-	log.Info(ctx, "startup", "status", "initializing KurrentDB event store", "host", cfg.KurrentDB.ConnectionString)
-
-	baseEventStore, err := kurrentdb.NewKurrentDBEventStore(cfg.KurrentDB.ConnectionString)
-	if err != nil {
-		return fmt.Errorf("failed to create KurrentDB event store: %w", err)
-	}
-	defer func() {
-		closeErr := baseEventStore.Close()
-		if closeErr != nil {
-			log.Error(ctx, "shutdown", "status", "failed to close event store", "ERROR", closeErr)
-		}
-	}()
-
-	// -------------------------------------------------------------------------
-	// Database Support for Projections
-
-	log.Info(ctx, "startup", "status", "initializing database support for projections", "host", cfg.DB.Host)
+	log.Info(ctx, "startup", "status", "initializing database support", "host", cfg.DB.Host)
 
 	db, err := sqldb.Open(sqldb.Config{
 		User:         cfg.DB.User,
@@ -259,6 +240,10 @@ func run(ctx context.Context, log *logger.Logger) error {
 		}
 	}()
 
+	// Initialize PostgreSQL Event Store
+	log.Info(ctx, "startup", "status", "initializing PostgreSQL event store")
+	baseEventStore := pgstore.NewPostgresEventStore(db)
+
 	// Initialize Student Profile Repository
 	studentProfileRepo := sqldb.NewPostgresStudentProfileRepository(db)
 	resourcesRepo := sqldb.NewPostgresResourcesRepository(db)
@@ -271,7 +256,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// -------------------------------------------------------------------------
 	// Initialize Projections
-	// persistenceRouter is used by the ProjectionUpdater to update Postgres AND broadcast to Redis
+	// persistenceRouter is used by the ProjectionUpdater to update projections AND broadcast to Redis
 	persistenceRouter := event.NewRouter()
 
 	// transientRouter is used by the orchestrator for non-persistent events (streaming deltas, etc.)
@@ -286,7 +271,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	}()
 
 	// Register Redis broadcaster to BOTH routers
-	// persistenceRouter will broadcast durable events once they hit ESDB
+	// persistenceRouter will broadcast durable events once they are persisted
 	// transientRouter will broadcast transient events immediately
 	persistenceRouter.RegisterAny(redisBroadcaster.Broadcast)
 	transientRouter.RegisterAny(redisBroadcaster.Broadcast)
@@ -299,19 +284,18 @@ func run(ctx context.Context, log *logger.Logger) error {
 	llmContextProjection := llmcontext.NewPostgresLLMContextProjection(log, db)
 	llmContextProjection.RegisterHandlers(persistenceRouter)
 
-	// All projections are now query-time, so we use the base event store directly
-	// No need for ProjectionEventStore wrapper anymore
+	// Use the Postgres event store directly as the write model
 	eventLog := baseEventStore
 
 	// -------------------------------------------------------------------------
-	// Start Projection Updater (subscribes to events and updates PostgreSQL)
+	// Start Projection Updater (polls Postgres event store for new events)
 
 	log.Info(ctx, "startup", "status", "starting projection updater")
 
 	// Create projection updater with the persistence router
 	projectionUpdater := subscriber.NewProjectionUpdater(
 		log,
-		baseEventStore.Client(),
+		baseEventStore,
 		db,
 		persistenceRouter,
 	)
@@ -441,7 +425,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// Create a simple map of available agents
 	availableAgents := map[string]agent.Agent{
-		"math-instructor":      mathInstructor,
+		"math-instructor":       mathInstructor,
 		"statistics-instructor": statsInstructor,
 	}
 	agentProvider := custom.NewMapAgentProvider(availableAgents)
