@@ -144,18 +144,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 			Provider string `conf:"default:openai"`
 			Model    string `conf:"default:gpt-4o"`
 		}
-		Langfuse struct {
-			Enabled   bool   `conf:"default:false"`
-			BaseURL   string `conf:"default:http://localhost:3000"`
-			PublicKey string
-			SecretKey string
-		}
-		Observability struct {
-			Release    string   // Release version override (defaults to build version)
-			Env        string   `conf:"default:development"`
-			Deployment string   // Optional deployment context (e.g., us-east-1)
-			Tags       []string // Additional custom tags for traces
-		}
+
+
 		Artifacts struct {
 			S3Endpoint  string `conf:"default:localhost:9100"`
 			S3AccessKey string `conf:"default:minio"`
@@ -340,18 +330,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		APIKey:   apiKey,
 	}
 
-	// Initialize Langfuse tracer (optional observability)
-	var langfuseTracer *taskmanagement.LangfuseTracer
-	if cfg.Langfuse.Enabled {
-		log.Info(ctx, "startup", "status", "initializing Langfuse tracer", "baseURL", cfg.Langfuse.BaseURL)
-		langfuseTracer = taskmanagement.NewLangfuseTracer(taskmanagement.LangfuseConfig{
-			BaseURL:   cfg.Langfuse.BaseURL,
-			PublicKey: cfg.Langfuse.PublicKey,
-			SecretKey: cfg.Langfuse.SecretKey,
-		})
-	} else {
-		log.Info(ctx, "startup", "status", "Langfuse tracing disabled")
-	}
+
 
 	// Initialize artifact service
 	log.Info(ctx, "startup", "status", "initializing s3 artifact service", "endpoint", cfg.Artifacts.S3Endpoint, "bucket", cfg.Artifacts.S3Bucket)
@@ -507,16 +486,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	log.Info(ctx, "startup", "status", "initializing asynq server", "redis", cfg.Redis.Addr)
 
-	// Prepare observability configuration
-	observabilityConfig := taskmanagement.ObservabilityConfig{
-		Release:    cfg.Observability.Release,
-		Env:        cfg.Observability.Env,
-		Deployment: cfg.Observability.Deployment,
-		Tags:       cfg.Observability.Tags,
-	}
-	if observabilityConfig.Release == "" {
-		observabilityConfig.Release = build
-	}
+
 
 	// (agentFactory removed)
 
@@ -529,8 +499,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 			HealthCheckInterval: cfg.Orchestration.HealthCheckInterval,
 		},
 		agentOrchestrator, // Pass orchestrator instead of runner
-		langfuseTracer,
-		observabilityConfig,
+
+
 	)
 	defer taskManager.Shutdown()
 	log.Info(ctx, "startup", "status", "task manager started",

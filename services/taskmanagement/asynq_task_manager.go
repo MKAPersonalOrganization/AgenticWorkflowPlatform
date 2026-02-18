@@ -42,8 +42,6 @@ func NewAsynqTaskManager(
 	log *logger.Logger,
 	config AsynqConfig,
 	orchestrator Orchestrator, // Orchestrator that emits run lifecycle events
-	langfuseTracer *LangfuseTracer,
-	observabilityConfig ObservabilityConfig,
 ) *AsynqTaskManager {
 	// Default Redis options if not provided
 	if config.RedisOptions.Addr == "" && config.RedisAddr == "" {
@@ -74,8 +72,8 @@ func NewAsynqTaskManager(
 	orchestrationService := NewService(
 		log,
 		orchestrator,
-		langfuseTracer,
-		observabilityConfig,
+
+
 	)
 
 	// Create chat worker (thin wrapper around orchestration service)
