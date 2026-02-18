@@ -2,42 +2,8 @@ package footer
 
 import "school-with-ai/components/i18n"
 
-// Footer - LibreChat style footer with disclaimer and links
+// Footer - Empty footer after removal of disclaimer and links
 templ Footer() {
-	<div class="relative w-full">
-		<div
-			class="hidden items-center justify-center gap-2 px-2 py-2 text-center text-xs text-muted-foreground sm:flex md:px-[60px]"
-			role="contentinfo"
-		>
-			<span>
-				<a
-					class="text-muted-foreground hover:text-foreground underline transition-colors"
-					href="https://compass.ai"
-					target="_blank"
-					rel="noreferrer"
-				>
-					compass.AI
-				</a>
-				{ " " + i18n.T(ctx, "may produce inaccurate information.") }
-			</span>
-			<div class="h-2 border-r border-border"></div>
-			<a
-				class="text-muted-foreground hover:text-foreground underline transition-colors"
-				href="/privacy"
-				rel="noreferrer"
-			>
-				{ i18n.T(ctx, "Privacy Policy") }
-			</a>
-			<div class="h-2 border-r border-border"></div>
-			<a
-				class="text-muted-foreground hover:text-foreground underline transition-colors"
-				href="/terms"
-				rel="noreferrer"
-			>
-				{ i18n.T(ctx, "Terms of Service") }
-			</a>
-		</div>
-	</div>
 }
 
 // CompactFooter - Smaller footer for conversation state
