@@ -122,34 +122,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # KurrentDB - Event Store (PostgreSQL-backed)
-  kurrentdb:
-    image: docker.kurrent.io/eventstore/eventstoredb-ee:lts
-    container_name: kurrentdb
-    environment:
-      - EVENTSTORE_CLUSTER_SIZE=1
-      - EVENTSTORE_RUN_PROJECTIONS=All
-      - EVENTSTORE_START_STANDARD_PROJECTIONS=true
-      - EVENTSTORE_INSECURE=true # For development only
-      - EVENTSTORE_ENABLE_ATOM_PUB_OVER_HTTP=true
-      - EVENTSTORE_MEM_DB=false
-      - EVENTSTORE_DB=/var/lib/eventstore
-      - EVENTSTORE_LOG_LEVEL=Information
-    ports:
-      - "2113:2113" # HTTP API and UI
-      - "1113:1113" # TCP (for client connections)
-    volumes:
-      - kurrentdb-data:/var/lib/eventstore
-      - kurrentdb-logs:/var/log/eventstore
-    networks:
-      - intranet
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:2113/health/live || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
   # Typesense - Vector search database for RAG
   typesense:
     image: typesense/typesense:26.0
@@ -483,8 +455,6 @@ volumes:
   kratos-postgres:
   redis-data:
   redis-insight-data:
-  kurrentdb-data:
-  kurrentdb-logs:
   typesense-data:
   langfuse-postgres-data:
   langfuse-clickhouse-data:

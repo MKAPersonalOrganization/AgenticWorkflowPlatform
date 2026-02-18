@@ -21,7 +21,6 @@ require (
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/kcmvp/archunit v0.2.0-alpha1
-	github.com/kurrent-io/KurrentDB-Client-Go v1.1.1
 	github.com/lib/pq v1.10.9
 	github.com/minio/minio-go/v7 v7.0.98
 	github.com/montanaflynn/stats v0.7.1
