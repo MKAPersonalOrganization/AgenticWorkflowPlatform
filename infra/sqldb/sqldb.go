@@ -35,14 +35,16 @@ var (
 
 // Config is the required properties to use the database.
 type Config struct {
-	User         string
-	Password     string
-	Host         string
-	Name         string
-	Schema       string
-	MaxIdleConns int
-	MaxOpenConns int
-	DisableTLS   bool
+	User            string
+	Password        string
+	Host            string
+	Name            string
+	Schema          string
+	MaxIdleConns    int
+	MaxOpenConns    int
+	ConnMaxLifetime time.Duration
+	ConnMaxIdleTime time.Duration
+	DisableTLS      bool
 }
 
 // Open knows how to open a database connection based on the configuration.
@@ -73,6 +75,20 @@ func Open(cfg Config) (*sqlx.DB, error) {
 	}
 	db.SetMaxIdleConns(cfg.MaxIdleConns)
 	db.SetMaxOpenConns(cfg.MaxOpenConns)
+
+	// Set connection lifetime defaults to recycle stale connections
+	// behind load balancers and after database restarts.
+	connMaxLifetime := cfg.ConnMaxLifetime
+	if connMaxLifetime == 0 {
+		connMaxLifetime = 30 * time.Minute
+	}
+	db.SetConnMaxLifetime(connMaxLifetime)
+
+	connMaxIdleTime := cfg.ConnMaxIdleTime
+	if connMaxIdleTime == 0 {
+		connMaxIdleTime = 5 * time.Minute
+	}
+	db.SetConnMaxIdleTime(connMaxIdleTime)
 
 	return db, nil
 }

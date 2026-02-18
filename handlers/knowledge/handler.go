@@ -234,7 +234,7 @@ func (h *Handler) UploadDocument(w http.ResponseWriter, r *http.Request) {
 
 	if uploadErr != nil {
 		h.log.Error(r.Context(), "failed to upload document", "error", uploadErr, "filename", header.Filename)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("Failed to upload document: %v", uploadErr)})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to upload document"})
 		return
 	}
 
@@ -566,7 +566,7 @@ func (h *Handler) CreateWorkspace(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		h.log.Error(r.Context(), "failed to create workspace", "error", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create workspace: " + err.Error()})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create workspace"})
 		return
 	}
 
@@ -719,7 +719,7 @@ func (h *Handler) ScanDocuments(w http.ResponseWriter, r *http.Request) {
 	result, err := h.edgequakeService.ScanDocuments(r.Context(), tCtx, req.Path)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to scan documents", "error", err, "path", req.Path)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to scan documents: " + err.Error()})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to scan documents"})
 		return
 	}
 
@@ -771,7 +771,7 @@ func (h *Handler) RetryTask(w http.ResponseWriter, r *http.Request) {
 	result, err := h.edgequakeService.RetryTask(r.Context(), tCtx, req.TaskID)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to retry task", "error", err, "taskId", req.TaskID)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to retry task: " + err.Error()})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to retry task"})
 		return
 	}
 
@@ -938,7 +938,7 @@ func (h *Handler) RebuildWorkspace(w http.ResponseWriter, r *http.Request) {
 		})
 		if err != nil {
 			h.log.Error(r.Context(), "failed to rebuild graph", "error", err, "workspaceId", wsID)
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to rebuild knowledge graph: " + err.Error()})
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to rebuild knowledge graph"})
 			return
 		}
 		writeJSON(w, http.StatusOK, result)
@@ -950,7 +950,7 @@ func (h *Handler) RebuildWorkspace(w http.ResponseWriter, r *http.Request) {
 		})
 		if err != nil {
 			h.log.Error(r.Context(), "failed to rebuild embeddings", "error", err, "workspaceId", wsID)
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to rebuild embeddings: " + err.Error()})
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to rebuild embeddings"})
 			return
 		}
 		writeJSON(w, http.StatusOK, result)
@@ -982,7 +982,7 @@ func (h *Handler) CancelPipelineTask(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		h.log.Error(r.Context(), "failed to cancel pipeline task", "error", err, "taskId", req.TaskID)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to cancel task: " + err.Error()})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to cancel task"})
 		return
 	}
 

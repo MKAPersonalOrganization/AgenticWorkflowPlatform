@@ -3,7 +3,10 @@ package resources
 import (
 	"encoding/json"
 	"io"
+	"mime"
 	"net/http"
+	"path/filepath"
+	"strings"
 
 	"school-with-ai/domain"
 	"school-with-ai/services/resources"
@@ -47,7 +50,7 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 
 	res, err := h.service.UploadResource(r.Context(), user.ID, header.Filename, header.Header.Get("Content-Type"), file)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Failed to upload resource", http.StatusInternalServerError)
 		return
 	}
 
@@ -71,7 +74,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 	res, err := h.service.ListResources(r.Context(), user.ID, source)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Failed to list resources", http.StatusInternalServerError)
 		return
 	}
 
@@ -97,7 +100,7 @@ func (h *Handler) GetContent(w http.ResponseWriter, r *http.Request) {
 
 	res, content, err := h.service.GetResourceContent(r.Context(), id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		http.Error(w, "Resource not found", http.StatusNotFound)
 		return
 	}
 	defer content.Close()
@@ -108,8 +111,29 @@ func (h *Handler) GetContent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", res.FileType)
-	w.Header().Set("Content-Disposition", "attachment; filename=\""+res.Title+"\"")
+	// Sanitize Content-Type: force download for potentially dangerous types
+	contentType := res.FileType
+	unsafeTypes := []string{"text/html", "application/xhtml", "application/javascript", "text/javascript"}
+	for _, ut := range unsafeTypes {
+		if strings.HasPrefix(strings.ToLower(contentType), ut) {
+			contentType = "application/octet-stream"
+			break
+		}
+	}
+	w.Header().Set("Content-Type", contentType)
+
+	// Sanitize filename for Content-Disposition to prevent header injection.
+	// Use only the base name and pass through mime.FormatMediaType.
+	safeFilename := filepath.Base(res.Title)
+	safeFilename = strings.ReplaceAll(safeFilename, "\"", "_")
+	safeFilename = strings.Map(func(r rune) rune {
+		if r == '\n' || r == '\r' {
+			return '_'
+		}
+		return r
+	}, safeFilename)
+	disposition := mime.FormatMediaType("attachment", map[string]string{"filename": safeFilename})
+	w.Header().Set("Content-Disposition", disposition)
 	io.Copy(w, content)
 }
 
@@ -130,7 +154,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.DeleteResource(r.Context(), id, user.ID); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Failed to delete resource", http.StatusInternalServerError)
 		return
 	}
 
