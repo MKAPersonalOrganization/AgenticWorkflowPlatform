@@ -57,32 +57,10 @@ templ Actions(props ActionProps) {
         ) }
 		x-data="{ isCopied: false }"
 	>
-		<!-- Copy Button -->
-		@tooltip.Tooltip() {
-			@tooltip.Trigger(tooltip.TriggerProps{}) {
-				@button.Button(button.Props{
-					Size:    button.SizeIcon,
-					Variant: button.VariantGhost,
-					Class:   "hover-button rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none transition-all",
-					Attributes: templ.Attributes{
-						"@click":     "copyMessage(" + props.MessageID + "); isCopied = true; setTimeout(() => isCopied = false, 2000)",
-						"aria-label": i18n.T(ctx, "Copy to clipboard"),
-					},
-				}) {
-					<template x-if="!isCopied">
-						@icon.Copy(icon.Props{Class: "size-[18px]"})
-					</template>
-					<template x-if="isCopied">
-						@icon.Check(icon.Props{Class: "size-[18px] text-green-500"})
-					</template>
-				}
-			}
-			@tooltip.Content(tooltip.ContentProps{Class: "text-xs"}) {
-				<span x-text={ "isCopied ? '" + i18n.T(ctx, "Copied!") + "' : '" + i18n.T(ctx, "Copy to clipboard") + "'" }></span>
-			}
-		}
-		if props.Role == "user" {
-			<!-- Edit Button -->
+
+
+		if props.Role == "assistant" {
+			<!-- Copy Button -->
 			@tooltip.Tooltip() {
 				@tooltip.Trigger(tooltip.TriggerProps{}) {
 					@button.Button(button.Props{
@@ -90,19 +68,22 @@ templ Actions(props ActionProps) {
 						Variant: button.VariantGhost,
 						Class:   "hover-button rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none transition-all",
 						Attributes: templ.Attributes{
-							"aria-label": i18n.T(ctx, "Edit message"),
-							"@click":     "editMessage(" + props.MessageID + ")",
+							"@click":     "copyMessage(" + props.MessageID + "); isCopied = true; setTimeout(() => isCopied = false, 2000)",
+							"aria-label": i18n.T(ctx, "Copy to clipboard"),
 						},
 					}) {
-						@icon.SquarePen(icon.Props{Class: "size-[18px]"})
+						<template x-if="!isCopied">
+							@icon.Copy(icon.Props{Class: "size-[18px]"})
+						</template>
+						<template x-if="isCopied">
+							@icon.Check(icon.Props{Class: "size-[18px] text-green-500"})
+						</template>
 					}
 				}
 				@tooltip.Content(tooltip.ContentProps{Class: "text-xs"}) {
-					{ i18n.T(ctx, "Edit message") }
+					<span x-text={ "isCopied ? '" + i18n.T(ctx, "Copied!") + "' : '" + i18n.T(ctx, "Copy to clipboard") + "'" }></span>
 				}
 			}
-		}
-		if props.Role == "assistant" {
 		}
 	</div>
 }

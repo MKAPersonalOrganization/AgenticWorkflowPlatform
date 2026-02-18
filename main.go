@@ -740,6 +740,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 		serverErrors <- server.ListenAndServe()
 	}()
 
+	log.Info(ctx, "startup", "msg", "Press CTRL+C or send SIGTERM to shutdown")
+
 	// -------------------------------------------------------------------------
 	// Shutdown
 
