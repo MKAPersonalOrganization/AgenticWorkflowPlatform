@@ -128,7 +128,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 			Host         string `conf:"default:localhost:5435"`
 			Name         string `conf:"default:projections"`
 			MaxIdleConns int    `conf:"default:2"`
-			MaxOpenConns int    `conf:"default:0"`
+			MaxOpenConns int    `conf:"default:25"`
 			DisableTLS   bool   `conf:"default:true"`
 		}
 		Redis struct {
@@ -144,7 +144,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 			Provider string `conf:"default:openai"`
 			Model    string `conf:"default:gpt-4o"`
 		}
-
 
 		Artifacts struct {
 			S3Endpoint  string `conf:"default:localhost:9100"`
@@ -179,6 +178,16 @@ func run(ctx context.Context, log *logger.Logger) error {
 	}
 
 	log.Info(ctx, "startup", "config_tenant_id", cfg.Edgequake.TenantID)
+
+	// -------------------------------------------------------------------------
+	// Production Configuration Guard
+	//
+	// Reject known development defaults when the binary is built for
+	// production (build != "develop").
+
+	if err := validateProductionConfig(cfg.Build, cfg.DashboardAdmin.User, cfg.DashboardAdmin.Pass, cfg.DB.Password, cfg.Artifacts.S3AccessKey, cfg.Artifacts.S3SecretKey); err != nil {
+		return err
+	}
 
 	// -------------------------------------------------------------------------
 	// Initialize I18n
@@ -294,9 +303,12 @@ func run(ctx context.Context, log *logger.Logger) error {
 	statsProjection := projectionStats.NewPostgresProjection(db)
 	statsProjection.RegisterHandlers(persistenceRouter)
 
-	// Start projection updater in background
+	// Start projection updater in background with a cancellable context
+	projCtx, projCancel := context.WithCancel(ctx)
+	defer projCancel()
+
 	go func() {
-		if err := projectionUpdater.Start(ctx); err != nil {
+		if err := projectionUpdater.Start(projCtx); err != nil && projCtx.Err() == nil {
 			log.Error(ctx, "projection updater stopped", "ERROR", err)
 		}
 	}()
@@ -329,8 +341,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 		Model:    cfg.AI.Model,
 		APIKey:   apiKey,
 	}
-
-
 
 	// Initialize artifact service
 	log.Info(ctx, "startup", "status", "initializing s3 artifact service", "endpoint", cfg.Artifacts.S3Endpoint, "bucket", cfg.Artifacts.S3Bucket)
@@ -450,24 +460,24 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// -------------------------------------------------------------------------
 	// Start Debug Service
 
+	debugMux.HandleFunc("/api/debug/state-machines/engine", func(w http.ResponseWriter, r *http.Request) {
+		// Engine and tool graphs are now handled by the custom adapter
+		// but we need to expose them if needed.
+		// (Note: Currently removed from Service to keep it agnostic)
+		http.Error(w, "Debug graphs temporarily unavailable during refactor", http.StatusNotFound)
+	})
+
+	debugServer := &http.Server{
+		Addr:              cfg.Web.DebugHost,
+		Handler:           debugMux,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
 	go func() {
 		log.Info(ctx, "startup", "status", "debug server started", "host", cfg.Web.DebugHost)
-
-		debugMux.HandleFunc("/api/debug/state-machines/engine", func(w http.ResponseWriter, r *http.Request) {
-			// Engine and tool graphs are now handled by the custom adapter
-			// but we need to expose them if needed.
-			// (Note: Currently removed from Service to keep it agnostic)
-			http.Error(w, "Debug graphs temporarily unavailable during refactor", http.StatusNotFound)
-		})
-
-		debugServer := &http.Server{
-			Addr:              cfg.Web.DebugHost,
-			Handler:           debugMux,
-			ReadTimeout:       10 * time.Second,
-			WriteTimeout:      10 * time.Second,
-			IdleTimeout:       120 * time.Second,
-			ReadHeaderTimeout: 5 * time.Second,
-		}
 
 		if err := debugServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Error(ctx, "shutdown", "status", "debug server closed", "host", cfg.Web.DebugHost, "msg", err)
@@ -486,8 +496,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	log.Info(ctx, "startup", "status", "initializing asynq server", "redis", cfg.Redis.Addr)
 
-
-
 	// (agentFactory removed)
 
 	taskManager := taskmanagement.NewAsynqTaskManager(
@@ -500,7 +508,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 		},
 		agentOrchestrator, // Pass orchestrator instead of runner
 
-
 	)
 	defer taskManager.Shutdown()
 	log.Info(ctx, "startup", "status", "task manager started",
@@ -510,36 +517,60 @@ func run(ctx context.Context, log *logger.Logger) error {
 		"healthCheckInterval", cfg.Orchestration.HealthCheckInterval)
 
 	// Create HTTP handler
-	handler := taskmgmthandlers.NewTaskManagementHandler(log, taskManager, agentProvider, authSvc, threadQueryService, aguiProjection, redisBroadcaster, threadMgmt, artifactService, memoryService, toolRegistry, permissionsService, edgequakeService, cfg.Edgequake.TenantID)
+	handler := taskmgmthandlers.NewTaskManagementHandler(log, taskManager, agentProvider, authSvc, threadQueryService, aguiProjection, redisBroadcaster, threadMgmt, artifactService, memoryService, toolRegistry, permissionsService, edgequakeService, cfg.Edgequake.TenantID, cfg.Auth.AppURL)
 
-	// Create health handler
-	healthHandler := healthhandlers.NewHealthHandler(log)
+	// Create health handler with dependency checkers
+	healthHandler := healthhandlers.NewHealthHandler(log,
+		healthhandlers.WithChecker("db", healthhandlers.CheckerFunc(func(ctx context.Context) error {
+			return db.PingContext(ctx)
+		})),
+	)
 
-	// Create chi router
-	r := chi.NewRouter()
+	// Create chi router (Root Router)
+	root := chi.NewRouter()
 
 	// Add panic recovery middleware first (most important - must be first)
-	r.Use(middleware.Panics())
+	root.Use(middleware.Panics())
+
+	// Add security headers middleware (early — sets headers before response body)
+	root.Use(middleware.SecurityHeaders())
+
+	// Add request body size limit middleware (1 MB default for JSON APIs).
+	// File upload handlers set their own higher limits via http.MaxBytesReader.
+	root.Use(middleware.BodyLimit(0))
+
+	// Add per-IP rate limiting (Moved to specific route groups below for split limits)
+	// r.Use(middleware.RateLimiter(100, 300))
 
 	// Add logging middleware
-	r.Use(middleware.Logger(log))
+	root.Use(middleware.Logger(log))
 
 	// Add metrics middleware
-	r.Use(middleware.Metrics())
+	root.Use(middleware.Metrics())
 
 	// Add I18n middleware (detects lang from query/cookie/header)
-	r.Use(middleware.I18n)
+	root.Use(middleware.I18n)
 
 	// Add chi middleware (we can keep or remove these depending on preference)
 	// Note: We now have our own Logger and Recoverer, so chi's can be removed
 	// r.Use(chimiddleware.Logger)
 	// r.Use(chimiddleware.Recoverer)
 
-	// Serve static assets
-	r.Handle("/assets/css/*", http.StripPrefix("/assets/css/", http.FileServer(http.Dir("./assets/css"))))
-	r.Handle("/assets/js/*", http.StripPrefix("/assets/js/", http.FileServer(http.Dir("./assets/js"))))
-	r.Handle("/assets/images/*", http.StripPrefix("/assets/images/", http.FileServer(http.Dir("./assets/images"))))
-	r.Handle("/assets/charts/*", http.StripPrefix("/assets/charts/", http.FileServer(http.Dir("./assets/charts"))))
+	// Serve static assets — Mount uses a catch-all so nested paths
+	// like /assets/js/chat/index.js are served correctly.
+	// Use higher rate limit for assets (100 req/s, 300 burst) to support parallel loading
+	root.Group(func(r chi.Router) {
+		r.Use(middleware.RateLimiter(100, 300))
+		r.Mount("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir("./assets"))))
+	})
+
+	// Create App Router for all other routes
+	// This router will enforce strict rate limits (10 req/s, 20 burst)
+	r := chi.NewRouter()
+	r.Use(middleware.RateLimiter(10, 20))
+
+	// Mount App Router on Root
+	root.Mount("/", r)
 
 	// Create AGUI projection handler
 	aguiHandler := aguihandlers.NewAguiProjectionHandler(aguiProjection, threadQueryService)
@@ -688,7 +719,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Create server with proper timeouts to prevent slowloris and similar attacks
 	server := &http.Server{
 		Addr:              cfg.Web.APIHost,
-		Handler:           r,
+		Handler:           root,
 		ReadTimeout:       cfg.Web.ReadTimeout,
 		ReadHeaderTimeout: cfg.Web.ReadHeaderTimeout,
 		WriteTimeout:      cfg.Web.WriteTimeout,
@@ -720,8 +751,16 @@ func run(ctx context.Context, log *logger.Logger) error {
 		log.Info(ctx, "shutdown", "status", "shutdown started", "signal", sig)
 		defer log.Info(ctx, "shutdown", "status", "shutdown complete", "signal", sig)
 
+		// Cancel the projection updater goroutine
+		projCancel()
+
 		ctx, cancel := context.WithTimeout(ctx, cfg.Web.ShutdownTimeout)
 		defer cancel()
+
+		// Shut down the debug server gracefully
+		if err := debugServer.Shutdown(ctx); err != nil {
+			log.Error(ctx, "shutdown", "status", "debug server shutdown error", "msg", err)
+		}
 
 		if err := server.Shutdown(ctx); err != nil {
 			if closeErr := server.Close(); closeErr != nil {
@@ -753,14 +792,17 @@ func HandleViewChatInputScreen(log *logger.Logger, edgequakeService *edgequake.S
 					Role:     &u.Role,
 				}
 
-				// We use a background context as the request context might cancel
-				_, err := edgequakeService.Users.Create(context.Background(), req)
+				// Use a bounded context so this goroutine cannot block forever
+				syncCtx, syncCancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer syncCancel()
+
+				_, err := edgequakeService.Users.Create(syncCtx, req)
 				if err != nil {
 					// Log error but don't fail the request (best effort sync)
 					// In production, we might want to check if error is "already exists" and ignore
-					log.Error(context.Background(), "failed to sync user to RAG", "error", err, "email", u.Email)
+					log.Error(syncCtx, "failed to sync user to RAG", "error", err, "email", u.Email)
 				} else {
-					log.Info(context.Background(), "synced user to RAG", "email", u.Email, "role", u.Role)
+					log.Info(syncCtx, "synced user to RAG", "email", u.Email, "role", u.Role)
 				}
 			}(user)
 		}
@@ -855,4 +897,36 @@ func renderGraph(w http.ResponseWriter, log *logger.Logger, r *http.Request, gra
 
 	w.Header().Set("Content-Type", "image/svg+xml")
 	w.Write(output)
+}
+
+// validateProductionConfig rejects known insecure defaults when the
+// binary is built for production (build != "develop"). This prevents
+// accidental deployment with development credentials.
+func validateProductionConfig(buildTag, adminUser, adminPass, dbPass, s3Key, s3Secret string) error {
+	if buildTag == "develop" {
+		return nil
+	}
+
+	insecure := map[string]string{
+		"dashboard admin user":     adminUser,
+		"dashboard admin password": adminPass,
+		"database password":        dbPass,
+		"S3 access key":            s3Key,
+		"S3 secret key":            s3Secret,
+	}
+
+	defaults := map[string]bool{
+		"admin":        true,
+		"dev-password": true,
+		"minio":        true,
+		"miniosecret":  true,
+	}
+
+	for label, val := range insecure {
+		if defaults[val] {
+			return fmt.Errorf("production config guard: %s is set to the development default %q — set a secure value", label, val)
+		}
+	}
+
+	return nil
 }

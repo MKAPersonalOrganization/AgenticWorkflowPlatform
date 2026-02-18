@@ -41,6 +41,7 @@ type TaskManagementHandler struct {
 	permissionsService *permissions.Service
 	edgequakeService   *edgequake.Service
 	tenantID           string
+	allowedOrigin      string
 }
 
 // NewTaskManagementHandler creates a new HTTP handler for task management.
@@ -59,6 +60,7 @@ func NewTaskManagementHandler(
 	permissionsService *permissions.Service,
 	edgequakeService *edgequake.Service,
 	tenantID string,
+	allowedOrigin string,
 ) *TaskManagementHandler {
 	return &TaskManagementHandler{
 		log:                log,
@@ -75,6 +77,7 @@ func NewTaskManagementHandler(
 		permissionsService: permissionsService,
 		edgequakeService:   edgequakeService,
 		tenantID:           tenantID,
+		allowedOrigin:      allowedOrigin,
 	}
 }
 
@@ -117,7 +120,7 @@ func (h *TaskManagementHandler) SendMessage(w http.ResponseWriter, r *http.Reque
 	result, err := h.taskManager.SubmitChatTask(r.Context(), user.ID, req.Message, req.ContextID, req.AgentName)
 	if err != nil {
 		h.log.Error(r.Context(), "[API] Failed to submit task", "error", err)
-		http.Error(w, fmt.Sprintf("Failed to submit task: %v", err), http.StatusInternalServerError)
+		http.Error(w, "Failed to submit task", http.StatusInternalServerError)
 		return
 	}
 
@@ -149,6 +152,14 @@ func (h *TaskManagementHandler) SendMessage(w http.ResponseWriter, r *http.Reque
 
 // StreamJobEvents streams SSE events for a specific job.
 func (h *TaskManagementHandler) StreamJobEvents(w http.ResponseWriter, r *http.Request) {
+	// Set CORS origin header early — even error responses need CORS
+	// to be readable by the browser from the allowed origin.
+	origin := h.allowedOrigin
+	if origin == "" {
+		origin = "self"
+	}
+	w.Header().Set("Access-Control-Allow-Origin", origin)
+
 	jobID := r.PathValue("id")
 	if jobID == "" {
 		http.Error(w, "jobId is required", http.StatusBadRequest)
@@ -166,7 +177,6 @@ func (h *TaskManagementHandler) StreamJobEvents(w http.ResponseWriter, r *http.R
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	// Get the flusher to flush data immediately
 	flusher, ok := w.(http.Flusher)
@@ -312,7 +322,7 @@ func (h *TaskManagementHandler) CancelJob(w http.ResponseWriter, r *http.Request
 	// Use Asynq Inspector to cancel task
 	err := h.taskManager.CancelTask(jobID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to cancel job: %s", err), http.StatusBadRequest)
+		http.Error(w, "Failed to cancel job", http.StatusBadRequest)
 
 		return
 	}
@@ -356,7 +366,7 @@ func (h *TaskManagementHandler) DeleteThread(w http.ResponseWriter, r *http.Requ
 
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Failed to delete thread", http.StatusInternalServerError)
 
 		return
 	}
