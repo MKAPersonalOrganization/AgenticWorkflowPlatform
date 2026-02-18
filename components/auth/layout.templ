@@ -15,8 +15,9 @@ type LayoutProps struct {
 // AuthLayout provides a centered card layout for authentication pages
 templ AuthLayout(props LayoutProps) {
 	@components.BaseLayout(components.LayoutProps{
-		Title: props.Title,
-		User:  props.User,
+		Title:      props.Title,
+		User:       props.User,
+		HideNavbar: true,
 	}) {
 		<style>
 			/* Compass spinning animation for auth pages */
