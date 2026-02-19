@@ -38,11 +38,7 @@ services:
       - SCHOOL_ARTIFACTS_S_3_SECRET_KEY=${SCHOOL_ARTIFACTS_S_3_SECRET_KEY}
       - SCHOOL_ARTIFACTS_S_3_BUCKET=artifacts
       - SCHOOL_ARTIFACTS_S_3_USE_SSL=false
-      # AI
-      - SCHOOL_AI_PROVIDER=${SCHOOL_AI_PROVIDER:-openai}
-      - SCHOOL_AI_MODEL=${SCHOOL_AI_MODEL:-gpt-4o}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      # AI settings are now per-user (stored in database)
       # Edgequake
       - SCHOOL_EDGEQUAKE_BASE_URL=http://edgequake-api:8080
       - SCHOOL_EDGEQUAKE_TENANT_ID=${SCHOOL_EDGEQUAKE_TENANT_ID}
@@ -50,7 +46,7 @@ services:
       - SCHOOL_DASHBOARD_ADMIN_USER=${SCHOOL_DASHBOARD_ADMIN_USER:-admin}
       - SCHOOL_DASHBOARD_ADMIN_PASS=${SCHOOL_DASHBOARD_ADMIN_PASS}
     volumes:
-      - ./tls:/app/tls:ro      # mount self-signed cert
+      - ./tls:/app/tls:ro # mount self-signed cert
     networks:
       - intranet
     depends_on:

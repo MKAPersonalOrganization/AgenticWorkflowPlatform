@@ -256,3 +256,23 @@ CREATE TABLE IF NOT EXISTS agent_workspace_permissions (
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
     PRIMARY KEY (user_id, agent_id, workspace_id)
 );
+
+-- Version: 1.20
+-- Description: Create User AI Settings table
+CREATE TABLE IF NOT EXISTS user_ai_settings (
+    id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL,
+    provider VARCHAR(50) NOT NULL,
+    api_key TEXT NOT NULL DEFAULT '',
+    default_llm_model VARCHAR(255) NOT NULL DEFAULT '',
+    default_embed_model VARCHAR(255) NOT NULL DEFAULT '',
+    is_default BOOLEAN NOT NULL DEFAULT FALSE,
+    max_tokens INTEGER NOT NULL DEFAULT 0,
+    temperature DOUBLE PRECISION NOT NULL DEFAULT 0.7,
+    embedding_dimensions INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_ai_settings_user ON user_ai_settings(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_user_ai_settings_user_provider ON user_ai_settings(user_id, provider);

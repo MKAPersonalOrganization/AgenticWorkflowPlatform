@@ -23,11 +23,16 @@ import (
 	"school-with-ai/services/workspacepermissions"
 )
 
+// ModelConfigResolver resolves LLM configuration for a given user.
+// This is used for per-user AI settings.
+type ModelConfigResolver interface {
+	GetModelConfigForUser(ctx context.Context, userID string) (*agent.ModelConfig, error)
+}
+
 // RunnerAdapter adapts the custom engine to the agent.Runner interface.
 type RunnerAdapter struct {
 	log                *logger.Logger
 	threadMgr          ThreadManager // Interface for thread management
-	engine             *engine.Engine
 	agentProvider      agent.AgentProvider
 	artifactStore      artifact.Service
 	profileRepo        domain.StudentProfileRepository
@@ -39,18 +44,17 @@ type RunnerAdapter struct {
 	edgequakeService   *edgequake.Service
 	edgequakeBaseURL   string
 	edgequakeTenantID  string
+	configResolver     ModelConfigResolver
 }
 
 // NewRunnerAdapter creates a new runner adapter.
-// It creates its own LLM client based on the ModelConfig.
-// NewRunnerAdapter creates a new runner adapter.
-// It creates its own LLM client based on the ModelConfig.
+// It uses a ModelConfigResolver to get per-user LLM configuration at runtime.
 func NewRunnerAdapter(
 	ctx context.Context,
 	log *logger.Logger,
 	threadMgr ThreadManager,
 	agentProvider agent.AgentProvider, // Injected provider
-	modelCfg *agent.ModelConfig,
+	configResolver ModelConfigResolver, // Per-user model config resolver
 	artifactStore artifact.Service,
 	profileRepo domain.StudentProfileRepository,
 	enableMemory bool,
@@ -61,14 +65,8 @@ func NewRunnerAdapter(
 	edgequakeBaseURL string,
 	edgequakeTenantID string,
 ) (*RunnerAdapter, error) {
-	if modelCfg == nil {
-		return nil, fmt.Errorf("model config is required")
-	}
-
-	// Create LLM client based on provider - this is now internal to the adapter
-	chatClient, err := createLLMClient(ctx, modelCfg)
-	if err != nil {
-		return nil, fmt.Errorf("creating LLM client: %w", err)
+	if configResolver == nil {
+		return nil, fmt.Errorf("model config resolver is required")
 	}
 
 	r := &RunnerAdapter{
@@ -85,32 +83,36 @@ func NewRunnerAdapter(
 		edgequakeService:   edgequakeService,
 		edgequakeBaseURL:   edgequakeBaseURL,
 		edgequakeTenantID:  edgequakeTenantID,
+		configResolver:     configResolver,
+	}
+
+	return r, nil
+}
+
+// buildEngine creates a per-request Engine using the user's model config.
+func (r *RunnerAdapter) buildEngine(ctx context.Context, modelCfg *agent.ModelConfig) (*engine.Engine, error) {
+	chatClient, err := createLLMClient(ctx, modelCfg)
+	if err != nil {
+		return nil, fmt.Errorf("creating LLM client: %w", err)
 	}
 
 	provider := &RegistryAgentProvider{
-		provider:           agentProvider,
+		provider:           r.agentProvider,
 		artifactStore:      r.artifactStore,
 		profileRepo:        r.profileRepo,
 		enableMemory:       r.enableMemory,
 		modelProvider:      modelCfg.Provider,
 		modelID:            modelCfg.Model,
 		modelAPIKey:        modelCfg.APIKey,
-		toolRegistry:       toolRegistry,
-		permissionsService: permissionsService,
-		workspacePermSvc:   workspacePermSvc,
-		edgequakeService:   edgequakeService,
-		edgequakeBaseURL:   edgequakeBaseURL,
-		edgequakeTenantID:  edgequakeTenantID,
+		toolRegistry:       r.toolRegistry,
+		permissionsService: r.permissionsService,
+		workspacePermSvc:   r.workspacePermSvc,
+		edgequakeService:   r.edgequakeService,
+		edgequakeBaseURL:   r.edgequakeBaseURL,
+		edgequakeTenantID:  r.edgequakeTenantID,
 	}
 
-	r.engine = engine.New(
-		chatClient,
-		provider,
-		nil, // reqCtxCapture
-		nil, // toolTracer
-	)
-
-	return r, nil
+	return engine.New(chatClient, provider, nil, nil), nil
 }
 
 // createLLMClient creates an LLM client based on the model configuration.
@@ -120,6 +122,12 @@ func createLLMClient(ctx context.Context, cfg *agent.ModelConfig) (llm.LLM, erro
 	case "openai":
 		if cfg.APIKey == "" {
 			return nil, fmt.Errorf("OpenAI API key is required")
+		}
+		return llm.NewOpenAIClientWithAPIKey(cfg.APIKey, cfg.Model), nil
+
+	case "anthropic":
+		if cfg.APIKey == "" {
+			return nil, fmt.Errorf("Anthropic API key is required")
 		}
 		return llm.NewOpenAIClientWithAPIKey(cfg.APIKey, cfg.Model), nil
 
@@ -141,6 +149,20 @@ func createLLMClient(ctx context.Context, cfg *agent.ModelConfig) (llm.LLM, erro
 // Run executes an agent with the given request.
 func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq2[domain.Event, error] {
 	return func(yield func(domain.Event, error) bool) {
+		// 0. Resolve per-user model config
+		modelCfg, err := r.configResolver.GetModelConfigForUser(ctx, req.UserID)
+		if err != nil {
+			yield(nil, fmt.Errorf("resolving AI settings for user: %w", err))
+			return
+		}
+
+		// Build a per-request engine with the user's config
+		eng, err := r.buildEngine(ctx, modelCfg)
+		if err != nil {
+			yield(nil, fmt.Errorf("building engine for user: %w", err))
+			return
+		}
+
 		// 1. Facts First: Initialize Thread and Message
 		threadMgmt := r.threadMgr.GetThreadManagement()
 		var agg *domain.ThreadAggregate
@@ -224,7 +246,7 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 			ctx = context.WithValue(ctx, domain.UserContextKey, &domain.User{ID: runCtx.UserID})
 		}
 
-		coreEvents := r.engine.Run(ctx, agentName, runCtx)
+		coreEvents := eng.Run(ctx, agentName, runCtx)
 
 		// Convert core events to domain events
 		engineDomainEvents := r.pipeline.ProcessEventStream(ctx, coreEvents)
