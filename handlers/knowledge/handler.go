@@ -870,6 +870,14 @@ func (h *Handler) CancelPipeline(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.edgequakeService.CancelPipeline(r.Context(), tCtx)
 	if err != nil {
+		// 409 means no job is running — this is not an error, just nothing to cancel
+		if strings.Contains(err.Error(), "409") {
+			writeJSON(w, http.StatusOK, map[string]string{
+				"status":  "no_job_running",
+				"message": "No pipeline job is currently running.",
+			})
+			return
+		}
 		h.log.Error(r.Context(), "failed to cancel pipeline", "error", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to cancel pipeline"})
 		return

@@ -196,6 +196,7 @@ templ workspaceDetailsScript() {
 				pipelineTasks: [],
 				queueMetrics: null,
 				pipelinePollingInterval: null,
+				pipelineCancelling: false,
 				isRefreshing: false,
 
 				// Sorting
@@ -282,6 +283,7 @@ templ workspaceDetailsScript() {
 				reprocessingFailed: false,
 				scanningDocuments: false,
 				deletingAllDocs: false,
+				recoveringStuck: false,
 
 				// Client-side filtered documents
 				get filteredDocuments() {
@@ -433,7 +435,13 @@ templ workspaceDetailsScript() {
 					try {
 						const resp = await fetch(`/api/knowledge/pipeline/enhanced-status?workspace_id=${this.workspaceId}`);
 						if (resp.ok) {
-							this.pipelineStatus = await resp.json();
+							const data = await resp.json();
+							// Normalize field names for template usage
+							data.pending = data.pending_tasks || 0;
+							data.processing = data.processing_tasks || 0;
+							data.completed = data.completed_tasks || 0;
+							data.failed = data.failed_tasks || 0;
+							this.pipelineStatus = data;
 						}
 					} catch (e) {
 						console.error('Failed to load pipeline status:', e);
@@ -596,9 +604,6 @@ templ workspaceDetailsScript() {
 				},
 
 				async deleteAllDocuments() {
-					if (!confirm('Are you sure you want to DELETE ALL documents in this workspace? This action cannot be undone.')) return;
-					if (!confirm('This is a destructive operation. Type "delete" to confirm.')) return;
-					
 					this.deletingAllDocs = true;
 					try {
 						const resp = await fetch(`/api/knowledge/documents?workspace_id=${this.workspaceId}`, {
@@ -606,14 +611,62 @@ templ workspaceDetailsScript() {
 						});
 						if (resp.ok) {
 							const data = await resp.json();
-							alert(`Deleted ${data.deleted_count} documents.`);
+							const count = data.deleted_count ?? data.count ?? 'all';
+							alert(`Deleted ${count} document(s).`);
 							this.refreshAll();
+						} else {
+							const data = await resp.json().catch(() => ({}));
+							alert(data.error || 'Failed to delete documents');
 						}
 					} catch (e) {
 						console.error('Failed to delete all documents:', e);
+						alert('Network error while deleting documents');
 					} finally {
 						setTimeout(() => { this.deletingAllDocs = false; }, 2000);
 					}
+				},
+
+				// === Recover Stuck Documents ===
+				async recoverStuck() {
+					this.recoveringStuck = true;
+					try {
+						const resp = await fetch(`/api/knowledge/documents/recover-stuck?workspace_id=${this.workspaceId}`, {
+							method: 'POST'
+						});
+						if (resp.ok) {
+							const data = await resp.json();
+							const count = data.recovered || 0;
+							if (count === 0) {
+								alert('No stuck documents found.');
+							} else {
+								alert(`Recovered ${count} stuck document(s).`);
+								this.refreshAll();
+							}
+						} else {
+							alert('Failed to recover stuck documents');
+						}
+					} catch (e) {
+						console.error('Failed to recover stuck documents:', e);
+					} finally {
+						setTimeout(() => { this.recoveringStuck = false; }, 2000);
+					}
+				},
+
+				// === Update Workspace (rename / description) ===
+				async updateWorkspace(name, description) {
+					try {
+						const resp = await fetch(`/api/knowledge/workspaces/${this.workspaceId}`, {
+							method: 'PUT',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({ name, description })
+						});
+						if (resp.ok) {
+							return await resp.json();
+						}
+					} catch (e) {
+						console.error('Failed to update workspace:', e);
+					}
+					return null;
 				},
 
 				// === File Operations ===
@@ -753,6 +806,27 @@ templ workspaceDetailsScript() {
 						}
 					} catch (e) {
 						console.error('Failed to cancel task:', e);
+					}
+				},
+
+				async cancelPipeline() {
+					if (this.pipelineCancelling) return;
+					this.pipelineCancelling = true;
+					try {
+						const resp = await fetch(`/api/knowledge/pipeline/cancel-all`, {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' }
+						});
+						if (resp.ok) {
+							await this.refreshAll();
+						} else {
+							const data = await resp.json().catch(() => ({}));
+							console.error('Failed to cancel pipeline:', data.error || resp.statusText);
+						}
+					} catch (e) {
+						console.error('Failed to cancel pipeline:', e);
+					} finally {
+						this.pipelineCancelling = false;
 					}
 				},
 
@@ -2098,12 +2172,22 @@ templ workspaceDetailsScript() {
 					}
 				},
 
-				// === Expand neighborhood (fetch 1-hop neighbors via API + add to graph) ===
+				// === Expand neighborhood (fetch 1-hop neighbors via entity API + add to graph) ===
 				async expandNeighborhood(nodeId) {
 					try {
-						const resp = await fetch(`/api/knowledge/graph/nodes/${encodeURIComponent(nodeId)}/neighbors?workspace_id=${this.workspaceId}&depth=1`);
+						// Use the entity neighborhood endpoint; nodeId doubles as entity name label
+						const resp = await fetch(`/api/knowledge/graph/entities/${encodeURIComponent(nodeId)}/neighborhood?depth=1&workspace_id=${this.workspaceId}`);
 						if (!resp.ok) return;
 						const data = await resp.json();
+						// Normalise: entity neighborhood returns { nodes: [...], edges: [...] }
+						const rawNodes = data.nodes || data.Nodes || [];
+						const rawEdges = data.edges || data.Edges || [];
+						// Remap to the graph data shape expected below
+						const remapped = {
+							nodes: rawNodes.map(n => ({ id: n.id, label: n.id, node_type: n.entityType || n.entity_type || 'UNKNOWN', description: n.description, degree: n.degree || 0 })),
+							edges: rawEdges.map(e => ({ source: e.source || e.Source, target: e.target || e.Target, edge_type: e.relationType || e.relation_type || e.edge_type || e.label || '', weight: e.weight || e.Weight || 1 })),
+						};
+						const mappedData = remapped;
 						const graph = this._graphologyInstance;
 						const sigma = this._sigmaInstance;
 						if (!graph || !sigma) return;
@@ -2115,7 +2199,7 @@ templ workspaceDetailsScript() {
 						let addedEdges = 0;
 
 						// Add new nodes
-						(data.nodes || []).forEach((node) => {
+						(mappedData.nodes || []).forEach((node) => {
 							if (!node.id || graph.hasNode(node.id)) return;
 							// Position near the expanded node
 							const parentX = graph.getNodeAttribute(nodeId, 'x') || 0;
@@ -2140,7 +2224,7 @@ templ workspaceDetailsScript() {
 						});
 
 						// Add new edges
-						(data.edges || []).forEach((edge) => {
+						(mappedData.edges || []).forEach((edge) => {
 							if (!edge.source || !edge.target) return;
 							if (!graph.hasNode(edge.source) || !graph.hasNode(edge.target)) return;
 							const edgeId = `${edge.source}-${edge.target}-${edge.edge_type || ''}`;
@@ -2216,11 +2300,11 @@ templ workspaceDetailsScript() {
 					this._setupMinimap();
 				},
 
-				// === Delete graph entity via API ===
+				// === Delete graph entity via API (uses entity CRUD endpoint) ===
 				async deleteGraphEntity(nodeId, label) {
 					if (!confirm(`Delete entity "${label}"? This cannot be undone.`)) return;
 					try {
-						const resp = await fetch(`/api/knowledge/graph/nodes/${encodeURIComponent(nodeId)}?workspace_id=${this.workspaceId}`, {
+						const resp = await fetch(`/api/knowledge/graph/entities/${encodeURIComponent(nodeId)}?confirm=true&workspace_id=${this.workspaceId}`, {
 							method: 'DELETE',
 						});
 						if (resp.ok) {
@@ -2453,7 +2537,7 @@ templ workspaceDetailsScript() {
 						document.getElementById('document-file').value = '';
 						
 						window.dispatchEvent(new CustomEvent('document-uploaded'));
-						this.$el.closest('[role="dialog"]')?.querySelector('[data-dialog-close]')?.click();
+					window.tui.dialog.close('upload-document-dialog');
 						
 					} catch (e) {
 						this.error = e.message;

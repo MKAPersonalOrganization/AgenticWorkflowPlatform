@@ -107,8 +107,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 	cfg := struct {
 		conf.Version
 		Web struct {
-			ReadTimeout       time.Duration `conf:"default:15s"`
-			WriteTimeout      time.Duration `conf:"default:15s"`
+			ReadTimeout       time.Duration `conf:"default:60s"`
+			WriteTimeout      time.Duration `conf:"default:60s"`
 			IdleTimeout       time.Duration `conf:"default:60s"`
 			ReadHeaderTimeout time.Duration `conf:"default:10s"`
 			ShutdownTimeout   time.Duration `conf:"default:20s"`
@@ -525,7 +525,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 	root.Use(middleware.SecurityHeaders())
 
 	// Add request body size limit middleware (1 MB default for JSON APIs).
-	// File upload handlers set their own higher limits via http.MaxBytesReader.
+	// Multipart/form-data requests (file uploads) are excluded — handlers
+	// control their own limits via ParseMultipartForm.
 	root.Use(middleware.BodyLimit(0))
 
 	// Add per-IP rate limiting (Moved to specific route groups below for split limits)

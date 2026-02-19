@@ -79,6 +79,13 @@ templ WorkspacesPage(props WorkspacesPageProps) {
 										</button>
 										<div x-show="open" x-cloak class="absolute right-0 top-6 z-10 w-48 rounded-md border bg-popover p-1 shadow-md">
 											<button
+												@click="renameWorkspace(ws.id, ws.name, ws.description); open = false"
+												class="w-full text-left flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted cursor-pointer"
+											>
+												@icon.Pencil(icon.Props{Class: "size-4"})
+												{ i18n.T(ctx, "Rename") }
+											</button>
+											<button
 												@click="deleteWorkspace(ws.id, ws.name); open = false"
 												class="w-full text-left flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive hover:bg-destructive/10 cursor-pointer"
 											>
@@ -282,6 +289,25 @@ templ workspacesScript() {
 					} catch (e) {
 						console.error('Failed to delete workspace:', e);
 						alert('An error occurred while deleting the workspace');
+					}
+				},
+
+				async renameWorkspace(id, currentName, currentDescription) {
+					const newName = prompt('Enter a new name for the workspace:', currentName || '');
+					if (!newName || newName === currentName) return;
+					try {
+						const resp = await fetch(`/api/knowledge/workspaces/${id}`, {
+							method: 'PUT',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({ name: newName, description: currentDescription }),
+						});
+						if (resp.ok) {
+							this.loadWorkspaces();
+						} else {
+							alert('Failed to rename workspace');
+						}
+					} catch (e) {
+						console.error('Failed to rename workspace:', e);
 					}
 				},
 				
