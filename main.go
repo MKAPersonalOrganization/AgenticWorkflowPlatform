@@ -40,6 +40,7 @@ import (
 	"school-with-ai/infra/sqldb"
 	"school-with-ai/infra/sqldb/migrate"
 	"school-with-ai/services/agentorchestrator"
+	"school-with-ai/services/aisettings"
 	"school-with-ai/services/artifact"
 	"school-with-ai/services/edgequake"
 	"school-with-ai/services/memory"
@@ -55,6 +56,7 @@ import (
 	"school-with-ai/services/agentorchestrator/agents/statistics"
 
 	aguihandlers "school-with-ai/handlers/agui"
+	aiSettingsHandlers "school-with-ai/handlers/aisettings"
 	bannerhandlers "school-with-ai/handlers/banner"
 	healthhandlers "school-with-ai/handlers/health"
 	knowledgehandlers "school-with-ai/handlers/knowledge"
@@ -144,10 +146,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 			Concurrency         int           `conf:"default:5"`
 			ShutdownTimeout     time.Duration `conf:"default:10s"`
 			HealthCheckInterval time.Duration `conf:"default:15s"`
-		}
-		AI struct {
-			Provider string `conf:"default:openai"`
-			Model    string `conf:"default:gpt-4o"`
 		}
 
 		Artifacts struct {
@@ -327,34 +325,10 @@ func run(ctx context.Context, log *logger.Logger) error {
 		}
 	}()
 
-	// Get AI provider configuration
-	// LLM client creation is now handled internally by each framework adapter
-	log.Info(ctx, "startup", "status", "preparing AI configuration", "provider", cfg.AI.Provider, "model", cfg.AI.Model)
-
-	var apiKey string
-	switch cfg.AI.Provider {
-	case "openai":
-		apiKey = os.Getenv("OPENAI_API_KEY")
-		if apiKey == "" {
-			return fmt.Errorf("OPENAI_API_KEY environment variable is not set")
-		}
-
-	case "gemini":
-		apiKey = os.Getenv("GEMINI_API_KEY")
-		if apiKey == "" {
-			return fmt.Errorf("GEMINI_API_KEY environment variable is not set")
-		}
-
-	default:
-		return fmt.Errorf("unsupported AI provider: %s", cfg.AI.Provider)
-	}
-
-	// Create model configuration - framework adapters will create their own clients
-	modelConfig := &agent.ModelConfig{
-		Provider: cfg.AI.Provider,
-		Model:    cfg.AI.Model,
-		APIKey:   apiKey,
-	}
+	// Initialize per-user AI settings
+	aiSettingsRepo := sqldb.NewPostgresAISettingsRepository(db)
+	aiSettingsService := aisettings.New(aiSettingsRepo)
+	log.Info(ctx, "startup", "status", "ai settings service initialized (per-user)")
 
 	// Initialize artifact service
 	log.Info(ctx, "startup", "status", "initializing s3 artifact service", "endpoint", cfg.Artifacts.S3Endpoint, "bucket", cfg.Artifacts.S3Bucket)
@@ -450,7 +424,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 			log,
 			agentOrchestrator, // ThreadManager interface
 			agentProvider,     // AgentProvider
-			modelConfig,       // Model configuration (provider, model, API key)
+			aiSettingsService, // Per-user model config resolver
 			artifactService,
 			studentProfileRepo,
 			cfg.AgentCapabilities.LongTermMemory,
@@ -634,6 +608,14 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Get("/profile", authMiddleware.RequireAuthFunc(profileHandler.HandleProfilePage))
 	r.Get("/api/profile", authMiddleware.RequireAuthFunc(profileHandler.GetProfile))
 	r.Put("/api/profile", authMiddleware.RequireAuthFunc(profileHandler.UpdateProfile))
+
+	// AI Settings routes (protected)
+	aiSettingsHandler := aiSettingsHandlers.NewHandler(log, aiSettingsService)
+	r.Get("/api/ai-settings/providers", authMiddleware.RequireAuthFunc(aiSettingsHandler.ListProviders))
+	r.Get("/api/ai-settings", authMiddleware.RequireAuthFunc(aiSettingsHandler.GetSettings))
+	r.Put("/api/ai-settings", authMiddleware.RequireAuthFunc(aiSettingsHandler.SaveSettings))
+	r.Delete("/api/ai-settings/{id}", authMiddleware.RequireAuthFunc(aiSettingsHandler.DeleteSettings))
+	r.Put("/api/ai-settings/{id}/default", authMiddleware.RequireAuthFunc(aiSettingsHandler.SetDefault))
 
 	// Analytics Dashboard (dedicated Basic Auth)
 	statsHandler := statisticsHandler.NewHandler(log, statsProjection, cfg.DashboardAdmin.User, cfg.DashboardAdmin.Pass)

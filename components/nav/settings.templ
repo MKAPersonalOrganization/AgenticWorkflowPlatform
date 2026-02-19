@@ -6,11 +6,11 @@ import (
 	"school-with-ai/components/dialog"
 	"school-with-ai/components/i18n"
 	"school-with-ai/components/icon"
+	"school-with-ai/components/memory"
 	"school-with-ai/components/nativeselect"
 	"school-with-ai/components/selectbox"
 	switchcomp "school-with-ai/components/switch"
 	"school-with-ai/components/tabs"
-	"school-with-ai/components/memory"
 )
 
 // Settings renders the settings dialog
@@ -83,8 +83,13 @@ templ Settings() {
 									@icon.Settings(icon.Props{Class: "size-4"})
 									<span>{ i18n.T(ctx, "General") }</span>
 								}
-								@tabs.Trigger(tabs.TriggerProps{
-									Value: "personalization",
+								@tabs.Trigger(tabs.TriggerProps{Value: "ai",
+									Class: "justify-start gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 data-[tui-tabs-state=active]:bg-accent data-[tui-tabs-state=active]:text-foreground data-[tui-tabs-state=inactive]:text-muted-foreground hover:bg-accent/50 hover:text-foreground shadow-none border-none",
+								}) {
+									@icon.Bot(icon.Props{Class: "size-4"})
+									<span>{ i18n.T(ctx, "AI") }</span>
+								}
+								@tabs.Trigger(tabs.TriggerProps{Value: "personalization",
 									Class: "justify-start gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 data-[tui-tabs-state=active]:bg-accent data-[tui-tabs-state=active]:text-foreground data-[tui-tabs-state=inactive]:text-muted-foreground hover:bg-accent/50 hover:text-foreground shadow-none border-none",
 								}) {
 									@icon.UserCog(icon.Props{Class: "size-4"})
@@ -175,6 +180,204 @@ templ Settings() {
 												"aria-label": i18n.T(ctx, "Auto-scroll during response"),
 											},
 										})
+									</div>
+								</div>
+							}
+							<!-- AI Tab -->
+							@tabs.Content(tabs.ContentProps{Value: "ai", Class: "space-y-6 animate-in fade-in duration-200"}) {
+								<div
+									x-data="aiSettingsManager()"
+									x-init="loadSettings()"
+									class="space-y-6"
+								>
+									<!-- Provider Selection -->
+									<div class="space-y-4">
+										<div class="flex items-center justify-between">
+											<h3 class="text-foreground font-medium">{ i18n.T(ctx, "AI Provider Configuration") }</h3>
+										</div>
+										<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "Configure your own AI provider and API keys. You are responsible for any costs incurred.") }</p>
+									</div>
+									<!-- Status Banner -->
+									<template x-if="statusMessage">
+										<div
+											:class="statusType === 'error' ? 'bg-destructive/10 border-destructive/30 text-destructive' : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'"
+											class="p-3 rounded-xl border text-sm"
+											x-text="statusMessage"
+										></div>
+									</template>
+									<!-- Existing Providers -->
+									<template x-if="settings.length > 0">
+										<div class="space-y-3">
+											<template x-for="s in settings" :key="s.id">
+												<div
+													class="flex items-center justify-between p-3 rounded-xl border border-border hover:bg-accent/50 transition-colors"
+													:class="s.is_default ? 'ring-1 ring-primary/50' : ''"
+												>
+													<div class="flex items-center gap-3">
+														<div class="size-8 rounded-lg bg-primary/10 flex items-center justify-center">
+															<span class="text-primary text-xs font-bold" x-text="s.provider.substring(0,2).toUpperCase()"></span>
+														</div>
+														<div>
+															<div class="font-medium text-foreground flex items-center gap-2">
+																<span x-text="providerName(s.provider)"></span>
+																<template x-if="s.is_default">
+																	<span class="text-[10px] bg-primary/20 text-primary rounded-full px-2 py-0.5">Default</span>
+																</template>
+															</div>
+															<div class="text-[12px] text-muted-foreground">
+																<span x-text="s.default_llm_model || 'No model selected'"></span>
+																<span class="mx-1">·</span>
+																<span x-text="s.api_key_masked"></span>
+															</div>
+														</div>
+													</div>
+													<div class="flex items-center gap-1">
+														<button
+															x-show="!s.is_default"
+															@click="setDefault(s.id)"
+															class="text-xs px-2 py-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+															title="Set as Default"
+														>Set Default</button>
+														<button
+															@click="editProvider(s)"
+															class="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+															title="Edit"
+														>✎</button>
+														<button
+															@click="deleteProvider(s.id)"
+															class="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+															title="Delete"
+														>✕</button>
+													</div>
+												</div>
+											</template>
+										</div>
+									</template>
+									<!-- Add / Edit Provider Form -->
+									<div class="border-t border-border pt-4 space-y-4">
+										<h4 class="text-foreground font-medium" x-text="editing ? 'Edit Provider' : 'Add Provider'"></h4>
+										<!-- Provider Select -->
+										<div class="flex flex-col gap-2">
+											<label class="text-foreground text-sm">{ i18n.T(ctx, "Provider") }</label>
+											<select
+												x-model="form.provider"
+												@change="onProviderChange()"
+												class="w-full h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs"
+											>
+												<option value="">{ i18n.T(ctx, "Select a provider...") }</option>
+												<template x-for="p in providers" :key="p.id">
+													<option :value="p.id" x-text="p.name"></option>
+												</template>
+											</select>
+										</div>
+										<!-- API Key -->
+										<div class="flex flex-col gap-2">
+											<label class="text-foreground text-sm">{ i18n.T(ctx, "API Key") }</label>
+											<input
+												type="password"
+												x-model="form.api_key"
+												placeholder={ i18n.T(ctx, "sk-...or paste your API key") }
+												class="w-full h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs"
+											/>
+											<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "Your API key is encrypted and stored securely. You are responsible for usage costs.") }</p>
+										</div>
+										<!-- Default LLM Model -->
+										<div class="flex flex-col gap-2">
+											<label class="text-foreground text-sm">{ i18n.T(ctx, "Default LLM Model") }</label>
+											<select
+												x-model="form.default_llm_model"
+												class="w-full h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs"
+											>
+												<option value="">{ i18n.T(ctx, "Select a model...") }</option>
+												<template x-for="m in currentModels" :key="m">
+													<option :value="m" x-text="m"></option>
+												</template>
+											</select>
+										</div>
+										<!-- Default Embedding Model -->
+										<div class="flex flex-col gap-2">
+											<label class="text-foreground text-sm">{ i18n.T(ctx, "Default Embedding Model") }</label>
+											<select
+												x-model="form.default_embed_model"
+												class="w-full h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs"
+											>
+												<option value="">{ i18n.T(ctx, "None") }</option>
+												<template x-for="m in currentEmbedModels" :key="m">
+													<option :value="m" x-text="m"></option>
+												</template>
+											</select>
+										</div>
+										<!-- Advanced Settings Toggle -->
+										<details class="group">
+											<summary class="cursor-pointer text-sm text-muted-foreground hover:text-foreground transition-colors list-none flex items-center gap-1">
+												<span class="group-open:rotate-90 transition-transform">▶</span>
+												{ i18n.T(ctx, "Advanced Settings") }
+											</summary>
+											<div class="pt-3 space-y-4">
+												<div class="flex items-center justify-between gap-4">
+													<div>
+														<label class="text-foreground text-sm">{ i18n.T(ctx, "Max Tokens") }</label>
+														<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "Maximum number of tokens in the response. 0 = provider default.") }</p>
+													</div>
+													<input
+														type="number"
+														x-model.number="form.max_tokens"
+														min="0"
+														max="128000"
+														class="w-24 h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs text-center"
+													/>
+												</div>
+												<div class="flex items-center justify-between gap-4">
+													<div>
+														<label class="text-foreground text-sm">{ i18n.T(ctx, "Temperature") }</label>
+														<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "Controls randomness. Lower = more deterministic.") }</p>
+													</div>
+													<input
+														type="number"
+														x-model.number="form.temperature"
+														min="0"
+														max="2"
+														step="0.1"
+														class="w-24 h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs text-center"
+													/>
+												</div>
+												<div class="flex items-center justify-between gap-4">
+													<div>
+														<label class="text-foreground text-sm">{ i18n.T(ctx, "Embedding Dimensions") }</label>
+														<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "Embedding vector size. 0 = model default.") }</p>
+													</div>
+													<input
+														type="number"
+														x-model.number="form.embedding_dimensions"
+														min="0"
+														max="3072"
+														class="w-24 h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs text-center"
+													/>
+												</div>
+											</div>
+										</details>
+										<!-- Save / Cancel -->
+										<div class="flex items-center justify-end gap-2 pt-2">
+											<button
+												x-show="editing"
+												@click="cancelEdit()"
+												class="px-4 py-2 text-sm rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+											>{ i18n.T(ctx, "Cancel") }</button>
+											@button.Button(button.Props{
+												Type:  button.TypeButton,
+												Class: "min-w-[120px]",
+												Attributes: templ.Attributes{
+													"@click":    "saveProvider()",
+													":disabled": "saving || !form.provider || !form.api_key",
+												},
+											}) {
+												<span x-show="!saving" x-text="editing ? 'Update Provider' : 'Add Provider'"></span>
+												<span x-show="saving" class="flex items-center gap-2">
+													<span class="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground"></span>
+													{ i18n.T(ctx, "Saving...") }
+												</span>
+											}
+										</div>
 									</div>
 								</div>
 							}
