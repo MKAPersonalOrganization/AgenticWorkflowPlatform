@@ -20,7 +20,7 @@ templ DocumentFilters() {
 			x-model="docStatusFilter"
 			@change="filterByStatus(docStatusFilter)"
 		>
-			<option value="" x-text="'All' + (docStatusCounts ? ' (' + (docStatusCounts.all || allDocuments.length) + ')' : '')"></option>
+			<option value="" x-text="'All' + (docStatusCounts ? ' (' + (docStatusCounts.all || documents.length) + ')' : '')"></option>
 			<option value="pending" x-text="'Pending' + (docStatusCounts?.pending ? ' (' + docStatusCounts.pending + ')' : '')"></option>
 			<option value="processing" x-text="'Processing' + (docStatusCounts?.processing ? ' (' + docStatusCounts.processing + ')' : '')"></option>
 			<option value="completed" x-text="'Completed' + (docStatusCounts?.completed ? ' (' + docStatusCounts.completed + ')' : '')"></option>
