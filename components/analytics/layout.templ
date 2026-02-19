@@ -6,8 +6,9 @@ import (
 )
 
 type LayoutProps struct {
-	Title string
-	User  *domain.User
+	Title      string
+	User       *domain.User
+	HideNavbar bool
 }
 
 templ AnalyticsExtraHead() {
@@ -16,9 +17,10 @@ templ AnalyticsExtraHead() {
 
 templ Layout(props LayoutProps) {
 	@components.BaseLayout(components.LayoutProps{
-		Title:     props.Title,
-		User:      props.User,
-		ExtraHead: AnalyticsExtraHead(),
+		Title:      props.Title,
+		User:       props.User,
+		ExtraHead:  AnalyticsExtraHead(),
+		HideNavbar: props.HideNavbar,
 	}) {
 		<!-- Main Content -->
 		<main class="flex-1">
