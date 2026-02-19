@@ -276,3 +276,19 @@ CREATE TABLE IF NOT EXISTS user_ai_settings (
 
 CREATE INDEX IF NOT EXISTS idx_user_ai_settings_user ON user_ai_settings(user_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_user_ai_settings_user_provider ON user_ai_settings(user_id, provider);
+
+-- Version: 1.21
+-- Description: Create analytics events table for time-series tool monitoring
+CREATE TABLE IF NOT EXISTS analytics_events (
+    id BIGSERIAL PRIMARY KEY,
+    agent_name VARCHAR(255) NOT NULL,
+    tool_name VARCHAR(255) NOT NULL,
+    is_error BOOLEAN NOT NULL DEFAULT FALSE,
+    latency_ms INTEGER,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_analytics_events_created ON analytics_events(created_at);
+CREATE INDEX IF NOT EXISTS idx_analytics_events_tool ON analytics_events(tool_name);
+CREATE INDEX IF NOT EXISTS idx_analytics_events_agent ON analytics_events(agent_name);
+CREATE INDEX IF NOT EXISTS idx_analytics_events_tool_created ON analytics_events(tool_name, created_at);
