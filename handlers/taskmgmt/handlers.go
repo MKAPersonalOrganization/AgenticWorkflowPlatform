@@ -586,8 +586,14 @@ func (h *TaskManagementHandler) ListAgentToolSets(w http.ResponseWriter, r *http
 		return
 	}
 
+	user := h.authService.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	// Get enabled tool set IDs for the agent
-	enabledToolSetIDs, err := h.permissionsService.GetEnabledToolSets(r.Context(), agentID)
+	enabledToolSetIDs, err := h.permissionsService.GetEnabledToolSets(r.Context(), user.ID, agentID)
 	if err != nil {
 		h.log.Error(r.Context(), "Failed to get enabled tool sets", "agent_id", agentID, "error", err)
 		http.Error(w, "Failed to retrieve agent tool set permissions", http.StatusInternalServerError)
@@ -614,7 +620,7 @@ func (h *TaskManagementHandler) ListAgentToolSets(w http.ResponseWriter, r *http
 		toolResponses := make([]ToolInSetResponse, 0, len(toolsInSet))
 		for _, tool := range toolsInSet {
 			// Check individual tool permission - if no explicit permission, inherit from tool set
-			toolEnabled := h.permissionsService.HasPermission(r.Context(), agentID, toolSet.ID, tool.ID)
+			toolEnabled := h.permissionsService.HasPermission(r.Context(), user.ID, agentID, toolSet.ID, tool.ID)
 
 			toolResponses = append(toolResponses, ToolInSetResponse{
 				ID:          tool.ID,
@@ -656,6 +662,12 @@ func (h *TaskManagementHandler) ToggleAgentToolSet(w http.ResponseWriter, r *htt
 		return
 	}
 
+	user := h.authService.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	var req ToggleAgentToolSetRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -671,7 +683,7 @@ func (h *TaskManagementHandler) ToggleAgentToolSet(w http.ResponseWriter, r *htt
 	}
 
 	// Update permission in permissions service
-	if err := h.permissionsService.SetToolSetPermission(r.Context(), agentID, toolSetID, req.Enabled); err != nil {
+	if err := h.permissionsService.SetToolSetPermission(r.Context(), user.ID, agentID, toolSetID, req.Enabled); err != nil {
 		h.log.Error(r.Context(), "Failed to update agent tool set permission",
 			"agent_id", agentID, "tool_set_id", toolSetID, "enabled", req.Enabled, "error", err)
 		http.Error(w, "Failed to update tool set permission", http.StatusInternalServerError)
@@ -702,6 +714,12 @@ func (h *TaskManagementHandler) ToggleIndividualTool(w http.ResponseWriter, r *h
 
 	if agentID == "" || toolSetID == "" || toolID == "" {
 		http.Error(w, "agentId, toolSetId, and toolId are required", http.StatusBadRequest)
+		return
+	}
+
+	user := h.authService.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -741,7 +759,7 @@ func (h *TaskManagementHandler) ToggleIndividualTool(w http.ResponseWriter, r *h
 	}
 
 	// Update individual tool permission
-	if err := h.permissionsService.SetPermission(r.Context(), agentID, toolSetID, toolID, req.Enabled); err != nil {
+	if err := h.permissionsService.SetPermission(r.Context(), user.ID, agentID, toolSetID, toolID, req.Enabled); err != nil {
 		h.log.Error(r.Context(), "Failed to update individual tool permission",
 			"agent_id", agentID, "tool_set_id", toolSetID, "tool_id", toolID, "enabled", req.Enabled, "error", err)
 		http.Error(w, "Failed to update tool permission", http.StatusInternalServerError)

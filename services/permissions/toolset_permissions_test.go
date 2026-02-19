@@ -7,7 +7,9 @@ import (
 
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/permissions"
+	"school-with-ai/services/permissions/mocks"
 	"school-with-ai/services/toolregistry"
+	toolregistry_mocks "school-with-ai/services/toolregistry/mocks"
 )
 
 func TestToolSetPermissions(t *testing.T) {
@@ -15,8 +17,8 @@ func TestToolSetPermissions(t *testing.T) {
 	log := logger.NewText(os.Stdout, logger.LevelInfo, "TEST", nil)
 
 	// Create repositories and services
-	permissionsRepo := permissions.NewInMemoryRepository()
-	toolRegistryRepo := toolregistry.NewInMemoryRepository()
+	permissionsRepo := mocks.NewInMemoryRepository()
+	toolRegistryRepo := toolregistry_mocks.NewInMemoryRepository()
 
 	permissionsService := permissions.NewService(log, permissionsRepo)
 	toolRegistry := toolregistry.NewRegistry(log, toolRegistryRepo)
@@ -26,13 +28,15 @@ func TestToolSetPermissions(t *testing.T) {
 		t.Fatalf("Failed to initialize tool registry: %v", err)
 	}
 
+	userID := "test-user"
+
 	// Test: Get default tool sets for different agents
 	agentTypes := []string{"math-instructor", "statistics-instructor"}
 
 	for _, agentType := range agentTypes {
 		t.Logf("Testing default tool sets for %s", agentType)
 
-		enabledToolSets, err := permissionsService.GetEnabledToolSets(ctx, agentType)
+		enabledToolSets, err := permissionsService.GetEnabledToolSets(ctx, userID, agentType)
 		if err != nil {
 			t.Fatalf("Failed to get enabled tool sets for %s: %v", agentType, err)
 		}
@@ -48,13 +52,13 @@ func TestToolSetPermissions(t *testing.T) {
 	t.Log("Testing tool set permission changes...")
 
 	// Disable calculator-set for math-instructor
-	err := permissionsService.SetToolSetPermission(ctx, "math-instructor", "calculator-set", false)
+	err := permissionsService.SetToolSetPermission(ctx, userID, "math-instructor", "calculator-set", false)
 	if err != nil {
 		t.Fatalf("Failed to disable calculator-set for math-instructor: %v", err)
 	}
 
 	// Verify calculator-set is disabled for math-instructor
-	mathToolSets, err := permissionsService.GetEnabledToolSets(ctx, "math-instructor")
+	mathToolSets, err := permissionsService.GetEnabledToolSets(ctx, userID, "math-instructor")
 	if err != nil {
 		t.Fatalf("Failed to get enabled tool sets for math-instructor: %v", err)
 	}
@@ -68,7 +72,7 @@ func TestToolSetPermissions(t *testing.T) {
 	t.Logf("After disabling calculator-set, math-instructor has %d tool sets: %v", len(mathToolSets), mathToolSets)
 
 	// Verify other agents are unaffected
-	physicsToolSets, err := permissionsService.GetEnabledToolSets(ctx, "physics-instructor")
+	physicsToolSets, err := permissionsService.GetEnabledToolSets(ctx, userID, "physics-instructor")
 	if err != nil {
 		t.Fatalf("Failed to get enabled tool sets for physics-instructor: %v", err)
 	}
@@ -86,12 +90,12 @@ func TestToolSetPermissions(t *testing.T) {
 	}
 
 	// Test: Enable a tool set that's not in defaults
-	err = permissionsService.SetToolSetPermission(ctx, "math-instructor", "chemistry-set", true)
+	err = permissionsService.SetToolSetPermission(ctx, userID, "math-instructor", "chemistry-set", true)
 	if err != nil {
 		t.Fatalf("Failed to enable chemistry-set for math-instructor: %v", err)
 	}
 
-	mathToolSetsAfterEnable, err := permissionsService.GetEnabledToolSets(ctx, "math-instructor")
+	mathToolSetsAfterEnable, err := permissionsService.GetEnabledToolSets(ctx, userID, "math-instructor")
 	if err != nil {
 		t.Fatalf("Failed to get enabled tool sets after enabling chemistry-set: %v", err)
 	}
@@ -111,7 +115,7 @@ func TestToolSetPermissions(t *testing.T) {
 	t.Logf("After enabling chemistry-set, math-instructor has %d tool sets: %v", len(mathToolSetsAfterEnable), mathToolSetsAfterEnable)
 
 	// Test: Individual tool set permission retrieval
-	calcPerm, err := permissionsService.GetToolSetPermission(ctx, "math-instructor", "calculator-set")
+	calcPerm, err := permissionsService.GetToolSetPermission(ctx, userID, "math-instructor", "calculator-set")
 	if err != nil {
 		t.Fatalf("Failed to get calculator-set permission: %v", err)
 	}
@@ -121,15 +125,15 @@ func TestToolSetPermissions(t *testing.T) {
 	}
 
 	// Test: Check if agent has permission for tool set
-	if permissionsService.HasToolSetPermission(ctx, "math-instructor", "calculator-set") {
+	if permissionsService.HasToolSetPermission(ctx, userID, "math-instructor", "calculator-set") {
 		t.Errorf("Expected math-instructor to NOT have calculator-set permission")
 	}
 
-	if !permissionsService.HasToolSetPermission(ctx, "physics-instructor", "calculator-set") {
+	if !permissionsService.HasToolSetPermission(ctx, userID, "physics-instructor", "calculator-set") {
 		t.Errorf("Expected physics-instructor to have calculator-set permission")
 	}
 
-	if !permissionsService.HasToolSetPermission(ctx, "math-instructor", "chemistry-set") {
+	if !permissionsService.HasToolSetPermission(ctx, userID, "math-instructor", "chemistry-set") {
 		t.Errorf("Expected math-instructor to have chemistry-set permission after manual enable")
 	}
 

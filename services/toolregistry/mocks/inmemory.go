@@ -1,29 +1,31 @@
-package toolregistry
+package mocks
 
 import (
 	"context"
 	"fmt"
 	"sync"
+
+	"school-with-ai/services/toolregistry"
 )
 
 // InMemoryRepository implements Repository interface with in-memory storage.
 // This is suitable for development and testing. For production, use a persistent storage.
 type InMemoryRepository struct {
 	mutex    sync.RWMutex
-	tools    map[string]*Tool    // toolID -> Tool
-	toolSets map[string]*ToolSet // toolSetID -> ToolSet
+	tools    map[string]*toolregistry.Tool    // toolID -> Tool
+	toolSets map[string]*toolregistry.ToolSet // toolSetID -> ToolSet
 }
 
 // NewInMemoryRepository creates a new in-memory repository.
-func NewInMemoryRepository() Repository {
+func NewInMemoryRepository() toolregistry.Repository {
 	return &InMemoryRepository{
-		tools:    make(map[string]*Tool),
-		toolSets: make(map[string]*ToolSet),
+		tools:    make(map[string]*toolregistry.Tool),
+		toolSets: make(map[string]*toolregistry.ToolSet),
 	}
 }
 
 // GetTool retrieves a tool by ID.
-func (r *InMemoryRepository) GetTool(ctx context.Context, id string) (*Tool, error) {
+func (r *InMemoryRepository) GetTool(ctx context.Context, id string) (*toolregistry.Tool, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 
@@ -38,11 +40,11 @@ func (r *InMemoryRepository) GetTool(ctx context.Context, id string) (*Tool, err
 }
 
 // ListTools returns all tools.
-func (r *InMemoryRepository) ListTools(ctx context.Context) ([]Tool, error) {
+func (r *InMemoryRepository) ListTools(ctx context.Context) ([]toolregistry.Tool, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 
-	tools := make([]Tool, 0, len(r.tools))
+	tools := make([]toolregistry.Tool, 0, len(r.tools))
 	for _, tool := range r.tools {
 		tools = append(tools, *tool) // Copy to prevent external modifications
 	}
@@ -51,7 +53,7 @@ func (r *InMemoryRepository) ListTools(ctx context.Context) ([]Tool, error) {
 }
 
 // SaveTool saves or updates a tool.
-func (r *InMemoryRepository) SaveTool(ctx context.Context, tool *Tool) error {
+func (r *InMemoryRepository) SaveTool(ctx context.Context, tool *toolregistry.Tool) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -76,7 +78,7 @@ func (r *InMemoryRepository) DeleteTool(ctx context.Context, id string) error {
 }
 
 // GetToolSet retrieves a tool set by ID.
-func (r *InMemoryRepository) GetToolSet(ctx context.Context, id string) (*ToolSet, error) {
+func (r *InMemoryRepository) GetToolSet(ctx context.Context, id string) (*toolregistry.ToolSet, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 
@@ -95,11 +97,11 @@ func (r *InMemoryRepository) GetToolSet(ctx context.Context, id string) (*ToolSe
 }
 
 // ListToolSets returns all tool sets.
-func (r *InMemoryRepository) ListToolSets(ctx context.Context) ([]ToolSet, error) {
+func (r *InMemoryRepository) ListToolSets(ctx context.Context) ([]toolregistry.ToolSet, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 
-	toolSets := make([]ToolSet, 0, len(r.toolSets))
+	toolSets := make([]toolregistry.ToolSet, 0, len(r.toolSets))
 	for _, toolSet := range r.toolSets {
 		// Create a copy with deep copy of slice
 		toolSetCopy := *toolSet
@@ -112,7 +114,7 @@ func (r *InMemoryRepository) ListToolSets(ctx context.Context) ([]ToolSet, error
 }
 
 // SaveToolSet saves or updates a tool set.
-func (r *InMemoryRepository) SaveToolSet(ctx context.Context, toolSet *ToolSet) error {
+func (r *InMemoryRepository) SaveToolSet(ctx context.Context, toolSet *toolregistry.ToolSet) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 

@@ -1,4 +1,4 @@
-package toolregistry
+package toolregistry_test
 
 import (
 	"context"
@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"school-with-ai/foundation/logger"
+	"school-with-ai/services/toolregistry"
+	"school-with-ai/services/toolregistry/mocks"
 )
 
 func TestToolRegistry(t *testing.T) {
@@ -13,7 +15,7 @@ func TestToolRegistry(t *testing.T) {
 	log := logger.NewText(os.Stdout, logger.LevelInfo, "TEST", nil)
 
 	// Create registry with in-memory repository
-	registry := NewRegistry(log, NewInMemoryRepository())
+	registry := toolregistry.NewRegistry(log, mocks.NewInMemoryRepository())
 
 	ctx := context.Background()
 
@@ -48,7 +50,7 @@ func TestToolRegistry(t *testing.T) {
 	t.Logf("Successfully retrieved tool: %s - %s", tool.ID, tool.Name)
 
 	// Test registering a new tool
-	newTool := &Tool{
+	newTool := &toolregistry.Tool{
 		ID:          "test-tool",
 		Name:        "Test Tool",
 		Description: "A tool for testing",
