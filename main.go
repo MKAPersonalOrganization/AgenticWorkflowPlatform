@@ -128,8 +128,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 			Password     string `conf:"default:dev-password,mask"`
 			Host         string `conf:"default:localhost:5435"`
 			Name         string `conf:"default:projections"`
-			MaxIdleConns int    `conf:"default:2"`
-			MaxOpenConns int    `conf:"default:25"`
+			MaxIdleConns int    `conf:"default:100"`
+			MaxOpenConns int    `conf:"default:100"`
 			DisableTLS   bool   `conf:"default:true"`
 		}
 		Redis struct {
