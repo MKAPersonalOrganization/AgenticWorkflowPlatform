@@ -63,7 +63,7 @@ templ DocumentHeader() {
 				</button>
 			</template>
 			<!-- Reprocess Failed -->
-			<template x-if="statusCounts.failed > 0 || statusCounts.partial_failure > 0">
+			<template x-if="docStatusCounts.failed > 0 || docStatusCounts.partial_failure > 0">
 				@button.Button(button.Props{
 					Variant: button.VariantOutline,
 					Size:    button.SizeSm,

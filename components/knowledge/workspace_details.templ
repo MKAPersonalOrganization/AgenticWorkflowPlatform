@@ -186,7 +186,8 @@ templ workspaceDetailsScript() {
 				docTotal: 0,
 				docTotalPages: 0,
 				docStatusFilter: '', // '', 'pending', 'processing', 'completed', 'failed', 'cancelled'
-				statusCounts: { pending: 0, processing: 0, completed: 0, partial_failure: 0, failed: 0, cancelled: 0 },
+				docsError: null,
+				docStatusCounts: { pending: 0, processing: 0, completed: 0, partial_failure: 0, failed: 0, cancelled: 0 },
 
 				// Pipeline Status
 				pipelineStatus: null,
@@ -650,17 +651,17 @@ templ workspaceDetailsScript() {
 							this.documents = data.documents || [];
 							this.docTotal = data.total || this.documents.length;
 							this.docTotalPages = 1;
-							// Use server status_counts if available, otherwise compute client-side
 							if (data.status_counts && Object.values(data.status_counts).some(v => v > 0)) {
-								this.statusCounts = data.status_counts;
+								this.docStatusCounts = data.status_counts;
 							} else {
 								this.computeStatusCounts();
 							}
 						}
+						setTimeout(() => { this.docsLoading = false; }, 300);
 					} catch (e) {
 						console.error('Failed to load documents:', e);
+						this.docsError = e.message || 'Unknown error';
 					} finally {
-						setTimeout(() => { this.docsLoading = false; }, 300);
 					}
 				},
 
@@ -678,7 +679,7 @@ templ workspaceDetailsScript() {
 							counts.completed++;
 						}
 					}
-					this.statusCounts = counts;
+					this.docStatusCounts = counts;
 				},
 
 				filterByStatus(status) {
