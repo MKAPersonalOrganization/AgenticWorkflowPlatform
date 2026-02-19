@@ -620,6 +620,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Analytics Dashboard (dedicated Basic Auth)
 	statsHandler := statisticsHandler.NewHandler(log, statsProjection, cfg.DashboardAdmin.User, cfg.DashboardAdmin.Pass)
 	r.Get("/analytics", statsHandler.BasicAuth(statsHandler.ServeDashboard))
+	r.Get("/analytics/api/timeseries", statsHandler.BasicAuth(statsHandler.ServeToolTimeSeries))
+	r.Get("/analytics/api/tools/{tool}", statsHandler.BasicAuth(statsHandler.ServeToolDetail))
 
 	// Pricing page
 	r.Get("/pricing", authMiddleware.RequireAuthFunc(HandlePricingPage(log)))

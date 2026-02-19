@@ -42,10 +42,16 @@ func (p *PostgresProjection) HandleEvent(ctx context.Context, event domain.Event
 	switch e := event.(type) {
 	case *domain.ToolResultAdded:
 		if e.IsError {
-			return p.updateToolErrorStats(ctx, e)
+			if err := p.updateToolErrorStats(ctx, e); err != nil {
+				return err
+			}
 		} else {
-			return p.updateToolSuccessStats(ctx, e)
+			if err := p.updateToolSuccessStats(ctx, e); err != nil {
+				return err
+			}
 		}
+		// Also record individual event for time-series analytics
+		return p.recordToolEvent(ctx, e)
 	case *domain.AssistantMessageCompleted:
 		return p.updateMessageStats(ctx, e)
 	}
@@ -113,6 +119,24 @@ func (p *PostgresProjection) updateMessageStats(ctx context.Context, e *domain.A
 	return err
 }
 
+// recordToolEvent inserts an individual tool event for time-series analysis.
+func (p *PostgresProjection) recordToolEvent(ctx context.Context, e *domain.ToolResultAdded) error {
+	query := `
+		INSERT INTO analytics_events (agent_name, tool_name, is_error, created_at)
+		VALUES ($1, $2, $3, $4)
+	`
+	_, err := p.db.ExecContext(ctx, query,
+		e.AgentName,
+		e.ToolName,
+		e.IsError,
+		e.Timestamp,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to record tool event for %s (agent: %s): %w", e.ToolName, e.AgentName, err)
+	}
+	return nil
+}
+
 // GetStats retrieves statistics, optionally filtered by agent.
 func (p *PostgresProjection) GetStats(ctx context.Context, agentName string) ([]StatRow, error) {
 	var stats []StatRow
@@ -141,4 +165,74 @@ func (p *PostgresProjection) GetAgents(ctx context.Context) ([]string, error) {
 		return nil, fmt.Errorf("failed to get agents: %w", err)
 	}
 	return agents, nil
+}
+
+// GetToolTimeSeries retrieves time-series data for tool calls, grouped by hourly buckets.
+// Optionally filtered by agent and/or tool name.
+func (p *PostgresProjection) GetToolTimeSeries(ctx context.Context, agentFilter, toolFilter string) ([]TimeSeriesPoint, error) {
+	var points []TimeSeriesPoint
+	query := `
+		SELECT
+			date_trunc('hour', created_at) AS bucket,
+			COUNT(*) AS total_calls,
+			SUM(CASE WHEN is_error THEN 1 ELSE 0 END) AS errors,
+			SUM(CASE WHEN NOT is_error THEN 1 ELSE 0 END) AS successes,
+			CASE WHEN COUNT(*) > 0 THEN ROUND(SUM(CASE WHEN is_error THEN 1 ELSE 0 END)::numeric / COUNT(*)::numeric * 100, 2) ELSE 0 END AS error_rate,
+			AVG(latency_ms)::double precision AS avg_latency
+		FROM analytics_events
+		WHERE created_at >= NOW() - INTERVAL '7 days'
+	`
+	var args []any
+	argIdx := 1
+
+	if agentFilter != "" {
+		query += fmt.Sprintf(" AND agent_name = $%d", argIdx)
+		args = append(args, agentFilter)
+		argIdx++
+	}
+	if toolFilter != "" {
+		query += fmt.Sprintf(" AND tool_name = $%d", argIdx)
+		args = append(args, toolFilter)
+		argIdx++
+	}
+
+	query += " GROUP BY bucket ORDER BY bucket ASC"
+
+	if err := p.db.SelectContext(ctx, &points, query, args...); err != nil {
+		return nil, fmt.Errorf("failed to get tool time series: %w", err)
+	}
+	return points, nil
+}
+
+// GetToolList retrieves a summary of all tools, optionally filtered by agent.
+func (p *PostgresProjection) GetToolList(ctx context.Context, agentFilter string) ([]ToolSummary, error) {
+	var tools []ToolSummary
+	query := `
+		SELECT
+			tool_name,
+			COUNT(*) AS total_calls,
+			SUM(CASE WHEN is_error THEN 1 ELSE 0 END) AS errors,
+			SUM(CASE WHEN NOT is_error THEN 1 ELSE 0 END) AS successes,
+			CASE WHEN COUNT(*) > 0 THEN ROUND(SUM(CASE WHEN NOT is_error THEN 1 ELSE 0 END)::numeric / COUNT(*)::numeric * 100, 2) ELSE 0 END AS success_rate,
+			AVG(latency_ms)::double precision AS avg_latency,
+			MAX(created_at) AS last_call
+		FROM analytics_events
+	`
+	var args []any
+	if agentFilter != "" {
+		query += " WHERE agent_name = $1"
+		args = append(args, agentFilter)
+	}
+
+	query += " GROUP BY tool_name ORDER BY total_calls DESC"
+
+	if err := p.db.SelectContext(ctx, &tools, query, args...); err != nil {
+		return nil, fmt.Errorf("failed to get tool list: %w", err)
+	}
+	return tools, nil
+}
+
+// GetToolDetail retrieves time-series data for a specific tool.
+func (p *PostgresProjection) GetToolDetail(ctx context.Context, toolName, agentFilter string) ([]TimeSeriesPoint, error) {
+	return p.GetToolTimeSeries(ctx, agentFilter, toolName)
 }

@@ -2,6 +2,7 @@ package analytics
 
 import (
 	"school-with-ai/components"
+	"school-with-ai/components/chart"
 	"school-with-ai/domain"
 )
 
@@ -26,6 +27,7 @@ templ Layout(props LayoutProps) {
 		<main class="flex-1">
 			{ children... }
 		</main>
+		@chart.Script()
 		<footer class="border-t py-6 bg-muted/50">
 			<div class="max-w-7xl mx-auto px-4 text-center text-sm text-muted-foreground">
 				<p>© 2026 Compass Analytics. All rights reserved.</p>
