@@ -2,7 +2,7 @@ version: 3
 dotenv: [".env"]
 
 env:
-  APP_URL: http://127.0.0.1:8090
+  APP_URL: https://127.0.0.1:8090
   KRATOS_PUBLIC_URL: http://127.0.0.1:4433
   KRATOS_ADMIN_URL: http://127.0.0.1:4434
   KRATOS_BROWSER_URL: http://127.0.0.1:4433
@@ -76,7 +76,7 @@ tasks:
   templ:
     desc: Run templ with integrated server and hot reload
     cmds:
-      - templ generate --watch --proxy="http://localhost:8090" --cmd="go run ./main.go" --open-browser=false
+      - templ generate --watch --proxy="https://localhost:8090" --cmd="go run ./main.go" --open-browser=false
 
   tailwind:
     desc: Watch Tailwind CSS changes
@@ -100,14 +100,19 @@ tasks:
   run: "wgo -file=.go -file=.templ -xfile=_templ.go  go tool templ generate :: go run main.go"
 
   up:
-    desc: Start all docker compose services (Redis, Asynqmon, Kratos, Postgres, MailSlurper, Typesense, Langfuse, App-Postgres)
+    desc: Start all docker compose services (includes dev-only override)
     cmds:
       - docker compose up -d
 
-  down:
-    desc: Stop all docker compose services and remove volumes
+  up:prod:
+    desc: "Production-parity: all services + containerised app (no dev UIs, no Redis host port)"
     cmds:
-      - docker compose down -v
+      - docker compose -f docker-compose.yml --profile prod up -d --build
+
+  down:
+    desc: "Stop and remove containers, networks, and volumes"
+    cmds:
+      - docker compose --profile prod down -v --remove-orphans
 
   logs:
     desc: Show docker compose logs

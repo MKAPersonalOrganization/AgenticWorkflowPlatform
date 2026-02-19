@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"expvar"
 	"fmt"
@@ -111,9 +112,11 @@ func run(ctx context.Context, log *logger.Logger) error {
 			ShutdownTimeout   time.Duration `conf:"default:20s"`
 			APIHost           string        `conf:"default:localhost:8090"`
 			DebugHost         string        `conf:"default:0.0.0.0:4010"`
+			TLSCert           string        `conf:"default:./tls/cert.pem"`
+			TLSKey            string        `conf:"default:./tls/key.pem"`
 		}
 		Auth struct {
-			AppURL        string `conf:"default:http://localhost:8090"`
+			AppURL        string `conf:"default:https://localhost:8090"`
 			KratosPublic  string `conf:"default:http://localhost:4433"`
 			KratosAdmin   string `conf:"default:http://localhost:4434"`
 			KratosBrowser string `conf:"default:http://localhost:4433"`
@@ -133,7 +136,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 			DisableTLS   bool   `conf:"default:true"`
 		}
 		Redis struct {
-			Addr string `conf:"default:localhost:6379"`
+			Addr     string `conf:"default:localhost:6379"`
+			Password string `conf:"mask"`
 		}
 		Orchestration struct {
 			Framework           string        `conf:"default:custom"`
@@ -263,7 +267,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	transientRouter := event.NewRouter()
 
 	// Initialize Redis broadcaster for cross-pod event delivery
-	redisBroadcaster := subscriber.NewRedisBroadcaster(log, cfg.Redis.Addr)
+	redisBroadcaster := subscriber.NewRedisBroadcaster(log, cfg.Redis.Addr, cfg.Redis.Password)
 	defer func() {
 		if closeErr := redisBroadcaster.Close(); closeErr != nil {
 			log.Error(ctx, "shutdown", "status", "failed to close Redis broadcaster", "ERROR", closeErr)
@@ -271,7 +275,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	}()
 
 	// Initialize Redis client for distributed rate limiting (shared across pods)
-	rateLimitRedis := goredis.NewClient(&goredis.Options{Addr: cfg.Redis.Addr})
+	rateLimitRedis := goredis.NewClient(&goredis.Options{Addr: cfg.Redis.Addr, Password: cfg.Redis.Password})
 	defer func() {
 		if closeErr := rateLimitRedis.Close(); closeErr != nil {
 			log.Error(ctx, "shutdown", "status", "failed to close rate-limit Redis client", "ERROR", closeErr)
@@ -512,6 +516,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		log,
 		taskmanagement.AsynqConfig{
 			RedisAddr:           cfg.Redis.Addr,
+			RedisPassword:       cfg.Redis.Password,
 			Concurrency:         cfg.Orchestration.Concurrency,
 			ShutdownTimeout:     cfg.Orchestration.ShutdownTimeout,
 			HealthCheckInterval: cfg.Orchestration.HealthCheckInterval,
@@ -726,6 +731,12 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Home route
 	r.Get("/", authMiddleware.RequireAuthFunc(HandleViewChatInputScreen(log, edgequakeService)))
 
+	// Configure TLS: restrict to elliptic curves with assembly implementations
+	// (X25519 and P256) to ensure the server remains performant under heavy load.
+	tlsConfig := &tls.Config{
+		CurvePreferences: []tls.CurveID{tls.X25519, tls.CurveP256},
+	}
+
 	// Create server with proper timeouts to prevent slowloris and similar attacks
 	server := &http.Server{
 		Addr:              cfg.Web.APIHost,
@@ -734,6 +745,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		ReadHeaderTimeout: cfg.Web.ReadHeaderTimeout,
 		WriteTimeout:      cfg.Web.WriteTimeout,
 		IdleTimeout:       cfg.Web.IdleTimeout,
+		TLSConfig:         tlsConfig,
 	}
 
 	// -------------------------------------------------------------------------
@@ -745,9 +757,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 	serverErrors := make(chan error, 1)
 
 	go func() {
-		log.Info(ctx, "startup", "status", "api router started", "host", server.Addr)
+		log.Info(ctx, "startup", "status", "api router started (HTTPS)", "host", server.Addr)
 
-		serverErrors <- server.ListenAndServe()
+		serverErrors <- server.ListenAndServeTLS(cfg.Web.TLSCert, cfg.Web.TLSKey)
 	}()
 
 	log.Info(ctx, "startup", "msg", "Press CTRL+C or send SIGTERM to shutdown")

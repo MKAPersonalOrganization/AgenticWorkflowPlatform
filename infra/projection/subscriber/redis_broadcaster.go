@@ -30,9 +30,10 @@ type redisSubscription struct {
 }
 
 // NewRedisBroadcaster creates a new Redis-backed broadcaster.
-func NewRedisBroadcaster(log *logger.Logger, redisAddr string) *RedisBroadcaster {
+func NewRedisBroadcaster(log *logger.Logger, redisAddr string, redisPassword string) *RedisBroadcaster {
 	client := redis.NewClient(&redis.Options{
-		Addr: redisAddr,
+		Addr:     redisAddr,
+		Password: redisPassword,
 	})
 
 	return &RedisBroadcaster{
