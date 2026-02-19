@@ -310,7 +310,7 @@ templ Settings() {
 										<!-- Advanced Settings Toggle -->
 										<details class="group">
 											<summary class="cursor-pointer text-sm text-muted-foreground hover:text-foreground transition-colors list-none flex items-center gap-1">
-												<span class="group-open:rotate-90 transition-transform">▶</span>
+												@icon.ChevronRight(icon.Props{Class: "size-4 transition-transform group-open:rotate-90"})
 												{ i18n.T(ctx, "Advanced Settings") }
 											</summary>
 											<div class="pt-3 space-y-4">
