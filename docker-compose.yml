@@ -1,55 +1,91 @@
 services:
-  # Redis for Asynq task queue
+  # =============================================================================
+  # Application — only started in production-parity mode (`task up:prod`)
+  # In dev mode the app runs on the host via `task dev`.
+  # =============================================================================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: school-with-ai:local
+    profiles: [prod]
+    ports:
+      - "8090:8090"
+    environment:
+      # Bind to all interfaces inside the container
+      - SCHOOL_WEB_API_HOST=0.0.0.0:8090
+      - SCHOOL_WEB_DEBUG_HOST=127.0.0.1:4015
+      # TLS — certs are mounted from host
+      - SCHOOL_WEB_TLS_CERT=/app/tls/cert.pem
+      - SCHOOL_WEB_TLS_KEY=/app/tls/key.pem
+      # Redis — internal Docker hostname + auth
+      - SCHOOL_REDIS_ADDR=redis:6379
+      - SCHOOL_REDIS_PASSWORD=${REDIS_PASSWORD}
+      # Database — internal Docker hostname
+      - SCHOOL_DB_HOST=app-postgres:5432
+      - SCHOOL_DB_USER=schoolai
+      - SCHOOL_DB_PASSWORD=${SCHOOL_DB_PASSWORD}
+      - SCHOOL_DB_NAME=projections
+      - SCHOOL_DB_DISABLE_TLS=true
+      # Auth — Kratos internal addresses
+      - SCHOOL_AUTH_APP_URL=https://localhost:8090
+      - SCHOOL_AUTH_KRATOS_PUBLIC=http://kratos:4433
+      - SCHOOL_AUTH_KRATOS_ADMIN=http://kratos:4434
+      - SCHOOL_AUTH_KRATOS_BROWSER=http://localhost:4433
+      # MinIO — internal Docker hostname
+      - SCHOOL_ARTIFACTS_S_3_ENDPOINT=minio:9000
+      - SCHOOL_ARTIFACTS_S_3_ACCESS_KEY=${SCHOOL_ARTIFACTS_S_3_ACCESS_KEY}
+      - SCHOOL_ARTIFACTS_S_3_SECRET_KEY=${SCHOOL_ARTIFACTS_S_3_SECRET_KEY}
+      - SCHOOL_ARTIFACTS_S_3_BUCKET=artifacts
+      - SCHOOL_ARTIFACTS_S_3_USE_SSL=false
+      # AI
+      - SCHOOL_AI_PROVIDER=${SCHOOL_AI_PROVIDER:-openai}
+      - SCHOOL_AI_MODEL=${SCHOOL_AI_MODEL:-gpt-4o}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      # Edgequake
+      - SCHOOL_EDGEQUAKE_BASE_URL=http://edgequake-api:8080
+      - SCHOOL_EDGEQUAKE_TENANT_ID=${SCHOOL_EDGEQUAKE_TENANT_ID}
+      # Dashboard admin
+      - SCHOOL_DASHBOARD_ADMIN_USER=${SCHOOL_DASHBOARD_ADMIN_USER:-admin}
+      - SCHOOL_DASHBOARD_ADMIN_PASS=${SCHOOL_DASHBOARD_ADMIN_PASS}
+    volumes:
+      - ./tls:/app/tls:ro      # mount self-signed cert
+    networks:
+      - intranet
+    depends_on:
+      redis:
+        condition: service_healthy
+      app-postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      kratos:
+        condition: service_started
+
+  # Redis for Asynq task queue — no host port in base (only in override for dev)
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    # No host port binding — only reachable inside intranet network
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
     volumes:
       - redis-data:/data
     networks:
       - intranet
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
-
-  # Asynqmon - monitoring UI for Asynq
-  asynqmon:
-    image: hibiken/asynqmon:latest
-    ports:
-      - "8080:8080"
-    environment:
-      - REDIS_ADDR=redis:6379
-    networks:
-      - intranet
-    depends_on:
-      redis:
-        condition: service_healthy
-
-  # RedisInsight - Redis GUI for monitoring pub/sub, keys, and streams
-  # Access at http://localhost:5540
-  redis-insight:
-    image: redis/redisinsight:latest
-    ports:
-      - "5540:5540"
-    volumes:
-      - redis-insight-data:/data
-    networks:
-      - intranet
-    depends_on:
-      redis:
-        condition: service_healthy
 
   # PostgreSQL database for Kratos
   postgres:
     image: postgres:16-alpine
     environment:
       - POSTGRES_USER=kratos
-      - POSTGRES_PASSWORD=secret
+      - POSTGRES_PASSWORD=${KRATOS_DB_PASSWORD}
       - POSTGRES_DB=kratos
-    ports:
-      - "5433:5432"
+    # No host port binding in production parity mode
     volumes:
       - kratos-postgres:/var/lib/postgresql/data
     networks:
@@ -64,15 +100,20 @@ services:
   mailslurper:
     image: oryd/mailslurper:latest-smtps
     ports:
-      - "4436:4436" # Web UI
+      - "4436:4436" # Web UI (dev convenience only)
       - "4437:4437" # API
     networks:
       - intranet
+
   # Kratos database migration
   kratos-migrate:
     image: oryd/kratos:v1.3.0
     environment:
-      - DSN=postgres://kratos:secret@postgres:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4
+      - DSN=postgres://kratos:${KRATOS_DB_PASSWORD}@postgres:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4
+      - KRATOS_COOKIE_SECRET=${KRATOS_COOKIE_SECRET}
+      - KRATOS_CIPHER_SECRET=${KRATOS_CIPHER_SECRET}
+      - SECRETS_COOKIE=${KRATOS_COOKIE_SECRET}
+      - SECRETS_CIPHER=${KRATOS_CIPHER_SECRET}
     volumes:
       - ./kratos:/etc/config/kratos
     command: -c /etc/config/kratos/kratos.yml migrate sql -e --yes
@@ -90,9 +131,14 @@ services:
       - "4433:4433" # public API
       - "4434:4434" # admin API
     environment:
-      - DSN=postgres://kratos:secret@postgres:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4
+      - DSN=postgres://kratos:${KRATOS_DB_PASSWORD}@postgres:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4
       - LOG_LEVEL=info
-    command: serve -c /etc/config/kratos/kratos.yml --dev --watch-courier
+      - KRATOS_COOKIE_SECRET=${KRATOS_COOKIE_SECRET}
+      - KRATOS_CIPHER_SECRET=${KRATOS_CIPHER_SECRET}
+      - SECRETS_COOKIE=${KRATOS_COOKIE_SECRET}
+      - SECRETS_CIPHER=${KRATOS_CIPHER_SECRET}
+    # --dev removed: production mode with proper TLS and secure secrets
+    command: serve -c /etc/config/kratos/kratos.yml --watch-courier
     volumes:
       - ./kratos:/etc/config/kratos
     networks:
@@ -108,7 +154,7 @@ services:
     container_name: app-postgres
     environment:
       - POSTGRES_USER=schoolai
-      - POSTGRES_PASSWORD=dev-password
+      - POSTGRES_PASSWORD=${SCHOOL_DB_PASSWORD}
       - POSTGRES_DB=projections
     ports:
       - "5435:5432"
@@ -122,17 +168,14 @@ services:
       timeout: 5s
       retries: 5
 
-
-
-
   # MinIO for Artifact Storage
   minio:
     image: minio/minio:latest
     container_name: minio
     command: server --address ":9000" --console-address ":9001" /data
     environment:
-      - MINIO_ROOT_USER=minio
-      - MINIO_ROOT_PASSWORD=miniosecret
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
     ports:
       - "9100:9000"
       - "9101:9001"
@@ -146,7 +189,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # MinIO Bucket Initialization for Artifacts
+  # MinIO Bucket Initialization — private bucket (no anonymous access)
   minio-create-bucket:
     image: minio/mc:latest
     container_name: minio-create-bucket
@@ -157,10 +200,9 @@ services:
       - intranet
     entrypoint: >
       /bin/sh -c "
-      until mc alias set local http://minio:9000 minio miniosecret; do echo 'Waiting for MinIO...'; sleep 1; done;
+      until mc alias set local http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD}; do echo 'Waiting for MinIO...'; sleep 1; done;
       mc mb --ignore-existing local/artifacts;
-      mc anonymous set public local/artifacts;
-      echo 'Bucket created';
+      echo 'Bucket created (private — files served via pre-signed URLs)';
       exit 0;
       "
 
@@ -228,20 +270,6 @@ services:
     network_mode: host
     restart: always
 
-  # EdgeQuake Web UI
-  edgequake-web:
-    build:
-      context: ./edgequake
-      dockerfile: edgequake_webui/Dockerfile
-      args:
-        NEXT_PUBLIC_API_URL: http://localhost:8081
-    container_name: edgequake-web
-    restart: unless-stopped
-    ports:
-      - "3002:3000"
-    networks:
-      - intranet
-
 networks:
   intranet:
 
@@ -249,9 +277,6 @@ volumes:
   go-modules:
   kratos-postgres:
   redis-data:
-  redis-insight-data:
-
-
   minio-data:
   app-postgres-data:
   edgequake-db-data:

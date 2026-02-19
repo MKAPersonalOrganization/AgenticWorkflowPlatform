@@ -8,7 +8,7 @@ serve:
     cors:
       enabled: true
       allowed_origins:
-        - http://localhost:8090
+        - https://localhost:8090
       allowed_methods:
         - POST
         - GET
@@ -26,9 +26,9 @@ serve:
     base_url: http://kratos:4434/
 
 selfservice:
-  default_browser_return_url: http://localhost:8090/
+  default_browser_return_url: https://localhost:8090/
   allowed_return_urls:
-    - http://localhost:8090
+    - https://localhost:8090
 
   methods:
     password:
@@ -46,40 +46,40 @@ selfservice:
 
   flows:
     error:
-      ui_url: http://localhost:8090/auth/error
+      ui_url: https://localhost:8090/auth/error
 
     settings:
-      ui_url: http://localhost:8090/auth/settings
+      ui_url: https://localhost:8090/auth/settings
       privileged_session_max_age: 15m
       required_aal: highest_available
 
     recovery:
       enabled: true
-      ui_url: http://localhost:8090/auth/recovery
+      ui_url: https://localhost:8090/auth/recovery
       use: code
       after:
-        default_browser_return_url: http://localhost:8090/auth/login
+        default_browser_return_url: https://localhost:8090/auth/login
 
     verification:
       enabled: true
-      ui_url: http://localhost:8090/auth/verification
+      ui_url: https://localhost:8090/auth/verification
       use: code
       after:
-        default_browser_return_url: http://localhost:8090/
+        default_browser_return_url: https://localhost:8090/
 
     logout:
       after:
-        default_browser_return_url: http://localhost:8090/auth/login
+        default_browser_return_url: https://localhost:8090/auth/login
 
     login:
-      ui_url: http://localhost:8090/auth/login
+      ui_url: https://localhost:8090/auth/login
       lifespan: 10m
       after:
-        default_browser_return_url: http://localhost:8090/
+        default_browser_return_url: https://localhost:8090/
 
     registration:
       lifespan: 10m
-      ui_url: http://localhost:8090/auth/registration
+      ui_url: https://localhost:8090/auth/registration
       enable_legacy_one_step: true
       after:
         password:
@@ -92,11 +92,7 @@ log:
   format: json
   leak_sensitive_values: false
 
-secrets:
-  cookie:
-    - PLEASE-CHANGE-ME-I-AM-VERY-INSECURE
-  cipher:
-    - 32-LONG-SECRET-NOT-SECURE-AT-ALL
+
 
 ciphers:
   algorithm: xchacha20-poly1305

@@ -21,15 +21,17 @@ var (
 
 // AsynqTaskManager wraps Asynq server and client for chat task processing.
 type AsynqTaskManager struct {
-	log       *logger.Logger
-	server    *asynq.Server
-	client    *asynq.Client
-	redisAddr string // Store for metrics
+	log           *logger.Logger
+	server        *asynq.Server
+	client        *asynq.Client
+	redisAddr     string // Store for metrics
+	redisPassword string // Store for Inspector calls
 }
 
 // AsynqConfig contains configuration for the Asynq server.
 type AsynqConfig struct {
 	RedisAddr           string
+	RedisPassword       string
 	Concurrency         int
 	RedisOptions        asynq.RedisClientOpt
 	ShutdownTimeout     time.Duration // Time to wait for workers to finish
@@ -50,7 +52,7 @@ func NewAsynqTaskManager(
 
 	redisOpt := config.RedisOptions
 	if redisOpt.Addr == "" {
-		redisOpt = asynq.RedisClientOpt{Addr: config.RedisAddr}
+		redisOpt = asynq.RedisClientOpt{Addr: config.RedisAddr, Password: config.RedisPassword}
 	}
 
 	// Default concurrency
@@ -141,7 +143,8 @@ func NewAsynqTaskManager(
 		log:       log,
 		server:    srv,
 		client:    client,
-		redisAddr: config.RedisAddr,
+		redisAddr:     config.RedisAddr,
+		redisPassword: config.RedisPassword,
 	}
 }
 
@@ -221,7 +224,7 @@ func (s *AsynqTaskManager) SubmitChatTask(ctx context.Context, userID, message, 
 
 // GetTaskInfo retrieves task information from Asynq.
 func (s *AsynqTaskManager) GetTaskInfo(queue, taskID string) (*asynq.TaskInfo, error) {
-	inspector := asynq.NewInspector(asynq.RedisClientOpt{Addr: s.redisAddr})
+	inspector := asynq.NewInspector(asynq.RedisClientOpt{Addr: s.redisAddr, Password: s.redisPassword})
 	defer func() {
 		err := inspector.Close()
 		if err != nil {
@@ -240,7 +243,7 @@ func (s *AsynqTaskManager) GetTaskInfo(queue, taskID string) (*asynq.TaskInfo, e
 
 // CancelTask attempts to cancel a task by job ID.
 func (s *AsynqTaskManager) CancelTask(jobID string) error {
-	inspector := asynq.NewInspector(asynq.RedisClientOpt{Addr: s.redisAddr})
+	inspector := asynq.NewInspector(asynq.RedisClientOpt{Addr: s.redisAddr, Password: s.redisPassword})
 	defer func() {
 		err := inspector.Close()
 		if err != nil {

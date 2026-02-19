@@ -1,0 +1,55 @@
+# docker-compose.override.yml — Dev-Only Services
+#
+# This file is automatically merged by Docker Compose when running locally.
+# It adds monitoring/admin UIs that have no place in production.
+#
+# To run WITHOUT these dev tools (production-parity mode):
+#   docker compose -f docker-compose.yml up -d
+
+services:
+  # Asynqmon - monitoring UI for Asynq task queue
+  # Access at http://localhost:8080
+  asynqmon:
+    image: hibiken/asynqmon:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - REDIS_ADDR=redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    networks:
+      - intranet
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # RedisInsight - Redis GUI for monitoring pub/sub, keys, and streams
+  # Access at http://localhost:5540
+  redis-insight:
+    image: redis/redisinsight:latest
+    ports:
+      - "5540:5540"
+    volumes:
+      - redis-insight-data:/data
+    networks:
+      - intranet
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # EdgeQuake Web UI - admin interface for the knowledge graph
+  # Access at http://localhost:3002
+  edgequake-web:
+    build:
+      context: ./edgequake
+      dockerfile: edgequake_webui/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8081
+    container_name: edgequake-web
+    restart: unless-stopped
+    ports:
+      - "3002:3000"
+    networks:
+      - intranet
+
+volumes:
+  redis-insight-data:

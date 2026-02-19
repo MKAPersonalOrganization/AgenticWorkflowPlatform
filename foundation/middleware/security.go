@@ -29,11 +29,11 @@ func SecurityHeaders() func(http.Handler) http.Handler {
 			// to evaluate x-data, x-show, @click and other expressions.
 			h.Set("Content-Security-Policy",
 				"default-src 'self'; "+
-					"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; "+
-					"style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "+
+					"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "+
+					"style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "+
 					"img-src 'self' data: blob:; "+
 					"connect-src 'self'; "+
-					"font-src 'self' https://cdn.jsdelivr.net; "+
+					"font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; "+
 					"frame-ancestors 'none'")
 
 			// Enforce HTTPS via HSTS when served over TLS.
