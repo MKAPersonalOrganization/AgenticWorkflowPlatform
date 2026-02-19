@@ -4,11 +4,23 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/alicebob/miniredis/v2"
+	goredis "github.com/redis/go-redis/v9"
 )
 
+// newTestRedis starts a miniredis server and returns a connected client.
+// The server is stopped automatically when the test ends.
+func newTestRedis(t *testing.T) *goredis.Client {
+	t.Helper()
+	s := miniredis.RunT(t)
+	return goredis.NewClient(&goredis.Options{Addr: s.Addr()})
+}
+
 func TestRateLimiterAllowsWithinLimit(t *testing.T) {
+	rdb := newTestRedis(t)
 	// 10 req/s with burst of 5
-	handler := RateLimiter(10, 5)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := RateLimiter(rdb, 10, 5)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -25,8 +37,9 @@ func TestRateLimiterAllowsWithinLimit(t *testing.T) {
 }
 
 func TestRateLimiterBlocks(t *testing.T) {
+	rdb := newTestRedis(t)
 	// 1 req/s with burst of 1 — second request should be blocked.
-	handler := RateLimiter(1, 1)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := RateLimiter(rdb, 1, 1)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -49,7 +62,8 @@ func TestRateLimiterBlocks(t *testing.T) {
 }
 
 func TestRateLimiterDifferentIPsGetOwnBuckets(t *testing.T) {
-	handler := RateLimiter(1, 1)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	rdb := newTestRedis(t)
+	handler := RateLimiter(rdb, 1, 1)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -73,7 +87,8 @@ func TestRateLimiterDifferentIPsGetOwnBuckets(t *testing.T) {
 }
 
 func TestRateLimiterUsesXForwardedFor(t *testing.T) {
-	handler := RateLimiter(1, 1)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	rdb := newTestRedis(t)
+	handler := RateLimiter(rdb, 1, 1)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 

@@ -1,21 +1,26 @@
 package middleware
 
 import (
+	"context"
+	"log/slog"
 	"net"
 	"net/http"
-	"sync"
-	"time"
 
-	"golang.org/x/time/rate"
+	"github.com/go-redis/redis_rate/v10"
+	goredis "github.com/redis/go-redis/v9"
 )
 
-// RateLimiter returns middleware that applies per-IP token-bucket rate
-// limiting. Each unique client IP gets its own limiter that permits
-// rps requests per second with a burst of burst. Pass 0 for rps to use
-// the default of 10 req/s and 0 for burst to use 20.
+// RateLimiter returns middleware that applies per-IP sliding-window rate
+// limiting backed by Redis. All pods behind a load balancer share the
+// same counters, so an attacker cannot multiply the limit by the number
+// of replicas.
 //
-// Stale limiters are evicted every 3 minutes to bound memory.
-func RateLimiter(rps float64, burst int) func(http.Handler) http.Handler {
+// rps is the sustained requests-per-second allowed per IP.
+// burst is the maximum number of requests allowed in a single burst.
+//
+// If Redis is unreachable the middleware fails open (allows the request)
+// and logs a warning so that a Redis hiccup does not take down the site.
+func RateLimiter(rdb *goredis.Client, rps int, burst int) func(http.Handler) http.Handler {
 	if rps <= 0 {
 		rps = 10
 	}
@@ -23,45 +28,28 @@ func RateLimiter(rps float64, burst int) func(http.Handler) http.Handler {
 		burst = 20
 	}
 
-	type entry struct {
-		limiter  *rate.Limiter
-		lastSeen time.Time
+	limiter := redis_rate.NewLimiter(rdb)
+	limit := redis_rate.Limit{
+		Rate:   rps,
+		Burst:  burst,
+		Period: 1_000_000_000, // 1 second in nanoseconds (time.Second)
 	}
-
-	var (
-		mu      sync.Mutex
-		clients = make(map[string]*entry)
-	)
-
-	// Background cleanup of stale entries.
-	go func() {
-		for {
-			time.Sleep(3 * time.Minute)
-			mu.Lock()
-			for ip, e := range clients {
-				if time.Since(e.lastSeen) > 3*time.Minute {
-					delete(clients, ip)
-				}
-			}
-			mu.Unlock()
-		}
-	}()
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ip := clientIP(r)
+			key := "ratelimit:" + ip
 
-			mu.Lock()
-			e, ok := clients[ip]
-			if !ok {
-				e = &entry{limiter: rate.NewLimiter(rate.Limit(rps), burst)}
-				clients[ip] = e
+			res, err := limiter.Allow(r.Context(), key, limit)
+			if err != nil {
+				// Fail open — allow the request but log the error.
+				slog.Warn("rate limiter redis error, failing open",
+					"ip", ip, "error", err)
+				next.ServeHTTP(w, r)
+				return
 			}
-			e.lastSeen = time.Now()
-			lim := e.limiter
-			mu.Unlock()
 
-			if !lim.Allow() {
+			if res.Allowed == 0 {
 				http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 				return
 			}
@@ -69,6 +57,12 @@ func RateLimiter(rps float64, burst int) func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// RateLimiterHealthCheck pings Redis and returns an error if unreachable.
+// Useful for wiring into /readiness probes.
+func RateLimiterHealthCheck(ctx context.Context, rdb *goredis.Client) error {
+	return rdb.Ping(ctx).Err()
 }
 
 // clientIP extracts the client IP from the request, preferring

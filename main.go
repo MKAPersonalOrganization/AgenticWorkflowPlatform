@@ -66,6 +66,7 @@ import (
 	"github.com/ardanlabs/conf/v3"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	goredis "github.com/redis/go-redis/v9"
 )
 
 var build = "develop"
@@ -268,6 +269,15 @@ func run(ctx context.Context, log *logger.Logger) error {
 			log.Error(ctx, "shutdown", "status", "failed to close Redis broadcaster", "ERROR", closeErr)
 		}
 	}()
+
+	// Initialize Redis client for distributed rate limiting (shared across pods)
+	rateLimitRedis := goredis.NewClient(&goredis.Options{Addr: cfg.Redis.Addr})
+	defer func() {
+		if closeErr := rateLimitRedis.Close(); closeErr != nil {
+			log.Error(ctx, "shutdown", "status", "failed to close rate-limit Redis client", "ERROR", closeErr)
+		}
+	}()
+	log.Info(ctx, "startup", "status", "rate-limit Redis client initialized", "addr", cfg.Redis.Addr)
 
 	// Register Redis broadcaster to BOTH routers
 	// persistenceRouter will broadcast durable events once they are persisted
@@ -560,14 +570,14 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// like /assets/js/chat/index.js are served correctly.
 	// Use higher rate limit for assets (100 req/s, 300 burst) to support parallel loading
 	root.Group(func(r chi.Router) {
-		r.Use(middleware.RateLimiter(100, 300))
+		r.Use(middleware.RateLimiter(rateLimitRedis, 100, 300))
 		r.Mount("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir("./assets"))))
 	})
 
 	// Create App Router for all other routes
 	// This router will enforce strict rate limits (10 req/s, 20 burst)
 	r := chi.NewRouter()
-	r.Use(middleware.RateLimiter(10, 20))
+	r.Use(middleware.RateLimiter(rateLimitRedis, 10, 20))
 
 	// Mount App Router on Root
 	root.Mount("/", r)
