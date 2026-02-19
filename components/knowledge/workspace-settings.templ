@@ -134,6 +134,20 @@ templ WorkspaceSettings() {
 							{ i18n.T(ctx, "Scanning...") }
 						</span>
 					}
+					@button.Button(button.Props{
+						Variant: button.VariantOutline,
+						Class:   "text-orange-600 border-orange-500 hover:bg-orange-500/10",
+						Attributes: templ.Attributes{
+							"@click":    "recoverStuck()",
+							":disabled": "recoveringStuck",
+						},
+					}) {
+						<span x-show="!recoveringStuck">{ i18n.T(ctx, "Recover Stuck") }</span>
+						<span x-show="recoveringStuck" class="flex items-center gap-2">
+							<span class="animate-spin size-4 border-2 border-orange-500 border-t-transparent rounded-full"></span>
+							{ i18n.T(ctx, "Recovering...") }
+						</span>
+					}
 				</div>
 			</div>
 		</div>

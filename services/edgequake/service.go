@@ -8,12 +8,20 @@ import (
 	"time"
 
 	"school-with-ai/domain"
+	"school-with-ai/services/rag/chunks"
+	"school-with-ai/services/rag/costs"
 	"school-with-ai/services/rag/documents"
+	"school-with-ai/services/rag/entities"
 	"school-with-ai/services/rag/folders"
 	"school-with-ai/services/rag/graph"
+	"school-with-ai/services/rag/lineage"
 	"school-with-ai/services/rag/models"
 	"school-with-ai/services/rag/pipeline"
+	"school-with-ai/services/rag/provenance"
 	"school-with-ai/services/rag/query"
+	"school-with-ai/services/rag/relationships"
+	"school-with-ai/services/rag/settings"
+	"school-with-ai/services/rag/tasks"
 	"school-with-ai/services/rag/tenants"
 	"school-with-ai/services/rag/users"
 	"school-with-ai/services/rag/workspaces"
@@ -28,17 +36,25 @@ var (
 
 // Service provides access to the Edgequake REST API.
 type Service struct {
-	baseURL    string
-	httpClient *http.Client
-	Documents  *documents.Service
-	Query      *query.Service
-	Workspaces *workspaces.Service
-	Tenants    *tenants.Service
-	Folders    *folders.Service
-	Users      *users.Service
-	Models     *models.Service
-	Pipeline   *pipeline.Service
-	Graph      *graph.Service
+	baseURL       string
+	httpClient    *http.Client
+	Documents     *documents.Service
+	Query         *query.Service
+	Workspaces    *workspaces.Service
+	Tenants       *tenants.Service
+	Folders       *folders.Service
+	Users         *users.Service
+	Models        *models.Service
+	Pipeline      *pipeline.Service
+	Graph         *graph.Service
+	Entities      *entities.Service
+	Relationships *relationships.Service
+	Lineage       *lineage.Service
+	Chunks        *chunks.Service
+	Costs         *costs.Service
+	Provenance    *provenance.Service
+	Settings      *settings.Service
+	Tasks         *tasks.Service
 }
 
 // NewService creates a new Edgequake service.
@@ -47,17 +63,25 @@ func NewService(baseURL string) *Service {
 		Timeout: 120 * time.Second, // Extended timeout to handle LLM cold starts (e.g. Ollama model loading)
 	}
 	return &Service{
-		baseURL:    baseURL,
-		httpClient: httpClient,
-		Documents:  documents.NewService(baseURL, httpClient),
-		Query:      query.NewService(baseURL, httpClient),
-		Workspaces: workspaces.NewService(baseURL, httpClient),
-		Tenants:    tenants.NewService(baseURL, httpClient),
-		Folders:    folders.NewService(baseURL, httpClient),
-		Users:      users.NewService(baseURL, httpClient),
-		Models:     models.NewService(baseURL, httpClient),
-		Pipeline:   pipeline.NewService(baseURL, httpClient),
-		Graph:      graph.NewService(baseURL, httpClient),
+		baseURL:       baseURL,
+		httpClient:    httpClient,
+		Documents:     documents.NewService(baseURL, httpClient),
+		Query:         query.NewService(baseURL, httpClient),
+		Workspaces:    workspaces.NewService(baseURL, httpClient),
+		Tenants:       tenants.NewService(baseURL, httpClient),
+		Folders:       folders.NewService(baseURL, httpClient),
+		Users:         users.NewService(baseURL, httpClient),
+		Models:        models.NewService(baseURL, httpClient),
+		Pipeline:      pipeline.NewService(baseURL, httpClient),
+		Graph:         graph.NewService(baseURL, httpClient),
+		Entities:      entities.NewService(baseURL, httpClient),
+		Relationships: relationships.NewService(baseURL, httpClient),
+		Lineage:       lineage.NewService(baseURL, httpClient),
+		Chunks:        chunks.NewService(baseURL, httpClient),
+		Costs:         costs.NewService(baseURL, httpClient),
+		Provenance:    provenance.NewService(baseURL, httpClient),
+		Settings:      settings.NewService(baseURL, httpClient),
+		Tasks:         tasks.NewService(baseURL, httpClient),
 	}
 }
 

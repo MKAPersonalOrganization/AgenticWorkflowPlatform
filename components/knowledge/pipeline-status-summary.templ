@@ -17,24 +17,28 @@ import (
 templ PipelineStatusSummary() {
 	<!-- Compact summary bar - always visible when pipeline has activity -->
 	<div
-		x-show="pipelineStatus && (pipelineStatus.pending > 0 || pipelineStatus.processing > 0)"
+		x-show="pipelineStatus && ((pipelineStatus.pending || 0) > 0 || (pipelineStatus.processing || 0) > 0)"
 		x-cloak
 		class="rounded-lg border bg-card"
 	>
-		<!-- Header row - clickable to expand -->
-		<button
-			@click="pipelineExpanded = !pipelineExpanded"
-			class="flex items-center justify-between w-full px-4 py-3 hover:bg-muted/50 transition-colors rounded-lg"
-		>
-			<div class="flex items-center gap-3">
+		<!-- Header row -->
+		<div class="flex items-center justify-between px-4 py-3">
+			<!-- Left side: clickable to expand -->
+			<button
+				@click="pipelineExpanded = !pipelineExpanded"
+				class="flex items-center gap-3 hover:bg-muted/50 transition-colors rounded-md px-2 py-1 -ml-2"
+			>
 				<!-- Animated processing indicator -->
-				<div class="relative flex items-center justify-center">
+				<div class="relative flex items-center justify-center" x-show="!pipelineStatus?.cancellation_requested">
 					<div class="h-2.5 w-2.5 rounded-full bg-blue-500 animate-pulse"></div>
 					<div class="absolute h-5 w-5 rounded-full border-2 border-blue-500/30 animate-ping"></div>
 				</div>
-				<span class="text-sm font-medium">{ i18n.T(ctx, "Pipeline Active") }</span>
-			</div>
-			<div class="flex items-center gap-3">
+				<!-- Cancelling indicator -->
+				<div class="relative flex items-center justify-center" x-show="pipelineStatus?.cancellation_requested" x-cloak>
+					<div class="h-2.5 w-2.5 rounded-full bg-orange-500 animate-pulse"></div>
+				</div>
+				<span class="text-sm font-medium" x-show="!pipelineStatus?.cancellation_requested">{ i18n.T(ctx, "Pipeline Active") }</span>
+				<span class="text-sm font-medium text-orange-600 dark:text-orange-400" x-show="pipelineStatus?.cancellation_requested" x-cloak>{ i18n.T(ctx, "Cancelling...") }</span>
 				<!-- Quick stage counts -->
 				<div class="flex items-center gap-2 text-xs text-muted-foreground">
 					<span class="flex items-center gap-1" x-show="pipelineStatus?.pending > 0">
@@ -58,8 +62,36 @@ templ PipelineStatusSummary() {
 				<div :class="pipelineExpanded ? 'rotate-180' : ''" class="transition-transform duration-200">
 					@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
 				</div>
-			</div>
-		</button>
+			</button>
+			<!-- Cancel Pipeline button -->
+			<button
+				@click.stop="cancelPipeline()"
+				:disabled="pipelineCancelling || pipelineStatus?.cancellation_requested"
+				class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors
+					bg-destructive/10 text-destructive border-destructive/20
+					hover:bg-destructive/20 hover:border-destructive/40
+					disabled:opacity-50 disabled:cursor-not-allowed"
+			>
+				<template x-if="pipelineCancelling">
+					<span class="flex items-center gap-1.5">
+						@icon.LoaderCircle(icon.Props{Class: "size-3.5 animate-spin"})
+						<span>{ i18n.T(ctx, "Cancelling...") }</span>
+					</span>
+				</template>
+				<template x-if="!pipelineCancelling && pipelineStatus?.cancellation_requested">
+					<span class="flex items-center gap-1.5">
+						@icon.Ban(icon.Props{Class: "size-3.5"})
+						<span>{ i18n.T(ctx, "Cancelling...") }</span>
+					</span>
+				</template>
+				<template x-if="!pipelineCancelling && !pipelineStatus?.cancellation_requested">
+					<span class="flex items-center gap-1.5">
+						@icon.CircleStop(icon.Props{Class: "size-3.5"})
+						<span>{ i18n.T(ctx, "Cancel Pipeline") }</span>
+					</span>
+				</template>
+			</button>
+		</div>
 		<!-- Expanded details -->
 		<div x-show="pipelineExpanded" x-cloak x-transition class="border-t">
 			<div class="px-4 py-3 space-y-3">
