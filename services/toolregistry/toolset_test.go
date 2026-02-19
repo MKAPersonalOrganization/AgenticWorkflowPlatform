@@ -7,6 +7,7 @@ import (
 
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/toolregistry"
+	"school-with-ai/services/toolregistry/mocks"
 )
 
 func TestToolSetFunctionality(t *testing.T) {
@@ -14,7 +15,7 @@ func TestToolSetFunctionality(t *testing.T) {
 	log := logger.NewText(os.Stdout, logger.LevelInfo, "TEST", nil)
 
 	// Create in-memory repository and registry
-	repo := toolregistry.NewInMemoryRepository()
+	repo := mocks.NewInMemoryRepository()
 	registry := toolregistry.NewRegistry(log, repo)
 
 	// Initialize with default tools and tool sets

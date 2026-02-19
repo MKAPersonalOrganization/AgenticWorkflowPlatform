@@ -88,7 +88,7 @@ func (h *Handler) ListAgentWorkspaces(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get permissions for this agent
-	permissions, err := h.workspacePermSvc.ListPermissionsByAgent(r.Context(), agentID)
+	permissions, err := h.workspacePermSvc.ListPermissionsByAgent(r.Context(), user.ID, agentID)
 	if err != nil {
 		h.log.Error(r.Context(), "Failed to list workspace permissions", "agent_id", agentID, "error", err)
 		http.Error(w, "Failed to retrieve permissions", http.StatusInternalServerError)
@@ -139,13 +139,19 @@ func (h *Handler) ToggleAgentWorkspace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	user := domain.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	var req ToggleAgentWorkspaceRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	if err := h.workspacePermSvc.SetPermission(r.Context(), agentID, workspaceID, req.Enabled); err != nil {
+	if err := h.workspacePermSvc.SetPermission(r.Context(), user.ID, agentID, workspaceID, req.Enabled); err != nil {
 		h.log.Error(r.Context(), "Failed to update workspace permission",
 			"agent_id", agentID, "workspace_id", workspaceID, "enabled", req.Enabled, "error", err)
 		http.Error(w, "Failed to update workspace permission", http.StatusInternalServerError)

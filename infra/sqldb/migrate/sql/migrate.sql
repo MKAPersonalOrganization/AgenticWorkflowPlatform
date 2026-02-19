@@ -189,3 +189,70 @@ ALTER TABLE projection_checkpoints ADD COLUMN IF NOT EXISTS global_position BIGI
 -- Description: Drop legacy commit_position and prepare_position columns from projection_checkpoints
 ALTER TABLE projection_checkpoints DROP COLUMN IF EXISTS commit_position;
 ALTER TABLE projection_checkpoints DROP COLUMN IF EXISTS prepare_position;
+
+-- Version: 1.17
+-- Description: Create Tool Registry tables
+CREATE TABLE IF NOT EXISTS tool_sets (
+    id VARCHAR(255) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    category VARCHAR(100),
+    tool_ids TEXT[], -- Array of tool IDs in this set
+    metadata JSONB,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS tools (
+    id VARCHAR(255) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    category VARCHAR(100),
+    tool_set_id VARCHAR(255),
+    metadata JSONB,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_tool_set FOREIGN KEY (tool_set_id) REFERENCES tool_sets(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_tools_tool_set ON tools(tool_set_id);
+
+-- Version: 1.18
+-- Description: Create Permissions tables
+CREATE TABLE IF NOT EXISTS agent_tool_set_permissions (
+    user_id VARCHAR(255) NOT NULL,
+    agent_id VARCHAR(255) NOT NULL,
+    tool_set_id VARCHAR(255) NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    config JSONB,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, agent_id, tool_set_id),
+    CONSTRAINT fk_perm_tool_set FOREIGN KEY (tool_set_id) REFERENCES tool_sets(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS agent_tool_permissions (
+    user_id VARCHAR(255) NOT NULL,
+    agent_id VARCHAR(255) NOT NULL,
+    tool_set_id VARCHAR(255) NOT NULL,
+    tool_id VARCHAR(255) NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    config JSONB,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, agent_id, tool_set_id, tool_id),
+    CONSTRAINT fk_perm_tool FOREIGN KEY (tool_id) REFERENCES tools(id) ON DELETE CASCADE,
+    CONSTRAINT fk_perm_tool_set_ref FOREIGN KEY (tool_set_id) REFERENCES tool_sets(id) ON DELETE CASCADE
+);
+
+-- Version: 1.19
+-- Description: Create Workspace Permissions table
+CREATE TABLE IF NOT EXISTS agent_workspace_permissions (
+    user_id VARCHAR(255) NOT NULL,
+    agent_id VARCHAR(255) NOT NULL,
+    workspace_id VARCHAR(255) NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, agent_id, workspace_id)
+);

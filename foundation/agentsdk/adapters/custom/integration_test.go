@@ -7,7 +7,9 @@ import (
 
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/permissions"
+	permissions_mocks "school-with-ai/services/permissions/mocks"
 	"school-with-ai/services/toolregistry"
+	toolregistry_mocks "school-with-ai/services/toolregistry/mocks"
 )
 
 // TestToolFactoryIntegration tests that the tool factory can properly create executable tools
@@ -17,8 +19,8 @@ func TestToolFactoryIntegration(t *testing.T) {
 	log := logger.NewText(os.Stdout, logger.LevelInfo, "TEST", nil)
 
 	// Create in-memory repositories
-	permissionsRepo := permissions.NewInMemoryRepository()
-	toolRegistryRepo := toolregistry.NewInMemoryRepository()
+	permissionsRepo := permissions_mocks.NewInMemoryRepository()
+	toolRegistryRepo := toolregistry_mocks.NewInMemoryRepository()
 
 	// Create services
 	permissionsService := permissions.NewService(log, permissionsRepo)
@@ -42,7 +44,8 @@ func TestToolFactoryIntegration(t *testing.T) {
 	t.Logf("Created %d default tool sets", len(toolSets))
 
 	// Test: Verify tool set permissions work
-	enabledToolSetIDs, err := permissionsService.GetEnabledToolSets(ctx, "math-instructor")
+	userID := "test-user"
+	enabledToolSetIDs, err := permissionsService.GetEnabledToolSets(ctx, userID, "math-instructor")
 	if err != nil {
 		t.Fatalf("Failed to get enabled tool sets: %v", err)
 	}
@@ -85,13 +88,13 @@ func TestToolFactoryIntegration(t *testing.T) {
 	t.Log("Testing tool set permission changes...")
 
 	// Disable calculator-set for math instructor
-	err = permissionsService.SetToolSetPermission(ctx, "math-instructor", "calculator-set", false)
+	err = permissionsService.SetToolSetPermission(ctx, userID, "math-instructor", "calculator-set", false)
 	if err != nil {
 		t.Fatalf("Failed to disable calculator-set: %v", err)
 	}
 
 	// Get enabled tool sets again
-	enabledToolSetsAfterDisable, err := permissionsService.GetEnabledToolSets(ctx, "math-instructor")
+	enabledToolSetsAfterDisable, err := permissionsService.GetEnabledToolSets(ctx, userID, "math-instructor")
 	if err != nil {
 		t.Fatalf("Failed to get enabled tool sets after disable: %v", err)
 	}
@@ -111,7 +114,7 @@ func TestToolFactoryIntegration(t *testing.T) {
 	t.Logf("After disabling calculator-set: math instructor has %d tool sets enabled", len(enabledToolSetsAfterDisable))
 
 	// Test: Verify other agents are not affected by tool set permission changes
-	enabledPhysicsToolSets, err := permissionsService.GetEnabledToolSets(ctx, "physics-instructor")
+	enabledPhysicsToolSets, err := permissionsService.GetEnabledToolSets(ctx, userID, "physics-instructor")
 	if err != nil {
 		t.Fatalf("Failed to get physics tool sets: %v", err)
 	}

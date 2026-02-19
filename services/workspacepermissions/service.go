@@ -10,6 +10,7 @@ import (
 
 // WorkspacePermission represents a workspace attached to an agent.
 type WorkspacePermission struct {
+	UserID      string    `json:"user_id"`
 	AgentID     string    `json:"agent_id"`
 	WorkspaceID string    `json:"workspace_id"`
 	Enabled     bool      `json:"enabled"`
@@ -19,10 +20,10 @@ type WorkspacePermission struct {
 
 // Repository defines the storage interface for workspace permissions.
 type Repository interface {
-	GetPermission(ctx context.Context, agentID, workspaceID string) (*WorkspacePermission, error)
-	ListPermissionsByAgent(ctx context.Context, agentID string) ([]*WorkspacePermission, error)
+	GetPermission(ctx context.Context, userID, agentID, workspaceID string) (*WorkspacePermission, error)
+	ListPermissionsByAgent(ctx context.Context, userID, agentID string) ([]*WorkspacePermission, error)
 	SavePermission(ctx context.Context, perm *WorkspacePermission) error
-	DeletePermission(ctx context.Context, agentID, workspaceID string) error
+	DeletePermission(ctx context.Context, userID, agentID, workspaceID string) error
 }
 
 // Service manages workspace-to-agent attachments.
@@ -30,7 +31,7 @@ type Service struct {
 	log   *logger.Logger
 	repo  Repository
 	mu    sync.RWMutex
-	cache map[string]map[string]*WorkspacePermission // agentID -> workspaceID -> Permission
+	cache map[string]map[string]map[string]*WorkspacePermission // userID -> agentID -> workspaceID -> Permission
 }
 
 // NewService creates a new workspace permissions service.
@@ -38,14 +39,15 @@ func NewService(log *logger.Logger, repo Repository) *Service {
 	return &Service{
 		log:   log,
 		repo:  repo,
-		cache: make(map[string]map[string]*WorkspacePermission),
+		cache: make(map[string]map[string]map[string]*WorkspacePermission),
 	}
 }
 
 // SetPermission enables or disables a workspace for an agent.
-func (s *Service) SetPermission(ctx context.Context, agentID, workspaceID string, enabled bool) error {
+func (s *Service) SetPermission(ctx context.Context, userID, agentID, workspaceID string, enabled bool) error {
 	now := time.Now()
 	perm := &WorkspacePermission{
+		UserID:      userID,
 		AgentID:     agentID,
 		WorkspaceID: workspaceID,
 		Enabled:     enabled,
@@ -59,50 +61,58 @@ func (s *Service) SetPermission(ctx context.Context, agentID, workspaceID string
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.cache[agentID] == nil {
-		s.cache[agentID] = make(map[string]*WorkspacePermission)
+	if _, ok := s.cache[userID]; !ok {
+		s.cache[userID] = make(map[string]map[string]*WorkspacePermission)
 	}
-	s.cache[agentID][workspaceID] = perm
+	if _, ok := s.cache[userID][agentID]; !ok {
+		s.cache[userID][agentID] = make(map[string]*WorkspacePermission)
+	}
+	s.cache[userID][agentID][workspaceID] = perm
 
 	return nil
 }
 
 // HasPermission checks if an agent has access to a workspace.
-func (s *Service) HasPermission(ctx context.Context, agentID, workspaceID string) bool {
+func (s *Service) HasPermission(ctx context.Context, userID, agentID, workspaceID string) bool {
 	s.mu.RLock()
-	if agentPerms, ok := s.cache[agentID]; ok {
-		if perm, ok := agentPerms[workspaceID]; ok {
-			s.mu.RUnlock()
-			return perm.Enabled
+	if userPerms, ok := s.cache[userID]; ok {
+		if agentPerms, ok := userPerms[agentID]; ok {
+			if perm, ok := agentPerms[workspaceID]; ok {
+				s.mu.RUnlock()
+				return perm.Enabled
+			}
 		}
 	}
 	s.mu.RUnlock()
 
 	// Not in cache, check repository
-	perm, err := s.repo.GetPermission(ctx, agentID, workspaceID)
+	perm, err := s.repo.GetPermission(ctx, userID, agentID, workspaceID)
 	if err != nil || perm == nil {
 		return false
 	}
 
 	// Update cache
 	s.mu.Lock()
-	if s.cache[agentID] == nil {
-		s.cache[agentID] = make(map[string]*WorkspacePermission)
+	if _, ok := s.cache[userID]; !ok {
+		s.cache[userID] = make(map[string]map[string]*WorkspacePermission)
 	}
-	s.cache[agentID][workspaceID] = perm
+	if _, ok := s.cache[userID][agentID]; !ok {
+		s.cache[userID][agentID] = make(map[string]*WorkspacePermission)
+	}
+	s.cache[userID][agentID][workspaceID] = perm
 	s.mu.Unlock()
 
 	return perm.Enabled
 }
 
 // ListPermissionsByAgent returns all workspace permissions for an agent.
-func (s *Service) ListPermissionsByAgent(ctx context.Context, agentID string) ([]*WorkspacePermission, error) {
-	return s.repo.ListPermissionsByAgent(ctx, agentID)
+func (s *Service) ListPermissionsByAgent(ctx context.Context, userID, agentID string) ([]*WorkspacePermission, error) {
+	return s.repo.ListPermissionsByAgent(ctx, userID, agentID)
 }
 
 // GetEnabledWorkspaces returns the IDs of all workspaces enabled for an agent.
-func (s *Service) GetEnabledWorkspaces(ctx context.Context, agentID string) ([]string, error) {
-	perms, err := s.repo.ListPermissionsByAgent(ctx, agentID)
+func (s *Service) GetEnabledWorkspaces(ctx context.Context, userID, agentID string) ([]string, error) {
+	perms, err := s.repo.ListPermissionsByAgent(ctx, userID, agentID)
 	if err != nil {
 		return nil, err
 	}

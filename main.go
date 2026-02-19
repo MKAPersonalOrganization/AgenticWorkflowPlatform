@@ -363,18 +363,18 @@ func run(ctx context.Context, log *logger.Logger) error {
 	resourcesService := resources.NewService(resourcesRepo, artifactService)
 
 	// Create and initialize tool registry
-	toolRegistry := toolregistry.NewRegistry(log, toolregistry.NewInMemoryRepository())
+	toolRegistry := toolregistry.NewRegistry(log, sqldb.NewPostgresToolRegistryRepository(db))
 	if err := toolRegistry.Initialize(ctx); err != nil {
 		return fmt.Errorf("failed to initialize tool registry: %w", err)
 	}
 	log.Info(ctx, "startup", "status", "tool registry initialized")
 
 	// Create and initialize permissions service
-	permissionsService := permissions.NewService(log, permissions.NewInMemoryRepository())
+	permissionsService := permissions.NewService(log, sqldb.NewPostgresPermissionsRepository(db))
 	log.Info(ctx, "startup", "status", "permissions service initialized")
 
 	// Create workspace permissions service
-	workspacePermissionsService := workspacepermissions.NewService(log, workspacepermissions.NewInMemoryRepository())
+	workspacePermissionsService := workspacepermissions.NewService(log, sqldb.NewPostgresWorkspacePermissionsRepository(db))
 	log.Info(ctx, "startup", "status", "workspace permissions service initialized")
 
 	// Initialize Edgequake service

@@ -358,8 +358,15 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 			factory.SetEdgequakeConfig(p.edgequakeBaseURL, p.modelAPIKey, p.modelID)
 		}
 
+		// Get user from context to check permissions
+		user := domain.GetUserFromContext(ctx)
+		var userID string
+		if user != nil {
+			userID = user.ID
+		}
+
 		// Get enabled tool sets for this agent
-		enabledToolSetIDs, err := p.permissionsService.GetEnabledToolSets(ctx, name)
+		enabledToolSetIDs, err := p.permissionsService.GetEnabledToolSets(ctx, userID, name)
 		if err != nil {
 			// Log error but continue with no tool sets
 			enabledToolSetIDs = []string{}
@@ -378,7 +385,14 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 
 	// Inject attached workspace info into system prompt as Knowledge Bases section
 	if p.workspacePermSvc != nil && p.edgequakeService != nil {
-		enabledWorkspaceIDs, err := p.workspacePermSvc.GetEnabledWorkspaces(ctx, name)
+		// Get user from context to check permissions
+		user := domain.GetUserFromContext(ctx)
+		var userID string
+		if user != nil {
+			userID = user.ID
+		}
+
+		enabledWorkspaceIDs, err := p.workspacePermSvc.GetEnabledWorkspaces(ctx, userID, name)
 		if err == nil && len(enabledWorkspaceIDs) > 0 {
 			kbSection := "\n\n## Knowledge Bases\n\nYou have access to the following knowledge base workspaces. Use the query_knowledge_base tool to search them:\n"
 			for _, wsID := range enabledWorkspaceIDs {
