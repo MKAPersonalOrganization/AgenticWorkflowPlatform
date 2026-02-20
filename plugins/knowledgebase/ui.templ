@@ -1,0 +1,1395 @@
+package knowledgebase
+
+import "school-with-ai/components/annotation"
+
+templ icon() {
+	<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-database">
+		<ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+		<path d="M3 5V19A9 3 0 0 0 21 19V5"></path>
+		<path d="M3 12A9 3 0 0 0 21 12"></path>
+	</svg>
+}
+
+// Helper icons used in the component
+templ clockIcon() {
+	<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clock"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+}
+
+templ gaugeIcon() {
+	<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-gauge"><path d="m12 14 4-4"></path><path d="M3.34 19a10 10 0 1 1 17.32 0"></path></svg>
+}
+
+templ zapIcon() {
+	<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-zap"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"></path></svg>
+}
+
+templ brainIcon() {
+	<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-brain"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"></path><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"></path><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"></path><path d="M17.599 6.5a3 3 0 0 0 .399-1.375"></path><path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"></path><path d="M3.477 10.896a4 4 0 0 1 .585-.396"></path><path d="M19.938 10.5a4 4 0 0 1 .585.396"></path><path d="M6 18a4 4 0 0 1-1.967-.516"></path><path d="M19.967 17.484A4 4 0 0 1 18 18"></path></svg>
+}
+
+templ fileTextIcon() {
+	<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-text flex-shrink-0"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M10 9H8"></path><path d="M16 13H8"></path><path d="M16 17H8"></path></svg>
+}
+
+templ networkIcon() {
+	<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-network"><rect x="16" y="16" width="6" height="6" rx="1"></rect><rect x="2" y="16" width="6" height="6" rx="1"></rect><rect x="9" y="2" width="6" height="6" rx="1"></rect><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"></path><path d="M12 12V8"></path></svg>
+}
+
+templ sparklesIcon() {
+	<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sparkles text-primary"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"></path><path d="M20 3v4"></path><path d="M22 5h-4"></path><path d="M4 17v2"></path><path d="M5 18H3"></path></svg>
+}
+
+templ bookOpenIcon() {
+	<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-book-open"><path d="M12 7v14"></path><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"></path></svg>
+}
+
+templ chevronDownIcon() {
+	<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down"><path d="m6 9 6 6 6-6"></path></svg>
+}
+
+templ chevronUpIcon() {
+	<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-up"><path d="m18 15-6-6-6 6"></path></svg>
+}
+
+templ Container() {
+	@annotation.Container(icon(), annotation.Props{
+		Label:   "Knowledge Base",
+		Subtext: "Context retrieved and synthesized from workspace documents",
+		FooterDotAttrs: templ.Attributes{
+			":class": `(() => {
+				if (message.status === 'completed') return 'bg-green-500/40';
+				if (message.status === 'error') return 'bg-destructive/40';
+				return 'bg-primary/30';
+			})()`,
+		},
+	}) {
+		<div class="flex flex-col gap-4 py-2">
+			<!-- Query & Namespace Info -->
+			<div class="flex flex-col gap-2">
+				<div class="flex items-center gap-2 text-[12px] text-muted-foreground/50 italic font-serif">
+					<span class="font-semibold text-muted-foreground/40">Query:</span>
+					<span
+						class="text-primary/70 not-italic font-mono text-[11px] bg-primary/[0.05] px-2 py-0.5 rounded-md border border-primary/10 shadow-sm"
+						x-text="message.parsedArgs?.query || 'knowledge base query'"
+					></span>
+				</div>
+				<div class="flex items-center gap-2 text-[12px] text-muted-foreground/50 italic font-serif">
+					<span class="font-semibold text-muted-foreground/40">Workspace:</span>
+					<span
+						class="text-muted-foreground/60 not-italic font-mono text-[10px] bg-muted/10 px-2 py-0.5 rounded-md border border-border/10"
+						x-text="message.parsedArgs?.namespace || 'default'"
+					></span>
+				</div>
+			</div>
+			<!-- Result Area -->
+			<div class="relative w-full">
+				<!-- Loading State -->
+				<template x-if="!message.result && message.status !== 'error'">
+					<div class="bg-muted/[0.03] border border-border/10 rounded-xl p-6 flex items-center justify-center gap-3">
+						<span class="w-1.5 h-1.5 bg-primary rounded-full animate-bounce"></span>
+						<span class="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style="animation-delay: 150ms;"></span>
+						<span class="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style="animation-delay: 300ms;"></span>
+						<span class="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground/30 ms-2">Searching knowledge base...</span>
+					</div>
+				</template>
+				<!-- Error State -->
+				<template x-if="message.status === 'error'">
+					<div class="flex items-center gap-3 text-destructive/80 font-medium py-3 px-4 bg-destructive/5 border border-destructive/10 rounded-xl">
+						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-alert-circle flex-shrink-0"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="8" y2="12"></line><line x1="12" x2="12.01" y1="16" y2="16"></line></svg>
+						<span class="text-xs" x-text="message.result || 'Knowledge base query failed'"></span>
+					</div>
+				</template>
+				<!-- Success State: Structured result with answer, metrics, and sources -->
+				<template x-if="message.result && message.status !== 'error'">
+					<div class="flex flex-col gap-4">
+						<!-- Answer Section: Rendered markdown -->
+						<div class="bg-muted/[0.03] border border-border/10 rounded-xl p-5 shadow-[inset_0_1px_4px_rgba(0,0,0,0.01)] transition-colors hover:bg-muted/[0.05]">
+							<div
+								class="prose prose-sm max-w-none text-sm leading-relaxed text-foreground dark:[&_*]:text-white"
+								x-html="renderMarkdown(message.parsedResult?.answer || message.result)"
+								dir="auto"
+							></div>
+						</div>
+						<!-- Metrics Bar: Generation time, speed, tokens, model -->
+						<template x-if="message.parsedResult?.metrics">
+							<div class="flex items-center gap-3 flex-wrap text-[11px] text-muted-foreground/60 px-1">
+								<!-- Generation Time -->
+								<template x-if="message.parsedResult.metrics.total_duration_ms">
+									<span class="flex items-center gap-1" title="Total generation time">
+										@clockIcon()
+										<span x-text="(message.parsedResult.metrics.total_duration_ms / 1000).toFixed(1) + 's'"></span>
+									</span>
+								</template>
+								<!-- Tokens Per Second (Speed) -->
+								<template x-if="message.parsedResult.metrics.total_tokens && message.parsedResult.metrics.generation_duration_ms > 0">
+									<span class="flex items-center gap-1 text-emerald-600 dark:text-emerald-400" title="Generation speed">
+										@gaugeIcon()
+										<span x-text="((message.parsedResult.metrics.completion_tokens || message.parsedResult.metrics.total_tokens) / message.parsedResult.metrics.generation_duration_ms * 1000).toFixed(1) + ' tok/s'"></span>
+									</span>
+								</template>
+								<!-- Total Tokens -->
+								<template x-if="message.parsedResult.metrics.total_tokens">
+									<span class="flex items-center gap-1" title="Total tokens used">
+										@zapIcon()
+										<span x-text="message.parsedResult.metrics.total_tokens.toLocaleString() + ' tokens'"></span>
+									</span>
+								</template>
+								<!-- Model Badge -->
+								<template x-if="message.parsedResult.metrics.model">
+									<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[10px] font-medium">
+										@brainIcon()
+										<span x-text="message.parsedResult.metrics.model"></span>
+									</span>
+								</template>
+								<!-- Mode Badge -->
+								<template x-if="message.parsedResult.metrics.mode">
+									<span
+										class="inline-flex items-center px-2 py-0.5 rounded-full bg-muted/50 text-muted-foreground text-[10px] font-medium border border-border/30"
+										x-text="message.parsedResult.metrics.mode"
+									></span>
+								</template>
+								<!-- Retrieval vs Generation breakdown -->
+								<template x-if="message.parsedResult.metrics.retrieval_duration_ms && message.parsedResult.metrics.generation_duration_ms">
+									<span class="flex items-center gap-1 text-muted-foreground/40 text-[10px]">
+										<span>retrieval:</span>
+										<span x-text="(message.parsedResult.metrics.retrieval_duration_ms / 1000).toFixed(1) + 's'"></span>
+										<span class="mx-0.5">·</span>
+										<span>generation:</span>
+										<span x-text="(message.parsedResult.metrics.generation_duration_ms / 1000).toFixed(1) + 's'"></span>
+										<template x-if="message.parsedResult.metrics.graph_duration_ms > 0">
+											<span>
+												<span class="mx-0.5">·</span>
+												<span>graph:</span>
+												<span x-text="(message.parsedResult.metrics.graph_duration_ms / 1000).toFixed(1) + 's'"></span>
+											</span>
+										</template>
+									</span>
+								</template>
+							</div>
+						</template>
+						<!-- Source Citations Panel -->
+						@SourceCitations()
+						<!-- Knowledge Graph Explorer Script (lazy-loaded) -->
+						@KBGraphExplorerScript()
+					</div>
+				</template>
+			</div>
+		</div>
+	}
+}
+
+// SourceCitations renders the collapsible source citations panel with Documents, Knowledge, and Explore tabs.
+templ SourceCitations() {
+	<template x-if="message.parsedResult?.sources && (message.parsedResult.sources.chunks?.length > 0 || message.parsedResult.sources.entities?.length > 0 || message.parsedResult.sources.relationships?.length > 0 || message.parsedResult?.graph?.nodes?.length > 0)">
+		<div
+			x-data="{
+			sourcesOpen: !!(message.parsedResult?.graph?.nodes?.length > 0),
+			activeTab: (message.parsedResult?.graph?.nodes?.length > 0) ? 'explore' : 'documents',
+			graphInitialized: false,
+		}"
+		>
+			<!-- Collapsible Trigger -->
+			<button
+				class="w-full flex items-center justify-between text-muted-foreground hover:text-foreground py-2.5 px-3.5 rounded-xl hover:bg-muted/30 transition-all text-xs group"
+				@click="sourcesOpen = !sourcesOpen"
+			>
+				<span class="flex items-center gap-2.5">
+					@bookOpenIcon()
+					<span class="font-medium">
+						<span x-text="(message.parsedResult.sources.chunks?.length || 0)"></span> Source<span x-show="(message.parsedResult.sources.chunks?.length || 0) !== 1">s</span>
+						<span class="mx-1 text-muted-foreground/30">·</span>
+						<span x-text="(message.parsedResult.sources.entities?.length || 0)"></span> Topic<span x-show="(message.parsedResult.sources.entities?.length || 0) !== 1">s</span>
+						<template x-if="message.parsedResult?.graph?.nodes?.length > 0">
+							<span>
+								<span class="mx-1 text-muted-foreground/30">·</span>
+								<span class="text-primary" x-text="message.parsedResult.graph.nodes.length + ' graph nodes'"></span>
+							</span>
+						</template>
+					</span>
+					<!-- Confidence Indicator -->
+					@ConfidenceDots()
+				</span>
+				<div class="flex items-center gap-1.5">
+					<template x-if="message.parsedResult?.graph?.nodes?.length > 0 && !sourcesOpen">
+						<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[9px] font-semibold animate-pulse">
+							@networkIcon()
+							Graph
+						</span>
+					</template>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						width="14"
+						height="14"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						class="transition-transform duration-200"
+						:class="sourcesOpen ? 'rotate-180' : ''"
+					><path d="m6 9 6 6 6-6"></path></svg>
+				</div>
+			</button>
+			<!-- Collapsible Content -->
+			<div x-show="sourcesOpen" x-transition.duration.300ms class="mt-2 border border-border/40 rounded-2xl shadow-lg overflow-hidden bg-card/50 backdrop-blur-sm">
+				<!-- Tab List -->
+				<div class="flex bg-muted/20 border-b border-border/20 px-1 pt-1">
+					<button
+						class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-medium transition-all rounded-t-lg"
+						:class="activeTab === 'documents' ? 'bg-background text-foreground shadow-sm border border-border/30 border-b-background -mb-px' : 'text-muted-foreground hover:text-foreground'"
+						@click="activeTab = 'documents'"
+					>
+						@fileTextIcon()
+						<span class="hidden sm:inline">Documents</span>
+						<span class="sm:hidden">Docs</span>
+						<template x-if="message.parsedResult?.sources?.chunks?.length > 0">
+							<span class="inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full bg-muted text-[9px] font-semibold text-muted-foreground" x-text="message.parsedResult.sources.chunks.length"></span>
+						</template>
+					</button>
+					<button
+						class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-medium transition-all rounded-t-lg"
+						:class="activeTab === 'knowledge' ? 'bg-background text-foreground shadow-sm border border-border/30 border-b-background -mb-px' : 'text-muted-foreground hover:text-foreground'"
+						@click="activeTab = 'knowledge'"
+					>
+						@brainIcon()
+						<span class="hidden sm:inline">Knowledge</span>
+						<span class="sm:hidden">Info</span>
+						<template x-if="message.parsedResult?.sources?.entities?.length > 0">
+							<span class="inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full bg-muted text-[9px] font-semibold text-muted-foreground" x-text="message.parsedResult.sources.entities.length"></span>
+						</template>
+					</button>
+					<button
+						class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-medium transition-all rounded-t-lg"
+						:class="activeTab === 'explore' ? 'bg-background text-foreground shadow-sm border border-border/30 border-b-background -mb-px' : 'text-muted-foreground hover:text-foreground'"
+						@click="activeTab = 'explore'"
+					>
+						@networkIcon()
+						<span class="hidden sm:inline">Explore</span>
+						<span class="sm:hidden">Graph</span>
+						<template x-if="message.parsedResult?.graph?.nodes?.length > 0">
+							<span class="inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full bg-primary/15 text-primary text-[9px] font-bold" x-text="message.parsedResult.graph.nodes.length"></span>
+						</template>
+					</button>
+				</div>
+				<!-- Tab Content -->
+				<div class="p-3">
+					<!-- Documents Tab -->
+					@DocumentsTab()
+					<!-- Knowledge Tab -->
+					@KnowledgeTab()
+					<!-- Explore Tab -->
+					@ExploreTab()
+				</div>
+			</div>
+		</div>
+	</template>
+}
+
+// ConfidenceDots renders a 5-dot confidence indicator based on chunk scores.
+templ ConfidenceDots() {
+	<span
+		class="inline-flex gap-0.5 items-center"
+		x-data="{
+			get confidence() {
+				const chunks = message.parsedResult?.sources?.chunks || [];
+				const scores = chunks.map(c => c.score).filter(s => s > 0);
+				if (scores.length === 0) return 0.5;
+				const maxScore = Math.max(...scores);
+				const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+				const entityBonus = Math.min(0.1, (message.parsedResult?.sources?.entities?.length || 0) * 0.005);
+				return Math.min(1.0, maxScore * 0.6 + avgScore * 0.3 + entityBonus);
+			},
+			get filled() { return Math.round(this.confidence * 5); },
+			get label() {
+				if (this.confidence >= 0.5) return 'Strong';
+				if (this.confidence >= 0.3) return 'Good';
+				if (this.confidence >= 0.2) return 'Related';
+				return 'Mentioned';
+			},
+			get color() {
+				if (this.confidence >= 0.5) return 'text-blue-600 dark:text-blue-400';
+				if (this.confidence >= 0.3) return 'text-sky-600 dark:text-sky-400';
+				if (this.confidence >= 0.2) return 'text-slate-600 dark:text-slate-400';
+				return 'text-slate-500 dark:text-slate-400';
+			},
+			get dotColor() {
+				if (this.confidence >= 0.5) return 'bg-blue-500';
+				if (this.confidence >= 0.3) return 'bg-sky-500';
+				if (this.confidence >= 0.2) return 'bg-slate-500';
+				return 'bg-slate-400';
+			}
+		}"
+		:title="Math.round(confidence * 100) + '% confidence'"
+	>
+		<template x-for="i in 5" :key="i">
+			<span
+				class="w-1.5 h-1.5 rounded-full transition-colors"
+				:class="i <= filled ? dotColor : 'bg-muted-foreground/20'"
+			></span>
+		</template>
+		<span class="text-[10px] font-semibold ms-1 hidden sm:inline" :class="color" x-text="label + ' (' + Math.round(confidence * 100) + '%)'"></span>
+		<span class="text-[10px] font-semibold ms-1 sm:hidden" :class="color" x-text="Math.round(confidence * 100) + '%'"></span>
+	</span>
+}
+
+// DocumentsTab renders grouped document chunks with scores and excerpts.
+templ DocumentsTab() {
+	<div x-show="activeTab === 'documents'">
+		<template x-if="!message.parsedResult?.sources?.chunks?.length">
+			<div class="flex flex-col items-center justify-center py-8 text-muted-foreground">
+				@fileTextIcon()
+				<p class="text-sm mt-2">No source documents</p>
+			</div>
+		</template>
+		<template x-if="message.parsedResult?.sources?.chunks?.length > 0">
+			<div
+				class="space-y-2 max-h-[300px] overflow-y-auto pr-1"
+				x-data="{
+					get groupedChunks() {
+						const chunks = message.parsedResult?.sources?.chunks || [];
+						const groups = {};
+						chunks.forEach(chunk => {
+							const key = chunk.document_id || chunk.file_path || 'unknown';
+							if (!groups[key]) groups[key] = [];
+							groups[key].push(chunk);
+						});
+						return Object.entries(groups);
+					},
+					showAll: false,
+					getDocTitle(chunks) {
+						const chunk = chunks[0];
+						if (!chunk) return 'Untitled';
+						if (chunk.file_path) {
+							const filename = chunk.file_path.split('/').pop() || '';
+							const clean = filename.replace(/\.(md|txt|pdf|docx?|html?|rst|json|xml)$/i, '');
+							if (clean.length > 0) return clean.length > 50 ? clean.slice(0, 50) + '...' : clean;
+						}
+						const content = chunk.content || '';
+						const titleMatch = content.match(/^#+\s+(.+)$/m);
+						if (titleMatch && titleMatch[1]) {
+							const t = titleMatch[1].trim();
+							return t.length > 50 ? t.slice(0, 50) + '...' : t;
+						}
+						return 'Untitled Document';
+					},
+					getScoreColor(score) {
+						if (score >= 0.5) return 'text-blue-600 dark:text-blue-400';
+						if (score >= 0.3) return 'text-sky-600 dark:text-sky-400';
+						if (score >= 0.2) return 'text-slate-600 dark:text-slate-400';
+						return 'text-slate-500 dark:text-slate-400';
+					}
+				}"
+			>
+				<template x-for="([docId, chunks], index) in (showAll ? groupedChunks : groupedChunks.slice(0, 3))" :key="docId">
+					<div class="group bg-muted/30 hover:bg-muted/50 border border-transparent hover:border-border/50 rounded-xl transition-all duration-200 p-3">
+						<div class="flex items-start gap-3">
+							<!-- Citation number -->
+							<span class="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center font-semibold group-hover:bg-primary group-hover:text-primary-foreground transition-colors" x-text="index + 1"></span>
+							<div class="flex-1 min-w-0 space-y-1.5">
+								<!-- Document header -->
+								<div class="flex items-center justify-between gap-2">
+									<div class="text-sm font-medium flex items-center gap-1.5 text-left max-w-full overflow-hidden">
+										@fileTextIcon()
+										<span class="truncate" x-text="getDocTitle(chunks)"></span>
+									</div>
+									<div class="flex items-center gap-2 flex-shrink-0">
+										<span class="text-xs font-semibold" :class="getScoreColor(chunks.reduce((a, c) => a + c.score, 0) / chunks.length)" x-text="Math.round((chunks.reduce((a, c) => a + c.score, 0) / chunks.length) * 100) + '%'"></span>
+									</div>
+								</div>
+								<!-- Chunk excerpts -->
+								<div class="space-y-1.5 mt-2">
+									<template x-for="(chunk, chunkIdx) in chunks.slice(0, 3)" :key="chunkIdx">
+										<div class="w-full text-left p-2 rounded bg-muted/40 hover:bg-muted/70 transition-colors">
+											<div class="flex items-start gap-2">
+												<span class="flex-shrink-0 inline-flex items-center justify-center text-[9px] h-4 px-1 rounded border border-border/30 bg-background text-muted-foreground mt-0.5" x-text="chunkIdx + 1"></span>
+												<p class="text-[11px] text-muted-foreground line-clamp-2 flex-1 leading-relaxed break-words overflow-hidden" x-text="(chunk.content || '').slice(0, 150) + (chunk.content?.length > 150 ? '...' : '')"></p>
+												<span class="text-[9px] flex-shrink-0" :class="getScoreColor(chunk.score)" x-text="Math.round(chunk.score * 100) + '%'"></span>
+											</div>
+											<!-- Line range -->
+											<template x-if="chunk.start_line != null && chunk.end_line != null">
+												<div class="text-[9px] text-muted-foreground mt-1 ps-6" x-text="'Lines ' + chunk.start_line + '-' + chunk.end_line"></div>
+											</template>
+										</div>
+									</template>
+									<template x-if="chunks.length > 3">
+										<p class="text-[10px] text-muted-foreground text-center pt-1" x-text="'+' + (chunks.length - 3) + ' more passages'"></p>
+									</template>
+								</div>
+							</div>
+						</div>
+					</div>
+				</template>
+				<!-- Show more button -->
+				<template x-if="groupedChunks.length > 3 && !showAll">
+					<button
+						class="w-full text-xs text-muted-foreground hover:text-foreground py-2 flex items-center justify-center gap-1 hover:bg-muted/30 rounded-lg transition-colors"
+						@click="showAll = true"
+					>
+						<span x-text="'Show ' + (groupedChunks.length - 3) + ' more sources'"></span>
+						@chevronDownIcon()
+					</button>
+				</template>
+			</div>
+		</template>
+	</div>
+}
+
+// KnowledgeTab renders entities and relationships from the knowledge graph.
+templ KnowledgeTab() {
+	<div x-show="activeTab === 'knowledge'">
+		<template x-if="!message.parsedResult?.sources?.entities?.length && !message.parsedResult?.sources?.relationships?.length">
+			<div class="flex flex-col items-center justify-center py-8 text-muted-foreground">
+				@brainIcon()
+				<p class="text-sm mt-2">No knowledge extracted</p>
+			</div>
+		</template>
+		<div
+			class="space-y-5 max-h-[400px] overflow-y-auto pr-2"
+			x-data="{ showAllEntities: false }"
+		>
+			<!-- Entities Section -->
+			<template x-if="message.parsedResult?.sources?.entities?.length > 0">
+				<div class="space-y-2.5">
+					<div class="flex items-center gap-2">
+						@sparklesIcon()
+						<h4 class="text-xs font-semibold text-foreground">Key Topics</h4>
+						<span class="inline-flex items-center justify-center h-4 px-1.5 rounded-full bg-muted text-muted-foreground text-[10px] font-medium" x-text="message.parsedResult.sources.entities.length"></span>
+					</div>
+					<div class="flex flex-wrap gap-1.5">
+						<template x-for="(entity, idx) in (showAllEntities ? message.parsedResult.sources.entities : message.parsedResult.sources.entities.slice(0, 12))" :key="entity.id">
+							<button
+								class="inline-flex items-center px-2.5 py-1 rounded-full bg-muted/50 text-xs font-medium text-foreground/80 border border-transparent hover:bg-primary/15 hover:text-primary hover:border-primary/30 transition-all cursor-pointer group/entity"
+								:title="entity.label + ' · ' + Math.round(entity.relevance * 100) + '% relevance · Click to explore in graph'"
+								@click="if (message.parsedResult?.graph?.nodes?.length > 0) { activeTab = 'explore'; $nextTick(() => { const el = $el.closest('[x-data]'); if (el && el.__x) { /* handled by x-effect */ } }) }"
+							>
+								<span x-text="entity.label"></span>
+								<template x-if="message.parsedResult?.graph?.nodes?.some(n => n.label === entity.label)">
+									<svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="ml-1 opacity-0 group-hover/entity:opacity-100 transition-opacity text-primary"><path d="m9 18 6-6-6-6"></path></svg>
+								</template>
+							</button>
+						</template>
+						<template x-if="message.parsedResult.sources.entities.length > 12 && !showAllEntities">
+							<button
+								class="inline-flex items-center px-2.5 py-1 rounded-full border border-border/30 text-xs text-muted-foreground hover:bg-muted transition-colors"
+								@click="showAllEntities = true"
+								x-text="'+' + (message.parsedResult.sources.entities.length - 12) + ' more'"
+							></button>
+						</template>
+					</div>
+				</div>
+			</template>
+			<!-- Relationships Section -->
+			<template x-if="message.parsedResult?.sources?.relationships?.length > 0">
+				<div class="space-y-2.5">
+					<div class="flex items-center gap-2">
+						@networkIcon()
+						<h4 class="text-xs font-semibold text-foreground">Connections</h4>
+						<span class="inline-flex items-center justify-center h-4 px-1.5 rounded-full bg-muted text-muted-foreground text-[10px] font-medium" x-text="message.parsedResult.sources.relationships.length"></span>
+					</div>
+					<div class="space-y-1">
+						<template x-for="(rel, idx) in message.parsedResult.sources.relationships.slice(0, 6)" :key="idx">
+							<div class="flex items-center gap-1.5 text-xs p-2 rounded-md hover:bg-muted/60 transition-colors group/rel">
+								<span class="font-medium truncate max-w-[100px]" x-text="rel.source"></span>
+								<span class="text-primary/60 group-hover/rel:text-primary transition-colors">→</span>
+								<span class="inline-flex items-center px-1.5 h-4 rounded border border-border/30 bg-background text-[10px] font-normal text-muted-foreground" x-text="(rel.type || '').toLowerCase().replace(/_/g, ' ')"></span>
+								<span class="text-primary/60 group-hover/rel:text-primary transition-colors">→</span>
+								<span class="font-medium truncate max-w-[100px]" x-text="rel.target"></span>
+								<template x-if="rel.relevance > 0.01">
+									<span class="ms-auto text-[10px] text-muted-foreground" x-text="Math.round(rel.relevance * 100) + '%'"></span>
+								</template>
+							</div>
+						</template>
+						<template x-if="message.parsedResult.sources.relationships.length > 6">
+							<p class="text-xs text-muted-foreground ps-2 pt-1" x-text="'+' + (message.parsedResult.sources.relationships.length - 6) + ' more connections'"></p>
+						</template>
+					</div>
+				</div>
+			</template>
+		</div>
+	</div>
+}
+
+// ExploreTab renders an interactive knowledge graph visualization using Sigma.js + Graphology.
+// Libraries are loaded on-demand (lazy) since they are not in the chat layout.
+templ ExploreTab() {
+	<div x-show="activeTab === 'explore'" x-transition.opacity.duration.200ms>
+		<!-- No graph data state -->
+		<template x-if="!message.parsedResult?.graph || !message.parsedResult.graph.nodes?.length">
+			<div class="flex flex-col items-center justify-center py-10 space-y-4">
+				<div class="relative">
+					<div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-transparent flex items-center justify-center shadow-inner">
+						@networkIcon()
+					</div>
+					<div class="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-muted text-muted-foreground text-[10px] font-semibold flex items-center justify-center border border-border/30" x-text="message.parsedResult?.sources?.entities?.length || 0"></div>
+				</div>
+				<div class="text-center space-y-1.5">
+					<p class="text-sm font-semibold text-muted-foreground">No Graph Data Available</p>
+					<p class="text-xs text-muted-foreground/50 max-w-[220px] leading-relaxed">
+						No knowledge graph relationships were found for this query. Try a more specific question.
+					</p>
+				</div>
+			</div>
+		</template>
+		<!-- Graph visualization -->
+		<template x-if="message.parsedResult?.graph?.nodes?.length > 0">
+			<div
+				x-data="kbGraphExplorer(message)"
+				x-init="initExplorer()"
+				x-effect="if (activeTab === 'explore' && !graphInitialized && libsReady) { graphInitialized = true; $nextTick(() => { setTimeout(() => _initSigma(), 80) }) }"
+				class="space-y-0"
+			>
+				<!-- Sigma.js WebGL Container -->
+				<style>
+					[x-ref="graphWrapper"]:fullscreen {
+						width: 100vw !important;
+						height: 100vh !important;
+						background: #000;
+					}
+					[x-ref="graphWrapper"]:fullscreen .graph-toolbar {
+						background: rgba(0,0,0,0.4);
+						backdrop-filter: blur(12px);
+						border-bottom: 1px solid rgba(255,255,255,0.1);
+						padding: 12px 16px;
+					}
+				</style>
+				<div x-ref="graphWrapper" class="relative flex flex-col rounded-xl border border-border/30 overflow-hidden bg-gradient-to-br from-background to-muted/10 transition-all duration-300" style="height: 360px;">
+					<!-- Graph Toolbar inside wrapper -->
+					<div class="graph-toolbar flex items-center justify-between px-1.5 py-2 gap-2 z-30 transition-all">
+						<div class="flex items-center gap-2 flex-1 min-w-0">
+							<!-- Graph Title + Stats -->
+							<div class="flex items-center gap-2 flex-shrink-0">
+								<span class="text-xs font-bold text-foreground flex items-center gap-1.5">
+									@networkIcon()
+									<span class="hidden sm:inline">Knowledge Graph</span>
+									<span class="sm:hidden">Graph</span>
+								</span>
+								<div class="flex items-center gap-1">
+									<span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-muted/70 text-[9px] font-semibold text-muted-foreground">
+										<span x-text="graphData.nodes.length"></span>
+										<span class="mx-0.5 text-muted-foreground/40">·</span>
+										<span x-text="graphData.edges.length"></span>
+									</span>
+									<template x-if="graphData.is_truncated">
+										<span class="text-[8px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-1.5 py-0.5 rounded-md font-semibold border border-amber-200 dark:border-amber-800/40">truncated</span>
+									</template>
+								</div>
+							</div>
+							<!-- Inline Search (only shown when not small screen or if fullscreen) -->
+							<div class="relative flex-1 max-w-[180px] hidden sm:block">
+								<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground/50"><circle cx="11" cy="11" r="8"></circle><line x1="21" x2="16.65" y1="21" y2="16.65"></line></svg>
+								<input
+									type="text"
+									class="w-full h-6 pl-6 pr-2 text-[10px] rounded-md border border-border/30 bg-muted/20 placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/40 transition-all"
+									placeholder="Search nodes..."
+									x-model.debounce.200ms="searchQuery"
+									@input="searchNodes($event.target.value)"
+								/>
+								<!-- Search results dropdown -->
+								<template x-if="searchResults.length > 0 && searchQuery.length >= 2">
+									<div class="absolute top-full left-0 right-0 mt-1 bg-background border border-border/50 rounded-lg shadow-xl z-30 max-h-[160px] overflow-y-auto">
+										<template x-for="(result, idx) in searchResults" :key="result.id">
+											<button
+												class="w-full flex items-center gap-2 px-2.5 py-1.5 text-[10px] hover:bg-muted/50 transition-colors text-left first:rounded-t-lg last:rounded-b-lg"
+												@click="focusOnNode(result.id); searchQuery = ''; searchResults = []"
+											>
+												<span class="w-2 h-2 rounded-full flex-shrink-0" :style="'background-color: ' + getNodeColor(result.node_type)"></span>
+												<span class="font-medium text-foreground truncate" x-text="result.label"></span>
+												<span class="text-muted-foreground/50 text-[8px] ml-auto flex-shrink-0" x-text="(result.node_type || '').toLowerCase()"></span>
+											</button>
+										</template>
+									</div>
+								</template>
+							</div>
+						</div>
+						<!-- Controls -->
+						<div class="flex items-center gap-0.5 flex-shrink-0">
+							<!-- Layout cycle -->
+							<button
+								class="inline-flex items-center justify-center h-6 px-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors gap-1"
+								@click="cycleLayout()"
+								:title="'Layout: ' + currentLayout"
+							>
+								<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="14" y="3" rx="1"></rect><path d="M10 21V8a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1H3"></path></svg>
+								<span class="text-[9px] hidden sm:inline" x-text="currentLayout === 'force-directed' ? 'Force' : currentLayout === 'circular' ? 'Circle' : 'Grid'"></span>
+							</button>
+							<!-- Divider -->
+							<div class="w-px h-4 bg-border/30 mx-0.5"></div>
+							<!-- Labels toggle -->
+							<button
+								class="inline-flex items-center justify-center h-6 w-6 rounded-md transition-colors"
+								:class="showLabels ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-muted'"
+								@click="toggleLabels()"
+								title="Toggle labels"
+							>
+								<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"></path><path d="M7 7h.01"></path></svg>
+							</button>
+							<!-- Zoom to fit -->
+							<button
+								class="inline-flex items-center justify-center h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+								@click="zoomToFit()"
+								title="Zoom to fit"
+							>
+								<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"></path><path d="M9 21H3v-6"></path><path d="M21 3l-7 7"></path><path d="M3 21l7-7"></path></svg>
+							</button>
+							<!-- Zoom In -->
+							<button
+								class="inline-flex items-center justify-center h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+								@click="zoomIn()"
+								title="Zoom in"
+							>
+								<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" x2="16.65" y1="21" y2="16.65"></line><line x1="11" x2="11" y1="8" y2="14"></line><line x1="8" x2="14" y1="11" y2="11"></line></svg>
+							</button>
+							<!-- Zoom Out -->
+							<button
+								class="inline-flex items-center justify-center h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+								@click="zoomOut()"
+								title="Zoom out"
+							>
+								<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" x2="16.65" y1="21" y2="16.65"></line><line x1="8" x2="14" y1="11" y2="11"></line></svg>
+							</button>
+							<!-- Divider -->
+							<div class="w-px h-4 bg-border/30 mx-0.5"></div>
+							<!-- Fullscreen toggle -->
+							<button
+								class="inline-flex items-center justify-center h-6 w-6 rounded-md transition-colors"
+								:class="isFullscreen ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-muted'"
+								@click="toggleFullscreen()"
+								:title="isFullscreen ? 'Exit fullscreen' : 'Fullscreen'"
+							>
+								<template x-if="!isFullscreen">
+									<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg>
+								</template>
+								<template x-if="isFullscreen">
+									<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" x2="21" y1="10" y2="3"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg>
+								</template>
+							</button>
+						</div>
+					</div>
+
+					<!-- Container for graph and legend -->
+					<div class="flex-1 relative overflow-hidden">
+						<!-- Loading overlay -->
+						<div x-show="graphLoading" x-transition.opacity.duration.300ms class="absolute inset-0 z-20 flex items-center justify-center bg-background/90 backdrop-blur-md">
+							<div class="flex flex-col items-center gap-3">
+								<div class="relative">
+									<span class="w-8 h-8 border-2 border-primary/30 rounded-full absolute inset-0 animate-ping"></span>
+									<span class="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin block"></span>
+								</div>
+								<div class="text-center">
+									<span class="text-[10px] text-muted-foreground font-semibold uppercase tracking-widest block">Rendering graph</span>
+									<span class="text-[9px] text-muted-foreground/50 mt-0.5 block" x-text="graphData.nodes.length + ' nodes · ' + graphData.edges.length + ' edges'"></span>
+								</div>
+							</div>
+						</div>
+						<!-- Sigma canvas container -->
+						<div :id="'kb-sigma-' + $id" class="w-full h-full" style="min-height: 200px;"></div>
+						
+						<!-- Hover Tooltip (floating, follows mouse position) -->
+						<template x-if="hoveredNode && hoveredNodePos">
+							<div
+								class="absolute z-30 pointer-events-none"
+								:style="'left: ' + Math.min(hoveredNodePos.x + 12, ($refs.graphWrapper?.clientWidth || 300) - 180) + 'px; top: ' + Math.max(hoveredNodePos.y - 50, 4) + 'px;'"
+							>
+								<div class="bg-background/95 backdrop-blur-lg border border-border/50 rounded-lg shadow-2xl p-2.5 min-w-[140px] max-w-[200px]">
+									<!-- tooltip content same as before -->
+									<div class="flex items-center gap-1.5 mb-1">
+										<span class="w-2.5 h-2.5 rounded-full flex-shrink-0 ring-2 ring-background" :style="'background-color: ' + getNodeColor(hoveredNode.node_type)"></span>
+										<span class="text-[11px] font-bold text-foreground truncate" x-text="hoveredNode.label"></span>
+									</div>
+									<div class="flex items-center gap-2 text-[9px] text-muted-foreground mb-1">
+										<span class="inline-flex items-center px-1 py-0.5 rounded bg-muted text-[8px] font-semibold" x-text="(hoveredNode.node_type || 'unknown').toLowerCase()"></span>
+									</div>
+									<template x-if="hoveredNode.description">
+										<p class="text-[9px] text-muted-foreground/70 leading-snug line-clamp-2 border-t border-border/20 pt-1 mt-0.5" x-text="hoveredNode.description"></p>
+									</template>
+								</div>
+							</div>
+						</template>
+
+						<!-- Type Legend overlay (bottom-left) -->
+						<div class="absolute bottom-2 left-2 z-10 transition-opacity" :class="isFullscreen ? 'opacity-100' : 'opacity-80 hover:opacity-100'">
+							<div class="bg-background/90 backdrop-blur-lg border border-border/30 rounded-lg p-2 shadow-lg max-w-[220px]">
+								<div class="text-[8px] font-bold text-muted-foreground/60 uppercase tracking-widest mb-1.5">Entity Types</div>
+								<div class="flex flex-wrap gap-1">
+									<template x-for="typeInfo in nodeTypeStats" :key="typeInfo.type">
+										<button
+											class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-medium cursor-pointer transition-all border"
+											:class="visibleTypes.has(typeInfo.type)
+												? 'opacity-100 border-border/20 bg-muted/30 hover:bg-muted/50'
+												: 'opacity-30 border-transparent hover:opacity-50'"
+											@click="toggleType(typeInfo.type)"
+											:title="typeInfo.type + ': ' + typeInfo.count + ' nodes (click to toggle)'"
+										>
+											<span class="w-2 h-2 rounded-full flex-shrink-0 ring-1 ring-background" :style="'background-color: ' + typeInfo.color"></span>
+											<span class="text-foreground/70" x-text="typeInfo.label"></span>
+										</button>
+									</template>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+				<!-- Selected Node Details Panel (premium card style) -->
+				<template x-if="selectedNode">
+					<div class="mt-2.5 bg-gradient-to-br from-muted/40 to-muted/10 border border-border/40 rounded-xl p-4 space-y-3 shadow-sm">
+						<!-- Header -->
+						<div class="flex items-start justify-between">
+							<div class="flex items-center gap-2.5 min-w-0">
+								<span class="w-4 h-4 rounded-full flex-shrink-0 ring-2 ring-background shadow-sm" :style="'background-color: ' + getNodeColor(selectedNode.node_type)"></span>
+								<div class="min-w-0">
+									<span class="text-sm font-bold text-foreground block truncate" x-text="selectedNode.label"></span>
+									<div class="flex items-center gap-1.5 mt-0.5">
+										<span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-muted text-[9px] font-semibold text-muted-foreground" x-text="(selectedNode.node_type || 'unknown').toLowerCase()"></span>
+										<span class="text-[9px] text-muted-foreground/50 flex items-center gap-0.5">
+											<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M16 3h5v5"></path><path d="M8 3H3v5"></path><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"></path><path d="m15 9 6-6"></path></svg>
+											<span x-text="(selectedNode.degree || 0) + ' connections'"></span>
+										</span>
+									</div>
+								</div>
+							</div>
+							<button class="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-md hover:bg-muted" @click="selectedNode = null; _clearHighlight()">
+								<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="6" y1="6" y2="18"></line><line x1="6" x2="18" y1="6" y2="18"></line></svg>
+							</button>
+						</div>
+						<!-- Description -->
+						<template x-if="selectedNode.description">
+							<p class="text-[11px] text-muted-foreground leading-relaxed bg-background/50 rounded-lg p-2.5 border border-border/20" x-text="selectedNode.description"></p>
+						</template>
+						<!-- Connected Entities -->
+						<template x-if="selectedNodeEdges.length > 0">
+							<div class="space-y-1.5">
+								<div class="flex items-center justify-between">
+									<div class="text-[9px] font-bold text-muted-foreground/60 uppercase tracking-widest">Connections</div>
+									<span class="text-[9px] text-muted-foreground/40" x-text="selectedNodeEdges.length + ' total'"></span>
+								</div>
+								<div class="grid gap-1 max-h-[120px] overflow-y-auto pr-1">
+									<template x-for="(edge, idx) in selectedNodeEdges.slice(0, 10)" :key="idx">
+										<button
+											class="flex items-center gap-2 text-[10px] px-2.5 py-1.5 rounded-lg bg-background/60 hover:bg-background border border-border/20 hover:border-border/40 cursor-pointer transition-all text-left w-full group/edge"
+											@click="focusOnNode(edge.source === selectedNode.id ? edge.target : edge.source)"
+										>
+											<span class="w-2 h-2 rounded-full flex-shrink-0" :style="'background-color: ' + getNodeColor((_nodeMap[edge.source === selectedNode.id ? edge.target : edge.source] || {}).node_type)"></span>
+											<span class="font-semibold text-foreground/80 truncate flex-1 group-hover/edge:text-primary transition-colors" x-text="getNodeLabel(edge.source === selectedNode.id ? edge.target : edge.source)"></span>
+											<span class="inline-flex items-center px-1 py-0.5 rounded bg-muted/60 text-[8px] text-muted-foreground/60 flex-shrink-0 font-medium" x-text="(edge.edge_type || 'related').toLowerCase().replace(/_/g, ' ')"></span>
+											<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0 text-muted-foreground/30 group-hover/edge:text-primary transition-colors"><path d="m9 18 6-6-6-6"></path></svg>
+										</button>
+									</template>
+									<template x-if="selectedNodeEdges.length > 10">
+										<div class="text-[9px] text-muted-foreground/40 text-center py-1 font-medium" x-text="'+' + (selectedNodeEdges.length - 10) + ' more connections'"></div>
+									</template>
+								</div>
+							</div>
+						</template>
+					</div>
+				</template>
+			</div>
+		</template>
+	</div>
+}
+
+// KBGraphExplorerScript renders the Alpine.js component for the inline knowledge graph explorer.
+// This script handles lazy-loading of Sigma.js + Graphology, graph initialization, layout, and interaction.
+templ KBGraphExplorerScript() {
+	<script>
+		// Lazy-load Sigma.js + Graphology if not already present
+		(function() {
+			const ENTITY_COLORS = {
+				'PERSON': '#3b82f6', 'ORGANIZATION': '#10b981', 'LOCATION': '#f59e0b',
+				'EVENT': '#ef4444', 'CONCEPT': '#8b5cf6', 'TECHNOLOGY': '#06b6d4',
+				'PRODUCT': '#d946ef', 'DATE': '#f97316', 'CATEGORY': '#14b8a6',
+				'DOCUMENT': '#6366f1', 'TOPIC': '#a855f7', 'METRIC': '#ec4899',
+				'LAW': '#84cc16', 'PROCESS': '#0ea5e9', 'TOOL': '#eab308',
+				'UNKNOWN': '#64748b',
+			};
+
+			const LAYOUTS = ['force-directed', 'circular', 'grid'];
+
+			function calcNodeSize(degree, base) {
+				if (!degree) return base;
+				const scale = Math.log2(degree + 1) * 2;
+				return Math.min(base + scale, base * 3);
+			}
+
+			function getNodeColor(nodeType) {
+				if (!nodeType) return ENTITY_COLORS['UNKNOWN'];
+				return ENTITY_COLORS[nodeType.toUpperCase()] || ENTITY_COLORS['UNKNOWN'];
+			}
+
+			// Load a script and return a promise
+			function loadScript(src) {
+				return new Promise((resolve, reject) => {
+					if (document.querySelector(`script[src="${src}"]`)) {
+						resolve();
+						return;
+					}
+					const script = document.createElement('script');
+					script.src = src;
+					script.onload = resolve;
+					script.onerror = reject;
+					document.head.appendChild(script);
+				});
+			}
+
+			// Ensure graphology + sigma are loaded
+			async function ensureLibraries() {
+				if (typeof graphology === 'undefined') {
+					await loadScript('https://cdnjs.cloudflare.com/ajax/libs/graphology/0.25.4/graphology.umd.min.js');
+				}
+				if (typeof Sigma === 'undefined') {
+					await loadScript('https://cdnjs.cloudflare.com/ajax/libs/sigma.js/2.4.0/sigma.min.js');
+				}
+			}
+
+			// Apply a layout to the graphology graph
+			function applyLayout(graph, layoutName) {
+				const nodeCount = graph.order;
+				if (nodeCount === 0) return;
+
+				switch (layoutName) {
+					case 'circular': {
+						let i = 0;
+						const radius = Math.max(100, nodeCount * 5);
+						graph.forEachNode((node) => {
+							const angle = (2 * Math.PI * i) / nodeCount;
+							graph.setNodeAttribute(node, 'x', Math.cos(angle) * radius);
+							graph.setNodeAttribute(node, 'y', Math.sin(angle) * radius);
+							i++;
+						});
+						break;
+					}
+					case 'grid': {
+						const cols = Math.ceil(Math.sqrt(nodeCount));
+						let i = 0;
+						const spacing = 50;
+						graph.forEachNode((node) => {
+							const col = i % cols;
+							const row = Math.floor(i / cols);
+							graph.setNodeAttribute(node, 'x', col * spacing);
+							graph.setNodeAttribute(node, 'y', row * spacing);
+							i++;
+						});
+						break;
+					}
+					case 'force-directed':
+					default: {
+						// Simple force-directed: initial circular placement + iterative spring forces
+						let i = 0;
+						const radius = Math.max(100, nodeCount * 3);
+						graph.forEachNode((node) => {
+							const angle = (2 * Math.PI * i) / nodeCount + (Math.random() * 0.3);
+							graph.setNodeAttribute(node, 'x', Math.cos(angle) * radius + (Math.random() - 0.5) * 30);
+							graph.setNodeAttribute(node, 'y', Math.sin(angle) * radius + (Math.random() - 0.5) * 30);
+							i++;
+						});
+
+						// Simple spring-force iterations
+						const iterations = Math.min(100, 30 + nodeCount);
+						const repulsion = 500;
+						const attraction = 0.01;
+						const damping = 0.9;
+
+						const positions = {};
+						const velocities = {};
+						graph.forEachNode((node, attrs) => {
+							positions[node] = { x: attrs.x, y: attrs.y };
+							velocities[node] = { x: 0, y: 0 };
+						});
+
+						for (let iter = 0; iter < iterations; iter++) {
+							const nodes = graph.nodes();
+							// Repulsion between all pairs
+							for (let a = 0; a < nodes.length; a++) {
+								for (let b = a + 1; b < nodes.length; b++) {
+									const na = nodes[a], nb = nodes[b];
+									const dx = positions[nb].x - positions[na].x;
+									const dy = positions[nb].y - positions[na].y;
+									const dist = Math.sqrt(dx * dx + dy * dy) + 0.1;
+									const force = repulsion / (dist * dist);
+									const fx = (dx / dist) * force;
+									const fy = (dy / dist) * force;
+									velocities[na].x -= fx;
+									velocities[na].y -= fy;
+									velocities[nb].x += fx;
+									velocities[nb].y += fy;
+								}
+							}
+							// Attraction along edges
+							graph.forEachEdge((edge, attrs, source, target) => {
+								const dx = positions[target].x - positions[source].x;
+								const dy = positions[target].y - positions[source].y;
+								const dist = Math.sqrt(dx * dx + dy * dy) + 0.1;
+								const force = dist * attraction;
+								const fx = (dx / dist) * force;
+								const fy = (dy / dist) * force;
+								velocities[source].x += fx;
+								velocities[source].y += fy;
+								velocities[target].x -= fx;
+								velocities[target].y -= fy;
+							});
+							// Apply velocities
+							for (const node of nodes) {
+								velocities[node].x *= damping;
+								velocities[node].y *= damping;
+								positions[node].x += velocities[node].x;
+								positions[node].y += velocities[node].y;
+							}
+						}
+
+						// Write back positions
+						for (const node of Object.keys(positions)) {
+							graph.setNodeAttribute(node, 'x', positions[node].x);
+							graph.setNodeAttribute(node, 'y', positions[node].y);
+						}
+						break;
+					}
+				}
+			}
+
+			// Register Alpine component
+			window.kbGraphExplorer = function(message) {
+				return {
+					graphData: message.parsedResult?.graph || { nodes: [], edges: [] },
+					graphLoading: true,
+					libsReady: false,
+					graphInitialized: false,
+					showLabels: true,
+					currentLayout: 'force-directed',
+					layoutIndex: 0,
+					selectedNode: null,
+					selectedNodeEdges: [],
+					hoveredNode: null,
+					hoveredNodePos: null,
+					searchQuery: '',
+					searchResults: [],
+					isFullscreen: false,
+					visibleTypes: new Set(),
+					nodeTypeStats: [],
+					_sigmaInstance: null,
+					_graphInstance: null,
+					_nodeMap: {},
+
+					async initExplorer() {
+						this.graphLoading = true;
+						try {
+							// Handle browser fullscreen events to sync our state
+							document.addEventListener('fullscreenchange', () => {
+								this.isFullscreen = !!document.fullscreenElement;
+								if (this._sigmaInstance) {
+									setTimeout(() => {
+										this._sigmaInstance.refresh();
+										window.dispatchEvent(new Event('resize'));
+										this.zoomToFit();
+									}, 150);
+								}
+							});
+
+							await ensureLibraries();
+							// Build type stats
+							const typeCounts = {};
+							this.graphData.nodes.forEach(n => {
+								const t = n.node_type || 'UNKNOWN';
+								typeCounts[t] = (typeCounts[t] || 0) + 1;
+							});
+							this.nodeTypeStats = Object.entries(typeCounts)
+								.sort((a, b) => b[1] - a[1])
+								.map(([type, count]) => ({
+									type,
+									count,
+									color: getNodeColor(type),
+									label: type.charAt(0).toUpperCase() + type.slice(1).toLowerCase().replace('_', ' ')
+								}));
+							this.visibleTypes = new Set(Object.keys(typeCounts));
+
+							// Build node map
+							this.graphData.nodes.forEach(n => { this._nodeMap[n.id] = n; });
+
+							// Mark libraries as ready — x-effect will pick this up
+							// and call _initSigma when the Explore tab is active
+							this.libsReady = true;
+						} catch (e) {
+							console.error('Failed to init KB graph explorer:', e);
+							this.graphLoading = false;
+						}
+					},
+
+					_initSigma() {
+						const containerId = 'kb-sigma-' + this.$id;
+						const container = document.getElementById(containerId);
+						if (!container) {
+							console.warn('KB graph container not found:', containerId);
+							this.graphLoading = false;
+							return;
+						}
+
+						// Verify container has real dimensions
+						const rect = container.getBoundingClientRect();
+						if (rect.width === 0 || rect.height === 0) {
+							console.warn('KB graph container has zero dimensions, retrying...');
+							setTimeout(() => this._initSigma(), 100);
+							return;
+						}
+
+						// Kill previous instance
+						if (this._sigmaInstance) {
+							this._sigmaInstance.kill();
+							this._sigmaInstance = null;
+						}
+
+						const isDark = document.documentElement.classList.contains('dark');
+						const graph = new graphology.Graph({ multi: true, type: 'directed' });
+						this._graphInstance = graph;
+
+						const nodes = this.graphData.nodes || [];
+						const edges = this.graphData.edges || [];
+						const baseNodeSize = 8;
+
+						// Add nodes
+						nodes.forEach((node, index) => {
+							if (!node.id || graph.hasNode(node.id)) return;
+							graph.addNode(node.id, {
+								label: node.label,
+								x: 0, y: 0, // will be set by layout
+								size: calcNodeSize(node.degree || 0, baseNodeSize),
+								color: getNodeColor(node.node_type),
+								entityType: node.node_type || 'UNKNOWN',
+								description: node.description || '',
+								degree: node.degree || 0,
+							});
+						});
+
+						// Add edges
+						edges.forEach((edge) => {
+							if (!edge.source || !edge.target) return;
+							if (!graph.hasNode(edge.source) || !graph.hasNode(edge.target)) return;
+							const edgeId = `${edge.source}-${edge.target}-${edge.edge_type || ''}`;
+							if (graph.hasEdge(edgeId)) return;
+							try {
+								graph.addEdgeWithKey(edgeId, edge.source, edge.target, {
+									label: edge.edge_type || '',
+									size: Math.max(1, Math.min((edge.weight || 1) * 1.5, 4)),
+									color: isDark ? '#4b5563' : '#d1d5db',
+									type: 'arrow',
+									forceLabel: false,
+								});
+							} catch (e) { /* duplicate or invalid */ }
+						});
+
+						// Apply layout
+						applyLayout(graph, this.currentLayout);
+
+						// Create Sigma instance
+						const SigmaClass = (typeof Sigma !== 'undefined') ? (Sigma.Sigma || Sigma.default || Sigma) : null;
+						if (!SigmaClass) {
+							console.error('Sigma.js not loaded');
+							return;
+						}
+
+						const sigma = new SigmaClass(graph, container, {
+							renderLabels: this.showLabels,
+							renderEdgeLabels: false,
+							labelSize: 11,
+							labelWeight: '500',
+							labelColor: { color: isDark ? '#e2e8f0' : '#374151' },
+							labelFont: 'Inter, ui-sans-serif, system-ui, sans-serif',
+							labelGridCellSize: 100,
+							labelRenderedSizeThreshold: 3,
+							labelDensity: 0.7,
+							defaultNodeColor: '#64748b',
+							defaultEdgeColor: isDark ? '#4b5563' : '#d1d5db',
+							defaultEdgeType: 'arrow',
+							minCameraRatio: 0.1,
+							maxCameraRatio: 10,
+							stagePadding: 30,
+							zIndex: true,
+							allowInvalidContainer: true,
+						});
+
+						this._sigmaInstance = sigma;
+
+						const self = this;
+
+						// Node click → select
+						sigma.on('clickNode', ({ node }) => {
+							const nodeData = self._nodeMap[node];
+							if (nodeData) {
+								self.selectedNode = nodeData;
+								self.selectedNodeEdges = (self.graphData.edges || []).filter(
+									e => e.source === node || e.target === node
+								);
+								// Highlight node and zoom
+								self._highlightNode(node);
+								const pos = {
+									x: graph.getNodeAttribute(node, 'x'),
+									y: graph.getNodeAttribute(node, 'y'),
+									ratio: 0.6,
+								};
+								sigma.getCamera().animate(pos, { duration: 400 });
+							}
+						});
+
+						// Click stage → deselect
+						sigma.on('clickStage', () => {
+							self.selectedNode = null;
+							self.selectedNodeEdges = [];
+							self._clearHighlight();
+						});
+
+						// Node hover → highlight neighbors + tooltip
+						sigma.on('enterNode', ({ node }) => {
+							container.style.cursor = 'pointer';
+							// Set hover tooltip data
+							const nodeData = self._nodeMap[node];
+							if (nodeData) {
+								const viewportPos = sigma.graphToViewport({
+									x: graph.getNodeAttribute(node, 'x'),
+									y: graph.getNodeAttribute(node, 'y'),
+								});
+								self.hoveredNode = nodeData;
+								self.hoveredNodePos = { x: viewportPos.x, y: viewportPos.y };
+							}
+							const neighbors = new Set();
+							graph.forEachNeighbor(node, (n) => neighbors.add(n));
+							graph.forEachNode((n) => {
+								if (n === node || neighbors.has(n)) {
+									graph.setNodeAttribute(n, 'highlighted', true);
+								} else {
+									graph.setNodeAttribute(n, 'hidden', true);
+								}
+							});
+							graph.forEachEdge((edge, attrs, source, target) => {
+								if (source !== node && target !== node) {
+									graph.setEdgeAttribute(edge, 'hidden', true);
+								}
+							});
+							sigma.refresh();
+						});
+
+						sigma.on('leaveNode', () => {
+							container.style.cursor = 'default';
+							self.hoveredNode = null;
+							self.hoveredNodePos = null;
+							graph.forEachNode((n) => {
+								graph.removeNodeAttribute(n, 'hidden');
+								graph.removeNodeAttribute(n, 'highlighted');
+							});
+							graph.forEachEdge((edge) => {
+								graph.removeEdgeAttribute(edge, 'hidden');
+							});
+							self._applyTypeFilter();
+						});
+
+						// Block right-click
+						container.addEventListener('contextmenu', (e) => e.preventDefault());
+
+						// Done loading
+						this.graphLoading = false;
+
+						// Animated camera entrance
+						sigma.getCamera().animate({ ratio: 1 }, { duration: 600 });
+					},
+
+					_highlightNode(nodeId) {
+						const graph = this._graphInstance;
+						const sigma = this._sigmaInstance;
+						if (!graph || !sigma) return;
+						graph.forEachNode((n) => {
+							if (n === nodeId) {
+								graph.setNodeAttribute(n, 'highlighted', true);
+								graph.setNodeAttribute(n, 'zIndex', 2);
+							} else {
+								graph.removeNodeAttribute(n, 'highlighted');
+								graph.setNodeAttribute(n, 'zIndex', 0);
+							}
+						});
+						sigma.refresh();
+					},
+
+					_clearHighlight() {
+						const graph = this._graphInstance;
+						const sigma = this._sigmaInstance;
+						if (!graph || !sigma) return;
+						graph.forEachNode((n) => {
+							graph.removeNodeAttribute(n, 'highlighted');
+							graph.setNodeAttribute(n, 'zIndex', 0);
+						});
+						sigma.refresh();
+					},
+
+					_applyTypeFilter() {
+						const graph = this._graphInstance;
+						const sigma = this._sigmaInstance;
+						if (!graph || !sigma) return;
+						const visible = this.visibleTypes;
+						const visibleNodeIds = new Set();
+						graph.forEachNode((nodeId, attrs) => {
+							const t = attrs.entityType || 'UNKNOWN';
+							const isVisible = visible.has(t);
+							graph.setNodeAttribute(nodeId, 'hidden', !isVisible);
+							if (isVisible) visibleNodeIds.add(nodeId);
+						});
+						graph.forEachEdge((edgeId, attrs, source, target) => {
+							graph.setEdgeAttribute(edgeId, 'hidden', !visibleNodeIds.has(source) || !visibleNodeIds.has(target));
+						});
+						sigma.refresh();
+					},
+
+					toggleType(type) {
+						if (this.visibleTypes.has(type)) {
+							this.visibleTypes.delete(type);
+						} else {
+							this.visibleTypes.add(type);
+						}
+						// Force Alpine reactivity
+						this.visibleTypes = new Set(this.visibleTypes);
+						this._applyTypeFilter();
+					},
+
+					cycleLayout() {
+						this.layoutIndex = (this.layoutIndex + 1) % LAYOUTS.length;
+						this.currentLayout = LAYOUTS[this.layoutIndex];
+						if (this._graphInstance) {
+							applyLayout(this._graphInstance, this.currentLayout);
+							if (this._sigmaInstance) {
+								this._sigmaInstance.refresh();
+								this.zoomToFit();
+							}
+						}
+					},
+
+					toggleLabels() {
+						this.showLabels = !this.showLabels;
+						if (this._sigmaInstance) {
+							this._sigmaInstance.setSetting('renderLabels', this.showLabels);
+						}
+					},
+
+					zoomToFit() {
+						if (this._sigmaInstance) {
+							this._sigmaInstance.getCamera().animate({ x: 0.5, y: 0.5, ratio: 1 }, { duration: 400 });
+						}
+					},
+
+					zoomIn() {
+						if (this._sigmaInstance) {
+							const cam = this._sigmaInstance.getCamera();
+							cam.animate({ ratio: cam.ratio / 1.5 }, { duration: 200 });
+						}
+					},
+
+					zoomOut() {
+						if (this._sigmaInstance) {
+							const cam = this._sigmaInstance.getCamera();
+							cam.animate({ ratio: cam.ratio * 1.5 }, { duration: 200 });
+						}
+					},
+
+					getNodeColor(type) {
+						return getNodeColor(type);
+					},
+
+					getNodeLabel(nodeId) {
+						const node = this._nodeMap[nodeId];
+						return node ? node.label : (nodeId || '').substring(0, 12);
+					},
+
+					focusOnNode(nodeId) {
+						const node = this._nodeMap[nodeId];
+						if (!node) return;
+						this.selectedNode = node;
+						this.selectedNodeEdges = (this.graphData.edges || []).filter(
+							e => e.source === nodeId || e.target === nodeId
+						);
+						if (this._sigmaInstance && this._graphInstance && this._graphInstance.hasNode(nodeId)) {
+							this._highlightNode(nodeId);
+							const pos = {
+								x: this._graphInstance.getNodeAttribute(nodeId, 'x'),
+								y: this._graphInstance.getNodeAttribute(nodeId, 'y'),
+								ratio: 0.6,
+							};
+							this._sigmaInstance.getCamera().animate(pos, { duration: 400 });
+						}
+					},
+
+					searchNodes(query) {
+						this.searchQuery = query;
+						if (!query || query.length < 2) {
+							this.searchResults = [];
+							// Clear any search highlight
+							if (this._graphInstance) {
+								this._graphInstance.forEachNode((n) => {
+									this._graphInstance.removeNodeAttribute(n, 'hidden');
+								});
+								this._graphInstance.forEachEdge((e) => {
+									this._graphInstance.removeEdgeAttribute(e, 'hidden');
+								});
+								this._applyTypeFilter();
+							}
+							return;
+						}
+						const q = query.toLowerCase();
+						this.searchResults = this.graphData.nodes
+							.filter(n => (n.label || '').toLowerCase().includes(q) || (n.description || '').toLowerCase().includes(q))
+							.slice(0, 8);
+
+						// Highlight matching nodes in the graph
+						if (this._graphInstance && this._sigmaInstance) {
+							const matchIds = new Set(this.searchResults.map(n => n.id));
+							this._graphInstance.forEachNode((nodeId) => {
+								this._graphInstance.setNodeAttribute(nodeId, 'hidden', !matchIds.has(nodeId));
+							});
+							this._graphInstance.forEachEdge((edgeId, attrs, source, target) => {
+								this._graphInstance.setEdgeAttribute(edgeId, 'hidden', !matchIds.has(source) || !matchIds.has(target));
+							});
+							this._sigmaInstance.refresh();
+						}
+					},
+
+					toggleFullscreen() {
+						const graphWrapper = this.$refs.graphWrapper;
+						if (!graphWrapper) return;
+
+						if (!document.fullscreenElement) {
+							// Enter fullscreen
+							if (graphWrapper.requestFullscreen) {
+								graphWrapper.requestFullscreen();
+							} else if (graphWrapper.mozRequestFullScreen) { // Firefox
+								graphWrapper.mozRequestFullScreen();
+							} else if (graphWrapper.webkitRequestFullscreen) { // Chrome, Safari and Opera
+								graphWrapper.webkitRequestFullscreen();
+							} else if (graphWrapper.msRequestFullscreen) { // IE/Edge
+								graphWrapper.msRequestFullscreen();
+							}
+						} else {
+							// Exit fullscreen
+							if (document.exitFullscreen) {
+								document.exitFullscreen();
+							} else if (document.mozCancelFullScreen) {
+								document.mozCancelFullScreen();
+							} else if (document.webkitExitFullscreen) {
+								document.webkitExitFullscreen();
+							} else if (document.msExitFullscreen) {
+								document.msExitFullscreen();
+							}
+						}
+					},
+
+					// Cleanup on component destroy
+					destroy() {
+						if (this._sigmaInstance) {
+							this._sigmaInstance.kill();
+							this._sigmaInstance = null;
+						}
+						this._graphInstance = null;
+					},
+				};
+			};
+		})();
+	</script>
+}
+
+templ PluginTemplate() {
+	<template x-if="message.name === 'query_knowledge_base'">
+		@Container()
+	</template>
+}

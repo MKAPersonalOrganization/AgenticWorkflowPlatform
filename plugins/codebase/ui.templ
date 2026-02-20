@@ -1,0 +1,15 @@
+package codebase
+
+import (
+	"school-with-ai/plugins/codebase/components/lookupsection"
+	"school-with-ai/plugins/codebase/components/searchtext"
+)
+
+templ PluginTemplate() {
+	<template x-if="message.name === 'lookup_section'">
+		@lookupsection.Container()
+	</template>
+	<template x-if="message.name === 'search_text_in_file'">
+		@searchtext.Container()
+	</template>
+}

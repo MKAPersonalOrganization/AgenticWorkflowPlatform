@@ -1,0 +1,61 @@
+package knowledgebase
+
+import (
+	"context"
+	"time"
+
+	"github.com/a-h/templ"
+
+	"school-with-ai/foundation/agent"
+	"school-with-ai/services/toolregistry"
+)
+
+// Provider implements the toolregistry.PluginProvider interface for the Knowledge Base toolset.
+type Provider struct{}
+
+func (p *Provider) ID() string {
+	return "knowledgebase"
+}
+
+func (p *Provider) DefaultSets() []toolregistry.ToolSet {
+	now := time.Now()
+	return []toolregistry.ToolSet{
+		{
+			ID:          "knowledge-base-set",
+			Name:        "Knowledge Base",
+			Description: "Tools for querying attached knowledge base workspaces",
+			Category:    "Knowledge",
+			ToolIDs:     []string{"kb-query"},
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		},
+	}
+}
+
+func (p *Provider) DefaultTools() []toolregistry.Tool {
+	now := time.Now()
+	return []toolregistry.Tool{
+		{ID: "kb-query", Name: "Query Knowledge Base", Description: "Search and retrieve information from attached knowledge base workspaces", Category: "Knowledge", ToolSetID: "knowledge-base-set", CreatedAt: now, UpdatedAt: now},
+	}
+}
+
+func (p *Provider) CreateExecutable(ctx context.Context, toolID string, deps toolregistry.FactoryDeps) (agent.ExecutableTool, error) {
+	switch toolID {
+	case "kb-query":
+		return NewQueryKnowledgeBaseTool(deps.EdgequakeBaseURL, deps.OpenAIAPIKey, deps.ModelID), nil
+	default:
+		return nil, nil // Not handled by this plugin
+	}
+}
+
+func (p *Provider) GetUITemplate() templ.Component {
+	return PluginTemplate()
+}
+
+func (p *Provider) UIHandledTools() []string {
+	return []string{"query_knowledge_base"}
+}
+
+func (p *Provider) UIHandledElicitations() []string {
+	return nil
+}

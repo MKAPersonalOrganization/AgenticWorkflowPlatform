@@ -239,102 +239,24 @@ func (r *Registry) GetToolsInSet(ctx context.Context, toolSetID string) ([]Tool,
 func (r *Registry) initializeDefaultTools(ctx context.Context) error {
 	now := time.Now()
 
-	// Define default tool sets
-	defaultToolSets := []ToolSet{
-		{
-			ID:          "calculator-set",
-			Name:        "Calculator",
-			Description: "Basic mathematical calculation tools",
-			Category:    "Math",
-			ToolIDs:     []string{"calc-add", "calc-subtract", "calc-multiply", "calc-divide", "calc-power", "calc-sqrt"},
-			CreatedAt:   now,
-			UpdatedAt:   now,
-		},
-		{
-			ID:          "visualization-set",
-			Name:        "Visualization",
-			Description: "Data visualization and plotting tools",
-			Category:    "Math",
-			ToolIDs:     []string{"viz-plot", "viz-animate"},
-			CreatedAt:   now,
-			UpdatedAt:   now,
-		},
-		{
-			ID:          "document-set",
-			Name:        "Document Management",
-			Description: "Tools for managing documents and artifacts",
-			Category:    "Productivity",
-			ToolIDs:     []string{"doc-create", "doc-update", "doc-delete"},
-			CreatedAt:   now,
-			UpdatedAt:   now,
-		},
-		{
-			ID:          "memory-set",
-			Name:        "Memory Management",
-			Description: "Tools for managing long-term memory and information storage",
-			Category:    "Productivity",
-			ToolIDs:     []string{"mem-remember", "mem-forget", "mem-list", "mem-clear"},
-			CreatedAt:   now,
-			UpdatedAt:   now,
-		},
-		{
-			ID:          "statistics-set",
-			Name:        "Statistical Analysis",
-			Description: "Statistical analysis and data processing tools",
-			Category:    "Math",
-			ToolIDs:     []string{"stats-mean", "stats-median", "stats-mode", "stats-variance", "stats-stddev", "stats-correlation", "stats-regression"},
-			CreatedAt:   now,
-			UpdatedAt:   now,
-		},
-		{
-			ID:          "knowledge-base-set",
-			Name:        "Knowledge Base",
-			Description: "Tools for querying attached knowledge base workspaces",
-			Category:    "Knowledge",
-			ToolIDs:     []string{"kb-query"},
-			CreatedAt:   now,
-			UpdatedAt:   now,
-		},
-	}
+	// Gather default tools and sets from registered plugins
+	var defaultToolSets []ToolSet
+	var defaultTools []Tool
 
-	// Define default tools with their tool set associations
-	defaultTools := []Tool{
-		// Calculator tools
-		{ID: "calc-add", Name: "Add", Description: "Add two numbers together", Category: "Calculator", ToolSetID: "calculator-set"},
-		{ID: "calc-subtract", Name: "Subtract", Description: "Subtract one number from another", Category: "Calculator", ToolSetID: "calculator-set"},
-		{ID: "calc-multiply", Name: "Multiply", Description: "Multiply two numbers", Category: "Calculator", ToolSetID: "calculator-set"},
-		{ID: "calc-divide", Name: "Divide", Description: "Divide one number by another", Category: "Calculator", ToolSetID: "calculator-set"},
-		{ID: "calc-power", Name: "Power", Description: "Raise a number to a power", Category: "Calculator", ToolSetID: "calculator-set"},
-		{ID: "calc-sqrt", Name: "Square Root", Description: "Calculate the square root of a number", Category: "Calculator", ToolSetID: "calculator-set"},
-		{ID: "math-solve", Name: "Solve Equation", Description: "Solve algebraic equations", Category: "Math", ToolSetID: "calculator-set"},
+	for _, provider := range GetAllPluginProviders() {
+		// Collect tool sets
+		for _, ts := range provider.DefaultSets() {
+			ts.CreatedAt = now
+			ts.UpdatedAt = now
+			defaultToolSets = append(defaultToolSets, ts)
+		}
 
-		// Visualization tools
-		{ID: "viz-plot", Name: "Plot", Description: "Generate a chart or plot from data", Category: "Visualization", ToolSetID: "visualization-set"},
-		{ID: "viz-animate", Name: "Animate", Description: "Create animated visualizations", Category: "Visualization", ToolSetID: "visualization-set"},
-
-		// Document management
-		{ID: "doc-create", Name: "Create Document", Description: "Create a new markdown document", Category: "Documents", ToolSetID: "document-set"},
-		{ID: "doc-update", Name: "Update Document", Description: "Update an existing document", Category: "Documents", ToolSetID: "document-set"},
-		{ID: "doc-delete", Name: "Delete Document", Description: "Delete a document", Category: "Documents", ToolSetID: "document-set"},
-
-		// Memory management
-		{ID: "mem-remember", Name: "Remember", Description: "Store information in long-term memory", Category: "Memory", ToolSetID: "memory-set"},
-		{ID: "mem-forget", Name: "Forget", Description: "Remove information from memory", Category: "Memory", ToolSetID: "memory-set"},
-		{ID: "mem-list", Name: "List Memories", Description: "List all stored memories", Category: "Memory", ToolSetID: "memory-set"},
-		{ID: "mem-clear", Name: "Clear Memory", Description: "Clear all stored memories", Category: "Memory", ToolSetID: "memory-set"},
-
-		// Statistics tools (for statistics instructor)
-		{ID: "stats-mean", Name: "Mean", Description: "Calculate the mean of a dataset", Category: "Statistics", ToolSetID: "statistics-set"},
-		{ID: "stats-median", Name: "Median", Description: "Calculate the median of a dataset", Category: "Statistics", ToolSetID: "statistics-set"},
-		{ID: "stats-mode", Name: "Mode", Description: "Calculate the mode of a dataset", Category: "Statistics", ToolSetID: "statistics-set"},
-		{ID: "stats-variance", Name: "Variance", Description: "Calculate the variance of a dataset", Category: "Statistics", ToolSetID: "statistics-set"},
-		{ID: "stats-stddev", Name: "Standard Deviation", Description: "Calculate the standard deviation of a dataset", Category: "Statistics", ToolSetID: "statistics-set"},
-		{ID: "stats-correlation", Name: "Correlation", Description: "Calculate correlation between two variables", Category: "Statistics", ToolSetID: "statistics-set"},
-		{ID: "stats-regression", Name: "Linear Regression", Description: "Perform linear regression analysis", Category: "Statistics", ToolSetID: "statistics-set"},
-
-
-		// Knowledge base tools
-		{ID: "kb-query", Name: "Query Knowledge Base", Description: "Search and retrieve information from attached knowledge base workspaces", Category: "Knowledge", ToolSetID: "knowledge-base-set"},
+		// Collect tools
+		for _, t := range provider.DefaultTools() {
+			t.CreatedAt = now
+			t.UpdatedAt = now
+			defaultTools = append(defaultTools, t)
+		}
 	}
 
 	// Save tool sets first
@@ -347,13 +269,9 @@ func (r *Registry) initializeDefaultTools(ctx context.Context) error {
 
 	// Save tools
 	for _, tool := range defaultTools {
-		tool.CreatedAt = now
-		tool.UpdatedAt = now
-
 		if err := r.repo.SaveTool(ctx, &tool); err != nil {
 			return fmt.Errorf("failed to save default tool %s: %w", tool.ID, err)
 		}
-
 		r.toolCache[tool.ID] = &tool
 	}
 
