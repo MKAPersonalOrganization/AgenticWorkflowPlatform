@@ -52,6 +52,7 @@ import (
 	"school-with-ai/services/toolregistry"
 	"school-with-ai/plugins/calculator"
 	"school-with-ai/plugins/codebase"
+	"school-with-ai/plugins/cognitive"
 	"school-with-ai/plugins/document"
 	"school-with-ai/plugins/elicitation"
 	"school-with-ai/plugins/knowledgebase"
@@ -362,6 +363,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	toolRegistry := toolregistry.NewRegistry(log, sqldb.NewPostgresToolRegistryRepository(db))
 	toolregistry.RegisterPlugin(&calculator.Provider{})
 	toolregistry.RegisterPlugin(&codebase.Provider{})
+	toolregistry.RegisterPlugin(&cognitive.Provider{})
 	toolregistry.RegisterPlugin(&document.Provider{})
 	toolregistry.RegisterPlugin(&elicitation.Provider{})
 	toolregistry.RegisterPlugin(&knowledgebase.Provider{})
