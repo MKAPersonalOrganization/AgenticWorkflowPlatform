@@ -84,21 +84,19 @@ func (r *Registry) Initialize(ctx context.Context) error {
 		return fmt.Errorf("failed to load tool sets: %w", err)
 	}
 
-	if len(tools) == 0 {
-		r.log.Info(ctx, "No tools found, initializing default tools and tool sets")
-		if err := r.initializeDefaultTools(ctx); err != nil {
-			return fmt.Errorf("failed to initialize default tools: %w", err)
-		}
-	} else {
-		// Cache existing tools
-		for _, tool := range tools {
-			r.toolCache[tool.ID] = &tool
-		}
+	// Cache existing tools
+	for _, tool := range tools {
+		r.toolCache[tool.ID] = &tool
+	}
 
-		// Cache existing tool sets
-		for _, toolSet := range toolSets {
-			r.toolSetCache[toolSet.ID] = &toolSet
-		}
+	// Cache existing tool sets
+	for _, toolSet := range toolSets {
+		r.toolSetCache[toolSet.ID] = &toolSet
+	}
+
+	// Initialize default tools (creates them if they don't exist yet)
+	if err := r.initializeDefaultTools(ctx); err != nil {
+		return fmt.Errorf("failed to initialize default tools: %w", err)
 	}
 
 	r.log.Info(ctx, "Tool registry initialized", "tool_count", len(r.toolCache), "tool_set_count", len(r.toolSetCache))
@@ -259,20 +257,24 @@ func (r *Registry) initializeDefaultTools(ctx context.Context) error {
 		}
 	}
 
-	// Save tool sets first
+	// Save tool sets first if they don't exist
 	for _, toolSet := range defaultToolSets {
-		if err := r.repo.SaveToolSet(ctx, &toolSet); err != nil {
-			return fmt.Errorf("failed to save default tool set %s: %w", toolSet.ID, err)
+		if _, exists := r.toolSetCache[toolSet.ID]; !exists {
+			if err := r.repo.SaveToolSet(ctx, &toolSet); err != nil {
+				return fmt.Errorf("failed to save default tool set %s: %w", toolSet.ID, err)
+			}
+			r.toolSetCache[toolSet.ID] = &toolSet
 		}
-		r.toolSetCache[toolSet.ID] = &toolSet
 	}
 
-	// Save tools
+	// Save tools if they don't exist
 	for _, tool := range defaultTools {
-		if err := r.repo.SaveTool(ctx, &tool); err != nil {
-			return fmt.Errorf("failed to save default tool %s: %w", tool.ID, err)
+		if _, exists := r.toolCache[tool.ID]; !exists {
+			if err := r.repo.SaveTool(ctx, &tool); err != nil {
+				return fmt.Errorf("failed to save default tool %s: %w", tool.ID, err)
+			}
+			r.toolCache[tool.ID] = &tool
 		}
-		r.toolCache[tool.ID] = &tool
 	}
 
 	return nil
