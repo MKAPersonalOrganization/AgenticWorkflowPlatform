@@ -63,6 +63,11 @@ func NewMathInstructorConfig(ctx context.Context, artifactStore artifact.Service
 		MaxIterations: 20,
 		SystemPrompt:  prompt,
 		Tools:         []agent.Tool{}, // Tools managed via permissions service
+		ChatMiddlewares: []agent.Middleware{
+			agent.RequirementMiddleware(
+				agent.NewConditionalRequirement("think", agent.ForceAtStep(1)),
+			),
+		},
 		Capabilities: agent.Capabilities{
 			InputElicitation: true,
 		},

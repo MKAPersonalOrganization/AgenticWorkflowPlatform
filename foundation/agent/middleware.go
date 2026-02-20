@@ -52,6 +52,7 @@ type AgentOp struct {
 type ChatOp struct {
 	Model    Model
 	Messages []Message
+	Tools    []Tool // Available tools for this LLM call
 	Options  *ChatOptions
 }
 
@@ -60,7 +61,11 @@ type ChatOptions struct {
 	Temperature   float64
 	MaxTokens     int
 	StopSequences []string
-	Metadata      map[string]any
+	// ToolChoice constrains which tool the LLM must use.
+	// Values: "" (no constraint), "auto", "required" (must call some tool),
+	// or a specific tool name (must call that exact tool).
+	ToolChoice string
+	Metadata   map[string]any
 }
 
 // FunctionOp groups tool call data.

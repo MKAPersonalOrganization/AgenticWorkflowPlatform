@@ -399,9 +399,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 	if err != nil {
 		return fmt.Errorf("creating math instructor config: %w", err)
 	}
-	mathConfig.AgentMiddlewares = []agent.Middleware{agentLoggingMw}
-	mathConfig.ChatMiddlewares = []agent.Middleware{chatLoggingMw}
-	mathConfig.FunctionMiddlewares = []agent.Middleware{toolLoggingMw}
+	mathConfig.AgentMiddlewares = append(mathConfig.AgentMiddlewares, agentLoggingMw)
+	mathConfig.ChatMiddlewares = append(mathConfig.ChatMiddlewares, chatLoggingMw)
+	mathConfig.FunctionMiddlewares = append(mathConfig.FunctionMiddlewares, toolLoggingMw)
 	mathInstructor, err := custom.NewAgent(mathConfig)
 	if err != nil {
 		return fmt.Errorf("creating math instructor agent: %w", err)
@@ -411,9 +411,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 	if err != nil {
 		return fmt.Errorf("creating statistics instructor config: %w", err)
 	}
-	statsConfig.AgentMiddlewares = []agent.Middleware{agentLoggingMw}
-	statsConfig.ChatMiddlewares = []agent.Middleware{chatLoggingMw}
-	statsConfig.FunctionMiddlewares = []agent.Middleware{toolLoggingMw}
+	statsConfig.AgentMiddlewares = append(statsConfig.AgentMiddlewares, agentLoggingMw)
+	statsConfig.ChatMiddlewares = append(statsConfig.ChatMiddlewares, chatLoggingMw)
+	statsConfig.FunctionMiddlewares = append(statsConfig.FunctionMiddlewares, toolLoggingMw)
 	statsInstructor, err := custom.NewAgent(statsConfig)
 	if err != nil {
 		return fmt.Errorf("creating statistics instructor agent: %w", err)

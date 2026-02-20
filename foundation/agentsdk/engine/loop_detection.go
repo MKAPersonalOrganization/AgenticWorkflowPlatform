@@ -1,21 +1,14 @@
 package engine
 
 import (
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"strings"
 	"unicode"
-
-	"school-with-ai/foundation/agentsdk/core"
 )
 
 // LoopDetector detects various types of loops in agent execution.
 type LoopDetector struct {
-	// Tool call loop detection
-	toolCallHistory   []toolCallSignature
-	toolLoopThreshold int
-
 	// Tool error loop detection (catches repeated failures even with different args)
 	toolErrorHistory   []toolErrorRecord
 	toolErrorThreshold int
@@ -40,18 +33,8 @@ type toolErrorRecord struct {
 	ErrorType string `json:"type"`
 }
 
-// toolCallSignature represents a unique tool call for loop detection.
-type toolCallSignature struct {
-	ToolName string `json:"name"`
-	ArgsHash string `json:"hash"`
-}
-
 // LoopDetectorConfig contains configuration for loop detection.
 type LoopDetectorConfig struct {
-	// ToolLoopThreshold is the number of consecutive identical tool calls
-	// before triggering a loop detection. Default: 5
-	ToolLoopThreshold int
-
 	// ToolErrorThreshold is the number of consecutive errors from the same tool
 	// before triggering a loop detection. This catches cases where the agent
 	// tries different arguments but keeps failing. Default: 3
@@ -77,7 +60,6 @@ type LoopDetectorConfig struct {
 // DefaultLoopDetectorConfig returns sensible defaults for loop detection.
 func DefaultLoopDetectorConfig() LoopDetectorConfig {
 	return LoopDetectorConfig{
-		ToolLoopThreshold:    5,
 		ToolErrorThreshold:   3, // Trigger after 3 consecutive errors from same tool
 		ContentChunkSize:     50,
 		ContentLoopThreshold: 10,
@@ -88,9 +70,6 @@ func DefaultLoopDetectorConfig() LoopDetectorConfig {
 
 // NewLoopDetector creates a new loop detector with the given configuration.
 func NewLoopDetector(config LoopDetectorConfig) *LoopDetector {
-	if config.ToolLoopThreshold <= 0 {
-		config.ToolLoopThreshold = 5
-	}
 	if config.ToolErrorThreshold <= 0 {
 		config.ToolErrorThreshold = 3
 	}
@@ -108,8 +87,6 @@ func NewLoopDetector(config LoopDetectorConfig) *LoopDetector {
 	}
 
 	return &LoopDetector{
-		toolCallHistory:      make([]toolCallSignature, 0),
-		toolLoopThreshold:    config.ToolLoopThreshold,
 		toolErrorHistory:     make([]toolErrorRecord, 0),
 		toolErrorThreshold:   config.ToolErrorThreshold,
 		contentChunks:        make([]string, 0),
@@ -120,41 +97,6 @@ func NewLoopDetector(config LoopDetectorConfig) *LoopDetector {
 		conceptQuizFailures:  make(map[string]int),
 		pedagogicalThreshold: config.PedagogicalThreshold,
 	}
-}
-
-// RecordToolCall records a tool call and checks for tool call loops.
-// Returns LoopInfo if a loop is detected, nil otherwise.
-func (d *LoopDetector) RecordToolCall(tc core.ToolCall) *LoopInfo {
-	// Create signature from tool name and arguments hash
-	// Arguments is already a JSON string in core.ToolCall
-	hash := sha256.Sum256([]byte(tc.Arguments))
-	sig := toolCallSignature{
-		ToolName: tc.Name,
-		ArgsHash: hex.EncodeToString(hash[:8]), // First 8 bytes is enough
-	}
-
-	d.toolCallHistory = append(d.toolCallHistory, sig)
-
-	// Count consecutive identical calls from the end
-	consecutive := 0
-	for i := len(d.toolCallHistory) - 1; i >= 0; i-- {
-		if d.toolCallHistory[i] == sig {
-			consecutive++
-		} else {
-			break
-		}
-	}
-
-	if consecutive >= d.toolLoopThreshold {
-		return &LoopInfo{
-			Type:        LoopTypeToolCall,
-			Description: "Agent is repeatedly calling the same tool with identical arguments",
-			Occurrences: consecutive,
-			Pattern:     sig.ToolName,
-		}
-	}
-
-	return nil
 }
 
 // RecordToolResult records a tool execution result and checks for error-based loops.
@@ -334,7 +276,6 @@ func (d *LoopDetector) CheckPedagogicalLoop(concept string) *LoopInfo {
 
 // Reset clears all loop detection state.
 func (d *LoopDetector) Reset() {
-	d.toolCallHistory = make([]toolCallSignature, 0)
 	d.toolErrorHistory = make([]toolErrorRecord, 0)
 	d.contentChunks = make([]string, 0)
 	d.contentRepetitionCount = 0
@@ -345,7 +286,6 @@ func (d *LoopDetector) Reset() {
 // GetStats returns statistics about the current detection state.
 func (d *LoopDetector) GetStats() map[string]any {
 	return map[string]any{
-		"tool_calls_recorded":      len(d.toolCallHistory),
 		"content_repetition_count": d.contentRepetitionCount,
 		"concepts_explained":       len(d.conceptExplanations),
 		"concepts_with_failures":   len(d.conceptQuizFailures),
@@ -355,7 +295,6 @@ func (d *LoopDetector) GetStats() map[string]any {
 // Serialize returns a hex-encoded JSON representation of the detector state.
 func (d *LoopDetector) Serialize() string {
 	state := loopDetectorState{
-		ToolCallHistory:     d.toolCallHistory,
 		ToolErrorHistory:    d.toolErrorHistory,
 		ContentChunks:       d.contentChunks,
 		ConceptExplanations: d.conceptExplanations,
@@ -378,7 +317,6 @@ func (d *LoopDetector) Load(stateHex string) error {
 	if err := json.Unmarshal(b, &state); err != nil {
 		return err
 	}
-	d.toolCallHistory = state.ToolCallHistory
 	d.toolErrorHistory = state.ToolErrorHistory
 	d.contentChunks = state.ContentChunks
 	d.conceptExplanations = state.ConceptExplanations
@@ -387,11 +325,10 @@ func (d *LoopDetector) Load(stateHex string) error {
 }
 
 type loopDetectorState struct {
-	ToolCallHistory     []toolCallSignature `json:"toolCallHistory"`
-	ToolErrorHistory    []toolErrorRecord   `json:"toolErrorHistory"`
-	ContentChunks       []string            `json:"contentChunks"`
-	ConceptExplanations map[string]int      `json:"conceptExplanations"`
-	ConceptQuizFailures map[string]int      `json:"conceptQuizFailures"`
+	ToolErrorHistory    []toolErrorRecord `json:"toolErrorHistory"`
+	ContentChunks       []string          `json:"contentChunks"`
+	ConceptExplanations map[string]int    `json:"conceptExplanations"`
+	ConceptQuizFailures map[string]int    `json:"conceptQuizFailures"`
 }
 
 // Helper functions
