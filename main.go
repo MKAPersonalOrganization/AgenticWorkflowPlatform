@@ -267,7 +267,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// -------------------------------------------------------------------------
 	// Initialize Projections
-	// persistenceRouter is used by the ProjectionUpdater to update projections AND broadcast to Redis
+	// persistenceRouter is used by the ProjectionUpdater exclusively to update Read Models (Projections).
 	persistenceRouter := event.NewRouter()
 
 	// transientRouter is used by the orchestrator for non-persistent events (streaming deltas, etc.)
@@ -290,10 +290,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 	}()
 	log.Info(ctx, "startup", "status", "rate-limit Redis client initialized", "addr", cfg.Redis.Addr)
 
-	// Register Redis broadcaster to BOTH routers
-	// persistenceRouter will broadcast durable events once they are persisted
-	// transientRouter will broadcast transient events immediately
-	persistenceRouter.RegisterAny(redisBroadcaster.Broadcast)
+	// Register Redis broadcaster ONLY to transientRouter.
+	// The orchestrator directly dispatches all events (Durable and Transient) to transientRouter.
+	// persistenceRouter is strictly for updating Read Models (Projections) and should not re-broadcast.
 	transientRouter.RegisterAny(redisBroadcaster.Broadcast)
 
 	// Initialize PostgreSQL AGUI projection
