@@ -1,70 +1,8 @@
 package engine
 
 import (
-	"fmt"
 	"testing"
-
-	"school-with-ai/foundation/agentsdk/core"
 )
-
-func TestLoopDetector_ToolCallLoop(t *testing.T) {
-	t.Parallel()
-	config := DefaultLoopDetectorConfig()
-	config.ToolLoopThreshold = 3 // Lower threshold for testing
-	detector := NewLoopDetector(config)
-
-	// Create a tool call
-	tc := core.ToolCall{
-		ID:        "test-1",
-		Type:      "function",
-		Name:      "calculate",
-		Arguments: `{"expression": "2+2"}`,
-	}
-
-	// First two calls should not trigger loop detection
-	if loopInfo := detector.RecordToolCall(tc); loopInfo != nil {
-		t.Errorf("Expected no loop on first call, got %v", loopInfo)
-	}
-	if loopInfo := detector.RecordToolCall(tc); loopInfo != nil {
-		t.Errorf("Expected no loop on second call, got %v", loopInfo)
-	}
-
-	// Third identical call should trigger loop detection
-	loopInfo := detector.RecordToolCall(tc)
-	if loopInfo == nil {
-		t.Fatal("Expected loop detection on third identical call")
-	}
-
-	if loopInfo.Type != LoopTypeToolCall {
-		t.Errorf("Expected loop type %s, got %s", LoopTypeToolCall, loopInfo.Type)
-	}
-	if loopInfo.Occurrences != 3 {
-		t.Errorf("Expected 3 occurrences, got %d", loopInfo.Occurrences)
-	}
-	if loopInfo.Pattern != "calculate" {
-		t.Errorf("Expected pattern 'calculate', got %s", loopInfo.Pattern)
-	}
-}
-
-func TestLoopDetector_DifferentArgsNoLoop(t *testing.T) {
-	t.Parallel()
-	config := DefaultLoopDetectorConfig()
-	config.ToolLoopThreshold = 3
-	detector := NewLoopDetector(config)
-
-	// Different arguments should not trigger loop
-	for i := 0; i < 5; i++ {
-		tc := core.ToolCall{
-			ID:        "test",
-			Type:      "function",
-			Name:      "calculate",
-			Arguments: fmt.Sprintf(`{"expression": %d}`, i), // Different each time
-		}
-		if loopInfo := detector.RecordToolCall(tc); loopInfo != nil {
-			t.Errorf("Expected no loop with different arguments, got %v", loopInfo)
-		}
-	}
-}
 
 func TestLoopDetector_ContentLoop(t *testing.T) {
 	t.Parallel()
@@ -170,32 +108,20 @@ func TestLoopDetector_QuizSuccessResetsPedagogicalLoop(t *testing.T) {
 func TestLoopDetector_Reset(t *testing.T) {
 	t.Parallel()
 	config := DefaultLoopDetectorConfig()
-	config.ToolLoopThreshold = 3
+	config.ToolErrorThreshold = 3
 	detector := NewLoopDetector(config)
 
-	tc := core.ToolCall{
-		ID:        "test",
-		Type:      "function",
-		Name:      "calculate",
-		Arguments: `{"x": 1}`,
-	}
-
-	// Record some calls
-	detector.RecordToolCall(tc)
-	detector.RecordToolCall(tc)
+	// Record some tool errors
+	detector.RecordToolResult("calculate", `{"error": "err1"}`, true)
+	detector.RecordToolResult("calculate", `{"error": "err2"}`, true)
 	detector.RecordConceptExplanation("test")
 
 	// Reset
 	detector.Reset()
 
 	// Should not trigger loop now
-	if loopInfo := detector.RecordToolCall(tc); loopInfo != nil {
+	if loopInfo := detector.RecordToolResult("calculate", `{"error": "err3"}`, true); loopInfo != nil {
 		t.Errorf("Expected no loop after reset, got %v", loopInfo)
-	}
-
-	stats := detector.GetStats()
-	if stats["tool_calls_recorded"].(int) != 1 {
-		t.Errorf("Expected 1 tool call after reset, got %v", stats["tool_calls_recorded"])
 	}
 }
 

@@ -335,6 +335,7 @@ func (s *Service) hasDefaultToolSetPermission(agentID, toolSetID string) bool {
 func (s *Service) getDefaultToolSetsForAgent(agentID string) []string {
 	defaultSets := map[string][]string{
 		"math-instructor": {
+			"cognitive-set",
 			"calculator-set",
 			"visualization-set",
 			"memory-set",
@@ -342,6 +343,7 @@ func (s *Service) getDefaultToolSetsForAgent(agentID string) []string {
 			"knowledge-base-set",
 		},
 		"physics-instructor": {
+			"cognitive-set",
 			"calculator-set",
 			"visualization-set",
 			"memory-set",
@@ -349,12 +351,14 @@ func (s *Service) getDefaultToolSetsForAgent(agentID string) []string {
 			"knowledge-base-set",
 		},
 		"chemistry-instructor": {
+			"cognitive-set",
 			"calculator-set",
 			"memory-set",
 			"document-set",
 			"knowledge-base-set",
 		},
 		"statistics-instructor": {
+			"cognitive-set",
 			"calculator-set",
 			"statistics-set",
 			"visualization-set",
@@ -369,5 +373,5 @@ func (s *Service) getDefaultToolSetsForAgent(agentID string) []string {
 	}
 
 	// Default fallback for unknown agents
-	return []string{"calculator-set", "memory-set", "document-set", "knowledge-base-set"}
+	return []string{"cognitive-set", "calculator-set", "memory-set", "document-set", "knowledge-base-set"}
 }

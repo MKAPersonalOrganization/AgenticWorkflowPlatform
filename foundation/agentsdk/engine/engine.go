@@ -7,8 +7,6 @@ import (
 	"iter"
 	"time"
 
-
-
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/internal/llm"
@@ -232,7 +230,6 @@ func (s *executionState) prepareExecutor() {
 		s.messageID,
 		nil, // No RequestContext yet - will be set during LLM call
 	)
-
 }
 
 var errStopIteration = fmt.Errorf("stop iteration")
@@ -430,10 +427,6 @@ func (s *SafetyUnit) RecordContent(content string) *LoopInfo {
 	return s.loopDetector.RecordContent(content)
 }
 
-func (s *SafetyUnit) RecordToolCall(tc core.ToolCall) *LoopInfo {
-	return s.loopDetector.RecordToolCall(tc)
-}
-
 func (s *SafetyUnit) RecordToolResult(name, result string, isErr bool) *LoopInfo {
 	return s.loopDetector.RecordToolResult(name, result, isErr)
 }
@@ -546,14 +539,6 @@ func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolve
 	for _, tc := range tctx.StreamResult.ToolCalls {
 		tc := tc // capture loop variable
 		tsm := tctx.ToolStateMachines[tc.ID]
-
-		if info := tctx.Safety.RecordToolCall(tc); info != nil {
-			return nil, nil, fmt.Errorf("loop detected: %s", info.Description)
-		}
-		// Yield state update
-		if !tctx.Yield(tctx.Safety.Report(tctx.ThreadID), nil) {
-			return nil, nil, fmt.Errorf("yield interrupted")
-		}
 
 		g.Go(func() error {
 			// Start the state machine (transition to Executing)
@@ -836,7 +821,6 @@ func (s *executionState) runCore() error {
 func (s *executionState) streamAndProcessLLMResponse(llmContext *LLMContext) error {
 	// Wrap LLM call with ChatMiddleware
 	if len(s.agent.Config.ChatMiddleware) > 0 {
-		// Extract provider/model and parameters from the LLM request for middleware logging
 		chatMeta := map[string]any{
 			"agent_name":    s.agent.Name(),
 			"thread_id":     s.threadID,
@@ -852,19 +836,150 @@ func (s *executionState) streamAndProcessLLMResponse(llmContext *LLMContext) err
 			}
 		}
 
-		return ExecuteChatMiddleware(
-			s.ctx,
+		// Convert tools to agent.Tool interface for middleware.
+		var agentTools []agent.Tool
+		for _, t := range llmContext.GetEffectiveTools() {
+			agentTools = append(agentTools, t)
+		}
+
+		// Convert LLM messages to agent messages, preserving ToolCall content
+		// so ConditionalRequirement can track step history.
+		chatMessages := convertLLMToAgentMessages(llmContext.Request.Messages)
+
+		ctxForMw := agent.NewChatContext(s.ctx, nil, chatMessages, nil)
+		ctxForMw.Chat.Tools = agentTools
+		for k, v := range chatMeta {
+			ctxForMw.Metadata[k] = v
+		}
+
+		return ExecuteWithMiddleware(
 			s.agent.Config.ChatMiddleware,
-			nil, // agent.Model (engine uses llm.Client, not agent.Model)
-			nil, // []agent.Message (engine uses llm.Message)
-			nil, // *agent.ChatOptions (parameters passed via metadata)
-			chatMeta,
-			func() error {
+			ctxForMw,
+			agent.HandlerFunc(func(c *agent.Context) error {
+				// Sync tools: filter engine tool lists to match middleware output.
+				syncToolsToEngine(c.Chat.Tools, llmContext)
+
+				// Sync prepended messages back to LLM request.
+				syncPrependedMessages(c.Chat.Messages, llmContext)
+
+				// Sync ToolChoice if middleware set one.
+				if c.Chat.Options != nil && c.Chat.Options.ToolChoice != "" {
+					if llmContext.Request.Extensions == nil {
+						llmContext.Request.Extensions = make(map[string]any)
+					}
+					llmContext.Request.Extensions["tool_choice"] = c.Chat.Options.ToolChoice
+				}
+
 				return s.streamAndProcessLLMResponseCore(llmContext)
-			},
+			}),
 		)
 	}
 	return s.streamAndProcessLLMResponseCore(llmContext)
+}
+
+// convertLLMToAgentMessages converts llm.Message slice to agent.Message slice,
+// preserving both text and tool call content for requirement step tracking.
+func convertLLMToAgentMessages(msgs []llm.Message) []agent.Message {
+	out := make([]agent.Message, 0, len(msgs))
+	for _, m := range msgs {
+		chatRole := agent.RoleUser
+		switch m.Role {
+		case "system":
+			chatRole = agent.RoleSystem
+		case "assistant":
+			chatRole = agent.RoleAssistant
+		case "tool":
+			chatRole = agent.RoleTool
+		}
+
+		var contents []agent.Content
+		if text := m.Text(); text != "" {
+			contents = append(contents, agent.Content{Type: agent.ContentTypeText, Text: text})
+		}
+		for _, fc := range m.FunctionCalls() {
+			contents = append(contents, agent.Content{
+				Type:     agent.ContentTypeToolCall,
+				ToolCall: &agent.ToolCall{ID: fc.ID, Name: fc.Name, Arguments: string(fc.Arguments)},
+			})
+		}
+		if len(contents) == 0 {
+			contents = append(contents, agent.Content{Type: agent.ContentTypeText})
+		}
+
+		out = append(out, agent.Message{Role: chatRole, Content: contents})
+	}
+	return out
+}
+
+// syncToolsToEngine filters the engine's internal tool lists to match the
+// middleware-processed tool set from c.Chat.Tools.
+func syncToolsToEngine(tools []agent.Tool, llmContext *LLMContext) {
+	allowed := make(map[string]bool, len(tools))
+	for _, t := range tools {
+		allowed[t.Name()] = true
+	}
+
+	// Filter RequestCtx.Tools
+	n := 0
+	for _, t := range llmContext.RequestCtx.Tools {
+		if allowed[t.Name()] {
+			llmContext.RequestCtx.Tools[n] = t
+			n++
+		}
+	}
+	llmContext.RequestCtx.Tools = llmContext.RequestCtx.Tools[:n]
+
+	// Filter RequestCtx.AdditionalTools
+	n = 0
+	for _, t := range llmContext.RequestCtx.AdditionalTools {
+		if allowed[t.Name()] {
+			llmContext.RequestCtx.AdditionalTools[n] = t
+			n++
+		}
+	}
+	llmContext.RequestCtx.AdditionalTools = llmContext.RequestCtx.AdditionalTools[:n]
+
+	// Filter Request.Tools (llm.ToolDeclaration)
+	n = 0
+	for _, t := range llmContext.Request.Tools {
+		if allowed[t.Name] {
+			llmContext.Request.Tools[n] = t
+			n++
+		}
+	}
+	llmContext.Request.Tools = llmContext.Request.Tools[:n]
+}
+
+// syncPrependedMessages detects messages prepended by middleware and converts
+// them back to llm.Message format at the front of the LLM request.
+func syncPrependedMessages(agentMsgs []agent.Message, llmContext *LLMContext) {
+	diff := len(agentMsgs) - len(llmContext.Request.Messages)
+	if diff <= 0 {
+		return
+	}
+
+	prepended := make([]llm.Message, diff)
+	for i := 0; i < diff; i++ {
+		msg := agentMsgs[i]
+		llmRole := llm.RoleSystem
+		switch msg.Role {
+		case agent.RoleUser:
+			llmRole = llm.RoleUser
+		case agent.RoleAssistant:
+			llmRole = llm.RoleAssistant
+		case agent.RoleTool:
+			llmRole = llm.RoleTool
+		}
+		text := ""
+		if len(msg.Content) > 0 {
+			text = msg.Content[0].Text
+		}
+		prepended[i] = llm.Message{
+			Role:    llmRole,
+			Content: []llm.Content{llm.TextContent{Text: text}},
+		}
+	}
+	llmContext.Request.Messages = append(prepended, llmContext.Request.Messages...)
 }
 
 func (s *executionState) streamAndProcessLLMResponseCore(llmContext *LLMContext) error {

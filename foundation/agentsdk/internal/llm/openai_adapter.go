@@ -336,12 +336,21 @@ func (c *OpenAIClient) applyOptions(params *openai.ChatCompletionNewParams, req 
 			openaiTools = append(openaiTools, openai.ChatCompletionFunctionTool(funcDef))
 		}
 		params.Tools = openaiTools
+	}
 
-		if req.Extensions != nil {
-			if toolChoice, ok := req.Extensions["tool_choice"].(string); ok {
+	if req.Extensions != nil {
+		if toolChoice, ok := req.Extensions["tool_choice"].(string); ok {
+			switch toolChoice {
+			case "none", "auto", "required":
 				params.ToolChoice = openai.ChatCompletionToolChoiceOptionUnionParam{
 					OfAuto: openai.String(toolChoice),
 				}
+			default:
+				params.ToolChoice = openai.ToolChoiceOptionFunctionToolChoice(
+					openai.ChatCompletionNamedToolChoiceFunctionParam{
+						Name: toolChoice,
+					},
+				)
 			}
 		}
 	}
