@@ -1,0 +1,9 @@
+package library
+
+import "school-with-ai/plugins/library/components"
+
+templ PluginTemplate() {
+	<template x-if="message.name === 'browse_library'">
+		@library.Library()
+	</template>
+}

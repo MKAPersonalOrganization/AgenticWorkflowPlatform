@@ -6,8 +6,13 @@ import (
 	"school-with-ai/components/i18n"
 	"school-with-ai/components/nav"
 	"school-with-ai/components/resources"
+	"school-with-ai/components/nav"
+	"school-with-ai/components/resources"
 	"school-with-ai/components/tools"
 	"school-with-ai/domain"
+	"school-with-ai/services/toolregistry"
+
+	"fmt"
 )
 
 type LayoutProps struct {
@@ -55,6 +60,7 @@ templ BaseLayout(props LayoutProps) {
 			<!-- i18n JavaScript module -->
 			<script src="/assets/js/i18n.js"></script>
 			@i18n.I18nScript()
+			@templ.Raw(fmt.Sprintf("<script>window.SPECIAL_TOOLS = %s; window.ELICITATION_SCHEMAS = %s;</script>", toolregistry.GetUIHandledToolsJSON(), toolregistry.GetUIHandledElicitationsJSON()))
 			<!-- Alpine.js global data for theme management -->
 			<script>
 				document.addEventListener('alpine:init', () => {

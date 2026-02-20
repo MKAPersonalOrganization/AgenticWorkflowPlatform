@@ -50,6 +50,15 @@ import (
 	"school-with-ai/services/taskmanagement"
 	"school-with-ai/services/threadmgmt"
 	"school-with-ai/services/toolregistry"
+	"school-with-ai/plugins/calculator"
+	"school-with-ai/plugins/codebase"
+	"school-with-ai/plugins/document"
+	"school-with-ai/plugins/elicitation"
+	"school-with-ai/plugins/knowledgebase"
+	"school-with-ai/plugins/library"
+	memoryplugin "school-with-ai/plugins/memory"
+	statisticsplugin "school-with-ai/plugins/statistics"
+	"school-with-ai/plugins/visualization"
 	"school-with-ai/services/workspacepermissions"
 
 	"school-with-ai/services/agentorchestrator/agents/math"
@@ -352,6 +361,15 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// Create and initialize tool registry
 	toolRegistry := toolregistry.NewRegistry(log, sqldb.NewPostgresToolRegistryRepository(db))
+	toolregistry.RegisterPlugin(&calculator.Provider{})
+	toolregistry.RegisterPlugin(&codebase.Provider{})
+	toolregistry.RegisterPlugin(&document.Provider{})
+	toolregistry.RegisterPlugin(&elicitation.Provider{})
+	toolregistry.RegisterPlugin(&knowledgebase.Provider{})
+	toolregistry.RegisterPlugin(&library.Provider{})
+	toolregistry.RegisterPlugin(&memoryplugin.Provider{})
+	toolregistry.RegisterPlugin(&statisticsplugin.Provider{})
+	toolregistry.RegisterPlugin(&visualization.Provider{})
 	if err := toolRegistry.Initialize(ctx); err != nil {
 		return fmt.Errorf("failed to initialize tool registry: %w", err)
 	}

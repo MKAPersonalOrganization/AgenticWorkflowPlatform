@@ -16,7 +16,7 @@ import (
 	"school-with-ai/services/artifact"
 	"school-with-ai/services/edgequake"
 	"school-with-ai/services/memory"
-	memorytools "school-with-ai/services/memory/tools"
+	memorytools "school-with-ai/plugins/memory"
 	"school-with-ai/services/permissions"
 	smiddleware "school-with-ai/services/studentprofile/middleware"
 	"school-with-ai/services/toolregistry"

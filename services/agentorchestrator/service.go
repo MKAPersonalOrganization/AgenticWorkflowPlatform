@@ -129,15 +129,14 @@ func (s *Service) ProcessEvents(ctx context.Context, events iter.Seq2[domain.Eve
 
 			// Handle broadcasting
 			if s.emitter != nil {
-				// We only broadcast TRANSIENT events from here.
-				// DURABLE events are broadcast by the projection updater to ensure consistency
-				// and prevent double-broadcasting to the UI.
-				if !durable {
-					if bErr := s.emitter.Dispatch(ctx, event); bErr != nil {
-						s.log.Error(ctx, "Orchestrator: Failed to dispatch transient event", "eventType", event.EventType(), "error", bErr)
-					} else {
-						s.log.Debug(ctx, "Orchestrator: Successfully dispatched transient event", "eventType", event.EventType())
-					}
+				// Broadcast ALL events (Durable and Transient) to prevent race conditions 
+				// where Runner finishes and closes SSE before outbox polling finishes.
+				// The JS frontend event state machines are idempotent and safely swallow 
+				// the guaranteed duplicate events generated later by ProjectionUpdater.
+				if bErr := s.emitter.Dispatch(ctx, event); bErr != nil {
+					s.log.Error(ctx, "Orchestrator: Failed to dispatch event", "eventType", event.EventType(), "error", bErr)
+				} else {
+					s.log.Debug(ctx, "Orchestrator: Successfully dispatched event", "eventType", event.EventType())
 				}
 			}
 
