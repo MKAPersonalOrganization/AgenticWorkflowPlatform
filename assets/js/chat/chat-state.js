@@ -37,6 +37,7 @@ export function createEmptyThreadState() {
         awaitingHumanInput: false,
         humanInputQuestion: null,
         humanInputSchema: null,
+        humanInputToolCallId: null,
         humanInputToastId: null,
         // Token usage tracking
         tokenUsage: null
@@ -66,6 +67,7 @@ export function createInitialState() {
             awaitingHumanInput: false,
             humanInputQuestion: null,
             humanInputSchema: null,
+            humanInputToolCallId: null,
             humanInputToastId: null,
             tokenUsage: null
         },
@@ -259,6 +261,11 @@ export function createStateMethods() {
                 const { question, schema } = context.elicitation;
                 msg.parsedResult = normalizeElicitation(question, schema);
             }
+
+            // Sync user answer (for answered quiz display)
+            if (context.userAnswer !== undefined && context.userAnswer !== null) {
+                msg.userAnswer = context.userAnswer;
+            }
         },
 
         /**
@@ -326,6 +333,7 @@ export function createStateMethods() {
             let isWaiting = false;
             let question = null;
             let schema = null;
+            let toolCallId = null;
 
             if (msgs && msgs.length > 0) {
                 // Iterate backwards to find the most recent tool call that is awaiting input
@@ -341,6 +349,7 @@ export function createStateMethods() {
                         // Strict XState check: only show input if machine is in 'awaiting_input'
                         if (machineState === TOOL_STATES.AWAITING_INPUT) {
                             isWaiting = true;
+                            toolCallId = m.id;
                             question = m.parsedResult?.question_text ||
                                 m.parsedResult?.statement_to_verify || null;
                             schema = m.parsedResult?.schema || null;
@@ -355,6 +364,7 @@ export function createStateMethods() {
                 state.awaitingHumanInput = isWaiting;
                 state.humanInputQuestion = question;
                 state.humanInputSchema = schema;
+                state.humanInputToolCallId = toolCallId;
             });
         }
     };

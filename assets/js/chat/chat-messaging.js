@@ -68,6 +68,15 @@ export function createMessagingMethods() {
                 // Store current interaction ID
                 state.currentInteractionId = interactionId;
 
+                // Capture toolCallId before clearing state (for elicitation correlation)
+                const toolCallId = state.humanInputToolCallId || null;
+
+                // Immediately transition the tool's state machine so the quiz
+                // buttons hide without waiting for the backend SSE round-trip.
+                if (toolCallId) {
+                    this.transitionToolState(toolCallId, TOOL_EVENTS.INPUT_PROVIDED, { input: userMessage });
+                }
+
                 // Update session title with first message
                 this.__updateSessionTitle();
 
@@ -94,7 +103,7 @@ export function createMessagingMethods() {
                 });
 
                 // Start SSE connection
-                this.__streamResponse(userMessage, this.__currentThreadId, this.selectedAgent);
+                this.__streamResponse(userMessage, this.__currentThreadId, this.selectedAgent, toolCallId);
             });
         },
 
@@ -323,11 +332,15 @@ export function createMessagingMethods() {
 
                 // Component-owned synchronization (React-like)
                 const config = getToolConfig(toolName, elicitation?.schema?.type);
+                // Extract userAnswer from persistent tool state (AGUI projection stores it as 'input')
+                const userAnswer = toolStatesMap[toolId]?.input || null;
+
                 config.onSync(toolId, threadId, {
                     toolName,
                     status,
                     toolResult,
                     elicitation,
+                    userAnswer,
                     TOOL_EVENTS
                 }, (id, ev, pay, tid) => this.transitionToolState(id, ev, pay, tid));
             }

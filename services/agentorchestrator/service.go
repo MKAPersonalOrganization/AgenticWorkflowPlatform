@@ -129,9 +129,9 @@ func (s *Service) ProcessEvents(ctx context.Context, events iter.Seq2[domain.Eve
 
 			// Handle broadcasting
 			if s.emitter != nil {
-				// Broadcast ALL events (Durable and Transient) to prevent race conditions 
+				// Broadcast ALL events (Durable and Transient) to prevent race conditions
 				// where Runner finishes and closes SSE before outbox polling finishes.
-				// The JS frontend event state machines are idempotent and safely swallow 
+				// The JS frontend event state machines are idempotent and safely swallow
 				// the guaranteed duplicate events generated later by ProjectionUpdater.
 				if bErr := s.emitter.Dispatch(ctx, event); bErr != nil {
 					s.log.Error(ctx, "Orchestrator: Failed to dispatch event", "eventType", event.EventType(), "error", bErr)
@@ -245,6 +245,7 @@ type RunExecutionRequest struct {
 	AgentName   string // Agent to execute
 	Message     string // User message content
 	MessageID   string // Message ID (used as RunID)
+	ToolCallID  string // (Optional) Correlates this message as an answer to a tool elicitation
 	ParentRunID string // (Optional) Lineage pointer for branching/time travel
 }
 
@@ -279,7 +280,33 @@ func (s *Service) ExecuteRun(
 			}
 		}
 
-		// 2. Call the framework runner to get events
+		// 2. If this message is an answer to a tool elicitation, emit InputProvided
+		if req.ToolCallID != "" {
+			inputProvidedEvent := &domain.InputProvided{
+				ThreadID:   req.SessionID,
+				MessageID:  req.MessageID,
+				ToolCallID: req.ToolCallID,
+				Input:      req.Message,
+				AgentName:  req.AgentName,
+				Timestamp:  time.Now(),
+			}
+
+			inputIter := func(y func(domain.Event, error) bool) {
+				y(inputProvidedEvent, nil)
+			}
+			processedInput := s.ProcessEvents(ctx, inputIter)
+			for evt, err := range processedInput {
+				if err != nil {
+					yield(nil, fmt.Errorf("failed to emit InputProvided: %w", err))
+					return
+				}
+				if !yield(evt, nil) {
+					return
+				}
+			}
+		}
+
+		// 3. Call the framework runner to get events
 		runnerReq := &agent.RunRequest{
 			SessionID: req.SessionID,
 			UserID:    req.UserID,
@@ -293,10 +320,10 @@ func (s *Service) ExecuteRun(
 		}
 		rawDomainEvents := s.runner.Run(ctx, runnerReq)
 
-		// 3. Process events for persistence and broadcasting
+		// 4. Process events for persistence and broadcasting
 		processedEvents := s.ProcessEvents(ctx, rawDomainEvents)
 
-		// 4. Yield orchestrated events to caller and check for errors
+		// 5. Yield orchestrated events to caller and check for errors
 		var executionError error
 		for de, err := range processedEvents {
 			if err != nil {
@@ -308,7 +335,7 @@ func (s *Service) ExecuteRun(
 			}
 		}
 
-		// 4. Emit RunError if execution failed, otherwise emit RunFinished
+		// 6. Emit RunError if execution failed, otherwise emit RunFinished
 		if executionError != nil {
 			runErrorEvent := &domain.RunError{
 				ThreadID:  req.SessionID,
@@ -337,7 +364,7 @@ func (s *Service) ExecuteRun(
 			return
 		}
 
-		// 5. Emit RunFinished on success
+		// 7. Emit RunFinished on success
 		runFinishedEvent := &domain.RunFinished{
 			ThreadID:  req.SessionID,
 			RunID:     req.MessageID,

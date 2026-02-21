@@ -74,8 +74,6 @@ func NewAsynqTaskManager(
 	orchestrationService := NewService(
 		log,
 		orchestrator,
-
-
 	)
 
 	// Create chat worker (thin wrapper around orchestration service)
@@ -140,9 +138,9 @@ func NewAsynqTaskManager(
 	}()
 
 	return &AsynqTaskManager{
-		log:       log,
-		server:    srv,
-		client:    client,
+		log:           log,
+		server:        srv,
+		client:        client,
 		redisAddr:     config.RedisAddr,
 		redisPassword: config.RedisPassword,
 	}
@@ -174,7 +172,7 @@ type SubmitChatTaskResult struct {
 
 // SubmitChatTask submits a chat task for async processing.
 // It handles validation, ID generation, and payload construction.
-func (s *AsynqTaskManager) SubmitChatTask(ctx context.Context, userID, message, contextID, agentName string) (*SubmitChatTaskResult, error) {
+func (s *AsynqTaskManager) SubmitChatTask(ctx context.Context, userID, message, contextID, agentName, toolCallID string) (*SubmitChatTaskResult, error) {
 	if message == "" {
 		return nil, errors.New("message is required")
 	}
@@ -190,12 +188,13 @@ func (s *AsynqTaskManager) SubmitChatTask(ctx context.Context, userID, message, 
 
 	// Create payload for async processing
 	payload := ProcessChatPayload{
-		JobID:     jobID,
-		ThreadID:  contextID,
-		MessageID: messageID,
-		Message:   message,
-		UserID:    userID,
-		AgentName: agentName,
+		JobID:      jobID,
+		ThreadID:   contextID,
+		MessageID:  messageID,
+		Message:    message,
+		UserID:     userID,
+		AgentName:  agentName,
+		ToolCallID: toolCallID,
 	}
 
 	s.log.Info(ctx, "Submitting chat task",

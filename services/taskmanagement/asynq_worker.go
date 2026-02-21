@@ -18,12 +18,13 @@ const (
 
 // ProcessChatPayload contains the data needed to process a chat message.
 type ProcessChatPayload struct {
-	JobID     string `json:"job_id"`
-	ThreadID  string `json:"thread_id"`
-	MessageID string `json:"message_id"`
-	Message   string `json:"message"`
-	UserID    string `json:"user_id"`
-	AgentName string `json:"agent_name,omitempty"`
+	JobID      string `json:"job_id"`
+	ThreadID   string `json:"thread_id"`
+	MessageID  string `json:"message_id"`
+	Message    string `json:"message"`
+	UserID     string `json:"user_id"`
+	AgentName  string `json:"agent_name,omitempty"`
+	ToolCallID string `json:"tool_call_id,omitempty"` // Set when this message is an answer to a tool's elicitation
 }
 
 // NewProcessChatTask creates a new task for processing a chat message.
@@ -94,11 +95,12 @@ func (w *ChatWorker) processChat(ctx context.Context, payload ProcessChatPayload
 
 	// Delegate to orchestration service
 	params := UserMessageParams{
-		ThreadID:  payload.ThreadID,
-		MessageID: payload.MessageID,
-		Content:   payload.Message,
-		UserID:    payload.UserID,
-		AgentName: payload.AgentName,
+		ThreadID:   payload.ThreadID,
+		MessageID:  payload.MessageID,
+		Content:    payload.Message,
+		UserID:     payload.UserID,
+		AgentName:  payload.AgentName,
+		ToolCallID: payload.ToolCallID,
 	}
 
 	return w.orchestrationService.HandleUserMessage(ctx, params)

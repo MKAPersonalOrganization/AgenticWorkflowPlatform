@@ -12,8 +12,6 @@ import (
 	"school-with-ai/services/agentorchestrator"
 )
 
-
-
 // Orchestrator is the interface for orchestrating agent runs with lifecycle events.
 type Orchestrator interface {
 	ExecuteRun(ctx context.Context, req agentorchestrator.RunExecutionRequest) iter.Seq2[domain.Event, error]
@@ -24,30 +22,29 @@ type Orchestrator interface {
 // managing threads, routing to agents, and coordinating execution.
 // It is designed to be reusable across different transports (HTTP/SSE, A2A, etc.).
 type Service struct {
-	log                 *logger.Logger
-	orchestrator        Orchestrator
+	log          *logger.Logger
+	orchestrator Orchestrator
 }
 
 // NewService creates a new orchestration service.
 func NewService(
 	log *logger.Logger,
 	orchestrator Orchestrator,
-
-
 ) *Service {
 	return &Service{
-		log:                 log,
-		orchestrator:        orchestrator,
+		log:          log,
+		orchestrator: orchestrator,
 	}
 }
 
 // UserMessageParams contains parameters for handling a user message.
 type UserMessageParams struct {
-	ThreadID  string
-	MessageID string
-	Content   string
-	UserID    string
-	AgentName string
+	ThreadID   string
+	MessageID  string
+	Content    string
+	UserID     string
+	AgentName  string
+	ToolCallID string // Set when this message is an answer to a tool's elicitation
 }
 
 // HandleUserMessage processes an incoming user message and coordinates agent execution.
@@ -65,8 +62,6 @@ func (s *Service) HandleUserMessage(
 		return fmt.Errorf("task cancelled: %w", ctx.Err())
 	}
 
-
-
 	// 2. Delegate to Orchestrator (which emits RunStarted/RunFinished/RunError)
 	req := agentorchestrator.RunExecutionRequest{
 		SessionID:   params.ThreadID,
@@ -74,6 +69,7 @@ func (s *Service) HandleUserMessage(
 		AgentName:   params.AgentName,
 		Message:     params.Content,
 		MessageID:   params.MessageID,
+		ToolCallID:  params.ToolCallID,
 		ParentRunID: "", // TODO: Support branching/time travel
 	}
 
@@ -86,5 +82,3 @@ func (s *Service) HandleUserMessage(
 
 	return nil
 }
-
-

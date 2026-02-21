@@ -10,6 +10,7 @@ export const TOOL_STATES = {
     EXECUTING: 'executing',
     AWAITING_INPUT: 'awaiting_input',
     AWAITING_AUTH: 'awaiting_auth',
+    ANSWERED: 'answered',
     COMPLETED: 'completed',
     ERROR: 'error'
 };
@@ -52,6 +53,7 @@ export function createToolStateMachine(toolCallId, initialContext = {}) {
             error: null,
             elicitation: null,
             authSpec: null,
+            userAnswer: null,
             ...initialContext
         },
         states: {
@@ -92,9 +94,9 @@ export function createToolStateMachine(toolCallId, initialContext = {}) {
             [TOOL_STATES.AWAITING_INPUT]: {
                 on: {
                     [TOOL_EVENTS.INPUT_PROVIDED]: {
-                        target: TOOL_STATES.EXECUTING,
+                        target: TOOL_STATES.ANSWERED,
                         actions: assign({
-                            elicitation: null
+                            userAnswer: ({ event }) => event.input || null
                         })
                     },
                     [TOOL_EVENTS.CANCELLED]: {
@@ -126,6 +128,9 @@ export function createToolStateMachine(toolCallId, initialContext = {}) {
                         })
                     }
                 }
+            },
+            [TOOL_STATES.ANSWERED]: {
+                type: 'final'
             },
             [TOOL_STATES.COMPLETED]: {
                 type: 'final'

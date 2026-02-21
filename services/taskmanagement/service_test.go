@@ -12,11 +12,6 @@ func TestServiceCreation(t *testing.T) {
 	service := NewService(
 		nil, // log
 		nil, // orchestrator
-		nil, // langfuseTracer
-		ObservabilityConfig{ // observabilityConfig
-			Release: "test-build-v1.0.0",
-			Env:     "test",
-		},
 	)
 
 	if service == nil {
@@ -50,7 +45,7 @@ func TestUserMessageParamsValidation(t *testing.T) {
 // TestHandleUserMessageCancellation verifies that HandleUserMessage respects context cancellation.
 func TestHandleUserMessageCancellation(t *testing.T) {
 	t.Parallel()
-	service := NewService(nil, nil, nil, ObservabilityConfig{Release: "test-build-v1.0.0"})
+	service := NewService(nil, nil)
 
 	// Create cancelled context
 	ctx, cancel := context.WithCancel(context.Background())
