@@ -128,21 +128,21 @@ templ ChatInputScreen(user *domain.User) {
 							@nav.MobileNav()
 							@chat.Header()
 							<!-- Content wrapper - class switches based on state -->
-							<div
-								class="flex flex-col"
-								:class="(hasMessages || isStreaming)
-									? 'h-full overflow-y-auto'
-									: 'flex-1 items-center justify-end sm:justify-center'"
-							>
-								<!-- Messages state -->
 								<div
-									x-show="hasMessages || isStreaming"
-									class="relative flex-1 overflow-hidden overflow-y-auto"
+									class="flex flex-col"
+									:class="(hasMessages || isStreaming)
+										? 'flex-1'
+										: 'flex-1 items-center justify-end sm:justify-center'"
 								>
+								<!-- Messages state -->
+									<div
+										x-show="hasMessages || isStreaming"
+										class="relative flex-1 overflow-hidden"
+									>
 									<div
 										x-ref="messageList"
 										@scroll="scrolledUp = ($refs.messageList.scrollHeight - $refs.messageList.scrollTop - $refs.messageList.clientHeight) > 100"
-										style="height: 100%; overflow-y: auto; width: 100%; scrollbar-gutter: stable;"
+										style="height: 100%; overflow-y: auto; width: 100%; scrollbar-gutter: stable; overflow-anchor: auto !important; scroll-behavior: auto !important;"
 										role="log"
 										aria-live="polite"
 									>
@@ -150,7 +150,7 @@ templ ChatInputScreen(user *domain.User) {
 											<div class="w-full max-w-3xl xl:max-w-4xl mx-auto px-4">
 												@messagelist.MessageList()
 											</div>
-											<div id="messages-end" class="h-0 w-full flex-shrink-0"></div>
+											<div id="messages-end" x-ref="messagesEnd" class="h-0 w-full flex-shrink-0"></div>
 										</div>
 									</div>
 									<!-- Scroll to Bottom Button -->

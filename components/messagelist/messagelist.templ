@@ -51,21 +51,7 @@ templ DateSeparator() {
 }
 
 templ MessageList() {
-	<div
-		class="space-y-4 relative"
-		x-data="{ scrolledUp: false }"
-		x-init="
-		$watch('messages', () => {
-			$nextTick(() => {
-				const container = $refs.messageList;
-				if (container) {
-					const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
-					if (isNearBottom) scrollToBottom();
-				}
-			});
-		});
-	"
-	>
+	<div class="space-y-4 relative">
 		<template x-for="(message, index) in messages" :key="message.id">
 			<div
 				class="group"

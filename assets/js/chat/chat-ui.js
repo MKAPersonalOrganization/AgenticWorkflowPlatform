@@ -479,24 +479,42 @@ export function createUIMethods() {
 
         /**
          * Scroll to bottom of message list
+         * @param {Object} options - Scroll options
+         * @param {string} options.behavior - Scroll behavior ('auto', 'smooth', 'instant')
+         * @param {boolean} options.force - If true, use a small timeout to ensure layout is ready
          */
-        __scrollToBottom() {
+        __scrollToBottom(options = { behavior: 'smooth', force: false }) {
             const container = this.$refs?.messageList;
+            const anchor = this.$refs?.messagesEnd;
+
             if (!container || !container.isConnected) {
                 return;
             }
 
-            if (typeof container.scrollTo !== 'function') {
-                console.warn('Container does not support scrollTo');
-                return;
-            }
-
-            this.__tryCatch('scroll to bottom', {}, () => {
-                container.scrollTo({
-                    top: container.scrollHeight,
-                    behavior: 'smooth'
+            const scroll = () => {
+                this.__tryCatch('scroll to bottom', { behavior: options.behavior }, () => {
+                    if (anchor && typeof anchor.scrollIntoView === 'function') {
+                        anchor.scrollIntoView({
+                            behavior: options.behavior === 'instant' ? 'auto' : options.behavior,
+                            block: 'end'
+                        });
+                    } else if (typeof container.scrollTo === 'function') {
+                        // Fallback to scrollTo
+                        container.scrollTo({
+                            top: container.scrollHeight,
+                            behavior: options.behavior || 'smooth'
+                        });
+                    }
                 });
-            });
+            };
+
+            if (options.force || options.behavior === 'auto' || options.behavior === 'instant') {
+                scroll();
+                setTimeout(scroll, 50);
+                setTimeout(scroll, 150);
+            } else {
+                scroll();
+            }
         },
 
         /**
