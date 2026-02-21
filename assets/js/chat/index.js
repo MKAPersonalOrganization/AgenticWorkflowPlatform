@@ -275,6 +275,31 @@ document.addEventListener('alpine:init', () => {
                 // Fetch available agents
                 this.fetchAgents();
 
+                // Cleanup previous observers
+                if (this.__mutationObserver) {
+                    this.__mutationObserver.disconnect();
+                }
+
+                // Setup MutationObserver to handle dynamic height changes (KaTeX, Markdown rendering, images)
+                this.$nextTick(() => {
+                    const container = this.$refs?.messageList;
+                    if (container) {
+                        this.__mutationObserver = new MutationObserver(() => {
+                            // Only auto-scroll if we were already near bottom or streaming
+                            // thresholds are slightly more generous to account for rapid growth
+                            const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200;
+                            if (isNearBottom || this.isStreaming) {
+                                this.__scrollToBottom({ behavior: 'auto' });
+                            }
+                        });
+                        this.__mutationObserver.observe(container, {
+                            childList: true,
+                            subtree: true,
+                            characterData: true
+                        });
+                    }
+                });
+
                 // Load sessions and profile asynchronously
                 queueMicrotask(() => {
                     this.__loadSessions();
@@ -308,7 +333,21 @@ document.addEventListener('alpine:init', () => {
                 const unwatchMessages = this.$watch('messages', (newMessages, oldMessages) => {
                     if (this.isStreaming) {
                         this.__scrollToBottomThrottled();
+                    } else {
+                        // Also scroll if near bottom even when not streaming (for late updates or historical load)
+                        this.$nextTick(() => {
+                            const container = this.$refs?.messageList;
+                            if (container) {
+                                const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+                                const isMajorUpdate = Math.abs(newMessages.length - oldMessages.length) > 5;
+
+                                if (isNearBottom || isMajorUpdate) {
+                                    this.__scrollToBottom({ behavior: 'auto', force: true });
+                                }
+                            }
+                        });
                     }
+
                     if (newMessages.length > oldMessages.length) {
                         const lastMsg = newMessages[newMessages.length - 1];
                         if (lastMsg.role === 'assistant' && !document.hasFocus()) {
@@ -349,6 +388,10 @@ document.addEventListener('alpine:init', () => {
             },
 
             destroy() {
+                if (this.__mutationObserver) {
+                    this.__mutationObserver.disconnect();
+                }
+
                 // Clean up all watchers
                 while (this.__watchers?.length) {
                     const unwatch = this.__watchers.pop();

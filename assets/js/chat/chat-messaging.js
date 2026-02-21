@@ -159,7 +159,7 @@ export function createMessagingMethods() {
 
                     // Scroll to bottom after loading
                     if (id === this.__currentThreadId) {
-                        this.$nextTick(() => this.__scrollToBottom());
+                        this.$nextTick(() => this.__scrollToBottom({ behavior: 'auto' }));
                     }
                 } else {
                     throw new Error(`${window.i18n.t('Failed to fetch messages')}: ${response.status}`);
@@ -421,7 +421,7 @@ export function createMessagingMethods() {
 
             // Scroll to bottom
             if (threadId === this.__currentThreadId) {
-                this.$nextTick(() => this.__scrollToBottom());
+                this.$nextTick(() => this.__scrollToBottom({ behavior: 'auto' }));
             }
         },
 

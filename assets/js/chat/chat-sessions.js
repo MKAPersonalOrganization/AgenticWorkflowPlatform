@@ -201,7 +201,7 @@ export function createSessionMethods() {
             }
 
             // Scroll to bottom after switching
-            this.$nextTick(() => this.__scrollToBottom());
+            this.$nextTick(() => this.__scrollToBottom({ behavior: 'auto' }));
         },
 
         /**
