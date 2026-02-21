@@ -535,7 +535,9 @@ export function createStreamingMethods() {
             }
 
             if (threadId === this.__currentThreadId) {
-                this.$nextTick(() => this.__scrollToBottom());
+                // Reset abort flag at the start of a new streaming message
+                this.__abortScroll = false;
+                this.$nextTick(() => this.__scrollToBottom({ behavior: 'instant' }));
             }
         },
 
@@ -564,7 +566,7 @@ export function createStreamingMethods() {
                 console.log(`[STREAM] First token for ${event.messageId}: "${event.delta}"`);
             }
 
-            if (threadId === this.__currentThreadId) {
+            if (threadId === this.__currentThreadId && !this.__abortScroll) {
                 this.__scrollToBottomThrottled();
             }
         },

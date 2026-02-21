@@ -478,12 +478,57 @@ export function createUIMethods() {
         // ============================================
 
         /**
+         * Resolve the effective scroll behavior, respecting prefers-reduced-motion.
+         * @param {string} requested - The requested behavior ('auto', 'smooth', 'instant')
+         * @returns {string} The resolved behavior
+         */
+        __resolveScrollBehavior(requested) {
+            if (this.preferences?.prefersReducedMotion) {
+                return 'auto'; // instant equivalent — no animation
+            }
+            return requested || 'smooth';
+        },
+
+        /**
+         * Clear all pending scroll timeouts (prevents stale scrolls on thread switch).
+         */
+        __clearScrollTimeouts() {
+            if (this.__scrollTimeouts?.length) {
+                this.__scrollTimeouts.forEach(id => clearTimeout(id));
+                this.__scrollTimeouts = [];
+            }
+        },
+
+        /**
+         * Schedule a deferred scroll that is tracked for cleanup.
+         * @param {Function} fn - Function to call
+         * @param {number} delay - Delay in ms
+         * @param {string} threadId - Thread ID to guard against stale calls
+         */
+        __deferScroll(fn, delay, threadId) {
+            const id = setTimeout(() => {
+                // Guard: only fire if still on the same thread
+                if (this.__currentThreadId === threadId) {
+                    fn();
+                }
+                // Remove from tracking
+                this.__scrollTimeouts = (this.__scrollTimeouts || []).filter(t => t !== id);
+            }, delay);
+            (this.__scrollTimeouts = this.__scrollTimeouts || []).push(id);
+        },
+
+        /**
          * Scroll to bottom of message list
          * @param {Object} options - Scroll options
          * @param {string} options.behavior - Scroll behavior ('auto', 'smooth', 'instant')
-         * @param {boolean} options.force - If true, use a small timeout to ensure layout is ready
+         * @param {boolean} options.force - If true, use deferred retries to ensure layout is ready
          */
         __scrollToBottom(options = { behavior: 'smooth', force: false }) {
+            // Respect user's abort during streaming
+            if (this.__abortScroll && this.isStreaming) {
+                return;
+            }
+
             const container = this.$refs?.messageList;
             const anchor = this.$refs?.messagesEnd;
 
@@ -491,37 +536,42 @@ export function createUIMethods() {
                 return;
             }
 
+            const behavior = this.__resolveScrollBehavior(options.behavior);
+
             const scroll = () => {
-                this.__tryCatch('scroll to bottom', { behavior: options.behavior }, () => {
+                this.__tryCatch('scroll to bottom', { behavior }, () => {
                     if (anchor && typeof anchor.scrollIntoView === 'function') {
                         anchor.scrollIntoView({
-                            behavior: options.behavior === 'instant' ? 'auto' : options.behavior,
+                            behavior: behavior === 'instant' ? 'auto' : behavior,
                             block: 'end'
                         });
                     } else if (typeof container.scrollTo === 'function') {
-                        // Fallback to scrollTo
                         container.scrollTo({
                             top: container.scrollHeight,
-                            behavior: options.behavior || 'smooth'
+                            behavior: behavior
                         });
                     }
                 });
             };
 
-            if (options.force || options.behavior === 'auto' || options.behavior === 'instant') {
+            const threadId = this.__currentThreadId;
+
+            if (options.force || behavior === 'auto' || behavior === 'instant') {
                 scroll();
-                setTimeout(scroll, 50);
-                setTimeout(scroll, 150);
+                this.__deferScroll(scroll, 50, threadId);
+                this.__deferScroll(scroll, 150, threadId);
             } else {
                 scroll();
             }
         },
 
         /**
-         * Public scroll to bottom method (for button click)
+         * Public scroll to bottom method (for button click).
+         * Clears the abort flag so user explicitly re-engages auto-scroll.
          */
         scrollToBottom() {
-            this.__scrollToBottom();
+            this.__abortScroll = false;
+            this.__scrollToBottom({ behavior: 'smooth' });
         },
 
         /**

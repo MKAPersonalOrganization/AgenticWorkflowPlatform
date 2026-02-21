@@ -157,11 +157,11 @@ export function createMessagingMethods() {
                         console.log('Token usage loaded from history:', state.tokenUsage);
                     }
 
-                    // Scroll to bottom after loading (force with deferred retries)
+                    // Scroll to bottom after loading (tracked deferred retries)
                     if (id === this.__currentThreadId) {
                         this.$nextTick(() => this.__scrollToBottom({ behavior: 'auto', force: true }));
-                        setTimeout(() => this.__scrollToBottom({ behavior: 'auto', force: true }), 150);
-                        setTimeout(() => this.__scrollToBottom({ behavior: 'auto', force: true }), 400);
+                        this.__deferScroll(() => this.__scrollToBottom({ behavior: 'auto', force: true }), 150, id);
+                        this.__deferScroll(() => this.__scrollToBottom({ behavior: 'auto', force: true }), 400, id);
                     }
                 } else {
                     throw new Error(`${window.i18n.t('Failed to fetch messages')}: ${response.status}`);

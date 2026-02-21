@@ -281,22 +281,42 @@ document.addEventListener('alpine:init', () => {
                 }
 
                 // Setup MutationObserver to handle dynamic height changes (KaTeX, Markdown rendering, images)
+                // Throttled to prevent layout thrashing during rapid DOM mutations.
                 this.$nextTick(() => {
                     const container = this.$refs?.messageList;
                     if (container) {
-                        this.__mutationObserver = new MutationObserver(() => {
-                            // Only auto-scroll if we were already near bottom or streaming
-                            // thresholds are slightly more generous to account for rapid growth
+                        const throttledMutationScroll = throttle(() => {
+                            if (this.__abortScroll && this.isStreaming) return;
                             const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200;
                             if (isNearBottom || this.isStreaming) {
                                 this.__scrollToBottom({ behavior: 'auto' });
                             }
+                        }, 100);
+
+                        this.__mutationObserver = new MutationObserver(() => {
+                            throttledMutationScroll();
                         });
                         this.__mutationObserver.observe(container, {
                             childList: true,
                             subtree: true,
                             characterData: true
                         });
+
+                        // Abort auto-scroll when user manually scrolls up during streaming
+                        container.addEventListener('scroll', () => {
+                            if (!this.isStreaming) {
+                                // Not streaming — just track position, don't set abort
+                                return;
+                            }
+                            const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+                            if (distanceFromBottom > 150) {
+                                // User scrolled away from bottom during streaming
+                                this.__abortScroll = true;
+                            } else {
+                                // User scrolled back near bottom — re-engage
+                                this.__abortScroll = false;
+                            }
+                        }, { passive: true });
                     }
                 });
 
@@ -334,20 +354,18 @@ document.addEventListener('alpine:init', () => {
                 // Initialize accessibility
                 this.__initScreenReaderAnnouncer();
 
-                // Initialize throttled scroll
+                // Initialize throttled scroll — use instant behavior during streaming
+                // (LibreChat uses instant/auto during streaming, smooth only for user clicks)
                 this.__scrollToBottomThrottled = throttle(
-                    () => this.__scrollToBottom(),
+                    () => this.__scrollToBottom({ behavior: 'instant' }),
                     100
                 );
 
-                // Bind resize handlers
-
-
                 // Set up watchers
                 const unwatchMessages = this.$watch('messages', (newMessages, oldMessages) => {
-                    if (this.isStreaming) {
+                    if (this.isStreaming && !this.__abortScroll) {
                         this.__scrollToBottomThrottled();
-                    } else {
+                    } else if (!this.isStreaming) {
                         // Also scroll if near bottom even when not streaming (for late updates or historical load)
                         this.$nextTick(() => {
                             const container = this.$refs?.messageList;
@@ -373,6 +391,10 @@ document.addEventListener('alpine:init', () => {
 
                 const unwatchThread = this.$watch('__currentThreadId', (newThreadId, oldThreadId) => {
                     if (newThreadId) {
+                        // Reset scroll state for the new thread
+                        this.__abortScroll = false;
+                        this.__clearScrollTimeouts();
+
                         this.__currentState = this.__getThreadState(newThreadId);
                         this.__onThreadSwitch(newThreadId, oldThreadId);
                     }
@@ -402,6 +424,9 @@ document.addEventListener('alpine:init', () => {
             },
 
             destroy() {
+                // Clear deferred scroll timeouts
+                this.__clearScrollTimeouts();
+
                 if (this.__mutationObserver) {
                     this.__mutationObserver.disconnect();
                 }
