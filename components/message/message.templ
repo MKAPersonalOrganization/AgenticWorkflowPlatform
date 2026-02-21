@@ -63,12 +63,6 @@ templ AssistantMessage() {
 			<!-- Assistant Name -->
 			<!-- Message Content -->
 			<div class="prose prose-sm max-w-none text-sm leading-relaxed text-foreground dark:[&_*]:text-white mb-1" x-html="renderMarkdown(message.content)" dir="auto"></div>
-			<!-- Streaming Indicator -->
-			<div x-show="message.streaming" class="flex items-center gap-1 text-muted-foreground mt-2">
-				<span class="w-1.5 h-1.5 bg-primary rounded-full animate-bounce"></span>
-				<span class="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style="animation-delay: 150ms;"></span>
-				<span class="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style="animation-delay: 300ms;"></span>
-			</div>
 			<!-- Interaction Actions (Copy, Regenerate) -->
 			<div class="mt-1">
 				@Actions(ActionProps{
