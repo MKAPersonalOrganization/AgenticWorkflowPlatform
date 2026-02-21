@@ -269,9 +269,46 @@ func (p *PostgresAguiProjection) applyToolResultAdded(ctx context.Context, event
 		return fmt.Errorf("failed to update thread timestamp: %w", err)
 	}
 
-	// Also persist the completed/error state in toolStates metadata
-	if err := p.applyToolResultState(ctx, *event); err != nil {
-		p.log.Error(ctx, "failed to update tool result state in metadata", "toolCallId", event.ToolCallID, "ERROR", err)
+	// Update tool state to terminal state in dedicated table.
+	// Guard: do not overwrite elicitation lifecycle states (awaiting_input,
+	// input_provided, answered) — those are more meaningful than the
+	// pause-handler's "completed" placeholder for elicitation tools.
+	terminalState := "completed"
+	if event.IsError {
+		terminalState = "error"
+	}
+	toolStateQuery := `
+		INSERT INTO agui_tool_states (tool_call_id, thread_id, state, tool_name, agent_name, result, error, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, CASE WHEN $7 THEN $6 ELSE NULL END, $8)
+		ON CONFLICT (tool_call_id) DO UPDATE SET
+			state = CASE
+				WHEN agui_tool_states.state IN ('awaiting_input', 'input_provided', 'answered')
+				THEN agui_tool_states.state
+				ELSE EXCLUDED.state
+			END,
+			result = CASE
+				WHEN agui_tool_states.state IN ('awaiting_input', 'input_provided', 'answered')
+				THEN agui_tool_states.result
+				ELSE EXCLUDED.result
+			END,
+			error = CASE
+				WHEN agui_tool_states.state IN ('awaiting_input', 'input_provided', 'answered')
+				THEN agui_tool_states.error
+				ELSE EXCLUDED.error
+			END,
+			updated_at = EXCLUDED.updated_at
+	`
+	if _, err := p.db.ExecContext(ctx, toolStateQuery,
+		event.ToolCallID,
+		event.ThreadID,
+		terminalState,
+		event.ToolName,
+		event.AgentName,
+		event.Result,
+		event.IsError,
+		event.Timestamp,
+	); err != nil {
+		p.log.Error(ctx, "failed to upsert tool result state", "toolCallId", event.ToolCallID, "ERROR", err)
 		// Non-fatal: the message row was inserted successfully
 	}
 
@@ -348,100 +385,33 @@ func (p *PostgresAguiProjection) applyTokenUsageReported(ctx context.Context, ev
 	return nil
 }
 
-// applyToolStart updates the tool state when execution starts.
+// applyToolStart records the tool execution start in the dedicated tool states table.
 func (p *PostgresAguiProjection) applyToolStart(ctx context.Context, event *domain.ToolStart) error {
 	query := `
-		UPDATE agui_messages
-		SET metadata = COALESCE(metadata, '{}'::jsonb) ||
-			jsonb_build_object(
-				'toolStates',
-				COALESCE(metadata->'toolStates', '[]'::jsonb) ||
-				jsonb_build_array(
-					jsonb_build_object(
-						'toolCallId', $1::text,
-						'state', 'executing',
-						'arguments', $2::text,
-						'timestamp', $3::timestamp
-					)
-				)
-			)
-		WHERE message_id = $4
+		INSERT INTO agui_tool_states (tool_call_id, thread_id, state, tool_name, agent_name, arguments, updated_at)
+		VALUES ($1, $2, 'executing', $3, $4, $5, $6)
+		ON CONFLICT (tool_call_id) DO UPDATE SET
+			state = 'executing',
+			tool_name  = COALESCE(EXCLUDED.tool_name, agui_tool_states.tool_name),
+			agent_name = COALESCE(EXCLUDED.agent_name, agui_tool_states.agent_name),
+			arguments  = COALESCE(EXCLUDED.arguments, agui_tool_states.arguments),
+			updated_at = EXCLUDED.updated_at
 	`
 	_, err := p.db.ExecContext(ctx, query,
 		event.ToolCallID,
+		event.ThreadID,
+		event.ToolName,
+		event.AgentName,
 		event.ToolArguments,
 		event.Timestamp,
-		event.MessageID,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to update tool start: %w", err)
+		return fmt.Errorf("failed to upsert tool start: %w", err)
 	}
 	return nil
 }
 
-// applyToolResultState updates the tool state when execution completes (successfully or with error).
-func (p *PostgresAguiProjection) applyToolResultState(ctx context.Context, event domain.ToolResultAdded) error {
-	var query string
-	var args []interface{}
-
-	if event.IsError {
-		query = `
-			UPDATE agui_messages
-			SET metadata = COALESCE(metadata, '{}'::jsonb) ||
-				jsonb_build_object(
-					'toolStates',
-					COALESCE(metadata->'toolStates', '[]'::jsonb) ||
-					jsonb_build_array(
-						jsonb_build_object(
-							'toolCallId', $1::text,
-							'state', 'error',
-							'error', $2::text,
-							'timestamp', $3::timestamp
-						)
-					)
-				)
-			WHERE message_id = $4
-		`
-		args = []interface{}{
-			event.ToolCallID,
-			event.Result, // Error message is stored in Result field
-			event.Timestamp,
-			event.MessageID,
-		}
-	} else {
-		query = `
-			UPDATE agui_messages
-			SET metadata = COALESCE(metadata, '{}'::jsonb) ||
-				jsonb_build_object(
-					'toolStates',
-					COALESCE(metadata->'toolStates', '[]'::jsonb) ||
-					jsonb_build_array(
-						jsonb_build_object(
-							'toolCallId', $1::text,
-							'state', 'completed',
-							'result', $2::text,
-							'timestamp', $3::timestamp
-						)
-					)
-				)
-			WHERE message_id = $4
-		`
-		args = []interface{}{
-			event.ToolCallID,
-			event.Result,
-			event.Timestamp,
-			event.MessageID,
-		}
-	}
-
-	_, err := p.db.ExecContext(ctx, query, args...)
-	if err != nil {
-		return fmt.Errorf("failed to update tool result: %w", err)
-	}
-	return nil
-}
-
-// applyToolNeedsInput updates the tool state with elicitation info.
+// applyToolNeedsInput records elicitation data in the dedicated tool states table.
 func (p *PostgresAguiProjection) applyToolNeedsInput(ctx context.Context, event *domain.ToolNeedsInput) error {
 	elicitationJSON, err := json.Marshal(event.Elicitation)
 	if err != nil {
@@ -449,35 +419,28 @@ func (p *PostgresAguiProjection) applyToolNeedsInput(ctx context.Context, event 
 	}
 
 	query := `
-		UPDATE agui_messages
-		SET metadata = COALESCE(metadata, '{}'::jsonb) ||
-			jsonb_build_object(
-				'toolStates',
-				COALESCE(metadata->'toolStates', '[]'::jsonb) ||
-				jsonb_build_array(
-					jsonb_build_object(
-						'toolCallId', $1::text,
-						'state', 'awaiting_input',
-						'elicitation', $2::jsonb,
-						'timestamp', $3::timestamp
-					)
-				)
-			)
-		WHERE message_id = $4
+		INSERT INTO agui_tool_states (tool_call_id, thread_id, state, tool_name, agent_name, elicitation, updated_at)
+		VALUES ($1, $2, 'awaiting_input', $3, $4, $5, $6)
+		ON CONFLICT (tool_call_id) DO UPDATE SET
+			state       = 'awaiting_input',
+			elicitation = EXCLUDED.elicitation,
+			updated_at  = EXCLUDED.updated_at
 	`
 	_, err = p.db.ExecContext(ctx, query,
 		event.ToolCallID,
+		event.ThreadID,
+		event.ToolName,
+		event.AgentName,
 		elicitationJSON,
 		event.Timestamp,
-		event.MessageID,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to update tool awaiting input: %w", err)
+		return fmt.Errorf("failed to upsert tool awaiting input: %w", err)
 	}
 	return nil
 }
 
-// applyToolNeedsAuth updates the tool state with authorization info.
+// applyToolNeedsAuth records authorization data in the dedicated tool states table.
 func (p *PostgresAguiProjection) applyToolNeedsAuth(ctx context.Context, event *domain.ToolNeedsAuth) error {
 	authSpecJSON, err := json.Marshal(event.AuthSpec)
 	if err != nil {
@@ -485,106 +448,69 @@ func (p *PostgresAguiProjection) applyToolNeedsAuth(ctx context.Context, event *
 	}
 
 	query := `
-		UPDATE agui_messages
-		SET metadata = COALESCE(metadata, '{}'::jsonb) ||
-			jsonb_build_object(
-				'toolStates',
-				COALESCE(metadata->'toolStates', '[]'::jsonb) ||
-				jsonb_build_array(
-					jsonb_build_object(
-						'toolCallId', $1::text,
-						'state', 'awaiting_auth',
-						'authSpec', $2::jsonb,
-						'timestamp', $3::timestamp
-					)
-				)
-			)
-		WHERE message_id = $4
+		INSERT INTO agui_tool_states (tool_call_id, thread_id, state, tool_name, agent_name, auth_spec, updated_at)
+		VALUES ($1, $2, 'awaiting_auth', $3, $4, $5, $6)
+		ON CONFLICT (tool_call_id) DO UPDATE SET
+			state      = 'awaiting_auth',
+			auth_spec  = EXCLUDED.auth_spec,
+			updated_at = EXCLUDED.updated_at
 	`
 	_, err = p.db.ExecContext(ctx, query,
 		event.ToolCallID,
+		event.ThreadID,
+		event.ToolName,
+		event.AgentName,
 		authSpecJSON,
 		event.Timestamp,
-		event.MessageID,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to update tool awaiting auth: %w", err)
+		return fmt.Errorf("failed to upsert tool awaiting auth: %w", err)
 	}
 	return nil
 }
 
-// applyInputProvided updates the tool state with provided input.
-// NOTE: We locate the target row by thread_id + toolCallId (via the existing
-// awaiting_input entry in the JSONB metadata) instead of by message_id, because
-// the InputProvided event carries the *user* message's ID which may not have
-// been inserted yet (UserMessageAdded is emitted after InputProvided in the
-// orchestrator pipeline).
+// applyInputProvided records the user's answer in the dedicated tool states table.
+// With the dedicated table this is a simple UPSERT by tool_call_id — no JSONB
+// containment query, no ordering dependency on UserMessageAdded.
 func (p *PostgresAguiProjection) applyInputProvided(ctx context.Context, event *domain.InputProvided) error {
 	query := `
-		UPDATE agui_messages
-		SET metadata = COALESCE(metadata, '{}'::jsonb) ||
-			jsonb_build_object(
-				'toolStates',
-				COALESCE(metadata->'toolStates', '[]'::jsonb) ||
-				jsonb_build_array(
-					jsonb_build_object(
-						'toolCallId', $1::text,
-						'state', 'input_provided',
-						'input', $2::text,
-						'agentName', $3::text,
-						'timestamp', $4::timestamp
-					)
-				)
-			)
-		WHERE thread_id = $5
-		  AND metadata->'toolStates' @> $6::jsonb
+		INSERT INTO agui_tool_states (tool_call_id, thread_id, state, input, agent_name, updated_at)
+		VALUES ($1, $2, 'input_provided', $3, $4, $5)
+		ON CONFLICT (tool_call_id) DO UPDATE SET
+			state      = 'input_provided',
+			input      = EXCLUDED.input,
+			updated_at = EXCLUDED.updated_at
 	`
-	// Build the containment filter: the row must already have a toolStates
-	// entry with this toolCallId in awaiting_input state (i.e. the entry
-	// written by applyToolNeedsInput on the assistant message).
-	filter := fmt.Sprintf(`[{"toolCallId": %q, "state": "awaiting_input"}]`, event.ToolCallID)
-
 	_, err := p.db.ExecContext(ctx, query,
 		event.ToolCallID,
+		event.ThreadID,
 		event.Input,
 		event.AgentName,
 		event.Timestamp,
-		event.ThreadID,
-		filter,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to update tool input provided: %w", err)
+		return fmt.Errorf("failed to upsert tool input provided: %w", err)
 	}
 	return nil
 }
 
-// applyAuthGranted updates the tool state with auth granted.
+// applyAuthGranted records authorization grant in the dedicated tool states table.
 func (p *PostgresAguiProjection) applyAuthGranted(ctx context.Context, event *domain.AuthGranted) error {
 	query := `
-		UPDATE agui_messages
-		SET metadata = COALESCE(metadata, '{}'::jsonb) ||
-			jsonb_build_object(
-				'toolStates',
-				COALESCE(metadata->'toolStates', '[]'::jsonb) ||
-				jsonb_build_array(
-					jsonb_build_object(
-						'toolCallId', $1::text,
-						'state', 'auth_granted',
-						'agentName', $2::text,
-						'timestamp', $3::timestamp
-					)
-				)
-			)
-		WHERE message_id = $4
+		INSERT INTO agui_tool_states (tool_call_id, thread_id, state, agent_name, updated_at)
+		VALUES ($1, $2, 'auth_granted', $3, $4)
+		ON CONFLICT (tool_call_id) DO UPDATE SET
+			state      = 'auth_granted',
+			updated_at = EXCLUDED.updated_at
 	`
 	_, err := p.db.ExecContext(ctx, query,
 		event.ToolCallID,
+		event.ThreadID,
 		event.AgentName,
 		event.Timestamp,
-		event.MessageID,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to update tool auth granted: %w", err)
+		return fmt.Errorf("failed to upsert tool auth granted: %w", err)
 	}
 	return nil
 }
@@ -652,7 +578,6 @@ func (p *PostgresAguiProjection) GetThreadState(threadID string) (*AguiThreadSta
 
 	// Convert database messages to AGUI SDK format
 	aguiMessages := make([]aguievents.Message, 0, len(messages))
-	toolStatesMap := make(map[string]interface{})
 	var tokenUsage *TokenUsageInfo
 
 	for _, msg := range messages {
@@ -716,72 +641,58 @@ func (p *PostgresAguiProjection) GetThreadState(threadID string) (*AguiThreadSta
 			}
 		}
 
-		// Extract metadata
-		if msg.Metadata != nil {
-			var metadata map[string]interface{}
-			if err := json.Unmarshal([]byte(*msg.Metadata), &metadata); err == nil {
-				// Aggregate tool states
-				if states, ok := metadata["toolStates"].([]interface{}); ok {
-					for _, s := range states {
-						if stateMap, ok := s.(map[string]interface{}); ok {
-							if tid, ok := stateMap["toolCallId"].(string); ok {
-								// Merge entries instead of overwriting so that fields
-								// from earlier lifecycle stages (e.g. elicitation from
-								// awaiting_input) survive into later stages (e.g.
-								// input_provided which carries the user's answer but
-								// not the elicitation spec).
-								if existing, exists := toolStatesMap[tid]; exists {
-									if existingMap, ok := existing.(map[string]interface{}); ok {
-										for k, v := range stateMap {
-											// Protect elicitation lifecycle states from being
-											// overwritten by a tool-result "completed" entry.
-											// The tool result for an elicitation tool carries
-											// state:"completed" with the pause-handler's
-											// placeholder text, which should not regress a
-											// more meaningful state like input_provided or
-											// awaiting_input.
-											if k == "state" {
-												if newState, ok := v.(string); ok && newState == "completed" {
-													if cur, ok := existingMap["state"].(string); ok {
-														if cur == "input_provided" || cur == "awaiting_input" || cur == "answered" {
-															continue
-														}
-													}
-												}
-											}
-											existingMap[k] = v
-										}
-									}
-								} else {
-									toolStatesMap[tid] = stateMap
-								}
-							}
-						}
-					}
-				}
+		aguiMessages = append(aguiMessages, aguimsit)
+	}
 
-				// Extract token usage
-				if usage, ok := metadata["usage"].(map[string]interface{}); ok {
-					tokenUsage = &TokenUsageInfo{
-						Provider:        getStringFromMap(usage, "provider"),
-						Model:           getStringFromMap(usage, "model"),
-						Prompt:          getIntFromMap(usage, "prompt"),
-						Completion:      getIntFromMap(usage, "completion"),
-						Total:           getIntFromMap(usage, "total"),
-						Cached:          getIntFromMap(usage, "cached"),
-						Reasoning:       getIntFromMap(usage, "reasoning"),
-						AudioInput:      getIntFromMap(usage, "audioInput"),
-						AudioOutput:     getIntFromMap(usage, "audioOutput"),
-						AcceptedPredict: getIntFromMap(usage, "acceptedPredict"),
-						RejectedPredict: getIntFromMap(usage, "rejectedPredict"),
-						MessageID:       msg.MessageID,
-						ThreadID:        threadID,
-					}
-				}
+	// Fetch tool states from the dedicated table (no merge logic needed)
+	var toolStateRows []struct {
+		ToolCallID  string           `db:"tool_call_id"`
+		State       string           `db:"state"`
+		ToolName    *string          `db:"tool_name"`
+		AgentName   *string          `db:"agent_name"`
+		Elicitation *json.RawMessage `db:"elicitation"`
+		Input       *string          `db:"input"`
+		Result      *string          `db:"result"`
+		Error       *string          `db:"error"`
+	}
+
+	toolStatesQuery := `
+		SELECT tool_call_id, state, tool_name, agent_name, elicitation, input, result, error
+		FROM agui_tool_states
+		WHERE thread_id = $1
+	`
+	if err := p.db.SelectContext(ctx, &toolStateRows, toolStatesQuery, threadID); err != nil && err != sql.ErrNoRows {
+		p.log.Error(ctx, "failed to get tool states", "threadID", threadID, "ERROR", err)
+	}
+
+	toolStatesMap := make(map[string]interface{}, len(toolStateRows))
+	for _, ts := range toolStateRows {
+		entry := map[string]interface{}{
+			"toolCallId": ts.ToolCallID,
+			"state":      ts.State,
+		}
+		if ts.ToolName != nil {
+			entry["toolName"] = *ts.ToolName
+		}
+		if ts.AgentName != nil {
+			entry["agentName"] = *ts.AgentName
+		}
+		if ts.Elicitation != nil {
+			var elicitation interface{}
+			if err := json.Unmarshal(*ts.Elicitation, &elicitation); err == nil {
+				entry["elicitation"] = elicitation
 			}
 		}
-
-		aguiMessages = append(aguiMessages, aguimsit)
+		if ts.Input != nil {
+			entry["input"] = *ts.Input
+		}
+		if ts.Result != nil {
+			entry["result"] = *ts.Result
+		}
+		if ts.Error != nil {
+			entry["error"] = *ts.Error
+		}
+		toolStatesMap[ts.ToolCallID] = entry
 	}
 
 	state := &AguiThreadState{

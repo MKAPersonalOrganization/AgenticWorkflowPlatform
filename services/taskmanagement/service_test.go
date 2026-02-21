@@ -3,6 +3,8 @@ package taskmanagement
 import (
 	"context"
 	"testing"
+
+	"school-with-ai/services/agentorchestrator"
 )
 
 // TestServiceCreation verifies that the orchestration service can be created.
@@ -23,22 +25,22 @@ func TestServiceCreation(t *testing.T) {
 	}
 }
 
-// TestUserMessageParamsValidation verifies that UserMessageParams is created correctly.
-func TestUserMessageParamsValidation(t *testing.T) {
+// TestRunExecutionRequestValidation verifies that RunExecutionRequest fields are set correctly.
+func TestRunExecutionRequestValidation(t *testing.T) {
 	t.Parallel()
-	params := UserMessageParams{
+	req := agentorchestrator.RunExecutionRequest{
 		ThreadID:  "thread-123",
 		MessageID: "msg-456",
-		Content:   "Hello, world!",
+		Message:   "Hello, world!",
 		UserID:    "user-789",
 	}
 
-	if params.ThreadID != "thread-123" {
-		t.Errorf("Expected ThreadID 'thread-123', got '%s'", params.ThreadID)
+	if req.ThreadID != "thread-123" {
+		t.Errorf("Expected ThreadID 'thread-123', got '%s'", req.ThreadID)
 	}
 
-	if params.Content != "Hello, world!" {
-		t.Errorf("Expected Content 'Hello, world!', got '%s'", params.Content)
+	if req.Message != "Hello, world!" {
+		t.Errorf("Expected Message 'Hello, world!', got '%s'", req.Message)
 	}
 }
 
@@ -51,15 +53,15 @@ func TestHandleUserMessageCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
 
-	params := UserMessageParams{
+	req := agentorchestrator.RunExecutionRequest{
 		ThreadID:  "thread-123",
 		MessageID: "msg-456",
-		Content:   "test",
+		Message:   "test",
 		UserID:    "user-789",
 	}
 
 	// Should return error due to cancelled context
-	err := service.HandleUserMessage(ctx, params)
+	err := service.HandleUserMessage(ctx, req)
 	if err == nil {
 		t.Error("Expected error for cancelled context, got nil")
 	}

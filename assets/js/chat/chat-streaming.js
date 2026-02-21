@@ -400,7 +400,6 @@ export function createStreamingMethods() {
             }
 
             this.transitionToolState(toolCallId, TOOL_EVENTS.START, { toolName });
-            this.__updateDerivedState();
         },
 
         __handleToolSuccess(value, state) {
@@ -417,7 +416,6 @@ export function createStreamingMethods() {
             }
 
             this.transitionToolState(toolCallId, TOOL_EVENTS.SUCCESS, { toolName, result });
-            this.__updateDerivedState();
 
             // Notify artifacts panel to refresh
             window.dispatchEvent(new CustomEvent('artifacts-updated'));
@@ -437,7 +435,6 @@ export function createStreamingMethods() {
             }
 
             this.transitionToolState(toolCallId, TOOL_EVENTS.ERROR, { toolName, error });
-            this.__updateDerivedState();
         },
 
         __handleToolNeedsInput(value, state, threadId) {
@@ -461,7 +458,6 @@ export function createStreamingMethods() {
             if (threadId === this.__currentThreadId) {
                 this.showToast(window.i18n.t('Input required'), 'info');
             }
-            this.__updateDerivedState();
         },
 
         __handleToolNeedsAuth(value, state) {
@@ -470,28 +466,24 @@ export function createStreamingMethods() {
 
             this.__ensureToolCallMessage(state, toolCallId, toolName, agentName);
             this.transitionToolState(toolCallId, TOOL_EVENTS.NEEDS_AUTH, { authSpec });
-            this.__updateDerivedState();
         },
 
         __handleInputProvided(value) {
             const { toolCallId, input } = value;
             console.log(`[Tool] Input provided for ${toolCallId}`);
             this.transitionToolState(toolCallId, TOOL_EVENTS.INPUT_PROVIDED, { input });
-            this.__updateDerivedState();
         },
 
         __handleAuthGranted(value) {
             const { toolCallId } = value;
             console.log(`[Tool] Authorization granted for ${toolCallId}`);
             this.transitionToolState(toolCallId, TOOL_EVENTS.AUTH_GRANTED, {});
-            this.__updateDerivedState();
         },
 
         __handleAuthDenied(value) {
             const { toolCallId } = value;
             console.log(`[Tool] Authorization denied for ${toolCallId}`);
             this.transitionToolState(toolCallId, TOOL_EVENTS.AUTH_DENIED, {});
-            this.__updateDerivedState();
         },
 
         __handleToolCancelled(value, state) {
@@ -499,7 +491,6 @@ export function createStreamingMethods() {
             console.log(`[Tool] ${toolName} (${toolCallId}) cancelled`);
 
             this.transitionToolState(toolCallId, TOOL_EVENTS.CANCELLED, { toolName });
-            this.__updateDerivedState();
         },
 
 

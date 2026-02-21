@@ -131,19 +131,43 @@ document.addEventListener('alpine:init', () => {
             },
 
             get awaitingHumanInput() {
-                return this.__currentState.awaitingHumanInput;
+                return this.__awaitingToolCall !== null;
             },
 
             get humanInputQuestion() {
-                return this.__currentState.humanInputQuestion;
+                const tc = this.__awaitingToolCall;
+                return tc?.parsedResult?.question_text ||
+                    tc?.parsedResult?.statement_to_verify || null;
             },
 
             get humanInputSchema() {
-                return this.__currentState.humanInputSchema;
+                const tc = this.__awaitingToolCall;
+                return tc?.parsedResult?.schema || null;
             },
 
             get humanInputToolCallId() {
-                return this.__currentState.humanInputToolCallId;
+                const tc = this.__awaitingToolCall;
+                return tc?.id || null;
+            },
+
+            /**
+             * Find the most recent tool call message that is currently awaiting input.
+             * This is the single source of truth — all human-input getters derive from it.
+             * @private
+             */
+            get __awaitingToolCall() {
+                const state = this.__currentState;
+                const msgs = state?.messages;
+                if (!msgs || msgs.length === 0) return null;
+
+                for (let i = msgs.length - 1; i >= 0; i--) {
+                    const m = msgs[i];
+                    if (m.type === 'tool_call') {
+                        const tc = state.toolCalls?.[m.id];
+                        if (tc?.state === 'awaiting_input') return m;
+                    }
+                }
+                return null;
             },
 
             get hasEvents() {
