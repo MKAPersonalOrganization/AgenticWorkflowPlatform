@@ -114,19 +114,22 @@ export function createInitialState() {
             goals: ''
         },
         profileLoading: false,
+
+        // User Preferences (consolidated)
+        preferences: {
+            markdownEnabled: true,
+            autoScroll: true,
+            theme: localStorage.getItem('theme') || 'system',
+            prefersReducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+            textToSpeechEnabled: false
+        },
+
         toasts: [],
         __toastIdCounter: 0,
 
         // Global Banner
         banner: null, // { id: string, message: string, persistable: boolean }
         bannerDismissedIds: JSON.parse(localStorage.getItem('bannerDismissedIds') || '[]'),
-
-        // Theme management
-        // Theme management
-        theme: localStorage.getItem('theme') || 'system',
-
-        // Accessibility
-        prefersReducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
 
         // Internal tracking
         __watchers: [],
@@ -135,8 +138,6 @@ export function createInitialState() {
         __updatePending: false,
         __srAnnouncer: null,
         __initialized: false,
-
-
 
         // Sidepanel view state
         activeView: 'artifacts',
@@ -151,12 +152,7 @@ export function createInitialState() {
         __connectionConfig: { ...CONNECTION_CONFIG },
 
         // Message parsing state
-        markdownEnabled: true,
-        autoScroll: true,
         scrolledUp: false, // Track if user has scrolled up from bottom
-        textToSpeechEnabled: false,
-
-        // Message queue for offline handling
         __messageQueue: [],
 
         // Sidepanel view state

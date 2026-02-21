@@ -66,7 +66,7 @@ export function createThemeMethods() {
          * updates state only, watcher triggers effects
          */
         toggleTheme() {
-            const currentTheme = this.theme;
+            const currentTheme = this.preferences.theme;
             let nextTheme;
 
             if (currentTheme === 'light') {
@@ -77,7 +77,7 @@ export function createThemeMethods() {
                 nextTheme = 'light';
             }
 
-            this.theme = nextTheme;
+            this.preferences.theme = nextTheme;
         },
 
         /**
@@ -86,7 +86,7 @@ export function createThemeMethods() {
          * @param {'light'|'dark'|'system'} theme - Theme to set
          */
         setTheme(theme) {
-            this.theme = theme;
+            this.preferences.theme = theme;
         },
 
         /**
@@ -94,14 +94,14 @@ export function createThemeMethods() {
          */
         __initTheme() {
             const savedTheme = localStorage.getItem('theme') || 'system';
-            this.theme = savedTheme;
+            this.preferences.theme = savedTheme;
             _applyThemeToDOM(savedTheme);
             this.__themeInitialized = true;
 
             // Listen for system theme changes when in system mode
             const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
             mediaQuery.addEventListener('change', () => {
-                if (this.theme === 'system') {
+                if (this.preferences.theme === 'system') {
                     _applyThemeToDOM('system');
                 }
             });

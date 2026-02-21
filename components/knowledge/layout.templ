@@ -49,15 +49,17 @@ templ knowledgeLayout(props knowledgeLayoutProps) {
 			<script>
 				document.addEventListener('alpine:init', () => {
 					Alpine.data('themeManager', () => ({
-						theme: localStorage.getItem('theme') || 'system',
+						preferences: {
+							theme: localStorage.getItem('theme') || 'system',
+						},
 						toggleTheme() {
 							const themes = ['light', 'dark', 'system'];
-							const currentIndex = themes.indexOf(this.theme);
+							const currentIndex = themes.indexOf(this.preferences.theme);
 							const nextTheme = themes[(currentIndex + 1) % themes.length];
 							this.setTheme(nextTheme);
 						},
 						setTheme(theme) {
-							this.theme = theme;
+							this.preferences.theme = theme;
 							localStorage.setItem('theme', theme);
 							this.applyTheme(theme);
 						},

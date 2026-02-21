@@ -141,7 +141,6 @@ templ ChatInputScreen(user *domain.User) {
 									>
 									<div
 										x-ref="messageList"
-										@scroll="scrolledUp = ($refs.messageList.scrollHeight - $refs.messageList.scrollTop - $refs.messageList.clientHeight) > 100"
 										style="height: 100%; overflow-y: auto; width: 100%; scrollbar-gutter: stable; overflow-anchor: auto !important; scroll-behavior: auto !important;"
 										role="log"
 										aria-live="polite"
