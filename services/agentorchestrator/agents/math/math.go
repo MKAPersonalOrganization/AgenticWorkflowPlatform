@@ -69,7 +69,7 @@ func NewMathInstructorConfig(ctx context.Context, artifactStore artifact.Service
 			),
 		},
 		Capabilities: agent.Capabilities{
-			InputElicitation: true,
+			RequireUserInput: true,
 		},
 	}, nil
 }

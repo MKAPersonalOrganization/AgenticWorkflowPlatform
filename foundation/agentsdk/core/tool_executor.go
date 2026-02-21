@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"time"
 
-
-
 	"school-with-ai/foundation/agent"
 )
 
@@ -119,7 +117,6 @@ func (e *RegistryToolExecutor) Execute(toolCall ToolCall) (ToolExecResult, error
 	args.SessionID = e.threadID
 	args.UserID = e.userID
 
-
 	// Populate legacy fields if requestCtx is available
 	if e.requestCtx != nil {
 		args.Metadata = e.requestCtx.State
@@ -194,6 +191,14 @@ func (e *RegistryToolExecutor) Execute(toolCall ToolCall) (ToolExecResult, error
 		}
 	}
 
+	// If no Command was extracted from content (e.g. tool returned metadata-based
+	// elicitation instead of core.ToolResult), check result.Metadata for elicitation.
+	// This bridges tools in the agent package (which can't import core) that signal
+	// elicitation via Metadata instead of returning a core.ToolResult.
+	if execResult.Command == nil {
+		execResult.Command, execResult.StopIteration = commandFromMetadata(result.Metadata)
+	}
+
 	// Track tool execution if tracer is available
 	if e.tracer != nil {
 		// Extract trace context from ctx if available
@@ -239,6 +244,42 @@ func extractTraceContext(ctx context.Context) (traceID string, parentObservation
 		parentObservationID = pid
 	}
 	return traceID, parentObservationID
+}
+
+// commandFromMetadata extracts a Command from agent.Result.Metadata.
+// This supports tools that cannot import the core package (e.g., foundation/agent)
+// and instead signal elicitation/stop via metadata keys:
+//
+//	"elicitation": map[string]any{"question": "...", "schema": {...}}
+//	"stop_iteration": true
+func commandFromMetadata(metadata map[string]any) (*Command, bool) {
+	if len(metadata) == 0 {
+		return nil, false
+	}
+
+	elicitation, hasElicitation := metadata["elicitation"]
+	stopIter, _ := metadata["stop_iteration"].(bool)
+
+	if !hasElicitation && !stopIter {
+		return nil, false
+	}
+
+	cmd := &Command{
+		StopIteration: stopIter,
+	}
+
+	if em, ok := elicitation.(map[string]any); ok {
+		spec := &ElicitationSpec{}
+		if q, ok := em["question"].(string); ok {
+			spec.Question = q
+		}
+		if s, ok := em["schema"].(map[string]any); ok {
+			spec.Schema = s
+		}
+		cmd.Elicitation = spec
+	}
+
+	return cmd, cmd.StopIteration
 }
 
 // Verify RegistryToolExecutor implements ToolExecutor.

@@ -65,7 +65,7 @@ func NewStatisticsInstructorConfig(ctx context.Context) (agent.Config, error) {
 		SystemPrompt:  prompt,
 		Tools:         []agent.Tool{}, // Tools managed via permissions service
 		Capabilities: agent.Capabilities{
-			InputElicitation: true,
+			RequireUserInput: true,
 		},
 	}, nil
 }
