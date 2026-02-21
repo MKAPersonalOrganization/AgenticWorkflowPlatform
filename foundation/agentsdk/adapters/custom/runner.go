@@ -9,14 +9,13 @@ import (
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/core"
-	"school-with-ai/foundation/agentsdk/core/middleware"
 	"school-with-ai/foundation/agentsdk/engine"
 	"school-with-ai/foundation/agentsdk/internal/llm"
 	"school-with-ai/foundation/logger"
+	memorytools "school-with-ai/plugins/memory"
 	"school-with-ai/services/artifact"
 	"school-with-ai/services/edgequake"
 	"school-with-ai/services/memory"
-	memorytools "school-with-ai/plugins/memory"
 	"school-with-ai/services/permissions"
 	smiddleware "school-with-ai/services/studentprofile/middleware"
 	"school-with-ai/services/toolregistry"
@@ -430,10 +429,16 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 	config.ChatMiddleware = append(config.ChatMiddleware, agentConfig.ChatMiddlewares...)
 	config.FunctionMiddleware = append(config.FunctionMiddleware, agentConfig.FunctionMiddlewares...)
 
-	// Add Capabilities (Middleware)
-	if agentConfig.Capabilities.InputElicitation {
-		elicitMw := middleware.NewElicitationMiddleware()
-		config.AgentMiddleware = append(config.AgentMiddleware, elicitMw.Middleware())
+	// Add Capabilities
+	// RequireUserInput: provides quiz tools via Requirement pattern (replaces old ElicitationMiddleware)
+	if agentConfig.Capabilities.RequireUserInput {
+		req := agent.NewRequireUserInput()
+		// Add quiz tools to the agent's tool set
+		config.Tools = append(config.Tools, req.Tools()...)
+		// Add system prompt instructions about quiz tools
+		config.SystemPrompt += "\n\n" + req.SystemPrompt()
+		// Add requirement to chat middleware for rule evaluation
+		config.ChatMiddleware = append(config.ChatMiddleware, agent.RequirementMiddleware(req))
 	}
 
 	// Inject Memory Context if available and enabled (Tools are now handled via factory/registry)

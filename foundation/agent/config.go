@@ -80,9 +80,10 @@ type Config struct {
 
 // Capabilities defines specific behaviors/features the agent requires.
 type Capabilities struct {
-	// InputElicitation enables the agent to ask the user for missing information
-	// before calling a tool.
-	InputElicitation bool
+	// RequireUserInput enables the agent to request structured user input
+	// (quizzes, true/false questions) during execution.
+	// This uses the Requirement pattern from the beeai-framework.
+	RequireUserInput bool
 
 	// LongTermMemory enables access to the user's long-term memory store.
 	LongTermMemory bool

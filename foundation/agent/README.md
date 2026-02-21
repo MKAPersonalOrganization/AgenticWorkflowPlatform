@@ -159,7 +159,7 @@ config := agent.Config{
     SystemPrompt: "You are a patient math tutor...",
     Tools:       []agent.Tool{calculator, grapher},
     Capabilities: agent.Capabilities{
-        InputElicitation: true,
+        RequireUserInput: true,
         LongTermMemory:   true,
     },
 }
