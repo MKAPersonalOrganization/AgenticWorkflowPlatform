@@ -208,6 +208,8 @@ templ ChatInputScreen(user *domain.User) {
 							</div>
 							@eventlog.EventLog()
 						</main>
+						<!-- Side Panel (inside layout to push content) -->
+						@sidepanel.SidePanel()
 					</div>
 				}
 			</div>
@@ -221,8 +223,6 @@ templ ChatInputScreen(user *domain.User) {
 			</div>
 			<!-- Settings Dialog -->
 			@nav.Settings()
-			<!-- Side Panel -->
-			@sidepanel.SidePanel()
 			<!-- Toast Notifications -->
 			<div
 				class="toast-container"
