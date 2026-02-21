@@ -200,8 +200,11 @@ export function createSessionMethods() {
                 this.__loadMessages(sessionId);
             }
 
-            // Scroll to bottom after switching
-            this.$nextTick(() => this.__scrollToBottom({ behavior: 'auto' }));
+            // Scroll to bottom after switching (multiple attempts for async message load)
+            this.$nextTick(() => this.__scrollToBottom({ behavior: 'auto', force: true }));
+            // Additional deferred scroll to catch async DOM updates
+            setTimeout(() => this.__scrollToBottom({ behavior: 'auto', force: true }), 100);
+            setTimeout(() => this.__scrollToBottom({ behavior: 'auto', force: true }), 300);
         },
 
         /**
