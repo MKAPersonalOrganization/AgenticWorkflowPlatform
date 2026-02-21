@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -9,58 +8,71 @@ import (
 	"school-with-ai/foundation/agent"
 )
 
-// NewStudentProfileInjectorMiddleware creates a middleware that injects the student profile.
-func NewStudentProfileInjectorMiddleware(repo domain.StudentProfileRepository) agent.RequestMiddleware {
-	return agent.RequestMiddlewareFunc(func(ctx context.Context, reqCtx *agent.RequestContext, next agent.RequestNextHandler) error {
-		user := domain.GetUserFromContext(ctx)
-		if user == nil {
-			return next(ctx, reqCtx)
-		}
-
-		profile, err := repo.GetByUserID(ctx, user.ID)
-		if err != nil {
-			// Log error but don't fail the request?
-			// Ideally we should log, but middleware func doesn't take logger directly.
-			// Proceed without profile.
-			return next(ctx, reqCtx)
-		}
-
-		if profile == nil {
-			// Attempt to use User details if profile doesn't exist
-			if user.HasName() {
-				reqCtx.AddSystemPrompt(fmt.Sprintf("# Student Profile\n- **Name:** %s", user.GetFullName()))
+// NewStudentProfileInjectorMiddleware returns a Chat-level Middleware that
+// prepends the student's profile as a system message before each LLM call.
+func NewStudentProfileInjectorMiddleware(repo domain.StudentProfileRepository) agent.Middleware {
+	return func(next agent.Handler) agent.Handler {
+		return agent.HandlerFunc(func(c *agent.Context) error {
+			if !c.IsChat() {
+				return next.Handle(c)
 			}
-			return next(ctx, reqCtx)
-		}
 
-		// Build Markdown representation
-		var sb strings.Builder
-		sb.WriteString("# Student Profile\n")
+			user := domain.GetUserFromContext(c.Context)
+			if user == nil {
+				return next.Handle(c)
+			}
 
-		name := user.GetFullName()
-		if name == "" {
-			name = "Student" // or keep empty
-		}
-		sb.WriteString(fmt.Sprintf("- **Name:** %s\n", name))
+			profile, err := repo.GetByUserID(c.Context, user.ID)
+			if err != nil {
+				// Proceed without profile on error.
+				return next.Handle(c)
+			}
 
-		if profile.LearningStyle != "" {
-			sb.WriteString(fmt.Sprintf("- **Learning Style:** %s\n", profile.LearningStyle))
-		}
+			if profile == nil {
+				// Use basic user details when no profile exists.
+				if user.HasName() {
+					msg := agent.Message{
+						Role:    agent.RoleSystem,
+						Content: []agent.Content{{Type: agent.ContentTypeText, Text: fmt.Sprintf("# Student Profile\n- **Name:** %s", user.GetFullName())}},
+					}
+					c.Chat.Messages = append([]agent.Message{msg}, c.Chat.Messages...)
+				}
+				return next.Handle(c)
+			}
 
-		if len(profile.Struggles) > 0 {
-			sb.WriteString(fmt.Sprintf("- **Current Struggles:** %s\n", strings.Join(profile.Struggles, ", ")))
-		}
+			// Build Markdown representation
+			var sb strings.Builder
+			sb.WriteString("# Student Profile\n")
 
-		if len(profile.Strengths) > 0 {
-			sb.WriteString(fmt.Sprintf("- **Strengths:** %s\n", strings.Join(profile.Strengths, ", ")))
-		}
+			name := user.GetFullName()
+			if name == "" {
+				name = "Student"
+			}
+			sb.WriteString(fmt.Sprintf("- **Name:** %s\n", name))
 
-		if profile.Goals != "" {
-			sb.WriteString(fmt.Sprintf("- **Goals:** %s\n", profile.Goals))
-		}
+			if profile.LearningStyle != "" {
+				sb.WriteString(fmt.Sprintf("- **Learning Style:** %s\n", profile.LearningStyle))
+			}
 
-		reqCtx.AddSystemPrompt(sb.String())
+			if len(profile.Struggles) > 0 {
+				sb.WriteString(fmt.Sprintf("- **Current Struggles:** %s\n", strings.Join(profile.Struggles, ", ")))
+			}
 
-		return next(ctx, reqCtx)
-	})
+			if len(profile.Strengths) > 0 {
+				sb.WriteString(fmt.Sprintf("- **Strengths:** %s\n", strings.Join(profile.Strengths, ", ")))
+			}
+
+			if profile.Goals != "" {
+				sb.WriteString(fmt.Sprintf("- **Goals:** %s\n", profile.Goals))
+			}
+
+			msg := agent.Message{
+				Role:    agent.RoleSystem,
+				Content: []agent.Content{{Type: agent.ContentTypeText, Text: sb.String()}},
+			}
+			c.Chat.Messages = append([]agent.Message{msg}, c.Chat.Messages...)
+
+			return next.Handle(c)
+		})
+	}
 }

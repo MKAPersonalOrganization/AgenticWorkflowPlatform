@@ -54,25 +54,3 @@ func (a *ExecutableToolAdapter) Execute(ctx context.Context, args agent.Argument
 	// If no executor, return error
 	return agent.Result{}, fmt.Errorf("tool %s does not implement Execute method", a.tool.Name())
 }
-
-// =============================================================================
-// Unified Middleware Adapters
-// =============================================================================
-
-// AdaptRequestMiddlewareToUnified converts agent.RequestMiddleware to unified agent.Middleware.
-// This bridges the old request-based middleware pattern to the new unified middleware system.
-func AdaptRequestMiddlewareToUnified(mw agent.RequestMiddleware) agent.Middleware {
-	return func(next agent.Handler) agent.Handler {
-		return agent.HandlerFunc(func(c *agent.Context) error {
-			agentReqCtx := &agent.RequestContext{}
-
-			// Create next handler adapter
-			agentNext := func(ctx context.Context, rc *agent.RequestContext) error {
-				return next.Handle(c)
-			}
-
-			// Execute the request middleware
-			return mw.Process(c.Context, agentReqCtx, agentNext)
-		})
-	}
-}

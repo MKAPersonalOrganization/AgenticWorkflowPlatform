@@ -451,17 +451,15 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 		config.ChatMiddleware = append(config.ChatMiddleware, agent.RequirementMiddleware(agentConfig.Requirements...))
 	}
 
-	// Inject Memory Context if available and enabled (Tools are now handled via factory/registry)
+	// Inject Memory Context as a Chat-level middleware (runs before each LLM call)
 	if p.artifactStore != nil && p.enableMemory {
 		memoryService := memory.NewArtifactMemoryService(p.artifactStore)
-		memoryMiddleware := memorytools.NewMemoryInjectorMiddleware(memoryService)
-		config.AgentMiddleware = append(config.AgentMiddleware, AdaptRequestMiddlewareToUnified(memoryMiddleware))
+		config.ChatMiddleware = append(config.ChatMiddleware, memorytools.NewMemoryInjectorMiddleware(memoryService))
 	}
 
-	// Inject Student Profile Middleware
+	// Inject Student Profile as a Chat-level middleware
 	if p.profileRepo != nil {
-		profileMiddleware := smiddleware.NewStudentProfileInjectorMiddleware(p.profileRepo)
-		config.AgentMiddleware = append(config.AgentMiddleware, AdaptRequestMiddlewareToUnified(profileMiddleware))
+		config.ChatMiddleware = append(config.ChatMiddleware, smiddleware.NewStudentProfileInjectorMiddleware(p.profileRepo))
 	}
 
 	return config, nil

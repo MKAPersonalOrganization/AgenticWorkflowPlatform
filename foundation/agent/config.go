@@ -101,18 +101,6 @@ type Config struct {
 type Capabilities struct {
 	// LongTermMemory enables access to the user's long-term memory store.
 	LongTermMemory bool
-
-	// StudentProfile enables access to the student's learning profile.
-	StudentProfile bool
-
-	// CodeExecution enables the agent to execute code.
-	CodeExecution bool
-
-	// WebSearch enables the agent to search the web.
-	WebSearch bool
-
-	// Artifacts enables the agent to save and load artifacts.
-	Artifacts bool
 }
 
 // DefaultConfig returns a Config with sensible defaults.
