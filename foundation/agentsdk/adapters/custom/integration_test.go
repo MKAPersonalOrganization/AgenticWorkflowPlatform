@@ -10,6 +10,7 @@ import (
 	permissions_mocks "school-with-ai/services/permissions/mocks"
 	"school-with-ai/services/toolregistry"
 	toolregistry_mocks "school-with-ai/services/toolregistry/mocks"
+	"school-with-ai/plugins/calculator"
 )
 
 // TestToolFactoryIntegration tests that the tool factory can properly create executable tools
@@ -21,6 +22,9 @@ func TestToolFactoryIntegration(t *testing.T) {
 	// Create in-memory repositories
 	permissionsRepo := permissions_mocks.NewInMemoryRepository()
 	toolRegistryRepo := toolregistry_mocks.NewInMemoryRepository()
+
+	// Register required plugins for the test
+	toolregistry.RegisterPlugin(&calculator.Provider{})
 
 	// Create services
 	permissionsService := permissions.NewService(log, permissionsRepo)

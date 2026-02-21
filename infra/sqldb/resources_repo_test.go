@@ -18,9 +18,14 @@ func TestPostgresResourcesRepository(t *testing.T) {
 		host = "localhost:5435" // default from .env
 	}
 
+	password := os.Getenv("SCHOOL_DB_PASSWORD")
+	if password == "" {
+		password = "dev-password"
+	}
+
 	cfg := Config{
 		User:         "schoolai",
-		Password:     "dev-password",
+		Password:     password,
 		Host:         host,
 		Name:         "projections",
 		DisableTLS:   true,
@@ -30,9 +35,13 @@ func TestPostgresResourcesRepository(t *testing.T) {
 
 	db, err := Open(cfg)
 	if err != nil {
-		t.Skipf("DB not reachable, skipping integration test: %v", err)
+		t.Skipf("DB connection failed, skipping integration test: %v", err)
 	}
 	defer db.Close()
+
+	if err := db.Ping(); err != nil {
+		t.Skipf("DB not reachable, skipping integration test: %v", err)
+	}
 
 	repo := NewPostgresResourcesRepository(db)
 	ctx := context.Background()
@@ -97,9 +106,14 @@ func TestPostgresResourcesRepository_Public(t *testing.T) {
 		host = "localhost:5435"
 	}
 
+	password := os.Getenv("SCHOOL_DB_PASSWORD")
+	if password == "" {
+		password = "dev-password"
+	}
+
 	cfg := Config{
 		User:       "schoolai",
-		Password:   "dev-password",
+		Password:   password,
 		Host:       host,
 		Name:       "projections",
 		DisableTLS: true,
@@ -107,9 +121,13 @@ func TestPostgresResourcesRepository_Public(t *testing.T) {
 
 	db, err := Open(cfg)
 	if err != nil {
-		t.Skipf("DB not reachable, skipping integration test: %v", err)
+		t.Skipf("DB connection failed, skipping integration test: %v", err)
 	}
 	defer db.Close()
+
+	if err := db.Ping(); err != nil {
+		t.Skipf("DB not reachable, skipping integration test: %v", err)
+	}
 
 	repo := NewPostgresResourcesRepository(db)
 	ctx := context.Background()

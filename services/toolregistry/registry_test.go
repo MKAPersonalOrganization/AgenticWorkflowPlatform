@@ -8,11 +8,15 @@ import (
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/toolregistry"
 	"school-with-ai/services/toolregistry/mocks"
+	"school-with-ai/plugins/calculator"
 )
 
 func TestToolRegistry(t *testing.T) {
 	// Create logger for tests
 	log := logger.NewText(os.Stdout, logger.LevelInfo, "TEST", nil)
+
+	// Register required plugins for the test
+	toolregistry.RegisterPlugin(&calculator.Provider{})
 
 	// Create registry with in-memory repository
 	registry := toolregistry.NewRegistry(log, mocks.NewInMemoryRepository())
