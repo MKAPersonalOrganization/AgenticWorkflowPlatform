@@ -58,12 +58,10 @@ import (
 	"school-with-ai/plugins/knowledgebase"
 	"school-with-ai/plugins/library"
 	memoryplugin "school-with-ai/plugins/memory"
-	statisticsplugin "school-with-ai/plugins/statistics"
 	"school-with-ai/plugins/visualization"
 	"school-with-ai/services/workspacepermissions"
 
 	"school-with-ai/services/agentorchestrator/agents/math"
-	"school-with-ai/services/agentorchestrator/agents/statistics"
 
 	aguihandlers "school-with-ai/handlers/agui"
 	aiSettingsHandlers "school-with-ai/handlers/aisettings"
@@ -369,7 +367,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 	toolregistry.RegisterPlugin(&knowledgebase.Provider{})
 	toolregistry.RegisterPlugin(&library.Provider{})
 	toolregistry.RegisterPlugin(&memoryplugin.Provider{})
-	toolregistry.RegisterPlugin(&statisticsplugin.Provider{})
 	toolregistry.RegisterPlugin(&visualization.Provider{})
 	if err := toolRegistry.Initialize(ctx); err != nil {
 		return fmt.Errorf("failed to initialize tool registry: %w", err)
@@ -407,22 +404,11 @@ func run(ctx context.Context, log *logger.Logger) error {
 		return fmt.Errorf("creating math instructor agent: %w", err)
 	}
 
-	statsConfig, err := statistics.NewStatisticsInstructorConfig(ctx)
-	if err != nil {
-		return fmt.Errorf("creating statistics instructor config: %w", err)
-	}
-	statsConfig.AgentMiddlewares = append(statsConfig.AgentMiddlewares, agentLoggingMw)
-	statsConfig.ChatMiddlewares = append(statsConfig.ChatMiddlewares, chatLoggingMw)
-	statsConfig.FunctionMiddlewares = append(statsConfig.FunctionMiddlewares, toolLoggingMw)
-	statsInstructor, err := custom.NewAgent(statsConfig)
-	if err != nil {
-		return fmt.Errorf("creating statistics instructor agent: %w", err)
-	}
+
 
 	// Create a simple map of available agents
 	availableAgents := map[string]agent.Agent{
-		"math-instructor":       mathInstructor,
-		"statistics-instructor": statsInstructor,
+		"math-instructor": mathInstructor,
 	}
 	agentProvider := custom.NewMapAgentProvider(availableAgents)
 

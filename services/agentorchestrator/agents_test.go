@@ -6,7 +6,6 @@ import (
 
 	"school-with-ai/foundation/agent"
 	"school-with-ai/services/agentorchestrator/agents/math"
-	"school-with-ai/services/agentorchestrator/agents/statistics"
 )
 
 func TestInstructorConfigurations(t *testing.T) {
@@ -22,14 +21,7 @@ func TestInstructorConfigurations(t *testing.T) {
 		t.Errorf("Expected math name 'math-instructor', got '%s'", mathConfig.Name)
 	}
 
-	// Statistics
-	statisticsConfig, err := statistics.NewStatisticsInstructorConfig(ctx)
-	if err != nil {
-		t.Fatalf("Failed to create statistics instructor config: %v", err)
-	}
-	if statisticsConfig.Name != "statistics-instructor" {
-		t.Errorf("Expected statistics name 'statistics-instructor', got '%s'", statisticsConfig.Name)
-	}
+
 }
 
 // mockTool implements the Tool interface simply for the test
