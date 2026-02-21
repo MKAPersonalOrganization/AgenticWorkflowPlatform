@@ -46,7 +46,7 @@ jobs:
         run: go vet ./...
 
       - name: Run tests
-        run: go test -v -race -coverprofile=coverage.out $(go list ./... | grep -v '/arch$')
+        run: go test -v -race -coverprofile=coverage.out ./...
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
@@ -91,39 +91,11 @@ jobs:
           args: --timeout=5m
           only-new-issues: true
 
-  arch-tests:
-    name: Architecture Tests
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.24.2"
-          cache: true
-
-      - name: Install templ
-        run: go install github.com/a-h/templ/cmd/templ@latest
-
-      - name: Generate templ files
-        run: templ generate
-
-      - name: Install dependencies
-        run: go mod download
-
-      - name: Verify dependencies
-        run: go mod verify
-
-      - name: Run architecture tests
-        run: go test -v ./arch/...
 
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [test, lint, arch-tests]
+    needs: [test, lint]
 
     steps:
       - name: Checkout code

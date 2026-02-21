@@ -653,7 +653,11 @@ func (s *Service) handleError(resp *http.Response) error {
 		return ErrConflict
 	}
 	if resp.StatusCode == http.StatusNotFound {
-		return fmt.Errorf("resource not found")
+		errStr := string(body)
+		if errStr == "" {
+			errStr = "resource not found"
+		}
+		return fmt.Errorf("%s", errStr)
 	}
 	return fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(body))
 }
