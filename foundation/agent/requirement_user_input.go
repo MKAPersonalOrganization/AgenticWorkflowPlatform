@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	"school-with-ai/foundation/agentsdk/io"
 )
 
 // RequireUserInput is a declarative Requirement that enables the agent
@@ -138,21 +140,14 @@ func (t *QuizMultipleChoiceTool) Execute(ctx context.Context, args Arguments) (R
 		"enum": options,
 	}
 
-	// Return a special result format that the adapter layer recognizes
-	// and converts to the engine's Command{Elicitation} format.
-	// The adapter handles converting agent.Result → core.ToolResult with Command.
-	return Result{
-		Content: []any{map[string]any{
-			"status": fmt.Sprintf("Requesting input: %s", question),
-		}},
-		Metadata: map[string]any{
-			"elicitation": map[string]any{
-				"question": question,
-				"schema":   schema,
-			},
-			"stop_iteration": true,
-		},
-	}, nil
+	// Request user input via IO handler.
+	// With PauseHandler (web): returns ErrInputRequired → engine pauses
+	// With StdinHandler (CLI): blocks until user responds
+	response, err := io.Read(ctx, question, schema)
+	if err != nil {
+		return Result{}, err // sentinel error handled by engine
+	}
+	return TextResult(response), nil
 }
 
 // QuizTrueFalseTool presents a true/false question to the user.
@@ -207,18 +202,12 @@ func (t *QuizTrueFalseTool) Execute(ctx context.Context, args Arguments) (Result
 		"type": "true_false",
 	}
 
-	return Result{
-		Content: []any{map[string]any{
-			"status": fmt.Sprintf("Requesting input: %s", question),
-		}},
-		Metadata: map[string]any{
-			"elicitation": map[string]any{
-				"question": question,
-				"schema":   schema,
-			},
-			"stop_iteration": true,
-		},
-	}, nil
+	// Request user input via IO handler.
+	response, err := io.Read(ctx, question, schema)
+	if err != nil {
+		return Result{}, err // sentinel error handled by engine
+	}
+	return TextResult(response), nil
 }
 
 // ==========================================================================

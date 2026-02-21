@@ -3,11 +3,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
-	"errors"
 )
-
-// ErrConfirmationRequired is returned when a tool requires user confirmation.
-var ErrConfirmationRequired = errors.New("tool requires user confirmation")
 
 // Schema describes the structure of data for tool parameters or structured output.
 type Schema struct {
@@ -74,7 +70,7 @@ type Arguments struct {
 	Raw    json.RawMessage // Original JSON
 	CallID string          // Unique ID for this invocation
 
-	// Legacy fields for backward compatibility with ToolContext
+	// Context fields populated by the executor.
 	SessionID string
 	UserID    string
 	Artifacts Artifacts
@@ -123,73 +119,6 @@ type LongRunning interface {
 	Tool
 	// IsLongRunning returns true if this tool runs asynchronously.
 	IsLongRunning() bool
-}
-
-// Confirmable tools require user confirmation before execution.
-type Confirmable interface {
-	Tool
-	// RequiresConfirmation returns true if user must confirm.
-	RequiresConfirmation(ctx context.Context, args Arguments) bool
-	// ConfirmationMessage returns the message to show the user.
-	ConfirmationMessage(args Arguments) string
-}
-
-// ToolContext provides execution context for tools.
-type ToolContext struct {
-	// Context is the Go context for cancellation and deadlines.
-	context.Context
-
-	// SessionID identifies the current conversation.
-	SessionID string
-
-	// UserID identifies the user.
-	UserID string
-
-	// ToolCallID uniquely identifies this tool invocation.
-	ToolCallID string
-
-	// Arguments is the JSON-encoded tool input.
-	Arguments string
-
-	// Artifacts provides access to artifact storage (optional).
-	Artifacts Artifacts
-
-	// Memory provides access to long-term memory (optional).
-	Memory Memory
-
-	// Actions allows the tool to request state changes.
-	// Keys are action names, values are action data.
-	Actions map[string]any
-
-	// Confirmation contains user confirmation if this is a HITL tool.
-	// nil if no confirmation was requested or provided.
-	Confirmation *ToolConfirmation
-
-	// Metadata for framework-specific data.
-	Metadata map[string]any
-}
-
-// ToolConfirmation represents user confirmation for a tool execution.
-type ToolConfirmation struct {
-	// Approved indicates whether the user approved the action.
-	Approved bool
-
-	// Hint is a human-readable explanation of what needs confirmation.
-	Hint string
-
-	// Payload contains the action details that were confirmed/rejected.
-	Payload any
-}
-
-// RequestConfirmation creates a ToolResult that requests user confirmation.
-// The tool execution will pause until the user responds.
-func (tc *ToolContext) RequestConfirmation(hint string, payload any) *ToolResult {
-	return &ToolResult{
-		ToolCallID:           tc.ToolCallID,
-		RequiresConfirmation: true,
-		ConfirmationHint:     hint,
-		ConfirmationPayload:  payload,
-	}
 }
 
 // Toolset groups related tools together.

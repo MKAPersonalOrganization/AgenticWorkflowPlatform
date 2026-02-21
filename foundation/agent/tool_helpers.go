@@ -36,7 +36,6 @@ func UnmarshalToolArgs(args any, target any) error {
 }
 
 // SchemaToMap converts a Schema to a map[string]any representation.
-// This is useful for adapters that need the legacy format.
 func SchemaToMap(s *Schema) map[string]any {
 	if s == nil {
 		return nil
@@ -79,7 +78,6 @@ func SchemaToMap(s *Schema) map[string]any {
 }
 
 // SchemaFromMap creates a Schema from a map[string]any representation.
-// This is useful for converting legacy tool definitions to the new format.
 func SchemaFromMap(m map[string]any) *Schema {
 	if m == nil {
 		return nil

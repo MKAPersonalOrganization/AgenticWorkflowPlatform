@@ -11,6 +11,7 @@ import (
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/engine"
 	"school-with-ai/foundation/agentsdk/internal/llm"
+	agentio "school-with-ai/foundation/agentsdk/io"
 	"school-with-ai/foundation/logger"
 	memorytools "school-with-ai/plugins/memory"
 	"school-with-ai/services/artifact"
@@ -245,12 +246,18 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 			ctx = context.WithValue(ctx, domain.UserContextKey, &domain.User{ID: runCtx.UserID})
 		}
 
+		// 6. Inject IO PauseHandler so tools can request user input/auth.
+		// When a tool calls io.Read() or io.Confirm(), the PauseHandler returns
+		// sentinel errors (ErrInputRequired / ErrAuthRequired) that cause the
+		// engine to pause and emit ToolNeedsInput / ToolNeedsAuth events.
+		ctx = agentio.WithHandler(ctx, agentio.NewPauseHandler())
+
 		coreEvents := eng.Run(ctx, agentName, runCtx)
 
 		// Convert core events to domain events
 		engineDomainEvents := r.pipeline.ProcessEventStream(ctx, coreEvents)
 
-		// 6. Yield all raw domain events to caller
+		// 7. Yield all raw domain events to caller
 		for de, err := range engineDomainEvents {
 			if !yield(de, err) {
 				return
@@ -443,6 +450,15 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 	for _, req := range agentConfig.Requirements {
 		if pp, ok := req.(agent.PromptProvider); ok {
 			config.SystemPrompt += "\n\n" + pp.PromptAddition()
+		}
+	}
+
+	// Auto-collect FunctionMiddleware from Requirements that implement FunctionMiddlewareProvider.
+	// This enables requirements like AskPermissionRequirement to inject tool-execution
+	// middleware without users manually adding it to FunctionMiddlewares.
+	for _, req := range agentConfig.Requirements {
+		if fmp, ok := req.(agent.FunctionMiddlewareProvider); ok {
+			config.FunctionMiddleware = append(config.FunctionMiddleware, fmp.FunctionMiddleware())
 		}
 	}
 
