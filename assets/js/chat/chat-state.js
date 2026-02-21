@@ -153,6 +153,8 @@ export function createInitialState() {
 
         // Message parsing state
         scrolledUp: false, // Track if user has scrolled up from bottom
+        __abortScroll: false, // User scrolled up during streaming — stop auto-scroll
+        __scrollTimeouts: [], // Track deferred scroll setTimeout handles for cleanup
         __messageQueue: [],
 
         // Sidepanel view state
