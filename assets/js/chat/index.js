@@ -286,12 +286,16 @@ document.addEventListener('alpine:init', () => {
                     const container = this.$refs?.messageList;
                     if (container) {
                         const throttledMutationScroll = throttle(() => {
-                            if (this.__abortScroll && this.isStreaming) return;
+                            // During streaming, the streaming handler is the single scroll source.
+                            // Letting MutationObserver also scroll causes competing scrollIntoView
+                            // calls that produce visible flickering/jitter.
+                            if (this.isStreaming) return;
+                            if (this.__abortScroll) return;
                             const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200;
-                            if (isNearBottom || this.isStreaming) {
+                            if (isNearBottom) {
                                 this.__scrollToBottom({ behavior: 'auto' });
                             }
-                        }, 100);
+                        }, 150);
 
                         this.__mutationObserver = new MutationObserver(() => {
                             throttledMutationScroll();
@@ -354,18 +358,19 @@ document.addEventListener('alpine:init', () => {
                 // Initialize accessibility
                 this.__initScreenReaderAnnouncer();
 
-                // Initialize throttled scroll — use instant behavior during streaming
-                // (LibreChat uses instant/auto during streaming, smooth only for user clicks)
+                // Initialize throttled scroll for streaming — uses direct scrollTop
+                // assignment (no scrollIntoView) to avoid animation jitter.
+                // 150ms matches LibreChat's streaming scroll cadence.
                 this.__scrollToBottomThrottled = throttle(
-                    () => this.__scrollToBottom({ behavior: 'instant' }),
-                    100
+                    () => this.__scrollToBottomStreaming(),
+                    150
                 );
 
                 // Set up watchers
                 const unwatchMessages = this.$watch('messages', (newMessages, oldMessages) => {
-                    if (this.isStreaming && !this.__abortScroll) {
-                        this.__scrollToBottomThrottled();
-                    } else if (!this.isStreaming) {
+                    // During streaming, TEXT_MESSAGE_CONTENT handler drives scroll via
+                    // __scrollToBottomThrottled. Don't duplicate it here.
+                    if (!this.isStreaming) {
                         // Also scroll if near bottom even when not streaming (for late updates or historical load)
                         this.$nextTick(() => {
                             const container = this.$refs?.messageList;

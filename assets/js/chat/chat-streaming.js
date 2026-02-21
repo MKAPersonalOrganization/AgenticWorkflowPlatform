@@ -537,7 +537,7 @@ export function createStreamingMethods() {
             if (threadId === this.__currentThreadId) {
                 // Reset abort flag at the start of a new streaming message
                 this.__abortScroll = false;
-                this.$nextTick(() => this.__scrollToBottom({ behavior: 'instant' }));
+                this.$nextTick(() => this.__scrollToBottomStreaming());
             }
         },
 
