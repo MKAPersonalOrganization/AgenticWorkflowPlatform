@@ -1,55 +1,37 @@
 package memory
 
 import (
-	"bytes"
 	"context"
-	"io"
 	"strings"
 	"testing"
 
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
-	"school-with-ai/services/artifact"
 )
 
-// MockArtifactService for testing
-type MockArtifactService struct {
-	files map[string][]byte
+// MockMemoryService for testing
+type MockMemoryService struct {
+	memories map[string]string
 }
 
-func NewMockArtifactService() *MockArtifactService {
-	return &MockArtifactService{files: make(map[string][]byte)}
+func NewMockMemoryService() *MockMemoryService {
+	return &MockMemoryService{memories: make(map[string]string)}
 }
 
-func (m *MockArtifactService) Save(ctx context.Context, userID, sessionID, fileName string, content io.Reader) (int64, error) {
-	data, _ := io.ReadAll(content)
-	key := userID + "/" + sessionID + "/" + fileName
-	m.files[key] = data
-	return int64(len(data)), nil
-}
-
-func (m *MockArtifactService) Load(ctx context.Context, userID, sessionID, fileName string) (io.ReadCloser, error) {
-	key := userID + "/" + sessionID + "/" + fileName
-	data, ok := m.files[key]
-	if !ok {
-		return nil, artifact.ErrNotFound
-	}
-	return io.NopCloser(bytes.NewReader(data)), nil
-}
-
-func (m *MockArtifactService) List(ctx context.Context, userID, sessionID string) ([]string, error) {
-	return nil, nil
-}
-
-func (m *MockArtifactService) Delete(ctx context.Context, userID, sessionID, fileName string) error {
+func (m *MockMemoryService) Save(ctx context.Context, userID, content string) error {
+	m.memories[userID] = content
 	return nil
+}
+
+func (m *MockMemoryService) Load(ctx context.Context, userID string) (string, error) {
+	return m.memories[userID], nil
 }
 
 func TestMemoryTool_Integration(t *testing.T) {
 	t.Parallel()
-	store := NewMockArtifactService()
-	saveTool := NewMemoryTool(store)
-	forgetTool := NewForgetMemoryTool(store)
+	service := NewMockMemoryService()
+	saveTool := NewMemoryTool(service)
+	forgetTool := NewForgetMemoryTool(service)
 
 	// Create context with user
 	user := &domain.User{ID: "test-user-123"}
@@ -67,7 +49,7 @@ func TestMemoryTool_Integration(t *testing.T) {
 	}
 
 	// 2. Verify saved
-	content, _ := saveTool.mgr.load(ctx)
+	content, _ := saveTool.service.Load(ctx, user.ID)
 	if !strings.Contains(content, "- My favorite color is blue.") {
 		t.Error("Fact not saved")
 	}
@@ -83,7 +65,7 @@ func TestMemoryTool_Integration(t *testing.T) {
 	}
 
 	// 4. Verify forgotten
-	content, _ = saveTool.mgr.load(ctx)
+	content, _ = saveTool.service.Load(ctx, user.ID)
 	if strings.Contains(content, "blue") {
 		t.Error("Fact not forgotten")
 	}
