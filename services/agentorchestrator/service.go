@@ -240,7 +240,7 @@ func (s *Service) GetThreadManagement() *threadmgmt.Manager {
 
 // RunExecutionRequest contains parameters for executing a run.
 type RunExecutionRequest struct {
-	SessionID   string // ID of the conversation thread
+	ThreadID    string // ID of the conversation thread
 	UserID      string // User making the request
 	AgentName   string // Agent to execute
 	Message     string // User message content
@@ -259,7 +259,7 @@ func (s *Service) ExecuteRun(
 	return func(yield func(domain.Event, error) bool) {
 		// 1. Emit RunStarted
 		runStartedEvent := &domain.RunStarted{
-			ThreadID:    req.SessionID,
+			ThreadID:    req.ThreadID,
 			RunID:       req.MessageID,
 			ParentRunID: req.ParentRunID,
 			Input:       req.Message,
@@ -283,7 +283,7 @@ func (s *Service) ExecuteRun(
 		// 2. If this message is an answer to a tool elicitation, emit InputProvided
 		if req.ToolCallID != "" {
 			inputProvidedEvent := &domain.InputProvided{
-				ThreadID:   req.SessionID,
+				ThreadID:   req.ThreadID,
 				MessageID:  req.MessageID,
 				ToolCallID: req.ToolCallID,
 				Input:      req.Message,
@@ -308,7 +308,7 @@ func (s *Service) ExecuteRun(
 
 		// 3. Call the framework runner to get events
 		runnerReq := &agent.RunRequest{
-			SessionID: req.SessionID,
+			SessionID: req.ThreadID,
 			UserID:    req.UserID,
 			AgentName: req.AgentName,
 			Message: &agent.Message{
@@ -338,7 +338,7 @@ func (s *Service) ExecuteRun(
 		// 6. Emit RunError if execution failed, otherwise emit RunFinished
 		if executionError != nil {
 			runErrorEvent := &domain.RunError{
-				ThreadID:  req.SessionID,
+				ThreadID:  req.ThreadID,
 				RunID:     req.MessageID,
 				Message:   executionError.Error(),
 				Code:      "RUN_ERROR",
@@ -366,7 +366,7 @@ func (s *Service) ExecuteRun(
 
 		// 7. Emit RunFinished on success
 		runFinishedEvent := &domain.RunFinished{
-			ThreadID:  req.SessionID,
+			ThreadID:  req.ThreadID,
 			RunID:     req.MessageID,
 			Result:    nil, // TODO: Capture result from framework events if available
 			Timestamp: time.Now(),

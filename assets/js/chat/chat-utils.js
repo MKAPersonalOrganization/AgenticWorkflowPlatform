@@ -190,8 +190,10 @@ export function normalizeElicitation(question, schema) {
 }
 
 /**
- * Enrich a tool result message or object with parsed content
- * Centralizes logic for tools that require structured result data (like browse_library)
+ * Enrich a tool result message or object with parsed content.
+ * This is the SINGLE place where parsedResult is set during message hydration.
+ * For elicitation tools, parsedResult comes from the elicitation data (not the
+ * raw result text). For standard tools, parsedResult is the JSON-parsed result.
  * @param {Object} toolResult - The tool result object/message
  * @param {string} content - The JSON string content
  * @returns {Object} The enriched tool result object
@@ -202,11 +204,13 @@ export function enrichToolResult(toolResult, content) {
     // Always set the raw result
     toolResult.result = content;
 
-    // Only parse into parsedResult if it wasn't already set by a component's
-    // onMap handler (e.g. elicitation tools set parsedResult from elicitation
-    // data — overwriting it with safeParseJSON of the raw "Requesting input: …"
-    // placeholder would destroy the schema needed by isElicitationTool()).
-    if (!toolResult.parsedResult) {
+    // For elicitation tools, parsedResult comes from elicitation data
+    if (toolResult.elicitation) {
+        toolResult.parsedResult = normalizeElicitation(
+            toolResult.elicitation.question,
+            toolResult.elicitation.schema
+        );
+    } else {
         toolResult.parsedResult = safeParseJSON(content);
     }
 

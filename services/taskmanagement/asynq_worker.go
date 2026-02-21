@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"school-with-ai/foundation/logger"
+	"school-with-ai/services/agentorchestrator"
 
 	"github.com/hibiken/asynq"
 )
@@ -93,15 +94,15 @@ func (w *ChatWorker) processChat(ctx context.Context, payload ProcessChatPayload
 		return fmt.Errorf("task cancelled: %w", ctx.Err())
 	}
 
-	// Delegate to orchestration service
-	params := UserMessageParams{
+	// Map directly to RunExecutionRequest (no intermediate struct)
+	req := agentorchestrator.RunExecutionRequest{
 		ThreadID:   payload.ThreadID,
-		MessageID:  payload.MessageID,
-		Content:    payload.Message,
 		UserID:     payload.UserID,
 		AgentName:  payload.AgentName,
+		Message:    payload.Message,
+		MessageID:  payload.MessageID,
 		ToolCallID: payload.ToolCallID,
 	}
 
-	return w.orchestrationService.HandleUserMessage(ctx, params)
+	return w.orchestrationService.HandleUserMessage(ctx, req)
 }

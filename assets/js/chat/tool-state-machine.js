@@ -37,24 +37,28 @@ export const TOOL_EVENTS = {
 import { createMachine, assign } from 'xstate';
 
 /**
- * Creates an XState machine definition for a tool call
+ * Creates an XState machine definition for a tool call.
+ * Supports direct hydration: pass initialContext.initialState to start the
+ * machine in a specific state (e.g. 'awaiting_input') with the provided
+ * context, instead of replaying transitions from idle.
  * @param {string} toolCallId - ID of the tool call
- * @param {Object} initialContext - Initial context/data
+ * @param {Object} initialContext - Initial context/data (may include initialState)
  * @returns {Object} XState machine definition
  */
 export function createToolStateMachine(toolCallId, initialContext = {}) {
+    const { initialState, ...contextData } = initialContext;
+
     return createMachine({
         id: `tool-${toolCallId}`,
-        initial: TOOL_STATES.IDLE,
+        initial: initialState || TOOL_STATES.IDLE,
         context: {
             toolCallId,
-            toolName: initialContext.toolName || '',
-            result: null,
-            error: null,
-            elicitation: null,
-            authSpec: null,
-            userAnswer: null,
-            ...initialContext
+            toolName: contextData.toolName || '',
+            result: contextData.result || null,
+            error: contextData.error || null,
+            elicitation: contextData.elicitation || null,
+            authSpec: contextData.authSpec || null,
+            userAnswer: contextData.userAnswer || null,
         },
         states: {
             [TOOL_STATES.IDLE]: {

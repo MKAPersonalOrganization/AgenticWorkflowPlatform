@@ -292,3 +292,24 @@ CREATE INDEX IF NOT EXISTS idx_analytics_events_created ON analytics_events(crea
 CREATE INDEX IF NOT EXISTS idx_analytics_events_tool ON analytics_events(tool_name);
 CREATE INDEX IF NOT EXISTS idx_analytics_events_agent ON analytics_events(agent_name);
 CREATE INDEX IF NOT EXISTS idx_analytics_events_tool_created ON analytics_events(tool_name, created_at);
+
+-- Version: 1.22
+-- Description: Create dedicated agui_tool_states table for tool lifecycle tracking.
+-- Replaces the JSONB append-only array in agui_messages.metadata->'toolStates'.
+-- Each apply* handler becomes a simple UPSERT by tool_call_id.
+CREATE TABLE IF NOT EXISTS agui_tool_states (
+    tool_call_id  TEXT PRIMARY KEY,
+    thread_id     TEXT NOT NULL REFERENCES agui_threads(thread_id) ON DELETE CASCADE,
+    state         TEXT NOT NULL DEFAULT 'executing',
+    tool_name     TEXT,
+    agent_name    TEXT,
+    arguments     TEXT,
+    elicitation   JSONB,
+    auth_spec     JSONB,
+    input         TEXT,
+    result        TEXT,
+    error         TEXT,
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_agui_tool_states_thread ON agui_tool_states(thread_id);

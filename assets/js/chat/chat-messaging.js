@@ -10,7 +10,7 @@
 
 import { createUserMessage, safeParseJSON, generateInteractionId, enrichToolResult } from './chat-utils.js';
 import { TOOL_EVENTS, TOOL_STATES } from './tool-state-machine.js';
-import { getToolConfig } from './chat-tool-registry.js';
+import { syncToolState } from './chat-tool-registry.js';
 /**
  * Create messaging methods mixin
  * @returns {Object} Methods for message handling
@@ -69,7 +69,7 @@ export function createMessagingMethods() {
                 state.currentInteractionId = interactionId;
 
                 // Capture toolCallId before clearing state (for elicitation correlation)
-                const toolCallId = state.humanInputToolCallId || null;
+                const toolCallId = this.humanInputToolCallId || null;
 
                 // Immediately transition the tool's state machine so the quiz
                 // buttons hide without waiting for the backend SSE round-trip.
@@ -90,9 +90,6 @@ export function createMessagingMethods() {
                     this.dismissToast(state.humanInputToastId);
                 }
                 state.humanInputToastId = null;
-
-                // Update derived state (will clear waiting status since calling push() added a user message)
-                this.__updateDerivedState();
 
                 // Focus management (back to main input)
                 this.$nextTick(() => {
@@ -159,9 +156,6 @@ export function createMessagingMethods() {
                         };
                         console.log('Token usage loaded from history:', state.tokenUsage);
                     }
-
-                    // Update derived state based on loaded messages
-                    this.__updateDerivedState();
 
                     // Scroll to bottom after loading
                     if (id === this.__currentThreadId) {
@@ -294,10 +288,6 @@ export function createMessagingMethods() {
                 if (stateObj.elicitation) elicitation = stateObj.elicitation;
             }
 
-            // Component-owned mapping (React-like)
-            const config = getToolConfig(toolName, elicitation?.schema?.type);
-            const mappedData = config.onMap(toolCall, toolResult, elicitation);
-
             return {
                 id: toolCall.id,
                 type: 'tool_call',
@@ -307,14 +297,15 @@ export function createMessagingMethods() {
                 result: toolResult,
                 status: status,
                 agentName: agent,
+                elicitation: elicitation || null,
                 timestamp: toolCall.timestamp || new Date().toISOString(),
-                ...mappedData
             };
         },
 
         /**
-         * State Synchronization Phase (React-like design)
-         * Decouples side effects (XState transitions) from data mapping.
+         * State Hydration Phase
+         * Creates XState machines directly in their target states, avoiding
+         * replay transitions. Uses the dedicated syncToolState function.
          * @param {Array} uiMessages - Converted UI messages
          * @param {Object} toolStatesMap - Map of tool states by toolCallId
          * @param {string} threadId - Thread ID
@@ -329,20 +320,11 @@ export function createMessagingMethods() {
                 const status = msg.status;
                 const toolResult = msg.result;
                 const elicitation = toolStatesMap[toolId]?.elicitation;
-
-                // Component-owned synchronization (React-like)
-                const config = getToolConfig(toolName, elicitation?.schema?.type);
-                // Extract userAnswer from persistent tool state (AGUI projection stores it as 'input')
                 const userAnswer = toolStatesMap[toolId]?.input || null;
 
-                config.onSync(toolId, threadId, {
-                    toolName,
-                    status,
-                    toolResult,
-                    elicitation,
-                    userAnswer,
-                    TOOL_EVENTS
-                }, (id, ev, pay, tid) => this.transitionToolState(id, ev, pay, tid));
+                syncToolState(toolId, threadId, {
+                    toolName, status, toolResult, elicitation, userAnswer
+                }, (id, state, ctx, tid) => this.hydrateToolState(id, state, ctx, tid));
             }
         },
 
@@ -434,9 +416,6 @@ export function createMessagingMethods() {
 
             // Sync stateful components (XState)
             this.__syncThreadToolStates(uiMessages, {}, threadId);
-
-            // Update derived state
-            this.__updateDerivedState();
 
             console.log('[MESSAGES_SNAPSHOT] Processing', state.messages.length, 'messages');
 

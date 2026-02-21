@@ -1,63 +1,4 @@
-import { safeParseJSON, normalizeElicitation } from './chat-utils.js';
-
-/**
- * Default tool configuration (Base component logic)
- */
-const DEFAULT_TOOL_CONFIG = {
-    type: 'standard',
-    category: 'general',
-
-    onMap: (toolCall, toolResult, elicitation) => {
-        return {
-            parsedResult: toolResult ? safeParseJSON(toolResult) : null
-        };
-    },
-
-    onSync: (toolId, threadId, context, transitionFn) => {
-        const { toolName, status, toolResult, elicitation, TOOL_EVENTS } = context;
-
-        transitionFn(toolId, TOOL_EVENTS.START, { toolName }, threadId);
-
-        const statusEventMap = {
-            'completed': { event: TOOL_EVENTS.SUCCESS, payload: { result: toolResult } },
-            'error': { event: TOOL_EVENTS.ERROR, payload: { error: toolResult || 'Unknown error' } },
-            'awaiting_input': { event: TOOL_EVENTS.NEEDS_INPUT, payload: { elicitation } },
-            'awaiting_auth': { event: TOOL_EVENTS.NEEDS_AUTH, payload: {} }
-        };
-
-        if (statusEventMap[status]) {
-            const { event, payload } = statusEventMap[status];
-            transitionFn(toolId, event, payload, threadId);
-        } else if (status === 'input_provided') {
-            // Replay: idle → executing → awaiting_input → answered
-            transitionFn(toolId, TOOL_EVENTS.NEEDS_INPUT, { elicitation }, threadId);
-            transitionFn(toolId, TOOL_EVENTS.INPUT_PROVIDED, { input: context.userAnswer }, threadId);
-        } else if (status === 'answered') {
-            // Already in terminal answered state on reload
-            transitionFn(toolId, TOOL_EVENTS.NEEDS_INPUT, { elicitation }, threadId);
-            transitionFn(toolId, TOOL_EVENTS.INPUT_PROVIDED, { input: context.userAnswer }, threadId);
-        }
-    }
-};
-
-const ELICITATION_BASE_CONFIG = {
-    ...DEFAULT_TOOL_CONFIG,
-    type: 'elicitation',
-    onMap: (toolCall, toolResult, elicitation) => {
-        return {
-            parsedResult: elicitation ? normalizeElicitation(elicitation.question, elicitation.schema) : null
-        };
-    }
-};
-
-export function getToolConfig(toolName, schemaType = null) {
-    const elicitationConfig = (schemaType && isElicitationTool(schemaType)) ? ELICITATION_BASE_CONFIG : null;
-
-    return {
-        ...DEFAULT_TOOL_CONFIG,
-        ...(elicitationConfig || {})
-    };
-}
+import { TOOL_STATES } from './tool-state-machine.js';
 
 export function isSpecialTool(toolName) {
     return window.SPECIAL_TOOLS && window.SPECIAL_TOOLS.includes(toolName);
@@ -68,4 +9,39 @@ export function isSpecialTool(toolName) {
  */
 export function isElicitationTool(schemaType) {
     return window.ELICITATION_SCHEMAS && window.ELICITATION_SCHEMAS.includes(schemaType);
+}
+
+/**
+ * Hydrate a tool's XState machine to match the persisted backend state.
+ * Instead of replaying transitions (idle → executing → awaiting_input → ...),
+ * this creates the machine directly in the target state with full context.
+ *
+ * @param {string} toolId - Tool call ID
+ * @param {string} threadId - Thread ID
+ * @param {Object} context - Backend state context
+ * @param {Function} hydrateFn - (toolId, targetState, contextData, threadId)
+ */
+export function syncToolState(toolId, threadId, context, hydrateFn) {
+    const { toolName, status, toolResult, elicitation, userAnswer } = context;
+
+    // Map backend status names to XState state values
+    const stateMap = {
+        'executing': TOOL_STATES.EXECUTING,
+        'completed': TOOL_STATES.COMPLETED,
+        'error': TOOL_STATES.ERROR,
+        'awaiting_input': TOOL_STATES.AWAITING_INPUT,
+        'awaiting_auth': TOOL_STATES.AWAITING_AUTH,
+        'input_provided': TOOL_STATES.ANSWERED,
+        'answered': TOOL_STATES.ANSWERED,
+        'auth_granted': TOOL_STATES.EXECUTING,
+    };
+
+    const targetState = stateMap[status] || TOOL_STATES.EXECUTING;
+
+    hydrateFn(toolId, targetState, {
+        toolName: toolName || '',
+        result: toolResult || null,
+        elicitation: elicitation || null,
+        userAnswer: userAnswer || null,
+    }, threadId);
 }

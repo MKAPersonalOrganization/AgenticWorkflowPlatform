@@ -7,7 +7,7 @@
 
 import { CONNECTION_CONFIG, DEFAULT_PERF_METRICS } from './constants.js';
 import { normalizeElicitation, safeParseJSON } from './chat-utils.js';
-import { createToolStateMachine, TOOL_EVENTS, TOOL_STATES } from './tool-state-machine.js';
+import { createToolStateMachine } from './tool-state-machine.js';
 import { isElicitationTool, isSpecialTool } from './chat-tool-registry.js';
 import { createActor } from 'xstate';
 
@@ -34,10 +34,6 @@ export function createEmptyThreadState() {
         activeJobStreams: new Set(),
         jobRetryMap: new Map(),
         currentJobId: null,
-        awaitingHumanInput: false,
-        humanInputQuestion: null,
-        humanInputSchema: null,
-        humanInputToolCallId: null,
         humanInputToastId: null,
         // Token usage tracking
         tokenUsage: null
@@ -64,10 +60,6 @@ export function createInitialState() {
             errorMessage: null,
             showTypingIndicator: false,
             currentStreamingId: null,
-            awaitingHumanInput: false,
-            humanInputQuestion: null,
-            humanInputSchema: null,
-            humanInputToolCallId: null,
             humanInputToastId: null,
             tokenUsage: null
         },
@@ -284,7 +276,7 @@ export function createStateMethods() {
                 const actor = createActor(machine);
 
                 // Initialize state synchronously to prevent race conditions during hydration/streaming
-                // This ensures __updateDerivedState finds the state immediately even before the listener fires
+                // This ensures computed getters find the state immediately even before the listener fires
                 if (!threadState.toolCalls) threadState.toolCalls = {};
                 threadState.toolCalls[toolCallId] = {
                     state: actor.getSnapshot().value,
@@ -304,9 +296,6 @@ export function createStateMethods() {
 
                         // Sync to message object for UI binding
                         this.__syncToolStateToMessage(targetState, toolCallId, snapshot.value, snapshot.context);
-
-                        // Force derived state update
-                        this.__updateDerivedState();
                     });
                 });
 
@@ -318,54 +307,58 @@ export function createStateMethods() {
             actor.send({ type: event, ...payload });
         },
 
+        /**
+         * Hydrate a tool's state machine directly into a target state.
+         * Used on page reload to restore XState machines without replaying transitions.
+         * @param {string} toolCallId
+         * @param {string} targetState - XState state value (e.g. 'awaiting_input')
+         * @param {Object} contextData - Context values (toolName, elicitation, userAnswer, etc.)
+         * @param {string|null} threadId
+         */
+        hydrateToolState(toolCallId, targetState, contextData = {}, threadId = null) {
+            const threadState = this.__getThreadState(threadId);
+
+            // Stop any existing actor for this tool
+            if (this.__toolStateServices[toolCallId]) {
+                this.__toolStateServices[toolCallId].stop();
+                delete this.__toolStateServices[toolCallId];
+            }
+
+            // Create machine starting directly in the target state with full context
+            const machine = createToolStateMachine(toolCallId, {
+                initialState: targetState,
+                ...contextData,
+            });
+            const actor = createActor(machine);
+
+            // Initialize state synchronously
+            if (!threadState.toolCalls) threadState.toolCalls = {};
+            threadState.toolCalls[toolCallId] = {
+                state: actor.getSnapshot().value,
+                context: actor.getSnapshot().context
+            };
+
+            actor.subscribe(snapshot => {
+                this.__batchUpdate(() => {
+                    const ts = this.__getThreadState(threadId);
+                    if (!ts.toolCalls) ts.toolCalls = {};
+                    ts.toolCalls[toolCallId] = {
+                        state: snapshot.value,
+                        context: snapshot.context
+                    };
+                    this.__syncToolStateToMessage(ts, toolCallId, snapshot.value, snapshot.context);
+                });
+            });
+
+            actor.start();
+            this.__toolStateServices[toolCallId] = actor;
+
+            // Sync to message immediately (not via microtask) for correct initial render
+            this.__syncToolStateToMessage(threadState, toolCallId, targetState, actor.getSnapshot().context);
+        },
+
         // Registry Helpers (exposed for UI templates)
         isSpecialTool,
         isElicitationTool,
-
-        /**
-         * Update derived state (awaiting input, questions, etc.)
-         */
-        __updateDerivedState() {
-            const state = this.__getThreadState();
-            const msgs = state.messages;
-
-            // Default: reset state
-            let isWaiting = false;
-            let question = null;
-            let schema = null;
-            let toolCallId = null;
-
-            if (msgs && msgs.length > 0) {
-                // Iterate backwards to find the most recent tool call that is awaiting input
-                for (let i = msgs.length - 1; i >= 0; i--) {
-                    const m = msgs[i];
-                    if (m.type === 'tool_call') {
-                        // Check XState machine state if available
-                        let machineState = null;
-                        if (state.toolCalls && state.toolCalls[m.id]) {
-                            machineState = state.toolCalls[m.id].state;
-                        }
-
-                        // Strict XState check: only show input if machine is in 'awaiting_input'
-                        if (machineState === TOOL_STATES.AWAITING_INPUT) {
-                            isWaiting = true;
-                            toolCallId = m.id;
-                            question = m.parsedResult?.question_text ||
-                                m.parsedResult?.statement_to_verify || null;
-                            schema = m.parsedResult?.schema || null;
-                            break; // Stop after finding the first one (most recent)
-                        }
-                    }
-                }
-            }
-
-            // Batch update derived properties
-            this.__batchUpdate(() => {
-                state.awaitingHumanInput = isWaiting;
-                state.humanInputQuestion = question;
-                state.humanInputSchema = schema;
-                state.humanInputToolCallId = toolCallId;
-            });
-        }
     };
 }
