@@ -281,16 +281,32 @@ func (t *ClearMemoriesTool) Execute(ctx context.Context, args agent.Arguments) (
 	return agent.TextResult("All memories have been cleared."), nil
 }
 
-// NewMemoryInjectorMiddleware injects the user's memories into the system prompt.
-func NewMemoryInjectorMiddleware(service memory.Service) agent.RequestMiddleware {
-	return agent.RequestMiddlewareFunc(func(ctx context.Context, reqCtx *agent.RequestContext, next agent.RequestNextHandler) error {
-		userID := getUserID(ctx)
-		content, err := service.Load(ctx, userID)
-		if err == nil && content != "" {
-			reqCtx.AddSystemPrompt(content)
-		}
-		return next(ctx, reqCtx)
-	})
+// NewMemoryInjectorMiddleware returns a Chat-level Middleware that prepends
+// the user's long-term memories as a system message before each LLM call.
+func NewMemoryInjectorMiddleware(service memory.Service) agent.Middleware {
+	return func(next agent.Handler) agent.Handler {
+		return agent.HandlerFunc(func(c *agent.Context) error {
+			if !c.IsChat() {
+				return next.Handle(c)
+			}
+
+			userID := getUserID(c.Context)
+			if userID == "" {
+				return next.Handle(c)
+			}
+
+			content, err := service.Load(c.Context, userID)
+			if err == nil && content != "" {
+				memMsg := agent.Message{
+					Role:    agent.RoleSystem,
+					Content: []agent.Content{{Type: agent.ContentTypeText, Text: content}},
+				}
+				c.Chat.Messages = append([]agent.Message{memMsg}, c.Chat.Messages...)
+			}
+
+			return next.Handle(c)
+		})
+	}
 }
 
 func getUserID(ctx context.Context) string {
