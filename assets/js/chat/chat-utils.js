@@ -202,9 +202,13 @@ export function enrichToolResult(toolResult, content) {
     // Always set the raw result
     toolResult.result = content;
 
-    // Always attempt to parse into parsedResult for UI components expecting objects
-    // This is shared logic between streaming (live) and messaging (history hydration)
-    toolResult.parsedResult = safeParseJSON(content);
+    // Only parse into parsedResult if it wasn't already set by a component's
+    // onMap handler (e.g. elicitation tools set parsedResult from elicitation
+    // data — overwriting it with safeParseJSON of the raw "Requesting input: …"
+    // placeholder would destroy the schema needed by isElicitationTool()).
+    if (!toolResult.parsedResult) {
+        toolResult.parsedResult = safeParseJSON(content);
+    }
 
     return toolResult;
 }

@@ -269,6 +269,12 @@ func (p *PostgresAguiProjection) applyToolResultAdded(ctx context.Context, event
 		return fmt.Errorf("failed to update thread timestamp: %w", err)
 	}
 
+	// Also persist the completed/error state in toolStates metadata
+	if err := p.applyToolResultState(ctx, *event); err != nil {
+		p.log.Error(ctx, "failed to update tool result state in metadata", "toolCallId", event.ToolCallID, "ERROR", err)
+		// Non-fatal: the message row was inserted successfully
+	}
+
 	return nil
 }
 
@@ -508,6 +514,11 @@ func (p *PostgresAguiProjection) applyToolNeedsAuth(ctx context.Context, event *
 }
 
 // applyInputProvided updates the tool state with provided input.
+// NOTE: We locate the target row by thread_id + toolCallId (via the existing
+// awaiting_input entry in the JSONB metadata) instead of by message_id, because
+// the InputProvided event carries the *user* message's ID which may not have
+// been inserted yet (UserMessageAdded is emitted after InputProvided in the
+// orchestrator pipeline).
 func (p *PostgresAguiProjection) applyInputProvided(ctx context.Context, event *domain.InputProvided) error {
 	query := `
 		UPDATE agui_messages
@@ -525,14 +536,21 @@ func (p *PostgresAguiProjection) applyInputProvided(ctx context.Context, event *
 					)
 				)
 			)
-		WHERE message_id = $5
+		WHERE thread_id = $5
+		  AND metadata->'toolStates' @> $6::jsonb
 	`
+	// Build the containment filter: the row must already have a toolStates
+	// entry with this toolCallId in awaiting_input state (i.e. the entry
+	// written by applyToolNeedsInput on the assistant message).
+	filter := fmt.Sprintf(`[{"toolCallId": %q, "state": "awaiting_input"}]`, event.ToolCallID)
+
 	_, err := p.db.ExecContext(ctx, query,
 		event.ToolCallID,
 		event.Input,
 		event.AgentName,
 		event.Timestamp,
-		event.MessageID,
+		event.ThreadID,
+		filter,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update tool input provided: %w", err)
@@ -707,7 +725,36 @@ func (p *PostgresAguiProjection) GetThreadState(threadID string) (*AguiThreadSta
 					for _, s := range states {
 						if stateMap, ok := s.(map[string]interface{}); ok {
 							if tid, ok := stateMap["toolCallId"].(string); ok {
-								toolStatesMap[tid] = stateMap
+								// Merge entries instead of overwriting so that fields
+								// from earlier lifecycle stages (e.g. elicitation from
+								// awaiting_input) survive into later stages (e.g.
+								// input_provided which carries the user's answer but
+								// not the elicitation spec).
+								if existing, exists := toolStatesMap[tid]; exists {
+									if existingMap, ok := existing.(map[string]interface{}); ok {
+										for k, v := range stateMap {
+											// Protect elicitation lifecycle states from being
+											// overwritten by a tool-result "completed" entry.
+											// The tool result for an elicitation tool carries
+											// state:"completed" with the pause-handler's
+											// placeholder text, which should not regress a
+											// more meaningful state like input_provided or
+											// awaiting_input.
+											if k == "state" {
+												if newState, ok := v.(string); ok && newState == "completed" {
+													if cur, ok := existingMap["state"].(string); ok {
+														if cur == "input_provided" || cur == "awaiting_input" || cur == "answered" {
+															continue
+														}
+													}
+												}
+											}
+											existingMap[k] = v
+										}
+									}
+								} else {
+									toolStatesMap[tid] = stateMap
+								}
 							}
 						}
 					}

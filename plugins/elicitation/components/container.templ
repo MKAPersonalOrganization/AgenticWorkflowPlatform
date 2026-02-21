@@ -3,7 +3,7 @@ package elicitation
 import "school-with-ai/components/annotation"
 
 // Props - no specific props, relies on Alpine context `message`
-type Props struct {}
+type Props struct{}
 
 templ icon() {
 	<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -15,20 +15,19 @@ templ Container() {
 	@annotation.Container(icon(), annotation.Props{
 		Label: "Clarification Requested",
 		FooterDotAttrs: templ.Attributes{
-			"x-show": "awaitingHumanInput && index === messages.length - 1",
-			"class": "bg-primary animate-pulse shadow-[0_0_8px_rgba(var(--primary),0.4)]",
+			"x-show": "message.status === 'awaiting_input'",
+			"class":  "bg-primary animate-pulse shadow-[0_0_8px_rgba(var(--primary),0.4)]",
 		},
 		Subtext: "Input required to synchronize learning trajectory",
 	}) {
 		<div class="flex flex-col gap-4">
 			<!-- Question Text: Academic Typography -->
 			<div class="group relative w-full">
-				<div 
-					class="text-[15px] leading-relaxed text-foreground/90 font-medium font-serif italic prose prose-sm max-w-none dark:prose-invert text-center px-4" 
+				<div
+					class="text-[15px] leading-relaxed text-foreground/90 font-medium font-serif italic prose prose-sm max-w-none dark:prose-invert text-center px-4"
 					x-html="renderMarkdown(message.parsedResult?.question_text || message.parsedResult?.statement_to_verify || '')"
 				></div>
 			</div>
-
 			<!-- Children (Input Controls) -->
 			<div class="w-full">
 				{ children... }
@@ -36,4 +35,3 @@ templ Container() {
 		</div>
 	}
 }
-

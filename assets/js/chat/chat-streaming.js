@@ -24,8 +24,9 @@ export function createStreamingMethods() {
          * @param {string} message - User message
          * @param {string} threadId - Thread ID
          * @param {string} agentName - Optional agent name to target
+         * @param {string|null} toolCallId - Optional tool call ID for elicitation answers
          */
-        async __streamResponse(message, threadId, agentName = '') {
+        async __streamResponse(message, threadId, agentName = '', toolCallId = null) {
             const state = this.__getThreadState(threadId);
 
             // Close existing stream if any (expected during elicitation responses)
@@ -48,6 +49,10 @@ export function createStreamingMethods() {
 
                 if (agentName) {
                     body.agentName = agentName;
+                }
+
+                if (toolCallId) {
+                    body.toolCallId = toolCallId;
                 }
 
                 const response = await fetch('/v1/message:send', {

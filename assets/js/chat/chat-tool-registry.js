@@ -29,8 +29,13 @@ const DEFAULT_TOOL_CONFIG = {
             const { event, payload } = statusEventMap[status];
             transitionFn(toolId, event, payload, threadId);
         } else if (status === 'input_provided') {
+            // Replay: idle → executing → awaiting_input → answered
             transitionFn(toolId, TOOL_EVENTS.NEEDS_INPUT, { elicitation }, threadId);
-            transitionFn(toolId, TOOL_EVENTS.INPUT_PROVIDED, {}, threadId);
+            transitionFn(toolId, TOOL_EVENTS.INPUT_PROVIDED, { input: context.userAnswer }, threadId);
+        } else if (status === 'answered') {
+            // Already in terminal answered state on reload
+            transitionFn(toolId, TOOL_EVENTS.NEEDS_INPUT, { elicitation }, threadId);
+            transitionFn(toolId, TOOL_EVENTS.INPUT_PROVIDED, { input: context.userAnswer }, threadId);
         }
     }
 };
