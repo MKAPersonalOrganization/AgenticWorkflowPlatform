@@ -39,6 +39,15 @@ import (
 	"school-with-ai/infra/projections"
 	"school-with-ai/infra/sqldb"
 	"school-with-ai/infra/sqldb/migrate"
+	"school-with-ai/plugins/calculator"
+	"school-with-ai/plugins/codebase"
+	"school-with-ai/plugins/cognitive"
+	"school-with-ai/plugins/document"
+	"school-with-ai/plugins/elicitation"
+	"school-with-ai/plugins/knowledgebase"
+	"school-with-ai/plugins/library"
+	memoryplugin "school-with-ai/plugins/memory"
+	"school-with-ai/plugins/visualization"
 	"school-with-ai/services/agentorchestrator"
 	"school-with-ai/services/aisettings"
 	"school-with-ai/services/artifact"
@@ -50,15 +59,6 @@ import (
 	"school-with-ai/services/taskmanagement"
 	"school-with-ai/services/threadmgmt"
 	"school-with-ai/services/toolregistry"
-	"school-with-ai/plugins/calculator"
-	"school-with-ai/plugins/codebase"
-	"school-with-ai/plugins/cognitive"
-	"school-with-ai/plugins/document"
-	"school-with-ai/plugins/elicitation"
-	"school-with-ai/plugins/knowledgebase"
-	"school-with-ai/plugins/library"
-	memoryplugin "school-with-ai/plugins/memory"
-	"school-with-ai/plugins/visualization"
 	"school-with-ai/services/workspacepermissions"
 
 	"school-with-ai/services/agentorchestrator/agents/math"
@@ -404,8 +404,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 		return fmt.Errorf("creating math instructor agent: %w", err)
 	}
 
-
-
 	// Create a simple map of available agents
 	availableAgents := map[string]agent.Agent{
 		"math-instructor": mathInstructor,
@@ -666,7 +664,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Delete("/api/resources/{id}", authMiddleware.RequireAuthFunc(resourcesHandler.Delete))
 
 	// Knowledge Base / RAG routes
-	knowledgeHandler := knowledgehandlers.NewHandler(log, edgequakeService, cfg.Edgequake.TenantID)
+	knowledgeHandler := knowledgehandlers.NewHandler(log, edgequakeService, aiSettingsService, cfg.Edgequake.TenantID)
 
 	// Pages
 	r.Get("/knowledge", authMiddleware.RequireAuthFunc(knowledgeHandler.WorkspacesPage))
@@ -700,9 +698,17 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Post("/api/knowledge/workspaces/{workspaceId}/rebuild", authMiddleware.RequireAuthFunc(knowledgeHandler.RebuildWorkspace))
 	r.Post("/api/knowledge/workspaces/reprocess", authMiddleware.RequireAuthFunc(knowledgeHandler.ReprocessAll))
 
+	// Workspaces API — Extended
+	r.Put("/api/knowledge/workspaces/{workspaceId}", authMiddleware.RequireAuthFunc(knowledgeHandler.UpdateWorkspace))
+
 	// Models API (maps to Edgequake /api/v1/models)
+	r.Get("/api/knowledge/models", authMiddleware.RequireAuthFunc(knowledgeHandler.ListAllModels))
 	r.Get("/api/knowledge/models/llm", authMiddleware.RequireAuthFunc(knowledgeHandler.ListLLMModels))
 	r.Get("/api/knowledge/models/embedding", authMiddleware.RequireAuthFunc(knowledgeHandler.ListEmbeddingModels))
+
+	// Settings API (maps to Edgequake /api/v1/settings)
+	r.Get("/api/knowledge/settings/status", authMiddleware.RequireAuthFunc(knowledgeHandler.GetProviderStatus))
+	r.Get("/api/knowledge/settings/providers", authMiddleware.RequireAuthFunc(knowledgeHandler.ListAvailableProviders))
 
 	// Pipeline API (maps to Edgequake /api/v1/pipeline + /api/v1/tasks)
 	r.Get("/api/knowledge/pipeline/enhanced-status", authMiddleware.RequireAuthFunc(knowledgeHandler.GetEnhancedPipelineStatus))

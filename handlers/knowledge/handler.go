@@ -13,6 +13,7 @@ import (
 	"school-with-ai/components/knowledge"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/logger"
+	"school-with-ai/services/aisettings"
 	"school-with-ai/services/edgequake"
 	"school-with-ai/services/rag/documents"
 	"school-with-ai/services/rag/graph"
@@ -26,14 +27,16 @@ import (
 type Handler struct {
 	log              *logger.Logger
 	edgequakeService *edgequake.Service
+	aiSettings       *aisettings.Service
 	tenantID         string
 }
 
 // NewHandler creates a new Knowledge Base handler.
-func NewHandler(log *logger.Logger, edgequakeService *edgequake.Service, tenantID string) *Handler {
+func NewHandler(log *logger.Logger, edgequakeService *edgequake.Service, aiSettings *aisettings.Service, tenantID string) *Handler {
 	return &Handler{
 		log:              log,
 		edgequakeService: edgequakeService,
+		aiSettings:       aiSettings,
 		tenantID:         tenantID,
 	}
 }
@@ -492,6 +495,7 @@ func (h *Handler) GetWorkspaceStats(w http.ResponseWriter, r *http.Request) {
 }
 
 // CreateWorkspace creates a new workspace.
+// Embedding provider/model/dimension are automatically resolved from the user's AI settings.
 func (h *Handler) CreateWorkspace(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
@@ -500,14 +504,8 @@ func (h *Handler) CreateWorkspace(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Name               string `json:"name"`
-		Description        string `json:"description"`
-		Slug               string `json:"slug"`
-		LlmModel           string `json:"llm_model"`
-		LlmProvider        string `json:"llm_provider"`
-		EmbeddingModel     string `json:"embedding_model"`
-		EmbeddingProvider  string `json:"embedding_provider"`
-		EmbeddingDimension int    `json:"embedding_dimension"`
+		Name        string `json:"name"`
+		Description string `json:"description"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
@@ -524,42 +522,32 @@ func (h *Handler) CreateWorkspace(w http.ResponseWriter, r *http.Request) {
 		desc = &req.Description
 	}
 
-	var slug *string
-	if req.Slug != "" {
-		slug = &req.Slug
-	}
-
-	var llmModel *string
-	if req.LlmModel != "" {
-		llmModel = &req.LlmModel
-	}
-
-	var llmProvider *string
-	if req.LlmProvider != "" {
-		llmProvider = &req.LlmProvider
-	}
-
-	var embeddingModel *string
-	if req.EmbeddingModel != "" {
-		embeddingModel = &req.EmbeddingModel
-	}
-
-	var embeddingProvider *string
-	if req.EmbeddingProvider != "" {
-		embeddingProvider = &req.EmbeddingProvider
-	}
-
+	// Resolve embedding config from the user's AI settings
+	var embeddingModel, embeddingProvider *string
 	var embeddingDimension *int
-	if req.EmbeddingDimension > 0 {
-		embeddingDimension = &req.EmbeddingDimension
+
+	user := domain.GetUserFromContext(r.Context())
+	if user != nil && h.aiSettings != nil {
+		embCfg, err := h.aiSettings.GetEmbeddingConfigForUser(r.Context(), user.ID)
+		if err != nil {
+			h.log.Warn(r.Context(), "failed to resolve embedding config from AI settings, using server defaults", "error", err)
+		} else if embCfg != nil {
+			embeddingProvider = &embCfg.Provider
+			embeddingModel = &embCfg.Model
+			if embCfg.Dimension > 0 {
+				embeddingDimension = &embCfg.Dimension
+			}
+			h.log.Info(r.Context(), "using embedding config from AI settings",
+				"provider", embCfg.Provider,
+				"model", embCfg.Model,
+				"dimension", embCfg.Dimension,
+			)
+		}
 	}
 
 	ws, err := h.edgequakeService.CreateWorkspace(r.Context(), tCtx, &workspaces.CreateWorkspaceRequest{
 		Name:               req.Name,
 		Description:        desc,
-		Slug:               slug,
-		LlmModel:           llmModel,
-		LlmProvider:        llmProvider,
 		EmbeddingModel:     embeddingModel,
 		EmbeddingProvider:  embeddingProvider,
 		EmbeddingDimension: embeddingDimension,

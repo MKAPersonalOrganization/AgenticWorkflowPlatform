@@ -145,6 +145,29 @@ func (h *Handler) SaveSettings(w http.ResponseWriter, r *http.Request) {
 		EmbeddingDimensions: req.EmbeddingDimensions,
 	}
 
+	// If no API key provided, try to reuse the existing key for this provider
+	if settings.APIKey == "" {
+		existing, err := h.service.GetUserSettings(r.Context(), user.ID)
+		if err == nil {
+			for _, ex := range existing {
+				if ex.Provider == settings.Provider && ex.APIKey != "" {
+					settings.APIKey = ex.APIKey
+					// Preserve existing fields when only updating embed model
+					if settings.DefaultLLMModel == "" {
+						settings.DefaultLLMModel = ex.DefaultLLMModel
+					}
+					if settings.MaxTokens == 0 {
+						settings.MaxTokens = ex.MaxTokens
+					}
+					if settings.Temperature == 0 {
+						settings.Temperature = ex.Temperature
+					}
+					break
+				}
+			}
+		}
+	}
+
 	if err := h.service.SaveSettings(r.Context(), settings); err != nil {
 		h.log.Error(r.Context(), "failed to save ai settings", "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
