@@ -127,7 +127,7 @@ templ Settings() {
 									@nativeselect.Select(
 										nativeselect.Props{
 											Class:       "w-[180px]",
-											Model:       "theme",
+											Model:       "preferences.theme",
 											Label:       i18n.T(ctx, "Select Theme"),
 											Placeholder: i18n.T(ctx, "Select Theme"),
 										},
@@ -165,7 +165,7 @@ templ Settings() {
 											Name:    "markdownEnabled",
 											Checked: true,
 											Attributes: templ.Attributes{
-												"x-model":    "markdownEnabled",
+												"x-model":    "preferences.markdownEnabled",
 												"aria-label": i18n.T(ctx, "Enable Markdown"),
 											},
 										})
@@ -176,7 +176,7 @@ templ Settings() {
 											Name:    "autoScroll",
 											Checked: true,
 											Attributes: templ.Attributes{
-												"x-model":    "autoScroll",
+												"x-model":    "preferences.autoScroll",
 												"aria-label": i18n.T(ctx, "Auto-scroll during response"),
 											},
 										})
@@ -470,7 +470,7 @@ templ Settings() {
 									@switchcomp.Switch(switchcomp.Props{
 										Name: "textToSpeech",
 										Attributes: templ.Attributes{
-											"x-model":    "textToSpeechEnabled",
+											"x-model":    "preferences.textToSpeechEnabled",
 											"aria-label": i18n.T(ctx, "Enable Text-to-Speech"),
 										},
 									})

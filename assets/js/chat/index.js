@@ -307,8 +307,22 @@ document.addEventListener('alpine:init', () => {
                     this.fetchBanner();
                 });
 
+                // Setup IntersectionObserver for scroll button visibility
+                this.$nextTick(() => {
+                    const anchor = this.$refs?.messagesEnd;
+                    if (anchor) {
+                        this.__scrollButtonObserver = new IntersectionObserver(([entry]) => {
+                            this.scrolledUp = !entry.isIntersecting;
+                        }, {
+                            root: this.$refs.messageList,
+                            threshold: 0.1
+                        });
+                        this.__scrollButtonObserver.observe(anchor);
+                    }
+                });
+
                 // Set up infinite scroll for sidebar sessions (handled by x-intersect in nav.templ)
-                /* 
+                /*
                 this.$nextTick(() => {
                     const sidebarContent = document.querySelector('[data-tui-sidebar="content"]');
                     if (sidebarContent) {
@@ -390,6 +404,9 @@ document.addEventListener('alpine:init', () => {
             destroy() {
                 if (this.__mutationObserver) {
                     this.__mutationObserver.disconnect();
+                }
+                if (this.__scrollButtonObserver) {
+                    this.__scrollButtonObserver.disconnect();
                 }
 
                 // Clean up all watchers
