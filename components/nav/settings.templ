@@ -6,11 +6,11 @@ import (
 	"school-with-ai/components/dialog"
 	"school-with-ai/components/i18n"
 	"school-with-ai/components/icon"
-	"school-with-ai/plugins/memory"
 	"school-with-ai/components/nativeselect"
 	"school-with-ai/components/selectbox"
 	switchcomp "school-with-ai/components/switch"
 	"school-with-ai/components/tabs"
+	"school-with-ai/plugins/memory"
 )
 
 // Settings renders the settings dialog
@@ -46,7 +46,7 @@ templ Settings() {
 				@click.self="showSettings = false"
 			>
 				<div
-					class="w-full md:w-[680px] max-h-[90vh] bg-background rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-border relative z-10"
+					class="w-full md:w-[800px] max-h-[90vh] bg-background rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-border relative z-10"
 					@keydown.escape.window="showSettings = false"
 				>
 					<!-- Header -->
@@ -378,6 +378,126 @@ templ Settings() {
 												</span>
 											}
 										</div>
+									</div>
+									<!-- Knowledge Graph Embedding -->
+									<div class="border-t border-border pt-6 space-y-4">
+										<div class="space-y-2">
+											<h3 class="text-foreground font-medium flex items-center gap-2">
+												@icon.Network(icon.Props{Class: "size-4"})
+												{ i18n.T(ctx, "Knowledge Graph Embedding") }
+											</h3>
+											<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "Select the embedding model used for knowledge graph vector search across all workspaces.") }</p>
+										</div>
+										<!-- Provider Status -->
+										<template x-if="kgProviderStatus">
+											<div class="grid gap-3 grid-cols-3">
+												<div class="rounded-xl border p-3">
+													<div class="flex items-center gap-2 mb-1">
+														<span class="size-2 rounded-full" :class="kgProviderStatus?.provider?.status === 'available' ? 'bg-green-500' : 'bg-red-500'"></span>
+														<span class="text-xs font-medium">{ i18n.T(ctx, "LLM") }</span>
+													</div>
+													<p class="text-xs font-mono truncate" x-text="kgProviderStatus?.provider?.model || 'default'"></p>
+												</div>
+												<div class="rounded-xl border p-3">
+													<div class="flex items-center gap-2 mb-1">
+														<span class="size-2 rounded-full" :class="kgProviderStatus?.embedding?.status === 'available' ? 'bg-green-500' : 'bg-red-500'"></span>
+														<span class="text-xs font-medium">{ i18n.T(ctx, "Embedding") }</span>
+													</div>
+													<p class="text-xs font-mono truncate" x-text="(kgProviderStatus?.embedding?.model || 'default') + ' (' + (kgProviderStatus?.embedding?.dimension || '?') + 'd)'"></p>
+												</div>
+												<div class="rounded-xl border p-3">
+													<div class="flex items-center gap-2 mb-1">
+														<span class="size-2 rounded-full" :class="kgProviderStatus?.storage?.dimension_mismatch ? 'bg-amber-500' : 'bg-green-500'"></span>
+														<span class="text-xs font-medium">{ i18n.T(ctx, "Storage") }</span>
+													</div>
+													<p class="text-xs font-mono truncate" x-text="(kgProviderStatus?.storage?.type || '-') + ' (' + (kgProviderStatus?.storage?.dimension || '?') + 'd)'"></p>
+													<p x-show="kgProviderStatus?.storage?.dimension_mismatch" class="text-[10px] text-amber-600 mt-1">⚠ { i18n.T(ctx, "Mismatch") }</p>
+												</div>
+											</div>
+										</template>
+										<!-- Embedding Provider -->
+										<div class="flex flex-col gap-2">
+											<label class="text-foreground text-sm">{ i18n.T(ctx, "Embedding Provider") }</label>
+											<select
+												x-model="kgEmbProvider"
+												@change="onKgEmbProviderChange()"
+												class="w-full h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs"
+											>
+												<option value="">{ i18n.T(ctx, "Select a provider...") }</option>
+												<template x-for="p in kgEmbProviders" :key="p.id">
+													<option :value="p.id" x-text="p.name"></option>
+												</template>
+											</select>
+										</div>
+										<!-- Embedding Model -->
+										<div class="flex flex-col gap-2" x-show="kgEmbProvider">
+											<label class="text-foreground text-sm">{ i18n.T(ctx, "Embedding Model") }</label>
+											<select
+												x-model="kgEmbModel"
+												class="w-full h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs"
+											>
+												<option value="">{ i18n.T(ctx, "Select a model...") }</option>
+												<template x-for="m in kgCurrentEmbModels" :key="m">
+													<option :value="m" x-text="m"></option>
+												</template>
+											</select>
+										</div>
+										<!-- API Key source -->
+										<div class="flex flex-col gap-2" x-show="kgEmbProvider">
+											<label class="text-foreground text-sm">{ i18n.T(ctx, "API Key") }</label>
+											<!-- Show "Use same key" option if the selected provider matches a configured provider -->
+											<template x-if="kgMatchingProviderSetting">
+												<div class="space-y-3">
+													<label class="flex items-center gap-2 cursor-pointer">
+														<input type="radio" name="kg-api-key-source" value="reuse" x-model="kgApiKeySource" class="text-primary focus:ring-primary"/>
+														<span class="text-sm">
+															{ i18n.T(ctx, "Use same API key as") }
+															<span class="font-medium" x-text="providerName(kgEmbProvider)"></span>
+															<span class="text-muted-foreground" x-text="'(' + kgMatchingProviderSetting.api_key_masked + ')'"></span>
+														</span>
+													</label>
+													<label class="flex items-center gap-2 cursor-pointer">
+														<input type="radio" name="kg-api-key-source" value="custom" x-model="kgApiKeySource" class="text-primary focus:ring-primary"/>
+														<span class="text-sm">{ i18n.T(ctx, "Enter a different API key") }</span>
+													</label>
+												</div>
+											</template>
+											<!-- Custom API key input (shown when no matching provider, or user chose "custom") -->
+											<div x-show="!kgMatchingProviderSetting || kgApiKeySource === 'custom'">
+												<input
+													type="password"
+													x-model="kgApiKey"
+													placeholder={ i18n.T(ctx, "sk-...or paste your API key") }
+													class="w-full h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs"
+												/>
+											</div>
+											<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "This key is used for embedding documents in the knowledge graph. Applied to all workspaces.") }</p>
+										</div>
+										<!-- Save -->
+										<div class="flex items-center justify-end gap-2 pt-2" x-show="kgEmbProvider && kgEmbModel">
+											<span x-show="kgSaved" x-transition class="text-xs text-emerald-600">✓ { i18n.T(ctx, "Saved") }</span>
+											<span x-show="kgError" x-transition class="text-xs text-destructive" x-text="kgError"></span>
+											@button.Button(button.Props{
+												Type:  button.TypeButton,
+												Class: "min-w-[120px]",
+												Attributes: templ.Attributes{
+													"@click":    "saveKgEmbedding()",
+													":disabled": "kgSaving || (!kgApiKey && kgApiKeySource !== 'reuse')",
+												},
+											}) {
+												<span x-show="!kgSaving">{ i18n.T(ctx, "Save Embedding Settings") }</span>
+												<span x-show="kgSaving" class="flex items-center gap-2">
+													<span class="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground"></span>
+													{ i18n.T(ctx, "Saving...") }
+												</span>
+											}
+										</div>
+										<template x-if="kgLoading">
+											<div class="flex items-center gap-2 text-xs text-muted-foreground">
+												<span class="animate-spin rounded-full h-3 w-3 border-b-2 border-primary"></span>
+												{ i18n.T(ctx, "Loading...") }
+											</div>
+										</template>
 									</div>
 								</div>
 							}

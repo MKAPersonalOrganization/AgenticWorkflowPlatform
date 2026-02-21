@@ -133,3 +133,62 @@ func (s *Service) GetModelConfigForUser(ctx context.Context, userID string) (*ag
 
 	return cfg, nil
 }
+
+// EmbeddingConfig holds the resolved embedding provider/model/dimension for a user.
+type EmbeddingConfig struct {
+	Provider  string
+	Model     string
+	Dimension int
+	APIKey    string
+}
+
+// GetEmbeddingConfigForUser finds the user's configured embedding settings.
+// It scans all provider entries and returns the first one with a DefaultEmbedModel set.
+// If none is explicitly configured, it falls back to the default provider's first available embedding model.
+func (s *Service) GetEmbeddingConfigForUser(ctx context.Context, userID string) (*EmbeddingConfig, error) {
+	settings, err := s.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("getting user ai settings: %w", err)
+	}
+
+	// First pass: find a provider with an explicitly configured embedding model
+	for _, s := range settings {
+		if s.DefaultEmbedModel != "" {
+			return &EmbeddingConfig{
+				Provider:  string(s.Provider),
+				Model:     s.DefaultEmbedModel,
+				Dimension: s.EmbeddingDimensions,
+				APIKey:    s.APIKey,
+			}, nil
+		}
+	}
+
+	// Second pass: use the default provider's first available embedding model
+	for _, s := range settings {
+		if !s.IsDefault {
+			continue
+		}
+		models := domain.ProviderEmbeddingModels(s.Provider)
+		if len(models) > 0 {
+			return &EmbeddingConfig{
+				Provider: string(s.Provider),
+				Model:    models[0],
+				APIKey:   s.APIKey,
+			}, nil
+		}
+	}
+
+	// Third pass: any provider with embedding models
+	for _, s := range settings {
+		models := domain.ProviderEmbeddingModels(s.Provider)
+		if len(models) > 0 {
+			return &EmbeddingConfig{
+				Provider: string(s.Provider),
+				Model:    models[0],
+				APIKey:   s.APIKey,
+			}, nil
+		}
+	}
+
+	return nil, nil // No embedding config available
+}

@@ -4,6 +4,9 @@ package knowledge
  * WorkspaceSettings - Settings tab with rebuild/embeddings/recovery actions.
  * Matches EdgeQuake edgequake_webui/src/components/workspace/ settings pattern.
  *
+ * Model configuration has been moved to the global AI Settings page
+ * (Settings → AI → Knowledge Graph Models) for a unified experience.
+ *
  * Contains: Knowledge Graph rebuild card, Embeddings rebuild card,
  * and Advanced Recovery danger zone.
  */
@@ -16,6 +19,19 @@ import (
 
 templ WorkspaceSettings() {
 	<div class="space-y-6 mt-6 max-w-4xl">
+		<!-- Model Config Note -->
+		<div class="rounded-xl border bg-muted/30 p-4 flex items-start gap-3">
+			@icon.Settings(icon.Props{Class: "size-5 text-muted-foreground mt-0.5 shrink-0"})
+			<div class="text-sm">
+				<p class="text-muted-foreground">
+					{ i18n.T(ctx, "LLM and embedding models are configured in") }
+					<button
+						@click="$dispatch('open-settings-dialog', { tab: 'ai' })"
+						class="text-primary hover:underline font-medium"
+					>{ i18n.T(ctx, "Settings → AI → Knowledge Graph Models") }</button>.
+				</p>
+			</div>
+		</div>
 		<div class="grid gap-6 md:grid-cols-2">
 			<!-- Knowledge Graph Card -->
 			<div class="rounded-xl border bg-card shadow-sm overflow-hidden">
@@ -26,7 +42,7 @@ templ WorkspaceSettings() {
 						</div>
 						<h3 class="font-bold text-lg">{ i18n.T(ctx, "Knowledge Graph") }</h3>
 					</div>
-					<p class="text-sm text-muted-foreground mb-6">
+					<p class="text-sm text-muted-foreground mb-4">
 						{ i18n.T(ctx, "Rebuild the semantic relations between your documents. This can improve search quality but uses significant LLM resources.") }
 					</p>
 					<div class="space-y-4">
@@ -59,7 +75,7 @@ templ WorkspaceSettings() {
 						</div>
 						<h3 class="font-bold text-lg">{ i18n.T(ctx, "Embeddings") }</h3>
 					</div>
-					<p class="text-sm text-muted-foreground mb-6">
+					<p class="text-sm text-muted-foreground mb-4">
 						{ i18n.T(ctx, "Regenerate all document embeddings. Useful if you change the embedding model or want to ensure consistency.") }
 					</p>
 					<div class="space-y-4">

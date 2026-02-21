@@ -1,6 +1,7 @@
 /**
  * AI Settings Manager
- * Alpine.js component for managing per-user AI provider configuration.
+ * Alpine.js component for managing per-user AI provider configuration
+ * and knowledge graph (EdgeQuake) model settings.
  */
 function aiSettingsManager() {
     return {
@@ -22,6 +23,20 @@ function aiSettingsManager() {
         currentModels: [],
         currentEmbedModels: [],
 
+        // Knowledge Graph embedding state (global, not per-workspace)
+        kgProviderStatus: null,
+        kgLoading: false,
+        kgEmbProvider: '',
+        kgEmbModel: '',
+        kgApiKeySource: 'reuse',
+        kgApiKey: '',
+        kgEmbProviders: [],       // [{id, name}]
+        kgCurrentEmbModels: [],   // [model_name, ...]
+        kgAllEmbModels: [],       // [{provider, name, dimension, ...}]
+        kgSaving: false,
+        kgSaved: false,
+        kgError: '',
+
         async loadSettings() {
             try {
                 // Load providers
@@ -37,6 +52,8 @@ function aiSettingsManager() {
             } catch (err) {
                 console.error('Failed to load AI settings:', err);
             }
+            // Load knowledge graph settings in parallel
+            this.loadKgSettings();
         },
 
         onProviderChange() {
@@ -146,6 +163,135 @@ function aiSettingsManager() {
                 }
             } catch (err) {
                 console.error('Failed to set default:', err);
+            }
+        },
+
+        // === Knowledge Graph Embedding Settings ===
+
+        get kgMatchingProviderSetting() {
+            if (!this.kgEmbProvider) return null;
+            const match = this.settings.find(s => s.provider === this.kgEmbProvider);
+            if (match && match.api_key) {
+                return { ...match, api_key_masked: match.api_key.slice(0, 3) + '***' + match.api_key.slice(-4) };
+            }
+            // Check if provider is configured (API key hidden) - use masked indicator
+            if (match) {
+                return { ...match, api_key_masked: '••••••••' };
+            }
+            return null;
+        },
+
+        async loadKgSettings() {
+            this.kgLoading = true;
+            try {
+                const [embRes, statusRes] = await Promise.all([
+                    fetch('/api/knowledge/models/embedding'),
+                    fetch('/api/knowledge/settings/status'),
+                ]);
+                if (embRes.ok) {
+                    const data = await embRes.json();
+                    this.kgAllEmbModels = data.models || [];
+                    // Derive unique providers that have embedding models
+                    const seen = new Set();
+                    this.kgEmbProviders = [];
+                    for (const m of this.kgAllEmbModels) {
+                        if (!seen.has(m.provider)) {
+                            seen.add(m.provider);
+                            this.kgEmbProviders.push({
+                                id: m.provider,
+                                name: m.provider_display_name || this.providerName(m.provider),
+                            });
+                        }
+                    }
+                }
+                if (statusRes.ok) {
+                    this.kgProviderStatus = await statusRes.json();
+                    // Pre-select from current status if available
+                    if (this.kgProviderStatus?.embedding?.provider && !this.kgEmbProvider) {
+                        this.kgEmbProvider = this.kgProviderStatus.embedding.provider;
+                        this.onKgEmbProviderChange();
+                        if (this.kgProviderStatus.embedding.model) {
+                            this.kgEmbModel = this.kgProviderStatus.embedding.model;
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to load KG settings:', err);
+            } finally {
+                this.kgLoading = false;
+            }
+        },
+
+        onKgEmbProviderChange() {
+            // Filter models for selected provider
+            this.kgCurrentEmbModels = this.kgAllEmbModels
+                .filter(m => m.provider === this.kgEmbProvider)
+                .map(m => m.name);
+            this.kgEmbModel = this.kgCurrentEmbModels.length === 1 ? this.kgCurrentEmbModels[0] : '';
+            // Default to reuse if a matching provider is already configured
+            this.kgApiKeySource = this.kgMatchingProviderSetting ? 'reuse' : 'custom';
+            this.kgApiKey = '';
+            this.kgSaved = false;
+            this.kgError = '';
+        },
+
+        async saveKgEmbedding() {
+            if (!this.kgEmbProvider || !this.kgEmbModel) return;
+            this.kgSaving = true;
+            this.kgSaved = false;
+            this.kgError = '';
+            try {
+                // Determine API key
+                let apiKey = '';
+                if (this.kgApiKeySource === 'reuse' && this.kgMatchingProviderSetting) {
+                    // Reuse - send empty api_key, backend keeps existing
+                    apiKey = '';
+                } else {
+                    apiKey = this.kgApiKey;
+                    if (!apiKey) {
+                        this.kgError = 'API key is required';
+                        this.kgSaving = false;
+                        return;
+                    }
+                }
+
+                // Find embedding dimension from model info
+                const modelInfo = this.kgAllEmbModels.find(
+                    m => m.provider === this.kgEmbProvider && m.name === this.kgEmbModel
+                );
+                const dimension = modelInfo?.dimension || modelInfo?.capabilities?.embedding_dimension || 0;
+
+                // Save via AI settings endpoint (updates the provider's embed model config)
+                const payload = {
+                    provider: this.kgEmbProvider,
+                    default_embed_model: this.kgEmbModel,
+                    embedding_dimensions: dimension,
+                };
+                if (apiKey) {
+                    payload.api_key = apiKey;
+                }
+
+                const res = await fetch('/api/ai-settings', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                if (res.ok) {
+                    this.kgSaved = true;
+                    // Reload settings so kgMatchingProviderSetting updates
+                    await this.loadSettings();
+                    setTimeout(() => { this.kgSaved = false; }, 3000);
+                } else {
+                    const errText = await res.text();
+                    this.kgError = errText || 'Failed to save embedding settings';
+                    setTimeout(() => { this.kgError = ''; }, 5000);
+                }
+            } catch (err) {
+                this.kgError = 'Network error';
+                console.error('Failed to save KG embedding:', err);
+                setTimeout(() => { this.kgError = ''; }, 5000);
+            } finally {
+                this.kgSaving = false;
             }
         },
     };
