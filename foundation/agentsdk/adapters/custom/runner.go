@@ -429,16 +429,26 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 	config.ChatMiddleware = append(config.ChatMiddleware, agentConfig.ChatMiddlewares...)
 	config.FunctionMiddleware = append(config.FunctionMiddleware, agentConfig.FunctionMiddlewares...)
 
-	// Add Capabilities
-	// RequireUserInput: provides quiz tools via Requirement pattern (replaces old ElicitationMiddleware)
-	if agentConfig.Capabilities.RequireUserInput {
-		req := agent.NewRequireUserInput()
-		// Add quiz tools to the agent's tool set
-		config.Tools = append(config.Tools, req.Tools()...)
-		// Add system prompt instructions about quiz tools
-		config.SystemPrompt += "\n\n" + req.SystemPrompt()
-		// Add requirement to chat middleware for rule evaluation
-		config.ChatMiddleware = append(config.ChatMiddleware, agent.RequirementMiddleware(req))
+	// =================================================================
+	// Declarative Requirements System
+	// =================================================================
+	// Auto-collect tools from Requirements that implement ToolProvider.
+	for _, req := range agentConfig.Requirements {
+		if tp, ok := req.(agent.ToolProvider); ok {
+			config.Tools = append(config.Tools, tp.ProvidedTools()...)
+		}
+	}
+
+	// Auto-collect prompt additions from Requirements that implement PromptProvider.
+	for _, req := range agentConfig.Requirements {
+		if pp, ok := req.(agent.PromptProvider); ok {
+			config.SystemPrompt += "\n\n" + pp.PromptAddition()
+		}
+	}
+
+	// Wire up the RequirementMiddleware if we have any requirements.
+	if len(agentConfig.Requirements) > 0 {
+		config.ChatMiddleware = append(config.ChatMiddleware, agent.RequirementMiddleware(agentConfig.Requirements...))
 	}
 
 	// Inject Memory Context if available and enabled (Tools are now handled via factory/registry)

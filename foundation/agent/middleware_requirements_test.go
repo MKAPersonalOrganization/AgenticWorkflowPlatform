@@ -43,7 +43,7 @@ func TestRequirementMiddleware(t *testing.T) {
 		reqs := []Requirement{
 			&mockRequirement{
 				rules: []Rule{
-					{TargetTool: "badTool", Allowed: false},
+					{TargetTool: "badTool", Blocked: true},
 				},
 			},
 		}
@@ -73,7 +73,7 @@ func TestRequirementMiddleware(t *testing.T) {
 		reqs := []Requirement{
 			&mockRequirement{
 				rules: []Rule{
-					{TargetTool: "think", Allowed: true, Forced: true},
+					{TargetTool: "think", Forced: true},
 				},
 			},
 		}
@@ -107,7 +107,7 @@ func TestRequirementMiddleware(t *testing.T) {
 		reqs := []Requirement{
 			&mockRequirement{
 				rules: []Rule{
-					{TargetTool: "search", Allowed: true, PreventStop: true},
+					{TargetTool: "search", PreventStop: true},
 				},
 			},
 		}
@@ -146,7 +146,7 @@ func TestRequirementMiddleware_TypedToolsField(t *testing.T) {
 		reqs := []Requirement{
 			&mockRequirement{
 				rules: []Rule{
-					{TargetTool: "think", Allowed: true, Forced: true},
+					{TargetTool: "think", Forced: true},
 				},
 			},
 		}
@@ -191,7 +191,7 @@ func TestRequirementMiddleware_TypedToolsField(t *testing.T) {
 		reqs := []Requirement{
 			&mockRequirement{
 				rules: []Rule{
-					{TargetTool: "badTool", Allowed: false},
+					{TargetTool: "badTool", Blocked: true},
 				},
 			},
 		}
@@ -229,7 +229,7 @@ func TestRequirementMiddleware_ToolChoice(t *testing.T) {
 		reqs := []Requirement{
 			&mockRequirement{
 				rules: []Rule{
-					{TargetTool: "think", Allowed: true, Forced: true},
+					{TargetTool: "think", Forced: true},
 				},
 			},
 		}
@@ -254,8 +254,8 @@ func TestRequirementMiddleware_ToolChoice(t *testing.T) {
 		reqs := []Requirement{
 			&mockRequirement{
 				rules: []Rule{
-					{TargetTool: "think", Allowed: true, Forced: true},
-					{TargetTool: "search", Allowed: true, Forced: true},
+					{TargetTool: "think", Forced: true},
+					{TargetTool: "search", Forced: true},
 				},
 			},
 		}
@@ -280,7 +280,7 @@ func TestRequirementMiddleware_ToolChoice(t *testing.T) {
 		reqs := []Requirement{
 			&mockRequirement{
 				rules: []Rule{
-					{TargetTool: "search", Allowed: true, PreventStop: true},
+					{TargetTool: "search", PreventStop: true},
 				},
 			},
 		}
@@ -313,7 +313,7 @@ func TestRequirementMiddleware_ForcedToolRestriction(t *testing.T) {
 		reqs := []Requirement{
 			&mockRequirement{
 				rules: []Rule{
-					{TargetTool: "think", Allowed: true, Forced: true},
+					{TargetTool: "think", Forced: true},
 				},
 			},
 		}
@@ -352,10 +352,10 @@ func TestRequirementMiddleware_ForbiddenOverridesForced(t *testing.T) {
 	t.Run("forbidden by one requirement overrides forced by another", func(t *testing.T) {
 		reqs := []Requirement{
 			&mockRequirement{
-				rules: []Rule{{TargetTool: "think", Allowed: true, Forced: true}},
+				rules: []Rule{{TargetTool: "think", Forced: true}},
 			},
 			&mockRequirement{
-				rules: []Rule{{TargetTool: "think", Allowed: false}},
+				rules: []Rule{{TargetTool: "think", Blocked: true}},
 			},
 		}
 
@@ -389,7 +389,7 @@ func TestRequirementMiddleware_PreventStopWithoutToolInList(t *testing.T) {
 		reqs := []Requirement{
 			&mockRequirement{
 				rules: []Rule{
-					{TargetTool: "missing_tool", Allowed: true, PreventStop: true},
+					{TargetTool: "missing_tool", PreventStop: true},
 				},
 			},
 		}
@@ -429,7 +429,7 @@ func TestRequirementMiddleware_ForcedToolNotInList(t *testing.T) {
 		reqs := []Requirement{
 			&mockRequirement{
 				rules: []Rule{
-					{TargetTool: "think", Allowed: true, Forced: true},
+					{TargetTool: "think", Forced: true},
 				},
 			},
 		}

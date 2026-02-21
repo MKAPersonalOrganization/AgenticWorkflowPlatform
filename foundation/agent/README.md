@@ -158,9 +158,16 @@ config := agent.Config{
     Description: "A helpful math tutor",
     SystemPrompt: "You are a patient math tutor...",
     Tools:       []agent.Tool{calculator, grapher},
-    Capabilities: agent.Capabilities{
-        RequireUserInput: true,
-        LongTermMemory:   true,
+
+    // Declarative requirements: evaluated before each LLM turn.
+    // ToolProvider requirements auto-contribute tools.
+    // PromptProvider requirements auto-contribute to the system prompt.
+    Requirements: []agent.Requirement{
+        agent.NewRequireUserInput(),                                       // quiz tools
+        agent.NewConditionalRequirement("think", agent.ForceAtStep(1)),    // force think first
+        agent.Require("limit-search", func(ctx context.Context, inv *agent.Invocation) ([]agent.Rule, error) {
+            return []agent.Rule{{TargetTool: "search", Blocked: true, Reason: "max reached"}}, nil
+        }),
     },
 }
 

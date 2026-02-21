@@ -2,18 +2,23 @@ package agent
 
 import (
 	"fmt"
+	"sort"
 )
 
-// RequirementMiddleware creates a Middleware that enforces deterministic rules
-// before the Invocation reaches the LLM adapter (ChatOp).
+// RequirementMiddleware creates a Chat-level Middleware that acts as a
+// declarative Reasoner — evaluating all Requirements, resolving conflicts
+// by priority, and enforcing the result on the LLM call.
 //
-// The middleware evaluates all Requirements against the current conversation state,
-// aggregates the resulting Rules, and enforces them by:
-//   - Filtering c.Chat.Tools (removing disallowed tools)
-//   - Restricting c.Chat.Tools to only forced tools (when applicable)
-//   - Setting c.Chat.Options.ToolChoice to force specific tool usage
-//   - Prepending system messages as additional enforcement
-//   - Preventing early stopping when requirements are not yet satisfied
+// This is the Go equivalent of BeeAI's RequirementsReasoner.
+//
+// Resolution algorithm (per tool):
+//  1. Collect all Rules from all enabled Requirements
+//  2. Group rules by TargetTool
+//  3. Allowed=false is a hard veto — always wins regardless of priority
+//  4. Hidden=true is sticky — any rule can hide a tool
+//  5. Forced=true resolved by highest priority when conflicting
+//  6. PreventStop accumulates — any rule can prevent stopping
+//  7. Reasons are collected from highest-priority rule per tool
 func RequirementMiddleware(reqs ...Requirement) Middleware {
 	return func(next Handler) Handler {
 		return HandlerFunc(func(c *Context) error {
@@ -21,7 +26,7 @@ func RequirementMiddleware(reqs ...Requirement) Middleware {
 				return next.Handle(c)
 			}
 
-			// Build an Invocation from the current Chat context for requirement evaluation.
+			// Build an Invocation from the current Chat context.
 			inv := &Invocation{
 				History: make([]*Message, len(c.Chat.Messages)),
 				Tools:   c.Chat.Tools,
@@ -30,9 +35,13 @@ func RequirementMiddleware(reqs ...Requirement) Middleware {
 				inv.History[i] = m.Clone()
 			}
 
-			// 1. Evaluate all Requirements.
+			// 1. Evaluate all enabled Requirements → collect Rules.
 			var allRules []Rule
 			for _, req := range reqs {
+				// Skip disabled requirements.
+				if e, ok := req.(Enableable); ok && !e.Enabled() {
+					continue
+				}
 				rules, err := req.Run(c, inv)
 				if err != nil {
 					return fmt.Errorf("requirement evaluation failed: %w", err)
@@ -40,119 +49,190 @@ func RequirementMiddleware(reqs ...Requirement) Middleware {
 				allRules = append(allRules, rules...)
 			}
 
-			// 2. Aggregate rules per tool.
-			//    Conflict resolution: forbidden overrides forced, PreventStop accumulates.
-			type toolState struct {
-				Allowed, Forced bool
-			}
-			states := make(map[string]*toolState)
-			for _, t := range c.Chat.Tools {
-				states[t.Name()] = &toolState{Allowed: true}
+			if len(allRules) == 0 {
+				return next.Handle(c)
 			}
 
-			globalPreventStop := false
-			var forcedToolNames []string
+			// 2. Resolve rules into a RequirementRequest.
+			request := resolveRules(allRules, c.Chat.Tools)
 
-			for _, r := range allRules {
-				if r.PreventStop {
-					globalPreventStop = true
-				}
-				if r.Forced {
-					forcedToolNames = append(forcedToolNames, r.TargetTool)
-				}
-				if state, ok := states[r.TargetTool]; ok {
-					if !r.Allowed {
-						state.Allowed = false
-					}
-					if r.Forced {
-						state.Forced = true
-					}
-				}
-			}
-
-			// Remove forced names that are also forbidden.
-			forbidden := make(map[string]bool)
-			for name, st := range states {
-				if !st.Allowed {
-					forbidden[name] = true
-				}
-			}
-			{
-				clean := forcedToolNames[:0]
-				for _, n := range forcedToolNames {
-					if !forbidden[n] {
-						clean = append(clean, n)
-					}
-				}
-				forcedToolNames = clean
-			}
-
-			// 3. Build filtered and forced tool lists.
-			var filteredTools, forcedTools []Tool
-			for _, t := range c.Chat.Tools {
-				st := states[t.Name()]
-				if !st.Allowed {
-					continue
-				}
-				filteredTools = append(filteredTools, t)
-				if st.Forced {
-					forcedTools = append(forcedTools, t)
-				}
-			}
-
-			// Ensure ChatOptions exists for writing ToolChoice.
-			if c.Chat.Options == nil {
-				c.Chat.Options = &ChatOptions{}
-			}
-
-			// 4. Apply forced tools: restrict available tools + set ToolChoice.
-			if len(forcedTools) > 0 {
-				c.Chat.Tools = forcedTools
-
-				instr := "CRITICAL SYSTEM INSTRUCTION: You MUST use one of the following tools immediately: "
-				for i, ft := range forcedTools {
-					if i > 0 {
-						instr += ", "
-					}
-					instr += "'" + ft.Name() + "'"
-				}
-				c.Chat.Messages = append([]Message{*NewSystemMessage(instr)}, c.Chat.Messages...)
-
-				if len(forcedTools) == 1 {
-					c.Chat.Options.ToolChoice = forcedTools[0].Name()
-				} else {
-					c.Chat.Options.ToolChoice = "required"
-				}
-			} else if len(forcedToolNames) > 0 {
-				// Forced by name but tool not in the tools list — still enforce.
-				instr := "CRITICAL SYSTEM INSTRUCTION: You MUST use one of the following tools immediately: "
-				for i, name := range forcedToolNames {
-					if i > 0 {
-						instr += ", "
-					}
-					instr += "'" + name + "'"
-				}
-				c.Chat.Messages = append([]Message{*NewSystemMessage(instr)}, c.Chat.Messages...)
-
-				if len(forcedToolNames) == 1 {
-					c.Chat.Options.ToolChoice = forcedToolNames[0]
-				} else {
-					c.Chat.Options.ToolChoice = "required"
-				}
-			} else if len(filteredTools) < len(c.Chat.Tools) {
-				// Some tools filtered out, none forced.
-				c.Chat.Tools = filteredTools
-			}
-
-			// 5. PreventStop: block the agent from finishing prematurely.
-			if globalPreventStop && len(forcedTools) == 0 && len(forcedToolNames) == 0 {
-				c.Chat.Messages = append([]Message{*NewSystemMessage(
-					"CRITICAL SYSTEM INSTRUCTION: You cannot provide a final answer yet. You must continue using tools.",
-				)}, c.Chat.Messages...)
-				c.Chat.Options.ToolChoice = "required"
-			}
+			// 3. Apply the resolved request to the Chat context.
+			applyRequest(c, request)
 
 			return next.Handle(c)
 		})
+	}
+}
+
+// resolveRules aggregates rules per tool and resolves conflicts by priority.
+// This is the core "Reasoner" algorithm inspired by BeeAI's RequirementsReasoner.
+func resolveRules(rules []Rule, tools []Tool) RequirementRequest {
+	// Group rules by target tool.
+	type toolRules struct {
+		rules []Rule
+	}
+	grouped := make(map[string]*toolRules)
+	for _, r := range rules {
+		if _, ok := grouped[r.TargetTool]; !ok {
+			grouped[r.TargetTool] = &toolRules{}
+		}
+		grouped[r.TargetTool].rules = append(grouped[r.TargetTool].rules, r)
+	}
+
+	// Resolve per-tool state.
+	type resolvedTool struct {
+		allowed     bool
+		forced      bool
+		hidden      bool
+		preventStop bool
+		reason      string
+	}
+	resolved := make(map[string]*resolvedTool)
+
+	for toolName, tr := range grouped {
+		rt := &resolvedTool{allowed: true}
+
+		// Sort rules by priority descending for forced/reason resolution.
+		sorted := make([]Rule, len(tr.rules))
+		copy(sorted, tr.rules)
+		sort.Slice(sorted, func(i, j int) bool {
+			return sorted[i].Priority > sorted[j].Priority
+		})
+
+		for _, r := range sorted {
+			// Blocked=true is a hard veto — always wins.
+			if r.Blocked {
+				rt.allowed = false
+			}
+			// Hidden is sticky — any rule can hide.
+			if r.Hidden {
+				rt.hidden = true
+			}
+			// PreventStop accumulates.
+			if r.PreventStop {
+				rt.preventStop = true
+			}
+		}
+
+		// Forced and Reason come from the highest-priority rule.
+		if len(sorted) > 0 && sorted[0].Forced && rt.allowed {
+			rt.forced = true
+		}
+		if len(sorted) > 0 && sorted[0].Reason != "" {
+			rt.reason = sorted[0].Reason
+		}
+
+		resolved[toolName] = rt
+	}
+
+	// Build the RequirementRequest.
+	req := RequirementRequest{
+		CanFinish: true,
+		Reasons:   make(map[string]string),
+	}
+
+	// Collect global PreventStop.
+	for _, rt := range resolved {
+		if rt.preventStop {
+			req.CanFinish = false
+			break
+		}
+	}
+
+	// Collect forced tools.
+	for toolName, rt := range resolved {
+		if rt.forced {
+			req.ForcedTools = append(req.ForcedTools, toolName)
+		}
+		if rt.reason != "" {
+			req.Reasons[toolName] = rt.reason
+		}
+	}
+
+	// Filter tools.
+	for _, t := range tools {
+		rt, hasRules := resolved[t.Name()]
+		if !hasRules {
+			// No rules for this tool — allowed by default.
+			req.AllowedTools = append(req.AllowedTools, t)
+			continue
+		}
+		if rt.hidden {
+			req.HiddenTools = append(req.HiddenTools, t.Name())
+			continue
+		}
+		if !rt.allowed {
+			continue // blocked
+		}
+		req.AllowedTools = append(req.AllowedTools, t)
+	}
+
+	// Determine ToolChoice.
+	switch len(req.ForcedTools) {
+	case 0:
+		if !req.CanFinish {
+			req.ToolChoice = "required"
+		}
+	case 1:
+		req.ToolChoice = req.ForcedTools[0]
+	default:
+		req.ToolChoice = "required"
+	}
+
+	return req
+}
+
+// applyRequest enforces the RequirementRequest on the Chat context.
+func applyRequest(c *Context, req RequirementRequest) {
+	// Ensure ChatOptions exists.
+	if c.Chat.Options == nil {
+		c.Chat.Options = &ChatOptions{}
+	}
+
+	// Apply tool filtering.
+	if len(req.ForcedTools) > 0 {
+		// When tools are forced, restrict to only forced tools.
+		forced := make(map[string]bool, len(req.ForcedTools))
+		for _, name := range req.ForcedTools {
+			forced[name] = true
+		}
+		var forcedTools []Tool
+		for _, t := range req.AllowedTools {
+			if forced[t.Name()] {
+				forcedTools = append(forcedTools, t)
+			}
+		}
+		if len(forcedTools) > 0 {
+			c.Chat.Tools = forcedTools
+		} else {
+			c.Chat.Tools = req.AllowedTools
+		}
+
+		// Build instruction with reasons.
+		instr := "CRITICAL SYSTEM INSTRUCTION: You MUST use one of the following tools immediately: "
+		for i, name := range req.ForcedTools {
+			if i > 0 {
+				instr += ", "
+			}
+			instr += "'" + name + "'"
+			if reason, ok := req.Reasons[name]; ok {
+				instr += " (" + reason + ")"
+			}
+		}
+		c.Chat.Messages = append([]Message{*NewSystemMessage(instr)}, c.Chat.Messages...)
+	} else {
+		c.Chat.Tools = req.AllowedTools
+	}
+
+	// Apply ToolChoice.
+	if req.ToolChoice != "" {
+		c.Chat.Options.ToolChoice = req.ToolChoice
+	}
+
+	// Apply PreventStop.
+	if !req.CanFinish && len(req.ForcedTools) == 0 {
+		c.Chat.Messages = append([]Message{*NewSystemMessage(
+			"CRITICAL SYSTEM INSTRUCTION: You cannot provide a final answer yet. You must continue using tools.",
+		)}, c.Chat.Messages...)
 	}
 }

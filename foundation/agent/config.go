@@ -40,6 +40,22 @@ type Config struct {
 	// SubAgents are child agents for hierarchical delegation.
 	SubAgents []Agent
 
+	// Requirements are declarative constraints evaluated before each LLM turn.
+	// Requirements that implement ToolProvider automatically contribute tools.
+	// Requirements that implement PromptProvider automatically contribute to the system prompt.
+	// The RequirementMiddleware is automatically wired when Requirements is non-empty.
+	//
+	// Example:
+	//
+	//    Requirements: []agent.Requirement{
+	//        agent.NewRequireUserInput(),
+	//        agent.NewConditionalRequirement("think", agent.ForceAtStep(1)),
+	//        agent.Require("custom", func(ctx context.Context, inv *agent.Invocation) ([]agent.Rule, error) {
+	//            return []agent.Rule{{TargetTool: "search", Blocked: true}}, nil
+	//        }),
+	//    },
+	Requirements []Requirement
+
 	// Capabilities enables specific agent behaviors.
 	Capabilities Capabilities
 
@@ -79,12 +95,10 @@ type Config struct {
 }
 
 // Capabilities defines specific behaviors/features the agent requires.
+//
+// For tool-access constraints, quiz tools, and human-in-the-loop flows,
+// use the declarative Requirements system on Config instead.
 type Capabilities struct {
-	// RequireUserInput enables the agent to request structured user input
-	// (quizzes, true/false questions) during execution.
-	// This uses the Requirement pattern from the beeai-framework.
-	RequireUserInput bool
-
 	// LongTermMemory enables access to the user's long-term memory store.
 	LongTermMemory bool
 
@@ -107,4 +121,28 @@ func DefaultConfig(name string) Config {
 		Name:          name,
 		MaxIterations: 10,
 	}
+}
+
+// CollectRequirementTools returns all tools provided by Requirements
+// that implement ToolProvider.
+func (cfg *Config) CollectRequirementTools() []ExecutableTool {
+	var tools []ExecutableTool
+	for _, req := range cfg.Requirements {
+		if tp, ok := req.(ToolProvider); ok {
+			tools = append(tools, tp.ProvidedTools()...)
+		}
+	}
+	return tools
+}
+
+// CollectRequirementPrompts returns concatenated prompt additions from
+// Requirements that implement PromptProvider.
+func (cfg *Config) CollectRequirementPrompts() string {
+	var additions string
+	for _, req := range cfg.Requirements {
+		if pp, ok := req.(PromptProvider); ok {
+			additions += "\n\n" + pp.PromptAddition()
+		}
+	}
+	return additions
 }

@@ -64,8 +64,10 @@ func NewStatisticsInstructorConfig(ctx context.Context) (agent.Config, error) {
 		MaxIterations: 20,
 		SystemPrompt:  prompt,
 		Tools:         []agent.Tool{}, // Tools managed via permissions service
-		Capabilities: agent.Capabilities{
-			RequireUserInput: true,
+
+		// Declarative requirements: the framework auto-wires tools, prompts, and middleware.
+		Requirements: []agent.Requirement{
+			agent.NewRequireUserInput(),
 		},
 	}, nil
 }

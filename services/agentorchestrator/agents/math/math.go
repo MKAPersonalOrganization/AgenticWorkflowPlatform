@@ -63,13 +63,13 @@ func NewMathInstructorConfig(ctx context.Context, artifactStore artifact.Service
 		MaxIterations: 20,
 		SystemPrompt:  prompt,
 		Tools:         []agent.Tool{}, // Tools managed via permissions service
-		ChatMiddlewares: []agent.Middleware{
-			agent.RequirementMiddleware(
-				agent.NewConditionalRequirement("think", agent.ForceAtStep(1)),
-			),
-		},
-		Capabilities: agent.Capabilities{
-			RequireUserInput: true,
+
+		// Declarative requirements: evaluated before each LLM turn.
+		// The framework auto-wires ToolProvider tools, PromptProvider prompts,
+		// and the RequirementMiddleware from this list.
+		Requirements: []agent.Requirement{
+			agent.NewRequireUserInput(),
+			agent.NewConditionalRequirement("think", agent.ForceAtStep(1)),
 		},
 	}, nil
 }

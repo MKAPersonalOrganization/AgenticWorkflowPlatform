@@ -2,12 +2,20 @@ package agent
 
 import "context"
 
-// ConditionalRequirement enforces rules for a specific tool based on
+// ConditionalRequirement enforces declarative rules for a specific tool based on
 // the current state of the conversation (step number, tool history, etc.).
 //
 // This is the Go port of beeai-framework's ConditionalRequirement.
 // It evaluates the conversation history to produce Rules that constrain
 // which tools the agent can use on the current turn.
+//
+// Usage:
+//
+//	agent.NewConditionalRequirement("think",
+//	    agent.ForceAtStep(1),
+//	    agent.WithPriority(10),
+//	    agent.WithReason("Must think before acting"),
+//	)
 type ConditionalRequirement struct {
 	TargetTool         string
 	ForceAtStep        int
@@ -17,10 +25,23 @@ type ConditionalRequirement struct {
 	ForceAfterAny      bool // Force after ANY tool call (beeai's force_after=Tool)
 	MinInvocations     int
 	ConsecutiveAllowed bool // Defaults to true
+
+	// Priority controls conflict resolution. Higher priority wins.
+	RulePriority int
+
+	// Reason is a human-readable explanation included in rules.
+	RuleReason string
+
+	// IsEnabled controls whether this requirement is evaluated.
+	// Defaults to true.
+	IsEnabled bool
 }
 
-// Ensure it implements the interface
-var _ Requirement = (*ConditionalRequirement)(nil)
+// Ensure it implements the interfaces.
+var (
+	_ Requirement = (*ConditionalRequirement)(nil)
+	_ Enableable  = (*ConditionalRequirement)(nil)
+)
 
 // NewConditionalRequirement creates a new conditional requirement.
 func NewConditionalRequirement(targetTool string, opts ...func(*ConditionalRequirement)) *ConditionalRequirement {
@@ -30,12 +51,16 @@ func NewConditionalRequirement(targetTool string, opts ...func(*ConditionalRequi
 		MaxInvocations:     -1, // -1 means infinite
 		MinInvocations:     0,
 		ConsecutiveAllowed: true,
+		IsEnabled:          true,
 	}
 	for _, opt := range opts {
 		opt(req)
 	}
 	return req
 }
+
+// Enabled implements Enableable.
+func (c *ConditionalRequirement) Enabled() bool { return c.IsEnabled }
 
 // Options for ConditionalRequirement
 
@@ -70,6 +95,21 @@ func PreventConsecutive() func(*ConditionalRequirement) {
 	return func(c *ConditionalRequirement) { c.ConsecutiveAllowed = false }
 }
 
+// WithPriority sets the priority for rules produced by this requirement.
+func WithPriority(p int) func(*ConditionalRequirement) {
+	return func(c *ConditionalRequirement) { c.RulePriority = p }
+}
+
+// WithReason sets a human-readable reason for rules produced by this requirement.
+func WithReason(reason string) func(*ConditionalRequirement) {
+	return func(c *ConditionalRequirement) { c.RuleReason = reason }
+}
+
+// WithEnabled sets whether this requirement is active.
+func WithEnabled(enabled bool) func(*ConditionalRequirement) {
+	return func(c *ConditionalRequirement) { c.IsEnabled = enabled }
+}
+
 // extractToolHistory scans the conversation history and returns step count,
 // target tool invocations, last tool used, and the set of all tools used.
 func (c *ConditionalRequirement) extractToolHistory(inv *Invocation) (stepCount int, invocationsOfTarget int, lastToolUsed string, toolsUsed map[string]bool) {
@@ -99,15 +139,16 @@ func (c *ConditionalRequirement) extractToolHistory(inv *Invocation) (stepCount 
 func (c *ConditionalRequirement) Run(ctx context.Context, inv *Invocation) ([]Rule, error) {
 	rule := Rule{
 		TargetTool: c.TargetTool,
-		Allowed:    true,
-		Forced:     false,
+		Priority:   c.RulePriority,
+		Reason:     c.RuleReason,
+		// Blocked/Forced default to false (zero value) — computed below.
 	}
 
 	stepCount, invocationsOfTarget, lastToolUsed, toolsUsed := c.extractToolHistory(inv)
 
-	// 1. Max Invocations Check — hard limit, disallows tool entirely
+	// 1. Max Invocations Check — hard limit, blocks tool entirely
 	if c.MaxInvocations >= 0 && invocationsOfTarget >= c.MaxInvocations {
-		rule.Allowed = false
+		rule.Blocked = true
 		return []Rule{rule}, nil
 	}
 
@@ -115,7 +156,7 @@ func (c *ConditionalRequirement) Run(ctx context.Context, inv *Invocation) ([]Ru
 	if len(c.OnlyAfter) > 0 {
 		for _, requiredTool := range c.OnlyAfter {
 			if !toolsUsed[requiredTool] {
-				rule.Allowed = false
+				rule.Blocked = true
 				return []Rule{rule}, nil
 			}
 		}
@@ -152,7 +193,7 @@ func (c *ConditionalRequirement) Run(ctx context.Context, inv *Invocation) ([]Ru
 	// 4. Consecutive Check — prevents the same tool from being called twice in a row.
 	//    This overrides forcing: if the target was just used, it cannot be forced again.
 	if !c.ConsecutiveAllowed && lastToolUsed == c.TargetTool {
-		rule.Allowed = false
+		rule.Blocked = true
 		rule.Forced = false
 		return []Rule{rule}, nil
 	}
@@ -160,7 +201,7 @@ func (c *ConditionalRequirement) Run(ctx context.Context, inv *Invocation) ([]Ru
 	// 5. Apply forcing
 	if forced {
 		rule.Forced = true
-		rule.Allowed = true
+		// Blocked stays false (zero value) — tool is available.
 	}
 
 	// 6. Prevent Stop (if min invocations not yet met)
