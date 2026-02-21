@@ -518,7 +518,23 @@ export function createUIMethods() {
         },
 
         /**
-         * Scroll to bottom of message list
+         * Fast scroll-to-bottom for streaming. Uses a direct scrollTop assignment
+         * which is synchronous, single-frame, and produces zero animation jitter.
+         * This should be the ONLY scroll method called during active token streaming.
+         */
+        __scrollToBottomStreaming() {
+            if (this.__abortScroll) return;
+
+            const container = this.$refs?.messageList;
+            if (!container || !container.isConnected) return;
+
+            // Direct assignment — no scrollIntoView, no behavior animation, no reflow fight
+            container.scrollTop = container.scrollHeight;
+        },
+
+        /**
+         * Scroll to bottom of message list (for non-streaming contexts:
+         * thread switch, history load, button click, post-stream).
          * @param {Object} options - Scroll options
          * @param {string} options.behavior - Scroll behavior ('auto', 'smooth', 'instant')
          * @param {boolean} options.force - If true, use deferred retries to ensure layout is ready
