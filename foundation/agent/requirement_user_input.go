@@ -6,23 +6,27 @@ import (
 	"strings"
 )
 
-// RequireUserInput is a Requirement that enables the agent to request
-// structured user input (quizzes, true/false) before proceeding.
+// RequireUserInput is a declarative Requirement that enables the agent
+// to request structured user input (quizzes, true/false) during execution.
 //
-// This replaces the old ElicitationMiddleware by making user-input collection
-// a declarative requirement following the beeai-framework pattern.
+// It implements three interfaces:
+//   - Requirement:    produces rules making quiz tools always available
+//   - ToolProvider:   provides quiz tools (quiz_multiple_choice, quiz_yes_no)
+//   - PromptProvider: contributes system prompt instructions about the tools
 //
-// The requirement:
-//   - Provides quiz tools (quiz_multiple_choice, quiz_yes_no)
-//   - Produces rules that make these tools always available
-//   - Includes a system prompt instructing the LLM about the tools
+// Usage (declarative on Config):
+//
+//	agent.Config{
+//	    Requirements: []agent.Requirement{
+//	        agent.NewRequireUserInput(),
+//	    },
+//	}
 type RequireUserInput struct {
 	tools  []ExecutableTool
 	prompt string
 }
 
-// NewRequireUserInput creates a new RequireUserInput requirement with
-// the standard quiz tools.
+// NewRequireUserInput creates a new RequireUserInput with the standard quiz tools.
 func NewRequireUserInput() *RequireUserInput {
 	return &RequireUserInput{
 		tools: []ExecutableTool{
@@ -42,32 +46,34 @@ You MUST use these tools to verify understanding when appropriate. Arguments are
 	}
 }
 
-// Tools returns the quiz tools this requirement provides.
-func (r *RequireUserInput) Tools() []ExecutableTool {
+// ProvidedTools implements ToolProvider — returns the quiz tools.
+func (r *RequireUserInput) ProvidedTools() []ExecutableTool {
 	return r.tools
 }
 
-// SystemPrompt returns the system prompt additions for quiz tools.
-func (r *RequireUserInput) SystemPrompt() string {
+// PromptAddition implements PromptProvider — returns quiz tool instructions.
+func (r *RequireUserInput) PromptAddition() string {
 	return r.prompt
 }
 
-// Run evaluates the requirement - quiz tools are always allowed when enabled.
+// Run implements Requirement — quiz tools are always allowed when enabled.
 func (r *RequireUserInput) Run(ctx context.Context, inv *Invocation) ([]Rule, error) {
 	rules := make([]Rule, 0, len(r.tools))
 	for _, t := range r.tools {
 		rules = append(rules, Rule{
-			TargetTool:  t.Name(),
-			Allowed:     true,
-			Forced:      false,
-			PreventStop: false,
+			TargetTool: t.Name(),
+			// Blocked: false (zero value) — tools are available.
 		})
 	}
 	return rules, nil
 }
 
 // Verify interface compliance.
-var _ Requirement = (*RequireUserInput)(nil)
+var (
+	_ Requirement    = (*RequireUserInput)(nil)
+	_ ToolProvider   = (*RequireUserInput)(nil)
+	_ PromptProvider = (*RequireUserInput)(nil)
+)
 
 // ==========================================================================
 // Quiz Tools

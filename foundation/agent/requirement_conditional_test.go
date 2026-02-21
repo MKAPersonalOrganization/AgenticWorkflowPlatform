@@ -56,7 +56,7 @@ func TestConditionalRequirement_Run(t *testing.T) {
 		if !rule.Forced {
 			t.Error("expected tool to be forced at step 1")
 		}
-		if !rule.Allowed {
+		if rule.Blocked {
 			t.Error("expected tool to be allowed")
 		}
 	})
@@ -78,7 +78,7 @@ func TestConditionalRequirement_Run(t *testing.T) {
 		if rule.Forced {
 			t.Error("expected tool NOT to be forced at step 2")
 		}
-		if !rule.Allowed {
+		if rule.Blocked {
 			t.Error("expected tool to be allowed")
 		}
 	})
@@ -91,7 +91,7 @@ func TestConditionalRequirement_Run(t *testing.T) {
 			History: []*Message{},
 		}
 		rules1, _ := req.Run(ctx, invBefore)
-		if rules1[0].Allowed {
+		if !rules1[0].Blocked {
 			t.Error("expected search to NOT be allowed before think")
 		}
 
@@ -107,7 +107,7 @@ func TestConditionalRequirement_Run(t *testing.T) {
 			},
 		}
 		rules2, _ := req.Run(ctx, invAfter)
-		if !rules2[0].Allowed {
+		if rules2[0].Blocked {
 			t.Error("expected search to be allowed after think")
 		}
 	})
@@ -127,7 +127,7 @@ func TestConditionalRequirement_Run(t *testing.T) {
 		}
 
 		rules, _ := req.Run(ctx, inv)
-		if rules[0].Allowed {
+		if !rules[0].Blocked {
 			t.Error("expected search to be disallowed because max invocations reached")
 		}
 	})
@@ -147,7 +147,7 @@ func TestConditionalRequirement_Run(t *testing.T) {
 		}
 
 		rules, _ := req.Run(ctx, inv)
-		if rules[0].Allowed {
+		if !rules[0].Blocked {
 			t.Error("expected search to be disallowed consecutively")
 		}
 	})
@@ -269,7 +269,7 @@ func TestConditionalRequirement_ForceAfterAny(t *testing.T) {
 		if !rules[0].Forced {
 			t.Error("expected think forced after search (ForceAfterAny)")
 		}
-		if !rules[0].Allowed {
+		if rules[0].Blocked {
 			t.Error("expected think allowed when forced")
 		}
 	})
@@ -286,7 +286,7 @@ func TestConditionalRequirement_ForceAfterAny(t *testing.T) {
 		}
 		rules, _ := req.Run(ctx, inv)
 		// With PreventConsecutive, think should NOT be allowed
-		if rules[0].Allowed {
+		if !rules[0].Blocked {
 			t.Error("expected think NOT allowed consecutively")
 		}
 		if rules[0].Forced {
@@ -326,7 +326,7 @@ func TestConditionalRequirement_ForceAfterAny(t *testing.T) {
 			historyEntry{role: RoleTool},
 		)}
 		r2, _ := req.Run(ctx, inv2)
-		if r2[0].Allowed {
+		if !r2[0].Blocked {
 			t.Error("step 2: expected think NOT allowed after itself")
 		}
 
@@ -354,7 +354,7 @@ func TestConditionalRequirement_ForceAfterAny(t *testing.T) {
 			historyEntry{role: RoleTool},
 		)}
 		r4, _ := req.Run(ctx, inv4)
-		if r4[0].Allowed {
+		if !r4[0].Blocked {
 			t.Error("step 4: expected think NOT allowed consecutively")
 		}
 	})
@@ -412,7 +412,7 @@ func TestConditionalRequirement_OnlyAfter_MultiplePrereqs(t *testing.T) {
 	t.Run("blocked when no prerequisites met", func(t *testing.T) {
 		inv := &Invocation{History: buildHistory(historyEntry{role: RoleUser})}
 		rules, _ := req.Run(ctx, inv)
-		if rules[0].Allowed {
+		if !rules[0].Blocked {
 			t.Error("expected finalize blocked (no prerequisites met)")
 		}
 	})
@@ -426,7 +426,7 @@ func TestConditionalRequirement_OnlyAfter_MultiplePrereqs(t *testing.T) {
 			),
 		}
 		rules, _ := req.Run(ctx, inv)
-		if rules[0].Allowed {
+		if !rules[0].Blocked {
 			t.Error("expected finalize blocked (only think met, search missing)")
 		}
 	})
@@ -442,7 +442,7 @@ func TestConditionalRequirement_OnlyAfter_MultiplePrereqs(t *testing.T) {
 			),
 		}
 		rules, _ := req.Run(ctx, inv)
-		if !rules[0].Allowed {
+		if rules[0].Blocked {
 			t.Error("expected finalize allowed (all prerequisites met)")
 		}
 	})
@@ -459,7 +459,7 @@ func TestConditionalRequirement_MaxInvocations_EdgeCases(t *testing.T) {
 		req := NewConditionalRequirement("search", MaxInvocations(0))
 		inv := &Invocation{History: buildHistory(historyEntry{role: RoleUser})}
 		rules, _ := req.Run(ctx, inv)
-		if rules[0].Allowed {
+		if !rules[0].Blocked {
 			t.Error("expected search disallowed with max=0")
 		}
 	})
@@ -478,7 +478,7 @@ func TestConditionalRequirement_MaxInvocations_EdgeCases(t *testing.T) {
 			),
 		}
 		rules, _ := req.Run(ctx, inv)
-		if !rules[0].Allowed {
+		if rules[0].Blocked {
 			t.Error("expected search allowed with unlimited max")
 		}
 	})
@@ -487,7 +487,7 @@ func TestConditionalRequirement_MaxInvocations_EdgeCases(t *testing.T) {
 		req := NewConditionalRequirement("think", ForceAtStep(1), MaxInvocations(0))
 		inv := &Invocation{History: buildHistory(historyEntry{role: RoleUser})}
 		rules, _ := req.Run(ctx, inv)
-		if rules[0].Allowed {
+		if !rules[0].Blocked {
 			t.Error("expected MaxInvocations(0) to override ForceAtStep")
 		}
 		if rules[0].Forced {
@@ -561,7 +561,7 @@ func TestConditionalRequirement_CombinedRules(t *testing.T) {
 		if !thinkRules[0].Forced {
 			t.Error("step 1: think should be forced")
 		}
-		if searchRules[0].Allowed {
+		if !searchRules[0].Blocked {
 			t.Error("step 1: search should NOT be allowed (think not done yet)")
 		}
 
@@ -574,10 +574,10 @@ func TestConditionalRequirement_CombinedRules(t *testing.T) {
 		thinkRules2, _ := thinkReq.Run(ctx, inv2)
 		searchRules2, _ := searchReq.Run(ctx, inv2)
 
-		if thinkRules2[0].Allowed {
+		if !thinkRules2[0].Blocked {
 			t.Error("step 2: think should NOT be allowed (consecutive)")
 		}
-		if !searchRules2[0].Allowed {
+		if searchRules2[0].Blocked {
 			t.Error("step 2: search should be allowed (think prerequisite met)")
 		}
 
