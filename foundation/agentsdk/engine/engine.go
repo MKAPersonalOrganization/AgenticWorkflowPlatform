@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"iter"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/internal/llm"
+	"school-with-ai/foundation/agentsdk/io"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -507,8 +509,6 @@ func (e *Engine) newAgentInstance(ctx context.Context, name string) (*AgentInsta
 	}, nil
 }
 
-// PersistenceUnit is deprecated.
-
 // ToolProcessor handles the execution of tools and determination of next steps.
 type ToolProcessor struct{}
 
@@ -588,7 +588,52 @@ func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolve
 				execErr = err
 			}
 
-			// Prepare result for state machine (always, even for elicitation/auth)
+			// ── IO sentinel error detection ──────────────────────────
+			// Check for io.ErrInputRequired / io.ErrAuthRequired BEFORE
+			// building the tool result. These sentinel errors are returned
+			// by io.Handler implementations (e.g., PauseHandler) or by
+			// the AskPermission middleware when tools need user interaction.
+			//
+			// This bridges BeeAI's blocking IO model to Go's pause-and-resume:
+			//   io.ErrInputRequired → tsm.NeedsInput() → AwaitingInput
+			//   io.ErrAuthRequired  → tsm.NeedsAuth()  → AwaitingAuth
+			var ioInputErr *io.ErrInputRequired
+			var ioAuthErr *io.ErrAuthRequired
+
+			if execErr != nil && errors.As(execErr, &ioInputErr) {
+				toolResult := &core.ToolExecutionResult{
+					ToolCallID:    tc.ID,
+					ToolName:      tc.Name,
+					Arguments:     tc.Arguments,
+					Result:        fmt.Sprintf("Requesting input: %s", ioInputErr.Question),
+					IsError:       false,
+					StopIteration: true,
+				}
+				return tsm.NeedsInput(&core.ElicitationSpec{
+					Question: ioInputErr.Question,
+					Schema:   ioInputErr.Schema,
+				}, toolResult)
+			}
+
+			if execErr != nil && errors.As(execErr, &ioAuthErr) {
+				toolResult := &core.ToolExecutionResult{
+					ToolCallID:    tc.ID,
+					ToolName:      tc.Name,
+					Arguments:     tc.Arguments,
+					Result:        fmt.Sprintf("Awaiting authorization: %s", ioAuthErr.Reason),
+					IsError:       false,
+					StopIteration: true,
+				}
+				return tsm.NeedsAuth(&core.AuthorizationSpec{
+					Resource: ioAuthErr.Resource,
+					Action:   ioAuthErr.Action,
+					Reason:   ioAuthErr.Reason,
+					Scopes:   ioAuthErr.Scopes,
+				}, toolResult)
+			}
+			// ── End IO sentinel error detection ──────────────────────
+
+			// Prepare result for state machine
 			toolResult := &core.ToolExecutionResult{
 				ToolCallID:    tc.ID,
 				ToolName:      tc.Name,
@@ -597,16 +642,6 @@ func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolve
 				IsError:       execErr != nil,
 				StopIteration: execResult.StopIteration,
 				Command:       execResult.Command,
-			}
-
-			// Handle elicitation (needs input)
-			if execResult.Command != nil && execResult.Command.Elicitation != nil {
-				return tsm.NeedsInput(execResult.Command.Elicitation, toolResult)
-			}
-
-			// Handle authorization (needs auth)
-			if execResult.Command != nil && execResult.Command.Authorization != nil {
-				return tsm.NeedsAuth(execResult.Command.Authorization, toolResult)
 			}
 
 			// Update state machine based on execution result

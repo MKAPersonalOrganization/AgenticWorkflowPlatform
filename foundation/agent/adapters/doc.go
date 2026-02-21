@@ -6,7 +6,7 @@
 //
 // # Available Adapters
 //
-//   - custom: Wraps foundation/agentsdk (legacy)
+//   - custom: Wraps foundation/agentsdk
 //   - adkgo: Wraps Google ADK-Go
 //   - blades: Wraps Go-Kratos Blades
 //

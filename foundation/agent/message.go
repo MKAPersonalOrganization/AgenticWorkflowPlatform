@@ -134,15 +134,6 @@ type ToolResult struct {
 
 	// IsError indicates whether the execution failed.
 	IsError bool `json:"is_error,omitempty"`
-
-	// RequiresConfirmation indicates this result is a confirmation request.
-	RequiresConfirmation bool `json:"requires_confirmation,omitempty"`
-
-	// ConfirmationHint explains what needs confirmation.
-	ConfirmationHint string `json:"confirmation_hint,omitempty"`
-
-	// ConfirmationPayload contains action details for confirmation.
-	ConfirmationPayload any `json:"confirmation_payload,omitempty"`
 }
 
 // NewUserMessage creates a new user message with text content.

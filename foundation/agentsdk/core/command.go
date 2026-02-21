@@ -12,12 +12,6 @@ type Command struct {
 
 	// StopIteration indicates the engine should stop iterating
 	StopIteration bool
-
-	// Elicitation specifies a request for structured user input
-	Elicitation *ElicitationSpec
-
-	// Authorization specifies a request for user authorization
-	Authorization *AuthorizationSpec
 }
 
 // ElicitationSpec defines the structure for user input requests
