@@ -1,10 +1,6 @@
 package workspaces
 
-import (
-	"time"
-
-	"github.com/google/uuid"
-)
+import "github.com/google/uuid"
 
 // CreateWorkspaceRequest represents the payload to create a new workspace.
 type CreateWorkspaceRequest struct {
@@ -17,6 +13,8 @@ type CreateWorkspaceRequest struct {
 	EmbeddingModel     *string `json:"embedding_model,omitempty"`
 	EmbeddingProvider  *string `json:"embedding_provider,omitempty"`
 	EmbeddingDimension *int    `json:"embedding_dimension,omitempty"`
+	VisionProvider     *string `json:"vision_provider,omitempty"`
+	VisionModel        *string `json:"vision_model,omitempty"`
 }
 
 // WorkspaceResponse represents a single workspace returned by the API.
@@ -35,8 +33,10 @@ type WorkspaceResponse struct {
 	EmbeddingProvider  string    `json:"embedding_provider"`
 	EmbeddingDimension int       `json:"embedding_dimension"`
 	EmbeddingFullID    string    `json:"embedding_full_id"`
-	CreatedAt          time.Time `json:"created_at"`
-	UpdatedAt          time.Time `json:"updated_at"`
+	VisionProvider     *string   `json:"vision_provider,omitempty"`
+	VisionModel        *string   `json:"vision_model,omitempty"`
+	CreatedAt          string    `json:"created_at"`
+	UpdatedAt          string    `json:"updated_at"`
 }
 
 // WorkspaceListResponse represents a paginated list of workspaces.
@@ -70,6 +70,8 @@ type UpdateWorkspaceRequest struct {
 	EmbeddingModel     *string `json:"embedding_model,omitempty"`
 	EmbeddingProvider  *string `json:"embedding_provider,omitempty"`
 	EmbeddingDimension *int    `json:"embedding_dimension,omitempty"`
+	VisionProvider     *string `json:"vision_provider,omitempty"`
+	VisionModel        *string `json:"vision_model,omitempty"`
 }
 
 // RebuildKnowledgeGraphRequest represents a request to rebuild the knowledge graph.
@@ -78,21 +80,22 @@ type RebuildKnowledgeGraphRequest struct {
 	LlmProvider       *string `json:"llm_provider,omitempty"`
 	Force             bool    `json:"force"`
 	RebuildEmbeddings bool    `json:"rebuild_embeddings"`
+	MaxDocuments      int     `json:"max_documents,omitempty"`
 }
 
 // RebuildKnowledgeGraphResponse represents the response from rebuilding the graph.
 type RebuildKnowledgeGraphResponse struct {
-	WorkspaceID          string  `json:"workspace_id"`
-	Status               string  `json:"status"`
-	NodesCleared         int     `json:"nodes_cleared"`
-	EdgesCleared         int     `json:"edges_cleared"`
-	VectorsCleared       int     `json:"vectors_cleared"`
-	DocumentsToProcess   int     `json:"documents_to_process"`
-	ChunksToProcess      int     `json:"chunks_to_process"`
-	LlmModel             string  `json:"llm_model"`
-	LlmProvider          string  `json:"llm_provider"`
-	EstimatedTimeSeconds *uint64 `json:"estimated_time_seconds,omitempty"`
-	TrackID              *string `json:"track_id,omitempty"`
+	WorkspaceID          uuid.UUID `json:"workspace_id"`
+	Status               string    `json:"status"`
+	NodesCleared         int       `json:"nodes_cleared"`
+	EdgesCleared         int       `json:"edges_cleared"`
+	VectorsCleared       int       `json:"vectors_cleared"`
+	DocumentsToProcess   int       `json:"documents_to_process"`
+	ChunksToProcess      int       `json:"chunks_to_process"`
+	LlmModel             string    `json:"llm_model"`
+	LlmProvider          string    `json:"llm_provider"`
+	EstimatedTimeSeconds *uint64   `json:"estimated_time_seconds,omitempty"`
+	TrackID              *string   `json:"track_id,omitempty"`
 }
 
 // RebuildEmbeddingsRequest represents a request to rebuild embeddings.
@@ -105,16 +108,55 @@ type RebuildEmbeddingsRequest struct {
 
 // RebuildEmbeddingsResponse represents the response from rebuilding embeddings.
 type RebuildEmbeddingsResponse struct {
-	WorkspaceID          string  `json:"workspace_id"`
-	Status               string  `json:"status"`
-	DocumentsToProcess   int     `json:"documents_to_process"`
-	ChunksToProcess      int     `json:"chunks_to_process"`
-	VectorsCleared       int     `json:"vectors_cleared"`
-	EmbeddingModel       string  `json:"embedding_model"`
-	EmbeddingProvider    string  `json:"embedding_provider"`
-	EmbeddingDimension   int     `json:"embedding_dimension"`
-	ModelContextLength   int     `json:"model_context_length"`
-	EstimatedTimeSeconds *uint64 `json:"estimated_time_seconds,omitempty"`
-	JobID                *string `json:"job_id,omitempty"`
-	CompatibilityWarning *string `json:"compatibility_warning,omitempty"`
+	WorkspaceID          uuid.UUID `json:"workspace_id"`
+	Status               string    `json:"status"`
+	DocumentsToProcess   int       `json:"documents_to_process"`
+	ChunksToProcess      int       `json:"chunks_to_process"`
+	VectorsCleared       int       `json:"vectors_cleared"`
+	EmbeddingModel       string    `json:"embedding_model"`
+	EmbeddingProvider    string    `json:"embedding_provider"`
+	EmbeddingDimension   int       `json:"embedding_dimension"`
+	ModelContextLength   int       `json:"model_context_length"`
+	EstimatedTimeSeconds *uint64   `json:"estimated_time_seconds,omitempty"`
+	JobID                *string   `json:"job_id,omitempty"`
+	CompatibilityWarning *string   `json:"compatibility_warning,omitempty"`
+}
+
+// ReprocessAllRequest represents a request to reprocess all documents in a workspace.
+type ReprocessAllRequest struct {
+	IncludeCompleted bool `json:"include_completed"`
+	MaxDocuments     int  `json:"max_documents,omitempty"`
+}
+
+// ReprocessAllResponse represents the response from reprocessing all documents.
+type ReprocessAllResponse struct {
+	TrackID              string    `json:"track_id"`
+	WorkspaceID          uuid.UUID `json:"workspace_id"`
+	Status               string    `json:"status"`
+	DocumentsFound       int       `json:"documents_found"`
+	DocumentsQueued      int       `json:"documents_queued"`
+	DocumentsSkipped     int       `json:"documents_skipped"`
+	EstimatedTimeSeconds *uint64   `json:"estimated_time_seconds,omitempty"`
+}
+
+// MetricsSnapshotDTO represents a single metrics snapshot for historical data.
+type MetricsSnapshotDTO struct {
+	ID                uuid.UUID `json:"id"`
+	RecordedAt        string    `json:"recorded_at"`
+	TriggerType       string    `json:"trigger_type"`
+	DocumentCount     int64     `json:"document_count"`
+	ChunkCount        int64     `json:"chunk_count"`
+	EntityCount       int64     `json:"entity_count"`
+	RelationshipCount int64     `json:"relationship_count"`
+	EmbeddingCount    int64     `json:"embedding_count"`
+	StorageBytes      int64     `json:"storage_bytes"`
+}
+
+// MetricsHistoryResponse represents workspace metrics history with pagination.
+type MetricsHistoryResponse struct {
+	WorkspaceID uuid.UUID            `json:"workspace_id"`
+	Snapshots   []MetricsSnapshotDTO `json:"snapshots"`
+	Count       int                  `json:"count"`
+	Offset      int                  `json:"offset"`
+	Limit       int                  `json:"limit"`
 }

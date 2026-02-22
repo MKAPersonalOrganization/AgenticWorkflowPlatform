@@ -20,14 +20,14 @@ func TestService_List(t *testing.T) {
 				Slug: "test-tenant",
 			},
 		},
-		Total:    1,
-		Page:     1,
-		PageSize: 10,
+		Total:  1,
+		Offset: 0,
+		Limit:  10,
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Verify URL and query params
-		expectedURL := "/api/v1/tenants?page=1&page_size=10"
+		expectedURL := "/api/v1/tenants?offset=0&limit=10"
 		if r.URL.String() != expectedURL {
 			t.Errorf("Expected URL %s, got %s", expectedURL, r.URL.String())
 		}
@@ -38,7 +38,7 @@ func TestService_List(t *testing.T) {
 	defer server.Close()
 
 	service := NewService(server.URL, nil)
-	resp, err := service.List(context.Background(), 1, 10)
+	resp, err := service.List(context.Background(), 0, 10)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -69,9 +69,10 @@ func TestService_List_Unauthorized(t *testing.T) {
 
 func TestService_Create(t *testing.T) {
 	tenantID := uuid.New()
+	slug := "new-org"
 	mockRequest := CreateTenantRequest{
 		Name: "New Org",
-		Slug: "new-org",
+		Slug: &slug,
 	}
 	mockResponse := TenantResponse{
 		ID:   tenantID,

@@ -4,117 +4,120 @@
 package pipeline
 
 import (
-"context"
-"os"
-"testing"
+	"context"
+	"os"
+	"school-with-ai/domain"
+	"testing"
 
-"school-with-ai/domain"
-
-"github.com/google/uuid"
-"github.com/stretchr/testify/assert"
-"github.com/stretchr/testify/require"
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func testTenantContext() *domain.TenantContext {
-tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
-workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-return &domain.TenantContext{
-TenantID:    &tenantID,
-WorkspaceID: &workspaceID,
-UserID:      "00000000-0000-0000-0000-000000000001",
-Role:        "admin",
-}
+	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
+	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
+	return &domain.TenantContext{
+		TenantID:    &tenantID,
+		WorkspaceID: &workspaceID,
+		UserID:      "00000000-0000-0000-0000-000000000001",
+		Role:        "admin",
+	}
 }
 
 func TestService_Integration_PipelineStatus(t *testing.T) {
-baseURL := os.Getenv("EDGEQUAKE_BASE_URL")
-if baseURL == "" {
-t.Skip("EDGEQUAKE_BASE_URL not set")
-}
+	baseURL := os.Getenv("EDGEQUAKE_BASE_URL")
+	if baseURL == "" {
+		t.Skip("EDGEQUAKE_BASE_URL not set")
+	}
 
-service := NewService(baseURL, nil)
-ctx := context.Background()
-tCtx := testTenantContext()
+	service := NewService(baseURL, nil)
+	ctx := context.Background()
+	tCtx := testTenantContext()
 
-resp, err := service.Status(ctx, tCtx)
-require.NoError(t, err)
-require.NotNil(t, resp)
-assert.GreaterOrEqual(t, resp.PendingTasks, 0)
-assert.GreaterOrEqual(t, resp.ProcessingTasks, 0)
-assert.GreaterOrEqual(t, resp.CompletedTasks, 0)
-assert.GreaterOrEqual(t, resp.FailedTasks, 0)
+	resp, err := service.Status(ctx, tCtx)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.GreaterOrEqual(t, resp.PendingTasks, 0)
+	assert.GreaterOrEqual(t, resp.ProcessingTasks, 0)
+	assert.GreaterOrEqual(t, resp.CompletedTasks, 0)
+	assert.GreaterOrEqual(t, resp.FailedTasks, 0)
 }
 
 func TestService_Integration_PipelineMetrics_NoActiveJob(t *testing.T) {
-baseURL := os.Getenv("EDGEQUAKE_BASE_URL")
-if baseURL == "" {
-t.Skip("EDGEQUAKE_BASE_URL not set")
-}
+	baseURL := os.Getenv("EDGEQUAKE_BASE_URL")
+	if baseURL == "" {
+		t.Skip("EDGEQUAKE_BASE_URL not set")
+	}
 
-service := NewService(baseURL, nil)
-ctx := context.Background()
-tCtx := testTenantContext()
+	service := NewService(baseURL, nil)
+	ctx := context.Background()
+	tCtx := testTenantContext()
 
-// Metrics returns 404 when no pipeline job is active
-_, err := service.Metrics(ctx, tCtx)
-assert.Error(t, err)
-assert.Contains(t, err.Error(), "not found")
+	// Queue metrics are always available (returns zeroed metrics when idle)
+	resp, err := service.Metrics(ctx, tCtx)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.GreaterOrEqual(t, resp.PendingCount, uint64(0))
+	assert.GreaterOrEqual(t, resp.ProcessingCount, uint64(0))
+	assert.GreaterOrEqual(t, resp.MaxWorkers, uint32(0))
+	assert.NotEmpty(t, resp.Timestamp)
 }
 
 func TestService_Integration_PipelineCancel_NoActiveJob(t *testing.T) {
-baseURL := os.Getenv("EDGEQUAKE_BASE_URL")
-if baseURL == "" {
-t.Skip("EDGEQUAKE_BASE_URL not set")
-}
+	baseURL := os.Getenv("EDGEQUAKE_BASE_URL")
+	if baseURL == "" {
+		t.Skip("EDGEQUAKE_BASE_URL not set")
+	}
 
-service := NewService(baseURL, nil)
-ctx := context.Background()
-tCtx := testTenantContext()
+	service := NewService(baseURL, nil)
+	ctx := context.Background()
+	tCtx := testTenantContext()
 
-// Cancel returns 409 when no job is running
-_, err := service.Cancel(ctx, tCtx)
-assert.Error(t, err)
-assert.Contains(t, err.Error(), "409")
+	// Cancel returns 409 when no job is running
+	_, err := service.Cancel(ctx, tCtx)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "409")
 }
 
 func TestService_Integration_PipelineHistory_NoHistory(t *testing.T) {
-baseURL := os.Getenv("EDGEQUAKE_BASE_URL")
-if baseURL == "" {
-t.Skip("EDGEQUAKE_BASE_URL not set")
-}
+	baseURL := os.Getenv("EDGEQUAKE_BASE_URL")
+	if baseURL == "" {
+		t.Skip("EDGEQUAKE_BASE_URL not set")
+	}
 
-service := NewService(baseURL, nil)
-ctx := context.Background()
-tCtx := testTenantContext()
+	service := NewService(baseURL, nil)
+	ctx := context.Background()
+	tCtx := testTenantContext()
 
-// History returns 404 when no cost history exists
-_, err := service.History(ctx, tCtx, nil)
-assert.Error(t, err)
-assert.Contains(t, err.Error(), "not found")
+	// History returns 404 when no cost history exists
+	_, err := service.History(ctx, tCtx, nil)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not found")
 }
 
 func TestService_Integration_PipelineCostEstimate(t *testing.T) {
-baseURL := os.Getenv("EDGEQUAKE_BASE_URL")
-if baseURL == "" {
-t.Skip("EDGEQUAKE_BASE_URL not set")
-}
+	baseURL := os.Getenv("EDGEQUAKE_BASE_URL")
+	if baseURL == "" {
+		t.Skip("EDGEQUAKE_BASE_URL not set")
+	}
 
-service := NewService(baseURL, nil)
-ctx := context.Background()
-tCtx := testTenantContext()
+	service := NewService(baseURL, nil)
+	ctx := context.Background()
+	tCtx := testTenantContext()
 
-estReq := &EstimateCostRequest{
-Model:        "gpt-4",
-InputTokens:  1000,
-OutputTokens: 500,
-}
+	estReq := &EstimateCostRequest{
+		Model:        "gpt-4",
+		InputTokens:  1000,
+		OutputTokens: 500,
+	}
 
-resp, err := service.EstimateCost(ctx, tCtx, estReq)
-require.NoError(t, err)
-require.NotNil(t, resp)
-assert.Equal(t, "gpt-4", resp.Model)
-assert.Equal(t, 1000, resp.InputTokens)
-assert.Equal(t, 500, resp.OutputTokens)
-assert.GreaterOrEqual(t, resp.EstimatedCostUSD, 0.0)
-assert.NotEmpty(t, resp.FormattedCost)
+	resp, err := service.EstimateCost(ctx, tCtx, estReq)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Equal(t, "gpt-4", resp.Model)
+	assert.Equal(t, 1000, resp.InputTokens)
+	assert.Equal(t, 500, resp.OutputTokens)
+	assert.GreaterOrEqual(t, resp.EstimatedCostUSD, 0.0)
+	assert.NotEmpty(t, resp.FormattedCost)
 }

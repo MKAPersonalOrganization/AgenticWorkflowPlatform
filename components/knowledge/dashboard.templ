@@ -32,7 +32,6 @@ templ DashboardPage(props DashboardPageProps) {
 		Title: "Knowledge Base",
 		User:  props.User,
 	}) {
-		@knowledgeScript()
 		<div
 			class="flex-1 overflow-y-auto p-6 md:p-8 space-y-6"
 			x-data="knowledgeDashboard"
@@ -905,7 +904,7 @@ templ knowledgeScript() {
 				},
 
 				async uploadDocument() {
-					if (!this.selectedFile) return;
+					if (!this.selectedFile || this.uploading) return;
 					this.uploading = true;
 					this.uploadError = null;
 
@@ -969,7 +968,7 @@ templ knowledgeScript() {
 				},
 
 				async uploadPdf() {
-					if (!this.selectedFile) return;
+					if (!this.selectedFile || this.uploading) return;
 					this.uploading = true;
 					this.uploadError = null;
 

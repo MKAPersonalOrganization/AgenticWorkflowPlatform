@@ -3,6 +3,7 @@ package workspaces
 // Extended service methods for additional workspace endpoints.
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -12,22 +13,6 @@ import (
 
 	"github.com/google/uuid"
 )
-
-// MetricsHistoryResponse represents workspace metrics history.
-type MetricsHistoryResponse struct {
-	History []MetricsSnapshot `json:"history"`
-}
-
-// MetricsSnapshot represents a single metrics snapshot.
-type MetricsSnapshot struct {
-	Timestamp     string  `json:"timestamp"`
-	DocumentCount int     `json:"document_count"`
-	ChunkCount    int     `json:"chunk_count"`
-	EntityCount   int     `json:"entity_count"`
-	StorageBytes  int64   `json:"storage_bytes"`
-	QueryCount    int     `json:"query_count"`
-	AvgLatencyMs  float64 `json:"avg_latency_ms"`
-}
 
 // MetricsSnapshotTriggerResponse represents the result of triggering a snapshot.
 type MetricsSnapshotTriggerResponse struct {
@@ -123,5 +108,40 @@ func (s *Service) GetBySlug(ctx context.Context, tCtx *domain.TenantContext, slu
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
+	return &response, nil
+}
+
+// ReprocessAllDocuments triggers reprocessing for all documents in the workspace.
+func (s *Service) ReprocessAllDocuments(ctx context.Context, tCtx *domain.TenantContext, workspaceID uuid.UUID, req *ReprocessAllRequest) (*ReprocessAllResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/workspaces/%s/reprocess-documents", s.baseURL, workspaceID.String())
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	s.injectHeaders(httpReq, tCtx)
+
+	resp, err := s.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var response ReprocessAllResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
 	return &response, nil
 }

@@ -111,6 +111,12 @@ func (s *Service) Stream(ctx context.Context, tCtx *domain.TenantContext, req *S
 			if tCtx.WorkspaceID != nil {
 				httpReq.Header.Set("X-Workspace-ID", tCtx.WorkspaceID.String())
 			}
+			if tCtx.UserID != "" {
+				httpReq.Header.Set("X-User-ID", tCtx.UserID)
+			}
+			if tCtx.Role != "" {
+				httpReq.Header.Set("X-User-Role", tCtx.Role)
+			}
 		}
 
 		resp, err := s.httpClient.Do(httpReq)

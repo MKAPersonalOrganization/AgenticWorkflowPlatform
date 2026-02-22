@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"school-with-ai/domain"
+	"school-with-ai/services/rag/tasks"
 )
 
 var (
@@ -365,7 +366,7 @@ func (s *Service) DownloadPDF(ctx context.Context, tCtx *domain.TenantContext, p
 }
 
 // GetPipelineTasks retrieves the current tasks in the pipeline.
-func (s *Service) GetPipelineTasks(ctx context.Context, tCtx *domain.TenantContext, page, pageSize int) (*TaskListResponse, error) {
+func (s *Service) GetPipelineTasks(ctx context.Context, tCtx *domain.TenantContext, page, pageSize int) (*tasks.TaskListResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/tasks?page=%d&page_size=%d", s.baseURL, page, pageSize)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -385,7 +386,7 @@ func (s *Service) GetPipelineTasks(ctx context.Context, tCtx *domain.TenantConte
 		return nil, err
 	}
 
-	var result TaskListResponse
+	var result tasks.TaskListResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("decoding response: %w", err)
 	}
@@ -462,13 +463,10 @@ func (s *Service) ReprocessFailed(ctx context.Context, tCtx *domain.TenantContex
 }
 
 // ScanDocuments triggers scanning of the input directory for new documents.
-func (s *Service) ScanDocuments(ctx context.Context, tCtx *domain.TenantContext, path string) (*ScanDocumentsResponse, error) {
+func (s *Service) ScanDocuments(ctx context.Context, tCtx *domain.TenantContext, scanReq ScanDocumentsRequest) (*ScanDocumentsResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/documents/scan", s.baseURL)
-	reqBody := map[string]string{
-		"path": path,
-	}
 
-	body, _ := json.Marshal(reqBody)
+	body, _ := json.Marshal(scanReq)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)

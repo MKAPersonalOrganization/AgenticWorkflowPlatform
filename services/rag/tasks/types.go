@@ -1,27 +1,29 @@
 package tasks
 
 import (
+	"encoding/json"
+
 	"github.com/google/uuid"
 )
 
 // TaskResponse represents a single task returned by the API.
 type TaskResponse struct {
-	TrackID      string                 `json:"track_id"`
-	TenantID     string                 `json:"tenant_id"`
-	WorkspaceID  string                 `json:"workspace_id"`
-	TaskType     string                 `json:"task_type"`
-	Status       string                 `json:"status"`
-	CreatedAt    string                 `json:"created_at"`
-	UpdatedAt    string                 `json:"updated_at"`
-	StartedAt    *string                `json:"started_at,omitempty"`
-	CompletedAt  *string                `json:"completed_at,omitempty"`
-	ErrorMessage *string                `json:"error_message,omitempty"`
-	Error        *TaskErrorResponse     `json:"error,omitempty"`
-	RetryCount   int32                  `json:"retry_count"`
-	MaxRetries   int32                  `json:"max_retries"`
-	Progress     map[string]interface{} `json:"progress,omitempty"`
-	Result       map[string]interface{} `json:"result,omitempty"`
-	Metadata     map[string]interface{} `json:"metadata,omitempty"`
+	TrackID      string             `json:"track_id"`
+	TenantID     string             `json:"tenant_id"`
+	WorkspaceID  string             `json:"workspace_id"`
+	TaskType     string             `json:"task_type"`
+	Status       string             `json:"status"`
+	CreatedAt    string             `json:"created_at"`
+	UpdatedAt    string             `json:"updated_at"`
+	StartedAt    *string            `json:"started_at,omitempty"`
+	CompletedAt  *string            `json:"completed_at,omitempty"`
+	ErrorMessage *string            `json:"error_message,omitempty"`
+	Error        *TaskErrorResponse `json:"error,omitempty"`
+	RetryCount   int32              `json:"retry_count"`
+	MaxRetries   int32              `json:"max_retries"`
+	Progress     json.RawMessage    `json:"progress,omitempty"`
+	Result       json.RawMessage    `json:"result,omitempty"`
+	Metadata     json.RawMessage    `json:"metadata,omitempty"`
 }
 
 // TaskErrorResponse represents detailed error information for a failed task.

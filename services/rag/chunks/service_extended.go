@@ -12,12 +12,6 @@ import (
 	"school-with-ai/domain"
 )
 
-// ChunkLineageResponse represents lineage information for a chunk.
-type ChunkLineageResponse struct {
-	ChunkID string      `json:"chunk_id"`
-	Lineage interface{} `json:"lineage"`
-}
-
 // GetChunkLineage retrieves lineage for a specific chunk.
 func (s *Service) GetChunkLineage(ctx context.Context, tCtx *domain.TenantContext, chunkID string) (*ChunkLineageResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/chunks/%s/lineage", s.baseURL, url.PathEscape(chunkID))
