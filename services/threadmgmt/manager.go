@@ -63,15 +63,17 @@ func (m *Manager) CreateThread(ctx context.Context, threadID, userID, title stri
 }
 
 // AddUserMessage adds a user message to a thread.
-func (m *Manager) AddUserMessage(ctx context.Context, threadID, messageID, content, userID string) (*domain.ThreadAggregate, *domain.UserMessageAdded, error) {
+// Returns the thread aggregate, the primary UserMessageAdded event, any additional
+// side-effect events (e.g. ThreadTitleUpdated from auto-titling), and an error.
+func (m *Manager) AddUserMessage(ctx context.Context, threadID, messageID, content, userID string) (*domain.ThreadAggregate, *domain.UserMessageAdded, []domain.Event, error) {
 	thread, err := m.threadRepo.Load(ctx, threadID)
 	if errors.Is(err, domain.ErrThreadNotFound) {
 		thread, err = domain.OpenThread(threadID, userID, "New Chat")
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create thread: %w", err)
+			return nil, nil, nil, fmt.Errorf("failed to create thread: %w", err)
 		}
 	} else if err != nil {
-		return nil, nil, fmt.Errorf("failed to load thread: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to load thread: %w", err)
 	}
 
 	isNewThread := thread.GetVersion() == 0
@@ -86,6 +88,10 @@ func (m *Manager) AddUserMessage(ctx context.Context, threadID, messageID, conte
 		"",
 		nil,
 	)
+
+	// Track whether we changed the title for event emission
+	var sideEffects []domain.Event
+
 	// Auto-titling: if the thread is new or has the default "New Chat" title, update it
 	// using the first 50 characters of the user message.
 	if isNewThread || thread.Title == "New Chat" {
@@ -95,6 +101,12 @@ func (m *Manager) AddUserMessage(ctx context.Context, threadID, messageID, conte
 		}
 		if err := thread.ChangeTitle(newTitle); err != nil {
 			m.log.Warn(ctx, "failed to auto-generate thread title", "error", err)
+		} else {
+			sideEffects = append(sideEffects, &domain.ThreadTitleUpdated{
+				ThreadID:  threadID,
+				Title:     newTitle,
+				Timestamp: time.Now(),
+			})
 		}
 	}
 
@@ -104,14 +116,14 @@ func (m *Manager) AddUserMessage(ctx context.Context, threadID, messageID, conte
 			if errors.Is(err, domain.ErrConcurrencyConflict) {
 				// Reload if already exists
 				t, err := m.threadRepo.Load(ctx, threadID)
-				return t, nil, err
+				return t, nil, nil, err
 			}
-			return nil, nil, fmt.Errorf("failed to save new thread: %w", err)
+			return nil, nil, nil, fmt.Errorf("failed to save new thread: %w", err)
 		}
 	} else {
 		err = m.threadRepo.Save(ctx, thread)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to save thread: %w", err)
+			return nil, nil, nil, fmt.Errorf("failed to save thread: %w", err)
 		}
 	}
 
@@ -122,7 +134,7 @@ func (m *Manager) AddUserMessage(ctx context.Context, threadID, messageID, conte
 		Timestamp: time.Now(),
 	}
 
-	return thread, event, nil
+	return thread, event, sideEffects, nil
 }
 
 // AddAssistantMessage adds an assistant message to the thread.

@@ -141,7 +141,7 @@ func TestManager_AutoTitling(t *testing.T) {
 
 		// 2. Add first user message
 		messageContent := "This is a long message that should be truncated for the title"
-		_, _, err = mgr.AddUserMessage(ctx, threadID, "msg-1", messageContent, "user-1")
+		_, _, _, err = mgr.AddUserMessage(ctx, threadID, "msg-1", messageContent, "user-1")
 		if err != nil {
 			t.Fatalf("Failed to add user message: %v", err)
 		}
@@ -175,7 +175,7 @@ func TestManager_AutoTitling(t *testing.T) {
 		mgr.CreateThread(ctx, threadID, "user-1", "Custom Title")
 
 		// 2. Add user message
-		mgr.AddUserMessage(ctx, threadID, "msg-1", "Some content", "user-1")
+		_, _, _, _ = mgr.AddUserMessage(ctx, threadID, "msg-1", "Some content", "user-1")
 
 		// 3. Verify title remains the same
 		thread, _ := repo.Load(ctx, threadID)
