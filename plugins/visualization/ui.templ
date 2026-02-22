@@ -2,21 +2,32 @@ package visualization
 
 import "school-with-ai/components/annotation"
 
-templ icon() {
-	<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-activity"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+// ──────────────────────────────────────────────────────
+// Plot tool: static chart generation via gnuplot
+// Nature: data/function → single PNG image
+// ──────────────────────────────────────────────────────
+templ plotIcon() {
+	<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chart-line"><path d="M3 3v16a2 2 0 0 0 2 2h16"></path><path d="m19 9-5 5-4-4-3 3"></path></svg>
 }
 
-templ Container() {
-	@annotation.Container(icon(), annotation.Props{
-		Label:   "Visual Synthesized",
-		Subtext: "Visualization generated via SchoolAI plotting engine",
+templ PlotContainer() {
+	@annotation.Container(plotIcon(), annotation.Props{
+		Label:   "Plot Generated",
+		Subtext: "Static chart rendered via gnuplot engine",
+		FooterDotAttrs: templ.Attributes{
+			":class": `(() => {
+				if (message.parsedResult?.success) return 'bg-green-500/40';
+				if (message.parsedResult?.error) return 'bg-destructive/40';
+				return 'bg-primary/30';
+			})()`,
+		},
 	}) {
 		<div class="flex flex-col gap-4">
 			<!-- Title: Academic Typography -->
 			<div class="flex items-center gap-2 text-[12px] text-muted-foreground/60 italic font-serif">
-				<span class="font-semibold" x-text="message.parsedResult?.title || message.parsedArgs?.title || 'Metric Visualization'"></span>
+				<span class="font-semibold" x-text="message.parsedResult?.title || message.parsedArgs?.title || 'Chart'"></span>
 			</div>
-			<!-- Image Display: Integrated Surface -->
+			<!-- Image Display -->
 			<div class="relative w-full bg-muted/[0.03] border border-border/10 rounded-xl p-6 flex items-center justify-center min-h-[240px] shadow-[inset_0_1px_4px_rgba(0,0,0,0.02)] transition-colors hover:bg-muted/[0.05]">
 				<!-- Loading State -->
 				<div x-show="!message.parsedResult?.image_url" class="absolute inset-0 flex items-center justify-center bg-background/40 backdrop-blur-sm z-10 rounded-xl">
@@ -32,16 +43,108 @@ templ Container() {
 				</template>
 				<!-- Fallback -->
 				<template x-if="!message.parsedResult?.image_url">
-					<div class="text-[11px] text-muted-foreground/40 uppercase tracking-[0.2em] font-bold">Rendering Visual Dataset...</div>
+					<div class="text-[11px] text-muted-foreground/40 uppercase tracking-[0.2em] font-bold">Rendering chart...</div>
+				</template>
+			</div>
+			<!-- Format badge -->
+			<div class="flex items-center gap-2 text-[10px] text-muted-foreground/40 px-1">
+				<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-muted/50 text-muted-foreground text-[10px] font-medium border border-border/30">PNG</span>
+				<template x-if="message.parsedResult?.filename">
+					<span class="font-mono text-muted-foreground/30" x-text="message.parsedResult.filename"></span>
 				</template>
 			</div>
 		</div>
 	}
 }
 
+// ──────────────────────────────────────────────────────
+// Animate tool: animated visualization via gnuplot frame loop
+// Nature: multi-frame generation → animated GIF/WebP with timing metadata
+// ──────────────────────────────────────────────────────
+templ animateIcon() {
+	<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clapperboard"><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z"></path><path d="m6.2 5.3 3.1 3.9"></path><path d="m12.4 3.4 3.1 4"></path><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"></path></svg>
+}
+
+templ AnimateContainer() {
+	@annotation.Container(animateIcon(), annotation.Props{
+		Label:   "Animation Rendered",
+		Subtext: "Multi-frame visualization generated via gnuplot animation engine",
+		FooterDotAttrs: templ.Attributes{
+			":class": `(() => {
+				if (message.parsedResult?.success) return 'bg-green-500/40';
+				if (message.parsedResult?.error) return 'bg-destructive/40';
+				return 'bg-primary/30';
+			})()`,
+		},
+	}) {
+		<div class="flex flex-col gap-4">
+			<!-- Title -->
+			<div class="flex items-center gap-2 text-[12px] text-muted-foreground/60 italic font-serif">
+				<span class="font-semibold" x-text="message.parsedResult?.title || message.parsedArgs?.title || 'Animation'"></span>
+			</div>
+			<!-- Animation Display -->
+			<div class="relative w-full bg-muted/[0.03] border border-border/10 rounded-xl p-6 flex items-center justify-center min-h-[240px] shadow-[inset_0_1px_4px_rgba(0,0,0,0.02)] transition-colors hover:bg-muted/[0.05]">
+				<!-- Loading State -->
+				<div x-show="!message.parsedResult?.image_url && !message.parsedResult?.animation_url" class="absolute inset-0 flex items-center justify-center bg-background/40 backdrop-blur-sm z-10 rounded-xl">
+					<div class="flex flex-col items-center gap-2">
+						<span class="loading loading-spinner loading-md text-primary/40"></span>
+						<span class="text-[10px] text-muted-foreground/30 uppercase tracking-[0.15em] font-bold">Generating frames...</span>
+					</div>
+				</div>
+				<!-- Animation Image (GIF/WebP auto-animates) -->
+				<template x-if="message.parsedResult?.image_url || message.parsedResult?.animation_url">
+					<img
+						:src="message.parsedResult?.image_url || message.parsedResult?.animation_url"
+						:alt="message.parsedResult?.title || 'Animation'"
+						class="max-w-full h-auto rounded-lg shadow-md border border-border/20"
+					/>
+				</template>
+				<!-- Fallback -->
+				<template x-if="!message.parsedResult?.image_url && !message.parsedResult?.animation_url">
+					<div class="text-[11px] text-muted-foreground/40 uppercase tracking-[0.2em] font-bold">Rendering animation frames...</div>
+				</template>
+			</div>
+			<!-- Animation Metadata Bar -->
+			<div class="flex items-center gap-3 flex-wrap text-[10px] text-muted-foreground/50 px-1">
+				<!-- Format Badge -->
+				<span
+					class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-[0.1em]"
+					:class="{
+						'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800': (message.parsedResult?.format || message.parsedArgs?.format) === 'webp',
+						'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800': (message.parsedResult?.format || message.parsedArgs?.format) !== 'webp'
+					}"
+					x-text="(message.parsedResult?.format || message.parsedArgs?.format || 'gif').toUpperCase()"
+				></span>
+				<!-- Frame Delay -->
+				<template x-if="message.parsedResult?.delay || message.parsedArgs?.delay">
+					<span class="flex items-center gap-1">
+						<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+						<span x-text="((message.parsedResult?.delay || message.parsedArgs?.delay || 50) / 100).toFixed(2) + 's/frame'"></span>
+					</span>
+				</template>
+				<!-- FPS -->
+				<template x-if="message.parsedResult?.delay || message.parsedArgs?.delay">
+					<span class="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+						<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4"></path><path d="M3.34 19a10 10 0 1 1 17.32 0"></path></svg>
+						<span x-text="Math.round(100 / (message.parsedResult?.delay || message.parsedArgs?.delay || 50)) + ' fps'"></span>
+					</span>
+				</template>
+				<!-- Filename -->
+				<template x-if="message.parsedResult?.filename">
+					<span class="font-mono text-muted-foreground/30" x-text="message.parsedResult.filename"></span>
+				</template>
+			</div>
+		</div>
+	}
+}
 
 templ PluginTemplate() {
-	<template x-if="['plot', 'animate', 'viz-plot', 'viz-animate'].includes(message.name)">
-		@Container()
+	<!-- Static plot: data/function → PNG chart -->
+	<template x-if="['plot', 'viz-plot'].includes(message.name)">
+		@PlotContainer()
+	</template>
+	<!-- Animation: frame loop → animated GIF/WebP -->
+	<template x-if="['animate', 'viz-animate'].includes(message.name)">
+		@AnimateContainer()
 	</template>
 }
