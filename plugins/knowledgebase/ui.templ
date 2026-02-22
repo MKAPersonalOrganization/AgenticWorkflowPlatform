@@ -84,12 +84,29 @@ templ Container() {
 			<!-- Result Area -->
 			<div class="relative w-full">
 				<!-- Loading State -->
-				<template x-if="!message.result && message.status !== 'error'">
+				<template x-if="!message.result && !message.isStreaming && message.status !== 'error'">
 					<div class="bg-muted/[0.03] border border-border/10 rounded-xl p-6 flex items-center justify-center gap-3">
 						<span class="w-1.5 h-1.5 bg-primary rounded-full animate-bounce"></span>
 						<span class="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style="animation-delay: 150ms;"></span>
 						<span class="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style="animation-delay: 300ms;"></span>
 						<span class="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground/30 ms-2">Searching knowledge base...</span>
+					</div>
+				</template>
+				<!-- Streaming State: Show answer as it arrives token by token -->
+				<template x-if="message.isStreaming && message.parsedResult?.answer">
+					<div class="flex flex-col gap-4">
+						<div class="bg-muted/[0.03] border border-border/10 rounded-xl p-5 shadow-[inset_0_1px_4px_rgba(0,0,0,0.01)]">
+							<div
+								class="prose prose-sm max-w-none text-sm leading-relaxed text-foreground dark:[&_*]:text-white"
+								x-html="renderMarkdown(message.parsedResult.answer)"
+								dir="auto"
+							></div>
+							<span class="inline-block w-2 h-4 bg-primary/50 animate-pulse ml-0.5"></span>
+						</div>
+						<div class="flex items-center gap-2 text-[10px] text-muted-foreground/40 px-1">
+							<span class="w-1.5 h-1.5 bg-primary rounded-full animate-pulse"></span>
+							<span class="uppercase tracking-[0.2em] font-bold">Generating answer...</span>
+						</div>
 					</div>
 				</template>
 				<!-- Error State -->
@@ -100,7 +117,7 @@ templ Container() {
 					</div>
 				</template>
 				<!-- Success State: Structured result with answer, metrics, and sources -->
-				<template x-if="message.result && message.status !== 'error'">
+				<template x-if="message.result && !message.isStreaming && message.status !== 'error'">
 					<div class="flex flex-col gap-4">
 						<!-- Answer Section: Rendered markdown -->
 						<div class="bg-muted/[0.03] border border-border/10 rounded-xl p-5 shadow-[inset_0_1px_4px_rgba(0,0,0,0.01)] transition-colors hover:bg-muted/[0.05]">
@@ -666,7 +683,6 @@ templ ExploreTab() {
 							</button>
 						</div>
 					</div>
-
 					<!-- Container for graph and legend -->
 					<div class="flex-1 relative overflow-hidden">
 						<!-- Loading overlay -->
@@ -684,7 +700,6 @@ templ ExploreTab() {
 						</div>
 						<!-- Sigma canvas container -->
 						<div :id="'kb-sigma-' + $id" class="w-full h-full" style="min-height: 200px;"></div>
-						
 						<!-- Hover Tooltip (floating, follows mouse position) -->
 						<template x-if="hoveredNode && hoveredNodePos">
 							<div
@@ -706,7 +721,6 @@ templ ExploreTab() {
 								</div>
 							</div>
 						</template>
-
 						<!-- Type Legend overlay (bottom-left) -->
 						<div class="absolute bottom-2 left-2 z-10 transition-opacity" :class="isFullscreen ? 'opacity-100' : 'opacity-80 hover:opacity-100'">
 							<div class="bg-background/90 backdrop-blur-lg border border-border/30 rounded-lg p-2 shadow-lg max-w-[220px]">

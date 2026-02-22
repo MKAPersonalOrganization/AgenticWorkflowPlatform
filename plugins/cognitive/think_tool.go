@@ -2,7 +2,6 @@ package cognitive
 
 import (
 	"context"
-	"fmt"
 
 	"school-with-ai/foundation/agent"
 )
@@ -24,6 +23,8 @@ var thinkSchema = &agent.Schema{
 }
 
 // ThinkTool allows the agent to output its thoughts before acting.
+// It implements StreamingExecutableTool to stream the thoughts content
+// in real-time via the TOOL_CONTENT_STREAMED event.
 type ThinkTool struct{}
 
 func (t *ThinkTool) Name() string { return "think" }
@@ -34,12 +35,15 @@ func (t *ThinkTool) Description() string {
 
 func (t *ThinkTool) Schema() *agent.Schema { return thinkSchema }
 
+// Execute implements the Executor interface.
+// The think tool's purpose is to let the model generate text in the arguments;
+// the actual streaming of "thoughts" happens during LLM argument generation
+// (via ToolContentStreamed events emitted by StreamProcessor), not here.
 func (t *ThinkTool) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
-	var params ThinkArgs
-	if err := args.Decode(&params); err != nil {
-		return agent.ErrorResult(fmt.Errorf("failed to parse think args: %w", err)), nil
-	}
-
-	// We simply return OK, as the purpose of the tool is just to let the model generate text in the arguments.
+	// We simply return OK. The thoughts content was already streamed to the
+	// frontend in real-time during the LLM response phase.
 	return agent.JSONResult(map[string]any{"status": "OK"}), nil
 }
+
+// Verify ThinkTool implements ExecutableTool.
+var _ agent.ExecutableTool = (*ThinkTool)(nil)

@@ -65,6 +65,35 @@ type ExecutableTool interface {
 	Executor
 }
 
+// StreamCallback is called by streaming tools to emit content deltas in real-time.
+// The toolCallID identifies which tool call the delta belongs to.
+// The delta is a chunk of the tool's output (e.g., a token from an LLM response).
+// The field identifies what part of the result is being streamed (e.g., "answer", "thoughts").
+// Returns false if the stream consumer has disconnected.
+type StreamCallback func(delta string, field string) bool
+
+// StreamingExecutor can execute tool invocations with real-time streaming output.
+type StreamingExecutor interface {
+	// ExecuteStreaming runs the tool with the given context, arguments, and a callback
+	// for emitting content deltas in real-time. The final Result is still returned
+	// at the end for persistence, but intermediate tokens are streamed via the callback.
+	ExecuteStreaming(ctx context.Context, args Arguments, stream StreamCallback) (Result, error)
+}
+
+// StreamingExecutableTool combines Tool metadata with streaming execution capability.
+// Tools that implement this interface will have their output streamed token-by-token
+// to the frontend, instead of waiting for the complete result.
+type StreamingExecutableTool interface {
+	Tool
+	StreamingExecutor
+}
+
+// IsStreamingTool checks if an ExecutableTool also implements StreamingExecutableTool.
+func IsStreamingTool(tool ExecutableTool) (StreamingExecutableTool, bool) {
+	st, ok := tool.(StreamingExecutableTool)
+	return st, ok
+}
+
 // Arguments holds the decoded arguments for a tool invocation.
 type Arguments struct {
 	Raw    json.RawMessage // Original JSON

@@ -48,6 +48,10 @@ func (m *MockToolExecutor) Context() context.Context {
 	return context.Background()
 }
 
+func (m *MockToolExecutor) SetStreamCallback(toolCallID string, cb agent.StreamCallback) {
+	// No-op for mock
+}
+
 func (m *MockToolExecutor) SetResult(toolName, result string) {
 	m.results[toolName] = result
 }

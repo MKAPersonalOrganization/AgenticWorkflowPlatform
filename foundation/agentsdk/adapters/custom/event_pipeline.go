@@ -92,6 +92,16 @@ func (ep *EventPipeline) convertCoreEvent(e core.Event) domain.Event {
 	// Tool lifecycle events
 	case *core.ToolStart:
 		return (*domain.ToolStart)(evt)
+	case *core.ToolContentStreamed:
+		return &domain.ToolContentStreamed{
+			ThreadID:   evt.ThreadID,
+			MessageID:  evt.MessageID,
+			ToolCallID: evt.ToolCallID,
+			ToolName:   evt.ToolName,
+			Delta:      evt.Delta,
+			Field:      evt.Field,
+			Timestamp:  evt.Timestamp,
+		}
 	case *core.InputProvided:
 		return (*domain.InputProvided)(evt)
 	case *core.AuthGranted:

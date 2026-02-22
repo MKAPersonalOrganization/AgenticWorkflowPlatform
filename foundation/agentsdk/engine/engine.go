@@ -315,6 +315,7 @@ func (s *executionState) executeRequiredActions() error {
 		Executor:          s.agent.Executor,
 		Middlewares:       s.agent.Config.FunctionMiddleware,
 		Tools:             s.agent.Config.Tools,
+		Events:            s.agent.Events,
 	}
 	resolution, agg, err := s.tools.ProcessActions(tctx)
 	if err != nil {
@@ -525,6 +526,7 @@ type ToolProcessorContext struct {
 	Executor          core.ToolExecutor
 	Middlewares       []agent.Middleware
 	Tools             []agent.ExecutableTool // Added for tool lookup
+	Events            *EventFactory          // Event factory for creating streaming events
 }
 
 func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolver, []core.Message, error) {
@@ -544,6 +546,22 @@ func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolve
 			// Start the state machine (transition to Executing)
 			if err := tsm.Start(tctx.Ctx); err != nil {
 				return err
+			}
+
+			// Set up per-call streaming callback for this specific tool call.
+			// The callback yields ToolContentStreamed events in real-time.
+			if tctx.Events != nil {
+				tctx.Executor.SetStreamCallback(tc.ID, func(delta string, field string) bool {
+					evt := tctx.Events.ToolContentStreamed(
+						tctx.ThreadID,
+						tctx.MessageID,
+						tc.ID,
+						tc.Name,
+						delta,
+						field,
+					)
+					return tctx.Yield(evt, nil)
+				})
 			}
 
 			var execResult core.ToolExecResult

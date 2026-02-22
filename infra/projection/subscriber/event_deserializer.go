@@ -101,6 +101,13 @@ func deserializeDomainEvent(eventType string, data []byte) (domain.Event, error)
 		}
 		return &evt, nil
 
+	case "ToolContentStreamed":
+		var evt domain.ToolContentStreamed
+		if err := json.Unmarshal(data, &evt); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal ToolContentStreamed: %w", err)
+		}
+		return &evt, nil
+
 	case "ToolSuccess", "ToolError", "ToolResultAdded":
 		var evt domain.ToolResultAdded
 		if err := json.Unmarshal(data, &evt); err != nil {
