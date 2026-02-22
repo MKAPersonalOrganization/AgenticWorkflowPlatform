@@ -1,11 +1,8 @@
 package taskmanagement
 
 import (
-	"context"
 	"fmt"
 	"time"
-
-	"github.com/hibiken/asynq"
 )
 
 // ServerMetrics contains metrics about the Asynq server.
@@ -32,19 +29,8 @@ type ServerMetrics struct {
 
 // GetMetrics returns current server and queue metrics.
 func (s *AsynqTaskManager) GetMetrics() (*ServerMetrics, error) {
-	inspector := asynq.NewInspector(asynq.RedisClientOpt{
-		Addr:     s.redisAddr,
-		Password: s.redisPassword,
-	})
-	defer func() {
-		err := inspector.Close()
-		if err != nil {
-			s.log.Warn(context.Background(), "Failed to close inspector", "error", err)
-		}
-	}()
-
 	// Get queue stats
-	stats, err := inspector.GetQueueInfo("default")
+	stats, err := s.inspector.GetQueueInfo("default")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get queue info: %w", err)
 	}

@@ -34,12 +34,30 @@ type Service struct {
 	cache map[string]map[string]map[string]*WorkspacePermission // userID -> agentID -> workspaceID -> Permission
 }
 
+const wsCacheMaxUsers = 5000 // Max distinct user entries in the cache
+
 // NewService creates a new workspace permissions service.
 func NewService(log *logger.Logger, repo Repository) *Service {
 	return &Service{
 		log:   log,
 		repo:  repo,
 		cache: make(map[string]map[string]map[string]*WorkspacePermission),
+	}
+}
+
+// evictCacheIfNeeded evicts user entries when the cache exceeds its size limit.
+// Must be called while holding s.mu (write lock).
+func (s *Service) evictCacheIfNeeded() {
+	if len(s.cache) >= wsCacheMaxUsers {
+		count := 0
+		half := len(s.cache) / 2
+		for k := range s.cache {
+			delete(s.cache, k)
+			count++
+			if count >= half {
+				break
+			}
+		}
 	}
 }
 
@@ -61,6 +79,7 @@ func (s *Service) SetPermission(ctx context.Context, userID, agentID, workspaceI
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.evictCacheIfNeeded()
 	if _, ok := s.cache[userID]; !ok {
 		s.cache[userID] = make(map[string]map[string]*WorkspacePermission)
 	}
@@ -93,6 +112,7 @@ func (s *Service) HasPermission(ctx context.Context, userID, agentID, workspaceI
 
 	// Update cache
 	s.mu.Lock()
+	s.evictCacheIfNeeded()
 	if _, ok := s.cache[userID]; !ok {
 		s.cache[userID] = make(map[string]map[string]*WorkspacePermission)
 	}

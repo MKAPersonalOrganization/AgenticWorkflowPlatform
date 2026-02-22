@@ -20,6 +20,9 @@ const (
 
 	// MemoryFileName is the name of the markdown file storing the memories.
 	MemoryFileName = "SCHOOLAI.md"
+
+	// maxMemorySize caps the memory file read to 2 MB to prevent OOM.
+	maxMemorySize = 2 << 20
 )
 
 // ArtifactMemoryService implements the Service interface using the Artifact Store as backend.
@@ -47,7 +50,7 @@ func (s *ArtifactMemoryService) Load(ctx context.Context, userID string) (string
 			}
 			defer legacyRC.Close()
 
-			content, err := io.ReadAll(legacyRC)
+			content, err := io.ReadAll(io.LimitReader(legacyRC, maxMemorySize))
 			if err != nil {
 				return "", fmt.Errorf("failed to read legacy memory content: %w", err)
 			}
@@ -67,7 +70,7 @@ func (s *ArtifactMemoryService) Load(ctx context.Context, userID string) (string
 	}
 	defer rc.Close()
 
-	content, err := io.ReadAll(rc)
+	content, err := io.ReadAll(io.LimitReader(rc, maxMemorySize))
 	if err != nil {
 		return "", fmt.Errorf("failed to read memory content: %w", err)
 	}

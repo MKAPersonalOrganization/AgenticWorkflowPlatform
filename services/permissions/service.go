@@ -70,6 +70,8 @@ type Service struct {
 	toolCache    map[string]map[string]map[string]map[string]*Permission // userID -> agentID -> toolSetID -> toolID -> Permission
 }
 
+const permCacheMaxUsers = 5000 // Max distinct user entries in each cache map
+
 // NewService creates a new permissions service.
 func NewService(log *logger.Logger, repo Repository) *Service {
 	return &Service{
@@ -77,6 +79,37 @@ func NewService(log *logger.Logger, repo Repository) *Service {
 		repo:         repo,
 		toolSetCache: make(map[string]map[string]map[string]*ToolSetPermission),
 		toolCache:    make(map[string]map[string]map[string]map[string]*Permission),
+	}
+}
+
+// evictCacheIfNeeded evicts user entries if the cache exceeds the max size.
+// Must be called while holding s.mutex (write lock).
+func (s *Service) evictToolSetCacheIfNeeded() {
+	if len(s.toolSetCache) >= permCacheMaxUsers {
+		// Evict half the entries (random, since map iteration is non-deterministic).
+		count := 0
+		half := len(s.toolSetCache) / 2
+		for k := range s.toolSetCache {
+			delete(s.toolSetCache, k)
+			count++
+			if count >= half {
+				break
+			}
+		}
+	}
+}
+
+func (s *Service) evictToolCacheIfNeeded() {
+	if len(s.toolCache) >= permCacheMaxUsers {
+		count := 0
+		half := len(s.toolCache) / 2
+		for k := range s.toolCache {
+			delete(s.toolCache, k)
+			count++
+			if count >= half {
+				break
+			}
+		}
 	}
 }
 
@@ -113,6 +146,7 @@ func (s *Service) SetPermission(ctx context.Context, userID, agentID, toolSetID,
 
 	// Update cache
 	s.mutex.Lock()
+	s.evictToolCacheIfNeeded()
 	if _, exists := s.toolCache[userID]; !exists {
 		s.toolCache[userID] = make(map[string]map[string]map[string]*Permission)
 	}
@@ -163,6 +197,7 @@ func (s *Service) GetPermission(ctx context.Context, userID, agentID, toolSetID,
 
 	// Cache it
 	s.mutex.Lock()
+	s.evictToolCacheIfNeeded()
 	if _, exists := s.toolCache[userID]; !exists {
 		s.toolCache[userID] = make(map[string]map[string]map[string]*Permission)
 	}
@@ -226,6 +261,7 @@ func (s *Service) SetToolSetPermission(ctx context.Context, userID, agentID, too
 
 	// Update cache
 	s.mutex.Lock()
+	s.evictToolSetCacheIfNeeded()
 	if _, exists := s.toolSetCache[userID]; !exists {
 		s.toolSetCache[userID] = make(map[string]map[string]*ToolSetPermission)
 	}
@@ -261,6 +297,7 @@ func (s *Service) GetToolSetPermission(ctx context.Context, userID, agentID, too
 
 	// Cache it
 	s.mutex.Lock()
+	s.evictToolSetCacheIfNeeded()
 	if _, exists := s.toolSetCache[userID]; !exists {
 		s.toolSetCache[userID] = make(map[string]map[string]*ToolSetPermission)
 	}

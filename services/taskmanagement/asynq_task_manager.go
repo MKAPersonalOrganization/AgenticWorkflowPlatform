@@ -24,6 +24,7 @@ type AsynqTaskManager struct {
 	log           *logger.Logger
 	server        *asynq.Server
 	client        *asynq.Client
+	inspector     *asynq.Inspector
 	redisAddr     string // Store for metrics
 	redisPassword string // Store for Inspector calls
 	concurrency   int    // Store for metrics
@@ -142,6 +143,7 @@ func NewAsynqTaskManager(
 		log:           log,
 		server:        srv,
 		client:        client,
+		inspector:     asynq.NewInspector(redisOpt),
 		redisAddr:     config.RedisAddr,
 		redisPassword: config.RedisPassword,
 		concurrency:   config.Concurrency,
@@ -225,16 +227,8 @@ func (s *AsynqTaskManager) SubmitChatTask(ctx context.Context, userID, message, 
 
 // GetTaskInfo retrieves task information from Asynq.
 func (s *AsynqTaskManager) GetTaskInfo(queue, taskID string) (*asynq.TaskInfo, error) {
-	inspector := asynq.NewInspector(asynq.RedisClientOpt{Addr: s.redisAddr, Password: s.redisPassword})
-	defer func() {
-		err := inspector.Close()
-		if err != nil {
-			s.log.Warn(context.Background(), "Failed to close inspector", "error", err)
-		}
-	}()
-
 	// Use Inspector's GetTaskInfo which efficiently looks up the task
-	taskInfo, err := inspector.GetTaskInfo(queue, taskID)
+	taskInfo, err := s.inspector.GetTaskInfo(queue, taskID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get task info for queue=%s taskID=%s: %w", queue, taskID, err)
 	}
@@ -244,16 +238,8 @@ func (s *AsynqTaskManager) GetTaskInfo(queue, taskID string) (*asynq.TaskInfo, e
 
 // CancelTask attempts to cancel a task by job ID.
 func (s *AsynqTaskManager) CancelTask(jobID string) error {
-	inspector := asynq.NewInspector(asynq.RedisClientOpt{Addr: s.redisAddr, Password: s.redisPassword})
-	defer func() {
-		err := inspector.Close()
-		if err != nil {
-			s.log.Warn(context.Background(), "Failed to close inspector", "error", err)
-		}
-	}()
-
 	// Try to delete the task from the default queue first (for pending/scheduled/retry tasks)
-	err := inspector.DeleteTask("default", jobID)
+	err := s.inspector.DeleteTask("default", jobID)
 	if err == nil {
 		s.log.Info(context.Background(), "Deleted pending task", "jobID", jobID)
 
@@ -262,7 +248,7 @@ func (s *AsynqTaskManager) CancelTask(jobID string) error {
 
 	// If delete failed, the task might be actively processing
 	// Try to send cancellation signal instead
-	if err := inspector.CancelProcessing(jobID); err != nil {
+	if err := s.inspector.CancelProcessing(jobID); err != nil {
 		s.log.Warn(context.Background(), "Failed to send cancellation signal",
 			"jobID", jobID,
 			"error", err,
