@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"school-with-ai/foundation/agent"
@@ -35,6 +36,11 @@ type ToolExecutor interface {
 
 	// Context returns the execution context.
 	Context() context.Context
+
+	// SetStreamCallback sets the streaming callback for a specific tool call.
+	// When set, tools implementing StreamingExecutableTool will stream their
+	// output token-by-token via this callback.
+	SetStreamCallback(toolCallID string, cb agent.StreamCallback)
 }
 
 // ToolTracer defines the interface for tracking tool executions (e.g., Langfuse).
@@ -45,13 +51,14 @@ type ToolTracer interface {
 
 // RegistryToolExecutor executes tools using a ToolRegistry.
 type RegistryToolExecutor struct {
-	registry   *ToolRegistry
-	ctx        context.Context
-	threadID   string
-	userID     string
-	messageID  string
-	requestCtx *RequestContext
-	tracer     ToolTracer // Optional tracer for observability
+	registry        *ToolRegistry
+	ctx             context.Context
+	threadID        string
+	userID          string
+	messageID       string
+	requestCtx      *RequestContext
+	tracer          ToolTracer // Optional tracer for observability
+	streamCallbacks sync.Map   // map[string]agent.StreamCallback — per tool-call-ID callbacks
 }
 
 // ToolExecutorOption is a functional option for configuring the tool executor.
@@ -98,7 +105,18 @@ func (e *RegistryToolExecutor) Context() context.Context {
 	return e.ctx
 }
 
+// SetStreamCallback sets the streaming callback for a specific tool call.
+func (e *RegistryToolExecutor) SetStreamCallback(toolCallID string, cb agent.StreamCallback) {
+	if cb != nil {
+		e.streamCallbacks.Store(toolCallID, cb)
+	} else {
+		e.streamCallbacks.Delete(toolCallID)
+	}
+}
+
 // Execute runs a tool call using the registry.
+// If the tool implements StreamingExecutableTool and a stream callback is set,
+// it will use ExecuteStreaming for real-time output.
 func (e *RegistryToolExecutor) Execute(toolCall ToolCall) (ToolExecResult, error) {
 	startTime := time.Now()
 
@@ -122,8 +140,19 @@ func (e *RegistryToolExecutor) Execute(toolCall ToolCall) (ToolExecResult, error
 		args.Metadata = e.requestCtx.State
 	}
 
-	// Execute tool with new spec-compliant interface
-	result, err := tool.Execute(e.ctx, args)
+	// Check if the tool supports streaming and we have a per-call stream callback
+	var result agent.Result
+	var err error
+
+	cb, hasCB := e.streamCallbacks.Load(toolCall.ID)
+	if streamingTool, isStreaming := agent.IsStreamingTool(tool); isStreaming && hasCB {
+		// Use streaming execution path with per-call callback
+		result, err = streamingTool.ExecuteStreaming(e.ctx, args, cb.(agent.StreamCallback))
+		e.streamCallbacks.Delete(toolCall.ID) // clean up after use
+	} else {
+		// Use standard execution path
+		result, err = tool.Execute(e.ctx, args)
+	}
 	endTime := time.Now()
 
 	// Build execution result

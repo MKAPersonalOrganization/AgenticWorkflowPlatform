@@ -100,6 +100,26 @@ func (f *EventFactory) ToolStart(
 	}
 }
 
+// ToolContentStreamed creates a ToolContentStreamed event.
+func (f *EventFactory) ToolContentStreamed(
+	threadID string,
+	messageID string,
+	toolCallID string,
+	toolName string,
+	delta string,
+	field string,
+) *core.ToolContentStreamed {
+	return &core.ToolContentStreamed{
+		ThreadID:   threadID,
+		MessageID:  messageID,
+		ToolCallID: toolCallID,
+		ToolName:   toolName,
+		Delta:      delta,
+		Field:      field,
+		Timestamp:  time.Now(),
+	}
+}
+
 // ToolResultAdded creates a ToolResultAdded event (unified for success/error).
 func (f *EventFactory) ToolResultAdded(
 	threadID string,

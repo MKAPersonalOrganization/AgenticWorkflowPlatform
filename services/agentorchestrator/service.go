@@ -181,7 +181,8 @@ func (s *Service) isDurable(event domain.Event) bool {
 		*domain.AssistantMessageStarted,
 		*domain.AssistantContentStreamed,
 		*domain.AssistantMessageCompleted,
-		*domain.ToolStart:
+		*domain.ToolStart,
+		*domain.ToolContentStreamed:
 		return false
 
 	default:

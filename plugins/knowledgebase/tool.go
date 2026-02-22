@@ -1,6 +1,7 @@
 package knowledgebase
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -247,6 +248,19 @@ type queryArgs struct {
 // 3. Call OpenAI to synthesize an answer grounded in the context
 // Returns a structured JSON result with answer, sources, and generation metrics.
 func (t *QueryKnowledgeBaseTool) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
+	return t.executeInternal(ctx, args, nil)
+}
+
+// ExecuteStreaming implements the StreamingExecutor interface.
+// It streams the LLM answer tokens in real-time via the stream callback,
+// while still returning the complete structured result at the end.
+func (t *QueryKnowledgeBaseTool) ExecuteStreaming(ctx context.Context, args agent.Arguments, stream agent.StreamCallback) (agent.Result, error) {
+	return t.executeInternal(ctx, args, stream)
+}
+
+// executeInternal is the shared implementation for both Execute and ExecuteStreaming.
+// When stream is non-nil, the LLM answer tokens are streamed in real-time.
+func (t *QueryKnowledgeBaseTool) executeInternal(ctx context.Context, args agent.Arguments, stream agent.StreamCallback) (agent.Result, error) {
 	totalStart := time.Now()
 
 	var a queryArgs
@@ -305,16 +319,29 @@ func (t *QueryKnowledgeBaseTool) Execute(ctx context.Context, args agent.Argumen
 	// --- Step 3: Call OpenAI to synthesize the answer ---
 
 	genStart := time.Now()
-	llmResp, err := t.callLLMFull(ctx, promptBuf.String(), a.Query)
-	genDuration := time.Since(genStart)
-	if err != nil {
-		return agent.ErrorResult(fmt.Errorf("LLM synthesis failed: %w", err)), nil
-	}
+	var answer string
+	var llmUsageData llmUsage
 
-	answer := ""
-	if len(llmResp.Choices) > 0 {
-		answer = llmResp.Choices[0].Message.Content
+	if stream != nil {
+		// Streaming path: stream tokens in real-time via callback
+		streamedAnswer, usage, err := t.callLLMStreaming(ctx, promptBuf.String(), a.Query, stream)
+		if err != nil {
+			return agent.ErrorResult(fmt.Errorf("LLM synthesis failed: %w", err)), nil
+		}
+		answer = streamedAnswer
+		llmUsageData = usage
+	} else {
+		// Non-streaming path: wait for complete response
+		llmResp, err := t.callLLMFull(ctx, promptBuf.String(), a.Query)
+		if err != nil {
+			return agent.ErrorResult(fmt.Errorf("LLM synthesis failed: %w", err)), nil
+		}
+		if len(llmResp.Choices) > 0 {
+			answer = llmResp.Choices[0].Message.Content
+		}
+		llmUsageData = llmResp.Usage
 	}
+	genDuration := time.Since(genStart)
 
 	// --- Step 4: Fetch knowledge graph subgraph for visualization ---
 
@@ -337,9 +364,9 @@ func (t *QueryKnowledgeBaseTool) Execute(ctx context.Context, args agent.Argumen
 			TotalDurationMs:      time.Since(totalStart).Milliseconds(),
 			Model:                t.modelID,
 			Mode:                 resp.Mode,
-			PromptTokens:         llmResp.Usage.PromptTokens,
-			CompletionTokens:     llmResp.Usage.CompletionTokens,
-			TotalTokens:          llmResp.Usage.TotalTokens,
+			PromptTokens:         llmUsageData.PromptTokens,
+			CompletionTokens:     llmUsageData.CompletionTokens,
+			TotalTokens:          llmUsageData.TotalTokens,
 		},
 	}
 
@@ -433,6 +460,122 @@ func (t *QueryKnowledgeBaseTool) callLLMFull(ctx context.Context, systemPrompt, 
 	}
 
 	return &llmResp, nil
+}
+
+// --- OpenAI Streaming SSE types ---
+
+type llmStreamRequest struct {
+	Model    string       `json:"model"`
+	Messages []llmMessage `json:"messages"`
+	Stream   bool         `json:"stream"`
+	// Request usage stats in the final streamed chunk
+	StreamOptions *streamOptions `json:"stream_options,omitempty"`
+}
+
+type streamOptions struct {
+	IncludeUsage bool `json:"include_usage"`
+}
+
+type llmStreamDelta struct {
+	Content string `json:"content"`
+}
+
+type llmStreamChoice struct {
+	Delta        llmStreamDelta `json:"delta"`
+	FinishReason *string        `json:"finish_reason"`
+}
+
+type llmStreamChunk struct {
+	Choices []llmStreamChoice `json:"choices"`
+	Usage   *llmUsage         `json:"usage,omitempty"` // Only present in final chunk with stream_options
+}
+
+// callLLMStreaming sends the augmented prompt to OpenAI with streaming enabled.
+// It streams each token via the stream callback and returns the accumulated answer + usage.
+func (t *QueryKnowledgeBaseTool) callLLMStreaming(ctx context.Context, systemPrompt, userQuery string, stream agent.StreamCallback) (string, llmUsage, error) {
+	reqBody, err := json.Marshal(llmStreamRequest{
+		Model: t.modelID,
+		Messages: []llmMessage{
+			{Role: "system", Content: systemPrompt},
+			{Role: "user", Content: userQuery},
+		},
+		Stream: true,
+		StreamOptions: &streamOptions{
+			IncludeUsage: true,
+		},
+	})
+	if err != nil {
+		return "", llmUsage{}, fmt.Errorf("failed to marshal streaming LLM request: %w", err)
+	}
+
+	httpClient := &http.Client{Timeout: 120 * time.Second}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.openai.com/v1/chat/completions", bytes.NewReader(reqBody))
+	if err != nil {
+		return "", llmUsage{}, fmt.Errorf("failed to create streaming LLM request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+t.openAIAPIKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return "", llmUsage{}, fmt.Errorf("OpenAI streaming API request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", llmUsage{}, fmt.Errorf("OpenAI streaming API returned error %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse SSE stream
+	var answerBuilder strings.Builder
+	var usage llmUsage
+	scanner := bufio.NewScanner(resp.Body)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		// SSE format: "data: {json}" or "data: [DONE]"
+		if !strings.HasPrefix(line, "data: ") {
+			continue
+		}
+
+		data := strings.TrimPrefix(line, "data: ")
+		if data == "[DONE]" {
+			break
+		}
+
+		var chunk llmStreamChunk
+		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
+			continue // Skip malformed chunks
+		}
+
+		// Extract usage from final chunk
+		if chunk.Usage != nil {
+			usage = *chunk.Usage
+		}
+
+		// Stream content deltas
+		if len(chunk.Choices) > 0 {
+			delta := chunk.Choices[0].Delta.Content
+			if delta != "" {
+				answerBuilder.WriteString(delta)
+				// Stream the token to the UI
+				if !stream(delta, "answer") {
+					// Consumer disconnected
+					break
+				}
+			}
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return answerBuilder.String(), usage, fmt.Errorf("error reading SSE stream: %w", err)
+	}
+
+	return answerBuilder.String(), usage, nil
 }
 
 // buildStructuredSources converts raw source references into structured UI-ready sources.
@@ -766,3 +909,9 @@ func (t *QueryKnowledgeBaseTool) MarshalJSON() ([]byte, error) {
 		"description": t.Description(),
 	})
 }
+
+// Verify QueryKnowledgeBaseTool implements both ExecutableTool and StreamingExecutableTool.
+var (
+	_ agent.ExecutableTool          = (*QueryKnowledgeBaseTool)(nil)
+	_ agent.StreamingExecutableTool = (*QueryKnowledgeBaseTool)(nil)
+)

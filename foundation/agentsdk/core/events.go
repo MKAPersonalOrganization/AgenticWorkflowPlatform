@@ -149,6 +149,22 @@ func (e ToolStart) EventType() string         { return "ToolStart" }
 func (e ToolStart) EventTimestamp() time.Time { return e.Timestamp }
 func (e ToolStart) AggregateID() string       { return e.ThreadID }
 
+// ToolContentStreamed is emitted for each content delta during streaming tool execution.
+// This is a transient event - NOT persisted to event store.
+type ToolContentStreamed struct {
+	ThreadID   string    `json:"threadId"`
+	MessageID  string    `json:"messageId"`
+	ToolCallID string    `json:"toolCallId"`
+	ToolName   string    `json:"toolName"`
+	Delta      string    `json:"delta"`
+	Field      string    `json:"field,omitempty"` // Which part of the result is streaming (e.g. "answer", "thoughts")
+	Timestamp  time.Time `json:"timestamp"`
+}
+
+func (e ToolContentStreamed) EventType() string         { return "ToolContentStreamed" }
+func (e ToolContentStreamed) EventTimestamp() time.Time { return e.Timestamp }
+func (e ToolContentStreamed) AggregateID() string       { return e.ThreadID }
+
 // ToolNeedsInput is emitted when a tool requests user input (elicitation).
 type ToolNeedsInput struct {
 	ThreadID    string           `json:"threadId"`

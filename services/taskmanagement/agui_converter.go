@@ -77,6 +77,18 @@ func toAguiEventsInternal(event any) []any {
 			}),
 		)}
 
+	case *domain.ToolContentStreamed:
+		return []any{aguievents.NewCustomEvent(
+			"TOOL_CONTENT_STREAMED",
+			aguievents.WithValue(map[string]any{
+				"toolCallId": evt.ToolCallID,
+				"toolName":   evt.ToolName,
+				"delta":      evt.Delta,
+				"field":      evt.Field,
+				"timestamp":  evt.Timestamp,
+			}),
+		)}
+
 	case *domain.ToolResultAdded:
 		eventName := "TOOL_RESULT_ADDED"
 		// Backward compatibility: emit legacy event names based on IsError flag

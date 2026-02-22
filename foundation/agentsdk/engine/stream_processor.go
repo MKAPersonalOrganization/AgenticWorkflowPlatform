@@ -84,10 +84,27 @@ func (p *StreamProcessor) Process(
 		}
 
 		// Process tool calls
-		_, hasTool := toolCalls.ProcessUpdate(resp)
+		updates, hasTool := toolCalls.ProcessUpdate(resp)
 		if hasTool {
-			// We no longer emit ToolCallStarted or ToolCallArgumentsStreamed.
-			// Tool calls are accumulated and their execution is tracked via the state machine.
+			// Stream tool call argument deltas in real-time.
+			// This enables true streaming for tools like "think" where
+			// the content IS the arguments (i.e., the LLM generates the
+			// "thoughts" text as tool call arguments).
+			for _, update := range updates {
+				if update.ArgsDelta != "" {
+					argEvent := p.events.ToolContentStreamed(
+						params.ThreadID,
+						params.MessageID,
+						update.ID,
+						update.Name,
+						update.ArgsDelta,
+						"__arguments__",
+					)
+					if !yield(argEvent, nil) {
+						return &StreamResult{Content: content, ToolCalls: toolCalls.GetAll()}, nil
+					}
+				}
+			}
 		}
 
 		// Process usage updates

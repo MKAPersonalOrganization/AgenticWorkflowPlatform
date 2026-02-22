@@ -313,6 +313,9 @@ export function createStreamingMethods() {
                 case 'TOOL_START':
                     this.__handleToolStart(event.value, state);
                     break;
+                case 'TOOL_CONTENT_STREAMED':
+                    this.__handleToolContentStreamed(event.value, state, threadId);
+                    break;
                 case 'TOOL_SUCCESS':
                     this.__handleToolSuccess(event.value, state);
                     break;
@@ -402,17 +405,117 @@ export function createStreamingMethods() {
             this.transitionToolState(toolCallId, TOOL_EVENTS.START, { toolName });
         },
 
+        /**
+         * Handle TOOL_CONTENT_STREAMED event - streams tool output tokens in real-time.
+         *
+         * Two streaming phases exist:
+         *   1. LLM argument generation: field='__arguments__' — raw JSON argument
+         *      deltas are accumulated and partially parsed to extract display fields
+         *      (e.g. thoughts for the think tool).
+         *   2. Tool execution: field='answer', 'thoughts', etc. — post-execution
+         *      streaming from tools that call external APIs (e.g. knowledge base).
+         */
+        __handleToolContentStreamed(value, state, threadId) {
+            const { toolCallId, toolName, delta, field } = value;
+
+            // Lazily create the tool call message if it doesn't exist yet.
+            // During LLM argument streaming, TOOL_START may not have arrived yet.
+            this.__ensureToolCallMessage(state, toolCallId, toolName);
+
+            const msg = state.messages.find(m => m.id === toolCallId);
+            if (!msg) return;
+
+            // Initialize streaming state on the message if not present
+            if (!msg.streamingContent) {
+                msg.streamingContent = {};
+            }
+            msg.isStreaming = true;
+
+            // Accumulate streamed content by field
+            const fieldKey = field || 'default';
+            if (!msg.streamingContent[fieldKey]) {
+                msg.streamingContent[fieldKey] = '';
+            }
+            msg.streamingContent[fieldKey] += delta;
+
+            // --- Phase 1: LLM argument streaming ---
+            // The StreamProcessor emits argument deltas with field='__arguments__'.
+            // We accumulate raw JSON and try to extract display-ready fields.
+            if (fieldKey === '__arguments__') {
+                // Update the raw args string
+                msg.args = (msg.args || '') + delta;
+
+                // Try to extract fields from partial JSON.
+                // For the think tool the schema is {"thoughts": "..."} — we can
+                // extract the thoughts value even from incomplete JSON.
+                this.__extractStreamingArgs(msg, toolName);
+            }
+            // --- Phase 2: Tool execution streaming ---
+            else if (fieldKey === 'thoughts') {
+                if (!msg.parsedArgs) msg.parsedArgs = {};
+                msg.parsedArgs.thoughts = msg.streamingContent[fieldKey];
+            } else if (fieldKey === 'answer') {
+                if (!msg.parsedResult) msg.parsedResult = {};
+                msg.parsedResult.answer = msg.streamingContent[fieldKey];
+                msg.result = msg.streamingContent[fieldKey];
+            }
+
+            // Scroll to bottom during streaming
+            if (threadId === this.__currentThreadId && !this.__abortScroll) {
+                this.__scrollToBottomThrottled();
+            }
+        },
+
+        /**
+         * Extract display-ready fields from partially streamed JSON arguments.
+         * Handles incomplete JSON gracefully — we try to pull out string values
+         * even when the JSON is not yet valid.
+         */
+        __extractStreamingArgs(msg, toolName) {
+            const raw = msg.args || '';
+            if (!raw) return;
+
+            // Try full JSON parse first
+            const parsed = safeParseJSON(raw);
+            if (parsed) {
+                msg.parsedArgs = parsed;
+                return;
+            }
+
+            // Fallback: extract partial string values from incomplete JSON.
+            // For {"thoughts": "some text that is still being generated...
+            // We look for the pattern "key": "value... and extract value.
+            if (!msg.parsedArgs) msg.parsedArgs = {};
+
+            // Generic extraction for any string field in progress
+            const fieldPattern = /"(\w+)"\s*:\s*"((?:[^"\\]|\\.)*)$/;
+            const match = raw.match(fieldPattern);
+            if (match) {
+                const [, key, partialValue] = match;
+                // Unescape JSON escapes
+                try {
+                    msg.parsedArgs[key] = JSON.parse('"' + partialValue + '"');
+                } catch {
+                    msg.parsedArgs[key] = partialValue;
+                }
+            }
+        },
+
         __handleToolSuccess(value, state) {
             const { toolCallId, toolName, result, arguments: toolArgs, agentName } = value;
             console.log(`[Tool] ${toolName} (${toolCallId}) completed successfully`);
 
             this.__ensureToolCallMessage(state, toolCallId, toolName, agentName);
 
-            // Sync arguments if provided
+            // Mark streaming as complete and clean up
             const msg = state.messages.find(m => m.id === toolCallId);
-            if (msg && toolArgs) {
-                msg.args = toolArgs;
-                msg.parsedArgs = safeParseJSON(toolArgs);
+            if (msg) {
+                msg.isStreaming = false;
+                delete msg.streamingContent;
+                if (toolArgs) {
+                    msg.args = toolArgs;
+                    msg.parsedArgs = safeParseJSON(toolArgs);
+                }
             }
 
             this.transitionToolState(toolCallId, TOOL_EVENTS.SUCCESS, { toolName, result });
