@@ -21,3 +21,4 @@ _tmp/
 
 # TLS certificates (never commit private keys)
 tls/
+edgequake/
