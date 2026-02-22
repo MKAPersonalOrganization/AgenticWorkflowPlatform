@@ -26,6 +26,7 @@ type AsynqTaskManager struct {
 	client        *asynq.Client
 	redisAddr     string // Store for metrics
 	redisPassword string // Store for Inspector calls
+	concurrency   int    // Store for metrics
 }
 
 // AsynqConfig contains configuration for the Asynq server.
@@ -143,6 +144,7 @@ func NewAsynqTaskManager(
 		client:        client,
 		redisAddr:     config.RedisAddr,
 		redisPassword: config.RedisPassword,
+		concurrency:   config.Concurrency,
 	}
 }
 

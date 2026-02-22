@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"strings"
 
 	"school-with-ai/domain"
 
@@ -90,21 +91,41 @@ func (s *PostgresEventStore) AppendWithVersion(ctx context.Context, streamID str
 		}
 	}
 
-	// Append events
+	// Append events using a single batch INSERT for performance
 	newVersion := currentVersion
-	for _, event := range events {
+	if len(events) == 1 {
+		// Single event - simple INSERT
 		newVersion++
-
-		data, err := json.Marshal(event)
+		data, err := json.Marshal(events[0])
 		if err != nil {
 			return 0, fmt.Errorf("marshal event: %w", err)
 		}
-
 		if _, err := tx.ExecContext(ctx,
 			`INSERT INTO events (stream_id, stream_version, event_type, data)
 			 VALUES ($1, $2, $3, $4)`,
-			streamID, newVersion, event.EventType(), data); err != nil {
+			streamID, newVersion, events[0].EventType(), data); err != nil {
 			return 0, fmt.Errorf("insert event: %w", err)
+		}
+	} else {
+		// Multiple events - batch INSERT to minimize round trips while holding advisory lock
+		valueStrings := make([]string, 0, len(events))
+		valueArgs := make([]interface{}, 0, len(events)*4)
+		for i, event := range events {
+			newVersion++
+			data, err := json.Marshal(event)
+			if err != nil {
+				return 0, fmt.Errorf("marshal event %d: %w", i, err)
+			}
+			paramBase := i * 4
+			valueStrings = append(valueStrings, fmt.Sprintf("($%d, $%d, $%d, $%d)",
+				paramBase+1, paramBase+2, paramBase+3, paramBase+4))
+			valueArgs = append(valueArgs, streamID, newVersion, event.EventType(), data)
+		}
+		query := fmt.Sprintf(
+			`INSERT INTO events (stream_id, stream_version, event_type, data) VALUES %s`,
+			joinStrings(valueStrings, ", "))
+		if _, err := tx.ExecContext(ctx, query, valueArgs...); err != nil {
+			return 0, fmt.Errorf("batch insert events: %w", err)
 		}
 	}
 
@@ -231,3 +252,8 @@ func (s *PostgresEventStore) ReadAllFromPosition(ctx context.Context, afterPosit
 
 // Verify PostgresEventStore implements domain.EventStore.
 var _ domain.EventStore = (*PostgresEventStore)(nil)
+
+// joinStrings joins a slice of strings with a separator (avoids importing strings just for Join).
+func joinStrings(elems []string, sep string) string {
+	return strings.Join(elems, sep)
+}

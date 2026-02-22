@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"runtime"
 	"sync"
+	"time"
 
 	"school-with-ai/domain"
 	"school-with-ai/foundation/logger"
@@ -31,9 +33,19 @@ type redisSubscription struct {
 
 // NewRedisBroadcaster creates a new Redis-backed broadcaster.
 func NewRedisBroadcaster(log *logger.Logger, redisAddr string, redisPassword string) *RedisBroadcaster {
+	poolSize := 10 * runtime.GOMAXPROCS(0)
+	if poolSize < 50 {
+		poolSize = 50
+	}
+
 	client := redis.NewClient(&redis.Options{
-		Addr:     redisAddr,
-		Password: redisPassword,
+		Addr:         redisAddr,
+		Password:     redisPassword,
+		PoolSize:     poolSize,
+		MinIdleConns: 10,
+		DialTimeout:  5 * time.Second,
+		ReadTimeout:  3 * time.Second,
+		WriteTimeout: 3 * time.Second,
 	})
 
 	return &RedisBroadcaster{
@@ -122,6 +134,10 @@ func (b *RedisBroadcaster) Subscribe(threadID string) (<-chan domain.Event, func
 				break
 			}
 		}
+		// Remove the map entry entirely if no subscribers remain to prevent memory leak
+		if len(b.subscribers[threadID]) == 0 {
+			delete(b.subscribers, threadID)
+		}
 	}
 }
 
@@ -193,7 +209,16 @@ func (b *RedisBroadcaster) deserializeEvent(payload string) (domain.Event, error
 	return event, nil
 }
 
-// Close closes the Redis client connection.
+// Close cancels all active subscriptions and closes the Redis client connection.
 func (b *RedisBroadcaster) Close() error {
+	b.mu.Lock()
+	for threadID, subs := range b.subscribers {
+		for _, s := range subs {
+			s.cancel()
+		}
+		delete(b.subscribers, threadID)
+	}
+	b.mu.Unlock()
+
 	return b.client.Close()
 }

@@ -64,14 +64,25 @@ func (s *S3Service) getObjectKey(userID, sessionID, fileName string) string {
 	return path.Join(userID, sessionID, fileName)
 }
 
+// validateFileName checks for path traversal attempts in file names.
+func validateFileName(fileName string) error {
+	if fileName == "" {
+		return fmt.Errorf("fileName is required")
+	}
+	if strings.Contains(fileName, "..") || strings.Contains(fileName, "/") || strings.Contains(fileName, "\\") {
+		return ErrInvalidPath
+	}
+	return nil
+}
+
 func (s *S3Service) Save(ctx context.Context, userID, sessionID, fileName string, content io.Reader) (int64, error) {
 	if userID == "" || sessionID == "" || fileName == "" {
 		return 0, fmt.Errorf("userID, sessionID, and fileName are required")
 	}
 
 	// Check for naming validity (S3 is generous but let's be safe against traversal attempts in logic)
-	if strings.Contains(fileName, "..") || strings.Contains(fileName, "/") || strings.Contains(fileName, "\\") {
-		return 0, ErrInvalidPath
+	if err := validateFileName(fileName); err != nil {
+		return 0, err
 	}
 
 	objectKey := s.getObjectKey(userID, sessionID, fileName)
@@ -95,6 +106,10 @@ func (s *S3Service) Save(ctx context.Context, userID, sessionID, fileName string
 }
 
 func (s *S3Service) Load(ctx context.Context, userID, sessionID, fileName string) (io.ReadCloser, error) {
+	if err := validateFileName(fileName); err != nil {
+		return nil, err
+	}
+
 	objectKey := s.getObjectKey(userID, sessionID, fileName)
 
 	obj, err := s.client.GetObject(ctx, s.bucketName, objectKey, minio.GetObjectOptions{})
@@ -148,6 +163,10 @@ func (s *S3Service) List(ctx context.Context, userID, sessionID string) ([]strin
 }
 
 func (s *S3Service) Delete(ctx context.Context, userID, sessionID, fileName string) error {
+	if err := validateFileName(fileName); err != nil {
+		return err
+	}
+
 	objectKey := s.getObjectKey(userID, sessionID, fileName)
 
 	err := s.client.RemoveObject(ctx, s.bucketName, objectKey, minio.RemoveObjectOptions{})

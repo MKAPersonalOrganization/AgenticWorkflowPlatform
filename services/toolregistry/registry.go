@@ -107,8 +107,9 @@ func (r *Registry) Initialize(ctx context.Context) error {
 func (r *Registry) GetTool(ctx context.Context, id string) (*Tool, error) {
 	r.mutex.RLock()
 	if tool, exists := r.toolCache[id]; exists {
+		toolCopy := *tool
 		r.mutex.RUnlock()
-		return tool, nil
+		return &toolCopy, nil
 	}
 	r.mutex.RUnlock()
 
@@ -118,8 +119,9 @@ func (r *Registry) GetTool(ctx context.Context, id string) (*Tool, error) {
 		return nil, err
 	}
 
+	toolCopy := *tool
 	r.mutex.Lock()
-	r.toolCache[id] = tool
+	r.toolCache[id] = &toolCopy
 	r.mutex.Unlock()
 
 	return tool, nil
@@ -150,8 +152,9 @@ func (r *Registry) RegisterTool(ctx context.Context, tool *Tool) error {
 		return fmt.Errorf("failed to save tool: %w", err)
 	}
 
+	toolCopy := *tool
 	r.mutex.Lock()
-	r.toolCache[tool.ID] = tool
+	r.toolCache[tool.ID] = &toolCopy
 	r.mutex.Unlock()
 
 	r.log.Info(ctx, "Tool registered", "tool_id", tool.ID, "name", tool.Name)
@@ -162,8 +165,9 @@ func (r *Registry) RegisterTool(ctx context.Context, tool *Tool) error {
 func (r *Registry) GetToolSet(ctx context.Context, id string) (*ToolSet, error) {
 	r.mutex.RLock()
 	if toolSet, exists := r.toolSetCache[id]; exists {
+		toolSetCopy := *toolSet
 		r.mutex.RUnlock()
-		return toolSet, nil
+		return &toolSetCopy, nil
 	}
 	r.mutex.RUnlock()
 
@@ -173,8 +177,9 @@ func (r *Registry) GetToolSet(ctx context.Context, id string) (*ToolSet, error) 
 		return nil, err
 	}
 
+	toolSetCopy := *toolSet
 	r.mutex.Lock()
-	r.toolSetCache[id] = toolSet
+	r.toolSetCache[id] = &toolSetCopy
 	r.mutex.Unlock()
 
 	return toolSet, nil
@@ -205,8 +210,9 @@ func (r *Registry) RegisterToolSet(ctx context.Context, toolSet *ToolSet) error 
 		return fmt.Errorf("failed to save tool set: %w", err)
 	}
 
+	toolSetCopy := *toolSet
 	r.mutex.Lock()
-	r.toolSetCache[toolSet.ID] = toolSet
+	r.toolSetCache[toolSet.ID] = &toolSetCopy
 	r.mutex.Unlock()
 
 	r.log.Info(ctx, "Tool set registered", "tool_set_id", toolSet.ID, "name", toolSet.Name)

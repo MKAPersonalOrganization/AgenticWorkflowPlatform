@@ -3,6 +3,7 @@ package toolregistry
 import (
 	"context"
 	"encoding/json"
+	"sync"
 
 	"github.com/a-h/templ"
 
@@ -11,12 +12,12 @@ import (
 
 // ToolUIContext provides the data required for a plugin to render its UI.
 type ToolUIContext struct {
-	MessageID     string
-	MessageName   string
-	ParsedArgs    any
-	ParsedResult  map[string]any
-	RawResult     string
-	Error         bool
+	MessageID    string
+	MessageName  string
+	ParsedArgs   any
+	ParsedResult map[string]any
+	RawResult    string
+	Error        bool
 }
 
 // FactoryDeps holds the dependencies required to instantiate certain tools.
@@ -53,21 +54,30 @@ type PluginProvider interface {
 	UIHandledElicitations() []string
 }
 
-var providers = make(map[string]PluginProvider)
+var (
+	providersMu sync.RWMutex
+	providers   = make(map[string]PluginProvider)
+)
 
 // RegisterPlugin registers a new plugin provider.
 func RegisterPlugin(p PluginProvider) {
+	providersMu.Lock()
+	defer providersMu.Unlock()
 	providers[p.ID()] = p
 }
 
 // GetPluginProvider returns a plugin provider by ID.
 func GetPluginProvider(id string) (PluginProvider, bool) {
+	providersMu.RLock()
+	defer providersMu.RUnlock()
 	p, ok := providers[id]
 	return p, ok
 }
 
 // GetAllPluginProviders returns all registered plugin providers.
 func GetAllPluginProviders() []PluginProvider {
+	providersMu.RLock()
+	defer providersMu.RUnlock()
 	result := make([]PluginProvider, 0, len(providers))
 	for _, p := range providers {
 		result = append(result, p)

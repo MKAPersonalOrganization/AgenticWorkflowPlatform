@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"strings"
 
 	"github.com/go-redis/redis_rate/v10"
 	goredis "github.com/redis/go-redis/v9"
@@ -65,15 +66,17 @@ func RateLimiterHealthCheck(ctx context.Context, rdb *goredis.Client) error {
 	return rdb.Ping(ctx).Err()
 }
 
-// clientIP extracts the client IP from the request, preferring
-// X-Forwarded-For when present (common behind reverse proxies).
+// clientIP extracts the client IP from the request.
+// When behind a reverse proxy, the rightmost IP in X-Forwarded-For
+// (appended by the trusted proxy) is used. The leftmost entry is
+// client-supplied and trivially spoofable.
 func clientIP(r *http.Request) string {
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		// First entry is the original client.
-		if comma := indexOf(xff, ','); comma > 0 {
-			xff = xff[:comma]
+		// Use the last (rightmost) entry — the one appended by our trusted proxy.
+		parts := splitXFF(xff)
+		if len(parts) > 0 {
+			return strings.TrimSpace(parts[len(parts)-1])
 		}
-		return xff
 	}
 	ip, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
@@ -82,11 +85,13 @@ func clientIP(r *http.Request) string {
 	return ip
 }
 
-func indexOf(s string, b byte) int {
-	for i := 0; i < len(s); i++ {
-		if s[i] == b {
-			return i
+func splitXFF(xff string) []string {
+	var parts []string
+	for _, p := range strings.Split(xff, ",") {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			parts = append(parts, p)
 		}
 	}
-	return -1
+	return parts
 }

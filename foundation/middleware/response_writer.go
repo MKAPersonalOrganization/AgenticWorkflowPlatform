@@ -6,14 +6,17 @@ import "net/http"
 // This is shared across middleware to track response status.
 type responseWriter struct {
 	http.ResponseWriter
-	statusCode int
+	statusCode  int
+	wroteHeader bool
 }
 
-// WriteHeader captures the status code.
+// WriteHeader captures the status code and delegates to the underlying writer only once.
 func (rw *responseWriter) WriteHeader(code int) {
-	if rw.statusCode == 0 || rw.statusCode == http.StatusOK {
-		rw.statusCode = code
+	if rw.wroteHeader {
+		return
 	}
+	rw.statusCode = code
+	rw.wroteHeader = true
 	rw.ResponseWriter.WriteHeader(code)
 }
 

@@ -88,6 +88,9 @@ func (m *Manager) AddUserMessage(ctx context.Context, threadID, messageID, conte
 		"",
 		nil,
 	)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to add user message: %w", err)
+	}
 
 	// Track whether we changed the title for event emission
 	var sideEffects []domain.Event
@@ -313,6 +316,11 @@ func (m *Manager) retryUpdate(ctx context.Context, threadID string, update func(
 	var lastErr error
 
 	for i := 0; i < maxRetries; i++ {
+		// Check for context cancellation before each attempt
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+
 		thread, err := m.threadRepo.Load(ctx, threadID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load thread: %w", err)
@@ -332,16 +340,21 @@ func (m *Manager) retryUpdate(ctx context.Context, threadID string, update func(
 		}
 
 		lastErr = err
-		// Exponential backoff with a bit of jitter to avoid synchronized retries
+		// Exponential backoff with true random jitter to avoid thundering herd
 		backoff := time.Duration(10*(i+1)) * time.Millisecond
-		// Simple jitter
-		jitter := time.Duration(i*5) * time.Millisecond
+		jitter := time.Duration(time.Now().UnixNano() % int64(10*time.Millisecond))
+		wait := backoff + jitter
 		m.log.Debug(ctx, "Concurrency conflict during update, retrying",
 			"threadID", threadID,
 			"attempt", i+1,
-			"wait", backoff+jitter,
+			"wait", wait,
 		)
-		time.Sleep(backoff + jitter)
+		// Use context-aware sleep so shutdown/cancellation interrupts immediately
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(wait):
+		}
 	}
 
 	return nil, fmt.Errorf("exceeded max retries (%d) after concurrency conflict: %w", maxRetries, lastErr)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"iter"
+	"sync"
 	"time"
 
 	"school-with-ai/domain"
@@ -31,7 +32,9 @@ type Service struct {
 	emitter       EventEmitter
 	artifactStore artifact.Service
 	profileRepo   domain.StudentProfileRepository
-	runner        Runner // Domain-aware runner interface
+
+	runnerMu sync.RWMutex
+	runner   Runner // Domain-aware runner interface
 
 	// Internal components
 	threadMgmt *threadmgmt.Manager
@@ -46,11 +49,12 @@ func New(
 	eventLog domain.EventStore,
 	opts ...Option,
 ) *Service {
+	sharedRepo := domain.NewThreadRepository(threadmgmt.NewEventStoreAdapter(eventLog))
 	s := &Service{
 		log:        log,
 		writeModel: eventLog,
-		threadRepo: domain.NewThreadRepository(threadmgmt.NewEventStoreAdapter(eventLog)),
-		threadMgmt: threadmgmt.New(log, domain.NewThreadRepository(threadmgmt.NewEventStoreAdapter(eventLog))),
+		threadRepo: sharedRepo,
+		threadMgmt: threadmgmt.New(log, sharedRepo),
 	}
 
 	for _, opt := range opts {
@@ -90,6 +94,8 @@ func WithRunner(runner Runner) Option {
 
 // SetRunner sets the runner for the agent orchestrator.
 func (s *Service) SetRunner(runner Runner) {
+	s.runnerMu.Lock()
+	defer s.runnerMu.Unlock()
 	s.runner = runner
 }
 
@@ -308,6 +314,14 @@ func (s *Service) ExecuteRun(
 		}
 
 		// 3. Call the framework runner to get events
+		s.runnerMu.RLock()
+		runner := s.runner
+		s.runnerMu.RUnlock()
+		if runner == nil {
+			yield(nil, fmt.Errorf("runner not configured"))
+			return
+		}
+
 		runnerReq := &agent.RunRequest{
 			SessionID: req.ThreadID,
 			UserID:    req.UserID,
@@ -319,7 +333,7 @@ func (s *Service) ExecuteRun(
 				},
 			},
 		}
-		rawDomainEvents := s.runner.Run(ctx, runnerReq)
+		rawDomainEvents := runner.Run(ctx, runnerReq)
 
 		// 4. Process events for persistence and broadcasting
 		processedEvents := s.ProcessEvents(ctx, rawDomainEvents)
