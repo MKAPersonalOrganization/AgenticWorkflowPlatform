@@ -61,6 +61,11 @@ type Service struct {
 func NewService(baseURL string) *Service {
 	httpClient := &http.Client{
 		Timeout: 120 * time.Second, // Extended timeout to handle LLM cold starts (e.g. Ollama model loading)
+		Transport: &http.Transport{
+			MaxIdleConns:        200,
+			MaxIdleConnsPerHost: 100,
+			IdleConnTimeout:     90 * time.Second,
+		},
 	}
 	return &Service{
 		baseURL:       baseURL,

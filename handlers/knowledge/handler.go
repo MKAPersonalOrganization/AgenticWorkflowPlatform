@@ -439,7 +439,9 @@ func (h *Handler) DownloadPDF(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Disposition", "inline; filename=\"document.pdf\"")
-	io.Copy(w, body)
+	if _, err := io.Copy(w, body); err != nil {
+		h.log.Error(r.Context(), "failed to stream PDF content", "error", err)
+	}
 }
 
 // ListWorkspaces returns workspaces for the user's tenant.
@@ -1078,6 +1080,9 @@ func (h *Handler) SearchGraphNodes(w http.ResponseWriter, r *http.Request) {
 	if l, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && l > 0 {
 		limit = l
 	}
+	if limit > 200 {
+		limit = 200
+	}
 
 	result, err := h.edgequakeService.SearchGraphNodes(r.Context(), tCtx, q, limit)
 	if err != nil {
@@ -1107,6 +1112,9 @@ func (h *Handler) GetPopularLabels(w http.ResponseWriter, r *http.Request) {
 	limit := 20
 	if l, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && l > 0 {
 		limit = l
+	}
+	if limit > 200 {
+		limit = 200
 	}
 
 	result, err := h.edgequakeService.GetPopularLabels(r.Context(), tCtx, limit)
@@ -1143,6 +1151,9 @@ func (h *Handler) SearchGraphLabels(w http.ResponseWriter, r *http.Request) {
 	limit := 20
 	if l, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && l > 0 {
 		limit = l
+	}
+	if limit > 200 {
+		limit = 200
 	}
 
 	result, err := h.edgequakeService.SearchGraphLabels(r.Context(), tCtx, q, limit)

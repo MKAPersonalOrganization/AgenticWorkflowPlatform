@@ -82,17 +82,10 @@ func (p *PostgresLLMContextProjection) applyThreadCreated(ctx context.Context, e
 
 // applyUserMessageAdded adds a user message to the thread.
 func (p *PostgresLLMContextProjection) applyUserMessageAdded(ctx context.Context, event *domain.UserMessageAdded) error {
-	// First, get current message count for sequence number
-	var messageCount int
-	countQuery := `SELECT COUNT(*) FROM llm_messages WHERE thread_id = $1`
-	if err := p.db.GetContext(ctx, &messageCount, countQuery, event.ThreadID); err != nil {
-		return fmt.Errorf("failed to get message count: %w", err)
-	}
-
-	// Insert message
+	// Use atomic subquery for sequence number to prevent race conditions.
 	insertQuery := `
 		INSERT INTO llm_messages (message_id, thread_id, role, content, created_at, sequence_num)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		VALUES ($1, $2, $3, $4, $5, (SELECT COUNT(*) FROM llm_messages WHERE thread_id = $2))
 		ON CONFLICT (message_id) DO NOTHING
 	`
 
@@ -102,7 +95,6 @@ func (p *PostgresLLMContextProjection) applyUserMessageAdded(ctx context.Context
 		"user",
 		event.Content,
 		event.Timestamp,
-		messageCount, // 0-indexed sequence
 	)
 	if err != nil {
 		return fmt.Errorf("failed to insert message: %w", err)
@@ -125,13 +117,6 @@ func (p *PostgresLLMContextProjection) applyUserMessageAdded(ctx context.Context
 
 // applyAssistantMessageAdded adds an assistant message to the thread.
 func (p *PostgresLLMContextProjection) applyAssistantMessageAdded(ctx context.Context, event *domain.AssistantMessageAdded) error {
-	// First, get current message count for sequence number
-	var messageCount int
-	countQuery := `SELECT COUNT(*) FROM llm_messages WHERE thread_id = $1`
-	if err := p.db.GetContext(ctx, &messageCount, countQuery, event.ThreadID); err != nil {
-		return fmt.Errorf("failed to get message count: %w", err)
-	}
-
 	// Marshal tool calls to JSONB
 	var toolCallsJSON []byte
 	if len(event.ToolCalls) > 0 {
@@ -142,10 +127,10 @@ func (p *PostgresLLMContextProjection) applyAssistantMessageAdded(ctx context.Co
 		}
 	}
 
-	// Insert message
+	// Use atomic subquery for sequence number to prevent race conditions.
 	insertQuery := `
 		INSERT INTO llm_messages (message_id, thread_id, role, content, tool_calls, agent_name, created_at, sequence_num)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, (SELECT COUNT(*) FROM llm_messages WHERE thread_id = $2))
 		ON CONFLICT (message_id) DO NOTHING
 	`
 
@@ -157,7 +142,6 @@ func (p *PostgresLLMContextProjection) applyAssistantMessageAdded(ctx context.Co
 		toolCallsJSON,
 		event.AgentName,
 		event.Timestamp,
-		messageCount, // 0-indexed sequence
 	)
 	if err != nil {
 		return fmt.Errorf("failed to insert message: %w", err)
@@ -180,17 +164,10 @@ func (p *PostgresLLMContextProjection) applyAssistantMessageAdded(ctx context.Co
 
 // applyToolResultAdded adds a tool result message to the thread.
 func (p *PostgresLLMContextProjection) applyToolResultAdded(ctx context.Context, event *domain.ToolResultAdded) error {
-	// First, get current message count for sequence number
-	var messageCount int
-	countQuery := `SELECT COUNT(*) FROM llm_messages WHERE thread_id = $1`
-	if err := p.db.GetContext(ctx, &messageCount, countQuery, event.ThreadID); err != nil {
-		return fmt.Errorf("failed to get message count: %w", err)
-	}
-
-	// Insert message
+	// Use atomic subquery for sequence number to prevent race conditions.
 	insertQuery := `
 		INSERT INTO llm_messages (message_id, thread_id, role, content, tool_call_id, agent_name, created_at, sequence_num)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, (SELECT COUNT(*) FROM llm_messages WHERE thread_id = $2))
 		ON CONFLICT (message_id) DO NOTHING
 	`
 
@@ -202,7 +179,6 @@ func (p *PostgresLLMContextProjection) applyToolResultAdded(ctx context.Context,
 		event.ToolCallID,
 		event.AgentName,
 		event.Timestamp,
-		messageCount, // 0-indexed sequence
 	)
 	if err != nil {
 		return fmt.Errorf("failed to insert message: %w", err)
@@ -257,7 +233,8 @@ func (p *PostgresLLMContextProjection) applyThreadDeleted(ctx context.Context, e
 
 // Get retrieves a thread from PostgreSQL.
 func (p *PostgresLLMContextProjection) Get(threadID string) (*domain.Thread, bool) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
 	// Get thread record
 	var thread struct {
@@ -370,9 +347,10 @@ func (p *PostgresLLMContextProjection) Messages(threadID string) []domain.Messag
 	return []domain.Message{}
 }
 
-// All retrieves all non-deleted threads.
+// All retrieves all non-deleted threads (capped to prevent unbounded queries).
 func (p *PostgresLLMContextProjection) All() []domain.Thread {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	var threadIDs []string
 	query := `
@@ -380,6 +358,7 @@ func (p *PostgresLLMContextProjection) All() []domain.Thread {
 		FROM llm_threads
 		WHERE is_deleted = false
 		ORDER BY updated_at DESC
+		LIMIT 500
 	`
 
 	err := p.db.SelectContext(ctx, &threadIDs, query)

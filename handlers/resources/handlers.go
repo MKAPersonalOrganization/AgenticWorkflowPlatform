@@ -3,6 +3,7 @@ package resources
 import (
 	"encoding/json"
 	"io"
+	"log/slog"
 	"mime"
 	"net/http"
 	"path/filepath"
@@ -134,7 +135,9 @@ func (h *Handler) GetContent(w http.ResponseWriter, r *http.Request) {
 	}, safeFilename)
 	disposition := mime.FormatMediaType("attachment", map[string]string{"filename": safeFilename})
 	w.Header().Set("Content-Disposition", disposition)
-	io.Copy(w, content)
+	if _, err := io.Copy(w, content); err != nil {
+		slog.Error("failed to stream resource content", "error", err)
+	}
 }
 
 // Delete handles resource deletion.

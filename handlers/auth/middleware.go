@@ -2,10 +2,14 @@ package auth
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
+	"sync"
+	"time"
 
 	"school-with-ai/domain"
 	"school-with-ai/infra/kratos"
@@ -20,17 +24,50 @@ var (
 	ErrSessionNotActive = errors.New("session is not active")
 )
 
+// sessionCacheEntry holds a cached session with its expiration time.
+type sessionCacheEntry struct {
+	session   *client.Session
+	expiresAt time.Time
+}
+
+const (
+	sessionCacheTTL     = 30 * time.Second
+	sessionCacheMaxSize = 10000
+)
+
 // Middleware wraps the Kratos client for authentication middleware.
 type Middleware struct {
 	kratosClient *kratos.KratosClient
 	appURL       string
+	cacheMu      sync.RWMutex
+	sessionCache map[string]sessionCacheEntry
 }
 
 // NewMiddleware creates a new authentication middleware.
 func NewMiddleware(kratosClient *kratos.KratosClient, appURL string) *Middleware {
-	return &Middleware{
+	m := &Middleware{
 		kratosClient: kratosClient,
 		appURL:       appURL,
+		sessionCache: make(map[string]sessionCacheEntry),
+	}
+	// Background goroutine to periodically evict expired entries.
+	go m.evictExpired()
+	return m
+}
+
+// evictExpired removes expired entries from the session cache every 60 seconds.
+func (m *Middleware) evictExpired() {
+	ticker := time.NewTicker(60 * time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		now := time.Now()
+		m.cacheMu.Lock()
+		for k, v := range m.sessionCache {
+			if now.After(v.expiresAt) {
+				delete(m.sessionCache, k)
+			}
+		}
+		m.cacheMu.Unlock()
 	}
 }
 
@@ -125,6 +162,19 @@ func (m *Middleware) validateSession(r *http.Request) (*client.Session, error) {
 		return nil, ErrNoCookieHeader
 	}
 
+	// Hash the cookie to use as a cache key (avoid storing raw cookies in memory).
+	h := sha256.Sum256([]byte(cookie))
+	cacheKey := hex.EncodeToString(h[:])
+
+	// Check cache first.
+	now := time.Now()
+	m.cacheMu.RLock()
+	if entry, ok := m.sessionCache[cacheKey]; ok && now.Before(entry.expiresAt) {
+		m.cacheMu.RUnlock()
+		return entry.session, nil
+	}
+	m.cacheMu.RUnlock()
+
 	// Validate session with Kratos
 	session, err := m.kratosClient.ToSession(r.Context(), cookie)
 	if err != nil {
@@ -135,6 +185,25 @@ func (m *Middleware) validateSession(r *http.Request) (*client.Session, error) {
 	if session.Active == nil || !*session.Active {
 		return nil, ErrSessionNotActive
 	}
+
+	// Store in cache with TTL. Evict half the entries if over capacity.
+	m.cacheMu.Lock()
+	if len(m.sessionCache) >= sessionCacheMaxSize {
+		count := 0
+		half := sessionCacheMaxSize / 2
+		for k := range m.sessionCache {
+			delete(m.sessionCache, k)
+			count++
+			if count >= half {
+				break
+			}
+		}
+	}
+	m.sessionCache[cacheKey] = sessionCacheEntry{
+		session:   session,
+		expiresAt: now.Add(sessionCacheTTL),
+	}
+	m.cacheMu.Unlock()
 
 	return session, nil
 }

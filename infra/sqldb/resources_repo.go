@@ -45,10 +45,10 @@ func (r *PostgresResourcesRepository) List(ctx context.Context, userID string, s
 	var err error
 
 	if source == resources.SourcePublic {
-		const q = `SELECT * FROM resources WHERE source = 'public' ORDER BY created_at DESC`
+		const q = `SELECT * FROM resources WHERE source = 'public' ORDER BY created_at DESC LIMIT 500`
 		err = r.db.SelectContext(ctx, &res, q)
 	} else if userID != "" {
-		const q = `SELECT * FROM resources WHERE user_id = $1 AND source = 'private' ORDER BY created_at DESC`
+		const q = `SELECT * FROM resources WHERE user_id = $1 AND source = 'private' ORDER BY created_at DESC LIMIT 500`
 		err = r.db.SelectContext(ctx, &res, q, userID)
 	} else {
 		return nil, fmt.Errorf("user_id required for private resources")

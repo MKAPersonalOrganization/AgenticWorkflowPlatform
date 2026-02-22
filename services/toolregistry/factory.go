@@ -3,6 +3,7 @@ package toolregistry
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"school-with-ai/foundation/agent"
 	"school-with-ai/services/artifact"
@@ -11,6 +12,7 @@ import (
 
 // ExecutableToolFactory creates executable tools from tool registry entries and tool sets.
 type ExecutableToolFactory struct {
+	mu               sync.RWMutex
 	artifactStore    artifact.Service
 	toolRegistry     *Registry
 	edgequakeBaseURL string
@@ -28,6 +30,8 @@ func NewExecutableToolFactory(artifactStore artifact.Service) *ExecutableToolFac
 // SetEdgequakeConfig sets the edgequake base URL and LLM config for knowledge base tools.
 // The openAIAPIKey and modelID are used by the KB sub-agent to synthesize answers.
 func (f *ExecutableToolFactory) SetEdgequakeConfig(edgequakeBaseURL, openAIAPIKey, modelID string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.edgequakeBaseURL = edgequakeBaseURL
 	f.openAIAPIKey = openAIAPIKey
 	f.modelID = modelID
@@ -35,17 +39,23 @@ func (f *ExecutableToolFactory) SetEdgequakeConfig(edgequakeBaseURL, openAIAPIKe
 
 // SetToolRegistry sets the tool registry for the factory (used for tool set expansion).
 func (f *ExecutableToolFactory) SetToolRegistry(registry *Registry) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.toolRegistry = registry
 }
 
 // CreateExecutableToolsFromSet creates all executable tools from a tool set.
 func (f *ExecutableToolFactory) CreateExecutableToolsFromSet(ctx context.Context, toolSetID string) ([]agent.ExecutableTool, error) {
-	if f.toolRegistry == nil {
+	f.mu.RLock()
+	registry := f.toolRegistry
+	f.mu.RUnlock()
+
+	if registry == nil {
 		return nil, fmt.Errorf("tool registry not set")
 	}
 
 	// Get tools in the set
-	tools, err := f.toolRegistry.GetToolsInSet(ctx, toolSetID)
+	tools, err := registry.GetToolsInSet(ctx, toolSetID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get tools in set %s: %w", toolSetID, err)
 	}
@@ -65,6 +75,7 @@ func (f *ExecutableToolFactory) CreateExecutableToolsFromSet(ctx context.Context
 
 // CreateExecutableTool creates an executable tool from a tool registry entry.
 func (f *ExecutableToolFactory) CreateExecutableTool(ctx context.Context, tool *Tool) (agent.ExecutableTool, error) {
+	f.mu.RLock()
 	deps := FactoryDeps{
 		ArtifactStore:    f.artifactStore,
 		EdgequakeBaseURL: f.edgequakeBaseURL,
@@ -72,6 +83,7 @@ func (f *ExecutableToolFactory) CreateExecutableTool(ctx context.Context, tool *
 		ModelID:          f.modelID,
 		MemoryService:    memory.NewArtifactMemoryService(f.artifactStore),
 	}
+	f.mu.RUnlock()
 
 	for _, provider := range GetAllPluginProviders() {
 		executable, err := provider.CreateExecutable(ctx, tool.ID, deps)
