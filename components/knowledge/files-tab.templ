@@ -69,7 +69,7 @@ templ FilesTab() {
 								<td class="p-4 align-middle font-medium">
 									<div class="flex items-center gap-2">
 										@icon.FileText(icon.Props{Class: "size-4 text-muted-foreground flex-shrink-0"})
-									<span class="truncate max-w-[300px]" x-text="file.filename"></span>
+										<span class="truncate max-w-[300px]" x-text="file.filename"></span>
 									</div>
 								</td>
 								<td class="p-4 align-middle text-muted-foreground" x-text="formatBytes(file.file_size_bytes)"></td>
@@ -97,7 +97,7 @@ templ FilesTab() {
 											@icon.RotateCcw(icon.Props{Class: "size-4"})
 										</button>
 										<button
-										@click="deleteFile(file.pdf_id, file.filename)"
+											@click="deleteFile(file.pdf_id, file.filename)"
 											class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-destructive/10 hover:text-destructive h-8 w-8"
 											title="Delete"
 										>
