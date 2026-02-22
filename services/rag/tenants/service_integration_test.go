@@ -20,7 +20,7 @@ func TestService_Integration_List(t *testing.T) {
 
 	service := NewService(baseURL, nil)
 
-	resp, err := service.List(context.Background(), 1, 10)
+	resp, err := service.List(context.Background(), 0, 10)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, resp)
@@ -37,9 +37,10 @@ func TestService_Integration_Create(t *testing.T) {
 	service := NewService(baseURL, nil)
 
 	tenantName := "Integration Org " + uuid.New().String()[:8]
+	slug := "integration-org-" + uuid.New().String()[:8]
 	req := &CreateTenantRequest{
 		Name: tenantName,
-		Slug: "integration-org-" + uuid.New().String()[:8],
+		Slug: &slug,
 	}
 
 	resp, err := service.Create(context.Background(), req)
@@ -59,7 +60,7 @@ func TestService_Integration_Get(t *testing.T) {
 	service := NewService(baseURL, nil)
 
 	// 1. First list to get a valid ID
-	listResp, err := service.List(context.Background(), 1, 1)
+	listResp, err := service.List(context.Background(), 0, 1)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, listResp.Items)
 
@@ -134,9 +135,10 @@ func TestService_Integration_Lifecycle(t *testing.T) {
 
 	// 1. Create
 	name := "Lifecycle Org " + uuid.New().String()[:8]
+	slug := "lifecycle-org-" + uuid.New().String()[:8]
 	createReq := &CreateTenantRequest{
 		Name: name,
-		Slug: "lifecycle-org-" + uuid.New().String()[:8],
+		Slug: &slug,
 	}
 	tenant, err := service.Create(ctx, createReq)
 	assert.NoError(t, err)
@@ -144,7 +146,7 @@ func TestService_Integration_Lifecycle(t *testing.T) {
 	tenantID := tenant.ID
 
 	// 2. List & Verify presence
-	listResp, err := service.List(ctx, 1, 100)
+	listResp, err := service.List(ctx, 0, 100)
 	assert.NoError(t, err)
 	found := false
 	for _, item := range listResp.Items {
@@ -176,4 +178,60 @@ func TestService_Integration_Lifecycle(t *testing.T) {
 	// 6. Verify Deletion
 	_, err = service.Get(ctx, tenantID)
 	assert.Error(t, err, "Get should fail after deletion")
+}
+
+// TestService_Integration_TenantResponseFields verifies that all fields from the
+// Rust TenantResponse are properly deserialized.
+func TestService_Integration_TenantResponseFields(t *testing.T) {
+	baseURL := os.Getenv("EDGEQUAKE_BASE_URL")
+	if baseURL == "" {
+		t.Skip("EDGEQUAKE_BASE_URL not set")
+	}
+
+	service := NewService(baseURL, nil)
+
+	// Get the default tenant
+	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
+	resp, err := service.Get(context.Background(), tenantID)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.Equal(t, tenantID, resp.ID)
+	assert.NotEmpty(t, resp.Name)
+	assert.NotEmpty(t, resp.Slug)
+	assert.NotEmpty(t, resp.Plan)
+	assert.True(t, resp.IsActive)
+	assert.Greater(t, resp.MaxWorkspaces, 0)
+
+	// SPEC-032: Default model fields
+	assert.NotEmpty(t, resp.DefaultLLMModel)
+	assert.NotEmpty(t, resp.DefaultLLMProvider)
+	assert.NotEmpty(t, resp.DefaultLLMFullID, "default_llm_full_id should be populated")
+	assert.NotEmpty(t, resp.DefaultEmbeddingModel)
+	assert.NotEmpty(t, resp.DefaultEmbeddingProvider)
+	assert.Greater(t, resp.DefaultEmbeddingDimension, 0)
+	assert.NotEmpty(t, resp.DefaultEmbeddingFullID, "default_embedding_full_id should be populated")
+
+	// Timestamps should be RFC3339 strings
+	assert.NotEmpty(t, resp.CreatedAt)
+	assert.NotEmpty(t, resp.UpdatedAt)
+	assert.Contains(t, resp.CreatedAt, "T", "created_at should be an RFC3339 string")
+}
+
+// TestService_Integration_TenantListPagination verifies offset/limit pagination.
+func TestService_Integration_TenantListPagination(t *testing.T) {
+	baseURL := os.Getenv("EDGEQUAKE_BASE_URL")
+	if baseURL == "" {
+		t.Skip("EDGEQUAKE_BASE_URL not set")
+	}
+
+	service := NewService(baseURL, nil)
+
+	resp, err := service.List(context.Background(), 0, 5)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.GreaterOrEqual(t, resp.Total, 1)
+	assert.Equal(t, 0, resp.Offset)
+	assert.Equal(t, 5, resp.Limit)
 }

@@ -13,58 +13,13 @@ import (
 	"school-with-ai/domain"
 )
 
-// TrackStatusResponse represents the status of a tracked upload.
-type TrackStatusResponse struct {
-	TrackID string `json:"track_id"`
-	Status  string `json:"status"`
-	Message string `json:"message,omitempty"`
-}
-
-// RecoverStuckResponse represents the result of recovering stuck documents.
-type RecoverStuckResponse struct {
-	Recovered int    `json:"recovered"`
-	Message   string `json:"message"`
-}
-
-// DeletionImpactResponse represents the impact of deleting a document.
-type DeletionImpactResponse struct {
-	DocumentID   string `json:"document_id"`
-	ChunksCount  int    `json:"chunks_count"`
-	EntitiesLost int    `json:"entities_lost"`
-	Message      string `json:"message,omitempty"`
-}
-
-// FailedChunkItem represents a single failed chunk.
-type FailedChunkItem struct {
-	ChunkID string `json:"chunk_id"`
-	Error   string `json:"error"`
-}
-
-// FailedChunksResponse represents a list of failed chunks.
-type FailedChunksResponse struct {
-	Chunks []FailedChunkItem `json:"chunks"`
-	Total  int               `json:"total"`
-}
-
-// RetryChunksResponse represents the result of retrying failed chunks.
-type RetryChunksResponse struct {
-	Retried int    `json:"retried"`
-	Message string `json:"message"`
-}
-
-// DocumentLineageResponse represents full lineage for a document.
-type DocumentLineageResponse struct {
-	DocumentID string      `json:"document_id"`
-	Lineage    interface{} `json:"lineage"`
-}
-
-// DocumentMetadataResponse represents metadata for a document.
+// DocumentMetadataResponse wraps the JSON metadata from the API.
 type DocumentMetadataResponse struct {
 	DocumentID string      `json:"document_id"`
 	Metadata   interface{} `json:"metadata"`
 }
 
-// ExportLineageResponse represents exported lineage data.
+// ExportLineageResponse wraps exported lineage data.
 type ExportLineageResponse struct {
 	Data   interface{} `json:"data"`
 	Format string      `json:"format"`
@@ -76,14 +31,7 @@ type CancelPdfResponse struct {
 	Message string `json:"message"`
 }
 
-// BatchUploadResponse represents a batch upload result.
-type BatchUploadResponse struct {
-	Uploaded int    `json:"uploaded"`
-	TrackID  string `json:"track_id,omitempty"`
-	Message  string `json:"message"`
-}
-
-// GetTrackStatus retrieves the status of a tracked upload.
+// GetTrackStatus retrieves the status of a tracked upload batch.
 func (s *Service) GetTrackStatus(ctx context.Context, tCtx *domain.TenantContext, trackID string) (*TrackStatusResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/documents/track/%s", s.baseURL, trackID)
 
@@ -137,7 +85,7 @@ func (s *Service) RecoverStuck(ctx context.Context, tCtx *domain.TenantContext) 
 	return &response, nil
 }
 
-// GetDeletionImpact analyzes the impact of deleting a document.
+// GetDeletionImpact analyses the impact of deleting a document.
 func (s *Service) GetDeletionImpact(ctx context.Context, tCtx *domain.TenantContext, documentID string) (*DeletionImpactResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/documents/%s/deletion-impact", s.baseURL, documentID)
 
@@ -192,7 +140,7 @@ func (s *Service) RetryFailedChunks(ctx context.Context, tCtx *domain.TenantCont
 }
 
 // ListFailedChunks lists failed chunks for a document.
-func (s *Service) ListFailedChunks(ctx context.Context, tCtx *domain.TenantContext, documentID string) (*FailedChunksResponse, error) {
+func (s *Service) ListFailedChunks(ctx context.Context, tCtx *domain.TenantContext, documentID string) (*ListFailedChunksResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/documents/%s/failed-chunks", s.baseURL, documentID)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
@@ -211,7 +159,7 @@ func (s *Service) ListFailedChunks(ctx context.Context, tCtx *domain.TenantConte
 		return nil, err
 	}
 
-	var response FailedChunksResponse
+	var response ListFailedChunksResponse
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
@@ -219,7 +167,8 @@ func (s *Service) ListFailedChunks(ctx context.Context, tCtx *domain.TenantConte
 }
 
 // GetFullLineage retrieves full lineage for a document.
-func (s *Service) GetFullLineage(ctx context.Context, tCtx *domain.TenantContext, documentID string) (*DocumentLineageResponse, error) {
+// The endpoint returns the document detail with lineage information.
+func (s *Service) GetFullLineage(ctx context.Context, tCtx *domain.TenantContext, documentID string) (*DocumentDetail, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/documents/%s/lineage", s.baseURL, documentID)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
@@ -238,7 +187,7 @@ func (s *Service) GetFullLineage(ctx context.Context, tCtx *domain.TenantContext
 		return nil, err
 	}
 
-	var response DocumentLineageResponse
+	var response DocumentDetail
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}

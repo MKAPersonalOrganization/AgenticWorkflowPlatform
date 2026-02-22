@@ -152,7 +152,12 @@ func (s *Service) ReprocessFailedDocuments(ctx context.Context, tCtx *domain.Ten
 
 // ScanDocuments triggers scanning of the input directory for new documents.
 func (s *Service) ScanDocuments(ctx context.Context, tCtx *domain.TenantContext, path string) (*documents.ScanDocumentsResponse, error) {
-	return s.Documents.ScanDocuments(ctx, tCtx, path)
+	return s.Documents.ScanDocuments(ctx, tCtx, documents.ScanDocumentsRequest{
+		Path:            path,
+		Recursive:       true,
+		MaxFiles:        1000,
+		AsyncProcessing: true,
+	})
 }
 
 // DeleteAllDocuments deletes all documents from the workspace.
@@ -186,7 +191,7 @@ func (s *Service) CancelPipeline(ctx context.Context, tCtx *domain.TenantContext
 }
 
 // GetPipelineTasks retrieves the current tasks in the pipeline.
-func (s *Service) GetPipelineTasks(ctx context.Context, tCtx *domain.TenantContext, page, pageSize int) (*documents.TaskListResponse, error) {
+func (s *Service) GetPipelineTasks(ctx context.Context, tCtx *domain.TenantContext, page, pageSize int) (*tasks.TaskListResponse, error) {
 	return s.Documents.GetPipelineTasks(ctx, tCtx, page, pageSize)
 }
 
@@ -242,12 +247,17 @@ func (s *Service) RebuildEmbeddings(ctx context.Context, tCtx *domain.TenantCont
 
 // ReprocessAllDocuments triggers reprocessing for all documents in the workspace.
 func (s *Service) ReprocessAllDocuments(ctx context.Context, tCtx *domain.TenantContext, workspaceID uuid.UUID) error {
-	return s.Workspaces.ReprocessAllDocuments(ctx, tCtx, workspaceID)
+	req := &workspaces.ReprocessAllRequest{
+		IncludeCompleted: true,
+		MaxDocuments:     1000,
+	}
+	_, err := s.Workspaces.ReprocessAllDocuments(ctx, tCtx, workspaceID, req)
+	return err
 }
 
 // ListTenants retrieves all tenants from Edgequake.
-func (s *Service) ListTenants(ctx context.Context, page, pageSize int) (*tenants.TenantListResponse, error) {
-	return s.Tenants.List(ctx, page, pageSize)
+func (s *Service) ListTenants(ctx context.Context, offset, limit int) (*tenants.TenantListResponse, error) {
+	return s.Tenants.List(ctx, offset, limit)
 }
 
 // CreateTenant creates a new tenant.

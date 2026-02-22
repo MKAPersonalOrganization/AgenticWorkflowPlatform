@@ -12,23 +12,29 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	testUsername = "testuser"
-	testPassword = "TestPass123!"
-)
+func getTestCredentials(t *testing.T) (string, string) {
+	t.Helper()
+	username := os.Getenv("TEST_AUTH_USERNAME")
+	password := os.Getenv("TEST_AUTH_PASSWORD")
+	if username == "" || password == "" {
+		t.Skip("TEST_AUTH_USERNAME and TEST_AUTH_PASSWORD must be set for auth integration tests")
+	}
+	return username, password
+}
 
 func TestService_Integration_LoginSuccess(t *testing.T) {
 	baseURL := os.Getenv("EDGEQUAKE_BASE_URL")
 	if baseURL == "" {
 		t.Skip("EDGEQUAKE_BASE_URL not set")
 	}
+	username, password := getTestCredentials(t)
 
 	service := NewService(baseURL, nil)
 	ctx := context.Background()
 
 	resp, err := service.Login(ctx, &LoginRequest{
-		Username: testUsername,
-		Password: testPassword,
+		Username: username,
+		Password: password,
 	})
 	require.NoError(t, err)
 	require.NotNil(t, resp)
@@ -37,7 +43,7 @@ func TestService_Integration_LoginSuccess(t *testing.T) {
 	assert.Equal(t, "Bearer", resp.TokenType)
 	assert.Greater(t, resp.ExpiresIn, int64(0))
 	assert.NotEmpty(t, resp.RefreshToken)
-	assert.Equal(t, testUsername, resp.User.Username)
+	assert.Equal(t, username, resp.User.Username)
 	assert.NotEmpty(t, resp.User.UserID)
 	assert.NotEmpty(t, resp.User.Email)
 	assert.NotEmpty(t, resp.User.Role)
@@ -64,13 +70,14 @@ func TestService_Integration_RefreshToken(t *testing.T) {
 	if baseURL == "" {
 		t.Skip("EDGEQUAKE_BASE_URL not set")
 	}
+	username, password := getTestCredentials(t)
 
 	service := NewService(baseURL, nil)
 	ctx := context.Background()
 
 	loginResp, err := service.Login(ctx, &LoginRequest{
-		Username: testUsername,
-		Password: testPassword,
+		Username: username,
+		Password: password,
 	})
 	require.NoError(t, err)
 
@@ -105,13 +112,14 @@ func TestService_Integration_GetMe(t *testing.T) {
 	if baseURL == "" {
 		t.Skip("EDGEQUAKE_BASE_URL not set")
 	}
+	username, password := getTestCredentials(t)
 
 	service := NewService(baseURL, nil)
 	ctx := context.Background()
 
 	loginResp, err := service.Login(ctx, &LoginRequest{
-		Username: testUsername,
-		Password: testPassword,
+		Username: username,
+		Password: password,
 	})
 	require.NoError(t, err)
 
@@ -119,7 +127,7 @@ func TestService_Integration_GetMe(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, meResp)
 
-	assert.Equal(t, testUsername, meResp.User.Username)
+	assert.Equal(t, username, meResp.User.Username)
 	assert.NotEmpty(t, meResp.User.UserID)
 	assert.NotEmpty(t, meResp.User.Email)
 }
@@ -142,13 +150,14 @@ func TestService_Integration_Logout(t *testing.T) {
 	if baseURL == "" {
 		t.Skip("EDGEQUAKE_BASE_URL not set")
 	}
+	username, password := getTestCredentials(t)
 
 	service := NewService(baseURL, nil)
 	ctx := context.Background()
 
 	loginResp, err := service.Login(ctx, &LoginRequest{
-		Username: testUsername,
-		Password: testPassword,
+		Username: username,
+		Password: password,
 	})
 	require.NoError(t, err)
 
@@ -161,14 +170,15 @@ func TestService_Integration_FullAuthFlow(t *testing.T) {
 	if baseURL == "" {
 		t.Skip("EDGEQUAKE_BASE_URL not set")
 	}
+	username, password := getTestCredentials(t)
 
 	service := NewService(baseURL, nil)
 	ctx := context.Background()
 
 	// 1. Login
 	loginResp, err := service.Login(ctx, &LoginRequest{
-		Username: testUsername,
-		Password: testPassword,
+		Username: username,
+		Password: password,
 	})
 	require.NoError(t, err)
 

@@ -215,3 +215,68 @@ func TestService_Integration_Update(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, newName, getResp.Name)
 }
+
+// TestService_Integration_WorkspaceResponseFields verifies all fields from the
+// Rust WorkspaceResponse are properly deserialized including SPEC-032 and SPEC-040 fields.
+func TestService_Integration_WorkspaceResponseFields(t *testing.T) {
+	baseURL := os.Getenv("EDGEQUAKE_BASE_URL")
+	if baseURL == "" {
+		t.Skip("EDGEQUAKE_BASE_URL not set")
+	}
+
+	service := NewService(baseURL, nil)
+
+	// Use the known default workspace ID
+	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
+	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
+
+	resp, err := service.Get(context.Background(), nil, workspaceID)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.Equal(t, workspaceID, resp.ID)
+	assert.Equal(t, tenantID, resp.TenantID)
+	assert.NotEmpty(t, resp.Name)
+	assert.NotEmpty(t, resp.Slug)
+	assert.True(t, resp.IsActive)
+
+	// SPEC-032: LLM configuration
+	assert.NotEmpty(t, resp.LlmModel)
+	assert.NotEmpty(t, resp.LlmProvider)
+	assert.NotEmpty(t, resp.LlmFullID, "llm_full_id should be populated")
+
+	// SPEC-032: Embedding configuration
+	assert.NotEmpty(t, resp.EmbeddingModel)
+	assert.NotEmpty(t, resp.EmbeddingProvider)
+	assert.Greater(t, resp.EmbeddingDimension, 0)
+	assert.NotEmpty(t, resp.EmbeddingFullID, "embedding_full_id should be populated")
+
+	// Timestamps should be RFC3339 strings
+	assert.NotEmpty(t, resp.CreatedAt)
+	assert.NotEmpty(t, resp.UpdatedAt)
+	assert.Contains(t, resp.CreatedAt, "T", "created_at should be an RFC3339 string")
+}
+
+// TestService_Integration_WorkspaceStatsFields verifies all fields from WorkspaceStatsResponse.
+func TestService_Integration_WorkspaceStatsFields(t *testing.T) {
+	baseURL := os.Getenv("EDGEQUAKE_BASE_URL")
+	if baseURL == "" {
+		t.Skip("EDGEQUAKE_BASE_URL not set")
+	}
+
+	service := NewService(baseURL, nil)
+
+	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
+
+	resp, err := service.GetStats(context.Background(), nil, workspaceID)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.Equal(t, workspaceID, resp.WorkspaceID)
+	assert.GreaterOrEqual(t, resp.DocumentCount, 0)
+	assert.GreaterOrEqual(t, resp.EntityCount, 0)
+	assert.GreaterOrEqual(t, resp.RelationshipCount, 0)
+	assert.GreaterOrEqual(t, resp.EntityTypeCount, 0)
+	assert.GreaterOrEqual(t, resp.ChunkCount, 0)
+	assert.GreaterOrEqual(t, resp.EmbeddingCount, 0)
+}

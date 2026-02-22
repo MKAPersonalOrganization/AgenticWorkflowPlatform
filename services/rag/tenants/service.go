@@ -28,8 +28,8 @@ func NewService(baseURL string, httpClient *http.Client) *Service {
 }
 
 // List retrieves a list of all tenants.
-func (s *Service) List(ctx context.Context, page, pageSize int) (*TenantListResponse, error) {
-	url := fmt.Sprintf("%s/api/v1/tenants?page=%d&page_size=%d", s.baseURL, page, pageSize)
+func (s *Service) List(ctx context.Context, offset, limit int) (*TenantListResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/tenants?offset=%d&limit=%d", s.baseURL, offset, limit)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {

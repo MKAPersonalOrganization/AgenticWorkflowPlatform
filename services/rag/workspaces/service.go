@@ -372,30 +372,6 @@ func (s *Service) RebuildEmbeddings(ctx context.Context, tCtx *domain.TenantCont
 	return &response, nil
 }
 
-// ReprocessAllDocuments triggers reprocessing for all documents in the workspace.
-func (s *Service) ReprocessAllDocuments(ctx context.Context, tCtx *domain.TenantContext, workspaceID uuid.UUID) error {
-	url := fmt.Sprintf("%s/api/v1/workspaces/%s/reprocess-documents", s.baseURL, workspaceID.String())
-
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, nil)
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-
-	s.injectHeaders(httpReq, tCtx)
-
-	resp, err := s.httpClient.Do(httpReq)
-	if err != nil {
-		return fmt.Errorf("request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
-		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
-	return nil
-}
-
 func (s *Service) injectHeaders(req *http.Request, tCtx *domain.TenantContext) {
 	if tCtx != nil {
 		if tCtx.TenantID != nil {

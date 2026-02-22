@@ -14,6 +14,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func testFolderContext() *domain.TenantContext {
+	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
+	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
+	return &domain.TenantContext{
+		TenantID:    &tenantID,
+		WorkspaceID: &workspaceID,
+		UserID:      "00000000-0000-0000-0000-000000000001",
+		Role:        "admin",
+	}
+}
+
 func TestService_Integration_Lifecycle(t *testing.T) {
 	baseURL := os.Getenv("EDGEQUAKE_BASE_URL")
 	if baseURL == "" {
@@ -22,15 +33,7 @@ func TestService_Integration_Lifecycle(t *testing.T) {
 
 	service := NewService(baseURL, nil)
 	ctx := context.Background()
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
-	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-	userID := uuid.MustParse("00000000-0000-0000-0000-000000000004")
-	tCtx := &domain.TenantContext{
-		TenantID:    &tenantID,
-		WorkspaceID: &workspaceID,
-		UserID:      userID.String(),
-		Role:        "user",
-	}
+	tCtx := testFolderContext()
 
 	// 1. Create a folder
 	folderName := "Integration Folder " + uuid.New().String()[:8]
@@ -90,15 +93,7 @@ func TestService_Integration_NestedFolders(t *testing.T) {
 
 	service := NewService(baseURL, nil)
 	ctx := context.Background()
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
-	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-	userID := uuid.MustParse("00000000-0000-0000-0000-000000000004")
-	tCtx := &domain.TenantContext{
-		TenantID:    &tenantID,
-		WorkspaceID: &workspaceID,
-		UserID:      userID.String(),
-		Role:        "user",
-	}
+	tCtx := testFolderContext()
 
 	// Create parent folder
 	parentName := "Parent Folder " + uuid.New().String()[:8]
@@ -173,15 +168,7 @@ func TestService_Integration_MoveFolderBetweenParents(t *testing.T) {
 
 	service := NewService(baseURL, nil)
 	ctx := context.Background()
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
-	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-	userID := uuid.MustParse("00000000-0000-0000-0000-000000000004")
-	tCtx := &domain.TenantContext{
-		TenantID:    &tenantID,
-		WorkspaceID: &workspaceID,
-		UserID:      userID.String(),
-		Role:        "user",
-	}
+	tCtx := testFolderContext()
 
 	// Create two parent folders
 	parent1Name := "Parent 1 " + uuid.New().String()[:8]
@@ -224,15 +211,7 @@ func TestService_Integration_UpdateFolderPosition(t *testing.T) {
 
 	service := NewService(baseURL, nil)
 	ctx := context.Background()
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
-	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-	userID := uuid.MustParse("00000000-0000-0000-0000-000000000004")
-	tCtx := &domain.TenantContext{
-		TenantID:    &tenantID,
-		WorkspaceID: &workspaceID,
-		UserID:      userID.String(),
-		Role:        "user",
-	}
+	tCtx := testFolderContext()
 
 	// Create a folder
 	folderName := "Positioned Folder " + uuid.New().String()[:8]
@@ -263,15 +242,7 @@ func TestService_Integration_UpdateMultipleFields(t *testing.T) {
 
 	service := NewService(baseURL, nil)
 	ctx := context.Background()
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
-	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-	userID := uuid.MustParse("00000000-0000-0000-0000-000000000004")
-	tCtx := &domain.TenantContext{
-		TenantID:    &tenantID,
-		WorkspaceID: &workspaceID,
-		UserID:      userID.String(),
-		Role:        "user",
-	}
+	tCtx := testFolderContext()
 
 	// Create parent folder
 	parentName := "Update Parent " + uuid.New().String()[:8]
@@ -311,15 +282,7 @@ func TestService_Integration_CreateMultipleFoldersAndList(t *testing.T) {
 
 	service := NewService(baseURL, nil)
 	ctx := context.Background()
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
-	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-	userID := uuid.MustParse("00000000-0000-0000-0000-000000000004")
-	tCtx := &domain.TenantContext{
-		TenantID:    &tenantID,
-		WorkspaceID: &workspaceID,
-		UserID:      userID.String(),
-		Role:        "user",
-	}
+	tCtx := testFolderContext()
 
 	// Create multiple folders
 	folderCount := 5
@@ -364,15 +327,7 @@ func TestService_Integration_DeleteNonExistentFolder(t *testing.T) {
 
 	service := NewService(baseURL, nil)
 	ctx := context.Background()
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
-	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-	userID := uuid.MustParse("00000000-0000-0000-0000-000000000004")
-	tCtx := &domain.TenantContext{
-		TenantID:    &tenantID,
-		WorkspaceID: &workspaceID,
-		UserID:      userID.String(),
-		Role:        "user",
-	}
+	tCtx := testFolderContext()
 
 	// Try to delete a non-existent folder
 	nonExistentID := uuid.New()
@@ -390,15 +345,7 @@ func TestService_Integration_UpdateNonExistentFolder(t *testing.T) {
 
 	service := NewService(baseURL, nil)
 	ctx := context.Background()
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
-	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-	userID := uuid.MustParse("00000000-0000-0000-0000-000000000004")
-	tCtx := &domain.TenantContext{
-		TenantID:    &tenantID,
-		WorkspaceID: &workspaceID,
-		UserID:      userID.String(),
-		Role:        "user",
-	}
+	tCtx := testFolderContext()
 
 	// Try to update a non-existent folder
 	nonExistentID := uuid.New()
@@ -450,15 +397,7 @@ func TestService_Integration_FolderTimestamps(t *testing.T) {
 
 	service := NewService(baseURL, nil)
 	ctx := context.Background()
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
-	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-	userID := uuid.MustParse("00000000-0000-0000-0000-000000000004")
-	tCtx := &domain.TenantContext{
-		TenantID:    &tenantID,
-		WorkspaceID: &workspaceID,
-		UserID:      userID.String(),
-		Role:        "user",
-	}
+	tCtx := testFolderContext()
 
 	// Create a folder
 	folderName := "Timestamp Folder " + uuid.New().String()[:8]

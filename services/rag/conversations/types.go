@@ -136,6 +136,7 @@ type ListConversationsParams struct {
 	FilterArchived *bool
 	FilterPinned   *bool
 	FilterFolderID *uuid.UUID
+	FilterUnfiled  *bool
 	FilterSearch   *string
 	Sort           *string
 	Order          *string
@@ -145,4 +146,22 @@ type ListConversationsParams struct {
 type ListMessagesParams struct {
 	Cursor *string
 	Limit  *int
+}
+
+// ImportConversationsRequest represents a request to import conversations.
+type ImportConversationsRequest struct {
+	Conversations []json.RawMessage `json:"conversations"`
+}
+
+// ImportConversationsResponse represents the response from importing conversations.
+type ImportConversationsResponse struct {
+	Imported int                   `json:"imported"`
+	Failed   int                   `json:"failed"`
+	Errors   []ImportErrorResponse `json:"errors"`
+}
+
+// ImportErrorResponse represents a single import error.
+type ImportErrorResponse struct {
+	Title string `json:"title"`
+	Error string `json:"error"`
 }

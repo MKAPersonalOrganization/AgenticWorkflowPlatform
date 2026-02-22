@@ -2491,7 +2491,7 @@ templ workspaceDetailsScript() {
 				},
 
 				async upload() {
-					if (!this.file) return;
+					if (!this.file || this.uploading) return;
 					
 					this.uploading = true;
 					this.progress = 0;
