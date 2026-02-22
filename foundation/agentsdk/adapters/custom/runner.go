@@ -177,8 +177,9 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 
 			// AddUserMessage handles both thread creation and message persistence
 			var uEvent *domain.UserMessageAdded
+			var sideEffects []domain.Event
 			var pErr error
-			agg, uEvent, pErr = threadMgmt.AddUserMessage(ctx, req.SessionID, messageID, userContent, req.UserID)
+			agg, uEvent, sideEffects, pErr = threadMgmt.AddUserMessage(ctx, req.SessionID, messageID, userContent, req.UserID)
 			if pErr != nil {
 				yield(nil, fmt.Errorf("failed to persist user message: %w", pErr))
 				return
@@ -186,6 +187,8 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 			if uEvent != nil {
 				initialEvents = append(initialEvents, uEvent)
 			}
+			// Include side-effect events (e.g. ThreadTitleUpdated from auto-titling)
+			initialEvents = append(initialEvents, sideEffects...)
 		} else {
 			// Resuming without a new message
 			var lErr error
@@ -257,7 +260,14 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 		// Convert core events to domain events
 		engineDomainEvents := r.pipeline.ProcessEventStream(ctx, coreEvents)
 
-		// 7. Yield all raw domain events to caller
+		// 7. Yield initial events (UserMessageAdded, ThreadTitleUpdated, etc.)
+		for _, ie := range initialEvents {
+			if !yield(ie, nil) {
+				return
+			}
+		}
+
+		// 8. Yield all engine domain events to caller
 		for de, err := range engineDomainEvents {
 			if !yield(de, err) {
 				return

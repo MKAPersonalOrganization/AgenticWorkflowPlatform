@@ -200,7 +200,7 @@ func (s *Service) persistDurableEvent(ctx context.Context, event domain.Event) e
 		_, err := s.threadMgmt.DeleteThread(ctx, e.ThreadID)
 		return err
 	case *domain.UserMessageAdded:
-		_, _, err := s.threadMgmt.AddUserMessage(ctx, e.ThreadID, e.MessageID, e.Content, e.UserID)
+		_, _, _, err := s.threadMgmt.AddUserMessage(ctx, e.ThreadID, e.MessageID, e.Content, e.UserID)
 		return err
 	case *domain.AssistantMessageAdded:
 		_, _, err := s.threadMgmt.AddAssistantMessage(ctx, e.ThreadID, e.MessageID, e.Content, e.ToolCalls, e.AgentName)
