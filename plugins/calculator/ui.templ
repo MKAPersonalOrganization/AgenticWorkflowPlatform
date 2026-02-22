@@ -2,12 +2,16 @@ package calculator
 
 import "school-with-ai/components/annotation"
 
-templ icon() {
+// ──────────────────────────────────────────────────────
+// Arithmetic tools: add, subtract, multiply, divide, power, sqrt
+// Nature: instant binary/unary computation → single numeric result
+// ──────────────────────────────────────────────────────
+templ arithmeticIcon() {
 	<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calculator"><rect width="16" height="20" x="4" y="2" rx="2"></rect><line x1="8" x2="16" y1="6" y2="6"></line><line x1="16" x2="16" y1="14" y2="18"></line><path d="M16 10h.01"></path><path d="M12 10h.01"></path><path d="M8 10h.01"></path><path d="M12 14h.01"></path><path d="M8 14h.01"></path><path d="M12 18h.01"></path><path d="M8 18h.01"></path></svg>
 }
 
-templ Container() {
-	@annotation.Container(icon(), annotation.Props{
+templ ArithmeticContainer() {
+	@annotation.Container(arithmeticIcon(), annotation.Props{
 		Label: "Expression Resolved",
 		LabelAttrs: templ.Attributes{
 			"x-text": `
@@ -25,15 +29,17 @@ templ Container() {
 			<!-- Expression: Academic Typography -->
 			<div class="flex items-center gap-2 text-[12px] text-muted-foreground/50 italic font-serif">
 				<span class="font-semibold text-muted-foreground/40">Operation:</span>
-				<span class="text-primary/70 not-italic font-mono text-[11px] bg-primary/[0.05] px-2 py-0.5 rounded-md border border-primary/10" x-text="
+				<span
+					class="text-primary/70 not-italic font-mono text-[11px] bg-primary/[0.05] px-2 py-0.5 rounded-md border border-primary/10"
+					x-text="
 					message.name === 'add' ? `${message.parsedArgs?.a} + ${message.parsedArgs?.b}` :
 					message.name === 'subtract' ? `${message.parsedArgs?.a} - ${message.parsedArgs?.b}` :
 					message.name === 'multiply' ? `${message.parsedArgs?.a} × ${message.parsedArgs?.b}` :
 					message.name === 'divide' ? `${message.parsedArgs?.a} ÷ ${message.parsedArgs?.b}` :
 					message.name === 'power' ? `${message.parsedArgs?.a}^${message.parsedArgs?.b}` :
-					message.name === 'sqrt' ? `√${message.parsedArgs?.value}` :
-					(message.parsedArgs?.expression || '')
-				"></span>
+					message.name === 'sqrt' ? `√${message.parsedArgs?.value}` : ''
+				"
+				></span>
 			</div>
 			<!-- Result Area -->
 			<div class="relative w-full">
@@ -56,10 +62,122 @@ templ Container() {
 	}
 }
 
+// ──────────────────────────────────────────────────────
+// Equation Solver tool: math-solve / solve_equation
+// Nature: symbolic algebra → equation type, step-by-step derivation, multiple solutions
+// ──────────────────────────────────────────────────────
+templ equationIcon() {
+	<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sigma"><path d="M18 7V4H6l6 8-6 8h12v-3"></path></svg>
+}
 
+templ EquationSolverContainer() {
+	@annotation.Container(equationIcon(), annotation.Props{
+		Label:   "Equation Solved",
+		Subtext: "Symbolic algebra engine — step-by-step derivation",
+		FooterDotAttrs: templ.Attributes{
+			":class": `(() => {
+				if (message.parsedResult?.verified) return 'bg-green-500/40';
+				if (message.parsedResult?.error) return 'bg-destructive/40';
+				return 'bg-primary/30';
+			})()`,
+		},
+	}) {
+		<div class="flex flex-col gap-4">
+			<!-- Equation & Classification -->
+			<div class="flex flex-col gap-2">
+				<div class="flex items-center gap-2 text-[12px] text-muted-foreground/50 italic font-serif">
+					<span class="font-semibold text-muted-foreground/40">Equation:</span>
+					<span
+						class="text-primary/70 not-italic font-mono text-[11px] bg-primary/[0.05] px-2 py-0.5 rounded-md border border-primary/10 shadow-sm"
+						x-text="message.parsedArgs?.equation || message.parsedResult?.equation || ''"
+					></span>
+				</div>
+				<div class="flex items-center gap-3">
+					<div class="flex items-center gap-2 text-[12px] text-muted-foreground/50 italic font-serif">
+						<span class="font-semibold text-muted-foreground/40">Variable:</span>
+						<span
+							class="text-foreground/70 not-italic font-mono text-[11px] bg-muted/10 px-2 py-0.5 rounded-md border border-border/10"
+							x-text="message.parsedArgs?.variable || message.parsedResult?.variable || 'x'"
+						></span>
+					</div>
+					<template x-if="message.parsedResult?.type">
+						<span
+							class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-[0.15em] border"
+							:class="{
+								'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800': message.parsedResult.type === 'linear',
+								'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800': message.parsedResult.type === 'quadratic',
+								'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800': message.parsedResult.type === 'cubic',
+								'bg-muted/50 text-muted-foreground border-border/30': !['linear', 'quadratic', 'cubic'].includes(message.parsedResult.type)
+							}"
+							x-text="message.parsedResult.type"
+						></span>
+					</template>
+				</div>
+			</div>
+			<!-- Error State -->
+			<template x-if="message.parsedResult?.error || (typeof message.result === 'string' && message.result.includes('error'))">
+				<div class="flex items-center gap-3 text-destructive/80 font-medium py-3 px-4 bg-destructive/5 border border-destructive/10 rounded-xl">
+					<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-alert-circle"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="8" y2="12"></line><line x1="12" x2="12.01" y1="16" y2="16"></line></svg>
+					<span class="text-xs uppercase tracking-[0.1em] font-bold">Could Not Solve</span>
+				</div>
+			</template>
+			<!-- Solutions -->
+			<template x-if="message.parsedResult?.solutions && !message.parsedResult?.error">
+				<div class="bg-muted/[0.03] border border-border/10 rounded-xl p-6 flex flex-col items-center justify-center shadow-[inset_0_1px_4px_rgba(0,0,0,0.01)] transition-colors hover:bg-muted/[0.05]">
+					<div class="text-[10px] uppercase tracking-[0.3em] font-bold text-muted-foreground/30 mb-3">
+						<span x-text="message.parsedResult.solutions.length === 1 ? 'Solution' : 'Solutions'"></span>
+					</div>
+					<div class="flex items-center gap-4 flex-wrap justify-center">
+						<template x-for="(sol, idx) in message.parsedResult.solutions" :key="idx">
+							<div class="flex items-baseline gap-1.5">
+								<span class="text-xs text-muted-foreground/40 font-mono" x-text="(message.parsedArgs?.variable || message.parsedResult?.variable || 'x') + ' ='"></span>
+								<span class="text-3xl font-mono font-bold text-foreground tracking-tighter" x-text="sol"></span>
+							</div>
+						</template>
+					</div>
+				</div>
+			</template>
+			<!-- Step-by-Step Derivation -->
+			<template x-if="message.parsedResult?.steps && message.parsedResult.steps.length > 0">
+				<div x-data="{ showSteps: false }">
+					<button
+						class="flex items-center gap-2 text-[11px] font-semibold text-muted-foreground/50 hover:text-muted-foreground/80 transition-colors uppercase tracking-[0.15em]"
+						@click="showSteps = !showSteps"
+					>
+						<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :class="showSteps ? 'rotate-90' : ''" class="transition-transform"><path d="m9 18 6-6-6-6"></path></svg>
+						<span x-text="showSteps ? 'Hide Steps' : 'Show Steps'"></span>
+						<span class="text-muted-foreground/30" x-text="'(' + message.parsedResult.steps.length + ')'"></span>
+					</button>
+					<div x-show="showSteps" x-collapse class="mt-3">
+						<div class="border-l-2 border-primary/10 pl-4 flex flex-col gap-2">
+							<template x-for="(step, idx) in message.parsedResult.steps" :key="idx">
+								<div class="flex items-start gap-2.5">
+									<span class="text-[10px] font-bold text-primary/30 font-mono shrink-0 mt-0.5 w-4 text-right" x-text="idx + 1"></span>
+									<span class="text-[13px] text-foreground/80 font-mono leading-relaxed" x-text="step"></span>
+								</div>
+							</template>
+						</div>
+					</div>
+				</div>
+			</template>
+			<!-- Verification Badge -->
+			<template x-if="message.parsedResult?.verified">
+				<div class="flex items-center gap-2 text-[10px] text-green-600 dark:text-green-400">
+					<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><path d="m9 11 3 3L22 4"></path></svg>
+					<span class="uppercase tracking-[0.15em] font-bold">Solution Verified</span>
+				</div>
+			</template>
+		</div>
+	}
+}
 
 templ PluginTemplate() {
-	<template x-if="['calculate', 'add', 'subtract', 'multiply', 'divide', 'power', 'sqrt', 'math-solve'].includes(message.name)">
-		@Container()
+	<!-- Arithmetic: simple expression → numeric result -->
+	<template x-if="['calculate', 'add', 'subtract', 'multiply', 'divide', 'power', 'sqrt'].includes(message.name)">
+		@ArithmeticContainer()
+	</template>
+	<!-- Equation Solver: symbolic algebra → steps + solutions -->
+	<template x-if="message.name === 'math-solve'">
+		@EquationSolverContainer()
 	</template>
 }
