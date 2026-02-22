@@ -99,9 +99,10 @@ func (h *TaskManagementHandler) SendMessage(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Parse JSON request body
+	// Parse JSON request body (limit to 1MB to prevent memory exhaustion)
+	limitedBody := io.LimitReader(r.Body, 1<<20) // 1 MB
 	var req SendMessageRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(limitedBody).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 
 		return
@@ -224,12 +225,27 @@ func (h *TaskManagementHandler) StreamJobEvents(w http.ResponseWriter, r *http.R
 	// 	flusher.Flush()
 	// }
 
-	// 5. Stream events
+	// 5. Stream events with heartbeat to detect dead connections
 	ctx := r.Context()
+	heartbeat := time.NewTicker(30 * time.Second)
+	defer heartbeat.Stop()
+	// Maximum connection duration to prevent indefinite goroutine leaks
+	maxTTL := time.NewTimer(30 * time.Minute)
+	defer maxTTL.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
+		case <-maxTTL.C:
+			// Force close after max TTL to reclaim resources
+			return
+		case <-heartbeat.C:
+			// SSE comment line as keepalive to detect dead connections
+			if _, err := fmt.Fprintf(w, ": heartbeat\n\n"); err != nil {
+				return
+			}
+			flusher.Flush()
 		case event, ok := <-eventCh:
 			if !ok {
 				// Channel closed
@@ -526,7 +542,9 @@ func (h *TaskManagementHandler) DownloadArtifact(w http.ResponseWriter, r *http.
 	// In a real app we might want to detect mime type, but S3/MinIO often returns generic if not set.
 	// For now, let the browser handle it.
 
-	io.Copy(w, content)
+	if _, err := io.Copy(w, content); err != nil {
+		h.log.Error(r.Context(), "failed to stream artifact to client", "error", err, "fileName", fileName)
+	}
 }
 
 // GetMemory retrieves the user's long-term memory.

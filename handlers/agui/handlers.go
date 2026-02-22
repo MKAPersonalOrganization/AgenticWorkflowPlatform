@@ -1,6 +1,7 @@
 package agui
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -83,11 +84,15 @@ func (h *AguiProjectionHandler) writeThreadResponse(w http.ResponseWriter, state
 		response["toolStates"] = state.ToolStates
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	err := json.NewEncoder(w).Encode(response)
-	if err != nil {
+	// Encode to buffer first to avoid partial writes with incorrect status
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
 	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(buf.Bytes())
 }
 
 // ListThreads returns paginated thread summaries, sorted by most recent.
@@ -103,6 +108,7 @@ func (h *AguiProjectionHandler) ListThreads(w http.ResponseWriter, r *http.Reque
 	// Parse query params
 	cursor := r.URL.Query().Get("cursor")
 	limit := 10 // default
+	const maxLimit = 100
 	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
 		parsedLimit, err := strconv.Atoi(limitStr)
 		if err != nil || parsedLimit < 1 {
@@ -110,6 +116,9 @@ func (h *AguiProjectionHandler) ListThreads(w http.ResponseWriter, r *http.Reque
 			return
 		}
 		limit = parsedLimit
+		if limit > maxLimit {
+			limit = maxLimit
+		}
 	}
 
 	// Parse optional search query

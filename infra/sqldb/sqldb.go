@@ -73,8 +73,19 @@ func Open(cfg Config) (*sqlx.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	db.SetMaxIdleConns(cfg.MaxIdleConns)
-	db.SetMaxOpenConns(cfg.MaxOpenConns)
+
+	// Apply sane defaults for connection pool limits to prevent
+	// overwhelming PostgreSQL under high concurrency.
+	maxIdleConns := cfg.MaxIdleConns
+	if maxIdleConns <= 0 {
+		maxIdleConns = 25
+	}
+	maxOpenConns := cfg.MaxOpenConns
+	if maxOpenConns <= 0 {
+		maxOpenConns = 50
+	}
+	db.SetMaxIdleConns(maxIdleConns)
+	db.SetMaxOpenConns(maxOpenConns)
 
 	// Set connection lifetime defaults to recycle stale connections
 	// behind load balancers and after database restarts.

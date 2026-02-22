@@ -45,24 +45,31 @@ func (r *Router) RegisterAny(handler HandlerFunc) {
 }
 
 // Dispatch sends the event to all registered handlers for its type.
+// Handlers are isolated: a failure in one handler does not prevent others from running.
+// The first error encountered is returned, but all handlers are always invoked.
 func (r *Router) Dispatch(ctx context.Context, event domain.Event) error {
 	r.mu.RLock()
 	t := reflect.TypeOf(event)
-	handlers := r.handlers[t]
-	anyHandlers := r.anyHandlers
+	// Copy slice headers to prevent data races if Register is called concurrently.
+	anyHandlers := make([]HandlerFunc, len(r.anyHandlers))
+	copy(anyHandlers, r.anyHandlers)
+	handlers := make([]HandlerFunc, len(r.handlers[t]))
+	copy(handlers, r.handlers[t])
 	r.mu.RUnlock()
 
+	var firstErr error
+
 	for _, handler := range anyHandlers {
-		if err := handler(ctx, event); err != nil {
-			return fmt.Errorf("any handler failed: %w", err)
+		if err := handler(ctx, event); err != nil && firstErr == nil {
+			firstErr = fmt.Errorf("any handler failed: %w", err)
 		}
 	}
 
 	for _, handler := range handlers {
-		if err := handler(ctx, event); err != nil {
-			return fmt.Errorf("event handler failed for %T: %w", event, err)
+		if err := handler(ctx, event); err != nil && firstErr == nil {
+			firstErr = fmt.Errorf("event handler failed for %T: %w", event, err)
 		}
 	}
 
-	return nil
+	return firstErr
 }

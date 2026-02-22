@@ -90,8 +90,8 @@ func toAguiEventsInternal(event any) []any {
 		)}
 
 	case *domain.ToolResultAdded:
-		eventName := "TOOL_RESULT_ADDED"
-		// Backward compatibility: emit legacy event names based on IsError flag
+		// Emit event names based on IsError flag
+		var eventName string
 		if evt.IsError {
 			eventName = "TOOL_ERROR"
 		} else {

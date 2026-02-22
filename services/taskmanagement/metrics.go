@@ -33,7 +33,8 @@ type ServerMetrics struct {
 // GetMetrics returns current server and queue metrics.
 func (s *AsynqTaskManager) GetMetrics() (*ServerMetrics, error) {
 	inspector := asynq.NewInspector(asynq.RedisClientOpt{
-		Addr: s.redisAddr,
+		Addr:     s.redisAddr,
+		Password: s.redisPassword,
 	})
 	defer func() {
 		err := inspector.Close()
@@ -59,7 +60,7 @@ func (s *AsynqTaskManager) GetMetrics() (*ServerMetrics, error) {
 		RedisAddr:    s.redisAddr,
 		RedisHealthy: true,
 		Status:       "running",
-		Concurrency:  5,
+		Concurrency:  s.concurrency,
 	}
 
 	return metrics, nil

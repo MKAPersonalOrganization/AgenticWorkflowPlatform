@@ -97,15 +97,14 @@ func TestOpenCustomConnLifetime(t *testing.T) {
 func TestOpenMaxOpenConnsNotZero(t *testing.T) {
 	t.Parallel()
 
-	// Verify that when MaxOpenConns is 0, the db still opens (sql.DB allows 0
-	// which means unlimited). Our main.go now defaults to 25, but the library
-	// should still work with 0 if explicitly passed.
+	// Verify that when MaxOpenConns is 0 (unset), the library applies a sane
+	// default (50) to prevent overwhelming PostgreSQL under high concurrency.
 	cfg := sqldb.Config{
 		User:         "testuser",
 		Password:     "testpass",
 		Host:         "localhost:59999",
 		Name:         "testdb",
-		MaxIdleConns: 2,
+		MaxIdleConns: 0,
 		MaxOpenConns: 0,
 		DisableTLS:   true,
 	}
@@ -116,9 +115,9 @@ func TestOpenMaxOpenConnsNotZero(t *testing.T) {
 	}
 	defer db.Close()
 
-	// MaxOpenConnections=0 means unlimited in database/sql
+	// MaxOpenConns=0 now defaults to 50, MaxIdleConns=0 now defaults to 25
 	stats := db.Stats()
-	if stats.MaxOpenConnections != 0 {
-		t.Errorf("MaxOpenConnections = %d, want 0 (unlimited)", stats.MaxOpenConnections)
+	if stats.MaxOpenConnections != 50 {
+		t.Errorf("MaxOpenConnections = %d, want 50 (sane default)", stats.MaxOpenConnections)
 	}
 }

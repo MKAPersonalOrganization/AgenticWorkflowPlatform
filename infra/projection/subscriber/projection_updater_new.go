@@ -4,6 +4,7 @@ package subscriber
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"school-with-ai/domain"
@@ -27,6 +28,7 @@ type ProjectionUpdater struct {
 	checkpointStore *CheckpointStore
 	router          EventRouter
 	shutdownChan    chan struct{}
+	shutdownOnce    sync.Once
 
 	// Polling configuration
 	pollInterval time.Duration
@@ -90,46 +92,55 @@ func (u *ProjectionUpdater) Start(ctx context.Context) error {
 	eventsSinceCheckpoint := 0
 	const checkpointInterval = 100
 
+	// saveCheckpoint saves the checkpoint using a fresh context (not the cancelled one).
+	saveCheckpoint := func(position int64) {
+		saveCtx, saveCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer saveCancel()
+		if saveErr := u.checkpointStore.SaveGlobalPosition(saveCtx, "all_projections", position); saveErr != nil {
+			u.log.Error(saveCtx, "failed to save final checkpoint", "ERROR", saveErr)
+		}
+	}
+
+	ticker := time.NewTicker(u.pollInterval)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
-			// Save final checkpoint before exit
+			// Save final checkpoint before exit using a fresh context
 			if eventsSinceCheckpoint > 0 {
-				if saveErr := u.checkpointStore.SaveGlobalPosition(ctx, "all_projections", lastPosition); saveErr != nil {
-					u.log.Error(ctx, "failed to save final checkpoint", "ERROR", saveErr)
-				}
+				saveCheckpoint(lastPosition)
 			}
 			u.log.Info(ctx, "projection updater stopping due to context cancellation")
 			return ctx.Err()
 
 		case <-u.shutdownChan:
 			if eventsSinceCheckpoint > 0 {
-				if saveErr := u.checkpointStore.SaveGlobalPosition(ctx, "all_projections", lastPosition); saveErr != nil {
-					u.log.Error(ctx, "failed to save final checkpoint", "ERROR", saveErr)
-				}
+				saveCheckpoint(lastPosition)
 			}
 			u.log.Info(ctx, "projection updater stopping due to shutdown signal")
 			return nil
 
-		default:
+		case <-ticker.C:
 			// Poll for new events
 			events, err := u.eventStore.ReadAllFromPosition(ctx, lastPosition, u.batchSize)
 			if err != nil {
 				u.log.Error(ctx, "failed to poll events", "ERROR", err)
-				time.Sleep(backoff)
+				ticker.Reset(backoff)
 				backoff = min(backoff*2, u.maxBackoff)
 				continue
 			}
 
 			if len(events) == 0 {
 				// No new events — idle backoff
-				time.Sleep(backoff)
+				ticker.Reset(backoff)
 				backoff = min(backoff*2, u.idleBackoff)
 				continue
 			}
 
 			// Reset backoff on successful read
 			backoff = u.pollInterval
+			ticker.Reset(u.pollInterval)
 
 			for _, ep := range events {
 				if err := u.router.Dispatch(ctx, ep.Event); err != nil {
@@ -156,9 +167,11 @@ func (u *ProjectionUpdater) Start(ctx context.Context) error {
 	}
 }
 
-// Shutdown signals the updater to stop gracefully.
+// Shutdown signals the updater to stop gracefully. Safe to call multiple times.
 func (u *ProjectionUpdater) Shutdown() {
-	close(u.shutdownChan)
+	u.shutdownOnce.Do(func() {
+		close(u.shutdownChan)
+	})
 }
 
 // min returns the smaller of two durations.
