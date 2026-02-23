@@ -1,13 +1,18 @@
 package components
 
 import (
+	"school-with-ai/components/agents"
+	"school-with-ai/components/convsearch"
 	"school-with-ai/components/i18n"
 	"school-with-ai/components/nav"
+	"school-with-ai/components/resources"
+	"school-with-ai/components/tools"
 	"school-with-ai/domain"
+	"school-with-ai/services/toolregistry"
+
+	"fmt"
 )
 
-// LayoutProps configures the root application layout.
-// Similar to Next.js layout.tsx props pattern.
 type LayoutProps struct {
 	Title      string
 	User       *domain.User
@@ -15,15 +20,94 @@ type LayoutProps struct {
 	HideNavbar bool
 }
 
-// BaseLayout is the root layout component — equivalent to Next.js RootLayout.
-// It composes: DocumentHead, ThemeProvider (body), Navbar, content slot, and GlobalModals.
-// All pages render inside this layout.
+// BaseLayout provides the single governing application layout with navbar
 templ BaseLayout(props LayoutProps) {
 	<!DOCTYPE html>
 	<html lang={ i18n.Lang(ctx) } dir={ i18n.Dir(ctx) }>
-		@DocumentHead(props.Title, props.ExtraHead)
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>{ props.Title } - Compass</title>
+			<!-- Import Map MUST be at the top of head -->
+			<script type="importmap">
+			{
+				"imports": {
+					"xstate": "https://cdn.jsdelivr.net/npm/xstate@5.25.1/+esm"
+				}
+			}
+			</script>
+			<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z'/><circle cx='12' cy='12' r='10'/></svg>"/>
+			<link rel="preconnect" href="https://fonts.googleapis.com"/>
+			<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+			<link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Noto+Sans+Arabic:wght@100..900&family=Noto+Sans:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet"/>
+			<link rel="stylesheet" href="/assets/css/output.css"/>
+			<!-- Theme initialization (runs before page render to prevent flash) -->
+			<script>
+				(function() {
+					const theme = localStorage.getItem('theme') || 'system';
+					const root = document.documentElement;
+
+					if (theme === 'system') {
+						const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+						if (systemPrefersDark) {
+							root.classList.add('dark');
+						}
+					}
+				})();
+			</script>
+			<!-- i18n JavaScript module -->
+			<script src="/assets/js/i18n.js"></script>
+			@i18n.I18nScript()
+			@templ.Raw(fmt.Sprintf("<script>window.SPECIAL_TOOLS = %s; window.ELICITATION_SCHEMAS = %s;</script>", toolregistry.GetUIHandledToolsJSON(), toolregistry.GetUIHandledElicitationsJSON()))
+			<!-- Alpine.js global data for theme management -->
+			<script>
+				document.addEventListener('alpine:init', () => {
+					Alpine.data('themeManager', () => ({
+						theme: localStorage.getItem('theme') || 'system',
+
+						toggleTheme() {
+							const themes = ['light', 'dark', 'system'];
+							const currentIndex = themes.indexOf(this.theme);
+							const nextTheme = themes[(currentIndex + 1) % themes.length];
+							this.setTheme(nextTheme);
+						},
+
+						setTheme(theme) {
+							this.theme = theme;
+							localStorage.setItem('theme', theme);
+							this.applyTheme(theme);
+						},
+
+						applyTheme(theme) {
+							const root = document.documentElement;
+
+							if (theme === 'system') {
+								const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+								if (systemPrefersDark) {
+									root.classList.add('dark');
+								} else {
+									root.classList.remove('dark');
+								}
+							} else if (theme === 'dark') {
+								root.classList.add('dark');
+							} else {
+								root.classList.remove('dark');
+							}
+						}
+					}));
+				});
+			</script>
+			if props.ExtraHead != nil {
+				@props.ExtraHead
+			}
+			<!-- AI Settings Manager -->
+			<script src="/assets/js/ai-settings.js"></script>
+			<!-- Alpine.js Core - MUST load after plugins -->
+			<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+		</head>
 		<body class="flex h-dvh bg-background text-foreground antialiased overflow-hidden" x-data="themeManager">
 			<div class="flex h-dvh w-full overflow-hidden">
+				<!-- Root Navbar - always available as the first child -->
 				if !props.HideNavbar {
 					@nav.Navbar(nav.NavbarProps{
 						User: props.User,
@@ -34,19 +118,23 @@ templ BaseLayout(props LayoutProps) {
 					{ children... }
 				</div>
 			</div>
-			@GlobalModals()
+			<!-- Global Modals -->
+			@resources.ResourcesDialog()
+			@agents.AgentsDialog()
+			@tools.ToolsDialog()
+			@convsearch.SearchDialog()
 		</body>
 	</html>
 }
 
-// AppLayoutProps is kept for backward compatibility.
 type AppLayoutProps struct {
 	Title       string
 	User        *domain.User
 	IncludeChat bool // If true, includes chat-specific scripts
 }
 
-// AppLayout wraps BaseLayout for backward compatibility.
+// AppLayout provides the main application layout with navbar
+// (Kept for compatibility, now wraps BaseLayout)
 templ AppLayout(props AppLayoutProps) {
 	@BaseLayout(LayoutProps{
 		Title: props.Title,
