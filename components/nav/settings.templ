@@ -1,20 +1,28 @@
 package nav
 
 import (
-	"fmt"
+	"context"
 	"school-with-ai/components/button"
 	"school-with-ai/components/dialog"
 	"school-with-ai/components/i18n"
 	"school-with-ai/components/icon"
-	"school-with-ai/components/nativeselect"
-	"school-with-ai/components/selectbox"
-	switchcomp "school-with-ai/components/switch"
 	"school-with-ai/components/tabs"
 	"school-with-ai/plugins/memory"
 )
 
-// Settings renders the settings dialog
-// (matches LibreChat's Settings.tsx).
+// Settings renders the settings dialog shell and composes all tab components.
+// Each tab is extracted into its own file following the single-responsibility principle.
+// This is the "page" that composes "sections" — similar to React's Settings page
+// with separate tab panel components.
+//
+// Tab files:
+//   - settings_general.templ    → SettingsGeneralTab
+//   - settings_ai.templ         → SettingsAiTab
+//   - settings_personalization.templ → SettingsPersonalizationTab
+//   - settings_speech.templ     → SettingsSpeechTab
+//   - settings_data.templ       → SettingsDataTab
+//   - settings_account.templ    → SettingsAccountTab
+//   - settings_language.templ   → SettingsLanguageSelect (shared)
 templ Settings() {
 	<div
 		x-show="showSettings"
@@ -64,7 +72,7 @@ templ Settings() {
 							@icon.X(icon.Props{Class: "size-5"})
 						}
 					</div>
-					<!-- Use Tabs Component -->
+					<!-- Tabs Component -->
 					@tabs.Tabs(tabs.Props{
 						ID:    "settings-tabs",
 						Class: "flex flex-col md:flex-row h-full overflow-hidden px-6 pb-6 gap-6",
@@ -72,597 +80,26 @@ templ Settings() {
 							"data-orientation": "vertical",
 						},
 					}) {
-						<!-- Tab List -->
-						<div class="flex flex-row md:flex-col gap-1 min-w-[160px] overflow-x-auto md:overflow-y-auto scrollbar-none pb-2 md:pb-0 border-b md:border-b-0 md:border-e border-border pe-0 md:pe-4">
-							@tabs.List(tabs.ListProps{Class: "flex flex-row md:flex-col gap-1 bg-transparent p-0 w-full h-auto items-stretch"}) {
-								@tabs.Trigger(tabs.TriggerProps{
-									Value:    "general",
-									IsActive: true,
-									Class:    "justify-start gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 data-[tui-tabs-state=active]:bg-accent data-[tui-tabs-state=active]:text-foreground data-[tui-tabs-state=inactive]:text-muted-foreground hover:bg-accent/50 hover:text-foreground shadow-none border-none",
-								}) {
-									@icon.Settings(icon.Props{Class: "size-4"})
-									<span>{ i18n.T(ctx, "General") }</span>
-								}
-								@tabs.Trigger(tabs.TriggerProps{Value: "ai",
-									Class: "justify-start gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 data-[tui-tabs-state=active]:bg-accent data-[tui-tabs-state=active]:text-foreground data-[tui-tabs-state=inactive]:text-muted-foreground hover:bg-accent/50 hover:text-foreground shadow-none border-none",
-								}) {
-									@icon.Bot(icon.Props{Class: "size-4"})
-									<span>{ i18n.T(ctx, "AI") }</span>
-								}
-								@tabs.Trigger(tabs.TriggerProps{Value: "personalization",
-									Class: "justify-start gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 data-[tui-tabs-state=active]:bg-accent data-[tui-tabs-state=active]:text-foreground data-[tui-tabs-state=inactive]:text-muted-foreground hover:bg-accent/50 hover:text-foreground shadow-none border-none",
-								}) {
-									@icon.UserCog(icon.Props{Class: "size-4"})
-									<span>{ i18n.T(ctx, "Personalization") }</span>
-								}
-								@tabs.Trigger(tabs.TriggerProps{
-									Value: "speech",
-									Class: "justify-start gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 data-[tui-tabs-state=active]:bg-accent data-[tui-tabs-state=active]:text-foreground data-[tui-tabs-state=inactive]:text-muted-foreground hover:bg-accent/50 hover:text-foreground shadow-none border-none",
-								}) {
-									@icon.Mic(icon.Props{Class: "size-4"})
-									<span>{ i18n.T(ctx, "Speech") }</span>
-								}
-								@tabs.Trigger(tabs.TriggerProps{
-									Value: "data",
-									Class: "justify-start gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 data-[tui-tabs-state=active]:bg-accent data-[tui-tabs-state=active]:text-foreground data-[tui-tabs-state=inactive]:text-muted-foreground hover:bg-accent/50 hover:text-foreground shadow-none border-none",
-								}) {
-									@icon.Database(icon.Props{Class: "size-4"})
-									<span>{ i18n.T(ctx, "Data") }</span>
-								}
-								@tabs.Trigger(tabs.TriggerProps{
-									Value: "account",
-									Class: "justify-start gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 data-[tui-tabs-state=active]:bg-accent data-[tui-tabs-state=active]:text-foreground data-[tui-tabs-state=inactive]:text-muted-foreground hover:bg-accent/50 hover:text-foreground shadow-none border-none",
-								}) {
-									@icon.User(icon.Props{Class: "size-4"})
-									<span>{ i18n.T(ctx, "Account") }</span>
-								}
-							}
-						</div>
+						@SettingsTabList(ctx)
 						<!-- Tab Content Wrapper -->
 						<div class="flex-1 overflow-y-auto pe-2 scrollbar-transparent scrollbar-hover text-sm">
-							<!-- General Tab -->
 							@tabs.Content(tabs.ContentProps{Value: "general", IsActive: true, Class: "space-y-6 animate-in fade-in duration-200"}) {
-								<div class="flex items-center justify-between gap-4">
-									<div class="text-foreground">{ i18n.T(ctx, "Theme") }</div>
-									@nativeselect.Select(
-										nativeselect.Props{
-											Class:       "w-[180px]",
-											Model:       "preferences.theme",
-											Label:       i18n.T(ctx, "Select Theme"),
-											Placeholder: i18n.T(ctx, "Select Theme"),
-										},
-										[]nativeselect.Option{
-											{Value: "system", Label: i18n.T(ctx, "System")},
-											{Value: "dark", Label: i18n.T(ctx, "Dark")},
-											{Value: "light", Label: i18n.T(ctx, "Light")},
-										},
-									)
-								</div>
-								<div class="flex items-center justify-between gap-4">
-									<div class="text-foreground">{ i18n.T(ctx, "Language") }</div>
-									@selectbox.SelectBox(selectbox.Props{Class: "w-[180px]"}) {
-										<div class="relative w-full" x-data="{ currentLang: '' }" x-init={ fmt.Sprintf("currentLang = '%s'", i18n.Lang(ctx)) }>
-											<select
-												x-model="currentLang"
-												@change="window.location.href = '?lang=' + $event.target.value"
-												class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-												aria-label="Select Language"
-											>
-												<option value="en">English</option>
-												<option value="ar">العربية</option>
-											</select>
-											<div class="w-full h-9 px-3 py-1 text-base md:text-sm flex items-center justify-between rounded-md border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground">
-												<span x-text="currentLang === 'ar' ? 'العربية' : 'English'"></span>
-												@icon.ChevronDown(icon.Props{Size: 16, Class: "text-muted-foreground"})
-											</div>
-										</div>
-									}
-								</div>
-								<div class="border-t border-border pt-4 space-y-4">
-									<div class="flex items-center justify-between gap-4">
-										<div class="text-foreground">{ i18n.T(ctx, "Enable Markdown for user messages") }</div>
-										@switchcomp.Switch(switchcomp.Props{
-											Name:    "markdownEnabled",
-											Checked: true,
-											Attributes: templ.Attributes{
-												"x-model":    "preferences.markdownEnabled",
-												"aria-label": i18n.T(ctx, "Enable Markdown"),
-											},
-										})
-									</div>
-									<div class="flex items-center justify-between gap-4">
-										<div class="text-foreground">{ i18n.T(ctx, "Auto-scroll during response") }</div>
-										@switchcomp.Switch(switchcomp.Props{
-											Name:    "autoScroll",
-											Checked: true,
-											Attributes: templ.Attributes{
-												"x-model":    "preferences.autoScroll",
-												"aria-label": i18n.T(ctx, "Auto-scroll during response"),
-											},
-										})
-									</div>
-								</div>
+								@SettingsGeneralTab(ctx)
 							}
-							<!-- AI Tab -->
 							@tabs.Content(tabs.ContentProps{Value: "ai", Class: "space-y-6 animate-in fade-in duration-200"}) {
-								<div
-									x-data="aiSettingsManager()"
-									x-init="loadSettings()"
-									class="space-y-6"
-								>
-									<!-- Provider Selection -->
-									<div class="space-y-4">
-										<div class="flex items-center justify-between">
-											<h3 class="text-foreground font-medium">{ i18n.T(ctx, "AI Provider Configuration") }</h3>
-										</div>
-										<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "Configure your own AI provider and API keys. You are responsible for any costs incurred.") }</p>
-									</div>
-									<!-- Status Banner -->
-									<template x-if="statusMessage">
-										<div
-											:class="statusType === 'error' ? 'bg-destructive/10 border-destructive/30 text-destructive' : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'"
-											class="p-3 rounded-xl border text-sm"
-											x-text="statusMessage"
-										></div>
-									</template>
-									<!-- Existing Providers -->
-									<template x-if="settings.length > 0">
-										<div class="space-y-3">
-											<template x-for="s in settings" :key="s.id">
-												<div
-													class="flex items-center justify-between p-3 rounded-xl border border-border hover:bg-accent/50 transition-colors"
-													:class="s.is_default ? 'ring-1 ring-primary/50' : ''"
-												>
-													<div class="flex items-center gap-3">
-														<div class="size-8 rounded-lg bg-primary/10 flex items-center justify-center">
-															<span class="text-primary text-xs font-bold" x-text="s.provider.substring(0,2).toUpperCase()"></span>
-														</div>
-														<div>
-															<div class="font-medium text-foreground flex items-center gap-2">
-																<span x-text="providerName(s.provider)"></span>
-																<template x-if="s.is_default">
-																	<span class="text-[10px] bg-primary/20 text-primary rounded-full px-2 py-0.5">Default</span>
-																</template>
-															</div>
-															<div class="text-[12px] text-muted-foreground">
-																<span x-text="s.default_llm_model || 'No model selected'"></span>
-																<span class="mx-1">·</span>
-																<span x-text="s.api_key_masked"></span>
-															</div>
-														</div>
-													</div>
-													<div class="flex items-center gap-1">
-														<button
-															x-show="!s.is_default"
-															@click="setDefault(s.id)"
-															class="text-xs px-2 py-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-															title="Set as Default"
-														>Set Default</button>
-														<button
-															@click="editProvider(s)"
-															class="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-															title="Edit"
-														>✎</button>
-														<button
-															@click="deleteProvider(s.id)"
-															class="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-															title="Delete"
-														>✕</button>
-													</div>
-												</div>
-											</template>
-										</div>
-									</template>
-									<!-- Add / Edit Provider Form -->
-									<div class="border-t border-border pt-4 space-y-4">
-										<h4 class="text-foreground font-medium" x-text="editing ? 'Edit Provider' : 'Add Provider'"></h4>
-										<!-- Provider Select -->
-										<div class="flex flex-col gap-2">
-											<label class="text-foreground text-sm">{ i18n.T(ctx, "Provider") }</label>
-											<select
-												x-model="form.provider"
-												@change="onProviderChange()"
-												class="w-full h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs"
-											>
-												<option value="">{ i18n.T(ctx, "Select a provider...") }</option>
-												<template x-for="p in providers" :key="p.id">
-													<option :value="p.id" x-text="p.name"></option>
-												</template>
-											</select>
-										</div>
-										<!-- API Key -->
-										<div class="flex flex-col gap-2">
-											<label class="text-foreground text-sm">{ i18n.T(ctx, "API Key") }</label>
-											<input
-												type="password"
-												x-model="form.api_key"
-												placeholder={ i18n.T(ctx, "sk-...or paste your API key") }
-												class="w-full h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs"
-											/>
-											<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "Your API key is encrypted and stored securely. You are responsible for usage costs.") }</p>
-										</div>
-										<!-- Default LLM Model -->
-										<div class="flex flex-col gap-2">
-											<label class="text-foreground text-sm">{ i18n.T(ctx, "Default LLM Model") }</label>
-											<select
-												x-model="form.default_llm_model"
-												class="w-full h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs"
-											>
-												<option value="">{ i18n.T(ctx, "Select a model...") }</option>
-												<template x-for="m in currentModels" :key="m">
-													<option :value="m" x-text="m"></option>
-												</template>
-											</select>
-										</div>
-										<!-- Default Embedding Model -->
-										<div class="flex flex-col gap-2">
-											<label class="text-foreground text-sm">{ i18n.T(ctx, "Default Embedding Model") }</label>
-											<select
-												x-model="form.default_embed_model"
-												class="w-full h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs"
-											>
-												<option value="">{ i18n.T(ctx, "None") }</option>
-												<template x-for="m in currentEmbedModels" :key="m">
-													<option :value="m" x-text="m"></option>
-												</template>
-											</select>
-										</div>
-										<!-- Advanced Settings Toggle -->
-										<details class="group">
-											<summary class="cursor-pointer text-sm text-muted-foreground hover:text-foreground transition-colors list-none flex items-center gap-1">
-												@icon.ChevronRight(icon.Props{Class: "size-4 transition-transform group-open:rotate-90"})
-												{ i18n.T(ctx, "Advanced Settings") }
-											</summary>
-											<div class="pt-3 space-y-4">
-												<div class="flex items-center justify-between gap-4">
-													<div>
-														<label class="text-foreground text-sm">{ i18n.T(ctx, "Max Tokens") }</label>
-														<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "Maximum number of tokens in the response. 0 = provider default.") }</p>
-													</div>
-													<input
-														type="number"
-														x-model.number="form.max_tokens"
-														min="0"
-														max="128000"
-														class="w-24 h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs text-center"
-													/>
-												</div>
-												<div class="flex items-center justify-between gap-4">
-													<div>
-														<label class="text-foreground text-sm">{ i18n.T(ctx, "Temperature") }</label>
-														<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "Controls randomness. Lower = more deterministic.") }</p>
-													</div>
-													<input
-														type="number"
-														x-model.number="form.temperature"
-														min="0"
-														max="2"
-														step="0.1"
-														class="w-24 h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs text-center"
-													/>
-												</div>
-												<div class="flex items-center justify-between gap-4">
-													<div>
-														<label class="text-foreground text-sm">{ i18n.T(ctx, "Embedding Dimensions") }</label>
-														<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "Embedding vector size. 0 = model default.") }</p>
-													</div>
-													<input
-														type="number"
-														x-model.number="form.embedding_dimensions"
-														min="0"
-														max="3072"
-														class="w-24 h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs text-center"
-													/>
-												</div>
-											</div>
-										</details>
-										<!-- Save / Cancel -->
-										<div class="flex items-center justify-end gap-2 pt-2">
-											<button
-												x-show="editing"
-												@click="cancelEdit()"
-												class="px-4 py-2 text-sm rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-											>{ i18n.T(ctx, "Cancel") }</button>
-											@button.Button(button.Props{
-												Type:  button.TypeButton,
-												Class: "min-w-[120px]",
-												Attributes: templ.Attributes{
-													"@click":    "saveProvider()",
-													":disabled": "saving || !form.provider || !form.api_key",
-												},
-											}) {
-												<span x-show="!saving" x-text="editing ? 'Update Provider' : 'Add Provider'"></span>
-												<span x-show="saving" class="flex items-center gap-2">
-													<span class="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground"></span>
-													{ i18n.T(ctx, "Saving...") }
-												</span>
-											}
-										</div>
-									</div>
-									<!-- Knowledge Graph Embedding -->
-									<div class="border-t border-border pt-6 space-y-4">
-										<div class="space-y-2">
-											<h3 class="text-foreground font-medium flex items-center gap-2">
-												@icon.Network(icon.Props{Class: "size-4"})
-												{ i18n.T(ctx, "Knowledge Graph Embedding") }
-											</h3>
-											<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "Select the embedding model used for knowledge graph vector search across all workspaces.") }</p>
-										</div>
-										<!-- Provider Status -->
-										<template x-if="kgProviderStatus">
-											<div class="grid gap-3 grid-cols-3">
-												<div class="rounded-xl border p-3">
-													<div class="flex items-center gap-2 mb-1">
-														<span class="size-2 rounded-full" :class="kgProviderStatus?.provider?.status === 'available' ? 'bg-green-500' : 'bg-red-500'"></span>
-														<span class="text-xs font-medium">{ i18n.T(ctx, "LLM") }</span>
-													</div>
-													<p class="text-xs font-mono truncate" x-text="kgProviderStatus?.provider?.model || 'default'"></p>
-												</div>
-												<div class="rounded-xl border p-3">
-													<div class="flex items-center gap-2 mb-1">
-														<span class="size-2 rounded-full" :class="kgProviderStatus?.embedding?.status === 'available' ? 'bg-green-500' : 'bg-red-500'"></span>
-														<span class="text-xs font-medium">{ i18n.T(ctx, "Embedding") }</span>
-													</div>
-													<p class="text-xs font-mono truncate" x-text="(kgProviderStatus?.embedding?.model || 'default') + ' (' + (kgProviderStatus?.embedding?.dimension || '?') + 'd)'"></p>
-												</div>
-												<div class="rounded-xl border p-3">
-													<div class="flex items-center gap-2 mb-1">
-														<span class="size-2 rounded-full" :class="kgProviderStatus?.storage?.dimension_mismatch ? 'bg-amber-500' : 'bg-green-500'"></span>
-														<span class="text-xs font-medium">{ i18n.T(ctx, "Storage") }</span>
-													</div>
-													<p class="text-xs font-mono truncate" x-text="(kgProviderStatus?.storage?.type || '-') + ' (' + (kgProviderStatus?.storage?.dimension || '?') + 'd)'"></p>
-													<p x-show="kgProviderStatus?.storage?.dimension_mismatch" class="text-[10px] text-amber-600 mt-1">⚠ { i18n.T(ctx, "Mismatch") }</p>
-												</div>
-											</div>
-										</template>
-										<!-- Embedding Provider -->
-										<div class="flex flex-col gap-2">
-											<label class="text-foreground text-sm">{ i18n.T(ctx, "Embedding Provider") }</label>
-											<select
-												x-model="kgEmbProvider"
-												@change="onKgEmbProviderChange()"
-												class="w-full h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs"
-											>
-												<option value="">{ i18n.T(ctx, "Select a provider...") }</option>
-												<template x-for="p in kgEmbProviders" :key="p.id">
-													<option :value="p.id" x-text="p.name"></option>
-												</template>
-											</select>
-										</div>
-										<!-- Embedding Model -->
-										<div class="flex flex-col gap-2" x-show="kgEmbProvider">
-											<label class="text-foreground text-sm">{ i18n.T(ctx, "Embedding Model") }</label>
-											<select
-												x-model="kgEmbModel"
-												class="w-full h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs"
-											>
-												<option value="">{ i18n.T(ctx, "Select a model...") }</option>
-												<template x-for="m in kgCurrentEmbModels" :key="m">
-													<option :value="m" x-text="m"></option>
-												</template>
-											</select>
-										</div>
-										<!-- API Key source -->
-										<div class="flex flex-col gap-2" x-show="kgEmbProvider">
-											<label class="text-foreground text-sm">{ i18n.T(ctx, "API Key") }</label>
-											<!-- Show "Use same key" option if the selected provider matches a configured provider -->
-											<template x-if="kgMatchingProviderSetting">
-												<div class="space-y-3">
-													<label class="flex items-center gap-2 cursor-pointer">
-														<input type="radio" name="kg-api-key-source" value="reuse" x-model="kgApiKeySource" class="text-primary focus:ring-primary"/>
-														<span class="text-sm">
-															{ i18n.T(ctx, "Use same API key as") }
-															<span class="font-medium" x-text="providerName(kgEmbProvider)"></span>
-															<span class="text-muted-foreground" x-text="'(' + kgMatchingProviderSetting.api_key_masked + ')'"></span>
-														</span>
-													</label>
-													<label class="flex items-center gap-2 cursor-pointer">
-														<input type="radio" name="kg-api-key-source" value="custom" x-model="kgApiKeySource" class="text-primary focus:ring-primary"/>
-														<span class="text-sm">{ i18n.T(ctx, "Enter a different API key") }</span>
-													</label>
-												</div>
-											</template>
-											<!-- Custom API key input (shown when no matching provider, or user chose "custom") -->
-											<div x-show="!kgMatchingProviderSetting || kgApiKeySource === 'custom'">
-												<input
-													type="password"
-													x-model="kgApiKey"
-													placeholder={ i18n.T(ctx, "sk-...or paste your API key") }
-													class="w-full h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs"
-												/>
-											</div>
-											<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "This key is used for embedding documents in the knowledge graph. Applied to all workspaces.") }</p>
-										</div>
-										<!-- Save -->
-										<div class="flex items-center justify-end gap-2 pt-2" x-show="kgEmbProvider && kgEmbModel">
-											<span x-show="kgSaved" x-transition class="text-xs text-emerald-600">✓ { i18n.T(ctx, "Saved") }</span>
-											<span x-show="kgError" x-transition class="text-xs text-destructive" x-text="kgError"></span>
-											@button.Button(button.Props{
-												Type:  button.TypeButton,
-												Class: "min-w-[120px]",
-												Attributes: templ.Attributes{
-													"@click":    "saveKgEmbedding()",
-													":disabled": "kgSaving || (!kgApiKey && kgApiKeySource !== 'reuse')",
-												},
-											}) {
-												<span x-show="!kgSaving">{ i18n.T(ctx, "Save Embedding Settings") }</span>
-												<span x-show="kgSaving" class="flex items-center gap-2">
-													<span class="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground"></span>
-													{ i18n.T(ctx, "Saving...") }
-												</span>
-											}
-										</div>
-										<template x-if="kgLoading">
-											<div class="flex items-center gap-2 text-xs text-muted-foreground">
-												<span class="animate-spin rounded-full h-3 w-3 border-b-2 border-primary"></span>
-												{ i18n.T(ctx, "Loading...") }
-											</div>
-										</template>
-									</div>
-								</div>
+								@SettingsAiTab(ctx)
 							}
-							<!-- Personalization Tab -->
 							@tabs.Content(tabs.ContentProps{Value: "personalization", Class: "space-y-6 animate-in fade-in duration-200"}) {
-								<div class="space-y-4">
-									<div class="flex flex-col gap-2">
-										<label class="text-foreground font-medium">{ i18n.T(ctx, "Learning Style") }</label>
-										@selectbox.SelectBox(selectbox.Props{Class: "w-full"}) {
-											@selectbox.Trigger(selectbox.TriggerProps{
-												Attributes: templ.Attributes{
-													"x-model": "profile.learning_style",
-												},
-											}) {
-												<span x-text={ "profile.learning_style || '" + i18n.T(ctx, "Select a style...") + "'" }>{ i18n.T(ctx, "Select a style...") }</span>
-											}
-											@selectbox.Content(selectbox.ContentProps{NoSearch: true}) {
-												@selectbox.Item(selectbox.ItemProps{Value: "Visual"}) {
-													{ i18n.T(ctx, "Visual") }
-												}
-												@selectbox.Item(selectbox.ItemProps{Value: "Auditory"}) {
-													{ i18n.T(ctx, "Auditory") }
-												}
-												@selectbox.Item(selectbox.ItemProps{Value: "Read/Write"}) {
-													{ i18n.T(ctx, "Read/Write") }
-												}
-												@selectbox.Item(selectbox.ItemProps{Value: "Kinesthetic"}) {
-													{ i18n.T(ctx, "Kinesthetic") }
-												}
-												@selectbox.Item(selectbox.ItemProps{Value: "Multimodal"}) {
-													{ i18n.T(ctx, "Multimodal") }
-												}
-											}
-										}
-										<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "How you prefer to take in and process information.") }</p>
-									</div>
-									<div class="flex flex-col gap-2 pt-2">
-										<label class="text-foreground font-medium">{ i18n.T(ctx, "Struggles") }</label>
-										<textarea
-											x-model="profile.struggles"
-											placeholder={ i18n.T(ctx, "e.g. Algebra, focus, time management...") }
-											class="w-full h-20 bg-card border border-border rounded-xl p-3 outline-none focus:ring-1 focus:ring-primary resize-none"
-										></textarea>
-										<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "Topics or skills you find challenging (comma separated).") }</p>
-									</div>
-									<div class="flex flex-col gap-2 pt-2">
-										<label class="text-foreground font-medium">{ i18n.T(ctx, "Strengths") }</label>
-										<textarea
-											x-model="profile.strengths"
-											placeholder={ i18n.T(ctx, "e.g. Critical thinking, geometry, writing...") }
-											class="w-full h-20 bg-card border border-border rounded-xl p-3 outline-none focus:ring-1 focus:ring-primary resize-none"
-										></textarea>
-										<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "Areas where you excel or feel confident (comma separated).") }</p>
-									</div>
-									<div class="flex flex-col gap-2 pt-2">
-										<label class="text-foreground font-medium">{ i18n.T(ctx, "Academic Goals") }</label>
-										<textarea
-											x-model="profile.goals"
-											placeholder={ i18n.T(ctx, "e.g. Master calculus, improve essay structure...") }
-											class="w-full h-24 bg-card border border-border rounded-xl p-3 outline-none focus:ring-1 focus:ring-primary resize-none"
-										></textarea>
-										<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "What you hope to achieve with your AI assistant.") }</p>
-									</div>
-									<!-- Explict Save Button -->
-									<div class="flex items-center justify-end pt-2">
-										@button.Button(button.Props{
-											Type:  button.TypeButton,
-											Class: "min-w-[120px]",
-											Attributes: templ.Attributes{
-												"@click":    "updateProfile()",
-												":disabled": "profileLoading",
-											},
-										}) {
-											<span x-show="!profileLoading">{ i18n.T(ctx, "Save Changes") }</span>
-											<span x-show="profileLoading" class="flex items-center gap-2">
-												<span class="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground"></span>
-												{ i18n.T(ctx, "Saving...") }
-											</span>
-										}
-									</div>
-								</div>
+								@SettingsPersonalizationTab(ctx)
 							}
-							<!-- Speech Tab -->
 							@tabs.Content(tabs.ContentProps{Value: "speech", Class: "space-y-6 animate-in fade-in duration-200"}) {
-								<div class="flex items-center justify-between gap-4">
-									<div class="space-y-0.5">
-										<div class="text-foreground font-medium">{ i18n.T(ctx, "Text-to-Speech") }</div>
-										<p class="text-[12px] text-muted-foreground leading-tight">{ i18n.T(ctx, "Enable reading assistant messages aloud.") }</p>
-									</div>
-									@switchcomp.Switch(switchcomp.Props{
-										Name: "textToSpeech",
-										Attributes: templ.Attributes{
-											"x-model":    "preferences.textToSpeechEnabled",
-											"aria-label": i18n.T(ctx, "Enable Text-to-Speech"),
-										},
-									})
-								</div>
-								<div class="flex flex-col gap-2 pt-4 border-t border-border">
-									<div class="text-foreground">{ i18n.T(ctx, "Voice Engine") }</div>
-									@selectbox.SelectBox(selectbox.Props{Class: "w-full"}) {
-										@selectbox.Trigger(selectbox.TriggerProps{}) {
-											<span>{ i18n.T(ctx, "Default Browser Voice") }</span>
-										}
-										@selectbox.Content(selectbox.ContentProps{NoSearch: true}) {
-											@selectbox.Item(selectbox.ItemProps{Value: "default", Selected: true}) {
-												{ i18n.T(ctx, "Default Browser Voice") }
-											}
-											@selectbox.Item(selectbox.ItemProps{Value: "premium"}) {
-												{ i18n.T(ctx, "Premium AI Voice (BETA)") }
-											}
-										}
-									}
-								</div>
+								@SettingsSpeechTab(ctx)
 							}
-							<!-- Data Tab -->
 							@tabs.Content(tabs.ContentProps{Value: "data", Class: "space-y-4 animate-in fade-in duration-200"}) {
-								<div
-									class="flex items-center justify-between p-3 rounded-xl border border-border hover:bg-accent transition-colors group cursor-pointer"
-									@click="$dispatch('open-memory-dialog')"
-								>
-									<div class="space-y-0.5">
-										<div class="text-foreground font-medium">{ i18n.T(ctx, "Long-Term Memory") }</div>
-										<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "View what the AI remembers about you.") }</p>
-									</div>
-									@icon.Brain(icon.Props{Class: "size-4 text-muted-foreground group-hover:text-foreground"})
-								</div>
-								<div
-									class="flex items-center justify-between p-3 rounded-xl border border-destructive/20 bg-destructive/5 hover:bg-destructive/10 transition-colors group cursor-pointer"
-									@click={ fmt.Sprintf("if(confirm('%s')) { sessions = []; showSettings = false; }", i18n.T(ctx, "Are you sure you want to clear all conversations?")) }
-								>
-									<div class="space-y-0.5">
-										<div class="text-destructive font-medium">{ i18n.T(ctx, "Clear all conversations") }</div>
-										<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "Permanently delete all thread history.") }</p>
-									</div>
-									@icon.Trash2(icon.Props{Class: "size-4 text-destructive"})
-								</div>
-								<div class="flex items-center justify-between p-3 rounded-xl border border-border hover:bg-accent transition-colors group cursor-pointer">
-									<div class="space-y-0.5">
-										<div class="text-foreground font-medium">{ i18n.T(ctx, "Export all data") }</div>
-										<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "Download a copy of your chat history.") }</p>
-									</div>
-									@icon.Download(icon.Props{Class: "size-4 text-muted-foreground group-hover:text-foreground"})
-								</div>
+								@SettingsDataTab(ctx)
 							}
-							<!-- Account Tab -->
 							@tabs.Content(tabs.ContentProps{Value: "account", Class: "space-y-6 animate-in fade-in duration-200"}) {
-								<div class="flex items-center gap-4">
-									<div class="size-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg">
-										U
-									</div>
-									<div>
-										<div class="text-foreground font-medium">{ i18n.T(ctx, "User Profile") }</div>
-										<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "Manage your account details and preferences.") }</p>
-									</div>
-								</div>
-								<div class="space-y-4 border-t border-border pt-4">
-									<a href="/auth/settings?flow=settings" class="w-full text-start p-3 rounded-xl border border-border hover:bg-accent transition-colors flex items-center justify-between group">
-										<span class="font-medium">{ i18n.T(ctx, "Manage Account & Security") }</span>
-										@icon.ChevronRight(icon.Props{Class: "size-4 text-muted-foreground group-hover:text-foreground"})
-									</a>
-									<button class="w-full text-start p-3 rounded-xl border border-destructive/20 bg-destructive/5 hover:bg-destructive/10 transition-colors flex items-center justify-between group">
-										<span class="text-destructive font-medium">{ i18n.T(ctx, "Delete Account") }</span>
-										@icon.UserX(icon.Props{Class: "size-4 text-destructive"})
-									</button>
-								</div>
+								@SettingsAccountTab(ctx)
 							}
 						</div>
 					}
@@ -674,4 +111,47 @@ templ Settings() {
 	@profileDialog()
 	@pricingDialog()
 	@checkoutDialog()
+}
+
+// SettingsTabList renders the vertical tab navigation sidebar.
+templ SettingsTabList(ctx context.Context) {
+	<div class="flex flex-row md:flex-col gap-1 min-w-[160px] overflow-x-auto md:overflow-y-auto scrollbar-none pb-2 md:pb-0 border-b md:border-b-0 md:border-e border-border pe-0 md:pe-4">
+		@tabs.List(tabs.ListProps{Class: "flex flex-row md:flex-col gap-1 bg-transparent p-0 w-full h-auto items-stretch"}) {
+			@settingsTabTrigger("general", true, ctx) {
+				@icon.Settings(icon.Props{Class: "size-4"})
+				<span>{ i18n.T(ctx, "General") }</span>
+			}
+			@settingsTabTrigger("ai", false, ctx) {
+				@icon.Bot(icon.Props{Class: "size-4"})
+				<span>{ i18n.T(ctx, "AI") }</span>
+			}
+			@settingsTabTrigger("personalization", false, ctx) {
+				@icon.UserCog(icon.Props{Class: "size-4"})
+				<span>{ i18n.T(ctx, "Personalization") }</span>
+			}
+			@settingsTabTrigger("speech", false, ctx) {
+				@icon.Mic(icon.Props{Class: "size-4"})
+				<span>{ i18n.T(ctx, "Speech") }</span>
+			}
+			@settingsTabTrigger("data", false, ctx) {
+				@icon.Database(icon.Props{Class: "size-4"})
+				<span>{ i18n.T(ctx, "Data") }</span>
+			}
+			@settingsTabTrigger("account", false, ctx) {
+				@icon.User(icon.Props{Class: "size-4"})
+				<span>{ i18n.T(ctx, "Account") }</span>
+			}
+		}
+	</div>
+}
+
+// settingsTabTrigger is a helper to DRY up the tab trigger styling.
+templ settingsTabTrigger(value string, isActive bool, ctx context.Context) {
+	@tabs.Trigger(tabs.TriggerProps{
+		Value:    value,
+		IsActive: isActive,
+		Class:    "justify-start gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 data-[tui-tabs-state=active]:bg-accent data-[tui-tabs-state=active]:text-foreground data-[tui-tabs-state=inactive]:text-muted-foreground hover:bg-accent/50 hover:text-foreground shadow-none border-none",
+	}) {
+		{ children... }
+	}
 }

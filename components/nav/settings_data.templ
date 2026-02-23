@@ -1,0 +1,40 @@
+package nav
+
+import (
+	"context"
+	"fmt"
+	"school-with-ai/components/i18n"
+	"school-with-ai/components/icon"
+)
+
+// SettingsDataTab renders the Data management settings tab.
+// Contains: Long-term memory, Clear conversations, Export data.
+templ SettingsDataTab(ctx context.Context) {
+	<div
+		class="flex items-center justify-between p-3 rounded-xl border border-border hover:bg-accent transition-colors group cursor-pointer"
+		@click="$dispatch('open-memory-dialog')"
+	>
+		<div class="space-y-0.5">
+			<div class="text-foreground font-medium">{ i18n.T(ctx, "Long-Term Memory") }</div>
+			<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "View what the AI remembers about you.") }</p>
+		</div>
+		@icon.Brain(icon.Props{Class: "size-4 text-muted-foreground group-hover:text-foreground"})
+	</div>
+	<div
+		class="flex items-center justify-between p-3 rounded-xl border border-destructive/20 bg-destructive/5 hover:bg-destructive/10 transition-colors group cursor-pointer"
+		@click={ fmt.Sprintf("if(confirm('%s')) { sessions = []; showSettings = false; }", i18n.T(ctx, "Are you sure you want to clear all conversations?")) }
+	>
+		<div class="space-y-0.5">
+			<div class="text-destructive font-medium">{ i18n.T(ctx, "Clear all conversations") }</div>
+			<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "Permanently delete all thread history.") }</p>
+		</div>
+		@icon.Trash2(icon.Props{Class: "size-4 text-destructive"})
+	</div>
+	<div class="flex items-center justify-between p-3 rounded-xl border border-border hover:bg-accent transition-colors group cursor-pointer">
+		<div class="space-y-0.5">
+			<div class="text-foreground font-medium">{ i18n.T(ctx, "Export all data") }</div>
+			<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "Download a copy of your chat history.") }</p>
+		</div>
+		@icon.Download(icon.Props{Class: "size-4 text-muted-foreground group-hover:text-foreground"})
+	</div>
+}

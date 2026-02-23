@@ -16,8 +16,8 @@ import (
 	"syscall"
 	"time"
 
-	"school-with-ai/components"
 	"school-with-ai/components/checkout"
+	"school-with-ai/components/home"
 	"school-with-ai/components/pricing"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
@@ -827,7 +827,7 @@ func HandleViewChatInputScreen(log *logger.Logger, edgequakeService *edgequake.S
 			}(user)
 		}
 
-		component := components.ChatInputScreen(user)
+		component := home.ChatInputScreen(user)
 		if err := component.Render(r.Context(), w); err != nil {
 			log.Error(r.Context(), "failed to render chat input screen", "error", err)
 		}

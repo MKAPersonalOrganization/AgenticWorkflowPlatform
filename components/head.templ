@@ -1,0 +1,120 @@
+package components
+
+import (
+	"school-with-ai/components/i18n"
+	"school-with-ai/services/toolregistry"
+
+	"fmt"
+)
+
+// DocumentHead renders the <head> section of the HTML document.
+// Follows React/Next.js pattern of separating metadata/head concerns
+// from the layout shell. Similar to Next.js <Head> component.
+templ DocumentHead(title string, extraHead templ.Component) {
+	<head>
+		<meta charset="UTF-8"/>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+		<title>{ title } - Compass</title>
+		<!-- Import Map MUST be at the top of head -->
+		<script type="importmap">
+		{
+			"imports": {
+				"xstate": "https://cdn.jsdelivr.net/npm/xstate@5.25.1/+esm"
+			}
+		}
+		</script>
+		@Favicon()
+		@FontPreloads()
+		<link rel="stylesheet" href="/assets/css/output.css"/>
+		@ThemeInitScript()
+		<!-- i18n JavaScript module -->
+		<script src="/assets/js/i18n.js"></script>
+		@i18n.I18nScript()
+		@SpecialToolsScript()
+		@ThemeManagerScript()
+		if extraHead != nil {
+			@extraHead
+		}
+		<!-- AI Settings Manager -->
+		<script src="/assets/js/ai-settings.js"></script>
+		<!-- Alpine.js Core - MUST load after plugins -->
+		<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+	</head>
+}
+
+// Favicon renders the SVG compass favicon.
+templ Favicon() {
+	<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z'/><circle cx='12' cy='12' r='10'/></svg>"/>
+}
+
+// FontPreloads renders Google Fonts preconnect and stylesheet links.
+templ FontPreloads() {
+	<link rel="preconnect" href="https://fonts.googleapis.com"/>
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+	<link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Noto+Sans+Arabic:wght@100..900&family=Noto+Sans:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet"/>
+}
+
+// ThemeInitScript runs before page render to prevent flash of unstyled content.
+// This MUST execute synchronously before the body is painted.
+templ ThemeInitScript() {
+	<script>
+		(function() {
+			const theme = localStorage.getItem('theme') || 'system';
+			const root = document.documentElement;
+
+			if (theme === 'system') {
+				const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+				if (systemPrefersDark) {
+					root.classList.add('dark');
+				}
+			}
+		})();
+	</script>
+}
+
+// ThemeManagerScript registers the Alpine.js themeManager data component.
+// This is the "provider" pattern — similar to React's ThemeProvider context.
+templ ThemeManagerScript() {
+	<script>
+		document.addEventListener('alpine:init', () => {
+			Alpine.data('themeManager', () => ({
+				theme: localStorage.getItem('theme') || 'system',
+
+				toggleTheme() {
+					const themes = ['light', 'dark', 'system'];
+					const currentIndex = themes.indexOf(this.theme);
+					const nextTheme = themes[(currentIndex + 1) % themes.length];
+					this.setTheme(nextTheme);
+				},
+
+				setTheme(theme) {
+					this.theme = theme;
+					localStorage.setItem('theme', theme);
+					this.applyTheme(theme);
+				},
+
+				applyTheme(theme) {
+					const root = document.documentElement;
+
+					if (theme === 'system') {
+						const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+						if (systemPrefersDark) {
+							root.classList.add('dark');
+						} else {
+							root.classList.remove('dark');
+						}
+					} else if (theme === 'dark') {
+						root.classList.add('dark');
+					} else {
+						root.classList.remove('dark');
+					}
+				}
+			}));
+		});
+	</script>
+}
+
+// SpecialToolsScript injects tool registry configuration into the window object.
+templ SpecialToolsScript() {
+	@templ.Raw(fmt.Sprintf("<script>window.SPECIAL_TOOLS = %s; window.ELICITATION_SCHEMAS = %s;</script>", toolregistry.GetUIHandledToolsJSON(), toolregistry.GetUIHandledElicitationsJSON()))
+}

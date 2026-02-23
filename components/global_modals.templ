@@ -1,0 +1,18 @@
+package components
+
+import (
+	"school-with-ai/components/agents"
+	"school-with-ai/components/convsearch"
+	"school-with-ai/components/resources"
+	"school-with-ai/components/tools"
+)
+
+// GlobalModals renders all application-wide modal dialogs.
+// These are always present in the DOM but hidden until triggered.
+// Follows the React pattern of placing modal portals at the root level.
+templ GlobalModals() {
+	@resources.ResourcesDialog()
+	@agents.AgentsDialog()
+	@tools.ToolsDialog()
+	@convsearch.SearchDialog()
+}

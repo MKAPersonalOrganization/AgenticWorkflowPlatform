@@ -1,0 +1,89 @@
+package nav
+
+import (
+	"context"
+	"school-with-ai/components/button"
+	"school-with-ai/components/i18n"
+	"school-with-ai/components/selectbox"
+)
+
+// SettingsPersonalizationTab renders the Personalization settings tab.
+// Contains: Learning style, Struggles, Strengths, Academic Goals.
+templ SettingsPersonalizationTab(ctx context.Context) {
+	<div class="space-y-4">
+		<div class="flex flex-col gap-2">
+			<label class="text-foreground font-medium">{ i18n.T(ctx, "Learning Style") }</label>
+			@selectbox.SelectBox(selectbox.Props{Class: "w-full"}) {
+				@selectbox.Trigger(selectbox.TriggerProps{
+					Attributes: templ.Attributes{
+						"x-model": "profile.learning_style",
+					},
+				}) {
+					<span x-text={ "profile.learning_style || '" + i18n.T(ctx, "Select a style...") + "'" }>{ i18n.T(ctx, "Select a style...") }</span>
+				}
+				@selectbox.Content(selectbox.ContentProps{NoSearch: true}) {
+					@selectbox.Item(selectbox.ItemProps{Value: "Visual"}) {
+						{ i18n.T(ctx, "Visual") }
+					}
+					@selectbox.Item(selectbox.ItemProps{Value: "Auditory"}) {
+						{ i18n.T(ctx, "Auditory") }
+					}
+					@selectbox.Item(selectbox.ItemProps{Value: "Read/Write"}) {
+						{ i18n.T(ctx, "Read/Write") }
+					}
+					@selectbox.Item(selectbox.ItemProps{Value: "Kinesthetic"}) {
+						{ i18n.T(ctx, "Kinesthetic") }
+					}
+					@selectbox.Item(selectbox.ItemProps{Value: "Multimodal"}) {
+						{ i18n.T(ctx, "Multimodal") }
+					}
+				}
+			}
+			<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "How you prefer to take in and process information.") }</p>
+		</div>
+		<div class="flex flex-col gap-2 pt-2">
+			<label class="text-foreground font-medium">{ i18n.T(ctx, "Struggles") }</label>
+			<textarea
+				x-model="profile.struggles"
+				placeholder={ i18n.T(ctx, "e.g. Algebra, focus, time management...") }
+				class="w-full h-20 bg-card border border-border rounded-xl p-3 outline-none focus:ring-1 focus:ring-primary resize-none"
+			></textarea>
+			<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "Topics or skills you find challenging (comma separated).") }</p>
+		</div>
+		<div class="flex flex-col gap-2 pt-2">
+			<label class="text-foreground font-medium">{ i18n.T(ctx, "Strengths") }</label>
+			<textarea
+				x-model="profile.strengths"
+				placeholder={ i18n.T(ctx, "e.g. Critical thinking, geometry, writing...") }
+				class="w-full h-20 bg-card border border-border rounded-xl p-3 outline-none focus:ring-1 focus:ring-primary resize-none"
+			></textarea>
+			<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "Areas where you excel or feel confident (comma separated).") }</p>
+		</div>
+		<div class="flex flex-col gap-2 pt-2">
+			<label class="text-foreground font-medium">{ i18n.T(ctx, "Academic Goals") }</label>
+			<textarea
+				x-model="profile.goals"
+				placeholder={ i18n.T(ctx, "e.g. Master calculus, improve essay structure...") }
+				class="w-full h-24 bg-card border border-border rounded-xl p-3 outline-none focus:ring-1 focus:ring-primary resize-none"
+			></textarea>
+			<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "What you hope to achieve with your AI assistant.") }</p>
+		</div>
+		<!-- Save Button -->
+		<div class="flex items-center justify-end pt-2">
+			@button.Button(button.Props{
+				Type:  button.TypeButton,
+				Class: "min-w-[120px]",
+				Attributes: templ.Attributes{
+					"@click":    "updateProfile()",
+					":disabled": "profileLoading",
+				},
+			}) {
+				<span x-show="!profileLoading">{ i18n.T(ctx, "Save Changes") }</span>
+				<span x-show="profileLoading" class="flex items-center gap-2">
+					<span class="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground"></span>
+					{ i18n.T(ctx, "Saving...") }
+				</span>
+			}
+		</div>
+	</div>
+}
