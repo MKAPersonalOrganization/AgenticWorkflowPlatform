@@ -1,0 +1,35 @@
+package nav
+
+import (
+	"context"
+	"fmt"
+	"school-with-ai/components/i18n"
+	"school-with-ai/components/icon"
+	"school-with-ai/components/selectbox"
+)
+
+// SettingsLanguageSelect renders the language selection dropdown.
+// Extracted as a reusable component since language switching
+// is also available in the account menu.
+templ SettingsLanguageSelect(ctx context.Context) {
+	<div class="flex items-center justify-between gap-4">
+		<div class="text-foreground">{ i18n.T(ctx, "Language") }</div>
+		@selectbox.SelectBox(selectbox.Props{Class: "w-[180px]"}) {
+			<div class="relative w-full" x-data="{ currentLang: '' }" x-init={ fmt.Sprintf("currentLang = '%s'", i18n.Lang(ctx)) }>
+				<select
+					x-model="currentLang"
+					@change="window.location.href = '?lang=' + $event.target.value"
+					class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+					aria-label="Select Language"
+				>
+					<option value="en">English</option>
+					<option value="ar">العربية</option>
+				</select>
+				<div class="w-full h-9 px-3 py-1 text-base md:text-sm flex items-center justify-between rounded-md border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground">
+					<span x-text="currentLang === 'ar' ? 'العربية' : 'English'"></span>
+					@icon.ChevronDown(icon.Props{Size: 16, Class: "text-muted-foreground"})
+				</div>
+			</div>
+		}
+	</div>
+}

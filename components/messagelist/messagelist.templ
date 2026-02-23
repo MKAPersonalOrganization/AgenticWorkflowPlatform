@@ -1,161 +1,22 @@
 package messagelist
 
+// messagelist.templ — Composition shell (React-inspired single-responsibility pattern).
+// Each visual concern lives in its own file:
+//   scroll_to_bottom.templ   — ScrollToBottom button
+//   date_separator.templ     — DateSeparator between days
+//   tool_call.templ          — ToolCall, ToolCallHeader, ToolCallDetails
+//   agent_transfer.templ     — AgentTransfer and its sub-components
+//   special_tools.templ      — SpecialToolPlugins (tool-registry UI templates)
+//   thinking_skeleton.templ  — ThinkingSkeleton indicator
+
 import (
-	"context"
-	"school-with-ai/components/alert"
-	"school-with-ai/components/badge"
-	"school-with-ai/components/button"
 	"school-with-ai/components/errormessage"
-	"school-with-ai/components/i18n"
 	"school-with-ai/components/message"
 	"school-with-ai/components/tokenusage"
-	"school-with-ai/components/utils"
-	"school-with-ai/services/toolregistry"
 )
 
-// ScrollToBottom - LibreChat style floating scroll button
-templ ScrollToBottom() {
-	<button
-		x-show="scrolledUp"
-		x-transition:enter="transition ease-out duration-200"
-		x-transition:enter-start="opacity-0 translate-y-2"
-		x-transition:enter-end="opacity-100 translate-y-0"
-		x-transition:leave="transition ease-in duration-150"
-		x-transition:leave-start="opacity-100 translate-y-0"
-		x-transition:leave-end="opacity-0 translate-y-2"
-		@click="scrollToBottom()"
-		class="absolute bottom-5 left-1/2 -translate-x-1/2 cursor-pointer rounded-full border border-border bg-background p-2 shadow-md hover:shadow-lg hover:bg-accent/50 transition-all z-10"
-		aria-label={ i18n.T(ctx, "Scroll to bottom") }
-	>
-		<svg width="18" height="18" viewBox="0 0 24 24" fill="none" class="text-muted-foreground">
-			<path
-				d="M17 13L12 18L7 13M12 6L12 17"
-				stroke="currentColor"
-				stroke-width="2"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-			></path>
-		</svg>
-	</button>
-}
-
-// DateSeparator - LibreChat style date separator
-templ DateSeparator() {
-	<div
-		x-show="index > 0 && getMessageDate(message) !== getMessageDate(messages[index - 1])"
-		class="flex items-center justify-center my-4"
-	>
-		<div class="text-xs text-muted-foreground bg-muted/50 px-3 py-1 rounded-full">
-			<span x-text="formatRelativeDate(getMessageDate(message))"></span>
-		</div>
-	</div>
-}
-
-// ToolCall - Modern specialized tool call rendering
-templ ToolCall(ctx context.Context) {
-	<div
-		x-data="{ expanded: false }"
-		class="my-2 relative group/message border-s-4 border-primary bg-card/30 rounded-r-lg overflow-hidden transition-all duration-300 hover:bg-card/50"
-		:class="expanded ? 'shadow-md' : 'shadow-sm'"
-	>
-		<!-- Parallel indicator bar -->
-		<template x-if="getParallelToolCallInfo(message).isParallel">
-			<div class="absolute inset-inline-start-0 top-0 bottom-0 w-1 bg-primary/20" title="Parallel tool call"></div>
-		</template>
-		<!-- Header/Summary line -->
-		<div
-			@click="expanded = !expanded"
-			class="flex items-center gap-3 px-4 py-3 cursor-pointer select-none overflow-hidden"
-		>
-			<!-- Tool Icon -->
-			<div class="flex-shrink-0 text-primary">
-				<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-					<path d="M10 3.5a1.5 1.5 0 013 0V4a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-.5a1.5 1.5 0 000 3h.5a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-.5a1.5 1.5 0 00-3 0v.5a1 1 0 01-1 1H6a1 1 0 01-1-1v-3a1 1 0 00-1-1h-.5a1.5 1.5 0 010-3H4a1 1 0 001-1V6a1 1 0 011-1h3a1 1 0 001-1v-.5z"></path>
-				</svg>
-			</div>
-			<div class="flex items-center gap-2 min-w-0 flex-1">
-				<template x-if="message.agentName">
-					<span class="text-xs font-medium text-muted-foreground truncate" x-text="message.agentName"></span>
-				</template>
-				<template x-if="message.agentName">
-					<svg class="w-3 h-3 text-muted-foreground/50 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-					</svg>
-				</template>
-				@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "font-mono text-[10px] px-1.5 py-0 h-5 truncate"}) {
-					<span x-text="message.name"></span>
-				}
-				<template x-if="getParallelToolCallInfo(message).isParallel">
-					<span class="text-[10px] text-muted-foreground/70 font-medium" x-text="`${getParallelToolCallInfo(message).position}/${getParallelToolCallInfo(message).count}`"></span>
-				</template>
-			</div>
-			<div class="flex items-center gap-2 flex-shrink-0">
-				<span class="text-xs text-primary/80 font-medium" x-text="message.status === 'completed' ? '✓' : '...' "></span>
-				<svg
-					class="w-4 h-4 text-muted-foreground transition-transform duration-300"
-					:class="expanded ? 'rotate-180' : ''"
-					fill="none"
-					stroke="currentColor"
-					viewBox="0 0 24 24"
-				>
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-				</svg>
-			</div>
-		</div>
-		<!-- Collapsible Details -->
-		<div x-show="expanded" x-collapse>
-			<div class="px-4 pb-4 pt-0 space-y-4 border-t border-border/20 bg-muted/5">
-				<!-- Arguments -->
-				<div class="space-y-1.5">
-					<div class="flex items-center gap-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-tight">
-						<span>{ i18n.T(ctx, "Arguments") }</span>
-					</div>
-					<div class="rounded-md bg-muted/40 p-3 font-mono text-xs overflow-x-auto ring-1 ring-inset ring-border/20">
-						<div x-html="`<pre class='whitespace-pre-wrap break-words'><code>${JSON.stringify(message.parsedArgs || {}, null, 2)}</code></pre>`"></div>
-					</div>
-				</div>
-				<!-- Result -->
-				<template x-if="message.result">
-					<div class="space-y-1.5">
-						<div class="flex items-center gap-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-tight">
-							<span>{ i18n.T(ctx, "Result") }</span>
-						</div>
-						<div class="rounded-md bg-background/50 p-3 font-mono text-xs overflow-x-auto ring-1 ring-inset ring-border/20">
-							<template x-if="isValidJSON(message.result)">
-								<div x-html="`<pre class='whitespace-pre-wrap break-words'><code>${JSON.stringify(JSON.parse(message.result), null, 2)}</code></pre>`"></div>
-							</template>
-							<template x-if="!isValidJSON(message.result)">
-								<div x-text="message.result" class="whitespace-pre-wrap break-words"></div>
-							</template>
-						</div>
-					</div>
-				</template>
-			</div>
-		</div>
-	</div>
-}
-
-// ThinkingSkeleton - Premium thinking indicator for assistant activity
-templ ThinkingSkeleton() {
-	<div
-		x-show="showTypingIndicator"
-		class="flex items-center py-4 animate-in fade-in slide-in-from-bottom-2 duration-500"
-		role="status"
-		aria-live="polite"
-	>
-		<div class="flex items-center gap-3 px-4">
-			<!-- Animated shimmer orb -->
-			<div class="relative flex items-center justify-center size-5">
-				<div class="absolute inset-0 rounded-full bg-primary/20 animate-ping" style="animation-duration: 2s;"></div>
-				<div class="size-2.5 rounded-full bg-primary animate-pulse shadow-sm shadow-primary/50"></div>
-			</div>
-			<span class="thinking-shimmer text-sm font-medium text-muted-foreground tracking-wide">
-				{ i18n.T(ctx, "thinking") }
-			</span>
-		</div>
-	</div>
-}
-
+// MessageList renders the full chat message stream with all message types,
+// typing indicators, error messages, and token usage.
 templ MessageList() {
 	<div class="space-y-4 relative">
 		<template x-for="(message, index) in messages" :key="message.id">
@@ -173,104 +34,14 @@ templ MessageList() {
 				<!-- User Message -->
 				@message.UserMessage()
 				<!-- Agent Transfer Tool Call - Special Rendering -->
-				<div x-show="message.type === 'tool_call' && message.name === 'transfer_to_agent' && message.status === 'completed'" class="my-2 relative group/message">
-					<!-- Copy button for tool call -->
-					@button.Button(button.Props{
-						Type:    button.TypeButton,
-						Variant: button.VariantGhost,
-						Size:    button.SizeIcon,
-						Class:   "absolute top-2 end-2 z-10 opacity-0 group-hover/message:opacity-100 transition-opacity bg-background/50 hover:bg-background size-8 h-8 w-8",
-						Attributes: templ.Attributes{
-							"@click":     "copyMessage(message.id)",
-							"aria-label": "Copy message",
-							"title":      "Copy message",
-						},
-					}) {
-						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-						</svg>
-					}
-					@alert.Alert(alert.Props{
-						Class: utils.TwMerge(
-							"border-s-4 overflow-hidden shadow-sm transition-all duration-300",
-							"border-primary",
-						),
-					}) {
-						<div :class="message.parsedArgs?.agent_name === 'human' ? 'absolute inset-0 bg-primary/5 pointer-events-none' : ''"></div>
-						<!-- Agent collaboration icon -->
-						<template x-if="message.parsedArgs?.agent_name !== 'human'">
-							<svg class="w-5 h-5 text-primary flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-								<path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"></path>
-							</svg>
-						</template>
-						<template x-if="message.parsedArgs?.agent_name === 'human'">
-							<svg class="w-5 h-5 text-primary flex-shrink-0 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-							</svg>
-						</template>
-						@alert.Title() {
-							<span class="flex items-center gap-2 flex-wrap">
-								<template x-if="message.agentName">
-									@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "text-xs font-medium break-all"}) {
-										<span class="break-all" x-text="message.agentName"></span>
-									}
-								</template>
-								<template x-if="message.agentName">
-									<svg class="w-4 h-4 text-primary flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-										<path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"></path>
-									</svg>
-								</template>
-								<template x-if="message.parsedArgs?.agent_name === 'human'">
-									@badge.Badge(badge.Props{Variant: badge.VariantDefault, Class: "text-xs font-medium px-2 py-0 h-5"}) {
-										<span>{ i18n.T(ctx, "HUMAN HELP") }</span>
-									}
-								</template>
-								<template x-if="message.parsedArgs?.agent_name !== 'human'">
-									@badge.Badge(badge.Props{Variant: badge.VariantDefault, Class: "text-xs font-medium break-all"}) {
-										<span class="break-all" x-text="message.parsedArgs?.agent_name || 'specialist'"></span>
-									}
-								</template>
-								<template x-if="message.result">
-									<span class="text-primary text-xs font-medium">✓ { i18n.T(ctx, "transferred") }</span>
-								</template>
-							</span>
-						}
-						@alert.Description() {
-							<div class="space-y-2">
-								<template x-if="message.parsedArgs?.question">
-									<div class="text-sm break-words">
-										<span class="font-semibold text-primary">{ i18n.T(ctx, "Question:") }</span>
-										<span class="mis-2" x-text="message.parsedArgs?.question"></span>
-									</div>
-								</template>
-								<template x-if="message.parsedArgs?.context">
-									<div class="text-sm text-muted-foreground break-words">
-										<span class="font-semibold">{ i18n.T(ctx, "Context:") }</span>
-										<span class="mis-2" x-text="message.parsedArgs?.context"></span>
-									</div>
-								</template>
-								<template x-if="!message.parsedArgs?.question && !message.parsedArgs?.context">
-									<div class="text-sm text-muted-foreground italic">
-										{ i18n.T(ctx, "Transferring context to") }
-									</div>
-								</template>
-							</div>
-						}
-					}
-				</div>
+				@AgentTransfer()
 				<!-- Special Tool & Elicitation Components -->
-				<div x-show="message.type === 'tool_call' && (isSpecialTool(message.name) || isElicitationTool(message.parsedResult?.schema?.type))" class="my-2 relative w-full flex flex-col items-stretch">
-					for _, p := range toolregistry.GetAllPluginProviders() {
-						if t := p.GetUITemplate(); t != nil {
-							@t
-						}
-					}
-				</div>
+				@SpecialToolPlugins()
 				<!-- Regular Tool Call Message -->
 				<template x-if="message.type === 'tool_call' && !isSpecialTool(message.name) && !isElicitationTool(message.parsedResult?.schema?.type)">
 					@ToolCall(ctx)
 				</template>
-				<!-- Tool Result Message (orphaned - should not happen with new approach, but kept for safety) -->
+				<!-- Tool Result Message (orphaned - kept for safety) -->
 				<div x-show="message.type === 'tool_result'" class="my-2" style="display: none;">
 					<!-- Hidden - tool results are now embedded in tool call messages -->
 				</div>

@@ -1,0 +1,42 @@
+package nav
+
+import (
+	"context"
+	"school-with-ai/components/i18n"
+	"school-with-ai/components/selectbox"
+	switchcomp "school-with-ai/components/switch"
+)
+
+// SettingsSpeechTab renders the Speech settings tab.
+// Contains: Text-to-Speech toggle, Voice Engine selection.
+templ SettingsSpeechTab(ctx context.Context) {
+	<div class="flex items-center justify-between gap-4">
+		<div class="space-y-0.5">
+			<div class="text-foreground font-medium">{ i18n.T(ctx, "Text-to-Speech") }</div>
+			<p class="text-[12px] text-muted-foreground leading-tight">{ i18n.T(ctx, "Enable reading assistant messages aloud.") }</p>
+		</div>
+		@switchcomp.Switch(switchcomp.Props{
+			Name: "textToSpeech",
+			Attributes: templ.Attributes{
+				"x-model":    "preferences.textToSpeechEnabled",
+				"aria-label": i18n.T(ctx, "Enable Text-to-Speech"),
+			},
+		})
+	</div>
+	<div class="flex flex-col gap-2 pt-4 border-t border-border">
+		<div class="text-foreground">{ i18n.T(ctx, "Voice Engine") }</div>
+		@selectbox.SelectBox(selectbox.Props{Class: "w-full"}) {
+			@selectbox.Trigger(selectbox.TriggerProps{}) {
+				<span>{ i18n.T(ctx, "Default Browser Voice") }</span>
+			}
+			@selectbox.Content(selectbox.ContentProps{NoSearch: true}) {
+				@selectbox.Item(selectbox.ItemProps{Value: "default", Selected: true}) {
+					{ i18n.T(ctx, "Default Browser Voice") }
+				}
+				@selectbox.Item(selectbox.ItemProps{Value: "premium"}) {
+					{ i18n.T(ctx, "Premium AI Voice (BETA)") }
+				}
+			}
+		}
+	</div>
+}
