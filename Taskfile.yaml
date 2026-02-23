@@ -107,7 +107,8 @@ tasks:
   up:prod:
     desc: "Production-parity: all services + containerised app (no dev UIs, no Redis host port)"
     cmds:
-      - docker compose -f docker-compose.yml --profile prod up -d --build
+      - docker compose -f docker-compose.yml build --no-cache app
+      - docker compose -f docker-compose.yml --profile prod up -d
 
   down:
     desc: "Stop and remove containers, networks, and volumes"

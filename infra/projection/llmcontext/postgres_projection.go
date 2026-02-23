@@ -85,7 +85,7 @@ func (p *PostgresLLMContextProjection) applyUserMessageAdded(ctx context.Context
 	// Use atomic subquery for sequence number to prevent race conditions.
 	insertQuery := `
 		INSERT INTO llm_messages (message_id, thread_id, role, content, created_at, sequence_num)
-		VALUES ($1, $2, $3, $4, $5, (SELECT COUNT(*) FROM llm_messages WHERE thread_id = $2))
+		VALUES ($1, $2, $3, $4, $5, (SELECT COUNT(*) FROM llm_messages WHERE thread_id = $2::varchar))
 		ON CONFLICT (message_id) DO NOTHING
 	`
 
@@ -130,7 +130,7 @@ func (p *PostgresLLMContextProjection) applyAssistantMessageAdded(ctx context.Co
 	// Use atomic subquery for sequence number to prevent race conditions.
 	insertQuery := `
 		INSERT INTO llm_messages (message_id, thread_id, role, content, tool_calls, agent_name, created_at, sequence_num)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, (SELECT COUNT(*) FROM llm_messages WHERE thread_id = $2))
+		VALUES ($1, $2, $3, $4, $5, $6, $7, (SELECT COUNT(*) FROM llm_messages WHERE thread_id = $2::varchar))
 		ON CONFLICT (message_id) DO NOTHING
 	`
 
@@ -167,7 +167,7 @@ func (p *PostgresLLMContextProjection) applyToolResultAdded(ctx context.Context,
 	// Use atomic subquery for sequence number to prevent race conditions.
 	insertQuery := `
 		INSERT INTO llm_messages (message_id, thread_id, role, content, tool_call_id, agent_name, created_at, sequence_num)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, (SELECT COUNT(*) FROM llm_messages WHERE thread_id = $2))
+		VALUES ($1, $2, $3, $4, $5, $6, $7, (SELECT COUNT(*) FROM llm_messages WHERE thread_id = $2::varchar))
 		ON CONFLICT (message_id) DO NOTHING
 	`
 

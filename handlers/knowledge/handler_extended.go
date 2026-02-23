@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"school-with-ai/services/rag/costs"
 	"school-with-ai/services/rag/entities"
@@ -967,6 +968,11 @@ func (h *Handler) GetEntityProvenance(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetProviderStatus(w http.ResponseWriter, r *http.Request) {
 	result, err := h.edgequakeService.Settings.GetStatus(r.Context())
 	if err != nil {
+		// If settings are not configured yet, return a 404 instead of 500
+		if strings.Contains(err.Error(), "not found") {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "Provider settings not configured"})
+			return
+		}
 		h.log.Error(r.Context(), "failed to get provider status", "error", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to get provider status"})
 		return
