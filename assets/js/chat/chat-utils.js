@@ -232,6 +232,30 @@ export function enrichToolResult(toolResult, content) {
 }
 
 /**
+ * Map raw token usage data to a normalized structure.
+ * Deduplicates the mapping between streaming and message loading.
+ * @param {Object} raw - Raw token usage data from backend
+ * @returns {Object} Normalized token usage
+ */
+export function mapTokenUsage(raw) {
+    return {
+        total: raw.total || 0,
+        prompt: raw.prompt || 0,
+        completion: raw.completion || 0,
+        cached: raw.cached || 0,
+        reasoning: raw.reasoning || 0,
+        audioInput: raw.audioInput || 0,
+        audioOutput: raw.audioOutput || 0,
+        acceptedPredict: raw.acceptedPredict || 0,
+        rejectedPredict: raw.rejectedPredict || 0,
+        model: raw.model || 'N/A',
+        provider: raw.provider || 'N/A',
+        messageId: raw.messageId,
+        threadId: raw.threadId
+    };
+}
+
+/**
  * Create a user message object
  * @param {string} content - Message content
  * @param {string} interactionId - Interaction ID

@@ -57,20 +57,7 @@ export function createInitialState() {
         // Thread management (internal)
         __threadStates: {},
         __currentThreadId: null,
-        __currentState: {
-            messages: [],
-            isStreaming: false,
-            eventSource: null,
-            events: [],
-            toolCalls: {},
-            pendingToolCallAgents: {},
-            currentInteractionId: null,
-            errorMessage: null,
-            showTypingIndicator: false,
-            currentStreamingId: null,
-            humanInputToastId: null,
-            tokenUsage: null
-        },
+        __currentState: createEmptyThreadState(),
         __toolStateServices: {}, // Map of toolCallId -> XState Service
 
         // User input
