@@ -26,7 +26,7 @@ func TestMain(m *testing.M) {
 func TestNewMiddleware(t *testing.T) {
 	t.Parallel()
 	kratosClient := kratos.NewKratosClient(testConfig())
-	middleware := NewMiddleware(kratosClient, os.Getenv("APP_URL"))
+	middleware := NewMiddleware(kratosClient, os.Getenv("APP_URL"), context.Background())
 
 	if middleware == nil {
 		t.Fatal("NewMiddleware() returned nil")
@@ -44,7 +44,7 @@ func TestNewMiddleware(t *testing.T) {
 func TestMiddleware_RequireAuth_NoSession(t *testing.T) {
 	t.Parallel()
 	kratosClient := kratos.NewKratosClient(testConfig())
-	middleware := NewMiddleware(kratosClient, os.Getenv("APP_URL"))
+	middleware := NewMiddleware(kratosClient, os.Getenv("APP_URL"), context.Background())
 
 	// Create a test handler
 	called := false
@@ -89,7 +89,7 @@ func TestMiddleware_RequireAuth_ValidSession(t *testing.T) {
 	_ = os.Setenv("APP_URL", "http://127.0.0.1:8090")
 
 	kratosClient := kratos.NewKratosClient(testConfig())
-	middleware := NewMiddleware(kratosClient, os.Getenv("APP_URL"))
+	middleware := NewMiddleware(kratosClient, os.Getenv("APP_URL"), context.Background())
 
 	// Create a test handler that checks for user in context
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -123,7 +123,7 @@ func TestMiddleware_RequireAuth_ValidSession(t *testing.T) {
 func TestMiddleware_OptionalAuth_NoSession(t *testing.T) {
 	t.Parallel()
 	kratosClient := kratos.NewKratosClient(testConfig())
-	middleware := NewMiddleware(kratosClient, os.Getenv("APP_URL"))
+	middleware := NewMiddleware(kratosClient, os.Getenv("APP_URL"), context.Background())
 
 	called := false
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -154,7 +154,7 @@ func TestMiddleware_OptionalAuth_NoSession(t *testing.T) {
 func TestMiddleware_validateSession(t *testing.T) {
 	t.Parallel()
 	kratosClient := kratos.NewKratosClient(testConfig())
-	middleware := NewMiddleware(kratosClient, os.Getenv("APP_URL"))
+	middleware := NewMiddleware(kratosClient, os.Getenv("APP_URL"), context.Background())
 
 	tests := []struct {
 		name        string
@@ -201,7 +201,7 @@ func TestMiddleware_validateSession(t *testing.T) {
 func TestMiddleware_RequireAuthFunc(t *testing.T) {
 	t.Parallel()
 	kratosClient := kratos.NewKratosClient(testConfig())
-	middleware := NewMiddleware(kratosClient, os.Getenv("APP_URL"))
+	middleware := NewMiddleware(kratosClient, os.Getenv("APP_URL"), context.Background())
 
 	called := false
 	handler := func(w http.ResponseWriter, r *http.Request) {
@@ -229,7 +229,7 @@ func TestMiddleware_RequireAuthFunc(t *testing.T) {
 func TestMiddleware_OptionalAuthFunc(t *testing.T) {
 	t.Parallel()
 	kratosClient := kratos.NewKratosClient(testConfig())
-	middleware := NewMiddleware(kratosClient, os.Getenv("APP_URL"))
+	middleware := NewMiddleware(kratosClient, os.Getenv("APP_URL"), context.Background())
 
 	called := false
 	handler := func(w http.ResponseWriter, r *http.Request) {
@@ -259,7 +259,7 @@ func TestMiddleware_AAL2Redirect(t *testing.T) {
 	t.Parallel()
 	// Test that if AAL2 is required but not satisfied, we redirect
 	kratosClient := kratos.NewKratosClient(testConfig())
-	middleware := NewMiddleware(kratosClient, os.Getenv("APP_URL"))
+	middleware := NewMiddleware(kratosClient, os.Getenv("APP_URL"), context.Background())
 
 	// This would require mocking the session response
 	// For now, we just verify the middleware is created correctly

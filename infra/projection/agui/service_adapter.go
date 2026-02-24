@@ -1,6 +1,8 @@
 package agui
 
 import (
+	"context"
+
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
 
@@ -16,11 +18,11 @@ func NewServiceAdapter(proj AguiProjection) *ServiceAdapter {
 }
 
 // GetThreadState returns thread state as interface{} to match services contract.
-func (a *ServiceAdapter) GetThreadState(threadID string) (any, bool) {
-	return a.projection.GetThreadState(threadID)
+func (a *ServiceAdapter) GetThreadState(ctx context.Context, threadID string) (any, bool) {
+	return a.projection.GetThreadState(ctx, threadID)
 }
 
 // GetMessages retrieves all UI-formatted messages for a thread.
-func (a *ServiceAdapter) GetMessages(threadID string) []aguievents.Message {
-	return a.projection.GetMessages(threadID)
+func (a *ServiceAdapter) GetMessages(ctx context.Context, threadID string) []aguievents.Message {
+	return a.projection.GetMessages(ctx, threadID)
 }

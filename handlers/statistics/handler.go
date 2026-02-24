@@ -1,6 +1,7 @@
 package statistics
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"net/http"
 
@@ -26,11 +27,14 @@ func NewHandler(log *logger.Logger, stats *statistics.PostgresProjection, adminU
 	}
 }
 
-// BasicAuth provides simple authentication for the analytics dashboard
+// BasicAuth provides simple authentication for the analytics dashboard.
+// Uses constant-time comparison to prevent timing attacks.
 func (h *Handler) BasicAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user, pass, ok := r.BasicAuth()
-		if !ok || user != h.adminUser || pass != h.adminPass {
+		userMatch := subtle.ConstantTimeCompare([]byte(user), []byte(h.adminUser))
+		passMatch := subtle.ConstantTimeCompare([]byte(pass), []byte(h.adminPass))
+		if !ok || userMatch != 1 || passMatch != 1 {
 			w.Header().Set("WWW-Authenticate", `Basic realm="Analytics Dashboard"`)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return

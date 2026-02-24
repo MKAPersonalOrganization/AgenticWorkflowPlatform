@@ -15,10 +15,10 @@ type EventEmitter func(threadID string, event any) error
 // AguiProjection is a read model optimized for the AG-UI protocol.
 type AguiProjection interface {
 	// GetThreadState retrieves the UI state for a thread.
-	GetThreadState(threadID string) (*AguiThreadState, bool)
+	GetThreadState(ctx context.Context, threadID string) (*AguiThreadState, bool)
 
 	// GetMessages retrieves all UI-formatted messages for a thread.
-	GetMessages(threadID string) []aguievents.Message
+	GetMessages(ctx context.Context, threadID string) []aguievents.Message
 
 	// ListThreads returns paginated threads for a user.
 	ListThreads(ctx context.Context, req ThreadListRequest) (*ThreadListResponse, error)
@@ -34,6 +34,7 @@ type AguiBroadcaster interface {
 // AguiThreadState represents the complete UI state for a thread.
 type AguiThreadState struct {
 	ThreadID      string                        `json:"threadId"`
+	UserID        string                        `json:"userId"`
 	Title         string                        `json:"title,omitempty"`
 	Messages      []aguievents.Message          `json:"messages"` // AG-UI SDK format
 	ToolCalls     []AguiToolCall                `json:"toolCalls"`
