@@ -1,8 +1,15 @@
 /**
  * Chat State Management
  *
- * Handles state initialization, thread state management, and computed properties.
- * Follows Alpine.js patterns for reactive state management.
+ * State initialization, thread state management, and tool state machines.
+ *
+ * Alpine.js patterns applied:
+ * - State returned from Alpine.data() factory becomes reactive automatically
+ *   (Alpine wraps it in Vue's reactive() — see packages/alpinejs/src/reactivity.js)
+ * - Thread states use lazy initialization: __getThreadState() creates on first access
+ * - Batch updates use queueMicrotask to coalesce multiple mutations into one render
+ *   (mirrors Alpine's internal scheduler — see packages/alpinejs/src/scheduler.js)
+ * - Tool machines use XState actors with Alpine-batched state sync
  */
 
 import { CONNECTION_CONFIG, DEFAULT_PERF_METRICS } from './constants.js';
@@ -41,7 +48,8 @@ export function createEmptyThreadState() {
 }
 
 /**
- * Create the initial state for the chat component
+ * Create the initial state for the chat component.
+ * Every property here becomes reactive when returned from Alpine.data().
  * @returns {Object} Initial component state
  */
 export function createInitialState() {
@@ -194,26 +202,25 @@ export function createStateMethods() {
         },
 
         /**
-         * Batch update helper
+         * Coalesce multiple state mutations into one reactive flush.
+         * Mirrors Alpine's internal scheduler pattern (queueMicrotask + dedup).
          * @param {Function} callback - Update callback
          */
         __batchUpdate(callback) {
-            // Prevent duplicate callbacks
             if (!this.__updateQueue.includes(callback)) {
                 this.__updateQueue.push(callback);
             }
 
-            if (!this.__updatePending) {
-                this.__updatePending = true;
+            if (this.__updatePending) return;
+            this.__updatePending = true;
 
-                queueMicrotask(() => {
-                    while (this.__updateQueue.length > 0) {
-                        const fn = this.__updateQueue.shift();
-                        this.__tryCatch('batch update', {}, () => fn?.());
-                    }
-                    this.__updatePending = false;
-                });
-            }
+            queueMicrotask(() => {
+                while (this.__updateQueue.length > 0) {
+                    const fn = this.__updateQueue.shift();
+                    this.__tryCatch('batch update', {}, () => fn?.());
+                }
+                this.__updatePending = false;
+            });
         },
 
         /**

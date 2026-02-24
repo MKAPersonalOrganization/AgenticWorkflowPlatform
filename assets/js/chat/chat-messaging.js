@@ -1,11 +1,14 @@
 /**
  * Chat Messaging
  *
- * Handles message operations including:
- * - Sending messages
- * - Loading messages from server
- * - Converting backend messages to UI format
- * - Message snapshot handling
+ * Message send, load, format conversion (backend AG-UI → UI), and snapshot handling.
+ *
+ * Alpine.js patterns applied:
+ * - state.messages is a reactive array; push/splice trigger re-renders
+ * - $nextTick() for focus management after DOM updates
+ * - $refs for safe DOM element access (messageInput)
+ * - Tool state machines (XState) are synced via __batchUpdate to coalesce
+ *   multiple transitions into one reactive flush
  */
 
 import { createUserMessage, safeParseJSON, generateInteractionId, enrichToolResult } from './chat-utils.js';

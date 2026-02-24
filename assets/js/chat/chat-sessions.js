@@ -1,11 +1,14 @@
 /**
  * Chat Sessions Management
  *
- * Handles session/thread CRUD operations including:
- * - Loading sessions from server
- * - Creating new sessions
- * - Switching between sessions
- * - Deleting sessions
+ * Session/thread CRUD: load, create, switch, delete, rename.
+ *
+ * Alpine.js patterns applied:
+ * - this.sessions is a reactive array; push/filter/unshift trigger re-renders
+ * - switchSession() updates this.__currentThreadId, which the $watch in init()
+ *   picks up to sync __currentState (single source of truth pattern)
+ * - $nextTick() ensures DOM is updated before focus/scroll operations
+ * - Optimistic updates with rollback on failure (submitRename)
  */
 
 import { generateThreadId } from './chat-utils.js';

@@ -1,28 +1,30 @@
 /**
- * Chat Component - Main Entry Point
+ * Chat Component — Main Entry Point
  *
- * This module composes all chat functionality into a single Alpine.js component.
+ * Composes all chat functionality into a single Alpine.data('chat') component.
  *
- * Architecture:
- * - Event-driven with SSE streaming
- * - Multi-threaded chat with isolated state
- * - AG-UI Protocol integration
- * - Production-ready error handling and monitoring
+ * Architecture (follows Alpine.js idioms):
+ * - Alpine.plugin(chatPlugin) registers stores and debug utilities
+ * - Alpine.data('chat', factory) registers the component
+ * - Factory returns state + method mixins (spread), composed via JS modules
+ * - init() sets up observers/watchers, destroy() tears them down
+ * - $watch returns unwatch functions collected for destroy() cleanup
+ * - Reactive state (messages, sessions, etc.) drives UI automatically
  *
- * Module Structure:
- * - constants.js: Event types and configuration
- * - markdown-renderer.js: Markdown rendering utilities
- * - chat-utils.js: Utility functions (throttle, format, etc.)
- * - chat-state.js: State initialization and management
- * - chat-sessions.js: Session CRUD operations
- * - chat-messaging.js: Message handling and conversion
- * - chat-streaming.js: SSE streaming and event processing
- * - chat-ui.js: UI actions, toasts, clipboard
- * - chat-keyboard.js: Keyboard shortcuts
- * - chat-theme.js: Theme management
- * - chat-accessibility.js: Screen reader support
+ * Module structure:
+ * - constants.js: Event types and configuration (pure data)
+ * - markdown-renderer.js: Markdown → HTML pipeline (pure function)
+ * - chat-utils.js: Utilities (pure functions, no Alpine dependency)
+ * - chat-state.js: State initialization and thread management
+ * - chat-sessions.js: Session CRUD
+ * - chat-messaging.js: Message handling and AG-UI conversion
+ * - chat-streaming.js: SSE streaming and event dispatch
+ * - chat-ui.js: UI actions, toasts, clipboard, scroll
+ * - chat-keyboard.js: Global keyboard shortcuts
+ * - chat-theme.js: Theme management (light/dark/system)
+ * - chat-accessibility.js: Screen reader ARIA support
  * - chat-health.js: Connection health monitoring
- * - alpine-extensions.js: Custom magics and stores
+ * - alpine-extensions.js: Alpine.plugin for stores and debug
  */
 
 // Import all modules
@@ -37,15 +39,20 @@ import { createKeyboardMethods } from './chat-keyboard.js';
 import { createThemeMethods } from './chat-theme.js';
 import { createAccessibilityMethods } from './chat-accessibility.js';
 import { createHealthMethods } from './chat-health.js';
-import { initAlpineExtensions } from './alpine-extensions.js';
-
-// Initialize Alpine extensions (magics, stores, debug utils)
-initAlpineExtensions();
+import { chatPlugin } from './alpine-extensions.js';
 
 /**
- * Register the chat Alpine.js component
+ * Register the chat component and extensions.
+ *
+ * Alpine.js idiom: use a single alpine:init listener to register all
+ * extensions (plugins, stores, data components) in one place.
+ * Alpine.plugin() receives the Alpine instance — it's the canonical
+ * entry point for extensions (see packages/alpinejs/src/plugin.js).
  */
 document.addEventListener('alpine:init', () => {
+    // Register plugin first — stores must exist before component init()
+    Alpine.plugin(chatPlugin);
+
     Alpine.data('chat', () => {
         // Create initial state
         const state = createInitialState();
@@ -257,7 +264,8 @@ document.addEventListener('alpine:init', () => {
             // ============================================
 
             init() {
-                // Guard: Prevent double initialization
+                // Guard: Alpine guarantees init() is called once per instance,
+                // but this protects against edge cases (HMR, re-mount).
                 if (this.__initialized) {
                     console.warn('Chat component already initialized');
                     return;
@@ -269,205 +277,166 @@ document.addEventListener('alpine:init', () => {
                 this.__tryCatch = errorHandlers.tryCatch.bind(this);
                 this.__tryCatchAsync = errorHandlers.tryCatchAsync.bind(this);
 
-                // Initialize theme
+                // Initialize theme (reads localStorage, applies to DOM)
                 this.__initTheme();
 
                 // Fetch available agents
                 this.fetchAgents();
 
-                // Cleanup previous observers
-                if (this.__mutationObserver) {
-                    this.__mutationObserver.disconnect();
-                }
-
-                // Setup MutationObserver to handle dynamic height changes (KaTeX, Markdown rendering, images)
-                // Throttled to prevent layout thrashing during rapid DOM mutations.
+                // ── DOM Observers (deferred to next tick for DOM readiness) ──
                 this.$nextTick(() => {
-                    const container = this.$refs?.messageList;
-                    if (container) {
-                        const throttledMutationScroll = throttle(() => {
-                            // During streaming, the streaming handler is the single scroll source.
-                            // Letting MutationObserver also scroll causes competing scrollIntoView
-                            // calls that produce visible flickering/jitter.
-                            if (this.isStreaming) return;
-                            if (this.__abortScroll) return;
-                            const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200;
-                            if (isNearBottom) {
-                                this.__scrollToBottom({ behavior: 'auto' });
-                            }
-                        }, 150);
-
-                        this.__mutationObserver = new MutationObserver(() => {
-                            throttledMutationScroll();
-                        });
-                        this.__mutationObserver.observe(container, {
-                            childList: true,
-                            subtree: true,
-                            characterData: true
-                        });
-
-                        // Abort auto-scroll when user manually scrolls up during streaming
-                        const scrollAbort = new AbortController();
-                        container.addEventListener('scroll', () => {
-                            if (!this.isStreaming) {
-                                // Not streaming — just track position, don't set abort
-                                return;
-                            }
-                            const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-                            if (distanceFromBottom > 150) {
-                                // User scrolled away from bottom during streaming
-                                this.__abortScroll = true;
-                            } else {
-                                // User scrolled back near bottom — re-engage
-                                this.__abortScroll = false;
-                            }
-                        }, { passive: true, signal: scrollAbort.signal });
-
-                        // Register cleanup for scroll listener
-                        this.__cleanupTasks.add(() => scrollAbort.abort());
-
-                        // Listen for code-copied events from markdown code blocks (event delegation)
-                        const codeCopiedAbort = new AbortController();
-                        container.addEventListener('code-copied', (e) => {
-                            if (e.detail?.success) {
-                                this.showToast(window.i18n.t('Code copied to clipboard'), 'success', 2000);
-                            } else {
-                                this.showToast(window.i18n.t('Failed to copy code'), 'error');
-                            }
-                        }, { signal: codeCopiedAbort.signal });
-                        this.__cleanupTasks.add(() => codeCopiedAbort.abort());
-                    }
+                    this.__setupScrollObservers();
+                    this.__setupIntersectionObserver();
                 });
 
-                // Load sessions and profile asynchronously
+                // ── Async data loading (via microtask to not block init) ──
                 queueMicrotask(() => {
                     this.__loadSessions();
                     this.fetchProfile();
                     this.fetchBanner();
                 });
 
-                // Setup IntersectionObserver for scroll button visibility
-                this.$nextTick(() => {
-                    const anchor = this.$refs?.messagesEnd;
-                    if (anchor) {
-                        this.__scrollButtonObserver = new IntersectionObserver(([entry]) => {
-                            this.scrolledUp = !entry.isIntersecting;
-                        }, {
-                            root: this.$refs.messageList,
-                            threshold: 0.1
-                        });
-                        this.__scrollButtonObserver.observe(anchor);
-                    }
-                });
-
-                // Set up infinite scroll for sidebar sessions (handled by x-intersect in nav.templ)
-                /*
-                this.$nextTick(() => {
-                    const sidebarContent = document.querySelector('[data-tui-sidebar="content"]');
-                    if (sidebarContent) {
-                        sidebarContent.addEventListener('scroll', (e) => this.__onSidebarScroll(e));
-                    }
-                });
-                */
-
-                // Initialize accessibility
+                // Initialize accessibility (screen reader live region)
                 this.__initScreenReaderAnnouncer();
 
-                // Initialize throttled scroll for streaming — uses direct scrollTop
-                // assignment (no scrollIntoView) to avoid animation jitter.
-                // 150ms matches LibreChat's streaming scroll cadence.
+                // Throttled scroll for streaming — direct scrollTop assignment
+                // avoids scrollIntoView animation jitter. 150ms matches LibreChat.
                 this.__scrollToBottomThrottled = throttle(
                     () => this.__scrollToBottomStreaming(),
                     150
                 );
 
-                // Set up watchers
-                const unwatchMessages = this.$watch('messages', (newMessages, oldMessages) => {
-                    // During streaming, TEXT_MESSAGE_CONTENT handler drives scroll via
-                    // __scrollToBottomThrottled. Don't duplicate it here.
-                    if (!this.isStreaming) {
-                        // Also scroll if near bottom even when not streaming (for late updates or historical load)
-                        this.$nextTick(() => {
-                            const container = this.$refs?.messageList;
-                            if (container) {
+                // ── Watchers ($watch returns unwatch fn — collected for destroy) ──
+                this.__watchers.push(
+                    this.$watch('messages', (newMessages, oldMessages) => {
+                        if (!this.isStreaming) {
+                            this.$nextTick(() => {
+                                const container = this.$refs?.messageList;
+                                if (!container) return;
                                 const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
                                 const isMajorUpdate = Math.abs(newMessages.length - oldMessages.length) > 5;
-
                                 if (isNearBottom || isMajorUpdate) {
                                     this.__scrollToBottom({ behavior: 'auto', force: true });
                                 }
-                            }
-                        });
-                    }
-
-                    if (newMessages.length > oldMessages.length) {
-                        const lastMsg = newMessages[newMessages.length - 1];
-                        if (lastMsg.role === 'assistant' && !document.hasFocus()) {
-                            this.__notifyNewMessage(lastMsg);
+                            });
                         }
-                    }
-                });
-                this.__watchers.push(unwatchMessages);
-
-                const unwatchThread = this.$watch('__currentThreadId', (newThreadId, oldThreadId) => {
-                    if (newThreadId) {
-                        // Reset scroll state for the new thread
-                        this.__abortScroll = false;
-                        this.__clearScrollTimeouts();
-
-                        this.__currentState = this.__getThreadState(newThreadId);
-                        this.__onThreadSwitch(newThreadId, oldThreadId);
-                    }
-                });
-                this.__watchers.push(unwatchThread);
-
-                const unwatchError = this.$watch('errorMessage', (error) => {
-                    if (error) {
-                        setTimeout(() => {
-                            if (this.errorMessage === error) {
-                                this.__currentState.errorMessage = null;
+                        if (newMessages.length > oldMessages.length) {
+                            const lastMsg = newMessages[newMessages.length - 1];
+                            if (lastMsg.role === 'assistant' && !document.hasFocus()) {
+                                this.__notifyNewMessage(lastMsg);
                             }
-                        }, 5000);
-                    }
-                });
-                this.__watchers.push(unwatchError);
+                        }
+                    }),
 
-                const unwatchTheme = this.$watch('preferences.theme', (newTheme) => {
-                    // Centralized watcher for theme side effects
-                    // Triggered by x-model, toggleTheme, or direct assignment
-                    this.applyThemeEffects(newTheme);
-                });
-                this.__watchers.push(unwatchTheme);
+                    this.$watch('__currentThreadId', (newThreadId, oldThreadId) => {
+                        if (newThreadId) {
+                            this.__abortScroll = false;
+                            this.__clearScrollTimeouts();
+                            this.__currentState = this.__getThreadState(newThreadId);
+                            this.__onThreadSwitch(newThreadId, oldThreadId);
+                        }
+                    }),
+
+                    this.$watch('errorMessage', (error) => {
+                        if (error) {
+                            setTimeout(() => {
+                                if (this.errorMessage === error) {
+                                    this.__currentState.errorMessage = null;
+                                }
+                            }, 5000);
+                        }
+                    }),
+
+                    // Theme watcher: centralized side-effect trigger
+                    this.$watch('preferences.theme', (newTheme) => {
+                        this.applyThemeEffects(newTheme);
+                    }),
+                );
 
                 // Register keyboard shortcuts
                 this.__registerKeyboardShortcuts();
             },
 
+            /**
+             * Set up MutationObserver and scroll listeners for the message list.
+             * Uses AbortController for clean listener removal in destroy().
+             * @private
+             */
+            __setupScrollObservers() {
+                const container = this.$refs?.messageList;
+                if (!container) return;
+
+                // Shared AbortController for all container event listeners
+                const controller = new AbortController();
+                this.__cleanupTasks.add(() => controller.abort());
+
+                // MutationObserver: auto-scroll on DOM changes (KaTeX, images)
+                const throttledScroll = throttle(() => {
+                    if (this.isStreaming || this.__abortScroll) return;
+                    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200;
+                    if (isNearBottom) {
+                        this.__scrollToBottom({ behavior: 'auto' });
+                    }
+                }, 150);
+
+                this.__mutationObserver = new MutationObserver(() => throttledScroll());
+                this.__mutationObserver.observe(container, {
+                    childList: true,
+                    subtree: true,
+                    characterData: true
+                });
+
+                // Scroll abort: user scrolled up during streaming — pause auto-scroll
+                container.addEventListener('scroll', () => {
+                    if (!this.isStreaming) return;
+                    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+                    this.__abortScroll = distanceFromBottom > 150;
+                }, { passive: true, signal: controller.signal });
+
+                // Code copy events from markdown code blocks (event delegation)
+                container.addEventListener('code-copied', (e) => {
+                    if (e.detail?.success) {
+                        this.showToast(window.i18n.t('Code copied to clipboard'), 'success', 2000);
+                    } else {
+                        this.showToast(window.i18n.t('Failed to copy code'), 'error');
+                    }
+                }, { signal: controller.signal });
+            },
+
+            /**
+             * Set up IntersectionObserver for scroll-to-bottom button visibility.
+             * @private
+             */
+            __setupIntersectionObserver() {
+                const anchor = this.$refs?.messagesEnd;
+                if (!anchor) return;
+
+                this.__scrollButtonObserver = new IntersectionObserver(([entry]) => {
+                    this.scrolledUp = !entry.isIntersecting;
+                }, {
+                    root: this.$refs.messageList,
+                    threshold: 0.1
+                });
+                this.__scrollButtonObserver.observe(anchor);
+            },
+
             destroy() {
-                // Clear deferred scroll timeouts
+                // ── Observers ──
                 this.__clearScrollTimeouts();
+                this.__mutationObserver?.disconnect();
+                this.__scrollButtonObserver?.disconnect();
 
-                if (this.__mutationObserver) {
-                    this.__mutationObserver.disconnect();
-                }
-                if (this.__scrollButtonObserver) {
-                    this.__scrollButtonObserver.disconnect();
-                }
-
-                // Clean up all watchers
-                while (this.__watchers?.length) {
-                    const unwatch = this.__watchers.pop();
+                // ── Watchers (Alpine $watch returns unwatch functions) ──
+                this.__watchers.forEach(unwatch => {
                     this.__tryCatch('cleanup watcher', {}, () => unwatch?.());
-                }
+                });
+                this.__watchers.length = 0;
 
-                // Execute all cleanup tasks
-                while (this.__cleanupTasks?.size > 0) {
-                    const tasks = Array.from(this.__cleanupTasks);
-                    this.__cleanupTasks.clear();
-                    tasks.forEach(task => {
-                        this.__tryCatch('cleanup task', {}, () => task?.());
-                    });
+                // ── Cleanup tasks (AbortControllers, media queries, DOM elements) ──
+                for (const task of this.__cleanupTasks) {
+                    this.__tryCatch('cleanup task', {}, () => task?.());
                 }
+                this.__cleanupTasks.clear();
 
                 // Close all EventSource connections
                 const threadStates = Object.values(this.__threadStates);

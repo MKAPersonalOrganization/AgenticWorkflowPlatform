@@ -1,9 +1,11 @@
 /**
  * Chat Accessibility
  *
- * Handles accessibility features:
- * - Screen reader announcements
- * - Live regions for dynamic content
+ * Screen reader support via ARIA live regions.
+ *
+ * Alpine.js pattern: the announcer DOM element is created in init() and
+ * removed in destroy() — matching Alpine's component lifecycle.
+ * The __announce() method uses aria-live for polite/assertive announcements.
  */
 
 /**
@@ -13,45 +15,40 @@
 export function createAccessibilityMethods() {
     return {
         /**
-         * Initialize screen reader announcer element
+         * Create a hidden ARIA live region for screen reader announcements.
+         * Called once from init(). Cleanup is registered for destroy().
          */
         __initScreenReaderAnnouncer() {
-            // Create hidden live region for screen reader announcements
-            this.__srAnnouncer = document.createElement('div');
-            this.__srAnnouncer.setAttribute('role', 'status');
-            this.__srAnnouncer.setAttribute('aria-live', 'polite');
-            this.__srAnnouncer.setAttribute('aria-atomic', 'true');
-            this.__srAnnouncer.className = 'sr-only';
-            document.body.appendChild(this.__srAnnouncer);
+            const el = document.createElement('div');
+            el.setAttribute('role', 'status');
+            el.setAttribute('aria-live', 'polite');
+            el.setAttribute('aria-atomic', 'true');
+            el.className = 'sr-only';
+            document.body.appendChild(el);
 
-            // Register cleanup
-            this.__cleanupTasks.add(() => {
-                if (this.__srAnnouncer) {
-                    this.__srAnnouncer.remove();
-                }
-            });
+            this.__srAnnouncer = el;
+
+            // Alpine pattern: register cleanup for destroy() lifecycle
+            this.__cleanupTasks.add(() => this.__srAnnouncer?.remove());
         },
 
         /**
-         * Announce message to screen readers
-         * @param {string} message - Message to announce
-         * @param {string} priority - 'polite' (default) or 'assertive'
+         * Announce a message to screen readers via the ARIA live region.
+         * Clears → waits → sets text to ensure AT detects the change.
+         * @param {string} message - Text to announce
+         * @param {'polite'|'assertive'} priority - Urgency level
          */
         __announce(message, priority = 'polite') {
-            if (!this.__srAnnouncer) return;
+            const el = this.__srAnnouncer;
+            if (!el) return;
 
-            // Update aria-live if priority changed
-            if (this.__srAnnouncer.getAttribute('aria-live') !== priority) {
-                this.__srAnnouncer.setAttribute('aria-live', priority);
+            if (el.getAttribute('aria-live') !== priority) {
+                el.setAttribute('aria-live', priority);
             }
 
-            // Clear previous announcement
-            this.__srAnnouncer.textContent = '';
-
-            // Announce new message (timeout ensures screen readers detect the change)
-            setTimeout(() => {
-                this.__srAnnouncer.textContent = message;
-            }, 100);
+            // Clear then set on next frame — ensures screen readers detect the update
+            el.textContent = '';
+            setTimeout(() => { el.textContent = message; }, 100);
         }
     };
 }

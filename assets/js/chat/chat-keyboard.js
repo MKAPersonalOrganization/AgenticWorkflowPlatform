@@ -1,10 +1,14 @@
 /**
  * Chat Keyboard Shortcuts
  *
- * Handles keyboard navigation and shortcuts:
- * - Global shortcuts (new chat, toggle sidebar, etc.)
- * - Modal dismissal
- * - Session navigation
+ * Global keyboard navigation and shortcuts.
+ *
+ * Alpine.js pattern: event listeners registered in init() are cleaned up
+ * via __cleanupTasks in destroy(). This follows Alpine's lifecycle convention
+ * where init() sets up resources and destroy() tears them down.
+ *
+ * Input guard: shortcuts that conflict with text entry are gated by a
+ * target-tag check to avoid firing inside INPUT/TEXTAREA elements.
  */
 
 /**
@@ -14,18 +18,21 @@
 export function createKeyboardMethods() {
     return {
         /**
-         * Register keyboard shortcuts
+         * Register global keyboard shortcuts.
+         * Called once from init(). Cleanup is registered for destroy().
          */
         __registerKeyboardShortcuts() {
-            const handler = (e) => {
-                // Ctrl+/ - Show keyboard shortcuts
+            const controller = new AbortController();
+
+            document.addEventListener('keydown', (e) => {
+                // Ctrl+/ — Toggle keyboard shortcuts help
                 if ((e.ctrlKey || e.metaKey) && e.key === '/') {
                     e.preventDefault();
                     this.toggleKeyboardShortcuts();
                     return;
                 }
 
-                // Escape - Close modals or cancel streaming
+                // Escape — Close modals or cancel streaming
                 if (e.key === 'Escape') {
                     e.preventDefault();
                     if (this.showKeyboardShortcuts) {
@@ -36,48 +43,33 @@ export function createKeyboardMethods() {
                     return;
                 }
 
-                // Don't trigger other shortcuts when typing in input fields
+                // Guard: Don't trigger navigation shortcuts inside text fields
                 if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
                     return;
                 }
 
-                // Ctrl/Cmd + Shift + N - New chat
-                if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'N') {
+                const mod = e.ctrlKey || e.metaKey;
+
+                if (mod && e.shiftKey && e.key === 'N') {
                     e.preventDefault();
                     this.createNewSession();
-                }
-
-                // Ctrl/Cmd + B - Toggle sidebar
-                if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+                } else if (mod && e.key === 'b') {
                     e.preventDefault();
                     this.toggle();
-                }
-
-                // Ctrl/Cmd + Shift + D - Toggle debug panel
-                if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'D') {
+                } else if (mod && e.shiftKey && e.key === 'D') {
                     e.preventDefault();
                     this.toggleDebugPanel();
-                }
-
-                // Ctrl/Cmd + Shift + T - Toggle theme
-                if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'T') {
+                } else if (mod && e.shiftKey && e.key === 'T') {
                     e.preventDefault();
                     this.toggleTheme();
-                }
-
-                // Ctrl/Cmd + Up/Down - Navigate sessions
-                if ((e.ctrlKey || e.metaKey) && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+                } else if (mod && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
                     e.preventDefault();
                     this.__navigateSessions(e.key === 'ArrowUp' ? -1 : 1);
                 }
-            };
+            }, { signal: controller.signal });
 
-            document.addEventListener('keydown', handler);
-
-            // Register cleanup
-            this.__cleanupTasks.add(() => {
-                document.removeEventListener('keydown', handler);
-            });
+            // AbortController.abort() removes all listeners registered with this signal
+            this.__cleanupTasks.add(() => controller.abort());
         }
     };
 }

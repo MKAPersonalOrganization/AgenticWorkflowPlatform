@@ -1,123 +1,60 @@
 /**
- * Alpine.js Extensions
+ * Alpine.js Chat Plugin
  *
- * Custom Alpine.js magics, global store, and debug utilities.
+ * Registers all chat-specific Alpine extensions using Alpine's plugin pattern.
+ * Alpine.plugin() is the idiomatic way to extend Alpine — it simply passes the
+ * Alpine instance to a callback, giving it access to Alpine.store(), Alpine.magic(), etc.
+ * See: packages/alpinejs/src/plugin.js
  *
  * Design principles (from Alpine.js source):
- * - Magics are lazily evaluated on access, not eagerly computed
- * - Use Alpine's scope chain ($data) rather than fragile DOM queries
  * - Stores are for truly global cross-component state only
  * - Keep the API surface minimal — don't duplicate component methods
+ * - Use Alpine.plugin() instead of scattered alpine:init listeners
  */
 
 /**
- * Register custom Alpine.js magics
+ * Chat plugin — registers stores and debug utilities.
+ *
+ * Usage (inside alpine:init or before Alpine.start()):
+ *   Alpine.plugin(chatPlugin)
+ *
+ * @param {Object} Alpine - The Alpine.js instance (injected by Alpine.plugin)
  */
-export function registerAlpineMagics() {
-    document.addEventListener('alpine:init', () => {
-        // $formatTime — pure utility, no component dependency
-        Alpine.magic('formatTime', () => {
-            return (timestamp) => {
-                if (!timestamp) return '';
-                return new Date(timestamp).toLocaleTimeString('en-US', {
-                    hour: 'numeric',
-                    minute: '2-digit'
-                });
-            };
-        });
+export function chatPlugin(Alpine) {
+    // ── Global Store ────────────────────────────────────────────────────────
+    // Only stores truly global settings that outlive any single component.
+    // Alpine.store() auto-wraps the object in reactive() — no manual setup needed.
+    // Properties with init() are auto-called by Alpine after store registration.
+    Alpine.store('chatSettings', {
+        theme: localStorage.getItem('theme') ||
+            (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'),
 
-        // $copyToClipboard — pure utility, no component dependency
-        Alpine.magic('copyToClipboard', () => {
-            return async (text) => {
-                try {
-                    await navigator.clipboard.writeText(text);
-                    return true;
-                } catch (error) {
-                    console.error('Failed to copy to clipboard:', error);
-                    return false;
-                }
-            };
-        });
+        soundEnabled: true,
+        notificationsEnabled: true,
+        showTimestamps: true,
+        compactMode: false,
+
+        toggleSound() { this.soundEnabled = !this.soundEnabled; },
+        toggleNotifications() { this.notificationsEnabled = !this.notificationsEnabled; },
+        toggleCompactMode() { this.compactMode = !this.compactMode; },
     });
-}
 
-/**
- * Register Alpine.js global store
- * Only stores truly global settings that outlive any single component.
- * Theme is managed by the chat component's preferences.theme — the store
- * mirrors it for cross-component reads (e.g. standalone widgets).
- */
-export function registerAlpineStore() {
-    document.addEventListener('alpine:init', () => {
-        Alpine.store('chatSettings', {
-            init() {
-                this.theme = localStorage.getItem('theme') ||
-                    (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    // ── Debug Utilities (development only) ──────────────────────────────────
+    // Uses Alpine.$data() — the canonical way to access component scope from outside.
+    if (typeof window !== 'undefined') {
+        window.__chatDebug = {
+            getComponent() {
+                const el = document.querySelector('[x-data*="chat"]');
+                return el ? Alpine.$data(el) : null;
             },
+            getMetrics() { return this.getComponent()?.getMetrics?.() ?? null; },
+            getHealth() { return this.getComponent()?.getConnectionHealth?.() ?? null; },
+            exportDiagnostics() { return this.getComponent()?.exportDiagnostics?.() ?? null; },
+            resetMetrics() { return this.getComponent()?.resetMetrics?.(); },
+            getSettings() { return Alpine.store('chatSettings'); },
+            isHealthy() { return this.getComponent()?.isHealthy?.() ?? false; },
+        };
 
-            // Mirrored from component (set by applyThemeEffects)
-            theme: 'light',
-
-            // Independent global settings
-            soundEnabled: true,
-            notificationsEnabled: true,
-            showTimestamps: true,
-            compactMode: false,
-
-            toggleSound() {
-                this.soundEnabled = !this.soundEnabled;
-            },
-
-            toggleNotifications() {
-                this.notificationsEnabled = !this.notificationsEnabled;
-            },
-
-            toggleCompactMode() {
-                this.compactMode = !this.compactMode;
-            }
-        });
-    });
-}
-
-/**
- * Register global debug utilities (development only)
- */
-export function registerDebugUtilities() {
-    if (typeof window === 'undefined') return;
-
-    window.__chatDebug = {
-        getComponent() {
-            const el = document.querySelector('[x-data*="chat"]');
-            return el ? Alpine.$data(el) : null;
-        },
-        getMetrics() {
-            return this.getComponent()?.getMetrics?.() ?? null;
-        },
-        getHealth() {
-            return this.getComponent()?.getConnectionHealth?.() ?? null;
-        },
-        exportDiagnostics() {
-            return this.getComponent()?.exportDiagnostics?.() ?? null;
-        },
-        resetMetrics() {
-            return this.getComponent()?.resetMetrics?.();
-        },
-        getSettings() {
-            return Alpine.store('chatSettings');
-        },
-        isHealthy() {
-            return this.getComponent()?.isHealthy?.() ?? false;
-        }
-    };
-
-    console.log('[Chat] Debug: window.__chatDebug available');
-}
-
-/**
- * Initialize all Alpine extensions
- */
-export function initAlpineExtensions() {
-    registerAlpineMagics();
-    registerAlpineStore();
-    registerDebugUtilities();
+        console.log('[Chat] Debug: window.__chatDebug available');
+    }
 }

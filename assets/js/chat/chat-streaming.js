@@ -1,11 +1,15 @@
 /**
  * Chat Streaming
  *
- * Handles SSE streaming and AG-UI Protocol event processing including:
- * - Starting and managing SSE connections
- * - Processing all AG-UI event types
- * - Connection retry with exponential backoff
- * - Event logging
+ * SSE streaming and AG-UI Protocol event processing.
+ *
+ * Alpine.js patterns applied:
+ * - State mutations (state.isStreaming, state.messages) are on reactive objects
+ *   so Alpine auto-updates the UI on change
+ * - __scrollToBottomThrottled batches scroll calls during rapid token streaming
+ *   (mirrors Alpine's internal scheduler pattern)
+ * - Tool state transitions use __batchUpdate for coalesced reactive flushes
+ * - Event handlers follow a dispatch-table pattern for maintainability
  */
 
 import { LIFECYCLE_EVENT_TYPES } from './constants.js';

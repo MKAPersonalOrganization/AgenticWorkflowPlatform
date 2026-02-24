@@ -1,7 +1,8 @@
 /**
  * Chat Constants
  *
- * AG-UI Protocol event types and configuration constants.
+ * AG-UI Protocol event types and configuration.
+ * Pure data — no Alpine dependency.
  */
 
 // AG-UI Protocol Lifecycle Event Types

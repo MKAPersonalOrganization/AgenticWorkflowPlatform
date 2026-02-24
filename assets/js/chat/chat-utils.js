@@ -1,11 +1,12 @@
 /**
  * Chat Utilities
  *
- * Utility functions for the chat component including:
- * - Performance utilities (throttle, debounce)
- * - Formatting utilities (time, JSON)
- * - ID generators
- * - Error handling wrappers
+ * Pure utility functions — no Alpine dependency, no component state access.
+ * These are imported by modules that compose into the Alpine.data('chat') component.
+ *
+ * Alpine.js design principle: keep utilities as pure functions that receive
+ * their inputs as arguments. This makes them testable and decoupled from
+ * the reactive system.
  */
 
 
