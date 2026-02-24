@@ -1,10 +1,11 @@
 /**
  * Chat Connection Health
  *
- * Handles connection monitoring and diagnostics:
- * - Connection health checks
- * - Performance metrics
- * - Diagnostic exports
+ * Connection monitoring, performance metrics, and diagnostic exports.
+ *
+ * Alpine.js pattern: all methods are pure reads of reactive state —
+ * they access this.__perfMetrics, this.__connectionConfig, etc. which
+ * are reactive properties on the component. No side effects on read.
  */
 
 import { DEFAULT_PERF_METRICS } from './constants.js';

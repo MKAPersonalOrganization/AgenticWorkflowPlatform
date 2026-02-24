@@ -5,111 +5,98 @@
  * - Light/dark/system theme modes
  * - Local storage persistence
  * - System preference detection
+ *
+ * Alpine.js pattern: preferences.theme on the component is the single source
+ * of truth. The $watch in init() triggers applyThemeEffects on changes,
+ * which handles DOM updates and persistence. No store mirroring needed —
+ * Alpine's scope chain makes this.preferences.theme accessible to all
+ * child components and templates.
  */
+
+/**
+ * Apply theme to document root.
+ * Pure function — no Alpine dependency.
+ * @param {'light'|'dark'|'system'} theme
+ */
+function applyThemeToDOM(theme) {
+    const root = document.documentElement;
+
+    if (theme === 'system') {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        root.classList.toggle('dark', prefersDark);
+    } else {
+        root.classList.toggle('dark', theme === 'dark');
+    }
+}
 
 /**
  * Create theme management methods mixin
  * @returns {Object} Methods for theme management
  */
 export function createThemeMethods() {
-    /**
-     * Private helper: Apply theme to document
-     * @param {'light'|'dark'|'system'} theme - Theme to apply
-     */
-    const _applyThemeToDOM = (theme) => {
-        const root = document.documentElement;
-
-        if (theme === 'system') {
-            const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-            if (systemPrefersDark) {
-                root.classList.add('dark');
-            } else {
-                root.classList.remove('dark');
-            }
-        } else if (theme === 'dark') {
-            root.classList.add('dark');
-        } else {
-            root.classList.remove('dark');
-        }
-    };
-
     return {
         /**
-         * Apply theme side effects (DOM, localStorage, Toast)
-         * Should be called by watcher
-         * @param {'light'|'dark'|'system'} theme 
+         * Apply theme side effects (DOM + localStorage).
+         * Called by the $watch('preferences.theme') watcher in init().
+         * @param {'light'|'dark'|'system'} theme
          */
         applyThemeEffects(theme) {
             localStorage.setItem('theme', theme);
-            _applyThemeToDOM(theme);
+            applyThemeToDOM(theme);
 
-            // Update Alpine store if available
-            if (Alpine.store('chatSettings')) {
-                Alpine.store('chatSettings').theme = theme;
-            }
+            // Keep global store in sync for cross-component reads (e.g. standalone widgets)
+            const store = Alpine.store('chatSettings');
+            if (store) store.theme = theme;
 
-            // Show toast notification
-            const themeLabels = {
-                light: 'Light mode',
-                dark: 'Dark mode',
-                system: 'System theme'
-            };
-
-            // Only show toast if initialized (avoid toast on load)
-            if (this.__initialized && this.__themeInitialized) {
-                this.showToast(`${themeLabels[theme]} enabled`, 'info', 2000);
+            // Only show toast after initial load (avoid toast on hydration)
+            if (this._themeReady) {
+                const labels = { light: 'Light mode', dark: 'Dark mode', system: 'System theme' };
+                this.showToast(`${labels[theme]} enabled`, 'info', 2000);
             }
         },
 
         /**
-         * Toggle theme: light -> dark -> system -> light
-         * updates state only, watcher triggers effects
+         * Cycle theme: light → dark → system → light.
+         * Only updates state — the watcher triggers side effects.
          */
         toggleTheme() {
-            const currentTheme = this.preferences.theme;
-            let nextTheme;
-
-            if (currentTheme === 'light') {
-                nextTheme = 'dark';
-            } else if (currentTheme === 'dark') {
-                nextTheme = 'system';
-            } else {
-                nextTheme = 'light';
-            }
-
-            this.preferences.theme = nextTheme;
+            const cycle = { light: 'dark', dark: 'system', system: 'light' };
+            this.preferences.theme = cycle[this.preferences.theme] || 'light';
         },
 
         /**
-         * Set theme preference
-         * updates state only, watcher triggers effects
-         * @param {'light'|'dark'|'system'} theme - Theme to set
+         * Set theme preference.
+         * Only updates state — the watcher triggers side effects.
+         * @param {'light'|'dark'|'system'} theme
          */
         setTheme(theme) {
             this.preferences.theme = theme;
         },
 
         /**
-         * Initialize theme from localStorage or system preference
+         * Initialize theme from localStorage or system preference.
+         * Called once from init().
          */
         __initTheme() {
-            const savedTheme = localStorage.getItem('theme') || 'system';
-            this.preferences.theme = savedTheme;
-            _applyThemeToDOM(savedTheme);
-            this.__themeInitialized = true;
+            const saved = localStorage.getItem('theme') || 'system';
+            this.preferences.theme = saved;
+            applyThemeToDOM(saved);
 
-            // Listen for system theme changes when in system mode
+            // Mark ready after initial application (prevents toast on load)
+            this._themeReady = true;
+
+            // React to OS-level theme changes when in "system" mode
             const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-            const mediaHandler = () => {
+            const onSystemChange = () => {
                 if (this.preferences.theme === 'system') {
-                    _applyThemeToDOM('system');
+                    applyThemeToDOM('system');
                 }
             };
-            mediaQuery.addEventListener('change', mediaHandler);
+            mediaQuery.addEventListener('change', onSystemChange);
 
-            // Register cleanup to prevent listener leak
+            // Alpine pattern: register cleanup via destroy() lifecycle
             this.__cleanupTasks.add(() => {
-                mediaQuery.removeEventListener('change', mediaHandler);
+                mediaQuery.removeEventListener('change', onSystemChange);
             });
         }
     };
