@@ -136,14 +136,6 @@ func (u *User) GetDisplayName() string {
 	return u.Email
 }
 
-// IsEmailVerified checks if the user's email is verified
-// This requires checking the verifiable_addresses in the identity.
-func (u *User) IsEmailVerified() bool {
-	// This will be implemented when we have access to verifiable addresses
-	// For now, return false as a safe default
-	return false
-}
-
 // GetUserFromContext retrieves the authenticated user from the request context.
 func GetUserFromContext(ctx context.Context) *User {
 	if user, ok := ctx.Value(UserContextKey).(*User); ok {
@@ -170,9 +162,4 @@ func IsAuthenticated(ctx context.Context) bool {
 // HasName checks if the user has provided their name.
 func (u *User) HasName() bool {
 	return u.FirstName != "" || u.LastName != ""
-}
-
-// IsComplete checks if the user profile has all recommended information.
-func (u *User) IsComplete() bool {
-	return u.Email != "" && u.FirstName != "" && u.LastName != ""
 }

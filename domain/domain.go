@@ -31,12 +31,6 @@ type ToolCall struct {
 	Arguments string `json:"arguments"` // JSON string
 }
 
-// ToolFunction represents the function details of a tool call.
-type ToolFunction struct {
-	Name      string `json:"name"`
-	Arguments string `json:"arguments"` // JSON string
-}
-
 // Message represents a single message in a conversation.
 type Message struct {
 	ID         string         `json:"id"`
