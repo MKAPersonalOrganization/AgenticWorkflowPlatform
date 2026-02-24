@@ -139,9 +139,6 @@ export function createInitialState() {
         __srAnnouncer: null,
         __initialized: false,
 
-        // Sidepanel view state
-        activeView: 'artifacts',
-
         // Memoization cache
         __memoCache: {},
 

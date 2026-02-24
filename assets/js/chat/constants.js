@@ -32,7 +32,3 @@ export const DEFAULT_PERF_METRICS = {
     reconnects: 0,
     avgResponseTime: 0
 };
-
-// Available agents for selection
-// Available agents for selection (populated dynamically)
-export const AVAILABLE_AGENTS = [];

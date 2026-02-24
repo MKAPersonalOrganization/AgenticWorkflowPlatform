@@ -599,34 +599,6 @@ export function createUIMethods() {
             console.log('New message received:', message.id);
         },
 
-        // ============================================
-        // Time-based Greeting (LibreChat style)
-        // ============================================
 
-        /**
-         * Get time-based greeting message
-         * @returns {string} Greeting based on current time
-         */
-        getTimeBasedGreeting() {
-            const hour = new Date().getHours();
-            if (hour >= 5 && hour < 12) {
-                return window.i18n.t('Good morning');
-            } else if (hour >= 12 && hour < 17) {
-                return window.i18n.t('Good afternoon');
-            } else if (hour >= 17 && hour < 21) {
-                return window.i18n.t('Good evening');
-            } else {
-                return window.i18n.t('Good night');
-            }
-        },
-
-        /**
-         * Get current session title for mobile header
-         * @returns {string} Current session title or 'New Chat'
-         */
-        getCurrentSessionTitle() {
-            const currentThread = this.chatComponent.currentThread;
-            return currentThread ? currentThread.title : 'New Chat';
-        }
     };
 }

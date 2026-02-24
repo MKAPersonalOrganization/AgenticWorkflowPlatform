@@ -319,7 +319,7 @@ function enhanceCodeBlocks(html) {
                 <div class="flex items-center justify-between px-3 py-2 bg-muted/50 border-b border-border/50">
                     <span class="text-xs font-semibold text-muted-foreground uppercase tracking-wider select-none">${language}</span>
                     <button
-                        onclick="copyCodeBlock(event)"
+                        data-copy-code
                         class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-semibold text-muted-foreground hover:bg-background hover:text-primary hover:shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/20 group/copybtn"
                         type="button"
                         aria-label="${window.i18n.t('Copy code')}"
@@ -400,11 +400,15 @@ function convertDigits(str) {
 }
 
 /**
- * Global function to copy code blocks (called from onclick)
- * @param {Event} event
+ * Event-delegated code block copy handler.
+ * Listens for clicks on [data-copy-code] buttons anywhere in the document.
+ * Uses CustomEvent to notify the chat component for toast feedback,
+ * eliminating the need for fragile Alpine.$data DOM queries.
  */
-window.copyCodeBlock = async function (event) {
-  const button = event.currentTarget;
+document.addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-copy-code]');
+  if (!button) return;
+
   const codeBlock = button.closest('.group\\/codeblock')?.querySelector('code');
   if (!codeBlock) return;
 
@@ -423,16 +427,17 @@ window.copyCodeBlock = async function (event) {
       button.innerHTML = originalHTML;
     }, 2000);
 
-    const chatComponent = Alpine.$data(document.querySelector('[x-data*="chat"]'));
-    if (chatComponent?.showToast) {
-      chatComponent.showToast(window.i18n.t('Code copied to clipboard'), 'success', 2000);
-    }
+    // Dispatch event for toast notification (Alpine components can listen via @code-copied.window)
+    button.dispatchEvent(new CustomEvent('code-copied', {
+      bubbles: true,
+      detail: { success: true }
+    }));
   } catch (error) {
     console.error('Failed to copy code:', error);
 
-    const chatComponent = Alpine.$data(document.querySelector('[x-data*="chat"]'));
-    if (chatComponent?.showToast) {
-      chatComponent.showToast(window.i18n.t('Failed to copy code'), 'error');
-    }
+    button.dispatchEvent(new CustomEvent('code-copied', {
+      bubbles: true,
+      detail: { success: false }
+    }));
   }
-}
+});
