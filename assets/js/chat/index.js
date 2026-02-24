@@ -39,6 +39,12 @@ import { createKeyboardMethods } from './chat-keyboard.js';
 import { createThemeMethods } from './chat-theme.js';
 import { createAccessibilityMethods } from './chat-accessibility.js';
 import { createHealthMethods } from './chat-health.js';
+import { createToastMethods } from './chat-toasts.js';
+import { createScrollMethods } from './chat-scroll.js';
+import { createEventLogMethods } from './chat-event-log.js';
+import { createInputMethods } from './chat-input.js';
+import { createProfileMethods } from './chat-profile.js';
+import { createEventHandlerMethods } from './chat-event-handlers.js';
 import { chatPlugin } from './alpine-extensions.js';
 
 /**
@@ -67,6 +73,12 @@ document.addEventListener('alpine:init', () => {
         const themeMethods = createThemeMethods();
         const accessibilityMethods = createAccessibilityMethods();
         const healthMethods = createHealthMethods();
+        const toastMethods = createToastMethods();
+        const scrollMethods = createScrollMethods();
+        const eventLogMethods = createEventLogMethods();
+        const inputMethods = createInputMethods();
+        const profileMethods = createProfileMethods();
+        const eventHandlerMethods = createEventHandlerMethods();
 
         return {
             // Spread initial state
@@ -82,6 +94,12 @@ document.addEventListener('alpine:init', () => {
             ...themeMethods,
             ...accessibilityMethods,
             ...healthMethods,
+            ...toastMethods,
+            ...scrollMethods,
+            ...eventLogMethods,
+            ...inputMethods,
+            ...profileMethods,
+            ...eventHandlerMethods,
 
             // Constants
             AVAILABLE_AGENTS: [],

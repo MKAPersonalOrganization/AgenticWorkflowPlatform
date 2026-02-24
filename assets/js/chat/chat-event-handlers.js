@@ -1,0 +1,494 @@
+/**
+ * Chat AG-UI Event Handlers
+ *
+ * Specific handler implementations for all AG-UI Protocol events and custom
+ * tool lifecycle events. Called by the event dispatcher in chat-streaming.js
+ * via the shared component scope (mixin pattern).
+ *
+ * Alpine.js pattern: all handlers mutate reactive state (state.messages,
+ * state.isStreaming, etc.) which triggers automatic UI re-renders.
+ * Tool state transitions use transitionToolState() which coalesces updates
+ * via __batchUpdate.
+ */
+
+import { normalizeElicitation, safeParseJSON, mapTokenUsage } from './chat-utils.js';
+import { TOOL_EVENTS } from './tool-state-machine.js';
+
+/**
+ * Lifecycle content label generators — lookup table replaces switch statement.
+ * Each entry is a function that takes the event and returns the display label.
+ * @type {Record<string, (event: Object) => string>}
+ */
+const LIFECYCLE_LABELS = {
+    'RUN_STARTED': () => window.i18n.t('Started'),
+    'RUN_FINISHED': (e) => e.outcome === 'interrupt' ? window.i18n.t('Paused') : window.i18n.t('Completed'),
+    'RUN_ERROR': (e) => `${window.i18n.t('Error')}: ${e.message || window.i18n.t('Unknown')}`,
+    'STEP_STARTED': (e) => `${window.i18n.t('Step')}: ${e.stepName || window.i18n.t('Unknown')}`,
+    'STEP_FINISHED': (e) => `${e.stepName || window.i18n.t('Step')} ${window.i18n.t('Done')}`,
+    'TEXT_MESSAGE_START': () => window.i18n.t('Responding'),
+    'TEXT_MESSAGE_END': () => window.i18n.t('Response Done'),
+    'TOOL_CALL_START': (e) => `${window.i18n.t('Tool')}: ${e.toolCallName || window.i18n.t('Unknown')}`,
+    'TOOL_CALL_ARGS': () => window.i18n.t('Args'),
+    'TOOL_CALL_END': () => window.i18n.t('Tool Done'),
+    'TOOL_CALL_RESULT': () => window.i18n.t('Result'),
+    'STATE_SNAPSHOT': () => window.i18n.t('State Snapshot'),
+    'STATE_DELTA': () => window.i18n.t('State Update'),
+    'MESSAGES_SNAPSHOT': () => window.i18n.t('Messages Sync'),
+    'ACTIVITY_SNAPSHOT': (e) => `${window.i18n.t('Activity')}: ${e.activityType || window.i18n.t('Unknown')}`,
+    'ACTIVITY_DELTA': () => window.i18n.t('Activity Update'),
+    'REASONING_START': () => window.i18n.t('Thinking'),
+    'REASONING_MESSAGE_START': () => window.i18n.t('Reasoning'),
+    'REASONING_MESSAGE_END': () => window.i18n.t('Thought Complete'),
+    'REASONING_END': () => window.i18n.t('Thinking Done'),
+    'META_EVENT': (e) => e.metaType || window.i18n.t('Meta'),
+    'RAW': (e) => `${window.i18n.t('Raw')}: ${e.source || window.i18n.t('External')}`,
+    'CUSTOM': (e) => e.name || window.i18n.t('Custom'),
+};
+
+/**
+ * Create AG-UI event handler methods mixin
+ * @returns {Object} Methods for handling specific AG-UI events
+ */
+export function createEventHandlerMethods() {
+    return {
+        // ============================================
+        // Custom Event Handlers
+        // ============================================
+
+        __handleThreadTitleUpdated(value) {
+            const session = this.sessions.find(s => s.id === value.threadId);
+            if (session) {
+                session.title = value.title;
+            }
+        },
+
+        __handleToolCallAgent(value, state) {
+            const { toolCallId, agentName } = value;
+            state.pendingToolCallAgents = state.pendingToolCallAgents || {};
+            state.pendingToolCallAgents[toolCallId] = agentName;
+
+            if (state.toolCalls[toolCallId]) state.toolCalls[toolCallId].agentName = agentName;
+            const msg = state.messages.find(m => m.id === toolCallId);
+            if (msg) {
+                msg.agentName = agentName;
+                delete state.pendingToolCallAgents[toolCallId];
+            }
+        },
+
+        __handleAgentCalled(value) {
+            const { callerAgent, calledAgent, reason } = value;
+            console.log(`Agent collaboration: ${callerAgent} → ${calledAgent} (${reason})`);
+        },
+
+        __handleTokenUsageReported(value, state) {
+            console.log('Token usage reported:', value);
+            state.tokenUsage = mapTokenUsage(value);
+        },
+
+        // ============================================
+        // Tool Lifecycle Handlers
+        // ============================================
+
+        __handleToolStart(value, state) {
+            const { toolCallId, toolName, arguments: toolArgs, agentName } = value;
+            console.log(`[Tool] ${toolName} (${toolCallId}) started`);
+
+            this.__ensureToolCallMessage(state, toolCallId, toolName, agentName);
+
+            // Sync arguments
+            const msg = state.messages.find(m => m.id === toolCallId);
+            if (msg && toolArgs) {
+                msg.args = toolArgs;
+                msg.parsedArgs = safeParseJSON(toolArgs);
+            }
+
+            this.transitionToolState(toolCallId, TOOL_EVENTS.START, { toolName });
+        },
+
+        /**
+         * Handle TOOL_CONTENT_STREAMED event — streams tool output tokens in real-time.
+         *
+         * Two streaming phases:
+         *   1. LLM argument generation: field='__arguments__' — raw JSON deltas
+         *   2. Tool execution: field='answer', 'thoughts', etc. — post-execution streaming
+         */
+        __handleToolContentStreamed(value, state, threadId) {
+            const { toolCallId, toolName, delta, field } = value;
+
+            // Lazily create the tool call message if it doesn't exist yet.
+            this.__ensureToolCallMessage(state, toolCallId, toolName);
+
+            const msg = state.messages.find(m => m.id === toolCallId);
+            if (!msg) return;
+
+            // Initialize streaming state on the message if not present
+            if (!msg.streamingContent) {
+                msg.streamingContent = {};
+            }
+            msg.isStreaming = true;
+
+            // Accumulate streamed content by field
+            const fieldKey = field || 'default';
+            if (!msg.streamingContent[fieldKey]) {
+                msg.streamingContent[fieldKey] = '';
+            }
+            msg.streamingContent[fieldKey] += delta;
+
+            // --- Phase 1: LLM argument streaming ---
+            if (fieldKey === '__arguments__') {
+                msg.args = (msg.args || '') + delta;
+                this.__extractStreamingArgs(msg, toolName);
+            }
+            // --- Phase 2: Tool execution streaming ---
+            else if (fieldKey === 'thoughts') {
+                if (!msg.parsedArgs) msg.parsedArgs = {};
+                msg.parsedArgs.thoughts = msg.streamingContent[fieldKey];
+            } else if (fieldKey === 'answer') {
+                if (!msg.parsedResult) msg.parsedResult = {};
+                msg.parsedResult.answer = msg.streamingContent[fieldKey];
+                msg.result = msg.streamingContent[fieldKey];
+            }
+
+            // Scroll to bottom during streaming
+            if (threadId === this.__currentThreadId && !this.__abortScroll) {
+                this.__scrollToBottomThrottled();
+            }
+        },
+
+        /**
+         * Extract display-ready fields from partially streamed JSON arguments.
+         * Handles incomplete JSON gracefully.
+         */
+        __extractStreamingArgs(msg, toolName) {
+            const raw = msg.args || '';
+            if (!raw) return;
+
+            // Try full JSON parse first
+            const parsed = safeParseJSON(raw);
+            if (parsed) {
+                msg.parsedArgs = parsed;
+                return;
+            }
+
+            // Fallback: extract partial string values from incomplete JSON.
+            if (!msg.parsedArgs) msg.parsedArgs = {};
+
+            // Generic extraction for any string field in progress
+            const fieldPattern = /"(\w+)"\s*:\s*"((?:[^"\\]|\\.)*)$/;
+            const match = raw.match(fieldPattern);
+            if (match) {
+                const [, key, partialValue] = match;
+                try {
+                    msg.parsedArgs[key] = JSON.parse('"' + partialValue + '"');
+                } catch {
+                    msg.parsedArgs[key] = partialValue;
+                }
+            }
+        },
+
+        __handleToolSuccess(value, state) {
+            const { toolCallId, toolName, result, arguments: toolArgs, agentName } = value;
+            console.log(`[Tool] ${toolName} (${toolCallId}) completed successfully`);
+
+            this.__ensureToolCallMessage(state, toolCallId, toolName, agentName);
+
+            // Mark streaming as complete and clean up
+            const msg = state.messages.find(m => m.id === toolCallId);
+            if (msg) {
+                msg.isStreaming = false;
+                delete msg.streamingContent;
+                if (toolArgs) {
+                    msg.args = toolArgs;
+                    msg.parsedArgs = safeParseJSON(toolArgs);
+                }
+            }
+
+            this.transitionToolState(toolCallId, TOOL_EVENTS.SUCCESS, { toolName, result });
+
+            // Notify artifacts panel to refresh
+            window.dispatchEvent(new CustomEvent('artifacts-updated'));
+        },
+
+        __handleToolError(value, state) {
+            const { toolCallId, toolName, error, arguments: toolArgs, agentName } = value;
+            console.log(`[Tool] ${toolName} (${toolCallId}) error:`, error);
+
+            this.__ensureToolCallMessage(state, toolCallId, toolName, agentName);
+
+            // Sync arguments if provided
+            const msg = state.messages.find(m => m.id === toolCallId);
+            if (msg && toolArgs) {
+                msg.args = toolArgs;
+                msg.parsedArgs = safeParseJSON(toolArgs);
+            }
+
+            this.transitionToolState(toolCallId, TOOL_EVENTS.ERROR, { toolName, error });
+        },
+
+        __handleToolNeedsInput(value, state, threadId) {
+            const { toolCallId, toolName, question, schema, agentName } = value;
+            console.log(`[Tool] ${toolName} needs input: ${question}`);
+
+            this.__ensureToolCallMessage(state, toolCallId, toolName, agentName);
+
+            // Transition machine
+            this.transitionToolState(toolCallId, TOOL_EVENTS.NEEDS_INPUT, {
+                elicitation: { question, schema }
+            });
+
+            // Update the message in the list to trigger elicitation UI rendering
+            const msg = state.messages.find(m => m.id === toolCallId);
+            if (msg) {
+                msg.status = 'awaiting_input';
+                msg.parsedResult = normalizeElicitation(question, schema);
+            }
+
+            if (threadId === this.__currentThreadId) {
+                this.showToast(window.i18n.t('Input required'), 'info');
+            }
+        },
+
+        __handleToolNeedsAuth(value, state) {
+            const { toolCallId, toolName, authSpec, agentName } = value;
+            console.log(`[Tool] ${toolName} needs authorization: ${authSpec.reason}`);
+
+            this.__ensureToolCallMessage(state, toolCallId, toolName, agentName);
+            this.transitionToolState(toolCallId, TOOL_EVENTS.NEEDS_AUTH, { authSpec });
+        },
+
+        __handleInputProvided(value) {
+            const { toolCallId, input } = value;
+            console.log(`[Tool] Input provided for ${toolCallId}`);
+            this.transitionToolState(toolCallId, TOOL_EVENTS.INPUT_PROVIDED, { input });
+        },
+
+        __handleAuthGranted(value) {
+            const { toolCallId } = value;
+            console.log(`[Tool] Authorization granted for ${toolCallId}`);
+            this.transitionToolState(toolCallId, TOOL_EVENTS.AUTH_GRANTED, {});
+        },
+
+        __handleAuthDenied(value) {
+            const { toolCallId } = value;
+            console.log(`[Tool] Authorization denied for ${toolCallId}`);
+            this.transitionToolState(toolCallId, TOOL_EVENTS.AUTH_DENIED, {});
+        },
+
+        __handleToolCancelled(value, state) {
+            const { toolCallId, toolName } = value;
+            console.log(`[Tool] ${toolName} (${toolCallId}) cancelled`);
+
+            this.transitionToolState(toolCallId, TOOL_EVENTS.CANCELLED, { toolName });
+        },
+
+        // ============================================
+        // Text Message Handlers
+        // ============================================
+
+        /**
+         * Handle TEXT_MESSAGE_START event
+         */
+        __handleTextMessageStart(event, state, threadId) {
+            console.log(`[STREAM] TEXT_MESSAGE_START for messageId: ${event.messageId}`);
+            state.showTypingIndicator = false;
+            state.currentStreamingId = event.messageId;
+
+            this.__perfMetrics.messagesReceived++;
+
+            const lastUserMsg = state.messages.slice().reverse().find(m => m.role === 'user');
+            if (lastUserMsg?._sendTime) {
+                const responseTime = Date.now() - lastUserMsg._sendTime;
+                this.__perfMetrics.avgResponseTime =
+                    (this.__perfMetrics.avgResponseTime * (this.__perfMetrics.messagesReceived - 1) + responseTime) /
+                    this.__perfMetrics.messagesReceived;
+                console.log(`Response time: ${responseTime}ms (avg: ${Math.round(this.__perfMetrics.avgResponseTime)}ms)`);
+            }
+
+            if (threadId === this.__currentThreadId) {
+                this.__announce(window.i18n.t('Assistant is responding'));
+            }
+
+            // Check if we already have this message (e.g. from history or snapshot)
+            const existingMsg = state.messages.find(m => m.id === event.messageId);
+            if (!existingMsg) {
+                console.log(`[STREAM] Adding new assistant message for ID: ${event.messageId}`);
+                state.messages.push({
+                    id: event.messageId,
+                    role: 'assistant',
+                    content: '',
+                    timestamp: new Date(event.timestamp || Date.now()).toISOString(),
+                    streaming: true
+                });
+            } else {
+                console.log(`[STREAM] Message already exists for ID: ${event.messageId}, marking as streaming`);
+                existingMsg.streaming = true;
+            }
+
+            if (threadId === this.__currentThreadId) {
+                // Reset abort flag at the start of a new streaming message
+                this.__abortScroll = false;
+                this.$nextTick(() => this.__scrollToBottomStreaming());
+            }
+        },
+
+        /**
+         * Handle TEXT_MESSAGE_CONTENT event
+         */
+        __handleTextMessageContent(event, state, threadId) {
+            let msgIndex = state.messages.findIndex(m => m.id === event.messageId);
+            if (msgIndex === -1) {
+                console.warn(`[STREAM] TEXT_MESSAGE_CONTENT for unknown ID: ${event.messageId}, lazily creating segment.`);
+                state.messages.push({
+                    id: event.messageId,
+                    role: 'assistant',
+                    content: '',
+                    timestamp: new Date().toISOString(),
+                    streaming: true
+                });
+                msgIndex = state.messages.length - 1;
+            }
+
+            // Append directly to the message's content property
+            state.messages[msgIndex].content += event.delta;
+
+            // Log very selectively (first few chars) to avoid log spam but confirm it's working
+            if (state.messages[msgIndex].content.length <= event.delta.length) {
+                console.log(`[STREAM] First token for ${event.messageId}: "${event.delta}"`);
+            }
+
+            if (threadId === this.__currentThreadId && !this.__abortScroll) {
+                this.__scrollToBottomThrottled();
+            }
+        },
+
+        /**
+         * Handle TEXT_MESSAGE_END event
+         */
+        __handleTextMessageEnd(event, state, threadId) {
+            console.log(`[STREAM] TEXT_MESSAGE_END for messageId: ${event.messageId}`);
+            const endMsgIndex = state.messages.findIndex(m => m.id === event.messageId);
+            if (endMsgIndex !== -1) {
+                state.messages[endMsgIndex].streaming = false;
+            }
+
+            if (threadId === this.__currentThreadId) {
+                this.__announce(window.i18n.t('Response complete'));
+            }
+
+            if (state.currentStreamingId === event.messageId) {
+                state.currentStreamingId = null;
+            }
+        },
+
+        // ============================================
+        // Run Lifecycle Handlers
+        // ============================================
+
+        /**
+         * Handle RUN_FINISHED event
+         */
+        __handleRunFinished(state, eventSource) {
+            state.activeJobStreams.clear();
+            state.jobRetryMap.clear();
+            state.currentJobId = null;
+            state.isStreaming = false;
+            state.showTypingIndicator = false;
+            state.eventSource = null;
+            state.retryCount = 0;
+            eventSource.close();
+        },
+
+        /**
+         * Handle RUN_ERROR event
+         */
+        __handleRunError(event, state, threadId, eventSource) {
+            console.error('Run error:', event.message);
+
+            state.activeJobStreams.clear();
+            state.isStreaming = false;
+            state.showTypingIndicator = false;
+            state.eventSource = null;
+
+            if (threadId === this.__currentThreadId) {
+                this.__showError(event.message || window.i18n.t('An error occurred'), threadId);
+            }
+            eventSource.close();
+        },
+
+        // ============================================
+        // Lifecycle Message Display
+        // ============================================
+
+        /**
+         * Add lifecycle message to user message
+         */
+        __addLifecycleMessage(event, threadId) {
+            const state = this.__getThreadState(threadId);
+
+            const userMessageIndex = state.messages.findIndex(m =>
+                m.role === 'user' && m.interactionId === state.currentInteractionId
+            );
+
+            if (userMessageIndex !== -1) {
+                const lifecycleEvent = {
+                    id: `lifecycle_${Date.now()}_${Math.random()}`,
+                    type: event.type,
+                    content: this.__getLifecycleContent(event),
+                    timestamp: new Date().toISOString()
+                };
+
+                if (!state.messages[userMessageIndex].lifecycleEvents) {
+                    state.messages[userMessageIndex].lifecycleEvents = [];
+                }
+
+                state.messages[userMessageIndex].lifecycleEvents = [
+                    ...state.messages[userMessageIndex].lifecycleEvents,
+                    lifecycleEvent
+                ];
+            }
+        },
+
+        /**
+         * Get human-readable lifecycle event content.
+         * Uses lookup table instead of switch for maintainability.
+         */
+        __getLifecycleContent(event) {
+            const labelFn = LIFECYCLE_LABELS[event.type];
+            return labelFn ? labelFn(event) : event.type;
+        },
+
+        // ============================================
+        // Tool Call Message Helpers
+        // ============================================
+
+        /**
+         * Ensure a tool call message exists in state
+         */
+        __ensureToolCallMessage(state, toolCallId, toolName, agentName) {
+            if (state.toolCalls[toolCallId]) return;
+
+            console.log(`[STREAM] Lazily creating tool call message for ${toolName} (${toolCallId})`);
+
+            state.toolCalls[toolCallId] = {
+                id: toolCallId,
+                name: toolName,
+                args: '',
+                status: 'executing',
+                timestamp: new Date().toISOString(),
+                agentName: agentName
+            };
+
+            state.messages.push({
+                id: toolCallId,
+                type: 'tool_call',
+                name: toolName,
+                args: '',
+                parsedArgs: {},
+                parsedResult: null,
+                status: 'executing',
+                timestamp: new Date().toISOString(),
+                agentName: agentName
+            });
+        }
+    };
+}

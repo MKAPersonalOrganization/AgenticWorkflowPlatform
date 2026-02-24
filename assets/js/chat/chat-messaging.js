@@ -11,7 +11,7 @@
  *   multiple transitions into one reactive flush
  */
 
-import { createUserMessage, safeParseJSON, generateInteractionId, enrichToolResult } from './chat-utils.js';
+import { createUserMessage, safeParseJSON, generateInteractionId, enrichToolResult, mapTokenUsage } from './chat-utils.js';
 import { TOOL_EVENTS, TOOL_STATES } from './tool-state-machine.js';
 import { syncToolState } from './chat-tool-registry.js';
 /**
@@ -142,21 +142,7 @@ export function createMessagingMethods() {
 
                     // Load token usage if available
                     if (data.tokenUsage) {
-                        state.tokenUsage = {
-                            total: data.tokenUsage.total || 0,
-                            prompt: data.tokenUsage.prompt || 0,
-                            completion: data.tokenUsage.completion || 0,
-                            cached: data.tokenUsage.cached || 0,
-                            reasoning: data.tokenUsage.reasoning || 0,
-                            audioInput: data.tokenUsage.audioInput || 0,
-                            audioOutput: data.tokenUsage.audioOutput || 0,
-                            acceptedPredict: data.tokenUsage.acceptedPredict || 0,
-                            rejectedPredict: data.tokenUsage.rejectedPredict || 0,
-                            model: data.tokenUsage.model || 'N/A',
-                            provider: data.tokenUsage.provider || 'N/A',
-                            messageId: data.tokenUsage.messageId,
-                            threadId: data.tokenUsage.threadId
-                        };
+                        state.tokenUsage = mapTokenUsage(data.tokenUsage);
                         console.log('Token usage loaded from history:', state.tokenUsage);
                     }
 
