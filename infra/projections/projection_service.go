@@ -31,7 +31,7 @@ func NewUIProjectionService(
 
 // GetThreadMessages retrieves AGUI-formatted messages for a thread.
 func (s *UIProjectionService) GetThreadMessages(threadID string) []aguievents.Message {
-	return s.aguiProjection.GetMessages(threadID)
+	return s.aguiProjection.GetMessages(context.Background(), threadID)
 }
 
 // ListThreadSummaries retrieves all threads with summaries, sorted by most recent.

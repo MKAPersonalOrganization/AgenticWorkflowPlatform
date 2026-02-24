@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"school-with-ai/components/i18n"
@@ -493,8 +494,8 @@ func (p *PostgresAguiProjection) applyAuthGranted(ctx context.Context, event *do
 }
 
 // GetThreadState retrieves the complete UI state for a thread from PostgreSQL.
-func (p *PostgresAguiProjection) GetThreadState(threadID string) (*AguiThreadState, bool) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+func (p *PostgresAguiProjection) GetThreadState(ctx context.Context, threadID string) (*AguiThreadState, bool) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	// Get thread record
@@ -675,6 +676,7 @@ func (p *PostgresAguiProjection) GetThreadState(threadID string) (*AguiThreadSta
 
 	state := &AguiThreadState{
 		ThreadID:      thread.ThreadID,
+		UserID:        thread.UserID,
 		Title:         thread.Title,
 		Messages:      aguiMessages,
 		ToolCalls:     []AguiToolCall{},
@@ -691,8 +693,8 @@ func (p *PostgresAguiProjection) GetThreadState(threadID string) (*AguiThreadSta
 }
 
 // GetMessages retrieves all UI-formatted messages for a thread.
-func (p *PostgresAguiProjection) GetMessages(threadID string) []aguievents.Message {
-	state, exists := p.GetThreadState(threadID)
+func (p *PostgresAguiProjection) GetMessages(ctx context.Context, threadID string) []aguievents.Message {
+	state, exists := p.GetThreadState(ctx, threadID)
 	if !exists {
 		return []aguievents.Message{}
 	}
@@ -721,8 +723,10 @@ func (p *PostgresAguiProjection) ListThreads(ctx context.Context, req ThreadList
 
 	var err error
 	if req.Query != "" {
-		// Search mode - filter by title
-		searchPattern := "%" + req.Query + "%"
+		// Search mode - filter by title.
+		// Escape LIKE wildcards to prevent pattern injection (e.g. % or _).
+		escaped := strings.NewReplacer("%", "\\%", "_", "\\_").Replace(req.Query)
+		searchPattern := "%" + escaped + "%"
 		if req.Cursor == "" {
 			query := `
 				SELECT thread_id, title, updated_at

@@ -40,10 +40,22 @@ func (h *AguiProjectionHandler) GetThreadState(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	state, exists := h.projection.GetThreadState(threadID)
+	// Verify ownership: the authenticated user must own this thread.
+	user := domain.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	state, exists := h.projection.GetThreadState(r.Context(), threadID)
 	if !exists {
 		http.Error(w, "thread not found", http.StatusNotFound)
 
+		return
+	}
+
+	if state.UserID != user.ID {
+		http.Error(w, "thread not found", http.StatusNotFound)
 		return
 	}
 
@@ -60,9 +72,21 @@ func (h *AguiProjectionHandler) GetMessages(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// Verify ownership: the authenticated user must own this thread.
+	user := domain.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	// Get full thread state including token usage
-	state, exists := h.projection.GetThreadState(threadID)
+	state, exists := h.projection.GetThreadState(r.Context(), threadID)
 	if !exists {
+		http.Error(w, "thread not found", http.StatusNotFound)
+		return
+	}
+
+	if state.UserID != user.ID {
 		http.Error(w, "thread not found", http.StatusNotFound)
 		return
 	}

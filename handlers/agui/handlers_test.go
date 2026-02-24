@@ -25,11 +25,11 @@ type mockProjection struct {
 	totalThreads int // Total threads in "database"
 }
 
-func (m *mockProjection) GetThreadState(threadID string) (*agui.AguiThreadState, bool) {
+func (m *mockProjection) GetThreadState(ctx context.Context, threadID string) (*agui.AguiThreadState, bool) {
 	return nil, false
 }
 
-func (m *mockProjection) GetMessages(threadID string) []aguievents.Message {
+func (m *mockProjection) GetMessages(ctx context.Context, threadID string) []aguievents.Message {
 	return nil
 }
 

@@ -373,6 +373,17 @@ func (h *TaskManagementHandler) DeleteThread(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// Verify ownership: the authenticated user must own this thread.
+	state, exists := h.aguiProjection.GetThreadState(r.Context(), threadID)
+	if !exists {
+		http.Error(w, "Thread not found", http.StatusNotFound)
+		return
+	}
+	if state.UserID != user.ID {
+		http.Error(w, "Thread not found", http.StatusNotFound)
+		return
+	}
+
 	h.log.Info(r.Context(), "Deleting thread", "userID", user.ID, "threadID", threadID)
 
 	// Delete thread using thread management manager
@@ -414,6 +425,17 @@ func (h *TaskManagementHandler) UpdateThreadTitle(w http.ResponseWriter, r *http
 	threadID := r.PathValue("threadId")
 	if threadID == "" {
 		http.Error(w, "threadId is required", http.StatusBadRequest)
+		return
+	}
+
+	// Verify ownership: the authenticated user must own this thread.
+	state, exists := h.aguiProjection.GetThreadState(r.Context(), threadID)
+	if !exists {
+		http.Error(w, "Thread not found", http.StatusNotFound)
+		return
+	}
+	if state.UserID != user.ID {
+		http.Error(w, "Thread not found", http.StatusNotFound)
 		return
 	}
 

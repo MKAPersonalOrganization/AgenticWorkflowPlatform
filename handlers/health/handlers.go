@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"os"
-	"runtime"
 	"sync"
 	"time"
 
@@ -51,18 +49,12 @@ func WithChecker(name string, c Checker) func(*HealthHandler) {
 }
 
 // Liveness returns simple status info if the service is alive.
+// This endpoint is public — do not expose infrastructure details.
 func (h *HealthHandler) Liveness(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	host, err := os.Hostname()
-	if err != nil {
-		host = "unavailable"
-	}
-
 	info := map[string]any{
-		"status":     "up",
-		"host":       host,
-		"GOMAXPROCS": runtime.GOMAXPROCS(0),
+		"status": "up",
 	}
 
 	if err := json.NewEncoder(w).Encode(info); err != nil {

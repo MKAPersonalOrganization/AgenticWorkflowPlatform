@@ -41,33 +41,43 @@ type Middleware struct {
 	appURL       string
 	cacheMu      sync.RWMutex
 	sessionCache map[string]sessionCacheEntry
+	stopEviction context.CancelFunc
 }
 
 // NewMiddleware creates a new authentication middleware.
-func NewMiddleware(kratosClient *kratos.KratosClient, appURL string) *Middleware {
+// The provided context controls the lifetime of the background eviction goroutine.
+func NewMiddleware(kratosClient *kratos.KratosClient, appURL string, ctx context.Context) *Middleware {
+	evictCtx, cancel := context.WithCancel(ctx)
 	m := &Middleware{
 		kratosClient: kratosClient,
 		appURL:       appURL,
 		sessionCache: make(map[string]sessionCacheEntry),
+		stopEviction: cancel,
 	}
 	// Background goroutine to periodically evict expired entries.
-	go m.evictExpired()
+	go m.evictExpired(evictCtx)
 	return m
 }
 
 // evictExpired removes expired entries from the session cache every 60 seconds.
-func (m *Middleware) evictExpired() {
+// It exits when the provided context is cancelled.
+func (m *Middleware) evictExpired(ctx context.Context) {
 	ticker := time.NewTicker(60 * time.Second)
 	defer ticker.Stop()
-	for range ticker.C {
-		now := time.Now()
-		m.cacheMu.Lock()
-		for k, v := range m.sessionCache {
-			if now.After(v.expiresAt) {
-				delete(m.sessionCache, k)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			now := time.Now()
+			m.cacheMu.Lock()
+			for k, v := range m.sessionCache {
+				if now.After(v.expiresAt) {
+					delete(m.sessionCache, k)
+				}
 			}
+			m.cacheMu.Unlock()
 		}
-		m.cacheMu.Unlock()
 	}
 }
 

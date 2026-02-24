@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"sync"
 	"syscall"
 	"time"
 
@@ -568,7 +569,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	}
 	kratosClient := kratos.NewKratosClient(kratosConfig)
 	authHandlers := auth.NewAuthHandlers(log, kratosClient, cfg.Auth.AppURL)
-	authMiddleware := auth.NewMiddleware(kratosClient, cfg.Auth.AppURL)
+	authMiddleware := auth.NewMiddleware(kratosClient, cfg.Auth.AppURL, ctx)
 
 	// Profile Handler
 	profileHandler := profile.NewHandler(log, studentProfileRepo)
@@ -790,37 +791,42 @@ func run(ctx context.Context, log *logger.Logger) error {
 }
 
 func HandleViewChatInputScreen(log *logger.Logger, edgequakeService *edgequake.Service) http.HandlerFunc {
+	// Track which users have already been synced to avoid redundant goroutines.
+	var syncedUsers sync.Map
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get authenticated user from context
 		user := domain.GetUserFromContext(r.Context())
 
-		// Sync user to RAG (Idempotent)
+		// Sync user to RAG at most once per process lifetime (idempotent create).
 		if user != nil {
-			go func(u *domain.User) {
-				// Generate a random password since RAG requires one, but we don't use it for auth
-				randomPass := uuid.New().String()
+			if _, alreadySynced := syncedUsers.LoadOrStore(user.ID, struct{}{}); !alreadySynced {
+				go func(u *domain.User) {
+					// Generate a random password since RAG requires one, but we don't use it for auth
+					randomPass := uuid.New().String()
 
-				// Create user request
-				req := &users.CreateUserRequest{
-					Username: u.GetDisplayName(),
-					Email:    u.Email,
-					Password: randomPass,
-					Role:     &u.Role,
-				}
+					// Create user request
+					req := &users.CreateUserRequest{
+						Username: u.GetDisplayName(),
+						Email:    u.Email,
+						Password: randomPass,
+						Role:     &u.Role,
+					}
 
-				// Use a bounded context so this goroutine cannot block forever
-				syncCtx, syncCancel := context.WithTimeout(context.Background(), 10*time.Second)
-				defer syncCancel()
+					// Use a bounded context so this goroutine cannot block forever
+					syncCtx, syncCancel := context.WithTimeout(context.Background(), 10*time.Second)
+					defer syncCancel()
 
-				_, err := edgequakeService.Users.Create(syncCtx, req)
-				if err != nil {
-					// Log error but don't fail the request (best effort sync)
-					// In production, we might want to check if error is "already exists" and ignore
-					log.Error(syncCtx, "failed to sync user to RAG", "error", err, "email", u.Email)
-				} else {
-					log.Info(syncCtx, "synced user to RAG", "email", u.Email, "role", u.Role)
-				}
-			}(user)
+					_, err := edgequakeService.Users.Create(syncCtx, req)
+					if err != nil {
+						// Remove from map so next page load retries the sync
+						syncedUsers.Delete(u.ID)
+						log.Error(syncCtx, "failed to sync user to RAG", "error", err, "email", u.Email)
+					} else {
+						log.Info(syncCtx, "synced user to RAG", "email", u.Email, "role", u.Role)
+					}
+				}(user)
+			}
 		}
 
 		component := components.ChatInputScreen(user)
