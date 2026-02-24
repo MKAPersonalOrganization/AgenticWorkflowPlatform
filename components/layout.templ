@@ -46,12 +46,12 @@ templ BaseLayout(props LayoutProps) {
 				(function() {
 					const theme = localStorage.getItem('theme') || 'system';
 					const root = document.documentElement;
+					const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
-					if (theme === 'system') {
-						const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-						if (systemPrefersDark) {
-							root.classList.add('dark');
-						}
+					if (theme === 'dark' || (theme === 'system' && systemPrefersDark)) {
+						root.classList.add('dark');
+					} else {
+						root.classList.remove('dark');
 					}
 				})();
 			</script>
@@ -83,10 +83,12 @@ templ BaseLayout(props LayoutProps) {
 				</div>
 			</div>
 			<!-- Global Modals -->
-			@resources.ResourcesDialog()
-			@agents.AgentsDialog()
-			@tools.ToolsSidebar()
-			@convsearch.SearchDialog()
+			<div x-cloak>
+				@resources.ResourcesDialog()
+				@agents.AgentsDialog()
+				@tools.ToolsSidebar()
+				@convsearch.SearchDialog()
+			</div>
 		</body>
 	</html>
 }

@@ -489,4 +489,9 @@
     align-items: center !important;
     justify-content: center !important;
   }
+
+  /* Alpine.js cloak */
+  [x-cloak] {
+    display: none !important;
+  }
 }

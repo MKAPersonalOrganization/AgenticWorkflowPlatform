@@ -96,11 +96,11 @@ templ ChatInput() {
 								},
 							}) {
 								<!-- Send Icon -->
-								<div x-show="!isStreaming">
+								<div x-show="!isStreaming" x-cloak>
 									@icon.ArrowUp(icon.Props{Class: "size-5"})
 								</div>
 								<!-- Cancel/Stop Icon -->
-								<div x-show="isStreaming">
+								<div x-show="isStreaming" x-cloak>
 									<div class="size-3 bg-current rounded-[2px]"></div>
 								</div>
 							}
