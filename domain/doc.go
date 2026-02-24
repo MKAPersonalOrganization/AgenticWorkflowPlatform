@@ -38,7 +38,7 @@
 //	}
 //
 //	// 2. Call business method on aggregate
-//	err = thread.AddMessage("msg-789", "user", "Hello, world!", nil, "", "", "", nil)
+//	err = thread.AddMessage("msg-789", "user", "Hello, world!", nil, "", "", "")
 //	if err != nil {
 //	    return err // Business rule violation
 //	}

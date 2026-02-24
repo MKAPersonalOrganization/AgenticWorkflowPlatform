@@ -9,10 +9,8 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"os/exec"
 	"os/signal"
 	"runtime"
-	"strings"
 	"syscall"
 	"time"
 
@@ -385,8 +383,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	edgequakeService := edgequake.NewService(cfg.Edgequake.BaseURL)
 	log.Info(ctx, "startup", "status", "edgequake service initialized", "baseURL", cfg.Edgequake.BaseURL)
 
-	// Initialize Agents directly (Step 2 of Registry Removal)
-	// Initialize Agents directly (Step 2 of Registry Removal) - Updated for Service Decoupling
+	// Initialize Agents
 	slogLogger := slog.New(log)
 	agentLoggingMw := agent.AgentLogging(slogLogger)
 	chatLoggingMw := agent.ChatLogging(slogLogger)
@@ -450,13 +447,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// -------------------------------------------------------------------------
 	// Start Debug Service
-
-	debugMux.HandleFunc("/api/debug/state-machines/engine", func(w http.ResponseWriter, r *http.Request) {
-		// Engine and tool graphs are now handled by the custom adapter
-		// but we need to expose them if needed.
-		// (Note: Currently removed from Service to keep it agnostic)
-		http.Error(w, "Debug graphs temporarily unavailable during refactor", http.StatusNotFound)
-	})
 
 	debugServer := &http.Server{
 		Addr:              cfg.Web.DebugHost,
@@ -902,27 +892,6 @@ func HandleCheckoutPage(log *logger.Logger) http.HandlerFunc {
 			log.Error(r.Context(), "failed to render checkout page", "error", err)
 		}
 	}
-}
-
-func renderGraph(w http.ResponseWriter, log *logger.Logger, r *http.Request, graph string) {
-	format := r.URL.Query().Get("format")
-	if format == "dot" || format == "text" {
-		w.Header().Set("Content-Type", "text/plain")
-		w.Write([]byte(graph))
-		return
-	}
-
-	cmd := exec.Command("dot", "-Tsvg")
-	cmd.Stdin = strings.NewReader(graph)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Error(r.Context(), "failed to render graph", "error", err, "output", string(output))
-		http.Error(w, "Failed to render graph", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "image/svg+xml")
-	w.Write(output)
 }
 
 // validateProductionConfig rejects known insecure defaults when the

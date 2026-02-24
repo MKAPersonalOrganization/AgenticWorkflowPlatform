@@ -8,9 +8,6 @@ import (
 // ThreadAggregate is an event-sourced aggregate representing a conversation thread.
 // Following the pattern from EventSourcing.NetCore, business logic is implemented
 // as methods on the aggregate that validate rules and enqueue events.
-// ThreadAggregate is an event-sourced aggregate representing a conversation thread.
-// Following the pattern from EventSourcing.NetCore, business logic is implemented
-// as methods on the aggregate that validate rules and enqueue events.
 type ThreadAggregate struct {
 	BaseAggregate
 	UserID           string
@@ -58,7 +55,7 @@ func OpenThread(threadID, userID, title string) (*ThreadAggregate, error) {
 
 // AddMessage adds a message to the thread.
 // This implements business logic like ShoppingCart.AddProduct.
-func (t *ThreadAggregate) AddMessage(messageID, role, content string, toolCalls []ToolCall, toolCallID, toolName, agentName string, metadata map[string]interface{}) error {
+func (t *ThreadAggregate) AddMessage(messageID, role, content string, toolCalls []ToolCall, toolCallID, toolName, agentName string) error {
 	if t.IsDeleted {
 		return errors.New("cannot add message to deleted thread")
 	}
@@ -284,17 +281,4 @@ func (t *ThreadAggregate) Apply(event Event) {
 // StreamName returns the event stream name for this aggregate.
 func (t *ThreadAggregate) StreamName() string {
 	return StreamName("Thread", t.ID)
-}
-
-// GetMessageCount returns the number of messages in the thread.
-func (t *ThreadAggregate) GetMessageCount() int {
-	return len(t.Messages)
-}
-
-// GetLastMessage returns the last message in the thread, or nil if empty.
-func (t *ThreadAggregate) GetLastMessage() *Message {
-	if len(t.Messages) == 0 {
-		return nil
-	}
-	return &t.Messages[len(t.Messages)-1]
 }

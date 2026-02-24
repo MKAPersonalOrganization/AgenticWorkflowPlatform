@@ -86,7 +86,6 @@ func (m *Manager) AddUserMessage(ctx context.Context, threadID, messageID, conte
 		"",
 		"",
 		"",
-		nil,
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to add user message: %w", err)
@@ -155,7 +154,6 @@ func (m *Manager) AddAssistantMessage(ctx context.Context, threadID, messageID, 
 		"",
 		"",
 		agentName,
-		nil,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to add assistant message: %w", err)
@@ -202,7 +200,6 @@ func (m *Manager) AddToolResultMessage(ctx context.Context, threadID, messageID,
 			toolCallID,
 			toolName,
 			agentName,
-			nil,
 		)
 	})
 	if err != nil {

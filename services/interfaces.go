@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"iter"
 
 	"school-with-ai/domain"
 
@@ -24,17 +23,6 @@ type ThreadQueryService interface {
 	// ListThreadSummaries retrieves all threads with summaries, sorted by most recent
 	ListThreadSummaries() []ThreadSummary
 }
-
-// AgentOrchestrator defines the interface for running agent-based workflows.
-type AgentOrchestrator interface {
-	// ProcessEvents orchestrates a stream of domain events, providing persistence and broadcasting.
-	ProcessEvents(ctx context.Context, events iter.Seq2[domain.Event, error]) iter.Seq2[domain.Event, error]
-
-	// GetAvailableAgents returns a list of available agents
-	GetAvailableAgents() []string
-}
-
-// (AgentFactory removed - no longer needed with new RunnerAdapter design)
 
 // ThreadSummary represents a summary of a thread for list views.
 type ThreadSummary struct {
