@@ -796,6 +796,221 @@ func (h *TaskManagementHandler) ToggleIndividualTool(w http.ResponseWriter, r *h
 	}
 }
 
+// resolveAgentID extracts agent_id from query params, falling back to the first available agent.
+func (h *TaskManagementHandler) resolveAgentID(r *http.Request) string {
+	if agentID := r.URL.Query().Get("agent_id"); agentID != "" {
+		return agentID
+	}
+	// Fall back to the first available agent
+	agents := h.agentProvider.List()
+	if len(agents) > 0 {
+		return agents[0].Name()
+	}
+	return ""
+}
+
+// PluginResponse represents a plugin (tool set) in the simplified API.
+type PluginResponse struct {
+	ID          string              `json:"id"`
+	Name        string              `json:"name"`
+	Description string              `json:"description"`
+	Category    string              `json:"category"`
+	Enabled     bool                `json:"enabled"`
+	Tools       []ToolInSetResponse `json:"tools"`
+}
+
+// ListPlugins returns all available plugins with their enabled state.
+// GET /v1/plugins?agent_id=xxx (agent_id optional, defaults to primary agent)
+func (h *TaskManagementHandler) ListPlugins(w http.ResponseWriter, r *http.Request) {
+	user := h.authService.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	agentID := h.resolveAgentID(r)
+	if agentID == "" {
+		http.Error(w, "No agents available", http.StatusNotFound)
+		return
+	}
+
+	allToolSets, err := h.toolRegistry.ListToolSets(r.Context())
+	if err != nil {
+		h.log.Error(r.Context(), "Failed to list tool sets", "error", err)
+		http.Error(w, "Failed to retrieve plugins", http.StatusInternalServerError)
+		return
+	}
+
+	enabledToolSetIDs, err := h.permissionsService.GetEnabledToolSets(r.Context(), user.ID, agentID)
+	if err != nil {
+		h.log.Error(r.Context(), "Failed to get enabled tool sets", "agent_id", agentID, "error", err)
+		http.Error(w, "Failed to retrieve plugin permissions", http.StatusInternalServerError)
+		return
+	}
+
+	enabledToolSets := make(map[string]bool)
+	for _, toolSetID := range enabledToolSetIDs {
+		enabledToolSets[toolSetID] = true
+	}
+
+	plugins := make([]PluginResponse, 0, len(allToolSets))
+	for _, toolSet := range allToolSets {
+		toolsInSet, err := h.toolRegistry.GetToolsInSet(r.Context(), toolSet.ID)
+		if err != nil {
+			h.log.Error(r.Context(), "Failed to get tools in set", "tool_set_id", toolSet.ID, "error", err)
+			continue
+		}
+
+		toolResponses := make([]ToolInSetResponse, 0, len(toolsInSet))
+		for _, tool := range toolsInSet {
+			toolEnabled := h.permissionsService.HasPermission(r.Context(), user.ID, agentID, toolSet.ID, tool.ID)
+			toolResponses = append(toolResponses, ToolInSetResponse{
+				ID:          tool.ID,
+				Name:        tool.Name,
+				Description: tool.Description,
+				Category:    tool.Category,
+				Enabled:     toolEnabled,
+			})
+		}
+
+		plugins = append(plugins, PluginResponse{
+			ID:          toolSet.ID,
+			Name:        toolSet.Name,
+			Description: toolSet.Description,
+			Category:    toolSet.Category,
+			Enabled:     enabledToolSets[toolSet.ID],
+			Tools:       toolResponses,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]any{"plugins": plugins}); err != nil {
+		h.log.Error(r.Context(), "failed to encode plugins list", "error", err)
+	}
+}
+
+// TogglePlugin enables or disables a plugin.
+// PUT /v1/plugins/{pluginId}?agent_id=xxx
+func (h *TaskManagementHandler) TogglePlugin(w http.ResponseWriter, r *http.Request) {
+	pluginID := r.PathValue("pluginId")
+	if pluginID == "" {
+		http.Error(w, "pluginId is required", http.StatusBadRequest)
+		return
+	}
+
+	user := h.authService.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	agentID := h.resolveAgentID(r)
+	if agentID == "" {
+		http.Error(w, "No agents available", http.StatusNotFound)
+		return
+	}
+
+	var req ToggleAgentToolSetRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if _, err := h.toolRegistry.GetToolSet(r.Context(), pluginID); err != nil {
+		h.log.Error(r.Context(), "Plugin not found in registry", "plugin_id", pluginID, "error", err)
+		http.Error(w, "Plugin not found", http.StatusNotFound)
+		return
+	}
+
+	if err := h.permissionsService.SetToolSetPermission(r.Context(), user.ID, agentID, pluginID, req.Enabled); err != nil {
+		h.log.Error(r.Context(), "Failed to update plugin permission",
+			"agent_id", agentID, "plugin_id", pluginID, "enabled", req.Enabled, "error", err)
+		http.Error(w, "Failed to update plugin permission", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]any{
+		"status":   "success",
+		"pluginId": pluginID,
+		"enabled":  req.Enabled,
+	}); err != nil {
+		h.log.Error(r.Context(), "failed to encode toggle plugin response", "error", err)
+	}
+}
+
+// TogglePluginTool enables or disables an individual tool within a plugin.
+// PUT /v1/plugins/{pluginId}/tools/{toolId}?agent_id=xxx
+func (h *TaskManagementHandler) TogglePluginTool(w http.ResponseWriter, r *http.Request) {
+	pluginID := r.PathValue("pluginId")
+	toolID := r.PathValue("toolId")
+
+	if pluginID == "" || toolID == "" {
+		http.Error(w, "pluginId and toolId are required", http.StatusBadRequest)
+		return
+	}
+
+	user := h.authService.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	agentID := h.resolveAgentID(r)
+	if agentID == "" {
+		http.Error(w, "No agents available", http.StatusNotFound)
+		return
+	}
+
+	var req ToggleIndividualToolRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if _, err := h.toolRegistry.GetToolSet(r.Context(), pluginID); err != nil {
+		h.log.Error(r.Context(), "Plugin not found in registry", "plugin_id", pluginID, "error", err)
+		http.Error(w, "Plugin not found", http.StatusNotFound)
+		return
+	}
+
+	toolsInSet, err := h.toolRegistry.GetToolsInSet(r.Context(), pluginID)
+	if err != nil {
+		h.log.Error(r.Context(), "Failed to get tools in plugin", "plugin_id", pluginID, "error", err)
+		http.Error(w, "Failed to verify tool", http.StatusInternalServerError)
+		return
+	}
+
+	toolExists := false
+	for _, tool := range toolsInSet {
+		if tool.ID == toolID {
+			toolExists = true
+			break
+		}
+	}
+	if !toolExists {
+		http.Error(w, "Tool not found in plugin", http.StatusNotFound)
+		return
+	}
+
+	if err := h.permissionsService.SetPermission(r.Context(), user.ID, agentID, pluginID, toolID, req.Enabled); err != nil {
+		h.log.Error(r.Context(), "Failed to update tool permission",
+			"agent_id", agentID, "plugin_id", pluginID, "tool_id", toolID, "enabled", req.Enabled, "error", err)
+		http.Error(w, "Failed to update tool permission", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]any{
+		"status":   "success",
+		"pluginId": pluginID,
+		"toolId":   toolID,
+		"enabled":  req.Enabled,
+	}); err != nil {
+		h.log.Error(r.Context(), "failed to encode toggle plugin tool response", "error", err)
+	}
+}
+
 // ListDocuments handles GET /v1/documents - retrieves documents from Edgequake using passive context resolution.
 func (h *TaskManagementHandler) ListDocuments(w http.ResponseWriter, r *http.Request) {
 	// 1. Authenticate user via Kratos

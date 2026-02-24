@@ -643,6 +643,12 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Get("/v1/agents/{agentId}/toolsets", authMiddleware.RequireAuthFunc(handler.ListAgentToolSets))
 	r.Put("/v1/agents/{agentId}/toolsets/{toolSetId}", authMiddleware.RequireAuthFunc(handler.ToggleAgentToolSet))
 	r.Put("/v1/agents/{agentId}/toolsets/{toolSetId}/tools/{toolId}", authMiddleware.RequireAuthFunc(handler.ToggleIndividualTool))
+
+	// Plugin endpoints (agent-agnostic, agent_id via query param)
+	r.Get("/v1/plugins", authMiddleware.RequireAuthFunc(handler.ListPlugins))
+	r.Put("/v1/plugins/{pluginId}", authMiddleware.RequireAuthFunc(handler.TogglePlugin))
+	r.Put("/v1/plugins/{pluginId}/tools/{toolId}", authMiddleware.RequireAuthFunc(handler.TogglePluginTool))
+
 	r.Get("/v1/documents", authMiddleware.RequireAuthFunc(handler.ListDocuments))
 	r.Post("/v1/documents", authMiddleware.RequireAuthFunc(handler.UploadDocument))
 
