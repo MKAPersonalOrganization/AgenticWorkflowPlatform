@@ -11,7 +11,7 @@ templ Header() {
 		<div class="flex items-center gap-2">
 			<!-- Right Side Actions -->
 			<!-- New Chat -->
-			<div x-show="hasMessages || isStreaming">
+			<div x-show="hasMessages || isStreaming" x-cloak>
 				@button.Button(button.Props{
 					Size:    button.SizeIcon,
 					Variant: button.VariantGhost,
@@ -25,7 +25,7 @@ templ Header() {
 				}
 			</div>
 			<!-- Search Toggle -->
-			<div x-show="hasMessages" x-transition.opacity>
+			<div x-show="hasMessages" x-cloak x-transition.opacity>
 				@Search()
 			</div>
 			<!-- Artifacts Toggle -->
