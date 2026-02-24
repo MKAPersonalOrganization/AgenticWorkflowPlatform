@@ -8,7 +8,6 @@
  * - Error handling wrappers
  */
 
-import { tryCatch, tryCatchAsync } from '../error-handler.js';
 
 /**
  * Throttle function execution
@@ -18,11 +17,25 @@ import { tryCatch, tryCatchAsync } from '../error-handler.js';
  */
 export function throttle(func, limit) {
     let inThrottle;
+    let lastArgs;
+    let lastThis;
     return function (...args) {
         if (!inThrottle) {
             func.apply(this, args);
             inThrottle = true;
-            setTimeout(() => inThrottle = false, limit);
+            setTimeout(() => {
+                inThrottle = false;
+                // Fire trailing call if one was queued during throttle window
+                if (lastArgs) {
+                    func.apply(lastThis, lastArgs);
+                    lastArgs = null;
+                    lastThis = null;
+                }
+            }, limit);
+        } else {
+            // Queue the latest call for trailing execution
+            lastArgs = args;
+            lastThis = this;
         }
     };
 }
@@ -280,17 +293,6 @@ export function reportError(error, operation, context = {}, metrics = null) {
     };
 
     log('error', `Operation failed: ${operation}`, errorReport);
-
-    // Async error throwing (Alpine error.js pattern: setTimeout(0))
-    setTimeout(() => {
-        if (window.onerror) {
-            const errorWithContext = Object.assign(
-                error || new Error('Unknown error'),
-                { operation, context: errorReport.context }
-            );
-            throw errorWithContext;
-        }
-    }, 0);
 }
 
 /**
@@ -308,10 +310,10 @@ export function createErrorHandlers(component) {
                     ...context,
                     threadId: component.__currentThreadId
                 }, component.__perfMetrics);
-                return tryCatch(operation, context, callback, {
-                    threadId: component.__currentThreadId,
-                    component
-                });
+                if (typeof component.__showError === 'function') {
+                    component.__showError(`Failed to ${operation}`);
+                }
+                return null;
             }
         },
 
@@ -323,10 +325,10 @@ export function createErrorHandlers(component) {
                     ...context,
                     threadId: component.__currentThreadId
                 }, component.__perfMetrics);
-                return await tryCatchAsync(operation, context, callback, {
-                    threadId: component.__currentThreadId,
-                    component
-                });
+                if (typeof component.__showError === 'function') {
+                    component.__showError(`Failed to ${operation}`);
+                }
+                return null;
             }
         }
     };

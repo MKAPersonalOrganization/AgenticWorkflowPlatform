@@ -307,6 +307,7 @@ document.addEventListener('alpine:init', () => {
                         });
 
                         // Abort auto-scroll when user manually scrolls up during streaming
+                        const scrollAbort = new AbortController();
                         container.addEventListener('scroll', () => {
                             if (!this.isStreaming) {
                                 // Not streaming — just track position, don't set abort
@@ -320,7 +321,21 @@ document.addEventListener('alpine:init', () => {
                                 // User scrolled back near bottom — re-engage
                                 this.__abortScroll = false;
                             }
-                        }, { passive: true });
+                        }, { passive: true, signal: scrollAbort.signal });
+
+                        // Register cleanup for scroll listener
+                        this.__cleanupTasks.add(() => scrollAbort.abort());
+
+                        // Listen for code-copied events from markdown code blocks (event delegation)
+                        const codeCopiedAbort = new AbortController();
+                        container.addEventListener('code-copied', (e) => {
+                            if (e.detail?.success) {
+                                this.showToast(window.i18n.t('Code copied to clipboard'), 'success', 2000);
+                            } else {
+                                this.showToast(window.i18n.t('Failed to copy code'), 'error');
+                            }
+                        }, { signal: codeCopiedAbort.signal });
+                        this.__cleanupTasks.add(() => codeCopiedAbort.abort());
                     }
                 });
 
@@ -417,7 +432,7 @@ document.addEventListener('alpine:init', () => {
                 });
                 this.__watchers.push(unwatchError);
 
-                const unwatchTheme = this.$watch('theme', (newTheme) => {
+                const unwatchTheme = this.$watch('preferences.theme', (newTheme) => {
                     // Centralized watcher for theme side effects
                     // Triggered by x-model, toggleTheme, or direct assignment
                     this.applyThemeEffects(newTheme);
@@ -465,6 +480,14 @@ document.addEventListener('alpine:init', () => {
                         threadState.eventSource.close();
                         threadState.eventSource = null;
                     }
+                }
+
+                // Stop all XState tool actors
+                if (this.__toolStateServices) {
+                    for (const actor of Object.values(this.__toolStateServices)) {
+                        actor?.stop();
+                    }
+                    this.__toolStateServices = null;
                 }
 
                 // Clear state for GC

@@ -100,10 +100,16 @@ export function createThemeMethods() {
 
             // Listen for system theme changes when in system mode
             const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-            mediaQuery.addEventListener('change', () => {
+            const mediaHandler = () => {
                 if (this.preferences.theme === 'system') {
                     _applyThemeToDOM('system');
                 }
+            };
+            mediaQuery.addEventListener('change', mediaHandler);
+
+            // Register cleanup to prevent listener leak
+            this.__cleanupTasks.add(() => {
+                mediaQuery.removeEventListener('change', mediaHandler);
             });
         }
     };
