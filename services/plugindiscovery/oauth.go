@@ -15,6 +15,18 @@ import (
 	"time"
 )
 
+const (
+	// maxMetadataResponseBytes limits the size of OAuth metadata discovery
+	// responses to prevent unbounded memory consumption from malicious servers.
+	maxMetadataResponseBytes = 1 << 20 // 1 MiB
+
+	// maxTokenResponseBytes limits the size of token endpoint responses.
+	maxTokenResponseBytes = 256 << 10 // 256 KiB
+
+	// oauthHTTPTimeout is the default timeout for all OAuth HTTP requests.
+	oauthHTTPTimeout = 30 * time.Second
+)
+
 // OAuthService handles the OAuth 2.1 Authorization Code + PKCE flow for MCP servers.
 type OAuthService struct {
 	callbackURL string // e.g. https://app.example.com/v1/mcp/oauth/callback
@@ -26,7 +38,7 @@ func NewOAuthService(callbackURL string) *OAuthService {
 	return &OAuthService{
 		callbackURL: callbackURL,
 		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: oauthHTTPTimeout,
 		},
 	}
 }
@@ -88,7 +100,7 @@ func (o *OAuthService) DiscoverProtectedResourceMetadata(ctx context.Context, se
 	}
 
 	var meta ProtectedResourceMetadata
-	if err := json.NewDecoder(resp.Body).Decode(&meta); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxMetadataResponseBytes)).Decode(&meta); err != nil {
 		return nil, fmt.Errorf("decoding protected resource metadata: %w", err)
 	}
 	return &meta, nil
@@ -118,7 +130,7 @@ func (o *OAuthService) DiscoverAuthServerMetadata(ctx context.Context, authServe
 	}
 
 	var meta OAuthMetadata
-	if err := json.NewDecoder(resp.Body).Decode(&meta); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxMetadataResponseBytes)).Decode(&meta); err != nil {
 		return nil, fmt.Errorf("decoding auth server metadata: %w", err)
 	}
 	return &meta, nil
@@ -152,7 +164,7 @@ func (o *OAuthService) RegisterClient(ctx context.Context, registrationEndpoint,
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, maxTokenResponseBytes))
 		return "", "", fmt.Errorf("client registration failed (status %d): %s", resp.StatusCode, string(respBody))
 	}
 
@@ -160,7 +172,7 @@ func (o *OAuthService) RegisterClient(ctx context.Context, registrationEndpoint,
 		ClientID     string `json:"client_id"`
 		ClientSecret string `json:"client_secret"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxTokenResponseBytes)).Decode(&result); err != nil {
 		return "", "", fmt.Errorf("decoding registration response: %w", err)
 	}
 	return result.ClientID, result.ClientSecret, nil
@@ -208,12 +220,12 @@ func (o *OAuthService) ExchangeCode(ctx context.Context, meta *OAuthMetadata, cl
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxTokenResponseBytes))
 		return nil, fmt.Errorf("token exchange failed (status %d): %s", resp.StatusCode, string(body))
 	}
 
 	var tokenResp OAuthTokenResponse
-	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxTokenResponseBytes)).Decode(&tokenResp); err != nil {
 		return nil, fmt.Errorf("decoding token response: %w", err)
 	}
 	return &tokenResp, nil
@@ -243,15 +255,48 @@ func (o *OAuthService) RefreshToken(ctx context.Context, meta *OAuthMetadata, cl
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxTokenResponseBytes))
 		return nil, fmt.Errorf("token refresh failed (status %d): %s", resp.StatusCode, string(body))
 	}
 
 	var tokenResp OAuthTokenResponse
-	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxTokenResponseBytes)).Decode(&tokenResp); err != nil {
 		return nil, fmt.Errorf("decoding refresh response: %w", err)
 	}
 	return &tokenResp, nil
+}
+
+// RevokeToken revokes an access token at the authorization server's revocation
+// endpoint (RFC 7009). Errors are returned but callers should treat revocation
+// as best-effort — the token is cleared locally regardless.
+func (o *OAuthService) RevokeToken(ctx context.Context, meta *OAuthMetadata, accessToken string) error {
+	if meta.RevocationEndpoint == "" {
+		return fmt.Errorf("authorization server does not support token revocation")
+	}
+
+	data := url.Values{
+		"token":           {accessToken},
+		"token_type_hint": {"access_token"},
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, meta.RevocationEndpoint, strings.NewReader(data.Encode()))
+	if err != nil {
+		return fmt.Errorf("creating revocation request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := o.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("revoking token: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// RFC 7009: the server returns 200 even if the token was already invalid.
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxTokenResponseBytes))
+		return fmt.Errorf("token revocation failed (status %d): %s", resp.StatusCode, string(body))
+	}
+	return nil
 }
 
 // GenerateState creates a cryptographically random state parameter.
