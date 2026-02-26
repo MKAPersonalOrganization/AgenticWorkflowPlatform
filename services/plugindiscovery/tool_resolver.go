@@ -1,0 +1,211 @@
+package plugindiscovery
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+
+	"school-with-ai/domain"
+	"school-with-ai/foundation/agent"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+)
+
+// MCPToolResolver implements agent.ToolResolver to provide tools from
+// connected MCP servers for a specific user.
+type MCPToolResolver struct {
+	service *Service
+	userID  string
+}
+
+// NewMCPToolResolver creates a tool resolver for a user's MCP connectors.
+func NewMCPToolResolver(service *Service, userID string) *MCPToolResolver {
+	return &MCPToolResolver{
+		service: service,
+		userID:  userID,
+	}
+}
+
+// Resolve returns all tools from all connected MCP servers belonging to the user.
+func (r *MCPToolResolver) Resolve(ctx context.Context) ([]agent.Tool, error) {
+	connectors, err := r.service.ListConnectors(ctx, r.userID)
+	if err != nil {
+		return nil, fmt.Errorf("listing connectors: %w", err)
+	}
+
+	var tools []agent.Tool
+	for _, conn := range connectors {
+		if conn.Status != domain.ConnectorStatusConnected {
+			continue
+		}
+
+		session := r.service.GetSessionManager().GetSession(conn.ID)
+		if session == nil {
+			continue
+		}
+
+		discoveredTools, err := r.service.GetConnectorTools(ctx, conn.ID)
+		if err != nil {
+			continue
+		}
+
+		for _, dt := range discoveredTools {
+			tools = append(tools, &mcpRemoteTool{
+				connectorID: conn.ID,
+				name:        dt.Name,
+				description: dt.Description,
+				inputSchema: dt.InputSchema,
+				session:     session,
+			})
+		}
+	}
+
+	return tools, nil
+}
+
+// mcpRemoteTool wraps a discovered MCP tool as an agent.ExecutableTool.
+type mcpRemoteTool struct {
+	connectorID string
+	name        string
+	description string
+	inputSchema string // JSON Schema string
+	session     *mcp.ClientSession
+}
+
+// NewMCPRemoteTool creates an agent.ExecutableTool that delegates to a remote MCP session.
+func NewMCPRemoteTool(connectorID, name, description, inputSchema string, session *mcp.ClientSession) agent.ExecutableTool {
+	return &mcpRemoteTool{
+		connectorID: connectorID,
+		name:        name,
+		description: description,
+		inputSchema: inputSchema,
+		session:     session,
+	}
+}
+
+// Name returns the tool's unique identifier, prefixed to avoid collisions.
+func (t *mcpRemoteTool) Name() string {
+	return t.name
+}
+
+// Description returns the tool's description.
+func (t *mcpRemoteTool) Description() string {
+	return t.description
+}
+
+// Schema parses the JSON Schema into an agent.Schema.
+func (t *mcpRemoteTool) Schema() *agent.Schema {
+	if t.inputSchema == "" || t.inputSchema == "{}" {
+		return &agent.Schema{
+			Type:        agent.TypeObject,
+			Description: t.description,
+		}
+	}
+
+	var raw map[string]any
+	if err := json.Unmarshal([]byte(t.inputSchema), &raw); err != nil {
+		return &agent.Schema{
+			Type:        agent.TypeObject,
+			Description: t.description,
+		}
+	}
+
+	return convertJSONSchemaToAgentSchema(raw)
+}
+
+// Execute calls the tool on the remote MCP server.
+func (t *mcpRemoteTool) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
+	var arguments map[string]any
+	if len(args.Raw) > 0 {
+		if err := json.Unmarshal(args.Raw, &arguments); err != nil {
+			return agent.ErrorResult(fmt.Errorf("invalid arguments: %w", err)), nil
+		}
+	}
+
+	result, err := t.session.CallTool(ctx, &mcp.CallToolParams{
+		Name:      t.name,
+		Arguments: arguments,
+	})
+	if err != nil {
+		return agent.ErrorResult(fmt.Errorf("MCP tool call failed: %w", err)), nil
+	}
+
+	if result.IsError {
+		// Extract error text from content.
+		var errText string
+		for _, c := range result.Content {
+			if tc, ok := c.(*mcp.TextContent); ok {
+				errText += tc.Text
+			}
+		}
+		return agent.Result{
+			Content: []any{errText},
+			Error:   fmt.Errorf("tool returned error: %s", errText),
+		}, nil
+	}
+
+	// Collect all text content from the result.
+	var texts []string
+	for _, c := range result.Content {
+		switch v := c.(type) {
+		case *mcp.TextContent:
+			texts = append(texts, v.Text)
+		default:
+			b, _ := json.Marshal(c)
+			texts = append(texts, string(b))
+		}
+	}
+
+	content := make([]any, len(texts))
+	for i, t := range texts {
+		content[i] = t
+	}
+
+	return agent.Result{Content: content}, nil
+}
+
+// convertJSONSchemaToAgentSchema converts a raw JSON Schema map to agent.Schema.
+func convertJSONSchemaToAgentSchema(raw map[string]any) *agent.Schema {
+	schema := &agent.Schema{}
+
+	if t, ok := raw["type"].(string); ok {
+		schema.Type = agent.SchemaType(t)
+	} else {
+		schema.Type = agent.TypeObject
+	}
+
+	if d, ok := raw["description"].(string); ok {
+		schema.Description = d
+	}
+
+	if props, ok := raw["properties"].(map[string]any); ok {
+		schema.Properties = make(map[string]*agent.Schema, len(props))
+		for name, propRaw := range props {
+			if propMap, ok := propRaw.(map[string]any); ok {
+				schema.Properties[name] = convertJSONSchemaToAgentSchema(propMap)
+			}
+		}
+	}
+
+	if req, ok := raw["required"].([]any); ok {
+		for _, r := range req {
+			if s, ok := r.(string); ok {
+				schema.Required = append(schema.Required, s)
+			}
+		}
+	}
+
+	if items, ok := raw["items"].(map[string]any); ok {
+		schema.Items = convertJSONSchemaToAgentSchema(items)
+	}
+
+	if enum, ok := raw["enum"].([]any); ok {
+		for _, e := range enum {
+			if s, ok := e.(string); ok {
+				schema.Enum = append(schema.Enum, s)
+			}
+		}
+	}
+
+	return schema
+}

@@ -19,6 +19,11 @@ export const toolsSidebar = () => ({
     profileTab: 'details',
 
     init() {
+        // Refresh plugins when MCP connection state changes
+        window.addEventListener('mcp-state-changed', () => {
+            this.fetchPlugins();
+        });
+
         // When thread-history-sidebar opens, close tools sidebar
         const threadSidebar = document.querySelector('[data-tui-sidebar-wrapper][data-tui-sidebar-id="thread-history-sidebar"]');
         if (threadSidebar) {

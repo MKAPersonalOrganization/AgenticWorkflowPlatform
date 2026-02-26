@@ -313,3 +313,41 @@ CREATE TABLE IF NOT EXISTS agui_tool_states (
 );
 
 CREATE INDEX IF NOT EXISTS idx_agui_tool_states_thread ON agui_tool_states(thread_id);
+
+-- Version: 1.23
+-- Description: Create MCP connector tables for user-registered remote MCP servers
+CREATE TABLE IF NOT EXISTS mcp_connectors (
+    id                   VARCHAR(255) PRIMARY KEY,
+    user_id              VARCHAR(255) NOT NULL,
+    title                TEXT NOT NULL,
+    server_url           TEXT NOT NULL,
+    status               TEXT NOT NULL DEFAULT 'created',
+    error_msg            TEXT NOT NULL DEFAULT '',
+
+    oauth_client_id      TEXT,
+    oauth_client_secret  TEXT,
+    oauth_token_json     TEXT,
+    oauth_server_meta    JSONB,
+
+    server_name          TEXT,
+    server_version       TEXT,
+    capabilities         JSONB,
+
+    created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_mcp_connectors_user_id ON mcp_connectors(user_id);
+
+CREATE TABLE IF NOT EXISTS mcp_discovered_tools (
+    id              VARCHAR(255) PRIMARY KEY,
+    connector_id    VARCHAR(255) NOT NULL REFERENCES mcp_connectors(id) ON DELETE CASCADE,
+    name            TEXT NOT NULL,
+    description     TEXT NOT NULL DEFAULT '',
+    input_schema    JSONB NOT NULL DEFAULT '{}',
+    annotations     JSONB NOT NULL DEFAULT '{}',
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_mcp_discovered_tools_connector ON mcp_discovered_tools(connector_id);

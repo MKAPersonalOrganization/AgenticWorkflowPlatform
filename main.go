@@ -53,6 +53,7 @@ import (
 	"school-with-ai/services/edgequake"
 	"school-with-ai/services/memory"
 	"school-with-ai/services/permissions"
+	"school-with-ai/services/plugindiscovery"
 	"school-with-ai/services/rag/users"
 	"school-with-ai/services/resources"
 	"school-with-ai/services/taskmanagement"
@@ -67,6 +68,7 @@ import (
 	bannerhandlers "school-with-ai/handlers/banner"
 	healthhandlers "school-with-ai/handlers/health"
 	knowledgehandlers "school-with-ai/handlers/knowledge"
+	mcphandler "school-with-ai/handlers/mcp"
 	resourceshandlers "school-with-ai/handlers/resources"
 	taskmgmthandlers "school-with-ai/handlers/taskmgmt"
 	wkspermhandlers "school-with-ai/handlers/workspacepermissions"
@@ -372,6 +374,12 @@ func run(ctx context.Context, log *logger.Logger) error {
 	}
 	log.Info(ctx, "startup", "status", "tool registry initialized")
 
+	// Create MCP plugin discovery service
+	mcpConnectorRepo := sqldb.NewPostgresMCPConnectorRepository(db)
+	mcpService := plugindiscovery.NewService(log, mcpConnectorRepo, cfg.Auth.AppURL+"/v1/mcp/oauth/callback", toolRegistry)
+	defer mcpService.Shutdown()
+	log.Info(ctx, "startup", "status", "mcp plugin discovery service initialized")
+
 	// Create and initialize permissions service
 	permissionsService := permissions.NewService(log, sqldb.NewPostgresPermissionsRepository(db))
 	log.Info(ctx, "startup", "status", "permissions service initialized")
@@ -435,6 +443,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 			edgequakeService,            // Edgequake service for KB tools
 			cfg.Edgequake.BaseURL,       // Edgequake base URL for raw KB queries
 			cfg.Edgequake.TenantID,      // Tenant ID for edgequake
+			mcpService,                  // MCP plugin discovery service
 		)
 		if err != nil {
 			return fmt.Errorf("creating custom runner: %w", err)
@@ -639,6 +648,19 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Get("/v1/plugins", authMiddleware.RequireAuthFunc(handler.ListPlugins))
 	r.Put("/v1/plugins/{pluginId}", authMiddleware.RequireAuthFunc(handler.TogglePlugin))
 	r.Put("/v1/plugins/{pluginId}/tools/{toolId}", authMiddleware.RequireAuthFunc(handler.TogglePluginTool))
+
+	// MCP Connector endpoints
+	mcpHandler := mcphandler.NewHandler(log, mcpService)
+	r.Get("/v1/mcp/connectors", authMiddleware.RequireAuthFunc(mcpHandler.ListConnectors))
+	r.Post("/v1/mcp/connectors", authMiddleware.RequireAuthFunc(mcpHandler.CreateConnector))
+	r.Get("/v1/mcp/connectors/{id}", authMiddleware.RequireAuthFunc(mcpHandler.GetConnector))
+	r.Delete("/v1/mcp/connectors/{id}", authMiddleware.RequireAuthFunc(mcpHandler.DeleteConnector))
+	r.Post("/v1/mcp/connectors/{id}/connect", authMiddleware.RequireAuthFunc(mcpHandler.Connect))
+	r.Post("/v1/mcp/connectors/{id}/disconnect", authMiddleware.RequireAuthFunc(mcpHandler.Disconnect))
+	r.Get("/v1/mcp/connectors/{id}/tools", authMiddleware.RequireAuthFunc(mcpHandler.ListTools))
+	r.Post("/v1/mcp/connectors/{id}/refresh", authMiddleware.RequireAuthFunc(mcpHandler.RefreshTools))
+	// OAuth callback (public — called by external OAuth provider redirect)
+	r.Get("/v1/mcp/oauth/callback", mcpHandler.OAuthCallback)
 
 	r.Get("/v1/documents", authMiddleware.RequireAuthFunc(handler.ListDocuments))
 	r.Post("/v1/documents", authMiddleware.RequireAuthFunc(handler.UploadDocument))

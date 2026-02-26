@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"strings"
 
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
@@ -18,6 +19,7 @@ import (
 	"school-with-ai/services/edgequake"
 	"school-with-ai/services/memory"
 	"school-with-ai/services/permissions"
+	"school-with-ai/services/plugindiscovery"
 	smiddleware "school-with-ai/services/studentprofile/middleware"
 	"school-with-ai/services/toolregistry"
 	"school-with-ai/services/workspacepermissions"
@@ -45,6 +47,7 @@ type RunnerAdapter struct {
 	edgequakeBaseURL   string
 	edgequakeTenantID  string
 	configResolver     ModelConfigResolver
+	mcpService         *plugindiscovery.Service
 }
 
 // NewRunnerAdapter creates a new runner adapter.
@@ -64,6 +67,7 @@ func NewRunnerAdapter(
 	edgequakeService *edgequake.Service,
 	edgequakeBaseURL string,
 	edgequakeTenantID string,
+	mcpService *plugindiscovery.Service,
 ) (*RunnerAdapter, error) {
 	if configResolver == nil {
 		return nil, fmt.Errorf("model config resolver is required")
@@ -84,6 +88,7 @@ func NewRunnerAdapter(
 		edgequakeBaseURL:   edgequakeBaseURL,
 		edgequakeTenantID:  edgequakeTenantID,
 		configResolver:     configResolver,
+		mcpService:         mcpService,
 	}
 
 	return r, nil
@@ -110,6 +115,7 @@ func (r *RunnerAdapter) buildEngine(ctx context.Context, modelCfg *agent.ModelCo
 		edgequakeService:   r.edgequakeService,
 		edgequakeBaseURL:   r.edgequakeBaseURL,
 		edgequakeTenantID:  r.edgequakeTenantID,
+		mcpService:         r.mcpService,
 	}
 
 	return engine.New(chatClient, provider, nil, nil), nil
@@ -353,6 +359,7 @@ type RegistryAgentProvider struct {
 	edgequakeService   *edgequake.Service
 	edgequakeBaseURL   string
 	edgequakeTenantID  string
+	mcpService         *plugindiscovery.Service
 }
 
 func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (core.AgentConfig, error) {
@@ -410,14 +417,30 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 			enabledToolSetIDs = []string{}
 		}
 
-		// Add tools from enabled tool sets
+		// Add tools from enabled tool sets (skip MCP sets — handled separately below)
 		for _, toolSetID := range enabledToolSetIDs {
+			if strings.HasPrefix(toolSetID, "mcp-") {
+				continue // MCP toolsets handled below
+			}
 			toolsFromSet, err := factory.CreateExecutableToolsFromSet(ctx, toolSetID)
 			if err != nil {
 				// Skip tool sets that can't be processed
 				continue
 			}
 			config.Tools = append(config.Tools, toolsFromSet...)
+		}
+
+		// Resolve MCP tools from user's connected MCP servers
+		if p.mcpService != nil && userID != "" {
+			mcpTools := p.mcpService.ResolveEnabledTools(ctx, userID,
+				func(toolSetID string) bool {
+					return p.permissionsService.HasToolSetPermission(ctx, userID, name, toolSetID)
+				},
+				func(toolSetID, toolID string) bool {
+					return p.permissionsService.HasPermission(ctx, userID, name, toolSetID, toolID)
+				},
+			)
+			config.Tools = append(config.Tools, mcpTools...)
 		}
 	}
 
