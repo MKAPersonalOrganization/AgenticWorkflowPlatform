@@ -1,14 +1,22 @@
 /**
  * Tools Sidebar Component
- * Handles plugin and tool toggling logic
+ * Handles plugin browsing and inline profile/management display.
+ * Everything stays within the SPA — no full-page navigations.
+ *
+ * Sidebar: Search & browse only (like VS Code / IntelliJ extensions sidebar).
+ * Detail panel: Opens in the editor area with profile info + enable/disable + per-tool toggles.
  */
 export const toolsSidebar = () => ({
     open: false,
     plugins: [],
     loading: false,
     search: '',
-    expandedSets: [],
     _loaded: false,
+
+    /** The plugin whose detail panel is open (null = closed) */
+    profilePlugin: null,
+    /** Active tab in the detail panel: 'details' | 'tools' */
+    profileTab: 'details',
 
     init() {
         // When thread-history-sidebar opens, close tools sidebar
@@ -38,7 +46,7 @@ export const toolsSidebar = () => ({
             }
         } catch (e) {
             /* ignore */
-}
+        }
         return '';
     },
 
@@ -59,6 +67,9 @@ export const toolsSidebar = () => ({
                 await this.fetchPlugins();
                 this._loaded = true;
             }
+        } else {
+            // When closing the sidebar, also close the detail panel
+            this.profilePlugin = null;
         }
     },
 
@@ -109,6 +120,21 @@ export const toolsSidebar = () => ({
         };
     },
 
+    // ── Navigation ──────────────────────────────────────────────────────
+
+    /** Show the plugin detail panel inline (no page navigation) */
+    openProfile(plugin) {
+        this.profilePlugin = plugin;
+        this.profileTab = 'details';
+    },
+
+    /** Close the detail panel */
+    closeProfile() {
+        this.profilePlugin = null;
+    },
+
+    // ── Toggle actions (used from the detail panel) ─────────────────────
+
     async togglePlugin(plugin) {
         const newState = !plugin.enabled;
         try {
@@ -149,18 +175,5 @@ export const toolsSidebar = () => ({
         } catch (err) {
             console.error('Failed to toggle tool:', err);
         }
-    },
-
-    toggleExpand(plugin) {
-        const idx = this.expandedSets.indexOf(plugin.id);
-        if (idx === -1) {
-            this.expandedSets.push(plugin.id);
-        } else {
-            this.expandedSets.splice(idx, 1);
-        }
-    },
-
-    isExpanded(plugin) {
-        return this.expandedSets.includes(plugin.id);
     }
 });
