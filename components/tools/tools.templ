@@ -73,6 +73,43 @@ templ ToolsSidebar() {
 				</div>
 				<!-- Scrollable plugin list -->
 				<div class="flex-1 overflow-y-auto scrollbar-thin">
+					<!-- ═══════ MCP SERVERS SECTION ═══════ -->
+					<div x-data="mcpConnectors">
+						<div class="flex items-center justify-between px-3 py-1.5 bg-muted/30 border-b border-border">
+							<span class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{ i18n.T(ctx, "MCP Servers") }</span>
+							<button
+								@click="mcpOpenAddDialog()"
+								class="p-0.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+								title={ i18n.T(ctx, "Add MCP Server") }
+							>
+								@icon.Plus(icon.Props{Class: "size-3.5"})
+							</button>
+						</div>
+						<!-- MCP connector cards -->
+						<template x-if="mcpConnectors.length > 0">
+							<div class="divide-y divide-border/50">
+								@MCPConnectorCard()
+							</div>
+						</template>
+						<template x-if="mcpConnectors.length === 0">
+							<div class="px-3 py-3 text-center">
+								<button
+									@click="mcpOpenAddDialog()"
+									class="text-xs text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1"
+								>
+									@icon.Plus(icon.Props{Class: "size-3"})
+									{ i18n.T(ctx, "Add your first MCP server") }
+								</button>
+							</div>
+						</template>
+						<!-- MCP Dialogs -->
+						@MCPAddDialog()
+						@MCPConnectorDetailDialog()
+					</div>
+					<!-- ═══════ BUILT-IN PLUGINS SECTION ═══════ -->
+					<div class="flex items-center px-3 py-1.5 bg-muted/30 border-b border-border">
+						<span class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{ i18n.T(ctx, "Built-in Plugins") }</span>
+					</div>
 					<!-- Loading skeleton -->
 					<template x-if="loading && plugins.length === 0">
 						<div class="divide-y divide-border">

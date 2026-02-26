@@ -3,6 +3,7 @@ package toolregistry
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -84,13 +85,23 @@ func (r *Registry) Initialize(ctx context.Context) error {
 		return fmt.Errorf("failed to load tool sets: %w", err)
 	}
 
-	// Cache existing tools
+	// Cache existing tools (skip MCP tools — they are ephemeral and
+	// will be re-registered when connectors reconnect).
 	for _, tool := range tools {
+		if strings.HasPrefix(tool.ID, "mcp-") {
+			// Clean up stale MCP tools from the DB.
+			_ = r.repo.DeleteTool(ctx, tool.ID)
+			continue
+		}
 		r.toolCache[tool.ID] = &tool
 	}
 
-	// Cache existing tool sets
+	// Cache existing tool sets (skip MCP sets — same reason).
 	for _, toolSet := range toolSets {
+		if strings.HasPrefix(toolSet.ID, "mcp-") {
+			_ = r.repo.DeleteToolSet(ctx, toolSet.ID)
+			continue
+		}
 		r.toolSetCache[toolSet.ID] = &toolSet
 	}
 
@@ -161,6 +172,19 @@ func (r *Registry) RegisterTool(ctx context.Context, tool *Tool) error {
 	return nil
 }
 
+// UnregisterTool removes a tool from the registry (DB + cache).
+func (r *Registry) UnregisterTool(ctx context.Context, id string) error {
+	if err := r.repo.DeleteTool(ctx, id); err != nil {
+		return fmt.Errorf("failed to delete tool: %w", err)
+	}
+
+	r.mutex.Lock()
+	delete(r.toolCache, id)
+	r.mutex.Unlock()
+
+	return nil
+}
+
 // GetToolSet retrieves a tool set by ID.
 func (r *Registry) GetToolSet(ctx context.Context, id string) (*ToolSet, error) {
 	r.mutex.RLock()
@@ -216,6 +240,32 @@ func (r *Registry) RegisterToolSet(ctx context.Context, toolSet *ToolSet) error 
 	r.mutex.Unlock()
 
 	r.log.Info(ctx, "Tool set registered", "tool_set_id", toolSet.ID, "name", toolSet.Name)
+	return nil
+}
+
+// UnregisterToolSet removes a tool set and its tools from the registry (DB + cache).
+func (r *Registry) UnregisterToolSet(ctx context.Context, id string) error {
+	// Remove child tools first.
+	r.mutex.RLock()
+	ts, exists := r.toolSetCache[id]
+	var toolIDs []string
+	if exists {
+		toolIDs = append(toolIDs, ts.ToolIDs...)
+	}
+	r.mutex.RUnlock()
+
+	for _, toolID := range toolIDs {
+		_ = r.UnregisterTool(ctx, toolID)
+	}
+
+	if err := r.repo.DeleteToolSet(ctx, id); err != nil {
+		return fmt.Errorf("failed to delete tool set: %w", err)
+	}
+
+	r.mutex.Lock()
+	delete(r.toolSetCache, id)
+	r.mutex.Unlock()
+
 	return nil
 }
 
