@@ -68,8 +68,8 @@ export const toolsSidebar = () => ({
                 this._loaded = true;
             }
         } else {
-            // When closing the sidebar, also close the detail panel
-            this.profilePlugin = null;
+            // When closing the sidebar, also close the detail dialog
+            this.closeProfile();
         }
     },
 
@@ -122,14 +122,23 @@ export const toolsSidebar = () => ({
 
     // ── Navigation ──────────────────────────────────────────────────────
 
-    /** Show the plugin detail panel inline (no page navigation) */
+    /** Show the plugin detail dialog */
     openProfile(plugin) {
         this.profilePlugin = plugin;
         this.profileTab = 'details';
+        // Open the dialog via the templui dialog API
+        this.$nextTick(() => {
+            if (window.tui?.dialog) {
+                window.tui.dialog.open('plugin-profile-dialog');
+            }
+        });
     },
 
-    /** Close the detail panel */
+    /** Close the detail dialog */
     closeProfile() {
+        if (window.tui?.dialog) {
+            window.tui.dialog.close('plugin-profile-dialog');
+        }
         this.profilePlugin = null;
     },
 

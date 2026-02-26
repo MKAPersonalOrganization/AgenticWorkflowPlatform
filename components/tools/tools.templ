@@ -2,6 +2,7 @@ package tools
 
 import (
 	"school-with-ai/components/button"
+	"school-with-ai/components/dialog"
 	"school-with-ai/components/i18n"
 	"school-with-ai/components/icon"
 )
@@ -153,217 +154,135 @@ templ ToolsSidebar() {
 				</div>
 			</div>
 		</aside>
-		<!-- ═══════════ DETAIL PANEL (editor-tab area, VS Code / IntelliJ style) ═══════════ -->
-		<div
-			x-show="profilePlugin"
-			x-transition:enter="transition ease-out duration-200"
-			x-transition:enter-start="opacity-0 translate-y-2"
-			x-transition:enter-end="opacity-100 translate-y-0"
-			x-transition:leave="transition ease-in duration-150"
-			x-transition:leave-start="opacity-100 translate-y-0"
-			x-transition:leave-end="opacity-0 translate-y-2"
-			x-cloak
-			class="fixed inset-0 z-40 bg-background overflow-hidden flex flex-col"
-			style="left: calc(3rem + 20rem)"
-		>
-			<template x-if="profilePlugin">
-				<div class="flex flex-col h-full overflow-hidden">
-					<!-- Editor tab bar -->
-					<div class="flex items-center h-9 bg-sidebar border-b border-border shrink-0 px-1 gap-px">
-						<div class="flex items-center gap-1.5 px-3 h-full bg-background border-r border-border text-xs font-medium text-foreground">
-							@icon.Puzzle(icon.Props{Class: "size-3.5 text-primary"})
-							<span x-text="profilePlugin.name" class="truncate max-w-[200px]"></span>
-							<button
-								@click="closeProfile()"
-								class="ml-2 p-0.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-							>
-								@icon.X(icon.Props{Class: "size-3"})
-							</button>
-						</div>
-					</div>
-					<!-- Scrollable content -->
-					<div class="flex-1 overflow-y-auto">
-						<!-- Banner header -->
-						<div class="bg-sidebar border-b border-border">
-							<div class="max-w-5xl mx-auto px-6 py-5">
-								<div class="flex items-start gap-5">
-									<!-- Icon -->
-									<div class="size-[72px] rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/10 flex items-center justify-center shrink-0 shadow-sm">
-										@icon.Puzzle(icon.Props{Class: "size-9 text-primary"})
-									</div>
-									<!-- Info -->
-									<div class="flex-1 min-w-0">
-										<h1 x-text="profilePlugin.name" class="text-xl font-bold text-foreground"></h1>
-										<p x-text="profilePlugin.description" class="text-sm text-muted-foreground leading-relaxed mt-1 max-w-2xl"></p>
-										<!-- Stats row -->
-										<div class="flex items-center gap-3 mt-3 text-xs text-muted-foreground">
-											<span class="flex items-center gap-1">
-												@icon.Tag(icon.Props{Class: "size-3"})
-												<span x-text="profilePlugin.category"></span>
+		<!-- ═══════════ PLUGIN DETAIL DIALOG ═══════════ -->
+		@dialog.Dialog(dialog.Props{
+			ID: "plugin-profile-dialog",
+		}) {
+			@dialog.Content(dialog.ContentProps{
+				Class: "sm:max-w-2xl max-h-[90vh] flex flex-col p-0 overflow-hidden",
+			}) {
+				<template x-if="profilePlugin">
+					<div class="flex flex-col h-full overflow-hidden">
+						@dialog.Header(dialog.HeaderProps{Class: "p-4 pb-3 border-b border-border"}) {
+							<div class="flex items-start gap-4">
+								<!-- Plugin icon -->
+								<div
+									class="size-11 rounded-lg flex items-center justify-center shrink-0"
+									:class="profilePlugin.enabled ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'"
+								>
+									@icon.Puzzle(icon.Props{Class: "size-5"})
+								</div>
+								<div class="flex-1 min-w-0">
+									@dialog.Title(dialog.TitleProps{Class: "flex items-center gap-2"}) {
+										<span x-text="profilePlugin.name"></span>
+										<template x-if="profilePlugin.enabled">
+											<span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+												{ i18n.T(ctx, "Enabled") }
 											</span>
-											<span class="text-border">|</span>
-											<span class="flex items-center gap-1">
-												@icon.Blocks(icon.Props{Class: "size-3"})
-												<span x-text="profilePlugin.tools.length + ' tools'"></span>
+										</template>
+										<template x-if="!profilePlugin.enabled">
+											<span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+												{ i18n.T(ctx, "Disabled") }
 											</span>
-											<span class="text-border">|</span>
-											<span class="flex items-center gap-1">
-												@icon.CircleCheck(icon.Props{Class: "size-3"})
-												<span x-text="profilePlugin.tools.filter(t => t.enabled).length + ' active'"></span>
-											</span>
-										</div>
-										<!-- Action buttons — like VS Code Install/Uninstall -->
-										<div class="flex items-center gap-2 mt-4">
-											<button
-												@click="togglePlugin(profilePlugin)"
-												class="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium rounded-md transition-colors"
-												:class="profilePlugin.enabled
-													? 'bg-destructive/10 text-destructive hover:bg-destructive/20 border border-destructive/20'
-													: 'bg-primary text-primary-foreground hover:bg-primary/90'"
-											>
-												<template x-if="!profilePlugin.enabled">
-													<span class="flex items-center gap-1.5">
-														@icon.Download(icon.Props{Class: "size-3.5"})
-														{ i18n.T(ctx, "Enable") }
-													</span>
-												</template>
-												<template x-if="profilePlugin.enabled">
-													<span class="flex items-center gap-1.5">
-														@icon.X(icon.Props{Class: "size-3.5"})
-														{ i18n.T(ctx, "Disable") }
-													</span>
-												</template>
-											</button>
-										</div>
-									</div>
+										</template>
+									}
+									@dialog.Description(dialog.DescriptionProps{}) {
+										<span x-text="profilePlugin.description"></span>
+									}
 								</div>
 							</div>
-						</div>
-						<!-- Body: Tabs + side metadata -->
-						<div class="max-w-5xl mx-auto px-6 py-6">
-							<div class="flex gap-8">
-								<!-- Main content area -->
-								<div class="flex-1 min-w-0">
-									<!-- Tab switcher -->
-									<div class="flex items-center gap-0 border-b border-border mb-5">
-										<button
-											@click="profileTab = 'details'"
-											class="px-4 py-2 text-xs font-medium transition-colors border-b-2 -mb-px"
-											:class="profileTab === 'details' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'"
-										>
-											@icon.Info(icon.Props{Class: "size-3.5 inline mr-1.5 -mt-px"})
-											{ i18n.T(ctx, "Details") }
-										</button>
-										<button
-											@click="profileTab = 'tools'"
-											class="px-4 py-2 text-xs font-medium transition-colors border-b-2 -mb-px"
-											:class="profileTab === 'tools' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'"
-										>
-											@icon.Wrench(icon.Props{Class: "size-3.5 inline mr-1.5 -mt-px"})
-											{ i18n.T(ctx, "Feature Contributions") }
-										</button>
-									</div>
-									<!-- ── Details tab ── -->
-									<div x-show="profileTab === 'details'">
-										<div class="prose prose-sm dark:prose-invert max-w-none">
-											<p x-text="profilePlugin.description" class="text-muted-foreground leading-relaxed"></p>
-											<template x-if="profilePlugin.tools.length > 0">
-												<div>
-													<h3 class="text-sm font-semibold text-foreground mt-6 mb-3 flex items-center gap-2">
-														@icon.Sparkles(icon.Props{Class: "size-4 text-primary"})
-														{ i18n.T(ctx, "What this plugin provides") }
-													</h3>
-													<ul class="space-y-2.5 list-none pl-0 mt-0">
-														<template x-for="tool in profilePlugin.tools" :key="tool.id">
-															<li class="flex items-start gap-2.5 text-sm text-muted-foreground">
-																@icon.ChevronRight(icon.Props{Class: "size-3.5 mt-0.5 text-primary shrink-0"})
-																<span>
-																	<span class="font-medium text-foreground" x-text="tool.name"></span>
-																	<span>— </span>
-																	<span x-text="tool.description"></span>
-																</span>
-															</li>
-														</template>
-													</ul>
-												</div>
-											</template>
-										</div>
-									</div>
-									<!-- ── Feature Contributions tab (with inline toggles) ── -->
-									<div x-show="profileTab === 'tools'">
-										<template x-if="profilePlugin.tools.length === 0">
-											<div class="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
-												@icon.PackageOpen(icon.Props{Class: "size-10 opacity-20"})
-												<p class="text-sm">{ i18n.T(ctx, "No tools registered for this plugin") }</p>
-											</div>
-										</template>
-										<template x-if="profilePlugin.tools.length > 0">
-											<div class="border border-border rounded-lg overflow-hidden">
-												<table class="w-full text-sm">
-													<thead>
-														<tr class="bg-muted/50 border-b border-border">
-															<th class="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-																{ i18n.T(ctx, "Tool") }
-															</th>
-															<th class="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden md:table-cell">
-																{ i18n.T(ctx, "Category") }
-															</th>
-															<th class="text-center px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider w-24">
-																{ i18n.T(ctx, "Enabled") }
-															</th>
-														</tr>
-													</thead>
-													<tbody class="divide-y divide-border/50">
-														<template x-for="tool in profilePlugin.tools" :key="tool.id">
-															<tr class="hover:bg-accent/30 transition-colors">
-																<td class="px-4 py-3">
-																	<div class="flex items-center gap-2.5">
-																		<div class="size-7 rounded bg-accent flex items-center justify-center shrink-0">
-																			@icon.Cog(icon.Props{Class: "size-3.5 text-muted-foreground"})
-																		</div>
-																		<div class="min-w-0">
-																			<div class="font-medium text-foreground truncate" x-text="tool.name"></div>
-																			<div class="text-xs text-muted-foreground truncate max-w-sm" x-text="tool.description"></div>
-																		</div>
-																	</div>
-																</td>
-																<td class="px-4 py-3 hidden md:table-cell">
-																	<template x-if="tool.category">
-																		<span class="inline-block px-2 py-0.5 text-[10px] font-medium rounded-full bg-accent text-muted-foreground" x-text="tool.category"></span>
-																	</template>
-																	<template x-if="!tool.category">
-																		<span class="text-xs text-muted-foreground/40">—</span>
-																	</template>
-																</td>
-																<td class="px-4 py-3">
-																	<div class="flex justify-center">
-																		<button
-																			@click="toggleTool(profilePlugin, tool)"
-																			class="relative inline-flex h-5 w-9 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
-																			:class="tool.enabled ? 'bg-primary' : 'bg-input'"
-																			role="switch"
-																			:aria-checked="tool.enabled"
-																			:aria-label="tool.name"
-																			:disabled="!profilePlugin.enabled"
-																		>
-																			<span
-																				class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow ring-0 transition-transform duration-200 ease-in-out"
-																				:class="tool.enabled ? 'translate-x-4' : 'translate-x-0'"
-																			></span>
-																		</button>
-																	</div>
-																</td>
-															</tr>
-														</template>
-													</tbody>
-												</table>
-											</div>
-										</template>
-									</div>
+						}
+						<!-- Action bar -->
+						<div class="px-4 py-2.5 border-b border-border bg-muted/50">
+							<div class="flex items-center justify-between">
+								<!-- Stats -->
+								<div class="flex items-center gap-3 text-xs text-muted-foreground">
+									<span class="flex items-center gap-1.5">
+										@icon.Tag(icon.Props{Class: "size-3 opacity-60"})
+										<span x-text="profilePlugin.category"></span>
+									</span>
+									<span class="text-border">|</span>
+									<span class="flex items-center gap-1.5">
+										@icon.Blocks(icon.Props{Class: "size-3 opacity-60"})
+										<span x-text="profilePlugin.tools.length"></span> { i18n.T(ctx, "tools") }
+									</span>
+									<span class="text-border">|</span>
+									<span class="flex items-center gap-1.5">
+										@icon.CircleCheck(icon.Props{Class: "size-3 opacity-60"})
+										<span x-text="profilePlugin.tools.filter(t => t.enabled).length"></span> { i18n.T(ctx, "active") }
+									</span>
 								</div>
-								<!-- Right sidebar metadata -->
-								<aside class="w-52 shrink-0 hidden lg:block">
-									<div class="space-y-4 sticky top-6">
+								<!-- Enable/Disable toggle -->
+								<button
+									@click="togglePlugin(profilePlugin)"
+									class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors"
+									:class="profilePlugin.enabled
+										? 'bg-destructive/10 text-destructive hover:bg-destructive/20 border border-destructive/20'
+										: 'bg-primary text-primary-foreground hover:bg-primary/90'"
+								>
+									<template x-if="!profilePlugin.enabled">
+										<span class="flex items-center gap-1.5">
+											@icon.Download(icon.Props{Class: "size-3.5"})
+											{ i18n.T(ctx, "Enable") }
+										</span>
+									</template>
+									<template x-if="profilePlugin.enabled">
+										<span class="flex items-center gap-1.5">
+											@icon.X(icon.Props{Class: "size-3.5"})
+											{ i18n.T(ctx, "Disable") }
+										</span>
+									</template>
+								</button>
+							</div>
+						</div>
+						<!-- Tab switcher -->
+						<div class="flex items-center gap-0 border-b border-border px-4">
+							<button
+								@click="profileTab = 'details'"
+								class="px-3 py-2 text-xs font-medium transition-colors border-b-2 -mb-px"
+								:class="profileTab === 'details' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'"
+							>
+								@icon.Info(icon.Props{Class: "size-3.5 inline mr-1.5 -mt-px"})
+								{ i18n.T(ctx, "Details") }
+							</button>
+							<button
+								@click="profileTab = 'tools'"
+								class="px-3 py-2 text-xs font-medium transition-colors border-b-2 -mb-px"
+								:class="profileTab === 'tools' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'"
+							>
+								@icon.Wrench(icon.Props{Class: "size-3.5 inline mr-1.5 -mt-px"})
+								{ i18n.T(ctx, "Feature Contributions") }
+							</button>
+						</div>
+						<!-- Scrollable tab content -->
+						<div class="flex-1 overflow-auto scrollbar-thin p-4">
+							<!-- ── Details tab ── -->
+							<div x-show="profileTab === 'details'">
+								<div class="space-y-5">
+									<p x-text="profilePlugin.description" class="text-sm text-muted-foreground leading-relaxed"></p>
+									<template x-if="profilePlugin.tools.length > 0">
+										<div>
+											<div class="flex items-center gap-2 mb-2.5">
+												@icon.Sparkles(icon.Props{Class: "size-4 text-muted-foreground"})
+												<h4 class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{ i18n.T(ctx, "What this plugin provides") }</h4>
+											</div>
+											<div class="space-y-2 pl-6">
+												<template x-for="tool in profilePlugin.tools" :key="tool.id">
+													<div class="border border-border rounded-lg p-2.5 border-l-[3px] bg-card" :class="tool.enabled ? 'border-l-primary' : 'border-l-border opacity-70'">
+														<div class="flex items-center gap-2 mb-1">
+															<span class="text-xs font-semibold text-foreground" x-text="tool.name"></span>
+															<template x-if="tool.category">
+																<span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-accent text-muted-foreground" x-text="tool.category"></span>
+															</template>
+														</div>
+														<p class="text-xs text-muted-foreground leading-relaxed" x-text="tool.description"></p>
+													</div>
+												</template>
+											</div>
+										</div>
+									</template>
+									<!-- Plugin metadata -->
+									<div class="border-t border-border pt-4 grid grid-cols-2 gap-3">
 										<div>
 											<div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 mb-1">{ i18n.T(ctx, "Category") }</div>
 											<div class="text-xs text-foreground flex items-center gap-1.5">
@@ -372,40 +291,106 @@ templ ToolsSidebar() {
 											</div>
 										</div>
 										<div>
-											<div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 mb-1">{ i18n.T(ctx, "Tools") }</div>
-											<div class="text-xs text-foreground" x-text="profilePlugin.tools.length + ' registered'"></div>
-										</div>
-										<div>
-											<div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 mb-1">{ i18n.T(ctx, "Active Tools") }</div>
-											<div class="text-xs text-foreground" x-text="profilePlugin.tools.filter(t=>t.enabled).length + ' of ' + profilePlugin.tools.length"></div>
-										</div>
-										<div>
-											<div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 mb-1">{ i18n.T(ctx, "Status") }</div>
-											<template x-if="profilePlugin.enabled">
-												<div class="text-xs flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
-													@icon.CircleCheck(icon.Props{Class: "size-3"})
-													{ i18n.T(ctx, "Enabled") }
-												</div>
-											</template>
-											<template x-if="!profilePlugin.enabled">
-												<div class="text-xs flex items-center gap-1.5 text-muted-foreground">
-													@icon.CircleDot(icon.Props{Class: "size-3"})
-													{ i18n.T(ctx, "Disabled") }
-												</div>
-											</template>
-										</div>
-										<div>
 											<div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 mb-1">{ i18n.T(ctx, "Plugin ID") }</div>
 											<code class="text-[11px] bg-muted px-1.5 py-0.5 rounded font-mono break-all" x-text="profilePlugin.id"></code>
 										</div>
 									</div>
-								</aside>
+								</div>
+							</div>
+							<!-- ── Feature Contributions tab ── -->
+							<div x-show="profileTab === 'tools'">
+								<template x-if="profilePlugin.tools.length === 0">
+									<div class="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
+										@icon.PackageOpen(icon.Props{Class: "size-10 opacity-20"})
+										<p class="text-sm">{ i18n.T(ctx, "No tools registered for this plugin") }</p>
+									</div>
+								</template>
+								<template x-if="profilePlugin.tools.length > 0">
+									<div class="space-y-2">
+										<template x-for="tool in profilePlugin.tools" :key="tool.id">
+											<div
+												class="group border rounded-lg overflow-hidden transition-all duration-200 border-l-[3px] hover:shadow-md"
+												:class="tool.enabled ? 'border-border border-l-primary bg-card' : 'border-border border-l-border opacity-70'"
+											>
+												<div class="flex items-center justify-between gap-4 p-3">
+													<div class="flex items-start gap-3 flex-1 min-w-0">
+														<div
+															class="size-8 rounded-lg flex items-center justify-center shrink-0"
+															:class="tool.enabled ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'"
+														>
+															@icon.Cog(icon.Props{Class: "size-3.5"})
+														</div>
+														<div class="flex flex-col gap-0.5 flex-1 min-w-0">
+															<div class="flex items-center gap-2">
+																<span x-text="tool.name" class="text-sm font-semibold text-foreground truncate"></span>
+																<template x-if="tool.category">
+																	<span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-accent text-muted-foreground" x-text="tool.category"></span>
+																</template>
+															</div>
+															<p x-text="tool.description" class="text-xs text-muted-foreground line-clamp-2"></p>
+														</div>
+													</div>
+													<div class="flex items-center gap-2 shrink-0">
+														<button
+															@click="toggleTool(profilePlugin, tool)"
+															class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
+															:class="tool.enabled ? 'bg-primary' : 'bg-input'"
+															role="switch"
+															:aria-checked="tool.enabled"
+															:aria-label="tool.name"
+															:disabled="!profilePlugin.enabled"
+														>
+															<span
+																class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200 ease-in-out"
+																:class="tool.enabled ? 'translate-x-4' : 'translate-x-0'"
+															></span>
+														</button>
+													</div>
+												</div>
+											</div>
+										</template>
+									</div>
+								</template>
 							</div>
 						</div>
+						@dialog.Footer(dialog.FooterProps{Class: "px-4 py-3 border-t mt-auto bg-muted/50"}) {
+							<div class="flex items-center justify-between w-full">
+								<div class="flex items-center gap-3 text-xs text-muted-foreground">
+									<span class="flex items-center gap-1.5">
+										@icon.Blocks(icon.Props{Class: "size-3 opacity-60"})
+										<span x-text="profilePlugin.tools.filter(t=>t.enabled).length"></span>/<span x-text="profilePlugin.tools.length"></span> { i18n.T(ctx, "tools active") }
+									</span>
+									<span class="text-border">|</span>
+									<template x-if="profilePlugin.enabled">
+										<span class="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+											@icon.CircleCheck(icon.Props{Class: "size-3"})
+											{ i18n.T(ctx, "Plugin enabled") }
+										</span>
+									</template>
+									<template x-if="!profilePlugin.enabled">
+										<span class="flex items-center gap-1.5">
+											@icon.CircleDot(icon.Props{Class: "size-3 opacity-60"})
+											{ i18n.T(ctx, "Plugin disabled") }
+										</span>
+									</template>
+								</div>
+								@dialog.Close(dialog.CloseProps{For: "plugin-profile-dialog"}) {
+									@button.Button(button.Props{
+										Variant: button.VariantGhost,
+										Class:   "h-8 px-3 text-xs",
+										Attributes: templ.Attributes{
+											"@click": "closeProfile()",
+										},
+									}) {
+										{ i18n.T(ctx, "Close") }
+									}
+								}
+							</div>
+						}
 					</div>
-				</div>
-			</template>
-		</div>
+				</template>
+			}
+		}
 	</div>
 }
 
