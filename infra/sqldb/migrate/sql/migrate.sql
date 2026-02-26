@@ -351,3 +351,8 @@ CREATE TABLE IF NOT EXISTS mcp_discovered_tools (
 );
 
 CREATE INDEX IF NOT EXISTS idx_mcp_discovered_tools_connector ON mcp_discovered_tools(connector_id);
+
+-- Version: 1.24
+-- Description: Add disconnect tracking columns to mcp_connectors
+ALTER TABLE mcp_connectors ADD COLUMN IF NOT EXISTS disconnect_reason TEXT NOT NULL DEFAULT '';
+ALTER TABLE mcp_connectors ADD COLUMN IF NOT EXISTS disconnect_permanent BOOLEAN NOT NULL DEFAULT FALSE;

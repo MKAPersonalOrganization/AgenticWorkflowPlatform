@@ -4,8 +4,19 @@ import (
 	"context"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+)
+
+const (
+	// sessionConnectTimeout limits how long we wait for the MCP handshake
+	// to complete when opening a new session.
+	sessionConnectTimeout = 30 * time.Second
+
+	// defaultHTTPTimeout is applied to the HTTP client used by the
+	// StreamableClientTransport when the caller does not supply one.
+	defaultHTTPTimeout = 30 * time.Second
 )
 
 // SessionEntry holds a live MCP session along with its lifecycle controls.
@@ -50,12 +61,19 @@ func (sm *SessionManager) Connect(ctx context.Context, connectorID, serverURL st
 	}
 	if httpClient != nil {
 		transport.HTTPClient = httpClient
+	} else {
+		transport.HTTPClient = &http.Client{Timeout: defaultHTTPTimeout}
 	}
 
 	// Create a long-lived context for the session.
 	sessionCtx, cancel := context.WithCancel(context.Background())
 
-	session, err := sm.client.Connect(sessionCtx, transport, nil)
+	// Use a bounded timeout for the initial handshake so we don't block
+	// forever if the remote server stalls during initialization.
+	connectCtx, connectCancel := context.WithTimeout(sessionCtx, sessionConnectTimeout)
+	defer connectCancel()
+
+	session, err := sm.client.Connect(connectCtx, transport, nil)
 	if err != nil {
 		cancel()
 		return nil, err

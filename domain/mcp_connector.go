@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 )
 
@@ -28,6 +29,10 @@ type MCPConnector struct {
 	Status    ConnectorStatus `json:"status" db:"status"`
 	ErrorMsg  string          `json:"error_msg,omitempty" db:"error_msg"`
 
+	// Disconnect tracking — distinguishes transient failures from permanent ones.
+	DisconnectReason    string `json:"disconnect_reason,omitempty" db:"disconnect_reason"`
+	DisconnectPermanent bool   `json:"disconnect_permanent,omitempty" db:"disconnect_permanent"`
+
 	// OAuth fields (nullable — set only if the server requires auth)
 	OAuthClientID     sql.NullString `json:"-" db:"oauth_client_id"`
 	OAuthClientSecret sql.NullString `json:"-" db:"oauth_client_secret"` // encrypted at rest
@@ -41,6 +46,37 @@ type MCPConnector struct {
 
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
+}
+
+// Refreshable reports whether this connector should be probed by a background
+// health-check loop. Connected connectors are always refreshable. Disconnected
+// connectors are refreshable only if the disconnect was transient (not permanent).
+func (c *MCPConnector) Refreshable() bool {
+	return c.Status == ConnectorStatusConnected ||
+		(c.Status == ConnectorStatusDisconnected && !c.DisconnectPermanent)
+}
+
+// Transition validates and applies a state change. It enforces:
+//   - "created" is the initial state and cannot be transitioned to.
+//   - moving to "disconnected" requires a reason and a permanence flag.
+//   - moving to any other state clears the disconnect fields.
+func (c *MCPConnector) Transition(status ConnectorStatus, reason string, permanent bool) error {
+	if status == ConnectorStatusCreated {
+		return fmt.Errorf("cannot transition back to created state")
+	}
+	if status == ConnectorStatusDisconnected {
+		if reason == "" {
+			return fmt.Errorf("disconnect reason is required when transitioning to disconnected")
+		}
+	} else {
+		// Clear disconnect fields when moving to a non-disconnected state.
+		reason = ""
+		permanent = false
+	}
+	c.Status = status
+	c.DisconnectReason = reason
+	c.DisconnectPermanent = permanent
+	return nil
 }
 
 // MCPDiscoveredTool represents a tool discovered from a connected MCP server.
@@ -61,6 +97,7 @@ type MCPConnectorRepository interface {
 	Create(ctx context.Context, connector *MCPConnector) error
 	GetByID(ctx context.Context, id string) (*MCPConnector, error)
 	ListByUser(ctx context.Context, userID string) ([]MCPConnector, error)
+	CountByUser(ctx context.Context, userID string) (int, error)
 	Update(ctx context.Context, connector *MCPConnector) error
 	Delete(ctx context.Context, id string) error
 

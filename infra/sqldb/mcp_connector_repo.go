@@ -41,18 +41,21 @@ func (r *PostgresMCPConnectorRepository) Create(ctx context.Context, c *domain.M
 	query := `
 		INSERT INTO mcp_connectors (
 			id, user_id, title, server_url, status, error_msg,
+			disconnect_reason, disconnect_permanent,
 			oauth_client_id, oauth_client_secret, oauth_token_json, oauth_server_meta,
 			server_name, server_version, capabilities,
 			created_at, updated_at
 		) VALUES (
 			$1, $2, $3, $4, $5, $6,
-			$7, $8, $9, $10,
-			$11, $12, $13,
-			$14, $15
+			$7, $8,
+			$9, $10, $11, $12,
+			$13, $14, $15,
+			$16, $17
 		)
 	`
 	_, err := r.db.ExecContext(ctx, query,
 		c.ID, c.UserID, c.Title, c.ServerURL, c.Status, c.ErrorMsg,
+		c.DisconnectReason, c.DisconnectPermanent,
 		c.OAuthClientID, c.OAuthClientSecret, c.OAuthTokenJSON, c.OAuthServerMeta,
 		c.ServerName, c.ServerVersion, c.Capabilities,
 		c.CreatedAt, c.UpdatedAt,
@@ -67,6 +70,7 @@ func (r *PostgresMCPConnectorRepository) Create(ctx context.Context, c *domain.M
 func (r *PostgresMCPConnectorRepository) GetByID(ctx context.Context, id string) (*domain.MCPConnector, error) {
 	query := `
 		SELECT id, user_id, title, server_url, status, error_msg,
+		       disconnect_reason, disconnect_permanent,
 		       oauth_client_id, oauth_client_secret, oauth_token_json, oauth_server_meta,
 		       server_name, server_version, capabilities,
 		       created_at, updated_at
@@ -76,6 +80,7 @@ func (r *PostgresMCPConnectorRepository) GetByID(ctx context.Context, id string)
 	var c domain.MCPConnector
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&c.ID, &c.UserID, &c.Title, &c.ServerURL, &c.Status, &c.ErrorMsg,
+		&c.DisconnectReason, &c.DisconnectPermanent,
 		&c.OAuthClientID, &c.OAuthClientSecret, &c.OAuthTokenJSON, &c.OAuthServerMeta,
 		&c.ServerName, &c.ServerVersion, &c.Capabilities,
 		&c.CreatedAt, &c.UpdatedAt,
@@ -93,6 +98,7 @@ func (r *PostgresMCPConnectorRepository) GetByID(ctx context.Context, id string)
 func (r *PostgresMCPConnectorRepository) ListByUser(ctx context.Context, userID string) ([]domain.MCPConnector, error) {
 	query := `
 		SELECT id, user_id, title, server_url, status, error_msg,
+		       disconnect_reason, disconnect_permanent,
 		       oauth_client_id, oauth_client_secret, oauth_token_json, oauth_server_meta,
 		       server_name, server_version, capabilities,
 		       created_at, updated_at
@@ -111,6 +117,7 @@ func (r *PostgresMCPConnectorRepository) ListByUser(ctx context.Context, userID 
 		var c domain.MCPConnector
 		if err := rows.Scan(
 			&c.ID, &c.UserID, &c.Title, &c.ServerURL, &c.Status, &c.ErrorMsg,
+			&c.DisconnectReason, &c.DisconnectPermanent,
 			&c.OAuthClientID, &c.OAuthClientSecret, &c.OAuthTokenJSON, &c.OAuthServerMeta,
 			&c.ServerName, &c.ServerVersion, &c.Capabilities,
 			&c.CreatedAt, &c.UpdatedAt,
@@ -129,13 +136,15 @@ func (r *PostgresMCPConnectorRepository) Update(ctx context.Context, c *domain.M
 	query := `
 		UPDATE mcp_connectors SET
 			title = $1, server_url = $2, status = $3, error_msg = $4,
-			oauth_client_id = $5, oauth_client_secret = $6, oauth_token_json = $7, oauth_server_meta = $8,
-			server_name = $9, server_version = $10, capabilities = $11,
-			updated_at = $12
-		WHERE id = $13
+			disconnect_reason = $5, disconnect_permanent = $6,
+			oauth_client_id = $7, oauth_client_secret = $8, oauth_token_json = $9, oauth_server_meta = $10,
+			server_name = $11, server_version = $12, capabilities = $13,
+			updated_at = $14
+		WHERE id = $15
 	`
 	result, err := r.db.ExecContext(ctx, query,
 		c.Title, c.ServerURL, c.Status, c.ErrorMsg,
+		c.DisconnectReason, c.DisconnectPermanent,
 		c.OAuthClientID, c.OAuthClientSecret, c.OAuthTokenJSON, c.OAuthServerMeta,
 		c.ServerName, c.ServerVersion, c.Capabilities,
 		c.UpdatedAt, c.ID,
@@ -151,6 +160,16 @@ func (r *PostgresMCPConnectorRepository) Update(ctx context.Context, c *domain.M
 		return fmt.Errorf("mcp connector not found: %s", c.ID)
 	}
 	return nil
+}
+
+// CountByUser returns the number of connectors a user has registered.
+func (r *PostgresMCPConnectorRepository) CountByUser(ctx context.Context, userID string) (int, error) {
+	var count int
+	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM mcp_connectors WHERE user_id = $1`, userID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("counting mcp connectors: %w", err)
+	}
+	return count, nil
 }
 
 // Delete removes a connector by ID.
