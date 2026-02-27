@@ -651,6 +651,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// MCP Connector endpoints
 	mcpHandler := mcphandler.NewHandler(log, mcpService)
 	r.Get("/v1/mcp/connectors", authMiddleware.RequireAuthFunc(mcpHandler.ListConnectors))
+	r.Get("/v1/mcp/connectors/presets", mcpHandler.ListPresets) // Public — no auth needed for preset catalog
 	r.Post("/v1/mcp/connectors", authMiddleware.RequireAuthFunc(mcpHandler.CreateConnector))
 	r.Get("/v1/mcp/connectors/{id}", authMiddleware.RequireAuthFunc(mcpHandler.GetConnector))
 	r.Delete("/v1/mcp/connectors/{id}", authMiddleware.RequireAuthFunc(mcpHandler.DeleteConnector))
@@ -658,6 +659,10 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Post("/v1/mcp/connectors/{id}/disconnect", authMiddleware.RequireAuthFunc(mcpHandler.Disconnect))
 	r.Get("/v1/mcp/connectors/{id}/tools", authMiddleware.RequireAuthFunc(mcpHandler.ListTools))
 	r.Post("/v1/mcp/connectors/{id}/refresh", authMiddleware.RequireAuthFunc(mcpHandler.RefreshTools))
+	// MCP Proxy — authenticated reverse proxy to the connector's MCP server (agentstack pattern).
+	// Supports all HTTP methods so external MCP clients can use connectors directly.
+	r.HandleFunc("/v1/mcp/connectors/{id}/mcp", authMiddleware.RequireAuthFunc(mcpHandler.MCPProxy))
+	r.HandleFunc("/v1/mcp/connectors/{id}/mcp/*", authMiddleware.RequireAuthFunc(mcpHandler.MCPProxy))
 	// OAuth callback (public — called by external OAuth provider redirect)
 	r.Get("/v1/mcp/oauth/callback", mcpHandler.OAuthCallback)
 
