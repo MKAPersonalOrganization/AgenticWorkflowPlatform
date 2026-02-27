@@ -315,7 +315,10 @@ templ MCPConnectorDetailDialog() {
 											</div>
 											<span x-text="tool.name" class="text-sm font-semibold text-foreground"></span>
 										</div>
-										<p x-text="tool.description" class="text-xs text-muted-foreground leading-relaxed ml-9"></p>
+										<div
+											x-html="renderToolDescription(tool.description)"
+											class="text-xs text-muted-foreground leading-relaxed ml-9 prose prose-xs dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-headings:my-1 prose-pre:my-1 prose-pre:text-[11px] prose-code:text-[11px] prose-code:before:content-none prose-code:after:content-none"
+										></div>
 									</div>
 								</template>
 							</div>

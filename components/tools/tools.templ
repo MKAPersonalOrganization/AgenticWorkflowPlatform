@@ -312,7 +312,7 @@ templ ToolsSidebar() {
 																<span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-accent text-muted-foreground" x-text="tool.category"></span>
 															</template>
 														</div>
-														<p class="text-xs text-muted-foreground leading-relaxed" x-text="tool.description"></p>
+														<div x-html="renderToolDescription(tool.description)" class="text-xs text-muted-foreground leading-relaxed prose prose-xs dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-headings:my-1 prose-pre:my-1 prose-pre:text-[11px] prose-code:text-[11px] prose-code:before:content-none prose-code:after:content-none"></div>
 													</div>
 												</template>
 											</div>
@@ -364,7 +364,7 @@ templ ToolsSidebar() {
 																	<span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-accent text-muted-foreground" x-text="tool.category"></span>
 																</template>
 															</div>
-															<p x-text="tool.description" class="text-xs text-muted-foreground line-clamp-2"></p>
+															<div x-html="renderToolDescription(tool.description)" class="text-xs text-muted-foreground line-clamp-2 prose prose-xs dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-headings:my-1 prose-pre:my-1 prose-pre:text-[11px] prose-code:text-[11px] prose-code:before:content-none prose-code:after:content-none"></div>
 														</div>
 													</div>
 													<div class="flex items-center gap-2 shrink-0">
