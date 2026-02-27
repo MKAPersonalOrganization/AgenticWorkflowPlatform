@@ -37,10 +37,6 @@ const (
 	// probeRetryDelay is the initial back-off between probe retries.
 	probeRetryDelay = 2 * time.Second
 
-	// oauthStateExpiry controls how long a pending OAuth state is kept before
-	// being garbage-collected.
-	oauthStateExpiry = 10 * time.Minute
-
 	// healthCheckInterval is the recommended ticker duration for
 	// RefreshAllConnectors (caller owns the ticker).
 	healthCheckInterval = 30 * time.Second
@@ -53,10 +49,6 @@ type Service struct {
 	sessions     *SessionManager
 	oauth        *OAuthService
 	toolRegistry *toolregistry.Registry
-
-	// oauthStates stores transient PKCE state during OAuth flows.
-	oauthStatesMu sync.RWMutex
-	oauthStates   map[string]*OAuthState // state param → OAuthState
 }
 
 // NewService creates a new MCP discovery service.
@@ -66,7 +58,6 @@ func NewService(log *logger.Logger, repo domain.MCPConnectorRepository, callback
 		repo:         repo,
 		sessions:     NewSessionManager(),
 		oauth:        NewOAuthService(callbackURL),
-		oauthStates:  make(map[string]*OAuthState),
 		toolRegistry: toolRegistry,
 	}
 }
@@ -97,7 +88,7 @@ func (s *Service) CreateConnector(ctx context.Context, userID, serverURL, title 
 		return nil, fmt.Errorf("checking connector count: %w", err)
 	}
 	if count >= maxConnectorsPerUser {
-		return nil, fmt.Errorf("maximum of %d MCP connectors per user reached", maxConnectorsPerUser)
+		return nil, fmt.Errorf("%w: maximum of %d per user", ErrConnectorLimitReached, maxConnectorsPerUser)
 	}
 
 	if title == "" {
@@ -112,6 +103,9 @@ func (s *Service) CreateConnector(ctx context.Context, userID, serverURL, title 
 	}
 
 	if err := s.repo.Create(ctx, connector); err != nil {
+		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
+			return nil, fmt.Errorf("%w: %s", ErrDuplicateConnector, serverURL)
+		}
 		return nil, fmt.Errorf("creating connector: %w", err)
 	}
 
@@ -152,18 +146,31 @@ func (s *Service) GetConnectorTools(ctx context.Context, connectorID string) ([]
 
 // ConnectConnector attempts to establish an MCP session and discover tools.
 // If the server responds with 401, triggers the OAuth flow and returns the auth URL.
-func (s *Service) ConnectConnector(ctx context.Context, connectorID string) (*domain.MCPConnector, string, error) {
+// An optional accessToken can be provided to skip OAuth — the token is injected
+// directly as a Bearer token (agentstack pattern). If the injected token fails
+// with a 401, the OAuth flow is initiated automatically.
+func (s *Service) ConnectConnector(ctx context.Context, connectorID, accessToken string) (*domain.MCPConnector, string, error) {
 	connector, err := s.repo.GetByID(ctx, connectorID)
 	if err != nil {
 		return nil, "", fmt.Errorf("fetching connector: %w", err)
 	}
 	if connector == nil {
-		return nil, "", fmt.Errorf("connector not found: %s", connectorID)
+		return nil, "", ErrConnectorNotFound
 	}
-
-	// Transition to connecting.
 	connector.Status = domain.ConnectorStatusConnecting
 	connector.ErrorMsg = ""
+
+	// If an access_token was provided, inject it directly so buildHTTPClient
+	// can use it as a Bearer token (agentstack pattern — skip OAuth).
+	if accessToken != "" {
+		tokenResp := OAuthTokenResponse{
+			AccessToken: accessToken,
+			TokenType:   "bearer",
+		}
+		tokenJSON, _ := json.Marshal(tokenResp)
+		connector.OAuthTokenJSON = toNullString(string(tokenJSON))
+	}
+
 	if err := s.repo.Update(ctx, connector); err != nil {
 		return nil, "", fmt.Errorf("updating connector status: %w", err)
 	}
@@ -213,13 +220,26 @@ func (s *Service) ConnectConnector(ctx context.Context, connectorID string) (*do
 }
 
 // DisconnectConnector closes the session, revokes tokens, and updates status.
-func (s *Service) DisconnectConnector(ctx context.Context, connectorID string) error {
+// Returns the updated connector (agentstack pattern — caller can use it for response).
+func (s *Service) DisconnectConnector(ctx context.Context, connectorID string) (*domain.MCPConnector, error) {
 	connector, err := s.repo.GetByID(ctx, connectorID)
 	if err != nil {
-		return fmt.Errorf("fetching connector: %w", err)
+		return nil, fmt.Errorf("fetching connector: %w", err)
 	}
 	if connector == nil {
-		return fmt.Errorf("connector not found: %s", connectorID)
+		return nil, ErrConnectorNotFound
+	}
+
+	// Validate that the connector is in a state that can be disconnected.
+	// Agentstack validates status ∈ {connected, connecting, auth_required, disconnected}.
+	switch connector.Status {
+	case domain.ConnectorStatusConnected, domain.ConnectorStatusConnecting,
+		domain.ConnectorStatusAuthRequired, domain.ConnectorStatusDisconnected:
+		// OK — proceed.
+	case domain.ConnectorStatusCreated:
+		return nil, fmt.Errorf("%w: connector has never been connected", ErrInvalidConnectorState)
+	default:
+		// error state — allow disconnect to reset.
 	}
 
 	// Close the live session.
@@ -231,13 +251,18 @@ func (s *Service) DisconnectConnector(ctx context.Context, connectorID string) e
 	// Revoke OAuth token if present.
 	s.revokeToken(ctx, connector)
 
+	// Clear pending OAuth flow state so stale state can't be replayed
+	// (agentstack clears auth_flow on disconnect).
+	connector.OAuthState = ""
+	connector.OAuthCodeVerifier = ""
+
 	_ = connector.Transition(domain.ConnectorStatusDisconnected, "client request", true)
 	if err := s.repo.Update(ctx, connector); err != nil {
-		return fmt.Errorf("updating connector status: %w", err)
+		return nil, fmt.Errorf("updating connector status: %w", err)
 	}
 
 	s.log.Info(ctx, "mcp connector disconnected", "id", connectorID)
-	return nil
+	return connector, nil
 }
 
 // DeleteConnector disconnects and removes a connector.
@@ -247,10 +272,10 @@ func (s *Service) DeleteConnector(ctx context.Context, connectorID, userID strin
 		return fmt.Errorf("fetching connector: %w", err)
 	}
 	if connector == nil {
-		return fmt.Errorf("connector not found: %s", connectorID)
+		return ErrConnectorNotFound
 	}
 	if connector.UserID != userID {
-		return fmt.Errorf("connector does not belong to user")
+		return ErrConnectorNotFound // don't leak existence to other users
 	}
 
 	s.sessions.Disconnect(connectorID)
@@ -269,7 +294,7 @@ func (s *Service) DeleteConnector(ctx context.Context, connectorID, userID strin
 func (s *Service) RefreshTools(ctx context.Context, connectorID string) ([]domain.MCPDiscoveredTool, error) {
 	session := s.sessions.GetSession(connectorID)
 	if session == nil {
-		return nil, fmt.Errorf("connector is not connected: %s", connectorID)
+		return nil, ErrConnectorNotConnected
 	}
 
 	connector, err := s.repo.GetByID(ctx, connectorID)
@@ -277,7 +302,7 @@ func (s *Service) RefreshTools(ctx context.Context, connectorID string) ([]domai
 		return nil, fmt.Errorf("fetching connector: %w", err)
 	}
 	if connector == nil {
-		return nil, fmt.Errorf("connector not found: %s", connectorID)
+		return nil, ErrConnectorNotFound
 	}
 
 	if err := s.discoverTools(ctx, connector, session); err != nil {
@@ -340,16 +365,35 @@ func (s *Service) RefreshConnector(ctx context.Context, connectorID string) {
 }
 
 // RefreshAllConnectors iterates all connectors and refreshes those that
-// are eligible. Designed to be called from a background goroutine on a ticker.
+// are eligible. Uses bounded concurrency to prevent one slow server from
+// blocking the entire cycle (agentstack uses asyncio.TaskGroup similarly).
 func (s *Service) RefreshAllConnectors(ctx context.Context) {
-	connectors, err := s.listAllRefreshable(ctx)
+	connectors, err := s.repo.ListRefreshable(ctx)
 	if err != nil {
 		s.log.Warn(ctx, "failed to list connectors for refresh", "error", err)
 		return
 	}
+
+	const maxConcurrency = 10
+	sem := make(chan struct{}, maxConcurrency)
+
+	var wg sync.WaitGroup
 	for _, c := range connectors {
-		s.RefreshConnector(ctx, c.ID)
+		wg.Add(1)
+		id := c.ID
+		go func() {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			// Per-connector timeout prevents a single stalled server
+			// from blocking the entire health-check cycle.
+			rCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+			defer cancel()
+			s.RefreshConnector(rCtx, id)
+		}()
 	}
+	wg.Wait()
 }
 
 // StartHealthCheck launches a background goroutine that periodically
@@ -375,24 +419,26 @@ func (s *Service) StartHealthCheck(ctx context.Context) {
 
 // HandleOAuthCallback processes the OAuth redirect callback.
 func (s *Service) HandleOAuthCallback(ctx context.Context, stateParam, code string) (*domain.MCPConnector, error) {
-	s.oauthStatesMu.Lock()
-	oauthState, ok := s.oauthStates[stateParam]
-	if ok {
-		delete(s.oauthStates, stateParam)
-	}
-	s.oauthStatesMu.Unlock()
-
-	if !ok {
-		return nil, fmt.Errorf("invalid or expired OAuth state")
-	}
-
-	connector, err := s.repo.GetByID(ctx, oauthState.ConnectorID)
+	// Look up the connector by persisted OAuth state (survives restarts).
+	connector, err := s.repo.GetByOAuthState(ctx, stateParam)
 	if err != nil {
-		return nil, fmt.Errorf("fetching connector: %w", err)
+		return nil, fmt.Errorf("looking up oauth state: %w", err)
 	}
 	if connector == nil {
-		return nil, fmt.Errorf("connector not found")
+		return nil, ErrOAuthStateInvalid
 	}
+
+	// Agentstack validates the connector must be in auth_required state.
+	if connector.Status != domain.ConnectorStatusAuthRequired {
+		return nil, fmt.Errorf("%w: expected auth_required, got %s", ErrInvalidConnectorState, connector.Status)
+	}
+
+	// Extract the code verifier before clearing it.
+	codeVerifier := connector.OAuthCodeVerifier
+
+	// Clear the state fields so they can't be replayed.
+	connector.OAuthState = ""
+	connector.OAuthCodeVerifier = ""
 
 	// Retrieve cached auth server metadata.
 	var authMeta OAuthMetadata
@@ -414,7 +460,7 @@ func (s *Service) HandleOAuthCallback(ctx context.Context, stateParam, code stri
 	}
 
 	// Exchange authorization code for tokens.
-	tokenResp, err := s.oauth.ExchangeCode(ctx, &authMeta, clientID, clientSecret, code, oauthState.CodeVerifier)
+	tokenResp, err := s.oauth.ExchangeCode(ctx, &authMeta, clientID, clientSecret, code, codeVerifier)
 	if err != nil {
 		connector.ErrorMsg = "token exchange failed: " + err.Error()
 		_ = connector.Transition(domain.ConnectorStatusError, "", false)
@@ -433,8 +479,8 @@ func (s *Service) HandleOAuthCallback(ctx context.Context, stateParam, code stri
 
 	s.log.Info(ctx, "oauth tokens acquired", "connector_id", connector.ID)
 
-	// Reconnect with tokens.
-	_, _, err = s.ConnectConnector(ctx, connector.ID)
+	// Reconnect with tokens (no external access_token — we just obtained one via OAuth).
+	_, _, err = s.ConnectConnector(ctx, connector.ID, "")
 	if err != nil {
 		return nil, fmt.Errorf("reconnecting after OAuth: %w", err)
 	}
@@ -450,7 +496,7 @@ func (s *Service) HandleOAuthCallback(ctx context.Context, stateParam, code stri
 func (s *Service) CallTool(ctx context.Context, connectorID, toolName string, arguments map[string]any) (*mcp.CallToolResult, error) {
 	session := s.sessions.GetSession(connectorID)
 	if session == nil {
-		return nil, fmt.Errorf("connector is not connected: %s", connectorID)
+		return nil, ErrConnectorNotConnected
 	}
 
 	result, err := session.CallTool(ctx, &mcp.CallToolParams{
@@ -659,21 +705,10 @@ func (s *Service) initiateOAuth(ctx context.Context, connector *domain.MCPConnec
 
 	authURL := s.oauth.BuildAuthorizationURL(authMeta, clientID, state, challenge, scopes)
 
-	s.oauthStatesMu.Lock()
-	s.oauthStates[state] = &OAuthState{
-		ConnectorID:  connector.ID,
-		State:        state,
-		CodeVerifier: codeVerifier,
-	}
-	s.oauthStatesMu.Unlock()
-
-	// Garbage-collect stale state after expiry.
-	go func() {
-		time.Sleep(oauthStateExpiry)
-		s.oauthStatesMu.Lock()
-		delete(s.oauthStates, state)
-		s.oauthStatesMu.Unlock()
-	}()
+	// Persist the OAuth state to the connector row so it survives server
+	// restarts and works across multi-instance deployments (agentstack pattern).
+	connector.OAuthState = state
+	connector.OAuthCodeVerifier = codeVerifier
 
 	_ = connector.Transition(domain.ConnectorStatusAuthRequired, "", false)
 	if err := s.repo.Update(ctx, connector); err != nil {
@@ -836,29 +871,10 @@ func (s *Service) discoverTools(ctx context.Context, connector *domain.MCPConnec
 // Internal helpers
 // --------------------------------------------------------------------------
 
-// listAllRefreshable returns connectors that should be probed in a health-check.
-func (s *Service) listAllRefreshable(ctx context.Context) ([]domain.MCPConnector, error) {
-	var result []domain.MCPConnector
-	s.sessions.mu.RLock()
-	ids := make([]string, 0, len(s.sessions.sessions))
-	for id := range s.sessions.sessions {
-		ids = append(ids, id)
-	}
-	s.sessions.mu.RUnlock()
-
-	for _, id := range ids {
-		c, err := s.repo.GetByID(ctx, id)
-		if err != nil || c == nil {
-			continue
-		}
-		if c.Refreshable() {
-			result = append(result, *c)
-		}
-	}
-	return result, nil
-}
-
 // buildHTTPClient creates an HTTP client with OAuth token injection if available.
+// When a refresh token and auth server metadata are present, the client uses an
+// auto-refreshing transport (like agentstack's auto_refresh_client) that
+// transparently refreshes expired tokens and persists the result.
 func (s *Service) buildHTTPClient(connector *domain.MCPConnector) *http.Client {
 	if !connector.OAuthTokenJSON.Valid || connector.OAuthTokenJSON.String == "" {
 		return &http.Client{Timeout: 30 * time.Second}
@@ -873,6 +889,44 @@ func (s *Service) buildHTTPClient(connector *domain.MCPConnector) *http.Client {
 		return &http.Client{Timeout: 30 * time.Second}
 	}
 
+	// If we have a refresh token AND cached auth server metadata, use the
+	// auto-refreshing transport so expired tokens are refreshed transparently.
+	if tokenResp.RefreshToken != "" && connector.OAuthServerMeta.Valid {
+		var authMeta OAuthMetadata
+		if err := json.Unmarshal([]byte(connector.OAuthServerMeta.String), &authMeta); err == nil {
+			clientID := ""
+			if connector.OAuthClientID.Valid {
+				clientID = connector.OAuthClientID.String
+			}
+			clientSecret := ""
+			if connector.OAuthClientSecret.Valid {
+				clientSecret = connector.OAuthClientSecret.String
+			}
+
+			connectorID := connector.ID
+			return &http.Client{
+				Timeout: 30 * time.Second,
+				Transport: NewAutoRefreshTransport(
+					s.oauth, &authMeta, clientID, clientSecret, tokenResp,
+					func(newToken *OAuthTokenResponse) error {
+						// Persist refreshed token — best-effort.
+						tokenJSON, _ := json.Marshal(newToken)
+						connector.OAuthTokenJSON = toNullString(string(tokenJSON))
+						ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+						defer cancel()
+						if err := s.repo.Update(ctx, connector); err != nil {
+							s.log.Warn(ctx, "failed to persist refreshed token",
+								"connector_id", connectorID, "error", err)
+							return err
+						}
+						return nil
+					},
+				),
+			}
+		}
+	}
+
+	// Fallback: static bearer token (no refresh capability).
 	return &http.Client{
 		Timeout: 30 * time.Second,
 		Transport: &BearerTokenTransport{

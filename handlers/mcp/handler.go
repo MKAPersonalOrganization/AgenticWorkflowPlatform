@@ -3,6 +3,8 @@ package mcphandler
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 
 	"school-with-ai/domain"
@@ -36,16 +38,18 @@ type createConnectorRequest struct {
 }
 
 type connectorResponse struct {
-	ID            string `json:"id"`
-	Title         string `json:"title"`
-	ServerURL     string `json:"server_url"`
-	Status        string `json:"status"`
-	ErrorMsg      string `json:"error_msg,omitempty"`
-	ServerName    string `json:"server_name,omitempty"`
-	ServerVersion string `json:"server_version,omitempty"`
-	ToolCount     int    `json:"tool_count"`
-	CreatedAt     string `json:"created_at"`
-	UpdatedAt     string `json:"updated_at"`
+	ID                  string `json:"id"`
+	Title               string `json:"title"`
+	ServerURL           string `json:"server_url"`
+	Status              string `json:"status"`
+	ErrorMsg            string `json:"error_msg,omitempty"`
+	DisconnectReason    string `json:"disconnect_reason,omitempty"`
+	DisconnectPermanent bool   `json:"disconnect_permanent,omitempty"`
+	ServerName          string `json:"server_name,omitempty"`
+	ServerVersion       string `json:"server_version,omitempty"`
+	ToolCount           int    `json:"tool_count"`
+	CreatedAt           string `json:"created_at"`
+	UpdatedAt           string `json:"updated_at"`
 }
 
 type connectResponse struct {
@@ -63,14 +67,16 @@ type toolResponse struct {
 
 func toConnectorResponse(c domain.MCPConnector, toolCount int) connectorResponse {
 	resp := connectorResponse{
-		ID:        c.ID,
-		Title:     c.Title,
-		ServerURL: c.ServerURL,
-		Status:    string(c.Status),
-		ErrorMsg:  c.ErrorMsg,
-		ToolCount: toolCount,
-		CreatedAt: c.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		UpdatedAt: c.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+		ID:                  c.ID,
+		Title:               c.Title,
+		ServerURL:           c.ServerURL,
+		Status:              string(c.Status),
+		ErrorMsg:            c.ErrorMsg,
+		DisconnectReason:    c.DisconnectReason,
+		DisconnectPermanent: c.DisconnectPermanent,
+		ToolCount:           toolCount,
+		CreatedAt:           c.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt:           c.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
 	if c.ServerName.Valid {
 		resp.ServerName = c.ServerName.String
@@ -119,6 +125,7 @@ func (h *Handler) CreateConnector(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req createConnectorRequest
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1 MiB limit
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, i18n.T(r.Context(), "Invalid request body"), http.StatusBadRequest)
 		return
@@ -132,7 +139,8 @@ func (h *Handler) CreateConnector(w http.ResponseWriter, r *http.Request) {
 	connector, err := h.service.CreateConnector(r.Context(), user.ID, req.ServerURL, req.Title)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to create connector", "error", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		msg, code := mapServiceError(err)
+		writeJSONError(w, msg, code)
 		return
 	}
 
@@ -183,7 +191,8 @@ func (h *Handler) DeleteConnector(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if err := h.service.DeleteConnector(r.Context(), id, user.ID); err != nil {
 		h.log.Error(r.Context(), "failed to delete connector", "error", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		msg, code := mapServiceError(err)
+		writeJSONError(w, msg, code)
 		return
 	}
 
@@ -207,10 +216,18 @@ func (h *Handler) Connect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	updated, authURL, err := h.service.ConnectConnector(r.Context(), id)
+	// Read optional access_token from request body (agentstack pattern).
+	var body struct {
+		AccessToken string `json:"access_token"`
+	}
+	if r.Body != nil {
+		_ = json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&body)
+	}
+
+	updated, authURL, err := h.service.ConnectConnector(r.Context(), id, body.AccessToken)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to connect", "error", err, "connector_id", id)
-		// Return the connector status even on error.
+		// Return the connector status even on error so the UI can show the state.
 		if updated != nil {
 			tools, _ := h.service.GetConnectorTools(r.Context(), id)
 			w.Header().Set("Content-Type", "application/json")
@@ -221,7 +238,8 @@ func (h *Handler) Connect(w http.ResponseWriter, r *http.Request) {
 			})
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		msg, code := mapServiceError(err)
+		writeJSONError(w, msg, code)
 		return
 	}
 
@@ -249,13 +267,17 @@ func (h *Handler) Disconnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.service.DisconnectConnector(r.Context(), id); err != nil {
+	updated, err := h.service.DisconnectConnector(r.Context(), id)
+	if err != nil {
 		h.log.Error(r.Context(), "failed to disconnect", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		msg, code := mapServiceError(err)
+		writeJSONError(w, msg, code)
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	tools, _ := h.service.GetConnectorTools(r.Context(), id)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(toConnectorResponse(*updated, len(tools)))
 }
 
 // ListTools handles GET /v1/mcp/connectors/{id}/tools
@@ -320,7 +342,8 @@ func (h *Handler) RefreshTools(w http.ResponseWriter, r *http.Request) {
 	tools, err := h.service.RefreshTools(r.Context(), id)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to refresh tools", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		msg, code := mapServiceError(err)
+		writeJSONError(w, msg, code)
 		return
 	}
 
@@ -346,6 +369,22 @@ func (h *Handler) RefreshTools(w http.ResponseWriter, r *http.Request) {
 
 // OAuthCallback handles GET /v1/mcp/oauth/callback
 func (h *Handler) OAuthCallback(w http.ResponseWriter, r *http.Request) {
+	// Handle OAuth error response from the authorization server (RFC 6749 §4.1.2.1).
+	if oauthErr := r.URL.Query().Get("error"); oauthErr != "" {
+		desc := r.URL.Query().Get("error_description")
+		if desc == "" {
+			desc = oauthErr
+		}
+		h.log.Error(r.Context(), "OAuth provider returned error",
+			"error", oauthErr, "description", desc)
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte(`<!DOCTYPE html><html><body><script>
+			window.opener && window.opener.postMessage({type:'mcp-oauth-callback',success:false,error:` + jsonEscape(desc) + `},'*');
+			window.close();
+		</script><p>Authentication failed: ` + desc + `. You can close this window.</p></body></html>`))
+		return
+	}
+
 	state := r.URL.Query().Get("state")
 	code := r.URL.Query().Get("code")
 
@@ -392,4 +431,32 @@ func ptr[T any](v T) *T {
 func jsonEscape(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
+}
+
+// writeJSONError sends a structured JSON error response.
+// Matches agentstack's {\"detail\": \"...\"} pattern.
+func writeJSONError(w http.ResponseWriter, msg string, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}
+
+// mapServiceError translates typed service errors to (message, httpStatus) pairs.
+func mapServiceError(err error) (string, int) {
+	switch {
+	case errors.Is(err, plugindiscovery.ErrConnectorNotFound):
+		return "Connector not found", http.StatusNotFound
+	case errors.Is(err, plugindiscovery.ErrDuplicateConnector):
+		return err.Error(), http.StatusConflict
+	case errors.Is(err, plugindiscovery.ErrConnectorLimitReached):
+		return err.Error(), http.StatusForbidden
+	case errors.Is(err, plugindiscovery.ErrInvalidConnectorState):
+		return err.Error(), http.StatusConflict
+	case errors.Is(err, plugindiscovery.ErrConnectorNotConnected):
+		return "Connector is not connected", http.StatusConflict
+	case errors.Is(err, plugindiscovery.ErrOAuthStateInvalid):
+		return "Invalid or expired OAuth state", http.StatusBadRequest
+	default:
+		return "Internal server error", http.StatusInternalServerError
+	}
 }
