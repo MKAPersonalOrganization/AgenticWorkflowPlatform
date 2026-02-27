@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 
 	"school-with-ai/domain"
@@ -36,17 +35,15 @@ const (
 
 	// probeRetryDelay is the initial back-off between probe retries.
 	probeRetryDelay = 2 * time.Second
-
-	// healthCheckInterval is the recommended ticker duration for
-	// RefreshAllConnectors (caller owns the ticker).
-	healthCheckInterval = 30 * time.Second
 )
 
 // Service orchestrates MCP connector lifecycle: create, connect, discover tools, OAuth.
+// Designed for horizontal scaling — no persistent sessions are held in memory.
+// All MCP interactions use ephemeral sessions opened on-demand and closed after use.
 type Service struct {
 	log          *logger.Logger
 	repo         domain.MCPConnectorRepository
-	sessions     *SessionManager
+	mcpClient    *mcp.Client
 	oauth        *OAuthService
 	toolRegistry *toolregistry.Registry
 }
@@ -54,9 +51,12 @@ type Service struct {
 // NewService creates a new MCP discovery service.
 func NewService(log *logger.Logger, repo domain.MCPConnectorRepository, callbackURL string, toolRegistry *toolregistry.Registry) *Service {
 	return &Service{
-		log:          log,
-		repo:         repo,
-		sessions:     NewSessionManager(),
+		log:  log,
+		repo: repo,
+		mcpClient: mcp.NewClient(
+			&mcp.Implementation{Name: "schoolwithai", Version: "1.0.0"},
+			&mcp.ClientOptions{},
+		),
 		oauth:        NewOAuthService(callbackURL),
 		toolRegistry: toolRegistry,
 	}
@@ -118,21 +118,10 @@ func (s *Service) GetConnector(ctx context.Context, connectorID string) (*domain
 	return s.repo.GetByID(ctx, connectorID)
 }
 
-// ListConnectors returns all connectors for a user, syncing in-memory
-// session liveness with persisted status.
+// ListConnectors returns all connectors for a user.
+// Status is purely DB-driven — no in-memory session sync needed.
 func (s *Service) ListConnectors(ctx context.Context, userID string) ([]domain.MCPConnector, error) {
-	connectors, err := s.repo.ListByUser(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	for i := range connectors {
-		if s.sessions.IsConnected(connectors[i].ID) && connectors[i].Status != domain.ConnectorStatusConnected {
-			connectors[i].Status = domain.ConnectorStatusConnected
-		} else if !s.sessions.IsConnected(connectors[i].ID) && connectors[i].Status == domain.ConnectorStatusConnected {
-			connectors[i].Status = domain.ConnectorStatusDisconnected
-		}
-	}
-	return connectors, nil
+	return s.repo.ListByUser(ctx, userID)
 }
 
 // GetConnectorTools returns the discovered tools for a connector.
@@ -178,25 +167,14 @@ func (s *Service) ConnectConnector(ctx context.Context, connectorID, accessToken
 	// Build HTTP client (with OAuth token if available).
 	httpClient := s.buildHTTPClient(connector)
 
-	// Probe: attempt MCP handshake with retries.
-	if err := s.probeConnector(ctx, connector, httpClient); err != nil {
+	// Open ephemeral session with retries — validates reachability and auth.
+	// The session is used for metadata capture and tool discovery, then closed.
+	// No persistent connection is kept (stateless proxy pattern).
+	session, err := s.probeConnector(ctx, connector, httpClient)
+	if err != nil {
 		return s.handleConnectionError(ctx, connector, err)
 	}
-
-	// Probe succeeded — open the persistent session.
-	session, err := s.sessions.Connect(ctx, connector.ID, connector.ServerURL, httpClient)
-	if err != nil {
-		connector.ErrorMsg = err.Error()
-		_ = connector.Transition(domain.ConnectorStatusError, "", false)
-		_ = s.repo.Update(ctx, connector)
-		return connector, "", fmt.Errorf("establishing persistent session: %w", err)
-	}
-
-	// Discover tools.
-	if err := s.discoverTools(ctx, connector, session); err != nil {
-		s.log.Warn(ctx, "tool discovery failed", "connector_id", connectorID, "error", err)
-		connector.ErrorMsg = "connected but tool discovery failed: " + err.Error()
-	}
+	defer session.Close()
 
 	// Capture server metadata from the initialization result.
 	initResult := session.InitializeResult()
@@ -205,6 +183,12 @@ func (s *Service) ConnectConnector(ctx context.Context, connectorID, accessToken
 		connector.ServerVersion = toNullString(initResult.ServerInfo.Version)
 		capJSON, _ := json.Marshal(initResult.Capabilities)
 		connector.Capabilities = toNullString(string(capJSON))
+	}
+
+	// Discover tools and cache them in the DB for permission lookups.
+	if err := s.discoverTools(ctx, connector, session); err != nil {
+		s.log.Warn(ctx, "tool discovery failed", "connector_id", connectorID, "error", err)
+		connector.ErrorMsg = "connected but tool discovery failed: " + err.Error()
 	}
 
 	_ = connector.Transition(domain.ConnectorStatusConnected, "", false)
@@ -219,7 +203,7 @@ func (s *Service) ConnectConnector(ctx context.Context, connectorID, accessToken
 	return connector, "", nil
 }
 
-// DisconnectConnector closes the session, revokes tokens, and updates status.
+// DisconnectConnector revokes tokens and updates status to disconnected.
 // Returns the updated connector (agentstack pattern — caller can use it for response).
 func (s *Service) DisconnectConnector(ctx context.Context, connectorID string) (*domain.MCPConnector, error) {
 	connector, err := s.repo.GetByID(ctx, connectorID)
@@ -241,9 +225,6 @@ func (s *Service) DisconnectConnector(ctx context.Context, connectorID string) (
 	default:
 		// error state — allow disconnect to reset.
 	}
-
-	// Close the live session.
-	s.sessions.Disconnect(connectorID)
 
 	// Remove from plugin system.
 	s.unregisterConnectorFromToolRegistry(ctx, connectorID)
@@ -278,7 +259,6 @@ func (s *Service) DeleteConnector(ctx context.Context, connectorID, userID strin
 		return ErrConnectorNotFound // don't leak existence to other users
 	}
 
-	s.sessions.Disconnect(connectorID)
 	s.unregisterConnectorFromToolRegistry(ctx, connectorID)
 	s.revokeToken(ctx, connector)
 
@@ -290,13 +270,9 @@ func (s *Service) DeleteConnector(ctx context.Context, connectorID, userID strin
 	return nil
 }
 
-// RefreshTools re-discovers tools from a connected MCP server.
+// RefreshTools re-discovers tools from a connected MCP server via an
+// ephemeral session. The discovered tools are cached in the DB.
 func (s *Service) RefreshTools(ctx context.Context, connectorID string) ([]domain.MCPDiscoveredTool, error) {
-	session := s.sessions.GetSession(connectorID)
-	if session == nil {
-		return nil, ErrConnectorNotConnected
-	}
-
 	connector, err := s.repo.GetByID(ctx, connectorID)
 	if err != nil {
 		return nil, fmt.Errorf("fetching connector: %w", err)
@@ -304,113 +280,22 @@ func (s *Service) RefreshTools(ctx context.Context, connectorID string) ([]domai
 	if connector == nil {
 		return nil, ErrConnectorNotFound
 	}
+	if connector.Status != domain.ConnectorStatusConnected {
+		return nil, ErrConnectorNotConnected
+	}
+
+	httpClient := s.buildHTTPClient(connector)
+	session, err := s.openEphemeralSession(ctx, connector.ServerURL, httpClient)
+	if err != nil {
+		return nil, fmt.Errorf("opening session for tool refresh: %w", err)
+	}
+	defer session.Close()
 
 	if err := s.discoverTools(ctx, connector, session); err != nil {
 		return nil, fmt.Errorf("refreshing tools: %w", err)
 	}
 
 	return s.repo.ListTools(ctx, connectorID)
-}
-
-// --------------------------------------------------------------------------
-// Background health check
-// --------------------------------------------------------------------------
-
-// RefreshConnector probes a single connector and updates its status.
-// Connected connectors that fail the probe are transitioned to disconnected.
-// Transient disconnects (disconnect_permanent=false) are retried.
-func (s *Service) RefreshConnector(ctx context.Context, connectorID string) {
-	connector, err := s.repo.GetByID(ctx, connectorID)
-	if err != nil || connector == nil {
-		return
-	}
-	if !connector.Refreshable() {
-		return
-	}
-
-	httpClient := s.buildHTTPClient(connector)
-
-	if err := s.probeConnector(ctx, connector, httpClient); err != nil {
-		// Classify the error to decide permanence.
-		permanent := isHTTPClientError(err) // 4xx errors are permanent
-		reason := err.Error()
-
-		// If it's a 401, revoke the token and mark permanent.
-		if isAuthError(err) {
-			s.revokeToken(ctx, connector)
-			permanent = true
-		}
-
-		s.sessions.Disconnect(connectorID)
-		s.unregisterConnectorFromToolRegistry(ctx, connectorID)
-		_ = connector.Transition(domain.ConnectorStatusDisconnected, reason, permanent)
-	} else {
-		// Probe succeeded — make sure we have a live session.
-		if !s.sessions.IsConnected(connectorID) {
-			session, connErr := s.sessions.Connect(ctx, connectorID, connector.ServerURL, httpClient)
-			if connErr != nil {
-				_ = connector.Transition(domain.ConnectorStatusDisconnected, connErr.Error(), false)
-			} else {
-				// Re-discover tools on reconnect.
-				_ = s.discoverTools(ctx, connector, session)
-				_ = connector.Transition(domain.ConnectorStatusConnected, "", false)
-				s.registerConnectorInToolRegistry(ctx, connector)
-			}
-		} else {
-			_ = connector.Transition(domain.ConnectorStatusConnected, "", false)
-		}
-	}
-
-	_ = s.repo.Update(ctx, connector)
-}
-
-// RefreshAllConnectors iterates all connectors and refreshes those that
-// are eligible. Uses bounded concurrency to prevent one slow server from
-// blocking the entire cycle (agentstack uses asyncio.TaskGroup similarly).
-func (s *Service) RefreshAllConnectors(ctx context.Context) {
-	connectors, err := s.repo.ListRefreshable(ctx)
-	if err != nil {
-		s.log.Warn(ctx, "failed to list connectors for refresh", "error", err)
-		return
-	}
-
-	const maxConcurrency = 10
-	sem := make(chan struct{}, maxConcurrency)
-
-	var wg sync.WaitGroup
-	for _, c := range connectors {
-		wg.Add(1)
-		id := c.ID
-		go func() {
-			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-
-			// Per-connector timeout prevents a single stalled server
-			// from blocking the entire health-check cycle.
-			rCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
-			defer cancel()
-			s.RefreshConnector(rCtx, id)
-		}()
-	}
-	wg.Wait()
-}
-
-// StartHealthCheck launches a background goroutine that periodically
-// probes all refreshable connectors. It stops when ctx is cancelled.
-func (s *Service) StartHealthCheck(ctx context.Context) {
-	go func() {
-		ticker := time.NewTicker(healthCheckInterval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				s.RefreshAllConnectors(ctx)
-			}
-		}
-	}()
 }
 
 // --------------------------------------------------------------------------
@@ -492,12 +377,27 @@ func (s *Service) HandleOAuthCallback(ctx context.Context, stateParam, code stri
 // Tool execution
 // --------------------------------------------------------------------------
 
-// CallTool executes a tool on a remote MCP server via the live session.
+// CallTool executes a tool on a remote MCP server via an ephemeral session.
+// Each call opens a fresh session, executes, and closes — no persistent
+// connection is held (stateless proxy pattern for horizontal scaling).
 func (s *Service) CallTool(ctx context.Context, connectorID, toolName string, arguments map[string]any) (*mcp.CallToolResult, error) {
-	session := s.sessions.GetSession(connectorID)
-	if session == nil {
+	connector, err := s.repo.GetByID(ctx, connectorID)
+	if err != nil {
+		return nil, fmt.Errorf("fetching connector: %w", err)
+	}
+	if connector == nil {
+		return nil, ErrConnectorNotFound
+	}
+	if connector.Status != domain.ConnectorStatusConnected {
 		return nil, ErrConnectorNotConnected
 	}
+
+	httpClient := s.buildHTTPClient(connector)
+	session, err := s.openEphemeralSession(ctx, connector.ServerURL, httpClient)
+	if err != nil {
+		return nil, fmt.Errorf("opening ephemeral session: %w", err)
+	}
+	defer session.Close()
 
 	result, err := session.CallTool(ctx, &mcp.CallToolParams{
 		Name:      toolName,
@@ -509,19 +409,9 @@ func (s *Service) CallTool(ctx context.Context, connectorID, toolName string, ar
 	return result, nil
 }
 
-// GetSessionManager returns the session manager for direct access (e.g. by tool resolver).
-func (s *Service) GetSessionManager() *SessionManager {
-	return s.sessions
-}
-
-// Shutdown gracefully closes all sessions.
-func (s *Service) Shutdown() {
-	s.sessions.CloseAll()
-}
-
 // ResolveEnabledTools returns MCP executable tools for a user, filtered by the provided
-// permission checker callbacks. This allows the agent orchestrator to inject only
-// the MCP tools that the user has explicitly enabled for a given agent.
+// permission checker callbacks. Tool metadata comes from the DB cache (populated on
+// connect/refresh). Tool execution uses ephemeral sessions — no persistent connections.
 func (s *Service) ResolveEnabledTools(
 	ctx context.Context,
 	userID string,
@@ -544,11 +434,6 @@ func (s *Service) ResolveEnabledTools(
 			continue
 		}
 
-		session := s.sessions.GetSession(conn.ID)
-		if session == nil {
-			continue
-		}
-
 		discoveredTools, err := s.GetConnectorTools(ctx, conn.ID)
 		if err != nil {
 			continue
@@ -559,7 +444,7 @@ func (s *Service) ResolveEnabledTools(
 			if !isToolEnabled(toolSetID, toolID) {
 				continue
 			}
-			tools = append(tools, NewMCPRemoteTool(conn.ID, dt.Name, dt.Description, dt.InputSchema, session))
+			tools = append(tools, NewMCPRemoteTool(s, conn.ID, dt.Name, dt.Description, dt.InputSchema))
 		}
 	}
 	return tools
@@ -571,7 +456,8 @@ func (s *Service) ResolveEnabledTools(
 
 // probeConnector performs a lightweight MCP handshake to verify that the server
 // is reachable and the credentials are valid. It retries on transient errors.
-func (s *Service) probeConnector(ctx context.Context, connector *domain.MCPConnector, httpClient *http.Client) error {
+// On success, returns the live session — caller is responsible for closing it.
+func (s *Service) probeConnector(ctx context.Context, connector *domain.MCPConnector, httpClient *http.Client) (*mcp.ClientSession, error) {
 	var lastErr error
 
 	for attempt := range probeMaxRetries {
@@ -584,19 +470,17 @@ func (s *Service) probeConnector(ctx context.Context, connector *domain.MCPConne
 			transport.HTTPClient = httpClient
 		}
 
-		session, err := s.sessions.client.Connect(probeCtx, transport, nil)
+		session, err := s.mcpClient.Connect(probeCtx, transport, nil)
 		if err == nil {
-			// Probe succeeded — close the temporary session.
-			session.Close()
 			cancel()
-			return nil
+			return session, nil
 		}
 		cancel()
 		lastErr = err
 
 		// Only retry on transient network errors.
 		if !isTransientError(err) {
-			return lastErr
+			return nil, lastErr
 		}
 
 		if attempt < probeMaxRetries-1 {
@@ -609,7 +493,22 @@ func (s *Service) probeConnector(ctx context.Context, connector *domain.MCPConne
 		}
 	}
 
-	return lastErr
+	return nil, lastErr
+}
+
+// openEphemeralSession opens a short-lived MCP session to the given server.
+// The caller MUST close the session when done. This is the core primitive for
+// the stateless proxy pattern — sessions are opened on-demand and closed after use.
+func (s *Service) openEphemeralSession(ctx context.Context, serverURL string, httpClient *http.Client) (*mcp.ClientSession, error) {
+	transport := &mcp.StreamableClientTransport{
+		Endpoint: serverURL,
+	}
+	if httpClient != nil {
+		transport.HTTPClient = httpClient
+	} else {
+		transport.HTTPClient = &http.Client{Timeout: 30 * time.Second}
+	}
+	return s.mcpClient.Connect(ctx, transport, nil)
 }
 
 // handleConnectionError classifies the connection failure and returns the

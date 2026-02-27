@@ -9,7 +9,6 @@ import (
 	"school-with-ai/services/toolregistry"
 
 	"github.com/a-h/templ"
-	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // MCPPluginProvider wraps a connected MCP server as a PluginProvider,
@@ -17,15 +16,15 @@ import (
 type MCPPluginProvider struct {
 	connector       domain.MCPConnector
 	discoveredTools []domain.MCPDiscoveredTool
-	session         *mcp.ClientSession
+	service         *Service
 }
 
 // NewMCPPluginProvider creates a plugin provider for an MCP connector.
-func NewMCPPluginProvider(connector domain.MCPConnector, tools []domain.MCPDiscoveredTool, session *mcp.ClientSession) *MCPPluginProvider {
+func NewMCPPluginProvider(service *Service, connector domain.MCPConnector, tools []domain.MCPDiscoveredTool) *MCPPluginProvider {
 	return &MCPPluginProvider{
 		connector:       connector,
 		discoveredTools: tools,
-		session:         session,
+		service:         service,
 	}
 }
 
@@ -82,19 +81,13 @@ func (p *MCPPluginProvider) DefaultTools() []toolregistry.Tool {
 	return tools
 }
 
-// CreateExecutable creates an executable tool by delegating to the MCP session.
+// CreateExecutable creates an executable tool by delegating to the MCP service.
 func (p *MCPPluginProvider) CreateExecutable(_ context.Context, toolID string, _ toolregistry.FactoryDeps) (agent.ExecutableTool, error) {
 	// Find the matching discovered tool.
 	for _, dt := range p.discoveredTools {
 		expectedID := "mcp-" + p.connector.ID + "-" + dt.Name
 		if toolID == expectedID || toolID == dt.Name {
-			return &mcpRemoteTool{
-				connectorID: p.connector.ID,
-				name:        dt.Name,
-				description: dt.Description,
-				inputSchema: dt.InputSchema,
-				session:     p.session,
-			}, nil
+			return NewMCPRemoteTool(p.service, p.connector.ID, dt.Name, dt.Description, dt.InputSchema), nil
 		}
 	}
 	return nil, nil // Not handled by this provider

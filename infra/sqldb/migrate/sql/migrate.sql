@@ -365,3 +365,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_mcp_connectors_user_url ON mcp_connectors(
 CREATE INDEX IF NOT EXISTS idx_mcp_connectors_oauth_state ON mcp_connectors(oauth_state) WHERE oauth_state != '';
 CREATE INDEX IF NOT EXISTS idx_mcp_connectors_refreshable ON mcp_connectors(status, disconnect_permanent)
     WHERE status IN ('connected', 'disconnected');
+
+-- Version: 1.26
+-- Description: Drop refreshable index — background health checks removed in favor of stateless proxy pattern
+DROP INDEX IF EXISTS idx_mcp_connectors_refreshable;
