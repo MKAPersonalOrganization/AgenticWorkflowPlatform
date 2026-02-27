@@ -52,14 +52,6 @@ type MCPConnector struct {
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }
 
-// Refreshable reports whether this connector should be probed by a background
-// health-check loop. Connected connectors are always refreshable. Disconnected
-// connectors are refreshable only if the disconnect was transient (not permanent).
-func (c *MCPConnector) Refreshable() bool {
-	return c.Status == ConnectorStatusConnected ||
-		(c.Status == ConnectorStatusDisconnected && !c.DisconnectPermanent)
-}
-
 // Transition validates and applies a state change. It enforces:
 //   - "created" is the initial state and cannot be transitioned to.
 //   - moving to "disconnected" requires a reason and a permanence flag.
@@ -102,7 +94,6 @@ type MCPConnectorRepository interface {
 	GetByID(ctx context.Context, id string) (*MCPConnector, error)
 	GetByOAuthState(ctx context.Context, state string) (*MCPConnector, error)
 	ListByUser(ctx context.Context, userID string) ([]MCPConnector, error)
-	ListRefreshable(ctx context.Context) ([]MCPConnector, error)
 	CountByUser(ctx context.Context, userID string) (int, error)
 	Update(ctx context.Context, connector *MCPConnector) error
 	Delete(ctx context.Context, id string) error

@@ -98,14 +98,15 @@ Additional migrations:
 
 | Pattern | Implementation |
 |---|---|
-| **State Machine** | `MCPConnector.Transition()` validates state changes; `Refreshable()` determines health-check eligibility |
-| **Probe with Retries** | `probeConnector()` retries up to 3 times with exponential backoff on transient errors |
+| **Stateless Proxy** | No persistent MCP sessions held in memory. All interactions use ephemeral sessions (`openEphemeralSession`) opened on-demand and closed after use — enables horizontal scaling to N pods |
+| **State Machine** | `MCPConnector.Transition()` validates state changes; "connected" means "last probe succeeded" not "session held in memory" |
+| **Probe with Retries** | `probeConnector()` retries up to 3 times with exponential backoff; returns the live session for caller to use then close |
 | **Error Classification** | `isTransientError()` (DNS, timeouts, 5xx), `isAuthError()` (401), `isHTTPClientError()` (4xx) route to different recovery paths |
 | **SSRF Protection** | `validateExternalHost()` blocks localhost, RFC-1918, link-local, cloud metadata |
 | **Token Auto-Refresh** | `AutoRefreshTransport` proactively refreshes tokens before expiry and retries on 401, persisting new tokens to DB |
 | **Token Revocation** | `RevokeToken()` (RFC 7009) called on disconnect/delete; best-effort with local token clear regardless |
 | **DB-Persisted OAuth State** | OAuth `state` + `code_verifier` stored on the connector row; survives restarts and works in multi-instance deployments |
-| **Background Health Checks** | `StartHealthCheck()` runs a 30s ticker; `RefreshAllConnectors()` uses bounded concurrency (10 goroutines) with 60s per-connector timeout |
+| **Ephemeral Tool Calls** | `CallTool()` opens a fresh session per call via `openEphemeralSession`, executes, closes — no unbounded connection growth |
 | **Response Size Limits** | `io.LimitReader` on all OAuth metadata (1 MiB) and token (256 KiB) responses |
 | **Per-User Limits** | `maxConnectorsPerUser = 20` enforced at creation |
 | **Unique Constraint** | `(user_id, server_url)` prevents duplicate registrations |

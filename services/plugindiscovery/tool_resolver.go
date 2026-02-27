@@ -27,6 +27,7 @@ func NewMCPToolResolver(service *Service, userID string) *MCPToolResolver {
 }
 
 // Resolve returns all tools from all connected MCP servers belonging to the user.
+// Tool metadata comes from the DB cache; execution uses ephemeral sessions.
 func (r *MCPToolResolver) Resolve(ctx context.Context) ([]agent.Tool, error) {
 	connectors, err := r.service.ListConnectors(ctx, r.userID)
 	if err != nil {
@@ -39,24 +40,13 @@ func (r *MCPToolResolver) Resolve(ctx context.Context) ([]agent.Tool, error) {
 			continue
 		}
 
-		session := r.service.GetSessionManager().GetSession(conn.ID)
-		if session == nil {
-			continue
-		}
-
 		discoveredTools, err := r.service.GetConnectorTools(ctx, conn.ID)
 		if err != nil {
 			continue
 		}
 
 		for _, dt := range discoveredTools {
-			tools = append(tools, &mcpRemoteTool{
-				connectorID: conn.ID,
-				name:        dt.Name,
-				description: dt.Description,
-				inputSchema: dt.InputSchema,
-				session:     session,
-			})
+			tools = append(tools, NewMCPRemoteTool(r.service, conn.ID, dt.Name, dt.Description, dt.InputSchema))
 		}
 	}
 
@@ -64,22 +54,24 @@ func (r *MCPToolResolver) Resolve(ctx context.Context) ([]agent.Tool, error) {
 }
 
 // mcpRemoteTool wraps a discovered MCP tool as an agent.ExecutableTool.
+// It holds a reference to the Service for ephemeral session-based execution.
 type mcpRemoteTool struct {
+	service     *Service
 	connectorID string
 	name        string
 	description string
 	inputSchema string // JSON Schema string
-	session     *mcp.ClientSession
 }
 
-// NewMCPRemoteTool creates an agent.ExecutableTool that delegates to a remote MCP session.
-func NewMCPRemoteTool(connectorID, name, description, inputSchema string, session *mcp.ClientSession) agent.ExecutableTool {
+// NewMCPRemoteTool creates an agent.ExecutableTool that delegates to a remote
+// MCP server via the Service's ephemeral session mechanism.
+func NewMCPRemoteTool(service *Service, connectorID, name, description, inputSchema string) agent.ExecutableTool {
 	return &mcpRemoteTool{
+		service:     service,
 		connectorID: connectorID,
 		name:        name,
 		description: description,
 		inputSchema: inputSchema,
-		session:     session,
 	}
 }
 
@@ -113,7 +105,7 @@ func (t *mcpRemoteTool) Schema() *agent.Schema {
 	return convertJSONSchemaToAgentSchema(raw)
 }
 
-// Execute calls the tool on the remote MCP server.
+// Execute calls the tool on the remote MCP server via an ephemeral session.
 func (t *mcpRemoteTool) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
 	var arguments map[string]any
 	if len(args.Raw) > 0 {
@@ -122,10 +114,7 @@ func (t *mcpRemoteTool) Execute(ctx context.Context, args agent.Arguments) (agen
 		}
 	}
 
-	result, err := t.session.CallTool(ctx, &mcp.CallToolParams{
-		Name:      t.name,
-		Arguments: arguments,
-	})
+	result, err := t.service.CallTool(ctx, t.connectorID, t.name, arguments)
 	if err != nil {
 		return agent.ErrorResult(fmt.Errorf("MCP tool call failed: %w", err)), nil
 	}

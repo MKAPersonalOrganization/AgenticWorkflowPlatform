@@ -212,45 +212,6 @@ func (r *PostgresMCPConnectorRepository) GetByOAuthState(ctx context.Context, st
 	return &c, nil
 }
 
-// ListRefreshable returns all connectors eligible for background health-check
-// probing in a single query (no N+1). A connector is refreshable if it is
-// connected, or disconnected but not permanently.
-func (r *PostgresMCPConnectorRepository) ListRefreshable(ctx context.Context) ([]domain.MCPConnector, error) {
-	query := `
-		SELECT id, user_id, title, server_url, status, error_msg,
-		       disconnect_reason, disconnect_permanent,
-		       oauth_client_id, oauth_client_secret, oauth_token_json, oauth_server_meta,
-		       oauth_state, oauth_code_verifier,
-		       server_name, server_version, capabilities,
-		       created_at, updated_at
-		FROM mcp_connectors
-		WHERE status IN ('connected', 'disconnected')
-		  AND (status = 'connected' OR disconnect_permanent = FALSE)
-	`
-	rows, err := r.db.QueryContext(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("querying refreshable connectors: %w", err)
-	}
-	defer rows.Close()
-
-	var results []domain.MCPConnector
-	for rows.Next() {
-		var c domain.MCPConnector
-		if err := rows.Scan(
-			&c.ID, &c.UserID, &c.Title, &c.ServerURL, &c.Status, &c.ErrorMsg,
-			&c.DisconnectReason, &c.DisconnectPermanent,
-			&c.OAuthClientID, &c.OAuthClientSecret, &c.OAuthTokenJSON, &c.OAuthServerMeta,
-			&c.OAuthState, &c.OAuthCodeVerifier,
-			&c.ServerName, &c.ServerVersion, &c.Capabilities,
-			&c.CreatedAt, &c.UpdatedAt,
-		); err != nil {
-			return nil, fmt.Errorf("scanning refreshable connector row: %w", err)
-		}
-		results = append(results, c)
-	}
-	return results, rows.Err()
-}
-
 // Delete removes a connector by ID.
 func (r *PostgresMCPConnectorRepository) Delete(ctx context.Context, id string) error {
 	query := `DELETE FROM mcp_connectors WHERE id = $1`
