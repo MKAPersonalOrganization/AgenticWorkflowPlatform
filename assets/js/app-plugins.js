@@ -9,6 +9,10 @@ import { toolsSidebar } from './components/tools-sidebar.js';
 import { agentsDialog } from './components/agents-dialog.js';
 import { convSearchDialog } from './components/conv-search-dialog.js';
 import { mcpConnectors } from './components/mcp-connectors.js';
+import { renderMarkdown } from './chat/markdown-renderer.js';
+
+// Expose markdown renderer globally so Alpine expressions in any scope can use it
+window.renderToolDescription = (description) => description ? renderMarkdown(description) : '';
 
 document.addEventListener('alpine:init', () => {
     Alpine.plugin(themePlugin);
