@@ -35,17 +35,41 @@ const (
 
 	// probeRetryDelay is the initial back-off between probe retries.
 	probeRetryDelay = 2 * time.Second
+
+	// maxConcurrentSessions caps simultaneous outbound MCP sessions per pod.
+	// Prevents file-descriptor / memory exhaustion when many users trigger
+	// tool calls concurrently. Analogous to agentstack's DB pool_size bounding.
+	maxConcurrentSessions = 100
+
+	// circuitFailureThreshold is how many consecutive failures trip the breaker.
+	circuitFailureThreshold = 5
+
+	// circuitRecoveryTimeout is how long the breaker stays open before allowing
+	// a probe request (half-open state).
+	circuitRecoveryTimeout = 60 * time.Second
+
+	// maxMCPResponseBytes limits the size of any MCP response body read during
+	// tool calls to prevent OOM from malicious or oversized servers.
+	maxMCPResponseBytes = 16 << 20 // 16 MiB
 )
 
 // Service orchestrates MCP connector lifecycle: create, connect, discover tools, OAuth.
 // Designed for horizontal scaling — no persistent sessions are held in memory.
 // All MCP interactions use ephemeral sessions opened on-demand and closed after use.
+//
+// Scaling infrastructure (mirrors agentstack patterns):
+//   - circuitRegistry: per-server-URL circuit breakers prevent thundering herd
+//   - sessions semaphore: bounds concurrent outbound MCP sessions per pod
+//   - presets: pre-configured connector templates for common MCP servers
 type Service struct {
 	log          *logger.Logger
 	repo         domain.MCPConnectorRepository
 	mcpClient    *mcp.Client
 	oauth        *OAuthService
 	toolRegistry *toolregistry.Registry
+	circuits     *circuitRegistry
+	sessions     *semaphore
+	presets      []ConnectorPreset
 }
 
 // NewService creates a new MCP discovery service.
@@ -59,7 +83,15 @@ func NewService(log *logger.Logger, repo domain.MCPConnectorRepository, callback
 		),
 		oauth:        NewOAuthService(callbackURL),
 		toolRegistry: toolRegistry,
+		circuits:     newCircuitRegistry(circuitFailureThreshold, circuitRecoveryTimeout),
+		sessions:     newSemaphore(maxConcurrentSessions),
+		presets:      builtinPresets,
 	}
+}
+
+// ListPresets returns the available connector presets.
+func (s *Service) ListPresets() []ConnectorPreset {
+	return s.presets
 }
 
 // --------------------------------------------------------------------------
@@ -95,6 +127,16 @@ func (s *Service) CreateConnector(ctx context.Context, userID, serverURL, title 
 		title = parsed.Host
 	}
 
+	// Auto-match against connector presets (agentstack's match_preset=true default).
+	// If a preset matches, apply its metadata and credentials.
+	var matchedPreset *ConnectorPreset
+	if preset := MatchPreset(serverURL, s.presets); preset != nil {
+		matchedPreset = preset
+		if title == parsed.Host && preset.Name != "" {
+			title = preset.Name
+		}
+	}
+
 	connector := &domain.MCPConnector{
 		UserID:    userID,
 		Title:     title,
@@ -110,6 +152,16 @@ func (s *Service) CreateConnector(ctx context.Context, userID, serverURL, title 
 	}
 
 	s.log.Info(ctx, "mcp connector created", "id", connector.ID, "url", serverURL, "user_id", userID)
+
+	// Apply preset credentials if the user didn't provide their own.
+	if matchedPreset != nil && matchedPreset.ClientID != "" {
+		if !connector.OAuthClientID.Valid || connector.OAuthClientID.String == "" {
+			connector.OAuthClientID = toNullString(matchedPreset.ClientID)
+			connector.OAuthClientSecret = toNullString(matchedPreset.ClientSecret)
+			_ = s.repo.Update(ctx, connector)
+		}
+	}
+
 	return connector, nil
 }
 
@@ -167,14 +219,32 @@ func (s *Service) ConnectConnector(ctx context.Context, connectorID, accessToken
 	// Build HTTP client (with OAuth token if available).
 	httpClient := s.buildHTTPClient(connector)
 
+	// Check circuit breaker — if the remote server has been failing, fast-fail
+	// instead of adding to the thundering herd.
+	cb := s.circuits.Get(connector.ServerURL)
+	if !cb.Allow() {
+		connector.ErrorMsg = "server circuit breaker open — recent failures detected"
+		_ = connector.Transition(domain.ConnectorStatusError, "", false)
+		_ = s.repo.Update(ctx, connector)
+		return connector, "", ErrCircuitOpen
+	}
+
+	// Acquire concurrency slot to bound outbound sessions per pod.
+	if err := s.sessions.Acquire(ctx); err != nil {
+		return nil, "", err
+	}
+	defer s.sessions.Release()
+
 	// Open ephemeral session with retries — validates reachability and auth.
 	// The session is used for metadata capture and tool discovery, then closed.
 	// No persistent connection is kept (stateless proxy pattern).
 	session, err := s.probeConnector(ctx, connector, httpClient)
 	if err != nil {
+		cb.RecordFailure()
 		return s.handleConnectionError(ctx, connector, err)
 	}
 	defer session.Close()
+	cb.RecordSuccess()
 
 	// Capture server metadata from the initialization result.
 	initResult := session.InitializeResult()
@@ -261,6 +331,7 @@ func (s *Service) DeleteConnector(ctx context.Context, connectorID, userID strin
 
 	s.unregisterConnectorFromToolRegistry(ctx, connectorID)
 	s.revokeToken(ctx, connector)
+	s.circuits.Reset(connector.ServerURL)
 
 	if err := s.repo.Delete(ctx, connectorID); err != nil {
 		return fmt.Errorf("deleting connector: %w", err)
@@ -284,12 +355,26 @@ func (s *Service) RefreshTools(ctx context.Context, connectorID string) ([]domai
 		return nil, ErrConnectorNotConnected
 	}
 
+	// Check circuit breaker before opening a session.
+	cb := s.circuits.Get(connector.ServerURL)
+	if !cb.Allow() {
+		return nil, ErrCircuitOpen
+	}
+
+	// Bound concurrent sessions.
+	if err := s.sessions.Acquire(ctx); err != nil {
+		return nil, err
+	}
+	defer s.sessions.Release()
+
 	httpClient := s.buildHTTPClient(connector)
 	session, err := s.openEphemeralSession(ctx, connector.ServerURL, httpClient)
 	if err != nil {
+		cb.RecordFailure()
 		return nil, fmt.Errorf("opening session for tool refresh: %w", err)
 	}
 	defer session.Close()
+	cb.RecordSuccess()
 
 	if err := s.discoverTools(ctx, connector, session); err != nil {
 		return nil, fmt.Errorf("refreshing tools: %w", err)
@@ -392,9 +477,22 @@ func (s *Service) CallTool(ctx context.Context, connectorID, toolName string, ar
 		return nil, ErrConnectorNotConnected
 	}
 
+	// Fast-fail if the circuit breaker is open for this server.
+	cb := s.circuits.Get(connector.ServerURL)
+	if !cb.Allow() {
+		return nil, ErrCircuitOpen
+	}
+
+	// Bound concurrent outbound sessions.
+	if err := s.sessions.Acquire(ctx); err != nil {
+		return nil, err
+	}
+	defer s.sessions.Release()
+
 	httpClient := s.buildHTTPClient(connector)
 	session, err := s.openEphemeralSession(ctx, connector.ServerURL, httpClient)
 	if err != nil {
+		cb.RecordFailure()
 		return nil, fmt.Errorf("opening ephemeral session: %w", err)
 	}
 	defer session.Close()
@@ -404,8 +502,10 @@ func (s *Service) CallTool(ctx context.Context, connectorID, toolName string, ar
 		Arguments: arguments,
 	})
 	if err != nil {
+		cb.RecordFailure()
 		return nil, fmt.Errorf("calling tool %s: %w", toolName, err)
 	}
+	cb.RecordSuccess()
 	return result, nil
 }
 

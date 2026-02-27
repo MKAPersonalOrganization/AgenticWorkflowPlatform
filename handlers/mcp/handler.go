@@ -65,6 +65,12 @@ type toolResponse struct {
 	Annotations any    `json:"annotations"`
 }
 
+type presetResponse struct {
+	URL         string `json:"url"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
 func toConnectorResponse(c domain.MCPConnector, toolCount int) connectorResponse {
 	resp := connectorResponse{
 		ID:                  c.ID,
@@ -367,6 +373,52 @@ func (h *Handler) RefreshTools(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]any{"tools": result})
 }
 
+// ListPresets handles GET /v1/mcp/connectors/presets
+// Returns pre-configured connector templates for common MCP servers (agentstack pattern).
+func (h *Handler) ListPresets(w http.ResponseWriter, r *http.Request) {
+	presets := h.service.ListPresets()
+	result := make([]presetResponse, 0, len(presets))
+	for _, p := range presets {
+		result = append(result, presetResponse{
+			URL:         p.URL,
+			Name:        p.Name,
+			Description: p.Description,
+		})
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"presets": result})
+}
+
+// MCPProxy handles all methods on /v1/mcp/connectors/{id}/mcp/*
+// Acts as an authenticated reverse proxy to the connector's MCP server.
+// This is agentstack's core pattern: the platform forwards raw MCP protocol
+// messages so external clients can use connectors directly.
+func (h *Handler) MCPProxy(w http.ResponseWriter, r *http.Request) {
+	user := domain.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
+		return
+	}
+
+	id := chi.URLParam(r, "id")
+
+	// Verify ownership.
+	connector, err := h.service.GetConnector(r.Context(), id)
+	if err != nil || connector == nil || connector.UserID != user.ID {
+		http.Error(w, i18n.T(r.Context(), "Connector not found"), http.StatusNotFound)
+		return
+	}
+
+	if err := h.service.MCPProxy(r.Context(), id, w, r); err != nil {
+		h.log.Error(r.Context(), "mcp proxy error", "error", err, "connector_id", id)
+		// Don't write error if headers already sent (streaming started).
+		if !headersSent(w) {
+			msg, code := mapServiceError(err)
+			writeJSONError(w, msg, code)
+		}
+	}
+}
+
 // OAuthCallback handles GET /v1/mcp/oauth/callback
 func (h *Handler) OAuthCallback(w http.ResponseWriter, r *http.Request) {
 	// Handle OAuth error response from the authorization server (RFC 6749 §4.1.2.1).
@@ -433,6 +485,14 @@ func jsonEscape(s string) string {
 	return string(b)
 }
 
+// headersSent checks if the response writer has already sent headers.
+// This prevents writing error responses over streaming data.
+func headersSent(w http.ResponseWriter) bool {
+	// Check if any content has been written by testing Content-Type.
+	// Once WriteHeader or Write is called, the header map is "frozen".
+	return w.Header().Get("X-Proxy-Started") != ""
+}
+
 // writeJSONError sends a structured JSON error response.
 // Matches agentstack's {\"detail\": \"...\"} pattern.
 func writeJSONError(w http.ResponseWriter, msg string, code int) {
@@ -456,6 +516,10 @@ func mapServiceError(err error) (string, int) {
 		return "Connector is not connected", http.StatusConflict
 	case errors.Is(err, plugindiscovery.ErrOAuthStateInvalid):
 		return "Invalid or expired OAuth state", http.StatusBadRequest
+	case errors.Is(err, plugindiscovery.ErrCircuitOpen):
+		return "Remote server is temporarily unavailable", http.StatusServiceUnavailable
+	case errors.Is(err, plugindiscovery.ErrConcurrencyLimit):
+		return "Too many concurrent requests — try again later", http.StatusTooManyRequests
 	default:
 		return "Internal server error", http.StatusInternalServerError
 	}
