@@ -356,3 +356,12 @@ CREATE INDEX IF NOT EXISTS idx_mcp_discovered_tools_connector ON mcp_discovered_
 -- Description: Add disconnect tracking columns to mcp_connectors
 ALTER TABLE mcp_connectors ADD COLUMN IF NOT EXISTS disconnect_reason TEXT NOT NULL DEFAULT '';
 ALTER TABLE mcp_connectors ADD COLUMN IF NOT EXISTS disconnect_permanent BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Version: 1.25
+-- Description: Persist OAuth state to survive restarts, add unique constraint, add index for refreshable connectors
+ALTER TABLE mcp_connectors ADD COLUMN IF NOT EXISTS oauth_state TEXT NOT NULL DEFAULT '';
+ALTER TABLE mcp_connectors ADD COLUMN IF NOT EXISTS oauth_code_verifier TEXT NOT NULL DEFAULT '';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mcp_connectors_user_url ON mcp_connectors(user_id, server_url);
+CREATE INDEX IF NOT EXISTS idx_mcp_connectors_oauth_state ON mcp_connectors(oauth_state) WHERE oauth_state != '';
+CREATE INDEX IF NOT EXISTS idx_mcp_connectors_refreshable ON mcp_connectors(status, disconnect_permanent)
+    WHERE status IN ('connected', 'disconnected');

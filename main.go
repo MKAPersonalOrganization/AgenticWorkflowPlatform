@@ -378,6 +378,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	mcpConnectorRepo := sqldb.NewPostgresMCPConnectorRepository(db)
 	mcpService := plugindiscovery.NewService(log, mcpConnectorRepo, cfg.Auth.AppURL+"/v1/mcp/oauth/callback", toolRegistry)
 	defer mcpService.Shutdown()
+	mcpService.StartHealthCheck(ctx)
 	log.Info(ctx, "startup", "status", "mcp plugin discovery service initialized")
 
 	// Create and initialize permissions service

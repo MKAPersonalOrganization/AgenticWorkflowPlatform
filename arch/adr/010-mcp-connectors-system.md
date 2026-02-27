@@ -83,12 +83,40 @@ For connectors with `authType: "oauth"`:
 6. Tokens are attached to subsequent MCP session transports automatically.
 
 ### 7. Persistence
-A single migration (v1.23) adds two tables:
+A migration (v1.23) adds two tables, with subsequent migrations for production hardening:
 
-- `mcp_connectors` — Connector metadata, OAuth config/tokens (JSONB), status.
+- `mcp_connectors` — Connector metadata, OAuth config/tokens (JSONB), status, disconnect tracking.
 - `mcp_connector_tools` — Discovered tools with name, description, and JSON Schema input definition.
 
 Both are scoped to `user_id` with cascading deletes.
+
+Additional migrations:
+- **v1.24** — Adds `disconnect_reason` and `disconnect_permanent` columns for state-machine tracking.
+- **v1.25** — Adds `oauth_state` / `oauth_code_verifier` columns (DB-persisted OAuth flow survives restarts), unique index on `(user_id, server_url)`, partial indexes for refreshable connectors and OAuth state lookups.
+
+### 8. Production Hardening (learned from BeeAI/agentstack reference)
+
+| Pattern | Implementation |
+|---|---|
+| **State Machine** | `MCPConnector.Transition()` validates state changes; `Refreshable()` determines health-check eligibility |
+| **Probe with Retries** | `probeConnector()` retries up to 3 times with exponential backoff on transient errors |
+| **Error Classification** | `isTransientError()` (DNS, timeouts, 5xx), `isAuthError()` (401), `isHTTPClientError()` (4xx) route to different recovery paths |
+| **SSRF Protection** | `validateExternalHost()` blocks localhost, RFC-1918, link-local, cloud metadata |
+| **Token Auto-Refresh** | `AutoRefreshTransport` proactively refreshes tokens before expiry and retries on 401, persisting new tokens to DB |
+| **Token Revocation** | `RevokeToken()` (RFC 7009) called on disconnect/delete; best-effort with local token clear regardless |
+| **DB-Persisted OAuth State** | OAuth `state` + `code_verifier` stored on the connector row; survives restarts and works in multi-instance deployments |
+| **Background Health Checks** | `StartHealthCheck()` runs a 30s ticker; `RefreshAllConnectors()` uses bounded concurrency (10 goroutines) with 60s per-connector timeout |
+| **Response Size Limits** | `io.LimitReader` on all OAuth metadata (1 MiB) and token (256 KiB) responses |
+| **Per-User Limits** | `maxConnectorsPerUser = 20` enforced at creation |
+| **Unique Constraint** | `(user_id, server_url)` prevents duplicate registrations |
+| **Disconnect State Validation** | `DisconnectConnector` validates the connector is in a disconnectable state before proceeding |
+| **OAuth Error Handling** | Callback handler processes `?error=` and `?error_description=` from OAuth providers |
+| **Request Body Limits** | `http.MaxBytesReader` (1 MiB) on create endpoint |
+| **Typed Service Errors** | Sentinel errors (`ErrConnectorNotFound`, `ErrDuplicateConnector`, etc.) checked via `errors.Is()` for deterministic HTTP status mapping |
+| **Structured JSON Errors** | `writeJSONError()` + `mapServiceError()` return `{"error":"..."}` with correct status codes (404, 409, 403, 400, 500) |
+| **OAuth Metadata Cache** | In-memory TTL cache (`ttlCache[T]`) — 10 min for resource/auth metadata, 24 h for client registration — avoids redundant network round-trips |
+| **Access Token Injection** | `ConnectConnector(ctx, id, accessToken)` accepts optional pre-authorized Bearer token, falls through to OAuth on 401 |
+| **Disconnect Returns Entity** | `DisconnectConnector` returns the updated `*MCPConnector` and clears pending OAuth state |
 
 ## Consequences
 

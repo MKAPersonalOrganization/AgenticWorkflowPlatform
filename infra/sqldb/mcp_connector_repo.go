@@ -43,20 +43,23 @@ func (r *PostgresMCPConnectorRepository) Create(ctx context.Context, c *domain.M
 			id, user_id, title, server_url, status, error_msg,
 			disconnect_reason, disconnect_permanent,
 			oauth_client_id, oauth_client_secret, oauth_token_json, oauth_server_meta,
+			oauth_state, oauth_code_verifier,
 			server_name, server_version, capabilities,
 			created_at, updated_at
 		) VALUES (
 			$1, $2, $3, $4, $5, $6,
 			$7, $8,
 			$9, $10, $11, $12,
-			$13, $14, $15,
-			$16, $17
+			$13, $14,
+			$15, $16, $17,
+			$18, $19
 		)
 	`
 	_, err := r.db.ExecContext(ctx, query,
 		c.ID, c.UserID, c.Title, c.ServerURL, c.Status, c.ErrorMsg,
 		c.DisconnectReason, c.DisconnectPermanent,
 		c.OAuthClientID, c.OAuthClientSecret, c.OAuthTokenJSON, c.OAuthServerMeta,
+		c.OAuthState, c.OAuthCodeVerifier,
 		c.ServerName, c.ServerVersion, c.Capabilities,
 		c.CreatedAt, c.UpdatedAt,
 	)
@@ -72,6 +75,7 @@ func (r *PostgresMCPConnectorRepository) GetByID(ctx context.Context, id string)
 		SELECT id, user_id, title, server_url, status, error_msg,
 		       disconnect_reason, disconnect_permanent,
 		       oauth_client_id, oauth_client_secret, oauth_token_json, oauth_server_meta,
+		       oauth_state, oauth_code_verifier,
 		       server_name, server_version, capabilities,
 		       created_at, updated_at
 		FROM mcp_connectors
@@ -82,6 +86,7 @@ func (r *PostgresMCPConnectorRepository) GetByID(ctx context.Context, id string)
 		&c.ID, &c.UserID, &c.Title, &c.ServerURL, &c.Status, &c.ErrorMsg,
 		&c.DisconnectReason, &c.DisconnectPermanent,
 		&c.OAuthClientID, &c.OAuthClientSecret, &c.OAuthTokenJSON, &c.OAuthServerMeta,
+		&c.OAuthState, &c.OAuthCodeVerifier,
 		&c.ServerName, &c.ServerVersion, &c.Capabilities,
 		&c.CreatedAt, &c.UpdatedAt,
 	)
@@ -100,6 +105,7 @@ func (r *PostgresMCPConnectorRepository) ListByUser(ctx context.Context, userID 
 		SELECT id, user_id, title, server_url, status, error_msg,
 		       disconnect_reason, disconnect_permanent,
 		       oauth_client_id, oauth_client_secret, oauth_token_json, oauth_server_meta,
+		       oauth_state, oauth_code_verifier,
 		       server_name, server_version, capabilities,
 		       created_at, updated_at
 		FROM mcp_connectors
@@ -119,6 +125,7 @@ func (r *PostgresMCPConnectorRepository) ListByUser(ctx context.Context, userID 
 			&c.ID, &c.UserID, &c.Title, &c.ServerURL, &c.Status, &c.ErrorMsg,
 			&c.DisconnectReason, &c.DisconnectPermanent,
 			&c.OAuthClientID, &c.OAuthClientSecret, &c.OAuthTokenJSON, &c.OAuthServerMeta,
+			&c.OAuthState, &c.OAuthCodeVerifier,
 			&c.ServerName, &c.ServerVersion, &c.Capabilities,
 			&c.CreatedAt, &c.UpdatedAt,
 		); err != nil {
@@ -138,14 +145,16 @@ func (r *PostgresMCPConnectorRepository) Update(ctx context.Context, c *domain.M
 			title = $1, server_url = $2, status = $3, error_msg = $4,
 			disconnect_reason = $5, disconnect_permanent = $6,
 			oauth_client_id = $7, oauth_client_secret = $8, oauth_token_json = $9, oauth_server_meta = $10,
-			server_name = $11, server_version = $12, capabilities = $13,
-			updated_at = $14
-		WHERE id = $15
+			oauth_state = $11, oauth_code_verifier = $12,
+			server_name = $13, server_version = $14, capabilities = $15,
+			updated_at = $16
+		WHERE id = $17
 	`
 	result, err := r.db.ExecContext(ctx, query,
 		c.Title, c.ServerURL, c.Status, c.ErrorMsg,
 		c.DisconnectReason, c.DisconnectPermanent,
 		c.OAuthClientID, c.OAuthClientSecret, c.OAuthTokenJSON, c.OAuthServerMeta,
+		c.OAuthState, c.OAuthCodeVerifier,
 		c.ServerName, c.ServerVersion, c.Capabilities,
 		c.UpdatedAt, c.ID,
 	)
@@ -170,6 +179,76 @@ func (r *PostgresMCPConnectorRepository) CountByUser(ctx context.Context, userID
 		return 0, fmt.Errorf("counting mcp connectors: %w", err)
 	}
 	return count, nil
+}
+
+// GetByOAuthState looks up a connector by its pending OAuth state parameter.
+// Returns nil if no connector has this state (expired or invalid).
+func (r *PostgresMCPConnectorRepository) GetByOAuthState(ctx context.Context, state string) (*domain.MCPConnector, error) {
+	query := `
+		SELECT id, user_id, title, server_url, status, error_msg,
+		       disconnect_reason, disconnect_permanent,
+		       oauth_client_id, oauth_client_secret, oauth_token_json, oauth_server_meta,
+		       oauth_state, oauth_code_verifier,
+		       server_name, server_version, capabilities,
+		       created_at, updated_at
+		FROM mcp_connectors
+		WHERE oauth_state = $1 AND oauth_state != ''
+	`
+	var c domain.MCPConnector
+	err := r.db.QueryRowContext(ctx, query, state).Scan(
+		&c.ID, &c.UserID, &c.Title, &c.ServerURL, &c.Status, &c.ErrorMsg,
+		&c.DisconnectReason, &c.DisconnectPermanent,
+		&c.OAuthClientID, &c.OAuthClientSecret, &c.OAuthTokenJSON, &c.OAuthServerMeta,
+		&c.OAuthState, &c.OAuthCodeVerifier,
+		&c.ServerName, &c.ServerVersion, &c.Capabilities,
+		&c.CreatedAt, &c.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("querying mcp connector by oauth state: %w", err)
+	}
+	return &c, nil
+}
+
+// ListRefreshable returns all connectors eligible for background health-check
+// probing in a single query (no N+1). A connector is refreshable if it is
+// connected, or disconnected but not permanently.
+func (r *PostgresMCPConnectorRepository) ListRefreshable(ctx context.Context) ([]domain.MCPConnector, error) {
+	query := `
+		SELECT id, user_id, title, server_url, status, error_msg,
+		       disconnect_reason, disconnect_permanent,
+		       oauth_client_id, oauth_client_secret, oauth_token_json, oauth_server_meta,
+		       oauth_state, oauth_code_verifier,
+		       server_name, server_version, capabilities,
+		       created_at, updated_at
+		FROM mcp_connectors
+		WHERE status IN ('connected', 'disconnected')
+		  AND (status = 'connected' OR disconnect_permanent = FALSE)
+	`
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("querying refreshable connectors: %w", err)
+	}
+	defer rows.Close()
+
+	var results []domain.MCPConnector
+	for rows.Next() {
+		var c domain.MCPConnector
+		if err := rows.Scan(
+			&c.ID, &c.UserID, &c.Title, &c.ServerURL, &c.Status, &c.ErrorMsg,
+			&c.DisconnectReason, &c.DisconnectPermanent,
+			&c.OAuthClientID, &c.OAuthClientSecret, &c.OAuthTokenJSON, &c.OAuthServerMeta,
+			&c.OAuthState, &c.OAuthCodeVerifier,
+			&c.ServerName, &c.ServerVersion, &c.Capabilities,
+			&c.CreatedAt, &c.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scanning refreshable connector row: %w", err)
+		}
+		results = append(results, c)
+	}
+	return results, rows.Err()
 }
 
 // Delete removes a connector by ID.

@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -25,12 +26,32 @@ const (
 
 	// oauthHTTPTimeout is the default timeout for all OAuth HTTP requests.
 	oauthHTTPTimeout = 30 * time.Second
+
+	// metadataCacheTTL is the TTL for cached OAuth metadata discovery results.
+	// Matches agentstack's @alru_cache(ttl=600) for metadata endpoints.
+	metadataCacheTTL = 10 * time.Minute
+
+	// registrationCacheTTL is the TTL for cached dynamic client registrations.
+	// Matches agentstack's @alru_cache(ttl=86400) for client registration.
+	registrationCacheTTL = 24 * time.Hour
 )
 
 // OAuthService handles the OAuth 2.1 Authorization Code + PKCE flow for MCP servers.
 type OAuthService struct {
 	callbackURL string // e.g. https://app.example.com/v1/mcp/oauth/callback
 	httpClient  *http.Client
+
+	// In-memory TTL caches to avoid redundant network round-trips when
+	// multiple connectors share the same auth server (agentstack pattern).
+	resourceMetaCache *ttlCache[*ProtectedResourceMetadata]
+	authMetaCache     *ttlCache[*OAuthMetadata]
+	registrationCache *ttlCache[clientRegistration]
+}
+
+// clientRegistration holds the result of a dynamic client registration.
+type clientRegistration struct {
+	ClientID     string
+	ClientSecret string
 }
 
 // NewOAuthService creates a new OAuth service.
@@ -40,6 +61,9 @@ func NewOAuthService(callbackURL string) *OAuthService {
 		httpClient: &http.Client{
 			Timeout: oauthHTTPTimeout,
 		},
+		resourceMetaCache: newTTLCache[*ProtectedResourceMetadata](metadataCacheTTL),
+		authMetaCache:     newTTLCache[*OAuthMetadata](metadataCacheTTL),
+		registrationCache: newTTLCache[clientRegistration](registrationCacheTTL),
 	}
 }
 
@@ -69,18 +93,18 @@ type OAuthTokenResponse struct {
 	Scope        string `json:"scope,omitempty"`
 }
 
-// OAuthState holds transient state during the OAuth flow.
-type OAuthState struct {
-	ConnectorID  string `json:"connector_id"`
-	State        string `json:"state"`
-	CodeVerifier string `json:"code_verifier"`
-}
-
 // DiscoverProtectedResourceMetadata fetches RFC 9728 metadata from the MCP server.
+// Results are cached for 10 minutes (agentstack pattern) to avoid redundant
+// round-trips when multiple connectors point to the same server.
 func (o *OAuthService) DiscoverProtectedResourceMetadata(ctx context.Context, serverURL string) (*ProtectedResourceMetadata, error) {
 	parsed, err := url.Parse(serverURL)
 	if err != nil {
 		return nil, fmt.Errorf("parsing server URL: %w", err)
+	}
+
+	cacheKey := parsed.Scheme + "://" + parsed.Host
+	if cached, ok := o.resourceMetaCache.Get(cacheKey); ok {
+		return cached, nil
 	}
 
 	metaURL := fmt.Sprintf("%s://%s/.well-known/oauth-protected-resource", parsed.Scheme, parsed.Host)
@@ -103,14 +127,21 @@ func (o *OAuthService) DiscoverProtectedResourceMetadata(ctx context.Context, se
 	if err := json.NewDecoder(io.LimitReader(resp.Body, maxMetadataResponseBytes)).Decode(&meta); err != nil {
 		return nil, fmt.Errorf("decoding protected resource metadata: %w", err)
 	}
+	o.resourceMetaCache.Set(cacheKey, &meta)
 	return &meta, nil
 }
 
 // DiscoverAuthServerMetadata fetches OAuth Authorization Server metadata (RFC 8414).
+// Results are cached for 10 minutes (agentstack pattern).
 func (o *OAuthService) DiscoverAuthServerMetadata(ctx context.Context, authServerURL string) (*OAuthMetadata, error) {
 	parsed, err := url.Parse(authServerURL)
 	if err != nil {
 		return nil, fmt.Errorf("parsing auth server URL: %w", err)
+	}
+
+	cacheKey := parsed.Scheme + "://" + parsed.Host
+	if cached, ok := o.authMetaCache.Get(cacheKey); ok {
+		return cached, nil
 	}
 
 	metaURL := fmt.Sprintf("%s://%s/.well-known/oauth-authorization-server", parsed.Scheme, parsed.Host)
@@ -133,11 +164,18 @@ func (o *OAuthService) DiscoverAuthServerMetadata(ctx context.Context, authServe
 	if err := json.NewDecoder(io.LimitReader(resp.Body, maxMetadataResponseBytes)).Decode(&meta); err != nil {
 		return nil, fmt.Errorf("decoding auth server metadata: %w", err)
 	}
+	o.authMetaCache.Set(cacheKey, &meta)
 	return &meta, nil
 }
 
 // RegisterClient performs Dynamic Client Registration (RFC 7591).
+// RegisterClient performs Dynamic Client Registration (RFC 7591).
+// Results are cached for 24 hours keyed by registration endpoint (agentstack pattern).
 func (o *OAuthService) RegisterClient(ctx context.Context, registrationEndpoint, serverName string) (clientID, clientSecret string, err error) {
+	if cached, ok := o.registrationCache.Get(registrationEndpoint); ok {
+		return cached.ClientID, cached.ClientSecret, nil
+	}
+
 	body := map[string]any{
 		"client_name":                "SchoolWithAI - " + serverName,
 		"redirect_uris":              []string{o.callbackURL},
@@ -175,6 +213,10 @@ func (o *OAuthService) RegisterClient(ctx context.Context, registrationEndpoint,
 	if err := json.NewDecoder(io.LimitReader(resp.Body, maxTokenResponseBytes)).Decode(&result); err != nil {
 		return "", "", fmt.Errorf("decoding registration response: %w", err)
 	}
+	o.registrationCache.Set(registrationEndpoint, clientRegistration{
+		ClientID:     result.ClientID,
+		ClientSecret: result.ClientSecret,
+	})
 	return result.ClientID, result.ClientSecret, nil
 }
 
@@ -338,4 +380,112 @@ func (t *BearerTokenTransport) RoundTrip(req *http.Request) (*http.Response, err
 		base = http.DefaultTransport
 	}
 	return base.RoundTrip(req2)
+}
+
+// TokenRefreshCallback is invoked after a successful token refresh so the
+// caller can persist the new tokens (e.g. update the DB row).
+type TokenRefreshCallback func(newToken *OAuthTokenResponse) error
+
+// AutoRefreshTransport is an http.RoundTripper that automatically refreshes
+// the OAuth token on 401 responses. Modelled after agentstack's
+// auto_refresh_client pattern.
+type AutoRefreshTransport struct {
+	mu           sync.Mutex
+	oauth        *OAuthService
+	meta         *OAuthMetadata
+	clientID     string
+	clientSecret string
+	token        OAuthTokenResponse
+	expiresAt    time.Time // computed from token.ExpiresIn at creation
+	onRefresh    TokenRefreshCallback
+	base         http.RoundTripper
+}
+
+// NewAutoRefreshTransport creates a transport that injects the Bearer token and
+// transparently refreshes it when the server responds with 401.
+func NewAutoRefreshTransport(
+	oauth *OAuthService,
+	meta *OAuthMetadata,
+	clientID, clientSecret string,
+	token OAuthTokenResponse,
+	onRefresh TokenRefreshCallback,
+) *AutoRefreshTransport {
+	var expiresAt time.Time
+	if token.ExpiresIn > 0 {
+		// Subtract a small buffer to refresh proactively.
+		expiresAt = time.Now().Add(time.Duration(token.ExpiresIn)*time.Second - 30*time.Second)
+	}
+	return &AutoRefreshTransport{
+		oauth:        oauth,
+		meta:         meta,
+		clientID:     clientID,
+		clientSecret: clientSecret,
+		token:        token,
+		expiresAt:    expiresAt,
+		onRefresh:    onRefresh,
+		base:         http.DefaultTransport,
+	}
+}
+
+// RoundTrip implements http.RoundTripper with automatic token refresh.
+func (t *AutoRefreshTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Proactively refresh if the token is about to expire.
+	if !t.expiresAt.IsZero() && time.Now().After(t.expiresAt) && t.token.RefreshToken != "" {
+		_ = t.refreshToken(req.Context())
+	}
+
+	// Inject the current token.
+	req2 := req.Clone(req.Context())
+	t.mu.Lock()
+	req2.Header.Set("Authorization", "Bearer "+t.token.AccessToken)
+	t.mu.Unlock()
+
+	resp, err := t.base.RoundTrip(req2)
+	if err != nil {
+		return nil, err
+	}
+
+	// If 401 and we have a refresh token, try once.
+	if resp.StatusCode == http.StatusUnauthorized && t.token.RefreshToken != "" {
+		resp.Body.Close()
+		if refreshErr := t.refreshToken(req.Context()); refreshErr != nil {
+			// Return the original 401 — caller will see it as an auth error.
+			return t.base.RoundTrip(req.Clone(req.Context()))
+		}
+		// Retry with the new token.
+		retry := req.Clone(req.Context())
+		t.mu.Lock()
+		retry.Header.Set("Authorization", "Bearer "+t.token.AccessToken)
+		t.mu.Unlock()
+		return t.base.RoundTrip(retry)
+	}
+
+	return resp, nil
+}
+
+// refreshToken calls the OAuth token endpoint with the refresh_token grant.
+func (t *AutoRefreshTransport) refreshToken(ctx context.Context) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	newToken, err := t.oauth.RefreshToken(ctx, t.meta, t.clientID, t.clientSecret, t.token.RefreshToken)
+	if err != nil {
+		return err
+	}
+
+	// Preserve the refresh token if the server didn't issue a new one.
+	if newToken.RefreshToken == "" {
+		newToken.RefreshToken = t.token.RefreshToken
+	}
+
+	t.token = *newToken
+	if newToken.ExpiresIn > 0 {
+		t.expiresAt = time.Now().Add(time.Duration(newToken.ExpiresIn)*time.Second - 30*time.Second)
+	}
+
+	// Notify the caller so it can persist the new token.
+	if t.onRefresh != nil {
+		_ = t.onRefresh(newToken)
+	}
+	return nil
 }

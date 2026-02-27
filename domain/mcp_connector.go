@@ -39,6 +39,10 @@ type MCPConnector struct {
 	OAuthTokenJSON    sql.NullString `json:"-" db:"oauth_token_json"`    // encrypted at rest
 	OAuthServerMeta   sql.NullString `json:"-" db:"oauth_server_meta"`   // JSON: cached RFC 8414 metadata
 
+	// OAuth flow state — persisted so in-progress flows survive server restarts.
+	OAuthState        string `json:"-" db:"oauth_state"`
+	OAuthCodeVerifier string `json:"-" db:"oauth_code_verifier"`
+
 	// Discovered server metadata (populated after successful connection)
 	ServerName    sql.NullString `json:"server_name,omitempty" db:"server_name"`
 	ServerVersion sql.NullString `json:"server_version,omitempty" db:"server_version"`
@@ -96,7 +100,9 @@ type MCPConnectorRepository interface {
 	// Connector CRUD
 	Create(ctx context.Context, connector *MCPConnector) error
 	GetByID(ctx context.Context, id string) (*MCPConnector, error)
+	GetByOAuthState(ctx context.Context, state string) (*MCPConnector, error)
 	ListByUser(ctx context.Context, userID string) ([]MCPConnector, error)
+	ListRefreshable(ctx context.Context) ([]MCPConnector, error)
 	CountByUser(ctx context.Context, userID string) (int, error)
 	Update(ctx context.Context, connector *MCPConnector) error
 	Delete(ctx context.Context, id string) error
