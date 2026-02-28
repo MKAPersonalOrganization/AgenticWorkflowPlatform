@@ -526,7 +526,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// control their own limits via ParseMultipartForm.
 	// /v1/message:send is excluded because it carries base64 file attachments
 	// and applies its own larger limit via a route-group middleware.
-	root.Use(middleware.BodyLimit(0, "/v1/message:send", "/v1/threads/"))
+	// Note: multipart/form-data requests (attachment uploads) are automatically
+	// excluded by the middleware, so no path exclusion is needed for those.
+	root.Use(middleware.BodyLimit(0, "/v1/message:send"))
 
 	// Add per-IP rate limiting (Moved to specific route groups below for split limits)
 	// r.Use(middleware.RateLimiter(100, 300))

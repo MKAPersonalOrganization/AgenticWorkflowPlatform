@@ -612,8 +612,14 @@ func (s *Service) buildMessageContent(ctx context.Context, req RunExecutionReque
 	return content
 }
 
+// maxArtifactLoadSize caps how many bytes loadArtifactAsDataURL will read
+// into memory. This prevents a single large file from causing OOM under
+// concurrent load (100K users × 20 MB = 2 TB if unbounded).
+const maxArtifactLoadSize = 20 << 20 // 20 MB
+
 // loadArtifactAsDataURL loads a file from the artifact store and returns it as
 // a base64 data URL suitable for sending to LLM APIs.
+// Reads are capped at maxArtifactLoadSize to prevent OOM.
 func (s *Service) loadArtifactAsDataURL(ctx context.Context, userID, threadID, fileName, mimeType string) (string, error) {
 	reader, meta, err := s.artifactStore.Load(ctx, userID, threadID, fileName)
 	if err != nil {
@@ -621,9 +627,13 @@ func (s *Service) loadArtifactAsDataURL(ctx context.Context, userID, threadID, f
 	}
 	defer reader.Close()
 
-	data, err := io.ReadAll(reader)
+	data, err := io.ReadAll(io.LimitReader(reader, maxArtifactLoadSize+1))
 	if err != nil {
 		return "", fmt.Errorf("read artifact data: %w", err)
+	}
+	if int64(len(data)) > maxArtifactLoadSize {
+		return "", fmt.Errorf("artifact too large for LLM: %s (%d bytes exceeds %d byte limit)",
+			fileName, meta.Size, maxArtifactLoadSize)
 	}
 
 	if mimeType == "" {
