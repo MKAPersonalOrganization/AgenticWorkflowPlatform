@@ -176,8 +176,8 @@ type SubmitChatTaskResult struct {
 
 // SubmitChatTask submits a chat task for async processing.
 // It handles validation, ID generation, and payload construction.
-func (s *AsynqTaskManager) SubmitChatTask(ctx context.Context, userID, message, contextID, agentName, toolCallID string) (*SubmitChatTaskResult, error) {
-	if message == "" {
+func (s *AsynqTaskManager) SubmitChatTask(ctx context.Context, userID, message, contextID, agentName, toolCallID string, images []ImageAttachment) (*SubmitChatTaskResult, error) {
+	if message == "" && len(images) == 0 {
 		return nil, errors.New("message is required")
 	}
 
@@ -199,6 +199,7 @@ func (s *AsynqTaskManager) SubmitChatTask(ctx context.Context, userID, message, 
 		UserID:     userID,
 		AgentName:  agentName,
 		ToolCallID: toolCallID,
+		Images:     images,
 	}
 
 	s.log.Info(ctx, "Submitting chat task",

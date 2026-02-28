@@ -104,6 +104,17 @@ func convertToLLMMessage(msg *agent.Message) llm.Message {
 		switch c.Type {
 		case agent.ContentTypeText:
 			contents = append(contents, llm.TextContent{Text: c.Text})
+		case agent.ContentTypeImageURL:
+			if c.ImageURL != nil {
+				detail := c.ImageURL.Detail
+				if detail == "" {
+					detail = "auto"
+				}
+				contents = append(contents, llm.ImageURLContent{
+					URL:    c.ImageURL.URL,
+					Detail: detail,
+				})
+			}
 		case agent.ContentTypeToolCall:
 			if c.ToolCall != nil {
 				contents = append(contents, llm.FunctionCall{

@@ -108,6 +108,10 @@ func (h *AguiProjectionHandler) writeThreadResponse(w http.ResponseWriter, state
 		response["toolStates"] = state.ToolStates
 	}
 
+	if len(state.MessageImages) > 0 {
+		response["messageImages"] = state.MessageImages
+	}
+
 	// Encode to buffer first to avoid partial writes with incorrect status
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {

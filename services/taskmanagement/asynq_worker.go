@@ -17,15 +17,22 @@ const (
 	TypeProcessChat = "chat:process"
 )
 
+// ImageAttachment represents an image sent with a chat message.
+type ImageAttachment struct {
+	Data     string `json:"data"`               // Base64 data URL (data:image/png;base64,...)
+	MimeType string `json:"mimeType,omitempty"` // e.g. "image/png"
+}
+
 // ProcessChatPayload contains the data needed to process a chat message.
 type ProcessChatPayload struct {
-	JobID      string `json:"job_id"`
-	ThreadID   string `json:"thread_id"`
-	MessageID  string `json:"message_id"`
-	Message    string `json:"message"`
-	UserID     string `json:"user_id"`
-	AgentName  string `json:"agent_name,omitempty"`
-	ToolCallID string `json:"tool_call_id,omitempty"` // Set when this message is an answer to a tool's elicitation
+	JobID      string            `json:"job_id"`
+	ThreadID   string            `json:"thread_id"`
+	MessageID  string            `json:"message_id"`
+	Message    string            `json:"message"`
+	UserID     string            `json:"user_id"`
+	AgentName  string            `json:"agent_name,omitempty"`
+	ToolCallID string            `json:"tool_call_id,omitempty"` // Set when this message is an answer to a tool's elicitation
+	Images     []ImageAttachment `json:"images,omitempty"`       // Attached images (base64 data URLs)
 }
 
 // NewProcessChatTask creates a new task for processing a chat message.
@@ -102,7 +109,23 @@ func (w *ChatWorker) processChat(ctx context.Context, payload ProcessChatPayload
 		Message:    payload.Message,
 		MessageID:  payload.MessageID,
 		ToolCallID: payload.ToolCallID,
+		Images:     toOrchestratorImages(payload.Images),
 	}
 
 	return w.orchestrationService.HandleUserMessage(ctx, req)
+}
+
+// toOrchestratorImages converts taskmanagement images to orchestrator images.
+func toOrchestratorImages(imgs []ImageAttachment) []agentorchestrator.ImageAttachment {
+	if len(imgs) == 0 {
+		return nil
+	}
+	result := make([]agentorchestrator.ImageAttachment, len(imgs))
+	for i, img := range imgs {
+		result[i] = agentorchestrator.ImageAttachment{
+			Data:     img.Data,
+			MimeType: img.MimeType,
+		}
+	}
+	return result
 }

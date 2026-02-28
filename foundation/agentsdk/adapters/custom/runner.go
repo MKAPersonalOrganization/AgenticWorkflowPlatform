@@ -175,6 +175,16 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 		var initialEvents []domain.Event
 
 		userContent := extractUserPrompt(req.Message)
+		userImages := extractUserImages(req.Message)
+
+		// Extract artifact image refs passed from orchestrator (for event persistence)
+		var imageRefs []domain.ImageRef
+		if req.Context != nil {
+			if refs, ok := req.Context["imageRefs"].([]domain.ImageRef); ok {
+				imageRefs = refs
+			}
+		}
+
 		if req.Message != nil {
 			messageID := req.Message.ID
 			if messageID == "" {
@@ -185,7 +195,7 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 			var uEvent *domain.UserMessageAdded
 			var sideEffects []domain.Event
 			var pErr error
-			agg, uEvent, sideEffects, pErr = threadMgmt.AddUserMessage(ctx, req.SessionID, messageID, userContent, req.UserID)
+			agg, uEvent, sideEffects, pErr = threadMgmt.AddUserMessage(ctx, req.SessionID, messageID, userContent, req.UserID, imageRefs...)
 			if pErr != nil {
 				yield(nil, fmt.Errorf("failed to persist user message: %w", pErr))
 				return
@@ -216,6 +226,19 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 			if hErr != nil {
 				yield(nil, fmt.Errorf("failed to retrieve history: %w", hErr))
 				return
+			}
+
+			// Inject image metadata into the latest user message so the LLM sees them
+			if len(userImages) > 0 && len(messages) > 0 {
+				for i := len(messages) - 1; i >= 0; i-- {
+					if messages[i].Role == "user" {
+						if messages[i].Metadata == nil {
+							messages[i].Metadata = make(map[string]any)
+						}
+						messages[i].Metadata["images"] = userImages
+						break
+					}
+				}
 			}
 		} else {
 			thread = core.NewInMemoryThreadWithID(req.SessionID)
@@ -582,4 +605,27 @@ func extractUserPrompt(msg *agent.Message) string {
 	}
 
 	return ""
+}
+
+// extractUserImages extracts image URLs from a message as a []map[string]any
+// suitable for storing in core.Message.Metadata["images"].
+func extractUserImages(msg *agent.Message) []map[string]any {
+	if msg == nil {
+		return nil
+	}
+
+	var images []map[string]any
+	for _, c := range msg.Content {
+		if c.Type == agent.ContentTypeImageURL && c.ImageURL != nil {
+			detail := c.ImageURL.Detail
+			if detail == "" {
+				detail = "auto"
+			}
+			images = append(images, map[string]any{
+				"url":    c.ImageURL.URL,
+				"detail": detail,
+			})
+		}
+	}
+	return images
 }

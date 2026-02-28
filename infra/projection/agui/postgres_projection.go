@@ -132,11 +132,22 @@ func (p *PostgresAguiProjection) applyThreadCreated(ctx context.Context, event *
 
 // applyUserMessageAdded adds a user message to the thread.
 func (p *PostgresAguiProjection) applyUserMessageAdded(ctx context.Context, event *domain.UserMessageAdded) error {
+	// Marshal images to metadata JSONB for persistence
+	var metadataJSON []byte
+	if len(event.Images) > 0 {
+		metaMap := map[string]any{"images": event.Images}
+		var err error
+		metadataJSON, err = json.Marshal(metaMap)
+		if err != nil {
+			p.log.Warn(ctx, "failed to marshal image metadata", "error", err)
+		}
+	}
+
 	// Use atomic subquery for sequence number to prevent race conditions
 	// under concurrent event processing.
 	insertQuery := `
-		INSERT INTO agui_messages (message_id, thread_id, role, content, created_at, sequence_num)
-		VALUES ($1, $2, $3, $4, $5, (SELECT COUNT(*) FROM agui_messages WHERE thread_id = $2::varchar))
+		INSERT INTO agui_messages (message_id, thread_id, role, content, metadata, created_at, sequence_num)
+		VALUES ($1, $2, $3, $4, $5, $6, (SELECT COUNT(*) FROM agui_messages WHERE thread_id = $2::varchar))
 		ON CONFLICT (message_id) DO NOTHING
 	`
 
@@ -145,6 +156,7 @@ func (p *PostgresAguiProjection) applyUserMessageAdded(ctx context.Context, even
 		event.ThreadID,
 		"user",
 		event.Content,
+		metadataJSON,
 		event.Timestamp,
 	)
 	if err != nil {
@@ -557,6 +569,7 @@ func (p *PostgresAguiProjection) GetThreadState(ctx context.Context, threadID st
 
 	// Convert database messages to AGUI SDK format
 	aguiMessages := make([]aguievents.Message, 0, len(messages))
+	messageImages := make(map[string][]domain.ImageRef)
 	var tokenUsage *TokenUsageInfo
 
 	for _, msg := range messages {
@@ -596,10 +609,11 @@ func (p *PostgresAguiProjection) GetThreadState(ctx context.Context, threadID st
 			}
 		}
 
-		// Extract token usage from metadata if present
+		// Extract metadata (token usage, images, etc.)
 		if msg.Metadata != nil {
 			var metadata map[string]interface{}
 			if err := json.Unmarshal([]byte(*msg.Metadata), &metadata); err == nil {
+				// Extract token usage
 				if usage, ok := metadata["usage"].(map[string]interface{}); ok {
 					tokenUsage = &TokenUsageInfo{
 						Provider:        getStringFromMap(usage, "provider"),
@@ -615,6 +629,27 @@ func (p *PostgresAguiProjection) GetThreadState(ctx context.Context, threadID st
 						RejectedPredict: getIntFromMap(usage, "rejectedPredict"),
 						MessageID:       msg.MessageID,
 						ThreadID:        threadID,
+					}
+				}
+
+				// Extract image references for user messages
+				if imagesRaw, ok := metadata["images"]; ok {
+					if imagesArr, ok := imagesRaw.([]interface{}); ok {
+						var refs []domain.ImageRef
+						for _, imgRaw := range imagesArr {
+							if imgMap, ok := imgRaw.(map[string]interface{}); ok {
+								ref := domain.ImageRef{
+									URL:      getStringFromMap(imgMap, "url"),
+									MimeType: getStringFromMap(imgMap, "mimeType"),
+								}
+								if ref.URL != "" {
+									refs = append(refs, ref)
+								}
+							}
+						}
+						if len(refs) > 0 {
+							messageImages[msg.MessageID] = refs
+						}
 					}
 				}
 			}
@@ -683,6 +718,7 @@ func (p *PostgresAguiProjection) GetThreadState(ctx context.Context, threadID st
 		AgentActivity: make(map[string]*AguiAgentActivity),
 		ToolStates:    toolStatesMap,
 		TokenUsage:    tokenUsage,
+		MessageImages: messageImages,
 		CreatedAt:     thread.CreatedAt,
 		UpdatedAt:     thread.UpdatedAt,
 		Version:       thread.Version,

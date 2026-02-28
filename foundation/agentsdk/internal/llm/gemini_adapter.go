@@ -2,6 +2,7 @@ package llm
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"iter"
@@ -275,6 +276,25 @@ func (c *GeminiClient) buildContents(messages []Message) []*genai.Content {
 						Response: resultData,
 					},
 				})
+			case ImageURLContent:
+				// Gemini supports inline images via data URIs
+				if strings.HasPrefix(v.URL, "data:") {
+					// Parse data URI: data:image/png;base64,<data>
+					if idx := strings.Index(v.URL, ","); idx > 0 {
+						header := v.URL[5:idx] // e.g. "image/png;base64"
+						mimeType := strings.Split(header, ";")[0]
+						b64Data := v.URL[idx+1:]
+						decoded, err := base64.StdEncoding.DecodeString(b64Data)
+						if err == nil {
+							parts = append(parts, &genai.Part{
+								InlineData: &genai.Blob{
+									MIMEType: mimeType,
+									Data:     decoded,
+								},
+							})
+						}
+					}
+				}
 			}
 		}
 

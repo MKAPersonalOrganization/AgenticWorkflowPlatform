@@ -55,7 +55,7 @@ func OpenThread(threadID, userID, title string) (*ThreadAggregate, error) {
 
 // AddMessage adds a message to the thread.
 // This implements business logic like ShoppingCart.AddProduct.
-func (t *ThreadAggregate) AddMessage(messageID, role, content string, toolCalls []ToolCall, toolCallID, toolName, agentName string) error {
+func (t *ThreadAggregate) AddMessage(messageID, role, content string, toolCalls []ToolCall, toolCallID, toolName, agentName string, images ...ImageRef) error {
 	if t.IsDeleted {
 		return errors.New("cannot add message to deleted thread")
 	}
@@ -74,6 +74,7 @@ func (t *ThreadAggregate) AddMessage(messageID, role, content string, toolCalls 
 			ThreadID:  t.ID,
 			MessageID: messageID,
 			Content:   content,
+			Images:    images,
 			Timestamp: time.Now(),
 		}
 	case "assistant":
@@ -177,6 +178,16 @@ func (t *ThreadAggregate) Apply(event Event) {
 			Role:      "user",
 			Content:   e.Content,
 			Timestamp: e.Timestamp,
+		}
+		if len(e.Images) > 0 {
+			imgs := make([]any, len(e.Images))
+			for i, img := range e.Images {
+				imgs[i] = map[string]any{
+					"url":      img.URL,
+					"mimeType": img.MimeType,
+				}
+			}
+			msg.Metadata = map[string]any{"images": imgs}
 		}
 		t.Messages = append(t.Messages, msg)
 		t.UpdatedAt = e.Timestamp

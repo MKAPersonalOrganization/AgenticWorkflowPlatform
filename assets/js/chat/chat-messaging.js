@@ -42,8 +42,13 @@ export function createMessagingMethods() {
                     userMessage = this.currentMessage.trim();
                 }
 
-                // Validation
-                if (!userMessage) {
+                // Capture attached images before validation
+                const attachedImages = this.files
+                    .filter(f => f.type && f.type.startsWith('image/') && f.data)
+                    .map(f => ({ data: f.data, type: f.type, name: f.name }));
+
+                // Validation — need text OR images
+                if (!userMessage && attachedImages.length === 0) {
                     return;
                 }
 
@@ -63,8 +68,8 @@ export function createMessagingMethods() {
                 this.__perfMetrics.messagesSent++;
                 const sendTime = Date.now();
 
-                // Create and add user message
-                const userMsg = createUserMessage(userMessage, interactionId);
+                // Create and add user message (including image previews)
+                const userMsg = createUserMessage(userMessage, interactionId, attachedImages);
                 userMsg._sendTime = sendTime;
                 state.messages.push(userMsg);
 
@@ -88,6 +93,9 @@ export function createMessagingMethods() {
                     this.currentMessage = '';
                 }
 
+                // Clear attached files
+                this.files.splice(0);
+
                 // Clear human input state
                 if (state.humanInputToastId) {
                     this.dismissToast(state.humanInputToastId);
@@ -103,7 +111,7 @@ export function createMessagingMethods() {
                 });
 
                 // Start SSE connection
-                this.__streamResponse(userMessage, this.__currentThreadId, this.selectedAgent, toolCallId);
+                this.__streamResponse(userMessage, this.__currentThreadId, this.selectedAgent, toolCallId, attachedImages);
             });
         },
 
@@ -134,7 +142,7 @@ export function createMessagingMethods() {
                     const data = await response.json();
                     const state = this.__getThreadState(id);
                     const messages = Array.isArray(data) ? data : (data.messages || []);
-                    const uiMessages = this.__convertBackendMessagesToUI(messages, data.toolStates || {}, id);
+                    const uiMessages = this.__convertBackendMessagesToUI(messages, data.toolStates || {}, id, data.messageImages || {});
                     state.messages = uiMessages;
 
                     // Side Effect Phase: Sync stateful components (XState)
@@ -163,16 +171,10 @@ export function createMessagingMethods() {
          * @param {Array} backendMessages - Messages in AG-UI SDK format
          * @param {Object} toolStatesMap - Map of tool states by toolCallId (optional)
          * @param {string|null} targetThreadId - Thread ID for state syncing (optional)
+         * @param {Object} messageImages - Map of messageID → image refs from backend (optional)
          * @returns {Array} Converted messages for UI display
          */
-        /**
-         * Convert backend AG-UI messages to UI display format
-         * @param {Array} backendMessages - Messages in AG-UI SDK format
-         * @param {Object} toolStatesMap - Map of tool states by toolCallId (optional)
-         * @param {string|null} targetThreadId - Thread ID for state syncing (optional)
-         * @returns {Array} Converted messages for UI display
-         */
-        __convertBackendMessagesToUI(backendMessages, toolStatesMap = {}, targetThreadId = null) {
+        __convertBackendMessagesToUI(backendMessages, toolStatesMap = {}, targetThreadId = null, messageImages = {}) {
             if (!Array.isArray(backendMessages)) {
                 console.warn('[Messaging] Invalid messages array:', backendMessages);
                 return [];
@@ -186,7 +188,7 @@ export function createMessagingMethods() {
 
                 switch (msg.role) {
                     case 'user':
-                        uiMessages.push(this.__handleUserMessage(msg));
+                        uiMessages.push(this.__handleUserMessage(msg, messageImages));
                         break;
 
                     case 'assistant':
@@ -216,11 +218,21 @@ export function createMessagingMethods() {
          * Handle conversion of a user message
          * @private
          */
-        __handleUserMessage(msg) {
+        __handleUserMessage(msg, messageImages = {}) {
+            // Merge persisted images from backend (artifact URLs)
+            let images = msg.images || [];
+            if (messageImages[msg.id] && messageImages[msg.id].length > 0) {
+                images = messageImages[msg.id].map(ref => ({
+                    data: ref.url,    // artifact URL like /v1/threads/.../artifacts/img-xxx.png
+                    type: ref.mimeType || 'image/png',
+                    name: ref.url.split('/').pop() || 'image'
+                }));
+            }
             return {
                 id: msg.id,
                 role: 'user',
                 content: msg.content || '',
+                images: images,
                 timestamp: msg.timestamp || new Date().toISOString(),
                 streaming: false
             };

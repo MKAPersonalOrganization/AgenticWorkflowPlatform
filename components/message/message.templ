@@ -40,9 +40,18 @@ templ UserMessage() {
 			<!-- User Message Bubble -->
 			<div
 				class="bg-secondary/80 px-4 py-2.5 rounded-2xl text-start prose prose-sm max-w-none text-foreground leading-relaxed shadow-xs"
-				x-html="renderMarkdown(message.content)"
 				dir="auto"
-			></div>
+			>
+				<!-- Inline images from user message -->
+				<template x-if="message.images && message.images.length > 0">
+					<div class="flex flex-wrap gap-2 mb-2 not-prose">
+						<template x-for="(img, idx) in message.images" :key="idx">
+							<img :src="img.data" :alt="img.name || 'Attached image'" class="max-h-48 max-w-xs rounded-lg border border-border object-contain cursor-pointer hover:opacity-90 transition-opacity" @click="window.open(img.data, '_blank')"/>
+						</template>
+					</div>
+				</template>
+				<div x-show="message.content" x-html="renderMarkdown(message.content)"></div>
+			</div>
 			<!-- Actions (Bottom Right fallback or integrated? LibreChat puts them on the side or bottom) -->
 		</div>
 	</div>

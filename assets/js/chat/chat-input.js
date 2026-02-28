@@ -20,6 +20,100 @@ export function createInputMethods() {
         // File Management
         // ============================================
 
+        /** Max image size: 20 MB */
+        MAX_IMAGE_SIZE: 20 * 1024 * 1024,
+
+        /** Max number of images per message */
+        MAX_IMAGE_COUNT: 5,
+
+        /** Accepted image MIME types */
+        ACCEPTED_IMAGE_TYPES: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+
+        /**
+         * Validate an image file by type and size.
+         * Shows a user-visible toast on failure.
+         * @param {File} file
+         * @returns {boolean}
+         */
+        _isValidImage(file) {
+            if (!this.ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+                this.showToast(window.i18n?.t?.('Unsupported image type: {type}', { type: file.type }) || `Unsupported image type: ${file.type}`, 'error');
+                return false;
+            }
+            if (file.size > this.MAX_IMAGE_SIZE) {
+                const sizeMB = (file.size / 1024 / 1024).toFixed(1);
+                this.showToast(window.i18n?.t?.('Image too large ({size} MB). Max is 20 MB.', { size: sizeMB }) || `Image too large (${sizeMB} MB). Max is 20 MB.`, 'error');
+                return false;
+            }
+            return true;
+        },
+
+        /**
+         * Read image files and add them to the files[] array.
+         * Enforces MAX_IMAGE_COUNT per message.
+         * @param {File[]} imageFiles
+         */
+        _addImageFiles(imageFiles) {
+            for (const file of imageFiles) {
+                if (this.files.length >= this.MAX_IMAGE_COUNT) {
+                    this.showToast(window.i18n?.t?.('Maximum {count} images per message', { count: this.MAX_IMAGE_COUNT }) || `Maximum ${this.MAX_IMAGE_COUNT} images per message`, 'error');
+                    break;
+                }
+                if (!this._isValidImage(file)) continue;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    this.files.push({
+                        name: file.name || `clipboard_${Date.now()}.${file.type.split('/')[1]}`,
+                        type: file.type,
+                        size: file.size,
+                        data: e.target.result // Base64 data URL
+                    });
+                };
+                reader.readAsDataURL(file);
+            }
+        },
+
+        /**
+         * Handle paste events on the textarea (images from clipboard)
+         * @param {ClipboardEvent} event
+         */
+        handlePaste(event) {
+            const clipboardData = event.clipboardData;
+            if (!clipboardData || clipboardData.files.length === 0) return;
+
+            // Filter to image files only
+            const imageFiles = Array.from(clipboardData.files).filter(f => f.type.startsWith('image/'));
+            if (imageFiles.length === 0) return;
+
+            // Prevent the default paste (which would insert weird text)
+            event.preventDefault();
+            this._addImageFiles(imageFiles);
+        },
+
+        /**
+         * Handle drop events on the chat input area
+         * @param {DragEvent} event
+         */
+        handleDrop(event) {
+            event.preventDefault();
+            const dt = event.dataTransfer;
+            if (!dt || dt.files.length === 0) return;
+
+            const imageFiles = Array.from(dt.files).filter(f => f.type.startsWith('image/'));
+            if (imageFiles.length === 0) return;
+
+            this._addImageFiles(imageFiles);
+        },
+
+        /**
+         * Handle dragover to allow drop
+         * @param {DragEvent} event
+         */
+        handleDragOver(event) {
+            event.preventDefault();
+        },
+
         /**
          * Remove a file from the attachment list
          * @param {number} index - Index of file to remove
