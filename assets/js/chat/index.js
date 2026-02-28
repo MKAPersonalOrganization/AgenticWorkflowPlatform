@@ -115,8 +115,8 @@ document.addEventListener('alpine:init', () => {
 
                             // Set default if not set
                             if (!this.selectedAgent && this.AVAILABLE_AGENTS.length > 0) {
-                                // Prefer math-instructor as default
-                                const defaultAgent = this.AVAILABLE_AGENTS.find(a => a.id === 'math-instructor') || this.AVAILABLE_AGENTS[0];
+                                // Prefer the default agent (isDefault flag from backend)
+                                const defaultAgent = this.AVAILABLE_AGENTS.find(a => a.isDefault) || this.AVAILABLE_AGENTS[0];
                                 this.selectedAgent = defaultAgent.id;
                             }
                         }

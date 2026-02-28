@@ -1,6 +1,7 @@
 package taskmgmt
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -482,18 +483,43 @@ func (h *TaskManagementHandler) UpdateThreadTitle(w http.ResponseWriter, r *http
 
 // ListAgents returns a list of available agents.
 func (h *TaskManagementHandler) ListAgents(w http.ResponseWriter, r *http.Request) {
-	agents := h.agentProvider.List()
+	// Try to list user-specific agents if provider supports it
+	var agents []agent.Agent
+
+	user := h.authService.GetUserFromContext(r.Context())
+
+	type userAwareProvider interface {
+		ListForUser(ctx context.Context, userID string) ([]agent.Agent, error)
+	}
+
+	if uap, ok := h.agentProvider.(userAwareProvider); ok && user != nil {
+		var err error
+		agents, err = uap.ListForUser(r.Context(), user.ID)
+		if err != nil {
+			agents = h.agentProvider.List() // Fallback to default
+		}
+	} else {
+		agents = h.agentProvider.List()
+	}
 
 	response := agent.AgentListResponse{
 		Agents: make([]agent.AgentMetadata, 0, len(agents)),
 	}
 
 	for _, a := range agents {
-		response.Agents = append(response.Agents, agent.AgentMetadata{
+		meta := agent.AgentMetadata{
 			ID:          a.ID(),
 			Name:        a.Name(),
 			Description: a.Description(),
-		})
+		}
+		// Check if the agent carries a default flag
+		type defaultChecker interface {
+			IsDefault() bool
+		}
+		if dc, ok := a.(defaultChecker); ok {
+			meta.IsDefault = dc.IsDefault()
+		}
+		response.Agents = append(response.Agents, meta)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
