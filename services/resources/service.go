@@ -68,7 +68,7 @@ func (s *Service) UploadResource(ctx context.Context, userID string, title, file
 
 	// Save to artifact service (S3)
 	fileName := id.String() // Use UUID as filename in S3 to avoid collisions
-	if _, err := s.artifactService.Save(ctx, uploadUserID, sessionID, fileName, content); err != nil {
+	if _, err := s.artifactService.Save(ctx, uploadUserID, sessionID, fileName, fileType, content); err != nil {
 		return Resource{}, fmt.Errorf("saving to s3: %w", err)
 	}
 
@@ -106,7 +106,7 @@ func (s *Service) GetResourceContent(ctx context.Context, id uuid.UUID) (Resourc
 		sessionID = ResourceSessionID
 	}
 
-	content, err := s.artifactService.Load(ctx, userID, sessionID, res.FilePath)
+	content, _, err := s.artifactService.Load(ctx, userID, sessionID, res.FilePath)
 	if err != nil {
 		return Resource{}, nil, fmt.Errorf("loading from s3: %w", err)
 	}

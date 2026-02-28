@@ -75,7 +75,7 @@ func validateFileName(fileName string) error {
 	return nil
 }
 
-func (s *S3Service) Save(ctx context.Context, userID, sessionID, fileName string, content io.Reader) (int64, error) {
+func (s *S3Service) Save(ctx context.Context, userID, sessionID, fileName, contentType string, content io.Reader) (int64, error) {
 	if userID == "" || sessionID == "" || fileName == "" {
 		return 0, fmt.Errorf("userID, sessionID, and fileName are required")
 	}
@@ -87,16 +87,12 @@ func (s *S3Service) Save(ctx context.Context, userID, sessionID, fileName string
 
 	objectKey := s.getObjectKey(userID, sessionID, fileName)
 
-	// Prepare for PutObject. We need to know size or let PutObject determine it.
-	// Since we take io.Reader, if it's mostly a buffer we might know size.
-	// PutObject takes objectSize. -1 means unknown.
-
-	// Read into buffer if needed to get size? No, io.Reader can be streamed.
-	// However, without size, MinIO client buffers in memory up to part size.
-	// Let's assume content is typically small text files for now.
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
 
 	info, err := s.client.PutObject(ctx, s.bucketName, objectKey, content, -1, minio.PutObjectOptions{
-		ContentType: "text/plain", // Default to text/plain for our artifacts
+		ContentType: contentType,
 	})
 	if err != nil {
 		return 0, fmt.Errorf("failed to upload object: %w", err)
@@ -105,29 +101,34 @@ func (s *S3Service) Save(ctx context.Context, userID, sessionID, fileName string
 	return info.Size, nil
 }
 
-func (s *S3Service) Load(ctx context.Context, userID, sessionID, fileName string) (io.ReadCloser, error) {
+func (s *S3Service) Load(ctx context.Context, userID, sessionID, fileName string) (io.ReadCloser, ArtifactMeta, error) {
 	if err := validateFileName(fileName); err != nil {
-		return nil, err
+		return nil, ArtifactMeta{}, err
 	}
 
 	objectKey := s.getObjectKey(userID, sessionID, fileName)
 
 	obj, err := s.client.GetObject(ctx, s.bucketName, objectKey, minio.GetObjectOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get object: %w", err)
+		return nil, ArtifactMeta{}, fmt.Errorf("failed to get object: %w", err)
 	}
 
 	// Verify existence (GetObject doesn't error immediately if doesn't exist, stat does)
-	_, err = obj.Stat()
+	stat, err := obj.Stat()
 	if err != nil {
 		_ = obj.Close() // Close underlying if stat fails
 		if minio.ToErrorResponse(err).Code == "NoSuchKey" {
-			return nil, ErrNotFound
+			return nil, ArtifactMeta{}, ErrNotFound
 		}
-		return nil, fmt.Errorf("failed to stat object: %w", err)
+		return nil, ArtifactMeta{}, fmt.Errorf("failed to stat object: %w", err)
 	}
 
-	return obj, nil
+	meta := ArtifactMeta{
+		ContentType: stat.ContentType,
+		Size:        stat.Size,
+	}
+
+	return obj, meta, nil
 }
 
 func (s *S3Service) List(ctx context.Context, userID, sessionID string) ([]string, error) {

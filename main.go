@@ -526,7 +526,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// control their own limits via ParseMultipartForm.
 	// /v1/message:send is excluded because it carries base64 file attachments
 	// and applies its own larger limit via a route-group middleware.
-	root.Use(middleware.BodyLimit(0, "/v1/message:send"))
+	root.Use(middleware.BodyLimit(0, "/v1/message:send", "/v1/threads/"))
 
 	// Add per-IP rate limiting (Moved to specific route groups below for split limits)
 	// r.Use(middleware.RateLimiter(100, 300))
@@ -637,6 +637,11 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.BodyLimit(150 << 20)) // 150 MB
 		r.Post("/v1/message:send", authMiddleware.RequireAuthFunc(handler.SendMessage))
+	})
+	// Attachment pre-upload (multipart form, 20 MB per file).
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.BodyLimit(25 << 20)) // 25 MB (20 MB file + multipart overhead)
+		r.Post("/v1/threads/{threadId}/attachments:upload", authMiddleware.RequireAuthFunc(handler.UploadAttachment))
 	})
 	r.Get("/v1/tasks/{id}:subscribe", authMiddleware.RequireAuthFunc(handler.StreamJobEvents))
 	r.Post("/v1/tasks/{id}:cancel", authMiddleware.RequireAuthFunc(handler.CancelJob))

@@ -259,6 +259,7 @@ export function mapTokenUsage(raw) {
  * Create a user message object
  * @param {string} content - Message content
  * @param {string} interactionId - Interaction ID
+ * @param {Array} attachments - File attachments [{url, type, name}]
  * @returns {Object} User message object
  */
 export function createUserMessage(content, interactionId, attachments = []) {
@@ -266,7 +267,14 @@ export function createUserMessage(content, interactionId, attachments = []) {
         id: generateMessageId(),
         role: 'user',
         content: content,
-        attachments: attachments, // [{data: 'data:...;base64,...', type: 'image/png', name: '...'}]
+        // Map to the format expected by the message template:
+        //   data = artifact URL (for audio/file playback via streaming)
+        //   type = MIME type, name = filename
+        attachments: attachments.map(a => ({
+            data: a.url || a.data, // prefer artifact URL, fallback to base64
+            type: a.type,
+            name: a.name,
+        })),
         timestamp: new Date().toISOString(),
         interactionId: interactionId,
         lifecycleEvents: []

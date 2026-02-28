@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"school-with-ai/domain"
@@ -84,7 +85,8 @@ func NewTaskManagementHandler(
 
 // FileAttachment represents a file sent with a message (image, audio, PDF, etc.).
 type FileAttachment struct {
-	Data     string `json:"data"`               // Base64 data URL (data:image/...;base64,...)
+	Data     string `json:"data,omitempty"`     // Base64 data URL (data:image/...;base64,...) — legacy path
+	URL      string `json:"url,omitempty"`      // Pre-uploaded artifact URL (/v1/threads/.../artifacts/...)
 	MimeType string `json:"mimeType,omitempty"` // e.g. "image/png", "audio/wav"
 	FileName string `json:"fileName,omitempty"` // Original filename
 }
@@ -132,6 +134,7 @@ func (h *TaskManagementHandler) SendMessage(w http.ResponseWriter, r *http.Reque
 	for _, att := range req.Attachments {
 		attachments = append(attachments, taskmanagement.FileAttachment{
 			Data:     att.Data,
+			URL:      att.URL,
 			MimeType: att.MimeType,
 			FileName: att.FileName,
 		})
@@ -568,8 +571,13 @@ func (h *TaskManagementHandler) ListArtifacts(w http.ResponseWriter, r *http.Req
 	}
 }
 
-// DownloadArtifact downloads a specific artifact.
+// DownloadArtifact streams a specific artifact with HTTP Range request support.
 // GET /v1/threads/{threadId}/artifacts/{fileName}
+//
+// Uses http.ServeContent which handles:
+//   - Range requests (HTTP 206 Partial Content) for audio/video streaming
+//   - Content-Length headers
+//   - If-Modified-Since / If-None-Match conditional requests
 func (h *TaskManagementHandler) DownloadArtifact(w http.ResponseWriter, r *http.Request) {
 	user := h.authService.GetUserFromContext(r.Context())
 	if user == nil {
@@ -584,7 +592,7 @@ func (h *TaskManagementHandler) DownloadArtifact(w http.ResponseWriter, r *http.
 		return
 	}
 
-	content, err := h.artifactStore.Load(r.Context(), user.ID, threadID, fileName)
+	content, meta, err := h.artifactStore.Load(r.Context(), user.ID, threadID, fileName)
 	if err != nil {
 		if errors.Is(err, artifact.ErrNotFound) {
 			http.Error(w, "Artifact not found", http.StatusNotFound)
@@ -596,14 +604,97 @@ func (h *TaskManagementHandler) DownloadArtifact(w http.ResponseWriter, r *http.
 	}
 	defer content.Close()
 
-	// Set content type and disposition
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", fileName))
-	// In a real app we might want to detect mime type, but S3/MinIO often returns generic if not set.
-	// For now, let the browser handle it.
-
-	if _, err := io.Copy(w, content); err != nil {
-		h.log.Error(r.Context(), "failed to stream artifact to client", "error", err, "fileName", fileName)
+	// Set content type from S3 metadata
+	ct := meta.ContentType
+	if ct == "" {
+		ct = "application/octet-stream"
 	}
+	w.Header().Set("Content-Type", ct)
+
+	// Use inline disposition for media types so browsers can play/display them,
+	// and attachment for everything else so they download.
+	if strings.HasPrefix(ct, "image/") || strings.HasPrefix(ct, "audio/") || strings.HasPrefix(ct, "video/") {
+		w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%q", fileName))
+	} else {
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", fileName))
+	}
+
+	// minio.Object implements io.ReadSeeker, so http.ServeContent can handle
+	// Range requests (HTTP 206), Content-Length, and conditional headers.
+	if rs, ok := content.(io.ReadSeeker); ok {
+		http.ServeContent(w, r, fileName, time.Time{}, rs)
+	} else {
+		// Fallback: plain copy (no Range support)
+		if _, copyErr := io.Copy(w, content); copyErr != nil {
+			h.log.Error(r.Context(), "failed to stream artifact to client", "error", copyErr, "fileName", fileName)
+		}
+	}
+}
+
+// UploadAttachment handles direct file uploads to the artifact store.
+// POST /v1/threads/{threadId}/attachments:upload
+//
+// Accepts multipart/form-data with a single "file" field.
+// Returns JSON: {"url": "/v1/threads/.../artifacts/...", "mimeType": "...", "fileName": "..."}
+func (h *TaskManagementHandler) UploadAttachment(w http.ResponseWriter, r *http.Request) {
+	user := h.authService.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	threadID := r.PathValue("threadId")
+	if threadID == "" {
+		http.Error(w, "threadId is required", http.StatusBadRequest)
+		return
+	}
+
+	// Limit multipart memory to 20 MB (single-file upload, not the full 150 MB)
+	if err := r.ParseMultipartForm(20 << 20); err != nil {
+		http.Error(w, "Failed to parse multipart form", http.StatusBadRequest)
+		return
+	}
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "Missing 'file' field", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	// Determine content type from the file header or detect it
+	contentType := header.Header.Get("Content-Type")
+	if contentType == "" || contentType == "application/octet-stream" {
+		contentType = "application/octet-stream"
+	}
+
+	fileName := header.Filename
+	if fileName == "" {
+		fileName = fmt.Sprintf("upload-%s", uuid.New().String()[:8])
+	}
+
+	// Save to artifact store (S3)
+	_, saveErr := h.artifactStore.Save(r.Context(), user.ID, threadID, fileName, contentType, file)
+	if saveErr != nil {
+		h.log.Error(r.Context(), "failed to save uploaded attachment",
+			"error", saveErr, "userID", user.ID, "threadID", threadID, "fileName", fileName)
+		http.Error(w, "Failed to save attachment", http.StatusInternalServerError)
+		return
+	}
+
+	artifactURL := fmt.Sprintf("/v1/threads/%s/artifacts/%s", threadID, fileName)
+
+	h.log.Info(r.Context(), "[API] Attachment uploaded",
+		"userID", user.ID, "threadID", threadID, "fileName", fileName,
+		"contentType", contentType, "size", header.Size)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]string{
+		"url":      artifactURL,
+		"mimeType": contentType,
+		"fileName": fileName,
+	})
 }
 
 // GetMemory retrieves the user's long-term memory.

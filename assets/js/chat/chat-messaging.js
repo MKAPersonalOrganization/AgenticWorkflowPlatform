@@ -42,10 +42,17 @@ export function createMessagingMethods() {
                     userMessage = this.currentMessage.trim();
                 }
 
-                // Capture attached files before validation
+                // Capture attached files — use artifact URLs (pre-uploaded), not base64.
                 const attachedFiles = this.files
-                    .filter(f => f.type && f.data)
-                    .map(f => ({ data: f.data, type: f.type, name: f.name }));
+                    .filter(f => f.type && f.status === 'ready' && f.url)
+                    .map(f => ({ url: f.url, type: f.type, name: f.name }));
+
+                // Block send if any files are still uploading.
+                const uploading = this.files.some(f => f.status === 'uploading');
+                if (uploading) {
+                    this.showToast(window.i18n?.t?.('Please wait for file uploads to complete') || 'Please wait for file uploads to complete', 'info');
+                    return;
+                }
 
                 // Validation — need text OR files
                 if (!userMessage && attachedFiles.length === 0) {

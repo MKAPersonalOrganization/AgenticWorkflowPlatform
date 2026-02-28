@@ -19,7 +19,8 @@ const (
 
 // FileAttachment represents a file sent with a chat message (image, audio, PDF, etc.).
 type FileAttachment struct {
-	Data     string `json:"data"`               // Base64 data URL (data:image/png;base64,...)
+	Data     string `json:"data,omitempty"`     // Base64 data URL — legacy path (data:image/png;base64,...)
+	URL      string `json:"url,omitempty"`      // Pre-uploaded artifact URL (e.g. /v1/threads/.../artifacts/file.wav)
 	MimeType string `json:"mimeType,omitempty"` // e.g. "image/png", "audio/wav"
 	FileName string `json:"fileName,omitempty"` // Original filename
 }
@@ -125,6 +126,7 @@ func toOrchestratorAttachments(atts []FileAttachment) []agentorchestrator.FileAt
 	for i, att := range atts {
 		result[i] = agentorchestrator.FileAttachment{
 			Data:     att.Data,
+			URL:      att.URL,
 			MimeType: att.MimeType,
 			FileName: att.FileName,
 		}
