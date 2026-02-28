@@ -203,7 +203,8 @@ document.addEventListener('alpine:init', () => {
             },
 
             get canSendMessage() {
-                return this.currentMessage.trim() !== '' && !this.isStreaming;
+                const hasContent = this.currentMessage.trim() !== '' || this.files.length > 0;
+                return hasContent && !this.isStreaming;
             },
 
             get currentThread() {

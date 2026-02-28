@@ -65,7 +65,7 @@ func (m *Manager) CreateThread(ctx context.Context, threadID, userID, title stri
 // AddUserMessage adds a user message to a thread.
 // Returns the thread aggregate, the primary UserMessageAdded event, any additional
 // side-effect events (e.g. ThreadTitleUpdated from auto-titling), and an error.
-func (m *Manager) AddUserMessage(ctx context.Context, threadID, messageID, content, userID string) (*domain.ThreadAggregate, *domain.UserMessageAdded, []domain.Event, error) {
+func (m *Manager) AddUserMessage(ctx context.Context, threadID, messageID, content, userID string, images ...domain.ImageRef) (*domain.ThreadAggregate, *domain.UserMessageAdded, []domain.Event, error) {
 	thread, err := m.threadRepo.Load(ctx, threadID)
 	if errors.Is(err, domain.ErrThreadNotFound) {
 		thread, err = domain.OpenThread(threadID, userID, "New Chat")
@@ -86,6 +86,7 @@ func (m *Manager) AddUserMessage(ctx context.Context, threadID, messageID, conte
 		"",
 		"",
 		"",
+		images...,
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to add user message: %w", err)
@@ -133,6 +134,7 @@ func (m *Manager) AddUserMessage(ctx context.Context, threadID, messageID, conte
 		ThreadID:  threadID,
 		MessageID: messageID,
 		Content:   content,
+		Images:    images,
 		Timestamp: time.Now(),
 	}
 

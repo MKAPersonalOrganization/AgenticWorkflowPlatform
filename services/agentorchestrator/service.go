@@ -1,9 +1,12 @@
 package agentorchestrator
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"iter"
+	"strings"
 	"sync"
 	"time"
 
@@ -12,6 +15,8 @@ import (
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/artifact"
 	"school-with-ai/services/threadmgmt"
+
+	"github.com/google/uuid"
 )
 
 // EventEmitter is the interface for broadcasting events.
@@ -206,7 +211,7 @@ func (s *Service) persistDurableEvent(ctx context.Context, event domain.Event) e
 		_, err := s.threadMgmt.DeleteThread(ctx, e.ThreadID)
 		return err
 	case *domain.UserMessageAdded:
-		_, _, _, err := s.threadMgmt.AddUserMessage(ctx, e.ThreadID, e.MessageID, e.Content, e.UserID)
+		_, _, _, err := s.threadMgmt.AddUserMessage(ctx, e.ThreadID, e.MessageID, e.Content, e.UserID, e.Images...)
 		return err
 	case *domain.AssistantMessageAdded:
 		_, _, err := s.threadMgmt.AddAssistantMessage(ctx, e.ThreadID, e.MessageID, e.Content, e.ToolCalls, e.AgentName)
@@ -245,15 +250,22 @@ func (s *Service) GetThreadManagement() *threadmgmt.Manager {
 	return s.threadMgmt
 }
 
+// ImageAttachment represents an image attached to a message.
+type ImageAttachment struct {
+	Data     string // Base64 data URL (data:image/png;base64,...)
+	MimeType string // e.g. "image/png"
+}
+
 // RunExecutionRequest contains parameters for executing a run.
 type RunExecutionRequest struct {
-	ThreadID    string // ID of the conversation thread
-	UserID      string // User making the request
-	AgentName   string // Agent to execute
-	Message     string // User message content
-	MessageID   string // Message ID (used as RunID)
-	ToolCallID  string // (Optional) Correlates this message as an answer to a tool elicitation
-	ParentRunID string // (Optional) Lineage pointer for branching/time travel
+	ThreadID    string            // ID of the conversation thread
+	UserID      string            // User making the request
+	AgentName   string            // Agent to execute
+	Message     string            // User message content
+	MessageID   string            // Message ID (used as RunID)
+	ToolCallID  string            // (Optional) Correlates this message as an answer to a tool elicitation
+	ParentRunID string            // (Optional) Lineage pointer for branching/time travel
+	Images      []ImageAttachment // (Optional) Attached images
 }
 
 // ExecuteRun orchestrates a framework-agnostic run execution with lifecycle events.
@@ -322,15 +334,19 @@ func (s *Service) ExecuteRun(
 			return
 		}
 
+		// Save images to artifacts and build image refs for event persistence
+		imageRefs := s.saveImagesToArtifacts(ctx, req)
+
 		runnerReq := &agent.RunRequest{
 			SessionID: req.ThreadID,
 			UserID:    req.UserID,
 			AgentName: req.AgentName,
 			Message: &agent.Message{
-				ID: req.MessageID,
-				Content: []agent.Content{
-					{Type: agent.ContentTypeText, Text: req.Message},
-				},
+				ID:      req.MessageID,
+				Content: buildMessageContent(req.Message, req.Images),
+			},
+			Context: map[string]any{
+				"imageRefs": imageRefs,
 			},
 		}
 		rawDomainEvents := runner.Run(ctx, runnerReq)
@@ -401,4 +417,111 @@ func (s *Service) ExecuteRun(
 			}
 		}
 	}
+}
+
+// saveImagesToArtifacts saves attached images to the artifact store and returns
+// domain.ImageRef slices for event persistence. If the artifact store is nil or
+// no images are present, it returns nil.
+func (s *Service) saveImagesToArtifacts(ctx context.Context, req RunExecutionRequest) []domain.ImageRef {
+	if s.artifactStore == nil || len(req.Images) == 0 {
+		return nil
+	}
+
+	var refs []domain.ImageRef
+	for _, img := range req.Images {
+		mimeType, data, err := parseDataURL(img.Data)
+		if err != nil {
+			s.log.Warn(ctx, "Orchestrator: Failed to parse image data URL, skipping artifact save", "error", err)
+			continue
+		}
+		if mimeType == "" {
+			mimeType = img.MimeType
+		}
+
+		ext := mimeToExt(mimeType)
+		fileName := fmt.Sprintf("img-%s.%s", uuid.New().String()[:8], ext)
+
+		_, saveErr := s.artifactStore.Save(ctx, req.UserID, req.ThreadID, fileName, bytes.NewReader(data))
+		if saveErr != nil {
+			s.log.Error(ctx, "Orchestrator: Failed to save image artifact", "error", saveErr, "fileName", fileName)
+			continue
+		}
+
+		artifactURL := fmt.Sprintf("/v1/threads/%s/artifacts/%s", req.ThreadID, fileName)
+		refs = append(refs, domain.ImageRef{
+			URL:      artifactURL,
+			MimeType: mimeType,
+		})
+	}
+	return refs
+}
+
+// parseDataURL extracts the MIME type and raw bytes from a data URL.
+func parseDataURL(dataURL string) (mimeType string, data []byte, err error) {
+	if !strings.HasPrefix(dataURL, "data:") {
+		return "", nil, fmt.Errorf("not a data URL")
+	}
+	rest := dataURL[5:] // strip "data:"
+	semicolonIdx := strings.Index(rest, ";")
+	commaIdx := strings.Index(rest, ",")
+	if semicolonIdx < 0 || commaIdx < 0 || commaIdx < semicolonIdx {
+		return "", nil, fmt.Errorf("invalid data URL format")
+	}
+	mimeType = rest[:semicolonIdx]
+	encoded := rest[commaIdx+1:]
+	data, err = base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		// Try URL-safe base64 or raw encoding
+		data, err = base64.RawStdEncoding.DecodeString(encoded)
+	}
+	return mimeType, data, err
+}
+
+// mimeToExt returns a file extension for common image MIME types.
+func mimeToExt(mimeType string) string {
+	switch mimeType {
+	case "image/jpeg":
+		return "jpg"
+	case "image/png":
+		return "png"
+	case "image/gif":
+		return "gif"
+	case "image/webp":
+		return "webp"
+	default:
+		return "png"
+	}
+}
+
+// buildMessageContent constructs the Content slice for a user message,
+// combining text and optional image attachments.
+func buildMessageContent(text string, images []ImageAttachment) []agent.Content {
+	var content []agent.Content
+
+	if text != "" {
+		content = append(content, agent.Content{
+			Type: agent.ContentTypeText,
+			Text: text,
+		})
+	}
+
+	for _, img := range images {
+		content = append(content, agent.Content{
+			Type: agent.ContentTypeImageURL,
+			ImageURL: &agent.ImageURL{
+				URL:    img.Data,
+				Detail: "auto",
+			},
+		})
+	}
+
+	// Ensure at least one content part
+	if len(content) == 0 {
+		content = append(content, agent.Content{
+			Type: agent.ContentTypeText,
+			Text: "",
+		})
+	}
+
+	return content
 }

@@ -2,6 +2,7 @@ package llm
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -161,10 +162,23 @@ func (c *OllamaClient) buildMessages(messages []Message, system string) []api.Me
 	for _, msg := range messages {
 		switch msg.Role {
 		case RoleUser:
-			ollamaMessages = append(ollamaMessages, api.Message{
+			userMsg := api.Message{
 				Role:    "user",
 				Content: msg.Text(),
-			})
+			}
+			// Add images for multimodal models (Ollama uses raw bytes)
+			for _, img := range msg.ImageURLs() {
+				if strings.HasPrefix(img.URL, "data:") {
+					if idx := strings.Index(img.URL, ","); idx > 0 {
+						b64Data := img.URL[idx+1:]
+						decoded, err := base64.StdEncoding.DecodeString(b64Data)
+						if err == nil {
+							userMsg.Images = append(userMsg.Images, api.ImageData(decoded))
+						}
+					}
+				}
+			}
+			ollamaMessages = append(ollamaMessages, userMsg)
 
 		case RoleAssistant:
 			ollamaMsg := api.Message{

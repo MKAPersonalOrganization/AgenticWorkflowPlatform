@@ -180,7 +180,29 @@ func (c *OpenAIClient) buildMessages(messages []Message, system string) []openai
 	for _, msg := range messages {
 		switch msg.Role {
 		case RoleUser:
-			params = append(params, openai.UserMessage(msg.Text()))
+			// Check if message has images for multimodal support
+			if msg.HasImages() {
+				parts := []openai.ChatCompletionContentPartUnionParam{}
+				// Add text content if present
+				text := msg.Text()
+				if text != "" {
+					parts = append(parts, openai.TextContentPart(text))
+				}
+				// Add image content parts
+				for _, img := range msg.ImageURLs() {
+					detail := img.Detail
+					if detail == "" {
+						detail = "auto"
+					}
+					parts = append(parts, openai.ImageContentPart(openai.ChatCompletionContentPartImageImageURLParam{
+						URL:    img.URL,
+						Detail: detail,
+					}))
+				}
+				params = append(params, openai.UserMessage(parts))
+			} else {
+				params = append(params, openai.UserMessage(msg.Text()))
+			}
 
 		case RoleAssistant:
 			params = append(params, c.buildAssistantMessage(msg))

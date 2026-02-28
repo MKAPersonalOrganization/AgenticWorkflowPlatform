@@ -41,6 +41,7 @@ type AguiThreadState struct {
 	AgentActivity map[string]*AguiAgentActivity `json:"agentActivity"`
 	ToolStates    map[string]any                `json:"toolStates,omitempty"`
 	TokenUsage    *TokenUsageInfo               `json:"tokenUsage,omitempty"`
+	MessageImages map[string][]domain.ImageRef  `json:"messageImages,omitempty"` // messageID -> image refs
 	CreatedAt     time.Time                     `json:"createdAt"`
 	UpdatedAt     time.Time                     `json:"updatedAt"`
 	Version       int64                         `json:"version"` // Event version

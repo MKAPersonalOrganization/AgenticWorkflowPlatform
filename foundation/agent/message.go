@@ -95,6 +95,15 @@ type Content struct {
 
 	// ToolResult is the tool output (for Type == ContentTypeToolResult).
 	ToolResult *ToolResult
+
+	// ImageURL is an image URL or base64 data URI (for Type == ContentTypeImageURL).
+	ImageURL *ImageURL
+}
+
+// ImageURL represents an image reference in a message.
+type ImageURL struct {
+	URL    string `json:"url"`              // HTTP URL or data:image/...;base64,... data URI
+	Detail string `json:"detail,omitempty"` // "auto", "low", "high"
 }
 
 // ContentType identifies the type of content.
@@ -104,6 +113,7 @@ const (
 	ContentTypeText       ContentType = "text"
 	ContentTypeToolCall   ContentType = "tool_call"
 	ContentTypeToolResult ContentType = "tool_result"
+	ContentTypeImageURL   ContentType = "image_url"
 )
 
 // ToolCall represents a request to execute a tool.

@@ -73,6 +73,27 @@ func (m Message) HasFunctionCalls() bool {
 	return false
 }
 
+// ImageURLs returns all ImageURLContent items in the message.
+func (m Message) ImageURLs() []ImageURLContent {
+	var urls []ImageURLContent
+	for _, c := range m.Content {
+		if img, ok := c.(ImageURLContent); ok {
+			urls = append(urls, img)
+		}
+	}
+	return urls
+}
+
+// HasImages returns true if the message contains any image content.
+func (m Message) HasImages() bool {
+	for _, c := range m.Content {
+		if _, ok := c.(ImageURLContent); ok {
+			return true
+		}
+	}
+	return false
+}
+
 // NewUserMessage creates a user message with text content.
 func NewUserMessage(text string) Message {
 	return Message{

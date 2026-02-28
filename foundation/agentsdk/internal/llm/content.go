@@ -30,6 +30,17 @@ type BinaryContent struct {
 func (BinaryContent) ContentType() string { return "binary" }
 func (BinaryContent) isContent()          {}
 
+// ImageURLContent represents an image specified by a URL or base64 data URI.
+// This is used for multimodal (vision) messages.
+type ImageURLContent struct {
+	URL    string // Either an HTTP URL or a data URI (data:image/png;base64,...)
+	Detail string // "auto", "low", or "high" (optional, defaults to "auto")
+}
+
+// ContentType implements Content.
+func (ImageURLContent) ContentType() string { return "image_url" }
+func (ImageURLContent) isContent()          {}
+
 // JSONContent is structured JSON data.
 type JSONContent struct {
 	Data json.RawMessage
@@ -66,6 +77,7 @@ func (FunctionResult) isContent()          {}
 var (
 	_ Content = TextContent{}
 	_ Content = BinaryContent{}
+	_ Content = ImageURLContent{}
 	_ Content = JSONContent{}
 	_ Content = FunctionCall{}
 	_ Content = FunctionResult{}

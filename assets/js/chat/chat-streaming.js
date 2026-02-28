@@ -26,8 +26,9 @@ export function createStreamingMethods() {
          * @param {string} threadId - Thread ID
          * @param {string} agentName - Optional agent name to target
          * @param {string|null} toolCallId - Optional tool call ID for elicitation answers
+         * @param {Array} images - Optional array of image objects [{data, type, name}]
          */
-        async __streamResponse(message, threadId, agentName = '', toolCallId = null) {
+        async __streamResponse(message, threadId, agentName = '', toolCallId = null, images = []) {
             const state = this.__getThreadState(threadId);
 
             // Close existing stream if any (expected during elicitation responses)
@@ -54,6 +55,14 @@ export function createStreamingMethods() {
 
                 if (toolCallId) {
                     body.toolCallId = toolCallId;
+                }
+
+                // Attach images as base64 data URLs
+                if (images && images.length > 0) {
+                    body.images = images.map(img => ({
+                        data: img.data,     // base64 data URL (data:image/png;base64,...)
+                        mimeType: img.type,  // e.g. 'image/png'
+                    }));
                 }
 
                 const response = await fetch('/v1/message:send', {
