@@ -80,6 +80,7 @@ export function createInputMethods() {
                     data: null,   // filled for images (local preview)
                     url: null,    // filled after upload completes
                     status: 'uploading',
+                    _abortController: new AbortController(), // for cancellation on remove
                 };
                 this.files.push(entry);
                 const idx = this.files.length - 1;
@@ -93,22 +94,32 @@ export function createInputMethods() {
                     reader.readAsDataURL(file);
                 }
 
-                // Upload to artifact store
+                // Upload to artifact store (respects MAX_CONCURRENT_UPLOADS)
                 this._uploadFile(file, idx);
             }
         },
 
+        /** Maximum simultaneous upload HTTP connections */
+        MAX_CONCURRENT_UPLOADS: 2,
+
+        /** Maximum number of retry attempts per file */
+        MAX_UPLOAD_RETRIES: 3,
+
         /**
-         * Upload a single file to the artifact store.
-         * Updates this.files[idx] with the resulting URL or error state.
+         * Upload a single file to the artifact store with retry + backoff.
+         *
+         * Production resilience for 100K concurrent users:
+         *   - Exponential backoff with jitter on transient failures
+         *   - AbortController: cancelled when the user removes a file mid-upload
+         *   - Concurrency gate: MAX_CONCURRENT_UPLOADS limits parallel S3 writes
+         *     to avoid saturating the browser connection pool
+         *
          * @param {File} file
          * @param {number} idx - Index in this.files[]
          */
         async _uploadFile(file, idx) {
             const threadId = this.__currentThreadId;
             if (!threadId) {
-                // No active thread yet — create one via session management
-                // For now, mark as error; sendMessage will handle thread creation.
                 if (this.files[idx]) {
                     this.files[idx].status = 'error';
                     this.files[idx].error = 'No active thread';
@@ -117,34 +128,85 @@ export function createInputMethods() {
                 return;
             }
 
-            try {
-                const formData = new FormData();
-                formData.append('file', file, file.name);
-
-                const resp = await fetch(`/v1/threads/${threadId}/attachments:upload`, {
-                    method: 'POST',
-                    body: formData,
-                });
-
-                if (!resp.ok) {
-                    throw new Error(`Upload failed: ${resp.statusText}`);
-                }
-
-                const result = await resp.json();
-
-                // Update the file entry (it may have been removed while uploading)
-                if (this.files[idx] && this.files[idx].name === file.name) {
-                    this.files[idx].url = result.url;
-                    this.files[idx].status = 'ready';
-                }
-            } catch (err) {
-                console.error('[ChatInput] File upload error:', err);
-                if (this.files[idx]) {
-                    this.files[idx].status = 'error';
-                    this.files[idx].error = err.message;
-                }
-                this.showToast(window.i18n?.t?.('Failed to upload file: {name}', { name: file.name }) || `Failed to upload file: ${file.name}`, 'error');
+            // ── Concurrency gate ──────────────────────────────────────────
+            // Wait if too many uploads are in flight. This is a simple
+            // cooperative gate — no lock needed because JS is single-threaded.
+            while ((this._activeUploads ?? 0) >= this.MAX_CONCURRENT_UPLOADS) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                // If the file was removed while waiting, bail out.
+                if (!this.files[idx] || this.files[idx].status !== 'uploading') return;
             }
+            this._activeUploads = (this._activeUploads ?? 0) + 1;
+
+            const entry = this.files[idx];
+            const abortSignal = entry?._abortController?.signal;
+
+            try {
+                await this._uploadFileWithRetry(file, idx, threadId, abortSignal);
+            } finally {
+                this._activeUploads = Math.max(0, (this._activeUploads ?? 1) - 1);
+            }
+        },
+
+        /**
+         * Inner retry loop for a single file upload.
+         * @private
+         */
+        async _uploadFileWithRetry(file, idx, threadId, signal) {
+            let lastErr;
+
+            for (let attempt = 0; attempt < this.MAX_UPLOAD_RETRIES; attempt++) {
+                // Check if file was removed or aborted
+                if (!this.files[idx] || this.files[idx].status !== 'uploading') return;
+                if (signal?.aborted) return;
+
+                try {
+                    const formData = new FormData();
+                    formData.append('file', file, file.name);
+
+                    const resp = await fetch(`/v1/threads/${threadId}/attachments:upload`, {
+                        method: 'POST',
+                        body: formData,
+                        signal,
+                    });
+
+                    // Non-retryable client errors (4xx)
+                    if (resp.status >= 400 && resp.status < 500) {
+                        const text = await resp.text().catch(() => resp.statusText);
+                        throw Object.assign(new Error(`Upload rejected: ${text}`), { noRetry: true });
+                    }
+
+                    if (!resp.ok) {
+                        throw new Error(`Upload failed: ${resp.status} ${resp.statusText}`);
+                    }
+
+                    const result = await resp.json();
+
+                    // Success — update entry (may have been removed while uploading)
+                    if (this.files[idx] && this.files[idx].name === file.name) {
+                        this.files[idx].url = result.url;
+                        this.files[idx].status = 'ready';
+                    }
+                    return; // done
+                } catch (err) {
+                    if (err.name === 'AbortError') return; // user removed the file
+                    lastErr = err;
+                    if (err.noRetry) break; // 4xx — don't retry
+
+                    // Exponential backoff with jitter: 500ms, 1500ms, 3500ms ...
+                    const backoff = Math.min(500 * Math.pow(2, attempt), 8000);
+                    const jitter = Math.random() * backoff * 0.3;
+                    await new Promise(resolve => setTimeout(resolve, backoff + jitter));
+                }
+            }
+
+            // All retries exhausted
+            console.error('[ChatInput] File upload error after retries:', lastErr);
+            if (this.files[idx]) {
+                this.files[idx].status = 'error';
+                this.files[idx].error = lastErr?.message || 'Upload failed';
+            }
+            this.showToast(window.i18n?.t?.('Failed to upload file: {name}', { name: file.name }) || `Failed to upload file: ${file.name}`, 'error');
         },
 
         /**
@@ -188,11 +250,18 @@ export function createInputMethods() {
         },
 
         /**
-         * Remove a file from the attachment list
+         * Remove a file from the attachment list.
+         * If the file is still uploading, abort the in-flight HTTP request
+         * so we don't waste bandwidth or S3 writes for a discarded file.
          * @param {number} index - Index of file to remove
          */
         removeFile(index) {
             if (index >= 0 && index < this.files.length) {
+                const entry = this.files[index];
+                // Abort in-flight upload if still active
+                if (entry._abortController) {
+                    entry._abortController.abort();
+                }
                 this.files.splice(index, 1);
             }
         },
