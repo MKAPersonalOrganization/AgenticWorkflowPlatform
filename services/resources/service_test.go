@@ -77,6 +77,10 @@ func (m *MockArtifactService) Delete(ctx context.Context, userID, sessionID, fil
 	return nil
 }
 
+func (m *MockArtifactService) HealthCheck(ctx context.Context) error {
+	return nil
+}
+
 func TestUploadResource(t *testing.T) {
 	repo := &MockRepository{Resources: make(map[uuid.UUID]Resource)}
 	artSvc := &MockArtifactService{Files: make(map[string][]byte)}

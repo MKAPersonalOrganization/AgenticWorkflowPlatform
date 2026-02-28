@@ -510,6 +510,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 		healthhandlers.WithChecker("db", healthhandlers.CheckerFunc(func(ctx context.Context) error {
 			return db.PingContext(ctx)
 		})),
+		healthhandlers.WithChecker("s3", healthhandlers.CheckerFunc(func(ctx context.Context) error {
+			return artifactService.HealthCheck(ctx)
+		})),
 	)
 
 	// Create chi router (Root Router)

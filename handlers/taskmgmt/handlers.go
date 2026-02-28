@@ -548,27 +548,27 @@ func (h *TaskManagementHandler) ListAgents(w http.ResponseWriter, r *http.Reques
 func (h *TaskManagementHandler) ListArtifacts(w http.ResponseWriter, r *http.Request) {
 	user := h.authService.GetUserFromContext(r.Context())
 	if user == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		jsonError(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	threadID := r.PathValue("threadId")
 	if threadID == "" {
-		http.Error(w, "threadId is required", http.StatusBadRequest)
+		jsonError(w, "threadId is required", http.StatusBadRequest)
 		return
 	}
 
 	// Thread ownership check — users must only list their own artifacts.
 	state, exists := h.aguiProjection.GetThreadState(r.Context(), threadID)
 	if !exists || state.UserID != user.ID {
-		http.Error(w, "Thread not found", http.StatusNotFound)
+		jsonError(w, "Thread not found", http.StatusNotFound)
 		return
 	}
 
 	artifacts, err := h.artifactStore.List(r.Context(), user.ID, threadID)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to list artifacts", "error", err, "userID", user.ID, "threadID", threadID)
-		http.Error(w, "Failed to list artifacts", http.StatusInternalServerError)
+		jsonError(w, "Failed to list artifacts", http.StatusInternalServerError)
 		return
 	}
 
@@ -588,14 +588,14 @@ func (h *TaskManagementHandler) ListArtifacts(w http.ResponseWriter, r *http.Req
 func (h *TaskManagementHandler) DownloadArtifact(w http.ResponseWriter, r *http.Request) {
 	user := h.authService.GetUserFromContext(r.Context())
 	if user == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		jsonError(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	threadID := r.PathValue("threadId")
 	fileName := r.PathValue("fileName")
 	if threadID == "" || fileName == "" {
-		http.Error(w, "threadId and fileName are required", http.StatusBadRequest)
+		jsonError(w, "threadId and fileName are required", http.StatusBadRequest)
 		return
 	}
 
@@ -603,18 +603,18 @@ func (h *TaskManagementHandler) DownloadArtifact(w http.ResponseWriter, r *http.
 	// Prevents user A from reading user B's artifacts by guessing thread IDs.
 	state, exists := h.aguiProjection.GetThreadState(r.Context(), threadID)
 	if !exists || state.UserID != user.ID {
-		http.Error(w, "Artifact not found", http.StatusNotFound)
+		jsonError(w, "Artifact not found", http.StatusNotFound)
 		return
 	}
 
 	content, meta, err := h.artifactStore.Load(r.Context(), user.ID, threadID, fileName)
 	if err != nil {
 		if errors.Is(err, artifact.ErrNotFound) {
-			http.Error(w, "Artifact not found", http.StatusNotFound)
+			jsonError(w, "Artifact not found", http.StatusNotFound)
 			return
 		}
 		h.log.Error(r.Context(), "failed to load artifact", "error", err, "userID", user.ID, "threadID", threadID, "fileName", fileName)
-		http.Error(w, "Failed to load artifact", http.StatusInternalServerError)
+		jsonError(w, "Failed to load artifact", http.StatusInternalServerError)
 		return
 	}
 	defer content.Close()
@@ -634,6 +634,10 @@ func (h *TaskManagementHandler) DownloadArtifact(w http.ResponseWriter, r *http.
 		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", fileName))
 	}
 
+	// Artifacts are named with UUID prefixes (immutable content-addressing).
+	// Set aggressive cache headers so browsers and CDNs never re-fetch.
+	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+
 	// minio.Object implements io.ReadSeeker, so http.ServeContent can handle
 	// Range requests (HTTP 206), Content-Length, and conditional headers.
 	if rs, ok := content.(io.ReadSeeker); ok {
@@ -644,6 +648,39 @@ func (h *TaskManagementHandler) DownloadArtifact(w http.ResponseWriter, r *http.
 			h.log.Error(r.Context(), "failed to stream artifact to client", "error", copyErr, "fileName", fileName)
 		}
 	}
+}
+
+// sanitizeFileName strips control characters, null bytes, path separators, and
+// caps the length to prevent header injection and S3 key abuse.
+func sanitizeFileName(name string) string {
+	// Replace path separators with underscores
+	name = strings.ReplaceAll(name, "/", "_")
+	name = strings.ReplaceAll(name, "\\", "_")
+	name = strings.ReplaceAll(name, "..", "_")
+
+	// Strip control characters (ASCII 0x00–0x1F, 0x7F)
+	var b strings.Builder
+	b.Grow(len(name))
+	for _, r := range name {
+		if r > 0x1F && r != 0x7F {
+			b.WriteRune(r)
+		}
+	}
+	name = b.String()
+
+	// Cap at 200 bytes (leave room for UUID prefix + underscore = ~9 chars)
+	if len(name) > 200 {
+		name = name[:200]
+	}
+	return strings.TrimSpace(name)
+}
+
+// jsonError writes a structured JSON error response.
+// Industry practice: API error responses should be machine-parseable.
+func jsonError(w http.ResponseWriter, msg string, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
 
 // allowedUploadTypes is the server-side allowlist of MIME types accepted for
@@ -680,13 +717,13 @@ var allowedUploadTypes = map[string]bool{
 func (h *TaskManagementHandler) UploadAttachment(w http.ResponseWriter, r *http.Request) {
 	user := h.authService.GetUserFromContext(r.Context())
 	if user == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		jsonError(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	threadID := r.PathValue("threadId")
 	if threadID == "" {
-		http.Error(w, "threadId is required", http.StatusBadRequest)
+		jsonError(w, "threadId is required", http.StatusBadRequest)
 		return
 	}
 
@@ -695,7 +732,7 @@ func (h *TaskManagementHandler) UploadAttachment(w http.ResponseWriter, r *http.
 	// (even a fabricated one), polluting another user's S3 namespace.
 	state, exists := h.aguiProjection.GetThreadState(r.Context(), threadID)
 	if !exists || state.UserID != user.ID {
-		http.Error(w, "Thread not found", http.StatusNotFound)
+		jsonError(w, "Thread not found", http.StatusNotFound)
 		return
 	}
 
@@ -703,13 +740,13 @@ func (h *TaskManagementHandler) UploadAttachment(w http.ResponseWriter, r *http.
 	// maxMemory = 2 MB: keeps RAM bounded under concurrent load.
 	// Excess spills to OS temp files (cleaned up when request ends).
 	if err := r.ParseMultipartForm(2 << 20); err != nil {
-		http.Error(w, "Failed to parse multipart form", http.StatusBadRequest)
+		jsonError(w, "Failed to parse multipart form", http.StatusBadRequest)
 		return
 	}
 
 	file, header, err := r.FormFile("file")
 	if err != nil {
-		http.Error(w, "Missing 'file' field", http.StatusBadRequest)
+		jsonError(w, "Missing 'file' field", http.StatusBadRequest)
 		return
 	}
 	defer file.Close()
@@ -726,7 +763,7 @@ func (h *TaskManagementHandler) UploadAttachment(w http.ResponseWriter, r *http.
 
 	// Seek back so S3 upload reads from the beginning.
 	if _, seekErr := file.Seek(0, io.SeekStart); seekErr != nil {
-		http.Error(w, "Internal error", http.StatusInternalServerError)
+		jsonError(w, "Internal error", http.StatusInternalServerError)
 		return
 	}
 
@@ -737,14 +774,14 @@ func (h *TaskManagementHandler) UploadAttachment(w http.ResponseWriter, r *http.
 		contentType = detected
 	}
 	if !allowedUploadTypes[contentType] {
-		http.Error(w, fmt.Sprintf("Unsupported file type: %s", contentType), http.StatusUnsupportedMediaType)
+		jsonError(w, fmt.Sprintf("Unsupported file type: %s", contentType), http.StatusUnsupportedMediaType)
 		return
 	}
 
 	// ── Collision-safe filename ───────────────────────────────────────────
 	// UUID prefix ensures no two concurrent uploads collide, even with the
 	// same original filename across 100K users.
-	originalName := header.Filename
+	originalName := sanitizeFileName(header.Filename)
 	if originalName == "" {
 		originalName = "upload"
 	}
@@ -755,7 +792,7 @@ func (h *TaskManagementHandler) UploadAttachment(w http.ResponseWriter, r *http.
 	if saveErr != nil {
 		h.log.Error(r.Context(), "failed to save uploaded attachment",
 			"error", saveErr, "userID", user.ID, "threadID", threadID, "fileName", fileName)
-		http.Error(w, "Failed to save attachment", http.StatusInternalServerError)
+		jsonError(w, "Failed to save attachment", http.StatusInternalServerError)
 		return
 	}
 
