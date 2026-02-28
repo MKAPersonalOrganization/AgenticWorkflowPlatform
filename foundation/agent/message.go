@@ -98,12 +98,31 @@ type Content struct {
 
 	// ImageURL is an image URL or base64 data URI (for Type == ContentTypeImageURL).
 	ImageURL *ImageURL
+
+	// AudioInput is base64-encoded audio data (for Type == ContentTypeInputAudio).
+	AudioInput *AudioInput
+
+	// FileInput is base64-encoded file data (for Type == ContentTypeFile).
+	FileInput *FileInput
 }
 
 // ImageURL represents an image reference in a message.
 type ImageURL struct {
 	URL    string `json:"url"`              // HTTP URL or data:image/...;base64,... data URI
 	Detail string `json:"detail,omitempty"` // "auto", "low", "high"
+}
+
+// AudioInput represents base64-encoded audio data for multimodal messages.
+type AudioInput struct {
+	Data   string `json:"data"`   // Raw base64-encoded audio data (no data URL prefix)
+	Format string `json:"format"` // "wav" or "mp3"
+}
+
+// FileInput represents base64-encoded file data for multimodal messages.
+type FileInput struct {
+	Data     string `json:"data"`     // Raw base64-encoded file data (no data URL prefix)
+	FileName string `json:"fileName"` // Original filename
+	MimeType string `json:"mimeType"` // e.g. "application/pdf", "text/plain"
 }
 
 // ContentType identifies the type of content.
@@ -114,6 +133,8 @@ const (
 	ContentTypeToolCall   ContentType = "tool_call"
 	ContentTypeToolResult ContentType = "tool_result"
 	ContentTypeImageURL   ContentType = "image_url"
+	ContentTypeInputAudio ContentType = "input_audio"
+	ContentTypeFile       ContentType = "file"
 )
 
 // ToolCall represents a request to execute a tool.

@@ -17,22 +17,23 @@ const (
 	TypeProcessChat = "chat:process"
 )
 
-// ImageAttachment represents an image sent with a chat message.
-type ImageAttachment struct {
+// FileAttachment represents a file sent with a chat message (image, audio, PDF, etc.).
+type FileAttachment struct {
 	Data     string `json:"data"`               // Base64 data URL (data:image/png;base64,...)
-	MimeType string `json:"mimeType,omitempty"` // e.g. "image/png"
+	MimeType string `json:"mimeType,omitempty"` // e.g. "image/png", "audio/wav"
+	FileName string `json:"fileName,omitempty"` // Original filename
 }
 
 // ProcessChatPayload contains the data needed to process a chat message.
 type ProcessChatPayload struct {
-	JobID      string            `json:"job_id"`
-	ThreadID   string            `json:"thread_id"`
-	MessageID  string            `json:"message_id"`
-	Message    string            `json:"message"`
-	UserID     string            `json:"user_id"`
-	AgentName  string            `json:"agent_name,omitempty"`
-	ToolCallID string            `json:"tool_call_id,omitempty"` // Set when this message is an answer to a tool's elicitation
-	Images     []ImageAttachment `json:"images,omitempty"`       // Attached images (base64 data URLs)
+	JobID       string           `json:"job_id"`
+	ThreadID    string           `json:"thread_id"`
+	MessageID   string           `json:"message_id"`
+	Message     string           `json:"message"`
+	UserID      string           `json:"user_id"`
+	AgentName   string           `json:"agent_name,omitempty"`
+	ToolCallID  string           `json:"tool_call_id,omitempty"` // Set when this message is an answer to a tool's elicitation
+	Attachments []FileAttachment `json:"attachments,omitempty"`  // Attached files (base64 data URLs)
 }
 
 // NewProcessChatTask creates a new task for processing a chat message.
@@ -103,28 +104,29 @@ func (w *ChatWorker) processChat(ctx context.Context, payload ProcessChatPayload
 
 	// Map directly to RunExecutionRequest (no intermediate struct)
 	req := agentorchestrator.RunExecutionRequest{
-		ThreadID:   payload.ThreadID,
-		UserID:     payload.UserID,
-		AgentName:  payload.AgentName,
-		Message:    payload.Message,
-		MessageID:  payload.MessageID,
-		ToolCallID: payload.ToolCallID,
-		Images:     toOrchestratorImages(payload.Images),
+		ThreadID:    payload.ThreadID,
+		UserID:      payload.UserID,
+		AgentName:   payload.AgentName,
+		Message:     payload.Message,
+		MessageID:   payload.MessageID,
+		ToolCallID:  payload.ToolCallID,
+		Attachments: toOrchestratorAttachments(payload.Attachments),
 	}
 
 	return w.orchestrationService.HandleUserMessage(ctx, req)
 }
 
-// toOrchestratorImages converts taskmanagement images to orchestrator images.
-func toOrchestratorImages(imgs []ImageAttachment) []agentorchestrator.ImageAttachment {
-	if len(imgs) == 0 {
+// toOrchestratorAttachments converts taskmanagement attachments to orchestrator attachments.
+func toOrchestratorAttachments(atts []FileAttachment) []agentorchestrator.FileAttachment {
+	if len(atts) == 0 {
 		return nil
 	}
-	result := make([]agentorchestrator.ImageAttachment, len(imgs))
-	for i, img := range imgs {
-		result[i] = agentorchestrator.ImageAttachment{
-			Data:     img.Data,
-			MimeType: img.MimeType,
+	result := make([]agentorchestrator.FileAttachment, len(atts))
+	for i, att := range atts {
+		result[i] = agentorchestrator.FileAttachment{
+			Data:     att.Data,
+			MimeType: att.MimeType,
+			FileName: att.FileName,
 		}
 	}
 	return result

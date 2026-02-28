@@ -53,24 +53,47 @@ func mapFromCoreToLLMMessage(msg core.Message) llm.Message {
 		cm.Content = append(cm.Content, llm.TextContent{Text: msg.Content})
 	}
 
-	// Add image URL content from metadata (multimodal messages).
-	// Images may arrive as []any (from event replay/JSON) or []map[string]any
+	// Add multimodal content from metadata (images, audio, files).
+	// Attachments may arrive as []any (from event replay/JSON) or []map[string]any
 	// (from in-process injection). We handle both.
 	// Only base64 data URLs and absolute HTTP(S) URLs are LLM-accessible;
 	// relative artifact paths (e.g. /v1/threads/.../artifacts/...) are skipped.
-	for _, imgMap := range extractImageMaps(msg.Metadata) {
-		url, _ := imgMap["url"].(string)
+	for _, attMap := range extractAttachmentMaps(msg.Metadata) {
+		url, _ := attMap["url"].(string)
 		if url == "" || !isLLMAccessibleURL(url) {
 			continue
 		}
-		detail, _ := imgMap["detail"].(string)
-		if detail == "" {
-			detail = "auto"
+		mimeType, _ := attMap["mimeType"].(string)
+
+		switch {
+		case strings.HasPrefix(mimeType, "image/") || (mimeType == "" && strings.HasPrefix(url, "data:image/")):
+			detail, _ := attMap["detail"].(string)
+			if detail == "" {
+				detail = "auto"
+			}
+			cm.Content = append(cm.Content, llm.ImageURLContent{
+				URL:    url,
+				Detail: detail,
+			})
+		case strings.HasPrefix(mimeType, "audio/"):
+			data := stripDataURLPrefix(url)
+			format := audioFormatFromMIME(mimeType)
+			cm.Content = append(cm.Content, llm.AudioContent{
+				Data:   data,
+				Format: format,
+			})
+		default:
+			data := stripDataURLPrefix(url)
+			fileName, _ := attMap["fileName"].(string)
+			if mimeType == "" {
+				mimeType = "application/octet-stream"
+			}
+			cm.Content = append(cm.Content, llm.FileContent{
+				Data:     data,
+				FileName: fileName,
+				MimeType: mimeType,
+			})
 		}
-		cm.Content = append(cm.Content, llm.ImageURLContent{
-			URL:    url,
-			Detail: detail,
-		})
 	}
 
 	// Add function calls from tool calls
@@ -95,17 +118,17 @@ func mapFromCoreToLLMMessage(msg core.Message) llm.Message {
 	return cm
 }
 
-// extractImageMaps extracts a slice of map[string]any from msg.Metadata["images"].
+// extractAttachmentMaps extracts a slice of map[string]any from msg.Metadata["attachments"].
 // It handles both []any (produced by JSON unmarshal / event replay) and
 // []map[string]any (produced by in-process injection from the runner).
-func extractImageMaps(metadata map[string]any) []map[string]any {
-	images, ok := metadata["images"]
+func extractAttachmentMaps(metadata map[string]any) []map[string]any {
+	raw, ok := metadata["attachments"]
 	if !ok {
 		return nil
 	}
 
 	// Fast path: []any (from JSON / event replay)
-	if anyList, ok := images.([]any); ok {
+	if anyList, ok := raw.([]any); ok {
 		result := make([]map[string]any, 0, len(anyList))
 		for _, item := range anyList {
 			if m, ok := item.(map[string]any); ok {
@@ -115,12 +138,33 @@ func extractImageMaps(metadata map[string]any) []map[string]any {
 		return result
 	}
 
-	// Alternate path: []map[string]any (from runner's extractUserImages)
-	if mapList, ok := images.([]map[string]any); ok {
+	// Alternate path: []map[string]any (from runner's extractUserAttachments)
+	if mapList, ok := raw.([]map[string]any); ok {
 		return mapList
 	}
 
 	return nil
+}
+
+// stripDataURLPrefix removes the data:...;base64, prefix from a data URL,
+// returning just the raw base64 content.
+func stripDataURLPrefix(dataURL string) string {
+	if idx := strings.Index(dataURL, ","); idx >= 0 {
+		return dataURL[idx+1:]
+	}
+	return dataURL
+}
+
+// audioFormatFromMIME returns the audio format string for the LLM from a MIME type.
+func audioFormatFromMIME(mimeType string) string {
+	switch mimeType {
+	case "audio/wav", "audio/x-wav":
+		return "wav"
+	case "audio/mpeg", "audio/mp3":
+		return "mp3"
+	default:
+		return "wav"
+	}
 }
 
 // isLLMAccessibleURL returns true if the URL can be consumed by an external LLM API.

@@ -175,13 +175,13 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 		var initialEvents []domain.Event
 
 		userContent := extractUserPrompt(req.Message)
-		userImages := extractUserImages(req.Message)
+		userAttachments := extractUserAttachments(req.Message)
 
-		// Extract artifact image refs passed from orchestrator (for event persistence)
-		var imageRefs []domain.ImageRef
+		// Extract artifact attachment refs passed from orchestrator (for event persistence)
+		var attachmentRefs []domain.Attachment
 		if req.Context != nil {
-			if refs, ok := req.Context["imageRefs"].([]domain.ImageRef); ok {
-				imageRefs = refs
+			if refs, ok := req.Context["attachmentRefs"].([]domain.Attachment); ok {
+				attachmentRefs = refs
 			}
 		}
 
@@ -195,7 +195,7 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 			var uEvent *domain.UserMessageAdded
 			var sideEffects []domain.Event
 			var pErr error
-			agg, uEvent, sideEffects, pErr = threadMgmt.AddUserMessage(ctx, req.SessionID, messageID, userContent, req.UserID, imageRefs...)
+			agg, uEvent, sideEffects, pErr = threadMgmt.AddUserMessage(ctx, req.SessionID, messageID, userContent, req.UserID, attachmentRefs...)
 			if pErr != nil {
 				yield(nil, fmt.Errorf("failed to persist user message: %w", pErr))
 				return
@@ -228,14 +228,14 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 				return
 			}
 
-			// Inject image metadata into the latest user message so the LLM sees them
-			if len(userImages) > 0 && len(messages) > 0 {
+			// Inject attachment metadata into the latest user message so the LLM sees them
+			if len(userAttachments) > 0 && len(messages) > 0 {
 				for i := len(messages) - 1; i >= 0; i-- {
 					if messages[i].Role == "user" {
 						if messages[i].Metadata == nil {
 							messages[i].Metadata = make(map[string]any)
 						}
-						messages[i].Metadata["images"] = userImages
+						messages[i].Metadata["attachments"] = userAttachments
 						break
 					}
 				}
@@ -607,25 +607,70 @@ func extractUserPrompt(msg *agent.Message) string {
 	return ""
 }
 
-// extractUserImages extracts image URLs from a message as a []map[string]any
-// suitable for storing in core.Message.Metadata["images"].
-func extractUserImages(msg *agent.Message) []map[string]any {
+// extractUserAttachments extracts multimodal content from a message as a
+// []map[string]any suitable for storing in core.Message.Metadata["attachments"].
+// Handles images, audio, and file attachments uniformly.
+func extractUserAttachments(msg *agent.Message) []map[string]any {
 	if msg == nil {
 		return nil
 	}
 
-	var images []map[string]any
+	var attachments []map[string]any
 	for _, c := range msg.Content {
-		if c.Type == agent.ContentTypeImageURL && c.ImageURL != nil {
-			detail := c.ImageURL.Detail
-			if detail == "" {
-				detail = "auto"
+		switch c.Type {
+		case agent.ContentTypeImageURL:
+			if c.ImageURL != nil {
+				detail := c.ImageURL.Detail
+				if detail == "" {
+					detail = "auto"
+				}
+				m := map[string]any{
+					"url":      c.ImageURL.URL,
+					"mimeType": mimeFromDataURL(c.ImageURL.URL),
+					"detail":   detail,
+				}
+				attachments = append(attachments, m)
 			}
-			images = append(images, map[string]any{
-				"url":    c.ImageURL.URL,
-				"detail": detail,
-			})
+		case agent.ContentTypeInputAudio:
+			if c.AudioInput != nil {
+				mimeType := "audio/" + c.AudioInput.Format
+				dataURL := "data:" + mimeType + ";base64," + c.AudioInput.Data
+				attachments = append(attachments, map[string]any{
+					"url":      dataURL,
+					"mimeType": mimeType,
+				})
+			}
+		case agent.ContentTypeFile:
+			if c.FileInput != nil {
+				mimeType := c.FileInput.MimeType
+				if mimeType == "" {
+					mimeType = "application/octet-stream"
+				}
+				dataURL := "data:" + mimeType + ";base64," + c.FileInput.Data
+				m := map[string]any{
+					"url":      dataURL,
+					"mimeType": mimeType,
+				}
+				if c.FileInput.FileName != "" {
+					m["fileName"] = c.FileInput.FileName
+				}
+				attachments = append(attachments, m)
+			}
 		}
 	}
-	return images
+	return attachments
+}
+
+// mimeFromDataURL extracts the MIME type from a data URL.
+// Returns "image/png" as default if parsing fails.
+func mimeFromDataURL(dataURL string) string {
+	// data:image/png;base64,...
+	if !strings.HasPrefix(dataURL, "data:") {
+		return "image/png"
+	}
+	rest := dataURL[5:]
+	if idx := strings.Index(rest, ";"); idx > 0 {
+		return rest[:idx]
+	}
+	return "image/png"
 }

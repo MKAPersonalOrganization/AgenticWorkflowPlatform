@@ -49,12 +49,43 @@ templ ChatInput() {
 				<!-- Slash Command Menu -->
 				@SlashMenu()
 			</div>
+			<!-- Hidden file input for attach button -->
+			<input
+				type="file"
+				multiple
+				x-ref="fileInput"
+				@change="handleFileSelect($event)"
+				accept="image/jpeg,image/png,image/gif,image/webp,audio/wav,audio/x-wav,audio/mpeg,audio/mp3,audio/ogg,audio/webm,application/pdf,text/plain,text/csv,text/markdown"
+				class="hidden"
+				tabindex="-1"
+				aria-hidden="true"
+			/>
 			<!-- Footer Area -->
 			<div class="flex items-center gap-2 pb-2">
 				<!-- Left: Agents & Attachments -->
 				<div class="ml-2 flex items-center gap-1">
 					<!-- Agents Selector -->
 					@agents.AgentsButtonTrigger()
+					<!-- Attach Files Button -->
+					@tooltip.Tooltip() {
+						@tooltip.Trigger(tooltip.TriggerProps{}) {
+							@button.Button(button.Props{
+								Type:    button.TypeButton,
+								Variant: button.VariantGhost,
+								Size:    button.SizeIcon,
+								Class:   "text-muted-foreground hover:text-foreground transition-colors p-2 rounded-xl hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+								Attributes: templ.Attributes{
+									"@click.stop": "$refs.fileInput.click()",
+									"aria-label":  i18n.T(ctx, "Attach files"),
+								},
+							}) {
+								@icon.Paperclip(icon.Props{Class: "size-5"})
+							}
+						}
+						@tooltip.Content(tooltip.ContentProps{Class: "text-xs"}) {
+							{ i18n.T(ctx, "Attach files") }
+						}
+					}
 				</div>
 				<!-- Center: Token Counter -->
 				<div class="flex-1 flex justify-center">

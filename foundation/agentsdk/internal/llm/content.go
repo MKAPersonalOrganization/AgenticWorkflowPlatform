@@ -41,6 +41,27 @@ type ImageURLContent struct {
 func (ImageURLContent) ContentType() string { return "image_url" }
 func (ImageURLContent) isContent()          {}
 
+// AudioContent represents base64-encoded audio data for multimodal messages.
+type AudioContent struct {
+	Data   string // Raw base64-encoded audio (no data URL prefix)
+	Format string // "wav" or "mp3"
+}
+
+// ContentType implements Content.
+func (AudioContent) ContentType() string { return "input_audio" }
+func (AudioContent) isContent()          {}
+
+// FileContent represents base64-encoded file data for multimodal messages.
+type FileContent struct {
+	Data     string // Raw base64-encoded file data (no data URL prefix)
+	FileName string // Original filename
+	MimeType string // e.g. "application/pdf", "text/plain"
+}
+
+// ContentType implements Content.
+func (FileContent) ContentType() string { return "file" }
+func (FileContent) isContent()          {}
+
 // JSONContent is structured JSON data.
 type JSONContent struct {
 	Data json.RawMessage
@@ -78,6 +99,8 @@ var (
 	_ Content = TextContent{}
 	_ Content = BinaryContent{}
 	_ Content = ImageURLContent{}
+	_ Content = AudioContent{}
+	_ Content = FileContent{}
 	_ Content = JSONContent{}
 	_ Content = FunctionCall{}
 	_ Content = FunctionResult{}

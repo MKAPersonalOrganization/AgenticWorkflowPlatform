@@ -22,20 +22,21 @@ func (e *ThreadCreated) EventTimestamp() time.Time { return e.Timestamp }
 func (e *ThreadCreated) AggregateID() string       { return e.ThreadID }
 func (e *ThreadCreated) sealed()                   {}
 
-// ImageRef is a reference to an image stored in the artifact service.
-type ImageRef struct {
+// Attachment is a reference to a file stored in the artifact service (image, audio, PDF, etc.).
+type Attachment struct {
 	URL      string `json:"url"`
 	MimeType string `json:"mimeType"`
+	FileName string `json:"fileName,omitempty"`
 }
 
 // UserMessageAdded is emitted when a user message is added to the thread.
 type UserMessageAdded struct {
-	ThreadID  string     `json:"threadId"`
-	UserID    string     `json:"userId,omitempty"`
-	MessageID string     `json:"messageId"`
-	Content   string     `json:"content"`
-	Images    []ImageRef `json:"images,omitempty"`
-	Timestamp time.Time  `json:"timestamp"`
+	ThreadID    string       `json:"threadId"`
+	UserID      string       `json:"userId,omitempty"`
+	MessageID   string       `json:"messageId"`
+	Content     string       `json:"content"`
+	Attachments []Attachment `json:"attachments,omitempty"`
+	Timestamp   time.Time    `json:"timestamp"`
 }
 
 func (e *UserMessageAdded) EventType() string         { return "UserMessageAdded" }

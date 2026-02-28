@@ -94,6 +94,40 @@ func (m Message) HasImages() bool {
 	return false
 }
 
+// AudioContents returns all AudioContent items in the message.
+func (m Message) AudioContents() []AudioContent {
+	var result []AudioContent
+	for _, c := range m.Content {
+		if a, ok := c.(AudioContent); ok {
+			result = append(result, a)
+		}
+	}
+	return result
+}
+
+// FileContents returns all FileContent items in the message.
+func (m Message) FileContents() []FileContent {
+	var result []FileContent
+	for _, c := range m.Content {
+		if f, ok := c.(FileContent); ok {
+			result = append(result, f)
+		}
+	}
+	return result
+}
+
+// HasMultimodal returns true if the message contains any non-text media
+// (images, audio, or file attachments).
+func (m Message) HasMultimodal() bool {
+	for _, c := range m.Content {
+		switch c.(type) {
+		case ImageURLContent, AudioContent, FileContent:
+			return true
+		}
+	}
+	return false
+}
+
 // NewUserMessage creates a user message with text content.
 func NewUserMessage(text string) Message {
 	return Message{

@@ -166,7 +166,7 @@ func (c *OllamaClient) buildMessages(messages []Message, system string) []api.Me
 				Role:    "user",
 				Content: msg.Text(),
 			}
-			// Add images for multimodal models (Ollama uses raw bytes)
+			// Add images for multimodal models (Ollama uses raw bytes, images only)
 			for _, img := range msg.ImageURLs() {
 				if strings.HasPrefix(img.URL, "data:") {
 					if idx := strings.Index(img.URL, ","); idx > 0 {
@@ -178,6 +178,8 @@ func (c *OllamaClient) buildMessages(messages []Message, system string) []api.Me
 					}
 				}
 			}
+			// Note: Ollama does not natively support audio or file attachments;
+			// they are silently skipped here.
 			ollamaMessages = append(ollamaMessages, userMsg)
 
 		case RoleAssistant:

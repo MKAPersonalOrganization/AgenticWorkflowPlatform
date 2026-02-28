@@ -261,12 +261,12 @@ export function mapTokenUsage(raw) {
  * @param {string} interactionId - Interaction ID
  * @returns {Object} User message object
  */
-export function createUserMessage(content, interactionId, images = []) {
+export function createUserMessage(content, interactionId, attachments = []) {
     return {
         id: generateMessageId(),
         role: 'user',
         content: content,
-        images: images, // [{data: 'data:image/...', type: 'image/png', name: '...'}]
+        attachments: attachments, // [{data: 'data:...;base64,...', type: 'image/png', name: '...'}]
         timestamp: new Date().toISOString(),
         interactionId: interactionId,
         lifecycleEvents: []

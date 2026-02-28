@@ -20,46 +20,51 @@ export function createInputMethods() {
         // File Management
         // ============================================
 
-        /** Max image size: 20 MB */
-        MAX_IMAGE_SIZE: 20 * 1024 * 1024,
+        /** Max file size: 20 MB */
+        MAX_FILE_SIZE: 20 * 1024 * 1024,
 
-        /** Max number of images per message */
-        MAX_IMAGE_COUNT: 5,
+        /** Max number of files per message */
+        MAX_FILE_COUNT: 5,
 
-        /** Accepted image MIME types */
-        ACCEPTED_IMAGE_TYPES: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+        /** Accepted MIME types for file attachments */
+        ACCEPTED_FILE_TYPES: [
+            'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+            'audio/wav', 'audio/x-wav', 'audio/mpeg', 'audio/mp3', 'audio/ogg', 'audio/webm',
+            'application/pdf',
+            'text/plain', 'text/csv', 'text/markdown',
+        ],
 
         /**
-         * Validate an image file by type and size.
+         * Validate a file by type and size.
          * Shows a user-visible toast on failure.
          * @param {File} file
          * @returns {boolean}
          */
-        _isValidImage(file) {
-            if (!this.ACCEPTED_IMAGE_TYPES.includes(file.type)) {
-                this.showToast(window.i18n?.t?.('Unsupported image type: {type}', { type: file.type }) || `Unsupported image type: ${file.type}`, 'error');
+        _isValidFile(file) {
+            if (!this.ACCEPTED_FILE_TYPES.includes(file.type)) {
+                this.showToast(window.i18n?.t?.('Unsupported file type: {type}', { type: file.type }) || `Unsupported file type: ${file.type}`, 'error');
                 return false;
             }
-            if (file.size > this.MAX_IMAGE_SIZE) {
+            if (file.size > this.MAX_FILE_SIZE) {
                 const sizeMB = (file.size / 1024 / 1024).toFixed(1);
-                this.showToast(window.i18n?.t?.('Image too large ({size} MB). Max is 20 MB.', { size: sizeMB }) || `Image too large (${sizeMB} MB). Max is 20 MB.`, 'error');
+                this.showToast(window.i18n?.t?.('File too large ({size} MB). Max is 20 MB.', { size: sizeMB }) || `File too large (${sizeMB} MB). Max is 20 MB.`, 'error');
                 return false;
             }
             return true;
         },
 
         /**
-         * Read image files and add them to the files[] array.
-         * Enforces MAX_IMAGE_COUNT per message.
-         * @param {File[]} imageFiles
+         * Read files and add them to the files[] array.
+         * Enforces MAX_FILE_COUNT per message.
+         * @param {File[]} fileList
          */
-        _addImageFiles(imageFiles) {
-            for (const file of imageFiles) {
-                if (this.files.length >= this.MAX_IMAGE_COUNT) {
-                    this.showToast(window.i18n?.t?.('Maximum {count} images per message', { count: this.MAX_IMAGE_COUNT }) || `Maximum ${this.MAX_IMAGE_COUNT} images per message`, 'error');
+        _addFiles(fileList) {
+            for (const file of fileList) {
+                if (this.files.length >= this.MAX_FILE_COUNT) {
+                    this.showToast(window.i18n?.t?.('Maximum {count} files per message', { count: this.MAX_FILE_COUNT }) || `Maximum ${this.MAX_FILE_COUNT} files per message`, 'error');
                     break;
                 }
-                if (!this._isValidImage(file)) continue;
+                if (!this._isValidFile(file)) continue;
 
                 const reader = new FileReader();
                 reader.onload = (e) => {
@@ -82,13 +87,13 @@ export function createInputMethods() {
             const clipboardData = event.clipboardData;
             if (!clipboardData || clipboardData.files.length === 0) return;
 
-            // Filter to image files only
-            const imageFiles = Array.from(clipboardData.files).filter(f => f.type.startsWith('image/'));
-            if (imageFiles.length === 0) return;
+            // Filter to supported file types
+            const validFiles = Array.from(clipboardData.files).filter(f => this.ACCEPTED_FILE_TYPES.includes(f.type));
+            if (validFiles.length === 0) return;
 
             // Prevent the default paste (which would insert weird text)
             event.preventDefault();
-            this._addImageFiles(imageFiles);
+            this._addFiles(validFiles);
         },
 
         /**
@@ -100,10 +105,10 @@ export function createInputMethods() {
             const dt = event.dataTransfer;
             if (!dt || dt.files.length === 0) return;
 
-            const imageFiles = Array.from(dt.files).filter(f => f.type.startsWith('image/'));
-            if (imageFiles.length === 0) return;
+            const validFiles = Array.from(dt.files).filter(f => this.ACCEPTED_FILE_TYPES.includes(f.type));
+            if (validFiles.length === 0) return;
 
-            this._addImageFiles(imageFiles);
+            this._addFiles(validFiles);
         },
 
         /**
@@ -132,21 +137,8 @@ export function createInputMethods() {
             const files = event.target.files;
             if (!files || files.length === 0) return;
 
-            for (let i = 0; i < files.length; i++) {
-                const file = files[i];
-                const reader = new FileReader();
-
-                reader.onload = (e) => {
-                    this.files.push({
-                        name: file.name,
-                        type: file.type,
-                        size: file.size,
-                        data: e.target.result // Base64 data
-                    });
-                };
-
-                reader.readAsDataURL(file);
-            }
+            const validFiles = Array.from(files).filter(f => this._isValidFile(f));
+            this._addFiles(validFiles);
 
             // Reset input so same file can be selected again
             event.target.value = '';
