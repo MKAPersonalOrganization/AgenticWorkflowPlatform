@@ -560,10 +560,18 @@ func (s *Service) buildMessageContent(ctx context.Context, req RunExecutionReque
 		// Resolve the data URL: use existing Data or load from S3 for pre-uploaded files.
 		dataURL := att.Data
 		if dataURL == "" && att.URL != "" && s.artifactStore != nil {
-			loaded, err := s.loadArtifactAsDataURL(ctx, req.UserID, req.ThreadID, att.FileName, att.MimeType)
+			// Extract the actual S3 filename from the artifact URL.
+			// URL format: /v1/threads/{threadId}/artifacts/{uuid_originalName}
+			// att.FileName has the original name (e.g. "Logo.jpg") but S3
+			// stores the UUID-prefixed version (e.g. "65f313b5_Logo.jpg").
+			s3FileName := att.FileName
+			if parts := strings.Split(att.URL, "/"); len(parts) > 0 {
+				s3FileName = parts[len(parts)-1]
+			}
+			loaded, err := s.loadArtifactAsDataURL(ctx, req.UserID, req.ThreadID, s3FileName, att.MimeType)
 			if err != nil {
 				s.log.Warn(ctx, "Failed to load pre-uploaded attachment for LLM, skipping",
-					"error", err, "fileName", att.FileName)
+					"error", err, "fileName", s3FileName, "url", att.URL)
 				continue
 			}
 			dataURL = loaded

@@ -150,7 +150,13 @@ export function createInitialState() {
         __messageQueue: [],
 
         // Sidepanel view state
-        activeView: 'artifacts'
+        activeView: 'artifacts',
+
+        // Right-click context menu state
+        contextMenuOpen: false,
+        contextMenuX: 0,
+        contextMenuY: 0,
+        __contextMenuMessage: null,
     };
 }
 
