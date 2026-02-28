@@ -26,9 +26,9 @@ export function createStreamingMethods() {
          * @param {string} threadId - Thread ID
          * @param {string} agentName - Optional agent name to target
          * @param {string|null} toolCallId - Optional tool call ID for elicitation answers
-         * @param {Array} images - Optional array of image objects [{data, type, name}]
+         * @param {Array} attachedFiles - Optional array of file objects [{data, type, name}]
          */
-        async __streamResponse(message, threadId, agentName = '', toolCallId = null, images = []) {
+        async __streamResponse(message, threadId, agentName = '', toolCallId = null, attachedFiles = []) {
             const state = this.__getThreadState(threadId);
 
             // Close existing stream if any (expected during elicitation responses)
@@ -57,11 +57,12 @@ export function createStreamingMethods() {
                     body.toolCallId = toolCallId;
                 }
 
-                // Attach images as base64 data URLs
-                if (images && images.length > 0) {
-                    body.images = images.map(img => ({
-                        data: img.data,     // base64 data URL (data:image/png;base64,...)
-                        mimeType: img.type,  // e.g. 'image/png'
+                // Attach files as base64 data URLs
+                if (attachedFiles && attachedFiles.length > 0) {
+                    body.attachments = attachedFiles.map(f => ({
+                        data: f.data,      // base64 data URL (data:image/png;base64,...)
+                        mimeType: f.type,  // e.g. 'image/png', 'audio/wav'
+                        fileName: f.name,  // original filename
                     }));
                 }
 

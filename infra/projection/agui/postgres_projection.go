@@ -132,14 +132,14 @@ func (p *PostgresAguiProjection) applyThreadCreated(ctx context.Context, event *
 
 // applyUserMessageAdded adds a user message to the thread.
 func (p *PostgresAguiProjection) applyUserMessageAdded(ctx context.Context, event *domain.UserMessageAdded) error {
-	// Marshal images to metadata JSONB for persistence
+	// Marshal attachments to metadata JSONB for persistence
 	var metadataJSON []byte
-	if len(event.Images) > 0 {
-		metaMap := map[string]any{"images": event.Images}
+	if len(event.Attachments) > 0 {
+		metaMap := map[string]any{"attachments": event.Attachments}
 		var err error
 		metadataJSON, err = json.Marshal(metaMap)
 		if err != nil {
-			p.log.Warn(ctx, "failed to marshal image metadata", "error", err)
+			p.log.Warn(ctx, "failed to marshal attachment metadata", "error", err)
 		}
 	}
 
@@ -569,7 +569,7 @@ func (p *PostgresAguiProjection) GetThreadState(ctx context.Context, threadID st
 
 	// Convert database messages to AGUI SDK format
 	aguiMessages := make([]aguievents.Message, 0, len(messages))
-	messageImages := make(map[string][]domain.ImageRef)
+	messageAttachments := make(map[string][]domain.Attachment)
 	var tokenUsage *TokenUsageInfo
 
 	for _, msg := range messages {
@@ -632,15 +632,16 @@ func (p *PostgresAguiProjection) GetThreadState(ctx context.Context, threadID st
 					}
 				}
 
-				// Extract image references for user messages
-				if imagesRaw, ok := metadata["images"]; ok {
-					if imagesArr, ok := imagesRaw.([]interface{}); ok {
-						var refs []domain.ImageRef
-						for _, imgRaw := range imagesArr {
-							if imgMap, ok := imgRaw.(map[string]interface{}); ok {
-								ref := domain.ImageRef{
-									URL:      getStringFromMap(imgMap, "url"),
-									MimeType: getStringFromMap(imgMap, "mimeType"),
+				// Extract attachment references for user messages
+				if attachmentsRaw, ok := metadata["attachments"]; ok {
+					if attachmentsArr, ok := attachmentsRaw.([]interface{}); ok {
+						var refs []domain.Attachment
+						for _, attRaw := range attachmentsArr {
+							if attMap, ok := attRaw.(map[string]interface{}); ok {
+								ref := domain.Attachment{
+									URL:      getStringFromMap(attMap, "url"),
+									MimeType: getStringFromMap(attMap, "mimeType"),
+									FileName: getStringFromMap(attMap, "fileName"),
 								}
 								if ref.URL != "" {
 									refs = append(refs, ref)
@@ -648,7 +649,7 @@ func (p *PostgresAguiProjection) GetThreadState(ctx context.Context, threadID st
 							}
 						}
 						if len(refs) > 0 {
-							messageImages[msg.MessageID] = refs
+							messageAttachments[msg.MessageID] = refs
 						}
 					}
 				}
@@ -710,19 +711,19 @@ func (p *PostgresAguiProjection) GetThreadState(ctx context.Context, threadID st
 	}
 
 	state := &AguiThreadState{
-		ThreadID:      thread.ThreadID,
-		UserID:        thread.UserID,
-		Title:         thread.Title,
-		Messages:      aguiMessages,
-		ToolCalls:     []AguiToolCall{},
-		AgentActivity: make(map[string]*AguiAgentActivity),
-		ToolStates:    toolStatesMap,
-		TokenUsage:    tokenUsage,
-		MessageImages: messageImages,
-		CreatedAt:     thread.CreatedAt,
-		UpdatedAt:     thread.UpdatedAt,
-		Version:       thread.Version,
-		IsDeleted:     thread.IsDeleted,
+		ThreadID:           thread.ThreadID,
+		UserID:             thread.UserID,
+		Title:              thread.Title,
+		Messages:           aguiMessages,
+		ToolCalls:          []AguiToolCall{},
+		AgentActivity:      make(map[string]*AguiAgentActivity),
+		ToolStates:         toolStatesMap,
+		TokenUsage:         tokenUsage,
+		MessageAttachments: messageAttachments,
+		CreatedAt:          thread.CreatedAt,
+		UpdatedAt:          thread.UpdatedAt,
+		Version:            thread.Version,
+		IsDeleted:          thread.IsDeleted,
 	}
 
 	return state, true

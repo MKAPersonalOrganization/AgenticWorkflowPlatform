@@ -42,11 +42,31 @@ templ UserMessage() {
 				class="bg-secondary/80 px-4 py-2.5 rounded-2xl text-start prose prose-sm max-w-none text-foreground leading-relaxed shadow-xs"
 				dir="auto"
 			>
-				<!-- Inline images from user message -->
-				<template x-if="message.images && message.images.length > 0">
+				<!-- Inline attachments from user message (images, audio, files) -->
+				<template x-if="message.attachments && message.attachments.length > 0">
 					<div class="flex flex-wrap gap-2 mb-2 not-prose">
-						<template x-for="(img, idx) in message.images" :key="idx">
-							<img :src="img.data" :alt="img.name || 'Attached image'" class="max-h-48 max-w-xs rounded-lg border border-border object-contain cursor-pointer hover:opacity-90 transition-opacity" @click="window.open(img.data, '_blank')"/>
+						<template x-for="(att, idx) in message.attachments" :key="idx">
+							<div>
+								<!-- Image attachments -->
+								<template x-if="att.type && att.type.startsWith('image/')">
+									<img :src="att.data" :alt="att.name || 'Attached image'" class="max-h-48 max-w-xs rounded-lg border border-border object-contain cursor-pointer hover:opacity-90 transition-opacity" @click="window.open(att.data, '_blank')"/>
+								</template>
+								<!-- Audio attachments -->
+								<template x-if="att.type && att.type.startsWith('audio/')">
+									<div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted border border-border">
+										<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+										<audio controls :src="att.data" class="h-8 max-w-[200px]"></audio>
+										<span class="text-xs text-muted-foreground" x-text="att.name || 'Audio'"></span>
+									</div>
+								</template>
+								<!-- Other file attachments (PDF, text, etc.) -->
+								<template x-if="att.type && !att.type.startsWith('image/') && !att.type.startsWith('audio/')">
+									<a :href="att.data" :download="att.name || 'file'" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted border border-border hover:bg-muted/80 transition-colors no-underline">
+										<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+										<span class="text-xs text-muted-foreground" x-text="att.name || 'File'"></span>
+									</a>
+								</template>
+							</div>
 						</template>
 					</div>
 				</template>

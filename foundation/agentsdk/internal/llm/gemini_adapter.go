@@ -295,6 +295,33 @@ func (c *GeminiClient) buildContents(messages []Message) []*genai.Content {
 						}
 					}
 				}
+			case AudioContent:
+				// Gemini supports inline audio via InlineData blobs
+				decoded, err := base64.StdEncoding.DecodeString(v.Data)
+				if err == nil {
+					mimeType := "audio/" + v.Format
+					parts = append(parts, &genai.Part{
+						InlineData: &genai.Blob{
+							MIMEType: mimeType,
+							Data:     decoded,
+						},
+					})
+				}
+			case FileContent:
+				// Gemini supports inline files via InlineData blobs
+				decoded, err := base64.StdEncoding.DecodeString(v.Data)
+				if err == nil {
+					mimeType := v.MimeType
+					if mimeType == "" {
+						mimeType = "application/octet-stream"
+					}
+					parts = append(parts, &genai.Part{
+						InlineData: &genai.Blob{
+							MIMEType: mimeType,
+							Data:     decoded,
+						},
+					})
+				}
 			}
 		}
 

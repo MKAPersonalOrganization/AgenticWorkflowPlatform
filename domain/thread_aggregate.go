@@ -55,7 +55,7 @@ func OpenThread(threadID, userID, title string) (*ThreadAggregate, error) {
 
 // AddMessage adds a message to the thread.
 // This implements business logic like ShoppingCart.AddProduct.
-func (t *ThreadAggregate) AddMessage(messageID, role, content string, toolCalls []ToolCall, toolCallID, toolName, agentName string, images ...ImageRef) error {
+func (t *ThreadAggregate) AddMessage(messageID, role, content string, toolCalls []ToolCall, toolCallID, toolName, agentName string, attachments ...Attachment) error {
 	if t.IsDeleted {
 		return errors.New("cannot add message to deleted thread")
 	}
@@ -71,11 +71,11 @@ func (t *ThreadAggregate) AddMessage(messageID, role, content string, toolCalls 
 	switch role {
 	case "user":
 		event = &UserMessageAdded{
-			ThreadID:  t.ID,
-			MessageID: messageID,
-			Content:   content,
-			Images:    images,
-			Timestamp: time.Now(),
+			ThreadID:    t.ID,
+			MessageID:   messageID,
+			Content:     content,
+			Attachments: attachments,
+			Timestamp:   time.Now(),
 		}
 	case "assistant":
 		event = &AssistantMessageAdded{
@@ -179,15 +179,16 @@ func (t *ThreadAggregate) Apply(event Event) {
 			Content:   e.Content,
 			Timestamp: e.Timestamp,
 		}
-		if len(e.Images) > 0 {
-			imgs := make([]any, len(e.Images))
-			for i, img := range e.Images {
-				imgs[i] = map[string]any{
-					"url":      img.URL,
-					"mimeType": img.MimeType,
+		if len(e.Attachments) > 0 {
+			atts := make([]any, len(e.Attachments))
+			for i, att := range e.Attachments {
+				atts[i] = map[string]any{
+					"url":      att.URL,
+					"mimeType": att.MimeType,
+					"fileName": att.FileName,
 				}
 			}
-			msg.Metadata = map[string]any{"images": imgs}
+			msg.Metadata = map[string]any{"attachments": atts}
 		}
 		t.Messages = append(t.Messages, msg)
 		t.UpdatedAt = e.Timestamp

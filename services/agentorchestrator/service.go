@@ -211,7 +211,7 @@ func (s *Service) persistDurableEvent(ctx context.Context, event domain.Event) e
 		_, err := s.threadMgmt.DeleteThread(ctx, e.ThreadID)
 		return err
 	case *domain.UserMessageAdded:
-		_, _, _, err := s.threadMgmt.AddUserMessage(ctx, e.ThreadID, e.MessageID, e.Content, e.UserID, e.Images...)
+		_, _, _, err := s.threadMgmt.AddUserMessage(ctx, e.ThreadID, e.MessageID, e.Content, e.UserID, e.Attachments...)
 		return err
 	case *domain.AssistantMessageAdded:
 		_, _, err := s.threadMgmt.AddAssistantMessage(ctx, e.ThreadID, e.MessageID, e.Content, e.ToolCalls, e.AgentName)
@@ -250,22 +250,23 @@ func (s *Service) GetThreadManagement() *threadmgmt.Manager {
 	return s.threadMgmt
 }
 
-// ImageAttachment represents an image attached to a message.
-type ImageAttachment struct {
-	Data     string // Base64 data URL (data:image/png;base64,...)
-	MimeType string // e.g. "image/png"
+// FileAttachment represents a file attached to a message (image, audio, PDF, etc.).
+type FileAttachment struct {
+	Data     string // Base64 data URL (data:image/...;base64,...)
+	MimeType string // e.g. "image/png", "audio/wav", "application/pdf"
+	FileName string // Original filename (e.g. "screenshot.png")
 }
 
 // RunExecutionRequest contains parameters for executing a run.
 type RunExecutionRequest struct {
-	ThreadID    string            // ID of the conversation thread
-	UserID      string            // User making the request
-	AgentName   string            // Agent to execute
-	Message     string            // User message content
-	MessageID   string            // Message ID (used as RunID)
-	ToolCallID  string            // (Optional) Correlates this message as an answer to a tool elicitation
-	ParentRunID string            // (Optional) Lineage pointer for branching/time travel
-	Images      []ImageAttachment // (Optional) Attached images
+	ThreadID    string           // ID of the conversation thread
+	UserID      string           // User making the request
+	AgentName   string           // Agent to execute
+	Message     string           // User message content
+	MessageID   string           // Message ID (used as RunID)
+	ToolCallID  string           // (Optional) Correlates this message as an answer to a tool elicitation
+	ParentRunID string           // (Optional) Lineage pointer for branching/time travel
+	Attachments []FileAttachment // (Optional) Attached files (images, audio, PDFs, etc.)
 }
 
 // ExecuteRun orchestrates a framework-agnostic run execution with lifecycle events.
@@ -334,8 +335,8 @@ func (s *Service) ExecuteRun(
 			return
 		}
 
-		// Save images to artifacts and build image refs for event persistence
-		imageRefs := s.saveImagesToArtifacts(ctx, req)
+		// Save attachments to artifacts and build refs for event persistence
+		attachmentRefs := s.saveAttachments(ctx, req)
 
 		runnerReq := &agent.RunRequest{
 			SessionID: req.ThreadID,
@@ -343,10 +344,10 @@ func (s *Service) ExecuteRun(
 			AgentName: req.AgentName,
 			Message: &agent.Message{
 				ID:      req.MessageID,
-				Content: buildMessageContent(req.Message, req.Images),
+				Content: buildMessageContent(req.Message, req.Attachments),
 			},
 			Context: map[string]any{
-				"imageRefs": imageRefs,
+				"attachmentRefs": attachmentRefs,
 			},
 		}
 		rawDomainEvents := runner.Run(ctx, runnerReq)
@@ -419,38 +420,42 @@ func (s *Service) ExecuteRun(
 	}
 }
 
-// saveImagesToArtifacts saves attached images to the artifact store and returns
-// domain.ImageRef slices for event persistence. If the artifact store is nil or
-// no images are present, it returns nil.
-func (s *Service) saveImagesToArtifacts(ctx context.Context, req RunExecutionRequest) []domain.ImageRef {
-	if s.artifactStore == nil || len(req.Images) == 0 {
+// saveAttachments saves attached files to the artifact store and returns
+// domain.Attachment slices for event persistence. If the artifact store is nil or
+// no attachments are present, it returns nil.
+func (s *Service) saveAttachments(ctx context.Context, req RunExecutionRequest) []domain.Attachment {
+	if s.artifactStore == nil || len(req.Attachments) == 0 {
 		return nil
 	}
 
-	var refs []domain.ImageRef
-	for _, img := range req.Images {
-		mimeType, data, err := parseDataURL(img.Data)
+	var refs []domain.Attachment
+	for _, att := range req.Attachments {
+		mimeType, data, err := parseDataURL(att.Data)
 		if err != nil {
-			s.log.Warn(ctx, "Orchestrator: Failed to parse image data URL, skipping artifact save", "error", err)
+			s.log.Warn(ctx, "Orchestrator: Failed to parse data URL, skipping artifact save", "error", err)
 			continue
 		}
 		if mimeType == "" {
-			mimeType = img.MimeType
+			mimeType = att.MimeType
 		}
 
 		ext := mimeToExt(mimeType)
-		fileName := fmt.Sprintf("img-%s.%s", uuid.New().String()[:8], ext)
+		fileName := att.FileName
+		if fileName == "" {
+			fileName = fmt.Sprintf("file-%s.%s", uuid.New().String()[:8], ext)
+		}
 
 		_, saveErr := s.artifactStore.Save(ctx, req.UserID, req.ThreadID, fileName, bytes.NewReader(data))
 		if saveErr != nil {
-			s.log.Error(ctx, "Orchestrator: Failed to save image artifact", "error", saveErr, "fileName", fileName)
+			s.log.Error(ctx, "Orchestrator: Failed to save artifact", "error", saveErr, "fileName", fileName)
 			continue
 		}
 
 		artifactURL := fmt.Sprintf("/v1/threads/%s/artifacts/%s", req.ThreadID, fileName)
-		refs = append(refs, domain.ImageRef{
+		refs = append(refs, domain.Attachment{
 			URL:      artifactURL,
 			MimeType: mimeType,
+			FileName: fileName,
 		})
 	}
 	return refs
@@ -477,7 +482,7 @@ func parseDataURL(dataURL string) (mimeType string, data []byte, err error) {
 	return mimeType, data, err
 }
 
-// mimeToExt returns a file extension for common image MIME types.
+// mimeToExt returns a file extension for common MIME types.
 func mimeToExt(mimeType string) string {
 	switch mimeType {
 	case "image/jpeg":
@@ -488,14 +493,38 @@ func mimeToExt(mimeType string) string {
 		return "gif"
 	case "image/webp":
 		return "webp"
+	case "audio/wav", "audio/x-wav":
+		return "wav"
+	case "audio/mpeg", "audio/mp3":
+		return "mp3"
+	case "audio/ogg":
+		return "ogg"
+	case "audio/webm":
+		return "webm"
+	case "application/pdf":
+		return "pdf"
+	case "text/plain":
+		return "txt"
+	case "text/csv":
+		return "csv"
+	case "text/markdown":
+		return "md"
 	default:
-		return "png"
+		if idx := strings.LastIndex(mimeType, "/"); idx >= 0 {
+			ext := mimeType[idx+1:]
+			if plus := strings.Index(ext, "+"); plus >= 0 {
+				ext = ext[:plus]
+			}
+			return ext
+		}
+		return "bin"
 	}
 }
 
 // buildMessageContent constructs the Content slice for a user message,
-// combining text and optional image attachments.
-func buildMessageContent(text string, images []ImageAttachment) []agent.Content {
+// combining text and optional file attachments. It classifies each attachment
+// by MIME type into the appropriate agent content type (image, audio, or file).
+func buildMessageContent(text string, attachments []FileAttachment) []agent.Content {
 	var content []agent.Content
 
 	if text != "" {
@@ -505,14 +534,34 @@ func buildMessageContent(text string, images []ImageAttachment) []agent.Content 
 		})
 	}
 
-	for _, img := range images {
-		content = append(content, agent.Content{
-			Type: agent.ContentTypeImageURL,
-			ImageURL: &agent.ImageURL{
-				URL:    img.Data,
-				Detail: "auto",
-			},
-		})
+	for _, att := range attachments {
+		switch {
+		case strings.HasPrefix(att.MimeType, "image/"):
+			content = append(content, agent.Content{
+				Type: agent.ContentTypeImageURL,
+				ImageURL: &agent.ImageURL{
+					URL:    att.Data,
+					Detail: "auto",
+				},
+			})
+		case strings.HasPrefix(att.MimeType, "audio/"):
+			content = append(content, agent.Content{
+				Type: agent.ContentTypeInputAudio,
+				AudioInput: &agent.AudioInput{
+					Data:   stripDataURLPrefix(att.Data),
+					Format: audioFormat(att.MimeType),
+				},
+			})
+		default:
+			content = append(content, agent.Content{
+				Type: agent.ContentTypeFile,
+				FileInput: &agent.FileInput{
+					Data:     stripDataURLPrefix(att.Data),
+					FileName: att.FileName,
+					MimeType: att.MimeType,
+				},
+			})
+		}
 	}
 
 	// Ensure at least one content part
@@ -524,4 +573,25 @@ func buildMessageContent(text string, images []ImageAttachment) []agent.Content 
 	}
 
 	return content
+}
+
+// stripDataURLPrefix removes the data:...;base64, prefix from a data URL,
+// returning just the raw base64 content.
+func stripDataURLPrefix(dataURL string) string {
+	if idx := strings.Index(dataURL, ","); idx >= 0 {
+		return dataURL[idx+1:]
+	}
+	return dataURL
+}
+
+// audioFormat returns the audio format string for the LLM from a MIME type.
+func audioFormat(mimeType string) string {
+	switch mimeType {
+	case "audio/wav", "audio/x-wav":
+		return "wav"
+	case "audio/mpeg", "audio/mp3":
+		return "mp3"
+	default:
+		return "wav"
+	}
 }

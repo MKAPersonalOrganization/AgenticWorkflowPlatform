@@ -16,7 +16,11 @@ const defaultBodyLimit int64 = 1 << 20 // 1 MB
 // This middleware should be applied globally. Multipart/form-data requests
 // (file uploads) are excluded so that handlers can control their own limits
 // via ParseMultipartForm.
-func BodyLimit(limit int64) func(http.Handler) http.Handler {
+//
+// Optional excludePaths may be provided — requests whose path has any of these
+// prefixes skip the limit entirely (they are expected to apply their own
+// limit via a route-group middleware).
+func BodyLimit(limit int64, excludePaths ...string) func(http.Handler) http.Handler {
 	if limit <= 0 {
 		limit = defaultBodyLimit
 	}
@@ -28,8 +32,17 @@ func BodyLimit(limit int64) func(http.Handler) http.Handler {
 			ct := r.Header.Get("Content-Type")
 			isMultipart := strings.HasPrefix(ct, "multipart/form-data")
 
-			// Only limit bodies for non-multipart requests that have a body.
-			if !isMultipart && r.Body != nil && r.ContentLength != 0 {
+			// Skip excluded paths — they set their own limits.
+			excluded := false
+			for _, prefix := range excludePaths {
+				if strings.HasPrefix(r.URL.Path, prefix) {
+					excluded = true
+					break
+				}
+			}
+
+			// Only limit bodies for non-excluded, non-multipart requests that have a body.
+			if !excluded && !isMultipart && r.Body != nil && r.ContentLength != 0 {
 				r.Body = http.MaxBytesReader(w, r.Body, limit)
 			}
 

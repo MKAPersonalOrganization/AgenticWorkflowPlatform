@@ -8,6 +8,7 @@ import (
 
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
+	"github.com/openai/openai-go/v3/packages/param"
 )
 
 // OpenAIClient implements the LLM interface for OpenAI.
@@ -47,13 +48,16 @@ func (c *OpenAIClient) Generate(
 	req *Request,
 ) iter.Seq2[*Response, error] {
 	return func(yield func(*Response, error) bool) {
+		// Resolve model first so buildMessages can adapt content to model capabilities
+		model := c.getModel(req.Extensions)
+
 		// Build OpenAI message parameters
-		params := c.buildMessages(req.Messages, req.System)
+		params := c.buildMessages(req.Messages, req.System, model)
 
 		// Build stream parameters
 		streamParams := openai.ChatCompletionNewParams{
 			Messages: params,
-			Model:    c.getModel(req.Extensions),
+			Model:    model,
 		}
 
 		// Apply options
@@ -168,8 +172,11 @@ func (c *OpenAIClient) Generate(
 }
 
 // buildMessages converts Message slice to OpenAI message format.
-func (c *OpenAIClient) buildMessages(messages []Message, system string) []openai.ChatCompletionMessageParamUnion {
+func (c *OpenAIClient) buildMessages(messages []Message, system string, model openai.ChatModel) []openai.ChatCompletionMessageParamUnion {
 	params := make([]openai.ChatCompletionMessageParamUnion, 0, len(messages)+1)
+
+	supportsAudio := modelSupportsAudioInput(string(model))
+	supportsFiles := modelSupportsFileInput(string(model))
 
 	// Prepend system message if instructions are provided
 	if system != "" {
@@ -180,8 +187,8 @@ func (c *OpenAIClient) buildMessages(messages []Message, system string) []openai
 	for _, msg := range messages {
 		switch msg.Role {
 		case RoleUser:
-			// Check if message has images for multimodal support
-			if msg.HasImages() {
+			// Check if message has multimodal content (images, audio, files)
+			if msg.HasMultimodal() {
 				parts := []openai.ChatCompletionContentPartUnionParam{}
 				// Add text content if present
 				text := msg.Text()
@@ -198,6 +205,33 @@ func (c *OpenAIClient) buildMessages(messages []Message, system string) []openai
 						URL:    img.URL,
 						Detail: detail,
 					}))
+				}
+				// Add audio content parts
+				for _, audio := range msg.AudioContents() {
+					if supportsAudio {
+						parts = append(parts, openai.InputAudioContentPart(openai.ChatCompletionContentPartInputAudioInputAudioParam{
+							Data:   audio.Data,
+							Format: audio.Format,
+						}))
+					} else {
+						// Model doesn't support input_audio — add a text note so the LLM
+						// is aware an audio attachment was provided.
+						parts = append(parts, openai.TextContentPart("[Audio attachment: "+audio.Format+" format — this model does not support inline audio input]"))
+					}
+				}
+				// Add file content parts
+				for _, file := range msg.FileContents() {
+					if supportsFiles {
+						// OpenAI expects a full data URL: data:<mime>;base64,<data>
+						fileDataURL := "data:" + file.MimeType + ";base64," + file.Data
+						parts = append(parts, openai.FileContentPart(openai.ChatCompletionContentPartFileFileParam{
+							FileData: param.NewOpt(fileDataURL),
+							Filename: param.NewOpt(file.FileName),
+						}))
+					} else {
+						// Model doesn't support inline file content — add a text note.
+						parts = append(parts, openai.TextContentPart("[File attachment: "+file.FileName+" ("+file.MimeType+") — this model does not support inline file input]"))
+					}
 				}
 				params = append(params, openai.UserMessage(parts))
 			} else {
@@ -429,5 +463,35 @@ func (c *OpenAIClient) mapError(op string, err error) error {
 		Context: map[string]any{
 			"model": c.model,
 		},
+	}
+}
+
+// modelSupportsAudioInput returns true if the OpenAI model accepts input_audio
+// content parts.  Currently only gpt-4o-audio-* models support this.
+func modelSupportsAudioInput(model string) bool {
+	return strings.Contains(model, "audio")
+}
+
+// modelSupportsFileInput returns true if the OpenAI model accepts inline file
+// content parts (the "file" content type with base64 file_data).
+// Supported by gpt-4o family, gpt-4.1 family, o1, o3, o4-mini and newer.
+// NOT supported by gpt-4-turbo, gpt-4, gpt-3.5-turbo, o1-mini, o3-mini.
+func modelSupportsFileInput(model string) bool {
+	switch {
+	case strings.HasPrefix(model, "gpt-4o"):
+		return true
+	case strings.HasPrefix(model, "gpt-4.1"):
+		return true
+	case strings.HasPrefix(model, "gpt-4.5"):
+		return true
+	case model == "o1" || strings.HasPrefix(model, "o1-2"):
+		// o1 (full) supports it, but o1-mini and o1-preview do not
+		return true
+	case strings.HasPrefix(model, "o3") && !strings.Contains(model, "mini"):
+		return true
+	case strings.HasPrefix(model, "o4-mini"):
+		return true
+	default:
+		return false
 	}
 }
