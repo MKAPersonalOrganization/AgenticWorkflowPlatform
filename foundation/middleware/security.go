@@ -32,6 +32,7 @@ func SecurityHeaders() func(http.Handler) http.Handler {
 					"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "+
 					"style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "+
 					"img-src 'self' data: blob:; "+
+					"media-src 'self'; "+
 					"connect-src 'self'; "+
 					"font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; "+
 					"frame-ancestors 'none'")

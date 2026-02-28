@@ -29,6 +29,10 @@ type Service interface {
 
 	// Delete removes a file from the artifact store.
 	Delete(ctx context.Context, userID, sessionID, fileName string) error
+
+	// HealthCheck verifies the storage backend is reachable.
+	// Used by readiness probes to detect S3/MinIO outages.
+	HealthCheck(ctx context.Context) error
 }
 
 var (

@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -29,11 +32,30 @@ type S3Config struct {
 
 // NewS3Service creates a new S3Service.
 func NewS3Service(ctx context.Context, config S3Config) (*S3Service, error) {
+	// Production-grade HTTP transport for the S3 client:
+	//   - Bounded timeouts prevent goroutine leaks under network issues
+	//   - Connection pool sized for 100K concurrent users with connection reuse
+	//   - KeepAlive keeps connections warm to reduce TLS handshake overhead
+	transport := &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   5 * time.Second,  // TCP connect timeout
+			KeepAlive: 30 * time.Second, // TCP keepalive interval
+		}).DialContext,
+		TLSHandshakeTimeout:   5 * time.Second,
+		ResponseHeaderTimeout: 30 * time.Second, // Wait for S3 response headers
+		ExpectContinueTimeout: 2 * time.Second,  // For 100-continue on PutObject
+		MaxIdleConns:          200,              // Total pool across all hosts
+		MaxIdleConnsPerHost:   200,              // Single S3 endpoint
+		IdleConnTimeout:       90 * time.Second, // Close stale connections
+		ForceAttemptHTTP2:     true,
+	}
+
 	// Initialize minio client object.
 	minioClient, err := minio.New(config.Endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(config.AccessKeyID, config.SecretAccessKey, ""),
-		Secure: config.UseSSL,
-		Region: config.Region,
+		Creds:     credentials.NewStaticV4(config.AccessKeyID, config.SecretAccessKey, ""),
+		Secure:    config.UseSSL,
+		Region:    config.Region,
+		Transport: transport,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize minio client: %w", err)
@@ -64,13 +86,27 @@ func (s *S3Service) getObjectKey(userID, sessionID, fileName string) string {
 	return path.Join(userID, sessionID, fileName)
 }
 
-// validateFileName checks for path traversal attempts in file names.
+// maxFileNameLen caps filenames to 255 bytes — the POSIX and S3 limit.
+const maxFileNameLen = 255
+
+// validateFileName checks for path traversal, control characters, null bytes,
+// and excessive length in file names. This is the last line of defence before
+// a user-controlled string reaches S3.
 func validateFileName(fileName string) error {
 	if fileName == "" {
 		return fmt.Errorf("fileName is required")
 	}
+	if len(fileName) > maxFileNameLen {
+		return ErrInvalidPath
+	}
 	if strings.Contains(fileName, "..") || strings.Contains(fileName, "/") || strings.Contains(fileName, "\\") {
 		return ErrInvalidPath
+	}
+	// Reject null bytes and control characters (ASCII 0x00–0x1F, 0x7F).
+	for _, c := range fileName {
+		if c <= 0x1F || c == 0x7F {
+			return ErrInvalidPath
+		}
 	}
 	return nil
 }
@@ -173,6 +209,17 @@ func (s *S3Service) Delete(ctx context.Context, userID, sessionID, fileName stri
 	err := s.client.RemoveObject(ctx, s.bucketName, objectKey, minio.RemoveObjectOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to remove object: %w", err)
+	}
+	return nil
+}
+
+// HealthCheck verifies that the S3 backend is reachable by checking
+// whether the configured bucket exists. This is lightweight (a single
+// HEAD request) and used by readiness probes.
+func (s *S3Service) HealthCheck(ctx context.Context) error {
+	_, err := s.client.BucketExists(ctx, s.bucketName)
+	if err != nil {
+		return fmt.Errorf("s3 health check failed: %w", err)
 	}
 	return nil
 }
