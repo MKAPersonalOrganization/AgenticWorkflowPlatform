@@ -13,23 +13,6 @@ templ UserMessage() {
 			templ.KV("pie-10", i18n.Dir(ctx) == "rtl"),
 		}
 	>
-		<!-- Actions (End side of the message in LTR, Start side in RTL -> physically always Left for User sitting on Right) -->
-		<div
-			class={
-				"absolute top-2 flex flex-col items-end",
-				templ.KV("inset-inline-end-full mie-2", i18n.Dir(ctx) == "ltr"),
-				templ.KV("inset-inline-start-full mis-2", i18n.Dir(ctx) == "rtl"),
-			}
-		>
-			@Actions(ActionProps{
-				MessageID: "message.id", // Using string literal placeholder, Alpine will bind it logic is slightly complex here in templ, simpler to inline or assume ID binding
-				// Actually, since we are inside an Alpine loop, we can't easily pass 'message.id' as a string to the Go function if strictly server-side rendered.
-				// However, if we just render static HTML structure and let Alpine handle the click binding, it works.
-				// But the Go struct passing implies server-side data.
-				// Since this is a client-side rendered list (Alpine x-for), we need to generate Alpine-compatible markup.
-				Role: "user",
-			})
-		</div>
 		<div
 			class={
 				"flex flex-col gap-1 max-w-full",
@@ -97,13 +80,6 @@ templ AssistantMessage() {
 			<!-- Assistant Name -->
 			<!-- Message Content -->
 			<div class="prose prose-sm max-w-none text-sm leading-relaxed text-foreground dark:[&_*]:text-white mb-1" x-html="renderMarkdown(message.content)" dir="auto"></div>
-			<!-- Interaction Actions (Copy, Regenerate) -->
-			<div class="mt-1">
-				@Actions(ActionProps{
-					MessageID: "message.id",
-					Role:      "assistant",
-				})
-			</div>
 		</div>
 	</div>
 }

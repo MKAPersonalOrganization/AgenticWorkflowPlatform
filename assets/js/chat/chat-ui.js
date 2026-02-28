@@ -80,6 +80,42 @@ export function createUIMethods() {
         },
 
         // ============================================
+        // Message Context Menu
+        // ============================================
+
+        /**
+         * Open the right-click context menu for a message.
+         * Positions the menu at the cursor, clamped to the viewport.
+         * @param {MouseEvent} event - The contextmenu event
+         * @param {Object} message - The Alpine message object
+         */
+        openMessageContextMenu(event, message) {
+            this.__contextMenuMessage = message;
+
+            // Position at cursor, but clamp so the menu doesn't overflow viewport
+            const menuWidth = 180;
+            const menuHeight = 40;
+            const x = Math.min(event.clientX, window.innerWidth - menuWidth - 8);
+            const y = Math.min(event.clientY, window.innerHeight - menuHeight - 8);
+
+            this.contextMenuX = x;
+            this.contextMenuY = y;
+            this.contextMenuOpen = true;
+        },
+
+        /**
+         * Copy the message targeted by the context menu.
+         */
+        async contextMenuCopyMessage() {
+            const message = this.__contextMenuMessage;
+            if (message) {
+                const content = message.content || message.args || '';
+                await this.copyToClipboard(content, window.i18n.t('Message copied'));
+            }
+            this.__contextMenuMessage = null;
+        },
+
+        // ============================================
         // Error Display
         // ============================================
 

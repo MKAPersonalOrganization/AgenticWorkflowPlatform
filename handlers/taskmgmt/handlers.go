@@ -558,9 +558,10 @@ func (h *TaskManagementHandler) ListArtifacts(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Thread ownership check — users must only list their own artifacts.
-	state, exists := h.aguiProjection.GetThreadState(r.Context(), threadID)
-	if !exists || state.UserID != user.ID {
+	// Thread ownership check — S3 keys are userID/threadID prefixed.
+	// For new sessions the thread doesn't exist yet, so allow (returns empty).
+	// Block only if the thread exists and belongs to a different user.
+	if state, exists := h.aguiProjection.GetThreadState(r.Context(), threadID); exists && state.UserID != user.ID {
 		jsonError(w, "Thread not found", http.StatusNotFound)
 		return
 	}
@@ -728,10 +729,11 @@ func (h *TaskManagementHandler) UploadAttachment(w http.ResponseWriter, r *http.
 	}
 
 	// ── Thread ownership check ────────────────────────────────────────────
-	// Without this, any authenticated user could upload to any thread ID
-	// (even a fabricated one), polluting another user's S3 namespace.
-	state, exists := h.aguiProjection.GetThreadState(r.Context(), threadID)
-	if !exists || state.UserID != user.ID {
+	// S3 keys are prefixed with userID/threadID, so namespace isolation is
+	// inherent. For new sessions the thread doesn't exist in the projection
+	// yet (it's created when the first message is sent), so we allow the
+	// upload. If the thread *does* exist and belongs to another user, block.
+	if state, exists := h.aguiProjection.GetThreadState(r.Context(), threadID); exists && state.UserID != user.ID {
 		jsonError(w, "Thread not found", http.StatusNotFound)
 		return
 	}
