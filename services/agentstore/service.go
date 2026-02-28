@@ -9,9 +9,6 @@ import (
 	"school-with-ai/foundation/logger"
 )
 
-// ErrDeleteDefault is returned when a user attempts to delete the default agent.
-var ErrDeleteDefault = fmt.Errorf("cannot delete the default agent")
-
 // Service manages user-created agent definitions.
 type Service struct {
 	log  *logger.Logger
@@ -80,17 +77,8 @@ func (s *Service) Update(ctx context.Context, agent *domain.AgentDefinition) err
 	return nil
 }
 
-// Delete removes an agent definition. Cannot delete the default agent.
+// Delete removes an agent definition.
 func (s *Service) Delete(ctx context.Context, id, userID string) error {
-	// Fetch the agent to check if it's the default
-	agent, err := s.repo.GetByID(ctx, id, userID)
-	if err != nil {
-		return fmt.Errorf("deleting agent: %w", err)
-	}
-	if agent.IsDefault {
-		return ErrDeleteDefault
-	}
-
 	s.log.Info(ctx, "deleting agent definition", "agentID", id, "userID", userID)
 
 	if err := s.repo.Delete(ctx, id, userID); err != nil {
@@ -106,11 +94,11 @@ func (s *Service) GetByID(ctx context.Context, id, userID string) (*domain.Agent
 }
 
 // ListByUser returns all agents created by a specific user.
-// Lazily ensures the default agent exists before listing.
+// Lazily ensures the initial agent exists before listing.
 func (s *Service) ListByUser(ctx context.Context, userID string) ([]domain.AgentDefinition, error) {
-	// Ensure the default agent exists for this user
-	if _, err := s.repo.EnsureDefaultAgent(ctx, userID); err != nil {
-		s.log.Error(ctx, "failed to ensure default agent", "userID", userID, "error", err)
+	// Ensure at least one agent exists for this user
+	if _, err := s.repo.EnsureInitialAgent(ctx, userID); err != nil {
+		s.log.Error(ctx, "failed to ensure initial agent", "userID", userID, "error", err)
 		// Continue anyway — list whatever exists
 	}
 	return s.repo.ListByUser(ctx, userID)
@@ -121,11 +109,11 @@ func (s *Service) Search(ctx context.Context, userID, query string) ([]domain.Ag
 	return s.repo.Search(ctx, userID, query)
 }
 
-// EnsureDefaultAgent guarantees a default agent exists for the given user,
-// creating one atomically if missing. Returns the default agent definition.
-func (s *Service) EnsureDefaultAgent(ctx context.Context, userID string) (*domain.AgentDefinition, error) {
+// EnsureInitialAgent guarantees at least one agent exists for the given user,
+// creating a starter agent if the user has none. Returns the first agent.
+func (s *Service) EnsureInitialAgent(ctx context.Context, userID string) (*domain.AgentDefinition, error) {
 	if userID == "" {
 		return nil, fmt.Errorf("user ID is required")
 	}
-	return s.repo.EnsureDefaultAgent(ctx, userID)
+	return s.repo.EnsureInitialAgent(ctx, userID)
 }
