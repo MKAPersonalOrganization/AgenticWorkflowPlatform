@@ -55,7 +55,12 @@ templ UserMessage() {
 								<template x-if="att.type && att.type.startsWith('audio/')">
 									<div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted border border-border">
 										<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
-										<audio controls :src="att.data" class="h-8 max-w-[200px]"></audio>
+										<audio
+											controls
+											preload="metadata"
+											class="h-8 max-w-[200px]"
+											x-init="$el.src = att.data; $el.load()"
+										></audio>
 										<span class="text-xs text-muted-foreground" x-text="att.name || 'Audio'"></span>
 									</div>
 								</template>

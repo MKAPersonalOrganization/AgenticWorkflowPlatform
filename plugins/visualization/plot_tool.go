@@ -178,7 +178,7 @@ func (p *PlotTool) Execute(ctx context.Context, args agent.Arguments) (agent.Res
 	defer file.Close()
 
 	filename := filepath.Base(imagePath)
-	_, err = p.ArtifactStore.Save(ctx, args.UserID, args.SessionID, filename, file)
+	_, err = p.ArtifactStore.Save(ctx, args.UserID, args.SessionID, filename, "image/png", file)
 	if err != nil {
 		return agent.ErrorResult(fmt.Errorf("failed to save plot to artifact store: %w", err)), nil
 	}

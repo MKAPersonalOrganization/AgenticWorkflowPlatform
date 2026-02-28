@@ -37,11 +37,11 @@ func NewArtifactMemoryService(store artifact.Service) *ArtifactMemoryService {
 
 // Load retrieves memory for the user.
 func (s *ArtifactMemoryService) Load(ctx context.Context, userID string) (string, error) {
-	rc, err := s.store.Load(ctx, userID, MemorySessionID, MemoryFileName)
+	rc, _, err := s.store.Load(ctx, userID, MemorySessionID, MemoryFileName)
 	if err != nil {
 		if errors.Is(err, artifact.ErrNotFound) {
 			// Fallback to legacy location for backward compatibility
-			legacyRC, legacyErr := s.store.Load(ctx, userID, LegacyMemorySessionID, MemoryFileName)
+			legacyRC, _, legacyErr := s.store.Load(ctx, userID, LegacyMemorySessionID, MemoryFileName)
 			if legacyErr != nil {
 				if errors.Is(legacyErr, artifact.ErrNotFound) {
 					return "", nil
@@ -80,7 +80,7 @@ func (s *ArtifactMemoryService) Load(ctx context.Context, userID string) (string
 
 // Save persists memory for the user.
 func (s *ArtifactMemoryService) Save(ctx context.Context, userID string, content string) error {
-	_, err := s.store.Save(ctx, userID, MemorySessionID, MemoryFileName, strings.NewReader(content))
+	_, err := s.store.Save(ctx, userID, MemorySessionID, MemoryFileName, "text/plain", strings.NewReader(content))
 	if err != nil {
 		return fmt.Errorf("failed to save memory to artifact store: %w", err)
 	}

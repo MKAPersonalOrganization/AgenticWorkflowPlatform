@@ -6,16 +6,23 @@ import (
 	"io"
 )
 
+// ArtifactMeta contains metadata about a stored artifact.
+type ArtifactMeta struct {
+	ContentType string
+	Size        int64
+}
+
 // Service is the interface for the Artifact Store.
 type Service interface {
 	// Save saves a file to the artifact store.
-	// content is the data to be written.
+	// contentType is the MIME type (e.g. "audio/wav", "image/png").
+	// An empty contentType defaults to "application/octet-stream".
 	// Returns the size of the saved file or an error.
-	Save(ctx context.Context, userID, sessionID, fileName string, content io.Reader) (int64, error)
+	Save(ctx context.Context, userID, sessionID, fileName, contentType string, content io.Reader) (int64, error)
 
 	// Load reads a file from the artifact store.
-	// Returns a ReadCloser that must be closed by the caller.
-	Load(ctx context.Context, userID, sessionID, fileName string) (io.ReadCloser, error)
+	// Returns a ReadCloser that must be closed by the caller, metadata, or an error.
+	Load(ctx context.Context, userID, sessionID, fileName string) (io.ReadCloser, ArtifactMeta, error)
 
 	// List returns a list of filenames for a given session.
 	List(ctx context.Context, userID, sessionID string) ([]string, error)

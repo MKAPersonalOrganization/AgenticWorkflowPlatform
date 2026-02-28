@@ -54,8 +54,14 @@ export function createInputMethods() {
         },
 
         /**
-         * Read files and add them to the files[] array.
-         * Enforces MAX_FILE_COUNT per message.
+         * Read files and add them to the files[] array, then upload each to the
+         * artifact store. Enforces MAX_FILE_COUNT per message.
+         *
+         * Each file entry tracks its upload lifecycle:
+         *   status: 'uploading' → 'ready' | 'error'
+         *   url:    artifact URL once uploaded (e.g. /v1/threads/.../artifacts/...)
+         *   data:   base64 data URL kept for local image previews
+         *
          * @param {File[]} fileList
          */
         _addFiles(fileList) {
@@ -66,16 +72,78 @@ export function createInputMethods() {
                 }
                 if (!this._isValidFile(file)) continue;
 
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    this.files.push({
-                        name: file.name || `clipboard_${Date.now()}.${file.type.split('/')[1]}`,
-                        type: file.type,
-                        size: file.size,
-                        data: e.target.result // Base64 data URL
-                    });
+                // Reserve the slot immediately so the preview appears.
+                const entry = {
+                    name: file.name || `clipboard_${Date.now()}.${file.type.split('/')[1]}`,
+                    type: file.type,
+                    size: file.size,
+                    data: null,   // filled for images (local preview)
+                    url: null,    // filled after upload completes
+                    status: 'uploading',
                 };
-                reader.readAsDataURL(file);
+                this.files.push(entry);
+                const idx = this.files.length - 1;
+
+                // Read as data URL for local image preview only.
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        if (this.files[idx]) this.files[idx].data = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                }
+
+                // Upload to artifact store
+                this._uploadFile(file, idx);
+            }
+        },
+
+        /**
+         * Upload a single file to the artifact store.
+         * Updates this.files[idx] with the resulting URL or error state.
+         * @param {File} file
+         * @param {number} idx - Index in this.files[]
+         */
+        async _uploadFile(file, idx) {
+            const threadId = this.__currentThreadId;
+            if (!threadId) {
+                // No active thread yet — create one via session management
+                // For now, mark as error; sendMessage will handle thread creation.
+                if (this.files[idx]) {
+                    this.files[idx].status = 'error';
+                    this.files[idx].error = 'No active thread';
+                }
+                this.showToast(window.i18n?.t?.('Please select or create a chat session first') || 'Please select or create a chat session first', 'error');
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('file', file, file.name);
+
+                const resp = await fetch(`/v1/threads/${threadId}/attachments:upload`, {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (!resp.ok) {
+                    throw new Error(`Upload failed: ${resp.statusText}`);
+                }
+
+                const result = await resp.json();
+
+                // Update the file entry (it may have been removed while uploading)
+                if (this.files[idx] && this.files[idx].name === file.name) {
+                    this.files[idx].url = result.url;
+                    this.files[idx].status = 'ready';
+                }
+            } catch (err) {
+                console.error('[ChatInput] File upload error:', err);
+                if (this.files[idx]) {
+                    this.files[idx].status = 'error';
+                    this.files[idx].error = err.message;
+                }
+                this.showToast(window.i18n?.t?.('Failed to upload file: {name}', { name: file.name }) || `Failed to upload file: ${file.name}`, 'error');
             }
         },
 

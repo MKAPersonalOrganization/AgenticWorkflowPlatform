@@ -202,7 +202,7 @@ func (a *AnimateTool) Execute(ctx context.Context, args agent.Arguments) (agent.
 	defer file.Close()
 
 	filename := filepath.Base(animationPath)
-	_, err = a.ArtifactStore.Save(ctx, args.UserID, args.SessionID, filename, file)
+	_, err = a.ArtifactStore.Save(ctx, args.UserID, args.SessionID, filename, "video/mp4", file)
 	if err != nil {
 		return agent.ErrorResult(fmt.Errorf("failed to save animation to artifact store: %w", err)), nil
 	}

@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"school-with-ai/services/artifact"
+
 	"github.com/google/uuid"
 )
 
@@ -49,20 +51,20 @@ type MockArtifactService struct {
 	Files map[string][]byte
 }
 
-func (m *MockArtifactService) Save(ctx context.Context, userID, sessionID, fileName string, content io.Reader) (int64, error) {
+func (m *MockArtifactService) Save(ctx context.Context, userID, sessionID, fileName, contentType string, content io.Reader) (int64, error) {
 	data, _ := io.ReadAll(content)
 	key := userID + "/" + sessionID + "/" + fileName
 	m.Files[key] = data
 	return int64(len(data)), nil
 }
 
-func (m *MockArtifactService) Load(ctx context.Context, userID, sessionID, fileName string) (io.ReadCloser, error) {
+func (m *MockArtifactService) Load(ctx context.Context, userID, sessionID, fileName string) (io.ReadCloser, artifact.ArtifactMeta, error) {
 	key := userID + "/" + sessionID + "/" + fileName
 	data, ok := m.Files[key]
 	if !ok {
-		return nil, nil // Error in real s3
+		return nil, artifact.ArtifactMeta{}, nil // Error in real s3
 	}
-	return io.NopCloser(strings.NewReader(string(data))), nil
+	return io.NopCloser(strings.NewReader(string(data))), artifact.ArtifactMeta{}, nil
 }
 
 func (m *MockArtifactService) List(ctx context.Context, userID, sessionID string) ([]string, error) {

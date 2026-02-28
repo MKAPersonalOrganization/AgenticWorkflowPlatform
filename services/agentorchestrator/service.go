@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"iter"
 	"strings"
 	"sync"
@@ -252,7 +253,8 @@ func (s *Service) GetThreadManagement() *threadmgmt.Manager {
 
 // FileAttachment represents a file attached to a message (image, audio, PDF, etc.).
 type FileAttachment struct {
-	Data     string // Base64 data URL (data:image/...;base64,...)
+	Data     string // Base64 data URL (data:image/...;base64,...) — legacy path
+	URL      string // Pre-uploaded artifact URL (e.g. /v1/threads/.../artifacts/file.wav)
 	MimeType string // e.g. "image/png", "audio/wav", "application/pdf"
 	FileName string // Original filename (e.g. "screenshot.png")
 }
@@ -344,7 +346,7 @@ func (s *Service) ExecuteRun(
 			AgentName: req.AgentName,
 			Message: &agent.Message{
 				ID:      req.MessageID,
-				Content: buildMessageContent(req.Message, req.Attachments),
+				Content: s.buildMessageContent(ctx, req),
 			},
 			Context: map[string]any{
 				"attachmentRefs": attachmentRefs,
@@ -423,6 +425,9 @@ func (s *Service) ExecuteRun(
 // saveAttachments saves attached files to the artifact store and returns
 // domain.Attachment slices for event persistence. If the artifact store is nil or
 // no attachments are present, it returns nil.
+//
+// Pre-uploaded attachments (those with a URL starting with "/v1/threads/") are
+// already in S3 and are passed through without re-uploading.
 func (s *Service) saveAttachments(ctx context.Context, req RunExecutionRequest) []domain.Attachment {
 	if s.artifactStore == nil || len(req.Attachments) == 0 {
 		return nil
@@ -430,6 +435,17 @@ func (s *Service) saveAttachments(ctx context.Context, req RunExecutionRequest) 
 
 	var refs []domain.Attachment
 	for _, att := range req.Attachments {
+		// Pre-uploaded attachment: already in S3, just build the ref.
+		if att.URL != "" {
+			refs = append(refs, domain.Attachment{
+				URL:      att.URL,
+				MimeType: att.MimeType,
+				FileName: att.FileName,
+			})
+			continue
+		}
+
+		// Legacy path: base64 data URL → decode and save to S3.
 		mimeType, data, err := parseDataURL(att.Data)
 		if err != nil {
 			s.log.Warn(ctx, "Orchestrator: Failed to parse data URL, skipping artifact save", "error", err)
@@ -445,7 +461,7 @@ func (s *Service) saveAttachments(ctx context.Context, req RunExecutionRequest) 
 			fileName = fmt.Sprintf("file-%s.%s", uuid.New().String()[:8], ext)
 		}
 
-		_, saveErr := s.artifactStore.Save(ctx, req.UserID, req.ThreadID, fileName, bytes.NewReader(data))
+		_, saveErr := s.artifactStore.Save(ctx, req.UserID, req.ThreadID, fileName, mimeType, bytes.NewReader(data))
 		if saveErr != nil {
 			s.log.Error(ctx, "Orchestrator: Failed to save artifact", "error", saveErr, "fileName", fileName)
 			continue
@@ -524,7 +540,13 @@ func mimeToExt(mimeType string) string {
 // buildMessageContent constructs the Content slice for a user message,
 // combining text and optional file attachments. It classifies each attachment
 // by MIME type into the appropriate agent content type (image, audio, or file).
-func buildMessageContent(text string, attachments []FileAttachment) []agent.Content {
+//
+// For pre-uploaded attachments (URL set, Data empty), the file data is loaded
+// from S3 and a data URL is reconstructed for the LLM.
+func (s *Service) buildMessageContent(ctx context.Context, req RunExecutionRequest) []agent.Content {
+	text := req.Message
+	attachments := req.Attachments
+
 	var content []agent.Content
 
 	if text != "" {
@@ -535,12 +557,27 @@ func buildMessageContent(text string, attachments []FileAttachment) []agent.Cont
 	}
 
 	for _, att := range attachments {
+		// Resolve the data URL: use existing Data or load from S3 for pre-uploaded files.
+		dataURL := att.Data
+		if dataURL == "" && att.URL != "" && s.artifactStore != nil {
+			loaded, err := s.loadArtifactAsDataURL(ctx, req.UserID, req.ThreadID, att.FileName, att.MimeType)
+			if err != nil {
+				s.log.Warn(ctx, "Failed to load pre-uploaded attachment for LLM, skipping",
+					"error", err, "fileName", att.FileName)
+				continue
+			}
+			dataURL = loaded
+		}
+		if dataURL == "" {
+			continue
+		}
+
 		switch {
 		case strings.HasPrefix(att.MimeType, "image/"):
 			content = append(content, agent.Content{
 				Type: agent.ContentTypeImageURL,
 				ImageURL: &agent.ImageURL{
-					URL:    att.Data,
+					URL:    dataURL,
 					Detail: "auto",
 				},
 			})
@@ -548,7 +585,7 @@ func buildMessageContent(text string, attachments []FileAttachment) []agent.Cont
 			content = append(content, agent.Content{
 				Type: agent.ContentTypeInputAudio,
 				AudioInput: &agent.AudioInput{
-					Data:   stripDataURLPrefix(att.Data),
+					Data:   stripDataURLPrefix(dataURL),
 					Format: audioFormat(att.MimeType),
 				},
 			})
@@ -556,7 +593,7 @@ func buildMessageContent(text string, attachments []FileAttachment) []agent.Cont
 			content = append(content, agent.Content{
 				Type: agent.ContentTypeFile,
 				FileInput: &agent.FileInput{
-					Data:     stripDataURLPrefix(att.Data),
+					Data:     stripDataURLPrefix(dataURL),
 					FileName: att.FileName,
 					MimeType: att.MimeType,
 				},
@@ -573,6 +610,26 @@ func buildMessageContent(text string, attachments []FileAttachment) []agent.Cont
 	}
 
 	return content
+}
+
+// loadArtifactAsDataURL loads a file from the artifact store and returns it as
+// a base64 data URL suitable for sending to LLM APIs.
+func (s *Service) loadArtifactAsDataURL(ctx context.Context, userID, threadID, fileName, mimeType string) (string, error) {
+	reader, meta, err := s.artifactStore.Load(ctx, userID, threadID, fileName)
+	if err != nil {
+		return "", fmt.Errorf("load artifact: %w", err)
+	}
+	defer reader.Close()
+
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return "", fmt.Errorf("read artifact data: %w", err)
+	}
+
+	if mimeType == "" {
+		mimeType = meta.ContentType
+	}
+	return fmt.Sprintf("data:%s;base64,%s", mimeType, base64.StdEncoding.EncodeToString(data)), nil
 }
 
 // stripDataURLPrefix removes the data:...;base64, prefix from a data URL,

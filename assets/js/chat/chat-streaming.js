@@ -57,10 +57,10 @@ export function createStreamingMethods() {
                     body.toolCallId = toolCallId;
                 }
 
-                // Attach files as base64 data URLs
+                // Attach files as pre-uploaded artifact references (compact, no base64).
                 if (attachedFiles && attachedFiles.length > 0) {
                     body.attachments = attachedFiles.map(f => ({
-                        data: f.data,      // base64 data URL (data:image/png;base64,...)
+                        url: f.url,        // artifact URL (e.g. /v1/threads/.../artifacts/file.wav)
                         mimeType: f.type,  // e.g. 'image/png', 'audio/wav'
                         fileName: f.name,  // original filename
                     }));

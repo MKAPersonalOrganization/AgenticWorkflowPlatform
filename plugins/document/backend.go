@@ -59,7 +59,7 @@ func (t *CreateMarkdownTool) Execute(ctx context.Context, args agent.Arguments) 
 	}
 
 	reader := strings.NewReader(input.Content)
-	size, err := t.ArtifactStore.Save(ctx, args.UserID, args.SessionID, input.Filename, reader)
+	size, err := t.ArtifactStore.Save(ctx, args.UserID, args.SessionID, input.Filename, "text/markdown", reader)
 	if err != nil {
 		return agent.NewResultError(fmt.Errorf("failed to save artifact: %w", err)), nil
 	}
@@ -116,7 +116,7 @@ func (t *UpdateMarkdownTool) Execute(ctx context.Context, args agent.Arguments) 
 	}
 
 	reader := strings.NewReader(input.Content)
-	size, err := t.ArtifactStore.Save(ctx, args.UserID, args.SessionID, input.Filename, reader)
+	size, err := t.ArtifactStore.Save(ctx, args.UserID, args.SessionID, input.Filename, "text/markdown", reader)
 	if err != nil {
 		return agent.NewResultError(fmt.Errorf("failed to save artifact: %w", err)), nil
 	}
