@@ -369,3 +369,23 @@ CREATE INDEX IF NOT EXISTS idx_mcp_connectors_refreshable ON mcp_connectors(stat
 -- Version: 1.26
 -- Description: Drop refreshable index — background health checks removed in favor of stateless proxy pattern
 DROP INDEX IF EXISTS idx_mcp_connectors_refreshable;
+
+-- Version: 1.27
+-- Description: Create user_agents table for user-created agent definitions
+CREATE TABLE IF NOT EXISTS user_agents (
+    id              VARCHAR(255) PRIMARY KEY,
+    user_id         VARCHAR(255) NOT NULL,
+    name            VARCHAR(255) NOT NULL,
+    description     TEXT NOT NULL DEFAULT '',
+    system_prompt   TEXT NOT NULL DEFAULT '',
+    model_id        VARCHAR(255) NOT NULL DEFAULT '',
+    max_iterations  INTEGER NOT NULL DEFAULT 10,
+    temperature     DOUBLE PRECISION NOT NULL DEFAULT 0.7,
+    is_default      BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_agents_user_id ON user_agents(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_agents_user_name ON user_agents(user_id, name);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_user_agents_user_default ON user_agents(user_id) WHERE is_default = TRUE;

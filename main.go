@@ -61,8 +61,7 @@ import (
 	"school-with-ai/services/toolregistry"
 	"school-with-ai/services/workspacepermissions"
 
-	"school-with-ai/services/agentorchestrator/agents/math"
-
+	agentstorehandlers "school-with-ai/handlers/agentstore"
 	aguihandlers "school-with-ai/handlers/agui"
 	aiSettingsHandlers "school-with-ai/handlers/aisettings"
 	bannerhandlers "school-with-ai/handlers/banner"
@@ -73,6 +72,7 @@ import (
 	taskmgmthandlers "school-with-ai/handlers/taskmgmt"
 	wkspermhandlers "school-with-ai/handlers/workspacepermissions"
 
+	"school-with-ai/services/agentstore"
 	authService "school-with-ai/services/auth"
 
 	"github.com/ardanlabs/conf/v3"
@@ -397,23 +397,18 @@ func run(ctx context.Context, log *logger.Logger) error {
 	chatLoggingMw := agent.ChatLogging(slogLogger)
 	toolLoggingMw := agent.ToolLogging(slogLogger)
 
-	mathConfig, err := math.NewMathInstructorConfig(ctx, artifactService)
-	if err != nil {
-		return fmt.Errorf("creating math instructor config: %w", err)
-	}
-	mathConfig.AgentMiddlewares = append(mathConfig.AgentMiddlewares, agentLoggingMw)
-	mathConfig.ChatMiddlewares = append(mathConfig.ChatMiddlewares, chatLoggingMw)
-	mathConfig.FunctionMiddlewares = append(mathConfig.FunctionMiddlewares, toolLoggingMw)
-	mathInstructor, err := custom.NewAgent(mathConfig)
-	if err != nil {
-		return fmt.Errorf("creating math instructor agent: %w", err)
-	}
+	// All agents (including the default assistant) live in the database.
+	// The provider lazily ensures a default agent row per user on first access.
+	agentDefRepo := sqldb.NewPostgresAgentDefinitionRepository(db)
+	agentProvider := custom.NewUserAwareAgentProvider(
+		agentDefRepo,
+		[]agent.Middleware{agentLoggingMw},
+		[]agent.Middleware{chatLoggingMw},
+		[]agent.Middleware{toolLoggingMw},
+	)
 
-	// Create a simple map of available agents
-	availableAgents := map[string]agent.Agent{
-		"math-instructor": mathInstructor,
-	}
-	agentProvider := custom.NewMapAgentProvider(availableAgents)
+	// Create agent store service for CRUD operations
+	agentStoreService := agentstore.New(log, agentDefRepo)
 
 	var runner agentorchestrator.Runner
 	var agentOrchestrator *agentorchestrator.Service
@@ -588,6 +583,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Workspace Permissions Handler
 	workspacePermHandler := wkspermhandlers.NewHandler(log, workspacePermissionsService, edgequakeService, agentProvider, cfg.Edgequake.TenantID)
 
+	// Agent Store Handler
+	agentStoreHandler := agentstorehandlers.NewHandler(log, agentStoreService, authSvc)
+
 	// Banner Handler
 	bannerHandler := bannerhandlers.NewHandler(log)
 	r.Get("/api/banner", authMiddleware.RequireAuthFunc(bannerHandler.GetBanner))
@@ -642,6 +640,14 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Get("/v1/agents/{agentId}/toolsets", authMiddleware.RequireAuthFunc(handler.ListAgentToolSets))
 	r.Put("/v1/agents/{agentId}/toolsets/{toolSetId}", authMiddleware.RequireAuthFunc(handler.ToggleAgentToolSet))
 	r.Put("/v1/agents/{agentId}/toolsets/{toolSetId}/tools/{toolId}", authMiddleware.RequireAuthFunc(handler.ToggleIndividualTool))
+
+	// Agent definition CRUD routes (user-created agents)
+	r.Get("/v1/agent-definitions", authMiddleware.RequireAuthFunc(agentStoreHandler.List))
+	r.Get("/v1/agent-definitions/search", authMiddleware.RequireAuthFunc(agentStoreHandler.Search))
+	r.Post("/v1/agent-definitions", authMiddleware.RequireAuthFunc(agentStoreHandler.Create))
+	r.Get("/v1/agent-definitions/{id}", authMiddleware.RequireAuthFunc(agentStoreHandler.Get))
+	r.Put("/v1/agent-definitions/{id}", authMiddleware.RequireAuthFunc(agentStoreHandler.Update))
+	r.Delete("/v1/agent-definitions/{id}", authMiddleware.RequireAuthFunc(agentStoreHandler.Delete))
 
 	// Plugin endpoints (agent-agnostic, agent_id via query param)
 	r.Get("/v1/plugins", authMiddleware.RequireAuthFunc(handler.ListPlugins))

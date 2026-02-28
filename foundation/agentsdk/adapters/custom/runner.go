@@ -245,10 +245,8 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 				}
 			}
 		}
-		// Fallback to default if still empty
-		if agentName == "" {
-			agentName = "math-instructor"
-		}
+		// Fallback: empty agentName triggers the default agent resolution in GetForUser.
+		// No need to set a specific name — the provider handles it.
 
 		// 5. Inject user into context for tools that need it (using domain.User)
 		if runCtx.UserID != "" {
@@ -363,21 +361,51 @@ type RegistryAgentProvider struct {
 }
 
 func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (core.AgentConfig, error) {
-	// Use provided provider
-	a, err := p.provider.Get(name)
-	if err != nil {
-		return core.AgentConfig{}, fmt.Errorf("agent %s not found: %w", name, err)
+	// Try user-aware provider first if available
+	var a agent.Agent
+	var err error
+
+	type userAware interface {
+		GetForUser(ctx context.Context, name, userID string) (agent.Agent, error)
 	}
 
-	// Assert that it is a CustomAgent to access the config
-	// This is required because the generic agent.Agent interface hides implementation details
-	// like SystemPrompt which the engine needs.
-	customAgent, ok := a.(*CustomAgent)
-	if !ok {
+	if uap, ok := p.provider.(userAware); ok {
+		// Extract userID from context if available
+		userID := ""
+		if u, ok := ctx.Value(domain.UserContextKey).(*domain.User); ok && u != nil {
+			userID = u.ID
+		}
+		a, err = uap.GetForUser(ctx, name, userID)
+		if err != nil {
+			// Fallback to standard provider
+			a, err = p.provider.Get(name)
+			if err != nil {
+				return core.AgentConfig{}, fmt.Errorf("agent %s not found: %w", name, err)
+			}
+		}
+	} else {
+		a, err = p.provider.Get(name)
+		if err != nil {
+			return core.AgentConfig{}, fmt.Errorf("agent %s not found: %w", name, err)
+		}
+	}
+
+	// Extract config from the agent — all agents are dbAgent wrappers around CustomAgent.
+	var agentConfig agent.Config
+	if da, ok := a.(*dbAgent); ok {
+		if inner, ok := da.Agent.(*CustomAgent); ok {
+			agentConfig = inner.Config()
+			agentConfig.Name = da.id
+			agentConfig.Description = da.Description()
+		} else {
+			return core.AgentConfig{}, fmt.Errorf("agent %s has unsupported inner type", name)
+		}
+	} else if ca, ok := a.(*CustomAgent); ok {
+		// Fallback for any non-DB agent (e.g. tests)
+		agentConfig = ca.Config()
+	} else {
 		return core.AgentConfig{}, fmt.Errorf("agent %s is not a custom agent", name)
 	}
-
-	agentConfig := customAgent.Config()
 
 	// Map agent.Config to core.AgentConfig
 	modelID := agentConfig.ModelID
@@ -514,8 +542,20 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 	return config, nil
 }
 
-// GetAgent returns an agent by name.
+// GetAgent returns an agent by name, supporting user-aware providers.
 func (r *RunnerAdapter) GetAgent(name string) (agent.Agent, error) {
+	return r.agentProvider.Get(name)
+}
+
+// GetAgentForUser returns an agent by name for a specific user.
+func (r *RunnerAdapter) GetAgentForUser(ctx context.Context, name, userID string) (agent.Agent, error) {
+	type userAware interface {
+		GetForUser(ctx context.Context, name, userID string) (agent.Agent, error)
+	}
+
+	if uap, ok := r.agentProvider.(userAware); ok {
+		return uap.GetForUser(ctx, name, userID)
+	}
 	return r.agentProvider.Get(name)
 }
 
