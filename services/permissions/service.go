@@ -314,101 +314,26 @@ func (s *Service) GetToolSetPermission(ctx context.Context, userID, agentID, too
 func (s *Service) HasToolSetPermission(ctx context.Context, userID, agentID, toolSetID string) bool {
 	permission, err := s.GetToolSetPermission(ctx, userID, agentID, toolSetID)
 	if err != nil {
-		// If no explicit permission exists, check if this is a default tool set for the agent
-		return s.hasDefaultToolSetPermission(agentID, toolSetID)
+		return false
 	}
 	return permission.Enabled
 }
 
 // GetEnabledToolSets returns all enabled tool sets for an agent.
+// Permissions are purely explicit — there are no hardcoded defaults.
 func (s *Service) GetEnabledToolSets(ctx context.Context, userID, agentID string) ([]string, error) {
-	// Get default tool sets for this agent type
-	defaultToolSets := s.getDefaultToolSetsForAgent(agentID)
-
-	// Create a map to track final permissions (default + explicit overrides)
-	finalPermissions := make(map[string]bool)
-
-	// Start with defaults
-	for _, toolSetID := range defaultToolSets {
-		finalPermissions[toolSetID] = true
-	}
-
-	// Load explicit permissions from database to override defaults
 	permissions, err := s.repo.ListToolSetPermissions(ctx, userID, agentID)
 	if err != nil {
 		s.log.Warn(ctx, "Failed to load tool set permissions", "user_id", userID, "agent_id", agentID, "error", err)
-		// Return just defaults if database fails
-		return defaultToolSets, nil
+		return nil, nil
 	}
 
-	// Apply explicit permissions as overrides
-	for _, perm := range permissions {
-		finalPermissions[perm.ToolSetID] = perm.Enabled
-	}
-
-	// Build final list of enabled tools
 	var enabledToolSets []string
-	for toolSetID, enabled := range finalPermissions {
-		if enabled {
-			enabledToolSets = append(enabledToolSets, toolSetID)
+	for _, perm := range permissions {
+		if perm.Enabled {
+			enabledToolSets = append(enabledToolSets, perm.ToolSetID)
 		}
 	}
 
 	return enabledToolSets, nil
-}
-
-// hasDefaultToolSetPermission checks if a tool set is enabled by default for an agent.
-func (s *Service) hasDefaultToolSetPermission(agentID, toolSetID string) bool {
-	defaultToolSets := s.getDefaultToolSetsForAgent(agentID)
-	for _, defaultToolSet := range defaultToolSets {
-		if defaultToolSet == toolSetID {
-			return true
-		}
-	}
-	return false
-}
-
-// getDefaultToolSetsForAgent returns the default tool sets for each agent type.
-func (s *Service) getDefaultToolSetsForAgent(agentID string) []string {
-	defaultSets := map[string][]string{
-		"math-instructor": {
-			"cognitive-set",
-			"calculator-set",
-			"visualization-set",
-			"memory-set",
-			"document-set",
-			"knowledge-base-set",
-		},
-		"physics-instructor": {
-			"cognitive-set",
-			"calculator-set",
-			"visualization-set",
-			"memory-set",
-			"document-set",
-			"knowledge-base-set",
-		},
-		"chemistry-instructor": {
-			"cognitive-set",
-			"calculator-set",
-			"memory-set",
-			"document-set",
-			"knowledge-base-set",
-		},
-		"statistics-instructor": {
-			"cognitive-set",
-			"calculator-set",
-			"statistics-set",
-			"visualization-set",
-			"memory-set",
-			"document-set",
-			"knowledge-base-set",
-		},
-	}
-
-	if toolSets, exists := defaultSets[agentID]; exists {
-		return toolSets
-	}
-
-	// Default fallback for unknown agents
-	return []string{"cognitive-set", "calculator-set", "memory-set", "document-set", "knowledge-base-set"}
 }

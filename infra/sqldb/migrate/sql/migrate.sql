@@ -381,11 +381,9 @@ CREATE TABLE IF NOT EXISTS user_agents (
     model_id        VARCHAR(255) NOT NULL DEFAULT '',
     max_iterations  INTEGER NOT NULL DEFAULT 10,
     temperature     DOUBLE PRECISION NOT NULL DEFAULT 0.7,
-    is_default      BOOLEAN NOT NULL DEFAULT FALSE,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_user_agents_user_id ON user_agents(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_agents_user_name ON user_agents(user_id, name);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_user_agents_user_default ON user_agents(user_id) WHERE is_default = TRUE;

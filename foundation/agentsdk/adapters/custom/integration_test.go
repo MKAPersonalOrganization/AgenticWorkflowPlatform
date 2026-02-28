@@ -6,11 +6,11 @@ import (
 	"testing"
 
 	"school-with-ai/foundation/logger"
+	"school-with-ai/plugins/calculator"
 	"school-with-ai/services/permissions"
 	permissions_mocks "school-with-ai/services/permissions/mocks"
 	"school-with-ai/services/toolregistry"
 	toolregistry_mocks "school-with-ai/services/toolregistry/mocks"
-	"school-with-ai/plugins/calculator"
 )
 
 // TestToolFactoryIntegration tests that the tool factory can properly create executable tools
@@ -47,18 +47,32 @@ func TestToolFactoryIntegration(t *testing.T) {
 
 	t.Logf("Created %d default tool sets", len(toolSets))
 
-	// Test: Verify tool set permissions work
+	// Test: Agents start with no tool sets (purely explicit permissions)
 	userID := "test-user"
 	enabledToolSetIDs, err := permissionsService.GetEnabledToolSets(ctx, userID, "math-instructor")
 	if err != nil {
 		t.Fatalf("Failed to get enabled tool sets: %v", err)
 	}
 
-	if len(enabledToolSetIDs) == 0 {
-		t.Errorf("Expected math instructor to have default tool sets enabled, but got none")
+	if len(enabledToolSetIDs) != 0 {
+		t.Errorf("Expected math instructor to start with 0 tool sets, got %d", len(enabledToolSetIDs))
 	}
 
-	t.Logf("Math instructor has %d tool sets enabled by default", len(enabledToolSetIDs))
+	// Explicitly enable calculator-set for math-instructor
+	if err := permissionsService.SetToolSetPermission(ctx, userID, "math-instructor", "calculator-set", true); err != nil {
+		t.Fatalf("Failed to enable calculator-set: %v", err)
+	}
+
+	enabledToolSetIDs, err = permissionsService.GetEnabledToolSets(ctx, userID, "math-instructor")
+	if err != nil {
+		t.Fatalf("Failed to get enabled tool sets: %v", err)
+	}
+
+	if len(enabledToolSetIDs) != 1 {
+		t.Errorf("Expected math instructor to have 1 tool set, got %d", len(enabledToolSetIDs))
+	}
+
+	t.Logf("Math instructor has %d tool sets enabled after explicit enable", len(enabledToolSetIDs))
 
 	// Test: Verify we can create executable tools from tool sets
 	factory := toolregistry.NewExecutableToolFactory(nil)
@@ -110,9 +124,9 @@ func TestToolFactoryIntegration(t *testing.T) {
 		}
 	}
 
-	if len(enabledToolSetsAfterDisable) != len(enabledToolSetIDs)-1 {
-		t.Errorf("Expected tool set count to decrease by 1 after disabling calculator-set, original: %d, after disable: %d",
-			len(enabledToolSetIDs), len(enabledToolSetsAfterDisable))
+	if len(enabledToolSetsAfterDisable) != 0 {
+		t.Errorf("Expected tool set count to be 0 after disabling the only enabled set, got: %d",
+			len(enabledToolSetsAfterDisable))
 	}
 
 	t.Logf("After disabling calculator-set: math instructor has %d tool sets enabled", len(enabledToolSetsAfterDisable))
@@ -123,20 +137,12 @@ func TestToolFactoryIntegration(t *testing.T) {
 		t.Fatalf("Failed to get physics tool sets: %v", err)
 	}
 
-	// Physics should still have calculator-set enabled
-	physicsHasCalculatorSet := false
-	for _, toolSetID := range enabledPhysicsToolSets {
-		if toolSetID == "calculator-set" {
-			physicsHasCalculatorSet = true
-			break
-		}
+	// Physics was never given any tool sets explicitly, should have 0
+	if len(enabledPhysicsToolSets) != 0 {
+		t.Errorf("Expected physics instructor to have 0 tool sets, got %d", len(enabledPhysicsToolSets))
 	}
 
-	if !physicsHasCalculatorSet {
-		t.Errorf("Expected physics instructor to still have calculator-set enabled")
-	}
-
-	t.Logf("Physics instructor has %d tool sets enabled (including calculator-set)", len(enabledPhysicsToolSets))
+	t.Logf("Physics instructor has %d tool sets (no explicit permissions set)", len(enabledPhysicsToolSets))
 
 	// Test: Verify tools in a set
 	calculatorSet, err := toolRegistry.GetToolSet(ctx, "calculator-set")

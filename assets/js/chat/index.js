@@ -115,9 +115,8 @@ document.addEventListener('alpine:init', () => {
 
                             // Set default if not set
                             if (!this.selectedAgent && this.AVAILABLE_AGENTS.length > 0) {
-                                // Prefer the default agent (isDefault flag from backend)
-                                const defaultAgent = this.AVAILABLE_AGENTS.find(a => a.isDefault) || this.AVAILABLE_AGENTS[0];
-                                this.selectedAgent = defaultAgent.id;
+                                // Use the first agent in the list (oldest by creation time)
+                                this.selectedAgent = this.AVAILABLE_AGENTS[0].id;
                             }
                         }
                     }

@@ -1,6 +1,6 @@
 /**
  * Agents Manager Component
- * Handles agent CRUD operations, search, and selection
+ * Handles agent CRUD operations, search, selection, and per-agent tool/KB wiring
  */
 export const agentsManager = () => ({
     // State
@@ -22,6 +22,14 @@ export const agentsManager = () => ({
         maxIterations: 10,
     },
     showAdvanced: false,
+
+    // Tools & KB state (for edit mode)
+    showTools: false,
+    showKnowledgeBases: false,
+    agentPlugins: [],
+    agentWorkspaces: [],
+    loadingTools: false,
+    loadingKBs: false,
 
     // Delete state
     deletingAgent: null,
@@ -96,6 +104,10 @@ export const agentsManager = () => ({
             maxIterations: 10,
         };
         this.showAdvanced = false;
+        this.showTools = false;
+        this.showKnowledgeBases = false;
+        this.agentPlugins = [];
+        this.agentWorkspaces = [];
         this.view = 'form';
     },
 
@@ -110,7 +122,15 @@ export const agentsManager = () => ({
             maxIterations: agent.maxIterations ?? 10,
         };
         this.showAdvanced = !!(agent.modelId || (agent.temperature != null && agent.temperature !== 0.7) || (agent.maxIterations != null && agent.maxIterations !== 10));
+        this.showTools = false;
+        this.showKnowledgeBases = false;
+        this.agentPlugins = [];
+        this.agentWorkspaces = [];
         this.view = 'form';
+
+        // Load tool/KB data for this agent
+        this.fetchAgentPlugins(agent.id);
+        this.fetchAgentWorkspaces(agent.id);
     },
 
     async saveAgent() {
@@ -203,6 +223,107 @@ export const agentsManager = () => ({
         // Close the dialog using TUI dialog API
         if (window.tui?.dialog?.close) {
             window.tui.dialog.close('agents-manager-dialog');
+        }
+    },
+
+    // ============================================
+    // Agent Tools & Knowledge Bases
+    // ============================================
+
+    get toolsSummary() {
+        if (this.loadingTools) return '';
+        const enabled = this.agentPlugins.filter(p => p.enabled).length;
+        return `${enabled}/${this.agentPlugins.length}`;
+    },
+
+    get kbSummary() {
+        if (this.loadingKBs) return '';
+        const enabled = this.agentWorkspaces.filter(w => w.enabled).length;
+        return `${enabled}/${this.agentWorkspaces.length}`;
+    },
+
+    async fetchAgentPlugins(agentId) {
+        this.loadingTools = true;
+        try {
+            const response = await fetch(`/v1/plugins?agent_id=${encodeURIComponent(agentId)}`);
+            if (response.ok) {
+                const data = await response.json();
+                this.agentPlugins = data.plugins || [];
+            }
+        } catch (err) {
+            console.error('Failed to fetch agent plugins:', err);
+        } finally {
+            this.loadingTools = false;
+        }
+    },
+
+    async fetchAgentWorkspaces(agentId) {
+        this.loadingKBs = true;
+        try {
+            const response = await fetch(`/v1/agents/${encodeURIComponent(agentId)}/workspaces`);
+            if (response.ok) {
+                const data = await response.json();
+                this.agentWorkspaces = data.workspaces || [];
+            }
+        } catch (err) {
+            console.error('Failed to fetch agent workspaces:', err);
+        } finally {
+            this.loadingKBs = false;
+        }
+    },
+
+    async toggleAgentPlugin(plugin) {
+        if (!this.editingAgent) return;
+        const newState = !plugin.enabled;
+        try {
+            const response = await fetch(`/v1/plugins/${plugin.id}?agent_id=${encodeURIComponent(this.editingAgent.id)}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: newState }),
+            });
+            if (response.ok) {
+                plugin.enabled = newState;
+                // When toggling a plugin set, also toggle all its tools
+                plugin.tools.forEach(t => t.enabled = newState);
+            }
+        } catch (err) {
+            console.error('Failed to toggle agent plugin:', err);
+        }
+    },
+
+    async toggleAgentTool(plugin, tool) {
+        if (!this.editingAgent) return;
+        const newState = !tool.enabled;
+        try {
+            const response = await fetch(`/v1/plugins/${plugin.id}/tools/${tool.id}?agent_id=${encodeURIComponent(this.editingAgent.id)}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: newState }),
+            });
+            if (response.ok) {
+                tool.enabled = newState;
+                // Update plugin enabled state based on whether any tool is enabled
+                plugin.enabled = plugin.tools.some(t => t.enabled);
+            }
+        } catch (err) {
+            console.error('Failed to toggle agent tool:', err);
+        }
+    },
+
+    async toggleAgentWorkspace(ws) {
+        if (!this.editingAgent) return;
+        const newState = !ws.enabled;
+        try {
+            const response = await fetch(`/v1/agents/${encodeURIComponent(this.editingAgent.id)}/workspaces/${ws.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: newState }),
+            });
+            if (response.ok) {
+                ws.enabled = newState;
+            }
+        } catch (err) {
+            console.error('Failed to toggle agent workspace:', err);
         }
     },
 

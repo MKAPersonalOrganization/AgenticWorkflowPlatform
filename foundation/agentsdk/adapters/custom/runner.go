@@ -245,7 +245,7 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 				}
 			}
 		}
-		// Fallback: empty agentName triggers the default agent resolution in GetForUser.
+		// Fallback: empty agentName triggers the initial agent resolution in GetForUser.
 		// No need to set a specific name — the provider handles it.
 
 		// 5. Inject user into context for tools that need it (using domain.User)

@@ -512,13 +512,6 @@ func (h *TaskManagementHandler) ListAgents(w http.ResponseWriter, r *http.Reques
 			Name:        a.Name(),
 			Description: a.Description(),
 		}
-		// Check if the agent carries a default flag
-		type defaultChecker interface {
-			IsDefault() bool
-		}
-		if dc, ok := a.(defaultChecker); ok {
-			meta.IsDefault = dc.IsDefault()
-		}
 		response.Agents = append(response.Agents, meta)
 	}
 
@@ -844,19 +837,6 @@ func (h *TaskManagementHandler) ToggleIndividualTool(w http.ResponseWriter, r *h
 	}
 }
 
-// resolveAgentID extracts agent_id from query params, falling back to the first available agent.
-func (h *TaskManagementHandler) resolveAgentID(r *http.Request) string {
-	if agentID := r.URL.Query().Get("agent_id"); agentID != "" {
-		return agentID
-	}
-	// Fall back to the first available agent
-	agents := h.agentProvider.List()
-	if len(agents) > 0 {
-		return agents[0].Name()
-	}
-	return ""
-}
-
 // PluginResponse represents a plugin (tool set) in the simplified API.
 type PluginResponse struct {
 	ID          string              `json:"id"`
@@ -868,7 +848,8 @@ type PluginResponse struct {
 }
 
 // ListPlugins returns all available plugins with their enabled state.
-// GET /v1/plugins?agent_id=xxx (agent_id optional, defaults to primary agent)
+// GET /v1/plugins (global — no per-agent state)
+// GET /v1/plugins?agent_id=xxx (per-agent enabled state for agent config)
 func (h *TaskManagementHandler) ListPlugins(w http.ResponseWriter, r *http.Request) {
 	user := h.authService.GetUserFromContext(r.Context())
 	if user == nil {
@@ -876,11 +857,8 @@ func (h *TaskManagementHandler) ListPlugins(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	agentID := h.resolveAgentID(r)
-	if agentID == "" {
-		http.Error(w, "No agents available", http.StatusNotFound)
-		return
-	}
+	// agent_id is optional — if absent, return plugins without per-agent enabled state
+	agentID := r.URL.Query().Get("agent_id")
 
 	allToolSets, err := h.toolRegistry.ListToolSets(r.Context())
 	if err != nil {
@@ -889,16 +867,18 @@ func (h *TaskManagementHandler) ListPlugins(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	enabledToolSetIDs, err := h.permissionsService.GetEnabledToolSets(r.Context(), user.ID, agentID)
-	if err != nil {
-		h.log.Error(r.Context(), "Failed to get enabled tool sets", "agent_id", agentID, "error", err)
-		http.Error(w, "Failed to retrieve plugin permissions", http.StatusInternalServerError)
-		return
-	}
-
+	// If an agent_id is provided, resolve per-agent enabled state
 	enabledToolSets := make(map[string]bool)
-	for _, toolSetID := range enabledToolSetIDs {
-		enabledToolSets[toolSetID] = true
+	if agentID != "" {
+		enabledToolSetIDs, err := h.permissionsService.GetEnabledToolSets(r.Context(), user.ID, agentID)
+		if err != nil {
+			h.log.Error(r.Context(), "Failed to get enabled tool sets", "agent_id", agentID, "error", err)
+			// Continue without enabled state
+		} else {
+			for _, toolSetID := range enabledToolSetIDs {
+				enabledToolSets[toolSetID] = true
+			}
+		}
 	}
 
 	plugins := make([]PluginResponse, 0, len(allToolSets))
@@ -911,7 +891,10 @@ func (h *TaskManagementHandler) ListPlugins(w http.ResponseWriter, r *http.Reque
 
 		toolResponses := make([]ToolInSetResponse, 0, len(toolsInSet))
 		for _, tool := range toolsInSet {
-			toolEnabled := h.permissionsService.HasPermission(r.Context(), user.ID, agentID, toolSet.ID, tool.ID)
+			toolEnabled := false
+			if agentID != "" {
+				toolEnabled = h.permissionsService.HasPermission(r.Context(), user.ID, agentID, toolSet.ID, tool.ID)
+			}
 			toolResponses = append(toolResponses, ToolInSetResponse{
 				ID:          tool.ID,
 				Name:        tool.Name,
@@ -937,8 +920,8 @@ func (h *TaskManagementHandler) ListPlugins(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-// TogglePlugin enables or disables a plugin.
-// PUT /v1/plugins/{pluginId}?agent_id=xxx
+// TogglePlugin enables or disables a plugin for a specific agent.
+// PUT /v1/plugins/{pluginId}?agent_id=xxx (agent_id required)
 func (h *TaskManagementHandler) TogglePlugin(w http.ResponseWriter, r *http.Request) {
 	pluginID := r.PathValue("pluginId")
 	if pluginID == "" {
@@ -952,9 +935,9 @@ func (h *TaskManagementHandler) TogglePlugin(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	agentID := h.resolveAgentID(r)
+	agentID := r.URL.Query().Get("agent_id")
 	if agentID == "" {
-		http.Error(w, "No agents available", http.StatusNotFound)
+		http.Error(w, "agent_id query parameter is required", http.StatusBadRequest)
 		return
 	}
 
@@ -987,8 +970,8 @@ func (h *TaskManagementHandler) TogglePlugin(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-// TogglePluginTool enables or disables an individual tool within a plugin.
-// PUT /v1/plugins/{pluginId}/tools/{toolId}?agent_id=xxx
+// TogglePluginTool enables or disables an individual tool within a plugin for a specific agent.
+// PUT /v1/plugins/{pluginId}/tools/{toolId}?agent_id=xxx (agent_id required)
 func (h *TaskManagementHandler) TogglePluginTool(w http.ResponseWriter, r *http.Request) {
 	pluginID := r.PathValue("pluginId")
 	toolID := r.PathValue("toolId")
@@ -1004,9 +987,9 @@ func (h *TaskManagementHandler) TogglePluginTool(w http.ResponseWriter, r *http.
 		return
 	}
 
-	agentID := h.resolveAgentID(r)
+	agentID := r.URL.Query().Get("agent_id")
 	if agentID == "" {
-		http.Error(w, "No agents available", http.StatusNotFound)
+		http.Error(w, "agent_id query parameter is required", http.StatusBadRequest)
 		return
 	}
 

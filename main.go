@@ -398,7 +398,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	toolLoggingMw := agent.ToolLogging(slogLogger)
 
 	// All agents (including the default assistant) live in the database.
-	// The provider lazily ensures a default agent row per user on first access.
+	// The provider lazily ensures a starter agent per user on first access.
 	agentDefRepo := sqldb.NewPostgresAgentDefinitionRepository(db)
 	agentProvider := custom.NewUserAwareAgentProvider(
 		agentDefRepo,

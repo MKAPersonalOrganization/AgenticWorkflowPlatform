@@ -42,24 +42,6 @@ export const toolsSidebar = () => ({
         }
     },
 
-    get _agentId() {
-        try {
-            const chatEl = document.querySelector('[x-data="chat"]');
-            if (chatEl) {
-                const chatData = Alpine.$data(chatEl);
-                if (chatData?.selectedAgent) return chatData.selectedAgent;
-            }
-        } catch (e) {
-            /* ignore */
-        }
-        return '';
-    },
-
-    _buildUrl(path) {
-        const agentId = this._agentId;
-        return agentId ? `${path}?agent_id=${encodeURIComponent(agentId)}` : path;
-    },
-
     async toggle() {
         this.open = !this.open;
         if (this.open) {
@@ -81,7 +63,7 @@ export const toolsSidebar = () => ({
     async fetchPlugins() {
         this.loading = true;
         try {
-            const response = await fetch(this._buildUrl('/v1/plugins'));
+            const response = await fetch('/v1/plugins');
             if (response.ok) {
                 const data = await response.json();
                 if (data.plugins && Array.isArray(data.plugins)) {
@@ -112,16 +94,14 @@ export const toolsSidebar = () => ({
         );
     },
 
-    get enabledSummary() {
-        const enabledSets = this.plugins.filter(p => p.enabled).length;
-        let enabledTools = 0;
+    get pluginSummary() {
+        let totalTools = 0;
         this.plugins.forEach(p => {
-            if (p.enabled) enabledTools += (p.tools || []).filter(t => t.enabled).length;
+            totalTools += (p.tools || []).length;
         });
         return {
-            sets: enabledSets,
-            tools: enabledTools,
-            total: this.plugins.length
+            plugins: this.plugins.length,
+            tools: totalTools,
         };
     },
 
@@ -147,47 +127,4 @@ export const toolsSidebar = () => ({
         this.profilePlugin = null;
     },
 
-    // ── Toggle actions (used from the detail panel) ─────────────────────
-
-    async togglePlugin(plugin) {
-        const newState = !plugin.enabled;
-        try {
-            const response = await fetch(this._buildUrl(`/v1/plugins/${plugin.id}`), {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    enabled: newState
-                })
-            });
-            if (response.ok) {
-                plugin.enabled = newState;
-                plugin.tools.forEach(tool => tool.enabled = newState);
-            }
-        } catch (err) {
-            console.error('Failed to toggle plugin:', err);
-        }
-    },
-
-    async toggleTool(plugin, tool) {
-        const newState = !tool.enabled;
-        try {
-            const response = await fetch(this._buildUrl(`/v1/plugins/${plugin.id}/tools/${tool.id}`), {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    enabled: newState
-                })
-            });
-            if (response.ok) {
-                tool.enabled = newState;
-                plugin.enabled = plugin.tools.some(t => t.enabled);
-            }
-        } catch (err) {
-            console.error('Failed to toggle tool:', err);
-        }
-    }
 });

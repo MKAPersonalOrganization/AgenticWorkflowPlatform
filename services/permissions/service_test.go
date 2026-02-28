@@ -99,14 +99,15 @@ func TestDefaultToolSets(t *testing.T) {
 
 	userID := "test-user"
 
-	// Test different agent types have default tool sets
+	// With the decoupled architecture, agents start with no default tool sets.
+	// All tool sets must be explicitly enabled per agent.
 	testCases := []struct {
 		agentID  string
-		expected []string
+		expected int
 	}{
-		{"math-instructor", []string{"cognitive-set", "calculator-set", "visualization-set", "memory-set", "document-set", "knowledge-base-set"}},
-		{"statistics-instructor", []string{"cognitive-set", "calculator-set", "statistics-set", "visualization-set", "memory-set", "document-set", "knowledge-base-set"}},
-		{"unknown-agent", []string{"cognitive-set", "calculator-set", "memory-set", "document-set", "knowledge-base-set"}}, // fallback
+		{"math-instructor", 0},
+		{"statistics-instructor", 0},
+		{"unknown-agent", 0},
 	}
 
 	for _, tc := range testCases {
@@ -116,22 +117,9 @@ func TestDefaultToolSets(t *testing.T) {
 			continue
 		}
 
-		if len(enabledToolSets) != len(tc.expected) {
+		if len(enabledToolSets) != tc.expected {
 			t.Errorf("Agent %s: expected %d tool sets, got %d: %v",
-				tc.agentID, len(tc.expected), len(enabledToolSets), enabledToolSets)
-			continue
-		}
-
-		// Convert to map for easier checking
-		enabledMap := make(map[string]bool)
-		for _, toolSet := range enabledToolSets {
-			enabledMap[toolSet] = true
-		}
-
-		for _, expectedToolSet := range tc.expected {
-			if !enabledMap[expectedToolSet] {
-				t.Errorf("Agent %s: missing expected tool set %s", tc.agentID, expectedToolSet)
-			}
+				tc.agentID, tc.expected, len(enabledToolSets), enabledToolSets)
 		}
 	}
 }

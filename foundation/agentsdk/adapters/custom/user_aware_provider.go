@@ -3,17 +3,14 @@ package custom
 import (
 	"context"
 	"fmt"
-	"sort"
 
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
 )
 
 // UserAwareAgentProvider implements agent.AgentProvider by loading all agents
-// (including the default assistant) from the database. Every user gets a
-// default agent created lazily on first access, stored in user_agents with
-// is_default=true. User-created agents are stored identically — the system
-// treats them all the same way.
+// from the database. Every user gets a starter agent created lazily on first
+// access if they have none. All agents are equal — there is no "default".
 type UserAwareAgentProvider struct {
 	repo domain.AgentDefinitionRepository
 
@@ -47,17 +44,17 @@ func (p *UserAwareAgentProvider) Get(name string) (agent.Agent, error) {
 }
 
 // GetForUser retrieves an agent by ID for a specific user. If name is empty,
-// returns the user's default agent (creating it lazily if needed).
+// returns the user's first agent (creating a starter if they have none).
 func (p *UserAwareAgentProvider) GetForUser(ctx context.Context, name, userID string) (agent.Agent, error) {
 	if userID == "" {
 		return nil, fmt.Errorf("user ID is required to resolve agent %q", name)
 	}
 
-	// Empty name → default agent
+	// Empty name → first agent (starter created lazily if needed)
 	if name == "" {
-		def, err := p.repo.EnsureDefaultAgent(ctx, userID)
+		def, err := p.repo.EnsureInitialAgent(ctx, userID)
 		if err != nil {
-			return nil, fmt.Errorf("resolving default agent: %w", err)
+			return nil, fmt.Errorf("resolving initial agent: %w", err)
 		}
 		return p.agentFromDefinition(def), nil
 	}
@@ -76,16 +73,16 @@ func (p *UserAwareAgentProvider) List() []agent.Agent {
 	return []agent.Agent{}
 }
 
-// ListForUser returns all agents (default + user-created) for the given user.
-// The default agent is created lazily if it doesn't exist yet.
+// ListForUser returns all agents for the given user.
+// A starter agent is created lazily if the user has none.
 func (p *UserAwareAgentProvider) ListForUser(ctx context.Context, userID string) ([]agent.Agent, error) {
 	if userID == "" {
 		return nil, nil
 	}
 
-	// Ensure the default agent exists before listing
-	if _, err := p.repo.EnsureDefaultAgent(ctx, userID); err != nil {
-		return nil, fmt.Errorf("ensuring default agent: %w", err)
+	// Ensure at least one agent exists before listing
+	if _, err := p.repo.EnsureInitialAgent(ctx, userID); err != nil {
+		return nil, fmt.Errorf("ensuring initial agent: %w", err)
 	}
 
 	definitions, err := p.repo.ListByUser(ctx, userID)
@@ -98,16 +95,7 @@ func (p *UserAwareAgentProvider) ListForUser(ctx context.Context, userID string)
 		agents = append(agents, p.agentFromDefinition(&definitions[i]))
 	}
 
-	// Default agent first, then sorted by name
-	sort.Slice(agents, func(i, j int) bool {
-		ai := agents[i].(*dbAgent)
-		aj := agents[j].(*dbAgent)
-		if ai.isDefault != aj.isDefault {
-			return ai.isDefault // default comes first
-		}
-		return ai.Name() < aj.Name()
-	})
-
+	// Sorted by creation time (oldest first) — inherited from the DB query.
 	return agents, nil
 }
 
@@ -134,20 +122,16 @@ func (p *UserAwareAgentProvider) agentFromDefinition(def *domain.AgentDefinition
 		Agent:       a,
 		displayName: def.Name,
 		id:          def.ID,
-		isDefault:   def.IsDefault,
 	}
 }
 
 // dbAgent wraps a CustomAgent to carry display metadata from the DB row.
-// Every agent (default or user-created) is a dbAgent — no special types.
 type dbAgent struct {
 	agent.Agent
 	displayName string
 	id          string
-	isDefault   bool
 }
 
 func (a *dbAgent) ID() agent.ID        { return a.id }
 func (a *dbAgent) Name() string        { return a.displayName }
 func (a *dbAgent) Description() string { return a.Agent.Description() }
-func (a *dbAgent) IsDefault() bool     { return a.isDefault }

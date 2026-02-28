@@ -3,7 +3,6 @@ package agentstore
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 
 	"school-with-ai/domain"
@@ -57,7 +56,6 @@ type AgentResponse struct {
 	ModelID       string  `json:"modelId"`
 	MaxIterations int     `json:"maxIterations"`
 	Temperature   float64 `json:"temperature"`
-	IsDefault     bool    `json:"isDefault"`
 	CreatedAt     string  `json:"createdAt"`
 	UpdatedAt     string  `json:"updatedAt"`
 }
@@ -76,7 +74,6 @@ func toAgentResponse(a *domain.AgentDefinition) AgentResponse {
 		ModelID:       a.ModelID,
 		MaxIterations: a.MaxIterations,
 		Temperature:   a.Temperature,
-		IsDefault:     a.IsDefault,
 		CreatedAt:     a.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		UpdatedAt:     a.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
@@ -193,10 +190,6 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.Delete(r.Context(), agentID, user.ID); err != nil {
-		if errors.Is(err, agentStoreService.ErrDeleteDefault) {
-			http.Error(w, "Cannot delete the default agent", http.StatusForbidden)
-			return
-		}
 		h.log.Error(r.Context(), "failed to delete agent", "error", err)
 		http.Error(w, "Failed to delete agent", http.StatusInternalServerError)
 		return

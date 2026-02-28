@@ -54,7 +54,6 @@ type AgentMetadata struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
-	IsDefault   bool   `json:"isDefault,omitempty"`
 }
 
 // AgentListResponse represents the response containing a list of agents.
