@@ -1,36 +1,26 @@
 /**
- * TTS Player — Alpine.js component for synchronized word highlighting
- * within a Markdown-rendered transcript.
+ * TTS Player — Alpine.js component for an immersive language-learning
+ * listening session with synchronized word highlighting.
  *
- * Alignment approach: Needleman-Wunsch global sequence alignment
- * ─────────────────────────────────────────────────────────────
- * The same algorithm used in:
- *   - Bioinformatics (BLAST, ClustalW) for DNA/protein alignment
- *   - Subtitle synchronization tools (Aeneas, Gentle, WhisperX)
- *   - Forced alignment in ASR (Montreal Forced Aligner)
+ * ─── Features ──────────────────────────────────────────────────────
+ *  ✦ Fullscreen Focus Mode  — native Fullscreen API, dark backdrop
+ *  ✦ Real-time word highlight — Whisper timestamps + jsdiff alignment
+ *  ✦ Custom transport controls — play/pause, seek bar, time display
+ *  ✦ Playback speed — 0.5× to 2.0× in 0.25 steps
+ *  ✦ Repeat / Loop — auto-replay on end
+ *  ✦ A-B Loop — set markers to loop a specific section
+ *  ✦ Sentence navigation — jump between sentence boundaries
+ *  ✦ Keyboard shortcuts — Space, ←→, ↑↓, R, F, A, B, Escape
  *
- * Why not greedy sequential matching?
- *   If Whisper adds, drops, or merges even ONE word, a greedy pointer
- *   drifts and all subsequent matches are wrong. NW handles insertions,
- *   deletions, and substitutions optimally via dynamic programming.
- *
- * Pipeline:
- * 1. Render Markdown → HTML (preserves headings, bold, lists, etc.)
- * 2. Walk DOM text nodes, wrap every word in a <span>
- * 3. Normalize both DOM words and Whisper words (lowercase, strip
- *    punctuation, Unicode-aware via \p{L}\p{N})
- * 4. Run Needleman-Wunsch with Levenshtein-weighted substitution
- *    scoring to find optimal global alignment
- * 5. Traceback → emit only high-confidence (score > 0) pairs
- * 6. Attach timestamp indices + click-to-seek to aligned spans
- * 7. requestAnimationFrame loop with binary search for 60fps tracking
- *
- * Complexity: O(n·m) time and space where n,m are word counts.
- * For max 4096 chars (~600 words): ~360K cells — sub-millisecond.
+ * ─── Alignment ─────────────────────────────────────────────────────
+ *  jsdiff (Diff.diffArrays) — Myers O(ND) algorithm
+ *  40M+ weekly npm downloads, powers Jest & Mocha.
  */
 function ttsPlayer() {
     return {
-        // ── State ────────────────────────────────────────────────────────
+        // ═══════════════════════════════════════════════════════════════
+        //  STATE
+        // ═══════════════════════════════════════════════════════════════
 
         /** @private Current highlighted timestamp index (-1 = none) */
         _currentIdx: -1,
@@ -50,20 +40,63 @@ function ttsPlayer() {
         /** @private Tracks init mode ('md' | 'ts') to allow upgrade */
         _initMode: null,
 
-        // ── Lifecycle ────────────────────────────────────────────────────
+        /** @private Sentence boundary indices (start tsIdx of each sentence) */
+        _sentences: [],
+
+        /** @private Bound keyboard handler reference for cleanup */
+        _keyHandler: null,
+
+        // ── Public reactive state (Alpine) ────────────────────────────
+
+        /** Fullscreen focus mode active */
+        isFullscreen: false,
+
+        /** Is audio currently playing */
+        isPlaying: false,
+
+        /** Current playback time (seconds) */
+        currentTime: 0,
+
+        /** Total duration (seconds) */
+        duration: 0,
+
+        /** Playback speed multiplier */
+        speed: 1.0,
+
+        /** Auto-repeat on end */
+        repeat: false,
+
+        /** A-B loop: start time (null = not set) */
+        loopA: null,
+
+        /** A-B loop: end time (null = not set) */
+        loopB: null,
+
+        /** Progress percentage (0-100) */
+        progress: 0,
+
+        /** Show keyboard shortcut hints overlay */
+        showShortcuts: false,
+
+        // ═══════════════════════════════════════════════════════════════
+        //  LIFECYCLE
+        // ═══════════════════════════════════════════════════════════════
 
         destroy() {
             this._stopTracking();
+            this._removeKeyboardShortcuts();
+            if (this._onFullscreenChange) {
+                document.removeEventListener('fullscreenchange', this._onFullscreenChange);
+            }
         },
 
-        // ── Transcript Initialization ────────────────────────────────────
+        // ═══════════════════════════════════════════════════════════════
+        //  TRANSCRIPT INITIALIZATION
+        // ═══════════════════════════════════════════════════════════════
 
         /**
          * Render Markdown and optionally enhance with word-level highlighting.
          * Called via x-effect — re-runs when parsedResult arrives.
-         *
-         * @param {string} text - The transcript text (Markdown)
-         * @param {Array<{word:string, start:number, end:number}>|undefined} timestamps
          */
         initTranscript(text, timestamps) {
             const box = this.$refs.transcriptBox;
@@ -73,53 +106,343 @@ function ttsPlayer() {
             if (this._initMode === mode) return;
             this._initMode = mode;
 
-            // Step 1: Render Markdown → HTML (preserves all formatting)
+            // Step 1: Render Markdown → HTML
             box.innerHTML = window.renderMarkdown
                 ? window.renderMarkdown(text)
                 : text;
 
-            // Step 2: If no timestamps, we're done — static Markdown
+            // Step 2: If no timestamps, static Markdown is enough
             if (!timestamps?.length) {
                 this._timestamps = [];
                 this._wordSpans = [];
+                this._sentences = [];
                 return;
             }
 
-            // Step 3: Wrap + Align using Needleman-Wunsch
+            // Step 3: Wrap DOM words + align via jsdiff
             this._timestamps = timestamps;
             this._wordSpans = this._wrapAndAlign(box, timestamps);
+
+            // Step 4: Detect sentence boundaries from timestamps
+            this._sentences = this._detectSentences(timestamps);
         },
 
-        // ═════════════════════════════════════════════════════════════════
-        //  ALIGNMENT ENGINE
-        // ═════════════════════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════════════════════
+        //  AUDIO INITIALIZATION
+        // ═══════════════════════════════════════════════════════════════
 
         /**
-         * Master alignment pipeline:
-         * 1. Walk DOM → wrap every word in a <span>, collect {text, span}
-         * 2. Normalize both sequences
-         * 3. Needleman-Wunsch DP alignment
-         * 4. Traceback → high-confidence pairs
-         * 5. Attach timestamps to matched spans
-         *
-         * @param {HTMLElement} container
-         * @param {Array<{word:string, start:number, end:number}>} timestamps
-         * @returns {Array<{span: HTMLElement, tsIdx: number}>}
+         * Called when the audio element is ready.
+         * Sets up all audio event listeners and fullscreen change listener.
          */
+        initAudio() {
+            if (this._audio) return; // Already initialized — single DOM, no re-init needed
+            const audio = this.$refs.ttsAudio;
+            if (!audio) return;
+            this._audio = audio;
+
+            audio.addEventListener('loadedmetadata', () => {
+                this.duration = audio.duration || 0;
+            });
+
+            audio.addEventListener('timeupdate', () => {
+                this.currentTime = audio.currentTime;
+                this.duration = audio.duration || 0;
+                this.progress = this.duration > 0
+                    ? (audio.currentTime / this.duration) * 100
+                    : 0;
+
+                // A-B loop enforcement
+                if (this.loopA !== null && this.loopB !== null) {
+                    if (audio.currentTime >= this.loopB) {
+                        audio.currentTime = this.loopA;
+                    }
+                }
+            });
+
+            audio.addEventListener('play', () => {
+                this.isPlaying = true;
+                this.startTracking();
+            });
+
+            audio.addEventListener('pause', () => {
+                this.isPlaying = false;
+                this.stopTracking();
+            });
+
+            audio.addEventListener('ended', () => {
+                this.isPlaying = false;
+                this.stopTracking();
+                if (this.repeat) {
+                    audio.currentTime = this.loopA ?? 0;
+                    audio.play();
+                } else {
+                    this.resetPlayer();
+                }
+            });
+
+            audio.addEventListener('seeked', () => {
+                if (!audio.paused) this.startTracking();
+            });
+
+            // Fullscreen change listener
+            this._onFullscreenChange = () => {
+                this.isFullscreen = !!document.fullscreenElement;
+                if (!this.isFullscreen) {
+                    this._removeKeyboardShortcuts();
+                    this.showShortcuts = false;
+                }
+            };
+            document.addEventListener('fullscreenchange', this._onFullscreenChange);
+        },
+
+        // ═══════════════════════════════════════════════════════════════
+        //  FULLSCREEN FOCUS MODE
+        // ═══════════════════════════════════════════════════════════════
+
+        toggleFullscreen() {
+            const wrapper = this.$refs.ttsWrapper;
+            if (!wrapper) return;
+
+            if (!document.fullscreenElement) {
+                wrapper.requestFullscreen().then(() => {
+                    this.isFullscreen = true;
+                    this._installKeyboardShortcuts();
+                }).catch(() => { });
+            } else {
+                document.exitFullscreen().then(() => {
+                    this.isFullscreen = false;
+                }).catch(() => { });
+            }
+        },
+
+        // ═══════════════════════════════════════════════════════════════
+        //  TRANSPORT CONTROLS
+        // ═══════════════════════════════════════════════════════════════
+
+        togglePlay() {
+            const audio = this._audio || this.$refs.ttsAudio;
+            if (!audio) return;
+            if (audio.paused) {
+                audio.play();
+            } else {
+                audio.pause();
+            }
+        },
+
+        seekRelative(delta) {
+            const audio = this._audio || this.$refs.ttsAudio;
+            if (!audio) return;
+            audio.currentTime = Math.max(0, Math.min(audio.duration || 0, audio.currentTime + delta));
+        },
+
+        seekTo(pct) {
+            const audio = this._audio || this.$refs.ttsAudio;
+            if (!audio || !audio.duration) return;
+            audio.currentTime = (pct / 100) * audio.duration;
+        },
+
+        seekFromClick(event) {
+            const bar = event.currentTarget;
+            const rect = bar.getBoundingClientRect();
+            const pct = ((event.clientX - rect.left) / rect.width) * 100;
+            this.seekTo(Math.max(0, Math.min(100, pct)));
+        },
+
+        // ── Playback Speed ────────────────────────────────────────────
+
+        setSpeed(newSpeed) {
+            this.speed = Math.round(Math.max(0.25, Math.min(3.0, newSpeed)) * 100) / 100;
+            const audio = this._audio || this.$refs.ttsAudio;
+            if (audio) audio.playbackRate = this.speed;
+        },
+
+        cycleSpeed() {
+            const speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+            const idx = speeds.indexOf(this.speed);
+            const next = idx >= 0 ? (idx + 1) % speeds.length : 2;
+            this.setSpeed(speeds[next]);
+        },
+
+        // ── Repeat / Loop ─────────────────────────────────────────────
+
+        toggleRepeat() {
+            this.repeat = !this.repeat;
+        },
+
+        setLoopA() {
+            const audio = this._audio;
+            if (!audio) return;
+            this.loopA = audio.currentTime;
+            if (this.loopB !== null && this.loopB <= this.loopA) {
+                this.loopB = null;
+            }
+        },
+
+        setLoopB() {
+            const audio = this._audio;
+            if (!audio) return;
+            if (this.loopA === null) return;
+            this.loopB = audio.currentTime;
+            if (this.loopB <= this.loopA) {
+                this.loopB = null;
+            }
+        },
+
+        clearLoop() {
+            this.loopA = null;
+            this.loopB = null;
+        },
+
+        get hasLoop() {
+            return this.loopA !== null && this.loopB !== null;
+        },
+
+        // ── Sentence Navigation ───────────────────────────────────────
+
+        _detectSentences(timestamps) {
+            if (!timestamps?.length) return [];
+            const boundaries = [0];
+            for (let i = 0; i < timestamps.length - 1; i++) {
+                const word = timestamps[i].word;
+                const gap = timestamps[i + 1].start - timestamps[i].end;
+                if (/[.!?。？！]\s*$/.test(word) || gap > 0.4) {
+                    boundaries.push(i + 1);
+                }
+            }
+            return boundaries;
+        },
+
+        prevSentence() {
+            const audio = this._audio;
+            if (!audio || !this._sentences.length) return;
+            const t = audio.currentTime;
+            const ts = this._timestamps;
+
+            let currentSent = 0;
+            for (let i = this._sentences.length - 1; i >= 0; i--) {
+                if (ts[this._sentences[i]].start <= t + 0.1) {
+                    currentSent = i;
+                    break;
+                }
+            }
+
+            const sentStart = ts[this._sentences[currentSent]].start;
+            if (t - sentStart > 2) {
+                audio.currentTime = sentStart;
+            } else {
+                const prevIdx = Math.max(0, currentSent - 1);
+                audio.currentTime = ts[this._sentences[prevIdx]].start;
+            }
+            if (audio.paused) audio.play();
+        },
+
+        nextSentence() {
+            const audio = this._audio;
+            if (!audio || !this._sentences.length) return;
+            const t = audio.currentTime;
+            const ts = this._timestamps;
+
+            for (let i = 0; i < this._sentences.length; i++) {
+                if (ts[this._sentences[i]].start > t + 0.1) {
+                    audio.currentTime = ts[this._sentences[i]].start;
+                    if (audio.paused) audio.play();
+                    return;
+                }
+            }
+            audio.currentTime = audio.duration || 0;
+        },
+
+        // ═══════════════════════════════════════════════════════════════
+        //  KEYBOARD SHORTCUTS (active in fullscreen)
+        // ═══════════════════════════════════════════════════════════════
+
+        _installKeyboardShortcuts() {
+            this._removeKeyboardShortcuts();
+            this._keyHandler = (e) => {
+                if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+
+                switch (e.code) {
+                    case 'Space':
+                        e.preventDefault();
+                        this.togglePlay();
+                        break;
+                    case 'ArrowLeft':
+                        e.preventDefault();
+                        e.shiftKey ? this.prevSentence() : this.seekRelative(-5);
+                        break;
+                    case 'ArrowRight':
+                        e.preventDefault();
+                        e.shiftKey ? this.nextSentence() : this.seekRelative(5);
+                        break;
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        this.setSpeed(this.speed + 0.25);
+                        break;
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        this.setSpeed(this.speed - 0.25);
+                        break;
+                    case 'KeyR':
+                        e.preventDefault();
+                        this.toggleRepeat();
+                        break;
+                    case 'KeyF':
+                        e.preventDefault();
+                        this.toggleFullscreen();
+                        break;
+                    case 'KeyA':
+                        e.preventDefault();
+                        this.setLoopA();
+                        break;
+                    case 'KeyB':
+                        e.preventDefault();
+                        this.setLoopB();
+                        break;
+                    case 'KeyC':
+                        e.preventDefault();
+                        this.clearLoop();
+                        break;
+                    case 'Escape':
+                        e.preventDefault();
+                        if (this.showShortcuts) {
+                            this.showShortcuts = false;
+                        } else {
+                            this.toggleFullscreen();
+                        }
+                        break;
+                    case 'Slash':
+                        if (e.shiftKey) {
+                            e.preventDefault();
+                            this.showShortcuts = !this.showShortcuts;
+                        }
+                        break;
+                }
+            };
+            document.addEventListener('keydown', this._keyHandler);
+        },
+
+        _removeKeyboardShortcuts() {
+            if (this._keyHandler) {
+                document.removeEventListener('keydown', this._keyHandler);
+                this._keyHandler = null;
+            }
+        },
+
+        // ═══════════════════════════════════════════════════════════════
+        //  ALIGNMENT ENGINE (jsdiff)
+        // ═══════════════════════════════════════════════════════════════
+
         _wrapAndAlign(container, timestamps) {
-            // ── Phase 1: Wrap every word in the DOM ──────────────────────
             const domWords = this._wrapDOMWords(container);
             if (!domWords.length) return [];
 
-            // ── Phase 2: Normalize both sequences ────────────────────────
             const norm = s => s.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
             const domNorm = domWords.map(d => norm(d.text));
             const tsNorm = timestamps.map(t => norm(t.word));
 
-            // ── Phase 3: Needleman-Wunsch alignment ──────────────────────
-            const pairs = this._needlemanWunsch(domNorm, tsNorm);
+            const pairs = this._diffAlign(domNorm, tsNorm);
 
-            // ── Phase 4: Apply alignment to DOM ──────────────────────────
             const aligned = [];
             for (const [domIdx, tsIdx] of pairs) {
                 const span = domWords[domIdx].span;
@@ -137,18 +460,56 @@ function ttsPlayer() {
             return aligned;
         },
 
-        /**
-         * Walk all text nodes in the rendered HTML and wrap each word
-         * token in a <span>. Returns an array of {text, span} for
-         * every word in DOM order.
-         *
-         * Preserves all Markdown structure — only text nodes are modified.
-         *
-         * @param {HTMLElement} container
-         * @returns {Array<{text: string, span: HTMLElement}>}
-         */
+        _diffAlign(domNorm, tsNorm) {
+            if (typeof Diff === 'undefined' || !Diff.diffArrays) {
+                return this._fallbackAlign(domNorm, tsNorm);
+            }
+
+            const changes = Diff.diffArrays(tsNorm, domNorm, {
+                comparator: (a, b) => {
+                    if (a === b) return true;
+                    if (!a || !b) return false;
+                    return a.startsWith(b) || b.startsWith(a);
+                },
+            });
+
+            const pairs = [];
+            let tsPtr = 0;
+            let domPtr = 0;
+
+            for (const change of changes) {
+                const count = change.value.length;
+                if (!change.added && !change.removed) {
+                    for (let k = 0; k < count; k++) {
+                        pairs.push([domPtr + k, tsPtr + k]);
+                    }
+                    tsPtr += count;
+                    domPtr += count;
+                } else if (change.removed) {
+                    tsPtr += count;
+                } else {
+                    domPtr += count;
+                }
+            }
+
+            return pairs;
+        },
+
+        _fallbackAlign(domNorm, tsNorm) {
+            const pairs = [];
+            let tsPtr = 0;
+            for (let d = 0; d < domNorm.length && tsPtr < tsNorm.length; d++) {
+                const dw = domNorm[d];
+                const tw = tsNorm[tsPtr];
+                if (dw && tw && (dw === tw || dw.startsWith(tw) || tw.startsWith(dw))) {
+                    pairs.push([d, tsPtr]);
+                    tsPtr++;
+                }
+            }
+            return pairs;
+        },
+
         _wrapDOMWords(container) {
-            // Snapshot text nodes (live iteration breaks on DOM mutation)
             const walker = document.createTreeWalker(
                 container, NodeFilter.SHOW_TEXT, null
             );
@@ -159,179 +520,29 @@ function ttsPlayer() {
             }
 
             const words = [];
-
             for (const textNode of textNodes) {
                 const frag = document.createDocumentFragment();
                 const regex = /(\s+)|(\S+)/g;
                 let match;
-
                 while ((match = regex.exec(textNode.textContent)) !== null) {
                     if (match[1]) {
-                        // Whitespace — preserve as-is
                         frag.appendChild(document.createTextNode(match[1]));
                     } else {
-                        // Word — wrap in span
                         const span = document.createElement('span');
                         span.textContent = match[2];
                         frag.appendChild(span);
                         words.push({ text: match[2], span });
                     }
                 }
-
                 textNode.parentNode.replaceChild(frag, textNode);
             }
-
             return words;
         },
 
-        /**
-         * Needleman-Wunsch global sequence alignment.
-         *
-         * Standard DP algorithm from bioinformatics adapted for word-level
-         * alignment of DOM text ↔ Whisper timestamps.
-         *
-         * Substitution scoring uses Levenshtein-based similarity so that
-         * near-matches ("dont" ↔ "don't", "naïve" ↔ "naive") are aligned
-         * rather than gapped.
-         *
-         * Scoring parameters (tuned for TTS↔Whisper where most words
-         * match exactly and differences are minor):
-         *   Match:    +3  (exact normalized match)
-         *   Similar:  +3 × similarity  (Levenshtein-weighted)
-         *   Mismatch: -1  (similarity below threshold)
-         *   Gap:      -2  (insertion/deletion)
-         *
-         * @param {string[]} seqA - Normalized DOM words
-         * @param {string[]} seqB - Normalized Whisper words
-         * @returns {Array<[number, number]>} Aligned index pairs [domIdx, tsIdx]
-         */
-        _needlemanWunsch(seqA, seqB) {
-            const n = seqA.length;
-            const m = seqB.length;
+        // ═══════════════════════════════════════════════════════════════
+        //  TRACKING
+        // ═══════════════════════════════════════════════════════════════
 
-            // Bail out for degenerate cases
-            if (n === 0 || m === 0) return [];
-
-            const MATCH = 3;
-            const MISMATCH = -1;
-            const GAP = -2;
-            const SIM_THRESHOLD = 0.5;
-
-            // Substitution score: Levenshtein-weighted
-            const subScore = (a, b) => {
-                if (!a || !b) return MISMATCH;
-                if (a === b) return MATCH;
-
-                const sim = 1 - this._levenshtein(a, b) / Math.max(a.length, b.length);
-                return sim >= SIM_THRESHOLD ? MATCH * sim : MISMATCH;
-            };
-
-            // ── DP matrix fill ───────────────────────────────────────────
-            // Use Float32Array for cache-friendly, compact storage.
-            // Layout: dp[(n+1) × (m+1)] row-major.
-            const cols = m + 1;
-            const dp = new Float32Array((n + 1) * cols);
-
-            // Initialize first column and row (gap penalties)
-            for (let i = 0; i <= n; i++) dp[i * cols] = i * GAP;
-            for (let j = 0; j <= m; j++) dp[j] = j * GAP;
-
-            for (let i = 1; i <= n; i++) {
-                const row = i * cols;
-                const prevRow = (i - 1) * cols;
-                const wordA = seqA[i - 1];
-
-                for (let j = 1; j <= m; j++) {
-                    dp[row + j] = Math.max(
-                        dp[prevRow + j - 1] + subScore(wordA, seqB[j - 1]),
-                        dp[prevRow + j] + GAP,
-                        dp[row + j - 1] + GAP
-                    );
-                }
-            }
-
-            // ── Traceback ────────────────────────────────────────────────
-            const pairs = [];
-            let i = n, j = m;
-
-            while (i > 0 && j > 0) {
-                const row = i * cols;
-                const prevRow = (i - 1) * cols;
-                const score = subScore(seqA[i - 1], seqB[j - 1]);
-                const diag = dp[prevRow + j - 1] + score;
-
-                if (dp[row + j] === diag) {
-                    // Diagonal move — emit pair only if score > 0 (real match)
-                    if (score > 0) {
-                        pairs.push([i - 1, j - 1]);
-                    }
-                    i--;
-                    j--;
-                } else if (dp[row + j] === dp[prevRow + j] + GAP) {
-                    // Up — DOM word has no Whisper match (deletion)
-                    i--;
-                } else {
-                    // Left — Whisper word has no DOM match (insertion)
-                    j--;
-                }
-            }
-
-            pairs.reverse();
-            return pairs;
-        },
-
-        /**
-         * Levenshtein edit distance (Wagner-Fischer algorithm).
-         *
-         * Computes the minimum number of single-character edits (insert,
-         * delete, substitute) to transform string a into string b.
-         *
-         * Optimized: single-row DP, O(min(n,m)) space.
-         *
-         * @param {string} a
-         * @param {string} b
-         * @returns {number} Edit distance
-         */
-        _levenshtein(a, b) {
-            // Ensure a is the shorter string (optimize space)
-            if (a.length > b.length) { const t = a; a = b; b = t; }
-
-            const m = a.length;
-            const n = b.length;
-
-            // Single-row DP
-            let prev = new Uint16Array(m + 1);
-            let curr = new Uint16Array(m + 1);
-
-            for (let j = 0; j <= m; j++) prev[j] = j;
-
-            for (let i = 1; i <= n; i++) {
-                curr[0] = i;
-                const bChar = b.charCodeAt(i - 1);
-
-                for (let j = 1; j <= m; j++) {
-                    const cost = a.charCodeAt(j - 1) === bChar ? 0 : 1;
-                    curr[j] = Math.min(
-                        prev[j] + 1,        // deletion
-                        curr[j - 1] + 1,    // insertion
-                        prev[j - 1] + cost   // substitution
-                    );
-                }
-
-                // Swap rows
-                const tmp = prev;
-                prev = curr;
-                curr = tmp;
-            }
-
-            return prev[m];
-        },
-
-        // ═════════════════════════════════════════════════════════════════
-        //  AUDIO EVENT HANDLERS
-        // ═════════════════════════════════════════════════════════════════
-
-        /** Begin RAF tracking loop. Called on audio play / seeked. */
         startTracking() {
             this._stopTracking();
             this._audio = this.$refs.ttsAudio;
@@ -340,12 +551,10 @@ function ttsPlayer() {
             this._scheduleTrack();
         },
 
-        /** Pause tracking. Called on audio pause. */
         stopTracking() {
             this._stopTracking();
         },
 
-        /** Reset to initial state. Called on audio ended. */
         resetPlayer() {
             this._stopTracking();
             this._currentIdx = -1;
@@ -353,10 +562,6 @@ function ttsPlayer() {
                 span.classList.remove('tts-word-active', 'tts-word-past');
             }
         },
-
-        // ═════════════════════════════════════════════════════════════════
-        //  TRACKING LOOP
-        // ═════════════════════════════════════════════════════════════════
 
         _scheduleTrack() {
             const audio = this._audio;
@@ -368,7 +573,6 @@ function ttsPlayer() {
 
                 const t = audio.currentTime;
 
-                // Binary search: find last timestamp with start ≤ t
                 let lo = 0, hi = ts.length - 1, idx = -1;
                 while (lo <= hi) {
                     const mid = (lo + hi) >> 1;
@@ -386,7 +590,15 @@ function ttsPlayer() {
 
                     const active = spans.find(s => s.tsIdx === idx)?.span;
                     if (active) {
-                        active.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        // Use the scroll container ref (wrapper in both normal + fullscreen)
+                        const scrollBox = this.$refs.transcriptScroll || this.$refs.transcriptBox;
+                        if (scrollBox) {
+                            const boxRect = scrollBox.getBoundingClientRect();
+                            const spanRect = active.getBoundingClientRect();
+                            if (spanRect.top < boxRect.top || spanRect.bottom > boxRect.bottom) {
+                                active.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }
+                        }
                     }
                 }
 
@@ -396,7 +608,6 @@ function ttsPlayer() {
             this._raf = requestAnimationFrame(tick);
         },
 
-        /** Seek audio to a specific time and resume playback. */
         _seekTo(time) {
             const audio = this.$refs.ttsAudio;
             if (!audio) return;
@@ -404,12 +615,22 @@ function ttsPlayer() {
             if (audio.paused) audio.play();
         },
 
-        /** Cancel any running RAF loop. */
         _stopTracking() {
             if (this._raf) {
                 cancelAnimationFrame(this._raf);
                 this._raf = null;
             }
+        },
+
+        // ═══════════════════════════════════════════════════════════════
+        //  UTILITY
+        // ═══════════════════════════════════════════════════════════════
+
+        formatTime(seconds) {
+            if (!seconds || isNaN(seconds)) return '0:00';
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            return `${m}:${s.toString().padStart(2, '0')}`;
         },
     };
 }
