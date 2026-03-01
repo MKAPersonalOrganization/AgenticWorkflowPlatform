@@ -77,6 +77,51 @@ func ProviderEmbeddingModels(provider AIProvider) []string {
 	}
 }
 
+// ProviderTTSModels returns the known text-to-speech models for each provider.
+func ProviderTTSModels(provider AIProvider) []string {
+	switch provider {
+	case AIProviderOpenAI:
+		return []string{
+			"gpt-4o-mini-tts",
+			"tts-1",
+			"tts-1-hd",
+		}
+	default:
+		// Only OpenAI supports TTS for now; more providers will be added later.
+		return nil
+	}
+}
+
+// TTSVoices returns the available voice options for a given TTS model.
+func TTSVoices(model string) []string {
+	switch model {
+	case "gpt-4o-mini-tts":
+		// Full voice set for the latest model.
+		return []string{
+			"alloy", "ash", "ballad", "coral", "echo",
+			"fable", "nova", "onyx", "sage", "shimmer",
+			"verse", "marin", "cedar",
+		}
+	case "tts-1", "tts-1-hd":
+		// Smaller subset for legacy models.
+		return []string{
+			"alloy", "ash", "coral", "echo", "fable",
+			"onyx", "nova", "sage", "shimmer",
+		}
+	default:
+		// Sensible defaults.
+		return []string{
+			"alloy", "ash", "coral", "echo", "fable",
+			"nova", "onyx", "sage", "shimmer",
+		}
+	}
+}
+
+// ProviderSupportsTTS reports whether the given provider has TTS capability.
+func ProviderSupportsTTS(provider AIProvider) bool {
+	return len(ProviderTTSModels(provider)) > 0
+}
+
 // AISettings represents per-user AI provider configuration.
 // Each user has completely isolated settings.
 type AISettings struct {
@@ -90,6 +135,8 @@ type AISettings struct {
 	MaxTokens           int        `json:"max_tokens,omitempty" db:"max_tokens"`
 	Temperature         float64    `json:"temperature,omitempty" db:"temperature"`
 	EmbeddingDimensions int        `json:"embedding_dimensions,omitempty" db:"embedding_dimensions"`
+	TTSModel            string     `json:"tts_model,omitempty" db:"tts_model"`
+	TTSVoice            string     `json:"tts_voice,omitempty" db:"tts_voice"`
 	CreatedAt           time.Time  `json:"created_at" db:"created_at"`
 	UpdatedAt           time.Time  `json:"updated_at" db:"updated_at"`
 }

@@ -46,6 +46,7 @@ import (
 	"school-with-ai/plugins/knowledgebase"
 	"school-with-ai/plugins/library"
 	memoryplugin "school-with-ai/plugins/memory"
+	"school-with-ai/plugins/tts"
 	"school-with-ai/plugins/visualization"
 	"school-with-ai/services/agentorchestrator"
 	"school-with-ai/services/aisettings"
@@ -368,6 +369,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	toolregistry.RegisterPlugin(&knowledgebase.Provider{})
 	toolregistry.RegisterPlugin(&library.Provider{})
 	toolregistry.RegisterPlugin(&memoryplugin.Provider{})
+	toolregistry.RegisterPlugin(&tts.Provider{})
 	toolregistry.RegisterPlugin(&visualization.Provider{})
 	if err := toolRegistry.Initialize(ctx); err != nil {
 		return fmt.Errorf("failed to initialize tool registry: %w", err)
@@ -620,6 +622,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// AI Settings routes (protected)
 	aiSettingsHandler := aiSettingsHandlers.NewHandler(log, aiSettingsService)
 	r.Get("/api/ai-settings/providers", authMiddleware.RequireAuthFunc(aiSettingsHandler.ListProviders))
+	r.Get("/api/ai-settings/tts-voices", authMiddleware.RequireAuthFunc(aiSettingsHandler.GetTTSVoices))
 	r.Get("/api/ai-settings", authMiddleware.RequireAuthFunc(aiSettingsHandler.GetSettings))
 	r.Put("/api/ai-settings", authMiddleware.RequireAuthFunc(aiSettingsHandler.SaveSettings))
 	r.Delete("/api/ai-settings/{id}", authMiddleware.RequireAuthFunc(aiSettingsHandler.DeleteSettings))
