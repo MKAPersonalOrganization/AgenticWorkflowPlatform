@@ -78,6 +78,11 @@ function ttsPlayer() {
         /** Show keyboard shortcut hints overlay */
         showShortcuts: false,
 
+        // ── Reading Mode Toggle ──────────────────────────────────────
+
+        /** Transcript visibility mode: 'visible' | 'blurred' | 'hidden' */
+        transcriptMode: 'visible',
+
         // ═══════════════════════════════════════════════════════════════
         //  LIFECYCLE
         // ═══════════════════════════════════════════════════════════════
@@ -298,7 +303,34 @@ function ttsPlayer() {
             return this.loopA !== null && this.loopB !== null;
         },
 
-        // ── Sentence Navigation ───────────────────────────────────────
+        // ── Reading Mode ──────────────────────────────────────────────
+
+        cycleTranscriptMode() {
+            const modes = ['visible', 'blurred', 'hidden'];
+            const idx = modes.indexOf(this.transcriptMode);
+            this.transcriptMode = modes[(idx + 1) % modes.length];
+        },
+
+        toggleTranscriptVisibility() {
+            this.transcriptMode = this.transcriptMode === 'hidden' ? 'visible' : 'hidden';
+        },
+
+        peekSentence(event) {
+            if (this.transcriptMode !== 'blurred') return;
+            const box = this.$refs.transcriptBox;
+            if (!box) return;
+            // Find the closest block-level child of the transcript box
+            let target = event.target;
+            while (target && target.parentNode !== box) {
+                target = target.parentNode;
+            }
+            if (target && target !== box) {
+                target.classList.add('tts-sentence-peek');
+                setTimeout(() => target.classList.remove('tts-sentence-peek'), 3000);
+            }
+        },
+
+        // ── Sentence Navigation ───────────────────────────────────────────
 
         _detectSentences(timestamps) {
             if (!timestamps?.length) return [];
@@ -402,6 +434,14 @@ function ttsPlayer() {
                     case 'KeyC':
                         e.preventDefault();
                         this.clearLoop();
+                        break;
+                    case 'KeyT':
+                        e.preventDefault();
+                        this.cycleTranscriptMode();
+                        break;
+                    case 'KeyH':
+                        e.preventDefault();
+                        this.toggleTranscriptVisibility();
                         break;
                     case 'Escape':
                         e.preventDefault();
