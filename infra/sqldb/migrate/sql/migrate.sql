@@ -387,3 +387,8 @@ CREATE TABLE IF NOT EXISTS user_agents (
 
 CREATE INDEX IF NOT EXISTS idx_user_agents_user_id ON user_agents(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_agents_user_name ON user_agents(user_id, name);
+
+-- Version: 1.28
+-- Description: Add TTS (text-to-speech) model and voice columns to user AI settings
+ALTER TABLE user_ai_settings ADD COLUMN IF NOT EXISTS tts_model VARCHAR(255) NOT NULL DEFAULT '';
+ALTER TABLE user_ai_settings ADD COLUMN IF NOT EXISTS tts_voice VARCHAR(255) NOT NULL DEFAULT '';

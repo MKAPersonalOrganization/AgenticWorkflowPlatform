@@ -12,6 +12,7 @@ import { mcpConnectors } from './components/mcp-connectors.js';
 import { renderMarkdown } from './chat/markdown-renderer.js';
 
 // Expose markdown renderer globally so Alpine expressions in any scope can use it
+window.renderMarkdown = renderMarkdown;
 window.renderToolDescription = (description) => description ? renderMarkdown(description) : '';
 
 document.addEventListener('alpine:init', () => {

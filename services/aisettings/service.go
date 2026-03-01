@@ -33,6 +33,11 @@ func (s *Service) ListEmbeddingModels(provider domain.AIProvider) []string {
 	return domain.ProviderEmbeddingModels(provider)
 }
 
+// ListTTSModels returns text-to-speech models for a given provider.
+func (s *Service) ListTTSModels(provider domain.AIProvider) []string {
+	return domain.ProviderTTSModels(provider)
+}
+
 // GetUserSettings returns all AI settings for a user.
 func (s *Service) GetUserSettings(ctx context.Context, userID string) ([]domain.AISettings, error) {
 	settings, err := s.repo.GetByUserID(ctx, userID)

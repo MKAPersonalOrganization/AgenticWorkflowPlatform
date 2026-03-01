@@ -32,6 +32,8 @@ type providerInfo struct {
 	Name            string   `json:"name"`
 	Models          []string `json:"models"`
 	EmbeddingModels []string `json:"embedding_models"`
+	TTSModels       []string `json:"tts_models"`
+	SupportsTTS     bool     `json:"supports_tts"`
 }
 
 type settingsResponse struct {
@@ -45,6 +47,8 @@ type settingsResponse struct {
 	MaxTokens           int     `json:"max_tokens"`
 	Temperature         float64 `json:"temperature"`
 	EmbeddingDimensions int     `json:"embedding_dimensions"`
+	TTSModel            string  `json:"tts_model"`
+	TTSVoice            string  `json:"tts_voice"`
 }
 
 func toSettingsResponse(s domain.AISettings) settingsResponse {
@@ -59,6 +63,8 @@ func toSettingsResponse(s domain.AISettings) settingsResponse {
 		MaxTokens:           s.MaxTokens,
 		Temperature:         s.Temperature,
 		EmbeddingDimensions: s.EmbeddingDimensions,
+		TTSModel:            s.TTSModel,
+		TTSVoice:            s.TTSVoice,
 	}
 }
 
@@ -72,11 +78,14 @@ func (h *Handler) ListProviders(w http.ResponseWriter, r *http.Request) {
 
 	var result []providerInfo
 	for _, p := range providers {
+		ttsModels := h.service.ListTTSModels(p)
 		result = append(result, providerInfo{
 			ID:              string(p),
 			Name:            providerDisplayName(p),
 			Models:          h.service.ListModels(p),
 			EmbeddingModels: h.service.ListEmbeddingModels(p),
+			TTSModels:       ttsModels,
+			SupportsTTS:     len(ttsModels) > 0,
 		})
 	}
 
@@ -127,6 +136,8 @@ func (h *Handler) SaveSettings(w http.ResponseWriter, r *http.Request) {
 		MaxTokens           int     `json:"max_tokens"`
 		Temperature         float64 `json:"temperature"`
 		EmbeddingDimensions int     `json:"embedding_dimensions"`
+		TTSModel            string  `json:"tts_model"`
+		TTSVoice            string  `json:"tts_voice"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -143,6 +154,8 @@ func (h *Handler) SaveSettings(w http.ResponseWriter, r *http.Request) {
 		MaxTokens:           req.MaxTokens,
 		Temperature:         req.Temperature,
 		EmbeddingDimensions: req.EmbeddingDimensions,
+		TTSModel:            req.TTSModel,
+		TTSVoice:            req.TTSVoice,
 	}
 
 	// If no API key provided, try to reuse the existing key for this provider
@@ -161,6 +174,12 @@ func (h *Handler) SaveSettings(w http.ResponseWriter, r *http.Request) {
 					}
 					if settings.Temperature == 0 {
 						settings.Temperature = ex.Temperature
+					}
+					if settings.TTSModel == "" {
+						settings.TTSModel = ex.TTSModel
+					}
+					if settings.TTSVoice == "" {
+						settings.TTSVoice = ex.TTSVoice
 					}
 					break
 				}
@@ -235,4 +254,18 @@ func providerDisplayName(p domain.AIProvider) string {
 	default:
 		return string(p)
 	}
+}
+
+// GetTTSVoices handles GET /api/ai-settings/tts-voices?model=...
+func (h *Handler) GetTTSVoices(w http.ResponseWriter, r *http.Request) {
+	model := r.URL.Query().Get("model")
+	voices := domain.TTSVoices(model)
+	if voices == nil {
+		voices = []string{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"model":  model,
+		"voices": voices,
+	})
 }
