@@ -95,7 +95,7 @@ export function createInitialState() {
         sessionsNextCursor: null,
         sessionsHasMore: false,
         sessionsLoading: false,
-        sidebarOpen: true,
+        sidebarOpen: false,
         showDebugPanel: false,
         showEventLog: false,
         eventLogCopied: false,
@@ -150,7 +150,7 @@ export function createInitialState() {
         __messageQueue: [],
 
         // Sidepanel view state
-        activeView: 'artifacts',
+        activeView: localStorage.getItem('activeView') || 'artifacts',
 
         // Right-click context menu state
         contextMenuOpen: false,
