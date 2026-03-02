@@ -113,14 +113,42 @@ document.addEventListener('alpine:init', () => {
                         if (data.agents && Array.isArray(data.agents)) {
                             this.AVAILABLE_AGENTS = data.agents;
 
-                            // Set default if not set
-                            if (!this.selectedAgent && this.AVAILABLE_AGENTS.length > 0) {
-                                // Use the first agent in the list (oldest by creation time)
+                            // Fetch the server-side saved preference (cross-device source of truth)
+                            let serverAgent = '';
+                            try {
+                                const prefResp = await fetch('/api/preferences/selected_agent');
+                                if (prefResp.ok) {
+                                    const prefData = await prefResp.json();
+                                    serverAgent = prefData.value || '';
+                                }
+                            } catch { /* ignore — fall back to localStorage or first agent */ }
+
+                            // Priority: server preference > localStorage cache > first agent
+                            const candidate = serverAgent || localStorage.getItem('selectedAgent') || '';
+                            const isValid = candidate &&
+                                this.AVAILABLE_AGENTS.some(a => a.id === candidate);
+
+                            if (isValid) {
+                                this.selectedAgent = candidate;
+                                localStorage.setItem('selectedAgent', candidate);
+                            } else if (this.AVAILABLE_AGENTS.length > 0) {
+                                // Fall back to the first agent (oldest by creation time)
                                 this.selectedAgent = this.AVAILABLE_AGENTS[0].id;
+                                this.__persistAgentPreference(this.selectedAgent);
                             }
                         }
                     }
                 });
+            },
+
+            // Persist agent preference to server and localStorage cache
+            __persistAgentPreference(agentId) {
+                localStorage.setItem('selectedAgent', agentId);
+                fetch('/api/preferences/selected_agent', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ value: agentId })
+                }).catch(() => { /* best-effort — localStorage is the fast fallback */ });
             },
 
             // ============================================

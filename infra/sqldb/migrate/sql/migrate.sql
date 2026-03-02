@@ -392,3 +392,15 @@ CREATE INDEX IF NOT EXISTS idx_user_agents_user_name ON user_agents(user_id, nam
 -- Description: Add TTS (text-to-speech) model and voice columns to user AI settings
 ALTER TABLE user_ai_settings ADD COLUMN IF NOT EXISTS tts_model VARCHAR(255) NOT NULL DEFAULT '';
 ALTER TABLE user_ai_settings ADD COLUMN IF NOT EXISTS tts_voice VARCHAR(255) NOT NULL DEFAULT '';
+
+-- Version: 1.29
+-- Description: Create user preferences table for cross-device UI state persistence
+CREATE TABLE IF NOT EXISTS user_preferences (
+    user_id    VARCHAR(255) NOT NULL,
+    key        VARCHAR(255) NOT NULL,
+    value      TEXT NOT NULL DEFAULT '',
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_preferences_user ON user_preferences(user_id);
