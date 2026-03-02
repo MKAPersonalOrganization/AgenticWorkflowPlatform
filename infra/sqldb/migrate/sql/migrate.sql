@@ -441,3 +441,17 @@ ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS icon VARCHAR(50) NOT NULL DEFAU
 ALTER TABLE agent_store_catalog ALTER COLUMN icon_label TYPE TEXT;
 ALTER TABLE user_agents ALTER COLUMN icon TYPE TEXT;
 TRUNCATE TABLE agent_store_catalog;
+
+-- Version: 1.34
+-- Description: Backfill user agent icons with SVGs from re-seeded catalog (match by name)
+UPDATE user_agents ua
+   SET icon = cat.icon_label
+  FROM agent_store_catalog cat
+ WHERE LOWER(TRIM(ua.name)) = LOWER(TRIM(cat.name))
+   AND ua.icon NOT LIKE '<svg%'
+   AND cat.icon_label LIKE '<svg%';
+
+-- Remaining agents (custom-created or renamed) get the default bot icon
+UPDATE user_agents
+   SET icon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>'
+ WHERE icon NOT LIKE '<svg%';
