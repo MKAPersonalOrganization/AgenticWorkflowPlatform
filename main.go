@@ -28,6 +28,7 @@ import (
 	"school-with-ai/foundation/middleware"
 	"school-with-ai/handlers/auth"
 	"school-with-ai/handlers/profile"
+	preferenceshandler "school-with-ai/handlers/preferences"
 	statisticsHandler "school-with-ai/handlers/statistics"
 	pgstore "school-with-ai/infra/eventstore/postgres"
 	"school-with-ai/infra/kratos"
@@ -258,6 +259,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// Initialize Student Profile Repository
 	studentProfileRepo := sqldb.NewPostgresStudentProfileRepository(db)
+	userPreferenceRepo := sqldb.NewPostgresUserPreferenceRepository(db)
 	resourcesRepo := sqldb.NewPostgresResourcesRepository(db)
 
 	// Run migrations
@@ -618,6 +620,12 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Get("/profile", authMiddleware.RequireAuthFunc(profileHandler.HandleProfilePage))
 	r.Get("/api/profile", authMiddleware.RequireAuthFunc(profileHandler.GetProfile))
 	r.Put("/api/profile", authMiddleware.RequireAuthFunc(profileHandler.UpdateProfile))
+
+	// User Preferences routes (cross-device UI state persistence)
+	prefsHandler := preferenceshandler.NewHandler(log, userPreferenceRepo)
+	r.Get("/api/preferences", authMiddleware.RequireAuthFunc(prefsHandler.GetAllPreferences))
+	r.Get("/api/preferences/{key}", authMiddleware.RequireAuthFunc(prefsHandler.GetPreference))
+	r.Put("/api/preferences/{key}", authMiddleware.RequireAuthFunc(prefsHandler.SetPreference))
 
 	// AI Settings routes (protected)
 	aiSettingsHandler := aiSettingsHandlers.NewHandler(log, aiSettingsService)

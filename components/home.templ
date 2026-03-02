@@ -113,7 +113,7 @@ templ ChatInputScreen(user *domain.User) {
 		User:      user,
 		ExtraHead: HomeExtraHead(),
 	}) {
-		<div class="w-full h-full flex flex-col" x-data="chat" @agent-selected.window="selectedAgent = $event.detail.id">
+		<div class="w-full h-full flex flex-col" x-data="chat" @agent-selected.window="selectedAgent = $event.detail.id; __persistAgentPreference($event.detail.id)">
 			<!-- Sidebar Layout -->
 			<div class="flex-1 min-h-0 overflow-hidden">
 				@sidebar.Layout(sidebar.LayoutProps{Class: "h-full min-h-0"}) {
