@@ -273,8 +273,11 @@ templ AgentsDialog() {
 												<template x-for="entry in storeEntries" :key="entry.id">
 													<div class="group p-4 rounded-lg border border-border hover:border-primary/30 hover:bg-accent/30 transition-all duration-150 flex flex-col">
 														<div class="flex items-start gap-3 mb-2">
-															<!-- Icon label (emoji) -->
-															<div class="size-10 rounded-lg bg-primary/10 flex items-center justify-center text-lg shrink-0" x-text="entry.iconLabel || '🤖'"></div>
+															<!-- Agent icon (SVG) -->
+															<div
+																class="size-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0 [&_svg]:size-5"
+																x-html="entry.iconLabel"
+															></div>
 															<div class="flex-1 min-w-0">
 																<div class="flex items-center gap-2">
 																	<h3 class="text-sm font-semibold text-foreground truncate" x-text="entry.name"></h3>
@@ -788,12 +791,12 @@ templ AgentsButtonTrigger() {
 			<span x-show="!AVAILABLE_AGENTS?.find(a => a.id === selectedAgent)">
 				@icon.Compass(icon.Props{Class: "size-5"})
 			</span>
-			<!-- Agent initial badge (shown when an agent is selected) -->
+			<!-- Agent icon (shown when an agent is selected) -->
 			<span
 				x-cloak
 				x-show="AVAILABLE_AGENTS?.find(a => a.id === selectedAgent)"
-				x-text="AVAILABLE_AGENTS?.find(a => a.id === selectedAgent)?.name?.charAt(0)?.toUpperCase() || ''"
-				class="size-5 flex items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold"
+				x-html="AVAILABLE_AGENTS?.find(a => a.id === selectedAgent)?.icon || ''"
+				class="size-5 flex items-center justify-center text-foreground [&_svg]:size-4"
 			></span>
 			<span class="sr-only">{ i18n.T(ctx, "Agents") }</span>
 		}

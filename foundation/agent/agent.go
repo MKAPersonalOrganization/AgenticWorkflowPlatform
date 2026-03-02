@@ -54,6 +54,7 @@ type AgentMetadata struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	Icon        string `json:"icon"`
 }
 
 // AgentListResponse represents the response containing a list of agents.

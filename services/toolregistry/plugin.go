@@ -30,10 +30,21 @@ type FactoryDeps struct {
 	MemoryService    any
 }
 
+// BuildIconSVG wraps Lucide-style inner SVG paths in a complete <svg> element.
+// The result uses stroke="currentColor" so it inherits the parent's text colour (theme-compatible).
+// Width/height are omitted — size the icon via CSS on the container.
+func BuildIconSVG(inner string) string {
+	return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">` + inner + `</svg>`
+}
+
 // PluginProvider defines the interface that each toolset plugin must implement.
 type PluginProvider interface {
 	// ID returns the unique identifier for the plugin.
 	ID() string
+
+	// Icon returns a complete theme-compatible SVG element representing this plugin.
+	// Use [BuildIconSVG] to create one from Lucide inner paths.
+	Icon() string
 
 	// DefaultSets returns the default tool sets provided by this plugin.
 	DefaultSets() []ToolSet
@@ -87,6 +98,24 @@ func GetAllPluginProviders() []PluginProvider {
 		return result[i].ID() < result[j].ID()
 	})
 	return result
+}
+
+// defaultIconSVG is the fallback icon (Lucide "puzzle") for unknown plugins.
+var defaultIconSVG = BuildIconSVG(`<path d="M15.39 4.39a1 1 0 0 0 1.68-.474 2.5 2.5 0 1 1 3.014 3.015 1 1 0 0 0-.474 1.68l1.683 1.682a2.414 2.414 0 0 1 0 3.414L19.61 15.39a1 1 0 0 1-1.68-.474 2.5 2.5 0 1 0-3.014 3.015 1 1 0 0 1 .474 1.68l-1.683 1.682a2.414 2.414 0 0 1-3.414 0L8.61 19.61a1 1 0 0 0-1.68.474 2.5 2.5 0 1 1-3.014-3.015 1 1 0 0 0 .474-1.68l-1.683-1.682a2.414 2.414 0 0 1 0-3.414L4.39 8.61a1 1 0 0 1 1.68.474 2.5 2.5 0 1 0 3.014-3.015 1 1 0 0 1-.474-1.68l1.683-1.682a2.414 2.414 0 0 1 3.414 0z"/>`)
+
+// GetPluginIcon returns the full SVG icon for the plugin that owns the given tool set ID.
+// Falls back to a puzzle icon if no provider claims the set.
+func GetPluginIcon(toolSetID string) string {
+	providersMu.RLock()
+	defer providersMu.RUnlock()
+	for _, p := range providers {
+		for _, ts := range p.DefaultSets() {
+			if ts.ID == toolSetID {
+				return p.Icon()
+			}
+		}
+	}
+	return defaultIconSVG
 }
 
 // GetUIHandledToolsJSON returns a JSON-encoded list of all tool names that possess a custom UI template.

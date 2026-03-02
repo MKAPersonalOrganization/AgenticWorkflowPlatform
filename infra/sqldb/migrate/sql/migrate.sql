@@ -431,3 +431,13 @@ CREATE INDEX IF NOT EXISTS idx_agent_store_catalog_tags ON agent_store_catalog U
 -- Description: Track which catalog entry a user-agent was forked from
 ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS source_catalog_id VARCHAR(255) NOT NULL DEFAULT '';
 CREATE INDEX IF NOT EXISTS idx_user_agents_source_catalog ON user_agents(user_id, source_catalog_id) WHERE source_catalog_id != '';
+
+-- Version: 1.32
+-- Description: Add icon column to user_agents
+ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS icon VARCHAR(50) NOT NULL DEFAULT '';
+
+-- Version: 1.33
+-- Description: Widen icon columns to TEXT for SVG markup; re-seed catalog with professional icons
+ALTER TABLE agent_store_catalog ALTER COLUMN icon_label TYPE TEXT;
+ALTER TABLE user_agents ALTER COLUMN icon TYPE TEXT;
+TRUNCATE TABLE agent_store_catalog;

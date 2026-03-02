@@ -149,10 +149,9 @@ templ ToolsSidebar() {
 								>
 									<!-- Plugin icon -->
 									<div
-										class="size-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 bg-primary/10 text-primary"
-									>
-										@icon.Blocks(icon.Props{Class: "size-4"})
-									</div>
+										class="size-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 bg-primary/10 text-primary [&_svg]:size-4"
+										x-html="plugin.icon"
+									></div>
 									<!-- Info -->
 									<div class="flex-1 min-w-0">
 										<div class="flex items-center gap-1.5">
@@ -198,10 +197,9 @@ templ ToolsSidebar() {
 							<div class="flex items-start gap-4">
 								<!-- Plugin icon -->
 								<div
-									class="size-11 rounded-lg flex items-center justify-center shrink-0 bg-primary/10 text-primary"
-								>
-									@icon.Puzzle(icon.Props{Class: "size-5"})
-								</div>
+									class="size-11 rounded-lg flex items-center justify-center shrink-0 bg-primary/10 text-primary [&_svg]:size-5"
+									x-html="profilePlugin.icon"
+								></div>
 								<div class="flex-1 min-w-0">
 									@dialog.Title(dialog.TitleProps{Class: "flex items-center gap-2"}) {
 										<span x-text="profilePlugin.name"></span>
@@ -231,29 +229,10 @@ templ ToolsSidebar() {
 								</span>
 							</div>
 						</div>
-						<!-- Tab switcher -->
-						<div class="flex items-center gap-0 border-b border-border px-4">
-							<button
-								@click="profileTab = 'details'"
-								class="px-3 py-2 text-xs font-medium transition-colors border-b-2 -mb-px"
-								:class="profileTab === 'details' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'"
-							>
-								@icon.Info(icon.Props{Class: "size-3.5 inline mr-1.5 -mt-px"})
-								{ i18n.T(ctx, "Details") }
-							</button>
-							<button
-								@click="profileTab = 'tools'"
-								class="px-3 py-2 text-xs font-medium transition-colors border-b-2 -mb-px"
-								:class="profileTab === 'tools' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'"
-							>
-								@icon.Wrench(icon.Props{Class: "size-3.5 inline mr-1.5 -mt-px"})
-								{ i18n.T(ctx, "Feature Contributions") }
-							</button>
-						</div>
-						<!-- Scrollable tab content -->
+						<!-- Scrollable content -->
 						<div class="flex-1 overflow-auto scrollbar-thin p-4">
-							<!-- ── Details tab ── -->
-							<div x-show="profileTab === 'details'">
+							<!-- Plugin details -->
+							<div>
 								<div class="space-y-5">
 									<p x-text="profilePlugin.description" class="text-sm text-muted-foreground leading-relaxed"></p>
 									<template x-if="profilePlugin.tools.length > 0">
@@ -292,41 +271,6 @@ templ ToolsSidebar() {
 										</div>
 									</div>
 								</div>
-							</div>
-							<!-- ── Feature Contributions tab ── -->
-							<div x-show="profileTab === 'tools'">
-								<template x-if="profilePlugin.tools.length === 0">
-									<div class="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
-										@icon.PackageOpen(icon.Props{Class: "size-10 opacity-20"})
-										<p class="text-sm">{ i18n.T(ctx, "No tools registered for this plugin") }</p>
-									</div>
-								</template>
-								<template x-if="profilePlugin.tools.length > 0">
-									<div class="space-y-2">
-										<template x-for="tool in profilePlugin.tools" :key="tool.id">
-											<div
-												class="group border rounded-lg overflow-hidden transition-all duration-200 border-l-[3px] hover:shadow-md border-border border-l-primary bg-card"
-											>
-												<div class="flex items-start gap-3 p-3">
-													<div
-														class="size-8 rounded-lg flex items-center justify-center shrink-0 bg-primary/10 text-primary"
-													>
-														@icon.Cog(icon.Props{Class: "size-3.5"})
-													</div>
-													<div class="flex flex-col gap-0.5 flex-1 min-w-0">
-														<div class="flex items-center gap-2">
-															<span x-text="tool.name" class="text-sm font-semibold text-foreground truncate"></span>
-															<template x-if="tool.category">
-																<span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-accent text-muted-foreground" x-text="tool.category"></span>
-															</template>
-														</div>
-														<div x-html="renderToolDescription(tool.description)" class="text-xs text-muted-foreground line-clamp-2 prose prose-xs dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-headings:my-1 prose-pre:my-1 prose-pre:text-[11px] prose-code:text-[11px] prose-code:before:content-none prose-code:after:content-none"></div>
-													</div>
-												</div>
-											</div>
-										</template>
-									</div>
-								</template>
 							</div>
 						</div>
 						@dialog.Footer(dialog.FooterProps{Class: "px-4 py-3 border-t mt-auto bg-muted/50"}) {

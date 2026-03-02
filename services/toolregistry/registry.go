@@ -322,7 +322,7 @@ func (r *Registry) initializeDefaultTools(ctx context.Context) error {
 		}
 	}
 
-	// Save tool sets first if they don't exist
+	// Save tool sets if they don't exist yet
 	for _, toolSet := range defaultToolSets {
 		if _, exists := r.toolSetCache[toolSet.ID]; !exists {
 			if err := r.repo.SaveToolSet(ctx, &toolSet); err != nil {
