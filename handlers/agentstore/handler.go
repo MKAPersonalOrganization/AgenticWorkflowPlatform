@@ -49,15 +49,16 @@ type UpdateRequest struct {
 
 // AgentResponse represents a single agent in API responses.
 type AgentResponse struct {
-	ID            string  `json:"id"`
-	Name          string  `json:"name"`
-	Description   string  `json:"description"`
-	SystemPrompt  string  `json:"systemPrompt"`
-	ModelID       string  `json:"modelId"`
-	MaxIterations int     `json:"maxIterations"`
-	Temperature   float64 `json:"temperature"`
-	CreatedAt     string  `json:"createdAt"`
-	UpdatedAt     string  `json:"updatedAt"`
+	ID              string  `json:"id"`
+	Name            string  `json:"name"`
+	Description     string  `json:"description"`
+	SystemPrompt    string  `json:"systemPrompt"`
+	ModelID         string  `json:"modelId"`
+	MaxIterations   int     `json:"maxIterations"`
+	Temperature     float64 `json:"temperature"`
+	SourceCatalogID string  `json:"sourceCatalogId,omitempty"`
+	CreatedAt       string  `json:"createdAt"`
+	UpdatedAt       string  `json:"updatedAt"`
 }
 
 // ListResponse represents the response for listing agents.
@@ -67,15 +68,16 @@ type ListResponse struct {
 
 func toAgentResponse(a *domain.AgentDefinition) AgentResponse {
 	return AgentResponse{
-		ID:            a.ID,
-		Name:          a.Name,
-		Description:   a.Description,
-		SystemPrompt:  a.SystemPrompt,
-		ModelID:       a.ModelID,
-		MaxIterations: a.MaxIterations,
-		Temperature:   a.Temperature,
-		CreatedAt:     a.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		UpdatedAt:     a.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+		ID:              a.ID,
+		Name:            a.Name,
+		Description:     a.Description,
+		SystemPrompt:    a.SystemPrompt,
+		ModelID:         a.ModelID,
+		MaxIterations:   a.MaxIterations,
+		Temperature:     a.Temperature,
+		SourceCatalogID: a.SourceCatalogID,
+		CreatedAt:       a.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt:       a.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
 }
 

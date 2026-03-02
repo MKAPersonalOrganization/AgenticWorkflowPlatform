@@ -63,6 +63,7 @@ import (
 	"school-with-ai/services/toolregistry"
 	"school-with-ai/services/workspacepermissions"
 
+	agentcataloghandlers "school-with-ai/handlers/agentcatalog"
 	agentstorehandlers "school-with-ai/handlers/agentstore"
 	aguihandlers "school-with-ai/handlers/agui"
 	aiSettingsHandlers "school-with-ai/handlers/aisettings"
@@ -260,12 +261,20 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Initialize Student Profile Repository
 	studentProfileRepo := sqldb.NewPostgresStudentProfileRepository(db)
 	userPreferenceRepo := sqldb.NewPostgresUserPreferenceRepository(db)
+	agentCatalogRepo := sqldb.NewPostgresAgentCatalogRepository(db)
 	resourcesRepo := sqldb.NewPostgresResourcesRepository(db)
 
 	// Run migrations
 	log.Info(ctx, "startup", "status", "running database migrations")
 	if err := migrate.Migrate(ctx, db); err != nil {
 		return fmt.Errorf("migrating database: %w", err)
+	}
+
+	// Seed agent store catalog (only inserts if table is empty)
+	log.Info(ctx, "startup", "status", "seeding agent store catalog")
+	seedEntries := agentcataloghandlers.SeedCatalog()
+	if err := agentCatalogRepo.Seed(ctx, seedEntries); err != nil {
+		return fmt.Errorf("seeding agent catalog: %w", err)
 	}
 
 	// -------------------------------------------------------------------------
@@ -597,6 +606,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Agent Store Handler
 	agentStoreHandler := agentstorehandlers.NewHandler(log, agentStoreService, authSvc)
 
+	// Agent Catalog Handler (shared agent store)
+	agentCatalogHandler := agentcataloghandlers.NewHandler(log, agentCatalogRepo, agentDefRepo)
+
 	// Banner Handler
 	bannerHandler := bannerhandlers.NewHandler(log)
 	r.Get("/api/banner", authMiddleware.RequireAuthFunc(bannerHandler.GetBanner))
@@ -676,6 +688,11 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Get("/v1/agent-definitions/{id}", authMiddleware.RequireAuthFunc(agentStoreHandler.Get))
 	r.Put("/v1/agent-definitions/{id}", authMiddleware.RequireAuthFunc(agentStoreHandler.Update))
 	r.Delete("/v1/agent-definitions/{id}", authMiddleware.RequireAuthFunc(agentStoreHandler.Delete))
+
+	// Agent Catalog routes (shared agent store)
+	r.Get("/v1/agent-catalog", authMiddleware.RequireAuthFunc(agentCatalogHandler.List))
+	r.Get("/v1/agent-catalog/search", authMiddleware.RequireAuthFunc(agentCatalogHandler.Search))
+	r.Post("/v1/agent-catalog/{id}/add", authMiddleware.RequireAuthFunc(agentCatalogHandler.AddToMyAgents))
 
 	// Plugin endpoints (agent-agnostic, agent_id via query param)
 	r.Get("/v1/plugins", authMiddleware.RequireAuthFunc(handler.ListPlugins))

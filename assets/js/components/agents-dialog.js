@@ -1,10 +1,12 @@
 /**
  * Agents Manager Component
  * Handles agent CRUD operations, search, selection, and per-agent tool/KB wiring
+ * Now includes Agent Store (shared catalog) tab for browsing and adding pre-built agents.
  */
 export const agentsManager = () => ({
     // State
     view: 'list', // 'list' | 'form' | 'delete'
+    activeTab: 'my-agents', // 'my-agents' | 'store'
     agents: [],
     filteredAgents: [],
     loading: false,
@@ -34,10 +36,26 @@ export const agentsManager = () => ({
     // Delete state
     deletingAgent: null,
 
+    // ── Agent Store state ──
+    storeEntries: [],
+    storeCategories: [],
+    storeSearchQuery: '',
+    selectedCategory: '',
+    storeLoading: false,
+    storeAddingIds: [], // catalog IDs currently being added
+    addedCatalogIds: [], // catalog IDs that the user has already added
+    storeSuccessId: null, // catalog ID that was just successfully added (for inline toast)
+    storeTotal: 0,
+
     async open() {
         this.view = 'list';
         this.searchQuery = '';
+        this.storeSuccessId = null;
         await this.fetchAgents();
+        // Pre-fetch store data in background
+        if (this.storeEntries.length === 0) {
+            await this.fetchCatalog();
+        }
     },
 
     // ============================================
@@ -325,6 +343,125 @@ export const agentsManager = () => ({
         } catch (err) {
             console.error('Failed to toggle agent workspace:', err);
         }
+    },
+
+    // ============================================
+    // Agent Store (shared catalog)
+    // ============================================
+
+    switchTab(tab) {
+        this.activeTab = tab;
+        if (tab === 'store' && this.storeEntries.length === 0) {
+            this.fetchCatalog();
+        }
+    },
+
+    async fetchCatalog() {
+        this.storeLoading = true;
+        try {
+            let url = '/v1/agent-catalog?limit=100';
+            if (this.selectedCategory) {
+                url += `&category=${encodeURIComponent(this.selectedCategory)}`;
+            }
+            const response = await fetch(url);
+            if (response.ok) {
+                const data = await response.json();
+                this.storeEntries = data.entries || [];
+                this.storeTotal = data.total || 0;
+                if (data.categories && data.categories.length > 0) {
+                    this.storeCategories = data.categories;
+                }
+                // Server provides the authoritative set of already-added catalog IDs
+                this.addedCatalogIds = data.addedCatalogIds || [];
+            }
+        } catch (err) {
+            console.error('Failed to fetch agent catalog:', err);
+        } finally {
+            this.storeLoading = false;
+        }
+    },
+
+    async searchCatalog() {
+        if (!this.storeSearchQuery.trim()) {
+            this.fetchCatalog();
+            return;
+        }
+        this.storeLoading = true;
+        try {
+            const response = await fetch(`/v1/agent-catalog/search?q=${encodeURIComponent(this.storeSearchQuery)}`);
+            if (response.ok) {
+                const data = await response.json();
+                this.storeEntries = data.entries || [];
+                this.storeTotal = data.total || 0;
+                // Server provides the authoritative set
+                if (data.addedCatalogIds) {
+                    this.addedCatalogIds = data.addedCatalogIds;
+                }
+            }
+        } catch (err) {
+            console.error('Failed to search agent catalog:', err);
+        } finally {
+            this.storeLoading = false;
+        }
+    },
+
+    filterByCategory(category) {
+        this.selectedCategory = this.selectedCategory === category ? '' : category;
+        this.storeSearchQuery = '';
+        this.fetchCatalog();
+    },
+
+    async addFromStore(entry) {
+        // Prevent adding if already added or currently adding
+        if (this.addedCatalogIds.includes(entry.id)) return;
+        if (this.storeAddingIds.includes(entry.id)) return;
+        this.storeAddingIds.push(entry.id);
+        try {
+            const response = await fetch(`/v1/agent-catalog/${entry.id}/add`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            if (response.ok) {
+                // Mark as added — stay on the store tab so user can keep browsing
+                if (!this.addedCatalogIds.includes(entry.id)) {
+                    this.addedCatalogIds.push(entry.id);
+                }
+                // Refresh agents list in the background
+                this.fetchAgents();
+                // Show brief inline success toast
+                this.storeSuccessId = entry.id;
+                setTimeout(() => {
+                    if (this.storeSuccessId === entry.id) this.storeSuccessId = null;
+                }, 2500);
+            } else if (response.status === 409) {
+                // Already added (race condition or stale UI) — just mark it
+                if (!this.addedCatalogIds.includes(entry.id)) {
+                    this.addedCatalogIds.push(entry.id);
+                }
+            } else {
+                const errData = await response.text();
+                console.error('Failed to add agent from store:', response.status, errData);
+                try {
+                    const errJson = JSON.parse(errData);
+                    alert(errJson.error || 'Failed to add agent');
+                } catch {
+                    alert('Failed to add agent');
+                }
+            }
+        } catch (err) {
+            console.error('Failed to add agent from store:', err);
+            alert('Failed to add agent');
+        } finally {
+            this.storeAddingIds = this.storeAddingIds.filter(id => id !== entry.id);
+        }
+    },
+
+    isStoreAdding(id) {
+        return this.storeAddingIds.includes(id);
+    },
+
+    get filteredStoreEntries() {
+        return this.storeEntries;
     },
 
     // ============================================
