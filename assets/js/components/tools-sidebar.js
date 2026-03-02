@@ -7,7 +7,7 @@
  * Detail panel: Opens in the editor area with profile info + enable/disable + per-tool toggles.
  */
 export const toolsSidebar = () => ({
-    open: false,
+    open: localStorage.getItem('toolsSidebarOpen') === 'true',
     plugins: [],
     loading: false,
     search: '',
@@ -19,6 +19,16 @@ export const toolsSidebar = () => ({
     profileTab: 'details',
 
     init() {
+        // Restore tools sidebar — if it was open, load plugins eagerly
+        if (this.open && !this._loaded) {
+            this.fetchPlugins().then(() => { this._loaded = true; });
+            // Also collapse thread-history-sidebar since tools sidebar is open
+            const wrapper = document.querySelector('[data-tui-sidebar-wrapper][data-tui-sidebar-id="thread-history-sidebar"]');
+            if (wrapper && wrapper.getAttribute('data-tui-sidebar-state') === 'expanded') {
+                wrapper.setAttribute('data-tui-sidebar-state', 'collapsed');
+            }
+        }
+
         // Refresh plugins when MCP connection state changes
         window.addEventListener('mcp-state-changed', () => {
             this.fetchPlugins();
@@ -33,6 +43,7 @@ export const toolsSidebar = () => ({
                         m.target.getAttribute('data-tui-sidebar-state') === 'expanded' &&
                         this.open) {
                         this.open = false;
+                        localStorage.setItem('toolsSidebarOpen', 'false');
                     }
                 }
             }).observe(threadSidebar, {
@@ -44,6 +55,7 @@ export const toolsSidebar = () => ({
 
     async toggle() {
         this.open = !this.open;
+        localStorage.setItem('toolsSidebarOpen', this.open ? 'true' : 'false');
         if (this.open) {
             // Collapse thread-history-sidebar
             const wrapper = document.querySelector('[data-tui-sidebar-wrapper][data-tui-sidebar-id="thread-history-sidebar"]');

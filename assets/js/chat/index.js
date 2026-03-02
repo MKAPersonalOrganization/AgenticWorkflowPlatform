@@ -334,6 +334,12 @@ document.addEventListener('alpine:init', () => {
                 this.$nextTick(() => {
                     this.__setupScrollObservers();
                     this.__setupIntersectionObserver();
+
+                    // Sync Alpine sidebarOpen with the actual DOM sidebar state
+                    const sidebarWrapper = document.querySelector('[data-tui-sidebar-wrapper][data-tui-sidebar-id="thread-history-sidebar"]');
+                    if (sidebarWrapper) {
+                        this.sidebarOpen = sidebarWrapper.getAttribute('data-tui-sidebar-state') === 'expanded';
+                    }
                 });
 
                 // ── Async data loading (via microtask to not block init) ──
@@ -397,6 +403,11 @@ document.addEventListener('alpine:init', () => {
                     // Theme watcher: centralized side-effect trigger
                     this.$watch('preferences.theme', (newTheme) => {
                         this.applyThemeEffects(newTheme);
+                    }),
+
+                    // Persist activeView (sidepanel tab) to localStorage
+                    this.$watch('activeView', (newView) => {
+                        localStorage.setItem('activeView', newView || '');
                     }),
                 );
 

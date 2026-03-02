@@ -3,6 +3,7 @@ package toolregistry
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -148,6 +149,10 @@ func (r *Registry) ListTools(ctx context.Context) ([]Tool, error) {
 		tools = append(tools, *tool)
 	}
 
+	sort.Slice(tools, func(i, j int) bool {
+		return tools[i].ID < tools[j].ID
+	})
+
 	return tools, nil
 }
 
@@ -218,6 +223,10 @@ func (r *Registry) ListToolSets(ctx context.Context) ([]ToolSet, error) {
 	for _, toolSet := range r.toolSetCache {
 		toolSets = append(toolSets, *toolSet)
 	}
+
+	sort.Slice(toolSets, func(i, j int) bool {
+		return toolSets[i].ID < toolSets[j].ID
+	})
 
 	return toolSets, nil
 }

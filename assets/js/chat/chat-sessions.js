@@ -43,17 +43,58 @@ export function createSessionMethods() {
 
                     // Get or create current thread ID
                     const savedThreadId = localStorage.getItem('currentThreadId');
-                    if (!savedThreadId || !this.sessions.find(s => s.id === savedThreadId)) {
+                    if (!savedThreadId) {
+                        // No saved thread — pick first or create new
                         if (this.sessions.length > 0) {
                             this.switchSession(this.sessions[0].id);
                         } else {
                             this.createNewSession();
                         }
-                    } else {
-                        // Load existing messages for this thread
+                    } else if (this.sessions.find(s => s.id === savedThreadId)) {
+                        // Saved thread is in the loaded page — restore it
                         this.__currentThreadId = savedThreadId;
                         this.__currentState = this.__getThreadState(savedThreadId);
                         await this.__loadMessages(savedThreadId);
+                    } else {
+                        // Saved thread not in first page — try loading it directly
+                        try {
+                            const msgResp = await fetch(`/api/agui/threads/${savedThreadId}/messages`);
+                            if (msgResp.ok) {
+                                // Thread exists on server — restore it and prepend to session list
+                                this.sessions.unshift({
+                                    id: savedThreadId,
+                                    title: window.i18n.t('New Chat'),
+                                    groupTitle: null,
+                                    lastMessage: new Date().toISOString()
+                                });
+                                this.__currentThreadId = savedThreadId;
+                                this.__currentState = this.__getThreadState(savedThreadId);
+                                const data = await msgResp.json();
+                                const state = this.__getThreadState(savedThreadId);
+                                const messages = Array.isArray(data) ? data : (data.messages || []);
+                                state.messages = this.__convertBackendMessagesToUI(messages, data.toolStates || {}, savedThreadId, data.messageAttachments || {});
+                                this.__syncThreadToolStates(state.messages, data.toolStates || {}, savedThreadId);
+                                if (data.tokenUsage) {
+                                    state.tokenUsage = this.__mapTokenUsage ? this.__mapTokenUsage(data.tokenUsage) : data.tokenUsage;
+                                }
+                                this.$nextTick(() => this.__scrollToBottom({ behavior: 'auto', force: true }));
+                            } else {
+                                // Thread no longer exists — pick first or create new
+                                localStorage.removeItem('currentThreadId');
+                                if (this.sessions.length > 0) {
+                                    this.switchSession(this.sessions[0].id);
+                                } else {
+                                    this.createNewSession();
+                                }
+                            }
+                        } catch (_e) {
+                            // Network error — fall back to first session
+                            if (this.sessions.length > 0) {
+                                this.switchSession(this.sessions[0].id);
+                            } else {
+                                this.createNewSession();
+                            }
+                        }
                     }
 
                 } else {

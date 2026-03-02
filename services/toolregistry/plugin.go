@@ -3,6 +3,7 @@ package toolregistry
 import (
 	"context"
 	"encoding/json"
+	"sort"
 	"sync"
 
 	"github.com/a-h/templ"
@@ -82,6 +83,9 @@ func GetAllPluginProviders() []PluginProvider {
 	for _, p := range providers {
 		result = append(result, p)
 	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].ID() < result[j].ID()
+	})
 	return result
 }
 
