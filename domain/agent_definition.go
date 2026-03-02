@@ -8,16 +8,17 @@ import (
 // AgentDefinition represents a user-created agent definition.
 // Each user can create agents that are scoped only to them.
 type AgentDefinition struct {
-	ID            string    `json:"id" db:"id"`
-	UserID        string    `json:"user_id" db:"user_id"`
-	Name          string    `json:"name" db:"name"`
-	Description   string    `json:"description" db:"description"`
-	SystemPrompt  string    `json:"system_prompt" db:"system_prompt"`
-	ModelID       string    `json:"model_id,omitempty" db:"model_id"`
-	MaxIterations int       `json:"max_iterations" db:"max_iterations"`
-	Temperature   float64   `json:"temperature" db:"temperature"`
-	CreatedAt     time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at" db:"updated_at"`
+	ID              string    `json:"id" db:"id"`
+	UserID          string    `json:"user_id" db:"user_id"`
+	Name            string    `json:"name" db:"name"`
+	Description     string    `json:"description" db:"description"`
+	SystemPrompt    string    `json:"system_prompt" db:"system_prompt"`
+	ModelID         string    `json:"model_id,omitempty" db:"model_id"`
+	MaxIterations   int       `json:"max_iterations" db:"max_iterations"`
+	Temperature     float64   `json:"temperature" db:"temperature"`
+	SourceCatalogID string    `json:"source_catalog_id,omitempty" db:"source_catalog_id"`
+	CreatedAt       time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at" db:"updated_at"`
 }
 
 // InitialAgentTemplate returns the template used to seed a user's first agent.
@@ -57,4 +58,12 @@ type AgentDefinitionRepository interface {
 	// zero agents. Returns the first agent (by creation time). This is NOT
 	// a "default" — the user can rename, edit, or delete it like any other.
 	EnsureInitialAgent(ctx context.Context, userID string) (*AgentDefinition, error)
+
+	// ListAddedCatalogIDs returns the set of catalog entry IDs that the
+	// user has already forked into their personal agents.
+	ListAddedCatalogIDs(ctx context.Context, userID string) ([]string, error)
+
+	// ExistsByCatalogID checks whether the user already has an agent
+	// forked from the given catalog entry. Used to prevent duplicates.
+	ExistsByCatalogID(ctx context.Context, userID, catalogID string) (bool, error)
 }

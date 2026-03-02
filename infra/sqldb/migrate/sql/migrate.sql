@@ -404,3 +404,30 @@ CREATE TABLE IF NOT EXISTS user_preferences (
 );
 
 CREATE INDEX IF NOT EXISTS idx_user_preferences_user ON user_preferences(user_id);
+
+-- Version: 1.30
+-- Description: Create agent store catalog table for shared pre-built agents
+CREATE TABLE IF NOT EXISTS agent_store_catalog (
+    id            VARCHAR(255) PRIMARY KEY,
+    name          VARCHAR(255) NOT NULL,
+    description   TEXT NOT NULL DEFAULT '',
+    system_prompt TEXT NOT NULL DEFAULT '',
+    category      VARCHAR(255) NOT NULL DEFAULT '',
+    tags          TEXT[] NOT NULL DEFAULT '{}',
+    author_name   VARCHAR(255) NOT NULL DEFAULT '',
+    icon_label    VARCHAR(50) NOT NULL DEFAULT '',
+    featured      BOOLEAN NOT NULL DEFAULT FALSE,
+    add_count     INTEGER NOT NULL DEFAULT 0,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_store_catalog_category ON agent_store_catalog(category);
+CREATE INDEX IF NOT EXISTS idx_agent_store_catalog_name ON agent_store_catalog(name);
+CREATE INDEX IF NOT EXISTS idx_agent_store_catalog_featured ON agent_store_catalog(featured) WHERE featured = TRUE;
+CREATE INDEX IF NOT EXISTS idx_agent_store_catalog_tags ON agent_store_catalog USING GIN (tags);
+
+-- Version: 1.31
+-- Description: Track which catalog entry a user-agent was forked from
+ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS source_catalog_id VARCHAR(255) NOT NULL DEFAULT '';
+CREATE INDEX IF NOT EXISTS idx_user_agents_source_catalog ON user_agents(user_id, source_catalog_id) WHERE source_catalog_id != '';
