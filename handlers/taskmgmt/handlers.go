@@ -533,6 +533,14 @@ func (h *TaskManagementHandler) ListAgents(w http.ResponseWriter, r *http.Reques
 			Name:        a.Name(),
 			Description: a.Description(),
 		}
+		if ip, ok := a.(interface{ Icon() string }); ok {
+			if icon := ip.Icon(); strings.HasPrefix(icon, "<svg") {
+				meta.Icon = icon
+			}
+		}
+		if meta.Icon == "" {
+			meta.Icon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>`
+		}
 		response.Agents = append(response.Agents, meta)
 	}
 
@@ -1068,6 +1076,7 @@ type PluginResponse struct {
 	Name        string              `json:"name"`
 	Description string              `json:"description"`
 	Category    string              `json:"category"`
+	Icon        string              `json:"icon"`
 	Enabled     bool                `json:"enabled"`
 	Tools       []ToolInSetResponse `json:"tools"`
 }
@@ -1134,6 +1143,7 @@ func (h *TaskManagementHandler) ListPlugins(w http.ResponseWriter, r *http.Reque
 			Name:        toolSet.Name,
 			Description: toolSet.Description,
 			Category:    toolSet.Category,
+			Icon:        toolregistry.GetPluginIcon(toolSet.ID),
 			Enabled:     enabledToolSets[toolSet.ID],
 			Tools:       toolResponses,
 		})

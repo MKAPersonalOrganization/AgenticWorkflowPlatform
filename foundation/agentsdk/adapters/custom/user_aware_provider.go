@@ -122,6 +122,7 @@ func (p *UserAwareAgentProvider) agentFromDefinition(def *domain.AgentDefinition
 		Agent:       a,
 		displayName: def.Name,
 		id:          def.ID,
+		icon:        def.Icon,
 	}
 }
 
@@ -130,8 +131,10 @@ type dbAgent struct {
 	agent.Agent
 	displayName string
 	id          string
+	icon        string
 }
 
 func (a *dbAgent) ID() agent.ID        { return a.id }
 func (a *dbAgent) Name() string        { return a.displayName }
 func (a *dbAgent) Description() string { return a.Agent.Description() }
+func (a *dbAgent) Icon() string        { return a.icon }

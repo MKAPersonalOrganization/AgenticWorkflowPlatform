@@ -6,6 +6,7 @@
  * Sidebar: Search & browse only (like VS Code / IntelliJ extensions sidebar).
  * Detail panel: Opens in the editor area with profile info + enable/disable + per-tool toggles.
  */
+
 export const toolsSidebar = () => ({
     open: localStorage.getItem('toolsSidebarOpen') === 'true',
     plugins: [],

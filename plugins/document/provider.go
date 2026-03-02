@@ -7,15 +7,16 @@ import (
 	"github.com/a-h/templ"
 
 	"school-with-ai/foundation/agent"
-	"school-with-ai/services/toolregistry"
 	"school-with-ai/services/artifact"
+	"school-with-ai/services/toolregistry"
 )
 
 // Provider implements the toolregistry.PluginProvider interface for the Document toolset.
 type Provider struct{}
 
-func (p *Provider) ID() string {
-	return "document"
+func (p *Provider) ID() string { return "document" }
+func (p *Provider) Icon() string {
+	return toolregistry.BuildIconSVG(`<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>`)
 }
 
 func (p *Provider) DefaultSets() []toolregistry.ToolSet {

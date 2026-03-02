@@ -7,15 +7,16 @@ import (
 	"github.com/a-h/templ"
 
 	"school-with-ai/foundation/agent"
-	"school-with-ai/services/toolregistry"
 	"school-with-ai/services/memory"
+	"school-with-ai/services/toolregistry"
 )
 
 // Provider implements the toolregistry.PluginProvider interface for the Memory toolset.
 type Provider struct{}
 
-func (p *Provider) ID() string {
-	return "memory"
+func (p *Provider) ID() string { return "memory" }
+func (p *Provider) Icon() string {
+	return toolregistry.BuildIconSVG(`<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/>`)
 }
 
 func (p *Provider) DefaultSets() []toolregistry.ToolSet {

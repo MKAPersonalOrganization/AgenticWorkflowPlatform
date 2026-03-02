@@ -4,6 +4,7 @@ package agentstore
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"school-with-ai/domain"
 	"school-with-ai/foundation/logger"
@@ -56,6 +57,7 @@ type AgentResponse struct {
 	ModelID         string  `json:"modelId"`
 	MaxIterations   int     `json:"maxIterations"`
 	Temperature     float64 `json:"temperature"`
+	Icon            string  `json:"icon"`
 	SourceCatalogID string  `json:"sourceCatalogId,omitempty"`
 	CreatedAt       string  `json:"createdAt"`
 	UpdatedAt       string  `json:"updatedAt"`
@@ -64,6 +66,17 @@ type AgentResponse struct {
 // ListResponse represents the response for listing agents.
 type ListResponse struct {
 	Agents []AgentResponse `json:"agents"`
+}
+
+// defaultAgentIconSVG is the fallback icon (bot) for agents without a valid SVG icon.
+var defaultAgentIconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>`
+
+// agentIconOrDefault returns the icon if it's a valid SVG, otherwise the default bot icon.
+func agentIconOrDefault(icon string) string {
+	if strings.HasPrefix(icon, "<svg") {
+		return icon
+	}
+	return defaultAgentIconSVG
 }
 
 func toAgentResponse(a *domain.AgentDefinition) AgentResponse {
@@ -75,6 +88,7 @@ func toAgentResponse(a *domain.AgentDefinition) AgentResponse {
 		ModelID:         a.ModelID,
 		MaxIterations:   a.MaxIterations,
 		Temperature:     a.Temperature,
+		Icon:            agentIconOrDefault(a.Icon),
 		SourceCatalogID: a.SourceCatalogID,
 		CreatedAt:       a.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		UpdatedAt:       a.UpdatedAt.Format("2006-01-02T15:04:05Z"),

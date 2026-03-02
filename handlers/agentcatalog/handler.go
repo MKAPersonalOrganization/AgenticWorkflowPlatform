@@ -204,6 +204,7 @@ func (h *Handler) AddToMyAgents(w http.ResponseWriter, r *http.Request) {
 		Name:            entry.Name,
 		Description:     entry.Description,
 		SystemPrompt:    entry.SystemPrompt,
+		Icon:            entry.IconLabel,
 		SourceCatalogID: catalogID,
 		MaxIterations:   20,
 		Temperature:     0.7,
