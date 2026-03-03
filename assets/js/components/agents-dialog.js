@@ -13,6 +13,9 @@ export const agentsManager = () => ({
     saving: false,
     searchQuery: '',
 
+    // Currently active agent (synced from localStorage / chat component)
+    selectedAgent: localStorage.getItem('selectedAgent') || '',
+
     // Form state
     editingAgent: null, // null = create mode, object = edit mode
     form: {
@@ -51,6 +54,8 @@ export const agentsManager = () => ({
         this.view = 'list';
         this.searchQuery = '';
         this.storeSuccessId = null;
+        // Refresh the active agent from localStorage (set by the chat component)
+        this.selectedAgent = localStorage.getItem('selectedAgent') || '';
         await this.fetchAgents();
         // Pre-fetch store data in background
         if (this.storeEntries.length === 0) {
@@ -96,15 +101,26 @@ export const agentsManager = () => ({
     },
 
     applyFilter() {
+        let results;
         if (!this.searchQuery.trim()) {
-            this.filteredAgents = [...this.agents];
+            results = [...this.agents];
         } else {
             const q = this.searchQuery.toLowerCase();
-            this.filteredAgents = this.agents.filter(a =>
+            results = this.agents.filter(a =>
                 a.name.toLowerCase().includes(q) ||
                 (a.description && a.description.toLowerCase().includes(q))
             );
         }
+        // Pin the active agent to the top of the list
+        const activeId = this.selectedAgent;
+        if (activeId) {
+            results.sort((a, b) => {
+                if (a.id === activeId) return -1;
+                if (b.id === activeId) return 1;
+                return 0;
+            });
+        }
+        this.filteredAgents = results;
     },
 
     // ============================================
@@ -234,6 +250,7 @@ export const agentsManager = () => ({
     // ============================================
 
     selectAgentForChat(agentId) {
+        this.selectedAgent = agentId;
         window.dispatchEvent(new CustomEvent('agent-selected', {
             detail: { id: agentId }
         }));
