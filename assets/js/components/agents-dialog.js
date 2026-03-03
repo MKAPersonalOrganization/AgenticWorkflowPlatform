@@ -214,7 +214,6 @@ export const agentsManager = () => ({
                 method: 'DELETE',
             });
             if (response.ok) {
-                this.deletingAgent = null;
                 await this.fetchAgents();
                 this.view = 'list';
             } else {

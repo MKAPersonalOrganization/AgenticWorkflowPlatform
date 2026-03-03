@@ -674,6 +674,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Get("/v1/tasks/{id}:subscribe", authMiddleware.RequireAuthFunc(handler.StreamJobEvents))
 	r.Post("/v1/tasks/{id}:cancel", authMiddleware.RequireAuthFunc(handler.CancelJob))
 	r.Get("/v1/agents", authMiddleware.RequireAuthFunc(handler.ListAgents))
+	r.Get("/v1/agents/{agentId}", authMiddleware.RequireAuthFunc(handler.GetAgent))
 	r.Get("/v1/threads/{threadId}/artifacts", authMiddleware.RequireAuthFunc(handler.ListArtifacts))
 	r.Get("/v1/threads/{threadId}/artifacts/{fileName}", authMiddleware.RequireAuthFunc(handler.DownloadArtifact))
 	r.Get("/v1/memory", authMiddleware.RequireAuthFunc(handler.GetMemory))
