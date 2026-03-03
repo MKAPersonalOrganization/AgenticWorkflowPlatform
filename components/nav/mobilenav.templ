@@ -6,10 +6,11 @@ import "school-with-ai/components/i18n"
 // (matches LibreChat's MobileNav.tsx).
 templ MobileNav() {
 	<div class="sticky top-0 z-10 flex min-h-[40px] items-center justify-center bg-background pl-1 md:hidden">
-		<!-- Sidebar Toggle -->
+		<!-- Thread History Toggle (opens dialog) -->
 		<button
 			type="button"
-			data-tui-sheet-trigger="thread-history-sidebar-mobile"
+			data-tui-dialog-trigger="threads-dialog"
+			@click="$dispatch('open-threads-dialog')"
 			aria-label={ i18n.T(ctx, "Toggle sidebar") }
 			class="m-1 inline-flex size-10 items-center justify-center rounded-full hover:bg-accent/50 transition-colors"
 		>
@@ -19,7 +20,6 @@ templ MobileNav() {
 			</svg>
 		</button>
 		<!-- Title -->
-
 		<!-- New Chat -->
 		<button
 			type="button"
