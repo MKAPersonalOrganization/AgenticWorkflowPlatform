@@ -89,6 +89,7 @@ export function createInitialState() {
         renameTitle: '',
 
         selectedAgent: localStorage.getItem('selectedAgent') || '',
+        currentAgentData: null,
 
         // UI state
         sessions: [],

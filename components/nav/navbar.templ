@@ -7,15 +7,14 @@ import (
 	"school-with-ai/components/i18n"
 	"school-with-ai/components/icon"
 	"school-with-ai/components/resources"
-	"school-with-ai/components/sheet"
+	"school-with-ai/components/threads"
 	"school-with-ai/components/tools"
 	"school-with-ai/domain"
 )
 
 type NavbarProps struct {
-	SidebarID string
-	Class     string
-	User      *domain.User // Authenticated user (nil if not authenticated)
+	Class string
+	User  *domain.User // Authenticated user (nil if not authenticated)
 }
 
 templ Navbar(props ...NavbarProps) {
@@ -23,46 +22,14 @@ templ Navbar(props ...NavbarProps) {
 	if len(props) > 0 {
 		{{ p = props[0] }}
 	}
-	if p.SidebarID == "" {
-		{{ p.SidebarID = "thread-history-sidebar" }}
-	}
 	<!-- Left Navigation Bar -->
 	<nav
 		class={ "h-full w-12 bg-sidebar flex flex-col items-center py-4 gap-4 transition-opacity duration-200 border-e border-sidebar-border shrink-0 z-40", p.Class }
 		id="main-navbar"
-		data-navbar-for={ p.SidebarID }
 	>
 		if p.User != nil {
-			<!-- Sidebar Toggle Button (Mobile) -->
-			<div class="md:hidden">
-				@sheet.Trigger(sheet.TriggerProps{
-					For: p.SidebarID + "-mobile",
-				}) {
-					@button.Button(button.Props{
-						Size:    button.SizeIcon,
-						Variant: button.VariantGhost,
-						Class:   "size-9",
-					}) {
-						@icon.PanelLeft(icon.Props{Class: "size-5"})
-						<span class="sr-only">{ i18n.T(ctx, "Open Thread History") }</span>
-					}
-				}
-			</div>
-			<!-- Sidebar Toggle Button (Desktop) -->
-			<div class="hidden md:block">
-				@button.Button(button.Props{
-					Size:    button.SizeIcon,
-					Variant: button.VariantGhost,
-					Class:   "size-9",
-					Attributes: templ.Attributes{
-						"data-tui-sidebar-trigger": true,
-						"data-tui-sidebar-target":  p.SidebarID,
-					},
-				}) {
-					@icon.PanelLeft(icon.Props{Class: "size-5"})
-					<span class="sr-only">{ i18n.T(ctx, "Open Thread History") }</span>
-				}
-			</div>
+			<!-- Chat History Button -->
+			@threads.ThreadsButtonTrigger()
 			<!-- Resources Button -->
 			<div class="hidden md:block">
 				@resources.ResourcesButtonTrigger()

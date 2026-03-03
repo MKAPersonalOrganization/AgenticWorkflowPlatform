@@ -22,6 +22,7 @@ import (
 	"school-with-ai/components/sidepanel"
 	"school-with-ai/components/tabs"
 	"school-with-ai/components/textarea"
+	"school-with-ai/components/threads"
 	"school-with-ai/domain"
 )
 
@@ -117,7 +118,6 @@ templ ChatInputScreen(user *domain.User) {
 			<!-- Sidebar Layout -->
 			<div class="flex-1 min-h-0 overflow-hidden">
 				@sidebar.Layout(sidebar.LayoutProps{Class: "h-full min-h-0"}) {
-					@nav.Nav()
 					<!-- Main Content Area -->
 					<div class="flex-1 flex h-full overflow-hidden relative">
 						<!-- Main Chat Panel -->
@@ -218,6 +218,8 @@ templ ChatInputScreen(user *domain.User) {
 					</div>
 				}
 			</div>
+			<!-- Thread History Dialog -->
+			@threads.ThreadsDialog()
 			<!-- Keyboard Shortcuts Dialog -->
 			<div x-show="showKeyboardShortcuts" x-cloak>
 				@dialog.Dialog(dialog.Props{Open: true}) {
