@@ -43,6 +43,38 @@ selfservice:
       enabled: true
     code:
       enabled: true
+      config:
+        lifespan: 15m
+      passwordless_enabled: true
+    oidc:
+      enabled: true
+      config:
+        providers:
+          - id: google
+            provider: google
+            # Overridden at runtime via environment variables:
+            # SELFSERVICE_METHODS_OIDC_CONFIG_PROVIDERS_0_CLIENT_ID
+            # SELFSERVICE_METHODS_OIDC_CONFIG_PROVIDERS_0_CLIENT_SECRET
+            client_id: ""
+            client_secret: ""
+            scope:
+              - openid
+              - email
+              - profile
+            mapper_url: file:///etc/config/kratos/oidc.google.jsonnet
+          # Apple Sign-In requires HTTPS on a registered domain.
+          # Uncomment for staging/production deployments.
+          # - id: apple
+          #   provider: apple
+          #   client_id: env://OIDC_APPLE_CLIENT_ID
+          #   apple_team_id: env://OIDC_APPLE_TEAM_ID
+          #   apple_private_key_id: env://OIDC_APPLE_PRIVATE_KEY_ID
+          #   apple_private_key: env://OIDC_APPLE_PRIVATE_KEY
+          #   scope:
+          #     - openid
+          #     - email
+          #     - name
+          #   mapper_url: file:///etc/config/kratos/oidc.apple.jsonnet
 
   flows:
     error:
@@ -86,13 +118,17 @@ selfservice:
           hooks:
             - hook: session
             - hook: show_verification_ui
+        oidc:
+          hooks:
+            - hook: session
+        code:
+          hooks:
+            - hook: session
 
 log:
   level: info
   format: json
   leak_sensitive_values: false
-
-
 
 ciphers:
   algorithm: xchacha20-poly1305

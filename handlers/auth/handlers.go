@@ -212,10 +212,12 @@ func (h *AuthHandlers) RegistrationPage(w http.ResponseWriter, r *http.Request) 
 		User:       domain.GetUserFromContext(r.Context()), // nil if not authenticated
 	}
 
-	// Hide internal fields like role by setting them to hidden input with default value
-	// This ensures the value "user" is submitted to Kratos so it persists in the traits
+	// Hide internal fields like role and picture by setting them to hidden input with default value
+	// This ensures the value "user" is submitted to Kratos so it persists in the traits.
+	// Picture is populated by OIDC providers and should not be user-editable during registration.
 	nodes := hideNodes(flow.Ui.Nodes, map[string]string{
-		"traits.role": "user",
+		"traits.role":    "user",
+		"traits.picture": "",
 	})
 
 	component := auth.RegistrationPageWithNodes(nodes, props)

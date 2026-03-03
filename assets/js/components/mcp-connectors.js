@@ -14,9 +14,7 @@ export const mcpConnectors = () => ({
     mcpNewClientID: '',
     mcpNewClientSecret: '',
 
-    // Detail dialog state
-    mcpDetailConnector: null,
-    mcpDetailTools: [],
+
 
     // OAuth popup reference
     _oauthWindow: null,
@@ -29,6 +27,14 @@ export const mcpConnectors = () => ({
             if (event.data?.type === 'mcp-oauth-callback') {
                 this._handleOAuthMessage(event.data);
             }
+        });
+
+        // Listen for connect/disconnect requests from the detail view (parent scope)
+        window.addEventListener('mcp-action-connect', (e) => {
+            this.mcpConnect(e.detail);
+        });
+        window.addEventListener('mcp-action-disconnect', (e) => {
+            this.mcpDisconnect(e.detail);
         });
     },
 
@@ -111,10 +117,8 @@ export const mcpConnectors = () => ({
             });
             if (res.ok) {
                 this.mcpConnectors = this.mcpConnectors.filter(c => c.id !== connectorId);
-                // Close detail dialog if showing this connector
-                if (this.mcpDetailConnector?.id === connectorId) {
-                    this.mcpCloseDetail();
-                }
+                // Notify parent to close detail view if showing this connector
+                window.dispatchEvent(new CustomEvent('mcp-connector-removed', { detail: connectorId }));
                 window.dispatchEvent(new CustomEvent('mcp-state-changed'));
             }
         } catch (err) {
@@ -165,34 +169,12 @@ export const mcpConnectors = () => ({
 
     // ── Detail dialog ───────────────────────────────────────────────────
 
-    async mcpOpenDetail(connector) {
-        this.mcpDetailConnector = connector;
-        this.mcpDetailTools = [];
-
-        // Fetch tools for this connector
-        try {
-            const res = await fetch(`/v1/mcp/connectors/${connector.id}/tools`);
-            if (res.ok) {
-                const data = await res.json();
-                this.mcpDetailTools = data.tools || [];
-            }
-        } catch (err) {
-            console.error('[MCP] Failed to fetch tools:', err);
-        }
-
-        this.$nextTick(() => {
-            if (window.tui?.dialog) {
-                window.tui.dialog.open('mcp-detail-dialog');
-            }
-        });
+    mcpOpenDetail(connector) {
+        window.dispatchEvent(new CustomEvent('show-mcp-detail', { detail: connector }));
     },
 
     mcpCloseDetail() {
-        if (window.tui?.dialog) {
-            window.tui.dialog.close('mcp-detail-dialog');
-        }
-        this.mcpDetailConnector = null;
-        this.mcpDetailTools = [];
+        // No-op — detail view is managed by the parent toolsDialog
     },
 
     // ── OAuth popup ─────────────────────────────────────────────────────
@@ -219,10 +201,10 @@ export const mcpConnectors = () => ({
             // OAuth succeeded — refresh connectors to pick up new status
             await this.mcpFetchConnectors();
             window.dispatchEvent(new CustomEvent('mcp-state-changed'));
-            // Also update the detail dialog if it's showing this connector
-            if (this.mcpDetailConnector?.id === data.connector_id) {
-                const conn = this.mcpConnectors.find(c => c.id === data.connector_id);
-                if (conn) this.mcpDetailConnector = conn;
+            // Notify parent to update MCP detail view if showing this connector
+            const conn = this.mcpConnectors.find(c => c.id === data.connector_id);
+            if (conn) {
+                window.dispatchEvent(new CustomEvent('mcp-detail-updated', { detail: conn }));
             }
         } else {
             console.error('[MCP] OAuth failed:', data.error);

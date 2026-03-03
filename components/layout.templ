@@ -90,13 +90,15 @@ templ BaseLayout(props LayoutProps) {
 					{ children... }
 				</div>
 			</div>
-			<!-- Global Modals -->
-			<div x-cloak>
-				@resources.ResourcesDialog()
-				@agents.AgentsDialog()
-				@tools.ToolsSidebar()
-				@convsearch.SearchDialog()
-			</div>
+			<!-- Global Modals (authenticated only) -->
+			if props.User != nil {
+				<div x-cloak>
+					@resources.ResourcesDialog()
+					@agents.AgentsDialog()
+					@tools.ToolsDialog()
+					@convsearch.SearchDialog()
+				</div>
+			}
 		</body>
 	</html>
 }
