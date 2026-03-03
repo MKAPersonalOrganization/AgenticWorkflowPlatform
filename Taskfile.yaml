@@ -3,9 +3,6 @@ dotenv: [".env"]
 
 env:
   APP_URL: https://127.0.0.1:8090
-  KRATOS_PUBLIC_URL: http://127.0.0.1:4433
-  KRATOS_ADMIN_URL: http://127.0.0.1:4434
-  KRATOS_BROWSER_URL: http://127.0.0.1:4433
 
 vars:
   TAILWIND_CMD:
@@ -118,7 +115,7 @@ tasks:
   logs:
     desc: Show docker compose logs
     cmds:
-      - docker compose logs -f kratos
+      - docker compose logs -f
 
   statistics:
     desc: Generate and save git repository statistics

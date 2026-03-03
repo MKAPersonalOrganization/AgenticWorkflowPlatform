@@ -31,7 +31,7 @@ import (
 	"school-with-ai/handlers/profile"
 	statisticsHandler "school-with-ai/handlers/statistics"
 	pgstore "school-with-ai/infra/eventstore/postgres"
-	"school-with-ai/infra/kratos"
+	"school-with-ai/infra/googleauth"
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/infra/projection/llmcontext"
 	projectionStats "school-with-ai/infra/projection/statistics"
@@ -130,11 +130,10 @@ func run(ctx context.Context, log *logger.Logger) error {
 			TLSKey            string        `conf:"default:./tls/key.pem"`
 		}
 		Auth struct {
-			AppURL        string `conf:"default:https://localhost:8090"`
-			KratosPublic  string `conf:"default:http://localhost:4433"`
-			KratosAdmin   string `conf:"default:http://localhost:4434"`
-			KratosBrowser string `conf:"default:http://localhost:4433"`
-			AdminAPIToken string
+			AppURL             string `conf:"default:https://localhost:8090"`
+			GoogleClientID     string
+			GoogleClientSecret string
+			SessionSecret      string `conf:"default:change-me-in-production-32-chars!"`
 		}
 		DashboardAdmin struct {
 			User string `conf:"default:admin"`
@@ -582,17 +581,16 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Create AGUI projection handler
 	aguiHandler := aguihandlers.NewAguiProjectionHandler(aguiProjection, threadQueryService)
 
-	// Initialize Kratos client and auth handlers
-	kratosConfig := kratos.Config{
-		AppURL:        cfg.Auth.AppURL,
-		KratosPublic:  cfg.Auth.KratosPublic,
-		KratosAdmin:   cfg.Auth.KratosAdmin,
-		KratosBrowser: cfg.Auth.KratosBrowser,
-		AdminAPIToken: cfg.Auth.AdminAPIToken,
-	}
-	kratosClient := kratos.NewKratosClient(kratosConfig)
-	authHandlers := auth.NewAuthHandlers(log, kratosClient, cfg.Auth.AppURL)
-	authMiddleware := auth.NewMiddleware(kratosClient, cfg.Auth.AppURL, ctx)
+	// Initialize Google OAuth client and auth handlers
+	googleClient := googleauth.NewClient(googleauth.Config{
+		ClientID:     cfg.Auth.GoogleClientID,
+		ClientSecret: cfg.Auth.GoogleClientSecret,
+		RedirectURL:  cfg.Auth.AppURL + "/auth/callback",
+		SessionKey:   cfg.Auth.SessionSecret,
+	}, db)
+	sessionStore := googleauth.NewSessionStore(cfg.Auth.SessionSecret)
+	authHandlers := auth.NewAuthHandlers(log, googleClient, sessionStore, cfg.Auth.AppURL)
+	authMiddleware := auth.NewMiddleware(googleClient, sessionStore, cfg.Auth.AppURL, ctx)
 
 	// Profile Handler
 	profileHandler := profile.NewHandler(log, studentProfileRepo)
@@ -619,14 +617,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// Auth routes (public)
 	r.Get("/auth/login", authHandlers.LoginPage)
-	r.Get("/auth/registration", authHandlers.RegistrationPage)
-	r.Get("/auth/recovery", authHandlers.RecoveryPage)
-	r.Get("/auth/verification", authHandlers.VerificationPage)
+	r.Get("/auth/callback", authHandlers.CallbackHandler)
 	r.Get("/auth/logout", authHandlers.LogoutHandler)
 	r.Get("/auth/error", authHandlers.ErrorPage)
-
-	// Protected auth routes
-	r.Get("/auth/settings", authMiddleware.RequireAuthFunc(authHandlers.SettingsPage))
 
 	// Profile routes (protected)
 	r.Get("/profile", authMiddleware.RequireAuthFunc(profileHandler.HandleProfilePage))

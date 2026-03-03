@@ -455,3 +455,22 @@ UPDATE user_agents ua
 UPDATE user_agents
    SET icon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>'
  WHERE icon NOT LIKE '<svg%';
+
+-- Version: 1.35
+-- Description: Create users table for local authentication (Google OAuth)
+CREATE TABLE IF NOT EXISTS users (
+    id         VARCHAR(255) PRIMARY KEY,
+    email      VARCHAR(255) NOT NULL UNIQUE,
+    first_name VARCHAR(255) NOT NULL DEFAULT '',
+    last_name  VARCHAR(255) NOT NULL DEFAULT '',
+    picture    TEXT         NOT NULL DEFAULT '',
+    role       VARCHAR(50)  NOT NULL DEFAULT 'user',
+    created_at TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
+-- Version: 1.36
+-- Description: Add google_sub column to users table for stable Google identity
+ALTER TABLE users ADD COLUMN IF NOT EXISTS google_sub VARCHAR(255) NOT NULL DEFAULT '';
+CREATE INDEX IF NOT EXISTS idx_users_google_sub ON users(google_sub);
