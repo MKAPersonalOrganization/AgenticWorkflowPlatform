@@ -620,6 +620,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Get("/auth/callback", authHandlers.CallbackHandler)
 	r.Get("/auth/logout", authHandlers.LogoutHandler)
 	r.Get("/auth/error", authHandlers.ErrorPage)
+	r.Get("/auth/settings", authMiddleware.RequireAuthFunc(authHandlers.SettingsPage))
 
 	// Profile routes (protected)
 	r.Get("/profile", authMiddleware.RequireAuthFunc(profileHandler.HandleProfilePage))
