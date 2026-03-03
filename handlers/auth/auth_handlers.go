@@ -3,6 +3,7 @@ package auth
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -169,21 +170,17 @@ func (h *AuthHandlers) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/auth/login", http.StatusSeeOther)
 }
 
-// SettingsPage handles GET /auth/settings — account management page.
-func (h *AuthHandlers) SettingsPage(w http.ResponseWriter, r *http.Request) {
+// MeHandler handles GET /api/me — returns the current user as JSON.
+func (h *AuthHandlers) MeHandler(w http.ResponseWriter, r *http.Request) {
 	user := domain.GetUserFromContext(r.Context())
 	if user == nil {
-		http.Redirect(w, r, "/auth/login?return_to=/auth/settings", http.StatusSeeOther)
+		http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 		return
 	}
 
-	props := authcomp.SettingsPageProps{
-		User: user,
-	}
-
-	component := authcomp.SettingsPage(props)
-	if err := component.Render(r.Context(), w); err != nil {
-		h.log.Error(r.Context(), "failed to render settings page", "error", err)
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(user); err != nil {
+		h.log.Error(r.Context(), "failed to encode user JSON", "error", err)
 	}
 }
 
