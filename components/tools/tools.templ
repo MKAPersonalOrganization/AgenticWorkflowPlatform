@@ -20,7 +20,7 @@ templ ToolsDialog() {
 				Class: "sm:max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden",
 			}) {
 				<!-- Main View (Plugins + MCP Tabs) -->
-				<template x-if="!profilePlugin && !mcpDetailConnector">
+				<template x-if="!detailItem">
 					<div class="flex flex-col h-full max-h-[90vh]">
 						@dialog.Header(dialog.HeaderProps{Class: "p-4 pb-0 border-b border-border"}) {
 							<div class="flex items-center justify-between mb-3">
@@ -212,8 +212,8 @@ templ ToolsDialog() {
 						}
 					</div>
 				</template>
-				<!-- ═══════ Plugin Detail View ═══════ -->
-				<template x-if="profilePlugin && !mcpDetailConnector">
+				<!-- ═══════ Unified Detail View (Plugin or MCP) ═══════ -->
+				<template x-if="detailItem">
 					<div class="flex flex-col h-full max-h-[90vh]">
 						@dialog.Header(dialog.HeaderProps{Class: "p-4 pb-3 border-b border-border"}) {
 							<div class="flex items-start gap-4">
@@ -222,58 +222,129 @@ templ ToolsDialog() {
 									Variant: button.VariantGhost,
 									Class:   "size-8 shrink-0",
 									Attributes: templ.Attributes{
-										"@click": "closeProfile()",
+										"@click": "closeDetail()",
 									},
 								}) {
 									@icon.ArrowLeft(icon.Props{Class: "size-4"})
 								}
-								<!-- Plugin icon -->
+								<!-- Icon -->
 								<div
-									class="size-11 rounded-lg flex items-center justify-center shrink-0 bg-primary/10 text-primary [&_svg]:size-5"
-									x-html="profilePlugin.icon"
+									class="size-11 rounded-lg flex items-center justify-center shrink-0 [&_svg]:size-5"
+									:class="detailItem._type === 'mcp' ? 'bg-primary/10 text-primary' : 'bg-primary/10 text-primary'"
+									x-html="detailItem._icon"
 								></div>
 								<div class="flex-1 min-w-0">
 									@dialog.Title(dialog.TitleProps{Class: "flex items-center gap-2"}) {
-										<span x-text="profilePlugin.name"></span>
+										<span x-text="detailItem._name"></span>
+										<!-- MCP status badge -->
+										<template x-if="detailItem._type === 'mcp' && detailItem.status">
+											<span
+												class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+												:class="{
+													'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400': detailItem.status === 'connected',
+													'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400': detailItem.status === 'connecting',
+													'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400': detailItem.status === 'auth_required',
+													'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400': detailItem.status === 'error',
+													'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300': detailItem.status === 'disconnected' || detailItem.status === 'created'
+												}"
+												x-text="detailItem.status.replace('_', ' ')"
+											></span>
+										</template>
 									}
 									@dialog.Description(dialog.DescriptionProps{}) {
-										<span x-text="profilePlugin.description"></span>
+										<span x-text="detailItem._subtitle"></span>
 									}
 								</div>
 							</div>
 						}
 						<!-- Info bar -->
 						<div class="px-4 py-2.5 border-b border-border bg-muted/50">
-							<div class="flex items-center gap-3 text-xs text-muted-foreground">
-								<span class="flex items-center gap-1.5">
-									@icon.Tag(icon.Props{Class: "size-3 opacity-60"})
-									<span x-text="profilePlugin.category"></span>
-								</span>
-								<span class="text-border">|</span>
-								<span class="flex items-center gap-1.5">
-									@icon.Blocks(icon.Props{Class: "size-3 opacity-60"})
-									<span x-text="profilePlugin.tools.length"></span> { i18n.T(ctx, "tools") }
-								</span>
-								<span class="text-border">|</span>
-								<span class="flex items-center gap-1.5 text-muted-foreground/70">
-									@icon.Info(icon.Props{Class: "size-3 opacity-60"})
-									{ i18n.T(ctx, "Configure per agent") }
-								</span>
+							<div class="flex items-center justify-between">
+								<div class="flex items-center gap-3 text-xs text-muted-foreground">
+									<!-- Category (plugins) -->
+									<template x-if="detailItem._type === 'plugin' && detailItem.category">
+										<span class="flex items-center gap-1.5">
+											@icon.Tag(icon.Props{Class: "size-3 opacity-60"})
+											<span x-text="detailItem.category"></span>
+										</span>
+									</template>
+									<template x-if="detailItem._type === 'plugin' && detailItem.category">
+										<span class="text-border">|</span>
+									</template>
+									<!-- Tool count -->
+									<span class="flex items-center gap-1.5">
+										@icon.Blocks(icon.Props{Class: "size-3 opacity-60"})
+										<span x-text="detailItem._tools.length"></span> { i18n.T(ctx, "tools") }
+									</span>
+									<!-- MCP server info -->
+									<template x-if="detailItem._type === 'mcp' && detailItem.server_name">
+										<span class="flex items-center gap-1.5">
+											<span class="text-border">|</span>
+											@icon.Server(icon.Props{Class: "size-3 opacity-60"})
+											<span x-text="detailItem.server_name"></span>
+											<template x-if="detailItem.server_version">
+												<span x-text="'v' + detailItem.server_version" class="text-muted-foreground/60"></span>
+											</template>
+										</span>
+									</template>
+									<!-- Plugin hint -->
+									<template x-if="detailItem._type === 'plugin'">
+										<span class="flex items-center gap-1.5">
+											<span class="text-border">|</span>
+											@icon.Info(icon.Props{Class: "size-3 opacity-60"})
+											{ i18n.T(ctx, "Configure per agent") }
+										</span>
+									</template>
+								</div>
+								<!-- MCP connect/disconnect actions -->
+								<template x-if="detailItem._type === 'mcp'">
+									<div class="flex items-center gap-2">
+										<template x-if="detailItem.status === 'connected'">
+											<button
+												@click="window.dispatchEvent(new CustomEvent('mcp-action-disconnect', { detail: detailItem.id }))"
+												class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-destructive/10 text-destructive hover:bg-destructive/20 border border-destructive/20 transition-colors"
+											>
+												@icon.Unplug(icon.Props{Class: "size-3.5"})
+												{ i18n.T(ctx, "Disconnect") }
+											</button>
+										</template>
+										<template x-if="detailItem.status !== 'connected' && detailItem.status !== 'connecting'">
+											<button
+												@click="window.dispatchEvent(new CustomEvent('mcp-action-connect', { detail: detailItem.id }))"
+												class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+											>
+												@icon.Plug(icon.Props{Class: "size-3.5"})
+												{ i18n.T(ctx, "Connect") }
+											</button>
+										</template>
+									</div>
+								</template>
 							</div>
 						</div>
-						<!-- Scrollable content -->
+						<!-- Scrollable content — unified tool list -->
 						<div class="flex-1 overflow-y-auto scrollbar-thin p-4">
 							<div class="space-y-5">
-								<p x-text="profilePlugin.description" class="text-sm text-muted-foreground leading-relaxed"></p>
-								<template x-if="profilePlugin.tools.length > 0">
+								<!-- Description -->
+								<p x-text="detailItem._description" class="text-sm text-muted-foreground leading-relaxed"></p>
+								<!-- Error message (MCP only) -->
+								<template x-if="detailItem._type === 'mcp' && detailItem.error_msg">
+									<div class="rounded-md bg-destructive/10 border border-destructive/20 p-3">
+										<p class="text-xs text-destructive flex items-start gap-1.5">
+											@icon.CircleAlert(icon.Props{Class: "size-3.5 shrink-0 mt-0.5"})
+											<span x-text="detailItem.error_msg"></span>
+										</p>
+									</div>
+								</template>
+								<!-- Tools list -->
+								<template x-if="detailItem._tools.length > 0">
 									<div>
 										<div class="flex items-center gap-2 mb-2.5">
 											@icon.Sparkles(icon.Props{Class: "size-4 text-muted-foreground"})
-											<h4 class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{ i18n.T(ctx, "What this plugin provides") }</h4>
+											<h4 class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{ i18n.T(ctx, "Available tools") }</h4>
 										</div>
-										<div class="space-y-2 pl-6">
-											<template x-for="tool in profilePlugin.tools" :key="tool.id">
-												<div class="border border-border rounded-lg p-2.5 border-l-[3px] bg-card border-l-primary">
+										<div class="space-y-2">
+											<template x-for="tool in detailItem._tools" :key="tool.id || tool.name">
+												<div class="border border-border rounded-lg p-3 border-l-[3px] border-l-primary bg-card">
 													<div class="flex items-center gap-2 mb-1">
 														<span class="text-xs font-semibold text-foreground" x-text="tool.name"></span>
 														<template x-if="tool.category">
@@ -286,18 +357,47 @@ templ ToolsDialog() {
 										</div>
 									</div>
 								</template>
-								<!-- Plugin metadata -->
+								<!-- Empty tools -->
+								<template x-if="detailItem._tools.length === 0">
+									<div class="flex flex-col items-center justify-center py-12 gap-3 text-muted-foreground">
+										@icon.PackageOpen(icon.Props{Class: "size-10 opacity-20"})
+										<template x-if="detailItem._type === 'mcp'">
+											<p class="text-sm">{ i18n.T(ctx, "No tools discovered yet. Connect to the server to discover tools.") }</p>
+										</template>
+										<template x-if="detailItem._type === 'plugin'">
+											<p class="text-sm">{ i18n.T(ctx, "This plugin has no tools.") }</p>
+										</template>
+									</div>
+								</template>
+								<!-- Metadata (both types) -->
 								<div class="border-t border-border pt-4 grid grid-cols-2 gap-3">
 									<div>
-										<div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 mb-1">{ i18n.T(ctx, "Category") }</div>
+										<div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 mb-1">
+											<template x-if="detailItem._type === 'plugin'">
+												<span>{ i18n.T(ctx, "Category") }</span>
+											</template>
+											<template x-if="detailItem._type === 'mcp'">
+												<span>{ i18n.T(ctx, "Server URL") }</span>
+											</template>
+										</div>
 										<div class="text-xs text-foreground flex items-center gap-1.5">
-											@icon.Tag(icon.Props{Class: "size-3 text-muted-foreground"})
-											<span x-text="profilePlugin.category"></span>
+											<template x-if="detailItem._type === 'plugin'">
+												<span class="flex items-center gap-1.5">
+													@icon.Tag(icon.Props{Class: "size-3 text-muted-foreground"})
+													<span x-text="detailItem.category"></span>
+												</span>
+											</template>
+											<template x-if="detailItem._type === 'mcp'">
+												<span class="flex items-center gap-1.5 truncate">
+													@icon.Globe(icon.Props{Class: "size-3 text-muted-foreground shrink-0"})
+													<span x-text="detailItem.server_url" class="truncate"></span>
+												</span>
+											</template>
 										</div>
 									</div>
 									<div>
-										<div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 mb-1">{ i18n.T(ctx, "Plugin ID") }</div>
-										<code class="text-[11px] bg-muted px-1.5 py-0.5 rounded font-mono break-all" x-text="profilePlugin.id"></code>
+										<div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 mb-1">{ i18n.T(ctx, "ID") }</div>
+										<code class="text-[11px] bg-muted px-1.5 py-0.5 rounded font-mono break-all" x-text="detailItem.id"></code>
 									</div>
 								</div>
 							</div>
@@ -307,149 +407,14 @@ templ ToolsDialog() {
 								<div class="flex items-center gap-3 text-xs text-muted-foreground">
 									<span class="flex items-center gap-1.5">
 										@icon.Blocks(icon.Props{Class: "size-3 opacity-60"})
-										<span x-text="profilePlugin.tools.length"></span> { i18n.T(ctx, "tools available") }
+										<span x-text="detailItem._tools.length"></span> { i18n.T(ctx, "tools") }
 									</span>
 								</div>
 								@button.Button(button.Props{
 									Variant: button.VariantGhost,
 									Class:   "h-8 px-3 text-xs",
 									Attributes: templ.Attributes{
-										"@click": "closeProfile()",
-									},
-								}) {
-									{ i18n.T(ctx, "Back") }
-								}
-							</div>
-						}
-					</div>
-				</template>
-				<!-- ═══════ MCP Connector Detail View ═══════ -->
-				<template x-if="mcpDetailConnector">
-					<div class="flex flex-col h-full max-h-[90vh]">
-						@dialog.Header(dialog.HeaderProps{Class: "p-4 pb-3 border-b border-border"}) {
-							<div class="flex items-start gap-4">
-								@button.Button(button.Props{
-									Size:    button.SizeIcon,
-									Variant: button.VariantGhost,
-									Class:   "size-8 shrink-0",
-									Attributes: templ.Attributes{
-										"@click": "closeMcpDetail()",
-									},
-								}) {
-									@icon.ArrowLeft(icon.Props{Class: "size-4"})
-								}
-								<div class="size-11 rounded-lg flex items-center justify-center shrink-0 bg-blue-500/10 text-blue-500">
-									@icon.Globe(icon.Props{Class: "size-5"})
-								</div>
-								<div class="flex-1 min-w-0">
-									@dialog.Title(dialog.TitleProps{Class: "flex items-center gap-2"}) {
-										<span x-text="mcpDetailConnector.title"></span>
-										<span
-											class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium"
-											:class="{
-												'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400': mcpDetailConnector.status === 'connected',
-												'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400': mcpDetailConnector.status === 'connecting',
-												'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400': mcpDetailConnector.status === 'auth_required',
-												'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400': mcpDetailConnector.status === 'error',
-												'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300': mcpDetailConnector.status === 'disconnected' || mcpDetailConnector.status === 'created'
-											}"
-											x-text="mcpDetailConnector.status.replace('_', ' ')"
-										></span>
-									}
-									@dialog.Description(dialog.DescriptionProps{}) {
-										<span x-text="mcpDetailConnector.server_url"></span>
-									}
-								</div>
-							</div>
-						}
-						<!-- Action bar -->
-						<div class="px-4 py-2.5 border-b border-border bg-muted/50">
-							<div class="flex items-center justify-between">
-								<div class="flex items-center gap-3 text-xs text-muted-foreground">
-									<span class="flex items-center gap-1.5">
-										@icon.Blocks(icon.Props{Class: "size-3 opacity-60"})
-										<span x-text="mcpDetailConnector.tool_count"></span> { i18n.T(ctx, "tools") }
-									</span>
-									<template x-if="mcpDetailConnector.server_name">
-										<span class="flex items-center gap-1.5">
-											<span class="text-border">|</span>
-											@icon.Server(icon.Props{Class: "size-3 opacity-60"})
-											<span x-text="mcpDetailConnector.server_name"></span>
-											<template x-if="mcpDetailConnector.server_version">
-												<span x-text="'v' + mcpDetailConnector.server_version" class="text-muted-foreground/60"></span>
-											</template>
-										</span>
-									</template>
-								</div>
-								<div class="flex items-center gap-2">
-									<template x-if="mcpDetailConnector.status === 'connected'">
-										<button
-											@click="window.dispatchEvent(new CustomEvent('mcp-action-disconnect', { detail: mcpDetailConnector.id }))"
-											class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-destructive/10 text-destructive hover:bg-destructive/20 border border-destructive/20 transition-colors"
-										>
-											@icon.Unplug(icon.Props{Class: "size-3.5"})
-											{ i18n.T(ctx, "Disconnect") }
-										</button>
-									</template>
-									<template x-if="mcpDetailConnector.status !== 'connected' && mcpDetailConnector.status !== 'connecting'">
-										<button
-											@click="window.dispatchEvent(new CustomEvent('mcp-action-connect', { detail: mcpDetailConnector.id }))"
-											class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-										>
-											@icon.Plug(icon.Props{Class: "size-3.5"})
-											{ i18n.T(ctx, "Connect") }
-										</button>
-									</template>
-								</div>
-							</div>
-						</div>
-						<!-- Tools list -->
-						<div class="flex-1 overflow-y-auto scrollbar-thin p-4">
-							<template x-if="mcpDetailTools.length === 0">
-								<div class="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
-									@icon.PackageOpen(icon.Props{Class: "size-10 opacity-20"})
-									<p class="text-sm">{ i18n.T(ctx, "No tools discovered yet. Connect to the server to discover tools.") }</p>
-								</div>
-							</template>
-							<template x-if="mcpDetailTools.length > 0">
-								<div class="space-y-2">
-									<template x-for="tool in mcpDetailTools" :key="tool.id">
-										<div class="border border-border rounded-lg p-3 border-l-[3px] border-l-blue-500 bg-card hover:shadow-md transition-all">
-											<div class="flex items-center gap-2 mb-1">
-												<div class="size-7 rounded-md flex items-center justify-center bg-blue-500/10 text-blue-500">
-													@icon.Cog(icon.Props{Class: "size-3.5"})
-												</div>
-												<span x-text="tool.name" class="text-sm font-semibold text-foreground"></span>
-											</div>
-											<div
-												x-html="renderToolDescription(tool.description)"
-												class="text-xs text-muted-foreground leading-relaxed ml-9 prose prose-xs dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-headings:my-1 prose-pre:my-1 prose-pre:text-[11px] prose-code:text-[11px] prose-code:before:content-none prose-code:after:content-none"
-											></div>
-										</div>
-									</template>
-								</div>
-							</template>
-							<!-- Error message if any -->
-							<template x-if="mcpDetailConnector.error_msg">
-								<div class="mt-4 rounded-md bg-destructive/10 border border-destructive/20 p-3">
-									<p class="text-xs text-destructive flex items-start gap-1.5">
-										@icon.CircleAlert(icon.Props{Class: "size-3.5 shrink-0 mt-0.5"})
-										<span x-text="mcpDetailConnector.error_msg"></span>
-									</p>
-								</div>
-							</template>
-						</div>
-						@dialog.Footer(dialog.FooterProps{Class: "px-4 py-3 border-t mt-auto bg-muted/50"}) {
-							<div class="flex items-center justify-between w-full">
-								<span class="text-xs text-muted-foreground flex items-center gap-1.5">
-									@icon.Globe(icon.Props{Class: "size-3 opacity-60"})
-									<span x-text="mcpDetailConnector.server_url" class="truncate max-w-[300px]"></span>
-								</span>
-								@button.Button(button.Props{
-									Variant: button.VariantGhost,
-									Class:   "h-8 px-3 text-xs",
-									Attributes: templ.Attributes{
-										"@click": "closeMcpDetail()",
+										"@click": "closeDetail()",
 									},
 								}) {
 									{ i18n.T(ctx, "Back") }
@@ -463,7 +428,7 @@ templ ToolsDialog() {
 	</div>
 }
 
-// MCPConnectorDialogCard renders MCP connector cards styled for the dialog layout.
+// MCPConnectorDialogCard renders MCP connector cards styled to match plugin cards.
 templ MCPConnectorDialogCard() {
 	<template x-for="conn in mcpConnectors" :key="conn.id">
 		<div
@@ -471,9 +436,9 @@ templ MCPConnectorDialogCard() {
 			@click="mcpOpenDetail(conn)"
 		>
 			<div class="flex items-start gap-3 mb-2">
-				<!-- MCP icon with status dot -->
+				<!-- Icon with status dot (mirrors plugin icon area) -->
 				<div class="relative">
-					<div class="size-10 rounded-lg flex items-center justify-center shrink-0 bg-blue-500/10 text-blue-500">
+					<div class="size-10 rounded-lg flex items-center justify-center shrink-0 bg-primary/10 text-primary">
 						@icon.Globe(icon.Props{Class: "size-5"})
 					</div>
 					<span
@@ -489,26 +454,13 @@ templ MCPConnectorDialogCard() {
 				</div>
 				<div class="flex-1 min-w-0">
 					<h3 class="text-sm font-semibold text-foreground truncate" x-text="conn.title"></h3>
-					<span
-						class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium"
-						:class="{
-							'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400': conn.status === 'connected',
-							'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400': conn.status === 'connecting',
-							'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400': conn.status === 'auth_required',
-							'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400': conn.status === 'error',
-							'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300': conn.status === 'disconnected' || conn.status === 'created'
-						}"
-						x-text="conn.status.replace('_', ' ')"
-					></span>
+					<span class="text-[10px] text-muted-foreground" x-text="conn.status.replace('_', ' ')"></span>
 				</div>
 			</div>
-			<p class="text-xs text-muted-foreground line-clamp-1 mb-3 flex-1" x-text="conn.server_url"></p>
+			<p class="text-xs text-muted-foreground line-clamp-2 mb-3 flex-1" x-text="conn.server_url"></p>
 			<div class="flex items-center justify-between mt-auto">
-				<div class="flex items-center gap-2">
-					<span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-blue-500/10 text-blue-500">MCP</span>
-					<span class="text-[10px] text-muted-foreground/60 tabular-nums" x-text="conn.tool_count + ' tools'"></span>
-				</div>
-				<!-- Actions -->
+				<span class="text-[10px] text-muted-foreground/60 tabular-nums" x-text="conn.tool_count + ' tools'"></span>
+				<!-- Hover actions -->
 				<div class="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
 					<template x-if="conn.status === 'connected'">
 						<button
