@@ -214,11 +214,11 @@ templ unauthenticatedMenu() {
 		"/auth/login",
 		"",
 	)
-	<!-- Register -->
+	<!-- Register (uses same Google OAuth login flow) -->
 	@accountMenuLink(
 		icon.UserPlus(icon.Props{Class: "size-4"}),
 		i18n.T(ctx, "Register"),
-		"/auth/registration",
+		"/auth/login",
 		"",
 	)
 	@accountMenuSeparator()
