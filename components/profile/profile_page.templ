@@ -1,14 +1,14 @@
 package profile
 
 import (
-	"school-with-ai/domain"
 	"school-with-ai/components"
+	"school-with-ai/components/button"
 	"school-with-ai/components/card"
 	"school-with-ai/components/icon"
-	"school-with-ai/components/button"
 	"school-with-ai/components/input"
-	"school-with-ai/components/textarea"
 	"school-with-ai/components/label"
+	"school-with-ai/components/textarea"
+	"school-with-ai/domain"
 	"strings"
 )
 
@@ -39,7 +39,6 @@ templ ProfilePage(props ProfilePageProps) {
 					<p class="text-muted-foreground mt-1">Personalize your learning experience</p>
 				</div>
 			</div>
-
 			<!-- Profile Form -->
 			@card.Card(card.Props{}) {
 				@card.Header(card.HeaderProps{}) {
@@ -58,7 +57,9 @@ templ ProfilePage(props ProfilePageProps) {
 						<!-- Identity (Read-only) -->
 						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 							<div class="space-y-2">
-								@label.Label(label.Props{For: "email"}) { Email }
+								@label.Label(label.Props{For: "email"}) {
+									Email 
+								}
 								@input.Input(input.Props{
 									ID:       "email",
 									Value:    props.User.Email,
@@ -66,7 +67,9 @@ templ ProfilePage(props ProfilePageProps) {
 								})
 							</div>
 							<div class="space-y-2">
-								@label.Label(label.Props{For: "name"}) { Full Name }
+								@label.Label(label.Props{For: "name"}) {
+									Full Name 
+								}
 								@input.Input(input.Props{
 									ID:       "name",
 									Value:    props.User.GetFullName(),
@@ -75,15 +78,15 @@ templ ProfilePage(props ProfilePageProps) {
 							</div>
 						</div>
 						<div class="text-[0.8rem] text-muted-foreground flex items-center gap-1">
-							<span>Managed by your account.</span>
-							<a href="/auth/settings" class="text-primary hover:underline">Edit in Account Settings</a>
+							<span>Managed by your Google account.</span>
+							<a href="/auth/settings" class="text-primary hover:underline">Account Settings</a>
 						</div>
-
 						<div class="border-t border-border"></div>
-
 						<!-- Learning Style -->
 						<div class="space-y-2">
-							@label.Label(label.Props{For: "learning_style"}) { Learning Style }
+							@label.Label(label.Props{For: "learning_style"}) {
+								Learning Style 
+							}
 							@input.Input(input.Props{
 								ID:          "learning_style",
 								Name:        "learning_style",
@@ -93,10 +96,11 @@ templ ProfilePage(props ProfilePageProps) {
 							})
 							<p class="text-[0.8rem] text-muted-foreground">How do you learn best?</p>
 						</div>
-
 						<!-- Struggles -->
 						<div class="space-y-2">
-							@label.Label(label.Props{For: "struggles"}) { Current Struggles }
+							@label.Label(label.Props{For: "struggles"}) {
+								Current Struggles 
+							}
 							@textarea.Textarea(textarea.Props{
 								ID:          "struggles",
 								Name:        "struggles",
@@ -106,10 +110,11 @@ templ ProfilePage(props ProfilePageProps) {
 							})
 							<p class="text-[0.8rem] text-muted-foreground">Separate multiple items with commas.</p>
 						</div>
-
 						<!-- Strengths -->
 						<div class="space-y-2">
-							@label.Label(label.Props{For: "strengths"}) { Strengths }
+							@label.Label(label.Props{For: "strengths"}) {
+								Strengths 
+							}
 							@textarea.Textarea(textarea.Props{
 								ID:          "strengths",
 								Name:        "strengths",
@@ -119,10 +124,11 @@ templ ProfilePage(props ProfilePageProps) {
 							})
 							<p class="text-[0.8rem] text-muted-foreground">Separate multiple items with commas.</p>
 						</div>
-
 						<!-- Goals -->
 						<div class="space-y-2">
-							@label.Label(label.Props{For: "goals"}) { Academic Goals }
+							@label.Label(label.Props{For: "goals"}) {
+								Academic Goals 
+							}
 							@textarea.Textarea(textarea.Props{
 								ID:          "goals",
 								Name:        "goals",
@@ -131,7 +137,6 @@ templ ProfilePage(props ProfilePageProps) {
 								Rows:        3,
 							})
 						</div>
-
 						<!-- Actions -->
 						<div class="flex justify-end gap-4 pt-4">
 							@button.Button(button.Props{
@@ -144,7 +149,6 @@ templ ProfilePage(props ProfilePageProps) {
 				}
 			}
 		</div>
-
 		<script>
 			document.getElementById('profile-form').addEventListener('submit', async (e) => {
 				e.preventDefault();
