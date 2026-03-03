@@ -1,76 +1,62 @@
 /**
- * Tools Sidebar Component
- * Handles plugin browsing and inline profile/management display.
- * Everything stays within the SPA — no full-page navigations.
- *
- * Sidebar: Search & browse only (like VS Code / IntelliJ extensions sidebar).
- * Detail panel: Opens in the editor area with profile info + enable/disable + per-tool toggles.
+ * Tools Dialog Component
+ * Handles plugin browsing and MCP server management in a dialog.
+ * Replaces the old sidebar approach with a centered dialog
+ * matching the agent store and resources dialog patterns.
  */
 
-export const toolsSidebar = () => ({
-    open: localStorage.getItem('toolsSidebarOpen') === 'true',
+export const toolsDialog = () => ({
     plugins: [],
     loading: false,
     search: '',
+    mcpSearch: '',
+    activeTab: 'plugins',
     _loaded: false,
 
     /** The plugin whose detail panel is open (null = closed) */
     profilePlugin: null,
-    /** Active tab in the detail panel: 'details' | 'tools' */
-    profileTab: 'details',
+
+    /** MCP detail view state (lifted from mcpConnectors for in-dialog view) */
+    mcpDetailConnector: null,
+    mcpDetailTools: [],
 
     init() {
-        // Restore tools sidebar — if it was open, load plugins eagerly
-        if (this.open && !this._loaded) {
-            this.fetchPlugins().then(() => { this._loaded = true; });
-            // Also collapse thread-history-sidebar since tools sidebar is open
-            const wrapper = document.querySelector('[data-tui-sidebar-wrapper][data-tui-sidebar-id="thread-history-sidebar"]');
-            if (wrapper && wrapper.getAttribute('data-tui-sidebar-state') === 'expanded') {
-                wrapper.setAttribute('data-tui-sidebar-state', 'collapsed');
-            }
-        }
-
         // Refresh plugins when MCP connection state changes
         window.addEventListener('mcp-state-changed', () => {
             this.fetchPlugins();
         });
 
-        // When thread-history-sidebar opens, close tools sidebar
-        const threadSidebar = document.querySelector('[data-tui-sidebar-wrapper][data-tui-sidebar-id="thread-history-sidebar"]');
-        if (threadSidebar) {
-            new MutationObserver((mutations) => {
-                for (const m of mutations) {
-                    if (m.attributeName === 'data-tui-sidebar-state' &&
-                        m.target.getAttribute('data-tui-sidebar-state') === 'expanded' &&
-                        this.open) {
-                        this.open = false;
-                        localStorage.setItem('toolsSidebarOpen', 'false');
-                    }
-                }
-            }).observe(threadSidebar, {
-                attributes: true,
-                attributeFilter: ['data-tui-sidebar-state']
-            });
+        // Listen for MCP detail requests from the nested mcpConnectors component
+        window.addEventListener('show-mcp-detail', (e) => {
+            this.openMcpDetail(e.detail);
+        });
+
+        // Close MCP detail if the connector was removed
+        window.addEventListener('mcp-connector-removed', (e) => {
+            if (this.mcpDetailConnector?.id === e.detail) {
+                this.closeMcpDetail();
+            }
+        });
+
+        // Update MCP detail connector when state changes (e.g. after OAuth)
+        window.addEventListener('mcp-detail-updated', (e) => {
+            if (this.mcpDetailConnector?.id === e.detail?.id) {
+                this.mcpDetailConnector = e.detail;
+            }
+        });
+    },
+
+    /** Called when the dialog opens */
+    async open() {
+        if (!this._loaded) {
+            await this.fetchPlugins();
+            this._loaded = true;
         }
     },
 
-    async toggle() {
-        this.open = !this.open;
-        localStorage.setItem('toolsSidebarOpen', this.open ? 'true' : 'false');
-        if (this.open) {
-            // Collapse thread-history-sidebar
-            const wrapper = document.querySelector('[data-tui-sidebar-wrapper][data-tui-sidebar-id="thread-history-sidebar"]');
-            if (wrapper && wrapper.getAttribute('data-tui-sidebar-state') === 'expanded') {
-                wrapper.setAttribute('data-tui-sidebar-state', 'collapsed');
-            }
-            if (!this._loaded) {
-                await this.fetchPlugins();
-                this._loaded = true;
-            }
-        } else {
-            // When closing the sidebar, also close the detail dialog
-            this.closeProfile();
-        }
+    /** Refresh all data */
+    async fetchAll() {
+        await this.fetchPlugins();
     },
 
     async fetchPlugins() {
@@ -120,24 +106,38 @@ export const toolsSidebar = () => ({
 
     // ── Navigation ──────────────────────────────────────────────────────
 
-    /** Show the plugin detail dialog */
+    /** Show the plugin detail view (in-dialog, same as agents pattern) */
     openProfile(plugin) {
         this.profilePlugin = plugin;
-        this.profileTab = 'details';
-        // Open the dialog via the templui dialog API
-        this.$nextTick(() => {
-            if (window.tui?.dialog) {
-                window.tui.dialog.open('plugin-profile-dialog');
-            }
-        });
     },
 
-    /** Close the detail dialog */
+    /** Close the detail view and return to list */
     closeProfile() {
-        if (window.tui?.dialog) {
-            window.tui.dialog.close('plugin-profile-dialog');
-        }
         this.profilePlugin = null;
+    },
+
+    // ── MCP Detail View ─────────────────────────────────────────────────
+
+    /** Show the MCP connector detail view (in-dialog, replaces nested dialog) */
+    async openMcpDetail(connector) {
+        this.mcpDetailConnector = connector;
+        this.mcpDetailTools = [];
+
+        try {
+            const res = await fetch(`/v1/mcp/connectors/${connector.id}/tools`);
+            if (res.ok) {
+                const data = await res.json();
+                this.mcpDetailTools = data.tools || [];
+            }
+        } catch (err) {
+            console.error('[MCP] Failed to fetch tools:', err);
+        }
+    },
+
+    /** Close MCP detail view and return to list */
+    closeMcpDetail() {
+        this.mcpDetailConnector = null;
+        this.mcpDetailTools = [];
     },
 
 });

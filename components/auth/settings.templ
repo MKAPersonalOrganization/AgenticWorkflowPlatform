@@ -6,6 +6,7 @@ import "school-with-ai/components/icon"
 import "school-with-ai/components"
 import "school-with-ai/domain"
 import "school-with-ai/components/i18n"
+import "strings"
 
 type SettingsPageProps struct {
 	FlowAction     string
@@ -101,6 +102,23 @@ templ SettingsPageWithNodes(nodes []client.UiNode, props SettingsPageProps) {
 									</div>
 								</div>
 							}
+							<!-- Social Accounts (OIDC link/unlink) -->
+							{{ oidcNodes := filterNodesByGroup(nodes, "oidc") }}
+							if len(oidcNodes) > 0 {
+								<div class="space-y-4">
+									<div class="flex items-center gap-2 pb-2 border-b border-border/50">
+										@icon.Link(icon.Props{Class: "size-4 text-muted-foreground"})
+										<h1 class="font-medium text-sm text-foreground">{ i18n.T(ctx, "Connected Accounts") }</h1>
+									</div>
+									<div class="px-2 space-y-3">
+										for _, node := range oidcNodes {
+											if node.Attributes.UiNodeInputAttributes != nil {
+												@renderOIDCSettingsNode(node)
+											}
+										}
+									</div>
+								</div>
+							}
 							<!-- Default/Other Settings -->
 							{{ defaultNodes := filterNodesByGroup(nodes, "default") }}
 							if len(defaultNodes) > 0 {
@@ -127,4 +145,48 @@ func filterNodesByGroup(nodes []client.UiNode, group string) []client.UiNode {
 		}
 	}
 	return filtered
+}
+
+// renderOIDCSettingsNode renders a single OIDC link/unlink button in settings
+templ renderOIDCSettingsNode(node client.UiNode) {
+	{{ attrs := node.Attributes.UiNodeInputAttributes }}
+	{{ providerID := stringValue(attrs.Value) }}
+	{{ isUnlink := attrs.Name == "unlink" }}
+	{{ label := getNodeLabel(node) }}
+	<div class="flex items-center justify-between rounded-lg border border-border px-4 py-3">
+		<div class="flex items-center gap-3">
+			@socialProviderIcon(providerID)
+			<div>
+				<p class="text-sm font-medium text-foreground">{ capitalizeProvider(providerID) }</p>
+				if isUnlink {
+					<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "Connected") }</p>
+				} else {
+					<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "Not connected") }</p>
+				}
+			</div>
+		</div>
+		<button
+			type="submit"
+			name={ attrs.Name }
+			value={ providerID }
+			if isUnlink {
+				class="inline-flex items-center justify-center rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+			} else {
+				class="inline-flex items-center justify-center rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+			}
+			if boolValue(attrs.Disabled) {
+				disabled
+			}
+		>
+			{ label }
+		</button>
+	</div>
+}
+
+func capitalizeProvider(id string) string {
+	normalized := normalizeProviderID(id)
+	if len(normalized) == 0 {
+		return id
+	}
+	return strings.ToUpper(normalized[:1]) + normalized[1:]
 }

@@ -32,52 +32,54 @@ templ Navbar(props ...NavbarProps) {
 		id="main-navbar"
 		data-navbar-for={ p.SidebarID }
 	>
-		<!-- Sidebar Toggle Button (Mobile) -->
-		<div class="md:hidden">
-			@sheet.Trigger(sheet.TriggerProps{
-				For: p.SidebarID + "-mobile",
-			}) {
+		if p.User != nil {
+			<!-- Sidebar Toggle Button (Mobile) -->
+			<div class="md:hidden">
+				@sheet.Trigger(sheet.TriggerProps{
+					For: p.SidebarID + "-mobile",
+				}) {
+					@button.Button(button.Props{
+						Size:    button.SizeIcon,
+						Variant: button.VariantGhost,
+						Class:   "size-9",
+					}) {
+						@icon.PanelLeft(icon.Props{Class: "size-5"})
+						<span class="sr-only">{ i18n.T(ctx, "Open Thread History") }</span>
+					}
+				}
+			</div>
+			<!-- Sidebar Toggle Button (Desktop) -->
+			<div class="hidden md:block">
 				@button.Button(button.Props{
 					Size:    button.SizeIcon,
 					Variant: button.VariantGhost,
 					Class:   "size-9",
+					Attributes: templ.Attributes{
+						"data-tui-sidebar-trigger": true,
+						"data-tui-sidebar-target":  p.SidebarID,
+					},
 				}) {
 					@icon.PanelLeft(icon.Props{Class: "size-5"})
 					<span class="sr-only">{ i18n.T(ctx, "Open Thread History") }</span>
 				}
-			}
-		</div>
-		<!-- Sidebar Toggle Button (Desktop) -->
-		<div class="hidden md:block">
-			@button.Button(button.Props{
-				Size:    button.SizeIcon,
-				Variant: button.VariantGhost,
-				Class:   "size-9",
-				Attributes: templ.Attributes{
-					"data-tui-sidebar-trigger": true,
-					"data-tui-sidebar-target":  p.SidebarID,
-				},
-			}) {
-				@icon.PanelLeft(icon.Props{Class: "size-5"})
-				<span class="sr-only">{ i18n.T(ctx, "Open Thread History") }</span>
-			}
-		</div>
-		<!-- Resources Button -->
-		<div class="hidden md:block">
-			@resources.ResourcesButtonTrigger()
-		</div>
-		<!-- Tools Button -->
-		<div class="hidden md:block">
-			@tools.ToolsButtonTrigger()
-		</div>
-		<!-- Agent Store Button -->
-		<div class="hidden md:block">
-			@agents.AgentStoreNavButtonTrigger()
-		</div>
-		<!-- Search Conversations Button -->
-		<div class="hidden md:block">
-			@convsearch.SearchButtonTrigger()
-		</div>
+			</div>
+			<!-- Resources Button -->
+			<div class="hidden md:block">
+				@resources.ResourcesButtonTrigger()
+			</div>
+			<!-- Tools Button -->
+			<div class="hidden md:block">
+				@tools.ToolsButtonTrigger()
+			</div>
+			<!-- Agent Store Button -->
+			<div class="hidden md:block">
+				@agents.AgentStoreNavButtonTrigger()
+			</div>
+			<!-- Search Conversations Button -->
+			<div class="hidden md:block">
+				@convsearch.SearchButtonTrigger()
+			</div>
+		}
 		<!-- Admin Indicator -->
 		if p.User != nil && p.User.Role == "admin" {
 			<div class="hidden md:block">

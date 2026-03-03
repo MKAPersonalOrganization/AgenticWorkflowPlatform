@@ -473,23 +473,6 @@
     -webkit-line-clamp: 3;
   }
   
-  /* Full-width dialog overrides */
-  #tools-manager-dialog [data-dialog-content],
-  #tools-manager-dialog > div,
-  #tools-manager-dialog .dialog-content {
-    width: 98vw !important;
-    height: 95vh !important;
-    max-width: none !important;
-    max-height: none !important;
-  }
-  
-  /* Override any container constraints */
-  [data-dialog-overlay] {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-  }
-
   /* Alpine.js cloak */
   [x-cloak] {
     display: none !important;
