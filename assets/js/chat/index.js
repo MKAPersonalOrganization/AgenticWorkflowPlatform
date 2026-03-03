@@ -129,16 +129,31 @@ document.addEventListener('alpine:init', () => {
                                 this.AVAILABLE_AGENTS.some(a => a.id === candidate);
 
                             if (isValid) {
-                                this.selectedAgent = candidate;
-                                localStorage.setItem('selectedAgent', candidate);
+                                this.selectAgent(candidate);
                             } else if (this.AVAILABLE_AGENTS.length > 0) {
                                 // Fall back to the first agent (oldest by creation time)
-                                this.selectedAgent = this.AVAILABLE_AGENTS[0].id;
-                                this.__persistAgentPreference(this.selectedAgent);
+                                this.selectAgent(this.AVAILABLE_AGENTS[0].id);
                             }
                         }
                     }
                 });
+            },
+
+            // Explictly select an agent and fetch its data
+            async selectAgent(agentId) {
+                this.selectedAgent = agentId;
+                this.__persistAgentPreference(agentId);
+
+                // Fetch the agent details from the backend
+                try {
+                    const response = await fetch('/v1/agents/' + agentId);
+                    if (response.ok) {
+                        const data = await response.json();
+                        this.currentAgentData = data;
+                    }
+                } catch (err) {
+                    console.error('Failed to resolve current agent details:', err);
+                }
             },
 
             // Persist agent preference to server and localStorage cache

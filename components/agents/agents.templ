@@ -785,18 +785,18 @@ templ AgentsButtonTrigger() {
 			Class:   "size-9",
 			Attributes: templ.Attributes{
 				"@click": "$dispatch('open-agents-dialog')",
-				":title": "AVAILABLE_AGENTS?.find(a => a.id === selectedAgent)?.name || '" + i18n.T(ctx, "Agents") + "'",
+				":title": "currentAgentData?.name || '" + i18n.T(ctx, "Agents") + "'",
 			},
 		}) {
 			<!-- Compass icon (shown when no agent matched) -->
-			<span x-show="!AVAILABLE_AGENTS?.find(a => a.id === selectedAgent)">
+			<span x-show="!currentAgentData">
 				@icon.Compass(icon.Props{Class: "size-5"})
 			</span>
 			<!-- Agent icon (shown when an agent is selected) -->
 			<span
 				x-cloak
-				x-show="AVAILABLE_AGENTS?.find(a => a.id === selectedAgent)"
-				x-html="AVAILABLE_AGENTS?.find(a => a.id === selectedAgent)?.icon || ''"
+				x-show="currentAgentData"
+				x-html="currentAgentData?.icon || ''"
 				class="size-5 flex items-center justify-center text-foreground [&_svg]:size-4"
 			></span>
 			<span class="sr-only">{ i18n.T(ctx, "Agents") }</span>

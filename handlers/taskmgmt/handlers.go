@@ -551,6 +551,56 @@ func (h *TaskManagementHandler) ListAgents(w http.ResponseWriter, r *http.Reques
 	}
 }
 
+// GetAgent returns a specific agent's details by ID.
+func (h *TaskManagementHandler) GetAgent(w http.ResponseWriter, r *http.Request) {
+	agentID := r.PathValue("agentId")
+	if agentID == "" {
+		http.Error(w, "agentId is required", http.StatusBadRequest)
+		return
+	}
+
+	user := h.authService.GetUserFromContext(r.Context())
+
+	type userAwareProvider interface {
+		GetForUser(ctx context.Context, name, userID string) (agent.Agent, error)
+	}
+
+	var a agent.Agent
+	var err error
+
+	if uap, ok := h.agentProvider.(userAwareProvider); ok && user != nil {
+		a, err = uap.GetForUser(r.Context(), agentID, user.ID)
+	} else {
+		a, err = h.agentProvider.Get(agentID)
+	}
+
+	if err != nil {
+		h.log.Error(r.Context(), "failed to get agent", "agentID", agentID, "error", err)
+		http.Error(w, "Agent not found", http.StatusNotFound)
+		return
+	}
+
+	meta := agent.AgentMetadata{
+		ID:          a.ID(),
+		Name:        a.Name(),
+		Description: a.Description(),
+	}
+	if ip, ok := a.(interface{ Icon() string }); ok {
+		if icon := ip.Icon(); strings.HasPrefix(icon, "<svg") {
+			meta.Icon = icon
+		}
+	}
+	if meta.Icon == "" {
+		meta.Icon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>`
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(meta); err != nil {
+		h.log.Error(r.Context(), "failed to encode agent response", "error", err)
+		http.Error(w, "Failed to encode agent response", http.StatusInternalServerError)
+	}
+}
+
 // ListArtifacts returns a list of artifacts for a thread.
 // GET /v1/threads/{threadId}/artifacts
 func (h *TaskManagementHandler) ListArtifacts(w http.ResponseWriter, r *http.Request) {
