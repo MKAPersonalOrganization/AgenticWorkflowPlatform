@@ -5,6 +5,7 @@ import (
 	"school-with-ai/components/alert"
 	"school-with-ai/components/button"
 	"school-with-ai/components/form"
+	"school-with-ai/components/i18n"
 	"school-with-ai/components/input"
 	"strings"
 )
@@ -148,7 +149,7 @@ templ renderInputNode(node client.UiNode) {
 				{ getNodeLabel(node) }
 			}
 			@input.Input(input.Props{
-				Type:        getInputType(attrs.Type),
+				Type:        getInputTypeForNode(node),
 				Name:        attrs.Name,
 				ID:          attrs.Name,
 				Value:       stringValue(attrs.Value),
@@ -234,6 +235,11 @@ func getFormMessageVariant(msgType string) form.MessageVariant {
 }
 
 func getNodeLabel(node client.UiNode) string {
+	// Override the generic "ID" label for the login identifier field.
+	// We only support email-based login so label it accordingly.
+	if node.Attributes.UiNodeInputAttributes != nil && node.Attributes.UiNodeInputAttributes.Name == "identifier" {
+		return "E-Mail"
+	}
 	if node.Meta.Label != nil && node.Meta.Label.Text != "" {
 		return node.Meta.Label.Text
 	}
@@ -258,6 +264,18 @@ func getInputType(kratosType string) input.Type {
 	default:
 		return input.TypeText
 	}
+}
+
+// getInputTypeForNode returns the appropriate input type, overriding for known fields.
+// The "identifier" field is always email since that's our only login identifier.
+func getInputTypeForNode(node client.UiNode) input.Type {
+	if node.Attributes.UiNodeInputAttributes != nil {
+		if node.Attributes.UiNodeInputAttributes.Name == "identifier" {
+			return input.TypeEmail
+		}
+		return getInputType(node.Attributes.UiNodeInputAttributes.Type)
+	}
+	return input.TypeText
 }
 
 func stringValue(v interface{}) string {
@@ -339,7 +357,7 @@ templ AuthDivider() {
 			<div class="w-full border-t border-border"></div>
 		</div>
 		<div class="relative flex justify-center text-xs uppercase">
-			<span class="bg-card px-2 text-muted-foreground">or</span>
+			<span class="bg-card px-2 text-muted-foreground">{ i18n.T(ctx, "or") }</span>
 		</div>
 	</div>
 }
@@ -353,7 +371,7 @@ templ renderSocialButton(node client.UiNode) {
 		type="submit"
 		name={ attrs.Name }
 		value={ providerID }
-		class="inline-flex w-full items-center justify-center gap-3 rounded-md border border-border bg-background px-4 py-2.5 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+		class="inline-flex w-full items-center justify-center gap-3 rounded-lg border border-border bg-background px-4 py-3 text-sm font-medium text-foreground shadow-sm transition-all hover:bg-accent hover:text-accent-foreground hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
 		if boolValue(attrs.Disabled) {
 			disabled
 		}

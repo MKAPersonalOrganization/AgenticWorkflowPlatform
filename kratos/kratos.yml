@@ -45,7 +45,7 @@ selfservice:
       enabled: true
       config:
         lifespan: 15m
-      passwordless_enabled: true
+      passwordless_enabled: false
     oidc:
       enabled: true
       config:
@@ -119,9 +119,6 @@ selfservice:
             - hook: session
             - hook: show_verification_ui
         oidc:
-          hooks:
-            - hook: session
-        code:
           hooks:
             - hook: session
 

@@ -17,10 +17,6 @@
                         "credentials": {
                             "password": {
                                 "identifier": true
-                            },
-                            "code": {
-                                "identifier": true,
-                                "via": "email"
                             }
                         },
                         "verification": {
@@ -28,19 +24,6 @@
                         },
                         "recovery": {
                             "via": "email"
-                        }
-                    }
-                },
-                "phone": {
-                    "type": "string",
-                    "title": "Phone Number",
-                    "maxLength": 20,
-                    "ory.sh/kratos": {
-                        "credentials": {
-                            "code": {
-                                "identifier": true,
-                                "via": "sms"
-                            }
                         }
                     }
                 },

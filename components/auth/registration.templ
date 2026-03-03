@@ -50,43 +50,43 @@ templ RegistrationPage(props RegistrationPageProps) {
 templ RegistrationPageWithNodes(nodes []client.UiNode, props RegistrationPageProps) {
 	@AuthLayout(LayoutProps{
 		Title:       i18n.T(ctx, "Create Account"),
-		Description: i18n.T(ctx, "Enter your details to create a new account"),
+		Description: i18n.T(ctx, "Get started by creating your account."),
 	}) {
 		<!-- Flow-level messages -->
 		if len(props.Messages) > 0 {
 			@Messages(MessagesProps{Messages: props.Messages})
 		}
 		if props.FlowAction != "" {
-			<!-- Social login buttons (OIDC) — separate form to avoid nested forms -->
+			<!-- 1. Social sign-up buttons (Google, etc.) — always first -->
 			if hasOIDCNodes(nodes) {
 				@OIDCNodes(nodes, props.FlowAction, props.FlowMethod)
-				<!-- Show divider if there are also password/code/profile nodes -->
-				if hasNonOIDCNodes(nodes, []string{"password", "code", "profile"}) {
-					@AuthDivider()
+			}
+			<!-- 2. Divider between social and email registration -->
+			if hasOIDCNodes(nodes) && hasNonOIDCNodes(nodes, []string{"password", "profile"}) {
+				@AuthDivider()
+			}
+			<!-- 3. Email + password registration form -->
+			if hasNonOIDCNodes(nodes, []string{"password", "profile"}) {
+				@Form(FormProps{
+					Action: props.FlowAction,
+					Method: props.FlowMethod,
+				}) {
+					@UINodes(UINodesProps{
+						Nodes:  nodes,
+						Groups: []string{"default", "password", "profile"},
+					})
 				}
 			}
-			<!-- Password, code, and profile registration form -->
-			@Form(FormProps{
-				Action: props.FlowAction,
-				Method: props.FlowMethod,
-			}) {
-				@UINodes(UINodesProps{
-					Nodes:  nodes,
-					Groups: []string{"default", "password", "code", "profile"},
-				})
+			<!-- 4. Sign in link — always at the bottom -->
+			if props.LoginURL != "" {
+				<div class="mt-6 text-center text-sm text-muted-foreground">
+					{ i18n.T(ctx, "Already have an account?") }
+					{ " " }
+					<a href={ templ.SafeURL(props.LoginURL) } class="font-medium text-primary hover:underline">
+						{ i18n.T(ctx, "Sign in") }
+					</a>
+				</div>
 			}
-			<!-- Additional Links -->
-			<div class="mt-4 text-center text-sm">
-				if props.LoginURL != "" {
-					<div class="text-muted-foreground">
-						{ i18n.T(ctx, "Already have an account?") }
-						{ " " }
-						<a href={ templ.SafeURL(props.LoginURL) } class="text-primary hover:underline">
-							{ i18n.T(ctx, "Sign in") }
-						</a>
-					</div>
-				}
-			</div>
 		}
 	}
 }
