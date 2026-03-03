@@ -5,114 +5,57 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"time"
 
-	kratos "github.com/ory/client-go"
+	"school-with-ai/infra/sqldb"
 )
 
 func main() {
 	email := flag.String("email", "", "Email of the user to promote")
 	role := flag.String("role", "admin", "Role to assign (default: admin)")
-	adminURL := flag.String("admin-url", "http://localhost:4434", "Kratos Admin API URL")
+	dbHost := flag.String("db-host", "localhost:5435", "Database host:port")
+	dbUser := flag.String("db-user", "schoolai", "Database user")
+	dbPass := flag.String("db-pass", "dev-password", "Database password")
+	dbName := flag.String("db-name", "projections", "Database name")
 	flag.Parse()
 
 	if *email == "" {
 		log.Fatal("Please provide an email using --email")
 	}
 
-	configuration := kratos.NewConfiguration()
-	configuration.Servers = kratos.ServerConfigurations{
-		{
-			URL: *adminURL,
-		},
+	db, err := sqldb.Open(sqldb.Config{
+		User:         *dbUser,
+		Password:     *dbPass,
+		Host:         *dbHost,
+		Name:         *dbName,
+		MaxIdleConns: 2,
+		MaxOpenConns: 2,
+		DisableTLS:   true,
+	})
+	if err != nil {
+		log.Fatalf("failed to connect to database: %v", err)
 	}
-	apiClient := kratos.NewAPIClient(configuration)
+	defer db.Close()
 
-	// List identities to find the user by email
-	// Note: Kratos ListIdentities doesn't natively support filtering by trait in all versions cleanly via SDK in one go,
-	// but we can list and filter or use the experimental search if enabled.
-	// For simplicity and standard compatibility, we'll list and filter (assuming reasonable number of users or using pagination if needed, though CLI is for ad-hoc).
-	// Better approach for production with many users: Use Kratos `ListIdentities` with `CredentialsIdentifier` if available or just iterate.
-	// Actually, Kratos Admin API allows listing identities. We'll list and look for the email.
-
-	// In a real prod env with millions of users, you'd want to use the Identity ID directly or a lookup service.
-	// For this tool, we'll iterate pages to find the user.
-
-	ctx := context.Background()
-
-	var targetIdentity *kratos.Identity
-	page := int64(0)
-	perPage := int64(100)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	fmt.Printf("Searching for user with email: %s...\n", *email)
 
-	for {
-		identities, _, err := apiClient.IdentityAPI.ListIdentities(ctx).Page(page).PerPage(perPage).Execute()
-		if err != nil {
-			log.Fatalf("Error listing identities: %v", err)
-		}
-
-		if len(identities) == 0 {
-			break
-		}
-
-		for i := range identities {
-			id := identities[i]
-			traits, ok := id.Traits.(map[string]interface{})
-			if !ok {
-				continue
-			}
-
-			if traitEmail, ok := traits["email"].(string); ok && traitEmail == *email {
-				targetIdentity = &id
-				break
-			}
-		}
-
-		if targetIdentity != nil {
-			break
-		}
-		page++
-	}
-
-	if targetIdentity == nil {
-		log.Fatalf("User with email %s not found", *email)
-	}
-
-	fmt.Printf("Found user: %s (ID: %s)\n", *email, targetIdentity.Id)
-	fmt.Printf("Current Role: %v\n", getRole(targetIdentity.Traits))
-
-	// Update traits
-	traits, _ := targetIdentity.Traits.(map[string]interface{})
-	traits["role"] = *role
-
-	// Create patch
-	// We need to use PatchIdentity
-	// The SDK PatchIdentity requires a JsonPatchDocument.
-	// However, it's often easier to use UpdateIdentity if we have the full object, but Patch is preferred for partial updates.
-	// Let's use UpdateIdentity for simplicity as we have the full identity and just want to modify traits.
-
-	updateParams := *kratos.NewUpdateIdentityBody(
-		targetIdentity.SchemaId,
-		*targetIdentity.State,
-		traits,
-	)
-
-	updatedIdentity, _, err := apiClient.IdentityAPI.UpdateIdentity(ctx, targetIdentity.Id).UpdateIdentityBody(updateParams).Execute()
+	var currentRole string
+	var userID string
+	err = db.QueryRowContext(ctx, "SELECT id, role FROM users WHERE email = $1", *email).Scan(&userID, &currentRole)
 	if err != nil {
-		log.Fatalf("Error updating identity: %v\nFull error: %+v", err, err)
+		log.Fatalf("User with email %s not found: %v", *email, err)
+	}
+
+	fmt.Printf("Found user: %s (ID: %s)\n", *email, userID)
+	fmt.Printf("Current Role: %s\n", currentRole)
+
+	_, err = db.ExecContext(ctx, "UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2", *role, userID)
+	if err != nil {
+		log.Fatalf("Error updating user role: %v", err)
 	}
 
 	fmt.Printf("Successfully promoted %s to %s\n", *email, *role)
-	fmt.Printf("New Role: %v\n", getRole(updatedIdentity.Traits))
-}
-
-func getRole(traits interface{}) string {
-	t, ok := traits.(map[string]interface{})
-	if !ok {
-		return "unknown"
-	}
-	if role, ok := t["role"].(string); ok {
-		return role
-	}
-	return "none"
 }

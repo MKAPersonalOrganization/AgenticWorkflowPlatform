@@ -4,7 +4,6 @@ import "school-with-ai/domain"
 import "school-with-ai/components/i18n"
 
 type ErrorPageProps struct {
-	ErrorID      string
 	ErrorMessage string
 	ErrorDetails string
 	LoginURL     string
@@ -37,9 +36,6 @@ templ ErrorPage(props ErrorPageProps) {
 				}
 				if props.ErrorDetails != "" {
 					<p class="text-sm text-muted-foreground">{ props.ErrorDetails }</p>
-				}
-				if props.ErrorID != "" {
-					<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "Error ID") }: { props.ErrorID }</p>
 				}
 			</div>
 			<!-- Action Buttons -->
