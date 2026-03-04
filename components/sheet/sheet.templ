@@ -1,4 +1,4 @@
-// templui component sheet - version: v1.5.0 installed by templui v1.5.0
+// templui component sheet - version: v1.6.0 installed by templui v1.6.0
 // 📚 Documentation: https://templui.io/docs/components/sheet
 package sheet
 
@@ -44,7 +44,7 @@ type ContentProps struct {
 	ID              string
 	Class           string
 	Attributes      templ.Attributes
-	ShowCloseButton bool
+	HideCloseButton bool
 	Side            Side //
 	Open            bool // Initial open state for standalone usage
 }
@@ -142,7 +142,7 @@ templ Content(props ...ContentProps) {
 	@dialog.Content(dialog.ContentProps{
 		ID:              p.ID,
 		Open:            p.Open,
-		ShowCloseButton: p.ShowCloseButton,
+		HideCloseButton: p.HideCloseButton,
 		Class: utils.TwMerge(
 			// First apply side-specific positioning and animations
 			getSideClasses(p.Side),
