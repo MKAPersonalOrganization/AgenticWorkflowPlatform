@@ -1,4 +1,4 @@
-// templui component dialog - version: v1.5.0 installed by templui v1.5.0
+// templui component dialog - version: v1.6.0 installed by templui v1.6.0
 // 📚 Documentation: https://templui.io/docs/components/dialog
 package dialog
 
@@ -35,7 +35,7 @@ type ContentProps struct {
 	ID               string
 	Class            string
 	Attributes       templ.Attributes
-	ShowCloseButton  bool
+	HideCloseButton  bool
 	Open             bool // Initial open state for standalone usage (when no context)
 	DisableAutoFocus bool
 }
@@ -208,7 +208,7 @@ templ Content(props ...ContentProps) {
 		{ p.Attributes... }
 	>
 		{ children... }
-		if p.ShowCloseButton {
+		if !p.HideCloseButton {
 			<button
 				class={ utils.TwMerge(
 						// Positioning
