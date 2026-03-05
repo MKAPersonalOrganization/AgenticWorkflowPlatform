@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"school-with-ai/components"
+	"school-with-ai/components/docs"
 	"school-with-ai/components/landing"
 	"school-with-ai/components/pricing"
 	"school-with-ai/domain"
@@ -970,7 +971,7 @@ func HandleDocsPage(log *logger.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := domain.GetUserFromContext(r.Context())
 
-		component := landing.DocsPage(landing.DocsPageProps{
+		component := docs.DocsPage(docs.DocsPageProps{
 			User: user,
 		})
 		if err := component.Render(r.Context(), w); err != nil {

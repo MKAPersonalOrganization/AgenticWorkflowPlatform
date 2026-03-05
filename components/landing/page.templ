@@ -1,0 +1,49 @@
+package landing
+
+import (
+	"school-with-ai/components"
+	"school-with-ai/domain"
+)
+
+type LandingPageProps struct {
+	User *domain.User
+}
+
+templ LandingPage(props LandingPageProps) {
+	@components.BaseLayout(components.LayoutProps{
+		Title:      "Your AI-Powered Learning Platform",
+		User:       props.User,
+		HideNavbar: true,
+	}) {
+		<div class="h-full overflow-y-auto scroll-smooth" id="landing-root">
+			<!-- Sticky Navbar -->
+			@Nav(props.User)
+			<!-- Hero Section -->
+			@heroSection(props.User)
+			<!-- Trusted By / Social Proof -->
+			@socialProofBar()
+			<!-- Features Grid -->
+			@featuresSection()
+			<!-- Agent Store Showcase -->
+			@agentStoreSection()
+			<!-- Multi-Provider AI Models -->
+			@aiModelsSection()
+			<!-- MCP Integration Section -->
+			@mcpSection()
+			<!-- Plugin System Section -->
+			@pluginSection()
+			<!-- Knowledge Base Section -->
+			@knowledgeBaseSection()
+			<!-- Personalized Learning Section -->
+			@personalizedLearningSection()
+			<!-- Voice & Visualization Section -->
+			@voiceVisualizationSection()
+			<!-- Pricing Section -->
+			@pricingSection(props.User)
+			<!-- CTA Section -->
+			@ctaSection(props.User)
+			<!-- Footer -->
+			@Footer()
+		</div>
+	}
+}
