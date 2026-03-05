@@ -33,22 +33,12 @@ func NewAuthHandlers(log *logger.Logger, googleClient *googleauth.Client, sessio
 	}
 }
 
-// LoginPage handles GET /auth/login — renders the Google login page.
+// LoginPage handles GET /auth/login — redirects directly to Google OAuth.
 func (h *AuthHandlers) LoginPage(w http.ResponseWriter, r *http.Request) {
 	// If already authenticated, redirect to chat
 	if user := domain.GetUserFromContext(r.Context()); user != nil {
 		http.Redirect(w, r, "/chat", http.StatusSeeOther)
 		return
-	}
-
-	// Get optional error message from query
-	errorMsg := r.URL.Query().Get("error")
-	var messages []authcomp.UIMessage
-	if errorMsg != "" {
-		messages = append(messages, authcomp.UIMessage{
-			Text: errorMsg,
-			Type: "error",
-		})
 	}
 
 	// Build the Google OAuth URL with CSRF state
@@ -64,16 +54,7 @@ func (h *AuthHandlers) LoginPage(w http.ResponseWriter, r *http.Request) {
 	_ = session.Save(r, w)
 
 	googleURL := h.googleClient.AuthCodeURL(state)
-
-	props := authcomp.LoginPageProps{
-		GoogleAuthURL: googleURL,
-		Messages:      messages,
-	}
-
-	component := authcomp.LoginPage(props)
-	if err := component.Render(r.Context(), w); err != nil {
-		h.log.Error(r.Context(), "failed to render login page", "error", err)
-	}
+	http.Redirect(w, r, googleURL, http.StatusSeeOther)
 }
 
 // CallbackHandler handles GET /auth/callback — the Google OAuth2 callback.
@@ -84,7 +65,7 @@ func (h *AuthHandlers) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 	session, err := h.sessions.Get(r)
 	if err != nil {
 		h.log.Error(ctx, "failed to get session", "error", err)
-		http.Redirect(w, r, "/auth/login?error="+url.QueryEscape("Session error"), http.StatusSeeOther)
+		http.Redirect(w, r, "/auth/error?error="+url.QueryEscape("Session error"), http.StatusSeeOther)
 		return
 	}
 
@@ -92,7 +73,7 @@ func (h *AuthHandlers) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 	actualState := r.URL.Query().Get("state")
 	if expectedState == "" || actualState != expectedState {
 		h.log.Error(ctx, "OAuth state mismatch", "expected", expectedState, "actual", actualState)
-		http.Redirect(w, r, "/auth/login?error="+url.QueryEscape("Invalid OAuth state"), http.StatusSeeOther)
+		http.Redirect(w, r, "/auth/error?error="+url.QueryEscape("Invalid OAuth state"), http.StatusSeeOther)
 		return
 	}
 
@@ -108,21 +89,21 @@ func (h *AuthHandlers) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 		if errDesc == "" {
 			errDesc = errParam
 		}
-		http.Redirect(w, r, "/auth/login?error="+url.QueryEscape(errDesc), http.StatusSeeOther)
+		http.Redirect(w, r, "/auth/error?error="+url.QueryEscape(errDesc), http.StatusSeeOther)
 		return
 	}
 
 	// Exchange code for token
 	code := r.URL.Query().Get("code")
 	if code == "" {
-		http.Redirect(w, r, "/auth/login?error="+url.QueryEscape("Missing authorization code"), http.StatusSeeOther)
+		http.Redirect(w, r, "/auth/error?error="+url.QueryEscape("Missing authorization code"), http.StatusSeeOther)
 		return
 	}
 
 	token, err := h.googleClient.Exchange(ctx, code)
 	if err != nil {
 		h.log.Error(ctx, "failed to exchange code for token", "error", err)
-		http.Redirect(w, r, "/auth/login?error="+url.QueryEscape("Failed to authenticate with Google"), http.StatusSeeOther)
+		http.Redirect(w, r, "/auth/error?error="+url.QueryEscape("Failed to authenticate with Google"), http.StatusSeeOther)
 		return
 	}
 
@@ -130,12 +111,12 @@ func (h *AuthHandlers) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 	info, err := h.googleClient.FetchUserInfo(ctx, token)
 	if err != nil {
 		h.log.Error(ctx, "failed to fetch Google user info", "error", err)
-		http.Redirect(w, r, "/auth/login?error="+url.QueryEscape("Failed to retrieve your profile"), http.StatusSeeOther)
+		http.Redirect(w, r, "/auth/error?error="+url.QueryEscape("Failed to retrieve your profile"), http.StatusSeeOther)
 		return
 	}
 
 	if !info.Verified {
-		http.Redirect(w, r, "/auth/login?error="+url.QueryEscape("Email address is not verified"), http.StatusSeeOther)
+		http.Redirect(w, r, "/auth/error?error="+url.QueryEscape("Email address is not verified"), http.StatusSeeOther)
 		return
 	}
 
@@ -143,14 +124,14 @@ func (h *AuthHandlers) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 	user, err := h.googleClient.UpsertUser(ctx, info)
 	if err != nil {
 		h.log.Error(ctx, "failed to upsert user", "error", err)
-		http.Redirect(w, r, "/auth/login?error="+url.QueryEscape("Failed to create user account"), http.StatusSeeOther)
+		http.Redirect(w, r, "/auth/error?error="+url.QueryEscape("Failed to create user account"), http.StatusSeeOther)
 		return
 	}
 
 	// Store user ID in session
 	if err := h.sessions.SetUserID(w, r, user.ID); err != nil {
 		h.log.Error(ctx, "failed to save session", "error", err)
-		http.Redirect(w, r, "/auth/login?error="+url.QueryEscape("Failed to create session"), http.StatusSeeOther)
+		http.Redirect(w, r, "/auth/error?error="+url.QueryEscape("Failed to create session"), http.StatusSeeOther)
 		return
 	}
 
@@ -167,7 +148,7 @@ func (h *AuthHandlers) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 		h.log.Error(r.Context(), "failed to clear session", "error", err)
 	}
 
-	http.Redirect(w, r, "/auth/login", http.StatusSeeOther)
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 // MeHandler handles GET /api/me — returns the current user as JSON.
