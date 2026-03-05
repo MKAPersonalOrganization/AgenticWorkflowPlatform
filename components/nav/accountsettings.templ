@@ -268,12 +268,19 @@ templ authenticatedMenu(user *domain.User) {
 					<div class="flex items-center justify-center size-5">
 						@icon.BadgeCheck(icon.Props{Class: "size-4 text-green-600 dark:text-green-400"})
 					</div>
-					<span class="flex-1 text-start text-green-600 dark:text-green-400 font-medium">{ i18n.T(ctx, "Account Active") }</span>
+					<div class="flex-1 text-start">
+						<span class="text-green-600 dark:text-green-400 font-medium block" x-text="(billingData && billingData.planName) || 'Full Access'"></span>
+						<template x-if="billingData && billingData.nextBillingAt">
+							<span class="text-[10px] text-muted-foreground" x-text="'Next billing ' + formatDate(billingData.nextBillingAt)"></span>
+						</template>
+					</div>
 				</div>
 				<!-- Card info if available -->
 				<template x-if="billingData && billingData.cardLast4">
 					<div class="flex items-center gap-3 w-full px-3 py-1 text-xs text-muted-foreground">
-						<div class="flex items-center justify-center size-5"></div>
+						<div class="flex items-center justify-center size-5">
+							@icon.CreditCard(icon.Props{Class: "size-3 text-muted-foreground/70"})
+						</div>
 						<span x-text="(billingData.cardBrand ? billingData.cardBrand.charAt(0).toUpperCase() + billingData.cardBrand.slice(1) : 'Card') + ' ••••' + billingData.cardLast4"></span>
 					</div>
 				</template>
@@ -305,8 +312,11 @@ templ authenticatedMenu(user *domain.User) {
 					</div>
 					<div class="flex-1 text-start">
 						<span class="text-yellow-600 dark:text-yellow-400 font-medium block">{ i18n.T(ctx, "Cancelled") }</span>
-						<template x-if="billingData && billingData.cancelsOn">
-							<span class="text-xs text-muted-foreground" x-text="'Access until ' + formatDate(billingData.cancelsOn)"></span>
+						<template x-if="billingData && billingData.daysRemaining > 0">
+							<span class="text-[10px] text-muted-foreground" x-text="billingData.daysRemaining + ' days remaining'"></span>
+						</template>
+						<template x-if="billingData && (!billingData.daysRemaining || billingData.daysRemaining <= 0) && billingData.cancelsOn">
+							<span class="text-[10px] text-muted-foreground" x-text="'Until ' + formatDate(billingData.cancelsOn)"></span>
 						</template>
 					</div>
 				</div>

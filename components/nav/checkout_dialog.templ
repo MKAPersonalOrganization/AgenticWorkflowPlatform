@@ -211,12 +211,27 @@ templ checkoutDialog() {
 						<p class="text-sm text-destructive" x-text="errorMsg"></p>
 					</div>
 					<!-- Success message -->
-					<div x-show="succeeded" x-cloak class="rounded-lg border border-primary bg-primary/10 p-4 text-center space-y-2">
+					<div x-show="succeeded" x-cloak class="rounded-xl border border-green-500/20 bg-gradient-to-br from-green-500/5 to-transparent p-6 text-center space-y-4">
 						<div class="flex justify-center">
-							<svg class="size-8 text-primary" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
+							<div class="flex items-center justify-center size-14 rounded-full bg-green-500/10 ring-2 ring-green-500/20">
+								@icon.BadgeCheck(icon.Props{Class: "size-8 text-green-600 dark:text-green-400"})
+							</div>
 						</div>
-						<p class="font-semibold text-primary">{ i18n.T(ctx, "Payment successful!") }</p>
-						<p class="text-sm text-muted-foreground">{ i18n.T(ctx, "Your account is now fully activated. Redirecting…") }</p>
+						<div class="space-y-1">
+							<p class="text-base font-semibold text-foreground">{ i18n.T(ctx, "You're all set!") }</p>
+							<p class="text-sm text-muted-foreground">{ i18n.T(ctx, "Your Full Access subscription is now active.") }</p>
+						</div>
+						<div class="flex flex-wrap items-center justify-center gap-2 text-xs text-muted-foreground">
+							<span class="inline-flex items-center gap-1 rounded-full bg-green-500/10 px-2.5 py-0.5 text-green-600 dark:text-green-400 ring-1 ring-inset ring-green-500/20 font-medium">
+								@icon.Sparkles(icon.Props{Class: "size-3"})
+								{ i18n.T(ctx, "Unlimited conversations") }
+							</span>
+							<span class="inline-flex items-center gap-1 rounded-full bg-green-500/10 px-2.5 py-0.5 text-green-600 dark:text-green-400 ring-1 ring-inset ring-green-500/20 font-medium">
+								@icon.Sparkles(icon.Props{Class: "size-3"})
+								{ i18n.T(ctx, "All AI models") }
+							</span>
+						</div>
+						<p class="text-xs text-muted-foreground animate-pulse">{ i18n.T(ctx, "Redirecting to your dashboard…") }</p>
 					</div>
 					<!-- Stripe Payment Element -->
 					<div x-show="!succeeded && !loading">

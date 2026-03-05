@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"school-with-ai/domain"
 	"school-with-ai/foundation/logger"
@@ -349,12 +350,17 @@ func (h *Handler) handleInvoicePaymentFailed(w http.ResponseWriter, r *http.Requ
 // --------------------------------------------------------------------------
 
 type paymentStatusResponse struct {
-	Status      string `json:"status"` // "none", "active", "pending", "cancelled"
-	PaidAt      string `json:"paidAt,omitempty"`
-	CardBrand   string `json:"cardBrand,omitempty"` // e.g. "visa", "mastercard"
-	CardLast4   string `json:"cardLast4,omitempty"` // e.g. "4242"
-	CancelledAt string `json:"cancelledAt,omitempty"`
-	CancelsOn   string `json:"cancelsOn,omitempty"`
+	Status        string `json:"status"`                  // "none", "active", "pending", "cancelled"
+	PlanName      string `json:"planName,omitempty"`      // e.g. "Full Access"
+	PlanAmount    string `json:"planAmount,omitempty"`    // e.g. "$5.00"
+	PlanInterval  string `json:"planInterval,omitempty"`  // e.g. "month"
+	PaidAt        string `json:"paidAt,omitempty"`        // ISO 8601
+	NextBillingAt string `json:"nextBillingAt,omitempty"` // ISO 8601 — next charge date
+	CardBrand     string `json:"cardBrand,omitempty"`     // e.g. "visa", "mastercard"
+	CardLast4     string `json:"cardLast4,omitempty"`     // e.g. "4242"
+	CancelledAt   string `json:"cancelledAt,omitempty"`   // ISO 8601
+	CancelsOn     string `json:"cancelsOn,omitempty"`     // ISO 8601 — access-until date
+	DaysRemaining int    `json:"daysRemaining,omitempty"` // days until cancellation takes effect
 }
 
 // GetPaymentStatus returns the current payment status for the authenticated user.
@@ -375,8 +381,22 @@ func (h *Handler) GetPaymentStatus(w http.ResponseWriter, r *http.Request) {
 	resp := paymentStatusResponse{Status: "none"}
 	if status != nil {
 		resp.Status = status.Status
+
+		// Plan metadata — shown for any non-"none" status
+		if status.Status != "none" {
+			resp.PlanName = "Full Access"
+			resp.PlanAmount = "$5.00"
+			resp.PlanInterval = "month"
+		}
+
 		if status.PaidAt != nil {
 			resp.PaidAt = status.PaidAt.Format("2006-01-02T15:04:05Z")
+
+			// Next billing date = paid_at + 1 month (for active subscriptions)
+			if status.Status == "active" {
+				nextBilling := status.PaidAt.AddDate(0, 1, 0)
+				resp.NextBillingAt = nextBilling.Format("2006-01-02T15:04:05Z")
+			}
 		}
 		if status.CardBrand != nil {
 			resp.CardBrand = *status.CardBrand
@@ -389,6 +409,13 @@ func (h *Handler) GetPaymentStatus(w http.ResponseWriter, r *http.Request) {
 		}
 		if status.CancelsOn != nil {
 			resp.CancelsOn = status.CancelsOn.Format("2006-01-02T15:04:05Z")
+
+			// Calculate days remaining until access expires
+			daysLeft := int(status.CancelsOn.Sub(time.Now().UTC()).Hours() / 24)
+			if daysLeft < 0 {
+				daysLeft = 0
+			}
+			resp.DaysRemaining = daysLeft
 		}
 	}
 
