@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"school-with-ai/components"
+	"school-with-ai/components/landing"
 	"school-with-ai/components/pricing"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
@@ -818,8 +819,14 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Get("/api/knowledge/graph/labels/popular", authMiddleware.RequireAuthFunc(knowledgeHandler.GetPopularLabels))
 	r.Get("/api/knowledge/graph/labels/search", authMiddleware.RequireAuthFunc(knowledgeHandler.SearchGraphLabels))
 
-	// Home route
-	r.Get("/", authMiddleware.RequireAuthFunc(HandleViewChatInputScreen(log, edgequakeService)))
+	// Landing page (public — shows branding page with optional user context)
+	r.Get("/", authMiddleware.OptionalAuthFunc(HandleLandingPage(log)))
+
+	// Documentation page (public)
+	r.Get("/docs", authMiddleware.OptionalAuthFunc(HandleDocsPage(log)))
+
+	// Chat route (authenticated — main app)
+	r.Get("/chat", authMiddleware.RequireAuthFunc(HandleViewChatInputScreen(log, edgequakeService)))
 
 	// Configure TLS: restrict to elliptic curves with assembly implementations
 	// (X25519 and P256) to ensure the server remains performant under heavy load.
@@ -942,6 +949,32 @@ func HandlePricingPage(log *logger.Logger) http.HandlerFunc {
 		})
 		if err := component.Render(r.Context(), w); err != nil {
 			log.Error(r.Context(), "failed to render pricing page", "error", err)
+		}
+	}
+}
+
+func HandleLandingPage(log *logger.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := domain.GetUserFromContext(r.Context())
+
+		component := landing.LandingPage(landing.LandingPageProps{
+			User: user,
+		})
+		if err := component.Render(r.Context(), w); err != nil {
+			log.Error(r.Context(), "failed to render landing page", "error", err)
+		}
+	}
+}
+
+func HandleDocsPage(log *logger.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := domain.GetUserFromContext(r.Context())
+
+		component := landing.DocsPage(landing.DocsPageProps{
+			User: user,
+		})
+		if err := component.Render(r.Context(), w); err != nil {
+			log.Error(r.Context(), "failed to render docs page", "error", err)
 		}
 	}
 }

@@ -35,9 +35,9 @@ func NewAuthHandlers(log *logger.Logger, googleClient *googleauth.Client, sessio
 
 // LoginPage handles GET /auth/login — renders the Google login page.
 func (h *AuthHandlers) LoginPage(w http.ResponseWriter, r *http.Request) {
-	// If already authenticated, redirect to home
+	// If already authenticated, redirect to chat
 	if user := domain.GetUserFromContext(r.Context()); user != nil {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
+		http.Redirect(w, r, "/chat", http.StatusSeeOther)
 		return
 	}
 
@@ -209,23 +209,23 @@ func (h *AuthHandlers) ErrorPage(w http.ResponseWriter, r *http.Request) {
 // Rejects absolute URLs, protocol-relative URLs, and external domains.
 func sanitizeReturnTo(returnTo string) string {
 	if returnTo == "" {
-		return "/"
+		return "/chat"
 	}
 
 	// Parse the URL
 	parsed, err := url.Parse(returnTo)
 	if err != nil {
-		return "/"
+		return "/chat"
 	}
 
 	// Reject absolute URLs (has scheme or host) and protocol-relative URLs
 	if parsed.Scheme != "" || parsed.Host != "" || len(returnTo) > 1 && returnTo[0:2] == "//" {
-		return "/"
+		return "/chat"
 	}
 
 	// Must start with /
 	if len(returnTo) == 0 || returnTo[0] != '/' {
-		return "/"
+		return "/chat"
 	}
 
 	return returnTo
