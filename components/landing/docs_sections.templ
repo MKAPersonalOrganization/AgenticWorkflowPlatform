@@ -1,0 +1,259 @@
+package landing
+
+import (
+	"school-with-ai/components/button"
+	"school-with-ai/components/icon"
+)
+
+// ─── Security ────────────────────────────────────────────────────────────────
+templ docsSecurity() {
+	@docsSection("security", "Security", iconShieldCheck, "text-red-500") {
+		<p>
+			Security is built into every layer of Compass, from network transport to data storage.
+		</p>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Layer</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Protection</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow2("Transport", "TLS encryption with restricted elliptic curves (X25519, P256)")
+				@docsTableRow2("Authentication", "Google OAuth with session management")
+				@docsTableRow2("Rate Limiting", "Per-IP rate limiting (10 req/s API, 100 req/s assets)")
+				@docsTableRow2("Body Limits", "1 MB default, 150 MB for file uploads")
+				@docsTableRow2("Headers", "Security headers middleware on all responses")
+				@docsTableRow2("Panic Recovery", "Global panic recovery middleware")
+				@docsTableRow2("MCP Security", "SSRF protection, encrypted OAuth tokens at rest")
+				@docsTableRow2("Payments", "PCI SAQ-A compliant via Stripe.js")
+				@docsTableRow2("Production Guard", "Rejects development defaults in production builds")
+			</tbody>
+		}
+	}
+}
+
+// ─── Internationalization ────────────────────────────────────────────────────
+templ docsI18n() {
+	@docsSection("i18n", "Internationalization", iconLanguages, "text-teal-500") {
+		<p>
+			Compass supports multiple languages with full RTL (right-to-left) layout support.
+		</p>
+		<h3>Language Detection</h3>
+		<p>
+			The language is detected automatically from (in priority order):
+		</p>
+		<ol class="list-decimal list-inside space-y-1 my-4">
+			<li>Query parameter (<code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">?lang=ar</code>)</li>
+			<li>Cookie preference</li>
+			<li>Browser <code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">Accept-Language</code> header</li>
+		</ol>
+		<h3>RTL Support</h3>
+		<p>
+			When an RTL language (like Arabic) is detected, the entire UI flips direction automatically.
+			This includes layout, text alignment, scroll directions, and icon mirroring. Compass uses
+			logical CSS properties (<code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">margin-inline-start</code>) and the
+			<code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">dir</code> attribute for correct bidirectional rendering.
+		</p>
+		<h3>Fonts</h3>
+		<p>
+			Compass loads optimized Google Fonts for each script:
+			<strong>Inter</strong> (Latin), <strong>Noto Sans</strong> (universal fallback),
+			and <strong>Noto Sans Arabic</strong> (Arabic script).
+		</p>
+	}
+}
+
+// ─── Billing ─────────────────────────────────────────────────────────────────
+templ docsBilling() {
+	@docsSection("billing", "Billing", iconLock, "text-violet-500") {
+		<p>
+			Compass integrates with Stripe for secure, PCI SAQ-A compliant payment processing. Credit
+			card data is handled entirely by Stripe and never touches Compass servers.
+		</p>
+		<h3>Payment Flow</h3>
+		<ol class="list-decimal list-inside space-y-2 my-4">
+			<li>Navigate to the <strong>Pricing</strong> page</li>
+			<li>Select a plan and click <strong>Subscribe</strong></li>
+			<li>Complete payment via Stripe Checkout</li>
+			<li>Subscription activates immediately</li>
+			<li>Webhooks keep Compass in sync</li>
+		</ol>
+		<h3>Subscription Management</h3>
+		<p>
+			Manage subscriptions from the Profile page:
+		</p>
+		<ul class="space-y-2 my-4">
+			<li>View current plan and billing cycle</li>
+			<li>Upgrade or downgrade plans</li>
+			<li>Update payment method via Stripe Customer Portal</li>
+			<li>Cancel subscription (access retained until period end)</li>
+		</ul>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Feature</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Details</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow2("Payment Processor", "Stripe")
+				@docsTableRow2("Compliance", "PCI SAQ-A")
+				@docsTableRow2("Webhook Events", "Checkout completed, subscription updated/deleted, invoice paid")
+				@docsTableRow2("Customer Portal", "Self-service billing management via Stripe")
+				@docsTableRow2("Trial Support", "Configurable trial periods per plan")
+			</tbody>
+		}
+	}
+}
+
+// ─── API Reference ───────────────────────────────────────────────────────────
+templ docsAPI() {
+	@docsSection("api", "API Reference", iconCode, "text-slate-500") {
+		<p>
+			Compass exposes a comprehensive REST API for all features. All API endpoints require authentication
+			unless otherwise noted.
+		</p>
+		<h3>Core Endpoints</h3>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Method</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Endpoint</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Description</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow("POST", "/v1/message:send", "Send a message to an agent")
+				@docsTableRow("GET", "/v1/tasks/{id}:subscribe", "Stream job events (SSE)")
+				@docsTableRow("POST", "/v1/tasks/{id}:cancel", "Cancel a running job")
+				@docsTableRow("GET", "/v1/agents", "List user's agents")
+				@docsTableRow("GET", "/v1/plugins", "List all plugins")
+				@docsTableRow("GET", "/api/agui/threads", "List conversation threads")
+				@docsTableRow("GET", "/api/agui/threads/{id}/messages", "Get thread messages")
+			</tbody>
+		}
+		<h3>Agent Endpoints</h3>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Method</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Endpoint</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Description</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow("GET", "/v1/agent-definitions", "List user's custom agents")
+				@docsTableRow("POST", "/v1/agent-definitions", "Create a new agent")
+				@docsTableRow("PUT", "/v1/agent-definitions/{id}", "Update an agent")
+				@docsTableRow("DELETE", "/v1/agent-definitions/{id}", "Delete an agent")
+				@docsTableRow("GET", "/v1/agent-catalog", "Browse agent catalog")
+				@docsTableRow("POST", "/v1/agent-catalog/{id}/add", "Fork catalog agent")
+			</tbody>
+		}
+		<h3>MCP Endpoints</h3>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Method</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Endpoint</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Description</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow("GET", "/v1/mcp/connectors", "List MCP connectors")
+				@docsTableRow("POST", "/v1/mcp/connectors", "Create a connector")
+				@docsTableRow("POST", "/v1/mcp/connectors/{id}/connect", "Connect to MCP server")
+				@docsTableRow("GET", "/v1/mcp/connectors/{id}/tools", "List discovered tools")
+				@docsTableRow("POST", "/v1/mcp/connectors/{id}/refresh", "Refresh tools")
+				@docsTableRow("*", "/v1/mcp/connectors/{id}/mcp/*", "MCP proxy")
+			</tbody>
+		}
+		<h3>Knowledge Base Endpoints</h3>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Method</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Endpoint</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Description</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow("GET", "/api/knowledge/workspaces", "List workspaces")
+				@docsTableRow("POST", "/api/knowledge/workspaces", "Create workspace")
+				@docsTableRow("POST", "/api/knowledge/documents/upload", "Upload document")
+				@docsTableRow("GET", "/api/knowledge/graph", "Get knowledge graph")
+				@docsTableRow("GET", "/api/knowledge/graph/nodes/search", "Search graph nodes")
+			</tbody>
+		}
+		<div class="mt-8">
+			@button.Button(button.Props{
+				Href:    "/",
+				Variant: button.VariantOutline,
+			}) {
+				@icon.ArrowRight(icon.Props{Class: "size-4"})
+				<span>Back to Home</span>
+			}
+		</div>
+	}
+}
+
+// ─── Shared Components ───────────────────────────────────────────────────────
+templ docsSection(id, title string, iconComp templ.Component, colorClass string) {
+	<section id={ id } class="scroll-mt-24 border-b border-border pb-12 mb-12 last:border-0">
+		<div class="flex items-center gap-3 mb-6">
+			<div class={ "inline-flex h-10 w-10 items-center justify-center rounded-lg bg-muted", colorClass }>
+				@iconComp
+			</div>
+			<h2 class="text-2xl font-bold tracking-tight">{ title }</h2>
+		</div>
+		<div class="prose prose-sm dark:prose-invert max-w-none [&>p]:text-muted-foreground [&>p]:leading-relaxed [&>p]:mb-4 [&>h3]:text-lg [&>h3]:font-semibold [&>h3]:mt-8 [&>h3]:mb-3">
+			{ children... }
+		</div>
+	</section>
+}
+
+templ docsInfoBox(title string) {
+	<div class="my-6 rounded-lg border border-primary/20 bg-primary/5 p-4">
+		<div class="flex items-center gap-2 text-sm font-semibold text-primary mb-1">
+			@icon.Sparkles(icon.Props{Class: "size-4"})
+			<span>{ title }</span>
+		</div>
+		<div class="text-sm text-muted-foreground">
+			{ children... }
+		</div>
+	</div>
+}
+
+templ docsTable() {
+	<div class="my-6 overflow-x-auto rounded-lg border border-border">
+		<table class="w-full text-sm">
+			{ children... }
+		</table>
+	</div>
+}
+
+templ docsTableRow(col1, col2, col3 string) {
+	<tr class="border-b border-border last:border-0 hover:bg-muted/30">
+		<td class="py-2.5 px-3 font-medium">{ col1 }</td>
+		<td class="py-2.5 px-3 text-muted-foreground">{ col2 }</td>
+		<td class="py-2.5 px-3 text-muted-foreground">{ col3 }</td>
+	</tr>
+}
+
+templ docsTableRow2(col1, col2 string) {
+	<tr class="border-b border-border last:border-0 hover:bg-muted/30">
+		<td class="py-2.5 px-3 font-medium">{ col1 }</td>
+		<td class="py-2.5 px-3 text-muted-foreground">{ col2 }</td>
+	</tr>
+}
+
+templ statusBadge(text, bgColor string) {
+	<span class={ "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium text-white", bgColor }>
+		{ text }
+	</span>
+}
+
+templ docsCode(text string) {
+	<code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">{ text }</code>
+}
