@@ -39,13 +39,13 @@ type LedgerEntry struct {
 	Status          LedgerEntryStatus // Typed status matching Stripe lifecycle
 	Description     string
 	FailureReason   string
-	ErrorCode       string      // Stripe ErrorCode for programmatic failure handling
-	DeclineCode     string      // Stripe DeclineCode for card-specific failures
-	RefundedCents   int64       // Running total of refunds against this entry
-	DisputedCents   int64       // Amount currently under dispute
-	CardBrand       string      // e.g. "visa", "mastercard" (PCI-safe, from Charge)
-	CardLast4       string      // e.g. "4242" (PCI-safe, from Charge)
-	ReceiptURL      string      // Stripe receipt URL
+	ErrorCode       string // Stripe ErrorCode for programmatic failure handling
+	DeclineCode     string // Stripe DeclineCode for card-specific failures
+	RefundedCents   int64  // Running total of refunds against this entry
+	DisputedCents   int64  // Amount currently under dispute
+	CardBrand       string // e.g. "visa", "mastercard" (PCI-safe, from Charge)
+	CardLast4       string // e.g. "4242" (PCI-safe, from Charge)
+	ReceiptURL      string // Stripe receipt URL
 	InitiatedAt     time.Time
 	ResolvedAt      *time.Time
 }

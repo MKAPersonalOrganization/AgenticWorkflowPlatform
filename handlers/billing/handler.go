@@ -138,8 +138,8 @@ func (h *Handler) CreatePaymentIntent(w http.ResponseWriter, r *http.Request) {
 // All others are acknowledged with 200 OK.
 //
 // Idempotency is guaranteed at two levels:
-//   1. Aggregate-level: duplicate commands are no-ops
-//   2. Stripe event dedup: ProcessedStripeEvents map in the aggregate
+//  1. Aggregate-level: duplicate commands are no-ops
+//  2. Stripe event dedup: ProcessedStripeEvents map in the aggregate
 func (h *Handler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	const maxBodyBytes = 65536
 	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
