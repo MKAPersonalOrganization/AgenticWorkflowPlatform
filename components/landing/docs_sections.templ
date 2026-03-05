@@ -25,7 +25,7 @@ templ docsSecurity() {
 				@docsTableRow2("Body Limits", "1 MB default, 150 MB for file uploads")
 				@docsTableRow2("Headers", "Security headers middleware on all responses")
 				@docsTableRow2("Panic Recovery", "Global panic recovery middleware")
-				@docsTableRow2("MCP Security", "SSRF protection, encrypted OAuth tokens at rest")
+				@docsTableRow2("MCP Security", "SSRF protection, encrypted OAuth tokens at rest, per-server circuit breakers")
 				@docsTableRow2("Payments", "PCI SAQ-A compliant via Stripe.js")
 				@docsTableRow2("Production Guard", "Rejects development defaults in production builds")
 			</tbody>
@@ -184,6 +184,23 @@ templ docsAPI() {
 				@docsTableRow("POST", "/api/knowledge/documents/upload", "Upload document")
 				@docsTableRow("GET", "/api/knowledge/graph", "Get knowledge graph")
 				@docsTableRow("GET", "/api/knowledge/graph/nodes/search", "Search graph nodes")
+			</tbody>
+		}
+		<h3>Resource and File Endpoints</h3>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Method</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Endpoint</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Description</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow("GET", "/api/resources", "List public resources")
+				@docsTableRow("GET", "/api/resources/private", "List user's private resources")
+				@docsTableRow("POST", "/api/resources/upload", "Upload a resource file")
+				@docsTableRow("GET", "/api/resources/{id}/download", "Download a resource")
+				@docsTableRow("DELETE", "/api/resources/{id}", "Delete a private resource")
 			</tbody>
 		}
 		<div class="mt-8">

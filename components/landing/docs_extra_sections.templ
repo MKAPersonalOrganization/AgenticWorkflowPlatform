@@ -1,0 +1,427 @@
+package landing
+
+// docsAIModels renders the AI Models documentation section.
+templ docsAIModels() {
+	@docsSection("ai-models", "AI Models", iconCpu, "text-blue-500") {
+		<p>
+			Compass supports <strong>15+ models from three major AI providers</strong>. Each agent can be configured
+			to use a different model, giving you the flexibility to match the right model to the right task.
+		</p>
+		<h3>Supported Providers and Models</h3>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Provider</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Model</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Best For</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow("OpenAI", "GPT-4o", "All-rounder, fast, capable, multimodal")
+				@docsTableRow("OpenAI", "GPT-4o-mini", "Quick tasks, cost-effective responses")
+				@docsTableRow("OpenAI", "GPT-4 Turbo", "Complex reasoning, large context window")
+				@docsTableRow("OpenAI", "o1 / o1-mini", "Advanced reasoning and chain-of-thought")
+				@docsTableRow("OpenAI", "o3-mini", "Efficient reasoning at lower cost")
+				@docsTableRow("Anthropic", "Claude Sonnet 4", "Best overall, nuanced, precise, safe")
+				@docsTableRow("Anthropic", "Claude 3.5 Sonnet", "Creative writing, analysis, coding")
+				@docsTableRow("Anthropic", "Claude 3.5 Haiku", "Fast, lightweight tasks")
+				@docsTableRow("Anthropic", "Claude 3 Opus", "Deep analysis, research, complex tasks")
+				@docsTableRow("Google", "Gemini 2.0 Flash", "Fast multimodal reasoning")
+				@docsTableRow("Google", "Gemini 2.0 Flash Lite", "Ultra-fast, cost-effective")
+				@docsTableRow("Google", "Gemini 1.5 Pro", "1M token context window, deep analysis")
+				@docsTableRow("Google", "Gemini 1.5 Flash", "Balanced speed and capability")
+			</tbody>
+		}
+		<h3>Per-Agent Model Selection</h3>
+		<p>
+			When creating or editing an agent, you can select which AI model it should use. This means you
+			can have a Math Tutor running on GPT-4o for fast computation, a Writing Coach running on
+			Claude Sonnet 4 for nuanced feedback, and a Quick Helper on Gemini Flash Lite for rapid
+			answers -- all in the same workspace.
+		</p>
+		<h3>Streaming and Real-Time Delivery</h3>
+		<p>
+			All models stream responses in real-time using the <strong>AG-UI protocol</strong> over Server-Sent Events (SSE).
+			You see tokens appear character-by-character as the AI generates them, with live tool
+			execution feedback and smooth UI updates.
+		</p>
+		<h3>Configuration</h3>
+		<p>
+			Each agent has the following model-related settings:
+		</p>
+		<ul class="space-y-2 my-4">
+			<li>
+				<strong>Model ID</strong> -- Which provider and model combination to use
+			</li>
+			<li>
+				<strong>Temperature</strong> -- Controls randomness (0.0 = deterministic, 1.0 = creative)
+			</li>
+			<li>
+				<strong>Max Iterations</strong> -- Maximum tool-use cycles per response (default: 20)
+			</li>
+		</ul>
+		@docsInfoBox("Provider Health") {
+			<p>Compass monitors provider availability and can gracefully handle provider outages. Each provider connection is health-checked independently.</p>
+		}
+	}
+}
+
+// docsStudentProfile renders the Student Profile documentation section.
+templ docsStudentProfile() {
+	@docsSection("student-profile", "Student Profile", iconGraduationCap, "text-amber-500") {
+		<p>
+			The Student Profile is a powerful personalization feature that makes Compass truly adaptive.
+			By defining your learning preferences, every AI agent automatically adjusts its approach to
+			match how you learn best.
+		</p>
+		<h3>Profile Fields</h3>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Field</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Purpose</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Example</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow("Learning Style", "How you prefer to absorb information", "Visual learner, hands-on practice")
+				@docsTableRow("Goals", "What you are working toward", "Master calculus, improve essay writing")
+				@docsTableRow("Strengths", "Subjects or skills you are good at", "Problem solving, creative thinking")
+				@docsTableRow("Struggles", "Areas where you need extra help", "Time management, complex proofs")
+			</tbody>
+		}
+		<h3>How It Works</h3>
+		<p>
+			Your student profile is automatically <strong>injected into every agent system prompt</strong>.
+			When you ask a Math Tutor for help, it already knows you prefer visual explanations
+			and struggle with complex proofs, and adjusts its teaching accordingly.
+		</p>
+		<ol class="list-decimal list-inside space-y-2 my-4">
+			<li>Navigate to <strong>Profile</strong> in the sidebar</li>
+			<li>Fill in your learning style, goals, strengths, and struggles</li>
+			<li>Save your profile -- changes apply to all future conversations immediately</li>
+			<li>Every agent now adapts its responses based on your profile</li>
+		</ol>
+		<h3>Adaptive Teaching</h3>
+		<p>
+			The profile data is used by specialized agent prompts to deliver personalized experiences:
+		</p>
+		<ul class="space-y-2 my-4">
+			<li>
+				<strong>Visual learners</strong> get more diagrams, charts, and spatial explanations
+			</li>
+			<li>
+				<strong>Hands-on learners</strong> get interactive exercises and step-by-step walkthroughs
+			</li>
+			<li>
+				<strong>Struggling areas</strong> trigger extra scaffolding and gentler explanations
+			</li>
+			<li>
+				<strong>Strengths</strong> allow agents to reference known concepts for faster learning
+			</li>
+		</ul>
+		@docsInfoBox("Privacy") {
+			<p>Your student profile is private to your account and is only used to personalize AI interactions. It is never shared with other users or used for advertising.</p>
+		}
+	}
+}
+
+// docsVoiceTTS renders the Voice and Text-to-Speech documentation section.
+templ docsVoiceTTS() {
+	@docsSection("voice-tts", "Voice and Text-to-Speech", iconHeadphones, "text-indigo-500") {
+		<p>
+			The Text-to-Speech plugin converts AI responses into <strong>lifelike spoken audio</strong>
+			using advanced voice synthesis. Perfect for language learning, accessibility, reviewing
+			study materials, and hands-free study sessions.
+		</p>
+		<h3>Available Voices</h3>
+		<p>
+			Compass offers <strong>13 distinct AI voices</strong>, each with its own character and tone:
+		</p>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Voice</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Character</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow2("alloy", "Neutral, balanced, great default")
+				@docsTableRow2("ash", "Warm, conversational")
+				@docsTableRow2("ballad", "Melodic, storytelling")
+				@docsTableRow2("coral", "Clear, professional")
+				@docsTableRow2("echo", "Authoritative, deep")
+				@docsTableRow2("fable", "Gentle, narrative")
+				@docsTableRow2("nova", "Energetic, expressive")
+				@docsTableRow2("onyx", "Rich, confident")
+				@docsTableRow2("sage", "Calm, wise")
+				@docsTableRow2("shimmer", "Bright, friendly")
+				@docsTableRow2("verse", "Articulate, precise")
+				@docsTableRow2("marin", "Warm, approachable")
+				@docsTableRow2("cedar", "Steady, trustworthy")
+			</tbody>
+		}
+		<h3>Features</h3>
+		<ul class="space-y-2 my-4">
+			<li>
+				<strong>Word-level timestamps</strong> -- Synchronized highlighting via Whisper forced-alignment so you can follow along as audio plays
+			</li>
+			<li>
+				<strong>Custom voice instructions</strong> -- Control tone, speed, emotion, and accent through natural language
+			</li>
+			<li>
+				<strong>MP3 output</strong> -- Generated audio is saved as a downloadable MP3 artifact attached to the thread
+			</li>
+			<li>
+				<strong>Up to 4,096 characters</strong> -- Per request, supporting full paragraph-length narration
+			</li>
+		</ul>
+		<h3>Usage</h3>
+		<ol class="list-decimal list-inside space-y-2 my-4">
+			<li>Enable the <strong>Text-to-Speech</strong> plugin for your agent</li>
+			<li>Ask the agent to read text aloud, explain something verbally, or narrate content</li>
+			<li>The agent generates an audio file and presents it with an inline player</li>
+			<li>Download the MP3 from the artifacts panel for offline listening</li>
+		</ol>
+		@docsInfoBox("Language Learning Tip") {
+			<p>Combine TTS with the Elicitation plugin for interactive listening exercises: the agent reads a passage aloud, then quizzes you with comprehension questions.</p>
+		}
+	}
+}
+
+// docsVisualization renders the Visualization and Charts documentation section.
+templ docsVisualization() {
+	@docsSection("visualization", "Visualization and Charts", iconActivity, "text-cyan-500") {
+		<p>
+			The Visualization plugin enables agents to generate 
+			<strong>
+				publication-quality plots and animated
+				visualizations
+			</strong> directly within conversations. Powered by gnuplot with full scripting support,
+			it covers everything from simple line graphs to rotating 3D surfaces.
+		</p>
+		<h3>Plot Tool (Static Charts)</h3>
+		<p>
+			The Plot tool generates static charts and graphs as PNG images:
+		</p>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Plot Type</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Description</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Example Use</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow("Function Plots", "Plot mathematical functions f(x)", "Graphing sin(x), polynomial curves")
+				@docsTableRow("Data Scatter", "Plot data points with trend lines", "Statistical analysis, data exploration")
+				@docsTableRow("3D Surfaces", "Three-dimensional mesh and surface plots", "Multivariable calculus, topology")
+				@docsTableRow("Custom Scripts", "Full gnuplot scripting support", "Complex multi-panel layouts, styling")
+			</tbody>
+		}
+		<p>
+			All plots support custom titles, axis labels, grid lines, ranges, and styling. Generated PNGs
+			are saved as downloadable artifacts.
+		</p>
+		<h3>Animate Tool (Animated Visualizations)</h3>
+		<p>
+			The Animate tool creates animated visualizations as GIF or WebP files:
+		</p>
+		<ul class="space-y-2 my-4">
+			<li>
+				<strong>Rotating 3D plots</strong> -- Spin around a surface to see it from all angles
+			</li>
+			<li>
+				<strong>Wave propagation</strong> -- Animate traveling waves and interference patterns
+			</li>
+			<li>
+				<strong>Parameter variations</strong> -- Show how a function changes as a parameter sweeps
+			</li>
+			<li>
+				<strong>Configurable frame rate</strong> -- Control animation speed via delay between frames
+			</li>
+		</ul>
+		<h3>How It Works</h3>
+		<ol class="list-decimal list-inside space-y-2 my-4">
+			<li>Enable the <strong>Visualization</strong> plugin for your agent</li>
+			<li>Ask the agent to plot a function, chart data, or animate a concept</li>
+			<li>The agent writes a gnuplot script and executes it server-side</li>
+			<li>The resulting image or animation is displayed inline and saved as an artifact</li>
+		</ol>
+		@docsInfoBox("Educational Power") {
+			<p>Combine visualization with the Calculator plugin for a complete math experience: solve an equation analytically, then plot the solution to see it visually.</p>
+		}
+	}
+}
+
+// docsFileAttachments renders the File Attachments documentation section.
+templ docsFileAttachments() {
+	@docsSection("file-attachments", "File Attachments", iconPaperclip, "text-rose-500") {
+		<p>
+			Compass supports <strong>file attachments in chat messages</strong>, allowing you to send images,
+			audio files, PDFs, and other documents directly to your AI agents for analysis and discussion.
+		</p>
+		<h3>Supported File Types</h3>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Category</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Formats</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Use Case</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow("Images", "PNG, JPEG, GIF, WebP", "Visual analysis, diagram review, photo questions")
+				@docsTableRow("Audio", "MP3, WAV, OGG", "Transcription, audio analysis")
+				@docsTableRow("Documents", "PDF, TXT, Markdown", "Document review, content extraction")
+			</tbody>
+		}
+		<h3>How Attachments Work</h3>
+		<ol class="list-decimal list-inside space-y-2 my-4">
+			<li>Click the attachment icon in the chat input bar</li>
+			<li>Select one or more files from your device</li>
+			<li>Files are uploaded to secure S3 storage and attached to your message</li>
+			<li>The AI agent receives the file content alongside your text message</li>
+			<li>The agent can analyze, summarize, or discuss the attached content</li>
+		</ol>
+		<p>
+			Attachments are stored per-thread and persist with the conversation history. The maximum
+			upload size is <strong>150 MB per file</strong>.
+		</p>
+	}
+}
+
+// docsResourceLibrary renders the Resource Library documentation section.
+templ docsResourceLibrary() {
+	@docsSection("resource-library", "Resource Library", iconFolderOpen, "text-emerald-500") {
+		<p>
+			The Resource Library provides persistent file management separate from chat conversations.
+			Upload documents, reference materials, and study aids that you can access anytime.
+		</p>
+		<h3>Public vs Private Resources</h3>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Type</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Visibility</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Description</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow("Public", "All users", "System-wide library of curated reference materials and templates")
+				@docsTableRow("Private", "You only", "Your personal uploads: notes, documents, and study materials")
+			</tbody>
+		}
+		<h3>Features</h3>
+		<ul class="space-y-2 my-4">
+			<li>
+				<strong>Upload</strong> -- Drag and drop files into your personal library
+			</li>
+			<li>
+				<strong>Download</strong> -- Access any resource with automatic content-type detection
+			</li>
+			<li>
+				<strong>Delete</strong> -- Remove private resources you no longer need
+			</li>
+			<li>
+				<strong>S3 Storage</strong> -- All files are stored in reliable S3-compatible object storage
+			</li>
+		</ul>
+		<p>
+			Resources are separate from the Knowledge Base. While the Knowledge Base indexes documents for
+			AI-powered RAG queries, the Resource Library is a simple file store for your reference materials.
+		</p>
+	}
+}
+
+// docsConversationSearch renders the Conversation Search documentation section.
+templ docsConversationSearch() {
+	@docsSection("conversation-search", "Conversation Search", iconSearch, "text-sky-500") {
+		<p>
+			Compass provides <strong>full-text search across all your conversations</strong>, making it easy
+			to find past discussions, answers, and generated content.
+		</p>
+		<h3>Search Capabilities</h3>
+		<ul class="space-y-2 my-4">
+			<li>
+				<strong>Thread Search</strong> -- Search across all thread titles and messages
+			</li>
+			<li>
+				<strong>Message Content</strong> -- Find specific answers, explanations, or tool outputs
+			</li>
+			<li>
+				<strong>Quick Navigation</strong> -- Click any search result to jump directly to the thread
+			</li>
+		</ul>
+		<h3>Thread Management</h3>
+		<p>
+			All conversations are organized into <strong>threads</strong>. Each thread has:
+		</p>
+		<ul class="space-y-2 my-4">
+			<li>
+				<strong>Auto-generated titles</strong> -- Compass automatically titles threads based on the conversation content
+			</li>
+			<li>
+				<strong>Rename</strong> -- Customize thread titles for easy identification
+			</li>
+			<li>
+				<strong>Full history</strong> -- Every message, tool call, and artifact is preserved
+			</li>
+			<li>
+				<strong>Delete</strong> -- Remove threads when they are no longer needed
+			</li>
+		</ul>
+		<p>
+			Threads are backed by an <strong>event-sourced architecture</strong> (CQRS), meaning the read model is
+			optimized for fast retrieval while the write model ensures data integrity.
+		</p>
+	}
+}
+
+// docsTokenUsage renders the Token Usage and Analytics documentation section.
+templ docsTokenUsage() {
+	@docsSection("token-usage", "Token Usage and Analytics", iconChartBar, "text-orange-500") {
+		<p>
+			Compass tracks <strong>detailed token usage per message</strong>, giving you full visibility into
+			how your AI budget is being spent across different agents and models.
+		</p>
+		<h3>Per-Message Breakdown</h3>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Metric</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Description</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow2("Prompt Tokens", "Tokens in the input (your message + context)")
+				@docsTableRow2("Completion Tokens", "Tokens generated in the AI response")
+				@docsTableRow2("Cached Tokens", "Tokens served from cache (lower cost)")
+				@docsTableRow2("Reasoning Tokens", "Tokens used for chain-of-thought reasoning (o1/o3 models)")
+				@docsTableRow2("Audio Tokens", "Tokens for audio processing (TTS)")
+				@docsTableRow2("Total Tokens", "Combined token count for the interaction")
+			</tbody>
+		}
+		<h3>Analytics Dashboard</h3>
+		<p>
+			Administrators have access to a dedicated analytics dashboard that provides:
+		</p>
+		<ul class="space-y-2 my-4">
+			<li>
+				<strong>Tool usage time-series</strong> -- Chart-ready data showing tool usage over time
+			</li>
+			<li>
+				<strong>Per-tool metrics</strong> -- Detailed analytics for each tool and plugin
+			</li>
+			<li>
+				<strong>Agent-level filtering</strong> -- View statistics scoped to specific agents
+			</li>
+			<li>
+				<strong>Usage trends</strong> -- Identify patterns and optimize your workflow
+			</li>
+		</ul>
+		@docsInfoBox("Cost Optimization") {
+			<p>Use token usage data to make informed decisions: assign cost-effective models like GPT-4o-mini or Gemini Flash Lite to simple tasks, and reserve premium models for complex analysis.</p>
+		}
+	}
+}
