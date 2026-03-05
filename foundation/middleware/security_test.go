@@ -30,7 +30,7 @@ func TestSecurityHeaders(t *testing.T) {
 		{"X-Content-Type-Options", "nosniff"},
 		{"Referrer-Policy", "strict-origin-when-cross-origin"},
 		{"Permissions-Policy", "camera=(), microphone=(), geolocation=()"},
-		{"Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; img-src 'self' data: blob:; media-src 'self'; connect-src 'self'; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; frame-ancestors 'none'"},
+		{"Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://js.stripe.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; img-src 'self' data: blob: https://lh3.googleusercontent.com; media-src 'self'; connect-src 'self' https://api.stripe.com; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; frame-src https://js.stripe.com; frame-ancestors 'none'"},
 	}
 
 	for _, tt := range tests {

@@ -160,6 +160,91 @@ func DeserializeDomainEvent(eventType string, data []byte) (domain.Event, error)
 		}
 		return &evt, nil
 
+	// Payment account events
+	case "PaymentAccountOpened":
+		var evt domain.PaymentAccountOpened
+		if err := json.Unmarshal(data, &evt); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal PaymentAccountOpened: %w", err)
+		}
+		return &evt, nil
+
+	case "PaymentInitiated":
+		var evt domain.PaymentInitiated
+		if err := json.Unmarshal(data, &evt); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal PaymentInitiated: %w", err)
+		}
+		return &evt, nil
+
+	case "PaymentSucceeded":
+		var evt domain.PaymentSucceeded
+		if err := json.Unmarshal(data, &evt); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal PaymentSucceeded: %w", err)
+		}
+		return &evt, nil
+
+	case "PaymentFailed":
+		var evt domain.PaymentFailed
+		if err := json.Unmarshal(data, &evt); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal PaymentFailed: %w", err)
+		}
+		return &evt, nil
+
+	case "PaymentRefunded":
+		var evt domain.PaymentRefunded
+		if err := json.Unmarshal(data, &evt); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal PaymentRefunded: %w", err)
+		}
+		return &evt, nil
+
+	case "PaymentDisputed":
+		var evt domain.PaymentDisputed
+		if err := json.Unmarshal(data, &evt); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal PaymentDisputed: %w", err)
+		}
+		return &evt, nil
+
+	case "DisputeResolved":
+		var evt domain.DisputeResolved
+		if err := json.Unmarshal(data, &evt); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal DisputeResolved: %w", err)
+		}
+		return &evt, nil
+
+	case "PaymentMethodUpdated":
+		var evt domain.PaymentMethodUpdated
+		if err := json.Unmarshal(data, &evt); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal PaymentMethodUpdated: %w", err)
+		}
+		return &evt, nil
+
+	case "InvoicePaymentFailed":
+		var evt domain.InvoicePaymentFailed
+		if err := json.Unmarshal(data, &evt); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal InvoicePaymentFailed: %w", err)
+		}
+		return &evt, nil
+
+	case "SubscriptionCancelled":
+		var evt domain.SubscriptionCancelled
+		if err := json.Unmarshal(data, &evt); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal SubscriptionCancelled: %w", err)
+		}
+		return &evt, nil
+
+	case "SubscriptionExpired":
+		var evt domain.SubscriptionExpired
+		if err := json.Unmarshal(data, &evt); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal SubscriptionExpired: %w", err)
+		}
+		return &evt, nil
+
+	case "SubscriptionReactivated":
+		var evt domain.SubscriptionReactivated
+		if err := json.Unmarshal(data, &evt); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal SubscriptionReactivated: %w", err)
+		}
+		return &evt, nil
+
 	default:
 		return nil, fmt.Errorf("unknown event type: %s", eventType)
 	}

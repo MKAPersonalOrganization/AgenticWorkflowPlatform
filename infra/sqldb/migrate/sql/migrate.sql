@@ -474,3 +474,53 @@ CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 -- Description: Add google_sub column to users table for stable Google identity
 ALTER TABLE users ADD COLUMN IF NOT EXISTS google_sub VARCHAR(255) NOT NULL DEFAULT '';
 CREATE INDEX IF NOT EXISTS idx_users_google_sub ON users(google_sub);
+
+-- Version: 1.37
+-- Description: Add plan column to users table for subscription tiers (free/go/plus/pro)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS plan VARCHAR(20) NOT NULL DEFAULT 'free';
+
+-- Version: 1.38
+-- Description: Add Stripe billing columns to users table for subscription management
+ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR(255);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS payment_status VARCHAR(20) NOT NULL DEFAULT 'none';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP;
+
+-- Version: 1.39
+-- Description: Create plan_audit_log table for compliance and security audit trail
+CREATE TABLE IF NOT EXISTS plan_audit_log (
+    id           BIGSERIAL PRIMARY KEY,
+    user_id      VARCHAR(255) NOT NULL,
+    action       VARCHAR(50) NOT NULL,
+    old_plan     VARCHAR(20),
+    new_plan     VARCHAR(20),
+    detail       TEXT,
+    created_at   TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- Version: 1.40
+-- Description: Create payment_accounts read-model projection table (event-sourced)
+-- The source of truth is the event store (PaymentAccount-{userId} streams).
+-- This table is a denormalized projection for fast payment status lookups.
+CREATE TABLE IF NOT EXISTS payment_accounts (
+    user_id      VARCHAR(255) PRIMARY KEY,
+    status       VARCHAR(20)  NOT NULL DEFAULT 'none',
+    paid_at      TIMESTAMP,
+    amount_cents BIGINT       NOT NULL DEFAULT 0,
+    currency     VARCHAR(3)   NOT NULL DEFAULT 'usd',
+    updated_at   TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_payment_accounts_status ON payment_accounts(status);
+
+-- Version: 1.41
+-- Description: Add subscription cancellation columns to payment_accounts
+ALTER TABLE payment_accounts ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMP;
+ALTER TABLE payment_accounts ADD COLUMN IF NOT EXISTS cancels_on  TIMESTAMP;
+
+-- Version: 1.42
+-- Description: Rename subscription status 'cancelling' to 'cancelled'
+UPDATE payment_accounts SET status = 'cancelled' WHERE status = 'cancelling';
+
+-- Version: 1.43
+-- Description: Add payment method info (PCI-safe card brand + last4) to payment_accounts
+ALTER TABLE payment_accounts ADD COLUMN IF NOT EXISTS card_brand VARCHAR(20);
+ALTER TABLE payment_accounts ADD COLUMN IF NOT EXISTS card_last4 VARCHAR(4);

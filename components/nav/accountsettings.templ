@@ -151,12 +151,185 @@ templ authenticatedMenu(user *domain.User) {
 		i18n.T(ctx, "Settings"),
 		templ.Attributes{"@click": "$dispatch('open-settings-dialog', {})"},
 	)
-	<!-- Upgrade Plan -->
-	@accountMenuItem(
-		icon.Crown(icon.Props{Class: "size-4"}),
-		i18n.T(ctx, "Upgrade Plan"),
-		templ.Attributes{"@click": "$dispatch('open-pricing-dialog')"},
-	)
+	<!-- Billing Status — conditionally show Activate or Active badge -->
+	<div
+		x-data="{
+			billingStatus: 'loading',
+			billingData: null,
+			cancelling: false,
+			reactivating: false,
+			billingError: '',
+			async fetchStatus() {
+				try {
+					const r = await fetch('/api/billing/status', { credentials: 'same-origin' });
+					if (r.ok) {
+						const d = await r.json();
+						this.billingStatus = d.status;
+						this.billingData = d;
+					} else {
+						this.billingStatus = 'none';
+					}
+				} catch(e) {
+					this.billingStatus = 'none';
+				}
+			},
+			async cancelSubscription() {
+				if (this.cancelling) return;
+				if (!confirm('Are you sure you want to cancel your subscription? You will retain access until the end of your billing period.')) return;
+				this.cancelling = true;
+				this.billingError = '';
+				try {
+					const r = await fetch('/api/billing/cancel', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						credentials: 'same-origin',
+						body: JSON.stringify({})
+					});
+					if (r.ok) {
+						const d = await r.json();
+						this.billingStatus = 'cancelled';
+						this.billingData = { ...this.billingData, status: 'cancelled', cancelsOn: d.cancelsOn };
+					} else {
+						const body = await r.json().catch(() => ({}));
+						this.billingError = body.error || 'Could not cancel subscription. Please try again.';
+					}
+				} catch(e) {
+					this.billingError = 'Network error. Please check your connection.';
+				}
+				this.cancelling = false;
+			},
+			async reactivateSubscription() {
+				if (this.reactivating) return;
+				this.reactivating = true;
+				this.billingError = '';
+				try {
+					const r = await fetch('/api/billing/reactivate', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						credentials: 'same-origin'
+					});
+					if (r.ok) {
+						this.billingStatus = 'active';
+						this.billingData = { ...this.billingData, status: 'active', cancelledAt: null, cancelsOn: null };
+					} else {
+						const body = await r.json().catch(() => ({}));
+						if (body.code === 'billing_period_ended') {
+							this.billingError = 'Billing period ended. Please subscribe again.';
+							this.billingStatus = 'none';
+						} else {
+							this.billingError = body.error || 'Could not reactivate. Please try again.';
+						}
+					}
+				} catch(e) {
+					this.billingError = 'Network error. Please check your connection.';
+				}
+				this.reactivating = false;
+			},
+			formatDate(iso) {
+				if (!iso) return '';
+				try { return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); }
+				catch(e) { return iso; }
+			}
+		}"
+		x-init="fetchStatus()"
+	>
+		<!-- Loading state -->
+		<template x-if="billingStatus === 'loading'">
+			<div class="flex items-center gap-3 w-full px-3 py-2 text-sm rounded-lg text-start">
+				<div class="flex items-center justify-center size-5">
+					<span class="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-muted-foreground"></span>
+				</div>
+				<span class="flex-1 text-start text-muted-foreground">{ i18n.T(ctx, "Loading…") }</span>
+			</div>
+		</template>
+		<!-- Error banner for billing operations -->
+		<template x-if="billingError">
+			<div class="px-3 py-1.5">
+				<div class="text-xs text-destructive bg-destructive/10 rounded px-2 py-1.5" x-text="billingError" @click="billingError = ''"></div>
+			</div>
+		</template>
+		<!-- Activate Account — shown when not active and not cancelled -->
+		<template x-if="billingStatus !== 'active' && billingStatus !== 'cancelled' && billingStatus !== 'loading'">
+			<button
+				type="button"
+				class="flex items-center gap-3 w-full px-3 py-2 text-sm rounded-lg hover:bg-accent transition-colors text-start"
+				@click="$dispatch('open-pricing-dialog')"
+			>
+				<div class="flex items-center justify-center size-5">
+					@icon.Crown(icon.Props{Class: "size-4"})
+				</div>
+				<span class="flex-1 text-start">{ i18n.T(ctx, "Activate Account") }</span>
+			</button>
+		</template>
+		<!-- Active state — with subscription management -->
+		<template x-if="billingStatus === 'active'">
+			<div class="space-y-1">
+				<div class="flex items-center gap-3 w-full px-3 py-2 text-sm rounded-lg text-start">
+					<div class="flex items-center justify-center size-5">
+						@icon.BadgeCheck(icon.Props{Class: "size-4 text-green-600 dark:text-green-400"})
+					</div>
+					<span class="flex-1 text-start text-green-600 dark:text-green-400 font-medium">{ i18n.T(ctx, "Account Active") }</span>
+				</div>
+				<!-- Card info if available -->
+				<template x-if="billingData && billingData.cardLast4">
+					<div class="flex items-center gap-3 w-full px-3 py-1 text-xs text-muted-foreground">
+						<div class="flex items-center justify-center size-5"></div>
+						<span x-text="(billingData.cardBrand ? billingData.cardBrand.charAt(0).toUpperCase() + billingData.cardBrand.slice(1) : 'Card') + ' ••••' + billingData.cardLast4"></span>
+					</div>
+				</template>
+				<!-- Cancel subscription button -->
+				<button
+					type="button"
+					class="flex items-center gap-3 w-full px-3 py-1.5 text-xs rounded-lg hover:bg-destructive/10 transition-colors text-start text-muted-foreground hover:text-destructive"
+					@click="cancelSubscription()"
+					:disabled="cancelling"
+				>
+					<div class="flex items-center justify-center size-5">
+						<template x-if="!cancelling">
+							@icon.X(icon.Props{Class: "size-3"})
+						</template>
+						<template x-if="cancelling">
+							<span class="animate-spin rounded-full h-3 w-3 border-b-2 border-current"></span>
+						</template>
+					</div>
+					<span class="flex-1 text-start" x-text="cancelling ? 'Cancelling…' : 'Cancel Subscription'"></span>
+				</button>
+			</div>
+		</template>
+		<!-- Cancelled state — with reactivation option -->
+		<template x-if="billingStatus === 'cancelled'">
+			<div class="space-y-1">
+				<div class="flex items-center gap-3 w-full px-3 py-2 text-sm rounded-lg text-start">
+					<div class="flex items-center justify-center size-5">
+						@icon.Clock(icon.Props{Class: "size-4 text-yellow-600 dark:text-yellow-400"})
+					</div>
+					<div class="flex-1 text-start">
+						<span class="text-yellow-600 dark:text-yellow-400 font-medium block">{ i18n.T(ctx, "Cancelled") }</span>
+						<template x-if="billingData && billingData.cancelsOn">
+							<span class="text-xs text-muted-foreground" x-text="'Access until ' + formatDate(billingData.cancelsOn)"></span>
+						</template>
+					</div>
+				</div>
+				<!-- Reactivate button -->
+				<button
+					type="button"
+					class="flex items-center gap-3 w-full px-3 py-1.5 text-xs rounded-lg hover:bg-primary/10 transition-colors text-start text-primary"
+					@click="reactivateSubscription()"
+					:disabled="reactivating"
+				>
+					<div class="flex items-center justify-center size-5">
+						<template x-if="!reactivating">
+							@icon.RefreshCw(icon.Props{Class: "size-3"})
+						</template>
+						<template x-if="reactivating">
+							<span class="animate-spin rounded-full h-3 w-3 border-b-2 border-primary"></span>
+						</template>
+					</div>
+					<span class="flex-1 text-start" x-text="reactivating ? 'Reactivating…' : 'Reactivate Subscription'"></span>
+				</button>
+			</div>
+		</template>
+	</div>
 	@accountMenuSeparator()
 	<!-- Theme Toggle -->
 	@button.Button(button.Props{

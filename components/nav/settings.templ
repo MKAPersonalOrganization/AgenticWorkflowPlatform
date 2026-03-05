@@ -749,11 +749,15 @@ templ Settings() {
 							<!-- Account Tab -->
 							@tabs.Content(tabs.ContentProps{Value: "account", Class: "space-y-6 animate-in fade-in duration-200"}) {
 								<div
-									x-data="{ acct: null, acctLoading: true, acctError: '' }"
+									x-data="{ acct: null, acctLoading: true, acctError: '', billing: null, billingLoading: true, cancelConfirm: false, cancelling: false, cancelError: '', reactivating: false, reactivateError: '' }"
 									x-init="
 										fetch('/api/me').then(r => { if (!r.ok) throw new Error('Failed'); return r.json(); })
 										.then(u => { acct = u; acctLoading = false; })
-										.catch(e => { acctError = e.message; acctLoading = false; })
+										.catch(e => { acctError = e.message; acctLoading = false; });
+										fetch('/api/billing/status', { credentials: 'same-origin' })
+										.then(r => r.ok ? r.json() : { status: 'none' })
+										.then(d => { billing = d; billingLoading = false; })
+										.catch(() => { billing = { status: 'none' }; billingLoading = false; });
 									"
 									class="space-y-6"
 								>
@@ -799,6 +803,241 @@ templ Settings() {
 													{ i18n.T(ctx, "Edit on Google") } ↗
 												</a>
 											</p>
+											<!-- Subscription section -->
+											<div class="border-t border-border pt-4 space-y-3">
+												<div class="text-xs font-medium text-muted-foreground uppercase tracking-wider">{ i18n.T(ctx, "Subscription") }</div>
+												<!-- Loading -->
+												<template x-if="billingLoading">
+													<div class="flex items-center justify-center py-4">
+														<span class="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></span>
+													</div>
+												</template>
+												<!-- Active subscription -->
+												<template x-if="!billingLoading && billing && billing.status === 'active'">
+													<div class="rounded-xl border border-green-500/30 bg-green-500/5 p-4 space-y-3">
+														<div class="flex items-center justify-between">
+															<div class="flex items-center gap-2.5">
+																<div class="flex items-center justify-center size-9 rounded-full bg-green-500/10">
+																	@icon.BadgeCheck(icon.Props{Class: "size-5 text-green-600 dark:text-green-400"})
+																</div>
+																<div>
+																	<div class="text-sm font-semibold text-foreground">{ i18n.T(ctx, "Full Access") }</div>
+																	<div class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "Monthly subscription") }</div>
+																</div>
+															</div>
+															<span class="inline-flex items-center rounded-full bg-green-500/10 px-2.5 py-1 text-xs font-semibold text-green-600 dark:text-green-400 ring-1 ring-inset ring-green-500/20">
+																{ i18n.T(ctx, "Active") }
+															</span>
+														</div>
+														<div class="grid grid-cols-2 gap-3 pt-1">
+															<div class="rounded-lg bg-background/50 border border-border/50 p-2.5">
+																<div class="text-[10px] text-muted-foreground uppercase tracking-wider">{ i18n.T(ctx, "Plan") }</div>
+																<div class="text-sm font-medium text-foreground mt-0.5">{ i18n.T(ctx, "$5/month") }</div>
+															</div>
+															<div class="rounded-lg bg-background/50 border border-border/50 p-2.5">
+																<div class="text-[10px] text-muted-foreground uppercase tracking-wider">{ i18n.T(ctx, "Member since") }</div>
+																<div class="text-sm font-medium text-foreground mt-0.5" x-text="billing.paidAt ? new Date(billing.paidAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—'"></div>
+															</div>
+														</div>
+														<!-- Payment method -->
+														<template x-if="billing.cardLast4">
+															<div class="flex items-center gap-2 rounded-lg bg-background/50 border border-border/50 p-2.5">
+																@icon.CreditCard(icon.Props{Class: "size-4 text-muted-foreground shrink-0"})
+																<div>
+																	<div class="text-[10px] text-muted-foreground uppercase tracking-wider">{ i18n.T(ctx, "Payment method") }</div>
+																	<div class="text-sm font-medium text-foreground mt-0.5" x-text="(billing.cardBrand ? billing.cardBrand.charAt(0).toUpperCase() + billing.cardBrand.slice(1) : 'Card') + ' •••• ' + billing.cardLast4"></div>
+																</div>
+															</div>
+														</template>
+														<p class="text-[11px] text-muted-foreground flex items-center gap-1">
+															@icon.ShieldCheck(icon.Props{Class: "size-3 text-green-600 dark:text-green-400 shrink-0"})
+															{ i18n.T(ctx, "Your payment is processed securely by Stripe.") }
+														</p>
+														<!-- Cancel subscription -->
+														<div class="border-t border-border/50 pt-3 space-y-2">
+															<template x-if="!cancelConfirm">
+																<button
+																	type="button"
+																	@click="cancelConfirm = true"
+																	class="text-xs text-muted-foreground hover:text-destructive transition-colors underline underline-offset-2"
+																>
+																	{ i18n.T(ctx, "Cancel subscription") }
+																</button>
+															</template>
+															<template x-if="cancelConfirm">
+																<div class="rounded-lg border border-destructive/20 bg-destructive/5 p-3 space-y-2.5">
+																	<p class="text-sm text-foreground font-medium">{ i18n.T(ctx, "Are you sure you want to cancel?") }</p>
+																	<p class="text-xs text-muted-foreground">
+																		{ i18n.T(ctx, "Your access will continue until the end of your current billing period. After that, your account will return to the free tier.") }
+																	</p>
+																	<template x-if="cancelError">
+																		<p class="text-xs text-destructive" x-text="cancelError"></p>
+																	</template>
+																	<div class="flex items-center gap-2">
+																		<button
+																			type="button"
+																			:disabled="cancelling"
+																			@click="
+																				cancelling = true; cancelError = '';
+																				fetch('/api/billing/cancel', {
+																					method: 'POST',
+																					headers: { 'Content-Type': 'application/json' },
+																					credentials: 'same-origin',
+																					body: JSON.stringify({})
+																				})
+																				.then(r => r.json().then(d => ({ ok: r.ok, data: d })))
+																				.then(({ ok, data }) => {
+																					if (ok) {
+																						billing.status = 'cancelled';
+																						billing.cancelsOn = data.cancelsOn;
+																						billing.cancelledAt = new Date().toISOString();
+																						cancelConfirm = false;
+																					} else {
+																						cancelError = data.error || 'Failed to cancel. Please try again.';
+																					}
+																					cancelling = false;
+																				})
+																				.catch(() => { cancelError = 'Something went wrong.'; cancelling = false; })
+																			"
+																			class="inline-flex items-center justify-center rounded-md text-xs font-medium h-7 px-3 bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50"
+																		>
+																			<template x-if="cancelling">
+																				<span class="animate-spin rounded-full h-3 w-3 border-b-2 border-destructive-foreground mr-1.5"></span>
+																			</template>
+																			{ i18n.T(ctx, "Yes, cancel") }
+																		</button>
+																		<button
+																			type="button"
+																			@click="cancelConfirm = false; cancelError = ''"
+																			class="inline-flex items-center justify-center rounded-md text-xs font-medium h-7 px-3 border border-border hover:bg-accent transition-colors"
+																		>
+																			{ i18n.T(ctx, "Keep subscription") }
+																		</button>
+																	</div>
+																</div>
+															</template>
+														</div>
+													</div>
+												</template>
+												<!-- Cancelled subscription — access until end of period -->
+												<template x-if="!billingLoading && billing && billing.status === 'cancelled'">
+													<div class="rounded-xl border border-yellow-500/30 bg-yellow-500/5 p-4 space-y-3">
+														<div class="flex items-center justify-between">
+															<div class="flex items-center gap-2.5">
+																<div class="flex items-center justify-center size-9 rounded-full bg-yellow-500/10">
+																	@icon.Clock(icon.Props{Class: "size-5 text-yellow-600 dark:text-yellow-400"})
+																</div>
+																<div>
+																	<div class="text-sm font-semibold text-foreground">{ i18n.T(ctx, "Subscription Cancelled") }</div>
+																	<div class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "Access continues until end of billing period") }</div>
+																</div>
+															</div>
+															<span class="inline-flex items-center rounded-full bg-yellow-500/10 px-2.5 py-1 text-xs font-semibold text-yellow-600 dark:text-yellow-400 ring-1 ring-inset ring-yellow-500/20">
+																{ i18n.T(ctx, "Cancelled") }
+															</span>
+														</div>
+														<div class="grid grid-cols-2 gap-3 pt-1">
+															<div class="rounded-lg bg-background/50 border border-border/50 p-2.5">
+																<div class="text-[10px] text-muted-foreground uppercase tracking-wider">{ i18n.T(ctx, "Cancelled on") }</div>
+																<div class="text-sm font-medium text-foreground mt-0.5" x-text="billing.cancelledAt ? new Date(billing.cancelledAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—'"></div>
+															</div>
+															<div class="rounded-lg bg-background/50 border border-border/50 p-2.5">
+																<div class="text-[10px] text-muted-foreground uppercase tracking-wider">{ i18n.T(ctx, "Access until") }</div>
+																<div class="text-sm font-medium text-foreground mt-0.5" x-text="billing.cancelsOn ? new Date(billing.cancelsOn).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—'"></div>
+															</div>
+														</div>
+														<p class="text-xs text-muted-foreground">
+															{ i18n.T(ctx, "You still have full access to all features until the date shown above. After that, your account will return to the free tier.") }
+														</p>
+														<!-- Reactivate subscription -->
+														<div class="border-t border-border/50 pt-3 space-y-2">
+															<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "Changed your mind? You can reactivate before your billing period ends.") }</p>
+															<template x-if="reactivateError">
+																<p class="text-xs text-destructive" x-text="reactivateError"></p>
+															</template>
+															<button
+																type="button"
+																:disabled="reactivating"
+																@click="
+															reactivating = true; reactivateError = '';
+															fetch('/api/billing/reactivate', {
+																method: 'POST',
+																headers: { 'Content-Type': 'application/json' },
+																credentials: 'same-origin'
+															})
+															.then(r => r.json().then(d => ({ ok: r.ok, data: d })))
+															.then(({ ok, data }) => {
+																if (ok) {
+																	billing.status = 'active';
+																	billing.cancelledAt = null;
+																	billing.cancelsOn = null;
+																} else {
+																	reactivateError = data.error || 'Failed to reactivate.';
+																}
+																reactivating = false;
+															})
+															.catch(() => { reactivateError = 'Something went wrong.'; reactivating = false; })
+														"
+																class="w-full inline-flex items-center justify-center gap-2 rounded-lg text-sm font-medium h-9 px-4 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+															>
+																<template x-if="reactivating">
+																	<span class="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-primary-foreground"></span>
+																</template>
+																{ i18n.T(ctx, "Reactivate Subscription") }
+															</button>
+														</div>
+													</div>
+												</template>
+												<!-- Pending payment -->
+												<template x-if="!billingLoading && billing && billing.status === 'pending'">
+													<div class="rounded-xl border border-yellow-500/30 bg-yellow-500/5 p-4 space-y-3">
+														<div class="flex items-center justify-between">
+															<div class="flex items-center gap-2.5">
+																<div class="flex items-center justify-center size-9 rounded-full bg-yellow-500/10">
+																	@icon.CreditCard(icon.Props{Class: "size-5 text-yellow-600 dark:text-yellow-400"})
+																</div>
+																<div>
+																	<div class="text-sm font-semibold text-foreground">{ i18n.T(ctx, "Payment Pending") }</div>
+																	<div class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "Your payment is being processed") }</div>
+																</div>
+															</div>
+															<span class="inline-flex items-center rounded-full bg-yellow-500/10 px-2.5 py-1 text-xs font-semibold text-yellow-600 dark:text-yellow-400 ring-1 ring-inset ring-yellow-500/20">
+																{ i18n.T(ctx, "Pending") }
+															</span>
+														</div>
+													</div>
+												</template>
+												<!-- No subscription -->
+												<template x-if="!billingLoading && billing && billing.status === 'none'">
+													<div class="rounded-xl border border-border p-4 space-y-3">
+														<div class="flex items-center justify-between">
+															<div class="flex items-center gap-2.5">
+																<div class="flex items-center justify-center size-9 rounded-full bg-primary/10">
+																	@icon.Crown(icon.Props{Class: "size-5 text-primary"})
+																</div>
+																<div>
+																	<div class="text-sm font-semibold text-foreground">{ i18n.T(ctx, "Free Tier") }</div>
+																	<div class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "Activate to unlock all features") }</div>
+																</div>
+															</div>
+															<span class="inline-flex items-center rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground ring-1 ring-inset ring-border">
+																{ i18n.T(ctx, "Inactive") }
+															</span>
+														</div>
+														<button
+															type="button"
+															@click="$dispatch('open-pricing-dialog')"
+															class="w-full inline-flex items-center justify-center gap-2 rounded-lg text-sm font-medium h-9 px-4 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+														>
+															@icon.Sparkles(icon.Props{Class: "size-4"})
+															{ i18n.T(ctx, "Subscribe — $5/month") }
+														</button>
+														<p class="text-[11px] text-muted-foreground text-center">
+															{ i18n.T(ctx, "Cancel anytime. Your access continues until the end of your billing period.") }
+														</p>
+													</div>
+												</template>
+											</div>
 											<!-- Security section -->
 											<div class="border-t border-border pt-4 space-y-3">
 												<div class="text-xs font-medium text-muted-foreground uppercase tracking-wider">{ i18n.T(ctx, "Security") }</div>

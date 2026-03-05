@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"school-with-ai/components"
-	"school-with-ai/components/checkout"
 	"school-with-ai/components/pricing"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
@@ -68,6 +67,7 @@ import (
 	aguihandlers "school-with-ai/handlers/agui"
 	aiSettingsHandlers "school-with-ai/handlers/aisettings"
 	bannerhandlers "school-with-ai/handlers/banner"
+	billinghandlers "school-with-ai/handlers/billing"
 	healthhandlers "school-with-ai/handlers/health"
 	knowledgehandlers "school-with-ai/handlers/knowledge"
 	mcphandler "school-with-ai/handlers/mcp"
@@ -75,13 +75,16 @@ import (
 	taskmgmthandlers "school-with-ai/handlers/taskmgmt"
 	wkspermhandlers "school-with-ai/handlers/workspacepermissions"
 
+	projPayment "school-with-ai/infra/projection/payment"
 	"school-with-ai/services/agentstore"
 	authService "school-with-ai/services/auth"
+	billingService "school-with-ai/services/billing"
 
 	"github.com/ardanlabs/conf/v3"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	goredis "github.com/redis/go-redis/v9"
+	"github.com/stripe/stripe-go/v84"
 )
 
 var build = "develop"
@@ -174,6 +177,11 @@ func run(ctx context.Context, log *logger.Logger) error {
 			BaseURL  string `conf:"default:http://localhost:8081"`
 			TenantID string
 		}
+		Stripe struct {
+			SecretKey      string `conf:"mask"`
+			PublishableKey string
+			WebhookSecret  string `conf:"mask"`
+		}
 	}{
 		Version: conf.Version{
 			Build: build,
@@ -199,7 +207,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Reject known development defaults when the binary is built for
 	// production (build != "develop").
 
-	if err := validateProductionConfig(cfg.Build, cfg.DashboardAdmin.User, cfg.DashboardAdmin.Pass, cfg.DB.Password, cfg.Artifacts.S3AccessKey, cfg.Artifacts.S3SecretKey); err != nil {
+	if err := validateProductionConfig(log, cfg.Build, cfg.DashboardAdmin.User, cfg.DashboardAdmin.Pass, cfg.DB.Password, cfg.Artifacts.S3AccessKey, cfg.Artifacts.S3SecretKey, cfg.Stripe.SecretKey, cfg.Stripe.WebhookSecret); err != nil {
 		return err
 	}
 
@@ -333,6 +341,10 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Initialize Statistics Projection (Postgres)
 	statsProjection := projectionStats.NewPostgresProjection(db)
 	statsProjection.RegisterHandlers(persistenceRouter)
+
+	// Initialize Payment Projection (event-sourced read model)
+	paymentProjection := projPayment.NewPostgresPaymentProjection(log, db)
+	paymentProjection.RegisterHandlers(persistenceRouter)
 
 	// Start projection updater in background with a cancellable context
 	projCtx, projCancel := context.WithCancel(ctx)
@@ -651,8 +663,21 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Pricing page
 	r.Get("/pricing", authMiddleware.RequireAuthFunc(HandlePricingPage(log)))
 
-	// Checkout page
-	r.Get("/checkout", authMiddleware.RequireAuthFunc(HandleCheckoutPage(log)))
+	// Billing (event-sourced payment system)
+	// Set Stripe API key — must be done before any Stripe SDK calls
+	stripe.Key = cfg.Stripe.SecretKey
+	paymentRepo := domain.NewPaymentAccountRepository(eventLog)
+	billingSvc := billingService.New(log, paymentRepo, paymentProjection)
+	billingHandler := billinghandlers.NewHandler(log, billingSvc, cfg.Stripe.WebhookSecret, cfg.Stripe.PublishableKey)
+
+	// Billing API routes
+	r.Post("/api/billing/create-payment-intent", authMiddleware.RequireAuthFunc(billingHandler.CreatePaymentIntent))
+	r.Get("/api/billing/status", authMiddleware.RequireAuthFunc(billingHandler.GetPaymentStatus))
+	r.Post("/api/billing/verify-payment", authMiddleware.RequireAuthFunc(billingHandler.VerifyPayment))
+	r.Post("/api/billing/cancel", authMiddleware.RequireAuthFunc(billingHandler.CancelSubscription))
+	r.Post("/api/billing/reactivate", authMiddleware.RequireAuthFunc(billingHandler.ReactivateSubscription))
+	// Webhook is public — Stripe calls it with signature verification
+	r.Post("/api/billing/webhook", billingHandler.HandleWebhook)
 
 	// message:send needs a larger body limit for file attachments (base64).
 	// 5 files × 20 MB raw ≈ 133 MB base64 — round up to 150 MB.
@@ -910,15 +935,10 @@ func HandleViewChatInputScreen(log *logger.Logger, edgequakeService *edgequake.S
 
 func HandlePricingPage(log *logger.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Get authenticated user from context
 		user := domain.GetUserFromContext(r.Context())
 
-		// Get default pricing plans
-		plans := pricing.GetDefaultPlans(r.Context())
-
 		component := pricing.PricingPage(pricing.PricingPageProps{
-			Plans: plans,
-			User:  user,
+			User: user,
 		})
 		if err := component.Render(r.Context(), w); err != nil {
 			log.Error(r.Context(), "failed to render pricing page", "error", err)
@@ -926,56 +946,10 @@ func HandlePricingPage(log *logger.Logger) http.HandlerFunc {
 	}
 }
 
-func HandleCheckoutPage(log *logger.Logger) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Get authenticated user from context
-		user := domain.GetUserFromContext(r.Context())
-
-		// Get plan from query parameter
-		planID := r.URL.Query().Get("plan")
-		if planID == "" {
-			http.Redirect(w, r, "/pricing", http.StatusSeeOther)
-			return
-		}
-
-		// Find the plan details
-		plans := pricing.GetDefaultPlans(r.Context())
-		var selectedPlan *pricing.Plan
-		for _, p := range plans {
-			if p.ID == planID {
-				selectedPlan = &p
-				break
-			}
-		}
-
-		if selectedPlan == nil {
-			http.Redirect(w, r, "/pricing", http.StatusSeeOther)
-			return
-		}
-
-		// Convert to checkout plan details
-		planDetails := checkout.PlanDetails{
-			ID:       selectedPlan.ID,
-			Name:     selectedPlan.Name,
-			Price:    selectedPlan.Price,
-			Period:   selectedPlan.Period,
-			Features: selectedPlan.Features,
-		}
-
-		component := checkout.CheckoutPage(checkout.CheckoutPageProps{
-			Plan: planDetails,
-			User: user,
-		})
-		if err := component.Render(r.Context(), w); err != nil {
-			log.Error(r.Context(), "failed to render checkout page", "error", err)
-		}
-	}
-}
-
 // validateProductionConfig rejects known insecure defaults when the
 // binary is built for production (build != "develop"). This prevents
 // accidental deployment with development credentials.
-func validateProductionConfig(buildTag, adminUser, adminPass, dbPass, s3Key, s3Secret string) error {
+func validateProductionConfig(log *logger.Logger, buildTag, adminUser, adminPass, dbPass, s3Key, s3Secret, stripeSecret, stripeWebhook string) error {
 	if buildTag == "develop" {
 		return nil
 	}
@@ -999,6 +973,16 @@ func validateProductionConfig(buildTag, adminUser, adminPass, dbPass, s3Key, s3S
 		if defaults[val] {
 			return fmt.Errorf("production config guard: %s is set to the development default %q — set a secure value", label, val)
 		}
+	}
+
+	// Stripe keys: secret key MUST be set in production.
+	// Webhook secret is strongly recommended — without it, payment confirmation
+	// relies solely on lazy-verification (client-side redirect).
+	if stripeSecret == "" {
+		return fmt.Errorf("production config guard: Stripe secret key is empty — payment features require this value")
+	}
+	if stripeWebhook == "" {
+		log.Info(context.Background(), "production config guard: WARNING — Stripe webhook secret is empty. Payment confirmations will rely on lazy-verification only. Set SCHOOL_STRIPE_WEBHOOK_SECRET for reliable webhook processing.")
 	}
 
 	return nil
