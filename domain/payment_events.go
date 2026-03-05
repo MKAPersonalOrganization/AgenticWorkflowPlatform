@@ -25,10 +25,10 @@ type PaymentAccountOpened struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
-func (e *PaymentAccountOpened) EventType() string        { return "PaymentAccountOpened" }
+func (e *PaymentAccountOpened) EventType() string         { return "PaymentAccountOpened" }
 func (e *PaymentAccountOpened) EventTimestamp() time.Time { return e.Timestamp }
-func (e *PaymentAccountOpened) AggregateID() string      { return e.AccountID }
-func (e *PaymentAccountOpened) sealed()                  {}
+func (e *PaymentAccountOpened) AggregateID() string       { return e.AccountID }
+func (e *PaymentAccountOpened) sealed()                   {}
 
 // PaymentInitiated is emitted when a Stripe PaymentIntent is created and the
 // user begins the checkout flow. This is a "hold" — funds are not yet captured.
@@ -47,10 +47,10 @@ type PaymentInitiated struct {
 	Timestamp        time.Time `json:"timestamp"`
 }
 
-func (e *PaymentInitiated) EventType() string        { return "PaymentInitiated" }
+func (e *PaymentInitiated) EventType() string         { return "PaymentInitiated" }
 func (e *PaymentInitiated) EventTimestamp() time.Time { return e.Timestamp }
-func (e *PaymentInitiated) AggregateID() string      { return e.AccountID }
-func (e *PaymentInitiated) sealed()                  {}
+func (e *PaymentInitiated) AggregateID() string       { return e.AccountID }
+func (e *PaymentInitiated) sealed()                   {}
 
 // PaymentSucceeded is emitted when Stripe confirms the payment was captured.
 // This is the authoritative "debit posted" event.
@@ -71,10 +71,10 @@ type PaymentSucceeded struct {
 	Timestamp       time.Time `json:"timestamp"`
 }
 
-func (e *PaymentSucceeded) EventType() string        { return "PaymentSucceeded" }
+func (e *PaymentSucceeded) EventType() string         { return "PaymentSucceeded" }
 func (e *PaymentSucceeded) EventTimestamp() time.Time { return e.Timestamp }
-func (e *PaymentSucceeded) AggregateID() string      { return e.AccountID }
-func (e *PaymentSucceeded) sealed()                  {}
+func (e *PaymentSucceeded) AggregateID() string       { return e.AccountID }
+func (e *PaymentSucceeded) sealed()                   {}
 
 // PaymentFailed is emitted when Stripe reports a payment failure (card
 // declined, insufficient funds, etc.).
@@ -94,10 +94,10 @@ type PaymentFailed struct {
 	Timestamp       time.Time `json:"timestamp"`
 }
 
-func (e *PaymentFailed) EventType() string        { return "PaymentFailed" }
+func (e *PaymentFailed) EventType() string         { return "PaymentFailed" }
 func (e *PaymentFailed) EventTimestamp() time.Time { return e.Timestamp }
-func (e *PaymentFailed) AggregateID() string      { return e.AccountID }
-func (e *PaymentFailed) sealed()                  {}
+func (e *PaymentFailed) AggregateID() string       { return e.AccountID }
+func (e *PaymentFailed) sealed()                   {}
 
 // PaymentRefunded is emitted when a completed payment is refunded (full or
 // partial). Follows the banking "credit" pattern.
@@ -117,10 +117,10 @@ type PaymentRefunded struct {
 	Timestamp      time.Time `json:"timestamp"`
 }
 
-func (e *PaymentRefunded) EventType() string        { return "PaymentRefunded" }
+func (e *PaymentRefunded) EventType() string         { return "PaymentRefunded" }
 func (e *PaymentRefunded) EventTimestamp() time.Time { return e.Timestamp }
-func (e *PaymentRefunded) AggregateID() string      { return e.AccountID }
-func (e *PaymentRefunded) sealed()                  {}
+func (e *PaymentRefunded) AggregateID() string       { return e.AccountID }
+func (e *PaymentRefunded) sealed()                   {}
 
 // PaymentDisputed is emitted when a chargeback/dispute is opened against a
 // payment. This is critical for production: disputes can reverse funds and
@@ -140,10 +140,10 @@ type PaymentDisputed struct {
 	Timestamp       time.Time `json:"timestamp"`
 }
 
-func (e *PaymentDisputed) EventType() string        { return "PaymentDisputed" }
+func (e *PaymentDisputed) EventType() string         { return "PaymentDisputed" }
 func (e *PaymentDisputed) EventTimestamp() time.Time { return e.Timestamp }
-func (e *PaymentDisputed) AggregateID() string      { return e.AccountID }
-func (e *PaymentDisputed) sealed()                  {}
+func (e *PaymentDisputed) AggregateID() string       { return e.AccountID }
+func (e *PaymentDisputed) sealed()                   {}
 
 // DisputeResolved is emitted when a dispute reaches a terminal state
 // (won or lost). If lost, the funds are permanently reversed.
@@ -158,10 +158,10 @@ type DisputeResolved struct {
 	Timestamp       time.Time `json:"timestamp"`
 }
 
-func (e *DisputeResolved) EventType() string        { return "DisputeResolved" }
+func (e *DisputeResolved) EventType() string         { return "DisputeResolved" }
 func (e *DisputeResolved) EventTimestamp() time.Time { return e.Timestamp }
-func (e *DisputeResolved) AggregateID() string      { return e.AccountID }
-func (e *DisputeResolved) sealed()                  {}
+func (e *DisputeResolved) AggregateID() string       { return e.AccountID }
+func (e *DisputeResolved) sealed()                   {}
 
 // PaymentMethodUpdated is emitted when the user's payment method changes
 // (new card attached, card updated by card network). Tracks PCI-safe info only.
@@ -178,10 +178,10 @@ type PaymentMethodUpdated struct {
 	Timestamp             time.Time `json:"timestamp"`
 }
 
-func (e *PaymentMethodUpdated) EventType() string        { return "PaymentMethodUpdated" }
+func (e *PaymentMethodUpdated) EventType() string         { return "PaymentMethodUpdated" }
 func (e *PaymentMethodUpdated) EventTimestamp() time.Time { return e.Timestamp }
-func (e *PaymentMethodUpdated) AggregateID() string      { return e.AccountID }
-func (e *PaymentMethodUpdated) sealed()                  {}
+func (e *PaymentMethodUpdated) AggregateID() string       { return e.AccountID }
+func (e *PaymentMethodUpdated) sealed()                   {}
 
 // InvoicePaymentFailed is emitted when a recurring invoice payment fails.
 // This is distinct from PaymentFailed (which covers initial payment attempts)
@@ -200,10 +200,10 @@ type InvoicePaymentFailed struct {
 	Timestamp       time.Time `json:"timestamp"`
 }
 
-func (e *InvoicePaymentFailed) EventType() string        { return "InvoicePaymentFailed" }
+func (e *InvoicePaymentFailed) EventType() string         { return "InvoicePaymentFailed" }
 func (e *InvoicePaymentFailed) EventTimestamp() time.Time { return e.Timestamp }
-func (e *InvoicePaymentFailed) AggregateID() string      { return e.AccountID }
-func (e *InvoicePaymentFailed) sealed()                  {}
+func (e *InvoicePaymentFailed) AggregateID() string       { return e.AccountID }
+func (e *InvoicePaymentFailed) sealed()                   {}
 
 // SubscriptionCancelled is emitted when a user requests cancellation.
 // The subscription remains active until CancelsOn (end of billing period).
@@ -219,10 +219,10 @@ type SubscriptionCancelled struct {
 	Timestamp            time.Time `json:"timestamp"`
 }
 
-func (e *SubscriptionCancelled) EventType() string        { return "SubscriptionCancelled" }
+func (e *SubscriptionCancelled) EventType() string         { return "SubscriptionCancelled" }
 func (e *SubscriptionCancelled) EventTimestamp() time.Time { return e.Timestamp }
-func (e *SubscriptionCancelled) AggregateID() string      { return e.AccountID }
-func (e *SubscriptionCancelled) sealed()                  {}
+func (e *SubscriptionCancelled) AggregateID() string       { return e.AccountID }
+func (e *SubscriptionCancelled) sealed()                   {}
 
 // SubscriptionExpired is emitted when a cancelled subscription reaches its
 // cancels_on date and access is revoked. The account returns to free tier.
@@ -232,10 +232,10 @@ type SubscriptionExpired struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
-func (e *SubscriptionExpired) EventType() string        { return "SubscriptionExpired" }
+func (e *SubscriptionExpired) EventType() string         { return "SubscriptionExpired" }
 func (e *SubscriptionExpired) EventTimestamp() time.Time { return e.Timestamp }
-func (e *SubscriptionExpired) AggregateID() string      { return e.AccountID }
-func (e *SubscriptionExpired) sealed()                  {}
+func (e *SubscriptionExpired) AggregateID() string       { return e.AccountID }
+func (e *SubscriptionExpired) sealed()                   {}
 
 // SubscriptionReactivated is emitted when a user reverses a cancellation
 // before the billing period ends. The subscription returns to active.
@@ -245,7 +245,7 @@ type SubscriptionReactivated struct {
 	Timestamp     time.Time `json:"timestamp"`
 }
 
-func (e *SubscriptionReactivated) EventType() string        { return "SubscriptionReactivated" }
+func (e *SubscriptionReactivated) EventType() string         { return "SubscriptionReactivated" }
 func (e *SubscriptionReactivated) EventTimestamp() time.Time { return e.Timestamp }
-func (e *SubscriptionReactivated) AggregateID() string      { return e.AccountID }
-func (e *SubscriptionReactivated) sealed()                  {}
+func (e *SubscriptionReactivated) AggregateID() string       { return e.AccountID }
+func (e *SubscriptionReactivated) sealed()                   {}
