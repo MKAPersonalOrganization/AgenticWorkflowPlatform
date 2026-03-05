@@ -45,6 +45,11 @@ services:
       # Dashboard admin
       - SCHOOL_DASHBOARD_ADMIN_USER=${SCHOOL_DASHBOARD_ADMIN_USER:-admin}
       - SCHOOL_DASHBOARD_ADMIN_PASS=${SCHOOL_DASHBOARD_ADMIN_PASS}
+      # Stripe — payment processing
+      - SCHOOL_STRIPE_SECRET_KEY=${SCHOOL_STRIPE_SECRET_KEY}
+      - SCHOOL_STRIPE_PUBLISHABLE_KEY=${SCHOOL_STRIPE_PUBLISHABLE_KEY}
+      - SCHOOL_STRIPE_WEBHOOK_SECRET=${SCHOOL_STRIPE_WEBHOOK_SECRET}
+      - SCHOOL_STRIPE_PRICE_ID=${SCHOOL_STRIPE_PRICE_ID}
     volumes:
       - ./tls:/app/tls:ro # mount self-signed cert
     networks:

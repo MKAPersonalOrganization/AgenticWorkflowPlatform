@@ -3,207 +3,89 @@ package pricing
 import "school-with-ai/components/card"
 import "school-with-ai/components/button"
 import "school-with-ai/components/icon"
-import "school-with-ai/components/badge"
 import "school-with-ai/components/pageheader"
 import "school-with-ai/components"
 import "school-with-ai/domain"
 import "school-with-ai/components/i18n"
-import "context"
-
-type Plan struct {
-	ID          string
-	Name        string
-	Price       string
-	Period      string
-	Description string
-	Features    []string
-	Popular     bool
-	ButtonText  string
-	ButtonHref  string
-}
 
 type PricingPageProps struct {
-	Plans []Plan
-	User  *domain.User
+	User *domain.User
 }
 
 templ PricingPage(props PricingPageProps) {
 	@components.AppLayout(components.AppLayoutProps{
-		Title: i18n.T(ctx, "Pricing Plans"),
+		Title: i18n.T(ctx, "Activate Your Account"),
 		User:  props.User,
 	}) {
 		<div class="min-h-screen bg-background">
-			<div class="container mx-auto max-w-7xl px-6 py-8 lg:py-12 space-y-10">
-				<!-- Header with Back Button -->
+			<div class="container mx-auto max-w-3xl px-6 py-8 lg:py-12 space-y-10">
 				@pageheader.PageHeader(pageheader.Props{
-					Title:       i18n.T(ctx, "Choose Your Plan"),
-					Description: i18n.T(ctx, "Unlock the full potential of AI-powered learning with our flexible pricing options"),
+					Title:       i18n.T(ctx, "Activate Your Account"),
+					Description: i18n.T(ctx, "$5/month subscription — unlimited access to all features"),
 					BackURL:     "/",
 					BackLabel:   i18n.T(ctx, "Back to Home"),
 				})
-				<!-- Pricing Cards -->
-				@PricingCards(props)
+				@ActivationCard()
 			</div>
 		</div>
 	}
 }
 
-templ PricingCards(props PricingPageProps) {
-	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
-		for _, plan := range props.Plans {
-			if plan.Popular {
-				<div class="relative lg:scale-105 lg:z-10">
-					@card.Card(card.Props{
-						Class: "border-2 border-primary shadow-xl",
-					}) {
-						<div class="absolute -top-4 left-1/2 -translate-x-1/2">
-							@badge.Badge(badge.Props{
-								Variant: badge.VariantDefault,
-								Class:   "px-4 py-2 text-xs font-bold shadow-lg",
-							}) {
-								<span>{ i18n.T(ctx, "POPULAR") }</span>
-							}
-						</div>
-						@planCardContent(plan)
-					}
+templ ActivationCard() {
+	<div class="max-w-xl mx-auto">
+		@card.Card(card.Props{
+			Class: "border-2 border-primary shadow-xl",
+		}) {
+			@card.Header(card.HeaderProps{Class: "text-center pb-8 pt-8"}) {
+				@card.Title(card.TitleProps{Class: "text-2xl font-bold"}) {
+					{ i18n.T(ctx, "Full Access") }
+				}
+				@card.Description(card.DescriptionProps{Class: "mt-3 leading-relaxed"}) {
+					{ i18n.T(ctx, "Subscribe and get unlimited access to every feature") }
+				}
+				<div class="mt-6">
+					<div class="flex items-baseline justify-center gap-2">
+						<span class="text-5xl font-bold tracking-tight">{ i18n.T(ctx, "$5") }</span>
+						<span class="text-base text-muted-foreground font-medium">{ i18n.T(ctx, "/month") }</span>
+					</div>
 				</div>
-			} else {
-				<div class="relative">
-					@card.Card(card.Props{
-						Class: "border-2 border-border hover:border-ring transition-all hover:shadow-lg",
-					}) {
-						@planCardContent(plan)
-					}
-				</div>
+			}
+			@card.Content(card.ContentProps{Class: "space-y-5 pb-8"}) {
+				<ul class="space-y-4">
+					@featureItem(i18n.T(ctx, "Unlimited conversations"))
+					@featureItem(i18n.T(ctx, "All AI models"))
+					@featureItem(i18n.T(ctx, "Priority support"))
+					@featureItem(i18n.T(ctx, "Export conversation history"))
+					@featureItem(i18n.T(ctx, "Advanced analytics"))
+					@featureItem(i18n.T(ctx, "Custom instructions"))
+					@featureItem(i18n.T(ctx, "Cancel anytime"))
+				</ul>
+			}
+			@card.Footer(card.FooterProps{Class: "flex-col pt-6"}) {
+				@button.Button(button.Props{
+					Variant:   button.VariantDefault,
+					FullWidth: true,
+					Size:      button.SizeLg,
+					Attributes: templ.Attributes{
+						"@click": "$dispatch('open-checkout-dialog')",
+					},
+				}) {
+					@icon.Lock(icon.Props{Class: "size-4"})
+					<span>{ i18n.T(ctx, "Activate Now") }</span>
+				}
+				<p class="text-xs text-muted-foreground mt-4 text-center">
+					{ i18n.T(ctx, "Secure payment powered by Stripe. Your card details never touch our servers.") }
+				</p>
 			}
 		}
 	</div>
 }
 
-templ planCardContent(plan Plan) {
-	@card.Header(card.HeaderProps{Class: "text-center pb-10 pt-8"}) {
-		@card.Title(card.TitleProps{Class: "text-2xl font-bold"}) {
-			{ plan.Name }
-		}
-		@card.Description(card.DescriptionProps{Class: "mt-3 leading-relaxed"}) {
-			{ plan.Description }
-		}
-		<div class="mt-6">
-			<div class="flex items-baseline justify-center gap-2">
-				<span class="text-5xl font-bold tracking-tight">{ plan.Price }</span>
-				if plan.Period != "" {
-					<span class="text-base text-muted-foreground font-medium">{ plan.Period }</span>
-				}
-			</div>
+templ featureItem(text string) {
+	<li class="flex items-start gap-3">
+		<div class="mt-1">
+			@icon.Check(icon.Props{Class: "size-5 text-primary flex-shrink-0"})
 		</div>
-	}
-	@card.Content(card.ContentProps{Class: "space-y-5 pb-8"}) {
-		<ul class="space-y-4">
-			for _, feature := range plan.Features {
-				<li class="flex items-start gap-3">
-					<div class="mt-1">
-						@icon.Check(icon.Props{Class: "size-5 text-primary flex-shrink-0"})
-					</div>
-					<span class="text-sm leading-relaxed">{ feature }</span>
-				</li>
-			}
-		</ul>
-	}
-	@card.Footer(card.FooterProps{Class: "flex-col pt-6"}) {
-		if plan.Popular {
-			@button.Button(button.Props{
-				Variant:   button.VariantDefault,
-				FullWidth: true,
-				Href:      plan.ButtonHref,
-				Size:      button.SizeLg,
-			}) {
-				{ plan.ButtonText }
-			}
-		} else {
-			@button.Button(button.Props{
-				Variant:   button.VariantOutline,
-				FullWidth: true,
-				Href:      plan.ButtonHref,
-				Size:      button.SizeLg,
-			}) {
-				{ plan.ButtonText }
-			}
-		}
-	}
-}
-
-func GetDefaultPlans(ctx context.Context) []Plan {
-	return []Plan{
-		{
-			ID:          "free",
-			Name:        i18n.T(ctx, "Free"),
-			Price:       i18n.T(ctx, "$0"),
-			Period:      "",
-			Description: i18n.T(ctx, "Perfect for getting started"),
-			Features: []string{
-				i18n.T(ctx, "10 conversations per day"),
-				i18n.T(ctx, "Basic AI model"),
-				i18n.T(ctx, "Community support"),
-				i18n.T(ctx, "Standard response time"),
-			},
-			Popular:    false,
-			ButtonText: i18n.T(ctx, "Current Plan"),
-			ButtonHref: "#",
-		},
-		{
-			ID:          "go",
-			Name:        i18n.T(ctx, "Go"),
-			Price:       i18n.T(ctx, "$9"),
-			Period:      i18n.T(ctx, "/month"),
-			Description: i18n.T(ctx, "For individuals who need more"),
-			Features: []string{
-				i18n.T(ctx, "100 conversations per day"),
-				i18n.T(ctx, "Advanced AI model"),
-				i18n.T(ctx, "Priority support"),
-				i18n.T(ctx, "Faster response time"),
-				i18n.T(ctx, "Export conversation history"),
-			},
-			Popular:    false,
-			ButtonText: i18n.T(ctx, "Upgrade"),
-			ButtonHref: "/checkout?plan=go",
-		},
-		{
-			ID:          "plus",
-			Name:        i18n.T(ctx, "Plus"),
-			Price:       i18n.T(ctx, "$19"),
-			Period:      i18n.T(ctx, "/month"),
-			Description: i18n.T(ctx, "Most popular for power users"),
-			Features: []string{
-				i18n.T(ctx, "Unlimited conversations"),
-				i18n.T(ctx, "Premium AI models"),
-				i18n.T(ctx, "Priority support"),
-				i18n.T(ctx, "Fastest response time"),
-				i18n.T(ctx, "Export conversation history"),
-				i18n.T(ctx, "Advanced analytics"),
-				i18n.T(ctx, "Custom instructions"),
-			},
-			Popular:    true,
-			ButtonText: i18n.T(ctx, "Upgrade"),
-			ButtonHref: "/checkout?plan=plus",
-		},
-		{
-			ID:          "pro",
-			Name:        i18n.T(ctx, "Pro"),
-			Price:       i18n.T(ctx, "$49"),
-			Period:      i18n.T(ctx, "/month"),
-			Description: i18n.T(ctx, "For professionals and teams"),
-			Features: []string{
-				i18n.T(ctx, "Everything in Plus"),
-				i18n.T(ctx, "Dedicated support"),
-				i18n.T(ctx, "API access"),
-				i18n.T(ctx, "Team collaboration"),
-				i18n.T(ctx, "Custom integrations"),
-				i18n.T(ctx, "SLA guarantee"),
-				i18n.T(ctx, "Advanced security"),
-			},
-			Popular:    false,
-			ButtonText: i18n.T(ctx, "Upgrade"),
-			ButtonHref: "/checkout?plan=pro",
-		},
-	}
+		<span class="text-sm leading-relaxed">{ text }</span>
+	</li>
 }

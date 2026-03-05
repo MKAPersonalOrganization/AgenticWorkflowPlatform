@@ -361,6 +361,44 @@ document.addEventListener('alpine:init', () => {
                 // Initialize accessibility (screen reader live region)
                 this.__initScreenReaderAnnouncer();
 
+                // ── Payment success: detect Stripe redirect ──
+                // After confirmPayment, Stripe redirects to /?redirect_status=succeeded
+                // with additional params: payment_intent, payment_intent_client_secret.
+                // We call the server-side verify endpoint as a fallback to confirm
+                // the payment. The webhook is the canonical confirmation path.
+                this.$nextTick(() => {
+                    const params = new URLSearchParams(window.location.search);
+                    if (params.get('redirect_status') === 'succeeded' || params.get('payment') === 'success') {
+                        const piId = params.get('payment_intent');
+                        if (piId) {
+                            fetch('/api/billing/verify-payment', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                credentials: 'same-origin',
+                                body: JSON.stringify({ paymentIntent: piId }),
+                            }).then(r => {
+                                if (r.ok) {
+                                    this.showToast('🎉 Payment successful! Your account is now fully activated.', 'success', 6000);
+                                } else {
+                                    // Webhook will handle confirmation — show optimistic message
+                                    this.showToast('🎉 Payment received! Activation may take a moment.', 'success', 6000);
+                                }
+                            }).catch(() => {
+                                this.showToast('🎉 Payment received! Activation may take a moment.', 'success', 6000);
+                            });
+                        } else {
+                            this.showToast('🎉 Payment successful! Your account is now fully activated.', 'success', 6000);
+                        }
+                        // Clean the URL so a refresh doesn't re-show the toast
+                        const url = new URL(window.location);
+                        url.searchParams.delete('payment');
+                        url.searchParams.delete('payment_intent');
+                        url.searchParams.delete('payment_intent_client_secret');
+                        url.searchParams.delete('redirect_status');
+                        window.history.replaceState({}, '', url.pathname);
+                    }
+                });
+
                 // Throttled scroll for streaming — direct scrollTop assignment
                 // avoids scrollIntoView animation jitter. 150ms matches LibreChat.
                 this.__scrollToBottomThrottled = throttle(
