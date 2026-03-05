@@ -1,0 +1,257 @@
+package docs
+
+// ─── Plugin System ───────────────────────────────────────────────────────────
+templ docsPlugins() {
+	@docsSection("plugins", "Plugin System", iconPuzzle, "text-green-500") {
+		<p>
+			Compass's plugin system provides a powerful extension mechanism that gives agents specialized
+			capabilities. Plugins are registered at startup and managed through a central registry, with
+			per-agent toggle control for fine-grained configuration.
+		</p>
+		<h3>Built-in Plugins</h3>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Plugin</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Description</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Use Cases</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow("Calculator", "Mathematical computations and expressions", "Solving equations, unit conversions, statistics")
+				@docsTableRow("Codebase", "Source code analysis and generation", "Code review, refactoring, debugging")
+				@docsTableRow("Cognitive", "Advanced reasoning and analysis tools", "Logic puzzles, step-by-step problem solving")
+				@docsTableRow("Document", "File processing and text extraction", "PDF parsing, document summarization")
+				@docsTableRow("Elicitation", "Interactive clarification and follow-ups", "Gathering requirements, interviews")
+				@docsTableRow("Knowledge Base", "RAG queries against uploaded documents", "Research, fact-checking, document Q&A")
+				@docsTableRow("Library", "Access to reference materials and resources", "Looking up definitions, formulas, references")
+				@docsTableRow("Memory", "Long-term recall across conversations", "Remembering preferences, tracking progress")
+				@docsTableRow("Text-to-Speech", "Convert AI responses to spoken audio", "Language learning, accessibility, narration")
+				@docsTableRow("Visualization", "Chart and diagram generation", "Data analysis, concept mapping, flowcharts")
+			</tbody>
+		}
+		<h3>How Plugins Work</h3>
+		<p>
+			Each plugin implements a <code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">Provider</code> interface and registers its tool sets at application startup. The tool registry stores the state of each plugin (enabled/disabled) in PostgreSQL, ensuring consistency across restarts.
+		</p>
+		<h3>Per-Agent Tool Management</h3>
+		<p>
+			Plugins expose <strong>tool sets</strong>, and each tool set contains one or more <strong>individual tools</strong>.
+			You can control availability at both levels:
+		</p>
+		<ul class="space-y-2 my-4">
+			<li>• <strong>Toggle a full tool set</strong> — Enable or disable all tools in a plugin for a specific agent</li>
+			<li>• <strong>Toggle individual tools</strong> — Fine-tune by enabling/disabling specific tools within a set</li>
+		</ul>
+		<p>
+			This flexibility lets you create highly specialized agents. For example, a "Data Analyst" agent might
+			have the Visualization plugin fully enabled, but only the <code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">evaluate</code> tool from the Calculator plugin.
+		</p>
+		<h3>MCP Tools Integration</h3>
+		<p>
+			MCP connectors are also registered as dynamic plugins in the tool registry. This means tools
+			discovered from remote MCP servers appear alongside built-in plugins in the agent's tool configuration
+			panel, providing a unified management experience.
+		</p>
+	}
+}
+
+// ─── Voice & TTS ─────────────────────────────────────────────────────────────
+templ docsVoiceTTS() {
+	@docsSection("voice-tts", "Voice and Text-to-Speech", iconHeadphones, "text-indigo-500") {
+		<p>
+			The Text-to-Speech plugin converts AI responses into <strong>lifelike spoken audio</strong>
+			using advanced voice synthesis. Perfect for language learning, accessibility, reviewing
+			study materials, and hands-free study sessions.
+		</p>
+		<h3>Available Voices</h3>
+		<p>
+			Compass offers <strong>13 distinct AI voices</strong>, each with its own character and tone:
+		</p>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Voice</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Character</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow2("alloy", "Neutral, balanced, great default")
+				@docsTableRow2("ash", "Warm, conversational")
+				@docsTableRow2("ballad", "Melodic, storytelling")
+				@docsTableRow2("coral", "Clear, professional")
+				@docsTableRow2("echo", "Authoritative, deep")
+				@docsTableRow2("fable", "Gentle, narrative")
+				@docsTableRow2("nova", "Energetic, expressive")
+				@docsTableRow2("onyx", "Rich, confident")
+				@docsTableRow2("sage", "Calm, wise")
+				@docsTableRow2("shimmer", "Bright, friendly")
+				@docsTableRow2("verse", "Articulate, precise")
+				@docsTableRow2("marin", "Warm, approachable")
+				@docsTableRow2("cedar", "Steady, trustworthy")
+			</tbody>
+		}
+		<h3>Features</h3>
+		<ul class="space-y-2 my-4">
+			<li>
+				<strong>Word-level timestamps</strong> -- Synchronized highlighting via Whisper forced-alignment so you can follow along as audio plays
+			</li>
+			<li>
+				<strong>Custom voice instructions</strong> -- Control tone, speed, emotion, and accent through natural language
+			</li>
+			<li>
+				<strong>MP3 output</strong> -- Generated audio is saved as a downloadable MP3 artifact attached to the thread
+			</li>
+			<li>
+				<strong>Up to 4,096 characters</strong> -- Per request, supporting full paragraph-length narration
+			</li>
+		</ul>
+		<h3>Usage</h3>
+		<ol class="list-decimal list-inside space-y-2 my-4">
+			<li>Enable the <strong>Text-to-Speech</strong> plugin for your agent</li>
+			<li>Ask the agent to read text aloud, explain something verbally, or narrate content</li>
+			<li>The agent generates an audio file and presents it with an inline player</li>
+			<li>Download the MP3 from the artifacts panel for offline listening</li>
+		</ol>
+		@docsInfoBox("Language Learning Tip") {
+			<p>Combine TTS with the Elicitation plugin for interactive listening exercises: the agent reads a passage aloud, then quizzes you with comprehension questions.</p>
+		}
+	}
+}
+
+// ─── Visualization ───────────────────────────────────────────────────────────
+templ docsVisualization() {
+	@docsSection("visualization", "Visualization and Charts", iconActivity, "text-cyan-500") {
+		<p>
+			The Visualization plugin enables agents to generate 
+			<strong>
+				publication-quality plots and animated
+				visualizations
+			</strong> directly within conversations. Powered by gnuplot with full scripting support,
+			it covers everything from simple line graphs to rotating 3D surfaces.
+		</p>
+		<h3>Plot Tool (Static Charts)</h3>
+		<p>
+			The Plot tool generates static charts and graphs as PNG images:
+		</p>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Plot Type</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Description</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Example Use</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow("Function Plots", "Plot mathematical functions f(x)", "Graphing sin(x), polynomial curves")
+				@docsTableRow("Data Scatter", "Plot data points with trend lines", "Statistical analysis, data exploration")
+				@docsTableRow("3D Surfaces", "Three-dimensional mesh and surface plots", "Multivariable calculus, topology")
+				@docsTableRow("Custom Scripts", "Full gnuplot scripting support", "Complex multi-panel layouts, styling")
+			</tbody>
+		}
+		<p>
+			All plots support custom titles, axis labels, grid lines, ranges, and styling. Generated PNGs
+			are saved as downloadable artifacts.
+		</p>
+		<h3>Animate Tool (Animated Visualizations)</h3>
+		<p>
+			The Animate tool creates animated visualizations as GIF or WebP files:
+		</p>
+		<ul class="space-y-2 my-4">
+			<li>
+				<strong>Rotating 3D plots</strong> -- Spin around a surface to see it from all angles
+			</li>
+			<li>
+				<strong>Wave propagation</strong> -- Animate traveling waves and interference patterns
+			</li>
+			<li>
+				<strong>Parameter variations</strong> -- Show how a function changes as a parameter sweeps
+			</li>
+			<li>
+				<strong>Configurable frame rate</strong> -- Control animation speed via delay between frames
+			</li>
+		</ul>
+		<h3>How It Works</h3>
+		<ol class="list-decimal list-inside space-y-2 my-4">
+			<li>Enable the <strong>Visualization</strong> plugin for your agent</li>
+			<li>Ask the agent to plot a function, chart data, or animate a concept</li>
+			<li>The agent writes a gnuplot script and executes it server-side</li>
+			<li>The resulting image or animation is displayed inline and saved as an artifact</li>
+		</ol>
+		@docsInfoBox("Educational Power") {
+			<p>Combine visualization with the Calculator plugin for a complete math experience: solve an equation analytically, then plot the solution to see it visually.</p>
+		}
+	}
+}
+
+// ─── MCP Integration ─────────────────────────────────────────────────────────
+templ docsMCP() {
+	@docsSection("mcp", "MCP Integration", iconNetwork, "text-orange-500") {
+		<p>
+			The <strong>Model Context Protocol (MCP)</strong> is an open standard that allows AI applications to connect
+			with external tools and data sources. Compass implements full MCP client support, enabling your agents to
+			interact with remote services seamlessly.
+		</p>
+		<h3>How MCP Works</h3>
+		<p>
+			MCP connectors act as bridges between Compass and external servers. When you connect to an MCP server,
+			Compass automatically discovers the available tools and makes them accessible to your agents.
+		</p>
+		@docsInfoBox("Connector Lifecycle") {
+			<div class="flex flex-wrap items-center gap-2 mt-2 text-sm">
+				@statusBadge("Created", "bg-gray-500")
+				<span class="text-muted-foreground">→</span>
+				@statusBadge("Connecting", "bg-blue-500")
+				<span class="text-muted-foreground">→</span>
+				@statusBadge("Connected", "bg-green-500")
+				<span class="text-muted-foreground">or</span>
+				@statusBadge("Auth Required", "bg-yellow-500")
+				<span class="text-muted-foreground">→</span>
+				@statusBadge("Authorizing", "bg-purple-500")
+			</div>
+		}
+		<h3>Setting Up an MCP Connector</h3>
+		<ol class="list-decimal list-inside space-y-2 my-4">
+			<li>Navigate to the <strong>Tools</strong> section in the sidebar</li>
+			<li>Click <strong>"Add MCP Connector"</strong></li>
+			<li>Enter the MCP server URL (e.g., <code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">https://mcp.github.com</code>)</li>
+			<li>If the server requires OAuth, you'll be redirected to authenticate</li>
+			<li>Once connected, available tools are automatically discovered</li>
+			<li>Assign the connector's tools to specific agents</li>
+		</ol>
+		<h3>OAuth 2.1 Support</h3>
+		<p>
+			Compass supports the full OAuth 2.1 Authorization Code + PKCE flow for secure authentication
+			with MCP servers. This means you can safely connect to services like GitHub, Notion, and Slack
+			without exposing your credentials.
+		</p>
+		<h3>MCP Proxy</h3>
+		<p>
+			Compass includes an authenticated reverse proxy to MCP servers. This means your agents can
+			communicate with external services through Compass's secure infrastructure, with SSRF protection
+			and encrypted OAuth tokens at rest.
+		</p>
+		<h3>Preset Connectors</h3>
+		<p>
+			Compass ships with a catalog of preset MCP connectors for popular services. These presets
+			come pre-configured with the correct server URLs and OAuth settings, so you can connect
+			with a single click.
+		</p>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Feature</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Details</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow2("Protocol", "Model Context Protocol (MCP)")
+				@docsTableRow2("Auth Flow", "OAuth 2.1 Authorization Code + PKCE")
+				@docsTableRow2("Max Connectors", "20 per user")
+				@docsTableRow2("Tool Discovery", "Automatic — refreshable on demand")
+				@docsTableRow2("Security", "SSRF protection, encrypted tokens at rest")
+				@docsTableRow2("Proxy", "Authenticated reverse proxy to MCP servers")
+			</tbody>
+		}
+	}
+}

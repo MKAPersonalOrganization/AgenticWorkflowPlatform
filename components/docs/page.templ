@@ -1,0 +1,58 @@
+package docs
+
+import (
+	"school-with-ai/components"
+	"school-with-ai/components/landing"
+	"school-with-ai/domain"
+)
+
+type DocsPageProps struct {
+	User *domain.User
+}
+
+templ DocsPage(props DocsPageProps) {
+	@components.BaseLayout(components.LayoutProps{
+		Title:      "Documentation",
+		User:       props.User,
+		HideNavbar: true,
+	}) {
+		<div class="h-full overflow-y-auto scroll-smooth" id="docs-root">
+			<!-- Navbar (reuse landing nav) -->
+			@landing.Nav(props.User)
+			<!-- Docs Layout -->
+			<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
+				<div class="lg:grid lg:grid-cols-[240px_1fr] lg:gap-12">
+					<!-- Sidebar Navigation -->
+					@docsSidebar()
+					<!-- Main Content -->
+					<main class="min-w-0">
+						@docsHero()
+						@docsOverview()
+						@docsGettingStarted()
+						@docsAIModels()
+						@docsAgentStore()
+						@docsCustomAgents()
+						@docsStudentProfile()
+						@docsPlugins()
+						@docsVoiceTTS()
+						@docsVisualization()
+						@docsMCP()
+						@docsKnowledgeBase()
+						@docsMemoryArtifacts()
+						@docsFileAttachments()
+						@docsResourceLibrary()
+						@docsConversationSearch()
+						@docsTokenUsage()
+						@docsArchitecture()
+						@docsSecurity()
+						@docsI18n()
+						@docsBilling()
+						@docsAPI()
+					</main>
+				</div>
+			</div>
+			<!-- Footer -->
+			@landing.Footer()
+		</div>
+	}
+}

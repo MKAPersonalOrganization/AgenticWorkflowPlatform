@@ -1,0 +1,163 @@
+package landing
+
+import (
+	"school-with-ai/components/button"
+	"school-with-ai/components/icon"
+	"school-with-ai/domain"
+)
+
+// ─── Hero Section ────────────────────────────────────────────────────────────
+templ heroSection(user *domain.User) {
+	<section class="relative overflow-hidden">
+		<!-- Background gradient -->
+		<div class="pointer-events-none absolute inset-0 -z-10">
+			<div class="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent"></div>
+			<div class="absolute left-1/2 top-0 -translate-x-1/2 h-[600px] w-[900px] rounded-full bg-primary/5 blur-3xl"></div>
+		</div>
+		<div class="mx-auto max-w-7xl px-4 pb-20 pt-24 sm:px-6 sm:pt-32 lg:px-8 lg:pt-40">
+			<div class="mx-auto max-w-3xl text-center">
+				<!-- Badge -->
+				<div class="mb-8 inline-flex items-center gap-2 rounded-full border border-border bg-muted/50 px-4 py-1.5 text-sm text-muted-foreground">
+					@icon.Sparkles(icon.Props{Class: "size-4 text-primary"})
+					<span>Powered by cutting-edge AI models</span>
+				</div>
+				<!-- Heading -->
+				<h1 class="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
+					Your Intelligent
+					<span class="bg-linear-to-r from-primary to-primary/60 bg-clip-text text-transparent">Learning Companion</span>
+				</h1>
+				<!-- Subheading -->
+				<p class="mt-6 text-lg leading-relaxed text-muted-foreground sm:text-xl">
+					Compass brings together AI agents, a powerful plugin system, knowledge bases, and MCP integrations — all in one beautiful platform designed to supercharge your learning and productivity.
+				</p>
+				<!-- CTA Buttons -->
+				<div class="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+					if user != nil {
+						@button.Button(button.Props{
+							Href: "/chat",
+							Size: button.SizeLg,
+						}) {
+							<span>Open Compass</span>
+							@icon.ArrowRight(icon.Props{Class: "size-5"})
+						}
+					} else {
+						@button.Button(button.Props{
+							Href: "/auth/login",
+							Size: button.SizeLg,
+						}) {
+							<span>Start for Free</span>
+							@icon.ArrowRight(icon.Props{Class: "size-5"})
+						}
+					}
+					@button.Button(button.Props{
+						Href:    "/docs",
+						Variant: button.VariantOutline,
+						Size:    button.SizeLg,
+					}) {
+						@icon.BookOpen(icon.Props{Class: "size-5"})
+						<span>Read the Docs</span>
+					}
+				</div>
+			</div>
+			<!-- Hero visual — Compass illustration -->
+			<div class="mx-auto mt-20 max-w-4xl">
+				<div class="relative rounded-xl border border-border bg-card p-1 shadow-2xl shadow-primary/5">
+					<div class="overflow-hidden rounded-lg bg-background">
+						<!-- Mock app screenshot -->
+						<div class="flex h-[400px] flex-col sm:h-[500px]">
+							<!-- Mock top bar -->
+							<div class="flex items-center gap-2 border-b border-border px-4 py-3">
+								<div class="flex gap-1.5">
+									<div class="h-3 w-3 rounded-full bg-red-400/60"></div>
+									<div class="h-3 w-3 rounded-full bg-yellow-400/60"></div>
+									<div class="h-3 w-3 rounded-full bg-green-400/60"></div>
+								</div>
+								<div class="ml-4 flex-1">
+									<div class="mx-auto h-6 w-60 rounded-md bg-muted/50"></div>
+								</div>
+							</div>
+							<!-- Mock sidebar + chat -->
+							<div class="flex flex-1">
+								<!-- Sidebar -->
+								<div class="hidden w-12 flex-col items-center gap-4 border-r border-border py-4 sm:flex">
+									<div class="h-6 w-6 rounded bg-primary/20"></div>
+									<div class="h-6 w-6 rounded bg-muted"></div>
+									<div class="h-6 w-6 rounded bg-muted"></div>
+									<div class="h-6 w-6 rounded bg-muted"></div>
+								</div>
+								<!-- Chat area -->
+								<div class="flex flex-1 flex-col justify-between p-6">
+									<div class="space-y-4">
+										<!-- User message -->
+										<div class="flex justify-end">
+											<div class="max-w-xs rounded-xl bg-primary px-4 py-2.5 text-sm text-primary-foreground">
+												Explain quantum entanglement simply
+											</div>
+										</div>
+										<!-- AI response -->
+										<div class="flex justify-start">
+											<div class="max-w-sm rounded-xl bg-muted px-4 py-2.5 text-sm">
+												<div class="flex items-center gap-2 mb-2">
+													@icon.Bot(icon.Props{Class: "size-4 text-primary"})
+													<span class="font-medium text-xs text-muted-foreground">Physics Tutor</span>
+												</div>
+												Imagine two coins that are magically linked — no matter how far apart they are, when you flip one to heads, the other instantly becomes tails...
+											</div>
+										</div>
+										<!-- Another user message -->
+										<div class="flex justify-end">
+											<div class="max-w-xs rounded-xl bg-primary px-4 py-2.5 text-sm text-primary-foreground">
+												Can you visualize that with a diagram?
+											</div>
+										</div>
+										<!-- AI with tool usage -->
+										<div class="flex justify-start">
+											<div class="max-w-sm rounded-xl bg-muted px-4 py-2.5 text-sm">
+												<div class="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+													@icon.Wand(icon.Props{Class: "size-3 text-primary"})
+													<span>Using visualization tool...</span>
+												</div>
+												<div class="h-24 w-full rounded-md bg-primary/10 border border-primary/20 flex items-center justify-center">
+													<span class="text-xs text-muted-foreground">📊 Interactive Diagram</span>
+												</div>
+											</div>
+										</div>
+									</div>
+									<!-- Input bar mock -->
+									<div class="mt-4 flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-3">
+										<div class="flex-1 text-sm text-muted-foreground/50">Ask anything...</div>
+										<div class="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
+											@icon.ArrowRight(icon.Props{Class: "size-4 text-primary-foreground"})
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</section>
+}
+
+// ─── Social Proof ────────────────────────────────────────────────────────────
+templ socialProofBar() {
+	<section class="border-y border-border bg-muted/30 py-10">
+		<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+			<div class="grid grid-cols-2 gap-8 md:grid-cols-5">
+				@statItem("3", "AI Providers")
+				@statItem("15+", "AI Models")
+				@statItem("10", "Built-in Plugins")
+				@statItem("100+", "Agent Templates")
+				@statItem("MCP", "Protocol Support")
+			</div>
+		</div>
+	</section>
+}
+
+templ statItem(value, label string) {
+	<div class="text-center">
+		<div class="text-3xl font-bold tracking-tight text-foreground">{ value }</div>
+		<div class="mt-1 text-sm text-muted-foreground">{ label }</div>
+	</div>
+}

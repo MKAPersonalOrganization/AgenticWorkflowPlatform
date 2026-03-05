@@ -1,9 +1,124 @@
-package landing
+package docs
 
 import (
 	"school-with-ai/components/button"
 	"school-with-ai/components/icon"
 )
+
+// ─── Token Usage ─────────────────────────────────────────────────────────────
+templ docsTokenUsage() {
+	@docsSection("token-usage", "Token Usage and Analytics", iconChartBar, "text-orange-500") {
+		<p>
+			Compass tracks <strong>detailed token usage per message</strong>, giving you full visibility into
+			how your AI budget is being spent across different agents and models.
+		</p>
+		<h3>Per-Message Breakdown</h3>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Metric</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Description</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow2("Prompt Tokens", "Tokens in the input (your message + context)")
+				@docsTableRow2("Completion Tokens", "Tokens generated in the AI response")
+				@docsTableRow2("Cached Tokens", "Tokens served from cache (lower cost)")
+				@docsTableRow2("Reasoning Tokens", "Tokens used for chain-of-thought reasoning (o1/o3 models)")
+				@docsTableRow2("Audio Tokens", "Tokens for audio processing (TTS)")
+				@docsTableRow2("Total Tokens", "Combined token count for the interaction")
+			</tbody>
+		}
+		<h3>Analytics Dashboard</h3>
+		<p>
+			Administrators have access to a dedicated analytics dashboard that provides:
+		</p>
+		<ul class="space-y-2 my-4">
+			<li>
+				<strong>Tool usage time-series</strong> -- Chart-ready data showing tool usage over time
+			</li>
+			<li>
+				<strong>Per-tool metrics</strong> -- Detailed analytics for each tool and plugin
+			</li>
+			<li>
+				<strong>Agent-level filtering</strong> -- View statistics scoped to specific agents
+			</li>
+			<li>
+				<strong>Usage trends</strong> -- Identify patterns and optimize your workflow
+			</li>
+		</ul>
+		@docsInfoBox("Cost Optimization") {
+			<p>Use token usage data to make informed decisions: assign cost-effective models like GPT-4o-mini or Gemini Flash Lite to simple tasks, and reserve premium models for complex analysis.</p>
+		}
+	}
+}
+
+// ─── Architecture ────────────────────────────────────────────────────────────
+templ docsArchitecture() {
+	@docsSection("architecture", "Architecture", iconLayers, "text-indigo-500") {
+		<p>
+			Compass is built on a modern, event-sourced architecture designed for reliability, scalability,
+			and observability. Every component is designed for horizontal scaling and fault tolerance.
+		</p>
+		<h3>Event Sourcing & CQRS</h3>
+		<p>
+			Every state change in Compass is recorded as an immutable <strong>event</strong> in PostgreSQL.
+			This event-sourced approach provides:
+		</p>
+		<ul class="space-y-2 my-4">
+			<li>• <strong>Full audit trail</strong> — Every action is recorded and can be replayed</li>
+			<li>• <strong>Time-travel debugging</strong> — Reconstruct state at any point in time</li>
+			<li>• <strong>Reliable projections</strong> — Read models are derived from events, ensuring consistency</li>
+			<li>• <strong>CQRS separation</strong> — Write side (commands) and read side (queries) are fully decoupled</li>
+			<li>• <strong>Optimistic concurrency</strong> — Stream version checking prevents conflicting updates</li>
+		</ul>
+		<h3>AG-UI Protocol & Real-Time Streaming</h3>
+		<p>
+			The chat interface uses the <strong>AG-UI protocol</strong> with Server-Sent Events (SSE) for
+			real-time streaming. This enables:
+		</p>
+		<ul class="space-y-2 my-4">
+			<li>• <strong>Token-by-token delivery</strong> — See AI responses appear in real-time</li>
+			<li>• <strong>Live tool execution</strong> — Watch tool calls execute and return results</li>
+			<li>• <strong>Thought streaming</strong> — See AI reasoning in real-time via the Cognitive plugin</li>
+			<li>• <strong>Elicitation events</strong> — Interactive forms rendered mid-conversation</li>
+		</ul>
+		<h3>Agent Runtime</h3>
+		<p>
+			Compass uses a <strong>framework-agnostic agent runtime</strong> with middleware chains, hierarchical
+			agent delegation (parent/child sub-agents), and a <strong>declarative requirements system</strong> for
+			human-in-the-loop authorization gates and conditional tool constraints.
+		</p>
+		<h3>Background Processing</h3>
+		<p>
+			Long-running tasks (AI agent execution, document processing, embedding generation) are handled by
+			<strong>Asynq</strong> — a Redis-backed task queue that supports concurrent workers,
+			retry policies, circuit breakers, and graceful shutdown.
+		</p>
+		<h3>Multi-Pod Scalability</h3>
+		<p>
+			Compass is designed for horizontal scaling. Events are broadcast across pods via
+			<strong>Redis Pub/Sub</strong>, ensuring all instances stay synchronized. The projection
+			updater runs independently, keeping read models up to date across the cluster.
+		</p>
+		@docsInfoBox("Tech Stack") {
+			<div class="grid grid-cols-2 gap-2 mt-2 text-sm">
+				<div><strong>Language:</strong> Go</div>
+				<div><strong>Templates:</strong> Templ</div>
+				<div><strong>Frontend:</strong> Alpine.js + HTMX patterns</div>
+				<div><strong>CSS:</strong> Tailwind CSS v4</div>
+				<div><strong>Database:</strong> PostgreSQL + pgvector</div>
+				<div><strong>Queue:</strong> Redis + Asynq</div>
+				<div><strong>Storage:</strong> S3 (MinIO compatible)</div>
+				<div><strong>Payments:</strong> Stripe (event-sourced)</div>
+				<div><strong>Embeddings:</strong> OpenAI / Gemini</div>
+				<div><strong>Visualization:</strong> gnuplot</div>
+				<div><strong>TTS:</strong> OpenAI Whisper-aligned</div>
+				<div><strong>Protocols:</strong> AG-UI, MCP, OAuth 2.1</div>
+			</div>
+		}
+	}
+}
 
 // ─── Security ────────────────────────────────────────────────────────────────
 templ docsSecurity() {
@@ -213,64 +328,4 @@ templ docsAPI() {
 			}
 		</div>
 	}
-}
-
-// ─── Shared Components ───────────────────────────────────────────────────────
-templ docsSection(id, title string, iconComp templ.Component, colorClass string) {
-	<section id={ id } class="scroll-mt-24 border-b border-border pb-12 mb-12 last:border-0">
-		<div class="flex items-center gap-3 mb-6">
-			<div class={ "inline-flex h-10 w-10 items-center justify-center rounded-lg bg-muted", colorClass }>
-				@iconComp
-			</div>
-			<h2 class="text-2xl font-bold tracking-tight">{ title }</h2>
-		</div>
-		<div class="prose prose-sm dark:prose-invert max-w-none [&>p]:text-muted-foreground [&>p]:leading-relaxed [&>p]:mb-4 [&>h3]:text-lg [&>h3]:font-semibold [&>h3]:mt-8 [&>h3]:mb-3">
-			{ children... }
-		</div>
-	</section>
-}
-
-templ docsInfoBox(title string) {
-	<div class="my-6 rounded-lg border border-primary/20 bg-primary/5 p-4">
-		<div class="flex items-center gap-2 text-sm font-semibold text-primary mb-1">
-			@icon.Sparkles(icon.Props{Class: "size-4"})
-			<span>{ title }</span>
-		</div>
-		<div class="text-sm text-muted-foreground">
-			{ children... }
-		</div>
-	</div>
-}
-
-templ docsTable() {
-	<div class="my-6 overflow-x-auto rounded-lg border border-border">
-		<table class="w-full text-sm">
-			{ children... }
-		</table>
-	</div>
-}
-
-templ docsTableRow(col1, col2, col3 string) {
-	<tr class="border-b border-border last:border-0 hover:bg-muted/30">
-		<td class="py-2.5 px-3 font-medium">{ col1 }</td>
-		<td class="py-2.5 px-3 text-muted-foreground">{ col2 }</td>
-		<td class="py-2.5 px-3 text-muted-foreground">{ col3 }</td>
-	</tr>
-}
-
-templ docsTableRow2(col1, col2 string) {
-	<tr class="border-b border-border last:border-0 hover:bg-muted/30">
-		<td class="py-2.5 px-3 font-medium">{ col1 }</td>
-		<td class="py-2.5 px-3 text-muted-foreground">{ col2 }</td>
-	</tr>
-}
-
-templ statusBadge(text, bgColor string) {
-	<span class={ "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium text-white", bgColor }>
-		{ text }
-	</span>
-}
-
-templ docsCode(text string) {
-	<code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">{ text }</code>
 }

@@ -1,0 +1,107 @@
+package landing
+
+import "school-with-ai/components/icon"
+
+// ─── Features Section ────────────────────────────────────────────────────────
+templ featuresSection() {
+	<section id="features" class="py-24">
+		<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+			<div class="mx-auto max-w-2xl text-center">
+				<div class="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-muted/50 px-4 py-1.5 text-sm text-muted-foreground">
+					@icon.Zap(icon.Props{Class: "size-4 text-primary"})
+					<span>Core Capabilities</span>
+				</div>
+				<h2 class="text-3xl font-bold tracking-tight sm:text-4xl">
+					Everything you need, in one platform
+				</h2>
+				<p class="mt-4 text-lg text-muted-foreground">
+					From AI-powered conversations to knowledge management, Compass delivers a complete learning ecosystem.
+				</p>
+			</div>
+			<div class="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+				@featureCard(
+					"Multi-Model AI Chat",
+					"Converse with GPT-4o, Claude Sonnet 4, Gemini 2.0 and more. Stream responses in real-time with full tool execution and token-by-token delivery.",
+					"text-blue-500",
+					iconMessageSq,
+				)
+				@featureCard(
+					"Agent Store & Builder",
+					"Browse 100+ pre-built agent templates by category. Fork, customize, or create your own agents with tailored prompts, models, and tool configurations.",
+					"text-purple-500",
+					iconStore,
+				)
+				@featureCard(
+					"10 Built-in Plugins",
+					"Calculator, Codebase, Cognitive Reasoning, Document, Elicitation, Knowledge Base, Library, Memory, Text-to-Speech, and Visualization — all toggle-able per agent.",
+					"text-green-500",
+					iconPuzzle,
+				)
+				@featureCard(
+					"MCP Protocol",
+					"Connect to external MCP servers with full OAuth 2.1 + PKCE support. Auto-discover remote tools from GitHub, Notion, Slack, and your own servers.",
+					"text-orange-500",
+					iconPlug,
+				)
+				@featureCard(
+					"Knowledge Base (RAG)",
+					"Upload PDFs and documents, build interactive knowledge graphs with vector embeddings, and let agents give answers grounded in your own data.",
+					"text-pink-500",
+					iconDatabase,
+				)
+				@featureCard(
+					"AI Voice & TTS",
+					"13 lifelike AI voices with word-level timestamp synchronization. Perfect for language learning, accessibility, and hands-free study sessions.",
+					"text-indigo-500",
+					iconHeadphones,
+				)
+				@featureCard(
+					"Student Profiles",
+					"Define your learning style, goals, strengths, and struggles. Agents auto-adapt their teaching approach based on your unique profile.",
+					"text-amber-500",
+					iconGraduationCap,
+				)
+				@featureCard(
+					"Charts & Animations",
+					"Generate static plots, 3D surfaces, and animated visualizations on the fly. Function plots, data scatter, wave animations — all rendered as downloadable artifacts.",
+					"text-cyan-500",
+					iconActivity,
+				)
+				@featureCard(
+					"Interactive Quizzes",
+					"Multiple choice, true/false, short answer, and multi-select questions rendered inline in chat. Test your knowledge without leaving the conversation.",
+					"text-emerald-500",
+					iconStar,
+				)
+				@featureCard(
+					"Event-Sourced Architecture",
+					"Every action is an immutable event. Full audit trail, time-travel debugging, and reliable state reconstruction built into the core.",
+					"text-slate-500",
+					iconLayers,
+				)
+				@featureCard(
+					"Memory & Artifacts",
+					"Long-term memory persists across conversations. Generate downloadable code files, diagrams, reports, and audio artifacts per thread.",
+					"text-violet-500",
+					iconBrain,
+				)
+				@featureCard(
+					"Enterprise Security",
+					"TLS with X25519/P256, per-IP rate limiting, SSRF protection, encrypted OAuth tokens, PCI SAQ-A payments, and production config guard.",
+					"text-red-500",
+					iconShieldCheck,
+				)
+			</div>
+		</div>
+	</section>
+}
+
+templ featureCard(title, description, colorClass string, iconComp templ.Component) {
+	<div class="group relative rounded-xl border border-border bg-card p-6 transition-all hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5">
+		<div class={ "mb-4 inline-flex h-11 w-11 items-center justify-center rounded-lg bg-muted", colorClass }>
+			@iconComp
+		</div>
+		<h3 class="text-lg font-semibold">{ title }</h3>
+		<p class="mt-2 text-sm leading-relaxed text-muted-foreground">{ description }</p>
+	</div>
+}

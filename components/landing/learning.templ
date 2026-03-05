@@ -1,0 +1,65 @@
+package landing
+
+import "school-with-ai/components/icon"
+
+// ─── Personalized Learning ───────────────────────────────────────────────────
+templ personalizedLearningSection() {
+	<section id="learning" class="border-t border-border bg-muted/20 py-24">
+		<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+			<div class="grid gap-12 lg:grid-cols-2 lg:items-center">
+				<!-- Visual: Student Profile mock -->
+				<div class="order-2 lg:order-1">
+					<div class="rounded-xl border border-border bg-card p-6">
+						<div class="flex items-center gap-3 mb-6">
+							@icon.GraduationCap(icon.Props{Class: "size-5 text-amber-500"})
+							<h4 class="text-sm font-semibold">Student Profile</h4>
+						</div>
+						<div class="space-y-4">
+							@profileFieldMock("Learning Style", "Visual & hands-on learner", "bg-purple-500/10 text-purple-600 dark:text-purple-400")
+							@profileFieldMock("Current Goals", "Master calculus, improve essay writing", "bg-blue-500/10 text-blue-600 dark:text-blue-400")
+							@profileFieldMock("Strengths", "Problem solving, creative thinking", "bg-green-500/10 text-green-600 dark:text-green-400")
+							@profileFieldMock("Struggles", "Time management, complex proofs", "bg-red-500/10 text-red-600 dark:text-red-400")
+						</div>
+						<div class="mt-6 rounded-lg border border-primary/20 bg-primary/5 p-4">
+							<div class="flex items-center gap-2 text-xs text-primary mb-2">
+								@icon.Sparkles(icon.Props{Class: "size-3"})
+								<span class="font-medium">AI Adaptation</span>
+							</div>
+							<p class="text-xs text-muted-foreground">
+								Agents automatically read your profile and adjust their teaching approach — using more visuals, providing step-by-step breakdowns, and focusing on your weak areas.
+							</p>
+						</div>
+					</div>
+				</div>
+				<!-- Text content -->
+				<div class="order-1 lg:order-2">
+					<div class="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-1.5 text-sm text-muted-foreground">
+						@icon.GraduationCap(icon.Props{Class: "size-4 text-amber-500"})
+						<span>Personalized Learning</span>
+					</div>
+					<h2 class="text-3xl font-bold tracking-tight sm:text-4xl">
+						AI that knows
+						<span class="text-primary">how you learn</span>
+					</h2>
+					<p class="mt-4 text-lg text-muted-foreground">
+						Compass goes beyond generic AI chat. Define your learning profile — style, goals, strengths, and struggles — and every agent automatically adapts its teaching approach to match you.
+					</p>
+					<ul class="mt-8 space-y-4">
+						@checkListItem("Student profile injected into every AI interaction automatically")
+						@checkListItem("Agents adapt teaching style based on your learning preferences")
+						@checkListItem("Track your goals, strengths, and areas for improvement")
+						@checkListItem("Interactive quizzes with MCQ, true/false, and short answer formats")
+						@checkListItem("Long-term memory tracks your learning progress across sessions")
+					</ul>
+				</div>
+			</div>
+		</div>
+	</section>
+}
+
+templ profileFieldMock(label, value, colorClass string) {
+	<div class={ "rounded-lg px-4 py-3", colorClass }>
+		<div class="text-xs font-medium opacity-80">{ label }</div>
+		<div class="mt-0.5 text-sm font-medium">{ value }</div>
+	</div>
+}

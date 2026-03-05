@@ -1,0 +1,56 @@
+package landing
+
+import "school-with-ai/components/icon"
+
+// ─── AI Models Section ───────────────────────────────────────────────────────
+templ aiModelsSection() {
+	<section id="models" class="py-24">
+		<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+			<div class="grid gap-12 lg:grid-cols-2 lg:items-center">
+				<!-- Text content -->
+				<div>
+					<div class="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-muted/50 px-4 py-1.5 text-sm text-muted-foreground">
+						@icon.Cpu(icon.Props{Class: "size-4 text-blue-500"})
+						<span>Multi-Provider AI</span>
+					</div>
+					<h2 class="text-3xl font-bold tracking-tight sm:text-4xl">
+						Your choice of
+						<span class="text-primary">world-class AI models</span>
+					</h2>
+					<p class="mt-4 text-lg text-muted-foreground">
+						Compass isn't locked to a single provider. Switch between OpenAI, Anthropic, and Google Gemini models per-agent. Use GPT-4o for creative writing, Claude for analysis, and Gemini for fast iteration — all within the same platform.
+					</p>
+					<ul class="mt-8 space-y-4">
+						@checkListItem("Per-agent model selection — each agent can use a different model")
+						@checkListItem("Real-time streaming with token-by-token delivery via AG-UI protocol")
+						@checkListItem("Configurable temperature and max iterations per agent")
+						@checkListItem("Token usage tracking with detailed cost breakdown per message")
+						@checkListItem("Automatic model fallback and provider health monitoring")
+					</ul>
+				</div>
+				<!-- Visual: Provider cards -->
+				<div class="space-y-4">
+					@aiProviderCard("OpenAI", "GPT-4o · GPT-4o-mini · GPT-4 Turbo · o1 · o3-mini", "text-green-500", "bg-green-500")
+					@aiProviderCard("Anthropic", "Claude Sonnet 4 · Claude 3.5 Sonnet · Claude 3.5 Haiku · Claude 3 Opus", "text-amber-500", "bg-amber-500")
+					@aiProviderCard("Google Gemini", "Gemini 2.0 Flash · Gemini 2.0 Flash Lite · Gemini 1.5 Pro · Gemini 1.5 Flash", "text-blue-500", "bg-blue-500")
+					<div class="rounded-xl border border-dashed border-border bg-muted/20 p-5 text-center">
+						<p class="text-sm text-muted-foreground">More providers coming soon — the architecture supports any LLM with a streaming API</p>
+					</div>
+				</div>
+			</div>
+		</div>
+	</section>
+}
+
+templ aiProviderCard(provider, models, textColor, dotColor string) {
+	<div class="rounded-xl border border-border bg-card p-5 transition-all hover:border-primary/30 hover:shadow-md">
+		<div class="flex items-center justify-between">
+			<div class="flex items-center gap-3">
+				<div class={ "h-3 w-3 rounded-full", dotColor }></div>
+				<h4 class={ "text-base font-semibold", textColor }>{ provider }</h4>
+			</div>
+			<span class="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Available</span>
+		</div>
+		<p class="mt-2 text-sm text-muted-foreground leading-relaxed">{ models }</p>
+	</div>
+}

@@ -1,0 +1,64 @@
+package docs
+
+import "school-with-ai/components/icon"
+
+// ─── Shared Components ───────────────────────────────────────────────────────
+
+templ docsSection(id, title string, iconComp templ.Component, colorClass string) {
+	<section id={ id } class="scroll-mt-24 border-b border-border pb-12 mb-12 last:border-0">
+		<div class="flex items-center gap-3 mb-6">
+			<div class={ "inline-flex h-10 w-10 items-center justify-center rounded-lg bg-muted", colorClass }>
+				@iconComp
+			</div>
+			<h2 class="text-2xl font-bold tracking-tight">{ title }</h2>
+		</div>
+		<div class="prose prose-sm dark:prose-invert max-w-none [&>p]:text-muted-foreground [&>p]:leading-relaxed [&>p]:mb-4 [&>h3]:text-lg [&>h3]:font-semibold [&>h3]:mt-8 [&>h3]:mb-3">
+			{ children... }
+		</div>
+	</section>
+}
+
+templ docsInfoBox(title string) {
+	<div class="my-6 rounded-lg border border-primary/20 bg-primary/5 p-4">
+		<div class="flex items-center gap-2 text-sm font-semibold text-primary mb-1">
+			@icon.Sparkles(icon.Props{Class: "size-4"})
+			<span>{ title }</span>
+		</div>
+		<div class="text-sm text-muted-foreground">
+			{ children... }
+		</div>
+	</div>
+}
+
+templ docsTable() {
+	<div class="my-6 overflow-x-auto rounded-lg border border-border">
+		<table class="w-full text-sm">
+			{ children... }
+		</table>
+	</div>
+}
+
+templ docsTableRow(col1, col2, col3 string) {
+	<tr class="border-b border-border last:border-0 hover:bg-muted/30">
+		<td class="py-2.5 px-3 font-medium">{ col1 }</td>
+		<td class="py-2.5 px-3 text-muted-foreground">{ col2 }</td>
+		<td class="py-2.5 px-3 text-muted-foreground">{ col3 }</td>
+	</tr>
+}
+
+templ docsTableRow2(col1, col2 string) {
+	<tr class="border-b border-border last:border-0 hover:bg-muted/30">
+		<td class="py-2.5 px-3 font-medium">{ col1 }</td>
+		<td class="py-2.5 px-3 text-muted-foreground">{ col2 }</td>
+	</tr>
+}
+
+templ statusBadge(text, bgColor string) {
+	<span class={ "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium text-white", bgColor }>
+		{ text }
+	</span>
+}
+
+templ docsCode(text string) {
+	<code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">{ text }</code>
+}

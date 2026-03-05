@@ -1,0 +1,222 @@
+package docs
+
+// ─── Knowledge Base ──────────────────────────────────────────────────────────
+templ docsKnowledgeBase() {
+	@docsSection("knowledge-base", "Knowledge Base", iconDatabase, "text-pink-500") {
+		<p>
+			The Knowledge Base feature turns Compass into a powerful RAG (Retrieval Augmented Generation)
+			platform. Upload your documents, and your AI agents can answer questions grounded in your own data.
+		</p>
+		<h3>Workspaces</h3>
+		<p>
+			Documents are organized into <strong>workspaces</strong>. Each workspace is an independent collection
+			with its own vector index and knowledge graph. You can create workspaces for different subjects,
+			projects, or topics.
+		</p>
+		<h3>Document Pipeline</h3>
+		<p>
+			When you upload a document, it goes through an automated processing pipeline:
+		</p>
+		<ol class="list-decimal list-inside space-y-2 my-4">
+			<li><strong>Upload</strong> — File is received and stored</li>
+			<li><strong>Extraction</strong> — Text is extracted from PDFs, documents, and files</li>
+			<li><strong>Chunking</strong> — Text is split into optimally-sized chunks</li>
+			<li><strong>Embedding</strong> — Chunks are converted to vector embeddings</li>
+			<li><strong>Indexing</strong> — Vectors are stored in the search index</li>
+			<li><strong>Graph Building</strong> — Entities and relationships are extracted into a knowledge graph</li>
+		</ol>
+		<h3>Knowledge Graph</h3>
+		<p>
+			Beyond simple vector search, Compass builds a <strong>knowledge graph</strong> from your documents.
+			You can visually explore entities, relationships, and concepts through an interactive graph view.
+			Search by node labels, browse popular concepts, and see how your documents connect.
+		</p>
+		<h3>Per-Agent Access Control</h3>
+		<p>
+			Each agent can be granted access to specific workspaces. This means a "Physics Tutor" agent will
+			only search your physics workspace, while a "History Explorer" agent queries your history workspace.
+			This keeps responses focused and relevant.
+		</p>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Feature</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Details</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow2("Document Types", "PDF, text files, and more")
+				@docsTableRow2("Processing", "Automatic pipeline with progress tracking")
+				@docsTableRow2("Search", "Hybrid vector + knowledge graph retrieval")
+				@docsTableRow2("Graph", "Interactive visualization with node search")
+				@docsTableRow2("Access Control", "Per-agent workspace permissions")
+				@docsTableRow2("Operations", "Rebuild, reprocess, scan, and retry failed documents")
+			</tbody>
+		}
+	}
+}
+
+// ─── Memory & Artifacts ──────────────────────────────────────────────────────
+templ docsMemoryArtifacts() {
+	@docsSection("memory", "Memory & Artifacts", iconBrain, "text-cyan-500") {
+		<h3>Long-Term Memory</h3>
+		<p>
+			Compass supports <strong>long-term memory</strong> that persists across conversations. When enabled,
+			the Memory plugin stores important context — your preferences, ongoing projects, learning progress —
+			and makes it available to agents in future conversations.
+		</p>
+		<p>
+			Memory is stored as artifacts in S3-compatible object storage, ensuring durability and scalability.
+			Each user has their own private memory space that is never shared.
+		</p>
+		<h3>Artifacts</h3>
+		<p>
+			Agents can generate <strong>artifacts</strong> during conversations — downloadable files such as:
+		</p>
+		<ul class="space-y-2 my-4">
+			<li>• Code files and scripts</li>
+			<li>• Diagrams and visualizations</li>
+			<li>• Analysis reports</li>
+			<li>• Study materials and summaries</li>
+		</ul>
+		<p>
+			Artifacts are stored per-thread and can be listed and downloaded at any time. They're backed by
+			S3-compatible storage for reliable access.
+		</p>
+		<h3>Thread Management</h3>
+		<p>
+			All conversations are organized into <strong>threads</strong>. You can:
+		</p>
+		<ul class="space-y-2 my-4">
+			<li>• Create new threads for different topics</li>
+			<li>• Rename threads for easy identification</li>
+			<li>• Search across all conversations</li>
+			<li>• Delete threads when no longer needed</li>
+			<li>• View full message history with tool usage details</li>
+		</ul>
+	}
+}
+
+// ─── File Attachments ────────────────────────────────────────────────────────
+templ docsFileAttachments() {
+	@docsSection("file-attachments", "File Attachments", iconPaperclip, "text-rose-500") {
+		<p>
+			Compass supports <strong>file attachments in chat messages</strong>, allowing you to send images,
+			audio files, PDFs, and other documents directly to your AI agents for analysis and discussion.
+		</p>
+		<h3>Supported File Types</h3>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Category</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Formats</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Use Case</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow("Images", "PNG, JPEG, GIF, WebP", "Visual analysis, diagram review, photo questions")
+				@docsTableRow("Audio", "MP3, WAV, OGG", "Transcription, audio analysis")
+				@docsTableRow("Documents", "PDF, TXT, Markdown", "Document review, content extraction")
+			</tbody>
+		}
+		<h3>How Attachments Work</h3>
+		<ol class="list-decimal list-inside space-y-2 my-4">
+			<li>Click the attachment icon in the chat input bar</li>
+			<li>Select one or more files from your device</li>
+			<li>Files are uploaded to secure S3 storage and attached to your message</li>
+			<li>The AI agent receives the file content alongside your text message</li>
+			<li>The agent can analyze, summarize, or discuss the attached content</li>
+		</ol>
+		<p>
+			Attachments are stored per-thread and persist with the conversation history. The maximum
+			upload size is <strong>150 MB per file</strong>.
+		</p>
+	}
+}
+
+// ─── Resource Library ────────────────────────────────────────────────────────
+templ docsResourceLibrary() {
+	@docsSection("resource-library", "Resource Library", iconFolderOpen, "text-emerald-500") {
+		<p>
+			The Resource Library provides persistent file management separate from chat conversations.
+			Upload documents, reference materials, and study aids that you can access anytime.
+		</p>
+		<h3>Public vs Private Resources</h3>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Type</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Visibility</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Description</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow("Public", "All users", "System-wide library of curated reference materials and templates")
+				@docsTableRow("Private", "You only", "Your personal uploads: notes, documents, and study materials")
+			</tbody>
+		}
+		<h3>Features</h3>
+		<ul class="space-y-2 my-4">
+			<li>
+				<strong>Upload</strong> -- Drag and drop files into your personal library
+			</li>
+			<li>
+				<strong>Download</strong> -- Access any resource with automatic content-type detection
+			</li>
+			<li>
+				<strong>Delete</strong> -- Remove private resources you no longer need
+			</li>
+			<li>
+				<strong>S3 Storage</strong> -- All files are stored in reliable S3-compatible object storage
+			</li>
+		</ul>
+		<p>
+			Resources are separate from the Knowledge Base. While the Knowledge Base indexes documents for
+			AI-powered RAG queries, the Resource Library is a simple file store for your reference materials.
+		</p>
+	}
+}
+
+// ─── Conversation Search ─────────────────────────────────────────────────────
+templ docsConversationSearch() {
+	@docsSection("conversation-search", "Conversation Search", iconSearch, "text-sky-500") {
+		<p>
+			Compass provides <strong>full-text search across all your conversations</strong>, making it easy
+			to find past discussions, answers, and generated content.
+		</p>
+		<h3>Search Capabilities</h3>
+		<ul class="space-y-2 my-4">
+			<li>
+				<strong>Thread Search</strong> -- Search across all thread titles and messages
+			</li>
+			<li>
+				<strong>Message Content</strong> -- Find specific answers, explanations, or tool outputs
+			</li>
+			<li>
+				<strong>Quick Navigation</strong> -- Click any search result to jump directly to the thread
+			</li>
+		</ul>
+		<h3>Thread Management</h3>
+		<p>
+			All conversations are organized into <strong>threads</strong>. Each thread has:
+		</p>
+		<ul class="space-y-2 my-4">
+			<li>
+				<strong>Auto-generated titles</strong> -- Compass automatically titles threads based on the conversation content
+			</li>
+			<li>
+				<strong>Rename</strong> -- Customize thread titles for easy identification
+			</li>
+			<li>
+				<strong>Full history</strong> -- Every message, tool call, and artifact is preserved
+			</li>
+			<li>
+				<strong>Delete</strong> -- Remove threads when they are no longer needed
+			</li>
+		</ul>
+		<p>
+			Threads are backed by an <strong>event-sourced architecture</strong> (CQRS), meaning the read model is
+			optimized for fast retrieval while the write model ensures data integrity.
+		</p>
+	}
+}
