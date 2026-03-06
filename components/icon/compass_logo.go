@@ -8,9 +8,10 @@ import (
 	"github.com/a-h/templ"
 )
 
-// compassSVG is the branded Compass.AI logo — an elegant compass rose with a
+// compassBase is the branded Compass.AI logo — an elegant compass rose with a
 // diamond needle, delicate cardinal ticks, and a jewel-bearing center.
-const compassSVG = `<svg class="%s" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">` +
+// %s is the class list; %s is an optional extra class injected after sizing.
+const compassBase = `<svg class="%s" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">` +
 	// — Outer bezel ring (double stroke for depth) —
 	`<circle cx="16" cy="16" r="14.5" stroke="currentColor" stroke-width="0.6" opacity="0.25"/>` +
 	`<circle cx="16" cy="16" r="13" stroke="currentColor" stroke-width="1.2" opacity="0.7"/>` +
@@ -40,65 +41,68 @@ const compassSVG = `<svg class="%s" viewBox="0 0 32 32" fill="none" xmlns="http:
 // class controls sizing (e.g. "size-4", "size-5", "size-12").
 func CompassLogo(class string) templ.Component {
 	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
-		_, err := w.Write([]byte(fmt.Sprintf(compassSVG, class)))
+		_, err := w.Write([]byte(fmt.Sprintf(compassBase, class)))
 		return err
 	})
 }
 
-// CompassLogoAnimated renders the compass logo with a realistic needle-seek
-// animation. The needle oscillates and settles toward north like a physical
-// compass. Use wrapperClass to control the outer container and svgClass for
-// the SVG sizing.
-func CompassLogoAnimated(svgClass, wrapperClass string) templ.Component {
+// CompassLogoAnimated renders the compass logo with the needle-seek animation
+// baked directly into the SVG element — no wrapper div. The SVG flows inline
+// like any other icon. The needle responds to ancestor :hover (a, button, etc.)
+// so the animation feels native to the UI, not layered on top.
+func CompassLogoAnimated(class string) templ.Component {
 	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
-		html := fmt.Sprintf(
-			`<div class="%s compass-logo-animated">`+compassSVG+`</div>`,
-			wrapperClass, svgClass,
-		)
-		_, err := w.Write([]byte(html))
+		_, err := w.Write([]byte(fmt.Sprintf(compassBase, class+" compass-live")))
 		return err
 	})
 }
 
-// CompassLogoCSS returns the <style> block for the compass needle-seek
-// animation. Include this once per page that uses CompassLogoAnimated.
+// CompassLogoCSS returns the <style> block for the compass needle animation.
+// Include once per page that uses CompassLogoAnimated.
 func CompassLogoCSS() templ.Component {
 	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
 		css := `<style>
-/* ── Compass.AI needle-seek animation ── */
-@keyframes needleSeek {
+/* ── Compass.AI — embedded needle animation ──
+   No wrapper div. The .compass-live class sits directly on the <svg>.
+   Needle reacts to ancestor hover so it feels native, not overlaid. */
+
+@keyframes compassSettle {
   0%   { transform: rotate(0deg); }
-  6%   { transform: rotate(22deg); }
-  14%  { transform: rotate(-14deg); }
-  22%  { transform: rotate(9deg); }
-  32%  { transform: rotate(-5deg); }
-  44%  { transform: rotate(3deg); }
-  58%  { transform: rotate(-1.5deg); }
-  72%  { transform: rotate(0.5deg); }
+  8%   { transform: rotate(15deg); }
+  20%  { transform: rotate(-9deg); }
+  34%  { transform: rotate(5deg); }
+  50%  { transform: rotate(-2deg); }
+  68%  { transform: rotate(0.8deg); }
   100% { transform: rotate(0deg); }
 }
-@keyframes needleHover {
+@keyframes compassIdle {
+  0%, 100% { transform: rotate(0deg); }
+  40%      { transform: rotate(0.6deg); }
+  70%      { transform: rotate(-0.4deg); }
+}
+@keyframes compassDisturb {
   0%   { transform: rotate(0deg); }
-  25%  { transform: rotate(1.5deg); }
-  50%  { transform: rotate(-1deg); }
-  75%  { transform: rotate(0.5deg); }
+  12%  { transform: rotate(8deg); }
+  30%  { transform: rotate(-5deg); }
+  50%  { transform: rotate(2.5deg); }
+  72%  { transform: rotate(-0.8deg); }
   100% { transform: rotate(0deg); }
 }
-/* Initial settle — plays once */
-.compass-logo-animated .compass-needle {
-  animation: needleSeek 2.4s cubic-bezier(0.22, 1, 0.36, 1) forwards,
-             needleHover 4s ease-in-out 2.4s infinite;
+
+/* On load: settle once, then idle drift (barely visible, like a real compass) */
+.compass-live .compass-needle {
+  animation: compassSettle 2s cubic-bezier(0.22, 1, 0.36, 1) forwards,
+             compassIdle 6s ease-in-out 2s infinite;
 }
-/* On parent hover — needle disturbed, re-settles */
-.compass-logo-animated:hover .compass-needle {
-  animation: needleSeek 1.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-}
-/* Subtle ring glow on hover */
-.compass-logo-animated {
-  transition: filter 0.3s ease;
-}
-.compass-logo-animated:hover {
-  filter: drop-shadow(0 0 6px currentColor);
+
+/* Ancestor hover → needle gets disturbed & re-settles (feels native) */
+a:hover > * .compass-live .compass-needle,
+a:hover > .compass-live .compass-needle,
+button:hover > * .compass-live .compass-needle,
+button:hover > .compass-live .compass-needle,
+.group:hover .compass-live .compass-needle,
+div:hover > .compass-live .compass-needle {
+  animation: compassDisturb 1.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 </style>`
 		_, err := w.Write([]byte(css))
