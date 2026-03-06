@@ -7,6 +7,11 @@
 #   docker compose -f docker-compose.yml up -d
 
 services:
+  # Redis (Dev only port mapping for task dev)
+  redis:
+    ports:
+      - "6379:6379"
+
   # Asynqmon - monitoring UI for Asynq task queue
   # Access at http://localhost:8080
   asynqmon:

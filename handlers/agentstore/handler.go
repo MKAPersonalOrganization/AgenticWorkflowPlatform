@@ -59,8 +59,8 @@ type ListResponse struct {
 	Agents []AgentResponse `json:"agents"`
 }
 
-// defaultAgentIconSVG is the fallback icon (bot) for agents without a valid SVG icon.
-var defaultAgentIconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>`
+// defaultAgentIconSVG is the fallback icon (compass) for agents without a valid SVG icon.
+var defaultAgentIconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z" /></svg>`
 
 // agentIconOrDefault returns the icon if it's a valid SVG, otherwise the default bot icon.
 func agentIconOrDefault(icon string) string {
