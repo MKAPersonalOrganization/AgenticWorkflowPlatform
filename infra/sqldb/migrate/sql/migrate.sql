@@ -569,3 +569,9 @@ ALTER TABLE user_agents DROP COLUMN IF EXISTS model_id;
 -- capability system (user_ai_capability_config LLM capability JSONB config).
 ALTER TABLE user_agents DROP COLUMN IF EXISTS temperature;
 ALTER TABLE user_agents DROP COLUMN IF EXISTS max_iterations;
+
+-- Version: 1.48
+-- Description: Update legacy Bot SVG back to Compass SVG in user_agents.
+UPDATE user_agents
+   SET icon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z" /></svg>'
+ WHERE icon LIKE '%path d="M12 8V4H8"%';

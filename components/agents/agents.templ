@@ -749,17 +749,16 @@ templ AgentsButtonTrigger() {
 				":title": "currentAgentData?.name || '" + i18n.T(ctx, "Agents") + "'",
 			},
 		}) {
-			<!-- Compass icon (shown when no agent matched) -->
-			<span x-show="!currentAgentData">
-				@icon.Compass(icon.Props{Class: "size-5"})
-			</span>
-			<!-- Agent icon (shown when an agent is selected) -->
+			<!-- Agent icon (synced directly from backend, no frontend fallback symbol) -->
 			<span
-				x-cloak
 				x-show="currentAgentData"
 				x-html="currentAgentData?.icon || ''"
 				class="size-5 flex items-center justify-center text-foreground [&_svg]:size-4"
 			></span>
+			<!-- Loading state -->
+			<span x-show="!currentAgentData" class="size-5 flex items-center justify-center text-muted-foreground">
+				<span class="animate-spin size-4 border-2 border-current border-t-transparent rounded-full"></span>
+			</span>
 			<span class="sr-only">{ i18n.T(ctx, "Agents") }</span>
 		}
 	}

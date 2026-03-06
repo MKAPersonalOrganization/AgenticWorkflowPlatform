@@ -57,10 +57,12 @@ func TestProductionConfigGuardAcceptsSecureValues(t *testing.T) {
 }
 
 func TestProductionConfigGuardWarnsEmptyStripeKeys(t *testing.T) {
-	// Empty Stripe keys should NOT cause a fatal error — just a warning.
-	// The app should still start; payment endpoints will fail gracefully.
+	// Empty Stripe keys should cause an error in production as per recent Stripe migration.
 	err := validateProductionConfig(testLogger(), "v1.0.0", "ops", "Str0ng!", "pr0d-p@ss", "AKIAIOSFODNN7", "wJalrXUtnFEMI/K7MDENG", "", "")
-	if err != nil {
-		t.Fatalf("expected no error for empty Stripe keys (should be warning only), got: %v", err)
+	if err == nil {
+		t.Fatal("expected error for empty Stripe keys in production")
+	}
+	if !strings.Contains(err.Error(), "Stripe secret key is empty") {
+		t.Fatalf("error should mention Stripe keys, got: %v", err)
 	}
 }
