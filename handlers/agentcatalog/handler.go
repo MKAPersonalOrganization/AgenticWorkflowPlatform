@@ -206,8 +206,6 @@ func (h *Handler) AddToMyAgents(w http.ResponseWriter, r *http.Request) {
 		SystemPrompt:    entry.SystemPrompt,
 		Icon:            entry.IconLabel,
 		SourceCatalogID: catalogID,
-		MaxIterations:   20,
-		Temperature:     0.7,
 	}
 
 	if err := h.agentRepo.Create(r.Context(), agent); err != nil {

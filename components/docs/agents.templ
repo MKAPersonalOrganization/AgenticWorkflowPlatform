@@ -4,8 +4,8 @@ package docs
 templ docsAIModels() {
 	@docsSection("ai-models", "AI Models", iconCpu, "text-blue-500") {
 		<p>
-			Compass supports <strong>15+ models from three major AI providers</strong>. Each agent can be configured
-			to use a different model, giving you the flexibility to match the right model to the right task.
+			Compass supports <strong>15+ models from three major AI providers</strong>. Configure your preferred
+			model globally in Settings → AI → Chat Model, and all agents automatically use it.
 		</p>
 		<h3>Supported Providers and Models</h3>
 		@docsTable() {
@@ -32,34 +32,18 @@ templ docsAIModels() {
 				@docsTableRow("Google", "Gemini 1.5 Flash", "Balanced speed and capability")
 			</tbody>
 		}
-		<h3>Per-Agent Model Selection</h3>
-		<p>
-			When creating or editing an agent, you can select which AI model it should use. This means you
-			can have a Math Tutor running on GPT-4o for fast computation, a Writing Coach running on
-			Claude Sonnet 4 for nuanced feedback, and a Quick Helper on Gemini Flash Lite for rapid
-			answers -- all in the same workspace.
-		</p>
 		<h3>Streaming and Real-Time Delivery</h3>
 		<p>
 			All models stream responses in real-time using the <strong>AG-UI protocol</strong> over Server-Sent Events (SSE).
 			You see tokens appear character-by-character as the AI generates them, with live tool
 			execution feedback and smooth UI updates.
 		</p>
-		<h3>Configuration</h3>
+		<h3>Global Execution Settings</h3>
 		<p>
-			Each agent has the following model-related settings:
+			All AI execution parameters are configured globally in Settings → AI → Chat Model.
+			Every agent inherits the same model, temperature, max tokens, and iteration limits.
+			Agents only define behavioral configuration: name, system prompt, tools, and knowledge base access.
 		</p>
-		<ul class="space-y-2 my-4">
-			<li>
-				<strong>Model ID</strong> -- Which provider and model combination to use
-			</li>
-			<li>
-				<strong>Temperature</strong> -- Controls randomness (0.0 = deterministic, 1.0 = creative)
-			</li>
-			<li>
-				<strong>Max Iterations</strong> -- Maximum tool-use cycles per response (default: 20)
-			</li>
-		</ul>
 		@docsInfoBox("Provider Health") {
 			<p>Compass monitors provider availability and can gracefully handle provider outages. Each provider connection is health-checked independently.</p>
 		}
@@ -99,7 +83,7 @@ templ docsAISettings() {
 				</tr>
 			</thead>
 			<tbody>
-				@docsTableRow("Chat Model (LLM)", "The AI model used for chatting with agents", "Provider, model, temperature, max tokens")
+				@docsTableRow("Chat Model (LLM)", "The AI model used for chatting with agents", "Provider, model, temperature, max tokens, max iterations")
 				@docsTableRow("Text-to-Speech (TTS)", "Voice synthesis for spoken audio", "Provider, model, voice, voice instructions")
 				@docsTableRow("Embedding", "Vector embeddings for knowledge graph search", "Provider, model")
 				@docsTableRow("Speech-to-Text (STT)", "Transcription and audio understanding", "Provider, model")
@@ -113,12 +97,6 @@ templ docsAISettings() {
 			<li><strong>Fine-tune settings</strong> — Adjust capability-specific options like temperature, max tokens, or voice selection.</li>
 			<li><strong>Start using agents</strong> — Every agent automatically uses the right provider for each capability based on your configuration.</li>
 		</ol>
-		<h3>Per-Agent Model Override</h3>
-		<p>
-			While AI Settings defines your <strong>account-wide defaults</strong>, individual agents can override the
-			chat model. A Math Tutor can use GPT-4o while a Creative Writer uses Claude Sonnet 4 — regardless of
-			your default. Capability settings (TTS, Embedding) apply globally across all agents.
-		</p>
 		@docsInfoBox("Your Keys, Your Control") {
 			<p>Compass never stores your API keys in plain text — they are encrypted at rest. You own your keys and can revoke them at any time. Compass does not proxy or mark up API costs; all charges go directly to your provider. Use token analytics to monitor usage and optimize spend.</p>
 		}
@@ -130,7 +108,7 @@ templ docsAgentStore() {
 	@docsSection("agent-store", "Agent Store", iconStore, "text-purple-500") {
 		<p>
 			The Agent Store is a curated catalog of pre-built AI agents designed for specific tasks.
-			Each agent comes with a carefully crafted system prompt, recommended model, and tool configuration.
+			Each agent comes with a carefully crafted system prompt and tool configuration.
 		</p>
 		<h3>Browsing the Catalog</h3>
 		<p>
@@ -158,17 +136,14 @@ templ docsAgentStore() {
 		<h3>Forking Agents</h3>
 		<p>
 			When you find an agent you like, click <strong>"Add to My Agents"</strong> to fork it into your personal
-			collection. Forked agents are fully editable — you can customize the system prompt, switch models,
-			add or remove tools, and change the temperature settings.
+			collection. Forked agents are fully editable — you can customize the system prompt,
+			add or remove tools, and configure knowledge base access.
 		</p>
 		@docsInfoBox("Agent Properties") {
 			<ul class="space-y-2 mt-2">
 				<li><strong>Name</strong> — Display name for the agent</li>
 				<li><strong>Description</strong> — Short description of the agent's purpose</li>
 				<li><strong>System Prompt</strong> — Instructions that define the agent's behavior and personality</li>
-				<li><strong>Model</strong> — Which AI model the agent uses (GPT-4o, Claude, etc.)</li>
-				<li><strong>Temperature</strong> — Controls randomness (0 = deterministic, 1 = creative)</li>
-				<li><strong>Max Iterations</strong> — Maximum tool-use cycles per response</li>
 				<li><strong>Icon</strong> — Emoji label for visual identification</li>
 				<li><strong>Tool Sets</strong> — Which plugins and individual tools are enabled</li>
 				<li><strong>Workspace Access</strong> — Which knowledge base workspaces the agent can query</li>
@@ -190,7 +165,6 @@ templ docsCustomAgents() {
 			<li>Click <strong>"Create Agent"</strong> at the top</li>
 			<li>Fill in the agent's name, description, and icon</li>
 			<li>Write a detailed system prompt that defines the agent's role and instructions</li>
-			<li>Select the AI model and adjust temperature/iteration settings</li>
 			<li>Configure which tool sets and individual tools are available to the agent</li>
 			<li>Assign knowledge base workspaces the agent can access</li>
 		</ol>

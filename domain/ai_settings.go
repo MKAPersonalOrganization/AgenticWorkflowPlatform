@@ -211,8 +211,9 @@ type TTSCapabilitySettings struct {
 
 // LLMCapabilitySettings holds LLM-specific config stored in Config JSON.
 type LLMCapabilitySettings struct {
-	MaxTokens   int     `json:"max_tokens,omitempty"`
-	Temperature float64 `json:"temperature,omitempty"`
+	MaxTokens     int     `json:"max_tokens,omitempty"`
+	Temperature   float64 `json:"temperature,omitempty"`
+	MaxIterations int     `json:"max_iterations,omitempty"`
 }
 
 // EmbeddingCapabilitySettings holds embedding-specific config stored in Config JSON.

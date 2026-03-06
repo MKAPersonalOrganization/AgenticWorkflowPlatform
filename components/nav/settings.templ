@@ -402,6 +402,19 @@ templ Settings() {
 														class="w-24 h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs text-center"
 													/>
 												</div>
+												<div class="flex items-center justify-between gap-4">
+													<div>
+														<label class="text-foreground text-sm">{ i18n.T(ctx, "Max Iterations") }</label>
+														<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "Maximum tool-calling loops per request. 0 = engine default.") }</p>
+													</div>
+													<input
+														type="number"
+														x-model.number="chatForm.max_iterations"
+														min="0"
+														max="50"
+														class="w-24 h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs text-center"
+													/>
+												</div>
 											</div>
 										</details>
 										<!-- Save Button -->

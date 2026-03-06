@@ -31,7 +31,7 @@ function aiSettingsManager() {
         capStatusType: 'success',
 
         // Chat (LLM) capability form
-        chatForm: { provider: '', model: '', max_tokens: 0, temperature: 0.7 },
+        chatForm: { provider: '', model: '', max_tokens: 0, temperature: 0.7, max_iterations: 20 },
         chatProviders: [],
         chatCurrentModels: [],
         chatSaving: false,
@@ -207,6 +207,7 @@ function aiSettingsManager() {
                 if (cap.config) {
                     if (cap.config.max_tokens) this.chatForm.max_tokens = cap.config.max_tokens;
                     if (cap.config.temperature) this.chatForm.temperature = cap.config.temperature;
+                    if (cap.config.max_iterations) this.chatForm.max_iterations = cap.config.max_iterations;
                 }
             }
         },
@@ -221,6 +222,7 @@ function aiSettingsManager() {
                     model: cap.model,
                     max_tokens: cap.config?.max_tokens || 0,
                     temperature: cap.config?.temperature || 0.7,
+                    max_iterations: cap.config?.max_iterations || 20,
                 };
             }
             return null;
@@ -242,6 +244,7 @@ function aiSettingsManager() {
                 const config = {};
                 if (this.chatForm.max_tokens > 0) config.max_tokens = Number(this.chatForm.max_tokens);
                 if (this.chatForm.temperature > 0) config.temperature = Number(this.chatForm.temperature);
+                if (this.chatForm.max_iterations > 0) config.max_iterations = Number(this.chatForm.max_iterations);
                 const res = await fetch('/api/ai-settings/capabilities/llm', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },

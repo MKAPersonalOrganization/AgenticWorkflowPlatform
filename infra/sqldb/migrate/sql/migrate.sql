@@ -556,3 +556,16 @@ ALTER TABLE user_ai_settings DROP COLUMN IF EXISTS temperature;
 ALTER TABLE user_ai_settings DROP COLUMN IF EXISTS embedding_dimensions;
 ALTER TABLE user_ai_settings DROP COLUMN IF EXISTS tts_model;
 ALTER TABLE user_ai_settings DROP COLUMN IF EXISTS tts_voice;
+
+-- Version: 1.46
+-- Description: Remove per-agent model_id column. AI model configuration is now
+-- managed globally through the AI Settings capability system (user_ai_capability_config).
+-- Agents inherit the global Chat Model setting; no per-agent model override.
+ALTER TABLE user_agents DROP COLUMN IF EXISTS model_id;
+
+-- Version: 1.47
+-- Description: Remove per-agent temperature and max_iterations columns.
+-- These execution parameters are now managed globally through the AI Settings
+-- capability system (user_ai_capability_config LLM capability JSONB config).
+ALTER TABLE user_agents DROP COLUMN IF EXISTS temperature;
+ALTER TABLE user_agents DROP COLUMN IF EXISTS max_iterations;

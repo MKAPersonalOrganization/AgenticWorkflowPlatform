@@ -129,6 +129,9 @@ func (r *RunnerAdapter) buildEngine(ctx context.Context, modelCfg *agent.ModelCo
 		modelProvider:      modelCfg.Provider,
 		modelID:            modelCfg.Model,
 		modelAPIKey:        modelCfg.APIKey,
+		temperature:        modelCfg.Temperature,
+		maxIterations:      modelCfg.MaxIterations,
+		maxTokens:          modelCfg.MaxTokens,
 		toolRegistry:       r.toolRegistry,
 		permissionsService: r.permissionsService,
 		workspacePermSvc:   r.workspacePermSvc,
@@ -394,9 +397,12 @@ type RegistryAgentProvider struct {
 	artifactStore      artifact.Service
 	enableMemory       bool
 	profileRepo        domain.StudentProfileRepository
-	modelProvider      string // LLM provider name (e.g., "openai", "gemini")
-	modelID            string // LLM model name (e.g., "gpt-4o", "gemini-2.0-flash")
-	modelAPIKey        string // LLM API key for sub-agent tool calls
+	modelProvider      string   // LLM provider name (e.g., "openai", "gemini")
+	modelID            string   // LLM model name (e.g., "gpt-4o", "gemini-2.0-flash")
+	modelAPIKey        string   // LLM API key for sub-agent tool calls
+	temperature        *float64 // Global temperature from AI settings
+	maxIterations      int      // Global max iterations from AI settings
+	maxTokens          *int     // Global max tokens from AI settings
 	toolRegistry       *toolregistry.Registry
 	permissionsService *permissions.Service
 	workspacePermSvc   *workspacepermissions.Service
@@ -457,16 +463,19 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 		return core.AgentConfig{}, fmt.Errorf("agent %s is not a custom agent", name)
 	}
 
-	// Map agent.Config to core.AgentConfig
-	modelID := agentConfig.ModelID
-	if modelID == "" {
-		modelID = p.modelID // Fall back to runner-level model
+	// Map agent.Config to core.AgentConfig — model, temperature, and max iterations
+	// are always from global AI settings; agents only carry behavioral config (prompt, tools).
+	maxIter := p.maxIterations
+	if maxIter <= 0 {
+		maxIter = agentConfig.MaxIterations // fallback to framework default
 	}
 	config := core.AgentConfig{
 		Name:          agentConfig.Name,
 		SystemPrompt:  agentConfig.SystemPrompt,
-		MaxIterations: agentConfig.MaxIterations,
-		ModelID:       modelID,
+		MaxIterations: maxIter,
+		Temperature:   p.temperature,
+		MaxTokens:     p.maxTokens,
+		ModelID:       p.modelID,
 		Provider:      p.modelProvider,
 	}
 
