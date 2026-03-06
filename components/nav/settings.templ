@@ -225,8 +225,6 @@ templ Settings() {
 																</template>
 															</div>
 															<div class="text-[12px] text-muted-foreground">
-																<span x-text="s.default_llm_model || 'No model selected'"></span>
-																<span class="mx-1">·</span>
 																<span x-text="s.api_key_masked"></span>
 															</div>
 														</div>
@@ -281,81 +279,6 @@ templ Settings() {
 											/>
 											<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "Your API key is encrypted and stored securely. You are responsible for usage costs.") }</p>
 										</div>
-										<!-- Default LLM Model -->
-										<div class="flex flex-col gap-2">
-											<label class="text-foreground text-sm">{ i18n.T(ctx, "Default LLM Model") }</label>
-											<select
-												x-model="form.default_llm_model"
-												class="w-full h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs"
-											>
-												<option value="">{ i18n.T(ctx, "Select a model...") }</option>
-												<template x-for="m in currentModels" :key="m">
-													<option :value="m" x-text="m"></option>
-												</template>
-											</select>
-										</div>
-										<!-- Default Embedding Model -->
-										<div class="flex flex-col gap-2">
-											<label class="text-foreground text-sm">{ i18n.T(ctx, "Default Embedding Model") }</label>
-											<select
-												x-model="form.default_embed_model"
-												class="w-full h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs"
-											>
-												<option value="">{ i18n.T(ctx, "None") }</option>
-												<template x-for="m in currentEmbedModels" :key="m">
-													<option :value="m" x-text="m"></option>
-												</template>
-											</select>
-										</div>
-										<!-- Advanced Settings Toggle -->
-										<details class="group">
-											<summary class="cursor-pointer text-sm text-muted-foreground hover:text-foreground transition-colors list-none flex items-center gap-1">
-												@icon.ChevronRight(icon.Props{Class: "size-4 transition-transform group-open:rotate-90"})
-												{ i18n.T(ctx, "Advanced Settings") }
-											</summary>
-											<div class="pt-3 space-y-4">
-												<div class="flex items-center justify-between gap-4">
-													<div>
-														<label class="text-foreground text-sm">{ i18n.T(ctx, "Max Tokens") }</label>
-														<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "Maximum number of tokens in the response. 0 = provider default.") }</p>
-													</div>
-													<input
-														type="number"
-														x-model.number="form.max_tokens"
-														min="0"
-														max="128000"
-														class="w-24 h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs text-center"
-													/>
-												</div>
-												<div class="flex items-center justify-between gap-4">
-													<div>
-														<label class="text-foreground text-sm">{ i18n.T(ctx, "Temperature") }</label>
-														<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "Controls randomness. Lower = more deterministic.") }</p>
-													</div>
-													<input
-														type="number"
-														x-model.number="form.temperature"
-														min="0"
-														max="2"
-														step="0.1"
-														class="w-24 h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs text-center"
-													/>
-												</div>
-												<div class="flex items-center justify-between gap-4">
-													<div>
-														<label class="text-foreground text-sm">{ i18n.T(ctx, "Embedding Dimensions") }</label>
-														<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "Embedding vector size. 0 = model default.") }</p>
-													</div>
-													<input
-														type="number"
-														x-model.number="form.embedding_dimensions"
-														min="0"
-														max="3072"
-														class="w-24 h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs text-center"
-													/>
-												</div>
-											</div>
-										</details>
 										<!-- Save / Cancel -->
 										<div class="flex items-center justify-end gap-2 pt-2">
 											<button
@@ -379,6 +302,127 @@ templ Settings() {
 											}
 										</div>
 									</div>
+									<!-- Chat Model Configuration (LLM) -->
+									<div class="border-t border-border pt-6 space-y-4">
+										<div class="space-y-1">
+											<h3 class="text-foreground font-medium flex items-center gap-2">
+												@icon.MessageSquare(icon.Props{Class: "size-4"})
+												{ i18n.T(ctx, "Chat Model") }
+											</h3>
+											<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "Choose which model to use for chatting with agents. Your configured providers are listed automatically.") }</p>
+										</div>
+										<!-- Chat Status Banner -->
+										<template x-if="chatStatusMessage">
+											<div
+												:class="chatStatusType === 'error' ? 'bg-destructive/10 border-destructive/30 text-destructive' : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'"
+												class="p-3 rounded-xl border text-sm"
+												x-text="chatStatusMessage"
+											></div>
+										</template>
+										<!-- Current Chat Config Display -->
+										<template x-if="currentChatConfig">
+											<div class="flex items-center gap-3 p-3 rounded-xl border border-primary/20 bg-primary/5">
+												<div class="size-8 rounded-lg bg-primary/10 flex items-center justify-center">
+													@icon.MessageSquare(icon.Props{Class: "size-4 text-primary"})
+												</div>
+												<div>
+													<div class="font-medium text-foreground text-sm">
+														<span x-text="currentChatConfig.model"></span>
+													</div>
+													<div class="text-[12px] text-muted-foreground">
+														<span x-text="currentChatConfig.provider_name"></span>
+													</div>
+												</div>
+											</div>
+										</template>
+										<!-- No providers warning -->
+										<template x-if="chatProviders.length === 0 && settings.length > 0">
+											<div class="p-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-sm">
+												{ i18n.T(ctx, "No configured providers with chat models found. Configure a provider with an API key above to get started.") }
+											</div>
+										</template>
+										<!-- Chat Provider -->
+										<div class="flex flex-col gap-2" x-show="chatProviders.length > 0">
+											<label class="text-foreground text-sm">{ i18n.T(ctx, "Provider") }</label>
+											<select
+												x-model="chatForm.provider"
+												@change="onChatProviderChange()"
+												class="w-full h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs"
+											>
+												<option value="">{ i18n.T(ctx, "Select a provider...") }</option>
+												<template x-for="p in chatProviders" :key="p.id">
+													<option :value="p.id" x-text="p.name"></option>
+												</template>
+											</select>
+										</div>
+										<!-- Chat Model -->
+										<div class="flex flex-col gap-2" x-show="chatForm.provider">
+											<label class="text-foreground text-sm">{ i18n.T(ctx, "Model") }</label>
+											<select
+												x-model="chatForm.model"
+												class="w-full h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs"
+											>
+												<option value="">{ i18n.T(ctx, "Select a model...") }</option>
+												<template x-for="m in chatCurrentModels" :key="m">
+													<option :value="m" x-text="m"></option>
+												</template>
+											</select>
+										</div>
+										<!-- Advanced: Temperature & Max Tokens -->
+										<details class="group" x-show="chatForm.model">
+											<summary class="cursor-pointer text-sm text-muted-foreground hover:text-foreground transition-colors list-none flex items-center gap-1">
+												@icon.ChevronRight(icon.Props{Class: "size-4 transition-transform group-open:rotate-90"})
+												{ i18n.T(ctx, "Advanced Settings") }
+											</summary>
+											<div class="pt-3 space-y-4">
+												<div class="flex items-center justify-between gap-4">
+													<div>
+														<label class="text-foreground text-sm">{ i18n.T(ctx, "Temperature") }</label>
+														<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "Controls randomness. Lower = more deterministic.") }</p>
+													</div>
+													<input
+														type="number"
+														x-model.number="chatForm.temperature"
+														min="0"
+														max="2"
+														step="0.1"
+														class="w-24 h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs text-center"
+													/>
+												</div>
+												<div class="flex items-center justify-between gap-4">
+													<div>
+														<label class="text-foreground text-sm">{ i18n.T(ctx, "Max Tokens") }</label>
+														<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "Maximum tokens in the response. 0 = provider default.") }</p>
+													</div>
+													<input
+														type="number"
+														x-model.number="chatForm.max_tokens"
+														min="0"
+														max="128000"
+														class="w-24 h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs text-center"
+													/>
+												</div>
+											</div>
+										</details>
+										<!-- Save Button -->
+										<div class="flex items-center justify-end gap-2 pt-2" x-show="chatForm.provider && chatForm.model">
+											<span x-show="chatSaved" x-transition class="text-xs text-emerald-600">&check; { i18n.T(ctx, "Saved") }</span>
+											@button.Button(button.Props{
+												Type:  button.TypeButton,
+												Class: "min-w-[120px]",
+												Attributes: templ.Attributes{
+													"@click":    "saveChatCapability()",
+													":disabled": "chatSaving",
+												},
+											}) {
+												<span x-show="!chatSaving">{ i18n.T(ctx, "Save Chat Model") }</span>
+												<span x-show="chatSaving" class="flex items-center gap-2">
+													<span class="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground"></span>
+													{ i18n.T(ctx, "Saving...") }
+												</span>
+											}
+										</div>
+									</div>
 									<!-- Knowledge Graph Embedding -->
 									<div class="border-t border-border pt-6 space-y-4">
 										<div class="space-y-2">
@@ -386,7 +430,7 @@ templ Settings() {
 												@icon.Network(icon.Props{Class: "size-4"})
 												{ i18n.T(ctx, "Knowledge Graph Embedding") }
 											</h3>
-											<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "Select the embedding model used for knowledge graph vector search across all workspaces.") }</p>
+											<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "Choose the embedding model for knowledge graph vector search. Your configured providers are listed automatically.") }</p>
 										</div>
 										<!-- Provider Status -->
 										<template x-if="kgProviderStatus">
@@ -442,37 +486,6 @@ templ Settings() {
 												</template>
 											</select>
 										</div>
-										<!-- API Key source -->
-										<div class="flex flex-col gap-2" x-show="kgEmbProvider">
-											<label class="text-foreground text-sm">{ i18n.T(ctx, "API Key") }</label>
-											<!-- Show "Use same key" option if the selected provider matches a configured provider -->
-											<template x-if="kgMatchingProviderSetting">
-												<div class="space-y-3">
-													<label class="flex items-center gap-2 cursor-pointer">
-														<input type="radio" name="kg-api-key-source" value="reuse" x-model="kgApiKeySource" class="text-primary focus:ring-primary"/>
-														<span class="text-sm">
-															{ i18n.T(ctx, "Use same API key as") }
-															<span class="font-medium" x-text="providerName(kgEmbProvider)"></span>
-															<span class="text-muted-foreground" x-text="'(' + kgMatchingProviderSetting.api_key_masked + ')'"></span>
-														</span>
-													</label>
-													<label class="flex items-center gap-2 cursor-pointer">
-														<input type="radio" name="kg-api-key-source" value="custom" x-model="kgApiKeySource" class="text-primary focus:ring-primary"/>
-														<span class="text-sm">{ i18n.T(ctx, "Enter a different API key") }</span>
-													</label>
-												</div>
-											</template>
-											<!-- Custom API key input (shown when no matching provider, or user chose "custom") -->
-											<div x-show="!kgMatchingProviderSetting || kgApiKeySource === 'custom'">
-												<input
-													type="password"
-													x-model="kgApiKey"
-													placeholder={ i18n.T(ctx, "sk-...or paste your API key") }
-													class="w-full h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs"
-												/>
-											</div>
-											<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "This key is used for embedding documents in the knowledge graph. Applied to all workspaces.") }</p>
-										</div>
 										<!-- Save -->
 										<div class="flex items-center justify-end gap-2 pt-2" x-show="kgEmbProvider && kgEmbModel">
 											<span x-show="kgSaved" x-transition class="text-xs text-emerald-600">✓ { i18n.T(ctx, "Saved") }</span>
@@ -482,7 +495,7 @@ templ Settings() {
 												Class: "min-w-[120px]",
 												Attributes: templ.Attributes{
 													"@click":    "saveKgEmbedding()",
-													":disabled": "kgSaving || (!kgApiKey && kgApiKeySource !== 'reuse')",
+													":disabled": "kgSaving || !kgEmbModel",
 												},
 											}) {
 												<span x-show="!kgSaving">{ i18n.T(ctx, "Save Embedding Settings") }</span>
@@ -498,6 +511,108 @@ templ Settings() {
 												{ i18n.T(ctx, "Loading...") }
 											</div>
 										</template>
+									</div>
+									<!-- AI Voice Configuration (TTS) -->
+									<div class="border-t border-border pt-6 space-y-4">
+										<div class="space-y-1">
+											<h3 class="text-foreground font-medium flex items-center gap-2">
+												@icon.Mic(icon.Props{Class: "size-4"})
+												{ i18n.T(ctx, "AI Voice Configuration") }
+											</h3>
+											<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "Choose the model and voice for text-to-speech. Your configured providers are listed automatically.") }</p>
+										</div>
+										<!-- Capability Status Banner -->
+										<template x-if="capStatusMessage">
+											<div
+												:class="capStatusType === 'error' ? 'bg-destructive/10 border-destructive/30 text-destructive' : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'"
+												class="p-3 rounded-xl border text-sm"
+												x-text="capStatusMessage"
+											></div>
+										</template>
+										<!-- Current TTS Config Display -->
+										<template x-if="currentTTSConfig">
+											<div class="flex items-center gap-3 p-3 rounded-xl border border-primary/20 bg-primary/5">
+												<div class="size-8 rounded-lg bg-primary/10 flex items-center justify-center">
+													@icon.Mic(icon.Props{Class: "size-4 text-primary"})
+												</div>
+												<div>
+													<div class="font-medium text-foreground text-sm flex items-center gap-2">
+														<span x-text="currentTTSConfig.model || 'Not configured'"></span>
+													</div>
+													<div class="text-[12px] text-muted-foreground">
+														{ i18n.T(ctx, "Voice") }: <span class="capitalize" x-text="currentTTSConfig.voice || 'coral'"></span>
+														<span class="mx-1">&middot;</span>
+														<span x-text="currentTTSConfig.provider_name"></span>
+													</div>
+												</div>
+											</div>
+										</template>
+										<!-- No providers warning -->
+										<template x-if="ttsProviders.length === 0 && settings.length > 0">
+											<div class="p-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-sm">
+												{ i18n.T(ctx, "No configured providers with TTS support found. TTS requires an OpenAI provider with an API key.") }
+											</div>
+										</template>
+										<!-- TTS Provider -->
+										<div class="flex flex-col gap-2" x-show="ttsProviders.length > 0">
+											<label class="text-foreground text-sm">{ i18n.T(ctx, "TTS Provider") }</label>
+											<select
+												x-model="ttsForm.provider"
+												@change="onTTSProviderChange()"
+												class="w-full h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs"
+											>
+												<option value="">{ i18n.T(ctx, "Select a provider...") }</option>
+												<template x-for="p in ttsProviders" :key="p.id">
+													<option :value="p.id" x-text="p.name"></option>
+												</template>
+											</select>
+										</div>
+										<!-- TTS Model -->
+										<div class="flex flex-col gap-2" x-show="ttsForm.provider">
+											<label class="text-foreground text-sm">{ i18n.T(ctx, "TTS Model") }</label>
+											<select
+												x-model="ttsForm.model"
+												@change="onTTSModelChange()"
+												class="w-full h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs"
+											>
+												<option value="">{ i18n.T(ctx, "Select a model...") }</option>
+												<template x-for="m in ttsModels" :key="m">
+													<option :value="m" x-text="m"></option>
+												</template>
+											</select>
+										</div>
+										<!-- TTS Voice -->
+										<div class="flex flex-col gap-2" x-show="ttsForm.model">
+											<label class="text-foreground text-sm">{ i18n.T(ctx, "Voice") }</label>
+											<select
+												x-model="ttsForm.voice"
+												class="w-full h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs"
+											>
+												<option value="">{ i18n.T(ctx, "Select a voice...") }</option>
+												<template x-for="v in ttsVoices" :key="v">
+													<option :value="v" x-text="v" class="capitalize"></option>
+												</template>
+											</select>
+											<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "For best quality, use 'marin' or 'cedar'. Voices are optimized for English.") }</p>
+										</div>
+										<!-- Save Button -->
+										<div class="flex items-center justify-end gap-2 pt-2" x-show="ttsForm.provider && ttsForm.model && ttsForm.voice">
+											<span x-show="capSaved" x-transition class="text-xs text-emerald-600">&check; { i18n.T(ctx, "Saved") }</span>
+											@button.Button(button.Props{
+												Type:  button.TypeButton,
+												Class: "min-w-[120px]",
+												Attributes: templ.Attributes{
+													"@click":    "saveTTSCapability()",
+													":disabled": "capSaving",
+												},
+											}) {
+												<span x-show="!capSaving">{ i18n.T(ctx, "Save Voice Settings") }</span>
+												<span x-show="capSaving" class="flex items-center gap-2">
+													<span class="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground"></span>
+													{ i18n.T(ctx, "Saving...") }
+												</span>
+											}
+										</div>
 									</div>
 								</div>
 							}
@@ -582,11 +697,7 @@ templ Settings() {
 							}
 							<!-- Speech Tab -->
 							@tabs.Content(tabs.ContentProps{Value: "speech", Class: "space-y-6 animate-in fade-in duration-200"}) {
-								<div
-									x-data="ttsSettingsManager()"
-									x-init="loadTTSSettings()"
-									class="space-y-6"
-								>
+								<div class="space-y-6">
 									<div class="flex items-center justify-between gap-4">
 										<div class="space-y-0.5">
 											<div class="text-foreground font-medium">{ i18n.T(ctx, "Text-to-Speech") }</div>
@@ -617,102 +728,16 @@ templ Settings() {
 											}
 										}
 									</div>
-									<!-- TTS Provider & Model Configuration -->
-									<div class="pt-4 border-t border-border space-y-4">
-										<div class="space-y-1">
-											<h3 class="text-foreground font-medium flex items-center gap-2">
-												@icon.Mic(icon.Props{Class: "size-4"})
-												{ i18n.T(ctx, "AI Voice Configuration") }
-											</h3>
-											<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "Configure the AI model and voice used by the text-to-speech tool.") }</p>
-										</div>
-										<!-- Status Banner -->
-										<template x-if="ttsStatusMessage">
-											<div
-												:class="ttsStatusType === 'error' ? 'bg-destructive/10 border-destructive/30 text-destructive' : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'"
-												class="p-3 rounded-xl border text-sm"
-												x-text="ttsStatusMessage"
-											></div>
-										</template>
-										<!-- Current TTS Config Display -->
-										<template x-if="currentTTSConfig">
-											<div class="flex items-center gap-3 p-3 rounded-xl border border-primary/20 bg-primary/5">
-												<div class="size-8 rounded-lg bg-primary/10 flex items-center justify-center">
-													@icon.Mic(icon.Props{Class: "size-4 text-primary"})
-												</div>
-												<div>
-													<div class="font-medium text-foreground text-sm flex items-center gap-2">
-														<span x-text="currentTTSConfig.model || 'Not configured'"></span>
-													</div>
-													<div class="text-[12px] text-muted-foreground">
-														{ i18n.T(ctx, "Voice") }: <span class="capitalize" x-text="currentTTSConfig.voice || 'coral'"></span>
-														<span class="mx-1">·</span>
-														<span x-text="currentTTSConfig.provider_name"></span>
-													</div>
-												</div>
-											</div>
-										</template>
-										<!-- TTS Provider -->
-										<div class="flex flex-col gap-2">
-											<label class="text-foreground text-sm">{ i18n.T(ctx, "TTS Provider") }</label>
-											<select
-												x-model="ttsForm.provider"
-												@change="onTTSProviderChange()"
-												class="w-full h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs"
-											>
-												<option value="">{ i18n.T(ctx, "Select a provider...") }</option>
-												<template x-for="p in ttsProviders" :key="p.id">
-													<option :value="p.id" x-text="p.name"></option>
-												</template>
-											</select>
-											<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "Only providers with a configured API key and TTS support are shown.") }</p>
-										</div>
-										<!-- TTS Model -->
-										<div class="flex flex-col gap-2" x-show="ttsForm.provider">
-											<label class="text-foreground text-sm">{ i18n.T(ctx, "TTS Model") }</label>
-											<select
-												x-model="ttsForm.model"
-												@change="onTTSModelChange()"
-												class="w-full h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs"
-											>
-												<option value="">{ i18n.T(ctx, "Select a model...") }</option>
-												<template x-for="m in ttsModels" :key="m">
-													<option :value="m" x-text="m"></option>
-												</template>
-											</select>
-										</div>
-										<!-- TTS Voice -->
-										<div class="flex flex-col gap-2" x-show="ttsForm.model">
-											<label class="text-foreground text-sm">{ i18n.T(ctx, "Voice") }</label>
-											<select
-												x-model="ttsForm.voice"
-												class="w-full h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs"
-											>
-												<option value="">{ i18n.T(ctx, "Select a voice...") }</option>
-												<template x-for="v in ttsVoices" :key="v">
-													<option :value="v" x-text="v" class="capitalize"></option>
-												</template>
-											</select>
-											<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "For best quality, use 'marin' or 'cedar'. Voices are optimized for English.") }</p>
-										</div>
-										<!-- Save Button -->
-										<div class="flex items-center justify-end gap-2 pt-2" x-show="ttsForm.provider && ttsForm.model && ttsForm.voice">
-											<span x-show="ttsSaved" x-transition class="text-xs text-emerald-600">✓ { i18n.T(ctx, "Saved") }</span>
-											@button.Button(button.Props{
-												Type:  button.TypeButton,
-												Class: "min-w-[120px]",
-												Attributes: templ.Attributes{
-													"@click":    "saveTTSSettings()",
-													":disabled": "ttsSaving",
-												},
-											}) {
-												<span x-show="!ttsSaving">{ i18n.T(ctx, "Save TTS Settings") }</span>
-												<span x-show="ttsSaving" class="flex items-center gap-2">
-													<span class="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground"></span>
-													{ i18n.T(ctx, "Saving...") }
-												</span>
-											}
-										</div>
+									<!-- Hint to configure voice in AI tab -->
+									<div class="pt-4 border-t border-border">
+										<p class="text-[12px] text-muted-foreground">
+											{ i18n.T(ctx, "To configure the AI voice model, provider, and voice, go to") }
+											<button
+												type="button"
+												@click="if (window.tui && window.tui.tabs) window.tui.tabs.setActive('settings-tabs', 'ai')"
+												class="text-primary hover:underline font-medium"
+											>{ i18n.T(ctx, "AI Settings") }</button>.
+										</p>
 									</div>
 								</div>
 							}

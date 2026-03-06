@@ -28,6 +28,10 @@ type FactoryDeps struct {
 	OpenAIAPIKey     string
 	ModelID          string
 	MemoryService    any
+	// TTS capability config (resolved per-user from capability settings)
+	TTSAPIKey string // API key for the TTS provider (may differ from OpenAIAPIKey)
+	TTSModel  string // e.g. "gpt-4o-mini-tts"
+	TTSVoice  string // Default voice e.g. "marin", "coral"
 }
 
 // BuildIconSVG wraps Lucide-style inner SVG paths in a complete <svg> element.

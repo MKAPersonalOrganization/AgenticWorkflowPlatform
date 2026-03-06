@@ -524,3 +524,35 @@ UPDATE payment_accounts SET status = 'cancelled' WHERE status = 'cancelling';
 -- Description: Add payment method info (PCI-safe card brand + last4) to payment_accounts
 ALTER TABLE payment_accounts ADD COLUMN IF NOT EXISTS card_brand VARCHAR(20);
 ALTER TABLE payment_accounts ADD COLUMN IF NOT EXISTS card_last4 VARCHAR(4);
+
+-- Version: 1.44
+-- Description: Add capability-based AI configuration table.
+-- Decouples provider credentials from capability assignments.
+-- Each capability (llm, tts, embedding, stt, image) can independently
+-- reference a different provider + model + capability-specific settings.
+CREATE TABLE IF NOT EXISTS user_ai_capability_config (
+    id         VARCHAR(255) PRIMARY KEY,
+    user_id    VARCHAR(255)  NOT NULL,
+    capability VARCHAR(50)   NOT NULL, -- 'llm', 'tts', 'embedding', 'stt', 'image'
+    provider   VARCHAR(50)   NOT NULL, -- must match a row in user_ai_settings
+    model      VARCHAR(255)  NOT NULL,
+    config     JSONB         NOT NULL DEFAULT '{}', -- capability-specific: {voice, temperature, ...}
+    created_at TIMESTAMP     NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP     NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_user_ai_cap_user_cap ON user_ai_capability_config(user_id, capability);
+CREATE INDEX IF NOT EXISTS idx_user_ai_cap_user ON user_ai_capability_config(user_id);
+
+-- Version: 1.45
+-- Description: Drop legacy capability columns from user_ai_settings.
+-- Provider rows now store credentials only (provider, api_key, is_default).
+-- All capability-specific config (LLM model, TTS voice, embedding model, etc.)
+-- lives in user_ai_capability_config.
+ALTER TABLE user_ai_settings DROP COLUMN IF EXISTS default_llm_model;
+ALTER TABLE user_ai_settings DROP COLUMN IF EXISTS default_embed_model;
+ALTER TABLE user_ai_settings DROP COLUMN IF EXISTS max_tokens;
+ALTER TABLE user_ai_settings DROP COLUMN IF EXISTS temperature;
+ALTER TABLE user_ai_settings DROP COLUMN IF EXISTS embedding_dimensions;
+ALTER TABLE user_ai_settings DROP COLUMN IF EXISTS tts_model;
+ALTER TABLE user_ai_settings DROP COLUMN IF EXISTS tts_voice;

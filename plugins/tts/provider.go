@@ -53,7 +53,12 @@ func (p *Provider) CreateExecutable(ctx context.Context, toolID string, deps too
 	switch toolID {
 	case "tts-speak":
 		artifactStore, _ := deps.ArtifactStore.(artifact.Service)
-		return NewSpeakTool(artifactStore, deps.OpenAIAPIKey), nil
+		// Use TTS-specific API key/model/voice from user's capability config
+		apiKey := deps.TTSAPIKey
+		if apiKey == "" {
+			apiKey = deps.OpenAIAPIKey // backward compat
+		}
+		return NewSpeakTool(artifactStore, apiKey, deps.TTSModel, deps.TTSVoice), nil
 	default:
 		return nil, nil
 	}

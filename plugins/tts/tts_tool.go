@@ -49,13 +49,17 @@ type whisperResponse struct {
 type SpeakTool struct {
 	ArtifactStore artifact.Service
 	APIKey        string
+	Model         string // TTS model from user's capability config (e.g. "gpt-4o-mini-tts")
+	DefaultVoice  string // Default voice from user's capability config (e.g. "marin")
 }
 
 // NewSpeakTool creates a new TTS speak tool.
-func NewSpeakTool(store artifact.Service, apiKey string) *SpeakTool {
+func NewSpeakTool(store artifact.Service, apiKey, model, defaultVoice string) *SpeakTool {
 	return &SpeakTool{
 		ArtifactStore: store,
 		APIKey:        apiKey,
+		Model:         model,
+		DefaultVoice:  defaultVoice,
 	}
 }
 
@@ -109,14 +113,20 @@ func (t *SpeakTool) Execute(ctx context.Context, args agent.Arguments) (agent.Re
 		return agent.ErrorResult(ErrAPIKeyMissing), nil
 	}
 
-	// Default voice
+	// Default voice — use user's configured default, then LLM-provided, then hardcoded fallback
 	voice := params.Voice
+	if voice == "" {
+		voice = t.DefaultVoice
+	}
 	if voice == "" {
 		voice = "coral"
 	}
 
-	// Default model — gpt-4o-mini-tts supports instructions and full voice set
-	model := "gpt-4o-mini-tts"
+	// Use user's configured model, fallback to gpt-4o-mini-tts
+	model := t.Model
+	if model == "" {
+		model = "gpt-4o-mini-tts"
+	}
 
 	// Call OpenAI TTS API
 	audioData, err := t.callOpenAITTS(ctx, model, voice, params.Text, params.Instructions)

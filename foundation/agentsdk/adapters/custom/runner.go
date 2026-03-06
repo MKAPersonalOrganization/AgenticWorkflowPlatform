@@ -31,6 +31,13 @@ type ModelConfigResolver interface {
 	GetModelConfigForUser(ctx context.Context, userID string) (*agent.ModelConfig, error)
 }
 
+// TTSConfigResolver resolves TTS configuration for a given user.
+type TTSConfigResolver interface {
+	// GetTTSConfigForUserFlat returns the API key, model, and voice for a user's TTS config.
+	// Returns empty strings (no error) if no TTS config is set.
+	GetTTSConfigForUserFlat(ctx context.Context, userID string) (apiKey, model, voice string, err error)
+}
+
 // RunnerAdapter adapts the custom engine to the agent.Runner interface.
 type RunnerAdapter struct {
 	log                *logger.Logger
@@ -47,6 +54,7 @@ type RunnerAdapter struct {
 	edgequakeBaseURL   string
 	edgequakeTenantID  string
 	configResolver     ModelConfigResolver
+	ttsResolver        TTSConfigResolver
 	mcpService         *plugindiscovery.Service
 }
 
@@ -58,6 +66,7 @@ func NewRunnerAdapter(
 	threadMgr ThreadManager,
 	agentProvider agent.AgentProvider, // Injected provider
 	configResolver ModelConfigResolver, // Per-user model config resolver
+	ttsResolver TTSConfigResolver, // Per-user TTS config resolver (may be nil)
 	artifactStore artifact.Service,
 	profileRepo domain.StudentProfileRepository,
 	enableMemory bool,
@@ -88,6 +97,7 @@ func NewRunnerAdapter(
 		edgequakeBaseURL:   edgequakeBaseURL,
 		edgequakeTenantID:  edgequakeTenantID,
 		configResolver:     configResolver,
+		ttsResolver:        ttsResolver,
 		mcpService:         mcpService,
 	}
 
@@ -95,10 +105,20 @@ func NewRunnerAdapter(
 }
 
 // buildEngine creates a per-request Engine using the user's model config.
-func (r *RunnerAdapter) buildEngine(ctx context.Context, modelCfg *agent.ModelConfig) (*engine.Engine, error) {
+func (r *RunnerAdapter) buildEngine(ctx context.Context, modelCfg *agent.ModelConfig, userID string) (*engine.Engine, error) {
 	chatClient, err := createLLMClient(ctx, modelCfg)
 	if err != nil {
 		return nil, fmt.Errorf("creating LLM client: %w", err)
+	}
+
+	// Resolve TTS config for this user (non-fatal if unavailable)
+	var ttsAPIKey, ttsModel, ttsVoice string
+	if r.ttsResolver != nil && userID != "" {
+		if key, model, voice, ttsErr := r.ttsResolver.GetTTSConfigForUserFlat(ctx, userID); ttsErr == nil {
+			ttsAPIKey = key
+			ttsModel = model
+			ttsVoice = voice
+		}
 	}
 
 	provider := &RegistryAgentProvider{
@@ -116,6 +136,9 @@ func (r *RunnerAdapter) buildEngine(ctx context.Context, modelCfg *agent.ModelCo
 		edgequakeBaseURL:   r.edgequakeBaseURL,
 		edgequakeTenantID:  r.edgequakeTenantID,
 		mcpService:         r.mcpService,
+		ttsAPIKey:          ttsAPIKey,
+		ttsModel:           ttsModel,
+		ttsVoice:           ttsVoice,
 	}
 
 	return engine.New(chatClient, provider, nil, nil), nil
@@ -163,7 +186,7 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 		}
 
 		// Build a per-request engine with the user's config
-		eng, err := r.buildEngine(ctx, modelCfg)
+		eng, err := r.buildEngine(ctx, modelCfg, req.UserID)
 		if err != nil {
 			yield(nil, fmt.Errorf("building engine for user: %w", err))
 			return
@@ -381,6 +404,10 @@ type RegistryAgentProvider struct {
 	edgequakeBaseURL   string
 	edgequakeTenantID  string
 	mcpService         *plugindiscovery.Service
+	// Per-user TTS config resolved at request time
+	ttsAPIKey string
+	ttsModel  string
+	ttsVoice  string
 }
 
 func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (core.AgentConfig, error) {
@@ -452,6 +479,11 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 		// Wire edgequake config for KB tools
 		if p.edgequakeBaseURL != "" {
 			factory.SetEdgequakeConfig(p.edgequakeBaseURL, p.modelAPIKey, p.modelID)
+		}
+
+		// Wire TTS config for speech tools
+		if p.ttsAPIKey != "" {
+			factory.SetTTSConfig(p.ttsAPIKey, p.ttsModel, p.ttsVoice)
 		}
 
 		// Get user from context to check permissions

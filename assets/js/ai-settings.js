@@ -1,10 +1,16 @@
 /**
  * AI Settings Manager
  * Alpine.js component for managing per-user AI provider configuration
- * and knowledge graph (EdgeQuake) model settings.
+ * and per-capability settings (LLM, TTS, Embedding, etc.).
+ *
+ * Architecture:
+ *   1. Providers — credential storage (API keys) per provider (OpenAI, Anthropic, …)
+ *   2. Capabilities — per-capability config selecting which provider/model to use
+ *      (e.g. use OpenAI for LLM, Anthropic for TTS, etc.)
  */
 function aiSettingsManager() {
     return {
+        // ─── Provider State ──────────────────────────────────────────
         providers: [],
         settings: [],
         editing: false,
@@ -14,57 +20,80 @@ function aiSettingsManager() {
         form: {
             provider: '',
             api_key: '',
-            default_llm_model: '',
-            default_embed_model: '',
-            max_tokens: 0,
-            temperature: 0.7,
-            embedding_dimensions: 0,
         },
-        currentModels: [],
-        currentEmbedModels: [],
 
-        // Knowledge Graph embedding state (global, not per-workspace)
+        // ─── Capability State ────────────────────────────────────────
+        capabilities: {},
+        activeCapTab: 'tts',
+        capSaving: false,
+        capSaved: false,
+        capStatusMessage: '',
+        capStatusType: 'success',
+
+        // Chat (LLM) capability form
+        chatForm: { provider: '', model: '', max_tokens: 0, temperature: 0.7 },
+        chatProviders: [],
+        chatCurrentModels: [],
+        chatSaving: false,
+        chatSaved: false,
+        chatStatusMessage: '',
+        chatStatusType: 'success',
+
+        // TTS capability form
+        ttsForm: { provider: '', model: '', voice: '' },
+        ttsModels: [],
+        ttsVoices: [],
+        ttsProviders: [],
+
+        // Knowledge Graph Embedding state
         kgProviderStatus: null,
         kgLoading: false,
         kgEmbProvider: '',
         kgEmbModel: '',
         kgApiKeySource: 'reuse',
         kgApiKey: '',
-        kgEmbProviders: [],       // [{id, name}]
-        kgCurrentEmbModels: [],   // [model_name, ...]
-        kgAllEmbModels: [],       // [{provider, name, dimension, ...}]
+        kgEmbProviders: [],
+        kgCurrentEmbModels: [],
+        kgAllEmbModels: [],
         kgSaving: false,
         kgSaved: false,
         kgError: '',
 
+        // ─── Lifecycle ───────────────────────────────────────────────
+
         async loadSettings() {
             try {
-                // Load providers
-                const pRes = await fetch('/api/ai-settings/providers');
-                if (pRes.ok) {
-                    this.providers = await pRes.json();
-                }
-                // Load user settings
-                const sRes = await fetch('/api/ai-settings');
-                if (sRes.ok) {
-                    this.settings = await sRes.json();
+                const [pRes, sRes, capRes] = await Promise.all([
+                    fetch('/api/ai-settings/providers'),
+                    fetch('/api/ai-settings'),
+                    fetch('/api/ai-settings/capabilities'),
+                ]);
+                if (pRes.ok) this.providers = await pRes.json();
+                if (sRes.ok) this.settings = await sRes.json();
+                if (capRes.ok) {
+                    const caps = await capRes.json();
+                    this.capabilities = {};
+                    for (const c of (caps || [])) {
+                        this.capabilities[c.capability] = c;
+                    }
                 }
             } catch (err) {
                 console.error('Failed to load AI settings:', err);
             }
-            // Load knowledge graph settings in parallel
+            this._loadChatProviders();
+            this._loadCurrentChatConfig();
+            this._loadTTSProviders();
+            this._loadCurrentTTSConfig();
             this.loadKgSettings();
         },
 
+        // ═══════════════════════════════════════════════════════════════
+        //  Provider CRUD
+        // ═══════════════════════════════════════════════════════════════
+
         onProviderChange() {
-            const p = this.providers.find(x => x.id === this.form.provider);
-            this.currentModels = p ? p.models : [];
-            this.currentEmbedModels = p ? (p.embedding_models || []) : [];
-            // Reset model selections when provider changes
-            if (!this.editing) {
-                this.form.default_llm_model = this.currentModels.length ? this.currentModels[0] : '';
-                this.form.default_embed_model = '';
-            }
+            // No-op: provider selection no longer drives model lists.
+            // Model selection is done per-capability.
         },
 
         providerName(id) {
@@ -76,14 +105,8 @@ function aiSettingsManager() {
             this.editing = true;
             this.form = {
                 provider: s.provider,
-                api_key: '',  // Don't pre-fill API key for security
-                default_llm_model: s.default_llm_model,
-                default_embed_model: s.default_embed_model,
-                max_tokens: s.max_tokens || 0,
-                temperature: s.temperature || 0.7,
-                embedding_dimensions: s.embedding_dimensions || 0,
+                api_key: '',
             };
-            this.onProviderChange();
         },
 
         cancelEdit() {
@@ -95,14 +118,7 @@ function aiSettingsManager() {
             this.form = {
                 provider: '',
                 api_key: '',
-                default_llm_model: '',
-                default_embed_model: '',
-                max_tokens: 0,
-                temperature: 0.7,
-                embedding_dimensions: 0,
             };
-            this.currentModels = [];
-            this.currentEmbedModels = [];
         },
 
         async saveProvider() {
@@ -131,7 +147,6 @@ function aiSettingsManager() {
                 this.statusType = 'error';
             } finally {
                 this.saving = false;
-                // Auto-clear status after 4 seconds
                 setTimeout(() => { this.statusMessage = ''; }, 4000);
             }
         },
@@ -158,15 +173,222 @@ function aiSettingsManager() {
         async setDefault(id) {
             try {
                 const res = await fetch(`/api/ai-settings/${id}/default`, { method: 'PUT' });
-                if (res.ok) {
-                    await this.loadSettings();
-                }
+                if (res.ok) await this.loadSettings();
             } catch (err) {
                 console.error('Failed to set default:', err);
             }
         },
 
-        // === Knowledge Graph Embedding Settings ===
+        get hasConfiguredProvider() {
+            return this.settings.some(s => s.api_key_set);
+        },
+
+        // ═══════════════════════════════════════════════════════════════
+        //  Chat (LLM) Capability Configuration
+        // ═══════════════════════════════════════════════════════════════
+
+        _loadChatProviders() {
+            this.chatProviders = this.providers
+                .filter(p => p.models && p.models.length > 0)
+                .filter(p => this.settings.some(s => s.provider === p.id && s.api_key_set))
+                .map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    models: p.models,
+                }));
+        },
+
+        _loadCurrentChatConfig() {
+            const cap = this.capabilities['llm'];
+            if (cap) {
+                this.chatForm.provider = cap.provider;
+                this.onChatProviderChange();
+                this.chatForm.model = cap.model;
+                if (cap.config) {
+                    if (cap.config.max_tokens) this.chatForm.max_tokens = cap.config.max_tokens;
+                    if (cap.config.temperature) this.chatForm.temperature = cap.config.temperature;
+                }
+            }
+        },
+
+        get currentChatConfig() {
+            const cap = this.capabilities['llm'];
+            if (cap) {
+                const provider = this.providers.find(p => p.id === cap.provider);
+                return {
+                    provider: cap.provider,
+                    provider_name: provider ? provider.name : cap.provider,
+                    model: cap.model,
+                    max_tokens: cap.config?.max_tokens || 0,
+                    temperature: cap.config?.temperature || 0.7,
+                };
+            }
+            return null;
+        },
+
+        onChatProviderChange() {
+            const provider = this.chatProviders.find(p => p.id === this.chatForm.provider);
+            this.chatCurrentModels = provider ? provider.models : [];
+            this.chatForm.model = '';
+            this.chatSaved = false;
+        },
+
+        async saveChatCapability() {
+            if (!this.chatForm.provider || !this.chatForm.model) return;
+            this.chatSaving = true;
+            this.chatSaved = false;
+            this.chatStatusMessage = '';
+            try {
+                const config = {};
+                if (this.chatForm.max_tokens > 0) config.max_tokens = Number(this.chatForm.max_tokens);
+                if (this.chatForm.temperature > 0) config.temperature = Number(this.chatForm.temperature);
+                const res = await fetch('/api/ai-settings/capabilities/llm', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        provider: this.chatForm.provider,
+                        model: this.chatForm.model,
+                        config,
+                    }),
+                });
+                if (res.ok) {
+                    this.chatSaved = true;
+                    this.chatStatusMessage = 'Chat model saved successfully.';
+                    this.chatStatusType = 'success';
+                    await this.loadSettings();
+                    setTimeout(() => { this.chatSaved = false; this.chatStatusMessage = ''; }, 3000);
+                } else {
+                    const errText = await res.text();
+                    this.chatStatusMessage = errText || 'Failed to save chat model.';
+                    this.chatStatusType = 'error';
+                    setTimeout(() => { this.chatStatusMessage = ''; }, 5000);
+                }
+            } catch (err) {
+                this.chatStatusMessage = 'Network error. Please try again.';
+                this.chatStatusType = 'error';
+                setTimeout(() => { this.chatStatusMessage = ''; }, 5000);
+            } finally {
+                this.chatSaving = false;
+            }
+        },
+
+        // ═══════════════════════════════════════════════════════════════
+        //  TTS Capability Configuration
+        // ═══════════════════════════════════════════════════════════════
+
+        _loadTTSProviders() {
+            this.ttsProviders = this.providers
+                .filter(p => p.supports_tts && p.tts_models && p.tts_models.length > 0)
+                .filter(p => this.settings.some(s => s.provider === p.id && s.api_key_set))
+                .map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    tts_models: p.tts_models,
+                }));
+        },
+
+        _loadCurrentTTSConfig() {
+            const cap = this.capabilities['tts'];
+            if (cap) {
+                this.ttsForm.provider = cap.provider;
+                this.onTTSProviderChange();
+                this.ttsForm.model = cap.model;
+                this.onTTSModelChange();
+                if (cap.config && cap.config.voice) {
+                    this.ttsForm.voice = cap.config.voice;
+                }
+            }
+        },
+
+        get currentTTSConfig() {
+            const cap = this.capabilities['tts'];
+            if (cap) {
+                const provider = this.providers.find(p => p.id === cap.provider);
+                return {
+                    provider: cap.provider,
+                    provider_name: provider ? provider.name : cap.provider,
+                    model: cap.model,
+                    voice: cap.config?.voice || 'coral',
+                };
+            }
+            return null;
+        },
+
+        onTTSProviderChange() {
+            const provider = this.providers.find(p => p.id === this.ttsForm.provider);
+            this.ttsModels = provider ? (provider.tts_models || []) : [];
+            this.ttsForm.model = this.ttsModels.length === 1 ? this.ttsModels[0] : '';
+            this.ttsVoices = [];
+            this.ttsForm.voice = '';
+            this.capSaved = false;
+            if (this.ttsForm.model) {
+                this.onTTSModelChange();
+            }
+        },
+
+        async onTTSModelChange() {
+            this.ttsForm.voice = '';
+            this.capSaved = false;
+            if (!this.ttsForm.model) {
+                this.ttsVoices = [];
+                return;
+            }
+            try {
+                const res = await fetch('/api/ai-settings/tts-voices?model=' + encodeURIComponent(this.ttsForm.model));
+                if (res.ok) {
+                    const data = await res.json();
+                    this.ttsVoices = data.voices || [];
+                    if (this.ttsVoices.includes('coral')) {
+                        this.ttsForm.voice = 'coral';
+                    } else if (this.ttsVoices.length > 0) {
+                        this.ttsForm.voice = this.ttsVoices[0];
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to load TTS voices:', err);
+                this.ttsVoices = ['alloy', 'ash', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer'];
+            }
+        },
+
+        async saveTTSCapability() {
+            if (!this.ttsForm.provider || !this.ttsForm.model || !this.ttsForm.voice) return;
+            this.capSaving = true;
+            this.capSaved = false;
+            this.capStatusMessage = '';
+            try {
+                const res = await fetch('/api/ai-settings/capabilities/tts', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        provider: this.ttsForm.provider,
+                        model: this.ttsForm.model,
+                        config: { voice: this.ttsForm.voice },
+                    }),
+                });
+                if (res.ok) {
+                    this.capSaved = true;
+                    this.capStatusMessage = 'Voice settings saved successfully.';
+                    this.capStatusType = 'success';
+                    await this.loadSettings();
+                    setTimeout(() => { this.capSaved = false; this.capStatusMessage = ''; }, 3000);
+                } else {
+                    const errText = await res.text();
+                    this.capStatusMessage = errText || 'Failed to save voice settings.';
+                    this.capStatusType = 'error';
+                    setTimeout(() => { this.capStatusMessage = ''; }, 5000);
+                }
+            } catch (err) {
+                this.capStatusMessage = 'Network error. Please try again.';
+                this.capStatusType = 'error';
+                setTimeout(() => { this.capStatusMessage = ''; }, 5000);
+            } finally {
+                this.capSaving = false;
+            }
+        },
+
+        // ═══════════════════════════════════════════════════════════════
+        //  Knowledge Graph Embedding Settings
+        // ═══════════════════════════════════════════════════════════════
 
         get kgMatchingProviderSetting() {
             if (!this.kgEmbProvider) return null;
@@ -174,7 +396,6 @@ function aiSettingsManager() {
             if (match && match.api_key) {
                 return { ...match, api_key_masked: match.api_key.slice(0, 3) + '***' + match.api_key.slice(-4) };
             }
-            // Check if provider is configured (API key hidden) - use masked indicator
             if (match) {
                 return { ...match, api_key_masked: '••••••••' };
             }
@@ -191,7 +412,6 @@ function aiSettingsManager() {
                 if (embRes.ok) {
                     const data = await embRes.json();
                     this.kgAllEmbModels = data.models || [];
-                    // Derive unique providers that have embedding models
                     const seen = new Set();
                     this.kgEmbProviders = [];
                     for (const m of this.kgAllEmbModels) {
@@ -206,7 +426,6 @@ function aiSettingsManager() {
                 }
                 if (statusRes.ok) {
                     this.kgProviderStatus = await statusRes.json();
-                    // Pre-select from current status if available
                     if (this.kgProviderStatus?.embedding?.provider && !this.kgEmbProvider) {
                         this.kgEmbProvider = this.kgProviderStatus.embedding.provider;
                         this.onKgEmbProviderChange();
@@ -223,12 +442,10 @@ function aiSettingsManager() {
         },
 
         onKgEmbProviderChange() {
-            // Filter models for selected provider
             this.kgCurrentEmbModels = this.kgAllEmbModels
                 .filter(m => m.provider === this.kgEmbProvider)
                 .map(m => m.name);
             this.kgEmbModel = this.kgCurrentEmbModels.length === 1 ? this.kgCurrentEmbModels[0] : '';
-            // Default to reuse if a matching provider is already configured
             this.kgApiKeySource = this.kgMatchingProviderSetting ? 'reuse' : 'custom';
             this.kgApiKey = '';
             this.kgSaved = false;
@@ -241,44 +458,22 @@ function aiSettingsManager() {
             this.kgSaved = false;
             this.kgError = '';
             try {
-                // Determine API key
-                let apiKey = '';
-                if (this.kgApiKeySource === 'reuse' && this.kgMatchingProviderSetting) {
-                    // Reuse - send empty api_key, backend keeps existing
-                    apiKey = '';
-                } else {
-                    apiKey = this.kgApiKey;
-                    if (!apiKey) {
-                        this.kgError = 'API key is required';
-                        this.kgSaving = false;
-                        return;
-                    }
-                }
-
-                // Find embedding dimension from model info
                 const modelInfo = this.kgAllEmbModels.find(
                     m => m.provider === this.kgEmbProvider && m.name === this.kgEmbModel
                 );
                 const dimension = modelInfo?.dimension || modelInfo?.capabilities?.embedding_dimension || 0;
-
-                // Save via AI settings endpoint (updates the provider's embed model config)
                 const payload = {
                     provider: this.kgEmbProvider,
-                    default_embed_model: this.kgEmbModel,
-                    embedding_dimensions: dimension,
+                    model: this.kgEmbModel,
+                    config: { dimensions: dimension },
                 };
-                if (apiKey) {
-                    payload.api_key = apiKey;
-                }
-
-                const res = await fetch('/api/ai-settings', {
+                const res = await fetch('/api/ai-settings/capabilities/embedding', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload),
                 });
                 if (res.ok) {
                     this.kgSaved = true;
-                    // Reload settings so kgMatchingProviderSetting updates
                     await this.loadSettings();
                     setTimeout(() => { this.kgSaved = false; }, 3000);
                 } else {
@@ -288,7 +483,6 @@ function aiSettingsManager() {
                 }
             } catch (err) {
                 this.kgError = 'Network error';
-                console.error('Failed to save KG embedding:', err);
                 setTimeout(() => { this.kgError = ''; }, 5000);
             } finally {
                 this.kgSaving = false;

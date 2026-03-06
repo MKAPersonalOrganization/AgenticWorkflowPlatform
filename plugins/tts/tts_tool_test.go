@@ -9,14 +9,14 @@ import (
 )
 
 func TestSpeakTool_Name(t *testing.T) {
-	tool := NewSpeakTool(nil, "")
+	tool := NewSpeakTool(nil, "", "", "")
 	if got := tool.Name(); got != "speak" {
 		t.Errorf("Name() = %q, want %q", got, "speak")
 	}
 }
 
 func TestSpeakTool_Schema(t *testing.T) {
-	tool := NewSpeakTool(nil, "")
+	tool := NewSpeakTool(nil, "", "", "")
 	schema := tool.Schema()
 	if schema == nil {
 		t.Fatal("Schema() returned nil")
@@ -36,7 +36,7 @@ func TestSpeakTool_Schema(t *testing.T) {
 }
 
 func TestSpeakTool_Execute_EmptyText(t *testing.T) {
-	tool := NewSpeakTool(nil, "test-key")
+	tool := NewSpeakTool(nil, "test-key", "", "")
 	args := agent.Arguments{
 		Raw: json.RawMessage(`{"text": ""}`),
 	}
@@ -50,7 +50,7 @@ func TestSpeakTool_Execute_EmptyText(t *testing.T) {
 }
 
 func TestSpeakTool_Execute_TextTooLong(t *testing.T) {
-	tool := NewSpeakTool(nil, "test-key")
+	tool := NewSpeakTool(nil, "test-key", "", "")
 	longText := make([]byte, 4097)
 	for i := range longText {
 		longText[i] = 'a'
@@ -69,7 +69,7 @@ func TestSpeakTool_Execute_TextTooLong(t *testing.T) {
 }
 
 func TestSpeakTool_Execute_MissingAPIKey(t *testing.T) {
-	tool := NewSpeakTool(nil, "")
+	tool := NewSpeakTool(nil, "", "", "")
 	args := agent.Arguments{
 		Raw: json.RawMessage(`{"text": "Hello world"}`),
 	}

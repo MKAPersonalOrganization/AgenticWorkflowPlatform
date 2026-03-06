@@ -18,14 +18,14 @@ templ aiModelsSection() {
 						<span class="text-primary">world-class AI models</span>
 					</h2>
 					<p class="mt-4 text-lg text-muted-foreground">
-						Compass isn't locked to a single provider. Switch between OpenAI, Anthropic, and Google Gemini models per-agent. Use GPT-4o for creative writing, Claude for analysis, and Gemini for fast iteration — all within the same platform.
+						Bring your own API keys and configure each AI capability independently. Add your providers once, then choose which one powers chat, voice, and embeddings — no re-entering keys, no vendor lock-in.
 					</p>
 					<ul class="mt-8 space-y-4">
-						@checkListItem("Per-agent model selection — each agent can use a different model")
+						@checkListItem("Bring Your Own Key — add OpenAI, Anthropic, and Gemini API keys once")
+						@checkListItem("Per-capability model selection — pick the best model for chat, voice, and embeddings independently")
+						@checkListItem("Per-agent overrides — each agent can use a different chat model")
 						@checkListItem("Real-time streaming with token-by-token delivery via AG-UI protocol")
-						@checkListItem("Configurable temperature and max iterations per agent")
 						@checkListItem("Token usage tracking with detailed cost breakdown per message")
-						@checkListItem("Automatic model fallback and provider health monitoring")
 					</ul>
 				</div>
 				<!-- Visual: Provider cards -->
