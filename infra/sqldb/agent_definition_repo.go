@@ -34,8 +34,8 @@ func (r *PostgresAgentDefinitionRepository) Create(ctx context.Context, agent *d
 	agent.UpdatedAt = now
 
 	query := `
-INSERT INTO user_agents (id, user_id, name, description, system_prompt, model_id, max_iterations, temperature, icon, source_catalog_id, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`
+INSERT INTO user_agents (id, user_id, name, description, system_prompt, icon, source_catalog_id, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
 
 	_, err := r.db.ExecContext(ctx, query,
 		agent.ID,
@@ -43,9 +43,6 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`
 		agent.Name,
 		agent.Description,
 		agent.SystemPrompt,
-		agent.ModelID,
-		agent.MaxIterations,
-		agent.Temperature,
 		agent.Icon,
 		agent.SourceCatalogID,
 		agent.CreatedAt,
@@ -64,17 +61,14 @@ func (r *PostgresAgentDefinitionRepository) Update(ctx context.Context, agent *d
 
 	query := `
 UPDATE user_agents
-SET name = $1, description = $2, system_prompt = $3, model_id = $4,
-    max_iterations = $5, temperature = $6, icon = $7, updated_at = $8
-WHERE id = $9 AND user_id = $10`
+SET name = $1, description = $2, system_prompt = $3,
+    icon = $4, updated_at = $5
+WHERE id = $6 AND user_id = $7`
 
 	result, err := r.db.ExecContext(ctx, query,
 		agent.Name,
 		agent.Description,
 		agent.SystemPrompt,
-		agent.ModelID,
-		agent.MaxIterations,
-		agent.Temperature,
 		agent.Icon,
 		agent.UpdatedAt,
 		agent.ID,
@@ -117,7 +111,7 @@ func (r *PostgresAgentDefinitionRepository) Delete(ctx context.Context, id, user
 
 // GetByID retrieves a single agent by ID.
 func (r *PostgresAgentDefinitionRepository) GetByID(ctx context.Context, id, userID string) (*domain.AgentDefinition, error) {
-	query := `SELECT id, user_id, name, description, system_prompt, model_id, max_iterations, temperature, icon, source_catalog_id, created_at, updated_at
+	query := `SELECT id, user_id, name, description, system_prompt, icon, source_catalog_id, created_at, updated_at
 FROM user_agents WHERE id = $1 AND user_id = $2`
 
 	var agent domain.AgentDefinition
@@ -130,7 +124,7 @@ FROM user_agents WHERE id = $1 AND user_id = $2`
 
 // ListByUser returns all agents created by a specific user, ordered by creation time.
 func (r *PostgresAgentDefinitionRepository) ListByUser(ctx context.Context, userID string) ([]domain.AgentDefinition, error) {
-	query := `SELECT id, user_id, name, description, system_prompt, model_id, max_iterations, temperature, icon, source_catalog_id, created_at, updated_at
+	query := `SELECT id, user_id, name, description, system_prompt, icon, source_catalog_id, created_at, updated_at
 FROM user_agents WHERE user_id = $1 ORDER BY created_at ASC`
 
 	var agents []domain.AgentDefinition
@@ -143,7 +137,7 @@ FROM user_agents WHERE user_id = $1 ORDER BY created_at ASC`
 
 // Search finds agents matching a query string within a user's agents.
 func (r *PostgresAgentDefinitionRepository) Search(ctx context.Context, userID, query string) ([]domain.AgentDefinition, error) {
-	sqlQuery := `SELECT id, user_id, name, description, system_prompt, model_id, max_iterations, temperature, icon, source_catalog_id, created_at, updated_at
+	sqlQuery := `SELECT id, user_id, name, description, system_prompt, icon, source_catalog_id, created_at, updated_at
 FROM user_agents
 WHERE user_id = $1 AND (name ILIKE $2 OR description ILIKE $2)
 ORDER BY created_at ASC`
@@ -193,7 +187,7 @@ func (r *PostgresAgentDefinitionRepository) EnsureInitialAgent(ctx context.Conte
 
 // getFirstAgent returns the oldest agent for a user.
 func (r *PostgresAgentDefinitionRepository) getFirstAgent(ctx context.Context, userID string) (*domain.AgentDefinition, error) {
-	query := `SELECT id, user_id, name, description, system_prompt, model_id, max_iterations, temperature, icon, source_catalog_id, created_at, updated_at
+	query := `SELECT id, user_id, name, description, system_prompt, icon, source_catalog_id, created_at, updated_at
 FROM user_agents WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1`
 
 	var agent domain.AgentDefinition

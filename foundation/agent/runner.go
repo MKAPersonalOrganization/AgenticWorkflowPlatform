@@ -96,7 +96,7 @@ type RunnerConfig struct {
 	ModelConfig *ModelConfig
 }
 
-// ModelConfig specifies LLM provider and credentials.
+// ModelConfig specifies LLM provider, credentials, and global execution parameters.
 // Framework adapters use this to create their internal LLM clients.
 type ModelConfig struct {
 	// Provider identifies the LLM provider ("openai", "gemini", "anthropic", etc.).
@@ -108,8 +108,16 @@ type ModelConfig struct {
 	// APIKey is the authentication key for the provider.
 	APIKey string
 
-	// AdditionalConfig for provider-specific settings.
-	AdditionalConfig map[string]any
+	// Temperature controls randomness (0.0–2.0). nil = provider default.
+	Temperature *float64
+
+	// MaxIterations limits the number of tool-calling loops per request.
+	// 0 = engine default.
+	MaxIterations int
+
+	// MaxTokens limits the number of tokens the model can generate per response.
+	// nil = provider default.
+	MaxTokens *int
 }
 
 // ArtifactStore persists artifacts.

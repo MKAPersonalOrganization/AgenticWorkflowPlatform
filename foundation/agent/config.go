@@ -63,9 +63,6 @@ type Config struct {
 	// Default is 10.
 	MaxIterations int
 
-	// ModelID (optional) overrides the default model.
-	ModelID string
-
 	// Model is the LLM client for this agent (optional).
 	// If not set, the default model from the runner is used.
 	Model Model

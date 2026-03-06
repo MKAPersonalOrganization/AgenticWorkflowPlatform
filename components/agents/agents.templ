@@ -175,9 +175,6 @@ templ AgentsDialog() {
 																<p class="text-xs text-muted-foreground mt-0.5 line-clamp-2" x-text="ag.description || 'No description'"></p>
 																<div class="flex items-center gap-3 mt-2">
 																	<span class="text-[10px] text-muted-foreground" x-text="'Created ' + formatDate(ag.createdAt)"></span>
-																	<template x-if="ag.modelId">
-																		<span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground" x-text="ag.modelId"></span>
-																	</template>
 																</div>
 															</div>
 															<!-- Actions -->
@@ -469,79 +466,6 @@ templ AgentsDialog() {
 								<p class="text-[11px] text-muted-foreground">
 									{ i18n.T(ctx, "This is the instruction that defines the agent's personality, expertise, and behavior.") }
 								</p>
-							</div>
-							<!-- Advanced Settings (Collapsible) -->
-							<div class="border border-border rounded-lg">
-								<button
-									type="button"
-									@click="showAdvanced = !showAdvanced"
-									class="flex items-center justify-between w-full p-3 text-sm font-medium text-foreground hover:bg-accent/30 rounded-lg transition-colors"
-								>
-									<span class="flex items-center gap-2">
-										@icon.Settings(icon.Props{Class: "size-4 text-muted-foreground"})
-										{ i18n.T(ctx, "Advanced Settings") }
-									</span>
-									<span
-										class="transition-transform duration-200"
-										:class="showAdvanced ? 'rotate-180' : ''"
-									>
-										@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
-									</span>
-								</button>
-								<div x-show="showAdvanced" x-collapse class="px-3 pb-3 space-y-4 border-t border-border pt-3">
-									<!-- Model Override -->
-									<div class="space-y-2">
-										@label.Label(label.Props{}) {
-											{ i18n.T(ctx, "Model Override") }
-										}
-										@input.Input(input.Props{
-											Placeholder: i18n.T(ctx, "Leave empty to use your default model"),
-											Attributes: templ.Attributes{
-												"x-model": "form.modelId",
-											},
-										})
-										<p class="text-[11px] text-muted-foreground">
-											{ i18n.T(ctx, "Optionally override the AI model used by this agent.") }
-										</p>
-									</div>
-									<!-- Temperature -->
-									<div class="space-y-2">
-										@label.Label(label.Props{}) {
-											{ i18n.T(ctx, "Temperature") }
-										}
-										<div class="flex items-center gap-3">
-											<input
-												type="range"
-												min="0"
-												max="2"
-												step="0.1"
-												x-model="form.temperature"
-												class="flex-1 h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
-											/>
-											<span class="text-sm text-muted-foreground tabular-nums w-8 text-right" x-text="parseFloat(form.temperature).toFixed(1)"></span>
-										</div>
-										<p class="text-[11px] text-muted-foreground">
-											{ i18n.T(ctx, "Lower values make output more focused, higher values more creative.") }
-										</p>
-									</div>
-									<!-- Max Iterations -->
-									<div class="space-y-2">
-										@label.Label(label.Props{}) {
-											{ i18n.T(ctx, "Max Iterations") }
-										}
-										@input.Input(input.Props{
-											Type: input.TypeNumber,
-											Attributes: templ.Attributes{
-												"x-model.number": "form.maxIterations",
-												"min":            "1",
-												"max":            "50",
-											},
-										})
-										<p class="text-[11px] text-muted-foreground">
-											{ i18n.T(ctx, "Maximum number of tool-calling loops per request.") }
-										</p>
-									</div>
-								</div>
 							</div>
 							<!-- Tools & Knowledge Bases (only when editing an existing agent) -->
 							<template x-if="editingAgent">

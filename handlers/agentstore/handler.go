@@ -30,37 +30,28 @@ func NewHandler(log *logger.Logger, service *agentStoreService.Service, authServ
 
 // CreateRequest represents the request body for creating an agent.
 type CreateRequest struct {
-	Name          string  `json:"name"`
-	Description   string  `json:"description"`
-	SystemPrompt  string  `json:"systemPrompt"`
-	ModelID       string  `json:"modelId"`
-	MaxIterations int     `json:"maxIterations"`
-	Temperature   float64 `json:"temperature"`
+	Name         string `json:"name"`
+	Description  string `json:"description"`
+	SystemPrompt string `json:"systemPrompt"`
 }
 
 // UpdateRequest represents the request body for updating an agent.
 type UpdateRequest struct {
-	Name          string  `json:"name"`
-	Description   string  `json:"description"`
-	SystemPrompt  string  `json:"systemPrompt"`
-	ModelID       string  `json:"modelId"`
-	MaxIterations int     `json:"maxIterations"`
-	Temperature   float64 `json:"temperature"`
+	Name         string `json:"name"`
+	Description  string `json:"description"`
+	SystemPrompt string `json:"systemPrompt"`
 }
 
 // AgentResponse represents a single agent in API responses.
 type AgentResponse struct {
-	ID              string  `json:"id"`
-	Name            string  `json:"name"`
-	Description     string  `json:"description"`
-	SystemPrompt    string  `json:"systemPrompt"`
-	ModelID         string  `json:"modelId"`
-	MaxIterations   int     `json:"maxIterations"`
-	Temperature     float64 `json:"temperature"`
-	Icon            string  `json:"icon"`
-	SourceCatalogID string  `json:"sourceCatalogId,omitempty"`
-	CreatedAt       string  `json:"createdAt"`
-	UpdatedAt       string  `json:"updatedAt"`
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	Description     string `json:"description"`
+	SystemPrompt    string `json:"systemPrompt"`
+	Icon            string `json:"icon"`
+	SourceCatalogID string `json:"sourceCatalogId,omitempty"`
+	CreatedAt       string `json:"createdAt"`
+	UpdatedAt       string `json:"updatedAt"`
 }
 
 // ListResponse represents the response for listing agents.
@@ -85,9 +76,6 @@ func toAgentResponse(a *domain.AgentDefinition) AgentResponse {
 		Name:            a.Name,
 		Description:     a.Description,
 		SystemPrompt:    a.SystemPrompt,
-		ModelID:         a.ModelID,
-		MaxIterations:   a.MaxIterations,
-		Temperature:     a.Temperature,
 		Icon:            agentIconOrDefault(a.Icon),
 		SourceCatalogID: a.SourceCatalogID,
 		CreatedAt:       a.CreatedAt.Format("2006-01-02T15:04:05Z"),
@@ -115,13 +103,10 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	agent := &domain.AgentDefinition{
-		UserID:        user.ID,
-		Name:          req.Name,
-		Description:   req.Description,
-		SystemPrompt:  req.SystemPrompt,
-		ModelID:       req.ModelID,
-		MaxIterations: req.MaxIterations,
-		Temperature:   req.Temperature,
+		UserID:       user.ID,
+		Name:         req.Name,
+		Description:  req.Description,
+		SystemPrompt: req.SystemPrompt,
 	}
 
 	if err := h.service.Create(r.Context(), agent); err != nil {
@@ -162,14 +147,11 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	agent := &domain.AgentDefinition{
-		ID:            agentID,
-		UserID:        user.ID,
-		Name:          req.Name,
-		Description:   req.Description,
-		SystemPrompt:  req.SystemPrompt,
-		ModelID:       req.ModelID,
-		MaxIterations: req.MaxIterations,
-		Temperature:   req.Temperature,
+		ID:           agentID,
+		UserID:       user.ID,
+		Name:         req.Name,
+		Description:  req.Description,
+		SystemPrompt: req.SystemPrompt,
 	}
 
 	if err := h.service.Update(r.Context(), agent); err != nil {

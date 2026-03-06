@@ -32,14 +32,6 @@ func (s *Service) Create(ctx context.Context, agent *domain.AgentDefinition) err
 		return fmt.Errorf("user ID is required")
 	}
 
-	// Set sensible defaults
-	if agent.MaxIterations <= 0 {
-		agent.MaxIterations = 10
-	}
-	if agent.Temperature <= 0 {
-		agent.Temperature = 0.7
-	}
-
 	s.log.Info(ctx, "creating agent definition", "userID", agent.UserID, "name", agent.Name)
 
 	if err := s.repo.Create(ctx, agent); err != nil {
@@ -59,13 +51,6 @@ func (s *Service) Update(ctx context.Context, agent *domain.AgentDefinition) err
 	}
 	if agent.Name == "" {
 		return fmt.Errorf("agent name is required")
-	}
-
-	if agent.MaxIterations <= 0 {
-		agent.MaxIterations = 10
-	}
-	if agent.Temperature <= 0 {
-		agent.Temperature = 0.7
 	}
 
 	s.log.Info(ctx, "updating agent definition", "agentID", agent.ID, "userID", agent.UserID)

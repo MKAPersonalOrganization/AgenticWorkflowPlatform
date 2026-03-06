@@ -149,14 +149,16 @@ func (s *Service) GetModelConfigForUser(ctx context.Context, userID string) (*ag
 		}
 
 		llmSettings := capConfig.GetLLMSettings()
-		if llmSettings.MaxTokens > 0 || llmSettings.Temperature > 0 {
-			cfg.AdditionalConfig = map[string]any{}
-			if llmSettings.MaxTokens > 0 {
-				cfg.AdditionalConfig["max_tokens"] = llmSettings.MaxTokens
-			}
-			if llmSettings.Temperature > 0 {
-				cfg.AdditionalConfig["temperature"] = llmSettings.Temperature
-			}
+		if llmSettings.Temperature > 0 {
+			t := llmSettings.Temperature
+			cfg.Temperature = &t
+		}
+		if llmSettings.MaxIterations > 0 {
+			cfg.MaxIterations = llmSettings.MaxIterations
+		}
+		if llmSettings.MaxTokens > 0 {
+			maxTokens := llmSettings.MaxTokens
+			cfg.MaxTokens = &maxTokens
 		}
 	} else {
 		// No LLM capability configured — fall back to provider's first model

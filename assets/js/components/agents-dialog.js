@@ -22,11 +22,7 @@ export const agentsManager = () => ({
         name: '',
         description: '',
         systemPrompt: '',
-        modelId: '',
-        temperature: 0.7,
-        maxIterations: 10,
     },
-    showAdvanced: false,
 
     // Tools & KB state (for edit mode)
     showTools: false,
@@ -133,11 +129,7 @@ export const agentsManager = () => ({
             name: '',
             description: '',
             systemPrompt: '',
-            modelId: '',
-            temperature: 0.7,
-            maxIterations: 10,
         };
-        this.showAdvanced = false;
         this.showTools = false;
         this.showKnowledgeBases = false;
         this.agentPlugins = [];
@@ -151,11 +143,7 @@ export const agentsManager = () => ({
             name: agent.name || '',
             description: agent.description || '',
             systemPrompt: agent.systemPrompt || '',
-            modelId: agent.modelId || '',
-            temperature: agent.temperature ?? 0.7,
-            maxIterations: agent.maxIterations ?? 10,
         };
-        this.showAdvanced = !!(agent.modelId || (agent.temperature != null && agent.temperature !== 0.7) || (agent.maxIterations != null && agent.maxIterations !== 10));
         this.showTools = false;
         this.showKnowledgeBases = false;
         this.agentPlugins = [];
@@ -175,9 +163,6 @@ export const agentsManager = () => ({
                 name: this.form.name.trim(),
                 description: this.form.description.trim(),
                 systemPrompt: this.form.systemPrompt.trim(),
-                modelId: this.form.modelId.trim(),
-                temperature: parseFloat(this.form.temperature),
-                maxIterations: parseInt(this.form.maxIterations, 10) || 10,
             };
 
             let response;
