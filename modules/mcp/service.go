@@ -1,4 +1,4 @@
-package plugindiscovery
+package mcp
 
 import (
 	"context"

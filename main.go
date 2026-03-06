@@ -49,7 +49,7 @@ import (
 	"school-with-ai/services/edgequake"
 	"school-with-ai/services/memory"
 	"school-with-ai/services/permissions"
-	"school-with-ai/services/plugindiscovery"
+
 	"school-with-ai/services/rag/users"
 	"school-with-ai/services/taskmanagement"
 	"school-with-ai/services/threadmgmt"
@@ -69,12 +69,12 @@ import (
 	bannerhandlers "school-with-ai/handlers/banner"
 	healthhandlers "school-with-ai/handlers/health"
 	knowledgehandlers "school-with-ai/handlers/knowledge"
-	mcphandler "school-with-ai/handlers/mcp"
 	taskmgmthandlers "school-with-ai/handlers/taskmgmt"
 	wkspermhandlers "school-with-ai/handlers/workspacepermissions"
 	agentstoremod "school-with-ai/modules/agentstore"
 	aisettingsmod "school-with-ai/modules/aisettings"
 	billingmod "school-with-ai/modules/billing"
+	mcpmod "school-with-ai/modules/mcp"
 	resourcesmod "school-with-ai/modules/resources"
 
 	authService "school-with-ai/services/auth"
@@ -395,10 +395,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 	}
 	log.Info(ctx, "startup", "status", "tool registry initialized")
 
-	// Create MCP plugin discovery service
-	mcpConnectorRepo := sqldb.NewPostgresMCPConnectorRepository(db)
-	mcpService := plugindiscovery.NewService(log, mcpConnectorRepo, cfg.Auth.AppURL+"/v1/mcp/oauth/callback", toolRegistry)
-	log.Info(ctx, "startup", "status", "mcp plugin discovery service initialized")
+	// Create MCP module
+	mcpModule := mcpmod.New(log, db, cfg.Auth.AppURL+"/v1/mcp/oauth/callback", toolRegistry)
+	log.Info(ctx, "startup", "status", "mcp module initialized")
 
 	// Create and initialize permissions service
 	permissionsService := permissions.NewService(log, sqldb.NewPostgresPermissionsRepository(db))
@@ -455,7 +454,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 			edgequakeService,            // Edgequake service for KB tools
 			cfg.Edgequake.BaseURL,       // Edgequake base URL for raw KB queries
 			cfg.Edgequake.TenantID,      // Tenant ID for edgequake
-			mcpService,                  // MCP plugin discovery service
+			mcpModule.Service(),         // MCP plugin discovery service
 		)
 		if err != nil {
 			return fmt.Errorf("creating custom runner: %w", err)
@@ -681,22 +680,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Put("/v1/plugins/{pluginId}/tools/{toolId}", authMiddleware.RequireAuthFunc(handler.TogglePluginTool))
 
 	// MCP Connector endpoints
-	mcpHandler := mcphandler.NewHandler(log, mcpService)
-	r.Get("/v1/mcp/connectors", authMiddleware.RequireAuthFunc(mcpHandler.ListConnectors))
-	r.Get("/v1/mcp/connectors/presets", mcpHandler.ListPresets) // Public — no auth needed for preset catalog
-	r.Post("/v1/mcp/connectors", authMiddleware.RequireAuthFunc(mcpHandler.CreateConnector))
-	r.Get("/v1/mcp/connectors/{id}", authMiddleware.RequireAuthFunc(mcpHandler.GetConnector))
-	r.Delete("/v1/mcp/connectors/{id}", authMiddleware.RequireAuthFunc(mcpHandler.DeleteConnector))
-	r.Post("/v1/mcp/connectors/{id}/connect", authMiddleware.RequireAuthFunc(mcpHandler.Connect))
-	r.Post("/v1/mcp/connectors/{id}/disconnect", authMiddleware.RequireAuthFunc(mcpHandler.Disconnect))
-	r.Get("/v1/mcp/connectors/{id}/tools", authMiddleware.RequireAuthFunc(mcpHandler.ListTools))
-	r.Post("/v1/mcp/connectors/{id}/refresh", authMiddleware.RequireAuthFunc(mcpHandler.RefreshTools))
-	// MCP Proxy — authenticated reverse proxy to the connector's MCP server (agentstack pattern).
-	// Supports all HTTP methods so external MCP clients can use connectors directly.
-	r.HandleFunc("/v1/mcp/connectors/{id}/mcp", authMiddleware.RequireAuthFunc(mcpHandler.MCPProxy))
-	r.HandleFunc("/v1/mcp/connectors/{id}/mcp/*", authMiddleware.RequireAuthFunc(mcpHandler.MCPProxy))
-	// OAuth callback (public — called by external OAuth provider redirect)
-	r.Get("/v1/mcp/oauth/callback", mcpHandler.OAuthCallback)
+	mcpModule.RegisterRoutes(r, authMiddleware)
 
 	r.Get("/v1/documents", authMiddleware.RequireAuthFunc(handler.ListDocuments))
 	r.Post("/v1/documents", authMiddleware.RequireAuthFunc(handler.UploadDocument))
