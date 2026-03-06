@@ -1,171 +1,271 @@
 # School with AI
 
-A chat application built with Go, Templ, Tailwind CSS, and Alpine.js, implementing the AG-UI protocol for AI agent interactions.
+An event-sourced, multi-agent AI chat platform built with Go, Templ, Tailwind CSS, and Alpine.js. Implements the AG-UI protocol for real-time agent interactions, with a modular plugin system for tools and MCP connector support for remote tool servers.
 
-[Changelog](CHANGELOG.md)
+[Changelog](CHANGELOG.md) · [Developer Onboarding Guide](ONBOARDING.md)
 
 ## Repository Statistics
 
 ![Repository Statistics](.github/images/repo_statistics.png)
 
-## Containers Diagram
+## System Context Diagram (Level 1)
 
 ```mermaid
 %%{init: {'flowchart': {'curve': 'linear'}}}%%
 graph TB
-    Browser[Web Browser<br/>Alpine.js + Tailwind]
+    User["<b>Student / Teacher</b><br/>[Person]<br/>Interacts with AI agents for<br/>learning and content creation."]
 
-    GoApp[Go Application<br/>Event-Sourced Multi-Agent System]
+    System["<b>School with AI</b><br/>[Software System]<br/>Event-sourced multi-agent platform<br/>with knowledge graph RAG."]
 
-    KurrentDB[(KurrentDB<br/>Event Store)]
-    AppPostgres[(PostgreSQL<br/>Projections DB)]
-    RedisTQ[(Redis<br/>Task Queue)]
-    RedisPS[(Redis<br/>Pub/Sub)]
-    Kratos[Ory Kratos<br/>Identity & Auth]
-    Postgres[(PostgreSQL<br/>Kratos DB)]
+    GoogleOAuth["<b>Google OAuth 2.0</b><br/>[External System]<br/>Identity provider for<br/>authentication."]
+    LLMAPIs["<b>LLM APIs</b><br/>[External System]<br/>OpenAI, Google Gemini"]
+    Ollama["<b>Ollama</b><br/>[External System — Optional]<br/>Local LLM inference server."]
+    Stripe["<b>Stripe</b><br/>[External System]<br/>Payment processing and<br/>subscription billing."]
+    MCPServers["<b>Remote MCP Servers</b><br/>[External Systems — Optional]<br/>GitHub, Notion, Linear, etc."]
 
-    EmailService[Email Service]
+    User -->|"HTTPS / SSE"| System
+    System -->|"OAuth 2.0"| GoogleOAuth
+    System -->|"HTTPS (Chat Completions)"| LLMAPIs
+    System -.->|"HTTP (Chat Completions)"| Ollama
+    System -->|"HTTPS (Payments API)"| Stripe
+    System -.->|"Streamable HTTP (MCP)"| MCPServers
+```
 
-    Browser -->|HTTP/SSE| GoApp
-    GoApp -->|Events| KurrentDB
-    GoApp -->|Subscribe<br/>to Events| KurrentDB
-    GoApp -->|Fast Reads<br/>Materialized Views| AppPostgres
-    GoApp -->|Update<br/>Projections| AppPostgres
-    GoApp -->|Tasks| RedisTQ
-    GoApp -->|Pub/Sub| RedisPS
-    GoApp -->|Auth API| Kratos
+## Containers Diagram (Level 2)
 
-    Kratos -->|SQL| Postgres
-    Kratos -->|SMTP| EmailService
+```mermaid
+%%{init: {'flowchart': {'curve': 'linear'}}}%%
+graph TB
+    Browser["<b>Web Browser</b><br/>[Container: Alpine.js + Tailwind CSS]<br/>Server-rendered HTML via Templ<br/>with SSE for real-time updates."]
 
-    note["<i>Note: Solid lines denote synchronous interactions; dashed lines denote asynchronous interactions. The system also supports optional LLM observability via Langfuse (not shown here for clarity).</i>"]
+    GoApp["<b>Go Application</b><br/>[Container: Go + Chi + Asynq]<br/>Event-sourced multi-agent system<br/>with CQRS projections."]
+
+    AppPostgres[("<b>PostgreSQL</b><br/>[Container: Postgres 16]<br/>Events + materialized projections<br/>(AGUI, LLM context, payments, stats).")]
+
+    Redis["<b>Redis</b><br/>[Container: Redis 7]<br/>Task queue (Asynq) + Pub/Sub<br/>broadcast + rate limiting."]
+
+    MinIO["<b>MinIO</b><br/>[Container: S3-Compatible]<br/>Artifact storage (files, audio,<br/>images, long-term memory)."]
+
+    EdgeQuakeAPI["<b>EdgeQuake API</b><br/>[Container: Rust / Axum]<br/>RAG framework: document pipeline,<br/>knowledge graph, vector search."]
+
+    EdgeQuakeDB[("<b>EdgeQuake PostgreSQL</b><br/>[Container: Postgres + AGE + pgvector]<br/>Graph database for knowledge<br/>representation and embeddings.")]
+
+    GoogleOAuth["<b>Google OAuth</b><br/>[External]"]
+    LLMAPIs["<b>LLM APIs</b><br/>[External: OpenAI, Gemini]"]
+    Stripe["<b>Stripe API</b><br/>[External]"]
+
+    Browser -->|"HTTPS / SSE"| GoApp
+    GoApp -->|"Append + Read Events"| AppPostgres
+    GoApp -->|"Update + Query Projections"| AppPostgres
+    GoApp -->|"Enqueue + Process Tasks"| Redis
+    GoApp -->|"Pub/Sub Broadcast"| Redis
+    GoApp -->|"Rate Limit Counters"| Redis
+    GoApp -->|"Store / Retrieve Artifacts"| MinIO
+    GoApp -->|"REST API (Query, Ingest, Pipeline)"| EdgeQuakeAPI
+    GoApp -->|"OAuth 2.0"| GoogleOAuth
+    GoApp -->|"Chat Completions"| LLMAPIs
+    GoApp -->|"Payments / Webhooks"| Stripe
+    EdgeQuakeAPI -->|"SQL + Graph (AGE) + Vector (pgvector)"| EdgeQuakeDB
 ```
 
 ### Containers Overview
 
-- **Web Browser**: Frontend with Alpine.js for reactivity, Tailwind CSS for styling
-- **Go Application**: Event-sourced multi-agent system with PostgreSQL materialized projections
-- **KurrentDB**: PostgreSQL-backed event store (single source of truth for events)
-- **PostgreSQL (App)**: Materialized projection database for fast reads (updated in real-time via event subscription)
-- **Redis (Task Queue)**: Distributed task queue (Asynq) for background agent execution
-- **Redis (Pub/Sub)**: Real-time event broadcaster for multi-pod scalability
-- **Ory Kratos**: Identity and session management
-- **PostgreSQL (Kratos)**: Database for Kratos user data
-- **Email Service**: Notification service for authentication emails
-- **Langfuse**: LLM observability platform for tracing agent executions, handoffs, and responses
-- **PostgreSQL (Langfuse)**: Database for Langfuse traces and metadata
-- **ClickHouse**: Analytics database for Langfuse metrics and aggregations
-- **MinIO**: S3-compatible object storage for Langfuse media and event logs
+| Container | Technology | Description |
+| :--- | :--- | :--- |
+| **Web Browser** | Alpine.js, Tailwind CSS v4, Templ | Server-rendered HTML with client-side reactivity and SSE streaming. |
+| **Go Application** | Go, Chi, Asynq, Templ | Event-sourced multi-agent system. Single binary serving HTTP, background workers, and projections. |
+| **PostgreSQL** | PostgreSQL 16 | Single database for both the append-only event log and all materialized read-model projections. |
+| **Redis** | Redis 7 | Triple-duty: Asynq distributed task queue, cross-pod Pub/Sub for real-time SSE delivery, and distributed per-IP rate limiting. |
+| **MinIO** | MinIO (S3-compatible) | Private artifact storage for user uploads, audio recordings, images, and long-term memory files. Served via pre-signed URLs. |
+| **EdgeQuake API** | Rust, Axum | Advanced RAG framework with document ingestion pipeline, knowledge graph extraction, and hybrid vector + graph search. |
+| **EdgeQuake PostgreSQL** | PostgreSQL + Apache AGE + pgvector | Dedicated graph database with vector embeddings for knowledge representation. |
+| **Google OAuth** | External | Identity provider — session-based authentication via Google OAuth 2.0. |
+| **LLM APIs** | External (OpenAI, Gemini) | Chat completion providers. Per-user model and provider selection stored in the database. |
+| **Stripe API** | External | Subscription billing with event-sourced payment aggregate and webhook integration. |
 
 ## Components Diagram (Level 3)
 
-The following diagram zooms into the **Go Application** container to show its internal components, their responsibilities, technologies, and interactions.
+The following diagram zooms into the **Go Application** container. Components are grouped by architectural layer.
 
 ```mermaid
 %%{init: {'flowchart': {'curve': 'linear'}}}%%
 graph TB
-    subgraph GoApp["Go Application"]
-        Router["<b>Chi Router</b><br/>[Technology: Go Chi]<br/>Routes incoming HTTP requests to appropriate handlers and applies global middleware."]
-        AuthM["<b>Auth Middleware</b><br/>Intercepts requests to validate user sessions via Ory Kratos."]
-        HealthH["<b>Health Handlers</b><br/>Provides public endpoints for liveness and readiness probes."]
-        
-        TaskH["<b>Task Handlers</b><br/>Handles command-side interactions (POST/DELETE) for task and thread management."]
-        AGUIH["<b>AGUI Handlers</b><br/>Handles query-side interactions (GET) for AGUI-compatible thread state."]
-        
-        TaskS["<b>Asynq Task Manager</b><br/>[Technology: Asynq/Redis]<br/>Orchestrates background workers and handles job concurrency."]
-        ThreadMgmt["<b>Thread Manager</b><br/>[Module]<br/>Handles thread lifecycle events directly via event store."]
-        ProjS["<b>UI Projection Service</b><br/>Coordinates fast reads from PostgreSQL materialized projections."]
-        
-        OrchS["<b>Agent Orchestrator</b><br/>Manages multi-agent execution, tool-calling, and event persistence."]
-        
-        ProjUpdater["<b>Projection Updater</b><br/>[Technology: KurrentDB Subscriptions]<br/>Subscribes to event stream and updates PostgreSQL projections in real-time."]
-        
-        RedisB["<b>Redis Broadcaster</b><br/>[Technology: Redis Pub/Sub]<br/>Broadcasts events across multiple pods for real-time UI updates."]
+    User["<b>User / Browser</b>"]
 
-        LLMProj["<b>LLM Context Projection (PostgreSQL)</b><br/>[Technology: Materialized Views]<br/>Fast conversation history from PostgreSQL for LLM prompts."]
-        
-        AGUIProj["<b>AGUI Projection (PostgreSQL)</b><br/>[Technology: Materialized Views]<br/>Fast reads from PostgreSQL for current thread state."]
+    subgraph GoApp["Go Application"]
+
+        subgraph HTTP["HTTP Layer"]
+            Router["<b>Chi Router</b><br/>Routing + global middleware"]
+            MWStack["<b>Middleware Stack</b><br/>Security headers, rate limiting,<br/>body limit, i18n, metrics,<br/>recovery, logging"]
+            AuthMW["<b>Google OAuth Auth</b><br/>Session-based authentication"]
+            HealthH["<b>Health Handlers</b><br/>Liveness + readiness probes"]
+        end
+
+        subgraph Handlers["Handler Layer (27 packages)"]
+            TaskH["<b>Task Management</b><br/>Command side: send message,<br/>agent run, artifacts, memory,<br/>toolsets, plugins"]
+            AGUIH["<b>AGUI Handlers</b><br/>Query side: thread state,<br/>messages, SSE streaming"]
+            KnowledgeH["<b>Knowledge Handlers</b><br/>KB UI + API: documents,<br/>workspaces, graph, pipeline"]
+            MCPH["<b>MCP Handlers</b><br/>Connector CRUD, OAuth,<br/>connect/disconnect, tool proxy"]
+            BillingH["<b>Billing Handlers</b><br/>Stripe intents, status,<br/>webhooks"]
+            OtherH["<b>Other Handlers</b><br/>Agent store, catalog, AI settings,<br/>resources, profile, preferences,<br/>statistics, ratings, co-writer"]
+        end
+
+        subgraph Services["Service Layer"]
+            Orchestrator["<b>Agent Orchestrator</b><br/>Event classification (durable vs transient),<br/>persistence, broadcast, error handling"]
+            TaskMgr["<b>Asynq Task Manager</b><br/>Async job queue with<br/>retry + priority"]
+            ThreadMgmt["<b>Thread Management</b><br/>Thread lifecycle via<br/>event store"]
+            ToolReg["<b>Tool Registry</b><br/>Plugin registration +<br/>DB persistence"]
+            MCPDiscovery["<b>MCP Plugin Discovery</b><br/>Remote connector lifecycle,<br/>OAuth, circuit breaker"]
+            BillingS["<b>Billing Service</b><br/>Event-sourced Stripe<br/>payment aggregate"]
+            EdgequakeS["<b>EdgeQuake Service</b><br/>REST facade to RAG API"]
+            ArtifactS["<b>Artifact Service</b><br/>S3/MinIO storage"]
+            MemoryS["<b>Memory Service</b><br/>Long-term memory (S3)"]
+            OtherS["<b>Other Services</b><br/>Agent store, AI settings,<br/>permissions, resources,<br/>student profile, title gen"]
+        end
+
+        subgraph Plugins["Plugin Layer (9 plugins)"]
+            PluginList["<b>calculator</b> · <b>codebase</b> · <b>cognitive</b><br/><b>document</b> · <b>elicitation</b> · <b>knowledgebase</b><br/><b>library</b> · <b>memory</b> · <b>tts</b>"]
+        end
+
+        subgraph Foundation["Foundation Layer"]
+            AgentSDK["<b>Agent SDK</b><br/>Core abstractions, engine,<br/>LLM adapters (OpenAI,<br/>Gemini, Ollama), I/O"]
+            AgentFW["<b>Agent Framework</b><br/>Agent, Runner, Tool,<br/>Middleware interfaces"]
+            EventRouter["<b>Event Router</b><br/>Persistence router +<br/>transient router"]
+            UnifiedMW["<b>Unified Middleware</b><br/>Agent / Chat / Function<br/>interception pipeline"]
+            Metrics["<b>Metrics + OTel</b><br/>Counters, spans, traces"]
+        end
+
+        subgraph Infra["Infrastructure Layer"]
+            EventStore["<b>PostgreSQL Event Store</b><br/>Append-only log with<br/>optimistic concurrency"]
+            Projections["<b>Projection Updater</b><br/>Polls event store, updates<br/>4 projections in real-time"]
+            AGUIProj["<b>AGUI Projection</b>"]
+            LLMProj["<b>LLM Context Projection</b>"]
+            PayProj["<b>Payment Projection</b>"]
+            StatsProj["<b>Statistics Projection</b>"]
+            RedisB["<b>Redis Broadcaster</b><br/>Cross-pod SSE delivery"]
+            DBRepos["<b>SQL Repositories</b><br/>11 repos + migrations"]
+            GoogleAuth["<b>Google Auth Client</b><br/>OAuth + session store"]
+        end
     end
 
-    User["<b>User / Browser</b><br/>[Person/Client]"]
-    Kratos["<b>Ory Kratos</b><br/>[Software System]<br/>Identity Management"]
-    RedisTQ["<b>Redis (Task Queue)</b><br/>[Container]<br/>Asynq Backend"]
-    RedisPS["<b>Redis (Pub/Sub)</b><br/>[Container]<br/>Real-time Broadcaster"]
-    KurrentDB["<b>KurrentDB</b><br/>[Container]<br/>Event Store"]
-    AppPostgres["<b>PostgreSQL</b><br/>[Container]<br/>Projections DB"]
+    AppPostgres[("<b>PostgreSQL</b>")]
+    Redis["<b>Redis</b>"]
+    MinIO["<b>MinIO</b>"]
+    EdgeQuake["<b>EdgeQuake API</b>"]
+    GoogleOAuthExt["<b>Google OAuth</b>"]
+    LLMAPIs["<b>LLM APIs</b>"]
+    StripeAPI["<b>Stripe API</b>"]
 
-    User -->|"Uses [HTTPS/SSE]"| Router
-    Router -->|"Routes to"| HealthH
-    Router -->|"Passes to"| AuthM
-    AuthM -->|"Routes to"| TaskH
-    AuthM -->|"Routes to"| AGUIH
-    
-    AuthM -->|"Validates session [HTTPS]"| Kratos
-    
-    TaskH -->|"Command to enqueue [In-process]"| TaskS
-    TaskH -->|"Manages threads [In-process]"| ThreadMgmt
-    AGUIH -->|"Requests projection [In-process]"| ProjS
-    
-    TaskS -.->|"Enqueues job"| RedisTQ
-    RedisTQ -.->|"Pulls job for processing"| TaskS
-    
-    TaskS -->|"Executes business logic [In-process]"| OrchS
-    
-    OrchS -->|"Requests context [In-process]"| LLMProj
-    
-    ProjS -->|"Fast reads"| AGUIProj
-    AGUIProj -->|"Query"| AppPostgres
-    
-    AGUIH -->|"Subscribes (Live)"| RedisB
-    RedisB -.->|"Subscribe/Publish"| RedisPS
-    ProjUpdater -.->|"Notify (Live)"| RedisB
-    
-    LLMProj -->|"Query"| AppPostgres
-    
-    ProjUpdater -->|"Subscribe to $all"| KurrentDB
-    ProjUpdater -->|"Update all projections"| AppPostgres
-    
-    OrchS -->|"Appends events"| KurrentDB
-    ThreadMgmt -->|"Appends events"| KurrentDB
-    
-    note["<i>Note: Solid lines denote synchronous interactions; dashed lines denote asynchronous interactions. LLM interactions and detailed tracing (via Langfuse) are omitted for clarity as they are considered implicit.</i>"]
+    User -->|"HTTPS / SSE"| Router
+    Router --> MWStack --> AuthMW
+    AuthMW --> TaskH & AGUIH & KnowledgeH & MCPH & BillingH & OtherH
+    Router --> HealthH
+
+    TaskH --> TaskMgr --> Orchestrator
+    TaskH --> ThreadMgmt
+    AGUIH --> AGUIProj
+    AGUIH -->|"Live SSE"| RedisB
+    KnowledgeH --> EdgequakeS
+    MCPH --> MCPDiscovery
+    BillingH --> BillingS
+
+    Orchestrator --> AgentSDK
+    Orchestrator --> EventStore
+    Orchestrator --> EventRouter
+    Orchestrator --> RedisB
+
+    AgentSDK --> UnifiedMW
+    AgentSDK --> LLMAPIs
+
+    ToolReg --> PluginList
+    MCPDiscovery --> ToolReg
+
+    EventRouter --> Projections
+    Projections --> AGUIProj & LLMProj & PayProj & StatsProj
+    Projections --> RedisB
+
+    EventStore --> AppPostgres
+    AGUIProj --> AppPostgres
+    LLMProj --> AppPostgres
+    PayProj --> AppPostgres
+    StatsProj --> AppPostgres
+    DBRepos --> AppPostgres
+    TaskMgr --> Redis
+    RedisB --> Redis
+    ArtifactS --> MinIO
+    MemoryS --> MinIO
+    EdgequakeS --> EdgeQuake
+    GoogleAuth --> GoogleOAuthExt
+    BillingS --> StripeAPI
+    ThreadMgmt --> EventStore
 ```
 
 ### Components Overview
 
-| Name | Technology | Description |
+| Component | Technology | Description |
 | :--- | :--- | :--- |
-| **Chi Router** | Go Chi | High-performance routing with middleware for panic recovery, logging, and metrics. |
-| **Auth Middleware** | - | Security layer that enforces session requirements using external Kratos identity service. |
-| **Health Handlers** | - | Public system status endpoints used for infrastructure health checks. |
-| **Task Handlers** | - | The "Command" side of CQRS, transforming HTTP requests into background tasks. |
-| **AGUI Handlers** | - | The "Query" side of CQRS, serving structured JSON/SSE for the AGUI frontend. |
-| **Asynq Task Manager** | Asynq/Redis | Reliable task queueing and processing with retry logic and priority management. |
-| **Thread Manager** | - | Handles thread lifecycle events (creation, deletion) directly via event store adapter. |
-| **UI Projection Service** | - | Domain logic for fast reads from PostgreSQL materialized projections. |
-| **Agent Orchestrator** | - | Manages LLM interactions, tool-calling loops, and agent handoffs. (Package: `services/agentorchestrator`) |
-| **Projection Updater** | KurrentDB Subscriptions | Subscribes to KurrentDB event stream and updates PostgreSQL projections in real-time. |
-| **Redis Broadcaster** | Redis Pub/Sub | Distributed event broadcaster that ensures real-time updates are delivered across all application pods. |
-| **LLM Context Projection** | PostgreSQL Materialized Views | Fast conversation history from PostgreSQL for LLM prompts (3-8ms reads). |
-| **AGUI Projection** | PostgreSQL Materialized Views | Fast reads from PostgreSQL tables that are kept up-to-date via event subscription (3-8ms vs 50-500ms). |
+| **Chi Router** | Go Chi | HTTP routing with middleware pipeline (recovery, logging, metrics, security headers, rate limiting, body limit, i18n). |
+| **Google OAuth Auth** | `infra/googleauth` | Session-based authentication via Google OAuth 2.0 with cookie session store. |
+| **Health Handlers** | — | Public `/liveness` and `/readiness` endpoints with dependency health checks. |
+| **Task Management** | `handlers/taskmgmt` | Command side of CQRS — message send, agent runs, artifact upload, memory, toolset management, plugin UI. |
+| **AGUI Handlers** | `handlers/agui` | Query side of CQRS — thread listing, message history, live SSE streaming via AG-UI protocol. |
+| **Knowledge Handlers** | `handlers/knowledge` | Full knowledge base UI and API — document upload, workspace management, graph exploration, pipeline control. |
+| **MCP Handlers** | `handlers/mcp` | MCP connector CRUD, OAuth callback, connect/disconnect, tool discovery, request proxy. |
+| **Billing Handlers** | `handlers/billing` | Stripe payment intents, subscription status, webhook processing. |
+| **Agent Orchestrator** | `services/agentorchestrator` | Core orchestration loop — classifies events as **durable** (persisted to event store) or **transient** (broadcast-only), then persists and/or broadcasts accordingly (ADR-003, ADR-007). |
+| **Asynq Task Manager** | `services/taskmanagement` | Distributed background job queue via Asynq/Redis with retry logic and AG-UI event conversion. |
+| **Thread Management** | `services/threadmgmt` | Thread lifecycle (create, delete) via event store aggregate. |
+| **Tool Registry** | `services/toolregistry` | Central registry for all tool plugins. Manages `PluginProvider` registration, tool/toolset DB persistence, and dynamic UI injection (ADR-008). |
+| **MCP Plugin Discovery** | `services/plugindiscovery` | Remote MCP connector lifecycle — OAuth 2.1 + PKCE, circuit breakers, bounded concurrency, ephemeral toolset registration (ADR-010). |
+| **Billing Service** | `services/billing` | Event-sourced payment aggregate with Stripe SDK. Subscription lifecycle, lazy expiration, idempotent webhook processing. |
+| **EdgeQuake Service** | `services/edgequake` | HTTP facade to the Rust RAG API — documents, query, workspaces, pipeline, graph, entities, relationships. |
+| **Artifact Service** | `services/artifact` | S3/MinIO storage for user files, audio, images. Pre-upload pattern with HTTP Range streaming (ADR-011). |
+| **Memory Service** | `services/memory` | Long-term memory stored as `SCHOOLAI.md` in S3. Read/write via memory plugin tool. |
+| **Plugin Layer** | `plugins/*` | 9 self-contained plugins each implementing `PluginProvider`: calculator, codebase, cognitive, document, elicitation, knowledgebase, library, memory, tts. Each provides backend logic + Templ UI templates (ADR-008). |
+| **Agent SDK** | `foundation/agentsdk` | Framework-isolated agent engine with LLM iteration loop, tool execution, stream processing, and human-in-the-loop I/O. LLM adapters for OpenAI, Gemini, and Ollama (ADR-001, ADR-005). |
+| **Agent Framework** | `foundation/agent` | Framework-agnostic interfaces: `Agent`, `Runner`, `ExecutableTool`, `StreamingExecutor`, `AgentProvider`, `Middleware` (ADR-006). |
+| **Event Router** | `foundation/event` | Dual-router event dispatch — persistence router (feeds projection updater) and transient router (feeds Redis broadcaster). |
+| **Unified Middleware** | `foundation/agent` | Echo-inspired middleware pipeline intercepting three operation kinds: Agent runs, Chat (LLM) calls, and Function (tool) calls (ADR-006). |
+| **PostgreSQL Event Store** | `infra/eventstore/postgres` | Append-only event log with optimistic concurrency and typed event deserialization. |
+| **Projection Updater** | `infra/projection` | Background worker polling the event store, updating 4 PostgreSQL projections (AGUI, LLM context, payment, statistics) with leader election. |
+| **Redis Broadcaster** | `infra/projection` | Cross-pod event broadcaster via Redis Pub/Sub. Both durable and ephemeral events are broadcast synchronously for zero-latency SSE delivery (ADR-007). |
+| **SQL Repositories** | `infra/sqldb` | 11 PostgreSQL repositories (agent catalog, agent definitions, AI settings, MCP connectors, permissions, resources, student profiles, tool registry, user preferences, workspace permissions) + migration runner. |
 
-### Key Patterns
+### Key Architectural Patterns
 
-- **Event Sourcing**: All state changes are persisted as a sequence of events in KurrentDB.
-- **Materialized Projections**: PostgreSQL tables updated in real-time via event subscription for fast reads (~100x faster than query-time).
-- **Event Subscription**: Projection updater subscribes to KurrentDB `$all` stream and incrementally updates both projections (AGUI, LLM Context).
-- **CQRS**: Clear separation between command side (Task Handlers writing events) and query side (AGUI Handlers reading projections).
-- **Multi-Pod Scalability**: Real-time events are broadcasted via **Redis Pub/Sub**. This ensures that even if a user is connected to Pod A but their background task is running on Pod B, they still receive real-time UI updates seamlessly.
-- **Multi-Agent Orchestration**: Collaborative agent execution with explicit handoff protocols.
+| Pattern | Description | Relevant ADRs |
+| :--- | :--- | :--- |
+| **Event Sourcing** | All state changes persisted as an ordered sequence of events in a PostgreSQL-backed event store. Two aggregates: `ThreadAggregate` (conversations) and `PaymentAccountAggregate` (billing). | — |
+| **CQRS** | Strict separation — command side (Task Handlers → Orchestrator → Event Store) and query side (AGUI Handlers → Projections). | — |
+| **Materialized Projections** | Four PostgreSQL projections (AGUI, LLM context, payment, statistics) updated in real-time by a background projection updater. Fast reads (~3-8ms) vs query-time aggregation (~50-500ms). | — |
+| **Event Classification** | Every event is explicitly classified as **durable** (persisted then broadcast) or **transient** (broadcast-only, never persisted). System recovers from durable events alone. | ADR-003, ADR-007 |
+| **Synchronous Broadcast** | Durable events are broadcast to Redis immediately alongside persistence (outbox bypass), eliminating latency gaps between transient and durable event delivery. | ADR-007 |
+| **Agent SDK Boundary** | Strict architectural boundary — the application interacts with agent frameworks only through `foundation/agent` interfaces. Each framework adapter translates `core.Event` → `domain.Event`. | ADR-001, ADR-002, ADR-005 |
+| **Plugin Architecture** | Every toolset is a self-contained package under `plugins/` implementing `PluginProvider`. Backend logic + frontend Templ UI. Dynamic registry replaces hardcoded tool lists. | ADR-008 |
+| **MCP Connectors** | User-registered remote MCP servers bridged into the plugin/permissions system as ephemeral toolsets. OAuth 2.1 + PKCE, circuit breakers, SSRF protection. | ADR-010 |
+| **Unified Middleware** | Single middleware pipeline intercepting three operation kinds (Agent, Chat, Function) — enables cross-cutting concerns like tracing, rate limiting, and permission checks. | ADR-006 |
+| **Pre-Upload Artifacts** | Files uploaded to S3 on attach (before send). Only ~100-byte URL references flow through the event/message pipeline instead of multi-MB base64 blobs. | ADR-011 |
+| **Multi-Pod Scalability** | Redis Pub/Sub ensures real-time SSE delivery across all pods. A user connected to Pod A receives events from background tasks running on Pod B. | — |
+| **Pointer-Based Domain Events** | All domain events handled as pointers throughout the lifecycle for compile-time type safety and correct type-switch matching. | ADR-004 |
 
 ## Tech Stack
 
-- **Backend**: Go with Templ templating
-- **Frontend**: Alpine.js for reactivity
-- **Styling**: Tailwind CSS v4
-- **Components**: templui (shadcn/ui equivalent for Go/Templ)
-- **Protocol**: AG-UI for server-sent events
-- **Linear Algebra**: gosl library (LAPACK/OpenBLAS integration)
+| Layer | Technology |
+| :--- | :--- |
+| **Backend** | Go with [Templ](https://templ.guide) server-side templating |
+| **Frontend** | Alpine.js for reactivity, [templui](https://templui.io) component library |
+| **Styling** | Tailwind CSS v4 |
+| **Protocol** | [AG-UI](https://github.com/ag-ui-protocol/ag-ui) for server-sent events |
+| **Event Store** | PostgreSQL (append-only log with optimistic concurrency) |
+| **Task Queue** | [Asynq](https://github.com/hibiken/asynq) (Redis-backed distributed workers) |
+| **RAG** | [EdgeQuake](edgequake/) — Rust framework with Apache AGE graph + pgvector |
+| **Object Storage** | MinIO (S3-compatible) for artifacts and long-term memory |
+| **Authentication** | Google OAuth 2.0 with cookie sessions |
+| **Billing** | Stripe (event-sourced payment aggregate) |
+| **LLM Providers** | OpenAI, Google Gemini, Ollama (per-user selection) |
+| **Tool Protocol** | [MCP](https://modelcontextprotocol.io/) (Streamable HTTP transport) for remote tool servers |
+| **Observability** | OpenTelemetry spans, expvar/pprof debug server, state machine visualization |
+| **TLS** | Direct TLS termination (X25519 / P-256 curves) |
 
 ## Debugging
 
