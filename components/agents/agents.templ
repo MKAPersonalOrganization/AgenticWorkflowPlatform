@@ -45,7 +45,7 @@ templ AgentsDialog() {
 									class="px-4 py-2 text-sm font-medium border-b-2 transition-colors"
 									:class="activeTab === 'my-agents' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'"
 								>
-									@icon.Compass(icon.Props{Class: "size-4 inline-block mr-1.5 -mt-0.5"})
+									@icon.CompassLogo("size-4 inline-block mr-1.5 -mt-0.5")
 									{ i18n.T(ctx, "My Agents") }
 								</button>
 								<button
@@ -108,7 +108,7 @@ templ AgentsDialog() {
 											<!-- Empty State -->
 											<template x-if="filteredAgents.length === 0">
 												<div class="flex flex-col items-center justify-center py-12 gap-3 text-muted-foreground">
-													@icon.Compass(icon.Props{Class: "size-12 opacity-20"})
+													@icon.CompassLogo("size-12 opacity-20")
 													<template x-if="searchQuery">
 														<div class="text-center">
 															<p class="text-sm font-medium">{ i18n.T(ctx, "No agents found") }</p>
@@ -757,7 +757,7 @@ templ AgentsButtonTrigger() {
 			></span>
 			<!-- Fallback compass icon when agent has no SVG icon -->
 			<span x-show="currentAgentData && !currentAgentData.icon" class="size-5 flex items-center justify-center text-foreground">
-				@icon.Compass(icon.Props{Class: "size-4"})
+				@icon.CompassLogo("size-4")
 			</span>
 			<!-- Loading spinner (only while agent data is being fetched) -->
 			<span x-show="!currentAgentData" class="size-5 flex items-center justify-center text-muted-foreground">
@@ -782,7 +782,7 @@ templ AgentsNavButtonTrigger() {
 				"title":  i18n.T(ctx, "Agents"),
 			},
 		}) {
-			@icon.Compass(icon.Props{Class: "size-5"})
+			@icon.CompassLogo("size-5")
 			<span class="sr-only">{ i18n.T(ctx, "Agents") }</span>
 		}
 	}

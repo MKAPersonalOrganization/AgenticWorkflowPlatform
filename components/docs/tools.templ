@@ -4,7 +4,7 @@ package docs
 templ docsPlugins() {
 	@docsSection("plugins", "Plugin System", iconPuzzle, "text-green-500") {
 		<p>
-			Compass's plugin system provides a powerful extension mechanism that gives agents specialized
+			Compass.AI's plugin system provides a powerful extension mechanism that gives agents specialized
 			capabilities. Plugins are registered at startup and managed through a central registry, with
 			per-agent toggle control for fine-grained configuration.
 		</p>
@@ -65,14 +65,14 @@ templ docsVoiceTTS() {
 		</p>
 		<h3>Decoupled Voice Configuration</h3>
 		<p>
-			Voice settings are a standalone <strong>capability</strong> in Compass's two-layer AI architecture.
+			Voice settings are a standalone <strong>capability</strong> in Compass.AI's two-layer AI architecture.
 			Your configured providers are listed automatically — just pick which one to use for TTS, select a
 			model and voice, and you're done. Configure once in Settings → AI → AI Voice Configuration, and
 			every agent that uses the TTS plugin automatically picks up your preferences.
 		</p>
 		<h3>Available Voices</h3>
 		<p>
-			Compass offers <strong>a wide selection of AI voices</strong>, each with its own character and tone:
+			Compass.AI offers <strong>a wide selection of AI voices</strong>, each with its own character and tone:
 		</p>
 		@docsTable() {
 			<thead>
@@ -134,13 +134,13 @@ templ docsMCP() {
 	@docsSection("mcp", "MCP Integration", iconNetwork, "text-orange-500") {
 		<p>
 			The <strong>Model Context Protocol (MCP)</strong> is an open standard that allows AI applications to connect
-			with external tools and data sources. Compass implements full MCP client support, enabling your agents to
+			with external tools and data sources. Compass.AI implements full MCP client support, enabling your agents to
 			interact with remote services seamlessly.
 		</p>
 		<h3>How MCP Works</h3>
 		<p>
-			MCP connectors act as bridges between Compass and external servers. When you connect to an MCP server,
-			Compass automatically discovers the available tools and makes them accessible to your agents.
+			MCP connectors act as bridges between Compass.AI and external servers. When you connect to an MCP server,
+			Compass.AI automatically discovers the available tools and makes them accessible to your agents.
 		</p>
 		@docsInfoBox("Connector Lifecycle") {
 			<div class="flex flex-wrap items-center gap-2 mt-2 text-sm">
@@ -166,19 +166,19 @@ templ docsMCP() {
 		</ol>
 		<h3>OAuth 2.1 Support</h3>
 		<p>
-			Compass supports the full OAuth 2.1 Authorization Code + PKCE flow for secure authentication
+			Compass.AI supports the full OAuth 2.1 Authorization Code + PKCE flow for secure authentication
 			with MCP servers. This means you can safely connect to services like GitHub, Notion, and Slack
 			without exposing your credentials.
 		</p>
 		<h3>MCP Proxy</h3>
 		<p>
-			Compass includes an authenticated reverse proxy to MCP servers. This means your agents can
-			communicate with external services through Compass's secure infrastructure, with SSRF protection
+			Compass.AI includes an authenticated reverse proxy to MCP servers. This means your agents can
+			communicate with external services through Compass.AI's secure infrastructure, with SSRF protection
 			and encrypted OAuth tokens at rest.
 		</p>
 		<h3>Preset Connectors</h3>
 		<p>
-			Compass ships with a catalog of preset MCP connectors for popular services. These presets
+			Compass.AI ships with a catalog of preset MCP connectors for popular services. These presets
 			come pre-configured with the correct server URLs and OAuth settings, so you can connect
 			with a single click.
 		</p>

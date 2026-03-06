@@ -34,7 +34,7 @@ templ AuthLayout(props LayoutProps) {
 				<!-- Logo -->
 				<div class="flex justify-center">
 					if props.LogoURL != "" {
-						<img src={ props.LogoURL } alt="Compass Logo" class="h-12 w-auto"/>
+						<img src={ props.LogoURL } alt="Compass.AI Logo" class="h-12 w-auto"/>
 					} else {
 						<div class="h-12 w-12 mx-auto flex items-center justify-center bg-primary text-primary-foreground rounded-full">
 							<svg width="24" height="24" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" class="compass-spin-slow">
@@ -86,7 +86,7 @@ templ AuthLayout(props LayoutProps) {
 						<a href="/support" class="hover:text-foreground">{ i18n.T(ctx, "Support") }</a>
 					</div>
 					<div class="mt-2 text-xs">
-						© { templ.EscapeString(getCurrentYear()) } Compass. { i18n.T(ctx, "All rights reserved.") }
+						© { templ.EscapeString(getCurrentYear()) } Compass.AI. { i18n.T(ctx, "All rights reserved.") }
 					</div>
 				</div>
 			</div>

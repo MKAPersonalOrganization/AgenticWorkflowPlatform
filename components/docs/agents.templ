@@ -4,7 +4,7 @@ package docs
 templ docsAIModels() {
 	@docsSection("ai-models", "AI Models", iconCpu, "text-blue-500") {
 		<p>
-			Compass supports <strong>models from three major AI providers</strong>. Configure your preferred
+			Compass.AI supports <strong>models from three major AI providers</strong>. Configure your preferred
 			model globally in Settings → AI → Chat Model, and all agents automatically use it.
 		</p>
 		<h3>Supported Providers and Models</h3>
@@ -45,7 +45,7 @@ templ docsAIModels() {
 			Agents only define behavioral configuration: name, system prompt, tools, and knowledge base access.
 		</p>
 		@docsInfoBox("Provider Health") {
-			<p>Compass monitors provider availability and can gracefully handle provider outages. Each provider connection is health-checked independently.</p>
+			<p>Compass.AI monitors provider availability and can gracefully handle provider outages. Each provider connection is health-checked independently.</p>
 		}
 	}
 }
@@ -54,7 +54,7 @@ templ docsAIModels() {
 templ docsAISettings() {
 	@docsSection("ai-settings", "AI Settings — Bring Your Own Key", iconSlidersHorizontal, "text-teal-500") {
 		<p>
-			Compass gives you <strong>full control over your AI infrastructure</strong> through a clean
+			Compass.AI gives you <strong>full control over your AI infrastructure</strong> through a clean
 			two-layer architecture: <strong>provider credentials</strong> and <strong>capability configuration</strong>.
 			Add your API keys once, then independently choose which provider and model powers each AI
 			function — chat, voice, embeddings — without any overlap or duplication.
@@ -62,7 +62,7 @@ templ docsAISettings() {
 		<h3>Two-Layer Architecture</h3>
 		<p>
 			Unlike platforms that lock you into a single AI provider or force you to reconfigure credentials per feature,
-			Compass cleanly separates the two concerns:
+			Compass.AI cleanly separates the two concerns:
 		</p>
 		<ul class="space-y-2 my-4">
 			<li>• <strong>Layer 1 — Providers</strong> — Store API keys for OpenAI, Anthropic, and Google Gemini. Each provider is configured once and shared across all capabilities.</li>
@@ -98,7 +98,7 @@ templ docsAISettings() {
 			<li><strong>Start using agents</strong> — Every agent automatically uses the right provider for each capability based on your configuration.</li>
 		</ol>
 		@docsInfoBox("Your Keys, Your Control") {
-			<p>Compass never stores your API keys in plain text — they are encrypted at rest. You own your keys and can revoke them at any time. Compass does not proxy or mark up API costs; all charges go directly to your provider. Use token analytics to monitor usage and optimize spend.</p>
+			<p>Compass.AI never stores your API keys in plain text — they are encrypted at rest. You own your keys and can revoke them at any time. Compass.AI does not proxy or mark up API costs; all charges go directly to your provider. Use token analytics to monitor usage and optimize spend.</p>
 		}
 	}
 }
@@ -203,7 +203,7 @@ templ docsCustomAgents() {
 templ docsStudentProfile() {
 	@docsSection("personalized-profile", "Personalized Profile", iconUser, "text-amber-500") {
 		<p>
-			The Personalized Profile is a powerful adaptation feature that makes Compass truly yours.
+			The Personalized Profile is a powerful adaptation feature that makes Compass.AI truly yours.
 			By defining your work preferences, every AI agent automatically adjusts its approach to
 			match how you work best.
 		</p>

@@ -15,74 +15,44 @@ templ featuresSection() {
 					Everything you need, in one platform
 				</h2>
 				<p class="mt-4 text-lg text-muted-foreground">
-					From AI-powered conversations to knowledge management, Compass delivers a complete workspace ecosystem.
+					From AI-powered conversations to knowledge management, Compass.AI delivers a complete workspace ecosystem.
 				</p>
 			</div>
 			<div class="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
 				@featureCard(
 					"Multi-Model AI Chat",
-					"Bring your own API keys and independently configure which provider powers chat, voice, and embeddings. Stream GPT-4o, Claude, or Gemini responses in real-time.",
+					"Stream GPT-4o, Claude 3.5 Sonnet, or Gemini 2.0. Switch models instantly based on your task requirements.",
 					"text-blue-500",
 					iconMessageSq,
 				)
 				@featureCard(
-					"Agent Store & Builder",
-					"Browse a growing catalog of specialized agent templates by category. Fork, customize, or create your own agents with tailored prompts, models, and tool configurations.",
+					"Agentic Workflows",
+					"Fork, customize, and orchestrate specialized AI agents with tailored system prompts and tool access for complex tasks.",
 					"text-purple-500",
 					iconStore,
 				)
 				@featureCard(
-					"Built-in Plugins",
-					"A rich set of built-in plugins — from calculation and code analysis to document processing, memory, and voice — useful for many agentic scenarios. Toggle per agent.",
-					"text-green-500",
-					iconPuzzle,
-				)
-				@featureCard(
-					"MCP Protocol",
-					"Connect to external MCP servers with full OAuth 2.1 + PKCE support. Auto-discover remote tools from GitHub, Notion, Slack, and your own servers.",
-					"text-orange-500",
-					iconPlug,
-				)
-				@featureCard(
-					"Knowledge Base (RAG)",
-					"Upload PDFs and documents, build interactive knowledge graphs with vector embeddings, and let agents give answers grounded in your own data.",
+					"Knowledge Integration",
+					"Connect your own data. Build interactive RAG knowledge bases that ground your AI agents in reality.",
 					"text-pink-500",
 					iconDatabase,
 				)
 				@featureCard(
-					"AI Voice & TTS",
-					"Lifelike AI voices configured independently from your chat model. Pick a TTS provider, model, and voice — all managed separately in AI Settings.",
-					"text-indigo-500",
-					iconHeadphones,
+					"MCP & Plugin Ecosystem",
+					"Connect to local tools or remote MCP servers to give your agents access to GitHub, Slack, Notion, and your filesystem.",
+					"text-orange-500",
+					iconPlug,
 				)
 				@featureCard(
-					"Personalized Profiles",
-					"Define your work style, goals, strengths, and preferences. Agents auto-adapt their communication approach based on your unique profile.",
-					"text-amber-500",
-					iconUser,
-				)
-				@featureCard(
-					"Interactive Forms",
-					"Multiple choice, true/false, short answer, and multi-select inputs rendered inline in chat. Manage structured data without leaving the conversation.",
-					"text-emerald-500",
-					iconStar,
-				)
-				@featureCard(
-					"Event-Sourced Architecture",
-					"Every action is an immutable event. Full audit trail, time-travel debugging, and reliable state reconstruction built into the core.",
-					"text-slate-500",
-					iconLayers,
-				)
-				@featureCard(
-					"Memory & Artifacts",
-					"Long-term memory persists across conversations. Generate downloadable code files, diagrams, reports, and audio artifacts per thread.",
+					"Persistent Memory",
+					"Long-term memory persists across conversations. Generate and manage downloadable code, reports, and artifacts seamlessly.",
 					"text-violet-500",
 					iconBrain,
 				)
 				@featureCard(
-					"Enterprise Security",
-					"TLS with X25519/P256, per-IP rate limiting, SSRF protection, encrypted OAuth tokens, PCI SAQ-A payments, and production config guard.",
-					"text-red-500",
+					"Secure Architecture",
+					"Enterprise-grade security built-in. Features time-travel debugging, immutable event logs, and robust rate-limiting.",
+					"text-slate-500",
 					iconShieldCheck,
 				)
 			</div>
@@ -91,11 +61,14 @@ templ featuresSection() {
 }
 
 templ featureCard(title, description, colorClass string, iconComp templ.Component) {
-	<div class="group relative rounded-xl border border-border bg-card p-6 transition-all hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5">
-		<div class={ "mb-4 inline-flex h-11 w-11 items-center justify-center rounded-lg bg-muted", colorClass }>
-			@iconComp
+	<div class="group relative rounded-2xl border border-transparent p-6 transition-colors duration-200 hover:bg-muted/30">
+		<div class="relative z-10">
+			<!-- Subtle monochrome icon container -->
+			<div class="mb-5 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-foreground">
+				@iconComp
+			</div>
+			<h3 class="text-lg font-semibold tracking-tight text-foreground">{ title }</h3>
+			<p class="mt-2 text-sm leading-relaxed text-muted-foreground">{ description }</p>
 		</div>
-		<h3 class="text-lg font-semibold">{ title }</h3>
-		<p class="mt-2 text-sm leading-relaxed text-muted-foreground">{ description }</p>
 	</div>
 }

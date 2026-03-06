@@ -8,50 +8,43 @@ import (
 
 // ─── CTA Section ─────────────────────────────────────────────────────────────
 templ ctaSection(user *domain.User) {
-	<section class="py-24">
-		<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-			<div class="relative overflow-hidden rounded-2xl bg-primary px-8 py-16 text-center sm:px-16">
-				<!-- Decorative elements -->
-				<div class="pointer-events-none absolute inset-0 z-0">
-					<div class="absolute -left-20 -top-20 h-60 w-60 rounded-full bg-white/10 blur-3xl"></div>
-					<div class="absolute -bottom-20 -right-20 h-60 w-60 rounded-full bg-white/10 blur-3xl"></div>
-				</div>
-				<div class="relative z-10">
-					<h2 class="text-3xl font-bold tracking-tight text-primary-foreground sm:text-4xl">
-						Ready to transform your workflow?
-					</h2>
-					<p class="mx-auto mt-4 max-w-xl text-lg text-primary-foreground/80">
-						Join thousands of professionals who use Compass to work smarter, move faster, and achieve more with AI.
-					</p>
-					<div class="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
-						if user != nil {
-							@button.Button(button.Props{
-								Href:    "/chat",
-								Variant: button.VariantSecondary,
-								Size:    button.SizeLg,
-							}) {
-								<span>Open Compass</span>
-								@icon.ArrowRight(icon.Props{Class: "size-5"})
-							}
-						} else {
-							@button.Button(button.Props{
-								Href:    "/auth/login",
-								Variant: button.VariantSecondary,
-								Size:    button.SizeLg,
-							}) {
-								<span>Start for Free</span>
-								@icon.ArrowRight(icon.Props{Class: "size-5"})
-							}
-						}
+	<section class="py-32 bg-background border-t border-border">
+		<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
+			<div class="mx-auto max-w-3xl">
+				<h2 class="text-4xl font-semibold tracking-tight sm:text-5xl text-foreground pb-2">
+					Ready to transform your workflow?
+				</h2>
+				<p class="mx-auto mt-6 text-xl text-muted-foreground">
+					Join thousands of professionals who use Compass.AI to work smarter, move faster, and achieve more with AI.
+				</p>
+				<div class="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+					if user != nil {
 						@button.Button(button.Props{
-							Href:    "/docs",
-							Variant: button.VariantOutline,
-							Size:    button.SizeLg,
-							Class:   "border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10",
+							Href:  "/chat",
+							Size:  button.SizeLg,
+							Class: "px-8 rounded-full",
 						}) {
-							<span>Read Documentation</span>
+							<span>Open Compass.AI</span>
+							@icon.ArrowRight(icon.Props{Class: "size-4 ml-2"})
 						}
-					</div>
+					} else {
+						@button.Button(button.Props{
+							Href:  "/auth/login",
+							Size:  button.SizeLg,
+							Class: "px-8 rounded-full",
+						}) {
+							<span>Start for Free</span>
+							@icon.ArrowRight(icon.Props{Class: "size-4 ml-2"})
+						}
+					}
+					@button.Button(button.Props{
+						Href:    "/docs",
+						Variant: button.VariantOutline,
+						Size:    button.SizeLg,
+						Class:   "px-8 rounded-full",
+					}) {
+						<span>Explore Documentation</span>
+					}
 				</div>
 			</div>
 		</div>
