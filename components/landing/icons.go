@@ -14,7 +14,7 @@ func iconSized(fn func(...icon.Props) templ.Component) templ.Component {
 }
 
 var (
-	iconCompass     = iconSized(icon.Compass)
+	iconCompass     = icon.CompassLogo("size-5")
 	iconRocket      = iconSized(icon.Rocket)
 	iconStore       = iconSized(icon.Store)
 	iconPuzzle      = iconSized(icon.Puzzle)

@@ -212,6 +212,7 @@
     animation: bounce 1s infinite;
   }
 
+
   /* Respect reduced motion preferences */
   @media (prefers-reduced-motion: reduce) {
     *,
