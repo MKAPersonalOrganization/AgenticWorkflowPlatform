@@ -182,7 +182,7 @@ templ ChatInputScreen(user *domain.User) {
 									<!-- Landing Page Logo (appears above chat input when no messages) -->
 									<div x-show="!hasMessages && !isStreaming" x-cloak class="flex flex-col items-center justify-center mb-12">
 										<div class="h-16 w-16 flex items-center justify-center bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-full mb-4 shadow-sm">
-											@icon.CompassLogoAnimated("size-8", "")
+											@icon.CompassLogoAnimated("size-8")
 										</div>
 										<p class="text-muted-foreground text-center max-w-md">
 											Your intelligent AI companion
