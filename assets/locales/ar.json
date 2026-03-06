@@ -109,6 +109,8 @@
   "Select a voice...": "اختر صوتاً...",
   "For best quality, use 'marin' or 'cedar'. Voices are optimized for English.": "للحصول على أفضل جودة، استخدم 'marin' أو 'cedar'. الأصوات محسّنة للغة الإنجليزية.",
   "Save TTS Settings": "حفظ إعدادات الصوت",
+  "To configure the AI voice model, provider, and voice, go to": "لإعداد نموذج الصوت الذكي والمزود والصوت، انتقل إلى",
+  "AI Settings": "إعدادات الذكاء الاصطناعي",
   "Clear all conversations": "مسح جميع المحادثات",
   "Permanently delete all thread history.": "حذف جميع سجلات المحادثات بشكل دائم.",
   "Are you sure you want to clear all conversations?": "هل أنت متأكد من أنك تريد مسح جميع المحادثات؟",

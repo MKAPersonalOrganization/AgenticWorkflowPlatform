@@ -18,6 +18,9 @@ type ExecutableToolFactory struct {
 	edgequakeBaseURL string
 	openAIAPIKey     string
 	modelID          string
+	ttsAPIKey        string
+	ttsModel         string
+	ttsVoice         string
 }
 
 // NewExecutableToolFactory creates a new tool factory.
@@ -35,6 +38,15 @@ func (f *ExecutableToolFactory) SetEdgequakeConfig(edgequakeBaseURL, openAIAPIKe
 	f.edgequakeBaseURL = edgequakeBaseURL
 	f.openAIAPIKey = openAIAPIKey
 	f.modelID = modelID
+}
+
+// SetTTSConfig sets the TTS model, voice, and API key resolved from user's capability config.
+func (f *ExecutableToolFactory) SetTTSConfig(apiKey, model, voice string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.ttsAPIKey = apiKey
+	f.ttsModel = model
+	f.ttsVoice = voice
 }
 
 // SetToolRegistry sets the tool registry for the factory (used for tool set expansion).
@@ -76,12 +88,19 @@ func (f *ExecutableToolFactory) CreateExecutableToolsFromSet(ctx context.Context
 // CreateExecutableTool creates an executable tool from a tool registry entry.
 func (f *ExecutableToolFactory) CreateExecutableTool(ctx context.Context, tool *Tool) (agent.ExecutableTool, error) {
 	f.mu.RLock()
+	ttsAPIKey := f.ttsAPIKey
+	if ttsAPIKey == "" {
+		ttsAPIKey = f.openAIAPIKey // fallback to LLM key for backward compat
+	}
 	deps := FactoryDeps{
 		ArtifactStore:    f.artifactStore,
 		EdgequakeBaseURL: f.edgequakeBaseURL,
 		OpenAIAPIKey:     f.openAIAPIKey,
 		ModelID:          f.modelID,
 		MemoryService:    memory.NewArtifactMemoryService(f.artifactStore),
+		TTSAPIKey:        ttsAPIKey,
+		TTSModel:         f.ttsModel,
+		TTSVoice:         f.ttsVoice,
 	}
 	f.mu.RUnlock()
 

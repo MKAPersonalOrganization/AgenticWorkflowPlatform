@@ -109,6 +109,8 @@
   "Select a voice...": "Select a voice...",
   "For best quality, use 'marin' or 'cedar'. Voices are optimized for English.": "For best quality, use 'marin' or 'cedar'. Voices are optimized for English.",
   "Save TTS Settings": "Save TTS Settings",
+  "To configure the AI voice model, provider, and voice, go to": "To configure the AI voice model, provider, and voice, go to",
+  "AI Settings": "AI Settings",
   "Clear all conversations": "Clear all conversations",
   "Permanently delete all thread history.": "Permanently delete all thread history.",
   "Are you sure you want to clear all conversations?": "Are you sure you want to clear all conversations?",

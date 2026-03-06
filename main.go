@@ -360,7 +360,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// Initialize per-user AI settings
 	aiSettingsRepo := sqldb.NewPostgresAISettingsRepository(db)
-	aiSettingsService := aisettings.New(aiSettingsRepo)
+	aiCapabilityRepo := sqldb.NewPostgresAICapabilityConfigRepository(db)
+	aiSettingsService := aisettings.New(aiSettingsRepo, aiCapabilityRepo)
 	log.Info(ctx, "startup", "status", "ai settings service initialized (per-user)")
 
 	// Initialize artifact service
@@ -454,6 +455,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 			agentOrchestrator, // ThreadManager interface
 			agentProvider,     // AgentProvider
 			aiSettingsService, // Per-user model config resolver
+			aiSettingsService, // Per-user TTS config resolver
 			artifactService,
 			studentProfileRepo,
 			cfg.AgentCapabilities.LongTermMemory,
@@ -655,6 +657,10 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Put("/api/ai-settings", authMiddleware.RequireAuthFunc(aiSettingsHandler.SaveSettings))
 	r.Delete("/api/ai-settings/{id}", authMiddleware.RequireAuthFunc(aiSettingsHandler.DeleteSettings))
 	r.Put("/api/ai-settings/{id}/default", authMiddleware.RequireAuthFunc(aiSettingsHandler.SetDefault))
+	// Capability config routes (decoupled per-capability settings)
+	r.Get("/api/ai-settings/capabilities", authMiddleware.RequireAuthFunc(aiSettingsHandler.GetCapabilityConfigs))
+	r.Put("/api/ai-settings/capabilities/{capability}", authMiddleware.RequireAuthFunc(aiSettingsHandler.SaveCapabilityConfig))
+	r.Delete("/api/ai-settings/capabilities/{capability}", authMiddleware.RequireAuthFunc(aiSettingsHandler.DeleteCapabilityConfig))
 
 	// Analytics Dashboard (dedicated Basic Auth)
 	statsHandler := statisticsHandler.NewHandler(log, statsProjection, cfg.DashboardAdmin.User, cfg.DashboardAdmin.Pass)

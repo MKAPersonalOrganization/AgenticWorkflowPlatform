@@ -66,6 +66,65 @@ templ docsAIModels() {
 	}
 }
 
+// ─── AI Settings ─────────────────────────────────────────────────────────────
+templ docsAISettings() {
+	@docsSection("ai-settings", "AI Settings — Bring Your Own Key", iconSlidersHorizontal, "text-teal-500") {
+		<p>
+			Compass gives you <strong>full control over your AI infrastructure</strong> through a clean
+			two-layer architecture: <strong>provider credentials</strong> and <strong>capability configuration</strong>.
+			Add your API keys once, then independently choose which provider and model powers each AI
+			function — chat, voice, embeddings — without any overlap or duplication.
+		</p>
+		<h3>Two-Layer Architecture</h3>
+		<p>
+			Unlike platforms that lock you into a single AI provider or force you to reconfigure credentials per feature,
+			Compass cleanly separates the two concerns:
+		</p>
+		<ul class="space-y-2 my-4">
+			<li>• <strong>Layer 1 — Providers</strong> — Store API keys for OpenAI, Anthropic, and Google Gemini. Each provider is configured once and shared across all capabilities.</li>
+			<li>• <strong>Layer 2 — Capabilities</strong> — For each AI function (chat, voice, embedding), choose which of your configured providers and which specific model to use. No re-entering keys.</li>
+		</ul>
+		<p>
+			This means you can use GPT-4o for chat, Claude Sonnet 4 for a different agent, OpenAI TTS for voice, and
+			Gemini for embeddings — all at the same time, on the same account. Change your chat model without
+			touching your voice or embedding setup.
+		</p>
+		<h3>Capabilities</h3>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Capability</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">What It Controls</th>
+					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Configurable Settings</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow("Chat Model (LLM)", "The AI model used for chatting with agents", "Provider, model, temperature, max tokens")
+				@docsTableRow("Text-to-Speech (TTS)", "Voice synthesis for spoken audio", "Provider, model, voice, voice instructions")
+				@docsTableRow("Embedding", "Vector embeddings for knowledge graph search", "Provider, model")
+				@docsTableRow("Speech-to-Text (STT)", "Transcription and audio understanding", "Provider, model")
+				@docsTableRow("Image Generation", "AI image creation from text", "Coming soon")
+			</tbody>
+		}
+		<h3>Setup Workflow</h3>
+		<ol class="list-decimal list-inside space-y-2 my-4">
+			<li><strong>Add your providers</strong> — Go to Settings → AI and enter your API keys for OpenAI, Anthropic, or Gemini. Add as many as you like.</li>
+			<li><strong>Configure each capability</strong> — Under each capability section (Chat Model, Voice, Embedding), pick a provider and model from your already-configured list. No re-entering keys.</li>
+			<li><strong>Fine-tune settings</strong> — Adjust capability-specific options like temperature, max tokens, or voice selection.</li>
+			<li><strong>Start using agents</strong> — Every agent automatically uses the right provider for each capability based on your configuration.</li>
+		</ol>
+		<h3>Per-Agent Model Override</h3>
+		<p>
+			While AI Settings defines your <strong>account-wide defaults</strong>, individual agents can override the
+			chat model. A Math Tutor can use GPT-4o while a Creative Writer uses Claude Sonnet 4 — regardless of
+			your default. Capability settings (TTS, Embedding) apply globally across all agents.
+		</p>
+		@docsInfoBox("Your Keys, Your Control") {
+			<p>Compass never stores your API keys in plain text — they are encrypted at rest. You own your keys and can revoke them at any time. Compass does not proxy or mark up API costs; all charges go directly to your provider. Use token analytics to monitor usage and optimize spend.</p>
+		}
+	}
+}
+
 // ─── Agent Store ─────────────────────────────────────────────────────────────
 templ docsAgentStore() {
 	@docsSection("agent-store", "Agent Store", iconStore, "text-purple-500") {

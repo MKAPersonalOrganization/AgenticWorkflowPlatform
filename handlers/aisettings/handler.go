@@ -37,34 +37,28 @@ type providerInfo struct {
 }
 
 type settingsResponse struct {
-	ID                  string  `json:"id"`
-	Provider            string  `json:"provider"`
-	APIKeySet           bool    `json:"api_key_set"`
-	APIKeyMasked        string  `json:"api_key_masked"`
-	DefaultLLMModel     string  `json:"default_llm_model"`
-	DefaultEmbedModel   string  `json:"default_embed_model"`
-	IsDefault           bool    `json:"is_default"`
-	MaxTokens           int     `json:"max_tokens"`
-	Temperature         float64 `json:"temperature"`
-	EmbeddingDimensions int     `json:"embedding_dimensions"`
-	TTSModel            string  `json:"tts_model"`
-	TTSVoice            string  `json:"tts_voice"`
+	ID           string `json:"id"`
+	Provider     string `json:"provider"`
+	APIKeySet    bool   `json:"api_key_set"`
+	APIKeyMasked string `json:"api_key_masked"`
+	IsDefault    bool   `json:"is_default"`
+}
+
+type capabilityConfigResponse struct {
+	ID         string          `json:"id"`
+	Capability string          `json:"capability"`
+	Provider   string          `json:"provider"`
+	Model      string          `json:"model"`
+	Config     json.RawMessage `json:"config"`
 }
 
 func toSettingsResponse(s domain.AISettings) settingsResponse {
 	return settingsResponse{
-		ID:                  s.ID,
-		Provider:            string(s.Provider),
-		APIKeySet:           s.APIKey != "",
-		APIKeyMasked:        s.MaskedAPIKey(),
-		DefaultLLMModel:     s.DefaultLLMModel,
-		DefaultEmbedModel:   s.DefaultEmbedModel,
-		IsDefault:           s.IsDefault,
-		MaxTokens:           s.MaxTokens,
-		Temperature:         s.Temperature,
-		EmbeddingDimensions: s.EmbeddingDimensions,
-		TTSModel:            s.TTSModel,
-		TTSVoice:            s.TTSVoice,
+		ID:           s.ID,
+		Provider:     string(s.Provider),
+		APIKeySet:    s.APIKey != "",
+		APIKeyMasked: s.MaskedAPIKey(),
+		IsDefault:    s.IsDefault,
 	}
 }
 
@@ -129,15 +123,8 @@ func (h *Handler) SaveSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Provider            string  `json:"provider"`
-		APIKey              string  `json:"api_key"`
-		DefaultLLMModel     string  `json:"default_llm_model"`
-		DefaultEmbedModel   string  `json:"default_embed_model"`
-		MaxTokens           int     `json:"max_tokens"`
-		Temperature         float64 `json:"temperature"`
-		EmbeddingDimensions int     `json:"embedding_dimensions"`
-		TTSModel            string  `json:"tts_model"`
-		TTSVoice            string  `json:"tts_voice"`
+		Provider string `json:"provider"`
+		APIKey   string `json:"api_key"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -146,16 +133,9 @@ func (h *Handler) SaveSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	settings := &domain.AISettings{
-		UserID:              user.ID,
-		Provider:            domain.AIProvider(req.Provider),
-		APIKey:              req.APIKey,
-		DefaultLLMModel:     req.DefaultLLMModel,
-		DefaultEmbedModel:   req.DefaultEmbedModel,
-		MaxTokens:           req.MaxTokens,
-		Temperature:         req.Temperature,
-		EmbeddingDimensions: req.EmbeddingDimensions,
-		TTSModel:            req.TTSModel,
-		TTSVoice:            req.TTSVoice,
+		UserID:   user.ID,
+		Provider: domain.AIProvider(req.Provider),
+		APIKey:   req.APIKey,
 	}
 
 	// If no API key provided, try to reuse the existing key for this provider
@@ -165,22 +145,6 @@ func (h *Handler) SaveSettings(w http.ResponseWriter, r *http.Request) {
 			for _, ex := range existing {
 				if ex.Provider == settings.Provider && ex.APIKey != "" {
 					settings.APIKey = ex.APIKey
-					// Preserve existing fields when only updating embed model
-					if settings.DefaultLLMModel == "" {
-						settings.DefaultLLMModel = ex.DefaultLLMModel
-					}
-					if settings.MaxTokens == 0 {
-						settings.MaxTokens = ex.MaxTokens
-					}
-					if settings.Temperature == 0 {
-						settings.Temperature = ex.Temperature
-					}
-					if settings.TTSModel == "" {
-						settings.TTSModel = ex.TTSModel
-					}
-					if settings.TTSVoice == "" {
-						settings.TTSVoice = ex.TTSVoice
-					}
 					break
 				}
 			}
@@ -268,4 +232,113 @@ func (h *Handler) GetTTSVoices(w http.ResponseWriter, r *http.Request) {
 		"model":  model,
 		"voices": voices,
 	})
+}
+
+// --------------------------------------------------------------------------
+// Capability Config Handlers
+// --------------------------------------------------------------------------
+
+// GetCapabilityConfigs handles GET /api/ai-settings/capabilities
+func (h *Handler) GetCapabilityConfigs(w http.ResponseWriter, r *http.Request) {
+	user := domain.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
+		return
+	}
+
+	configs, err := h.service.GetAllCapabilityConfigs(r.Context(), user.ID)
+	if err != nil {
+		h.log.Error(r.Context(), "failed to get capability configs", "error", err)
+		http.Error(w, i18n.T(r.Context(), "Failed to retrieve capability configs"), http.StatusInternalServerError)
+		return
+	}
+
+	var result []capabilityConfigResponse
+	for _, c := range configs {
+		result = append(result, capabilityConfigResponse{
+			ID:         c.ID,
+			Capability: string(c.Capability),
+			Provider:   string(c.Provider),
+			Model:      c.Model,
+			Config:     c.Config,
+		})
+	}
+	if result == nil {
+		result = []capabilityConfigResponse{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
+// SaveCapabilityConfig handles PUT /api/ai-settings/capabilities/{capability}
+func (h *Handler) SaveCapabilityConfig(w http.ResponseWriter, r *http.Request) {
+	user := domain.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
+		return
+	}
+
+	capability := chi.URLParam(r, "capability")
+	if capability == "" {
+		http.Error(w, "Missing capability", http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		Provider string          `json:"provider"`
+		Model    string          `json:"model"`
+		Config   json.RawMessage `json:"config"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, i18n.T(r.Context(), "Invalid request body"), http.StatusBadRequest)
+		return
+	}
+
+	config := &domain.AICapabilityConfig{
+		UserID:     user.ID,
+		Capability: domain.AICapability(capability),
+		Provider:   domain.AIProvider(req.Provider),
+		Model:      req.Model,
+		Config:     req.Config,
+	}
+
+	if err := h.service.SaveCapabilityConfig(r.Context(), config); err != nil {
+		h.log.Error(r.Context(), "failed to save capability config", "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(capabilityConfigResponse{
+		ID:         config.ID,
+		Capability: string(config.Capability),
+		Provider:   string(config.Provider),
+		Model:      config.Model,
+		Config:     config.Config,
+	})
+}
+
+// DeleteCapabilityConfig handles DELETE /api/ai-settings/capabilities/{capability}
+func (h *Handler) DeleteCapabilityConfig(w http.ResponseWriter, r *http.Request) {
+	user := domain.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
+		return
+	}
+
+	capability := chi.URLParam(r, "capability")
+	if capability == "" {
+		http.Error(w, "Missing capability", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.service.DeleteCapabilityConfig(r.Context(), user.ID, domain.AICapability(capability)); err != nil {
+		h.log.Error(r.Context(), "failed to delete capability config", "error", err)
+		http.Error(w, i18n.T(r.Context(), "Failed to delete capability config"), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

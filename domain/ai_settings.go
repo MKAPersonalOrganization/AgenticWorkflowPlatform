@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 )
 
@@ -122,23 +123,18 @@ func ProviderSupportsTTS(provider AIProvider) bool {
 	return len(ProviderTTSModels(provider)) > 0
 }
 
-// AISettings represents per-user AI provider configuration.
+// AISettings represents per-user AI provider credentials.
 // Each user has completely isolated settings.
+// Capability-specific configuration (LLM model, TTS voice, embedding model, etc.)
+// lives in AICapabilityConfig — providers only store credentials.
 type AISettings struct {
-	ID                  string     `json:"id" db:"id"`
-	UserID              string     `json:"user_id" db:"user_id"`
-	Provider            AIProvider `json:"provider" db:"provider"`
-	APIKey              string     `json:"api_key,omitempty" db:"api_key"`
-	DefaultLLMModel     string     `json:"default_llm_model" db:"default_llm_model"`
-	DefaultEmbedModel   string     `json:"default_embed_model" db:"default_embed_model"`
-	IsDefault           bool       `json:"is_default" db:"is_default"`
-	MaxTokens           int        `json:"max_tokens,omitempty" db:"max_tokens"`
-	Temperature         float64    `json:"temperature,omitempty" db:"temperature"`
-	EmbeddingDimensions int        `json:"embedding_dimensions,omitempty" db:"embedding_dimensions"`
-	TTSModel            string     `json:"tts_model,omitempty" db:"tts_model"`
-	TTSVoice            string     `json:"tts_voice,omitempty" db:"tts_voice"`
-	CreatedAt           time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt           time.Time  `json:"updated_at" db:"updated_at"`
+	ID        string     `json:"id" db:"id"`
+	UserID    string     `json:"user_id" db:"user_id"`
+	Provider  AIProvider `json:"provider" db:"provider"`
+	APIKey    string     `json:"api_key,omitempty" db:"api_key"`
+	IsDefault bool       `json:"is_default" db:"is_default"`
+	CreatedAt time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at" db:"updated_at"`
 }
 
 // MaskedAPIKey returns the API key with all but the last 4 characters masked.
@@ -168,4 +164,100 @@ type AISettingsRepository interface {
 
 	// SetDefault marks one entry as default and unsets all others for the user.
 	SetDefault(ctx context.Context, id string, userID string) error
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Capability-Based Configuration (Decoupled from Provider)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// AICapability represents a distinct AI function that can be independently configured.
+type AICapability string
+
+const (
+	CapabilityLLM       AICapability = "llm"
+	CapabilityTTS       AICapability = "tts"
+	CapabilityEmbedding AICapability = "embedding"
+	CapabilitySTT       AICapability = "stt"
+	CapabilityImage     AICapability = "image"
+)
+
+// SupportedCapabilities returns all capabilities that can be configured.
+func SupportedCapabilities() []AICapability {
+	return []AICapability{
+		CapabilityLLM,
+		CapabilityTTS,
+		CapabilityEmbedding,
+	}
+}
+
+// AICapabilityConfig stores per-user, per-capability model assignment.
+// A user can use OpenAI for LLM, Anthropic for embeddings, and OpenAI for TTS—
+// each capability is independently wired to a provider + model + extra settings.
+type AICapabilityConfig struct {
+	ID         string          `json:"id" db:"id"`
+	UserID     string          `json:"user_id" db:"user_id"`
+	Capability AICapability    `json:"capability" db:"capability"`
+	Provider   AIProvider      `json:"provider" db:"provider"`
+	Model      string          `json:"model" db:"model"`
+	Config     json.RawMessage `json:"config" db:"config"` // capability-specific (e.g. {voice, temperature})
+	CreatedAt  time.Time       `json:"created_at" db:"created_at"`
+	UpdatedAt  time.Time       `json:"updated_at" db:"updated_at"`
+}
+
+// TTSCapabilitySettings holds TTS-specific config stored in Config JSON.
+type TTSCapabilitySettings struct {
+	Voice string `json:"voice"`
+}
+
+// LLMCapabilitySettings holds LLM-specific config stored in Config JSON.
+type LLMCapabilitySettings struct {
+	MaxTokens   int     `json:"max_tokens,omitempty"`
+	Temperature float64 `json:"temperature,omitempty"`
+}
+
+// EmbeddingCapabilitySettings holds embedding-specific config stored in Config JSON.
+type EmbeddingCapabilitySettings struct {
+	Dimensions int `json:"dimensions,omitempty"`
+}
+
+// GetTTSSettings parses the Config JSON into TTSCapabilitySettings.
+func (c *AICapabilityConfig) GetTTSSettings() TTSCapabilitySettings {
+	var s TTSCapabilitySettings
+	if len(c.Config) > 0 {
+		_ = json.Unmarshal(c.Config, &s)
+	}
+	return s
+}
+
+// GetLLMSettings parses the Config JSON into LLMCapabilitySettings.
+func (c *AICapabilityConfig) GetLLMSettings() LLMCapabilitySettings {
+	var s LLMCapabilitySettings
+	if len(c.Config) > 0 {
+		_ = json.Unmarshal(c.Config, &s)
+	}
+	return s
+}
+
+// GetEmbeddingSettings parses the Config JSON into EmbeddingCapabilitySettings.
+func (c *AICapabilityConfig) GetEmbeddingSettings() EmbeddingCapabilitySettings {
+	var s EmbeddingCapabilitySettings
+	if len(c.Config) > 0 {
+		_ = json.Unmarshal(c.Config, &s)
+	}
+	return s
+}
+
+// AICapabilityConfigRepository provides persistence for capability configs.
+type AICapabilityConfigRepository interface {
+	// GetAllByUserID returns all capability configs for a user.
+	GetAllByUserID(ctx context.Context, userID string) ([]AICapabilityConfig, error)
+
+	// GetByCapability returns a specific capability config.
+	GetByCapability(ctx context.Context, userID string, capability AICapability) (*AICapabilityConfig, error)
+
+	// Upsert creates or updates a capability config.
+	Upsert(ctx context.Context, config *AICapabilityConfig) error
+
+	// Delete removes a capability config.
+	Delete(ctx context.Context, userID string, capability AICapability) error
 }

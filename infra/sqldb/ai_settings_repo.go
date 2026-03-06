@@ -26,8 +26,7 @@ func NewPostgresAISettingsRepository(db *sqlx.DB) *PostgresAISettingsRepository 
 // GetByUserID returns all AI settings for a user.
 func (r *PostgresAISettingsRepository) GetByUserID(ctx context.Context, userID string) ([]domain.AISettings, error) {
 	query := `
-		SELECT id, user_id, provider, api_key, default_llm_model, default_embed_model,
-		       is_default, max_tokens, temperature, embedding_dimensions, tts_model, tts_voice, created_at, updated_at
+		SELECT id, user_id, provider, api_key, is_default, created_at, updated_at
 		FROM user_ai_settings
 		WHERE user_id = $1
 		ORDER BY is_default DESC, created_at ASC
@@ -42,8 +41,8 @@ func (r *PostgresAISettingsRepository) GetByUserID(ctx context.Context, userID s
 	for rows.Next() {
 		var s domain.AISettings
 		if err := rows.Scan(
-			&s.ID, &s.UserID, &s.Provider, &s.APIKey, &s.DefaultLLMModel, &s.DefaultEmbedModel,
-			&s.IsDefault, &s.MaxTokens, &s.Temperature, &s.EmbeddingDimensions, &s.TTSModel, &s.TTSVoice, &s.CreatedAt, &s.UpdatedAt,
+			&s.ID, &s.UserID, &s.Provider, &s.APIKey,
+			&s.IsDefault, &s.CreatedAt, &s.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scanning ai settings row: %w", err)
 		}
@@ -56,16 +55,15 @@ func (r *PostgresAISettingsRepository) GetByUserID(ctx context.Context, userID s
 // GetDefaultForUser returns the user's default AI settings.
 func (r *PostgresAISettingsRepository) GetDefaultForUser(ctx context.Context, userID string) (*domain.AISettings, error) {
 	query := `
-		SELECT id, user_id, provider, api_key, default_llm_model, default_embed_model,
-		       is_default, max_tokens, temperature, embedding_dimensions, tts_model, tts_voice, created_at, updated_at
+		SELECT id, user_id, provider, api_key, is_default, created_at, updated_at
 		FROM user_ai_settings
 		WHERE user_id = $1 AND is_default = true
 		LIMIT 1
 	`
 	var s domain.AISettings
 	err := r.db.QueryRowContext(ctx, query, userID).Scan(
-		&s.ID, &s.UserID, &s.Provider, &s.APIKey, &s.DefaultLLMModel, &s.DefaultEmbedModel,
-		&s.IsDefault, &s.MaxTokens, &s.Temperature, &s.EmbeddingDimensions, &s.TTSModel, &s.TTSVoice, &s.CreatedAt, &s.UpdatedAt,
+		&s.ID, &s.UserID, &s.Provider, &s.APIKey,
+		&s.IsDefault, &s.CreatedAt, &s.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -80,15 +78,14 @@ func (r *PostgresAISettingsRepository) GetDefaultForUser(ctx context.Context, us
 // GetByID returns a specific AI settings entry.
 func (r *PostgresAISettingsRepository) GetByID(ctx context.Context, id string) (*domain.AISettings, error) {
 	query := `
-		SELECT id, user_id, provider, api_key, default_llm_model, default_embed_model,
-		       is_default, max_tokens, temperature, embedding_dimensions, tts_model, tts_voice, created_at, updated_at
+		SELECT id, user_id, provider, api_key, is_default, created_at, updated_at
 		FROM user_ai_settings
 		WHERE id = $1
 	`
 	var s domain.AISettings
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&s.ID, &s.UserID, &s.Provider, &s.APIKey, &s.DefaultLLMModel, &s.DefaultEmbedModel,
-		&s.IsDefault, &s.MaxTokens, &s.Temperature, &s.EmbeddingDimensions, &s.TTSModel, &s.TTSVoice, &s.CreatedAt, &s.UpdatedAt,
+		&s.ID, &s.UserID, &s.Provider, &s.APIKey,
+		&s.IsDefault, &s.CreatedAt, &s.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -112,27 +109,17 @@ func (r *PostgresAISettingsRepository) Upsert(ctx context.Context, settings *dom
 	settings.UpdatedAt = now
 
 	query := `
-		INSERT INTO user_ai_settings (id, user_id, provider, api_key, default_llm_model, default_embed_model,
-		                              is_default, max_tokens, temperature, embedding_dimensions, tts_model, tts_voice, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+		INSERT INTO user_ai_settings (id, user_id, provider, api_key, is_default, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		ON CONFLICT (user_id, provider) DO UPDATE SET
 			api_key = EXCLUDED.api_key,
-			default_llm_model = EXCLUDED.default_llm_model,
-			default_embed_model = EXCLUDED.default_embed_model,
 			is_default = EXCLUDED.is_default,
-			max_tokens = EXCLUDED.max_tokens,
-			temperature = EXCLUDED.temperature,
-			embedding_dimensions = EXCLUDED.embedding_dimensions,
-			tts_model = EXCLUDED.tts_model,
-			tts_voice = EXCLUDED.tts_voice,
 			updated_at = EXCLUDED.updated_at
 	`
 
 	_, err := r.db.ExecContext(ctx, query,
 		settings.ID, settings.UserID, settings.Provider, settings.APIKey,
-		settings.DefaultLLMModel, settings.DefaultEmbedModel, settings.IsDefault,
-		settings.MaxTokens, settings.Temperature, settings.EmbeddingDimensions,
-		settings.TTSModel, settings.TTSVoice,
+		settings.IsDefault,
 		settings.CreatedAt, settings.UpdatedAt,
 	)
 	if err != nil {

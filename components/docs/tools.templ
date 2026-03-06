@@ -64,6 +64,13 @@ templ docsVoiceTTS() {
 			using advanced voice synthesis. Perfect for language learning, accessibility, reviewing
 			study materials, and hands-free study sessions.
 		</p>
+		<h3>Decoupled Voice Configuration</h3>
+		<p>
+			Voice settings are a standalone <strong>capability</strong> in Compass's two-layer AI architecture.
+			Your configured providers are listed automatically — just pick which one to use for TTS, select a
+			model and voice, and you're done. Configure once in Settings → AI → AI Voice Configuration, and
+			every agent that uses the TTS plugin automatically picks up your preferences.
+		</p>
 		<h3>Available Voices</h3>
 		<p>
 			Compass offers <strong>13 distinct AI voices</strong>, each with its own character and tone:
@@ -87,12 +94,15 @@ templ docsVoiceTTS() {
 				@docsTableRow2("sage", "Calm, wise")
 				@docsTableRow2("shimmer", "Bright, friendly")
 				@docsTableRow2("verse", "Articulate, precise")
-				@docsTableRow2("marin", "Warm, approachable")
-				@docsTableRow2("cedar", "Steady, trustworthy")
+				@docsTableRow2("marin", "Warm, approachable (recommended)")
+				@docsTableRow2("cedar", "Steady, trustworthy (recommended)")
 			</tbody>
 		}
 		<h3>Features</h3>
 		<ul class="space-y-2 my-4">
+			<li>
+				<strong>Per-user voice selection</strong> -- Choose your preferred default voice in AI Settings; agents can still override per-request
+			</li>
 			<li>
 				<strong>Word-level timestamps</strong> -- Synchronized highlighting via Whisper forced-alignment so you can follow along as audio plays
 			</li>
@@ -108,10 +118,11 @@ templ docsVoiceTTS() {
 		</ul>
 		<h3>Usage</h3>
 		<ol class="list-decimal list-inside space-y-2 my-4">
+			<li>Add your OpenAI API key in <strong>Settings → AI</strong></li>
+			<li>Configure your preferred TTS model and voice in the <strong>Voice Configuration</strong> section</li>
 			<li>Enable the <strong>Text-to-Speech</strong> plugin for your agent</li>
 			<li>Ask the agent to read text aloud, explain something verbally, or narrate content</li>
 			<li>The agent generates an audio file and presents it with an inline player</li>
-			<li>Download the MP3 from the artifacts panel for offline listening</li>
 		</ol>
 		@docsInfoBox("Language Learning Tip") {
 			<p>Combine TTS with the Elicitation plugin for interactive listening exercises: the agent reads a passage aloud, then quizzes you with comprehension questions.</p>
