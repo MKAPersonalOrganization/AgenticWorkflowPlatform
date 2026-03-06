@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
+	"time"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
@@ -19,8 +22,6 @@ import (
 	"school-with-ai/services/taskmanagement"
 	"school-with-ai/services/threadmgmt"
 	"school-with-ai/services/toolregistry"
-	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
@@ -80,6 +81,20 @@ func NewTaskManagementHandler(
 		tenantID:           tenantID,
 		allowedOrigin:      allowedOrigin,
 	}
+}
+
+// defaultAgentIconSVG is the fallback compass icon for agents without a valid SVG icon.
+var defaultAgentIconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z" /></svg>`
+
+// resolveAgentIcon extracts the icon from an agent (via optional Icon() method)
+// and falls back to the default compass SVG if the agent doesn't provide one.
+func resolveAgentIcon(a agent.Agent) string {
+	if ip, ok := a.(interface{ Icon() string }); ok {
+		if icon := ip.Icon(); strings.HasPrefix(icon, "<svg") {
+			return icon
+		}
+	}
+	return defaultAgentIconSVG
 }
 
 // FileAttachment represents a file sent with a message (image, audio, PDF, etc.).
@@ -531,14 +546,7 @@ func (h *TaskManagementHandler) ListAgents(w http.ResponseWriter, r *http.Reques
 			ID:          a.ID(),
 			Name:        a.Name(),
 			Description: a.Description(),
-		}
-		if ip, ok := a.(interface{ Icon() string }); ok {
-			if icon := ip.Icon(); strings.HasPrefix(icon, "<svg") {
-				meta.Icon = icon
-			}
-		}
-		if meta.Icon == "" {
-			meta.Icon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z" /></svg>`
+			Icon:        resolveAgentIcon(a),
 		}
 		response.Agents = append(response.Agents, meta)
 	}
@@ -583,14 +591,7 @@ func (h *TaskManagementHandler) GetAgent(w http.ResponseWriter, r *http.Request)
 		ID:          a.ID(),
 		Name:        a.Name(),
 		Description: a.Description(),
-	}
-	if ip, ok := a.(interface{ Icon() string }); ok {
-		if icon := ip.Icon(); strings.HasPrefix(icon, "<svg") {
-			meta.Icon = icon
-		}
-	}
-	if meta.Icon == "" {
-		meta.Icon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z" /></svg>`
+		Icon:        resolveAgentIcon(a),
 	}
 
 	w.Header().Set("Content-Type", "application/json")

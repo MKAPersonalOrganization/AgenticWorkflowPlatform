@@ -415,7 +415,7 @@ CREATE TABLE IF NOT EXISTS agent_store_catalog (
     category      VARCHAR(255) NOT NULL DEFAULT '',
     tags          TEXT[] NOT NULL DEFAULT '{}',
     author_name   VARCHAR(255) NOT NULL DEFAULT '',
-    icon_label    VARCHAR(50) NOT NULL DEFAULT '',
+    icon          TEXT NOT NULL DEFAULT '',
     featured      BOOLEAN NOT NULL DEFAULT FALSE,
     add_count     INTEGER NOT NULL DEFAULT 0,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -433,28 +433,8 @@ ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS source_catalog_id VARCHAR(255) 
 CREATE INDEX IF NOT EXISTS idx_user_agents_source_catalog ON user_agents(user_id, source_catalog_id) WHERE source_catalog_id != '';
 
 -- Version: 1.32
--- Description: Add icon column to user_agents
-ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS icon VARCHAR(50) NOT NULL DEFAULT '';
-
--- Version: 1.33
--- Description: Widen icon columns to TEXT for SVG markup; re-seed catalog with professional icons
-ALTER TABLE agent_store_catalog ALTER COLUMN icon_label TYPE TEXT;
-ALTER TABLE user_agents ALTER COLUMN icon TYPE TEXT;
-TRUNCATE TABLE agent_store_catalog;
-
--- Version: 1.34
--- Description: Backfill user agent icons with SVGs from re-seeded catalog (match by name)
-UPDATE user_agents ua
-   SET icon = cat.icon_label
-  FROM agent_store_catalog cat
- WHERE LOWER(TRIM(ua.name)) = LOWER(TRIM(cat.name))
-   AND ua.icon NOT LIKE '<svg%'
-   AND cat.icon_label LIKE '<svg%';
-
--- Remaining agents (custom-created or renamed) get the default bot icon
-UPDATE user_agents
-   SET icon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>'
- WHERE icon NOT LIKE '<svg%';
+-- Description: Add icon column to user_agents (TEXT for SVG markup)
+ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS icon TEXT NOT NULL DEFAULT '';
 
 -- Version: 1.35
 -- Description: Create users table for local authentication (Google OAuth)
@@ -570,8 +550,4 @@ ALTER TABLE user_agents DROP COLUMN IF EXISTS model_id;
 ALTER TABLE user_agents DROP COLUMN IF EXISTS temperature;
 ALTER TABLE user_agents DROP COLUMN IF EXISTS max_iterations;
 
--- Version: 1.48
--- Description: Update legacy Bot SVG back to Compass SVG in user_agents.
-UPDATE user_agents
-   SET icon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z" /></svg>'
- WHERE icon LIKE '%path d="M12 8V4H8"%';
+

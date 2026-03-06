@@ -165,6 +165,11 @@ export const agentsManager = () => ({
                 systemPrompt: this.form.systemPrompt.trim(),
             };
 
+            // Preserve the existing icon when editing (the backend handles fallback)
+            if (this.editingAgent && this.editingAgent.icon) {
+                payload.icon = this.editingAgent.icon;
+            }
+
             let response;
             if (this.editingAgent) {
                 // Update

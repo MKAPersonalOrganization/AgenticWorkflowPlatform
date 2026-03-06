@@ -4,9 +4,10 @@ package agentcatalog
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/logger"
-	"strconv"
 )
 
 // Handler encapsulates HTTP handlers for the agent catalog.
@@ -29,7 +30,7 @@ type CatalogEntryResponse struct {
 	Category    string   `json:"category"`
 	Tags        []string `json:"tags"`
 	AuthorName  string   `json:"authorName"`
-	IconLabel   string   `json:"iconLabel"`
+	Icon        string   `json:"icon"`
 	Featured    bool     `json:"featured"`
 	AddCount    int64    `json:"addCount"`
 }
@@ -54,7 +55,7 @@ func toCatalogResponse(e *domain.AgentCatalogEntry) CatalogEntryResponse {
 		Category:    e.Category,
 		Tags:        tags,
 		AuthorName:  e.AuthorName,
-		IconLabel:   e.IconLabel,
+		Icon:        e.Icon,
 		Featured:    e.Featured,
 		AddCount:    e.AddCount,
 	}
@@ -203,7 +204,7 @@ func (h *Handler) AddToMyAgents(w http.ResponseWriter, r *http.Request) {
 		Name:            entry.Name,
 		Description:     entry.Description,
 		SystemPrompt:    entry.SystemPrompt,
-		Icon:            entry.IconLabel,
+		Icon:            entry.Icon,
 		SourceCatalogID: catalogID,
 	}
 
