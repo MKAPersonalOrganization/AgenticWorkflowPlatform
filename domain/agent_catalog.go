@@ -15,7 +15,7 @@ type AgentCatalogEntry struct {
 	Category     string    `json:"category" db:"category"`
 	Tags         []string  `json:"tags" db:"tags"`
 	AuthorName   string    `json:"author_name" db:"author_name"`
-	IconLabel    string    `json:"icon_label" db:"icon_label"` // Emoji or short label for display
+	Icon         string    `json:"icon" db:"icon"` // SVG icon markup
 	Featured     bool      `json:"featured" db:"featured"`
 	AddCount     int64     `json:"add_count" db:"add_count"` // Popularity counter
 	CreatedAt    time.Time `json:"created_at" db:"created_at"`

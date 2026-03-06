@@ -42,7 +42,7 @@ func (r *PostgresAgentCatalogRepository) List(ctx context.Context, category stri
 		}
 
 		query := `
-			SELECT id, name, description, system_prompt, category, tags, author_name, icon_label, featured, add_count, created_at, updated_at
+			SELECT id, name, description, system_prompt, category, tags, author_name, icon, featured, add_count, created_at, updated_at
 			FROM agent_store_catalog
 			WHERE category = $1
 			ORDER BY featured DESC, add_count DESC, name ASC
@@ -64,7 +64,7 @@ func (r *PostgresAgentCatalogRepository) List(ctx context.Context, category stri
 		}
 
 		query := `
-			SELECT id, name, description, system_prompt, category, tags, author_name, icon_label, featured, add_count, created_at, updated_at
+			SELECT id, name, description, system_prompt, category, tags, author_name, icon, featured, add_count, created_at, updated_at
 			FROM agent_store_catalog
 			ORDER BY featured DESC, add_count DESC, name ASC
 			LIMIT $1 OFFSET $2
@@ -101,7 +101,7 @@ func (r *PostgresAgentCatalogRepository) Search(ctx context.Context, query strin
 	}
 
 	searchQuery := `
-		SELECT id, name, description, system_prompt, category, tags, author_name, icon_label, featured, add_count, created_at, updated_at
+		SELECT id, name, description, system_prompt, category, tags, author_name, icon, featured, add_count, created_at, updated_at
 		FROM agent_store_catalog
 		WHERE name ILIKE $1 OR description ILIKE $1 OR category ILIKE $1
 		ORDER BY featured DESC, add_count DESC, name ASC
@@ -124,7 +124,7 @@ func (r *PostgresAgentCatalogRepository) Search(ctx context.Context, query strin
 // GetByID retrieves a single catalog entry.
 func (r *PostgresAgentCatalogRepository) GetByID(ctx context.Context, id string) (*domain.AgentCatalogEntry, error) {
 	query := `
-		SELECT id, name, description, system_prompt, category, tags, author_name, icon_label, featured, add_count, created_at, updated_at
+		SELECT id, name, description, system_prompt, category, tags, author_name, icon, featured, add_count, created_at, updated_at
 		FROM agent_store_catalog
 		WHERE id = $1
 	`
@@ -132,7 +132,7 @@ func (r *PostgresAgentCatalogRepository) GetByID(ctx context.Context, id string)
 	var tags []string
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&entry.ID, &entry.Name, &entry.Description, &entry.SystemPrompt,
-		&entry.Category, pq.Array(&tags), &entry.AuthorName, &entry.IconLabel,
+		&entry.Category, pq.Array(&tags), &entry.AuthorName, &entry.Icon,
 		&entry.Featured, &entry.AddCount, &entry.CreatedAt, &entry.UpdatedAt,
 	)
 	if err != nil {
@@ -185,7 +185,7 @@ func (r *PostgresAgentCatalogRepository) Seed(ctx context.Context, entries []dom
 	}
 
 	query := `
-		INSERT INTO agent_store_catalog (id, name, description, system_prompt, category, tags, author_name, icon_label, featured, add_count, created_at, updated_at)
+		INSERT INTO agent_store_catalog (id, name, description, system_prompt, category, tags, author_name, icon, featured, add_count, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, $10, $10)
 	`
 	now := time.Now()
@@ -196,7 +196,7 @@ func (r *PostgresAgentCatalogRepository) Seed(ctx context.Context, entries []dom
 		}
 		_, err := r.db.ExecContext(ctx, query,
 			id, e.Name, e.Description, e.SystemPrompt, e.Category,
-			pq.Array(e.Tags), e.AuthorName, e.IconLabel, e.Featured, now,
+			pq.Array(e.Tags), e.AuthorName, e.Icon, e.Featured, now,
 		)
 		if err != nil {
 			return fmt.Errorf("seeding catalog entry %q: %w", e.Name, err)
@@ -213,7 +213,7 @@ func scanCatalogRows(rows *sql.Rows) ([]domain.AgentCatalogEntry, error) {
 		var tags []string
 		if err := rows.Scan(
 			&e.ID, &e.Name, &e.Description, &e.SystemPrompt,
-			&e.Category, pq.Array(&tags), &e.AuthorName, &e.IconLabel,
+			&e.Category, pq.Array(&tags), &e.AuthorName, &e.Icon,
 			&e.Featured, &e.AddCount, &e.CreatedAt, &e.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scanning catalog entry: %w", err)

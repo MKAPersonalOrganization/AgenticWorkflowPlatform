@@ -4,10 +4,11 @@ package agentstore
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services"
-	"strings"
 
 	agentStoreService "school-with-ai/services/agentstore"
 )
@@ -33,6 +34,7 @@ type CreateRequest struct {
 	Name         string `json:"name"`
 	Description  string `json:"description"`
 	SystemPrompt string `json:"systemPrompt"`
+	Icon         string `json:"icon"`
 }
 
 // UpdateRequest represents the request body for updating an agent.
@@ -40,6 +42,7 @@ type UpdateRequest struct {
 	Name         string `json:"name"`
 	Description  string `json:"description"`
 	SystemPrompt string `json:"systemPrompt"`
+	Icon         string `json:"icon"`
 }
 
 // AgentResponse represents a single agent in API responses.
@@ -62,7 +65,7 @@ type ListResponse struct {
 // defaultAgentIconSVG is the fallback icon (compass) for agents without a valid SVG icon.
 var defaultAgentIconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z" /></svg>`
 
-// agentIconOrDefault returns the icon if it's a valid SVG, otherwise the default bot icon.
+// agentIconOrDefault returns the icon if it's a valid SVG, otherwise the default compass icon.
 func agentIconOrDefault(icon string) string {
 	if strings.HasPrefix(icon, "<svg") {
 		return icon
@@ -107,6 +110,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		Name:         req.Name,
 		Description:  req.Description,
 		SystemPrompt: req.SystemPrompt,
+		Icon:         agentIconOrDefault(req.Icon),
 	}
 
 	if err := h.service.Create(r.Context(), agent); err != nil {
@@ -146,12 +150,26 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Fetch the existing agent to preserve the icon if the request doesn't provide one.
+	existing, err := h.service.GetByID(r.Context(), agentID, user.ID)
+	if err != nil {
+		h.log.Error(r.Context(), "agent not found", "error", err)
+		http.Error(w, "Agent not found", http.StatusNotFound)
+		return
+	}
+
+	iconValue := existing.Icon
+	if req.Icon != "" {
+		iconValue = req.Icon
+	}
+
 	agent := &domain.AgentDefinition{
 		ID:           agentID,
 		UserID:       user.ID,
 		Name:         req.Name,
 		Description:  req.Description,
 		SystemPrompt: req.SystemPrompt,
+		Icon:         iconValue,
 	}
 
 	if err := h.service.Update(r.Context(), agent); err != nil {

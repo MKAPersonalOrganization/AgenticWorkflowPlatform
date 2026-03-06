@@ -311,7 +311,7 @@ templ AgentsDialog() {
 															<!-- Agent icon (SVG) -->
 															<div
 																class="size-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0 [&_svg]:size-5"
-																x-html="entry.iconLabel"
+																x-html="entry.icon"
 															></div>
 															<div class="flex-1 min-w-0">
 																<div class="flex items-center gap-2">
@@ -749,13 +749,17 @@ templ AgentsButtonTrigger() {
 				":title": "currentAgentData?.name || '" + i18n.T(ctx, "Agents") + "'",
 			},
 		}) {
-			<!-- Agent icon (synced directly from backend, no frontend fallback symbol) -->
+			<!-- Agent icon (synced from backend, compass fallback if icon is empty) -->
 			<span
-				x-show="currentAgentData"
+				x-show="currentAgentData?.icon"
 				x-html="currentAgentData?.icon || ''"
 				class="size-5 flex items-center justify-center text-foreground [&_svg]:size-4"
 			></span>
-			<!-- Loading state -->
+			<!-- Fallback compass icon when agent has no SVG icon -->
+			<span x-show="currentAgentData && !currentAgentData.icon" class="size-5 flex items-center justify-center text-foreground">
+				@icon.Compass(icon.Props{Class: "size-4"})
+			</span>
+			<!-- Loading spinner (only while agent data is being fetched) -->
 			<span x-show="!currentAgentData" class="size-5 flex items-center justify-center text-muted-foreground">
 				<span class="animate-spin size-4 border-2 border-current border-t-transparent rounded-full"></span>
 			</span>

@@ -133,8 +133,17 @@ document.addEventListener('alpine:init', () => {
                             } else if (this.AVAILABLE_AGENTS.length > 0) {
                                 // Fall back to the first agent (oldest by creation time)
                                 this.selectAgent(this.AVAILABLE_AGENTS[0].id);
+                            } else {
+                                // No agents available — stop the spinner with empty data
+                                this.currentAgentData = { id: '', name: 'Agent', description: '', icon: '' };
                             }
+                        } else {
+                            // Malformed response — stop the spinner
+                            this.currentAgentData = { id: '', name: 'Agent', description: '', icon: '' };
                         }
+                    } else {
+                        // Fetch failed — stop the spinner
+                        this.currentAgentData = { id: '', name: 'Agent', description: '', icon: '' };
                     }
                 });
             },
@@ -150,9 +159,14 @@ document.addEventListener('alpine:init', () => {
                     if (response.ok) {
                         const data = await response.json();
                         this.currentAgentData = data;
+                    } else {
+                        // Fetch failed — set minimal data so the UI doesn't spin forever
+                        console.error('Failed to fetch agent details, status:', response.status);
+                        this.currentAgentData = { id: agentId, name: 'Agent', description: '', icon: '' };
                     }
                 } catch (err) {
                     console.error('Failed to resolve current agent details:', err);
+                    this.currentAgentData = { id: agentId, name: 'Agent', description: '', icon: '' };
                 }
             },
 
