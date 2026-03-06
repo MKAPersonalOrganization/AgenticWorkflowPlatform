@@ -49,6 +49,7 @@ templ HomeExtraHead() {
 	@copybutton.Script()
 	@dropdown.Script()
 	@dialog.Script()
+	@icon.CompassLogoCSS()
 	<style>
 		@keyframes shrink {
 			from { transform: scaleX(1); }
@@ -180,17 +181,8 @@ templ ChatInputScreen(user *domain.User) {
 								>
 									<!-- Landing Page Logo (appears above chat input when no messages) -->
 									<div x-show="!hasMessages && !isStreaming" x-cloak class="flex flex-col items-center justify-center mb-12">
-										<div class="h-16 w-16 flex items-center justify-center bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-full mb-4 shadow-sm compass-pulse">
-											<div class="compass-float">
-												<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-													<!-- Outer ring -->
-													<circle cx="16" cy="16" r="15" stroke="currentColor" stroke-width="1.5" fill="none"></circle>
-													<!-- Needle - North Tip Only -->
-													<path d="M16 6 L19 14 L16 12.5 L13 14 Z" fill="currentColor"></path>
-													<!-- Center dot -->
-													<circle cx="16" cy="16" r="2" fill="currentColor"></circle>
-												</svg>
-											</div>
+										<div class="h-16 w-16 flex items-center justify-center bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-full mb-4 shadow-sm">
+											@icon.CompassLogoAnimated("size-8", "")
 										</div>
 										<p class="text-muted-foreground text-center max-w-md">
 											Your intelligent AI companion

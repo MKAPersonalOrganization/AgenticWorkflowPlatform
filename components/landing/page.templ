@@ -2,6 +2,7 @@ package landing
 
 import (
 	"school-with-ai/components"
+	"school-with-ai/components/icon"
 	"school-with-ai/domain"
 )
 
@@ -15,6 +16,7 @@ templ LandingPage(props LandingPageProps) {
 		User:       props.User,
 		HideNavbar: true,
 	}) {
+		@icon.CompassLogoCSS()
 		<div class="h-full overflow-y-auto scroll-smooth" id="landing-root">
 			<!-- Sticky Navbar -->
 			@Nav(props.User)
