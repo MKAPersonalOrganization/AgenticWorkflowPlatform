@@ -5,20 +5,21 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"strings"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/engine"
 	"school-with-ai/foundation/agentsdk/internal/llm"
 	"school-with-ai/foundation/logger"
+	mcpmod "school-with-ai/modules/mcp"
 	"school-with-ai/services/artifact"
 	"school-with-ai/services/edgequake"
 	"school-with-ai/services/memory"
 	"school-with-ai/services/permissions"
-	"school-with-ai/services/plugindiscovery"
 	"school-with-ai/services/toolregistry"
 	"school-with-ai/services/workspacepermissions"
-	"strings"
 
 	agentio "school-with-ai/foundation/agentsdk/io"
 
@@ -57,7 +58,7 @@ type RunnerAdapter struct {
 	edgequakeTenantID  string
 	configResolver     ModelConfigResolver
 	ttsResolver        TTSConfigResolver
-	mcpService         *plugindiscovery.Service
+	mcpService         *mcpmod.Service
 }
 
 // NewRunnerAdapter creates a new runner adapter.
@@ -78,7 +79,7 @@ func NewRunnerAdapter(
 	edgequakeService *edgequake.Service,
 	edgequakeBaseURL string,
 	edgequakeTenantID string,
-	mcpService *plugindiscovery.Service,
+	mcpService *mcpmod.Service,
 ) (*RunnerAdapter, error) {
 	if configResolver == nil {
 		return nil, fmt.Errorf("model config resolver is required")
@@ -411,7 +412,7 @@ type RegistryAgentProvider struct {
 	edgequakeService   *edgequake.Service
 	edgequakeBaseURL   string
 	edgequakeTenantID  string
-	mcpService         *plugindiscovery.Service
+	mcpService         *mcpmod.Service
 	// Per-user TTS config resolved at request time
 	ttsAPIKey string
 	ttsModel  string
