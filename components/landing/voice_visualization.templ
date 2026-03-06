@@ -2,23 +2,23 @@ package landing
 
 import "school-with-ai/components/icon"
 
-// ─── Voice & Visualization ───────────────────────────────────────────────────
+// ─── Voice ───────────────────────────────────────────────────
 templ voiceVisualizationSection() {
 	<section class="py-24">
 		<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
 			<div class="mx-auto max-w-2xl text-center">
 				<div class="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-muted/50 px-4 py-1.5 text-sm text-muted-foreground">
 					@icon.AudioWaveform(icon.Props{Class: "size-4 text-indigo-500"})
-					<span>Voice & Visualization</span>
+					<span>Voice Capabilities</span>
 				</div>
 				<h2 class="text-3xl font-bold tracking-tight sm:text-4xl">
-					Hear it. See it. Understand it.
+					Hear and Understand it.
 				</h2>
 				<p class="mt-4 text-lg text-muted-foreground">
-					Work isn't just text. Compass generates lifelike voice narration and rich visualizations to bring data to life.
+					Work isn't just text. Compass generates lifelike voice narration to bring responses to life.
 				</p>
 			</div>
-			<div class="mt-16 grid gap-8 lg:grid-cols-2">
+			<div class="mx-auto mt-16 max-w-3xl">
 				<!-- Voice card -->
 				<div class="rounded-xl border border-border bg-card p-6">
 					<div class="flex items-center gap-3 mb-4">
@@ -57,36 +57,6 @@ templ voiceVisualizationSection() {
 						</span>
 					</div>
 				</div>
-				<!-- Visualization card -->
-				<div class="rounded-xl border border-border bg-card p-6">
-					<div class="flex items-center gap-3 mb-4">
-						<div class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-500">
-							@icon.Activity(icon.Props{Class: "size-5"})
-						</div>
-						<h3 class="text-lg font-semibold">Charts & Animations</h3>
-					</div>
-					<p class="text-sm text-muted-foreground leading-relaxed mb-4">
-						Generate publication-quality plots, 3D surfaces, and animated visualizations directly in your conversations. Powered by gnuplot with full scripting support.
-					</p>
-					<!-- Chart type grid -->
-					<div class="grid grid-cols-2 gap-3 mb-4">
-						@vizTypeMock("📈", "Function Plots", "f(x) graphs, parametric curves")
-						@vizTypeMock("📊", "Data Scatter", "Data points, trend lines, statistics")
-						@vizTypeMock("🌐", "3D Surfaces", "Rotating 3D plots, mesh, contours")
-						@vizTypeMock("🎞️", "Animations", "Animated GIF/WebP, wave propagation")
-					</div>
-					<!-- Feature pills -->
-					<div class="flex flex-wrap gap-2">
-						<span class="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
-							@icon.Download(icon.Props{Class: "size-3"})
-							<span>PNG / GIF / WebP</span>
-						</span>
-						<span class="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
-							@icon.Palette(icon.Props{Class: "size-3"})
-							<span>Custom styling</span>
-						</span>
-					</div>
-				</div>
 			</div>
 		</div>
 	</section>
@@ -102,12 +72,4 @@ templ voiceChip(name string, active bool) {
 			{ name }
 		</div>
 	}
-}
-
-templ vizTypeMock(emoji, title, desc string) {
-	<div class="rounded-lg border border-border bg-muted/30 p-3">
-		<div class="text-lg mb-1">{ emoji }</div>
-		<div class="text-xs font-semibold">{ title }</div>
-		<div class="text-xs text-muted-foreground mt-0.5">{ desc }</div>
-	</div>
 }

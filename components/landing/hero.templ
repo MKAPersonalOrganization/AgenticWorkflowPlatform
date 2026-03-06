@@ -104,24 +104,6 @@ templ heroSection(user *domain.User) {
 												Imagine two connected systems that are perfectly synchronized — no matter how far apart they are, when you observe one, you instantly know the state of the other...
 											</div>
 										</div>
-										<!-- Another user message -->
-										<div class="flex justify-end">
-											<div class="max-w-xs rounded-xl bg-primary px-4 py-2.5 text-sm text-primary-foreground">
-												Can you visualize that with a diagram?
-											</div>
-										</div>
-										<!-- AI with tool usage -->
-										<div class="flex justify-start">
-											<div class="max-w-sm rounded-xl bg-muted px-4 py-2.5 text-sm">
-												<div class="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-													@icon.Wand(icon.Props{Class: "size-3 text-primary"})
-													<span>Using visualization tool...</span>
-												</div>
-												<div class="h-24 w-full rounded-md bg-primary/10 border border-primary/20 flex items-center justify-center">
-													<span class="text-xs text-muted-foreground">📊 Interactive Diagram</span>
-												</div>
-											</div>
-										</div>
 									</div>
 									<!-- Input bar mock -->
 									<div class="mt-4 flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-3">
@@ -147,7 +129,7 @@ templ socialProofBar() {
 			<div class="grid grid-cols-2 gap-8 md:grid-cols-5">
 				@statItem("3", "AI Providers")
 				@statItem("15+", "AI Models")
-				@statItem("10", "Built-in Plugins")
+				@statItem("✓", "Agentic Plugins")
 				@statItem("100+", "Agent Templates")
 				@statItem("MCP", "Protocol Support")
 			</div>

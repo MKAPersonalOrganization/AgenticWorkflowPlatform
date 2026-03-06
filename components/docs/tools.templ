@@ -27,7 +27,6 @@ templ docsPlugins() {
 				@docsTableRow("Library", "Access to reference materials and resources", "Looking up definitions, formulas, references")
 				@docsTableRow("Memory", "Long-term recall across conversations", "Remembering preferences, tracking progress")
 				@docsTableRow("Text-to-Speech", "Convert AI responses to spoken audio", "Accessibility, narration, auditory processing")
-				@docsTableRow("Visualization", "Chart and diagram generation", "Data analysis, concept mapping, flowcharts")
 			</tbody>
 		}
 		<h3>How Plugins Work</h3>
@@ -44,8 +43,8 @@ templ docsPlugins() {
 			<li>• <strong>Toggle individual tools</strong> — Fine-tune by enabling/disabling specific tools within a set</li>
 		</ul>
 		<p>
-			This flexibility lets you create highly specialized agents. For example, a "Data Analyst" agent might
-			have the Visualization plugin fully enabled, but only the <code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">evaluate</code> tool from the Calculator plugin.
+			This flexibility lets you create highly specialized agents. For example, a "Software Engineer" agent might
+			have the Codebase plugin fully enabled, but only the <code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">evaluate</code> tool from the Calculator plugin.
 		</p>
 		<h3>MCP Tools Integration</h3>
 		<p>
@@ -126,71 +125,6 @@ templ docsVoiceTTS() {
 		</ol>
 		@docsInfoBox("Interactive Audio") {
 			<p>Combine TTS with the Elicitation plugin for interactive audio sessions: the agent reads a report aloud, then asks you for feedback.</p>
-		}
-	}
-}
-
-// ─── Visualization ───────────────────────────────────────────────────────────
-templ docsVisualization() {
-	@docsSection("visualization", "Visualization and Charts", iconActivity, "text-cyan-500") {
-		<p>
-			The Visualization plugin enables agents to generate 
-			<strong>
-				publication-quality plots and animated
-				visualizations
-			</strong> directly within conversations. Powered by gnuplot with full scripting support,
-			it covers everything from simple line graphs to rotating 3D surfaces.
-		</p>
-		<h3>Plot Tool (Static Charts)</h3>
-		<p>
-			The Plot tool generates static charts and graphs as PNG images:
-		</p>
-		@docsTable() {
-			<thead>
-				<tr>
-					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Plot Type</th>
-					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Description</th>
-					<th class="text-left py-2 px-3 text-sm font-medium border-b border-border">Example Use</th>
-				</tr>
-			</thead>
-			<tbody>
-				@docsTableRow("Function Plots", "Plot mathematical functions f(x)", "Graphing sin(x), polynomial curves")
-				@docsTableRow("Data Scatter", "Plot data points with trend lines", "Statistical analysis, data exploration")
-				@docsTableRow("3D Surfaces", "Three-dimensional mesh and surface plots", "Multivariable calculus, topology")
-				@docsTableRow("Custom Scripts", "Full gnuplot scripting support", "Complex multi-panel layouts, styling")
-			</tbody>
-		}
-		<p>
-			All plots support custom titles, axis labels, grid lines, ranges, and styling. Generated PNGs
-			are saved as downloadable artifacts.
-		</p>
-		<h3>Animate Tool (Animated Visualizations)</h3>
-		<p>
-			The Animate tool creates animated visualizations as GIF or WebP files:
-		</p>
-		<ul class="space-y-2 my-4">
-			<li>
-				<strong>Rotating 3D plots</strong> -- Spin around a surface to see it from all angles
-			</li>
-			<li>
-				<strong>Wave propagation</strong> -- Animate traveling waves and interference patterns
-			</li>
-			<li>
-				<strong>Parameter variations</strong> -- Show how a function changes as a parameter sweeps
-			</li>
-			<li>
-				<strong>Configurable frame rate</strong> -- Control animation speed via delay between frames
-			</li>
-		</ul>
-		<h3>How It Works</h3>
-		<ol class="list-decimal list-inside space-y-2 my-4">
-			<li>Enable the <strong>Visualization</strong> plugin for your agent</li>
-			<li>Ask the agent to plot a function, chart data, or animate a concept</li>
-			<li>The agent writes a gnuplot script and executes it server-side</li>
-			<li>The resulting image or animation is displayed inline and saved as an artifact</li>
-		</ol>
-		@docsInfoBox("Analytical Power") {
-			<p>Combine visualization with the Data Analyst plugin for a complete analysis experience: process a dataset, then plot the results to see it visually.</p>
 		}
 	}
 }

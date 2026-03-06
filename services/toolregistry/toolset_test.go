@@ -6,7 +6,6 @@ import (
 	"school-with-ai/foundation/logger"
 	"school-with-ai/plugins/calculator"
 	"school-with-ai/plugins/memory"
-	"school-with-ai/plugins/visualization"
 	"school-with-ai/services/toolregistry"
 	"school-with-ai/services/toolregistry/mocks"
 	"testing"
@@ -18,7 +17,6 @@ func TestToolSetFunctionality(t *testing.T) {
 
 	// Register required plugins for the test
 	toolregistry.RegisterPlugin(&calculator.Provider{})
-	toolregistry.RegisterPlugin(&visualization.Provider{})
 	toolregistry.RegisterPlugin(&memory.Provider{})
 
 	// Create in-memory repository and registry
@@ -43,7 +41,7 @@ func TestToolSetFunctionality(t *testing.T) {
 	t.Logf("Found %d tool sets", len(toolSets))
 
 	// Test: Verify specific tool sets exist
-	expectedToolSets := []string{"calculator-set", "visualization-set", "memory-set"}
+	expectedToolSets := []string{"calculator-set", "memory-set"}
 	for _, expectedID := range expectedToolSets {
 		toolSet, err := registry.GetToolSet(ctx, expectedID)
 		if err != nil {
@@ -102,7 +100,7 @@ func TestToolSetFunctionality(t *testing.T) {
 		Name:        "Custom Test Set",
 		Description: "A test tool set for validation",
 		Category:    "Testing",
-		ToolIDs:     []string{"calc-add", "viz-plot"},
+		ToolIDs:     []string{"calc-add"},
 	}
 
 	if err := registry.RegisterToolSet(ctx, customToolSet); err != nil {
@@ -119,8 +117,8 @@ func TestToolSetFunctionality(t *testing.T) {
 		t.Errorf("Expected custom set name '%s', but got '%s'", customToolSet.Name, retrievedCustomSet.Name)
 	}
 
-	if len(retrievedCustomSet.ToolIDs) != 2 {
-		t.Errorf("Expected custom set to have 2 tools, but got %d", len(retrievedCustomSet.ToolIDs))
+	if len(retrievedCustomSet.ToolIDs) != 1 {
+		t.Errorf("Expected custom set to have 1 tool, but got %d", len(retrievedCustomSet.ToolIDs))
 	}
 
 	t.Log("Tool set functionality tests passed!")
