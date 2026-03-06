@@ -5,14 +5,13 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"strings"
-	"time"
-
 	"school-with-ai/components/i18n"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/event"
 	"school-with-ai/foundation/logger"
+	"strings"
+	"time"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 	"github.com/jmoiron/sqlx"

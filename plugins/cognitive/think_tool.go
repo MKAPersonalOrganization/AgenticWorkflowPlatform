@@ -2,7 +2,6 @@ package cognitive
 
 import (
 	"context"
-
 	"school-with-ai/foundation/agent"
 )
 

@@ -2,11 +2,10 @@ package memory
 
 import (
 	"context"
-	"strings"
-	"testing"
-
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
+	"strings"
+	"testing"
 )
 
 // MockMemoryService for testing

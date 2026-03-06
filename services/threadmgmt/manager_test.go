@@ -4,11 +4,10 @@ import (
 	"context"
 	"errors"
 	"io"
-	"sync"
-	"testing"
-
 	"school-with-ai/domain"
 	"school-with-ai/foundation/logger"
+	"sync"
+	"testing"
 )
 
 // ConcurrentMockEventStore simulates concurrency conflicts

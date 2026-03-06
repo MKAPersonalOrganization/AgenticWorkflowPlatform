@@ -3,9 +3,8 @@ package tts
 import (
 	"context"
 	"encoding/json"
-	"testing"
-
 	"school-with-ai/foundation/agent"
+	"testing"
 )
 
 func TestSpeakTool_Name(t *testing.T) {

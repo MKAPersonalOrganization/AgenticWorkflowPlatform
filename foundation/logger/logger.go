@@ -147,7 +147,7 @@ func (log *Logger) Errorc(ctx context.Context, caller int, msg string, args ...a
 func (log *Logger) write(ctx context.Context, level Level, caller int, msg string, args ...any) {
 	slogLevel := slog.Level(level)
 
-	if !log.Handler.Enabled(ctx, slogLevel) {
+	if !log.Enabled(ctx, slogLevel) {
 		return
 	}
 
@@ -161,7 +161,7 @@ func (log *Logger) write(ctx context.Context, level Level, caller int, msg strin
 	}
 	r.Add(args...)
 
-	_ = log.Handler.Handle(ctx, r)
+	_ = log.Handle(ctx, r)
 }
 
 func new(w io.Writer, minLevel Level, serviceName string, traceIDFn TraceIDFn, events Events, mode logMode) *Logger {

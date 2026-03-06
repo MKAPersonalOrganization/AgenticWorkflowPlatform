@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-
 	"school-with-ai/domain"
 
 	"github.com/google/uuid"

@@ -3,50 +3,50 @@
 package relationships_test
 
 import (
-"context"
-"os"
-"testing"
+	"context"
+	"os"
+	"testing"
 
-"school-with-ai/domain"
-"school-with-ai/services/rag/relationships"
+	"school-with-ai/domain"
+	"school-with-ai/services/rag/relationships"
 
-"github.com/google/uuid"
-"github.com/stretchr/testify/assert"
-"github.com/stretchr/testify/require"
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func baseURL(t *testing.T) string {
-t.Helper()
-u := os.Getenv("EDGEQUAKE_BASE_URL")
-if u == "" {
-t.Skip("EDGEQUAKE_BASE_URL not set")
-}
-return u
+	t.Helper()
+	u := os.Getenv("EDGEQUAKE_BASE_URL")
+	if u == "" {
+		t.Skip("EDGEQUAKE_BASE_URL not set")
+	}
+	return u
 }
 
 func tenantCtx() domain.TenantContext {
-tid := uuid.MustParse("00000000-0000-0000-0000-000000000002")
-wid := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-return domain.TenantContext{
-TenantID:    &tid,
-WorkspaceID: &wid,
-UserID:      "00000000-0000-0000-0000-000000000001",
-Role:        "admin",
-}
+	tid := uuid.MustParse("00000000-0000-0000-0000-000000000002")
+	wid := uuid.MustParse("00000000-0000-0000-0000-000000000003")
+	return domain.TenantContext{
+		TenantID:    &tid,
+		WorkspaceID: &wid,
+		UserID:      "00000000-0000-0000-0000-000000000001",
+		Role:        "admin",
+	}
 }
 
 func TestListRelationships(t *testing.T) {
-svc := relationships.NewService(baseURL(t), nil)
-resp, err := svc.ListRelationships(context.Background(), tenantCtx(), nil)
-require.NoError(t, err)
-assert.NotNil(t, resp)
-assert.GreaterOrEqual(t, resp.Total, 0)
-assert.NotNil(t, resp.Items)
+	svc := relationships.NewService(baseURL(t), nil)
+	resp, err := svc.ListRelationships(context.Background(), tenantCtx(), nil)
+	require.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.GreaterOrEqual(t, resp.Total, 0)
+	assert.NotNil(t, resp.Items)
 }
 
 func TestGetRelationship_NotFound(t *testing.T) {
-svc := relationships.NewService(baseURL(t), nil)
-_, err := svc.GetRelationship(context.Background(), tenantCtx(), "nonexistent")
-require.Error(t, err)
-assert.Contains(t, err.Error(), "not found")
+	svc := relationships.NewService(baseURL(t), nil)
+	_, err := svc.GetRelationship(context.Background(), tenantCtx(), "nonexistent")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not found")
 }

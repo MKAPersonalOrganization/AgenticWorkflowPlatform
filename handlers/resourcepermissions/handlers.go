@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
@@ -16,10 +15,10 @@ import (
 
 // Handler provides HTTP endpoints for resource permission management.
 type Handler struct {
-	log                    *logger.Logger
-	resourcePermService    *resourcepermissions.Service
-	resourcesService       *resources.Service
-	agentProvider          agent.AgentProvider
+	log                 *logger.Logger
+	resourcePermService *resourcepermissions.Service
+	resourcesService    *resources.Service
+	agentProvider       agent.AgentProvider
 }
 
 // NewHandler creates a new resource permissions handler.

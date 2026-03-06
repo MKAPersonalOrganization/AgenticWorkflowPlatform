@@ -3,12 +3,11 @@ package toolregistry
 import (
 	"context"
 	"fmt"
+	"school-with-ai/foundation/logger"
 	"sort"
 	"strings"
 	"sync"
 	"time"
-
-	"school-with-ai/foundation/logger"
 )
 
 // Tool represents a tool available in the registry.

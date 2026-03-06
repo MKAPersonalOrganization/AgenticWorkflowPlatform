@@ -10,9 +10,8 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
-	"strings"
-
 	"school-with-ai/domain"
+	"strings"
 
 	"github.com/jmoiron/sqlx"
 )

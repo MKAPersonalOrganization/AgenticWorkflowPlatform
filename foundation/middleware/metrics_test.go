@@ -3,9 +3,8 @@ package middleware_test
 import (
 	"net/http"
 	"net/http/httptest"
-	"testing"
-
 	"school-with-ai/foundation/middleware"
+	"testing"
 )
 
 func TestMetrics(t *testing.T) {

@@ -3,10 +3,9 @@ package resourcepermissions
 import (
 	"context"
 	"fmt"
+	"school-with-ai/foundation/logger"
 	"sync"
 	"time"
-
-	"school-with-ai/foundation/logger"
 )
 
 // ResourcePermission represents permission for an agent to access a specific resource.

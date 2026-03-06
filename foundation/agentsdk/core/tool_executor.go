@@ -5,10 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"school-with-ai/foundation/agent"
 	"sync"
 	"time"
-
-	"school-with-ai/foundation/agent"
 )
 
 // ErrToolNotFound is returned when a tool is not registered.

@@ -2,9 +2,8 @@ package engine
 
 import (
 	"context"
-	"testing"
-
 	"school-with-ai/foundation/agentsdk/core"
+	"testing"
 )
 
 // MockToolExecutor is a mock implementation of ToolExecutor for testing.

@@ -4,10 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
-
 	"school-with-ai/domain"
 	"school-with-ai/foundation/logger"
+	"time"
 )
 
 // Manager handles thread lifecycle and persistence using event sourcing.

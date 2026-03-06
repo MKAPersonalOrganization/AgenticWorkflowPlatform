@@ -7,9 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
-	"time"
-
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
@@ -22,6 +19,8 @@ import (
 	"school-with-ai/services/taskmanagement"
 	"school-with-ai/services/threadmgmt"
 	"school-with-ai/services/toolregistry"
+	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"

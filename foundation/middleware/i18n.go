@@ -3,9 +3,8 @@ package middleware
 import (
 	"context"
 	"net/http"
-	"time"
-
 	"school-with-ai/foundation/i18n"
+	"time"
 
 	"golang.org/x/text/language"
 )

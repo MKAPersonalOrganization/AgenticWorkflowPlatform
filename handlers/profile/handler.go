@@ -3,12 +3,11 @@ package profile
 import (
 	"encoding/json"
 	"net/http"
-	"strings"
-
 	"school-with-ai/components/profile"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/i18n"
 	"school-with-ai/foundation/logger"
+	"strings"
 )
 
 // Handler manages student profile requests.

@@ -4,10 +4,9 @@ package agentcatalog
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
-
 	"school-with-ai/domain"
 	"school-with-ai/foundation/logger"
+	"strconv"
 )
 
 // Handler encapsulates HTTP handlers for the agent catalog.

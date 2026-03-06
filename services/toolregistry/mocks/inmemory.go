@@ -3,9 +3,8 @@ package mocks
 import (
 	"context"
 	"fmt"
-	"sync"
-
 	"school-with-ai/services/toolregistry"
+	"sync"
 )
 
 // InMemoryRepository implements Repository interface with in-memory storage.

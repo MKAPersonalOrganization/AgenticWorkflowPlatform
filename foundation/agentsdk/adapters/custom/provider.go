@@ -2,9 +2,8 @@ package custom
 
 import (
 	"fmt"
-	"sort"
-
 	"school-with-ai/foundation/agent"
+	"sort"
 )
 
 // MapAgentProvider implements agent.AgentProvider using a simple map.

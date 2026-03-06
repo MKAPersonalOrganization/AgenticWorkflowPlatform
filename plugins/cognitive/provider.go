@@ -2,12 +2,11 @@ package cognitive
 
 import (
 	"context"
+	"school-with-ai/foundation/agent"
+	"school-with-ai/services/toolregistry"
 	"time"
 
 	"github.com/a-h/templ"
-
-	"school-with-ai/foundation/agent"
-	"school-with-ai/services/toolregistry"
 )
 
 // Provider implements the toolregistry.PluginProvider interface for the cognitive toolset.

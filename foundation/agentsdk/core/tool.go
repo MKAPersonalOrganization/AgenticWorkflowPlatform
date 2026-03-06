@@ -3,7 +3,6 @@ package core
 import (
 	"encoding/json"
 	"fmt"
-
 	"school-with-ai/foundation/agent"
 )
 

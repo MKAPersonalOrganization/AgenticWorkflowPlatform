@@ -5,8 +5,9 @@ package health_test
 import (
 	"context"
 	"os"
-	"school-with-ai/services/rag/health"
 	"testing"
+
+	"school-with-ai/services/rag/health"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

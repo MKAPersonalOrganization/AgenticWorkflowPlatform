@@ -3,7 +3,6 @@ package custom
 import (
 	"context"
 	"iter"
-
 	"school-with-ai/domain"
 	"school-with-ai/services/threadmgmt"
 )

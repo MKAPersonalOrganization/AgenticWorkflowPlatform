@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"iter"
-
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/internal/llm"
 )

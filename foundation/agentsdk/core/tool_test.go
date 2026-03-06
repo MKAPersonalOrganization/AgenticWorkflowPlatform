@@ -4,10 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"testing"
-
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/core"
+	"testing"
 )
 
 func TestFunctionTool(t *testing.T) {

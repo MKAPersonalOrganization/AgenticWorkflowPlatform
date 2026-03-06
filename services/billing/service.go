@@ -14,10 +14,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
-
 	"school-with-ai/domain"
 	"school-with-ai/foundation/logger"
+	"time"
+
 	projPayment "school-with-ai/infra/projection/payment"
 
 	"github.com/google/uuid"
@@ -879,7 +879,7 @@ func extractChargeDetails(pi *stripe.PaymentIntent) (chargeID, brand, last4, rec
 			last4 = card.Last4
 		}
 	}
-	return
+	return chargeID, brand, last4, receiptURL
 }
 
 // extractCardInfo safely pulls card brand and last4 from a PaymentIntent's
@@ -889,7 +889,7 @@ func extractChargeDetails(pi *stripe.PaymentIntent) (chargeID, brand, last4, rec
 // Deprecated: Use extractChargeDetails for full charge metadata.
 func extractCardInfo(pi *stripe.PaymentIntent) (brand, last4 string) {
 	_, brand, last4, _ = extractChargeDetails(pi)
-	return
+	return brand, last4
 }
 
 // extractPaymentError extracts the full Stripe error taxonomy from a
@@ -909,7 +909,7 @@ func extractPaymentError(pi *stripe.PaymentIntent) (reason, errorCode, declineCo
 			reason = fmt.Sprintf("%s:%s", errorCode, declineCode)
 		}
 	}
-	return
+	return reason, errorCode, declineCode, errorType, failureMessage
 }
 
 // resolveUserIDFromDispute attempts to extract user_id from a dispute's

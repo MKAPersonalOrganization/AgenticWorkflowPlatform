@@ -3,7 +3,6 @@ package projections
 import (
 	"context"
 	"errors"
-
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/services"
 

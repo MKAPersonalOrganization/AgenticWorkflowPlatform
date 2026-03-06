@@ -4,11 +4,10 @@ import (
 	"context"
 	"errors"
 	"iter"
-	"sync"
-	"testing"
-
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/internal/llm"
+	"sync"
+	"testing"
 )
 
 // MockChatClient implements llm.LLM for testing

@@ -3,7 +3,6 @@ package aisettings
 import (
 	"encoding/json"
 	"net/http"
-
 	"school-with-ai/domain"
 	"school-with-ai/foundation/i18n"
 	"school-with-ai/foundation/logger"

@@ -3,10 +3,9 @@ package sqldb
 import (
 	"context"
 	"os"
+	"school-with-ai/services/resources"
 	"testing"
 	"time"
-
-	"school-with-ai/services/resources"
 
 	"github.com/google/uuid"
 )

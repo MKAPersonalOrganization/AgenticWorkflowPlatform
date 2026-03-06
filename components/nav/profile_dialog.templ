@@ -94,8 +94,8 @@ templ profileDialog() {
 				<!-- Header -->
 				<div class="flex items-center justify-between p-6 pb-4 border-b border-border">
 					<div class="space-y-1">
-						<h2 class="text-lg font-semibold leading-none tracking-tight">{ i18n.T(ctx, "Student Profile") }</h2>
-						<p class="text-sm text-muted-foreground">{ i18n.T(ctx, "Personalize your learning experience") }</p>
+						<h2 class="text-lg font-semibold leading-none tracking-tight">{ i18n.T(ctx, "Personalized Profile") }</h2>
+						<p class="text-sm text-muted-foreground">{ i18n.T(ctx, "Personalize your AI companion experience") }</p>
 					</div>
 					<button
 						type="button"
@@ -122,7 +122,7 @@ templ profileDialog() {
 						<div class="space-y-5">
 							<!-- Learning Style -->
 							<div class="space-y-2">
-								<label class="text-sm font-medium text-foreground">{ i18n.T(ctx, "Learning Style") }</label>
+								<label class="text-sm font-medium text-foreground">{ i18n.T(ctx, "Work Style") }</label>
 								<select
 									x-model="profile.learning_style"
 									class="w-full h-10 px-3 rounded-md border border-input bg-background text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-ring"
@@ -160,10 +160,10 @@ templ profileDialog() {
 							</div>
 							<!-- Goals -->
 							<div class="space-y-2">
-								<label class="text-sm font-medium text-foreground">{ i18n.T(ctx, "Academic Goals") }</label>
+								<label class="text-sm font-medium text-foreground">{ i18n.T(ctx, "Professional/Personal Goals") }</label>
 								<textarea
 									x-model="profile.goals"
-									placeholder={ i18n.T(ctx, "e.g. Master calculus, improve essay structure...") }
+									placeholder={ i18n.T(ctx, "e.g. Master system design, improve coding skills...") }
 									rows="3"
 									class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-ring resize-none"
 								></textarea>

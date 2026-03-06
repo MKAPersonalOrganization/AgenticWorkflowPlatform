@@ -6,9 +6,10 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"school-with-ai/domain"
 	"testing"
 	"time"
+
+	"school-with-ai/domain"
 
 	"github.com/google/uuid"
 )

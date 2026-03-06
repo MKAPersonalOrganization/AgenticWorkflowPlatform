@@ -3,7 +3,6 @@ package banner
 import (
 	"encoding/json"
 	"net/http"
-
 	"school-with-ai/foundation/logger"
 )
 

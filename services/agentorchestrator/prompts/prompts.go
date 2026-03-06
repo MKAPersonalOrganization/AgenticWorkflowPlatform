@@ -2,10 +2,9 @@ package prompts
 
 import (
 	"bytes"
+	"school-with-ai/domain"
 	"strings"
 	"text/template"
-
-	"school-with-ai/domain"
 )
 
 // Specialty defines an academic specialist for the learning coordinator.

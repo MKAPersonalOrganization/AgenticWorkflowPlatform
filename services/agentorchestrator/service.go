@@ -7,15 +7,14 @@ import (
 	"fmt"
 	"io"
 	"iter"
-	"strings"
-	"sync"
-	"time"
-
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/artifact"
 	"school-with-ai/services/threadmgmt"
+	"strings"
+	"sync"
+	"time"
 
 	"github.com/google/uuid"
 )

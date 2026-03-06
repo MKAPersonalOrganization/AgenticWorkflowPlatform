@@ -7,10 +7,9 @@ import (
 	"mime"
 	"net/http"
 	"path/filepath"
-	"strings"
-
 	"school-with-ai/domain"
 	"school-with-ai/services/resources"
+	"strings"
 
 	"github.com/google/uuid"
 )

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"iter"
-
 	"school-with-ai/foundation/agent"
 )
 

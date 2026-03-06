@@ -4,9 +4,8 @@ import (
 	"crypto/tls"
 	"net/http"
 	"net/http/httptest"
-	"testing"
-
 	"school-with-ai/foundation/middleware"
+	"testing"
 )
 
 func TestSecurityHeaders(t *testing.T) {

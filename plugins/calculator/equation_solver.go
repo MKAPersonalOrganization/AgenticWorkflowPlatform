@@ -3,9 +3,8 @@ package calculator
 import (
 	"context"
 	"fmt"
-	"strings"
-
 	"school-with-ai/foundation/agent"
+	"strings"
 )
 
 // EquationSolverArgs represents the arguments for equation solver tool.

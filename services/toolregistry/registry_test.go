@@ -3,12 +3,11 @@ package toolregistry_test
 import (
 	"context"
 	"os"
-	"testing"
-
 	"school-with-ai/foundation/logger"
+	"school-with-ai/plugins/calculator"
 	"school-with-ai/services/toolregistry"
 	"school-with-ai/services/toolregistry/mocks"
-	"school-with-ai/plugins/calculator"
+	"testing"
 )
 
 func TestToolRegistry(t *testing.T) {

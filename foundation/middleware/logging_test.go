@@ -5,10 +5,9 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"testing"
-
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/middleware"
+	"testing"
 )
 
 func TestLogging(t *testing.T) {

@@ -3,7 +3,6 @@ package adkgo
 
 import (
 	"context"
-
 	"school-with-ai/foundation/agent"
 )
 
@@ -41,7 +40,6 @@ func (a *AgentAdapter) Run(ctx context.Context, inv *agent.Invocation) agent.Str
 	}
 }
 
-
 // WrapTool wraps an ADK-Go tool to implement agent.ExecutableTool.
 func WrapTool(adkTool any) agent.ExecutableTool {
 	return &ToolAdapter{
@@ -54,8 +52,8 @@ type ToolAdapter struct {
 	adkTool any
 }
 
-func (t *ToolAdapter) Name() string        { return "" }
-func (t *ToolAdapter) Description() string { return "" }
+func (t *ToolAdapter) Name() string          { return "" }
+func (t *ToolAdapter) Description() string   { return "" }
 func (t *ToolAdapter) Schema() *agent.Schema { return nil }
 
 // Execute implements the Executor interface.

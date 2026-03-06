@@ -2,10 +2,9 @@ package middleware
 
 import (
 	"fmt"
-	"strings"
-
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
+	"strings"
 )
 
 // NewStudentProfileInjectorMiddleware returns a Chat-level Middleware that

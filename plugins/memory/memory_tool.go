@@ -3,11 +3,10 @@ package memory
 import (
 	"context"
 	"fmt"
-	"strings"
-
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/services/memory"
+	"strings"
 )
 
 const (

@@ -1,9 +1,8 @@
 package postgres
 
 import (
-	"time"
-
 	"school-with-ai/domain"
+	"time"
 )
 
 // EventWithPosition wraps a domain event with its global position metadata.

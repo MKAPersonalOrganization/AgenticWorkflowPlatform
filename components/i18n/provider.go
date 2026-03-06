@@ -7,7 +7,6 @@ import (
 	"golang.org/x/text/language"
 )
 
-
 // T translates a key using the printer found in the context.
 func T(ctx context.Context, key string, args ...interface{}) string {
 	return i18n.T(ctx, key, args...)
@@ -29,4 +28,3 @@ func Messages(ctx context.Context) map[string]string {
 	tag, _ := language.Parse(Lang(ctx))
 	return i18n.GetMessages(tag)
 }
-

@@ -118,9 +118,10 @@ func (c *ConditionalRequirement) extractToolHistory(inv *Invocation) (stepCount 
 	toolsUsed = make(map[string]bool)
 
 	for _, msg := range inv.History {
-		if msg.Role == RoleUser {
+		switch msg.Role {
+		case RoleUser:
 			stepCount = 1 // Reset step count for new user turn
-		} else if msg.Role == RoleAssistant {
+		case RoleAssistant:
 			stepCount++
 			for _, content := range msg.Content {
 				if content.Type == ContentTypeToolCall && content.ToolCall != nil {
@@ -133,7 +134,7 @@ func (c *ConditionalRequirement) extractToolHistory(inv *Invocation) (stepCount 
 			}
 		}
 	}
-	return
+	return stepCount, invocationsOfTarget, lastToolUsed, toolsUsed
 }
 
 func (c *ConditionalRequirement) Run(ctx context.Context, inv *Invocation) ([]Rule, error) {
@@ -166,12 +167,9 @@ func (c *ConditionalRequirement) Run(ctx context.Context, inv *Invocation) ([]Ru
 	//    We compute forcing BEFORE the consecutive check so that
 	//    consecutive prevention can correctly override forcing within
 	//    the same requirement.
-	forced := false
+	forced := c.ForceAtStep > 0 && stepCount == c.ForceAtStep
 
 	// 3a. ForceAtStep Check
-	if c.ForceAtStep > 0 && stepCount == c.ForceAtStep {
-		forced = true
-	}
 
 	// 3b. ForceAfter Check — force after specific tools
 	if len(c.ForceAfter) > 0 && lastToolUsed != "" {

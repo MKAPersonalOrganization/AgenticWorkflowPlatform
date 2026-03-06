@@ -3,10 +3,9 @@ package sqldb
 import (
 	"context"
 	"os"
+	"school-with-ai/services/toolregistry"
 	"testing"
 	"time"
-
-	"school-with-ai/services/toolregistry"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"

@@ -3,10 +3,9 @@ package engine
 import (
 	"encoding/json"
 	"reflect"
-	"testing"
-
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/internal/llm"
+	"testing"
 )
 
 func TestMapFromCoreToLLMMessages(t *testing.T) {

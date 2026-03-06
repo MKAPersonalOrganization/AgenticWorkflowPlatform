@@ -7,9 +7,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"strconv"
-	"strings"
-
 	"school-with-ai/components/knowledge"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/logger"
@@ -18,6 +15,8 @@ import (
 	"school-with-ai/services/rag/documents"
 	"school-with-ai/services/rag/graph"
 	"school-with-ai/services/rag/workspaces"
+	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -928,7 +927,8 @@ func (h *Handler) RebuildWorkspace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Type == "graph" {
+	switch req.Type {
+	case "graph":
 		result, err := h.edgequakeService.RebuildKnowledgeGraph(r.Context(), tCtx, workspaceID, &workspaces.RebuildKnowledgeGraphRequest{
 			LlmModel:    &req.LlmModel,
 			LlmProvider: &req.LlmProvider,
@@ -940,7 +940,7 @@ func (h *Handler) RebuildWorkspace(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, http.StatusOK, result)
-	} else if req.Type == "embeddings" {
+	case "embeddings":
 		result, err := h.edgequakeService.RebuildEmbeddings(r.Context(), tCtx, workspaceID, &workspaces.RebuildEmbeddingsRequest{
 			EmbeddingModel:    &req.EmbeddingModel,
 			EmbeddingProvider: &req.EmbeddingProvider,
@@ -952,7 +952,7 @@ func (h *Handler) RebuildWorkspace(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, http.StatusOK, result)
-	} else {
+	default:
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid rebuild type"})
 	}
 }

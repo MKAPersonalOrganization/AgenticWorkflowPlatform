@@ -4,39 +4,39 @@
 package chunks_test
 
 import (
-"context"
-"os"
-"testing"
+	"context"
+	"os"
+	"testing"
 
-"school-with-ai/domain"
-"school-with-ai/services/rag/chunks"
+	"school-with-ai/domain"
+	"school-with-ai/services/rag/chunks"
 
-"github.com/google/uuid"
-"github.com/stretchr/testify/assert"
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 )
 
 func testTenantContext() *domain.TenantContext {
-tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
-workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-return &domain.TenantContext{
-TenantID:    &tenantID,
-WorkspaceID: &workspaceID,
-UserID:      "00000000-0000-0000-0000-000000000001",
-Role:        "admin",
-}
+	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
+	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
+	return &domain.TenantContext{
+		TenantID:    &tenantID,
+		WorkspaceID: &workspaceID,
+		UserID:      "00000000-0000-0000-0000-000000000001",
+		Role:        "admin",
+	}
 }
 
 func TestGetChunk_NotFound(t *testing.T) {
-baseURL := os.Getenv("EDGEQUAKE_BASE_URL")
-if baseURL == "" {
-t.Skip("EDGEQUAKE_BASE_URL not set")
-}
+	baseURL := os.Getenv("EDGEQUAKE_BASE_URL")
+	if baseURL == "" {
+		t.Skip("EDGEQUAKE_BASE_URL not set")
+	}
 
-svc := chunks.NewService(baseURL, nil)
-ctx := context.Background()
-tCtx := testTenantContext()
+	svc := chunks.NewService(baseURL, nil)
+	ctx := context.Background()
+	tCtx := testTenantContext()
 
-_, err := svc.GetChunk(ctx, tCtx, "nonexistent")
-assert.Error(t, err)
-assert.Contains(t, err.Error(), "not found")
+	_, err := svc.GetChunk(ctx, tCtx, "nonexistent")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not found")
 }

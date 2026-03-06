@@ -3,13 +3,14 @@ package custom
 import (
 	"context"
 	"os"
-	"testing"
-
 	"school-with-ai/foundation/logger"
 	"school-with-ai/plugins/calculator"
 	"school-with-ai/services/permissions"
-	permissions_mocks "school-with-ai/services/permissions/mocks"
 	"school-with-ai/services/toolregistry"
+	"testing"
+
+	permissions_mocks "school-with-ai/services/permissions/mocks"
+
 	toolregistry_mocks "school-with-ai/services/toolregistry/mocks"
 )
 

@@ -199,13 +199,13 @@ templ docsCustomAgents() {
 	}
 }
 
-// ─── Student Profile ─────────────────────────────────────────────────────────
+// ─── Personalized Profile ─────────────────────────────────────────────────────────
 templ docsStudentProfile() {
-	@docsSection("student-profile", "Student Profile", iconGraduationCap, "text-amber-500") {
+	@docsSection("personalized-profile", "Personalized Profile", iconUser, "text-amber-500") {
 		<p>
-			The Student Profile is a powerful personalization feature that makes Compass truly adaptive.
-			By defining your learning preferences, every AI agent automatically adjusts its approach to
-			match how you learn best.
+			The Personalized Profile is a powerful adaptation feature that makes Compass truly yours.
+			By defining your work preferences, every AI agent automatically adjusts its approach to
+			match how you work best.
 		</p>
 		<h3>Profile Fields</h3>
 		@docsTable() {
@@ -217,44 +217,44 @@ templ docsStudentProfile() {
 				</tr>
 			</thead>
 			<tbody>
-				@docsTableRow("Learning Style", "How you prefer to absorb information", "Visual learner, hands-on practice")
-				@docsTableRow("Goals", "What you are working toward", "Master calculus, improve essay writing")
+				@docsTableRow("Work Style", "How you prefer to absorb and process information", "Visual thinker, hands-on, detail-oriented")
+				@docsTableRow("Goals", "What you are working toward", "Ship new features, improve system design")
 				@docsTableRow("Strengths", "Subjects or skills you are good at", "Problem solving, creative thinking")
-				@docsTableRow("Struggles", "Areas where you need extra help", "Time management, complex proofs")
+				@docsTableRow("Preferences", "How you want the AI to respond", "Concise summaries, code examples")
 			</tbody>
 		}
 		<h3>How It Works</h3>
 		<p>
-			Your student profile is automatically <strong>injected into every agent system prompt</strong>.
-			When you ask a Math Tutor for help, it already knows you prefer visual explanations
-			and struggle with complex proofs, and adjusts its teaching accordingly.
+			Your profile is automatically <strong>injected into every agent system prompt</strong>.
+			When you ask a Research Assistant for help, it already knows you prefer visual explanations
+			and adjusts its communication accordingly.
 		</p>
 		<ol class="list-decimal list-inside space-y-2 my-4">
 			<li>Navigate to <strong>Profile</strong> in the sidebar</li>
-			<li>Fill in your learning style, goals, strengths, and struggles</li>
+			<li>Fill in your work style, goals, strengths, and preferences</li>
 			<li>Save your profile -- changes apply to all future conversations immediately</li>
 			<li>Every agent now adapts its responses based on your profile</li>
 		</ol>
-		<h3>Adaptive Teaching</h3>
+		<h3>Adaptive Communication</h3>
 		<p>
 			The profile data is used by specialized agent prompts to deliver personalized experiences:
 		</p>
 		<ul class="space-y-2 my-4">
 			<li>
-				<strong>Visual learners</strong> get more diagrams, charts, and spatial explanations
+				<strong>Visual thinkers</strong> get more diagrams, charts, and spatial explanations
 			</li>
 			<li>
-				<strong>Hands-on learners</strong> get interactive exercises and step-by-step walkthroughs
+				<strong>Hands-on workers</strong> get interactive examples and actionable steps
 			</li>
 			<li>
-				<strong>Struggling areas</strong> trigger extra scaffolding and gentler explanations
+				<strong>Preferences</strong> trigger specific formatting like code blocks or concise lists
 			</li>
 			<li>
-				<strong>Strengths</strong> allow agents to reference known concepts for faster learning
+				<strong>Strengths</strong> allow agents to reference known concepts for faster communication
 			</li>
 		</ul>
 		@docsInfoBox("Privacy") {
-			<p>Your student profile is private to your account and is only used to personalize AI interactions. It is never shared with other users or used for advertising.</p>
+			<p>Your personalized profile is private to your account and is only used to tailor AI interactions. It is never shared with other users or used for training.</p>
 		}
 	}
 }

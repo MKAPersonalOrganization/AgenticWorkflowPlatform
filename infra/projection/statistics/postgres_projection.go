@@ -3,10 +3,9 @@ package statistics
 import (
 	"context"
 	"fmt"
-	"time"
-
 	"school-with-ai/domain"
 	"school-with-ai/foundation/event"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 )

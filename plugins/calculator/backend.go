@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-
 	"school-with-ai/foundation/agent"
 )
 
@@ -28,7 +27,6 @@ type UnaryOperationArgs struct {
 	Value float64 `json:"value"`
 }
 
-
 // Common schemas for calculator tools
 var binaryOpSchema = &agent.Schema{
 	Type: agent.TypeObject,
@@ -50,8 +48,8 @@ var unaryOpSchema = &agent.Schema{
 // AddTool performs addition.
 type AddTool struct{}
 
-func (t *AddTool) Name() string        { return "add" }
-func (t *AddTool) Description() string { return "Add two numbers (a + b)" }
+func (t *AddTool) Name() string          { return "add" }
+func (t *AddTool) Description() string   { return "Add two numbers (a + b)" }
 func (t *AddTool) Schema() *agent.Schema { return binaryOpSchema }
 
 func (t *AddTool) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
@@ -65,8 +63,8 @@ func (t *AddTool) Execute(ctx context.Context, args agent.Arguments) (agent.Resu
 // SubtractTool performs subtraction.
 type SubtractTool struct{}
 
-func (t *SubtractTool) Name() string        { return "subtract" }
-func (t *SubtractTool) Description() string { return "Subtract two numbers (a - b)" }
+func (t *SubtractTool) Name() string          { return "subtract" }
+func (t *SubtractTool) Description() string   { return "Subtract two numbers (a - b)" }
 func (t *SubtractTool) Schema() *agent.Schema { return binaryOpSchema }
 
 func (t *SubtractTool) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
@@ -80,8 +78,8 @@ func (t *SubtractTool) Execute(ctx context.Context, args agent.Arguments) (agent
 // MultiplyTool performs multiplication.
 type MultiplyTool struct{}
 
-func (t *MultiplyTool) Name() string        { return "multiply" }
-func (t *MultiplyTool) Description() string { return "Multiply two numbers (a * b)" }
+func (t *MultiplyTool) Name() string          { return "multiply" }
+func (t *MultiplyTool) Description() string   { return "Multiply two numbers (a * b)" }
 func (t *MultiplyTool) Schema() *agent.Schema { return binaryOpSchema }
 
 func (t *MultiplyTool) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
@@ -95,8 +93,8 @@ func (t *MultiplyTool) Execute(ctx context.Context, args agent.Arguments) (agent
 // DivideTool performs division.
 type DivideTool struct{}
 
-func (t *DivideTool) Name() string        { return "divide" }
-func (t *DivideTool) Description() string { return "Divide two numbers (a / b)" }
+func (t *DivideTool) Name() string          { return "divide" }
+func (t *DivideTool) Description() string   { return "Divide two numbers (a / b)" }
 func (t *DivideTool) Schema() *agent.Schema { return binaryOpSchema }
 
 func (t *DivideTool) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
@@ -113,8 +111,8 @@ func (t *DivideTool) Execute(ctx context.Context, args agent.Arguments) (agent.R
 // PowerTool performs exponentiation.
 type PowerTool struct{}
 
-func (t *PowerTool) Name() string        { return "power" }
-func (t *PowerTool) Description() string { return "Raise a to the power of b (a^b)" }
+func (t *PowerTool) Name() string          { return "power" }
+func (t *PowerTool) Description() string   { return "Raise a to the power of b (a^b)" }
 func (t *PowerTool) Schema() *agent.Schema { return binaryOpSchema }
 
 func (t *PowerTool) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
@@ -128,8 +126,8 @@ func (t *PowerTool) Execute(ctx context.Context, args agent.Arguments) (agent.Re
 // SqrtTool performs square root.
 type SqrtTool struct{}
 
-func (t *SqrtTool) Name() string        { return "sqrt" }
-func (t *SqrtTool) Description() string { return "Calculate the square root of a number" }
+func (t *SqrtTool) Name() string          { return "sqrt" }
+func (t *SqrtTool) Description() string   { return "Calculate the square root of a number" }
 func (t *SqrtTool) Schema() *agent.Schema { return unaryOpSchema }
 
 func (t *SqrtTool) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {

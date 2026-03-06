@@ -3,12 +3,11 @@ package toolregistry
 import (
 	"context"
 	"encoding/json"
+	"school-with-ai/foundation/agent"
 	"sort"
 	"sync"
 
 	"github.com/a-h/templ"
-
-	"school-with-ai/foundation/agent"
 )
 
 // ToolUIContext provides the data required for a plugin to render its UI.

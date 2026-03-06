@@ -1,10 +1,9 @@
 package taskmanagement
 
 import (
+	"school-with-ai/domain"
 	"testing"
 	"time"
-
-	"school-with-ai/domain"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 	"github.com/stretchr/testify/assert"

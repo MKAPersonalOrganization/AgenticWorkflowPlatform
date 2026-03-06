@@ -2,11 +2,10 @@ package codebase
 
 import (
 	"context"
-
-	"github.com/a-h/templ"
-
 	"school-with-ai/foundation/agent"
 	"school-with-ai/services/toolregistry"
+
+	"github.com/a-h/templ"
 )
 
 // Provider implements the toolregistry.PluginProvider interface for Codebase tools UI.
