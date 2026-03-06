@@ -7,16 +7,17 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
+	"strings"
+
 	"school-with-ai/components/knowledge"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/services/aisettings"
+	aisettingsmod "school-with-ai/modules/aisettings"
 	"school-with-ai/services/edgequake"
 	"school-with-ai/services/rag/documents"
 	"school-with-ai/services/rag/graph"
 	"school-with-ai/services/rag/workspaces"
-	"strconv"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -26,12 +27,12 @@ import (
 type Handler struct {
 	log              *logger.Logger
 	edgequakeService *edgequake.Service
-	aiSettings       *aisettings.Service
+	aiSettings       *aisettingsmod.Module
 	tenantID         string
 }
 
 // NewHandler creates a new Knowledge Base handler.
-func NewHandler(log *logger.Logger, edgequakeService *edgequake.Service, aiSettings *aisettings.Service, tenantID string) *Handler {
+func NewHandler(log *logger.Logger, edgequakeService *edgequake.Service, aiSettings *aisettingsmod.Module, tenantID string) *Handler {
 	return &Handler{
 		log:              log,
 		edgequakeService: edgequakeService,

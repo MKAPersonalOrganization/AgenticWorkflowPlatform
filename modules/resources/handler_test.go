@@ -1,4 +1,4 @@
-package resources_test
+package resources
 
 import (
 	"mime"
@@ -32,10 +32,10 @@ func TestContentDisposition_NormalFilename(t *testing.T) {
 
 func TestContentDisposition_QuoteInjection(t *testing.T) {
 	t.Parallel()
-	malicious := `foo"; malicious-header: value`
+	malicious := "foo\"; malicious-header: value"
 	name := sanitizeFilename(malicious)
 	disp := mime.FormatMediaType("attachment", map[string]string{"filename": name})
-	if strings.Contains(disp, `"; malicious-header`) {
+	if strings.Contains(disp, "\"; malicious-header") {
 		t.Errorf("Content-Disposition header injection possible: %q", disp)
 	}
 }

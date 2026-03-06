@@ -7,28 +7,26 @@ import (
 	"mime"
 	"net/http"
 	"path/filepath"
-	"school-with-ai/domain"
-	"school-with-ai/services/resources"
 	"strings"
+
+	"school-with-ai/domain"
 
 	"github.com/google/uuid"
 )
 
-// Handler provides HTTP endpoints for resource management.
-type Handler struct {
-	service *resources.Service
+// handler provides HTTP endpoints for resource management.
+type handler struct {
+	svc *service
 }
 
-// NewHandler creates a new Resources Handler.
-func NewHandler(service *resources.Service) *Handler {
-	return &Handler{
-		service: service,
-	}
+// newHandler creates a new resources handler.
+func newHandler(svc *service) *handler {
+	return &handler{svc: svc}
 }
 
-// Upload handles file upload requests.
+// upload handles file upload requests.
 // POST /api/resources/upload
-func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
+func (h *handler) upload(w http.ResponseWriter, r *http.Request) {
 	user := domain.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
@@ -48,7 +46,7 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	res, err := h.service.UploadResource(r.Context(), user.ID, header.Filename, header.Header.Get("Content-Type"), file)
+	res, err := h.svc.uploadResource(r.Context(), user.ID, header.Filename, header.Header.Get("Content-Type"), file)
 	if err != nil {
 		http.Error(w, "Failed to upload resource", http.StatusInternalServerError)
 		return
@@ -58,21 +56,21 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(res)
 }
 
-// List handles listing resources.
+// list handles listing resources.
 // GET /api/resources?source=public|private
-func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
+func (h *handler) list(w http.ResponseWriter, r *http.Request) {
 	user := domain.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	source := resources.ResourceSource(r.URL.Query().Get("source"))
+	source := ResourceSource(r.URL.Query().Get("source"))
 	if source == "" {
-		source = resources.SourcePublic
+		source = SourcePublic
 	}
 
-	res, err := h.service.ListResources(r.Context(), user.ID, source)
+	res, err := h.svc.listResources(r.Context(), user.ID, source)
 	if err != nil {
 		http.Error(w, "Failed to list resources", http.StatusInternalServerError)
 		return
@@ -82,9 +80,9 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(res)
 }
 
-// GetContent handles resource content retrieval.
+// getContent handles resource content retrieval.
 // GET /api/resources/{id}/content
-func (h *Handler) GetContent(w http.ResponseWriter, r *http.Request) {
+func (h *handler) getContent(w http.ResponseWriter, r *http.Request) {
 	user := domain.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
@@ -98,7 +96,7 @@ func (h *Handler) GetContent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res, content, err := h.service.GetResourceContent(r.Context(), id)
+	res, content, err := h.svc.getResourceContent(r.Context(), id)
 	if err != nil {
 		http.Error(w, "Resource not found", http.StatusNotFound)
 		return
@@ -106,7 +104,7 @@ func (h *Handler) GetContent(w http.ResponseWriter, r *http.Request) {
 	defer content.Close()
 
 	// Security check: private resources only for owner
-	if res.Source == resources.SourcePrivate && (res.UserID == nil || *res.UserID != user.ID) {
+	if res.Source == SourcePrivate && (res.UserID == nil || *res.UserID != user.ID) {
 		http.Error(w, "unauthorized", http.StatusForbidden)
 		return
 	}
@@ -139,9 +137,9 @@ func (h *Handler) GetContent(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Delete handles resource deletion.
+// delete handles resource deletion.
 // DELETE /api/resources/{id}
-func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
+func (h *handler) delete(w http.ResponseWriter, r *http.Request) {
 	user := domain.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
@@ -155,7 +153,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.service.DeleteResource(r.Context(), id, user.ID); err != nil {
+	if err := h.svc.deleteResource(r.Context(), id, user.ID); err != nil {
 		http.Error(w, "Failed to delete resource", http.StatusInternalServerError)
 		return
 	}

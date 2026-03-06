@@ -1,35 +1,40 @@
-package sqldb
+package resources
 
 import (
 	"context"
 	"database/sql"
 	"fmt"
-	"school-with-ai/services/resources"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 )
 
-// PostgresResourcesRepository implements the Resources Repository using PostgreSQL.
-type PostgresResourcesRepository struct {
+// repository defines the storage interface for resource metadata.
+type repository interface {
+	Create(ctx context.Context, res Resource) error
+	List(ctx context.Context, userID string, source ResourceSource) ([]Resource, error)
+	GetByID(ctx context.Context, id uuid.UUID) (Resource, error)
+	Delete(ctx context.Context, id uuid.UUID, userID string) error
+}
+
+// postgresResourcesRepository implements repository using PostgreSQL.
+type postgresResourcesRepository struct {
 	db *sqlx.DB
 }
 
-// NewPostgresResourcesRepository creates a new PostgresResourcesRepository.
-func NewPostgresResourcesRepository(db *sqlx.DB) *PostgresResourcesRepository {
-	return &PostgresResourcesRepository{
-		db: db,
-	}
+// newPostgresResourcesRepository creates a new postgresResourcesRepository.
+func newPostgresResourcesRepository(db *sqlx.DB) *postgresResourcesRepository {
+	return &postgresResourcesRepository{db: db}
 }
 
 // Create inserts a new resource into the database.
-func (r *PostgresResourcesRepository) Create(ctx context.Context, res resources.Resource) error {
+func (r *postgresResourcesRepository) Create(ctx context.Context, res Resource) error {
 	const q = `
-		INSERT INTO resources (
-			resource_id, user_id, title, file_type, file_path, source, created_at, updated_at
-		) VALUES (
-			:resource_id, :user_id, :title, :file_type, :file_path, :source, :created_at, :updated_at
-		)`
+INSERT INTO resources (
+resource_id, user_id, title, file_type, file_path, source, created_at, updated_at
+) VALUES (
+:resource_id, :user_id, :title, :file_type, :file_path, :source, :created_at, :updated_at
+)`
 
 	if _, err := r.db.NamedExecContext(ctx, q, res); err != nil {
 		return fmt.Errorf("inserting resource: %w", err)
@@ -39,11 +44,11 @@ func (r *PostgresResourcesRepository) Create(ctx context.Context, res resources.
 }
 
 // List returns a list of resources based on user_id and source filter.
-func (r *PostgresResourcesRepository) List(ctx context.Context, userID string, source resources.ResourceSource) ([]resources.Resource, error) {
-	var res []resources.Resource
+func (r *postgresResourcesRepository) List(ctx context.Context, userID string, source ResourceSource) ([]Resource, error) {
+	var res []Resource
 	var err error
 
-	if source == resources.SourcePublic {
+	if source == SourcePublic {
 		const q = `SELECT * FROM resources WHERE source = 'public' ORDER BY created_at DESC LIMIT 500`
 		err = r.db.SelectContext(ctx, &res, q)
 	} else if userID != "" {
@@ -61,22 +66,22 @@ func (r *PostgresResourcesRepository) List(ctx context.Context, userID string, s
 }
 
 // GetByID retrieves a resource by its ID.
-func (r *PostgresResourcesRepository) GetByID(ctx context.Context, id uuid.UUID) (resources.Resource, error) {
+func (r *postgresResourcesRepository) GetByID(ctx context.Context, id uuid.UUID) (Resource, error) {
 	const q = `SELECT * FROM resources WHERE resource_id = $1`
 
-	var res resources.Resource
+	var res Resource
 	if err := r.db.GetContext(ctx, &res, q, id); err != nil {
 		if err == sql.ErrNoRows {
-			return resources.Resource{}, fmt.Errorf("resource not found")
+			return Resource{}, fmt.Errorf("resource not found")
 		}
-		return resources.Resource{}, fmt.Errorf("selecting resource by id: %w", err)
+		return Resource{}, fmt.Errorf("selecting resource by id: %w", err)
 	}
 
 	return res, nil
 }
 
 // Delete removes a resource from the database.
-func (r *PostgresResourcesRepository) Delete(ctx context.Context, id uuid.UUID, userID string) error {
+func (r *postgresResourcesRepository) Delete(ctx context.Context, id uuid.UUID, userID string) error {
 	const q = `DELETE FROM resources WHERE resource_id = $1 AND (user_id = $2 OR source = 'public')`
 
 	res, err := r.db.ExecContext(ctx, q, id, userID)

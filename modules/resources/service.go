@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"school-with-ai/services/artifact"
 	"time"
+
+	"school-with-ai/services/artifact"
 
 	"github.com/google/uuid"
 )
@@ -15,51 +16,43 @@ var (
 	ErrUnauthorized     = fmt.Errorf("unauthorized")
 )
 
-// Repository defines the storage interface for resource metadata.
-type Repository interface {
-	Create(ctx context.Context, res Resource) error
-	List(ctx context.Context, userID string, source ResourceSource) ([]Resource, error)
-	GetByID(ctx context.Context, id uuid.UUID) (Resource, error)
-	Delete(ctx context.Context, id uuid.UUID, userID string) error
-}
-
-// Service manages document resources.
-type Service struct {
-	repo            Repository
+// service manages document resources.
+type service struct {
+	repo            repository
 	artifactService artifact.Service
 }
 
-// NewService creates a new Resources Service.
-func NewService(repo Repository, artifactService artifact.Service) *Service {
-	return &Service{
+// newService creates a new resources service.
+func newService(repo repository, artifactService artifact.Service) *service {
+	return &service{
 		repo:            repo,
 		artifactService: artifactService,
 	}
 }
 
-// ListResources returns a list of resources for the given user and source.
-func (s *Service) ListResources(ctx context.Context, userID string, source ResourceSource) ([]Resource, error) {
+const (
+	systemUserID      = "system"
+	librarySessionID  = "library"
+	resourceSessionID = "resources"
+)
+
+// listResources returns a list of resources for the given user and source.
+func (s *service) listResources(ctx context.Context, userID string, source ResourceSource) ([]Resource, error) {
 	return s.repo.List(ctx, userID, source)
 }
 
-const (
-	SystemUserID      = "system"
-	LibrarySessionID  = "library"
-	ResourceSessionID = "resources"
-)
-
-// UploadResource handles the upload of a new resource to S3.
-func (s *Service) UploadResource(ctx context.Context, userID string, title, fileType string, content io.Reader) (Resource, error) {
+// uploadResource handles the upload of a new resource to S3.
+func (s *service) uploadResource(ctx context.Context, userID string, title, fileType string, content io.Reader) (Resource, error) {
 	id := uuid.New()
 
 	uploadUserID := userID
-	sessionID := ResourceSessionID
+	sessionID := resourceSessionID
 	source := SourcePrivate
 	var uID *string
 
 	if userID == "" {
-		uploadUserID = SystemUserID
-		sessionID = LibrarySessionID
+		uploadUserID = systemUserID
+		sessionID = librarySessionID
 		source = SourcePublic
 	} else {
 		uID = &userID
@@ -91,18 +84,18 @@ func (s *Service) UploadResource(ctx context.Context, userID string, title, file
 	return res, nil
 }
 
-// GetResourceContent returns a reader for the resource content from S3.
-func (s *Service) GetResourceContent(ctx context.Context, id uuid.UUID) (Resource, io.ReadCloser, error) {
+// getResourceContent returns a reader for the resource content from S3.
+func (s *service) getResourceContent(ctx context.Context, id uuid.UUID) (Resource, io.ReadCloser, error) {
 	res, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return Resource{}, nil, err
 	}
 
-	userID := SystemUserID
-	sessionID := LibrarySessionID
+	userID := systemUserID
+	sessionID := librarySessionID
 	if res.Source == SourcePrivate && res.UserID != nil {
 		userID = *res.UserID
-		sessionID = ResourceSessionID
+		sessionID = resourceSessionID
 	}
 
 	content, _, err := s.artifactService.Load(ctx, userID, sessionID, res.FilePath)
@@ -113,8 +106,8 @@ func (s *Service) GetResourceContent(ctx context.Context, id uuid.UUID) (Resourc
 	return res, content, nil
 }
 
-// DeleteResource removes a resource from S3 and DB.
-func (s *Service) DeleteResource(ctx context.Context, id uuid.UUID, userID string) error {
+// deleteResource removes a resource from S3 and DB.
+func (s *service) deleteResource(ctx context.Context, id uuid.UUID, userID string) error {
 	res, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return err
@@ -129,11 +122,11 @@ func (s *Service) DeleteResource(ctx context.Context, id uuid.UUID, userID strin
 		return err
 	}
 
-	delUserID := SystemUserID
-	sessionID := LibrarySessionID
+	delUserID := systemUserID
+	sessionID := librarySessionID
 	if res.Source == SourcePrivate && res.UserID != nil {
 		delUserID = *res.UserID
-		sessionID = ResourceSessionID
+		sessionID = resourceSessionID
 	}
 
 	return s.artifactService.Delete(ctx, delUserID, sessionID, res.FilePath)
