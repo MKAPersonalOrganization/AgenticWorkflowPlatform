@@ -2,9 +2,8 @@ package core
 
 import (
 	"context"
-	"testing"
-
 	"school-with-ai/foundation/agentsdk/internal/llm"
+	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

@@ -7,9 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"time"
-
 	"school-with-ai/domain"
+	"time"
 )
 
 var (

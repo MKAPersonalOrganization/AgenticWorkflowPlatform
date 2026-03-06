@@ -3,15 +3,14 @@ package domain_test
 import (
 	"context"
 	"io"
+	"school-with-ai/domain"
+	"school-with-ai/foundation/logger"
+	"school-with-ai/services/threadmgmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"school-with-ai/domain"
-	"school-with-ai/foundation/logger"
-	"school-with-ai/services/threadmgmt"
 )
 
 // MockEventStore implements domain.EventStore for testing

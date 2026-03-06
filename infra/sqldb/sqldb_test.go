@@ -1,10 +1,9 @@
 package sqldb_test
 
 import (
+	"school-with-ai/infra/sqldb"
 	"testing"
 	"time"
-
-	"school-with-ai/infra/sqldb"
 )
 
 func TestOpenConfigDefaults(t *testing.T) {

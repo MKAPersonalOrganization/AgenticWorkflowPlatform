@@ -633,7 +633,7 @@ templ Settings() {
 							@tabs.Content(tabs.ContentProps{Value: "personalization", Class: "space-y-6 animate-in fade-in duration-200"}) {
 								<div class="space-y-4">
 									<div class="flex flex-col gap-2">
-										<label class="text-foreground font-medium">{ i18n.T(ctx, "Learning Style") }</label>
+										<label class="text-foreground font-medium">{ i18n.T(ctx, "Work Style") }</label>
 										@selectbox.SelectBox(selectbox.Props{Class: "w-full"}) {
 											@selectbox.Trigger(selectbox.TriggerProps{
 												Attributes: templ.Attributes{
@@ -681,10 +681,10 @@ templ Settings() {
 										<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "Areas where you excel or feel confident (comma separated).") }</p>
 									</div>
 									<div class="flex flex-col gap-2 pt-2">
-										<label class="text-foreground font-medium">{ i18n.T(ctx, "Academic Goals") }</label>
+										<label class="text-foreground font-medium">{ i18n.T(ctx, "Professional/Personal Goals") }</label>
 										<textarea
 											x-model="profile.goals"
-											placeholder={ i18n.T(ctx, "e.g. Master calculus, improve essay structure...") }
+											placeholder={ i18n.T(ctx, "e.g. Master system design, improve coding skills...") }
 											class="w-full h-24 bg-card border border-border rounded-xl p-3 outline-none focus:ring-1 focus:ring-primary resize-none"
 										></textarea>
 										<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "What you hope to achieve with your AI assistant.") }</p>

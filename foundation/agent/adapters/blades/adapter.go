@@ -3,7 +3,6 @@ package blades
 import (
 	"context"
 	"iter"
-
 	"school-with-ai/foundation/agent"
 )
 
@@ -47,4 +46,3 @@ func (a *Adapter) Run(ctx context.Context, input *agent.Invocation) iter.Seq2[ag
 		// Delegation to Blades agent would happen here
 	}
 }
-

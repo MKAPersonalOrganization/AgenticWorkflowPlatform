@@ -2,9 +2,8 @@ package taskmanagement
 
 import (
 	"context"
-	"testing"
-
 	"school-with-ai/services/agentorchestrator"
+	"testing"
 )
 
 // TestServiceCreation verifies that the orchestration service can be created.

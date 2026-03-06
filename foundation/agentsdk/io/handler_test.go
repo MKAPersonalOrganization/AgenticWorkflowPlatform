@@ -3,9 +3,8 @@ package io_test
 import (
 	"context"
 	"errors"
-	"testing"
-
 	"school-with-ai/foundation/agentsdk/io"
+	"testing"
 )
 
 // =============================================================================

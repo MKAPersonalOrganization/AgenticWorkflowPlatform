@@ -6,12 +6,11 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"testing"
-	"time"
-
 	"school-with-ai/domain"
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/services"
+	"testing"
+	"time"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )

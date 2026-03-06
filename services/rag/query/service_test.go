@@ -6,9 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"testing"
-
 	"school-with-ai/domain"
+	"testing"
 
 	"github.com/google/uuid"
 )

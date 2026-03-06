@@ -3,10 +3,9 @@ package core
 import (
 	"errors"
 	"fmt"
-	"strings"
-
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/internal/llm"
+	"strings"
 )
 
 var (

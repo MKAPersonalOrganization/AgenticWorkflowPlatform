@@ -4,10 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
-
 	"school-with-ai/foundation/agent"
 	"school-with-ai/services/artifact"
+	"strings"
 )
 
 // CreateMarkdownTool allows agents to create new markdown files.

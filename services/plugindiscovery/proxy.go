@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
-
 	"school-with-ai/domain"
+	"strings"
 )
 
 const (

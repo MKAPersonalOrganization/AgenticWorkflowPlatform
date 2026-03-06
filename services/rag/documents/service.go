@@ -8,10 +8,9 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
-	"time"
-
 	"school-with-ai/domain"
 	"school-with-ai/services/rag/tasks"
+	"time"
 )
 
 var (

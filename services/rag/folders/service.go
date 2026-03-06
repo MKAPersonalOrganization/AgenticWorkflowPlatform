@@ -6,9 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
-
 	"school-with-ai/domain"
+	"time"
 
 	"github.com/google/uuid"
 )

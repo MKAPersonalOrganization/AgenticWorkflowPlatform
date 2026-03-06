@@ -2,7 +2,6 @@ package threadmgmt
 
 import (
 	"context"
-
 	"school-with-ai/domain"
 )
 

@@ -6,8 +6,9 @@ package workspaces
 import (
 	"context"
 	"os"
-	"school-with-ai/domain"
 	"testing"
+
+	"school-with-ai/domain"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"

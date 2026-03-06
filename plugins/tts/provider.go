@@ -2,13 +2,12 @@ package tts
 
 import (
 	"context"
-	"time"
-
-	"github.com/a-h/templ"
-
 	"school-with-ai/foundation/agent"
 	"school-with-ai/services/artifact"
 	"school-with-ai/services/toolregistry"
+	"time"
+
+	"github.com/a-h/templ"
 )
 
 // Provider implements the toolregistry.PluginProvider interface for the TTS toolset.

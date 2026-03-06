@@ -3,14 +3,13 @@ package toolregistry_test
 import (
 	"context"
 	"os"
-	"testing"
-
 	"school-with-ai/foundation/logger"
+	"school-with-ai/plugins/calculator"
+	"school-with-ai/plugins/memory"
+	"school-with-ai/plugins/visualization"
 	"school-with-ai/services/toolregistry"
 	"school-with-ai/services/toolregistry/mocks"
-	"school-with-ai/plugins/calculator"
-	"school-with-ai/plugins/visualization"
-	"school-with-ai/plugins/memory"
+	"testing"
 )
 
 func TestToolSetFunctionality(t *testing.T) {

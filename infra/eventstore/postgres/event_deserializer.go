@@ -3,7 +3,6 @@ package postgres
 import (
 	"encoding/json"
 	"fmt"
-
 	"school-with-ai/domain"
 )
 

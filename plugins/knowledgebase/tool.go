@@ -9,11 +9,10 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"school-with-ai/foundation/agent"
 	"strings"
 	"text/template"
 	"time"
-
-	"school-with-ai/foundation/agent"
 )
 
 // DefaultKBSystemPrompt is the system prompt template for the knowledge base sub-agent.
@@ -807,14 +806,7 @@ func (t *QueryKnowledgeBaseTool) fetchGraphForEntities(ctx context.Context, work
 
 	nodes := make([]KBGraphNode, 0, len(allNodes))
 	for _, n := range allNodes {
-		nodes = append(nodes, KBGraphNode{
-			ID:          n.ID,
-			Label:       n.Label,
-			NodeType:    n.NodeType,
-			Description: n.Description,
-			Degree:      n.Degree,
-			Properties:  n.Properties,
-		})
+		nodes = append(nodes, KBGraphNode(n))
 	}
 
 	// Only include edges where both source and target are in our node set
@@ -831,12 +823,7 @@ func (t *QueryKnowledgeBaseTool) fetchGraphForEntities(ctx context.Context, work
 		if _, tgtOk := nodeSet[e.Target]; !tgtOk {
 			continue
 		}
-		edges = append(edges, KBGraphEdge{
-			Source:   e.Source,
-			Target:   e.Target,
-			EdgeType: e.EdgeType,
-			Weight:   e.Weight,
-		})
+		edges = append(edges, KBGraphEdge(e))
 	}
 
 	return &KBGraph{

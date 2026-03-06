@@ -5,9 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
-
 	"school-with-ai/services/artifact"
+	"strings"
 )
 
 const (

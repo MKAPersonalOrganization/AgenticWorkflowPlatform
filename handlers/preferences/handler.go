@@ -3,7 +3,6 @@ package preferences
 import (
 	"encoding/json"
 	"net/http"
-
 	"school-with-ai/domain"
 	"school-with-ai/foundation/logger"
 )

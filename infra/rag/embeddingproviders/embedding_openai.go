@@ -3,7 +3,6 @@ package embeddingproviders
 import (
 	"context"
 	"fmt"
-
 	"school-with-ai/domain"
 
 	"github.com/pgvector/pgvector-go"

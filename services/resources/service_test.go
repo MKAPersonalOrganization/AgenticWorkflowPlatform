@@ -3,10 +3,9 @@ package resources
 import (
 	"context"
 	"io"
+	"school-with-ai/services/artifact"
 	"strings"
 	"testing"
-
-	"school-with-ai/services/artifact"
 
 	"github.com/google/uuid"
 )

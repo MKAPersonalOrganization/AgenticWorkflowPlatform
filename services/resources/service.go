@@ -4,9 +4,8 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"time"
-
 	"school-with-ai/services/artifact"
+	"time"
 
 	"github.com/google/uuid"
 )

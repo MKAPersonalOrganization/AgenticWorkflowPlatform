@@ -4,10 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"school-with-ai/foundation/logger"
 	"sync"
 	"time"
-
-	"school-with-ai/foundation/logger"
 )
 
 // Checker represents a dependency that can report its health status.

@@ -5,13 +5,12 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"school-with-ai/domain"
+	"school-with-ai/foundation/logger"
 	"sync"
 	"time"
 
-	"school-with-ai/domain"
 	pgstore "school-with-ai/infra/eventstore/postgres"
-
-	"school-with-ai/foundation/logger"
 
 	"github.com/jmoiron/sqlx"
 )

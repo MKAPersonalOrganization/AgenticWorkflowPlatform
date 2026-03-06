@@ -5,9 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"strings"
-
 	"school-with-ai/services/toolregistry"
+	"strings"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
@@ -137,7 +136,7 @@ func (r *PostgresToolRegistryRepository) SaveTool(ctx context.Context, tool *too
 	if err != nil {
 		return fmt.Errorf("marshalling metadata: %w", err)
 	}
-	
+
 	// Handle empty/nil map marshalling to null or empty json object
 	if len(tool.Metadata) == 0 {
 		metadataJSON = []byte("{}")
@@ -284,17 +283,17 @@ func (r *PostgresToolRegistryRepository) SaveToolSet(ctx context.Context, toolSe
 	if err != nil {
 		return fmt.Errorf("marshalling metadata: %w", err)
 	}
-	
+
 	if len(toolSet.Metadata) == 0 {
 		metadataJSON = []byte("{}")
 	}
 
 	// Prepare data for proper types including pq.StringArray
-	
+
 	// We need to pass a struct or map that has the correct types
 	// Using map with pq.Array won't work easily with NamedExec and :param syntax directly if we want to be safe with sqlx
 	// But sqlx should handle slice to array conversion if the driver supports it, however pq.StringArray is safer.
-	
+
 	params := map[string]interface{}{
 		"id":          toolSet.ID,
 		"name":        toolSet.Name,
@@ -309,7 +308,7 @@ func (r *PostgresToolRegistryRepository) SaveToolSet(ctx context.Context, toolSe
 	if _, err := r.db.NamedExecContext(ctx, q, params); err != nil {
 		// Check for specific errors if needed
 		if strings.Contains(err.Error(), "pq: invalid input syntax for type json") {
-             // Try to handle potentially nil metadata
+			// Try to handle potentially nil metadata
 		}
 		return fmt.Errorf("saving tool set: %w", err)
 	}

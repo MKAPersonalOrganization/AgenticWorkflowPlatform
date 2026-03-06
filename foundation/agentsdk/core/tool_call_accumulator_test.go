@@ -2,10 +2,9 @@ package core_test
 
 import (
 	"encoding/json"
-	"testing"
-
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/internal/llm"
+	"testing"
 )
 
 func TestToolCallAccumulator_NewToolCall(t *testing.T) {

@@ -4,9 +4,8 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"sync"
-
 	"school-with-ai/domain"
+	"sync"
 )
 
 // HandlerFunc is a function that handles a specific event type.

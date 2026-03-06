@@ -6,12 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"iter"
-	"time"
-
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/internal/llm"
 	"school-with-ai/foundation/agentsdk/io"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 )

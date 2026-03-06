@@ -1,10 +1,9 @@
 package engine
 
 import (
-	"time"
-
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/internal/llm"
+	"time"
 )
 
 // EventFactory creates domain events with consistent agent name and timestamp handling.

@@ -7,10 +7,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"testing"
-
 	"school-with-ai/foundation/logger"
 	"school-with-ai/handlers/health"
+	"testing"
 )
 
 func newTestLogger() *logger.Logger {

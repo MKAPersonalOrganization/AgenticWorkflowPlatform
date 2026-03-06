@@ -19,7 +19,7 @@ type ProfilePageProps struct {
 
 templ ProfilePage(props ProfilePageProps) {
 	@components.AppLayout(components.AppLayoutProps{
-		Title: "Student Profile",
+		Title: "Personalized Profile",
 		User:  props.User,
 	}) {
 		<div class="container mx-auto max-w-3xl p-6 space-y-6">
@@ -35,8 +35,8 @@ templ ProfilePage(props ProfilePageProps) {
 					}
 				</a>
 				<div class="flex-1">
-					<h1 class="text-3xl font-bold tracking-tight">Student Profile</h1>
-					<p class="text-muted-foreground mt-1">Personalize your learning experience</p>
+					<h1 class="text-3xl font-bold tracking-tight">Personalized Profile</h1>
+					<p class="text-muted-foreground mt-1">Personalize your AI companion experience</p>
 				</div>
 			</div>
 			<!-- Profile Form -->
@@ -45,11 +45,11 @@ templ ProfilePage(props ProfilePageProps) {
 					@card.Title(card.TitleProps{}) {
 						<div class="flex items-center gap-2">
 							@icon.User(icon.Props{Class: "size-5"})
-							<span>Academic Preferences</span>
+							<span>Work Preferences</span>
 						</div>
 					}
 					@card.Description(card.DescriptionProps{}) {
-						These details help our AI agents tailor their teaching style to you.
+						These details help our AI agents tailor their communication style to you.
 					}
 				}
 				@card.Content(card.ContentProps{}) {
@@ -82,21 +82,21 @@ templ ProfilePage(props ProfilePageProps) {
 							<button type="button" @click="$dispatch('open-settings-dialog', { tab: 'account' })" class="text-primary hover:underline cursor-pointer">Account Settings</button>
 						</div>
 						<div class="border-t border-border"></div>
-						<!-- Learning Style -->
+						<!-- Work Style -->
 						<div class="space-y-2">
 							@label.Label(label.Props{For: "learning_style"}) {
-								Learning Style 
+								Work Style 
 							}
 							@input.Input(input.Props{
 								ID:          "learning_style",
 								Name:        "learning_style",
 								Type:        "text",
 								Value:       props.Profile.LearningStyle,
-								Placeholder: "e.g., Visual, Auditory, Kinesthetic",
+								Placeholder: "e.g., Visual thinker, Detail-oriented",
 							})
-							<p class="text-[0.8rem] text-muted-foreground">How do you learn best?</p>
+							<p class="text-[0.8rem] text-muted-foreground">How do you work best?</p>
 						</div>
-						<!-- Struggles -->
+						<!-- Preferences -->
 						<div class="space-y-2">
 							@label.Label(label.Props{For: "struggles"}) {
 								Current Struggles 
@@ -113,13 +113,13 @@ templ ProfilePage(props ProfilePageProps) {
 						<!-- Strengths -->
 						<div class="space-y-2">
 							@label.Label(label.Props{For: "strengths"}) {
-								Strengths 
+								Capabilities & Strengths 
 							}
 							@textarea.Textarea(textarea.Props{
 								ID:          "strengths",
 								Name:        "strengths",
 								Value:       strings.Join(props.Profile.Strengths, ", "),
-								Placeholder: "e.g., Mental math, Creative writing",
+								Placeholder: "e.g., System design, Data analysis",
 								Rows:        3,
 							})
 							<p class="text-[0.8rem] text-muted-foreground">Separate multiple items with commas.</p>
@@ -127,13 +127,13 @@ templ ProfilePage(props ProfilePageProps) {
 						<!-- Goals -->
 						<div class="space-y-2">
 							@label.Label(label.Props{For: "goals"}) {
-								Academic Goals 
+								Professional/Personal Goals 
 							}
 							@textarea.Textarea(textarea.Props{
 								ID:          "goals",
 								Name:        "goals",
 								Value:       props.Profile.Goals,
-								Placeholder: "e.g., Pass AP Chem, Learn Python",
+								Placeholder: "e.g., Ship the MVP, Learn Rust",
 								Rows:        3,
 							})
 						</div>

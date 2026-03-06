@@ -2,10 +2,9 @@ package engine
 
 import (
 	"encoding/json"
-	"strings"
-
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/internal/llm"
+	"strings"
 )
 
 // mapFromCoreToLLMMessages converts a slice of core.Message to llm.Message.

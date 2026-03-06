@@ -9,11 +9,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"school-with-ai/domain"
+	"school-with-ai/foundation/logger"
 	"strings"
 	"time"
 
-	"school-with-ai/domain"
-	"school-with-ai/foundation/logger"
 	billingService "school-with-ai/services/billing"
 
 	"github.com/stripe/stripe-go/v84"

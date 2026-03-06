@@ -3,10 +3,9 @@ package agent_test
 import (
 	"context"
 	"errors"
-	"testing"
-
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/io"
+	"testing"
 )
 
 // mockTool implements agent.Tool for testing.

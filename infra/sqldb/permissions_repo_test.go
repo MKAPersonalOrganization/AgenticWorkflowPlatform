@@ -3,10 +3,9 @@ package sqldb
 import (
 	"context"
 	"os"
+	"school-with-ai/services/permissions"
 	"testing"
 	"time"
-
-	"school-with-ai/services/permissions"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

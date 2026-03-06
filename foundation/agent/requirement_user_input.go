@@ -3,9 +3,8 @@ package agent
 import (
 	"context"
 	"fmt"
-	"strings"
-
 	"school-with-ai/foundation/agentsdk/io"
+	"strings"
 )
 
 // RequireUserInput is a declarative Requirement that enables the agent

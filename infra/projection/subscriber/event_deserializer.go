@@ -3,7 +3,6 @@ package subscriber
 import (
 	"encoding/json"
 	"fmt"
-
 	"school-with-ai/domain"
 )
 

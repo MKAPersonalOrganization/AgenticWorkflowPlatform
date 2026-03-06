@@ -1,12 +1,11 @@
 package domain_test
 
 import (
+	"school-with-ai/domain"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-
-	"school-with-ai/domain"
 )
 
 func TestThreadAggregate_ActiveToolStates(t *testing.T) {

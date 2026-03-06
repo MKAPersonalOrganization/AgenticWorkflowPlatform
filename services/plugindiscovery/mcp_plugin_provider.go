@@ -3,7 +3,6 @@ package plugindiscovery
 import (
 	"context"
 	"encoding/json"
-
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/services/toolregistry"

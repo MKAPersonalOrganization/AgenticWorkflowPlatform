@@ -2,10 +2,9 @@ package workspacepermissions
 
 import (
 	"context"
+	"school-with-ai/foundation/logger"
 	"sync"
 	"time"
-
-	"school-with-ai/foundation/logger"
 )
 
 // WorkspacePermission represents a workspace attached to an agent.

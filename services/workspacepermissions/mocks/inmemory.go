@@ -2,8 +2,8 @@ package mocks
 
 import (
 	"context"
-	"sync"
 	"school-with-ai/services/workspacepermissions"
+	"sync"
 )
 
 // InMemoryRepository is an in-memory implementation of the workspace permissions Repository.

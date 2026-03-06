@@ -2,10 +2,9 @@ package main
 
 import (
 	"os"
+	"school-with-ai/foundation/logger"
 	"strings"
 	"testing"
-
-	"school-with-ai/foundation/logger"
 )
 
 func testLogger() *logger.Logger {

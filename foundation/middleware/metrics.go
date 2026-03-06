@@ -3,7 +3,6 @@ package middleware
 
 import (
 	"net/http"
-
 	"school-with-ai/foundation/metrics"
 )
 

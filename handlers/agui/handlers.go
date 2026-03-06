@@ -4,11 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
-	"strconv"
-
 	"school-with-ai/domain"
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/services"
+	"strconv"
 )
 
 // AguiProjectionHandler provides HTTP endpoints for querying the AGUI projection.

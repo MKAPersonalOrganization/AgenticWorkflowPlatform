@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-
 	"school-with-ai/services/resources"
 
 	"github.com/google/uuid"

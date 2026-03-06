@@ -7,10 +7,9 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"school-with-ai/domain"
 	"strings"
 	"testing"
-
-	"school-with-ai/domain"
 
 	"github.com/google/uuid"
 )

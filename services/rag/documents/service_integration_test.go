@@ -8,10 +8,11 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"school-with-ai/domain"
 	"strings"
 	"testing"
 	"time"
+
+	"school-with-ai/domain"
 
 	"github.com/google/uuid"
 )

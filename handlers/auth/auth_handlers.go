@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-
-	authcomp "school-with-ai/components/auth"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/i18n"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/infra/googleauth"
+
+	authcomp "school-with-ai/components/auth"
 )
 
 // AuthHandlers contains handlers for authentication routes.

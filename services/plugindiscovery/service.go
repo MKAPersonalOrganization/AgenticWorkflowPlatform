@@ -9,13 +9,12 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"strings"
-	"time"
-
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/toolregistry"
+	"strings"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )

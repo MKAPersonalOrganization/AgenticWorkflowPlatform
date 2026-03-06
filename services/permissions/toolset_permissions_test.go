@@ -3,12 +3,12 @@ package permissions_test
 import (
 	"context"
 	"os"
-	"testing"
-
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/permissions"
 	"school-with-ai/services/permissions/mocks"
 	"school-with-ai/services/toolregistry"
+	"testing"
+
 	toolregistry_mocks "school-with-ai/services/toolregistry/mocks"
 )
 

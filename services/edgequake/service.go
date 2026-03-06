@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
-
 	"school-with-ai/domain"
 	"school-with-ai/services/rag/chunks"
 	"school-with-ai/services/rag/costs"
@@ -25,6 +23,7 @@ import (
 	"school-with-ai/services/rag/tenants"
 	"school-with-ai/services/rag/users"
 	"school-with-ai/services/rag/workspaces"
+	"time"
 
 	"github.com/google/uuid"
 )

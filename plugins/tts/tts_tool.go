@@ -10,11 +10,10 @@ import (
 	"mime/multipart"
 	"net/http"
 	"path/filepath"
-	"strings"
-	"time"
-
 	"school-with-ai/foundation/agent"
 	"school-with-ai/services/artifact"
+	"strings"
+	"time"
 )
 
 var (

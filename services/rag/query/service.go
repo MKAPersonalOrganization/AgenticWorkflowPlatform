@@ -8,9 +8,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
-
 	"school-with-ai/domain"
+	"strings"
 )
 
 // Service provides access to the Edgequake Query API.

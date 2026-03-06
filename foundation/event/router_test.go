@@ -3,10 +3,9 @@ package event
 import (
 	"context"
 	"errors"
+	"school-with-ai/domain"
 	"testing"
 	"time"
-
-	"school-with-ai/domain"
 )
 
 func TestRouter(t *testing.T) {

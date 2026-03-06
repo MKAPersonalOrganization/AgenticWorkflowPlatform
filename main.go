@@ -11,10 +11,6 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
-	"sync"
-	"syscall"
-	"time"
-
 	"school-with-ai/components"
 	"school-with-ai/components/docs"
 	"school-with-ai/components/landing"
@@ -28,14 +24,10 @@ import (
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/middleware"
 	"school-with-ai/handlers/auth"
-	preferenceshandler "school-with-ai/handlers/preferences"
 	"school-with-ai/handlers/profile"
-	statisticsHandler "school-with-ai/handlers/statistics"
-	pgstore "school-with-ai/infra/eventstore/postgres"
 	"school-with-ai/infra/googleauth"
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/infra/projection/llmcontext"
-	projectionStats "school-with-ai/infra/projection/statistics"
 	"school-with-ai/infra/projection/subscriber"
 	"school-with-ai/infra/projections"
 	"school-with-ai/infra/sqldb"
@@ -47,10 +39,10 @@ import (
 	"school-with-ai/plugins/elicitation"
 	"school-with-ai/plugins/knowledgebase"
 	"school-with-ai/plugins/library"
-	memoryplugin "school-with-ai/plugins/memory"
 	"school-with-ai/plugins/tts"
 	"school-with-ai/plugins/visualization"
 	"school-with-ai/services/agentorchestrator"
+	"school-with-ai/services/agentstore"
 	"school-with-ai/services/aisettings"
 	"school-with-ai/services/artifact"
 	"school-with-ai/services/edgequake"
@@ -63,6 +55,18 @@ import (
 	"school-with-ai/services/threadmgmt"
 	"school-with-ai/services/toolregistry"
 	"school-with-ai/services/workspacepermissions"
+	"sync"
+	"syscall"
+	"time"
+
+	preferenceshandler "school-with-ai/handlers/preferences"
+
+	statisticsHandler "school-with-ai/handlers/statistics"
+	pgstore "school-with-ai/infra/eventstore/postgres"
+
+	projectionStats "school-with-ai/infra/projection/statistics"
+
+	memoryplugin "school-with-ai/plugins/memory"
 
 	agentcataloghandlers "school-with-ai/handlers/agentcatalog"
 	agentstorehandlers "school-with-ai/handlers/agentstore"
@@ -78,7 +82,7 @@ import (
 	wkspermhandlers "school-with-ai/handlers/workspacepermissions"
 
 	projPayment "school-with-ai/infra/projection/payment"
-	"school-with-ai/services/agentstore"
+
 	authService "school-with-ai/services/auth"
 	billingService "school-with-ai/services/billing"
 

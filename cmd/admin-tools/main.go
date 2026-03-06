@@ -5,9 +5,8 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"time"
-
 	"school-with-ai/infra/sqldb"
+	"time"
 )
 
 func main() {

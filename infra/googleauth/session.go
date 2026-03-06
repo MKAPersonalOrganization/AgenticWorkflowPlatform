@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/gob"
 	"net/http"
-
 	"school-with-ai/domain"
 
 	"github.com/gorilla/sessions"

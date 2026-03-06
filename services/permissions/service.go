@@ -3,10 +3,9 @@ package permissions
 import (
 	"context"
 	"fmt"
+	"school-with-ai/foundation/logger"
 	"sync"
 	"time"
-
-	"school-with-ai/foundation/logger"
 )
 
 // Permission represents permission for an agent to use a specific tool within a tool set.

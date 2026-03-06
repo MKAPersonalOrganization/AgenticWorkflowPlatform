@@ -5,11 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"runtime"
-	"sync"
-	"time"
-
 	"school-with-ai/domain"
 	"school-with-ai/foundation/logger"
+	"sync"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )

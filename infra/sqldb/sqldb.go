@@ -7,11 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"strings"
-	"time"
-
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/otel"
+	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib"

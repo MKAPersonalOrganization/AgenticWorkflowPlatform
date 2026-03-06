@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-
 	"school-with-ai/services/permissions"
 
 	"github.com/jmoiron/sqlx"

@@ -2,10 +2,9 @@ package agentorchestrator_test
 
 import (
 	"context"
-	"testing"
-
 	"school-with-ai/foundation/agent"
 	"school-with-ai/services/agentorchestrator/agents/math"
+	"testing"
 )
 
 func TestInstructorConfigurations(t *testing.T) {
@@ -20,8 +19,6 @@ func TestInstructorConfigurations(t *testing.T) {
 	if mathConfig.Name != "math-instructor" {
 		t.Errorf("Expected math name 'math-instructor', got '%s'", mathConfig.Name)
 	}
-
-
 }
 
 // mockTool implements the Tool interface simply for the test

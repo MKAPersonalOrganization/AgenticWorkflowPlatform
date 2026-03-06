@@ -456,10 +456,7 @@ func main() {
 	llmProvider := os.Getenv("EDGEQUAKE_LLM_PROVIDER")
 	llmModel := os.Getenv("EDGEQUAKE_LLM_MODEL")
 
-	enableRerank := true // Default to true matching Rust API
-	if os.Getenv("EDGEQUAKE_RERANK") == "false" {
-		enableRerank = false
-	}
+	enableRerank := os.Getenv("EDGEQUAKE_RERANK") != "false" // Default to true matching Rust API
 
 	opts := QueryOptions{
 		EnableRerank: enableRerank,
