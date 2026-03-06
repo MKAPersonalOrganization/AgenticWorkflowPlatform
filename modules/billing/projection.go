@@ -1,18 +1,24 @@
-package payment
+package billing
+
+// This file was extracted from infra/projection/payment/postgres_projection.go
+// as part of the modular-monolith migration. All types and methods are now
+// unexported (module-internal); the Module facade in billing.go exposes
+// projection registration.
 
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/event"
 	"school-with-ai/foundation/logger"
-	"time"
 
 	"github.com/jmoiron/sqlx"
 )
 
-// AccountStatus is the projected read model for a user's payment account.
-type AccountStatus struct {
+// accountStatus is the projected read model for a user's payment account.
+type accountStatus struct {
 	UserID      string     `db:"user_id"      json:"userId"`
 	Status      string     `db:"status"       json:"status"` // "none", "active", "cancelled"
 	PaidAt      *time.Time `db:"paid_at"      json:"paidAt,omitempty"`
@@ -25,19 +31,19 @@ type AccountStatus struct {
 	UpdatedAt   time.Time  `db:"updated_at"    json:"updatedAt"`
 }
 
-// PostgresPaymentProjection builds a denormalized read model from payment events.
-type PostgresPaymentProjection struct {
+// postgresPaymentProjection builds a denormalized read model from payment events.
+type postgresPaymentProjection struct {
 	log *logger.Logger
 	db  *sqlx.DB
 }
 
-// NewPostgresPaymentProjection creates a new projection.
-func NewPostgresPaymentProjection(log *logger.Logger, db *sqlx.DB) *PostgresPaymentProjection {
-	return &PostgresPaymentProjection{log: log, db: db}
+// newPostgresPaymentProjection creates a new projection.
+func newPostgresPaymentProjection(log *logger.Logger, db *sqlx.DB) *postgresPaymentProjection {
+	return &postgresPaymentProjection{log: log, db: db}
 }
 
-// RegisterHandlers wires event handlers into the persistence router.
-func (p *PostgresPaymentProjection) RegisterHandlers(router interface {
+// registerHandlers wires event handlers into the persistence router.
+func (p *postgresPaymentProjection) registerHandlers(router interface {
 	Register(eventPrototype any, handler event.HandlerFunc)
 },
 ) {
@@ -81,10 +87,10 @@ func (p *PostgresPaymentProjection) RegisterHandlers(router interface {
 	})
 }
 
-// GetAccountStatus returns the projected payment status for a user.
+// getAccountStatus returns the projected payment status for a user.
 // Returns nil, nil if no account exists.
-func (p *PostgresPaymentProjection) GetAccountStatus(ctx context.Context, userID string) (*AccountStatus, error) {
-	var status AccountStatus
+func (p *postgresPaymentProjection) getAccountStatus(ctx context.Context, userID string) (*accountStatus, error) {
+	var status accountStatus
 	err := p.db.GetContext(ctx, &status,
 		`SELECT user_id, status, paid_at, amount_cents, currency, card_brand, card_last4, cancelled_at, cancels_on, updated_at
 		   FROM payment_accounts WHERE user_id = $1`, userID)
@@ -97,10 +103,10 @@ func (p *PostgresPaymentProjection) GetAccountStatus(ctx context.Context, userID
 	return &status, nil
 }
 
-// HasPaid checks whether a user has an active (paid) account.
+// hasPaid checks whether a user has an active (paid) account.
 // A user in "cancelled" state still has access until the billing period ends.
-func (p *PostgresPaymentProjection) HasPaid(ctx context.Context, userID string) (bool, error) {
-	status, err := p.GetAccountStatus(ctx, userID)
+func (p *postgresPaymentProjection) hasPaid(ctx context.Context, userID string) (bool, error) {
+	status, err := p.getAccountStatus(ctx, userID)
 	if err != nil {
 		return false, err
 	}
@@ -111,7 +117,7 @@ func (p *PostgresPaymentProjection) HasPaid(ctx context.Context, userID string) 
 // Event handlers — project events into the read model
 // -------------------------------------------------------------------------
 
-func (p *PostgresPaymentProjection) onAccountOpened(ctx context.Context, e *domain.PaymentAccountOpened) error {
+func (p *postgresPaymentProjection) onAccountOpened(ctx context.Context, e *domain.PaymentAccountOpened) error {
 	_, err := p.db.ExecContext(ctx,
 		`INSERT INTO payment_accounts (user_id, status, amount_cents, currency, updated_at)
 		 VALUES ($1, 'none', 0, 'usd', $2)
@@ -123,7 +129,7 @@ func (p *PostgresPaymentProjection) onAccountOpened(ctx context.Context, e *doma
 	return nil
 }
 
-func (p *PostgresPaymentProjection) onPaymentInitiated(ctx context.Context, e *domain.PaymentInitiated) error {
+func (p *postgresPaymentProjection) onPaymentInitiated(ctx context.Context, e *domain.PaymentInitiated) error {
 	// Track the pending payment in the read model. Only transition to
 	// 'pending' if the account is currently in 'none' state (not already
 	// active or cancelled) to avoid regressing the status.
@@ -139,7 +145,7 @@ func (p *PostgresPaymentProjection) onPaymentInitiated(ctx context.Context, e *d
 	return nil
 }
 
-func (p *PostgresPaymentProjection) onPaymentSucceeded(ctx context.Context, e *domain.PaymentSucceeded) error {
+func (p *postgresPaymentProjection) onPaymentSucceeded(ctx context.Context, e *domain.PaymentSucceeded) error {
 	_, err := p.db.ExecContext(ctx,
 		`UPDATE payment_accounts
 		    SET status = 'active',
@@ -157,7 +163,7 @@ func (p *PostgresPaymentProjection) onPaymentSucceeded(ctx context.Context, e *d
 	return nil
 }
 
-func (p *PostgresPaymentProjection) onPaymentFailed(ctx context.Context, e *domain.PaymentFailed) error {
+func (p *postgresPaymentProjection) onPaymentFailed(ctx context.Context, e *domain.PaymentFailed) error {
 	// Revert status from 'pending' to 'none' so the user can retry.
 	// Only revert if the current status is 'pending' — don't touch active/cancelled.
 	_, err := p.db.ExecContext(ctx,
@@ -174,7 +180,7 @@ func (p *PostgresPaymentProjection) onPaymentFailed(ctx context.Context, e *doma
 	return nil
 }
 
-func (p *PostgresPaymentProjection) onPaymentRefunded(ctx context.Context, e *domain.PaymentRefunded) error {
+func (p *postgresPaymentProjection) onPaymentRefunded(ctx context.Context, e *domain.PaymentRefunded) error {
 	// Check if net balance goes to zero → deactivate
 	_, err := p.db.ExecContext(ctx,
 		`UPDATE payment_accounts
@@ -190,7 +196,7 @@ func (p *PostgresPaymentProjection) onPaymentRefunded(ctx context.Context, e *do
 	return nil
 }
 
-func (p *PostgresPaymentProjection) onSubscriptionCancelled(ctx context.Context, e *domain.SubscriptionCancelled) error {
+func (p *postgresPaymentProjection) onSubscriptionCancelled(ctx context.Context, e *domain.SubscriptionCancelled) error {
 	_, err := p.db.ExecContext(ctx,
 		`UPDATE payment_accounts
 		    SET status = 'cancelled',
@@ -205,7 +211,7 @@ func (p *PostgresPaymentProjection) onSubscriptionCancelled(ctx context.Context,
 	return nil
 }
 
-func (p *PostgresPaymentProjection) onSubscriptionExpired(ctx context.Context, e *domain.SubscriptionExpired) error {
+func (p *postgresPaymentProjection) onSubscriptionExpired(ctx context.Context, e *domain.SubscriptionExpired) error {
 	// Transition to 'none' (free tier) but preserve paid_at and amount_cents
 	// as historical record. The event store has the full audit trail, but
 	// keeping these in the projection enables "previously paid" queries.
@@ -223,7 +229,7 @@ func (p *PostgresPaymentProjection) onSubscriptionExpired(ctx context.Context, e
 	return nil
 }
 
-func (p *PostgresPaymentProjection) onSubscriptionReactivated(ctx context.Context, e *domain.SubscriptionReactivated) error {
+func (p *postgresPaymentProjection) onSubscriptionReactivated(ctx context.Context, e *domain.SubscriptionReactivated) error {
 	_, err := p.db.ExecContext(ctx,
 		`UPDATE payment_accounts
 		    SET status = 'active',
@@ -242,7 +248,7 @@ func (p *PostgresPaymentProjection) onSubscriptionReactivated(ctx context.Contex
 // New event handlers — Stripe SDK v84 aligned
 // -------------------------------------------------------------------------
 
-func (p *PostgresPaymentProjection) onPaymentDisputed(ctx context.Context, e *domain.PaymentDisputed) error {
+func (p *postgresPaymentProjection) onPaymentDisputed(ctx context.Context, e *domain.PaymentDisputed) error {
 	// Mark the account as disputed. The status stays "active" since the
 	// user retains access during the dispute period, but we record the
 	// dispute metadata. Operators can query disputes via SQL.
@@ -268,7 +274,7 @@ func (p *PostgresPaymentProjection) onPaymentDisputed(ctx context.Context, e *do
 	return nil
 }
 
-func (p *PostgresPaymentProjection) onDisputeResolved(ctx context.Context, e *domain.DisputeResolved) error {
+func (p *postgresPaymentProjection) onDisputeResolved(ctx context.Context, e *domain.DisputeResolved) error {
 	p.log.Info(context.Background(), "payment projection: dispute resolved",
 		"user_id", e.AccountID,
 		"dispute_id", e.StripeDisputeID,
@@ -304,7 +310,7 @@ func (p *PostgresPaymentProjection) onDisputeResolved(ctx context.Context, e *do
 	return nil
 }
 
-func (p *PostgresPaymentProjection) onPaymentMethodUpdated(ctx context.Context, e *domain.PaymentMethodUpdated) error {
+func (p *postgresPaymentProjection) onPaymentMethodUpdated(ctx context.Context, e *domain.PaymentMethodUpdated) error {
 	// Update the displayed card brand and last4 when the user updates
 	// their payment method (e.g. card expires, they add a new one).
 	_, err := p.db.ExecContext(ctx,
@@ -320,7 +326,7 @@ func (p *PostgresPaymentProjection) onPaymentMethodUpdated(ctx context.Context, 
 	return nil
 }
 
-func (p *PostgresPaymentProjection) onInvoicePaymentFailed(ctx context.Context, e *domain.InvoicePaymentFailed) error {
+func (p *postgresPaymentProjection) onInvoicePaymentFailed(ctx context.Context, e *domain.InvoicePaymentFailed) error {
 	// Log the recurring payment failure. The projection doesn't change
 	// the account status yet — the aggregate tracks ConsecutiveInvoiceFailures
 	// and can flag the account when the threshold is reached.

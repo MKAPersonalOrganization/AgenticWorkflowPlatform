@@ -1,7 +1,8 @@
-// Package billing provides HTTP handlers for the payment flow.
-// All card details are handled exclusively by Stripe.js (Elements) on the
-// client side — no raw card data ever reaches this server (PCI SAQ-A).
 package billing
+
+// This file was extracted from handlers/billing/handler.go as part of the
+// modular-monolith migration. All types and methods are now unexported
+// (module-internal); the Module facade in billing.go exposes route registration.
 
 import (
 	"encoding/json"
@@ -9,28 +10,27 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"school-with-ai/domain"
-	"school-with-ai/foundation/logger"
 	"strings"
 	"time"
 
-	billingService "school-with-ai/services/billing"
+	"school-with-ai/domain"
+	"school-with-ai/foundation/logger"
 
 	"github.com/stripe/stripe-go/v84"
 	"github.com/stripe/stripe-go/v84/webhook"
 )
 
-// Handler holds HTTP handlers for billing endpoints.
-type Handler struct {
+// handler holds HTTP handlers for billing endpoints.
+type handler struct {
 	log            *logger.Logger
-	billing        *billingService.Service
+	billing        *service
 	webhookSecret  string
 	publishableKey string
 }
 
-// NewHandler creates a billing handler.
-func NewHandler(log *logger.Logger, svc *billingService.Service, webhookSecret, publishableKey string) *Handler {
-	return &Handler{
+// newHandler creates a billing handler.
+func newHandler(log *logger.Logger, svc *service, webhookSecret, publishableKey string) *handler {
+	return &handler{
 		log:            log,
 		billing:        svc,
 		webhookSecret:  webhookSecret,
@@ -77,9 +77,9 @@ type createPaymentIntentResponse struct {
 	Currency       string `json:"currency"`
 }
 
-// CreatePaymentIntent creates a Stripe PaymentIntent and returns the client
+// createPaymentIntent creates a Stripe PaymentIntent and returns the client
 // secret so the frontend can confirm payment via Stripe Elements.
-func (h *Handler) CreatePaymentIntent(w http.ResponseWriter, r *http.Request) {
+func (h *handler) createPaymentIntent(w http.ResponseWriter, r *http.Request) {
 	user := domain.GetUserFromContext(r.Context())
 	if user == nil {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "unauthorized")
@@ -89,7 +89,7 @@ func (h *Handler) CreatePaymentIntent(w http.ResponseWriter, r *http.Request) {
 	// Limit request body to prevent abuse
 	r.Body = http.MaxBytesReader(w, r.Body, 1024)
 
-	clientSecret, err := h.billing.CreatePaymentIntent(r.Context(), user.ID, user.Email)
+	clientSecret, err := h.billing.createPaymentIntent(r.Context(), user.ID, user.Email)
 	if err != nil {
 		h.log.Error(r.Context(), "billing: create payment intent failed", "error", err, "user_id", user.ID)
 
@@ -117,8 +117,8 @@ func (h *Handler) CreatePaymentIntent(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(createPaymentIntentResponse{
 		ClientSecret:   clientSecret,
 		PublishableKey: h.publishableKey,
-		Amount:         billingService.AmountCents,
-		Currency:       billingService.Currency,
+		Amount:         AmountCents,
+		Currency:       Currency,
 	})
 }
 
@@ -126,22 +126,22 @@ func (h *Handler) CreatePaymentIntent(w http.ResponseWriter, r *http.Request) {
 // POST /api/billing/webhook  (public — Stripe calls this)
 // --------------------------------------------------------------------------
 
-// HandleWebhook processes Stripe webhook events with cryptographic signature
+// handleWebhook processes Stripe webhook events with cryptographic signature
 // verification. Dispatches:
 //
-//   - payment_intent.succeeded  → ConfirmPaymentWithDetails
-//   - payment_intent.payment_failed → FailPaymentWithDetails
-//   - charge.refunded           → HandleRefund
-//   - charge.dispute.created    → HandleDispute
-//   - charge.dispute.closed     → HandleDisputeClosed
-//   - invoice.payment_failed    → HandleInvoicePaymentFailed
+//   - payment_intent.succeeded  → confirmPaymentWithDetails
+//   - payment_intent.payment_failed → failPaymentWithDetails
+//   - charge.refunded           → handleRefund
+//   - charge.dispute.created    → handleDispute
+//   - charge.dispute.closed     → handleDisputeClosed
+//   - invoice.payment_failed    → handleInvoicePaymentFailed
 //
 // All others are acknowledged with 200 OK.
 //
 // Idempotency is guaranteed at two levels:
 //  1. Aggregate-level: duplicate commands are no-ops
 //  2. Stripe event dedup: ProcessedStripeEvents map in the aggregate
-func (h *Handler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
+func (h *handler) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	const maxBodyBytes = 65536
 	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
 
@@ -200,8 +200,8 @@ func (h *Handler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 
 // handlePaymentSucceeded processes a payment_intent.succeeded webhook event.
 // Extracts full charge details (chargeID, card brand, last4, receipt URL)
-// and passes them to ConfirmPaymentWithDetails for complete traceability.
-func (h *Handler) handlePaymentSucceeded(w http.ResponseWriter, r *http.Request, event stripe.Event) {
+// and passes them to confirmPaymentWithDetails for complete traceability.
+func (h *handler) handlePaymentSucceeded(w http.ResponseWriter, r *http.Request, event stripe.Event) {
 	var pi stripe.PaymentIntent
 	if err := json.Unmarshal(event.Data.Raw, &pi); err != nil {
 		h.log.Error(r.Context(), "billing: webhook unmarshal succeeded", "error", err, "event_id", event.ID)
@@ -223,7 +223,7 @@ func (h *Handler) handlePaymentSucceeded(w http.ResponseWriter, r *http.Request,
 		}
 	}
 
-	if err := h.billing.ConfirmPaymentWithDetails(
+	if err := h.billing.confirmPaymentWithDetails(
 		r.Context(),
 		pi.ID, chargeID, event.ID,
 		pi.Amount, string(pi.Currency), cardBrand, cardLast4, receiptURL,
@@ -240,8 +240,8 @@ func (h *Handler) handlePaymentSucceeded(w http.ResponseWriter, r *http.Request,
 
 // handlePaymentFailed processes a payment_intent.payment_failed webhook event.
 // Extracts the full Stripe error taxonomy (ErrorType, ErrorCode, DeclineCode,
-// FailureMessage) and passes them to FailPaymentWithDetails.
-func (h *Handler) handlePaymentFailed(w http.ResponseWriter, r *http.Request, event stripe.Event) {
+// FailureMessage) and passes them to failPaymentWithDetails.
+func (h *handler) handlePaymentFailed(w http.ResponseWriter, r *http.Request, event stripe.Event) {
 	var pi stripe.PaymentIntent
 	if err := json.Unmarshal(event.Data.Raw, &pi); err != nil {
 		h.log.Error(r.Context(), "billing: webhook unmarshal failed", "error", err, "event_id", event.ID)
@@ -250,7 +250,7 @@ func (h *Handler) handlePaymentFailed(w http.ResponseWriter, r *http.Request, ev
 		return
 	}
 
-	if err := h.billing.FailPaymentWithDetails(r.Context(), pi.ID, event.ID, &pi, pi.Metadata); err != nil {
+	if err := h.billing.failPaymentWithDetails(r.Context(), pi.ID, event.ID, &pi, pi.Metadata); err != nil {
 		h.log.Error(r.Context(), "billing: mark payment failed",
 			"error", err, "stripe_pi", pi.ID, "event_id", event.ID, "metadata", pi.Metadata)
 	}
@@ -261,7 +261,7 @@ func (h *Handler) handlePaymentFailed(w http.ResponseWriter, r *http.Request, ev
 
 // handleChargeRefunded processes a charge.refunded webhook event.
 // This handles refunds initiated from the Stripe Dashboard or API.
-func (h *Handler) handleChargeRefunded(w http.ResponseWriter, r *http.Request, event stripe.Event) {
+func (h *handler) handleChargeRefunded(w http.ResponseWriter, r *http.Request, event stripe.Event) {
 	var charge stripe.Charge
 	if err := json.Unmarshal(event.Data.Raw, &charge); err != nil {
 		h.log.Error(r.Context(), "billing: webhook unmarshal charge.refunded", "error", err, "event_id", event.ID)
@@ -270,7 +270,7 @@ func (h *Handler) handleChargeRefunded(w http.ResponseWriter, r *http.Request, e
 		return
 	}
 
-	if err := h.billing.HandleRefund(r.Context(), &charge); err != nil {
+	if err := h.billing.handleRefund(r.Context(), &charge); err != nil {
 		h.log.Error(r.Context(), "billing: handle refund failed",
 			"error", err, "charge_id", charge.ID, "event_id", event.ID)
 	}
@@ -282,7 +282,7 @@ func (h *Handler) handleChargeRefunded(w http.ResponseWriter, r *http.Request, e
 // handleDisputeCreated processes a charge.dispute.created webhook event.
 // Disputes (chargebacks) are business-critical: they freeze funds, carry
 // financial penalties, and may require evidence submission within 7 days.
-func (h *Handler) handleDisputeCreated(w http.ResponseWriter, r *http.Request, event stripe.Event) {
+func (h *handler) handleDisputeCreated(w http.ResponseWriter, r *http.Request, event stripe.Event) {
 	var dispute stripe.Dispute
 	if err := json.Unmarshal(event.Data.Raw, &dispute); err != nil {
 		h.log.Error(r.Context(), "billing: webhook unmarshal charge.dispute.created",
@@ -292,7 +292,7 @@ func (h *Handler) handleDisputeCreated(w http.ResponseWriter, r *http.Request, e
 		return
 	}
 
-	if err := h.billing.HandleDispute(r.Context(), &dispute, event.ID); err != nil {
+	if err := h.billing.handleDispute(r.Context(), &dispute, event.ID); err != nil {
 		h.log.Error(r.Context(), "billing: handle dispute failed",
 			"error", err, "dispute_id", dispute.ID, "event_id", event.ID)
 	}
@@ -303,7 +303,7 @@ func (h *Handler) handleDisputeCreated(w http.ResponseWriter, r *http.Request, e
 
 // handleDisputeClosed processes a charge.dispute.closed webhook event.
 // Determines if the dispute was won (reversed) or lost (funds withdrawn).
-func (h *Handler) handleDisputeClosed(w http.ResponseWriter, r *http.Request, event stripe.Event) {
+func (h *handler) handleDisputeClosed(w http.ResponseWriter, r *http.Request, event stripe.Event) {
 	var dispute stripe.Dispute
 	if err := json.Unmarshal(event.Data.Raw, &dispute); err != nil {
 		h.log.Error(r.Context(), "billing: webhook unmarshal charge.dispute.closed",
@@ -313,7 +313,7 @@ func (h *Handler) handleDisputeClosed(w http.ResponseWriter, r *http.Request, ev
 		return
 	}
 
-	if err := h.billing.HandleDisputeClosed(r.Context(), &dispute, event.ID); err != nil {
+	if err := h.billing.handleDisputeClosed(r.Context(), &dispute, event.ID); err != nil {
 		h.log.Error(r.Context(), "billing: handle dispute closed failed",
 			"error", err, "dispute_id", dispute.ID, "event_id", event.ID)
 	}
@@ -326,7 +326,7 @@ func (h *Handler) handleDisputeClosed(w http.ResponseWriter, r *http.Request, ev
 // Tracks recurring payment failures for subscription health monitoring and
 // dunning management. After MaxConsecutiveInvoiceFailures, the account is
 // flagged as overdue.
-func (h *Handler) handleInvoicePaymentFailed(w http.ResponseWriter, r *http.Request, event stripe.Event) {
+func (h *handler) handleInvoicePaymentFailed(w http.ResponseWriter, r *http.Request, event stripe.Event) {
 	var invoice stripe.Invoice
 	if err := json.Unmarshal(event.Data.Raw, &invoice); err != nil {
 		h.log.Error(r.Context(), "billing: webhook unmarshal invoice.payment_failed",
@@ -336,7 +336,7 @@ func (h *Handler) handleInvoicePaymentFailed(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if err := h.billing.HandleInvoicePaymentFailed(r.Context(), &invoice, event.ID); err != nil {
+	if err := h.billing.handleInvoicePaymentFailed(r.Context(), &invoice, event.ID); err != nil {
 		h.log.Error(r.Context(), "billing: handle invoice payment failed",
 			"error", err, "invoice_id", invoice.ID, "event_id", event.ID)
 	}
@@ -363,15 +363,15 @@ type paymentStatusResponse struct {
 	DaysRemaining int    `json:"daysRemaining,omitempty"` // days until cancellation takes effect
 }
 
-// GetPaymentStatus returns the current payment status for the authenticated user.
-func (h *Handler) GetPaymentStatus(w http.ResponseWriter, r *http.Request) {
+// getPaymentStatus returns the current payment status for the authenticated user.
+func (h *handler) getPaymentStatus(w http.ResponseWriter, r *http.Request) {
 	user := domain.GetUserFromContext(r.Context())
 	if user == nil {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "unauthorized")
 		return
 	}
 
-	status, err := h.billing.GetAccountStatus(r.Context(), user.ID)
+	status, err := h.billing.getAccountStatus(r.Context(), user.ID)
 	if err != nil {
 		h.log.Error(r.Context(), "billing: get status failed", "error", err, "user_id", user.ID)
 		writeError(w, http.StatusInternalServerError, "Failed to get payment status.", "status_error")
@@ -433,12 +433,12 @@ type verifyPaymentRequest struct {
 	PaymentIntent string `json:"paymentIntent"`
 }
 
-// VerifyPayment is the redirect-return verification handler. After Stripe
+// verifyPayment is the redirect-return verification handler. After Stripe
 // redirects the user back with redirect_status=succeeded, the frontend
 // calls this endpoint with the payment_intent ID. We retrieve the PI from
 // Stripe, verify it succeeded and belongs to this user, then confirm the
 // aggregate. This is the fallback for when webhooks are unavailable.
-func (h *Handler) VerifyPayment(w http.ResponseWriter, r *http.Request) {
+func (h *handler) verifyPayment(w http.ResponseWriter, r *http.Request) {
 	user := domain.GetUserFromContext(r.Context())
 	if user == nil {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "unauthorized")
@@ -464,7 +464,7 @@ func (h *Handler) VerifyPayment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.billing.VerifyPayment(r.Context(), user.ID, req.PaymentIntent); err != nil {
+	if err := h.billing.verifyPayment(r.Context(), user.ID, req.PaymentIntent); err != nil {
 		h.log.Error(r.Context(), "billing: verify payment failed",
 			"error", err, "user_id", user.ID, "stripe_pi", req.PaymentIntent)
 		writeError(w, http.StatusUnprocessableEntity, "Payment could not be verified. Please try again or contact support.", "verification_failed")
@@ -488,9 +488,9 @@ type cancelSubscriptionResponse struct {
 	CancelsOn string `json:"cancelsOn"`
 }
 
-// CancelSubscription handles user-initiated subscription cancellation.
+// cancelSubscription handles user-initiated subscription cancellation.
 // Access continues until the end of the current billing period.
-func (h *Handler) CancelSubscription(w http.ResponseWriter, r *http.Request) {
+func (h *handler) cancelSubscription(w http.ResponseWriter, r *http.Request) {
 	user := domain.GetUserFromContext(r.Context())
 	if user == nil {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "unauthorized")
@@ -509,7 +509,7 @@ func (h *Handler) CancelSubscription(w http.ResponseWriter, r *http.Request) {
 		req.Reason = req.Reason[:500]
 	}
 
-	cancelsOn, err := h.billing.CancelSubscription(r.Context(), user.ID, req.Reason)
+	cancelsOn, err := h.billing.cancelSubscription(r.Context(), user.ID, req.Reason)
 	if err != nil {
 		h.log.Error(r.Context(), "billing: cancel subscription failed",
 			"error", err, "user_id", user.ID)
@@ -528,16 +528,16 @@ func (h *Handler) CancelSubscription(w http.ResponseWriter, r *http.Request) {
 // POST /api/billing/reactivate
 // --------------------------------------------------------------------------
 
-// ReactivateSubscription handles undoing a cancellation before the billing
+// reactivateSubscription handles undoing a cancellation before the billing
 // period ends. The subscription returns to active.
-func (h *Handler) ReactivateSubscription(w http.ResponseWriter, r *http.Request) {
+func (h *handler) reactivateSubscription(w http.ResponseWriter, r *http.Request) {
 	user := domain.GetUserFromContext(r.Context())
 	if user == nil {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "unauthorized")
 		return
 	}
 
-	if err := h.billing.ReactivateSubscription(r.Context(), user.ID); err != nil {
+	if err := h.billing.reactivateSubscription(r.Context(), user.ID); err != nil {
 		h.log.Error(r.Context(), "billing: reactivate subscription failed",
 			"error", err, "user_id", user.ID)
 

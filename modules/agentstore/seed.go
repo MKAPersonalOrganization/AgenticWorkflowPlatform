@@ -1,4 +1,4 @@
-package agentcatalog
+package agentstore
 
 import "school-with-ai/domain"
 
@@ -57,7 +57,7 @@ var (
 )
 
 // SeedCatalog returns the initial 30 agents for the agent store catalog.
-func SeedCatalog() []domain.AgentCatalogEntry {
+func seedCatalog() []domain.AgentCatalogEntry {
 	return []domain.AgentCatalogEntry{
 		// ── Education & Learning ──
 		{Name: "Study Planner", Description: "Creates personalized study schedules and learning roadmaps based on your goals, deadlines, and learning style.", Category: "Education", Tags: []string{"study", "planning", "productivity"}, AuthorName: "SchoolWithAI", Icon: iconNotebookPen, Featured: true, SystemPrompt: "You are an expert academic planner. Help students create structured, realistic study plans. Ask about their subjects, deadlines, available hours, and learning preferences. Break goals into daily/weekly tasks. Use spaced repetition principles. Always be encouraging and adapt to their pace."},

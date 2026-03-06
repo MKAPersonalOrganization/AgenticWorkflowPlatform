@@ -11,6 +11,10 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"sync"
+	"syscall"
+	"time"
+
 	"school-with-ai/components"
 	"school-with-ai/components/docs"
 	"school-with-ai/components/landing"
@@ -41,22 +45,16 @@ import (
 	"school-with-ai/plugins/library"
 	"school-with-ai/plugins/tts"
 	"school-with-ai/services/agentorchestrator"
-	"school-with-ai/services/agentstore"
-	"school-with-ai/services/aisettings"
 	"school-with-ai/services/artifact"
 	"school-with-ai/services/edgequake"
 	"school-with-ai/services/memory"
 	"school-with-ai/services/permissions"
 	"school-with-ai/services/plugindiscovery"
 	"school-with-ai/services/rag/users"
-	"school-with-ai/services/resources"
 	"school-with-ai/services/taskmanagement"
 	"school-with-ai/services/threadmgmt"
 	"school-with-ai/services/toolregistry"
 	"school-with-ai/services/workspacepermissions"
-	"sync"
-	"syscall"
-	"time"
 
 	preferenceshandler "school-with-ai/handlers/preferences"
 
@@ -67,23 +65,19 @@ import (
 
 	memoryplugin "school-with-ai/plugins/memory"
 
-	agentcataloghandlers "school-with-ai/handlers/agentcatalog"
-	agentstorehandlers "school-with-ai/handlers/agentstore"
 	aguihandlers "school-with-ai/handlers/agui"
-	aiSettingsHandlers "school-with-ai/handlers/aisettings"
 	bannerhandlers "school-with-ai/handlers/banner"
-	billinghandlers "school-with-ai/handlers/billing"
 	healthhandlers "school-with-ai/handlers/health"
 	knowledgehandlers "school-with-ai/handlers/knowledge"
 	mcphandler "school-with-ai/handlers/mcp"
-	resourceshandlers "school-with-ai/handlers/resources"
 	taskmgmthandlers "school-with-ai/handlers/taskmgmt"
 	wkspermhandlers "school-with-ai/handlers/workspacepermissions"
-
-	projPayment "school-with-ai/infra/projection/payment"
+	agentstoremod "school-with-ai/modules/agentstore"
+	aisettingsmod "school-with-ai/modules/aisettings"
+	billingmod "school-with-ai/modules/billing"
+	resourcesmod "school-with-ai/modules/resources"
 
 	authService "school-with-ai/services/auth"
-	billingService "school-with-ai/services/billing"
 
 	"github.com/ardanlabs/conf/v3"
 	"github.com/go-chi/chi/v5"
@@ -273,8 +267,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Initialize Student Profile Repository
 	studentProfileRepo := sqldb.NewPostgresStudentProfileRepository(db)
 	userPreferenceRepo := sqldb.NewPostgresUserPreferenceRepository(db)
-	agentCatalogRepo := sqldb.NewPostgresAgentCatalogRepository(db)
-	resourcesRepo := sqldb.NewPostgresResourcesRepository(db)
+
+	// Initialize Agent Store module (agent definitions + catalog)
+	agentStoreModule := agentstoremod.New(log, db)
 
 	// Run migrations
 	log.Info(ctx, "startup", "status", "running database migrations")
@@ -284,8 +279,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// Seed agent store catalog (only inserts if table is empty)
 	log.Info(ctx, "startup", "status", "seeding agent store catalog")
-	seedEntries := agentcataloghandlers.SeedCatalog()
-	if err := agentCatalogRepo.Seed(ctx, seedEntries); err != nil {
+	if err := agentStoreModule.SeedCatalog(ctx); err != nil {
 		return fmt.Errorf("seeding agent catalog: %w", err)
 	}
 
@@ -347,9 +341,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 	statsProjection := projectionStats.NewPostgresProjection(db)
 	statsProjection.RegisterHandlers(persistenceRouter)
 
-	// Initialize Payment Projection (event-sourced read model)
-	paymentProjection := projPayment.NewPostgresPaymentProjection(log, db)
-	paymentProjection.RegisterHandlers(persistenceRouter)
+	// Initialize Billing Module (event-sourced payment system)
+	billingModule := billingmod.New(log, db, baseEventStore, cfg.Stripe.WebhookSecret, cfg.Stripe.PublishableKey)
+	billingModule.RegisterProjection(persistenceRouter)
 
 	// Start projection updater in background with a cancellable context
 	projCtx, projCancel := context.WithCancel(ctx)
@@ -361,11 +355,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 		}
 	}()
 
-	// Initialize per-user AI settings
-	aiSettingsRepo := sqldb.NewPostgresAISettingsRepository(db)
-	aiCapabilityRepo := sqldb.NewPostgresAICapabilityConfigRepository(db)
-	aiSettingsService := aisettings.New(aiSettingsRepo, aiCapabilityRepo)
-	log.Info(ctx, "startup", "status", "ai settings service initialized (per-user)")
+	// Initialize per-user AI settings (modules/aisettings)
+	aiSettingsModule := aisettingsmod.New(log, db)
+	log.Info(ctx, "startup", "status", "ai settings module initialized (per-user)")
 
 	// Initialize artifact service
 	log.Info(ctx, "startup", "status", "initializing s3 artifact service", "endpoint", cfg.Artifacts.S3Endpoint, "bucket", cfg.Artifacts.S3Bucket)
@@ -384,8 +376,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Initialize memory service
 	memoryService := memory.NewArtifactMemoryService(artifactService)
 
-	// Initialize resources service
-	resourcesService := resources.NewService(resourcesRepo, artifactService)
+	// Initialize resources module
+	resourcesModule := resourcesmod.New(db, artifactService)
 
 	// Create and initialize tool registry
 	toolRegistry := toolregistry.NewRegistry(log, sqldb.NewPostgresToolRegistryRepository(db))
@@ -428,16 +420,12 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// All agents (including the default assistant) live in the database.
 	// The provider lazily ensures a starter agent per user on first access.
-	agentDefRepo := sqldb.NewPostgresAgentDefinitionRepository(db)
 	agentProvider := custom.NewUserAwareAgentProvider(
-		agentDefRepo,
+		agentStoreModule.AgentDefinitionRepo(),
 		[]agent.Middleware{agentLoggingMw},
 		[]agent.Middleware{chatLoggingMw},
 		[]agent.Middleware{toolLoggingMw},
 	)
-
-	// Create agent store service for CRUD operations
-	agentStoreService := agentstore.New(log, agentDefRepo)
 
 	var runner agentorchestrator.Runner
 	var agentOrchestrator *agentorchestrator.Service
@@ -456,8 +444,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 			log,
 			agentOrchestrator, // ThreadManager interface
 			agentProvider,     // AgentProvider
-			aiSettingsService, // Per-user model config resolver
-			aiSettingsService, // Per-user TTS config resolver
+			aiSettingsModule,  // Per-user model config resolver
+			aiSettingsModule,  // Per-user TTS config resolver
 			artifactService,
 			studentProfileRepo,
 			cfg.AgentCapabilities.LongTermMemory,
@@ -613,17 +601,14 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Profile Handler
 	profileHandler := profile.NewHandler(log, studentProfileRepo)
 
-	// Resources Handler
-	resourcesHandler := resourceshandlers.NewHandler(resourcesService)
+	// Resources Module routes
+	resourcesModule.RegisterRoutes(r, authMiddleware)
 
 	// Workspace Permissions Handler
 	workspacePermHandler := wkspermhandlers.NewHandler(log, workspacePermissionsService, edgequakeService, agentProvider, cfg.Edgequake.TenantID)
 
-	// Agent Store Handler
-	agentStoreHandler := agentstorehandlers.NewHandler(log, agentStoreService, authSvc)
-
-	// Agent Catalog Handler (shared agent store)
-	agentCatalogHandler := agentcataloghandlers.NewHandler(log, agentCatalogRepo, agentDefRepo)
+	// Agent Store & Catalog routes (module)
+	agentStoreModule.RegisterRoutes(r, authMiddleware)
 
 	// Banner Handler
 	bannerHandler := bannerhandlers.NewHandler(log)
@@ -651,18 +636,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Get("/api/preferences/{key}", authMiddleware.RequireAuthFunc(prefsHandler.GetPreference))
 	r.Put("/api/preferences/{key}", authMiddleware.RequireAuthFunc(prefsHandler.SetPreference))
 
-	// AI Settings routes (protected)
-	aiSettingsHandler := aiSettingsHandlers.NewHandler(log, aiSettingsService)
-	r.Get("/api/ai-settings/providers", authMiddleware.RequireAuthFunc(aiSettingsHandler.ListProviders))
-	r.Get("/api/ai-settings/tts-voices", authMiddleware.RequireAuthFunc(aiSettingsHandler.GetTTSVoices))
-	r.Get("/api/ai-settings", authMiddleware.RequireAuthFunc(aiSettingsHandler.GetSettings))
-	r.Put("/api/ai-settings", authMiddleware.RequireAuthFunc(aiSettingsHandler.SaveSettings))
-	r.Delete("/api/ai-settings/{id}", authMiddleware.RequireAuthFunc(aiSettingsHandler.DeleteSettings))
-	r.Put("/api/ai-settings/{id}/default", authMiddleware.RequireAuthFunc(aiSettingsHandler.SetDefault))
-	// Capability config routes (decoupled per-capability settings)
-	r.Get("/api/ai-settings/capabilities", authMiddleware.RequireAuthFunc(aiSettingsHandler.GetCapabilityConfigs))
-	r.Put("/api/ai-settings/capabilities/{capability}", authMiddleware.RequireAuthFunc(aiSettingsHandler.SaveCapabilityConfig))
-	r.Delete("/api/ai-settings/capabilities/{capability}", authMiddleware.RequireAuthFunc(aiSettingsHandler.DeleteCapabilityConfig))
+	// AI Settings routes (modules/aisettings)
+	aiSettingsModule.RegisterRoutes(r, authMiddleware)
 
 	// Analytics Dashboard (dedicated Basic Auth)
 	statsHandler := statisticsHandler.NewHandler(log, statsProjection, cfg.DashboardAdmin.User, cfg.DashboardAdmin.Pass)
@@ -673,21 +648,10 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Pricing page
 	r.Get("/pricing", authMiddleware.RequireAuthFunc(HandlePricingPage(log)))
 
-	// Billing (event-sourced payment system)
+	// Billing (event-sourced payment system — modules/billing)
 	// Set Stripe API key — must be done before any Stripe SDK calls
 	stripe.Key = cfg.Stripe.SecretKey
-	paymentRepo := domain.NewPaymentAccountRepository(eventLog)
-	billingSvc := billingService.New(log, paymentRepo, paymentProjection)
-	billingHandler := billinghandlers.NewHandler(log, billingSvc, cfg.Stripe.WebhookSecret, cfg.Stripe.PublishableKey)
-
-	// Billing API routes
-	r.Post("/api/billing/create-payment-intent", authMiddleware.RequireAuthFunc(billingHandler.CreatePaymentIntent))
-	r.Get("/api/billing/status", authMiddleware.RequireAuthFunc(billingHandler.GetPaymentStatus))
-	r.Post("/api/billing/verify-payment", authMiddleware.RequireAuthFunc(billingHandler.VerifyPayment))
-	r.Post("/api/billing/cancel", authMiddleware.RequireAuthFunc(billingHandler.CancelSubscription))
-	r.Post("/api/billing/reactivate", authMiddleware.RequireAuthFunc(billingHandler.ReactivateSubscription))
-	// Webhook is public — Stripe calls it with signature verification
-	r.Post("/api/billing/webhook", billingHandler.HandleWebhook)
+	billingModule.RegisterRoutes(r, authMiddleware)
 
 	// message:send needs a larger body limit for file attachments (base64).
 	// 5 files × 20 MB raw ≈ 133 MB base64 — round up to 150 MB.
@@ -710,19 +674,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Get("/v1/agents/{agentId}/toolsets", authMiddleware.RequireAuthFunc(handler.ListAgentToolSets))
 	r.Put("/v1/agents/{agentId}/toolsets/{toolSetId}", authMiddleware.RequireAuthFunc(handler.ToggleAgentToolSet))
 	r.Put("/v1/agents/{agentId}/toolsets/{toolSetId}/tools/{toolId}", authMiddleware.RequireAuthFunc(handler.ToggleIndividualTool))
-
-	// Agent definition CRUD routes (user-created agents)
-	r.Get("/v1/agent-definitions", authMiddleware.RequireAuthFunc(agentStoreHandler.List))
-	r.Get("/v1/agent-definitions/search", authMiddleware.RequireAuthFunc(agentStoreHandler.Search))
-	r.Post("/v1/agent-definitions", authMiddleware.RequireAuthFunc(agentStoreHandler.Create))
-	r.Get("/v1/agent-definitions/{id}", authMiddleware.RequireAuthFunc(agentStoreHandler.Get))
-	r.Put("/v1/agent-definitions/{id}", authMiddleware.RequireAuthFunc(agentStoreHandler.Update))
-	r.Delete("/v1/agent-definitions/{id}", authMiddleware.RequireAuthFunc(agentStoreHandler.Delete))
-
-	// Agent Catalog routes (shared agent store)
-	r.Get("/v1/agent-catalog", authMiddleware.RequireAuthFunc(agentCatalogHandler.List))
-	r.Get("/v1/agent-catalog/search", authMiddleware.RequireAuthFunc(agentCatalogHandler.Search))
-	r.Post("/v1/agent-catalog/{id}/add", authMiddleware.RequireAuthFunc(agentCatalogHandler.AddToMyAgents))
 
 	// Plugin endpoints (agent-agnostic, agent_id via query param)
 	r.Get("/v1/plugins", authMiddleware.RequireAuthFunc(handler.ListPlugins))
@@ -761,14 +712,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Delete("/api/agui/threads/{threadId}", authMiddleware.RequireAuthFunc(handler.DeleteThread))
 	r.Patch("/api/agui/threads/{threadId}", authMiddleware.RequireAuthFunc(handler.UpdateThreadTitle))
 
-	// Resources routes
-	r.Get("/api/resources", authMiddleware.RequireAuthFunc(resourcesHandler.List))
-	r.Post("/api/resources/upload", authMiddleware.RequireAuthFunc(resourcesHandler.Upload))
-	r.Get("/api/resources/{id}/content", authMiddleware.RequireAuthFunc(resourcesHandler.GetContent))
-	r.Delete("/api/resources/{id}", authMiddleware.RequireAuthFunc(resourcesHandler.Delete))
-
 	// Knowledge Base / RAG routes
-	knowledgeHandler := knowledgehandlers.NewHandler(log, edgequakeService, aiSettingsService, cfg.Edgequake.TenantID)
+	knowledgeHandler := knowledgehandlers.NewHandler(log, edgequakeService, aiSettingsModule, cfg.Edgequake.TenantID)
 
 	// Pages
 	r.Get("/knowledge", authMiddleware.RequireAuthFunc(knowledgeHandler.WorkspacesPage))

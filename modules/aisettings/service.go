@@ -4,43 +4,44 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
 )
 
-// Service provides business logic for per-user AI settings.
-type Service struct {
+// service provides business logic for per-user AI settings.
+type service struct {
 	repo    domain.AISettingsRepository
 	capRepo domain.AICapabilityConfigRepository
 }
 
-// New creates a new AI settings service.
-func New(repo domain.AISettingsRepository, capRepo domain.AICapabilityConfigRepository) *Service {
-	return &Service{repo: repo, capRepo: capRepo}
+// newService creates a new AI settings service.
+func newService(repo domain.AISettingsRepository, capRepo domain.AICapabilityConfigRepository) *service {
+	return &service{repo: repo, capRepo: capRepo}
 }
 
-// ListProviders returns all supported AI providers.
-func (s *Service) ListProviders() []domain.AIProvider {
+// listProviders returns all supported AI providers.
+func (s *service) listProviders() []domain.AIProvider {
 	return domain.SupportedProviders()
 }
 
-// ListModels returns models for a given provider.
-func (s *Service) ListModels(provider domain.AIProvider) []string {
+// listModels returns models for a given provider.
+func (s *service) listModels(provider domain.AIProvider) []string {
 	return domain.ProviderModels(provider)
 }
 
-// ListEmbeddingModels returns embedding models for a given provider.
-func (s *Service) ListEmbeddingModels(provider domain.AIProvider) []string {
+// listEmbeddingModels returns embedding models for a given provider.
+func (s *service) listEmbeddingModels(provider domain.AIProvider) []string {
 	return domain.ProviderEmbeddingModels(provider)
 }
 
-// ListTTSModels returns text-to-speech models for a given provider.
-func (s *Service) ListTTSModels(provider domain.AIProvider) []string {
+// listTTSModels returns text-to-speech models for a given provider.
+func (s *service) listTTSModels(provider domain.AIProvider) []string {
 	return domain.ProviderTTSModels(provider)
 }
 
-// GetUserSettings returns all AI settings for a user.
-func (s *Service) GetUserSettings(ctx context.Context, userID string) ([]domain.AISettings, error) {
+// getUserSettings returns all AI settings for a user.
+func (s *service) getUserSettings(ctx context.Context, userID string) ([]domain.AISettings, error) {
 	settings, err := s.repo.GetByUserID(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("getting user ai settings: %w", err)
@@ -48,8 +49,8 @@ func (s *Service) GetUserSettings(ctx context.Context, userID string) ([]domain.
 	return settings, nil
 }
 
-// GetDefaultSettings returns the user's default AI settings.
-func (s *Service) GetDefaultSettings(ctx context.Context, userID string) (*domain.AISettings, error) {
+// getDefaultSettings returns the user's default AI settings.
+func (s *service) getDefaultSettings(ctx context.Context, userID string) (*domain.AISettings, error) {
 	settings, err := s.repo.GetDefaultForUser(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("getting default ai settings: %w", err)
@@ -57,8 +58,8 @@ func (s *Service) GetDefaultSettings(ctx context.Context, userID string) (*domai
 	return settings, nil
 }
 
-// SaveSettings creates or updates an AI settings entry.
-func (s *Service) SaveSettings(ctx context.Context, settings *domain.AISettings) error {
+// saveSettings creates or updates an AI settings entry.
+func (s *service) saveSettings(ctx context.Context, settings *domain.AISettings) error {
 	if settings.UserID == "" {
 		return fmt.Errorf("user_id is required")
 	}
@@ -97,21 +98,18 @@ func (s *Service) SaveSettings(ctx context.Context, settings *domain.AISettings)
 	return nil
 }
 
-// DeleteSettings removes an AI settings entry.
-func (s *Service) DeleteSettings(ctx context.Context, id string, userID string) error {
+// deleteSettings removes an AI settings entry.
+func (s *service) deleteSettings(ctx context.Context, id string, userID string) error {
 	return s.repo.Delete(ctx, id, userID)
 }
 
-// SetDefault marks an entry as the user's default provider.
-func (s *Service) SetDefault(ctx context.Context, id string, userID string) error {
+// setDefault marks an entry as the user's default provider.
+func (s *service) setDefault(ctx context.Context, id string, userID string) error {
 	return s.repo.SetDefault(ctx, id, userID)
 }
 
-// GetModelConfigForUser resolves the active ModelConfig for a given user.
-// It reads the default provider for the API key, and the LLM capability config
-// for the model/temperature/max_tokens. If no LLM capability is configured,
-// it falls back to the default provider's first model.
-func (s *Service) GetModelConfigForUser(ctx context.Context, userID string) (*agent.ModelConfig, error) {
+// getModelConfigForUser resolves the active ModelConfig for a given user.
+func (s *service) getModelConfigForUser(ctx context.Context, userID string) (*agent.ModelConfig, error) {
 	settings, err := s.repo.GetDefaultForUser(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("getting default ai settings for user %s: %w", userID, err)
@@ -178,9 +176,8 @@ type EmbeddingConfig struct {
 	APIKey    string
 }
 
-// GetEmbeddingConfigForUser resolves the user's embedding config from the capability table.
-// If no embedding capability is configured, falls back to the default provider's first embedding model.
-func (s *Service) GetEmbeddingConfigForUser(ctx context.Context, userID string) (*EmbeddingConfig, error) {
+// getEmbeddingConfigForUser resolves the user's embedding config from the capability table.
+func (s *service) getEmbeddingConfigForUser(ctx context.Context, userID string) (*EmbeddingConfig, error) {
 	// Check capability config first
 	capConfig, err := s.capRepo.GetByCapability(ctx, userID, domain.CapabilityEmbedding)
 	if err != nil {
@@ -254,8 +251,8 @@ func (s *Service) GetEmbeddingConfigForUser(ctx context.Context, userID string) 
 // Capability-Based Configuration
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// GetAllCapabilityConfigs returns all capability configs for a user.
-func (s *Service) GetAllCapabilityConfigs(ctx context.Context, userID string) ([]domain.AICapabilityConfig, error) {
+// getAllCapabilityConfigs returns all capability configs for a user.
+func (s *service) getAllCapabilityConfigs(ctx context.Context, userID string) ([]domain.AICapabilityConfig, error) {
 	configs, err := s.capRepo.GetAllByUserID(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("getting capability configs: %w", err)
@@ -263,8 +260,8 @@ func (s *Service) GetAllCapabilityConfigs(ctx context.Context, userID string) ([
 	return configs, nil
 }
 
-// GetCapabilityConfig returns a specific capability config for a user.
-func (s *Service) GetCapabilityConfig(ctx context.Context, userID string, capability domain.AICapability) (*domain.AICapabilityConfig, error) {
+// getCapabilityConfig returns a specific capability config for a user.
+func (s *service) getCapabilityConfig(ctx context.Context, userID string, capability domain.AICapability) (*domain.AICapabilityConfig, error) {
 	config, err := s.capRepo.GetByCapability(ctx, userID, capability)
 	if err != nil {
 		return nil, fmt.Errorf("getting capability config %s: %w", capability, err)
@@ -272,9 +269,8 @@ func (s *Service) GetCapabilityConfig(ctx context.Context, userID string, capabi
 	return config, nil
 }
 
-// SaveCapabilityConfig validates and upserts a capability config.
-// It verifies that the referenced provider exists and has an API key.
-func (s *Service) SaveCapabilityConfig(ctx context.Context, config *domain.AICapabilityConfig) error {
+// saveCapabilityConfig validates and upserts a capability config.
+func (s *service) saveCapabilityConfig(ctx context.Context, config *domain.AICapabilityConfig) error {
 	if config.UserID == "" {
 		return fmt.Errorf("user_id is required")
 	}
@@ -312,22 +308,21 @@ func (s *Service) SaveCapabilityConfig(ctx context.Context, config *domain.AICap
 	return s.capRepo.Upsert(ctx, config)
 }
 
-// DeleteCapabilityConfig removes a capability config.
-func (s *Service) DeleteCapabilityConfig(ctx context.Context, userID string, capability domain.AICapability) error {
+// deleteCapabilityConfig removes a capability config.
+func (s *service) deleteCapabilityConfig(ctx context.Context, userID string, capability domain.AICapability) error {
 	return s.capRepo.Delete(ctx, userID, capability)
 }
 
-// TTSConfig holds resolved TTS configuration for speech generation.
-type TTSConfig struct {
+// ttsConfig holds resolved TTS configuration for speech generation.
+type ttsConfig struct {
 	Provider string
 	Model    string
 	Voice    string
 	APIKey   string
 }
 
-// GetTTSConfigForUser resolves the TTS configuration for a user
-// from the capability config table.
-func (s *Service) GetTTSConfigForUser(ctx context.Context, userID string) (*TTSConfig, error) {
+// getTTSConfigForUser resolves the TTS configuration for a user.
+func (s *service) getTTSConfigForUser(ctx context.Context, userID string) (*ttsConfig, error) {
 	capConfig, err := s.capRepo.GetByCapability(ctx, userID, domain.CapabilityTTS)
 	if err != nil {
 		return nil, fmt.Errorf("getting TTS capability config: %w", err)
@@ -360,7 +355,7 @@ func (s *Service) GetTTSConfigForUser(ctx context.Context, userID string) (*TTSC
 		voice = "coral"
 	}
 
-	return &TTSConfig{
+	return &ttsConfig{
 		Provider: string(capConfig.Provider),
 		Model:    capConfig.Model,
 		Voice:    voice,
@@ -368,10 +363,10 @@ func (s *Service) GetTTSConfigForUser(ctx context.Context, userID string) (*TTSC
 	}, nil
 }
 
-// GetTTSConfigForUserFlat returns the TTS config as flat values, satisfying the
+// getTTSConfigForUserFlat returns the TTS config as flat values, satisfying the
 // custom.TTSConfigResolver interface used by the runner adapter.
-func (s *Service) GetTTSConfigForUserFlat(ctx context.Context, userID string) (apiKey, model, voice string, err error) {
-	cfg, err := s.GetTTSConfigForUser(ctx, userID)
+func (s *service) getTTSConfigForUserFlat(ctx context.Context, userID string) (apiKey, model, voice string, err error) {
+	cfg, err := s.getTTSConfigForUser(ctx, userID)
 	if err != nil {
 		return "", "", "", err
 	}

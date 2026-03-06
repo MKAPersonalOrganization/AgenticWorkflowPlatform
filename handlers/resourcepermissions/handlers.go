@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
+	resourcesmod "school-with-ai/modules/resources"
 	"school-with-ai/services/resourcepermissions"
-	"school-with-ai/services/resources"
 
 	"github.com/google/uuid"
 )
@@ -17,7 +18,7 @@ import (
 type Handler struct {
 	log                 *logger.Logger
 	resourcePermService *resourcepermissions.Service
-	resourcesService    *resources.Service
+	resourcesModule     *resourcesmod.Module
 	agentProvider       agent.AgentProvider
 }
 
@@ -25,13 +26,13 @@ type Handler struct {
 func NewHandler(
 	log *logger.Logger,
 	resourcePermService *resourcepermissions.Service,
-	resourcesService *resources.Service,
+	resourcesModule *resourcesmod.Module,
 	agentProvider agent.AgentProvider,
 ) *Handler {
 	return &Handler{
 		log:                 log,
 		resourcePermService: resourcePermService,
-		resourcesService:    resourcesService,
+		resourcesModule:     resourcesModule,
 		agentProvider:       agentProvider,
 	}
 }
@@ -62,7 +63,7 @@ func (h *Handler) ListAgentResources(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get public resources
-	publicResources, err := h.resourcesService.ListResources(r.Context(), user.ID, resources.SourcePublic)
+	publicResources, err := h.resourcesModule.ListResources(r.Context(), user.ID, resourcesmod.SourcePublic)
 	if err != nil {
 		h.log.Error(r.Context(), "Failed to list public resources", "error", err)
 		http.Error(w, "Failed to retrieve resources", http.StatusInternalServerError)
@@ -70,7 +71,7 @@ func (h *Handler) ListAgentResources(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get private resources
-	privateResources, err := h.resourcesService.ListResources(r.Context(), user.ID, resources.SourcePrivate)
+	privateResources, err := h.resourcesModule.ListResources(r.Context(), user.ID, resourcesmod.SourcePrivate)
 	if err != nil {
 		h.log.Error(r.Context(), "Failed to list private resources", "error", err)
 		http.Error(w, "Failed to retrieve resources", http.StatusInternalServerError)
@@ -92,7 +93,7 @@ func (h *Handler) ListAgentResources(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Merge all resources with permission state
-	allResources := make([]resources.Resource, 0, len(publicResources)+len(privateResources))
+	allResources := make([]resourcesmod.Resource, 0, len(publicResources)+len(privateResources))
 	allResources = append(allResources, publicResources...)
 	allResources = append(allResources, privateResources...)
 
