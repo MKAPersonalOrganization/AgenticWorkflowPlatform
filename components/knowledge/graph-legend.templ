@@ -15,7 +15,7 @@ import (
 )
 
 templ GraphLegend() {
-	<div x-data="{ expanded: false }" class="absolute bottom-4 left-4 z-20">
+	<div x-data="{ expanded: false }" class="absolute bottom-4 start-4 z-20">
 		<!-- Legend button (when collapsed) -->
 		<template x-if="!expanded">
 			<button
@@ -48,7 +48,7 @@ templ GraphLegend() {
 				</div>
 				<button
 					@click="expanded = false"
-					class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted h-7 w-7 -mr-1 shrink-0"
+					class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted h-7 w-7 -me-1 shrink-0"
 					aria-label={ i18n.T(ctx, "Collapse legend") }
 					title={ i18n.T(ctx, "Collapse") }
 				>
@@ -71,7 +71,7 @@ templ GraphLegend() {
 								class="w-3.5 h-3.5 rounded-full shrink-0 ring-2 ring-background shadow-sm"
 								:style="{ backgroundColor: stat.color }"
 							></div>
-							<span class="flex-1 text-left font-medium leading-tight truncate min-w-0" x-text="stat.label"></span>
+							<span class="flex-1 text-start font-medium leading-tight truncate min-w-0" x-text="stat.label"></span>
 							@badge.Badge(badge.Props{
 								Variant: badge.VariantSecondary,
 								Class:   "h-5 px-2 text-[10px] font-semibold tabular-nums shrink-0",
@@ -96,7 +96,7 @@ templ GraphLegend() {
 						class="w-full h-9 inline-flex items-center justify-center rounded-md border border-input bg-background px-3 py-1 text-xs font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
 					>
 						<span>{ i18n.T(ctx, "Show All") }</span>
-						<span class="ml-1 opacity-80" x-text="'(' + graphGetHiddenTypeCount() + ' hidden)'"></span>
+						<span class="ms-1 opacity-80" x-text="'(' + graphGetHiddenTypeCount() + ' hidden)'"></span>
 					</button>
 				</div>
 			</template>

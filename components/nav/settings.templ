@@ -140,19 +140,20 @@ templ Settings() {
 								</div>
 								<div class="flex items-center justify-between gap-4">
 									<div class="text-foreground">{ i18n.T(ctx, "Language") }</div>
-									@selectbox.SelectBox(selectbox.Props{Class: "w-[180px]"}) {
-										<div class="relative w-full" x-data="{ currentLang: '' }" x-init={ fmt.Sprintf("currentLang = '%s'", i18n.Lang(ctx)) }>
+									@selectbox.SelectBox(selectbox.Props{Class: "w-[200px]"}) {
+										<div class="relative w-full" x-data="{ currentLang: '', languages: window.i18n ? window.i18n.LANGUAGES : {} }" x-init={ fmt.Sprintf("currentLang = '%s'", i18n.Lang(ctx)) }>
 											<select
 												x-model="currentLang"
 												@change="window.location.href = '?lang=' + $event.target.value"
 												class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
 												aria-label="Select Language"
 											>
-												<option value="en">English</option>
-												<option value="ar">العربية</option>
+												<template x-for="lang in Object.values(languages).sort((a, b) => a.nativeName.localeCompare(b.nativeName))" :key="lang.code">
+													<option :value="lang.code" :selected="lang.code === currentLang" x-text="lang.nativeName"></option>
+												</template>
 											</select>
 											<div class="w-full h-9 px-3 py-1 text-base md:text-sm flex items-center justify-between rounded-md border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground">
-												<span x-text="currentLang === 'ar' ? 'العربية' : 'English'"></span>
+												<span x-text="languages[currentLang] ? languages[currentLang].nativeName : currentLang"></span>
 												@icon.ChevronDown(icon.Props{Size: 16, Class: "text-muted-foreground"})
 											</div>
 										</div>
@@ -1165,7 +1166,7 @@ templ Settings() {
 																	@icon.Sparkles(icon.Props{Class: "size-4 text-primary"})
 																	<span class="text-sm font-medium text-foreground">{ i18n.T(ctx, "Upgrade to Full Access") }</span>
 																</div>
-																<p class="text-xs text-muted-foreground pl-6">
+																<p class="text-xs text-muted-foreground ps-6">
 																	{ i18n.T(ctx, "Unlimited conversations, all AI models, priority support, and more for just $5/month.") }
 																</p>
 																<button

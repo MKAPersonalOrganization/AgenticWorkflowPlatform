@@ -367,16 +367,32 @@ templ authenticatedMenu(user *shared.User) {
 		<span class="flex-1 text-start">{ i18n.T(ctx, "Theme:") } <span x-text="window.i18n.t(($data.preferences?.theme || theme).charAt(0).toUpperCase() + ($data.preferences?.theme || theme).slice(1))"></span></span>
 	}
 	<!-- Language Switcher -->
-	<button
-		@click="window.i18n.setLanguage(window.i18n.getCurrentLanguage() === 'ar' ? 'en' : 'ar')"
-		class="flex items-center gap-3 w-full px-3 py-2 text-sm rounded-lg hover:bg-accent transition-colors"
-		type="button"
-	>
-		<div class="flex items-center justify-center size-5">
-			@icon.Languages(icon.Props{Class: "size-4"})
+	<div class="relative" x-data="{ langOpen: false }">
+		<button
+			@click="langOpen = !langOpen"
+			class="flex items-center gap-3 w-full px-3 py-2 text-sm rounded-lg hover:bg-accent transition-colors"
+			type="button"
+		>
+			<div class="flex items-center justify-center size-5">
+				@icon.Languages(icon.Props{Class: "size-4"})
+			</div>
+			<span class="flex-1 text-start" x-text="window.i18n.getNativeName(window.i18n.getCurrentLanguage())"></span>
+			<svg class="size-4 text-muted-foreground transition-transform" :class="langOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+		</button>
+		<div x-show="langOpen" x-cloak @click.outside="langOpen = false" class="mt-1 w-full max-h-60 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg z-50">
+			<template x-for="lang in Object.values(window.i18n.LANGUAGES).sort((a, b) => a.nativeName.localeCompare(b.nativeName))" :key="lang.code">
+				<button
+					@click="window.i18n.setLanguage(lang.code)"
+					class="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-accent transition-colors"
+					:class="lang.code === window.i18n.getCurrentLanguage() ? 'bg-accent/50 font-medium' : ''"
+					type="button"
+				>
+					<span x-text="lang.nativeName"></span>
+					<span class="text-muted-foreground text-xs ms-auto" x-text="lang.code.toUpperCase()"></span>
+				</button>
+			</template>
 		</div>
-		<span class="flex-1 text-start" x-text="window.i18n.getCurrentLanguage() === 'ar' ? 'English' : 'العربية'"></span>
-	</button>
+	</div>
 	@accountMenuSeparator()
 	<!-- Logout -->
 	@accountMenuLink(
@@ -406,16 +422,32 @@ templ unauthenticatedMenu() {
 	)
 	@accountMenuSeparator()
 	<!-- Language Switcher -->
-	<button
-		@click="window.i18n.setLanguage(window.i18n.getCurrentLanguage() === 'ar' ? 'en' : 'ar')"
-		class="flex items-center gap-3 w-full px-3 py-2 text-sm rounded-lg hover:bg-accent transition-colors"
-		type="button"
-	>
-		<div class="flex items-center justify-center size-5">
-			@icon.Languages(icon.Props{Class: "size-4"})
+	<div class="relative" x-data="{ langOpen: false }">
+		<button
+			@click="langOpen = !langOpen"
+			class="flex items-center gap-3 w-full px-3 py-2 text-sm rounded-lg hover:bg-accent transition-colors"
+			type="button"
+		>
+			<div class="flex items-center justify-center size-5">
+				@icon.Languages(icon.Props{Class: "size-4"})
+			</div>
+			<span class="flex-1 text-start" x-text="window.i18n.getNativeName(window.i18n.getCurrentLanguage())"></span>
+			<svg class="size-4 text-muted-foreground transition-transform" :class="langOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+		</button>
+		<div x-show="langOpen" x-cloak @click.outside="langOpen = false" class="mt-1 w-full max-h-60 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg z-50">
+			<template x-for="lang in Object.values(window.i18n.LANGUAGES).sort((a, b) => a.nativeName.localeCompare(b.nativeName))" :key="lang.code">
+				<button
+					@click="window.i18n.setLanguage(lang.code)"
+					class="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-accent transition-colors"
+					:class="lang.code === window.i18n.getCurrentLanguage() ? 'bg-accent/50 font-medium' : ''"
+					type="button"
+				>
+					<span x-text="lang.nativeName"></span>
+					<span class="text-muted-foreground text-xs ms-auto" x-text="lang.code.toUpperCase()"></span>
+				</button>
+			</template>
 		</div>
-		<span class="flex-1 text-start" x-text="window.i18n.getCurrentLanguage() === 'ar' ? 'English' : 'العربية'"></span>
-	</button>
+	</div>
 	<!-- Theme Toggle -->
 	<button
 		@click="toggleTheme()"

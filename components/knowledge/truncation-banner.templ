@@ -26,7 +26,7 @@ templ TruncationBanner() {
 			<span class="opacity-80">of</span>
 			<span class="tabular-nums" x-text="(graphData?.total_nodes || 0).toLocaleString()"></span>
 			<span class="opacity-80">nodes</span>
-			<span class="text-xs opacity-70 ml-1" x-text="'(' + Math.round(((graphData?.nodes?.length || 0) / (graphData?.total_nodes || 1)) * 100) + '%)'"></span>
+			<span class="text-xs opacity-70 ms-1" x-text="'(' + Math.round(((graphData?.nodes?.length || 0) / (graphData?.total_nodes || 1)) * 100) + '%)'"></span>
 		</div>
 
 		<button

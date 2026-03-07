@@ -74,7 +74,7 @@ templ DocumentActionsMenu() {
 				<!-- Copy ID -->
 				<button
 					@click="navigator.clipboard.writeText(doc.id); showToast && showToast('Document ID copied'); menuOpen = false"
-					class="w-full flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted transition-colors text-left cursor-pointer"
+					class="w-full flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted transition-colors text-start cursor-pointer"
 				>
 					@icon.Copy(icon.Props{Class: "size-4 text-muted-foreground"})
 					Copy ID
@@ -83,7 +83,7 @@ templ DocumentActionsMenu() {
 				<template x-if="doc.source_type === 'pdf' || doc.pdf_id">
 					<button
 						@click="openPdfViewer && openPdfViewer(doc); menuOpen = false"
-						class="w-full flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted transition-colors text-left cursor-pointer"
+						class="w-full flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted transition-colors text-start cursor-pointer"
 					>
 						@icon.Eye(icon.Props{Class: "size-4 text-muted-foreground"})
 						View PDF
@@ -93,7 +93,7 @@ templ DocumentActionsMenu() {
 				<template x-if="doc.status === 'failed' || doc.status === 'partial_failure'">
 					<button
 						@click="doc.track_id ? retryTask(doc.track_id) : reprocessDocument(doc.id); menuOpen = false"
-						class="w-full flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted transition-colors text-left cursor-pointer text-amber-600"
+						class="w-full flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted transition-colors text-start cursor-pointer text-amber-600"
 					>
 						@icon.RotateCcw(icon.Props{Class: "size-4"})
 						Retry Failed
@@ -103,7 +103,7 @@ templ DocumentActionsMenu() {
 				<template x-if="!isTerminalStatus(doc.status)">
 					<button
 						@click="cancelDocumentTask(doc.id, doc.track_id); menuOpen = false"
-						class="w-full flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted transition-colors text-left cursor-pointer text-orange-600"
+						class="w-full flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted transition-colors text-start cursor-pointer text-orange-600"
 					>
 						@icon.Square(icon.Props{Class: "size-4 fill-current"})
 						Cancel Extraction
@@ -112,7 +112,7 @@ templ DocumentActionsMenu() {
 				<!-- Reprocess -->
 				<button
 					@click="reprocessDocument(doc.id); menuOpen = false"
-					class="w-full flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted transition-colors text-left cursor-pointer"
+					class="w-full flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted transition-colors text-start cursor-pointer"
 				>
 					@icon.RefreshCw(icon.Props{Class: "size-4 text-muted-foreground"})
 					Reprocess
@@ -122,7 +122,7 @@ templ DocumentActionsMenu() {
 				<!-- Delete -->
 				<button
 					@click="deleteDocument(doc.id, doc.title || doc.file_name); menuOpen = false"
-					class="w-full flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-destructive/10 transition-colors text-left cursor-pointer text-destructive"
+					class="w-full flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-destructive/10 transition-colors text-start cursor-pointer text-destructive"
 				>
 					@icon.Trash2(icon.Props{Class: "size-4"})
 					Delete

@@ -77,9 +77,9 @@ templ Container() {
 			<template x-if="message.name === 'save_memory' || message.name === 'forget_memory'">
 				<div class="w-full bg-muted/[0.03] border border-border/10 rounded-xl p-6 shadow-[inset_0_1px_4px_rgba(0,0,0,0.01)] transition-colors hover:bg-muted/[0.05]">
 					<p class="text-[15px] leading-relaxed text-foreground/90 font-medium font-serif italic text-center">
-						<span class="text-primary/40 mr-1 not-italic font-sans" :class="message.name === 'forget_memory' && 'text-destructive/40'">"</span>
+						<span class="text-primary/40 me-1 not-italic font-sans" :class="message.name === 'forget_memory' && 'text-destructive/40'">"</span>
 						<span x-text="message.parsedArgs?.fact" class="underline decoration-muted/20 underline-offset-8 decoration-1"></span>
-						<span class="text-primary/40 ml-1 not-italic font-sans" :class="message.name === 'forget_memory' && 'text-destructive/40'">"</span>
+						<span class="text-primary/40 ms-1 not-italic font-sans" :class="message.name === 'forget_memory' && 'text-destructive/40'">"</span>
 					</p>
 				</div>
 			</template>

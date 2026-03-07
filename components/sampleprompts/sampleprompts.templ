@@ -120,7 +120,7 @@ templ PromptButton(text string) {
 	@button.Button(button.Props{
 		Type:    button.TypeButton,
 		Variant: button.VariantGhost,
-		Class:   "w-full text-left p-4 rounded-xl border border-border/40 bg-card/50 hover:bg-accent hover:border-primary/50 transition-all duration-200 text-sm group flex items-center justify-between h-auto focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+		Class:   "w-full text-start p-4 rounded-xl border border-border/40 bg-card/50 hover:bg-accent hover:border-primary/50 transition-all duration-200 text-sm group flex items-center justify-between h-auto focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
 		Attributes: templ.Attributes{
 			"@click": "currentMessage = '" + strings.ReplaceAll(text, "'", "\\'") + "'; sendMessage()",
 		},

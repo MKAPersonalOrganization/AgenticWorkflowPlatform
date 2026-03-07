@@ -274,13 +274,13 @@ templ Sidebar(props ...Props) {
 					"fixed inset-y-0 z-10 hidden h-svh transition-transform duration-200 ease-linear md:flex",
 					"w-[var(--sidebar-width,16rem)]",
 					// Side positioning with data attributes
-					"group-data-[tui-sidebar-side=right]:right-0 group-data-[tui-sidebar-side=right]:group-data-[tui-sidebar-state=collapsed]:group-data-[tui-sidebar-collapsible=offcanvas]:translate-x-full",
-					"group-data-[tui-sidebar-side=left]:left-0 group-data-[tui-sidebar-side=left]:group-data-[tui-sidebar-state=collapsed]:group-data-[tui-sidebar-collapsible=offcanvas]:-translate-x-full",
+					"group-data-[tui-sidebar-side=right]:end-0 group-data-[tui-sidebar-side=right]:group-data-[tui-sidebar-state=collapsed]:group-data-[tui-sidebar-collapsible=offcanvas]:translate-x-[var(--slide-end)]",
+					"group-data-[tui-sidebar-side=left]:start-0 group-data-[tui-sidebar-side=left]:group-data-[tui-sidebar-state=collapsed]:group-data-[tui-sidebar-collapsible=offcanvas]:translate-x-[var(--slide-start)]",
 					// Adjust padding and width for variants
 					"group-data-[tui-sidebar-variant=floating]:p-2 group-data-[tui-sidebar-variant=floating]:group-data-[tui-sidebar-state=collapsed]:group-data-[tui-sidebar-collapsible=icon]:w-[calc(3rem+(theme(spacing.4))+2px)]",
 					"group-data-[tui-sidebar-variant=inset]:p-2 group-data-[tui-sidebar-variant=inset]:group-data-[tui-sidebar-state=collapsed]:group-data-[tui-sidebar-collapsible=icon]:w-[calc(3rem+(theme(spacing.4))+2px)]",
 					"group-data-[tui-sidebar-variant=sidebar]:group-data-[tui-sidebar-state=collapsed]:group-data-[tui-sidebar-collapsible=icon]:w-12",
-					"group-data-[tui-sidebar-variant=sidebar]:group-data-[tui-sidebar-side=left]:border-r group-data-[tui-sidebar-variant=sidebar]:group-data-[tui-sidebar-side=right]:border-l",
+					"group-data-[tui-sidebar-variant=sidebar]:group-data-[tui-sidebar-side=left]:border-e group-data-[tui-sidebar-variant=sidebar]:group-data-[tui-sidebar-side=right]:border-s",
 					p.Class,
 				) }
 			data-sidebar="sidebar"
@@ -491,7 +491,7 @@ templ menuButtonContent(p MenuButtonProps, buttonID string) {
 			}
 			href={ templ.SafeURL(p.Href) }
 			class={ utils.TwMerge(
-				"flex w-full items-center gap-2 rounded-md p-2 text-left overflow-hidden",
+				"flex w-full items-center gap-2 rounded-md p-2 text-start overflow-hidden",
 				"hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
 				"transition-[width,height,padding]",
 				// Size variants with data attributes
@@ -524,7 +524,7 @@ templ menuButtonContent(p MenuButtonProps, buttonID string) {
 			}
 			type="button"
 			class={ utils.TwMerge(
-				"flex w-full items-center gap-2 rounded-md p-2 text-left overflow-hidden",
+				"flex w-full items-center gap-2 rounded-md p-2 text-start overflow-hidden",
 				"hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
 				"transition-[width,height,padding]",
 				// Size variants with data attributes
@@ -563,7 +563,7 @@ templ MenuSub(props ...MenuSubProps) {
 			id={ p.ID }
 		}
 		class={ utils.TwMerge(
-			"mx-3.5 flex min-w-0 translate-x-px flex-col gap-1 border-l border-sidebar-border px-2.5 py-0.5",
+			"mx-3.5 flex min-w-0 translate-x-px flex-col gap-1 border-s border-sidebar-border px-2.5 py-0.5",
 			"group-data-[tui-sidebar-state=collapsed]:group-data-[tui-sidebar-collapsible=icon]:hidden",
 			p.Class,
 		) }
@@ -624,7 +624,7 @@ templ MenuSubButton(props ...MenuSubButtonProps) {
 			}
 			type="button"
 			class={ utils.TwMerge(
-				"flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-left",
+				"flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-start",
 				"hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
 				"transition-colors",
 				"data-[tui-sidebar-active=true]:bg-sidebar-accent data-[tui-sidebar-active=true]:text-sidebar-accent-foreground data-[tui-sidebar-active=true]:font-medium",
@@ -654,11 +654,11 @@ templ Inset(props ...InsetProps) {
 			"relative flex w-full flex-1 flex-col bg-background",
 			// Add special styling when peer sidebar has variant="inset"
 			"md:peer-data-[tui-sidebar-variant=inset]:m-2",
-			"md:peer-data-[tui-sidebar-variant=inset]:ml-0",
+			"md:peer-data-[tui-sidebar-variant=inset]:ms-0",
 			"md:peer-data-[tui-sidebar-variant=inset]:rounded-xl",
 			"md:peer-data-[tui-sidebar-variant=inset]:shadow-sm",
 			// When sidebar is collapsed (offcanvas mode) and variant is inset, add left margin back
-			"md:peer-data-[tui-sidebar-variant=inset]:peer-data-[tui-sidebar-state=collapsed]:peer-data-[tui-sidebar-collapsible=offcanvas]:ml-2",
+			"md:peer-data-[tui-sidebar-variant=inset]:peer-data-[tui-sidebar-state=collapsed]:peer-data-[tui-sidebar-collapsible=offcanvas]:ms-2",
 			p.Class,
 		) }
 		data-tui-sidebar="inset"
@@ -718,7 +718,7 @@ templ MenuBadge(props ...MenuBadgeProps) {
 			id={ p.ID }
 		}
 		class={ utils.TwMerge(
-				"ml-auto flex h-5 min-w-5 items-center justify-center rounded-md px-1 text-xs font-medium",
+				"ms-auto flex h-5 min-w-5 items-center justify-center rounded-md px-1 text-xs font-medium",
 				"bg-sidebar-accent text-sidebar-accent-foreground",
 				"group-data-[tui-sidebar-state=collapsed]:group-data-[tui-sidebar-collapsible=icon]:hidden",
 				p.Class,

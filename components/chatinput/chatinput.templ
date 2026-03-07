@@ -63,7 +63,7 @@ templ ChatInput() {
 			<!-- Footer Area -->
 			<div class="flex items-center gap-2 pb-2">
 				<!-- Left: Agents & Attachments -->
-				<div class="ml-2 flex items-center gap-1">
+				<div class="ms-2 flex items-center gap-1">
 					<!-- Agents Selector -->
 					@agents.AgentsButtonTrigger()
 					<!-- Attach Files Button -->
@@ -92,7 +92,7 @@ templ ChatInput() {
 					@tokenusage.TokenCounter()
 				</div>
 				<!-- Right: Send Button -->
-				<div class="mr-2 flex items-center gap-1">
+				<div class="me-2 flex items-center gap-1">
 					<!-- Help/Shortcuts -->
 					@tooltip.Tooltip() {
 						@tooltip.Trigger(tooltip.TriggerProps{}) {

@@ -114,10 +114,10 @@ templ TimePicker(props ...Props) {
 					"aria-invalid":                    utils.If(p.HasError, "true"),
 				}),
 			}) {
-				<span data-tui-timepicker-display class="text-left grow text-muted-foreground">
+				<span data-tui-timepicker-display class="text-start grow text-muted-foreground">
 					{ p.Placeholder }
 				</span>
-				<span class="text-muted-foreground flex items-center ml-2">
+				<span class="text-muted-foreground flex items-center ms-2">
 					@icon.Clock(icon.Props{Size: 16})
 				</span>
 			}
@@ -154,7 +154,7 @@ templ TimePicker(props ...Props) {
 												type="button"
 												data-tui-timepicker-hour="0"
 												data-tui-timepicker-selected="false"
-												class="w-full px-2 py-1 text-sm rounded transition-colors text-left hover:bg-accent hover:text-accent-foreground data-[tui-timepicker-selected=true]:bg-primary data-[tui-timepicker-selected=true]:text-primary-foreground data-[tui-timepicker-selected=true]:hover:bg-primary/90"
+												class="w-full px-2 py-1 text-sm rounded transition-colors text-start hover:bg-accent hover:text-accent-foreground data-[tui-timepicker-selected=true]:bg-primary data-[tui-timepicker-selected=true]:text-primary-foreground data-[tui-timepicker-selected=true]:hover:bg-primary/90"
 											>
 												12
 											</button>
@@ -163,7 +163,7 @@ templ TimePicker(props ...Props) {
 													type="button"
 													data-tui-timepicker-hour={ strconv.Itoa(hour) }
 													data-tui-timepicker-selected="false"
-													class="w-full px-2 py-1 text-sm rounded transition-colors text-left hover:bg-accent hover:text-accent-foreground data-[tui-timepicker-selected=true]:bg-primary data-[tui-timepicker-selected=true]:text-primary-foreground data-[tui-timepicker-selected=true]:hover:bg-primary/90"
+													class="w-full px-2 py-1 text-sm rounded transition-colors text-start hover:bg-accent hover:text-accent-foreground data-[tui-timepicker-selected=true]:bg-primary data-[tui-timepicker-selected=true]:text-primary-foreground data-[tui-timepicker-selected=true]:hover:bg-primary/90"
 												>
 													{ fmt.Sprintf("%02d", hour) }
 												</button>
@@ -175,7 +175,7 @@ templ TimePicker(props ...Props) {
 													type="button"
 													data-tui-timepicker-hour={ strconv.Itoa(hour) }
 													data-tui-timepicker-selected="false"
-													class="w-full px-2 py-1 text-sm rounded transition-colors text-left hover:bg-accent hover:text-accent-foreground data-[tui-timepicker-selected=true]:bg-primary data-[tui-timepicker-selected=true]:text-primary-foreground data-[tui-timepicker-selected=true]:hover:bg-primary/90"
+													class="w-full px-2 py-1 text-sm rounded transition-colors text-start hover:bg-accent hover:text-accent-foreground data-[tui-timepicker-selected=true]:bg-primary data-[tui-timepicker-selected=true]:text-primary-foreground data-[tui-timepicker-selected=true]:hover:bg-primary/90"
 												>
 													{ fmt.Sprintf("%02d", hour) }
 												</button>
@@ -194,7 +194,7 @@ templ TimePicker(props ...Props) {
 												type="button"
 												data-tui-timepicker-minute={ strconv.Itoa(minute) }
 												data-tui-timepicker-selected="false"
-												class="w-full px-2 py-1 text-sm rounded transition-colors text-left hover:bg-accent hover:text-accent-foreground data-[tui-timepicker-selected=true]:bg-primary data-[tui-timepicker-selected=true]:text-primary-foreground data-[tui-timepicker-selected=true]:hover:bg-primary/90"
+												class="w-full px-2 py-1 text-sm rounded transition-colors text-start hover:bg-accent hover:text-accent-foreground data-[tui-timepicker-selected=true]:bg-primary data-[tui-timepicker-selected=true]:text-primary-foreground data-[tui-timepicker-selected=true]:hover:bg-primary/90"
 											>
 												{ fmt.Sprintf("%02d", minute) }
 											</button>

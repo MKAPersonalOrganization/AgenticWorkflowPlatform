@@ -16,7 +16,7 @@ templ Container(icon templ.Component, props Props) {
 		{ props.ContainerAttrs... }
 	>
 		<!-- Top Accent Glow -->
-		<div class="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-primary/20 to-transparent"></div>
+		<div class="absolute top-0 start-0 end-0 h-[1px] bg-gradient-to-r from-transparent via-primary/20 to-transparent"></div>
 		
 		<!-- Widget Header -->
 		<div class="flex items-center justify-between px-5 pt-4 pb-2">
@@ -60,7 +60,7 @@ templ Container(icon templ.Component, props Props) {
 			>
 				{ props.Subtext }
 			</span>
-			<div class="ml-auto flex items-center gap-1 opacity-20 group-hover:opacity-40 transition-opacity">
+			<div class="ms-auto flex items-center gap-1 opacity-20 group-hover:opacity-40 transition-opacity">
 				<div class="w-8 h-[1px] bg-muted-foreground/30"></div>
 				<div class="size-0.5 rounded-full bg-muted-foreground/50"></div>
 			</div>

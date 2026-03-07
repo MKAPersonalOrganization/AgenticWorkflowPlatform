@@ -26,7 +26,7 @@ templ PipelineStatusSummary() {
 			<!-- Left side: clickable to expand -->
 			<button
 				@click="pipelineExpanded = !pipelineExpanded"
-				class="flex items-center gap-3 hover:bg-muted/50 transition-colors rounded-md px-2 py-1 -ml-2"
+				class="flex items-center gap-3 hover:bg-muted/50 transition-colors rounded-md px-2 py-1 -ms-2"
 			>
 				<!-- Animated processing indicator -->
 				<div class="relative flex items-center justify-center" x-show="!pipelineStatus?.cancellation_requested">

@@ -14,9 +14,9 @@ templ SidePanel() {
 		Variant:     sidebar.VariantSidebar,
 		Collapsible: sidebar.CollapsibleOffcanvas,
 		Collapsed:   true,
-		Class:       "ltr:border-l rtl:border-r border-border",
+		Class:       "border-s border-border",
 		Attributes: templ.Attributes{
-			"--sidebar-width":          "400px",
+			"--sidebar-width":            "400px",
 			"@open-right-sidebar.window": "$dispatch('sidebar:open', { id: 'premium-sidepanel' })",
 		},
 	}) {

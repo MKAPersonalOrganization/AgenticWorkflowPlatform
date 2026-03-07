@@ -45,7 +45,7 @@ templ AgentsDialog() {
 									class="px-4 py-2 text-sm font-medium border-b-2 transition-colors"
 									:class="activeTab === 'my-agents' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'"
 								>
-									@icon.CompassLogo("size-4 inline-block mr-1.5 -mt-0.5")
+									@icon.CompassLogo("size-4 inline-block me-1.5 -mt-0.5")
 									{ i18n.T(ctx, "My Agents") }
 								</button>
 								<button
@@ -54,7 +54,7 @@ templ AgentsDialog() {
 									class="px-4 py-2 text-sm font-medium border-b-2 transition-colors"
 									:class="activeTab === 'store' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'"
 								>
-									@icon.Store(icon.Props{Class: "size-4 inline-block mr-1.5 -mt-0.5"})
+									@icon.Store(icon.Props{Class: "size-4 inline-block me-1.5 -mt-0.5"})
 									{ i18n.T(ctx, "Agent Store") }
 								</button>
 							</div>
@@ -146,10 +146,10 @@ templ AgentsDialog() {
 													>
 														<!-- Active indicator bar -->
 														<div
-															class="absolute inset-y-0 left-0 w-1 rounded-l-xl transition-all duration-200"
+															class="absolute inset-y-0 start-0 w-1 rounded-s-xl transition-all duration-200"
 															:class="selectedAgent === ag.id ? 'bg-primary' : 'bg-transparent group-hover:bg-border'"
 														></div>
-														<div class="flex items-start gap-3.5 p-3.5 pl-5">
+														<div class="flex items-start gap-3.5 p-3.5 ps-5">
 															<!-- Agent Icon -->
 															<div
 																class="size-11 rounded-xl flex items-center justify-center shrink-0 [&_svg]:size-5 transition-colors duration-200"
@@ -201,7 +201,7 @@ templ AgentsDialog() {
 																	</span>
 																</template>
 																<!-- Edit & Delete -->
-																<div class="flex items-center gap-0.5 ml-1 pl-1.5 border-l border-border transition-opacity duration-150" :class="selectedAgent === ag.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'">
+																<div class="flex items-center gap-0.5 ms-1 ps-1.5 border-s border-border transition-opacity duration-150" :class="selectedAgent === ag.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'">
 																	@button.Button(button.Props{
 																		Size:    button.SizeIcon,
 																		Variant: button.VariantGhost,

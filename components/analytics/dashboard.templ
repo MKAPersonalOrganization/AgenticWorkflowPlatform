@@ -36,7 +36,7 @@ templ Dashboard(props DashboardProps) {
 				</div>
 				<div class="flex items-center gap-3">
 					<form action="/analytics" method="GET" class="flex items-center gap-3 bg-card p-2 rounded-xl border shadow-sm">
-						<label for="agent-filter" class="text-sm font-medium text-muted-foreground ml-2">Filter by Agent:</label>
+						<label for="agent-filter" class="text-sm font-medium text-muted-foreground ms-2">Filter by Agent:</label>
 						<select
 							id="agent-filter"
 							name="agent"
@@ -280,19 +280,19 @@ templ Dashboard(props DashboardProps) {
 							<table class="w-full text-sm">
 								<thead>
 									<tr class="border-b bg-muted/30">
-										<th class="h-10 px-3 text-left font-semibold text-muted-foreground uppercase tracking-wider text-xs">Tool</th>
-										<th class="h-10 px-3 text-right font-semibold text-muted-foreground uppercase tracking-wider text-xs">Calls</th>
-										<th class="h-10 px-3 text-right font-semibold text-muted-foreground uppercase tracking-wider text-xs">Success</th>
-										<th class="h-10 px-3 text-right font-semibold text-muted-foreground uppercase tracking-wider text-xs">Rate</th>
+										<th class="h-10 px-3 text-start font-semibold text-muted-foreground uppercase tracking-wider text-xs">Tool</th>
+										<th class="h-10 px-3 text-end font-semibold text-muted-foreground uppercase tracking-wider text-xs">Calls</th>
+										<th class="h-10 px-3 text-end font-semibold text-muted-foreground uppercase tracking-wider text-xs">Success</th>
+										<th class="h-10 px-3 text-end font-semibold text-muted-foreground uppercase tracking-wider text-xs">Rate</th>
 									</tr>
 								</thead>
 								<tbody class="divide-y divide-border">
 									for _, t := range props.ToolList {
 										<tr class="hover:bg-muted/20 transition-colors">
 											<td class="px-3 py-2.5 font-medium truncate max-w-[200px]" title={ t.ToolName }>{ t.ToolName }</td>
-											<td class="px-3 py-2.5 text-right font-semibold tabular-nums">{ fmt.Sprintf("%d", t.TotalCalls) }</td>
-											<td class="px-3 py-2.5 text-right text-green-600 dark:text-green-400 tabular-nums">{ fmt.Sprintf("%d", t.Successes) }</td>
-											<td class="px-3 py-2.5 text-right">
+											<td class="px-3 py-2.5 text-end font-semibold tabular-nums">{ fmt.Sprintf("%d", t.TotalCalls) }</td>
+											<td class="px-3 py-2.5 text-end text-green-600 dark:text-green-400 tabular-nums">{ fmt.Sprintf("%d", t.Successes) }</td>
+											<td class="px-3 py-2.5 text-end">
 												<div class="flex items-center justify-end gap-2">
 													<div class="w-12 bg-muted rounded-full h-1.5 hidden sm:block">
 														<div
@@ -493,15 +493,15 @@ templ Dashboard(props DashboardProps) {
 					<table class="w-full text-sm">
 						<thead>
 							<tr class="border-b bg-muted/30">
-								<th class="h-12 px-6 text-left align-middle font-semibold text-muted-foreground uppercase tracking-wider text-xs">Category</th>
-								<th class="h-12 px-6 text-left align-middle font-semibold text-muted-foreground uppercase tracking-wider text-xs">Name</th>
+								<th class="h-12 px-6 text-start align-middle font-semibold text-muted-foreground uppercase tracking-wider text-xs">Category</th>
+								<th class="h-12 px-6 text-start align-middle font-semibold text-muted-foreground uppercase tracking-wider text-xs">Name</th>
 								if props.CurrentAgent == "" {
-									<th class="h-12 px-6 text-left align-middle font-semibold text-muted-foreground uppercase tracking-wider text-xs">Agent</th>
+									<th class="h-12 px-6 text-start align-middle font-semibold text-muted-foreground uppercase tracking-wider text-xs">Agent</th>
 								}
-								<th class="h-12 px-6 text-right align-middle font-semibold text-muted-foreground uppercase tracking-wider text-xs">Total</th>
-								<th class="h-12 px-6 text-right align-middle font-semibold text-muted-foreground uppercase tracking-wider text-xs">Success</th>
-								<th class="h-12 px-6 text-right align-middle font-semibold text-muted-foreground uppercase tracking-wider text-xs">Failures</th>
-								<th class="h-12 px-6 text-right align-middle font-semibold text-muted-foreground uppercase tracking-wider text-xs">Failure Rate</th>
+								<th class="h-12 px-6 text-end align-middle font-semibold text-muted-foreground uppercase tracking-wider text-xs">Total</th>
+								<th class="h-12 px-6 text-end align-middle font-semibold text-muted-foreground uppercase tracking-wider text-xs">Success</th>
+								<th class="h-12 px-6 text-end align-middle font-semibold text-muted-foreground uppercase tracking-wider text-xs">Failures</th>
+								<th class="h-12 px-6 text-end align-middle font-semibold text-muted-foreground uppercase tracking-wider text-xs">Failure Rate</th>
 							</tr>
 						</thead>
 						<tbody class="divide-y divide-border">
@@ -528,10 +528,10 @@ templ Dashboard(props DashboardProps) {
 										if props.CurrentAgent == "" {
 											<td class="px-6 py-4 align-middle text-muted-foreground">{ s.AgentName }</td>
 										}
-										<td class="px-6 py-4 align-middle text-right font-semibold tabular-nums">{ fmt.Sprintf("%d", s.TotalCount) }</td>
-										<td class="px-6 py-4 align-middle text-right text-green-600 dark:text-green-400 tabular-nums">{ fmt.Sprintf("%d", s.Successes) }</td>
-										<td class="px-6 py-4 align-middle text-right text-destructive tabular-nums">{ fmt.Sprintf("%d", s.Failures) }</td>
-										<td class="px-6 py-4 align-middle text-right">
+										<td class="px-6 py-4 align-middle text-end font-semibold tabular-nums">{ fmt.Sprintf("%d", s.TotalCount) }</td>
+										<td class="px-6 py-4 align-middle text-end text-green-600 dark:text-green-400 tabular-nums">{ fmt.Sprintf("%d", s.Successes) }</td>
+										<td class="px-6 py-4 align-middle text-end text-destructive tabular-nums">{ fmt.Sprintf("%d", s.Failures) }</td>
+										<td class="px-6 py-4 align-middle text-end">
 											if s.TotalCount > 0 {
 												<div class="flex items-center justify-end gap-2">
 													<div class="w-16 bg-muted rounded-full h-1.5 hidden sm:block">

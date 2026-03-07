@@ -18,7 +18,8 @@ const LANGUAGES = {
         nativeName: 'العربية',
         dir: 'rtl',
         useEasternDigits: true
-    }
+    },
+
 };
 
 // Translation dictionary
@@ -155,23 +156,60 @@ function createLanguageSwitcher() {
     return {
         currentLang: getCurrentLanguage(),
         languages: LANGUAGES,
+        isOpen: false,
 
         switchLanguage(langCode) {
             setLanguage(langCode);
         },
 
         getCurrentLanguageData() {
-            return LANGUAGES[this.currentLang];
+            return LANGUAGES[this.currentLang] || LANGUAGES['en'];
+        },
+
+        getCurrentNativeName() {
+            const lang = LANGUAGES[this.currentLang];
+            return lang ? lang.nativeName : 'English';
         },
 
         isRTL() {
             return LANGUAGES[this.currentLang]?.dir === 'rtl';
         },
 
+        /**
+         * Get languages sorted by native name for display in dropdowns
+         * @returns {Array} Sorted array of language objects
+         */
+        getSortedLanguages() {
+            return Object.values(LANGUAGES).sort((a, b) =>
+                a.nativeName.localeCompare(b.nativeName)
+            );
+        },
+
+        /**
+         * Get the next language in the cycle (for compact toggle buttons)
+         * Cycles through: en → ar → de → fr → es → ... → en
+         */
+        getNextLanguage() {
+            const codes = Object.keys(LANGUAGES);
+            const currentIdx = codes.indexOf(this.currentLang);
+            const nextIdx = (currentIdx + 1) % codes.length;
+            return LANGUAGES[codes[nextIdx]];
+        },
+
         t(key, args) {
             return t(key, args);
         }
     };
+}
+
+/**
+ * Get the native name for a language code
+ * @param {string} langCode - Language code
+ * @returns {string} Native name or the code itself
+ */
+function getNativeName(langCode) {
+    const lang = LANGUAGES[langCode];
+    return lang ? lang.nativeName : langCode;
 }
 
 // Auto-initialize on DOM ready
@@ -186,6 +224,7 @@ window.i18n = {
     LANGUAGES,
     getCurrentLanguage,
     getLanguage,
+    getNativeName,
     setLanguage,
     initI18n,
     setTranslations,
