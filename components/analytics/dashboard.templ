@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"school-with-ai/components/chart"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 	"school-with-ai/infra/projection/statistics"
 )
 
@@ -12,7 +12,7 @@ type DashboardProps struct {
 	Stats        []statistics.StatRow
 	Agents       []string
 	CurrentAgent string
-	User         *domain.User
+	User         *shared.User
 	TimeSeries   []statistics.TimeSeriesPoint
 	ToolList     []statistics.ToolSummary
 }

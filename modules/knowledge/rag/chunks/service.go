@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 	"time"
 )
 
@@ -30,7 +30,7 @@ func NewService(baseURL string, httpClient *http.Client) *Service {
 }
 
 // GetChunk retrieves a specific chunk by ID.
-func (s *Service) GetChunk(ctx context.Context, tCtx *domain.TenantContext, chunkID string) (*ChunkDetailResponse, error) {
+func (s *Service) GetChunk(ctx context.Context, tCtx *shared.TenantContext, chunkID string) (*ChunkDetailResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/chunks/%s", s.baseURL, url.PathEscape(chunkID))
 
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
@@ -58,7 +58,7 @@ func (s *Service) GetChunk(ctx context.Context, tCtx *domain.TenantContext, chun
 	return &response, nil
 }
 
-func (s *Service) injectHeaders(req *http.Request, tCtx *domain.TenantContext) {
+func (s *Service) injectHeaders(req *http.Request, tCtx *shared.TenantContext) {
 	if tCtx != nil {
 		if tCtx.TenantID != nil {
 			req.Header.Set("X-Tenant-ID", tCtx.TenantID.String())

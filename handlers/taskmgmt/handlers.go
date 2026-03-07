@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"school-with-ai/domain"
+	"school-with-ai/shared"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/infra/projection/agui"
@@ -1337,7 +1338,7 @@ func (h *TaskManagementHandler) ListDocuments(w http.ResponseWriter, r *http.Req
 	}
 
 	// 2. Resolve Multitenancy Context
-	var tCtx *domain.TenantContext
+	var tCtx *shared.TenantContext
 	if h.tenantID == "" {
 		h.log.Error(r.Context(), "Tenant ID not configured")
 		http.Error(w, "Server configuration error", http.StatusInternalServerError)
@@ -1351,10 +1352,10 @@ func (h *TaskManagementHandler) ListDocuments(w http.ResponseWriter, r *http.Req
 		http.Error(w, "Invalid server configuration", http.StatusInternalServerError)
 		return
 	}
-	tCtx = &domain.TenantContext{
+	tCtx = &shared.TenantContext{
 		TenantID: &tID,
 		UserID:   user.ID,
-		Role:     string(domain.RoleAdmin),
+		Role:     string(shared.RoleAdmin),
 	}
 
 	// 3. Delegate to Edgequake (Passive Enforcement)
@@ -1391,7 +1392,7 @@ func (h *TaskManagementHandler) UploadDocument(w http.ResponseWriter, r *http.Re
 	}
 
 	// 2. Resolve Multitenancy Context
-	var tCtx *domain.TenantContext
+	var tCtx *shared.TenantContext
 	if h.tenantID == "" {
 		h.log.Error(r.Context(), "Tenant ID not configured")
 		http.Error(w, "Server configuration error", http.StatusInternalServerError)
@@ -1405,10 +1406,10 @@ func (h *TaskManagementHandler) UploadDocument(w http.ResponseWriter, r *http.Re
 		http.Error(w, "Invalid server configuration", http.StatusInternalServerError)
 		return
 	}
-	tCtx = &domain.TenantContext{
+	tCtx = &shared.TenantContext{
 		TenantID: &tID,
 		UserID:   user.ID,
-		Role:     string(domain.RoleAdmin),
+		Role:     string(shared.RoleAdmin),
 	}
 
 	// 3. Parse Multipart Form

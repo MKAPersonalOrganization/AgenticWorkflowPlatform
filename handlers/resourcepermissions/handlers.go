@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
 	resourcesmod "school-with-ai/modules/resources"
@@ -56,7 +56,7 @@ func (h *Handler) ListAgentResources(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := domain.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return

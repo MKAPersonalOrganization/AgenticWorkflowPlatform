@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"school-with-ai/domain"
+	"school-with-ai/shared"
 	"school-with-ai/foundation/logger"
 )
 
@@ -20,7 +21,7 @@ func NewHandler(log *logger.Logger, repo domain.UserPreferenceRepository) *Handl
 
 // GetPreference handles GET /api/preferences/{key}
 func (h *Handler) GetPreference(w http.ResponseWriter, r *http.Request) {
-	user := domain.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -51,7 +52,7 @@ func (h *Handler) GetPreference(w http.ResponseWriter, r *http.Request) {
 
 // SetPreference handles PUT /api/preferences/{key}
 func (h *Handler) SetPreference(w http.ResponseWriter, r *http.Request) {
-	user := domain.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -88,7 +89,7 @@ func (h *Handler) SetPreference(w http.ResponseWriter, r *http.Request) {
 
 // GetAllPreferences handles GET /api/preferences
 func (h *Handler) GetAllPreferences(w http.ResponseWriter, r *http.Request) {
-	user := domain.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return

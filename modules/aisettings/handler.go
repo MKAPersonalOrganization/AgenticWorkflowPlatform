@@ -5,6 +5,7 @@ import (
 "net/http"
 
 "school-with-ai/domain"
+	"school-with-ai/shared"
 "school-with-ai/foundation/i18n"
 "school-with-ai/foundation/logger"
 
@@ -88,7 +89,7 @@ json.NewEncoder(w).Encode(result)
 
 // getSettings handles GET /api/ai-settings
 func (h *handler) getSettings(w http.ResponseWriter, r *http.Request) {
-user := domain.GetUserFromContext(r.Context())
+user := shared.GetUserFromContext(r.Context())
 if user == nil {
 http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 return
@@ -115,7 +116,7 @@ json.NewEncoder(w).Encode(result)
 
 // saveSettings handles PUT /api/ai-settings
 func (h *handler) saveSettings(w http.ResponseWriter, r *http.Request) {
-user := domain.GetUserFromContext(r.Context())
+user := shared.GetUserFromContext(r.Context())
 if user == nil {
 http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 return
@@ -162,7 +163,7 @@ json.NewEncoder(w).Encode(toSettingsResponse(*settings))
 
 // deleteSettings handles DELETE /api/ai-settings/{id}
 func (h *handler) deleteSettings(w http.ResponseWriter, r *http.Request) {
-user := domain.GetUserFromContext(r.Context())
+user := shared.GetUserFromContext(r.Context())
 if user == nil {
 http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 return
@@ -185,7 +186,7 @@ w.WriteHeader(http.StatusNoContent)
 
 // setDefault handles PUT /api/ai-settings/{id}/default
 func (h *handler) setDefault(w http.ResponseWriter, r *http.Request) {
-user := domain.GetUserFromContext(r.Context())
+user := shared.GetUserFromContext(r.Context())
 if user == nil {
 http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 return
@@ -239,7 +240,7 @@ json.NewEncoder(w).Encode(map[string]any{
 
 // getCapabilityConfigs handles GET /api/ai-settings/capabilities
 func (h *handler) getCapabilityConfigs(w http.ResponseWriter, r *http.Request) {
-user := domain.GetUserFromContext(r.Context())
+user := shared.GetUserFromContext(r.Context())
 if user == nil {
 http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 return
@@ -272,7 +273,7 @@ json.NewEncoder(w).Encode(result)
 
 // saveCapabilityConfig handles PUT /api/ai-settings/capabilities/{capability}
 func (h *handler) saveCapabilityConfig(w http.ResponseWriter, r *http.Request) {
-user := domain.GetUserFromContext(r.Context())
+user := shared.GetUserFromContext(r.Context())
 if user == nil {
 http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 return
@@ -321,7 +322,7 @@ Config:     config.Config,
 
 // deleteCapabilityConfig handles DELETE /api/ai-settings/capabilities/{capability}
 func (h *handler) deleteCapabilityConfig(w http.ResponseWriter, r *http.Request) {
-user := domain.GetUserFromContext(r.Context())
+user := shared.GetUserFromContext(r.Context())
 if user == nil {
 http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 return

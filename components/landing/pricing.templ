@@ -2,11 +2,11 @@ package landing
 
 import (
 	"school-with-ai/components/button"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 )
 
 // ─── Pricing Section ─────────────────────────────────────────────────────────
-templ pricingSection(user *domain.User) {
+templ pricingSection(user *shared.User) {
 	<section id="pricing" class="border-t border-border bg-muted/20 py-24">
 		<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
 			<div class="mx-auto max-w-2xl text-center">

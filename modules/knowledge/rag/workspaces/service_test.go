@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 	"testing"
 
 	"github.com/google/uuid"
@@ -15,7 +15,7 @@ import (
 
 func TestService_List(t *testing.T) {
 	tenantID := uuid.New()
-	tCtx := &domain.TenantContext{
+	tCtx := &shared.TenantContext{
 		TenantID: &tenantID,
 	}
 
@@ -52,7 +52,7 @@ func TestService_List(t *testing.T) {
 
 func TestService_Create(t *testing.T) {
 	tenantID := uuid.New()
-	tCtx := &domain.TenantContext{
+	tCtx := &shared.TenantContext{
 		TenantID: &tenantID,
 	}
 

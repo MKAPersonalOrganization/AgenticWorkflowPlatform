@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 	"time"
 )
 
@@ -30,7 +30,7 @@ func NewService(baseURL string, httpClient *http.Client) *Service {
 }
 
 // GetEntityProvenance retrieves provenance information for an entity by ID.
-func (s *Service) GetEntityProvenance(ctx context.Context, tCtx *domain.TenantContext, entityID string) (*EntityProvenanceResponse, error) {
+func (s *Service) GetEntityProvenance(ctx context.Context, tCtx *shared.TenantContext, entityID string) (*EntityProvenanceResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/entities/%s/provenance", s.baseURL, url.PathEscape(entityID))
 
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
@@ -58,7 +58,7 @@ func (s *Service) GetEntityProvenance(ctx context.Context, tCtx *domain.TenantCo
 	return &response, nil
 }
 
-func (s *Service) injectHeaders(req *http.Request, tCtx *domain.TenantContext) {
+func (s *Service) injectHeaders(req *http.Request, tCtx *shared.TenantContext) {
 	if tCtx != nil {
 		if tCtx.TenantID != nil {
 			req.Header.Set("X-Tenant-ID", tCtx.TenantID.String())

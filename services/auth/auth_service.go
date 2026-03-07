@@ -2,7 +2,7 @@ package auth
 
 import (
 	"context"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 )
 
 // authService implements the services.AuthService interface.
@@ -14,8 +14,8 @@ func NewAuthService() *authService {
 }
 
 // GetUserFromContext extracts authenticated user from request context.
-func (s *authService) GetUserFromContext(ctx context.Context) *domain.User {
-	return domain.GetUserFromContext(ctx)
+func (s *authService) GetUserFromContext(ctx context.Context) *shared.User {
+	return shared.GetUserFromContext(ctx)
 }
 
 // IsAuthenticated checks if request context has valid authentication.

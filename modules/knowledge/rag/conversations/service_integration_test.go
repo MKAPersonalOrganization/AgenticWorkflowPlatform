@@ -8,17 +8,17 @@ import (
 	"os"
 	"testing"
 
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func getTestContext() *domain.TenantContext {
+func getTestContext() *shared.TenantContext {
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-	return &domain.TenantContext{
+	return &shared.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
 		UserID:      uuid.MustParse("00000000-0000-0000-0000-000000000001").String(),
@@ -105,7 +105,7 @@ func TestService_Integration_ListConversationsEmpty(t *testing.T) {
 
 	tenantID := uuid.New()
 	workspaceID := uuid.New()
-	tCtx := &domain.TenantContext{
+	tCtx := &shared.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
 		UserID:      "test-user-empty",

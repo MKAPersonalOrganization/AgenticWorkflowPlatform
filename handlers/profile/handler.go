@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"school-with-ai/components/profile"
 	"school-with-ai/domain"
+	"school-with-ai/shared"
 	"school-with-ai/foundation/i18n"
 	"school-with-ai/foundation/logger"
 	"strings"
@@ -23,7 +24,7 @@ func NewHandler(log *logger.Logger, repo domain.StudentProfileRepository) *Handl
 
 // HandleProfilePage serves the HTML profile page.
 func (h *Handler) HandleProfilePage(w http.ResponseWriter, r *http.Request) {
-	user := domain.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Redirect(w, r, "/auth/login", http.StatusSeeOther)
 		return
@@ -52,7 +53,7 @@ func (h *Handler) HandleProfilePage(w http.ResponseWriter, r *http.Request) {
 
 // GetProfile handles GET /api/profile
 func (h *Handler) GetProfile(w http.ResponseWriter, r *http.Request) {
-	user := domain.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
@@ -77,7 +78,7 @@ func (h *Handler) GetProfile(w http.ResponseWriter, r *http.Request) {
 
 // UpdateProfile handles PUT /api/profile
 func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
-	user := domain.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return

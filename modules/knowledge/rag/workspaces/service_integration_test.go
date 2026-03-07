@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -23,7 +23,7 @@ func TestService_Integration_List(t *testing.T) {
 	service := NewService(baseURL, nil)
 
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
-	tCtx := &domain.TenantContext{
+	tCtx := &shared.TenantContext{
 		TenantID: &tenantID,
 	}
 
@@ -47,7 +47,7 @@ func TestService_Integration_Create(t *testing.T) {
 	service := NewService(baseURL, nil)
 
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
-	tCtx := &domain.TenantContext{
+	tCtx := &shared.TenantContext{
 		TenantID: &tenantID,
 	}
 
@@ -75,7 +75,7 @@ func TestService_Integration_CreateAndListFlow(t *testing.T) {
 	service := NewService(baseURL, nil)
 
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
-	tCtx := &domain.TenantContext{
+	tCtx := &shared.TenantContext{
 		TenantID: &tenantID,
 	}
 
@@ -135,7 +135,7 @@ func TestService_Integration_Delete(t *testing.T) {
 	service := NewService(baseURL, nil)
 
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
-	tCtx := &domain.TenantContext{
+	tCtx := &shared.TenantContext{
 		TenantID: &tenantID,
 	}
 
@@ -189,7 +189,7 @@ func TestService_Integration_Update(t *testing.T) {
 	service := NewService(baseURL, nil)
 
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
-	tCtx := &domain.TenantContext{
+	tCtx := &shared.TenantContext{
 		TenantID: &tenantID,
 	}
 

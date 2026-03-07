@@ -23,7 +23,7 @@ import (
 	"school-with-ai/components/tabs"
 	"school-with-ai/components/textarea"
 	"school-with-ai/components/threads"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 )
 
 templ HomeExtraHead() {
@@ -109,7 +109,7 @@ templ HomeExtraHead() {
 	</style>
 }
 
-templ ChatInputScreen(user *domain.User) {
+templ ChatInputScreen(user *shared.User) {
 	@BaseLayout(LayoutProps{
 		Title:     "Chat",
 		User:      user,

@@ -2,7 +2,7 @@ package engine
 
 import (
 	"context"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 	"school-with-ai/foundation/agentsdk/core"
 )
 
@@ -16,7 +16,7 @@ func (e *Engine) ProcessUserMessage(ctx context.Context, agentName string, runCt
 
 	// Inject User into context for tools that need it
 	if runCtx.UserID != "" {
-		ctx = context.WithValue(ctx, domain.UserContextKey, &domain.User{ID: runCtx.UserID})
+		ctx = context.WithValue(ctx, shared.UserContextKey, &shared.User{ID: runCtx.UserID})
 	}
 
 	return e.executeRun(ctx, targetAgent, runCtx)

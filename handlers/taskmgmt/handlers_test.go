@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services"
 	"testing"
@@ -22,7 +22,7 @@ type mockAuthService struct{}
 
 var _ services.AuthService = (*mockAuthService)(nil)
 
-func (m *mockAuthService) GetUserFromContext(ctx context.Context) *domain.User { return nil }
+func (m *mockAuthService) GetUserFromContext(ctx context.Context) *shared.User { return nil }
 func (m *mockAuthService) IsAuthenticated(ctx context.Context) bool            { return false }
 
 func TestSSECORSOrigin(t *testing.T) {

@@ -6,6 +6,7 @@ import (
 "strconv"
 
 "school-with-ai/domain"
+	"school-with-ai/shared"
 "school-with-ai/foundation/logger"
 )
 
@@ -61,7 +62,7 @@ AddCount:    e.AddCount,
 
 // list handles GET /v1/agent-catalog
 func (h *catalogHandler) list(w http.ResponseWriter, r *http.Request) {
-user := domain.GetUserFromContext(r.Context())
+user := shared.GetUserFromContext(r.Context())
 if user == nil {
 http.Error(w, "Unauthorized", http.StatusUnauthorized)
 return
@@ -109,7 +110,7 @@ json.NewEncoder(w).Encode(resp)
 
 // search handles GET /v1/agent-catalog/search?q=...
 func (h *catalogHandler) search(w http.ResponseWriter, r *http.Request) {
-user := domain.GetUserFromContext(r.Context())
+user := shared.GetUserFromContext(r.Context())
 if user == nil {
 http.Error(w, "Unauthorized", http.StatusUnauthorized)
 return
@@ -155,7 +156,7 @@ json.NewEncoder(w).Encode(resp)
 
 // addToMyAgents handles POST /v1/agent-catalog/{id}/add
 func (h *catalogHandler) addToMyAgents(w http.ResponseWriter, r *http.Request) {
-user := domain.GetUserFromContext(r.Context())
+user := shared.GetUserFromContext(r.Context())
 if user == nil {
 http.Error(w, "Unauthorized", http.StatusUnauthorized)
 return

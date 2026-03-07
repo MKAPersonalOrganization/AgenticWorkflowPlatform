@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 )
 
 // PricingResponse represents pipeline cost pricing.
@@ -16,7 +16,7 @@ type PricingResponse struct {
 }
 
 // GetPricing retrieves pipeline cost pricing.
-func (s *Service) GetPricing(ctx context.Context, tCtx *domain.TenantContext) (*PricingResponse, error) {
+func (s *Service) GetPricing(ctx context.Context, tCtx *shared.TenantContext) (*PricingResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/pipeline/costs/pricing", s.baseURL)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)

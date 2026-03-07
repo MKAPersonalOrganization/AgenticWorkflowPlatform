@@ -9,11 +9,12 @@ import (
 	"school-with-ai/components/label"
 	"school-with-ai/components/textarea"
 	"school-with-ai/domain"
+	"school-with-ai/shared"
 	"strings"
 )
 
 type ProfilePageProps struct {
-	User    *domain.User
+	User    *shared.User
 	Profile *domain.StudentProfile
 }
 

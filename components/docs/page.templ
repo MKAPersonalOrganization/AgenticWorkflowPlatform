@@ -3,11 +3,11 @@ package docs
 import (
 	"school-with-ai/components"
 	"school-with-ai/components/landing"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 )
 
 type DocsPageProps struct {
-	User *domain.User
+	User *shared.User
 }
 
 templ DocsPage(props DocsPageProps) {

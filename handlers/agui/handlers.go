@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/services"
 	"strconv"
@@ -40,7 +40,7 @@ func (h *AguiProjectionHandler) GetThreadState(w http.ResponseWriter, r *http.Re
 	}
 
 	// Verify ownership: the authenticated user must own this thread.
-	user := domain.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -72,7 +72,7 @@ func (h *AguiProjectionHandler) GetMessages(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Verify ownership: the authenticated user must own this thread.
-	user := domain.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -126,7 +126,7 @@ func (h *AguiProjectionHandler) writeThreadResponse(w http.ResponseWriter, state
 // GET /api/agui/threads?cursor=<timestamp>&limit=<int>.
 func (h *AguiProjectionHandler) ListThreads(w http.ResponseWriter, r *http.Request) {
 	// Get user from auth context
-	user := domain.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return

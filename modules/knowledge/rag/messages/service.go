@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 	"time"
 )
 
@@ -31,7 +31,7 @@ func NewService(baseURL string, httpClient *http.Client) *Service {
 }
 
 // UpdateMessage updates a message by ID.
-func (s *Service) UpdateMessage(ctx context.Context, tCtx *domain.TenantContext, messageID string, req UpdateMessageRequest) (*MessageResponse, error) {
+func (s *Service) UpdateMessage(ctx context.Context, tCtx *shared.TenantContext, messageID string, req UpdateMessageRequest) (*MessageResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/messages/%s", s.baseURL, messageID)
 
 	body, err := json.Marshal(req)
@@ -66,7 +66,7 @@ func (s *Service) UpdateMessage(ctx context.Context, tCtx *domain.TenantContext,
 }
 
 // DeleteMessage deletes a message by ID.
-func (s *Service) DeleteMessage(ctx context.Context, tCtx *domain.TenantContext, messageID string) error {
+func (s *Service) DeleteMessage(ctx context.Context, tCtx *shared.TenantContext, messageID string) error {
 	urlStr := fmt.Sprintf("%s/api/v1/messages/%s", s.baseURL, messageID)
 
 	httpReq, err := http.NewRequestWithContext(ctx, "DELETE", urlStr, nil)
@@ -89,7 +89,7 @@ func (s *Service) DeleteMessage(ctx context.Context, tCtx *domain.TenantContext,
 	return nil
 }
 
-func (s *Service) injectHeaders(req *http.Request, tCtx *domain.TenantContext) {
+func (s *Service) injectHeaders(req *http.Request, tCtx *shared.TenantContext) {
 	if tCtx != nil {
 		if tCtx.TenantID != nil {
 			req.Header.Set("X-Tenant-ID", tCtx.TenantID.String())

@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 
 	"github.com/google/uuid"
 )
@@ -27,7 +27,7 @@ func handleExtendedError(resp *http.Response) error {
 }
 
 // GetMetricsHistory retrieves metrics history for a workspace.
-func (s *Service) GetMetricsHistory(ctx context.Context, tCtx *domain.TenantContext, workspaceID uuid.UUID) (*MetricsHistoryResponse, error) {
+func (s *Service) GetMetricsHistory(ctx context.Context, tCtx *shared.TenantContext, workspaceID uuid.UUID) (*MetricsHistoryResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/workspaces/%s/metrics-history", s.baseURL, workspaceID)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
@@ -54,7 +54,7 @@ func (s *Service) GetMetricsHistory(ctx context.Context, tCtx *domain.TenantCont
 }
 
 // TriggerMetricsSnapshot triggers a manual metrics snapshot.
-func (s *Service) TriggerMetricsSnapshot(ctx context.Context, tCtx *domain.TenantContext, workspaceID uuid.UUID) (*MetricsSnapshotTriggerResponse, error) {
+func (s *Service) TriggerMetricsSnapshot(ctx context.Context, tCtx *shared.TenantContext, workspaceID uuid.UUID) (*MetricsSnapshotTriggerResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/workspaces/%s/metrics-snapshot", s.baseURL, workspaceID)
 
 	req, err := http.NewRequestWithContext(ctx, "POST", urlStr, nil)
@@ -81,7 +81,7 @@ func (s *Service) TriggerMetricsSnapshot(ctx context.Context, tCtx *domain.Tenan
 }
 
 // GetBySlug retrieves a workspace by its slug.
-func (s *Service) GetBySlug(ctx context.Context, tCtx *domain.TenantContext, slug string) (*WorkspaceResponse, error) {
+func (s *Service) GetBySlug(ctx context.Context, tCtx *shared.TenantContext, slug string) (*WorkspaceResponse, error) {
 	if tCtx.TenantID == nil {
 		return nil, fmt.Errorf("tenant ID is required")
 	}
@@ -111,7 +111,7 @@ func (s *Service) GetBySlug(ctx context.Context, tCtx *domain.TenantContext, slu
 }
 
 // ReprocessAllDocuments triggers reprocessing for all documents in the workspace.
-func (s *Service) ReprocessAllDocuments(ctx context.Context, tCtx *domain.TenantContext, workspaceID uuid.UUID, req *ReprocessAllRequest) (*ReprocessAllResponse, error) {
+func (s *Service) ReprocessAllDocuments(ctx context.Context, tCtx *shared.TenantContext, workspaceID uuid.UUID, req *ReprocessAllRequest) (*ReprocessAllResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/workspaces/%s/reprocess-documents", s.baseURL, workspaceID.String())
 
 	body, err := json.Marshal(req)

@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 	"time"
 
 	"github.com/google/uuid"
@@ -37,7 +37,7 @@ func NewService(baseURL string, httpClient *http.Client) *Service {
 }
 
 // List retrieves a list of folders.
-func (s *Service) List(ctx context.Context, tCtx *domain.TenantContext) ([]FolderResponse, error) {
+func (s *Service) List(ctx context.Context, tCtx *shared.TenantContext) ([]FolderResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/folders", s.baseURL)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -66,7 +66,7 @@ func (s *Service) List(ctx context.Context, tCtx *domain.TenantContext) ([]Folde
 }
 
 // Create creates a new folder.
-func (s *Service) Create(ctx context.Context, tCtx *domain.TenantContext, req *CreateFolderRequest) (*FolderResponse, error) {
+func (s *Service) Create(ctx context.Context, tCtx *shared.TenantContext, req *CreateFolderRequest) (*FolderResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/folders", s.baseURL)
 
 	body, err := json.Marshal(req)
@@ -101,7 +101,7 @@ func (s *Service) Create(ctx context.Context, tCtx *domain.TenantContext, req *C
 }
 
 // Update updates an existing folder.
-func (s *Service) Update(ctx context.Context, tCtx *domain.TenantContext, folderID uuid.UUID, req *UpdateFolderRequest) (*FolderResponse, error) {
+func (s *Service) Update(ctx context.Context, tCtx *shared.TenantContext, folderID uuid.UUID, req *UpdateFolderRequest) (*FolderResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/folders/%s", s.baseURL, folderID.String())
 
 	body, err := json.Marshal(req)
@@ -136,7 +136,7 @@ func (s *Service) Update(ctx context.Context, tCtx *domain.TenantContext, folder
 }
 
 // Delete deletes a folder.
-func (s *Service) Delete(ctx context.Context, tCtx *domain.TenantContext, folderID uuid.UUID) error {
+func (s *Service) Delete(ctx context.Context, tCtx *shared.TenantContext, folderID uuid.UUID) error {
 	url := fmt.Sprintf("%s/api/v1/folders/%s", s.baseURL, folderID.String())
 
 	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
@@ -155,7 +155,7 @@ func (s *Service) Delete(ctx context.Context, tCtx *domain.TenantContext, folder
 	return s.handleError(resp)
 }
 
-func (s *Service) injectHeaders(req *http.Request, tCtx *domain.TenantContext) {
+func (s *Service) injectHeaders(req *http.Request, tCtx *shared.TenantContext) {
 	if tCtx != nil {
 		if tCtx.TenantID != nil {
 			req.Header.Set("X-Tenant-ID", tCtx.TenantID.String())
