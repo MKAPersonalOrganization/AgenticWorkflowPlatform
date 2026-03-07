@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 	"time"
 )
 
@@ -31,7 +31,7 @@ func NewService(baseURL string, httpClient *http.Client) *Service {
 }
 
 // Complete sends a chat completion request and returns the response.
-func (s *Service) Complete(ctx context.Context, tCtx *domain.TenantContext, req ChatCompletionRequest) (*ChatCompletionResponse, error) {
+func (s *Service) Complete(ctx context.Context, tCtx *shared.TenantContext, req ChatCompletionRequest) (*ChatCompletionResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/chat/completions", s.baseURL)
 
 	body, err := json.Marshal(req)
@@ -65,7 +65,7 @@ func (s *Service) Complete(ctx context.Context, tCtx *domain.TenantContext, req 
 	return &response, nil
 }
 
-func (s *Service) injectHeaders(req *http.Request, tCtx *domain.TenantContext) {
+func (s *Service) injectHeaders(req *http.Request, tCtx *shared.TenantContext) {
 	if tCtx != nil {
 		if tCtx.TenantID != nil {
 			req.Header.Set("X-Tenant-ID", tCtx.TenantID.String())

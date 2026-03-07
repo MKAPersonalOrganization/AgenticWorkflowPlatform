@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 	"time"
 )
 
@@ -30,7 +30,7 @@ func NewService(baseURL string, httpClient *http.Client) *Service {
 }
 
 // GetEntityLineage retrieves the lineage information for a specific entity.
-func (s *Service) GetEntityLineage(ctx context.Context, tCtx *domain.TenantContext, entityName string) (*EntityLineageResponse, error) {
+func (s *Service) GetEntityLineage(ctx context.Context, tCtx *shared.TenantContext, entityName string) (*EntityLineageResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/lineage/entities/%s", s.baseURL, url.PathEscape(entityName))
 
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
@@ -59,7 +59,7 @@ func (s *Service) GetEntityLineage(ctx context.Context, tCtx *domain.TenantConte
 }
 
 // GetDocumentLineage retrieves the graph lineage information for a specific document.
-func (s *Service) GetDocumentLineage(ctx context.Context, tCtx *domain.TenantContext, documentID string) (*DocumentGraphLineageResponse, error) {
+func (s *Service) GetDocumentLineage(ctx context.Context, tCtx *shared.TenantContext, documentID string) (*DocumentGraphLineageResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/lineage/documents/%s", s.baseURL, url.PathEscape(documentID))
 
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
@@ -87,7 +87,7 @@ func (s *Service) GetDocumentLineage(ctx context.Context, tCtx *domain.TenantCon
 	return &response, nil
 }
 
-func (s *Service) injectHeaders(req *http.Request, tCtx *domain.TenantContext) {
+func (s *Service) injectHeaders(req *http.Request, tCtx *shared.TenantContext) {
 	if tCtx != nil {
 		if tCtx.TenantID != nil {
 			req.Header.Set("X-Tenant-ID", tCtx.TenantID.String())

@@ -3,11 +3,11 @@ package landing
 import (
 	"school-with-ai/components/button"
 	"school-with-ai/components/icon"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 )
 
 // ─── CTA Section ─────────────────────────────────────────────────────────────
-templ ctaSection(user *domain.User) {
+templ ctaSection(user *shared.User) {
 	<section class="py-32 bg-background border-t border-border">
 		<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
 			<div class="mx-auto max-w-3xl">

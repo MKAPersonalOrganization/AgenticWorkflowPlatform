@@ -1,6 +1,6 @@
 package auth
 
-import "school-with-ai/domain"
+import "school-with-ai/shared"
 import "school-with-ai/components/i18n"
 
 type ErrorPageProps struct {
@@ -8,7 +8,7 @@ type ErrorPageProps struct {
 	ErrorDetails string
 	LoginURL     string
 	HomeURL      string
-	User         *domain.User
+	User         *shared.User
 }
 
 // ErrorPage renders the authentication error page

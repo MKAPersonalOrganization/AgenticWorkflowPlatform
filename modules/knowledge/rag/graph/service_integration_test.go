@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 	"school-with-ai/modules/knowledge/rag/graph"
 
 	"github.com/google/uuid"
@@ -24,10 +24,10 @@ func baseURL(t *testing.T) string {
 	return u
 }
 
-func tenantCtx() domain.TenantContext {
+func tenantCtx() shared.TenantContext {
 	tid := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	wid := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-	return domain.TenantContext{
+	return shared.TenantContext{
 		TenantID:    &tid,
 		WorkspaceID: &wid,
 		UserID:      "00000000-0000-0000-0000-000000000001",

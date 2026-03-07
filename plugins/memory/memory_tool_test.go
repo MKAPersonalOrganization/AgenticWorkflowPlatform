@@ -2,7 +2,7 @@ package memory
 
 import (
 	"context"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 	"school-with-ai/foundation/agent"
 	"strings"
 	"testing"
@@ -33,8 +33,8 @@ func TestMemoryTool_Integration(t *testing.T) {
 	forgetTool := NewForgetMemoryTool(service)
 
 	// Create context with user
-	user := &domain.User{ID: "test-user-123"}
-	ctx := context.WithValue(context.Background(), domain.UserContextKey, user)
+	user := &shared.User{ID: "test-user-123"}
+	ctx := context.WithValue(context.Background(), shared.UserContextKey, user)
 
 	// 1. Save new memory
 	args := agent.Arguments{

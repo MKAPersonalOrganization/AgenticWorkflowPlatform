@@ -7,7 +7,7 @@ import (
 	"school-with-ai/components/nav"
 	"school-with-ai/components/resources"
 	"school-with-ai/components/tools"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 	"school-with-ai/services/toolregistry"
 
 	"fmt"
@@ -15,7 +15,7 @@ import (
 
 type LayoutProps struct {
 	Title      string
-	User       *domain.User
+	User       *shared.User
 	ExtraHead  templ.Component
 	HideNavbar bool
 }
@@ -107,7 +107,7 @@ templ BaseLayout(props LayoutProps) {
 
 type AppLayoutProps struct {
 	Title       string
-	User        *domain.User
+	User        *shared.User
 	IncludeChat bool // If true, includes chat-specific scripts
 }
 

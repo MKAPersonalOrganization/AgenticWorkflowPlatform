@@ -4,7 +4,7 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"net/http"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/infra/projection/statistics"
 
@@ -72,7 +72,7 @@ func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get user from context
-	user := domain.GetUserFromContext(ctx)
+	user := shared.GetUserFromContext(ctx)
 
 	component.Dashboard(component.DashboardProps{
 		Stats:        stats,

@@ -4,7 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/gob"
 	"net/http"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 
 	"github.com/gorilla/sessions"
 )
@@ -17,8 +17,8 @@ const (
 )
 
 func init() {
-	// Register domain.User so gob can serialize it.
-	gob.Register(&domain.User{})
+	// Register shared.User so gob can serialize it.
+	gob.Register(&shared.User{})
 }
 
 // SessionStore wraps gorilla/sessions for cookie-based session management.

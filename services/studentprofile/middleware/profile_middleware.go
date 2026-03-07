@@ -3,6 +3,7 @@ package middleware
 import (
 	"fmt"
 	"school-with-ai/domain"
+	"school-with-ai/shared"
 	"school-with-ai/foundation/agent"
 	"strings"
 )
@@ -16,7 +17,7 @@ func NewStudentProfileInjectorMiddleware(repo domain.StudentProfileRepository) a
 				return next.Handle(c)
 			}
 
-			user := domain.GetUserFromContext(c.Context)
+			user := shared.GetUserFromContext(c.Context)
 			if user == nil {
 				return next.Handle(c)
 			}

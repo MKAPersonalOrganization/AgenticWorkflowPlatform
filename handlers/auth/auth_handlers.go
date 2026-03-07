@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 	"school-with-ai/foundation/i18n"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/infra/googleauth"
@@ -36,7 +36,7 @@ func NewAuthHandlers(log *logger.Logger, googleClient *googleauth.Client, sessio
 // LoginPage handles GET /auth/login — redirects directly to Google OAuth.
 func (h *AuthHandlers) LoginPage(w http.ResponseWriter, r *http.Request) {
 	// If already authenticated, redirect to chat
-	if user := domain.GetUserFromContext(r.Context()); user != nil {
+	if user := shared.GetUserFromContext(r.Context()); user != nil {
 		http.Redirect(w, r, "/chat", http.StatusSeeOther)
 		return
 	}
@@ -153,7 +153,7 @@ func (h *AuthHandlers) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 
 // MeHandler handles GET /api/me — returns the current user as JSON.
 func (h *AuthHandlers) MeHandler(w http.ResponseWriter, r *http.Request) {
-	user := domain.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 		return
@@ -177,7 +177,7 @@ func (h *AuthHandlers) ErrorPage(w http.ResponseWriter, r *http.Request) {
 		ErrorMessage: errorMessage,
 		LoginURL:     h.appURL + "/auth/login",
 		HomeURL:      h.appURL + "/",
-		User:         domain.GetUserFromContext(r.Context()),
+		User:         shared.GetUserFromContext(r.Context()),
 	}
 
 	component := authcomp.ErrorPage(props)

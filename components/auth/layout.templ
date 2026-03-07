@@ -3,14 +3,14 @@ package auth
 import "school-with-ai/components"
 import "school-with-ai/components/card"
 import "school-with-ai/components/icon"
-import "school-with-ai/domain"
+import "school-with-ai/shared"
 import "school-with-ai/components/i18n"
 
 type LayoutProps struct {
 	Title       string
 	Description string
 	LogoURL     string
-	User        *domain.User // Optional: if provided, navbar will show user info
+	User        *shared.User // Optional: if provided, navbar will show user info
 }
 
 // AuthLayout provides a centered card layout for authentication pages

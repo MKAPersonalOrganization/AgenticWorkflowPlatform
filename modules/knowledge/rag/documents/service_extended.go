@@ -9,7 +9,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 )
 
 // DocumentMetadataResponse wraps the JSON metadata from the API.
@@ -31,7 +31,7 @@ type CancelPdfResponse struct {
 }
 
 // GetTrackStatus retrieves the status of a tracked upload batch.
-func (s *Service) GetTrackStatus(ctx context.Context, tCtx *domain.TenantContext, trackID string) (*TrackStatusResponse, error) {
+func (s *Service) GetTrackStatus(ctx context.Context, tCtx *shared.TenantContext, trackID string) (*TrackStatusResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/documents/track/%s", s.baseURL, trackID)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
@@ -58,7 +58,7 @@ func (s *Service) GetTrackStatus(ctx context.Context, tCtx *domain.TenantContext
 }
 
 // RecoverStuck recovers documents stuck in processing.
-func (s *Service) RecoverStuck(ctx context.Context, tCtx *domain.TenantContext) (*RecoverStuckResponse, error) {
+func (s *Service) RecoverStuck(ctx context.Context, tCtx *shared.TenantContext) (*RecoverStuckResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/documents/recover-stuck", s.baseURL)
 
 	req, err := http.NewRequestWithContext(ctx, "POST", urlStr, nil)
@@ -85,7 +85,7 @@ func (s *Service) RecoverStuck(ctx context.Context, tCtx *domain.TenantContext) 
 }
 
 // GetDeletionImpact analyses the impact of deleting a document.
-func (s *Service) GetDeletionImpact(ctx context.Context, tCtx *domain.TenantContext, documentID string) (*DeletionImpactResponse, error) {
+func (s *Service) GetDeletionImpact(ctx context.Context, tCtx *shared.TenantContext, documentID string) (*DeletionImpactResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/documents/%s/deletion-impact", s.baseURL, documentID)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
@@ -112,7 +112,7 @@ func (s *Service) GetDeletionImpact(ctx context.Context, tCtx *domain.TenantCont
 }
 
 // RetryFailedChunks retries failed chunks for a document.
-func (s *Service) RetryFailedChunks(ctx context.Context, tCtx *domain.TenantContext, documentID string) (*RetryChunksResponse, error) {
+func (s *Service) RetryFailedChunks(ctx context.Context, tCtx *shared.TenantContext, documentID string) (*RetryChunksResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/documents/%s/retry-chunks", s.baseURL, documentID)
 
 	req, err := http.NewRequestWithContext(ctx, "POST", urlStr, nil)
@@ -139,7 +139,7 @@ func (s *Service) RetryFailedChunks(ctx context.Context, tCtx *domain.TenantCont
 }
 
 // ListFailedChunks lists failed chunks for a document.
-func (s *Service) ListFailedChunks(ctx context.Context, tCtx *domain.TenantContext, documentID string) (*ListFailedChunksResponse, error) {
+func (s *Service) ListFailedChunks(ctx context.Context, tCtx *shared.TenantContext, documentID string) (*ListFailedChunksResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/documents/%s/failed-chunks", s.baseURL, documentID)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
@@ -167,7 +167,7 @@ func (s *Service) ListFailedChunks(ctx context.Context, tCtx *domain.TenantConte
 
 // GetFullLineage retrieves full lineage for a document.
 // The endpoint returns the document detail with lineage information.
-func (s *Service) GetFullLineage(ctx context.Context, tCtx *domain.TenantContext, documentID string) (*DocumentDetail, error) {
+func (s *Service) GetFullLineage(ctx context.Context, tCtx *shared.TenantContext, documentID string) (*DocumentDetail, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/documents/%s/lineage", s.baseURL, documentID)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
@@ -194,7 +194,7 @@ func (s *Service) GetFullLineage(ctx context.Context, tCtx *domain.TenantContext
 }
 
 // GetMetadata retrieves metadata for a document.
-func (s *Service) GetMetadata(ctx context.Context, tCtx *domain.TenantContext, documentID string) (*DocumentMetadataResponse, error) {
+func (s *Service) GetMetadata(ctx context.Context, tCtx *shared.TenantContext, documentID string) (*DocumentMetadataResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/documents/%s/metadata", s.baseURL, documentID)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
@@ -221,7 +221,7 @@ func (s *Service) GetMetadata(ctx context.Context, tCtx *domain.TenantContext, d
 }
 
 // ExportLineage exports lineage data for a document.
-func (s *Service) ExportLineage(ctx context.Context, tCtx *domain.TenantContext, documentID string, format string) (*ExportLineageResponse, error) {
+func (s *Service) ExportLineage(ctx context.Context, tCtx *shared.TenantContext, documentID string, format string) (*ExportLineageResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/documents/%s/lineage/export", s.baseURL, documentID)
 	if format != "" {
 		urlStr += "?format=" + format
@@ -251,7 +251,7 @@ func (s *Service) ExportLineage(ctx context.Context, tCtx *domain.TenantContext,
 }
 
 // CancelPdfProcessing cancels processing for a specific PDF.
-func (s *Service) CancelPdfProcessing(ctx context.Context, tCtx *domain.TenantContext, pdfID string) (*CancelPdfResponse, error) {
+func (s *Service) CancelPdfProcessing(ctx context.Context, tCtx *shared.TenantContext, pdfID string) (*CancelPdfResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/documents/pdf/%s/cancel", s.baseURL, pdfID)
 
 	req, err := http.NewRequestWithContext(ctx, "DELETE", urlStr, nil)
@@ -278,7 +278,7 @@ func (s *Service) CancelPdfProcessing(ctx context.Context, tCtx *domain.TenantCo
 }
 
 // UploadBatch uploads multiple documents in a batch.
-func (s *Service) UploadBatch(ctx context.Context, tCtx *domain.TenantContext, files []io.Reader, fileNames []string) (*BatchUploadResponse, error) {
+func (s *Service) UploadBatch(ctx context.Context, tCtx *shared.TenantContext, files []io.Reader, fileNames []string) (*BatchUploadResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/documents/upload/batch", s.baseURL)
 
 	var body io.Reader

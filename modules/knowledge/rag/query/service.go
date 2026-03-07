@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 	"strings"
 )
 
@@ -30,7 +30,7 @@ func NewService(baseURL string, httpClient *http.Client) *Service {
 }
 
 // Execute performs a standard RAG query.
-func (s *Service) Execute(ctx context.Context, tCtx *domain.TenantContext, req *QueryRequest) (*QueryResponse, error) {
+func (s *Service) Execute(ctx context.Context, tCtx *shared.TenantContext, req *QueryRequest) (*QueryResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/query", s.baseURL)
 
 	body, err := json.Marshal(req)
@@ -78,7 +78,7 @@ func (s *Service) Execute(ctx context.Context, tCtx *domain.TenantContext, req *
 }
 
 // Stream performs a streaming RAG query.
-func (s *Service) Stream(ctx context.Context, tCtx *domain.TenantContext, req *StreamQueryRequest) (<-chan string, <-chan error) {
+func (s *Service) Stream(ctx context.Context, tCtx *shared.TenantContext, req *StreamQueryRequest) (<-chan string, <-chan error) {
 	textChan := make(chan string)
 	errChan := make(chan error, 1)
 

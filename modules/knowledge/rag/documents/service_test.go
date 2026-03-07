@@ -7,7 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 	"strings"
 	"testing"
 
@@ -20,7 +20,7 @@ func TestService_Upload(t *testing.T) {
 	userID := "test-user"
 	role := "admin"
 
-	tCtx := &domain.TenantContext{
+	tCtx := &shared.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
 		UserID:      userID,
@@ -101,7 +101,7 @@ func TestService_List_Headers(t *testing.T) {
 	userID := "test-user"
 	role := "admin"
 
-	tCtx := &domain.TenantContext{
+	tCtx := &shared.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
 		UserID:      userID,
@@ -146,7 +146,7 @@ func TestService_List_Headers(t *testing.T) {
 func TestService_UploadAndListFlow(t *testing.T) {
 	tenantID := uuid.New()
 	workspaceID := uuid.New()
-	tCtx := &domain.TenantContext{
+	tCtx := &shared.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
 		UserID:      "test-user",
@@ -188,7 +188,7 @@ func TestService_UploadAndListFlow(t *testing.T) {
 func TestService_ListPDFs(t *testing.T) {
 	tenantID := uuid.New()
 	workspaceID := uuid.New()
-	tCtx := &domain.TenantContext{
+	tCtx := &shared.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
 		UserID:      "test-user",
@@ -227,7 +227,7 @@ func TestService_DeletePDF(t *testing.T) {
 	pdfID := uuid.New().String()
 	tenantID := uuid.New()
 	workspaceID := uuid.New()
-	tCtx := &domain.TenantContext{
+	tCtx := &shared.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
 		UserID:      "test-user",
@@ -261,7 +261,7 @@ func TestService_DeletePDF_NotFound(t *testing.T) {
 	defer server.Close()
 
 	service := NewService(server.URL, nil)
-	err := service.DeletePDF(context.Background(), &domain.TenantContext{}, pdfID)
+	err := service.DeletePDF(context.Background(), &shared.TenantContext{}, pdfID)
 	if err != nil {
 		t.Fatalf("DeletePDF should be idempotent and return no error for NotFound, got %v", err)
 	}
@@ -271,7 +271,7 @@ func TestService_GetPDFProgress(t *testing.T) {
 	trackID := uuid.New().String()
 	tenantID := uuid.New()
 	workspaceID := uuid.New()
-	tCtx := &domain.TenantContext{
+	tCtx := &shared.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
 		UserID:      "test-user",
@@ -309,7 +309,7 @@ func TestService_GetPDFProgress_NotFound(t *testing.T) {
 	defer server.Close()
 
 	service := NewService(server.URL, nil)
-	_, err := service.GetPDFProgress(context.Background(), &domain.TenantContext{}, trackID)
+	_, err := service.GetPDFProgress(context.Background(), &shared.TenantContext{}, trackID)
 	if err == nil {
 		t.Fatal("Expected error for non-existent Progress, got nil")
 	}
@@ -319,7 +319,7 @@ func TestService_GetPDFStatus(t *testing.T) {
 	pdfID := uuid.New().String()
 	tenantID := uuid.New()
 	workspaceID := uuid.New()
-	tCtx := &domain.TenantContext{
+	tCtx := &shared.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
 		UserID:      "test-user",
@@ -366,7 +366,7 @@ func TestService_GetPDFStatus_NotFound(t *testing.T) {
 	defer server.Close()
 
 	service := NewService(server.URL, nil)
-	_, err := service.GetPDFStatus(context.Background(), &domain.TenantContext{}, pdfID)
+	_, err := service.GetPDFStatus(context.Background(), &shared.TenantContext{}, pdfID)
 	if err == nil {
 		t.Fatal("Expected error for non-existent PDF, got nil")
 	}
@@ -377,7 +377,7 @@ func TestService_GetPDFContent(t *testing.T) {
 	tenantID := uuid.New()
 	workspaceID := uuid.New()
 
-	tCtx := &domain.TenantContext{
+	tCtx := &shared.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
 		UserID:      "test-user",

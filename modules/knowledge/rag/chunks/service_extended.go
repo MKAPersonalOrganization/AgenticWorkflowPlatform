@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 )
 
 // GetChunkLineage retrieves lineage for a specific chunk.
-func (s *Service) GetChunkLineage(ctx context.Context, tCtx *domain.TenantContext, chunkID string) (*ChunkLineageResponse, error) {
+func (s *Service) GetChunkLineage(ctx context.Context, tCtx *shared.TenantContext, chunkID string) (*ChunkLineageResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/chunks/%s/lineage", s.baseURL, url.PathEscape(chunkID))
 
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)

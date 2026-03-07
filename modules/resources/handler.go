@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 
 	"github.com/google/uuid"
 )
@@ -27,7 +27,7 @@ func newHandler(svc *service) *handler {
 // upload handles file upload requests.
 // POST /api/resources/upload
 func (h *handler) upload(w http.ResponseWriter, r *http.Request) {
-	user := domain.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -59,7 +59,7 @@ func (h *handler) upload(w http.ResponseWriter, r *http.Request) {
 // list handles listing resources.
 // GET /api/resources?source=public|private
 func (h *handler) list(w http.ResponseWriter, r *http.Request) {
-	user := domain.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -83,7 +83,7 @@ func (h *handler) list(w http.ResponseWriter, r *http.Request) {
 // getContent handles resource content retrieval.
 // GET /api/resources/{id}/content
 func (h *handler) getContent(w http.ResponseWriter, r *http.Request) {
-	user := domain.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -140,7 +140,7 @@ func (h *handler) getContent(w http.ResponseWriter, r *http.Request) {
 // delete handles resource deletion.
 // DELETE /api/resources/{id}
 func (h *handler) delete(w http.ResponseWriter, r *http.Request) {
-	user := domain.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return

@@ -6,6 +6,7 @@ import (
 "strings"
 
 "school-with-ai/domain"
+	"school-with-ai/shared"
 "school-with-ai/foundation/logger"
 )
 
@@ -79,7 +80,7 @@ UpdatedAt:       a.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 
 // create handles POST /v1/agent-definitions
 func (h *storeHandler) create(w http.ResponseWriter, r *http.Request) {
-user := domain.GetUserFromContext(r.Context())
+user := shared.GetUserFromContext(r.Context())
 if user == nil {
 http.Error(w, "Unauthorized", http.StatusUnauthorized)
 return
@@ -118,7 +119,7 @@ json.NewEncoder(w).Encode(resp)
 
 // update handles PUT /v1/agent-definitions/{id}
 func (h *storeHandler) update(w http.ResponseWriter, r *http.Request) {
-user := domain.GetUserFromContext(r.Context())
+user := shared.GetUserFromContext(r.Context())
 if user == nil {
 http.Error(w, "Unauthorized", http.StatusUnauthorized)
 return
@@ -184,7 +185,7 @@ json.NewEncoder(w).Encode(resp)
 
 // delete handles DELETE /v1/agent-definitions/{id}
 func (h *storeHandler) delete(w http.ResponseWriter, r *http.Request) {
-user := domain.GetUserFromContext(r.Context())
+user := shared.GetUserFromContext(r.Context())
 if user == nil {
 http.Error(w, "Unauthorized", http.StatusUnauthorized)
 return
@@ -208,7 +209,7 @@ json.NewEncoder(w).Encode(map[string]string{"status": "deleted"})
 
 // list handles GET /v1/agent-definitions
 func (h *storeHandler) list(w http.ResponseWriter, r *http.Request) {
-user := domain.GetUserFromContext(r.Context())
+user := shared.GetUserFromContext(r.Context())
 if user == nil {
 http.Error(w, "Unauthorized", http.StatusUnauthorized)
 return
@@ -234,7 +235,7 @@ json.NewEncoder(w).Encode(resp)
 
 // get handles GET /v1/agent-definitions/{id}
 func (h *storeHandler) get(w http.ResponseWriter, r *http.Request) {
-user := domain.GetUserFromContext(r.Context())
+user := shared.GetUserFromContext(r.Context())
 if user == nil {
 http.Error(w, "Unauthorized", http.StatusUnauthorized)
 return
@@ -260,7 +261,7 @@ json.NewEncoder(w).Encode(resp)
 
 // search handles GET /v1/agent-definitions/search?q=...
 func (h *storeHandler) search(w http.ResponseWriter, r *http.Request) {
-user := domain.GetUserFromContext(r.Context())
+user := shared.GetUserFromContext(r.Context())
 if user == nil {
 http.Error(w, "Unauthorized", http.StatusUnauthorized)
 return

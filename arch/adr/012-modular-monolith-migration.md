@@ -72,7 +72,7 @@ shared/                      # Shared kernel (extracted from domain/)
 
 ### Migration Phases
 
-#### Phase 1: Extract leaf modules (zero cross-domain coupling)
+#### Phase 1: Extract leaf modules (zero cross-domain coupling) ✅
 Order based on dependency analysis — fewest inbound dependencies first:
 
 | Order | Module | Files to Move | Cross-Domain Deps |
@@ -84,11 +84,13 @@ Order based on dependency analysis — fewest inbound dependencies first:
 | 5 | **mcp** | `handlers/mcp/`, `services/plugindiscovery/` | `toolregistry` (shared infra — use interface) |
 | 6 | **knowledge** | `handlers/knowledge/`, `services/edgequake/`, `services/rag/` | `aisettings` (replace with interface) |
 
-#### Phase 2: Extract core domain events
+#### Phase 2: Extract core domain events ✅
 Remove the `sealed()` constraint on `domain.Event` and allow modules to define their own events. Introduce a shared `eventsourcing` package in `foundation/` with the generic `Event` interface, `BaseAggregate`, `Repository[T]`, and `EventStore`. Each module defines its events locally.
 
-#### Phase 3: Extract shared kernel
+#### Phase 3: Extract shared kernel ✅
 Move `domain.User`, `domain.GetUserFromContext`, and other truly cross-cutting types into a `shared/` package. The `domain/` package shrinks to contain only the chat/thread bounded context (the core domain).
+
+**Completed:** Created `shared/` package with `User`, `GetUserFromContext`, `SetUserInContext`, `IsAuthenticated`, `UserContextKey`, `TenantContext`, `EdgequakeRole`, and role constants (`RoleAdmin`, `RoleUser`, `RoleReadonly`). Backward-compatible type aliases remain in `domain/user.go` and `domain/edgequake_permissions.go`. All 110 consumer files migrated to import `shared/` directly. The 48 files that still import `domain/` do so only for thread/aggregate types or category-C module-specific types (AgentDefinition, AISettings, MCPConnector, StudentProfile, UserPreference) — zero shared-kernel references via `domain.` remain outside `domain/`.
 
 ### Module Public API Convention
 

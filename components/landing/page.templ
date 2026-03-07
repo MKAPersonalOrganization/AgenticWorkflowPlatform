@@ -3,11 +3,11 @@ package landing
 import (
 	"school-with-ai/components"
 	"school-with-ai/components/icon"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 )
 
 type LandingPageProps struct {
-	User *domain.User
+	User *shared.User
 }
 
 templ LandingPage(props LandingPageProps) {

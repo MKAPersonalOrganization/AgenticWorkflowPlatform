@@ -10,12 +10,12 @@ import (
 	"school-with-ai/components/popover"
 	"school-with-ai/components/progress"
 	"school-with-ai/components/tabs"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 )
 
 type knowledgeLayoutProps struct {
 	Title string
-	User  *domain.User
+	User  *shared.User
 }
 
 templ knowledgeLayout(props knowledgeLayoutProps) {

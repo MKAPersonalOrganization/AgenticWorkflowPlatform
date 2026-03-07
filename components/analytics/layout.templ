@@ -3,12 +3,12 @@ package analytics
 import (
 	"school-with-ai/components"
 	"school-with-ai/components/chart"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 )
 
 type LayoutProps struct {
 	Title      string
-	User       *domain.User
+	User       *shared.User
 	HideNavbar bool
 }
 

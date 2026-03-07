@@ -9,12 +9,12 @@ import (
 	"school-with-ai/components/resources"
 	"school-with-ai/components/threads"
 	"school-with-ai/components/tools"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 )
 
 type NavbarProps struct {
 	Class string
-	User  *domain.User // Authenticated user (nil if not authenticated)
+	User  *shared.User // Authenticated user (nil if not authenticated)
 }
 
 templ Navbar(props ...NavbarProps) {

@@ -2,7 +2,7 @@ package services
 
 import (
 	"context"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
@@ -10,7 +10,7 @@ import (
 // AuthService provides authentication and authorization operations.
 type AuthService interface {
 	// GetUserFromContext extracts authenticated user from request context
-	GetUserFromContext(ctx context.Context) *domain.User
+	GetUserFromContext(ctx context.Context) *shared.User
 	// IsAuthenticated checks if request context has valid authentication
 	IsAuthenticated(ctx context.Context) bool
 }

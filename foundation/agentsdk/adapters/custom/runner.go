@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"school-with-ai/domain"
+	"school-with-ai/shared"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/engine"
@@ -300,9 +301,9 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 		// Fallback: empty agentName triggers the initial agent resolution in GetForUser.
 		// No need to set a specific name — the provider handles it.
 
-		// 5. Inject user into context for tools that need it (using domain.User)
+		// 5. Inject user into context for tools that need it (using shared.User)
 		if runCtx.UserID != "" {
-			ctx = context.WithValue(ctx, domain.UserContextKey, &domain.User{ID: runCtx.UserID})
+			ctx = context.WithValue(ctx, shared.UserContextKey, &shared.User{ID: runCtx.UserID})
 		}
 
 		// 6. Inject IO PauseHandler so tools can request user input/auth.
@@ -431,7 +432,7 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 	if uap, ok := p.provider.(userAware); ok {
 		// Extract userID from context if available
 		userID := ""
-		if u, ok := ctx.Value(domain.UserContextKey).(*domain.User); ok && u != nil {
+		if u, ok := ctx.Value(shared.UserContextKey).(*shared.User); ok && u != nil {
 			userID = u.ID
 		}
 		a, err = uap.GetForUser(ctx, name, userID)
@@ -499,7 +500,7 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 		}
 
 		// Get user from context to check permissions
-		user := domain.GetUserFromContext(ctx)
+		user := shared.GetUserFromContext(ctx)
 		var userID string
 		if user != nil {
 			userID = user.ID
@@ -542,7 +543,7 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 	// Inject attached workspace info into system prompt as Knowledge Bases section
 	if p.workspacePermSvc != nil && p.edgequakeService != nil {
 		// Get user from context to check permissions
-		user := domain.GetUserFromContext(ctx)
+		user := shared.GetUserFromContext(ctx)
 		var userID string
 		if user != nil {
 			userID = user.ID

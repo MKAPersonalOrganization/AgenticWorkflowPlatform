@@ -3,7 +3,7 @@ package workspacepermissions
 import (
 	"encoding/json"
 	"net/http"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/modules/knowledge/edgequake"
@@ -58,7 +58,7 @@ func (h *Handler) ListAgentWorkspaces(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := domain.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -72,7 +72,7 @@ func (h *Handler) ListAgentWorkspaces(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tCtx := &domain.TenantContext{
+	tCtx := &shared.TenantContext{
 		TenantID: &tenantUUID,
 		UserID:   user.ID,
 		Role:     "user",
@@ -138,7 +138,7 @@ func (h *Handler) ToggleAgentWorkspace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := domain.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return

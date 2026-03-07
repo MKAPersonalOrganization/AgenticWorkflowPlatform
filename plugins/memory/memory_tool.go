@@ -3,7 +3,7 @@ package memory
 import (
 	"context"
 	"fmt"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/services/memory"
 	"strings"
@@ -309,7 +309,7 @@ func NewMemoryInjectorMiddleware(service memory.Service) agent.Middleware {
 }
 
 func getUserID(ctx context.Context) string {
-	if user := domain.GetUserFromContext(ctx); user != nil {
+	if user := shared.GetUserFromContext(ctx); user != nil {
 		return user.ID
 	}
 	// Return empty string if no authenticated user - this should not happen in production

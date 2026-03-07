@@ -1,22 +1,19 @@
 package domain
 
-import (
-	"github.com/google/uuid"
-)
+// This file re-exports shared kernel types for backward compatibility.
+// New code should import "school-with-ai/shared" directly.
 
-// TenantContext carries the active multitenancy state for a request.
-type TenantContext struct {
-	TenantID    *uuid.UUID `json:"tenant_id"`
-	WorkspaceID *uuid.UUID `json:"workspace_id,omitempty"`
-	UserID      string     `json:"user_id"`
-	Role        string     `json:"role"`
-}
+import "school-with-ai/shared"
 
-// EdgequakeRole represents a user's role in a tenant or workspace.
-type EdgequakeRole string
+// TenantContext is a type alias to the shared kernel TenantContext.
+type TenantContext = shared.TenantContext
 
+// EdgequakeRole is a type alias to the shared kernel EdgequakeRole.
+type EdgequakeRole = shared.EdgequakeRole
+
+// Role constants re-exported from shared.
 const (
-	RoleAdmin    EdgequakeRole = "admin"
-	RoleUser     EdgequakeRole = "user"
-	RoleReadonly EdgequakeRole = "readonly"
+	RoleAdmin    = shared.RoleAdmin
+	RoleUser     = shared.RoleUser
+	RoleReadonly = shared.RoleReadonly
 )

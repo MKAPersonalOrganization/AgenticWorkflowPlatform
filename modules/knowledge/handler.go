@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"school-with-ai/components/knowledge"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/modules/knowledge/edgequake"
 	"school-with-ai/modules/knowledge/rag/documents"
@@ -41,8 +41,8 @@ func newHandler(log *logger.Logger, edgequakeService *edgequake.Service, aiSetti
 }
 
 // resolveTenantContext resolves the tenant context for the authenticated user.
-func (h *handler) resolveTenantContext(r *http.Request) (*domain.TenantContext, error) {
-	user := domain.GetUserFromContext(r.Context())
+func (h *handler) resolveTenantContext(r *http.Request) (*shared.TenantContext, error) {
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		return nil, fmt.Errorf("no authenticated user")
 	}
@@ -57,16 +57,16 @@ func (h *handler) resolveTenantContext(r *http.Request) (*domain.TenantContext, 
 	if err != nil {
 		return nil, fmt.Errorf("invalid configured tenant ID: %w", err)
 	}
-	return &domain.TenantContext{
+	return &shared.TenantContext{
 		TenantID: &tID,
 		UserID:   user.ID,
-		Role:     string(domain.RoleAdmin), // Assume admin for static tenant
+		Role:     string(shared.RoleAdmin), // Assume admin for static tenant
 	}, nil
 }
 
 // WorkspacesPage renders the workspaces listing page.
 func (h *handler) WorkspacesPage(w http.ResponseWriter, r *http.Request) {
-	user := domain.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 
 	component := knowledge.WorkspacesPage(knowledge.WorkspacesPageProps{
 		User: user,
@@ -78,7 +78,7 @@ func (h *handler) WorkspacesPage(w http.ResponseWriter, r *http.Request) {
 
 // WorkspaceDetailsPage renders the workspace details and document list.
 func (h *handler) WorkspaceDetailsPage(w http.ResponseWriter, r *http.Request) {
-	user := domain.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to resolve tenant context", "error", err)
@@ -112,7 +112,7 @@ func (h *handler) WorkspaceDetailsPage(w http.ResponseWriter, r *http.Request) {
 
 // DashboardPage renders the knowledge dashboard page.
 func (h *handler) DashboardPage(w http.ResponseWriter, r *http.Request) {
-	user := domain.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 
 	component := knowledge.DashboardPage(knowledge.DashboardPageProps{
 		User: user,
@@ -527,7 +527,7 @@ func (h *handler) CreateWorkspace(w http.ResponseWriter, r *http.Request) {
 	var embeddingModel, embeddingProvider *string
 	var embeddingDimension *int
 
-	user := domain.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user != nil && h.aiSettings != nil {
 		embCfg, err := h.aiSettings.GetEmbeddingConfigForUser(r.Context(), user.ID)
 		if err != nil {

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 
 	"github.com/google/uuid"
 )
@@ -86,7 +86,7 @@ func TestService_Integration_Stream(t *testing.T) {
 	}
 }
 
-func getIntegrationContext() *domain.TenantContext {
+func getIntegrationContext() *shared.TenantContext {
 	tenantIDStr := "00000000-0000-0000-0000-000000000002"
 	workspaceIDStr := "00000000-0000-0000-0000-000000000003"
 	userID := "00000000-0000-0000-0000-000000000001"
@@ -95,7 +95,7 @@ func getIntegrationContext() *domain.TenantContext {
 	id1, _ := uuid.Parse(tenantIDStr)
 	id2, _ := uuid.Parse(workspaceIDStr)
 
-	return &domain.TenantContext{
+	return &shared.TenantContext{
 		TenantID:    &id1,
 		WorkspaceID: &id2,
 		UserID:      userID,

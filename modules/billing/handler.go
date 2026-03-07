@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 	"school-with-ai/foundation/logger"
 
 	"github.com/stripe/stripe-go/v84"
@@ -80,7 +80,7 @@ type createPaymentIntentResponse struct {
 // createPaymentIntent creates a Stripe PaymentIntent and returns the client
 // secret so the frontend can confirm payment via Stripe Elements.
 func (h *handler) createPaymentIntent(w http.ResponseWriter, r *http.Request) {
-	user := domain.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "unauthorized")
 		return
@@ -365,7 +365,7 @@ type paymentStatusResponse struct {
 
 // getPaymentStatus returns the current payment status for the authenticated user.
 func (h *handler) getPaymentStatus(w http.ResponseWriter, r *http.Request) {
-	user := domain.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "unauthorized")
 		return
@@ -439,7 +439,7 @@ type verifyPaymentRequest struct {
 // Stripe, verify it succeeded and belongs to this user, then confirm the
 // aggregate. This is the fallback for when webhooks are unavailable.
 func (h *handler) verifyPayment(w http.ResponseWriter, r *http.Request) {
-	user := domain.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "unauthorized")
 		return
@@ -491,7 +491,7 @@ type cancelSubscriptionResponse struct {
 // cancelSubscription handles user-initiated subscription cancellation.
 // Access continues until the end of the current billing period.
 func (h *handler) cancelSubscription(w http.ResponseWriter, r *http.Request) {
-	user := domain.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "unauthorized")
 		return
@@ -531,7 +531,7 @@ func (h *handler) cancelSubscription(w http.ResponseWriter, r *http.Request) {
 // reactivateSubscription handles undoing a cancellation before the billing
 // period ends. The subscription returns to active.
 func (h *handler) reactivateSubscription(w http.ResponseWriter, r *http.Request) {
-	user := domain.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "unauthorized")
 		return

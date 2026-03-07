@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 	"strconv"
 	"time"
 )
@@ -31,7 +31,7 @@ func NewService(baseURL string, httpClient *http.Client) *Service {
 	}
 }
 
-func injectHeaders(req *http.Request, tc domain.TenantContext) {
+func injectHeaders(req *http.Request, tc shared.TenantContext) {
 	if tc.TenantID != nil {
 		req.Header.Set("X-Tenant-ID", tc.TenantID.String())
 	}
@@ -57,7 +57,7 @@ func (s *Service) handleError(resp *http.Response) error {
 }
 
 // GetGraph retrieves the knowledge graph.
-func (s *Service) GetGraph(ctx context.Context, tc domain.TenantContext, params *GraphQueryParams) (*KnowledgeGraphResponse, error) {
+func (s *Service) GetGraph(ctx context.Context, tc shared.TenantContext, params *GraphQueryParams) (*KnowledgeGraphResponse, error) {
 	u, _ := url.Parse(fmt.Sprintf("%s/api/v1/graph", s.baseURL))
 	if params != nil {
 		q := u.Query()
@@ -97,7 +97,7 @@ func (s *Service) GetGraph(ctx context.Context, tc domain.TenantContext, params 
 }
 
 // GetNode retrieves a specific graph node.
-func (s *Service) GetNode(ctx context.Context, tc domain.TenantContext, nodeID string) (*GraphNodeResponse, error) {
+func (s *Service) GetNode(ctx context.Context, tc shared.TenantContext, nodeID string) (*GraphNodeResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/graph/nodes/%s", s.baseURL, url.PathEscape(nodeID))
 
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
@@ -124,7 +124,7 @@ func (s *Service) GetNode(ctx context.Context, tc domain.TenantContext, nodeID s
 }
 
 // SearchLabels searches for labels matching a query.
-func (s *Service) SearchLabels(ctx context.Context, tc domain.TenantContext, q string, limit int) (*SearchLabelsResponse, error) {
+func (s *Service) SearchLabels(ctx context.Context, tc shared.TenantContext, q string, limit int) (*SearchLabelsResponse, error) {
 	u, _ := url.Parse(fmt.Sprintf("%s/api/v1/graph/labels/search", s.baseURL))
 	qs := u.Query()
 	qs.Set("q", q)
@@ -157,7 +157,7 @@ func (s *Service) SearchLabels(ctx context.Context, tc domain.TenantContext, q s
 }
 
 // SearchNodes searches for nodes matching a query.
-func (s *Service) SearchNodes(ctx context.Context, tc domain.TenantContext, q string, limit int) (*SearchNodesResponse, error) {
+func (s *Service) SearchNodes(ctx context.Context, tc shared.TenantContext, q string, limit int) (*SearchNodesResponse, error) {
 	u, _ := url.Parse(fmt.Sprintf("%s/api/v1/graph/nodes/search", s.baseURL))
 	qs := u.Query()
 	qs.Set("q", q)
@@ -190,7 +190,7 @@ func (s *Service) SearchNodes(ctx context.Context, tc domain.TenantContext, q st
 }
 
 // GetPopularLabels retrieves popular labels.
-func (s *Service) GetPopularLabels(ctx context.Context, tc domain.TenantContext, limit int) (*PopularLabelsResponse, error) {
+func (s *Service) GetPopularLabels(ctx context.Context, tc shared.TenantContext, limit int) (*PopularLabelsResponse, error) {
 	u, _ := url.Parse(fmt.Sprintf("%s/api/v1/graph/labels/popular", s.baseURL))
 	if limit > 0 {
 		qs := u.Query()
@@ -222,7 +222,7 @@ func (s *Service) GetPopularLabels(ctx context.Context, tc domain.TenantContext,
 }
 
 // GetDegreesBatch retrieves degrees for multiple nodes.
-func (s *Service) GetDegreesBatch(ctx context.Context, tc domain.TenantContext, nodeIDs []string) (*BatchDegreeResponse, error) {
+func (s *Service) GetDegreesBatch(ctx context.Context, tc shared.TenantContext, nodeIDs []string) (*BatchDegreeResponse, error) {
 	body, err := json.Marshal(BatchDegreeRequest{NodeIDs: nodeIDs})
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)

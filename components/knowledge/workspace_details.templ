@@ -7,12 +7,12 @@ import (
 	"school-with-ai/components/icon"
 	"school-with-ai/components/separator"
 	"school-with-ai/components/tabs"
-	"school-with-ai/domain"
+	"school-with-ai/shared"
 	"school-with-ai/modules/knowledge/rag/workspaces"
 )
 
 type WorkspaceDetailsPageProps struct {
-	User      *domain.User
+	User      *shared.User
 	Workspace *workspaces.WorkspaceResponse
 }
 
