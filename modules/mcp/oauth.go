@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -169,10 +170,10 @@ func (o *OAuthService) DiscoverAuthServerMetadata(ctx context.Context, authServe
 }
 
 // RegisterClient performs Dynamic Client Registration (RFC 7591).
-// RegisterClient performs Dynamic Client Registration (RFC 7591).
-// Results are cached for 24 hours keyed by registration endpoint (agentstack pattern).
-func (o *OAuthService) RegisterClient(ctx context.Context, registrationEndpoint, serverName string) (clientID, clientSecret string, err error) {
-	if cached, ok := o.registrationCache.Get(registrationEndpoint); ok {
+// Results are cached for 24 hours keyed by a composite of registration endpoint and connector ID.
+func (o *OAuthService) RegisterClient(ctx context.Context, registrationEndpoint, serverName, connectorID string) (clientID, clientSecret string, err error) {
+	cacheKey := registrationEndpoint + "_" + connectorID
+	if cached, ok := o.registrationCache.Get(cacheKey); ok {
 		return cached.ClientID, cached.ClientSecret, nil
 	}
 
@@ -213,7 +214,7 @@ func (o *OAuthService) RegisterClient(ctx context.Context, registrationEndpoint,
 	if err := json.NewDecoder(io.LimitReader(resp.Body, maxTokenResponseBytes)).Decode(&result); err != nil {
 		return "", "", fmt.Errorf("decoding registration response: %w", err)
 	}
-	o.registrationCache.Set(registrationEndpoint, clientRegistration{
+	o.registrationCache.Set(cacheKey, clientRegistration{
 		ClientID:     result.ClientID,
 		ClientSecret: result.ClientSecret,
 	})
@@ -429,6 +430,18 @@ func NewAutoRefreshTransport(
 
 // RoundTrip implements http.RoundTripper with automatic token refresh.
 func (t *AutoRefreshTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Buffer the request body so it can be replayed on retry.
+	// MCP messages are small JSON-RPC payloads, so this is safe.
+	var bodyBytes []byte
+	if req.Body != nil {
+		var err error
+		bodyBytes, err = io.ReadAll(req.Body)
+		req.Body.Close()
+		if err != nil {
+			return nil, fmt.Errorf("reading request body for retry: %w", err)
+		}
+	}
+
 	// Proactively refresh if the token is about to expire.
 	if !t.expiresAt.IsZero() && time.Now().After(t.expiresAt) && t.token.RefreshToken != "" {
 		_ = t.refreshToken(req.Context())
@@ -436,6 +449,10 @@ func (t *AutoRefreshTransport) RoundTrip(req *http.Request) (*http.Response, err
 
 	// Inject the current token.
 	req2 := req.Clone(req.Context())
+	if bodyBytes != nil {
+		req2.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+		req2.ContentLength = int64(len(bodyBytes))
+	}
 	t.mu.Lock()
 	req2.Header.Set("Authorization", "Bearer "+t.token.AccessToken)
 	t.mu.Unlock()
@@ -449,11 +466,23 @@ func (t *AutoRefreshTransport) RoundTrip(req *http.Request) (*http.Response, err
 	if resp.StatusCode == http.StatusUnauthorized && t.token.RefreshToken != "" {
 		resp.Body.Close()
 		if refreshErr := t.refreshToken(req.Context()); refreshErr != nil {
-			// Return the original 401 — caller will see it as an auth error.
-			return t.base.RoundTrip(req.Clone(req.Context()))
+			// Refresh failed — return the original 401 with auth header.
+			retry := req.Clone(req.Context())
+			if bodyBytes != nil {
+				retry.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+				retry.ContentLength = int64(len(bodyBytes))
+			}
+			t.mu.Lock()
+			retry.Header.Set("Authorization", "Bearer "+t.token.AccessToken)
+			t.mu.Unlock()
+			return t.base.RoundTrip(retry)
 		}
 		// Retry with the new token.
 		retry := req.Clone(req.Context())
+		if bodyBytes != nil {
+			retry.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+			retry.ContentLength = int64(len(bodyBytes))
+		}
 		t.mu.Lock()
 		retry.Header.Set("Authorization", "Bearer "+t.token.AccessToken)
 		t.mu.Unlock()

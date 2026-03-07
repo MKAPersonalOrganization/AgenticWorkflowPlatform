@@ -9,11 +9,12 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
+	"time"
+
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/platform/toolregistry"
-	"strings"
-	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -62,7 +63,6 @@ const (
 type Service struct {
 	log          *logger.Logger
 	repo         MCPConnectorRepository
-	mcpClient    *mcp.Client
 	oauth        *OAuthService
 	toolRegistry *toolregistry.Registry
 	circuits     *circuitRegistry
@@ -73,12 +73,8 @@ type Service struct {
 // NewService creates a new MCP discovery service.
 func NewService(log *logger.Logger, repo MCPConnectorRepository, callbackURL string, toolRegistry *toolregistry.Registry) *Service {
 	return &Service{
-		log:  log,
-		repo: repo,
-		mcpClient: mcp.NewClient(
-			&mcp.Implementation{Name: "schoolwithai", Version: "1.0.0"},
-			&mcp.ClientOptions{},
-		),
+		log:          log,
+		repo:         repo,
 		oauth:        NewOAuthService(callbackURL),
 		toolRegistry: toolRegistry,
 		circuits:     newCircuitRegistry(circuitFailureThreshold, circuitRecoveryTimeout),
@@ -97,7 +93,9 @@ func (s *Service) ListPresets() []ConnectorPreset {
 // --------------------------------------------------------------------------
 
 // CreateConnector registers a new MCP server URL for a user.
-func (s *Service) CreateConnector(ctx context.Context, userID, serverURL, title string) (*MCPConnector, error) {
+// Optional OAuth client credentials are persisted with the connector so they
+// are available during the connect phase (aligns with agentstack's create_connector).
+func (s *Service) CreateConnector(ctx context.Context, userID, serverURL, title, clientID, clientSecret string) (*MCPConnector, error) {
 	// Validate URL.
 	parsed, err := url.Parse(serverURL)
 	if err != nil {
@@ -142,6 +140,15 @@ func (s *Service) CreateConnector(ctx context.Context, userID, serverURL, title 
 		Status:    ConnectorStatusCreated,
 	}
 
+	// Apply OAuth credentials: prefer user-supplied, then preset.
+	if clientID != "" {
+		connector.OAuthClientID = toNullString(clientID)
+		connector.OAuthClientSecret = toNullString(clientSecret)
+	} else if matchedPreset != nil && matchedPreset.ClientID != "" {
+		connector.OAuthClientID = toNullString(matchedPreset.ClientID)
+		connector.OAuthClientSecret = toNullString(matchedPreset.ClientSecret)
+	}
+
 	if err := s.repo.Create(ctx, connector); err != nil {
 		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
 			return nil, fmt.Errorf("%w: %s", ErrDuplicateConnector, serverURL)
@@ -150,15 +157,6 @@ func (s *Service) CreateConnector(ctx context.Context, userID, serverURL, title 
 	}
 
 	s.log.Info(ctx, "mcp connector created", "id", connector.ID, "url", serverURL, "user_id", userID)
-
-	// Apply preset credentials if the user didn't provide their own.
-	if matchedPreset != nil && matchedPreset.ClientID != "" {
-		if !connector.OAuthClientID.Valid || connector.OAuthClientID.String == "" {
-			connector.OAuthClientID = toNullString(matchedPreset.ClientID)
-			connector.OAuthClientSecret = toNullString(matchedPreset.ClientSecret)
-			_ = s.repo.Update(ctx, connector)
-		}
-	}
 
 	return connector, nil
 }
@@ -177,6 +175,12 @@ func (s *Service) ListConnectors(ctx context.Context, userID string) ([]MCPConne
 // GetConnectorTools returns the discovered tools for a connector.
 func (s *Service) GetConnectorTools(ctx context.Context, connectorID string) ([]MCPDiscoveredTool, error) {
 	return s.repo.ListTools(ctx, connectorID)
+}
+
+// CountToolsByConnectors returns a map of connector ID → tool count.
+// Single query instead of N+1. Used by the list handler.
+func (s *Service) CountToolsByConnectors(ctx context.Context, connectorIDs []string) (map[string]int, error) {
+	return s.repo.CountToolsByConnectors(ctx, connectorIDs)
 }
 
 // --------------------------------------------------------------------------
@@ -568,7 +572,14 @@ func (s *Service) probeConnector(ctx context.Context, connector *MCPConnector, h
 			transport.HTTPClient = httpClient
 		}
 
-		session, err := s.mcpClient.Connect(probeCtx, transport, nil)
+		// Create a fresh Client per session — avoids accumulating session
+		// references in a shared Client (the go-sdk tracks sessions internally).
+		client := mcp.NewClient(
+			&mcp.Implementation{Name: "schoolwithai", Version: "1.0.0"},
+			&mcp.ClientOptions{},
+		)
+
+		session, err := client.Connect(probeCtx, transport, nil)
 		if err == nil {
 			cancel()
 			return session, nil
@@ -587,7 +598,15 @@ func (s *Service) probeConnector(ctx context.Context, connector *MCPConnector, h
 				"attempt", attempt+1,
 				"error", err,
 			)
-			time.Sleep(probeRetryDelay * time.Duration(attempt+1))
+			// Context-aware sleep: respects cancellation instead of blocking.
+			delay := probeRetryDelay * time.Duration(attempt+1)
+			timer := time.NewTimer(delay)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return nil, ctx.Err()
+			case <-timer.C:
+			}
 		}
 	}
 
@@ -595,18 +614,27 @@ func (s *Service) probeConnector(ctx context.Context, connector *MCPConnector, h
 }
 
 // openEphemeralSession opens a short-lived MCP session to the given server.
-// The caller MUST close the session when done. This is the core primitive for
-// the stateless proxy pattern — sessions are opened on-demand and closed after use.
+// The caller MUST close the session when done.
 func (s *Service) openEphemeralSession(ctx context.Context, serverURL string, httpClient *http.Client) (*mcp.ClientSession, error) {
+	// Use a timeout for the initialize handshake only. The go-sdk internally
+	// detaches the context for the SSE stream, so cancel() won't kill it.
+	initCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
 	transport := &mcp.StreamableClientTransport{
 		Endpoint: serverURL,
 	}
 	if httpClient != nil {
 		transport.HTTPClient = httpClient
-	} else {
-		transport.HTTPClient = &http.Client{Timeout: 30 * time.Second}
 	}
-	return s.mcpClient.Connect(ctx, transport, nil)
+
+	// Create a fresh Client per session — avoids shared session tracking.
+	client := mcp.NewClient(
+		&mcp.Implementation{Name: "schoolwithai", Version: "1.0.0"},
+		&mcp.ClientOptions{},
+	)
+
+	return client.Connect(initCtx, transport, nil)
 }
 
 // handleConnectionError classifies the connection failure and returns the
@@ -672,7 +700,7 @@ func (s *Service) initiateOAuth(ctx context.Context, connector *MCPConnector) (*
 			clientSecret = connector.OAuthClientSecret.String
 		}
 	} else if authMeta.RegistrationEndpoint != "" {
-		cid, cs, regErr := s.oauth.RegisterClient(ctx, authMeta.RegistrationEndpoint, connector.Title)
+		cid, cs, regErr := s.oauth.RegisterClient(ctx, authMeta.RegistrationEndpoint, connector.Title, connector.ID)
 		if regErr != nil {
 			s.log.Warn(ctx, "dynamic client registration failed", "error", regErr)
 			connector.ErrorMsg = "dynamic client registration failed: " + regErr.Error()
@@ -937,12 +965,17 @@ func (s *Service) buildHTTPClient(connector *MCPConnector) *http.Client {
 // --------------------------------------------------------------------------
 
 // isAuthError checks if an error is an HTTP 401 Unauthorized.
+// The go-sdk uses http.StatusText(code) in its error messages, producing:
+//   - Streamable: "sending \"initialize\": Unauthorized"
+//   - SSE:        "failed to connect: Unauthorized"
+//
+// We match the status text that http.StatusText(401) returns.
 func isAuthError(err error) bool {
 	if err == nil {
 		return false
 	}
 	msg := err.Error()
-	return strings.Contains(msg, "401") || strings.Contains(msg, "Unauthorized") || strings.Contains(msg, "unauthorized")
+	return strings.Contains(msg, "Unauthorized")
 }
 
 // isHTTPClientError checks for 4xx HTTP errors (excluding 401 which is handled separately).
@@ -976,16 +1009,21 @@ func isTransientError(err error) bool {
 		return true
 	}
 
-	msg := err.Error()
+	msg := strings.ToLower(err.Error())
 	transientPatterns := []string{
 		"connection refused", "connection reset",
 		"timeout", "i/o timeout", "deadline exceeded",
-		"502", "503", "504",
 		"eof", "broken pipe",
 	}
-	lower := strings.ToLower(msg)
 	for _, p := range transientPatterns {
-		if strings.Contains(lower, p) {
+		if strings.Contains(msg, p) {
+			return true
+		}
+	}
+
+	// Match HTTP 5xx status codes precisely (go-sdk format: "HTTP status 502").
+	for _, code := range []string{"502", "503", "504"} {
+		if strings.Contains(msg, "status "+code) || strings.Contains(msg, code+" ") {
 			return true
 		}
 	}
@@ -1000,7 +1038,22 @@ func validateExternalHost(host string) error {
 	if host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "0.0.0.0" {
 		return fmt.Errorf("server URL cannot point to localhost")
 	}
-	if strings.HasPrefix(host, "10.") || strings.HasPrefix(host, "192.168.") || strings.HasPrefix(host, "172.") {
+	// RFC-1918 private ranges: 10.0.0.0/8, 192.168.0.0/16, 172.16.0.0/12.
+	if strings.HasPrefix(host, "10.") || strings.HasPrefix(host, "192.168.") {
+		return fmt.Errorf("server URL cannot point to private network addresses")
+	}
+	// 172.16.0.0/12 = 172.16.x.x through 172.31.x.x only.
+	if strings.HasPrefix(host, "172.") {
+		ip := net.ParseIP(host)
+		if ip != nil {
+			_, private172, _ := net.ParseCIDR("172.16.0.0/12")
+			if private172.Contains(ip) {
+				return fmt.Errorf("server URL cannot point to private network addresses")
+			}
+		}
+	}
+	// IPv6 private ranges.
+	if strings.HasPrefix(host, "fc") || strings.HasPrefix(host, "fd") || strings.HasPrefix(host, "fe80") {
 		return fmt.Errorf("server URL cannot point to private network addresses")
 	}
 	if strings.HasPrefix(host, "169.254.") || host == "metadata.google.internal" {

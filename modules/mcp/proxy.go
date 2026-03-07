@@ -30,6 +30,17 @@ var hopByHopHeaders = map[string]bool{
 	"Upgrade":             true,
 }
 
+// mcpForwardHeaders are the only request headers forwarded to the upstream MCP
+// server. This whitelist aligns with agentstack's proxy and prevents leaking
+// sensitive headers (cookies, internal auth tokens) to external servers.
+var mcpForwardHeaders = []string{
+	"Accept",
+	"Content-Type",
+	"Mcp-Protocol-Version",
+	"Mcp-Session-Id",
+	"Last-Event-ID",
+}
+
 // MCPProxy forwards raw MCP protocol messages to the connector's server.
 // This is agentstack's core scaling pattern: the platform acts as an
 // authenticated reverse proxy. The client manages its own MCP session;
@@ -75,17 +86,14 @@ func (s *Service) MCPProxy(ctx context.Context, connectorID string, w http.Respo
 		return fmt.Errorf("creating upstream request: %w", err)
 	}
 
-	// Forward non-hop-by-hop headers.
-	for key, values := range r.Header {
-		if hopByHopHeaders[key] {
-			continue
-		}
-		// Strip the existing Authorization — we inject our own.
-		if strings.EqualFold(key, "Authorization") {
-			continue
-		}
-		for _, v := range values {
-			upstreamReq.Header.Add(key, v)
+	// Forward only MCP-relevant headers (whitelist pattern from agentstack).
+	// This prevents leaking cookies, internal auth tokens, and other
+	// request headers to external MCP servers.
+	for _, key := range mcpForwardHeaders {
+		if values := r.Header.Values(key); len(values) > 0 {
+			for _, v := range values {
+				upstreamReq.Header.Add(key, v)
+			}
 		}
 	}
 
@@ -118,20 +126,19 @@ func (s *Service) MCPProxy(ctx context.Context, connectorID string, w http.Respo
 
 	w.WriteHeader(resp.StatusCode)
 
-	// Stream the response body with size limit.
+	// Mark that we've started writing the response — prevents the handler
+	// from attempting to write a JSON error after streaming has begun.
+	w.Header().Set("X-MCP-Proxy-Streamed", "1")
+
+	// Stream the response body.
 	// For SSE/streaming responses, we copy without buffering.
 	if isStreamingResponse(resp) {
 		// Flush-aware copy for SSE streams.
 		flusher, ok := w.(http.Flusher)
 		buf := make([]byte, 32*1024) // 32 KiB buffer
-		var totalWritten int64
 		for {
 			n, readErr := resp.Body.Read(buf)
 			if n > 0 {
-				totalWritten += int64(n)
-				if totalWritten > maxProxyResponseBytes {
-					break // Truncate oversized responses.
-				}
 				_, writeErr := w.Write(buf[:n])
 				if writeErr != nil {
 					break
@@ -145,16 +152,16 @@ func (s *Service) MCPProxy(ctx context.Context, connectorID string, w http.Respo
 			}
 		}
 	} else {
+		// Non-streaming: enforce size limit to prevent OOM.
 		io.Copy(w, io.LimitReader(resp.Body, maxProxyResponseBytes))
 	}
 
 	return nil
 }
 
-// isStreamingResponse checks if the response uses Server-Sent Events or
-// chunked transfer encoding (common for MCP Streamable HTTP).
+// isStreamingResponse checks if the response uses Server-Sent Events,
+// which is the streaming format for MCP Streamable HTTP.
 func isStreamingResponse(resp *http.Response) bool {
 	ct := resp.Header.Get("Content-Type")
-	return strings.Contains(ct, "text/event-stream") ||
-		strings.Contains(ct, "application/x-ndjson")
+	return strings.Contains(ct, "text/event-stream")
 }

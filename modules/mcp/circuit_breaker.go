@@ -35,6 +35,7 @@ type circuitBreaker struct {
 	lastSuccessTime  time.Time
 	failureThreshold int           // failures before tripping open
 	recoveryTimeout  time.Duration // how long to wait before half-open
+	probing          bool          // true when a half-open probe is in flight
 }
 
 // newCircuitBreaker creates a breaker with the given thresholds.
@@ -59,11 +60,18 @@ func (cb *circuitBreaker) Allow() bool {
 		// Check if recovery timeout has elapsed → transition to half-open.
 		if time.Since(cb.lastFailureTime) >= cb.recoveryTimeout {
 			cb.state = circuitHalfOpen
+			cb.probing = true // Only ONE probe allowed.
 			return true
 		}
 		return false
 	case circuitHalfOpen:
-		// Only one probe at a time — already allowed one.
+		// Only one probe at a time — reject additional requests while
+		// the probe is in flight to prevent thundering herd.
+		if cb.probing {
+			return false
+		}
+		// Probe completed without recording success/failure yet — allow another.
+		cb.probing = true
 		return true
 	}
 	return false
@@ -76,6 +84,7 @@ func (cb *circuitBreaker) RecordSuccess() {
 
 	cb.state = circuitClosed
 	cb.failureCount = 0
+	cb.probing = false
 	cb.lastSuccessTime = time.Now()
 }
 
@@ -86,6 +95,7 @@ func (cb *circuitBreaker) RecordFailure() {
 
 	cb.failureCount++
 	cb.lastFailureTime = time.Now()
+	cb.probing = false
 
 	switch cb.state {
 	case circuitClosed:
@@ -161,4 +171,26 @@ func (r *circuitRegistry) Reset(serverURL string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	delete(r.breakers, serverURL)
+}
+
+// Cleanup evicts breakers that have been idle (no activity) for longer than
+// the given duration. Call periodically to prevent unbounded map growth.
+func (r *circuitRegistry) Cleanup(maxIdle time.Duration) {
+	now := time.Now()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for url, cb := range r.breakers {
+		cb.mu.Lock()
+		lastActivity := cb.lastSuccessTime
+		if cb.lastFailureTime.After(lastActivity) {
+			lastActivity = cb.lastFailureTime
+		}
+		cb.mu.Unlock()
+
+		// If no activity recorded or idle too long, evict.
+		if lastActivity.IsZero() || now.Sub(lastActivity) > maxIdle {
+			delete(r.breakers, url)
+		}
+	}
 }

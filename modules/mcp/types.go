@@ -102,4 +102,7 @@ type MCPConnectorRepository interface {
 	UpsertTools(ctx context.Context, connectorID string, tools []MCPDiscoveredTool) error
 	ListTools(ctx context.Context, connectorID string) ([]MCPDiscoveredTool, error)
 	DeleteToolsByConnector(ctx context.Context, connectorID string) error
+	// CountToolsByConnectors returns a map of connector ID → tool count for a
+	// batch of connectors. Avoids N+1 queries when listing connectors.
+	CountToolsByConnectors(ctx context.Context, connectorIDs []string) (map[string]int, error)
 }
