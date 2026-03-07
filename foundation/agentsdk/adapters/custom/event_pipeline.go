@@ -3,7 +3,7 @@ package custom
 import (
 	"context"
 	"fmt"
-	"school-with-ai/domain"
+	"school-with-ai/modules/chat/thread"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/logger"
 )
@@ -20,7 +20,7 @@ func NewEventPipeline(log *logger.Logger) *EventPipeline {
 
 // ConversionResult represents the result of event conversion
 type ConversionResult struct {
-	DomainEvent domain.Event
+	DomainEvent thread.Event
 	Skipped     bool
 	Reason      string
 }
@@ -53,10 +53,10 @@ func (ep *EventPipeline) ConvertWithObservability(ctx context.Context, coreEvent
 }
 
 // convertCoreEvent handles the actual conversion logic
-func (ep *EventPipeline) convertCoreEvent(e core.Event) domain.Event {
+func (ep *EventPipeline) convertCoreEvent(e core.Event) thread.Event {
 	switch evt := e.(type) {
 	case *core.AssistantMessageAdded:
-		return &domain.AssistantMessageAdded{
+		return &thread.AssistantMessageAdded{
 			ThreadID:  evt.ThreadID,
 			MessageID: evt.MessageID,
 			Content:   evt.Content,
@@ -65,7 +65,7 @@ func (ep *EventPipeline) convertCoreEvent(e core.Event) domain.Event {
 			Timestamp: evt.Timestamp,
 		}
 	case *core.ToolResultAdded:
-		return &domain.ToolResultAdded{
+		return &thread.ToolResultAdded{
 			ThreadID:   evt.ThreadID,
 			MessageID:  evt.MessageID,
 			ToolCallID: evt.ToolCallID,
@@ -76,13 +76,13 @@ func (ep *EventPipeline) convertCoreEvent(e core.Event) domain.Event {
 			Timestamp:  evt.Timestamp,
 		}
 	case *core.TokenUsageReported:
-		return (*domain.TokenUsageReported)(evt)
+		return (*thread.TokenUsageReported)(evt)
 	case *core.AssistantMessageStarted:
-		return (*domain.AssistantMessageStarted)(evt)
+		return (*thread.AssistantMessageStarted)(evt)
 	case *core.AssistantContentStreamed:
-		return (*domain.AssistantContentStreamed)(evt)
+		return (*thread.AssistantContentStreamed)(evt)
 	case *core.AssistantMessageCompleted:
-		return &domain.AssistantMessageCompleted{
+		return &thread.AssistantMessageCompleted{
 			ThreadID:  evt.ThreadID,
 			MessageID: evt.MessageID,
 			Timestamp: evt.Timestamp,
@@ -90,9 +90,9 @@ func (ep *EventPipeline) convertCoreEvent(e core.Event) domain.Event {
 
 	// Tool lifecycle events
 	case *core.ToolStart:
-		return (*domain.ToolStart)(evt)
+		return (*thread.ToolStart)(evt)
 	case *core.ToolContentStreamed:
-		return &domain.ToolContentStreamed{
+		return &thread.ToolContentStreamed{
 			ThreadID:   evt.ThreadID,
 			MessageID:  evt.MessageID,
 			ToolCallID: evt.ToolCallID,
@@ -102,17 +102,17 @@ func (ep *EventPipeline) convertCoreEvent(e core.Event) domain.Event {
 			Timestamp:  evt.Timestamp,
 		}
 	case *core.InputProvided:
-		return (*domain.InputProvided)(evt)
+		return (*thread.InputProvided)(evt)
 	case *core.AuthGranted:
-		return (*domain.AuthGranted)(evt)
+		return (*thread.AuthGranted)(evt)
 	case *core.AuthDenied:
-		return (*domain.AuthDenied)(evt)
+		return (*thread.AuthDenied)(evt)
 	case *core.ToolCancelled:
-		return (*domain.ToolCancelled)(evt)
+		return (*thread.ToolCancelled)(evt)
 
 	// Events that need manual conversion
 	case *core.ToolNeedsInput:
-		return &domain.ToolNeedsInput{
+		return &thread.ToolNeedsInput{
 			ThreadID:    evt.ThreadID,
 			MessageID:   evt.MessageID,
 			ToolCallID:  evt.ToolCallID,
@@ -130,7 +130,7 @@ func (ep *EventPipeline) convertCoreEvent(e core.Event) domain.Event {
 		}
 
 		// Check if it's already a domain event
-		if de, ok := e.(domain.Event); ok {
+		if de, ok := e.(thread.Event); ok {
 			return de
 		}
 		return nil
@@ -138,7 +138,7 @@ func (ep *EventPipeline) convertCoreEvent(e core.Event) domain.Event {
 }
 
 // validateDomainEvent validates that domain events have required fields
-func (ep *EventPipeline) validateDomainEvent(event domain.Event) error {
+func (ep *EventPipeline) validateDomainEvent(event thread.Event) error {
 	if event == nil {
 		return fmt.Errorf("domain event is nil")
 	}
@@ -159,8 +159,8 @@ func (ep *EventPipeline) validateDomainEvent(event domain.Event) error {
 }
 
 // ProcessEventStream processes a stream of core events with full observability
-func (ep *EventPipeline) ProcessEventStream(ctx context.Context, coreEvents func(yield func(core.Event, error) bool)) func(yield func(domain.Event, error) bool) {
-	return func(yield func(domain.Event, error) bool) {
+func (ep *EventPipeline) ProcessEventStream(ctx context.Context, coreEvents func(yield func(core.Event, error) bool)) func(yield func(thread.Event, error) bool) {
+	return func(yield func(thread.Event, error) bool) {
 		eventCount := 0
 		convertedCount := 0
 		skippedCount := 0

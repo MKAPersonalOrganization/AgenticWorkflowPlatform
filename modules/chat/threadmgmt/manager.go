@@ -4,19 +4,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"school-with-ai/domain"
-	"school-with-ai/foundation/logger"
 	"time"
+
+	"school-with-ai/foundation/logger"
+	threadpkg "school-with-ai/modules/chat/thread"
 )
 
 // Manager handles thread lifecycle and persistence using event sourcing.
 type Manager struct {
 	log        *logger.Logger
-	threadRepo *domain.ThreadRepository
+	threadRepo *threadpkg.ThreadRepository
 }
 
 // New creates a new thread management component.
-func New(log *logger.Logger, threadRepo *domain.ThreadRepository) *Manager {
+func New(log *logger.Logger, threadRepo *threadpkg.ThreadRepository) *Manager {
 	return &Manager{
 		log:        log,
 		threadRepo: threadRepo,
@@ -24,7 +25,7 @@ func New(log *logger.Logger, threadRepo *domain.ThreadRepository) *Manager {
 }
 
 // CreateThread creates a new chat thread.
-func (m *Manager) CreateThread(ctx context.Context, threadID, userID, title string) (*domain.ThreadAggregate, *domain.ThreadCreated, error) {
+func (m *Manager) CreateThread(ctx context.Context, threadID, userID, title string) (*threadpkg.ThreadAggregate, *threadpkg.ThreadCreated, error) {
 	m.log.Debug(ctx, "CreateThread called", "threadID", threadID, "title", title)
 
 	existingThread, err := m.threadRepo.Load(ctx, threadID)
@@ -32,18 +33,18 @@ func (m *Manager) CreateThread(ctx context.Context, threadID, userID, title stri
 		m.log.Debug(ctx, "Thread already exists, skipping create", "threadID", threadID, "version", existingThread.GetVersion())
 		return existingThread, nil, nil
 	}
-	if !errors.Is(err, domain.ErrThreadNotFound) {
+	if !errors.Is(err, threadpkg.ErrThreadNotFound) {
 		return nil, nil, fmt.Errorf("failed to check existing thread: %w", err)
 	}
 
-	thread, err := domain.OpenThread(threadID, userID, title)
+	thread, err := threadpkg.OpenThread(threadID, userID, title)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create thread: %w", err)
 	}
 
 	err = m.threadRepo.SaveNew(ctx, thread)
 	if err != nil {
-		if errors.Is(err, domain.ErrConcurrencyConflict) {
+		if errors.Is(err, threadpkg.ErrConcurrencyConflict) {
 			// Reload the thread if it was already created by another request
 			t, err := m.threadRepo.Load(ctx, threadID)
 			return t, nil, err
@@ -51,7 +52,7 @@ func (m *Manager) CreateThread(ctx context.Context, threadID, userID, title stri
 		return nil, nil, fmt.Errorf("failed to save new thread: %w", err)
 	}
 
-	event := &domain.ThreadCreated{
+	event := &threadpkg.ThreadCreated{
 		ThreadID:  threadID,
 		UserID:    userID,
 		Title:     title,
@@ -64,10 +65,10 @@ func (m *Manager) CreateThread(ctx context.Context, threadID, userID, title stri
 // AddUserMessage adds a user message to a thread.
 // Returns the thread aggregate, the primary UserMessageAdded event, any additional
 // side-effect events (e.g. ThreadTitleUpdated from auto-titling), and an error.
-func (m *Manager) AddUserMessage(ctx context.Context, threadID, messageID, content, userID string, attachments ...domain.Attachment) (*domain.ThreadAggregate, *domain.UserMessageAdded, []domain.Event, error) {
+func (m *Manager) AddUserMessage(ctx context.Context, threadID, messageID, content, userID string, attachments ...threadpkg.Attachment) (*threadpkg.ThreadAggregate, *threadpkg.UserMessageAdded, []threadpkg.Event, error) {
 	thread, err := m.threadRepo.Load(ctx, threadID)
-	if errors.Is(err, domain.ErrThreadNotFound) {
-		thread, err = domain.OpenThread(threadID, userID, "New Chat")
+	if errors.Is(err, threadpkg.ErrThreadNotFound) {
+		thread, err = threadpkg.OpenThread(threadID, userID, "New Chat")
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to create thread: %w", err)
 		}
@@ -92,7 +93,7 @@ func (m *Manager) AddUserMessage(ctx context.Context, threadID, messageID, conte
 	}
 
 	// Track whether we changed the title for event emission
-	var sideEffects []domain.Event
+	var sideEffects []threadpkg.Event
 
 	// Auto-titling: if the thread is new or has the default "New Chat" title, update it
 	// using the first 50 characters of the user message.
@@ -104,7 +105,7 @@ func (m *Manager) AddUserMessage(ctx context.Context, threadID, messageID, conte
 		if err := thread.ChangeTitle(newTitle); err != nil {
 			m.log.Warn(ctx, "failed to auto-generate thread title", "error", err)
 		} else {
-			sideEffects = append(sideEffects, &domain.ThreadTitleUpdated{
+			sideEffects = append(sideEffects, &threadpkg.ThreadTitleUpdated{
 				ThreadID:  threadID,
 				Title:     newTitle,
 				Timestamp: time.Now(),
@@ -115,7 +116,7 @@ func (m *Manager) AddUserMessage(ctx context.Context, threadID, messageID, conte
 	if isNewThread {
 		err = m.threadRepo.SaveNew(ctx, thread)
 		if err != nil {
-			if errors.Is(err, domain.ErrConcurrencyConflict) {
+			if errors.Is(err, threadpkg.ErrConcurrencyConflict) {
 				// Reload if already exists
 				t, err := m.threadRepo.Load(ctx, threadID)
 				return t, nil, nil, err
@@ -129,7 +130,7 @@ func (m *Manager) AddUserMessage(ctx context.Context, threadID, messageID, conte
 		}
 	}
 
-	event := &domain.UserMessageAdded{
+	event := &threadpkg.UserMessageAdded{
 		ThreadID:    threadID,
 		MessageID:   messageID,
 		Content:     content,
@@ -141,7 +142,7 @@ func (m *Manager) AddUserMessage(ctx context.Context, threadID, messageID, conte
 }
 
 // AddAssistantMessage adds an assistant message to the thread.
-func (m *Manager) AddAssistantMessage(ctx context.Context, threadID, messageID, content string, toolCalls []domain.ToolCall, agentName string) (*domain.ThreadAggregate, *domain.AssistantMessageAdded, error) {
+func (m *Manager) AddAssistantMessage(ctx context.Context, threadID, messageID, content string, toolCalls []threadpkg.ToolCall, agentName string) (*threadpkg.ThreadAggregate, *threadpkg.AssistantMessageAdded, error) {
 	thread, err := m.threadRepo.Load(ctx, threadID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to load thread: %w", err)
@@ -164,7 +165,7 @@ func (m *Manager) AddAssistantMessage(ctx context.Context, threadID, messageID, 
 		return nil, nil, err
 	}
 
-	event := &domain.AssistantMessageAdded{
+	event := &threadpkg.AssistantMessageAdded{
 		ThreadID:  threadID,
 		MessageID: messageID,
 		Content:   content,
@@ -177,22 +178,22 @@ func (m *Manager) AddAssistantMessage(ctx context.Context, threadID, messageID, 
 }
 
 // AddTokenUsage records token usage for a message in the thread.
-func (m *Manager) AddTokenUsage(ctx context.Context, event *domain.TokenUsageReported) (*domain.ThreadAggregate, error) {
-	return m.retryUpdate(ctx, event.ThreadID, func(t *domain.ThreadAggregate) error {
+func (m *Manager) AddTokenUsage(ctx context.Context, event *threadpkg.TokenUsageReported) (*threadpkg.ThreadAggregate, error) {
+	return m.retryUpdate(ctx, event.ThreadID, func(t *threadpkg.ThreadAggregate) error {
 		return t.RecordUsage(event)
 	})
 }
 
 // RecordToolEvent records a tool lifecycle event in the thread.
-func (m *Manager) RecordToolEvent(ctx context.Context, threadID string, event domain.Event) (*domain.ThreadAggregate, error) {
-	return m.retryUpdate(ctx, threadID, func(t *domain.ThreadAggregate) error {
+func (m *Manager) RecordToolEvent(ctx context.Context, threadID string, event threadpkg.Event) (*threadpkg.ThreadAggregate, error) {
+	return m.retryUpdate(ctx, threadID, func(t *threadpkg.ThreadAggregate) error {
 		return t.RecordToolEvent(event)
 	})
 }
 
 // AddToolResultMessage adds a tool result message to the thread.
-func (m *Manager) AddToolResultMessage(ctx context.Context, threadID, messageID, toolCallID, toolName, result, agentName string) (*domain.ThreadAggregate, *domain.ToolResultAdded, error) {
-	thread, err := m.retryUpdate(ctx, threadID, func(t *domain.ThreadAggregate) error {
+func (m *Manager) AddToolResultMessage(ctx context.Context, threadID, messageID, toolCallID, toolName, result, agentName string) (*threadpkg.ThreadAggregate, *threadpkg.ToolResultAdded, error) {
+	thread, err := m.retryUpdate(ctx, threadID, func(t *threadpkg.ThreadAggregate) error {
 		return t.AddMessage(
 			messageID,
 			"tool",
@@ -207,7 +208,7 @@ func (m *Manager) AddToolResultMessage(ctx context.Context, threadID, messageID,
 		return nil, nil, err
 	}
 
-	event := &domain.ToolResultAdded{
+	event := &threadpkg.ToolResultAdded{
 		ThreadID:   threadID,
 		MessageID:  messageID,
 		ToolCallID: toolCallID,
@@ -221,7 +222,7 @@ func (m *Manager) AddToolResultMessage(ctx context.Context, threadID, messageID,
 }
 
 // UpdateThreadTitle updates the title of a thread.
-func (m *Manager) UpdateThreadTitle(ctx context.Context, threadID, newTitle string) (*domain.ThreadTitleUpdated, error) {
+func (m *Manager) UpdateThreadTitle(ctx context.Context, threadID, newTitle string) (*threadpkg.ThreadTitleUpdated, error) {
 	thread, err := m.threadRepo.Load(ctx, threadID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load thread: %w", err)
@@ -237,7 +238,7 @@ func (m *Manager) UpdateThreadTitle(ctx context.Context, threadID, newTitle stri
 		return nil, fmt.Errorf("failed to save thread: %w", err)
 	}
 
-	event := &domain.ThreadTitleUpdated{
+	event := &threadpkg.ThreadTitleUpdated{
 		ThreadID:  threadID,
 		Title:     newTitle,
 		Timestamp: time.Now(),
@@ -247,7 +248,7 @@ func (m *Manager) UpdateThreadTitle(ctx context.Context, threadID, newTitle stri
 }
 
 // DeleteThread deletes a thread and returns the deletion event.
-func (m *Manager) DeleteThread(ctx context.Context, threadID string) (*domain.ThreadDeleted, error) {
+func (m *Manager) DeleteThread(ctx context.Context, threadID string) (*threadpkg.ThreadDeleted, error) {
 	thread, err := m.threadRepo.Load(ctx, threadID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load thread: %w", err)
@@ -261,7 +262,7 @@ func (m *Manager) DeleteThread(ctx context.Context, threadID string) (*domain.Th
 		return nil, fmt.Errorf("failed to save thread: %w", err)
 	}
 
-	event := &domain.ThreadDeleted{
+	event := &threadpkg.ThreadDeleted{
 		ThreadID:  threadID,
 		Timestamp: time.Now(),
 	}
@@ -300,8 +301,8 @@ func (m *Manager) GetPendingAuthToolCall(ctx context.Context, threadID string) (
 }
 
 // Load loads an existing thread aggregate from the repository.
-// Returns domain.ErrThreadNotFound if the thread doesn't exist.
-func (m *Manager) Load(ctx context.Context, threadID string) (*domain.ThreadAggregate, error) {
+// Returns threadpkg.ErrThreadNotFound if the thread doesn't exist.
+func (m *Manager) Load(ctx context.Context, threadID string) (*threadpkg.ThreadAggregate, error) {
 	agg, err := m.threadRepo.Load(ctx, threadID)
 	if err != nil {
 		return nil, err
@@ -309,7 +310,7 @@ func (m *Manager) Load(ctx context.Context, threadID string) (*domain.ThreadAggr
 	return agg, nil
 }
 
-func (m *Manager) retryUpdate(ctx context.Context, threadID string, update func(*domain.ThreadAggregate) error) (*domain.ThreadAggregate, error) {
+func (m *Manager) retryUpdate(ctx context.Context, threadID string, update func(*threadpkg.ThreadAggregate) error) (*threadpkg.ThreadAggregate, error) {
 	const maxRetries = 10
 	var lastErr error
 
@@ -333,7 +334,7 @@ func (m *Manager) retryUpdate(ctx context.Context, threadID string, update func(
 			return thread, nil
 		}
 
-		if !errors.Is(err, domain.ErrConcurrencyConflict) {
+		if !errors.Is(err, threadpkg.ErrConcurrencyConflict) {
 			return nil, fmt.Errorf("failed to save thread: %w", err)
 		}
 

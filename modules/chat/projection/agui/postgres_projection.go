@@ -5,13 +5,14 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
+	"time"
+
 	"school-with-ai/components/i18n"
-	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/event"
 	"school-with-ai/foundation/logger"
-	"strings"
-	"time"
+	"school-with-ai/modules/chat/thread"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 	"github.com/jmoiron/sqlx"
@@ -60,53 +61,53 @@ func (p *PostgresAguiProjection) RegisterHandlers(router interface {
 	Register(eventPrototype any, handler event.HandlerFunc)
 },
 ) {
-	router.Register(&domain.ThreadCreated{}, func(ctx context.Context, e domain.Event) error {
-		return p.applyThreadCreated(ctx, e.(*domain.ThreadCreated))
+	router.Register(&thread.ThreadCreated{}, func(ctx context.Context, e thread.Event) error {
+		return p.applyThreadCreated(ctx, e.(*thread.ThreadCreated))
 	})
-	router.Register(&domain.UserMessageAdded{}, func(ctx context.Context, e domain.Event) error {
-		return p.applyUserMessageAdded(ctx, e.(*domain.UserMessageAdded))
+	router.Register(&thread.UserMessageAdded{}, func(ctx context.Context, e thread.Event) error {
+		return p.applyUserMessageAdded(ctx, e.(*thread.UserMessageAdded))
 	})
-	router.Register(&domain.AssistantMessageAdded{}, func(ctx context.Context, e domain.Event) error {
-		return p.applyAssistantMessageAdded(ctx, e.(*domain.AssistantMessageAdded))
+	router.Register(&thread.AssistantMessageAdded{}, func(ctx context.Context, e thread.Event) error {
+		return p.applyAssistantMessageAdded(ctx, e.(*thread.AssistantMessageAdded))
 	})
-	router.Register(&domain.ThreadTitleUpdated{}, func(ctx context.Context, e domain.Event) error {
-		return p.applyThreadTitleChanged(ctx, e.(*domain.ThreadTitleUpdated))
+	router.Register(&thread.ThreadTitleUpdated{}, func(ctx context.Context, e thread.Event) error {
+		return p.applyThreadTitleChanged(ctx, e.(*thread.ThreadTitleUpdated))
 	})
-	router.Register(&domain.ThreadDeleted{}, func(ctx context.Context, e domain.Event) error {
-		return p.applyThreadDeleted(ctx, e.(*domain.ThreadDeleted))
+	router.Register(&thread.ThreadDeleted{}, func(ctx context.Context, e thread.Event) error {
+		return p.applyThreadDeleted(ctx, e.(*thread.ThreadDeleted))
 	})
-	router.Register(&domain.TokenUsageReported{}, func(ctx context.Context, e domain.Event) error {
-		return p.applyTokenUsageReported(ctx, e.(*domain.TokenUsageReported))
+	router.Register(&thread.TokenUsageReported{}, func(ctx context.Context, e thread.Event) error {
+		return p.applyTokenUsageReported(ctx, e.(*thread.TokenUsageReported))
 	})
 	// Tool lifecycle events
-	router.Register(&domain.ToolStart{}, func(ctx context.Context, e domain.Event) error {
-		return p.applyToolStart(ctx, e.(*domain.ToolStart))
+	router.Register(&thread.ToolStart{}, func(ctx context.Context, e thread.Event) error {
+		return p.applyToolStart(ctx, e.(*thread.ToolStart))
 	})
-	router.Register(&domain.ToolResultAdded{}, func(ctx context.Context, e domain.Event) error {
-		return p.applyToolResultAdded(ctx, e.(*domain.ToolResultAdded))
+	router.Register(&thread.ToolResultAdded{}, func(ctx context.Context, e thread.Event) error {
+		return p.applyToolResultAdded(ctx, e.(*thread.ToolResultAdded))
 	})
-	router.Register(&domain.ToolNeedsInput{}, func(ctx context.Context, e domain.Event) error {
-		return p.applyToolNeedsInput(ctx, e.(*domain.ToolNeedsInput))
+	router.Register(&thread.ToolNeedsInput{}, func(ctx context.Context, e thread.Event) error {
+		return p.applyToolNeedsInput(ctx, e.(*thread.ToolNeedsInput))
 	})
-	router.Register(&domain.ToolNeedsAuth{}, func(ctx context.Context, e domain.Event) error {
-		return p.applyToolNeedsAuth(ctx, e.(*domain.ToolNeedsAuth))
+	router.Register(&thread.ToolNeedsAuth{}, func(ctx context.Context, e thread.Event) error {
+		return p.applyToolNeedsAuth(ctx, e.(*thread.ToolNeedsAuth))
 	})
-	router.Register(&domain.InputProvided{}, func(ctx context.Context, e domain.Event) error {
-		return p.applyInputProvided(ctx, e.(*domain.InputProvided))
+	router.Register(&thread.InputProvided{}, func(ctx context.Context, e thread.Event) error {
+		return p.applyInputProvided(ctx, e.(*thread.InputProvided))
 	})
-	router.Register(&domain.AuthGranted{}, func(ctx context.Context, e domain.Event) error {
-		return p.applyAuthGranted(ctx, e.(*domain.AuthGranted))
+	router.Register(&thread.AuthGranted{}, func(ctx context.Context, e thread.Event) error {
+		return p.applyAuthGranted(ctx, e.(*thread.AuthGranted))
 	})
-	router.Register(&domain.RunStarted{}, func(ctx context.Context, e domain.Event) error {
-		return p.applyRunStarted(ctx, e.(*domain.RunStarted))
+	router.Register(&thread.RunStarted{}, func(ctx context.Context, e thread.Event) error {
+		return p.applyRunStarted(ctx, e.(*thread.RunStarted))
 	})
-	router.Register(&domain.RunFinished{}, func(ctx context.Context, e domain.Event) error {
-		return p.applyRunFinished(ctx, e.(*domain.RunFinished))
+	router.Register(&thread.RunFinished{}, func(ctx context.Context, e thread.Event) error {
+		return p.applyRunFinished(ctx, e.(*thread.RunFinished))
 	})
 }
 
 // applyThreadCreated creates a new thread record.
-func (p *PostgresAguiProjection) applyThreadCreated(ctx context.Context, event *domain.ThreadCreated) error {
+func (p *PostgresAguiProjection) applyThreadCreated(ctx context.Context, event *thread.ThreadCreated) error {
 	query := `
 		INSERT INTO agui_threads (thread_id, user_id, title, created_at, updated_at, is_deleted, version)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -130,7 +131,7 @@ func (p *PostgresAguiProjection) applyThreadCreated(ctx context.Context, event *
 }
 
 // applyUserMessageAdded adds a user message to the thread.
-func (p *PostgresAguiProjection) applyUserMessageAdded(ctx context.Context, event *domain.UserMessageAdded) error {
+func (p *PostgresAguiProjection) applyUserMessageAdded(ctx context.Context, event *thread.UserMessageAdded) error {
 	// Marshal attachments to metadata JSONB for persistence
 	var metadataJSON []byte
 	if len(event.Attachments) > 0 {
@@ -178,7 +179,7 @@ func (p *PostgresAguiProjection) applyUserMessageAdded(ctx context.Context, even
 }
 
 // applyAssistantMessageAdded adds an assistant message to the thread.
-func (p *PostgresAguiProjection) applyAssistantMessageAdded(ctx context.Context, event *domain.AssistantMessageAdded) error {
+func (p *PostgresAguiProjection) applyAssistantMessageAdded(ctx context.Context, event *thread.AssistantMessageAdded) error {
 	// Marshal tool calls to JSONB
 	var toolCallsJSON []byte
 	if len(event.ToolCalls) > 0 {
@@ -225,7 +226,7 @@ func (p *PostgresAguiProjection) applyAssistantMessageAdded(ctx context.Context,
 }
 
 // applyToolResultAdded adds a tool result message to the thread.
-func (p *PostgresAguiProjection) applyToolResultAdded(ctx context.Context, event *domain.ToolResultAdded) error {
+func (p *PostgresAguiProjection) applyToolResultAdded(ctx context.Context, event *thread.ToolResultAdded) error {
 	// Use atomic subquery for sequence number to prevent race conditions.
 	insertQuery := `
 		INSERT INTO agui_messages (message_id, thread_id, role, content, tool_call_id, agent_name, created_at, sequence_num)
@@ -305,7 +306,7 @@ func (p *PostgresAguiProjection) applyToolResultAdded(ctx context.Context, event
 }
 
 // applyThreadTitleChanged updates the thread title.
-func (p *PostgresAguiProjection) applyThreadTitleChanged(ctx context.Context, event *domain.ThreadTitleUpdated) error {
+func (p *PostgresAguiProjection) applyThreadTitleChanged(ctx context.Context, event *thread.ThreadTitleUpdated) error {
 	query := `
 		UPDATE agui_threads
 		SET title = $1, updated_at = $2, version = version + 1
@@ -321,7 +322,7 @@ func (p *PostgresAguiProjection) applyThreadTitleChanged(ctx context.Context, ev
 }
 
 // applyThreadDeleted marks a thread as deleted (messages cascade delete via FK).
-func (p *PostgresAguiProjection) applyThreadDeleted(ctx context.Context, event *domain.ThreadDeleted) error {
+func (p *PostgresAguiProjection) applyThreadDeleted(ctx context.Context, event *thread.ThreadDeleted) error {
 	query := `
 		UPDATE agui_threads
 		SET is_deleted = true, updated_at = $1, version = version + 1
@@ -337,7 +338,7 @@ func (p *PostgresAguiProjection) applyThreadDeleted(ctx context.Context, event *
 }
 
 // applyTokenUsageReported updates message metadata with usage information.
-func (p *PostgresAguiProjection) applyTokenUsageReported(ctx context.Context, event *domain.TokenUsageReported) error {
+func (p *PostgresAguiProjection) applyTokenUsageReported(ctx context.Context, event *thread.TokenUsageReported) error {
 	usageJSON, err := json.Marshal(map[string]any{
 		"usage": map[string]any{
 			"provider":        event.Provider,
@@ -375,7 +376,7 @@ func (p *PostgresAguiProjection) applyTokenUsageReported(ctx context.Context, ev
 }
 
 // applyToolStart records the tool execution start in the dedicated tool states table.
-func (p *PostgresAguiProjection) applyToolStart(ctx context.Context, event *domain.ToolStart) error {
+func (p *PostgresAguiProjection) applyToolStart(ctx context.Context, event *thread.ToolStart) error {
 	query := `
 		INSERT INTO agui_tool_states (tool_call_id, thread_id, state, tool_name, agent_name, arguments, updated_at)
 		VALUES ($1, $2, 'executing', $3, $4, $5, $6)
@@ -401,7 +402,7 @@ func (p *PostgresAguiProjection) applyToolStart(ctx context.Context, event *doma
 }
 
 // applyToolNeedsInput records elicitation data in the dedicated tool states table.
-func (p *PostgresAguiProjection) applyToolNeedsInput(ctx context.Context, event *domain.ToolNeedsInput) error {
+func (p *PostgresAguiProjection) applyToolNeedsInput(ctx context.Context, event *thread.ToolNeedsInput) error {
 	elicitationJSON, err := json.Marshal(event.Elicitation)
 	if err != nil {
 		return fmt.Errorf("failed to marshal elicitation: %w", err)
@@ -430,7 +431,7 @@ func (p *PostgresAguiProjection) applyToolNeedsInput(ctx context.Context, event 
 }
 
 // applyToolNeedsAuth records authorization data in the dedicated tool states table.
-func (p *PostgresAguiProjection) applyToolNeedsAuth(ctx context.Context, event *domain.ToolNeedsAuth) error {
+func (p *PostgresAguiProjection) applyToolNeedsAuth(ctx context.Context, event *thread.ToolNeedsAuth) error {
 	authSpecJSON, err := json.Marshal(event.AuthSpec)
 	if err != nil {
 		return fmt.Errorf("failed to marshal auth spec: %w", err)
@@ -461,7 +462,7 @@ func (p *PostgresAguiProjection) applyToolNeedsAuth(ctx context.Context, event *
 // applyInputProvided records the user's answer in the dedicated tool states table.
 // With the dedicated table this is a simple UPSERT by tool_call_id — no JSONB
 // containment query, no ordering dependency on UserMessageAdded.
-func (p *PostgresAguiProjection) applyInputProvided(ctx context.Context, event *domain.InputProvided) error {
+func (p *PostgresAguiProjection) applyInputProvided(ctx context.Context, event *thread.InputProvided) error {
 	query := `
 		INSERT INTO agui_tool_states (tool_call_id, thread_id, state, input, agent_name, updated_at)
 		VALUES ($1, $2, 'input_provided', $3, $4, $5)
@@ -484,7 +485,7 @@ func (p *PostgresAguiProjection) applyInputProvided(ctx context.Context, event *
 }
 
 // applyAuthGranted records authorization grant in the dedicated tool states table.
-func (p *PostgresAguiProjection) applyAuthGranted(ctx context.Context, event *domain.AuthGranted) error {
+func (p *PostgresAguiProjection) applyAuthGranted(ctx context.Context, event *thread.AuthGranted) error {
 	query := `
 		INSERT INTO agui_tool_states (tool_call_id, thread_id, state, agent_name, updated_at)
 		VALUES ($1, $2, 'auth_granted', $3, $4)
@@ -510,7 +511,7 @@ func (p *PostgresAguiProjection) GetThreadState(ctx context.Context, threadID st
 	defer cancel()
 
 	// Get thread record
-	var thread struct {
+	var threadRow struct {
 		ThreadID  string    `db:"thread_id"`
 		UserID    string    `db:"user_id"`
 		Title     string    `db:"title"`
@@ -526,7 +527,7 @@ func (p *PostgresAguiProjection) GetThreadState(ctx context.Context, threadID st
 		WHERE thread_id = $1
 	`
 
-	err := p.db.GetContext(ctx, &thread, threadQuery, threadID)
+	err := p.db.GetContext(ctx, &threadRow, threadQuery, threadID)
 	if err == sql.ErrNoRows {
 		return nil, false
 	}
@@ -536,7 +537,7 @@ func (p *PostgresAguiProjection) GetThreadState(ctx context.Context, threadID st
 	}
 
 	// Don't return deleted threads
-	if thread.IsDeleted {
+	if threadRow.IsDeleted {
 		return nil, false
 	}
 
@@ -568,7 +569,7 @@ func (p *PostgresAguiProjection) GetThreadState(ctx context.Context, threadID st
 
 	// Convert database messages to AGUI SDK format
 	aguiMessages := make([]aguievents.Message, 0, len(messages))
-	messageAttachments := make(map[string][]domain.Attachment)
+	messageAttachments := make(map[string][]thread.Attachment)
 	var tokenUsage *TokenUsageInfo
 
 	for _, msg := range messages {
@@ -634,10 +635,10 @@ func (p *PostgresAguiProjection) GetThreadState(ctx context.Context, threadID st
 				// Extract attachment references for user messages
 				if attachmentsRaw, ok := metadata["attachments"]; ok {
 					if attachmentsArr, ok := attachmentsRaw.([]interface{}); ok {
-						var refs []domain.Attachment
+						var refs []thread.Attachment
 						for _, attRaw := range attachmentsArr {
 							if attMap, ok := attRaw.(map[string]interface{}); ok {
-								ref := domain.Attachment{
+								ref := thread.Attachment{
 									URL:      getStringFromMap(attMap, "url"),
 									MimeType: getStringFromMap(attMap, "mimeType"),
 									FileName: getStringFromMap(attMap, "fileName"),
@@ -710,19 +711,19 @@ func (p *PostgresAguiProjection) GetThreadState(ctx context.Context, threadID st
 	}
 
 	state := &AguiThreadState{
-		ThreadID:           thread.ThreadID,
-		UserID:             thread.UserID,
-		Title:              thread.Title,
+		ThreadID:           threadRow.ThreadID,
+		UserID:             threadRow.UserID,
+		Title:              threadRow.Title,
 		Messages:           aguiMessages,
 		ToolCalls:          []AguiToolCall{},
 		AgentActivity:      make(map[string]*AguiAgentActivity),
 		ToolStates:         toolStatesMap,
 		TokenUsage:         tokenUsage,
 		MessageAttachments: messageAttachments,
-		CreatedAt:          thread.CreatedAt,
-		UpdatedAt:          thread.UpdatedAt,
-		Version:            thread.Version,
-		IsDeleted:          thread.IsDeleted,
+		CreatedAt:          threadRow.CreatedAt,
+		UpdatedAt:          threadRow.UpdatedAt,
+		Version:            threadRow.Version,
+		IsDeleted:          threadRow.IsDeleted,
 	}
 
 	return state, true
@@ -875,7 +876,7 @@ func (p *PostgresAguiProjection) ListThreads(ctx context.Context, req ThreadList
 }
 
 // applyRunStarted handles run start events by updating the thread metadata.
-func (p *PostgresAguiProjection) applyRunStarted(ctx context.Context, event *domain.RunStarted) error {
+func (p *PostgresAguiProjection) applyRunStarted(ctx context.Context, event *thread.RunStarted) error {
 	// For now, we don't need to store run start/end separately in the database
 	// The frontend just needs these events for UI state management
 	// We could add run tracking to the metadata if needed later
@@ -883,7 +884,7 @@ func (p *PostgresAguiProjection) applyRunStarted(ctx context.Context, event *dom
 }
 
 // applyRunFinished handles run completion events by updating the thread metadata.
-func (p *PostgresAguiProjection) applyRunFinished(ctx context.Context, event *domain.RunFinished) error {
+func (p *PostgresAguiProjection) applyRunFinished(ctx context.Context, event *thread.RunFinished) error {
 	// For now, we don't need to store run start/end separately in the database
 	// The frontend just needs these events for UI state management
 	// We could add run tracking to the metadata if needed later

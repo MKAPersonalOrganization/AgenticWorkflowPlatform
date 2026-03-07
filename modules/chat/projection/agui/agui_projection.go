@@ -2,7 +2,7 @@ package agui
 
 import (
 	"context"
-	"school-with-ai/domain"
+	"school-with-ai/modules/chat/thread"
 	"time"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
@@ -26,8 +26,8 @@ type AguiProjection interface {
 // AguiBroadcaster is an interface for subscribing to real-time events.
 type AguiBroadcaster interface {
 	// Subscribe subscribes to real-time events for a thread.
-	// Returns a channel of events (type domain.Event) and a cancel function.
-	Subscribe(threadID string) (<-chan domain.Event, func())
+	// Returns a channel of events (type thread.Event) and a cancel function.
+	Subscribe(threadID string) (<-chan thread.Event, func())
 }
 
 // AguiThreadState represents the complete UI state for a thread.
@@ -40,7 +40,7 @@ type AguiThreadState struct {
 	AgentActivity      map[string]*AguiAgentActivity  `json:"agentActivity"`
 	ToolStates         map[string]any                 `json:"toolStates,omitempty"`
 	TokenUsage         *TokenUsageInfo                `json:"tokenUsage,omitempty"`
-	MessageAttachments map[string][]domain.Attachment `json:"messageAttachments,omitempty"` // messageID -> attachment refs
+	MessageAttachments map[string][]thread.Attachment `json:"messageAttachments,omitempty"` // messageID -> attachment refs
 	CreatedAt          time.Time                      `json:"createdAt"`
 	UpdatedAt          time.Time                      `json:"updatedAt"`
 	Version            int64                          `json:"version"` // Event version

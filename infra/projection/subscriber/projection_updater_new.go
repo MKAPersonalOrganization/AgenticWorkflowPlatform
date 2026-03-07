@@ -5,10 +5,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"school-with-ai/domain"
-	"school-with-ai/foundation/logger"
 	"sync"
 	"time"
+
+	es "school-with-ai/foundation/eventsourcing"
+	"school-with-ai/foundation/logger"
 
 	pgstore "school-with-ai/infra/eventstore/postgres"
 
@@ -22,7 +23,7 @@ const advisoryLockID int64 = 7_301_924_817 // arbitrary unique constant
 
 // EventRouter defines the interface for dispatching events.
 type EventRouter interface {
-	Dispatch(ctx context.Context, event domain.Event) error
+	Dispatch(ctx context.Context, event es.Event) error
 }
 
 // ProjectionUpdater polls the Postgres event store for new events and dispatches

@@ -1,4 +1,4 @@
-package domain
+package thread
 
 import (
 	"errors"
@@ -30,7 +30,7 @@ func NewThreadAggregate(id string) *ThreadAggregate {
 	}
 }
 
-// Open creates a new thread. This is a static factory method like ShoppingCart.Open.
+// OpenThread creates a new thread. This is a static factory method like ShoppingCart.Open.
 func OpenThread(threadID, userID, title string) (*ThreadAggregate, error) {
 	if threadID == "" {
 		return nil, errors.New("thread ID is required")
@@ -39,7 +39,7 @@ func OpenThread(threadID, userID, title string) (*ThreadAggregate, error) {
 		return nil, errors.New("user ID is required")
 	}
 
-	thread := NewThreadAggregate(threadID)
+	t := NewThreadAggregate(threadID)
 	event := &ThreadCreated{
 		ThreadID:  threadID,
 		UserID:    userID,
@@ -47,12 +47,11 @@ func OpenThread(threadID, userID, title string) (*ThreadAggregate, error) {
 		Timestamp: time.Now(),
 	}
 
-	thread.Enqueue(event, thread.Apply)
-	return thread, nil
+	t.Enqueue(event, t.Apply)
+	return t, nil
 }
 
 // AddMessage adds a message to the thread.
-// This implements business logic like ShoppingCart.AddProduct.
 func (t *ThreadAggregate) AddMessage(messageID, role, content string, toolCalls []ToolCall, toolCallID, toolName, agentName string, attachments ...Attachment) error {
 	if t.IsDeleted {
 		return errors.New("cannot add message to deleted thread")

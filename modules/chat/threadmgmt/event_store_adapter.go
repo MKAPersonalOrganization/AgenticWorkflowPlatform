@@ -2,23 +2,23 @@ package threadmgmt
 
 import (
 	"context"
-	"school-with-ai/domain"
+	"school-with-ai/modules/chat/thread"
 )
 
-// EventStoreAdapter adapts domain.EventStore.
+// EventStoreAdapter adapts thread.EventStore.
 type EventStoreAdapter struct {
-	store domain.EventStore
+	store thread.EventStore
 }
 
-func NewEventStoreAdapter(store domain.EventStore) *EventStoreAdapter {
+func NewEventStoreAdapter(store thread.EventStore) *EventStoreAdapter {
 	return &EventStoreAdapter{store: store}
 }
 
-func (a *EventStoreAdapter) AppendWithVersion(ctx context.Context, streamID string, expectedVersion int64, events ...domain.Event) (int64, error) {
+func (a *EventStoreAdapter) AppendWithVersion(ctx context.Context, streamID string, expectedVersion int64, events ...thread.Event) (int64, error) {
 	return a.store.AppendWithVersion(ctx, streamID, expectedVersion, events...)
 }
 
-func (a *EventStoreAdapter) ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]domain.Event, error) {
+func (a *EventStoreAdapter) ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]thread.Event, error) {
 	return a.store.ReadStream(ctx, streamID, fromVersion)
 }
 

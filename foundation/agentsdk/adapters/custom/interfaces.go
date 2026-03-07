@@ -4,7 +4,7 @@ import (
 	"context"
 	"iter"
 
-	"school-with-ai/domain"
+	"school-with-ai/modules/chat/thread"
 	"school-with-ai/foundation/agent"
 )
 
@@ -14,13 +14,13 @@ import (
 // Satisfied by *threadmgmt.Manager — the custom package never imports the
 // concrete type, keeping the dependency arrow from module → foundation.
 type ThreadManager interface {
-	AddUserMessage(ctx context.Context, threadID, messageID, content, userID string, attachments ...domain.Attachment) (*domain.ThreadAggregate, *domain.UserMessageAdded, []domain.Event, error)
-	Load(ctx context.Context, threadID string) (*domain.ThreadAggregate, error)
+	AddUserMessage(ctx context.Context, threadID, messageID, content, userID string, attachments ...thread.Attachment) (*thread.ThreadAggregate, *thread.UserMessageAdded, []thread.Event, error)
+	Load(ctx context.Context, threadID string) (*thread.ThreadAggregate, error)
 }
 
 // EventProcessor processes and broadcasts domain events.
 type EventProcessor interface {
-	ProcessEvents(ctx context.Context, events iter.Seq2[domain.Event, error]) iter.Seq2[domain.Event, error]
+	ProcessEvents(ctx context.Context, events iter.Seq2[thread.Event, error]) iter.Seq2[thread.Event, error]
 }
 
 // ─── Permissions ─────────────────────────────────────────────────────────────

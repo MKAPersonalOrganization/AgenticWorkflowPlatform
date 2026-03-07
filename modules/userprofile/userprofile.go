@@ -1,7 +1,6 @@
 package userprofile
 
 import (
-	"school-with-ai/domain"
 	"school-with-ai/foundation/auth"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/modules/userprofile/identity"
@@ -45,6 +44,6 @@ func (m *Module) RegisterRoutes(r chi.Router, authMW *auth.Middleware) {
 
 // StudentProfileRepo returns the student profile repository for cross-module
 // consumers (e.g., agent orchestrator, custom runner).
-func (m *Module) StudentProfileRepo() domain.StudentProfileRepository {
+func (m *Module) StudentProfileRepo() identity.StudentProfileRepository {
 	return m.identity.StudentProfileRepo()
 }

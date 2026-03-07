@@ -1,8 +1,9 @@
 package postgres
 
 import (
-	"school-with-ai/domain"
 	"time"
+
+	es "school-with-ai/foundation/eventsourcing"
 )
 
 // EventWithPosition wraps a domain event with its global position metadata.
@@ -12,6 +13,6 @@ type EventWithPosition struct {
 	StreamID       string
 	StreamVersion  int64
 	EventType      string
-	Event          domain.Event
+	Event          es.Event
 	CreatedAt      time.Time
 }

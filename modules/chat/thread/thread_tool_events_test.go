@@ -1,35 +1,36 @@
-package domain_test
+package thread_test
 
 import (
 	"context"
 	"io"
-	"school-with-ai/domain"
-	"school-with-ai/foundation/logger"
-	"school-with-ai/modules/chat/threadmgmt"
 	"testing"
 	"time"
+
+	"school-with-ai/foundation/logger"
+	"school-with-ai/modules/chat/thread"
+	"school-with-ai/modules/chat/threadmgmt"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// MockEventStore implements domain.EventStore for testing
+// MockEventStore implements thread.EventStore for testing
 type MockEventStore struct {
-	events map[string][]domain.Event
+	events map[string][]thread.Event
 }
 
 func NewMockEventStore() *MockEventStore {
 	return &MockEventStore{
-		events: make(map[string][]domain.Event),
+		events: make(map[string][]thread.Event),
 	}
 }
 
-func (m *MockEventStore) AppendWithVersion(ctx context.Context, streamID string, expectedVersion int64, events ...domain.Event) (int64, error) {
+func (m *MockEventStore) AppendWithVersion(ctx context.Context, streamID string, expectedVersion int64, events ...thread.Event) (int64, error) {
 	m.events[streamID] = append(m.events[streamID], events...)
 	return int64(len(m.events[streamID])), nil
 }
 
-func (m *MockEventStore) ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]domain.Event, error) {
+func (m *MockEventStore) ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]thread.Event, error) {
 	return m.events[streamID], nil
 }
 
@@ -42,16 +43,16 @@ func TestThreadAggregate_RecordToolEvent(t *testing.T) {
 	// Setup
 	threadID := "thread-123"
 	userID := "user-456"
-	thread, err := domain.OpenThread(threadID, userID, "Test Thread")
+	th, err := thread.OpenThread(threadID, userID, "Test Thread")
 	require.NoError(t, err)
 
 	// Create a dummy tool event
-	event := &domain.ToolNeedsInput{
+	event := &thread.ToolNeedsInput{
 		ThreadID:   threadID,
 		MessageID:  "msg-789",
 		ToolCallID: "call-abc",
 		ToolName:   "test-tool",
-		Elicitation: &domain.ElicitationSpec{
+		Elicitation: &thread.ElicitationSpec{
 			Question: "Please provide input",
 		},
 		AgentName: "test-agent",
@@ -59,7 +60,7 @@ func TestThreadAggregate_RecordToolEvent(t *testing.T) {
 	}
 
 	// Act
-	err = thread.RecordToolEvent(event)
+	err = th.RecordToolEvent(event)
 
 	// Assert
 	assert.NoError(t, err)
@@ -69,7 +70,7 @@ func TestManager_RecordToolEvent(t *testing.T) {
 	// Setup in-memory event store
 	eventStore := NewMockEventStore()
 	logger := logger.New(io.Discard, logger.LevelDebug, "test", nil)
-	repo := domain.NewThreadRepository(threadmgmt.NewEventStoreAdapter(eventStore))
+	repo := thread.NewThreadRepository(threadmgmt.NewEventStoreAdapter(eventStore))
 	manager := threadmgmt.New(logger, repo)
 	ctx := context.Background()
 
@@ -79,12 +80,12 @@ func TestManager_RecordToolEvent(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create event
-	event := &domain.ToolNeedsInput{
+	event := &thread.ToolNeedsInput{
 		ThreadID:   threadID,
 		MessageID:  "msg-111",
 		ToolCallID: "call-222",
 		ToolName:   "my-tool",
-		Elicitation: &domain.ElicitationSpec{
+		Elicitation: &thread.ElicitationSpec{
 			Question: "Need input",
 		},
 		AgentName: "agent-x",
@@ -92,21 +93,21 @@ func TestManager_RecordToolEvent(t *testing.T) {
 	}
 
 	// Load thread and record event
-	thread, err := repo.Load(ctx, threadID)
+	th, err := repo.Load(ctx, threadID)
 	require.NoError(t, err)
 
-	err = thread.RecordToolEvent(event)
+	err = th.RecordToolEvent(event)
 	require.NoError(t, err)
 
 	// Save thread
-	err = repo.Save(ctx, thread)
+	err = repo.Save(ctx, th)
 	require.NoError(t, err)
 
 	// Verify event is in store
 	found := false
 	for _, streamEvents := range eventStore.events {
 		for _, e := range streamEvents {
-			if te, ok := e.(*domain.ToolNeedsInput); ok {
+			if te, ok := e.(*thread.ToolNeedsInput); ok {
 				if te.ToolCallID == "call-222" {
 					found = true
 					break

@@ -3,7 +3,7 @@ package statistics
 import (
 	"context"
 	"fmt"
-	"school-with-ai/domain"
+	"school-with-ai/modules/chat/thread"
 	"school-with-ai/foundation/event"
 	"time"
 
@@ -27,19 +27,19 @@ func (p *PostgresProjection) RegisterHandlers(router interface {
 	Register(eventPrototype any, handler event.HandlerFunc)
 },
 ) {
-	router.Register(&domain.ToolResultAdded{}, func(ctx context.Context, e domain.Event) error {
+	router.Register(&thread.ToolResultAdded{}, func(ctx context.Context, e thread.Event) error {
 		return p.HandleEvent(ctx, e)
 	})
-	router.Register(&domain.AssistantMessageCompleted{}, func(ctx context.Context, e domain.Event) error {
+	router.Register(&thread.AssistantMessageCompleted{}, func(ctx context.Context, e thread.Event) error {
 		return p.HandleEvent(ctx, e)
 	})
 	// Note: RunError removed per EVENT_CONTRACTS.md - was framework lifecycle event
 }
 
 // HandleEvent processes domain events to update statistics in the database.
-func (p *PostgresProjection) HandleEvent(ctx context.Context, event domain.Event) error {
+func (p *PostgresProjection) HandleEvent(ctx context.Context, event thread.Event) error {
 	switch e := event.(type) {
-	case *domain.ToolResultAdded:
+	case *thread.ToolResultAdded:
 		if e.IsError {
 			if err := p.updateToolErrorStats(ctx, e); err != nil {
 				return err
@@ -51,13 +51,13 @@ func (p *PostgresProjection) HandleEvent(ctx context.Context, event domain.Event
 		}
 		// Also record individual event for time-series analytics
 		return p.recordToolEvent(ctx, e)
-	case *domain.AssistantMessageCompleted:
+	case *thread.AssistantMessageCompleted:
 		return p.updateMessageStats(ctx, e)
 	}
 	return nil
 }
 
-func (p *PostgresProjection) updateToolSuccessStats(ctx context.Context, e *domain.ToolResultAdded) error {
+func (p *PostgresProjection) updateToolSuccessStats(ctx context.Context, e *thread.ToolResultAdded) error {
 	query := `
 		INSERT INTO analytics_stats (agent_name, category, name, total_count, successes, failures, last_success, updated_at)
 		VALUES ($1, 'tool', $2, 1, 1, 0, $3, $4)
@@ -81,7 +81,7 @@ func (p *PostgresProjection) updateToolSuccessStats(ctx context.Context, e *doma
 	return nil
 }
 
-func (p *PostgresProjection) updateToolErrorStats(ctx context.Context, e *domain.ToolResultAdded) error {
+func (p *PostgresProjection) updateToolErrorStats(ctx context.Context, e *thread.ToolResultAdded) error {
 	query := `
 		INSERT INTO analytics_stats (agent_name, category, name, total_count, successes, failures, last_failure, updated_at)
 		VALUES ($1, 'tool', $2, 1, 0, 1, $3, $4)
@@ -105,7 +105,7 @@ func (p *PostgresProjection) updateToolErrorStats(ctx context.Context, e *domain
 	return nil
 }
 
-func (p *PostgresProjection) updateMessageStats(ctx context.Context, e *domain.AssistantMessageCompleted) error {
+func (p *PostgresProjection) updateMessageStats(ctx context.Context, e *thread.AssistantMessageCompleted) error {
 	query := `
 		INSERT INTO analytics_stats (agent_name, category, name, total_count, successes, updated_at)
 		VALUES ($1, 'message', 'total', 1, 1, $2)
@@ -119,7 +119,7 @@ func (p *PostgresProjection) updateMessageStats(ctx context.Context, e *domain.A
 }
 
 // recordToolEvent inserts an individual tool event for time-series analysis.
-func (p *PostgresProjection) recordToolEvent(ctx context.Context, e *domain.ToolResultAdded) error {
+func (p *PostgresProjection) recordToolEvent(ctx context.Context, e *thread.ToolResultAdded) error {
 	query := `
 		INSERT INTO analytics_events (agent_name, tool_name, is_error, created_at)
 		VALUES ($1, $2, $3, $4)

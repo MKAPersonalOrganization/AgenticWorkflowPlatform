@@ -1,9 +1,8 @@
-package domain
+package thread
 
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"time"
 
@@ -14,21 +13,18 @@ import (
 var (
 	// ErrThreadNotFound is returned when an aggregate has no events in the store.
 	// It is an alias for eventsourcing.ErrNotFound so that errors.Is works for
-	// both domain.ErrThreadNotFound and eventsourcing.ErrNotFound.
+	// both thread.ErrThreadNotFound and eventsourcing.ErrNotFound.
 	ErrThreadNotFound      = es.ErrNotFound
-	ErrConcurrencyConflict = errors.New("concurrency conflict: stream version mismatch")
+	ErrConcurrencyConflict = es.ErrConcurrencyConflict
 )
 
-// Event is the base interface for all domain events.
-// This is now an open interface (no sealed method) — any package can implement
-// it, enabling modules to define events locally.
-type Event = es.Event
+// ──────────────────────────────────────────────────────────────────────────────
+// Eventsourcing re-exports — convenience aliases so that callers dealing with
+// the thread aggregate only need to import this one package.
+// ──────────────────────────────────────────────────────────────────────────────
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Eventsourcing aliases — used by thread_aggregate.go and thread_repository.go
-// within this package. These are the shared kernel types for the event-sourced
-// thread aggregate.
-// ──────────────────────────────────────────────────────────────────────────────
+// Event is the base interface for all domain events.
+type Event = es.Event
 
 // EventEnvelope wraps an event with metadata about its position in the stream.
 type EventEnvelope = es.EventEnvelope

@@ -7,36 +7,38 @@ import (
 	"fmt"
 	"io"
 	"iter"
-	"school-with-ai/domain"
-	"school-with-ai/foundation/agent"
-	"school-with-ai/foundation/logger"
-	"school-with-ai/platform/artifact"
-	"school-with-ai/modules/chat/threadmgmt"
 	"strings"
 	"sync"
 	"time"
+
+	"school-with-ai/foundation/agent"
+	"school-with-ai/foundation/logger"
+	"school-with-ai/modules/chat/thread"
+	"school-with-ai/modules/chat/threadmgmt"
+	"school-with-ai/modules/userprofile/identity"
+	"school-with-ai/platform/artifact"
 
 	"github.com/google/uuid"
 )
 
 // EventEmitter is the interface for broadcasting events.
 type EventEmitter interface {
-	Dispatch(ctx context.Context, event domain.Event) error
+	Dispatch(ctx context.Context, event thread.Event) error
 }
 
-// Runner is the interface for executing agents specifically within this service's domain.
+// Runner is the interface for executing agents specifically within this service's thread.
 type Runner interface {
-	Run(ctx context.Context, req *agent.RunRequest) iter.Seq2[domain.Event, error]
+	Run(ctx context.Context, req *agent.RunRequest) iter.Seq2[thread.Event, error]
 }
 
 // Service handles orchestration of agent events, providing persistence and broadcasting.
 type Service struct {
 	log           *logger.Logger
-	writeModel    domain.EventStore
-	threadRepo    *domain.ThreadRepository
+	writeModel    thread.EventStore
+	threadRepo    *thread.ThreadRepository
 	emitter       EventEmitter
 	artifactStore artifact.Service
-	profileRepo   domain.StudentProfileRepository
+	profileRepo   identity.StudentProfileRepository
 
 	runnerMu sync.RWMutex
 	runner   Runner // Domain-aware runner interface
@@ -51,10 +53,10 @@ type Option func(*Service)
 // New creates a new framework-agnostic agent orchestration service.
 func New(
 	log *logger.Logger,
-	eventLog domain.EventStore,
+	eventLog thread.EventStore,
 	opts ...Option,
 ) *Service {
-	sharedRepo := domain.NewThreadRepository(threadmgmt.NewEventStoreAdapter(eventLog))
+	sharedRepo := thread.NewThreadRepository(threadmgmt.NewEventStoreAdapter(eventLog))
 	s := &Service{
 		log:        log,
 		writeModel: eventLog,
@@ -84,7 +86,7 @@ func WithArtifactService(store artifact.Service) Option {
 }
 
 // WithStudentProfileRepository configures the agent with a student profile repository.
-func WithStudentProfileRepository(repo domain.StudentProfileRepository) Option {
+func WithStudentProfileRepository(repo identity.StudentProfileRepository) Option {
 	return func(s *Service) {
 		s.profileRepo = repo
 	}
@@ -105,8 +107,8 @@ func (s *Service) SetRunner(runner Runner) {
 }
 
 // ProcessEvents orchestrates a stream of domain events, providing persistence and broadcasting.
-func (s *Service) ProcessEvents(ctx context.Context, events iter.Seq2[domain.Event, error]) iter.Seq2[domain.Event, error] {
-	return func(yield func(domain.Event, error) bool) {
+func (s *Service) ProcessEvents(ctx context.Context, events iter.Seq2[thread.Event, error]) iter.Seq2[thread.Event, error] {
+	return func(yield func(thread.Event, error) bool) {
 		eventCount := 0
 		durableCount := 0
 		transientCount := 0
@@ -163,37 +165,37 @@ func (s *Service) ProcessEvents(ctx context.Context, events iter.Seq2[domain.Eve
 
 // isDurable returns true if the event should be persisted to the event store.
 // Per EVENT_CONTRACTS.md: only business facts are persisted, not framework lifecycle events.
-func (s *Service) isDurable(event domain.Event) bool {
+func (s *Service) isDurable(event thread.Event) bool {
 	switch event.(type) {
 	// Application Service Events (Persisted)
-	case *domain.ThreadCreated,
-		*domain.ThreadDeleted,
-		*domain.ThreadTitleUpdated,
-		*domain.UserMessageAdded:
+	case *thread.ThreadCreated,
+		*thread.ThreadDeleted,
+		*thread.ThreadTitleUpdated,
+		*thread.UserMessageAdded:
 		return true
 
 	// Agent Framework Events - Persisted
-	case *domain.AssistantMessageAdded,
-		*domain.ToolResultAdded,
-		*domain.TokenUsageReported,
-		*domain.ToolNeedsInput,
-		*domain.ToolNeedsAuth,
-		*domain.InputProvided,
-		*domain.AuthGranted,
-		*domain.AuthDenied,
-		*domain.ToolCancelled:
+	case *thread.AssistantMessageAdded,
+		*thread.ToolResultAdded,
+		*thread.TokenUsageReported,
+		*thread.ToolNeedsInput,
+		*thread.ToolNeedsAuth,
+		*thread.InputProvided,
+		*thread.AuthGranted,
+		*thread.AuthDenied,
+		*thread.ToolCancelled:
 		return true
 
 	// Agent Framework Events - Transient (NOT persisted)
 	// Run lifecycle events are for frontend UI only, not thread state
-	case *domain.RunStarted,
-		*domain.RunFinished,
-		*domain.RunError,
-		*domain.AssistantMessageStarted,
-		*domain.AssistantContentStreamed,
-		*domain.AssistantMessageCompleted,
-		*domain.ToolStart,
-		*domain.ToolContentStreamed:
+	case *thread.RunStarted,
+		*thread.RunFinished,
+		*thread.RunError,
+		*thread.AssistantMessageStarted,
+		*thread.AssistantContentStreamed,
+		*thread.AssistantMessageCompleted,
+		*thread.ToolStart,
+		*thread.ToolContentStreamed:
 		return false
 
 	default:
@@ -202,35 +204,35 @@ func (s *Service) isDurable(event domain.Event) bool {
 }
 
 // persistDurableEvent persists a domain event based on its type.
-func (s *Service) persistDurableEvent(ctx context.Context, event domain.Event) error {
+func (s *Service) persistDurableEvent(ctx context.Context, event thread.Event) error {
 	switch e := event.(type) {
-	case *domain.ThreadCreated:
+	case *thread.ThreadCreated:
 		_, _, err := s.threadMgmt.CreateThread(ctx, e.ThreadID, e.UserID, e.Title)
 		return err
-	case *domain.ThreadDeleted:
+	case *thread.ThreadDeleted:
 		_, err := s.threadMgmt.DeleteThread(ctx, e.ThreadID)
 		return err
-	case *domain.UserMessageAdded:
+	case *thread.UserMessageAdded:
 		_, _, _, err := s.threadMgmt.AddUserMessage(ctx, e.ThreadID, e.MessageID, e.Content, e.UserID, e.Attachments...)
 		return err
-	case *domain.AssistantMessageAdded:
+	case *thread.AssistantMessageAdded:
 		_, _, err := s.threadMgmt.AddAssistantMessage(ctx, e.ThreadID, e.MessageID, e.Content, e.ToolCalls, e.AgentName)
 		return err
-	case *domain.ToolResultAdded:
+	case *thread.ToolResultAdded:
 		_, _, err := s.threadMgmt.AddToolResultMessage(ctx, e.ThreadID, e.MessageID, e.ToolCallID, e.ToolName, e.Result, e.AgentName)
 		return err
-	case *domain.ThreadTitleUpdated:
+	case *thread.ThreadTitleUpdated:
 		_, err := s.threadMgmt.UpdateThreadTitle(ctx, e.ThreadID, e.Title)
 		return err
-	case *domain.TokenUsageReported:
+	case *thread.TokenUsageReported:
 		_, err := s.threadMgmt.AddTokenUsage(ctx, e)
 		return err
-	case *domain.ToolNeedsInput,
-		*domain.ToolNeedsAuth,
-		*domain.InputProvided,
-		*domain.AuthGranted,
-		*domain.AuthDenied,
-		*domain.ToolCancelled:
+	case *thread.ToolNeedsInput,
+		*thread.ToolNeedsAuth,
+		*thread.InputProvided,
+		*thread.AuthGranted,
+		*thread.AuthDenied,
+		*thread.ToolCancelled:
 		_, err := s.threadMgmt.RecordToolEvent(ctx, event.AggregateID(), event)
 		return err
 	default:
@@ -276,10 +278,10 @@ type RunExecutionRequest struct {
 func (s *Service) ExecuteRun(
 	ctx context.Context,
 	req RunExecutionRequest,
-) iter.Seq2[domain.Event, error] {
-	return func(yield func(domain.Event, error) bool) {
+) iter.Seq2[thread.Event, error] {
+	return func(yield func(thread.Event, error) bool) {
 		// 1. Emit RunStarted
-		runStartedEvent := &domain.RunStarted{
+		runStartedEvent := &thread.RunStarted{
 			ThreadID:    req.ThreadID,
 			RunID:       req.MessageID,
 			ParentRunID: req.ParentRunID,
@@ -287,7 +289,7 @@ func (s *Service) ExecuteRun(
 			Timestamp:   time.Now(),
 		}
 
-		runStartedIter := func(y func(domain.Event, error) bool) {
+		runStartedIter := func(y func(thread.Event, error) bool) {
 			y(runStartedEvent, nil)
 		}
 		processedStart := s.ProcessEvents(ctx, runStartedIter)
@@ -303,7 +305,7 @@ func (s *Service) ExecuteRun(
 
 		// 2. If this message is an answer to a tool elicitation, emit InputProvided
 		if req.ToolCallID != "" {
-			inputProvidedEvent := &domain.InputProvided{
+			inputProvidedEvent := &thread.InputProvided{
 				ThreadID:   req.ThreadID,
 				MessageID:  req.MessageID,
 				ToolCallID: req.ToolCallID,
@@ -312,7 +314,7 @@ func (s *Service) ExecuteRun(
 				Timestamp:  time.Now(),
 			}
 
-			inputIter := func(y func(domain.Event, error) bool) {
+			inputIter := func(y func(thread.Event, error) bool) {
 				y(inputProvidedEvent, nil)
 			}
 			processedInput := s.ProcessEvents(ctx, inputIter)
@@ -370,7 +372,7 @@ func (s *Service) ExecuteRun(
 
 		// 6. Emit RunError if execution failed, otherwise emit RunFinished
 		if executionError != nil {
-			runErrorEvent := &domain.RunError{
+			runErrorEvent := &thread.RunError{
 				ThreadID:  req.ThreadID,
 				RunID:     req.MessageID,
 				Message:   executionError.Error(),
@@ -378,7 +380,7 @@ func (s *Service) ExecuteRun(
 				Timestamp: time.Now(),
 			}
 
-			runErrorIter := func(y func(domain.Event, error) bool) {
+			runErrorIter := func(y func(thread.Event, error) bool) {
 				y(runErrorEvent, nil)
 			}
 			processedError := s.ProcessEvents(ctx, runErrorIter)
@@ -398,14 +400,14 @@ func (s *Service) ExecuteRun(
 		}
 
 		// 7. Emit RunFinished on success
-		runFinishedEvent := &domain.RunFinished{
+		runFinishedEvent := &thread.RunFinished{
 			ThreadID:  req.ThreadID,
 			RunID:     req.MessageID,
 			Result:    nil, // TODO: Capture result from framework events if available
 			Timestamp: time.Now(),
 		}
 
-		runFinishedIter := func(y func(domain.Event, error) bool) {
+		runFinishedIter := func(y func(thread.Event, error) bool) {
 			y(runFinishedEvent, nil)
 		}
 		processedFinish := s.ProcessEvents(ctx, runFinishedIter)
@@ -422,21 +424,21 @@ func (s *Service) ExecuteRun(
 }
 
 // saveAttachments saves attached files to the artifact store and returns
-// domain.Attachment slices for event persistence. If the artifact store is nil or
+// thread.Attachment slices for event persistence. If the artifact store is nil or
 // no attachments are present, it returns nil.
 //
 // Pre-uploaded attachments (those with a URL starting with "/v1/threads/") are
 // already in S3 and are passed through without re-uploading.
-func (s *Service) saveAttachments(ctx context.Context, req RunExecutionRequest) []domain.Attachment {
+func (s *Service) saveAttachments(ctx context.Context, req RunExecutionRequest) []thread.Attachment {
 	if s.artifactStore == nil || len(req.Attachments) == 0 {
 		return nil
 	}
 
-	var refs []domain.Attachment
+	var refs []thread.Attachment
 	for _, att := range req.Attachments {
 		// Pre-uploaded attachment: already in S3, just build the ref.
 		if att.URL != "" {
-			refs = append(refs, domain.Attachment{
+			refs = append(refs, thread.Attachment{
 				URL:      att.URL,
 				MimeType: att.MimeType,
 				FileName: att.FileName,
@@ -467,7 +469,7 @@ func (s *Service) saveAttachments(ctx context.Context, req RunExecutionRequest) 
 		}
 
 		artifactURL := fmt.Sprintf("/v1/threads/%s/artifacts/%s", req.ThreadID, fileName)
-		refs = append(refs, domain.Attachment{
+		refs = append(refs, thread.Attachment{
 			URL:      artifactURL,
 			MimeType: mimeType,
 			FileName: fileName,

@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"school-with-ai/domain"
 	es "school-with-ai/foundation/eventsourcing"
 	"school-with-ai/foundation/logger"
 
@@ -28,7 +27,7 @@ type RedisBroadcaster struct {
 
 // redisSubscription tracks a local subscriber and its Redis pubsub connection.
 type redisSubscription struct {
-	ch     chan domain.Event
+	ch     chan es.Event
 	pubsub *redis.PubSub
 	cancel context.CancelFunc
 }
@@ -65,8 +64,8 @@ func channelName(threadID string) string {
 
 // Subscribe subscribes to real-time events for a thread.
 // Events are received via Redis pub/sub, enabling cross-pod delivery.
-func (b *RedisBroadcaster) Subscribe(threadID string) (<-chan domain.Event, func()) {
-	ch := make(chan domain.Event, 100)
+func (b *RedisBroadcaster) Subscribe(threadID string) (<-chan es.Event, func()) {
+	ch := make(chan es.Event, 100)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -145,7 +144,7 @@ func (b *RedisBroadcaster) Subscribe(threadID string) (<-chan domain.Event, func
 }
 
 // Broadcast publishes an event to Redis, which delivers it to all pods' subscribers.
-func (b *RedisBroadcaster) Broadcast(ctx context.Context, event domain.Event) error {
+func (b *RedisBroadcaster) Broadcast(ctx context.Context, event es.Event) error {
 	threadID := event.AggregateID()
 	if threadID == "" {
 		return nil
@@ -177,7 +176,7 @@ type eventEnvelope struct {
 }
 
 // serializeEvent serializes an event to JSON with type information.
-func (b *RedisBroadcaster) serializeEvent(event domain.Event) (string, error) {
+func (b *RedisBroadcaster) serializeEvent(event es.Event) (string, error) {
 	data, err := json.Marshal(event)
 	if err != nil {
 		return "", err
@@ -197,7 +196,7 @@ func (b *RedisBroadcaster) serializeEvent(event domain.Event) (string, error) {
 }
 
 // deserializeEvent deserializes an event from JSON.
-func (b *RedisBroadcaster) deserializeEvent(payload string) (domain.Event, error) {
+func (b *RedisBroadcaster) deserializeEvent(payload string) (es.Event, error) {
 	var envelope eventEnvelope
 	if err := json.Unmarshal([]byte(payload), &envelope); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal envelope: %w", err)

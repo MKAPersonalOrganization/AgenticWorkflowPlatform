@@ -1,7 +1,7 @@
 package taskmanagement
 
 import (
-	"school-with-ai/domain"
+	"school-with-ai/modules/chat/thread"
 	"testing"
 	"time"
 
@@ -20,7 +20,7 @@ func TestToAguiEvents(t *testing.T) {
 	}{
 		{
 			name: "RunStarted",
-			event: &domain.RunStarted{
+			event: &thread.RunStarted{
 				ThreadID:  "thread-1",
 				RunID:     "run-1",
 				Timestamp: now,
@@ -31,7 +31,7 @@ func TestToAguiEvents(t *testing.T) {
 		},
 		{
 			name: "RunFinished",
-			event: &domain.RunFinished{
+			event: &thread.RunFinished{
 				ThreadID:  "thread-1",
 				RunID:     "run-1",
 				Timestamp: now,
@@ -42,7 +42,7 @@ func TestToAguiEvents(t *testing.T) {
 		},
 		{
 			name: "RunError",
-			event: &domain.RunError{
+			event: &thread.RunError{
 				ThreadID:  "thread-1",
 				Message:   "error message",
 				Code:      "ERR-001",
@@ -54,7 +54,7 @@ func TestToAguiEvents(t *testing.T) {
 		},
 		{
 			name: "ThreadTitleUpdated",
-			event: &domain.ThreadTitleUpdated{
+			event: &thread.ThreadTitleUpdated{
 				ThreadID:  "thread-1",
 				Title:     "New Title",
 				Timestamp: now,
@@ -68,7 +68,7 @@ func TestToAguiEvents(t *testing.T) {
 		},
 		{
 			name: "AssistantMessageStarted",
-			event: &domain.AssistantMessageStarted{
+			event: &thread.AssistantMessageStarted{
 				ThreadID:  "thread-1",
 				MessageID: "msg-1",
 				Timestamp: now,
@@ -79,7 +79,7 @@ func TestToAguiEvents(t *testing.T) {
 		},
 		{
 			name: "AssistantContentStreamed",
-			event: &domain.AssistantContentStreamed{
+			event: &thread.AssistantContentStreamed{
 				ThreadID:  "thread-1",
 				MessageID: "msg-1",
 				Delta:     "hello",
@@ -91,7 +91,7 @@ func TestToAguiEvents(t *testing.T) {
 		},
 		{
 			name: "AssistantMessageCompleted",
-			event: &domain.AssistantMessageCompleted{
+			event: &thread.AssistantMessageCompleted{
 				ThreadID:  "thread-1",
 				MessageID: "msg-1",
 				Timestamp: now,
@@ -102,7 +102,7 @@ func TestToAguiEvents(t *testing.T) {
 		},
 		{
 			name: "ToolResultAdded",
-			event: &domain.ToolResultAdded{
+			event: &thread.ToolResultAdded{
 				ThreadID:   "thread-1",
 				MessageID:  "msg-1",
 				ToolCallID: "tool-1",
@@ -133,8 +133,8 @@ func TestToAguiEvents(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			var input domain.Event
-			if de, ok := tt.event.(domain.Event); ok {
+			var input thread.Event
+			if de, ok := tt.event.(thread.Event); ok {
 				input = de
 			}
 

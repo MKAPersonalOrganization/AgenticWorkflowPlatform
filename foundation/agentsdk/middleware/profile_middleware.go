@@ -2,15 +2,16 @@ package middleware
 
 import (
 	"fmt"
-	"school-with-ai/domain"
-	"school-with-ai/shared"
-	"school-with-ai/foundation/agent"
 	"strings"
+
+	"school-with-ai/foundation/agent"
+	"school-with-ai/modules/userprofile/identity"
+	"school-with-ai/shared"
 )
 
 // NewStudentProfileInjectorMiddleware returns a Chat-level Middleware that
 // prepends the student's profile as a system message before each LLM call.
-func NewStudentProfileInjectorMiddleware(repo domain.StudentProfileRepository) agent.Middleware {
+func NewStudentProfileInjectorMiddleware(repo identity.StudentProfileRepository) agent.Middleware {
 	return func(next agent.Handler) agent.Handler {
 		return agent.HandlerFunc(func(c *agent.Context) error {
 			if !c.IsChat() {

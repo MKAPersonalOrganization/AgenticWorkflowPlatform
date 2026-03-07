@@ -1,4 +1,4 @@
-// Package postgres provides a PostgreSQL-backed implementation of domain.EventStore.
+// Package postgres provides a PostgreSQL-backed implementation of es.EventStore.
 // It uses advisory locks for stream-level concurrency, JSONB for event data,
 // and a global sequence (global_position) for ordered event processing.
 package postgres
@@ -12,13 +12,12 @@ import (
 	"hash/fnv"
 	"strings"
 
-	"school-with-ai/domain"
 	es "school-with-ai/foundation/eventsourcing"
 
 	"github.com/jmoiron/sqlx"
 )
 
-// PostgresEventStore implements domain.EventStore using PostgreSQL.
+// PostgresEventStore implements es.EventStore using PostgreSQL.
 type PostgresEventStore struct {
 	db       *sqlx.DB
 	registry *es.DeserializerRegistry
@@ -45,7 +44,7 @@ func advisoryLockKey(streamID string) int64 {
 //	>= 0  : exact version check (optimistic concurrency)
 //	-2     : NoStream - stream must NOT exist
 //	-1     : Any - no concurrency check
-func (s *PostgresEventStore) AppendWithVersion(ctx context.Context, streamID string, expectedVersion int64, events ...domain.Event) (int64, error) {
+func (s *PostgresEventStore) AppendWithVersion(ctx context.Context, streamID string, expectedVersion int64, events ...es.Event) (int64, error) {
 	if len(events) == 0 {
 		return 0, nil
 	}
@@ -71,7 +70,7 @@ func (s *PostgresEventStore) AppendWithVersion(ctx context.Context, streamID str
 		// Stream doesn't exist
 		if expectedVersion >= 0 {
 			// Caller expected a specific version but stream doesn't exist
-			return 0, domain.ErrConcurrencyConflict
+			return 0, es.ErrConcurrencyConflict
 		}
 		// Create the stream (NoStream or Any)
 		if _, err := tx.ExecContext(ctx,
@@ -86,10 +85,10 @@ func (s *PostgresEventStore) AppendWithVersion(ctx context.Context, streamID str
 		// Stream exists
 		if expectedVersion == -2 {
 			// NoStream: stream must not exist
-			return 0, domain.ErrConcurrencyConflict
+			return 0, es.ErrConcurrencyConflict
 		}
 		if expectedVersion >= 0 && currentVersion != expectedVersion {
-			return 0, domain.ErrConcurrencyConflict
+			return 0, es.ErrConcurrencyConflict
 		}
 	}
 
@@ -147,7 +146,7 @@ func (s *PostgresEventStore) AppendWithVersion(ctx context.Context, streamID str
 
 // ReadStream reads all events for a stream starting from a specific version.
 // Returns an empty slice if the stream doesn't exist (not an error).
-func (s *PostgresEventStore) ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]domain.Event, error) {
+func (s *PostgresEventStore) ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]es.Event, error) {
 	if fromVersion < 0 {
 		return nil, fmt.Errorf("invalid fromVersion: must be non-negative, got %d", fromVersion)
 	}
@@ -162,7 +161,7 @@ func (s *PostgresEventStore) ReadStream(ctx context.Context, streamID string, fr
 	}
 	defer rows.Close()
 
-	var events []domain.Event
+	var events []es.Event
 	for rows.Next() {
 		var eventType string
 		var data []byte
@@ -252,8 +251,8 @@ func (s *PostgresEventStore) ReadAllFromPosition(ctx context.Context, afterPosit
 	return result, nil
 }
 
-// Verify PostgresEventStore implements domain.EventStore.
-var _ domain.EventStore = (*PostgresEventStore)(nil)
+// Verify PostgresEventStore implements es.EventStore.
+var _ es.EventStore = (*PostgresEventStore)(nil)
 
 // joinStrings joins a slice of strings with a separator (avoids importing strings just for Join).
 func joinStrings(elems []string, sep string) string {

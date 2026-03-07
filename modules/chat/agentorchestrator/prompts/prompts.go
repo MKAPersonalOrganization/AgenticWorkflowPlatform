@@ -2,9 +2,10 @@ package prompts
 
 import (
 	"bytes"
-	"school-with-ai/domain"
 	"strings"
 	"text/template"
+
+	"school-with-ai/modules/userprofile/identity"
 )
 
 // Specialty defines an academic specialist for the learning coordinator.
@@ -38,7 +39,7 @@ type TeacherPromptConfig struct {
 	Specialties    string   // raw text for backward compatibility or simple agents
 	Specialists    []Specialty
 	Skills         []Skill
-	StudentProfile *domain.StudentProfile
+	StudentProfile *identity.StudentProfile
 	LearningPath   *LearningPath // Guidance for progressive learning
 	ExtraRules     string
 	Interactive    bool
