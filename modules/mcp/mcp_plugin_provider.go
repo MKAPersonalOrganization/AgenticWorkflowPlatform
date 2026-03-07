@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"school-with-ai/foundation/agent"
-	"school-with-ai/services/toolregistry"
+	"school-with-ai/platform/toolregistry"
 
 	"github.com/a-h/templ"
 )

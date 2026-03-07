@@ -2,7 +2,7 @@ package mocks
 
 import (
 	"context"
-	"school-with-ai/services/workspacepermissions"
+	"school-with-ai/platform/workspacepermissions"
 	"sync"
 )
 

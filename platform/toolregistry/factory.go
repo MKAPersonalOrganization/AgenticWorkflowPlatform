@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"school-with-ai/foundation/agent"
-	"school-with-ai/services/artifact"
-	"school-with-ai/services/memory"
+	"school-with-ai/platform/artifact"
+	"school-with-ai/platform/memory"
 	"sync"
 )
 

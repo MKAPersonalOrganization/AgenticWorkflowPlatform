@@ -10,7 +10,7 @@ import (
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/services/artifact"
+	"school-with-ai/platform/artifact"
 	"school-with-ai/modules/chat/threadmgmt"
 	"strings"
 	"sync"

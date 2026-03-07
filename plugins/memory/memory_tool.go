@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"school-with-ai/shared"
 	"school-with-ai/foundation/agent"
-	"school-with-ai/services/memory"
+	"school-with-ai/platform/memory"
 	"strings"
 )
 

@@ -12,21 +12,10 @@ import (
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/engine"
 	"school-with-ai/foundation/agentsdk/internal/llm"
-	"school-with-ai/foundation/logger"
-	"school-with-ai/modules/knowledge/edgequake"
-	mcpmod "school-with-ai/modules/mcp"
-	"school-with-ai/services/artifact"
-	"school-with-ai/services/memory"
-	"school-with-ai/services/permissions"
-	"school-with-ai/services/toolregistry"
-	"school-with-ai/services/workspacepermissions"
-	"school-with-ai/shared"
-
 	agentio "school-with-ai/foundation/agentsdk/io"
-
-	memorytools "school-with-ai/plugins/memory"
-
 	smiddleware "school-with-ai/foundation/agentsdk/middleware"
+	"school-with-ai/foundation/logger"
+	"school-with-ai/shared"
 )
 
 // ModelConfigResolver resolves LLM configuration for a given user.
@@ -42,24 +31,24 @@ type TTSConfigResolver interface {
 	GetTTSConfigForUserFlat(ctx context.Context, userID string) (apiKey, model, voice string, err error)
 }
 
-// RunnerAdapter adapts the custom engine to the agent.Runner interface.
+// RunnerAdapter adapts the custom agent engine to the agent.Runner interface.
+// All external capabilities are injected as narrow interfaces defined in
+// interfaces.go — the adapter never imports module or service packages.
 type RunnerAdapter struct {
-	log                *logger.Logger
-	threadMgr          ThreadManager // Interface for thread management
-	agentProvider      agent.AgentProvider
-	artifactStore      artifact.Service
-	profileRepo        domain.StudentProfileRepository
-	enableMemory       bool
-	pipeline           *EventPipeline // Add event pipeline for observability
-	toolRegistry       *toolregistry.Registry
-	permissionsService *permissions.Service
-	workspacePermSvc   *workspacepermissions.Service
-	edgequakeService   *edgequake.Service
-	edgequakeBaseURL   string
-	edgequakeTenantID  string
-	configResolver     ModelConfigResolver
-	ttsResolver        TTSConfigResolver
-	mcpService         *mcpmod.Service
+	log                  *logger.Logger
+	agentProvider        agent.AgentProvider
+	threadMgr            ThreadManager
+	pipeline             *EventPipeline
+	profileRepo          domain.StudentProfileRepository
+	configResolver       ModelConfigResolver
+	ttsResolver          TTSConfigResolver
+	permChecker          ToolPermissionChecker
+	workspacePermChecker WorkspacePermissionChecker
+	mcpResolver          MCPToolResolver
+	newToolSetFactory    NewToolSetFactoryFunc
+	memoryMiddleware     agent.Middleware // nil when memory is disabled
+	edgequakeEnabled     bool
+	edgequakeBaseURL     string
 }
 
 // NewRunnerAdapter creates a new runner adapter.
@@ -68,41 +57,37 @@ func NewRunnerAdapter(
 	ctx context.Context,
 	log *logger.Logger,
 	threadMgr ThreadManager,
-	agentProvider agent.AgentProvider, // Injected provider
-	configResolver ModelConfigResolver, // Per-user model config resolver
-	ttsResolver TTSConfigResolver, // Per-user TTS config resolver (may be nil)
-	artifactStore artifact.Service,
+	agentProvider agent.AgentProvider,
+	configResolver ModelConfigResolver,
+	ttsResolver TTSConfigResolver,
 	profileRepo domain.StudentProfileRepository,
-	enableMemory bool,
-	toolRegistry *toolregistry.Registry,
-	permissionsService *permissions.Service,
-	workspacePermSvc *workspacepermissions.Service,
-	edgequakeService *edgequake.Service,
+	permChecker ToolPermissionChecker,
+	workspacePermChecker WorkspacePermissionChecker,
+	mcpResolver MCPToolResolver,
+	newToolSetFactory NewToolSetFactoryFunc,
+	memoryMiddleware agent.Middleware,
+	edgequakeEnabled bool,
 	edgequakeBaseURL string,
-	edgequakeTenantID string,
-	mcpService *mcpmod.Service,
 ) (*RunnerAdapter, error) {
 	if configResolver == nil {
 		return nil, fmt.Errorf("model config resolver is required")
 	}
 
 	r := &RunnerAdapter{
-		log:                log,
-		threadMgr:          threadMgr,
-		agentProvider:      agentProvider,
-		artifactStore:      artifactStore,
-		profileRepo:        profileRepo,
-		enableMemory:       enableMemory,
-		pipeline:           NewEventPipeline(log), // Initialize event pipeline
-		toolRegistry:       toolRegistry,
-		permissionsService: permissionsService,
-		workspacePermSvc:   workspacePermSvc,
-		edgequakeService:   edgequakeService,
-		edgequakeBaseURL:   edgequakeBaseURL,
-		edgequakeTenantID:  edgequakeTenantID,
-		configResolver:     configResolver,
-		ttsResolver:        ttsResolver,
-		mcpService:         mcpService,
+		log:                  log,
+		threadMgr:            threadMgr,
+		agentProvider:        agentProvider,
+		profileRepo:          profileRepo,
+		pipeline:             NewEventPipeline(log),
+		permChecker:          permChecker,
+		workspacePermChecker: workspacePermChecker,
+		mcpResolver:          mcpResolver,
+		newToolSetFactory:    newToolSetFactory,
+		memoryMiddleware:     memoryMiddleware,
+		edgequakeEnabled:     edgequakeEnabled,
+		edgequakeBaseURL:     edgequakeBaseURL,
+		configResolver:       configResolver,
+		ttsResolver:          ttsResolver,
 	}
 
 	return r, nil
@@ -125,27 +110,33 @@ func (r *RunnerAdapter) buildEngine(ctx context.Context, modelCfg *agent.ModelCo
 		}
 	}
 
+	// Build per-request tool set factory with user's LLM and TTS config.
+	var toolFactory ToolSetFactory
+	if r.newToolSetFactory != nil {
+		toolFactory = r.newToolSetFactory(ToolFactoryConfig{
+			EdgequakeBaseURL: r.edgequakeBaseURL,
+			ModelAPIKey:      modelCfg.APIKey,
+			ModelID:          modelCfg.Model,
+			TTSAPIKey:        ttsAPIKey,
+			TTSModel:         ttsModel,
+			TTSVoice:         ttsVoice,
+		})
+	}
+
 	provider := &RegistryAgentProvider{
-		provider:           r.agentProvider,
-		artifactStore:      r.artifactStore,
-		profileRepo:        r.profileRepo,
-		enableMemory:       r.enableMemory,
-		modelProvider:      modelCfg.Provider,
-		modelID:            modelCfg.Model,
-		modelAPIKey:        modelCfg.APIKey,
-		temperature:        modelCfg.Temperature,
-		maxIterations:      modelCfg.MaxIterations,
-		maxTokens:          modelCfg.MaxTokens,
-		toolRegistry:       r.toolRegistry,
-		permissionsService: r.permissionsService,
-		workspacePermSvc:   r.workspacePermSvc,
-		edgequakeService:   r.edgequakeService,
-		edgequakeBaseURL:   r.edgequakeBaseURL,
-		edgequakeTenantID:  r.edgequakeTenantID,
-		mcpService:         r.mcpService,
-		ttsAPIKey:          ttsAPIKey,
-		ttsModel:           ttsModel,
-		ttsVoice:           ttsVoice,
+		provider:             r.agentProvider,
+		profileRepo:          r.profileRepo,
+		modelProvider:        modelCfg.Provider,
+		modelID:              modelCfg.Model,
+		temperature:          modelCfg.Temperature,
+		maxIterations:        modelCfg.MaxIterations,
+		maxTokens:            modelCfg.MaxTokens,
+		toolFactory:          toolFactory,
+		permChecker:          r.permChecker,
+		workspacePermChecker: r.workspacePermChecker,
+		edgequakeEnabled:     r.edgequakeEnabled,
+		mcpResolver:          r.mcpResolver,
+		memoryMiddleware:     r.memoryMiddleware,
 	}
 
 	return engine.New(chatClient, provider, nil, nil), nil
@@ -200,7 +191,6 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 		}
 
 		// 1. Facts First: Initialize Thread and Message
-		threadMgmt := r.threadMgr.GetThreadManagement()
 		var agg *domain.ThreadAggregate
 		var initialEvents []domain.Event
 
@@ -225,7 +215,7 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 			var uEvent *domain.UserMessageAdded
 			var sideEffects []domain.Event
 			var pErr error
-			agg, uEvent, sideEffects, pErr = threadMgmt.AddUserMessage(ctx, req.SessionID, messageID, userContent, req.UserID, attachmentRefs...)
+			agg, uEvent, sideEffects, pErr = r.threadMgr.AddUserMessage(ctx, req.SessionID, messageID, userContent, req.UserID, attachmentRefs...)
 			if pErr != nil {
 				yield(nil, fmt.Errorf("failed to persist user message: %w", pErr))
 				return
@@ -238,7 +228,7 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 		} else {
 			// Resuming without a new message
 			var lErr error
-			agg, lErr = threadMgmt.Load(ctx, req.SessionID)
+			agg, lErr = r.threadMgr.Load(ctx, req.SessionID)
 			if lErr != nil && !errors.Is(lErr, domain.ErrThreadNotFound) {
 				yield(nil, fmt.Errorf("failed to load thread: %w", lErr))
 				return
@@ -397,27 +387,19 @@ func (r *RunnerAdapter) toCoreToolCalls(dtcs []domain.ToolCall) []core.ToolCall 
 
 // RegistryAgentProvider implements engine.AgentProvider using agent.AgentProvider.
 type RegistryAgentProvider struct {
-	provider           agent.AgentProvider
-	artifactStore      artifact.Service
-	enableMemory       bool
-	profileRepo        domain.StudentProfileRepository
-	modelProvider      string   // LLM provider name (e.g., "openai", "gemini")
-	modelID            string   // LLM model name (e.g., "gpt-4o", "gemini-2.0-flash")
-	modelAPIKey        string   // LLM API key for sub-agent tool calls
-	temperature        *float64 // Global temperature from AI settings
-	maxIterations      int      // Global max iterations from AI settings
-	maxTokens          *int     // Global max tokens from AI settings
-	toolRegistry       *toolregistry.Registry
-	permissionsService *permissions.Service
-	workspacePermSvc   *workspacepermissions.Service
-	edgequakeService   *edgequake.Service
-	edgequakeBaseURL   string
-	edgequakeTenantID  string
-	mcpService         *mcpmod.Service
-	// Per-user TTS config resolved at request time
-	ttsAPIKey string
-	ttsModel  string
-	ttsVoice  string
+	provider             agent.AgentProvider
+	profileRepo          domain.StudentProfileRepository
+	modelProvider        string   // LLM provider name (e.g., "openai", "gemini")
+	modelID              string   // LLM model name (e.g., "gpt-4o", "gemini-2.0-flash")
+	temperature          *float64 // Global temperature from AI settings
+	maxIterations        int      // Global max iterations from AI settings
+	maxTokens            *int     // Global max tokens from AI settings
+	toolFactory          ToolSetFactory
+	permChecker          ToolPermissionChecker
+	workspacePermChecker WorkspacePermissionChecker
+	edgequakeEnabled     bool
+	mcpResolver          MCPToolResolver
+	memoryMiddleware     agent.Middleware // nil when memory is disabled
 }
 
 func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (core.AgentConfig, error) {
@@ -483,22 +465,8 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 		Provider:      p.modelProvider,
 	}
 
-	// Get allowed tool sets for this agent from permissions service
-	if p.permissionsService != nil && p.toolRegistry != nil {
-		// Create tool factory
-		factory := toolregistry.NewExecutableToolFactory(p.artifactStore)
-		factory.SetToolRegistry(p.toolRegistry)
-
-		// Wire edgequake config for KB tools
-		if p.edgequakeBaseURL != "" {
-			factory.SetEdgequakeConfig(p.edgequakeBaseURL, p.modelAPIKey, p.modelID)
-		}
-
-		// Wire TTS config for speech tools
-		if p.ttsAPIKey != "" {
-			factory.SetTTSConfig(p.ttsAPIKey, p.ttsModel, p.ttsVoice)
-		}
-
+	// Get allowed tool sets for this agent from permissions
+	if p.permChecker != nil && p.toolFactory != nil {
 		// Get user from context to check permissions
 		user := shared.GetUserFromContext(ctx)
 		var userID string
@@ -507,7 +475,7 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 		}
 
 		// Get enabled tool sets for this agent
-		enabledToolSetIDs, err := p.permissionsService.GetEnabledToolSets(ctx, userID, name)
+		enabledToolSetIDs, err := p.permChecker.GetEnabledToolSets(ctx, userID, name)
 		if err != nil {
 			// Log error but continue with no tool sets
 			enabledToolSetIDs = []string{}
@@ -518,7 +486,7 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 			if strings.HasPrefix(toolSetID, "mcp-") {
 				continue // MCP toolsets handled below
 			}
-			toolsFromSet, err := factory.CreateExecutableToolsFromSet(ctx, toolSetID)
+			toolsFromSet, err := p.toolFactory.CreateExecutableToolsFromSet(ctx, toolSetID)
 			if err != nil {
 				// Skip tool sets that can't be processed
 				continue
@@ -527,13 +495,13 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 		}
 
 		// Resolve MCP tools from user's connected MCP servers
-		if p.mcpService != nil && userID != "" {
-			mcpTools := p.mcpService.ResolveEnabledTools(ctx, userID,
+		if p.mcpResolver != nil && userID != "" {
+			mcpTools := p.mcpResolver.ResolveEnabledTools(ctx, userID,
 				func(toolSetID string) bool {
-					return p.permissionsService.HasToolSetPermission(ctx, userID, name, toolSetID)
+					return p.permChecker.HasToolSetPermission(ctx, userID, name, toolSetID)
 				},
 				func(toolSetID, toolID string) bool {
-					return p.permissionsService.HasPermission(ctx, userID, name, toolSetID, toolID)
+					return p.permChecker.HasPermission(ctx, userID, name, toolSetID, toolID)
 				},
 			)
 			config.Tools = append(config.Tools, mcpTools...)
@@ -541,7 +509,7 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 	}
 
 	// Inject attached workspace info into system prompt as Knowledge Bases section
-	if p.workspacePermSvc != nil && p.edgequakeService != nil {
+	if p.workspacePermChecker != nil && p.edgequakeEnabled {
 		// Get user from context to check permissions
 		user := shared.GetUserFromContext(ctx)
 		var userID string
@@ -549,7 +517,7 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 			userID = user.ID
 		}
 
-		enabledWorkspaceIDs, err := p.workspacePermSvc.GetEnabledWorkspaces(ctx, userID, name)
+		enabledWorkspaceIDs, err := p.workspacePermChecker.GetEnabledWorkspaces(ctx, userID, name)
 		if err == nil && len(enabledWorkspaceIDs) > 0 {
 			kbSection := "\n\n## Knowledge Bases\n\nYou have access to the following knowledge base workspaces. Use the query_knowledge_base tool to search them:\n"
 			for _, wsID := range enabledWorkspaceIDs {
@@ -597,9 +565,8 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 	}
 
 	// Inject Memory Context as a Chat-level middleware (runs before each LLM call)
-	if p.artifactStore != nil && p.enableMemory {
-		memoryService := memory.NewArtifactMemoryService(p.artifactStore)
-		config.ChatMiddleware = append(config.ChatMiddleware, memorytools.NewMemoryInjectorMiddleware(memoryService))
+	if p.memoryMiddleware != nil {
+		config.ChatMiddleware = append(config.ChatMiddleware, p.memoryMiddleware)
 	}
 
 	// Inject Student Profile as a Chat-level middleware

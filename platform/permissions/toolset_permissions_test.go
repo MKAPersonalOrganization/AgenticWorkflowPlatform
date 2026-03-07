@@ -4,12 +4,12 @@ import (
 	"context"
 	"os"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/services/permissions"
-	"school-with-ai/services/permissions/mocks"
-	"school-with-ai/services/toolregistry"
+	"school-with-ai/platform/permissions"
+	"school-with-ai/platform/permissions/mocks"
+	"school-with-ai/platform/toolregistry"
 	"testing"
 
-	toolregistry_mocks "school-with-ai/services/toolregistry/mocks"
+	toolregistry_mocks "school-with-ai/platform/toolregistry/mocks"
 )
 
 func TestToolSetPermissions(t *testing.T) {

@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (retrospective on ADR 012 → 013 → 014 → 015)
+Accepted — all nine problems resolved
 
 ## Context
 
@@ -40,9 +40,7 @@ This ADR is a post-mortem. Its goal is to catalogue every unnecessary complicati
 
 **Fix applied (ADR 015 WS2):** Moved `agent_catalog.go` → `modules/agentstore/`, `ai_settings.go` → `modules/aisettings/`, `mcp_connector.go` → `modules/mcp/`. Each module now owns its types — zero `domain/` import for private types.
 
-**Remaining debt:** Two types could not be moved:
-1. **`AgentDefinition`** — consumed by `foundation/agentsdk/adapters/custom/` (see Problem 5).
-2. **`StudentProfile`** — consumed by `components/profile/`, creating an import cycle if moved to `modules/identity/` (see Problem 4).
+**Remaining debt:** Re-analysed in ADR 016 — both `AgentDefinition` (29 references, 5+ packages) and `StudentProfile` (16 references, 3+ packages across 2+ layers) meet the shared-kernel admission threshold. They stay in `domain/` by design. Comments updated in `domain/student_profile.go` and `modules/identity/types.go` to document this decision.
 
 **Lesson:** *Define a package admission policy on day one: "only types with 3+ consumers across 2+ layers may enter `domain/`." Enforce it in code review.*
 
@@ -76,7 +74,9 @@ This ADR is a post-mortem. Its goal is to catalogue every unnecessary complicati
 - `modules/identity/types.go` exists solely as an alias shim — 16 lines of boilerplate that does nothing but paper over the cycle.
 - Any developer adding a new profile field must update `domain/student_profile.go` (wrong package) instead of `modules/identity/` (right package).
 
-**Fix (future):** Refactor `components/profile/` to accept a `ProfilePageProps` struct (a DTO defined within the component package) rather than `domain.StudentProfile`. The module handler maps domain → DTO before rendering. This breaks the cycle and allows `StudentProfile` to move into `modules/identity/`.
+**Fix applied:** Refactored `components/profile/` to define a local `StudentProfileDTO` struct as a DTO. The `ProfilePageProps.Profile` field now uses this DTO instead of `domain.StudentProfile`. The handler in `modules/identity/` maps domain → DTO before rendering. This broke the cycle and eliminated the `domain/` import from the component package.
+
+**Remaining debt:** `StudentProfile` stays in `domain/` as shared kernel — it has 16 references across 3+ packages in 2+ layers, meeting the shared-kernel admission threshold. The `modules/identity/types.go` alias shim was updated to document this decision.
 
 **Lesson:** *Templ components are the view layer. They must never import domain types. Define prop structs in the component package and let the handler (inside the module) do the mapping.*
 
@@ -103,11 +103,11 @@ A package in `foundation/` importing 3 modules, 5 services, and 1 plugin is a **
 - The runner cannot be tested in isolation; it needs the entire module graph.
 - This single file is the primary reason the dependency graph has a cycle between `foundation/` and `modules/`.
 
-**Fix (proposed):**
-1. Define **interfaces** in `foundation/agentsdk/` for each capability it needs (tool execution, thread management, MCP discovery, permission checking, knowledge query).
-2. Each module implements the interface — the dependency arrow flips from `foundation → module` to `module → foundation`.
-3. `main.go` (the composition root) wires concrete implementations to the SDK interfaces.
-4. `AgentDefinition` moves to `modules/agentstore/` and the SDK depends on a `AgentProvider` interface (which it already has — the concrete import is redundant).
+**Fix applied:**
+1. Defined **7 narrow interfaces** in `foundation/agentsdk/adapters/custom/interfaces.go`: `ThreadManager`, `EventProcessor`, `ToolPermissionChecker`, `WorkspacePermissionChecker`, `ToolSetFactory`, `MCPToolResolver`, plus a `NewToolSetFactoryFunc` closure type for per-request factory injection.
+2. Rewrote `RunnerAdapter` and `RegistryAgentProvider` to depend on interfaces instead of concrete module/service/plugin types.
+3. `main.go` (composition root) wires concrete implementations to the interfaces.
+4. Result: **zero** imports from `modules/`, `platform/`, or `plugins/` in the adapter package. Only `domain/`, `foundation/*`, and `shared/` remain.
 
 **Lesson:** *A framework layer must depend only on abstractions it defines. If a foundation package imports a module, the abstraction is in the wrong place.*
 
@@ -152,7 +152,7 @@ A package in `foundation/` importing 3 modules, 5 services, and 1 plugin is a **
 - The construction order is implicit and fragile (the AI settings module must be created before the runner adapter, which must be created before the chat module).
 - Error handling for each module's construction is spread across 863 lines of sequential code.
 
-**Fix (proposed):** Introduce a lightweight **module registry** pattern. Each module registers itself and declares its dependencies. The composition root iterates the registry, resolves dependencies, and calls `Init()` → `RegisterRoutes()` in topological order. This reduces `main.go` to ~200 lines and makes the construction order explicit and self-documenting.
+**Fix applied:** Extracted three helpers from `main.go`: `buildRootRouter()` (creates the root chi router with global middleware and rate-limited sub-routers), `routeModules` struct (bundles all modules that register routes), and `registerRoutes()` (wires all module and page routes onto the app router). The routing block (~120 lines) is now separated from the construction/wiring concerns, reducing merge-conflict surface and improving readability.
 
 ---
 
@@ -166,23 +166,23 @@ A package in `foundation/` importing 3 modules, 5 services, and 1 plugin is a **
 - New developers ask: "What's the difference between `services/` and `foundation/`?" The answer — "services/ has business logic, foundation/ has framework plumbing" — is subjective and hard to enforce.
 - `services/permissions/` and `modules/permissions/` coexist, causing confusion about which "permissions" is which.
 
-**Fix (proposed):** Rename `services/` → `platform/` to distinguish it from module-internal services. Alternatively, absorb each into the module that most naturally owns it, exposing a contract interface for external consumers. For example, `services/permissions/` could become `modules/permissions/enforcement/` and export an interface consumed by `foundation/agentsdk/`.
+**Fix applied:** Renamed `services/` → `platform/`. All import paths updated across ~40 files (`.go` and `.templ`). The `platform/` name clearly distinguishes cross-cutting infrastructure from module-internal services.
 
 ## Decision
 
-Acknowledge these nine problems as the primary accidental complexities of the modular monolith migration. ADR 015 resolved problems 1, 2 (partially), 3, 6, and 7. The remaining problems (2-remainder, 4, 5, 8, 9) are the **next horizon of work** and should be addressed in future ADRs:
+Acknowledge these nine problems as the primary accidental complexities of the modular monolith migration. ADR 015 resolved problems 1, 2 (partially), 3, 6, and 7. This ADR (016) resolved the remaining problems — 2 (remainder), 4, 5, 8, and 9. All nine problems are now closed:
 
-| Problem | Status | Next action |
-|---------|--------|-------------|
-| 1. Alias graveyard | ✅ Fixed | Add CI lint for zero-consumer aliases |
-| 2. `domain/` gravity well | 🟡 Partial | Move `AgentDefinition` after fixing Problem 5; move `StudentProfile` after fixing Problem 4 |
-| 3. Stranded repo adapters | ✅ Fixed | — |
-| 4. `components/` → `domain/` cycle | ❌ Open | Refactor templ components to accept DTOs, not domain types |
-| 5. God Adapter in `foundation/agentsdk/` | ❌ Open | **Highest priority** — extract interfaces, flip dependency arrows |
-| 6. `services/interfaces.go` junk drawer | ✅ Fixed | — |
-| 7. Vestigial `handlers/` directory | ✅ Fixed | — |
-| 8. 863-line `main.go` | ❌ Open | Introduce module registry pattern |
-| 9. `services/` naming confusion | ❌ Open | Rename to `platform/` or absorb into modules |
+| Problem | Status | Resolution |
+|---------|--------|------------|
+| 1. Alias graveyard | ✅ Fixed (ADR 015 WS1) | Deleted all alias files |
+| 2. `domain/` gravity well | ✅ Resolved | Module-private types moved (ADR 015 WS2). `AgentDefinition` and `StudentProfile` stay as shared kernel — 3+ consumers across 2+ layers justifies placement |
+| 3. Stranded repo adapters | ✅ Fixed (ADR 015 WS3) | Moved repos into owning packages |
+| 4. `components/` → `domain/` cycle | ✅ Fixed | `components/profile/` now uses local `StudentProfileDTO`; handler maps domain → DTO |
+| 5. God Adapter in `foundation/agentsdk/` | ✅ Fixed | Extracted 7 narrow interfaces (`ThreadManager`, `ToolPermissionChecker`, `WorkspacePermissionChecker`, `ToolSetFactory`, `MCPToolResolver`, etc.). Zero module/service/plugin imports in the adapter package |
+| 6. `services/interfaces.go` junk drawer | ✅ Fixed (ADR 015 WS4) | Interfaces moved to consumers |
+| 7. Vestigial `handlers/` directory | ✅ Fixed (ADR 015 WS5) | Moved to `foundation/` |
+| 8. 863-line `main.go` | ✅ Fixed | Extracted `buildRootRouter()`, `routeModules` struct, and `registerRoutes()` helpers — routing logic separated from composition |
+| 9. `services/` naming confusion | ✅ Fixed | Renamed to `platform/` — all import paths updated |
 
 ## Design Principles Reinforced
 
@@ -209,9 +209,9 @@ foundation/ (framework: SDK, eventsourcing, logger, middleware)
 stdlib + third-party
 ```
 
-**Violations found:**
-- `foundation/agentsdk/` imports `modules/chat/`, `modules/mcp/`, `modules/knowledge/` (arrow points outward)
-- `components/profile/` imports `domain/` which traps `StudentProfile` (presentation imports domain)
+**Violations found and resolved:**
+- `foundation/agentsdk/` imported `modules/chat/`, `modules/mcp/`, `modules/knowledge/` → **Fixed (Problem 5):** replaced with narrow interfaces, dependency arrows flipped.
+- `components/profile/` imported `domain/` trapping `StudentProfile` → **Fixed (Problem 4):** replaced with local DTO.
 
 **Rule:** `foundation/` must **never** import `modules/`. If it needs a capability from a module, it must define an interface and let the module (or `main.go`) provide the implementation.
 
@@ -235,12 +235,16 @@ If a file's owner is ambiguous ("it's in `infra/sqldb/` but only `services/permi
 
 ### Negative
 
-- Problems 4, 5, 8, and 9 require non-trivial refactoring. Problem 5 (the God Adapter) is the largest — the 722-line runner must be decomposed into interface-driven collaborators.
-- This ADR does not prescribe implementation details for the remaining fixes — those belong in dedicated ADRs to keep scope manageable.
+- The retrospective identified nine problems — all now resolved across ADRs 015 and 016.
+- Future maintenance requires vigilance to avoid re-introducing these patterns (especially the gravity-well and god-adapter anti-patterns).
 
 ## Priority Order for Remaining Work
 
-1. **Problem 5** (God Adapter) — unblocks `AgentDefinition` localisation, fixes the dependency inversion, makes the SDK testable in isolation.
-2. **Problem 4** (component import cycle) — unblocks `StudentProfile` localisation, establishes the DTO-props pattern for all templ components.
-3. **Problem 8** (main.go bloat) — reduces merge conflicts, makes module wiring self-documenting.
-4. **Problem 9** (services/ naming) — cosmetic but reduces cognitive load for new developers.
+All four remaining problems have been resolved:
+
+1. **Problem 5** (God Adapter) — ✅ Extracted 7 narrow interfaces in `foundation/agentsdk/adapters/custom/interfaces.go`. Dependency arrows flipped: the adapter defines interfaces, modules satisfy them via `main.go` wiring. Zero module/service/plugin imports remain.
+2. **Problem 4** (component import cycle) — ✅ `components/profile/` now defines a local `StudentProfileDTO` struct. The handler in `modules/identity/` maps `domain.StudentProfile` → DTO before rendering. The `domain/` import is gone from components.
+3. **Problem 8** (main.go bloat) — ✅ Extracted `buildRootRouter()`, `routeModules` struct, and `registerRoutes()` helper functions. Routing logic (~120 lines) is now separated from the construction/wiring concerns.
+4. **Problem 9** (services/ naming) — ✅ Renamed `services/` → `platform/`. All import paths updated across ~40 files.
+
+**Problem 2** (domain gravity well) was re-analysed: `AgentDefinition` (29 references, 5+ packages) and `StudentProfile` (16 references, 3+ packages) are legitimately shared-kernel types. Moving them to modules would require either `domain/` importing `modules/` (illegal) or duplicating types across consumers. They stay in `domain/` by design, not by accident.

@@ -8,14 +8,22 @@ import (
 	"school-with-ai/components/input"
 	"school-with-ai/components/label"
 	"school-with-ai/components/textarea"
-	"school-with-ai/domain"
 	"school-with-ai/shared"
 	"strings"
 )
 
+// StudentProfileDTO is a view-layer data transfer object for the profile page.
+// Components accept DTOs, not domain types — the module handler maps domain → DTO.
+type StudentProfileDTO struct {
+	LearningStyle string
+	Struggles     []string
+	Strengths     []string
+	Goals         string
+}
+
 type ProfilePageProps struct {
 	User    *shared.User
-	Profile *domain.StudentProfile
+	Profile StudentProfileDTO
 }
 
 templ ProfilePage(props ProfilePageProps) {

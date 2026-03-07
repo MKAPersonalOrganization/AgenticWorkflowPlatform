@@ -3,7 +3,7 @@ package tools
 import (
 	"context"
 	"io"
-	"school-with-ai/services/artifact"
+	"school-with-ai/platform/artifact"
 )
 
 // MockArtifactStore is a mock implementation of artifact.Service for testing.

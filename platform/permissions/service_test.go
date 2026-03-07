@@ -4,8 +4,8 @@ import (
 	"context"
 	"os"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/services/permissions"
-	"school-with-ai/services/permissions/mocks"
+	"school-with-ai/platform/permissions"
+	"school-with-ai/platform/permissions/mocks"
 	"testing"
 )
 

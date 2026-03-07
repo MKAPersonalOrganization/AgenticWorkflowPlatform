@@ -5,7 +5,7 @@ import (
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/i18n"
 	"school-with-ai/modules/chat/agentorchestrator/prompts"
-	"school-with-ai/services/artifact"
+	"school-with-ai/platform/artifact"
 )
 
 // NOTE: Tools are now managed via permissions service instead of hardcoded domain tools

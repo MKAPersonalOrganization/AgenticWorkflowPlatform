@@ -11,7 +11,7 @@ import (
 	"net/url"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/services/toolregistry"
+	"school-with-ai/platform/toolregistry"
 	"strings"
 	"time"
 
