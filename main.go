@@ -34,8 +34,8 @@ import (
 	"school-with-ai/infra/sqldb"
 	"school-with-ai/infra/sqldb/migrate"
 	"school-with-ai/modules/knowledge/edgequake"
-	"school-with-ai/platform/artifact"
 	permtool "school-with-ai/modules/permissions/tool"
+	"school-with-ai/platform/artifact"
 	"school-with-ai/plugins/calculator"
 	"school-with-ai/plugins/codebase"
 	"school-with-ai/plugins/cognitive"
@@ -48,30 +48,27 @@ import (
 
 	"school-with-ai/modules/chat/taskmanagement"
 	"school-with-ai/modules/knowledge/rag/users"
-	"school-with-ai/platform/toolregistry"
 	permworkspace "school-with-ai/modules/permissions/workspace"
-
-	preferencesmod "school-with-ai/modules/preferences"
+	"school-with-ai/platform/toolregistry"
 
 	pgstore "school-with-ai/infra/eventstore/postgres"
 
 	projectionStats "school-with-ai/modules/analytics/statistics"
 
-	"school-with-ai/platform/memory"
+	"school-with-ai/modules/chat/memory"
 	memoryplugin "school-with-ai/plugins/memory"
 
 	healthhandlers "school-with-ai/foundation/health"
 	agentstoremod "school-with-ai/modules/agentstore"
 	aisettingsmod "school-with-ai/modules/aisettings"
 	analyticsmod "school-with-ai/modules/analytics"
-	bannermod "school-with-ai/modules/banner"
 	billingmod "school-with-ai/modules/billing"
 	chatmod "school-with-ai/modules/chat"
-	identitymod "school-with-ai/modules/identity"
 	knowledgemod "school-with-ai/modules/knowledge"
 	mcpmod "school-with-ai/modules/mcp"
 	permissionsmod "school-with-ai/modules/permissions"
 	resourcesmod "school-with-ai/modules/resources"
+	userprofilemod "school-with-ai/modules/userprofile"
 
 	"github.com/ardanlabs/conf/v3"
 	"github.com/go-chi/chi/v5"
@@ -265,12 +262,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 	log.Info(ctx, "startup", "status", "initializing PostgreSQL event store")
 	baseEventStore := pgstore.NewPostgresEventStore(db, eventRegistry)
 
-	// Initialize Student Profile / Identity module
-	identityModule := identitymod.New(log, db)
-	studentProfileRepo := identityModule.StudentProfileRepo()
-
-	// Initialize Preferences module (user key-value preferences)
-	preferencesModule := preferencesmod.New(log, db)
+	// Initialize User Profile module (identity + preferences + banner)
+	userProfileModule := userprofilemod.New(log, db)
+	studentProfileRepo := userProfileModule.StudentProfileRepo()
 
 	// Initialize Agent Store module (agent definitions + catalog)
 	agentStoreModule := agentstoremod.New(log, db)
@@ -569,15 +563,13 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	registerRoutes(appRouter, log, authHandlers, authMiddleware, healthHandler, routeModules{
 		chat:        chatModule,
-		identity:    identityModule,
-		preferences: preferencesModule,
+		userProfile: userProfileModule,
 		aiSettings:  aiSettingsModule,
 		agentStore:  agentStoreModule,
 		knowledge:   knowledgeModule,
 		mcp:         mcpModule,
 		resources:   resourcesModule,
 		billing:     billingModule,
-		banner:      bannermod.New(log),
 		permissions: permissionsmod.New(log, workspacePermissionsService, &WorkspaceProviderAdapter{svc: edgequakeService}, agentProvider, cfg.Edgequake.TenantID),
 		analytics:   analyticsmod.New(log, statsProjection, cfg.DashboardAdmin.User, cfg.DashboardAdmin.Pass),
 	}, edgequakeService)
@@ -679,10 +671,7 @@ type routeModules struct {
 	chat interface {
 		RegisterRoutes(chi.Router, *auth.Middleware)
 	}
-	identity interface {
-		RegisterRoutes(chi.Router, *auth.Middleware)
-	}
-	preferences interface {
+	userProfile interface {
 		RegisterRoutes(chi.Router, *auth.Middleware)
 	}
 	aiSettings interface {
@@ -701,9 +690,6 @@ type routeModules struct {
 		RegisterRoutes(chi.Router, *auth.Middleware)
 	}
 	billing interface {
-		RegisterRoutes(chi.Router, *auth.Middleware)
-	}
-	banner interface {
 		RegisterRoutes(chi.Router, *auth.Middleware)
 	}
 	permissions interface {
@@ -730,9 +716,7 @@ func registerRoutes(
 	mods.resources.RegisterRoutes(r, authMW)
 	mods.permissions.RegisterRoutes(r, authMW)
 	mods.agentStore.RegisterRoutes(r, authMW)
-	mods.banner.RegisterRoutes(r, authMW)
-	mods.identity.RegisterRoutes(r, authMW)
-	mods.preferences.RegisterRoutes(r, authMW)
+	mods.userProfile.RegisterRoutes(r, authMW)
 	mods.aiSettings.RegisterRoutes(r, authMW)
 	mods.billing.RegisterRoutes(r, authMW)
 	mods.chat.RegisterRoutes(r, authMW)

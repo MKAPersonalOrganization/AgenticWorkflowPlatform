@@ -3,10 +3,11 @@ package toolregistry
 import (
 	"context"
 	"fmt"
-	"school-with-ai/foundation/agent"
-	"school-with-ai/platform/artifact"
-	"school-with-ai/platform/memory"
 	"sync"
+
+	"school-with-ai/foundation/agent"
+	"school-with-ai/modules/chat/memory"
+	"school-with-ai/platform/artifact"
 )
 
 // ExecutableToolFactory creates executable tools from tool registry entries and tool sets.

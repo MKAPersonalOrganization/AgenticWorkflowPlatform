@@ -3,10 +3,11 @@ package memory
 import (
 	"context"
 	"fmt"
-	"school-with-ai/shared"
-	"school-with-ai/foundation/agent"
-	"school-with-ai/platform/memory"
 	"strings"
+
+	"school-with-ai/foundation/agent"
+	"school-with-ai/modules/chat/memory"
+	"school-with-ai/shared"
 )
 
 const (
