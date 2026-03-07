@@ -8,12 +8,12 @@ package knowledge
 import (
 	"encoding/json"
 	"net/http"
-	"school-with-ai/services/rag/costs"
-	"school-with-ai/services/rag/entities"
-	"school-with-ai/services/rag/pipeline"
-	"school-with-ai/services/rag/relationships"
-	"school-with-ai/services/rag/tasks"
-	"school-with-ai/services/rag/workspaces"
+	"school-with-ai/modules/knowledge/rag/costs"
+	"school-with-ai/modules/knowledge/rag/entities"
+	"school-with-ai/modules/knowledge/rag/pipeline"
+	"school-with-ai/modules/knowledge/rag/relationships"
+	"school-with-ai/modules/knowledge/rag/tasks"
+	"school-with-ai/modules/knowledge/rag/workspaces"
 	"strconv"
 	"strings"
 
@@ -26,7 +26,7 @@ import (
 // ============================================================================
 
 // UpdateWorkspace updates an existing workspace.
-func (h *Handler) UpdateWorkspace(w http.ResponseWriter, r *http.Request) {
+func (h *handler) UpdateWorkspace(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -56,7 +56,7 @@ func (h *Handler) UpdateWorkspace(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetWorkspaceMetricsHistory returns metrics history for a workspace.
-func (h *Handler) GetWorkspaceMetricsHistory(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetWorkspaceMetricsHistory(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -80,7 +80,7 @@ func (h *Handler) GetWorkspaceMetricsHistory(w http.ResponseWriter, r *http.Requ
 }
 
 // TriggerMetricsSnapshot triggers a manual metrics snapshot.
-func (h *Handler) TriggerMetricsSnapshot(w http.ResponseWriter, r *http.Request) {
+func (h *handler) TriggerMetricsSnapshot(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -104,7 +104,7 @@ func (h *Handler) TriggerMetricsSnapshot(w http.ResponseWriter, r *http.Request)
 }
 
 // GetWorkspaceBySlug retrieves a workspace by its slug.
-func (h *Handler) GetWorkspaceBySlug(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetWorkspaceBySlug(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -132,7 +132,7 @@ func (h *Handler) GetWorkspaceBySlug(w http.ResponseWriter, r *http.Request) {
 // ============================================================================
 
 // GetTrackStatus returns the status of a document tracking operation.
-func (h *Handler) GetTrackStatus(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetTrackStatus(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -151,7 +151,7 @@ func (h *Handler) GetTrackStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 // RecoverStuckDocuments recovers documents stuck in processing.
-func (h *Handler) RecoverStuckDocuments(w http.ResponseWriter, r *http.Request) {
+func (h *handler) RecoverStuckDocuments(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -169,7 +169,7 @@ func (h *Handler) RecoverStuckDocuments(w http.ResponseWriter, r *http.Request) 
 }
 
 // GetDeletionImpact analyzes the impact of deleting a document.
-func (h *Handler) GetDeletionImpact(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetDeletionImpact(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -188,7 +188,7 @@ func (h *Handler) GetDeletionImpact(w http.ResponseWriter, r *http.Request) {
 }
 
 // RetryFailedChunks retries failed chunks for a document.
-func (h *Handler) RetryFailedChunks(w http.ResponseWriter, r *http.Request) {
+func (h *handler) RetryFailedChunks(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -207,7 +207,7 @@ func (h *Handler) RetryFailedChunks(w http.ResponseWriter, r *http.Request) {
 }
 
 // ListFailedChunks lists failed chunks for a document.
-func (h *Handler) ListFailedChunks(w http.ResponseWriter, r *http.Request) {
+func (h *handler) ListFailedChunks(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -226,7 +226,7 @@ func (h *Handler) ListFailedChunks(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetDocumentFullLineage retrieves full lineage for a document.
-func (h *Handler) GetDocumentFullLineage(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetDocumentFullLineage(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -245,7 +245,7 @@ func (h *Handler) GetDocumentFullLineage(w http.ResponseWriter, r *http.Request)
 }
 
 // GetDocumentMetadata retrieves metadata for a document.
-func (h *Handler) GetDocumentMetadata(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetDocumentMetadata(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -264,7 +264,7 @@ func (h *Handler) GetDocumentMetadata(w http.ResponseWriter, r *http.Request) {
 }
 
 // ExportDocumentLineage exports lineage for a document.
-func (h *Handler) ExportDocumentLineage(w http.ResponseWriter, r *http.Request) {
+func (h *handler) ExportDocumentLineage(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -284,7 +284,7 @@ func (h *Handler) ExportDocumentLineage(w http.ResponseWriter, r *http.Request) 
 }
 
 // GetPDFStatus retrieves PDF processing status.
-func (h *Handler) GetPDFStatus(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetPDFStatus(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -303,7 +303,7 @@ func (h *Handler) GetPDFStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 // CancelPDFProcessing cancels PDF processing.
-func (h *Handler) CancelPDFProcessing(w http.ResponseWriter, r *http.Request) {
+func (h *handler) CancelPDFProcessing(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -326,7 +326,7 @@ func (h *Handler) CancelPDFProcessing(w http.ResponseWriter, r *http.Request) {
 // ============================================================================
 
 // GetDegreesBatch retrieves degrees for multiple nodes.
-func (h *Handler) GetDegreesBatch(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetDegreesBatch(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -356,7 +356,7 @@ func (h *Handler) GetDegreesBatch(w http.ResponseWriter, r *http.Request) {
 // ============================================================================
 
 // ListEntities returns a list of entities.
-func (h *Handler) ListEntities(w http.ResponseWriter, r *http.Request) {
+func (h *handler) ListEntities(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -381,7 +381,7 @@ func (h *Handler) ListEntities(w http.ResponseWriter, r *http.Request) {
 }
 
 // CreateEntity creates a new entity.
-func (h *Handler) CreateEntity(w http.ResponseWriter, r *http.Request) {
+func (h *handler) CreateEntity(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -405,7 +405,7 @@ func (h *Handler) CreateEntity(w http.ResponseWriter, r *http.Request) {
 }
 
 // EntityExists checks if an entity exists.
-func (h *Handler) EntityExists(w http.ResponseWriter, r *http.Request) {
+func (h *handler) EntityExists(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -424,7 +424,7 @@ func (h *Handler) EntityExists(w http.ResponseWriter, r *http.Request) {
 }
 
 // MergeEntities merges two entities.
-func (h *Handler) MergeEntities(w http.ResponseWriter, r *http.Request) {
+func (h *handler) MergeEntities(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -448,7 +448,7 @@ func (h *Handler) MergeEntities(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetEntity retrieves a specific entity.
-func (h *Handler) GetEntity(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetEntity(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -467,7 +467,7 @@ func (h *Handler) GetEntity(w http.ResponseWriter, r *http.Request) {
 }
 
 // UpdateEntity updates an entity.
-func (h *Handler) UpdateEntity(w http.ResponseWriter, r *http.Request) {
+func (h *handler) UpdateEntity(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -492,7 +492,7 @@ func (h *Handler) UpdateEntity(w http.ResponseWriter, r *http.Request) {
 }
 
 // DeleteEntity deletes an entity.
-func (h *Handler) DeleteEntity(w http.ResponseWriter, r *http.Request) {
+func (h *handler) DeleteEntity(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -512,7 +512,7 @@ func (h *Handler) DeleteEntity(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetEntityNeighborhood retrieves the neighborhood of an entity.
-func (h *Handler) GetEntityNeighborhood(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetEntityNeighborhood(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -536,7 +536,7 @@ func (h *Handler) GetEntityNeighborhood(w http.ResponseWriter, r *http.Request) 
 // ============================================================================
 
 // ListRelationships returns a list of relationships.
-func (h *Handler) ListRelationships(w http.ResponseWriter, r *http.Request) {
+func (h *handler) ListRelationships(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -560,7 +560,7 @@ func (h *Handler) ListRelationships(w http.ResponseWriter, r *http.Request) {
 }
 
 // CreateRelationship creates a new relationship.
-func (h *Handler) CreateRelationship(w http.ResponseWriter, r *http.Request) {
+func (h *handler) CreateRelationship(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -584,7 +584,7 @@ func (h *Handler) CreateRelationship(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetRelationship retrieves a specific relationship.
-func (h *Handler) GetRelationship(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetRelationship(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -603,7 +603,7 @@ func (h *Handler) GetRelationship(w http.ResponseWriter, r *http.Request) {
 }
 
 // UpdateRelationship updates a relationship.
-func (h *Handler) UpdateRelationship(w http.ResponseWriter, r *http.Request) {
+func (h *handler) UpdateRelationship(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -628,7 +628,7 @@ func (h *Handler) UpdateRelationship(w http.ResponseWriter, r *http.Request) {
 }
 
 // DeleteRelationship deletes a relationship.
-func (h *Handler) DeleteRelationship(w http.ResponseWriter, r *http.Request) {
+func (h *handler) DeleteRelationship(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -651,7 +651,7 @@ func (h *Handler) DeleteRelationship(w http.ResponseWriter, r *http.Request) {
 // ============================================================================
 
 // GetTask retrieves a task by track ID.
-func (h *Handler) GetTask(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetTask(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -670,7 +670,7 @@ func (h *Handler) GetTask(w http.ResponseWriter, r *http.Request) {
 }
 
 // ListTasks returns a list of tasks.
-func (h *Handler) ListTasks(w http.ResponseWriter, r *http.Request) {
+func (h *handler) ListTasks(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -722,7 +722,7 @@ func (h *Handler) ListTasks(w http.ResponseWriter, r *http.Request) {
 // ============================================================================
 
 // GetCostSummary returns the cost summary.
-func (h *Handler) GetCostSummary(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetCostSummary(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -740,7 +740,7 @@ func (h *Handler) GetCostSummary(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetCostHistory returns cost history.
-func (h *Handler) GetCostHistory(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetCostHistory(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -769,7 +769,7 @@ func (h *Handler) GetCostHistory(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetBudget returns the budget status.
-func (h *Handler) GetBudget(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetBudget(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -787,7 +787,7 @@ func (h *Handler) GetBudget(w http.ResponseWriter, r *http.Request) {
 }
 
 // UpdateBudget updates the budget.
-func (h *Handler) UpdateBudget(w http.ResponseWriter, r *http.Request) {
+func (h *handler) UpdateBudget(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -811,7 +811,7 @@ func (h *Handler) UpdateBudget(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetPipelinePricing returns pipeline cost pricing.
-func (h *Handler) GetPipelinePricing(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetPipelinePricing(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -829,7 +829,7 @@ func (h *Handler) GetPipelinePricing(w http.ResponseWriter, r *http.Request) {
 }
 
 // EstimatePipelineCost estimates the cost of a pipeline operation.
-func (h *Handler) EstimatePipelineCost(w http.ResponseWriter, r *http.Request) {
+func (h *handler) EstimatePipelineCost(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -857,7 +857,7 @@ func (h *Handler) EstimatePipelineCost(w http.ResponseWriter, r *http.Request) {
 // ============================================================================
 
 // GetEntityLineage retrieves lineage for an entity.
-func (h *Handler) GetEntityLineage(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetEntityLineage(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -876,7 +876,7 @@ func (h *Handler) GetEntityLineage(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetDocumentLineage retrieves graph lineage for a document.
-func (h *Handler) GetDocumentLineage(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetDocumentLineage(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -899,7 +899,7 @@ func (h *Handler) GetDocumentLineage(w http.ResponseWriter, r *http.Request) {
 // ============================================================================
 
 // GetChunkDetail retrieves a specific chunk.
-func (h *Handler) GetChunkDetail(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetChunkDetail(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -918,7 +918,7 @@ func (h *Handler) GetChunkDetail(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetChunkLineage retrieves lineage for a specific chunk.
-func (h *Handler) GetChunkLineage(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetChunkLineage(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -941,7 +941,7 @@ func (h *Handler) GetChunkLineage(w http.ResponseWriter, r *http.Request) {
 // ============================================================================
 
 // GetEntityProvenance retrieves provenance for an entity.
-func (h *Handler) GetEntityProvenance(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetEntityProvenance(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -964,7 +964,7 @@ func (h *Handler) GetEntityProvenance(w http.ResponseWriter, r *http.Request) {
 // ============================================================================
 
 // GetProviderStatus returns provider status.
-func (h *Handler) GetProviderStatus(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetProviderStatus(w http.ResponseWriter, r *http.Request) {
 	result, err := h.edgequakeService.Settings.GetStatus(r.Context())
 	if err != nil {
 		// If settings are not configured yet, return a 404 instead of 500
@@ -981,7 +981,7 @@ func (h *Handler) GetProviderStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 // ListAvailableProviders returns available providers.
-func (h *Handler) ListAvailableProviders(w http.ResponseWriter, r *http.Request) {
+func (h *handler) ListAvailableProviders(w http.ResponseWriter, r *http.Request) {
 	result, err := h.edgequakeService.Settings.GetProviders(r.Context())
 	if err != nil {
 		h.log.Error(r.Context(), "failed to list providers", "error", err)
@@ -997,7 +997,7 @@ func (h *Handler) ListAvailableProviders(w http.ResponseWriter, r *http.Request)
 // ============================================================================
 
 // ListAllModels returns all models.
-func (h *Handler) ListAllModels(w http.ResponseWriter, r *http.Request) {
+func (h *handler) ListAllModels(w http.ResponseWriter, r *http.Request) {
 	result, err := h.edgequakeService.Models.List(r.Context())
 	if err != nil {
 		h.log.Error(r.Context(), "failed to list models", "error", err)
@@ -1009,7 +1009,7 @@ func (h *Handler) ListAllModels(w http.ResponseWriter, r *http.Request) {
 }
 
 // CheckModelsHealth returns model provider health.
-func (h *Handler) CheckModelsHealth(w http.ResponseWriter, r *http.Request) {
+func (h *handler) CheckModelsHealth(w http.ResponseWriter, r *http.Request) {
 	result, err := h.edgequakeService.Models.Health(r.Context())
 	if err != nil {
 		h.log.Error(r.Context(), "failed to check model health", "error", err)
@@ -1021,7 +1021,7 @@ func (h *Handler) CheckModelsHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetProvider returns a specific provider.
-func (h *Handler) GetProvider(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetProvider(w http.ResponseWriter, r *http.Request) {
 	provider := chi.URLParam(r, "provider")
 	result, err := h.edgequakeService.Models.GetProvider(r.Context(), provider)
 	if err != nil {
@@ -1034,7 +1034,7 @@ func (h *Handler) GetProvider(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetModel returns a specific model.
-func (h *Handler) GetModel(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetModel(w http.ResponseWriter, r *http.Request) {
 	provider := chi.URLParam(r, "provider")
 	model := chi.URLParam(r, "model")
 	result, err := h.edgequakeService.Models.GetModel(r.Context(), provider, model)

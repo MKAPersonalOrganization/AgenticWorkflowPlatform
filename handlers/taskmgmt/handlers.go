@@ -16,7 +16,7 @@ import (
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/services"
 	"school-with-ai/services/artifact"
-	"school-with-ai/services/edgequake"
+	"school-with-ai/modules/knowledge/edgequake"
 	"school-with-ai/services/memory"
 	"school-with-ai/services/permissions"
 	"school-with-ai/services/taskmanagement"

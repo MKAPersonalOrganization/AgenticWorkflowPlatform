@@ -9,7 +9,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"school-with-ai/domain"
-	"school-with-ai/services/rag/tasks"
+	"school-with-ai/modules/knowledge/rag/tasks"
 	"time"
 )
 

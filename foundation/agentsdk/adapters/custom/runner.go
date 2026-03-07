@@ -15,7 +15,7 @@ import (
 	"school-with-ai/foundation/logger"
 	mcpmod "school-with-ai/modules/mcp"
 	"school-with-ai/services/artifact"
-	"school-with-ai/services/edgequake"
+	"school-with-ai/modules/knowledge/edgequake"
 	"school-with-ai/services/memory"
 	"school-with-ai/services/permissions"
 	"school-with-ai/services/toolregistry"
