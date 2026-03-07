@@ -20,7 +20,6 @@ import (
 	"school-with-ai/components/landing"
 	"school-with-ai/components/pricing"
 	"school-with-ai/domain"
-	"school-with-ai/shared"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/adapters/custom"
 	"school-with-ai/foundation/debug"
@@ -30,7 +29,6 @@ import (
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/middleware"
 	"school-with-ai/handlers/auth"
-	"school-with-ai/handlers/profile"
 	"school-with-ai/infra/googleauth"
 	"school-with-ai/infra/projection/agui"
 	"school-with-ai/infra/projection/llmcontext"
@@ -51,6 +49,7 @@ import (
 	"school-with-ai/services/artifact"
 	"school-with-ai/services/memory"
 	"school-with-ai/services/permissions"
+	"school-with-ai/shared"
 
 	"school-with-ai/modules/knowledge/rag/users"
 	"school-with-ai/services/taskmanagement"
@@ -58,9 +57,8 @@ import (
 	"school-with-ai/services/toolregistry"
 	"school-with-ai/services/workspacepermissions"
 
-	preferenceshandler "school-with-ai/handlers/preferences"
+	preferencesmod "school-with-ai/modules/preferences"
 
-	statisticsHandler "school-with-ai/handlers/statistics"
 	pgstore "school-with-ai/infra/eventstore/postgres"
 
 	projectionStats "school-with-ai/infra/projection/statistics"
@@ -68,15 +66,17 @@ import (
 	memoryplugin "school-with-ai/plugins/memory"
 
 	aguihandlers "school-with-ai/handlers/agui"
-	bannerhandlers "school-with-ai/handlers/banner"
 	healthhandlers "school-with-ai/handlers/health"
 	taskmgmthandlers "school-with-ai/handlers/taskmgmt"
-	wkspermhandlers "school-with-ai/handlers/workspacepermissions"
 	agentstoremod "school-with-ai/modules/agentstore"
 	aisettingsmod "school-with-ai/modules/aisettings"
+	analyticsmod "school-with-ai/modules/analytics"
+	bannermod "school-with-ai/modules/banner"
 	billingmod "school-with-ai/modules/billing"
+	identitymod "school-with-ai/modules/identity"
 	knowledgemod "school-with-ai/modules/knowledge"
 	mcpmod "school-with-ai/modules/mcp"
+	permissionsmod "school-with-ai/modules/permissions"
 	resourcesmod "school-with-ai/modules/resources"
 
 	authService "school-with-ai/services/auth"
@@ -273,9 +273,12 @@ func run(ctx context.Context, log *logger.Logger) error {
 	log.Info(ctx, "startup", "status", "initializing PostgreSQL event store")
 	baseEventStore := pgstore.NewPostgresEventStore(db, eventRegistry)
 
-	// Initialize Student Profile Repository
-	studentProfileRepo := sqldb.NewPostgresStudentProfileRepository(db)
-	userPreferenceRepo := sqldb.NewPostgresUserPreferenceRepository(db)
+	// Initialize Student Profile / Identity module
+	identityModule := identitymod.New(log, db)
+	studentProfileRepo := identityModule.StudentProfileRepo()
+
+	// Initialize Preferences module (user key-value preferences)
+	preferencesModule := preferencesmod.New(log, db)
 
 	// Initialize Agent Store module (agent definitions + catalog)
 	agentStoreModule := agentstoremod.New(log, db)
@@ -619,21 +622,19 @@ func run(ctx context.Context, log *logger.Logger) error {
 	authHandlers := auth.NewAuthHandlers(log, googleClient, sessionStore, cfg.Auth.AppURL)
 	authMiddleware := auth.NewMiddleware(googleClient, sessionStore, cfg.Auth.AppURL, ctx)
 
-	// Profile Handler
-	profileHandler := profile.NewHandler(log, studentProfileRepo)
-
 	// Resources Module routes
 	resourcesModule.RegisterRoutes(r, authMiddleware)
 
-	// Workspace Permissions Handler
-	workspacePermHandler := wkspermhandlers.NewHandler(log, workspacePermissionsService, edgequakeService, agentProvider, cfg.Edgequake.TenantID)
+	// Permissions module (workspace permissions)
+	permissionsModule := permissionsmod.New(log, workspacePermissionsService, edgequakeService, agentProvider, cfg.Edgequake.TenantID)
+	permissionsModule.RegisterRoutes(r, authMiddleware)
 
 	// Agent Store & Catalog routes (module)
 	agentStoreModule.RegisterRoutes(r, authMiddleware)
 
-	// Banner Handler
-	bannerHandler := bannerhandlers.NewHandler(log)
-	r.Get("/api/banner", authMiddleware.RequireAuthFunc(bannerHandler.GetBanner))
+	// Banner routes (modules/banner)
+	bannerModule := bannermod.New(log)
+	bannerModule.RegisterRoutes(r, authMiddleware)
 
 	// Health check endpoints (public)
 	r.Get("/liveness", healthHandler.Liveness)
@@ -646,25 +647,18 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Get("/auth/error", authHandlers.ErrorPage)
 	r.Get("/api/me", authMiddleware.RequireAuthFunc(authHandlers.MeHandler))
 
-	// Profile routes (protected)
-	r.Get("/profile", authMiddleware.RequireAuthFunc(profileHandler.HandleProfilePage))
-	r.Get("/api/profile", authMiddleware.RequireAuthFunc(profileHandler.GetProfile))
-	r.Put("/api/profile", authMiddleware.RequireAuthFunc(profileHandler.UpdateProfile))
+	// Profile routes (modules/identity)
+	identityModule.RegisterRoutes(r, authMiddleware)
 
-	// User Preferences routes (cross-device UI state persistence)
-	prefsHandler := preferenceshandler.NewHandler(log, userPreferenceRepo)
-	r.Get("/api/preferences", authMiddleware.RequireAuthFunc(prefsHandler.GetAllPreferences))
-	r.Get("/api/preferences/{key}", authMiddleware.RequireAuthFunc(prefsHandler.GetPreference))
-	r.Put("/api/preferences/{key}", authMiddleware.RequireAuthFunc(prefsHandler.SetPreference))
+	// User Preferences routes (modules/preferences)
+	preferencesModule.RegisterRoutes(r, authMiddleware)
 
 	// AI Settings routes (modules/aisettings)
 	aiSettingsModule.RegisterRoutes(r, authMiddleware)
 
-	// Analytics Dashboard (dedicated Basic Auth)
-	statsHandler := statisticsHandler.NewHandler(log, statsProjection, cfg.DashboardAdmin.User, cfg.DashboardAdmin.Pass)
-	r.Get("/analytics", statsHandler.BasicAuth(statsHandler.ServeDashboard))
-	r.Get("/analytics/api/timeseries", statsHandler.BasicAuth(statsHandler.ServeToolTimeSeries))
-	r.Get("/analytics/api/tools/{tool}", statsHandler.BasicAuth(statsHandler.ServeToolDetail))
+	// Analytics Dashboard (modules/analytics — uses own Basic Auth)
+	analyticsModule := analyticsmod.New(log, statsProjection, cfg.DashboardAdmin.User, cfg.DashboardAdmin.Pass)
+	analyticsModule.RegisterRoutes(r)
 
 	// Pricing page
 	r.Get("/pricing", authMiddleware.RequireAuthFunc(HandlePricingPage(log)))
@@ -706,10 +700,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	r.Get("/v1/documents", authMiddleware.RequireAuthFunc(handler.ListDocuments))
 	r.Post("/v1/documents", authMiddleware.RequireAuthFunc(handler.UploadDocument))
-
-	// Workspace permission routes
-	r.Get("/v1/agents/{agentId}/workspaces", authMiddleware.RequireAuthFunc(workspacePermHandler.ListAgentWorkspaces))
-	r.Put("/v1/agents/{agentId}/workspaces/{workspaceId}", authMiddleware.RequireAuthFunc(workspacePermHandler.ToggleAgentWorkspace))
 
 	// AGUI projection query endpoints (protected)
 	r.Get("/api/agui/threads", authMiddleware.RequireAuthFunc(aguiHandler.ListThreads))

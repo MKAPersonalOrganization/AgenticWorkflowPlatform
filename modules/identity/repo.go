@@ -1,29 +1,28 @@
-package sqldb
+package identity
 
 import (
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
-	"school-with-ai/domain"
 	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 )
 
-// PostgresStudentProfileRepository implements domain.StudentProfileRepository.
-type PostgresStudentProfileRepository struct {
+// postgresStudentProfileRepository implements StudentProfileRepository (domain.StudentProfileRepository).
+type postgresStudentProfileRepository struct {
 	db *sqlx.DB
 }
 
-// NewPostgresStudentProfileRepository creates a new repository.
-func NewPostgresStudentProfileRepository(db *sqlx.DB) *PostgresStudentProfileRepository {
-	return &PostgresStudentProfileRepository{db: db}
+// newPostgresStudentProfileRepository creates a new repository.
+func newPostgresStudentProfileRepository(db *sqlx.DB) *postgresStudentProfileRepository {
+	return &postgresStudentProfileRepository{db: db}
 }
 
 // GetByUserID retrieves a profile by User ID.
-func (r *PostgresStudentProfileRepository) GetByUserID(ctx context.Context, userID string) (*domain.StudentProfile, error) {
+func (r *postgresStudentProfileRepository) GetByUserID(ctx context.Context, userID string) (*StudentProfile, error) {
 	query := `
 		SELECT user_id, learning_style, struggles, strengths, goals, created_at, updated_at
 		FROM student_profiles
@@ -31,7 +30,7 @@ func (r *PostgresStudentProfileRepository) GetByUserID(ctx context.Context, user
 	`
 	row := r.db.QueryRowContext(ctx, query, userID)
 
-	var profile domain.StudentProfile
+	var profile StudentProfile
 	var struggles, strengths []string
 
 	err := row.Scan(
@@ -57,7 +56,7 @@ func (r *PostgresStudentProfileRepository) GetByUserID(ctx context.Context, user
 }
 
 // Upsert creates or updates a student profile.
-func (r *PostgresStudentProfileRepository) Upsert(ctx context.Context, profile *domain.StudentProfile) error {
+func (r *postgresStudentProfileRepository) Upsert(ctx context.Context, profile *StudentProfile) error {
 	query := `
 		INSERT INTO student_profiles (user_id, learning_style, struggles, strengths, goals, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
