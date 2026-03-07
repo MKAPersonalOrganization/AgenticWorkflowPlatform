@@ -7,7 +7,7 @@ import (
 
 	component "school-with-ai/components/analytics"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/infra/projection/statistics"
+	"school-with-ai/modules/analytics/statistics"
 	"school-with-ai/shared"
 )
 

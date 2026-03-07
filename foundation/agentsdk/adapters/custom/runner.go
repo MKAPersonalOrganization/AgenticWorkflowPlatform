@@ -8,25 +8,25 @@ import (
 	"strings"
 
 	"school-with-ai/domain"
-	"school-with-ai/shared"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/engine"
 	"school-with-ai/foundation/agentsdk/internal/llm"
 	"school-with-ai/foundation/logger"
+	"school-with-ai/modules/knowledge/edgequake"
 	mcpmod "school-with-ai/modules/mcp"
 	"school-with-ai/services/artifact"
-	"school-with-ai/modules/knowledge/edgequake"
 	"school-with-ai/services/memory"
 	"school-with-ai/services/permissions"
 	"school-with-ai/services/toolregistry"
 	"school-with-ai/services/workspacepermissions"
+	"school-with-ai/shared"
 
 	agentio "school-with-ai/foundation/agentsdk/io"
 
 	memorytools "school-with-ai/plugins/memory"
 
-	smiddleware "school-with-ai/services/studentprofile/middleware"
+	smiddleware "school-with-ai/foundation/agentsdk/middleware"
 )
 
 // ModelConfigResolver resolves LLM configuration for a given user.

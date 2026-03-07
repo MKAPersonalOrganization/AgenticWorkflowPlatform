@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"school-with-ai/components/chart"
+	"school-with-ai/modules/analytics/statistics"
 	"school-with-ai/shared"
-	"school-with-ai/infra/projection/statistics"
 )
 
 type DashboardProps struct {
@@ -313,9 +313,7 @@ templ Dashboard(props DashboardProps) {
 			}
 			<!-- Per-Tool Detail Section (Dynamic via Alpine.js) -->
 			if len(props.ToolList) > 0 {
-				{{
-					toolListJSON, _ := json.Marshal(props.ToolList)
-				}}
+				{{ toolListJSON, _ := json.Marshal(props.ToolList) }}
 				<div
 					class="bg-card rounded-2xl border shadow-sm p-6"
 					x-data={ fmt.Sprintf(`{

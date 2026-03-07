@@ -46,8 +46,8 @@ import (
 	"school-with-ai/services/permissions"
 	"school-with-ai/shared"
 
-	"school-with-ai/modules/knowledge/rag/users"
 	"school-with-ai/modules/chat/taskmanagement"
+	"school-with-ai/modules/knowledge/rag/users"
 	"school-with-ai/services/toolregistry"
 	"school-with-ai/services/workspacepermissions"
 
@@ -55,7 +55,7 @@ import (
 
 	pgstore "school-with-ai/infra/eventstore/postgres"
 
-	projectionStats "school-with-ai/infra/projection/statistics"
+	projectionStats "school-with-ai/modules/analytics/statistics"
 
 	memoryplugin "school-with-ai/plugins/memory"
 
@@ -71,8 +71,6 @@ import (
 	mcpmod "school-with-ai/modules/mcp"
 	permissionsmod "school-with-ai/modules/permissions"
 	resourcesmod "school-with-ai/modules/resources"
-
-	authService "school-with-ai/services/auth"
 
 	"github.com/ardanlabs/conf/v3"
 	"github.com/go-chi/chi/v5"
@@ -430,7 +428,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// -------------------------------------------------------------------------
 	// Initialize Chat Module (core chat bounded context — ADR 014)
 
-	authSvc := authService.NewAuthService()
+	authSvc := &contextAuthService{}
 	chatModule := chatmod.New(chatmod.Dependencies{
 		Log:                log,
 		DB:                 db,
@@ -849,4 +847,17 @@ func validateProductionConfig(log *logger.Logger, buildTag, adminUser, adminPass
 	}
 
 	return nil
+}
+
+// contextAuthService implements services.AuthService by reading the
+// authenticated user directly from the request context. This replaces
+// the former services/auth package (a trivial delegation wrapper).
+type contextAuthService struct{}
+
+func (*contextAuthService) GetUserFromContext(ctx context.Context) *shared.User {
+	return shared.GetUserFromContext(ctx)
+}
+
+func (s *contextAuthService) IsAuthenticated(ctx context.Context) bool {
+	return s.GetUserFromContext(ctx) != nil
 }
