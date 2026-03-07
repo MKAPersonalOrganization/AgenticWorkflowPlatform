@@ -404,6 +404,108 @@ export function createSessionMethods() {
                     input.focus({ preventScroll: true });
                 }
             });
+        },
+
+        /**
+         * Preview a thread's messages on hover (lightweight fetch for dialog preview).
+         * Caches results so repeated hovers are instant.
+         * @param {string} sessionId - Thread ID to preview
+         */
+        async previewSession(sessionId) {
+            if (!sessionId || sessionId === this.__previewSessionId) return;
+
+            // Cancel any in-flight preview fetch
+            if (this.__previewAbort) {
+                this.__previewAbort.abort();
+                this.__previewAbort = null;
+            }
+
+            this.__previewSessionId = sessionId;
+
+            // Check cache first
+            if (this.__previewCache[sessionId]) {
+                this.__previewMessages = this.__previewCache[sessionId];
+                this.__previewLoading = false;
+                return;
+            }
+
+            // If this is the current active thread, use already-loaded messages
+            const threadState = this.__threadStates[sessionId];
+            if (threadState?.messages?.length > 0) {
+                const preview = threadState.messages
+                    .filter(m => m.role === 'user' || m.role === 'assistant')
+                    .slice(0, 50)
+                    .map(m => ({
+                        id: m.id,
+                        role: m.role,
+                        content: m.content || '',
+                        attachments: m.attachments || [],
+                        type: m.type || 'message',
+                        streaming: false,
+                        timestamp: m.timestamp,
+                    }));
+                this.__previewCache[sessionId] = preview;
+                this.__previewMessages = preview;
+                this.__previewLoading = false;
+                return;
+            }
+
+            this.__previewMessages = [];
+            this.__previewLoading = true;
+
+            try {
+                const controller = new AbortController();
+                this.__previewAbort = controller;
+                const response = await fetch(`/api/agui/threads/${sessionId}/messages`, {
+                    signal: controller.signal
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                const messages = Array.isArray(data) ? data : (data.messages || []);
+
+                // Build preview using same shape as real messages (user + assistant only)
+                const preview = messages
+                    .filter(m => m.role === 'user' || m.role === 'assistant')
+                    .slice(0, 50)
+                    .map(m => ({
+                        id: m.id,
+                        role: m.role,
+                        content: typeof m.content === 'string' ? m.content : '',
+                        attachments: m.attachments || [],
+                        type: m.type || 'message',
+                        streaming: false,
+                        timestamp: m.timestamp,
+                    }));
+
+                this.__previewCache[sessionId] = preview;
+
+                // Only apply if this is still the hovered session
+                if (this.__previewSessionId === sessionId) {
+                    this.__previewMessages = preview;
+                    this.__previewLoading = false;
+                }
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    console.warn('[Sessions] Preview fetch failed:', err);
+                    if (this.__previewSessionId === sessionId) {
+                        this.__previewMessages = [];
+                        this.__previewLoading = false;
+                    }
+                }
+            }
+        },
+
+        /**
+         * Clear the thread preview state (on mouse leave)
+         */
+        clearPreview() {
+            if (this.__previewAbort) {
+                this.__previewAbort.abort();
+                this.__previewAbort = null;
+            }
+            this.__previewSessionId = null;
+            this.__previewMessages = [];
+            this.__previewLoading = false;
         }
     };
 }

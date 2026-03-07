@@ -88,6 +88,13 @@ export function createInitialState() {
         renamingSessionId: null,
         renameTitle: '',
 
+        // Thread preview (hover in history dialog)
+        __previewSessionId: null,
+        __previewMessages: [],
+        __previewLoading: false,
+        __previewCache: {},
+        __previewAbort: null,
+
         selectedAgent: localStorage.getItem('selectedAgent') || '',
         currentAgentData: null,
 
