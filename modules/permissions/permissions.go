@@ -4,7 +4,6 @@ import (
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/handlers/auth"
-	wkperms "school-with-ai/handlers/workspacepermissions"
 	"school-with-ai/modules/knowledge/edgequake"
 	"school-with-ai/services/workspacepermissions"
 
@@ -14,11 +13,11 @@ import (
 // Module is the permissions bounded context, combining workspace permissions
 // (and, in future, resource permissions) into a single module entry point.
 type Module struct {
-	workspacePermHandler *wkperms.Handler
+	handler *workspacePermHandler
 }
 
-// New creates a new permissions module by wiring the existing handler
-// implementations with the provided service dependencies.
+// New creates a new permissions module by wiring the handler
+// with the provided service dependencies.
 func New(
 	log *logger.Logger,
 	workspacePermService *workspacepermissions.Service,
@@ -26,9 +25,9 @@ func New(
 	agentProvider agent.AgentProvider,
 	tenantID string,
 ) *Module {
-	wh := wkperms.NewHandler(log, workspacePermService, edgequakeService, agentProvider, tenantID)
+	wh := newWorkspacePermHandler(log, workspacePermService, edgequakeService, agentProvider, tenantID)
 	return &Module{
-		workspacePermHandler: wh,
+		handler: wh,
 	}
 }
 
@@ -36,6 +35,6 @@ func New(
 // provided chi router.
 func (m *Module) RegisterRoutes(r chi.Router, authMW *auth.Middleware) {
 	// Workspace permission routes
-	r.Get("/v1/agents/{agentId}/workspaces", authMW.RequireAuthFunc(m.workspacePermHandler.ListAgentWorkspaces))
-	r.Put("/v1/agents/{agentId}/workspaces/{workspaceId}", authMW.RequireAuthFunc(m.workspacePermHandler.ToggleAgentWorkspace))
+	r.Get("/v1/agents/{agentId}/workspaces", authMW.RequireAuthFunc(m.handler.ListAgentWorkspaces))
+	r.Put("/v1/agents/{agentId}/workspaces/{workspaceId}", authMW.RequireAuthFunc(m.handler.ToggleAgentWorkspace))
 }
