@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"time"
 
-
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 )
 
 // postgresMCPConnectorRepository implements MCPConnectorRepository.
@@ -299,4 +299,35 @@ func (r *postgresMCPConnectorRepository) DeleteToolsByConnector(ctx context.Cont
 		return fmt.Errorf("deleting tools for connector %s: %w", connectorID, err)
 	}
 	return nil
+}
+
+// CountToolsByConnectors returns a map of connector ID → tool count.
+// Uses a single GROUP BY query to avoid N+1 when listing connectors.
+func (r *postgresMCPConnectorRepository) CountToolsByConnectors(ctx context.Context, connectorIDs []string) (map[string]int, error) {
+	if len(connectorIDs) == 0 {
+		return map[string]int{}, nil
+	}
+
+	query := `
+		SELECT connector_id, COUNT(*) as cnt
+		FROM mcp_discovered_tools
+		WHERE connector_id = ANY($1)
+		GROUP BY connector_id
+	`
+	rows, err := r.db.QueryContext(ctx, query, pq.Array(connectorIDs))
+	if err != nil {
+		return nil, fmt.Errorf("counting tools by connectors: %w", err)
+	}
+	defer rows.Close()
+
+	result := make(map[string]int, len(connectorIDs))
+	for rows.Next() {
+		var id string
+		var count int
+		if err := rows.Scan(&id, &count); err != nil {
+			return nil, fmt.Errorf("scanning tool count row: %w", err)
+		}
+		result[id] = count
+	}
+	return result, rows.Err()
 }

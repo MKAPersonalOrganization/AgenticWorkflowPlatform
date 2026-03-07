@@ -65,3 +65,16 @@ func (c *ttlCache[T]) Len() int {
 	defer c.mu.RUnlock()
 	return len(c.entries)
 }
+
+// Cleanup removes all expired entries. Call periodically to prevent
+// unbounded memory growth from entries that are never read after expiry.
+func (c *ttlCache[T]) Cleanup() {
+	now := time.Now()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for key, entry := range c.entries {
+		if now.After(entry.expiresAt) {
+			delete(c.entries, key)
+		}
+	}
+}

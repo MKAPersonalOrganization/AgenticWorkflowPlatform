@@ -4,9 +4,6 @@ import (
 	"context"
 	"fmt"
 	"school-with-ai/foundation/logger"
-	"sort"
-	"strings"
-	"sync"
 	"time"
 )
 
@@ -49,113 +46,53 @@ type Repository interface {
 	DeleteToolSet(ctx context.Context, id string) error
 }
 
-// Registry manages tools, tool sets, and their configurations per agent.
+// Registry manages tools and tool sets. All state lives in PostgreSQL — there
+// is no in-memory cache. This keeps the implementation simple, stateless, and
+// safe for hundreds of concurrent pods without cross-pod invalidation concerns.
+// PostgreSQL connection pooling (via pgx) provides the necessary throughput.
 type Registry struct {
-	log          *logger.Logger
-	repo         Repository
-	mutex        sync.RWMutex
-	toolCache    map[string]*Tool    // toolID -> Tool
-	toolSetCache map[string]*ToolSet // toolSetID -> ToolSet
+	log  *logger.Logger
+	repo Repository
 }
 
 // NewRegistry creates a new tool registry.
 func NewRegistry(log *logger.Logger, repo Repository) *Registry {
 	return &Registry{
-		log:          log,
-		repo:         repo,
-		toolCache:    make(map[string]*Tool),
-		toolSetCache: make(map[string]*ToolSet),
+		log:  log,
+		repo: repo,
 	}
 }
 
-// Initialize loads default tools and tool sets.
+// Initialize ensures default tools and tool sets exist in the database.
 func (r *Registry) Initialize(ctx context.Context) error {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-
-	// Load default tools if registry is empty
-	tools, err := r.repo.ListTools(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to load tools: %w", err)
-	}
-
-	// Load tool sets
-	toolSets, err := r.repo.ListToolSets(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to load tool sets: %w", err)
-	}
-
-	// Cache existing tools (skip MCP tools — they are ephemeral and
-	// will be re-registered when connectors reconnect).
-	for _, tool := range tools {
-		if strings.HasPrefix(tool.ID, "mcp-") {
-			// Clean up stale MCP tools from the DB.
-			_ = r.repo.DeleteTool(ctx, tool.ID)
-			continue
-		}
-		r.toolCache[tool.ID] = &tool
-	}
-
-	// Cache existing tool sets (skip MCP sets — same reason).
-	for _, toolSet := range toolSets {
-		if strings.HasPrefix(toolSet.ID, "mcp-") {
-			_ = r.repo.DeleteToolSet(ctx, toolSet.ID)
-			continue
-		}
-		r.toolSetCache[toolSet.ID] = &toolSet
-	}
-
-	// Initialize default tools (creates them if they don't exist yet)
 	if err := r.initializeDefaultTools(ctx); err != nil {
 		return fmt.Errorf("failed to initialize default tools: %w", err)
 	}
 
-	r.log.Info(ctx, "Tool registry initialized", "tool_count", len(r.toolCache), "tool_set_count", len(r.toolSetCache))
+	tools, err := r.repo.ListTools(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to count tools: %w", err)
+	}
+	toolSets, err := r.repo.ListToolSets(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to count tool sets: %w", err)
+	}
+
+	r.log.Info(ctx, "Tool registry initialized", "tool_count", len(tools), "tool_set_count", len(toolSets))
 	return nil
 }
 
 // GetTool retrieves a tool by ID.
 func (r *Registry) GetTool(ctx context.Context, id string) (*Tool, error) {
-	r.mutex.RLock()
-	if tool, exists := r.toolCache[id]; exists {
-		toolCopy := *tool
-		r.mutex.RUnlock()
-		return &toolCopy, nil
-	}
-	r.mutex.RUnlock()
-
-	// Not in cache, load from repository
-	tool, err := r.repo.GetTool(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	toolCopy := *tool
-	r.mutex.Lock()
-	r.toolCache[id] = &toolCopy
-	r.mutex.Unlock()
-
-	return tool, nil
+	return r.repo.GetTool(ctx, id)
 }
 
 // ListTools returns all available tools.
 func (r *Registry) ListTools(ctx context.Context) ([]Tool, error) {
-	r.mutex.RLock()
-	defer r.mutex.RUnlock()
-
-	tools := make([]Tool, 0, len(r.toolCache))
-	for _, tool := range r.toolCache {
-		tools = append(tools, *tool)
-	}
-
-	sort.Slice(tools, func(i, j int) bool {
-		return tools[i].ID < tools[j].ID
-	})
-
-	return tools, nil
+	return r.repo.ListTools(ctx)
 }
 
-// RegisterTool adds a new tool to the registry.
+// RegisterTool adds or updates a tool in the registry.
 func (r *Registry) RegisterTool(ctx context.Context, tool *Tool) error {
 	now := time.Now()
 	if tool.CreatedAt.IsZero() {
@@ -167,70 +104,29 @@ func (r *Registry) RegisterTool(ctx context.Context, tool *Tool) error {
 		return fmt.Errorf("failed to save tool: %w", err)
 	}
 
-	toolCopy := *tool
-	r.mutex.Lock()
-	r.toolCache[tool.ID] = &toolCopy
-	r.mutex.Unlock()
-
 	r.log.Info(ctx, "Tool registered", "tool_id", tool.ID, "name", tool.Name)
 	return nil
 }
 
-// UnregisterTool removes a tool from the registry (DB + cache).
+// UnregisterTool removes a tool from the registry.
 func (r *Registry) UnregisterTool(ctx context.Context, id string) error {
 	if err := r.repo.DeleteTool(ctx, id); err != nil {
 		return fmt.Errorf("failed to delete tool: %w", err)
 	}
-
-	r.mutex.Lock()
-	delete(r.toolCache, id)
-	r.mutex.Unlock()
-
 	return nil
 }
 
 // GetToolSet retrieves a tool set by ID.
 func (r *Registry) GetToolSet(ctx context.Context, id string) (*ToolSet, error) {
-	r.mutex.RLock()
-	if toolSet, exists := r.toolSetCache[id]; exists {
-		toolSetCopy := *toolSet
-		r.mutex.RUnlock()
-		return &toolSetCopy, nil
-	}
-	r.mutex.RUnlock()
-
-	// Not in cache, load from repository
-	toolSet, err := r.repo.GetToolSet(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	toolSetCopy := *toolSet
-	r.mutex.Lock()
-	r.toolSetCache[id] = &toolSetCopy
-	r.mutex.Unlock()
-
-	return toolSet, nil
+	return r.repo.GetToolSet(ctx, id)
 }
 
 // ListToolSets returns all available tool sets.
 func (r *Registry) ListToolSets(ctx context.Context) ([]ToolSet, error) {
-	r.mutex.RLock()
-	defer r.mutex.RUnlock()
-
-	toolSets := make([]ToolSet, 0, len(r.toolSetCache))
-	for _, toolSet := range r.toolSetCache {
-		toolSets = append(toolSets, *toolSet)
-	}
-
-	sort.Slice(toolSets, func(i, j int) bool {
-		return toolSets[i].ID < toolSets[j].ID
-	})
-
-	return toolSets, nil
+	return r.repo.ListToolSets(ctx)
 }
 
-// RegisterToolSet adds a new tool set to the registry.
+// RegisterToolSet adds or updates a tool set in the registry.
 func (r *Registry) RegisterToolSet(ctx context.Context, toolSet *ToolSet) error {
 	now := time.Now()
 	if toolSet.CreatedAt.IsZero() {
@@ -242,37 +138,27 @@ func (r *Registry) RegisterToolSet(ctx context.Context, toolSet *ToolSet) error 
 		return fmt.Errorf("failed to save tool set: %w", err)
 	}
 
-	toolSetCopy := *toolSet
-	r.mutex.Lock()
-	r.toolSetCache[toolSet.ID] = &toolSetCopy
-	r.mutex.Unlock()
-
 	r.log.Info(ctx, "Tool set registered", "tool_set_id", toolSet.ID, "name", toolSet.Name)
 	return nil
 }
 
-// UnregisterToolSet removes a tool set and its tools from the registry (DB + cache).
+// UnregisterToolSet removes a tool set and its child tools from the registry.
 func (r *Registry) UnregisterToolSet(ctx context.Context, id string) error {
-	// Remove child tools first.
-	r.mutex.RLock()
-	ts, exists := r.toolSetCache[id]
-	var toolIDs []string
-	if exists {
-		toolIDs = append(toolIDs, ts.ToolIDs...)
+	// Load tool set from DB to find child tool IDs.
+	ts, err := r.repo.GetToolSet(ctx, id)
+	if err != nil {
+		// If the tool set doesn't exist, nothing to unregister.
+		return nil
 	}
-	r.mutex.RUnlock()
 
-	for _, toolID := range toolIDs {
-		_ = r.UnregisterTool(ctx, toolID)
+	// Remove child tools first.
+	for _, toolID := range ts.ToolIDs {
+		_ = r.repo.DeleteTool(ctx, toolID)
 	}
 
 	if err := r.repo.DeleteToolSet(ctx, id); err != nil {
 		return fmt.Errorf("failed to delete tool set: %w", err)
 	}
-
-	r.mutex.Lock()
-	delete(r.toolSetCache, id)
-	r.mutex.Unlock()
 
 	return nil
 }
@@ -297,47 +183,28 @@ func (r *Registry) GetToolsInSet(ctx context.Context, toolSetID string) ([]Tool,
 	return tools, nil
 }
 
-// initializeDefaultTools creates the initial set of tools and tool sets.
+// initializeDefaultTools ensures default tools and tool sets from registered
+// plugins exist in the database. Uses upsert (ON CONFLICT DO UPDATE) so this
+// is safe to run on every pod startup concurrently.
 func (r *Registry) initializeDefaultTools(ctx context.Context) error {
 	now := time.Now()
 
-	// Gather default tools and sets from registered plugins
-	var defaultToolSets []ToolSet
-	var defaultTools []Tool
-
+	// Gather default tools and sets from registered plugins.
 	for _, provider := range GetAllPluginProviders() {
-		// Collect tool sets
 		for _, ts := range provider.DefaultSets() {
 			ts.CreatedAt = now
 			ts.UpdatedAt = now
-			defaultToolSets = append(defaultToolSets, ts)
+			if err := r.repo.SaveToolSet(ctx, &ts); err != nil {
+				return fmt.Errorf("failed to save default tool set %s: %w", ts.ID, err)
+			}
 		}
 
-		// Collect tools
 		for _, t := range provider.DefaultTools() {
 			t.CreatedAt = now
 			t.UpdatedAt = now
-			defaultTools = append(defaultTools, t)
-		}
-	}
-
-	// Save tool sets if they don't exist yet
-	for _, toolSet := range defaultToolSets {
-		if _, exists := r.toolSetCache[toolSet.ID]; !exists {
-			if err := r.repo.SaveToolSet(ctx, &toolSet); err != nil {
-				return fmt.Errorf("failed to save default tool set %s: %w", toolSet.ID, err)
+			if err := r.repo.SaveTool(ctx, &t); err != nil {
+				return fmt.Errorf("failed to save default tool %s: %w", t.ID, err)
 			}
-			r.toolSetCache[toolSet.ID] = &toolSet
-		}
-	}
-
-	// Save tools if they don't exist
-	for _, tool := range defaultTools {
-		if _, exists := r.toolCache[tool.ID]; !exists {
-			if err := r.repo.SaveTool(ctx, &tool); err != nil {
-				return fmt.Errorf("failed to save default tool %s: %w", tool.ID, err)
-			}
-			r.toolCache[tool.ID] = &tool
 		}
 	}
 
