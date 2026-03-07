@@ -6,18 +6,16 @@ import (
 
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/modules/knowledge/edgequake"
 	"school-with-ai/platform/workspacepermissions"
 	"school-with-ai/shared"
 
 	"github.com/google/uuid"
 )
 
-// workspacePermHandler provides HTTP endpoints for workspace permission management.
 type workspacePermHandler struct {
 	log              *logger.Logger
 	workspacePermSvc *workspacepermissions.Service
-	edgequakeService *edgequake.Service
+	workspaceProv    WorkspaceProvider
 	agentProvider    agent.AgentProvider
 	tenantID         string
 }
@@ -26,14 +24,14 @@ type workspacePermHandler struct {
 func newWorkspacePermHandler(
 	log *logger.Logger,
 	workspacePermSvc *workspacepermissions.Service,
-	edgequakeService *edgequake.Service,
+	workspaceProv WorkspaceProvider,
 	agentProvider agent.AgentProvider,
 	tenantID string,
 ) *workspacePermHandler {
 	return &workspacePermHandler{
 		log:              log,
 		workspacePermSvc: workspacePermSvc,
-		edgequakeService: edgequakeService,
+		workspaceProv:    workspaceProv,
 		agentProvider:    agentProvider,
 		tenantID:         tenantID,
 	}
@@ -79,10 +77,10 @@ func (h *workspacePermHandler) ListAgentWorkspaces(w http.ResponseWriter, r *htt
 		Role:     "user",
 	}
 
-	// List workspaces from edgequake
-	workspacesResp, err := h.edgequakeService.ListWorkspaces(r.Context(), tCtx, 1, 100)
+	// List workspaces from provider
+	workspacesResp, err := h.workspaceProv.ListWorkspaces(r.Context(), tCtx, 1, 100)
 	if err != nil {
-		h.log.Error(r.Context(), "Failed to list workspaces from edgequake", "error", err)
+		h.log.Error(r.Context(), "Failed to list workspaces from provider", "error", err)
 		http.Error(w, "Failed to retrieve workspaces", http.StatusInternalServerError)
 		return
 	}

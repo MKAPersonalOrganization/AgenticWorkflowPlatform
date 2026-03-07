@@ -17,7 +17,6 @@ import (
 	"school-with-ai/modules/chat/projection/agui"
 	"school-with-ai/modules/chat/taskmanagement"
 	"school-with-ai/modules/chat/threadmgmt"
-	"school-with-ai/modules/knowledge/edgequake"
 	"school-with-ai/platform/artifact"
 	"school-with-ai/platform/memory"
 	"school-with-ai/platform/permissions"
@@ -42,7 +41,7 @@ type TaskManagementHandler struct {
 	memoryStore        memory.Service
 	toolRegistry       *toolregistry.Registry
 	permissionsService *permissions.Service
-	edgequakeService   *edgequake.Service
+	documentProvider   chatcontracts.DocumentProvider
 	tenantID           string
 	allowedOrigin      string
 }
@@ -61,7 +60,7 @@ func NewTaskManagementHandler(
 	memoryStore memory.Service,
 	toolRegistry *toolregistry.Registry,
 	permissionsService *permissions.Service,
-	edgequakeService *edgequake.Service,
+	documentProvider chatcontracts.DocumentProvider,
 	tenantID string,
 	allowedOrigin string,
 ) *TaskManagementHandler {
@@ -78,7 +77,7 @@ func NewTaskManagementHandler(
 		memoryStore:        memoryStore,
 		toolRegistry:       toolRegistry,
 		permissionsService: permissionsService,
-		edgequakeService:   edgequakeService,
+		documentProvider:   documentProvider,
 		tenantID:           tenantID,
 		allowedOrigin:      allowedOrigin,
 	}
@@ -1358,20 +1357,20 @@ func (h *TaskManagementHandler) ListDocuments(w http.ResponseWriter, r *http.Req
 		Role:     string(shared.RoleAdmin),
 	}
 
-	// 3. Delegate to Edgequake (Passive Enforcement)
+	// 3. Delegate to Document Provider (Passive Enforcement)
 	// Go does NOT check if the user is allowed to list docs. It just passes the headers.
-	resp, err := h.edgequakeService.ListDocuments(r.Context(), tCtx, 1, 20, "")
+	resp, err := h.documentProvider.ListDocuments(r.Context(), tCtx, 1, 20, "")
 	if err != nil {
-		if err == edgequake.ErrEdgequakeUnauthorized {
-			http.Error(w, "Unauthorized by Edgequake", http.StatusUnauthorized)
+		if errors.Is(err, chatcontracts.ErrKnowledgeUnauthorized) {
+			http.Error(w, "Unauthorized by Document Provider", http.StatusUnauthorized)
 			return
 		}
-		if err == edgequake.ErrEdgequakeForbidden {
-			http.Error(w, "Access forbidden by Edgequake", http.StatusForbidden)
+		if errors.Is(err, chatcontracts.ErrKnowledgeForbidden) {
+			http.Error(w, "Access forbidden by Document Provider", http.StatusForbidden)
 			return
 		}
-		h.log.Error(r.Context(), "Edgequake API failure", "error", err)
-		http.Error(w, "Failed to retrieve documents from Edgequake", http.StatusInternalServerError)
+		h.log.Error(r.Context(), "Document Provider API failure", "error", err)
+		http.Error(w, "Failed to retrieve documents", http.StatusInternalServerError)
 		return
 	}
 
@@ -1425,19 +1424,19 @@ func (h *TaskManagementHandler) UploadDocument(w http.ResponseWriter, r *http.Re
 	}
 	defer file.Close()
 
-	// 4. Delegate to Edgequake (Passive Enforcement)
-	resp, err := h.edgequakeService.UploadDocument(r.Context(), tCtx, header.Filename, header.Header.Get("Content-Type"), file)
+	// 4. Delegate to Document Provider (Passive Enforcement)
+	resp, err := h.documentProvider.UploadDocument(r.Context(), tCtx, header.Filename, header.Header.Get("Content-Type"), file)
 	if err != nil {
-		if err == edgequake.ErrEdgequakeUnauthorized {
-			http.Error(w, "Unauthorized by Edgequake", http.StatusUnauthorized)
+		if errors.Is(err, chatcontracts.ErrKnowledgeUnauthorized) {
+			http.Error(w, "Unauthorized by Document Provider", http.StatusUnauthorized)
 			return
 		}
-		if err == edgequake.ErrEdgequakeForbidden {
-			http.Error(w, "Access forbidden by Edgequake", http.StatusForbidden)
+		if errors.Is(err, chatcontracts.ErrKnowledgeForbidden) {
+			http.Error(w, "Access forbidden by Document Provider", http.StatusForbidden)
 			return
 		}
-		h.log.Error(r.Context(), "Edgequake API failure during upload", "error", err)
-		http.Error(w, "Failed to upload document to Edgequake", http.StatusInternalServerError)
+		h.log.Error(r.Context(), "Document Provider API failure during upload", "error", err)
+		http.Error(w, "Failed to upload document", http.StatusInternalServerError)
 		return
 	}
 

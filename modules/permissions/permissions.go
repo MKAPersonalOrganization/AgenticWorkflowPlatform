@@ -2,9 +2,8 @@ package permissions
 
 import (
 	"school-with-ai/foundation/agent"
-	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/auth"
-	"school-with-ai/modules/knowledge/edgequake"
+	"school-with-ai/foundation/logger"
 	"school-with-ai/platform/workspacepermissions"
 
 	"github.com/go-chi/chi/v5"
@@ -21,11 +20,11 @@ type Module struct {
 func New(
 	log *logger.Logger,
 	workspacePermService *workspacepermissions.Service,
-	edgequakeService *edgequake.Service,
+	workspaceProvider WorkspaceProvider,
 	agentProvider agent.AgentProvider,
 	tenantID string,
 ) *Module {
-	wh := newWorkspacePermHandler(log, workspacePermService, edgequakeService, agentProvider, tenantID)
+	wh := newWorkspacePermHandler(log, workspacePermService, workspaceProvider, agentProvider, tenantID)
 	return &Module{
 		handler: wh,
 	}
