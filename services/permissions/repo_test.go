@@ -1,11 +1,12 @@
-package sqldb
+package permissions
 
 import (
 	"context"
 	"os"
-	"school-with-ai/services/permissions"
 	"testing"
 	"time"
+
+	"school-with-ai/infra/sqldb"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,7 +23,7 @@ func TestPostgresPermissionsRepository(t *testing.T) {
 		password = "dev-password"
 	}
 
-	cfg := Config{
+	cfg := sqldb.Config{
 		User:         "schoolai",
 		Password:     password,
 		Host:         host,
@@ -32,7 +33,7 @@ func TestPostgresPermissionsRepository(t *testing.T) {
 		MaxOpenConns: 2,
 	}
 
-	db, err := Open(cfg)
+	db, err := sqldb.Open(cfg)
 	if err != nil {
 		t.Skipf("DB connection failed, skipping integration test: %v", err)
 	}
@@ -45,11 +46,9 @@ func TestPostgresPermissionsRepository(t *testing.T) {
 	repo := NewPostgresPermissionsRepository(db)
 	ctx := context.Background()
 
-	// Clean up
 	db.Exec("DELETE FROM agent_tool_permissions")
 	db.Exec("DELETE FROM agent_tool_set_permissions")
 
-	// We need tool sets and tools existing due to FK constraints
 	db.Exec("INSERT INTO tool_sets (id, name) VALUES ('ts-perm-1', 'Perm Set 1') ON CONFLICT (id) DO NOTHING")
 	db.Exec("INSERT INTO tools (id, name, tool_set_id) VALUES ('t-perm-1', 'Perm Tool 1', 'ts-perm-1') ON CONFLICT (id) DO NOTHING")
 
@@ -58,7 +57,7 @@ func TestPostgresPermissionsRepository(t *testing.T) {
 		agentID := "agent-1"
 		toolSetID := "ts-perm-1"
 
-		perm := &permissions.ToolSetPermission{
+		perm := &ToolSetPermission{
 			UserID:    userID,
 			AgentID:   agentID,
 			ToolSetID: toolSetID,
@@ -77,12 +76,10 @@ func TestPostgresPermissionsRepository(t *testing.T) {
 		assert.Equal(t, perm.Config, got.Config)
 		assert.Equal(t, perm.UserID, got.UserID)
 
-		// List
 		list, err := repo.ListToolSetPermissions(ctx, userID, agentID)
 		require.NoError(t, err)
 		assert.NotEmpty(t, list)
 
-		// Delete
 		err = repo.DeleteToolSetPermission(ctx, userID, agentID, toolSetID)
 		require.NoError(t, err)
 
@@ -96,7 +93,7 @@ func TestPostgresPermissionsRepository(t *testing.T) {
 		toolSetID := "ts-perm-1"
 		toolID := "t-perm-1"
 
-		perm := &permissions.Permission{
+		perm := &Permission{
 			UserID:    userID,
 			AgentID:   agentID,
 			ToolSetID: toolSetID,
@@ -116,12 +113,10 @@ func TestPostgresPermissionsRepository(t *testing.T) {
 		assert.Equal(t, perm.Config, got.Config)
 		assert.Equal(t, perm.UserID, got.UserID)
 
-		// List
 		list, err := repo.ListPermissions(ctx, userID, agentID, toolSetID)
 		require.NoError(t, err)
 		assert.NotEmpty(t, list)
 
-		// Delete
 		err = repo.DeletePermission(ctx, userID, agentID, toolSetID, toolID)
 		require.NoError(t, err)
 

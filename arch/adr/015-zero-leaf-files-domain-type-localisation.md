@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (continues ADR 012 → 013 → 014)
+**Accepted — Implemented** (continues ADR 012 → 013 → 014)
 
 ## Context
 

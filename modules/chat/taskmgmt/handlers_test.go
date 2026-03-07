@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"school-with-ai/foundation/logger"
-	"school-with-ai/services"
 	"school-with-ai/shared"
 
 	taskmgmthandlers "school-with-ai/modules/chat/taskmgmt"
@@ -18,10 +17,10 @@ func newTestLogger() *logger.Logger {
 	return logger.NewTextWithEvents(os.Stdout, logger.LevelInfo, "TEST", nil, logger.Events{})
 }
 
-// mockAuthService implements services.AuthService for testing.
+// mockAuthService implements shared.AuthService for testing.
 type mockAuthService struct{}
 
-var _ services.AuthService = (*mockAuthService)(nil)
+var _ shared.AuthService = (*mockAuthService)(nil)
 
 func (m *mockAuthService) GetUserFromContext(ctx context.Context) *shared.User { return nil }
 func (m *mockAuthService) IsAuthenticated(ctx context.Context) bool            { return false }

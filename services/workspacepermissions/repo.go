@@ -1,10 +1,9 @@
-package sqldb
+package workspacepermissions
 
 import (
 	"context"
 	"database/sql"
 	"fmt"
-	"school-with-ai/services/workspacepermissions"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -22,7 +21,7 @@ func NewPostgresWorkspacePermissionsRepository(db *sqlx.DB) *PostgresWorkspacePe
 }
 
 // GetPermission retrieves a specific agent-workspace permission.
-func (r *PostgresWorkspacePermissionsRepository) GetPermission(ctx context.Context, userID, agentID, workspaceID string) (*workspacepermissions.WorkspacePermission, error) {
+func (r *PostgresWorkspacePermissionsRepository) GetPermission(ctx context.Context, userID, agentID, workspaceID string) (*WorkspacePermission, error) {
 	const q = `
 		SELECT * FROM agent_workspace_permissions 
 		WHERE user_id = $1 AND agent_id = $2 AND workspace_id = $3
@@ -44,7 +43,7 @@ func (r *PostgresWorkspacePermissionsRepository) GetPermission(ctx context.Conte
 		return nil, fmt.Errorf("selecting workspace permission: %w", err)
 	}
 
-	perm := &workspacepermissions.WorkspacePermission{
+	perm := &WorkspacePermission{
 		UserID:      dest.UserID,
 		AgentID:     dest.AgentID,
 		WorkspaceID: dest.WorkspaceID,
@@ -57,7 +56,7 @@ func (r *PostgresWorkspacePermissionsRepository) GetPermission(ctx context.Conte
 }
 
 // ListPermissionsByAgent returns all workspace permissions for an agent.
-func (r *PostgresWorkspacePermissionsRepository) ListPermissionsByAgent(ctx context.Context, userID, agentID string) ([]*workspacepermissions.WorkspacePermission, error) {
+func (r *PostgresWorkspacePermissionsRepository) ListPermissionsByAgent(ctx context.Context, userID, agentID string) ([]*WorkspacePermission, error) {
 	const q = `
 		SELECT * FROM agent_workspace_permissions 
 		WHERE user_id = $1 AND agent_id = $2
@@ -76,9 +75,9 @@ func (r *PostgresWorkspacePermissionsRepository) ListPermissionsByAgent(ctx cont
 		return nil, fmt.Errorf("selecting workspace permissions: %w", err)
 	}
 
-	perms := make([]*workspacepermissions.WorkspacePermission, len(dests))
+	perms := make([]*WorkspacePermission, len(dests))
 	for i, dest := range dests {
-		perms[i] = &workspacepermissions.WorkspacePermission{
+		perms[i] = &WorkspacePermission{
 			UserID:      dest.UserID,
 			AgentID:     dest.AgentID,
 			WorkspaceID: dest.WorkspaceID,
@@ -92,7 +91,7 @@ func (r *PostgresWorkspacePermissionsRepository) ListPermissionsByAgent(ctx cont
 }
 
 // SavePermission saves or updates a workspace permission.
-func (r *PostgresWorkspacePermissionsRepository) SavePermission(ctx context.Context, perm *workspacepermissions.WorkspacePermission) error {
+func (r *PostgresWorkspacePermissionsRepository) SavePermission(ctx context.Context, perm *WorkspacePermission) error {
 	const q = `
 		INSERT INTO agent_workspace_permissions (
 			user_id, agent_id, workspace_id, enabled, created_at, updated_at

@@ -4,7 +4,6 @@ import (
 "encoding/json"
 "net/http"
 
-"school-with-ai/domain"
 	"school-with-ai/shared"
 "school-with-ai/foundation/i18n"
 "school-with-ai/foundation/logger"
@@ -52,7 +51,7 @@ Model      string          `json:"model"`
 Config     json.RawMessage `json:"config"`
 }
 
-func toSettingsResponse(s domain.AISettings) settingsResponse {
+func toSettingsResponse(s AISettings) settingsResponse {
 return settingsResponse{
 ID:           s.ID,
 Provider:     string(s.Provider),
@@ -132,9 +131,9 @@ http.Error(w, i18n.T(r.Context(), "Invalid request body"), http.StatusBadRequest
 return
 }
 
-settings := &domain.AISettings{
+settings := &AISettings{
 UserID:   user.ID,
-Provider: domain.AIProvider(req.Provider),
+Provider: AIProvider(req.Provider),
 APIKey:   req.APIKey,
 }
 
@@ -207,13 +206,13 @@ return
 w.WriteHeader(http.StatusNoContent)
 }
 
-func providerDisplayName(p domain.AIProvider) string {
+func providerDisplayName(p AIProvider) string {
 switch p {
-case domain.AIProviderOpenAI:
+case AIProviderOpenAI:
 return "OpenAI"
-case domain.AIProviderAnthropic:
+case AIProviderAnthropic:
 return "Anthropic"
-case domain.AIProviderGemini:
+case AIProviderGemini:
 return "Google Gemini"
 default:
 return string(p)
@@ -223,7 +222,7 @@ return string(p)
 // getTTSVoices handles GET /api/ai-settings/tts-voices?model=...
 func (h *handler) getTTSVoices(w http.ResponseWriter, r *http.Request) {
 model := r.URL.Query().Get("model")
-voices := domain.TTSVoices(model)
+voices := TTSVoices(model)
 if voices == nil {
 voices = []string{}
 }
@@ -296,10 +295,10 @@ http.Error(w, i18n.T(r.Context(), "Invalid request body"), http.StatusBadRequest
 return
 }
 
-config := &domain.AICapabilityConfig{
+config := &AICapabilityConfig{
 UserID:     user.ID,
-Capability: domain.AICapability(capability),
-Provider:   domain.AIProvider(req.Provider),
+Capability: AICapability(capability),
+Provider:   AIProvider(req.Provider),
 Model:      req.Model,
 Config:     req.Config,
 }
@@ -334,7 +333,7 @@ http.Error(w, "Missing capability", http.StatusBadRequest)
 return
 }
 
-if err := h.svc.deleteCapabilityConfig(r.Context(), user.ID, domain.AICapability(capability)); err != nil {
+if err := h.svc.deleteCapabilityConfig(r.Context(), user.ID, AICapability(capability)); err != nil {
 h.log.Error(r.Context(), "failed to delete capability config", "error", err)
 http.Error(w, i18n.T(r.Context(), "Failed to delete capability config"), http.StatusInternalServerError)
 return

@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
-	"school-with-ai/shared"
-	"school-with-ai/modules/chat/projection/agui"
-	"school-with-ai/services"
 	"strconv"
+
+	"school-with-ai/modules/chat/chatcontracts"
+	"school-with-ai/modules/chat/projection/agui"
+	"school-with-ai/shared"
 )
 
 // AguiProjectionHandler provides HTTP endpoints for querying the AGUI projection.
@@ -18,7 +19,7 @@ type AguiProjectionHandler struct {
 
 // ProjectionService provides business logic for projections.
 type ProjectionService interface {
-	ListThreadSummaries() []services.ThreadSummary
+	ListThreadSummaries() []chatcontracts.ThreadSummary
 }
 
 // NewAguiProjectionHandler creates a new handler for AGUI projection queries.

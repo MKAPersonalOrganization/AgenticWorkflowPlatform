@@ -5,7 +5,6 @@ import (
 "database/sql"
 "errors"
 "fmt"
-"school-with-ai/domain"
 "time"
 
 "github.com/google/uuid"
@@ -13,7 +12,7 @@ import (
 "github.com/lib/pq"
 )
 
-// postgresAgentCatalogRepository implements domain.AgentCatalogRepository.
+// postgresAgentCatalogRepository implements AgentCatalogRepository.
 type postgresAgentCatalogRepository struct {
 db *sqlx.DB
 }
@@ -22,7 +21,7 @@ func newPostgresAgentCatalogRepository(db *sqlx.DB) *postgresAgentCatalogReposit
 return &postgresAgentCatalogRepository{db: db}
 }
 
-func (r *postgresAgentCatalogRepository) List(ctx context.Context, category string, limit, offset int) ([]domain.AgentCatalogEntry, int, error) {
+func (r *postgresAgentCatalogRepository) List(ctx context.Context, category string, limit, offset int) ([]AgentCatalogEntry, int, error) {
 if limit <= 0 {
 limit = 50
 }
@@ -30,7 +29,7 @@ if limit > 100 {
 limit = 100
 }
 
-var entries []domain.AgentCatalogEntry
+var entries []AgentCatalogEntry
 var total int
 
 if category != "" {
@@ -81,7 +80,7 @@ return nil, 0, err
 return entries, total, nil
 }
 
-func (r *postgresAgentCatalogRepository) Search(ctx context.Context, query string, limit, offset int) ([]domain.AgentCatalogEntry, int, error) {
+func (r *postgresAgentCatalogRepository) Search(ctx context.Context, query string, limit, offset int) ([]AgentCatalogEntry, int, error) {
 if limit <= 0 {
 limit = 50
 }
@@ -118,13 +117,13 @@ return nil, 0, err
 return entries, total, nil
 }
 
-func (r *postgresAgentCatalogRepository) GetByID(ctx context.Context, id string) (*domain.AgentCatalogEntry, error) {
+func (r *postgresAgentCatalogRepository) GetByID(ctx context.Context, id string) (*AgentCatalogEntry, error) {
 query := `
 SELECT id, name, description, system_prompt, category, tags, author_name, icon, featured, add_count, created_at, updated_at
 FROM agent_store_catalog
 WHERE id = $1
 `
-var entry domain.AgentCatalogEntry
+var entry AgentCatalogEntry
 var tags []string
 err := r.db.QueryRowContext(ctx, query, id).Scan(
 &entry.ID, &entry.Name, &entry.Description, &entry.SystemPrompt,
@@ -168,7 +167,7 @@ return fmt.Errorf("incrementing add count: %w", err)
 return nil
 }
 
-func (r *postgresAgentCatalogRepository) Seed(ctx context.Context, entries []domain.AgentCatalogEntry) error {
+func (r *postgresAgentCatalogRepository) Seed(ctx context.Context, entries []AgentCatalogEntry) error {
 var count int
 if err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM agent_store_catalog`).Scan(&count); err != nil {
 return fmt.Errorf("checking catalog count: %w", err)
@@ -198,10 +197,10 @@ return fmt.Errorf("seeding catalog entry %q: %w", e.Name, err)
 return nil
 }
 
-func scanCatalogRows(rows *sql.Rows) ([]domain.AgentCatalogEntry, error) {
-var entries []domain.AgentCatalogEntry
+func scanCatalogRows(rows *sql.Rows) ([]AgentCatalogEntry, error) {
+var entries []AgentCatalogEntry
 for rows.Next() {
-var e domain.AgentCatalogEntry
+var e AgentCatalogEntry
 var tags []string
 if err := rows.Scan(
 &e.ID, &e.Name, &e.Description, &e.SystemPrompt,

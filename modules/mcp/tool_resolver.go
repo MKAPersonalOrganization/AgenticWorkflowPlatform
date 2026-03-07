@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -35,7 +34,7 @@ func (r *MCPToolResolver) Resolve(ctx context.Context) ([]agent.Tool, error) {
 
 	var tools []agent.Tool
 	for _, conn := range connectors {
-		if conn.Status != domain.ConnectorStatusConnected {
+		if conn.Status != ConnectorStatusConnected {
 			continue
 		}
 

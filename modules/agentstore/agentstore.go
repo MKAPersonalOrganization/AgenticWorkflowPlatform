@@ -5,7 +5,7 @@ import (
 
 "school-with-ai/domain"
 "school-with-ai/foundation/logger"
-"school-with-ai/handlers/auth"
+"school-with-ai/foundation/auth"
 
 "github.com/go-chi/chi/v5"
 "github.com/jmoiron/sqlx"
@@ -39,7 +39,7 @@ storeHandler   *storeHandler
 catalogHandler *catalogHandler
 svc            *service
 agentDefRepo   domain.AgentDefinitionRepository
-catalogRepo    domain.AgentCatalogRepository
+catalogRepo    AgentCatalogRepository
 }
 
 // New creates the agent-store module.

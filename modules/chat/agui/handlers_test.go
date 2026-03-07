@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"school-with-ai/shared"
-	"school-with-ai/modules/chat/projection/agui"
-	"school-with-ai/services"
 	"testing"
 	"time"
+
+	"school-with-ai/modules/chat/chatcontracts"
+	"school-with-ai/modules/chat/projection/agui"
+	"school-with-ai/shared"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
@@ -85,7 +86,7 @@ func (m *mockProjection) ListThreads(ctx context.Context, req agui.ThreadListReq
 // mockProjectionService implements ProjectionService for testing.
 type mockProjectionService struct{}
 
-func (m *mockProjectionService) ListThreadSummaries() []services.ThreadSummary {
+func (m *mockProjectionService) ListThreadSummaries() []chatcontracts.ThreadSummary {
 	return nil
 }
 

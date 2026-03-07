@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	"school-with-ai/handlers/auth"
+	"school-with-ai/foundation/auth"
 	"school-with-ai/services/artifact"
 
 	"github.com/go-chi/chi/v5"

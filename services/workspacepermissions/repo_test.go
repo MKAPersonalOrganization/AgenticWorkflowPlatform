@@ -1,11 +1,12 @@
-package sqldb
+package workspacepermissions
 
 import (
 	"context"
 	"os"
-	"school-with-ai/services/workspacepermissions"
 	"testing"
 	"time"
+
+	"school-with-ai/infra/sqldb"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,7 +23,7 @@ func TestPostgresWorkspacePermissionsRepository(t *testing.T) {
 		password = "dev-password"
 	}
 
-	cfg := Config{
+	cfg := sqldb.Config{
 		User:         "schoolai",
 		Password:     password,
 		Host:         host,
@@ -32,7 +33,7 @@ func TestPostgresWorkspacePermissionsRepository(t *testing.T) {
 		MaxOpenConns: 2,
 	}
 
-	db, err := Open(cfg)
+	db, err := sqldb.Open(cfg)
 	if err != nil {
 		t.Skipf("DB connection failed, skipping integration test: %v", err)
 	}
@@ -53,7 +54,7 @@ func TestPostgresWorkspacePermissionsRepository(t *testing.T) {
 		agentID := "agent-1"
 		workspaceID := "ws-1"
 
-		perm := &workspacepermissions.WorkspacePermission{
+		perm := &WorkspacePermission{
 			UserID:      userID,
 			AgentID:     agentID,
 			WorkspaceID: workspaceID,

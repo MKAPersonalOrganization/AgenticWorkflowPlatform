@@ -26,7 +26,7 @@ import (
 	"context"
 
 	"school-with-ai/foundation/logger"
-	"school-with-ai/handlers/auth"
+	"school-with-ai/foundation/auth"
 	"school-with-ai/modules/knowledge/edgequake"
 
 	"github.com/go-chi/chi/v5"

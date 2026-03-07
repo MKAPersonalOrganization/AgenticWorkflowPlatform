@@ -23,7 +23,7 @@ package mcp
 
 import (
 "school-with-ai/foundation/logger"
-"school-with-ai/handlers/auth"
+"school-with-ai/foundation/auth"
 "school-with-ai/services/toolregistry"
 
 "github.com/go-chi/chi/v5"
