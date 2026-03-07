@@ -4,7 +4,7 @@ import (
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/auth"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/platform/workspacepermissions"
+	"school-with-ai/modules/permissions/workspace"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -19,7 +19,7 @@ type Module struct {
 // with the provided service dependencies.
 func New(
 	log *logger.Logger,
-	workspacePermService *workspacepermissions.Service,
+	workspacePermService *workspace.Service,
 	workspaceProvider WorkspaceProvider,
 	agentProvider agent.AgentProvider,
 	tenantID string,

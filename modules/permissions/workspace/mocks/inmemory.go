@@ -2,24 +2,24 @@ package mocks
 
 import (
 	"context"
-	"school-with-ai/platform/workspacepermissions"
+	"school-with-ai/modules/permissions/workspace"
 	"sync"
 )
 
 // InMemoryRepository is an in-memory implementation of the workspace permissions Repository.
 type InMemoryRepository struct {
 	mu   sync.RWMutex
-	data map[string]map[string]map[string]*workspacepermissions.WorkspacePermission // userID -> agentID -> workspaceID -> Permission
+	data map[string]map[string]map[string]*workspace.WorkspacePermission // userID -> agentID -> workspaceID -> Permission
 }
 
 // NewInMemoryRepository creates a new in-memory repository.
 func NewInMemoryRepository() *InMemoryRepository {
 	return &InMemoryRepository{
-		data: make(map[string]map[string]map[string]*workspacepermissions.WorkspacePermission),
+		data: make(map[string]map[string]map[string]*workspace.WorkspacePermission),
 	}
 }
 
-func (r *InMemoryRepository) GetPermission(_ context.Context, userID, agentID, workspaceID string) (*workspacepermissions.WorkspacePermission, error) {
+func (r *InMemoryRepository) GetPermission(_ context.Context, userID, agentID, workspaceID string) (*workspace.WorkspacePermission, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -33,7 +33,7 @@ func (r *InMemoryRepository) GetPermission(_ context.Context, userID, agentID, w
 	return nil, nil
 }
 
-func (r *InMemoryRepository) ListPermissionsByAgent(_ context.Context, userID, agentID string) ([]*workspacepermissions.WorkspacePermission, error) {
+func (r *InMemoryRepository) ListPermissionsByAgent(_ context.Context, userID, agentID string) ([]*workspace.WorkspacePermission, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -47,22 +47,22 @@ func (r *InMemoryRepository) ListPermissionsByAgent(_ context.Context, userID, a
 		return nil, nil
 	}
 
-	perms := make([]*workspacepermissions.WorkspacePermission, 0, len(agentPerms))
+	perms := make([]*workspace.WorkspacePermission, 0, len(agentPerms))
 	for _, perm := range agentPerms {
 		perms = append(perms, perm)
 	}
 	return perms, nil
 }
 
-func (r *InMemoryRepository) SavePermission(_ context.Context, perm *workspacepermissions.WorkspacePermission) error {
+func (r *InMemoryRepository) SavePermission(_ context.Context, perm *workspace.WorkspacePermission) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	if r.data[perm.UserID] == nil {
-		r.data[perm.UserID] = make(map[string]map[string]*workspacepermissions.WorkspacePermission)
+		r.data[perm.UserID] = make(map[string]map[string]*workspace.WorkspacePermission)
 	}
 	if r.data[perm.UserID][perm.AgentID] == nil {
-		r.data[perm.UserID][perm.AgentID] = make(map[string]*workspacepermissions.WorkspacePermission)
+		r.data[perm.UserID][perm.AgentID] = make(map[string]*workspace.WorkspacePermission)
 	}
 	r.data[perm.UserID][perm.AgentID][perm.WorkspaceID] = perm
 	return nil

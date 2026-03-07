@@ -1,11 +1,11 @@
-package permissions_test
+package tool_test
 
 import (
 	"context"
 	"os"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/platform/permissions"
-	"school-with-ai/platform/permissions/mocks"
+	"school-with-ai/modules/permissions/tool"
+	"school-with-ai/modules/permissions/tool/mocks"
 	"testing"
 )
 
@@ -14,7 +14,7 @@ func TestIndividualToolPermissions(t *testing.T) {
 	log := logger.NewText(os.Stdout, logger.LevelInfo, "TEST", nil)
 
 	// Create service with in-memory repository
-	service := permissions.NewService(log, mocks.NewInMemoryRepository())
+	service := tool.NewService(log, mocks.NewInMemoryRepository())
 
 	ctx := context.Background()
 
@@ -65,7 +65,7 @@ func TestIndividualToolPermissions(t *testing.T) {
 
 func TestIndividualToolPermissionInheritance(t *testing.T) {
 	log := logger.NewText(os.Stdout, logger.LevelInfo, "TEST", nil)
-	service := permissions.NewService(log, mocks.NewInMemoryRepository())
+	service := tool.NewService(log, mocks.NewInMemoryRepository())
 	ctx := context.Background()
 
 	userID := "test-user"
@@ -102,7 +102,7 @@ func TestIndividualToolPermissionInheritance(t *testing.T) {
 
 func TestIndividualToolPermissionOverride(t *testing.T) {
 	log := logger.NewText(os.Stdout, logger.LevelInfo, "TEST", nil)
-	service := permissions.NewService(log, mocks.NewInMemoryRepository())
+	service := tool.NewService(log, mocks.NewInMemoryRepository())
 	ctx := context.Background()
 
 	userID := "test-user"
@@ -142,7 +142,7 @@ func TestIndividualToolPermissionOverride(t *testing.T) {
 
 func TestGetEnabledToolsInSet(t *testing.T) {
 	log := logger.NewText(os.Stdout, logger.LevelInfo, "TEST", nil)
-	service := permissions.NewService(log, mocks.NewInMemoryRepository())
+	service := tool.NewService(log, mocks.NewInMemoryRepository())
 	ctx := context.Background()
 
 	userID := "test-user"

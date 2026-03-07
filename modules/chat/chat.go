@@ -36,7 +36,7 @@ import (
 	"school-with-ai/modules/chat/threadmgmt"
 	"school-with-ai/platform/artifact"
 	"school-with-ai/platform/memory"
-	"school-with-ai/platform/permissions"
+	"school-with-ai/modules/permissions/tool"
 	"school-with-ai/platform/toolregistry"
 	"school-with-ai/shared"
 
@@ -61,7 +61,7 @@ type Dependencies struct {
 	AgentProvider      agent.AgentProvider
 	AuthService        shared.AuthService
 	ToolRegistry       *toolregistry.Registry
-	PermissionsService *permissions.Service
+	PermissionsService *tool.Service
 	DocumentProvider   chatcontracts.DocumentProvider
 	TenantID           string
 	AllowedOrigin      string
