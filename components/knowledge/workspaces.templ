@@ -77,17 +77,17 @@ templ WorkspacesPage(props WorkspacesPageProps) {
 										<button @click="open = !open" @click.outside="open = false" class="text-muted-foreground hover:text-foreground p-1 rounded-md hover:bg-muted transition-colors">
 											@icon.EllipsisVertical(icon.Props{Class: "size-4"})
 										</button>
-										<div x-show="open" x-cloak class="absolute right-0 top-6 z-10 w-48 rounded-md border bg-popover p-1 shadow-md">
+										<div x-show="open" x-cloak class="absolute end-0 top-6 z-10 w-48 rounded-md border bg-popover p-1 shadow-md">
 											<button
 												@click="renameWorkspace(ws.id, ws.name, ws.description); open = false"
-												class="w-full text-left flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted cursor-pointer"
+												class="w-full text-start flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted cursor-pointer"
 											>
 												@icon.Pencil(icon.Props{Class: "size-4"})
 												{ i18n.T(ctx, "Rename") }
 											</button>
 											<button
 												@click="deleteWorkspace(ws.id, ws.name); open = false"
-												class="w-full text-left flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive hover:bg-destructive/10 cursor-pointer"
+												class="w-full text-start flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive hover:bg-destructive/10 cursor-pointer"
 											>
 												@icon.Trash2(icon.Props{Class: "size-4"})
 												{ i18n.T(ctx, "Delete") }

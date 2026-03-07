@@ -116,9 +116,9 @@ templ SpeakContainer() {
 						</button>
 						<!-- Progress Bar -->
 						<div class="flex-1 flex items-center gap-2">
-							<span class="text-[10px] font-mono text-muted-foreground/50 w-8 text-right" x-text="formatTime(currentTime)"></span>
+							<span class="text-[10px] font-mono text-muted-foreground/50 w-8 text-end" x-text="formatTime(currentTime)"></span>
 							<div class="flex-1 relative h-1.5 bg-muted/20 rounded-full cursor-pointer group" @click="seekFromClick($event)">
-								<div class="absolute inset-y-0 left-0 bg-primary/60 rounded-full transition-all" :style="`width: ${progress}%`"></div>
+								<div class="absolute inset-y-0 start-0 bg-primary/60 rounded-full transition-all" :style="`width: ${progress}%`"></div>
 								<template x-if="loopA !== null && duration > 0">
 									<div class="absolute top-[-3px] w-0.5 h-[calc(100%+6px)] bg-green-500 rounded-full" :style="`left: ${(loopA / duration) * 100}%`"></div>
 								</template>

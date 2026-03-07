@@ -59,7 +59,7 @@ templ Container() {
 				</div>
                 <!-- Action Button (View) -->
                  <button 
-                    class="ml-auto px-3 py-1.5 text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 rounded-md transition-colors"
+                    class="ms-auto px-3 py-1.5 text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 rounded-md transition-colors"
                     @click="$dispatch('open-artifact', { filename: message.parsedArgs?.filename })"
                     x-show="message.name !== 'delete_markdown'"
                  >
@@ -69,7 +69,7 @@ templ Container() {
 
             <!-- Content Preview (Optional, for Create/Update) -->
             <template x-if="message.parsedArgs?.content && message.name !== 'delete_markdown'">
-                <div class="mt-2 pl-4 border-l-2 border-border/10">
+                <div class="mt-2 ps-4 border-s-2 border-border/10">
                     <p class="text-xs text-muted-foreground line-clamp-3 italic" x-text="message.parsedArgs?.content"></p>
                 </div>
             </template>

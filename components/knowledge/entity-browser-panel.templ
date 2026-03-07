@@ -9,7 +9,7 @@ import (
 templ EntityBrowserPanel() {
 	<!-- Persistent drawer container -->
 	<aside
-		class="flex flex-col border-r bg-card/95 backdrop-blur-sm shrink-0 overflow-hidden transition-all duration-300 relative group"
+		class="flex flex-col border-e bg-card/95 backdrop-blur-sm shrink-0 overflow-hidden transition-all duration-300 relative group"
 		:class="entityBrowserCollapsed ? 'w-10' : 'w-64'"
 		aria-label="Entity browser"
 		data-tour="entity-browser"
@@ -76,19 +76,19 @@ templ EntityBrowserPanel() {
 			<!-- Search -->
 			<div class="p-2 border-b shrink-0">
 				<div class="relative">
-					@icon.Search(icon.Props{Class: "absolute left-2 top-1/2 -translate-y-1/2 size-3 text-muted-foreground"})
+					@icon.Search(icon.Props{Class: "absolute start-2 top-1/2 -translate-y-1/2 size-3 text-muted-foreground"})
 					<input
 						type="text"
 						x-model="entityBrowserSearchQuery"
 						placeholder={ i18n.T(ctx, "Search entities...") }
-						class="w-full h-7 pl-7 pr-3 text-xs bg-muted/30 border-muted rounded-md border focus:bg-background focus:ring-1 focus:ring-ring transition-colors"
+						class="w-full h-7 ps-7 pe-3 text-xs bg-muted/30 border-muted rounded-md border focus:bg-background focus:ring-1 focus:ring-ring transition-colors"
 						aria-label={ i18n.T(ctx, "Search entities by name, type, or description") }
 					/>
 				</div>
 			</div>
 			<!-- Sort Controls -->
 			<div class="flex items-center gap-0.5 px-2 py-1.5 border-b shrink-0" role="group" aria-label={ i18n.T(ctx, "Sort controls") }>
-				<span class="text-[10px] text-muted-foreground mr-1">
+				<span class="text-[10px] text-muted-foreground me-1">
 					{ i18n.T(ctx, "Sort:") }
 				</span>
 				<button
@@ -109,7 +109,7 @@ templ EntityBrowserPanel() {
 				</button>
 				<button
 					@click="entityBrowserSortAsc = !entityBrowserSortAsc"
-					class="h-5 w-5 ml-auto inline-flex items-center justify-center rounded hover:bg-muted text-muted-foreground transition-colors"
+					class="h-5 w-5 ms-auto inline-flex items-center justify-center rounded hover:bg-muted text-muted-foreground transition-colors"
 					:aria-label="entityBrowserSortAsc ? 'Sort ascending, click to sort descending' : 'Sort descending, click to sort ascending'"
 				>
 					<template x-if="entityBrowserSortAsc">
@@ -163,7 +163,7 @@ templ EntityBrowserPanel() {
 										@icon.ChevronDown(icon.Props{Class: "size-4"})
 									</div>
 								</button>
-								<div class="pl-2 space-y-0.5" role="group" :aria-label="type + ' entities'">
+								<div class="ps-2 space-y-0.5" role="group" :aria-label="type + ' entities'">
 									<template x-for="node in nodes" :key="node.id">
 										@EntityItem()
 									</template>
@@ -213,7 +213,7 @@ templ EntityBrowserPanel() {
 templ EntityItem() {
 	<button
 		@click="focusNode(node.id)"
-		class="w-full text-left px-2.5 py-1.5 rounded-md transition-all duration-150 group flex items-center gap-2 outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+		class="w-full text-start px-2.5 py-1.5 rounded-md transition-all duration-150 group flex items-center gap-2 outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
 		:class="selectedNodeId === node.id ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-muted/60'"
 		role="option"
 		:aria-selected="selectedNodeId === node.id"

@@ -237,7 +237,7 @@ templ ChatInputScreen(user *shared.User) {
 						:aria-live="toast.type === 'error' ? 'assertive' : 'polite'"
 					>
 						<!-- Progress Bar (Simulated) -->
-						<div class="absolute top-0 left-0 right-0 h-1 overflow-hidden" x-show="toast.duration > 0">
+						<div class="absolute top-0 start-0 end-0 h-1 overflow-hidden" x-show="toast.duration > 0">
 							<div
 								class="toast-progress h-full ltr:origin-left rtl:origin-right transition-transform ease-linear"
 								:class="{

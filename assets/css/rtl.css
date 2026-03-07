@@ -1,7 +1,28 @@
 /* RTL/LTR Utilities using CSS Logical Properties
  * These utilities provide direction-agnostic spacing and positioning
  * that automatically adapt to LTR and RTL layouts.
+ *
+ * NOTE: Tailwind CSS v4 natively supports logical properties:
+ *   ms-/me- (margin), ps-/pe- (padding), start-/end- (inset),
+ *   border-s-/border-e-, rounded-s-/rounded-e-, text-start/text-end
+ * The utilities below are kept for backward compatibility but prefer
+ * using the native TW4 equivalents in new code.
  */
+
+/* ========================================
+ * Direction-Aware Slide Transforms
+ * Used by sidebar/sheet collapse animations
+ * --slide-start: translate toward start edge (-100% in LTR, 100% in RTL)
+ * --slide-end:   translate toward end edge   (100% in LTR, -100% in RTL)
+ * ======================================== */
+:root {
+  --slide-start: -100%;
+  --slide-end: 100%;
+}
+[dir="rtl"] {
+  --slide-start: 100%;
+  --slide-end: -100%;
+}
 
 @layer utilities {
   /* ========================================

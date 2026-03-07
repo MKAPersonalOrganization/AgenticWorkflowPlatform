@@ -41,7 +41,7 @@ templ GraphSettingsPanel() {
 					{ i18n.T(ctx, "Focus Entity") }
 				</label>
 				<div class="relative group">
-					<div class="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
+					<div class="absolute start-2.5 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
 						@icon.Search(icon.Props{Class: "size-3.5"})
 					</div>
 					<input
@@ -49,12 +49,12 @@ templ GraphSettingsPanel() {
 						x-model="graphStartNodeInput"
 						@input.debounce.300ms="searchGraphLabels()"
 						placeholder={ i18n.T(ctx, "Search entity to focus...") }
-						class="w-full h-9 pl-8.5 pr-8 text-xs bg-muted/30 border border-border/50 rounded-md ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+						class="w-full h-9 ps-8.5 pe-8 text-xs bg-muted/30 border border-border/50 rounded-md ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all"
 					/>
 					<template x-if="graphStartNodeInput">
 						<button
 							@click="clearGraphFocus()"
-							class="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 flex items-center justify-center rounded-sm hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+							class="absolute end-1 top-1/2 -translate-y-1/2 h-7 w-7 flex items-center justify-center rounded-sm hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
 						>
 							@icon.X(icon.Props{Class: "size-3"})
 						</button>
@@ -66,7 +66,7 @@ templ GraphSettingsPanel() {
 						<template x-for="match in graphLabelMatches" :key="match">
 							<button
 								@click="selectGraphFocus(match)"
-								class="w-full px-3 py-2 text-left text-xs hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-2"
+								class="w-full px-3 py-2 text-start text-xs hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-2"
 							>
 								@icon.Tag(icon.Props{Class: "size-3 opacity-40"})
 								<span x-text="match" class="truncate font-medium"></span>

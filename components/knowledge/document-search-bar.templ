@@ -9,11 +9,11 @@ import "school-with-ai/components/icon"
 
 templ DocumentSearchBar() {
 	<div class="relative flex-1 max-w-md">
-		@icon.Search(icon.Props{Class: "absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground"})
+		@icon.Search(icon.Props{Class: "absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground"})
 		<input
 			type="search"
 			placeholder="Search documents..."
-			class="flex h-9 w-full rounded-md border border-input bg-transparent pl-9 pr-8 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+			class="flex h-9 w-full rounded-md border border-input bg-transparent ps-9 pe-8 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
 			x-model.debounce.300ms="docSearch"
 			@input="handleSearch()"
 		/>
@@ -22,7 +22,7 @@ templ DocumentSearchBar() {
 			x-show="docSearch"
 			x-cloak
 			@click="docSearch = ''; handleSearch()"
-			class="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-muted transition-colors"
+			class="absolute end-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-muted transition-colors"
 			aria-label="Clear search"
 		>
 			@icon.X(icon.Props{Class: "size-3.5 text-muted-foreground"})

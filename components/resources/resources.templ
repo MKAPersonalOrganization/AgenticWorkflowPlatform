@@ -47,14 +47,14 @@ templ ResourcesDialog() {
 							<select
 								x-model="selectedAgent"
 								@change="onAgentChange()"
-								class="w-full h-9 rounded-md border border-input bg-muted/40 px-3 pr-8 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring appearance-none transition-colors border-transparent focus-within:bg-background"
+								class="w-full h-9 rounded-md border border-input bg-muted/40 px-3 pe-8 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring appearance-none transition-colors border-transparent focus-within:bg-background"
 								:disabled="loadingAgents"
 							>
 								<template x-for="agent in agents" :key="agent.id">
 									<option :value="agent.id" x-text="agent.name"></option>
 								</template>
 							</select>
-							<div class="absolute inset-y-0 right-0 flex items-center pr-2.5 pointer-events-none">
+							<div class="absolute inset-y-0 end-0 flex items-center pe-2.5 pointer-events-none">
 								<template x-if="loadingAgents">
 									<div class="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent"></div>
 								</template>
@@ -140,8 +140,8 @@ templ ResourcesDialog() {
 							<div class="space-y-2">
 								<template x-for="workspace in filteredWorkspaces" :key="workspace.id">
 									<div
-										class="group border rounded-lg overflow-hidden transition-all duration-200 border-l-[3px] hover:shadow-md"
-										:class="workspace.enabled ? 'border-border border-l-primary bg-card' : 'border-border border-l-border opacity-70'"
+										class="group border rounded-lg overflow-hidden transition-all duration-200 border-s-[3px] hover:shadow-md"
+										:class="workspace.enabled ? 'border-border border-s-primary bg-card' : 'border-border border-s-border opacity-70'"
 									>
 										<div class="flex items-center justify-between gap-4 p-4">
 											<div class="flex items-start gap-3 flex-1 min-w-0">

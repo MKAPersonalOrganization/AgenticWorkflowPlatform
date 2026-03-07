@@ -47,7 +47,7 @@ templ GraphViewer() {
 						@click="window.location.href = '/documents'"
 						class="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
 					>
-						@icon.Upload(icon.Props{Class: "size-4 mr-2"})
+						@icon.Upload(icon.Props{Class: "size-4 me-2"})
 						{ i18n.T(ctx, "Upload Documents") }
 					</button>
 				</div>
@@ -59,16 +59,16 @@ templ GraphViewer() {
 				<div class="flex-1 relative overflow-hidden" id="graph-container">
 					<div id="sigma-container" class="w-full h-full" style="display: block; position: relative; min-height: 400px;"></div>
 					<!-- Overlays -->
-					<div class="absolute top-4 left-4 flex flex-col gap-2 z-20">
+					<div class="absolute top-4 start-4 flex flex-col gap-2 z-20">
 						@GraphControls()
 					</div>
-					<div class="absolute top-4 right-4 flex flex-col gap-2">
+					<div class="absolute top-4 end-4 flex flex-col gap-2">
 						@ZoomControls()
 					</div>
-					<div class="absolute bottom-4 right-4">
+					<div class="absolute bottom-4 end-4">
 						@GraphLegend()
 					</div>
-					<div class="absolute top-20 left-4 z-10">
+					<div class="absolute top-20 start-4 z-10">
 						@GraphMinimap()
 					</div>
 					<!-- Truncation banner -->

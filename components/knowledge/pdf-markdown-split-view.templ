@@ -21,7 +21,7 @@ templ PDFMarkdownSplitView(props PDFMarkdownSplitViewProps) {
 		<!-- View Mode Toolbar -->
 		<div class="flex items-center justify-between gap-2 p-2 border-b bg-muted/30 shrink-0">
 			<div class="flex items-center gap-1">
-				<span class="text-sm font-medium text-muted-foreground mr-2">
+				<span class="text-sm font-medium text-muted-foreground me-2">
 					{ i18n.T(ctx, "View:") }
 				</span>
 				@button.Button(button.Props{
@@ -68,7 +68,7 @@ templ PDFMarkdownSplitView(props PDFMarkdownSplitViewProps) {
 			<div
 				x-show="viewMode === 'pdf' || viewMode === 'split'"
 				class="overflow-hidden bg-muted/5 transition-all duration-300"
-				:class="viewMode === 'split' ? 'h-1/2 lg:h-full lg:border-r border-border' : 'w-full h-full'"
+				:class="viewMode === 'split' ? 'h-1/2 lg:h-full lg:border-e border-border' : 'w-full h-full'"
 			>
 				@PDFViewer(PDFViewerProps{
 					URL:    props.PDFURL,

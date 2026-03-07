@@ -26,7 +26,7 @@ templ DocumentDetailDialog() {
 			@dialog.Header(dialog.HeaderProps{}) {
 				@dialog.Title(dialog.TitleProps{Class: "flex items-center gap-2"}) {
 					@icon.FileText(icon.Props{Class: "size-5"})
-					<span x-text="detailDoc?.title || detailDoc?.file_name || 'Untitled Document'"></span>
+					<span x-text="detailDoc?.title || detailDoc?.file_name || window.i18n.t('Untitled Document')"></span>
 				}
 				@dialog.Description(dialog.DescriptionProps{Class: "flex items-center gap-2"}) {
 					<span
@@ -169,7 +169,7 @@ templ DocumentDetailDialog() {
 								Content:     "detailDoc?.content || previewContent",
 								Height:      "300px",
 								ShowToolbar: true,
-								Title:       "Extracted Markdown",
+								Title:       i18n.T(ctx, "Extracted Markdown"),
 							})
 						</template>
 						<template x-if="!detailDoc?.content && !previewContent">
@@ -184,7 +184,7 @@ templ DocumentDetailDialog() {
 						<template x-if="detailDoc?.entity_count && detailDoc.entity_count > 0">
 							<div class="text-center py-8">
 								<p class="text-sm text-muted-foreground mb-2">
-									<span x-text="detailDoc.entity_count"></span> entities extracted
+									<span x-text="detailDoc.entity_count"></span> { i18n.T(ctx, "entities extracted") }
 								</p>
 								<p class="text-xs text-muted-foreground mb-4">
 									{ i18n.T(ctx, "Switch to the Graph tab for detailed entity information") }

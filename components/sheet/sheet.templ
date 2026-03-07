@@ -177,7 +177,7 @@ templ Header(props ...HeaderProps) {
 	// Sheet header uses Dialog header but overrides styles
 	@dialog.Header(dialog.HeaderProps{
 		ID:         p.ID,
-		Class:      utils.TwMerge("gap-1.5 p-4 text-left", p.Class),
+		Class:      utils.TwMerge("gap-1.5 p-4 text-start", p.Class),
 		Attributes: p.Attributes,
 	}) {
 		{ children... }
@@ -255,38 +255,38 @@ func getSideClasses(side Side) string {
 	switch side {
 	case SideRight:
 		return baseClasses +
-			// Positioning
-			"!inset-y-0 !right-0 !left-auto !top-auto " +
+			// Positioning — logical: end-0 = right in LTR, left in RTL
+			"!inset-y-0 !end-0 !start-auto !top-auto " +
 			// Size
 			"h-full w-3/4 sm:max-w-sm " +
-			// Border
-			"border-l border-t-0 border-r-0 border-b-0 " +
+			// Border — logical: border-s = border on start side (left in LTR)
+			"border-s border-t-0 border-e-0 border-b-0 " +
 			// Reset Dialog transforms
 			"!translate-y-0 " +
-			// Slide animation
-			"data-[tui-dialog-open=false]:!translate-x-full " +
+			// Slide animation — direction-aware via CSS custom property
+			"data-[tui-dialog-open=false]:!translate-x-[var(--slide-end)] " +
 			"data-[tui-dialog-open=true]:!translate-x-0"
 	case SideLeft:
 		return baseClasses +
-			// Positioning
-			"!inset-y-0 !left-0 !right-auto !top-auto " +
+			// Positioning — logical: start-0 = left in LTR, right in RTL
+			"!inset-y-0 !start-0 !end-auto !top-auto " +
 			// Size
 			"h-full w-3/4 sm:max-w-sm " +
-			// Border
-			"border-r border-t-0 border-l-0 border-b-0 " +
+			// Border — logical: border-e = border on end side (right in LTR)
+			"border-e border-t-0 border-s-0 border-b-0 " +
 			// Reset Dialog transforms
 			"!translate-y-0 " +
-			// Slide animation
-			"data-[tui-dialog-open=false]:!-translate-x-full " +
+			// Slide animation — direction-aware via CSS custom property
+			"data-[tui-dialog-open=false]:!translate-x-[var(--slide-start)] " +
 			"data-[tui-dialog-open=true]:!translate-x-0"
 	case SideTop:
 		return baseClasses +
-			// Positioning - full width at top
-			"!inset-x-0 !top-0 !bottom-auto !left-0 !right-0 " +
+			// Positioning - full width at top (inset-x handles both sides logically)
+			"!inset-x-0 !top-0 !bottom-auto " +
 			// Size - full width, auto height
 			"!w-full !max-w-full h-auto " +
 			// Border
-			"border-b border-t-0 border-l-0 border-r-0 " +
+			"border-b border-t-0 border-s-0 border-e-0 " +
 			// Reset Dialog transforms - IMPORTANT: reset the centering from Dialog
 			"!translate-x-0 !translate-y-0 " +
 			// Slide animation - top slides up when closing
@@ -294,12 +294,12 @@ func getSideClasses(side Side) string {
 			"data-[tui-dialog-open=true]:!translate-y-0"
 	case SideBottom:
 		return baseClasses +
-			// Positioning - full width at bottom
-			"!inset-x-0 !bottom-0 !top-auto !left-0 !right-0 " +
+			// Positioning - full width at bottom (inset-x handles both sides logically)
+			"!inset-x-0 !bottom-0 !top-auto " +
 			// Size - full width, auto height
 			"!w-full !max-w-full h-auto " +
 			// Border
-			"border-t border-b-0 border-l-0 border-r-0 " +
+			"border-t border-b-0 border-s-0 border-e-0 " +
 			// Reset Dialog transforms - IMPORTANT: reset the centering from Dialog
 			"!translate-x-0 !translate-y-0 " +
 			// Slide animation
@@ -307,12 +307,12 @@ func getSideClasses(side Side) string {
 			"data-[tui-dialog-open=true]:!translate-y-0"
 	default:
 		return baseClasses +
-			// Default to right side
-			"!inset-y-0 !right-0 !left-auto !top-auto " +
+			// Default to right (end) side — logical properties
+			"!inset-y-0 !end-0 !start-auto !top-auto " +
 			"h-full w-3/4 " +
-			"border-l border-t-0 border-r-0 border-b-0 " +
+			"border-s border-t-0 border-e-0 border-b-0 " +
 			"!translate-y-0 " +
-			"data-[tui-dialog-open=false]:!translate-x-full " +
+			"data-[tui-dialog-open=false]:!translate-x-[var(--slide-end)] " +
 			"data-[tui-dialog-open=true]:!translate-x-0"
 	}
 }

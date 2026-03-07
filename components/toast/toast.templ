@@ -73,11 +73,11 @@ templ Toast(props ...Props) {
 			// Animation
 			"animate-in fade-in slide-in-from-bottom-4 duration-300",
 			// Position-based styles using data attributes
-			"data-[position=top-right]:top-0 data-[position=top-right]:right-0",
-			"data-[position=top-left]:top-0 data-[position=top-left]:left-0",
+			"data-[position=top-right]:top-0 data-[position=top-right]:end-0",
+			"data-[position=top-left]:top-0 data-[position=top-left]:start-0",
 			"data-[position=top-center]:top-0 data-[position=top-center]:left-1/2 data-[position=top-center]:-translate-x-1/2",
-			"data-[position=bottom-right]:bottom-0 data-[position=bottom-right]:right-0",
-			"data-[position=bottom-left]:bottom-0 data-[position=bottom-left]:left-0",
+			"data-[position=bottom-right]:bottom-0 data-[position=bottom-right]:end-0",
+			"data-[position=bottom-left]:bottom-0 data-[position=bottom-left]:start-0",
 			"data-[position=bottom-center]:bottom-0 data-[position=bottom-center]:left-1/2 data-[position=bottom-center]:-translate-x-1/2",
 			// Slide direction based on position
 			"data-[position*=top]:slide-in-from-top-4",
@@ -89,10 +89,10 @@ templ Toast(props ...Props) {
 		<div class="w-full bg-popover text-popover-foreground rounded-lg shadow-xs border pt-5 pb-4 px-4 flex items-center justify-center relative overflow-hidden group">
 			// Progress indicator
 			if p.ShowIndicator && p.Duration > 0 {
-				<div class="absolute top-0 left-0 right-0 h-1 overflow-hidden">
+				<div class="absolute top-0 start-0 end-0 h-1 overflow-hidden">
 					<div
 						class={ utils.TwMerge(
-							"toast-progress h-full origin-left transition-transform ease-linear",
+							"toast-progress h-full ltr:origin-left rtl:origin-right transition-transform ease-linear",
 							// Variant colors
 							"data-[variant=default]:bg-gray-500",
 							"data-[variant=success]:bg-green-500",
@@ -109,13 +109,13 @@ templ Toast(props ...Props) {
 			if p.Icon {
 				switch p.Variant {
 					case VariantSuccess:
-						@icon.CircleCheck(icon.Props{Size: 22, Class: "text-green-500 mr-3 flex-shrink-0"})
+						@icon.CircleCheck(icon.Props{Size: 22, Class: "text-green-500 me-3 flex-shrink-0"})
 					case VariantError:
-						@icon.CircleX(icon.Props{Size: 22, Class: "text-red-500 mr-3 flex-shrink-0"})
+						@icon.CircleX(icon.Props{Size: 22, Class: "text-red-500 me-3 flex-shrink-0"})
 					case VariantWarning:
-						@icon.TriangleAlert(icon.Props{Size: 22, Class: "text-yellow-500 mr-3 flex-shrink-0"})
+						@icon.TriangleAlert(icon.Props{Size: 22, Class: "text-yellow-500 me-3 flex-shrink-0"})
 					case VariantInfo:
-						@icon.Info(icon.Props{Size: 22, Class: "text-blue-500 mr-3 flex-shrink-0"})
+						@icon.Info(icon.Props{Size: 22, Class: "text-blue-500 me-3 flex-shrink-0"})
 				}
 			}
 			// Content

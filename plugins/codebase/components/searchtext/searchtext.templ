@@ -16,7 +16,7 @@ templ Container() {
 			<div class="flex items-center gap-2 text-[12px] text-muted-foreground/50 italic font-serif">
 				<span class="font-semibold">Query:</span>
 				<span class="text-primary/70 not-italic font-mono text-[11px] bg-primary/[0.05] px-2 py-0.5 rounded-md border border-primary/10 shadow-sm" x-text="message.parsedArgs?.pattern || 'search'"></span>
-				<span class="font-semibold ml-2">Context:</span>
+				<span class="font-semibold ms-2">Context:</span>
 				<span class="text-foreground/70 not-italic font-sans font-medium" x-text="(message.parsedArgs?.file_path || '').split('/').pop()"></span>
 			</div>
 			<!-- Content Area: Specialized Surface -->
