@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/services/agentorchestrator"
+	"school-with-ai/modules/chat/agentorchestrator"
 	"time"
 
 	"github.com/hibiken/asynq"

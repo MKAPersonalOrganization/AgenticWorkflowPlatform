@@ -3,7 +3,7 @@ package agentorchestrator_test
 import (
 	"context"
 	"school-with-ai/foundation/agent"
-	"school-with-ai/services/agentorchestrator/agents/math"
+	"school-with-ai/modules/chat/agentorchestrator/agents/math"
 	"testing"
 )
 

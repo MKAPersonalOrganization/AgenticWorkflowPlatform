@@ -47,7 +47,7 @@ import (
 	"school-with-ai/shared"
 
 	"school-with-ai/modules/knowledge/rag/users"
-	"school-with-ai/services/taskmanagement"
+	"school-with-ai/modules/chat/taskmanagement"
 	"school-with-ai/services/toolregistry"
 	"school-with-ai/services/workspacepermissions"
 

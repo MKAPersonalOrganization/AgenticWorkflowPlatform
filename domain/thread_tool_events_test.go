@@ -5,7 +5,7 @@ import (
 	"io"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/services/threadmgmt"
+	"school-with-ai/modules/chat/threadmgmt"
 	"testing"
 	"time"
 

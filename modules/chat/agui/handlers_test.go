@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"school-with-ai/shared"
-	"school-with-ai/infra/projection/agui"
+	"school-with-ai/modules/chat/projection/agui"
 	"school-with-ai/services"
 	"testing"
 	"time"

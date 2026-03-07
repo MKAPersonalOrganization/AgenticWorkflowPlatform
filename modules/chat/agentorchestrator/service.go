@@ -11,7 +11,7 @@ import (
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/services/artifact"
-	"school-with-ai/services/threadmgmt"
+	"school-with-ai/modules/chat/threadmgmt"
 	"strings"
 	"sync"
 	"time"
