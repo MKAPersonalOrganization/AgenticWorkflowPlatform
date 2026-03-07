@@ -143,7 +143,11 @@ export const mcpConnectors = () => ({
 
     async mcpConnect(connectorId) {
         const conn = this.mcpConnectors.find(c => c.id === connectorId);
-        if (conn) conn.status = 'connecting';
+        if (conn) {
+            conn.status = 'connecting';
+            // Immediately sync detail view so status badge + buttons update.
+            this._syncDetailView(conn);
+        }
 
         try {
             const res = await fetch(`/v1/mcp/connectors/${connectorId}/connect`, {
@@ -157,19 +161,34 @@ export const mcpConnectors = () => ({
             }
             await this.mcpFetchConnectors();
             window.dispatchEvent(new CustomEvent('mcp-state-changed'));
+            // Sync detail view with server-confirmed state.
+            this._syncDetailView(this.mcpConnectors.find(c => c.id === connectorId));
         } catch (err) {
             console.error('[MCP] Failed to connect:', err);
-            if (conn) conn.status = 'error';
+            if (conn) {
+                conn.status = 'error';
+                this._syncDetailView(conn);
+            }
         }
     },
 
     async mcpDisconnect(connectorId) {
+        const conn = this.mcpConnectors.find(c => c.id === connectorId);
+        if (conn) {
+            conn.status = 'disconnected';
+            // Immediately sync detail view — button switches from red "Disconnect"
+            // to "Connect" without waiting for the round-trip.
+            this._syncDetailView(conn);
+        }
+
         try {
             await fetch(`/v1/mcp/connectors/${connectorId}/disconnect`, {
                 method: 'POST',
             });
             await this.mcpFetchConnectors();
             window.dispatchEvent(new CustomEvent('mcp-state-changed'));
+            // Sync detail view with server-confirmed state.
+            this._syncDetailView(this.mcpConnectors.find(c => c.id === connectorId));
         } catch (err) {
             console.error('[MCP] Failed to disconnect:', err);
         }
@@ -225,6 +244,18 @@ export const mcpConnectors = () => ({
     },
 
     // ── Helpers ─────────────────────────────────────────────────────────
+
+    /**
+     * Dispatches mcp-detail-updated so the toolsDialog detail view (which
+     * lives in a separate Alpine scope) picks up the fresh connector status.
+     * Without this, detailItem.status stays stale and the connect/disconnect
+     * buttons don't swap until a full page reload.
+     */
+    _syncDetailView(connector) {
+        if (connector) {
+            window.dispatchEvent(new CustomEvent('mcp-detail-updated', { detail: connector }));
+        }
+    },
 
     _resetAddForm() {
         this.mcpNewUrl = '';
