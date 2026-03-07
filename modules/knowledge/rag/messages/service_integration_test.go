@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"school-with-ai/domain"
-	"school-with-ai/services/rag/messages"
+	"school-with-ai/modules/knowledge/rag/messages"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"

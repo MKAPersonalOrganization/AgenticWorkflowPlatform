@@ -13,27 +13,26 @@ import (
 	"school-with-ai/components/knowledge"
 	"school-with-ai/domain"
 	"school-with-ai/foundation/logger"
-	aisettingsmod "school-with-ai/modules/aisettings"
-	"school-with-ai/services/edgequake"
-	"school-with-ai/services/rag/documents"
-	"school-with-ai/services/rag/graph"
-	"school-with-ai/services/rag/workspaces"
+	"school-with-ai/modules/knowledge/edgequake"
+	"school-with-ai/modules/knowledge/rag/documents"
+	"school-with-ai/modules/knowledge/rag/graph"
+	"school-with-ai/modules/knowledge/rag/workspaces"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
 
-// Handler provides HTTP endpoints for the RAG Knowledge Base dashboard.
-type Handler struct {
+// handler provides HTTP endpoints for the RAG Knowledge Base dashboard.
+type handler struct {
 	log              *logger.Logger
 	edgequakeService *edgequake.Service
-	aiSettings       *aisettingsmod.Module
+	aiSettings       EmbeddingConfigResolver
 	tenantID         string
 }
 
-// NewHandler creates a new Knowledge Base handler.
-func NewHandler(log *logger.Logger, edgequakeService *edgequake.Service, aiSettings *aisettingsmod.Module, tenantID string) *Handler {
-	return &Handler{
+// newHandler creates a new Knowledge Base handler.
+func newHandler(log *logger.Logger, edgequakeService *edgequake.Service, aiSettings EmbeddingConfigResolver, tenantID string) *handler {
+	return &handler{
 		log:              log,
 		edgequakeService: edgequakeService,
 		aiSettings:       aiSettings,
@@ -42,7 +41,7 @@ func NewHandler(log *logger.Logger, edgequakeService *edgequake.Service, aiSetti
 }
 
 // resolveTenantContext resolves the tenant context for the authenticated user.
-func (h *Handler) resolveTenantContext(r *http.Request) (*domain.TenantContext, error) {
+func (h *handler) resolveTenantContext(r *http.Request) (*domain.TenantContext, error) {
 	user := domain.GetUserFromContext(r.Context())
 	if user == nil {
 		return nil, fmt.Errorf("no authenticated user")
@@ -66,7 +65,7 @@ func (h *Handler) resolveTenantContext(r *http.Request) (*domain.TenantContext, 
 }
 
 // WorkspacesPage renders the workspaces listing page.
-func (h *Handler) WorkspacesPage(w http.ResponseWriter, r *http.Request) {
+func (h *handler) WorkspacesPage(w http.ResponseWriter, r *http.Request) {
 	user := domain.GetUserFromContext(r.Context())
 
 	component := knowledge.WorkspacesPage(knowledge.WorkspacesPageProps{
@@ -78,7 +77,7 @@ func (h *Handler) WorkspacesPage(w http.ResponseWriter, r *http.Request) {
 }
 
 // WorkspaceDetailsPage renders the workspace details and document list.
-func (h *Handler) WorkspaceDetailsPage(w http.ResponseWriter, r *http.Request) {
+func (h *handler) WorkspaceDetailsPage(w http.ResponseWriter, r *http.Request) {
 	user := domain.GetUserFromContext(r.Context())
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
@@ -112,7 +111,7 @@ func (h *Handler) WorkspaceDetailsPage(w http.ResponseWriter, r *http.Request) {
 }
 
 // DashboardPage renders the knowledge dashboard page.
-func (h *Handler) DashboardPage(w http.ResponseWriter, r *http.Request) {
+func (h *handler) DashboardPage(w http.ResponseWriter, r *http.Request) {
 	user := domain.GetUserFromContext(r.Context())
 
 	component := knowledge.DashboardPage(knowledge.DashboardPageProps{
@@ -124,7 +123,7 @@ func (h *Handler) DashboardPage(w http.ResponseWriter, r *http.Request) {
 }
 
 // ListDocuments returns documents for the current workspace as JSON.
-func (h *Handler) ListDocuments(w http.ResponseWriter, r *http.Request) {
+func (h *handler) ListDocuments(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to resolve tenant context", "error", err)
@@ -161,7 +160,7 @@ func (h *Handler) ListDocuments(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetDocument retrieves a single document by ID.
-func (h *Handler) GetDocument(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetDocument(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -193,7 +192,7 @@ func (h *Handler) GetDocument(w http.ResponseWriter, r *http.Request) {
 }
 
 // UploadDocument handles document upload.
-func (h *Handler) UploadDocument(w http.ResponseWriter, r *http.Request) {
+func (h *handler) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to resolve tenant context", "error", err)
@@ -245,7 +244,7 @@ func (h *Handler) UploadDocument(w http.ResponseWriter, r *http.Request) {
 }
 
 // UploadPDF handles PDF upload.
-func (h *Handler) UploadPDF(w http.ResponseWriter, r *http.Request) {
+func (h *handler) UploadPDF(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -283,7 +282,7 @@ func (h *Handler) UploadPDF(w http.ResponseWriter, r *http.Request) {
 }
 
 // DeletePDF deletes a PDF document.
-func (h *Handler) DeletePDF(w http.ResponseWriter, r *http.Request) {
+func (h *handler) DeletePDF(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -314,7 +313,7 @@ func (h *Handler) DeletePDF(w http.ResponseWriter, r *http.Request) {
 }
 
 // ListPDFs returns PDFs for the current workspace.
-func (h *Handler) ListPDFs(w http.ResponseWriter, r *http.Request) {
+func (h *handler) ListPDFs(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -351,7 +350,7 @@ func (h *Handler) ListPDFs(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetPDFProgress retrieves the progress of a PDF upload.
-func (h *Handler) GetPDFProgress(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetPDFProgress(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -375,7 +374,7 @@ func (h *Handler) GetPDFProgress(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetPDFContent retrieves the content of a specific PDF.
-func (h *Handler) GetPDFContent(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetPDFContent(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -399,7 +398,7 @@ func (h *Handler) GetPDFContent(w http.ResponseWriter, r *http.Request) {
 }
 
 // DownloadPDF proxies the PDF binary download from Edgequake.
-func (h *Handler) DownloadPDF(w http.ResponseWriter, r *http.Request) {
+func (h *handler) DownloadPDF(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -445,7 +444,7 @@ func (h *Handler) DownloadPDF(w http.ResponseWriter, r *http.Request) {
 }
 
 // ListWorkspaces returns workspaces for the user's tenant.
-func (h *Handler) ListWorkspaces(w http.ResponseWriter, r *http.Request) {
+func (h *handler) ListWorkspaces(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -472,7 +471,7 @@ func (h *Handler) ListWorkspaces(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetWorkspaceStats returns statistics for a specific workspace.
-func (h *Handler) GetWorkspaceStats(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetWorkspaceStats(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -498,7 +497,7 @@ func (h *Handler) GetWorkspaceStats(w http.ResponseWriter, r *http.Request) {
 
 // CreateWorkspace creates a new workspace.
 // Embedding provider/model/dimension are automatically resolved from the user's AI settings.
-func (h *Handler) CreateWorkspace(w http.ResponseWriter, r *http.Request) {
+func (h *handler) CreateWorkspace(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -564,7 +563,7 @@ func (h *Handler) CreateWorkspace(w http.ResponseWriter, r *http.Request) {
 }
 
 // DeleteWorkspace deletes a workspace.
-func (h *Handler) DeleteWorkspace(w http.ResponseWriter, r *http.Request) {
+func (h *handler) DeleteWorkspace(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -588,7 +587,7 @@ func (h *Handler) DeleteWorkspace(w http.ResponseWriter, r *http.Request) {
 }
 
 // DeleteDocument deletes an ingested document.
-func (h *Handler) DeleteDocument(w http.ResponseWriter, r *http.Request) {
+func (h *handler) DeleteDocument(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -619,7 +618,7 @@ func (h *Handler) DeleteDocument(w http.ResponseWriter, r *http.Request) {
 }
 
 // ReprocessDocument triggers reprocessing for a single document.
-func (h *Handler) ReprocessDocument(w http.ResponseWriter, r *http.Request) {
+func (h *handler) ReprocessDocument(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -653,7 +652,7 @@ func (h *Handler) ReprocessDocument(w http.ResponseWriter, r *http.Request) {
 }
 
 // ReprocessFailed triggers reprocessing for all failed documents.
-func (h *Handler) ReprocessFailed(w http.ResponseWriter, r *http.Request) {
+func (h *handler) ReprocessFailed(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -679,7 +678,7 @@ func (h *Handler) ReprocessFailed(w http.ResponseWriter, r *http.Request) {
 }
 
 // ScanDocuments triggers scanning of an input directory for new documents.
-func (h *Handler) ScanDocuments(w http.ResponseWriter, r *http.Request) {
+func (h *handler) ScanDocuments(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -717,7 +716,7 @@ func (h *Handler) ScanDocuments(w http.ResponseWriter, r *http.Request) {
 }
 
 // DeleteAllDocuments deletes all documents in the workspace.
-func (h *Handler) DeleteAllDocuments(w http.ResponseWriter, r *http.Request) {
+func (h *handler) DeleteAllDocuments(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -743,7 +742,7 @@ func (h *Handler) DeleteAllDocuments(w http.ResponseWriter, r *http.Request) {
 }
 
 // RetryTask retries a failed pipeline task.
-func (h *Handler) RetryTask(w http.ResponseWriter, r *http.Request) {
+func (h *handler) RetryTask(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -769,7 +768,7 @@ func (h *Handler) RetryTask(w http.ResponseWriter, r *http.Request) {
 }
 
 // RetryPdfProcessing retries a failed PDF processing.
-func (h *Handler) RetryPdfProcessing(w http.ResponseWriter, r *http.Request) {
+func (h *handler) RetryPdfProcessing(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -793,7 +792,7 @@ func (h *Handler) RetryPdfProcessing(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetEnhancedPipelineStatus returns the enhanced pipeline status.
-func (h *Handler) GetEnhancedPipelineStatus(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetEnhancedPipelineStatus(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -825,7 +824,7 @@ func (h *Handler) GetEnhancedPipelineStatus(w http.ResponseWriter, r *http.Reque
 }
 
 // GetQueueMetrics returns queue metrics.
-func (h *Handler) GetQueueMetrics(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetQueueMetrics(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -851,7 +850,7 @@ func (h *Handler) GetQueueMetrics(w http.ResponseWriter, r *http.Request) {
 }
 
 // CancelPipeline cancels the entire pipeline.
-func (h *Handler) CancelPipeline(w http.ResponseWriter, r *http.Request) {
+func (h *handler) CancelPipeline(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -877,7 +876,7 @@ func (h *Handler) CancelPipeline(w http.ResponseWriter, r *http.Request) {
 }
 
 // ReprocessAll triggers reprocessing for all documents.
-func (h *Handler) ReprocessAll(w http.ResponseWriter, r *http.Request) {
+func (h *handler) ReprocessAll(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -901,7 +900,7 @@ func (h *Handler) ReprocessAll(w http.ResponseWriter, r *http.Request) {
 }
 
 // RebuildWorkspace triggers knowledge graph or embeddings rebuild.
-func (h *Handler) RebuildWorkspace(w http.ResponseWriter, r *http.Request) {
+func (h *handler) RebuildWorkspace(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -959,7 +958,7 @@ func (h *Handler) RebuildWorkspace(w http.ResponseWriter, r *http.Request) {
 }
 
 // CancelPipelineTask cancels a specific task in the pipeline.
-func (h *Handler) CancelPipelineTask(w http.ResponseWriter, r *http.Request) {
+func (h *handler) CancelPipelineTask(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -989,7 +988,7 @@ func (h *Handler) CancelPipelineTask(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetGraph retrieves the knowledge graph.
-func (h *Handler) GetGraph(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetGraph(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -1026,7 +1025,7 @@ func (h *Handler) GetGraph(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetGraphNode retrieves a specific graph node.
-func (h *Handler) GetGraphNode(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetGraphNode(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -1057,7 +1056,7 @@ func (h *Handler) GetGraphNode(w http.ResponseWriter, r *http.Request) {
 }
 
 // SearchGraphNodes searches for nodes by query.
-func (h *Handler) SearchGraphNodes(w http.ResponseWriter, r *http.Request) {
+func (h *handler) SearchGraphNodes(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -1096,7 +1095,7 @@ func (h *Handler) SearchGraphNodes(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetPopularLabels retrieves popular graph labels.
-func (h *Handler) GetPopularLabels(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetPopularLabels(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -1129,7 +1128,7 @@ func (h *Handler) GetPopularLabels(w http.ResponseWriter, r *http.Request) {
 }
 
 // SearchGraphLabels searches for graph labels.
-func (h *Handler) SearchGraphLabels(w http.ResponseWriter, r *http.Request) {
+func (h *handler) SearchGraphLabels(w http.ResponseWriter, r *http.Request) {
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -1168,7 +1167,7 @@ func (h *Handler) SearchGraphLabels(w http.ResponseWriter, r *http.Request) {
 }
 
 // ListLLMModels returns available LLM models for workspace creation.
-func (h *Handler) ListLLMModels(w http.ResponseWriter, r *http.Request) {
+func (h *handler) ListLLMModels(w http.ResponseWriter, r *http.Request) {
 	models, err := h.edgequakeService.ListLLMModels(r.Context())
 	if err != nil {
 		h.log.Error(r.Context(), "failed to list LLM models", "error", err)
@@ -1180,7 +1179,7 @@ func (h *Handler) ListLLMModels(w http.ResponseWriter, r *http.Request) {
 }
 
 // ListEmbeddingModels returns available embedding models for workspace creation.
-func (h *Handler) ListEmbeddingModels(w http.ResponseWriter, r *http.Request) {
+func (h *handler) ListEmbeddingModels(w http.ResponseWriter, r *http.Request) {
 	models, err := h.edgequakeService.ListEmbeddingModels(r.Context())
 	if err != nil {
 		h.log.Error(r.Context(), "failed to list embedding models", "error", err)

@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"school-with-ai/domain"
-	"school-with-ai/services/rag/relationships"
+	"school-with-ai/modules/knowledge/rag/relationships"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"

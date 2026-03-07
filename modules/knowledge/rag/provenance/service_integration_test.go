@@ -1,7 +1,7 @@
 //go:build integration
 // +build integration
 
-package chat_test
+package provenance_test
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"school-with-ai/domain"
-	"school-with-ai/services/rag/chat"
+	"school-with-ai/modules/knowledge/rag/provenance"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -26,20 +26,17 @@ func testTenantContext() *domain.TenantContext {
 	}
 }
 
-func TestComplete_NoLLM(t *testing.T) {
+func TestGetEntityProvenance_NotFound(t *testing.T) {
 	baseURL := os.Getenv("EDGEQUAKE_BASE_URL")
 	if baseURL == "" {
 		t.Skip("EDGEQUAKE_BASE_URL not set")
 	}
 
-	svc := chat.NewService(baseURL, nil)
+	svc := provenance.NewService(baseURL, nil)
 	ctx := context.Background()
 	tCtx := testTenantContext()
 
-	_, err := svc.Complete(ctx, tCtx, chat.ChatCompletionRequest{
-		Message: "test",
-		Stream:  false,
-	})
-	assert.Error(t, err, "expected error because no LLM backend is available")
-	t.Logf("got expected error: %v", err)
+	_, err := svc.GetEntityProvenance(ctx, tCtx, "nonexistent")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not found")
 }

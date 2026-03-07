@@ -36,6 +36,7 @@ import (
 	"school-with-ai/infra/projections"
 	"school-with-ai/infra/sqldb"
 	"school-with-ai/infra/sqldb/migrate"
+	"school-with-ai/modules/knowledge/edgequake"
 	"school-with-ai/plugins/calculator"
 	"school-with-ai/plugins/codebase"
 	"school-with-ai/plugins/cognitive"
@@ -46,11 +47,10 @@ import (
 	"school-with-ai/plugins/tts"
 	"school-with-ai/services/agentorchestrator"
 	"school-with-ai/services/artifact"
-	"school-with-ai/services/edgequake"
 	"school-with-ai/services/memory"
 	"school-with-ai/services/permissions"
 
-	"school-with-ai/services/rag/users"
+	"school-with-ai/modules/knowledge/rag/users"
 	"school-with-ai/services/taskmanagement"
 	"school-with-ai/services/threadmgmt"
 	"school-with-ai/services/toolregistry"
@@ -68,12 +68,12 @@ import (
 	aguihandlers "school-with-ai/handlers/agui"
 	bannerhandlers "school-with-ai/handlers/banner"
 	healthhandlers "school-with-ai/handlers/health"
-	knowledgehandlers "school-with-ai/handlers/knowledge"
 	taskmgmthandlers "school-with-ai/handlers/taskmgmt"
 	wkspermhandlers "school-with-ai/handlers/workspacepermissions"
 	agentstoremod "school-with-ai/modules/agentstore"
 	aisettingsmod "school-with-ai/modules/aisettings"
 	billingmod "school-with-ai/modules/billing"
+	knowledgemod "school-with-ai/modules/knowledge"
 	mcpmod "school-with-ai/modules/mcp"
 	resourcesmod "school-with-ai/modules/resources"
 
@@ -407,9 +407,22 @@ func run(ctx context.Context, log *logger.Logger) error {
 	workspacePermissionsService := workspacepermissions.NewService(log, sqldb.NewPostgresWorkspacePermissionsRepository(db))
 	log.Info(ctx, "startup", "status", "workspace permissions service initialized")
 
-	// Initialize Edgequake service
-	edgequakeService := edgequake.NewService(cfg.Edgequake.BaseURL)
-	log.Info(ctx, "startup", "status", "edgequake service initialized", "baseURL", cfg.Edgequake.BaseURL)
+	// Initialize Knowledge module (owns Edgequake / RAG services)
+	embeddingResolver := knowledgemod.EmbeddingConfigResolverFunc(func(ctx context.Context, userID string) (*knowledgemod.EmbeddingConfig, error) {
+		ec, err := aiSettingsModule.GetEmbeddingConfigForUser(ctx, userID)
+		if err != nil || ec == nil {
+			return nil, err
+		}
+		return &knowledgemod.EmbeddingConfig{
+			Provider:  ec.Provider,
+			Model:     ec.Model,
+			Dimension: ec.Dimension,
+			APIKey:    ec.APIKey,
+		}, nil
+	})
+	knowledgeModule := knowledgemod.New(log, cfg.Edgequake.BaseURL, embeddingResolver, cfg.Edgequake.TenantID)
+	edgequakeService := knowledgeModule.Service()
+	log.Info(ctx, "startup", "status", "knowledge module initialized", "baseURL", cfg.Edgequake.BaseURL)
 
 	// Initialize Agents
 	slogLogger := slog.New(log)
@@ -697,65 +710,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	r.Patch("/api/agui/threads/{threadId}", authMiddleware.RequireAuthFunc(handler.UpdateThreadTitle))
 
 	// Knowledge Base / RAG routes
-	knowledgeHandler := knowledgehandlers.NewHandler(log, edgequakeService, aiSettingsModule, cfg.Edgequake.TenantID)
-
-	// Pages
-	r.Get("/knowledge", authMiddleware.RequireAuthFunc(knowledgeHandler.WorkspacesPage))
-	r.Get("/knowledge/dashboard", authMiddleware.RequireAuthFunc(knowledgeHandler.DashboardPage))
-	r.Get("/knowledge/workspaces/{workspaceId}", authMiddleware.RequireAuthFunc(knowledgeHandler.WorkspaceDetailsPage))
-
-	// Documents API (maps to Edgequake /api/v1/documents)
-	r.Get("/api/knowledge/documents", authMiddleware.RequireAuthFunc(knowledgeHandler.ListDocuments))
-	r.Get("/api/knowledge/documents/{documentId}", authMiddleware.RequireAuthFunc(knowledgeHandler.GetDocument))
-	r.Post("/api/knowledge/documents/upload", authMiddleware.RequireAuthFunc(knowledgeHandler.UploadDocument))
-	r.Delete("/api/knowledge/documents/{documentId}", authMiddleware.RequireAuthFunc(knowledgeHandler.DeleteDocument))
-	r.Delete("/api/knowledge/documents", authMiddleware.RequireAuthFunc(knowledgeHandler.DeleteAllDocuments))
-	r.Post("/api/knowledge/documents/reprocess", authMiddleware.RequireAuthFunc(knowledgeHandler.ReprocessDocument))
-	r.Post("/api/knowledge/documents/reprocess-failed", authMiddleware.RequireAuthFunc(knowledgeHandler.ReprocessFailed))
-	r.Post("/api/knowledge/documents/scan", authMiddleware.RequireAuthFunc(knowledgeHandler.ScanDocuments))
-
-	// PDFs API (maps to Edgequake /api/v1/documents/pdf)
-	r.Get("/api/knowledge/pdfs", authMiddleware.RequireAuthFunc(knowledgeHandler.ListPDFs))
-	r.Post("/api/knowledge/pdfs/upload", authMiddleware.RequireAuthFunc(knowledgeHandler.UploadPDF))
-	r.Delete("/api/knowledge/pdfs/{pdfId}", authMiddleware.RequireAuthFunc(knowledgeHandler.DeletePDF))
-	r.Get("/api/knowledge/pdfs/{pdfId}/content", authMiddleware.RequireAuthFunc(knowledgeHandler.GetPDFContent))
-	r.Get("/api/knowledge/pdfs/{pdfId}/download", authMiddleware.RequireAuthFunc(knowledgeHandler.DownloadPDF))
-	r.Get("/api/knowledge/pdfs/{trackId}/progress", authMiddleware.RequireAuthFunc(knowledgeHandler.GetPDFProgress))
-	r.Post("/api/knowledge/pdfs/{pdfId}/retry", authMiddleware.RequireAuthFunc(knowledgeHandler.RetryPdfProcessing))
-
-	// Workspaces API (maps to Edgequake /api/v1/workspaces)
-	r.Get("/api/knowledge/workspaces", authMiddleware.RequireAuthFunc(knowledgeHandler.ListWorkspaces))
-	r.Post("/api/knowledge/workspaces", authMiddleware.RequireAuthFunc(knowledgeHandler.CreateWorkspace))
-	r.Get("/api/knowledge/workspaces/{workspaceId}/stats", authMiddleware.RequireAuthFunc(knowledgeHandler.GetWorkspaceStats))
-	r.Delete("/api/knowledge/workspaces/{workspaceId}", authMiddleware.RequireAuthFunc(knowledgeHandler.DeleteWorkspace))
-	r.Post("/api/knowledge/workspaces/{workspaceId}/rebuild", authMiddleware.RequireAuthFunc(knowledgeHandler.RebuildWorkspace))
-	r.Post("/api/knowledge/workspaces/reprocess", authMiddleware.RequireAuthFunc(knowledgeHandler.ReprocessAll))
-
-	// Workspaces API — Extended
-	r.Put("/api/knowledge/workspaces/{workspaceId}", authMiddleware.RequireAuthFunc(knowledgeHandler.UpdateWorkspace))
-
-	// Models API (maps to Edgequake /api/v1/models)
-	r.Get("/api/knowledge/models", authMiddleware.RequireAuthFunc(knowledgeHandler.ListAllModels))
-	r.Get("/api/knowledge/models/llm", authMiddleware.RequireAuthFunc(knowledgeHandler.ListLLMModels))
-	r.Get("/api/knowledge/models/embedding", authMiddleware.RequireAuthFunc(knowledgeHandler.ListEmbeddingModels))
-
-	// Settings API (maps to Edgequake /api/v1/settings)
-	r.Get("/api/knowledge/settings/status", authMiddleware.RequireAuthFunc(knowledgeHandler.GetProviderStatus))
-	r.Get("/api/knowledge/settings/providers", authMiddleware.RequireAuthFunc(knowledgeHandler.ListAvailableProviders))
-
-	// Pipeline API (maps to Edgequake /api/v1/pipeline + /api/v1/tasks)
-	r.Get("/api/knowledge/pipeline/enhanced-status", authMiddleware.RequireAuthFunc(knowledgeHandler.GetEnhancedPipelineStatus))
-	r.Get("/api/knowledge/pipeline/queue-metrics", authMiddleware.RequireAuthFunc(knowledgeHandler.GetQueueMetrics))
-	r.Post("/api/knowledge/pipeline/cancel", authMiddleware.RequireAuthFunc(knowledgeHandler.CancelPipelineTask))
-	r.Post("/api/knowledge/pipeline/cancel-all", authMiddleware.RequireAuthFunc(knowledgeHandler.CancelPipeline))
-	r.Post("/api/knowledge/pipeline/retry", authMiddleware.RequireAuthFunc(knowledgeHandler.RetryTask))
-
-	// Graph API (maps to Edgequake /api/v1/graph)
-	r.Get("/api/knowledge/graph", authMiddleware.RequireAuthFunc(knowledgeHandler.GetGraph))
-	r.Get("/api/knowledge/graph/nodes/search", authMiddleware.RequireAuthFunc(knowledgeHandler.SearchGraphNodes))
-	r.Get("/api/knowledge/graph/nodes/{nodeId}", authMiddleware.RequireAuthFunc(knowledgeHandler.GetGraphNode))
-	r.Get("/api/knowledge/graph/labels/popular", authMiddleware.RequireAuthFunc(knowledgeHandler.GetPopularLabels))
-	r.Get("/api/knowledge/graph/labels/search", authMiddleware.RequireAuthFunc(knowledgeHandler.SearchGraphLabels))
+	knowledgeModule.RegisterRoutes(r, authMiddleware)
 
 	// Landing page (public — shows branding page with optional user context)
 	r.Get("/", authMiddleware.OptionalAuthFunc(HandleLandingPage(log)))

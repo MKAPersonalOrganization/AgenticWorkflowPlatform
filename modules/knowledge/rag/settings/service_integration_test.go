@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"school-with-ai/services/rag/settings"
+	"school-with-ai/modules/knowledge/rag/settings"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

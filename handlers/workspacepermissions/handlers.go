@@ -6,7 +6,7 @@ import (
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/services/edgequake"
+	"school-with-ai/modules/knowledge/edgequake"
 	"school-with-ai/services/workspacepermissions"
 
 	"github.com/google/uuid"
