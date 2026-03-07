@@ -1,4 +1,4 @@
-package domain
+package billing
 
 // ==========================================================================
 // Stripe-Aligned Payment Types

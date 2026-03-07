@@ -96,7 +96,7 @@ func (h *handler) createPaymentIntent(w http.ResponseWriter, r *http.Request) {
 		// Map domain and Stripe errors to appropriate HTTP responses.
 		// Use errors.As to extract the SDK's *stripe.Error for typed handling.
 		switch {
-		case errors.Is(err, domain.ErrAlreadyActivated):
+		case errors.Is(err, ErrAlreadyActivated):
 			writeError(w, http.StatusConflict, "Account is already activated.", "already_activated")
 		default:
 			var stripeErr *stripe.Error
@@ -118,7 +118,7 @@ func (h *handler) createPaymentIntent(w http.ResponseWriter, r *http.Request) {
 		ClientSecret:   clientSecret,
 		PublishableKey: h.publishableKey,
 		Amount:         AmountCents,
-		Currency:       Currency,
+		Currency:       DefaultCurrency,
 	})
 }
 
@@ -544,10 +544,10 @@ func (h *handler) reactivateSubscription(w http.ResponseWriter, r *http.Request)
 		// Map specific errors to user-friendly messages
 		msg := "Could not reactivate subscription. Please try again or contact support."
 		code := "reactivate_failed"
-		if errors.Is(err, domain.ErrBillingPeriodEnded) {
+		if errors.Is(err, ErrBillingPeriodEnded) {
 			msg = "Your billing period has ended. Please subscribe again."
 			code = "billing_period_ended"
-		} else if errors.Is(err, domain.ErrNotCancelled) {
+		} else if errors.Is(err, ErrNotCancelled) {
 			msg = "Subscription is not cancelled."
 			code = "not_cancelled"
 		}

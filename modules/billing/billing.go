@@ -3,8 +3,8 @@ package billing
 import (
 	"context"
 
-	"school-with-ai/domain"
 	"school-with-ai/foundation/event"
+	es "school-with-ai/foundation/eventsourcing"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/handlers/auth"
 
@@ -20,10 +20,9 @@ import (
 // (see arch/adr/012-modular-monolith-migration.md). It replaces three former
 // packages: handlers/billing, services/billing, infra/projection/payment.
 //
-// Domain types (PaymentAccountAggregate, payment events, payment types) remain
-// in the shared domain/ package for now because domain.Event uses a sealed()
-// interface that only types in that package can implement. Phase 2 of the
-// migration will unseal the Event interface and move payment domain types here.
+// Domain types (PaymentAccountAggregate, payment events, payment types) now
+// live in this package. The shared eventsourcing kernel in foundation/
+// provides the open Event interface, BaseAggregate, and Repository[T].
 //
 // Public API for main.go:
 //
@@ -41,12 +40,12 @@ type Module struct {
 func New(
 	log *logger.Logger,
 	db *sqlx.DB,
-	eventStore domain.EventStore,
+	eventStore es.EventStore,
 	webhookSecret string,
 	publishableKey string,
 ) *Module {
 	projection := newPostgresPaymentProjection(log, db)
-	repo := domain.NewPaymentAccountRepository(eventStore)
+	repo := NewPaymentAccountRepository(eventStore)
 	svc := newService(log, repo, projection)
 	h := newHandler(log, svc, webhookSecret, publishableKey)
 

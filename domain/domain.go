@@ -6,22 +6,23 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	es "school-with-ai/foundation/eventsourcing"
 )
 
 // Common errors.
 var (
-	ErrThreadNotFound      = errors.New("thread not found")
+	// ErrThreadNotFound is returned when an aggregate has no events in the store.
+	// It is an alias for eventsourcing.ErrNotFound so that errors.Is works for
+	// both domain.ErrThreadNotFound and eventsourcing.ErrNotFound.
+	ErrThreadNotFound      = es.ErrNotFound
 	ErrConcurrencyConflict = errors.New("concurrency conflict: stream version mismatch")
 )
 
 // Event is the base interface for all domain events.
-// The sealed() method ensures only domain types can implement this interface.
-type Event interface {
-	EventType() string
-	EventTimestamp() time.Time
-	AggregateID() string // ThreadID
-	sealed()             // Prevents external packages from implementing this interface
-}
+// This is now an open interface (no sealed method) — any package can implement
+// it, enabling modules to define events locally.
+type Event = es.Event
 
 // ToolCall represents a tool/function call made by the assistant.
 type ToolCall struct {

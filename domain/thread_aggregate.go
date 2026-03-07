@@ -23,9 +23,7 @@ type ThreadAggregate struct {
 func NewThreadAggregate(id string) *ThreadAggregate {
 	return &ThreadAggregate{
 		BaseAggregate: BaseAggregate{
-			ID:                id,
-			Version:           0,
-			uncommittedEvents: make([]Event, 0),
+			ID: id,
 		},
 		Messages:         make([]Message, 0),
 		ActiveToolStates: make(map[string]ToolCallState),

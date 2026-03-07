@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"time"
 
-	"school-with-ai/domain"
+	es "school-with-ai/foundation/eventsourcing"
 	"school-with-ai/foundation/event"
 	"school-with-ai/foundation/logger"
 
@@ -47,43 +47,43 @@ func (p *postgresPaymentProjection) registerHandlers(router interface {
 	Register(eventPrototype any, handler event.HandlerFunc)
 },
 ) {
-	router.Register(&domain.PaymentAccountOpened{}, func(ctx context.Context, e domain.Event) error {
-		return p.onAccountOpened(ctx, e.(*domain.PaymentAccountOpened))
+	router.Register(&PaymentAccountOpened{}, func(ctx context.Context, e es.Event) error {
+		return p.onAccountOpened(ctx, e.(*PaymentAccountOpened))
 	})
-	router.Register(&domain.PaymentInitiated{}, func(ctx context.Context, e domain.Event) error {
-		return p.onPaymentInitiated(ctx, e.(*domain.PaymentInitiated))
+	router.Register(&PaymentInitiated{}, func(ctx context.Context, e es.Event) error {
+		return p.onPaymentInitiated(ctx, e.(*PaymentInitiated))
 	})
-	router.Register(&domain.PaymentSucceeded{}, func(ctx context.Context, e domain.Event) error {
-		return p.onPaymentSucceeded(ctx, e.(*domain.PaymentSucceeded))
+	router.Register(&PaymentSucceeded{}, func(ctx context.Context, e es.Event) error {
+		return p.onPaymentSucceeded(ctx, e.(*PaymentSucceeded))
 	})
-	router.Register(&domain.PaymentFailed{}, func(ctx context.Context, e domain.Event) error {
-		return p.onPaymentFailed(ctx, e.(*domain.PaymentFailed))
+	router.Register(&PaymentFailed{}, func(ctx context.Context, e es.Event) error {
+		return p.onPaymentFailed(ctx, e.(*PaymentFailed))
 	})
-	router.Register(&domain.PaymentRefunded{}, func(ctx context.Context, e domain.Event) error {
-		return p.onPaymentRefunded(ctx, e.(*domain.PaymentRefunded))
+	router.Register(&PaymentRefunded{}, func(ctx context.Context, e es.Event) error {
+		return p.onPaymentRefunded(ctx, e.(*PaymentRefunded))
 	})
-	router.Register(&domain.SubscriptionCancelled{}, func(ctx context.Context, e domain.Event) error {
-		return p.onSubscriptionCancelled(ctx, e.(*domain.SubscriptionCancelled))
+	router.Register(&SubscriptionCancelled{}, func(ctx context.Context, e es.Event) error {
+		return p.onSubscriptionCancelled(ctx, e.(*SubscriptionCancelled))
 	})
-	router.Register(&domain.SubscriptionExpired{}, func(ctx context.Context, e domain.Event) error {
-		return p.onSubscriptionExpired(ctx, e.(*domain.SubscriptionExpired))
+	router.Register(&SubscriptionExpired{}, func(ctx context.Context, e es.Event) error {
+		return p.onSubscriptionExpired(ctx, e.(*SubscriptionExpired))
 	})
-	router.Register(&domain.SubscriptionReactivated{}, func(ctx context.Context, e domain.Event) error {
-		return p.onSubscriptionReactivated(ctx, e.(*domain.SubscriptionReactivated))
+	router.Register(&SubscriptionReactivated{}, func(ctx context.Context, e es.Event) error {
+		return p.onSubscriptionReactivated(ctx, e.(*SubscriptionReactivated))
 	})
 
 	// --- New Stripe SDK v84 aligned events ---
-	router.Register(&domain.PaymentDisputed{}, func(ctx context.Context, e domain.Event) error {
-		return p.onPaymentDisputed(ctx, e.(*domain.PaymentDisputed))
+	router.Register(&PaymentDisputed{}, func(ctx context.Context, e es.Event) error {
+		return p.onPaymentDisputed(ctx, e.(*PaymentDisputed))
 	})
-	router.Register(&domain.DisputeResolved{}, func(ctx context.Context, e domain.Event) error {
-		return p.onDisputeResolved(ctx, e.(*domain.DisputeResolved))
+	router.Register(&DisputeResolved{}, func(ctx context.Context, e es.Event) error {
+		return p.onDisputeResolved(ctx, e.(*DisputeResolved))
 	})
-	router.Register(&domain.PaymentMethodUpdated{}, func(ctx context.Context, e domain.Event) error {
-		return p.onPaymentMethodUpdated(ctx, e.(*domain.PaymentMethodUpdated))
+	router.Register(&PaymentMethodUpdated{}, func(ctx context.Context, e es.Event) error {
+		return p.onPaymentMethodUpdated(ctx, e.(*PaymentMethodUpdated))
 	})
-	router.Register(&domain.InvoicePaymentFailed{}, func(ctx context.Context, e domain.Event) error {
-		return p.onInvoicePaymentFailed(ctx, e.(*domain.InvoicePaymentFailed))
+	router.Register(&InvoicePaymentFailed{}, func(ctx context.Context, e es.Event) error {
+		return p.onInvoicePaymentFailed(ctx, e.(*InvoicePaymentFailed))
 	})
 }
 
@@ -117,7 +117,7 @@ func (p *postgresPaymentProjection) hasPaid(ctx context.Context, userID string) 
 // Event handlers — project events into the read model
 // -------------------------------------------------------------------------
 
-func (p *postgresPaymentProjection) onAccountOpened(ctx context.Context, e *domain.PaymentAccountOpened) error {
+func (p *postgresPaymentProjection) onAccountOpened(ctx context.Context, e *PaymentAccountOpened) error {
 	_, err := p.db.ExecContext(ctx,
 		`INSERT INTO payment_accounts (user_id, status, amount_cents, currency, updated_at)
 		 VALUES ($1, 'none', 0, 'usd', $2)
@@ -129,7 +129,7 @@ func (p *postgresPaymentProjection) onAccountOpened(ctx context.Context, e *doma
 	return nil
 }
 
-func (p *postgresPaymentProjection) onPaymentInitiated(ctx context.Context, e *domain.PaymentInitiated) error {
+func (p *postgresPaymentProjection) onPaymentInitiated(ctx context.Context, e *PaymentInitiated) error {
 	// Track the pending payment in the read model. Only transition to
 	// 'pending' if the account is currently in 'none' state (not already
 	// active or cancelled) to avoid regressing the status.
@@ -145,7 +145,7 @@ func (p *postgresPaymentProjection) onPaymentInitiated(ctx context.Context, e *d
 	return nil
 }
 
-func (p *postgresPaymentProjection) onPaymentSucceeded(ctx context.Context, e *domain.PaymentSucceeded) error {
+func (p *postgresPaymentProjection) onPaymentSucceeded(ctx context.Context, e *PaymentSucceeded) error {
 	_, err := p.db.ExecContext(ctx,
 		`UPDATE payment_accounts
 		    SET status = 'active',
@@ -163,7 +163,7 @@ func (p *postgresPaymentProjection) onPaymentSucceeded(ctx context.Context, e *d
 	return nil
 }
 
-func (p *postgresPaymentProjection) onPaymentFailed(ctx context.Context, e *domain.PaymentFailed) error {
+func (p *postgresPaymentProjection) onPaymentFailed(ctx context.Context, e *PaymentFailed) error {
 	// Revert status from 'pending' to 'none' so the user can retry.
 	// Only revert if the current status is 'pending' — don't touch active/cancelled.
 	_, err := p.db.ExecContext(ctx,
@@ -180,7 +180,7 @@ func (p *postgresPaymentProjection) onPaymentFailed(ctx context.Context, e *doma
 	return nil
 }
 
-func (p *postgresPaymentProjection) onPaymentRefunded(ctx context.Context, e *domain.PaymentRefunded) error {
+func (p *postgresPaymentProjection) onPaymentRefunded(ctx context.Context, e *PaymentRefunded) error {
 	// Check if net balance goes to zero → deactivate
 	_, err := p.db.ExecContext(ctx,
 		`UPDATE payment_accounts
@@ -196,7 +196,7 @@ func (p *postgresPaymentProjection) onPaymentRefunded(ctx context.Context, e *do
 	return nil
 }
 
-func (p *postgresPaymentProjection) onSubscriptionCancelled(ctx context.Context, e *domain.SubscriptionCancelled) error {
+func (p *postgresPaymentProjection) onSubscriptionCancelled(ctx context.Context, e *SubscriptionCancelled) error {
 	_, err := p.db.ExecContext(ctx,
 		`UPDATE payment_accounts
 		    SET status = 'cancelled',
@@ -211,7 +211,7 @@ func (p *postgresPaymentProjection) onSubscriptionCancelled(ctx context.Context,
 	return nil
 }
 
-func (p *postgresPaymentProjection) onSubscriptionExpired(ctx context.Context, e *domain.SubscriptionExpired) error {
+func (p *postgresPaymentProjection) onSubscriptionExpired(ctx context.Context, e *SubscriptionExpired) error {
 	// Transition to 'none' (free tier) but preserve paid_at and amount_cents
 	// as historical record. The event store has the full audit trail, but
 	// keeping these in the projection enables "previously paid" queries.
@@ -229,7 +229,7 @@ func (p *postgresPaymentProjection) onSubscriptionExpired(ctx context.Context, e
 	return nil
 }
 
-func (p *postgresPaymentProjection) onSubscriptionReactivated(ctx context.Context, e *domain.SubscriptionReactivated) error {
+func (p *postgresPaymentProjection) onSubscriptionReactivated(ctx context.Context, e *SubscriptionReactivated) error {
 	_, err := p.db.ExecContext(ctx,
 		`UPDATE payment_accounts
 		    SET status = 'active',
@@ -248,7 +248,7 @@ func (p *postgresPaymentProjection) onSubscriptionReactivated(ctx context.Contex
 // New event handlers — Stripe SDK v84 aligned
 // -------------------------------------------------------------------------
 
-func (p *postgresPaymentProjection) onPaymentDisputed(ctx context.Context, e *domain.PaymentDisputed) error {
+func (p *postgresPaymentProjection) onPaymentDisputed(ctx context.Context, e *PaymentDisputed) error {
 	// Mark the account as disputed. The status stays "active" since the
 	// user retains access during the dispute period, but we record the
 	// dispute metadata. Operators can query disputes via SQL.
@@ -274,7 +274,7 @@ func (p *postgresPaymentProjection) onPaymentDisputed(ctx context.Context, e *do
 	return nil
 }
 
-func (p *postgresPaymentProjection) onDisputeResolved(ctx context.Context, e *domain.DisputeResolved) error {
+func (p *postgresPaymentProjection) onDisputeResolved(ctx context.Context, e *DisputeResolved) error {
 	p.log.Info(context.Background(), "payment projection: dispute resolved",
 		"user_id", e.AccountID,
 		"dispute_id", e.StripeDisputeID,
@@ -310,7 +310,7 @@ func (p *postgresPaymentProjection) onDisputeResolved(ctx context.Context, e *do
 	return nil
 }
 
-func (p *postgresPaymentProjection) onPaymentMethodUpdated(ctx context.Context, e *domain.PaymentMethodUpdated) error {
+func (p *postgresPaymentProjection) onPaymentMethodUpdated(ctx context.Context, e *PaymentMethodUpdated) error {
 	// Update the displayed card brand and last4 when the user updates
 	// their payment method (e.g. card expires, they add a new one).
 	_, err := p.db.ExecContext(ctx,
@@ -326,7 +326,7 @@ func (p *postgresPaymentProjection) onPaymentMethodUpdated(ctx context.Context, 
 	return nil
 }
 
-func (p *postgresPaymentProjection) onInvoicePaymentFailed(ctx context.Context, e *domain.InvoicePaymentFailed) error {
+func (p *postgresPaymentProjection) onInvoicePaymentFailed(ctx context.Context, e *InvoicePaymentFailed) error {
 	// Log the recurring payment failure. The projection doesn't change
 	// the account status yet — the aggregate tracks ConsecutiveInvoiceFailures
 	// and can flag the account when the threshold is reached.
