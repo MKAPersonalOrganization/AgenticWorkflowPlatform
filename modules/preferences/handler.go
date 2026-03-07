@@ -3,24 +3,24 @@ package preferences
 import (
 	"encoding/json"
 	"net/http"
-	"school-with-ai/domain"
-	"school-with-ai/shared"
+
 	"school-with-ai/foundation/logger"
+	"school-with-ai/shared"
 )
 
-// Handler manages user preference requests.
-type Handler struct {
-	Log  *logger.Logger
-	Repo domain.UserPreferenceRepository
+// handler manages user preference HTTP requests.
+type handler struct {
+	log  *logger.Logger
+	repo UserPreferenceRepository
 }
 
-// NewHandler creates a new preferences handler.
-func NewHandler(log *logger.Logger, repo domain.UserPreferenceRepository) *Handler {
-	return &Handler{Log: log, Repo: repo}
+// newHandler creates a new preferences handler.
+func newHandler(log *logger.Logger, repo UserPreferenceRepository) *handler {
+	return &handler{log: log, repo: repo}
 }
 
-// GetPreference handles GET /api/preferences/{key}
-func (h *Handler) GetPreference(w http.ResponseWriter, r *http.Request) {
+// getPreference handles GET /api/preferences/{key}
+func (h *handler) getPreference(w http.ResponseWriter, r *http.Request) {
 	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -33,9 +33,9 @@ func (h *Handler) GetPreference(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pref, err := h.Repo.Get(r.Context(), user.ID, key)
+	pref, err := h.repo.Get(r.Context(), user.ID, key)
 	if err != nil {
-		h.Log.Error(r.Context(), "failed to get preference", "error", err, "key", key)
+		h.log.Error(r.Context(), "failed to get preference", "error", err, "key", key)
 		http.Error(w, "Failed to retrieve preference", http.StatusInternalServerError)
 		return
 	}
@@ -50,8 +50,8 @@ func (h *Handler) GetPreference(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"key": pref.Key, "value": pref.Value})
 }
 
-// SetPreference handles PUT /api/preferences/{key}
-func (h *Handler) SetPreference(w http.ResponseWriter, r *http.Request) {
+// setPreference handles PUT /api/preferences/{key}
+func (h *handler) setPreference(w http.ResponseWriter, r *http.Request) {
 	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -72,14 +72,14 @@ func (h *Handler) SetPreference(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pref := &domain.UserPreference{
+	pref := &UserPreference{
 		UserID: user.ID,
 		Key:    key,
 		Value:  req.Value,
 	}
 
-	if err := h.Repo.Set(r.Context(), pref); err != nil {
-		h.Log.Error(r.Context(), "failed to set preference", "error", err, "key", key)
+	if err := h.repo.Set(r.Context(), pref); err != nil {
+		h.log.Error(r.Context(), "failed to set preference", "error", err, "key", key)
 		http.Error(w, "Failed to save preference", http.StatusInternalServerError)
 		return
 	}
@@ -87,17 +87,17 @@ func (h *Handler) SetPreference(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// GetAllPreferences handles GET /api/preferences
-func (h *Handler) GetAllPreferences(w http.ResponseWriter, r *http.Request) {
+// getAllPreferences handles GET /api/preferences
+func (h *handler) getAllPreferences(w http.ResponseWriter, r *http.Request) {
 	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	prefs, err := h.Repo.GetAll(r.Context(), user.ID)
+	prefs, err := h.repo.GetAll(r.Context(), user.ID)
 	if err != nil {
-		h.Log.Error(r.Context(), "failed to list preferences", "error", err)
+		h.log.Error(r.Context(), "failed to list preferences", "error", err)
 		http.Error(w, "Failed to retrieve preferences", http.StatusInternalServerError)
 		return
 	}

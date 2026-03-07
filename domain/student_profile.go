@@ -7,6 +7,11 @@ import (
 
 // StudentProfile represents the extended academic profile of a student.
 // This is separate from the User identity (Kratos).
+//
+// NOTE: This type remains in domain/ because components/profile imports it,
+// which would cause an import cycle if it lived in modules/identity/.
+// Once component templates stop referencing domain/ directly (Phase 6),
+// this type can move to modules/identity/.
 type StudentProfile struct {
 	UserID        string    `json:"user_id" db:"user_id"`
 	LearningStyle string    `json:"learning_style" db:"learning_style"`
@@ -17,7 +22,7 @@ type StudentProfile struct {
 	UpdatedAt     time.Time `json:"updated_at" db:"updated_at"`
 }
 
-// StudentProfileRepository defines the interface for extending student storage.
+// StudentProfileRepository defines the interface for student profile storage.
 type StudentProfileRepository interface {
 	GetByUserID(ctx context.Context, userID string) (*StudentProfile, error)
 	Upsert(ctx context.Context, profile *StudentProfile) error

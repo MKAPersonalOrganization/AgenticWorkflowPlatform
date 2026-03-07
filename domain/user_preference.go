@@ -1,33 +1,20 @@
 package domain
 
 import (
-	"context"
-	"time"
+	"school-with-ai/modules/preferences"
 )
 
-// UserPreference represents a single user preference (key-value pair).
-// Used for cross-device persistence of UI state such as selected agent.
-type UserPreference struct {
-	UserID    string    `json:"user_id" db:"user_id"`
-	Key       string    `json:"key" db:"key"`
-	Value     string    `json:"value" db:"value"`
-	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
-}
+// ──────────────────────────────────────────────────────────────────────────────
+// Backward-compatible aliases — canonical types now live in modules/preferences.
+// These aliases exist so that existing consumers importing domain.UserPreference
+// continue to compile. New code should import modules/preferences directly.
+// ──────────────────────────────────────────────────────────────────────────────
 
-// Well-known preference keys.
-const (
-	PrefSelectedAgent = "selected_agent"
-)
+// UserPreference is an alias for preferences.UserPreference.
+type UserPreference = preferences.UserPreference
 
-// UserPreferenceRepository defines the storage contract for user preferences.
-type UserPreferenceRepository interface {
-	// Get retrieves a single preference by user ID and key.
-	// Returns nil, nil if not found.
-	Get(ctx context.Context, userID, key string) (*UserPreference, error)
+// UserPreferenceRepository is an alias for preferences.UserPreferenceRepository.
+type UserPreferenceRepository = preferences.UserPreferenceRepository
 
-	// GetAll retrieves all preferences for a user.
-	GetAll(ctx context.Context, userID string) ([]UserPreference, error)
-
-	// Set creates or updates a single preference.
-	Set(ctx context.Context, pref *UserPreference) error
-}
+// PrefSelectedAgent is the well-known preference key for selected agent.
+const PrefSelectedAgent = preferences.PrefSelectedAgent

@@ -1,43 +1,43 @@
-package profile
+package identity
 
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
+
 	"school-with-ai/components/profile"
-	"school-with-ai/domain"
-	"school-with-ai/shared"
 	"school-with-ai/foundation/i18n"
 	"school-with-ai/foundation/logger"
-	"strings"
+	"school-with-ai/shared"
 )
 
-// Handler manages student profile requests.
-type Handler struct {
-	Log  *logger.Logger
-	Repo domain.StudentProfileRepository
+// handler manages student profile HTTP requests.
+type handler struct {
+	log  *logger.Logger
+	repo StudentProfileRepository
 }
 
-// NewHandler creates a new profile handler.
-func NewHandler(log *logger.Logger, repo domain.StudentProfileRepository) *Handler {
-	return &Handler{Log: log, Repo: repo}
+// newHandler creates a new profile handler.
+func newHandler(log *logger.Logger, repo StudentProfileRepository) *handler {
+	return &handler{log: log, repo: repo}
 }
 
-// HandleProfilePage serves the HTML profile page.
-func (h *Handler) HandleProfilePage(w http.ResponseWriter, r *http.Request) {
+// handleProfilePage serves the HTML profile page.
+func (h *handler) handleProfilePage(w http.ResponseWriter, r *http.Request) {
 	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Redirect(w, r, "/auth/login", http.StatusSeeOther)
 		return
 	}
 
-	profileData, err := h.Repo.GetByUserID(r.Context(), user.ID)
+	profileData, err := h.repo.GetByUserID(r.Context(), user.ID)
 	if err != nil {
-		h.Log.Error(r.Context(), "failed to get profile for page", "error", err)
+		h.log.Error(r.Context(), "failed to get profile for page", "error", err)
 		// We can still render the page with an empty profile or error handling
 	}
 
 	if profileData == nil {
-		profileData = &domain.StudentProfile{UserID: user.ID}
+		profileData = &StudentProfile{UserID: user.ID}
 	}
 
 	component := profile.ProfilePage(profile.ProfilePageProps{
@@ -46,38 +46,38 @@ func (h *Handler) HandleProfilePage(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if err := component.Render(r.Context(), w); err != nil {
-		h.Log.Error(r.Context(), "failed to render profile page", "error", err)
+		h.log.Error(r.Context(), "failed to render profile page", "error", err)
 		http.Error(w, i18n.T(r.Context(), "Internal Server Error"), http.StatusInternalServerError)
 	}
 }
 
-// GetProfile handles GET /api/profile
-func (h *Handler) GetProfile(w http.ResponseWriter, r *http.Request) {
+// getProfile handles GET /api/profile
+func (h *handler) getProfile(w http.ResponseWriter, r *http.Request) {
 	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
 	}
 
-	profile, err := h.Repo.GetByUserID(r.Context(), user.ID)
+	p, err := h.repo.GetByUserID(r.Context(), user.ID)
 	if err != nil {
 		http.Error(w, i18n.T(r.Context(), "Failed to retrieve profile"), http.StatusInternalServerError)
 		return
 	}
 
-	if profile == nil {
+	if p == nil {
 		// Return empty default profile instead of 404 for better UX in form
-		profile = &domain.StudentProfile{UserID: user.ID}
+		p = &StudentProfile{UserID: user.ID}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(profile); err != nil {
-		h.Log.Error(r.Context(), "failed to encode profile response", "error", err)
+	if err := json.NewEncoder(w).Encode(p); err != nil {
+		h.log.Error(r.Context(), "failed to encode profile response", "error", err)
 	}
 }
 
-// UpdateProfile handles PUT /api/profile
-func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
+// updateProfile handles PUT /api/profile
+func (h *handler) updateProfile(w http.ResponseWriter, r *http.Request) {
 	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
@@ -112,7 +112,7 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		return result
 	}
 
-	profile := &domain.StudentProfile{
+	p := &StudentProfile{
 		UserID:        user.ID,
 		LearningStyle: req.LearningStyle,
 		Struggles:     parseList(req.Struggles),
@@ -120,12 +120,12 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		Goals:         req.Goals,
 	}
 
-	if err := h.Repo.Upsert(r.Context(), profile); err != nil {
-		h.Log.Error(r.Context(), "failed to update profile", "error", err, "user_id", user.ID)
+	if err := h.repo.Upsert(r.Context(), p); err != nil {
+		h.log.Error(r.Context(), "failed to update profile", "error", err, "user_id", user.ID)
 		http.Error(w, i18n.T(r.Context(), "Failed to update profile"), http.StatusInternalServerError)
 		return
 	}
 
-	h.Log.Info(r.Context(), "profile updated successfully", "user_id", user.ID, "learning_style", profile.LearningStyle)
+	h.log.Info(r.Context(), "profile updated successfully", "user_id", user.ID, "learning_style", p.LearningStyle)
 	w.WriteHeader(http.StatusOK)
 }
