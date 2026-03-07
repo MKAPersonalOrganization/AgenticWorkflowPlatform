@@ -50,13 +50,10 @@ var mcpForwardHeaders = []string{
 //   - External MCP clients (Inspector, SDKs) to use connectors directly
 //   - Browser-based MCP clients to connect through the proxy
 //   - No server-side session state for proxy traffic
-func (s *Service) MCPProxy(ctx context.Context, connectorID string, w http.ResponseWriter, r *http.Request) error {
-	connector, err := s.repo.GetByID(ctx, connectorID)
+func (s *Service) MCPProxy(ctx context.Context, connectorID, userID string, w http.ResponseWriter, r *http.Request) error {
+	connector, err := s.getOwnedConnector(ctx, connectorID, userID)
 	if err != nil {
-		return fmt.Errorf("fetching connector: %w", err)
-	}
-	if connector == nil {
-		return ErrConnectorNotFound
+		return err
 	}
 	if connector.Status != ConnectorStatusConnected {
 		return ErrConnectorNotConnected
@@ -68,7 +65,13 @@ func (s *Service) MCPProxy(ctx context.Context, connectorID string, w http.Respo
 		return ErrCircuitOpen
 	}
 
-	// Acquire concurrency slot.
+	// Per-user concurrency cap.
+	if err := s.userSessions.Acquire(ctx, userID); err != nil {
+		return err
+	}
+	defer s.userSessions.Release(userID)
+
+	// Acquire global concurrency slot.
 	if err := s.sessions.Acquire(ctx); err != nil {
 		return err
 	}

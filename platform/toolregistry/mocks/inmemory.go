@@ -3,8 +3,9 @@ package mocks
 import (
 	"context"
 	"fmt"
-	"school-with-ai/platform/toolregistry"
 	"sync"
+
+	"school-with-ai/platform/toolregistry"
 )
 
 // InMemoryRepository implements Repository interface with in-memory storage.
@@ -60,6 +61,18 @@ func (r *InMemoryRepository) SaveTool(ctx context.Context, tool *toolregistry.To
 	toolCopy := *tool
 	r.tools[tool.ID] = &toolCopy
 
+	return nil
+}
+
+// SaveTools batch saves or updates multiple tools.
+func (r *InMemoryRepository) SaveTools(ctx context.Context, tools []*toolregistry.Tool) error {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	for _, tool := range tools {
+		toolCopy := *tool
+		r.tools[tool.ID] = &toolCopy
+	}
 	return nil
 }
 

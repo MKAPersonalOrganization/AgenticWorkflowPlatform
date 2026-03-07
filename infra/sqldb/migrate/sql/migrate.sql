@@ -550,4 +550,15 @@ ALTER TABLE user_agents DROP COLUMN IF EXISTS model_id;
 ALTER TABLE user_agents DROP COLUMN IF EXISTS temperature;
 ALTER TABLE user_agents DROP COLUMN IF EXISTS max_iterations;
 
+-- Version: 1.48
+-- Description: Add composite index for SQL-level tenant isolation on MCP connectors.
+-- getOwnedConnector now uses WHERE id=$1 AND user_id=$2 instead of fetching by id
+-- and checking user_id in Go. This index makes that query a single index-only scan
+-- at 1M+ connector rows (100K users × 10 connectors).
+CREATE INDEX IF NOT EXISTS idx_mcp_connectors_id_user ON mcp_connectors(id, user_id);
+
+-- Composite index on discovered_tools for batch queries with connector_id + name ordering.
+-- Covers the ORDER BY connector_id, name ASC used by ListToolsByConnectors.
+CREATE INDEX IF NOT EXISTS idx_mcp_discovered_tools_connector_name ON mcp_discovered_tools(connector_id, name);
+
 

@@ -92,15 +92,23 @@ type MCPConnectorRepository interface {
 	// Connector CRUD
 	Create(ctx context.Context, connector *MCPConnector) error
 	GetByID(ctx context.Context, id string) (*MCPConnector, error)
+	// GetByIDAndUser returns a connector only if it belongs to the given user.
+	// Ownership is enforced at the SQL level — the DB never returns another
+	// user's data. Returns nil, nil if not found or not owned.
+	GetByIDAndUser(ctx context.Context, id, userID string) (*MCPConnector, error)
 	GetByOAuthState(ctx context.Context, state string) (*MCPConnector, error)
 	ListByUser(ctx context.Context, userID string) ([]MCPConnector, error)
 	CountByUser(ctx context.Context, userID string) (int, error)
 	Update(ctx context.Context, connector *MCPConnector) error
-	Delete(ctx context.Context, id string) error
+	// Delete removes a connector, scoped to the owning user.
+	Delete(ctx context.Context, id, userID string) error
 
 	// Tool operations
 	UpsertTools(ctx context.Context, connectorID string, tools []MCPDiscoveredTool) error
 	ListTools(ctx context.Context, connectorID string) ([]MCPDiscoveredTool, error)
+	// ListToolsByConnectors returns tools for multiple connectors in a single
+	// query, keyed by connector ID. Avoids N+1 when resolving tools.
+	ListToolsByConnectors(ctx context.Context, connectorIDs []string) (map[string][]MCPDiscoveredTool, error)
 	DeleteToolsByConnector(ctx context.Context, connectorID string) error
 	// CountToolsByConnectors returns a map of connector ID → tool count for a
 	// batch of connectors. Avoids N+1 queries when listing connectors.

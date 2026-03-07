@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+
 	"school-with-ai/foundation/agent"
 	"school-with-ai/platform/toolregistry"
 
@@ -85,7 +86,7 @@ func (p *MCPPluginProvider) CreateExecutable(_ context.Context, toolID string, _
 	for _, dt := range p.discoveredTools {
 		expectedID := "mcp-" + p.connector.ID + "-" + dt.Name
 		if toolID == expectedID || toolID == dt.Name {
-			return NewMCPRemoteTool(p.service, p.connector.ID, dt.Name, dt.Description, dt.InputSchema), nil
+			return NewMCPRemoteTool(p.service, p.connector.ID, p.connector.UserID, dt.Name, dt.Description, dt.InputSchema), nil
 		}
 	}
 	return nil, nil // Not handled by this provider

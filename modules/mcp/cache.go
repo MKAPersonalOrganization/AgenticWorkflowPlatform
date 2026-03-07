@@ -59,6 +59,14 @@ func (c *ttlCache[T]) Set(key string, value T) {
 	c.mu.Unlock()
 }
 
+// Delete removes a single entry from the cache. Used to invalidate stale
+// entries (e.g. when OAuth tokens change for a connector).
+func (c *ttlCache[T]) Delete(key string) {
+	c.mu.Lock()
+	delete(c.entries, key)
+	c.mu.Unlock()
+}
+
 // Len returns the number of entries (including expired ones not yet evicted).
 func (c *ttlCache[T]) Len() int {
 	c.mu.RLock()

@@ -3,6 +3,15 @@
  * Manages user-registered MCP (Model Context Protocol) plugin connectors.
  * Handles connection lifecycle, OAuth authorization, and tool discovery.
  */
+
+// Module-level variable — MUST NOT live inside Alpine's reactive proxy.
+// window.open() returns a cross-origin Window reference once the popup
+// navigates to the external OAuth provider. Alpine's reactivity system
+// (backed by @vue/reactivity Proxy) tries to check __v_raw on every
+// proxied property, which throws "Permission denied to access property
+// '__v_raw' on cross-origin object" on cross-origin Window objects.
+let _oauthPopup = null;
+
 export const mcpConnectors = () => ({
     mcpConnectors: [],
     mcpLoading: false,
@@ -14,18 +23,22 @@ export const mcpConnectors = () => ({
     mcpNewClientID: '',
     mcpNewClientSecret: '',
 
-
-
-    // OAuth popup reference
-    _oauthWindow: null,
-
     init() {
         this.mcpFetchConnectors();
 
-        // Listen for OAuth callback messages from popup
+        // Listen for OAuth callback messages from popup.
+        // Guard with origin check to ignore cross-origin messages (browser
+        // extensions, ads, etc.) that would trigger Alpine's proxy to
+        // introspect the cross-origin MessageEvent.source.
         window.addEventListener('message', (event) => {
-            if (event.data?.type === 'mcp-oauth-callback') {
-                this._handleOAuthMessage(event.data);
+            if (event.origin !== window.location.origin) return;
+
+            // Shallow-copy event.data into a plain object before Alpine's
+            // reactive proxy can touch it. This detaches from the
+            // MessageEvent and its cross-origin .source property.
+            const data = Object.assign({}, event.data);
+            if (data.type === 'mcp-oauth-callback') {
+                this._handleOAuthMessage(data);
             }
         });
 
@@ -184,7 +197,7 @@ export const mcpConnectors = () => ({
         const left = window.screenX + (window.outerWidth - w) / 2;
         const top = window.screenY + (window.outerHeight - h) / 2;
 
-        this._oauthWindow = window.open(
+        _oauthPopup = window.open(
             authUrl,
             'mcp-oauth',
             `width=${w},height=${h},left=${left},top=${top},popup=1`
@@ -192,9 +205,9 @@ export const mcpConnectors = () => ({
     },
 
     async _handleOAuthMessage(data) {
-        if (this._oauthWindow) {
-            this._oauthWindow.close();
-            this._oauthWindow = null;
+        if (_oauthPopup) {
+            _oauthPopup.close();
+            _oauthPopup = null;
         }
 
         if (data.success) {

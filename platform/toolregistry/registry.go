@@ -3,8 +3,9 @@ package toolregistry
 import (
 	"context"
 	"fmt"
-	"school-with-ai/foundation/logger"
 	"time"
+
+	"school-with-ai/foundation/logger"
 )
 
 // Tool represents a tool available in the registry.
@@ -37,6 +38,7 @@ type Repository interface {
 	GetTool(ctx context.Context, id string) (*Tool, error)
 	ListTools(ctx context.Context) ([]Tool, error)
 	SaveTool(ctx context.Context, tool *Tool) error
+	SaveTools(ctx context.Context, tools []*Tool) error // batch upsert
 	DeleteTool(ctx context.Context, id string) error
 
 	// Tool Sets
@@ -105,6 +107,29 @@ func (r *Registry) RegisterTool(ctx context.Context, tool *Tool) error {
 	}
 
 	r.log.Info(ctx, "Tool registered", "tool_id", tool.ID, "name", tool.Name)
+	return nil
+}
+
+// RegisterTools adds or updates multiple tools in a single batch operation.
+// This is significantly more efficient than calling RegisterTool in a loop
+// when registering many tools (e.g. an MCP connector with 50 tools).
+func (r *Registry) RegisterTools(ctx context.Context, tools []*Tool) error {
+	if len(tools) == 0 {
+		return nil
+	}
+	now := time.Now()
+	for _, tool := range tools {
+		if tool.CreatedAt.IsZero() {
+			tool.CreatedAt = now
+		}
+		tool.UpdatedAt = now
+	}
+
+	if err := r.repo.SaveTools(ctx, tools); err != nil {
+		return fmt.Errorf("failed to batch save tools: %w", err)
+	}
+
+	r.log.Info(ctx, "Tools batch registered", "count", len(tools))
 	return nil
 }
 

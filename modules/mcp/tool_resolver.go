@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	"school-with-ai/foundation/agent"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -32,19 +33,29 @@ func (r *MCPToolResolver) Resolve(ctx context.Context) ([]agent.Tool, error) {
 		return nil, fmt.Errorf("listing connectors: %w", err)
 	}
 
-	var tools []agent.Tool
+	// Collect connected connector IDs for a single batch query.
+	var connectedIDs []string
 	for _, conn := range connectors {
 		if conn.Status != ConnectorStatusConnected {
 			continue
 		}
+		connectedIDs = append(connectedIDs, conn.ID)
+	}
 
-		discoveredTools, err := r.service.GetConnectorTools(ctx, conn.ID)
-		if err != nil {
-			continue
-		}
+	if len(connectedIDs) == 0 {
+		return nil, nil
+	}
 
-		for _, dt := range discoveredTools {
-			tools = append(tools, NewMCPRemoteTool(r.service, conn.ID, dt.Name, dt.Description, dt.InputSchema))
+	// Single query fetches tools for ALL connected connectors — avoids N+1.
+	allTools, err := r.service.repo.ListToolsByConnectors(ctx, connectedIDs)
+	if err != nil {
+		return nil, fmt.Errorf("batch listing tools: %w", err)
+	}
+
+	var tools []agent.Tool
+	for _, connID := range connectedIDs {
+		for _, dt := range allTools[connID] {
+			tools = append(tools, NewMCPRemoteTool(r.service, connID, r.userID, dt.Name, dt.Description, dt.InputSchema))
 		}
 	}
 
@@ -56,6 +67,7 @@ func (r *MCPToolResolver) Resolve(ctx context.Context) ([]agent.Tool, error) {
 type mcpRemoteTool struct {
 	service     *Service
 	connectorID string
+	userID      string // owning user — passed to CallTool for tenant isolation
 	name        string
 	description string
 	inputSchema string // JSON Schema string
@@ -63,10 +75,11 @@ type mcpRemoteTool struct {
 
 // NewMCPRemoteTool creates an agent.ExecutableTool that delegates to a remote
 // MCP server via the Service's ephemeral session mechanism.
-func NewMCPRemoteTool(service *Service, connectorID, name, description, inputSchema string) agent.ExecutableTool {
+func NewMCPRemoteTool(service *Service, connectorID, userID, name, description, inputSchema string) agent.ExecutableTool {
 	return &mcpRemoteTool{
 		service:     service,
 		connectorID: connectorID,
+		userID:      userID,
 		name:        name,
 		description: description,
 		inputSchema: inputSchema,
@@ -112,7 +125,7 @@ func (t *mcpRemoteTool) Execute(ctx context.Context, args agent.Arguments) (agen
 		}
 	}
 
-	result, err := t.service.CallTool(ctx, t.connectorID, t.name, arguments)
+	result, err := t.service.CallTool(ctx, t.connectorID, t.userID, t.name, arguments)
 	if err != nil {
 		return agent.ErrorResult(fmt.Errorf("MCP tool call failed: %w", err)), nil
 	}
