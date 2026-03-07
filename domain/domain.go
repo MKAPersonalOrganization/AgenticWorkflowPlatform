@@ -24,6 +24,45 @@ var (
 // it, enabling modules to define events locally.
 type Event = es.Event
 
+// ──────────────────────────────────────────────────────────────────────────────
+// Eventsourcing aliases — used by thread_aggregate.go and thread_repository.go
+// within this package. These are the shared kernel types for the event-sourced
+// thread aggregate.
+// ──────────────────────────────────────────────────────────────────────────────
+
+// EventEnvelope wraps an event with metadata about its position in the stream.
+type EventEnvelope = es.EventEnvelope
+
+// Aggregate is the base interface for all event-sourced aggregates.
+type Aggregate = es.Aggregate
+
+// BaseAggregate provides common functionality for event-sourced aggregates.
+type BaseAggregate = es.BaseAggregate
+
+// StreamName generates a consistent stream name for an aggregate.
+var StreamName = es.StreamName
+
+// EventStore interface defines the contract for persisting events.
+type EventStore = es.EventStore
+
+// Repository provides a generic interface for working with any aggregate.
+type Repository[T interface {
+	Aggregate
+	LoadFromHistory(events []Event, apply func(Event)) error
+}] = es.Repository[T]
+
+// NewRepository creates a new generic repository for any aggregate type.
+func NewRepository[T interface {
+	Aggregate
+	LoadFromHistory(events []Event, apply func(Event)) error
+}](
+	eventStore EventStore,
+	newAggregate func(id string) T,
+	getStreamName func(T) string,
+) *Repository[T] {
+	return es.NewRepository(eventStore, newAggregate, getStreamName)
+}
+
 // ToolCall represents a tool/function call made by the assistant.
 type ToolCall struct {
 	ID        string `json:"id"`
