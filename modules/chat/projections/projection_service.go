@@ -3,7 +3,7 @@ package projections
 import (
 	"context"
 	"errors"
-	"school-with-ai/infra/projection/agui"
+	"school-with-ai/modules/chat/projection/agui"
 	"school-with-ai/services"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"

@@ -4,7 +4,7 @@ import (
 	"context"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/i18n"
-	"school-with-ai/services/agentorchestrator/prompts"
+	"school-with-ai/modules/chat/agentorchestrator/prompts"
 	"school-with-ai/services/artifact"
 )
 

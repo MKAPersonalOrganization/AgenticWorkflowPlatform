@@ -2,7 +2,7 @@ package taskmanagement
 
 import (
 	"context"
-	"school-with-ai/services/agentorchestrator"
+	"school-with-ai/modules/chat/agentorchestrator"
 	"testing"
 )
 

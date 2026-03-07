@@ -154,7 +154,7 @@ defer chatModule.Shutdown()
 | `aguiProjection.RegisterHandlers(persistenceRouter)` | `RegisterProjection()` |
 | `llmContextProjection.RegisterHandlers(persistenceRouter)` | `RegisterProjection()` |
 
-### Sub-phase 5b: Full code relocation (future)
+### Sub-phase 5b: Full code relocation
 
 After Sub-phase 5a stabilises, relocate the actual source files into the module:
 
@@ -162,18 +162,24 @@ After Sub-phase 5a stabilises, relocate the actual source files into the module:
 |--------|--------|--------|
 | `handlers/agui/` | `modules/chat/agui/` | ✅ Done |
 | `handlers/taskmgmt/` | `modules/chat/taskmgmt/` | ✅ Done |
-| `services/agentorchestrator/` | `modules/chat/orchestrator/` | Pending |
-| `services/taskmanagement/` | `modules/chat/taskmanager/` | Pending |
-| `services/threadmgmt/` | `modules/chat/threadmgmt/` | Pending |
-| `services/chatread/` | `modules/chat/chatread/` | Pending |
-| `services/memory/` | `modules/chat/memory/` | Pending |
-| `infra/projection/agui/` | `modules/chat/projection/agui/` | Pending |
-| `infra/projection/llmcontext/` | `modules/chat/projection/llmcontext/` | Pending |
-| `infra/projections/` | `modules/chat/projection/` | Pending |
+| `services/agentorchestrator/` | `modules/chat/agentorchestrator/` | ✅ Done |
+| `services/taskmanagement/` | `modules/chat/taskmanagement/` | ✅ Done |
+| `services/threadmgmt/` | `modules/chat/threadmgmt/` | ✅ Done |
+| `services/chatread/` | `modules/chat/chatread/` | ✅ Done |
+| `services/memory/` | — | ⏭ Skipped (cross-cutting: plugins, SDK, toolregistry) |
+| `infra/projection/agui/` | `modules/chat/projection/agui/` | ✅ Done |
+| `infra/projection/llmcontext/` | `modules/chat/projection/llmcontext/` | ✅ Done |
+| `infra/projections/` | `modules/chat/projections/` | ✅ Done |
 | `domain/thread_aggregate.go` | `modules/chat/` (backward alias in `domain/`) | Pending |
 | `domain/thread_repository.go` | `modules/chat/` (backward alias in `domain/`) | Pending |
 | `domain/events.go` | `modules/chat/` (backward alias in `domain/`) | Pending |
-| `domain/events_registry.go` | `modules/chat/` (backward alias in `domain/`) |
+| `domain/events_registry.go` | `modules/chat/` (backward alias in `domain/`) | Pending |
+
+> **Note:** Directory names preserve the original package names to avoid
+> renaming all `package` declarations (e.g. `agentorchestrator/` not
+> `orchestrator/`). `services/memory/` stays in `services/` because it is
+> consumed by `plugins/memory`, `foundation/agentsdk/adapters/custom/runner.go`,
+> and `services/toolregistry/factory.go` — all outside the chat bounded context.
 
 ### Sub-phase 5c: Remaining `services/` and `handlers/` cleanup (future)
 

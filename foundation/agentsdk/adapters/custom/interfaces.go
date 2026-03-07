@@ -4,7 +4,7 @@ import (
 	"context"
 	"iter"
 	"school-with-ai/domain"
-	"school-with-ai/services/threadmgmt"
+	"school-with-ai/modules/chat/threadmgmt"
 )
 
 // ThreadManager manages thread lifecycle and message persistence.
