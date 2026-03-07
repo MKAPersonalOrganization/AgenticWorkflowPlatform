@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"runtime"
-	"school-with-ai/domain"
-	"school-with-ai/foundation/logger"
 	"sync"
 	"time"
+
+	"school-with-ai/domain"
+	es "school-with-ai/foundation/eventsourcing"
+	"school-with-ai/foundation/logger"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -16,8 +18,9 @@ import (
 // RedisBroadcaster handles real-time event broadcasting using Redis pub/sub.
 // This enables horizontal scaling by allowing events to be broadcast across multiple pods.
 type RedisBroadcaster struct {
-	log    *logger.Logger
-	client *redis.Client
+	log      *logger.Logger
+	client   *redis.Client
+	registry *es.DeserializerRegistry
 
 	mu          sync.RWMutex
 	subscribers map[string][]*redisSubscription // threadID -> local subscribers
@@ -31,7 +34,7 @@ type redisSubscription struct {
 }
 
 // NewRedisBroadcaster creates a new Redis-backed broadcaster.
-func NewRedisBroadcaster(log *logger.Logger, redisAddr string, redisPassword string) *RedisBroadcaster {
+func NewRedisBroadcaster(log *logger.Logger, redisAddr string, redisPassword string, registry *es.DeserializerRegistry) *RedisBroadcaster {
 	poolSize := 10 * runtime.GOMAXPROCS(0)
 	if poolSize < 50 {
 		poolSize = 50
@@ -50,6 +53,7 @@ func NewRedisBroadcaster(log *logger.Logger, redisAddr string, redisPassword str
 	return &RedisBroadcaster{
 		log:         log,
 		client:      client,
+		registry:    registry,
 		subscribers: make(map[string][]*redisSubscription),
 	}
 }
@@ -200,7 +204,7 @@ func (b *RedisBroadcaster) deserializeEvent(payload string) (domain.Event, error
 	}
 
 	// Use the same event deserialization as ProjectionUpdater
-	event, err := deserializeDomainEvent(envelope.Type, envelope.Data)
+	event, err := deserializeDomainEvent(b.registry, envelope.Type, envelope.Data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to deserialize event type %s: %w", envelope.Type, err)
 	}

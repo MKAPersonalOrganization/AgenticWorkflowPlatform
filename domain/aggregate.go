@@ -1,86 +1,19 @@
 package domain
 
 import (
-	"fmt"
-	"time"
+	es "school-with-ai/foundation/eventsourcing"
 )
 
 // EventEnvelope wraps an event with metadata about its position in the stream.
-type EventEnvelope struct {
-	Data           Event
-	EventID        string
-	StreamPosition int64
-	LogPosition    int64
-	Timestamp      time.Time
-}
+type EventEnvelope = es.EventEnvelope
 
 // Aggregate is the base interface for all event-sourced aggregates.
-type Aggregate interface {
-	// GetID returns the aggregate's unique identifier
-	GetID() string
-
-	// GetVersion returns the current version (number of applied events)
-	GetVersion() int64
-
-	// DequeueUncommittedEvents returns all uncommitted events and clears the queue
-	DequeueUncommittedEvents() []Event
-
-	// Apply applies an event to update the aggregate's state
-	// Each aggregate must implement this method for its specific events
-	Apply(event Event)
-}
+type Aggregate = es.Aggregate
 
 // BaseAggregate provides common functionality for event-sourced aggregates.
 // Embed this in your concrete aggregates.
-type BaseAggregate struct {
-	ID                string
-	Version           int64
-	uncommittedEvents []Event
-}
-
-// GetID returns the aggregate ID.
-func (a *BaseAggregate) GetID() string {
-	return a.ID
-}
-
-// GetVersion returns the aggregate version.
-func (a *BaseAggregate) GetVersion() int64 {
-	return a.Version
-}
-
-// Enqueue adds an event to the uncommitted events queue AND applies it to state.
-// This follows the pattern from EventSourcing.NetCore where Enqueue both queues and applies.
-// Version is NOT incremented here - it only tracks persisted events and is incremented in LoadFromHistory.
-func (a *BaseAggregate) Enqueue(event Event, apply func(Event)) {
-	a.uncommittedEvents = append(a.uncommittedEvents, event)
-	apply(event)
-}
-
-// DequeueUncommittedEvents returns all uncommitted events and clears the queue.
-func (a *BaseAggregate) DequeueUncommittedEvents() []Event {
-	events := a.uncommittedEvents
-	a.uncommittedEvents = make([]Event, 0)
-	return events
-}
-
-// LoadFromHistory rebuilds aggregate state by replaying events.
-func (a *BaseAggregate) LoadFromHistory(events []Event, apply func(Event)) error {
-	for i, event := range events {
-		aggID := event.AggregateID()
-		if aggID != a.ID {
-			return fmt.Errorf("event %d (type=%s) aggregate ID %q does not match %s",
-				i, event.EventType(), aggID, a.ID)
-		}
-
-		apply(event)
-		a.Version++
-	}
-	return nil
-}
+type BaseAggregate = es.BaseAggregate
 
 // StreamName generates a consistent stream name for an aggregate.
 // Format: {aggregateType}-{aggregateID}
-// Example: "Thread-123e4567-e89b-12d3-a456-426614174000"
-func StreamName(aggregateType, aggregateID string) string {
-	return fmt.Sprintf("%s-%s", aggregateType, aggregateID)
-}
+var StreamName = es.StreamName

@@ -10,21 +10,24 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
-	"school-with-ai/domain"
 	"strings"
+
+	"school-with-ai/domain"
+	es "school-with-ai/foundation/eventsourcing"
 
 	"github.com/jmoiron/sqlx"
 )
 
 // PostgresEventStore implements domain.EventStore using PostgreSQL.
 type PostgresEventStore struct {
-	db *sqlx.DB
+	db       *sqlx.DB
+	registry *es.DeserializerRegistry
 }
 
 // NewPostgresEventStore creates a new PostgreSQL-backed event store.
 // The db connection should already be configured with proper pool settings.
-func NewPostgresEventStore(db *sqlx.DB) *PostgresEventStore {
-	return &PostgresEventStore{db: db}
+func NewPostgresEventStore(db *sqlx.DB, registry *es.DeserializerRegistry) *PostgresEventStore {
+	return &PostgresEventStore{db: db, registry: registry}
 }
 
 // advisoryLockKey generates a deterministic advisory lock key from a stream ID.
@@ -167,7 +170,7 @@ func (s *PostgresEventStore) ReadStream(ctx context.Context, streamID string, fr
 			return nil, fmt.Errorf("scan event: %w", err)
 		}
 
-		event, err := DeserializeDomainEvent(eventType, data)
+		event, err := DeserializeDomainEvent(s.registry, eventType, data)
 		if err != nil {
 			// Skip unknown event types (forward compatibility)
 			continue
@@ -233,7 +236,7 @@ func (s *PostgresEventStore) ReadAllFromPosition(ctx context.Context, afterPosit
 			return nil, fmt.Errorf("scan event: %w", err)
 		}
 
-		event, err := DeserializeDomainEvent(ep.EventType, data)
+		event, err := DeserializeDomainEvent(s.registry, ep.EventType, data)
 		if err != nil {
 			// Skip unknown event types
 			continue

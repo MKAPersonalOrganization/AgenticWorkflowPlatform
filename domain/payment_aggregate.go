@@ -114,9 +114,7 @@ type PaymentAccountAggregate struct {
 func NewPaymentAccountAggregate(id string) *PaymentAccountAggregate {
 	return &PaymentAccountAggregate{
 		BaseAggregate: BaseAggregate{
-			ID:                id,
-			Version:           0,
-			uncommittedEvents: make([]Event, 0),
+			ID: id,
 		},
 		Ledger:                make([]LedgerEntry, 0),
 		ProcessedStripeEvents: make(map[string]struct{}),

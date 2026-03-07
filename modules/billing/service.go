@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"school-with-ai/domain"
 	"school-with-ai/foundation/logger"
 
 	"github.com/google/uuid"
@@ -18,19 +17,19 @@ import (
 // AmountCents is the monthly subscription fee in the smallest currency unit.
 const AmountCents int64 = 500
 
-// Currency is the ISO 4217 currency code (lowercase, matches stripe.Currency).
-const Currency = string(stripe.CurrencyUSD)
+// DefaultCurrency is the ISO 4217 currency code used for new charges.
+const DefaultCurrency = string(stripe.CurrencyUSD)
 
 // MaxConsecutiveInvoiceFailures is the threshold before the account is flagged as overdue.
 const MaxConsecutiveInvoiceFailures = 3
 
 type service struct {
 	log        *logger.Logger
-	repo       *domain.PaymentAccountRepository
+	repo       *PaymentAccountRepository
 	projection *postgresPaymentProjection
 }
 
-func newService(log *logger.Logger, repo *domain.PaymentAccountRepository, projection *postgresPaymentProjection) *service {
+func newService(log *logger.Logger, repo *PaymentAccountRepository, projection *postgresPaymentProjection) *service {
 	return &service{log: log, repo: repo, projection: projection}
 }
 
@@ -119,7 +118,7 @@ func (s *service) createPaymentIntent(ctx context.Context, userID, email string)
 		return "", err
 	}
 	if acct.IsActivated() {
-		return "", domain.ErrAlreadyActivated
+		return "", ErrAlreadyActivated
 	}
 
 	if pendingPI := acct.PendingStripePaymentID(); pendingPI != "" {
@@ -143,7 +142,7 @@ func (s *service) createPaymentIntent(ctx context.Context, userID, email string)
 
 	params := &stripe.PaymentIntentParams{
 		Amount:   stripe.Int64(AmountCents),
-		Currency: stripe.String(Currency),
+		Currency: stripe.String(DefaultCurrency),
 		Customer: stripe.String(customerID),
 		AutomaticPaymentMethods: &stripe.PaymentIntentAutomaticPaymentMethodsParams{
 			Enabled: stripe.Bool(true),
@@ -151,10 +150,10 @@ func (s *service) createPaymentIntent(ctx context.Context, userID, email string)
 		Description:  stripe.String("SchoolWithAI — Monthly subscription"),
 		ReceiptEmail: stripe.String(email),
 		Metadata: map[string]string{
-			domain.MetadataKeyUserID:    userID,
-			domain.MetadataKeyEmail:     email,
-			domain.MetadataKeyPaymentID: paymentID,
-			domain.MetadataKeyPurpose:   domain.MetadataPurposeMonthlySubscription,
+			MetadataKeyUserID:    userID,
+			MetadataKeyEmail:     email,
+			MetadataKeyPaymentID: paymentID,
+			MetadataKeyPurpose:   MetadataPurposeMonthlySubscription,
 		},
 	}
 	params.SetIdempotencyKey(paymentID)
@@ -166,8 +165,8 @@ func (s *service) createPaymentIntent(ctx context.Context, userID, email string)
 		return "", fmt.Errorf("billing: stripe create payment intent: %w", err)
 	}
 
-	if err := acct.InitiatePayment(paymentID, pi.ID, customerID, AmountCents, Currency, "Monthly subscription", paymentID); err != nil {
-		if errors.Is(err, domain.ErrAlreadyActivated) {
+	if err := acct.InitiatePayment(paymentID, pi.ID, customerID, AmountCents, DefaultCurrency, "Monthly subscription", paymentID); err != nil {
+		if errors.Is(err, ErrAlreadyActivated) {
 			return "", err
 		}
 		return "", fmt.Errorf("billing: initiate payment: %w", err)
@@ -179,13 +178,13 @@ func (s *service) createPaymentIntent(ctx context.Context, userID, email string)
 
 	s.log.Info(ctx, "billing: payment initiated",
 		"user_id", userID, "payment_id", paymentID, "stripe_pi", pi.ID,
-		"stripe_customer", customerID, "amount_cents", AmountCents, "currency", Currency)
+		"stripe_customer", customerID, "amount_cents", AmountCents, "currency", DefaultCurrency)
 
 	return pi.ClientSecret, nil
 }
 
 func (s *service) confirmPayment(ctx context.Context, stripePaymentID string, amountCents int64, currency, cardBrand, cardLast4 string, metadata map[string]string) error {
-	userID := metadata[domain.MetadataKeyUserID]
+	userID := metadata[MetadataKeyUserID]
 	if userID == "" {
 		return fmt.Errorf("billing: webhook missing user_id in metadata")
 	}
@@ -209,7 +208,7 @@ func (s *service) confirmPaymentWithDetails(
 	amountCents int64, currency, cardBrand, cardLast4, receiptURL string,
 	metadata map[string]string,
 ) error {
-	userID := metadata[domain.MetadataKeyUserID]
+	userID := metadata[MetadataKeyUserID]
 	if userID == "" {
 		return fmt.Errorf("billing: webhook missing user_id in metadata")
 	}
@@ -230,7 +229,7 @@ func (s *service) confirmPaymentWithDetails(
 }
 
 func (s *service) failPayment(ctx context.Context, stripePaymentID, reason string, metadata map[string]string) error {
-	userID := metadata[domain.MetadataKeyUserID]
+	userID := metadata[MetadataKeyUserID]
 	if userID == "" {
 		return fmt.Errorf("billing: webhook missing user_id in metadata")
 	}
@@ -254,7 +253,7 @@ func (s *service) failPaymentWithDetails(
 	pi *stripe.PaymentIntent,
 	metadata map[string]string,
 ) error {
-	userID := metadata[domain.MetadataKeyUserID]
+	userID := metadata[MetadataKeyUserID]
 	if userID == "" {
 		return fmt.Errorf("billing: webhook missing user_id in metadata")
 	}
@@ -280,7 +279,7 @@ func (s *service) verifyPayment(ctx context.Context, userID, stripePaymentIntent
 	if err != nil {
 		return fmt.Errorf("billing: stripe get payment intent: %w", err)
 	}
-	if pi.Metadata[domain.MetadataKeyUserID] != userID {
+	if pi.Metadata[MetadataKeyUserID] != userID {
 		return fmt.Errorf("billing: payment intent does not belong to user")
 	}
 	if pi.Status != stripe.PaymentIntentStatusSucceeded {
@@ -351,16 +350,16 @@ func (s *service) handleRefund(ctx context.Context, charge *stripe.Charge) error
 	if piID == "" {
 		return fmt.Errorf("billing: charge.refunded missing payment intent for charge %s", charge.ID)
 	}
-	userID := charge.Metadata[domain.MetadataKeyUserID]
+	userID := charge.Metadata[MetadataKeyUserID]
 	if userID == "" && charge.PaymentIntent != nil && charge.PaymentIntent.Metadata != nil {
-		userID = charge.PaymentIntent.Metadata[domain.MetadataKeyUserID]
+		userID = charge.PaymentIntent.Metadata[MetadataKeyUserID]
 	}
 	if userID == "" {
 		pi, err := paymentintent.Get(piID, piGetParams(ctx))
 		if err != nil {
 			return fmt.Errorf("billing: charge.refunded failed to fetch PI %s: %w", piID, err)
 		}
-		userID = pi.Metadata[domain.MetadataKeyUserID]
+		userID = pi.Metadata[MetadataKeyUserID]
 	}
 	if userID == "" {
 		return fmt.Errorf("billing: charge.refunded missing user_id in metadata for charge %s (pi: %s)", charge.ID, piID)
@@ -417,7 +416,7 @@ func (s *service) handleDispute(ctx context.Context, dispute *stripe.Dispute, st
 			if err != nil {
 				return fmt.Errorf("billing: dispute failed to fetch PI: %w", err)
 			}
-			userID = pi.Metadata[domain.MetadataKeyUserID]
+			userID = pi.Metadata[MetadataKeyUserID]
 		}
 	}
 	if userID == "" {
@@ -450,7 +449,7 @@ func (s *service) handleDisputeClosed(ctx context.Context, dispute *stripe.Dispu
 		if err != nil {
 			return fmt.Errorf("billing: dispute.closed failed to fetch PI: %w", err)
 		}
-		userID = pi.Metadata[domain.MetadataKeyUserID]
+		userID = pi.Metadata[MetadataKeyUserID]
 	}
 	if userID == "" {
 		return fmt.Errorf("billing: dispute.closed missing user_id for dispute %s", dispute.ID)
@@ -477,13 +476,13 @@ func (s *service) handleInvoicePaymentFailed(ctx context.Context, invoice *strip
 	}
 	var userID string
 	if invoice.Customer != nil && invoice.Customer.Metadata != nil {
-		userID = invoice.Customer.Metadata[domain.MetadataKeyUserID]
+		userID = invoice.Customer.Metadata[MetadataKeyUserID]
 	}
 	if userID == "" && invoice.Parent != nil &&
 		invoice.Parent.SubscriptionDetails != nil &&
 		invoice.Parent.SubscriptionDetails.Subscription != nil &&
 		invoice.Parent.SubscriptionDetails.Subscription.Metadata != nil {
-		userID = invoice.Parent.SubscriptionDetails.Subscription.Metadata[domain.MetadataKeyUserID]
+		userID = invoice.Parent.SubscriptionDetails.Subscription.Metadata[MetadataKeyUserID]
 	}
 	if userID == "" {
 		s.log.Error(ctx, "billing: invoice.payment_failed missing user_id", "invoice_id", invoice.ID, "stripe_event", stripeEventID)
@@ -510,22 +509,22 @@ func (s *service) handleInvoicePaymentFailed(ctx context.Context, invoice *strip
 	return nil
 }
 
-func calculateBillingPeriodEnd(now time.Time, ledger []domain.LedgerEntry) time.Time {
+func calculateBillingPeriodEnd(now time.Time, ledger []LedgerEntry) time.Time {
 	for i := len(ledger) - 1; i >= 0; i-- {
-		if ledger[i].Status == domain.LedgerEntryStatusSucceeded && ledger[i].ResolvedAt != nil {
+		if ledger[i].Status == LedgerEntryStatusSucceeded && ledger[i].ResolvedAt != nil {
 			return ledger[i].ResolvedAt.AddDate(0, 1, 0)
 		}
 	}
 	return now.AddDate(0, 0, 30)
 }
 
-func (s *service) loadOrOpenAccount(ctx context.Context, userID, email string) (*domain.PaymentAccountAggregate, error) {
+func (s *service) loadOrOpenAccount(ctx context.Context, userID, email string) (*PaymentAccountAggregate, error) {
 	acct, err := s.repo.Load(ctx, userID)
 	if err == nil {
 		return acct, nil
 	}
-	if errors.Is(err, domain.ErrAccountNotFound) {
-		newAcct, openErr := domain.OpenPaymentAccount(userID, email)
+	if errors.Is(err, ErrAccountNotFound) {
+		newAcct, openErr := OpenPaymentAccount(userID, email)
 		if openErr != nil {
 			return nil, fmt.Errorf("billing: open account: %w", openErr)
 		}
@@ -544,7 +543,7 @@ func (s *service) ensureStripeCustomer(ctx context.Context, userID, email, exist
 	params := &stripe.CustomerParams{
 		Email: stripe.String(email),
 		Metadata: map[string]string{
-			domain.MetadataKeyUserID: userID,
+			MetadataKeyUserID: userID,
 		},
 	}
 	params.Context = ctx
@@ -586,12 +585,12 @@ func extractPaymentError(pi *stripe.PaymentIntent) (reason, errorCode, declineCo
 
 func resolveUserIDFromDispute(dispute *stripe.Dispute) string {
 	if dispute.Charge != nil && dispute.Charge.Metadata != nil {
-		if uid := dispute.Charge.Metadata[domain.MetadataKeyUserID]; uid != "" {
+		if uid := dispute.Charge.Metadata[MetadataKeyUserID]; uid != "" {
 			return uid
 		}
 	}
 	if dispute.PaymentIntent != nil && dispute.PaymentIntent.Metadata != nil {
-		if uid := dispute.PaymentIntent.Metadata[domain.MetadataKeyUserID]; uid != "" {
+		if uid := dispute.PaymentIntent.Metadata[MetadataKeyUserID]; uid != "" {
 			return uid
 		}
 	}

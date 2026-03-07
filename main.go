@@ -24,6 +24,7 @@ import (
 	"school-with-ai/foundation/agentsdk/adapters/custom"
 	"school-with-ai/foundation/debug"
 	"school-with-ai/foundation/event"
+	es "school-with-ai/foundation/eventsourcing"
 	"school-with-ai/foundation/i18n"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/middleware"
@@ -260,9 +261,16 @@ func run(ctx context.Context, log *logger.Logger) error {
 		}
 	}()
 
+	// Initialize Event Deserializer Registry
+	// Each module registers its events so the event store and projection
+	// subscriber can deserialize them from JSON without a central switch.
+	eventRegistry := es.NewDeserializerRegistry()
+	domain.RegisterThreadEvents(eventRegistry)
+	billingmod.RegisterEvents(eventRegistry)
+
 	// Initialize PostgreSQL Event Store
 	log.Info(ctx, "startup", "status", "initializing PostgreSQL event store")
-	baseEventStore := pgstore.NewPostgresEventStore(db)
+	baseEventStore := pgstore.NewPostgresEventStore(db, eventRegistry)
 
 	// Initialize Student Profile Repository
 	studentProfileRepo := sqldb.NewPostgresStudentProfileRepository(db)
@@ -292,7 +300,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	transientRouter := event.NewRouter()
 
 	// Initialize Redis broadcaster for cross-pod event delivery
-	redisBroadcaster := subscriber.NewRedisBroadcaster(log, cfg.Redis.Addr, cfg.Redis.Password)
+	redisBroadcaster := subscriber.NewRedisBroadcaster(log, cfg.Redis.Addr, cfg.Redis.Password, eventRegistry)
 	defer func() {
 		if closeErr := redisBroadcaster.Close(); closeErr != nil {
 			log.Error(ctx, "shutdown", "status", "failed to close Redis broadcaster", "ERROR", closeErr)
