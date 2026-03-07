@@ -1,19 +1,20 @@
-package workspacepermissions
+package permissions
 
 import (
 	"encoding/json"
 	"net/http"
-	"school-with-ai/shared"
+
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/modules/knowledge/edgequake"
 	"school-with-ai/services/workspacepermissions"
+	"school-with-ai/shared"
 
 	"github.com/google/uuid"
 )
 
-// Handler provides HTTP endpoints for workspace permission management.
-type Handler struct {
+// workspacePermHandler provides HTTP endpoints for workspace permission management.
+type workspacePermHandler struct {
 	log              *logger.Logger
 	workspacePermSvc *workspacepermissions.Service
 	edgequakeService *edgequake.Service
@@ -21,15 +22,15 @@ type Handler struct {
 	tenantID         string
 }
 
-// NewHandler creates a new workspace permissions handler.
-func NewHandler(
+// newWorkspacePermHandler creates a new workspace permissions handler.
+func newWorkspacePermHandler(
 	log *logger.Logger,
 	workspacePermSvc *workspacepermissions.Service,
 	edgequakeService *edgequake.Service,
 	agentProvider agent.AgentProvider,
 	tenantID string,
-) *Handler {
-	return &Handler{
+) *workspacePermHandler {
+	return &workspacePermHandler{
 		log:              log,
 		workspacePermSvc: workspacePermSvc,
 		edgequakeService: edgequakeService,
@@ -51,7 +52,7 @@ type AgentWorkspaceResponse struct {
 
 // ListAgentWorkspaces returns all workspaces with permission state for an agent.
 // GET /v1/agents/{agentId}/workspaces
-func (h *Handler) ListAgentWorkspaces(w http.ResponseWriter, r *http.Request) {
+func (h *workspacePermHandler) ListAgentWorkspaces(w http.ResponseWriter, r *http.Request) {
 	agentID := r.PathValue("agentId")
 	if agentID == "" {
 		http.Error(w, "agentId is required", http.StatusBadRequest)
@@ -130,7 +131,7 @@ type ToggleAgentWorkspaceRequest struct {
 
 // ToggleAgentWorkspace enables or disables a workspace for an agent.
 // PUT /v1/agents/{agentId}/workspaces/{workspaceId}
-func (h *Handler) ToggleAgentWorkspace(w http.ResponseWriter, r *http.Request) {
+func (h *workspacePermHandler) ToggleAgentWorkspace(w http.ResponseWriter, r *http.Request) {
 	agentID := r.PathValue("agentId")
 	workspaceID := r.PathValue("workspaceId")
 	if agentID == "" || workspaceID == "" {

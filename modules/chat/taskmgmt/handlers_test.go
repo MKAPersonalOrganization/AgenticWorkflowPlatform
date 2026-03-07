@@ -5,12 +5,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"school-with-ai/shared"
-	"school-with-ai/foundation/logger"
-	"school-with-ai/services"
 	"testing"
 
-	taskmgmthandlers "school-with-ai/handlers/taskmgmt"
+	"school-with-ai/foundation/logger"
+	"school-with-ai/services"
+	"school-with-ai/shared"
+
+	taskmgmthandlers "school-with-ai/modules/chat/taskmgmt"
 )
 
 func newTestLogger() *logger.Logger {

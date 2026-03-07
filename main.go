@@ -30,10 +30,7 @@ import (
 	"school-with-ai/foundation/middleware"
 	"school-with-ai/handlers/auth"
 	"school-with-ai/infra/googleauth"
-	"school-with-ai/infra/projection/agui"
-	"school-with-ai/infra/projection/llmcontext"
 	"school-with-ai/infra/projection/subscriber"
-	"school-with-ai/infra/projections"
 	"school-with-ai/infra/sqldb"
 	"school-with-ai/infra/sqldb/migrate"
 	"school-with-ai/modules/knowledge/edgequake"
@@ -45,15 +42,12 @@ import (
 	"school-with-ai/plugins/knowledgebase"
 	"school-with-ai/plugins/library"
 	"school-with-ai/plugins/tts"
-	"school-with-ai/services/agentorchestrator"
 	"school-with-ai/services/artifact"
-	"school-with-ai/services/memory"
 	"school-with-ai/services/permissions"
 	"school-with-ai/shared"
 
 	"school-with-ai/modules/knowledge/rag/users"
 	"school-with-ai/services/taskmanagement"
-	"school-with-ai/services/threadmgmt"
 	"school-with-ai/services/toolregistry"
 	"school-with-ai/services/workspacepermissions"
 
@@ -65,14 +59,13 @@ import (
 
 	memoryplugin "school-with-ai/plugins/memory"
 
-	aguihandlers "school-with-ai/handlers/agui"
 	healthhandlers "school-with-ai/handlers/health"
-	taskmgmthandlers "school-with-ai/handlers/taskmgmt"
 	agentstoremod "school-with-ai/modules/agentstore"
 	aisettingsmod "school-with-ai/modules/aisettings"
 	analyticsmod "school-with-ai/modules/analytics"
 	bannermod "school-with-ai/modules/banner"
 	billingmod "school-with-ai/modules/billing"
+	chatmod "school-with-ai/modules/chat"
 	identitymod "school-with-ai/modules/identity"
 	knowledgemod "school-with-ai/modules/knowledge"
 	mcpmod "school-with-ai/modules/mcp"
@@ -325,14 +318,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// persistenceRouter is strictly for updating Read Models (Projections) and should not re-broadcast.
 	transientRouter.RegisterAny(redisBroadcaster.Broadcast)
 
-	// Initialize PostgreSQL AGUI projection
-	aguiProjection := agui.NewPostgresAguiProjection(log, db)
-	aguiProjection.RegisterHandlers(persistenceRouter)
-
-	// Initialize PostgreSQL LLM context projection
-	llmContextProjection := llmcontext.NewPostgresLLMContextProjection(log, db)
-	llmContextProjection.RegisterHandlers(persistenceRouter)
-
 	// Use the Postgres event store directly as the write model
 	eventLog := baseEventStore
 
@@ -357,15 +342,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 	billingModule := billingmod.New(log, db, baseEventStore, cfg.Stripe.WebhookSecret, cfg.Stripe.PublishableKey)
 	billingModule.RegisterProjection(persistenceRouter)
 
-	// Start projection updater in background with a cancellable context
+	// Projection updater start is deferred until all module projections are registered.
 	projCtx, projCancel := context.WithCancel(ctx)
 	defer projCancel()
-
-	go func() {
-		if err := projectionUpdater.Start(projCtx); err != nil && projCtx.Err() == nil {
-			log.Error(ctx, "projection updater stopped", "ERROR", err)
-		}
-	}()
 
 	// Initialize per-user AI settings (modules/aisettings)
 	aiSettingsModule := aisettingsmod.New(log, db)
@@ -384,9 +363,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 	if err != nil {
 		return fmt.Errorf("initializing s3 artifact service: %w", err)
 	}
-
-	// Initialize memory service
-	memoryService := memory.NewArtifactMemoryService(artifactService)
 
 	// Initialize resources module
 	resourcesModule := resourcesmod.New(db, artifactService)
@@ -451,25 +427,57 @@ func run(ctx context.Context, log *logger.Logger) error {
 		[]agent.Middleware{toolLoggingMw},
 	)
 
-	var runner agentorchestrator.Runner
-	var agentOrchestrator *agentorchestrator.Service
+	// -------------------------------------------------------------------------
+	// Initialize Chat Module (core chat bounded context — ADR 014)
+
+	authSvc := authService.NewAuthService()
+	chatModule := chatmod.New(chatmod.Dependencies{
+		Log:                log,
+		DB:                 db,
+		EventStore:         eventLog,
+		ArtifactService:    artifactService,
+		StudentProfileRepo: studentProfileRepo,
+		Emitter:            transientRouter,
+		AgentProvider:      agentProvider,
+		AuthService:        authSvc,
+		ToolRegistry:       toolRegistry,
+		PermissionsService: permissionsService,
+		EdgequakeService:   edgequakeService,
+		TenantID:           cfg.Edgequake.TenantID,
+		AllowedOrigin:      cfg.Auth.AppURL,
+		Broadcaster:        redisBroadcaster,
+		AsynqConfig: taskmanagement.AsynqConfig{
+			RedisAddr:           cfg.Redis.Addr,
+			RedisPassword:       cfg.Redis.Password,
+			Concurrency:         cfg.Orchestration.Concurrency,
+			ShutdownTimeout:     cfg.Orchestration.ShutdownTimeout,
+			HealthCheckInterval: cfg.Orchestration.HealthCheckInterval,
+		},
+	})
+
+	// Register chat projections (AGUI + LLM context) before starting the updater.
+	chatModule.RegisterProjection(persistenceRouter)
+
+	// Start projection updater in background (all projections now registered).
+	go func() {
+		if err := projectionUpdater.Start(projCtx); err != nil && projCtx.Err() == nil {
+			log.Error(ctx, "projection updater stopped", "ERROR", err)
+		}
+	}()
+	log.Info(ctx, "startup", "status", "projection updater started")
+
+	// Create agent runner and complete chat module initialisation (two-phase construction).
+	// The runner needs the orchestrator (from the chat module), and the orchestrator
+	// needs the runner — this circular dependency is resolved via SetRunner.
 	switch cfg.Orchestration.Framework {
 	case "custom":
-		agentOrchestrator = agentorchestrator.New(log, eventLog,
-			agentorchestrator.WithArtifactService(artifactService),
-			agentorchestrator.WithStudentProfileRepository(studentProfileRepo),
-			agentorchestrator.WithEmitter(transientRouter),
-		)
-
-		// Custom adapter creates its own LLM client internally
-		var err error
-		runner, err = custom.NewRunnerAdapter(
+		runner, err := custom.NewRunnerAdapter(
 			ctx,
 			log,
-			agentOrchestrator, // ThreadManager interface
-			agentProvider,     // AgentProvider
-			aiSettingsModule,  // Per-user model config resolver
-			aiSettingsModule,  // Per-user TTS config resolver
+			chatModule.Orchestrator(), // ThreadManager interface
+			agentProvider,             // AgentProvider
+			aiSettingsModule,          // Per-user model config resolver
+			aiSettingsModule,          // Per-user TTS config resolver
 			artifactService,
 			studentProfileRepo,
 			cfg.AgentCapabilities.LongTermMemory,
@@ -484,12 +492,15 @@ func run(ctx context.Context, log *logger.Logger) error {
 		if err != nil {
 			return fmt.Errorf("creating custom runner: %w", err)
 		}
-
-		// Wire the runner back to the service to complete the dependency cycle
-		agentOrchestrator.SetRunner(runner)
+		chatModule.SetRunner(runner)
 	default:
 		return fmt.Errorf("unsupported agent framework: %s", cfg.Orchestration.Framework)
 	}
+	defer chatModule.Shutdown()
+
+	log.Info(ctx, "startup", "status", "chat module initialized",
+		"redis", cfg.Redis.Addr,
+		"concurrency", cfg.Orchestration.Concurrency)
 
 	// -------------------------------------------------------------------------
 	// Start Debug Service
@@ -510,42 +521,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 			log.Error(ctx, "shutdown", "status", "debug server closed", "host", cfg.Web.DebugHost, "msg", err)
 		}
 	}()
-
-	threadRepo := domain.NewThreadRepository(threadmgmt.NewEventStoreAdapter(eventLog))
-	threadMgmt := threadmgmt.New(log, threadRepo)
-
-	// Initialize service layer
-	authSvc := authService.NewAuthService()
-	threadQueryService := projections.NewUIProjectionService(aguiProjection)
-
-	// -------------------------------------------------------------------------
-	// Initialize Asynq server
-
-	log.Info(ctx, "startup", "status", "initializing asynq server", "redis", cfg.Redis.Addr)
-
-	// (agentFactory removed)
-
-	taskManager := taskmanagement.NewAsynqTaskManager(
-		log,
-		taskmanagement.AsynqConfig{
-			RedisAddr:           cfg.Redis.Addr,
-			RedisPassword:       cfg.Redis.Password,
-			Concurrency:         cfg.Orchestration.Concurrency,
-			ShutdownTimeout:     cfg.Orchestration.ShutdownTimeout,
-			HealthCheckInterval: cfg.Orchestration.HealthCheckInterval,
-		},
-		agentOrchestrator, // Pass orchestrator instead of runner
-
-	)
-	defer taskManager.Shutdown()
-	log.Info(ctx, "startup", "status", "task manager started",
-		"redis", cfg.Redis.Addr,
-		"concurrency", cfg.Orchestration.Concurrency,
-		"shutdownTimeout", cfg.Orchestration.ShutdownTimeout,
-		"healthCheckInterval", cfg.Orchestration.HealthCheckInterval)
-
-	// Create HTTP handler
-	handler := taskmgmthandlers.NewTaskManagementHandler(log, taskManager, agentProvider, authSvc, threadQueryService, aguiProjection, redisBroadcaster, threadMgmt, artifactService, memoryService, toolRegistry, permissionsService, edgequakeService, cfg.Edgequake.TenantID, cfg.Auth.AppURL)
 
 	// Create health handler with dependency checkers
 	healthHandler := healthhandlers.NewHealthHandler(log,
@@ -608,9 +583,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Mount App Router on Root
 	root.Mount("/", r)
 
-	// Create AGUI projection handler
-	aguiHandler := aguihandlers.NewAguiProjectionHandler(aguiProjection, threadQueryService)
-
 	// Initialize Google OAuth client and auth handlers
 	googleClient := googleauth.NewClient(googleauth.Config{
 		ClientID:     cfg.Auth.GoogleClientID,
@@ -668,45 +640,11 @@ func run(ctx context.Context, log *logger.Logger) error {
 	stripe.Key = cfg.Stripe.SecretKey
 	billingModule.RegisterRoutes(r, authMiddleware)
 
-	// message:send needs a larger body limit for file attachments (base64).
-	// 5 files × 20 MB raw ≈ 133 MB base64 — round up to 150 MB.
-	r.Group(func(r chi.Router) {
-		r.Use(middleware.BodyLimit(150 << 20)) // 150 MB
-		r.Post("/v1/message:send", authMiddleware.RequireAuthFunc(handler.SendMessage))
-	})
-	// Attachment pre-upload (multipart form, 20 MB per file).
-	r.Group(func(r chi.Router) {
-		r.Use(middleware.BodyLimit(25 << 20)) // 25 MB (20 MB file + multipart overhead)
-		r.Post("/v1/threads/{threadId}/attachments:upload", authMiddleware.RequireAuthFunc(handler.UploadAttachment))
-	})
-	r.Get("/v1/tasks/{id}:subscribe", authMiddleware.RequireAuthFunc(handler.StreamJobEvents))
-	r.Post("/v1/tasks/{id}:cancel", authMiddleware.RequireAuthFunc(handler.CancelJob))
-	r.Get("/v1/agents", authMiddleware.RequireAuthFunc(handler.ListAgents))
-	r.Get("/v1/agents/{agentId}", authMiddleware.RequireAuthFunc(handler.GetAgent))
-	r.Get("/v1/threads/{threadId}/artifacts", authMiddleware.RequireAuthFunc(handler.ListArtifacts))
-	r.Get("/v1/threads/{threadId}/artifacts/{fileName}", authMiddleware.RequireAuthFunc(handler.DownloadArtifact))
-	r.Get("/v1/memory", authMiddleware.RequireAuthFunc(handler.GetMemory))
-	r.Get("/v1/agents/{agentId}/toolsets", authMiddleware.RequireAuthFunc(handler.ListAgentToolSets))
-	r.Put("/v1/agents/{agentId}/toolsets/{toolSetId}", authMiddleware.RequireAuthFunc(handler.ToggleAgentToolSet))
-	r.Put("/v1/agents/{agentId}/toolsets/{toolSetId}/tools/{toolId}", authMiddleware.RequireAuthFunc(handler.ToggleIndividualTool))
-
-	// Plugin endpoints (agent-agnostic, agent_id via query param)
-	r.Get("/v1/plugins", authMiddleware.RequireAuthFunc(handler.ListPlugins))
-	r.Put("/v1/plugins/{pluginId}", authMiddleware.RequireAuthFunc(handler.TogglePlugin))
-	r.Put("/v1/plugins/{pluginId}/tools/{toolId}", authMiddleware.RequireAuthFunc(handler.TogglePluginTool))
+	// Chat module routes (modules/chat — ADR 014)
+	chatModule.RegisterRoutes(r, authMiddleware)
 
 	// MCP Connector endpoints
 	mcpModule.RegisterRoutes(r, authMiddleware)
-
-	r.Get("/v1/documents", authMiddleware.RequireAuthFunc(handler.ListDocuments))
-	r.Post("/v1/documents", authMiddleware.RequireAuthFunc(handler.UploadDocument))
-
-	// AGUI projection query endpoints (protected)
-	r.Get("/api/agui/threads", authMiddleware.RequireAuthFunc(aguiHandler.ListThreads))
-	r.Get("/api/agui/threads/{threadId}", authMiddleware.RequireAuthFunc(aguiHandler.GetThreadState))
-	r.Get("/api/agui/threads/{threadId}/messages", authMiddleware.RequireAuthFunc(aguiHandler.GetMessages))
-	r.Delete("/api/agui/threads/{threadId}", authMiddleware.RequireAuthFunc(handler.DeleteThread))
-	r.Patch("/api/agui/threads/{threadId}", authMiddleware.RequireAuthFunc(handler.UpdateThreadTitle))
 
 	// Knowledge Base / RAG routes
 	knowledgeModule.RegisterRoutes(r, authMiddleware)
