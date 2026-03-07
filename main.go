@@ -441,7 +441,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		AuthService:        authSvc,
 		ToolRegistry:       toolRegistry,
 		PermissionsService: permissionsService,
-		EdgequakeService:   edgequakeService,
+		DocumentProvider:   &DocumentProviderAdapter{svc: edgequakeService},
 		TenantID:           cfg.Edgequake.TenantID,
 		AllowedOrigin:      cfg.Auth.AppURL,
 		Broadcaster:        redisBroadcaster,
@@ -578,7 +578,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		resources:   resourcesModule,
 		billing:     billingModule,
 		banner:      bannermod.New(log),
-		permissions: permissionsmod.New(log, workspacePermissionsService, edgequakeService, agentProvider, cfg.Edgequake.TenantID),
+		permissions: permissionsmod.New(log, workspacePermissionsService, &WorkspaceProviderAdapter{svc: edgequakeService}, agentProvider, cfg.Edgequake.TenantID),
 		analytics:   analyticsmod.New(log, statsProjection, cfg.DashboardAdmin.User, cfg.DashboardAdmin.Pass),
 	}, edgequakeService)
 
@@ -709,8 +709,10 @@ type routeModules struct {
 	permissions interface {
 		RegisterRoutes(chi.Router, *auth.Middleware)
 	}
-	analytics   interface {
-		RegisterRoutes(interface{ Get(string, http.HandlerFunc) })
+	analytics interface {
+		RegisterRoutes(interface {
+			Get(string, http.HandlerFunc)
+		})
 	}
 }
 

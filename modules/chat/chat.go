@@ -34,7 +34,6 @@ import (
 	"school-with-ai/modules/chat/projections"
 	"school-with-ai/modules/chat/taskmanagement"
 	"school-with-ai/modules/chat/threadmgmt"
-	"school-with-ai/modules/knowledge/edgequake"
 	"school-with-ai/platform/artifact"
 	"school-with-ai/platform/memory"
 	"school-with-ai/platform/permissions"
@@ -63,7 +62,7 @@ type Dependencies struct {
 	AuthService        shared.AuthService
 	ToolRegistry       *toolregistry.Registry
 	PermissionsService *permissions.Service
-	EdgequakeService   *edgequake.Service
+	DocumentProvider   chatcontracts.DocumentProvider
 	TenantID           string
 	AllowedOrigin      string
 	Broadcaster        agui.AguiBroadcaster
@@ -168,7 +167,7 @@ func (m *Module) SetRunner(runner agentorchestrator.Runner) {
 		m.memoryService,
 		m.deps.ToolRegistry,
 		m.deps.PermissionsService,
-		m.deps.EdgequakeService,
+		m.deps.DocumentProvider,
 		m.deps.TenantID,
 		m.deps.AllowedOrigin,
 	)
