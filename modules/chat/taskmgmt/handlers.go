@@ -11,18 +11,18 @@ import (
 	"time"
 
 	"school-with-ai/domain"
-	"school-with-ai/shared"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
+	"school-with-ai/modules/chat/chatcontracts"
 	"school-with-ai/modules/chat/projection/agui"
-	"school-with-ai/services"
-	"school-with-ai/services/artifact"
-	"school-with-ai/modules/knowledge/edgequake"
-	"school-with-ai/services/memory"
-	"school-with-ai/services/permissions"
 	"school-with-ai/modules/chat/taskmanagement"
 	"school-with-ai/modules/chat/threadmgmt"
+	"school-with-ai/modules/knowledge/edgequake"
+	"school-with-ai/services/artifact"
+	"school-with-ai/services/memory"
+	"school-with-ai/services/permissions"
 	"school-with-ai/services/toolregistry"
+	"school-with-ai/shared"
 
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
@@ -33,8 +33,8 @@ type TaskManagementHandler struct {
 	log                *logger.Logger
 	taskManager        *taskmanagement.AsynqTaskManager
 	agentProvider      agent.AgentProvider
-	authService        services.AuthService
-	threadQueryService services.ThreadQueryService
+	authService        shared.AuthService
+	threadQueryService chatcontracts.ThreadQueryService
 	aguiProjection     agui.AguiProjection
 	broadcaster        agui.AguiBroadcaster
 	threadMgmt         *threadmgmt.Manager
@@ -52,8 +52,8 @@ func NewTaskManagementHandler(
 	log *logger.Logger,
 	taskManager *taskmanagement.AsynqTaskManager,
 	agentProvider agent.AgentProvider,
-	authService services.AuthService,
-	threadQueryService services.ThreadQueryService,
+	authService shared.AuthService,
+	threadQueryService chatcontracts.ThreadQueryService,
 	aguiProjection agui.AguiProjection,
 	broadcaster agui.AguiBroadcaster,
 	threadMgmt *threadmgmt.Manager,

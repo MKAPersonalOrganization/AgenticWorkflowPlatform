@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"school-with-ai/foundation/logger"
-	"school-with-ai/handlers/auth"
+	"school-with-ai/foundation/auth"
 
 	"github.com/go-chi/chi/v5"
 )

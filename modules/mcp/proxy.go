@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"school-with-ai/domain"
 	"strings"
 )
 
@@ -48,7 +47,7 @@ func (s *Service) MCPProxy(ctx context.Context, connectorID string, w http.Respo
 	if connector == nil {
 		return ErrConnectorNotFound
 	}
-	if connector.Status != domain.ConnectorStatusConnected {
+	if connector.Status != ConnectorStatusConnected {
 		return ErrConnectorNotConnected
 	}
 

@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/handlers/health"
+	"school-with-ai/foundation/health"
 	"testing"
 )
 

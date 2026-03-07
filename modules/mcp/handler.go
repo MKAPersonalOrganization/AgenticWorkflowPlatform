@@ -6,7 +6,6 @@ import (
 "errors"
 "io"
 "net/http"
-"school-with-ai/domain"
 	"school-with-ai/shared"
 "school-with-ai/foundation/i18n"
 "school-with-ai/foundation/logger"
@@ -70,7 +69,7 @@ Name        string `json:"name"`
 Description string `json:"description"`
 }
 
-func toConnectorResponse(c domain.MCPConnector, toolCount int) connectorResponse {
+func toConnectorResponse(c MCPConnector, toolCount int) connectorResponse {
 resp := connectorResponse{
 ID:                  c.ID,
 Title:               c.Title,

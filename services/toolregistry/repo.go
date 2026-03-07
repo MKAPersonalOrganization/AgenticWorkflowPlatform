@@ -1,11 +1,10 @@
-package sqldb
+package toolregistry
 
 import (
 	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"school-with-ai/services/toolregistry"
 	"strings"
 
 	"github.com/jmoiron/sqlx"
@@ -29,7 +28,7 @@ func NewPostgresToolRegistryRepository(db *sqlx.DB) *PostgresToolRegistryReposit
 // =============================================================================
 
 // GetTool retrieves a tool by ID.
-func (r *PostgresToolRegistryRepository) GetTool(ctx context.Context, id string) (*toolregistry.Tool, error) {
+func (r *PostgresToolRegistryRepository) GetTool(ctx context.Context, id string) (*Tool, error) {
 	const q = `SELECT * FROM tools WHERE id = $1`
 
 	var dest struct {
@@ -50,7 +49,7 @@ func (r *PostgresToolRegistryRepository) GetTool(ctx context.Context, id string)
 		return nil, fmt.Errorf("selecting tool by id: %w", err)
 	}
 
-	tool := &toolregistry.Tool{
+	tool := &Tool{
 		ID:          dest.ID,
 		Name:        dest.Name,
 		Description: dest.Description,
@@ -73,7 +72,7 @@ func (r *PostgresToolRegistryRepository) GetTool(ctx context.Context, id string)
 }
 
 // ListTools returns all tools.
-func (r *PostgresToolRegistryRepository) ListTools(ctx context.Context) ([]toolregistry.Tool, error) {
+func (r *PostgresToolRegistryRepository) ListTools(ctx context.Context) ([]Tool, error) {
 	const q = `SELECT * FROM tools ORDER BY name`
 
 	var dests []struct {
@@ -91,9 +90,9 @@ func (r *PostgresToolRegistryRepository) ListTools(ctx context.Context) ([]toolr
 		return nil, fmt.Errorf("selecting tools: %w", err)
 	}
 
-	tools := make([]toolregistry.Tool, len(dests))
+	tools := make([]Tool, len(dests))
 	for i, dest := range dests {
-		tools[i] = toolregistry.Tool{
+		tools[i] = Tool{
 			ID:          dest.ID,
 			Name:        dest.Name,
 			Description: dest.Description,
@@ -117,7 +116,7 @@ func (r *PostgresToolRegistryRepository) ListTools(ctx context.Context) ([]toolr
 }
 
 // SaveTool saves or updates a tool.
-func (r *PostgresToolRegistryRepository) SaveTool(ctx context.Context, tool *toolregistry.Tool) error {
+func (r *PostgresToolRegistryRepository) SaveTool(ctx context.Context, tool *Tool) error {
 	const q = `
 		INSERT INTO tools (
 			id, name, description, category, tool_set_id, metadata, created_at, updated_at
@@ -182,7 +181,7 @@ func (r *PostgresToolRegistryRepository) DeleteTool(ctx context.Context, id stri
 // =============================================================================
 
 // GetToolSet retrieves a tool set by ID.
-func (r *PostgresToolRegistryRepository) GetToolSet(ctx context.Context, id string) (*toolregistry.ToolSet, error) {
+func (r *PostgresToolRegistryRepository) GetToolSet(ctx context.Context, id string) (*ToolSet, error) {
 	const q = `SELECT * FROM tool_sets WHERE id = $1`
 
 	var dest struct {
@@ -203,7 +202,7 @@ func (r *PostgresToolRegistryRepository) GetToolSet(ctx context.Context, id stri
 		return nil, fmt.Errorf("selecting tool set by id: %w", err)
 	}
 
-	toolSet := &toolregistry.ToolSet{
+	toolSet := &ToolSet{
 		ID:          dest.ID,
 		Name:        dest.Name,
 		Description: dest.Description,
@@ -223,7 +222,7 @@ func (r *PostgresToolRegistryRepository) GetToolSet(ctx context.Context, id stri
 }
 
 // ListToolSets returns all tool sets.
-func (r *PostgresToolRegistryRepository) ListToolSets(ctx context.Context) ([]toolregistry.ToolSet, error) {
+func (r *PostgresToolRegistryRepository) ListToolSets(ctx context.Context) ([]ToolSet, error) {
 	const q = `SELECT * FROM tool_sets ORDER BY name`
 
 	var dests []struct {
@@ -241,9 +240,9 @@ func (r *PostgresToolRegistryRepository) ListToolSets(ctx context.Context) ([]to
 		return nil, fmt.Errorf("selecting tool sets: %w", err)
 	}
 
-	toolSets := make([]toolregistry.ToolSet, len(dests))
+	toolSets := make([]ToolSet, len(dests))
 	for i, dest := range dests {
-		toolSets[i] = toolregistry.ToolSet{
+		toolSets[i] = ToolSet{
 			ID:          dest.ID,
 			Name:        dest.Name,
 			Description: dest.Description,
@@ -264,7 +263,7 @@ func (r *PostgresToolRegistryRepository) ListToolSets(ctx context.Context) ([]to
 }
 
 // SaveToolSet saves or updates a tool set.
-func (r *PostgresToolRegistryRepository) SaveToolSet(ctx context.Context, toolSet *toolregistry.ToolSet) error {
+func (r *PostgresToolRegistryRepository) SaveToolSet(ctx context.Context, toolSet *ToolSet) error {
 	const q = `
 		INSERT INTO tool_sets (
 			id, name, description, category, tool_ids, metadata, created_at, updated_at
@@ -288,12 +287,6 @@ func (r *PostgresToolRegistryRepository) SaveToolSet(ctx context.Context, toolSe
 		metadataJSON = []byte("{}")
 	}
 
-	// Prepare data for proper types including pq.StringArray
-
-	// We need to pass a struct or map that has the correct types
-	// Using map with pq.Array won't work easily with NamedExec and :param syntax directly if we want to be safe with sqlx
-	// But sqlx should handle slice to array conversion if the driver supports it, however pq.StringArray is safer.
-
 	params := map[string]interface{}{
 		"id":          toolSet.ID,
 		"name":        toolSet.Name,
@@ -306,7 +299,6 @@ func (r *PostgresToolRegistryRepository) SaveToolSet(ctx context.Context, toolSe
 	}
 
 	if _, err := r.db.NamedExecContext(ctx, q, params); err != nil {
-		// Check for specific errors if needed
 		if strings.Contains(err.Error(), "pq: invalid input syntax for type json") {
 			// Try to handle potentially nil metadata
 		}

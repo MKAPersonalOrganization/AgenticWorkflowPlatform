@@ -1,7 +1,5 @@
 package agentstore
 
-import "school-with-ai/domain"
-
 // svg wraps Lucide SVG inner paths in a complete theme-compatible <svg> element.
 // Width/height are omitted — size via CSS on the container.
 func svg(inner string) string {
@@ -57,8 +55,8 @@ var (
 )
 
 // SeedCatalog returns the initial 30 agents for the agent store catalog.
-func seedCatalog() []domain.AgentCatalogEntry {
-	return []domain.AgentCatalogEntry{
+func seedCatalog() []AgentCatalogEntry {
+	return []AgentCatalogEntry{
 		// ── Education & Learning ──
 		{Name: "Study Planner", Description: "Creates personalized study schedules and learning roadmaps based on your goals, deadlines, and learning style.", Category: "Education", Tags: []string{"study", "planning", "productivity"}, AuthorName: "SchoolWithAI", Icon: iconNotebookPen, Featured: true, SystemPrompt: "You are an expert academic planner. Help students create structured, realistic study plans. Ask about their subjects, deadlines, available hours, and learning preferences. Break goals into daily/weekly tasks. Use spaced repetition principles. Always be encouraging and adapt to their pace."},
 		{Name: "Flashcard Creator", Description: "Generates effective flashcards from any study material using active recall and spaced repetition principles.", Category: "Education", Tags: []string{"flashcards", "memorization", "study"}, AuthorName: "SchoolWithAI", Icon: iconLayers, SystemPrompt: "You are a flashcard creation specialist. Transform any study material into effective question-answer flashcards. Use active recall principles: make questions specific, avoid yes/no questions, include context clues. Group cards by topic. For complex topics, create multiple cards breaking down concepts."},

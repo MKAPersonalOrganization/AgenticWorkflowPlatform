@@ -28,7 +28,7 @@ import (
 	"school-with-ai/foundation/i18n"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/middleware"
-	"school-with-ai/handlers/auth"
+	"school-with-ai/foundation/auth"
 	"school-with-ai/infra/googleauth"
 	"school-with-ai/infra/projection/subscriber"
 	"school-with-ai/infra/sqldb"
@@ -59,7 +59,7 @@ import (
 
 	memoryplugin "school-with-ai/plugins/memory"
 
-	healthhandlers "school-with-ai/handlers/health"
+	healthhandlers "school-with-ai/foundation/health"
 	agentstoremod "school-with-ai/modules/agentstore"
 	aisettingsmod "school-with-ai/modules/aisettings"
 	analyticsmod "school-with-ai/modules/analytics"
@@ -366,7 +366,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	resourcesModule := resourcesmod.New(db, artifactService)
 
 	// Create and initialize tool registry
-	toolRegistry := toolregistry.NewRegistry(log, sqldb.NewPostgresToolRegistryRepository(db))
+	toolRegistry := toolregistry.NewRegistry(log, toolregistry.NewPostgresToolRegistryRepository(db))
 	toolregistry.RegisterPlugin(&calculator.Provider{})
 	toolregistry.RegisterPlugin(&codebase.Provider{})
 	toolregistry.RegisterPlugin(&cognitive.Provider{})
@@ -386,11 +386,11 @@ func run(ctx context.Context, log *logger.Logger) error {
 	log.Info(ctx, "startup", "status", "mcp module initialized")
 
 	// Create and initialize permissions service
-	permissionsService := permissions.NewService(log, sqldb.NewPostgresPermissionsRepository(db))
+	permissionsService := permissions.NewService(log, permissions.NewPostgresPermissionsRepository(db))
 	log.Info(ctx, "startup", "status", "permissions service initialized")
 
 	// Create workspace permissions service
-	workspacePermissionsService := workspacepermissions.NewService(log, sqldb.NewPostgresWorkspacePermissionsRepository(db))
+	workspacePermissionsService := workspacepermissions.NewService(log, workspacepermissions.NewPostgresWorkspacePermissionsRepository(db))
 	log.Info(ctx, "startup", "status", "workspace permissions service initialized")
 
 	// Initialize Knowledge module (owns Edgequake / RAG services)
@@ -849,7 +849,7 @@ func validateProductionConfig(log *logger.Logger, buildTag, adminUser, adminPass
 	return nil
 }
 
-// contextAuthService implements services.AuthService by reading the
+// contextAuthService implements shared.AuthService by reading the
 // authenticated user directly from the request context. This replaces
 // the former services/auth package (a trivial delegation wrapper).
 type contextAuthService struct{}

@@ -5,43 +5,42 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
 )
 
 // service provides business logic for per-user AI settings.
 type service struct {
-	repo    domain.AISettingsRepository
-	capRepo domain.AICapabilityConfigRepository
+	repo    AISettingsRepository
+	capRepo AICapabilityConfigRepository
 }
 
 // newService creates a new AI settings service.
-func newService(repo domain.AISettingsRepository, capRepo domain.AICapabilityConfigRepository) *service {
+func newService(repo AISettingsRepository, capRepo AICapabilityConfigRepository) *service {
 	return &service{repo: repo, capRepo: capRepo}
 }
 
 // listProviders returns all supported AI providers.
-func (s *service) listProviders() []domain.AIProvider {
-	return domain.SupportedProviders()
+func (s *service) listProviders() []AIProvider {
+	return SupportedProviders()
 }
 
 // listModels returns models for a given provider.
-func (s *service) listModels(provider domain.AIProvider) []string {
-	return domain.ProviderModels(provider)
+func (s *service) listModels(provider AIProvider) []string {
+	return ProviderModels(provider)
 }
 
 // listEmbeddingModels returns embedding models for a given provider.
-func (s *service) listEmbeddingModels(provider domain.AIProvider) []string {
-	return domain.ProviderEmbeddingModels(provider)
+func (s *service) listEmbeddingModels(provider AIProvider) []string {
+	return ProviderEmbeddingModels(provider)
 }
 
 // listTTSModels returns text-to-speech models for a given provider.
-func (s *service) listTTSModels(provider domain.AIProvider) []string {
-	return domain.ProviderTTSModels(provider)
+func (s *service) listTTSModels(provider AIProvider) []string {
+	return ProviderTTSModels(provider)
 }
 
 // getUserSettings returns all AI settings for a user.
-func (s *service) getUserSettings(ctx context.Context, userID string) ([]domain.AISettings, error) {
+func (s *service) getUserSettings(ctx context.Context, userID string) ([]AISettings, error) {
 	settings, err := s.repo.GetByUserID(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("getting user ai settings: %w", err)
@@ -50,7 +49,7 @@ func (s *service) getUserSettings(ctx context.Context, userID string) ([]domain.
 }
 
 // getDefaultSettings returns the user's default AI settings.
-func (s *service) getDefaultSettings(ctx context.Context, userID string) (*domain.AISettings, error) {
+func (s *service) getDefaultSettings(ctx context.Context, userID string) (*AISettings, error) {
 	settings, err := s.repo.GetDefaultForUser(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("getting default ai settings: %w", err)
@@ -59,7 +58,7 @@ func (s *service) getDefaultSettings(ctx context.Context, userID string) (*domai
 }
 
 // saveSettings creates or updates an AI settings entry.
-func (s *service) saveSettings(ctx context.Context, settings *domain.AISettings) error {
+func (s *service) saveSettings(ctx context.Context, settings *AISettings) error {
 	if settings.UserID == "" {
 		return fmt.Errorf("user_id is required")
 	}
@@ -72,7 +71,7 @@ func (s *service) saveSettings(ctx context.Context, settings *domain.AISettings)
 
 	// Validate provider
 	valid := false
-	for _, p := range domain.SupportedProviders() {
+	for _, p := range SupportedProviders() {
 		if p == settings.Provider {
 			valid = true
 			break
@@ -127,7 +126,7 @@ func (s *service) getModelConfigForUser(ctx context.Context, userID string) (*ag
 	}
 
 	// Check for an LLM capability config — it may override the provider and specify model/temperature/max_tokens
-	capConfig, capErr := s.capRepo.GetByCapability(ctx, userID, domain.CapabilityLLM)
+	capConfig, capErr := s.capRepo.GetByCapability(ctx, userID, CapabilityLLM)
 	if capErr == nil && capConfig != nil {
 		cfg.Model = capConfig.Model
 
@@ -159,7 +158,7 @@ func (s *service) getModelConfigForUser(ctx context.Context, userID string) (*ag
 		}
 	} else {
 		// No LLM capability configured — fall back to provider's first model
-		models := domain.ProviderModels(settings.Provider)
+		models := ProviderModels(settings.Provider)
 		if len(models) > 0 {
 			cfg.Model = models[0]
 		}
@@ -179,7 +178,7 @@ type EmbeddingConfig struct {
 // getEmbeddingConfigForUser resolves the user's embedding config from the capability table.
 func (s *service) getEmbeddingConfigForUser(ctx context.Context, userID string) (*EmbeddingConfig, error) {
 	// Check capability config first
-	capConfig, err := s.capRepo.GetByCapability(ctx, userID, domain.CapabilityEmbedding)
+	capConfig, err := s.capRepo.GetByCapability(ctx, userID, CapabilityEmbedding)
 	if err != nil {
 		return nil, fmt.Errorf("getting embedding capability config: %w", err)
 	}
@@ -222,7 +221,7 @@ func (s *service) getEmbeddingConfigForUser(ctx context.Context, userID string) 
 		if !st.IsDefault {
 			continue
 		}
-		models := domain.ProviderEmbeddingModels(st.Provider)
+		models := ProviderEmbeddingModels(st.Provider)
 		if len(models) > 0 {
 			return &EmbeddingConfig{
 				Provider: string(st.Provider),
@@ -234,7 +233,7 @@ func (s *service) getEmbeddingConfigForUser(ctx context.Context, userID string) 
 
 	// Second: any provider with embedding models
 	for _, st := range settings {
-		models := domain.ProviderEmbeddingModels(st.Provider)
+		models := ProviderEmbeddingModels(st.Provider)
 		if len(models) > 0 {
 			return &EmbeddingConfig{
 				Provider: string(st.Provider),
@@ -252,7 +251,7 @@ func (s *service) getEmbeddingConfigForUser(ctx context.Context, userID string) 
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // getAllCapabilityConfigs returns all capability configs for a user.
-func (s *service) getAllCapabilityConfigs(ctx context.Context, userID string) ([]domain.AICapabilityConfig, error) {
+func (s *service) getAllCapabilityConfigs(ctx context.Context, userID string) ([]AICapabilityConfig, error) {
 	configs, err := s.capRepo.GetAllByUserID(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("getting capability configs: %w", err)
@@ -261,7 +260,7 @@ func (s *service) getAllCapabilityConfigs(ctx context.Context, userID string) ([
 }
 
 // getCapabilityConfig returns a specific capability config for a user.
-func (s *service) getCapabilityConfig(ctx context.Context, userID string, capability domain.AICapability) (*domain.AICapabilityConfig, error) {
+func (s *service) getCapabilityConfig(ctx context.Context, userID string, capability AICapability) (*AICapabilityConfig, error) {
 	config, err := s.capRepo.GetByCapability(ctx, userID, capability)
 	if err != nil {
 		return nil, fmt.Errorf("getting capability config %s: %w", capability, err)
@@ -270,7 +269,7 @@ func (s *service) getCapabilityConfig(ctx context.Context, userID string, capabi
 }
 
 // saveCapabilityConfig validates and upserts a capability config.
-func (s *service) saveCapabilityConfig(ctx context.Context, config *domain.AICapabilityConfig) error {
+func (s *service) saveCapabilityConfig(ctx context.Context, config *AICapabilityConfig) error {
 	if config.UserID == "" {
 		return fmt.Errorf("user_id is required")
 	}
@@ -309,7 +308,7 @@ func (s *service) saveCapabilityConfig(ctx context.Context, config *domain.AICap
 }
 
 // deleteCapabilityConfig removes a capability config.
-func (s *service) deleteCapabilityConfig(ctx context.Context, userID string, capability domain.AICapability) error {
+func (s *service) deleteCapabilityConfig(ctx context.Context, userID string, capability AICapability) error {
 	return s.capRepo.Delete(ctx, userID, capability)
 }
 
@@ -323,7 +322,7 @@ type ttsConfig struct {
 
 // getTTSConfigForUser resolves the TTS configuration for a user.
 func (s *service) getTTSConfigForUser(ctx context.Context, userID string) (*ttsConfig, error) {
-	capConfig, err := s.capRepo.GetByCapability(ctx, userID, domain.CapabilityTTS)
+	capConfig, err := s.capRepo.GetByCapability(ctx, userID, CapabilityTTS)
 	if err != nil {
 		return nil, fmt.Errorf("getting TTS capability config: %w", err)
 	}

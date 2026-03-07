@@ -26,19 +26,20 @@ import (
 	"school-with-ai/foundation/event"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/middleware"
-	"school-with-ai/handlers/auth"
+	"school-with-ai/foundation/auth"
+	"school-with-ai/modules/chat/agentorchestrator"
+	"school-with-ai/modules/chat/chatcontracts"
 	"school-with-ai/modules/chat/projection/agui"
 	"school-with-ai/modules/chat/projection/llmcontext"
 	"school-with-ai/modules/chat/projections"
+	"school-with-ai/modules/chat/taskmanagement"
+	"school-with-ai/modules/chat/threadmgmt"
 	"school-with-ai/modules/knowledge/edgequake"
-	"school-with-ai/services"
-	"school-with-ai/modules/chat/agentorchestrator"
 	"school-with-ai/services/artifact"
 	"school-with-ai/services/memory"
 	"school-with-ai/services/permissions"
-	"school-with-ai/modules/chat/taskmanagement"
-	"school-with-ai/modules/chat/threadmgmt"
 	"school-with-ai/services/toolregistry"
+	"school-with-ai/shared"
 
 	aguihandlers "school-with-ai/modules/chat/agui"
 	taskmgmthandlers "school-with-ai/modules/chat/taskmgmt"
@@ -59,7 +60,7 @@ type Dependencies struct {
 	StudentProfileRepo domain.StudentProfileRepository
 	Emitter            agentorchestrator.EventEmitter // transient event router
 	AgentProvider      agent.AgentProvider
-	AuthService        services.AuthService
+	AuthService        shared.AuthService
 	ToolRegistry       *toolregistry.Registry
 	PermissionsService *permissions.Service
 	EdgequakeService   *edgequake.Service
@@ -87,7 +88,7 @@ type Module struct {
 	threadMgmt     *threadmgmt.Manager
 	aguiProjection *agui.PostgresAguiProjection
 	llmProjection  *llmcontext.PostgresLLMContextProjection
-	threadQuery    services.ThreadQueryService
+	threadQuery    chatcontracts.ThreadQueryService
 	chatHandler    *taskmgmthandlers.TaskManagementHandler
 	aguiHandler    *aguihandlers.AguiProjectionHandler
 	memoryService  *memory.ArtifactMemoryService

@@ -3,7 +3,7 @@ package permissions
 import (
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/handlers/auth"
+	"school-with-ai/foundation/auth"
 	"school-with-ai/modules/knowledge/edgequake"
 	"school-with-ai/services/workspacepermissions"
 

@@ -7,13 +7,12 @@ import (
 	"fmt"
 	"time"
 
-	"school-with-ai/domain"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 )
 
-// postgresMCPConnectorRepository implements domain.MCPConnectorRepository.
+// postgresMCPConnectorRepository implements MCPConnectorRepository.
 type postgresMCPConnectorRepository struct {
 	db *sqlx.DB
 }
@@ -24,7 +23,7 @@ func newPostgresMCPConnectorRepository(db *sqlx.DB) *postgresMCPConnectorReposit
 }
 
 // Create inserts a new MCP connector.
-func (r *postgresMCPConnectorRepository) Create(ctx context.Context, c *domain.MCPConnector) error {
+func (r *postgresMCPConnectorRepository) Create(ctx context.Context, c *MCPConnector) error {
 	now := time.Now()
 	if c.ID == "" {
 		c.ID = uuid.New().String()
@@ -35,7 +34,7 @@ func (r *postgresMCPConnectorRepository) Create(ctx context.Context, c *domain.M
 	c.UpdatedAt = now
 
 	if c.Status == "" {
-		c.Status = domain.ConnectorStatusCreated
+		c.Status = ConnectorStatusCreated
 	}
 
 	query := `
@@ -70,7 +69,7 @@ func (r *postgresMCPConnectorRepository) Create(ctx context.Context, c *domain.M
 }
 
 // GetByID returns a connector by its ID.
-func (r *postgresMCPConnectorRepository) GetByID(ctx context.Context, id string) (*domain.MCPConnector, error) {
+func (r *postgresMCPConnectorRepository) GetByID(ctx context.Context, id string) (*MCPConnector, error) {
 	query := `
 		SELECT id, user_id, title, server_url, status, error_msg,
 		       disconnect_reason, disconnect_permanent,
@@ -81,7 +80,7 @@ func (r *postgresMCPConnectorRepository) GetByID(ctx context.Context, id string)
 		FROM mcp_connectors
 		WHERE id = $1
 	`
-	var c domain.MCPConnector
+	var c MCPConnector
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&c.ID, &c.UserID, &c.Title, &c.ServerURL, &c.Status, &c.ErrorMsg,
 		&c.DisconnectReason, &c.DisconnectPermanent,
@@ -100,7 +99,7 @@ func (r *postgresMCPConnectorRepository) GetByID(ctx context.Context, id string)
 }
 
 // ListByUser returns all connectors for a given user.
-func (r *postgresMCPConnectorRepository) ListByUser(ctx context.Context, userID string) ([]domain.MCPConnector, error) {
+func (r *postgresMCPConnectorRepository) ListByUser(ctx context.Context, userID string) ([]MCPConnector, error) {
 	query := `
 		SELECT id, user_id, title, server_url, status, error_msg,
 		       disconnect_reason, disconnect_permanent,
@@ -118,9 +117,9 @@ func (r *postgresMCPConnectorRepository) ListByUser(ctx context.Context, userID 
 	}
 	defer rows.Close()
 
-	var results []domain.MCPConnector
+	var results []MCPConnector
 	for rows.Next() {
-		var c domain.MCPConnector
+		var c MCPConnector
 		if err := rows.Scan(
 			&c.ID, &c.UserID, &c.Title, &c.ServerURL, &c.Status, &c.ErrorMsg,
 			&c.DisconnectReason, &c.DisconnectPermanent,
@@ -137,7 +136,7 @@ func (r *postgresMCPConnectorRepository) ListByUser(ctx context.Context, userID 
 }
 
 // Update updates an existing connector.
-func (r *postgresMCPConnectorRepository) Update(ctx context.Context, c *domain.MCPConnector) error {
+func (r *postgresMCPConnectorRepository) Update(ctx context.Context, c *MCPConnector) error {
 	c.UpdatedAt = time.Now()
 
 	query := `
@@ -183,7 +182,7 @@ func (r *postgresMCPConnectorRepository) CountByUser(ctx context.Context, userID
 
 // GetByOAuthState looks up a connector by its pending OAuth state parameter.
 // Returns nil if no connector has this state (expired or invalid).
-func (r *postgresMCPConnectorRepository) GetByOAuthState(ctx context.Context, state string) (*domain.MCPConnector, error) {
+func (r *postgresMCPConnectorRepository) GetByOAuthState(ctx context.Context, state string) (*MCPConnector, error) {
 	query := `
 		SELECT id, user_id, title, server_url, status, error_msg,
 		       disconnect_reason, disconnect_permanent,
@@ -194,7 +193,7 @@ func (r *postgresMCPConnectorRepository) GetByOAuthState(ctx context.Context, st
 		FROM mcp_connectors
 		WHERE oauth_state = $1 AND oauth_state != ''
 	`
-	var c domain.MCPConnector
+	var c MCPConnector
 	err := r.db.QueryRowContext(ctx, query, state).Scan(
 		&c.ID, &c.UserID, &c.Title, &c.ServerURL, &c.Status, &c.ErrorMsg,
 		&c.DisconnectReason, &c.DisconnectPermanent,
@@ -231,7 +230,7 @@ func (r *postgresMCPConnectorRepository) Delete(ctx context.Context, id string) 
 
 // UpsertTools inserts or replaces the discovered tools for a connector.
 // It deletes all existing tools for the connector and inserts the new set.
-func (r *postgresMCPConnectorRepository) UpsertTools(ctx context.Context, connectorID string, tools []domain.MCPDiscoveredTool) error {
+func (r *postgresMCPConnectorRepository) UpsertTools(ctx context.Context, connectorID string, tools []MCPDiscoveredTool) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("beginning transaction: %w", err)
@@ -269,7 +268,7 @@ func (r *postgresMCPConnectorRepository) UpsertTools(ctx context.Context, connec
 }
 
 // ListTools returns all discovered tools for a connector.
-func (r *postgresMCPConnectorRepository) ListTools(ctx context.Context, connectorID string) ([]domain.MCPDiscoveredTool, error) {
+func (r *postgresMCPConnectorRepository) ListTools(ctx context.Context, connectorID string) ([]MCPDiscoveredTool, error) {
 	query := `
 		SELECT id, connector_id, name, description, input_schema, annotations, created_at, updated_at
 		FROM mcp_discovered_tools
@@ -282,9 +281,9 @@ func (r *postgresMCPConnectorRepository) ListTools(ctx context.Context, connecto
 	}
 	defer rows.Close()
 
-	var results []domain.MCPDiscoveredTool
+	var results []MCPDiscoveredTool
 	for rows.Next() {
-		var t domain.MCPDiscoveredTool
+		var t MCPDiscoveredTool
 		if err := rows.Scan(&t.ID, &t.ConnectorID, &t.Name, &t.Description, &t.InputSchema, &t.Annotations, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scanning discovered tool row: %w", err)
 		}

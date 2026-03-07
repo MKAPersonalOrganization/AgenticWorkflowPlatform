@@ -3,7 +3,6 @@ package mcp
 import (
 	"context"
 	"encoding/json"
-	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/services/toolregistry"
 
@@ -13,13 +12,13 @@ import (
 // MCPPluginProvider wraps a connected MCP server as a PluginProvider,
 // making it appear in the plugin sidebar alongside built-in plugins.
 type MCPPluginProvider struct {
-	connector       domain.MCPConnector
-	discoveredTools []domain.MCPDiscoveredTool
+	connector       MCPConnector
+	discoveredTools []MCPDiscoveredTool
 	service         *Service
 }
 
 // NewMCPPluginProvider creates a plugin provider for an MCP connector.
-func NewMCPPluginProvider(service *Service, connector domain.MCPConnector, tools []domain.MCPDiscoveredTool) *MCPPluginProvider {
+func NewMCPPluginProvider(service *Service, connector MCPConnector, tools []MCPDiscoveredTool) *MCPPluginProvider {
 	return &MCPPluginProvider{
 		connector:       connector,
 		discoveredTools: tools,
@@ -109,7 +108,7 @@ func (p *MCPPluginProvider) UIHandledElicitations() []string {
 
 // ConnectorToPluginResponse converts an MCP connector into the plugin list format
 // expected by the tools sidebar JS component.
-func ConnectorToPluginResponse(connector domain.MCPConnector, tools []domain.MCPDiscoveredTool) map[string]any {
+func ConnectorToPluginResponse(connector MCPConnector, tools []MCPDiscoveredTool) map[string]any {
 	name := connector.Title
 	if connector.ServerName.Valid && connector.ServerName.String != "" {
 		name = connector.ServerName.String
@@ -137,7 +136,7 @@ func ConnectorToPluginResponse(connector domain.MCPConnector, tools []domain.MCP
 		"name":        name,
 		"description": "MCP Server: " + connector.ServerURL,
 		"category":    "MCP",
-		"enabled":     connector.Status == domain.ConnectorStatusConnected,
+		"enabled":     connector.Status == ConnectorStatusConnected,
 		"tools":       toolList,
 		"metadata": map[string]any{
 			"type":           "mcp",

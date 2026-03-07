@@ -1,19 +1,11 @@
-package services
+// Package chatcontracts defines shared interfaces and types used across
+// the chat module's sub-packages. It exists as a separate sub-package to
+// avoid circular imports between modules/chat and its children.
+package chatcontracts
 
 import (
-	"context"
-	"school-with-ai/shared"
-
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
-
-// AuthService provides authentication and authorization operations.
-type AuthService interface {
-	// GetUserFromContext extracts authenticated user from request context
-	GetUserFromContext(ctx context.Context) *shared.User
-	// IsAuthenticated checks if request context has valid authentication
-	IsAuthenticated(ctx context.Context) bool
-}
 
 // ThreadQueryService provides read access to projections (queries) for UI.
 type ThreadQueryService interface {

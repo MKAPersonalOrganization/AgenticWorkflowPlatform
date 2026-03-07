@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"school-with-ai/domain"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -17,7 +16,7 @@ import (
 // AI Settings Repository
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// postgresAISettingsRepository implements domain.AISettingsRepository.
+// postgresAISettingsRepository implements AISettingsRepository.
 type postgresAISettingsRepository struct {
 	db *sqlx.DB
 }
@@ -28,7 +27,7 @@ func newPostgresAISettingsRepository(db *sqlx.DB) *postgresAISettingsRepository 
 }
 
 // GetByUserID returns all AI settings for a user.
-func (r *postgresAISettingsRepository) GetByUserID(ctx context.Context, userID string) ([]domain.AISettings, error) {
+func (r *postgresAISettingsRepository) GetByUserID(ctx context.Context, userID string) ([]AISettings, error) {
 	query := `
 SELECT id, user_id, provider, api_key, is_default, created_at, updated_at
 FROM user_ai_settings
@@ -41,9 +40,9 @@ ORDER BY is_default DESC, created_at ASC
 	}
 	defer rows.Close()
 
-	var results []domain.AISettings
+	var results []AISettings
 	for rows.Next() {
-		var s domain.AISettings
+		var s AISettings
 		if err := rows.Scan(
 			&s.ID, &s.UserID, &s.Provider, &s.APIKey,
 			&s.IsDefault, &s.CreatedAt, &s.UpdatedAt,
@@ -57,14 +56,14 @@ ORDER BY is_default DESC, created_at ASC
 }
 
 // GetDefaultForUser returns the user's default AI settings.
-func (r *postgresAISettingsRepository) GetDefaultForUser(ctx context.Context, userID string) (*domain.AISettings, error) {
+func (r *postgresAISettingsRepository) GetDefaultForUser(ctx context.Context, userID string) (*AISettings, error) {
 	query := `
 SELECT id, user_id, provider, api_key, is_default, created_at, updated_at
 FROM user_ai_settings
 WHERE user_id = $1 AND is_default = true
 LIMIT 1
 `
-	var s domain.AISettings
+	var s AISettings
 	err := r.db.QueryRowContext(ctx, query, userID).Scan(
 		&s.ID, &s.UserID, &s.Provider, &s.APIKey,
 		&s.IsDefault, &s.CreatedAt, &s.UpdatedAt,
@@ -80,13 +79,13 @@ LIMIT 1
 }
 
 // GetByID returns a specific AI settings entry.
-func (r *postgresAISettingsRepository) GetByID(ctx context.Context, id string) (*domain.AISettings, error) {
+func (r *postgresAISettingsRepository) GetByID(ctx context.Context, id string) (*AISettings, error) {
 	query := `
 SELECT id, user_id, provider, api_key, is_default, created_at, updated_at
 FROM user_ai_settings
 WHERE id = $1
 `
-	var s domain.AISettings
+	var s AISettings
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&s.ID, &s.UserID, &s.Provider, &s.APIKey,
 		&s.IsDefault, &s.CreatedAt, &s.UpdatedAt,
@@ -102,7 +101,7 @@ WHERE id = $1
 }
 
 // Upsert creates or updates an AI settings entry.
-func (r *postgresAISettingsRepository) Upsert(ctx context.Context, settings *domain.AISettings) error {
+func (r *postgresAISettingsRepository) Upsert(ctx context.Context, settings *AISettings) error {
 	now := time.Now()
 	if settings.ID == "" {
 		settings.ID = uuid.New().String()
@@ -183,7 +182,7 @@ func (r *postgresAISettingsRepository) SetDefault(ctx context.Context, id string
 // AI Capability Config Repository
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// postgresAICapabilityConfigRepository implements domain.AICapabilityConfigRepository.
+// postgresAICapabilityConfigRepository implements AICapabilityConfigRepository.
 type postgresAICapabilityConfigRepository struct {
 	db *sqlx.DB
 }
@@ -194,7 +193,7 @@ func newPostgresAICapabilityConfigRepository(db *sqlx.DB) *postgresAICapabilityC
 }
 
 // GetAllByUserID returns all capability configs for a user.
-func (r *postgresAICapabilityConfigRepository) GetAllByUserID(ctx context.Context, userID string) ([]domain.AICapabilityConfig, error) {
+func (r *postgresAICapabilityConfigRepository) GetAllByUserID(ctx context.Context, userID string) ([]AICapabilityConfig, error) {
 	query := `
 SELECT id, user_id, capability, provider, model, config, created_at, updated_at
 FROM user_ai_capability_config
@@ -207,9 +206,9 @@ ORDER BY capability ASC
 	}
 	defer rows.Close()
 
-	var results []domain.AICapabilityConfig
+	var results []AICapabilityConfig
 	for rows.Next() {
-		var c domain.AICapabilityConfig
+		var c AICapabilityConfig
 		if err := rows.Scan(
 			&c.ID, &c.UserID, &c.Capability, &c.Provider, &c.Model, &c.Config, &c.CreatedAt, &c.UpdatedAt,
 		); err != nil {
@@ -222,13 +221,13 @@ ORDER BY capability ASC
 }
 
 // GetByCapability returns a specific capability config.
-func (r *postgresAICapabilityConfigRepository) GetByCapability(ctx context.Context, userID string, capability domain.AICapability) (*domain.AICapabilityConfig, error) {
+func (r *postgresAICapabilityConfigRepository) GetByCapability(ctx context.Context, userID string, capability AICapability) (*AICapabilityConfig, error) {
 	query := `
 SELECT id, user_id, capability, provider, model, config, created_at, updated_at
 FROM user_ai_capability_config
 WHERE user_id = $1 AND capability = $2
 `
-	var c domain.AICapabilityConfig
+	var c AICapabilityConfig
 	err := r.db.QueryRowContext(ctx, query, userID, string(capability)).Scan(
 		&c.ID, &c.UserID, &c.Capability, &c.Provider, &c.Model, &c.Config, &c.CreatedAt, &c.UpdatedAt,
 	)
@@ -243,7 +242,7 @@ WHERE user_id = $1 AND capability = $2
 }
 
 // Upsert creates or updates a capability config.
-func (r *postgresAICapabilityConfigRepository) Upsert(ctx context.Context, config *domain.AICapabilityConfig) error {
+func (r *postgresAICapabilityConfigRepository) Upsert(ctx context.Context, config *AICapabilityConfig) error {
 	now := time.Now()
 	if config.ID == "" {
 		config.ID = uuid.New().String()
@@ -275,7 +274,7 @@ updated_at = EXCLUDED.updated_at
 }
 
 // Delete removes a capability config.
-func (r *postgresAICapabilityConfigRepository) Delete(ctx context.Context, userID string, capability domain.AICapability) error {
+func (r *postgresAICapabilityConfigRepository) Delete(ctx context.Context, userID string, capability AICapability) error {
 	query := `DELETE FROM user_ai_capability_config WHERE user_id = $1 AND capability = $2`
 	result, err := r.db.ExecContext(ctx, query, userID, string(capability))
 	if err != nil {

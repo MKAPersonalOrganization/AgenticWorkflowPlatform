@@ -1,4 +1,4 @@
-package domain
+package aisettings
 
 import (
 	"context"

@@ -13,11 +13,11 @@ import (
 // catalogHandler encapsulates HTTP handlers for the shared agent catalog.
 type catalogHandler struct {
 log       *logger.Logger
-catalog   domain.AgentCatalogRepository
+catalog   AgentCatalogRepository
 agentRepo domain.AgentDefinitionRepository
 }
 
-func newCatalogHandler(log *logger.Logger, catalog domain.AgentCatalogRepository, agentRepo domain.AgentDefinitionRepository) *catalogHandler {
+func newCatalogHandler(log *logger.Logger, catalog AgentCatalogRepository, agentRepo domain.AgentDefinitionRepository) *catalogHandler {
 return &catalogHandler{log: log, catalog: catalog, agentRepo: agentRepo}
 }
 
@@ -42,7 +42,7 @@ Categories      []string               `json:"categories,omitempty"`
 AddedCatalogIDs []string               `json:"addedCatalogIds"`
 }
 
-func toCatalogResponse(e *domain.AgentCatalogEntry) catalogEntryResponse {
+func toCatalogResponse(e *AgentCatalogEntry) catalogEntryResponse {
 tags := e.Tags
 if tags == nil {
 tags = []string{}

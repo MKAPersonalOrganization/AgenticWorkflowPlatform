@@ -6,7 +6,7 @@ import (
 	"school-with-ai/foundation/event"
 	es "school-with-ai/foundation/eventsourcing"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/handlers/auth"
+	"school-with-ai/foundation/auth"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jmoiron/sqlx"
