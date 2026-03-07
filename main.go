@@ -35,7 +35,7 @@ import (
 	"school-with-ai/infra/sqldb/migrate"
 	"school-with-ai/modules/knowledge/edgequake"
 	"school-with-ai/platform/artifact"
-	"school-with-ai/platform/permissions"
+	permtool "school-with-ai/modules/permissions/tool"
 	"school-with-ai/plugins/calculator"
 	"school-with-ai/plugins/codebase"
 	"school-with-ai/plugins/cognitive"
@@ -49,7 +49,7 @@ import (
 	"school-with-ai/modules/chat/taskmanagement"
 	"school-with-ai/modules/knowledge/rag/users"
 	"school-with-ai/platform/toolregistry"
-	"school-with-ai/platform/workspacepermissions"
+	permworkspace "school-with-ai/modules/permissions/workspace"
 
 	preferencesmod "school-with-ai/modules/preferences"
 
@@ -387,11 +387,11 @@ func run(ctx context.Context, log *logger.Logger) error {
 	log.Info(ctx, "startup", "status", "mcp module initialized")
 
 	// Create and initialize permissions service
-	permissionsService := permissions.NewService(log, permissions.NewPostgresPermissionsRepository(db))
+	permissionsService := permtool.NewService(log, permtool.NewPostgresPermissionsRepository(db))
 	log.Info(ctx, "startup", "status", "permissions service initialized")
 
 	// Create workspace permissions service
-	workspacePermissionsService := workspacepermissions.NewService(log, workspacepermissions.NewPostgresWorkspacePermissionsRepository(db))
+	workspacePermissionsService := permworkspace.NewService(log, permworkspace.NewPostgresWorkspacePermissionsRepository(db))
 	log.Info(ctx, "startup", "status", "workspace permissions service initialized")
 
 	// Initialize Knowledge module (owns Edgequake / RAG services)

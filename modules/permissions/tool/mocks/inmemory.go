@@ -3,22 +3,22 @@ package mocks
 import (
 	"context"
 	"fmt"
-	"school-with-ai/platform/permissions"
+	"school-with-ai/modules/permissions/tool"
 	"sync"
 )
 
 // InMemoryRepository implements Repository interface with in-memory storage.
 type InMemoryRepository struct {
 	mutex              sync.RWMutex
-	permissions        map[string]map[string]map[string]map[string]*permissions.Permission // userID -> agentID -> toolSetID -> toolID -> Permission
-	toolSetPermissions map[string]map[string]map[string]*permissions.ToolSetPermission     // userID -> agentID -> toolSetID -> ToolSetPermission
+	permissions        map[string]map[string]map[string]map[string]*tool.Permission // userID -> agentID -> toolSetID -> toolID -> Permission
+	toolSetPermissions map[string]map[string]map[string]*tool.ToolSetPermission     // userID -> agentID -> toolSetID -> ToolSetPermission
 }
 
 // NewInMemoryRepository creates a new in-memory permissions repository.
-func NewInMemoryRepository() permissions.Repository {
+func NewInMemoryRepository() tool.Repository {
 	return &InMemoryRepository{
-		permissions:        make(map[string]map[string]map[string]map[string]*permissions.Permission),
-		toolSetPermissions: make(map[string]map[string]map[string]*permissions.ToolSetPermission),
+		permissions:        make(map[string]map[string]map[string]map[string]*tool.Permission),
+		toolSetPermissions: make(map[string]map[string]map[string]*tool.ToolSetPermission),
 	}
 }
 
@@ -27,7 +27,7 @@ func NewInMemoryRepository() permissions.Repository {
 // =============================================================================
 
 // GetPermission retrieves a specific agent-tool permission within a tool set.
-func (r *InMemoryRepository) GetPermission(ctx context.Context, userID, agentID, toolSetID, toolID string) (*permissions.Permission, error) {
+func (r *InMemoryRepository) GetPermission(ctx context.Context, userID, agentID, toolSetID, toolID string) (*tool.Permission, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 
@@ -57,26 +57,26 @@ func (r *InMemoryRepository) GetPermission(ctx context.Context, userID, agentID,
 }
 
 // ListPermissions returns all individual tool permissions for an agent within a tool set.
-func (r *InMemoryRepository) ListPermissions(ctx context.Context, userID, agentID, toolSetID string) ([]permissions.Permission, error) {
+func (r *InMemoryRepository) ListPermissions(ctx context.Context, userID, agentID, toolSetID string) ([]tool.Permission, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 
 	userPerms, exists := r.permissions[userID]
 	if !exists {
-		return []permissions.Permission{}, nil // Return empty slice, not an error
+		return []tool.Permission{}, nil // Return empty slice, not an error
 	}
 
 	agentPerms, exists := userPerms[agentID]
 	if !exists {
-		return []permissions.Permission{}, nil // Return empty slice, not an error
+		return []tool.Permission{}, nil // Return empty slice, not an error
 	}
 
 	toolSetPerms, exists := agentPerms[toolSetID]
 	if !exists {
-		return []permissions.Permission{}, nil // Return empty slice, not an error
+		return []tool.Permission{}, nil // Return empty slice, not an error
 	}
 
-	permissionList := make([]permissions.Permission, 0, len(toolSetPerms))
+	permissionList := make([]tool.Permission, 0, len(toolSetPerms))
 	for _, perm := range toolSetPerms {
 		permissionList = append(permissionList, *perm) // Copy to prevent external modifications
 	}
@@ -85,19 +85,19 @@ func (r *InMemoryRepository) ListPermissions(ctx context.Context, userID, agentI
 }
 
 // SavePermission saves or updates an individual tool permission.
-func (r *InMemoryRepository) SavePermission(ctx context.Context, permission *permissions.Permission) error {
+func (r *InMemoryRepository) SavePermission(ctx context.Context, permission *tool.Permission) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
 	// Ensure nested maps exist
 	if r.permissions[permission.UserID] == nil {
-		r.permissions[permission.UserID] = make(map[string]map[string]map[string]*permissions.Permission)
+		r.permissions[permission.UserID] = make(map[string]map[string]map[string]*tool.Permission)
 	}
 	if r.permissions[permission.UserID][permission.AgentID] == nil {
-		r.permissions[permission.UserID][permission.AgentID] = make(map[string]map[string]*permissions.Permission)
+		r.permissions[permission.UserID][permission.AgentID] = make(map[string]map[string]*tool.Permission)
 	}
 	if r.permissions[permission.UserID][permission.AgentID][permission.ToolSetID] == nil {
-		r.permissions[permission.UserID][permission.AgentID][permission.ToolSetID] = make(map[string]*permissions.Permission)
+		r.permissions[permission.UserID][permission.AgentID][permission.ToolSetID] = make(map[string]*tool.Permission)
 	}
 
 	// Create a copy to store
@@ -152,7 +152,7 @@ func (r *InMemoryRepository) DeletePermission(ctx context.Context, userID, agent
 // =============================================================================
 
 // GetToolSetPermission retrieves a specific agent-toolset permission.
-func (r *InMemoryRepository) GetToolSetPermission(ctx context.Context, userID, agentID, toolSetID string) (*permissions.ToolSetPermission, error) {
+func (r *InMemoryRepository) GetToolSetPermission(ctx context.Context, userID, agentID, toolSetID string) (*tool.ToolSetPermission, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 
@@ -177,21 +177,21 @@ func (r *InMemoryRepository) GetToolSetPermission(ctx context.Context, userID, a
 }
 
 // ListToolSetPermissions returns all tool set permissions for an agent.
-func (r *InMemoryRepository) ListToolSetPermissions(ctx context.Context, userID, agentID string) ([]permissions.ToolSetPermission, error) {
+func (r *InMemoryRepository) ListToolSetPermissions(ctx context.Context, userID, agentID string) ([]tool.ToolSetPermission, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 
 	userPerms, exists := r.toolSetPermissions[userID]
 	if !exists {
-		return []permissions.ToolSetPermission{}, nil // Return empty slice, not an error
+		return []tool.ToolSetPermission{}, nil // Return empty slice, not an error
 	}
 
 	agentPerms, exists := userPerms[agentID]
 	if !exists {
-		return []permissions.ToolSetPermission{}, nil // Return empty slice, not an error
+		return []tool.ToolSetPermission{}, nil // Return empty slice, not an error
 	}
 
-	permissionList := make([]permissions.ToolSetPermission, 0, len(agentPerms))
+	permissionList := make([]tool.ToolSetPermission, 0, len(agentPerms))
 	for _, perm := range agentPerms {
 		permissionList = append(permissionList, *perm) // Copy to prevent external modifications
 	}
@@ -200,16 +200,16 @@ func (r *InMemoryRepository) ListToolSetPermissions(ctx context.Context, userID,
 }
 
 // SaveToolSetPermission saves or updates a tool set permission.
-func (r *InMemoryRepository) SaveToolSetPermission(ctx context.Context, permission *permissions.ToolSetPermission) error {
+func (r *InMemoryRepository) SaveToolSetPermission(ctx context.Context, permission *tool.ToolSetPermission) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
 	if r.toolSetPermissions[permission.UserID] == nil {
-		r.toolSetPermissions[permission.UserID] = make(map[string]map[string]*permissions.ToolSetPermission)
+		r.toolSetPermissions[permission.UserID] = make(map[string]map[string]*tool.ToolSetPermission)
 	}
 
 	if r.toolSetPermissions[permission.UserID][permission.AgentID] == nil {
-		r.toolSetPermissions[permission.UserID][permission.AgentID] = make(map[string]*permissions.ToolSetPermission)
+		r.toolSetPermissions[permission.UserID][permission.AgentID] = make(map[string]*tool.ToolSetPermission)
 	}
 
 	// Create a copy to store

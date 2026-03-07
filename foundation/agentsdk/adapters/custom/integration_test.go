@@ -5,11 +5,11 @@ import (
 	"os"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/plugins/calculator"
-	"school-with-ai/platform/permissions"
+	"school-with-ai/modules/permissions/tool"
 	"school-with-ai/platform/toolregistry"
 	"testing"
 
-	permissions_mocks "school-with-ai/platform/permissions/mocks"
+	tool_mocks "school-with-ai/modules/permissions/tool/mocks"
 
 	toolregistry_mocks "school-with-ai/platform/toolregistry/mocks"
 )
@@ -21,14 +21,14 @@ func TestToolFactoryIntegration(t *testing.T) {
 	log := logger.NewText(os.Stdout, logger.LevelInfo, "TEST", nil)
 
 	// Create in-memory repositories
-	permissionsRepo := permissions_mocks.NewInMemoryRepository()
+	permissionsRepo := tool_mocks.NewInMemoryRepository()
 	toolRegistryRepo := toolregistry_mocks.NewInMemoryRepository()
 
 	// Register required plugins for the test
 	toolregistry.RegisterPlugin(&calculator.Provider{})
 
 	// Create services
-	permissionsService := permissions.NewService(log, permissionsRepo)
+	permissionsService := tool.NewService(log, permissionsRepo)
 	toolRegistry := toolregistry.NewRegistry(log, toolRegistryRepo)
 
 	// Initialize tool registry with default tools and tool sets

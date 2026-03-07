@@ -6,7 +6,7 @@ import (
 
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/platform/workspacepermissions"
+	"school-with-ai/modules/permissions/workspace"
 	"school-with-ai/shared"
 
 	"github.com/google/uuid"
@@ -14,7 +14,7 @@ import (
 
 type workspacePermHandler struct {
 	log              *logger.Logger
-	workspacePermSvc *workspacepermissions.Service
+	workspacePermSvc *workspace.Service
 	workspaceProv    WorkspaceProvider
 	agentProvider    agent.AgentProvider
 	tenantID         string
@@ -23,7 +23,7 @@ type workspacePermHandler struct {
 // newWorkspacePermHandler creates a new workspace permissions handler.
 func newWorkspacePermHandler(
 	log *logger.Logger,
-	workspacePermSvc *workspacepermissions.Service,
+	workspacePermSvc *workspace.Service,
 	workspaceProv WorkspaceProvider,
 	agentProvider agent.AgentProvider,
 	tenantID string,

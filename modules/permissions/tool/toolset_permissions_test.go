@@ -1,11 +1,11 @@
-package permissions_test
+package tool_test
 
 import (
 	"context"
 	"os"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/platform/permissions"
-	"school-with-ai/platform/permissions/mocks"
+	"school-with-ai/modules/permissions/tool"
+	"school-with-ai/modules/permissions/tool/mocks"
 	"school-with-ai/platform/toolregistry"
 	"testing"
 
@@ -20,7 +20,7 @@ func TestToolSetPermissions(t *testing.T) {
 	permissionsRepo := mocks.NewInMemoryRepository()
 	toolRegistryRepo := toolregistry_mocks.NewInMemoryRepository()
 
-	permissionsService := permissions.NewService(log, permissionsRepo)
+	permissionsService := tool.NewService(log, permissionsRepo)
 	toolRegistry := toolregistry.NewRegistry(log, toolRegistryRepo)
 
 	// Initialize tool registry

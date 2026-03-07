@@ -1,4 +1,4 @@
-package workspacepermissions
+package workspace
 
 import (
 	"context"
