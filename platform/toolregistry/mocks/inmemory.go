@@ -3,7 +3,7 @@ package mocks
 import (
 	"context"
 	"fmt"
-	"school-with-ai/services/toolregistry"
+	"school-with-ai/platform/toolregistry"
 	"sync"
 )
 

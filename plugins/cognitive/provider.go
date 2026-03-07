@@ -3,7 +3,7 @@ package cognitive
 import (
 	"context"
 	"school-with-ai/foundation/agent"
-	"school-with-ai/services/toolregistry"
+	"school-with-ai/platform/toolregistry"
 	"time"
 
 	"github.com/a-h/templ"

@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"school-with-ai/foundation/agent"
-	"school-with-ai/services/artifact"
+	"school-with-ai/platform/artifact"
 	"strings"
 	"time"
 )

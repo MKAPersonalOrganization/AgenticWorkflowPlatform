@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"school-with-ai/foundation/agent"
-	"school-with-ai/services/artifact"
+	"school-with-ai/platform/artifact"
 	"strings"
 )
 

@@ -5,7 +5,7 @@ import (
 	"io"
 
 	"school-with-ai/foundation/auth"
-	"school-with-ai/services/artifact"
+	"school-with-ai/platform/artifact"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"

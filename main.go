@@ -22,18 +22,20 @@ import (
 	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/adapters/custom"
+	"school-with-ai/foundation/auth"
 	"school-with-ai/foundation/debug"
 	"school-with-ai/foundation/event"
 	es "school-with-ai/foundation/eventsourcing"
 	"school-with-ai/foundation/i18n"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/middleware"
-	"school-with-ai/foundation/auth"
 	"school-with-ai/infra/googleauth"
 	"school-with-ai/infra/projection/subscriber"
 	"school-with-ai/infra/sqldb"
 	"school-with-ai/infra/sqldb/migrate"
 	"school-with-ai/modules/knowledge/edgequake"
+	"school-with-ai/platform/artifact"
+	"school-with-ai/platform/permissions"
 	"school-with-ai/plugins/calculator"
 	"school-with-ai/plugins/codebase"
 	"school-with-ai/plugins/cognitive"
@@ -42,14 +44,12 @@ import (
 	"school-with-ai/plugins/knowledgebase"
 	"school-with-ai/plugins/library"
 	"school-with-ai/plugins/tts"
-	"school-with-ai/services/artifact"
-	"school-with-ai/services/permissions"
 	"school-with-ai/shared"
 
 	"school-with-ai/modules/chat/taskmanagement"
 	"school-with-ai/modules/knowledge/rag/users"
-	"school-with-ai/services/toolregistry"
-	"school-with-ai/services/workspacepermissions"
+	"school-with-ai/platform/toolregistry"
+	"school-with-ai/platform/workspacepermissions"
 
 	preferencesmod "school-with-ai/modules/preferences"
 
@@ -57,6 +57,7 @@ import (
 
 	projectionStats "school-with-ai/modules/analytics/statistics"
 
+	"school-with-ai/platform/memory"
 	memoryplugin "school-with-ai/plugins/memory"
 
 	healthhandlers "school-with-ai/foundation/health"
@@ -467,25 +468,45 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Create agent runner and complete chat module initialisation (two-phase construction).
 	// The runner needs the orchestrator (from the chat module), and the orchestrator
 	// needs the runner — this circular dependency is resolved via SetRunner.
+
+	// Build the tool set factory builder — closes over the tool registry so the adapter
+	// never imports service packages (dependency inversion via closure).
+	newToolSetFactory := custom.NewToolSetFactoryFunc(func(cfg custom.ToolFactoryConfig) custom.ToolSetFactory {
+		f := toolregistry.NewExecutableToolFactory(artifactService)
+		f.SetToolRegistry(toolRegistry)
+		if cfg.EdgequakeBaseURL != "" {
+			f.SetEdgequakeConfig(cfg.EdgequakeBaseURL, cfg.ModelAPIKey, cfg.ModelID)
+		}
+		if cfg.TTSAPIKey != "" {
+			f.SetTTSConfig(cfg.TTSAPIKey, cfg.TTSModel, cfg.TTSVoice)
+		}
+		return f
+	})
+
+	// Build memory middleware (nil when long-term memory is disabled).
+	var memoryMiddleware agent.Middleware
+	if cfg.AgentCapabilities.LongTermMemory && artifactService != nil {
+		memSvc := memory.NewArtifactMemoryService(artifactService)
+		memoryMiddleware = memoryplugin.NewMemoryInjectorMiddleware(memSvc)
+	}
+
 	switch cfg.Orchestration.Framework {
 	case "custom":
 		runner, err := custom.NewRunnerAdapter(
 			ctx,
 			log,
-			chatModule.Orchestrator(), // ThreadManager interface
-			agentProvider,             // AgentProvider
-			aiSettingsModule,          // Per-user model config resolver
-			aiSettingsModule,          // Per-user TTS config resolver
-			artifactService,
-			studentProfileRepo,
-			cfg.AgentCapabilities.LongTermMemory,
-			toolRegistry,                // Tool registry service
-			permissionsService,          // Permissions service
-			workspacePermissionsService, // Workspace permissions
-			edgequakeService,            // Edgequake service for KB tools
-			cfg.Edgequake.BaseURL,       // Edgequake base URL for raw KB queries
-			cfg.Edgequake.TenantID,      // Tenant ID for edgequake
-			mcpModule.Service(),         // MCP plugin discovery service
+			chatModule.Orchestrator().GetThreadManagement(), // ThreadManager
+			agentProvider,               // AgentProvider
+			aiSettingsModule,            // Per-user model config resolver
+			aiSettingsModule,            // Per-user TTS config resolver
+			studentProfileRepo,          // Student profile repository
+			permissionsService,          // ToolPermissionChecker
+			workspacePermissionsService, // WorkspacePermissionChecker
+			mcpModule.Service(),         // MCPToolResolver
+			newToolSetFactory,           // Tool factory builder
+			memoryMiddleware,            // Memory middleware (nil if disabled)
+			edgequakeService != nil,     // edgequakeEnabled
+			cfg.Edgequake.BaseURL,       // edgequakeBaseURL
 		)
 		if err != nil {
 			return fmt.Errorf("creating custom runner: %w", err)
@@ -530,56 +551,10 @@ func run(ctx context.Context, log *logger.Logger) error {
 		})),
 	)
 
-	// Create chi router (Root Router)
-	root := chi.NewRouter()
+	// -------------------------------------------------------------------------
+	// Initialize Router & Routes
 
-	// Add panic recovery middleware first (most important - must be first)
-	root.Use(middleware.Panics())
-
-	// Add security headers middleware (early — sets headers before response body)
-	root.Use(middleware.SecurityHeaders())
-
-	// Add request body size limit middleware (1 MB default for JSON APIs).
-	// Multipart/form-data requests (file uploads) are excluded — handlers
-	// control their own limits via ParseMultipartForm.
-	// /v1/message:send is excluded because it carries base64 file attachments
-	// and applies its own larger limit via a route-group middleware.
-	// Note: multipart/form-data requests (attachment uploads) are automatically
-	// excluded by the middleware, so no path exclusion is needed for those.
-	root.Use(middleware.BodyLimit(0, "/v1/message:send"))
-
-	// Add per-IP rate limiting (Moved to specific route groups below for split limits)
-	// r.Use(middleware.RateLimiter(100, 300))
-
-	// Add logging middleware
-	root.Use(middleware.Logger(log))
-
-	// Add metrics middleware
-	root.Use(middleware.Metrics())
-
-	// Add I18n middleware (detects lang from query/cookie/header)
-	root.Use(middleware.I18n)
-
-	// Add chi middleware (we can keep or remove these depending on preference)
-	// Note: We now have our own Logger and Recoverer, so chi's can be removed
-	// r.Use(chimiddleware.Logger)
-	// r.Use(chimiddleware.Recoverer)
-
-	// Serve static assets — Mount uses a catch-all so nested paths
-	// like /assets/js/chat/index.js are served correctly.
-	// Use higher rate limit for assets (100 req/s, 300 burst) to support parallel loading
-	root.Group(func(r chi.Router) {
-		r.Use(middleware.RateLimiter(rateLimitRedis, 100, 300))
-		r.Mount("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir("./assets"))))
-	})
-
-	// Create App Router for all other routes
-	// This router will enforce strict rate limits (10 req/s, 20 burst)
-	r := chi.NewRouter()
-	r.Use(middleware.RateLimiter(rateLimitRedis, 10, 20))
-
-	// Mount App Router on Root
-	root.Mount("/", r)
+	root, appRouter := buildRootRouter(log, rateLimitRedis)
 
 	// Initialize Google OAuth client and auth handlers
 	googleClient := googleauth.NewClient(googleauth.Config{
@@ -592,77 +567,25 @@ func run(ctx context.Context, log *logger.Logger) error {
 	authHandlers := auth.NewAuthHandlers(log, googleClient, sessionStore, cfg.Auth.AppURL)
 	authMiddleware := auth.NewMiddleware(googleClient, sessionStore, cfg.Auth.AppURL, ctx)
 
-	// Resources Module routes
-	resourcesModule.RegisterRoutes(r, authMiddleware)
+	registerRoutes(appRouter, log, authHandlers, authMiddleware, healthHandler, routeModules{
+		chat:        chatModule,
+		identity:    identityModule,
+		preferences: preferencesModule,
+		aiSettings:  aiSettingsModule,
+		agentStore:  agentStoreModule,
+		knowledge:   knowledgeModule,
+		mcp:         mcpModule,
+		resources:   resourcesModule,
+		billing:     billingModule,
+		banner:      bannermod.New(log),
+		permissions: permissionsmod.New(log, workspacePermissionsService, edgequakeService, agentProvider, cfg.Edgequake.TenantID),
+		analytics:   analyticsmod.New(log, statsProjection, cfg.DashboardAdmin.User, cfg.DashboardAdmin.Pass),
+	}, edgequakeService)
 
-	// Permissions module (workspace permissions)
-	permissionsModule := permissionsmod.New(log, workspacePermissionsService, edgequakeService, agentProvider, cfg.Edgequake.TenantID)
-	permissionsModule.RegisterRoutes(r, authMiddleware)
-
-	// Agent Store & Catalog routes (module)
-	agentStoreModule.RegisterRoutes(r, authMiddleware)
-
-	// Banner routes (modules/banner)
-	bannerModule := bannermod.New(log)
-	bannerModule.RegisterRoutes(r, authMiddleware)
-
-	// Health check endpoints (public)
-	r.Get("/liveness", healthHandler.Liveness)
-	r.Get("/readiness", healthHandler.Readiness)
-
-	// Auth routes (public)
-	r.Get("/auth/login", authHandlers.LoginPage)
-	r.Get("/auth/callback", authHandlers.CallbackHandler)
-	r.Get("/auth/logout", authHandlers.LogoutHandler)
-	r.Get("/auth/error", authHandlers.ErrorPage)
-	r.Get("/api/me", authMiddleware.RequireAuthFunc(authHandlers.MeHandler))
-
-	// Profile routes (modules/identity)
-	identityModule.RegisterRoutes(r, authMiddleware)
-
-	// User Preferences routes (modules/preferences)
-	preferencesModule.RegisterRoutes(r, authMiddleware)
-
-	// AI Settings routes (modules/aisettings)
-	aiSettingsModule.RegisterRoutes(r, authMiddleware)
-
-	// Analytics Dashboard (modules/analytics — uses own Basic Auth)
-	analyticsModule := analyticsmod.New(log, statsProjection, cfg.DashboardAdmin.User, cfg.DashboardAdmin.Pass)
-	analyticsModule.RegisterRoutes(r)
-
-	// Pricing page
-	r.Get("/pricing", authMiddleware.RequireAuthFunc(HandlePricingPage(log)))
-
-	// Billing (event-sourced payment system — modules/billing)
 	// Set Stripe API key — must be done before any Stripe SDK calls
 	stripe.Key = cfg.Stripe.SecretKey
-	billingModule.RegisterRoutes(r, authMiddleware)
 
-	// Chat module routes (modules/chat — ADR 014)
-	chatModule.RegisterRoutes(r, authMiddleware)
-
-	// MCP Connector endpoints
-	mcpModule.RegisterRoutes(r, authMiddleware)
-
-	// Knowledge Base / RAG routes
-	knowledgeModule.RegisterRoutes(r, authMiddleware)
-
-	// Landing page (public — shows branding page with optional user context)
-	r.Get("/", authMiddleware.OptionalAuthFunc(HandleLandingPage(log)))
-
-	// Documentation page (public)
-	r.Get("/docs", authMiddleware.OptionalAuthFunc(HandleDocsPage(log)))
-
-	// Chat route (authenticated — main app)
-	r.Get("/chat", authMiddleware.RequireAuthFunc(HandleViewChatInputScreen(log, edgequakeService)))
-
-	// Configure TLS: restrict to elliptic curves with assembly implementations
-	// (X25519 and P256) to ensure the server remains performant under heavy load.
-	tlsConfig := &tls.Config{
-		CurvePreferences: []tls.CurveID{tls.X25519, tls.CurveP256},
-	}
-
-	// Create server with proper timeouts to prevent slowloris and similar attacks
+	// Configure TLS and create server with proper timeouts
 	server := &http.Server{
 		Addr:              cfg.Web.APIHost,
 		Handler:           root,
@@ -670,7 +593,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 		ReadHeaderTimeout: cfg.Web.ReadHeaderTimeout,
 		WriteTimeout:      cfg.Web.WriteTimeout,
 		IdleTimeout:       cfg.Web.IdleTimeout,
-		TLSConfig:         tlsConfig,
+		TLSConfig: &tls.Config{
+			CurvePreferences: []tls.CurveID{tls.X25519, tls.CurveP256},
+		},
 	}
 
 	// -------------------------------------------------------------------------
@@ -721,6 +646,117 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	return nil
 }
+
+// ─── Router Setup Helpers ───────────────────────────────────────────────────
+
+// buildRootRouter creates the root chi router with global middleware and
+// an app sub-router with per-IP rate limiting. Returns (root, appRouter).
+func buildRootRouter(log *logger.Logger, rateLimitRedis *goredis.Client) (chi.Router, chi.Router) {
+	root := chi.NewRouter()
+	root.Use(middleware.Panics())
+	root.Use(middleware.SecurityHeaders())
+	root.Use(middleware.BodyLimit(0, "/v1/message:send"))
+	root.Use(middleware.Logger(log))
+	root.Use(middleware.Metrics())
+	root.Use(middleware.I18n)
+
+	// Static assets get a higher rate limit to support parallel loading.
+	root.Group(func(r chi.Router) {
+		r.Use(middleware.RateLimiter(rateLimitRedis, 100, 300))
+		r.Mount("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir("./assets"))))
+	})
+
+	appRouter := chi.NewRouter()
+	appRouter.Use(middleware.RateLimiter(rateLimitRedis, 10, 20))
+	root.Mount("/", appRouter)
+
+	return root, appRouter
+}
+
+// routeModules bundles all modules that register routes so they can be
+// passed as a single argument to registerRoutes.
+type routeModules struct {
+	chat interface {
+		RegisterRoutes(chi.Router, *auth.Middleware)
+	}
+	identity interface {
+		RegisterRoutes(chi.Router, *auth.Middleware)
+	}
+	preferences interface {
+		RegisterRoutes(chi.Router, *auth.Middleware)
+	}
+	aiSettings interface {
+		RegisterRoutes(chi.Router, *auth.Middleware)
+	}
+	agentStore interface {
+		RegisterRoutes(chi.Router, *auth.Middleware)
+	}
+	knowledge interface {
+		RegisterRoutes(chi.Router, *auth.Middleware)
+	}
+	mcp interface {
+		RegisterRoutes(chi.Router, *auth.Middleware)
+	}
+	resources interface {
+		RegisterRoutes(chi.Router, *auth.Middleware)
+	}
+	billing interface {
+		RegisterRoutes(chi.Router, *auth.Middleware)
+	}
+	banner interface {
+		RegisterRoutes(chi.Router, *auth.Middleware)
+	}
+	permissions interface {
+		RegisterRoutes(chi.Router, *auth.Middleware)
+	}
+	analytics   interface {
+		RegisterRoutes(interface{ Get(string, http.HandlerFunc) })
+	}
+}
+
+// registerRoutes wires all module and page routes onto the app router.
+func registerRoutes(
+	r chi.Router,
+	log *logger.Logger,
+	authHandlers *auth.AuthHandlers,
+	authMW *auth.Middleware,
+	healthHandler *healthhandlers.HealthHandler,
+	mods routeModules,
+	edgequakeService *edgequake.Service,
+) {
+	// Module routes
+	mods.resources.RegisterRoutes(r, authMW)
+	mods.permissions.RegisterRoutes(r, authMW)
+	mods.agentStore.RegisterRoutes(r, authMW)
+	mods.banner.RegisterRoutes(r, authMW)
+	mods.identity.RegisterRoutes(r, authMW)
+	mods.preferences.RegisterRoutes(r, authMW)
+	mods.aiSettings.RegisterRoutes(r, authMW)
+	mods.billing.RegisterRoutes(r, authMW)
+	mods.chat.RegisterRoutes(r, authMW)
+	mods.mcp.RegisterRoutes(r, authMW)
+	mods.knowledge.RegisterRoutes(r, authMW)
+	mods.analytics.RegisterRoutes(r)
+
+	// Health check endpoints (public)
+	r.Get("/liveness", healthHandler.Liveness)
+	r.Get("/readiness", healthHandler.Readiness)
+
+	// Auth routes (public)
+	r.Get("/auth/login", authHandlers.LoginPage)
+	r.Get("/auth/callback", authHandlers.CallbackHandler)
+	r.Get("/auth/logout", authHandlers.LogoutHandler)
+	r.Get("/auth/error", authHandlers.ErrorPage)
+	r.Get("/api/me", authMW.RequireAuthFunc(authHandlers.MeHandler))
+
+	// Page routes
+	r.Get("/", authMW.OptionalAuthFunc(HandleLandingPage(log)))
+	r.Get("/docs", authMW.OptionalAuthFunc(HandleDocsPage(log)))
+	r.Get("/pricing", authMW.RequireAuthFunc(HandlePricingPage(log)))
+	r.Get("/chat", authMW.RequireAuthFunc(HandleViewChatInputScreen(log, edgequakeService)))
+}
+
+// ─── Page Handlers ──────────────────────────────────────────────────────────
 
 func HandleViewChatInputScreen(log *logger.Logger, edgequakeService *edgequake.Service) http.HandlerFunc {
 	// Track which users have already been synced to avoid redundant goroutines.

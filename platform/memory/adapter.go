@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"school-with-ai/services/artifact"
+	"school-with-ai/platform/artifact"
 	"strings"
 )
 

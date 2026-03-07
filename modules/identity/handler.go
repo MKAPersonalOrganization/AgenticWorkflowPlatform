@@ -41,8 +41,13 @@ func (h *handler) handleProfilePage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	component := profile.ProfilePage(profile.ProfilePageProps{
-		User:    user,
-		Profile: profileData,
+		User: user,
+		Profile: profile.StudentProfileDTO{
+			LearningStyle: profileData.LearningStyle,
+			Struggles:     profileData.Struggles,
+			Strengths:     profileData.Strengths,
+			Goals:         profileData.Goals,
+		},
 	})
 
 	if err := component.Render(r.Context(), w); err != nil {

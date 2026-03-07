@@ -24,7 +24,7 @@ package mcp
 import (
 "school-with-ai/foundation/logger"
 "school-with-ai/foundation/auth"
-"school-with-ai/services/toolregistry"
+"school-with-ai/platform/toolregistry"
 
 "github.com/go-chi/chi/v5"
 "github.com/jmoiron/sqlx"

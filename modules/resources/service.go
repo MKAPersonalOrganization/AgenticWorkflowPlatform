@@ -6,7 +6,7 @@ import (
 	"io"
 	"time"
 
-	"school-with-ai/services/artifact"
+	"school-with-ai/platform/artifact"
 
 	"github.com/google/uuid"
 )

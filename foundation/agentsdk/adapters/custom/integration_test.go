@@ -5,13 +5,13 @@ import (
 	"os"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/plugins/calculator"
-	"school-with-ai/services/permissions"
-	"school-with-ai/services/toolregistry"
+	"school-with-ai/platform/permissions"
+	"school-with-ai/platform/toolregistry"
 	"testing"
 
-	permissions_mocks "school-with-ai/services/permissions/mocks"
+	permissions_mocks "school-with-ai/platform/permissions/mocks"
 
-	toolregistry_mocks "school-with-ai/services/toolregistry/mocks"
+	toolregistry_mocks "school-with-ai/platform/toolregistry/mocks"
 )
 
 // TestToolFactoryIntegration tests that the tool factory can properly create executable tools

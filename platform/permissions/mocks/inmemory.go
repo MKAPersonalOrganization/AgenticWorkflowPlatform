@@ -3,7 +3,7 @@ package mocks
 import (
 	"context"
 	"fmt"
-	"school-with-ai/services/permissions"
+	"school-with-ai/platform/permissions"
 	"sync"
 )
 

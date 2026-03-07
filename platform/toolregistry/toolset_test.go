@@ -6,8 +6,8 @@ import (
 	"school-with-ai/foundation/logger"
 	"school-with-ai/plugins/calculator"
 	"school-with-ai/plugins/memory"
-	"school-with-ai/services/toolregistry"
-	"school-with-ai/services/toolregistry/mocks"
+	"school-with-ai/platform/toolregistry"
+	"school-with-ai/platform/toolregistry/mocks"
 	"testing"
 )
 

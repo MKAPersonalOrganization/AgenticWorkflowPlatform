@@ -5,7 +5,7 @@ import (
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/auth"
 	"school-with-ai/modules/knowledge/edgequake"
-	"school-with-ai/services/workspacepermissions"
+	"school-with-ai/platform/workspacepermissions"
 
 	"github.com/go-chi/chi/v5"
 )
