@@ -2,10 +2,11 @@ package memory
 
 import (
 	"context"
-	"school-with-ai/foundation/agent"
-	"school-with-ai/platform/memory"
-	"school-with-ai/platform/toolregistry"
 	"time"
+
+	"school-with-ai/foundation/agent"
+	"school-with-ai/modules/chat/memory"
+	"school-with-ai/platform/toolregistry"
 
 	"github.com/a-h/templ"
 )
