@@ -1,14 +1,14 @@
 package taskmanagement
 
 import (
-	"school-with-ai/domain"
+	"school-with-ai/modules/chat/thread"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
 
 // ToAguiEvents converts domain events to AGUI events.
 // It returns a slice of events because some domain events map to multiple AGUI events.
-func ToAguiEvents(event domain.Event) []any {
+func ToAguiEvents(event thread.Event) []any {
 	if event == nil {
 		return nil
 	}
@@ -18,16 +18,16 @@ func ToAguiEvents(event domain.Event) []any {
 
 func toAguiEventsInternal(event any) []any {
 	switch evt := event.(type) {
-	case *domain.RunStarted:
+	case *thread.RunStarted:
 		return []any{aguievents.NewRunStartedEvent(evt.ThreadID, evt.RunID)}
 
-	case *domain.RunFinished:
+	case *thread.RunFinished:
 		return []any{aguievents.NewRunFinishedEvent(evt.ThreadID, evt.RunID)}
 
-	case *domain.RunError:
+	case *thread.RunError:
 		return []any{aguievents.NewRunErrorEvent(evt.Message, aguievents.WithErrorCode(evt.Code))}
 
-	case *domain.ThreadTitleUpdated:
+	case *thread.ThreadTitleUpdated:
 		return []any{aguievents.NewCustomEvent(
 			"THREAD_TITLE_UPDATED",
 			aguievents.WithValue(map[string]any{
@@ -36,16 +36,16 @@ func toAguiEventsInternal(event any) []any {
 			}),
 		)}
 
-	case *domain.AssistantMessageStarted:
+	case *thread.AssistantMessageStarted:
 		return []any{aguievents.NewTextMessageStartEvent(evt.MessageID, aguievents.WithRole("assistant"))}
 
-	case *domain.AssistantContentStreamed:
+	case *thread.AssistantContentStreamed:
 		return []any{aguievents.NewTextMessageContentEvent(evt.MessageID, evt.Delta)}
 
-	case *domain.AssistantMessageCompleted:
+	case *thread.AssistantMessageCompleted:
 		return []any{aguievents.NewTextMessageEndEvent(evt.MessageID)}
 
-	case *domain.TokenUsageReported:
+	case *thread.TokenUsageReported:
 		return []any{aguievents.NewCustomEvent(
 			"TOKEN_USAGE_REPORTED",
 			aguievents.WithValue(map[string]any{
@@ -65,7 +65,7 @@ func toAguiEventsInternal(event any) []any {
 			}),
 		)}
 
-	case *domain.ToolStart:
+	case *thread.ToolStart:
 		return []any{aguievents.NewCustomEvent(
 			"TOOL_START",
 			aguievents.WithValue(map[string]any{
@@ -77,7 +77,7 @@ func toAguiEventsInternal(event any) []any {
 			}),
 		)}
 
-	case *domain.ToolContentStreamed:
+	case *thread.ToolContentStreamed:
 		return []any{aguievents.NewCustomEvent(
 			"TOOL_CONTENT_STREAMED",
 			aguievents.WithValue(map[string]any{
@@ -89,7 +89,7 @@ func toAguiEventsInternal(event any) []any {
 			}),
 		)}
 
-	case *domain.ToolResultAdded:
+	case *thread.ToolResultAdded:
 		// Emit event names based on IsError flag
 		var eventName string
 		if evt.IsError {
@@ -110,7 +110,7 @@ func toAguiEventsInternal(event any) []any {
 			}),
 		)}
 
-	case *domain.ToolNeedsInput:
+	case *thread.ToolNeedsInput:
 		return []any{aguievents.NewCustomEvent(
 			"TOOL_NEEDS_INPUT",
 			aguievents.WithValue(map[string]any{
@@ -122,7 +122,7 @@ func toAguiEventsInternal(event any) []any {
 			}),
 		)}
 
-	case *domain.ToolNeedsAuth:
+	case *thread.ToolNeedsAuth:
 		return []any{aguievents.NewCustomEvent(
 			"TOOL_NEEDS_AUTH",
 			aguievents.WithValue(map[string]any{
@@ -133,7 +133,7 @@ func toAguiEventsInternal(event any) []any {
 			}),
 		)}
 
-	case *domain.InputProvided:
+	case *thread.InputProvided:
 		return []any{aguievents.NewCustomEvent(
 			"INPUT_PROVIDED",
 			aguievents.WithValue(map[string]any{
@@ -143,7 +143,7 @@ func toAguiEventsInternal(event any) []any {
 			}),
 		)}
 
-	case *domain.AuthGranted:
+	case *thread.AuthGranted:
 		return []any{aguievents.NewCustomEvent(
 			"AUTH_GRANTED",
 			aguievents.WithValue(map[string]any{
@@ -151,7 +151,7 @@ func toAguiEventsInternal(event any) []any {
 			}),
 		)}
 
-	case *domain.AuthDenied:
+	case *thread.AuthDenied:
 		return []any{aguievents.NewCustomEvent(
 			"AUTH_DENIED",
 			aguievents.WithValue(map[string]any{
@@ -159,7 +159,7 @@ func toAguiEventsInternal(event any) []any {
 			}),
 		)}
 
-	case *domain.ToolCancelled:
+	case *thread.ToolCancelled:
 		return []any{aguievents.NewCustomEvent(
 			"TOOL_CANCELLED",
 			aguievents.WithValue(map[string]any{
@@ -168,7 +168,7 @@ func toAguiEventsInternal(event any) []any {
 			}),
 		)}
 
-	case *domain.UserMessageAdded, *domain.AssistantMessageAdded, *domain.ThreadCreated:
+	case *thread.UserMessageAdded, *thread.AssistantMessageAdded, *thread.ThreadCreated:
 		// These are handled by the frontend locally or via snapshots, no need to stream
 		return []any{}
 

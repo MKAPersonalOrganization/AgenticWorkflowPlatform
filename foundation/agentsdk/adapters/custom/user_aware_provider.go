@@ -3,15 +3,16 @@ package custom
 import (
 	"context"
 	"fmt"
-	"school-with-ai/domain"
+
 	"school-with-ai/foundation/agent"
+	"school-with-ai/modules/agentstore"
 )
 
 // UserAwareAgentProvider implements agent.AgentProvider by loading all agents
 // from the database. Every user gets a starter agent created lazily on first
 // access if they have none. All agents are equal — there is no "default".
 type UserAwareAgentProvider struct {
-	repo domain.AgentDefinitionRepository
+	repo agentstore.AgentDefinitionRepository
 
 	// Middleware hooks injected at construction so every agent built from a
 	// definition gets the same observability wiring.
@@ -23,7 +24,7 @@ type UserAwareAgentProvider struct {
 // NewUserAwareAgentProvider creates a DB-only provider.
 // Middlewares are optional hooks applied to every agent built from the DB.
 func NewUserAwareAgentProvider(
-	repo domain.AgentDefinitionRepository,
+	repo agentstore.AgentDefinitionRepository,
 	agentMw []agent.Middleware,
 	chatMw []agent.Middleware,
 	funcMw []agent.Middleware,
@@ -98,9 +99,9 @@ func (p *UserAwareAgentProvider) ListForUser(ctx context.Context, userID string)
 	return agents, nil
 }
 
-// agentFromDefinition builds an agent.Agent from a domain.AgentDefinition.
+// agentFromDefinition builds an agent.Agent from a agentstore.AgentDefinition.
 // All agents — default or user-created — go through this single path.
-func (p *UserAwareAgentProvider) agentFromDefinition(def *domain.AgentDefinition) agent.Agent {
+func (p *UserAwareAgentProvider) agentFromDefinition(def *agentstore.AgentDefinition) agent.Agent {
 	cfg := agent.Config{
 		Name:         def.ID, // Use UUID as routing key
 		Description:  def.Description,

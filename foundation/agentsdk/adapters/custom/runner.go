@@ -7,7 +7,6 @@ import (
 	"iter"
 	"strings"
 
-	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/engine"
@@ -15,6 +14,8 @@ import (
 	agentio "school-with-ai/foundation/agentsdk/io"
 	smiddleware "school-with-ai/foundation/agentsdk/middleware"
 	"school-with-ai/foundation/logger"
+	"school-with-ai/modules/chat/thread"
+	"school-with-ai/modules/userprofile/identity"
 	"school-with-ai/shared"
 )
 
@@ -39,7 +40,7 @@ type RunnerAdapter struct {
 	agentProvider        agent.AgentProvider
 	threadMgr            ThreadManager
 	pipeline             *EventPipeline
-	profileRepo          domain.StudentProfileRepository
+	profileRepo          identity.StudentProfileRepository
 	configResolver       ModelConfigResolver
 	ttsResolver          TTSConfigResolver
 	permChecker          ToolPermissionChecker
@@ -60,7 +61,7 @@ func NewRunnerAdapter(
 	agentProvider agent.AgentProvider,
 	configResolver ModelConfigResolver,
 	ttsResolver TTSConfigResolver,
-	profileRepo domain.StudentProfileRepository,
+	profileRepo identity.StudentProfileRepository,
 	permChecker ToolPermissionChecker,
 	workspacePermChecker WorkspacePermissionChecker,
 	mcpResolver MCPToolResolver,
@@ -174,8 +175,8 @@ func createLLMClient(ctx context.Context, cfg *agent.ModelConfig) (llm.LLM, erro
 }
 
 // Run executes an agent with the given request.
-func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq2[domain.Event, error] {
-	return func(yield func(domain.Event, error) bool) {
+func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq2[thread.Event, error] {
+	return func(yield func(thread.Event, error) bool) {
 		// 0. Resolve per-user model config
 		modelCfg, err := r.configResolver.GetModelConfigForUser(ctx, req.UserID)
 		if err != nil {
@@ -191,16 +192,16 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 		}
 
 		// 1. Facts First: Initialize Thread and Message
-		var agg *domain.ThreadAggregate
-		var initialEvents []domain.Event
+		var agg *thread.ThreadAggregate
+		var initialEvents []thread.Event
 
 		userContent := extractUserPrompt(req.Message)
 		userAttachments := extractUserAttachments(req.Message)
 
 		// Extract artifact attachment refs passed from orchestrator (for event persistence)
-		var attachmentRefs []domain.Attachment
+		var attachmentRefs []thread.Attachment
 		if req.Context != nil {
-			if refs, ok := req.Context["attachmentRefs"].([]domain.Attachment); ok {
+			if refs, ok := req.Context["attachmentRefs"].([]thread.Attachment); ok {
 				attachmentRefs = refs
 			}
 		}
@@ -208,12 +209,12 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 		if req.Message != nil {
 			messageID := req.Message.ID
 			if messageID == "" {
-				messageID = domain.GenerateMessageID()
+				messageID = core.GenerateMessageID()
 			}
 
 			// AddUserMessage handles both thread creation and message persistence
-			var uEvent *domain.UserMessageAdded
-			var sideEffects []domain.Event
+			var uEvent *thread.UserMessageAdded
+			var sideEffects []thread.Event
 			var pErr error
 			agg, uEvent, sideEffects, pErr = r.threadMgr.AddUserMessage(ctx, req.SessionID, messageID, userContent, req.UserID, attachmentRefs...)
 			if pErr != nil {
@@ -229,7 +230,7 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 			// Resuming without a new message
 			var lErr error
 			agg, lErr = r.threadMgr.Load(ctx, req.SessionID)
-			if lErr != nil && !errors.Is(lErr, domain.ErrThreadNotFound) {
+			if lErr != nil && !errors.Is(lErr, thread.ErrThreadNotFound) {
 				yield(nil, fmt.Errorf("failed to load thread: %w", lErr))
 				return
 			}
@@ -272,7 +273,7 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 			UserContent:    userContent,
 			Thread:         thread,
 			InitialHistory: messages,
-			MessageID:      domain.GenerateMessageID(), // Always generate a fresh ID for the agent's first response
+			MessageID:      core.GenerateMessageID(), // Always generate a fresh ID for the agent's first response
 		}
 
 		// 4. Resolve Agent Name
@@ -323,7 +324,7 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *agent.RunRequest) iter.Seq
 	}
 }
 
-func (r *RunnerAdapter) toAgentThread(aggregate *domain.ThreadAggregate) core.AgentThread {
+func (r *RunnerAdapter) toAgentThread(aggregate *thread.ThreadAggregate) core.AgentThread {
 	agentThread := core.NewInMemoryThreadWithID(aggregate.ID)
 	messages := r.toCoreMessages(aggregate)
 	if len(messages) > 0 {
@@ -332,7 +333,7 @@ func (r *RunnerAdapter) toAgentThread(aggregate *domain.ThreadAggregate) core.Ag
 	return agentThread
 }
 
-func (r *RunnerAdapter) toCoreMessages(aggregate *domain.ThreadAggregate) []core.Message {
+func (r *RunnerAdapter) toCoreMessages(aggregate *thread.ThreadAggregate) []core.Message {
 	if len(aggregate.Messages) == 0 {
 		return nil
 	}
@@ -351,7 +352,7 @@ func (r *RunnerAdapter) toCoreMessages(aggregate *domain.ThreadAggregate) []core
 
 		// Inject active tool states if present
 		if len(dm.ToolCalls) > 0 && len(aggregate.ActiveToolStates) > 0 {
-			toolStates := make(map[string]domain.ToolCallState)
+			toolStates := make(map[string]thread.ToolCallState)
 			for _, tc := range dm.ToolCalls {
 				if state, ok := aggregate.ActiveToolStates[tc.ID]; ok {
 					toolStates[tc.ID] = state
@@ -369,7 +370,7 @@ func (r *RunnerAdapter) toCoreMessages(aggregate *domain.ThreadAggregate) []core
 	return messages
 }
 
-func (r *RunnerAdapter) toCoreToolCalls(dtcs []domain.ToolCall) []core.ToolCall {
+func (r *RunnerAdapter) toCoreToolCalls(dtcs []thread.ToolCall) []core.ToolCall {
 	if dtcs == nil {
 		return nil
 	}
@@ -388,7 +389,7 @@ func (r *RunnerAdapter) toCoreToolCalls(dtcs []domain.ToolCall) []core.ToolCall 
 // RegistryAgentProvider implements engine.AgentProvider using agent.AgentProvider.
 type RegistryAgentProvider struct {
 	provider             agent.AgentProvider
-	profileRepo          domain.StudentProfileRepository
+	profileRepo          identity.StudentProfileRepository
 	modelProvider        string   // LLM provider name (e.g., "openai", "gemini")
 	modelID              string   // LLM model name (e.g., "gpt-4o", "gemini-2.0-flash")
 	temperature          *float64 // Global temperature from AI settings

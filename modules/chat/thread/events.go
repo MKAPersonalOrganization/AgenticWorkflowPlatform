@@ -1,4 +1,4 @@
-package domain
+package thread
 
 import (
 	"time"
@@ -7,7 +7,7 @@ import (
 // Domain events - transport-agnostic events that represent business domain occurrences.
 // These events are emitted by the orchestration service and can be converted to
 // transport-specific events (AGUI, A2A, etc.) by the presentation layer.
-// All domain events implement the Event interface defined in domain/domain.go.
+// All domain events implement the Event interface defined in types.go.
 
 // ThreadCreated is emitted when a new thread is created.
 type ThreadCreated struct {
@@ -276,10 +276,6 @@ func (e *ToolCancelled) EventTimestamp() time.Time { return e.Timestamp }
 func (e *ToolCancelled) AggregateID() string       { return e.ThreadID }
 
 // RunStarted signals the start of an agent run.
-// The RunStarted event is the first event emitted when an agent begins processing a request.
-// It establishes a new execution context identified by a unique runId. This event serves as
-// a marker for frontends to initialize UI elements such as progress indicators or loading states.
-// It also provides crucial identifiers that can be used to associate subsequent events with this specific run.
 type RunStarted struct {
 	ThreadID    string    `json:"threadId"`              // ID of the conversation thread
 	RunID       string    `json:"runId"`                 // ID of the agent run
@@ -293,10 +289,6 @@ func (e *RunStarted) EventTimestamp() time.Time { return e.Timestamp }
 func (e *RunStarted) AggregateID() string       { return e.ThreadID }
 
 // RunFinished signals the successful completion of an agent run.
-// The RunFinished event indicates that an agent has successfully completed all its work for the current run.
-// Upon receiving this event, frontends should finalize any UI states that were waiting on the agent's completion.
-// This event marks a clean termination point and indicates that no further processing will occur in this run
-// unless explicitly requested. The optional result field can contain any output data produced by the agent run.
 type RunFinished struct {
 	ThreadID  string    `json:"threadId"`         // ID of the conversation thread
 	RunID     string    `json:"runId"`            // ID of the agent run
@@ -309,10 +301,6 @@ func (e *RunFinished) EventTimestamp() time.Time { return e.Timestamp }
 func (e *RunFinished) AggregateID() string       { return e.ThreadID }
 
 // RunError signals an error during an agent run.
-// The RunError event indicates that the agent encountered an error it could not recover from,
-// causing the run to terminate prematurely. This event provides information about what went wrong,
-// allowing frontends to display appropriate error messages and potentially offer recovery options.
-// After a RunError event, no further processing will occur in this run.
 type RunError struct {
 	ThreadID  string    `json:"threadId"`       // ID of the conversation thread
 	RunID     string    `json:"runId"`          // ID of the agent run

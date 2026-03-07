@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net/http"
 
-	"school-with-ai/domain"
+	"school-with-ai/modules/chat/thread"
 )
 
 // DeleteThread deletes a thread.
@@ -41,7 +41,7 @@ func (h *TaskManagementHandler) DeleteThread(w http.ResponseWriter, r *http.Requ
 	// Delete thread using thread management manager
 	_, err := h.threadMgmt.DeleteThread(r.Context(), threadID)
 	if err != nil {
-		if errors.Is(err, domain.ErrThreadNotFound) {
+		if errors.Is(err, thread.ErrThreadNotFound) {
 			http.Error(w, "Thread not found", http.StatusNotFound)
 
 			return
@@ -106,7 +106,7 @@ func (h *TaskManagementHandler) UpdateThreadTitle(w http.ResponseWriter, r *http
 
 	event, err := h.threadMgmt.UpdateThreadTitle(r.Context(), threadID, req.Title)
 	if err != nil {
-		if errors.Is(err, domain.ErrThreadNotFound) {
+		if errors.Is(err, thread.ErrThreadNotFound) {
 			http.Error(w, "Thread not found", http.StatusNotFound)
 			return
 		}

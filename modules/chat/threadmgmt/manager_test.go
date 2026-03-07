@@ -4,16 +4,17 @@ import (
 	"context"
 	"errors"
 	"io"
-	"school-with-ai/domain"
-	"school-with-ai/foundation/logger"
 	"sync"
 	"testing"
+
+	"school-with-ai/foundation/logger"
+	threadpkg "school-with-ai/modules/chat/thread"
 )
 
 // ConcurrentMockEventStore simulates concurrency conflicts
 type ConcurrentMockEventStore struct {
 	mu            sync.Mutex
-	events        map[string][]domain.Event
+	events        map[string][]threadpkg.Event
 	versions      map[string]int64
 	conflictCount int
 	maxConflicts  int
@@ -21,13 +22,13 @@ type ConcurrentMockEventStore struct {
 
 func NewConcurrentMockEventStore(maxConflicts int) *ConcurrentMockEventStore {
 	return &ConcurrentMockEventStore{
-		events:       make(map[string][]domain.Event),
+		events:       make(map[string][]threadpkg.Event),
 		versions:     make(map[string]int64),
 		maxConflicts: maxConflicts,
 	}
 }
 
-func (m *ConcurrentMockEventStore) AppendWithVersion(ctx context.Context, streamID string, expectedVersion int64, events ...domain.Event) (int64, error) {
+func (m *ConcurrentMockEventStore) AppendWithVersion(ctx context.Context, streamID string, expectedVersion int64, events ...threadpkg.Event) (int64, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -36,11 +37,11 @@ func (m *ConcurrentMockEventStore) AppendWithVersion(ctx context.Context, stream
 	// Simulate conflict
 	if m.conflictCount < m.maxConflicts {
 		m.conflictCount++
-		return 0, domain.ErrConcurrencyConflict
+		return 0, threadpkg.ErrConcurrencyConflict
 	}
 
 	if expectedVersion != -2 && expectedVersion != currentVersion {
-		return 0, domain.ErrConcurrencyConflict
+		return 0, threadpkg.ErrConcurrencyConflict
 	}
 
 	m.events[streamID] = append(m.events[streamID], events...)
@@ -48,12 +49,12 @@ func (m *ConcurrentMockEventStore) AppendWithVersion(ctx context.Context, stream
 	return m.versions[streamID], nil
 }
 
-func (m *ConcurrentMockEventStore) ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]domain.Event, error) {
+func (m *ConcurrentMockEventStore) ReadStream(ctx context.Context, streamID string, fromVersion int64) ([]threadpkg.Event, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	events, ok := m.events[streamID]
 	if !ok {
-		return nil, domain.ErrThreadNotFound
+		return nil, threadpkg.ErrThreadNotFound
 	}
 	return events, nil
 }
@@ -69,7 +70,7 @@ func TestManager_RetryUpdate(t *testing.T) {
 	t.Run("Success after retries", func(t *testing.T) {
 		// No conflicts for setup
 		store := NewConcurrentMockEventStore(0)
-		repo := domain.NewThreadRepository(store)
+		repo := threadpkg.NewThreadRepository(store)
 		mgr := New(log, repo)
 
 		threadID := "test-thread-success"
@@ -97,7 +98,7 @@ func TestManager_RetryUpdate(t *testing.T) {
 	t.Run("Failure after max retries", func(t *testing.T) {
 		// No conflicts for setup
 		store := NewConcurrentMockEventStore(0)
-		repo := domain.NewThreadRepository(store)
+		repo := threadpkg.NewThreadRepository(store)
 		mgr := New(log, repo)
 
 		threadID := "test-thread-fail"
@@ -116,7 +117,7 @@ func TestManager_RetryUpdate(t *testing.T) {
 			t.Fatal("Expected failure after max retries, got success")
 		}
 
-		if !errors.Is(err, domain.ErrConcurrencyConflict) {
+		if !errors.Is(err, threadpkg.ErrConcurrencyConflict) {
 			t.Errorf("Expected concurrency conflict error, got: %v", err)
 		}
 	})
@@ -126,7 +127,7 @@ func TestManager_AutoTitling(t *testing.T) {
 	ctx := context.Background()
 	log := logger.New(io.Discard, logger.LevelInfo, "test", nil)
 	store := NewConcurrentMockEventStore(0)
-	repo := domain.NewThreadRepository(store)
+	repo := threadpkg.NewThreadRepository(store)
 	mgr := New(log, repo)
 
 	t.Run("Auto-titles on first user message", func(t *testing.T) {
@@ -153,11 +154,11 @@ func TestManager_AutoTitling(t *testing.T) {
 		}
 
 		// 4. Verify events
-		streamName := domain.StreamName("Thread", threadID)
+		streamName := threadpkg.StreamName("Thread", threadID)
 		events, _ := store.ReadStream(ctx, streamName, 0)
 		hasTitleUpdated := false
 		for _, e := range events {
-			if _, ok := e.(*domain.ThreadTitleUpdated); ok {
+			if _, ok := e.(*threadpkg.ThreadTitleUpdated); ok {
 				hasTitleUpdated = true
 				break
 			}

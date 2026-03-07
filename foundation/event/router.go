@@ -4,12 +4,13 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"school-with-ai/domain"
 	"sync"
+
+	es "school-with-ai/foundation/eventsourcing"
 )
 
 // HandlerFunc is a function that handles a specific event type.
-type HandlerFunc func(ctx context.Context, event domain.Event) error
+type HandlerFunc func(ctx context.Context, event es.Event) error
 
 // Router dispatches events to registered handlers based on their type.
 type Router struct {
@@ -46,7 +47,7 @@ func (r *Router) RegisterAny(handler HandlerFunc) {
 // Dispatch sends the event to all registered handlers for its type.
 // Handlers are isolated: a failure in one handler does not prevent others from running.
 // The first error encountered is returned, but all handlers are always invoked.
-func (r *Router) Dispatch(ctx context.Context, event domain.Event) error {
+func (r *Router) Dispatch(ctx context.Context, event es.Event) error {
 	r.mu.RLock()
 	t := reflect.TypeOf(event)
 	// Copy slice headers to prevent data races if Register is called concurrently.

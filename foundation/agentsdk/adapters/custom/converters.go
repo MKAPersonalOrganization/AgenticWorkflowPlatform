@@ -1,16 +1,16 @@
 package custom
 
 import (
-	"school-with-ai/domain"
+	"school-with-ai/modules/chat/thread"
 	"school-with-ai/foundation/agentsdk/core"
 )
 
-// ToDomainEvent translates a core.Event to a domain.Event according to EVENT_CONTRACTS.md.
+// ToDomainEvent translates a core.Event to a thread.Event according to EVENT_CONTRACTS.md.
 // This function implements ADR 001 by:
 // 1. Only translating events that are permitted in the agent framework events section
 // 2. Discarding framework lifecycle events (RunStarted, RunFinished, RunError, etc.)
 // 3. Ensuring strict architectural boundary between framework and domain layer
-func ToDomainEvent(e core.Event) domain.Event {
+func ToDomainEvent(e core.Event) thread.Event {
 	if e == nil {
 		return nil
 	}
@@ -20,7 +20,7 @@ func ToDomainEvent(e core.Event) domain.Event {
 
 	// ✅ PERMITTED PERSISTED EVENTS (Agent Framework Events)
 	case *core.AssistantMessageAdded:
-		return &domain.AssistantMessageAdded{
+		return &thread.AssistantMessageAdded{
 			ThreadID:  evt.ThreadID,
 			MessageID: evt.MessageID,
 			Content:   evt.Content,
@@ -30,7 +30,7 @@ func ToDomainEvent(e core.Event) domain.Event {
 		}
 
 	case *core.ToolResultAdded:
-		return &domain.ToolResultAdded{
+		return &thread.ToolResultAdded{
 			ThreadID:   evt.ThreadID,
 			MessageID:  evt.MessageID,
 			ToolCallID: evt.ToolCallID,
@@ -42,7 +42,7 @@ func ToDomainEvent(e core.Event) domain.Event {
 		}
 
 	case *core.TokenUsageReported:
-		return &domain.TokenUsageReported{
+		return &thread.TokenUsageReported{
 			ThreadID:                 evt.ThreadID,
 			MessageID:                evt.MessageID,
 			Provider:                 evt.Provider,
@@ -60,7 +60,7 @@ func ToDomainEvent(e core.Event) domain.Event {
 		}
 
 	case *core.ToolNeedsInput:
-		return &domain.ToolNeedsInput{
+		return &thread.ToolNeedsInput{
 			ThreadID:    evt.ThreadID,
 			MessageID:   evt.MessageID,
 			ToolCallID:  evt.ToolCallID,
@@ -71,7 +71,7 @@ func ToDomainEvent(e core.Event) domain.Event {
 		}
 
 	case *core.ToolNeedsAuth:
-		return &domain.ToolNeedsAuth{
+		return &thread.ToolNeedsAuth{
 			ThreadID:   evt.ThreadID,
 			MessageID:  evt.MessageID,
 			ToolCallID: evt.ToolCallID,
@@ -82,7 +82,7 @@ func ToDomainEvent(e core.Event) domain.Event {
 		}
 
 	case *core.InputProvided:
-		return &domain.InputProvided{
+		return &thread.InputProvided{
 			ThreadID:   evt.ThreadID,
 			MessageID:  evt.MessageID,
 			ToolCallID: evt.ToolCallID,
@@ -92,7 +92,7 @@ func ToDomainEvent(e core.Event) domain.Event {
 		}
 
 	case *core.AuthGranted:
-		return &domain.AuthGranted{
+		return &thread.AuthGranted{
 			ThreadID:   evt.ThreadID,
 			MessageID:  evt.MessageID,
 			ToolCallID: evt.ToolCallID,
@@ -101,7 +101,7 @@ func ToDomainEvent(e core.Event) domain.Event {
 		}
 
 	case *core.AuthDenied:
-		return &domain.AuthDenied{
+		return &thread.AuthDenied{
 			ThreadID:   evt.ThreadID,
 			MessageID:  evt.MessageID,
 			ToolCallID: evt.ToolCallID,
@@ -110,7 +110,7 @@ func ToDomainEvent(e core.Event) domain.Event {
 		}
 
 	case *core.ToolCancelled:
-		return &domain.ToolCancelled{
+		return &thread.ToolCancelled{
 			ThreadID:   evt.ThreadID,
 			MessageID:  evt.MessageID,
 			ToolCallID: evt.ToolCallID,
@@ -121,14 +121,14 @@ func ToDomainEvent(e core.Event) domain.Event {
 
 	// ✅ PERMITTED TRANSIENT EVENTS (Agent Framework Events)
 	case *core.AssistantMessageStarted:
-		return &domain.AssistantMessageStarted{
+		return &thread.AssistantMessageStarted{
 			ThreadID:  evt.ThreadID,
 			MessageID: evt.MessageID,
 			Timestamp: evt.Timestamp,
 		}
 
 	case *core.AssistantContentStreamed:
-		return &domain.AssistantContentStreamed{
+		return &thread.AssistantContentStreamed{
 			ThreadID:  evt.ThreadID,
 			MessageID: evt.MessageID,
 			Delta:     evt.Delta,
@@ -136,7 +136,7 @@ func ToDomainEvent(e core.Event) domain.Event {
 		}
 
 	case *core.AssistantMessageCompleted:
-		return &domain.AssistantMessageCompleted{
+		return &thread.AssistantMessageCompleted{
 			ThreadID:  evt.ThreadID,
 			MessageID: evt.MessageID,
 			Content:   evt.Content,
@@ -146,7 +146,7 @@ func ToDomainEvent(e core.Event) domain.Event {
 		}
 
 	case *core.ToolStart:
-		return &domain.ToolStart{
+		return &thread.ToolStart{
 			ThreadID:      evt.ThreadID,
 			MessageID:     evt.MessageID,
 			ToolCallID:    evt.ToolCallID,
@@ -180,7 +180,7 @@ func ToDomainEvent(e core.Event) domain.Event {
 	// If the SDK emits these, we discard them to maintain proper boundaries
 	default:
 		// If it's already a domain event but came from SDK, we need to be careful
-		if de, ok := e.(domain.Event); ok {
+		if de, ok := e.(thread.Event); ok {
 			eventType := de.EventType()
 			switch eventType {
 			case "ThreadCreated", "ThreadDeleted", "ThreadTitleUpdated", "UserMessageAdded":
@@ -198,14 +198,14 @@ func ToDomainEvent(e core.Event) domain.Event {
 	}
 }
 
-// MapCoreToolCallsToDomain maps core.ToolCall to domain.ToolCall
-func MapCoreToolCallsToDomain(calls []core.ToolCall) []domain.ToolCall {
+// MapCoreToolCallsToDomain maps core.ToolCall to thread.ToolCall
+func MapCoreToolCallsToDomain(calls []core.ToolCall) []thread.ToolCall {
 	if calls == nil {
 		return nil
 	}
-	res := make([]domain.ToolCall, len(calls))
+	res := make([]thread.ToolCall, len(calls))
 	for i, c := range calls {
-		res[i] = domain.ToolCall{
+		res[i] = thread.ToolCall{
 			ID:        c.ID,
 			Type:      c.Type,
 			Name:      c.Name,
@@ -215,23 +215,23 @@ func MapCoreToolCallsToDomain(calls []core.ToolCall) []domain.ToolCall {
 	return res
 }
 
-// convertElicitationSpec converts core.ElicitationSpec to domain.ElicitationSpec
-func convertElicitationSpec(spec *core.ElicitationSpec) *domain.ElicitationSpec {
+// convertElicitationSpec converts core.ElicitationSpec to thread.ElicitationSpec
+func convertElicitationSpec(spec *core.ElicitationSpec) *thread.ElicitationSpec {
 	if spec == nil {
 		return nil
 	}
-	return &domain.ElicitationSpec{
+	return &thread.ElicitationSpec{
 		Question: spec.Question,
 		Schema:   spec.Schema,
 	}
 }
 
-// convertAuthorizationSpec converts core.AuthorizationSpec to domain.AuthorizationSpec
-func convertAuthorizationSpec(spec *core.AuthorizationSpec) *domain.AuthorizationSpec {
+// convertAuthorizationSpec converts core.AuthorizationSpec to thread.AuthorizationSpec
+func convertAuthorizationSpec(spec *core.AuthorizationSpec) *thread.AuthorizationSpec {
 	if spec == nil {
 		return nil
 	}
-	return &domain.AuthorizationSpec{
+	return &thread.AuthorizationSpec{
 		Resource: spec.Resource,
 		Action:   spec.Action,
 		Reason:   spec.Reason,

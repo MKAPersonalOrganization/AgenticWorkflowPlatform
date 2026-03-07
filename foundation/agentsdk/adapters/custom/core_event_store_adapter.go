@@ -2,24 +2,24 @@ package custom
 
 import (
 	"context"
-	"school-with-ai/domain"
+	"school-with-ai/modules/chat/thread"
 	"school-with-ai/foundation/agentsdk/core"
 )
 
-// CoreEventStoreAdapter adapts domain.EventStore to core.EventStore.
+// CoreEventStoreAdapter adapts thread.EventStore to core.EventStore.
 // This allows the SDK to use the domain-level event store without knowing about it.
 type CoreEventStoreAdapter struct {
-	store domain.EventStore
+	store thread.EventStore
 }
 
-func NewCoreEventStoreAdapter(store domain.EventStore) *CoreEventStoreAdapter {
+func NewCoreEventStoreAdapter(store thread.EventStore) *CoreEventStoreAdapter {
 	return &CoreEventStoreAdapter{store: store}
 }
 
 func (a *CoreEventStoreAdapter) AppendWithVersion(ctx context.Context, streamID string, expectedVersion int64, events ...core.Event) (int64, error) {
-	domainEvents := make([]domain.Event, len(events))
+	domainEvents := make([]thread.Event, len(events))
 	for i, evt := range events {
-		domainEvents[i] = evt.(domain.Event)
+		domainEvents[i] = evt.(thread.Event)
 	}
 	return a.store.AppendWithVersion(ctx, streamID, expectedVersion, domainEvents...)
 }

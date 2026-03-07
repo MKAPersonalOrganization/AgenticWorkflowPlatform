@@ -21,7 +21,6 @@
 package chat
 
 import (
-	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/auth"
 	"school-with-ai/foundation/event"
@@ -34,8 +33,10 @@ import (
 	"school-with-ai/modules/chat/projection/llmcontext"
 	"school-with-ai/modules/chat/projections"
 	"school-with-ai/modules/chat/taskmanagement"
+	"school-with-ai/modules/chat/thread"
 	"school-with-ai/modules/chat/threadmgmt"
 	"school-with-ai/modules/permissions/tool"
+	"school-with-ai/modules/userprofile/identity"
 	"school-with-ai/platform/artifact"
 	"school-with-ai/platform/toolregistry"
 	"school-with-ai/shared"
@@ -54,9 +55,9 @@ import (
 type Dependencies struct {
 	Log                *logger.Logger
 	DB                 *sqlx.DB
-	EventStore         domain.EventStore
+	EventStore         thread.EventStore
 	ArtifactService    artifact.Service
-	StudentProfileRepo domain.StudentProfileRepository
+	StudentProfileRepo identity.StudentProfileRepository
 	Emitter            agentorchestrator.EventEmitter // transient event router
 	AgentProvider      agent.AgentProvider
 	AuthService        shared.AuthService
@@ -108,7 +109,7 @@ func New(deps Dependencies) *Module {
 	llmProjection := llmcontext.NewPostgresLLMContextProjection(log, deps.DB)
 
 	// Thread management (event sourcing)
-	threadRepo := domain.NewThreadRepository(threadmgmt.NewEventStoreAdapter(deps.EventStore))
+	threadRepo := thread.NewThreadRepository(threadmgmt.NewEventStoreAdapter(deps.EventStore))
 	threadMgmtSvc := threadmgmt.New(log, threadRepo)
 
 	// Memory service (artifact-backed)

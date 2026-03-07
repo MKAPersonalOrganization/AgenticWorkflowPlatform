@@ -1,4 +1,4 @@
-package domain
+package thread
 
 import (
 	"testing"
@@ -236,40 +236,32 @@ func TestThreadTitleChangeIdempotent(t *testing.T) {
 }
 
 // TestAggregateVersionTracking verifies version tracking follows EventSourcing.NetCore pattern.
-// Version should only track PERSISTED events, not uncommitted ones.
 func TestAggregateVersionTracking(t *testing.T) {
 	t.Parallel()
 
 	thread, _ := OpenThread("thread-1", "user-1", "Test")
 
-	// Version should be 0 - Enqueue doesn't increment version, only LoadFromHistory does
 	if thread.Version != 0 {
 		t.Errorf("expected version 0 after creation (uncommitted), got %d", thread.Version)
 	}
 
-	// Should have 1 uncommitted event
 	uncommitted := thread.DequeueUncommittedEvents()
 	if len(uncommitted) != 1 {
 		t.Errorf("expected 1 uncommitted event, got %d", len(uncommitted))
 	}
 
-	// Simulate persisting and reloading (what repository does)
 	thread.LoadFromHistory(uncommitted, thread.Apply)
 
-	// NOW version should be 1 (1 persisted event)
 	if thread.Version != 1 {
 		t.Errorf("expected version 1 after loading history, got %d", thread.Version)
 	}
 
-	// Add another message
 	thread.AddMessage("msg-1", "user", "Test", nil, "", "", "")
 
-	// Version still 1 (new event not persisted yet)
 	if thread.Version != 1 {
 		t.Errorf("expected version 1 after adding uncommitted message, got %d", thread.Version)
 	}
 
-	// Simulate persist and reload
 	uncommitted2 := thread.DequeueUncommittedEvents()
 	if len(uncommitted2) != 1 {
 		t.Errorf("expected 1 uncommitted event, got %d", len(uncommitted2))
@@ -277,7 +269,6 @@ func TestAggregateVersionTracking(t *testing.T) {
 
 	thread.LoadFromHistory(uncommitted2, thread.Apply)
 
-	// NOW version should be 2
 	if thread.Version != 2 {
 		t.Errorf("expected version 2 after loading second event, got %d", thread.Version)
 	}

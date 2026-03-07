@@ -4,14 +4,14 @@ import (
 	"context"
 	"fmt"
 	"iter"
-	"school-with-ai/domain"
+	"school-with-ai/modules/chat/thread"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/modules/chat/agentorchestrator"
 )
 
 // Orchestrator is the interface for orchestrating agent runs with lifecycle events.
 type Orchestrator interface {
-	ExecuteRun(ctx context.Context, req agentorchestrator.RunExecutionRequest) iter.Seq2[domain.Event, error]
+	ExecuteRun(ctx context.Context, req agentorchestrator.RunExecutionRequest) iter.Seq2[thread.Event, error]
 }
 
 // Service provides transport-agnostic message taskmanagement.

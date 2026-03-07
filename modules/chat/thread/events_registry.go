@@ -1,4 +1,4 @@
-package domain
+package thread
 
 import (
 	es "school-with-ai/foundation/eventsourcing"

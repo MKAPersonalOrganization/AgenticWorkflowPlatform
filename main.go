@@ -19,7 +19,6 @@ import (
 	"school-with-ai/components/docs"
 	"school-with-ai/components/landing"
 	"school-with-ai/components/pricing"
-	"school-with-ai/domain"
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/adapters/custom"
 	"school-with-ai/foundation/auth"
@@ -33,6 +32,7 @@ import (
 	"school-with-ai/infra/projection/subscriber"
 	"school-with-ai/infra/sqldb"
 	"school-with-ai/infra/sqldb/migrate"
+	"school-with-ai/modules/chat/thread"
 	"school-with-ai/modules/knowledge/edgequake"
 	permtool "school-with-ai/modules/permissions/tool"
 	"school-with-ai/platform/artifact"
@@ -255,7 +255,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Each module registers its events so the event store and projection
 	// subscriber can deserialize them from JSON without a central switch.
 	eventRegistry := es.NewDeserializerRegistry()
-	domain.RegisterThreadEvents(eventRegistry)
+	thread.RegisterThreadEvents(eventRegistry)
 	billingmod.RegisterEvents(eventRegistry)
 
 	// Initialize PostgreSQL Event Store

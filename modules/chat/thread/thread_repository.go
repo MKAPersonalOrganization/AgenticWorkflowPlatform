@@ -1,4 +1,4 @@
-package domain
+package thread
 
 import (
 	"context"
@@ -26,16 +26,16 @@ func NewThreadRepository(eventStore EventStore) *ThreadRepository {
 // Delete marks a thread as deleted by appending a ThreadDeleted event.
 // This is a thread-specific operation that uses the generic repository's Load and Save.
 func (r *ThreadRepository) Delete(ctx context.Context, threadID string) error {
-	thread, err := r.Load(ctx, threadID)
+	t, err := r.Load(ctx, threadID)
 	if err != nil {
 		return err
 	}
 
 	// Call the aggregate's Delete method
-	err = thread.Delete()
+	err = t.Delete()
 	if err != nil {
 		return err
 	}
 
-	return r.Save(ctx, thread)
+	return r.Save(ctx, t)
 }
