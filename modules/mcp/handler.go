@@ -169,18 +169,14 @@ func (h *handler) getConnector(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id := chi.URLParam(r, "id")
-	connector, err := h.service.GetConnector(r.Context(), id)
+	connector, err := h.service.GetConnector(r.Context(), id, user.ID)
 	if err != nil {
-		h.log.Error(r.Context(), "failed to get connector", "error", err)
-		http.Error(w, i18n.T(r.Context(), "Failed to get connector"), http.StatusInternalServerError)
-		return
-	}
-	if connector == nil || connector.UserID != user.ID {
-		http.Error(w, i18n.T(r.Context(), "Connector not found"), http.StatusNotFound)
+		msg, code := mapServiceError(err)
+		writeJSONError(w, msg, code)
 		return
 	}
 
-	tools, _ := h.service.GetConnectorTools(r.Context(), id)
+	tools, _ := h.service.GetConnectorTools(r.Context(), id, user.ID)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(toConnectorResponse(*connector, len(tools)))
 }
@@ -214,13 +210,6 @@ func (h *handler) connect(w http.ResponseWriter, r *http.Request) {
 
 	id := chi.URLParam(r, "id")
 
-	// Verify ownership.
-	connector, err := h.service.GetConnector(r.Context(), id)
-	if err != nil || connector == nil || connector.UserID != user.ID {
-		http.Error(w, i18n.T(r.Context(), "Connector not found"), http.StatusNotFound)
-		return
-	}
-
 	// Read optional access_token from request body (agentstack pattern).
 	var body struct {
 		AccessToken string `json:"access_token"`
@@ -229,12 +218,12 @@ func (h *handler) connect(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&body)
 	}
 
-	updated, authURL, err := h.service.ConnectConnector(r.Context(), id, body.AccessToken)
+	updated, authURL, err := h.service.ConnectConnector(r.Context(), id, user.ID, body.AccessToken)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to connect", "error", err, "connector_id", id)
 		// Return the connector status even on error so the UI can show the state.
 		if updated != nil {
-			tools, _ := h.service.GetConnectorTools(r.Context(), id)
+			tools, _ := h.service.GetConnectorTools(r.Context(), id, user.ID)
 			setOAuthStateCookie(w, r, authURL)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnprocessableEntity)
@@ -249,7 +238,7 @@ func (h *handler) connect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tools, _ := h.service.GetConnectorTools(r.Context(), id)
+	tools, _ := h.service.GetConnectorTools(r.Context(), id, user.ID)
 	setOAuthStateCookie(w, r, authURL)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(connectResponse{
@@ -268,13 +257,7 @@ func (h *handler) disconnect(w http.ResponseWriter, r *http.Request) {
 
 	id := chi.URLParam(r, "id")
 
-	connector, err := h.service.GetConnector(r.Context(), id)
-	if err != nil || connector == nil || connector.UserID != user.ID {
-		http.Error(w, i18n.T(r.Context(), "Connector not found"), http.StatusNotFound)
-		return
-	}
-
-	updated, err := h.service.DisconnectConnector(r.Context(), id)
+	updated, err := h.service.DisconnectConnector(r.Context(), id, user.ID)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to disconnect", "error", err)
 		msg, code := mapServiceError(err)
@@ -282,7 +265,7 @@ func (h *handler) disconnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tools, _ := h.service.GetConnectorTools(r.Context(), id)
+	tools, _ := h.service.GetConnectorTools(r.Context(), id, user.ID)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(toConnectorResponse(*updated, len(tools)))
 }
@@ -297,13 +280,7 @@ func (h *handler) listTools(w http.ResponseWriter, r *http.Request) {
 
 	id := chi.URLParam(r, "id")
 
-	connector, err := h.service.GetConnector(r.Context(), id)
-	if err != nil || connector == nil || connector.UserID != user.ID {
-		http.Error(w, i18n.T(r.Context(), "Connector not found"), http.StatusNotFound)
-		return
-	}
-
-	tools, err := h.service.GetConnectorTools(r.Context(), id)
+	tools, err := h.service.GetConnectorTools(r.Context(), id, user.ID)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to list tools", "error", err)
 		http.Error(w, i18n.T(r.Context(), "Failed to list tools"), http.StatusInternalServerError)
@@ -340,13 +317,7 @@ func (h *handler) refreshTools(w http.ResponseWriter, r *http.Request) {
 
 	id := chi.URLParam(r, "id")
 
-	connector, err := h.service.GetConnector(r.Context(), id)
-	if err != nil || connector == nil || connector.UserID != user.ID {
-		http.Error(w, i18n.T(r.Context(), "Connector not found"), http.StatusNotFound)
-		return
-	}
-
-	tools, err := h.service.RefreshTools(r.Context(), id)
+	tools, err := h.service.RefreshTools(r.Context(), id, user.ID)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to refresh tools", "error", err)
 		msg, code := mapServiceError(err)
@@ -403,14 +374,7 @@ func (h *handler) mcpProxy(w http.ResponseWriter, r *http.Request) {
 
 	id := chi.URLParam(r, "id")
 
-	// Verify ownership.
-	connector, err := h.service.GetConnector(r.Context(), id)
-	if err != nil || connector == nil || connector.UserID != user.ID {
-		http.Error(w, i18n.T(r.Context(), "Connector not found"), http.StatusNotFound)
-		return
-	}
-
-	if err := h.service.MCPProxy(r.Context(), id, w, r); err != nil {
+	if err := h.service.MCPProxy(r.Context(), id, user.ID, w, r); err != nil {
 		h.log.Error(r.Context(), "mcp proxy error", "error", err, "connector_id", id)
 		// Don't write error if headers already sent (streaming started).
 		if !headersSent(w) {
@@ -432,7 +396,7 @@ func (h *handler) oauthCallback(w http.ResponseWriter, r *http.Request) {
 			"error", oauthErr, "description", desc)
 		w.Header().Set("Content-Type", "text/html")
 		w.Write([]byte(`<!DOCTYPE html><html><body><script>
-window.opener && window.opener.postMessage({type:'mcp-oauth-callback',success:false,error:` + jsonEscape(desc) + `},'*');
+window.opener && window.opener.postMessage({type:'mcp-oauth-callback',success:false,error:` + jsonEscape(desc) + `},window.location.origin);
 window.close();
 </script><p>Authentication failed: ` + desc + `. You can close this window.</p></body></html>`))
 		return
@@ -452,7 +416,7 @@ window.close();
 		// Return an HTML page that communicates the error to the opener.
 		w.Header().Set("Content-Type", "text/html")
 		w.Write([]byte(`<!DOCTYPE html><html><body><script>
-window.opener && window.opener.postMessage({type:'mcp-oauth-callback',success:false,error:` + jsonEscape(err.Error()) + `},'*');
+window.opener && window.opener.postMessage({type:'mcp-oauth-callback',success:false,error:` + jsonEscape(err.Error()) + `},window.location.origin);
 window.close();
 </script><p>Authentication failed. You can close this window.</p></body></html>`))
 		return
@@ -468,7 +432,7 @@ window.close();
 
 	w.Header().Set("Content-Type", "text/html")
 	w.Write([]byte(`<!DOCTYPE html><html><body><script>
-window.opener && window.opener.postMessage(` + string(connectorJSON) + `,'*');
+window.opener && window.opener.postMessage(` + string(connectorJSON) + `,window.location.origin);
 window.close();
 </script><p>Authentication successful! You can close this window.</p></body></html>`))
 }
@@ -545,6 +509,8 @@ func mapServiceError(err error) (string, int) {
 		return "Remote server is temporarily unavailable", http.StatusServiceUnavailable
 	case errors.Is(err, ErrConcurrencyLimit):
 		return "Too many concurrent requests — try again later", http.StatusTooManyRequests
+	case errors.Is(err, ErrUserConcurrencyLimit):
+		return "Too many concurrent requests for your account — try again later", http.StatusTooManyRequests
 	default:
 		return "Internal server error", http.StatusInternalServerError
 	}

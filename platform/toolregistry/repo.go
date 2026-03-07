@@ -176,6 +176,61 @@ func (r *PostgresToolRegistryRepository) DeleteTool(ctx context.Context, id stri
 	return nil
 }
 
+// SaveTools batch-upserts multiple tools in a single statement. This avoids
+// N round-trips to the database when registering an MCP connector with many
+// tools. Uses a multi-value INSERT ... ON CONFLICT DO UPDATE.
+func (r *PostgresToolRegistryRepository) SaveTools(ctx context.Context, tools []*Tool) error {
+	if len(tools) == 0 {
+		return nil
+	}
+
+	// Build a multi-value INSERT. Each tool contributes 8 placeholders.
+	var b strings.Builder
+	b.WriteString(`
+		INSERT INTO tools (id, name, description, category, tool_set_id, metadata, created_at, updated_at)
+		VALUES `)
+
+	args := make([]interface{}, 0, len(tools)*8)
+	for i, tool := range tools {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		base := i * 8
+		fmt.Fprintf(&b, "($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)",
+			base+1, base+2, base+3, base+4, base+5, base+6, base+7, base+8)
+
+		var toolSetID sql.NullString
+		if tool.ToolSetID != "" {
+			toolSetID = sql.NullString{String: tool.ToolSetID, Valid: true}
+		}
+
+		metadataJSON, err := json.Marshal(tool.Metadata)
+		if err != nil {
+			return fmt.Errorf("marshalling metadata for tool %s: %w", tool.ID, err)
+		}
+		if len(tool.Metadata) == 0 {
+			metadataJSON = []byte("{}")
+		}
+
+		args = append(args, tool.ID, tool.Name, tool.Description, tool.Category,
+			toolSetID, metadataJSON, tool.CreatedAt, tool.UpdatedAt)
+	}
+
+	b.WriteString(` ON CONFLICT (id) DO UPDATE SET
+		name = EXCLUDED.name,
+		description = EXCLUDED.description,
+		category = EXCLUDED.category,
+		tool_set_id = EXCLUDED.tool_set_id,
+		metadata = EXCLUDED.metadata,
+		updated_at = EXCLUDED.updated_at`)
+
+	if _, err := r.db.ExecContext(ctx, b.String(), args...); err != nil {
+		return fmt.Errorf("batch saving tools: %w", err)
+	}
+
+	return nil
+}
+
 // =============================================================================
 // Tool Set Methods
 // =============================================================================

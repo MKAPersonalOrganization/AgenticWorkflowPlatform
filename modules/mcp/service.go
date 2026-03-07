@@ -40,6 +40,16 @@ const (
 	// tool calls concurrently. Analogous to agentstack's DB pool_size bounding.
 	maxConcurrentSessions = 100
 
+	// maxSessionsPerUser caps how many concurrent MCP sessions a single user
+	// can hold. At 100K users × 10 connectors, this prevents one user from
+	// monopolizing the global semaphore (e.g. 10 parallel tool calls).
+	maxSessionsPerUser = 10
+
+	// connectorCacheTTL is how long a connector lookup is cached in memory.
+	// Short enough to pick up status changes quickly, long enough to avoid
+	// hammering PostgreSQL on hot paths (CallTool, MCPProxy).
+	connectorCacheTTL = 30 * time.Second
+
 	// circuitFailureThreshold is how many consecutive failures trip the breaker.
 	circuitFailureThreshold = 5
 
@@ -59,33 +69,107 @@ const (
 // Scaling infrastructure (mirrors agentstack patterns):
 //   - circuitRegistry: per-server-URL circuit breakers prevent thundering herd
 //   - sessions semaphore: bounds concurrent outbound MCP sessions per pod
+//   - httpClients cache: avoids rebuilding OAuth transports on every request
 //   - presets: pre-configured connector templates for common MCP servers
 type Service struct {
-	log          *logger.Logger
-	repo         MCPConnectorRepository
-	oauth        *OAuthService
-	toolRegistry *toolregistry.Registry
-	circuits     *circuitRegistry
-	sessions     *semaphore
-	presets      []ConnectorPreset
+	log            *logger.Logger
+	repo           MCPConnectorRepository
+	oauth          *OAuthService
+	toolRegistry   *toolregistry.Registry
+	circuits       *circuitRegistry
+	sessions       *semaphore
+	userSessions   *userSemaphore           // per-user concurrency limiter
+	httpClients    *ttlCache[*http.Client]  // per-connector cached HTTP clients
+	connectorCache *ttlCache[*MCPConnector] // read-through cache for hot-path lookups
+	presets        []ConnectorPreset
+	stopCleanup    chan struct{} // signals background cleanup goroutine to stop
 }
 
 // NewService creates a new MCP discovery service.
 func NewService(log *logger.Logger, repo MCPConnectorRepository, callbackURL string, toolRegistry *toolregistry.Registry) *Service {
-	return &Service{
-		log:          log,
-		repo:         repo,
-		oauth:        NewOAuthService(callbackURL),
-		toolRegistry: toolRegistry,
-		circuits:     newCircuitRegistry(circuitFailureThreshold, circuitRecoveryTimeout),
-		sessions:     newSemaphore(maxConcurrentSessions),
-		presets:      builtinPresets,
+	s := &Service{
+		log:            log,
+		repo:           repo,
+		oauth:          NewOAuthService(callbackURL),
+		toolRegistry:   toolRegistry,
+		circuits:       newCircuitRegistry(circuitFailureThreshold, circuitRecoveryTimeout),
+		sessions:       newSemaphore(maxConcurrentSessions),
+		userSessions:   newUserSemaphore(maxSessionsPerUser),
+		httpClients:    newTTLCache[*http.Client](5 * time.Minute),
+		connectorCache: newTTLCache[*MCPConnector](connectorCacheTTL),
+		presets:        builtinPresets,
+		stopCleanup:    make(chan struct{}),
+	}
+	go s.backgroundCleanup()
+	return s
+}
+
+// Shutdown stops background goroutines. Call on graceful shutdown.
+func (s *Service) Shutdown() {
+	close(s.stopCleanup)
+}
+
+// backgroundCleanup periodically evicts stale circuit breakers and expired
+// cache entries to prevent unbounded memory growth.
+func (s *Service) backgroundCleanup() {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-s.stopCleanup:
+			return
+		case <-ticker.C:
+			s.circuits.Cleanup(10 * time.Minute)
+			s.httpClients.Cleanup()
+			s.connectorCache.Cleanup()
+		}
 	}
 }
 
 // ListPresets returns the available connector presets.
 func (s *Service) ListPresets() []ConnectorPreset {
 	return s.presets
+}
+
+// --------------------------------------------------------------------------
+// Tenant isolation
+// --------------------------------------------------------------------------
+
+// getOwnedConnector fetches a connector and verifies it belongs to the given
+// user. Ownership is enforced at the SQL level (WHERE id=$1 AND user_id=$2) —
+// the DB never returns another user's data. Returns ErrConnectorNotFound if
+// the connector doesn't exist or belongs to another user — callers cannot
+// distinguish the two cases, preventing enumeration.
+//
+// Results are cached with a short TTL (30s) to avoid hitting PostgreSQL on
+// every CallTool / MCPProxy request. Cache is invalidated on any write.
+func (s *Service) getOwnedConnector(ctx context.Context, connectorID, userID string) (*MCPConnector, error) {
+	cacheKey := connectorID + ":" + userID
+
+	// Try cache first — hot path for CallTool / MCPProxy.
+	if cached, ok := s.connectorCache.Get(cacheKey); ok {
+		return cached, nil
+	}
+
+	// SQL-level isolation: the DB only returns the row if it belongs to this user.
+	connector, err := s.repo.GetByIDAndUser(ctx, connectorID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("fetching connector: %w", err)
+	}
+	if connector == nil {
+		return nil, ErrConnectorNotFound
+	}
+
+	// Cache for subsequent reads on the same hot path.
+	s.connectorCache.Set(cacheKey, connector)
+	return connector, nil
+}
+
+// invalidateConnectorCache evicts a connector from the read-through cache.
+// Must be called after any write (update, delete, status change).
+func (s *Service) invalidateConnectorCache(connectorID, userID string) {
+	s.connectorCache.Delete(connectorID + ":" + userID)
 }
 
 // --------------------------------------------------------------------------
@@ -161,9 +245,9 @@ func (s *Service) CreateConnector(ctx context.Context, userID, serverURL, title,
 	return connector, nil
 }
 
-// GetConnector retrieves a connector by ID.
-func (s *Service) GetConnector(ctx context.Context, connectorID string) (*MCPConnector, error) {
-	return s.repo.GetByID(ctx, connectorID)
+// GetConnector retrieves a connector by ID, verifying it belongs to the user.
+func (s *Service) GetConnector(ctx context.Context, connectorID, userID string) (*MCPConnector, error) {
+	return s.getOwnedConnector(ctx, connectorID, userID)
 }
 
 // ListConnectors returns all connectors for a user.
@@ -173,7 +257,11 @@ func (s *Service) ListConnectors(ctx context.Context, userID string) ([]MCPConne
 }
 
 // GetConnectorTools returns the discovered tools for a connector.
-func (s *Service) GetConnectorTools(ctx context.Context, connectorID string) ([]MCPDiscoveredTool, error) {
+// Verifies the connector belongs to the given user.
+func (s *Service) GetConnectorTools(ctx context.Context, connectorID, userID string) ([]MCPDiscoveredTool, error) {
+	if _, err := s.getOwnedConnector(ctx, connectorID, userID); err != nil {
+		return nil, err
+	}
 	return s.repo.ListTools(ctx, connectorID)
 }
 
@@ -192,13 +280,10 @@ func (s *Service) CountToolsByConnectors(ctx context.Context, connectorIDs []str
 // An optional accessToken can be provided to skip OAuth — the token is injected
 // directly as a Bearer token (agentstack pattern). If the injected token fails
 // with a 401, the OAuth flow is initiated automatically.
-func (s *Service) ConnectConnector(ctx context.Context, connectorID, accessToken string) (*MCPConnector, string, error) {
-	connector, err := s.repo.GetByID(ctx, connectorID)
+func (s *Service) ConnectConnector(ctx context.Context, connectorID, userID, accessToken string) (*MCPConnector, string, error) {
+	connector, err := s.getOwnedConnector(ctx, connectorID, userID)
 	if err != nil {
-		return nil, "", fmt.Errorf("fetching connector: %w", err)
-	}
-	if connector == nil {
-		return nil, "", ErrConnectorNotFound
+		return nil, "", err
 	}
 	connector.Status = ConnectorStatusConnecting
 	connector.ErrorMsg = ""
@@ -212,6 +297,7 @@ func (s *Service) ConnectConnector(ctx context.Context, connectorID, accessToken
 		}
 		tokenJSON, _ := json.Marshal(tokenResp)
 		connector.OAuthTokenJSON = toNullString(string(tokenJSON))
+		s.invalidateHTTPClient(connector.ID) // token changed
 	}
 
 	if err := s.repo.Update(ctx, connector); err != nil {
@@ -230,6 +316,13 @@ func (s *Service) ConnectConnector(ctx context.Context, connectorID, accessToken
 		_ = s.repo.Update(ctx, connector)
 		return connector, "", ErrCircuitOpen
 	}
+
+	// Acquire per-user concurrency slot BEFORE the global semaphore.
+	// This prevents a single user from monopolizing the pod's session pool.
+	if err := s.userSessions.Acquire(ctx, userID); err != nil {
+		return nil, "", err
+	}
+	defer s.userSessions.Release(userID)
 
 	// Acquire concurrency slot to bound outbound sessions per pod.
 	if err := s.sessions.Acquire(ctx); err != nil {
@@ -267,6 +360,7 @@ func (s *Service) ConnectConnector(ctx context.Context, connectorID, accessToken
 	if err := s.repo.Update(ctx, connector); err != nil {
 		return nil, "", fmt.Errorf("updating connector after connect: %w", err)
 	}
+	s.invalidateConnectorCache(connector.ID, userID)
 
 	// Register in the plugin system so it appears in the sidebar.
 	s.registerConnectorInToolRegistry(ctx, connector)
@@ -277,13 +371,10 @@ func (s *Service) ConnectConnector(ctx context.Context, connectorID, accessToken
 
 // DisconnectConnector revokes tokens and updates status to disconnected.
 // Returns the updated connector (agentstack pattern — caller can use it for response).
-func (s *Service) DisconnectConnector(ctx context.Context, connectorID string) (*MCPConnector, error) {
-	connector, err := s.repo.GetByID(ctx, connectorID)
+func (s *Service) DisconnectConnector(ctx context.Context, connectorID, userID string) (*MCPConnector, error) {
+	connector, err := s.getOwnedConnector(ctx, connectorID, userID)
 	if err != nil {
-		return nil, fmt.Errorf("fetching connector: %w", err)
-	}
-	if connector == nil {
-		return nil, ErrConnectorNotFound
+		return nil, err
 	}
 
 	// Validate that the connector is in a state that can be disconnected.
@@ -303,6 +394,7 @@ func (s *Service) DisconnectConnector(ctx context.Context, connectorID string) (
 
 	// Revoke OAuth token if present.
 	s.revokeToken(ctx, connector)
+	s.invalidateHTTPClient(connectorID)
 
 	// Clear pending OAuth flow state so stale state can't be replayed
 	// (agentstack clears auth_flow on disconnect).
@@ -313,6 +405,7 @@ func (s *Service) DisconnectConnector(ctx context.Context, connectorID string) (
 	if err := s.repo.Update(ctx, connector); err != nil {
 		return nil, fmt.Errorf("updating connector status: %w", err)
 	}
+	s.invalidateConnectorCache(connectorID, userID)
 
 	s.log.Info(ctx, "mcp connector disconnected", "id", connectorID)
 	return connector, nil
@@ -320,22 +413,18 @@ func (s *Service) DisconnectConnector(ctx context.Context, connectorID string) (
 
 // DeleteConnector disconnects and removes a connector.
 func (s *Service) DeleteConnector(ctx context.Context, connectorID, userID string) error {
-	connector, err := s.repo.GetByID(ctx, connectorID)
+	connector, err := s.getOwnedConnector(ctx, connectorID, userID)
 	if err != nil {
-		return fmt.Errorf("fetching connector: %w", err)
-	}
-	if connector == nil {
-		return ErrConnectorNotFound
-	}
-	if connector.UserID != userID {
-		return ErrConnectorNotFound // don't leak existence to other users
+		return err
 	}
 
 	s.unregisterConnectorFromToolRegistry(ctx, connectorID)
 	s.revokeToken(ctx, connector)
 	s.circuits.Reset(connector.ServerURL)
+	s.invalidateHTTPClient(connectorID)
+	s.invalidateConnectorCache(connectorID, userID)
 
-	if err := s.repo.Delete(ctx, connectorID); err != nil {
+	if err := s.repo.Delete(ctx, connectorID, userID); err != nil {
 		return fmt.Errorf("deleting connector: %w", err)
 	}
 
@@ -345,13 +434,10 @@ func (s *Service) DeleteConnector(ctx context.Context, connectorID, userID strin
 
 // RefreshTools re-discovers tools from a connected MCP server via an
 // ephemeral session. The discovered tools are cached in the DB.
-func (s *Service) RefreshTools(ctx context.Context, connectorID string) ([]MCPDiscoveredTool, error) {
-	connector, err := s.repo.GetByID(ctx, connectorID)
+func (s *Service) RefreshTools(ctx context.Context, connectorID, userID string) ([]MCPDiscoveredTool, error) {
+	connector, err := s.getOwnedConnector(ctx, connectorID, userID)
 	if err != nil {
-		return nil, fmt.Errorf("fetching connector: %w", err)
-	}
-	if connector == nil {
-		return nil, ErrConnectorNotFound
+		return nil, err
 	}
 	if connector.Status != ConnectorStatusConnected {
 		return nil, ErrConnectorNotConnected
@@ -362,6 +448,12 @@ func (s *Service) RefreshTools(ctx context.Context, connectorID string) ([]MCPDi
 	if !cb.Allow() {
 		return nil, ErrCircuitOpen
 	}
+
+	// Per-user concurrency cap.
+	if err := s.userSessions.Acquire(ctx, userID); err != nil {
+		return nil, err
+	}
+	defer s.userSessions.Release(userID)
 
 	// Bound concurrent sessions.
 	if err := s.sessions.Acquire(ctx); err != nil {
@@ -445,6 +537,8 @@ func (s *Service) HandleOAuthCallback(ctx context.Context, stateParam, code stri
 	connector.OAuthTokenJSON = toNullString(string(tokenJSON))
 	connector.Status = ConnectorStatusConnecting
 	connector.ErrorMsg = ""
+	s.invalidateHTTPClient(connector.ID) // token changed
+	s.invalidateConnectorCache(connector.ID, connector.UserID)
 	if err := s.repo.Update(ctx, connector); err != nil {
 		return nil, fmt.Errorf("saving tokens: %w", err)
 	}
@@ -452,12 +546,14 @@ func (s *Service) HandleOAuthCallback(ctx context.Context, stateParam, code stri
 	s.log.Info(ctx, "oauth tokens acquired", "connector_id", connector.ID)
 
 	// Reconnect with tokens (no external access_token — we just obtained one via OAuth).
-	_, _, err = s.ConnectConnector(ctx, connector.ID, "")
+	// The connector's UserID is trusted here because we looked it up by the
+	// cryptographically random OAuth state — not by a user-supplied ID.
+	_, _, err = s.ConnectConnector(ctx, connector.ID, connector.UserID, "")
 	if err != nil {
 		return nil, fmt.Errorf("reconnecting after OAuth: %w", err)
 	}
 
-	return s.repo.GetByID(ctx, connector.ID)
+	return s.getOwnedConnector(ctx, connector.ID, connector.UserID)
 }
 
 // --------------------------------------------------------------------------
@@ -467,13 +563,10 @@ func (s *Service) HandleOAuthCallback(ctx context.Context, stateParam, code stri
 // CallTool executes a tool on a remote MCP server via an ephemeral session.
 // Each call opens a fresh session, executes, and closes — no persistent
 // connection is held (stateless proxy pattern for horizontal scaling).
-func (s *Service) CallTool(ctx context.Context, connectorID, toolName string, arguments map[string]any) (*mcp.CallToolResult, error) {
-	connector, err := s.repo.GetByID(ctx, connectorID)
+func (s *Service) CallTool(ctx context.Context, connectorID, userID, toolName string, arguments map[string]any) (*mcp.CallToolResult, error) {
+	connector, err := s.getOwnedConnector(ctx, connectorID, userID)
 	if err != nil {
-		return nil, fmt.Errorf("fetching connector: %w", err)
-	}
-	if connector == nil {
-		return nil, ErrConnectorNotFound
+		return nil, err
 	}
 	if connector.Status != ConnectorStatusConnected {
 		return nil, ErrConnectorNotConnected
@@ -484,6 +577,12 @@ func (s *Service) CallTool(ctx context.Context, connectorID, toolName string, ar
 	if !cb.Allow() {
 		return nil, ErrCircuitOpen
 	}
+
+	// Per-user concurrency cap — prevents one user from monopolizing sessions.
+	if err := s.userSessions.Acquire(ctx, userID); err != nil {
+		return nil, err
+	}
+	defer s.userSessions.Release(userID)
 
 	// Bound concurrent outbound sessions.
 	if err := s.sessions.Acquire(ctx); err != nil {
@@ -525,28 +624,41 @@ func (s *Service) ResolveEnabledTools(
 		return nil
 	}
 
-	var tools []agent.ExecutableTool
-	for _, conn := range connectors {
+	// Collect connected connector IDs for batch query, filtering by
+	// toolset enablement to skip unnecessary DB reads.
+	var connectedIDs []string
+	connectorMap := make(map[string]*MCPConnector, len(connectors))
+	for i, conn := range connectors {
 		if conn.Status != ConnectorStatusConnected {
 			continue
 		}
-
 		toolSetID := "mcp-" + conn.ID
 		if !isToolSetEnabled(toolSetID) {
 			continue
 		}
+		connectedIDs = append(connectedIDs, conn.ID)
+		connectorMap[conn.ID] = &connectors[i]
+	}
 
-		discoveredTools, err := s.GetConnectorTools(ctx, conn.ID)
-		if err != nil {
-			continue
-		}
+	if len(connectedIDs) == 0 {
+		return nil
+	}
 
-		for _, dt := range discoveredTools {
-			toolID := "mcp-" + conn.ID + "-" + dt.Name
+	// Single query fetches tools for ALL enabled connectors — avoids N+1.
+	allTools, err := s.repo.ListToolsByConnectors(ctx, connectedIDs)
+	if err != nil {
+		return nil
+	}
+
+	var tools []agent.ExecutableTool
+	for _, connID := range connectedIDs {
+		toolSetID := "mcp-" + connID
+		for _, dt := range allTools[connID] {
+			toolID := "mcp-" + connID + "-" + dt.Name
 			if !isToolEnabled(toolSetID, toolID) {
 				continue
 			}
-			tools = append(tools, NewMCPRemoteTool(s, conn.ID, dt.Name, dt.Description, dt.InputSchema))
+			tools = append(tools, NewMCPRemoteTool(s, connID, userID, dt.Name, dt.Description, dt.InputSchema))
 		}
 	}
 	return tools
@@ -655,6 +767,7 @@ func (s *Service) handleConnectionError(ctx context.Context, connector *MCPConne
 	}
 
 	_ = s.repo.Update(ctx, connector)
+	s.invalidateConnectorCache(connector.ID, connector.UserID)
 	return connector, "", fmt.Errorf("connecting to MCP server: %w", err)
 }
 
@@ -739,6 +852,7 @@ func (s *Service) initiateOAuth(ctx context.Context, connector *MCPConnector) (*
 	if err := s.repo.Update(ctx, connector); err != nil {
 		return nil, "", fmt.Errorf("updating connector for OAuth: %w", err)
 	}
+	s.invalidateConnectorCache(connector.ID, connector.UserID)
 
 	s.log.Info(ctx, "oauth authorization URL generated", "connector_id", connector.ID)
 	return connector, authURL, nil
@@ -835,16 +949,23 @@ func (s *Service) registerConnectorInToolRegistry(ctx context.Context, connector
 		return
 	}
 
+	// Batch-register all tools in a single DB round-trip instead of N
+	// individual writes. A connector with 50 tools now costs 2 DB writes
+	// (1 SaveToolSet + 1 batch SaveTools) instead of 51.
+	regTools := make([]*toolregistry.Tool, 0, len(discoveredTools))
 	for _, dt := range discoveredTools {
 		toolID := "mcp-" + connector.ID + "-" + dt.Name
-		if err := s.toolRegistry.RegisterTool(ctx, &toolregistry.Tool{
+		regTools = append(regTools, &toolregistry.Tool{
 			ID:          toolID,
 			Name:        dt.Name,
 			Description: dt.Description,
 			Category:    "MCP",
 			ToolSetID:   toolSetID,
-		}); err != nil {
-			s.log.Warn(ctx, "failed to register mcp tool", "tool_id", toolID, "error", err)
+		})
+	}
+	if len(regTools) > 0 {
+		if err := s.toolRegistry.RegisterTools(ctx, regTools); err != nil {
+			s.log.Warn(ctx, "failed to batch register mcp tools", "tool_set_id", toolSetID, "error", err)
 		}
 	}
 
@@ -900,7 +1021,28 @@ func (s *Service) discoverTools(ctx context.Context, connector *MCPConnector, se
 // When a refresh token and auth server metadata are present, the client uses an
 // auto-refreshing transport (like agentstack's auto_refresh_client) that
 // transparently refreshes expired tokens and persists the result.
+//
+// Clients are cached per-connector with a 5-minute TTL to avoid rebuilding
+// OAuth transports on every request while still picking up token changes.
 func (s *Service) buildHTTPClient(connector *MCPConnector) *http.Client {
+	// Try the cache first.
+	if client, ok := s.httpClients.Get(connector.ID); ok {
+		return client
+	}
+
+	client := s.buildHTTPClientUncached(connector)
+	s.httpClients.Set(connector.ID, client)
+	return client
+}
+
+// invalidateHTTPClient evicts the cached HTTP client for a connector so the
+// next buildHTTPClient call picks up new tokens / credentials.
+func (s *Service) invalidateHTTPClient(connectorID string) {
+	s.httpClients.Delete(connectorID)
+}
+
+// buildHTTPClientUncached is the inner builder that always creates a fresh client.
+func (s *Service) buildHTTPClientUncached(connector *MCPConnector) *http.Client {
 	if !connector.OAuthTokenJSON.Valid || connector.OAuthTokenJSON.String == "" {
 		return &http.Client{Timeout: 30 * time.Second}
 	}
@@ -962,30 +1104,85 @@ func (s *Service) buildHTTPClient(connector *MCPConnector) *http.Client {
 
 // --------------------------------------------------------------------------
 // Error classification
+//
+// The go-sdk does NOT expose structured HTTP error types. All HTTP failures
+// are formatted as:
+//
+//   Streamable checkResponse: fmt.Errorf("%s: %v", requestSummary, http.StatusText(code))
+//   SSE connect:              fmt.Errorf("failed to connect: %s", http.StatusText(code))
+//   Streamable transient:     fmt.Errorf("%w: %s: %v", ErrRejected, summary, http.StatusText(code))
+//
+// http.StatusText returns the canonical reason phrase ("Unauthorized",
+// "Bad Gateway", etc.) WITHOUT the numeric code. We therefore match against
+// these exact phrases, computed from http.StatusText at init-time, so the
+// classifier can never drift from the go-sdk's output.
 // --------------------------------------------------------------------------
 
+// httpStatusTexts are pre-computed http.StatusText values, grouped by class,
+// used by the error classifiers. Built at init-time from the numeric codes so
+// they cannot go stale.
+var (
+	// authStatusText is http.StatusText(401) = "Unauthorized".
+	authStatusText = http.StatusText(http.StatusUnauthorized)
+
+	// clientErrorStatusTexts are the 4xx status texts we treat as permanent
+	// client errors (excluding 401, which triggers OAuth).
+	clientErrorStatusTexts = func() []string {
+		codes := []int{
+			http.StatusBadRequest,
+			http.StatusForbidden,
+			http.StatusNotFound,
+			http.StatusMethodNotAllowed,
+			http.StatusNotAcceptable,
+			http.StatusConflict,
+			http.StatusGone,
+			http.StatusUnprocessableEntity,
+			http.StatusTooManyRequests,
+		}
+		texts := make([]string, len(codes))
+		for i, c := range codes {
+			texts[i] = http.StatusText(c)
+		}
+		return texts
+	}()
+
+	// transientStatusTexts are the 5xx status texts that warrant a retry.
+	transientStatusTexts = func() []string {
+		codes := []int{
+			http.StatusBadGateway,
+			http.StatusServiceUnavailable,
+			http.StatusGatewayTimeout,
+		}
+		texts := make([]string, len(codes))
+		for i, c := range codes {
+			texts[i] = http.StatusText(c)
+		}
+		return texts
+	}()
+)
+
 // isAuthError checks if an error is an HTTP 401 Unauthorized.
-// The go-sdk uses http.StatusText(code) in its error messages, producing:
-//   - Streamable: "sending \"initialize\": Unauthorized"
-//   - SSE:        "failed to connect: Unauthorized"
 //
-// We match the status text that http.StatusText(401) returns.
+// The go-sdk uses http.StatusText(401) in its error messages:
+//   - Streamable: `sending "initialize": Unauthorized`
+//   - SSE:        `failed to connect: Unauthorized`
+//
+// We match the exact text produced by http.StatusText(401).
 func isAuthError(err error) bool {
 	if err == nil {
 		return false
 	}
-	msg := err.Error()
-	return strings.Contains(msg, "Unauthorized")
+	return strings.Contains(err.Error(), authStatusText)
 }
 
-// isHTTPClientError checks for 4xx HTTP errors (excluding 401 which is handled separately).
+// isHTTPClientError checks for 4xx HTTP errors (excluding 401 which triggers OAuth).
 func isHTTPClientError(err error) bool {
 	if err == nil {
 		return false
 	}
 	msg := err.Error()
-	for _, code := range []string{"400", "403", "404", "405", "406", "409", "410", "422", "429"} {
-		if strings.Contains(msg, code) {
+	for _, text := range clientErrorStatusTexts {
+		if strings.Contains(msg, text) {
 			return true
 		}
 	}
@@ -1021,9 +1218,10 @@ func isTransientError(err error) bool {
 		}
 	}
 
-	// Match HTTP 5xx status codes precisely (go-sdk format: "HTTP status 502").
-	for _, code := range []string{"502", "503", "504"} {
-		if strings.Contains(msg, "status "+code) || strings.Contains(msg, code+" ") {
+	// Match go-sdk's http.StatusText() output for 5xx errors.
+	msgOriginal := err.Error()
+	for _, text := range transientStatusTexts {
+		if strings.Contains(msgOriginal, text) {
 			return true
 		}
 	}

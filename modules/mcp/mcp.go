@@ -76,3 +76,8 @@ func (m *Module) RegisterRoutes(r chi.Router, authMW *auth.Middleware) {
 func (m *Module) Service() *Service {
 	return m.svc
 }
+
+// Shutdown stops background goroutines. Call during graceful shutdown.
+func (m *Module) Shutdown() {
+	m.svc.Shutdown()
+}
