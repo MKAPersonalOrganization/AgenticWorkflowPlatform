@@ -11,6 +11,11 @@ type contextKey string
 const (
 	// UserContextKey is the context key for storing the user.
 	UserContextKey contextKey = "user"
+
+	// ThreadIDContextKey is the context key for storing the current thread ID.
+	// Set by the engine before calling AgentProvider.GetConfig so that per-thread
+	// state (e.g. activated skills) can be injected into the agent config.
+	ThreadIDContextKey contextKey = "thread_id"
 )
 
 // User represents a user in the system, stored in the local database.
@@ -68,6 +73,19 @@ func GetUserFromContext(ctx context.Context) *User {
 // SetUserInContext stores the user in the given context.
 func SetUserInContext(ctx context.Context, user *User) context.Context {
 	return context.WithValue(ctx, UserContextKey, user)
+}
+
+// GetThreadIDFromContext retrieves the current thread ID from the context.
+func GetThreadIDFromContext(ctx context.Context) string {
+	if tid, ok := ctx.Value(ThreadIDContextKey).(string); ok {
+		return tid
+	}
+	return ""
+}
+
+// SetThreadIDInContext stores the thread ID in the given context.
+func SetThreadIDInContext(ctx context.Context, threadID string) context.Context {
+	return context.WithValue(ctx, ThreadIDContextKey, threadID)
 }
 
 // IsAuthenticated checks if the context has an authenticated user.

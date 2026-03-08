@@ -272,3 +272,13 @@ func (s *service) listPermissions(ctx context.Context, fsID uuid.UUID, userID st
 	}
 	return s.repo.ListPermissions(ctx, fsID, userID)
 }
+
+// ── Agent Tool Interface ────────────────────────────────────────────────────
+
+func (s *service) listPermittedFilesystems(ctx context.Context, userID, agentID string) ([]FileSystem, error) {
+	return s.repo.ListPermittedFilesystems(ctx, userID, agentID)
+}
+
+func (s *service) hasAgentPermission(ctx context.Context, fsID uuid.UUID, userID, agentID string) (bool, error) {
+	return s.repo.HasPermission(ctx, fsID, userID, agentID)
+}

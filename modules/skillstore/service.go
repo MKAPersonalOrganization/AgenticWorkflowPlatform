@@ -135,7 +135,7 @@ func (s *service) listPermissionsByAgent(ctx context.Context, userID, agentID st
 }
 
 // listSkillsForAgent returns the full UserSkill objects that an agent is permitted to use.
-// Used by the activate_skill tool at runtime.
+// Uses a batch query to avoid N+1 (1 query for IDs + 1 query for skills).
 func (s *service) listSkillsForAgent(ctx context.Context, userID, agentID string) ([]UserSkill, error) {
 	skillIDs, err := s.perms.ListGrantedSkillIDs(ctx, userID, agentID)
 	if err != nil {
@@ -146,33 +146,30 @@ func (s *service) listSkillsForAgent(ctx context.Context, userID, agentID string
 		return nil, nil
 	}
 
-	// Fetch full skill details for each granted skill
-	var skills []UserSkill
-	for _, sid := range skillIDs {
-		skill, err := s.skills.GetByID(ctx, sid, userID)
-		if err != nil {
-			// Skill may have been deleted after permission was granted; skip it
-			continue
-		}
-		skills = append(skills, *skill)
+	skills, err := s.skills.GetByIDs(ctx, skillIDs, userID)
+	if err != nil {
+		return nil, fmt.Errorf("batch fetching skills: %w", err)
 	}
 
 	return skills, nil
 }
 
-// getSkillByNameForAgent looks up a skill by name from the set of skills
-// the agent is permitted to use. Used by the activate_skill tool.
+// getSkillByNameForAgent looks up a skill by name and verifies the agent has
+// permission to use it. Uses 2 constant-time queries instead of loading all
+// agent skills.
 func (s *service) getSkillByNameForAgent(ctx context.Context, userID, agentID, skillName string) (*UserSkill, error) {
-	skills, err := s.listSkillsForAgent(ctx, userID, agentID)
+	skill, err := s.skills.GetByName(ctx, userID, skillName)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("skill %q not found or not permitted for this agent", skillName)
 	}
 
-	for i := range skills {
-		if skills[i].Name == skillName {
-			return &skills[i], nil
-		}
+	granted, err := s.perms.IsGranted(ctx, userID, agentID, skill.ID)
+	if err != nil {
+		return nil, fmt.Errorf("checking skill permission: %w", err)
+	}
+	if !granted {
+		return nil, fmt.Errorf("skill %q not found or not permitted for this agent", skillName)
 	}
 
-	return nil, fmt.Errorf("skill %q not found or not permitted for this agent", skillName)
+	return skill, nil
 }

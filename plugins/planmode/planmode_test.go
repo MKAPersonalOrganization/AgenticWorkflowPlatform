@@ -64,7 +64,7 @@ func TestProviderDefaultTools(t *testing.T) {
 func TestProviderCreateExecutable(t *testing.T) {
 	p := &Provider{}
 	ctx := context.Background()
-	deps := toolregistry.FactoryDeps{}
+	var deps toolregistry.FactoryDeps
 
 	enter, err := p.CreateExecutable(ctx, "enter_plan_mode", deps)
 	if err != nil {

@@ -61,6 +61,7 @@ import (
 
 	projectionStats "school-with-ai/modules/analytics/statistics"
 
+	"school-with-ai/plugins/fsplugin"
 	memoryplugin "school-with-ai/plugins/memory"
 
 	healthhandlers "school-with-ai/foundation/health"
@@ -269,6 +270,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 	log.Info(ctx, "startup", "status", "initializing PostgreSQL event store")
 	baseEventStore := pgstore.NewPostgresEventStore(db, eventRegistry)
 
+	// Initialize Snapshot Store (accelerates thread loading for long conversations)
+	snapshotStore := pgstore.NewSnapshotStore(db)
+
 	// Initialize User Profile module (identity + preferences + banner)
 	userProfileModule := userprofilemod.New(log, db)
 	studentProfileRepo := userProfileModule.StudentProfileRepo()
@@ -278,6 +282,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// Initialize Skill Store module (skills marketplace + library + permissions)
 	skillStoreModule := skillstoremod.New(log, db)
+
+	// Skill activation tracker (in-memory, shared between skill tool and runner)
+	skillActivationTracker := skillsplugin.NewSkillActivationTracker()
 
 	// Run migrations
 	log.Info(ctx, "startup", "status", "running database migrations")
@@ -421,7 +428,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 	toolregistry.RegisterPlugin(&tracker.Provider{})
 	toolregistry.RegisterPlugin(&tts.Provider{})
 	toolregistry.RegisterPlugin(&websearch.Provider{})
-	toolregistry.RegisterPlugin(&skillsplugin.Provider{SkillResolver: skillStoreModule})
+	toolregistry.RegisterPlugin(&skillsplugin.Provider{SkillResolver: skillStoreModule, Tracker: skillActivationTracker})
+	toolregistry.RegisterPlugin(&fsplugin.Provider{FS: filesystemModule.AgentFS()})
 	if err := toolRegistry.Initialize(ctx); err != nil {
 		return fmt.Errorf("failed to initialize tool registry: %w", err)
 	}
@@ -479,6 +487,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		Log:                log,
 		DB:                 db,
 		EventStore:         eventLog,
+		SnapshotStore:      snapshotStore,
 		ArtifactService:    artifactService,
 		StudentProfileRepo: studentProfileRepo,
 		Emitter:            transientRouter,
@@ -528,27 +537,30 @@ func run(ctx context.Context, log *logger.Logger) error {
 		if cfg.PluginSettings != nil {
 			f.SetPluginSettings(cfg.PluginSettings)
 		}
+		if len(cfg.AllowedKBNamespaces) > 0 {
+			f.SetAllowedKBNamespaces(cfg.AllowedKBNamespaces)
+		}
 		return f
 	})
 
 	switch cfg.Orchestration.Framework {
 	case "custom":
-		runner, err := custom.NewRunnerAdapter(
-			ctx,
-			log,
-			chatModule.Orchestrator().GetThreadManagement(), // ThreadManager
-			agentProvider,               // AgentProvider
-			aiSettingsModule,            // Per-user model config resolver
-			aiSettingsModule,            // Per-user TTS config resolver
-			pluginSettingsModule,        // Per-user plugin settings resolver
-			studentProfileRepo,          // Student profile repository
-			permissionsService,          // ToolPermissionChecker
-			workspacePermissionsService, // WorkspacePermissionChecker
-			mcpModule.Service(),         // MCPToolResolver
-			newToolSetFactory,           // Tool factory builder
-			edgequakeService != nil,     // edgequakeEnabled
-			cfg.Edgequake.BaseURL,       // edgequakeBaseURL
-		)
+		runner, err := custom.NewRunnerAdapter(ctx, custom.RunnerAdapterConfig{
+			Log:                    log,
+			ThreadMgr:              chatModule.Orchestrator().GetThreadManagement(),
+			AgentProvider:          agentProvider,
+			ConfigResolver:         aiSettingsModule,
+			TTSResolver:            aiSettingsModule,
+			PluginSettingsResolver: pluginSettingsModule,
+			ProfileRepo:            studentProfileRepo,
+			PermChecker:            permissionsService,
+			WorkspacePermChecker:   workspacePermissionsService,
+			MCPResolver:            mcpModule.Service(),
+			NewToolSetFactory:      newToolSetFactory,
+			SkillInjector:          skillActivationTracker,
+			EdgequakeEnabled:       edgequakeService != nil,
+			EdgequakeBaseURL:       cfg.Edgequake.BaseURL,
+		})
 		if err != nil {
 			return fmt.Errorf("creating custom runner: %w", err)
 		}

@@ -2,6 +2,8 @@ package thread
 
 import (
 	"context"
+
+	es "school-with-ai/foundation/eventsourcing"
 )
 
 // ThreadRepository manages persistence of ThreadAggregate.
@@ -11,12 +13,18 @@ type ThreadRepository struct {
 }
 
 // NewThreadRepository creates a new thread repository using the generic repository pattern.
-func NewThreadRepository(eventStore EventStore) *ThreadRepository {
+// If a SnapshotStore is provided, the repository will use snapshots to accelerate
+// aggregate loading for threads with many events.
+func NewThreadRepository(eventStore EventStore, snapshotStore ...es.SnapshotStore) *ThreadRepository {
 	genericRepo := NewRepository(
 		eventStore,
 		NewThreadAggregate,
 		func(t *ThreadAggregate) string { return t.StreamName() },
 	)
+
+	if len(snapshotStore) > 0 && snapshotStore[0] != nil {
+		genericRepo = genericRepo.WithSnapshots(snapshotStore[0])
+	}
 
 	return &ThreadRepository{
 		Repository: genericRepo,

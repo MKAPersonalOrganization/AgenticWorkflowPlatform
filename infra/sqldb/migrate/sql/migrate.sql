@@ -694,3 +694,13 @@ CREATE TABLE IF NOT EXISTS skill_agent_permissions (
 
 CREATE INDEX IF NOT EXISTS idx_skill_agent_perms_user_agent ON skill_agent_permissions(user_id, agent_id);
 CREATE INDEX IF NOT EXISTS idx_skill_agent_perms_user_skill ON skill_agent_permissions(user_id, skill_id);
+
+-- Version: 1.55
+-- Description: Create aggregate snapshots table for event sourcing snapshot support.
+-- One row per stream — UPSERT keeps only the latest snapshot.
+CREATE TABLE IF NOT EXISTS aggregate_snapshots (
+    stream_name VARCHAR(255) PRIMARY KEY,
+    version     BIGINT NOT NULL,
+    data        JSONB NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

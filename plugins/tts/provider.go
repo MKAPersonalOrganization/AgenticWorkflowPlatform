@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"school-with-ai/foundation/agent"
-	"school-with-ai/platform/artifact"
 	"school-with-ai/platform/toolregistry"
 
 	"github.com/a-h/templ"
@@ -85,14 +84,12 @@ func (p *Provider) SettingsSchema() []toolregistry.SettingsField {
 func (p *Provider) CreateExecutable(ctx context.Context, toolID string, deps toolregistry.FactoryDeps) (agent.ExecutableTool, error) {
 	switch toolID {
 	case "tts-speak":
-		artifactStore, _ := deps.ArtifactStore.(artifact.Service)
+		artifactStore := deps.ArtifactStore()
 
 		// Resolve settings: plugin settings override → TTS capability config → OpenAI key fallback
-		apiKey := deps.TTSAPIKey
-		model := deps.TTSModel
-		voice := deps.TTSVoice
+		apiKey, model, voice := deps.TTSConfig()
 
-		if ps := deps.PluginSettings["tts"]; ps != nil {
+		if ps := deps.PluginSettings("tts"); ps != nil {
 			if v := ps["api_key"]; v != "" {
 				apiKey = v
 			}
@@ -105,7 +102,7 @@ func (p *Provider) CreateExecutable(ctx context.Context, toolID string, deps too
 		}
 
 		if apiKey == "" {
-			apiKey = deps.OpenAIAPIKey // backward compat
+			apiKey = deps.OpenAIAPIKey() // backward compat
 		}
 
 		return NewSpeakTool(artifactStore, apiKey, model, voice), nil

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"school-with-ai/foundation/agent"
-	"school-with-ai/platform/artifact"
 	"school-with-ai/platform/toolregistry"
 
 	"github.com/a-h/templ"
@@ -46,10 +45,7 @@ func (p *Provider) DefaultTools() []toolregistry.Tool {
 func (p *Provider) SettingsSchema() []toolregistry.SettingsField { return nil }
 
 func (p *Provider) CreateExecutable(ctx context.Context, toolID string, deps toolregistry.FactoryDeps) (agent.ExecutableTool, error) {
-	artifactStore, ok := deps.ArtifactStore.(artifact.Service)
-	if !ok {
-		// Provide fallback or panic if strictly required
-	}
+	artifactStore := deps.ArtifactStore()
 
 	switch toolID {
 	case "doc-create":

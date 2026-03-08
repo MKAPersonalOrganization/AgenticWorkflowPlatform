@@ -96,6 +96,28 @@ func (r *postgresUserSkillRepository) GetByID(ctx context.Context, id, userID st
 	return &skill, nil
 }
 
+func (r *postgresUserSkillRepository) GetByIDs(ctx context.Context, ids []string, userID string) ([]UserSkill, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	query, args, err := sqlx.In(`
+		SELECT id, user_id, name, description, instructions, category, icon, is_custom, source_catalog_id, resources, created_at, updated_at
+		FROM user_skills WHERE user_id = ? AND id IN (?)
+		ORDER BY name ASC`, userID, ids)
+	if err != nil {
+		return nil, fmt.Errorf("building batch skill query: %w", err)
+	}
+
+	query = r.db.Rebind(query)
+
+	var skills []UserSkill
+	if err := r.db.SelectContext(ctx, &skills, query, args...); err != nil {
+		return nil, fmt.Errorf("batch fetching user skills: %w", err)
+	}
+	return skills, nil
+}
+
 func (r *postgresUserSkillRepository) GetByName(ctx context.Context, userID, name string) (*UserSkill, error) {
 	var skill UserSkill
 	err := r.db.QueryRowxContext(ctx, `

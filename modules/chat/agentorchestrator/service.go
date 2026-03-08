@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"school-with-ai/foundation/agent"
+	es "school-with-ai/foundation/eventsourcing"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/modules/chat/thread"
 	"school-with-ai/modules/chat/threadmgmt"
@@ -39,6 +40,7 @@ type Service struct {
 	emitter       EventEmitter
 	artifactStore artifact.Service
 	profileRepo   identity.StudentProfileRepository
+	snapshotStore es.SnapshotStore
 
 	runnerMu sync.RWMutex
 	runner   Runner // Domain-aware runner interface
@@ -56,17 +58,19 @@ func New(
 	eventLog thread.EventStore,
 	opts ...Option,
 ) *Service {
-	sharedRepo := thread.NewThreadRepository(threadmgmt.NewEventStoreAdapter(eventLog))
 	s := &Service{
 		log:        log,
 		writeModel: eventLog,
-		threadRepo: sharedRepo,
-		threadMgmt: threadmgmt.New(log, sharedRepo),
 	}
 
 	for _, opt := range opts {
 		opt(s)
 	}
+
+	// Build thread repo after options so snapshot store is available.
+	sharedRepo := thread.NewThreadRepository(threadmgmt.NewEventStoreAdapter(eventLog), s.snapshotStore)
+	s.threadRepo = sharedRepo
+	s.threadMgmt = threadmgmt.New(log, sharedRepo)
 
 	return s
 }
@@ -89,6 +93,13 @@ func WithArtifactService(store artifact.Service) Option {
 func WithStudentProfileRepository(repo identity.StudentProfileRepository) Option {
 	return func(s *Service) {
 		s.profileRepo = repo
+	}
+}
+
+// WithSnapshotStore configures thread repositories to use snapshot-accelerated loading.
+func WithSnapshotStore(store es.SnapshotStore) Option {
+	return func(s *Service) {
+		s.snapshotStore = store
 	}
 }
 

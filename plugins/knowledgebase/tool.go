@@ -9,10 +9,11 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"school-with-ai/foundation/agent"
 	"strings"
 	"text/template"
 	"time"
+
+	"school-with-ai/foundation/agent"
 )
 
 // DefaultKBSystemPrompt is the system prompt template for the knowledge base sub-agent.
@@ -192,20 +193,28 @@ type llmResponse struct {
 // QueryKnowledgeBaseTool implements the agent-as-tool pattern:
 // it retrieves context from Edgequake via raw HTTP then calls OpenAI to synthesize an answer.
 type QueryKnowledgeBaseTool struct {
-	edgequakeBaseURL string
-	openAIAPIKey     string
-	modelID          string
+	edgequakeBaseURL  string
+	openAIAPIKey      string
+	modelID           string
+	allowedNamespaces map[string]bool // Enforced at runtime — rejects any namespace not in this set
 }
 
 // NewQueryKnowledgeBaseTool creates a new knowledge base query tool.
-func NewQueryKnowledgeBaseTool(edgequakeBaseURL, openAIAPIKey, modelID string) *QueryKnowledgeBaseTool {
+// allowedNamespaces restricts which workspace IDs the tool may query.
+// If nil or empty, all namespaces are denied (secure default).
+func NewQueryKnowledgeBaseTool(edgequakeBaseURL, openAIAPIKey, modelID string, allowedNamespaces []string) *QueryKnowledgeBaseTool {
 	if modelID == "" {
 		modelID = "gpt-4o"
 	}
+	nsSet := make(map[string]bool, len(allowedNamespaces))
+	for _, ns := range allowedNamespaces {
+		nsSet[ns] = true
+	}
 	return &QueryKnowledgeBaseTool{
-		edgequakeBaseURL: edgequakeBaseURL,
-		openAIAPIKey:     openAIAPIKey,
-		modelID:          modelID,
+		edgequakeBaseURL:  edgequakeBaseURL,
+		openAIAPIKey:      openAIAPIKey,
+		modelID:           modelID,
+		allowedNamespaces: nsSet,
 	}
 }
 
@@ -272,6 +281,11 @@ func (t *QueryKnowledgeBaseTool) executeInternal(ctx context.Context, args agent
 	}
 	if a.Namespace == "" {
 		return agent.ErrorResult(fmt.Errorf("namespace parameter is required")), nil
+	}
+
+	// Runtime enforcement: reject namespaces not in the allowed set.
+	if len(t.allowedNamespaces) == 0 || !t.allowedNamespaces[a.Namespace] {
+		return agent.ErrorResult(fmt.Errorf("namespace %q is not an allowed workspace for this agent", a.Namespace)), nil
 	}
 
 	// --- Step 1: Retrieve context from Edgequake via raw HTTP ---

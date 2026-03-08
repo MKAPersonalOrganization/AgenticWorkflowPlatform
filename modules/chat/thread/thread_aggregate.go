@@ -1,6 +1,7 @@
 package thread
 
 import (
+	"encoding/json"
 	"errors"
 	"time"
 )
@@ -308,4 +309,50 @@ func (t *ThreadAggregate) Apply(event Event) {
 // StreamName returns the event stream name for this aggregate.
 func (t *ThreadAggregate) StreamName() string {
 	return StreamName("Thread", t.ID)
+}
+
+// ─── Snapshot Support ────────────────────────────────────────────────────────
+
+// threadSnapshot is the serialisation format for ThreadAggregate snapshots.
+type threadSnapshot struct {
+	UserID           string                   `json:"user_id"`
+	Title            string                   `json:"title"`
+	Messages         []Message                `json:"messages"`
+	ActiveToolStates map[string]ToolCallState `json:"active_tool_states,omitempty"`
+	CreatedAt        time.Time                `json:"created_at"`
+	UpdatedAt        time.Time                `json:"updated_at"`
+	IsDeleted        bool                     `json:"is_deleted"`
+}
+
+// MarshalSnapshot serialises the aggregate's current state for snapshotting.
+func (t *ThreadAggregate) MarshalSnapshot() (json.RawMessage, error) {
+	snap := threadSnapshot{
+		UserID:           t.UserID,
+		Title:            t.Title,
+		Messages:         t.Messages,
+		ActiveToolStates: t.ActiveToolStates,
+		CreatedAt:        t.CreatedAt,
+		UpdatedAt:        t.UpdatedAt,
+		IsDeleted:        t.IsDeleted,
+	}
+	return json.Marshal(snap)
+}
+
+// UnmarshalSnapshot restores the aggregate's state from a snapshot.
+func (t *ThreadAggregate) UnmarshalSnapshot(data json.RawMessage) error {
+	var snap threadSnapshot
+	if err := json.Unmarshal(data, &snap); err != nil {
+		return err
+	}
+	t.UserID = snap.UserID
+	t.Title = snap.Title
+	t.Messages = snap.Messages
+	t.ActiveToolStates = snap.ActiveToolStates
+	if t.ActiveToolStates == nil {
+		t.ActiveToolStates = make(map[string]ToolCallState)
+	}
+	t.CreatedAt = snap.CreatedAt
+	t.UpdatedAt = snap.UpdatedAt
+	t.IsDeleted = snap.IsDeleted
+	return nil
 }

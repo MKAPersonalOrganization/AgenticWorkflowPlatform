@@ -270,7 +270,7 @@ func TestProvider_DefaultTools(t *testing.T) {
 
 func TestProvider_CreateExecutable(t *testing.T) {
 	p := &Provider{}
-	tool, err := p.CreateExecutable(t.Context(), "ask_user", toolregistry.FactoryDeps{})
+	tool, err := p.CreateExecutable(t.Context(), "ask_user", nil)
 	if err != nil {
 		t.Fatalf("CreateExecutable() error = %v", err)
 	}
@@ -284,7 +284,7 @@ func TestProvider_CreateExecutable(t *testing.T) {
 
 func TestProvider_CreateExecutable_Unknown(t *testing.T) {
 	p := &Provider{}
-	tool, err := p.CreateExecutable(t.Context(), "unknown_tool", toolregistry.FactoryDeps{})
+	tool, err := p.CreateExecutable(t.Context(), "unknown_tool", nil)
 	if err != nil {
 		t.Fatalf("CreateExecutable() error = %v", err)
 	}

@@ -48,20 +48,25 @@ type Repository interface {
 	DeleteToolSet(ctx context.Context, id string) error
 }
 
-// Registry manages tools and tool sets. All state lives in PostgreSQL — there
-// is no in-memory cache. This keeps the implementation simple, stateless, and
-// safe for hundreds of concurrent pods without cross-pod invalidation concerns.
-// PostgreSQL connection pooling (via pgx) provides the necessary throughput.
+// Registry manages tools and tool sets. Built-in tools from registered plugins
+// are cached in-memory at startup, eliminating DB round-trips for the common
+// case. MCP (dynamic) tools still go through PostgreSQL.
 type Registry struct {
 	log  *logger.Logger
 	repo Repository
+
+	// In-memory indices for built-in tools (populated during Initialize).
+	builtinTools    map[string]*Tool    // toolID → Tool
+	builtinToolSets map[string]*ToolSet // toolSetID → ToolSet
 }
 
 // NewRegistry creates a new tool registry.
 func NewRegistry(log *logger.Logger, repo Repository) *Registry {
 	return &Registry{
-		log:  log,
-		repo: repo,
+		log:             log,
+		repo:            repo,
+		builtinTools:    make(map[string]*Tool),
+		builtinToolSets: make(map[string]*ToolSet),
 	}
 }
 
@@ -84,8 +89,11 @@ func (r *Registry) Initialize(ctx context.Context) error {
 	return nil
 }
 
-// GetTool retrieves a tool by ID.
+// GetTool retrieves a tool by ID. Checks the in-memory built-in index first.
 func (r *Registry) GetTool(ctx context.Context, id string) (*Tool, error) {
+	if t, ok := r.builtinTools[id]; ok {
+		return t, nil
+	}
 	return r.repo.GetTool(ctx, id)
 }
 
@@ -141,8 +149,11 @@ func (r *Registry) UnregisterTool(ctx context.Context, id string) error {
 	return nil
 }
 
-// GetToolSet retrieves a tool set by ID.
+// GetToolSet retrieves a tool set by ID. Checks the in-memory built-in index first.
 func (r *Registry) GetToolSet(ctx context.Context, id string) (*ToolSet, error) {
+	if ts, ok := r.builtinToolSets[id]; ok {
+		return ts, nil
+	}
 	return r.repo.GetToolSet(ctx, id)
 }
 
@@ -189,13 +200,30 @@ func (r *Registry) UnregisterToolSet(ctx context.Context, id string) error {
 }
 
 // GetToolsInSet retrieves all tools that belong to a specific tool set.
+// For built-in tool sets, uses the in-memory index (no DB round-trips).
 func (r *Registry) GetToolsInSet(ctx context.Context, toolSetID string) ([]Tool, error) {
 	toolSet, err := r.GetToolSet(ctx, toolSetID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get tool set %s: %w", toolSetID, err)
 	}
 
+	// Fast path: resolve all tools from in-memory built-in index.
 	tools := make([]Tool, 0, len(toolSet.ToolIDs))
+	allBuiltin := true
+	for _, toolID := range toolSet.ToolIDs {
+		if t, ok := r.builtinTools[toolID]; ok {
+			tools = append(tools, *t)
+		} else {
+			allBuiltin = false
+			break
+		}
+	}
+	if allBuiltin {
+		return tools, nil
+	}
+
+	// Slow path (MCP or mixed): fall back to individual lookups.
+	tools = make([]Tool, 0, len(toolSet.ToolIDs))
 	for _, toolID := range toolSet.ToolIDs {
 		tool, err := r.GetTool(ctx, toolID)
 		if err != nil {
@@ -211,6 +239,7 @@ func (r *Registry) GetToolsInSet(ctx context.Context, toolSetID string) ([]Tool,
 // initializeDefaultTools ensures default tools and tool sets from registered
 // plugins exist in the database. Uses upsert (ON CONFLICT DO UPDATE) so this
 // is safe to run on every pod startup concurrently.
+// Also populates the in-memory built-in index for fast lookups.
 func (r *Registry) initializeDefaultTools(ctx context.Context) error {
 	now := time.Now()
 
@@ -222,6 +251,9 @@ func (r *Registry) initializeDefaultTools(ctx context.Context) error {
 			if err := r.repo.SaveToolSet(ctx, &ts); err != nil {
 				return fmt.Errorf("failed to save default tool set %s: %w", ts.ID, err)
 			}
+			// Populate in-memory index.
+			tsCopy := ts
+			r.builtinToolSets[ts.ID] = &tsCopy
 		}
 
 		for _, t := range provider.DefaultTools() {
@@ -230,6 +262,9 @@ func (r *Registry) initializeDefaultTools(ctx context.Context) error {
 			if err := r.repo.SaveTool(ctx, &t); err != nil {
 				return fmt.Errorf("failed to save default tool %s: %w", t.ID, err)
 			}
+			// Populate in-memory index.
+			tCopy := t
+			r.builtinTools[t.ID] = &tCopy
 		}
 	}
 

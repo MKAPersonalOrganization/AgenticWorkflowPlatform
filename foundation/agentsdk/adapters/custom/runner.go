@@ -48,47 +48,51 @@ type RunnerAdapter struct {
 	workspacePermChecker   WorkspacePermissionChecker
 	mcpResolver            MCPToolResolver
 	newToolSetFactory      NewToolSetFactoryFunc
+	skillInjector          SkillPromptInjector
 	edgequakeEnabled       bool
 	edgequakeBaseURL       string
 }
 
-// NewRunnerAdapter creates a new runner adapter.
-// It uses a ModelConfigResolver to get per-user LLM configuration at runtime.
-func NewRunnerAdapter(
-	ctx context.Context,
-	log *logger.Logger,
-	threadMgr ThreadManager,
-	agentProvider agent.AgentProvider,
-	configResolver ModelConfigResolver,
-	ttsResolver TTSConfigResolver,
-	pluginSettingsResolver PluginSettingsResolver,
-	profileRepo identity.StudentProfileRepository,
-	permChecker ToolPermissionChecker,
-	workspacePermChecker WorkspacePermissionChecker,
-	mcpResolver MCPToolResolver,
-	newToolSetFactory NewToolSetFactoryFunc,
-	edgequakeEnabled bool,
-	edgequakeBaseURL string,
-) (*RunnerAdapter, error) {
-	if configResolver == nil {
+// RunnerAdapterConfig holds all dependencies for creating a RunnerAdapter.
+type RunnerAdapterConfig struct {
+	Log                    *logger.Logger
+	ThreadMgr              ThreadManager
+	AgentProvider          agent.AgentProvider
+	ConfigResolver         ModelConfigResolver
+	TTSResolver            TTSConfigResolver
+	PluginSettingsResolver PluginSettingsResolver
+	ProfileRepo            identity.StudentProfileRepository
+	PermChecker            ToolPermissionChecker
+	WorkspacePermChecker   WorkspacePermissionChecker
+	MCPResolver            MCPToolResolver
+	NewToolSetFactory      NewToolSetFactoryFunc
+	SkillInjector          SkillPromptInjector
+	EdgequakeEnabled       bool
+	EdgequakeBaseURL       string
+}
+
+// NewRunnerAdapter creates a new runner adapter from the given config.
+func NewRunnerAdapter(ctx context.Context, cfg RunnerAdapterConfig) (*RunnerAdapter, error) {
+	if cfg.ConfigResolver == nil {
 		return nil, fmt.Errorf("model config resolver is required")
 	}
 
 	r := &RunnerAdapter{
-		log:                    log,
-		threadMgr:              threadMgr,
-		agentProvider:          agentProvider,
-		profileRepo:            profileRepo,
-		pipeline:               NewEventPipeline(log),
-		permChecker:            permChecker,
-		workspacePermChecker:   workspacePermChecker,
-		mcpResolver:            mcpResolver,
-		newToolSetFactory:      newToolSetFactory,
-		edgequakeEnabled:       edgequakeEnabled,
-		edgequakeBaseURL:       edgequakeBaseURL,
-		configResolver:         configResolver,
-		ttsResolver:            ttsResolver,
-		pluginSettingsResolver: pluginSettingsResolver,
+		log:                    cfg.Log,
+		threadMgr:              cfg.ThreadMgr,
+		agentProvider:          cfg.AgentProvider,
+		profileRepo:            cfg.ProfileRepo,
+		pipeline:               NewEventPipeline(cfg.Log),
+		permChecker:            cfg.PermChecker,
+		workspacePermChecker:   cfg.WorkspacePermChecker,
+		mcpResolver:            cfg.MCPResolver,
+		newToolSetFactory:      cfg.NewToolSetFactory,
+		skillInjector:          cfg.SkillInjector,
+		edgequakeEnabled:       cfg.EdgequakeEnabled,
+		edgequakeBaseURL:       cfg.EdgequakeBaseURL,
+		configResolver:         cfg.ConfigResolver,
+		ttsResolver:            cfg.TTSResolver,
+		pluginSettingsResolver: cfg.PluginSettingsResolver,
 	}
 
 	return r, nil
@@ -146,6 +150,7 @@ func (r *RunnerAdapter) buildEngine(ctx context.Context, modelCfg *agent.ModelCo
 		workspacePermChecker: r.workspacePermChecker,
 		edgequakeEnabled:     r.edgequakeEnabled,
 		mcpResolver:          r.mcpResolver,
+		skillInjector:        r.skillInjector,
 	}
 
 	return engine.New(chatClient, provider, nil, nil), nil
@@ -408,6 +413,7 @@ type RegistryAgentProvider struct {
 	workspacePermChecker WorkspacePermissionChecker
 	edgequakeEnabled     bool
 	mcpResolver          MCPToolResolver
+	skillInjector        SkillPromptInjector
 }
 
 func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (core.AgentConfig, error) {
@@ -527,12 +533,28 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 
 		enabledWorkspaceIDs, err := p.workspacePermChecker.GetEnabledWorkspaces(ctx, userID, name)
 		if err == nil && len(enabledWorkspaceIDs) > 0 {
+			// Enforce allowed namespaces at the tool level (runtime security).
+			if p.toolFactory != nil {
+				p.toolFactory.SetAllowedKBNamespaces(enabledWorkspaceIDs)
+			}
+
 			kbSection := "\n\n## Knowledge Bases\n\nYou have access to the following knowledge base workspaces. Use the query_knowledge_base tool to search them:\n"
 			for _, wsID := range enabledWorkspaceIDs {
 				kbSection += fmt.Sprintf("- Workspace ID: %s\n", wsID)
 			}
 			kbSection += "\nWhen the user asks about topics that may be covered by these knowledge bases, use the query_knowledge_base tool with the appropriate namespace (workspace ID) and a relevant query to retrieve information."
 			config.SystemPrompt += kbSection
+		}
+	}
+
+	// Inject activated skill instructions into system prompt.
+	// Skills are activated via the activate_skill tool and stored in the tracker.
+	// By injecting here (instead of returning as tool result), instructions stay
+	// pinned at the system prompt level and don't drift down the conversation.
+	if p.skillInjector != nil {
+		threadID := shared.GetThreadIDFromContext(ctx)
+		if addition := p.skillInjector.BuildPromptAddition(threadID); addition != "" {
+			config.SystemPrompt += "\n\n" + addition
 		}
 	}
 

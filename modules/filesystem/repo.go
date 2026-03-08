@@ -35,6 +35,8 @@ type repository interface {
 	RevokePermission(ctx context.Context, filesystemID uuid.UUID, userID, agentID string) error
 	ListPermissions(ctx context.Context, filesystemID uuid.UUID, userID string) ([]FSPermission, error)
 	HasPermission(ctx context.Context, filesystemID uuid.UUID, userID, agentID string) (bool, error)
+	// ListPermittedFilesystems returns filesystems that an agent has been granted access to.
+	ListPermittedFilesystems(ctx context.Context, userID, agentID string) ([]FileSystem, error)
 }
 
 // ─── PostgreSQL Implementation ──────────────────────────────────────────────
@@ -197,6 +199,18 @@ func (r *postgresRepo) HasPermission(ctx context.Context, filesystemID uuid.UUID
 	const q = `SELECT COUNT(*) FROM filesystem_permissions WHERE filesystem_id = $1 AND user_id = $2 AND agent_id = $3`
 	err := r.db.GetContext(ctx, &count, q, filesystemID, userID, agentID)
 	return count > 0, err
+}
+
+func (r *postgresRepo) ListPermittedFilesystems(ctx context.Context, userID, agentID string) ([]FileSystem, error) {
+	var out []FileSystem
+	const q = `
+		SELECT f.filesystem_id, f.user_id, f.name, f.description, f.fs_type, f.config, f.created_at, f.updated_at
+		FROM filesystems f
+		INNER JOIN filesystem_permissions fp ON f.filesystem_id = fp.filesystem_id AND f.user_id = fp.user_id
+		WHERE fp.user_id = $1 AND fp.agent_id = $2
+		ORDER BY f.name ASC`
+	err := r.db.SelectContext(ctx, &out, q, userID, agentID)
+	return out, err
 }
 
 // compile-time check

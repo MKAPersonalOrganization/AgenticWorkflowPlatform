@@ -89,9 +89,9 @@ func (p *Provider) SettingsSchema() []toolregistry.SettingsField {
 func (p *Provider) CreateExecutable(_ context.Context, toolID string, deps toolregistry.FactoryDeps) (agent.ExecutableTool, error) {
 	switch toolID {
 	case "web_search":
-		// Resolve settings from the per-user plugin settings map.
+		// Resolve settings from the per-user plugin settings.
 		var apiKey, model string
-		if ps := deps.PluginSettings["websearch"]; ps != nil {
+		if ps := deps.PluginSettings("websearch"); ps != nil {
 			apiKey = ps["api_key"]
 			model = ps["model"]
 		}

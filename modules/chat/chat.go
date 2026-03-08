@@ -24,6 +24,7 @@ import (
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/auth"
 	"school-with-ai/foundation/event"
+	es "school-with-ai/foundation/eventsourcing"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/middleware"
 	"school-with-ai/modules/chat/agentorchestrator"
@@ -56,6 +57,7 @@ type Dependencies struct {
 	Log                *logger.Logger
 	DB                 *sqlx.DB
 	EventStore         thread.EventStore
+	SnapshotStore      es.SnapshotStore // optional — accelerates thread loading
 	ArtifactService    artifact.Service
 	StudentProfileRepo identity.StudentProfileRepository
 	Emitter            agentorchestrator.EventEmitter // transient event router
@@ -109,7 +111,7 @@ func New(deps Dependencies) *Module {
 	llmProjection := llmcontext.NewPostgresLLMContextProjection(log, deps.DB)
 
 	// Thread management (event sourcing)
-	threadRepo := thread.NewThreadRepository(threadmgmt.NewEventStoreAdapter(deps.EventStore))
+	threadRepo := thread.NewThreadRepository(threadmgmt.NewEventStoreAdapter(deps.EventStore), deps.SnapshotStore)
 	threadMgmtSvc := threadmgmt.New(log, threadRepo)
 
 	// Memory service (artifact-backed)
@@ -123,6 +125,7 @@ func New(deps Dependencies) *Module {
 		agentorchestrator.WithArtifactService(deps.ArtifactService),
 		agentorchestrator.WithStudentProfileRepository(deps.StudentProfileRepo),
 		agentorchestrator.WithEmitter(deps.Emitter),
+		agentorchestrator.WithSnapshotStore(deps.SnapshotStore),
 	)
 
 	return &Module{
