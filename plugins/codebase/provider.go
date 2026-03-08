@@ -20,6 +20,8 @@ func (p *Provider) Icon() string {
 func (p *Provider) DefaultSets() []toolregistry.ToolSet { return nil }
 func (p *Provider) DefaultTools() []toolregistry.Tool   { return nil }
 
+func (p *Provider) SettingsSchema() []toolregistry.SettingsField { return nil }
+
 func (p *Provider) CreateExecutable(ctx context.Context, toolID string, deps toolregistry.FactoryDeps) (agent.ExecutableTool, error) {
 	return nil, nil // Not handled by this plugin
 }

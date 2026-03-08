@@ -49,16 +49,66 @@ func (p *Provider) DefaultTools() []toolregistry.Tool {
 	}
 }
 
+// SettingsSchema declares the per-user settings the TTS plugin supports.
+// Users can optionally override the API key, model, and voice here instead of
+// relying on the AI-provider capability system.
+func (p *Provider) SettingsSchema() []toolregistry.SettingsField {
+	return []toolregistry.SettingsField{
+		{
+			Key:         "api_key",
+			Label:       "OpenAI API Key",
+			Description: "Your OpenAI API key for text-to-speech. Leave empty to use the key from AI Settings.",
+			Type:        toolregistry.FieldTypePassword,
+			Required:    false,
+		},
+		{
+			Key:         "model",
+			Label:       "TTS Model",
+			Description: "The OpenAI model used for speech generation",
+			Type:        toolregistry.FieldTypeSelect,
+			Required:    false,
+			Default:     "gpt-4o-mini-tts",
+			Options:     []string{"gpt-4o-mini-tts", "tts-1", "tts-1-hd"},
+		},
+		{
+			Key:         "voice",
+			Label:       "Default Voice",
+			Description: "The default voice for speech generation. Can be overridden per request.",
+			Type:        toolregistry.FieldTypeSelect,
+			Required:    false,
+			Default:     "coral",
+			Options:     []string{"alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse", "marin", "cedar"},
+		},
+	}
+}
+
 func (p *Provider) CreateExecutable(ctx context.Context, toolID string, deps toolregistry.FactoryDeps) (agent.ExecutableTool, error) {
 	switch toolID {
 	case "tts-speak":
 		artifactStore, _ := deps.ArtifactStore.(artifact.Service)
-		// Use TTS-specific API key/model/voice from user's capability config
+
+		// Resolve settings: plugin settings override → TTS capability config → OpenAI key fallback
 		apiKey := deps.TTSAPIKey
+		model := deps.TTSModel
+		voice := deps.TTSVoice
+
+		if ps := deps.PluginSettings["tts"]; ps != nil {
+			if v := ps["api_key"]; v != "" {
+				apiKey = v
+			}
+			if v := ps["model"]; v != "" {
+				model = v
+			}
+			if v := ps["voice"]; v != "" {
+				voice = v
+			}
+		}
+
 		if apiKey == "" {
 			apiKey = deps.OpenAIAPIKey // backward compat
 		}
-		return NewSpeakTool(artifactStore, apiKey, deps.TTSModel, deps.TTSVoice), nil
+
+		return NewSpeakTool(artifactStore, apiKey, model, voice), nil
 	default:
 		return nil, nil
 	}

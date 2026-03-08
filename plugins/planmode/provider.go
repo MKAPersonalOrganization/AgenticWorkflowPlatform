@@ -61,6 +61,8 @@ func (p *Provider) DefaultTools() []toolregistry.Tool {
 	}
 }
 
+func (p *Provider) SettingsSchema() []toolregistry.SettingsField { return nil }
+
 func (p *Provider) CreateExecutable(_ context.Context, toolID string, _ toolregistry.FactoryDeps) (agent.ExecutableTool, error) {
 	switch toolID {
 	case "enter_plan_mode":

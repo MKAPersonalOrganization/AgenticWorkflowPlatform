@@ -21,6 +21,7 @@ type ExecutableToolFactory struct {
 	ttsAPIKey        string
 	ttsModel         string
 	ttsVoice         string
+	pluginSettings   map[string]map[string]string // plugin_id → key → value
 }
 
 // NewExecutableToolFactory creates a new tool factory.
@@ -47,6 +48,14 @@ func (f *ExecutableToolFactory) SetTTSConfig(apiKey, model, voice string) {
 	f.ttsAPIKey = apiKey
 	f.ttsModel = model
 	f.ttsVoice = voice
+}
+
+// SetPluginSettings sets per-user plugin settings resolved from the
+// user_plugin_settings table. Outer key is plugin ID, inner key is setting key.
+func (f *ExecutableToolFactory) SetPluginSettings(settings map[string]map[string]string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.pluginSettings = settings
 }
 
 // SetToolRegistry sets the tool registry for the factory (used for tool set expansion).
@@ -101,6 +110,7 @@ func (f *ExecutableToolFactory) CreateExecutableTool(ctx context.Context, tool *
 		TTSAPIKey:        ttsAPIKey,
 		TTSModel:         f.ttsModel,
 		TTSVoice:         f.ttsVoice,
+		PluginSettings:   f.pluginSettings,
 	}
 	f.mu.RUnlock()
 

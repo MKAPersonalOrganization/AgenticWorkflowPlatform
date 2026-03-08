@@ -10,6 +10,7 @@ import (
 // PluginResponse represents a plugin (tool set) in the simplified API.
 type PluginResponse struct {
 	ID          string              `json:"id"`
+	PluginID    string              `json:"plugin_id"` // Parent plugin provider ID for settings lookup
 	Name        string              `json:"name"`
 	Description string              `json:"description"`
 	Category    string              `json:"category"`
@@ -77,6 +78,7 @@ func (h *TaskManagementHandler) ListPlugins(w http.ResponseWriter, r *http.Reque
 
 		plugins = append(plugins, PluginResponse{
 			ID:          toolSet.ID,
+			PluginID:    toolregistry.GetPluginIDForSet(toolSet.ID),
 			Name:        toolSet.Name,
 			Description: toolSet.Description,
 			Category:    toolSet.Category,

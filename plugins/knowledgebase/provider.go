@@ -40,10 +40,46 @@ func (p *Provider) DefaultTools() []toolregistry.Tool {
 	}
 }
 
+// SettingsSchema declares the per-user settings for the knowledge base plugin.
+// Users can optionally provide their own OpenAI key and model for the KB sub-agent.
+func (p *Provider) SettingsSchema() []toolregistry.SettingsField {
+	return []toolregistry.SettingsField{
+		{
+			Key:         "api_key",
+			Label:       "OpenAI API Key",
+			Description: "Your OpenAI API key for the knowledge-base sub-agent. Leave empty to use the key from AI Settings.",
+			Type:        toolregistry.FieldTypePassword,
+			Required:    false,
+		},
+		{
+			Key:         "model",
+			Label:       "Synthesis Model",
+			Description: "The OpenAI model used to synthesize answers from retrieved knowledge",
+			Type:        toolregistry.FieldTypeSelect,
+			Required:    false,
+			Default:     "gpt-4o",
+			Options:     []string{"gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano", "o4-mini"},
+		},
+	}
+}
+
 func (p *Provider) CreateExecutable(ctx context.Context, toolID string, deps toolregistry.FactoryDeps) (agent.ExecutableTool, error) {
 	switch toolID {
 	case "kb-query":
-		return NewQueryKnowledgeBaseTool(deps.EdgequakeBaseURL, deps.OpenAIAPIKey, deps.ModelID), nil
+		// Resolve settings: plugin settings override → FactoryDeps fallback
+		apiKey := deps.OpenAIAPIKey
+		modelID := deps.ModelID
+
+		if ps := deps.PluginSettings["knowledgebase"]; ps != nil {
+			if v := ps["api_key"]; v != "" {
+				apiKey = v
+			}
+			if v := ps["model"]; v != "" {
+				modelID = v
+			}
+		}
+
+		return NewQueryKnowledgeBaseTool(deps.EdgequakeBaseURL, apiKey, modelID), nil
 	default:
 		return nil, nil // Not handled by this plugin
 	}

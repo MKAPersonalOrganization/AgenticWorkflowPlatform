@@ -48,6 +48,8 @@ func (p *Provider) DefaultTools() []toolregistry.Tool {
 	}
 }
 
+func (p *Provider) SettingsSchema() []toolregistry.SettingsField { return nil }
+
 func (p *Provider) CreateExecutable(ctx context.Context, toolID string, deps toolregistry.FactoryDeps) (agent.ExecutableTool, error) {
 	switch toolID {
 	case "think":
