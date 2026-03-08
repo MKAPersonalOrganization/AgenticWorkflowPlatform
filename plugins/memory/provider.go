@@ -71,7 +71,3 @@ func (p *Provider) GetUITemplate() templ.Component {
 func (p *Provider) UIHandledTools() []string {
 	return []string{"save_memory", "forget_memory", "list_memories", "clear_memories"}
 }
-
-func (p *Provider) UIHandledElicitations() []string {
-	return nil
-}

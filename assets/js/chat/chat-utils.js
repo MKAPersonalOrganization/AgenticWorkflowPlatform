@@ -181,33 +181,10 @@ export function formatNumber(num) {
 }
 
 /**
- * Normalize elicitation data (question, schema) for UI component compatibility.
- * Maps backend protocol fields to frontend component expected properties.
- * @param {string} question - Question text
- * @param {Object} schema - Tool schema (type, enum, minimum, maximum, etc.)
- * @returns {Object} Normalized elicitation result
- */
-export function normalizeElicitation(question, schema) {
-    const normalized = {
-        question_text: question,
-        statement_to_verify: question, // Generic mapping for simplicity
-        schema: schema
-    };
-
-    if (schema) {
-        if (schema.enum) normalized.answer_choices = schema.enum;
-        if (schema.minimum !== undefined) normalized.scale_minimum = schema.minimum;
-        if (schema.maximum !== undefined) normalized.scale_maximum = schema.maximum;
-    }
-
-    return normalized;
-}
-
-/**
  * Enrich a tool result message or object with parsed content.
  * This is the SINGLE place where parsedResult is set during message hydration.
- * For elicitation tools, parsedResult comes from the elicitation data (not the
- * raw result text). For standard tools, parsedResult is the JSON-parsed result.
+ * For tools with elicitation data (ask_user in awaiting_input state), parsedResult
+ * is set from the elicitation schema. For standard tools, it's JSON-parsed result.
  * @param {Object} toolResult - The tool result object/message
  * @param {string} content - The JSON string content
  * @returns {Object} The enriched tool result object
@@ -218,12 +195,11 @@ export function enrichToolResult(toolResult, content) {
     // Always set the raw result
     toolResult.result = content;
 
-    // For elicitation tools, parsedResult comes from elicitation data
+    // For tools with elicitation data (e.g. ask_user in awaiting_input state),
+    // parsedResult must carry the schema so the UI component can render questions.
     if (toolResult.elicitation) {
-        toolResult.parsedResult = normalizeElicitation(
-            toolResult.elicitation.question,
-            toolResult.elicitation.schema
-        );
+        const { question, schema } = toolResult.elicitation;
+        toolResult.parsedResult = { question_text: question, schema: schema };
     } else {
         toolResult.parsedResult = safeParseJSON(content);
     }

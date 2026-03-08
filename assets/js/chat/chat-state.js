@@ -13,9 +13,9 @@
  */
 
 import { CONNECTION_CONFIG, DEFAULT_PERF_METRICS } from './constants.js';
-import { normalizeElicitation, safeParseJSON } from './chat-utils.js';
+import { safeParseJSON } from './chat-utils.js';
 import { createToolStateMachine } from './tool-state-machine.js';
-import { isElicitationTool, isSpecialTool } from './chat-tool-registry.js';
+import { isSpecialTool } from './chat-tool-registry.js';
 import { createActor } from 'xstate';
 
 /**
@@ -251,10 +251,10 @@ export function createStateMethods() {
                 msg.parsedResult = safeParseJSON(msg.result);
             }
 
-            // Sync elicitation (for UI component configuration)
+            // Sync elicitation data for ask_user tool (pass schema directly as parsedResult)
             if (context.elicitation) {
                 const { question, schema } = context.elicitation;
-                msg.parsedResult = normalizeElicitation(question, schema);
+                msg.parsedResult = { question_text: question, schema: schema };
             }
 
             // Sync user answer (for answered quiz display)
@@ -362,6 +362,5 @@ export function createStateMethods() {
 
         // Registry Helpers (exposed for UI templates)
         isSpecialTool,
-        isElicitationTool,
     };
 }

@@ -5,13 +5,6 @@ export function isSpecialTool(toolName) {
 }
 
 /**
- * Check if a schema type is for elicitation
- */
-export function isElicitationTool(schemaType) {
-    return window.ELICITATION_SCHEMAS && window.ELICITATION_SCHEMAS.includes(schemaType);
-}
-
-/**
  * Hydrate a tool's XState machine to match the persisted backend state.
  * Instead of replaying transitions (idle → executing → awaiting_input → ...),
  * this creates the machine directly in the target state with full context.

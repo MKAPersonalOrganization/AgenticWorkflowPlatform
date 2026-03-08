@@ -106,6 +106,8 @@ func GenerateMessageID() string {
 // ToolCallState represents the current state of a tool call in the thread.
 type ToolCallState struct {
 	ToolCallID  string         `json:"toolCallId"`
+	ToolName    string         `json:"toolName,omitempty"`
+	AgentName   string         `json:"agentName,omitempty"`
 	Status      string         `json:"status"` // "AwaitingInput", "AwaitingAuth", "Completed", etc.
 	Elicitation map[string]any `json:"elicitation,omitempty"`
 	AuthSpec    map[string]any `json:"authSpec,omitempty"`

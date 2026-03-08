@@ -1,0 +1,21 @@
+package askuser
+
+import "school-with-ai/plugins/askuser/components"
+
+templ icon() {
+	<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-help">
+		<circle cx="12" cy="12" r="10"></circle>
+		<path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+		<path d="M12 17h.01"></path>
+	</svg>
+}
+
+templ PluginTemplate() {
+	// Gate on parsedResult?.schema to prevent premature component creation during streaming.
+	// TOOL_START creates the message (name='ask_user') before TOOL_NEEDS_INPUT populates parsedResult.
+	// Without this gate, init() runs with null schema → empty questions that never update.
+	// The status checks keep the component alive after the user submits their answer.
+	<template x-if="message.name === 'ask_user' && (message.parsedResult?.schema || message.status === 'answered' || message.status === 'completed')">
+		@components.AskUser()
+	</template>
+}

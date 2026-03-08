@@ -102,11 +102,6 @@ func (p *MCPPluginProvider) UIHandledTools() []string {
 	return nil
 }
 
-// UIHandledElicitations returns an empty list.
-func (p *MCPPluginProvider) UIHandledElicitations() []string {
-	return nil
-}
-
 // ConnectorToPluginResponse converts an MCP connector into the plugin list format
 // expected by the tools sidebar JS component.
 func ConnectorToPluginResponse(connector MCPConnector, tools []MCPDiscoveredTool) map[string]any {

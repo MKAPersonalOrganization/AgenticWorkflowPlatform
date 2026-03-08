@@ -11,7 +11,7 @@
  * via __batchUpdate.
  */
 
-import { normalizeElicitation, safeParseJSON, mapTokenUsage } from './chat-utils.js';
+import { safeParseJSON, mapTokenUsage } from './chat-utils.js';
 import { TOOL_EVENTS } from './tool-state-machine.js';
 
 /**
@@ -236,11 +236,11 @@ export function createEventHandlerMethods() {
                 elicitation: { question, schema }
             });
 
-            // Update the message in the list to trigger elicitation UI rendering
+            // Update the message in the list to trigger UI rendering
             const msg = state.messages.find(m => m.id === toolCallId);
             if (msg) {
                 msg.status = 'awaiting_input';
-                msg.parsedResult = normalizeElicitation(question, schema);
+                msg.parsedResult = { question_text: question, schema: schema };
             }
 
             if (threadId === this.__currentThreadId) {

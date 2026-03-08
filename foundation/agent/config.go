@@ -48,7 +48,6 @@ type Config struct {
 	// Example:
 	//
 	//    Requirements: []agent.Requirement{
-	//        agent.NewRequireUserInput(),
 	//        agent.NewConditionalRequirement("think", agent.ForceAtStep(1)),
 	//        agent.Require("custom", func(ctx context.Context, inv *agent.Invocation) ([]agent.Rule, error) {
 	//            return []agent.Rule{{TargetTool: "search", Blocked: true}}, nil

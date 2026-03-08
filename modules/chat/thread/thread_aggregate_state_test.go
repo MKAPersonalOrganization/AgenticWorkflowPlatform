@@ -30,7 +30,8 @@ func TestThreadAggregate_ActiveToolStates(t *testing.T) {
 	assert.Equal(t, "AwaitingInput", th.ActiveToolStates["call-1"].Status)
 	assert.Equal(t, "Input?", th.ActiveToolStates["call-1"].Elicitation["question"])
 
-	// 2. Input Provided
+	// 2. Input Provided — adds user's answer as the real tool result message
+	// and removes the tool from ActiveToolStates.
 	inputProvided := thread.InputProvided{
 		ThreadID:   "thread-1",
 		MessageID:  "msg-2",
@@ -41,21 +42,17 @@ func TestThreadAggregate_ActiveToolStates(t *testing.T) {
 	}
 	th.Apply(&inputProvided)
 
-	assert.Contains(t, th.ActiveToolStates, "call-1")
-	assert.Equal(t, "InputProvided", th.ActiveToolStates["call-1"].Status)
+	// Tool should be removed from active states (answer recorded)
+	assert.NotContains(t, th.ActiveToolStates, "call-1",
+		"Tool state should be removed after user provides input")
 
-	// 3. Tool Result (ToolResultAdded)
-	toolResult := thread.ToolResultAdded{
-		ThreadID:   "thread-1",
-		MessageID:  "msg-3",
-		ToolCallID: "call-1",
-		Result:     "Result",
-		AgentName:  "agent",
-		Timestamp:  time.Now(),
-	}
-	th.Apply(&toolResult)
-
-	assert.NotContains(t, th.ActiveToolStates, "call-1", "Tool state should be removed after result")
+	// The user's answer should appear as a tool-role message in the thread
+	lastMsg := th.Messages[len(th.Messages)-1]
+	assert.Equal(t, "tool", lastMsg.Role)
+	assert.Equal(t, "yes", lastMsg.Content)
+	assert.Equal(t, "call-1", lastMsg.ToolCallID)
+	assert.Equal(t, "my-tool", lastMsg.ToolName)
+	assert.Equal(t, "agent", lastMsg.AgentName)
 }
 
 func TestThreadAggregate_ActiveToolStates_Auth(t *testing.T) {

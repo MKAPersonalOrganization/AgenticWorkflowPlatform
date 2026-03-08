@@ -360,10 +360,18 @@ func (s *Service) ExecuteRun(
 
 		// 5. Yield orchestrated events to caller and check for errors
 		var executionError error
+		awaitingInteraction := false
 		for de, err := range processedEvents {
 			if err != nil {
 				executionError = err
 				break
+			}
+			// Detect if the run paused for user interaction (input or auth).
+			// When this happens we must NOT emit RunFinished — the run is
+			// suspended, not done.
+			switch de.(type) {
+			case *thread.ToolNeedsInput, *thread.ToolNeedsAuth:
+				awaitingInteraction = true
 			}
 			if !yield(de, nil) {
 				return
@@ -399,7 +407,14 @@ func (s *Service) ExecuteRun(
 			return
 		}
 
-		// 7. Emit RunFinished on success
+		// 7. If the run is paused awaiting user interaction, do NOT emit
+		// RunFinished. The SSE stream will end without a terminal lifecycle
+		// event, signalling to the frontend that the run is suspended.
+		if awaitingInteraction {
+			return
+		}
+
+		// 8. Emit RunFinished on success
 		runFinishedEvent := &thread.RunFinished{
 			ThreadID:  req.ThreadID,
 			RunID:     req.MessageID,

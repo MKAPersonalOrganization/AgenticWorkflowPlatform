@@ -229,6 +229,8 @@ func (t *ThreadAggregate) Apply(event Event) {
 	case *ToolNeedsInput:
 		state := ToolCallState{
 			ToolCallID: e.ToolCallID,
+			ToolName:   e.ToolName,
+			AgentName:  e.AgentName,
 			Status:     "AwaitingInput",
 			Elicitation: map[string]any{
 				"question": e.Elicitation.Question,
@@ -240,6 +242,8 @@ func (t *ThreadAggregate) Apply(event Event) {
 	case *ToolNeedsAuth:
 		state := ToolCallState{
 			ToolCallID: e.ToolCallID,
+			ToolName:   e.ToolName,
+			AgentName:  e.AgentName,
 			Status:     "AwaitingAuth",
 			AuthSpec: map[string]any{
 				"resource": e.AuthSpec.Resource,
@@ -252,8 +256,22 @@ func (t *ThreadAggregate) Apply(event Event) {
 
 	case *InputProvided:
 		if state, ok := t.ActiveToolStates[e.ToolCallID]; ok {
-			state.Status = "InputProvided"
-			t.ActiveToolStates[e.ToolCallID] = state
+			// Record the user's answer as the real tool result message.
+			// No placeholder was stored during the pause — this is the
+			// single source of truth for the tool's output, ensuring the
+			// LLM sees a valid tool_call → tool_result pair.
+			msg := Message{
+				ID:         e.MessageID,
+				Role:       "tool",
+				Content:    e.Input,
+				ToolCallID: e.ToolCallID,
+				ToolName:   state.ToolName,
+				AgentName:  state.AgentName,
+				Timestamp:  e.Timestamp,
+			}
+			t.Messages = append(t.Messages, msg)
+			delete(t.ActiveToolStates, e.ToolCallID)
+			t.UpdatedAt = e.Timestamp
 		}
 
 	case *AuthGranted:

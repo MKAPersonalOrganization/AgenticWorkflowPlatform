@@ -2,6 +2,7 @@ package codebase
 
 import (
 	"context"
+
 	"school-with-ai/foundation/agent"
 	"school-with-ai/platform/toolregistry"
 
@@ -29,8 +30,4 @@ func (p *Provider) GetUITemplate() templ.Component {
 
 func (p *Provider) UIHandledTools() []string {
 	return []string{"lookup_section", "search_text_in_file"}
-}
-
-func (p *Provider) UIHandledElicitations() []string {
-	return nil
 }

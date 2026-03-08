@@ -2,6 +2,7 @@ package library
 
 import (
 	"context"
+
 	"school-with-ai/foundation/agent"
 	"school-with-ai/platform/toolregistry"
 
@@ -29,8 +30,4 @@ func (p *Provider) GetUITemplate() templ.Component {
 
 func (p *Provider) UIHandledTools() []string {
 	return []string{"browse_library"}
-}
-
-func (p *Provider) UIHandledElicitations() []string {
-	return nil
 }

@@ -2,6 +2,7 @@ package math
 
 import (
 	"context"
+
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/i18n"
 	"school-with-ai/modules/chat/agentorchestrator/prompts"
@@ -67,7 +68,6 @@ func NewMathInstructorConfig(ctx context.Context, artifactStore artifact.Service
 		// The framework auto-wires ToolProvider tools, PromptProvider prompts,
 		// and the RequirementMiddleware from this list.
 		Requirements: []agent.Requirement{
-			agent.NewRequireUserInput(),
 			agent.NewConditionalRequirement("think", agent.ForceAtStep(1)),
 		},
 	}, nil

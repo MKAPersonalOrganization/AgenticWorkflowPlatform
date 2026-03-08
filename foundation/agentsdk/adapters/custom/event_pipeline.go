@@ -3,9 +3,10 @@ package custom
 import (
 	"context"
 	"fmt"
-	"school-with-ai/modules/chat/thread"
+
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/logger"
+	"school-with-ai/modules/chat/thread"
 )
 
 // EventPipeline provides observability for event processing
