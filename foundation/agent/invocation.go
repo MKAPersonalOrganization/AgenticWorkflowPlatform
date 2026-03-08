@@ -33,11 +33,6 @@ type InvocationContext interface {
 	// RunConfig returns the runtime configuration for this invocation.
 	RunConfig() *RunConfig
 
-	// Branch returns the execution branch for sub-agent isolation.
-	// Format: "agent_1.agent_2.agent_3" where agent_1 is parent of agent_2.
-	// Empty string for root agent.
-	Branch() string
-
 	// EndInvocation signals that the invocation should terminate.
 	// Subsequent agent runs will be skipped.
 	EndInvocation()
@@ -62,9 +57,6 @@ type ReadonlyContext interface {
 
 	// SessionID returns the session identifier.
 	SessionID() string
-
-	// Branch returns the execution branch.
-	Branch() string
 
 	// UserContent returns the user's original input.
 	UserContent() *Message

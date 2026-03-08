@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"iter"
+
 	"school-with-ai/foundation/agent"
 )
 
@@ -60,11 +61,6 @@ func (a *CustomAgent) FunctionMiddlewares() []agent.Middleware {
 // Tools returns the agent's tools.
 func (a *CustomAgent) Tools() []agent.Tool {
 	return a.config.Tools
-}
-
-// SubAgents returns the agent's sub-agents.
-func (a *CustomAgent) SubAgents() []agent.Agent {
-	return a.config.SubAgents
 }
 
 // Config returns the underlying configuration.

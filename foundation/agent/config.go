@@ -24,10 +24,6 @@ type Config struct {
 	// Takes precedence over SystemPrompt if set.
 	InstructionProvider func(ctx ReadonlyContext) (string, error)
 
-	// GlobalInstruction is shared across all agents in the tree.
-	// Only effective when set on the root agent.
-	GlobalInstruction string
-
 	// Tools are the available capabilities for this agent.
 	Tools []Tool
 
@@ -36,9 +32,6 @@ type Config struct {
 
 	// ToolResolvers provide dynamic tool discovery.
 	ToolResolvers []ToolResolver
-
-	// SubAgents are child agents for hierarchical delegation.
-	SubAgents []Agent
 
 	// Requirements are declarative constraints evaluated before each LLM turn.
 	// Requirements that implement ToolProvider automatically contribute tools.
@@ -71,10 +64,6 @@ type Config struct {
 	ChatMiddlewares     []Middleware // Runs around each LLM call
 	FunctionMiddlewares []Middleware // Runs around each tool execution
 
-	// OutputKey stores the agent's output in session state.
-	// Useful for connecting agents to coordinate with each other.
-	OutputKey string
-
 	// InputSchema defines the expected input structure (optional).
 	// Used when the agent is invoked as a tool.
 	InputSchema map[string]any
@@ -82,12 +71,6 @@ type Config struct {
 	// OutputSchema defines the expected output structure (optional).
 	// When set, the agent can only reply (no tool calls).
 	OutputSchema map[string]any
-
-	// DisallowTransferToParent prevents escalation to parent agent.
-	DisallowTransferToParent bool
-
-	// DisallowTransferToPeers prevents transfer to sibling agents.
-	DisallowTransferToPeers bool
 }
 
 // Capabilities defines specific behaviors/features the agent requires.
