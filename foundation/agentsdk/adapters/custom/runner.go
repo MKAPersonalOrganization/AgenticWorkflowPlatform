@@ -36,20 +36,21 @@ type TTSConfigResolver interface {
 // All external capabilities are injected as narrow interfaces defined in
 // interfaces.go — the adapter never imports module or service packages.
 type RunnerAdapter struct {
-	log                  *logger.Logger
-	agentProvider        agent.AgentProvider
-	threadMgr            ThreadManager
-	pipeline             *EventPipeline
-	profileRepo          identity.StudentProfileRepository
-	configResolver       ModelConfigResolver
-	ttsResolver          TTSConfigResolver
-	permChecker          ToolPermissionChecker
-	workspacePermChecker WorkspacePermissionChecker
-	mcpResolver          MCPToolResolver
-	newToolSetFactory    NewToolSetFactoryFunc
-	memoryMiddleware     agent.Middleware // nil when memory is disabled
-	edgequakeEnabled     bool
-	edgequakeBaseURL     string
+	log                    *logger.Logger
+	agentProvider          agent.AgentProvider
+	threadMgr              ThreadManager
+	pipeline               *EventPipeline
+	profileRepo            identity.StudentProfileRepository
+	configResolver         ModelConfigResolver
+	ttsResolver            TTSConfigResolver
+	pluginSettingsResolver PluginSettingsResolver
+	permChecker            ToolPermissionChecker
+	workspacePermChecker   WorkspacePermissionChecker
+	mcpResolver            MCPToolResolver
+	newToolSetFactory      NewToolSetFactoryFunc
+	memoryMiddleware       agent.Middleware // nil when memory is disabled
+	edgequakeEnabled       bool
+	edgequakeBaseURL       string
 }
 
 // NewRunnerAdapter creates a new runner adapter.
@@ -61,6 +62,7 @@ func NewRunnerAdapter(
 	agentProvider agent.AgentProvider,
 	configResolver ModelConfigResolver,
 	ttsResolver TTSConfigResolver,
+	pluginSettingsResolver PluginSettingsResolver,
 	profileRepo identity.StudentProfileRepository,
 	permChecker ToolPermissionChecker,
 	workspacePermChecker WorkspacePermissionChecker,
@@ -75,20 +77,21 @@ func NewRunnerAdapter(
 	}
 
 	r := &RunnerAdapter{
-		log:                  log,
-		threadMgr:            threadMgr,
-		agentProvider:        agentProvider,
-		profileRepo:          profileRepo,
-		pipeline:             NewEventPipeline(log),
-		permChecker:          permChecker,
-		workspacePermChecker: workspacePermChecker,
-		mcpResolver:          mcpResolver,
-		newToolSetFactory:    newToolSetFactory,
-		memoryMiddleware:     memoryMiddleware,
-		edgequakeEnabled:     edgequakeEnabled,
-		edgequakeBaseURL:     edgequakeBaseURL,
-		configResolver:       configResolver,
-		ttsResolver:          ttsResolver,
+		log:                    log,
+		threadMgr:              threadMgr,
+		agentProvider:          agentProvider,
+		profileRepo:            profileRepo,
+		pipeline:               NewEventPipeline(log),
+		permChecker:            permChecker,
+		workspacePermChecker:   workspacePermChecker,
+		mcpResolver:            mcpResolver,
+		newToolSetFactory:      newToolSetFactory,
+		memoryMiddleware:       memoryMiddleware,
+		edgequakeEnabled:       edgequakeEnabled,
+		edgequakeBaseURL:       edgequakeBaseURL,
+		configResolver:         configResolver,
+		ttsResolver:            ttsResolver,
+		pluginSettingsResolver: pluginSettingsResolver,
 	}
 
 	return r, nil
@@ -114,6 +117,14 @@ func (r *RunnerAdapter) buildEngine(ctx context.Context, modelCfg *agent.ModelCo
 	// Build per-request tool set factory with user's LLM and TTS config.
 	var toolFactory ToolSetFactory
 	if r.newToolSetFactory != nil {
+		// Resolve per-user plugin settings (non-fatal if unavailable).
+		var pluginSettings map[string]map[string]string
+		if r.pluginSettingsResolver != nil && userID != "" {
+			if ps, psErr := r.pluginSettingsResolver.GetAllPluginSettingsForUser(ctx, userID); psErr == nil {
+				pluginSettings = ps
+			}
+		}
+
 		toolFactory = r.newToolSetFactory(ToolFactoryConfig{
 			EdgequakeBaseURL: r.edgequakeBaseURL,
 			ModelAPIKey:      modelCfg.APIKey,
@@ -121,6 +132,7 @@ func (r *RunnerAdapter) buildEngine(ctx context.Context, modelCfg *agent.ModelCo
 			TTSAPIKey:        ttsAPIKey,
 			TTSModel:         ttsModel,
 			TTSVoice:         ttsVoice,
+			PluginSettings:   pluginSettings,
 		})
 	}
 

@@ -1,0 +1,256 @@
+package websearch
+
+import "school-with-ai/components/annotation"
+
+templ icon() {
+	<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search">
+		<circle cx="11" cy="11" r="8"></circle>
+		<path d="m21 21-4.3-4.3"></path>
+	</svg>
+}
+
+templ Container() {
+	@annotation.Container(icon(), annotation.Props{
+		ContainerAttrs: templ.Attributes{
+			"x-data": `{
+				get result() {
+					try {
+						const r = typeof message.parsedResult === 'string' ? JSON.parse(message.parsedResult) : message.parsedResult;
+						return r || {};
+					} catch { return {}; }
+				},
+				get query() { return this.result?.query || message.parsedArgs?.query || ''; },
+				get summary() { return this.result?.summary || ''; },
+				get sources() { return this.result?.sources || []; },
+				get citations() { return this.result?.citations || []; },
+				get sourceCount() { return this.result?.source_count || this.sources.length; },
+				get hasCitations() { return this.result?.has_citations || this.sources.length > 0; },
+				get searchQueries() { return this.result?.search_queries || []; },
+				get isOk() { return this.result?.status === 'ok'; },
+				get isNoResults() { return this.result?.status === 'no_results'; },
+				get isError() { return message.error || this.result?.status === 'error'; },
+				showSources: false,
+				showCitations: false,
+				faviconUrl(domain) {
+					return 'https://www.google.com/s2/favicons?domain=' + encodeURIComponent(domain) + '&sz=32';
+				},
+				truncate(text, len) {
+					if (!text) return '';
+					return text.length > len ? text.substring(0, len) + '…' : text;
+				}
+			}`,
+			":class": `{
+				'border-primary/20': isOk,
+				'border-amber-500/20': isNoResults,
+				'border-destructive/20': isError,
+				'border-border/40': !isOk && !isNoResults && !isError
+			}`,
+		},
+		IconAttrs: templ.Attributes{
+			":class": `{
+				'bg-primary/15 text-primary group-hover:bg-primary/20': isOk || (!isError && !isNoResults),
+				'bg-amber-500/15 text-amber-600': isNoResults,
+				'bg-destructive/15 text-destructive': isError
+			}`,
+			"class": false,
+		},
+		LabelAttrs: templ.Attributes{
+			"x-text": `isOk ? 'Web Search' : (isNoResults ? 'No Results Found' : (isError ? 'Search Failed' : 'Searching…'))`,
+			":class": `{
+				'text-primary/90': isOk,
+				'text-amber-500/80': isNoResults,
+				'text-destructive/80': isError,
+				'text-muted-foreground/60': !isOk && !isError && !isNoResults
+			}`,
+		},
+		SubtextAttrs: templ.Attributes{
+			"x-text": `isOk ? sourceCount + ' source' + (sourceCount !== 1 ? 's' : '') + ' found' : (query ? truncate(query, 60) : 'Initializing search…')`,
+		},
+		FooterDotAttrs: templ.Attributes{
+			":class": `{
+				'bg-primary/50': isOk,
+				'bg-amber-500/40': isNoResults,
+				'bg-destructive/40': isError,
+				'bg-muted-foreground/20 animate-pulse': !isOk && !isError && !isNoResults
+			}`,
+		},
+	}) {
+		<!-- Streaming / loading state -->
+		<template x-if="message.isStreaming && !isOk && !isError && !isNoResults">
+			<div class="flex flex-col gap-3 py-2">
+				<!-- Search query badge -->
+				<div class="flex items-center gap-2" x-show="query">
+					<div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/[0.08] border border-primary/20">
+						<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-primary/70"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+						<span class="text-[11px] font-medium text-primary/80" x-text="truncate(query, 80)"></span>
+					</div>
+				</div>
+				<!-- Shimmer loading skeleton -->
+				<div class="flex flex-col gap-2 animate-pulse">
+					<div class="h-3 bg-muted/10 rounded-full w-full"></div>
+					<div class="h-3 bg-muted/10 rounded-full w-5/6"></div>
+					<div class="h-3 bg-muted/10 rounded-full w-4/6"></div>
+					<div class="flex gap-2 mt-2">
+						<div class="h-8 bg-muted/8 rounded-lg w-32"></div>
+						<div class="h-8 bg-muted/8 rounded-lg w-28"></div>
+						<div class="h-8 bg-muted/8 rounded-lg w-36"></div>
+					</div>
+				</div>
+			</div>
+		</template>
+		<!-- Success state: results -->
+		<template x-if="isOk">
+			<div class="flex flex-col gap-4">
+				<!-- Search query badge -->
+				<div class="flex items-center gap-2">
+					<div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/[0.08] border border-primary/20">
+						<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-primary/70"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+						<span class="text-[11px] font-medium text-primary/80" x-text="truncate(query, 80)"></span>
+					</div>
+					<template x-if="searchQueries.length > 1">
+						<div class="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-muted/10 border border-border/20">
+							<span class="text-[9px] text-muted-foreground/60" x-text="searchQueries.length + ' queries'"></span>
+						</div>
+					</template>
+				</div>
+				<!-- Sources carousel (always visible) -->
+				<div class="flex flex-col gap-2" x-show="sources.length > 0">
+					<div class="flex items-center justify-between">
+						<span class="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">Sources</span>
+						<button
+							class="text-[9px] font-bold text-primary/70 hover:text-primary transition-colors cursor-pointer"
+							@click="showSources = !showSources"
+							x-text="showSources ? 'Collapse' : 'Show All ' + sourceCount"
+						></button>
+					</div>
+					<!-- Compact source cards (first 4) -->
+					<div class="grid grid-cols-2 gap-1.5" x-show="!showSources">
+						<template x-for="(source, idx) in sources.slice(0, 4)" :key="idx">
+							<a
+								:href="source.url"
+								target="_blank"
+								rel="noopener noreferrer"
+								class="group/source flex items-center gap-2 px-2.5 py-2 rounded-xl bg-muted/[0.03] border border-border/10 hover:border-primary/20 hover:bg-primary/[0.03] transition-all duration-300 no-underline"
+							>
+								<div class="flex-shrink-0 w-5 h-5 rounded-md bg-muted/10 border border-border/10 overflow-hidden flex items-center justify-center">
+									<img :src="faviconUrl(source.domain)" :alt="source.domain" class="w-3.5 h-3.5" loading="lazy" onerror="this.style.display='none'"/>
+								</div>
+								<div class="flex-1 min-w-0 flex flex-col">
+									<span class="text-[11px] font-semibold text-foreground/90 group-hover/source:text-primary truncate leading-tight transition-colors" x-text="source.title || source.domain"></span>
+									<span class="text-[9px] text-muted-foreground/50 truncate" x-text="source.domain"></span>
+								</div>
+								<span class="flex-shrink-0 text-[10px] font-mono font-bold text-primary/60 tabular-nums" x-text="'[' + source.index + ']'"></span>
+							</a>
+						</template>
+					</div>
+					<!-- Expanded source list (all sources) -->
+					<div class="flex flex-col gap-1" x-show="showSources" x-transition>
+						<template x-for="(source, idx) in sources" :key="idx">
+							<a
+								:href="source.url"
+								target="_blank"
+								rel="noopener noreferrer"
+								class="group/source flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-muted/[0.03] border border-border/10 hover:border-primary/20 hover:bg-primary/[0.03] transition-all duration-300 no-underline"
+							>
+								<div class="flex-shrink-0 w-6 h-6 rounded-lg bg-muted/10 border border-border/10 overflow-hidden flex items-center justify-center">
+									<img :src="faviconUrl(source.domain)" :alt="source.domain" class="w-4 h-4" loading="lazy" onerror="this.style.display='none'"/>
+								</div>
+								<div class="flex-1 min-w-0 flex flex-col gap-0.5">
+									<span class="text-[12px] font-semibold text-foreground/90 group-hover/source:text-primary truncate transition-colors" x-text="source.title || source.domain"></span>
+									<span class="text-[10px] text-muted-foreground/50 truncate" x-text="source.url"></span>
+								</div>
+								<div class="flex-shrink-0 flex items-center gap-1.5">
+									<span class="text-[10px] font-mono font-bold text-primary/60 tabular-nums" x-text="'[' + source.index + ']'"></span>
+									<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground/40 group-hover/source:text-primary transition-colors"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+								</div>
+							</a>
+						</template>
+					</div>
+				</div>
+				<!-- Grounding confidence indicator -->
+				<template x-if="citations.length > 0">
+					<div class="flex items-center gap-2">
+						<button
+							class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/[0.08] border border-emerald-500/20 hover:border-emerald-500/40 transition-all cursor-pointer"
+							@click="showCitations = !showCitations"
+						>
+							<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-emerald-500/70"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
+							<span class="text-[9px] font-bold text-emerald-600/70 dark:text-emerald-400/80" x-text="citations.length + ' grounded citation' + (citations.length !== 1 ? 's' : '')"></span>
+							<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-emerald-500/50 transition-transform" :class="showCitations ? 'rotate-180' : ''"><path d="m6 9 6 6 6-6"></path></svg>
+						</button>
+					</div>
+				</template>
+				<!-- Expandable citations detail -->
+				<template x-if="showCitations && citations.length > 0">
+					<div class="flex flex-col gap-1 border-t border-border/15 pt-3" x-transition>
+						<span class="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50 mb-1">Citation Details</span>
+						<template x-for="(cit, idx) in citations.slice(0, 8)" :key="idx">
+							<div class="flex items-start gap-2 px-2.5 py-2 rounded-lg bg-muted/[0.02] border border-border/5 hover:border-border/15 transition-colors">
+								<div class="flex-shrink-0 flex gap-0.5 mt-0.5">
+									<template x-for="sidx in cit.source_indices" :key="sidx">
+										<span class="text-[8px] font-mono font-bold text-primary/70 bg-primary/[0.1] px-1 py-0.5 rounded" x-text="'[' + sidx + ']'"></span>
+									</template>
+								</div>
+								<span class="text-[11px] text-foreground/80 leading-relaxed line-clamp-2" x-text="cit.text"></span>
+								<template x-if="cit.confidence_avg > 0">
+									<span class="flex-shrink-0 text-[8px] font-mono font-bold text-emerald-600/50 dark:text-emerald-400/60 tabular-nums mt-0.5" x-text="Math.round(cit.confidence_avg * 100) + '%'"></span>
+								</template>
+							</div>
+						</template>
+						<template x-if="citations.length > 8">
+							<span class="text-[9px] text-muted-foreground/20 text-center py-1" x-text="'+ ' + (citations.length - 8) + ' more citations'"></span>
+						</template>
+					</div>
+				</template>
+				<!-- Footer stats -->
+				<div class="flex items-center gap-2 flex-wrap">
+					<div class="flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/[0.08] border border-primary/20">
+						<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-primary/70"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>
+						<span class="text-[9px] font-bold text-primary/60">Grounded</span>
+					</div>
+					<template x-if="sourceCount > 0">
+						<div class="flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted/5 border border-border/10">
+							<span class="text-[9px] font-semibold text-muted-foreground/30 tabular-nums" x-text="sourceCount + ' source' + (sourceCount !== 1 ? 's' : '')"></span>
+						</div>
+					</template>
+					<template x-if="hasCitations">
+						<div class="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/[0.06] border border-emerald-500/20">
+							<svg xmlns="http://www.w3.org/2000/svg" width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-emerald-500/60"><polyline points="20 6 9 17 4 12"></polyline></svg>
+							<span class="text-[9px] font-bold text-emerald-600/60 dark:text-emerald-400/70">Cited</span>
+						</div>
+					</template>
+				</div>
+			</div>
+		</template>
+		<!-- No results state -->
+		<template x-if="isNoResults">
+			<div class="flex flex-col items-center justify-center py-6 gap-3">
+				<div class="text-amber-500/20">
+					<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path><path d="M8 11h6"></path></svg>
+				</div>
+				<div class="flex flex-col items-center gap-1">
+					<span class="text-[12px] font-medium text-muted-foreground/40">No results found</span>
+					<span class="text-[10px] text-muted-foreground/20" x-text="'Try rephrasing: ' + truncate(query, 50)"></span>
+				</div>
+			</div>
+		</template>
+		<!-- Error state -->
+		<template x-if="isError && !isNoResults">
+			<div class="flex flex-col items-center justify-center py-6 gap-3">
+				<div class="text-destructive/20">
+					<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+				</div>
+				<div class="flex flex-col items-center gap-1">
+					<span class="text-[12px] font-medium text-destructive/40">Search failed</span>
+					<span class="text-[10px] text-muted-foreground/20">Please try again in a moment</span>
+				</div>
+			</div>
+		</template>
+	}
+}
+
+templ PluginTemplate() {
+	<template x-if="message.name === 'web_search'">
+		@Container()
+	</template>
+}

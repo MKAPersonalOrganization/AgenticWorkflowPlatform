@@ -620,3 +620,17 @@ CREATE TABLE IF NOT EXISTS github_connections (
     connected_at     TIMESTAMP    NOT NULL DEFAULT NOW(),
     updated_at       TIMESTAMP    NOT NULL DEFAULT NOW()
 );
+
+-- Version: 1.53
+-- Description: Create user_plugin_settings table — per-user, per-plugin
+-- configuration stored as JSONB. Each plugin declares its settings schema via
+-- PluginProvider.SettingsSchema(); the platform persists user values here.
+CREATE TABLE IF NOT EXISTS user_plugin_settings (
+    user_id    VARCHAR(255) NOT NULL,
+    plugin_id  VARCHAR(50)  NOT NULL,
+    settings   JSONB        NOT NULL DEFAULT '{}',
+    created_at TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP    NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, plugin_id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_plugin_settings_user ON user_plugin_settings(user_id);

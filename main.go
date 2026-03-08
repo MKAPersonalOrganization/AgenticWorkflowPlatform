@@ -47,6 +47,7 @@ import (
 	"school-with-ai/plugins/planmode"
 	"school-with-ai/plugins/todos"
 	"school-with-ai/plugins/tts"
+	"school-with-ai/plugins/websearch"
 	"school-with-ai/shared"
 
 	"school-with-ai/modules/chat/taskmanagement"
@@ -71,6 +72,7 @@ import (
 	knowledgemod "school-with-ai/modules/knowledge"
 	mcpmod "school-with-ai/modules/mcp"
 	permissionsmod "school-with-ai/modules/permissions"
+	pluginsettingsmod "school-with-ai/modules/pluginsettings"
 	resourcesmod "school-with-ai/modules/resources"
 	userprofilemod "school-with-ai/modules/userprofile"
 
@@ -349,6 +351,10 @@ func run(ctx context.Context, log *logger.Logger) error {
 	aiSettingsModule := aisettingsmod.New(log, db)
 	log.Info(ctx, "startup", "status", "ai settings module initialized (per-user)")
 
+	// Initialize per-user plugin settings (modules/pluginsettings)
+	pluginSettingsModule := pluginsettingsmod.New(log, db)
+	log.Info(ctx, "startup", "status", "plugin settings module initialized (per-user per-plugin)")
+
 	// Initialize artifact service
 	log.Info(ctx, "startup", "status", "initializing s3 artifact service", "endpoint", cfg.Artifacts.S3Endpoint, "bucket", cfg.Artifacts.S3Bucket)
 	artifactService, err := artifact.NewS3Service(ctx, artifact.S3Config{
@@ -405,6 +411,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	toolregistry.RegisterPlugin(&planmode.Provider{})
 	toolregistry.RegisterPlugin(&todos.Provider{})
 	toolregistry.RegisterPlugin(&tts.Provider{})
+	toolregistry.RegisterPlugin(&websearch.Provider{})
 	if err := toolRegistry.Initialize(ctx); err != nil {
 		return fmt.Errorf("failed to initialize tool registry: %w", err)
 	}
@@ -508,6 +515,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 		if cfg.TTSAPIKey != "" {
 			f.SetTTSConfig(cfg.TTSAPIKey, cfg.TTSModel, cfg.TTSVoice)
 		}
+		if cfg.PluginSettings != nil {
+			f.SetPluginSettings(cfg.PluginSettings)
+		}
 		return f
 	})
 
@@ -527,6 +537,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 			agentProvider,               // AgentProvider
 			aiSettingsModule,            // Per-user model config resolver
 			aiSettingsModule,            // Per-user TTS config resolver
+			pluginSettingsModule,        // Per-user plugin settings resolver
 			studentProfileRepo,          // Student profile repository
 			permissionsService,          // ToolPermissionChecker
 			workspacePermissionsService, // WorkspacePermissionChecker
@@ -596,17 +607,18 @@ func run(ctx context.Context, log *logger.Logger) error {
 	authMiddleware := auth.NewMiddleware(googleClient, sessionStore, cfg.Auth.AppURL, ctx)
 
 	registerRoutes(appRouter, log, authHandlers, authMiddleware, healthHandler, routeModules{
-		chat:        chatModule,
-		userProfile: userProfileModule,
-		aiSettings:  aiSettingsModule,
-		agentStore:  agentStoreModule,
-		knowledge:   knowledgeModule,
-		mcp:         mcpModule,
-		resources:   resourcesModule,
-		filesystem:  filesystemModule,
-		billing:     billingModule,
-		permissions: permissionsmod.New(log, workspacePermissionsService, &WorkspaceProviderAdapter{svc: edgequakeService}, agentProvider, cfg.Edgequake.TenantID),
-		analytics:   analyticsmod.New(log, statsProjection, cfg.DashboardAdmin.User, cfg.DashboardAdmin.Pass),
+		chat:           chatModule,
+		userProfile:    userProfileModule,
+		aiSettings:     aiSettingsModule,
+		pluginSettings: pluginSettingsModule,
+		agentStore:     agentStoreModule,
+		knowledge:      knowledgeModule,
+		mcp:            mcpModule,
+		resources:      resourcesModule,
+		filesystem:     filesystemModule,
+		billing:        billingModule,
+		permissions:    permissionsmod.New(log, workspacePermissionsService, &WorkspaceProviderAdapter{svc: edgequakeService}, agentProvider, cfg.Edgequake.TenantID),
+		analytics:      analyticsmod.New(log, statsProjection, cfg.DashboardAdmin.User, cfg.DashboardAdmin.Pass),
 	}, edgequakeService)
 
 	// Set Stripe API key — must be done before any Stripe SDK calls
@@ -712,6 +724,9 @@ type routeModules struct {
 	aiSettings interface {
 		RegisterRoutes(chi.Router, *auth.Middleware)
 	}
+	pluginSettings interface {
+		RegisterRoutes(chi.Router, *auth.Middleware)
+	}
 	agentStore interface {
 		RegisterRoutes(chi.Router, *auth.Middleware)
 	}
@@ -757,6 +772,7 @@ func registerRoutes(
 	mods.agentStore.RegisterRoutes(r, authMW)
 	mods.userProfile.RegisterRoutes(r, authMW)
 	mods.aiSettings.RegisterRoutes(r, authMW)
+	mods.pluginSettings.RegisterRoutes(r, authMW)
 	mods.billing.RegisterRoutes(r, authMW)
 	mods.chat.RegisterRoutes(r, authMW)
 	mods.mcp.RegisterRoutes(r, authMW)

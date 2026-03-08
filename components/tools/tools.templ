@@ -287,14 +287,7 @@ templ ToolsDialog() {
 											</template>
 										</span>
 									</template>
-									<!-- Plugin hint -->
-									<template x-if="detailItem._type === 'plugin'">
-										<span class="flex items-center gap-1.5">
-											<span class="text-border">|</span>
-											@icon.Info(icon.Props{Class: "size-3 opacity-60"})
-											{ i18n.T(ctx, "Configure per agent") }
-										</span>
-									</template>
+
 								</div>
 								<!-- MCP connect/disconnect actions -->
 								<template x-if="detailItem._type === 'mcp'">
@@ -366,6 +359,108 @@ templ ToolsDialog() {
 										</template>
 										<template x-if="detailItem._type === 'plugin'">
 											<p class="text-sm">{ i18n.T(ctx, "This plugin has no tools.") }</p>
+										</template>
+									</div>
+								</template>
+
+								<!-- Plugin Settings Section -->
+								<template x-if="detailItem._type === 'plugin'">
+									<div x-data="pluginSettingsManager()" class="border-t border-border pt-5 space-y-4">
+										<template x-if="schemas.find(s => s.plugin_id === detailItem.plugin_id)">
+											<div class="space-y-4">
+												<div class="flex items-center gap-2 mb-2">
+													@icon.Settings(icon.Props{Class: "size-4 text-muted-foreground"})
+													<h4 class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{ i18n.T(ctx, "Plugin Settings") }</h4>
+													<template x-if="isConfigured(detailItem.plugin_id)">
+														<span class="ms-1 inline-flex items-center rounded-full bg-green-500/10 px-1.5 py-0.5 text-[9px] font-medium text-green-600 dark:text-green-400 ring-1 ring-inset ring-green-500/20">{ i18n.T(ctx, "Configured") }</span>
+													</template>
+												</div>
+
+												<!-- Settings fields -->
+												<div class="space-y-4 bg-muted/30 rounded-xl p-4 border border-border/50">
+													<template x-for="field in (schemas.find(s => s.plugin_id === detailItem.plugin_id)?.schema || [])" :key="field.key">
+														<div class="flex flex-col gap-1.5">
+															<label class="text-foreground text-xs font-medium flex items-center gap-1">
+																<span x-text="field.label"></span>
+																<span x-show="field.required" class="text-destructive font-bold">*</span>
+															</label>
+															
+															<!-- Text input -->
+															<template x-if="field.type === 'string'">
+																<input
+																	type="text"
+																	:placeholder="field.description"
+																	:value="getField(detailItem.plugin_id, field.key)"
+																	@input="setField(detailItem.plugin_id, field.key, $event.target.value)"
+																	class="w-full h-8 px-3 py-1 text-xs rounded-md border border-input bg-background shadow-xs focus:ring-1 focus:ring-primary outline-none"
+																/>
+															</template>
+
+															<!-- Password input -->
+															<template x-if="field.type === 'password'">
+																<input
+																	type="password"
+																	:placeholder="field.description"
+																	:value="getField(detailItem.plugin_id, field.key)"
+																	@input="setField(detailItem.plugin_id, field.key, $event.target.value)"
+																	class="w-full h-8 px-3 py-1 text-xs rounded-md border border-input bg-background shadow-xs focus:ring-1 focus:ring-primary outline-none"
+																/>
+															</template>
+
+															<!-- Select input -->
+															<template x-if="field.type === 'select'">
+																<select
+																	:value="getField(detailItem.plugin_id, field.key)"
+																	@change="setField(detailItem.plugin_id, field.key, $event.target.value)"
+																	class="w-full h-8 px-3 py-1 text-xs rounded-md border border-input bg-background shadow-xs focus:ring-1 focus:ring-primary outline-none"
+																>
+																	<option value="">{ i18n.T(ctx, "Select...") }</option>
+																	<template x-for="opt in field.options" :key="opt">
+																		<option :value="opt" x-text="opt" :selected="opt === getField(detailItem.plugin_id, field.key)"></option>
+																	</template>
+																</select>
+															</template>
+
+															<p x-show="field.description && field.type !== 'string' && field.type !== 'password'" class="text-[10px] text-muted-foreground" x-text="field.description"></p>
+														</div>
+													</template>
+
+													<!-- Error message -->
+													<template x-if="errors[detailItem.plugin_id]">
+														<div class="p-2.5 rounded-lg border border-destructive/20 bg-destructive/5 text-destructive text-[11px]" x-text="errors[detailItem.plugin_id]"></div>
+													</template>
+
+													<!-- Actions -->
+													<div class="flex items-center justify-between pt-2">
+														<button
+															type="button"
+															@click="deletePlugin(detailItem.plugin_id)"
+															class="text-[10px] text-muted-foreground hover:text-destructive transition-colors underline underline-offset-2"
+															x-show="isConfigured(detailItem.plugin_id)"
+														>{ i18n.T(ctx, "Reset settings") }</button>
+														<div class="flex items-center gap-3 ms-auto">
+															<span x-show="saved[detailItem.plugin_id]" x-transition class="text-[11px] text-emerald-600 font-medium flex items-center gap-1">
+																@icon.Check(icon.Props{Class: "size-3"})
+																{ i18n.T(ctx, "Saved") }
+															</span>
+															<button
+																type="button"
+																@click="savePlugin(detailItem.plugin_id)"
+																:disabled="saving[detailItem.plugin_id]"
+																class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-xs font-semibold transition-all cursor-pointer bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-8 px-4 disabled:opacity-50"
+															>
+																<span x-show="!saving[detailItem.plugin_id]">{ i18n.T(ctx, "Save Settings") }</span>
+																<template x-if="saving[detailItem.plugin_id]">
+																	<span class="flex items-center gap-2">
+																		<span class="animate-spin rounded-full h-3 w-3 border-b-2 border-primary-foreground"></span>
+																		{ i18n.T(ctx, "Saving...") }
+																	</span>
+																</template>
+															</button>
+														</div>
+													</div>
+												</div>
+											</div>
 										</template>
 									</div>
 								</template>

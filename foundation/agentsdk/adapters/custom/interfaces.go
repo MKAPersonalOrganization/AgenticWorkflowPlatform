@@ -4,8 +4,8 @@ import (
 	"context"
 	"iter"
 
-	"school-with-ai/modules/chat/thread"
 	"school-with-ai/foundation/agent"
+	"school-with-ai/modules/chat/thread"
 )
 
 // ─── Thread Management ──────────────────────────────────────────────────────
@@ -55,6 +55,11 @@ type ToolFactoryConfig struct {
 	TTSAPIKey        string
 	TTSModel         string
 	TTSVoice         string
+
+	// PluginSettings carries per-user, per-plugin settings resolved from
+	// the user_plugin_settings table. Outer key = plugin ID, inner key =
+	// setting key, value = setting value.
+	PluginSettings map[string]map[string]string
 }
 
 // NewToolSetFactoryFunc builds a ToolSetFactory with per-request configuration.
@@ -68,4 +73,12 @@ type MCPToolResolver interface {
 		isToolSetEnabled func(toolSetID string) bool,
 		isToolEnabled func(toolSetID, toolID string) bool,
 	) []agent.ExecutableTool
+}
+
+// PluginSettingsResolver resolves per-user plugin settings at request time.
+// Satisfied by *pluginsettings.Module.
+type PluginSettingsResolver interface {
+	// GetAllPluginSettingsForUser returns all plugin settings as a map for a user.
+	// Outer key = plugin ID, inner key = setting key, value = setting value.
+	GetAllPluginSettingsForUser(ctx context.Context, userID string) (map[string]map[string]string, error)
 }

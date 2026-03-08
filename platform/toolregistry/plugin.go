@@ -21,6 +21,28 @@ type ToolUIContext struct {
 	Error        bool
 }
 
+// SettingsFieldType enumerates allowed plugin-setting field types.
+type SettingsFieldType string
+
+const (
+	FieldTypeString   SettingsFieldType = "string"   // Plain text
+	FieldTypePassword SettingsFieldType = "password" // Masked / sensitive
+	FieldTypeSelect   SettingsFieldType = "select"   // Dropdown with Options
+)
+
+// SettingsField describes one user-configurable setting that a plugin exposes.
+// Plugins declare their schema via [PluginProvider.SettingsSchema]; the platform
+// validates and persists the values per-user-per-plugin.
+type SettingsField struct {
+	Key         string            `json:"key"`
+	Label       string            `json:"label"`
+	Description string            `json:"description,omitempty"`
+	Type        SettingsFieldType `json:"type"`
+	Required    bool              `json:"required"`
+	Default     string            `json:"default,omitempty"`
+	Options     []string          `json:"options,omitempty"` // Used when Type == FieldTypeSelect
+}
+
 // FactoryDeps holds the dependencies required to instantiate certain tools.
 type FactoryDeps struct {
 	ArtifactStore    any // To be type-asserted by the specific plugin if needed
@@ -32,6 +54,11 @@ type FactoryDeps struct {
 	TTSAPIKey string // API key for the TTS provider (may differ from OpenAIAPIKey)
 	TTSModel  string // e.g. "gpt-4o-mini-tts"
 	TTSVoice  string // Default voice e.g. "marin", "coral"
+
+	// PluginSettings carries per-user, per-plugin configuration resolved at
+	// request time from the user_plugin_settings table.
+	// Outer key = plugin ID, inner key = setting field key, value = setting value.
+	PluginSettings map[string]map[string]string
 }
 
 // BuildIconSVG wraps Lucide-style inner SVG paths in a complete <svg> element.
@@ -55,6 +82,12 @@ type PluginProvider interface {
 
 	// DefaultTools returns the default tools provided by this plugin.
 	DefaultTools() []Tool
+
+	// SettingsSchema returns the list of user-configurable settings this plugin
+	// requires. Return nil or an empty slice if the plugin has no settings.
+	// The platform renders a settings form from this schema and stores the
+	// values per-user, per-plugin in the user_plugin_settings table.
+	SettingsSchema() []SettingsField
 
 	// CreateExecutable creates an executable tool instance given a tool ID.
 	CreateExecutable(ctx context.Context, toolID string, deps FactoryDeps) (agent.ExecutableTool, error)
@@ -119,6 +152,21 @@ func GetPluginIcon(toolSetID string) string {
 	return defaultIconSVG
 }
 
+// GetPluginIDForSet returns the ID of the plugin that owns the given tool set ID.
+// Returns an empty string if no provider claims the set.
+func GetPluginIDForSet(toolSetID string) string {
+	providersMu.RLock()
+	defer providersMu.RUnlock()
+	for _, p := range providers {
+		for _, ts := range p.DefaultSets() {
+			if ts.ID == toolSetID {
+				return p.ID()
+			}
+		}
+	}
+	return ""
+}
+
 // GetUIHandledToolsJSON returns a JSON-encoded list of all tool names that possess a custom UI template.
 func GetUIHandledToolsJSON() string {
 	var handled []string
@@ -130,4 +178,29 @@ func GetUIHandledToolsJSON() string {
 
 	bytes, _ := json.Marshal(handled)
 	return string(bytes)
+}
+
+// PluginSettingsMeta is a lightweight summary of a plugin's configurable settings.
+type PluginSettingsMeta struct {
+	PluginID string          `json:"plugin_id"`
+	Icon     string          `json:"icon"`
+	Schema   []SettingsField `json:"schema"`
+}
+
+// GetAllPluginSettingsSchemas returns schema metadata for every registered
+// plugin that declares at least one SettingsField.
+func GetAllPluginSettingsSchemas() []PluginSettingsMeta {
+	var out []PluginSettingsMeta
+	for _, p := range GetAllPluginProviders() {
+		schema := p.SettingsSchema()
+		if len(schema) == 0 {
+			continue
+		}
+		out = append(out, PluginSettingsMeta{
+			PluginID: p.ID(),
+			Icon:     p.Icon(),
+			Schema:   schema,
+		})
+	}
+	return out
 }

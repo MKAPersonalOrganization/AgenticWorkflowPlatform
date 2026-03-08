@@ -44,6 +44,8 @@ func (p *Provider) DefaultTools() []toolregistry.Tool {
 	}
 }
 
+func (p *Provider) SettingsSchema() []toolregistry.SettingsField { return nil }
+
 func (p *Provider) CreateExecutable(ctx context.Context, toolID string, deps toolregistry.FactoryDeps) (agent.ExecutableTool, error) {
 	memService, ok := deps.MemoryService.(memory.Service)
 	if !ok {
