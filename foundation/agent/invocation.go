@@ -23,10 +23,6 @@ type InvocationContext interface {
 	// Returns nil if artifacts are not supported.
 	Artifacts() Artifacts
 
-	// Memory provides access to long-term memory (optional).
-	// Returns nil if memory is not supported.
-	Memory() Memory
-
 	// UserContent returns the user's original input for this invocation.
 	UserContent() *Message
 
@@ -86,26 +82,4 @@ type Artifacts interface {
 
 	// List returns all artifact names.
 	List(ctx context.Context) ([]string, error)
-}
-
-// Memory provides access to long-term memory across sessions.
-// Memory enables agents to recall information from past interactions.
-type Memory interface {
-	// Search performs semantic search on stored memories.
-	Search(ctx context.Context, query string, limit int) ([]MemoryResult, error)
-
-	// Store saves a memory entry.
-	Store(ctx context.Context, content string, metadata map[string]any) error
-}
-
-// MemoryResult represents a single memory search result.
-type MemoryResult struct {
-	// Content is the remembered information.
-	Content string
-
-	// Score indicates relevance (0.0-1.0).
-	Score float64
-
-	// Metadata contains additional context.
-	Metadata map[string]any
 }

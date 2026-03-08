@@ -48,9 +48,6 @@ type Config struct {
 	//    },
 	Requirements []Requirement
 
-	// Capabilities enables specific agent behaviors.
-	Capabilities Capabilities
-
 	// MaxIterations limits the number of turns in a single run.
 	// Default is 10.
 	MaxIterations int
@@ -71,15 +68,6 @@ type Config struct {
 	// OutputSchema defines the expected output structure (optional).
 	// When set, the agent can only reply (no tool calls).
 	OutputSchema map[string]any
-}
-
-// Capabilities defines specific behaviors/features the agent requires.
-//
-// For tool-access constraints, quiz tools, and human-in-the-loop flows,
-// use the declarative Requirements system on Config instead.
-type Capabilities struct {
-	// LongTermMemory enables access to the user's long-term memory store.
-	LongTermMemory bool
 }
 
 // DefaultConfig returns a Config with sensible defaults.

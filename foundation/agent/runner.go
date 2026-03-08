@@ -85,9 +85,6 @@ type RunnerConfig struct {
 	// ArtifactStore manages artifact storage (optional).
 	ArtifactStore ArtifactStore
 
-	// MemoryStore manages long-term memory (optional).
-	MemoryStore MemoryStore
-
 	// Middlewares are applied to all agent invocations.
 	Middlewares []Middleware
 
@@ -130,13 +127,4 @@ type ArtifactStore interface {
 
 	// List returns artifact names for a session.
 	List(ctx context.Context, sessionID string) ([]string, error)
-}
-
-// MemoryStore persists long-term memories.
-type MemoryStore interface {
-	// Search finds relevant memories.
-	Search(ctx context.Context, userID, query string, limit int) ([]MemoryResult, error)
-
-	// Store saves a memory.
-	Store(ctx context.Context, userID, content string, metadata map[string]any) error
 }
