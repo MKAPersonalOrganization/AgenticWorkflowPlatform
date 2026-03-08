@@ -282,3 +282,34 @@ func (s *service) listPermittedFilesystems(ctx context.Context, userID, agentID 
 func (s *service) hasAgentPermission(ctx context.Context, fsID uuid.UUID, userID, agentID string) (bool, error) {
 	return s.repo.HasPermission(ctx, fsID, userID, agentID)
 }
+
+func (s *service) listAgentFilesystems(ctx context.Context, userID, agentID string) ([]AgentFilesystem, error) {
+	// 1. Get all filesystems owned by the user
+	allFS, err := s.repo.ListFilesystems(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Get filesystems the agent already has access to
+	permittedFS, err := s.repo.ListPermittedFilesystems(ctx, userID, agentID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. Create a map for quick lookup
+	permittedMap := make(map[uuid.UUID]bool)
+	for _, fs := range permittedFS {
+		permittedMap[fs.ID] = true
+	}
+
+	// 4. Merge results
+	out := make([]AgentFilesystem, 0, len(allFS))
+	for _, fs := range allFS {
+		out = append(out, AgentFilesystem{
+			FileSystem: fs,
+			Enabled:    permittedMap[fs.ID],
+		})
+	}
+
+	return out, nil
+}

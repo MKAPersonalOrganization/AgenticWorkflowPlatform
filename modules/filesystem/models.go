@@ -116,3 +116,14 @@ type RenameRequest struct {
 type PermissionRequest struct {
 	AgentID string `json:"agent_id"`
 }
+
+// AgentFilesystem represents a filesystem with an indication if a specific agent has access.
+type AgentFilesystem struct {
+	FileSystem
+	Enabled bool `json:"enabled"`
+}
+
+// ToggleAgentPermissionRequest is the request body for toggling agent access to a filesystem.
+type ToggleAgentPermissionRequest struct {
+	Enabled bool `json:"enabled"`
+}

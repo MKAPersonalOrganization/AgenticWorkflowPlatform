@@ -448,6 +448,62 @@ func (h *handler) listPermissions(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, perms)
 }
 
+func (h *handler) listAgentFilesystems(w http.ResponseWriter, r *http.Request) {
+	user, ok := userFromRequest(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	agentID := chi.URLParam(r, "agentId")
+	if agentID == "" {
+		writeError(w, http.StatusBadRequest, "agent id is required")
+		return
+	}
+
+	list, err := h.svc.listAgentFilesystems(r.Context(), user.ID, agentID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list agent filesystems")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, list)
+}
+
+func (h *handler) toggleAgentPermission(w http.ResponseWriter, r *http.Request) {
+	user, ok := userFromRequest(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	agentID := chi.URLParam(r, "agentId")
+	fsID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil || agentID == "" {
+		writeError(w, http.StatusBadRequest, "invalid agent or filesystem id")
+		return
+	}
+
+	var req ToggleAgentPermissionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.Enabled {
+		err = h.svc.grantPermission(r.Context(), fsID, user.ID, agentID)
+	} else {
+		err = h.svc.revokePermission(r.Context(), fsID, user.ID, agentID)
+	}
+
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
 // ── Error mapping ───────────────────────────────────────────────────────────
 
 func errorToStatus(err error) int {

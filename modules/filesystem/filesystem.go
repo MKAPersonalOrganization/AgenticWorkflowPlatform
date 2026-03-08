@@ -57,6 +57,10 @@ func (m *Module) RegisterRoutes(r chi.Router, authMW *auth.Middleware) {
 	r.Post("/api/filesystems/{id}/permissions", authMW.RequireAuthFunc(m.handler.grantPermission))
 	r.Delete("/api/filesystems/{id}/permissions/{agentId}", authMW.RequireAuthFunc(m.handler.revokePermission))
 
+	// Agent-centric permissions
+	r.Get("/v1/agents/{agentId}/filesystems", authMW.RequireAuthFunc(m.handler.listAgentFilesystems))
+	r.Put("/v1/agents/{agentId}/filesystems/{id}", authMW.RequireAuthFunc(m.handler.toggleAgentPermission))
+
 	// GitHub OAuth connection — routes are always registered so the frontend
 	// gets a clear error instead of a 404 when GitHub OAuth is not configured.
 	if m.ghHandler != nil {

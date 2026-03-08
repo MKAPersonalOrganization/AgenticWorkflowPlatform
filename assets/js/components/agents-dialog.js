@@ -27,10 +27,13 @@ export const agentsManager = () => ({
     // Tools & KB state (for edit mode)
     showTools: false,
     showKnowledgeBases: false,
+    showFilesystems: false,
     agentPlugins: [],
     agentWorkspaces: [],
+    agentFilesystems: [],
     loadingTools: false,
     loadingKBs: false,
+    loadingFilesystems: false,
 
     // Delete state
     deletingAgent: null,
@@ -132,8 +135,10 @@ export const agentsManager = () => ({
         };
         this.showTools = false;
         this.showKnowledgeBases = false;
+        this.showFilesystems = false;
         this.agentPlugins = [];
         this.agentWorkspaces = [];
+        this.agentFilesystems = [];
         this.view = 'form';
     },
 
@@ -146,13 +151,15 @@ export const agentsManager = () => ({
         };
         this.showTools = false;
         this.showKnowledgeBases = false;
+        this.showFilesystems = false;
         this.agentPlugins = [];
         this.agentWorkspaces = [];
         this.view = 'form';
 
-        // Load tool/KB data for this agent
+        // Load tool/KB/Filesystem data for this agent
         this.fetchAgentPlugins(agent.id);
         this.fetchAgentWorkspaces(agent.id);
+        this.fetchAgentFilesystems(agent.id);
     },
 
     async saveAgent() {
@@ -266,6 +273,12 @@ export const agentsManager = () => ({
         return `${enabled}/${this.agentWorkspaces.length}`;
     },
 
+    get fsSummary() {
+        if (this.loadingFilesystems) return '';
+        const enabled = this.agentFilesystems.filter(fs => fs.enabled).length;
+        return `${enabled}/${this.agentFilesystems.length}`;
+    },
+
     async fetchAgentPlugins(agentId) {
         this.loadingTools = true;
         try {
@@ -293,6 +306,21 @@ export const agentsManager = () => ({
             console.error('Failed to fetch agent workspaces:', err);
         } finally {
             this.loadingKBs = false;
+        }
+    },
+
+    async fetchAgentFilesystems(agentId) {
+        this.loadingFilesystems = true;
+        try {
+            const response = await fetch(`/v1/agents/${encodeURIComponent(agentId)}/filesystems`);
+            if (response.ok) {
+                const data = await response.json();
+                this.agentFilesystems = data || [];
+            }
+        } catch (err) {
+            console.error('Failed to fetch agent filesystems:', err);
+        } finally {
+            this.loadingFilesystems = false;
         }
     },
 
@@ -348,6 +376,23 @@ export const agentsManager = () => ({
             }
         } catch (err) {
             console.error('Failed to toggle agent workspace:', err);
+        }
+    },
+
+    async toggleAgentFilesystem(fs) {
+        if (!this.editingAgent) return;
+        const newState = !fs.enabled;
+        try {
+            const response = await fetch(`/v1/agents/${encodeURIComponent(this.editingAgent.id)}/filesystems/${fs.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: newState }),
+            });
+            if (response.ok) {
+                fs.enabled = newState;
+            }
+        } catch (err) {
+            console.error('Failed to toggle agent filesystem:', err);
         }
     },
 
