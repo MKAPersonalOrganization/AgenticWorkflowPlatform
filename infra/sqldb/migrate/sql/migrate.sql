@@ -634,3 +634,63 @@ CREATE TABLE IF NOT EXISTS user_plugin_settings (
     PRIMARY KEY (user_id, plugin_id)
 );
 CREATE INDEX IF NOT EXISTS idx_user_plugin_settings_user ON user_plugin_settings(user_id);
+
+-- Version: 1.54
+-- Description: Create skill system tables — shared catalog (marketplace), per-user
+-- skills library, and skill-agent permissions. Mirrors the agent store pattern.
+-- See arch/adr/017-skills-system.md for full design.
+
+-- Shared skill catalog (marketplace) — read-only, admin-seeded
+CREATE TABLE IF NOT EXISTS skill_catalog (
+    id            VARCHAR(255) PRIMARY KEY,
+    name          VARCHAR(255) NOT NULL,
+    description   TEXT NOT NULL DEFAULT '',
+    instructions  TEXT NOT NULL DEFAULT '',
+    category      VARCHAR(255) NOT NULL DEFAULT '',
+    tags          TEXT[] NOT NULL DEFAULT '{}',
+    author_name   VARCHAR(255) NOT NULL DEFAULT '',
+    icon          TEXT NOT NULL DEFAULT '',
+    featured      BOOLEAN NOT NULL DEFAULT FALSE,
+    add_count     INTEGER NOT NULL DEFAULT 0,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_skill_catalog_category ON skill_catalog(category);
+CREATE INDEX IF NOT EXISTS idx_skill_catalog_name ON skill_catalog(name);
+CREATE INDEX IF NOT EXISTS idx_skill_catalog_featured ON skill_catalog(featured) WHERE featured = TRUE;
+CREATE INDEX IF NOT EXISTS idx_skill_catalog_tags ON skill_catalog USING GIN (tags);
+
+-- Per-user skills library (imported from catalog + custom-created)
+CREATE TABLE IF NOT EXISTS user_skills (
+    id                VARCHAR(255) PRIMARY KEY,
+    user_id           VARCHAR(255) NOT NULL,
+    name              VARCHAR(255) NOT NULL,
+    description       TEXT NOT NULL DEFAULT '',
+    instructions      TEXT NOT NULL DEFAULT '',
+    category          VARCHAR(255) NOT NULL DEFAULT '',
+    icon              TEXT NOT NULL DEFAULT '',
+    is_custom         BOOLEAN NOT NULL DEFAULT FALSE,
+    source_catalog_id VARCHAR(255) NOT NULL DEFAULT '',
+    resources         JSONB NOT NULL DEFAULT '{}',
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_skills_user_id ON user_skills(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_skills_user_name ON user_skills(user_id, name);
+CREATE INDEX IF NOT EXISTS idx_user_skills_source_catalog ON user_skills(user_id, source_catalog_id) WHERE source_catalog_id != '';
+
+-- Skill-agent permissions: which agents can access which user skills
+-- Triple-key (user_id, agent_id, skill_id) ensures full multi-tenant isolation.
+CREATE TABLE IF NOT EXISTS skill_agent_permissions (
+    user_id    VARCHAR(255) NOT NULL,
+    agent_id   VARCHAR(255) NOT NULL,
+    skill_id   VARCHAR(255) NOT NULL,
+    enabled    BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, agent_id, skill_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_skill_agent_perms_user_agent ON skill_agent_permissions(user_id, agent_id);
+CREATE INDEX IF NOT EXISTS idx_skill_agent_perms_user_skill ON skill_agent_permissions(user_id, skill_id);

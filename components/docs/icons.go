@@ -36,4 +36,6 @@ var (
 	iconSearch            = iconSized(icon.Search)
 	iconChartBar          = iconSized(icon.ChartBar)
 	iconSlidersHorizontal = iconSized(icon.SlidersHorizontal)
+	iconZap               = iconSized(icon.Zap)
+	iconSparkles          = iconSized(icon.Sparkles)
 )

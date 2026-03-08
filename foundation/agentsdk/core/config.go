@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/internal/llm"
 )
@@ -168,6 +169,9 @@ func ApplyMiddleware(ctx context.Context, config AgentConfig, messages []llm.Mes
 
 	// Copy essential config fields to request context
 	reqCtx.Config.Name = config.Name
+
+	// Inject agent_id into State so tools can access it via args.Metadata
+	reqCtx.State["agent_id"] = config.Name
 
 	// Copy config parameters to request context
 	if config.Temperature != nil {
