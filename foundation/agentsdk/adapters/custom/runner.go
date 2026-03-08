@@ -48,7 +48,6 @@ type RunnerAdapter struct {
 	workspacePermChecker   WorkspacePermissionChecker
 	mcpResolver            MCPToolResolver
 	newToolSetFactory      NewToolSetFactoryFunc
-	memoryMiddleware       agent.Middleware // nil when memory is disabled
 	edgequakeEnabled       bool
 	edgequakeBaseURL       string
 }
@@ -68,7 +67,6 @@ func NewRunnerAdapter(
 	workspacePermChecker WorkspacePermissionChecker,
 	mcpResolver MCPToolResolver,
 	newToolSetFactory NewToolSetFactoryFunc,
-	memoryMiddleware agent.Middleware,
 	edgequakeEnabled bool,
 	edgequakeBaseURL string,
 ) (*RunnerAdapter, error) {
@@ -86,7 +84,6 @@ func NewRunnerAdapter(
 		workspacePermChecker:   workspacePermChecker,
 		mcpResolver:            mcpResolver,
 		newToolSetFactory:      newToolSetFactory,
-		memoryMiddleware:       memoryMiddleware,
 		edgequakeEnabled:       edgequakeEnabled,
 		edgequakeBaseURL:       edgequakeBaseURL,
 		configResolver:         configResolver,
@@ -149,7 +146,6 @@ func (r *RunnerAdapter) buildEngine(ctx context.Context, modelCfg *agent.ModelCo
 		workspacePermChecker: r.workspacePermChecker,
 		edgequakeEnabled:     r.edgequakeEnabled,
 		mcpResolver:          r.mcpResolver,
-		memoryMiddleware:     r.memoryMiddleware,
 	}
 
 	return engine.New(chatClient, provider, nil, nil), nil
@@ -412,7 +408,6 @@ type RegistryAgentProvider struct {
 	workspacePermChecker WorkspacePermissionChecker
 	edgequakeEnabled     bool
 	mcpResolver          MCPToolResolver
-	memoryMiddleware     agent.Middleware // nil when memory is disabled
 }
 
 func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (core.AgentConfig, error) {
@@ -575,11 +570,6 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 	// Wire up the RequirementMiddleware if we have any requirements.
 	if len(agentConfig.Requirements) > 0 {
 		config.ChatMiddleware = append(config.ChatMiddleware, agent.RequirementMiddleware(agentConfig.Requirements...))
-	}
-
-	// Inject Memory Context as a Chat-level middleware (runs before each LLM call)
-	if p.memoryMiddleware != nil {
-		config.ChatMiddleware = append(config.ChatMiddleware, p.memoryMiddleware)
 	}
 
 	// Inject Student Profile as a Chat-level middleware

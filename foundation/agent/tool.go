@@ -103,7 +103,6 @@ type Arguments struct {
 	SessionID string
 	UserID    string
 	Artifacts Artifacts
-	Memory    Memory
 	Metadata  map[string]any
 }
 

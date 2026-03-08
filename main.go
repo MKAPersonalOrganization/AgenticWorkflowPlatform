@@ -61,7 +61,6 @@ import (
 
 	projectionStats "school-with-ai/modules/analytics/statistics"
 
-	"school-with-ai/modules/chat/memory"
 	memoryplugin "school-with-ai/plugins/memory"
 
 	healthhandlers "school-with-ai/foundation/health"
@@ -170,9 +169,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 			S3Bucket    string `conf:"default:artifacts"`
 			S3UseSSL    bool   `conf:"default:false"`
 			S3Region    string `conf:"default:us-east-1"`
-		}
-		AgentCapabilities struct {
-			LongTermMemory bool `conf:"default:true"`
 		}
 		Edgequake struct {
 			BaseURL  string `conf:"default:http://localhost:8081"`
@@ -535,13 +531,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 		return f
 	})
 
-	// Build memory middleware (nil when long-term memory is disabled).
-	var memoryMiddleware agent.Middleware
-	if cfg.AgentCapabilities.LongTermMemory && artifactService != nil {
-		memSvc := memory.NewArtifactMemoryService(artifactService)
-		memoryMiddleware = memoryplugin.NewMemoryInjectorMiddleware(memSvc)
-	}
-
 	switch cfg.Orchestration.Framework {
 	case "custom":
 		runner, err := custom.NewRunnerAdapter(
@@ -557,7 +546,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 			workspacePermissionsService, // WorkspacePermissionChecker
 			mcpModule.Service(),         // MCPToolResolver
 			newToolSetFactory,           // Tool factory builder
-			memoryMiddleware,            // Memory middleware (nil if disabled)
 			edgequakeService != nil,     // edgequakeEnabled
 			cfg.Edgequake.BaseURL,       // edgequakeBaseURL
 		)
