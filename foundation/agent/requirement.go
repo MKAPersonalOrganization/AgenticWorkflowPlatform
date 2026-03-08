@@ -69,7 +69,7 @@ type Requirement interface {
 // =============================================================================
 
 // ToolProvider is implemented by Requirements that inject additional tools
-// into the agent's tool set (e.g., RequireUserInput provides quiz tools).
+// into the agent's tool set (e.g., RequireUserInput provides the ask_user tool).
 type ToolProvider interface {
 	// ProvidedTools returns tools that should be added to the agent.
 	ProvidedTools() []ExecutableTool
