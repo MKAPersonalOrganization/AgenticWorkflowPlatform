@@ -136,13 +136,32 @@ export function createStreamingMethods() {
             };
 
             eventSource.onerror = (error) => {
-                console.error('SSE error for job:', jobId, error);
-                this.__perfMetrics.errors++;
-
                 const wasConnected = eventSource.readyState === EventSource.OPEN;
                 eventSource.close();
                 state.eventSource = null;
                 state.activeJobStreams.delete(jobId);
+
+                // When the run is paused for user interaction (ask_user /
+                // authorization), the backend intentionally closes the SSE
+                // stream without a RUN_FINISHED event. Detect this and
+                // clean up gracefully instead of retrying.
+                const isAwaitingInteraction = state.messages?.some(m =>
+                    m.type === 'tool_call' && (m.status === 'awaiting_input' || m.status === 'awaiting_auth')
+                );
+
+                if (isAwaitingInteraction) {
+                    console.log('[SSE] Stream ended — run paused for user interaction');
+                    state.activeJobStreams.clear();
+                    state.jobRetryMap.clear();
+                    state.currentJobId = null;
+                    state.isStreaming = false;
+                    state.showTypingIndicator = false;
+                    state.retryCount = 0;
+                    return;
+                }
+
+                console.error('SSE error for job:', jobId, error);
+                this.__perfMetrics.errors++;
 
                 state.isStreaming = state.activeJobStreams.size > 0;
                 state.showTypingIndicator = state.isStreaming;

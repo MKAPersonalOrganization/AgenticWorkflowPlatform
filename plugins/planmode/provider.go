@@ -79,7 +79,3 @@ func (p *Provider) GetUITemplate() templ.Component {
 func (p *Provider) UIHandledTools() []string {
 	return []string{"enter_plan_mode", "exit_plan_mode"}
 }
-
-func (p *Provider) UIHandledElicitations() []string {
-	return nil
-}

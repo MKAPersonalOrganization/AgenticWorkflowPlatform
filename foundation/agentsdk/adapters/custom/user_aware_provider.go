@@ -103,13 +103,11 @@ func (p *UserAwareAgentProvider) ListForUser(ctx context.Context, userID string)
 // All agents — default or user-created — go through this single path.
 func (p *UserAwareAgentProvider) agentFromDefinition(def *agentstore.AgentDefinition) agent.Agent {
 	cfg := agent.Config{
-		Name:         def.ID, // Use UUID as routing key
-		Description:  def.Description,
-		SystemPrompt: def.SystemPrompt,
-		Tools:        []agent.Tool{},
-		Requirements: []agent.Requirement{
-			agent.NewRequireUserInput(),
-		},
+		Name:                def.ID, // Use UUID as routing key
+		Description:         def.Description,
+		SystemPrompt:        def.SystemPrompt,
+		Tools:               []agent.Tool{},
+		Requirements:        []agent.Requirement{},
 		AgentMiddlewares:    p.agentMiddlewares,
 		ChatMiddlewares:     p.chatMiddlewares,
 		FunctionMiddlewares: p.functionMiddlewares,

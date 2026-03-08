@@ -2,10 +2,11 @@ package tts
 
 import (
 	"context"
+	"time"
+
 	"school-with-ai/foundation/agent"
 	"school-with-ai/platform/artifact"
 	"school-with-ai/platform/toolregistry"
-	"time"
 
 	"github.com/a-h/templ"
 )
@@ -69,8 +70,4 @@ func (p *Provider) GetUITemplate() templ.Component {
 
 func (p *Provider) UIHandledTools() []string {
 	return []string{"speak", "tts-speak"}
-}
-
-func (p *Provider) UIHandledElicitations() []string {
-	return nil
 }

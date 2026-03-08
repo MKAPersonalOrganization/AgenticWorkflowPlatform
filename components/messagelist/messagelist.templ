@@ -280,8 +280,8 @@ templ MessageList() {
 						}
 					}
 				</div>
-				<!-- Special Tool & Elicitation Components -->
-				<div x-show="message.type === 'tool_call' && (isSpecialTool(message.name) || isElicitationTool(message.parsedResult?.schema?.type))" class="my-2 relative w-full flex flex-col items-stretch">
+				<!-- Special Tool Components -->
+				<div x-show="message.type === 'tool_call' && isSpecialTool(message.name)" class="my-2 relative w-full flex flex-col items-stretch">
 					for _, p := range toolregistry.GetAllPluginProviders() {
 						if t := p.GetUITemplate(); t != nil {
 							@t
@@ -289,7 +289,7 @@ templ MessageList() {
 					}
 				</div>
 				<!-- Regular Tool Call Message -->
-				<template x-if="message.type === 'tool_call' && !isSpecialTool(message.name) && !isElicitationTool(message.parsedResult?.schema?.type)">
+				<template x-if="message.type === 'tool_call' && !isSpecialTool(message.name)">
 					@ToolCall(ctx)
 				</template>
 				<!-- Tool Result Message (orphaned - should not happen with new approach, but kept for safety) -->

@@ -36,11 +36,11 @@ import (
 	"school-with-ai/modules/knowledge/edgequake"
 	permtool "school-with-ai/modules/permissions/tool"
 	"school-with-ai/platform/artifact"
+	"school-with-ai/plugins/askuser"
 	"school-with-ai/plugins/calculator"
 	"school-with-ai/plugins/codebase"
 	"school-with-ai/plugins/cognitive"
 	"school-with-ai/plugins/document"
-	"school-with-ai/plugins/elicitation"
 	"school-with-ai/plugins/knowledgebase"
 	"school-with-ai/plugins/library"
 	"school-with-ai/plugins/planmode"
@@ -368,7 +368,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	toolregistry.RegisterPlugin(&codebase.Provider{})
 	toolregistry.RegisterPlugin(&cognitive.Provider{})
 	toolregistry.RegisterPlugin(&document.Provider{})
-	toolregistry.RegisterPlugin(&elicitation.Provider{})
+	toolregistry.RegisterPlugin(&askuser.Provider{})
 	toolregistry.RegisterPlugin(&knowledgebase.Provider{})
 	toolregistry.RegisterPlugin(&library.Provider{})
 	toolregistry.RegisterPlugin(&memoryplugin.Provider{})

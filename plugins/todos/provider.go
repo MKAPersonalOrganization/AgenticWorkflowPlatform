@@ -73,7 +73,3 @@ func (p *Provider) GetUITemplate() templ.Component {
 func (p *Provider) UIHandledTools() []string {
 	return []string{"write_todos"}
 }
-
-func (p *Provider) UIHandledElicitations() []string {
-	return nil
-}

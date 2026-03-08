@@ -6,11 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"time"
+
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/internal/llm"
 	"school-with-ai/foundation/agentsdk/io"
-	"time"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -618,18 +619,13 @@ func (p *ToolProcessor) ProcessActions(tctx ToolProcessorContext) (*RouteResolve
 			var ioAuthErr *io.ErrAuthRequired
 
 			if execErr != nil && errors.As(execErr, &ioInputErr) {
-				toolResult := &core.ToolExecutionResult{
-					ToolCallID:    tc.ID,
-					ToolName:      tc.Name,
-					Arguments:     tc.Arguments,
-					Result:        fmt.Sprintf("Requesting input: %s", ioInputErr.Question),
-					IsError:       false,
-					StopIteration: true,
-				}
+				// Pass nil result so no ToolResultAdded placeholder is emitted.
+				// The real tool result is recorded when the user provides input
+				// (InputProvided event adds the user's answer to the aggregate).
 				return tsm.NeedsInput(&core.ElicitationSpec{
 					Question: ioInputErr.Question,
 					Schema:   ioInputErr.Schema,
-				}, toolResult)
+				}, nil)
 			}
 
 			if execErr != nil && errors.As(execErr, &ioAuthErr) {

@@ -27,17 +27,16 @@ This monolithic approach created several issues:
         CreateExecutable(ctx context.Context, toolID string, deps FactoryDeps) (agent.ExecutableTool, error)
         GetUITemplate() templ.Component
         UIHandledTools() []string
-        UIHandledElicitations() []string
     }
     ```
 3. **Dynamic Registry Loading:** The central `toolregistry.Service` is refactored to iterate over registered `PluginProvider`s to discover tools, rather than defining a monolithic static switch statement.
-4. **Dynamic Frontend Injection:** The hardcoded JS `TOOL_REGISTRY` is eliminated. Instead, the backend aggregates the `UIHandledTools()` and `UIHandledElicitations()` from all registered plugins and statically renders them as JSON directly into the DOM's `<head>` within `layout.templ` as global variables (`window.SPECIAL_TOOLS`, `window.ELICITATION_SCHEMAS`). JS files like `chat-tool-registry.js` dynamically rely on these variables.
+4. **Dynamic Frontend Injection:** The hardcoded JS `TOOL_REGISTRY` is eliminated. Instead, the backend aggregates the `UIHandledTools()` from all registered plugins and statically renders them as JSON directly into the DOM's `<head>` within `layout.templ` as a global variable (`window.SPECIAL_TOOLS`). JS files like `chat-tool-registry.js` dynamically rely on this variable.
 5. **Registration:** Plugins are wired into the application solely through explicit registration in `main.go` (e.g., `toolregistry.RegisterPlugin(&calculator.Provider{})`).
 
 ## Consequences
 
 **Positive:**
-- **Encapsulation:** A tool's backend execution logic, elicitation schema, and frontend visual representation are physically co-located and completely decoupled from the core framework.
+- **Encapsulation:** A tool's backend execution logic and frontend visual representation are physically co-located and completely decoupled from the core framework.
 - **Plug-and-Play Extensibility:** Adding a new complex tool with a custom UI now requires exactly one touchpoint in the core application: registering the provider once in `main.go`.
 - **Elimination of Frontend Drift:** By dynamically computing handled tools and injecting them into the DOM globally at render time, the frontend can never be out of sync with backend tool availability, curing JS race conditions and maintenance drag.
 

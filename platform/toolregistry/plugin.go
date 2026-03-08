@@ -3,9 +3,10 @@ package toolregistry
 import (
 	"context"
 	"encoding/json"
-	"school-with-ai/foundation/agent"
 	"sort"
 	"sync"
+
+	"school-with-ai/foundation/agent"
 
 	"github.com/a-h/templ"
 )
@@ -64,9 +65,6 @@ type PluginProvider interface {
 
 	// UIHandledTools returns the list of tool message names this plugin renders custom UI for.
 	UIHandledTools() []string
-
-	// UIHandledElicitations returns the list of elicitation schema types this plugin provides UI for.
-	UIHandledElicitations() []string
 }
 
 var (
@@ -129,17 +127,6 @@ func GetUIHandledToolsJSON() string {
 	}
 	// Inject any hardcoded stragglers that need special state routing but lack a literal visual component
 	handled = append(handled, "transfer_to_agent")
-
-	bytes, _ := json.Marshal(handled)
-	return string(bytes)
-}
-
-// GetUIHandledElicitationsJSON returns a JSON-encoded list of all elicitation schema types that possess a custom UI template.
-func GetUIHandledElicitationsJSON() string {
-	var handled []string
-	for _, p := range GetAllPluginProviders() {
-		handled = append(handled, p.UIHandledElicitations()...)
-	}
 
 	bytes, _ := json.Marshal(handled)
 	return string(bytes)
