@@ -47,6 +47,7 @@ import (
 	"school-with-ai/plugins/planmode"
 	skillsplugin "school-with-ai/plugins/skills"
 	"school-with-ai/plugins/todos"
+	"school-with-ai/plugins/tracker"
 	"school-with-ai/plugins/tts"
 	"school-with-ai/plugins/websearch"
 	"school-with-ai/shared"
@@ -421,6 +422,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	toolregistry.RegisterPlugin(&memoryplugin.Provider{})
 	toolregistry.RegisterPlugin(&planmode.Provider{})
 	toolregistry.RegisterPlugin(&todos.Provider{})
+	toolregistry.RegisterPlugin(&tracker.Provider{})
 	toolregistry.RegisterPlugin(&tts.Provider{})
 	toolregistry.RegisterPlugin(&websearch.Provider{})
 	toolregistry.RegisterPlugin(&skillsplugin.Provider{SkillResolver: skillStoreModule})
