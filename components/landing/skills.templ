@@ -1,0 +1,80 @@
+package landing
+
+import "school-with-ai/components/icon"
+
+// ─── Skill System ────────────────────────────────────────────────────────────
+templ skillsSection() {
+	<section id="skills" class="border-t border-border bg-muted/20 py-24">
+		<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+			<div class="grid gap-12 lg:grid-cols-2 lg:items-center">
+				<!-- Visual — skill activation cards -->
+				<div class="order-2 lg:order-1">
+					<div class="rounded-xl border border-border bg-card p-6">
+						<div class="mb-4 flex items-center gap-2 text-sm font-medium text-muted-foreground">
+							@icon.Sparkles(icon.Props{Class: "size-4 text-amber-500"})
+							<span>Skill Catalog</span>
+						</div>
+						<div class="space-y-3">
+							@skillPreviewRow("⚡", "Deep Research", "research", true)
+							@skillPreviewRow("🧠", "Chain-of-Thought Reasoning", "reasoning", true)
+							@skillPreviewRow("📝", "Academic Writing", "writing", false)
+							@skillPreviewRow("🔍", "Code Review", "development", false)
+							@skillPreviewRow("🎯", "Exam Preparation", "study", true)
+						</div>
+						<div class="mt-4 rounded-lg border border-dashed border-border bg-muted/30 p-3 text-center">
+							<div class="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+								@icon.Plus(icon.Props{Class: "size-4"})
+								<span>Create Custom Skill...</span>
+							</div>
+						</div>
+					</div>
+				</div>
+				<!-- Text content -->
+				<div class="order-1 lg:order-2">
+					<div class="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-1.5 text-sm text-muted-foreground">
+						@icon.Zap(icon.Props{Class: "size-4 text-amber-500"})
+						<span>Dynamic Skills</span>
+					</div>
+					<h2 class="text-3xl font-bold tracking-tight sm:text-4xl">
+						Activate skills
+						<span class="text-primary">on demand</span>
+					</h2>
+					<p class="mt-4 text-lg text-muted-foreground">
+						Give your agents superpowers with a dynamic skill system inspired by Gemini CLI. Browse a curated catalog, create custom skills, and activate them at runtime — each skill injects expert-level instructions that transform how your agent thinks and responds.
+					</p>
+					<ul class="mt-8 space-y-4">
+						@checkListItem("Curated skill catalog with categories: research, writing, coding, reasoning, and more")
+						@checkListItem("Create custom skills with tailored system instructions and metadata")
+						@checkListItem("Per-agent permissions — control exactly which skills each agent can access")
+						@checkListItem("Runtime activation — agents discover and activate skills mid-conversation")
+						@checkListItem("Skills compose with tools, knowledge bases, and MCP connectors")
+						@checkListItem("XML-wrapped instruction injection for clean prompt engineering")
+					</ul>
+				</div>
+			</div>
+		</div>
+	</section>
+}
+
+templ skillPreviewRow(emoji, name, category string, active bool) {
+	<div class="flex items-center justify-between rounded-lg border border-border bg-background px-4 py-3">
+		<div class="flex items-center gap-3">
+			<span class="text-lg">{ emoji }</span>
+			<div>
+				<div class="text-sm font-medium">{ name }</div>
+				<div class="text-xs text-muted-foreground">{ category }</div>
+			</div>
+		</div>
+		if active {
+			<div class="flex items-center gap-2">
+				<div class="h-2 w-2 rounded-full bg-green-500"></div>
+				<span class="text-xs text-green-600 dark:text-green-400">Active</span>
+			</div>
+		} else {
+			<div class="flex items-center gap-2">
+				<div class="h-2 w-2 rounded-full bg-gray-400"></div>
+				<span class="text-xs text-muted-foreground">Available</span>
+			</div>
+		}
+	</div>
+}

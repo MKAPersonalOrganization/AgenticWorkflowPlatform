@@ -22,7 +22,6 @@ templ DocsPage(props DocsPageProps) {
 				<div class="absolute inset-0 bg-grid-pattern [mask-image:radial-gradient(ellipse_at_top,black,transparent_80%)] opacity-20"></div>
 				<div class="absolute inset-0 bg-gradient-to-b from-background/50 to-background"></div>
 			</div>
-			
 			<!-- Navbar (reuse landing nav) -->
 			@landing.Nav(props.User)
 			<!-- Docs Layout -->
@@ -41,6 +40,7 @@ templ DocsPage(props DocsPageProps) {
 						@docsCustomAgents()
 						@docsStudentProfile()
 						@docsPlugins()
+						@docsSkills()
 						@docsVoiceTTS()
 						@docsMCP()
 						@docsKnowledgeBase()

@@ -28,4 +28,6 @@ var (
 	iconUser        = iconSized(icon.User)
 	iconHeadphones  = iconSized(icon.Headphones)
 	iconActivity    = iconSized(icon.Activity)
+	iconZap         = iconSized(icon.Zap)
+	iconSparkles    = iconSized(icon.Sparkles)
 )
