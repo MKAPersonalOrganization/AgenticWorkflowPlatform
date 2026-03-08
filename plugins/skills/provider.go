@@ -28,6 +28,10 @@ type Provider struct {
 	// SkillResolver is set during initialization (from main.go) to allow the
 	// plugin to look up skills without importing the skillstore module directly.
 	SkillResolver SkillResolver
+
+	// Tracker records which skills have been activated per thread so that
+	// instructions can be injected into the system prompt on subsequent turns.
+	Tracker *SkillActivationTracker
 }
 
 func (p *Provider) ID() string { return "skills" }
@@ -88,6 +92,7 @@ func (p *Provider) CreateExecutable(_ context.Context, toolID string, _ toolregi
 	case "activate_skill":
 		return &ActivateSkillTool{
 			resolver: p.SkillResolver,
+			tracker:  p.Tracker,
 		}, nil
 	default:
 		return nil, nil

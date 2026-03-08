@@ -88,3 +88,8 @@ func (m *Module) RegisterRoutes(r chi.Router, authMW *auth.Middleware) {
 func (m *Module) Service() *service {
 	return m.svc
 }
+
+// AgentFS returns an [AgentFS] adapter for use by agent-facing tools (plugins).
+func (m *Module) AgentFS() AgentFS {
+	return &agentFSAdapter{svc: m.svc}
+}

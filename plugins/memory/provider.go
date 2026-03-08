@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"school-with-ai/foundation/agent"
-	"school-with-ai/modules/chat/memory"
 	"school-with-ai/platform/toolregistry"
 
 	"github.com/a-h/templ"
@@ -47,10 +46,7 @@ func (p *Provider) DefaultTools() []toolregistry.Tool {
 func (p *Provider) SettingsSchema() []toolregistry.SettingsField { return nil }
 
 func (p *Provider) CreateExecutable(ctx context.Context, toolID string, deps toolregistry.FactoryDeps) (agent.ExecutableTool, error) {
-	memService, ok := deps.MemoryService.(memory.Service)
-	if !ok {
-		// Just panic or fail since dependencies should be provided
-	}
+	memService := deps.MemoryService()
 
 	switch toolID {
 	case "mem-remember":

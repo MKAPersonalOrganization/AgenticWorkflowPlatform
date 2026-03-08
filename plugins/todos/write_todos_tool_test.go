@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"school-with-ai/foundation/agent"
-	"school-with-ai/platform/toolregistry"
 )
 
 func TestWriteTodosTool_Name(t *testing.T) {
@@ -183,7 +182,7 @@ func TestProvider_CreateExecutable(t *testing.T) {
 	ctx := context.Background()
 
 	// Known tool
-	tool, err := p.CreateExecutable(ctx, "write_todos", toolregistry.FactoryDeps{})
+	tool, err := p.CreateExecutable(ctx, "write_todos", nil)
 	if err != nil {
 		t.Fatalf("CreateExecutable(write_todos) error = %v", err)
 	}
@@ -192,7 +191,7 @@ func TestProvider_CreateExecutable(t *testing.T) {
 	}
 
 	// Unknown tool
-	tool, err = p.CreateExecutable(ctx, "unknown_tool", toolregistry.FactoryDeps{})
+	tool, err = p.CreateExecutable(ctx, "unknown_tool", nil)
 	if err != nil {
 		t.Fatalf("CreateExecutable(unknown_tool) error = %v", err)
 	}

@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"school-with-ai/foundation/agent"
-	"school-with-ai/platform/toolregistry"
 )
 
 func TestStore_CreateTask(t *testing.T) {
@@ -486,7 +485,7 @@ func TestProvider_CreateExecutable(t *testing.T) {
 		"tracker_list_tasks", "tracker_add_dependency", "tracker_visualize",
 	}
 	for _, id := range toolIDs {
-		tool, err := p.CreateExecutable(ctx, id, toolregistry.FactoryDeps{})
+		tool, err := p.CreateExecutable(ctx, id, nil)
 		if err != nil {
 			t.Errorf("tool %q: unexpected error: %v", id, err)
 		}
@@ -494,7 +493,7 @@ func TestProvider_CreateExecutable(t *testing.T) {
 			t.Errorf("tool %q: expected non-nil tool", id)
 		}
 	}
-	tool, err := p.CreateExecutable(ctx, "unknown", toolregistry.FactoryDeps{})
+	tool, err := p.CreateExecutable(ctx, "unknown", nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

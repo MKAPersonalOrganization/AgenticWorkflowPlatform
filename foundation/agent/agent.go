@@ -8,8 +8,9 @@ import (
 // ID is a unique identifier for an agent.
 type ID = string
 
-// Identifiable represents an entity that can be identified by ID, name, and description.
-type Identifiable interface {
+// Agent represents an AI agent that can process user requests and produce responses.
+// Per ADR 001: This interface is the sole access point for agent interactions.
+type Agent interface {
 	// ID returns the unique identifier for this agent.
 	ID() ID
 
@@ -17,36 +18,11 @@ type Identifiable interface {
 	Name() string
 
 	// Description returns a human-readable description of the agent's capabilities.
-	// Used by LLMs to determine whether to delegate to this agent.
 	Description() string
-}
 
-// Runnable represents an entity that can execute with input and produce events.
-type Runnable interface {
 	// Run executes the agent with the given invocation.
 	// Returns an iterator that yields events as the agent processes the request.
 	Run(ctx context.Context, inv *Invocation) iter.Seq2[Event, error]
-}
-
-// Agent represents an AI agent that can process user requests and produce responses.
-// This interface is designed to be compatible with multiple agent frameworks:
-// - Custom agentsdk implementation
-// - Google ADK-Go
-// - Go-Kratos Blades
-//
-// Per ADR 001: This interface is the sole access point for agent interactions.
-// All framework-specific details are hidden behind adapter implementations.
-type Agent interface {
-	Identifiable
-	Runnable
-}
-
-// Toolable extends Agent with tool capabilities.
-type Toolable interface {
-	Agent
-
-	// Tools returns the list of tools available to this agent.
-	Tools() []Tool
 }
 
 // AgentMetadata represents metadata for an agent exposed via the API.
@@ -60,21 +36,6 @@ type AgentMetadata struct {
 // AgentListResponse represents the response containing a list of agents.
 type AgentListResponse struct {
 	Agents []AgentMetadata `json:"agents"`
-}
-
-// AgentWithMiddleware extends Agent with middleware support.
-// This is optional - compatible with Blades' middleware pattern.
-type AgentWithMiddleware interface {
-	Agent
-
-	// AgentMiddlewares returns the middleware chain for the agent run.
-	AgentMiddlewares() []Middleware
-
-	// ChatMiddlewares returns the middleware chain for LLM calls.
-	ChatMiddlewares() []Middleware
-
-	// FunctionMiddlewares returns the middleware chain for tool execution.
-	FunctionMiddlewares() []Middleware
 }
 
 // AgentProvider provides discovery and lookup for available agents.
@@ -176,9 +137,6 @@ type RunConfig struct {
 
 	// StopSequences are strings that stop generation when encountered.
 	StopSequences []string
-
-	// SaveInputBlobsAsArtifacts saves user input files as artifacts.
-	SaveInputBlobsAsArtifacts bool
 }
 
 // DefaultRunConfig returns sensible defaults for agent execution.

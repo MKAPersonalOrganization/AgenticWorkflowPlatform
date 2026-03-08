@@ -3,9 +3,10 @@ package tool
 import (
 	"context"
 	"fmt"
-	"school-with-ai/foundation/logger"
-	"sync"
 	"time"
+
+	"school-with-ai/foundation/logger"
+	"school-with-ai/foundation/permcache"
 )
 
 // Permission represents permission for an agent to use a specific tool within a tool set.
@@ -64,59 +65,22 @@ type Repository interface {
 type Service struct {
 	log          *logger.Logger
 	repo         Repository
-	mutex        sync.RWMutex
-	toolSetCache map[string]map[string]map[string]*ToolSetPermission     // userID -> agentID -> toolSetID -> ToolSetPermission
-	toolCache    map[string]map[string]map[string]map[string]*Permission // userID -> agentID -> toolSetID -> toolID -> Permission
+	toolSetCache *permcache.Cache[ToolSetPermission]
+	toolCache    *permcache.Cache[Permission]
 }
-
-const permCacheMaxUsers = 5000 // Max distinct user entries in each cache map
 
 // NewService creates a new permissions service.
 func NewService(log *logger.Logger, repo Repository) *Service {
 	return &Service{
 		log:          log,
 		repo:         repo,
-		toolSetCache: make(map[string]map[string]map[string]*ToolSetPermission),
-		toolCache:    make(map[string]map[string]map[string]map[string]*Permission),
-	}
-}
-
-// evictCacheIfNeeded evicts user entries if the cache exceeds the max size.
-// Must be called while holding s.mutex (write lock).
-func (s *Service) evictToolSetCacheIfNeeded() {
-	if len(s.toolSetCache) >= permCacheMaxUsers {
-		// Evict half the entries (random, since map iteration is non-deterministic).
-		count := 0
-		half := len(s.toolSetCache) / 2
-		for k := range s.toolSetCache {
-			delete(s.toolSetCache, k)
-			count++
-			if count >= half {
-				break
-			}
-		}
-	}
-}
-
-func (s *Service) evictToolCacheIfNeeded() {
-	if len(s.toolCache) >= permCacheMaxUsers {
-		count := 0
-		half := len(s.toolCache) / 2
-		for k := range s.toolCache {
-			delete(s.toolCache, k)
-			count++
-			if count >= half {
-				break
-			}
-		}
+		toolSetCache: permcache.New[ToolSetPermission](),
+		toolCache:    permcache.New[Permission](),
 	}
 }
 
 // Initialize loads existing tool set permissions.
 func (s *Service) Initialize(ctx context.Context) error {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
 	s.log.Info(ctx, "Permissions service initialized for tool sets")
 	return nil
 }
@@ -143,20 +107,7 @@ func (s *Service) SetPermission(ctx context.Context, userID, agentID, toolSetID,
 		return fmt.Errorf("failed to save individual tool permission: %w", err)
 	}
 
-	// Update cache
-	s.mutex.Lock()
-	s.evictToolCacheIfNeeded()
-	if _, exists := s.toolCache[userID]; !exists {
-		s.toolCache[userID] = make(map[string]map[string]map[string]*Permission)
-	}
-	if _, exists := s.toolCache[userID][agentID]; !exists {
-		s.toolCache[userID][agentID] = make(map[string]map[string]*Permission)
-	}
-	if _, exists := s.toolCache[userID][agentID][toolSetID]; !exists {
-		s.toolCache[userID][agentID][toolSetID] = make(map[string]*Permission)
-	}
-	s.toolCache[userID][agentID][toolSetID][toolID] = permission
-	s.mutex.Unlock()
+	s.toolCache.Set(userID, permission, agentID, toolSetID, toolID)
 
 	s.log.Info(ctx, "Individual tool permission updated", "user_id", userID, "agent_id", agentID, "tool_set_id", toolSetID, "tool_id", toolID, "enabled", enabled)
 	return nil
@@ -174,19 +125,10 @@ func (s *Service) HasPermission(ctx context.Context, userID, agentID, toolSetID,
 
 // GetPermission retrieves a specific agent's tool permission within a tool set.
 func (s *Service) GetPermission(ctx context.Context, userID, agentID, toolSetID, toolID string) (*Permission, error) {
-	s.mutex.RLock()
-	if userPerms, exists := s.toolCache[userID]; exists {
-		if agentPerms, exists := userPerms[agentID]; exists {
-			if toolSetPerms, exists := agentPerms[toolSetID]; exists {
-				if perm, exists := toolSetPerms[toolID]; exists {
-					s.mutex.RUnlock()
-					permCopy := *perm
-					return &permCopy, nil
-				}
-			}
-		}
+	if cached, ok := s.toolCache.Get(userID, agentID, toolSetID, toolID); ok {
+		permCopy := *cached
+		return &permCopy, nil
 	}
-	s.mutex.RUnlock()
 
 	// Not in cache, load from repository
 	permission, err := s.repo.GetPermission(ctx, userID, agentID, toolSetID, toolID)
@@ -194,21 +136,7 @@ func (s *Service) GetPermission(ctx context.Context, userID, agentID, toolSetID,
 		return nil, err
 	}
 
-	// Cache it
-	s.mutex.Lock()
-	s.evictToolCacheIfNeeded()
-	if _, exists := s.toolCache[userID]; !exists {
-		s.toolCache[userID] = make(map[string]map[string]map[string]*Permission)
-	}
-	if _, exists := s.toolCache[userID][agentID]; !exists {
-		s.toolCache[userID][agentID] = make(map[string]map[string]*Permission)
-	}
-	if _, exists := s.toolCache[userID][agentID][toolSetID]; !exists {
-		s.toolCache[userID][agentID][toolSetID] = make(map[string]*Permission)
-	}
-	s.toolCache[userID][agentID][toolSetID][toolID] = permission
-	s.mutex.Unlock()
-
+	s.toolCache.Set(userID, permission, agentID, toolSetID, toolID)
 	return permission, nil
 }
 
@@ -258,17 +186,7 @@ func (s *Service) SetToolSetPermission(ctx context.Context, userID, agentID, too
 		return fmt.Errorf("failed to save tool set permission: %w", err)
 	}
 
-	// Update cache
-	s.mutex.Lock()
-	s.evictToolSetCacheIfNeeded()
-	if _, exists := s.toolSetCache[userID]; !exists {
-		s.toolSetCache[userID] = make(map[string]map[string]*ToolSetPermission)
-	}
-	if _, exists := s.toolSetCache[userID][agentID]; !exists {
-		s.toolSetCache[userID][agentID] = make(map[string]*ToolSetPermission)
-	}
-	s.toolSetCache[userID][agentID][toolSetID] = permission
-	s.mutex.Unlock()
+	s.toolSetCache.Set(userID, permission, agentID, toolSetID)
 
 	s.log.Info(ctx, "Tool set permission updated", "user_id", userID, "agent_id", agentID, "tool_set_id", toolSetID, "enabled", enabled)
 	return nil
@@ -276,17 +194,10 @@ func (s *Service) SetToolSetPermission(ctx context.Context, userID, agentID, too
 
 // GetToolSetPermission retrieves a specific agent's tool set permission.
 func (s *Service) GetToolSetPermission(ctx context.Context, userID, agentID, toolSetID string) (*ToolSetPermission, error) {
-	s.mutex.RLock()
-	if userPerms, exists := s.toolSetCache[userID]; exists {
-		if agentPerms, exists := userPerms[agentID]; exists {
-			if perm, exists := agentPerms[toolSetID]; exists {
-				s.mutex.RUnlock()
-				permCopy := *perm
-				return &permCopy, nil
-			}
-		}
+	if cached, ok := s.toolSetCache.Get(userID, agentID, toolSetID); ok {
+		permCopy := *cached
+		return &permCopy, nil
 	}
-	s.mutex.RUnlock()
 
 	// Not in cache, load from repository
 	permission, err := s.repo.GetToolSetPermission(ctx, userID, agentID, toolSetID)
@@ -294,18 +205,7 @@ func (s *Service) GetToolSetPermission(ctx context.Context, userID, agentID, too
 		return nil, err
 	}
 
-	// Cache it
-	s.mutex.Lock()
-	s.evictToolSetCacheIfNeeded()
-	if _, exists := s.toolSetCache[userID]; !exists {
-		s.toolSetCache[userID] = make(map[string]map[string]*ToolSetPermission)
-	}
-	if _, exists := s.toolSetCache[userID][agentID]; !exists {
-		s.toolSetCache[userID][agentID] = make(map[string]*ToolSetPermission)
-	}
-	s.toolSetCache[userID][agentID][toolSetID] = permission
-	s.mutex.Unlock()
-
+	s.toolSetCache.Set(userID, permission, agentID, toolSetID)
 	return permission, nil
 }
 

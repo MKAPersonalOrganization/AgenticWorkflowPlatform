@@ -45,6 +45,7 @@ type WorkspacePermissionChecker interface {
 // Satisfied by *toolregistry.ExecutableToolFactory.
 type ToolSetFactory interface {
 	CreateExecutableToolsFromSet(ctx context.Context, toolSetID string) ([]agent.ExecutableTool, error)
+	SetAllowedKBNamespaces(namespaces []string)
 }
 
 // ToolFactoryConfig carries per-request LLM and TTS configuration for tool creation.
@@ -60,6 +61,9 @@ type ToolFactoryConfig struct {
 	// the user_plugin_settings table. Outer key = plugin ID, inner key =
 	// setting key, value = setting value.
 	PluginSettings map[string]map[string]string
+
+	// AllowedKBNamespaces is the set of workspace IDs the agent may query.
+	AllowedKBNamespaces []string
 }
 
 // NewToolSetFactoryFunc builds a ToolSetFactory with per-request configuration.
@@ -81,4 +85,13 @@ type PluginSettingsResolver interface {
 	// GetAllPluginSettingsForUser returns all plugin settings as a map for a user.
 	// Outer key = plugin ID, inner key = setting key, value = setting value.
 	GetAllPluginSettingsForUser(ctx context.Context, userID string) (map[string]map[string]string, error)
+}
+
+// SkillPromptInjector provides per-thread skill instructions for system prompt injection.
+// Satisfied by *skills.SkillActivationTracker.
+type SkillPromptInjector interface {
+	// BuildPromptAddition returns activated skill instructions for the given thread,
+	// formatted for direct concatenation with the system prompt.
+	// Returns empty string if no skills are activated.
+	BuildPromptAddition(threadID string) string
 }

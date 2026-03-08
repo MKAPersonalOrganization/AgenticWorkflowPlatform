@@ -70,7 +70,7 @@ func TestProvider_DefaultTools(t *testing.T) {
 func TestProvider_CreateExecutable(t *testing.T) {
 	resolver := &mockSkillResolver{}
 	p := &Provider{SkillResolver: resolver}
-	tool, err := p.CreateExecutable(context.Background(), "activate_skill", toolregistry.FactoryDeps{})
+	tool, err := p.CreateExecutable(context.Background(), "activate_skill", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -84,7 +84,7 @@ func TestProvider_CreateExecutable(t *testing.T) {
 
 func TestProvider_CreateExecutable_UnknownTool(t *testing.T) {
 	p := &Provider{}
-	tool, err := p.CreateExecutable(context.Background(), "unknown_tool", toolregistry.FactoryDeps{})
+	tool, err := p.CreateExecutable(context.Background(), "unknown_tool", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -451,7 +451,7 @@ func TestListSkillsTool_Execute_NoAgentID(t *testing.T) {
 func TestProvider_CreateExecutable_ListSkills(t *testing.T) {
 	resolver := &mockSkillResolver{}
 	p := &Provider{SkillResolver: resolver}
-	tool, err := p.CreateExecutable(context.Background(), "list_skills", toolregistry.FactoryDeps{})
+	tool, err := p.CreateExecutable(context.Background(), "list_skills", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

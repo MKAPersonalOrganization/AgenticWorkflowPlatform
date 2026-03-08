@@ -9,6 +9,21 @@ import (
 	"school-with-ai/platform/toolregistry"
 )
 
+// mockDeps implements toolregistry.FactoryDeps for testing.
+// Only PluginSettings is overridden; other methods are provided by the
+// embedded (nil) interface and must not be called.
+type mockDeps struct {
+	toolregistry.FactoryDeps
+	settings map[string]map[string]string
+}
+
+func (m *mockDeps) PluginSettings(pluginID string) map[string]string {
+	if m.settings == nil {
+		return nil
+	}
+	return m.settings[pluginID]
+}
+
 // =========================================================================
 // Tool identity tests
 // =========================================================================
@@ -262,8 +277,8 @@ func TestProvider_CreateExecutable(t *testing.T) {
 	ctx := context.Background()
 
 	// With plugin settings configured
-	tool, err := p.CreateExecutable(ctx, "web_search", toolregistry.FactoryDeps{
-		PluginSettings: map[string]map[string]string{
+	tool, err := p.CreateExecutable(ctx, "web_search", &mockDeps{
+		settings: map[string]map[string]string{
 			"websearch": {"api_key": "test-key", "model": "gemini-2.0-flash"},
 		},
 	})
@@ -285,7 +300,7 @@ func TestProvider_CreateExecutable(t *testing.T) {
 	}
 
 	// Without plugin settings (no settings configured)
-	tool2, err := p.CreateExecutable(ctx, "web_search", toolregistry.FactoryDeps{})
+	tool2, err := p.CreateExecutable(ctx, "web_search", &mockDeps{})
 	if err != nil {
 		t.Fatalf("CreateExecutable(web_search) no-settings error = %v", err)
 	}
@@ -301,7 +316,7 @@ func TestProvider_CreateExecutable(t *testing.T) {
 	}
 
 	// Unknown tool
-	tool, err = p.CreateExecutable(ctx, "unknown_tool", toolregistry.FactoryDeps{})
+	tool, err = p.CreateExecutable(ctx, "unknown_tool", &mockDeps{})
 	if err != nil {
 		t.Fatalf("CreateExecutable(unknown_tool) error = %v", err)
 	}

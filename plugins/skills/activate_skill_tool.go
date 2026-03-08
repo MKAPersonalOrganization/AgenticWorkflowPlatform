@@ -32,10 +32,12 @@ After activation, follow the skill's instructions for all subsequent responses i
 }
 
 // ActivateSkillTool implements agent.ExecutableTool for the activate_skill tool.
-// It follows the Gemini CLI pattern: look up a skill by name, return its
-// instructions wrapped in XML tags for the LLM to follow.
+// It follows the Gemini CLI pattern: look up a skill by name, register it in
+// the activation tracker so its instructions are injected into the system prompt
+// on subsequent turns, and return a brief confirmation to the LLM.
 type ActivateSkillTool struct {
 	resolver SkillResolver
+	tracker  *SkillActivationTracker
 }
 
 func (t *ActivateSkillTool) Name() string          { return "activate_skill" }
@@ -89,6 +91,7 @@ func (t *ActivateSkillTool) Execute(ctx context.Context, args agent.Arguments) (
 	// Look up from agent-permitted skills (exact match first)
 	s, err := t.resolver.GetSkillByNameForAgent(ctx, userID, agentID, skillName)
 	if err == nil && s != nil {
+		t.recordActivation(args.SessionID, s)
 		result := buildActivationResult(s)
 		resultJSON, _ := json.Marshal(result)
 		return agent.Result{Content: []any{string(resultJSON)}}, nil
@@ -102,6 +105,7 @@ func (t *ActivateSkillTool) Execute(ctx context.Context, args agent.Arguments) (
 
 	for i := range skills {
 		if strings.EqualFold(skills[i].Name, skillName) {
+			t.recordActivation(args.SessionID, &skills[i])
 			result := buildActivationResult(&skills[i])
 			resultJSON, _ := json.Marshal(result)
 			return agent.Result{Content: []any{string(resultJSON)}}, nil
@@ -125,8 +129,24 @@ func (t *ActivateSkillTool) Execute(ctx context.Context, args agent.Arguments) (
 	)), nil
 }
 
+// recordActivation stores the skill in the activation tracker so that its
+// instructions will be injected into the system prompt on subsequent turns.
+// Silently skips if no tracker is configured (graceful degradation).
+func (t *ActivateSkillTool) recordActivation(threadID string, s *skillstore.UserSkill) {
+	if t.tracker == nil || threadID == "" {
+		return
+	}
+	t.tracker.Activate(threadID, ActivatedSkill{
+		Name:         s.Name,
+		Instructions: s.Instructions,
+	})
+}
+
 // buildActivationResult creates the structured result following the Gemini CLI
 // pattern of wrapping skill instructions in XML tags.
+// The instructions are included in the tool result for immediate visibility
+// on the current turn. From the next turn onwards, the tracker ensures they
+// are injected into the system prompt for reliable positioning.
 func buildActivationResult(s *skillstore.UserSkill) activateSkillResult {
 	// Build the XML-wrapped instructions (Gemini CLI pattern)
 	xmlInstructions := fmt.Sprintf(

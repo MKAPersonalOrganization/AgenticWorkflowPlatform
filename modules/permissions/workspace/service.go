@@ -2,9 +2,10 @@ package workspace
 
 import (
 	"context"
-	"school-with-ai/foundation/logger"
-	"sync"
 	"time"
+
+	"school-with-ai/foundation/logger"
+	"school-with-ai/foundation/permcache"
 )
 
 // WorkspacePermission represents a workspace attached to an agent.
@@ -29,34 +30,15 @@ type Repository interface {
 type Service struct {
 	log   *logger.Logger
 	repo  Repository
-	mu    sync.RWMutex
-	cache map[string]map[string]map[string]*WorkspacePermission // userID -> agentID -> workspaceID -> Permission
+	cache *permcache.Cache[WorkspacePermission]
 }
-
-const wsCacheMaxUsers = 5000 // Max distinct user entries in the cache
 
 // NewService creates a new workspace permissions service.
 func NewService(log *logger.Logger, repo Repository) *Service {
 	return &Service{
 		log:   log,
 		repo:  repo,
-		cache: make(map[string]map[string]map[string]*WorkspacePermission),
-	}
-}
-
-// evictCacheIfNeeded evicts user entries when the cache exceeds its size limit.
-// Must be called while holding s.mu (write lock).
-func (s *Service) evictCacheIfNeeded() {
-	if len(s.cache) >= wsCacheMaxUsers {
-		count := 0
-		half := len(s.cache) / 2
-		for k := range s.cache {
-			delete(s.cache, k)
-			count++
-			if count >= half {
-				break
-			}
-		}
+		cache: permcache.New[WorkspacePermission](),
 	}
 }
 
@@ -76,32 +58,15 @@ func (s *Service) SetPermission(ctx context.Context, userID, agentID, workspaceI
 		return err
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.evictCacheIfNeeded()
-	if _, ok := s.cache[userID]; !ok {
-		s.cache[userID] = make(map[string]map[string]*WorkspacePermission)
-	}
-	if _, ok := s.cache[userID][agentID]; !ok {
-		s.cache[userID][agentID] = make(map[string]*WorkspacePermission)
-	}
-	s.cache[userID][agentID][workspaceID] = perm
-
+	s.cache.Set(userID, perm, agentID, workspaceID)
 	return nil
 }
 
 // HasPermission checks if an agent has access to a workspace.
 func (s *Service) HasPermission(ctx context.Context, userID, agentID, workspaceID string) bool {
-	s.mu.RLock()
-	if userPerms, ok := s.cache[userID]; ok {
-		if agentPerms, ok := userPerms[agentID]; ok {
-			if perm, ok := agentPerms[workspaceID]; ok {
-				s.mu.RUnlock()
-				return perm.Enabled
-			}
-		}
+	if cached, ok := s.cache.Get(userID, agentID, workspaceID); ok {
+		return cached.Enabled
 	}
-	s.mu.RUnlock()
 
 	// Not in cache, check repository
 	perm, err := s.repo.GetPermission(ctx, userID, agentID, workspaceID)
@@ -109,18 +74,7 @@ func (s *Service) HasPermission(ctx context.Context, userID, agentID, workspaceI
 		return false
 	}
 
-	// Update cache
-	s.mu.Lock()
-	s.evictCacheIfNeeded()
-	if _, ok := s.cache[userID]; !ok {
-		s.cache[userID] = make(map[string]map[string]*WorkspacePermission)
-	}
-	if _, ok := s.cache[userID][agentID]; !ok {
-		s.cache[userID][agentID] = make(map[string]*WorkspacePermission)
-	}
-	s.cache[userID][agentID][workspaceID] = perm
-	s.mu.Unlock()
-
+	s.cache.Set(userID, perm, agentID, workspaceID)
 	return perm.Enabled
 }
 

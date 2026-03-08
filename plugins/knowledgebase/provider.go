@@ -66,11 +66,11 @@ func (p *Provider) SettingsSchema() []toolregistry.SettingsField {
 func (p *Provider) CreateExecutable(ctx context.Context, toolID string, deps toolregistry.FactoryDeps) (agent.ExecutableTool, error) {
 	switch toolID {
 	case "kb-query":
-		// Resolve settings: plugin settings override → FactoryDeps fallback
-		apiKey := deps.OpenAIAPIKey
-		modelID := deps.ModelID
+		// Resolve settings: plugin settings override → deps fallback
+		apiKey := deps.OpenAIAPIKey()
+		modelID := deps.ModelID()
 
-		if ps := deps.PluginSettings["knowledgebase"]; ps != nil {
+		if ps := deps.PluginSettings("knowledgebase"); ps != nil {
 			if v := ps["api_key"]; v != "" {
 				apiKey = v
 			}
@@ -79,7 +79,7 @@ func (p *Provider) CreateExecutable(ctx context.Context, toolID string, deps too
 			}
 		}
 
-		return NewQueryKnowledgeBaseTool(deps.EdgequakeBaseURL, apiKey, modelID), nil
+		return NewQueryKnowledgeBaseTool(deps.EdgequakeBaseURL(), apiKey, modelID, deps.AllowedKBNamespaces()), nil
 	default:
 		return nil, nil // Not handled by this plugin
 	}

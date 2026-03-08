@@ -12,16 +12,17 @@ import (
 
 // ExecutableToolFactory creates executable tools from tool registry entries and tool sets.
 type ExecutableToolFactory struct {
-	mu               sync.RWMutex
-	artifactStore    artifact.Service
-	toolRegistry     *Registry
-	edgequakeBaseURL string
-	openAIAPIKey     string
-	modelID          string
-	ttsAPIKey        string
-	ttsModel         string
-	ttsVoice         string
-	pluginSettings   map[string]map[string]string // plugin_id → key → value
+	mu                  sync.RWMutex
+	artifactStore       artifact.Service
+	toolRegistry        *Registry
+	edgequakeBaseURL    string
+	openAIAPIKey        string
+	modelID             string
+	ttsAPIKey           string
+	ttsModel            string
+	ttsVoice            string
+	pluginSettings      map[string]map[string]string // plugin_id → key → value
+	allowedKBNamespaces []string                     // workspace IDs the agent may query
 }
 
 // NewExecutableToolFactory creates a new tool factory.
@@ -56,6 +57,13 @@ func (f *ExecutableToolFactory) SetPluginSettings(settings map[string]map[string
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.pluginSettings = settings
+}
+
+// SetAllowedKBNamespaces sets the workspace IDs the agent is permitted to query.
+func (f *ExecutableToolFactory) SetAllowedKBNamespaces(namespaces []string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.allowedKBNamespaces = namespaces
 }
 
 // SetToolRegistry sets the tool registry for the factory (used for tool set expansion).
@@ -96,23 +104,7 @@ func (f *ExecutableToolFactory) CreateExecutableToolsFromSet(ctx context.Context
 
 // CreateExecutableTool creates an executable tool from a tool registry entry.
 func (f *ExecutableToolFactory) CreateExecutableTool(ctx context.Context, tool *Tool) (agent.ExecutableTool, error) {
-	f.mu.RLock()
-	ttsAPIKey := f.ttsAPIKey
-	if ttsAPIKey == "" {
-		ttsAPIKey = f.openAIAPIKey // fallback to LLM key for backward compat
-	}
-	deps := FactoryDeps{
-		ArtifactStore:    f.artifactStore,
-		EdgequakeBaseURL: f.edgequakeBaseURL,
-		OpenAIAPIKey:     f.openAIAPIKey,
-		ModelID:          f.modelID,
-		MemoryService:    memory.NewArtifactMemoryService(f.artifactStore),
-		TTSAPIKey:        ttsAPIKey,
-		TTSModel:         f.ttsModel,
-		TTSVoice:         f.ttsVoice,
-		PluginSettings:   f.pluginSettings,
-	}
-	f.mu.RUnlock()
+	deps := &depResolver{factory: f}
 
 	for _, provider := range GetAllPluginProviders() {
 		executable, err := provider.CreateExecutable(ctx, tool.ID, deps)
@@ -125,4 +117,71 @@ func (f *ExecutableToolFactory) CreateExecutableTool(ctx context.Context, tool *
 	}
 
 	return nil, fmt.Errorf("unknown tool ID (no plugin handled it): %s", tool.ID)
+}
+
+// depResolver implements FactoryDeps using lazy, typed getters.
+// Dependencies are read from the factory under RLock to ensure thread safety.
+type depResolver struct {
+	factory     *ExecutableToolFactory
+	memoryOnce  sync.Once
+	memoryCache memory.Service
+}
+
+func (r *depResolver) ArtifactStore() artifact.Service {
+	r.factory.mu.RLock()
+	defer r.factory.mu.RUnlock()
+	return r.factory.artifactStore
+}
+
+func (r *depResolver) EdgequakeBaseURL() string {
+	r.factory.mu.RLock()
+	defer r.factory.mu.RUnlock()
+	return r.factory.edgequakeBaseURL
+}
+
+func (r *depResolver) OpenAIAPIKey() string {
+	r.factory.mu.RLock()
+	defer r.factory.mu.RUnlock()
+	return r.factory.openAIAPIKey
+}
+
+func (r *depResolver) ModelID() string {
+	r.factory.mu.RLock()
+	defer r.factory.mu.RUnlock()
+	return r.factory.modelID
+}
+
+func (r *depResolver) MemoryService() memory.Service {
+	r.memoryOnce.Do(func() {
+		r.factory.mu.RLock()
+		store := r.factory.artifactStore
+		r.factory.mu.RUnlock()
+		r.memoryCache = memory.NewArtifactMemoryService(store)
+	})
+	return r.memoryCache
+}
+
+func (r *depResolver) TTSConfig() (apiKey, model, voice string) {
+	r.factory.mu.RLock()
+	defer r.factory.mu.RUnlock()
+	apiKey = r.factory.ttsAPIKey
+	if apiKey == "" {
+		apiKey = r.factory.openAIAPIKey // fallback to LLM key for backward compat
+	}
+	return apiKey, r.factory.ttsModel, r.factory.ttsVoice
+}
+
+func (r *depResolver) PluginSettings(pluginID string) map[string]string {
+	r.factory.mu.RLock()
+	defer r.factory.mu.RUnlock()
+	if r.factory.pluginSettings == nil {
+		return nil
+	}
+	return r.factory.pluginSettings[pluginID]
+}
+
+func (r *depResolver) AllowedKBNamespaces() []string {
+	r.factory.mu.RLock()
+	defer r.factory.mu.RUnlock()
+	return r.factory.allowedKBNamespaces
 }

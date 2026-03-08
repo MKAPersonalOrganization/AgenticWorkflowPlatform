@@ -12,6 +12,7 @@ import (
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/internal/llm"
 	"school-with-ai/foundation/agentsdk/io"
+	"school-with-ai/shared"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -162,6 +163,10 @@ func (exec *executionState) finalizeResult() {
 }
 
 func (e *Engine) newExecutionState(ctx context.Context, agentName string, runCtx core.RunContext, yield func(core.Event, error) bool) (*executionState, error) {
+	// Put thread ID in context so AgentProvider.GetConfig can access it
+	// for per-thread state injection (e.g. activated skills).
+	ctx = shared.SetThreadIDInContext(ctx, runCtx.ThreadID)
+
 	instance, err := e.newAgentInstance(ctx, agentName)
 	if err != nil {
 		return nil, err

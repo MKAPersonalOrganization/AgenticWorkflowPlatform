@@ -7,6 +7,8 @@ import (
 	"sync"
 
 	"school-with-ai/foundation/agent"
+	"school-with-ai/modules/chat/memory"
+	"school-with-ai/platform/artifact"
 
 	"github.com/a-h/templ"
 )
@@ -43,22 +45,36 @@ type SettingsField struct {
 	Options     []string          `json:"options,omitempty"` // Used when Type == FieldTypeSelect
 }
 
-// FactoryDeps holds the dependencies required to instantiate certain tools.
-type FactoryDeps struct {
-	ArtifactStore    any // To be type-asserted by the specific plugin if needed
-	EdgequakeBaseURL string
-	OpenAIAPIKey     string
-	ModelID          string
-	MemoryService    any
-	// TTS capability config (resolved per-user from capability settings)
-	TTSAPIKey string // API key for the TTS provider (may differ from OpenAIAPIKey)
-	TTSModel  string // e.g. "gpt-4o-mini-tts"
-	TTSVoice  string // Default voice e.g. "marin", "coral"
+// FactoryDeps provides lazy, typed access to tool creation dependencies.
+// Plugins call only the getters they need, making dependencies explicit and
+// avoiding unnecessary allocations for services the requesting plugin doesn't use.
+type FactoryDeps interface {
+	// ArtifactStore returns the artifact storage service.
+	ArtifactStore() artifact.Service
 
-	// PluginSettings carries per-user, per-plugin configuration resolved at
-	// request time from the user_plugin_settings table.
-	// Outer key = plugin ID, inner key = setting field key, value = setting value.
-	PluginSettings map[string]map[string]string
+	// EdgequakeBaseURL returns the base URL for the Edgequake knowledge base service.
+	EdgequakeBaseURL() string
+
+	// OpenAIAPIKey returns the user's configured OpenAI API key.
+	OpenAIAPIKey() string
+
+	// ModelID returns the user's configured LLM model ID.
+	ModelID() string
+
+	// MemoryService returns a memory service backed by the artifact store.
+	// Constructed lazily on first call to avoid allocation when unused.
+	MemoryService() memory.Service
+
+	// TTSConfig returns the TTS API key, model, and voice.
+	// Falls back to OpenAIAPIKey for the API key if no dedicated TTS key is set.
+	TTSConfig() (apiKey, model, voice string)
+
+	// PluginSettings returns per-user settings for the given plugin ID.
+	// Returns nil if no settings are configured.
+	PluginSettings(pluginID string) map[string]string
+
+	// AllowedKBNamespaces returns workspace IDs the agent may query.
+	AllowedKBNamespaces() []string
 }
 
 // BuildIconSVG wraps Lucide-style inner SVG paths in a complete <svg> element.

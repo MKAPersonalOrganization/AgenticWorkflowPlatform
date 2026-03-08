@@ -74,6 +74,9 @@ type UserSkillRepository interface {
 	Delete(ctx context.Context, id, userID string) error
 	// GetByID retrieves a single skill by ID (must be owned by user).
 	GetByID(ctx context.Context, id, userID string) (*UserSkill, error)
+	// GetByIDs retrieves multiple skills by their IDs in a single query (must be owned by user).
+	// Missing or deleted skills are silently omitted from the result.
+	GetByIDs(ctx context.Context, ids []string, userID string) ([]UserSkill, error)
 	// GetByName retrieves a skill by name (must be owned by user).
 	GetByName(ctx context.Context, userID, name string) (*UserSkill, error)
 	// ListByUser returns all skills for a specific user.
