@@ -4,6 +4,7 @@ import (
 	"school-with-ai/components/agents"
 	"school-with-ai/components/button"
 	"school-with-ai/components/convsearch"
+	"school-with-ai/components/filesystem"
 	"school-with-ai/components/i18n"
 	"school-with-ai/components/icon"
 	"school-with-ai/components/resources"
@@ -45,6 +46,10 @@ templ Navbar(props ...NavbarProps) {
 			<!-- Search Conversations Button -->
 			<div class="hidden md:block">
 				@convsearch.SearchButtonTrigger()
+			</div>
+			<!-- Filesystems Button -->
+			<div class="hidden md:block">
+				@filesystem.FilesystemButtonTrigger()
 			</div>
 		}
 		<!-- Admin Indicator -->

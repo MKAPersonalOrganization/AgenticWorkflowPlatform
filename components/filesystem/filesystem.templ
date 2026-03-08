@@ -1,0 +1,504 @@
+package filesystem
+
+import (
+	"school-with-ai/components/badge"
+	"school-with-ai/components/button"
+	"school-with-ai/components/dialog"
+	"school-with-ai/components/i18n"
+	"school-with-ai/components/icon"
+	"school-with-ai/components/input"
+	"school-with-ai/components/label"
+	"school-with-ai/components/skeleton"
+	"school-with-ai/components/textarea"
+)
+
+// ─── Nav Button Trigger ─────────────────────────────────────────────────────
+templ FilesystemButtonTrigger() {
+	@dialog.Trigger(dialog.TriggerProps{For: "filesystem-dialog"}) {
+		@button.Button(button.Props{
+			Size:    button.SizeIcon,
+			Variant: button.VariantGhost,
+			Class:   "size-9",
+			Attributes: templ.Attributes{
+				"title":  i18n.T(ctx, "Filesystems"),
+				"@click": "$dispatch('open-filesystem-dialog')",
+			},
+		}) {
+			@icon.HardDrive(icon.Props{Class: "size-5"})
+			<span class="sr-only">{ i18n.T(ctx, "Filesystems") }</span>
+		}
+	}
+}
+
+// ─── Main Dialog ────────────────────────────────────────────────────────────
+templ FilesystemDialog() {
+	@dialog.Dialog(dialog.Props{
+		ID: "filesystem-dialog",
+	}) {
+		@dialog.Content(dialog.ContentProps{
+			Class: "sm:max-w-5xl max-h-[90vh] flex flex-col p-0 overflow-hidden",
+		}) {
+			<div
+				x-data="filesystemManager"
+				@open-filesystem-dialog.window="init()"
+				class="flex flex-col h-full max-h-[90vh]"
+			>
+				<!-- Header -->
+				@dialog.Header(dialog.HeaderProps{Class: "px-6 pt-6 pb-4 border-b shrink-0"}) {
+					<div class="flex items-center justify-between">
+						<div>
+							@dialog.Title() {
+								<span x-show="view === 'list'">{ i18n.T(ctx, "Filesystems") }</span>
+								<span x-show="view === 'create'" x-cloak>{ i18n.T(ctx, "Create Filesystem") }</span>
+								<span x-show="view === 'browse'" x-cloak>
+									<span x-text="currentFS?.name || 'Browse'"></span>
+								</span>
+								<span x-show="view === 'permissions'" x-cloak>
+									<span x-text="'Permissions: ' + (currentFS?.name || '')"></span>
+								</span>
+							}
+							@dialog.Description() {
+								<span x-show="view === 'list'">{ i18n.T(ctx, "Manage your virtual filesystems and control agent access.") }</span>
+								<span x-show="view === 'create'" x-cloak>{ i18n.T(ctx, "Set up a new virtual filesystem backed by S3 or GitHub.") }</span>
+								<span x-show="view === 'browse'" x-cloak>{ i18n.T(ctx, "Browse and manage files and directories.") }</span>
+								<span x-show="view === 'permissions'" x-cloak>{ i18n.T(ctx, "Control which agents can access this filesystem.") }</span>
+							}
+						</div>
+						<div x-show="view !== 'list'" x-cloak>
+							@button.Button(button.Props{
+								Variant: button.VariantOutline,
+								Size:    button.SizeSm,
+								Attributes: templ.Attributes{
+									"@click": "goBack()",
+								},
+							}) {
+								@icon.ArrowLeft(icon.Props{Class: "size-4 me-1"})
+								{ i18n.T(ctx, "Back") }
+							}
+						</div>
+					</div>
+				}
+				<!-- Body -->
+				<div class="flex-1 overflow-y-auto px-6 py-4">
+					<!-- LIST VIEW -->
+					<div x-show="view === 'list'">
+						<!-- Create Button -->
+						<div class="mb-4">
+							@button.Button(button.Props{
+								Variant: button.VariantDefault,
+								Size:    button.SizeSm,
+								Attributes: templ.Attributes{
+									"@click": "view = 'create'",
+								},
+							}) {
+								@icon.Plus(icon.Props{Class: "size-4 me-1"})
+								{ i18n.T(ctx, "New Filesystem") }
+							}
+						</div>
+						<!-- Loading Skeleton -->
+						<div x-show="loading" class="space-y-3">
+							@skeleton.Skeleton(skeleton.Props{Class: "h-20 w-full rounded-lg"})
+							@skeleton.Skeleton(skeleton.Props{Class: "h-20 w-full rounded-lg"})
+							@skeleton.Skeleton(skeleton.Props{Class: "h-20 w-full rounded-lg"})
+						</div>
+						<!-- Empty State -->
+						<div x-show="!loading && filesystems.length === 0" x-cloak class="text-center py-12">
+							@icon.HardDrive(icon.Props{Class: "size-12 mx-auto text-muted-foreground/50 mb-4"})
+							<h3 class="text-lg font-medium text-muted-foreground">{ i18n.T(ctx, "No filesystems yet") }</h3>
+							<p class="text-sm text-muted-foreground mt-1">{ i18n.T(ctx, "Create a virtual filesystem to give agents file management capabilities.") }</p>
+						</div>
+						<!-- Filesystem List -->
+						<div x-show="!loading && filesystems.length > 0" x-cloak class="space-y-3">
+							<template x-for="fs in filesystems" :key="fs.id">
+								<div class="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
+									<div class="flex items-center gap-3 flex-1 min-w-0 cursor-pointer" @click="browseFS(fs)">
+										<div class="shrink-0">
+											<template x-if="fs.type === 'local'">
+												@icon.HardDrive(icon.Props{Class: "size-5 text-blue-500"})
+											</template>
+											<template x-if="fs.type === 'github'">
+												@icon.Github(icon.Props{Class: "size-5 text-muted-foreground"})
+											</template>
+										</div>
+										<div class="min-w-0">
+											<div class="font-medium truncate" x-text="fs.name"></div>
+											<div class="text-xs text-muted-foreground truncate" x-text="fs.description || 'No description'"></div>
+										</div>
+										@badge.Badge(badge.Props{
+											Variant: badge.VariantSecondary,
+											Class:   "ml-2 shrink-0",
+										}) {
+											<span x-text="fs.type"></span>
+										}
+									</div>
+									<div class="flex items-center gap-1 shrink-0 ms-2">
+										@button.Button(button.Props{
+											Variant: button.VariantGhost,
+											Size:    button.SizeIcon,
+											Class:   "size-8",
+											Attributes: templ.Attributes{
+												"@click.stop": "openPermissions(fs)",
+												"title":       i18n.T(ctx, "Permissions"),
+											},
+										}) {
+											@icon.Shield(icon.Props{Class: "size-4"})
+										}
+										@button.Button(button.Props{
+											Variant: button.VariantGhost,
+											Size:    button.SizeIcon,
+											Class:   "size-8 text-destructive hover:text-destructive",
+											Attributes: templ.Attributes{
+												"@click.stop": "confirmDelete(fs)",
+												"title":       i18n.T(ctx, "Delete"),
+											},
+										}) {
+											@icon.Trash2(icon.Props{Class: "size-4"})
+										}
+									</div>
+								</div>
+							</template>
+						</div>
+					</div>
+					<!-- CREATE VIEW -->
+					<div x-show="view === 'create'" x-cloak>
+						<form @submit.prevent="submitCreate()" class="space-y-4">
+							<div>
+								@label.Label(label.Props{}) {
+									{ i18n.T(ctx, "Name") }
+								}
+								@input.Input(input.Props{
+									Placeholder: "My Workspace Files",
+									Attributes: templ.Attributes{
+										"x-model":  "form.name",
+										"required": "true",
+									},
+								})
+							</div>
+							<div>
+								@label.Label(label.Props{}) {
+									{ i18n.T(ctx, "Description") }
+								}
+								@textarea.Textarea(textarea.Props{
+									Placeholder: "Optional description...",
+									Attributes: templ.Attributes{
+										"x-model": "form.description",
+										"rows":    "2",
+									},
+								})
+							</div>
+							<div>
+								@label.Label(label.Props{}) {
+									{ i18n.T(ctx, "Type") }
+								}
+								<div class="flex gap-3 mt-1">
+									@button.Button(button.Props{
+										Variant: button.VariantOutline,
+										Size:    button.SizeSm,
+										Attributes: templ.Attributes{
+											"@click": "form.type = 'local'",
+											":class": "form.type === 'local' ? 'border-primary bg-primary/10' : ''",
+											"type":   "button",
+										},
+									}) {
+										@icon.HardDrive(icon.Props{Class: "size-4 me-1"})
+										{ i18n.T(ctx, "S3 / MinIO") }
+									}
+									@button.Button(button.Props{
+										Variant: button.VariantOutline,
+										Size:    button.SizeSm,
+										Attributes: templ.Attributes{
+											"@click": "form.type = 'github'",
+											":class": "form.type === 'github' ? 'border-primary bg-primary/10' : ''",
+											"type":   "button",
+										},
+									}) {
+										@icon.Github(icon.Props{Class: "size-4 me-1"})
+										{ i18n.T(ctx, "GitHub Repository") }
+									}
+								</div>
+							</div>
+							<!-- GitHub Config (OAuth-based) -->
+							<div x-show="form.type === 'github'" x-cloak class="space-y-3 p-4 rounded-lg border bg-muted/50">
+								<!-- Connection Status -->
+								<div x-show="!githubStatus.connected" class="text-center py-4">
+									@icon.Github(icon.Props{Class: "size-8 mx-auto text-muted-foreground mb-3"})
+									<p class="text-sm text-muted-foreground mb-3">{ i18n.T(ctx, "Connect your GitHub account to browse and select a repository.") }</p>
+									@button.Button(button.Props{
+										Variant: button.VariantOutline,
+										Attributes: templ.Attributes{
+											"@click": "connectGitHub()",
+											"type":   "button",
+										},
+									}) {
+										@icon.Github(icon.Props{Class: "size-4 me-2"})
+										{ i18n.T(ctx, "Connect GitHub Account") }
+									}
+								</div>
+								<div x-show="githubStatus.connected" x-cloak>
+									<!-- Connected Banner -->
+									<div class="flex items-center justify-between mb-3 p-2 rounded-md bg-green-500/10 border border-green-500/20">
+										<div class="flex items-center gap-2">
+											<img x-show="githubStatus.avatar" :src="githubStatus.avatar" class="size-6 rounded-full" alt=""/>
+											<span class="text-sm font-medium text-green-700 dark:text-green-400">
+												{ i18n.T(ctx, "Connected as") } <span x-text="'@' + githubStatus.username"></span>
+											</span>
+										</div>
+										@button.Button(button.Props{
+											Variant: button.VariantGhost,
+											Size:    button.SizeSm,
+											Class:   "text-destructive hover:text-destructive h-7",
+											Attributes: templ.Attributes{
+												"@click": "disconnectGitHub()",
+												"type":   "button",
+											},
+										}) {
+											{ i18n.T(ctx, "Disconnect") }
+										}
+									</div>
+									<!-- Repository Selector -->
+									<div>
+										@label.Label(label.Props{}) {
+											{ i18n.T(ctx, "Repository") }
+										}
+										<div class="relative mt-1">
+											<select
+												x-model="form.github.selectedRepo"
+												@change="onRepoSelected()"
+												class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 appearance-none cursor-pointer"
+											>
+												<option value="">{ i18n.T(ctx, "Select a repository...") }</option>
+												<template x-for="repo in githubRepos" :key="repo.full_name">
+													<option :value="repo.full_name" x-text="repo.full_name + (repo.private ? ' 🔒' : '')"></option>
+												</template>
+											</select>
+											<div x-show="loadingRepos" class="absolute right-3 top-2.5">
+												<div class="size-5 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin"></div>
+											</div>
+										</div>
+									</div>
+									<!-- Branch -->
+									<div class="mt-3">
+										@label.Label(label.Props{}) {
+											{ i18n.T(ctx, "Branch") }
+										}
+										@input.Input(input.Props{
+											Placeholder: "main",
+											Attributes: templ.Attributes{
+												"x-model": "form.github.branch",
+											},
+										})
+									</div>
+								</div>
+							</div>
+							<div class="flex justify-end gap-2 pt-2">
+								@button.Button(button.Props{
+									Variant: button.VariantOutline,
+									Attributes: templ.Attributes{
+										"@click": "view = 'list'",
+										"type":   "button",
+									},
+								}) {
+									{ i18n.T(ctx, "Cancel") }
+								}
+								@button.Button(button.Props{
+									Variant: button.VariantDefault,
+									Type:    button.TypeSubmit,
+									Attributes: templ.Attributes{
+										":disabled": "creating",
+									},
+								}) {
+									<span x-show="!creating">{ i18n.T(ctx, "Create") }</span>
+									<span x-show="creating" x-cloak>{ i18n.T(ctx, "Creating...") }</span>
+								}
+							</div>
+						</form>
+					</div>
+					<!-- BROWSE VIEW -->
+					<div x-show="view === 'browse'" x-cloak>
+						<!-- Breadcrumb -->
+						<div class="flex items-center gap-1 mb-4 text-sm text-muted-foreground flex-wrap">
+							<span class="cursor-pointer hover:text-foreground" @click="navigateTo('/')">
+								@icon.HardDrive(icon.Props{Class: "size-4 inline"})
+								<span x-text="currentFS?.name || 'Root'"></span>
+							</span>
+							<template x-for="(part, idx) in pathParts" :key="idx">
+								<span class="flex items-center gap-1">
+									<span>/</span>
+									<span class="cursor-pointer hover:text-foreground" @click="navigateToIndex(idx)" x-text="part"></span>
+								</span>
+							</template>
+						</div>
+						<!-- Toolbar -->
+						<div class="flex items-center gap-2 mb-4" x-show="currentFS?.type === 'local'">
+							@button.Button(button.Props{
+								Variant: button.VariantOutline,
+								Size:    button.SizeSm,
+								Attributes: templ.Attributes{
+									"@click": "showMkdir = !showMkdir",
+								},
+							}) {
+								@icon.FolderPlus(icon.Props{Class: "size-4 me-1"})
+								{ i18n.T(ctx, "New Folder") }
+							}
+							@button.Button(button.Props{
+								Variant: button.VariantOutline,
+								Size:    button.SizeSm,
+								Attributes: templ.Attributes{
+									"@click": "$refs.fileInput.click()",
+								},
+							}) {
+								@icon.Upload(icon.Props{Class: "size-4 me-1"})
+								{ i18n.T(ctx, "Upload File") }
+							}
+							<input type="file" x-ref="fileInput" class="hidden" @change="handleFileUpload($event)" multiple/>
+						</div>
+						<!-- Mkdir Inline -->
+						<div x-show="showMkdir" x-cloak class="flex items-center gap-2 mb-4">
+							@input.Input(input.Props{
+								Placeholder: "folder-name",
+								Class:       "max-w-xs",
+								Attributes: templ.Attributes{
+									"x-model":         "newDirName",
+									"@keydown.enter":  "createDir()",
+									"@keydown.escape": "showMkdir = false",
+								},
+							})
+							@button.Button(button.Props{
+								Variant: button.VariantDefault,
+								Size:    button.SizeSm,
+								Attributes: templ.Attributes{
+									"@click": "createDir()",
+								},
+							}) {
+								{ i18n.T(ctx, "Create") }
+							}
+						</div>
+						<!-- Loading -->
+						<div x-show="browseLoading" class="space-y-2">
+							@skeleton.Skeleton(skeleton.Props{Class: "h-10 w-full rounded"})
+							@skeleton.Skeleton(skeleton.Props{Class: "h-10 w-full rounded"})
+							@skeleton.Skeleton(skeleton.Props{Class: "h-10 w-full rounded"})
+						</div>
+						<!-- Empty Directory -->
+						<div x-show="!browseLoading && entries.length === 0" x-cloak class="text-center py-8">
+							@icon.FolderOpen(icon.Props{Class: "size-10 mx-auto text-muted-foreground/50 mb-3"})
+							<p class="text-sm text-muted-foreground">{ i18n.T(ctx, "This directory is empty.") }</p>
+						</div>
+						<!-- Entry List -->
+						<div x-show="!browseLoading && entries.length > 0" x-cloak class="space-y-1">
+							<template x-for="entry in entries" :key="entry.name">
+								<div class="flex items-center justify-between p-2 rounded hover:bg-accent/50 transition-colors group">
+									<div class="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" @click="clickEntry(entry)">
+										<template x-if="entry.is_dir">
+											@icon.Folder(icon.Props{Class: "size-4 text-blue-500 shrink-0"})
+										</template>
+										<template x-if="!entry.is_dir">
+											@icon.File(icon.Props{Class: "size-4 text-muted-foreground shrink-0"})
+										</template>
+										<span class="truncate text-sm" x-text="entry.name"></span>
+										<span x-show="!entry.is_dir" class="text-xs text-muted-foreground ms-2" x-text="formatSize(entry.size)"></span>
+									</div>
+									<div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" x-show="currentFS?.type === 'local'">
+										@button.Button(button.Props{
+											Variant: button.VariantGhost,
+											Size:    button.SizeIcon,
+											Class:   "size-7 text-destructive hover:text-destructive",
+											Attributes: templ.Attributes{
+												"@click.stop": "deleteEntry(entry)",
+												"title":       i18n.T(ctx, "Delete"),
+											},
+										}) {
+											@icon.Trash2(icon.Props{Class: "size-3.5"})
+										}
+									</div>
+								</div>
+							</template>
+						</div>
+					</div>
+					<!-- PERMISSIONS VIEW -->
+					<div x-show="view === 'permissions'" x-cloak>
+						<div class="space-y-4">
+							<!-- Grant form -->
+							<div class="flex items-end gap-2">
+								<div class="flex-1">
+									@label.Label(label.Props{}) {
+										{ i18n.T(ctx, "Agent ID") }
+									}
+									@input.Input(input.Props{
+										Placeholder: "Enter agent ID to grant access...",
+										Attributes: templ.Attributes{
+											"x-model":        "permAgentId",
+											"@keydown.enter": "grantPerm()",
+										},
+									})
+								</div>
+								@button.Button(button.Props{
+									Variant: button.VariantDefault,
+									Size:    button.SizeSm,
+									Class:   "mb-0.5",
+									Attributes: templ.Attributes{
+										"@click": "grantPerm()",
+									},
+								}) {
+									@icon.Plus(icon.Props{Class: "size-4 me-1"})
+									{ i18n.T(ctx, "Grant") }
+								}
+							</div>
+							<!-- Loading -->
+							<div x-show="permLoading" class="space-y-2">
+								@skeleton.Skeleton(skeleton.Props{Class: "h-10 w-full rounded"})
+							</div>
+							<!-- Empty -->
+							<div x-show="!permLoading && permissions.length === 0" x-cloak class="text-center py-8">
+								@icon.Shield(icon.Props{Class: "size-10 mx-auto text-muted-foreground/50 mb-3"})
+								<p class="text-sm text-muted-foreground">{ i18n.T(ctx, "No agents have access to this filesystem yet.") }</p>
+							</div>
+							<!-- Permission List -->
+							<div x-show="!permLoading && permissions.length > 0" x-cloak class="space-y-2">
+								<template x-for="perm in permissions" :key="perm.id">
+									<div class="flex items-center justify-between p-3 rounded-lg border bg-card">
+										<div class="flex items-center gap-2">
+											@icon.Bot(icon.Props{Class: "size-4 text-muted-foreground"})
+											<span class="text-sm font-medium" x-text="perm.agent_id"></span>
+										</div>
+										@button.Button(button.Props{
+											Variant: button.VariantGhost,
+											Size:    button.SizeIcon,
+											Class:   "size-7 text-destructive hover:text-destructive",
+											Attributes: templ.Attributes{
+												"@click": "revokePerm(perm.agent_id)",
+											},
+										}) {
+											@icon.X(icon.Props{Class: "size-3.5"})
+										}
+									</div>
+								</template>
+							</div>
+						</div>
+					</div>
+				</div>
+				<!-- Footer -->
+				@dialog.Footer(dialog.FooterProps{Class: "px-6 py-4 border-t shrink-0"}) {
+					<div class="flex items-center justify-between w-full">
+						<span x-show="view === 'list'" class="text-xs text-muted-foreground">
+							<span x-text="filesystems.length"></span> { i18n.T(ctx, "filesystem(s)") }
+						</span>
+						<span x-show="view === 'browse'" x-cloak class="text-xs text-muted-foreground">
+							<span x-text="entries.length"></span> { i18n.T(ctx, "item(s)") }
+						</span>
+						<div class="ms-auto">
+							@dialog.Close() {
+								@button.Button(button.Props{
+									Variant: button.VariantOutline,
+									Size:    button.SizeSm,
+								}) {
+									{ i18n.T(ctx, "Close") }
+								}
+							}
+						</div>
+					</div>
+				}
+			</div>
+		}
+	}
+}

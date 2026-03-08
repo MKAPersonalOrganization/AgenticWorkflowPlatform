@@ -561,4 +561,62 @@ CREATE INDEX IF NOT EXISTS idx_mcp_connectors_id_user ON mcp_connectors(id, user
 -- Covers the ORDER BY connector_id, name ASC used by ListToolsByConnectors.
 CREATE INDEX IF NOT EXISTS idx_mcp_discovered_tools_connector_name ON mcp_discovered_tools(connector_id, name);
 
+-- Version: 1.49
+-- Description: Create filesystems table for user-owned virtual filesystems.
+-- Each filesystem is backed by S3/MinIO (type='local') or a GitHub repository
+-- (type='github'). Config is a JSONB column holding backend-specific settings.
+CREATE TABLE IF NOT EXISTS filesystems (
+    filesystem_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id       VARCHAR(255) NOT NULL,
+    name          VARCHAR(255) NOT NULL,
+    description   TEXT         NOT NULL DEFAULT '',
+    fs_type       VARCHAR(50)  NOT NULL DEFAULT 'local',
+    config        JSONB        NOT NULL DEFAULT '{}',
+    created_at    TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_filesystems_user ON filesystems(user_id);
 
+-- Version: 1.50
+-- Description: Create filesystem_entries table — the VFS inode table.
+-- Each row is a file or directory inside a filesystem. For S3-backed
+-- filesystems the storage_key column holds the S3 object key.
+CREATE TABLE IF NOT EXISTS filesystem_entries (
+    entry_id      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    filesystem_id UUID         NOT NULL REFERENCES filesystems(filesystem_id) ON DELETE CASCADE,
+    parent_path   TEXT         NOT NULL DEFAULT '/',
+    name          VARCHAR(255) NOT NULL,
+    entry_type    VARCHAR(20)  NOT NULL,
+    size          BIGINT       NOT NULL DEFAULT 0,
+    content_type  VARCHAR(255) NOT NULL DEFAULT '',
+    storage_key   TEXT         NOT NULL DEFAULT '',
+    created_at    TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMP    NOT NULL DEFAULT NOW(),
+    UNIQUE(filesystem_id, parent_path, name)
+);
+CREATE INDEX IF NOT EXISTS idx_fs_entries_parent ON filesystem_entries(filesystem_id, parent_path);
+
+-- Version: 1.51
+-- Description: Create filesystem_permissions table — controls which agents
+-- can access a given filesystem. One row per (filesystem, user, agent) triple.
+CREATE TABLE IF NOT EXISTS filesystem_permissions (
+    permission_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    filesystem_id UUID         NOT NULL REFERENCES filesystems(filesystem_id) ON DELETE CASCADE,
+    user_id       VARCHAR(255) NOT NULL,
+    agent_id      VARCHAR(255) NOT NULL,
+    granted_at    TIMESTAMP    NOT NULL DEFAULT NOW(),
+    UNIQUE(filesystem_id, user_id, agent_id)
+);
+CREATE INDEX IF NOT EXISTS idx_fs_permissions_lookup ON filesystem_permissions(filesystem_id, user_id);
+
+-- Version: 1.52
+-- Description: Create github_connections table — stores per-user GitHub OAuth
+-- access tokens for the filesystem GitHub integration. One row per user.
+CREATE TABLE IF NOT EXISTS github_connections (
+    user_id          VARCHAR(255) PRIMARY KEY,
+    access_token     TEXT         NOT NULL,
+    github_username  VARCHAR(255) NOT NULL DEFAULT '',
+    github_avatar    TEXT         NOT NULL DEFAULT '',
+    connected_at     TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at       TIMESTAMP    NOT NULL DEFAULT NOW()
+);
