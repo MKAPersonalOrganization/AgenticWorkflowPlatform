@@ -28,6 +28,7 @@ import (
 	"school-with-ai/foundation/i18n"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/middleware"
+	"school-with-ai/infra/githubauth"
 	"school-with-ai/infra/googleauth"
 	"school-with-ai/infra/projection/subscriber"
 	"school-with-ai/infra/sqldb"
@@ -66,6 +67,7 @@ import (
 	analyticsmod "school-with-ai/modules/analytics"
 	billingmod "school-with-ai/modules/billing"
 	chatmod "school-with-ai/modules/chat"
+	filesystemmod "school-with-ai/modules/filesystem"
 	knowledgemod "school-with-ai/modules/knowledge"
 	mcpmod "school-with-ai/modules/mcp"
 	permissionsmod "school-with-ai/modules/permissions"
@@ -128,6 +130,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 			AppURL             string `conf:"default:https://localhost:8090"`
 			GoogleClientID     string
 			GoogleClientSecret string
+			GitHubClientID     string
+			GitHubClientSecret string
 			SessionSecret      string `conf:"default:change-me-in-production-32-chars!"`
 		}
 		DashboardAdmin struct {
@@ -362,6 +366,32 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Initialize resources module
 	resourcesModule := resourcesmod.New(db, artifactService)
 
+	// Initialize filesystem module (VFS backed by S3/MinIO)
+	var ghClient *githubauth.Client
+	var ghStore *githubauth.Store
+	if cfg.Auth.GitHubClientID != "" && cfg.Auth.GitHubClientSecret != "" {
+		ghClient = githubauth.NewClient(githubauth.Config{
+			ClientID:     cfg.Auth.GitHubClientID,
+			ClientSecret: cfg.Auth.GitHubClientSecret,
+			RedirectURL:  cfg.Auth.AppURL + "/api/github/callback",
+		})
+		ghStore = githubauth.NewStore(db)
+		log.Info(ctx, "startup", "status", "GitHub OAuth configured for filesystem module")
+	}
+
+	filesystemModule, err := filesystemmod.New(db, filesystemmod.S3Config{
+		Endpoint:        cfg.Artifacts.S3Endpoint,
+		AccessKeyID:     cfg.Artifacts.S3AccessKey,
+		SecretAccessKey: cfg.Artifacts.S3SecretKey,
+		UseSSL:          cfg.Artifacts.S3UseSSL,
+		BucketName:      cfg.Artifacts.S3Bucket,
+		Region:          cfg.Artifacts.S3Region,
+	}, ghClient, ghStore, cfg.Auth.AppURL)
+	if err != nil {
+		return fmt.Errorf("initializing filesystem module: %w", err)
+	}
+	log.Info(ctx, "startup", "status", "filesystem module initialized")
+
 	// Create and initialize tool registry
 	toolRegistry := toolregistry.NewRegistry(log, toolregistry.NewPostgresToolRegistryRepository(db))
 	toolregistry.RegisterPlugin(&calculator.Provider{})
@@ -573,6 +603,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		knowledge:   knowledgeModule,
 		mcp:         mcpModule,
 		resources:   resourcesModule,
+		filesystem:  filesystemModule,
 		billing:     billingModule,
 		permissions: permissionsmod.New(log, workspacePermissionsService, &WorkspaceProviderAdapter{svc: edgequakeService}, agentProvider, cfg.Edgequake.TenantID),
 		analytics:   analyticsmod.New(log, statsProjection, cfg.DashboardAdmin.User, cfg.DashboardAdmin.Pass),
@@ -693,6 +724,9 @@ type routeModules struct {
 	resources interface {
 		RegisterRoutes(chi.Router, *auth.Middleware)
 	}
+	filesystem interface {
+		RegisterRoutes(chi.Router, *auth.Middleware)
+	}
 	billing interface {
 		RegisterRoutes(chi.Router, *auth.Middleware)
 	}
@@ -718,6 +752,7 @@ func registerRoutes(
 ) {
 	// Module routes
 	mods.resources.RegisterRoutes(r, authMW)
+	mods.filesystem.RegisterRoutes(r, authMW)
 	mods.permissions.RegisterRoutes(r, authMW)
 	mods.agentStore.RegisterRoutes(r, authMW)
 	mods.userProfile.RegisterRoutes(r, authMW)

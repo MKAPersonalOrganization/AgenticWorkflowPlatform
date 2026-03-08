@@ -3,6 +3,7 @@ package components
 import (
 	"school-with-ai/components/agents"
 	"school-with-ai/components/convsearch"
+	"school-with-ai/components/filesystem"
 	"school-with-ai/components/i18n"
 	"school-with-ai/components/nav"
 	"school-with-ai/components/resources"
@@ -77,6 +78,7 @@ templ BaseLayout(props LayoutProps) {
 			     Firefox executes all defer scripts before any module scripts,
 			     so using defer here caused a race where Alpine would start
 			     before the module-based component registrations ran. -->
+			<script src="/assets/js/filesystem.js"></script>
 			<script type="module" src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 		</head>
 		<body class="flex h-dvh bg-background text-foreground antialiased overflow-hidden" x-data="themeManager">
@@ -99,6 +101,7 @@ templ BaseLayout(props LayoutProps) {
 					@agents.AgentsDialog()
 					@tools.ToolsDialog()
 					@convsearch.SearchDialog()
+					@filesystem.FilesystemDialog()
 				</div>
 			}
 		</body>
