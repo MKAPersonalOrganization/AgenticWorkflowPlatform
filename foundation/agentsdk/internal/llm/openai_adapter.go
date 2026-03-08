@@ -381,11 +381,17 @@ func (c *OpenAIClient) applyOptions(params *openai.ChatCompletionNewParams, req 
 
 			if tool.Parameters != nil {
 				// Convert Schema to map[string]any for OpenAI
-				// For now, we assume Parameters are already in the right format if we want to be simple
-				// But spec says it's a *Schema.
 				data, _ := json.Marshal(tool.Parameters)
 				var paramsMap map[string]any
 				_ = json.Unmarshal(data, &paramsMap)
+
+				// Ensure 'properties' is present for object types, as OpenAI requires it.
+				if typ, ok := paramsMap["type"].(string); ok && typ == "object" {
+					if _, hasProps := paramsMap["properties"]; !hasProps {
+						paramsMap["properties"] = map[string]any{}
+					}
+				}
+
 				funcDef.Parameters = openai.FunctionParameters(paramsMap)
 			}
 
