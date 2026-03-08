@@ -43,6 +43,7 @@ import (
 	"school-with-ai/plugins/elicitation"
 	"school-with-ai/plugins/knowledgebase"
 	"school-with-ai/plugins/library"
+	"school-with-ai/plugins/todos"
 	"school-with-ai/plugins/tts"
 	"school-with-ai/shared"
 
@@ -370,6 +371,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	toolregistry.RegisterPlugin(&knowledgebase.Provider{})
 	toolregistry.RegisterPlugin(&library.Provider{})
 	toolregistry.RegisterPlugin(&memoryplugin.Provider{})
+	toolregistry.RegisterPlugin(&todos.Provider{})
 	toolregistry.RegisterPlugin(&tts.Provider{})
 	if err := toolRegistry.Initialize(ctx); err != nil {
 		return fmt.Errorf("failed to initialize tool registry: %w", err)
