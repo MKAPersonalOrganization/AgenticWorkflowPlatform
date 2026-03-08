@@ -395,6 +395,13 @@ func (c *GeminiClient) buildConfig(req *Request) *genai.GenerateContentConfig {
 			if tool.Parameters != nil {
 				data, _ := json.Marshal(tool.Parameters)
 				_ = json.Unmarshal(data, &paramsMap)
+
+				// Ensure 'properties' is present for object types
+				if typ, ok := paramsMap["type"].(string); ok && typ == "object" {
+					if _, hasProps := paramsMap["properties"]; !hasProps {
+						paramsMap["properties"] = map[string]any{}
+					}
+				}
 			}
 
 			funcs = append(funcs, &genai.FunctionDeclaration{
