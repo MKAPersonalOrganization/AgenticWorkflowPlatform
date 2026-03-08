@@ -1,0 +1,415 @@
+package tracker
+
+import "school-with-ai/components/annotation"
+
+templ icon() {
+	<div
+		:class="{
+			'text-violet-500': message.name === 'tracker_create_task' || message.name === 'tracker_update_task',
+			'text-sky-500': message.name === 'tracker_get_task' || message.name === 'tracker_list_tasks',
+			'text-amber-500': message.name === 'tracker_add_dependency',
+			'text-emerald-500': message.name === 'tracker_visualize'
+		}"
+	>
+		<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+			<rect width="18" height="18" x="3" y="3" rx="2"></rect>
+			<path d="M7 7h10"></path>
+			<path d="M7 12h10"></path>
+			<path d="M7 17h10"></path>
+		</svg>
+	</div>
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// tracker_create_task — shows newly created task details
+// ─────────────────────────────────────────────────────────────────────────────
+templ CreateTaskContainer() {
+	@annotation.Container(icon(), annotation.Props{
+		ContainerAttrs: templ.Attributes{
+			"x-data": `{
+				get result() {
+					try {
+						return typeof message.parsedResult === 'string' ? JSON.parse(message.parsedResult) : (message.parsedResult || {});
+					} catch { return {}; }
+				},
+				get task() { return this.result?.task || {}; },
+				get isError() { return !!message.error; },
+				typeLabel(t) {
+					switch(t) { case 'epic': return '📋 EPIC'; case 'bug': return '🐛 BUG'; default: return '📝 TASK'; }
+				}
+			}`,
+			"class": "border-violet-500/20",
+		},
+		IconAttrs: templ.Attributes{
+			"class": "bg-violet-500/10 text-violet-500/70 group-hover:bg-violet-500/15 group-hover:text-violet-500",
+		},
+		LabelAttrs: templ.Attributes{
+			"x-text": "isError ? 'Task Creation Failed' : 'Task Created'",
+			"class":  "text-violet-500/50",
+		},
+		SubtextAttrs: templ.Attributes{
+			"x-text": "task.id ? task.id + ' — ' + task.title : 'Creating task…'",
+		},
+		FooterDotAttrs: templ.Attributes{
+			":class": "isError ? 'bg-destructive/50' : 'bg-violet-500/50'",
+		},
+	}) {
+		<div class="flex flex-col gap-2" x-show="task.id">
+			<div class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-violet-500/[0.04] border border-violet-500/10">
+				<span class="text-xs font-mono font-bold text-violet-500/60 bg-violet-500/10 px-2 py-0.5 rounded" x-text="task.id"></span>
+				<span class="text-xs font-semibold" x-text="typeLabel(task.type)"></span>
+				<span class="text-xs text-muted-foreground/50 flex-1 truncate" x-text="task.title"></span>
+				<span class="text-[9px] font-bold uppercase tracking-widest text-emerald-500/50 bg-emerald-500/[0.08] px-2 py-0.5 rounded-full">open</span>
+			</div>
+			<template x-if="task.description">
+				<p class="text-[12px] text-muted-foreground/40 leading-relaxed px-1" x-text="task.description"></p>
+			</template>
+			<template x-if="task.dependencies && task.dependencies.length > 0">
+				<div class="flex items-center gap-1 px-1">
+					<span class="text-[9px] uppercase tracking-widest text-muted-foreground/25 font-semibold">Depends on:</span>
+					<template x-for="dep in task.dependencies" :key="dep">
+						<span class="text-[10px] font-mono text-amber-500/50 bg-amber-500/[0.06] px-1.5 py-0.5 rounded" x-text="dep"></span>
+					</template>
+				</div>
+			</template>
+		</div>
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// tracker_update_task — shows what changed
+// ─────────────────────────────────────────────────────────────────────────────
+templ UpdateTaskContainer() {
+	@annotation.Container(icon(), annotation.Props{
+		ContainerAttrs: templ.Attributes{
+			"x-data": `{
+				get result() {
+					try {
+						return typeof message.parsedResult === 'string' ? JSON.parse(message.parsedResult) : (message.parsedResult || {});
+					} catch { return {}; }
+				},
+				get task() { return this.result?.task || {}; },
+				get isError() { return !!message.error; },
+				statusEmoji(s) {
+					switch(s) { case 'closed': return '✅'; case 'in_progress': return '🚧'; case 'blocked': return '🚫'; default: return '⭕'; }
+				}
+			}`,
+			"class": "border-violet-500/20",
+		},
+		IconAttrs: templ.Attributes{
+			"class": "bg-violet-500/10 text-violet-500/70 group-hover:bg-violet-500/15 group-hover:text-violet-500",
+		},
+		LabelAttrs: templ.Attributes{
+			"x-text": "isError ? 'Update Failed' : 'Task Updated'",
+			"class":  "text-violet-500/50",
+		},
+		SubtextAttrs: templ.Attributes{
+			"x-text": "task.id ? statusEmoji(task.status) + ' ' + task.id + ' — ' + task.title : 'Updating…'",
+		},
+		FooterDotAttrs: templ.Attributes{
+			":class": "isError ? 'bg-destructive/50' : 'bg-violet-500/50'",
+		},
+	}) {
+		<div class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-violet-500/[0.04] border border-violet-500/10" x-show="task.id">
+			<span class="text-xs font-mono font-bold text-violet-500/60 bg-violet-500/10 px-2 py-0.5 rounded" x-text="task.id"></span>
+			<span class="text-xs text-foreground/70 flex-1 truncate" x-text="task.title"></span>
+			<span
+				class="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full"
+				:class="{
+					'text-emerald-500/60 bg-emerald-500/[0.08]': task.status === 'closed',
+					'text-amber-500/60 bg-amber-500/[0.08]': task.status === 'in_progress',
+					'text-destructive/60 bg-destructive/[0.08]': task.status === 'blocked',
+					'text-muted-foreground/50 bg-muted/10': task.status === 'open'
+				}"
+				x-text="task.status"
+			></span>
+		</div>
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// tracker_get_task — shows full task detail
+// ─────────────────────────────────────────────────────────────────────────────
+templ GetTaskContainer() {
+	@annotation.Container(icon(), annotation.Props{
+		ContainerAttrs: templ.Attributes{
+			"x-data": `{
+				get task() {
+					try {
+						const r = typeof message.parsedResult === 'string' ? JSON.parse(message.parsedResult) : (message.parsedResult || {});
+						return r.id ? r : {};
+					} catch { return {}; }
+				},
+				get found() { return !!this.task.id; },
+				statusEmoji(s) {
+					switch(s) { case 'closed': return '✅'; case 'in_progress': return '🚧'; case 'blocked': return '🚫'; default: return '⭕'; }
+				},
+				typeLabel(t) {
+					switch(t) { case 'epic': return '📋 EPIC'; case 'bug': return '🐛 BUG'; default: return '📝 TASK'; }
+				}
+			}`,
+			"class": "border-sky-500/20",
+		},
+		IconAttrs: templ.Attributes{
+			"class": "bg-sky-500/10 text-sky-500/70 group-hover:bg-sky-500/15 group-hover:text-sky-500",
+		},
+		LabelAttrs: templ.Attributes{
+			"x-text": "found ? 'Task Details' : 'Task Not Found'",
+			"class":  "text-sky-500/50",
+		},
+		SubtextAttrs: templ.Attributes{
+			"x-text": "found ? task.id : 'No match'",
+		},
+		FooterDotAttrs: templ.Attributes{
+			":class": "found ? 'bg-sky-500/50' : 'bg-muted-foreground/20'",
+		},
+	}) {
+		<div class="flex flex-col gap-2" x-show="found">
+			<div class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-sky-500/[0.04] border border-sky-500/10">
+				<span class="text-xs font-mono font-bold text-sky-500/60 bg-sky-500/10 px-2 py-0.5 rounded" x-text="task.id"></span>
+				<span class="text-xs font-semibold" x-text="typeLabel(task.type)"></span>
+				<span class="text-xs text-foreground/70 flex-1 truncate" x-text="task.title"></span>
+				<span class="text-lg" x-text="statusEmoji(task.status)"></span>
+			</div>
+			<template x-if="task.description">
+				<p class="text-[12px] text-muted-foreground/40 leading-relaxed px-1" x-text="task.description"></p>
+			</template>
+			<template x-if="task.parent_id">
+				<div class="flex items-center gap-1 px-1">
+					<span class="text-[9px] uppercase tracking-widest text-muted-foreground/25 font-semibold">Parent:</span>
+					<span class="text-[10px] font-mono text-violet-500/50 bg-violet-500/[0.06] px-1.5 py-0.5 rounded" x-text="task.parent_id"></span>
+				</div>
+			</template>
+			<template x-if="task.dependencies && task.dependencies.length > 0">
+				<div class="flex items-center gap-1 flex-wrap px-1">
+					<span class="text-[9px] uppercase tracking-widest text-muted-foreground/25 font-semibold">Depends on:</span>
+					<template x-for="dep in task.dependencies" :key="dep">
+						<span class="text-[10px] font-mono text-amber-500/50 bg-amber-500/[0.06] px-1.5 py-0.5 rounded" x-text="dep"></span>
+					</template>
+				</div>
+			</template>
+		</div>
+		<div x-show="!found" class="flex items-center justify-center py-4">
+			<span class="text-[11px] text-muted-foreground/25 italic">Task not found</span>
+		</div>
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// tracker_list_tasks — shows task table
+// ─────────────────────────────────────────────────────────────────────────────
+templ ListTasksContainer() {
+	@annotation.Container(icon(), annotation.Props{
+		ContainerAttrs: templ.Attributes{
+			"x-data": `{
+				get result() {
+					try {
+						return typeof message.parsedResult === 'string' ? JSON.parse(message.parsedResult) : (message.parsedResult || {});
+					} catch { return {}; }
+				},
+				get tasks() { return this.result?.tasks || []; },
+				get total() { return this.tasks.length; },
+				statusEmoji(s) {
+					switch(s) { case 'closed': return '✅'; case 'in_progress': return '🚧'; case 'blocked': return '🚫'; default: return '⭕'; }
+				},
+				typeLabel(t) {
+					switch(t) { case 'epic': return 'EPIC'; case 'bug': return 'BUG'; default: return 'TASK'; }
+				}
+			}`,
+			"class": "border-sky-500/20",
+		},
+		IconAttrs: templ.Attributes{
+			"class": "bg-sky-500/10 text-sky-500/70 group-hover:bg-sky-500/15 group-hover:text-sky-500",
+		},
+		LabelAttrs: templ.Attributes{
+			"x-text": "total > 0 ? total + ' Task' + (total !== 1 ? 's' : '') : 'No Tasks'",
+			"class":  "text-sky-500/50",
+		},
+		SubtextAttrs: templ.Attributes{
+			"x-text": "total > 0 ? 'Showing ' + total + ' task(s)' : 'No tasks match the filter'",
+		},
+		FooterDotAttrs: templ.Attributes{
+			":class": "total > 0 ? 'bg-sky-500/50' : 'bg-muted-foreground/20'",
+		},
+	}) {
+		<div class="flex flex-col gap-0.5" x-show="total > 0">
+			<template x-for="(task, idx) in tasks" :key="task.id || idx">
+				<div class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-muted/[0.04] transition-colors">
+					<span class="text-sm" x-text="statusEmoji(task.status)"></span>
+					<span class="text-[10px] font-mono font-bold text-sky-500/50 bg-sky-500/[0.06] px-1.5 py-0.5 rounded min-w-[3.5rem] text-center" x-text="task.id"></span>
+					<span
+						class="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded min-w-[2.5rem] text-center"
+						:class="{
+							'text-violet-500/50 bg-violet-500/[0.06]': task.type === 'epic',
+							'text-sky-500/50 bg-sky-500/[0.06]': task.type === 'task',
+							'text-rose-500/50 bg-rose-500/[0.06]': task.type === 'bug'
+						}"
+						x-text="typeLabel(task.type)"
+					></span>
+					<span class="text-[12px] text-foreground/60 flex-1 truncate" x-text="task.title"></span>
+					<template x-if="task.dependencies && task.dependencies.length > 0">
+						<span class="text-[9px] text-amber-500/40" x-text="'⛓ ' + task.dependencies.length"></span>
+					</template>
+				</div>
+			</template>
+		</div>
+		<div x-show="total === 0" class="flex items-center justify-center py-4">
+			<span class="text-[11px] text-muted-foreground/25 italic">No tasks found</span>
+		</div>
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// tracker_add_dependency — simple confirmation
+// ─────────────────────────────────────────────────────────────────────────────
+templ AddDependencyContainer() {
+	@annotation.Container(icon(), annotation.Props{
+		ContainerAttrs: templ.Attributes{
+			"x-data": `{
+				get result() {
+					try {
+						return typeof message.parsedResult === 'string' ? JSON.parse(message.parsedResult) : (message.parsedResult || {});
+					} catch { return {}; }
+				},
+				get isError() { return !!message.error; },
+				get taskId() { return message.parsedArgs?.task_id || ''; },
+				get depId() { return message.parsedArgs?.dependency_id || ''; }
+			}`,
+			"class": "border-amber-500/20",
+		},
+		IconAttrs: templ.Attributes{
+			"class": "bg-amber-500/10 text-amber-500/70 group-hover:bg-amber-500/15 group-hover:text-amber-500",
+		},
+		LabelAttrs: templ.Attributes{
+			"x-text": "isError ? 'Dependency Failed' : 'Dependency Added'",
+			"class":  "text-amber-500/50",
+		},
+		SubtextAttrs: templ.Attributes{
+			"x-text": "taskId + ' → depends on → ' + depId",
+		},
+		FooterDotAttrs: templ.Attributes{
+			":class": "isError ? 'bg-destructive/50' : 'bg-amber-500/50'",
+		},
+	}) {
+		<div class="flex items-center justify-center gap-3 px-4 py-3 rounded-xl bg-amber-500/[0.04] border border-amber-500/10">
+			<span class="text-xs font-mono font-bold text-amber-500/60 bg-amber-500/10 px-2 py-0.5 rounded" x-text="taskId"></span>
+			<span class="text-muted-foreground/30 text-xs">→ depends on →</span>
+			<span class="text-xs font-mono font-bold text-amber-500/60 bg-amber-500/10 px-2 py-0.5 rounded" x-text="depId"></span>
+		</div>
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// tracker_visualize — renders the task graph
+// ─────────────────────────────────────────────────────────────────────────────
+templ VisualizeContainer() {
+	@annotation.Container(icon(), annotation.Props{
+		ContainerAttrs: templ.Attributes{
+			"x-data": `{
+				get result() {
+					try {
+						return typeof message.parsedResult === 'string' ? JSON.parse(message.parsedResult) : (message.parsedResult || {});
+					} catch { return {}; }
+				},
+				get graph() { return this.result?.graph || ''; },
+				get tasks() { return this.result?.tasks || []; },
+				get counts() { return this.result?.counts || {}; },
+				get total() { return this.result?.total || 0; },
+				get closedPct() {
+					return this.total > 0 ? Math.round(((this.counts?.closed || 0) / this.total) * 100) : 0;
+				}
+			}`,
+			"class": "border-emerald-500/20",
+		},
+		IconAttrs: templ.Attributes{
+			"class": "bg-emerald-500/10 text-emerald-500/70 group-hover:bg-emerald-500/15 group-hover:text-emerald-500",
+		},
+		LabelAttrs: templ.Attributes{
+			"x-text": "total > 0 ? 'Project Graph — ' + total + ' tasks' : 'Empty Tracker'",
+			"class":  "text-emerald-500/50",
+		},
+		SubtextAttrs: templ.Attributes{
+			"x-text": "closedPct + '% complete'",
+		},
+		FooterDotAttrs: templ.Attributes{
+			":class": "closedPct === 100 ? 'bg-emerald-500/50' : 'bg-emerald-500/30 animate-pulse'",
+		},
+	}) {
+		<div class="flex flex-col gap-3" x-show="total > 0">
+			<!-- Progress bar -->
+			<div class="relative w-full">
+				<div class="flex items-center justify-between mb-2">
+					<span class="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/30">Progress</span>
+					<span
+						class="text-[11px] font-bold tabular-nums transition-colors duration-500"
+						:class="closedPct === 100 ? 'text-emerald-500/70' : 'text-emerald-500/50'"
+						x-text="closedPct + '%'"
+					></span>
+				</div>
+				<div class="w-full h-1.5 bg-muted/10 rounded-full overflow-hidden">
+					<div
+						class="h-full rounded-full transition-all duration-700 ease-out bg-gradient-to-r from-emerald-500/60 to-emerald-400/60"
+						:style="'width: ' + closedPct + '%'"
+					></div>
+				</div>
+			</div>
+			<!-- Status chips -->
+			<div class="flex items-center gap-2 flex-wrap">
+				<template x-if="counts.open > 0">
+					<div class="flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted/5 border border-border/10">
+						<span class="text-xs">⭕</span>
+						<span class="text-[9px] font-semibold text-muted-foreground/40 tabular-nums" x-text="counts.open + ' open'"></span>
+					</div>
+				</template>
+				<template x-if="counts.in_progress > 0">
+					<div class="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/[0.06] border border-amber-500/10">
+						<span class="text-xs">🚧</span>
+						<span class="text-[9px] font-semibold text-amber-500/50 tabular-nums" x-text="counts.in_progress + ' in progress'"></span>
+					</div>
+				</template>
+				<template x-if="counts.blocked > 0">
+					<div class="flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive/[0.06] border border-destructive/10">
+						<span class="text-xs">🚫</span>
+						<span class="text-[9px] font-semibold text-destructive/50 tabular-nums" x-text="counts.blocked + ' blocked'"></span>
+					</div>
+				</template>
+				<template x-if="counts.closed > 0">
+					<div class="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/[0.06] border border-emerald-500/10">
+						<span class="text-xs">✅</span>
+						<span class="text-[9px] font-semibold text-emerald-500/50 tabular-nums" x-text="counts.closed + ' closed'"></span>
+					</div>
+				</template>
+			</div>
+			<!-- ASCII graph -->
+			<div class="px-3 py-3 rounded-xl bg-muted/[0.03] border border-border/10 font-mono text-[11px] leading-relaxed text-foreground/50 whitespace-pre-wrap overflow-x-auto" x-text="graph"></div>
+		</div>
+		<div x-show="total === 0" class="flex flex-col items-center justify-center py-4 gap-2">
+			<span class="text-2xl">📋</span>
+			<span class="text-[11px] text-muted-foreground/20 font-medium">No tasks to visualize</span>
+		</div>
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Plugin template — routes messages to the appropriate container
+// ─────────────────────────────────────────────────────────────────────────────
+templ PluginTemplate() {
+	<template x-if="message.name === 'tracker_create_task'">
+		@CreateTaskContainer()
+	</template>
+	<template x-if="message.name === 'tracker_update_task'">
+		@UpdateTaskContainer()
+	</template>
+	<template x-if="message.name === 'tracker_get_task'">
+		@GetTaskContainer()
+	</template>
+	<template x-if="message.name === 'tracker_list_tasks'">
+		@ListTasksContainer()
+	</template>
+	<template x-if="message.name === 'tracker_add_dependency'">
+		@AddDependencyContainer()
+	</template>
+	<template x-if="message.name === 'tracker_visualize'">
+		@VisualizeContainer()
+	</template>
+}
