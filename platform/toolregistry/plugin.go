@@ -173,9 +173,6 @@ func GetUIHandledToolsJSON() string {
 	for _, p := range GetAllPluginProviders() {
 		handled = append(handled, p.UIHandledTools()...)
 	}
-	// Inject any hardcoded stragglers that need special state routing but lack a literal visual component
-	handled = append(handled, "transfer_to_agent")
-
 	bytes, _ := json.Marshal(handled)
 	return string(bytes)
 }

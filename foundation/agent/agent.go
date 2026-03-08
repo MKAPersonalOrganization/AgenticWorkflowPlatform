@@ -62,18 +62,6 @@ type AgentListResponse struct {
 	Agents []AgentMetadata `json:"agents"`
 }
 
-// Hierarchical extends Agent with sub-agent capabilities for hierarchical delegation.
-type Hierarchical interface {
-	Agent
-
-	// SubAgents returns child agents for hierarchical delegation.
-	// Returns empty slice if the agent doesn't support sub-agents.
-	SubAgents() []Agent
-
-	// Parent returns the parent agent, or nil if this is a root agent.
-	Parent() Agent
-}
-
 // AgentWithMiddleware extends Agent with middleware support.
 // This is optional - compatible with Blades' middleware pattern.
 type AgentWithMiddleware interface {

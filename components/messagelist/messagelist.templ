@@ -2,13 +2,11 @@ package messagelist
 
 import (
 	"context"
-	"school-with-ai/components/alert"
 	"school-with-ai/components/badge"
 	"school-with-ai/components/errormessage"
 	"school-with-ai/components/i18n"
 	"school-with-ai/components/message"
 	"school-with-ai/components/tokenusage"
-	"school-with-ai/components/utils"
 	"school-with-ai/platform/toolregistry"
 )
 
@@ -210,76 +208,6 @@ templ MessageList() {
 				@DateSeparator()
 				<!-- User Message -->
 				@message.UserMessage()
-				<!-- Agent Transfer Tool Call - Special Rendering -->
-				<div x-show="message.type === 'tool_call' && message.name === 'transfer_to_agent' && message.status === 'completed'" class="my-2 relative group/message">
-					@alert.Alert(alert.Props{
-						Class: utils.TwMerge(
-							"border-s-4 overflow-hidden shadow-sm transition-all duration-300",
-							"border-primary",
-						),
-					}) {
-						<div :class="message.parsedArgs?.agent_name === 'human' ? 'absolute inset-0 bg-primary/5 pointer-events-none' : ''"></div>
-						<!-- Agent collaboration icon -->
-						<template x-if="message.parsedArgs?.agent_name !== 'human'">
-							<svg class="w-5 h-5 text-primary flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-								<path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"></path>
-							</svg>
-						</template>
-						<template x-if="message.parsedArgs?.agent_name === 'human'">
-							<svg class="w-5 h-5 text-primary flex-shrink-0 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-							</svg>
-						</template>
-						@alert.Title() {
-							<span class="flex items-center gap-2 flex-wrap">
-								<template x-if="message.agentName">
-									@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "text-xs font-medium break-all"}) {
-										<span class="break-all" x-text="message.agentName"></span>
-									}
-								</template>
-								<template x-if="message.agentName">
-									<svg class="w-4 h-4 text-primary flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-										<path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"></path>
-									</svg>
-								</template>
-								<template x-if="message.parsedArgs?.agent_name === 'human'">
-									@badge.Badge(badge.Props{Variant: badge.VariantDefault, Class: "text-xs font-medium px-2 py-0 h-5"}) {
-										<span>{ i18n.T(ctx, "HUMAN HELP") }</span>
-									}
-								</template>
-								<template x-if="message.parsedArgs?.agent_name !== 'human'">
-									@badge.Badge(badge.Props{Variant: badge.VariantDefault, Class: "text-xs font-medium break-all"}) {
-										<span class="break-all" x-text="message.parsedArgs?.agent_name || 'specialist'"></span>
-									}
-								</template>
-								<template x-if="message.result">
-									<span class="text-primary text-xs font-medium">✓ { i18n.T(ctx, "transferred") }</span>
-								</template>
-							</span>
-						}
-						@alert.Description() {
-							<div class="space-y-2">
-								<template x-if="message.parsedArgs?.question">
-									<div class="text-sm break-words">
-										<span class="font-semibold text-primary">{ i18n.T(ctx, "Question:") }</span>
-										<span class="mis-2" x-text="message.parsedArgs?.question"></span>
-									</div>
-								</template>
-								<template x-if="message.parsedArgs?.context">
-									<div class="text-sm text-muted-foreground break-words">
-										<span class="font-semibold">{ i18n.T(ctx, "Context:") }</span>
-										<span class="mis-2" x-text="message.parsedArgs?.context"></span>
-									</div>
-								</template>
-								<template x-if="!message.parsedArgs?.question && !message.parsedArgs?.context">
-									<div class="text-sm text-muted-foreground italic">
-										{ i18n.T(ctx, "Transferring context to") }
-									</div>
-								</template>
-							</div>
-						}
-					}
-				</div>
 				<!-- Special Tool Components -->
 				<div x-show="message.type === 'tool_call' && isSpecialTool(message.name)" class="my-2 relative w-full flex flex-col items-stretch">
 					for _, p := range toolregistry.GetAllPluginProviders() {
