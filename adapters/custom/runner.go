@@ -10,7 +10,7 @@ import (
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/engine"
-	"school-with-ai/foundation/agentsdk/internal/llm"
+	"school-with-ai/foundation/agentsdk/llm"
 	agentio "school-with-ai/foundation/agentsdk/io"
 	smiddleware "school-with-ai/foundation/agentsdk/middleware"
 	"school-with-ai/foundation/logger"

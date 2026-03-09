@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"iter"
 	"school-with-ai/foundation/agentsdk/core"
-	"school-with-ai/foundation/agentsdk/internal/llm"
+	"school-with-ai/foundation/agentsdk/llm"
 )
 
 // StreamResult holds the accumulated output from processing an LLM stream.

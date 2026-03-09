@@ -2,7 +2,7 @@ package engine
 
 import (
 	"school-with-ai/foundation/agentsdk/core"
-	"school-with-ai/foundation/agentsdk/internal/llm"
+	"school-with-ai/foundation/agentsdk/llm"
 	"time"
 )
 

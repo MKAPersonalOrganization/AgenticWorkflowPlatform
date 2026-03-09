@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"iter"
 	"school-with-ai/foundation/agent"
-	"school-with-ai/foundation/agentsdk/internal/llm"
+	"school-with-ai/foundation/agentsdk/llm"
 )
 
 // ModelAdapter adapts llm.LLM to the agent.Model interface.
