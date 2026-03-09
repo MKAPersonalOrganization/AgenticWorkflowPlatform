@@ -1,7 +1,7 @@
 package core
 
 import (
-	"school-with-ai/foundation/agentsdk/internal/llm"
+	"school-with-ai/foundation/agentsdk/llm"
 )
 
 // ToolCallAccumulator tracks streaming tool call deltas and builds complete tool calls.

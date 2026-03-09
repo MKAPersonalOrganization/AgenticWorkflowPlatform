@@ -15,12 +15,12 @@ import (
 	"syscall"
 	"time"
 
+	"school-with-ai/adapters/custom"
 	"school-with-ai/components"
 	"school-with-ai/components/docs"
 	"school-with-ai/components/landing"
 	"school-with-ai/components/pricing"
 	"school-with-ai/foundation/agent"
-	"school-with-ai/foundation/agentsdk/adapters/custom"
 	"school-with-ai/foundation/auth"
 	"school-with-ai/foundation/debug"
 	"school-with-ai/foundation/event"
