@@ -317,9 +317,6 @@ func (c *OpenAIClient) buildToolCallResponse(tc openai.ChatCompletionChunkChoice
 
 // applyOptions applies Parameters and Tools to OpenAI stream parameters.
 func (c *OpenAIClient) applyOptions(params *openai.ChatCompletionNewParams, req *Request) {
-	// Disable parallel tool calls by default as requested
-	params.ParallelToolCalls = openai.Bool(false)
-
 	// Always include usage in streams
 	params.StreamOptions = openai.ChatCompletionStreamOptionsParam{
 		IncludeUsage: openai.Bool(true),
@@ -365,13 +362,17 @@ func (c *OpenAIClient) applyOptions(params *openai.ChatCompletionNewParams, req 
 		if seed, ok := req.Extensions["seed"].(int64); ok {
 			params.Seed = openai.Int(seed)
 		}
-		if parallel, ok := req.Extensions["parallel_tool_calls"].(bool); ok {
-			params.ParallelToolCalls = openai.Bool(parallel)
-		}
 	}
 
 	// Apply tools
 	if len(req.Tools) > 0 {
+		parallel := false
+		if req.Extensions != nil {
+			if extParallel, ok := req.Extensions["parallel_tool_calls"].(bool); ok {
+				parallel = extParallel
+			}
+		}
+		params.ParallelToolCalls = openai.Bool(parallel)
 		openaiTools := make([]openai.ChatCompletionToolUnionParam, 0, len(req.Tools))
 		for _, tool := range req.Tools {
 			funcDef := openai.FunctionDefinitionParam{
