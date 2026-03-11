@@ -6,21 +6,20 @@ import (
 	"testing"
 
 	"school-with-ai/foundation/agent"
-	"school-with-ai/modules/skillstore"
 	"school-with-ai/platform/toolregistry"
 )
 
 // ─── Mock Skill Resolver ────────────────────────────────────────────────────
 
 type mockSkillResolver struct {
-	skills []skillstore.UserSkill
+	skills []Skill
 }
 
-func (m *mockSkillResolver) ListSkillsForAgent(_ context.Context, _, _ string) ([]skillstore.UserSkill, error) {
+func (m *mockSkillResolver) ListSkillsForAgent(_ context.Context, _, _ string) ([]Skill, error) {
 	return m.skills, nil
 }
 
-func (m *mockSkillResolver) GetSkillByNameForAgent(_ context.Context, _, _, name string) (*skillstore.UserSkill, error) {
+func (m *mockSkillResolver) GetSkillByNameForAgent(_ context.Context, _, _, name string) (*Skill, error) {
 	for i := range m.skills {
 		if m.skills[i].Name == name {
 			return &m.skills[i], nil
@@ -115,7 +114,7 @@ func TestActivateSkillTool_Schema(t *testing.T) {
 
 func TestActivateSkillTool_Execute_Success(t *testing.T) {
 	resolver := &mockSkillResolver{
-		skills: []skillstore.UserSkill{
+		skills: []Skill{
 			{
 				ID:           "skill-1",
 				Name:         "Statistics Expert",
@@ -160,7 +159,7 @@ func TestActivateSkillTool_Execute_Success(t *testing.T) {
 
 func TestActivateSkillTool_Execute_CaseInsensitive(t *testing.T) {
 	resolver := &mockSkillResolver{
-		skills: []skillstore.UserSkill{
+		skills: []Skill{
 			{
 				ID:           "skill-1",
 				Name:         "Statistics Expert",
@@ -191,7 +190,7 @@ func TestActivateSkillTool_Execute_CaseInsensitive(t *testing.T) {
 
 func TestActivateSkillTool_Execute_NotFound(t *testing.T) {
 	resolver := &mockSkillResolver{
-		skills: []skillstore.UserSkill{
+		skills: []Skill{
 			{
 				ID:   "skill-1",
 				Name: "Statistics Expert",
@@ -296,7 +295,7 @@ func TestActivateSkillTool_Execute_NoSkillsAvailable(t *testing.T) {
 }
 
 func TestActivateSkillResult_ContainsXMLInstructions(t *testing.T) {
-	skill := &skillstore.UserSkill{
+	skill := &Skill{
 		Name:         "Test Skill",
 		Description:  "A test skill",
 		Category:     "Test",
@@ -353,7 +352,7 @@ func TestListSkillsTool_Schema(t *testing.T) {
 
 func TestListSkillsTool_Execute_Success(t *testing.T) {
 	resolver := &mockSkillResolver{
-		skills: []skillstore.UserSkill{
+		skills: []Skill{
 			{Name: "Statistics Expert", Description: "Stats help", Category: "Data Science", Icon: "📊", IsCustom: false},
 			{Name: "Code Review", Description: "Review code", Category: "Engineering", Icon: "🔍", IsCustom: true},
 		},
@@ -392,7 +391,7 @@ func TestListSkillsTool_Execute_Success(t *testing.T) {
 }
 
 func TestListSkillsTool_Execute_Empty(t *testing.T) {
-	resolver := &mockSkillResolver{skills: []skillstore.UserSkill{}}
+	resolver := &mockSkillResolver{skills: []Skill{}}
 	tool := &ListSkillsTool{resolver: resolver}
 	args := agent.Arguments{
 		Raw:      json.RawMessage(`{}`),

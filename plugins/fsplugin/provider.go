@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"school-with-ai/foundation/agent"
-	"school-with-ai/modules/filesystem"
 	"school-with-ai/platform/toolregistry"
 
 	"github.com/a-h/templ"
@@ -13,7 +12,7 @@ import (
 
 // Provider implements the toolregistry.PluginProvider interface for agent filesystem tools.
 type Provider struct {
-	FS filesystem.AgentFS
+	FS AgentFilesystem
 }
 
 func (p *Provider) ID() string { return "filesystem" }
@@ -29,7 +28,7 @@ func (p *Provider) DefaultSets() []toolregistry.ToolSet {
 			Name:        "Filesystem",
 			Description: "Tools for reading and writing files in user-attached virtual filesystems",
 			Category:    "Storage",
-			ToolIDs:     []string{"fs-list-filesystems", "fs-list-dir", "fs-read-file", "fs-write-file", "fs-mkdir", "fs-remove", "fs-stat", "fs-rename"},
+			ToolIDs:     []string{"list_filesystems", "list_directory", "read_file", "write_file", "create_directory", "remove_entry", "file_info", "rename_entry"},
 			CreatedAt:   now,
 			UpdatedAt:   now,
 		},
@@ -39,14 +38,14 @@ func (p *Provider) DefaultSets() []toolregistry.ToolSet {
 func (p *Provider) DefaultTools() []toolregistry.Tool {
 	now := time.Now()
 	return []toolregistry.Tool{
-		{ID: "fs-list-filesystems", Name: "List Filesystems", Description: "List virtual filesystems the agent can access", Category: "Filesystem", ToolSetID: "filesystem-set", CreatedAt: now, UpdatedAt: now},
-		{ID: "fs-list-dir", Name: "List Directory", Description: "List files and subdirectories in a directory", Category: "Filesystem", ToolSetID: "filesystem-set", CreatedAt: now, UpdatedAt: now},
-		{ID: "fs-read-file", Name: "Read File", Description: "Read the contents of a file", Category: "Filesystem", ToolSetID: "filesystem-set", CreatedAt: now, UpdatedAt: now},
-		{ID: "fs-write-file", Name: "Write File", Description: "Create or overwrite a file with content", Category: "Filesystem", ToolSetID: "filesystem-set", CreatedAt: now, UpdatedAt: now},
-		{ID: "fs-mkdir", Name: "Create Directory", Description: "Create a new directory", Category: "Filesystem", ToolSetID: "filesystem-set", CreatedAt: now, UpdatedAt: now},
-		{ID: "fs-remove", Name: "Remove", Description: "Delete a file or empty directory", Category: "Filesystem", ToolSetID: "filesystem-set", CreatedAt: now, UpdatedAt: now},
-		{ID: "fs-stat", Name: "File Info", Description: "Get metadata (size, type, modified time) for a path", Category: "Filesystem", ToolSetID: "filesystem-set", CreatedAt: now, UpdatedAt: now},
-		{ID: "fs-rename", Name: "Rename / Move", Description: "Rename or move a file or directory", Category: "Filesystem", ToolSetID: "filesystem-set", CreatedAt: now, UpdatedAt: now},
+		{ID: "list_filesystems", Name: "List Filesystems", Description: "List virtual filesystems the agent can access", Category: "Filesystem", ToolSetID: "filesystem-set", CreatedAt: now, UpdatedAt: now},
+		{ID: "list_directory", Name: "List Directory", Description: "List files and subdirectories in a directory", Category: "Filesystem", ToolSetID: "filesystem-set", CreatedAt: now, UpdatedAt: now},
+		{ID: "read_file", Name: "Read File", Description: "Read the contents of a file", Category: "Filesystem", ToolSetID: "filesystem-set", CreatedAt: now, UpdatedAt: now},
+		{ID: "write_file", Name: "Write File", Description: "Create or overwrite a file with content", Category: "Filesystem", ToolSetID: "filesystem-set", CreatedAt: now, UpdatedAt: now},
+		{ID: "create_directory", Name: "Create Directory", Description: "Create a new directory", Category: "Filesystem", ToolSetID: "filesystem-set", CreatedAt: now, UpdatedAt: now},
+		{ID: "remove_entry", Name: "Remove", Description: "Delete a file or empty directory", Category: "Filesystem", ToolSetID: "filesystem-set", CreatedAt: now, UpdatedAt: now},
+		{ID: "file_info", Name: "File Info", Description: "Get metadata (size, type, modified time) for a path", Category: "Filesystem", ToolSetID: "filesystem-set", CreatedAt: now, UpdatedAt: now},
+		{ID: "rename_entry", Name: "Rename / Move", Description: "Rename or move a file or directory", Category: "Filesystem", ToolSetID: "filesystem-set", CreatedAt: now, UpdatedAt: now},
 	}
 }
 
@@ -58,21 +57,21 @@ func (p *Provider) CreateExecutable(_ context.Context, toolID string, _ toolregi
 	}
 
 	switch toolID {
-	case "fs-list-filesystems":
+	case "list_filesystems":
 		return &listFilesystemsTool{fs: p.FS}, nil
-	case "fs-list-dir":
+	case "list_directory":
 		return &listDirTool{fs: p.FS}, nil
-	case "fs-read-file":
+	case "read_file":
 		return &readFileTool{fs: p.FS}, nil
-	case "fs-write-file":
+	case "write_file":
 		return &writeFileTool{fs: p.FS}, nil
-	case "fs-mkdir":
+	case "create_directory":
 		return &mkdirTool{fs: p.FS}, nil
-	case "fs-remove":
+	case "remove_entry":
 		return &removeTool{fs: p.FS}, nil
-	case "fs-stat":
+	case "file_info":
 		return &statTool{fs: p.FS}, nil
-	case "fs-rename":
+	case "rename_entry":
 		return &renameTool{fs: p.FS}, nil
 	default:
 		return nil, nil

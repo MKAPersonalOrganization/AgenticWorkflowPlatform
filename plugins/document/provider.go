@@ -26,7 +26,7 @@ func (p *Provider) DefaultSets() []toolregistry.ToolSet {
 			Name:        "Document Management",
 			Description: "Tools for managing documents and artifacts",
 			Category:    "Productivity",
-			ToolIDs:     []string{"doc-create", "doc-update", "doc-delete"},
+			ToolIDs:     []string{"create_markdown", "update_markdown", "delete_markdown"},
 			CreatedAt:   now,
 			UpdatedAt:   now,
 		},
@@ -36,9 +36,9 @@ func (p *Provider) DefaultSets() []toolregistry.ToolSet {
 func (p *Provider) DefaultTools() []toolregistry.Tool {
 	now := time.Now()
 	return []toolregistry.Tool{
-		{ID: "doc-create", Name: "Create Document", Description: "Create a new markdown document", Category: "Documents", ToolSetID: "document-set", CreatedAt: now, UpdatedAt: now},
-		{ID: "doc-update", Name: "Update Document", Description: "Update an existing document", Category: "Documents", ToolSetID: "document-set", CreatedAt: now, UpdatedAt: now},
-		{ID: "doc-delete", Name: "Delete Document", Description: "Delete a document", Category: "Documents", ToolSetID: "document-set", CreatedAt: now, UpdatedAt: now},
+		{ID: "create_markdown", Name: "Create Document", Description: "Create a new markdown document", Category: "Documents", ToolSetID: "document-set", CreatedAt: now, UpdatedAt: now},
+		{ID: "update_markdown", Name: "Update Document", Description: "Update an existing document", Category: "Documents", ToolSetID: "document-set", CreatedAt: now, UpdatedAt: now},
+		{ID: "delete_markdown", Name: "Delete Document", Description: "Delete a document", Category: "Documents", ToolSetID: "document-set", CreatedAt: now, UpdatedAt: now},
 	}
 }
 
@@ -48,11 +48,11 @@ func (p *Provider) CreateExecutable(ctx context.Context, toolID string, deps too
 	artifactStore := deps.ArtifactStore()
 
 	switch toolID {
-	case "doc-create":
+	case "create_markdown":
 		return &CreateMarkdownTool{ArtifactStore: artifactStore}, nil
-	case "doc-update":
+	case "update_markdown":
 		return &UpdateMarkdownTool{ArtifactStore: artifactStore}, nil
-	case "doc-delete":
+	case "delete_markdown":
 		return &DeleteMarkdownTool{ArtifactStore: artifactStore}, nil
 	default:
 		return nil, nil

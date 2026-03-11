@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"school-with-ai/foundation/agent"
-	"school-with-ai/modules/chat/memory"
+	"school-with-ai/platform/toolregistry"
 	"school-with-ai/shared"
 )
 
@@ -22,10 +22,10 @@ const (
 // - Important insights or progress milestones
 // Use this tool when the user shares information that should be remembered permanently.
 type MemoryTool struct {
-	service memory.Service
+	service toolregistry.MemoryService
 }
 
-func NewMemoryTool(service memory.Service) *MemoryTool {
+func NewMemoryTool(service toolregistry.MemoryService) *MemoryTool {
 	return &MemoryTool{service: service}
 }
 
@@ -98,10 +98,10 @@ func (t *MemoryTool) Execute(ctx context.Context, args agent.Arguments) (agent.R
 // Use this when the user explicitly asks to forget something, or when information becomes
 // outdated or incorrect. The search is case-insensitive and matches partial text.
 type ForgetMemoryTool struct {
-	service memory.Service
+	service toolregistry.MemoryService
 }
 
-func NewForgetMemoryTool(service memory.Service) *ForgetMemoryTool {
+func NewForgetMemoryTool(service toolregistry.MemoryService) *ForgetMemoryTool {
 	return &ForgetMemoryTool{service: service}
 }
 
@@ -180,10 +180,10 @@ func (t *ForgetMemoryTool) Execute(ctx context.Context, args agent.Arguments) (a
 // Note: Memories are automatically injected into your context, so you don't need
 // to call this to access them during normal conversation.
 type ListMemoriesTool struct {
-	service memory.Service
+	service toolregistry.MemoryService
 }
 
-func NewListMemoriesTool(service memory.Service) *ListMemoriesTool {
+func NewListMemoriesTool(service toolregistry.MemoryService) *ListMemoriesTool {
 	return &ListMemoriesTool{service: service}
 }
 
@@ -249,10 +249,10 @@ func (t *ListMemoriesTool) Execute(ctx context.Context, args agent.Arguments) (a
 // - The user wants to start completely fresh
 // Always confirm with the user before executing this tool.
 type ClearMemoriesTool struct {
-	service memory.Service
+	service toolregistry.MemoryService
 }
 
-func NewClearMemoriesTool(service memory.Service) *ClearMemoriesTool {
+func NewClearMemoriesTool(service toolregistry.MemoryService) *ClearMemoriesTool {
 	return &ClearMemoriesTool{service: service}
 }
 
@@ -283,7 +283,7 @@ func (t *ClearMemoriesTool) Execute(ctx context.Context, args agent.Arguments) (
 
 // NewMemoryInjectorMiddleware returns a Chat-level Middleware that prepends
 // the user's long-term memories as a system message before each LLM call.
-func NewMemoryInjectorMiddleware(service memory.Service) agent.Middleware {
+func NewMemoryInjectorMiddleware(service toolregistry.MemoryService) agent.Middleware {
 	return func(next agent.Handler) agent.Handler {
 		return agent.HandlerFunc(func(c *agent.Context) error {
 			if !c.IsChat() {

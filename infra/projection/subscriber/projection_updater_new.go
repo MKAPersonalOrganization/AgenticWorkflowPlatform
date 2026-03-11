@@ -29,6 +29,12 @@ type EventRouter interface {
 // ProjectionUpdater polls the Postgres event store for new events and dispatches
 // them to registered projections via a router using a pull-based polling loop.
 //
+// Per-projection checkpoints: Each registered projection name has its own
+// checkpoint row. The updater polls from the minimum checkpoint across all
+// projections, and after successfully dispatching a batch it advances each
+// projection's checkpoint to the latest processed position. To rebuild a
+// single projection, reset its checkpoint to 0 without affecting others.
+//
 // Leader election: In a multi-pod deployment every pod starts a ProjectionUpdater,
 // but only the pod that holds the PostgreSQL session-level advisory lock
 // (pg_try_advisory_lock) actually polls and processes events. Other pods retry
@@ -43,6 +49,7 @@ type ProjectionUpdater struct {
 	router          EventRouter
 	shutdownChan    chan struct{}
 	shutdownOnce    sync.Once
+	projectionNames []string // registered projection names for per-projection checkpoints
 
 	// Polling configuration
 	pollInterval        time.Duration
@@ -96,6 +103,12 @@ func NewProjectionUpdater(
 		opt(u)
 	}
 	return u
+}
+
+// RegisterProjectionName adds a named projection so the updater tracks a
+// separate checkpoint for it. Must be called before Start.
+func (u *ProjectionUpdater) RegisterProjectionName(name string) {
+	u.projectionNames = append(u.projectionNames, name)
 }
 
 // Start begins the leader election + polling loop. This is a blocking call.
@@ -185,26 +198,50 @@ func (u *ProjectionUpdater) runAsLeader(ctx context.Context) error {
 
 // pollLoop is the core event-processing loop, extracted so it only runs while
 // this pod holds the advisory lock.
+//
+// Per-projection checkpoints: if projectionNames is non-empty the updater
+// maintains a separate checkpoint row per name. It polls from the minimum
+// position across all projections and advances each projection's checkpoint
+// after a successful dispatch batch. When projectionNames is empty the legacy
+// "all_projections" single-checkpoint behaviour is preserved.
 func (u *ProjectionUpdater) pollLoop(ctx context.Context) error {
-	// Get last checkpoint position
-	lastPosition, err := u.checkpointStore.GetGlobalPosition(ctx, "all_projections")
-	if err != nil {
-		u.log.Info(ctx, "no checkpoint found, starting from beginning")
-		lastPosition = 0
-	} else {
-		u.log.Info(ctx, "resuming from checkpoint", "global_position", lastPosition)
+	names := u.projectionNames
+	if len(names) == 0 {
+		// Legacy: single shared checkpoint.
+		names = []string{"all_projections"}
+	}
+
+	// Load the checkpoint for each registered projection.
+	checkpoints := make(map[string]int64, len(names))
+	minPosition := int64(0)
+	first := true
+	for _, name := range names {
+		pos, err := u.checkpointStore.GetGlobalPosition(ctx, name)
+		if err != nil {
+			u.log.Info(ctx, "no checkpoint found for projection, starting from 0", "projection", name)
+			pos = 0
+		} else {
+			u.log.Info(ctx, "resuming projection from checkpoint", "projection", name, "global_position", pos)
+		}
+		checkpoints[name] = pos
+		if first || pos < minPosition {
+			minPosition = pos
+			first = false
+		}
 	}
 
 	backoff := u.pollInterval
 	eventsSinceCheckpoint := 0
 	const checkpointInterval = 100
 
-	// saveCheckpoint saves the checkpoint using a fresh context (not the cancelled one).
-	saveCheckpoint := func(position int64) {
+	// saveCheckpoints saves every projection's checkpoint using a fresh context.
+	saveCheckpoints := func() {
 		saveCtx, saveCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer saveCancel()
-		if saveErr := u.checkpointStore.SaveGlobalPosition(saveCtx, "all_projections", position); saveErr != nil {
-			u.log.Error(saveCtx, "failed to save final checkpoint", "ERROR", saveErr)
+		for _, name := range names {
+			if saveErr := u.checkpointStore.SaveGlobalPosition(saveCtx, name, checkpoints[name]); saveErr != nil {
+				u.log.Error(saveCtx, "failed to save final checkpoint", "projection", name, "ERROR", saveErr)
+			}
 		}
 	}
 
@@ -214,23 +251,21 @@ func (u *ProjectionUpdater) pollLoop(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			// Save final checkpoint before exit using a fresh context
 			if eventsSinceCheckpoint > 0 {
-				saveCheckpoint(lastPosition)
+				saveCheckpoints()
 			}
 			u.log.Info(ctx, "projection updater stopping due to context cancellation")
 			return ctx.Err()
 
 		case <-u.shutdownChan:
 			if eventsSinceCheckpoint > 0 {
-				saveCheckpoint(lastPosition)
+				saveCheckpoints()
 			}
 			u.log.Info(ctx, "projection updater stopping due to shutdown signal")
 			return nil
 
 		case <-ticker.C:
-			// Poll for new events
-			events, err := u.eventStore.ReadAllFromPosition(ctx, lastPosition, u.batchSize)
+			events, err := u.eventStore.ReadAllFromPosition(ctx, minPosition, u.batchSize)
 			if err != nil {
 				u.log.Error(ctx, "failed to poll events", "ERROR", err)
 				ticker.Reset(backoff)
@@ -239,13 +274,11 @@ func (u *ProjectionUpdater) pollLoop(ctx context.Context) error {
 			}
 
 			if len(events) == 0 {
-				// No new events — idle backoff
 				ticker.Reset(backoff)
 				backoff = min(backoff*2, u.idleBackoff)
 				continue
 			}
 
-			// Reset backoff on successful read
 			backoff = u.pollInterval
 			ticker.Reset(u.pollInterval)
 
@@ -257,19 +290,34 @@ func (u *ProjectionUpdater) pollLoop(ctx context.Context) error {
 						"ERROR", err)
 				}
 
-				lastPosition = ep.GlobalPosition
+				// Advance every projection's checkpoint to the latest position.
+				for _, name := range names {
+					if ep.GlobalPosition > checkpoints[name] {
+						checkpoints[name] = ep.GlobalPosition
+					}
+				}
 				eventsSinceCheckpoint++
 
-				// Save checkpoint periodically
+				// Periodic checkpoint save.
 				if eventsSinceCheckpoint >= checkpointInterval {
-					if saveErr := u.checkpointStore.SaveGlobalPosition(ctx, "all_projections", lastPosition); saveErr != nil {
-						u.log.Error(ctx, "failed to save checkpoint", "ERROR", saveErr)
-					} else {
-						u.log.Info(ctx, "checkpoint saved", "global_position", lastPosition)
+					for _, name := range names {
+						if saveErr := u.checkpointStore.SaveGlobalPosition(ctx, name, checkpoints[name]); saveErr != nil {
+							u.log.Error(ctx, "failed to save checkpoint", "projection", name, "ERROR", saveErr)
+						}
 					}
+					u.log.Info(ctx, "checkpoints saved", "min_position", minPosition)
 					eventsSinceCheckpoint = 0
 				}
 			}
+
+			// Update minPosition for the next poll.
+			newMin := checkpoints[names[0]]
+			for _, name := range names[1:] {
+				if checkpoints[name] < newMin {
+					newMin = checkpoints[name]
+				}
+			}
+			minPosition = newMin
 		}
 	}
 }

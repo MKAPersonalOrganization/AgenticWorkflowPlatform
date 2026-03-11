@@ -26,7 +26,7 @@ func (p *Provider) DefaultSets() []toolregistry.ToolSet {
 			Name:        "Memory Management",
 			Description: "Tools for managing long-term memory and information storage",
 			Category:    "Productivity",
-			ToolIDs:     []string{"mem-remember", "mem-forget", "mem-list", "mem-clear"},
+			ToolIDs:     []string{"save_memory", "forget_memory", "list_memories", "clear_memories"},
 			CreatedAt:   now,
 			UpdatedAt:   now,
 		},
@@ -36,10 +36,10 @@ func (p *Provider) DefaultSets() []toolregistry.ToolSet {
 func (p *Provider) DefaultTools() []toolregistry.Tool {
 	now := time.Now()
 	return []toolregistry.Tool{
-		{ID: "mem-remember", Name: "Remember", Description: "Store information in long-term memory", Category: "Memory", ToolSetID: "memory-set", CreatedAt: now, UpdatedAt: now},
-		{ID: "mem-forget", Name: "Forget", Description: "Remove information from memory", Category: "Memory", ToolSetID: "memory-set", CreatedAt: now, UpdatedAt: now},
-		{ID: "mem-list", Name: "List Memories", Description: "List all stored memories", Category: "Memory", ToolSetID: "memory-set", CreatedAt: now, UpdatedAt: now},
-		{ID: "mem-clear", Name: "Clear Memory", Description: "Clear all stored memories", Category: "Memory", ToolSetID: "memory-set", CreatedAt: now, UpdatedAt: now},
+		{ID: "save_memory", Name: "Remember", Description: "Store information in long-term memory", Category: "Memory", ToolSetID: "memory-set", CreatedAt: now, UpdatedAt: now},
+		{ID: "forget_memory", Name: "Forget", Description: "Remove information from memory", Category: "Memory", ToolSetID: "memory-set", CreatedAt: now, UpdatedAt: now},
+		{ID: "list_memories", Name: "List Memories", Description: "List all stored memories", Category: "Memory", ToolSetID: "memory-set", CreatedAt: now, UpdatedAt: now},
+		{ID: "clear_memories", Name: "Clear Memory", Description: "Clear all stored memories", Category: "Memory", ToolSetID: "memory-set", CreatedAt: now, UpdatedAt: now},
 	}
 }
 
@@ -49,13 +49,13 @@ func (p *Provider) CreateExecutable(ctx context.Context, toolID string, deps too
 	memService := deps.MemoryService()
 
 	switch toolID {
-	case "mem-remember":
+	case "save_memory":
 		return NewMemoryTool(memService), nil
-	case "mem-forget":
+	case "forget_memory":
 		return NewForgetMemoryTool(memService), nil
-	case "mem-list":
+	case "list_memories":
 		return NewListMemoriesTool(memService), nil
-	case "mem-clear":
+	case "clear_memories":
 		return NewClearMemoriesTool(memService), nil
 	default:
 		return nil, nil // Not handled by this plugin

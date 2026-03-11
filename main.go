@@ -33,6 +33,7 @@ import (
 	"school-with-ai/infra/projection/subscriber"
 	"school-with-ai/infra/sqldb"
 	"school-with-ai/infra/sqldb/migrate"
+	chatmemory "school-with-ai/modules/chat/memory"
 	"school-with-ai/modules/chat/thread"
 	"school-with-ai/modules/knowledge/edgequake"
 	permtool "school-with-ai/modules/permissions/tool"
@@ -428,8 +429,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 	toolregistry.RegisterPlugin(&tracker.Provider{})
 	toolregistry.RegisterPlugin(&tts.Provider{})
 	toolregistry.RegisterPlugin(&websearch.Provider{})
-	toolregistry.RegisterPlugin(&skillsplugin.Provider{SkillResolver: skillStoreModule, Tracker: skillActivationTracker})
-	toolregistry.RegisterPlugin(&fsplugin.Provider{FS: filesystemModule.AgentFS()})
+	toolregistry.RegisterPlugin(&skillsplugin.Provider{SkillResolver: &custom.SkillResolverAdapter{Source: skillStoreModule}, Tracker: skillActivationTracker})
+	toolregistry.RegisterPlugin(&fsplugin.Provider{FS: &custom.AgentFSAdapter{Source: filesystemModule.AgentFS()}})
 	if err := toolRegistry.Initialize(ctx); err != nil {
 		return fmt.Errorf("failed to initialize tool registry: %w", err)
 	}
@@ -489,7 +490,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		EventStore:         eventLog,
 		SnapshotStore:      snapshotStore,
 		ArtifactService:    artifactService,
-		StudentProfileRepo: studentProfileRepo,
+		StudentProfileRepo: &custom.ChatProfileAdapter{Repo: studentProfileRepo},
 		Emitter:            transientRouter,
 		AgentProvider:      agentProvider,
 		AuthService:        authSvc,
@@ -511,6 +512,13 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Register chat projections (AGUI + LLM context) before starting the updater.
 	chatModule.RegisterProjection(persistenceRouter)
 
+	// Register per-projection checkpoint names. Each projection gets its own
+	// checkpoint row so a single projection can be rebuilt independently.
+	projectionUpdater.RegisterProjectionName("stats")
+	projectionUpdater.RegisterProjectionName("billing")
+	projectionUpdater.RegisterProjectionName("agui")
+	projectionUpdater.RegisterProjectionName("llm-context")
+
 	// Start projection updater in background (all projections now registered).
 	go func() {
 		if err := projectionUpdater.Start(projCtx); err != nil && projCtx.Err() == nil {
@@ -528,6 +536,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 	newToolSetFactory := custom.NewToolSetFactoryFunc(func(cfg custom.ToolFactoryConfig) custom.ToolSetFactory {
 		f := toolregistry.NewExecutableToolFactory(artifactService)
 		f.SetToolRegistry(toolRegistry)
+		f.SetMemoryFactory(func(store artifact.Service) toolregistry.MemoryService {
+			return chatmemory.NewArtifactMemoryService(store)
+		})
 		if cfg.EdgequakeBaseURL != "" {
 			f.SetEdgequakeConfig(cfg.EdgequakeBaseURL, cfg.ModelAPIKey, cfg.ModelID)
 		}
@@ -552,7 +563,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 			ConfigResolver:         aiSettingsModule,
 			TTSResolver:            aiSettingsModule,
 			PluginSettingsResolver: pluginSettingsModule,
-			ProfileRepo:            studentProfileRepo,
+			ProfileProvider:        &custom.StudentProfileAdapter{Repo: studentProfileRepo},
 			PermChecker:            permissionsService,
 			WorkspacePermChecker:   workspacePermissionsService,
 			MCPResolver:            mcpModule.Service(),
@@ -617,7 +628,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		SessionKey:   cfg.Auth.SessionSecret,
 	}, db)
 	sessionStore := googleauth.NewSessionStore(cfg.Auth.SessionSecret)
-	authHandlers := auth.NewAuthHandlers(log, googleClient, sessionStore, cfg.Auth.AppURL)
+	authHandlers := googleauth.NewAuthHandlers(log, googleClient, sessionStore, cfg.Auth.AppURL)
 	authMiddleware := auth.NewMiddleware(googleClient, sessionStore, cfg.Auth.AppURL, ctx)
 
 	registerRoutes(appRouter, log, authHandlers, authMiddleware, healthHandler, routeModules{
@@ -777,7 +788,7 @@ type routeModules struct {
 func registerRoutes(
 	r chi.Router,
 	log *logger.Logger,
-	authHandlers *auth.AuthHandlers,
+	authHandlers *googleauth.AuthHandlers,
 	authMW *auth.Middleware,
 	healthHandler *healthhandlers.HealthHandler,
 	mods routeModules,

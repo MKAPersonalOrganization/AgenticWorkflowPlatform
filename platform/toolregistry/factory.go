@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"school-with-ai/foundation/agent"
-	"school-with-ai/modules/chat/memory"
 	"school-with-ai/platform/artifact"
 )
 
@@ -23,6 +22,7 @@ type ExecutableToolFactory struct {
 	ttsVoice            string
 	pluginSettings      map[string]map[string]string // plugin_id → key → value
 	allowedKBNamespaces []string                     // workspace IDs the agent may query
+	memoryFactory       func(artifact.Service) MemoryService
 }
 
 // NewExecutableToolFactory creates a new tool factory.
@@ -30,6 +30,14 @@ func NewExecutableToolFactory(artifactStore artifact.Service) *ExecutableToolFac
 	return &ExecutableToolFactory{
 		artifactStore: artifactStore,
 	}
+}
+
+// SetMemoryFactory injects a factory function that creates a MemoryService
+// from an artifact store. This keeps toolregistry independent of modules/chat/memory.
+func (f *ExecutableToolFactory) SetMemoryFactory(fn func(artifact.Service) MemoryService) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.memoryFactory = fn
 }
 
 // SetEdgequakeConfig sets the edgequake base URL and LLM config for knowledge base tools.
@@ -106,6 +114,18 @@ func (f *ExecutableToolFactory) CreateExecutableToolsFromSet(ctx context.Context
 func (f *ExecutableToolFactory) CreateExecutableTool(ctx context.Context, tool *Tool) (agent.ExecutableTool, error) {
 	deps := &depResolver{factory: f}
 
+	// O(1) lookup via the tool-ID → provider index (covers all built-in tools).
+	if provider, ok := LookupProviderForTool(tool.ID); ok {
+		executable, err := provider.CreateExecutable(ctx, tool.ID, deps)
+		if err != nil {
+			return nil, err
+		}
+		if executable != nil {
+			return executable, nil
+		}
+	}
+
+	// Fallback: linear scan for MCP or dynamically registered tools.
 	for _, provider := range GetAllPluginProviders() {
 		executable, err := provider.CreateExecutable(ctx, tool.ID, deps)
 		if err != nil {
@@ -124,7 +144,7 @@ func (f *ExecutableToolFactory) CreateExecutableTool(ctx context.Context, tool *
 type depResolver struct {
 	factory     *ExecutableToolFactory
 	memoryOnce  sync.Once
-	memoryCache memory.Service
+	memoryCache MemoryService
 }
 
 func (r *depResolver) ArtifactStore() artifact.Service {
@@ -151,12 +171,15 @@ func (r *depResolver) ModelID() string {
 	return r.factory.modelID
 }
 
-func (r *depResolver) MemoryService() memory.Service {
+func (r *depResolver) MemoryService() MemoryService {
 	r.memoryOnce.Do(func() {
 		r.factory.mu.RLock()
 		store := r.factory.artifactStore
+		fn := r.factory.memoryFactory
 		r.factory.mu.RUnlock()
-		r.memoryCache = memory.NewArtifactMemoryService(store)
+		if fn != nil {
+			r.memoryCache = fn(store)
+		}
 	})
 	return r.memoryCache
 }

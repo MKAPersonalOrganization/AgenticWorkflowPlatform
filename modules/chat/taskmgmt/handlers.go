@@ -23,7 +23,6 @@ import (
 	"school-with-ai/modules/chat/projection/agui"
 	"school-with-ai/modules/chat/taskmanagement"
 	"school-with-ai/modules/chat/threadmgmt"
-	"school-with-ai/modules/permissions/tool"
 	"school-with-ai/platform/artifact"
 	"school-with-ai/platform/toolregistry"
 	"school-with-ai/shared"
@@ -42,7 +41,7 @@ type TaskManagementHandler struct {
 	artifactStore      artifact.Service
 	memoryStore        memory.Service
 	toolRegistry       *toolregistry.Registry
-	permissionsService *tool.Service
+	permissionsService chatcontracts.ToolPermissionService
 	documentProvider   chatcontracts.DocumentProvider
 	tenantID           string
 	allowedOrigin      string
@@ -61,7 +60,7 @@ func NewTaskManagementHandler(
 	artifactStore artifact.Service,
 	memoryStore memory.Service,
 	toolRegistry *toolregistry.Registry,
-	permissionsService *tool.Service,
+	permissionsService chatcontracts.ToolPermissionService,
 	documentProvider chatcontracts.DocumentProvider,
 	tenantID string,
 	allowedOrigin string,

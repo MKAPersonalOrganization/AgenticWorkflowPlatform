@@ -14,9 +14,9 @@ import (
 	"school-with-ai/foundation/agent"
 	es "school-with-ai/foundation/eventsourcing"
 	"school-with-ai/foundation/logger"
+	"school-with-ai/modules/chat/chatcontracts"
 	"school-with-ai/modules/chat/thread"
 	"school-with-ai/modules/chat/threadmgmt"
-	"school-with-ai/modules/userprofile/identity"
 	"school-with-ai/platform/artifact"
 
 	"github.com/google/uuid"
@@ -39,7 +39,7 @@ type Service struct {
 	threadRepo    *thread.ThreadRepository
 	emitter       EventEmitter
 	artifactStore artifact.Service
-	profileRepo   identity.StudentProfileRepository
+	profileRepo   chatcontracts.StudentProfileRepository
 	snapshotStore es.SnapshotStore
 
 	runnerMu sync.RWMutex
@@ -90,7 +90,7 @@ func WithArtifactService(store artifact.Service) Option {
 }
 
 // WithStudentProfileRepository configures the agent with a student profile repository.
-func WithStudentProfileRepository(repo identity.StudentProfileRepository) Option {
+func WithStudentProfileRepository(repo chatcontracts.StudentProfileRepository) Option {
 	return func(s *Service) {
 		s.profileRepo = repo
 	}

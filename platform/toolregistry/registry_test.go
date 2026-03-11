@@ -3,11 +3,12 @@ package toolregistry_test
 import (
 	"context"
 	"os"
+	"testing"
+
 	"school-with-ai/foundation/logger"
-	"school-with-ai/plugins/calculator"
 	"school-with-ai/platform/toolregistry"
 	"school-with-ai/platform/toolregistry/mocks"
-	"testing"
+	"school-with-ai/plugins/calculator"
 )
 
 func TestToolRegistry(t *testing.T) {
@@ -40,7 +41,7 @@ func TestToolRegistry(t *testing.T) {
 	t.Logf("Found %d default tools", len(tools))
 
 	// Test getting a specific tool
-	testToolID := "calc-power"
+	testToolID := "power"
 	tool, err := registry.GetTool(ctx, testToolID)
 	if err != nil {
 		t.Fatalf("Failed to get tool: %v", err)

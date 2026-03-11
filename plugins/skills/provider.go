@@ -5,17 +5,16 @@ import (
 	"time"
 
 	"school-with-ai/foundation/agent"
-	"school-with-ai/modules/skillstore"
 	"school-with-ai/platform/toolregistry"
 
 	"github.com/a-h/templ"
 )
 
 // SkillResolver is the interface the plugin uses to look up skills at runtime.
-// It is satisfied by skillstore.Module.
+// The composition root provides an adapter that maps skillstore.UserSkill → Skill.
 type SkillResolver interface {
-	ListSkillsForAgent(ctx context.Context, userID, agentID string) ([]skillstore.UserSkill, error)
-	GetSkillByNameForAgent(ctx context.Context, userID, agentID, skillName string) (*skillstore.UserSkill, error)
+	ListSkillsForAgent(ctx context.Context, userID, agentID string) ([]Skill, error)
+	GetSkillByNameForAgent(ctx context.Context, userID, agentID, skillName string) (*Skill, error)
 }
 
 // Provider implements the toolregistry.PluginProvider interface for the

@@ -3,12 +3,13 @@ package toolregistry_test
 import (
 	"context"
 	"os"
+	"testing"
+
 	"school-with-ai/foundation/logger"
-	"school-with-ai/plugins/calculator"
-	"school-with-ai/plugins/memory"
 	"school-with-ai/platform/toolregistry"
 	"school-with-ai/platform/toolregistry/mocks"
-	"testing"
+	"school-with-ai/plugins/calculator"
+	"school-with-ai/plugins/memory"
 )
 
 func TestToolSetFunctionality(t *testing.T) {
@@ -63,7 +64,7 @@ func TestToolSetFunctionality(t *testing.T) {
 	}
 
 	// Verify calculator tools are in the calculator set
-	expectedCalculatorTools := []string{"calc-add", "calc-subtract", "calc-multiply", "calc-divide", "calc-power", "calc-sqrt"}
+	expectedCalculatorTools := []string{"add", "subtract", "multiply", "divide", "power", "sqrt"}
 	for _, expectedTool := range expectedCalculatorTools {
 		found := false
 		for _, toolID := range calculatorSet.ToolIDs {
@@ -100,7 +101,7 @@ func TestToolSetFunctionality(t *testing.T) {
 		Name:        "Custom Test Set",
 		Description: "A test tool set for validation",
 		Category:    "Testing",
-		ToolIDs:     []string{"calc-add"},
+		ToolIDs:     []string{"add"},
 	}
 
 	if err := registry.RegisterToolSet(ctx, customToolSet); err != nil {

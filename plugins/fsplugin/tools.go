@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"school-with-ai/foundation/agent"
-	"school-with-ai/modules/filesystem"
 
 	"github.com/google/uuid"
 )
@@ -16,7 +15,7 @@ import (
 
 // requirePermission resolves the user/agent from args, validates the filesystem_id,
 // and checks that the agent has been granted access to the requested filesystem.
-func requirePermission(ctx context.Context, fs filesystem.AgentFS, args agent.Arguments, fsIDStr string) (uuid.UUID, string, error) {
+func requirePermission(ctx context.Context, fs AgentFilesystem, args agent.Arguments, fsIDStr string) (uuid.UUID, string, error) {
 	userID := args.UserID
 	if userID == "" {
 		return uuid.Nil, "", fmt.Errorf("user context is missing")
@@ -59,7 +58,7 @@ func getAgentID(args agent.Arguments) string {
 
 // ─── list_filesystems ───────────────────────────────────────────────────────
 
-type listFilesystemsTool struct{ fs filesystem.AgentFS }
+type listFilesystemsTool struct{ fs AgentFilesystem }
 
 func (t *listFilesystemsTool) Name() string { return "list_filesystems" }
 func (t *listFilesystemsTool) Description() string {
@@ -107,7 +106,7 @@ type listDirArgs struct {
 	Path         string `json:"path"`
 }
 
-type listDirTool struct{ fs filesystem.AgentFS }
+type listDirTool struct{ fs AgentFilesystem }
 
 func (t *listDirTool) Name() string { return "list_directory" }
 func (t *listDirTool) Description() string {
@@ -151,7 +150,7 @@ type readFileArgs struct {
 	Path         string `json:"path"`
 }
 
-type readFileTool struct{ fs filesystem.AgentFS }
+type readFileTool struct{ fs AgentFilesystem }
 
 func (t *readFileTool) Name() string { return "read_file" }
 func (t *readFileTool) Description() string {
@@ -219,7 +218,7 @@ type writeFileArgs struct {
 	ContentType  string `json:"content_type"`
 }
 
-type writeFileTool struct{ fs filesystem.AgentFS }
+type writeFileTool struct{ fs AgentFilesystem }
 
 func (t *writeFileTool) Name() string { return "write_file" }
 func (t *writeFileTool) Description() string {
@@ -273,7 +272,7 @@ type mkdirArgs struct {
 	Path         string `json:"path"`
 }
 
-type mkdirTool struct{ fs filesystem.AgentFS }
+type mkdirTool struct{ fs AgentFilesystem }
 
 func (t *mkdirTool) Name() string        { return "create_directory" }
 func (t *mkdirTool) Description() string { return "Create a directory in a virtual filesystem." }
@@ -313,7 +312,7 @@ type removeArgs struct {
 	Path         string `json:"path"`
 }
 
-type removeTool struct{ fs filesystem.AgentFS }
+type removeTool struct{ fs AgentFilesystem }
 
 func (t *removeTool) Name() string { return "remove_entry" }
 func (t *removeTool) Description() string {
@@ -356,7 +355,7 @@ type statArgs struct {
 	Path         string `json:"path"`
 }
 
-type statTool struct{ fs filesystem.AgentFS }
+type statTool struct{ fs AgentFilesystem }
 
 func (t *statTool) Name() string { return "file_info" }
 func (t *statTool) Description() string {
@@ -408,7 +407,7 @@ type renameArgs struct {
 	NewPath      string `json:"new_path"`
 }
 
-type renameTool struct{ fs filesystem.AgentFS }
+type renameTool struct{ fs AgentFilesystem }
 
 func (t *renameTool) Name() string { return "rename_entry" }
 func (t *renameTool) Description() string {

@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"school-with-ai/foundation/agent"
-	"school-with-ai/modules/skillstore"
 )
 
 // activateSkillSchema is the JSON schema for the activate_skill tool.
@@ -132,7 +131,7 @@ func (t *ActivateSkillTool) Execute(ctx context.Context, args agent.Arguments) (
 // recordActivation stores the skill in the activation tracker so that its
 // instructions will be injected into the system prompt on subsequent turns.
 // Silently skips if no tracker is configured (graceful degradation).
-func (t *ActivateSkillTool) recordActivation(threadID string, s *skillstore.UserSkill) {
+func (t *ActivateSkillTool) recordActivation(threadID string, s *Skill) {
 	if t.tracker == nil || threadID == "" {
 		return
 	}
@@ -147,7 +146,7 @@ func (t *ActivateSkillTool) recordActivation(threadID string, s *skillstore.User
 // The instructions are included in the tool result for immediate visibility
 // on the current turn. From the next turn onwards, the tracker ensures they
 // are injected into the system prompt for reliable positioning.
-func buildActivationResult(s *skillstore.UserSkill) activateSkillResult {
+func buildActivationResult(s *Skill) activateSkillResult {
 	// Build the XML-wrapped instructions (Gemini CLI pattern)
 	xmlInstructions := fmt.Sprintf(
 		"<activated_skill name=%q>\n<instructions>\n%s\n</instructions>\n</activated_skill>",

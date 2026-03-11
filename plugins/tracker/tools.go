@@ -52,7 +52,7 @@ var createTaskSchema = &agent.Schema{
 }
 
 // CreateTaskTool implements agent.ExecutableTool for tracker_create_task.
-type CreateTaskTool struct{ store *Store }
+type CreateTaskTool struct{ stores *StoreManager }
 
 func (t *CreateTaskTool) Name() string          { return "tracker_create_task" }
 func (t *CreateTaskTool) Description() string   { return createTaskSchema.Description }
@@ -64,7 +64,8 @@ func (t *CreateTaskTool) Execute(_ context.Context, args agent.Arguments) (agent
 		return agent.ErrorResult(fmt.Errorf("invalid arguments: %w", err)), nil
 	}
 
-	task, err := t.store.CreateTask(p.Title, p.Description, TaskType(p.Type), p.ParentID, p.Dependencies)
+	store := t.stores.ForUser(args.UserID)
+	task, err := store.CreateTask(p.Title, p.Description, TaskType(p.Type), p.ParentID, p.Dependencies)
 	if err != nil {
 		return agent.ErrorResult(err), nil
 	}
@@ -121,7 +122,7 @@ var updateTaskSchema = &agent.Schema{
 }
 
 // UpdateTaskTool implements agent.ExecutableTool for tracker_update_task.
-type UpdateTaskTool struct{ store *Store }
+type UpdateTaskTool struct{ stores *StoreManager }
 
 func (t *UpdateTaskTool) Name() string          { return "tracker_update_task" }
 func (t *UpdateTaskTool) Description() string   { return updateTaskSchema.Description }
@@ -136,6 +137,7 @@ func (t *UpdateTaskTool) Execute(_ context.Context, args agent.Arguments) (agent
 		return agent.ErrorResult(fmt.Errorf("id is required")), nil
 	}
 
+	store := t.stores.ForUser(args.UserID)
 	var statusPtr *TaskStatus
 	if p.Status != nil {
 		s := TaskStatus(*p.Status)
@@ -146,7 +148,7 @@ func (t *UpdateTaskTool) Execute(_ context.Context, args agent.Arguments) (agent
 		depsPtr = &p.Dependencies
 	}
 
-	task, err := t.store.UpdateTask(p.ID, p.Title, p.Description, statusPtr, depsPtr)
+	task, err := store.UpdateTask(p.ID, p.Title, p.Description, statusPtr, depsPtr)
 	if err != nil {
 		return agent.ErrorResult(err), nil
 	}
@@ -181,7 +183,7 @@ var getTaskSchema = &agent.Schema{
 }
 
 // GetTaskTool implements agent.ExecutableTool for tracker_get_task.
-type GetTaskTool struct{ store *Store }
+type GetTaskTool struct{ stores *StoreManager }
 
 func (t *GetTaskTool) Name() string          { return "tracker_get_task" }
 func (t *GetTaskTool) Description() string   { return getTaskSchema.Description }
@@ -196,7 +198,8 @@ func (t *GetTaskTool) Execute(_ context.Context, args agent.Arguments) (agent.Re
 		return agent.ErrorResult(fmt.Errorf("id is required")), nil
 	}
 
-	task := t.store.GetTask(p.ID)
+	store := t.stores.ForUser(args.UserID)
+	task := store.GetTask(p.ID)
 	if task == nil {
 		return agent.TextResult(fmt.Sprintf("Task %s not found.", p.ID)), nil
 	}
@@ -237,7 +240,7 @@ var listTasksSchema = &agent.Schema{
 }
 
 // ListTasksTool implements agent.ExecutableTool for tracker_list_tasks.
-type ListTasksTool struct{ store *Store }
+type ListTasksTool struct{ stores *StoreManager }
 
 func (t *ListTasksTool) Name() string          { return "tracker_list_tasks" }
 func (t *ListTasksTool) Description() string   { return listTasksSchema.Description }
@@ -249,7 +252,8 @@ func (t *ListTasksTool) Execute(_ context.Context, args agent.Arguments) (agent.
 		return agent.ErrorResult(fmt.Errorf("invalid arguments: %w", err)), nil
 	}
 
-	tasks := t.store.ListTasks()
+	store := t.stores.ForUser(args.UserID)
+	tasks := store.ListTasks()
 
 	// Apply filters.
 	if p.Status != "" {
@@ -302,7 +306,7 @@ var addDependencySchema = &agent.Schema{
 }
 
 // AddDependencyTool implements agent.ExecutableTool for tracker_add_dependency.
-type AddDependencyTool struct{ store *Store }
+type AddDependencyTool struct{ stores *StoreManager }
 
 func (t *AddDependencyTool) Name() string          { return "tracker_add_dependency" }
 func (t *AddDependencyTool) Description() string   { return addDependencySchema.Description }
@@ -317,7 +321,8 @@ func (t *AddDependencyTool) Execute(_ context.Context, args agent.Arguments) (ag
 		return agent.ErrorResult(fmt.Errorf("both task_id and dependency_id are required")), nil
 	}
 
-	if err := t.store.AddDependency(p.TaskID, p.DependencyID); err != nil {
+	store := t.stores.ForUser(args.UserID)
+	if err := store.AddDependency(p.TaskID, p.DependencyID); err != nil {
 		return agent.ErrorResult(err), nil
 	}
 
@@ -334,7 +339,7 @@ func (t *AddDependencyTool) Execute(_ context.Context, args agent.Arguments) (ag
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // VisualizeTool implements agent.ExecutableTool for tracker_visualize.
-type VisualizeTool struct{ store *Store }
+type VisualizeTool struct{ stores *StoreManager }
 
 func (t *VisualizeTool) Name() string { return "tracker_visualize" }
 func (t *VisualizeTool) Description() string {
@@ -342,8 +347,9 @@ func (t *VisualizeTool) Description() string {
 }
 func (t *VisualizeTool) Schema() *agent.Schema { return nil }
 
-func (t *VisualizeTool) Execute(_ context.Context, _ agent.Arguments) (agent.Result, error) {
-	tasks := t.store.ListTasks()
+func (t *VisualizeTool) Execute(_ context.Context, args agent.Arguments) (agent.Result, error) {
+	store := t.stores.ForUser(args.UserID)
+	tasks := store.ListTasks()
 	if len(tasks) == 0 {
 		return agent.TextResult("No tasks to visualize."), nil
 	}

@@ -5,13 +5,17 @@ import (
 	"strings"
 
 	"school-with-ai/foundation/agent"
-	"school-with-ai/modules/userprofile/identity"
 	"school-with-ai/shared"
 )
 
 // NewStudentProfileInjectorMiddleware returns a Chat-level Middleware that
 // prepends the student's profile as a system message before each LLM call.
-func NewStudentProfileInjectorMiddleware(repo identity.StudentProfileRepository) agent.Middleware {
+//
+// It depends on [agent.StudentProfileProvider], a foundation-level interface,
+// rather than importing the userprofile module directly. The concrete
+// implementation is wired in main.go / adapters/custom/.
+// See TODO-2 in MODULARITY_HANDOFF.md.
+func NewStudentProfileInjectorMiddleware(provider agent.StudentProfileProvider) agent.Middleware {
 	return func(next agent.Handler) agent.Handler {
 		return agent.HandlerFunc(func(c *agent.Context) error {
 			if !c.IsChat() {
@@ -23,7 +27,7 @@ func NewStudentProfileInjectorMiddleware(repo identity.StudentProfileRepository)
 				return next.Handle(c)
 			}
 
-			profile, err := repo.GetByUserID(c.Context, user.ID)
+			profile, err := provider.GetStudentProfile(c.Context, user.ID)
 			if err != nil {
 				// Proceed without profile on error.
 				return next.Handle(c)
