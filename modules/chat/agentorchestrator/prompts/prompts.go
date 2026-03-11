@@ -5,7 +5,7 @@ import (
 	"strings"
 	"text/template"
 
-	"school-with-ai/modules/userprofile/identity"
+	"school-with-ai/modules/chat/chatcontracts"
 )
 
 // Specialty defines an academic specialist for the learning coordinator.
@@ -39,7 +39,7 @@ type TeacherPromptConfig struct {
 	Specialties    string   // raw text for backward compatibility or simple agents
 	Specialists    []Specialty
 	Skills         []Skill
-	StudentProfile *identity.StudentProfile
+	StudentProfile *chatcontracts.StudentProfile
 	LearningPath   *LearningPath // Guidance for progressive learning
 	ExtraRules     string
 	Interactive    bool

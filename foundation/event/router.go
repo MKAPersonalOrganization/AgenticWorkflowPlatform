@@ -14,15 +14,17 @@ type HandlerFunc func(ctx context.Context, event es.Event) error
 
 // Router dispatches events to registered handlers based on their type.
 type Router struct {
-	mu          sync.RWMutex
-	handlers    map[reflect.Type][]HandlerFunc
-	anyHandlers []HandlerFunc
+	mu           sync.RWMutex
+	handlers     map[reflect.Type][]HandlerFunc
+	nameHandlers map[string][]HandlerFunc
+	anyHandlers  []HandlerFunc
 }
 
 // NewRouter creates a new event router.
 func NewRouter() *Router {
 	return &Router{
-		handlers: make(map[reflect.Type][]HandlerFunc),
+		handlers:     make(map[reflect.Type][]HandlerFunc),
+		nameHandlers: make(map[string][]HandlerFunc),
 	}
 }
 
@@ -44,17 +46,31 @@ func (r *Router) RegisterAny(handler HandlerFunc) {
 	r.anyHandlers = append(r.anyHandlers, handler)
 }
 
+// RegisterByName registers a handler that fires for events whose
+// EventType() string matches eventTypeName. This allows modules to receive
+// events without importing the concrete struct that the deserializer produces,
+// breaking the source-level dependency between producer and consumer.
+func (r *Router) RegisterByName(eventTypeName string, handler HandlerFunc) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.nameHandlers[eventTypeName] = append(r.nameHandlers[eventTypeName], handler)
+}
+
 // Dispatch sends the event to all registered handlers for its type.
 // Handlers are isolated: a failure in one handler does not prevent others from running.
 // The first error encountered is returned, but all handlers are always invoked.
 func (r *Router) Dispatch(ctx context.Context, event es.Event) error {
 	r.mu.RLock()
 	t := reflect.TypeOf(event)
+	eventName := event.EventType()
 	// Copy slice headers to prevent data races if Register is called concurrently.
 	anyHandlers := make([]HandlerFunc, len(r.anyHandlers))
 	copy(anyHandlers, r.anyHandlers)
 	handlers := make([]HandlerFunc, len(r.handlers[t]))
 	copy(handlers, r.handlers[t])
+	nameHandlers := make([]HandlerFunc, len(r.nameHandlers[eventName]))
+	copy(nameHandlers, r.nameHandlers[eventName])
 	r.mu.RUnlock()
 
 	var firstErr error
@@ -68,6 +84,12 @@ func (r *Router) Dispatch(ctx context.Context, event es.Event) error {
 	for _, handler := range handlers {
 		if err := handler(ctx, event); err != nil && firstErr == nil {
 			firstErr = fmt.Errorf("event handler failed for %T: %w", event, err)
+		}
+	}
+
+	for _, handler := range nameHandlers {
+		if err := handler(ctx, event); err != nil && firstErr == nil {
+			firstErr = fmt.Errorf("event name handler failed for %q: %w", eventName, err)
 		}
 	}
 

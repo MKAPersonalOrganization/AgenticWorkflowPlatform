@@ -7,11 +7,18 @@ import (
 	"sync"
 
 	"school-with-ai/foundation/agent"
-	"school-with-ai/modules/chat/memory"
 	"school-with-ai/platform/artifact"
 
 	"github.com/a-h/templ"
 )
+
+// MemoryService defines the interface for managing long-term memory storage.
+// This local definition mirrors modules/chat/memory.Service so that the
+// toolregistry package does not import the chat module directly.
+type MemoryService interface {
+	Load(ctx context.Context, userID string) (string, error)
+	Save(ctx context.Context, userID string, content string) error
+}
 
 // ToolUIContext provides the data required for a plugin to render its UI.
 type ToolUIContext struct {
@@ -48,32 +55,56 @@ type SettingsField struct {
 // FactoryDeps provides lazy, typed access to tool creation dependencies.
 // Plugins call only the getters they need, making dependencies explicit and
 // avoiding unnecessary allocations for services the requesting plugin doesn't use.
+//
+// # Plugin usage matrix (15 plugins, 2025-07)
+//
+// Only 5 plugins actively consume FactoryDeps; the other 10 ignore it entirely.
+//
+//	knowledgebase → EdgequakeBaseURL, OpenAIAPIKey, ModelID, PluginSettings, AllowedKBNamespaces
+//	tts           → ArtifactStore, OpenAIAPIKey, TTSConfig, PluginSettings
+//	document      → ArtifactStore
+//	memory        → MemoryService
+//	websearch     → PluginSettings
+//	askuser, calculator, codebase, cognitive, fsplugin, library, planmode, skills, todos, tracker → (none)
+//
+// The interface is intentionally kept as a single composite rather than split
+// into narrow per-concern interfaces. With only 8 methods and 15 plugins, the
+// ISP trade-off favours simplicity. If many more plugins are added, consider
+// splitting into ArtifactProvider, KBConfigProvider, etc.
 type FactoryDeps interface {
 	// ArtifactStore returns the artifact storage service.
+	// Used by: document, tts.
 	ArtifactStore() artifact.Service
 
 	// EdgequakeBaseURL returns the base URL for the Edgequake knowledge base service.
+	// Used by: knowledgebase.
 	EdgequakeBaseURL() string
 
 	// OpenAIAPIKey returns the user's configured OpenAI API key.
+	// Used by: knowledgebase, tts (as fallback for TTS API key).
 	OpenAIAPIKey() string
 
 	// ModelID returns the user's configured LLM model ID.
+	// Used by: knowledgebase.
 	ModelID() string
 
 	// MemoryService returns a memory service backed by the artifact store.
 	// Constructed lazily on first call to avoid allocation when unused.
-	MemoryService() memory.Service
+	// Used by: memory.
+	MemoryService() MemoryService
 
 	// TTSConfig returns the TTS API key, model, and voice.
 	// Falls back to OpenAIAPIKey for the API key if no dedicated TTS key is set.
+	// Used by: tts.
 	TTSConfig() (apiKey, model, voice string)
 
 	// PluginSettings returns per-user settings for the given plugin ID.
 	// Returns nil if no settings are configured.
+	// Used by: knowledgebase, tts, websearch.
 	PluginSettings(pluginID string) map[string]string
 
 	// AllowedKBNamespaces returns workspace IDs the agent may query.
+	// Used by: knowledgebase.
 	AllowedKBNamespaces() []string
 }
 
@@ -117,15 +148,32 @@ type PluginProvider interface {
 }
 
 var (
-	providersMu sync.RWMutex
-	providers   = make(map[string]PluginProvider)
+	providersMu    sync.RWMutex
+	providers      = make(map[string]PluginProvider)
+	toolToProvider = make(map[string]string) // toolID → providerID index
 )
 
-// RegisterPlugin registers a new plugin provider.
+// RegisterPlugin registers a new plugin provider and indexes its tool IDs.
 func RegisterPlugin(p PluginProvider) {
 	providersMu.Lock()
 	defer providersMu.Unlock()
 	providers[p.ID()] = p
+	for _, tool := range p.DefaultTools() {
+		toolToProvider[tool.ID] = p.ID()
+	}
+}
+
+// LookupProviderForTool returns the provider that owns the given tool ID.
+// Returns nil, false for MCP or dynamically registered tools.
+func LookupProviderForTool(toolID string) (PluginProvider, bool) {
+	providersMu.RLock()
+	defer providersMu.RUnlock()
+	pid, ok := toolToProvider[toolID]
+	if !ok {
+		return nil, false
+	}
+	p, ok := providers[pid]
+	return p, ok
 }
 
 // GetPluginProvider returns a plugin provider by ID.

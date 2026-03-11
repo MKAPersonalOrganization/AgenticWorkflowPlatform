@@ -26,7 +26,7 @@ func (p *Provider) DefaultSets() []toolregistry.ToolSet {
 			Name:        "Knowledge Base",
 			Description: "Tools for querying attached knowledge base workspaces",
 			Category:    "Knowledge",
-			ToolIDs:     []string{"kb-query"},
+			ToolIDs:     []string{"query_knowledge_base"},
 			CreatedAt:   now,
 			UpdatedAt:   now,
 		},
@@ -36,7 +36,7 @@ func (p *Provider) DefaultSets() []toolregistry.ToolSet {
 func (p *Provider) DefaultTools() []toolregistry.Tool {
 	now := time.Now()
 	return []toolregistry.Tool{
-		{ID: "kb-query", Name: "Query Knowledge Base", Description: "Search and retrieve information from attached knowledge base workspaces", Category: "Knowledge", ToolSetID: "knowledge-base-set", CreatedAt: now, UpdatedAt: now},
+		{ID: "query_knowledge_base", Name: "Query Knowledge Base", Description: "Search and retrieve information from attached knowledge base workspaces", Category: "Knowledge", ToolSetID: "knowledge-base-set", CreatedAt: now, UpdatedAt: now},
 	}
 }
 
@@ -65,7 +65,7 @@ func (p *Provider) SettingsSchema() []toolregistry.SettingsField {
 
 func (p *Provider) CreateExecutable(ctx context.Context, toolID string, deps toolregistry.FactoryDeps) (agent.ExecutableTool, error) {
 	switch toolID {
-	case "kb-query":
+	case "query_knowledge_base":
 		// Resolve settings: plugin settings override → deps fallback
 		apiKey := deps.OpenAIAPIKey()
 		modelID := deps.ModelID()

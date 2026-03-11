@@ -26,7 +26,7 @@ func (p *Provider) DefaultSets() []toolregistry.ToolSet {
 			Name:        "Text to Speech",
 			Description: "Generate spoken audio from text using AI voices",
 			Category:    "Audio",
-			ToolIDs:     []string{"tts-speak"},
+			ToolIDs:     []string{"speak"},
 			CreatedAt:   now,
 			UpdatedAt:   now,
 		},
@@ -37,7 +37,7 @@ func (p *Provider) DefaultTools() []toolregistry.Tool {
 	now := time.Now()
 	return []toolregistry.Tool{
 		{
-			ID:          "tts-speak",
+			ID:          "speak",
 			Name:        "Speak",
 			Description: "Convert text to spoken audio using AI voices",
 			Category:    "Audio",
@@ -83,7 +83,7 @@ func (p *Provider) SettingsSchema() []toolregistry.SettingsField {
 
 func (p *Provider) CreateExecutable(ctx context.Context, toolID string, deps toolregistry.FactoryDeps) (agent.ExecutableTool, error) {
 	switch toolID {
-	case "tts-speak":
+	case "speak":
 		artifactStore := deps.ArtifactStore()
 
 		// Resolve settings: plugin settings override → TTS capability config → OpenAI key fallback
@@ -116,5 +116,5 @@ func (p *Provider) GetUITemplate() templ.Component {
 }
 
 func (p *Provider) UIHandledTools() []string {
-	return []string{"speak", "tts-speak"}
+	return []string{"speak"}
 }

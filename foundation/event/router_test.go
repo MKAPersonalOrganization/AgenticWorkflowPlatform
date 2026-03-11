@@ -7,8 +7,19 @@ import (
 	"time"
 
 	es "school-with-ai/foundation/eventsourcing"
-	"school-with-ai/modules/chat/thread"
 )
+
+// testEvent is a test-local event type used to avoid importing module types
+// (modules/chat/thread) from the foundation layer. See AC-13 / TODO-11.
+type testEvent struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+func (e *testEvent) EventType() string         { return "test.EventCreated" }
+func (e *testEvent) EventTimestamp() time.Time { return e.Timestamp }
+func (e *testEvent) AggregateID() string       { return e.ID }
 
 func TestRouter(t *testing.T) {
 	t.Parallel()
@@ -16,7 +27,7 @@ func TestRouter(t *testing.T) {
 	ctx := context.Background()
 
 	var handled bool
-	router.Register(&thread.ThreadCreated{}, func(ctx context.Context, e es.Event) error {
+	router.Register(&testEvent{}, func(ctx context.Context, e es.Event) error {
 		handled = true
 		return nil
 	})
@@ -27,7 +38,7 @@ func TestRouter(t *testing.T) {
 		return nil
 	})
 
-	evt := &thread.ThreadCreated{ThreadID: "test-123", UserID: "user-456", Timestamp: time.Now()}
+	evt := &testEvent{ID: "test-123", Name: "example", Timestamp: time.Now()}
 	if err := router.Dispatch(ctx, evt); err != nil {
 		t.Fatalf("Dispatch failed: %v", err)
 	}
@@ -46,11 +57,11 @@ func TestRouter_Error(t *testing.T) {
 	ctx := context.Background()
 
 	expectedErr := errors.New("test error")
-	router.Register(&thread.ThreadCreated{}, func(ctx context.Context, e es.Event) error {
+	router.Register(&testEvent{}, func(ctx context.Context, e es.Event) error {
 		return expectedErr
 	})
 
-	evt := &thread.ThreadCreated{ThreadID: "test-123", UserID: "user-456", Timestamp: time.Now()}
+	evt := &testEvent{ID: "test-123", Name: "example", Timestamp: time.Now()}
 	err := router.Dispatch(ctx, evt)
 	if !errors.Is(err, expectedErr) {
 		t.Errorf("Expected error %v, got %v", expectedErr, err)

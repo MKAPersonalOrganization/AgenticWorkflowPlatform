@@ -1,4 +1,4 @@
-package auth
+package googleauth
 
 import (
 	"crypto/rand"
@@ -7,29 +7,29 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"school-with-ai/shared"
+
 	"school-with-ai/foundation/i18n"
 	"school-with-ai/foundation/logger"
-	"school-with-ai/infra/googleauth"
+	"school-with-ai/shared"
 
 	authcomp "school-with-ai/components/auth"
 )
 
 // AuthHandlers contains handlers for authentication routes.
 type AuthHandlers struct {
-	log          *logger.Logger
-	googleClient *googleauth.Client
-	sessions     *googleauth.SessionStore
-	appURL       string
+	log      *logger.Logger
+	client   *Client
+	sessions *SessionStore
+	appURL   string
 }
 
 // NewAuthHandlers creates new authentication handlers.
-func NewAuthHandlers(log *logger.Logger, googleClient *googleauth.Client, sessions *googleauth.SessionStore, appURL string) *AuthHandlers {
+func NewAuthHandlers(log *logger.Logger, client *Client, sessions *SessionStore, appURL string) *AuthHandlers {
 	return &AuthHandlers{
-		log:          log,
-		googleClient: googleClient,
-		sessions:     sessions,
-		appURL:       appURL,
+		log:      log,
+		client:   client,
+		sessions: sessions,
+		appURL:   appURL,
 	}
 }
 
@@ -53,7 +53,7 @@ func (h *AuthHandlers) LoginPage(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = session.Save(r, w)
 
-	googleURL := h.googleClient.AuthCodeURL(state)
+	googleURL := h.client.AuthCodeURL(state)
 	http.Redirect(w, r, googleURL, http.StatusSeeOther)
 }
 
@@ -100,7 +100,7 @@ func (h *AuthHandlers) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := h.googleClient.Exchange(ctx, code)
+	token, err := h.client.Exchange(ctx, code)
 	if err != nil {
 		h.log.Error(ctx, "failed to exchange code for token", "error", err)
 		http.Redirect(w, r, "/auth/error?error="+url.QueryEscape("Failed to authenticate with Google"), http.StatusSeeOther)
@@ -108,7 +108,7 @@ func (h *AuthHandlers) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch Google user info
-	info, err := h.googleClient.FetchUserInfo(ctx, token)
+	info, err := h.client.FetchUserInfo(ctx, token)
 	if err != nil {
 		h.log.Error(ctx, "failed to fetch Google user info", "error", err)
 		http.Redirect(w, r, "/auth/error?error="+url.QueryEscape("Failed to retrieve your profile"), http.StatusSeeOther)
@@ -121,7 +121,7 @@ func (h *AuthHandlers) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Upsert user in database
-	user, err := h.googleClient.UpsertUser(ctx, info)
+	user, err := h.client.UpsertUser(ctx, info)
 	if err != nil {
 		h.log.Error(ctx, "failed to upsert user", "error", err)
 		http.Redirect(w, r, "/auth/error?error="+url.QueryEscape("Failed to create user account"), http.StatusSeeOther)

@@ -2,13 +2,42 @@ package statistics
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"school-with-ai/modules/chat/thread"
-	"school-with-ai/foundation/event"
 	"time"
+
+	"school-with-ai/foundation/event"
+	es "school-with-ai/foundation/eventsourcing"
 
 	"github.com/jmoiron/sqlx"
 )
+
+// ---------------------------------------------------------------------------
+// Local event DTOs — mirror the fields the projection actually reads from
+// the chat domain events.  By defining them here the analytics module does
+// not import modules/chat/thread at compile-time.  The router's name-based
+// dispatch delivers the concrete event; we JSON-round-trip it into these DTOs
+// to read the fields we need.
+// ---------------------------------------------------------------------------
+
+// toolResultEvent mirrors the fields of thread.ToolResultAdded used here.
+type toolResultEvent struct {
+	ThreadID  string    `json:"threadId"`
+	ToolName  string    `json:"toolName"`
+	IsError   bool      `json:"isError"`
+	AgentName string    `json:"agentName"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// assistantMessageEvent mirrors thread.AssistantMessageCompleted.
+type assistantMessageEvent struct {
+	AgentName string    `json:"agentName"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// ---------------------------------------------------------------------------
+// Projection
+// ---------------------------------------------------------------------------
 
 // PostgresProjection projects tool statistics into PostgreSQL.
 type PostgresProjection struct {
@@ -23,41 +52,60 @@ func NewPostgresProjection(db *sqlx.DB) *PostgresProjection {
 }
 
 // RegisterHandlers registers database update handlers to the provided router.
+// Uses name-based registration so the analytics module does not depend on the
+// concrete event types defined in modules/chat/thread.
 func (p *PostgresProjection) RegisterHandlers(router interface {
-	Register(eventPrototype any, handler event.HandlerFunc)
+	RegisterByName(eventTypeName string, handler event.HandlerFunc)
 },
 ) {
-	router.Register(&thread.ToolResultAdded{}, func(ctx context.Context, e thread.Event) error {
-		return p.HandleEvent(ctx, e)
+	router.RegisterByName("ToolResultAdded", func(ctx context.Context, e es.Event) error {
+		return p.handleToolResult(ctx, e)
 	})
-	router.Register(&thread.AssistantMessageCompleted{}, func(ctx context.Context, e thread.Event) error {
-		return p.HandleEvent(ctx, e)
+	router.RegisterByName("AssistantMessageCompleted", func(ctx context.Context, e es.Event) error {
+		return p.handleAssistantMessage(ctx, e)
 	})
-	// Note: RunError removed per EVENT_CONTRACTS.md - was framework lifecycle event
 }
 
-// HandleEvent processes domain events to update statistics in the database.
-func (p *PostgresProjection) HandleEvent(ctx context.Context, event thread.Event) error {
-	switch e := event.(type) {
-	case *thread.ToolResultAdded:
-		if e.IsError {
-			if err := p.updateToolErrorStats(ctx, e); err != nil {
-				return err
-			}
-		} else {
-			if err := p.updateToolSuccessStats(ctx, e); err != nil {
-				return err
-			}
-		}
-		// Also record individual event for time-series analytics
-		return p.recordToolEvent(ctx, e)
-	case *thread.AssistantMessageCompleted:
-		return p.updateMessageStats(ctx, e)
+// eventToDTO JSON-round-trips an es.Event into the target DTO.
+func eventToDTO[T any](evt es.Event) (T, error) {
+	var dto T
+	raw, err := json.Marshal(evt)
+	if err != nil {
+		return dto, fmt.Errorf("marshal event: %w", err)
 	}
-	return nil
+	if err := json.Unmarshal(raw, &dto); err != nil {
+		return dto, fmt.Errorf("unmarshal event to DTO: %w", err)
+	}
+	return dto, nil
 }
 
-func (p *PostgresProjection) updateToolSuccessStats(ctx context.Context, e *thread.ToolResultAdded) error {
+func (p *PostgresProjection) handleToolResult(ctx context.Context, evt es.Event) error {
+	e, err := eventToDTO[toolResultEvent](evt)
+	if err != nil {
+		return err
+	}
+
+	if e.IsError {
+		if err := p.updateToolErrorStats(ctx, &e); err != nil {
+			return err
+		}
+	} else {
+		if err := p.updateToolSuccessStats(ctx, &e); err != nil {
+			return err
+		}
+	}
+	return p.recordToolEvent(ctx, &e)
+}
+
+func (p *PostgresProjection) handleAssistantMessage(ctx context.Context, evt es.Event) error {
+	e, err := eventToDTO[assistantMessageEvent](evt)
+	if err != nil {
+		return err
+	}
+	return p.updateMessageStats(ctx, &e)
+}
+
+func (p *PostgresProjection) updateToolSuccessStats(ctx context.Context, e *toolResultEvent) error {
 	query := `
 		INSERT INTO analytics_stats (agent_name, category, name, total_count, successes, failures, last_success, updated_at)
 		VALUES ($1, 'tool', $2, 1, 1, 0, $3, $4)
@@ -81,7 +129,7 @@ func (p *PostgresProjection) updateToolSuccessStats(ctx context.Context, e *thre
 	return nil
 }
 
-func (p *PostgresProjection) updateToolErrorStats(ctx context.Context, e *thread.ToolResultAdded) error {
+func (p *PostgresProjection) updateToolErrorStats(ctx context.Context, e *toolResultEvent) error {
 	query := `
 		INSERT INTO analytics_stats (agent_name, category, name, total_count, successes, failures, last_failure, updated_at)
 		VALUES ($1, 'tool', $2, 1, 0, 1, $3, $4)
@@ -105,7 +153,7 @@ func (p *PostgresProjection) updateToolErrorStats(ctx context.Context, e *thread
 	return nil
 }
 
-func (p *PostgresProjection) updateMessageStats(ctx context.Context, e *thread.AssistantMessageCompleted) error {
+func (p *PostgresProjection) updateMessageStats(ctx context.Context, e *assistantMessageEvent) error {
 	query := `
 		INSERT INTO analytics_stats (agent_name, category, name, total_count, successes, updated_at)
 		VALUES ($1, 'message', 'total', 1, 1, $2)
@@ -119,7 +167,7 @@ func (p *PostgresProjection) updateMessageStats(ctx context.Context, e *thread.A
 }
 
 // recordToolEvent inserts an individual tool event for time-series analysis.
-func (p *PostgresProjection) recordToolEvent(ctx context.Context, e *thread.ToolResultAdded) error {
+func (p *PostgresProjection) recordToolEvent(ctx context.Context, e *toolResultEvent) error {
 	query := `
 		INSERT INTO analytics_events (agent_name, tool_name, is_error, created_at)
 		VALUES ($1, $2, $3, $4)

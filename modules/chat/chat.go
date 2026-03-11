@@ -36,8 +36,6 @@ import (
 	"school-with-ai/modules/chat/taskmanagement"
 	"school-with-ai/modules/chat/thread"
 	"school-with-ai/modules/chat/threadmgmt"
-	"school-with-ai/modules/permissions/tool"
-	"school-with-ai/modules/userprofile/identity"
 	"school-with-ai/platform/artifact"
 	"school-with-ai/platform/toolregistry"
 	"school-with-ai/shared"
@@ -59,12 +57,12 @@ type Dependencies struct {
 	EventStore         thread.EventStore
 	SnapshotStore      es.SnapshotStore // optional — accelerates thread loading
 	ArtifactService    artifact.Service
-	StudentProfileRepo identity.StudentProfileRepository
+	StudentProfileRepo chatcontracts.StudentProfileRepository
 	Emitter            agentorchestrator.EventEmitter // transient event router
 	AgentProvider      agent.AgentProvider
 	AuthService        shared.AuthService
 	ToolRegistry       *toolregistry.Registry
-	PermissionsService *tool.Service
+	PermissionsService chatcontracts.ToolPermissionService
 	DocumentProvider   chatcontracts.DocumentProvider
 	TenantID           string
 	AllowedOrigin      string

@@ -10,12 +10,11 @@ import (
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/core"
 	"school-with-ai/foundation/agentsdk/engine"
-	"school-with-ai/foundation/agentsdk/llm"
 	agentio "school-with-ai/foundation/agentsdk/io"
+	"school-with-ai/foundation/agentsdk/llm"
 	smiddleware "school-with-ai/foundation/agentsdk/middleware"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/modules/chat/thread"
-	"school-with-ai/modules/userprofile/identity"
 	"school-with-ai/shared"
 )
 
@@ -40,7 +39,7 @@ type RunnerAdapter struct {
 	agentProvider          agent.AgentProvider
 	threadMgr              ThreadManager
 	pipeline               *EventPipeline
-	profileRepo            identity.StudentProfileRepository
+	profileProvider        agent.StudentProfileProvider
 	configResolver         ModelConfigResolver
 	ttsResolver            TTSConfigResolver
 	pluginSettingsResolver PluginSettingsResolver
@@ -61,7 +60,7 @@ type RunnerAdapterConfig struct {
 	ConfigResolver         ModelConfigResolver
 	TTSResolver            TTSConfigResolver
 	PluginSettingsResolver PluginSettingsResolver
-	ProfileRepo            identity.StudentProfileRepository
+	ProfileProvider        agent.StudentProfileProvider
 	PermChecker            ToolPermissionChecker
 	WorkspacePermChecker   WorkspacePermissionChecker
 	MCPResolver            MCPToolResolver
@@ -81,7 +80,7 @@ func NewRunnerAdapter(ctx context.Context, cfg RunnerAdapterConfig) (*RunnerAdap
 		log:                    cfg.Log,
 		threadMgr:              cfg.ThreadMgr,
 		agentProvider:          cfg.AgentProvider,
-		profileRepo:            cfg.ProfileRepo,
+		profileProvider:        cfg.ProfileProvider,
 		pipeline:               NewEventPipeline(cfg.Log),
 		permChecker:            cfg.PermChecker,
 		workspacePermChecker:   cfg.WorkspacePermChecker,
@@ -139,7 +138,7 @@ func (r *RunnerAdapter) buildEngine(ctx context.Context, modelCfg *agent.ModelCo
 
 	provider := &RegistryAgentProvider{
 		provider:             r.agentProvider,
-		profileRepo:          r.profileRepo,
+		profileProvider:      r.profileProvider,
 		modelProvider:        modelCfg.Provider,
 		modelID:              modelCfg.Model,
 		temperature:          modelCfg.Temperature,
@@ -402,7 +401,7 @@ func (r *RunnerAdapter) toCoreToolCalls(dtcs []thread.ToolCall) []core.ToolCall 
 // RegistryAgentProvider implements engine.AgentProvider using agent.AgentProvider.
 type RegistryAgentProvider struct {
 	provider             agent.AgentProvider
-	profileRepo          identity.StudentProfileRepository
+	profileProvider      agent.StudentProfileProvider
 	modelProvider        string   // LLM provider name (e.g., "openai", "gemini")
 	modelID              string   // LLM model name (e.g., "gpt-4o", "gemini-2.0-flash")
 	temperature          *float64 // Global temperature from AI settings
@@ -595,8 +594,8 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 	}
 
 	// Inject Student Profile as a Chat-level middleware
-	if p.profileRepo != nil {
-		config.ChatMiddleware = append(config.ChatMiddleware, smiddleware.NewStudentProfileInjectorMiddleware(p.profileRepo))
+	if p.profileProvider != nil {
+		config.ChatMiddleware = append(config.ChatMiddleware, smiddleware.NewStudentProfileInjectorMiddleware(p.profileProvider))
 	}
 
 	return config, nil

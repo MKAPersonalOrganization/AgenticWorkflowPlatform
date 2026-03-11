@@ -119,28 +119,23 @@ func (p *Provider) DefaultTools() []toolregistry.Tool {
 func (p *Provider) SettingsSchema() []toolregistry.SettingsField { return nil }
 
 // CreateExecutable creates the executable tool for the given tool ID.
-// All tools share a single per-session Store that is stored in the agent session.
-// For now we create a new store per factory call; the FactoryDeps can be
-// extended later to carry a session-scoped Store for true persistence.
+// All tools share a StoreManager that hands out per-user stores, ensuring
+// concurrent users have isolated task tracker state.
 func (p *Provider) CreateExecutable(_ context.Context, toolID string, _ toolregistry.FactoryDeps) (agent.ExecutableTool, error) {
-	// Each agent session should share the same store instance.
-	// The session-scoped wiring is handled at the factory level; here we
-	// simply instantiate. The factory/session manager is expected to re-use
-	// the same Provider instance per session so the store survives.
-	store := getOrCreateSessionStore()
+	stores := globalStoreManager()
 	switch toolID {
 	case "tracker_create_task":
-		return &CreateTaskTool{store: store}, nil
+		return &CreateTaskTool{stores: stores}, nil
 	case "tracker_update_task":
-		return &UpdateTaskTool{store: store}, nil
+		return &UpdateTaskTool{stores: stores}, nil
 	case "tracker_get_task":
-		return &GetTaskTool{store: store}, nil
+		return &GetTaskTool{stores: stores}, nil
 	case "tracker_list_tasks":
-		return &ListTasksTool{store: store}, nil
+		return &ListTasksTool{stores: stores}, nil
 	case "tracker_add_dependency":
-		return &AddDependencyTool{store: store}, nil
+		return &AddDependencyTool{stores: stores}, nil
 	case "tracker_visualize":
-		return &VisualizeTool{store: store}, nil
+		return &VisualizeTool{stores: stores}, nil
 	default:
 		return nil, nil
 	}
@@ -162,31 +157,58 @@ func (p *Provider) UIHandledTools() []string {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Session-scoped store singleton
+// StoreManager — per-user store isolation
 // ──────────────────────────────────────────────────────────────────────────────
 
-// sessionStore holds a lazily-created Store that lives for the duration of the
-// agent session. In a future iteration this can be replaced with a
-// PostgreSQL-backed store keyed by user_id+thread_id.
-var (
-	sessionStoreMu   = &sessionStoreSync{}
-	sessionStoreInst *Store
-)
-
-type sessionStoreSync struct{ sync.Mutex }
-
-func getOrCreateSessionStore() *Store {
-	sessionStoreMu.Lock()
-	defer sessionStoreMu.Unlock()
-	if sessionStoreInst == nil {
-		sessionStoreInst = NewStore()
-	}
-	return sessionStoreInst
+// StoreManager provides per-user Store instances so that concurrent users
+// have isolated task tracker state.
+type StoreManager struct {
+	mu     sync.Mutex
+	stores map[string]*Store // userID → store
 }
 
-// ResetSessionStore is exposed for tests — clears the in-memory store.
-func ResetSessionStore() {
-	sessionStoreMu.Lock()
-	defer sessionStoreMu.Unlock()
-	sessionStoreInst = nil
+// NewStoreManager creates an empty manager.
+func NewStoreManager() *StoreManager {
+	return &StoreManager{stores: make(map[string]*Store)}
+}
+
+// ForUser returns the Store for the given user, creating one if needed.
+func (m *StoreManager) ForUser(userID string) *Store {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	s, ok := m.stores[userID]
+	if !ok {
+		s = NewStore()
+		m.stores[userID] = s
+	}
+	return s
+}
+
+// Reset clears all stores. Exposed for tests.
+func (m *StoreManager) Reset() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.stores = make(map[string]*Store)
+}
+
+// global instance — lazily created
+var (
+	globalMgrMu   sync.Mutex
+	globalMgrInst *StoreManager
+)
+
+func globalStoreManager() *StoreManager {
+	globalMgrMu.Lock()
+	defer globalMgrMu.Unlock()
+	if globalMgrInst == nil {
+		globalMgrInst = NewStoreManager()
+	}
+	return globalMgrInst
+}
+
+// ResetGlobalStoreManager clears the global StoreManager. Exposed for tests.
+func ResetGlobalStoreManager() {
+	globalMgrMu.Lock()
+	defer globalMgrMu.Unlock()
+	globalMgrInst = nil
 }

@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"school-with-ai/shared"
-	"school-with-ai/infra/googleauth"
 	"sync"
 	"time"
+
+	"school-with-ai/shared"
 )
 
 // sessionCacheEntry holds a cached user with its expiration time.
@@ -24,10 +24,10 @@ const (
 	sessionCacheMaxSize = 10000
 )
 
-// Middleware provides authentication middleware using Google OAuth sessions.
+// Middleware provides authentication middleware using session-based identity.
 type Middleware struct {
-	googleClient *googleauth.Client
-	sessions     *googleauth.SessionStore
+	users        UserResolver
+	sessions     SessionReader
 	appURL       string
 	cacheMu      sync.RWMutex
 	userCache    map[string]sessionCacheEntry
@@ -35,10 +35,11 @@ type Middleware struct {
 }
 
 // NewMiddleware creates a new authentication middleware.
-func NewMiddleware(googleClient *googleauth.Client, sessions *googleauth.SessionStore, appURL string, ctx context.Context) *Middleware {
+// users resolves user records; sessions reads the session cookie.
+func NewMiddleware(users UserResolver, sessions SessionReader, appURL string, ctx context.Context) *Middleware {
 	evictCtx, cancel := context.WithCancel(ctx)
 	m := &Middleware{
-		googleClient: googleClient,
+		users:        users,
 		sessions:     sessions,
 		appURL:       appURL,
 		userCache:    make(map[string]sessionCacheEntry),
@@ -121,7 +122,7 @@ func (m *Middleware) resolveUser(r *http.Request) (*shared.User, error) {
 	m.cacheMu.RUnlock()
 
 	// Cache miss — load from database
-	user, err := m.googleClient.GetUserByID(r.Context(), userID)
+	user, err := m.users.GetUserByID(r.Context(), userID)
 	if err != nil {
 		return nil, err
 	}

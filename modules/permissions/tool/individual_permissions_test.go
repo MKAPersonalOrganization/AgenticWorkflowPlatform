@@ -20,7 +20,7 @@ func TestIndividualToolPermissions(t *testing.T) {
 
 	agentID := "math-instructor"
 	toolSetID := "calculator-set"
-	toolID := "calc-add"
+	toolID := "add"
 
 	userID := "test-user"
 
@@ -71,7 +71,7 @@ func TestIndividualToolPermissionInheritance(t *testing.T) {
 	userID := "test-user"
 	agentID := "math-instructor"
 	toolSetID := "calculator-set"
-	toolID := "calc-multiply"
+	toolID := "multiply"
 
 	// Test: Tool inherits permission from tool set when no explicit permission is set
 
@@ -108,7 +108,7 @@ func TestIndividualToolPermissionOverride(t *testing.T) {
 	userID := "test-user"
 	agentID := "math-instructor"
 	toolSetID := "calculator-set"
-	toolID := "calc-divide"
+	toolID := "divide"
 
 	// Test: Individual tool permission overrides tool set permission
 
@@ -171,7 +171,7 @@ func TestGetEnabledToolsInSet(t *testing.T) {
 	}
 
 	// Enable specific tools individually
-	tools := []string{"calc-add", "calc-multiply"}
+	tools := []string{"add", "multiply"}
 	for _, toolID := range tools {
 		err = service.SetPermission(ctx, userID, agentID, toolSetID, toolID, true)
 		if err != nil {
@@ -180,7 +180,7 @@ func TestGetEnabledToolsInSet(t *testing.T) {
 	}
 
 	// Disable one tool
-	err = service.SetPermission(ctx, userID, agentID, toolSetID, "calc-subtract", false)
+	err = service.SetPermission(ctx, userID, agentID, toolSetID, "subtract", false)
 	if err != nil {
 		t.Fatalf("Failed to disable tool calc-subtract: %v", err)
 	}
@@ -196,7 +196,7 @@ func TestGetEnabledToolsInSet(t *testing.T) {
 	}
 
 	// Check specific tools are in the list
-	expectedTools := map[string]bool{"calc-add": true, "calc-multiply": true}
+	expectedTools := map[string]bool{"add": true, "multiply": true}
 	for _, toolID := range enabledTools {
 		if !expectedTools[toolID] {
 			t.Errorf("Unexpected enabled tool: %s", toolID)

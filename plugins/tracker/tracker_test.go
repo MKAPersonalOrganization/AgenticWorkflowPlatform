@@ -276,12 +276,21 @@ func TestStore_AddDependency_MaxLimit(t *testing.T) {
 
 func makeArgs(data any) agent.Arguments {
 	b, _ := json.Marshal(data)
-	return agent.Arguments{Raw: b}
+	return agent.Arguments{Raw: b, UserID: "test-user"}
+}
+
+// storeManagerWith wraps a pre-populated Store in a StoreManager keyed to "test-user".
+func storeManagerWith(s *Store) *StoreManager {
+	mgr := NewStoreManager()
+	mgr.mu.Lock()
+	mgr.stores["test-user"] = s
+	mgr.mu.Unlock()
+	return mgr
 }
 
 func TestCreateTaskTool(t *testing.T) {
 	store := NewStore()
-	tool := &CreateTaskTool{store: store}
+	tool := &CreateTaskTool{stores: storeManagerWith(store)}
 	if tool.Name() != "tracker_create_task" {
 		t.Errorf("name = %q", tool.Name())
 	}
@@ -307,7 +316,7 @@ func TestCreateTaskTool(t *testing.T) {
 func TestUpdateTaskTool(t *testing.T) {
 	store := NewStore()
 	task, _ := store.CreateTask("Original", "Desc", TaskTypeTask, "", nil)
-	tool := &UpdateTaskTool{store: store}
+	tool := &UpdateTaskTool{stores: storeManagerWith(store)}
 	result, err := tool.Execute(context.Background(), makeArgs(map[string]any{
 		"id": task.ID, "status": "in_progress",
 	}))
@@ -326,7 +335,7 @@ func TestUpdateTaskTool(t *testing.T) {
 func TestGetTaskTool(t *testing.T) {
 	store := NewStore()
 	task, _ := store.CreateTask("Test", "Desc", TaskTypeTask, "", nil)
-	tool := &GetTaskTool{store: store}
+	tool := &GetTaskTool{stores: storeManagerWith(store)}
 	result, _ := tool.Execute(context.Background(), makeArgs(map[string]any{"id": task.ID}))
 	if result.Error != nil {
 		t.Fatalf("result error: %v", result.Error)
@@ -340,7 +349,7 @@ func TestGetTaskTool(t *testing.T) {
 
 func TestGetTaskTool_NotFound(t *testing.T) {
 	store := NewStore()
-	tool := &GetTaskTool{store: store}
+	tool := &GetTaskTool{stores: storeManagerWith(store)}
 	result, _ := tool.Execute(context.Background(), makeArgs(map[string]any{"id": "xxx"}))
 	content := result.Content[0].(string)
 	if content != "Task xxx not found." {
@@ -352,7 +361,7 @@ func TestListTasksTool(t *testing.T) {
 	store := NewStore()
 	store.CreateTask("Task 1", "Desc", TaskTypeTask, "", nil)
 	store.CreateTask("Task 2", "Desc", TaskTypeEpic, "", nil)
-	tool := &ListTasksTool{store: store}
+	tool := &ListTasksTool{stores: storeManagerWith(store)}
 	result, _ := tool.Execute(context.Background(), makeArgs(map[string]any{}))
 	if result.Error != nil {
 		t.Fatalf("result error: %v", result.Error)
@@ -368,7 +377,7 @@ func TestListTasksTool_WithFilters(t *testing.T) {
 	store := NewStore()
 	store.CreateTask("Epic 1", "Desc", TaskTypeEpic, "", nil)
 	store.CreateTask("Task 1", "Desc", TaskTypeTask, "", nil)
-	tool := &ListTasksTool{store: store}
+	tool := &ListTasksTool{stores: storeManagerWith(store)}
 	result, _ := tool.Execute(context.Background(), makeArgs(map[string]any{"type": "epic"}))
 	var parsed map[string]any
 	json.Unmarshal([]byte(result.Content[0].(string)), &parsed)
@@ -379,7 +388,7 @@ func TestListTasksTool_WithFilters(t *testing.T) {
 
 func TestListTasksTool_Empty(t *testing.T) {
 	store := NewStore()
-	tool := &ListTasksTool{store: store}
+	tool := &ListTasksTool{stores: storeManagerWith(store)}
 	result, _ := tool.Execute(context.Background(), makeArgs(map[string]any{}))
 	content := result.Content[0].(string)
 	if content != "No tasks found matching the criteria." {
@@ -391,7 +400,7 @@ func TestAddDependencyTool(t *testing.T) {
 	store := NewStore()
 	a, _ := store.CreateTask("A", "Desc", TaskTypeTask, "", nil)
 	b, _ := store.CreateTask("B", "Desc", TaskTypeTask, "", nil)
-	tool := &AddDependencyTool{store: store}
+	tool := &AddDependencyTool{stores: storeManagerWith(store)}
 	result, _ := tool.Execute(context.Background(), makeArgs(map[string]any{
 		"task_id": b.ID, "dependency_id": a.ID,
 	}))
@@ -407,7 +416,7 @@ func TestAddDependencyTool(t *testing.T) {
 func TestAddDependencyTool_SelfReference(t *testing.T) {
 	store := NewStore()
 	a, _ := store.CreateTask("A", "Desc", TaskTypeTask, "", nil)
-	tool := &AddDependencyTool{store: store}
+	tool := &AddDependencyTool{stores: storeManagerWith(store)}
 	result, _ := tool.Execute(context.Background(), makeArgs(map[string]any{
 		"task_id": a.ID, "dependency_id": a.ID,
 	}))
@@ -421,8 +430,8 @@ func TestVisualizeTool(t *testing.T) {
 	epic, _ := store.CreateTask("Project", "Root epic", TaskTypeEpic, "", nil)
 	task1, _ := store.CreateTask("Design", "Design the system", TaskTypeTask, epic.ID, nil)
 	store.CreateTask("Implement", "Build it", TaskTypeTask, epic.ID, []string{task1.ID})
-	tool := &VisualizeTool{store: store}
-	result, _ := tool.Execute(context.Background(), agent.Arguments{})
+	tool := &VisualizeTool{stores: storeManagerWith(store)}
+	result, _ := tool.Execute(context.Background(), agent.Arguments{UserID: "test-user"})
 	if result.Error != nil {
 		t.Fatalf("result error: %v", result.Error)
 	}
@@ -439,8 +448,8 @@ func TestVisualizeTool(t *testing.T) {
 
 func TestVisualizeTool_Empty(t *testing.T) {
 	store := NewStore()
-	tool := &VisualizeTool{store: store}
-	result, _ := tool.Execute(context.Background(), agent.Arguments{})
+	tool := &VisualizeTool{stores: storeManagerWith(store)}
+	result, _ := tool.Execute(context.Background(), agent.Arguments{UserID: "test-user"})
 	content := result.Content[0].(string)
 	if content != "No tasks to visualize." {
 		t.Errorf("unexpected content: %s", content)
@@ -476,8 +485,8 @@ func TestProvider_Interface(t *testing.T) {
 }
 
 func TestProvider_CreateExecutable(t *testing.T) {
-	ResetSessionStore()
-	defer ResetSessionStore()
+	ResetGlobalStoreManager()
+	defer ResetGlobalStoreManager()
 	p := &Provider{}
 	ctx := context.Background()
 	toolIDs := []string{

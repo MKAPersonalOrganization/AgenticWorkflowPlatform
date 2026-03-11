@@ -704,3 +704,104 @@ CREATE TABLE IF NOT EXISTS aggregate_snapshots (
     data        JSONB NOT NULL,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Version: 1.56
+-- Description: Unify tool IDs — registry ID now equals the LLM function name.
+-- Renames the old namespaced IDs (e.g. "calc-add") to their canonical names ("add").
+-- Order: update FKs first, then PKs/arrays.
+
+-- 1. Rename tool IDs in the tools table (PK)
+DO $$
+DECLARE
+    mapping RECORD;
+BEGIN
+    FOR mapping IN
+        SELECT old_id, new_id FROM (VALUES
+            ('calc-add',           'add'),
+            ('calc-subtract',      'subtract'),
+            ('calc-multiply',      'multiply'),
+            ('calc-divide',        'divide'),
+            ('calc-power',         'power'),
+            ('calc-sqrt',          'sqrt'),
+            ('math-solve',         'solve_equation'),
+            ('doc-create',         'create_markdown'),
+            ('doc-update',         'update_markdown'),
+            ('doc-delete',         'delete_markdown'),
+            ('fs-list-filesystems','list_filesystems'),
+            ('fs-list-dir',        'list_directory'),
+            ('fs-read-file',       'read_file'),
+            ('fs-write-file',      'write_file'),
+            ('fs-mkdir',           'create_directory'),
+            ('fs-remove',          'remove_entry'),
+            ('fs-stat',            'file_info'),
+            ('fs-rename',          'rename_entry'),
+            ('kb-query',           'query_knowledge_base'),
+            ('mem-remember',       'save_memory'),
+            ('mem-forget',         'forget_memory'),
+            ('mem-list',           'list_memories'),
+            ('mem-clear',          'clear_memories'),
+            ('tts-speak',          'speak')
+        ) AS t(old_id, new_id)
+    LOOP
+        -- Update agent_tool_permissions FK first
+        UPDATE agent_tool_permissions
+           SET tool_id = mapping.new_id
+         WHERE tool_id = mapping.old_id;
+
+        -- Update the tools PK
+        UPDATE tools SET id = mapping.new_id WHERE id = mapping.old_id;
+    END LOOP;
+END $$;
+
+-- 2. Replace old IDs in tool_sets.tool_ids arrays
+UPDATE tool_sets SET tool_ids = array(
+    SELECT CASE
+        WHEN elem = 'calc-add'            THEN 'add'
+        WHEN elem = 'calc-subtract'       THEN 'subtract'
+        WHEN elem = 'calc-multiply'       THEN 'multiply'
+        WHEN elem = 'calc-divide'         THEN 'divide'
+        WHEN elem = 'calc-power'          THEN 'power'
+        WHEN elem = 'calc-sqrt'           THEN 'sqrt'
+        WHEN elem = 'math-solve'          THEN 'solve_equation'
+        WHEN elem = 'doc-create'          THEN 'create_markdown'
+        WHEN elem = 'doc-update'          THEN 'update_markdown'
+        WHEN elem = 'doc-delete'          THEN 'delete_markdown'
+        WHEN elem = 'fs-list-filesystems' THEN 'list_filesystems'
+        WHEN elem = 'fs-list-dir'         THEN 'list_directory'
+        WHEN elem = 'fs-read-file'        THEN 'read_file'
+        WHEN elem = 'fs-write-file'       THEN 'write_file'
+        WHEN elem = 'fs-mkdir'            THEN 'create_directory'
+        WHEN elem = 'fs-remove'           THEN 'remove_entry'
+        WHEN elem = 'fs-stat'             THEN 'file_info'
+        WHEN elem = 'fs-rename'           THEN 'rename_entry'
+        WHEN elem = 'kb-query'            THEN 'query_knowledge_base'
+        WHEN elem = 'mem-remember'        THEN 'save_memory'
+        WHEN elem = 'mem-forget'          THEN 'forget_memory'
+        WHEN elem = 'mem-list'            THEN 'list_memories'
+        WHEN elem = 'mem-clear'           THEN 'clear_memories'
+        WHEN elem = 'tts-speak'           THEN 'speak'
+        ELSE elem
+    END
+    FROM unnest(tool_ids) AS elem
+)
+WHERE tool_ids && ARRAY[
+    'calc-add','calc-subtract','calc-multiply','calc-divide','calc-power','calc-sqrt','math-solve',
+    'doc-create','doc-update','doc-delete',
+    'fs-list-filesystems','fs-list-dir','fs-read-file','fs-write-file','fs-mkdir','fs-remove','fs-stat','fs-rename',
+    'kb-query',
+    'mem-remember','mem-forget','mem-list','mem-clear',
+    'tts-speak'
+];
+
+-- Version: 1.57
+-- Description: Seed per-projection checkpoint rows from the legacy "all_projections" row.
+-- Each projection gets its own checkpoint so it can be rebuilt independently.
+-- If "all_projections" does not exist yet (fresh install), no rows are inserted;
+-- the updater will start each projection from position 0.
+
+INSERT INTO projection_checkpoints (projection_name, global_position, updated_at)
+SELECT name, cp.global_position, NOW()
+FROM (VALUES ('stats'), ('billing'), ('agui'), ('llm-context')) AS t(name)
+CROSS JOIN projection_checkpoints cp
+WHERE cp.projection_name = 'all_projections'
+ON CONFLICT (projection_name) DO NOTHING;
