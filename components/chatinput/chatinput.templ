@@ -7,6 +7,7 @@ import "school-with-ai/components/tooltip"
 import "school-with-ai/components/i18n"
 import "school-with-ai/components/tokenusage"
 import "school-with-ai/components/agents"
+import "school-with-ai/components/agentcapabilities"
 
 templ ChatInput() {
 	<div
@@ -26,7 +27,7 @@ templ ChatInput() {
 					AutoResize: true,
 					Attributes: templ.Attributes{
 						"x-model": "currentMessage",
-				
+
 						"@keydown":     "handleSlashKeydown($event) || handleKeydown($event)",
 						"@input":       "handleInput($event)",
 						"@paste":       "handlePaste($event)",
@@ -39,7 +40,7 @@ templ ChatInput() {
 						"rows":         "1",
 						"style":        "max-height: 45vh;",
 						"aria-label":   "Type your message",
-				
+
 						":aria-describedby": "errorMessage ? 'error-message' : null",
 						"x-ref":             "messageInput",
 						"dir":               "auto",
@@ -66,6 +67,8 @@ templ ChatInput() {
 				<div class="ms-2 flex items-center gap-1">
 					<!-- Agents Selector -->
 					@agents.AgentsButtonTrigger()
+					<!-- Agent Capabilities -->
+					@agentcapabilities.AgentCapabilities()
 					<!-- Attach Files Button -->
 					@tooltip.Tooltip() {
 						@tooltip.Trigger(tooltip.TriggerProps{}) {
