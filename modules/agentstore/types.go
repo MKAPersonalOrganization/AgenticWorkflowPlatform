@@ -19,17 +19,7 @@ type AgentDefinition struct {
 	UpdatedAt       time.Time `json:"updated_at" db:"updated_at"`
 }
 
-// InitialAgentTemplate returns the template used to seed a user's first agent.
-// There is no "default" concept — this is simply the starter agent.
-func InitialAgentTemplate(userID string) AgentDefinition {
-	return AgentDefinition{
-		UserID:       userID,
-		Name:         "Assistant",
-		Description:  "A general-purpose AI assistant that can help with any topic.",
-		SystemPrompt: "You are a helpful, knowledgeable AI assistant. You can help with a wide range of topics including math, science, writing, coding, and more. Be clear, accurate, and supportive in your responses.",
-		Icon:         `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z" /></svg>`,
-	}
-}
+
 
 // AgentDefinitionRepository defines the storage contract for user-created agents.
 type AgentDefinitionRepository interface {
@@ -51,10 +41,6 @@ type AgentDefinitionRepository interface {
 	// Search finds agents matching a query string within a user's agents.
 	Search(ctx context.Context, userID, query string) ([]AgentDefinition, error)
 
-	// EnsureInitialAgent creates a starter agent for the user if they have
-	// zero agents. Returns the first agent (by creation time). This is NOT
-	// a "default" — the user can rename, edit, or delete it like any other.
-	EnsureInitialAgent(ctx context.Context, userID string) (*AgentDefinition, error)
 
 	// ListAddedCatalogIDs returns the set of catalog entry IDs that the
 	// user has already forked into their personal agents.

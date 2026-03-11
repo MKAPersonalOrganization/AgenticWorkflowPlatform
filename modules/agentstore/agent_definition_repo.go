@@ -2,13 +2,11 @@ package agentstore
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
 )
 
 // postgresAgentDefinitionRepository implements AgentDefinitionRepository using PostgreSQL.
@@ -143,65 +141,8 @@ ORDER BY created_at ASC`
 	return agents, nil
 }
 
-func (r *postgresAgentDefinitionRepository) EnsureInitialAgent(ctx context.Context, userID string) (*AgentDefinition, error) {
-	var count int
-	err := r.db.GetContext(ctx, &count, `SELECT COUNT(*) FROM user_agents WHERE user_id = $1`, userID)
-	if err != nil {
-		return nil, fmt.Errorf("counting agents: %w", err)
-	}
 
-	if count == 0 {
-		tmpl := InitialAgentTemplate(userID)
-		if err := r.Create(ctx, &tmpl); err != nil {
-			return nil, fmt.Errorf("creating initial agent: %w", err)
-		}
 
-		r.seedInitialToolPermissions(ctx, userID, tmpl.ID)
-
-		return &tmpl, nil
-	}
-
-	first, err := r.getFirstAgent(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	return first, nil
-}
-
-func (r *postgresAgentDefinitionRepository) getFirstAgent(ctx context.Context, userID string) (*AgentDefinition, error) {
-	query := `SELECT id, user_id, name, description, system_prompt, icon, source_catalog_id, created_at, updated_at
-FROM user_agents WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1`
-
-	var agent AgentDefinition
-	if err := r.db.GetContext(ctx, &agent, query, userID); err != nil {
-		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("no agents found for user")
-		}
-		return nil, fmt.Errorf("getting first agent: %w", err)
-	}
-	return &agent, nil
-}
-
-var initialToolSets = []string{
-	"cognitive-set",
-	"calculator-set",
-	"memory-set",
-	"document-set",
-	"knowledge-base-set",
-}
-
-func (r *postgresAgentDefinitionRepository) seedInitialToolPermissions(ctx context.Context, userID, agentID string) {
-	query := `
-INSERT INTO agent_tool_set_permissions (user_id, agent_id, tool_set_id, enabled, created_at, updated_at)
-SELECT $1, $2, ts.id, TRUE, NOW(), NOW()
-FROM tool_sets ts
-WHERE ts.id = ANY($3)
-ON CONFLICT (user_id, agent_id, tool_set_id) DO NOTHING`
-
-	if _, err := r.db.ExecContext(ctx, query, userID, agentID, pq.Array(initialToolSets)); err != nil {
-		_ = err
-	}
-}
 
 func (r *postgresAgentDefinitionRepository) ListAddedCatalogIDs(ctx context.Context, userID string) ([]string, error) {
 	query := `SELECT DISTINCT source_catalog_id FROM user_agents WHERE user_id = $1 AND source_catalog_id != ''`

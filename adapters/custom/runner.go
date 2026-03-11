@@ -488,7 +488,7 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 		}
 
 		// Get enabled tool sets for this agent
-		enabledToolSetIDs, err := p.permChecker.GetEnabledToolSets(ctx, userID, name)
+		enabledToolSetIDs, err := p.permChecker.GetEnabledToolSets(ctx, userID, config.Name)
 		if err != nil {
 			// Log error but continue with no tool sets
 			enabledToolSetIDs = []string{}
@@ -511,10 +511,10 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 		if p.mcpResolver != nil && userID != "" {
 			mcpTools := p.mcpResolver.ResolveEnabledTools(ctx, userID,
 				func(toolSetID string) bool {
-					return p.permChecker.HasToolSetPermission(ctx, userID, name, toolSetID)
+					return p.permChecker.HasToolSetPermission(ctx, userID, config.Name, toolSetID)
 				},
 				func(toolSetID, toolID string) bool {
-					return p.permChecker.HasPermission(ctx, userID, name, toolSetID, toolID)
+					return p.permChecker.HasPermission(ctx, userID, config.Name, toolSetID, toolID)
 				},
 			)
 			config.Tools = append(config.Tools, mcpTools...)
@@ -530,7 +530,7 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 			userID = user.ID
 		}
 
-		enabledWorkspaceIDs, err := p.workspacePermChecker.GetEnabledWorkspaces(ctx, userID, name)
+		enabledWorkspaceIDs, err := p.workspacePermChecker.GetEnabledWorkspaces(ctx, userID, config.Name)
 		if err == nil && len(enabledWorkspaceIDs) > 0 {
 			// Enforce allowed namespaces at the tool level (runtime security).
 			if p.toolFactory != nil {
