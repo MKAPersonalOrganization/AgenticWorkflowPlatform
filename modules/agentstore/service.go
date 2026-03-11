@@ -77,13 +77,7 @@ func (s *service) getByID(ctx context.Context, id, userID string) (*AgentDefinit
 }
 
 // listByUser returns all agents created by a specific user.
-// Lazily ensures the initial agent exists before listing.
 func (s *service) listByUser(ctx context.Context, userID string) ([]AgentDefinition, error) {
-	// Ensure at least one agent exists for this user
-	if _, err := s.repo.EnsureInitialAgent(ctx, userID); err != nil {
-		s.log.Error(ctx, "failed to ensure initial agent", "userID", userID, "error", err)
-		// Continue anyway — list whatever exists
-	}
 	return s.repo.ListByUser(ctx, userID)
 }
 

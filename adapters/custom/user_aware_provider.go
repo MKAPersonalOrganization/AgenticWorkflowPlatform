@@ -50,13 +50,9 @@ func (p *UserAwareAgentProvider) GetForUser(ctx context.Context, name, userID st
 		return nil, fmt.Errorf("user ID is required to resolve agent %q", name)
 	}
 
-	// Empty name → first agent (starter created lazily if needed)
+	// If name is empty, we no longer fallback. The user must provide a valid agent ID.
 	if name == "" {
-		def, err := p.repo.EnsureInitialAgent(ctx, userID)
-		if err != nil {
-			return nil, fmt.Errorf("resolving initial agent: %w", err)
-		}
-		return p.agentFromDefinition(def), nil
+		return nil, fmt.Errorf("an agent ID must be provided")
 	}
 
 	// Try to load agent by ID
@@ -74,15 +70,9 @@ func (p *UserAwareAgentProvider) List() []agent.Agent {
 }
 
 // ListForUser returns all agents for the given user.
-// A starter agent is created lazily if the user has none.
 func (p *UserAwareAgentProvider) ListForUser(ctx context.Context, userID string) ([]agent.Agent, error) {
 	if userID == "" {
 		return nil, nil
-	}
-
-	// Ensure at least one agent exists before listing
-	if _, err := p.repo.EnsureInitialAgent(ctx, userID); err != nil {
-		return nil, fmt.Errorf("ensuring initial agent: %w", err)
 	}
 
 	definitions, err := p.repo.ListByUser(ctx, userID)

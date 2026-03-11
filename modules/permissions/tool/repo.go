@@ -28,7 +28,10 @@ func NewPostgresPermissionsRepository(db *sqlx.DB) *PostgresPermissionsRepositor
 // GetPermission retrieves a specific agent-tool permission within a tool set.
 func (r *PostgresPermissionsRepository) GetPermission(ctx context.Context, userID, agentID, toolSetID, toolID string) (*Permission, error) {
 	const q = `
-		SELECT * FROM agent_tool_permissions 
+		SELECT 
+			user_id, agent_id, tool_set_id, tool_id, enabled, 
+			COALESCE(config, '{}') as config, created_at, updated_at
+		FROM agent_tool_permissions 
 		WHERE user_id = $1 AND agent_id = $2 AND tool_set_id = $3 AND tool_id = $4
 	`
 
@@ -70,7 +73,10 @@ func (r *PostgresPermissionsRepository) GetPermission(ctx context.Context, userI
 // ListPermissions returns all individual tool permissions for an agent within a tool set.
 func (r *PostgresPermissionsRepository) ListPermissions(ctx context.Context, userID, agentID, toolSetID string) ([]Permission, error) {
 	const q = `
-		SELECT * FROM agent_tool_permissions 
+		SELECT 
+			user_id, agent_id, tool_set_id, tool_id, enabled, 
+			COALESCE(config, '{}') as config, created_at, updated_at
+		FROM agent_tool_permissions 
 		WHERE user_id = $1 AND agent_id = $2 AND tool_set_id = $3
 	`
 
@@ -163,7 +169,10 @@ func (r *PostgresPermissionsRepository) DeletePermission(ctx context.Context, us
 // GetToolSetPermission retrieves a specific agent-toolset permission.
 func (r *PostgresPermissionsRepository) GetToolSetPermission(ctx context.Context, userID, agentID, toolSetID string) (*ToolSetPermission, error) {
 	const q = `
-		SELECT * FROM agent_tool_set_permissions 
+		SELECT 
+			user_id, agent_id, tool_set_id, enabled, 
+			COALESCE(config, '{}') as config, created_at, updated_at
+		FROM agent_tool_set_permissions 
 		WHERE user_id = $1 AND agent_id = $2 AND tool_set_id = $3
 	`
 
@@ -189,9 +198,12 @@ func (r *PostgresPermissionsRepository) GetToolSetPermission(ctx context.Context
 		AgentID:   dest.AgentID,
 		ToolSetID: dest.ToolSetID,
 		Enabled:   dest.Enabled,
-		Config:    string(dest.Config),
 		CreatedAt: dest.CreatedAt.Time,
 		UpdatedAt: dest.UpdatedAt.Time,
+	}
+
+	if len(dest.Config) > 0 {
+		perm.Config = string(dest.Config)
 	}
 
 	return perm, nil
@@ -200,7 +212,10 @@ func (r *PostgresPermissionsRepository) GetToolSetPermission(ctx context.Context
 // ListToolSetPermissions returns all tool set permissions for an agent.
 func (r *PostgresPermissionsRepository) ListToolSetPermissions(ctx context.Context, userID, agentID string) ([]ToolSetPermission, error) {
 	const q = `
-		SELECT * FROM agent_tool_set_permissions 
+		SELECT 
+			user_id, agent_id, tool_set_id, enabled, 
+			COALESCE(config, '{}') as config, created_at, updated_at
+		FROM agent_tool_set_permissions 
 		WHERE user_id = $1 AND agent_id = $2
 	`
 

@@ -76,7 +76,7 @@ operate on user-owned resources:
 | Resource | Permission Model | Status |
 |----------|-----------------|--------|
 | **Knowledge Base Workspaces** | `WorkspacePermission` — grants an agent access to specific knowledge base workspaces. Multiple workspaces can be enabled per agent. Enabled workspaces are injected into the agent's system prompt so the LLM knows which namespaces it can query. | ✅ |
-| **File Systems** | `FSPermission` — grants an agent access to specific virtual file systems. Multiple file systems can be enabled per agent. | ⚠️ Permission model exists, but agent-facing filesystem tools have not been built yet. |
+| **File Systems** | `FSPermission` — grants an agent access to specific virtual file systems. Multiple file systems can be enabled per agent. | ✅ Permission model and agent-facing filesystem tools are both implemented. |
 
 > **Summary:** Agents must have permissions to use tools. Tools must have
 > permissions to access resources.
@@ -116,14 +116,14 @@ Two backend implementations exist:
 | **GitHub** | Read-only. Uses the GitHub Contents API with OAuth token resolution. ✅ |
 
 An agent can be granted access to **multiple file systems**, each with
-independent permissions. ⚠️
+independent permissions. ✅
 
-> **Gap:** The VFS layer, filesystem domain model, and `FSPermission` model are
-> all implemented. However, there are **no agent-facing filesystem tools yet**
-> (e.g. `fs_read_file`, `fs_list_dir`). The filesystem is currently accessible
-> only through the HTTP API and UI. Building the filesystem plugin to expose
-> these operations as tools — following the same pattern as the knowledge base
-> plugin — is the remaining work. 🔲
+> The VFS layer, filesystem domain model, `FSPermission` model, and **agent-facing
+> filesystem tools** (`list_filesystems`, `list_directory`, `read_file`,
+> `write_file`, `create_directory`, `remove_entry`, `file_info`, `rename_entry`)
+> are all implemented. The filesystem plugin follows the same pattern as the
+> knowledge base plugin and exposes these operations through the unified tool
+> interface. ✅
 
 ---
 
@@ -228,8 +228,8 @@ wrapping a different scope:
 | Knowledge Bases | ✅ | Edgequake RAG with query tool |
 | KB Workspace Permissions | ✅ | Multi-workspace, prompt-injected |
 | Virtual File System (VFS) | ✅ | S3/MinIO + GitHub backends |
-| Filesystem Permissions | ⚠️ | `FSPermission` model exists |
-| **Filesystem Agent Tools** | **🔲** | **No `fs_read_file` / `fs_list_dir` plugin yet** |
+| Filesystem Permissions | ✅ | `FSPermission` model + enforced in `fsplugin` tools |
+| Filesystem Agent Tools | ✅ | 8 tools via `fsplugin` (list, read, write, mkdir, rm, stat, rename) |
 | Requirements | ✅ | Full rule engine with conditional, permission, and inline types |
 | Skills | ✅ | Catalog → user library → agent permissions → runtime activation |
 | Event-Sourced Threads | ✅ | 22+ event types, optimistic concurrency |
