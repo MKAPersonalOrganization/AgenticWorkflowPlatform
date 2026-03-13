@@ -60,10 +60,10 @@ type LoopDetectorConfig struct {
 // DefaultLoopDetectorConfig returns sensible defaults for loop detection.
 func DefaultLoopDetectorConfig() LoopDetectorConfig {
 	return LoopDetectorConfig{
-		ToolErrorThreshold:   3, // Trigger after 3 consecutive errors from same tool
-		ContentChunkSize:     50,
-		ContentLoopThreshold: 10,
-		ContentMaxDistance:   250, // 5 * 50
+		ToolErrorThreshold:     3, // Trigger after 3 consecutive errors from same tool
+		ContentChunkSize:       50,
+		ContentLoopThreshold:   10,
+		ContentMaxDistance:     250, // 5 * 50
 		ProgressStallThreshold: 3,
 	}
 }
