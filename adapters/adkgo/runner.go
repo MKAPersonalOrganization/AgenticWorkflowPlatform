@@ -318,10 +318,9 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 					}
 
 				case *thread.AssistantMessageAdded:
-					// The AGUI converter ignores AssistantMessageAdded (it is a
-					// persistence event). When we were streaming, replace it
-					// with AssistantMessageCompleted so the frontend receives
-					// TEXT_MESSAGE_END.
+					// When streaming, also emit AssistantMessageCompleted so the
+					// frontend receives TEXT_MESSAGE_END. Then fall through so
+					// AssistantMessageAdded reaches ProcessEvents for persistence.
 					if streamingMsgID != "" {
 						if !yield(&thread.AssistantMessageCompleted{
 							ThreadID:  evt.ThreadID,
@@ -334,7 +333,8 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 							return
 						}
 						streamingMsgID = ""
-						continue // skip the original AssistantMessageAdded
+						// Fall through to yield(de, nil) below so the event reaches
+						// ProcessEvents and is persisted to the event store.
 					}
 				}
 

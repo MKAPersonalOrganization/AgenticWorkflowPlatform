@@ -33,6 +33,14 @@ LogPosition    int64
 Timestamp      time.Time
 }
 
+// BroadcastEnvelope wraps a live event with the Redis Stream entry ID assigned
+// at publish time. The SeqID is used as the SSE "id:" field so reconnecting
+// clients can request an exact replay position via ?lastEventId=.
+type BroadcastEnvelope struct {
+SeqID string // Redis Stream entry ID, e.g. "1717000000000-0"
+Event Event
+}
+
 // StreamName generates a consistent stream name for an aggregate.
 // Format: {aggregateType}-{aggregateID}
 // Example: "Thread-123e4567-e89b-12d3-a456-426614174000"

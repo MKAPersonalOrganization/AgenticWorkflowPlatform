@@ -390,6 +390,7 @@ export function createEventHandlerMethods() {
         __handleRunFinished(state, eventSource) {
             state.activeJobStreams.clear();
             state.jobRetryMap.clear();
+            state.jobSeqIdMap?.clear();
             state.currentJobId = null;
             state.isStreaming = false;
             state.showTypingIndicator = false;
@@ -405,6 +406,7 @@ export function createEventHandlerMethods() {
             console.error('Run error:', event.message);
 
             state.activeJobStreams.clear();
+            state.jobSeqIdMap?.clear();
             state.isStreaming = false;
             state.showTypingIndicator = false;
             state.eventSource = null;
