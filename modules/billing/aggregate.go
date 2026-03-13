@@ -128,12 +128,10 @@ func (a *PaymentAccountAggregate) StreamName() string {
 	return es.StreamName("PaymentAccount", a.ID)
 }
 
-// isStripeEventProcessed checks if a Stripe webhook event has already been
-// applied. Returns false for empty event IDs (backward compat with events
-// recorded before dedup was added).
+// isStripeEventProcessed checks if a Stripe webhook event has already been applied.
 func (a *PaymentAccountAggregate) isStripeEventProcessed(stripeEventID string) bool {
 	if stripeEventID == "" {
-		return false
+		return false // No event ID means we cannot deduplicate.
 	}
 	_, exists := a.ProcessedStripeEvents[stripeEventID]
 	return exists

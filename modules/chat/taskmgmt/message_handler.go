@@ -10,7 +10,6 @@ import (
 
 // FileAttachment represents a file sent with a message (image, audio, PDF, etc.).
 type FileAttachment struct {
-	Data     string `json:"data,omitempty"`     // Base64 data URL (data:image/...;base64,...) — legacy path
 	URL      string `json:"url,omitempty"`      // Pre-uploaded artifact URL (/v1/threads/.../artifacts/...)
 	MimeType string `json:"mimeType,omitempty"` // e.g. "image/png", "audio/wav"
 	FileName string `json:"fileName,omitempty"` // Original filename
@@ -22,7 +21,7 @@ type SendMessageRequest struct {
 	Message     string           `json:"message"`               // The message/input for the task
 	AgentName   string           `json:"agentName,omitempty"`   // Optional: specific agent to target
 	ToolCallID  string           `json:"toolCallId,omitempty"`  // Optional: correlates this message as an answer to a tool's elicitation
-	Attachments []FileAttachment `json:"attachments,omitempty"` // Optional: attached files (base64 data URLs)
+	Attachments []FileAttachment `json:"attachments,omitempty"` // Optional: attached files
 }
 
 // SendMessage handles POST /api/messages - async chat message processing.
@@ -58,7 +57,6 @@ func (h *TaskManagementHandler) SendMessage(w http.ResponseWriter, r *http.Reque
 	var attachments []taskmanagement.FileAttachment
 	for _, att := range req.Attachments {
 		attachments = append(attachments, taskmanagement.FileAttachment{
-			Data:     att.Data,
 			URL:      att.URL,
 			MimeType: att.MimeType,
 			FileName: att.FileName,

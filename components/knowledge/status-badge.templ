@@ -100,12 +100,6 @@ templ StatusBadgeScript() {
 			failed:         { textColor: 'text-red-600 dark:text-red-400', bg: 'bg-red-500', label: 'Failed', animate: false },
 			partial_failure:{ textColor: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-500', label: 'Partial Failure', animate: false },
 			partial_success:{ textColor: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500', label: 'Partial', animate: false },
-			// Legacy
-			pending:   { textColor: 'text-yellow-600 dark:text-yellow-400', bg: 'bg-yellow-500', label: 'Pending', animate: false },
-			processing:{ textColor: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-500', label: 'Processing', animate: true },
-			indexing:  { textColor: 'text-teal-600 dark:text-teal-400', bg: 'bg-teal-500', label: 'Indexing', animate: true },
-			indexed:   { textColor: 'text-green-600 dark:text-green-400', bg: 'bg-green-500', label: 'Indexed', animate: false },
-			cancelled: { textColor: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-500', label: 'Cancelled', animate: false },
 		};
 
 		// SPEC-002: Processing stages in order with descriptions
@@ -138,25 +132,20 @@ templ StatusBadgeScript() {
 			failed:         '<svg class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>',
 			partial_failure:'<svg class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>',
 			partial_success:'<svg class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>',
-			pending:        '<svg class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
-			processing:     '<svg class="h-3 w-3 animate-spin" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>',
-			indexing:       '<svg class="h-3 w-3 animate-spin" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg>',
-			indexed:        '<svg class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>',
-			cancelled:      '<svg class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m8 8 8 8"/></svg>',
 		};
 
 		function statusBadgeClass(status) {
-			const config = window._statusConfig[status] || window._statusConfig.pending;
+			const config = window._statusConfig[status] || window._statusConfig.uploading;
 			return config.textColor + (config.animate ? ' animate-pulse' : '');
 		}
 
 		function statusLabel(status) {
-			const config = window._statusConfig[status] || window._statusConfig.pending;
+			const config = window._statusConfig[status] || window._statusConfig.uploading;
 			return config.label;
 		}
 
 		function statusIcon(status) {
-			return window._statusIcons[status] || window._statusIcons.pending;
+			return window._statusIcons[status] || window._statusIcons.uploading;
 		}
 
 		// Get stage progress info for processing states (OODA-11)
@@ -164,9 +153,6 @@ templ StatusBadgeScript() {
 			const idx = window._processingStages.findIndex(s => s.key === status);
 			if (idx >= 0) {
 				return { current: idx + 1, total: window._processingStages.length, description: window._processingStages[idx].description };
-			}
-			if (status === 'processing') {
-				return { current: 1, total: window._processingStages.length, description: 'Starting processing...' };
 			}
 			return null;
 		}
@@ -181,19 +167,18 @@ templ StatusBadgeScript() {
 		}
 
 		function isProcessingStatus(status) {
-			return ['processing', 'chunking', 'extracting', 'embedding', 'indexing', 'uploading', 'converting', 'preprocessing', 'gleaning', 'merging', 'summarizing', 'storing'].includes(status);
+			return ['chunking', 'extracting', 'embedding', 'uploading', 'converting', 'preprocessing', 'gleaning', 'merging', 'summarizing', 'storing'].includes(status);
 		}
 
 		function isTerminalStatus(status) {
-			return ['completed', 'indexed', 'failed', 'partial_failure', 'partial_success', 'cancelled'].includes(status);
+			return ['completed', 'failed', 'partial_failure', 'partial_success'].includes(status);
 		}
 
 		function normalizeStatus(status) {
-			if (!status) return 'pending';
+			if (!status) return 'uploading';
 			const normalized = status.toLowerCase();
 			if (window._statusConfig[normalized]) return normalized;
-			if (normalized.includes('process')) return 'processing';
-			return 'pending';
+			return 'uploading';
 		}
 
 		function getDocumentDisplayStatus(doc) {

@@ -36,7 +36,6 @@ type TeacherPromptConfig struct {
 	Topic          string
 	Mission        string   // Clear mission statement for the agent
 	Objectives     []string // Specific objectives to achieve
-	Specialties    string   // raw text for backward compatibility or simple agents
 	Specialists    []Specialty
 	Skills         []Skill
 	StudentProfile *chatcontracts.StudentProfile
@@ -129,11 +128,6 @@ You have access to the following specialized skills.
     <description>{{.Description}}</description>
   </specialist>
 {{end}}</specialists>
-{{end}}
-
-{{if .Specialties}}
-# Your Specialties
-{{.Specialties}}
 {{end}}
 
 {{if .ExtraRules}}
